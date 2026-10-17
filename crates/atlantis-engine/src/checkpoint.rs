@@ -92,6 +92,10 @@ impl Engine {
     /// The settings file, from the current options.
     pub(crate) fn save_settings(&mut self) {
         self.settings.subtitles = self.subtitles;
+        // The graphics mode is the front end's (its options menu).
+        if let Some(stored) = Settings::load(self.saves.as_ref()) {
+            self.settings.graphics = stored.graphics;
+        }
         self.settings.save(self.saves.as_ref());
     }
 

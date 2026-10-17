@@ -161,6 +161,7 @@ impl Engine {
     pub(crate) fn dimmed_view(&mut self) -> Screen {
         if self.warp_loaded {
             self.render_view();
+            self.sys.hd_unmark(); // dimmed: no HD view
         }
         let mut bg = self.sys.screen.borrow().clone();
         if !self.warp_loaded {

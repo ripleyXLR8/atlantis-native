@@ -87,6 +87,13 @@ panoramic view opens the in-game menu. On the player screen, click the
 last row to type a new name and press Enter or OK; Escape there quits (the
 port's way out; the original has none).
 
+F10 opens the port's options menu, over whatever the game shows (the game
+pauses, its sound too): the graphics, Original or HD (see
+[HD mode](#hd-mode)). Up / Down choose an entry, Enter, Space, Left / Right
+or a click change it; Escape, F10, Close or a click outside the menu
+closes it. F9 shows a diagnostic overlay in the panoramic view (the
+variables the scripts test).
+
 ## Command line
 
 The game folder can be left out of each of these: the remembered one is
@@ -99,6 +106,9 @@ the player screen.
 
 `atlantis-native --original /path/to/game` plays the original game, bug for
 bug (see [Enhancements](#enhancements)).
+
+`atlantis-native --hd /path/to/game` starts in the [HD mode](#hd-mode),
+whatever `settings.ini` says.
 
 `atlantis-native --headless /path/to/game [frames]` runs a new game without
 a window, with no input and the sound mixed and dropped, and prints what it
@@ -144,7 +154,9 @@ which the original also keeps in each checkpoint and sets again when one
 is loaded) and the [enhancements](#enhancements), one `name = on|off` line
 each. It also keeps `music_on_disk`, the music tracks the original game
 would have copied to its folder (it reads them from the archives here),
-so that this set outlives the session as the original's copies do.
+so that this set outlives the session as the original's copies do, and
+`graphics = original|hd`, the graphics mode of the options menu (F10;
+`original` by default).
 
 The web build keeps its players, checkpoints and settings in the
 browser's storage (`localStorage`, one entry per file, kept per site and
@@ -238,8 +250,43 @@ Where the port may differ from the original by choice, `Options` holds an
 
 `--original` turns all three off. Otherwise they are read from
 `settings.ini` (see [Players, checkpoints and settings](#players-checkpoints-and-settings)),
-which the first start writes with the defaults; there is no settings
-screen.
+which the first start writes with the defaults; the enhancements have no
+settings screen.
+
+### HD mode
+
+The original draws everything at 640x480, and the port shows it scaled to
+the window (nearest, in its 4:3 proportions). In the HD mode (options menu,
+F10, or `--hd`) two things are drawn at the window's resolution instead:
+
+- the panoramic view (in navigation, the turns before a move, the
+  inventory bar's backdrop, the dialog lines and the subject menu over the
+  panorama): the same projection as the original's, sampled from the
+  panorama (its sprites composited) with bilinear filtering;
+- the 3D talking heads, rasterised at that resolution with the
+  projection scaled.
+
+Everything else stays the original's 640x480 art, scaled as in the
+original mode: the cursor, the inventory bar, the guests' portraits, the
+subtitles, the menus, the videos, the puzzles, the dialog videos' bodies.
+The engine still draws its 640x480 frame unchanged (the scripts, the hit
+tests and the tests see the same pixels); for a frame that shows the
+panorama it also draws the HD picture and the 640x480 picture that this
+one stands for, and the front end shows the HD pixel wherever the frame
+still shows that picture, the frame's own pixel (scaled) where something
+was drawn over it. Frames without a panorama are shown as in the original
+mode.
+
+The HD size is a multiple of the original's 40x30 grid of 16x16 tiles:
+tiles of the window's picture width / 40 pixels, rounded up, at most 64 (4
+times 640x480; 32, twice, in the web build). The view is rendered again
+only when it changes (the angles, the field of view, the sprites); on
+desktop it is split over the processor's cores. On an 8-thread laptop
+processor the HD view takes about 2 ms at 1280x960, 4 ms at 1920x1440 and
+7 ms at 2560x1920, and the front end's composition about as much.
+`crates/atlantis-engine/src/hd.rs` holds the HD layer and its composition;
+the generalised renderer is `Warp::render_tiles` in `warp.rs` (at 16-pixel
+tiles it gives the original's pixels, which the tests check).
 
 ### Subtitles
 
@@ -295,6 +342,8 @@ not ours to distribute).
 - Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see the layout notes below).
+- F10 opens the port's options menu; the [HD mode](#hd-mode) it offers is
+  off by default.
 
 ## Licence
 

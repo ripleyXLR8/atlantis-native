@@ -11,6 +11,10 @@
 //! what happened: a check that the game starts. The sound is mixed and
 //! dropped, so that the voices end as they would.
 //!
+//! `--hd` starts in the HD mode (the panoramic view and the talking heads
+//! at the window's resolution), whatever `settings.ini` says; F10 opens the
+//! port's options menu, where it can be switched.
+//!
 //! `--original` (before the game directory) turns every enhancement off:
 //! the original game, bug for bug. `--new-game` skips the start-up videos
 //! and the player screen.
@@ -39,7 +43,7 @@ fn main() {
     use atlantis_app::{options_with_settings, start_game, App};
     use atlantis_data::Game;
     use atlantis_engine::persist::{user_data_dir, DirStore};
-    use atlantis_engine::{Enhancements, Options, SaveStore, Start};
+    use atlantis_engine::{Enhancements, Graphics, Options, SaveStore, Settings, Start};
     use winit::event_loop::EventLoop;
 
     let mut args: Vec<String> = std::env::args()
@@ -64,6 +68,7 @@ fn main() {
         None => false,
     };
     let original = flag("--original");
+    let force_hd = flag("--hd");
     let new_game = flag("--new-game");
     let mut value = |name: &str| -> Option<i32> {
         let i = args.iter().position(|a| a == name)?;
@@ -156,7 +161,7 @@ fn main() {
 
     if args.len() > 1 || args.first().is_some_and(|a| a.starts_with('-')) {
         error_box(&format!(
-            "usage: atlantis-native [--original] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]\n\n\
+            "usage: atlantis-native [--original] [--hd] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]\n\n\
              '{}' not understood",
             args.join(" ")
         ));
@@ -177,16 +182,22 @@ fn main() {
             Some(game) => game,
             None => {
                 eprintln!(
-                    "usage: atlantis-native [--original] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]"
+                    "usage: atlantis-native [--original] [--hd] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]"
                 );
                 return;
             }
         },
     };
     let saves = store_for(&game);
-    let options = options_with_settings(saves, original, start);
+    let options = options_with_settings(saves.clone(), original, start);
+    let graphics = if force_hd {
+        Graphics::Hd
+    } else {
+        Settings::load(saves.as_ref()).unwrap_or_default().graphics
+    };
     let (sys, runner) = start_game(game, options);
-    if let Err(e) = el.run_app(&mut App::new(sys, Some(runner))) {
+    let mut app = App::new(sys, Some(runner)).with_graphics(graphics, Some(saves));
+    if let Err(e) = el.run_app(&mut app) {
         error_box(&format!("The window failed: {e}"));
         std::process::exit(1);
     }

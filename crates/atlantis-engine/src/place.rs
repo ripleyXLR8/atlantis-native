@@ -115,6 +115,7 @@ impl Engine {
         };
         self.cyclo_h = pano.height;
         self.warp_surface.clone_from(&pano.pixels);
+        self.hd_surface_changed();
         self.cyclo = pano.pixels;
         self.warp_loaded = true;
         // FUN_0044a424 sets the warp FOV (0x0044a701) and leaves the pointer
@@ -177,6 +178,7 @@ impl Engine {
             return;
         };
         self.warp_surface.copy_from_slice(&self.cyclo);
+        self.hd_surface_changed();
         for e in &self.sprite_list {
             if e.place_id != vue || !e.active {
                 continue;
@@ -251,6 +253,8 @@ impl Engine {
         }
         let mut screen = self.sys.screen.borrow_mut();
         self.warp.render(&self.warp_surface, &mut screen);
+        drop(screen);
+        self.hd_show_view();
     }
 
     /// A move to `next` (`executeTransition`): the turn, the video, the

@@ -16,6 +16,7 @@ use std::rc::Rc;
 use std::task::{Context, Poll, Waker};
 
 use crate::audio::Mixer;
+use crate::hd::HdLayer;
 use crate::warp::{SCREEN_H, SCREEN_W};
 
 /// Input, in 640x480 screen coordinates.
@@ -85,6 +86,13 @@ pub type Timer = Box<dyn FnMut(u64)>;
 pub struct Sys {
     /// The frame shown at the next present, RGB565 640x480.
     pub screen: RefCell<Vec<u16>>,
+    /// The HD picture of the frame, when it has one (see [`crate::hd`]).
+    pub hd: RefCell<HdLayer>,
+    /// The HD tile size the front end asks for (0: HD off).
+    hd_tile: Cell<usize>,
+    /// The HD layer stands for the frame being drawn / the frame shown.
+    hd_marked: Cell<bool>,
+    hd_shown: Cell<bool>,
     pub cursor: RefCell<Option<Cursor>>,
     pub mixer: Mixer,
     now_ms: Cell<u64>,
@@ -104,6 +112,10 @@ impl Sys {
     pub fn new(mixer: Mixer) -> Rc<Sys> {
         Rc::new(Sys {
             screen: RefCell::new(vec![0; SCREEN_W * SCREEN_H]),
+            hd: RefCell::new(HdLayer::default()),
+            hd_tile: Cell::new(0),
+            hd_marked: Cell::new(false),
+            hd_shown: Cell::new(false),
             cursor: RefCell::new(None),
             mixer,
             now_ms: Cell::new(0),
@@ -245,6 +257,36 @@ impl Sys {
         self.events.borrow_mut().push_back(input);
     }
 
+    /// HD rendering (the port's HD mode): the tile size of the HD layer
+    /// (see [`crate::warp::hd_size`]), `None` for the original's 640x480
+    /// only. Set by the front end from its output size.
+    pub fn set_hd_tile(&self, tile: Option<usize>) {
+        self.hd_tile.set(tile.filter(|&t| t > 16).unwrap_or(0));
+    }
+
+    /// The HD tile size asked for, `None` when HD is off.
+    pub fn hd_tile(&self) -> Option<usize> {
+        Some(self.hd_tile.get()).filter(|&t| t > 0)
+    }
+
+    /// The engine side: [`Sys::hd`] stands for the frame being drawn (its
+    /// `base` is the 640x480 picture it is the HD version of). Valid until
+    /// the next present only: a frame that does not mark it is shown
+    /// without HD.
+    pub fn hd_mark(&self) {
+        self.hd_marked.set(true);
+    }
+
+    /// The frame being drawn has no HD picture after all.
+    pub fn hd_unmark(&self) {
+        self.hd_marked.set(false);
+    }
+
+    /// The front-end side: the frame last presented has an HD layer.
+    pub fn hd_shown(&self) -> bool {
+        self.hd_shown.get() && self.hd_tile().is_some()
+    }
+
     /// The pointer position the engine asked for since the last call, for
     /// the front end to move the system pointer to.
     pub fn take_warp_request(&self) -> Option<(i32, i32)> {
@@ -265,6 +307,7 @@ impl Future for FrameFuture<'_> {
         } else {
             self.started = true;
             self.sys.yielded.set(true);
+            self.sys.hd_shown.set(self.sys.hd_marked.replace(false));
             Poll::Pending
         }
     }

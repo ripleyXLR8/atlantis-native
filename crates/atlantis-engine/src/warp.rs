@@ -353,6 +353,93 @@ impl Warp {
         }
     }
 
+    /// The generalised `FUN_00451d8b` (a port addition, for the HD mode):
+    /// each 16x16 tile of the grid becomes a `tile` x `tile` block of
+    /// output pixels, so the output is `40 * tile` x `30 * tile`
+    /// ([`hd_size`]). The steps through the panorama are the original's
+    /// with the tile size as divisor (floor division, which is the
+    /// original's arithmetic shift at `tile` = 16): at `tile` = 16 the
+    /// sample points are those of [`Warp::render`], bit for bit.
+    ///
+    /// `sample` gets the 32-bit panorama coordinates of each output
+    /// pixel's centre: the column in the top 11 bits (21 fraction bits,
+    /// wrapping around the panorama), the row times 2048 in `py` (11
+    /// fraction bits, the row masked by 0x1ff800 as the original reads
+    /// it). Large outputs are rendered by several threads where the
+    /// platform has them.
+    ///
+    /// # Panics
+    ///
+    /// If `tile` is 0 or `out` is smaller than [`hd_size`]`(tile)`.
+    pub fn render_tiles<T, F>(&mut self, tile: usize, out: &mut [T], sample: F)
+    where
+        T: Send,
+        F: Fn(u32, u32) -> T + Sync,
+    {
+        assert!(tile > 0, "tile size 0");
+        let (w, h) = hd_size(tile);
+        assert!(out.len() >= w * h, "output smaller than {w}x{h}");
+        self.update_coords();
+        let c = &self.coords;
+        let band = w * tile; // one row of tiles
+        let out = &mut out[..w * h];
+        let threads = render_threads(w * h);
+        if threads <= 1 {
+            for (tile_y, rows) in out.chunks_mut(band).enumerate() {
+                tile_row(c, tile, tile_y, rows, &sample);
+            }
+            return;
+        }
+        let per = (SCREEN_H / 16).div_ceil(threads);
+        std::thread::scope(|s| {
+            for (k, chunk) in out.chunks_mut(band * per).enumerate() {
+                let sample = &sample;
+                s.spawn(move || {
+                    for (i, rows) in chunk.chunks_mut(band).enumerate() {
+                        tile_row(c, tile, k * per + i, rows, sample);
+                    }
+                });
+            }
+        });
+    }
+
+    /// [`Warp::render_tiles`] with the original's nearest sampling into
+    /// RGB565 (pixels outside the source read as 0): at `tile` = 16 the
+    /// same pixels as [`Warp::render`].
+    pub fn render_scaled(&mut self, pano: &[u16], tile: usize, out: &mut [u16]) {
+        self.render_tiles(tile, out, |px, py| {
+            let src = ((py & 0x1f_f800) | (px >> 21)) as usize;
+            pano.get(src).copied().unwrap_or(0)
+        });
+    }
+
+    /// [`Warp::render_tiles`] with bilinear sampling of a panorama in
+    /// XRGB8888 (`pano`, 2048 pixels per row): the HD view. The rows
+    /// wrap as the original's addressing does; past the source's last row
+    /// a pixel reads as 0, as in [`Warp::render`].
+    pub fn render_bilinear(&mut self, pano: &[u32], tile: usize, out: &mut [u32]) {
+        let rows = (pano.len() / PANO_W) as u32;
+        self.render_tiles(tile, out, |px, py| {
+            // The sample point is the pixel's centre; a texel's centre is
+            // half a texel into it.
+            let x = px.wrapping_sub(1 << 20);
+            let y = py.wrapping_sub(1 << 10);
+            let c0 = x >> 21;
+            let c1 = (c0 + 1) & (PANO_W as u32 - 1);
+            let fx = (x >> 13) & 0xff;
+            let r0 = (y >> 11) & 0x3ff;
+            let fy = (y >> 3) & 0xff;
+            if r0 >= rows {
+                return 0;
+            }
+            let r1 = if r0 + 1 < rows { r0 + 1 } else { r0 };
+            let (o0, o1) = ((r0 as usize) * PANO_W, (r1 as usize) * PANO_W);
+            let top = lerp888(pano[o0 + c0 as usize], pano[o0 + c1 as usize], fx);
+            let bottom = lerp888(pano[o1 + c0 as usize], pano[o1 + c1 as usize], fx);
+            lerp888(top, bottom, fy)
+        });
+    }
+
     /// The grid's panorama point under a screen point, bilinearly
     /// interpolated in the 16x16 tile: `(column, v)` with `v` counted from
     /// the grid's own vertical origin (ScummVM's `mapMouseCoords`).
@@ -396,5 +483,89 @@ impl Warp {
     pub fn screen_to_panorama(&mut self, x: i32, y: i32) -> (i32, i32) {
         let (px, v) = self.map_screen_point(x, y);
         (px, 0x2ff - v)
+    }
+}
+
+/// The output size of [`Warp::render_tiles`] for a tile size: 40 x 30
+/// tiles (640x480 at 16).
+pub fn hd_size(tile: usize) -> (usize, usize) {
+    (SCREEN_W / 16 * tile, SCREEN_H / 16 * tile)
+}
+
+/// The threads to render `pixels` output pixels with: one below 250000,
+/// one per core up to 8 above, one on the web.
+fn render_threads(pixels: usize) -> usize {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = pixels;
+        1
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if pixels < 250_000 {
+            return 1;
+        }
+        std::thread::available_parallelism().map_or(1, |n| n.get().min(8))
+    }
+}
+
+/// `a` to `b` at `w` / 256, per channel of XRGB8888.
+#[inline]
+fn lerp888(a: u32, b: u32, w: u32) -> u32 {
+    let iw = 256 - w;
+    let rb = (((a & 0xff_00ff) * iw + (b & 0xff_00ff) * w) >> 8) & 0xff_00ff;
+    let g = (((a & 0xff00) * iw + (b & 0xff00) * w) >> 8) & 0xff00;
+    rb | g
+}
+
+/// One row of tiles of [`Warp::render_tiles`]: `FUN_00451d8b`'s tile loop
+/// with `tile` for the original's 16 (the shifts by 4 and 9 are the
+/// divisions by 16 and 16 * 32).
+fn tile_row<T>(
+    c: &[i32; COORDS_LEN],
+    tile: usize,
+    tile_y: usize,
+    rows: &mut [T],
+    sample: &impl Fn(u32, u32) -> T,
+) {
+    let n = tile as i32;
+    let d = |v: i32, k: i32| v.div_euclid(k);
+    let w = SCREEN_W / 16 * tile;
+    let mut off = 2 + tile_y * ROW_STRIDE;
+    for tile_x in 0..SCREEN_W / 16 {
+        let mut x1 = d(c[off + 2].wrapping_sub(c[off]), n);
+        let mut y1 = d(c[off + 3].wrapping_sub(c[off + 1]), n);
+        let x1n = d(c[off + 84].wrapping_sub(c[off + 82]), n);
+        let y1n = d(c[off + 85].wrapping_sub(c[off + 83]), n);
+
+        let dx1 = d(x1n.wrapping_sub(x1), n);
+        let dy1 = d(y1n.wrapping_sub(y1), n * 32);
+
+        y1 >>= 5;
+
+        let dx2 = d(c[off + 82].wrapping_sub(c[off]), n);
+        let dy2 = d(c[off + 83].wrapping_sub(c[off + 1]), n * 32);
+        let mut x2 = c[off].wrapping_mul(2).wrapping_add(dx2) >> 1;
+        let mut y2 = (c[off + 1] >> 5).wrapping_mul(2).wrapping_add(dy2) >> 1;
+
+        for y in 0..tile {
+            let mut px = (x2.wrapping_mul(2).wrapping_add(x1) as u32).wrapping_mul(16);
+            let mut py = (y2.wrapping_mul(2).wrapping_add(y1) / 2) as u32;
+            let delta_x = (x1 as u32).wrapping_mul(32);
+            let delta_y = y1 as u32;
+
+            let start = y * w + tile_x * tile;
+            for dst in &mut rows[start..start + tile] {
+                *dst = sample(px, py);
+                px = px.wrapping_add(delta_x);
+                py = py.wrapping_add(delta_y);
+            }
+
+            x1 = x1.wrapping_add(dx1);
+            y1 = y1.wrapping_add(dy1);
+            x2 = x2.wrapping_add(dx2);
+            y2 = y2.wrapping_add(dy2);
+        }
+        off += 2;
     }
 }

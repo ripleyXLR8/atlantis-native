@@ -238,6 +238,7 @@ pub struct ProjectedVertex {
 }
 
 /// A node of the mesh with its per-frame state.
+#[derive(Clone)]
 struct Node {
     d: HeadNode,
     /// The world rotation and position of the last walk.
@@ -369,6 +370,7 @@ pub fn texture_paths(mesh: &F3dc) -> Vec<String> {
 }
 
 /// The 3D head of a dialog line.
+#[derive(Clone)]
 pub struct DialogHead {
     nodes: Vec<Node>,
     tracks: Vec<HeadTrack>,
@@ -409,6 +411,14 @@ pub struct DialogHead {
     /// Material -> index into `textures`.
     texture_index: HashMap<String, usize>,
     raster: raster::RasterState,
+    /// The camera (index into `cams`).
+    cam: usize,
+    /// The output: 640x480 for the original; the port's HD mode draws a
+    /// copy of the head at `tile` / 16 times that (see
+    /// [`DialogHead::scaled`]).
+    out_w: i32,
+    out_h: i32,
+    tile: i32,
 }
 
 impl DialogHead {
@@ -556,6 +566,10 @@ impl DialogHead {
             textures,
             texture_index,
             raster: raster::RasterState::default(),
+            cam: 0,
+            out_w: 640,
+            out_h: 480,
+            tile: 16,
         };
         h.camera((cam - 2) as usize);
         h.neutral();
@@ -564,6 +578,7 @@ impl DialogHead {
 
     /// `FUN_0044d7b0(slot, c)`: the camera.
     fn camera(&mut self, c: usize) {
+        self.cam = c;
         let r = self.cams[c];
         let mut d = [0; 3];
         let mut p = [0; 3];
@@ -604,6 +619,46 @@ impl DialogHead {
         let (fx, fy) = (self.fx, self.fy);
         let pl = [[-fx, 0, -320], [fx, 0, -320], [0, -fy, -240], [0, fy, -240]];
         self.planes = pl.map(|p| normalise(&p));
+        if self.tile != 16 {
+            self.scale_camera();
+        }
+    }
+
+    /// The port's HD mode: the camera of [`DialogHead::camera`] for an
+    /// output of `tile` / 16 times 640x480, the same view (focal lengths
+    /// and centre scaled; the clipping planes are the same).
+    fn scale_camera(&mut self) {
+        let t = i64::from(self.tile);
+        self.fx = tdiv(i64::from(self.fx) * t, 16);
+        self.fy = tdiv(i64::from(self.fy) * t, 16);
+        self.cx = self.out_w / 2;
+        self.cy = self.out_h / 2;
+        self.kx = tdiv(i64::from(self.out_w) << 15, -2 * i64::from(self.fx));
+        self.ky = tdiv(i64::from(self.out_h) << 15, -2 * i64::from(self.fy));
+        let (fx, fy, hw, hh) = (self.fx, self.fy, self.cx, self.cy);
+        let pl = [[-fx, 0, -hw], [fx, 0, -hw], [0, -fy, -hh], [0, fy, -hh]];
+        self.planes = pl.map(|p| normalise(&p));
+    }
+
+    /// A copy of the head drawn at `tile` / 16 times the original's size
+    /// (into a `40 * tile` x `30 * tile` buffer, see
+    /// [`crate::warp::hd_size`]): the port's HD mode. The copy is animated
+    /// by the same calls as the original-size head; the original-size
+    /// head itself is not changed.
+    pub fn scaled(&self, tile: usize) -> DialogHead {
+        let mut h = self.clone();
+        let (w, ht) = crate::warp::hd_size(tile);
+        h.out_w = w as i32;
+        h.out_h = ht as i32;
+        h.tile = tile as i32;
+        h.camera(h.cam);
+        h
+    }
+
+    /// The output size the head is drawn for (640x480, or the HD size of
+    /// [`DialogHead::scaled`]).
+    pub fn output_size(&self) -> (usize, usize) {
+        (self.out_w as usize, self.out_h as usize)
     }
 
     /// `FUN_00468458`: a mouth shape blended into a mesh at weight `w`.
@@ -1006,6 +1061,14 @@ impl DialogHead {
     /// faces are left alone.
     pub fn render(&mut self, dst: &mut [u16], pitch: usize) {
         self.build_lists();
-        self.rasterise(dst, pitch);
+        self.rasterise(dst, pitch, None);
+    }
+
+    /// [`DialogHead::render`] that also sets `mask` (one byte per pixel of
+    /// `dst`) to 1 where it draws: the HD head is laid over another
+    /// picture.
+    pub fn render_masked(&mut self, dst: &mut [u16], pitch: usize, mask: &mut [u8]) {
+        self.build_lists();
+        self.rasterise(dst, pitch, Some(mask));
     }
 }

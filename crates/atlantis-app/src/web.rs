@@ -242,12 +242,15 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
             Rc::new(atlantis_engine::MemStore::new())
         }
     };
+    let graphics = atlantis_engine::Settings::load(saves.as_ref())
+        .unwrap_or_default()
+        .graphics;
     let options = atlantis_engine::Options {
         loader: Rc::new(WebLoader { files: by_key, web }),
-        ..options_with_settings(saves, false, Start::Boot)
+        ..options_with_settings(saves.clone(), false, Start::Boot)
     };
     let (sys, runner) = start_game(game, options);
     let el = EventLoop::new().map_err(|e| e.to_string())?;
-    el.spawn_app(App::new(sys, Some(runner)));
+    el.spawn_app(App::new(sys, Some(runner)).with_graphics(graphics, Some(saves)));
     Ok(())
 }

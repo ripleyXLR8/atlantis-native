@@ -150,6 +150,35 @@ mod dir {
 /// The settings file in the store.
 pub const SETTINGS_FILE: &str = "settings.ini";
 
+/// The port's graphics mode (its options menu, F10).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Graphics {
+    /// The original's 640x480 frames, scaled to the window.
+    #[default]
+    Original,
+    /// The panoramic view and the talking heads drawn at the window's
+    /// resolution (see [`crate::hd`]).
+    Hd,
+}
+
+impl Graphics {
+    /// The value in `settings.ini`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Graphics::Original => "original",
+            Graphics::Hd => "hd",
+        }
+    }
+
+    pub fn from_name(s: &str) -> Option<Graphics> {
+        match s.to_ascii_lowercase().as_str() {
+            "original" => Some(Graphics::Original),
+            "hd" => Some(Graphics::Hd),
+            _ => None,
+        }
+    }
+}
+
 /// The options of the original's menus, and the port's enhancements.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
@@ -166,6 +195,8 @@ pub struct Settings {
     /// folder (bit i = track index i, LoadMusik / DelMusik): like that
     /// folder, the set outlives the session.
     pub music_on_disk: u32,
+    /// The port's graphics mode.
+    pub graphics: Graphics,
 }
 
 impl Default for Settings {
@@ -176,6 +207,7 @@ impl Default for Settings {
             volumes: [127; 4],
             enhancements: Enhancements::default(),
             music_on_disk: 0,
+            graphics: Graphics::Original,
         }
     }
 }
@@ -198,6 +230,13 @@ impl Settings {
                 "0" | "false" | "off" | "no" => Some(false),
                 _ => None,
             };
+            if k == "graphics" {
+                match Graphics::from_name(v) {
+                    Some(g) => s.graphics = g,
+                    None => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
+                }
+                continue;
+            }
             if k == "music_on_disk" {
                 match u32::from_str_radix(v, 16) {
                     Ok(bits) => s.music_on_disk = bits,
@@ -238,7 +277,9 @@ impl Settings {
              restored_content = {}\n\
              ui_ux = {}\n\
              # The music tracks LoadMusik copied (hexadecimal bit set)\n\
-             music_on_disk = {:x}\n",
+             music_on_disk = {:x}\n\
+             # The port's graphics (options menu, F10): original or hd\n\
+             graphics = {}\n",
             b(self.subtitles),
             b(self.omni3d_mode2),
             self.volumes[0],
@@ -249,6 +290,7 @@ impl Settings {
             b(self.enhancements.restored_content),
             b(self.enhancements.ui_ux),
             self.music_on_disk,
+            self.graphics.name(),
         )
     }
 
@@ -274,9 +316,16 @@ mod tests {
             volumes: [1, 2, 3, 127],
             enhancements: Enhancements::original(),
             music_on_disk: 0x8001_00a5,
+            graphics: Graphics::Hd,
         };
         assert_eq!(Settings::parse(&s.to_text()), s);
         assert_eq!(Settings::parse("music_on_disk = 1F").music_on_disk, 0x1f);
+        assert_eq!(Settings::parse("graphics = HD").graphics, Graphics::Hd);
+        assert_eq!(
+            Settings::parse("graphics = 4k").graphics,
+            Graphics::Original
+        );
+        assert_eq!(Settings::default().graphics, Graphics::Original);
         assert_eq!(
             Settings::parse("volume_music = 300\nbad"),
             Settings {

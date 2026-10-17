@@ -302,6 +302,8 @@ pub struct Engine {
     pub(crate) cyclo: Vec<u16>,
     pub(crate) cyclo_h: usize,
     pub(crate) warp_surface: Vec<u16>,
+    /// The port's HD mode (see [`crate::hd`]).
+    pub(crate) hd: crate::hd::HdState,
     pub warp_loaded: bool,
     pub(crate) momentum: WarpMomentum,
     pub(crate) pointer: WarpPointer,
@@ -418,6 +420,7 @@ impl Engine {
             cyclo: Vec::new(),
             cyclo_h: 0,
             warp_surface: Vec::new(),
+            hd: crate::hd::HdState::default(),
             warp_loaded: false,
             momentum: WarpMomentum::default(),
             pointer: WarpPointer::default(),

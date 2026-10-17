@@ -11,9 +11,6 @@
 
 use super::{f32r, truncd, wrap32, DialogHead, Edge, NONE, SENTINELS};
 
-const SCREEN_W: i32 = 640;
-const SCREEN_H: usize = 480;
-
 /// float 0x004bf044
 const EPS: f64 = 100.0;
 /// float 0x004baee0 = 1.5 * 2^52
@@ -65,7 +62,7 @@ struct Span {
 }
 
 /// The rasteriser's working lists, kept between frames for their storage.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct RasterState {
     /// `FUN_004567b4`'s row lists (0x00be473c start, 0x00be373c end,
     /// 0x00be573c replacements); each row's edges in the reverse of the
@@ -371,7 +368,7 @@ impl DialogHead {
     pub(super) fn build_lists(&mut self) {
         let st = &mut self.raster;
         for rows in [&mut st.start_rows, &mut st.end_rows, &mut st.repl_rows] {
-            rows.resize_with(SCREEN_H, Vec::new);
+            rows.resize_with(self.out_h as usize, Vec::new);
             rows.iter_mut().for_each(Vec::clear);
         }
         let mut warned = false;
@@ -556,7 +553,14 @@ impl DialogHead {
 
     /// The span fills of the table 0x004bad3c, called by `FUN_00472ad0`
     /// (ebx = xs, ecx = n).
-    fn fill_span(&self, dst: &mut [u16], pitch: usize, row: usize, sp: &Span) {
+    fn fill_span(
+        &self,
+        dst: &mut [u16],
+        pitch: usize,
+        row: usize,
+        sp: &Span,
+        mask: Option<&mut [u8]>,
+    ) {
         let (xs, xe) = (sp.xs, sp.xe);
         let e = &self.edges[sp.e];
         let n = xe.wrapping_sub(xs);
@@ -567,6 +571,9 @@ impl DialogHead {
         else {
             return;
         };
+        if let Some(m) = mask.and_then(|m| m.get_mut(start..start + n as usize)) {
+            m.fill(1);
+        }
         let out = &mut dst[start..start + n as usize];
         if sp.ty == 1 {
             // 0x00474380: flat colour
@@ -710,8 +717,8 @@ impl DialogHead {
     }
 
     /// `FUN_0045c104`: the row loop.
-    pub(super) fn rasterise(&mut self, dst: &mut [u16], pitch: usize) {
-        let (w, l) = (SCREEN_W, 0i32);
+    pub(super) fn rasterise(&mut self, dst: &mut [u16], pitch: usize, mut mask: Option<&mut [u8]>) {
+        let (w, l) = (self.out_w, 0i32);
         self.raster.entries.clear();
         let s0 = self.edges.len() - SENTINELS;
         for s in &mut self.edges[s0..] {
@@ -779,7 +786,7 @@ impl DialogHead {
         let rows = std::mem::take(&mut self.raster.start_rows);
         let ends = std::mem::take(&mut self.raster.end_rows);
         let repls = std::mem::take(&mut self.raster.repl_rows);
-        for row in 0..SCREEN_H {
+        for row in 0..self.out_h as usize {
             self.raster.entries[tail].behind = NONE;
             self.raster.entries[head].behind = bottom;
             for &ei in ends[row].iter().rev() {
@@ -861,7 +868,7 @@ impl DialogHead {
             self.build_spans(head, tail);
             for sp in self.raster.spans.iter().rev() {
                 if sp.xe - sp.xs > 0 && matches!(sp.ty, 1 | 2 | 9) {
-                    self.fill_span(dst, pitch, row, sp);
+                    self.fill_span(dst, pitch, row, sp, mask.as_deref_mut());
                 }
             }
         }

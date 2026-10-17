@@ -399,6 +399,8 @@ impl Dialogs {
             talking_head,
             voice_off_step: l.voice_off && !talking_head,
             kept_screen: l.keep_screen.then(|| e.sys.screen.borrow().clone()),
+            kept_hd: l.keep_screen && e.sys.hd_shown(),
+            hd: LineHd::default(),
             ubb,
             spf_count: spf.as_deref().map_or(0, spw_frame_count) as usize,
             spf,
@@ -614,6 +616,7 @@ impl Dialogs {
                 let mut frame = vec![0u16; N];
                 if e.warp_loaded {
                     e.warp.render(&e.warp_surface, &mut frame);
+                    e.hd_show_view_over(Some(&frame));
                 }
                 for (i, &id) in ids.iter().enumerate() {
                     let border = draws[2 * i];
@@ -779,6 +782,24 @@ struct LinePlayer {
     head_time0: Option<u64>,
     /// The lip-sync track has ended: the neutral mouth.
     head_ended: bool,
+    /// The kept screen had an HD layer, which still stands for it.
+    kept_hd: bool,
+    /// The HD picture of the line (the port's HD mode).
+    hd: LineHd,
+}
+
+/// The HD picture of a line: the head drawn at the HD size, and whether
+/// [`Sys::hd`](crate::sys::Sys::hd) holds the HD version of the composite.
+#[derive(Default)]
+struct LineHd {
+    head: Option<DialogHead>,
+    head_pixels: Vec<u16>,
+    head_mask: Vec<u8>,
+    /// The 640x480 view under this frame's composite, and the composite
+    /// before the head.
+    pano: Vec<u16>,
+    pre_head: Vec<u16>,
+    valid: bool,
 }
 
 impl LinePlayer {
@@ -792,6 +813,56 @@ impl LinePlayer {
         } else {
             out.fill(0);
         }
+    }
+
+    /// The HD picture of the composite just drawn (the port's HD mode):
+    /// the HD view, the UBB body upscaled, the head drawn again at the HD
+    /// size by its copy, animated with the same calls as the head (frame
+    /// `frame`, the neutral mouth when `ended`, else the lip-sync at
+    /// `t`).
+    fn draw_hd(&mut self, e: &mut Engine, tile: usize, frame: i32, ended: bool, t: Option<i32>) {
+        let (w, h) = crate::warp::hd_size(tile);
+        let mut drawn = false;
+        if let (Some(head), true) = (&self.head, self.hd.pre_head.len() == N) {
+            let fresh = self
+                .hd
+                .head
+                .as_ref()
+                .is_none_or(|hh| hh.output_size() != (w, h));
+            if fresh {
+                // A copy of the head as it stands after this frame's calls.
+                self.hd.head = Some(head.scaled(tile));
+            }
+            let hh = self.hd.head.as_mut().expect("HD head");
+            if !fresh {
+                hh.set_frame(frame);
+                if ended {
+                    hh.neutral();
+                } else if let Some(t) = t {
+                    hh.lipsync(t);
+                }
+            }
+            hh.transform();
+            self.hd.head_pixels.resize(w * h, 0);
+            self.hd.head_mask.clear();
+            self.hd.head_mask.resize(w * h, 0);
+            hh.render_masked(&mut self.hd.head_pixels, w, &mut self.hd.head_mask);
+            drawn = true;
+        }
+        let mut layer = e.sys.hd.borrow_mut();
+        crate::hd::compose_dialog(
+            &mut layer,
+            tile,
+            &e.hd.view,
+            &self.hd.pano,
+            &self.hd.pre_head,
+            &self.composite,
+            drawn.then_some((&self.hd.head_pixels[..], &self.hd.head_mask[..])),
+        );
+        layer.base.copy_from_slice(&self.composite);
+        drop(layer);
+        e.hd_layer_replaced();
+        self.hd.valid = true;
     }
 
     fn draw_frame(
@@ -809,6 +880,11 @@ impl LinePlayer {
         }
         let have_view = self.kept_screen.is_some() || e.warp_loaded;
         let due = e.sys.millis().saturating_sub(self.start) >= UBB_FRAME_MS * u64::from(self.shown);
+        // HD: a full-screen video over the panorama.
+        let hd_tile = e
+            .sys
+            .hd_tile()
+            .filter(|_| self.kept_screen.is_none() && e.warp_loaded);
         if let (Some(ubb), true) = (self.ubb.as_ref(), due) {
             let (w, h) = (ubb.width(), ubb.height());
             if self.composite.len() != w * h {
@@ -821,6 +897,11 @@ impl LinePlayer {
                 self.background(e, &mut comp);
             } else {
                 comp.fill(0);
+            }
+            self.hd.valid = false;
+            if let (Some(tile), true) = (hd_tile, w == SCREEN_W && h == SCREEN_H) {
+                e.hd_render_view(tile);
+                self.hd.pano.clone_from(&comp);
             }
             self.composite = comp;
         }
@@ -842,6 +923,9 @@ impl LinePlayer {
                         blend_ubb_pixel565,
                     );
                     decoded = true;
+                    if hd_tile.is_some() && self.head.is_some() && !self.hd.pano.is_empty() {
+                        self.hd.pre_head.clone_from(&self.composite);
+                    }
                 }
                 Err(err) => {
                     log::warn!("dialog video: {err}");
@@ -859,7 +943,10 @@ impl LinePlayer {
             // FUN_0044e2e0 once it has returned a negative value, then
             // FUN_0044c9c0), drawn after the UBB composite and before the
             // SPF frame as in FUN_0042ee88's loop.
-            if let (Some(head), true) = (self.head.as_mut(), w == SCREEN_W && h == SCREEN_H) {
+            let full = w == SCREEN_W && h == SCREEN_H;
+            let mut head_t = None;
+            let ended_before = self.head_ended;
+            if let (Some(head), true) = (self.head.as_mut(), full) {
                 head.set_frame(frame_index as i32);
                 let now = e.sys.millis();
                 let t0 = *self.head_time0.get_or_insert(now);
@@ -870,12 +957,17 @@ impl LinePlayer {
                     // 200 Hz (FUN_00431150, AIL_set_timer_frequency(200) in
                     // FUN_004310ac): the elapsed time is a multiple of 5
                     let t = (now - t0) / 5 * 5;
-                    if head.lipsync(i32::try_from(t).unwrap_or(i32::MAX)) < 0 {
+                    let t = i32::try_from(t).unwrap_or(i32::MAX);
+                    head_t = Some(t);
+                    if head.lipsync(t) < 0 {
                         self.head_ended = true;
                     }
                 }
                 head.transform();
                 head.render(&mut self.composite, w);
+            }
+            if let (Some(tile), true) = (hd_tile, full && self.hd.pano.len() == N) {
+                self.draw_hd(e, tile, frame_index as i32, ended_before, head_t);
             }
 
             // The SPF overlay: the original draws it into the locked
@@ -910,6 +1002,9 @@ impl LinePlayer {
         if let Some(ubb) = &self.ubb {
             let (w, h) = (ubb.width(), ubb.height());
             if self.composite.len() == w * h {
+                if self.hd.valid && hd_tile.is_some() {
+                    e.sys.hd_mark();
+                }
                 let mut compose = self.composite.clone();
                 // The original draws on the 640x480 screen (FUN_00430178).
                 let off = (h as i32 - SCREEN_H as i32) / 2;
@@ -924,6 +1019,11 @@ impl LinePlayer {
         let mut bg = std::mem::take(&mut self.bg);
         if have_view {
             self.background(e, &mut bg);
+            if self.kept_screen.is_none() {
+                e.hd_show_view_over(Some(&bg));
+            } else if self.kept_hd {
+                e.sys.hd_mark();
+            }
         } else {
             bg.fill(0);
         }

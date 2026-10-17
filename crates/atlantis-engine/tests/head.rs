@@ -176,3 +176,73 @@ fn every_head_loads_and_draws() {
     assert!(loaded >= 100, "{loaded} heads loaded");
     assert!(drawn * 10 >= loaded * 9, "{drawn} of {loaded} drew pixels");
 }
+
+/// The HD mode's copies of a head (`DialogHead::scaled`): at tile 16 the
+/// original's pixels; at 32 and 64 the same head over 4 and 16 times the
+/// pixels, the same at every run, the original-size head unchanged.
+#[test]
+fn scaled_heads() {
+    let Some(g) = game("scaled_heads") else {
+        return;
+    };
+    let init = DialInit::parse(&g.big.read("DIALOG\\INITDIAL.TXT").expect("INITDIAL.TXT"));
+    let mut buf = vec![0u16; 640 * 480];
+    let mut buf16 = vec![0u16; 640 * 480];
+    let mut checked = 0;
+    for (row, cam) in HEADS {
+        let Some(mut head) = load(&g, &init, row, cam, "ATA0001A.SYC") else {
+            continue;
+        };
+        let mut h16 = head.scaled(16);
+        let mut h32 = head.scaled(32);
+        let mut h32b = head.scaled(32);
+        let mut h64 = head.scaled(64);
+        assert_eq!(h32.output_size(), (1280, 960));
+        assert_eq!(h64.output_size(), (2560, 1920));
+        let mut b32 = vec![0u16; 1280 * 960];
+        let mut m32 = vec![0u8; 1280 * 960];
+        let mut b32b = vec![0u16; 1280 * 960];
+        let mut m32b = vec![0u8; 1280 * 960];
+        let mut b64 = vec![0u16; 2560 * 1920];
+        let mut m64 = vec![0u8; 2560 * 1920];
+        for (frame, ms) in FRAMES {
+            for h in [&mut head, &mut h16, &mut h32, &mut h32b, &mut h64] {
+                h.set_frame(frame);
+                h.lipsync(ms);
+                h.transform();
+            }
+            buf.fill(0);
+            head.render(&mut buf, 640);
+            buf16.fill(0);
+            h16.render(&mut buf16, 640);
+            assert_eq!(buf, buf16, "head {row} cam {cam} frame {frame}");
+            m32.fill(0);
+            m32b.fill(0);
+            m64.fill(0);
+            h32.render_masked(&mut b32, 1280, &mut m32);
+            h32b.render_masked(&mut b32b, 1280, &mut m32b);
+            h64.render_masked(&mut b64, 2560, &mut m64);
+            assert!(
+                m32 == m32b && b32 == b32b,
+                "head {row} cam {cam}: not deterministic"
+            );
+            let n1 = buf.iter().filter(|&&p| p != 0).count();
+            let n2 = m32.iter().filter(|&&m| m != 0).count();
+            let n4 = m64.iter().filter(|&&m| m != 0).count();
+            if n1 > 500 {
+                let (r2, r4) = (n2 as f64 / n1 as f64, n4 as f64 / n1 as f64);
+                assert!(
+                    (3.0..5.0).contains(&r2),
+                    "head {row} cam {cam}: x2 ratio {r2}"
+                );
+                assert!(
+                    (12.0..20.0).contains(&r4),
+                    "head {row} cam {cam}: x4 ratio {r4}"
+                );
+                checked += 1;
+            }
+        }
+    }
+    eprintln!("{checked} scaled frames checked");
+    assert!(checked >= 20, "{checked}");
+}

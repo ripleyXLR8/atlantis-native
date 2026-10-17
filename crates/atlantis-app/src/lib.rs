@@ -1,13 +1,18 @@
 //! Atlantis Native: the desktop and web front end. It owns the window, turns
 //! input into engine events, runs the engine task one step per displayed
-//! frame and shows its 640x480 frames scaled to the window.
+//! frame and shows its 640x480 frames scaled to the window, with the HD
+//! layer of the frames that have one in the HD mode
+//! ([`atlantis_engine::hd`]). It also runs the port's options menu (F10).
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use atlantis_data::Game;
 use atlantis_engine::audio::Mixer;
-use atlantis_engine::persist::Settings;
+use atlantis_engine::hd::{self, tile_for_output};
+use atlantis_engine::options_menu::{MenuAction, MenuValues, OptionsMenu};
+use atlantis_engine::persist::{Graphics, Settings};
+use atlantis_engine::subtitles::SubtitleFont;
 use atlantis_engine::sys::{Input, Key as EngineKey, MouseButton as EngineButton, Runner, Sys};
 use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
 use atlantis_engine::{Enhancements, SaveStore, Start};
@@ -73,7 +78,12 @@ impl Drop for WatchdogLeave {
     }
 }
 
-static RGB_LUT: std::sync::OnceLock<Vec<u32>> = std::sync::OnceLock::new();
+/// The largest HD tile size: 4 times 640x480 on desktop, twice on the web
+/// (one thread renders it there).
+#[cfg(not(target_arch = "wasm32"))]
+const HD_MAX_TILE: usize = hd::MAX_TILE;
+#[cfg(target_arch = "wasm32")]
+const HD_MAX_TILE: usize = 32;
 
 pub struct App {
     window: Option<Rc<Window>>,
@@ -98,6 +108,15 @@ pub struct App {
     audio: Option<cpal::Stream>,
     /// The browser starts sound only after a user gesture.
     audio_pending: bool,
+    /// The port's options menu (F10); the game is paused while it is open,
+    /// since `paused_at`.
+    menu: OptionsMenu,
+    menu_font: Option<SubtitleFont>,
+    menu_frame: Vec<u16>,
+    paused_at: Option<Instant>,
+    graphics: Graphics,
+    /// Where the graphics mode is saved (`settings.ini`).
+    saves: Option<Rc<dyn SaveStore>>,
 }
 
 impl App {
@@ -124,6 +143,82 @@ impl App {
             rel_acc: (0.0, 0.0),
             audio: None,
             audio_pending: true,
+            menu: OptionsMenu::new(),
+            menu_font: None,
+            menu_frame: Vec::new(),
+            paused_at: None,
+            graphics: Graphics::Original,
+            saves: None,
+        }
+    }
+
+    /// The graphics mode to start with, and the store its changes in the
+    /// options menu are saved to.
+    pub fn with_graphics(mut self, graphics: Graphics, saves: Option<Rc<dyn SaveStore>>) -> App {
+        self.graphics = graphics;
+        self.saves = saves;
+        self
+    }
+
+    /// Opens the options menu: the game pauses (its clock and its sound),
+    /// the system pointer is free.
+    fn open_menu(&mut self) {
+        if self.menu.is_open() {
+            return;
+        }
+        self.menu.open();
+        self.paused_at = Some(Instant::now());
+        self.sys.mixer.set_paused(true);
+        if let Some(w) = &self.window {
+            let _ = w.set_cursor_grab(CursorGrabMode::None);
+            w.set_cursor_visible(true);
+            w.request_redraw();
+        }
+        self.locked = false;
+        self.last_cursor = None;
+    }
+
+    /// The menu closed: the game goes on where it was.
+    fn close_menu(&mut self) {
+        self.menu.close();
+        if let Some(t) = self.paused_at.take() {
+            let now = Instant::now();
+            self.start += now.duration_since(t);
+            self.next_frame = now;
+        }
+        self.sys.mixer.set_paused(false);
+        if let Some(w) = &self.window {
+            if self.runner.is_some() {
+                w.set_cursor_visible(false);
+            }
+        }
+        // The engine's pointer lock is applied again.
+        self.locked = false;
+        self.apply_pointer();
+    }
+
+    fn menu_action(&mut self, action: MenuAction) {
+        match action {
+            MenuAction::None => {}
+            MenuAction::Close => self.close_menu(),
+            MenuAction::SetGraphics(g) => {
+                self.graphics = g;
+                log::info!("graphics: {}", g.name());
+                if let Some(saves) = &self.saves {
+                    let mut s = Settings::load(saves.as_ref()).unwrap_or_default();
+                    s.graphics = g;
+                    s.save(saves.as_ref());
+                }
+            }
+        }
+        if let Some(w) = &self.window {
+            w.request_redraw();
+        }
+    }
+
+    fn menu_values(&self) -> MenuValues {
+        MenuValues {
+            graphics: self.graphics,
         }
     }
 
@@ -137,6 +232,9 @@ impl App {
     /// Runs the engine to its next frame when it is due; false once the
     /// engine has ended.
     fn step(&mut self) -> bool {
+        if self.menu.is_open() {
+            return true; // paused
+        }
         let Some(runner) = &mut self.runner else {
             return true;
         };
@@ -224,26 +322,45 @@ impl App {
             oy: oy as f64,
             scale,
         };
+        // The HD tile the engine draws its next frames at.
+        let tile = match self.graphics {
+            Graphics::Hd => tile_for_output(sw, sh, HD_MAX_TILE),
+            Graphics::Original => None,
+        };
+        self.sys.set_hd_tile(tile);
         let screen = self.sys.screen.borrow();
-        let frame: &[u16] = if self.runner.is_some() {
+        let mut frame: &[u16] = if self.runner.is_some() {
             &screen
         } else {
             &self.pattern
         };
+        if self.menu.is_open() {
+            self.menu_frame.clear();
+            self.menu_frame.extend_from_slice(frame);
+            let font = self.menu_font.get_or_insert_with(SubtitleFont::new);
+            self.menu.draw(
+                &mut self.menu_frame,
+                font,
+                MenuValues {
+                    graphics: self.graphics,
+                },
+            );
+            frame = &self.menu_frame;
+        }
+        buf.fill(0);
+        if self.runner.is_some() && self.sys.hd_shown() {
+            let layer = self.sys.hd.borrow();
+            hd::compose(frame, &layer, &mut buf[..], sw, ox, oy, dw, dh);
+            drop(layer);
+            buf.present().unwrap();
+            return;
+        }
         // RGB565 -> XRGB8888 table and source column per window column,
         // built once (the per-pixel arithmetic was the cost in the browser).
-        let lut = RGB_LUT.get_or_init(|| {
-            (0..=u16::MAX as u32)
-                .map(|p| {
-                    let (r, g, b) = ((p >> 11) & 31, (p >> 5) & 63, p & 31);
-                    (r << 3 | r >> 2) << 16 | (g << 2 | g >> 4) << 8 | (b << 3 | b >> 2)
-                })
-                .collect()
-        });
+        let lut = hd::rgb565_to_888();
         if self.col_map.len() != dw {
             self.col_map = (0..dw).map(|x| x * W / dw).collect();
         }
-        buf.fill(0);
         let mut prev_src = usize::MAX;
         for y in 0..dh {
             let src_y = y * H / dh;
@@ -333,7 +450,8 @@ impl ApplicationHandler for App {
         el.set_control_flow(ControlFlow::Wait);
         #[cfg(not(target_arch = "wasm32"))]
         {
-            if self.runner.is_none() {
+            if self.runner.is_none() || self.menu.is_open() {
+                // (the menu redraws on its events)
                 el.set_control_flow(ControlFlow::Wait);
                 return;
             }
@@ -395,6 +513,15 @@ impl ApplicationHandler for App {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 let (x, y) = (position.x, position.y);
+                if self.menu.is_open() {
+                    let (sx, sy) = self.viewport.to_screen(x, y);
+                    self.menu.pointer(sx, sy);
+                    self.last_cursor = Some((x, y));
+                    if let Some(w) = &self.window {
+                        w.request_redraw();
+                    }
+                    return;
+                }
                 if self.locked {
                     // Without raw device motion (a browser without pointer
                     // lock), the cursor's own motion turns the view.
@@ -411,6 +538,16 @@ impl ApplicationHandler for App {
                 self.last_cursor = Some((x, y));
             }
             WindowEvent::MouseInput { state, button, .. } => {
+                if self.menu.is_open() {
+                    if let (MouseButton::Left, ElementState::Pressed, Some((x, y))) =
+                        (button, state, self.last_cursor)
+                    {
+                        let (sx, sy) = self.viewport.to_screen(x, y);
+                        let action = self.menu.click(sx, sy, self.menu_values());
+                        self.menu_action(action);
+                    }
+                    return;
+                }
                 self.start_audio();
                 let button = match button {
                     MouseButton::Left => EngineButton::Left,
@@ -430,10 +567,27 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
+                let key = engine_key(&event.logical_key);
+                let pressed = event.state == ElementState::Pressed;
+                if self.menu.is_open() {
+                    // The menu takes every key (with the repeats, to move).
+                    if let (Some(k), true) = (key, pressed) {
+                        let action = self.menu.key(k, self.menu_values());
+                        self.menu_action(action);
+                    }
+                    return;
+                }
                 if event.repeat {
                     return;
                 }
-                if let Some(k) = engine_key(&event.logical_key) {
+                if key == Some(EngineKey::F(10)) {
+                    // The port's options menu: not the engine's key.
+                    if pressed {
+                        self.open_menu();
+                    }
+                    return;
+                }
+                if let Some(k) = key {
                     self.sys.push_input(match event.state {
                         ElementState::Pressed => Input::KeyDown(k),
                         ElementState::Released => Input::KeyUp(k),

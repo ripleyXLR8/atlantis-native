@@ -86,6 +86,8 @@ struct State {
     voices: Vec<Voice>,
     next_id: VoiceId,
     master: u8,
+    /// Silence, the voices kept where they are (the port's options menu).
+    paused: bool,
 }
 
 /// Shared between the engine (control) and the audio thread (`fill`).
@@ -180,11 +182,19 @@ impl Mixer {
         self.0.lock().unwrap().master = master;
     }
 
+    /// Pauses (silence, nothing advances) or resumes every voice.
+    pub fn set_paused(&self, paused: bool) {
+        self.0.lock().unwrap().paused = paused;
+    }
+
     /// Mixes into `out` (interleaved f32, `channels` per frame, 1 or 2) at
     /// `rate` Hz, replacing its content.
     pub fn fill(&self, out: &mut [f32], rate: u32, channels: usize) {
         out.fill(0.0);
         let mut s = self.0.lock().unwrap();
+        if s.paused {
+            return;
+        }
         let master = f32::from(s.master) / 255.0;
         s.voices.retain_mut(|v| {
             let vol = f32::from(v.volume) / 255.0 * master;
