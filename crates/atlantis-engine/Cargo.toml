@@ -9,6 +9,7 @@ license.workspace = true
 atlantis-data = { path = "../atlantis-data" }
 atlantis-codecs = { path = "../atlantis-codecs" }
 libm = "=0.2.16"
+ab_glyph = "0.2"
 log = "0.4"
 
 [dev-dependencies]

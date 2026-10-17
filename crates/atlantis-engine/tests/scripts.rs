@@ -1563,8 +1563,11 @@ fn new_game_plays_the_intro() {
     let mut runner = Runner::new(sys.clone(), atlantis_engine::run(sys.clone(), g, opts));
     let mut frame = 0u64;
     let mut voices_after_cinema = 0;
+    // The sound mixed and dropped, so that the dialog line's voice ends.
+    let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
     while frame < 40_000 {
         assert!(runner.step(frame * 16), "the engine ended");
+        sys.mixer.fill(&mut sound, 22050, 2);
         frame += 1;
         let t = trace.borrow();
         if voices_after_cinema == 0 && t.iter().any(|e| matches!(e, Event::NewSound(1, _))) {

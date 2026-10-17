@@ -20,6 +20,8 @@ use atlantis_data::{Game, SpritePlaceEntry};
 use crate::ambient::{AmbientSounds, MixerAmbientOutput};
 use crate::con::{ConClocks, Vars};
 use crate::cursor::WarpCursorState;
+use crate::dialog::Dialogs;
+use crate::enhancements::Enhancements;
 use crate::hooks::{Departure, DirectLoader, Loader, ScriptHooks};
 use crate::look::{WarpMomentum, WarpPointer};
 use crate::music::Music;
@@ -76,6 +78,27 @@ pub enum Event {
     NewSound(i32, String),
     /// A game over (GameOver=N).
     GameOver(i32),
+    /// A voice started (a dialog line's or a game-over narrator's): the
+    /// archive member.
+    Voice(String),
+    /// The dialog presenter played a line: its section and letter, the
+    /// talking-head video, the UBB frames shown, whether its voice played
+    /// and the subtitle lines drawn.
+    LinePlayed {
+        section: i32,
+        letter: char,
+        video: Option<String>,
+        frames: u32,
+        voice: bool,
+        subtitles: usize,
+    },
+    /// The subject menu of a character: the subjects shown and the one
+    /// chosen (0 for an empty cell, `None` for a click outside the grid).
+    SubjectMenu {
+        perso: i32,
+        subjects: Vec<u8>,
+        chosen: Option<i32>,
+    },
 }
 
 /// Why the place loop ends (`_abortCommand`).
@@ -93,14 +116,20 @@ pub struct Options {
     pub hooks: Box<dyn ScriptHooks>,
     /// Receives the [`Event`]s when set.
     pub trace: Option<Rc<RefCell<Vec<Event>>>>,
+    /// The optional differences from the original game.
+    pub enhancements: Enhancements,
+    /// The dialog subtitles are shown (the original's SUBTITLES setting).
+    pub subtitles: bool,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Options {
             loader: Rc::new(DirectLoader),
-            hooks: Box::new(Scripts::new()),
+            hooks: Box::new(Scripts::with_dialog(Box::new(Dialogs::new()))),
             trace: None,
+            enhancements: Enhancements::default(),
+            subtitles: true,
         }
     }
 }
@@ -154,6 +183,13 @@ pub struct Engine {
     pub(crate) place_table_slots: Vec<Vec<Transition>>,
     /// The hidden persos (HidePerso): their sprites start inactive.
     pub hidden_persos: Vec<i32>,
+    /// The optional differences from the original game.
+    pub enhancements: Enhancements,
+    /// The dialog subtitles are shown (SUBTITLES, 0x004960a8).
+    pub subtitles: bool,
+    /// The object just given, shown under the talking heads until the end
+    /// of the section walk (0x0049619c): its OBJETS1.SPR sprite.
+    pub given_object: Option<usize>,
     /// The CON variable ZOOM: the next transition turn zooms in.
     pub zoom: bool,
     /// ANGLEWARPX / ANGLEWARPY of the last warp frame.
@@ -237,6 +273,9 @@ impl Engine {
             inventory: Vec::new(),
             place_table_slots: Vec::new(),
             hidden_persos: Vec::new(),
+            enhancements: Enhancements::default(),
+            subtitles: true,
+            given_object: None,
             zoom: false,
             angle_warp: (0, 0),
             sprite_list: Vec::new(),
@@ -617,9 +656,16 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         loader,
         mut hooks,
         trace,
+        enhancements,
+        subtitles,
     } = opts;
     let mut e = Engine::new(sys, game, loader);
     e.trace = trace;
+    e.enhancements = enhancements;
+    e.subtitles = subtitles;
+    // The music loops seamlessly with the minor bug fixes; the original's
+    // streaming ring otherwise.
+    e.music.original_ring = !enhancements.minor_bug_fixes;
     e.load_cursor_sprites().await;
     // TODO(phase 3): the start-up videos (LOGO15N, PREINTRO) and the player
     // screen before the game.

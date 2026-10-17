@@ -196,6 +196,7 @@ dependencies = [
 name = "atlantis-engine"
 version = "0.1.0"
 dependencies = [
+ "ab_glyph",
  "atlantis-codecs",
  "atlantis-data",
  "libm",

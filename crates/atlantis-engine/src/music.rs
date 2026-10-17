@@ -551,7 +551,8 @@ pub struct Music {
     /// The tracks the original would find in its install folder (bit i =
     /// track index i). TODO(phase 3): kept with the player's settings.
     pub on_disk: u32,
-    /// Play the tracks through the original's streaming ring.
+    /// Play the tracks through the original's streaming ring (set by
+    /// [`crate::Enhancements::minor_bug_fixes`] off).
     pub original_ring: bool,
     /// `FUN_00432a64`: 0x006cd87c, the value last started.
     pub new_sound_last: i32,

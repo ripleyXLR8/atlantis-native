@@ -41,6 +41,8 @@ pub struct LineRequest {
     pub perso: i32,
     /// The section was entered from a /con entry (an interactive dialog).
     pub interactive: bool,
+    /// The IncPerso count: the INITDIAL row of a Seth line (0x00428a91).
+    pub inc_perso: i32,
 }
 
 /// What the presentation of a line tells the walk.
@@ -215,10 +217,6 @@ pub struct Scripts {
     pub subjects: ConSubjects,
     /// The /con play counters (0x006cc6cc).
     pub counters: Vec<u8>,
-    /// Each evaluation starts from a clear key buffer, so INVENTnnn is
-    /// never extended by an earlier key and CHAPI063's Anna timer lines can
-    /// play (a fix; off: the original's buffer kept across a scan).
-    pub restored_content: bool,
     pub dialog: Box<dyn DialogPresenter>,
     /// The Seth row count of IncPerso (0x0077290c's offset).
     pub inc_perso: i32,
@@ -253,7 +251,6 @@ impl Scripts {
             chapter: 0,
             subjects: ConSubjects::default(),
             counters: vec![0; CON_PLAY_COUNTERS],
-            restored_content: false,
             dialog,
             inc_perso: 0,
             guests: Vec::new(),
@@ -265,7 +262,10 @@ impl Scripts {
         }
     }
 
-    /// A scan starts with its key buffer zeroed.
+    /// A scan starts with its key buffer zeroed. With the restored content
+    /// each evaluation starts from a clear key buffer (no buffer passed),
+    /// so INVENTnnn is never extended by an earlier key and CHAPI063's Anna
+    /// timer lines can play; the original keeps the buffer across a scan.
     fn begin_scan(&mut self) {
         self.scan_key = [0; 16];
     }
@@ -389,10 +389,20 @@ impl Scripts {
             }
             // INVENTn=v: v != 0 appends object n (no duplicate check), v == 0
             // removes its first record (FUN_0042b328 / FUN_0042b3ec); the
-            // hand keeps the object. TODO(phase 3): the object shown under
-            // the dialog (0x0049619c).
+            // hand keeps the object. An object given is shown under the
+            // talking heads (0x0049619c = its OBJETS1.SPR sprite, written by
+            // FUN_0042b328 @ 0x0042b3a2).
             if let Some((id, value)) = set.invent {
                 if value != 0 {
+                    if let Some(k) = e
+                        .game
+                        .exe
+                        .inventory_object_ids
+                        .iter()
+                        .position(|&o| o == id)
+                    {
+                        e.given_object = Some(k);
+                    }
                     if e.inventory.len() < INVENTORY_RECORDS {
                         e.inventory.push(id);
                     }
@@ -604,7 +614,7 @@ impl Scripts {
     /// `FUN_004277c8`: the first /sel entry whose condition holds runs.
     async fn run_sel_scan(&mut self, e: &mut Engine) {
         self.begin_scan();
-        let restored = self.restored_content;
+        let restored = e.enhancements.restored_content;
         let found = self.script.find_sel_entry(|sec| {
             let key = (!restored).then_some(&mut self.scan_key);
             eval_entry(&self.names, key, self.script.text(), e, sec)
@@ -637,7 +647,7 @@ impl Scripts {
                 continue;
             }
             self.begin_scan();
-            let restored = self.restored_content;
+            let restored = e.enhancements.restored_content;
             let found = self.script.sections().iter().position(|sec| {
                 let key = (!restored).then_some(&mut self.scan_key);
                 sec.is_entry
@@ -671,7 +681,7 @@ impl Scripts {
     /// object back into the place when the place's sprite list holds it.
     async fn run_con_click(&mut self, e: &mut Engine) {
         self.begin_scan();
-        let restored = self.restored_content;
+        let restored = e.enhancements.restored_content;
         let found = self.script.find_con_click_entry(&self.counters, |sec| {
             let key = (!restored).then_some(&mut self.scan_key);
             eval_entry(&self.names, key, self.script.text(), e, sec)
@@ -764,7 +774,7 @@ impl Scripts {
             }
         }
         self.begin_scan();
-        let restored = self.restored_content;
+        let restored = e.enhancements.restored_content;
         let mut play = None;
         for sec in self.script.sections() {
             let key = (!restored).then_some(&mut self.scan_key);
@@ -878,9 +888,10 @@ impl Scripts {
                                 .map(|l| (l.text.clone(), con_track_letter(line_idx)));
                             // The 1999 build: the second death in a section
                             // plays the next narrator line.
-                            if let (Some((text, letter)), true) =
-                                (narrator.as_mut(), e.game.exe.build.alt_game_over_narration)
-                            {
+                            // The 2001 build with the restored content too.
+                            let alt = e.game.exe.build.alt_game_over_narration
+                                || e.enhancements.restored_content;
+                            if let (Some((text, letter)), true) = (narrator.as_mut(), alt) {
                                 let count = self.game_over_count.entry(sec.id).or_default();
                                 let pick = con_alt_game_over_narration(&sec.items, i, count);
                                 if pick > 0 {
@@ -916,6 +927,7 @@ impl Scripts {
                             line: line.clone(),
                             perso,
                             interactive: sec.is_con,
+                            inc_perso: self.inc_perso,
                         };
                         e.emit(Event::Line {
                             section: sec.id,
@@ -958,6 +970,8 @@ impl Scripts {
                 && !had_game_over
                 && !e.should_abort();
             if !chain_go {
+                // The given object is no longer shown (0x00428c92).
+                e.given_object = None;
                 e.vars.set("clicperso", walk.clic_perso);
                 restore_entry(e, &mut walk);
             }
@@ -975,6 +989,7 @@ impl Scripts {
                         self.play_section(e, target, "go", Some(walk)).await;
                     }
                     None => {
+                        e.given_object = None;
                         e.vars.set("clicperso", walk.clic_perso);
                         restore_entry(e, &mut walk);
                     }
