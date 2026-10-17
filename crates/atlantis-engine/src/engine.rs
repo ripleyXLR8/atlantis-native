@@ -129,7 +129,8 @@ pub enum Abort {
     Load,
     /// QUIT GAME confirmed in the in-game menu (the credits have played).
     Quit,
-    /// Exit was set (CHAPI085's Exit=86): the end of the game.
+    /// Exit was set: the end of the game for 86 (CHAPI085's, the only
+    /// value shipped), the player screen again for any other value.
     Finished,
 }
 
@@ -473,6 +474,16 @@ impl Engine {
     /// The window closed, or the place loop has to end.
     pub fn should_abort(&self) -> bool {
         self.sys.should_quit() || self.abort.is_some()
+    }
+
+    /// After the inventory bar (`FUN_0042c59c` @ 0x0042c844), the pick-up
+    /// bar and a resumed in-game menu (`FUN_0041c838` @ 0x0041cb84): Time1
+    /// and Time2 resume from the values they stood at, ChapterTime starts
+    /// again from 0.
+    pub fn rebase_con_clocks(&mut self) {
+        let (t1, t2) = (self.vars.get("time1"), self.vars.get("time2"));
+        let now = self.now();
+        self.clocks.rebase(now, t1, t2);
     }
 
     /// `FUN_0041c75c`, at the start of every warp frame (0x0041c086).
@@ -844,7 +855,23 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
             Some(Abort::NewGame | Abort::Load) if !e.sys.should_quit() => {
                 e.load_checkpoint(hooks.as_mut(), true).await;
             }
-            Some(Abort::Finished) => break true,
+            Some(Abort::Finished) if e.vars.get("exit") == 86 => break true,
+            // Any other Exit value (none is shipped): the main loop ends
+            // the game only for 86 (0x00419775); otherwise Exit = 0 and the
+            // player screen again, then the chosen player's checkpoint as
+            // at boot.
+            Some(Abort::Finished) if !e.sys.should_quit() => {
+                log::warn!(
+                    "Exit={}: only 86 ends the game; back to the player screen",
+                    e.vars.get("exit")
+                );
+                e.vars.set("exit", 0);
+                match e.player_screen().await {
+                    Some(p) => e.player = p,
+                    None => break false,
+                }
+                e.load_checkpoint(hooks.as_mut(), false).await;
+            }
             _ => break false,
         }
     };
@@ -882,6 +909,9 @@ impl Engine {
         let outcome = self.ingame_menu().await;
         self.music.unduck(None);
         match outcome {
+            // The clocks resume only when the play goes on: a reload, a
+            // quit or an abort leaves them as they are.
+            MenuOutcome::Resume if !self.should_abort() => self.rebase_con_clocks(),
             MenuOutcome::Resume => {}
             MenuOutcome::Reload => self.abort = Some(Abort::Load),
             MenuOutcome::Quit => self.abort = Some(Abort::Quit),
@@ -922,5 +952,103 @@ mod spinning_clock_tests {
             r.step(t);
             assert!(picked.get(), "clock {t}");
         }
+    }
+}
+
+#[cfg(test)]
+mod exit_and_menu_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::hooks::{ready, HookFuture};
+    use crate::sys::{Input, MouseButton, Runner};
+    use crate::test_support::{button, with_engine};
+
+    /// The in-game menu ended by an abort (as a reload or a quit) leaves
+    /// the clocks alone; a resume rebases them.
+    #[test]
+    fn ingame_menu_rebases_the_clocks_only_on_resume() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "ingame_menu_rebases_the_clocks_only_on_resume",
+            move |mut e| async move {
+                e.vars.set("time1", 7);
+                e.abort = Some(Abort::Load);
+                e.run_ingame_menu().await;
+                g2.borrow_mut().push(e.clocks.time1_offset);
+                e.abort = None;
+                // A click outside the records: the menu resumes.
+                e.sys.set_mouse_pos(5, 5);
+                e.run_ingame_menu().await;
+                g2.borrow_mut().push(e.clocks.time1_offset);
+            },
+            |sys, f| match f {
+                40 => button(sys, MouseButton::Left, true),
+                42 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        assert_eq!(*got, [0, 7]);
+    }
+
+    /// Exit set on the first chapter load.
+    struct ExitHook(i32, bool);
+
+    impl ScriptHooks for ExitHook {
+        fn chapter_loaded<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _chapter: u32,
+            _keep_state: bool,
+        ) -> HookFuture<'a, ()> {
+            if !self.1 {
+                self.1 = true;
+                e.vars.set("exit", self.0);
+            }
+            ready(())
+        }
+    }
+
+    fn run_with_exit(exit: i32) -> Option<Vec<Event>> {
+        let dir = std::env::var_os("ATLANTIS_DATA")?;
+        let g = Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir))).unwrap();
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let sys = Sys::new(Mixer::new());
+        let opts = Options {
+            trace: Some(trace.clone()),
+            hooks: Box::new(ExitHook(exit, false)),
+            start: Start::NewGame,
+            ..Options::default()
+        };
+        let mut runner = Runner::new(sys.clone(), run(sys.clone(), g, opts));
+        let mut frame = 0u64;
+        while runner.step(frame * 16) {
+            frame += 1;
+            let seen = trace
+                .borrow()
+                .iter()
+                .any(|e| *e == Event::Menu("SELEMENU.TXT".into()));
+            if seen || frame == 20_000 {
+                sys.push_input(Input::Quit);
+            }
+            assert!(frame < 40_000);
+        }
+        let t = trace.borrow().clone();
+        Some(t)
+    }
+
+    /// Exit=N for N other than 86 does not end the game: the player
+    /// screen again (it played the ending).
+    #[test]
+    fn exit_other_than_86_returns_to_the_player_screen() {
+        let Some(t) = run_with_exit(5) else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        assert!(t.contains(&Event::Menu("SELEMENU.TXT".into())), "{t:?}");
     }
 }

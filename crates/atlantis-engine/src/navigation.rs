@@ -339,13 +339,18 @@ impl Engine {
                     self.enter_bow_mode().await;
                 }
                 // FUN_0042c59c @ 0x0042c844: the timers resume.
-                let (t1, t2) = (self.vars.get("time1"), self.vars.get("time2"));
-                let now = self.now();
-                self.clocks.rebase(now, t1, t2);
+                self.rebase_con_clocks();
+                // A guest's conversation that moved the player (a Vue= or a
+                // Chapter=) ends the loop for the arrival scan. A Vue= from
+                // a timer section that ran while the bar was open does not:
+                // the loop runs on in the new place, and the arrival scan
+                // comes after the next click (as for a warp-frame timer).
+                let mut moved = false;
                 if guest != 0 && !self.should_abort() {
                     hooks.talk_to_guest(self, guest).await;
+                    moved = self.arrival_scan_pending;
                 }
-                if self.should_abort() || self.arrival_scan_pending {
+                if self.should_abort() || moved {
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -503,5 +508,102 @@ impl Engine {
         self.wait_buttons_up().await;
         log::debug!("handle_warp: action {action}");
         action
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hooks::{ready, HookFuture};
+    use crate::test_support::{button, with_engine};
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+
+    /// A timer section that moved the player while the bar was open (as a
+    /// Vue= does: the arrival scan queued) on the bar's first frame; the
+    /// arrival scans counted.
+    struct BarVue {
+        fired: bool,
+        arrivals: Rc<Cell<u32>>,
+    }
+
+    impl ScriptHooks for BarVue {
+        fn arrival_scan<'a>(
+            &'a mut self,
+            _e: &'a mut Engine,
+            _v: u16,
+            _a: i32,
+        ) -> HookFuture<'a, ()> {
+            self.arrivals.set(self.arrivals.get() + 1);
+            ready(())
+        }
+
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.fired {
+                return ready(false);
+            }
+            self.fired = true;
+            e.arrival_scan_pending = true;
+            e.arrival_from_vue = 1;
+            ready(true)
+        }
+    }
+
+    /// The warp loop goes on after the bar when a timer section queued the
+    /// arrival scan during it (CHAPI028 /tim2 Vue=351): the scan comes
+    /// after the next click, not when the bar closes.
+    #[test]
+    fn bar_timer_vue_keeps_the_warp_loop() {
+        let arrivals = Rc::new(Cell::new(0));
+        let a2 = arrivals.clone();
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let s2 = seen.clone();
+        let (mut locked_for, mut t0) = (0u64, None::<u64>);
+        let ran = with_engine(
+            "bar_timer_vue_keeps_the_warp_loop",
+            move |mut e| async move {
+                assert!(e.load_wam_with("ATLAN1.WAM", true).await);
+                e.next_place_id = Some(1);
+                let mut hooks = BarVue {
+                    fired: false,
+                    arrivals: a2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, f| {
+                let Some(t) = t0 else {
+                    locked_for = if sys.mouse_locked() {
+                        locked_for + 1
+                    } else {
+                        0
+                    };
+                    if locked_for == 10 {
+                        // In the warp view: open the bar.
+                        button(sys, MouseButton::Right, true);
+                        t0 = Some(f);
+                    }
+                    return;
+                };
+                match f - t {
+                    2 => button(sys, MouseButton::Right, false),
+                    // Close the bar with a click above it.
+                    60 => {
+                        sys.push_input(Input::MouseMove { x: 320, y: 100 });
+                        button(sys, MouseButton::Left, true);
+                    }
+                    62 => button(sys, MouseButton::Left, false),
+                    200 => {
+                        s2.borrow_mut().push((arrivals.get(), sys.mouse_locked()));
+                        sys.push_input(Input::Quit);
+                    }
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        // The arrival scan of place 1 only; the warp view still runs.
+        assert_eq!(*seen.borrow(), [(1, true)]);
     }
 }

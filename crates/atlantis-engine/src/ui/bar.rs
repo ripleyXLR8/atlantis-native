@@ -205,6 +205,9 @@ impl Engine {
             }
             self.bar_scroll(&mut next_scroll);
             self.bar_frame(0, false);
+            // FUN_00432178 ends each bar frame (FUN_0042c8ac step 5): the
+            // NewSound poll FUN_00432a64, then the ambient sounds.
+            self.poll_new_sound().await;
             self.ambient_frame();
             self.sys.frame().await;
         }
@@ -270,6 +273,9 @@ impl Engine {
             self.vars.set("objetenmain", 0);
         }
         self.bar_slide_out(hooks).await;
+        // The timers resume from their values, ChapterTime from 0, as after
+        // the inventory bar (FUN_0042c59c @ 0x0042c844 ends the slide-out).
+        self.rebase_con_clocks();
         right
     }
 
@@ -415,6 +421,74 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hooks::NoScripts;
+    use crate::sys::MouseButton;
+    use crate::test_support::{button, with_engine};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// A left click at frame 40 (the bar is up by then).
+    fn click_at_40(sys: &Rc<crate::sys::Sys>, f: u64) {
+        match f {
+            40 => button(sys, MouseButton::Left, true),
+            42 => button(sys, MouseButton::Left, false),
+            _ => {}
+        }
+    }
+
+    /// The pick-up bar ends like the inventory bar: Time1 / Time2 resume
+    /// from their frozen values, ChapterTime from 0.
+    #[test]
+    fn pickup_bar_rebases_the_clocks() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "pickup_bar_rebases_the_clocks",
+            move |mut e| async move {
+                e.vars.set("time1", 7);
+                e.vars.set("time2", 9);
+                e.display_pickup(&mut NoScripts).await;
+                let now = e.now();
+                let c = e.clocks;
+                *g2.borrow_mut() = Some((
+                    c.time1_offset,
+                    c.time2_offset,
+                    c.time1_start == now,
+                    c.chapter_start == now,
+                ));
+            },
+            click_at_40,
+        );
+        if !ran {
+            return;
+        }
+        let got = *got.borrow();
+        assert_eq!(got, Some((7, 9, true, true)));
+    }
+
+    /// Each bar frame polls NewSound (FUN_00432178): a sample that ended
+    /// while the bar is open sets NEWSOUND back to 0.
+    #[test]
+    fn bar_loop_polls_newsound() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "bar_loop_polls_newsound",
+            move |mut e| async move {
+                e.vars.set("newsound", 5);
+                e.music.new_sound_last = 5;
+                e.music.new_sound_playing = true; // and no voice: it ended
+                e.display_bar(&mut NoScripts).await;
+                *g2.borrow_mut() = Some(e.vars.get("newsound"));
+            },
+            click_at_40,
+        );
+        if !ran {
+            return;
+        }
+        let got = *got.borrow();
+        assert_eq!(got, Some(0));
+    }
 
     #[test]
     fn bar_rules() {

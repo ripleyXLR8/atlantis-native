@@ -342,3 +342,44 @@ pub async fn play_puzzle(e: &mut Engine, hooks: &mut dyn ScriptHooks, id: i32) -
     e.emit(Event::Puzzle { id, result });
     result
 }
+
+#[cfg(test)]
+mod entry_tests {
+    use super::*;
+    use crate::hooks::NoScripts;
+    use crate::sys::Input;
+    use crate::test_support::with_engine;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// The mouse 10 frames into puzzle `id`, entered with it at (10, 10).
+    fn mouse_after_entry(id: i32) -> Option<(i32, i32)> {
+        let seen = Rc::new(Cell::new(None));
+        let s2 = seen.clone();
+        let ran = with_engine(
+            "puzzle_entry_centres_the_mouse",
+            move |mut e| async move {
+                e.sys.set_mouse_pos(10, 10);
+                play_puzzle(&mut e, &mut NoScripts, id).await;
+            },
+            move |sys, f| {
+                if f == 10 {
+                    s2.set(Some(sys.mouse()));
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        ran.then(|| seen.get().expect("the puzzle ended at once"))
+    }
+
+    /// The eclipse (0) and the ogre (2) put the mouse at the screen centre
+    /// on entry.
+    #[test]
+    fn eclipse_and_ogre_centre_the_mouse() {
+        for id in [0, 2] {
+            if let Some(m) = mouse_after_entry(id) {
+                assert_eq!(m, (320, 240), "puzzle {id}");
+            }
+        }
+    }
+}

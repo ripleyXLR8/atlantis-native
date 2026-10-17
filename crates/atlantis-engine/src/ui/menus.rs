@@ -417,10 +417,8 @@ impl Engine {
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
         }
-        // The timers resume from their values (0x0041cb84).
-        let (t1, t2) = (self.vars.get("time1"), self.vars.get("time2"));
-        let now = self.now();
-        self.clocks.rebase(now, t1, t2);
+        // The timers resume from their values (0x0041cb84) when the play
+        // goes on: the caller rebases them on a resume.
         outcome
     }
 

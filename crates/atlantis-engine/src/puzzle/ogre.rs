@@ -753,7 +753,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let sounds = PuzzleSounds::load(e, &SOUNDS).await;
     // FUN_0043a1e0 seeded the puzzle LCG from the clock.
     let mut game = OgreGame::new(&mut e.puzzles.lcg_seed);
+    // The mouse unlocked, then at the screen centre on entry; the mouse of
+    // the previous pass (0x004960ec / 0x004960f0) starts there too.
     let mut host = Host(PuzzleHost::new(e, hooks));
+    host.0.e.sys.set_mouse_pos(320, 240);
+    (game.mx, game.my) = (320, 240);
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;
     host.0.sounds = sounds;
