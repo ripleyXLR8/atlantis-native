@@ -99,6 +99,11 @@ pub struct App {
     col_map: Vec<usize>,
     /// The pointer lock as applied to the window.
     locked: bool,
+    /// The lock fell back to confining the pointer (Windows, X11): the
+    /// system pointer is then kept at the centre of the window.
+    confined: bool,
+    /// The window has the keyboard focus.
+    focused: bool,
     /// Raw device motion arrives (desktop): window cursor motion is then
     /// not used for the relative look.
     raw_motion: bool,
@@ -141,6 +146,8 @@ impl App {
             viewport: Viewport::default(),
             col_map: Vec::new(),
             locked: false,
+            confined: false,
+            focused: true,
             raw_motion: false,
             last_cursor: None,
             rel_acc: (0.0, 0.0),
@@ -296,18 +303,36 @@ impl App {
 
     /// The engine's pointer requests: lock (relative mode) and moves.
     fn apply_pointer(&mut self) {
-        let Some(window) = &self.window else { return };
+        let Some(window) = self.window.clone() else {
+            return;
+        };
         let want = self.sys.mouse_locked();
         if want != self.locked {
             self.locked = want;
             self.last_cursor = None;
             if want {
-                let _ = window
-                    .set_cursor_grab(CursorGrabMode::Locked)
-                    .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined))
-                    .map_err(|e| log::debug!("pointer lock: {e}"));
+                self.grab();
             } else {
+                self.confined = false;
                 let _ = window.set_cursor_grab(CursorGrabMode::None);
+            }
+        }
+        // Confined instead of locked (Windows has no lock): the system
+        // pointer still moves while the view turns on raw motion, reaches
+        // the window's edge and a click lands on the title bar or outside.
+        // Keep it at the centre while the view looks (the raw motion the
+        // look reads is not affected by moving the pointer).
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.locked && self.confined && self.focused {
+            let size = window.inner_size();
+            let centre = (f64::from(size.width / 2), f64::from(size.height / 2));
+            if window
+                .set_cursor_position(PhysicalPosition::new(centre.0, centre.1))
+                .is_ok()
+            {
+                // Without raw motion the look reads the pointer's motion:
+                // the move back to the centre is not a motion.
+                self.last_cursor = Some(centre);
             }
         }
         if let Some((x, y)) = self.sys.take_warp_request() {
@@ -315,6 +340,19 @@ impl App {
                 let (wx, wy) = self.viewport.to_window(x, y);
                 let _ = window.set_cursor_position(PhysicalPosition::new(wx, wy));
                 self.last_cursor = Some((wx, wy));
+            }
+        }
+    }
+
+    /// Takes the pointer for the relative look: locked where the system
+    /// can, confined to the window otherwise.
+    fn grab(&mut self) {
+        let Some(window) = &self.window else { return };
+        self.confined = false;
+        if window.set_cursor_grab(CursorGrabMode::Locked).is_err() {
+            match window.set_cursor_grab(CursorGrabMode::Confined) {
+                Ok(()) => self.confined = true,
+                Err(e) => log::debug!("pointer lock: {e}"),
             }
         }
     }
@@ -557,7 +595,24 @@ impl ApplicationHandler for App {
                     }
                 }
             }
+            // The system drops a confined pointer on a focus change, and a
+            // confinement keeps the window's old rectangle after a move or
+            // a resize: take it again.
+            WindowEvent::Focused(f) => {
+                self.focused = f;
+                if f && self.locked {
+                    self.grab();
+                }
+            }
+            WindowEvent::Moved(_) => {
+                if self.locked && self.focused {
+                    self.grab();
+                }
+            }
             WindowEvent::Resized(_) => {
+                if self.locked && self.focused {
+                    self.grab();
+                }
                 if let Some(w) = &self.window {
                     w.request_redraw();
                 }
