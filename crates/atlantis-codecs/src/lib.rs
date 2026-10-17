@@ -1,5 +1,5 @@
 //! Picture, video and sound codecs of *Atlantis: The Lost Tales* (Cryo,
-//! 1997): HNM6 panoramas and videos, APC sound.
+//! 1997): HNM6 panoramas and videos, UBB2 dialog videos, APC sound.
 //!
 //! Translated from ScummVM's HNM decoders (video/hnm_decoder.cpp and
 //! image/codecs/hnm.cpp) and APC decoder (audio/decoders/apc.cpp), GPLv3,
@@ -12,9 +12,11 @@ mod apc;
 mod hnm;
 mod hnm6;
 mod motion_order;
+mod ubb;
 
 pub use apc::{decode_apc, Apc, ApcDecoder, ApcHeader, APC_HEADER_SIZE};
 pub use hnm::{AudioFormat, HnmVideo};
+pub use ubb::{palette_to_rgb565, UbbFrame, UbbVideo, IA_BUFFER_SIZE};
 
 use std::fmt;
 
@@ -58,6 +60,8 @@ pub enum DecodeError {
     Unsupported(&'static str),
     /// Not an APC file (no `CRYO_APC1.20` header).
     NotApc,
+    /// Not a UBB2 dialog video.
+    NotUbb2,
 }
 
 impl fmt::Display for DecodeError {
@@ -82,6 +86,7 @@ impl fmt::Display for DecodeError {
             DecodeError::Bitstream(what) => write!(f, "corrupt frame: {what}"),
             DecodeError::Unsupported(what) => write!(f, "unsupported: {what}"),
             DecodeError::NotApc => write!(f, "not an APC file"),
+            DecodeError::NotUbb2 => write!(f, "not a UBB2 file"),
         }
     }
 }
