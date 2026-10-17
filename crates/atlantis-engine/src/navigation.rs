@@ -305,7 +305,15 @@ impl Engine {
                     self.sys.set_mouse_pos(320, 240);
                     self.cursor_shown = CURSOR_UNSET;
                     self.wait_buttons_up().await;
-                    clicked = false;
+                    // The original's warp loop returns the clicked character
+                    // (0x0041c71e) after this frame's timers (0x0041c369);
+                    // the place loop runs the conversation (0x00423c1c) and
+                    // enters the loop again, whose first frame updates the
+                    // clocks (0x0041c086). Going on with this frame ran the
+                    // timers with the clocks read before the conversation:
+                    // a Time1=0 in it (CHAPI024 /280, Carven's betrayal) was
+                    // seen as the old count and the guard struck at once.
+                    continue;
                 }
             }
             left_pressed = clicked;
@@ -605,5 +613,123 @@ mod tests {
         }
         // The arrival scan of place 1 only; the warp view still runs.
         assert_eq!(*seen.borrow(), [(1, true)]);
+    }
+
+    /// A conversation that restarts Time1 (CHAPI024 /280's Time1=0) and the
+    /// time1 the timers see on the next frame.
+    struct TalkTimer {
+        talked: Rc<Cell<bool>>,
+        seen: Rc<RefCell<Vec<i32>>>,
+    }
+
+    impl ScriptHooks for TalkTimer {
+        fn npc_click<'a>(&'a mut self, e: &'a mut Engine, _id: u32, _z: u32) -> HookFuture<'a, ()> {
+            let now = e.now();
+            e.clocks.restart(1, 0, now);
+            self.talked.set(true);
+            ready(())
+        }
+
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.talked.get() && self.seen.borrow().is_empty() {
+                self.seen.borrow_mut().push(e.vars.get("time1"));
+            }
+            ready(false)
+        }
+    }
+
+    /// After a conversation the timers run on a new frame, whose clocks are
+    /// read again (the original's warp loop returns the character, 0x0041c71e,
+    /// and is entered again): a Time1=0 in the conversation is seen as 0, not
+    /// as the count before it (the guard of CHAPI024 struck at once).
+    #[test]
+    fn timers_after_a_conversation_read_fresh_clocks() {
+        let talked = Rc::new(Cell::new(false));
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let (t2, s2) = (talked.clone(), seen.clone());
+        let found = Rc::new(Cell::new(false));
+        let f2 = found.clone();
+        let mut locked_for = 0u64;
+        let mut clicked_at = None::<u64>;
+        let ran = with_engine(
+            "timers_after_a_conversation_read_fresh_clocks",
+            move |mut e| async move {
+                assert!(e.load_wam_with("ATLAN1.WAM", true).await);
+                // A place and a view with a character under the pointer.
+                let ids: Vec<u16> = e.wam.places.iter().map(|p| p.id).collect();
+                let mut view = None;
+                'search: for id in ids {
+                    e.next_place_id = Some(id);
+                    e.do_place_change().await;
+                    if e.npc_rects.is_empty() {
+                        continue;
+                    }
+                    for ia in 0..315 {
+                        for ib in -4..=4 {
+                            let (a, b) = (ia as f32 * 0.02, ib as f32 * 0.1);
+                            e.set_view(a, b);
+                            // Both pointer positions the loop may use
+                            // (after a panorama load, after a recentre).
+                            let hit = [(320, 320), (320, 240)].iter().all(|&(x, y)| {
+                                let (px, py) = e.warp.screen_to_panorama(x, y);
+                                let (px, py) = (i32::from(px as i16), i32::from(py as i16));
+                                npc_hit_test(&e.wam.npcs, &e.npc_rects, &e.sprite_list, id, px, py)
+                                    >= 0x100
+                            });
+                            if hit {
+                                view = Some((id, a, b));
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+                let Some((id, a, b)) = view else { return };
+                f2.set(true);
+                e.next_place_id = Some(id);
+                e.do_place_change().await;
+                e.set_view(a, b);
+                // The count well past any timer's limit before the talk.
+                let now = e.now();
+                e.clocks.restart(1, 100, now);
+                e.update_con_clocks();
+                let mut hooks = TalkTimer {
+                    talked: t2,
+                    seen: s2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, f| {
+                if clicked_at.is_none() {
+                    locked_for = if sys.mouse_locked() {
+                        locked_for + 1
+                    } else {
+                        0
+                    };
+                    if locked_for == 10 {
+                        button(sys, MouseButton::Left, true);
+                        clicked_at = Some(f);
+                    }
+                    return;
+                }
+                let t = clicked_at.unwrap();
+                if f - t == 2 {
+                    button(sys, MouseButton::Left, false);
+                }
+                if f - t == 60 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if !ran || !found.get() {
+            return;
+        }
+        assert!(talked.get(), "the character was not clicked");
+        let seen = seen.borrow();
+        assert_eq!(seen.len(), 1);
+        assert!(
+            seen[0] <= 1,
+            "the timers saw time1 = {} after Time1=0",
+            seen[0]
+        );
     }
 }
