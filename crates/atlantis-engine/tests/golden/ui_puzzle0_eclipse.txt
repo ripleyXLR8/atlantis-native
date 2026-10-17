@@ -1,0 +1,24 @@
+# StartPuzzle 0, the eclipse FUN_0044154c of atlantis.exe (2001 English build): the click handler FUN_00441cd8
+# (with FUN_00441f50 / FUN_00441c68) run under emulation. table.<i>: the record table at 0x0049745e (dir, x, y, min,
+# max, curr, pad); hitrows: the class of a click on each pixel row (E exit, a/b lever 1 up/down, c/d lever 2 up/down,
+# . nothing) as runs; transitions: every lever state (71 x 71) x the four lever clicks; win.<o1>.<o2>.<click>: the
+# records' frames after a winning click.
+table.0 1,215,308,0,7,0,1
+table.1 1,298,308,8,15,8,2
+table.2 0,227,384,16,86,16,3
+table.3 0,443,373,87,157,87,4
+table.4 0,319,204,0,70,0,5
+table.5 0,236,222,71,141,71,6
+table.6 0,271,198,142,212,142,0
+hitrows.0-219 E160_.381_E99
+hitrows.220-370 .640
+hitrows.371-425 .121_a119_.191_c119_.90
+hitrows.426-479 .121_b119_.191_d119_.90
+hitmap_md5 9b84e4e2bbed965a729f29faa97b3208
+transitions_md5 5a0ebcac450a944f548262fbc74b97a1
+transitions_count 20164
+win.33.35.a 0,8,16,88,1,71,142
+win.34.34.c 0,8,16,88,1,71,142
+win.34.36.d 0,8,16,88,1,71,142
+win.35.35.b 0,8,16,88,1,71,142
+winstate 34 35

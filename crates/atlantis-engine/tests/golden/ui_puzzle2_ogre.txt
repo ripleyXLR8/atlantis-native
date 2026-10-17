@@ -1,0 +1,42 @@
+# StartPuzzle 2, the ogre game of atlantis.exe (2001 English build, 714240 bytes): its rule functions run under emulation:
+# FUN_00443f94 (path and mask, with the cell lookups FUN_00443ea0 / FUN_00443f18), FUN_00443c3c (pick-up, drop, catch,
+# leave), FUN_00442360 (the ogres' turn), FUN_00442a0c (the queen's walk); counts and md5 of the listings.
+init.records 1,0,0,0,3,3,1,6,6,0,4,4,0,5,5
+cell_edges 112,173,233,294,354,415,476,536,27,88,148,209,269,330,390,451
+pathcol 99:0-111_0:112-172_1:173-232_2:233-293_3:294-353_4:354-414_5:415-475_6:476-535_99:536-639
+pathrow 99:0-26_0:27-87_1:88-147_2:148-208_3:209-268_4:269-329_5:330-389_6:390-479
+pickup.0.0 count=2052 x=121..158 y=30..83 abortpixels=47520
+pickup.6.6 count=2052 x=481..518 y=390..443 abortpixels=47520
+pickup.3.4 count=2052 x=301..338 y=270..323 abortpixels=47520
+bfs_states 2552
+bfs_transitions 21734
+bfs_loss_transitions 11952
+bfs_garbage_dependent 0
+bfs_states_occ_inconsistent 34
+bfs_states_ogres_stacked 77
+bfs_md5 d5407e20e0b9e1f39da6ac6470cef3c3
+pathbuild_md5 e29742f19eeb72dfcb3f80f6a1a28fb6
+pathbuild_nondiag_md5 1ef75c21692f3319d86d4988a04c4319
+pathbuild_legal_count 452
+stale_after_own_cell 3,3,3,4,4,4
+catch_count 1237
+catch_md5 7c0ca28cd41282f4a84646b3e2225d18
+catch_nondiag_count 805
+catch_nondiag_md5 b5e8bf4fd682b23fff8aa18a0f4cacd0
+walk_count 196392
+walk_md5 e1c4aa8cc5c4accc29b41dedb1b3ee5f
+walk_nondiag_count 139944
+walk_nondiag_md5 7d26f13ed7d0d15bb7e35084f958e176
+walk_stay_count 6197
+diagonal_elbow_rule_checked 11664 mismatches=0 (elbow=(cx,hy) if |mx-(colEdge[hx]+30)| > |my-(rowEdge[hy]+30)| else (hx,cy))
+# The breadth-first search of the drops from the original start (occupancy all 0), from a start with the ogres' cells
+# marked, and with the bytes past the 49 cells set to 1.
+original_start_states 2552
+original_start_transitions 21734
+original_start_md5 1dd18fe0d19a0cbfbd6d46879eb22181
+port_start_states 2552
+port_start_transitions 21734
+port_start_md5 1dd18fe0d19a0cbfbd6d46879eb22181
+same_transitions 1
+padded_start_states 2531
+padded_same_transitions 0

@@ -1083,7 +1083,7 @@ fn engine_leaves_puzzles() {
         (15, 0, (320, 10), 1),
         (16, 0, (320, 10), 2),
         (5, 7, (0, 0), 1),
-        (0, 0, (0, 0), 255),
+        (0, 0, (0, 0), 1), // the eclipse: its top corners leave with 1
         (17, 0, (0, 0), 0),
     ];
     for (id, object, (x, y), want) in cases {

@@ -27,12 +27,13 @@ the game writes the original's checkpoint files, and a game over takes you
 back to the last one. The end of the game shows its last picture and the
 credits.
 
-Phase 5 (the puzzles) is under way. Six of them play as in the original:
-the throne lock, the three sliding puzzles, the four stages of the metal
-pieces, the hexagon, the crab race and Muria's tablets; you win, lose or
-leave them (a click on their frame), and the scripts go on as the
-original's do with the result. The eclipse, the hens, the ogre game, the
-rotating pieces, the rat's run and the snakes still count as won at once.
+Phase 5 (the puzzles) is under way. All twelve of them play as in the
+original: the eclipse, the hens, the ogre game, the rotating pieces, the
+rat's run, the throne lock, the three sliding puzzles, the snakes, the
+four stages of the metal pieces, the hexagon, the crab race and Muria's
+tablets; you win, lose or leave them (a click on their frame, or on the
+side edges for the ogre game and the rat's run), and the scripts go on as
+the original's do with the result.
 
 ## You need the game
 

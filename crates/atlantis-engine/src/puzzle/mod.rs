@@ -47,9 +47,15 @@
 
 pub mod assets;
 pub mod crab;
+pub mod eclipse;
+pub mod hens;
 pub mod hexa;
 pub mod meta;
 pub mod muria;
+pub mod ogre;
+pub mod pieces;
+pub mod rat;
+pub mod snakes;
 pub mod taquin;
 pub mod throne;
 
@@ -150,12 +156,18 @@ impl PuzzleKind {
     pub fn translated(self) -> bool {
         matches!(
             self,
-            PuzzleKind::Throne
+            PuzzleKind::Eclipse
+                | PuzzleKind::Hens
+                | PuzzleKind::RotatingPieces
+                | PuzzleKind::Snakes
+                | PuzzleKind::Throne
                 | PuzzleKind::Taquin(_)
                 | PuzzleKind::Meta(_)
                 | PuzzleKind::Hexa
                 | PuzzleKind::Crab
                 | PuzzleKind::Muria
+                | PuzzleKind::Rat
+                | PuzzleKind::OgreGame
         )
     }
 }
@@ -246,6 +258,15 @@ pub struct PuzzleState {
     pub meta: Option<meta::MetaMemory>,
     /// The crab records (static data: phase and timer carry over).
     pub crabs: Option<[crab::Crab; crab::NUM_CRABS]>,
+    /// The frames of the eclipse's records 0 and 1 (static data: they
+    /// turn on their own and are not reset).
+    pub eclipse: Option<[i16; 2]>,
+    /// The snakes of the last snakes run (their places and pieces are not
+    /// reset).
+    pub snakes: Option<[snakes::Snake; snakes::NUM_SNAKES]>,
+    /// The rat's run state (static data at 0x004969c0, partly reset by
+    /// each run).
+    pub rat: Option<rat::RatRules>,
 }
 
 impl Default for PuzzleState {
@@ -256,6 +277,9 @@ impl Default for PuzzleState {
             lcg_seed: 0,
             meta: None,
             crabs: None,
+            eclipse: None,
+            snakes: None,
+            rat: None,
         }
     }
 }
@@ -286,18 +310,21 @@ pub async fn play_puzzle(e: &mut Engine, hooks: &mut dyn ScriptHooks, id: i32) -
     e.puzzles.lcg_seed = e.sys.millis() as u16;
     let kind = PuzzleKind::of(id);
     let result = match kind {
+        Some(PuzzleKind::Eclipse) => eclipse::play(e, hooks).await,
+        Some(PuzzleKind::Hens) => hens::play(e, hooks).await,
+        Some(PuzzleKind::RotatingPieces) => pieces::play(e, hooks).await,
+        Some(PuzzleKind::Snakes) => snakes::play(e, hooks).await,
         Some(PuzzleKind::Throne) => throne::play(e, hooks).await,
         Some(PuzzleKind::Taquin(v)) => taquin::play(e, hooks, v).await,
         Some(PuzzleKind::Meta(stage)) => meta::play(e, hooks, stage).await,
         Some(PuzzleKind::Hexa) => hexa::play(e, hooks).await,
         Some(PuzzleKind::Crab) => crab::play(e, hooks).await,
         Some(PuzzleKind::Muria) => muria::play(e, hooks).await,
-        // TODO(phase 5, part 2): the eclipse (0), the hens (1), the ogre
-        // (2), the rotating pieces (3), the rat (4) and the snakes (8).
-        _ => {
-            log::warn!("puzzle {id} ({kind:?}): not translated yet, won");
-            255
-        }
+        Some(PuzzleKind::Rat) => rat::play(e, hooks).await,
+        Some(PuzzleKind::OgreGame) => ogre::play(e, hooks).await,
+        // Every id 0..=16 has a puzzle; `check` has already refused the
+        // others with 0, the answer kept here.
+        None => 0,
     };
     // FUN_0043d0e0 at the puzzles' exits, the last call before the return
     // (call sites 0x00438ec8 .. 0x00447819): puzzles 0, 2, 15 and 16 make

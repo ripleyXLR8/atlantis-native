@@ -1,0 +1,20 @@
+# StartPuzzle 3, the rotating pieces FUN_004459c0 of atlantis.exe (2001 English build): the set-up FUN_00445ba0 and the
+# click FUN_004460c8 run under emulation over the click map PUZZLES\PUZSRP2.BMP: the class of a click on every pixel
+# from the start (L leave, R reset, k refusal, a..l the move of map value 1..12), then every reachable state.
+start pieces (3, 1, 0, 4, 5, 2) counters (0, 0, 0, 0, 0, 0)
+clickmap md5 2ff11593bd4d3d9bc250a079243a705d
+clickmap counts L=79439 R=2702 a=9045 b=8537 c=7645 d=6914 e=5613 f=4518 g=4350 h=4182 i=4235 j=5701 k=156692 l=7627
+move v=1 at (303,229)
+move v=2 at (322,229)
+move v=3 at (350,217)
+move v=4 at (354,204)
+move v=5 at (454,141)
+move v=6 at (396,103)
+move v=7 at (319,89)
+move v=8 at (300,89)
+move v=9 at (244,103)
+move v=10 at (186,139)
+move v=11 at (148,204)
+move v=12 at (291,218)
+states 2429 transitions 31577 winning_states 1
+transitions md5 703d8b9fb24b1bc818e3be46703e0098

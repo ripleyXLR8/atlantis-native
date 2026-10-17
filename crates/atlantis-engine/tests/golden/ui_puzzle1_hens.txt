@@ -1,0 +1,21 @@
+# StartPuzzle 1, the hens FUN_004441e8 of atlantis.exe (2001 English build): the click FUN_00444a4c (with FUN_004457bc,
+# FUN_00444d80, FUN_00445614) run under emulation over every state reachable by the clicks listed (state: the hen carried,
+# then the targets of hens 2..8; line: state, click -> state, return value, leave, won, marked, sounds).
+start records (target, weight, x, y, tilt):
+0 (0, 0, 0, 0, 0)
+1 (1, 41, 0, 0, 0)
+2 (0, 20, 163, 447, 0)
+3 (0, 24, 216, 456, 0)
+4 (0, 38, 119, 428, 0)
+5 (0, 12, 369, 460, 0)
+6 (0, 36, 478, 454, 0)
+7 (0, 22, 414, 453, 0)
+8 (0, 11, 340, 463, 0)
+9 (9, 33, 0, 0, 1)
+targets 1=(298, 150) 2=(260, 198) 3=(245, 239) 4=(307, 254) 5=(359, 258) 6=(392, 222) 7=(434, 263) 8=(430, 295) 9=(393, 320) 10=(283, 199) 11=(336, 203) 12=(346, 175) 13=(364, 164) 14=(400, 276) 15=(341, 300)
+actions t1=(298, 150) t2=(260, 198) t3=(245, 239) t4=(307, 254) t5=(359, 258) t6=(392, 222) t7=(434, 263) t8=(430, 295) t9=(393, 320) t10=(283, 199) t11=(336, 203) t12=(346, 175) t13=(364, 164) t14=(400, 276) t15=(341, 300) home2=(163, 447) home3=(216, 456) home4=(119, 428) home5=(369, 460) home6=(478, 454) home7=(414, 453) home8=(340, 463) else=(450, 150) b1=(356, 360) b2=(420, 360)
+states 692384 transitions 17309600
+transitions md5 60208bbdeb4944d2567828a5197e8a57
+weighings lose=1 none=173094 win=1
+weighings md5 48f0837fc2e6e0e836d16b2dc607cdc3
+0 2 3 4 5 6 7 8 b2 -> 0 2 3 4 5 6 7 8 0 0 1 1 win

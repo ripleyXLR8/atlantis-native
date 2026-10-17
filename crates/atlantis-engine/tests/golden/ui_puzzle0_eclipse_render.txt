@@ -1,0 +1,17 @@
+# StartPuzzle 0, the eclipse: the frame FUN_00441828 of atlantis.exe (2001 English build) draws on the .data records
+# (pzlion.tga by FUN_00447478, pz1l.spr / pz2l.spr by FUN_00447398, blits FUN_00410430), run under emulation:
+# md5 of the 640x480 RGB565 back buffer (little endian), at the start and with the win highlight (records 4 and 5 at
+# the win frames, 0x007bebf0 = 2); pz1l frames drawn alone at (320, 240) on black: box of the drawn pixels, md5.
+# The blend tables of FUN_0042b930 were not built in that run (all zero): an edge pixel is its own colour term only.
+frame_initial_md5 e3e7fb15af5862a44f6cfc1effafda81
+win_highlight_md5 13a8b47e7563400826d1743f74c38081
+pz1l_0_box 247,159,408,334
+pz1l_0_md5 264fb7f6eeb35a21ce92bc7e7cedadbc
+pz1l_71_box 279,204,530,316
+pz1l_71_md5 5ca1abf37acc2c0c85c6554662c026e5
+pz1l_142_box 273,199,494,263
+pz1l_142_md5 f1e371b4097cbf839707e8eb50c38384
+pz1l_213_box 247,157,409,334
+pz1l_213_md5 1aa9ea9a55171cfd3dacb97b672ff1fe
+pz1l_214_box 279,204,530,316
+pz1l_214_md5 39a0c82f5e5daaea3d9fa3f428aab36b
