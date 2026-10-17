@@ -1,0 +1,29 @@
+# The ambient sounds of the WAMs as atlantis.exe (2001 English build, 714240 bytes) loads them (FUN_00421ebc, FUN_004315b4),
+# under emulation. <WAM>|ambient md5 of the lines (in this order, LF-ended):
+#   'fileref2 WAM\<WAM> <file reference 2>',
+#   'obj WAM\<WAM> <id> <name> <x> <y> <z> <loudness> <w0> <w1> <w2> <w3> <v0>,<v1>,<v2>,<v3>' per object
+#   (empty name or variant '-'), 'ref WAM\<WAM> <place> <k> <object> <t> <m> <c>' per reference;
+#   floats as printf %.9g. <WAM>|lines their number.
+# <VUE>|centre md5 of 'centre <VUE> <n> <x> <y> <z>' lines (%.9g) of the frames listed in <VUE>|frames.
+FORET3.WAM|ambient 9b71de74bd52bfb8954317b2ebbad14c
+FORET3.WAM|lines 3
+MURIA.WAM|ambient 902f77e0f39a927b39edb51dad6b22d5
+MURIA.WAM|lines 11
+PALAIS2.WAM|ambient 802d0a0c3d12ccc32ef33bda06957553
+PALAIS2.WAM|lines 10
+PALAIS3.WAM|ambient 8a8c83d821bccc43d751687698960c16
+PALAIS3.WAM|lines 10
+PECHEUR1.WAM|ambient 315128fddc5f71643e5cbb0c7087afa6
+PECHEUR1.WAM|lines 31
+PECHEUR2.WAM|ambient 5c329e7510c41ff96df1b03105e628f9
+PECHEUR2.WAM|lines 31
+PECHEUR3.WAM|ambient 9ad05c3b8407c6a6f18c7e520869f422
+PECHEUR3.WAM|lines 31
+FOR1CENT.VUE|centre 517c75b11a777ec1b21fd4ab6da3f750
+FOR1CENT.VUE|frames 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,62
+MUR1CENT.VUE|centre e3d9778822d051554252415518af0f51
+MUR1CENT.VUE|frames 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,33,34,35,36,37,38,41,43,45,46,47,48
+PAL1CENT.VUE|centre 33a45f0bdc78cbb397dc629840cf92e3
+PAL1CENT.VUE|frames 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,193,194,195,196,197,198,199,200
+PECHCENT.VUE|centre 4e053914680203c204c799e63687c31a
+PECHCENT.VUE|frames 121,122,123,124,125,126,127,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,150,151,152,153,154,155,157,158,159,160,161,162,163,164,165,170
