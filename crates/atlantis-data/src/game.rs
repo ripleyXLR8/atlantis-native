@@ -53,3 +53,53 @@ impl Game {
         Ok(Game { exe, big, unpacked })
     }
 }
+
+/// Which release of the game a folder holds, for display.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Edition {
+    /// "CD" or "GOG.com".
+    pub release: &'static str,
+    /// "English", "French", ... (`None` when not recognised).
+    pub language: Option<&'static str>,
+    /// The year the executable was built.
+    pub build_year: u16,
+}
+
+impl std::fmt::Display for Edition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.release)?;
+        if let Some(l) = self.language {
+            write!(f, ", {l}")?;
+        }
+        write!(f, " ({} build)", self.build_year)
+    }
+}
+
+impl Game {
+    /// The release: the executable's build, and the language of the GOG
+    /// build from its player-screen row (the five GOG languages share one
+    /// executable; only this string differs).
+    pub fn edition(&self) -> Edition {
+        let gog = self.exe.build.name.starts_with("atlantis-gog");
+        let marker = self.exe.new_player_marker.as_slice();
+        let starts = |p: &[u8]| marker.len() >= p.len() && &marker[..p.len()] == p;
+        let language = if starts(b"#NOUVEAU") {
+            Some("French")
+        } else if starts(b"#NEUE") {
+            Some("German")
+        } else if starts(b"#NUEVO") {
+            Some("Spanish")
+        } else if starts(b"#NUOVO") {
+            Some("Italian")
+        } else if starts(b"#NEW") || starts(b"#New") {
+            Some("English")
+        } else {
+            None
+        };
+        Edition {
+            release: if gog { "GOG.com" } else { "CD" },
+            language,
+            build_year: if gog { 1999 } else { 2001 },
+        }
+    }
+}

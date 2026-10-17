@@ -111,6 +111,7 @@ fn main() {
             eprintln!("{e}");
             std::process::exit(1);
         });
+        println!("{}, {}", game.edition(), atlantis_app::version_string());
         let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
         let trace = Rc::new(RefCell::new(Vec::new()));
         // Headless: a new game at once, the saves in memory.
@@ -195,8 +196,12 @@ fn main() {
     } else {
         Settings::load(saves.as_ref()).unwrap_or_default().graphics
     };
+    let edition = game.edition();
+    log::info!("{edition}, {}", atlantis_app::version_string());
     let (sys, runner) = start_game(game, options);
-    let mut app = App::new(sys, Some(runner)).with_graphics(graphics, Some(saves));
+    let mut app = App::new(sys, Some(runner))
+        .with_graphics(graphics, Some(saves))
+        .with_edition(&edition);
     if let Err(e) = el.run_app(&mut app) {
         error_box(&format!("The window failed: {e}"));
         std::process::exit(1);

@@ -85,6 +85,16 @@ const HD_MAX_TILE: usize = hd::MAX_TILE;
 #[cfg(target_arch = "wasm32")]
 const HD_MAX_TILE: usize = 32;
 
+/// The port's version and the commit it was built from.
+pub fn version_string() -> String {
+    let commit = env!("ATLANTIS_NATIVE_COMMIT");
+    if commit.is_empty() {
+        format!("Atlantis Native {}", env!("CARGO_PKG_VERSION"))
+    } else {
+        format!("Atlantis Native {} ({commit})", env!("CARGO_PKG_VERSION"))
+    }
+}
+
 pub struct App {
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
@@ -99,6 +109,8 @@ pub struct App {
     col_map: Vec<usize>,
     /// The pointer lock as applied to the window.
     locked: bool,
+    /// The window's title: the port and the game's release.
+    title: String,
     /// The lock fell back to confining the pointer (Windows, X11): the
     /// system pointer is then kept at the centre of the window.
     confined: bool,
@@ -146,6 +158,7 @@ impl App {
             viewport: Viewport::default(),
             col_map: Vec::new(),
             locked: false,
+            title: "Atlantis Native".to_string(),
             confined: false,
             focused: true,
             raw_motion: false,
@@ -166,6 +179,19 @@ impl App {
 
     /// The graphics mode to start with, and the store its changes in the
     /// options menu are saved to (the HD options are read from it).
+    /// The game's release (see [`atlantis_data::Edition`]): in the
+    /// window's title and at the foot of the options menu, with the
+    /// port's version.
+    pub fn with_edition(mut self, edition: &atlantis_data::Edition) -> App {
+        self.title = format!("Atlantis Native - {edition}");
+        self.menu
+            .set_info(vec![format!("Game: {edition}"), version_string()]);
+        if let Some(w) = &self.window {
+            w.set_title(&self.title);
+        }
+        self
+    }
+
     pub fn with_graphics(mut self, graphics: Graphics, saves: Option<Rc<dyn SaveStore>>) -> App {
         self.graphics = graphics;
         if let Some(s) = saves.as_ref().and_then(|s| Settings::load(s.as_ref())) {
@@ -506,7 +532,7 @@ impl ApplicationHandler for App {
             return;
         }
         let attrs = Window::default_attributes()
-            .with_title("Atlantis Native")
+            .with_title(self.title.clone())
             .with_inner_size(LogicalSize::new(W as f64 * 1.5, H as f64 * 1.5));
         #[cfg(target_arch = "wasm32")]
         let attrs = {

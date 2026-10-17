@@ -80,7 +80,9 @@ impl MenuValues {
 const BOX_W: i32 = 400;
 const ROW_H: i32 = 24;
 const TITLE_H: i32 = 34;
-const FOOTER_H: i32 = 50;
+/// The footer: two lines on the game and the port, the selected entry's
+/// description, the keys.
+const FOOTER_H: i32 = 86;
 const BOX_H: i32 = TITLE_H + ENTRIES.len() as i32 * ROW_H + FOOTER_H;
 const BOX_X: i32 = (SCREEN_W as i32 - BOX_W) / 2;
 const BOX_Y: i32 = (SCREEN_H as i32 - BOX_H) / 2;
@@ -98,11 +100,19 @@ const SELECTED: u16 = 0xffe0;
 pub struct OptionsMenu {
     open: bool,
     selected: usize,
+    /// Shown at the foot of the menu: the game's release, the port's
+    /// version (set by the front end).
+    info: Vec<String>,
 }
 
 impl OptionsMenu {
     pub fn new() -> OptionsMenu {
         OptionsMenu::default()
+    }
+
+    /// The lines shown at the foot of the menu (at most two).
+    pub fn set_info(&mut self, lines: Vec<String>) {
+        self.info = lines;
     }
 
     pub fn is_open(&self) -> bool {
@@ -322,6 +332,9 @@ impl OptionsMenu {
             text(label, BOX_X + 16, y + 4, c);
             let t = format!("< {value} >");
             text(&t, right(&t), y + 4, c);
+        }
+        for (i, line) in self.info.iter().take(2).enumerate() {
+            text(line, centre(line), BOX_Y + BOX_H - 82 + i as i32 * 18, DIM);
         }
         let d = Self::description(self.selected(), v);
         text(d, centre(d), BOX_Y + BOX_H - 44, TEXT);
@@ -543,6 +556,30 @@ mod tests {
         t.uncover(&mut u);
         assert!(u == t.under);
         assert!(!u.contains(&TEXT) && u.contains(&BG));
+    }
+
+    #[test]
+    fn info_lines_fit_on_the_screen() {
+        assert!(BOX_Y >= 0 && BOX_Y + BOX_H <= SCREEN_H as i32);
+        let font = SubtitleFont::new();
+        let mut s = vec![0x1234u16; SCREEN_W * SCREEN_H];
+        let mut m = OptionsMenu::new();
+        m.set_info(vec![
+            "Game: GOG.com, French (1999 build)".to_string(),
+            "Atlantis Native 0.1.0 (abcdef0)".to_string(),
+        ]);
+        m.open();
+        m.draw(&mut s, &font, HD);
+        // The text stays inside the box.
+        for y in 0..SCREEN_H as i32 {
+            for x in 0..SCREEN_W as i32 {
+                let inside = (BOX_X - 1..BOX_X + BOX_W + 1).contains(&x)
+                    && (BOX_Y - 1..BOX_Y + BOX_H + 1).contains(&y);
+                if !inside {
+                    assert_eq!(s[y as usize * SCREEN_W + x as usize], 0x1234, "({x}, {y})");
+                }
+            }
+        }
     }
 
     #[test]

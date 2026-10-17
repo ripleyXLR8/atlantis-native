@@ -21,7 +21,7 @@ pub mod wam;
 pub use big::BigArchive;
 pub use exe::{ExeBuild, ExeTables};
 pub use files::{FileSource, MemFiles, StdDir};
-pub use game::{Game, GameError};
+pub use game::{Edition, Game, GameError};
 pub use sprite::{read_spr_file, Image565, SprSprite};
 pub use sprite_list::SpritePlaceEntry;
 pub use wam::{Place, Wam};
