@@ -90,6 +90,10 @@ pub struct Sys {
     pub hd: RefCell<HdLayer>,
     /// The HD tile size the front end asks for (0: HD off).
     hd_tile: Cell<usize>,
+    /// The optional differences from the original game, shared with the
+    /// front end's options menu: the engine reads them where it uses them,
+    /// so a change applies at once.
+    enhancements: Cell<crate::enhancements::Enhancements>,
     /// The HD layer stands for the frame being drawn / the frame shown.
     hd_marked: Cell<bool>,
     hd_shown: Cell<bool>,
@@ -114,6 +118,7 @@ impl Sys {
             screen: RefCell::new(vec![0; SCREEN_W * SCREEN_H]),
             hd: RefCell::new(HdLayer::default()),
             hd_tile: Cell::new(0),
+            enhancements: Cell::new(crate::enhancements::Enhancements::default()),
             hd_marked: Cell::new(false),
             hd_shown: Cell::new(false),
             cursor: RefCell::new(None),
@@ -137,6 +142,16 @@ impl Sys {
     /// runs that way, beside the game's loops.
     pub fn add_timer(&self, f: Timer) {
         self.timers.borrow_mut().push(f);
+    }
+
+    /// The optional differences from the original game in force.
+    pub fn enhancements(&self) -> crate::enhancements::Enhancements {
+        self.enhancements.get()
+    }
+
+    /// Sets them (the engine at start, the options menu at any time).
+    pub fn set_enhancements(&self, e: crate::enhancements::Enhancements) {
+        self.enhancements.set(e);
     }
 
     /// Milliseconds since the start (the original reads timeGetTime).

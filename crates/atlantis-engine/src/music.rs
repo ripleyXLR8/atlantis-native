@@ -555,9 +555,6 @@ pub struct Music {
     /// the settings ([`crate::Settings::music_on_disk`]), so that the set
     /// outlives the session as the folder does.
     pub on_disk: u32,
-    /// Play the tracks through the original's streaming ring (set by
-    /// [`crate::Enhancements::minor_bug_fixes`] off).
-    pub original_ring: bool,
     /// `FUN_00432a64`: 0x006cd87c, the value last started.
     pub new_sound_last: i32,
     pub new_sound_playing: bool,
@@ -582,7 +579,6 @@ impl Music {
             handle_set: false,
             open_track: 0,
             on_disk: 0,
-            original_ring: false,
             new_sound_last: 0,
             new_sound_playing: false,
         }
@@ -721,7 +717,10 @@ impl Engine {
             return;
         };
         let mixer = self.music.mixer();
-        let voice = if self.music.original_ring {
+        // The minor bug fixes loop the music seamlessly; off, the original's
+        // streaming ring (read at each track start, so the options menu
+        // applies from the next track).
+        let voice = if !self.enhancements().minor_bug_fixes {
             let mut ring = MusicRing::wine(Arc::new(data.clone()));
             ring.start()
                 .then(|| mixer.play_source(Box::new(MusicRingSource::new(ring)), 0, 0))

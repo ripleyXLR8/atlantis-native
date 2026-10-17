@@ -291,7 +291,7 @@ impl Dialogs {
                 req.section,
                 req.letter
             );
-            if !e.enhancements.ui_ux {
+            if !e.enhancements().ui_ux {
                 self.error_box(e, HEAD_OPEN_FAIL_TEXT).await;
             }
         } else {
@@ -975,7 +975,7 @@ impl LinePlayer {
             // @ 0x0042f57e) then overwrites, so it is never seen; drawn over
             // the head with the minor bug fixes. The modulo loops the SPF
             // when the UBB outlives it (every shipped pair has 31 frames).
-            if let (Some(spf), true) = (&self.spf, e.enhancements.minor_bug_fixes) {
+            if let (Some(spf), true) = (&self.spf, e.enhancements().minor_bug_fixes) {
                 let k = if self.spf_count > 0 {
                     self.spf_frame % self.spf_count
                 } else {

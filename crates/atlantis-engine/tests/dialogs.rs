@@ -808,7 +808,7 @@ fn with_new_game(
     let task = async move {
         let mut e = Engine::new(s2, g, Rc::new(DirectLoader));
         e.trace = Some(t2);
-        e.enhancements = enhancements;
+        e.set_enhancements(enhancements);
         let mut scripts = Scripts::with_dialog(Box::new(Dialogs::new()));
         e.new_game(&mut scripts, false).await;
         f(e, scripts).await;

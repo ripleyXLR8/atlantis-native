@@ -685,7 +685,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     // carry over from the last run, as in the original's memory.
     let last = e.puzzles.snakes.unwrap_or_default();
     let mut game = SnakesGame::new(map, last);
-    game.fix_first_run_win = e.enhancements.minor_bug_fixes;
+    game.fix_first_run_win = e.enhancements().minor_bug_fixes;
     let mut host = Host(PuzzleHost::new(e, hooks));
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;

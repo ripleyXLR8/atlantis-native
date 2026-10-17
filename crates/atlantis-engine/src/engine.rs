@@ -264,8 +264,6 @@ pub struct Engine {
     pub(crate) place_table_slots: Vec<Vec<Transition>>,
     /// The hidden persos (HidePerso): their sprites start inactive.
     pub hidden_persos: Vec<i32>,
-    /// The optional differences from the original game.
-    pub enhancements: Enhancements,
     /// The dialog subtitles are shown (SUBTITLES, 0x004960a8).
     pub subtitles: bool,
     /// The object just given, shown under the talking heads until the end
@@ -399,7 +397,6 @@ impl Engine {
             load_running: false,
             place_table_slots: Vec::new(),
             hidden_persos: Vec::new(),
-            enhancements: Enhancements::default(),
             subtitles: true,
             given_object: None,
             zoom: false,
@@ -475,6 +472,16 @@ impl Engine {
     }
 
     /// The window closed, or the place loop has to end.
+    /// The optional differences from the original game in force (shared
+    /// with the options menu through [`Sys`], so a change applies at once).
+    pub fn enhancements(&self) -> Enhancements {
+        self.sys.enhancements()
+    }
+
+    pub fn set_enhancements(&mut self, x: Enhancements) {
+        self.sys.set_enhancements(x);
+    }
+
     pub fn should_abort(&self) -> bool {
         self.sys.should_quit() || self.abort.is_some()
     }
@@ -810,12 +817,9 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
     } = opts;
     let mut e = Engine::new(sys, game, loader);
     e.trace = trace;
-    e.enhancements = enhancements;
+    e.set_enhancements(enhancements);
     e.subtitles = subtitles;
     e.saves = saves;
-    // The music loops seamlessly with the minor bug fixes; the original's
-    // streaming ring otherwise.
-    e.music.original_ring = !enhancements.minor_bug_fixes;
     e.load_settings(Settings {
         subtitles,
         enhancements,

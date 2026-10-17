@@ -92,9 +92,13 @@ impl Engine {
     /// The settings file, from the current options.
     pub(crate) fn save_settings(&mut self) {
         self.settings.subtitles = self.subtitles;
-        // The graphics mode is the front end's (its options menu).
+        // The graphics mode and the enhancements are the front end's (its
+        // options menu writes them): keep the stored values, or this save
+        // would undo a choice made in the menu since start-up (and a
+        // --original run would store its overrides).
         if let Some(stored) = Settings::load(self.saves.as_ref()) {
             self.settings.graphics = stored.graphics;
+            self.settings.enhancements = stored.enhancements;
         }
         self.settings.save(self.saves.as_ref());
     }

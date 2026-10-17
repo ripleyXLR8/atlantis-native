@@ -2,9 +2,11 @@
 //! frame the game shows: settings of the port that the original's menus do
 //! not have. The game is paused while it is open.
 //!
-//! It holds one entry for now, the graphics mode (see [`crate::hd`]), and
-//! Close; the entries are a list so that more can follow.
+//! Entries: the graphics mode (see [`crate::hd`]), the three groups of
+//! [`Enhancements`] (the names of the ScummVM port's options), and Close;
+//! the entries are a list so that more can follow.
 
+use crate::enhancements::Enhancements;
 use crate::persist::Graphics;
 use crate::subtitles::SubtitleFont;
 use crate::sys::Key;
@@ -14,10 +16,19 @@ use crate::warp::{SCREEN_H, SCREEN_W};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Entry {
     Graphics,
+    BugFixes,
+    RestoredContent,
+    UiUx,
     Close,
 }
 
-const ENTRIES: [Entry; 2] = [Entry::Graphics, Entry::Close];
+const ENTRIES: [Entry; 5] = [
+    Entry::Graphics,
+    Entry::BugFixes,
+    Entry::RestoredContent,
+    Entry::UiUx,
+    Entry::Close,
+];
 
 /// What the front end does after an input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,6 +36,8 @@ pub enum MenuAction {
     None,
     /// The graphics mode was changed: apply and save it.
     SetGraphics(Graphics),
+    /// An enhancement group was switched: apply and save them.
+    SetEnhancements(Enhancements),
     /// The menu closed.
     Close,
 }
@@ -33,12 +46,13 @@ pub enum MenuAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MenuValues {
     pub graphics: Graphics,
+    pub enhancements: Enhancements,
 }
 
-const BOX_W: i32 = 300;
+const BOX_W: i32 = 360;
 const ROW_H: i32 = 24;
 const TITLE_H: i32 = 34;
-const FOOTER_H: i32 = 30;
+const FOOTER_H: i32 = 50;
 const BOX_H: i32 = TITLE_H + ENTRIES.len() as i32 * ROW_H + FOOTER_H;
 const BOX_X: i32 = (SCREEN_W as i32 - BOX_W) / 2;
 const BOX_Y: i32 = (SCREEN_H as i32 - BOX_H) / 2;
@@ -86,10 +100,36 @@ impl OptionsMenu {
                 Graphics::Original => Graphics::Hd,
                 Graphics::Hd => Graphics::Original,
             }),
+            Entry::BugFixes => {
+                let mut x = v.enhancements;
+                x.minor_bug_fixes = !x.minor_bug_fixes;
+                MenuAction::SetEnhancements(x)
+            }
+            Entry::RestoredContent => {
+                let mut x = v.enhancements;
+                x.restored_content = !x.restored_content;
+                MenuAction::SetEnhancements(x)
+            }
+            Entry::UiUx => {
+                let mut x = v.enhancements;
+                x.ui_ux = !x.ui_ux;
+                MenuAction::SetEnhancements(x)
+            }
             Entry::Close => {
                 self.close();
                 MenuAction::Close
             }
+        }
+    }
+
+    /// One line on what the selected entry does.
+    fn description(entry: Entry) -> &'static str {
+        match entry {
+            Entry::Graphics => "HD: the panorama and the faces at the window's resolution",
+            Entry::BugFixes => "Fixes bugs of the original release (on by default)",
+            Entry::RestoredContent => "Restores lines the original never plays (off by default)",
+            Entry::UiUx => "Modern comforts, e.g. no error box (off by default)",
+            Entry::Close => "Back to the game",
         }
     }
 
@@ -188,9 +228,28 @@ impl OptionsMenu {
                     let w = font.width(t.as_bytes());
                     text(screen, &t, BOX_X + BOX_W - 16 - w, y + 4, c);
                 }
+                Entry::BugFixes | Entry::RestoredContent | Entry::UiUx => {
+                    let (label, on) = match e {
+                        Entry::BugFixes => ("Fix original bugs", v.enhancements.minor_bug_fixes),
+                        Entry::RestoredContent => {
+                            ("Restored content", v.enhancements.restored_content)
+                        }
+                        _ => ("Modern UI/UX", v.enhancements.ui_ux),
+                    };
+                    text(screen, label, BOX_X + 16, y + 4, c);
+                    let t = format!("< {} >", if on { "On" } else { "Off" });
+                    let w = font.width(t.as_bytes());
+                    text(screen, &t, BOX_X + BOX_W - 16 - w, y + 4, c);
+                }
                 Entry::Close => centred(screen, "Close", y + 4, c),
             }
         }
+        centred(
+            screen,
+            Self::description(self.selected()),
+            BOX_Y + BOX_H - 44,
+            TEXT,
+        );
         centred(
             screen,
             "Arrows, Enter or click; Escape or F10 closes",
@@ -204,11 +263,18 @@ impl OptionsMenu {
 mod tests {
     use super::*;
 
+    const DEFAULTS: Enhancements = Enhancements {
+        minor_bug_fixes: true,
+        restored_content: false,
+        ui_ux: false,
+    };
     const ORIG: MenuValues = MenuValues {
         graphics: Graphics::Original,
+        enhancements: DEFAULTS,
     };
     const HD: MenuValues = MenuValues {
         graphics: Graphics::Hd,
+        enhancements: DEFAULTS,
     };
 
     #[test]
@@ -224,7 +290,9 @@ mod tests {
             m.key(Key::Right, HD),
             MenuAction::SetGraphics(Graphics::Original)
         );
-        assert_eq!(m.key(Key::Down, ORIG), MenuAction::None);
+        for _ in 0..4 {
+            assert_eq!(m.key(Key::Down, ORIG), MenuAction::None);
+        }
         assert_eq!(m.selected(), Entry::Close);
         assert_eq!(m.key(Key::Left, ORIG), MenuAction::None);
         assert!(m.is_open());
@@ -246,12 +314,46 @@ mod tests {
             m.click(320, gy, ORIG),
             MenuAction::SetGraphics(Graphics::Hd)
         );
-        m.pointer(320, gy + ROW_H);
+        m.pointer(320, gy + 4 * ROW_H);
         assert_eq!(m.selected(), Entry::Close);
         assert_eq!(m.click(320, BOX_Y + 2, ORIG), MenuAction::None);
         assert!(m.is_open());
         assert_eq!(m.click(5, 5, ORIG), MenuAction::Close);
         assert!(!m.is_open());
+    }
+
+    #[test]
+    fn enhancement_rows_switch_their_group() {
+        let mut m = OptionsMenu::new();
+        m.open();
+        m.key(Key::Down, ORIG);
+        assert_eq!(m.selected(), Entry::BugFixes);
+        let MenuAction::SetEnhancements(x) = m.key(Key::Enter, ORIG) else {
+            panic!("no change");
+        };
+        assert_eq!(
+            x,
+            Enhancements {
+                minor_bug_fixes: false,
+                ..DEFAULTS
+            }
+        );
+        m.key(Key::Down, ORIG);
+        assert_eq!(
+            m.key(Key::Right, ORIG),
+            MenuAction::SetEnhancements(Enhancements {
+                restored_content: true,
+                ..DEFAULTS
+            })
+        );
+        m.key(Key::Down, ORIG);
+        assert_eq!(
+            m.key(Key::Space, ORIG),
+            MenuAction::SetEnhancements(Enhancements {
+                ui_ux: true,
+                ..DEFAULTS
+            })
+        );
     }
 
     #[test]

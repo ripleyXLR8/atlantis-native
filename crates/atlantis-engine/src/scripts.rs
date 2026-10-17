@@ -646,7 +646,7 @@ impl Scripts {
     /// `FUN_004277c8`: the first /sel entry whose condition holds runs.
     async fn run_sel_scan(&mut self, e: &mut Engine) {
         self.begin_scan();
-        let restored = e.enhancements.restored_content;
+        let restored = e.enhancements().restored_content;
         let found = self.script.find_sel_entry(|sec| {
             let key = (!restored).then_some(&mut self.scan_key);
             eval_entry(&self.names, key, self.script.text(), e, sec)
@@ -679,7 +679,7 @@ impl Scripts {
                 continue;
             }
             self.begin_scan();
-            let restored = e.enhancements.restored_content;
+            let restored = e.enhancements().restored_content;
             let found = self.script.sections().iter().position(|sec| {
                 let key = (!restored).then_some(&mut self.scan_key);
                 sec.is_entry
@@ -713,7 +713,7 @@ impl Scripts {
     /// object back into the place when the place's sprite list holds it.
     async fn run_con_click(&mut self, e: &mut Engine) {
         self.begin_scan();
-        let restored = e.enhancements.restored_content;
+        let restored = e.enhancements().restored_content;
         let found = self.script.find_con_click_entry(&self.counters, |sec| {
             let key = (!restored).then_some(&mut self.scan_key);
             eval_entry(&self.names, key, self.script.text(), e, sec)
@@ -813,7 +813,7 @@ impl Scripts {
             }
         }
         self.begin_scan();
-        let restored = e.enhancements.restored_content;
+        let restored = e.enhancements().restored_content;
         let mut play = None;
         for sec in self.script.sections() {
             let key = (!restored).then_some(&mut self.scan_key);
@@ -929,7 +929,7 @@ impl Scripts {
                             // plays the next narrator line.
                             // The 2001 build with the restored content too.
                             let alt = e.game.exe.build.alt_game_over_narration
-                                || e.enhancements.restored_content;
+                                || e.enhancements().restored_content;
                             if let (Some((text, letter)), true) = (narrator.as_mut(), alt) {
                                 let count = self.game_over_count.entry(sec.id).or_default();
                                 let pick = con_alt_game_over_narration(&sec.items, i, count);
@@ -1333,7 +1333,11 @@ mod tests {
         let ran = with_engine(
             "second_game_over_after_a_reload_plays_the_second_narration",
             move |mut e| async move {
-                e.enhancements.restored_content = true;
+                {
+                    let mut x = e.enhancements();
+                    x.restored_content = true;
+                    e.set_enhancements(x);
+                }
                 let mut s = Scripts::with_dialog(Box::new(GameOvers(g2)));
                 s.chapter_loaded(&mut e, 3, false).await;
                 for _ in 0..2 {

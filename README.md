@@ -89,7 +89,10 @@ port's way out; the original has none).
 
 F10 opens the port's options menu, over whatever the game shows (the game
 pauses, its sound too): the graphics, Original or HD (see
-[HD mode](#hd-mode)). Up / Down choose an entry, Enter, Space, Left / Right
+[HD mode](#hd-mode)), and the three groups of [enhancements](#enhancements),
+"Fix original bugs", "Restored content" and "Modern UI/UX", on or off.
+A change applies at once (the music mode from the next track) and is saved
+in `settings.ini`. Up / Down choose an entry, Enter, Space, Left / Right
 or a click change it; Escape, F10, Close or a click outside the menu
 closes it. F9 shows a diagnostic overlay in the panoramic view (the
 variables the scripts test).

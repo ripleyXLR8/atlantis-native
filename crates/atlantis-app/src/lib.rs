@@ -210,6 +210,17 @@ impl App {
                     s.save(saves.as_ref());
                 }
             }
+            MenuAction::SetEnhancements(x) => {
+                // The engine reads them where it uses them: in force at once
+                // (the music mode from the next track).
+                self.sys.set_enhancements(x);
+                log::info!("enhancements: {x:?}");
+                if let Some(saves) = &self.saves {
+                    let mut s = Settings::load(saves.as_ref()).unwrap_or_default();
+                    s.enhancements = x;
+                    s.save(saves.as_ref());
+                }
+            }
         }
         if let Some(w) = &self.window {
             w.request_redraw();
@@ -219,6 +230,7 @@ impl App {
     fn menu_values(&self) -> MenuValues {
         MenuValues {
             graphics: self.graphics,
+            enhancements: self.sys.enhancements(),
         }
     }
 
@@ -337,14 +349,12 @@ impl App {
         if self.menu.is_open() {
             self.menu_frame.clear();
             self.menu_frame.extend_from_slice(frame);
+            let values = MenuValues {
+                graphics: self.graphics,
+                enhancements: self.sys.enhancements(),
+            };
             let font = self.menu_font.get_or_insert_with(SubtitleFont::new);
-            self.menu.draw(
-                &mut self.menu_frame,
-                font,
-                MenuValues {
-                    graphics: self.graphics,
-                },
-            );
+            self.menu.draw(&mut self.menu_frame, font, values);
             frame = &self.menu_frame;
         }
         buf.fill(0);
