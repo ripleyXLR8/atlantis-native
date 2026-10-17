@@ -97,6 +97,22 @@ impl Engine {
             self.wam_name,
             v("chapter")
         )];
+        // CHAPI022's patrol (60 s cycle on time2): 182, 183 and 185 are
+        // safe only while FlagGarde is 184 (time2 28..48), 182 and 183 also
+        // at 187.
+        if v("chapter") == 22 {
+            let g = v("flaggarde");
+            let safe = g == 184;
+            lines.push(format!(
+                "GARDES: time2 {}  FlagGarde {g}  => {}",
+                v("time2"),
+                if safe {
+                    "VOIE LIBRE: 182 > 183 > 185 > 186 vite"
+                } else {
+                    "attends a 181 (libre quand FlagGarde = 184, time2 28..48)"
+                }
+            ));
+        }
         if vue == 126 || vue == 125 {
             let ok = |b: bool| if b { "OK" } else { "--" };
             let x_ok = (ax > 0 && ax < 13) || (ax > 342 && ax < 360);
