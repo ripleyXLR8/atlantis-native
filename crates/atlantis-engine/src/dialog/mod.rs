@@ -33,6 +33,7 @@ use atlantis_data::SprSprite;
 use crate::audio::VoiceId;
 use crate::con::script::latin1_bytes;
 use crate::engine::{Engine, Event};
+use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;
 use crate::music::apc_pcm;
 use crate::scripts::{DialogPresenter, GameOverRequest, LineOutcome, LineRequest};
@@ -128,8 +129,7 @@ struct SingleLine<'a> {
     keep_screen: bool,
     /// A voice-only line that redraws the view (`FUN_00430258`).
     voice_off: bool,
-    /// The INITDIAL row of the head, for the 3D head (phase 4).
-    #[allow(dead_code)]
+    /// The INITDIAL row of the head, for the 3D head.
     dial_row: Option<i32>,
 }
 
@@ -371,9 +371,26 @@ impl Dialogs {
         // persos are not drawn. FUN_00430258 calls it once (0x00430467,
         // persos shown) before its wait loop; FUN_004305e8 never does.
         let talking_head = l.cam != 0 && !l.keep_screen;
-        // TODO(phase 4): the 3D head over the UBB (FUN_0042ee88 step 4:
-        // the INITDIAL row's s3d / 3dc / 3da / mouth animation, the camera
-        // and the lip-sync track wav\ata<NNNN><letter>.syc).
+        // The 3D head drawn over the UBB, the animated mouth (FUN_0042ee88
+        // step 4: the speaker's INITDIAL row, its first sub-record, the
+        // camera, and the line's lip-sync track wav\ata<NNNN><letter>.syc
+        // read by FUN_0042f9e8).
+        let full_screen_ubb = ubb
+            .as_ref()
+            .is_some_and(|u| u.width() == SCREEN_W && u.height() == SCREEN_H);
+        let head = match l.dial_row {
+            Some(row) if talking_head && full_screen_ubb && (2..=5).contains(&l.cam) => {
+                let syc = format!("ATA{:04}{}.SYC", l.section, l.letter);
+                let head = self.load_head(e, row, l.cam, &syc).await;
+                if head.is_none() {
+                    // A head file is missing (lines without a .SYC never get
+                    // here: they are played voice-only).
+                    log::info!("no head for INITDIAL row {row} ({syc})");
+                }
+                head
+            }
+            _ => None,
+        };
         if talking_head {
             e.sprites_hide_npcs = true;
             e.recomposite_sprite_layer();
@@ -390,6 +407,9 @@ impl Dialogs {
             start: e.sys.millis(),
             shown: 0,
             spf_frame: 0,
+            head,
+            head_time0: None,
+            head_ended: false,
         };
 
         // The line lasts as long as its voice; a talking head (0x00496188
@@ -469,6 +489,38 @@ impl Dialogs {
             e.warp.set_hfov(saved_fov);
         }
         out
+    }
+
+    /// The 3D head of INITDIAL row `row` at camera `cam` with the lip-sync
+    /// track `syc` (`WAV\<syc>`); `None` when a file is missing.
+    async fn load_head(&mut self, e: &Engine, row: i32, cam: i32, syc: &str) -> Option<DialogHead> {
+        let init = self.dial_init(e).await;
+        let r = init.rows.get(&row)?;
+        if r.s3d.is_empty() || r.anim_3dc.is_empty() || r.anim_3da.is_empty() || r.anim_m.is_empty()
+        {
+            return None;
+        }
+        let paths = head_paths(&r.s3d, &r.anim_3dc, &r.anim_3da, &r.anim_m, syc);
+        let mut files = std::collections::HashMap::new();
+        for p in &paths {
+            let d = e.read(p).await?;
+            files.insert(p.clone(), d);
+        }
+        // the textures the mesh names
+        let mesh = atlantis_data::head::F3dc::parse(&files[&paths[0]])?;
+        for p in texture_paths(&mesh) {
+            let d = e.read(&p).await?;
+            files.insert(p, d);
+        }
+        DialogHead::load(
+            |name| files.get(name).cloned(),
+            &r.s3d,
+            &r.anim_3dc,
+            &r.anim_3da,
+            &r.anim_m,
+            cam,
+            syc,
+        )
     }
 
     /// The error box of a head that cannot be opened. The original shows a
@@ -721,6 +773,12 @@ struct LinePlayer {
     shown: u32,
     /// The SPF frame (0x00496104).
     spf_frame: usize,
+    /// The 3D head over the UBB.
+    head: Option<DialogHead>,
+    /// The clock at the head's first frame.
+    head_time0: Option<u64>,
+    /// The lip-sync track has ended: the neutral mouth.
+    head_ended: bool,
 }
 
 impl LinePlayer {
@@ -767,9 +825,14 @@ impl LinePlayer {
             self.composite = comp;
         }
         let mut decoded = false;
+        let mut frame_index = 0;
         if let (Some(ubb), true) = (self.ubb.as_mut(), due) {
             match ubb.next_frame() {
                 Ok(f) => {
+                    // the frame index in the loop (the original rewinds at
+                    // the header's frame count, and the head animation's
+                    // index restarts with it)
+                    frame_index = f.index;
                     // FUN_00450b08.
                     compose_ubb_ia(
                         &mut self.composite,
@@ -791,9 +854,29 @@ impl LinePlayer {
                 .ubb
                 .as_ref()
                 .map_or((0, 0), |u| (u.width(), u.height()));
-            // TODO(phase 4): the 3D head is drawn here, after the UBB
-            // composite and before the SPF frame (FUN_0044dd10 with the
-            // UBB frame index, FUN_0044e860 lip-sync, FUN_0044c9c0).
+            // The 3D head (FUN_0044dd10 with the frame index of the UBB
+            // loop, FUN_0044e860 at the ms elapsed since the first frame, or
+            // FUN_0044e2e0 once it has returned a negative value, then
+            // FUN_0044c9c0), drawn after the UBB composite and before the
+            // SPF frame as in FUN_0042ee88's loop.
+            if let (Some(head), true) = (self.head.as_mut(), w == SCREEN_W && h == SCREEN_H) {
+                head.set_frame(frame_index as i32);
+                let now = e.sys.millis();
+                let t0 = *self.head_time0.get_or_insert(now);
+                if self.head_ended {
+                    head.neutral();
+                } else {
+                    // 0x006ce0e0 is a millisecond clock advanced by 5 at
+                    // 200 Hz (FUN_00431150, AIL_set_timer_frequency(200) in
+                    // FUN_004310ac): the elapsed time is a multiple of 5
+                    let t = (now - t0) / 5 * 5;
+                    if head.lipsync(i32::try_from(t).unwrap_or(i32::MAX)) < 0 {
+                        self.head_ended = true;
+                    }
+                }
+                head.transform();
+                head.render(&mut self.composite, w);
+            }
 
             // The SPF overlay: the original draws it into the locked
             // surface, which the full copy of the back buffer (FUN_00410f36

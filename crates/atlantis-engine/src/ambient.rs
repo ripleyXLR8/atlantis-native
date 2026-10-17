@@ -661,6 +661,27 @@ impl MixerAmbientOutput {
         }
     }
 
+    /// A puzzle's sound on sample `slot` (the players `FUN_0043ca28` and
+    /// its siblings): AIL_set_sample_pan / volume, then the start. The
+    /// sound plays at its own rate, as the ScummVM port plays it.
+    pub fn start_pcm(&mut self, slot: usize, pcm: Pcm, pan: u8, volume: u8) {
+        if let Some(v) = self.voices[slot].take() {
+            self.mixer.stop(v);
+        }
+        self.pan[slot] = pan & 0x7f;
+        self.volume[slot] = volume & 0x7f;
+        self.miles.started(slot);
+        if pcm.samples.is_empty() {
+            return;
+        }
+        self.voices[slot] = Some(self.mixer.play(
+            pcm,
+            false,
+            mixer_volume(self.volume[slot]),
+            miles_pan_balance(self.pan[slot]),
+        ));
+    }
+
     fn active(&self, slot: usize) -> bool {
         self.voices[slot].is_some_and(|v| self.mixer.is_playing(v))
     }

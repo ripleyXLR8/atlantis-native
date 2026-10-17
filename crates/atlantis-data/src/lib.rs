@@ -9,6 +9,7 @@ pub mod big;
 pub mod exe;
 pub mod files;
 pub mod game;
+pub mod head;
 mod reader;
 pub mod saves;
 pub mod sprite;

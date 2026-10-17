@@ -587,8 +587,8 @@ fn subtitle_pixels(frame: &[u16]) -> (usize, usize) {
 }
 
 /// A new game, headless: after the intro cinematics the first line plays
-/// with the pilot's talking head (its UBB over the panorama), its voice and
-/// its subtitle, then the game goes on to place 1.
+/// with the pilot's talking head (its UBB over the panorama, the 3D mouth
+/// over it), its voice and its subtitle, then the game goes on to place 1.
 #[test]
 fn new_game_plays_the_first_dialog_line() {
     let Some(g) = game("new_game_plays_the_first_dialog_line") else {
@@ -663,6 +663,18 @@ fn new_game_plays_the_first_dialog_line() {
     assert_eq!(w, white);
     assert!(white > 200, "{white} subtitle pixels");
     assert!(shadow > white / 2, "{shadow} shadowed of {white}");
+    // The 3D head fills the pilot's mouth, which the UBB leaves black
+    // (about 2500 near-black pixels of this box without the head).
+    let fr = &frame;
+    let dark = (190..250)
+        .flat_map(|y| (80..140).map(move |x| fr[y * 640 + x]))
+        .filter(|&p| {
+            let (r, g, b) = ((p >> 11) & 0x1f, (p >> 5) & 0x3f, p & 0x1f);
+            u32::from(r << 3 | r >> 2) + u32::from(g << 2 | g >> 4) + u32::from(b << 3 | b >> 2)
+                < 60
+        })
+        .count();
+    assert!(dark < 400, "{dark} near-black pixels where the mouth is");
     dump("dialog_first_line", &frame);
     // Then place 1.
     assert!(ev

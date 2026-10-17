@@ -1,0 +1,40 @@
+# The puzzle dispatcher FUN_0043a1e0 of atlantis.exe (2001 English build, 714240 bytes) under emulation, for each
+# StartPuzzle 0..17 with no object and with object 7 in hand: the entry called, the result (0x55 when the entry ran)
+# and OBJETENMAIN after.
+OBJETENMAIN variable index 30
+held 0 puzzle 0: entry FUN_0044154c result 85 objetenmain 0
+held 0 puzzle 1: entry FUN_004441e8 result 85 objetenmain 0
+held 0 puzzle 2: entry FUN_0044203c result 85 objetenmain 0
+held 0 puzzle 3: entry FUN_004459c0 result 85 objetenmain 0
+held 0 puzzle 4: entry FUN_00438bf0 result 85 objetenmain 0
+held 0 puzzle 5: entry FUN_0043fcb4 result 85 objetenmain 0
+held 0 puzzle 6: entry FUN_00446300 result 85 objetenmain 0
+held 0 puzzle 7: entry FUN_0044659c result 85 objetenmain 0
+held 0 puzzle 8: entry FUN_0043b0f4 result 85 objetenmain 0
+held 0 puzzle 9: entry FUN_0044763c result 85 objetenmain 0
+held 0 puzzle 10: entry FUN_0044763c result 85 objetenmain 0
+held 0 puzzle 11: entry FUN_0044763c result 85 objetenmain 0
+held 0 puzzle 12: entry FUN_0044763c result 85 objetenmain 0
+held 0 puzzle 13: entry FUN_004404fc result 85 objetenmain 0
+held 0 puzzle 14: entry FUN_00446830 result 85 objetenmain 0
+held 0 puzzle 15: entry FUN_0043d28c result 85 objetenmain 0
+held 0 puzzle 16: entry FUN_0043ee54 result 85 objetenmain 0
+held 0 puzzle 17: entry none result 0 objetenmain 0
+held 7 puzzle 0: entry none result 1 objetenmain 7
+held 7 puzzle 1: entry none result 1 objetenmain 7
+held 7 puzzle 2: entry none result 1 objetenmain 7
+held 7 puzzle 3: entry none result 1 objetenmain 7
+held 7 puzzle 4: entry none result 1 objetenmain 7
+held 7 puzzle 5: entry none result 1 objetenmain 7
+held 7 puzzle 6: entry FUN_00446300 result 85 objetenmain 7
+held 7 puzzle 7: entry FUN_0044659c result 85 objetenmain 7
+held 7 puzzle 8: entry none result 1 objetenmain 7
+held 7 puzzle 9: entry none result 1 objetenmain 7
+held 7 puzzle 10: entry FUN_0044763c result 85 objetenmain 7
+held 7 puzzle 11: entry FUN_0044763c result 85 objetenmain 7
+held 7 puzzle 12: entry FUN_0044763c result 85 objetenmain 7
+held 7 puzzle 13: entry FUN_004404fc result 85 objetenmain 7
+held 7 puzzle 14: entry FUN_00446830 result 85 objetenmain 7
+held 7 puzzle 15: entry FUN_0043d28c result 85 objetenmain 0
+held 7 puzzle 16: entry none result 1 objetenmain 7
+held 7 puzzle 17: entry none result 1 objetenmain 7

@@ -100,6 +100,12 @@ pub trait ScriptHooks {
         ready(false)
     }
 
+    /// The /sel scan `FUN_004277c8` on its own: the first /sel entry whose
+    /// condition holds runs (a puzzle runs it: Muria's tablets).
+    fn sel_scan<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, ()> {
+        ready(())
+    }
+
     /// The departure /sel scan before a move to `dest` (`FUN_00423ad8` @
     /// 0x00423dc5..0x00423e7e), DEPARTVUE = `dest`.
     fn departure_scan<'a>(&'a mut self, e: &'a mut Engine, dest: u16) -> HookFuture<'a, Departure> {

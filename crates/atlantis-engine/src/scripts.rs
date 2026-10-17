@@ -853,11 +853,8 @@ impl Scripts {
     async fn run_puzzle_zone(&mut self, e: &mut Engine, n: u32) {
         e.stop_ambient();
         e.music.duck(false, Some(50));
-        // TODO(phase 5): the puzzles. Each one is won at once, as the
-        // puzzles not translated yet are in the ScummVM port, so that the
-        // chapters it gates go on (FinPuzzle = 255).
-        log::warn!("puzzle {n}: not translated yet, won");
-        e.vars.set("finpuzzle", 255);
+        // FinPuzzle = the result (crate::puzzle, FUN_0043a1e0).
+        crate::puzzle::play_puzzle(e, self, n as i32).await;
         e.music.unduck(Some(80));
         if e.should_abort() {
             return;
@@ -1222,6 +1219,10 @@ impl ScriptHooks for Scripts {
             self.run_sel_scan(e).await;
             e.vars.zone999_end();
         })
+    }
+
+    fn sel_scan<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, ()> {
+        Box::pin(self.run_sel_scan(e))
     }
 
     fn puzzle_zone<'a>(&'a mut self, e: &'a mut Engine, n: u32) -> HookFuture<'a, bool> {

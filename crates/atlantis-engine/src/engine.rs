@@ -111,6 +111,11 @@ pub enum Event {
     /// A checkpoint was written or loaded (its file).
     CheckpointWritten(String),
     CheckpointLoaded(String),
+    /// A puzzle ended (StartPuzzle `id`), with its FinPuzzle.
+    Puzzle {
+        id: i32,
+        result: i32,
+    },
 }
 
 /// Why the place loop ends (`_abortCommand`).
@@ -138,6 +143,11 @@ pub enum Start {
     /// A new game at once, with no player screen (tests, tools); the
     /// checkpoints are those of player 0.
     NewGame,
+    /// A testing aid: StartPuzzle `id` at once, with object `object` in
+    /// hand (0 for none); its FinPuzzle is reported (an
+    /// [`Event::Puzzle`]), then a new game starts as with
+    /// [`Start::NewGame`].
+    Puzzle { id: i32, object: i32 },
 }
 
 /// What [`run`] needs besides the platform and the game.
@@ -264,6 +274,8 @@ pub struct Engine {
     pub zoom: bool,
     /// ANGLEWARPX / ANGLEWARPY of the last warp frame.
     pub angle_warp: (i32, i32),
+    /// What the puzzles keep from one run to the next.
+    pub puzzles: crate::puzzle::PuzzleState,
 
     // The place sprites.
     pub sprite_list: Vec<SpritePlaceEntry>,
@@ -368,6 +380,7 @@ impl Engine {
             given_object: None,
             zoom: false,
             angle_warp: (0, 0),
+            puzzles: crate::puzzle::PuzzleState::default(),
             sprite_list: Vec::new(),
             spf_list: Vec::new(),
             npc_rects: Vec::new(),
@@ -785,6 +798,17 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         }
         e.load_checkpoint(hooks.as_mut(), false).await;
     } else {
+        if let Start::Puzzle { id, object } = start {
+            e.vars.set("objetenmain", object);
+            let r = crate::puzzle::play_puzzle(&mut e, hooks.as_mut(), id).await;
+            log::warn!("puzzle {id} ended with FinPuzzle {r}");
+            e.vars.set("objetenmain", 0);
+            e.vars.set("finpuzzle", 0);
+            if e.sys.should_quit() {
+                e.stop_ambient();
+                return;
+            }
+        }
         e.new_game(hooks.as_mut(), false).await;
     }
     let finished = loop {

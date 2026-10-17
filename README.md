@@ -9,13 +9,14 @@ reverse engineering the original game's executable. The goal is the
 original game, pixel for pixel and sample for sample, with optional fixes of
 the original's bugs.
 
-**Status: phase 3 (inventory, menus, players and checkpoints) done.** The
+**Status: phase 4 (the 3D talking heads) done.** The
 game starts as the original's does: the Cryo logo and the pre-intro with
 their sounds, then the player screen, where you create, choose or delete a
 player. A new player starts a new game; an existing one resumes at the
 checkpoint of the last chapter reached. The chapter scripts run their
 cinematics, dialogs, music and sounds as you look around and walk between
-the places of Atlantis. A right click opens the inventory bar: click an
+the places of Atlantis; the talking heads of the dialogs move their 3D
+mouths in time with the voices. A right click opens the inventory bar: click an
 object to take it in hand (the cursor carries it), use it on a place or a
 character, click it again or right-click to put it away; the objects you
 pick up slide into the bar. The characters who follow you show their
@@ -26,9 +27,12 @@ the game writes the original's checkpoint files, and a game over takes you
 back to the last one. The end of the game shows its last picture and the
 credits.
 
-The 3D mouths of the talking heads come with phase 4: until then the mouth
-area of a head is left as the video has it. The puzzles come with phase 5:
-until then a puzzle counts as won.
+Phase 5 (the puzzles) is under way. Six of them play as in the original:
+the throne lock, the three sliding puzzles, the four stages of the metal
+pieces, the hexagon, the crab race and Muria's tablets; you win, lose or
+leave them (a click on their frame), and the scripts go on as the
+original's do with the result. The eclipse, the hens, the ogre game, the
+rotating pieces, the rat's run and the snakes still count as won at once.
 
 ## You need the game
 
@@ -65,6 +69,12 @@ bug (see [Enhancements](#enhancements)).
 `atlantis-native --headless /path/to/game [frames]` runs a new game without
 a window, with no input and the sound mixed and dropped, and prints what it
 did (the places, videos, sections, dialog lines and voices).
+
+`atlantis-native --puzzle <n> [--object <id>] /path/to/game` (a testing
+aid, with or without `--headless`) plays puzzle `n` (the scripts'
+StartPuzzle number, 0..16) at once, with object `id` in hand (322, the
+missing tile, for the sliding puzzles 6, 7 and 14), reports its result,
+then starts a new game.
 
 ## Players, checkpoints and settings
 
@@ -138,6 +148,23 @@ composited over the panorama, the voices, the subtitles
 (`subtitles.rs`), the subject menu, the error box of a head that cannot be
 opened and the game-over screen.
 
+The 3D talking heads are in `crates/atlantis-engine/src/head/`: the dialog
+video leaves the speaker's mouth empty, and the line player draws a
+textured 3D lower face there every frame, posed by the head animation at
+the video's frame and shaped by the line's lip-sync track at the voice's
+time (`mod.rs`: animation, camera, tree walk, culling and projection;
+`raster.rs`: the original's span rasteriser, flat, affine and perspective
+texture fills). The files (`.3DC` meshes, `.3DA` animations and mouth
+shapes, `.S3D` tables and cameras, `.SYC` lip-sync tracks, `.3DM` texture
+maps) are parsed in `crates/atlantis-data/src/head.rs`. The arithmetic is
+the original's, operation for operation (32-bit fixed point, x87 doubles
+with float stores, the transcendental functions of the `libm` crate), so
+the heads are drawn pixel for pixel as the original draws them, on every
+platform. Three paths of the original that no shipped head and camera
+reach are not ported (they log a warning): the clipping of faces at the
+near plane, of edges above the top of the screen, and the slerp of
+opposite quaternions.
+
 The 2D interface is in `crates/atlantis-engine/src/ui/`: the menu files'
 walk and the menu fonts (`layout.rs`), the menus, the player screen, the
 load picker, the credits and the end (`menus.rs`, `credits.rs`), the
@@ -146,6 +173,17 @@ inventory bar, the object picked up, bow mode and the guests' portraits
 `crates/atlantis-engine/src/checkpoint.rs`, their file formats in
 `crates/atlantis-data/src/saves.rs`, the save folder and the settings file
 in `crates/atlantis-engine/src/persist.rs`.
+
+The puzzles are in `crates/atlantis-engine/src/puzzle/`. `mod.rs` holds the
+dispatcher (StartPuzzle n run by zone 1000 + n: its checks, the result
+set in FinPuzzle), the cursor animation and the random generators the
+puzzles share, and what the original keeps from one puzzle to the next;
+`assets.rs` the PUZZLES\ files, the work screen, the input read at the
+frame boundaries and the puzzle samples. Each puzzle is one file: its
+state and loop, translated line for line, behind a trait of its own for
+the input, drawing and sounds, which the engine implements and the tests
+replay the original's runs through, pass by pass (`throne.rs`,
+`taquin.rs`, `meta.rs`, `hexa.rs`, `crab.rs`, `muria.rs`).
 
 ### Enhancements
 

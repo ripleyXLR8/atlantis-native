@@ -9,6 +9,10 @@
 //! the original game, bug for bug. `--new-game` skips the start-up videos
 //! and the player screen.
 //!
+//! `--puzzle <n> [--object <id>]` (a testing aid) plays StartPuzzle `n` at
+//! once, with object `id` in hand, reports its FinPuzzle, then starts a new
+//! game.
+//!
 //! The players, the checkpoints (the original's `players.atl` and
 //! `p<letter><chapter>.gam`) and `settings.ini` are kept in the per-user
 //! data folder (`~/.local/share/atlantis-native/<build>` on Linux,
@@ -40,6 +44,26 @@ fn main() {
     };
     let original = flag("--original");
     let new_game = flag("--new-game");
+    let mut value = |name: &str| -> Option<i32> {
+        let i = args.iter().position(|a| a == name)?;
+        args.remove(i);
+        if i >= args.len() {
+            eprintln!("{name} needs a number");
+            std::process::exit(2);
+        }
+        let v = args.remove(i);
+        Some(v.parse().unwrap_or_else(|_| {
+            eprintln!("{name} {v}: not a number");
+            std::process::exit(2);
+        }))
+    };
+    let puzzle = value("--puzzle");
+    let object = value("--object").unwrap_or(0);
+    let start = match puzzle {
+        Some(id) => Start::Puzzle { id, object },
+        None if new_game => Start::NewGame,
+        None => Start::Boot,
+    };
     // The saves of each build in their own folder (the player lists of the
     // languages differ in their marker row).
     let store_for = |game: &Game| -> Rc<dyn SaveStore> {
@@ -63,11 +87,7 @@ fn main() {
             enhancements,
             subtitles: settings.subtitles,
             saves,
-            start: if new_game {
-                Start::NewGame
-            } else {
-                Start::Boot
-            },
+            start,
             ..Options::default()
         }
     };
@@ -80,7 +100,9 @@ fn main() {
 
     if args.first().map(String::as_str) == Some("--headless") {
         let Some(dir) = args.get(1) else {
-            eprintln!("usage: atlantis-native [--original] --headless <game dir> [frames]");
+            eprintln!(
+                "usage: atlantis-native [--original] [--puzzle <n> [--object <id>]] --headless <game dir> [frames]"
+            );
             std::process::exit(2);
         };
         let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
@@ -93,7 +115,11 @@ fn main() {
             } else {
                 Enhancements::default()
             },
-            start: Start::NewGame,
+            start: if puzzle.is_some() {
+                start
+            } else {
+                Start::NewGame
+            },
             ..Options::default()
         };
         let (sys, mut runner) = start_game(open(dir), options);
@@ -123,7 +149,9 @@ fn main() {
     }
 
     let Some(dir) = args.first() else {
-        eprintln!("usage: atlantis-native [--original] [--new-game] <game dir>");
+        eprintln!(
+            "usage: atlantis-native [--original] [--new-game | --puzzle <n> [--object <id>]] <game dir>"
+        );
         // Without a game: the window with a test pattern.
         let el = EventLoop::new().unwrap();
         el.run_app(&mut App::new(
