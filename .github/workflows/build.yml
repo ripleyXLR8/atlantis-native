@@ -8,8 +8,31 @@ on:
 permissions:
   contents: write   # the rolling "nightly" release
 
+# The nightly release's assets keep the same names from one build to the
+# next (installers download them by name):
+#   atlantis-native-macos-arm64.dmg
+#   atlantis-native-windows-x64.zip
+#   atlantis-native-linux-x64.tar.gz
+#   atlantis-native-web.zip
+
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create or update the nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Built from the latest commit on main ($GITHUB_SHA). Playable from start to end; you need your own copy of the game. See the README for the downloads and their use."
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release edit nightly --notes "$notes"
+          else
+            gh release create nightly --prerelease --title "Nightly build" --notes "$notes"
+          fi
+
   macos-arm64:
+    needs: release
     runs-on: macos-14   # Apple Silicon
     steps:
       - uses: actions/checkout@v4
@@ -23,9 +46,8 @@ jobs:
           app="dist/Atlantis Native.app"
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp packaging/macos/Info.plist "$app/Contents/"
-          cp packaging/macos/launcher.sh "$app/Contents/MacOS/launcher"
           cp target/release/atlantis-native "$app/Contents/MacOS/"
-          chmod +x "$app/Contents/MacOS/launcher" "$app/Contents/MacOS/atlantis-native"
+          chmod +x "$app/Contents/MacOS/atlantis-native"
           cp README.md LICENSE dist/
           ln -s /Applications dist/Applications
           codesign --force --deep -s - "$app"   # ad-hoc signature
@@ -37,11 +59,10 @@ jobs:
       - name: Publish to the nightly release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release view nightly >/dev/null 2>&1 || gh release create nightly --prerelease --title "Nightly build" --notes "Built from the latest commit on main. Early work: not playable yet."
-          gh release upload nightly atlantis-native-macos-arm64.dmg --clobber
+        run: gh release upload nightly atlantis-native-macos-arm64.dmg --clobber
 
   windows-x64:
+    needs: release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +85,62 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+        run: gh release upload nightly atlantis-native-windows-x64.zip --clobber
+
+  linux-x64:
+    needs: release
+    # The oldest supported runner: the binary needs the glibc it was built
+    # against or a newer one.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build dependencies (ALSA headers for cpal)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config
+      - name: Test (game data tests skip without ATLANTIS_DATA)
+        run: cargo test --release --workspace
+      - name: Build
+        run: cargo build --release -p atlantis-app
+      - name: Package
         run: |
-          gh release view nightly >/dev/null 2>&1 || gh release create nightly --prerelease --title "Nightly build" --notes "Built from the latest commit on main. Early work."
-          gh release upload nightly atlantis-native-windows-x64.zip --clobber
+          mkdir -p dist/atlantis-native
+          cp target/release/atlantis-native README.md LICENSE dist/atlantis-native/
+          strip dist/atlantis-native/atlantis-native
+          tar -C dist -czf atlantis-native-linux-x64.tar.gz atlantis-native
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-linux-x64
+          path: atlantis-native-linux-x64.tar.gz
+      - name: Publish to the nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload nightly atlantis-native-linux-x64.tar.gz --clobber
+
+  web:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: wasm-bindgen-cli of the wasm-bindgen crate's version
+        run: |
+          version=$(awk '/^name = "wasm-bindgen"$/ { getline; gsub(/version = |"/, ""); print; exit }' Cargo.lock)
+          echo "wasm-bindgen $version"
+          cargo install wasm-bindgen-cli --version "$version" --locked
+      - name: Build
+        run: sh web/build.sh
+      - name: Package (the static site)
+        run: |
+          mkdir -p dist/atlantis-native-web
+          cp -r web/index.html web/pkg README.md LICENSE dist/atlantis-native-web/
+          (cd dist && zip -r ../atlantis-native-web.zip atlantis-native-web)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-web
+          path: atlantis-native-web.zip
+      - name: Publish to the nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload nightly atlantis-native-web.zip --clobber

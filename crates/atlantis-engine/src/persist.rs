@@ -2,8 +2,9 @@
 //! (`players.atl`, `p<letter><chapter>.gam`) and the port's settings.
 //!
 //! The original writes them in its install folder; the port keeps them in
-//! a per-user data folder ([`DirStore`], see [`user_data_dir`]), or in
-//! memory ([`MemStore`]: tests, and the web build for now).
+//! a per-user data folder ([`DirStore`], see [`user_data_dir`]); the web
+//! front end keeps them in the browser's storage; [`MemStore`] keeps them
+//! in memory (tests, headless runs).
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -21,8 +22,6 @@ pub trait SaveStore {
 }
 
 /// Files in memory.
-// TODO(phase 6): the web build keeps its saves in the browser's storage
-// (localStorage / IndexedDB); until then they last as long as the page.
 #[derive(Debug, Default)]
 pub struct MemStore(RefCell<BTreeMap<String, Vec<u8>>>);
 

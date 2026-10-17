@@ -9,31 +9,32 @@ reverse engineering the original game's executable. The goal is the
 original game, pixel for pixel and sample for sample, with optional fixes of
 the original's bugs.
 
-**Status: phase 4 (the 3D talking heads) done.** The
-game starts as the original's does: the Cryo logo and the pre-intro with
-their sounds, then the player screen, where you create, choose or delete a
-player. A new player starts a new game; an existing one resumes at the
-checkpoint of the last chapter reached. The chapter scripts run their
+**Status: playable from start to end.** The game starts as the
+original's does: the Cryo logo and the pre-intro, then the player screen,
+where you create, choose or delete a player. The chapter scripts run their
 cinematics, dialogs, music and sounds as you look around and walk between
 the places of Atlantis; the talking heads of the dialogs move their 3D
-mouths in time with the voices. A right click opens the inventory bar: click an
-object to take it in hand (the cursor carries it), use it on a place or a
-character, click it again or right-click to put it away; the objects you
-pick up slide into the bar. The characters who follow you show their
-portraits, and you can click one in the open bar to talk to them. Escape
-opens the in-game menu: load a chapter, the options (subtitles, the
-OMNI 3D mouse mode, the sound volumes), or quit. At every chapter change
-the game writes the original's checkpoint files, and a game over takes you
-back to the last one. The end of the game shows its last picture and the
-credits.
+mouths in time with the voices. The inventory, the characters who follow
+you, the in-game menu (load a chapter, the options, quit), the checkpoints
+written at every chapter change, the game overs, all seventeen puzzles and
+the end with its credits play as in the original.
 
-Phase 5 (the puzzles) is under way. All twelve of them play as in the
-original: the eclipse, the hens, the ogre game, the rotating pieces, the
-rat's run, the throne lock, the three sliding puzzles, the snakes, the
-four stages of the metal pieces, the hexagon, the crab race and Muria's
-tablets; you win, lose or leave them (a click on their frame, or on the
-side edges for the ogre game and the rat's run), and the scripts go on as
-the original's do with the result.
+## Downloads
+
+Builds of the latest commit are on the
+[nightly release](https://github.com/ripleyXLR8/atlantis-native/releases/tag/nightly):
+
+| File | System |
+|---|---|
+| `atlantis-native-windows-x64.zip` | Windows 10 and later, 64-bit |
+| `atlantis-native-macos-arm64.dmg` | macOS 11 and later, Apple Silicon |
+| `atlantis-native-linux-x64.tar.gz` | Linux, x86-64 (glibc 2.35 and later; ALSA for the sound) |
+| `atlantis-native-web.zip` | the web build: a static site to serve over HTTP |
+
+The macOS build is signed ad hoc only: the first time, open it with a right
+click and Open (or allow it in System Settings, Privacy & Security). On
+Linux, the folder picker is the desktop's (through the XDG desktop portal,
+or `zenity`).
 
 ## You need the game
 
@@ -44,6 +45,25 @@ Atlantis Native contains no game data. You need your own copy of the game:
 - or the GOG.com release (English, French, German, Spanish, Italian): its
   installation folder.
 
+## Playing
+
+Double-click `atlantis-native` (on macOS, `Atlantis Native`). The first
+time, it asks for the game folder in the system's folder picker: the folder
+with `atlantis.exe` and the `BIGCD*.BIG` files, or the GOG.com installation
+folder. It remembers the folder (`game-folder.txt` in the per-user folder,
+see [Players, checkpoints and settings](#players-checkpoints-and-settings))
+and asks again only if the folder no longer holds the game. Errors are
+shown in a message box. When it is not started from a terminal, the log
+goes to `atlantis-native.log` in the same folder (rewritten at every start;
+set `RUST_LOG` to send it to the terminal's standard error).
+
+From a terminal, a game folder given on the command line is used instead
+(it is not remembered):
+
+```sh
+atlantis-native /path/to/game
+```
+
 ## Building
 
 ```sh
@@ -51,7 +71,13 @@ cargo build --release
 cargo run --release -- /path/to/game
 ```
 
-Controls: move the mouse to look around (the pointer is captured by the
+On Linux, building needs the ALSA headers (`libasound2-dev` or
+`alsa-lib-devel`); nothing else to link (the windowing libraries, the
+desktop portal's libdbus are loaded at run time).
+
+## Controls
+
+Move the mouse to look around (the pointer is captured by the
 window, as the original takes it fullscreen), F5 / F6 / F7 / F8 turn and
 tilt the view, click where the cursor animates to go there, click a
 character to talk. A left click ends a dialog line; Escape ends a talking
@@ -60,6 +86,13 @@ A right click opens the inventory bar (its edges scroll it); Escape in the
 panoramic view opens the in-game menu. On the player screen, click the
 last row to type a new name and press Enter or OK; Escape there quits (the
 port's way out; the original has none).
+
+## Command line
+
+The game folder can be left out of each of these: the remembered one is
+used, or the picker asks for it (except with `--headless`). The Windows
+release build has no console: redirect its output to a file
+(`atlantis-native.exe --headless C:\game > out.txt`) to read it.
 
 `atlantis-native --new-game /path/to/game` skips the start-up videos and
 the player screen.
@@ -92,6 +125,9 @@ files are kept in a per-user folder, one per game build:
 | macOS | `~/Library/Application Support/atlantis-native/<build>` |
 | Windows | `%APPDATA%\atlantis-native\<build>` |
 
+(`game-folder.txt` and `atlantis-native.log` are in the `atlantis-native`
+folder itself.)
+
 On its first start with a game whose folder holds an original
 `players.atl` (an installation the original game played), the port copies
 it and its checkpoints into that folder; the game folder is only read.
@@ -108,9 +144,10 @@ which the original also keeps in each checkpoint and sets again when one
 is loaded) and the [enhancements](#enhancements), one `name = on|off` line
 each.
 
-The web build keeps its players and checkpoints in memory for now (they
-are lost when the page closes); it does not take over the files of an
-original installation.
+The web build keeps its players, checkpoints and settings in the
+browser's storage (`localStorage`, one entry per file, kept per site and
+per browser). It too takes over the `players.atl` and checkpoints of the
+picked folder on its first start.
 
 Tests that need the game files read the game directory from the
 `ATLANTIS_DATA` environment variable and are skipped without it:
@@ -212,10 +249,12 @@ Windows-1252. The font is bundled in `assets/fonts`.
 
 ### The web build
 
-`web/build.sh` builds it; the page asks for the game folder. The engine
+`web/build.sh` builds it (`atlantis-native-web.zip` on the nightly
+release holds the result); serve the folder over HTTP (for example
+`python3 -m http.server -d web 8000`), the page asks for the game folder. The engine
 reads the player's files through an asynchronous loader that fetches each
 archive member before it is read, so the browser runs the same game as the
-desktop. It has been built but not tried in a browser yet. A browser grants
+desktop. A browser grants
 the pointer capture only on a click: until then the view turns with the
 pointer's own motion. Sound starts on the first click.
 
@@ -232,7 +271,28 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 | 3 | inventory, menus, players and checkpoints |
 | 4 | 3D talking heads |
 | 5 | the 17 puzzles |
-| 6 | packages for each platform, web build |
+| 6 | packages for each platform, web build, folder picker, saves in the browser |
+
+The web build has been built in CI but little tried in browsers. There is
+no application icon yet (the game's own pictures are not used: they are
+not ours to distribute).
+
+## Known differences from the original
+
+- The window: the game runs in a resizable window (the picture scaled,
+  in its 4:3 proportions) rather than fullscreen at 640x480.
+- The saves are in a per-user folder, not in the game folder (see above);
+  deleting a player deletes its own checkpoints.
+- The subtitles are drawn with Liberation Sans, which has the metrics of
+  the original's Arial (see [Subtitles](#subtitles)).
+- The engine runs at a steady 60 steps per second; the original's loops
+  run as fast as the machine allows.
+- The [enhancements](#enhancements) on by default: the music loops
+  seamlessly; the SPF overlays of some talking heads are drawn over the
+  head. `--original` turns them off.
+- Escape on the player screen quits.
+- Three paths of the 3D talking heads that no shipped head reaches are
+  not ported (see the layout notes below).
 
 ## Licence
 

@@ -1,4 +1,10 @@
-//! Desktop entry point: `atlantis-native <game dir>`.
+//! Desktop entry point: `atlantis-native [<game dir>]`.
+//!
+//! Without a game folder (a double click), the folder chosen last time is
+//! used if it still holds the game; else the system's folder picker asks
+//! for it, and it is remembered (`game-folder.txt` in the per-user data
+//! folder). Errors are shown in message boxes. Without a terminal the log
+//! goes to `atlantis-native.log` in the same folder.
 //!
 //! `atlantis-native --headless <game dir> [frames]` runs the engine without
 //! a window for a number of frames (default 600) with no input, and prints
@@ -20,21 +26,35 @@
 //! Support/atlantis-native/<build>` on macOS); `settings.ini` also holds
 //! the enhancements.
 
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
     use std::cell::RefCell;
+    use std::io::IsTerminal;
+    use std::path::Path;
     use std::rc::Rc;
-    use std::sync::Arc;
 
-    use atlantis_app::{start_game, App};
-    use atlantis_data::{Game, StdDir};
-    use atlantis_engine::audio::Mixer;
-    use atlantis_engine::persist::{user_data_dir, DirStore, Settings};
+    use atlantis_app::desktop::{choose_game, error_box, init_log, install_panic_hook, open_game};
+    use atlantis_app::{options_with_settings, start_game, App};
+    use atlantis_data::Game;
+    use atlantis_engine::persist::{user_data_dir, DirStore};
     use atlantis_engine::{Enhancements, Options, SaveStore, Start};
     use winit::event_loop::EventLoop;
 
-    env_logger::init();
-    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args: Vec<String> = std::env::args()
+        .skip(1)
+        // Old macOS versions pass the process serial number to an app
+        // opened from the Finder.
+        .filter(|a| !a.starts_with("-psn_"))
+        .collect();
+    let headless = args.iter().any(|a| a == "--headless");
+    let log_file = init_log(headless);
+    // No terminal: the panics and the errors in message boxes.
+    install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
+    if let Some(path) = &log_file {
+        log::info!("log in {}", path.display());
+    }
     let mut flag = |name: &str| match args.iter().position(|a| a == name) {
         Some(i) => {
             args.remove(i);
@@ -73,30 +93,6 @@ fn main() {
         log::info!("saves in {}", dir.display());
         Rc::new(DirStore::new(dir))
     };
-    let options_for = |saves: Rc<dyn SaveStore>| {
-        let settings = Settings::load(saves.as_ref()).unwrap_or_default();
-        let enhancements = if original {
-            Enhancements::original()
-        } else {
-            settings.enhancements
-        };
-        if Settings::load(saves.as_ref()).is_none() {
-            settings.save(saves.as_ref());
-        }
-        Options {
-            enhancements,
-            subtitles: settings.subtitles,
-            saves,
-            start,
-            ..Options::default()
-        }
-    };
-    let open = |dir: &str| {
-        Game::open(Arc::new(StdDir::new(dir))).unwrap_or_else(|e| {
-            eprintln!("{dir}: {e}");
-            std::process::exit(1);
-        })
-    };
 
     if args.first().map(String::as_str) == Some("--headless") {
         let Some(dir) = args.get(1) else {
@@ -105,6 +101,10 @@ fn main() {
             );
             std::process::exit(2);
         };
+        let game = open_game(Path::new(dir)).unwrap_or_else(|e| {
+            eprintln!("{e}");
+            std::process::exit(1);
+        });
         let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
         let trace = Rc::new(RefCell::new(Vec::new()));
         // Headless: a new game at once, the saves in memory.
@@ -122,7 +122,7 @@ fn main() {
             },
             ..Options::default()
         };
-        let (sys, mut runner) = start_game(open(dir), options);
+        let (sys, mut runner) = start_game(game, options);
         let mut alive = true;
         // 16 ms of sound per frame at 22050 Hz, stereo.
         let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
@@ -148,25 +148,42 @@ fn main() {
         return;
     }
 
-    let Some(dir) = args.first() else {
-        eprintln!(
-            "usage: atlantis-native [--original] [--new-game | --puzzle <n> [--object <id>]] <game dir>"
-        );
-        // Without a game: the window with a test pattern.
-        let el = EventLoop::new().unwrap();
-        el.run_app(&mut App::new(
-            atlantis_engine::sys::Sys::new(Mixer::new()),
-            None,
-        ))
-        .unwrap();
-        return;
+    if args.len() > 1 || args.first().is_some_and(|a| a.starts_with('-')) {
+        error_box(&format!(
+            "usage: atlantis-native [--original] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]\n\n\
+             '{}' not understood",
+            args.join(" ")
+        ));
+        std::process::exit(2);
+    }
+    // The event loop first: on macOS winit must own the application before
+    // the folder picker or a message box creates it.
+    let el = EventLoop::new().unwrap_or_else(|e| {
+        error_box(&format!("No window can be opened: {e}"));
+        std::process::exit(1);
+    });
+    let game = match args.first() {
+        Some(dir) => open_game(Path::new(dir)).unwrap_or_else(|e| {
+            error_box(&e);
+            std::process::exit(1);
+        }),
+        None => match choose_game() {
+            Some(game) => game,
+            None => {
+                eprintln!(
+                    "usage: atlantis-native [--original] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]"
+                );
+                return;
+            }
+        },
     };
-    let game = open(dir);
     let saves = store_for(&game);
-    let options = options_for(saves);
+    let options = options_with_settings(saves, original, start);
     let (sys, runner) = start_game(game, options);
-    let el = EventLoop::new().unwrap();
-    el.run_app(&mut App::new(sys, Some(runner))).unwrap();
+    if let Err(e) = el.run_app(&mut App::new(sys, Some(runner))) {
+        error_box(&format!("The window failed: {e}"));
+        std::process::exit(1);
+    }
 }
 
 #[cfg(target_arch = "wasm32")]

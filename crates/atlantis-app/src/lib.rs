@@ -7,8 +7,10 @@ use std::rc::Rc;
 
 use atlantis_data::Game;
 use atlantis_engine::audio::Mixer;
+use atlantis_engine::persist::Settings;
 use atlantis_engine::sys::{Input, Key as EngineKey, MouseButton as EngineButton, Runner, Sys};
 use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
+use atlantis_engine::{Enhancements, SaveStore, Start};
 use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition};
@@ -18,6 +20,8 @@ use winit::keyboard::{Key, NamedKey};
 use winit::window::{CursorGrabMode, Window, WindowId};
 
 mod audio_out;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod desktop;
 #[cfg(target_arch = "wasm32")]
 mod web;
 
@@ -397,6 +401,32 @@ impl ApplicationHandler for App {
             }
             _ => {}
         }
+    }
+}
+
+/// The options of a run with its saves in `saves`: the subtitles and the
+/// enhancements read from the store's `settings.ini` (written with the
+/// defaults when there is none); `original` turns the enhancements off.
+pub fn options_with_settings(
+    saves: Rc<dyn SaveStore>,
+    original: bool,
+    start: Start,
+) -> atlantis_engine::Options {
+    let stored = Settings::load(saves.as_ref());
+    let settings = stored.unwrap_or_default();
+    if stored.is_none() {
+        settings.save(saves.as_ref());
+    }
+    atlantis_engine::Options {
+        enhancements: if original {
+            Enhancements::original()
+        } else {
+            settings.enhancements
+        },
+        subtitles: settings.subtitles,
+        saves,
+        start,
+        ..atlantis_engine::Options::default()
     }
 }
 

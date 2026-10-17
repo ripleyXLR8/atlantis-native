@@ -24,12 +24,16 @@ web-time = "1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
+# The native folder picker and message boxes. On Linux the XDG desktop
+# portal (libdbus loaded at run time, zenity as the fallback): nothing to
+# link at build time.
+rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 cpal = { version = "0.15", features = ["wasm-bindgen"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["File", "FileList", "Blob"] }
+web-sys = { version = "0.3", features = ["File", "FileList", "Blob", "Window", "Storage"] }
 console_error_panic_hook = "0.1"
 console_log = "1"
