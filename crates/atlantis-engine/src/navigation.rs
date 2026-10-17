@@ -60,6 +60,7 @@ impl Engine {
                     ..
                 } => fi.right_press = true,
                 Input::KeyDown(Key::Escape) => fi.escape = true,
+                Input::KeyDown(Key::F(9)) => self.debug_overlay.set(!self.debug_overlay.get()),
                 _ => {}
             }
         }
@@ -72,6 +73,68 @@ impl Engine {
         while self.sys.buttons() != (false, false) && !self.sys.should_quit() {
             while self.sys.poll_event().is_some() {}
             self.sys.frame().await;
+        }
+    }
+
+    /// Port-only diagnostic overlay (F9): the variables the scripts test
+    /// during navigation, and the conditions of CHAPI013's flower pot at
+    /// view 126 (/178, /14: AngleWarpX 1..12 or 343..359, AngleWarpY 27..45,
+    /// Wsprframe 8..33 or 70..96, ObjetEnMain 261).
+    fn draw_debug_overlay(&self) {
+        let font = self
+            .debug_font
+            .get_or_init(crate::subtitles::SubtitleFont::new);
+        let v = |k: &str| self.vars.get(k);
+        let (ax, ay, w, obj) = (
+            v("anglewarpx"),
+            v("anglewarpy"),
+            v("wsprframe"),
+            v("objetenmain"),
+        );
+        let vue = self.current_place_id.map_or(-1, i32::from);
+        let mut lines = vec![format!(
+            "{} vue {vue}  chap {}  AngleWarpX {ax}  AngleWarpY {ay}  Wsprframe {w}  ObjetEnMain {obj}",
+            self.wam_name,
+            v("chapter")
+        )];
+        if vue == 126 || vue == 125 {
+            let ok = |b: bool| if b { "OK" } else { "--" };
+            let x_ok = (ax > 0 && ax < 13) || (ax > 342 && ax < 360);
+            let y_ok = ay > 26 && ay < 46;
+            let w_ok = (w > 7 && w < 34) || (w > 69 && w < 97);
+            lines.push(format!(
+                "POT: vue126 {}  X {}  Y {}  image {}  pot en main {}  => {}",
+                ok(vue == 126),
+                ok(x_ok),
+                ok(y_ok),
+                ok(w_ok),
+                ok(obj == 261),
+                if vue == 126 && x_ok && y_ok && w_ok && obj == 261 {
+                    "CLIQUE MAINTENANT"
+                } else {
+                    "pas encore"
+                }
+            ));
+        }
+        let mut s = self.sys.screen.borrow_mut();
+        for (i, line) in lines.iter().enumerate() {
+            let y = 4 + i as i32 * 16;
+            for yy in y.max(0)..(y + 15).min(SCREEN_H as i32) {
+                for xx in 0..SCREEN_W {
+                    let p = &mut s[yy as usize * SCREEN_W + xx];
+                    *p = (*p >> 2) & 0x39e7; // darkened band
+                }
+            }
+            font.draw(
+                &mut s,
+                SCREEN_W,
+                SCREEN_H,
+                line.as_bytes(),
+                5,
+                y,
+                630,
+                0xffe0,
+            );
         }
     }
 
@@ -392,6 +455,9 @@ impl Engine {
                 *self.sys.screen.borrow_mut() = s;
             }
             self.draw_cursor();
+            if self.debug_overlay.get() {
+                self.draw_debug_overlay();
+            }
             // The arrow shot (0x0041c61d..0x0041c6a0), after the frame is
             // drawn.
             let mut tir = self.vars.get("tirfleche");

@@ -287,6 +287,9 @@ pub struct Engine {
     pub(crate) sprite_anim_tick: u32,
     /// WSPRFRAME.
     pub wspr_frame: i32,
+    /// F9 during navigation: the diagnostic overlay (port-only).
+    pub debug_overlay: std::cell::Cell<bool>,
+    pub(crate) debug_font: std::cell::OnceCell<crate::subtitles::SubtitleFont>,
     /// 0x00496188 == 1 (a talking-head line): the persos are not drawn.
     pub sprites_hide_npcs: bool,
     /// The SPW files of the place, by name.
@@ -406,6 +409,8 @@ impl Engine {
             sprite_anim_last: [0; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
             sprite_anim_tick: 0,
             wspr_frame: 0,
+            debug_overlay: std::cell::Cell::new(false),
+            debug_font: std::cell::OnceCell::new(),
             sprites_hide_npcs: false,
             spw_cache: HashMap::new(),
             warp: Warp::new(),
