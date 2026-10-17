@@ -339,42 +339,6 @@ pub(crate) fn spinning_clock(sys: Rc<Sys>) -> impl FnMut() -> u32 {
     }
 }
 
-#[cfg(test)]
-mod spinning_clock_tests {
-    use super::*;
-    use crate::ambient::AmbientSounds;
-    use crate::audio::Mixer;
-    use atlantis_data::wam::AmbientObject;
-
-    #[test]
-    fn reads_advance_within_a_frame_and_the_variant_pick_ends() {
-        let sys = Sys::new(Mixer::new());
-        let mut clock = spinning_clock(sys.clone());
-        // Sys starts at 0 ms: 0, then 1 ms per read in the same frame.
-        assert_eq!((clock(), clock(), clock()), (0, 1, 2));
-        // Within a frame whose clock reads 115 (& 0x7f above 100) the
-        // variant pick ends (it spun forever with the frame's clock).
-        for t in [101u64, 115, 127, 128 + 110] {
-            let sys = Sys::new(Mixer::new());
-            let s = sys.clone();
-            let picked = Rc::new(std::cell::Cell::new(false));
-            let p = picked.clone();
-            let mut r = crate::sys::Runner::new(sys, async move {
-                let mut a = AmbientSounds::new();
-                a.set_clock(spinning_clock(s));
-                let obj = AmbientObject {
-                    weights: [50, 50, 0, 0],
-                    ..Default::default()
-                };
-                assert!(a.pick_variant(&obj, 2).is_some());
-                p.set(true);
-            });
-            r.step(t);
-            assert!(picked.get(), "clock {t}");
-        }
-    }
-}
-
 impl Engine {
     pub fn new(sys: Rc<Sys>, game: Game, loader: Rc<dyn Loader>) -> Engine {
         let mut ambient = AmbientSounds::new();
@@ -916,6 +880,42 @@ impl Engine {
             MenuOutcome::Resume => {}
             MenuOutcome::Reload => self.abort = Some(Abort::Load),
             MenuOutcome::Quit => self.abort = Some(Abort::Quit),
+        }
+    }
+}
+
+#[cfg(test)]
+mod spinning_clock_tests {
+    use super::*;
+    use crate::ambient::AmbientSounds;
+    use crate::audio::Mixer;
+    use atlantis_data::wam::AmbientObject;
+
+    #[test]
+    fn reads_advance_within_a_frame_and_the_variant_pick_ends() {
+        let sys = Sys::new(Mixer::new());
+        let mut clock = spinning_clock(sys.clone());
+        // Sys starts at 0 ms: 0, then 1 ms per read in the same frame.
+        assert_eq!((clock(), clock(), clock()), (0, 1, 2));
+        // Within a frame whose clock reads 115 (& 0x7f above 100) the
+        // variant pick ends (it spun forever with the frame's clock).
+        for t in [101u64, 115, 127, 128 + 110] {
+            let sys = Sys::new(Mixer::new());
+            let s = sys.clone();
+            let picked = Rc::new(std::cell::Cell::new(false));
+            let p = picked.clone();
+            let mut r = crate::sys::Runner::new(sys, async move {
+                let mut a = AmbientSounds::new();
+                a.set_clock(spinning_clock(s));
+                let obj = AmbientObject {
+                    weights: [50, 50, 0, 0],
+                    ..Default::default()
+                };
+                assert!(a.pick_variant(&obj, 2).is_some());
+                p.set(true);
+            });
+            r.step(t);
+            assert!(picked.get(), "clock {t}");
         }
     }
 }
