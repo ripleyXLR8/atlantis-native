@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write   # the rolling "nightly" release
+
 jobs:
   macos-arm64:
     runs-on: macos-14   # Apple Silicon
@@ -15,13 +18,25 @@ jobs:
         run: cargo test --release --workspace
       - name: Build
         run: cargo build --release -p atlantis-app
-      - name: Package
+      - name: Package (Atlantis Native.app in a .dmg)
         run: |
-          mkdir -p dist
-          cp target/release/atlantis-native dist/
+          app="dist/Atlantis Native.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp packaging/macos/Info.plist "$app/Contents/"
+          cp packaging/macos/launcher.sh "$app/Contents/MacOS/launcher"
+          cp target/release/atlantis-native "$app/Contents/MacOS/"
+          chmod +x "$app/Contents/MacOS/launcher" "$app/Contents/MacOS/atlantis-native"
           cp README.md LICENSE dist/
-          tar -C dist -czf atlantis-native-macos-arm64.tar.gz .
+          ln -s /Applications dist/Applications
+          codesign --force --deep -s - "$app"   # ad-hoc signature
+          hdiutil create -volname "Atlantis Native" -srcfolder dist -ov -format UDZO atlantis-native-macos-arm64.dmg
       - uses: actions/upload-artifact@v4
         with:
           name: atlantis-native-macos-arm64
-          path: atlantis-native-macos-arm64.tar.gz
+          path: atlantis-native-macos-arm64.dmg
+      - name: Publish to the nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view nightly >/dev/null 2>&1 || gh release create nightly --prerelease --title "Nightly build" --notes "Built from the latest commit on main. Early work: not playable yet."
+          gh release upload nightly atlantis-native-macos-arm64.dmg --clobber
