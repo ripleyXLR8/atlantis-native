@@ -1,10 +1,14 @@
-//! HNM6 frame codec: the warp (panorama) keyframe decoder.
+//! HNM6 frame codec: the warp (panorama) keyframe decoder and the IX video
+//! keyframe / interframe decoder.
 //!
 //! Translated from ScummVM's `Image::HNM6Decoder` (image/codecs/hnm.cpp,
-//! GPLv3, the ScummVM team). Only the paths the first frame of a CYCLO
-//! panorama takes are kept: IW keyframes, decoded bit exact as the original
-//! warp decoder FUN_0045084c does.
+//! GPLv3, the ScummVM team), in the bit-exact RGB565 mode the Atlantis
+//! engine selects for both chunk types: IW keyframes as the original warp
+//! decoder FUN_0045084c decodes them, IX frames as the original video
+//! decoder FUN_004506ec does (including the read / write order of its
+//! motion-copy routines, see `motion_order`).
 
+use crate::motion_order;
 use crate::DecodeError;
 
 /// Size of the frame header: quality and five region offsets.
@@ -182,7 +186,11 @@ impl ShortMotionBuffer<'_> {
 
 /// 4-bit coefficient codes, low nibble first.
 struct JpegBuffer<'a> {
+    /// The frame buffer from the start of the region: ScummVM checks
+    /// `pos > size`, which lets one byte past the region be read (whatever
+    /// the frame buffer holds there; 0 past its end).
     data: &'a [u8],
+    size: usize,
     pos: usize,
     // 0x80 marks a pending high nibble
     other: u8,
@@ -195,9 +203,7 @@ impl JpegBuffer<'_> {
             self.other = 0;
             return Ok(ret);
         }
-        // ScummVM checks `pos > size`, which lets one byte past the region
-        // be read; past the frame data it reads 0 here.
-        if self.pos > self.data.len() {
+        if self.pos > self.size {
             return Err(DecodeError::Bitstream("coefficient buffer exhausted"));
         }
         let full = self.data.get(self.pos).copied().unwrap_or(0);
@@ -334,32 +340,68 @@ fn quant_tables(quality: i32) -> ([i32; 64], [i32; 64]) {
     (make(&LUMA_QUANT_TABLE), make(&CHROMA_QUANT_TABLE))
 }
 
-/// The pixels being decoded: RGB565, one `u16` each, rows contiguous.
-struct Surface {
-    w: usize,
-    h: usize,
-    pixels: Vec<u16>,
+/// The source pixel (y * 8 + x in the block read) of destination pixel
+/// (x, y) of an `sx` x `sy` copy under transform `xform`.
+fn motion_source(xform: u8, sx: usize, sy: usize, x: usize, y: usize) -> usize {
+    match xform {
+        0 => y * 8 + x,
+        1 => y * 8 + (sx - 1 - x),
+        2 => (sy - 1 - y) * 8 + x,
+        3 => (sy - 1 - y) * 8 + (sx - 1 - x),
+        4 => (sx - 1 - x) * 8 + (sy - 1 - y),
+        5 => (sx - 1 - x) * 8 + y,
+        6 => x * 8 + (sy - 1 - y),
+        _ => x * 8 + y,
+    }
 }
 
-impl Surface {
-    /// Index of pixel (x, y). Coordinates may leave the line: rows are
-    /// contiguous, so a block that starts left of x = 0 ends on the
-    /// previous row, as in the original.
-    fn index(&self, x: isize, y: isize) -> Result<usize, DecodeError> {
+/// The read / write order table of the original's IX copy routine for an
+/// `sx` x `sy` block under transform `xform`.
+fn motion_order(xform: u8, sx: usize, sy: usize) -> &'static [u8] {
+    let x = usize::from(xform);
+    match (sx, sy) {
+        (8, 8) => &motion_order::ORDER_8X8[x],
+        (4, 8) => &motion_order::ORDER_4X8[x],
+        (8, 4) => &motion_order::ORDER_8X4[x],
+        (4, 4) => &motion_order::ORDER_4X4[x],
+        (2, 4) => &motion_order::ORDER_2X4[x],
+        (4, 2) => &motion_order::ORDER_4X2[x],
+        _ => &motion_order::ORDER_2X2[x],
+    }
+}
+
+/// The frame buffers: RGB565, one `u16` each, rows contiguous. `cur` and
+/// `old` are the offsets of the frame being decoded and of the previous one
+/// in `px` (both 0 for warp frames, which have no previous frame).
+struct Planes<'a> {
+    px: &'a mut [u16],
+    w: usize,
+    h: usize,
+    cur: usize,
+    old: usize,
+}
+
+impl Planes<'_> {
+    /// Index in `px` of pixel (x, y) of the frame at `base`. Coordinates
+    /// may leave the line: rows are contiguous, so a block that starts left
+    /// of x = 0 ends on the previous row, as in the original.
+    fn index(&self, base: usize, x: isize, y: isize) -> Result<usize, DecodeError> {
         let i = y * self.w as isize + x;
-        if i < 0 || i as usize >= self.pixels.len() {
+        if i < 0 || i as usize >= self.w * self.h {
             return Err(DecodeError::Bitstream("motion source outside the frame"));
         }
-        Ok(i as usize)
+        Ok(base + i as usize)
     }
 
-    /// Copies an `sx` x `sy` block from (srx, sry) to (dx, dy) of the same
-    /// surface, under transform `xform`, in the original's copy order (the
+    /// Copies an `sx` x `sy` block from (srx, sry) of the frame at `src` to
+    /// (dx, dy) of the current frame, under transform `xform`, in the copy
+    /// order of ScummVM's `doMotion` (with `src` the current frame, the
     /// source may overlap pixels already written by this copy).
     fn motion(
         &mut self,
         xform: u8,
         (sx, sy): (isize, isize),
+        src: usize,
         (srx, sry): (isize, isize),
         (dx, dy): (usize, usize),
     ) -> Result<(), DecodeError> {
@@ -373,10 +415,10 @@ impl Surface {
                     } else {
                         sry + sy - 1 - y
                     };
-                    let s = self.index(srx, src_y)?;
-                    self.index(srx + sx - 1, src_y)?;
-                    let d = self.index(dx, dy + y)?;
-                    self.pixels.copy_within(s..s + sx as usize, d);
+                    let s = self.index(src, srx, src_y)?;
+                    self.index(src, srx + sx - 1, src_y)?;
+                    let d = self.index(self.cur, dx, dy + y)?;
+                    self.px.copy_within(s..s + sx as usize, d);
                 }
             }
             // Pixel by pixel, row by row
@@ -391,9 +433,9 @@ impl Surface {
                             6 => (sy - 1 - y, x),          // backward rotate
                             _ => (y, x),                   // backward flip
                         };
-                        let s = self.index(srx + cx, sry + cy)?;
-                        let d = self.index(dx + x, dy + y)?;
-                        self.pixels[d] = self.pixels[s];
+                        let s = self.index(src, srx + cx, sry + cy)?;
+                        let d = self.index(self.cur, dx + x, dy + y)?;
+                        self.px[d] = self.px[s];
                     }
                 }
             }
@@ -401,37 +443,82 @@ impl Surface {
         }
         Ok(())
     }
-}
 
-/// Converts an 8x8 block of Y, U, V coefficients to RGB565 at (x, y), with
-/// the original's green clip and channel truncation.
-fn yuv_to_rgb(surface: &mut Surface, x: usize, y: usize, coeffs: &[i32; 192]) {
-    let cr_of = |v: i32| (16 * (v - 256) + 8) / 10;
-    let cb_of = |v: i32| (v - 256) / 3;
-    for ry in 0..8 {
-        let line = (y + ry) * surface.w + x;
-        for rx in 0..8 {
-            let c = ry * 8 + rx;
-            let cy = coeffs[c] >> 4;
-            let cu = coeffs[64 + c];
-            let cv = coeffs[128 + c];
+    /// The IX motion copy in the order of atlantis.exe's routines: when the
+    /// source lies in the frame being decoded and overlaps the destination,
+    /// a pixel takes the value it had when the original read it.
+    fn motion_ordered(
+        &mut self,
+        xform: u8,
+        (sx, sy): (usize, usize),
+        src: usize,
+        (srx, sry): (isize, isize),
+        (dx, dy): (usize, usize),
+    ) -> Result<(), DecodeError> {
+        let order = motion_order(xform, sx, sy);
+        let mut tmp = [0u16; 64];
+        for &ev in &order[..2 * sx * sy] {
+            let x = usize::from(ev & 7);
+            let y = usize::from((ev >> 3) & 7);
+            if ev & 0x80 != 0 {
+                let d = self.index(self.cur, (dx + x) as isize, (dy + y) as isize)?;
+                self.px[d] = tmp[motion_source(xform, sx, sy, x, y)];
+            } else {
+                let s = self.index(src, srx + x as isize, sry + y as isize)?;
+                tmp[y * 8 + x] = self.px[s];
+            }
+        }
+        Ok(())
+    }
 
-            let cr = cr_of((cv >> 4) + 256);
-            let cb = cb_of((cu >> 4) + 256);
+    /// Converts an 8x8 block of Y, U, V coefficients to RGB565 at (x, y) of
+    /// the current frame, with the original's green clip and channel
+    /// truncation.
+    fn yuv_to_rgb(&mut self, x: usize, y: usize, coeffs: &[i32; 192]) {
+        let cr_of = |v: i32| (16 * (v - 256) + 8) / 10;
+        let cb_of = |v: i32| (v - 256) / 3;
+        for ry in 0..8 {
+            let line = self.cur + (y + ry) * self.w + x;
+            for rx in 0..8 {
+                let c = ry * 8 + rx;
+                let cy = coeffs[c] >> 4;
+                let cu = coeffs[64 + c];
+                let cv = coeffs[128 + c];
 
-            // The original clips G a little more and keeps 5/6/5 bits
-            let r = (cy + 128 + cr).clamp(0, 255) as u16 & 0xf8;
-            let g = (cy + 128 - (cr >> 1) - cb).clamp(0, 251) as u16 & 0xfc;
-            let b = (cy + 128 + (cu >> 3)).clamp(0, 255) as u16 & 0xf8;
+                let cr = cr_of((cv >> 4) + 256);
+                let cb = cb_of((cu >> 4) + 256);
 
-            surface.pixels[line + rx] = (r << 8) | (g << 3) | (b >> 3);
+                // The original clips G a little more and keeps 5/6/5 bits
+                let r = (cy + 128 + cr).clamp(0, 255) as u16 & 0xf8;
+                let g = (cy + 128 - (cr >> 1) - cb).clamp(0, 251) as u16 & 0xfc;
+                let b = (cy + 128 + (cu >> 3)).clamp(0, 255) as u16 & 0xf8;
+
+                self.px[line + rx] = (r << 8) | (g << 3) | (b >> 3);
+            }
         }
     }
 }
 
+/// Coordinate of the 8x8 block holding `v`.
+fn balign(v: usize) -> isize {
+    (v & !7) as isize
+}
+
+/// Wraps a motion source around the line horizontally.
+fn wrap_line(x: isize, w: usize) -> isize {
+    let w = w as isize;
+    if x < 0 {
+        x + w
+    } else if x >= w {
+        x - w
+    } else {
+        x
+    }
+}
+
 /// The state of one frame's decoding.
-struct IwDecoder<'a> {
-    surface: &'a mut Surface,
+struct FrameDecoder<'a> {
+    planes: Planes<'a>,
     bitbuf: BitBuffer<'a>,
     motion: MotionBuffer<'a>,
     shortmo: ShortMotionBuffer<'a>,
@@ -441,46 +528,320 @@ struct IwDecoder<'a> {
     chroma_quant: [i32; 64],
 }
 
-impl IwDecoder<'_> {
-    fn decode(&mut self) -> Result<(), DecodeError> {
-        for y in (0..self.surface.h).step_by(8) {
-            for x in (0..self.surface.w).step_by(8) {
-                self.decode88(x, y)?;
+impl FrameDecoder<'_> {
+    fn bit(&mut self) -> Result<bool, DecodeError> {
+        Ok(self.bitbuf.next()? != 0)
+    }
+
+    /// Three transform bits from the bit buffer, or two and the motion
+    /// word's top bit.
+    fn xform_bits(&mut self, low: Option<u16>) -> Result<u8, DecodeError> {
+        let hi = self.bitbuf.next()? << 2;
+        let mid = self.bitbuf.next()? << 1;
+        let lo = match low {
+            Some(moword) => (moword >> 15) as u8,
+            None => self.bitbuf.next()?,
+        };
+        Ok(hi | mid | lo)
+    }
+
+    fn blocks(
+        &mut self,
+        mut f: impl FnMut(&mut Self, usize, usize) -> Result<(), DecodeError>,
+    ) -> Result<(), DecodeError> {
+        for y in (0..self.planes.h).step_by(8) {
+            for x in (0..self.planes.w).step_by(8) {
+                f(self, x, y)?;
             }
         }
         Ok(())
     }
 
-    fn decode88(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
-        if self.bitbuf.next()? != 0 {
-            if self.bitbuf.next()? != 0 {
+    // ----- IW: warp keyframes (panoramas) -----
+
+    fn decode_iw_kf88(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            if self.bit()? {
                 // 11: keyblock
                 self.render_keyblock(x, y)
             } else {
                 // 10: motion
-                self.render_motion(8, x, y)
+                self.render_iw_motion(8, x, y)
             }
         } else {
             // 0: cross-cut
-            self.decode44(x, y)?;
-            self.decode44(x + 4, y)?;
-            self.decode44(x, y + 4)?;
-            self.decode44(x + 4, y + 4)
+            self.decode_iw_kf44(x, y)?;
+            self.decode_iw_kf44(x + 4, y)?;
+            self.decode_iw_kf44(x, y + 4)?;
+            self.decode_iw_kf44(x + 4, y + 4)
         }
     }
 
-    fn decode44(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
-        if self.bitbuf.next()? != 0 {
+    fn decode_iw_kf44(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
             // 1: double cross-cut
-            self.render_shortmo(x, y)?;
-            self.render_shortmo(x + 2, y)?;
-            self.render_shortmo(x, y + 2)?;
-            self.render_shortmo(x + 2, y + 2)
+            self.render_iw_shortmo(x, y)?;
+            self.render_iw_shortmo(x + 2, y)?;
+            self.render_iw_shortmo(x, y + 2)?;
+            self.render_iw_shortmo(x + 2, y + 2)
         } else {
             // 0: motion
-            self.render_motion(4, x, y)
+            self.render_iw_motion(4, x, y)
         }
     }
+
+    // ----- IX keyframes -----
+
+    fn decode_ix_kf88(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            if self.bit()? {
+                if self.bit()? {
+                    // 111: motion
+                    self.render_ix_kf_motion((8, 8), false, x, y)
+                } else {
+                    // 110: keyblock
+                    self.render_keyblock(x, y)
+                }
+            } else {
+                // 10: cross-cut
+                self.decode_ix_kf44(x, y)?;
+                self.decode_ix_kf44(x + 4, y)?;
+                self.decode_ix_kf44(x, y + 4)?;
+                self.decode_ix_kf44(x + 4, y + 4)
+            }
+        } else if self.bit()? {
+            // 01: V-cut
+            self.decode_ix_kf48(x, y)?;
+            self.decode_ix_kf48(x + 4, y)
+        } else {
+            // 00: H-cut
+            self.decode_ix_kf84(x, y)?;
+            self.decode_ix_kf84(x, y + 4)
+        }
+    }
+
+    fn decode_ix_kf48(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            // 1: motion
+            self.render_ix_kf_motion((4, 8), false, x, y)
+        } else {
+            // 0: cross-cut
+            self.decode_ix_kf44(x, y)?;
+            self.decode_ix_kf44(x, y + 4)
+        }
+    }
+
+    fn decode_ix_kf84(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            // 1: motion
+            self.render_ix_kf_motion((8, 4), false, x, y)
+        } else {
+            // 0: cross-cut
+            self.decode_ix_kf44(x, y)?;
+            self.decode_ix_kf44(x + 4, y)
+        }
+    }
+
+    fn decode_ix_kf44(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            if self.bit()? {
+                // 11: double cross-cut; 2x2 blocks are always small motions
+                self.render_ix_kf_motion((2, 2), true, x, y)?;
+                self.render_ix_kf_motion((2, 2), true, x + 2, y)?;
+                self.render_ix_kf_motion((2, 2), true, x, y + 2)?;
+                self.render_ix_kf_motion((2, 2), true, x + 2, y + 2)
+            } else {
+                // 10: DV-cut
+                self.decode_ix_kf24(x, y)?;
+                self.decode_ix_kf24(x + 2, y)
+            }
+        } else if self.bit()? {
+            // 01: DH-cut
+            self.decode_ix_kf42(x, y)?;
+            self.decode_ix_kf42(x, y + 2)
+        } else {
+            // 00: motion
+            self.render_ix_kf_motion((4, 4), false, x, y)
+        }
+    }
+
+    fn decode_ix_kf24(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            // 1: double cross-cut
+            self.render_ix_kf_motion((2, 2), true, x, y)?;
+            self.render_ix_kf_motion((2, 2), true, x, y + 2)
+        } else {
+            // 0: small motion
+            self.render_ix_kf_motion((2, 4), true, x, y)
+        }
+    }
+
+    fn decode_ix_kf42(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            // 1: double cross-cut
+            self.render_ix_kf_motion((2, 2), true, x, y)?;
+            self.render_ix_kf_motion((2, 2), true, x + 2, y)
+        } else {
+            // 0: small motion
+            self.render_ix_kf_motion((4, 2), true, x, y)
+        }
+    }
+
+    // ----- IX interframes -----
+
+    fn decode_ix_if88(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            if self.bit()? {
+                if self.bit()? {
+                    if self.bit()? {
+                        // 1111: not a valid code
+                        Err(DecodeError::Bitstream("unknown 8x8 interframe block code"))
+                    } else {
+                        // 1110: cross-cut
+                        self.decode_ix_if44(x, y)?;
+                        self.decode_ix_if44(x + 4, y)?;
+                        self.decode_ix_if44(x, y + 4)?;
+                        self.decode_ix_if44(x + 4, y + 4)
+                    }
+                } else {
+                    // 110: skip
+                    self.render_skip((8, 8), x, y)
+                }
+            } else if self.bit()? {
+                // 101: V-cut
+                self.decode_ix_if48(x, y)?;
+                self.decode_ix_if48(x + 4, y)
+            } else {
+                // 100: H-cut
+                self.decode_ix_if84(x, y)?;
+                self.decode_ix_if84(x, y + 4)
+            }
+        } else if self.bit()? {
+            if self.bit()? {
+                // 011: keyblock
+                self.render_keyblock(x, y)
+            } else {
+                // 010: motion
+                self.render_ix_if_motion((8, 8), false, x, y)
+            }
+        } else {
+            // 00: short motion
+            self.render_ix_if_shortmo((8, 8), x, y)
+        }
+    }
+
+    /// The 4x8 and 8x4 halves of a cut 8x8 block: `vertical` for 4x8.
+    fn decode_ix_if_half(&mut self, vertical: bool, x: usize, y: usize) -> Result<(), DecodeError> {
+        let size = if vertical { (4, 8) } else { (8, 4) };
+        if self.bit()? {
+            if self.bit()? {
+                // 11: skip
+                self.render_skip(size, x, y)
+            } else if vertical {
+                // 10: cross-cut
+                self.decode_ix_if44(x, y)?;
+                self.decode_ix_if44(x, y + 4)
+            } else {
+                // 10: cross-cut
+                self.decode_ix_if44(x, y)?;
+                self.decode_ix_if44(x + 4, y)
+            }
+        } else if self.bit()? {
+            // 01: motion
+            self.render_ix_if_motion(size, false, x, y)
+        } else {
+            // 00: short motion
+            self.render_ix_if_shortmo(size, x, y)
+        }
+    }
+
+    fn decode_ix_if48(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        self.decode_ix_if_half(true, x, y)
+    }
+
+    fn decode_ix_if84(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        self.decode_ix_if_half(false, x, y)
+    }
+
+    fn decode_ix_if44(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            if self.bit()? {
+                if self.bit()? {
+                    // 111: double cross-cut
+                    self.decode_ix_if22(x, y)?;
+                    self.decode_ix_if22(x + 2, y)?;
+                    self.decode_ix_if22(x, y + 2)?;
+                    self.decode_ix_if22(x + 2, y + 2)
+                } else {
+                    // 110: DV-cut
+                    self.decode_ix_if_small_half(true, x, y)?;
+                    self.decode_ix_if_small_half(true, x + 2, y)
+                }
+            } else if self.bit()? {
+                // 101: DH-cut
+                self.decode_ix_if_small_half(false, x, y)?;
+                self.decode_ix_if_small_half(false, x, y + 2)
+            } else {
+                // 100: skip
+                self.render_skip((4, 4), x, y)
+            }
+        } else if self.bit()? {
+            // 01: motion
+            self.render_ix_if_motion((4, 4), false, x, y)
+        } else {
+            // 00: short motion
+            self.render_ix_if_shortmo((4, 4), x, y)
+        }
+    }
+
+    /// The 2x4 and 4x2 halves of a cut 4x4 block: `vertical` for 2x4.
+    fn decode_ix_if_small_half(
+        &mut self,
+        vertical: bool,
+        x: usize,
+        y: usize,
+    ) -> Result<(), DecodeError> {
+        let size = if vertical { (2, 4) } else { (4, 2) };
+        if self.bit()? {
+            if self.bit()? {
+                if self.bit()? {
+                    // 111: double cross-cut
+                    self.decode_ix_if22(x, y)?;
+                    if vertical {
+                        self.decode_ix_if22(x, y + 2)
+                    } else {
+                        self.decode_ix_if22(x + 2, y)
+                    }
+                } else {
+                    // 110: skip
+                    self.render_skip(size, x, y)
+                }
+            } else {
+                // 10: small motion
+                self.render_ix_if_motion(size, true, x, y)
+            }
+        } else {
+            // 0: short motion
+            self.render_ix_if_shortmo(size, x, y)
+        }
+    }
+
+    fn decode_ix_if22(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+        if self.bit()? {
+            if self.bit()? {
+                // 11: skip
+                self.render_skip((2, 2), x, y)
+            } else {
+                // 10: small motion
+                self.render_ix_if_motion((2, 2), true, x, y)
+            }
+        } else {
+            // 0: short motion
+            self.render_ix_if_shortmo((2, 2), x, y)
+        }
+    }
+
+    // ----- Block renderers -----
 
     fn render_keyblock(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
         let mut plane = [0i32; 64];
@@ -493,7 +854,7 @@ impl IwDecoder<'_> {
             self.render_plane(&mut plane, &quant)?;
             self.coeffs[p * 64..(p + 1) * 64].copy_from_slice(&plane);
         }
-        yuv_to_rgb(self.surface, x, y, &self.coeffs);
+        self.planes.yuv_to_rgb(x, y, &self.coeffs);
         Ok(())
     }
 
@@ -601,24 +962,21 @@ impl IwDecoder<'_> {
 
     /// IW motion: an `size` x `size` copy from earlier in the panorama,
     /// wrapping around the line horizontally.
-    fn render_motion(&mut self, size: isize, x: usize, y: usize) -> Result<(), DecodeError> {
+    fn render_iw_motion(&mut self, size: isize, x: usize, y: usize) -> Result<(), DecodeError> {
         let moword = self.motion.next()?;
-        let xform = (self.bitbuf.next()? << 2) | (self.bitbuf.next()? << 1) | (moword >> 15) as u8;
+        let xform = self.xform_bits(Some(moword))?;
 
         let offy = if size == 8 { 0 } else { 4 };
-        let w = self.surface.w as isize;
-        let mut srx = (x & !7) as isize + 128 - ((moword >> 7) & 0xff) as isize;
-        let sry = (y & !7) as isize + offy - (moword & 0x7f) as isize;
-        if srx < 0 {
-            srx += w;
-        } else if srx >= w {
-            srx -= w;
-        }
-        self.surface.motion(xform, (size, size), (srx, sry), (x, y))
+        let srx = balign(x) + 128 - ((moword >> 7) & 0xff) as isize;
+        let sry = balign(y) + offy - (moword & 0x7f) as isize;
+        let srx = wrap_line(srx, self.planes.w);
+        let cur = self.planes.cur;
+        self.planes
+            .motion(xform, (size, size), cur, (srx, sry), (x, y))
     }
 
     /// IW short motion: a 2x2 copy from close by.
-    fn render_shortmo(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
+    fn render_iw_shortmo(&mut self, x: usize, y: usize) -> Result<(), DecodeError> {
         let moword = self.shortmo.next()?;
         let xform = ((moword >> 1) & 7) as u8;
 
@@ -636,74 +994,269 @@ impl IwDecoder<'_> {
 
         // A source beyond the line ends up on the previous or next line:
         // this is expected (rows are contiguous).
-        let srx = (x & !7) as isize + xmotion;
-        let sry = (y & !7) as isize + ymotion;
-        self.surface.motion(xform, (2, 2), (srx, sry), (x, y))
+        let srx = balign(x) + xmotion;
+        let sry = balign(y) + ymotion;
+        let cur = self.planes.cur;
+        self.planes.motion(xform, (2, 2), cur, (srx, sry), (x, y))
+    }
+
+    /// IX keyframe motion: a copy from earlier in the frame being decoded.
+    fn render_ix_kf_motion(
+        &mut self,
+        size: (usize, usize),
+        small: bool,
+        x: usize,
+        y: usize,
+    ) -> Result<(), DecodeError> {
+        let moword = self.motion.next()?;
+        let (xform, srx, sry);
+        if small {
+            xform = ((moword >> 12) & 7) as u8;
+            // A source beyond the line ends up on the previous or next line
+            srx = balign(x) + 63 - (moword & 0x7f) as isize;
+            sry = balign(y) + 6 - ((moword >> 7) & 0x1f) as isize;
+        } else {
+            xform = self.xform_bits(Some(moword))?;
+            let offy = if size == (8, 8) { 0 } else { 4 };
+            let rx = balign(x) + 128 - ((moword >> 7) & 0xff) as isize;
+            srx = wrap_line(rx, self.planes.w);
+            sry = balign(y) + offy - (moword & 0x7f) as isize;
+        }
+        let cur = self.planes.cur;
+        self.planes
+            .motion_ordered(xform, size, cur, (srx, sry), (x, y))
+    }
+
+    /// IX skip: the block of the previous frame, unchanged.
+    fn render_skip(
+        &mut self,
+        (sx, sy): (usize, usize),
+        x: usize,
+        y: usize,
+    ) -> Result<(), DecodeError> {
+        let old = self.planes.old;
+        let pos = (x as isize, y as isize);
+        self.planes
+            .motion(0, (sx as isize, sy as isize), old, pos, (x, y))
+    }
+
+    /// IX interframe motion: a copy from the frame being decoded or from
+    /// the previous one.
+    fn render_ix_if_motion(
+        &mut self,
+        size: (usize, usize),
+        small: bool,
+        x: usize,
+        y: usize,
+    ) -> Result<(), DecodeError> {
+        let moword = self.motion.next()?;
+        let use_current = moword & 0x8000 != 0;
+        let (xform, srx, sry);
+        if small {
+            xform = ((moword >> 12) & 7) as u8;
+            // A source beyond the line ends up on the previous or next line
+            if use_current {
+                srx = balign(x) + 63 - (moword & 0x7f) as isize;
+                sry = balign(y) + 6 - ((moword >> 7) & 0x1f) as isize;
+            } else {
+                srx = balign(x) + 31 - (moword & 0x3f) as isize;
+                sry = balign(y) + 31 - ((moword >> 6) & 0x3f) as isize;
+            }
+        } else {
+            xform = self.xform_bits(None)?;
+            let offy = match (use_current, size) {
+                (true, (8, 8)) => 0,
+                (true, _) => 4,
+                (false, _) => 64,
+            };
+            let rx = balign(x) + 128 - ((moword >> 7) & 0xff) as isize;
+            srx = wrap_line(rx, self.planes.w);
+            sry = balign(y) + offy - (moword & 0x7f) as isize;
+        }
+        let src = if use_current {
+            self.planes.cur
+        } else {
+            self.planes.old
+        };
+        self.planes
+            .motion_ordered(xform, size, src, (srx, sry), (x, y))
+    }
+
+    /// IX interframe short motion: the previous frame's pixels a little
+    /// away (on square rings around the block, not block aligned).
+    fn render_ix_if_shortmo(
+        &mut self,
+        (sx, sy): (usize, usize),
+        x: usize,
+        y: usize,
+    ) -> Result<(), DecodeError> {
+        let mut somoword = self.shortmo.next()? as isize;
+        let (ox, oy);
+        if somoword == 0 {
+            ox = 1;
+            oy = 0;
+        } else {
+            somoword -= 1;
+            let mut span = 1;
+            while somoword >= 8 * span {
+                somoword -= 8 * span;
+                span += 1;
+            }
+            let base = -span + 1;
+            let side_sz = (span * 8) / 4;
+            let side = somoword / side_sz;
+            let side_pos = somoword % side_sz;
+            let (off_x, off_y) = match side {
+                0 => (0, side_pos),
+                1 => (side_pos + 1, side_sz - 1),
+                2 => (side_sz, side_sz - 1 - side_pos - 1),
+                _ => (side_sz - 1 - side_pos, -1),
+            };
+            ox = base + off_x;
+            oy = base + off_y;
+        }
+
+        // Not block aligned; a source beyond the line ends up on the
+        // previous or next line.
+        let src = (x as isize + ox, y as isize + oy);
+        let old = self.planes.old;
+        self.planes
+            .motion(0, (sx as isize, sy as isize), old, src, (x, y))
     }
 }
 
-/// Decodes one IW (warp keyframe) chunk of a `width` x `height` HNM6 file
-/// into `pixels`. `buffer_size` is the file header's largest frame size.
-pub(crate) fn decode_iw_frame(
-    chunk: &[u8],
-    width: usize,
-    height: usize,
+/// Decodes HNM6 frames into one or two frame buffers.
+pub(crate) struct Hnm6Decoder {
+    w: usize,
+    h: usize,
+    /// The file header's largest frame size.
     buffer_size: usize,
-    pixels: &mut Vec<u16>,
-) -> Result<(), DecodeError> {
-    if chunk.len() < HEADER_SIZE {
-        return Err(DecodeError::InvalidFrameHeader);
-    }
-    let field = |n: usize| le32(chunk, 4 * n);
-    let quality = field(0) as i32;
-    let offsets: [usize; 5] = std::array::from_fn(|n| field(n + 1) as usize);
-    let [bit_start, motion_start, shortmo_start, jpeg_start, end] = offsets;
+    /// The frame data, kept from one frame to the next as ScummVM's (the
+    /// coefficient reader may look one byte past a frame's data).
+    buffer: Vec<u8>,
+    /// The pixels: one frame (warp) or two frame buffers (video).
+    block: Vec<u16>,
+    video_mode: bool,
+    cur: usize,
+    old: usize,
+}
 
-    if offsets.iter().any(|&o| o > end) || end > buffer_size || end < HEADER_SIZE {
-        return Err(DecodeError::InvalidFrameHeader);
+impl Hnm6Decoder {
+    /// A decoder of `width` x `height` frames of at most `buffer_size`
+    /// bytes. Video mode keeps two frame buffers in `block`, at offsets 0
+    /// and `width * height` (the block grows with zeros to hold them);
+    /// warp mode one at offset 0.
+    pub(crate) fn new(
+        width: usize,
+        height: usize,
+        buffer_size: usize,
+        video_mode: bool,
+        mut block: Vec<u16>,
+    ) -> Self {
+        let frame = width * height;
+        let need = if video_mode { 2 * frame } else { frame };
+        if block.len() < need {
+            block.resize(need, 0);
+        }
+        Hnm6Decoder {
+            w: width,
+            h: height,
+            buffer_size,
+            buffer: vec![0; buffer_size],
+            block,
+            video_mode,
+            cur: 0,
+            old: if video_mode { frame } else { 0 },
+        }
     }
-    if end > chunk.len() {
-        return Err(DecodeError::Truncated);
-    }
-    // ScummVM reads regions of `next - start` bytes, unsigned; well formed
-    // frames have them in order.
-    if bit_start > motion_start || motion_start > shortmo_start || shortmo_start > jpeg_start {
-        return Err(DecodeError::InvalidFrameHeader);
-    }
-    // Warp frames always carry a positive quality.
-    if quality <= 0 {
-        return Err(DecodeError::InvalidFrameHeader);
-    }
-    let data = &chunk[..end];
-    let (luma_quant, chroma_quant) = quant_tables(quality);
 
-    let mut surface = Surface {
-        w: width,
-        h: height,
-        pixels: std::mem::take(pixels),
-    };
-    let mut dec = IwDecoder {
-        surface: &mut surface,
-        bitbuf: BitBuffer::new(&data[bit_start..motion_start]),
-        motion: MotionBuffer {
-            data: &data[motion_start..shortmo_start],
-            pos: 0,
-        },
-        shortmo: ShortMotionBuffer {
-            data: &data[shortmo_start..jpeg_start],
-            pos: 0,
-            other: 0,
-        },
-        jpeg: JpegBuffer {
-            data: &data[jpeg_start..end],
-            pos: 0,
-            other: 0,
-        },
-        coeffs: [0; 192],
-        luma_quant,
-        chroma_quant,
-    };
-    let result = dec.decode();
-    *pixels = surface.pixels;
-    result
+    /// The last decoded frame.
+    pub(crate) fn frame(&self) -> &[u16] {
+        &self.block[self.cur..self.cur + self.w * self.h]
+    }
+
+    pub(crate) fn into_block(self) -> Vec<u16> {
+        self.block
+    }
+
+    /// Decodes one IW (`warp`) or IX chunk.
+    pub(crate) fn decode_frame(&mut self, chunk: &[u8], warp: bool) -> Result<(), DecodeError> {
+        // Video mode switches both buffers first: the frame lands in the
+        // other one, the one just shown becomes the previous frame.
+        if self.video_mode {
+            std::mem::swap(&mut self.cur, &mut self.old);
+        }
+
+        if chunk.len() < HEADER_SIZE {
+            return Err(DecodeError::InvalidFrameHeader);
+        }
+        let field = |n: usize| le32(chunk, 4 * n);
+        let quality = field(0) as i32;
+        let offsets: [usize; 5] = std::array::from_fn(|n| field(n + 1) as usize);
+        let [bit_start, motion_start, shortmo_start, jpeg_start, end] = offsets;
+
+        if offsets.iter().any(|&o| o > end) || end > self.buffer_size || end < HEADER_SIZE {
+            return Err(DecodeError::InvalidFrameHeader);
+        }
+        if end > chunk.len() {
+            return Err(DecodeError::Truncated);
+        }
+        // ScummVM reads regions of `next - start` bytes, unsigned; well
+        // formed frames have them in order.
+        if bit_start > motion_start || motion_start > shortmo_start || shortmo_start > jpeg_start {
+            return Err(DecodeError::InvalidFrameHeader);
+        }
+        // Warp frames always carry a positive quality; a negative one marks
+        // an IX keyframe.
+        if warp && quality <= 0 {
+            return Err(DecodeError::InvalidFrameHeader);
+        }
+        if warp == self.video_mode {
+            return Err(DecodeError::Bitstream(if warp {
+                "IW frame in a video file"
+            } else {
+                "IX frame in a warp file"
+            }));
+        }
+        let keyframe = quality < 0;
+        self.buffer[..end].copy_from_slice(&chunk[..end]);
+        let data = &self.buffer[..];
+        let (luma_quant, chroma_quant) = quant_tables(quality);
+
+        let mut dec = FrameDecoder {
+            planes: Planes {
+                px: &mut self.block,
+                w: self.w,
+                h: self.h,
+                cur: self.cur,
+                old: self.old,
+            },
+            bitbuf: BitBuffer::new(&data[bit_start..motion_start]),
+            motion: MotionBuffer {
+                data: &data[motion_start..shortmo_start],
+                pos: 0,
+            },
+            shortmo: ShortMotionBuffer {
+                data: &data[shortmo_start..jpeg_start],
+                pos: 0,
+                other: 0,
+            },
+            jpeg: JpegBuffer {
+                data: &data[jpeg_start..],
+                size: end - jpeg_start,
+                pos: 0,
+                other: 0,
+            },
+            coeffs: [0; 192],
+            luma_quant,
+            chroma_quant,
+        };
+        if warp {
+            dec.blocks(FrameDecoder::decode_iw_kf88)
+        } else if keyframe {
+            dec.blocks(FrameDecoder::decode_ix_kf88)
+        } else {
+            dec.blocks(FrameDecoder::decode_ix_if88)
+        }
+    }
 }

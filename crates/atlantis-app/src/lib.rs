@@ -14,6 +14,7 @@ use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
+mod audio_out;
 #[cfg(target_arch = "wasm32")]
 mod web;
 

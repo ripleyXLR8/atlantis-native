@@ -1,14 +1,20 @@
-//! Picture and video codecs of *Atlantis: The Lost Tales* (Cryo, 1997).
+//! Picture, video and sound codecs of *Atlantis: The Lost Tales* (Cryo,
+//! 1997): HNM6 panoramas and videos, APC sound.
 //!
 //! Translated from ScummVM's HNM decoders (video/hnm_decoder.cpp and
-//! image/codecs/hnm.cpp, GPLv3, the ScummVM team) as used by the CryOmni3D
-//! Atlantis engine. Comments cite addresses in the original `atlantis.exe`
+//! image/codecs/hnm.cpp) and APC decoder (audio/decoders/apc.cpp), GPLv3,
+//! the ScummVM team, as used by the CryOmni3D Atlantis engine. Comments cite addresses in the original `atlantis.exe`
 //! (the 2001 English build) where they explain a behaviour.
 
 #![forbid(unsafe_code)]
 
+mod apc;
 mod hnm;
 mod hnm6;
+mod motion_order;
+
+pub use apc::{decode_apc, Apc, ApcDecoder, ApcHeader, APC_HEADER_SIZE};
+pub use hnm::{AudioFormat, HnmVideo};
 
 use std::fmt;
 
@@ -48,8 +54,10 @@ pub enum DecodeError {
     InvalidFrameHeader,
     /// The compressed frame data is inconsistent.
     Bitstream(&'static str),
-    /// A valid feature that is not translated (not used by panoramas).
+    /// A valid feature that is not translated.
     Unsupported(&'static str),
+    /// Not an APC file (no `CRYO_APC1.20` header).
+    NotApc,
 }
 
 impl fmt::Display for DecodeError {
@@ -73,6 +81,7 @@ impl fmt::Display for DecodeError {
             DecodeError::InvalidFrameHeader => write!(f, "invalid frame header"),
             DecodeError::Bitstream(what) => write!(f, "corrupt frame: {what}"),
             DecodeError::Unsupported(what) => write!(f, "unsupported: {what}"),
+            DecodeError::NotApc => write!(f, "not an APC file"),
         }
     }
 }
