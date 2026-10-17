@@ -12,6 +12,7 @@ use std::pin::Pin;
 
 use atlantis_data::BigArchive;
 
+use crate::checkpoint::ScriptState;
 use crate::engine::Engine;
 
 /// A boxed future borrowing the hook and the engine.
@@ -105,17 +106,21 @@ pub trait ScriptHooks {
         ready(Departure::Go)
     }
 
-    /// A right click in the warp view: the inventory bar (`FUN_0041bfa0` @
-    /// 0x0041c6d2). TODO(phase 3).
-    fn bar_requested<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, ()> {
+    /// One frame of the inventory bar's loops: the CON timers
+    /// (`FUN_0042c8ac` @ 0x0042cb2c). True when a section ran.
+    fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+        ready(false)
+    }
+
+    /// A guest's portrait clicked in the open bar (`FUN_0042c8ac` @
+    /// 0x0042cbfe): the conversation `FUN_00425828` with 0x00496144 = 1.
+    fn talk_to_guest<'a>(&'a mut self, e: &'a mut Engine, id: i32) -> HookFuture<'a, ()> {
         ready(())
     }
 
-    /// Escape in the warp view: the in-game menu (`FUN_0041c838`, opened
-    /// @ 0x0041c5f7..0x0041c618). TODO(phase 3).
-    fn menu_requested<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, ()> {
-        ready(())
-    }
+    /// A checkpoint is loaded (`FUN_0042de5c`): the script state it holds,
+    /// before the chapter's CON is loaded.
+    fn restore_script_state(&mut self, e: &mut Engine, state: &ScriptState) {}
 }
 
 /// Navigation alone: every hook does nothing.

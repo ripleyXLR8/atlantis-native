@@ -6,7 +6,15 @@
 //! dropped, so that the voices end as they would.
 //!
 //! `--original` (before the game directory) turns every enhancement off:
-//! the original game, bug for bug.
+//! the original game, bug for bug. `--new-game` skips the start-up videos
+//! and the player screen.
+//!
+//! The players, the checkpoints (the original's `players.atl` and
+//! `p<letter><chapter>.gam`) and `settings.ini` are kept in the per-user
+//! data folder (`~/.local/share/atlantis-native/<build>` on Linux,
+//! `%APPDATA%\atlantis-native\<build>` on Windows, `~/Library/Application
+//! Support/atlantis-native/<build>` on macOS); `settings.ini` also holds
+//! the enhancements.
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -17,17 +25,51 @@ fn main() {
     use atlantis_app::{start_game, App};
     use atlantis_data::{Game, StdDir};
     use atlantis_engine::audio::Mixer;
-    use atlantis_engine::{Enhancements, Options};
+    use atlantis_engine::persist::{user_data_dir, DirStore, Settings};
+    use atlantis_engine::{Enhancements, Options, SaveStore, Start};
     use winit::event_loop::EventLoop;
 
     env_logger::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
-    let enhancements = match args.iter().position(|a| a == "--original") {
+    let mut flag = |name: &str| match args.iter().position(|a| a == name) {
         Some(i) => {
             args.remove(i);
-            Enhancements::original()
+            true
         }
-        None => Enhancements::default(),
+        None => false,
+    };
+    let original = flag("--original");
+    let new_game = flag("--new-game");
+    // The saves of each build in their own folder (the player lists of the
+    // languages differ in their marker row).
+    let store_for = |game: &Game| -> Rc<dyn SaveStore> {
+        let dir = user_data_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("atlantis-native-data"))
+            .join(game.exe.build.name);
+        log::info!("saves in {}", dir.display());
+        Rc::new(DirStore::new(dir))
+    };
+    let options_for = |saves: Rc<dyn SaveStore>| {
+        let settings = Settings::load(saves.as_ref()).unwrap_or_default();
+        let enhancements = if original {
+            Enhancements::original()
+        } else {
+            settings.enhancements
+        };
+        if Settings::load(saves.as_ref()).is_none() {
+            settings.save(saves.as_ref());
+        }
+        Options {
+            enhancements,
+            subtitles: settings.subtitles,
+            saves,
+            start: if new_game {
+                Start::NewGame
+            } else {
+                Start::Boot
+            },
+            ..Options::default()
+        }
     };
     let open = |dir: &str| {
         Game::open(Arc::new(StdDir::new(dir))).unwrap_or_else(|e| {
@@ -43,9 +85,15 @@ fn main() {
         };
         let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
         let trace = Rc::new(RefCell::new(Vec::new()));
+        // Headless: a new game at once, the saves in memory.
         let options = Options {
             trace: Some(trace.clone()),
-            enhancements,
+            enhancements: if original {
+                Enhancements::original()
+            } else {
+                Enhancements::default()
+            },
+            start: Start::NewGame,
             ..Options::default()
         };
         let (sys, mut runner) = start_game(open(dir), options);
@@ -75,7 +123,7 @@ fn main() {
     }
 
     let Some(dir) = args.first() else {
-        eprintln!("usage: atlantis-native [--original] <game dir>");
+        eprintln!("usage: atlantis-native [--original] [--new-game] <game dir>");
         // Without a game: the window with a test pattern.
         let el = EventLoop::new().unwrap();
         el.run_app(&mut App::new(
@@ -85,11 +133,10 @@ fn main() {
         .unwrap();
         return;
     };
-    let options = Options {
-        enhancements,
-        ..Options::default()
-    };
-    let (sys, runner) = start_game(open(dir), options);
+    let game = open(dir);
+    let saves = store_for(&game);
+    let options = options_for(saves);
+    let (sys, runner) = start_game(game, options);
     let el = EventLoop::new().unwrap();
     el.run_app(&mut App::new(sys, Some(runner))).unwrap();
 }

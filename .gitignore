@@ -2,3 +2,4 @@
 /game
 *.local.toml
 /web/pkg
+/target-wt

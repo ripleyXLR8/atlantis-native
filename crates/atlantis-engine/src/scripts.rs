@@ -14,6 +14,7 @@
 //! heads, the voices, the subtitles); the walk itself (the /set commands,
 //! the track letters, /go, the Escape skip, the game over) is here.
 
+use crate::checkpoint::ScriptState;
 use crate::con::{
     con_alt_game_over_narration, con_angle_radians, con_entry_allowed, con_escape_skip,
     con_game_over_narrator, con_track_letter, evaluate, parse_con_set, vars, ConItem, ConKeyBuffer,
@@ -220,10 +221,9 @@ pub struct Scripts {
     pub dialog: Box<dyn DialogPresenter>,
     /// The Seth row count of IncPerso (0x0077290c's offset).
     pub inc_perso: i32,
-    /// The guests following the player: their ids, and whether they are
-    /// shown. TODO(phase 3): the portraits and their slides.
-    pub guests: Vec<i32>,
-    pub guests_shown: bool,
+    /// The persistent variables of a checkpoint being loaded, set once
+    /// VARIAS.CON is read, before the /INIT block.
+    pending_vars: Option<[i32; 7]>,
     scan_key: ConKeyBuffer,
     /// The /INIT block runs (the loading flag 0x00496168).
     init_running: bool,
@@ -253,8 +253,7 @@ impl Scripts {
             counters: vec![0; CON_PLAY_COUNTERS],
             dialog,
             inc_perso: 0,
-            guests: Vec::new(),
-            guests_shown: true,
+            pending_vars: None,
             scan_key: [0; 16],
             init_running: false,
             in_place_arrival_scan: false,
@@ -311,6 +310,14 @@ impl Scripts {
                 match e.read("SCENAR\\VARIAS.CON").await {
                     Some(d) => self.names = ConVariableNames::load(&d),
                     None => log::warn!("no VARIAS.CON"),
+                }
+            }
+            // A checkpoint's variables 0..6 replace the persistent ones
+            // (FUN_0042de5c reads them before the chapter change).
+            if let Some(v) = self.pending_vars.take() {
+                for (i, &value) in v.iter().enumerate().take(self.names.len()) {
+                    let name = self.names.name(i).to_string();
+                    e.vars.set(&name, value);
                 }
             }
             let name = format!("SCENAR\\CHAPI{chapter:03}.CON");
@@ -440,21 +447,24 @@ impl Scripts {
                 }
                 "cinema" => e.play_cinema(value).await,
                 // ChangeCd=n: the disc prompt for disc n (@ 0x0042a4c4); the
-                // port reads every disc at once.
-                "changecd" => {}
-                // HideGuest / ShowGuest store no variable.
-                "hideguest" | "showguest" => self.guests_shown = key == "showguest",
-                // AddGuest / SubGuest (FUN_0042b480 / FUN_0042b6c0): the
-                // record, then the variable 0. TODO(phase 3): the portraits
-                // sliding in and out.
-                "addguest" => {
-                    if self.guests.len() < 5 {
-                        self.guests.push(value);
+                // port reads every disc at once and only notes the disc,
+                // which the checkpoints keep.
+                "changecd" => {
+                    if (1..=4).contains(&value) {
+                        e.disc = value as u8;
                     }
+                }
+                // HideGuest / ShowGuest store no variable.
+                "hideguest" | "showguest" => e.guests_shown = key == "showguest",
+                // AddGuest / SubGuest (FUN_0042b480 / FUN_0042b6c0): the
+                // record and its portrait sliding in or out, then the
+                // variable 0.
+                "addguest" => {
+                    e.add_guest(value).await;
                     e.vars.set(key, 0);
                 }
                 "subguest" => {
-                    self.guests.retain(|&g| g != value);
+                    e.sub_guest(value).await;
                     e.vars.set(key, 0);
                 }
                 "hideperso" => {
@@ -516,9 +526,17 @@ impl Scripts {
                     e.music.stop_new_sound();
                 }
                 // ArcMagique=N: the magic-bow animation (@ 0x0042aa09), then
-                // the store. TODO(phase 3): the animation.
+                // the store.
+                "arcmagique" => {
+                    e.play_arc_magique().await;
+                    e.vars.set(key, value);
+                }
                 // TirFleche=N restarts the arrow frame (0x0042a98e), then the
-                // store. TODO(phase 3): bow mode.
+                // store.
+                "tirfleche" => {
+                    e.arrow_frame = 0;
+                    e.vars.set(key, value);
+                }
                 // StartPuzzle=N only arms puzzle N: it runs when zone 1000 + N
                 // is clicked (FUN_004240fc).
                 _ => {
@@ -539,15 +557,25 @@ impl Scripts {
     /// /sel scan runs with ArriveeVue = LastVue (`FUN_00427634` sets it at
     /// 0x0042777d, `FUN_0042a100` scans at 0x0042a60e).
     async fn change_chapter(&mut self, e: &mut Engine, value: i32) {
+        let left = e.vars.get("chapter");
         e.vars.set("chapter", value);
         if value <= 0 || value as u32 == self.chapter {
             return;
         }
         log::info!("chapter {} -> {value}", self.chapter);
+        // The previous chapter (0x00772907 @ 0x0042a582), the chapter byte
+        // (0x00772909 @ 0x0042a58a).
+        e.prev_chapter = self.chapter as u8;
         self.chapter = value as u32;
         e.chapter = value as u32;
-        // TODO(phase 3): the chapter checkpoint, written first
-        // (0x0042765f) unless the /INIT block runs (0x00496168).
+        // The chapter checkpoint, written first (0x0042765f) unless the
+        // /INIT block or a load runs (0x00496168): it holds the state where
+        // chapter= fired, with the new chapter number and, in variable 0,
+        // the chapter left (the variable is stored after it).
+        if !self.init_running && !e.load_running {
+            let state = self.script_state(e, left);
+            e.write_checkpoint(&state);
+        }
         self.load_con_script(e, value as u32).await;
         if let Some(cur) = e.current_place_id {
             let last = i32::from(e.last_vue);
@@ -731,9 +759,16 @@ impl Scripts {
             } else {
                 log::warn!("inventory full, object {obj} not added");
             }
-            // TODO(phase 3): the bar shows the object; a right click keeps
-            // it in hand, a left click puts it away.
-            e.vars.set("objetenmain", 0);
+            // The bar shows the object in hand (FUN_0042c2c4, FUN_0042cc98,
+            // FUN_0042c59c): a right click keeps it in hand, a left click
+            // puts it away.
+            let keep = e.display_pickup(self).await;
+            if e.should_abort() {
+                return;
+            }
+            if !keep {
+                e.vars.set("objetenmain", 0);
+            }
         }
     }
 
@@ -955,8 +990,7 @@ impl Scripts {
             // set after a line (0x00428c05), before the end of the walk, so
             // the music stays lowered under the narrator. Then GameOver = 0
             // (FUN_0042de5c -> FUN_00426c68) and the main loop reloads the
-            // player's checkpoint (0x0041975d), TODO(phase 3); without one,
-            // a new game.
+            // player's checkpoint (0x0041975d); without one, a new game.
             let had_game_over = game_over.is_some();
             if let Some(req) = game_over {
                 e.emit(Event::GameOver(req.n));
@@ -998,6 +1032,27 @@ impl Scripts {
             // The click that ended the last line is not a navigation press.
             e.wait_buttons_up().await;
         })
+    }
+}
+
+impl Scripts {
+    /// The script side of a checkpoint; `left` is CHAPTER before the
+    /// chapter= that writes it.
+    fn script_state(&self, e: &Engine, left: i32) -> ScriptState {
+        let mut vars = [0; 7];
+        for (i, v) in vars.iter_mut().enumerate().take(self.names.len()) {
+            let name = self.names.name(i);
+            *v = if name == "chapter" {
+                left
+            } else {
+                e.vars.get(name)
+            };
+        }
+        ScriptState {
+            counters: self.counters.clone(),
+            inc_perso: self.inc_perso as u8,
+            vars,
+        }
     }
 }
 
@@ -1076,12 +1131,9 @@ impl ScriptHooks for Scripts {
         Box::pin(async move {
             if !keep_state {
                 // FUN_00423760 zeroes the /con play counters when a game
-                // starts, and the IncPerso count (@ 0x004237a0); the guest
-                // list is zeroed at boot (FUN_004239f4), shown.
+                // starts, and the IncPerso count (@ 0x004237a0).
                 self.counters.iter_mut().for_each(|c| *c = 0);
                 self.inc_perso = 0;
-                self.guests.clear();
-                self.guests_shown = true;
                 self.game_over_count.clear();
             }
             // FUN_00427634 reloads the CON and runs its /INIT even when the
@@ -1111,6 +1163,38 @@ impl ScriptHooks for Scripts {
 
     fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
         Box::pin(self.run_con_timers(e, true))
+    }
+
+    fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+        Box::pin(self.run_con_timers(e, false))
+    }
+
+    /// `FUN_00425828` with 0x00496144 = 1: the other guests are hidden
+    /// only when the guest has enabled subjects (the loop at 0x0042594d
+    /// runs on the subject path), then restored.
+    fn talk_to_guest<'a>(&'a mut self, e: &'a mut Engine, id: i32) -> HookFuture<'a, ()> {
+        Box::pin(async move {
+            let saved = e.guests.sprite;
+            if !self.subjects.subjects(id).is_empty() {
+                for i in 0..e.guests.count {
+                    if e.guests.id[i] != id {
+                        e.guests.sprite[i] = crate::ui::Guests::HIDDEN;
+                    }
+                }
+            }
+            self.interact_npc(e, id).await;
+            e.guests.sprite = saved;
+        })
+    }
+
+    fn restore_script_state(&mut self, _e: &mut Engine, state: &ScriptState) {
+        self.counters.iter_mut().for_each(|c| *c = 0);
+        for (c, &v) in self.counters.iter_mut().zip(&state.counters) {
+            *c = v;
+        }
+        self.inc_perso = i32::from(state.inc_perso);
+        self.game_over_count.clear();
+        self.pending_vars = Some(state.vars);
     }
 
     fn npc_click<'a>(&'a mut self, e: &'a mut Engine, id: u32, _zone: u32) -> HookFuture<'a, ()> {

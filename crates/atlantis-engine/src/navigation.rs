@@ -75,8 +75,24 @@ impl Engine {
         }
     }
 
-    /// Draws the cursor sprite at the pointer.
+    /// Draws the cursor at the pointer: the object in hand (0x0041c45a),
+    /// then the cursor sprite `FUN_00422fcc` chose over it.
     fn draw_cursor(&self) {
+        let held = self.vars.get("objetenmain");
+        if held != 0 {
+            if let Some(spr) = crate::ui::object_icon(&self.game.exe.inventory_object_ids, held)
+                .and_then(|i| self.ui.object(i))
+            {
+                let mut screen = self.sys.screen.borrow_mut();
+                spr.draw(
+                    &mut screen,
+                    SCREEN_W,
+                    SCREEN_H,
+                    self.pointer.pos.0,
+                    self.pointer.pos.1,
+                );
+            }
+        }
         let Ok(i) = usize::try_from(self.cursor_shown) else {
             return;
         };
@@ -102,6 +118,8 @@ impl Engine {
         // a mouse motion since the engine last wrote it is the WM_MOUSEMOVE
         // that set it in the original.
         self.sync_pointer_mouse();
+        // The entry block clears 0x00496120 and 0x004960c4 (0x0041bff4).
+        self.bar.flags_reset();
         self.sys.set_mouse_pos(320, 240);
         // Drain stale clicks from the place change.
         for _ in 0..5 {
@@ -117,7 +135,9 @@ impl Engine {
         self.sys.take_mouse_relative();
 
         self.cursor_shown = CURSOR_UNSET;
-        // TODO(phase 2): the arrow frame starts at 0 (0x0041c017), bow mode.
+        // The arrow frame starts at 0 on every entry (0x0041c017).
+        self.arrow_frame = 0;
+        let mut bow_button_held = self.sys.buttons().0;
         // FUN_00431a1c at 0x0041c012: the place's ambient sounds.
         self.ambient_enter_place().await;
 
@@ -129,7 +149,14 @@ impl Engine {
                                       // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
             let mut clicked = fi.left_press || self.sys.buttons().0;
-            // TODO(phase 2): bow mode consumes the click (0x0041c631).
+            // Bow mode consumes the click (0x0041c631): no zone or
+            // character action; the press edge feeds the shot test after
+            // the frame is drawn.
+            let bow_click = self.bow_mode && clicked && !bow_button_held;
+            bow_button_held = clicked;
+            if self.bow_mode {
+                clicked = false;
+            }
 
             // The zone and the character under the pointer: a character
             // takes priority over the zone underneath it.
@@ -154,14 +181,14 @@ impl Engine {
             }
 
             // The cursor (FUN_00422fcc): talk (NPC) > navigate (zone) >
-            // nothing. TODO(phase 3): the carried object's cursor.
+            // nothing; with an object in hand, its animation over the icon.
             let now = self.sys.millis();
             if self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms {
                 self.cursor_next_ms = now + CURSOR_STEP_MS;
                 let input = WarpCursorInput {
                     zone: action,
                     id: centre_perso,
-                    held: 0,
+                    held: self.vars.get("objetenmain").max(0) as u32,
                     hidden: false,
                     edge_scroll: false,
                     id_rule,
@@ -208,23 +235,57 @@ impl Engine {
                 exit = true;
             }
 
-            // A right click opens the inventory bar, Escape the in-game
-            // menu (0x0041c6d2, 0x0041c5f7).
-            if !exit && (fi.right_press || self.sys.buttons().1) {
+            // A right click opens the inventory bar (FUN_0041a298 toggles
+            // 0x004960c4, the loop opens the bar @ 0x0041c6d2), also when a
+            // right press during the previous frame's timer section left
+            // the request; each frame starts by clearing the flags
+            // (0x0041c04a..0x0041c07c). Escape opens the in-game menu with
+            // no bow, no request and an empty hand (0x0041c5f7).
+            let pending = self.bar.warp_frame_start();
+            let mut bar = !exit && (fi.right_press || self.sys.buttons().1 || pending);
+            if bar && self.bow_mode {
+                // In bow mode the request only lowers the bow
+                // (0x0041c6af..0x0041c6c8: FUN_0042d368).
                 self.sys.set_mouse_locked(false);
-                hooks.bar_requested(self).await;
+                self.lower_bow().await;
                 self.sys.set_mouse_locked(true);
                 self.sys.take_mouse_relative();
-                // FUN_0042c098 closes the bar with the pointer at (320, 240).
-                self.pointer.recentre();
-                self.cursor_shown = CURSOR_UNSET;
-                self.wait_buttons_up().await;
-            } else if !exit && fi.escape {
+                bar = false;
+            }
+            if bar {
+                let guest = self.display_bar(hooks).await;
+                // Closing the bar: bow mode with the bow in hand and
+                // ArcMagique set (FUN_0042d098), the bow rising.
+                if !self.should_abort() {
+                    self.enter_bow_mode().await;
+                }
+                // FUN_0042c59c @ 0x0042c844: the timers resume.
+                let (t1, t2) = (self.vars.get("time1"), self.vars.get("time2"));
+                let now = self.now();
+                self.clocks.rebase(now, t1, t2);
+                if guest != 0 && !self.should_abort() {
+                    hooks.talk_to_guest(self, guest).await;
+                }
+                if self.should_abort() || self.arrival_scan_pending {
+                    action = WARP_ABORT;
+                    exit = true;
+                } else {
+                    self.sys.set_mouse_locked(true);
+                    self.sys.take_mouse_relative();
+                    // FUN_0042c098 closes the bar with the pointer at
+                    // (320, 240) (@ 0x0042c275).
+                    self.sys.set_mouse_pos(320, 240);
+                    self.pointer.recentre();
+                    self.cursor_shown = CURSOR_UNSET;
+                    self.wait_buttons_up().await;
+                    bow_button_held = false;
+                }
+            } else if !exit && fi.escape && !self.bow_mode && self.vars.get("objetenmain") == 0 {
                 self.sys.set_mouse_locked(false);
                 self.sys
                     .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                 self.mark_pointer_mouse();
-                hooks.menu_requested(self).await;
+                self.run_ingame_menu().await;
                 self.sync_pointer_mouse();
                 if self.should_abort() {
                     action = WARP_ABORT;
@@ -233,6 +294,7 @@ impl Engine {
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
                     self.cursor_shown = CURSOR_UNSET;
+                    self.wait_buttons_up().await;
                 }
             }
 
@@ -254,15 +316,16 @@ impl Engine {
                     beta = (f64::from(beta) - VIEW_KEY_STEP) as f32;
                 }
             }
-            // OMNI 3D MODE 1, the original's default (0x004960ac == 0).
-            // TODO(phase 3): MODE 2 from the options menu.
+            // OMNI 3D MODE 1, the original's default (0x004960ac == 0),
+            // gives dy = prevY - y; MODE 2 y - prevY.
+            let mode2 = self.settings.omni3d_mode2;
             let look = warp_look_frame(
                 &mut self.momentum,
                 &mut alpha,
                 &mut beta,
                 motion_x,
                 motion_y,
-                false,
+                mode2,
                 self.pointer.prev_alpha,
                 self.pointer.prev_beta,
                 self.warp.pi(),
@@ -315,9 +378,32 @@ impl Engine {
                 self.animate_sprites();
             }
             self.render_view();
+            // The bow, ARCWARP.SPR frame arrow_frame at (0x2e, 0x79)
+            // (0x0041c40b), then the guests' portraits (0x0041c489 ->
+            // FUN_0042bc58).
+            if self.warp_loaded {
+                let mut s = self.sys.screen.borrow().clone();
+                if self.bow_mode {
+                    if let Some(spr) = self.bow_sprites.get(usize::from(self.arrow_frame)) {
+                        crate::ui::draw_sprite(&mut s, spr, 0x2e, 0x79);
+                    }
+                }
+                self.draw_guests(&mut s, None);
+                *self.sys.screen.borrow_mut() = s;
+            }
             self.draw_cursor();
-            // TODO(phase 2/3): the bow (0x0041c40b) and the guests'
-            // portraits (0x0041c489) over the view; the arrow shot.
+            // The arrow shot (0x0041c61d..0x0041c6a0), after the frame is
+            // drawn.
+            let mut tir = self.vars.get("tirfleche");
+            let angle_y = self.vars.get("anglewarpy");
+            atlantis_data::sprite_anim::bow_frame_step(
+                self.bow_mode,
+                bow_click,
+                angle_y,
+                &mut tir,
+                &mut self.arrow_frame,
+            );
+            self.vars.set("tirfleche", tir);
             // FUN_00432178, the last call of the frame: the ambient sounds,
             // then the NewSound poll FUN_00432a64.
             self.poll_new_sound().await;

@@ -10,6 +10,7 @@ pub mod exe;
 pub mod files;
 pub mod game;
 mod reader;
+pub mod saves;
 pub mod sprite;
 pub mod sprite_anim;
 pub mod sprite_blend;

@@ -415,7 +415,7 @@ impl Dialogs {
                 let mixer = e.sys.mixer.clone();
                 let mut voice: Option<VoiceId> = None;
                 let start_voice = |e: &Engine, voice: &mut Option<VoiceId>| {
-                    *voice = Some(mixer.play(pcm.clone(), false, 255, 0));
+                    *voice = Some(mixer.play(pcm.clone(), false, e.voice_volume, 0));
                     e.emit(Event::Voice(apc.clone()));
                 };
                 // With a talking head the voice starts after the second UBB
@@ -439,8 +439,11 @@ impl Dialogs {
                     }
                     e.sys.frame().await;
                     let fi = poll_input(e);
-                    // TODO(phase 3): a right press toggles the bar request
-                    // (FUN_0041a298, bar_session.h).
+                    // FUN_0041a298 in both line loops: a right press sets
+                    // 0x00496120 and toggles the bar request.
+                    if fi.right_press {
+                        e.bar.right_pressed(e.section_play, false);
+                    }
                     let escape = escape_skips && fi.escape;
                     if escape || fi.left_press || e.sys.buttons().0 {
                         out.escape = escape;
@@ -452,6 +455,7 @@ impl Dialogs {
                     out.voice = true;
                     if l.cam == 0 {
                         e.music.unduck(None);
+                        e.bar.voice_line_ended(); // 0x004305cb
                     }
                 }
             }
@@ -650,7 +654,7 @@ impl Dialogs {
             None => None,
         };
         if let Some((pcm, apc)) = pcm {
-            let v = e.sys.mixer.play(pcm, false, 255, 0);
+            let v = e.sys.mixer.play(pcm, false, e.voice_volume, 0);
             e.emit(Event::Voice(apc));
             // @ 0x00426b0c: until the sample ends, a left press or Escape
             // (when it would open the menu).

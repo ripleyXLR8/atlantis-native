@@ -38,7 +38,7 @@ use atlantis_engine::scripts::resolve_speaker_perso;
 use atlantis_engine::subtitles::{split_subtitle, subtitle_line_y, SUBTITLE_X};
 use atlantis_engine::sys::{Input, MouseButton, Runner, Sys};
 use atlantis_engine::video_skip::VideoSkipState;
-use atlantis_engine::{Dialogs, Engine, Event, Options, Scripts};
+use atlantis_engine::{Dialogs, Engine, Event, Options, Scripts, Start};
 use md5::{Digest, Md5};
 
 fn md5_hex(b: &[u8]) -> String {
@@ -598,6 +598,7 @@ fn new_game_plays_the_first_dialog_line() {
     let sys = Sys::new(Mixer::new());
     let opts = Options {
         trace: Some(trace.clone()),
+        start: Start::NewGame,
         ..Options::default()
     };
     let runner = Runner::new(sys.clone(), atlantis_engine::run(sys.clone(), g, opts));

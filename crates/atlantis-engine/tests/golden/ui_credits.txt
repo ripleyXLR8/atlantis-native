@@ -1,0 +1,46 @@
+# The credits FUN_0041a72c of atlantis.exe (2001 English build, 714240 bytes) run whole under emulation on SPRLIST\CREDITS.TXT: the event count,
+# the glyph counts, the md5 of every event line joined by \n ('image N', 'glyph W|B x y frame',
+# 'present at tick T', 'clear at tick T'), then the picture and page events in order.
+returned 1
+events 3176
+glyphs 3138
+blue 743
+all_events_md5 2b5bbb1548476f60725b96742e9c615d
+image 1
+present at tick 26
+image 2
+present at tick 1392
+image 3
+present at tick 2758
+image 3
+present at tick 4124
+image 4
+present at tick 5490
+image 4
+present at tick 6856
+image 5
+present at tick 8222
+image 6
+present at tick 9588
+image 6
+present at tick 10954
+image 7
+present at tick 12320
+image 8
+present at tick 13686
+image 8
+present at tick 15052
+image 9
+present at tick 16418
+image 9
+present at tick 17784
+image 9
+present at tick 19150
+image 2
+present at tick 20516
+image 2
+present at tick 21882
+image 10
+present at tick 23248
+image 10
+clear at tick 24614

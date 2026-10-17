@@ -11,7 +11,7 @@ use std::sync::Arc;
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::hooks::{ready, HookFuture};
 use atlantis_engine::sys::{Input, MouseButton, Runner, Sys};
-use atlantis_engine::{audio::Mixer, Engine, Event, Options, ScriptHooks};
+use atlantis_engine::{audio::Mixer, Engine, Event, Options, ScriptHooks, Start};
 
 /// What the hooks saw, shared with the test.
 #[derive(Default)]
@@ -193,6 +193,7 @@ fn new_game_look_around_and_walk() {
     let opts = Options {
         hooks: Box::new(Aim::new(&seen)),
         trace: Some(trace.clone()),
+        start: Start::NewGame,
         ..Options::default()
     };
     let runner = Runner::new(sys.clone(), atlantis_engine::run(sys.clone(), game, opts));
@@ -295,6 +296,7 @@ fn ambient_sounds_and_sub_wam() {
     let opts = Options {
         hooks: Box::new(hooks),
         trace: Some(trace.clone()),
+        start: Start::NewGame,
         ..Options::default()
     };
     let runner = Runner::new(sys.clone(), atlantis_engine::run(sys.clone(), game, opts));

@@ -41,6 +41,11 @@ impl BigArchive {
         }
     }
 
+    /// The player's files the archive reads (the game directory).
+    pub fn source(&self) -> &Arc<dyn FileSource> {
+        &self.src
+    }
+
     /// Mounts one archive. False when it is missing or not a BigFile.
     pub fn mount(&mut self, file: &str) -> bool {
         let Some(size) = self.src.size(file) else {

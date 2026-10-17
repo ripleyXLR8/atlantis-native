@@ -385,18 +385,6 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                // TODO(phase 3): Escape in the panoramic view (the pointer
-                // locked) opens the in-game menu; until then it leaves the
-                // desktop game. Elsewhere (a dialog line) the game reads it.
-                #[cfg(not(target_arch = "wasm32"))]
-                if event.state == ElementState::Pressed
-                    && event.logical_key == Key::Named(NamedKey::Escape)
-                    && self.sys.mouse_locked()
-                {
-                    self.sys.push_input(Input::Quit);
-                    el.exit();
-                    return;
-                }
                 if event.repeat {
                     return;
                 }

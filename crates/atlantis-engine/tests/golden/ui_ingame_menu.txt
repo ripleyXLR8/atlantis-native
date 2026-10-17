@@ -1,0 +1,573 @@
+# The input poll FUN_0041a298 with the warp loop's menu test 0x0041c5f7, and the in-game menu FUN_0041c838
+# with FUN_0041fb6c / FUN_004210c0, of atlantis.exe (2001 English build, 714240 bytes), run under emulation.
+# O <keys> bow B bar R objet J head H section S: menu (opens) request (0x00496138) keep (0x00496124) click (0x0049611c) bar (0x004960c4 after)
+# M record R at x,y pre <keys> loadexit L quitexit Q: the entry called, keep, reload (0x00496198), ...
+# G <y> x0-x1:record ...: the record FUN_004210c0 finds on MAINMENU for every pixel of row y (255: none)
+O escape bow 0 bar 0 objet 0 head 0 section 0: menu 1 request 1 keep 0 click 0 bar 0
+O escape bow 0 bar 0 objet 0 head 0 section 1: menu 1 request 1 keep 0 click 0 bar 0
+O escape bow 0 bar 0 objet 0 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 0
+O escape bow 0 bar 0 objet 0 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 0
+O escape bow 0 bar 0 objet 1 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 0
+O escape bow 0 bar 0 objet 1 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 0
+O escape bow 0 bar 0 objet 1 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 0
+O escape bow 0 bar 0 objet 1 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 0
+O escape bow 0 bar 1 objet 0 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 1
+O escape bow 0 bar 1 objet 0 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 1
+O escape bow 0 bar 1 objet 0 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 1
+O escape bow 0 bar 1 objet 0 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 1
+O escape bow 0 bar 1 objet 1 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 1
+O escape bow 0 bar 1 objet 1 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 1
+O escape bow 0 bar 1 objet 1 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 1
+O escape bow 0 bar 1 objet 1 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 1
+O escape bow 1 bar 0 objet 0 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 0
+O escape bow 1 bar 0 objet 0 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 0
+O escape bow 1 bar 0 objet 0 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 0
+O escape bow 1 bar 0 objet 0 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 0
+O escape bow 1 bar 0 objet 1 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 0
+O escape bow 1 bar 0 objet 1 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 0
+O escape bow 1 bar 0 objet 1 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 0
+O escape bow 1 bar 0 objet 1 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 0
+O escape bow 1 bar 1 objet 0 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 1
+O escape bow 1 bar 1 objet 0 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 1
+O escape bow 1 bar 1 objet 0 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 1
+O escape bow 1 bar 1 objet 0 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 1
+O escape bow 1 bar 1 objet 1 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 1
+O escape bow 1 bar 1 objet 1 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 1
+O escape bow 1 bar 1 objet 1 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 1
+O escape bow 1 bar 1 objet 1 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 1
+O escape+rbutton bow 0 bar 0 objet 0 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 1
+O escape+rbutton bow 0 bar 0 objet 0 head 0 section 1: menu 1 request 1 keep 0 click 0 bar 0
+O escape+rbutton bow 0 bar 0 objet 0 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 1
+O escape+rbutton bow 0 bar 0 objet 0 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 0
+O escape+rbutton bow 0 bar 0 objet 1 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 1
+O escape+rbutton bow 0 bar 0 objet 1 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 0
+O escape+rbutton bow 0 bar 0 objet 1 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 1
+O escape+rbutton bow 0 bar 0 objet 1 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 0
+O escape+rbutton bow 0 bar 1 objet 0 head 0 section 0: menu 1 request 1 keep 0 click 0 bar 0
+O escape+rbutton bow 0 bar 1 objet 0 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 1
+O escape+rbutton bow 0 bar 1 objet 0 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 0
+O escape+rbutton bow 0 bar 1 objet 0 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 1
+O escape+rbutton bow 0 bar 1 objet 1 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 0
+O escape+rbutton bow 0 bar 1 objet 1 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 1
+O escape+rbutton bow 0 bar 1 objet 1 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 0
+O escape+rbutton bow 0 bar 1 objet 1 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 1
+O escape+rbutton bow 1 bar 0 objet 0 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 1
+O escape+rbutton bow 1 bar 0 objet 0 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 0
+O escape+rbutton bow 1 bar 0 objet 0 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 1
+O escape+rbutton bow 1 bar 0 objet 0 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 0
+O escape+rbutton bow 1 bar 0 objet 1 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 1
+O escape+rbutton bow 1 bar 0 objet 1 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 0
+O escape+rbutton bow 1 bar 0 objet 1 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 1
+O escape+rbutton bow 1 bar 0 objet 1 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 0
+O escape+rbutton bow 1 bar 1 objet 0 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 0
+O escape+rbutton bow 1 bar 1 objet 0 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 1
+O escape+rbutton bow 1 bar 1 objet 0 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 0
+O escape+rbutton bow 1 bar 1 objet 0 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 1
+O escape+rbutton bow 1 bar 1 objet 1 head 0 section 0: menu 0 request 0 keep 1 click 0 bar 0
+O escape+rbutton bow 1 bar 1 objet 1 head 0 section 1: menu 0 request 0 keep 1 click 0 bar 1
+O escape+rbutton bow 1 bar 1 objet 1 head 1 section 0: menu 0 request 0 keep 1 click 1 bar 0
+O escape+rbutton bow 1 bar 1 objet 1 head 1 section 1: menu 0 request 0 keep 1 click 1 bar 1
+G 0 0-639:255
+G 1 0-639:255
+G 2 0-639:255
+G 3 0-639:255
+G 4 0-639:255
+G 5 0-639:255
+G 6 0-639:255
+G 7 0-639:255
+G 8 0-639:255
+G 9 0-639:255
+G 10 0-639:255
+G 11 0-639:255
+G 12 0-639:255
+G 13 0-639:255
+G 14 0-639:255
+G 15 0-639:255
+G 16 0-639:255
+G 17 0-639:255
+G 18 0-639:255
+G 19 0-639:255
+G 20 0-639:255
+G 21 0-639:255
+G 22 0-639:255
+G 23 0-639:255
+G 24 0-639:255
+G 25 0-639:255
+G 26 0-639:255
+G 27 0-639:255
+G 28 0-639:255
+G 29 0-639:255
+G 30 0-639:255
+G 31 0-639:255
+G 32 0-639:255
+G 33 0-639:255
+G 34 0-639:255
+G 35 0-639:255
+G 36 0-639:255
+G 37 0-639:255
+G 38 0-639:255
+G 39 0-639:255
+G 40 0-639:255
+G 41 0-639:255
+G 42 0-639:255
+G 43 0-639:255
+G 44 0-639:255
+G 45 0-639:255
+G 46 0-639:255
+G 47 0-639:255
+G 48 0-639:255
+G 49 0-639:255
+G 50 0-639:255
+G 51 0-639:255
+G 52 0-639:255
+G 53 0-639:255
+G 54 0-639:255
+G 55 0-639:255
+G 56 0-639:255
+G 57 0-639:255
+G 58 0-639:255
+G 59 0-639:255
+G 60 0-639:255
+G 61 0-639:255
+G 62 0-639:255
+G 63 0-639:255
+G 64 0-639:255
+G 65 0-639:255
+G 66 0-639:255
+G 67 0-639:255
+G 68 0-639:255
+G 69 0-639:255
+G 70 0-639:255
+G 71 0-639:255
+G 72 0-639:255
+G 73 0-639:255
+G 74 0-639:255
+G 75 0-639:255
+G 76 0-639:255
+G 77 0-639:255
+G 78 0-639:255
+G 79 0-639:255
+G 80 0-639:255
+G 81 0-639:255
+G 82 0-639:255
+G 83 0-639:255
+G 84 0-639:255
+G 85 0-639:255
+G 86 0-639:255
+G 87 0-639:255
+G 88 0-639:255
+G 89 0-639:255
+G 90 0-639:255
+G 91 0-639:255
+G 92 0-639:255
+G 93 0-639:255
+G 94 0-639:255
+G 95 0-639:255
+G 96 0-639:255
+G 97 0-639:255
+G 98 0-639:255
+G 99 0-639:255
+G 100 0-639:255
+G 101 0-639:255
+G 102 0-639:255
+G 103 0-639:255
+G 104 0-639:255
+G 105 0-639:255
+G 106 0-639:255
+G 107 0-639:255
+G 108 0-639:255
+G 109 0-639:255
+G 110 0-639:255
+G 111 0-639:255
+G 112 0-639:255
+G 113 0-639:255
+G 114 0-639:255
+G 115 0-639:255
+G 116 0-639:255
+G 117 0-639:255
+G 118 0-639:255
+G 119 0-639:255
+G 120 0-639:255
+G 121 0-639:255
+G 122 0-639:255
+G 123 0-639:255
+G 124 0-639:255
+G 125 0-639:255
+G 126 0-639:255
+G 127 0-639:255
+G 128 0-639:255
+G 129 0-639:255
+G 130 0-639:255
+G 131 0-639:255
+G 132 0-639:255
+G 133 0-639:255
+G 134 0-639:255
+G 135 0-639:255
+G 136 0-639:255
+G 137 0-639:255
+G 138 0-639:255
+G 139 0-639:255
+G 140 0-639:255
+G 141 0-639:255
+G 142 0-639:255
+G 143 0-639:255
+G 144 0-639:255
+G 145 0-639:255
+G 146 0-639:255
+G 147 0-639:255
+G 148 0-639:255
+G 149 0-639:255
+G 150 0-639:255
+G 151 0-639:255
+G 152 0-639:255
+G 153 0-639:255
+G 154 0-639:255
+G 155 0-639:255
+G 156 0-639:255
+G 157 0-639:255
+G 158 0-639:255
+G 159 0-639:255
+G 160 0-639:255
+G 161 0-639:255
+G 162 0-639:255
+G 163 0-639:255
+G 164 0-639:255
+G 165 0-639:255
+G 166 0-639:255
+G 167 0-639:255
+G 168 0-639:255
+G 169 0-639:255
+G 170 0-639:255
+G 171 0-639:255
+G 172 0-639:255
+G 173 0-639:255
+G 174 0-639:255
+G 175 0-639:255
+G 176 0-639:255
+G 177 0-639:255
+G 178 0-639:255
+G 179 0-639:255
+G 180 0-639:255
+G 181 0-639:255
+G 182 0-639:255
+G 183 0-639:255
+G 184 0-639:255
+G 185 0-639:255
+G 186 0-639:255
+G 187 0-639:255
+G 188 0-639:255
+G 189 0-639:255
+G 190 0-639:255
+G 191 0-639:255
+G 192 0-639:255
+G 193 0-639:255
+G 194 0-639:255
+G 195 0-639:255
+G 196 0-639:255
+G 197 0-639:255
+G 198 0-639:255
+G 199 0-639:255
+G 200 0-639:255
+G 201 0-639:255
+G 202 0-639:255
+G 203 0-207:255 208-409:0 410-639:255
+G 204 0-207:255 208-409:0 410-639:255
+G 205 0-207:255 208-409:0 410-639:255
+G 206 0-207:255 208-409:0 410-639:255
+G 207 0-207:255 208-409:0 410-639:255
+G 208 0-207:255 208-409:0 410-639:255
+G 209 0-207:255 208-409:0 410-639:255
+G 210 0-207:255 208-409:0 410-639:255
+G 211 0-207:255 208-409:0 410-639:255
+G 212 0-207:255 208-409:0 410-639:255
+G 213 0-207:255 208-409:0 410-639:255
+G 214 0-207:255 208-409:0 410-639:255
+G 215 0-207:255 208-409:0 410-639:255
+G 216 0-207:255 208-409:0 410-639:255
+G 217 0-207:255 208-409:0 410-639:255
+G 218 0-207:255 208-409:0 410-639:255
+G 219 0-207:255 208-409:0 410-639:255
+G 220 0-207:255 208-409:0 410-639:255
+G 221 0-207:255 208-409:0 410-639:255
+G 222 0-207:255 208-409:0 410-639:255
+G 223 0-207:255 208-409:0 410-639:255
+G 224 0-207:255 208-409:0 410-639:255
+G 225 0-207:255 208-409:0 410-639:255
+G 226 0-207:255 208-409:0 410-639:255
+G 227 0-207:255 208-409:0 410-639:255
+G 228 0-207:255 208-409:0 410-639:255
+G 229 0-207:255 208-409:0 410-639:255
+G 230 0-639:255
+G 231 0-639:255
+G 232 0-639:255
+G 233 0-639:255
+G 234 0-639:255
+G 235 0-639:255
+G 236 0-639:255
+G 237 0-639:255
+G 238 0-639:255
+G 239 0-639:255
+G 240 0-639:255
+G 241 0-639:255
+G 242 0-639:255
+G 243 0-172:255 173-444:1 445-639:255
+G 244 0-172:255 173-444:1 445-639:255
+G 245 0-172:255 173-444:1 445-639:255
+G 246 0-172:255 173-444:1 445-639:255
+G 247 0-172:255 173-444:1 445-639:255
+G 248 0-172:255 173-444:1 445-639:255
+G 249 0-172:255 173-444:1 445-639:255
+G 250 0-172:255 173-444:1 445-639:255
+G 251 0-172:255 173-444:1 445-639:255
+G 252 0-172:255 173-444:1 445-639:255
+G 253 0-172:255 173-444:1 445-639:255
+G 254 0-172:255 173-444:1 445-639:255
+G 255 0-172:255 173-444:1 445-639:255
+G 256 0-172:255 173-444:1 445-639:255
+G 257 0-172:255 173-444:1 445-639:255
+G 258 0-172:255 173-444:1 445-639:255
+G 259 0-172:255 173-444:1 445-639:255
+G 260 0-172:255 173-444:1 445-639:255
+G 261 0-172:255 173-444:1 445-639:255
+G 262 0-172:255 173-444:1 445-639:255
+G 263 0-172:255 173-444:1 445-639:255
+G 264 0-172:255 173-444:1 445-639:255
+G 265 0-172:255 173-444:1 445-639:255
+G 266 0-172:255 173-444:1 445-639:255
+G 267 0-172:255 173-444:1 445-639:255
+G 268 0-172:255 173-444:1 445-639:255
+G 269 0-172:255 173-444:1 445-639:255
+G 270 0-639:255
+G 271 0-639:255
+G 272 0-639:255
+G 273 0-639:255
+G 274 0-639:255
+G 275 0-639:255
+G 276 0-639:255
+G 277 0-639:255
+G 278 0-639:255
+G 279 0-639:255
+G 280 0-639:255
+G 281 0-639:255
+G 282 0-639:255
+G 283 0-209:255 210-408:2 409-639:255
+G 284 0-209:255 210-408:2 409-639:255
+G 285 0-209:255 210-408:2 409-639:255
+G 286 0-209:255 210-408:2 409-639:255
+G 287 0-209:255 210-408:2 409-639:255
+G 288 0-209:255 210-408:2 409-639:255
+G 289 0-209:255 210-408:2 409-639:255
+G 290 0-209:255 210-408:2 409-639:255
+G 291 0-209:255 210-408:2 409-639:255
+G 292 0-209:255 210-408:2 409-639:255
+G 293 0-209:255 210-408:2 409-639:255
+G 294 0-209:255 210-408:2 409-639:255
+G 295 0-209:255 210-408:2 409-639:255
+G 296 0-209:255 210-408:2 409-639:255
+G 297 0-209:255 210-408:2 409-639:255
+G 298 0-209:255 210-408:2 409-639:255
+G 299 0-209:255 210-408:2 409-639:255
+G 300 0-209:255 210-408:2 409-639:255
+G 301 0-209:255 210-408:2 409-639:255
+G 302 0-209:255 210-408:2 409-639:255
+G 303 0-209:255 210-408:2 409-639:255
+G 304 0-209:255 210-408:2 409-639:255
+G 305 0-209:255 210-408:2 409-639:255
+G 306 0-209:255 210-408:2 409-639:255
+G 307 0-209:255 210-408:2 409-639:255
+G 308 0-209:255 210-408:2 409-639:255
+G 309 0-209:255 210-408:2 409-639:255
+G 310 0-639:255
+G 311 0-639:255
+G 312 0-639:255
+G 313 0-639:255
+G 314 0-639:255
+G 315 0-639:255
+G 316 0-639:255
+G 317 0-639:255
+G 318 0-639:255
+G 319 0-639:255
+G 320 0-639:255
+G 321 0-639:255
+G 322 0-639:255
+G 323 0-639:255
+G 324 0-639:255
+G 325 0-639:255
+G 326 0-639:255
+G 327 0-639:255
+G 328 0-639:255
+G 329 0-639:255
+G 330 0-639:255
+G 331 0-639:255
+G 332 0-639:255
+G 333 0-639:255
+G 334 0-639:255
+G 335 0-639:255
+G 336 0-639:255
+G 337 0-639:255
+G 338 0-639:255
+G 339 0-639:255
+G 340 0-639:255
+G 341 0-639:255
+G 342 0-639:255
+G 343 0-639:255
+G 344 0-639:255
+G 345 0-639:255
+G 346 0-639:255
+G 347 0-639:255
+G 348 0-639:255
+G 349 0-639:255
+G 350 0-639:255
+G 351 0-639:255
+G 352 0-639:255
+G 353 0-639:255
+G 354 0-639:255
+G 355 0-639:255
+G 356 0-639:255
+G 357 0-639:255
+G 358 0-639:255
+G 359 0-639:255
+G 360 0-639:255
+G 361 0-639:255
+G 362 0-639:255
+G 363 0-639:255
+G 364 0-639:255
+G 365 0-639:255
+G 366 0-639:255
+G 367 0-639:255
+G 368 0-639:255
+G 369 0-639:255
+G 370 0-639:255
+G 371 0-639:255
+G 372 0-639:255
+G 373 0-639:255
+G 374 0-639:255
+G 375 0-639:255
+G 376 0-639:255
+G 377 0-639:255
+G 378 0-639:255
+G 379 0-639:255
+G 380 0-639:255
+G 381 0-639:255
+G 382 0-639:255
+G 383 0-639:255
+G 384 0-639:255
+G 385 0-639:255
+G 386 0-639:255
+G 387 0-639:255
+G 388 0-639:255
+G 389 0-639:255
+G 390 0-639:255
+G 391 0-639:255
+G 392 0-639:255
+G 393 0-639:255
+G 394 0-639:255
+G 395 0-639:255
+G 396 0-639:255
+G 397 0-639:255
+G 398 0-639:255
+G 399 0-639:255
+G 400 0-639:255
+G 401 0-639:255
+G 402 0-639:255
+G 403 0-639:255
+G 404 0-639:255
+G 405 0-639:255
+G 406 0-639:255
+G 407 0-639:255
+G 408 0-639:255
+G 409 0-639:255
+G 410 0-639:255
+G 411 0-639:255
+G 412 0-639:255
+G 413 0-639:255
+G 414 0-639:255
+G 415 0-639:255
+G 416 0-639:255
+G 417 0-639:255
+G 418 0-639:255
+G 419 0-639:255
+G 420 0-639:255
+G 421 0-639:255
+G 422 0-639:255
+G 423 0-639:255
+G 424 0-639:255
+G 425 0-639:255
+G 426 0-639:255
+G 427 0-639:255
+G 428 0-639:255
+G 429 0-639:255
+G 430 0-639:255
+G 431 0-639:255
+G 432 0-639:255
+G 433 0-639:255
+G 434 0-639:255
+G 435 0-639:255
+G 436 0-639:255
+G 437 0-639:255
+G 438 0-639:255
+G 439 0-639:255
+G 440 0-639:255
+G 441 0-639:255
+G 442 0-639:255
+G 443 0-639:255
+G 444 0-639:255
+G 445 0-639:255
+G 446 0-639:255
+G 447 0-639:255
+G 448 0-639:255
+G 449 0-639:255
+G 450 0-639:255
+G 451 0-639:255
+G 452 0-639:255
+G 453 0-639:255
+G 454 0-639:255
+G 455 0-639:255
+G 456 0-639:255
+G 457 0-639:255
+G 458 0-639:255
+G 459 0-639:255
+G 460 0-639:255
+G 461 0-639:255
+G 462 0-639:255
+G 463 0-639:255
+G 464 0-639:255
+G 465 0-639:255
+G 466 0-639:255
+G 467 0-639:255
+G 468 0-639:255
+G 469 0-639:255
+G 470 0-639:255
+G 471 0-639:255
+G 472 0-639:255
+G 473 0-639:255
+G 474 0-639:255
+G 475 0-639:255
+G 476 0-639:255
+G 477 0-639:255
+G 478 0-639:255
+G 479 0-639:255
+M record 0 at 208,203 pre - loadexit 6 quitexit 3: calls load keep 0 reload 1 click 0 menu 0 bar 0 polls 34
+M record 0 at 208,203 pre - loadexit 7 quitexit 3: calls load keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 0 at 208,203 pre escape loadexit 6 quitexit 3: calls load keep 0 reload 1 click 0 menu 0 bar 0 polls 34
+M record 0 at 208,203 pre escape loadexit 7 quitexit 3: calls load keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 0 at 208,203 pre rbutton loadexit 6 quitexit 3: calls load keep 0 reload 1 click 0 menu 0 bar 0 polls 34
+M record 0 at 208,203 pre rbutton loadexit 7 quitexit 3: calls load keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 0 at 208,203 pre escape+rbutton loadexit 6 quitexit 3: calls load keep 0 reload 1 click 0 menu 0 bar 0 polls 34
+M record 0 at 208,203 pre escape+rbutton loadexit 7 quitexit 3: calls load keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 1 at 173,243 pre - loadexit 6 quitexit 3: calls options keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 1 at 173,243 pre escape loadexit 6 quitexit 3: calls options keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 1 at 173,243 pre rbutton loadexit 6 quitexit 3: calls options keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 1 at 173,243 pre escape+rbutton loadexit 6 quitexit 3: calls options keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 2 at 210,283 pre - loadexit 6 quitexit 3: calls quit keep 0 reload 0 click 0 menu 0 bar 0 polls 34
+M record 2 at 210,283 pre - loadexit 6 quitexit 4: calls quit keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 2 at 210,283 pre escape loadexit 6 quitexit 3: calls quit keep 0 reload 0 click 0 menu 0 bar 0 polls 34
+M record 2 at 210,283 pre escape loadexit 6 quitexit 4: calls quit keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 2 at 210,283 pre rbutton loadexit 6 quitexit 3: calls quit keep 0 reload 0 click 0 menu 0 bar 0 polls 34
+M record 2 at 210,283 pre rbutton loadexit 6 quitexit 4: calls quit keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 2 at 210,283 pre escape+rbutton loadexit 6 quitexit 3: calls quit keep 0 reload 0 click 0 menu 0 bar 0 polls 34
+M record 2 at 210,283 pre escape+rbutton loadexit 6 quitexit 4: calls quit keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 255 at 0,0 pre - loadexit 6 quitexit 3: calls - keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 255 at 0,0 pre escape loadexit 6 quitexit 3: calls - keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 255 at 0,0 pre rbutton loadexit 6 quitexit 3: calls - keep 1 reload 0 click 0 menu 0 bar 0 polls 34
+M record 255 at 0,0 pre escape+rbutton loadexit 6 quitexit 3: calls - keep 1 reload 0 click 0 menu 0 bar 0 polls 34

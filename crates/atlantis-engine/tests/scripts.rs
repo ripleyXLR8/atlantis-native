@@ -31,7 +31,7 @@ use atlantis_engine::con::{
 use atlantis_engine::hooks::DirectLoader;
 use atlantis_engine::music::MusicRing;
 use atlantis_engine::sys::{Runner, Sys};
-use atlantis_engine::{Engine, Event, Options, Scripts};
+use atlantis_engine::{Engine, Event, Options, Scripts, Start};
 use md5::{Digest, Md5};
 
 fn md5_hex(b: &[u8]) -> String {
@@ -1558,6 +1558,7 @@ fn new_game_plays_the_intro() {
     let sys = Sys::new(Mixer::new());
     let opts = Options {
         trace: Some(trace.clone()),
+        start: Start::NewGame,
         ..Options::default()
     };
     let mut runner = Runner::new(sys.clone(), atlantis_engine::run(sys.clone(), g, opts));
@@ -1804,6 +1805,7 @@ fn walking_to_place_14_enters_chapter_2() {
             goal: 14,
             target: target.clone(),
         }),
+        start: Start::NewGame,
         ..Options::default()
     };
     let mut runner = Runner::new(sys.clone(), atlantis_engine::run(sys.clone(), g, opts));

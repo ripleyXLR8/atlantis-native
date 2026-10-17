@@ -1,0 +1,439 @@
+# The load picker FUN_0041cf78 of atlantis.exe (2001 English build, 714240 bytes) run whole under emulation:
+# K <file count> <knob x>; S <count> <rows> <md5 of the rows '<mouse y> <knob y> <offset> <knob blit y>' for
+# mouse y 0..479 with the track latched and the button down, joined by \n>; T <chapter> <md5 of the title's
+# FONTMIN2 blits ' idx@x,y...' at y 0x50 after a row click>; X <scenario> exit <record> chapterbyte <byte> files <n>.
+K 0 -50
+K 1 -50
+K 2 -50
+K 3 -50
+K 4 -50
+K 5 -50
+K 6 -50
+K 7 -50
+K 8 -50
+K 9 -50
+K 10 -50
+K 11 -50
+K 12 600
+K 13 600
+K 14 600
+K 15 600
+K 16 600
+K 17 600
+K 18 600
+K 19 600
+K 20 600
+K 21 600
+K 22 600
+K 23 600
+K 24 600
+K 25 600
+K 26 600
+K 27 600
+K 28 600
+K 29 600
+K 30 600
+K 31 600
+K 32 600
+K 33 600
+K 34 600
+K 35 600
+K 36 600
+K 37 600
+K 38 600
+K 39 600
+K 40 600
+K 41 600
+K 42 600
+K 43 600
+K 44 600
+K 45 600
+K 46 600
+K 47 600
+K 48 600
+K 49 600
+K 50 600
+K 51 600
+K 52 600
+K 53 600
+K 54 600
+K 55 600
+K 56 600
+K 57 600
+K 58 600
+K 59 600
+K 60 600
+K 61 600
+K 62 600
+K 63 600
+K 64 600
+K 65 600
+K 66 600
+K 67 600
+K 68 600
+K 69 600
+K 70 600
+K 71 600
+K 72 600
+K 73 600
+K 74 600
+K 75 600
+K 76 600
+K 77 600
+K 78 600
+K 79 600
+K 80 600
+K 81 600
+K 82 600
+K 83 600
+K 84 600
+K 85 600
+K 86 600
+K 87 600
+K 88 600
+K 89 600
+K 90 600
+K 91 600
+K 92 600
+K 93 600
+K 94 600
+K 95 600
+K 96 600
+K 97 600
+K 98 600
+K 99 600
+K 100 600
+K 101 600
+K 102 600
+K 103 600
+K 104 600
+K 105 600
+K 106 600
+K 107 600
+K 108 600
+K 109 600
+K 110 600
+K 111 600
+K 112 600
+K 113 600
+K 114 600
+K 115 600
+K 116 600
+K 117 600
+K 118 600
+K 119 600
+K 120 600
+K 121 600
+K 122 600
+K 123 600
+K 124 600
+K 125 600
+K 126 600
+K 127 600
+K 128 600
+S 0 480 965310df8f971212557eb932118eab7f
+S 1 480 965310df8f971212557eb932118eab7f
+S 2 480 965310df8f971212557eb932118eab7f
+S 3 480 965310df8f971212557eb932118eab7f
+S 4 480 965310df8f971212557eb932118eab7f
+S 5 480 965310df8f971212557eb932118eab7f
+S 6 480 965310df8f971212557eb932118eab7f
+S 7 480 965310df8f971212557eb932118eab7f
+S 8 480 965310df8f971212557eb932118eab7f
+S 9 480 965310df8f971212557eb932118eab7f
+S 10 480 965310df8f971212557eb932118eab7f
+S 11 480 965310df8f971212557eb932118eab7f
+S 12 480 e4389780372bcd8d7a26513408db0fe7
+S 13 480 467e02ebe91a6da038ea6a513d43fbf1
+S 14 480 14e101be23167fcc78a909170ecc8911
+S 15 480 30d91dd7e98cdf2986e90074146ae9a7
+S 16 480 e48d20833b3747f301f818a605b995e5
+S 17 480 b62d6c2b7f7fb5cb3901a5a8fe9f73d3
+S 18 480 301c21e156cdc27ce05034678057355f
+S 19 480 52932624abe52bbedac1ee029d790c9e
+S 20 480 e4bebafd52490c2a71e1bb9d969b9fa5
+S 21 480 2389b2f16b93ace121eaa9f1422f5ce3
+S 22 480 aed1db74c6c3cc72913993659617fec1
+S 23 480 9ea84ded2e4fb50d956e8ca3e2acbbe3
+S 24 480 f54d07b99c408185a59152070bc63dad
+S 25 480 2b9e008b5d9dfd22ef8974aca1e4a2f0
+S 26 480 92f0376a4259a65514bbd72f6e60c29c
+S 27 480 908e80bf211035f57de0eab56684eba8
+S 28 480 60a935caf56ce3c638895c81636d1b3a
+S 29 480 60a935caf56ce3c638895c81636d1b3a
+S 30 480 d75f72d161da77c4ca82b4b68f4d3e23
+S 31 480 d75f72d161da77c4ca82b4b68f4d3e23
+S 32 480 2d93226e815f03ea4099e87017d2264f
+S 33 480 2d93226e815f03ea4099e87017d2264f
+S 34 480 0b2fcfcc5fb312f7a5c572f3c66601c7
+S 35 480 0b2fcfcc5fb312f7a5c572f3c66601c7
+S 36 480 0b2fcfcc5fb312f7a5c572f3c66601c7
+S 37 480 8e67b560341c71019ef3eff1a40d9a79
+S 38 480 8e67b560341c71019ef3eff1a40d9a79
+S 39 480 8e67b560341c71019ef3eff1a40d9a79
+S 40 480 8e67b560341c71019ef3eff1a40d9a79
+S 41 480 ad93b0ccce1a6d3e9d5e0e97a3ce1671
+S 42 480 ad93b0ccce1a6d3e9d5e0e97a3ce1671
+S 43 480 ad93b0ccce1a6d3e9d5e0e97a3ce1671
+S 44 480 ad93b0ccce1a6d3e9d5e0e97a3ce1671
+S 45 480 ad93b0ccce1a6d3e9d5e0e97a3ce1671
+S 46 480 3471e332ca3fa7296ab36892fd4b0d37
+S 47 480 3471e332ca3fa7296ab36892fd4b0d37
+S 48 480 3471e332ca3fa7296ab36892fd4b0d37
+S 49 480 3471e332ca3fa7296ab36892fd4b0d37
+S 50 480 3471e332ca3fa7296ab36892fd4b0d37
+S 51 480 3471e332ca3fa7296ab36892fd4b0d37
+S 52 480 3471e332ca3fa7296ab36892fd4b0d37
+S 53 480 3471e332ca3fa7296ab36892fd4b0d37
+S 54 480 ceccce20f220df91b5c0d2cfda55efc3
+S 55 480 ceccce20f220df91b5c0d2cfda55efc3
+S 56 480 ceccce20f220df91b5c0d2cfda55efc3
+S 57 480 ceccce20f220df91b5c0d2cfda55efc3
+S 58 480 ceccce20f220df91b5c0d2cfda55efc3
+S 59 480 ceccce20f220df91b5c0d2cfda55efc3
+S 60 480 ceccce20f220df91b5c0d2cfda55efc3
+S 61 480 ceccce20f220df91b5c0d2cfda55efc3
+S 62 480 ceccce20f220df91b5c0d2cfda55efc3
+S 63 480 ceccce20f220df91b5c0d2cfda55efc3
+S 64 480 a43f6a50a5f0ac03509c8de149910456
+S 65 480 a43f6a50a5f0ac03509c8de149910456
+S 66 480 a43f6a50a5f0ac03509c8de149910456
+S 67 480 a43f6a50a5f0ac03509c8de149910456
+S 68 480 a43f6a50a5f0ac03509c8de149910456
+S 69 480 a43f6a50a5f0ac03509c8de149910456
+S 70 480 a43f6a50a5f0ac03509c8de149910456
+S 71 480 a43f6a50a5f0ac03509c8de149910456
+S 72 480 a43f6a50a5f0ac03509c8de149910456
+S 73 480 a43f6a50a5f0ac03509c8de149910456
+S 74 480 a43f6a50a5f0ac03509c8de149910456
+S 75 480 a43f6a50a5f0ac03509c8de149910456
+S 76 480 a43f6a50a5f0ac03509c8de149910456
+S 77 480 a43f6a50a5f0ac03509c8de149910456
+S 78 480 a43f6a50a5f0ac03509c8de149910456
+S 79 480 a43f6a50a5f0ac03509c8de149910456
+S 80 480 a43f6a50a5f0ac03509c8de149910456
+S 81 480 a43f6a50a5f0ac03509c8de149910456
+S 82 480 ae4d36dcf12257f260af6f97e9450d8d
+S 83 480 ae4d36dcf12257f260af6f97e9450d8d
+S 84 480 ae4d36dcf12257f260af6f97e9450d8d
+S 85 480 ae4d36dcf12257f260af6f97e9450d8d
+S 86 480 ae4d36dcf12257f260af6f97e9450d8d
+S 87 480 ae4d36dcf12257f260af6f97e9450d8d
+S 88 480 ae4d36dcf12257f260af6f97e9450d8d
+S 89 480 ae4d36dcf12257f260af6f97e9450d8d
+S 90 480 ae4d36dcf12257f260af6f97e9450d8d
+S 91 480 ae4d36dcf12257f260af6f97e9450d8d
+S 92 480 ae4d36dcf12257f260af6f97e9450d8d
+S 93 480 ae4d36dcf12257f260af6f97e9450d8d
+S 94 480 ae4d36dcf12257f260af6f97e9450d8d
+S 95 480 ae4d36dcf12257f260af6f97e9450d8d
+S 96 480 ae4d36dcf12257f260af6f97e9450d8d
+S 97 480 ae4d36dcf12257f260af6f97e9450d8d
+S 98 480 ae4d36dcf12257f260af6f97e9450d8d
+S 99 480 ae4d36dcf12257f260af6f97e9450d8d
+S 100 480 ae4d36dcf12257f260af6f97e9450d8d
+S 101 480 ae4d36dcf12257f260af6f97e9450d8d
+S 102 480 ae4d36dcf12257f260af6f97e9450d8d
+S 103 480 ae4d36dcf12257f260af6f97e9450d8d
+S 104 480 ae4d36dcf12257f260af6f97e9450d8d
+S 105 480 ae4d36dcf12257f260af6f97e9450d8d
+S 106 480 ae4d36dcf12257f260af6f97e9450d8d
+S 107 480 ae4d36dcf12257f260af6f97e9450d8d
+S 108 480 ae4d36dcf12257f260af6f97e9450d8d
+S 109 480 ae4d36dcf12257f260af6f97e9450d8d
+S 110 480 ae4d36dcf12257f260af6f97e9450d8d
+S 111 480 ae4d36dcf12257f260af6f97e9450d8d
+S 112 480 ae4d36dcf12257f260af6f97e9450d8d
+S 113 480 ae4d36dcf12257f260af6f97e9450d8d
+S 114 480 ae4d36dcf12257f260af6f97e9450d8d
+S 115 480 ae4d36dcf12257f260af6f97e9450d8d
+S 116 480 ae4d36dcf12257f260af6f97e9450d8d
+S 117 480 ae4d36dcf12257f260af6f97e9450d8d
+S 118 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 119 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 120 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 121 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 122 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 123 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 124 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 125 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 126 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 127 480 2595ad1cb87ca86abb2f2c9d08cf0944
+S 128 480 2595ad1cb87ca86abb2f2c9d08cf0944
+T 2 3211d28696f6f8ae3bb114ad0f37b0a0
+T 3 64c2cca8eac1ae90028ee582619f1130
+T 4 f1a46f22b8c74a76c5c7238d51c1abfe
+T 5 1ac40bb79aee36613d26c77708828932
+T 6 62033a6f535c4f4fe653fab823f2243e
+T 7 d41d8cd98f00b204e9800998ecf8427e
+T 8 d41d8cd98f00b204e9800998ecf8427e
+T 9 36bd892f114dff2654e01fbd70e0d714
+T 10 d41d8cd98f00b204e9800998ecf8427e
+T 11 c6880baa1b16e243656843ee9ad3995f
+T 12 f74064a2f1a8e3ada3d7376e8cf7145a
+T 13 15bf5efc7a0b759933d984a84297b913
+T 14 8f739b26ab4d52786c3318c983454854
+T 15 7e0ebefa0c9181c25f5b3b51c0fc1af7
+T 16 90f92c5bad8bcc1dc5172b32838fc2dd
+T 17 d425ec729c754ce597337c80501534b9
+T 18 b585d065f8db740bb1ee4e21d56adb40
+T 19 d41d8cd98f00b204e9800998ecf8427e
+T 20 2f75e2fb47536722f94acae4a02cd3e3
+T 21 fe064fd48686665c4d5b004fed676dbf
+T 22 7e5b5b53cee1c0c775893c0098da2d90
+T 23 17ea9c6dc1e5cc7bde235b518f7c7bc1
+T 24 fa255076e26b895a13d47d31810b5f5f
+T 25 9195bc78813cc1241cf5693d78c502fb
+T 26 9eba8577273696584da05252be106b8a
+T 27 857fb71e8385d4151accec80c5474b33
+T 28 9febf03bbca4e8b2450f1e0a5c4d9ee9
+T 29 25718e0a07667cd98030a843896f25fe
+T 30 69b96fb078240a896a5cb769dad9940a
+T 31 d624b9b9ed98aee42b7c761af43a621f
+T 32 3e22ec71ec3b8df9450eec0f338876d7
+T 33 25de5e124968192e0a56e73231b5e776
+T 34 197de48eb0f0371d2db0b116fd386627
+T 35 361779ca9005d342fd51b5210563911e
+T 36 580c392c74cedefc0cda20b4dd7db079
+T 37 196b7e356984cd848f8d78444393b043
+T 38 a4711b03246efa24a4030dfa35853937
+T 39 36bd892f114dff2654e01fbd70e0d714
+T 40 290603f3cdb66f559f834594f2ff81fd
+T 41 71fabf3324d30074226843f53797a50f
+T 42 1a2d8b29119592bbef1d746ce6227250
+T 43 cad956e7bf50cdd05bef1819e957d6b6
+T 44 e876850f0bf963b3da8e682b5951d2f4
+T 45 35bc8dcf43d62c31faef222ac094dae1
+T 46 140387a9683b79fe2b75e629070e425a
+T 47 c2b3248451488dbe2832cecf5b18f842
+T 48 210f89246c249e15f346b12ed4d280c2
+T 49 9872b23acf7721327b2f3deb0a471b42
+T 50 127712b1ebee80eef6e837c586a1c550
+T 51 3717f33b3bc4f56a7b04acf3c1a06bb1
+T 52 089211641e30af80c809d0fa856616d4
+T 53 83378bf7bb0c8ac85d0a26a7461f8d21
+T 54 69829bb770114206e5d7e2da0d2c7ed2
+T 55 a2a826c6ee67e7c1adabe414a7a1d500
+T 56 f895e215fef641c39c37d6bfaa29fc76
+T 57 2fd74a39b4ea96cca9d6f6bee74e2ee6
+T 58 05d990465b531e5893a8d7c907aef023
+T 59 9841f819a7dba75fd3fcab2b671c02fa
+T 60 d4f797f9ede6aa26d36461cfbf9ecb6e
+T 61 65a8b50522dbc1ec21277b7fe277915d
+T 62 c7d03a34dda2ad0542f99ca6c635d221
+T 63 331c0d15b283bcb17bd6103ad459f375
+T 64 5d9c57f205c7efbaef9bcd78effbb6ff
+T 65 273abd7f5e6e6ac93d3dd68cb95bf605
+T 66 7ece9eafd9f70a6df93e4c529a7c0977
+T 67 49ba187daba8d5b3152f16432500286d
+T 68 6eee84cc6d11dd02f00ffa147a51d0e5
+T 69 8eb31fe68db7acd3fe5f710a6b4b9889
+T 70 f58d8fcb60d8c5142285786744438d6a
+T 71 6f79bdfccdaca20b0537364f8373e659
+T 72 280beab3fbe13baf426a505f7d938a35
+T 73 d41d8cd98f00b204e9800998ecf8427e
+T 74 d41d8cd98f00b204e9800998ecf8427e
+T 75 d41d8cd98f00b204e9800998ecf8427e
+T 76 d41d8cd98f00b204e9800998ecf8427e
+T 77 218e3632840ea66752529da2b6f12a5a
+T 78 6f302ec1b43c8cb961a849887310fcf2
+T 79 6d67f584a5f5a73da30fa5d1adfd2d37
+T 80 d41d8cd98f00b204e9800998ecf8427e
+T 81 d41d8cd98f00b204e9800998ecf8427e
+T 82 aacfaf64c157c945616bcd800e864ebb
+T 83 f64ccf7fefbfb6cf569de355e306a5af
+T 84 35eb3434a8a372d25c45dc9f487e8837
+T 85 bed482d82b34ae7842a237a36a0dfdf5
+T 86 3377309c6ff336f2e81fee25fd3d3187
+X title2 exit 6 chapterbyte 2 files 1
+X title3 exit 6 chapterbyte 3 files 1
+X title4 exit 6 chapterbyte 4 files 1
+X title5 exit 6 chapterbyte 5 files 1
+X title6 exit 6 chapterbyte 6 files 1
+X title7 exit 6 chapterbyte 7 files 1
+X title8 exit 6 chapterbyte 8 files 1
+X title9 exit 6 chapterbyte 9 files 1
+X title10 exit 6 chapterbyte 10 files 1
+X title11 exit 6 chapterbyte 11 files 1
+X title12 exit 6 chapterbyte 12 files 1
+X title13 exit 6 chapterbyte 13 files 1
+X title14 exit 6 chapterbyte 14 files 1
+X title15 exit 6 chapterbyte 15 files 1
+X title16 exit 6 chapterbyte 16 files 1
+X title17 exit 6 chapterbyte 17 files 1
+X title18 exit 6 chapterbyte 18 files 1
+X title19 exit 6 chapterbyte 19 files 1
+X title20 exit 6 chapterbyte 20 files 1
+X title21 exit 6 chapterbyte 21 files 1
+X title22 exit 6 chapterbyte 22 files 1
+X title23 exit 6 chapterbyte 23 files 1
+X title24 exit 6 chapterbyte 24 files 1
+X title25 exit 6 chapterbyte 25 files 1
+X title26 exit 6 chapterbyte 26 files 1
+X title27 exit 6 chapterbyte 27 files 1
+X title28 exit 6 chapterbyte 28 files 1
+X title29 exit 6 chapterbyte 29 files 1
+X title30 exit 6 chapterbyte 30 files 1
+X title31 exit 6 chapterbyte 31 files 1
+X title32 exit 6 chapterbyte 32 files 1
+X title33 exit 6 chapterbyte 33 files 1
+X title34 exit 6 chapterbyte 34 files 1
+X title35 exit 6 chapterbyte 35 files 1
+X title36 exit 6 chapterbyte 36 files 1
+X title37 exit 6 chapterbyte 37 files 1
+X title38 exit 6 chapterbyte 38 files 1
+X title39 exit 6 chapterbyte 39 files 1
+X title40 exit 6 chapterbyte 40 files 1
+X title41 exit 6 chapterbyte 41 files 1
+X title42 exit 6 chapterbyte 42 files 1
+X title43 exit 6 chapterbyte 43 files 1
+X title44 exit 6 chapterbyte 44 files 1
+X title45 exit 6 chapterbyte 45 files 1
+X title46 exit 6 chapterbyte 46 files 1
+X title47 exit 6 chapterbyte 47 files 1
+X title48 exit 6 chapterbyte 48 files 1
+X title49 exit 6 chapterbyte 49 files 1
+X title50 exit 6 chapterbyte 50 files 1
+X title51 exit 6 chapterbyte 51 files 1
+X title52 exit 6 chapterbyte 52 files 1
+X title53 exit 6 chapterbyte 53 files 1
+X title54 exit 6 chapterbyte 54 files 1
+X title55 exit 6 chapterbyte 55 files 1
+X title56 exit 6 chapterbyte 56 files 1
+X title57 exit 6 chapterbyte 57 files 1
+X title58 exit 6 chapterbyte 58 files 1
+X title59 exit 6 chapterbyte 59 files 1
+X title60 exit 6 chapterbyte 60 files 1
+X title61 exit 6 chapterbyte 61 files 1
+X title62 exit 6 chapterbyte 62 files 1
+X title63 exit 6 chapterbyte 63 files 1
+X title64 exit 6 chapterbyte 64 files 1
+X title65 exit 6 chapterbyte 65 files 1
+X title66 exit 6 chapterbyte 66 files 1
+X title67 exit 6 chapterbyte 67 files 1
+X title68 exit 6 chapterbyte 68 files 1
+X title69 exit 6 chapterbyte 69 files 1
+X title70 exit 6 chapterbyte 70 files 1
+X title71 exit 6 chapterbyte 71 files 1
+X title72 exit 6 chapterbyte 72 files 1
+X title73 exit 6 chapterbyte 73 files 1
+X title74 exit 6 chapterbyte 74 files 1
+X title75 exit 6 chapterbyte 75 files 1
+X title76 exit 6 chapterbyte 76 files 1
+X title77 exit 6 chapterbyte 77 files 1
+X title78 exit 6 chapterbyte 78 files 1
+X title79 exit 6 chapterbyte 79 files 1
+X title80 exit 6 chapterbyte 80 files 1
+X title81 exit 6 chapterbyte 81 files 1
+X title82 exit 6 chapterbyte 82 files 1
+X title83 exit 6 chapterbyte 83 files 1
+X title84 exit 6 chapterbyte 84 files 1
+X title85 exit 6 chapterbyte 85 files 1
+X title86 exit 6 chapterbyte 86 files 1
+X ok exit 6 chapterbyte 7 files 0
+X restart exit 5 chapterbyte 7 files 0
+X cancel exit 7 chapterbyte 7 files 0
+X ok exit 6 chapterbyte 7 files 3
+X restart exit 5 chapterbyte 5 files 3
+X cancel exit 7 chapterbyte 7 files 3
+X double exit 255 chapterbyte 3 files 3

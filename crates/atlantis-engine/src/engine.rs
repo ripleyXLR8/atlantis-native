@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
+use atlantis_data::saves::Players;
 use atlantis_data::sprite::{read_spr_file, SprSprite};
 use atlantis_data::sprite_list::{NpcClickRect, SpriteTransEntry};
 use atlantis_data::wam::{CentrePos, Place, Transition, Wam};
@@ -25,8 +26,11 @@ use crate::enhancements::Enhancements;
 use crate::hooks::{Departure, DirectLoader, Loader, ScriptHooks};
 use crate::look::{WarpMomentum, WarpPointer};
 use crate::music::Music;
+use crate::persist::{MemStore, SaveStore, Settings};
 use crate::scripts::Scripts;
 use crate::sys::Sys;
+use crate::ui::menus::MenuOutcome;
+use crate::ui::{BarSession, Guests, UiAssets};
 use crate::warp::Warp;
 
 /// The action [`Engine::handle_warp`] returns when it leaves without a
@@ -46,7 +50,10 @@ pub enum Event {
     /// A WAM was loaded.
     WamLoaded(String),
     /// A place was entered (its panorama shown).
-    PlaceEntered { wam: String, place: u16 },
+    PlaceEntered {
+        wam: String,
+        place: u16,
+    },
     /// A video was played: its name, the frames shown and the number of
     /// SPF sprites drawn over it.
     Video {
@@ -99,15 +106,38 @@ pub enum Event {
         subjects: Vec<u8>,
         chosen: Option<i32>,
     },
+    /// A menu file was opened (`SPRLIST\<name>`).
+    Menu(String),
+    /// A checkpoint was written or loaded (its file).
+    CheckpointWritten(String),
+    CheckpointLoaded(String),
 }
 
 /// Why the place loop ends (`_abortCommand`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Abort {
-    /// A new game (a game over without a checkpoint).
+    /// A game over: the player's checkpoint is reloaded, a new game
+    /// without one (0x0041975d -> `FUN_0042de5c`).
     NewGame,
+    /// The load picker's OK, RESTART EPISODE or double click: the
+    /// checkpoint of the player's chapter byte is reloaded.
+    Load,
+    /// QUIT GAME confirmed in the in-game menu (the credits have played).
+    Quit,
     /// Exit was set (CHAPI085's Exit=86): the end of the game.
     Finished,
+}
+
+/// How [`run`] starts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Start {
+    /// As the original: the logos, PREINTRO, the player screen, the
+    /// player's checkpoint (or a new game).
+    #[default]
+    Boot,
+    /// A new game at once, with no player screen (tests, tools); the
+    /// checkpoints are those of player 0.
+    NewGame,
 }
 
 /// What [`run`] needs besides the platform and the game.
@@ -120,6 +150,9 @@ pub struct Options {
     pub enhancements: Enhancements,
     /// The dialog subtitles are shown (the original's SUBTITLES setting).
     pub subtitles: bool,
+    /// Where the players, the checkpoints and the settings are kept.
+    pub saves: Rc<dyn SaveStore>,
+    pub start: Start,
 }
 
 impl Default for Options {
@@ -130,6 +163,8 @@ impl Default for Options {
             trace: None,
             enhancements: Enhancements::default(),
             subtitles: true,
+            saves: Rc::new(MemStore::new()),
+            start: Start::default(),
         }
     }
 }
@@ -175,8 +210,43 @@ pub struct Engine {
     /// reads it until the next place change.
     pub vue_override: Option<i32>,
     /// The inventory records (0x006ce138): the object id of each, in
-    /// order. TODO(phase 3): the bar, the icons, the object in hand.
+    /// order. The object in hand is OBJETENMAIN.
     pub inventory: Vec<i32>,
+    /// The first record the bar shows (0x00496924).
+    pub bar_first: usize,
+    /// The bar request and the right-press flag.
+    pub bar: BarSession,
+    /// The guests following the player, and whether they are shown
+    /// (HideGuest / ShowGuest, 0x0049613c).
+    pub guests: Guests,
+    pub guests_shown: bool,
+    /// Bow mode (0x00496164), the arrow frame (0x0049619d), ARCWARP.SPR.
+    pub bow_mode: bool,
+    pub arrow_frame: u8,
+    pub(crate) bow_sprites: Vec<SprSprite>,
+    /// The interface's sprites.
+    pub ui: Rc<UiAssets>,
+    /// SPRLIST\EPI.TXT, the checkpoints' names.
+    pub epi_text: Vec<u8>,
+    /// The options of the menus and the enhancements as the settings file
+    /// keeps them.
+    pub settings: Settings,
+    /// The SUBTITLES toggle's click counter (0x00496098).
+    pub subtitle_clicks: u8,
+    /// The sound menu's knobs, kept for the session (0 = the file's).
+    pub son_knob_x: [i32; 4],
+    pub(crate) channel_test_voice: Option<crate::audio::VoiceId>,
+    /// The voices' volume, 0..255.
+    pub voice_volume: u8,
+    /// The players, and the current one's row (0x00496607).
+    pub players: Players,
+    pub player: usize,
+    pub saves: Rc<dyn SaveStore>,
+    /// The previous chapter (0x00772907) and the disc in use (0x00772913).
+    pub prev_chapter: u8,
+    pub disc: u8,
+    /// A checkpoint load runs (0x00496168): no checkpoint is written.
+    pub load_running: bool,
     /// The place table slots as the WAM loads wrote them (0x006cd894 + the
     /// records' transition arrays), stale entries included: a departure
     /// Vue= reads entry i of the new place's record.
@@ -271,6 +341,26 @@ impl Engine {
             section_play: false,
             vue_override: None,
             inventory: Vec::new(),
+            bar_first: 0,
+            bar: BarSession::default(),
+            guests: Guests::default(),
+            guests_shown: true,
+            bow_mode: false,
+            arrow_frame: 0,
+            bow_sprites: Vec::new(),
+            ui: Rc::new(UiAssets::default()),
+            epi_text: Vec::new(),
+            settings: Settings::default(),
+            subtitle_clicks: 0,
+            son_knob_x: [0; 4],
+            channel_test_voice: None,
+            voice_volume: 255,
+            players: Players::new(b"#New Player"),
+            player: 0,
+            saves: Rc::new(MemStore::new()),
+            prev_chapter: 0,
+            disc: 1,
+            load_running: false,
             place_table_slots: Vec::new(),
             hidden_persos: Vec::new(),
             enhancements: Enhancements::default(),
@@ -382,7 +472,7 @@ impl Engine {
 
     /// `record`: the place table slots are written (`setupWAMByName`; the
     /// chapter's own WAM load `setupChapterWAM` does not).
-    async fn load_wam_with(&mut self, name: &str, record: bool) -> bool {
+    pub(crate) async fn load_wam_with(&mut self, name: &str, record: bool) -> bool {
         let Some(data) = self.read(&format!("WAM\\{name}")).await else {
             return false;
         };
@@ -445,7 +535,13 @@ impl Engine {
         // /INIT block establishes the initial set.
         if !in_play {
             self.hidden_persos.clear();
+            // The guest list is zeroed at boot (FUN_004239f4), shown.
+            self.guests.clear();
+            self.guests_shown = true;
         }
+        self.bar_first = 0; // FUN_0042de5c @ 0x0042e2ec
+        self.disc = 1; // the no-checkpoint branch (0x00772914 = 1)
+        self.prev_chapter = 0;
         // FUN_0042de5c step 4 (both branches): ZOOM = NEWSOUND = 0; NEWSOUND
         // is one of the variables the chapter change keeps.
         self.zoom = false;
@@ -649,8 +745,9 @@ impl Engine {
     }
 }
 
-/// The game, from the new-game start: the engine task the front end runs
-/// with a [`crate::sys::Runner`].
+/// The game: the start-up videos, the player screen, the player's
+/// checkpoint and the place loop, until the game is quit or ends; the task
+/// the front end runs with a [`crate::sys::Runner`].
 pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
     let Options {
         loader,
@@ -658,31 +755,89 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         trace,
         enhancements,
         subtitles,
+        saves,
+        start,
     } = opts;
     let mut e = Engine::new(sys, game, loader);
     e.trace = trace;
     e.enhancements = enhancements;
     e.subtitles = subtitles;
+    e.saves = saves;
     // The music loops seamlessly with the minor bug fixes; the original's
     // streaming ring otherwise.
     e.music.original_ring = !enhancements.minor_bug_fixes;
-    e.load_cursor_sprites().await;
-    // TODO(phase 3): the start-up videos (LOGO15N, PREINTRO) and the player
-    // screen before the game.
-    let mut in_play = false;
-    loop {
+    e.load_settings(Settings {
+        subtitles,
+        enhancements,
+        ..Settings::default()
+    });
+    e.load_interface().await;
+    if start == Start::Boot {
+        e.play_startup().await;
+        // The player screen (FUN_0041dea4), then FUN_0042de5c on the
+        // player's resume chapter; the boot pass runs FUN_00423760.
+        match e.player_screen().await {
+            Some(p) => e.player = p,
+            None => {
+                e.stop_ambient();
+                return;
+            }
+        }
+        e.load_checkpoint(hooks.as_mut(), false).await;
+    } else {
+        e.new_game(hooks.as_mut(), false).await;
+    }
+    let finished = loop {
         e.abort = None;
-        e.new_game(hooks.as_mut(), in_play).await;
         e.game_step(hooks.as_mut()).await;
         match e.abort {
-            // A game over reloads the player's checkpoint (0x0041975d ->
-            // FUN_0042de5c); without one, chapter 1, place 1.
-            // TODO(phase 3): the checkpoints.
-            Some(Abort::NewGame) if !e.sys.should_quit() => in_play = true,
-            // Exit == 86 (CHAPI085): FUN_0041a66c, END.TGA for up to 7 s,
-            // then the credits FUN_0041a72c. TODO(phase 3).
-            _ => break,
+            // A game over or the load picker: the checkpoint of the
+            // player's chapter byte (0x0041975d -> FUN_0042de5c), a new
+            // game from play without one.
+            Some(Abort::NewGame | Abort::Load) if !e.sys.should_quit() => {
+                e.load_checkpoint(hooks.as_mut(), true).await;
+            }
+            Some(Abort::Finished) => break true,
+            _ => break false,
         }
+    };
+    if finished && !e.sys.should_quit() {
+        // Exit == 86 (CHAPI085, the only value shipped, 0x00419775):
+        // FUN_0041a66c, then the program ends.
+        e.end_of_game().await;
     }
     e.stop_ambient();
+}
+
+impl Engine {
+    /// The start-up videos (0x0041960a..0x004196cc): LOGO15N.HNM and
+    /// PREINTRO.HNM with their sounds, through the transition player at the
+    /// cinema pace, a 200-tick (1 s) wait that reads no input between them.
+    pub async fn play_startup(&mut self) {
+        use crate::place::CINEMA_FRAME_MS;
+        self.play_transition_video("LOGO15N.HNM", None, CINEMA_FRAME_MS)
+            .await;
+        let start = self.sys.millis();
+        while self.sys.millis() - start < 1000 && !self.sys.should_quit() {
+            while self.sys.poll_event().is_some() {}
+            self.sys.frame().await;
+        }
+        self.play_transition_video("PREINTRO.HNM", None, CINEMA_FRAME_MS)
+            .await;
+    }
+
+    /// The in-game menu from the warp loop: a reload or a quit ends the
+    /// place loop.
+    pub(crate) async fn run_ingame_menu(&mut self) {
+        // FUN_0041c838 lowers the music while it runs (@ 0x0041c88a) and
+        // raises it at the end (@ 0x0041cb7d).
+        self.music.duck(false, None);
+        let outcome = self.ingame_menu().await;
+        self.music.unduck(None);
+        match outcome {
+            MenuOutcome::Resume => {}
+            MenuOutcome::Reload => self.abort = Some(Abort::Load),
+            MenuOutcome::Quit => self.abort = Some(Abort::Quit),
+        }
+    }
 }

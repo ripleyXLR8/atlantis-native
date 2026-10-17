@@ -1,0 +1,414 @@
+//! The game's 2D interface: the menus, the player screen, the inventory
+//! bar, the guests' portraits and the credits.
+//!
+//! Translated from ScummVM's CryOmni3D Atlantis engine (`menus.cpp`,
+//! `menu_layout.cpp`, `toolbar.cpp`, `inventory.cpp`, `bar_session.h`,
+//! `credits_layout.h`; GPLv3, the ScummVM team).
+
+pub mod bar;
+pub mod credits;
+pub mod layout;
+pub mod menus;
+
+use atlantis_data::sprite::{limits, read_spr_file, SprSprite};
+
+use crate::engine::Engine;
+use crate::warp::{SCREEN_H, SCREEN_W};
+use layout::{font_min_blits, FontMin, MenuWalk};
+
+/// The sprite banks of the interface (`SPRITE\2D\`).
+#[derive(Clone, Debug, Default)]
+pub struct UiAssets {
+    /// FONTMAX.SPR, the menu font; FONTMAX2.SPR, its hovered glyphs.
+    pub fontmax: Vec<SprSprite>,
+    pub fontmax2: Vec<SprSprite>,
+    /// FONTMIN.SPR, the player-name font; FONTMIN2.SPR, its hovered glyphs.
+    pub fontmin: Vec<SprSprite>,
+    pub fontmin2: Vec<SprSprite>,
+    /// CREDBLAN.SPR / CREDBLEU.SPR, the credits fonts.
+    pub credblan: Vec<SprSprite>,
+    pub credbleu: Vec<SprSprite>,
+    /// SPRMENU.SPR, the menus' ornaments.
+    pub sprmenu: Vec<SprSprite>,
+    /// OBJETS1.SPR, the objects' icons (index = the exe's table index).
+    pub objects: Vec<SprSprite>,
+    /// SUIVEUR.SPR, the guests' portraits.
+    pub guests: Vec<SprSprite>,
+    /// OBJETS0.SPR, the inventory bar.
+    pub bar: Option<SprSprite>,
+}
+
+/// A whole screen.
+pub type Screen = Vec<u16>;
+
+/// Draws a sprite with its hotspot at (x, y) on a 640x480 screen.
+pub fn draw_sprite(screen: &mut [u16], spr: &SprSprite, x: i32, y: i32) {
+    spr.draw(screen, SCREEN_W, SCREEN_H, x, y);
+}
+
+/// Draws a sprite clipped to the rows from `top` down.
+pub fn draw_sprite_below(screen: &mut [u16], spr: &SprSprite, x: i32, y: i32, top: usize) {
+    if top >= SCREEN_H {
+        return;
+    }
+    spr.draw(
+        &mut screen[top * SCREEN_W..],
+        SCREEN_W,
+        SCREEN_H - top,
+        x,
+        y - top as i32,
+    );
+}
+
+/// `FUN_004108e0` (through `FUN_0041cc28`): every pixel dimmed, red and
+/// blue to c - c / 2, green to g - ((g & 0x3c) >> 1) (mask 0xf79e).
+pub fn dim_screen(screen: &mut [u16]) {
+    for p in screen.iter_mut() {
+        *p -= (*p & 0xf79e) >> 1;
+    }
+}
+
+impl UiAssets {
+    /// The blits of a menu walk: SPRMENU sprites and FONTMAX glyphs
+    /// (FONTMAX2 on the hovered line), in file order. The alternate bank of
+    /// `/sprj=` `/sprr=` `/sprc=` is never loaded by the executable.
+    pub fn draw_menu(&self, screen: &mut [u16], walk: &MenuWalk) {
+        for op in &walk.ops {
+            let bank = if op.sprite {
+                if op.alt_bank {
+                    continue;
+                }
+                &self.sprmenu
+            } else if op.hover_font && !self.fontmax2.is_empty() {
+                &self.fontmax2
+            } else {
+                &self.fontmax
+            };
+            if let Some(spr) = usize::try_from(op.index).ok().and_then(|i| bank.get(i)) {
+                draw_sprite(screen, spr, i32::from(op.x), i32::from(op.y));
+            }
+        }
+    }
+
+    /// FONTMIN text (FONTMIN2 when `hover`) with one of the renderers.
+    pub fn draw_font_min(
+        &self,
+        screen: &mut [u16],
+        r: FontMin,
+        text: &[u8],
+        x: i32,
+        y: i32,
+        hover: bool,
+    ) {
+        let bank = if hover && !self.fontmin2.is_empty() {
+            &self.fontmin2
+        } else {
+            &self.fontmin
+        };
+        for b in font_min_blits(r, text, x, y) {
+            if let Some(spr) = bank.get(usize::from(b.idx)) {
+                draw_sprite(screen, spr, b.x, b.y);
+            }
+        }
+    }
+
+    /// The icon of OBJETS1.SPR sprite `icon`.
+    pub fn object(&self, icon: usize) -> Option<&SprSprite> {
+        self.objects.get(icon).filter(|s| !s.pixels.is_empty())
+    }
+}
+
+/// The characters following the player ("guests"): 5-byte records {int32
+/// id, byte sprite} at 0x006cd7fc, count 0x0077290e. Fixed slots, so that a
+/// slot reused by AddGuest keeps the sprite byte it held when the id is not
+/// in the sprite table, as in the original.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Guests {
+    pub id: [i32; Guests::SLOTS],
+    pub sprite: [u8; Guests::SLOTS],
+    pub count: usize,
+    /// 0x00496880: the portraits' y, 350 in the image; the bar's slide-in
+    /// raises them 7 a frame and the slide-out lowers them back. Not reset
+    /// with the list.
+    pub portrait_y: i32,
+}
+
+impl Default for Guests {
+    fn default() -> Self {
+        Guests {
+            id: [0; Guests::SLOTS],
+            sprite: [0; Guests::SLOTS],
+            count: 0,
+            portrait_y: 350,
+        }
+    }
+}
+
+impl Guests {
+    pub const SLOTS: usize = 12;
+    /// The sprite of a record not drawn.
+    pub const HIDDEN: u8 = 0xff;
+
+    pub fn clear(&mut self) {
+        self.id = [0; Guests::SLOTS];
+        self.sprite = [0; Guests::SLOTS];
+        self.count = 0;
+    }
+
+    /// `FUN_0042b480` (list part): append {id, index of id in `table`}.
+    pub fn add(&mut self, guest: i32, table: &[i32]) {
+        if self.count >= Guests::SLOTS {
+            return;
+        }
+        self.id[self.count] = guest;
+        if let Some(i) = table.iter().position(|&t| t == guest) {
+            self.sprite[self.count] = i as u8;
+        }
+        self.count += 1;
+    }
+
+    /// Removes record `i`, the following ones move down.
+    pub fn remove_at(&mut self, i: usize) {
+        for k in i..self.count {
+            if k + 1 < Guests::SLOTS {
+                self.id[k] = self.id[k + 1];
+                self.sprite[k] = self.sprite[k + 1];
+            }
+        }
+        self.count -= 1;
+    }
+
+    /// `FUN_0042bdb8`: the guest whose portrait cell holds (x, y), 0 for
+    /// none. Grid `FUN_004211f0` at x0 = 540 - 100 * (count - 1), y0 =
+    /// portrait_y, cells 85 x 100, count columns, one row, edges inclusive;
+    /// the record is count - 1 - cell. On the right and bottom edge pixels
+    /// the original reads the memory before the list (see
+    /// [`guest_edge_original`]); the port returns 0.
+    pub fn at(&self, x: i32, y: i32) -> i32 {
+        if self.count == 0 {
+            return 0;
+        }
+        let n = self.count as i32;
+        let x0 = 540 - 100 * (n - 1);
+        let y0 = self.portrait_y;
+        if x < x0 || x > x0 + n * 85 || y < y0 || y > y0 + 100 {
+            return 0;
+        }
+        let cell = ((y - y0) / 100) * n + (x - x0) / 85;
+        let k = n - 1 - cell;
+        if k >= 0 {
+            self.id[k as usize]
+        } else {
+            0
+        }
+    }
+}
+
+/// What `FUN_0042bdb8` reads for record -1 (the right or bottom edge pixel
+/// of a one-guest grid): the 4 bytes before the list, the high byte of
+/// ClicPerso and the low 3 bytes of the zone left under the pointer.
+pub fn guest_edge_original(clic_perso: u32, zone: u32) -> u32 {
+    (zone << 8) | (clic_perso >> 24)
+}
+
+/// The bar request 0x004960c4 and the right-press flag 0x00496120.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BarSession {
+    pub request: bool,
+    pub right_press: bool,
+}
+
+impl BarSession {
+    /// The bar loop's entry (`FUN_0042c8ac` @ 0x0042c8c4).
+    pub fn opened(&mut self) {
+        self.request = true;
+    }
+
+    /// The input flag resets of a video end (0x0041bf5b..0x0041bf8d), a
+    /// Cinema=, a StartMusik= that closes the open stream, a StopMusik=
+    /// with a stream open, the end of a bar session and the warp loop's
+    /// entry.
+    pub fn flags_reset(&mut self) {
+        *self = BarSession::default();
+    }
+
+    /// The end of a voice-only line that loaded its voice (0x004305cb).
+    pub fn voice_line_ended(&mut self) {
+        self.request = false;
+    }
+
+    /// A right press seen by `FUN_0041a298` (@ 0x0041a2f2..0x0041a337):
+    /// the flag, and the request toggles unless a clicked section plays or
+    /// the menu is requested.
+    pub fn right_pressed(&mut self, section_play: bool, menu_request: bool) {
+        self.right_press = true;
+        if !section_play && !menu_request {
+            self.request = !self.request;
+        }
+    }
+
+    /// The warp loop's frame start: the request a timer section left (a
+    /// right press during its lines) opens the bar, then the flags clear
+    /// (0x0041c04a..0x0041c07c).
+    pub fn warp_frame_start(&mut self) -> bool {
+        let pending = self.request;
+        self.flags_reset();
+        pending
+    }
+}
+
+/// The icon (OBJETS1.SPR index) of an object: the last entry of the
+/// table 0x004967b0 with its id (`FUN_0042b328`).
+pub fn object_icon(table: &[i32], id: i32) -> Option<usize> {
+    table.iter().rposition(|&t| t == id && id != 0)
+}
+
+impl Engine {
+    /// What the interface needs before the game: the cursors, the sprite
+    /// banks, EPI.TXT, the settings' volumes and the player list.
+    pub async fn load_interface(&mut self) {
+        self.load_cursor_sprites().await;
+        self.load_ui_assets().await;
+        self.load_players();
+    }
+
+    /// Loads the interface's sprite banks.
+    pub(crate) async fn load_ui_assets(&mut self) {
+        async fn bank(e: &Engine, name: &str, lim: (u16, u16)) -> Vec<SprSprite> {
+            match e.read(&format!("SPRITE\\2D\\{name}")).await {
+                Some(d) => read_spr_file(&d, lim.0, lim.1).unwrap_or_default(),
+                None => Vec::new(),
+            }
+        }
+        let d = limits::DEFAULT;
+        let mut a = UiAssets {
+            fontmax: bank(self, "FONTMAX.SPR", d).await,
+            fontmax2: bank(self, "FONTMAX2.SPR", d).await,
+            fontmin: bank(self, "FONTMIN.SPR", d).await,
+            fontmin2: bank(self, "FONTMIN2.SPR", d).await,
+            credblan: bank(self, "CREDBLAN.SPR", d).await,
+            credbleu: bank(self, "CREDBLEU.SPR", d).await,
+            sprmenu: bank(self, "SPRMENU.SPR", d).await,
+            objects: bank(self, "OBJETS1.SPR", d).await,
+            guests: bank(self, "SUIVEUR.SPR", d).await,
+            bar: None,
+        };
+        a.bar = bank(self, "OBJETS0.SPR", limits::INVENTORY_BAR)
+            .await
+            .into_iter()
+            .next()
+            .filter(|s| !s.pixels.is_empty());
+        if let Some(t) = self.read("SPRLIST\\EPI.TXT").await {
+            self.epi_text = t;
+        }
+        self.ui = std::rc::Rc::new(a);
+    }
+
+    /// The arrow cursor (CURSEURS.SPR frame 6, `FUN_0042d558`) at the
+    /// mouse, or the object in hand.
+    pub(crate) fn draw_pointer(&self, screen: &mut [u16]) {
+        let (x, y) = self.sys.mouse();
+        let held = self.vars.get("objetenmain");
+        if held != 0 {
+            if let Some(spr) = object_icon(&self.game.exe.inventory_object_ids, held)
+                .and_then(|i| self.ui.object(i))
+            {
+                draw_sprite(screen, spr, x, y);
+                return;
+            }
+        }
+        if let Some(spr) = self.cursor_sprites.get(6) {
+            draw_sprite(screen, spr, x, y);
+        }
+    }
+
+    /// `FUN_0042bc58`: every guest record not hidden at (540 - 100 i,
+    /// portrait_y), when they are shown; then a moving portrait.
+    pub(crate) fn draw_guests(&self, screen: &mut [u16], moving: Option<(usize, i32)>) {
+        if !self.guests_shown {
+            return;
+        }
+        let g = &self.guests;
+        for i in 0..g.count.min(Guests::SLOTS) {
+            let s = g.sprite[i];
+            if s != Guests::HIDDEN {
+                if let Some(spr) = self.ui.guests.get(usize::from(s)) {
+                    draw_sprite(screen, spr, 540 - 100 * i as i32, g.portrait_y);
+                }
+            }
+        }
+        if let Some((s, x)) = moving {
+            if let Some(spr) = self.ui.guests.get(s) {
+                draw_sprite(screen, spr, x, g.portrait_y);
+            }
+        }
+    }
+
+    /// The guest under (x, y) when they are shown.
+    pub(crate) fn guest_at(&self, x: i32, y: i32) -> i32 {
+        if self.guests_shown {
+            self.guests.at(x, y)
+        } else {
+            0
+        }
+    }
+
+    /// The portraits' y during a bar slide: -7 a frame up (`FUN_0042c2c4`),
+    /// +7 down while above 350 (`FUN_0042c59c`), with guests shown.
+    pub(crate) fn slide_guest_portraits(&mut self, dy: i32) {
+        if self.guests.count == 0 || !self.guests_shown {
+            return;
+        }
+        if dy < 0 || self.guests.portrait_y < 350 {
+            self.guests.portrait_y += dy;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn guests_list() {
+        let table = [600, 587, 601];
+        let mut g = Guests::default();
+        g.add(587, &table);
+        assert_eq!((g.count, g.sprite[0]), (1, 1));
+        // One guest: the cell at (540, 350), 85 x 100.
+        assert_eq!(g.at(540, 350), 587);
+        assert_eq!(g.at(624, 449), 587);
+        assert_eq!(g.at(625, 400), 0); // the edge column: record -1
+        assert_eq!(g.at(540, 450), 0); // the edge row
+        assert_eq!(g.at(539, 400), 0);
+        g.add(601, &table);
+        assert_eq!(g.at(440, 400), 601);
+        assert_eq!(g.at(530, 400), 587);
+        g.remove_at(0);
+        assert_eq!((g.count, g.id[0], g.sprite[0]), (1, 601, 2));
+    }
+
+    #[test]
+    fn bar_session() {
+        let mut s = BarSession::default();
+        s.right_pressed(false, false);
+        assert!(s.request && s.right_press);
+        s.right_pressed(true, false);
+        assert!(s.request);
+        assert!(s.warp_frame_start());
+        assert_eq!(s, BarSession::default());
+        s.opened();
+        s.voice_line_ended();
+        assert!(!s.request);
+    }
+
+    #[test]
+    fn dim() {
+        let mut s = vec![0xffff, 0x0000, 0x0842];
+        dim_screen(&mut s);
+        assert_eq!(
+            s,
+            vec![0xffff - (0xf79e >> 1), 0, 0x0842 - ((0x0842 & 0xf79e) >> 1)]
+        );
+    }
+}

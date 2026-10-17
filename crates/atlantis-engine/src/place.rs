@@ -295,7 +295,11 @@ impl Engine {
             self.set_view(f.alpha, f.beta);
             self.animate_sprites();
             self.render_view();
-            // TODO(phase 3): the guests' portraits over the frame.
+            if self.guests_shown && self.guests.count != 0 {
+                let mut s = self.sys.screen.borrow().clone();
+                self.draw_guests(&mut s, None);
+                *self.sys.screen.borrow_mut() = s;
+            }
             // The original's turn has no timer of its own: one frame each.
             self.sys.frame().await;
         }
@@ -377,9 +381,13 @@ impl Engine {
         // FUN_0041bc74's input: a left click, or Escape with the conditions
         // of FUN_0041a298 (video_skip); after that poll the next frame is
         // still presented.
+        // The bar request as it stands: set for a Cinema= of a timer the
+        // bar loop runs, so that Escape does not end it then.
         let mut skip = VideoSkipState {
             object_in_hand: self.vars.get("objetenmain") != 0,
             section_play: self.section_play,
+            bow_mode: self.bow_mode,
+            bar_request: self.bar.request,
             ..VideoSkipState::default()
         };
         let mut stop_after_frame = false;
@@ -404,6 +412,9 @@ impl Engine {
                         // sprites, then the guests' portraits.
                         for spf in &spfs {
                             composite_spf_frame(spf, spf_frame, &mut screen, SCREEN_W, SCREEN_H);
+                        }
+                        if self.guests_shown && self.guests.count != 0 {
+                            self.draw_guests(&mut screen, None);
                         }
                         drop(screen);
                         // FUN_0041bc74 decodes the first frame before its
@@ -454,14 +465,14 @@ impl Engine {
         // (FUN_0042a100 @ 0x0042a907..0x0042a954 stops nothing); one cut
         // short fades it out, 2 volume steps every 25 ms from the effects
         // volume (FUN_0041bc74 @ 0x0041be69..0x0041be9e arms 0x00495eb0 =
-        // 2). TODO(phase 3): the bar flags are cleared (0x0041bf5b..
-        // 0x0041bf8d).
+        // 2). Then the input flags are cleared (0x0041bf5b..0x0041bf8d).
         if stop_after_frame
             && skip.fades(frame_ms == CINEMA_FRAME_MS)
             && self.music.new_sound_active()
         {
             self.music.fade_out_new_sound(self.effects_volume());
         }
+        self.bar.flags_reset();
         self.ix_buffers = hnm.into_buffers();
         self.emit(Event::Video {
             name,

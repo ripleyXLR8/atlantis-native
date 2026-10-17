@@ -549,7 +549,8 @@ pub struct Music {
     /// 0x00772915: the track opened last (0 for none).
     pub open_track: i32,
     /// The tracks the original would find in its install folder (bit i =
-    /// track index i). TODO(phase 3): kept with the player's settings.
+    /// track index i). The original's copies live in its install folder;
+    /// the port reads the tracks from the archives and only notes them.
     pub on_disk: u32,
     /// Play the tracks through the original's streaming ring (set by
     /// [`crate::Enhancements::minor_bug_fixes`] off).
@@ -786,7 +787,9 @@ impl Engine {
         }
         // Closing the open stream for another track resets the input flags,
         // the bar request among them (0x0042add3..0x0042ae05).
-        // TODO(phase 3): the bar request.
+        if self.music.handle_set {
+            self.bar.flags_reset();
+        }
         self.music_switch_track(track).await;
     }
 
@@ -801,10 +804,11 @@ impl Engine {
         }
         // StopMusik closes and clears 0x006ce0c0 and 0x00772915 only when
         // the handle is set (@ 0x0042aea9, 0x0042af0e, 0x0042af18), then
-        // resets the input flags (0x0042af26..0x0042af58, TODO(phase 3)).
+        // resets the input flags (0x0042af26..0x0042af58).
         if self.music.handle_set {
             self.music.handle_set = false;
             self.music.open_track = 0;
+            self.bar.flags_reset();
         }
         self.music.track_id = 0;
     }

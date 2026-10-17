@@ -1,0 +1,587 @@
+//! The original game's save files: the player list `players.atl` and the
+//! chapter checkpoints `p<letter><chapter>.gam`, and the episode names of
+//! `SPRLIST\EPI.TXT` the load screen shows.
+//!
+//! Translated from ScummVM's CryOmni3D Atlantis engine (`saveload_format.cpp`;
+//! GPLv3, the ScummVM team), which reads the files `atlantis.exe` writes.
+//! The writers are `FUN_0042d6b8` (checkpoint and player list, on every
+//! chapter change), `FUN_0041dea4` (player created) and `FUN_0041e8a8`
+//! (player deleted); the readers the start-up code at
+//! 0x0041916b..0x004192e0 (player list) and `FUN_0042de5c` (checkpoint).
+
+/// The rows of the player list.
+pub const MAX_PLAYERS: usize = 5;
+/// A player name's bytes, its NUL included (16 characters at most).
+pub const NAME_LEN: usize = 17;
+/// The longest name typed on the player screen (`FUN_0041dea4`).
+pub const NAME_MAX_CHARS: usize = 16;
+/// `players.atl` of the English builds: 5 names, 6 chapter bytes, 6 letters.
+pub const PLAYERS_SIZE: usize = 97;
+/// A 95-byte `players.atl` written by a French retail build: 5 chapter
+/// bytes and 5 letters, as far as one file shows (the split is inferred
+/// from the size).
+pub const PLAYERS_SIZE_FR: usize = 95;
+/// A checkpoint: a raw dump of 25 globals, 2639 bytes.
+pub const CHECKPOINT_SIZE: usize = 2639;
+/// The inventory records a checkpoint holds (0x10e bytes of 9).
+pub const CHECKPOINT_RECORDS: usize = 30;
+/// The `/con` play counters (0x5dc bytes).
+pub const CON_COUNTERS: usize = 0x5dc;
+/// The guest records a checkpoint holds (0x14 bytes of 5).
+pub const CHECKPOINT_GUESTS: usize = 4;
+/// The hidden-perso ids a checkpoint holds (0x200 bytes of int16).
+pub const CHECKPOINT_HIDDEN: usize = 256;
+
+/// The player list (the globals 0x0049657c names, 0x006ce246 resume
+/// chapters, 0x006ce24c save letters, 0x00496606 row count).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Players {
+    /// The name rows as the original keeps them: NUL-terminated, the bytes
+    /// after the NUL stale (a name is strcpy'd over the previous one).
+    pub rows: [[u8; NAME_LEN]; MAX_PLAYERS],
+    /// The resume chapter of each player (index 5 unused, kept).
+    pub chapters: [u8; 6],
+    /// The letter of each player's files (index 5 unused, kept).
+    pub letters: [u8; 6],
+    /// The rows of the list: the players, then the "new player" row while
+    /// fewer than 5 players exist.
+    pub count: usize,
+    /// The row marker of the build (0x00496570, e.g. `#New Player`).
+    pub marker: Vec<u8>,
+}
+
+fn cstr(b: &[u8]) -> &[u8] {
+    let n = b.iter().position(|&c| c == 0).unwrap_or(b.len());
+    &b[..n]
+}
+
+fn strcpy(row: &mut [u8; NAME_LEN], s: &[u8]) {
+    let n = s.len().min(NAME_LEN - 1);
+    row[..n].copy_from_slice(&s[..n]);
+    row[n] = 0;
+}
+
+impl Players {
+    /// No `players.atl`: one row, the marker; the letters 'a'..'e'
+    /// (0x004191a2, before the file is read).
+    pub fn new(marker: &[u8]) -> Players {
+        let mut p = Players {
+            rows: [[0; NAME_LEN]; MAX_PLAYERS],
+            chapters: [0; 6],
+            letters: [b'a', b'b', b'c', b'd', b'e', 0],
+            count: 1,
+            marker: marker.to_vec(),
+        };
+        strcpy(&mut p.rows[0], marker);
+        p
+    }
+
+    /// Reads a `players.atl` (97 or 95 bytes); `None` for another size.
+    pub fn read(data: &[u8], marker: &[u8]) -> Option<Players> {
+        let mut p = Players::new(marker);
+        let (n, letter_base) = match data.len() {
+            PLAYERS_SIZE => (6, 0x5b),
+            PLAYERS_SIZE_FR => (5, 0x5a),
+            _ => return None,
+        };
+        for (i, row) in p.rows.iter_mut().enumerate() {
+            row.copy_from_slice(&data[NAME_LEN * i..NAME_LEN * (i + 1)]);
+        }
+        p.chapters = [0; 6];
+        p.chapters[..n].copy_from_slice(&data[0x55..0x55 + n]);
+        p.letters = [0; 6];
+        p.letters[..n].copy_from_slice(&data[letter_base..letter_base + n]);
+        p.count = p.count_rows();
+        Some(p)
+    }
+
+    /// The row count rule of the reader (0x00419275..0x004192e0): the index
+    /// of the first name that is the marker or empty, plus the marker row
+    /// when fewer than 5.
+    fn count_rows(&self) -> usize {
+        let n = (0..MAX_PLAYERS)
+            .find(|&i| {
+                let name = self.name(i);
+                name.is_empty() || name == self.marker.as_slice()
+            })
+            .unwrap_or(MAX_PLAYERS);
+        if n < MAX_PLAYERS {
+            n + 1
+        } else {
+            n
+        }
+    }
+
+    /// The file the writers write: names (0x55 bytes), chapters (6),
+    /// letters (6).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(PLAYERS_SIZE);
+        for row in &self.rows {
+            out.extend_from_slice(row);
+        }
+        out.extend_from_slice(&self.chapters);
+        out.extend_from_slice(&self.letters);
+        out
+    }
+
+    /// The name of row `i`, without its NUL.
+    pub fn name(&self, i: usize) -> &[u8] {
+        cstr(&self.rows[i])
+    }
+
+    /// Whether row `i` is the "new player" row.
+    pub fn is_new_row(&self, i: usize) -> bool {
+        self.name(i) == self.marker.as_slice()
+    }
+
+    /// The players (the rows other than the "new player" row).
+    pub fn player_count(&self) -> usize {
+        (0..self.count).filter(|&i| !self.is_new_row(i)).count()
+    }
+
+    /// `FUN_0041dea4`, a typed name committed: it replaces the "new player"
+    /// row, and the marker row is appended when fewer than 5 rows exist.
+    /// Returns the new player's row, `None` when there is no free row or
+    /// the name is refused (its first byte ' ', '.' or none).
+    pub fn create(&mut self, name: &[u8]) -> Option<usize> {
+        if matches!(name.first(), None | Some(b' ' | b'.')) {
+            return None;
+        }
+        let row = self.count.checked_sub(1)?;
+        if !self.is_new_row(row) {
+            return None;
+        }
+        strcpy(&mut self.rows[row], name);
+        if self.count < MAX_PLAYERS {
+            let marker = self.marker.clone();
+            strcpy(&mut self.rows[self.count], &marker);
+            self.count += 1;
+        }
+        Some(row)
+    }
+
+    /// `FUN_0041e8a8`: the rows after `row` move up one slot (names,
+    /// chapters and letters); the deleted player's letter goes to slot 4,
+    /// its chapter there becomes 0. With five players the last row becomes
+    /// the marker and the count stays 5; otherwise the rows from the new
+    /// count on are emptied. Returns the deleted player's letter.
+    pub fn delete(&mut self, row: usize) -> Option<u8> {
+        if row >= self.count || self.is_new_row(row) {
+            return None;
+        }
+        let letter = self.letters[row];
+        for i in row..MAX_PLAYERS {
+            if i + 1 < MAX_PLAYERS {
+                self.rows[i] = self.rows[i + 1];
+            }
+            self.chapters[i] = self.chapters[i + 1];
+            self.letters[i] = self.letters[i + 1];
+        }
+        self.letters[4] = letter;
+        self.chapters[4] = 0;
+        let five = self.count == MAX_PLAYERS && !self.is_new_row(MAX_PLAYERS - 1);
+        if five {
+            let marker = self.marker.clone();
+            strcpy(&mut self.rows[MAX_PLAYERS - 1], &marker);
+        } else {
+            self.count -= 1;
+            for r in self.count..MAX_PLAYERS {
+                self.rows[r] = [0; NAME_LEN];
+            }
+        }
+        Some(letter)
+    }
+
+    /// The checkpoint file of player `row` for `chapter` (the writer's
+    /// path @ 0x0042d7db..0x0042d86b).
+    pub fn checkpoint_name(&self, row: usize, chapter: u8) -> String {
+        checkpoint_name(self.letters[row], chapter)
+    }
+}
+
+/// `p<letter><chapter>.gam`, the chapter in decimal.
+pub fn checkpoint_name(letter: u8, chapter: u8) -> String {
+    format!("p{}{}.gam", char::from(letter), chapter)
+}
+
+/// The chapter of a checkpoint file name `p<letter><N>.gam` of `letter`,
+/// `None` for another file.
+pub fn checkpoint_chapter(name: &str, letter: u8) -> Option<u8> {
+    let lower = name.to_ascii_lowercase();
+    let rest = lower.strip_prefix('p')?;
+    let rest = rest.strip_prefix(char::from(letter.to_ascii_lowercase()))?;
+    let digits = rest.strip_suffix(".gam")?;
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+/// One inventory record of a checkpoint: {sprite, id, present}.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct InventoryRecord {
+    pub sprite: u8,
+    pub id: i32,
+    pub present: i32,
+}
+
+/// A chapter checkpoint `p<L><N>.gam`: the 25 globals `FUN_0042d6b8`
+/// writes, in its order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Checkpoint {
+    /// 0x000: the path of the current WAM (`wam\atlan4.wam`), 0x104 bytes.
+    pub wam_path: Vec<u8>,
+    /// 0x104: the chapter (0x00772909).
+    pub chapter: u8,
+    /// 0x105: the previous chapter (0x00772907).
+    pub prev_chapter: u8,
+    /// 0x106: the place bank (0x00496920).
+    pub bank: i32,
+    /// 0x10a / 0x10e: the place index and the previous one.
+    pub place_index: i32,
+    pub prev_place_index: i32,
+    /// 0x112: the current place (0x006cd7c0).
+    pub place_id: i32,
+    /// 0x116: LastVue (0x0049692c).
+    pub last_vue: i32,
+    /// 0x11a: the requested place (0x006cd7b8).
+    pub requested_vue: i32,
+    /// 0x11e: the IncPerso count (0x0077290d).
+    pub inc_perso: u8,
+    /// 0x11f / 0x123: the inventory records (count, then 30 slots).
+    pub inventory: Vec<InventoryRecord>,
+    /// 0x231: the `/con` play counters.
+    pub counters: Vec<u8>,
+    /// 0x80d: the CON variables 0..6.
+    pub vars: [i32; 7],
+    /// 0x829 / 0x82a: the guests {id, sprite}, 4 records.
+    pub guest_count: u8,
+    pub guests: [(i32, u8); CHECKPOINT_GUESTS],
+    /// 0x83e / 0x842: the hidden persos.
+    pub hidden: Vec<i16>,
+    /// 0xa42: SUBTITLES (0x004960a8, 1 = on).
+    pub subtitles: i32,
+    /// 0xa46: OMNI 3D mode (0x004960ac, 0 = MODE 1).
+    pub omni3d: i32,
+    /// 0xa4a..0xa4d: master, music, effects and voices volumes (0..127).
+    pub volumes: [u8; 4],
+    /// 0xa4e: the disc in use (0x00772913).
+    pub disc: u8,
+}
+
+impl Default for Checkpoint {
+    fn default() -> Self {
+        Checkpoint {
+            wam_path: Vec::new(),
+            chapter: 0,
+            prev_chapter: 0,
+            bank: 0,
+            place_index: 0,
+            prev_place_index: 0,
+            place_id: 0,
+            last_vue: 0,
+            requested_vue: 0,
+            inc_perso: 0,
+            inventory: Vec::new(),
+            counters: vec![0; CON_COUNTERS],
+            vars: [0; 7],
+            guest_count: 0,
+            guests: [(0, 0); CHECKPOINT_GUESTS],
+            hidden: Vec::new(),
+            subtitles: 1,
+            omni3d: 0,
+            volumes: [127; 4],
+            disc: 1,
+        }
+    }
+}
+
+fn le32(b: &[u8], at: usize) -> i32 {
+    i32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]])
+}
+
+impl Checkpoint {
+    /// Reads a checkpoint; `None` unless it has the size of one.
+    pub fn parse(b: &[u8]) -> Option<Checkpoint> {
+        if b.len() != CHECKPOINT_SIZE {
+            return None;
+        }
+        let count = le32(b, 0x11f).clamp(0, CHECKPOINT_RECORDS as i32) as usize;
+        let inventory = (0..count)
+            .map(|i| {
+                let r = 0x123 + 9 * i;
+                InventoryRecord {
+                    sprite: b[r],
+                    id: le32(b, r + 1),
+                    present: le32(b, r + 5),
+                }
+            })
+            .collect();
+        let mut vars = [0; 7];
+        for (i, v) in vars.iter_mut().enumerate() {
+            *v = le32(b, 0x80d + 4 * i);
+        }
+        let mut guests = [(0, 0); CHECKPOINT_GUESTS];
+        for (i, g) in guests.iter_mut().enumerate() {
+            *g = (le32(b, 0x82a + 5 * i), b[0x82a + 5 * i + 4]);
+        }
+        let hidden_n = le32(b, 0x83e).clamp(0, CHECKPOINT_HIDDEN as i32) as usize;
+        let hidden = (0..hidden_n)
+            .map(|i| i16::from_le_bytes([b[0x842 + 2 * i], b[0x843 + 2 * i]]))
+            .collect();
+        Some(Checkpoint {
+            wam_path: cstr(&b[..0x104]).to_vec(),
+            chapter: b[0x104],
+            prev_chapter: b[0x105],
+            bank: le32(b, 0x106),
+            place_index: le32(b, 0x10a),
+            prev_place_index: le32(b, 0x10e),
+            place_id: le32(b, 0x112),
+            last_vue: le32(b, 0x116),
+            requested_vue: le32(b, 0x11a),
+            inc_perso: b[0x11e],
+            inventory,
+            counters: b[0x231..0x231 + CON_COUNTERS].to_vec(),
+            vars,
+            guest_count: b[0x829],
+            guests,
+            hidden,
+            subtitles: le32(b, 0xa42),
+            omni3d: le32(b, 0xa46),
+            volumes: [b[0xa4a], b[0xa4b], b[0xa4c], b[0xa4d]],
+            disc: b[0xa4e],
+        })
+    }
+
+    /// The file `FUN_0042d6b8` writes (unused bytes zero).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut b = vec![0u8; CHECKPOINT_SIZE];
+        let path = cstr(&self.wam_path);
+        let n = path.len().min(0x103);
+        b[..n].copy_from_slice(&path[..n]);
+        b[0x104] = self.chapter;
+        b[0x105] = self.prev_chapter;
+        let put = |b: &mut [u8], at: usize, v: i32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
+        put(&mut b, 0x106, self.bank);
+        put(&mut b, 0x10a, self.place_index);
+        put(&mut b, 0x10e, self.prev_place_index);
+        put(&mut b, 0x112, self.place_id);
+        put(&mut b, 0x116, self.last_vue);
+        put(&mut b, 0x11a, self.requested_vue);
+        b[0x11e] = self.inc_perso;
+        let recs = &self.inventory[..self.inventory.len().min(CHECKPOINT_RECORDS)];
+        put(&mut b, 0x11f, recs.len() as i32);
+        for (i, r) in recs.iter().enumerate() {
+            let at = 0x123 + 9 * i;
+            b[at] = r.sprite;
+            put(&mut b, at + 1, r.id);
+            put(&mut b, at + 5, r.present);
+        }
+        let n = self.counters.len().min(CON_COUNTERS);
+        b[0x231..0x231 + n].copy_from_slice(&self.counters[..n]);
+        for (i, &v) in self.vars.iter().enumerate() {
+            put(&mut b, 0x80d + 4 * i, v);
+        }
+        b[0x829] = self.guest_count;
+        for (i, &(id, spr)) in self.guests.iter().enumerate() {
+            put(&mut b, 0x82a + 5 * i, id);
+            b[0x82a + 5 * i + 4] = spr;
+        }
+        let hidden = &self.hidden[..self.hidden.len().min(CHECKPOINT_HIDDEN)];
+        put(&mut b, 0x83e, hidden.len() as i32);
+        for (i, &h) in hidden.iter().enumerate() {
+            b[0x842 + 2 * i..0x844 + 2 * i].copy_from_slice(&h.to_le_bytes());
+        }
+        put(&mut b, 0xa42, self.subtitles);
+        put(&mut b, 0xa46, self.omni3d);
+        b[0xa4a..0xa4e].copy_from_slice(&self.volumes);
+        b[0xa4e] = self.disc;
+        b
+    }
+
+    /// The WAM file name of the path (`wam\atlan4.wam` -> `ATLAN4.WAM`).
+    pub fn wam_name(&self) -> String {
+        let path: String = cstr(&self.wam_path)
+            .iter()
+            .map(|&c| char::from(c))
+            .collect();
+        path.rsplit(['\\', '/'])
+            .next()
+            .unwrap_or("")
+            .to_ascii_uppercase()
+    }
+}
+
+/// The name of chapter `chapter`'s checkpoint as the load picker extracts
+/// it from EPI.TXT (`FUN_0041cf78` @ 0x0041d3a1..0x0041d431): each CR
+/// counts and skips the byte after it; the name runs to the next CR.
+/// Chapter 1 has none (the original's scan would not end on EPI.TXT).
+pub fn epi_episode_name(text: &[u8], chapter: u32) -> Vec<u8> {
+    if chapter < 2 {
+        return Vec::new();
+    }
+    let wanted = chapter - 1;
+    let (mut count, mut i) = (0u32, 0usize);
+    loop {
+        if i >= text.len() {
+            return Vec::new();
+        }
+        if text[i] == b'\r' {
+            i += 1;
+            count += 1;
+        }
+        i += 1;
+        if count == wanted {
+            break;
+        }
+    }
+    let end = text[i.min(text.len())..]
+        .iter()
+        .position(|&c| c == b'\r')
+        .map_or(text.len(), |n| i + n);
+    text[i.min(text.len())..end].to_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MARKER: &[u8] = b"#New Player";
+
+    /// players.atl written by the original `FUN_0042d6b8` (emulated) for
+    /// the names Alice, Bob and the marker, resume chapters {3, 7} with
+    /// player 0 saving chapter 12, letters "abcdef".
+    fn original_players_atl() -> Vec<u8> {
+        let mut b = vec![0u8; 97];
+        for (i, n) in [&b"Alice"[..], b"Bob", MARKER].iter().enumerate() {
+            b[17 * i..17 * i + n.len()].copy_from_slice(n);
+        }
+        b[85] = 12;
+        b[86] = 7;
+        b[91..97].copy_from_slice(b"abcdef");
+        b
+    }
+
+    #[test]
+    fn players_atl_round_trip() {
+        let data = original_players_atl();
+        let p = Players::read(&data, MARKER).unwrap();
+        assert_eq!(p.count, 3);
+        assert_eq!(p.name(0), b"Alice");
+        assert_eq!(p.chapters[0], 12);
+        assert_eq!(p.letters[1], b'b');
+        assert_eq!(p.checkpoint_name(0, p.chapters[0]), "pa12.gam");
+        assert_eq!(checkpoint_name(b'c', 40), "pc40.gam");
+        assert_eq!(p.to_bytes(), data);
+    }
+
+    #[test]
+    fn create_and_delete() {
+        let mut p = Players::new(MARKER);
+        assert_eq!(p.count, 1);
+        assert_eq!(p.create(b" x"), None);
+        assert_eq!(p.create(b".x"), None);
+        assert_eq!(p.create(b"Alice"), Some(0));
+        assert_eq!(p.create(b"Bob"), Some(1));
+        assert_eq!(p.create(b"Carol"), Some(2));
+        assert_eq!(p.count, 4);
+        assert!(p.is_new_row(3));
+        // FUN_0041e8a8 on row 0 (emulated: names Bob, Carol, marker;
+        // letters "bcdeaf"; 3 rows).
+        p.letters = *b"abcdef";
+        assert_eq!(p.delete(0), Some(b'a'));
+        assert_eq!(p.name(0), b"Bob");
+        assert_eq!(p.name(1), b"Carol");
+        assert!(p.is_new_row(2));
+        assert_eq!(p.name(3), b"");
+        assert_eq!(&p.letters, b"bcdeaf");
+        assert_eq!(p.count, 3);
+        assert_eq!(p.delete(0), Some(b'b'));
+        assert_eq!(&p.letters, b"cdeabf");
+        assert_eq!(p.count, 2);
+        // Five players: the last row becomes the marker, 5 rows stay.
+        let mut q = Players::new(MARKER);
+        for n in [&b"A"[..], b"B", b"C", b"D", b"E"] {
+            q.create(n).unwrap();
+        }
+        assert_eq!((q.count, q.player_count()), (5, 5));
+        assert_eq!(q.create(b"F"), None);
+        q.delete(1);
+        assert_eq!((q.count, q.player_count()), (5, 4));
+        assert!(q.is_new_row(4));
+    }
+
+    #[test]
+    fn checkpoint_round_trip() {
+        let mut cp = Checkpoint {
+            wam_path: b"wam\\atlan4.wam".to_vec(),
+            chapter: 12,
+            prev_chapter: 11,
+            place_id: 180,
+            last_vue: 179,
+            inc_perso: 2,
+            inventory: vec![InventoryRecord {
+                sprite: 0,
+                id: 257,
+                present: 1,
+            }],
+            vars: [12, 1, 0, 0, 0, 0, 3],
+            guest_count: 1,
+            hidden: vec![262, 279],
+            disc: 2,
+            ..Checkpoint::default()
+        };
+        cp.guests[0] = (587, 4);
+        cp.counters[5] = 3;
+        let b = cp.to_bytes();
+        assert_eq!(b.len(), CHECKPOINT_SIZE);
+        assert_eq!(Checkpoint::parse(&b).unwrap(), cp);
+        assert_eq!(cp.wam_name(), "ATLAN4.WAM");
+        assert_eq!(checkpoint_chapter("PA12.GAM", b'a'), Some(12));
+        assert_eq!(checkpoint_chapter("pb12.gam", b'a'), None);
+        assert_eq!(checkpoint_chapter("pa.gam", b'a'), None);
+    }
+
+    /// The layout of `FUN_0042d6b8`'s output (emulated with marker bytes in
+    /// every field: field k byte j = (k + 1) * 16 + j; chapter 12; bank and
+    /// place 0; the writer copies the old place index into field 6).
+    #[test]
+    fn checkpoint_field_layout() {
+        const FIELDS: [usize; 25] = [
+            0x104, 1, 1, 4, 4, 4, 4, 4, 4, 1, 4, 0x10e, 0x5dc, 0x1c, 1, 0x14, 4, 0x200, 4, 4, 1, 1,
+            1, 1, 1,
+        ];
+        let mut offset = 0;
+        let starts: Vec<usize> = FIELDS
+            .iter()
+            .map(|n| {
+                let s = offset;
+                offset += n;
+                s
+            })
+            .collect();
+        assert_eq!(offset, CHECKPOINT_SIZE);
+        assert_eq!(
+            starts,
+            [
+                0x000, 0x104, 0x105, 0x106, 0x10a, 0x10e, 0x112, 0x116, 0x11a, 0x11e, 0x11f, 0x123,
+                0x231, 0x80d, 0x829, 0x82a, 0x83e, 0x842, 0xa42, 0xa46, 0xa4a, 0xa4b, 0xa4c, 0xa4d,
+                0xa4e
+            ]
+        );
+    }
+
+    #[test]
+    fn episode_names() {
+        let epi = b"\r\nTwo\r\n\r\nFour \r\nFive\r\n/FIN\r\n";
+        assert_eq!(epi_episode_name(epi, 1), b"");
+        assert_eq!(epi_episode_name(epi, 2), b"Two");
+        assert_eq!(epi_episode_name(epi, 3), b"");
+        assert_eq!(epi_episode_name(epi, 4), b"Four ");
+        assert_eq!(epi_episode_name(epi, 5), b"Five");
+        assert_eq!(epi_episode_name(epi, 6), b"/FIN");
+        let lf = b"\r\nTwo\nX\r\nThree\r\n/fin\r\n";
+        assert_eq!(epi_episode_name(lf, 2), b"Two\nX");
+        assert_eq!(epi_episode_name(lf, 3), b"Three");
+    }
+}

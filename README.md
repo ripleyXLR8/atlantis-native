@@ -9,19 +9,26 @@ reverse engineering the original game's executable. The goal is the
 original game, pixel for pixel and sample for sample, with optional fixes of
 the original's bugs.
 
-**Status: phase 2 (scripts and dialogs) done.** A new game starts as the
-original's does: the chapter script runs its intro (the music, the opening
-cinematics with their sound, the first dialog line), then you can look
-around and walk between the places of Atlantis, with the transition videos,
-the animated place sprites and the ambient sounds. The chapter scripts run
-as you move and click (their scans, timers, sounds, music and chapter
-changes), and their dialogs play: the talking heads over the panorama at
-each camera's field of view, the voices, the subtitles, the subject menu of
-the characters you talk to, the object given shown under the heads, and the
-game-over screens with their narrator. The 3D mouths of the talking heads
-come with phase 4: until then the mouth area of a head is left as the video
-has it. There are no inventory, menus or puzzles yet (a puzzle counts as
-won).
+**Status: phase 3 (inventory, menus, players and checkpoints) done.** The
+game starts as the original's does: the Cryo logo and the pre-intro with
+their sounds, then the player screen, where you create, choose or delete a
+player. A new player starts a new game; an existing one resumes at the
+checkpoint of the last chapter reached. The chapter scripts run their
+cinematics, dialogs, music and sounds as you look around and walk between
+the places of Atlantis. A right click opens the inventory bar: click an
+object to take it in hand (the cursor carries it), use it on a place or a
+character, click it again or right-click to put it away; the objects you
+pick up slide into the bar. The characters who follow you show their
+portraits, and you can click one in the open bar to talk to them. Escape
+opens the in-game menu: load a chapter, the options (subtitles, the
+OMNI 3D mouse mode, the sound volumes), or quit. At every chapter change
+the game writes the original's checkpoint files, and a game over takes you
+back to the last one. The end of the game shows its last picture and the
+credits.
+
+The 3D mouths of the talking heads come with phase 4: until then the mouth
+area of a head is left as the video has it. The puzzles come with phase 5:
+until then a puzzle counts as won.
 
 ## You need the game
 
@@ -44,14 +51,55 @@ window, as the original takes it fullscreen), F5 / F6 / F7 / F8 turn and
 tilt the view, click where the cursor animates to go there, click a
 character to talk. A left click ends a dialog line; Escape ends a talking
 head's line and skips the lines after it up to the next script command.
-Escape in the panoramic view quits (the in-game menu comes with phase 3).
+A right click opens the inventory bar (its edges scroll it); Escape in the
+panoramic view opens the in-game menu. On the player screen, click the
+last row to type a new name and press Enter or OK; Escape there quits (the
+port's way out; the original has none).
+
+`atlantis-native --new-game /path/to/game` skips the start-up videos and
+the player screen.
 
 `atlantis-native --original /path/to/game` plays the original game, bug for
 bug (see [Enhancements](#enhancements)).
 
-`atlantis-native --headless /path/to/game [frames]` runs the engine without
+`atlantis-native --headless /path/to/game [frames]` runs a new game without
 a window, with no input and the sound mixed and dropped, and prints what it
 did (the places, videos, sections, dialog lines and voices).
+
+## Players, checkpoints and settings
+
+There are no free saves: as in the original, the game saves itself at
+every chapter change, in the original's own files: `players.atl` (the
+player list) and `p<letter><chapter>.gam` (one checkpoint per chapter and
+player, the original's 2639-byte format). The load picker of the in-game
+menu lists the current player's checkpoints by their chapter names. The
+files are kept in a per-user folder, one per game build:
+
+| System | Folder |
+|---|---|
+| Linux and other Unix systems | `$XDG_DATA_HOME/atlantis-native/<build>` (by default `~/.local/share/atlantis-native/<build>`) |
+| macOS | `~/Library/Application Support/atlantis-native/<build>` |
+| Windows | `%APPDATA%\atlantis-native\<build>` |
+
+On its first start with a game whose folder holds an original
+`players.atl` (an installation the original game played), the port copies
+it and its checkpoints into that folder; the game folder is only read.
+Files written by the port can be copied back for the original game.
+
+Deleting a player deletes that player's own checkpoints; the players after
+it move up with their files. (The original deletes the files of the letter
+of the row, which after an earlier deletion can be another player's and
+leaves the deleted player's files behind.)
+
+The same folder holds `settings.ini`: the options of the game's menus
+(subtitles, OMNI 3D mode, the master, music, effects and voices volumes,
+which the original also keeps in each checkpoint and sets again when one
+is loaded) and the [enhancements](#enhancements), one `name = on|off` line
+each.
+
+The web build keeps its players and checkpoints in memory for now (they
+are lost when the page closes); it does not take over the files of an
+original installation.
 
 Tests that need the game files read the game directory from the
 `ATLANTIS_DATA` environment variable and are skipped without it:
@@ -79,7 +127,8 @@ the browser.
 
 Where the original runs its scripts from navigation (arrival and departure
 scans, click scans, timers, characters and objects clicked, puzzle zones,
-the inventory bar and the menu), the engine calls the `ScriptHooks` trait
+the inventory bar's timers, a guest's portrait clicked), the engine calls
+the `ScriptHooks` trait
 (`crates/atlantis-engine/src/hooks.rs`). The CON script interpreter
 (`crates/atlantis-engine/src/con/`, `scripts.rs`) implements it; the dialog
 lines of a section go to the `DialogPresenter` trait, which `Dialogs`
@@ -88,6 +137,15 @@ the camera choice, the view behind each line, the UBB talking-head videos
 composited over the panorama, the voices, the subtitles
 (`subtitles.rs`), the subject menu, the error box of a head that cannot be
 opened and the game-over screen.
+
+The 2D interface is in `crates/atlantis-engine/src/ui/`: the menu files'
+walk and the menu fonts (`layout.rs`), the menus, the player screen, the
+load picker, the credits and the end (`menus.rs`, `credits.rs`), the
+inventory bar, the object picked up, bow mode and the guests' portraits
+(`bar.rs`, `mod.rs`). The players and checkpoints are in
+`crates/atlantis-engine/src/checkpoint.rs`, their file formats in
+`crates/atlantis-data/src/saves.rs`, the save folder and the settings file
+in `crates/atlantis-engine/src/persist.rs`.
 
 ### Enhancements
 
@@ -100,7 +158,10 @@ Where the port may differ from the original by choice, `Options` holds an
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 build, a second death in a section plays the next narrator line, as the 1999 build does |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
-`--original` turns all three off. There is no settings screen yet.
+`--original` turns all three off. Otherwise they are read from
+`settings.ini` (see [Players, checkpoints and settings](#players-checkpoints-and-settings)),
+which the first start writes with the defaults; there is no settings
+screen.
 
 ### Subtitles
 
