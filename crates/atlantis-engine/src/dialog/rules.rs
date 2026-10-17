@@ -9,8 +9,8 @@
 
 use std::collections::HashMap;
 
-use crate::con::script::latin1_bytes;
-use crate::con::ConLine;
+use crate::con_script::script::latin1_bytes;
+use crate::con_script::ConLine;
 
 /// One row of `DIALOG\INITDIAL.TXT`: the files of a character's talking
 /// head, per camera 2..5. "none" is stored as an empty name, except for the
@@ -57,7 +57,7 @@ impl DialInit {
             let tok: Vec<String> = line
                 .split(|&c| c == b' ' || c == b'\t')
                 .filter(|t| !t.is_empty())
-                .map(crate::con::script::latin1)
+                .map(crate::con_script::script::latin1)
                 .collect();
             if tok.is_empty() {
                 continue;
@@ -68,7 +68,7 @@ impl DialInit {
             if tok.len() < 10 {
                 continue;
             }
-            let id = crate::con::script::ConText(tok[0].as_bytes()).atoi(0);
+            let id = crate::con_script::script::ConText(tok[0].as_bytes()).atoi(0);
             if id <= 0 {
                 continue;
             }

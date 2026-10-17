@@ -19,7 +19,7 @@ use atlantis_data::wam::{CentrePos, Place, Transition, Wam};
 use atlantis_data::{Game, SpritePlaceEntry};
 
 use crate::ambient::{AmbientSounds, MixerAmbientOutput};
-use crate::con::{ConClocks, Vars};
+use crate::con_script::{ConClocks, Vars};
 use crate::cursor::WarpCursorState;
 use crate::dialog::Dialogs;
 use crate::enhancements::Enhancements;

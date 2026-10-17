@@ -25,8 +25,8 @@ use atlantis_data::sprite::{read_spr_file, spw_frame_count};
 use atlantis_data::sprite_blend::SPR_NO_BLEND;
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::audio::Mixer;
-use atlantis_engine::con::script::latin1_bytes;
-use atlantis_engine::con::{con_game_over_narrator, con_track_letter, ConItem, ConScript};
+use atlantis_engine::con_script::script::latin1_bytes;
+use atlantis_engine::con_script::{con_game_over_narrator, con_track_letter, ConItem, ConScript};
 use atlantis_engine::dialog::game_over::{
     game_over_fades_new_sound, game_over_image_name, game_over_subtitle_drawn,
     game_over_voice_name, game_over_wait_ends,
@@ -380,7 +380,7 @@ fn game_over_matches_original() {
                     .get(..9)
                     .filter(|p| p.eq_ignore_ascii_case("gameover="))
                     .map_or(0, |_| {
-                        atlantis_engine::con::script::ConText(&cmd.as_bytes()[9..]).atoi(0)
+                        atlantis_engine::con_script::script::ConText(&cmd.as_bytes()[9..]).atoi(0)
                     });
                 if n == 0 {
                     continue;
@@ -828,7 +828,7 @@ fn with_new_game(
 }
 
 /// The first line of a section of the loaded CON, as the walk hands it.
-fn first_line(s: &Scripts, section: i32) -> atlantis_engine::con::ConLine {
+fn first_line(s: &Scripts, section: i32) -> atlantis_engine::con_script::ConLine {
     let sec = s
         .script
         .sections()
@@ -846,7 +846,7 @@ fn first_line(s: &Scripts, section: i32) -> atlantis_engine::con::ConLine {
 
 fn request(
     section: i32,
-    line: atlantis_engine::con::ConLine,
+    line: atlantis_engine::con_script::ConLine,
     perso: i32,
 ) -> atlantis_engine::scripts::LineRequest {
     atlantis_engine::scripts::LineRequest {
@@ -967,7 +967,7 @@ fn head_open_fails_shows_the_error_box() {
             enh,
             |mut e, _| {
                 Box::pin(async move {
-                    let line = atlantis_engine::con::ConLine {
+                    let line = atlantis_engine::con_script::ConLine {
                         speaker: "Servage".into(),
                         text: "x".into(),
                         ..Default::default()

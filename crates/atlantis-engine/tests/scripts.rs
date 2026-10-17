@@ -22,8 +22,8 @@ use std::sync::Arc;
 
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::audio::Mixer;
-use atlantis_engine::con::script::{latin1_bytes, ConText};
-use atlantis_engine::con::{
+use atlantis_engine::con_script::script::{latin1_bytes, ConText};
+use atlantis_engine::con_script::{
     arrival_after_chapter_load, con_angle_radians, con_entry_allowed, con_escape_skip,
     con_music_apply, con_music_list, con_track_letter, evaluate, parse_con_set, ConClocks, ConItem,
     ConKeyBuffer, ConScript, ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
@@ -1183,7 +1183,7 @@ fn departvue_after_vue_matches_original() {
             let mut st = make_state(line_idx, k, &var_names, &conds[line_idx]);
             st.vars.insert("vue".into(), vue);
             st.vars.insert("arriveevue".into(), src);
-            let mut v = atlantis_engine::con::Vars::default();
+            let mut v = atlantis_engine::con_script::Vars::default();
             v.place_looked_up(vue);
             st.vars.insert("departvue".into(), v.get("departvue"));
             fixed.push(if port_eval(&names, &conds[line_idx], &st) {

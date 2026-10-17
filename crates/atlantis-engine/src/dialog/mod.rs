@@ -31,7 +31,7 @@ use atlantis_data::sprite_blend::{blend_ubb_pixel565, compose_ubb_ia};
 use atlantis_data::SprSprite;
 
 use crate::audio::VoiceId;
-use crate::con::script::latin1_bytes;
+use crate::con_script::script::latin1_bytes;
 use crate::engine::{Engine, Event};
 use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;

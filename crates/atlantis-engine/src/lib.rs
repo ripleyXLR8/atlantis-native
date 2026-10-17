@@ -9,7 +9,7 @@
 pub mod ambient;
 pub mod audio;
 pub mod checkpoint;
-pub mod con;
+pub mod con_script;
 pub mod cursor;
 pub mod dialog;
 pub mod engine;

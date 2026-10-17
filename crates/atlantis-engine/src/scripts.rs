@@ -15,7 +15,7 @@
 //! the track letters, /go, the Escape skip, the game over) is here.
 
 use crate::checkpoint::ScriptState;
-use crate::con::{
+use crate::con_script::{
     con_alt_game_over_narration, con_angle_radians, con_entry_allowed, con_escape_skip,
     con_game_over_narrator, con_track_letter, evaluate, parse_con_set, vars, ConItem, ConKeyBuffer,
     ConLine, ConScript, ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
@@ -363,7 +363,7 @@ impl Scripts {
                 Some(_) => Vec::new(),
                 None => {
                     let mut t = b"/set(".to_vec();
-                    t.extend(crate::con::script::latin1_bytes(cmd));
+                    t.extend(crate::con_script::script::latin1_bytes(cmd));
                     t.extend_from_slice(b")\r\n");
                     t
                 }
@@ -1079,7 +1079,7 @@ fn eval_entry(
 fn gameover_value(cmd: &str) -> i32 {
     match cmd.get(..9) {
         Some(k) if k.eq_ignore_ascii_case("gameover=") => {
-            crate::con::script::ConText(&cmd.as_bytes()[9..]).atoi(0)
+            crate::con_script::script::ConText(&cmd.as_bytes()[9..]).atoi(0)
         }
         _ => 0,
     }
