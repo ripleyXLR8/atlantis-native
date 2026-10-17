@@ -1,0 +1,35 @@
+# The music ring of atlantis.exe (2001 English build, 714240 bytes) (FUN_00432ea8 + FUN_0043318c + FUN_00433310 + FUN_004101ce) run
+# under emulation over 2 loops of each track: the refill FUN_0043318c in the same 5 ms period right after the release
+# FUN_00433310; reported play position = play + 0x8000 rounded down to 0x4000 (the law measured under Wine).
+# M <track> heard_bytes <n> md5 <md5 of the PCM heard, little-endian int16 stereo>
+M 01ATLAN1.APC heard_bytes 71083024 md5 603b4ea2fe822daa7057aa170f5cdb4b
+M 10ATLAN2.APC heard_bytes 49359364 md5 a716124326e74e6911e573c5ff55122c
+M 23_PALA1.APC heard_bytes 54102320 md5 6460bbc393a65721bffeb68d3edfea9e
+M 02AUBERG.APC heard_bytes 33631540 md5 b90c5e3bcecd3ba38195ec8abec830e2
+M 24_RATS.APC heard_bytes 18927720 md5 f387f3da202ebd430a2423d1101f5df3
+M DAUPHINS.APC heard_bytes 53141820 md5 1b218d25c2b0ee5c0b52c9c2cdecabbd
+M 05SSTRON.APC heard_bytes 48680664 md5 5c47813c2efbb90b9cd7a3bf824af569
+M METAMORF.APC heard_bytes 70286580 md5 30b60ad99fe2d54e9c42801296636090
+M LABYRINT.APC heard_bytes 56814468 md5 fc76748b03a36435ca27f6ea20e3c636
+M 31CRANES.APC heard_bytes 33000468 md5 1e297b64ee83bf9f708c5fd1a37b4096
+M STONEHEG.APC heard_bytes 26340048 md5 4f6a1fd1765ee59014e2a87ac20cd47f
+M ASCENSE1.APC heard_bytes 20316868 md5 ab5fdfbd55e91d75df28818eb0b586aa
+M FORET_35.APC heard_bytes 31907672 md5 62c0ee456859c4aec201e56a360d8bac
+M 23_PRET1.APC heard_bytes 48311548 md5 56adc90afae32a9a67d7a40cf97b05fc
+M 20SORCIE.APC heard_bytes 72789696 md5 c222d6731e58543ce8104f54e64a2d4d
+M 06SPITZ2.APC heard_bytes 56144592 md5 6fd36a23dcb152d74dad80c32c7d293c
+M 30SHAMAN.APC heard_bytes 31106816 md5 a597de35271e89e82b385f732dad5fa1
+M 21PACQUE.APC heard_bytes 29293424 md5 e4adcd00503cab6426364927932a5bc8
+M 08TISSE2.APC heard_bytes 48019608 md5 368abf712e4d76ad07ef8cedca634a76
+M 33INTRO.APC heard_bytes 19819860 md5 ae19eaa4d38edff5c7695311a4bed2d3
+M HANGAR1.APC heard_bytes 12336972 md5 9c5e36cf4034ce0492e388a643ca8b10
+M 04GENERI.APC heard_bytes 55506464 md5 51bb8ae74ed8ada642907bf0eedc2d1e
+M TETE1.APC heard_bytes 9114144 md5 8fe62fa97944d6f25fb5acd94719b248
+M TETE2.APC heard_bytes 7579464 md5 670ce39754d12e6f1ecdc5171a2fe719
+M 03ATTACK.APC heard_bytes 26117340 md5 69a7fccd4191070c99962237ad8851cb
+M 09VOLTOT.APC heard_bytes 24317180 md5 54bb76a4d18c8a13071569f4533a7ce0
+M CINE101.APC heard_bytes 56404340 md5 aec40e8701753024c34c2c5b1e469c4a
+M LAC.APC heard_bytes 9933084 md5 8b014c4d9d2cf292e2ee95ce38455d4b
+M CINE147.APC heard_bytes 7048060 md5 c4c5e760d750a7ddd4df2328071d79b5
+M CINE172.APC heard_bytes 5245252 md5 f99d868d30caee7c3c98950f47f43927
+M CINE194.APC heard_bytes 10555776 md5 6f7f48f6d4b38ba8083dc118a88a007f

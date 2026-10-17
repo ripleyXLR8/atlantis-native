@@ -68,7 +68,7 @@ impl Engine {
 
     /// Waits for the buttons to be released (the loops drain the click
     /// that ended them).
-    async fn wait_buttons_up(&self) {
+    pub(crate) async fn wait_buttons_up(&self) {
         while self.sys.buttons() != (false, false) && !self.sys.should_quit() {
             while self.sys.poll_event().is_some() {}
             self.sys.frame().await;
@@ -125,7 +125,8 @@ impl Engine {
         let mut left_pressed = false;
         while !left_pressed && !exit {
             let fi = self.poll_frame_input();
-            // This frame's relative motion (x right, y down).
+            self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
+                                      // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
             let mut clicked = fi.left_press || self.sys.buttons().0;
             // TODO(phase 2): bow mode consumes the click (0x0041c631).
@@ -179,9 +180,15 @@ impl Engine {
                 self.mark_pointer_mouse();
                 // FUN_004278a0 starts the click animation (0x004278b5).
                 self.cursor_state.click_anim = true;
+                // ClicZone = the zone under the pointer: the warp loop
+                // returns it with the NPC (0x0041c71e) and the place loop
+                // stores it before FUN_004278a0 (0x00423c1c); it returns to
+                // 0 on the next pass.
+                self.vars.set("cliczone", action as i32);
                 hooks.npc_click(self, centre_perso, action).await;
+                self.vars.set("cliczone", 0);
                 self.sync_pointer_mouse();
-                if self.sys.should_quit() || self.arrival_scan_pending {
+                if self.should_abort() || self.arrival_scan_pending {
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -196,7 +203,7 @@ impl Engine {
                 }
             }
             left_pressed = clicked;
-            if self.sys.should_quit() {
+            if self.should_abort() {
                 action = WARP_ABORT;
                 exit = true;
             }
@@ -219,7 +226,7 @@ impl Engine {
                 self.mark_pointer_mouse();
                 hooks.menu_requested(self).await;
                 self.sync_pointer_mouse();
-                if self.sys.should_quit() {
+                if self.should_abort() {
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -263,6 +270,8 @@ impl Engine {
                 self.warp.beta_limit(),
             );
             self.angle_warp = (look.angle_warp_x, look.angle_warp_y);
+            self.vars.set("anglewarpx", look.angle_warp_x);
+            self.vars.set("anglewarpy", look.angle_warp_y);
             self.set_view(alpha, beta);
             // The pointer follows the mouse, and goes back to the centre when
             // the new (unclamped) angles differ from the previous frame's
@@ -276,10 +285,16 @@ impl Engine {
                 beta,
             );
 
-            // Timer sections (@ 0x0041c369).
+            // Timer sections (@ 0x0041c369). A Vue= in the timer section has
+            // entered another place; the warp loop does not return for it:
+            // the section executor ends with the click flag cleared
+            // (FUN_0042844c @ 0x00428d77) and the Vue= branch sets no exit
+            // flag (FUN_0042a100 @ 0x0042a630..0x0042a749), so the loop runs
+            // on in the new place and the arrival scan comes after the next
+            // click.
             if !exit && hooks.warp_frame(self).await {
                 self.sync_pointer_mouse();
-                if self.sys.should_quit() {
+                if self.should_abort() {
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -290,7 +305,12 @@ impl Engine {
                 }
             }
 
-            // Place sprites: FUN_00425304 at 0x0041c3a9, after the timers.
+            // Place sprites: FUN_00425304 at 0x0041c3a9, after the timers,
+            // unless GameOver or Exit is set (then it leaves, 0x0041c387).
+            if !exit && self.vars.get("exit") != 0 {
+                action = WARP_ABORT;
+                exit = true;
+            }
             if !exit {
                 self.animate_sprites();
             }
@@ -298,7 +318,9 @@ impl Engine {
             self.draw_cursor();
             // TODO(phase 2/3): the bow (0x0041c40b) and the guests'
             // portraits (0x0041c489) over the view; the arrow shot.
-            // FUN_00432178, the last call of the frame.
+            // FUN_00432178, the last call of the frame: the ambient sounds,
+            // then the NewSound poll FUN_00432a64.
+            self.poll_new_sound().await;
             self.ambient_frame();
             if !exit {
                 self.sys.frame().await;

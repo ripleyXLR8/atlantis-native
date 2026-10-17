@@ -1,0 +1,229 @@
+# The place loop's first arrival scan after a chapter load, atlantis.exe (2001 English build, 714240 bytes): FUN_0042de5c on the 74
+# original checkpoints (pa0: no file, a new game), then the head of FUN_00423ad8 (ARRIVEEVUE != 0 @ 0x00423b48,
+# FUN_00427548, FUN_004280f8) run under emulation. CK: the state after the load and the /sel section fired (-: none);
+# VARS: variable index:value (non-zero) as the scan reads them; INV: object id:value of the inventory records.
+CK pa0 chapter 1 vue 450 lastvue 1 arriveevue 1 sel 1 alt 1 sel 1
+VARS pa0 0:1 7:1 8:450 10:1 14:450
+INV pa0 
+CK pa2 chapter 2 vue 14 lastvue 13 arriveevue 13 sel 10 alt 1 sel 10
+VARS pa2 0:2 7:13 10:13 14:14
+INV pa2 257:1
+CK pa3 chapter 3 vue 170 lastvue 64 arriveevue 64 sel 10 alt 1 sel 10
+VARS pa3 0:3 7:64 10:64 14:170
+INV pa3 257:1
+CK pa4 chapter 4 vue 64 lastvue 170 arriveevue 170 sel 10 alt 1 sel 10
+VARS pa4 0:4 7:170 10:170 14:64
+INV pa4 257:1
+CK pa5 chapter 5 vue 131 lastvue 147 arriveevue 147 sel 10 alt 1 sel 10
+VARS pa5 0:5 7:147 10:147 14:131
+INV pa5 257:1
+CK pa6 chapter 6 vue 145 lastvue 139 arriveevue 139 sel 10 alt 1 sel 10
+VARS pa6 0:6 7:139 10:139 14:145
+INV pa6 257:1 259:1
+CK pa9 chapter 9 vue 10 lastvue 146 arriveevue 146 sel 10 alt 1 sel 10
+VARS pa9 0:9 3:2 7:146 10:146 14:10
+INV pa9 257:1 259:1
+CK pa11 chapter 11 vue 278 lastvue 275 arriveevue 275 sel 125 alt 1 sel 125
+VARS pa11 0:11 3:2 7:275 10:275 14:278
+INV pa11 257:1 259:1
+CK pa12 chapter 12 vue 180 lastvue 180 arriveevue 180 sel 10 alt 1 sel 10
+VARS pa12 0:12 3:2 7:180 10:180 14:180 28:185 34:1
+INV pa12 257:1 259:1 260:1
+CK pa13 chapter 13 vue 119 lastvue 70 arriveevue 70 sel 10 alt 1 sel 10
+VARS pa13 0:13 3:2 7:70 10:70 14:119
+INV pa13 257:1 259:1 260:1
+CK pa14 chapter 14 vue 126 lastvue 125 arriveevue 125 sel 10 alt 1 sel 10
+VARS pa14 0:14 3:2 7:125 10:125 14:126
+INV pa14 257:1 259:1 260:1
+CK pa15 chapter 15 vue 81 lastvue 84 arriveevue 84 sel 10 alt 1 sel 10
+VARS pa15 0:15 3:2 7:84 10:84 14:81
+INV pa15 257:1 259:1 260:1
+CK pa16 chapter 16 vue 81 lastvue 70 arriveevue 70 sel 10 alt 1 sel 10
+VARS pa16 0:16 3:2 7:70 10:70 14:81 39:270
+INV pa16 257:1 259:1 260:1 262:1
+CK pa17 chapter 17 vue 111 lastvue 111 arriveevue 111 sel 10 alt 1 sel 10
+VARS pa17 0:17 3:2 7:111 10:111 14:111
+INV pa17 257:1 259:1 260:1 262:1
+CK pa18 chapter 18 vue 296 lastvue 116 arriveevue 116 sel 10 alt 1 sel 10
+VARS pa18 0:18 3:2 7:116 10:116 14:296
+INV pa18 257:1 259:1 260:1 262:1
+CK pa20 chapter 20 vue 290 lastvue 491 arriveevue 491 sel 10 alt 1 sel 10
+VARS pa20 0:20 3:2 7:491 10:491 14:290
+INV pa20 257:1 259:1 260:1 262:1 267:1
+CK pa21 chapter 21 vue 271 lastvue 194 arriveevue 194 sel 10 alt 1 sel 10
+VARS pa21 0:21 3:2 7:194 10:194 14:271 20:1
+INV pa21 257:1 259:1 260:1 262:1 267:1 271:1
+CK pa22 chapter 22 vue 181 lastvue 193 arriveevue 193 sel 10 alt 1 sel 10
+VARS pa22 0:22 3:2 7:193 8:181 10:193 14:181 28:185 34:1
+INV pa22 257:1 259:1 260:1 262:1 267:1
+CK pa23 chapter 23 vue 230 lastvue 192 arriveevue 192 sel 10 alt 1 sel 10
+VARS pa23 0:23 3:2 7:192 10:192 14:230
+INV pa23 257:1 259:1 260:1 262:1 267:1
+CK pa24 chapter 24 vue 102 lastvue 239 arriveevue 239 sel 10 alt 1 sel 10
+VARS pa24 0:24 3:2 7:239 10:239 14:102
+INV pa24 257:1 259:1 260:1 262:1 267:1
+CK pa25 chapter 25 vue 99 lastvue 100 arriveevue 100 sel 10 alt 1 sel 10
+VARS pa25 0:25 3:2 7:100 10:100 14:99
+INV pa25 257:1 259:1 260:1 262:1 267:1 276:1
+CK pa26 chapter 26 vue 184 lastvue 210 arriveevue 210 sel 10 alt 1 sel 10
+VARS pa26 0:26 3:2 7:210 10:210 14:184 28:188 34:1 39:359 40:28
+INV pa26 257:1 259:1 260:1 262:1 267:1 276:1
+CK pa27 chapter 27 vue 175 lastvue 0 arriveevue 0 sel - alt 1 sel -
+VARS pa27 0:27 3:2 14:175
+INV pa27 257:1 259:1 260:1 262:1 267:1 276:1
+CK pa28 chapter 28 vue 322 lastvue 351 arriveevue 351 sel 10 alt 1 sel 10
+VARS pa28 0:28 3:2 7:351 10:351 14:322 34:1
+INV pa28 257:1 259:1 260:1 262:1 267:1 276:1
+CK pa29 chapter 29 vue 116 lastvue 1 arriveevue 1 sel 10 alt 1 sel 10
+VARS pa29 0:29 3:2 7:1 10:1 14:116
+INV pa29 257:1 259:1 260:1 262:1 267:1
+CK pa30 chapter 30 vue 9 lastvue 1 arriveevue 1 sel 10 alt 1 sel 10
+VARS pa30 0:30 3:2 7:1 10:1 14:9
+INV pa30 257:1 259:1 260:1 262:1 267:1
+CK pa31 chapter 31 vue 7 lastvue 8 arriveevue 8 sel 10 alt 1 sel 10
+VARS pa31 0:31 3:2 7:8 10:8 14:7
+INV pa31 257:1 259:1 260:1 262:1 267:1 300:1 301:1
+CK pa32 chapter 32 vue 26 lastvue 23 arriveevue 23 sel 10 alt 1 sel 10
+VARS pa32 0:32 3:2 7:23 10:23 14:26
+INV pa32 257:1 259:1 260:1 262:1 267:1 300:1 301:1
+CK pa33 chapter 33 vue 161 lastvue 1 arriveevue 1 sel - alt 1 sel -
+VARS pa33 0:33 1:1 3:2 7:1 10:1 14:161
+INV pa33 257:1 259:1 260:1 262:1 267:1 304:1
+CK pa34 chapter 34 vue 52 lastvue 51 arriveevue 51 sel 10 alt 1 sel - DIFFERS
+VARS pa34 0:34 1:1 3:2 7:51 10:51 14:52 64:1
+INV pa34 257:1 259:1 260:1 262:1 267:1 304:1
+CK pa35 chapter 35 vue 52 lastvue 51 arriveevue 51 sel 10 alt 1 sel 10
+VARS pa35 0:35 1:1 3:2 7:51 10:51 14:52 64:1
+INV pa35 257:1 259:1 260:1 262:1 267:1 304:1
+CK pa36 chapter 36 vue 54 lastvue 52 arriveevue 52 sel - alt 1 sel -
+VARS pa36 0:36 1:1 3:2 7:52 10:52 14:54 34:1
+INV pa36 257:1 259:1 260:1 262:1 267:1 304:1
+CK pa37 chapter 37 vue 53 lastvue 54 arriveevue 54 sel 10 alt 1 sel 10
+VARS pa37 0:37 1:1 3:2 7:54 10:54 14:53 34:1
+INV pa37 257:1 259:1 260:1 262:1 267:1 304:1
+CK pa38 chapter 38 vue 139 lastvue 131 arriveevue 131 sel 545 alt 1 sel 545
+VARS pa38 0:38 1:1 3:2 7:131 10:131 14:139
+INV pa38 257:1 259:1 260:1 262:1 267:1 304:1 310:1
+CK pa39 chapter 39 vue 10 lastvue 146 arriveevue 146 sel 10 alt 1 sel 10
+VARS pa39 0:39 1:1 3:2 7:146 10:146 14:10
+INV pa39 257:1 259:1 260:1 262:1 267:1 304:1 310:1
+CK pa40 chapter 40 vue 70 lastvue 16 arriveevue 16 sel 10 alt 1 sel 10
+VARS pa40 0:40 1:1 3:2 7:16 10:16 14:70
+INV pa40 257:1 259:1 260:1 262:1 267:1 304:1 310:1
+CK pa41 chapter 41 vue 290 lastvue 491 arriveevue 491 sel 10 alt 1 sel 10
+VARS pa41 0:41 1:1 3:2 7:491 10:491 14:290 34:1
+INV pa41 257:1 259:1 260:1 262:1 267:1 304:1 310:1
+CK pa42 chapter 42 vue 272 lastvue 223 arriveevue 223 sel 10 alt 1 sel 10
+VARS pa42 0:42 1:1 3:2 7:223 10:223 14:272
+INV pa42 257:1 259:1 260:1 262:1 267:1 304:1 310:1 311:1
+CK pa43 chapter 43 vue 270 lastvue 229 arriveevue 229 sel 10 alt 1 sel 10
+VARS pa43 0:43 1:1 3:2 7:229 10:229 14:270 64:1
+INV pa43 257:1 259:1 260:1 262:1 267:1 304:1 310:1 311:1
+CK pa44 chapter 44 vue 275 lastvue 275 arriveevue 275 sel 10 alt 1 sel 10
+VARS pa44 0:44 1:1 3:2 7:275 10:275 14:275 34:1
+INV pa44 257:1 259:1 260:1 262:1 267:1 304:1 310:1 311:1
+CK pa45 chapter 45 vue 322 lastvue 322 arriveevue 322 sel 10 alt 1 sel 10
+VARS pa45 0:45 1:1 3:2 7:322 10:322 14:322
+INV pa45 257:1 259:1 260:1 262:1 267:1 304:1 310:1 311:1
+CK pa46 chapter 46 vue 268 lastvue 265 arriveevue 265 sel 14 alt 1 sel 14
+VARS pa46 0:46 1:1 3:2 7:265 10:265 14:268
+INV pa46 257:1 259:1 260:1 262:1 267:1 304:1 310:1 311:1
+CK pa47 chapter 47 vue 201 lastvue 269 arriveevue 269 sel 10 alt 1 sel 10
+VARS pa47 0:47 1:1 3:2 6:5 7:269 10:269 14:201
+INV pa47 257:1 259:1 260:1 262:1 267:1 304:1 310:1 311:1
+CK pa48 chapter 48 vue 208 lastvue 209 arriveevue 209 sel 10 alt 1 sel 10
+VARS pa48 0:48 1:1 3:2 6:5 7:209 10:209 14:208
+INV pa48 257:1 259:1 260:1 262:1 267:1 304:1 310:1 311:1 322:1 323:1
+CK pa49 chapter 49 vue 323 lastvue 342 arriveevue 342 sel 10 alt 1 sel 10
+VARS pa49 0:49 1:1 3:2 6:5 7:342 10:342 14:323
+INV pa49 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa50 chapter 50 vue 8 lastvue 1 arriveevue 1 sel 10 alt 1 sel 10
+VARS pa50 0:50 1:1 3:2 6:5 7:1 10:1 14:8 46:14
+INV pa50 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa51 chapter 51 vue 10 lastvue 146 arriveevue 146 sel 10 alt 1 sel 10
+VARS pa51 0:51 1:1 3:2 6:5 7:146 10:146 14:10
+INV pa51 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 326:1
+CK pa52 chapter 52 vue 188 lastvue 180 arriveevue 180 sel 10 alt 1 sel 10
+VARS pa52 0:52 1:1 3:2 6:5 7:180 10:180 14:188
+INV pa52 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 326:1
+CK pa53 chapter 53 vue 71 lastvue 70 arriveevue 70 sel 10 alt 1 sel 10
+VARS pa53 0:53 1:1 3:2 6:5 7:70 10:70 14:71 34:1
+INV pa53 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 326:1
+CK pa54 chapter 54 vue 150 lastvue 81 arriveevue 81 sel 10 alt 1 sel 10
+VARS pa54 0:54 1:1 3:2 6:5 7:81 10:81 14:150 34:1
+INV pa54 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 326:1
+CK pa55 chapter 55 vue 160 lastvue 158 arriveevue 158 sel 10 alt 1 sel 10
+VARS pa55 0:55 1:1 3:2 6:5 7:158 10:158 14:160 34:1
+INV pa55 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 326:1
+CK pa56 chapter 56 vue 81 lastvue 70 arriveevue 70 sel 10 alt 1 sel 10
+VARS pa56 0:56 1:1 3:2 6:5 7:70 10:70 14:81 34:1 39:180
+INV pa56 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 326:1
+CK pa57 chapter 57 vue 175 lastvue 0 arriveevue 0 sel - alt 1 sel 10 DIFFERS
+VARS pa57 0:57 1:1 3:2 6:5 14:175
+INV pa57 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa58 chapter 58 vue 28 lastvue 1 arriveevue 1 sel 810 alt 1 sel 810
+VARS pa58 0:58 1:1 3:2 6:5 7:1 10:1 14:28
+INV pa58 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa59 chapter 59 vue 34 lastvue 30 arriveevue 30 sel 830 alt 1 sel 830
+VARS pa59 0:59 1:1 3:2 6:5 7:30 10:30 14:34
+INV pa59 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa60 chapter 60 vue 26 lastvue 26 arriveevue 26 sel 10 alt 1 sel 10
+VARS pa60 0:60 1:1 3:2 6:5 7:26 10:26 14:26
+INV pa60 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa61 chapter 61 vue 1 lastvue 1 arriveevue 1 sel 10 alt 1 sel 10
+VARS pa61 0:61 1:1 3:2 6:5 7:1 10:1 14:1
+INV pa61 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa62 chapter 62 vue 114 lastvue 14 arriveevue 14 sel 10 alt 1 sel 10
+VARS pa62 0:62 1:1 3:2 6:5 7:14 10:14 14:114
+INV pa62 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa63 chapter 63 vue 105 lastvue 110 arriveevue 110 sel 10 alt 1 sel 10
+VARS pa63 0:63 1:1 3:2 6:5 7:110 10:110 14:105
+INV pa63 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1
+CK pa64 chapter 64 vue 2 lastvue 1 arriveevue 1 sel - alt 1 sel -
+VARS pa64 0:64 1:1 3:2 6:5 7:1 10:1 14:2 34:1
+INV pa64 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 408:1
+CK pa65 chapter 65 vue 2 lastvue 1 arriveevue 1 sel 10 alt 1 sel 10
+VARS pa65 0:65 1:1 3:2 6:5 7:1 10:1 14:2 19:6
+INV pa65 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 408:1
+CK pa66 chapter 66 vue 11 lastvue 1 arriveevue 1 sel 10 alt 1 sel 10
+VARS pa66 0:66 1:1 3:2 6:5 7:1 10:1 14:11
+INV pa66 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 408:1
+CK pa67 chapter 67 vue 7 lastvue 6 arriveevue 6 sel 10 alt 1 sel 10
+VARS pa67 0:67 1:1 3:2 6:5 7:6 10:6 14:7 19:1 34:1
+INV pa67 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 408:1 409:1
+CK pa68 chapter 68 vue 204 lastvue 201 arriveevue 201 sel 10 alt 1 sel 10
+VARS pa68 0:68 1:1 3:2 6:5 7:201 10:201 14:204
+INV pa68 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 408:1
+CK pa69 chapter 69 vue 1 lastvue 5 arriveevue 5 sel 10 alt 1 sel 10
+VARS pa69 0:69 1:1 3:2 6:5 7:5 10:5 14:1
+INV pa69 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 408:1
+CK pa70 chapter 70 vue 5 lastvue 4 arriveevue 4 sel 10 alt 1 sel 10
+VARS pa70 0:70 1:1 3:2 6:5 7:4 10:4 14:5
+INV pa70 257:1 259:1 260:1 262:1 267:1 304:1 311:1 322:1 420:1 323:1 408:1
+CK pa71 chapter 71 vue 29 lastvue 29 arriveevue 29 sel 10 alt 1 sel 10
+VARS pa71 0:71 1:1 3:2 6:5 7:29 10:29 14:29
+INV pa71 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 323:1
+CK pa72 chapter 72 vue 33 lastvue 29 arriveevue 29 sel 10 alt 1 sel 10
+VARS pa72 0:72 1:1 3:2 6:5 7:29 10:29 14:33
+INV pa72 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 323:1 416:1
+CK pa77 chapter 77 vue 139 lastvue 131 arriveevue 131 sel 10 alt 1 sel 10
+VARS pa77 0:77 1:1 3:2 6:5 7:131 10:131 14:139
+INV pa77 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 323:1 419:1
+CK pa78 chapter 78 vue 1 lastvue 1 arriveevue 1 sel 10 alt 1 sel 10
+VARS pa78 0:78 1:1 3:2 6:5 7:1 10:1 14:1
+INV pa78 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 323:1 419:1
+CK pa79 chapter 79 vue 180 lastvue 180 arriveevue 180 sel 10 alt 1 sel 10
+VARS pa79 0:79 1:1 3:2 6:5 7:180 10:180 14:180
+INV pa79 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 323:1 419:1
+CK pa82 chapter 82 vue 1 lastvue 1 arriveevue 1 sel 10 alt 1 sel 10
+VARS pa82 0:82 1:1 3:2 6:5 7:1 10:1 14:1
+INV pa82 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 323:1 419:1
+CK pa83 chapter 83 vue 51 lastvue 19 arriveevue 19 sel 10 alt 1 sel 10
+VARS pa83 0:83 1:1 3:2 6:5 7:19 10:19 14:51 34:1
+INV pa83 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 323:1 419:1
+CK pa84 chapter 84 vue 51 lastvue 19 arriveevue 19 sel 10 alt 1 sel 10
+VARS pa84 0:84 1:1 3:2 6:5 7:19 10:19 14:51
+INV pa84 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 419:1
+CK pa85 chapter 85 vue 51 lastvue 53 arriveevue 53 sel 10 alt 1 sel 10
+VARS pa85 0:85 1:1 3:2 6:5 7:53 10:53 14:51
+INV pa85 257:1 259:1 260:1 262:1 267:1 311:1 322:1 420:1 408:1 419:1

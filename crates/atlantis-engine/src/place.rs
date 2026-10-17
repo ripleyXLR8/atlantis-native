@@ -12,9 +12,10 @@ use atlantis_codecs::HnmVideo;
 use atlantis_data::sprite::{composite_spf_frame, decode_spw_pixels, spw_frame_count};
 use atlantis_data::sprite_anim::{animate_place_sprites, enter_place, SPRITE_TICK_MS};
 use atlantis_data::sprite_list::{npc_click_rects, npc_row_matches};
-use atlantis_data::wam::CentrePos;
+use atlantis_data::wam::{CentrePos, Transition};
 
 use crate::engine::{Engine, Event};
+use crate::music::apc_pcm;
 use crate::sys::{Input, MouseButton};
 use crate::turn::{transition_turn, TURN_END_FOV_DEG};
 use crate::video_skip::VideoSkipState;
@@ -62,6 +63,7 @@ impl Engine {
         self.current_place = Some(index);
         self.current_place_id = Some(next);
         self.next_place_id = None;
+        self.vue_override = None; // `Vue` follows the place again
         let cyclo = self.wam.places[index].cyclo.clone();
         if self.load_cyclo(&cyclo).await {
             self.composite_npc_sprites().await;
@@ -280,7 +282,7 @@ impl Engine {
             self.warp.beta(),
             src_alpha,
             src_beta,
-            self.zoom,
+            self.zoom || self.vars.get("zoom") != 0,
         );
         for f in frames {
             if self.sys.should_quit() {
@@ -299,6 +301,7 @@ impl Engine {
         }
         self.warp.set_hfov(TURN_END_FOV_DEG);
         self.zoom = false;
+        self.vars.set("zoom", 0);
     }
 
     /// A video of `UBB_VUE\` (`playTransitionVideo`, `FUN_0041bc74`):
@@ -348,14 +351,37 @@ impl Engine {
         if let Some((_, to)) = places {
             self.ambient_prepare_glide(to, hnm.frame_count() as i32);
         }
-        // TODO(phase 2): a cinematic's same-name sound (WAV\<name>.APC,
-        // NEWSOUND = 1); a move's video opens no sound.
+        // The same-name sound of a cinematic or a start-up video (e.g.
+        // WAV\CINEM020.APC for CINEM020.HNM): the Cinema= handler names
+        // 0x007728c7 "cinem" + N + ".apc" and sets NEWSOUND = 1
+        // (FUN_0042a100 @ 0x0042a7c0..0x0042a881, poller FUN_00432a64). A
+        // move's video (FUN_00423ad8) opens no sound: the transition-named
+        // APCs are NewSound entries that the departure sections play.
+        if places.is_none() {
+            let apc = format!("WAV\\{}", with_ext(&name, "APC"));
+            if self.game.big.contains(&apc) {
+                if let Some(pcm) = self.read(&apc).await.and_then(|d| apc_pcm(&d)) {
+                    self.music.start_new_sound(pcm);
+                    self.music.new_sound_last = 1;
+                    self.music.new_sound_playing = true;
+                    self.vars.set("newsound", 1);
+                    self.emit(Event::NewSound(1, apc));
+                }
+            }
+        }
 
         let start = self.sys.millis();
         let mut first = true;
         let mut spf_frame = 0usize;
         let mut shown = 0u32;
-        let mut skip = VideoSkipState::default();
+        // FUN_0041bc74's input: a left click, or Escape with the conditions
+        // of FUN_0041a298 (video_skip); after that poll the next frame is
+        // still presented.
+        let mut skip = VideoSkipState {
+            object_in_hand: self.vars.get("objetenmain") != 0,
+            section_play: self.section_play,
+            ..VideoSkipState::default()
+        };
         let mut stop_after_frame = false;
         let (w, h) = (hnm.width(), hnm.height());
         loop {
@@ -424,9 +450,18 @@ impl Engine {
             }
             self.sys.frame().await;
         }
-        // TODO(phase 2): a skipped cinematic fades its sound out
-        // (skip.fades); TODO(phase 3): the bar flags are cleared
-        // (0x0041bf5b..0x0041bf8d).
+        // A video that ends by itself leaves its sound playing to its end
+        // (FUN_0042a100 @ 0x0042a907..0x0042a954 stops nothing); one cut
+        // short fades it out, 2 volume steps every 25 ms from the effects
+        // volume (FUN_0041bc74 @ 0x0041be69..0x0041be9e arms 0x00495eb0 =
+        // 2). TODO(phase 3): the bar flags are cleared (0x0041bf5b..
+        // 0x0041bf8d).
+        if stop_after_frame
+            && skip.fades(frame_ms == CINEMA_FRAME_MS)
+            && self.music.new_sound_active()
+        {
+            self.music.fade_out_new_sound(self.effects_volume());
+        }
         self.ix_buffers = hnm.into_buffers();
         self.emit(Event::Video {
             name,
@@ -481,9 +516,9 @@ impl Engine {
         }
     }
 
-    /// `FUN_00432178`'s ambient part, at the end of a warp frame.
+    /// `FUN_00432178`'s ambient part, at the end of a warp frame (its
+    /// tail, the NewSound poll, is [`Engine::poll_new_sound`]).
     pub(crate) fn ambient_frame(&mut self) {
-        // TODO(phase 2): FUN_00432178's tail polls NEWSOUND (FUN_00432a64).
         if !self.ambient.active() {
             return;
         }
@@ -532,5 +567,116 @@ impl Engine {
         let t = self.chapter_time();
         self.ambient
             .video_frame(&mut self.ambient_out, &place, &self.wam.ambient_objects, t);
+    }
+
+    /// `recordPlaceTable`: the WAM's transitions written into the place
+    /// table slots, over what earlier loads left there.
+    pub(crate) fn record_place_table(&mut self) {
+        let places = &self.wam.places;
+        if self.place_table_slots.len() < places.len() {
+            self.place_table_slots.resize(places.len(), Vec::new());
+        }
+        for (r, p) in places.iter().enumerate() {
+            let slots = &mut self.place_table_slots[r];
+            if slots.len() < p.transitions.len() {
+                slots.resize(p.transitions.len(), Transition::default());
+            }
+            slots[..p.transitions.len()].clone_from_slice(&p.transitions);
+        }
+    }
+
+    /// Entry `i` of record `record` of the place table: never written in
+    /// this run, the zeroed table of a fresh start (empty name, destination
+    /// 0, angles 0).
+    fn place_table_entry(&self, record: usize, i: usize) -> Transition {
+        self.place_table_slots
+            .get(record)
+            .and_then(|s| s.get(i))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// `FUN_00423ad8` after a departure section that ran Vue=N without
+    /// AbortDepart (CHAPI062 /864): the Vue= handler has already pointed
+    /// the place record 0x006cd7a8 at N and loaded its panorama, and the
+    /// loop goes on with the index i of the clicked transition of the place
+    /// left: TESTTIME1 and Time1 restart (@ 0x00423e8d), the turn
+    /// `FUN_004212cc(i)`, then the video "ubb_vue\" + the name of entry i of
+    /// N's record, a stale slot past N's transition count. An empty name has
+    /// no '.', so `FUN_00422f2c` returns -1 and no video plays (the
+    /// fresh-start case).
+    pub(crate) async fn transition_after_departure_vue(&mut self, index: usize) {
+        self.vars.set("testtime1", 0);
+        self.clocks.time1_start = self.now();
+        self.clocks.time1_offset = 0;
+        let (Some(record), Some(cur)) = (self.current_place, self.current_place_id) else {
+            return;
+        };
+        let t = self.place_table_entry(record, index);
+        self.turn_to_transition(t.src_alpha, t.src_beta).await;
+        // 0x00421b01..0x00421b31, before the video.
+        self.set_view(t.dst_alpha, t.dst_beta);
+        if t.video.contains('.') {
+            self.play_transition_video(&t.video, Some((cur, cur)), TRANSITION_FRAME_MS)
+                .await;
+        }
+    }
+
+    /// Cinema=N: `CINEM<NNN>.HNM` full screen with its sound, at the cinema
+    /// pace (`FUN_0042a100` @ 0x0042a7c0..0x0042a954).
+    pub async fn play_cinema(&mut self, n: i32) {
+        let name = format!("CINEM{n:03}.HNM");
+        self.play_transition_video(&name, None, CINEMA_FRAME_MS)
+            .await;
+    }
+
+    /// `FUN_00432a64`, the NewSound poller. The loop flag 0x00496194 is 0
+    /// in the image and never written, so a sound plays once.
+    pub async fn poll_new_sound(&mut self) {
+        let value = self.vars.get("newsound");
+        if value == 0 {
+            return; // 1: nothing is stopped
+        }
+        let active = self.music.new_sound_active();
+        if value != self.music.new_sound_last {
+            // 3: another value.
+            self.music.stop_new_sound();
+            self.music.new_sound_playing = false;
+        }
+        if self.music.new_sound_playing {
+            if !active {
+                // 4: done (status 2).
+                self.music.stop_new_sound();
+                self.music.new_sound_playing = false;
+                self.vars.set("newsound", 0);
+            }
+            return;
+        }
+        // 5: wav\ + entry `value` of the table at 0x00496224.
+        let Some(name) = usize::try_from(value)
+            .ok()
+            .and_then(|v| self.game.exe.newsound_names.get(v))
+            .cloned()
+        else {
+            log::warn!("newsound={value} out of the table");
+            self.vars.set("newsound", 0);
+            return;
+        };
+        // A missing file or a bad header: NEWSOUND = 0.
+        let path = format!("WAV\\{name}");
+        let data = if self.game.big.contains(&path) {
+            self.read(&path).await
+        } else {
+            None
+        };
+        let Some(pcm) = data.and_then(|d| apc_pcm(&d)) else {
+            log::warn!("newsound={value}: {path} not played");
+            self.vars.set("newsound", 0);
+            return;
+        };
+        self.music.start_new_sound(pcm);
+        self.music.new_sound_playing = true;
+        self.music.new_sound_last = value;
+        self.emit(Event::NewSound(value, name));
     }
 }

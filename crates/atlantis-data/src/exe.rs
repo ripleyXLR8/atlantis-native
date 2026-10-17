@@ -73,6 +73,51 @@ pub struct ExeTables {
     pub guest_sprite_ids: Vec<i32>,
     /// Credits font advance per byte.
     pub credit_widths: [u8; 256],
+    /// The music tracks, StartMusik=N naming entry N - 1: 13-byte records
+    /// at 0x00495eec (FUN_0042a100 @ 0x0042ae0f calls FUN_00432ea8(N - 1)),
+    /// as written there (lower case).
+    pub music_names: Vec<String>,
+    /// The NewSound APC names, /set(NewSound=N) naming entry N: the pointer
+    /// table at 0x00496224 (17 WAM names at 0x004961e0 come first), up to
+    /// its "FIN" entry. The poller FUN_00432a64 plays "wav\" + entry N.
+    pub newsound_names: Vec<String>,
+}
+
+/// The number of music tracks (StartMusik=1..31).
+pub const MUSIC_TRACKS: usize = 31;
+
+fn latin1(bytes: &[u8]) -> String {
+    bytes.iter().map(|&b| char::from(b)).collect()
+}
+
+/// The 31 names of 0x00495eec (the same address in the known builds).
+fn music_names(exe: &[u8]) -> Vec<String> {
+    let off = file_offset(0x0049_5eec);
+    (0..MUSIC_TRACKS)
+        .map(|i| latin1(&cstr(&exe[off + 13 * i..off + 13 * (i + 1)], 0)))
+        .collect()
+}
+
+/// The pointer table 0x004961e0 (the same address in the known builds):
+/// 17 WAM names, then the NewSound names up to "FIN".
+fn newsound_names(exe: &[u8]) -> Vec<String> {
+    const SKIP_WAMS: usize = 17;
+    let table = file_offset(0x0049_61e0) + 4 * SKIP_WAMS;
+    let mut names = Vec::new();
+    for i in 0..200 {
+        let at = table + 4 * i;
+        let Some(c) = exe.get(at..at + 4) else { break };
+        let va = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+        if !(0x004b_0000..=0x004d_0000).contains(&va) {
+            break; // off the end of the data
+        }
+        let name = latin1(&cstr(exe, file_offset(va)));
+        if name.eq_ignore_ascii_case("FIN") {
+            break;
+        }
+        names.push(name);
+    }
+    names
 }
 
 fn cstr(exe: &[u8], off: usize) -> Vec<u8> {
@@ -113,6 +158,8 @@ impl ExeTables {
             inventory_object_ids: i32_list(exe, file_offset(build.inventory_va), 64),
             guest_sprite_ids: i32_list(exe, file_offset(build.guest_va), 64),
             credit_widths,
+            music_names: music_names(exe),
+            newsound_names: newsound_names(exe),
         })
     }
 }

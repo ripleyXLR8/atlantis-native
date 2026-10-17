@@ -46,7 +46,12 @@ impl Aim {
 }
 
 impl ScriptHooks for Aim {
-    fn chapter_loaded<'a>(&'a mut self, e: &'a mut Engine, _chapter: u32) -> HookFuture<'a, ()> {
+    fn chapter_loaded<'a>(
+        &'a mut self,
+        e: &'a mut Engine,
+        _chapter: u32,
+        _keep_state: bool,
+    ) -> HookFuture<'a, ()> {
         Box::pin(async move {
             if let Some((wam, vue)) = self.start {
                 assert!(e.load_wam(wam).await);

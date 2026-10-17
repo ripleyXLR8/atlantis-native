@@ -9,11 +9,14 @@ reverse engineering the original game's executable. The goal is the
 original game, pixel for pixel and sample for sample, with optional fixes of
 the original's bugs.
 
-**Status: phase 1 (navigation).** A new game starts where the original's
-does (ATLAN1.WAM, place 1) and you can look around and walk between the
+**Status: phase 2 (scripts) in progress.** A new game starts as the
+original's does: the chapter script runs its intro (the music, the opening
+cinematics with their sound), then you can look around and walk between the
 places of Atlantis, with the transition videos, the animated place sprites
-and the ambient sounds. There are no scripts, dialogs, inventory, menus or
-puzzles yet: the story does not advance.
+and the ambient sounds. The chapter scripts run as you move and click (their
+scans, timers, sounds, music and chapter changes), but the dialog lines are
+not shown or heard yet, and there are no inventory, menus or puzzles (a
+puzzle counts as won).
 
 ## You need the game
 
@@ -66,7 +69,11 @@ the browser.
 Where the original runs its scripts from navigation (arrival and departure
 scans, click scans, timers, characters and objects clicked, puzzle zones,
 the inventory bar and the menu), the engine calls the `ScriptHooks` trait
-(`crates/atlantis-engine/src/hooks.rs`), which does nothing in phase 1.
+(`crates/atlantis-engine/src/hooks.rs`). The CON script interpreter
+(`crates/atlantis-engine/src/con/`, `scripts.rs`) implements it; the dialog
+lines of a section go to the `DialogPresenter` trait, which shows nothing
+yet. The music (`music.rs`) plays its tracks looped cleanly by default, or
+through the original's streaming ring with its audible seams.
 
 ### The web build
 

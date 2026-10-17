@@ -8,17 +8,21 @@
 
 pub mod ambient;
 pub mod audio;
+pub mod con;
 pub mod cursor;
 pub mod engine;
 pub mod hooks;
 pub mod look;
+pub mod music;
 mod navigation;
 pub mod place;
+pub mod scripts;
 pub mod sys;
 pub mod turn;
 pub mod video_skip;
 pub mod warp;
 
-pub use engine::{run, Engine, Event, Options};
+pub use engine::{run, Abort, Engine, Event, Options};
 pub use hooks::{Departure, DirectLoader, Loader, NoScripts, ScriptHooks};
+pub use scripts::{DialogPresenter, NoDialog, Scripts};
 pub use warp::Warp;

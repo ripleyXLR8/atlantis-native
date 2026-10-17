@@ -1,0 +1,2800 @@
+# Escape during a talking head, atlantis.exe (2001 English build, 714240 bytes): FUN_0042844c run under emulation with 0x00496134 = 1
+# after the j-th played line of the walk. E <CON> <body> <kind> <section> esc <j> skipped <k>: the lines played after
+# line j.
+E CHAPI001 1258 sel 1 esc 1 skipped 0: 
+E CHAPI001 1571 sel 2 esc 1 skipped 0: 
+E CHAPI001 1714 con 14 esc 1 skipped 1: 
+E CHAPI001 1714 con 14 esc 2 skipped 0: 
+E CHAPI001 1746 con 3 esc 1 skipped 1: 
+E CHAPI001 1746 con 3 esc 2 skipped 0: 
+E CHAPI001 1922 con 4 esc 1 skipped 1: 
+E CHAPI001 1922 con 4 esc 2 skipped 0: 
+E CHAPI001 2019 con 5 esc 1 skipped 1: 
+E CHAPI001 2019 con 5 esc 2 skipped 0: 
+E CHAPI001 2158 con 6 esc 1 skipped 1: 
+E CHAPI001 2158 con 6 esc 2 skipped 0: 
+E CHAPI001 2270 con 7 esc 1 skipped 1: 
+E CHAPI001 2270 con 7 esc 2 skipped 0: 
+E CHAPI001 2428 con 8 esc 1 skipped 1: 
+E CHAPI001 2428 con 8 esc 2 skipped 0: 
+E CHAPI001 2556 con 9 esc 1 skipped 1: 
+E CHAPI001 2556 con 9 esc 2 skipped 0: 
+E CHAPI001 2690 con 11 esc 1 skipped 1: 
+E CHAPI001 2690 con 11 esc 2 skipped 0: 
+E CHAPI001 2828 con 12 esc 1 skipped 1: 
+E CHAPI001 2828 con 12 esc 2 skipped 0: 
+E CHAPI001 2948 con 13 esc 1 skipped 3: 
+E CHAPI001 2948 con 13 esc 2 skipped 2: 
+E CHAPI001 2948 con 13 esc 3 skipped 1: 
+E CHAPI001 2948 con 13 esc 4 skipped 0: 
+E CHAPI002 604 sel 2 esc 1 skipped 0: 
+E CHAPI002 734 sel 2 esc 1 skipped 0: 
+E CHAPI002 857 con 15 esc 1 skipped 1: 
+E CHAPI002 857 con 15 esc 2 skipped 0: 
+E CHAPI002 1035 con 16 esc 1 skipped 1: 
+E CHAPI002 1035 con 16 esc 2 skipped 0: 
+E CHAPI002 1178 con 17 esc 1 skipped 1: 
+E CHAPI002 1178 con 17 esc 2 skipped 0: 
+E CHAPI002 1479 con 20 esc 1 skipped 0: 
+E CHAPI002 1687 con 18 esc 1 skipped 3: 
+E CHAPI002 1687 con 18 esc 2 skipped 2: 
+E CHAPI002 1687 con 18 esc 3 skipped 1: 
+E CHAPI002 1687 con 18 esc 4 skipped 0: 
+E CHAPI002 1982 con 19 esc 1 skipped 0: 
+E CHAPI002 2133 con 27 esc 1 skipped 1: 
+E CHAPI002 2133 con 27 esc 2 skipped 0: 
+E CHAPI002 2326 con 26 esc 1 skipped 0: 
+E CHAPI002 2404 sel 21 esc 1 skipped 2: 
+E CHAPI002 2404 sel 21 esc 2 skipped 1: 
+E CHAPI002 2404 sel 21 esc 3 skipped 0: 
+E CHAPI002 2625 con 22 esc 1 skipped 1: 
+E CHAPI002 2625 con 22 esc 2 skipped 0: 
+E CHAPI002 2782 con 23 esc 1 skipped 1: 
+E CHAPI002 2782 con 23 esc 2 skipped 0: 
+E CHAPI002 2929 con 24 esc 1 skipped 1: 
+E CHAPI002 2929 con 24 esc 2 skipped 0: 
+E CHAPI002 3064 con 28 esc 1 skipped 1: 
+E CHAPI002 3064 con 28 esc 2 skipped 0: 
+E CHAPI002 3210 con 58 esc 1 skipped 1: 
+E CHAPI002 3210 con 58 esc 2 skipped 0: 
+E CHAPI002 3346 con 29 esc 1 skipped 1: 
+E CHAPI002 3346 con 29 esc 2 skipped 0: 
+E CHAPI002 3486 con 30 esc 1 skipped 1: 
+E CHAPI002 3486 con 30 esc 2 skipped 0: 
+E CHAPI002 3641 con 31 esc 1 skipped 1: 
+E CHAPI002 3641 con 31 esc 2 skipped 0: 
+E CHAPI002 3863 sel 32 esc 1 skipped 0: 
+E CHAPI002 3944 sel 33 esc 1 skipped 0: 
+E CHAPI003 913 con 14 esc 1 skipped 4: 
+E CHAPI003 913 con 14 esc 2 skipped 3: 
+E CHAPI003 913 con 14 esc 3 skipped 2: 
+E CHAPI003 913 con 14 esc 4 skipped 1: 
+E CHAPI003 913 con 14 esc 5 skipped 0: 
+E CHAPI003 956 tim1 35 esc 1 skipped 4: 
+E CHAPI003 956 tim1 35 esc 2 skipped 3: 
+E CHAPI003 956 tim1 35 esc 3 skipped 2: 
+E CHAPI003 956 tim1 35 esc 4 skipped 1: 
+E CHAPI003 956 tim1 35 esc 5 skipped 0: 
+E CHAPI003 1389 sel 36 esc 1 skipped 0: 
+E CHAPI003 1502 con 37 esc 1 skipped 0: 1901:40a 1946:40b 1998:40c 2092:40d 2133:40e 2214:40f 2256:40g 2288:40h 2315:40i 2344:40j 2481:40k
+E CHAPI003 1502 con 37 esc 2 skipped 10: 
+E CHAPI003 1502 con 37 esc 3 skipped 9: 
+E CHAPI003 1502 con 37 esc 4 skipped 8: 
+E CHAPI003 1502 con 37 esc 5 skipped 7: 
+E CHAPI003 1502 con 37 esc 6 skipped 6: 
+E CHAPI003 1502 con 37 esc 7 skipped 5: 
+E CHAPI003 1502 con 37 esc 8 skipped 4: 
+E CHAPI003 1502 con 37 esc 9 skipped 3: 
+E CHAPI003 1502 con 37 esc 10 skipped 2: 
+E CHAPI003 1502 con 37 esc 11 skipped 1: 
+E CHAPI003 1502 con 37 esc 12 skipped 0: 
+E CHAPI003 1628 con 38 esc 1 skipped 1: 1901:40a 1946:40b 1998:40c 2092:40d 2133:40e 2214:40f 2256:40g 2288:40h 2315:40i 2344:40j 2481:40k
+E CHAPI003 1628 con 38 esc 2 skipped 0: 1901:40a 1946:40b 1998:40c 2092:40d 2133:40e 2214:40f 2256:40g 2288:40h 2315:40i 2344:40j 2481:40k
+E CHAPI003 1628 con 38 esc 3 skipped 10: 
+E CHAPI003 1628 con 38 esc 4 skipped 9: 
+E CHAPI003 1628 con 38 esc 5 skipped 8: 
+E CHAPI003 1628 con 38 esc 6 skipped 7: 
+E CHAPI003 1628 con 38 esc 7 skipped 6: 
+E CHAPI003 1628 con 38 esc 8 skipped 5: 
+E CHAPI003 1628 con 38 esc 9 skipped 4: 
+E CHAPI003 1628 con 38 esc 10 skipped 3: 
+E CHAPI003 1628 con 38 esc 11 skipped 2: 
+E CHAPI003 1628 con 38 esc 12 skipped 1: 
+E CHAPI003 1628 con 38 esc 13 skipped 0: 
+E CHAPI003 1742 con 39 esc 1 skipped 1: 1901:40a 1946:40b 1998:40c 2092:40d 2133:40e 2214:40f 2256:40g 2288:40h 2315:40i 2344:40j 2481:40k
+E CHAPI003 1742 con 39 esc 2 skipped 0: 1901:40a 1946:40b 1998:40c 2092:40d 2133:40e 2214:40f 2256:40g 2288:40h 2315:40i 2344:40j 2481:40k
+E CHAPI003 1742 con 39 esc 3 skipped 10: 
+E CHAPI003 1742 con 39 esc 4 skipped 9: 
+E CHAPI003 1742 con 39 esc 5 skipped 8: 
+E CHAPI003 1742 con 39 esc 6 skipped 7: 
+E CHAPI003 1742 con 39 esc 7 skipped 6: 
+E CHAPI003 1742 con 39 esc 8 skipped 5: 
+E CHAPI003 1742 con 39 esc 9 skipped 4: 
+E CHAPI003 1742 con 39 esc 10 skipped 3: 
+E CHAPI003 1742 con 39 esc 11 skipped 2: 
+E CHAPI003 1742 con 39 esc 12 skipped 1: 
+E CHAPI003 1742 con 39 esc 13 skipped 0: 
+E CHAPI003 1853 tim2 34 esc 1 skipped 10: 
+E CHAPI003 1853 tim2 34 esc 2 skipped 9: 
+E CHAPI003 1853 tim2 34 esc 3 skipped 8: 
+E CHAPI003 1853 tim2 34 esc 4 skipped 7: 
+E CHAPI003 1853 tim2 34 esc 5 skipped 6: 
+E CHAPI003 1853 tim2 34 esc 6 skipped 5: 
+E CHAPI003 1853 tim2 34 esc 7 skipped 4: 
+E CHAPI003 1853 tim2 34 esc 8 skipped 3: 
+E CHAPI003 1853 tim2 34 esc 9 skipped 2: 
+E CHAPI003 1853 tim2 34 esc 10 skipped 1: 
+E CHAPI003 1853 tim2 34 esc 11 skipped 0: 
+E CHAPI003 1884 con 40 esc 1 skipped 10: 
+E CHAPI003 1884 con 40 esc 2 skipped 9: 
+E CHAPI003 1884 con 40 esc 3 skipped 8: 
+E CHAPI003 1884 con 40 esc 4 skipped 7: 
+E CHAPI003 1884 con 40 esc 5 skipped 6: 
+E CHAPI003 1884 con 40 esc 6 skipped 5: 
+E CHAPI003 1884 con 40 esc 7 skipped 4: 
+E CHAPI003 1884 con 40 esc 8 skipped 3: 
+E CHAPI003 1884 con 40 esc 9 skipped 2: 
+E CHAPI003 1884 con 40 esc 10 skipped 1: 
+E CHAPI003 1884 con 40 esc 11 skipped 0: 
+E CHAPI003 2701 tim2 46 esc 1 skipped 0: 
+E CHAPI003 2810 tim2 41 esc 1 skipped 0: 
+E CHAPI003 3001 con 52 esc 1 skipped 1: 
+E CHAPI003 3001 con 52 esc 2 skipped 0: 
+E CHAPI003 3162 sel 53 esc 1 skipped 0: 
+E CHAPI003 3321 con 42 esc 1 skipped 4: 
+E CHAPI003 3321 con 42 esc 2 skipped 3: 
+E CHAPI003 3321 con 42 esc 3 skipped 2: 
+E CHAPI003 3321 con 42 esc 4 skipped 1: 
+E CHAPI003 3321 con 42 esc 5 skipped 0: 
+E CHAPI003 3868 con 14 esc 1 skipped 4: 
+E CHAPI003 3868 con 14 esc 2 skipped 3: 
+E CHAPI003 3868 con 14 esc 3 skipped 2: 
+E CHAPI003 3868 con 14 esc 4 skipped 1: 
+E CHAPI003 3868 con 14 esc 5 skipped 0: 
+E CHAPI003 3937 con 43 esc 1 skipped 6: 
+E CHAPI003 3937 con 43 esc 2 skipped 5: 
+E CHAPI003 3937 con 43 esc 3 skipped 4: 
+E CHAPI003 3937 con 43 esc 4 skipped 3: 
+E CHAPI003 3937 con 43 esc 5 skipped 2: 
+E CHAPI003 3937 con 43 esc 6 skipped 1: 
+E CHAPI003 3937 con 43 esc 7 skipped 0: 
+E CHAPI003 4516 sel 44 esc 1 skipped 0: 
+E CHAPI003 4623 con 45 esc 1 skipped 1: 
+E CHAPI003 4623 con 45 esc 2 skipped 0: 
+E CHAPI003 5205 con 49 esc 1 skipped 3: 
+E CHAPI003 5205 con 49 esc 2 skipped 2: 
+E CHAPI003 5205 con 49 esc 3 skipped 1: 
+E CHAPI003 5205 con 49 esc 4 skipped 0: 
+E CHAPI003 5714 con 50 esc 1 skipped 0: 
+E CHAPI003 6000 con 51 esc 1 skipped 1: 
+E CHAPI003 6000 con 51 esc 2 skipped 0: 
+E CHAPI004 799 con 54 esc 1 skipped 3: 
+E CHAPI004 799 con 54 esc 2 skipped 2: 
+E CHAPI004 799 con 54 esc 3 skipped 1: 
+E CHAPI004 799 con 54 esc 4 skipped 0: 
+E CHAPI004 1069 con 55 esc 1 skipped 3: 
+E CHAPI004 1069 con 55 esc 2 skipped 2: 
+E CHAPI004 1069 con 55 esc 3 skipped 1: 
+E CHAPI004 1069 con 55 esc 4 skipped 0: 
+E CHAPI004 1335 con 56 esc 1 skipped 1: 
+E CHAPI004 1335 con 56 esc 2 skipped 0: 
+E CHAPI004 1478 con 1200 esc 1 skipped 1: 
+E CHAPI004 1478 con 1200 esc 2 skipped 0: 
+E CHAPI004 1598 con 1201 esc 1 skipped 1: 
+E CHAPI004 1598 con 1201 esc 2 skipped 0: 
+E CHAPI004 1710 con 57 esc 1 skipped 1: 
+E CHAPI004 1710 con 57 esc 2 skipped 0: 
+E CHAPI004 2156 sel 32 esc 1 skipped 0: 
+E CHAPI004 2237 sel 33 esc 1 skipped 0: 
+E CHAPI004 2671 sel 113 esc 1 skipped 0: 
+E CHAPI005 352 sel 113 esc 1 skipped 0: 
+E CHAPI005 914 tim1 60 esc 1 skipped 4: 
+E CHAPI005 914 tim1 60 esc 2 skipped 3: 
+E CHAPI005 914 tim1 60 esc 3 skipped 2: 
+E CHAPI005 914 tim1 60 esc 4 skipped 1: 
+E CHAPI005 914 tim1 60 esc 5 skipped 0: 
+E CHAPI005 1506 tim1 70 esc 1 skipped 2: 
+E CHAPI005 1506 tim1 70 esc 2 skipped 1: 
+E CHAPI005 1506 tim1 70 esc 3 skipped 0: 
+E CHAPI005 1854 con 75 esc 1 skipped 5: 
+E CHAPI005 1854 con 75 esc 2 skipped 4: 
+E CHAPI005 1854 con 75 esc 3 skipped 3: 
+E CHAPI005 1854 con 75 esc 4 skipped 2: 
+E CHAPI005 1854 con 75 esc 5 skipped 1: 
+E CHAPI005 1854 con 75 esc 6 skipped 0: 
+E CHAPI005 2421 con 61 esc 1 skipped 1: 
+E CHAPI005 2421 con 61 esc 2 skipped 0: 
+E CHAPI005 2647 con 62 esc 1 skipped 1: 
+E CHAPI005 2647 con 62 esc 2 skipped 0: 
+E CHAPI005 2912 con 63 esc 1 skipped 1: 
+E CHAPI005 2912 con 63 esc 2 skipped 0: 
+E CHAPI005 3058 con 76 esc 1 skipped 1: 
+E CHAPI005 3058 con 76 esc 2 skipped 0: 
+E CHAPI005 3199 con 64 esc 1 skipped 1: 3436:64c
+E CHAPI005 3199 con 64 esc 2 skipped 0: 3436:64c
+E CHAPI005 3199 con 64 esc 3 skipped 0: 
+E CHAPI005 3761 con 77 esc 1 skipped 0: 4062:77b
+E CHAPI005 3761 con 77 esc 2 skipped 0: 
+E CHAPI005 4408 con 78 esc 1 skipped 3: 4931:78e
+E CHAPI005 4408 con 78 esc 2 skipped 2: 4931:78e
+E CHAPI005 4408 con 78 esc 3 skipped 1: 4931:78e
+E CHAPI005 4408 con 78 esc 4 skipped 0: 4931:78e
+E CHAPI005 4408 con 78 esc 5 skipped 0: 
+E CHAPI005 5244 sel 91 esc 1 skipped 2: 
+E CHAPI005 5244 sel 91 esc 2 skipped 1: 
+E CHAPI005 5244 sel 91 esc 3 skipped 0: 
+E CHAPI005 5509 sel 97 esc 1 skipped 0: 
+E CHAPI005 5679 con 92 esc 1 skipped 0: 
+E CHAPI005 6017 con 93 esc 1 skipped 1: 
+E CHAPI005 6017 con 93 esc 2 skipped 0: 
+E CHAPI005 6278 con 94 esc 1 skipped 1: 
+E CHAPI005 6278 con 94 esc 2 skipped 0: 
+E CHAPI005 6517 sel 103 esc 1 skipped 0: 
+E CHAPI005 6694 con 95 esc 1 skipped 1: 
+E CHAPI005 6694 con 95 esc 2 skipped 0: 
+E CHAPI005 6923 con 96 esc 1 skipped 1: 
+E CHAPI005 6923 con 96 esc 2 skipped 0: 
+E CHAPI005 7181 con 98 esc 1 skipped 1: 
+E CHAPI005 7181 con 98 esc 2 skipped 0: 
+E CHAPI005 7333 con 100 esc 1 skipped 0: 9267:89a
+E CHAPI005 7333 con 100 esc 2 skipped 0: 
+E CHAPI005 7440 con 101 esc 1 skipped 0: 9267:89a
+E CHAPI005 7440 con 101 esc 2 skipped 0: 
+E CHAPI005 7563 con 102 esc 1 skipped 0: 
+E CHAPI005 7724 con 109 esc 1 skipped 0: 7970:112a
+E CHAPI005 7724 con 109 esc 2 skipped 0: 
+E CHAPI005 7829 con 110 esc 1 skipped 0: 7970:112a
+E CHAPI005 7829 con 110 esc 2 skipped 0: 
+E CHAPI005 7931 con 111 esc 1 skipped 1: 
+E CHAPI005 7931 con 111 esc 2 skipped 0: 
+E CHAPI005 7970 con 112 esc 1 skipped 0: 
+E CHAPI005 8196 con 85 esc 1 skipped 1: 
+E CHAPI005 8196 con 85 esc 2 skipped 0: 
+E CHAPI005 8576 sel 99 esc 1 skipped 0: 
+E CHAPI005 8774 con 113 esc 1 skipped 0: 
+E CHAPI005 8866 con 86 esc 1 skipped 0: 9361:88a
+E CHAPI005 8866 con 86 esc 2 skipped 0: 
+E CHAPI005 9077 con 87 esc 1 skipped 0: 9361:88a
+E CHAPI005 9077 con 87 esc 2 skipped 0: 
+E CHAPI005 9267 sel 89 esc 1 skipped 0: 
+E CHAPI005 9361 con 88 esc 1 skipped 0: 
+E CHAPI006 272 con 66 esc 1 skipped 1: 
+E CHAPI006 272 con 66 esc 2 skipped 0: 
+E CHAPI006 402 con 67 esc 1 skipped 3: 
+E CHAPI006 402 con 67 esc 2 skipped 2: 
+E CHAPI006 402 con 67 esc 3 skipped 1: 
+E CHAPI006 402 con 67 esc 4 skipped 0: 
+E CHAPI006 740 con 68 esc 1 skipped 7: 
+E CHAPI006 740 con 68 esc 2 skipped 6: 
+E CHAPI006 740 con 68 esc 3 skipped 5: 
+E CHAPI006 740 con 68 esc 4 skipped 4: 
+E CHAPI006 740 con 68 esc 5 skipped 3: 
+E CHAPI006 740 con 68 esc 6 skipped 2: 
+E CHAPI006 740 con 68 esc 7 skipped 1: 
+E CHAPI006 740 con 68 esc 8 skipped 0: 
+E CHAPI006 1519 con 69 esc 1 skipped 1: 
+E CHAPI006 1519 con 69 esc 2 skipped 0: 
+E CHAPI006 1668 sel 91 esc 1 skipped 2: 
+E CHAPI006 1668 sel 91 esc 2 skipped 1: 
+E CHAPI006 1668 sel 91 esc 3 skipped 0: 
+E CHAPI006 1933 sel 97 esc 1 skipped 0: 
+E CHAPI006 2103 con 92 esc 1 skipped 0: 
+E CHAPI006 2441 con 93 esc 1 skipped 1: 
+E CHAPI006 2441 con 93 esc 2 skipped 0: 
+E CHAPI006 2702 con 94 esc 1 skipped 1: 
+E CHAPI006 2702 con 94 esc 2 skipped 0: 
+E CHAPI006 2941 sel 103 esc 1 skipped 0: 
+E CHAPI006 3118 con 95 esc 1 skipped 1: 
+E CHAPI006 3118 con 95 esc 2 skipped 0: 
+E CHAPI006 3347 con 96 esc 1 skipped 1: 
+E CHAPI006 3347 con 96 esc 2 skipped 0: 
+E CHAPI006 3605 con 98 esc 1 skipped 1: 
+E CHAPI006 3605 con 98 esc 2 skipped 0: 
+E CHAPI006 3757 con 100 esc 1 skipped 0: 5691:89a
+E CHAPI006 3757 con 100 esc 2 skipped 0: 
+E CHAPI006 3864 con 101 esc 1 skipped 0: 5691:89a
+E CHAPI006 3864 con 101 esc 2 skipped 0: 
+E CHAPI006 3987 con 102 esc 1 skipped 0: 
+E CHAPI006 4148 con 109 esc 1 skipped 0: 4394:112a
+E CHAPI006 4148 con 109 esc 2 skipped 0: 
+E CHAPI006 4253 con 110 esc 1 skipped 0: 4394:112a
+E CHAPI006 4253 con 110 esc 2 skipped 0: 
+E CHAPI006 4355 con 111 esc 1 skipped 1: 
+E CHAPI006 4355 con 111 esc 2 skipped 0: 
+E CHAPI006 4394 con 112 esc 1 skipped 0: 
+E CHAPI006 4620 con 85 esc 1 skipped 1: 
+E CHAPI006 4620 con 85 esc 2 skipped 0: 
+E CHAPI006 5000 sel 99 esc 1 skipped 0: 
+E CHAPI006 5198 con 113 esc 1 skipped 0: 
+E CHAPI006 5290 con 86 esc 1 skipped 0: 5785:88a
+E CHAPI006 5290 con 86 esc 2 skipped 0: 
+E CHAPI006 5501 con 87 esc 1 skipped 0: 5785:88a
+E CHAPI006 5501 con 87 esc 2 skipped 0: 
+E CHAPI006 5691 sel 89 esc 1 skipped 0: 
+E CHAPI006 5785 con 88 esc 1 skipped 0: 
+E CHAPI009 753 con 114 esc 1 skipped 1: 
+E CHAPI009 753 con 114 esc 2 skipped 0: 
+E CHAPI009 947 con 115 esc 1 skipped 1: 
+E CHAPI009 947 con 115 esc 2 skipped 0: 
+E CHAPI009 1097 con 116 esc 1 skipped 1: 
+E CHAPI009 1097 con 116 esc 2 skipped 0: 
+E CHAPI009 1242 con 117 esc 1 skipped 0: 
+E CHAPI009 1349 sel 118 esc 1 skipped 5: 
+E CHAPI009 1349 sel 118 esc 2 skipped 4: 
+E CHAPI009 1349 sel 118 esc 3 skipped 3: 
+E CHAPI009 1349 sel 118 esc 4 skipped 2: 
+E CHAPI009 1349 sel 118 esc 5 skipped 1: 
+E CHAPI009 1349 sel 118 esc 6 skipped 0: 
+E CHAPI009 1735 sel 91 esc 1 skipped 2: 
+E CHAPI009 1735 sel 91 esc 2 skipped 1: 
+E CHAPI009 1735 sel 91 esc 3 skipped 0: 
+E CHAPI009 2000 sel 97 esc 1 skipped 0: 
+E CHAPI009 2170 con 92 esc 1 skipped 0: 
+E CHAPI009 2508 con 93 esc 1 skipped 1: 
+E CHAPI009 2508 con 93 esc 2 skipped 0: 
+E CHAPI009 2769 con 94 esc 1 skipped 1: 
+E CHAPI009 2769 con 94 esc 2 skipped 0: 
+E CHAPI009 3008 sel 103 esc 1 skipped 0: 
+E CHAPI009 3164 con 95 esc 1 skipped 1: 
+E CHAPI009 3164 con 95 esc 2 skipped 0: 
+E CHAPI009 3393 con 96 esc 1 skipped 1: 
+E CHAPI009 3393 con 96 esc 2 skipped 0: 
+E CHAPI009 3651 con 98 esc 1 skipped 1: 
+E CHAPI009 3651 con 98 esc 2 skipped 0: 
+E CHAPI009 3803 con 100 esc 1 skipped 0: 5737:89a
+E CHAPI009 3803 con 100 esc 2 skipped 0: 
+E CHAPI009 3910 con 101 esc 1 skipped 0: 5737:89a
+E CHAPI009 3910 con 101 esc 2 skipped 0: 
+E CHAPI009 4033 con 102 esc 1 skipped 0: 
+E CHAPI009 4194 con 109 esc 1 skipped 0: 4440:112a
+E CHAPI009 4194 con 109 esc 2 skipped 0: 
+E CHAPI009 4299 con 110 esc 1 skipped 0: 4440:112a
+E CHAPI009 4299 con 110 esc 2 skipped 0: 
+E CHAPI009 4401 con 111 esc 1 skipped 1: 
+E CHAPI009 4401 con 111 esc 2 skipped 0: 
+E CHAPI009 4440 con 112 esc 1 skipped 0: 
+E CHAPI009 4666 con 85 esc 1 skipped 1: 
+E CHAPI009 4666 con 85 esc 2 skipped 0: 
+E CHAPI009 5046 sel 99 esc 1 skipped 0: 
+E CHAPI009 5244 con 113 esc 1 skipped 0: 
+E CHAPI009 5336 con 86 esc 1 skipped 0: 5831:88a
+E CHAPI009 5336 con 86 esc 2 skipped 0: 
+E CHAPI009 5547 con 87 esc 1 skipped 0: 5831:88a
+E CHAPI009 5547 con 87 esc 2 skipped 0: 
+E CHAPI009 5737 sel 89 esc 1 skipped 0: 
+E CHAPI009 5831 con 88 esc 1 skipped 0: 
+E CHAPI011 346 sel 125 esc 1 skipped 4: 
+E CHAPI011 346 sel 125 esc 2 skipped 3: 
+E CHAPI011 346 sel 125 esc 3 skipped 2: 
+E CHAPI011 346 sel 125 esc 4 skipped 1: 
+E CHAPI011 346 sel 125 esc 5 skipped 0: 
+E CHAPI011 995 con 14 esc 1 skipped 1: 1466:128a
+E CHAPI011 995 con 14 esc 2 skipped 0: 1466:128a
+E CHAPI011 995 con 14 esc 3 skipped 0: 
+E CHAPI011 1046 con 126 esc 1 skipped 1: 1466:128a
+E CHAPI011 1046 con 126 esc 2 skipped 0: 1466:128a
+E CHAPI011 1046 con 126 esc 3 skipped 0: 
+E CHAPI011 1316 con 127 esc 1 skipped 1: 1466:128a
+E CHAPI011 1316 con 127 esc 2 skipped 0: 1466:128a
+E CHAPI011 1316 con 127 esc 3 skipped 0: 
+E CHAPI011 1466 con 128 esc 1 skipped 0: 
+E CHAPI011 1877 con 14 esc 1 skipped 4: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 1877 con 14 esc 2 skipped 3: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 1877 con 14 esc 3 skipped 2: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 1877 con 14 esc 4 skipped 1: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 1877 con 14 esc 5 skipped 0: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 1877 con 14 esc 6 skipped 3: 
+E CHAPI011 1877 con 14 esc 7 skipped 2: 
+E CHAPI011 1877 con 14 esc 8 skipped 1: 
+E CHAPI011 1877 con 14 esc 9 skipped 0: 
+E CHAPI011 1945 con 134 esc 1 skipped 1: 
+E CHAPI011 1945 con 134 esc 2 skipped 0: 
+E CHAPI011 2113 con 135 esc 1 skipped 0: 
+E CHAPI011 2275 con 136 esc 1 skipped 0: 
+E CHAPI011 2464 con 137 esc 1 skipped 3: 
+E CHAPI011 2464 con 137 esc 2 skipped 2: 
+E CHAPI011 2464 con 137 esc 3 skipped 1: 
+E CHAPI011 2464 con 137 esc 4 skipped 0: 
+E CHAPI011 2668 con 138 esc 1 skipped 1: 
+E CHAPI011 2668 con 138 esc 2 skipped 0: 
+E CHAPI011 2791 con 139 esc 1 skipped 0: 
+E CHAPI011 2908 con 140 esc 1 skipped 0: 
+E CHAPI011 3016 sel 141 esc 1 skipped 0: 
+E CHAPI011 3128 sel 142 esc 1 skipped 0: 
+E CHAPI011 3228 con 143 esc 1 skipped 1: 
+E CHAPI011 3228 con 143 esc 2 skipped 0: 
+E CHAPI011 3344 sel 144 esc 1 skipped 0: 
+E CHAPI011 3491 con 145 esc 1 skipped 3: 
+E CHAPI011 3491 con 145 esc 2 skipped 2: 
+E CHAPI011 3491 con 145 esc 3 skipped 1: 
+E CHAPI011 3491 con 145 esc 4 skipped 0: 
+E CHAPI011 3758 con 146 esc 1 skipped 3: 
+E CHAPI011 3758 con 146 esc 2 skipped 2: 
+E CHAPI011 3758 con 146 esc 3 skipped 1: 
+E CHAPI011 3758 con 146 esc 4 skipped 0: 
+E CHAPI011 4099 con 147 esc 1 skipped 5: 
+E CHAPI011 4099 con 147 esc 2 skipped 4: 
+E CHAPI011 4099 con 147 esc 3 skipped 3: 
+E CHAPI011 4099 con 147 esc 4 skipped 2: 
+E CHAPI011 4099 con 147 esc 5 skipped 1: 
+E CHAPI011 4099 con 147 esc 6 skipped 0: 
+E CHAPI011 4692 con 148 esc 1 skipped 3: 
+E CHAPI011 4692 con 148 esc 2 skipped 2: 
+E CHAPI011 4692 con 148 esc 3 skipped 1: 
+E CHAPI011 4692 con 148 esc 4 skipped 0: 
+E CHAPI011 4990 con 149 esc 1 skipped 7: 
+E CHAPI011 4990 con 149 esc 2 skipped 6: 
+E CHAPI011 4990 con 149 esc 3 skipped 5: 
+E CHAPI011 4990 con 149 esc 4 skipped 4: 
+E CHAPI011 4990 con 149 esc 5 skipped 3: 
+E CHAPI011 4990 con 149 esc 6 skipped 2: 
+E CHAPI011 4990 con 149 esc 7 skipped 1: 
+E CHAPI011 4990 con 149 esc 8 skipped 0: 
+E CHAPI011 5858 con 150 esc 1 skipped 3: 
+E CHAPI011 5858 con 150 esc 2 skipped 2: 
+E CHAPI011 5858 con 150 esc 3 skipped 1: 
+E CHAPI011 5858 con 150 esc 4 skipped 0: 
+E CHAPI011 6633 tim1 167 esc 1 skipped 6: 
+E CHAPI011 6633 tim1 167 esc 2 skipped 5: 
+E CHAPI011 6633 tim1 167 esc 3 skipped 4: 
+E CHAPI011 6633 tim1 167 esc 4 skipped 3: 
+E CHAPI011 6633 tim1 167 esc 5 skipped 2: 
+E CHAPI011 6633 tim1 167 esc 6 skipped 1: 
+E CHAPI011 6633 tim1 167 esc 7 skipped 0: 
+E CHAPI011 7274 tim1 168 esc 1 skipped 6: 
+E CHAPI011 7274 tim1 168 esc 2 skipped 5: 
+E CHAPI011 7274 tim1 168 esc 3 skipped 4: 
+E CHAPI011 7274 tim1 168 esc 4 skipped 3: 
+E CHAPI011 7274 tim1 168 esc 5 skipped 2: 
+E CHAPI011 7274 tim1 168 esc 6 skipped 1: 
+E CHAPI011 7274 tim1 168 esc 7 skipped 0: 
+E CHAPI011 7957 tim1 162 esc 1 skipped 4: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 7957 tim1 162 esc 2 skipped 3: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 7957 tim1 162 esc 3 skipped 2: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 7957 tim1 162 esc 4 skipped 1: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 7957 tim1 162 esc 5 skipped 0: 8200:162f 8225:162g 8356:162h 8403:162i
+E CHAPI011 7957 tim1 162 esc 6 skipped 3: 
+E CHAPI011 7957 tim1 162 esc 7 skipped 2: 
+E CHAPI011 7957 tim1 162 esc 8 skipped 1: 
+E CHAPI011 7957 tim1 162 esc 9 skipped 0: 
+E CHAPI011 8695 con 164 esc 1 skipped 0: 
+E CHAPI011 8845 con 165 esc 1 skipped 0: 
+E CHAPI011 8990 con 166 esc 1 skipped 1: 
+E CHAPI011 8990 con 166 esc 2 skipped 0: 
+E CHAPI011 9223 con 151 esc 1 skipped 11: 
+E CHAPI011 9223 con 151 esc 2 skipped 10: 
+E CHAPI011 9223 con 151 esc 3 skipped 9: 
+E CHAPI011 9223 con 151 esc 4 skipped 8: 
+E CHAPI011 9223 con 151 esc 5 skipped 7: 
+E CHAPI011 9223 con 151 esc 6 skipped 6: 
+E CHAPI011 9223 con 151 esc 7 skipped 5: 
+E CHAPI011 9223 con 151 esc 8 skipped 4: 
+E CHAPI011 9223 con 151 esc 9 skipped 3: 
+E CHAPI011 9223 con 151 esc 10 skipped 2: 
+E CHAPI011 9223 con 151 esc 11 skipped 1: 
+E CHAPI011 9223 con 151 esc 12 skipped 0: 
+E CHAPI011 10443 con 152 esc 1 skipped 5: 10983:152g 11070:152h 11099:152i
+E CHAPI011 10443 con 152 esc 2 skipped 4: 10983:152g 11070:152h 11099:152i
+E CHAPI011 10443 con 152 esc 3 skipped 3: 10983:152g 11070:152h 11099:152i
+E CHAPI011 10443 con 152 esc 4 skipped 2: 10983:152g 11070:152h 11099:152i
+E CHAPI011 10443 con 152 esc 5 skipped 1: 10983:152g 11070:152h 11099:152i
+E CHAPI011 10443 con 152 esc 6 skipped 0: 10983:152g 11070:152h 11099:152i
+E CHAPI011 10443 con 152 esc 7 skipped 2: 
+E CHAPI011 10443 con 152 esc 8 skipped 1: 
+E CHAPI011 10443 con 152 esc 9 skipped 0: 
+E CHAPI011 11514 con 153 esc 1 skipped 3: 
+E CHAPI011 11514 con 153 esc 2 skipped 2: 
+E CHAPI011 11514 con 153 esc 3 skipped 1: 
+E CHAPI011 11514 con 153 esc 4 skipped 0: 
+E CHAPI011 11797 con 154 esc 1 skipped 1: 
+E CHAPI011 11797 con 154 esc 2 skipped 0: 
+E CHAPI011 12065 con 155 esc 1 skipped 3: 
+E CHAPI011 12065 con 155 esc 2 skipped 2: 
+E CHAPI011 12065 con 155 esc 3 skipped 1: 
+E CHAPI011 12065 con 155 esc 4 skipped 0: 
+E CHAPI011 12332 con 156 esc 1 skipped 1: 
+E CHAPI011 12332 con 156 esc 2 skipped 0: 
+E CHAPI011 12475 con 157 esc 1 skipped 5: 
+E CHAPI011 12475 con 157 esc 2 skipped 4: 
+E CHAPI011 12475 con 157 esc 3 skipped 3: 
+E CHAPI011 12475 con 157 esc 4 skipped 2: 
+E CHAPI011 12475 con 157 esc 5 skipped 1: 
+E CHAPI011 12475 con 157 esc 6 skipped 0: 
+E CHAPI011 13197 con 158 esc 1 skipped 1: 
+E CHAPI011 13197 con 158 esc 2 skipped 0: 
+E CHAPI011 13455 sel 159 esc 1 skipped 0: 
+E CHAPI011 13814 sel 160 esc 1 skipped 0: 
+E CHAPI011 14015 sel 160 esc 1 skipped 0: 
+E CHAPI012 354 sel 10 esc 1 skipped 0: 
+E CHAPI012 591 sel 10 esc 1 skipped 0: 
+E CHAPI012 1522 tim2 34 esc 1 skipped 0: 
+E CHAPI012 1710 tim2 34 esc 1 skipped 0: 
+E CHAPI012 1877 tim2 34 esc 1 skipped 0: 
+E CHAPI012 2065 tim2 34 esc 1 skipped 0: 
+E CHAPI012 2232 tim2 34 esc 1 skipped 0: 
+E CHAPI012 2278 tim2 34 esc 1 skipped 0: 
+E CHAPI012 2411 sel 10 esc 1 skipped 0: 
+E CHAPI012 2451 tim2 34 esc 1 skipped 0: 
+E CHAPI012 2542 con 169 esc 1 skipped 0: 
+E CHAPI012 2619 con 267 esc 1 skipped 0: 
+E CHAPI013 1822 con 175 esc 1 skipped 1: 
+E CHAPI013 1822 con 175 esc 2 skipped 0: 
+E CHAPI013 1999 sel 176 esc 1 skipped 0: 
+E CHAPI013 2884 con 179 esc 1 skipped 0: 
+E CHAPI013 2956 con 180 esc 1 skipped 0: 
+E CHAPI014 440 con 175 esc 1 skipped 1: 
+E CHAPI014 440 con 175 esc 2 skipped 0: 
+E CHAPI014 617 sel 176 esc 1 skipped 0: 
+E CHAPI014 765 sel 182 esc 1 skipped 0: 
+E CHAPI015 524 con 14 esc 1 skipped 0: 
+E CHAPI015 589 tim1 185 esc 1 skipped 0: 
+E CHAPI015 1562 con 186 esc 1 skipped 1: 
+E CHAPI015 1562 con 186 esc 2 skipped 0: 
+E CHAPI015 1746 con 187 esc 1 skipped 3: 
+E CHAPI015 1746 con 187 esc 2 skipped 2: 
+E CHAPI015 1746 con 187 esc 3 skipped 1: 
+E CHAPI015 1746 con 187 esc 4 skipped 0: 
+E CHAPI015 2050 con 188 esc 1 skipped 1: 
+E CHAPI015 2050 con 188 esc 2 skipped 0: 
+E CHAPI015 2293 tim1 189 esc 1 skipped 7: 
+E CHAPI015 2293 tim1 189 esc 2 skipped 6: 
+E CHAPI015 2293 tim1 189 esc 3 skipped 5: 
+E CHAPI015 2293 tim1 189 esc 4 skipped 4: 
+E CHAPI015 2293 tim1 189 esc 5 skipped 3: 
+E CHAPI015 2293 tim1 189 esc 6 skipped 2: 
+E CHAPI015 2293 tim1 189 esc 7 skipped 1: 
+E CHAPI015 2293 tim1 189 esc 8 skipped 0: 
+E CHAPI015 3325 sel 190 esc 1 skipped 0: 
+E CHAPI015 4670 sel 192 esc 1 skipped 0: 
+E CHAPI015 6920 con 193 esc 1 skipped 0: 
+E CHAPI015 7039 con 195 esc 1 skipped 0: 
+E CHAPI015 7124 sel 176 esc 1 skipped 0: 
+E CHAPI016 955 con 204 esc 1 skipped 1: 
+E CHAPI016 955 con 204 esc 2 skipped 0: 
+E CHAPI016 1074 sel 176 esc 1 skipped 0: 
+E CHAPI016 1159 tim1 205 esc 1 skipped 0: 
+E CHAPI016 1325 tim1 192 esc 1 skipped 0: 
+E CHAPI016 1778 sel 10 esc 1 skipped 0: 
+E CHAPI016 1983 sel 206 esc 1 skipped 0: 2057:206b 2119:206c
+E CHAPI016 1983 sel 206 esc 2 skipped 1: 
+E CHAPI016 1983 sel 206 esc 3 skipped 0: 
+E CHAPI016 2280 con 207 esc 1 skipped 5: 
+E CHAPI016 2280 con 207 esc 2 skipped 4: 
+E CHAPI016 2280 con 207 esc 3 skipped 3: 
+E CHAPI016 2280 con 207 esc 4 skipped 2: 
+E CHAPI016 2280 con 207 esc 5 skipped 1: 
+E CHAPI016 2280 con 207 esc 6 skipped 0: 
+E CHAPI016 3115 sel 10 esc 1 skipped 5: 
+E CHAPI016 3115 sel 10 esc 2 skipped 4: 
+E CHAPI016 3115 sel 10 esc 3 skipped 3: 
+E CHAPI016 3115 sel 10 esc 4 skipped 2: 
+E CHAPI016 3115 sel 10 esc 5 skipped 1: 
+E CHAPI016 3115 sel 10 esc 6 skipped 0: 
+E CHAPI016 3194 sel 10 esc 1 skipped 5: 4353:210g
+E CHAPI016 3194 sel 10 esc 2 skipped 4: 4353:210g
+E CHAPI016 3194 sel 10 esc 3 skipped 3: 4353:210g
+E CHAPI016 3194 sel 10 esc 4 skipped 2: 4353:210g
+E CHAPI016 3194 sel 10 esc 5 skipped 1: 4353:210g
+E CHAPI016 3194 sel 10 esc 6 skipped 0: 4353:210g
+E CHAPI016 3194 sel 10 esc 7 skipped 0: 
+E CHAPI016 3308 con 209 esc 1 skipped 1: 
+E CHAPI016 3308 con 209 esc 2 skipped 0: 
+E CHAPI016 3573 con 210 esc 1 skipped 5: 4353:210g
+E CHAPI016 3573 con 210 esc 2 skipped 4: 4353:210g
+E CHAPI016 3573 con 210 esc 3 skipped 3: 4353:210g
+E CHAPI016 3573 con 210 esc 4 skipped 2: 4353:210g
+E CHAPI016 3573 con 210 esc 5 skipped 1: 4353:210g
+E CHAPI016 3573 con 210 esc 6 skipped 0: 4353:210g
+E CHAPI016 3573 con 210 esc 7 skipped 0: 
+E CHAPI016 4485 tim2 244 esc 1 skipped 0: 
+E CHAPI017 1771 sel 176 esc 1 skipped 0: 
+E CHAPI018 222 tim2 237 esc 1 skipped 0: 
+E CHAPI018 786 sel 238 esc 1 skipped 3: 
+E CHAPI018 786 sel 238 esc 2 skipped 2: 
+E CHAPI018 786 sel 238 esc 3 skipped 1: 
+E CHAPI018 786 sel 238 esc 4 skipped 0: 
+E CHAPI018 1519 con 244 esc 1 skipped 0: 
+E CHAPI018 1797 tim2 225 esc 1 skipped 0: 
+E CHAPI018 1915 sel 226 esc 1 skipped 2: 
+E CHAPI018 1915 sel 226 esc 2 skipped 1: 
+E CHAPI018 1915 sel 226 esc 3 skipped 0: 
+E CHAPI018 2171 con 227 esc 1 skipped 3: 
+E CHAPI018 2171 con 227 esc 2 skipped 2: 
+E CHAPI018 2171 con 227 esc 3 skipped 1: 
+E CHAPI018 2171 con 227 esc 4 skipped 0: 
+E CHAPI018 2427 con 228 esc 1 skipped 0: 
+E CHAPI018 2659 con 229 esc 1 skipped 0: 
+E CHAPI018 2839 con 230 esc 1 skipped 3: 
+E CHAPI018 2839 con 230 esc 2 skipped 2: 
+E CHAPI018 2839 con 230 esc 3 skipped 1: 
+E CHAPI018 2839 con 230 esc 4 skipped 0: 
+E CHAPI018 3169 con 231 esc 1 skipped 5: 
+E CHAPI018 3169 con 231 esc 2 skipped 4: 
+E CHAPI018 3169 con 231 esc 3 skipped 3: 
+E CHAPI018 3169 con 231 esc 4 skipped 2: 
+E CHAPI018 3169 con 231 esc 5 skipped 1: 
+E CHAPI018 3169 con 231 esc 6 skipped 0: 
+E CHAPI018 3609 con 232 esc 1 skipped 0: 
+E CHAPI018 3753 con 233 esc 1 skipped 5: 
+E CHAPI018 3753 con 233 esc 2 skipped 4: 
+E CHAPI018 3753 con 233 esc 3 skipped 3: 
+E CHAPI018 3753 con 233 esc 4 skipped 2: 
+E CHAPI018 3753 con 233 esc 5 skipped 1: 
+E CHAPI018 3753 con 233 esc 6 skipped 0: 
+E CHAPI018 4156 con 234 esc 1 skipped 0: 
+E CHAPI018 4588 con 241 esc 1 skipped 0: 
+E CHAPI018 4717 con 235 esc 1 skipped 1: 
+E CHAPI018 4717 con 235 esc 2 skipped 0: 
+E CHAPI018 4884 con 236 esc 1 skipped 0: 
+E CHAPI018 4976 sel 240 esc 1 skipped 0: 
+E CHAPI018 5096 sel 242 esc 1 skipped 0: 
+E CHAPI018 5192 sel 243 esc 1 skipped 0: 
+E CHAPI018 5264 sel 239 esc 1 skipped 0: 
+E CHAPI018 6912 sel 176 esc 1 skipped 0: 
+E CHAPI020 151 con 260 esc 1 skipped 6: 
+E CHAPI020 151 con 260 esc 2 skipped 5: 
+E CHAPI020 151 con 260 esc 3 skipped 4: 
+E CHAPI020 151 con 260 esc 4 skipped 3: 
+E CHAPI020 151 con 260 esc 5 skipped 2: 
+E CHAPI020 151 con 260 esc 6 skipped 1: 
+E CHAPI020 151 con 260 esc 7 skipped 0: 
+E CHAPI020 803 tim2 261 esc 1 skipped 0: 
+E CHAPI020 1898 sel 176 esc 1 skipped 0: 
+E CHAPI020 3474 con 244 esc 1 skipped 0: 
+E CHAPI020 4304 tim2 237 esc 1 skipped 0: 
+E CHAPI021 474 tim2 265 esc 1 skipped 1: 629:265c 667:265d 754:265e 879:265f 984:265g 1074:265h 1138:265i 1247:265j 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 2 skipped 0: 629:265c 667:265d 754:265e 879:265f 984:265g 1074:265h 1138:265i 1247:265j 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 3 skipped 3: 984:265g 1074:265h 1138:265i 1247:265j 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 4 skipped 2: 984:265g 1074:265h 1138:265i 1247:265j 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 5 skipped 1: 984:265g 1074:265h 1138:265i 1247:265j 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 6 skipped 0: 984:265g 1074:265h 1138:265i 1247:265j 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 7 skipped 3: 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 8 skipped 2: 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 9 skipped 1: 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 10 skipped 0: 1331:265k 1370:265l
+E CHAPI021 474 tim2 265 esc 11 skipped 1: 
+E CHAPI021 474 tim2 265 esc 12 skipped 0: 
+E CHAPI021 1571 sel 269 esc 1 skipped 0: 
+E CHAPI021 1691 con 270 esc 1 skipped 0: 
+E CHAPI022 378 sel 10 esc 1 skipped 0: 
+E CHAPI022 1675 tim2 34 esc 1 skipped 0: 
+E CHAPI022 1888 tim2 34 esc 1 skipped 0: 
+E CHAPI022 2364 tim2 34 esc 1 skipped 0: 
+E CHAPI022 2530 tim2 34 esc 1 skipped 0: 
+E CHAPI022 2586 tim2 34 esc 1 skipped 0: 
+E CHAPI022 2751 tim2 34 esc 1 skipped 0: 
+E CHAPI022 2796 tim2 34 esc 1 skipped 0: 
+E CHAPI022 2866 tim2 34 esc 1 skipped 0: 
+E CHAPI022 2925 tim2 34 esc 1 skipped 0: 
+E CHAPI022 2984 tim2 34 esc 1 skipped 0: 
+E CHAPI022 3028 sel 10 esc 1 skipped 0: 
+E CHAPI022 3187 tim2 34 esc 1 skipped 0: 
+E CHAPI022 3246 tim2 34 esc 1 skipped 0: 
+E CHAPI022 3305 tim2 34 esc 1 skipped 0: 
+E CHAPI022 3483 tim2 34 esc 1 skipped 0: 
+E CHAPI022 3516 con 169 esc 1 skipped 0: 
+E CHAPI022 3612 con 267 esc 1 skipped 0: 
+E CHAPI022 4348 sel 269 esc 1 skipped 0: 
+E CHAPI023 269 tim1 34 esc 1 skipped 0: 
+E CHAPI023 309 tim1 34 esc 1 skipped 0: 
+E CHAPI023 349 tim1 34 esc 1 skipped 0: 
+E CHAPI023 389 tim1 34 esc 1 skipped 0: 
+E CHAPI023 605 tim2 271 esc 1 skipped 3: 
+E CHAPI023 605 tim2 271 esc 2 skipped 2: 
+E CHAPI023 605 tim2 271 esc 3 skipped 1: 
+E CHAPI023 605 tim2 271 esc 4 skipped 0: 
+E CHAPI023 977 tim2 272 esc 1 skipped 3: 
+E CHAPI023 977 tim2 272 esc 2 skipped 2: 
+E CHAPI023 977 tim2 272 esc 3 skipped 1: 
+E CHAPI023 977 tim2 272 esc 4 skipped 0: 
+E CHAPI023 1352 tim2 273 esc 1 skipped 2: 
+E CHAPI023 1352 tim2 273 esc 2 skipped 1: 
+E CHAPI023 1352 tim2 273 esc 3 skipped 0: 
+E CHAPI023 1765 sel 10 esc 1 skipped 0: 
+E CHAPI023 1795 tim2 274 esc 1 skipped 0: 
+E CHAPI023 2387 sel 169 esc 1 skipped 0: 
+E CHAPI024 396 sel 275 esc 1 skipped 3: 567:275e 609:275f 668:275g
+E CHAPI024 396 sel 275 esc 2 skipped 2: 567:275e 609:275f 668:275g
+E CHAPI024 396 sel 275 esc 3 skipped 1: 567:275e 609:275f 668:275g
+E CHAPI024 396 sel 275 esc 4 skipped 0: 567:275e 609:275f 668:275g
+E CHAPI024 396 sel 275 esc 5 skipped 2: 
+E CHAPI024 396 sel 275 esc 6 skipped 1: 
+E CHAPI024 396 sel 275 esc 7 skipped 0: 
+E CHAPI024 871 sel 276 esc 1 skipped 0: 
+E CHAPI024 989 sel 276 esc 1 skipped 0: 
+E CHAPI024 1108 con 277 esc 1 skipped 1: 
+E CHAPI024 1108 con 277 esc 2 skipped 0: 
+E CHAPI024 1353 con 277 esc 1 skipped 1: 2292:280a 2318:280b
+E CHAPI024 1353 con 277 esc 2 skipped 0: 2292:280a 2318:280b
+E CHAPI024 1353 con 277 esc 3 skipped 1: 
+E CHAPI024 1353 con 277 esc 4 skipped 0: 
+E CHAPI024 1586 con 278 esc 1 skipped 1: 
+E CHAPI024 1586 con 278 esc 2 skipped 0: 
+E CHAPI024 1883 con 278 esc 1 skipped 1: 2292:280a 2318:280b
+E CHAPI024 1883 con 278 esc 2 skipped 0: 2292:280a 2318:280b
+E CHAPI024 1883 con 278 esc 3 skipped 1: 
+E CHAPI024 1883 con 278 esc 4 skipped 0: 
+E CHAPI024 2153 con 279 esc 1 skipped 1: 
+E CHAPI024 2153 con 279 esc 2 skipped 0: 
+E CHAPI024 2275 con 280 esc 1 skipped 1: 
+E CHAPI024 2275 con 280 esc 2 skipped 0: 
+E CHAPI024 3395 con 281 esc 1 skipped 5: 
+E CHAPI024 3395 con 281 esc 2 skipped 4: 
+E CHAPI024 3395 con 281 esc 3 skipped 3: 
+E CHAPI024 3395 con 281 esc 4 skipped 2: 
+E CHAPI024 3395 con 281 esc 5 skipped 1: 
+E CHAPI024 3395 con 281 esc 6 skipped 0: 
+E CHAPI025 1308 sel 286 esc 1 skipped 0: 
+E CHAPI026 421 sel 10 esc 1 skipped 0: 
+E CHAPI026 542 sel 10 esc 1 skipped 0: 
+E CHAPI026 1734 tim2 34 esc 1 skipped 0: 
+E CHAPI026 1901 tim2 34 esc 1 skipped 0: 
+E CHAPI026 1947 tim2 34 esc 1 skipped 0: 
+E CHAPI026 2114 tim2 34 esc 1 skipped 0: 
+E CHAPI026 2302 tim2 34 esc 1 skipped 0: 
+E CHAPI026 2491 tim2 34 esc 1 skipped 0: 
+E CHAPI026 2566 tim2 34 esc 1 skipped 0: 
+E CHAPI026 2714 con 169 esc 1 skipped 0: 
+E CHAPI026 2810 con 267 esc 1 skipped 0: 
+E CHAPI026 3158 sel 285 esc 1 skipped 0: 
+E CHAPI026 3266 sel 287 esc 1 skipped 0: 
+E CHAPI026 3359 sel 286 esc 1 skipped 0: 
+E CHAPI026 3716 tim2 291 esc 1 skipped 0: 
+E CHAPI026 4191 tim2 14 esc 1 skipped 0: 
+E CHAPI026 4225 sel 10 esc 1 skipped 0: 
+E CHAPI026 4259 sel 10 esc 1 skipped 0: 
+E CHAPI026 4332 tim2 34 esc 1 skipped 0: 
+E CHAPI026 4405 tim2 34 esc 1 skipped 0: 
+E CHAPI026 4445 tim2 34 esc 1 skipped 0: 
+E CHAPI026 4479 sel 290 esc 1 skipped 0: 
+E CHAPI026 4967 sel 269 esc 1 skipped 0: 
+E CHAPI027 391 tim1 294 esc 1 skipped 0: 
+E CHAPI027 800 sel 290 esc 1 skipped 0: 
+E CHAPI027 888 sel 291 esc 1 skipped 0: 
+E CHAPI028 165 tim2 300 esc 1 skipped 0: 220:300b
+E CHAPI028 165 tim2 300 esc 2 skipped 0: 
+E CHAPI028 597 con 301 esc 1 skipped 2: 
+E CHAPI028 597 con 301 esc 2 skipped 1: 
+E CHAPI028 597 con 301 esc 3 skipped 0: 
+E CHAPI028 854 con 302 esc 1 skipped 12: 
+E CHAPI028 854 con 302 esc 2 skipped 11: 
+E CHAPI028 854 con 302 esc 3 skipped 10: 
+E CHAPI028 854 con 302 esc 4 skipped 9: 
+E CHAPI028 854 con 302 esc 5 skipped 8: 
+E CHAPI028 854 con 302 esc 6 skipped 7: 
+E CHAPI028 854 con 302 esc 7 skipped 6: 
+E CHAPI028 854 con 302 esc 8 skipped 5: 
+E CHAPI028 854 con 302 esc 9 skipped 4: 
+E CHAPI028 854 con 302 esc 10 skipped 3: 
+E CHAPI028 854 con 302 esc 11 skipped 2: 
+E CHAPI028 854 con 302 esc 12 skipped 1: 
+E CHAPI028 854 con 302 esc 13 skipped 0: 
+E CHAPI028 1780 con 303 esc 1 skipped 3: 
+E CHAPI028 1780 con 303 esc 2 skipped 2: 
+E CHAPI028 1780 con 303 esc 3 skipped 1: 
+E CHAPI028 1780 con 303 esc 4 skipped 0: 
+E CHAPI028 2083 con 304 esc 1 skipped 0: 597:301a 656:301b 718:301c
+E CHAPI028 2083 con 304 esc 2 skipped 2: 
+E CHAPI028 2083 con 304 esc 3 skipped 1: 
+E CHAPI028 2083 con 304 esc 4 skipped 0: 
+E CHAPI028 2188 con 305 esc 1 skipped 0: 1788:303a 1847:303b 1891:303c 1939:303d
+E CHAPI028 2188 con 305 esc 2 skipped 3: 
+E CHAPI028 2188 con 305 esc 3 skipped 2: 
+E CHAPI028 2188 con 305 esc 4 skipped 1: 
+E CHAPI028 2188 con 305 esc 5 skipped 0: 
+E CHAPI028 2295 sel 306 esc 1 skipped 0: 
+E CHAPI028 2460 sel 313 esc 1 skipped 0: 
+E CHAPI028 2577 con 307 esc 1 skipped 10: 
+E CHAPI028 2577 con 307 esc 2 skipped 9: 
+E CHAPI028 2577 con 307 esc 3 skipped 8: 
+E CHAPI028 2577 con 307 esc 4 skipped 7: 
+E CHAPI028 2577 con 307 esc 5 skipped 6: 
+E CHAPI028 2577 con 307 esc 6 skipped 5: 
+E CHAPI028 2577 con 307 esc 7 skipped 4: 
+E CHAPI028 2577 con 307 esc 8 skipped 3: 
+E CHAPI028 2577 con 307 esc 9 skipped 2: 
+E CHAPI028 2577 con 307 esc 10 skipped 1: 
+E CHAPI028 2577 con 307 esc 11 skipped 0: 
+E CHAPI028 3281 con 308 esc 1 skipped 0: 
+E CHAPI028 3495 con 311 esc 1 skipped 0: 
+E CHAPI028 3647 con 312 esc 1 skipped 0: 
+E CHAPI029 534 tim1 325 esc 1 skipped 4: 
+E CHAPI029 534 tim1 325 esc 2 skipped 3: 
+E CHAPI029 534 tim1 325 esc 3 skipped 2: 
+E CHAPI029 534 tim1 325 esc 4 skipped 1: 
+E CHAPI029 534 tim1 325 esc 5 skipped 0: 
+E CHAPI029 1111 con 326 esc 1 skipped 0: 
+E CHAPI029 1294 con 327 esc 1 skipped 0: 
+E CHAPI029 1459 con 328 esc 1 skipped 1: 
+E CHAPI029 1459 con 328 esc 2 skipped 0: 
+E CHAPI029 1621 sel 329 esc 1 skipped 4: 
+E CHAPI029 1621 sel 329 esc 2 skipped 3: 
+E CHAPI029 1621 sel 329 esc 3 skipped 2: 
+E CHAPI029 1621 sel 329 esc 4 skipped 1: 
+E CHAPI029 1621 sel 329 esc 5 skipped 0: 
+E CHAPI029 1948 con 330 esc 1 skipped 0: 
+E CHAPI029 2081 con 331 esc 1 skipped 0: 
+E CHAPI029 2269 con 332 esc 1 skipped 0: 
+E CHAPI029 2489 tim1 34 esc 1 skipped 0: 
+E CHAPI029 2541 sel 333 esc 1 skipped 0: 
+E CHAPI030 330 tim2 340 esc 1 skipped 0: 
+E CHAPI030 460 con 341 esc 1 skipped 1: 
+E CHAPI030 460 con 341 esc 2 skipped 0: 
+E CHAPI030 711 con 343 esc 1 skipped 1: 
+E CHAPI030 711 con 343 esc 2 skipped 0: 
+E CHAPI030 1014 con 344 esc 1 skipped 1: 
+E CHAPI030 1014 con 344 esc 2 skipped 0: 
+E CHAPI030 1215 sel 345 esc 1 skipped 0: 
+E CHAPI030 1478 con 346 esc 1 skipped 2: 
+E CHAPI030 1478 con 346 esc 2 skipped 1: 
+E CHAPI030 1478 con 346 esc 3 skipped 0: 
+E CHAPI030 1961 con 348 esc 1 skipped 1: 
+E CHAPI030 1961 con 348 esc 2 skipped 0: 
+E CHAPI030 2142 con 349 esc 1 skipped 0: 
+E CHAPI030 2389 sel 350 esc 1 skipped 0: 
+E CHAPI030 2510 sel 352 esc 1 skipped 0: 
+E CHAPI030 2690 sel 353 esc 1 skipped 0: 
+E CHAPI030 2808 sel 354 esc 1 skipped 0: 
+E CHAPI030 2958 con 14 esc 1 skipped 2: 
+E CHAPI030 2958 con 14 esc 2 skipped 1: 
+E CHAPI030 2958 con 14 esc 3 skipped 0: 
+E CHAPI030 3024 con 14 esc 1 skipped 2: 
+E CHAPI030 3024 con 14 esc 2 skipped 1: 
+E CHAPI030 3024 con 14 esc 3 skipped 0: 
+E CHAPI030 3451 con 355 esc 1 skipped 0: 3528:355b
+E CHAPI030 3451 con 355 esc 2 skipped 0: 
+E CHAPI030 3643 con 356 esc 1 skipped 0: 
+E CHAPI030 3794 con 357 esc 1 skipped 0: 
+E CHAPI030 3936 con 358 esc 1 skipped 3: 
+E CHAPI030 3936 con 358 esc 2 skipped 2: 
+E CHAPI030 3936 con 358 esc 3 skipped 1: 
+E CHAPI030 3936 con 358 esc 4 skipped 0: 
+E CHAPI030 4255 sel 359 esc 1 skipped 1: 4418:359c 4464:359d 4527:359e 4581:359f
+E CHAPI030 4255 sel 359 esc 2 skipped 0: 4418:359c 4464:359d 4527:359e 4581:359f
+E CHAPI030 4255 sel 359 esc 3 skipped 2: 4581:359f
+E CHAPI030 4255 sel 359 esc 4 skipped 1: 4581:359f
+E CHAPI030 4255 sel 359 esc 5 skipped 0: 4581:359f
+E CHAPI030 4255 sel 359 esc 6 skipped 0: 
+E CHAPI030 4731 con 366 esc 1 skipped 1: 4894:366c 4940:366d 4993:366e 5047:366f
+E CHAPI030 4731 con 366 esc 2 skipped 0: 4894:366c 4940:366d 4993:366e 5047:366f
+E CHAPI030 4731 con 366 esc 3 skipped 2: 5047:366f
+E CHAPI030 4731 con 366 esc 4 skipped 1: 5047:366f
+E CHAPI030 4731 con 366 esc 5 skipped 0: 5047:366f
+E CHAPI030 4731 con 366 esc 6 skipped 0: 
+E CHAPI030 5179 sel 360 esc 1 skipped 2: 5332:360d
+E CHAPI030 5179 sel 360 esc 2 skipped 1: 5332:360d
+E CHAPI030 5179 sel 360 esc 3 skipped 0: 5332:360d
+E CHAPI030 5179 sel 360 esc 4 skipped 0: 
+E CHAPI030 5463 con 363 esc 1 skipped 0: 
+E CHAPI030 5595 con 363 esc 1 skipped 0: 
+E CHAPI030 5748 sel 364 esc 1 skipped 0: 
+E CHAPI030 5828 con 36 esc 1 skipped 0: 
+E CHAPI031 333 sel 367 esc 1 skipped 0: 
+E CHAPI031 509 sel 10 esc 1 skipped 0: 
+E CHAPI031 581 sel 368 esc 1 skipped 0: 
+E CHAPI031 773 sel 10 esc 1 skipped 0: 
+E CHAPI031 817 sel 10 esc 1 skipped 0: 
+E CHAPI031 893 sel 369 esc 1 skipped 0: 
+E CHAPI031 1053 sel 10 esc 1 skipped 0: 
+E CHAPI031 1288 con 370 esc 1 skipped 3: 1430:370e 1461:370f
+E CHAPI031 1288 con 370 esc 2 skipped 2: 1430:370e 1461:370f
+E CHAPI031 1288 con 370 esc 3 skipped 1: 1430:370e 1461:370f
+E CHAPI031 1288 con 370 esc 4 skipped 0: 1430:370e 1461:370f
+E CHAPI031 1288 con 370 esc 5 skipped 1: 
+E CHAPI031 1288 con 370 esc 6 skipped 0: 
+E CHAPI031 1595 con 371 esc 1 skipped 2: 1706:371d 1720:371e
+E CHAPI031 1595 con 371 esc 2 skipped 1: 1706:371d 1720:371e
+E CHAPI031 1595 con 371 esc 3 skipped 0: 1706:371d 1720:371e
+E CHAPI031 1595 con 371 esc 4 skipped 1: 
+E CHAPI031 1595 con 371 esc 5 skipped 0: 
+E CHAPI031 1863 con 383 esc 1 skipped 2: 1996:383d 2008:383e
+E CHAPI031 1863 con 383 esc 2 skipped 1: 1996:383d 2008:383e
+E CHAPI031 1863 con 383 esc 3 skipped 0: 1996:383d 2008:383e
+E CHAPI031 1863 con 383 esc 4 skipped 1: 
+E CHAPI031 1863 con 383 esc 5 skipped 0: 
+E CHAPI031 2152 sel 372 esc 1 skipped 0: 
+E CHAPI031 2478 tim1 385 esc 1 skipped 0: 
+E CHAPI031 2769 tim1 384 esc 1 skipped 0: 
+E CHAPI031 3043 sel 374 esc 1 skipped 5: 
+E CHAPI031 3043 sel 374 esc 2 skipped 4: 
+E CHAPI031 3043 sel 374 esc 3 skipped 3: 
+E CHAPI031 3043 sel 374 esc 4 skipped 2: 
+E CHAPI031 3043 sel 374 esc 5 skipped 1: 
+E CHAPI031 3043 sel 374 esc 6 skipped 0: 
+E CHAPI031 3406 tim1 376 esc 1 skipped 0: 
+E CHAPI031 3646 sel 375 esc 1 skipped 0: 
+E CHAPI031 3859 tim1 34 esc 1 skipped 0: 
+E CHAPI031 3922 sel 10 esc 1 skipped 0: 
+E CHAPI031 3971 sel 10 esc 1 skipped 0: 
+E CHAPI031 4289 con 392 esc 1 skipped 0: 
+E CHAPI031 4423 con 14 esc 1 skipped 0: 
+E CHAPI031 4496 con 14 esc 1 skipped 0: 
+E CHAPI031 4571 con 14 esc 1 skipped 0: 
+E CHAPI031 4624 tim1 377 esc 1 skipped 3: 
+E CHAPI031 4624 tim1 377 esc 2 skipped 2: 
+E CHAPI031 4624 tim1 377 esc 3 skipped 1: 
+E CHAPI031 4624 tim1 377 esc 4 skipped 0: 
+E CHAPI031 5013 sel 378 esc 1 skipped 0: 
+E CHAPI031 5215 con 379 esc 1 skipped 0: 
+E CHAPI031 5450 con 390 esc 1 skipped 0: 
+E CHAPI031 5546 sel 391 esc 1 skipped 0: 
+E CHAPI031 5676 sel 393 esc 1 skipped 1: 
+E CHAPI031 5676 sel 393 esc 2 skipped 0: 
+E CHAPI031 6037 con 373 esc 1 skipped 0: 
+E CHAPI031 6156 con 382 esc 1 skipped 4: 
+E CHAPI031 6156 con 382 esc 2 skipped 3: 
+E CHAPI031 6156 con 382 esc 3 skipped 2: 
+E CHAPI031 6156 con 382 esc 4 skipped 1: 
+E CHAPI031 6156 con 382 esc 5 skipped 0: 
+E CHAPI031 6366 con 363 esc 1 skipped 0: 
+E CHAPI031 6469 con 36 esc 1 skipped 0: 
+E CHAPI032 339 con 389 esc 1 skipped 0: 
+E CHAPI032 529 tim2 387 esc 1 skipped 0: 
+E CHAPI032 988 sel 10 esc 1 skipped 0: 
+E CHAPI032 1071 sel 400 esc 1 skipped 0: 
+E CHAPI032 1190 sel 401 esc 1 skipped 0: 
+E CHAPI032 1285 con 403 esc 1 skipped 7: 
+E CHAPI032 1285 con 403 esc 2 skipped 6: 
+E CHAPI032 1285 con 403 esc 3 skipped 5: 
+E CHAPI032 1285 con 403 esc 4 skipped 4: 
+E CHAPI032 1285 con 403 esc 5 skipped 3: 
+E CHAPI032 1285 con 403 esc 6 skipped 2: 
+E CHAPI032 1285 con 403 esc 7 skipped 1: 
+E CHAPI032 1285 con 403 esc 8 skipped 0: 
+E CHAPI032 1878 con 404 esc 1 skipped 7: 
+E CHAPI032 1878 con 404 esc 2 skipped 6: 
+E CHAPI032 1878 con 404 esc 3 skipped 5: 
+E CHAPI032 1878 con 404 esc 4 skipped 4: 
+E CHAPI032 1878 con 404 esc 5 skipped 3: 
+E CHAPI032 1878 con 404 esc 6 skipped 2: 
+E CHAPI032 1878 con 404 esc 7 skipped 1: 
+E CHAPI032 1878 con 404 esc 8 skipped 0: 
+E CHAPI032 2455 con 404 esc 1 skipped 7: 
+E CHAPI032 2455 con 404 esc 2 skipped 6: 
+E CHAPI032 2455 con 404 esc 3 skipped 5: 
+E CHAPI032 2455 con 404 esc 4 skipped 4: 
+E CHAPI032 2455 con 404 esc 5 skipped 3: 
+E CHAPI032 2455 con 404 esc 6 skipped 2: 
+E CHAPI032 2455 con 404 esc 7 skipped 1: 
+E CHAPI032 2455 con 404 esc 8 skipped 0: 
+E CHAPI032 3022 con 404 esc 1 skipped 4: 
+E CHAPI032 3022 con 404 esc 2 skipped 3: 
+E CHAPI032 3022 con 404 esc 3 skipped 2: 
+E CHAPI032 3022 con 404 esc 4 skipped 1: 
+E CHAPI032 3022 con 404 esc 5 skipped 0: 
+E CHAPI032 3452 con 404 esc 1 skipped 4: 
+E CHAPI032 3452 con 404 esc 2 skipped 3: 
+E CHAPI032 3452 con 404 esc 3 skipped 2: 
+E CHAPI032 3452 con 404 esc 4 skipped 1: 
+E CHAPI032 3452 con 404 esc 5 skipped 0: 
+E CHAPI032 3871 con 405 esc 1 skipped 2: 
+E CHAPI032 3871 con 405 esc 2 skipped 1: 
+E CHAPI032 3871 con 405 esc 3 skipped 0: 
+E CHAPI032 4097 con 408 esc 1 skipped 2: 
+E CHAPI032 4097 con 408 esc 2 skipped 1: 
+E CHAPI032 4097 con 408 esc 3 skipped 0: 
+E CHAPI032 4305 con 406 esc 1 skipped 1: 4459:406c 4496:406d
+E CHAPI032 4305 con 406 esc 2 skipped 0: 4459:406c 4496:406d
+E CHAPI032 4305 con 406 esc 3 skipped 1: 
+E CHAPI032 4305 con 406 esc 4 skipped 0: 
+E CHAPI032 4762 con 407 esc 1 skipped 1: 
+E CHAPI032 4762 con 407 esc 2 skipped 0: 
+E CHAPI032 5088 sel 409 esc 1 skipped 4: 
+E CHAPI032 5088 sel 409 esc 2 skipped 3: 
+E CHAPI032 5088 sel 409 esc 3 skipped 2: 
+E CHAPI032 5088 sel 409 esc 4 skipped 1: 
+E CHAPI032 5088 sel 409 esc 5 skipped 0: 
+E CHAPI032 5448 con 410 esc 1 skipped 0: 
+E CHAPI032 5721 con 410 esc 1 skipped 0: 
+E CHAPI032 6005 tim1 411 esc 1 skipped 0: 
+E CHAPI032 6285 tim1 412 esc 1 skipped 0: 
+E CHAPI032 6501 tim1 413 esc 1 skipped 0: 
+E CHAPI032 6749 sel 414 esc 1 skipped 7: 
+E CHAPI032 6749 sel 414 esc 2 skipped 6: 
+E CHAPI032 6749 sel 414 esc 3 skipped 5: 
+E CHAPI032 6749 sel 414 esc 4 skipped 4: 
+E CHAPI032 6749 sel 414 esc 5 skipped 3: 
+E CHAPI032 6749 sel 414 esc 6 skipped 2: 
+E CHAPI032 6749 sel 414 esc 7 skipped 1: 
+E CHAPI032 6749 sel 414 esc 8 skipped 0: 
+E CHAPI032 7389 con 415 esc 1 skipped 9: 
+E CHAPI032 7389 con 415 esc 2 skipped 8: 
+E CHAPI032 7389 con 415 esc 3 skipped 7: 
+E CHAPI032 7389 con 415 esc 4 skipped 6: 
+E CHAPI032 7389 con 415 esc 5 skipped 5: 
+E CHAPI032 7389 con 415 esc 6 skipped 4: 
+E CHAPI032 7389 con 415 esc 7 skipped 3: 
+E CHAPI032 7389 con 415 esc 8 skipped 2: 
+E CHAPI032 7389 con 415 esc 9 skipped 1: 
+E CHAPI032 7389 con 415 esc 10 skipped 0: 
+E CHAPI032 8208 con 416 esc 1 skipped 1: 
+E CHAPI032 8208 con 416 esc 2 skipped 0: 
+E CHAPI032 8404 con 417 esc 1 skipped 7: 
+E CHAPI032 8404 con 417 esc 2 skipped 6: 
+E CHAPI032 8404 con 417 esc 3 skipped 5: 
+E CHAPI032 8404 con 417 esc 4 skipped 4: 
+E CHAPI032 8404 con 417 esc 5 skipped 3: 
+E CHAPI032 8404 con 417 esc 6 skipped 2: 
+E CHAPI032 8404 con 417 esc 7 skipped 1: 
+E CHAPI032 8404 con 417 esc 8 skipped 0: 
+E CHAPI032 9088 sel 418 esc 1 skipped 0: 
+E CHAPI032 9335 con 419 esc 1 skipped 3: 
+E CHAPI032 9335 con 419 esc 2 skipped 2: 
+E CHAPI032 9335 con 419 esc 3 skipped 1: 
+E CHAPI032 9335 con 419 esc 4 skipped 0: 
+E CHAPI032 9746 con 419 esc 1 skipped 3: 
+E CHAPI032 9746 con 419 esc 2 skipped 2: 
+E CHAPI032 9746 con 419 esc 3 skipped 1: 
+E CHAPI032 9746 con 419 esc 4 skipped 0: 
+E CHAPI032 10178 con 419 esc 1 skipped 3: 
+E CHAPI032 10178 con 419 esc 2 skipped 2: 
+E CHAPI032 10178 con 419 esc 3 skipped 1: 
+E CHAPI032 10178 con 419 esc 4 skipped 0: 
+E CHAPI032 10717 tim2 422 esc 1 skipped 0: 10780:422b
+E CHAPI032 10717 tim2 422 esc 2 skipped 0: 
+E CHAPI032 11008 tim2 422 esc 1 skipped 1: 
+E CHAPI032 11008 tim2 422 esc 2 skipped 0: 
+E CHAPI032 11290 tim2 420 esc 1 skipped 0: 
+E CHAPI032 11499 tim2 34 esc 1 skipped 0: 
+E CHAPI032 11565 sel 423 esc 1 skipped 0: 
+E CHAPI032 11840 con 424 esc 1 skipped 0: 
+E CHAPI032 12044 con 424 esc 1 skipped 0: 
+E CHAPI032 12248 con 425 esc 1 skipped 0: 
+E CHAPI032 12479 con 425 esc 1 skipped 0: 
+E CHAPI032 12705 tim1 426 esc 1 skipped 0: 
+E CHAPI032 12854 tim1 428 esc 1 skipped 0: 
+E CHAPI032 12997 tim1 428 esc 1 skipped 0: 
+E CHAPI032 13077 sel 429 esc 1 skipped 0: 
+E CHAPI032 13313 sel 427 esc 1 skipped 0: 
+E CHAPI032 13475 sel 433 esc 1 skipped 0: 
+E CHAPI032 13634 con 434 esc 1 skipped 4: 
+E CHAPI032 13634 con 434 esc 2 skipped 3: 
+E CHAPI032 13634 con 434 esc 3 skipped 2: 
+E CHAPI032 13634 con 434 esc 4 skipped 1: 
+E CHAPI032 13634 con 434 esc 5 skipped 0: 
+E CHAPI032 14076 con 435 esc 1 skipped 5: 
+E CHAPI032 14076 con 435 esc 2 skipped 4: 
+E CHAPI032 14076 con 435 esc 3 skipped 3: 
+E CHAPI032 14076 con 435 esc 4 skipped 2: 
+E CHAPI032 14076 con 435 esc 5 skipped 1: 
+E CHAPI032 14076 con 435 esc 6 skipped 0: 
+E CHAPI032 14674 sel 436 esc 1 skipped 0: 
+E CHAPI032 14853 sel 437 esc 1 skipped 0: 
+E CHAPI032 15127 con 438 esc 1 skipped 2: 
+E CHAPI032 15127 con 438 esc 2 skipped 1: 
+E CHAPI032 15127 con 438 esc 3 skipped 0: 
+E CHAPI032 15445 con 439 esc 1 skipped 6: 
+E CHAPI032 15445 con 439 esc 2 skipped 5: 
+E CHAPI032 15445 con 439 esc 3 skipped 4: 
+E CHAPI032 15445 con 439 esc 4 skipped 3: 
+E CHAPI032 15445 con 439 esc 5 skipped 2: 
+E CHAPI032 15445 con 439 esc 6 skipped 1: 
+E CHAPI032 15445 con 439 esc 7 skipped 0: 
+E CHAPI032 16087 con 440 esc 1 skipped 0: 
+E CHAPI032 16197 con 440 esc 1 skipped 0: 
+E CHAPI032 16325 sel 441 esc 1 skipped 0: 
+E CHAPI032 16421 con 442 esc 1 skipped 0: 
+E CHAPI032 16942 con 432 esc 1 skipped 0: 
+E CHAPI032 17070 con 14 esc 1 skipped 0: 
+E CHAPI032 17140 con 430 esc 1 skipped 0: 
+E CHAPI032 17231 con 431 esc 1 skipped 0: 
+E CHAPI033 232 con 437 esc 1 skipped 0: 
+E CHAPI033 547 sel 447 esc 1 skipped 1: 
+E CHAPI033 547 sel 447 esc 2 skipped 0: 
+E CHAPI033 828 sel 448 esc 1 skipped 0: 
+E CHAPI033 1182 tim2 34 esc 1 skipped 0: 
+E CHAPI033 1226 tim1 34 esc 1 skipped 0: 
+E CHAPI033 1270 sel 449 esc 1 skipped 14: 
+E CHAPI033 1270 sel 449 esc 2 skipped 13: 
+E CHAPI033 1270 sel 449 esc 3 skipped 12: 
+E CHAPI033 1270 sel 449 esc 4 skipped 11: 
+E CHAPI033 1270 sel 449 esc 5 skipped 10: 
+E CHAPI033 1270 sel 449 esc 6 skipped 9: 
+E CHAPI033 1270 sel 449 esc 7 skipped 8: 
+E CHAPI033 1270 sel 449 esc 8 skipped 7: 
+E CHAPI033 1270 sel 449 esc 9 skipped 6: 
+E CHAPI033 1270 sel 449 esc 10 skipped 5: 
+E CHAPI033 1270 sel 449 esc 11 skipped 4: 
+E CHAPI033 1270 sel 449 esc 12 skipped 3: 
+E CHAPI033 1270 sel 449 esc 13 skipped 2: 
+E CHAPI033 1270 sel 449 esc 14 skipped 1: 
+E CHAPI033 1270 sel 449 esc 15 skipped 0: 
+E CHAPI033 2722 sel 464 esc 1 skipped 0: 
+E CHAPI033 2968 tim1 34 esc 1 skipped 0: 
+E CHAPI033 3046 tim1 465 esc 1 skipped 1: 
+E CHAPI033 3046 tim1 465 esc 2 skipped 0: 
+E CHAPI033 3376 tim1 34 esc 1 skipped 0: 
+E CHAPI033 3496 tim1 450 esc 1 skipped 0: 
+E CHAPI033 3790 tim1 34 esc 1 skipped 0: 
+E CHAPI033 3865 tim1 34 esc 1 skipped 0: 
+E CHAPI033 3940 tim1 34 esc 1 skipped 0: 
+E CHAPI033 4015 tim1 34 esc 1 skipped 0: 
+E CHAPI033 4072 sel 10 esc 1 skipped 0: 
+E CHAPI033 4093 sel 10 esc 1 skipped 0: 
+E CHAPI033 4169 tim1 34 esc 1 skipped 0: 
+E CHAPI033 4258 tim1 34 esc 1 skipped 0: 
+E CHAPI033 4348 tim1 34 esc 1 skipped 0: 
+E CHAPI033 4440 sel 10 esc 1 skipped 0: 
+E CHAPI033 4497 sel 34 esc 1 skipped 0: 
+E CHAPI033 4568 sel 451 esc 1 skipped 0: 
+E CHAPI033 4708 sel 1220 esc 1 skipped 0: 
+E CHAPI033 4946 con 452 esc 1 skipped 0: 
+E CHAPI033 5394 tim1 453 esc 1 skipped 3: 
+E CHAPI033 5394 tim1 453 esc 2 skipped 2: 
+E CHAPI033 5394 tim1 453 esc 3 skipped 1: 
+E CHAPI033 5394 tim1 453 esc 4 skipped 0: 
+E CHAPI033 5760 tim1 460 esc 1 skipped 0: 
+E CHAPI033 6071 tim1 454 esc 1 skipped 0: 
+E CHAPI033 6184 tim1 462 esc 1 skipped 0: 
+E CHAPI033 6292 tim1 462 esc 1 skipped 0: 
+E CHAPI034 615 con 431 esc 1 skipped 0: 
+E CHAPI034 720 tim1 455 esc 1 skipped 8: 1362:455j
+E CHAPI034 720 tim1 455 esc 2 skipped 7: 1362:455j
+E CHAPI034 720 tim1 455 esc 3 skipped 6: 1362:455j
+E CHAPI034 720 tim1 455 esc 4 skipped 5: 1362:455j
+E CHAPI034 720 tim1 455 esc 5 skipped 4: 1362:455j
+E CHAPI034 720 tim1 455 esc 6 skipped 3: 1362:455j
+E CHAPI034 720 tim1 455 esc 7 skipped 2: 1362:455j
+E CHAPI034 720 tim1 455 esc 8 skipped 1: 1362:455j
+E CHAPI034 720 tim1 455 esc 9 skipped 0: 1362:455j
+E CHAPI034 720 tim1 455 esc 10 skipped 0: 
+E CHAPI034 1527 sel 456 esc 1 skipped 0: 
+E CHAPI034 1661 con 456 esc 1 skipped 0: 
+E CHAPI034 1779 sel 457 esc 1 skipped 2: 2026:457d 2083:457e
+E CHAPI034 1779 sel 457 esc 2 skipped 1: 2026:457d 2083:457e
+E CHAPI034 1779 sel 457 esc 3 skipped 0: 2026:457d 2083:457e
+E CHAPI034 1779 sel 457 esc 4 skipped 1: 
+E CHAPI034 1779 sel 457 esc 5 skipped 0: 
+E CHAPI034 2417 sel 458 esc 1 skipped 0: 
+E CHAPI034 2586 sel 459 esc 1 skipped 0: 2790:459b 2888:459c 2925:459d
+E CHAPI034 2586 sel 459 esc 2 skipped 2: 
+E CHAPI034 2586 sel 459 esc 3 skipped 1: 
+E CHAPI034 2586 sel 459 esc 4 skipped 0: 
+E CHAPI034 3215 con 463 esc 1 skipped 0: 
+E CHAPI034 3338 con 463 esc 1 skipped 0: 
+E CHAPI034 7735 con 472 esc 1 skipped 0: 
+E CHAPI034 8185 con 1223 esc 1 skipped 0: 
+E CHAPI034 8688 con 1224 esc 1 skipped 0: 
+E CHAPI034 9225 con 474 esc 1 skipped 0: 
+E CHAPI034 9389 tim1 470 esc 1 skipped 2: 
+E CHAPI034 9389 tim1 470 esc 2 skipped 1: 
+E CHAPI034 9389 tim1 470 esc 3 skipped 0: 
+E CHAPI034 9843 tim1 471 esc 1 skipped 1: 9936:471c 9989:471d 10068:471e 10119:471f
+E CHAPI034 9843 tim1 471 esc 2 skipped 0: 9936:471c 9989:471d 10068:471e 10119:471f
+E CHAPI034 9843 tim1 471 esc 3 skipped 1: 10068:471e 10119:471f
+E CHAPI034 9843 tim1 471 esc 4 skipped 0: 10068:471e 10119:471f
+E CHAPI034 9843 tim1 471 esc 5 skipped 1: 
+E CHAPI034 9843 tim1 471 esc 6 skipped 0: 
+E CHAPI034 10411 tim1 475 esc 1 skipped 1: 10504:475c 10538:475d 10589:475e 10635:475f
+E CHAPI034 10411 tim1 475 esc 2 skipped 0: 10504:475c 10538:475d 10589:475e 10635:475f
+E CHAPI034 10411 tim1 475 esc 3 skipped 3: 
+E CHAPI034 10411 tim1 475 esc 4 skipped 2: 
+E CHAPI034 10411 tim1 475 esc 5 skipped 1: 
+E CHAPI034 10411 tim1 475 esc 6 skipped 0: 
+E CHAPI034 10943 tim1 477 esc 1 skipped 0: 11014:477b 11028:477c 11081:477d
+E CHAPI034 10943 tim1 477 esc 2 skipped 2: 
+E CHAPI034 10943 tim1 477 esc 3 skipped 1: 
+E CHAPI034 10943 tim1 477 esc 4 skipped 0: 
+E CHAPI034 11271 tim1 478 esc 1 skipped 0: 11352:478b 11405:478c
+E CHAPI034 11271 tim1 478 esc 2 skipped 1: 
+E CHAPI034 11271 tim1 478 esc 3 skipped 0: 
+E CHAPI034 11595 tim1 476 esc 1 skipped 0: 11676:476b 11728:476c 11781:476d
+E CHAPI034 11595 tim1 476 esc 2 skipped 0: 11728:476c 11781:476d
+E CHAPI034 11595 tim1 476 esc 3 skipped 1: 
+E CHAPI034 11595 tim1 476 esc 4 skipped 0: 
+E CHAPI034 12406 con 345 esc 1 skipped 0: 
+E CHAPI035 323 con 479 esc 1 skipped 1: 
+E CHAPI035 323 con 479 esc 2 skipped 0: 
+E CHAPI035 479 con 480 esc 1 skipped 1: 
+E CHAPI035 479 con 480 esc 2 skipped 0: 
+E CHAPI035 685 con 481 esc 1 skipped 3: 
+E CHAPI035 685 con 481 esc 2 skipped 2: 
+E CHAPI035 685 con 481 esc 3 skipped 1: 
+E CHAPI035 685 con 481 esc 4 skipped 0: 
+E CHAPI035 929 con 482 esc 1 skipped 7: 
+E CHAPI035 929 con 482 esc 2 skipped 6: 
+E CHAPI035 929 con 482 esc 3 skipped 5: 
+E CHAPI035 929 con 482 esc 4 skipped 4: 
+E CHAPI035 929 con 482 esc 5 skipped 3: 
+E CHAPI035 929 con 482 esc 6 skipped 2: 
+E CHAPI035 929 con 482 esc 7 skipped 1: 
+E CHAPI035 929 con 482 esc 8 skipped 0: 
+E CHAPI035 1475 con 483 esc 1 skipped 3: 
+E CHAPI035 1475 con 483 esc 2 skipped 2: 
+E CHAPI035 1475 con 483 esc 3 skipped 1: 
+E CHAPI035 1475 con 483 esc 4 skipped 0: 
+E CHAPI035 1679 con 484 esc 1 skipped 7: 
+E CHAPI035 1679 con 484 esc 2 skipped 6: 
+E CHAPI035 1679 con 484 esc 3 skipped 5: 
+E CHAPI035 1679 con 484 esc 4 skipped 4: 
+E CHAPI035 1679 con 484 esc 5 skipped 3: 
+E CHAPI035 1679 con 484 esc 6 skipped 2: 
+E CHAPI035 1679 con 484 esc 7 skipped 1: 
+E CHAPI035 1679 con 484 esc 8 skipped 0: 
+E CHAPI035 2233 con 499 esc 1 skipped 5: 
+E CHAPI035 2233 con 499 esc 2 skipped 4: 
+E CHAPI035 2233 con 499 esc 3 skipped 3: 
+E CHAPI035 2233 con 499 esc 4 skipped 2: 
+E CHAPI035 2233 con 499 esc 5 skipped 1: 
+E CHAPI035 2233 con 499 esc 6 skipped 0: 
+E CHAPI035 2661 con 485 esc 1 skipped 0: 
+E CHAPI035 2777 con 486 esc 1 skipped 0: 
+E CHAPI035 3007 con 487 esc 1 skipped 0: 
+E CHAPI035 3250 con 488 esc 1 skipped 0: 
+E CHAPI035 3328 con 489 esc 1 skipped 0: 
+E CHAPI035 3488 con 490 esc 1 skipped 0: 
+E CHAPI035 3720 con 500 esc 1 skipped 0: 
+E CHAPI035 3879 con 491 esc 1 skipped 0: 4131:510a
+E CHAPI035 3879 con 491 esc 2 skipped 0: 
+E CHAPI035 3987 tim1 492 esc 1 skipped 0: 4131:510a
+E CHAPI035 3987 tim1 492 esc 2 skipped 0: 
+E CHAPI035 4091 con 510 esc 1 skipped 0: 
+E CHAPI036 117 tim2 515 esc 1 skipped 0: 235:515b 576:515c 613:515d 649:515e 682:515f 749:515g 867:515h 898:515i 944:515j 979:515k 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 2 skipped 0: 576:515c 613:515d 649:515e 682:515f 749:515g 867:515h 898:515i 944:515j 979:515k 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 3 skipped 4: 867:515h 898:515i 944:515j 979:515k 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 4 skipped 3: 867:515h 898:515i 944:515j 979:515k 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 5 skipped 2: 867:515h 898:515i 944:515j 979:515k 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 6 skipped 1: 867:515h 898:515i 944:515j 979:515k 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 7 skipped 0: 867:515h 898:515i 944:515j 979:515k 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 8 skipped 3: 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 9 skipped 2: 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 10 skipped 1: 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 11 skipped 0: 1038:515l 1079:515m 1193:515n
+E CHAPI036 117 tim2 515 esc 12 skipped 1: 1193:515n
+E CHAPI036 117 tim2 515 esc 13 skipped 0: 1193:515n
+E CHAPI036 117 tim2 515 esc 14 skipped 0: 
+E CHAPI037 207 tim2 520 esc 1 skipped 0: 355:520b 389:520c 452:520d 573:520e 630:520f 736:520g 850:520h 923:520i 998:520j
+E CHAPI037 207 tim2 520 esc 2 skipped 8: 
+E CHAPI037 207 tim2 520 esc 3 skipped 7: 
+E CHAPI037 207 tim2 520 esc 4 skipped 6: 
+E CHAPI037 207 tim2 520 esc 5 skipped 5: 
+E CHAPI037 207 tim2 520 esc 6 skipped 4: 
+E CHAPI037 207 tim2 520 esc 7 skipped 3: 
+E CHAPI037 207 tim2 520 esc 8 skipped 2: 
+E CHAPI037 207 tim2 520 esc 9 skipped 1: 
+E CHAPI037 207 tim2 520 esc 10 skipped 0: 
+E CHAPI037 1163 con 521 esc 1 skipped 1: 3405:534a 3597:534b 3639:534c
+E CHAPI037 1163 con 521 esc 2 skipped 0: 3405:534a 3597:534b 3639:534c
+E CHAPI037 1163 con 521 esc 3 skipped 0: 3597:534b 3639:534c
+E CHAPI037 1163 con 521 esc 4 skipped 1: 
+E CHAPI037 1163 con 521 esc 5 skipped 0: 
+E CHAPI037 1328 con 522 esc 1 skipped 1: 
+E CHAPI037 1328 con 522 esc 2 skipped 0: 
+E CHAPI037 1532 con 523 esc 1 skipped 3: 
+E CHAPI037 1532 con 523 esc 2 skipped 2: 
+E CHAPI037 1532 con 523 esc 3 skipped 1: 
+E CHAPI037 1532 con 523 esc 4 skipped 0: 
+E CHAPI037 1907 con 524 esc 1 skipped 5: 
+E CHAPI037 1907 con 524 esc 2 skipped 4: 
+E CHAPI037 1907 con 524 esc 3 skipped 3: 
+E CHAPI037 1907 con 524 esc 4 skipped 2: 
+E CHAPI037 1907 con 524 esc 5 skipped 1: 
+E CHAPI037 1907 con 524 esc 6 skipped 0: 
+E CHAPI037 2361 con 525 esc 1 skipped 1: 
+E CHAPI037 2361 con 525 esc 2 skipped 0: 
+E CHAPI037 2662 con 526 esc 1 skipped 1: 
+E CHAPI037 2662 con 526 esc 2 skipped 0: 
+E CHAPI037 2952 con 527 esc 1 skipped 0: 
+E CHAPI037 3090 sel 528 esc 1 skipped 2: 3405:534a 3597:534b 3639:534c
+E CHAPI037 3090 sel 528 esc 2 skipped 1: 3405:534a 3597:534b 3639:534c
+E CHAPI037 3090 sel 528 esc 3 skipped 0: 3405:534a 3597:534b 3639:534c
+E CHAPI037 3090 sel 528 esc 4 skipped 0: 3597:534b 3639:534c
+E CHAPI037 3090 sel 528 esc 5 skipped 1: 
+E CHAPI037 3090 sel 528 esc 6 skipped 0: 
+E CHAPI037 3405 con 534 esc 1 skipped 0: 3597:534b 3639:534c
+E CHAPI037 3405 con 534 esc 2 skipped 1: 
+E CHAPI037 3405 con 534 esc 3 skipped 0: 
+E CHAPI037 3900 con 529 esc 1 skipped 0: 4511:531a
+E CHAPI037 3900 con 529 esc 2 skipped 0: 
+E CHAPI037 4040 con 530 esc 1 skipped 0: 4511:531a
+E CHAPI037 4040 con 530 esc 2 skipped 0: 
+E CHAPI037 4151 con 535 esc 1 skipped 1: 
+E CHAPI037 4151 con 535 esc 2 skipped 0: 
+E CHAPI037 4345 con 537 esc 1 skipped 1: 
+E CHAPI037 4345 con 537 esc 2 skipped 0: 
+E CHAPI037 4511 con 531 esc 1 skipped 0: 
+E CHAPI037 4715 con 527 esc 1 skipped 0: 
+E CHAPI037 4852 sel 532 esc 1 skipped 0: 
+E CHAPI037 4947 sel 533 esc 1 skipped 0: 
+E CHAPI037 5049 sel 536 esc 1 skipped 1: 
+E CHAPI037 5049 sel 536 esc 2 skipped 0: 
+E CHAPI038 220 sel 545 esc 1 skipped 2: 
+E CHAPI038 220 sel 545 esc 2 skipped 1: 
+E CHAPI038 220 sel 545 esc 3 skipped 0: 
+E CHAPI038 740 con 546 esc 1 skipped 4: 
+E CHAPI038 740 con 546 esc 2 skipped 3: 
+E CHAPI038 740 con 546 esc 3 skipped 2: 
+E CHAPI038 740 con 546 esc 4 skipped 1: 
+E CHAPI038 740 con 546 esc 5 skipped 0: 
+E CHAPI038 1067 con 547 esc 1 skipped 6: 
+E CHAPI038 1067 con 547 esc 2 skipped 5: 
+E CHAPI038 1067 con 547 esc 3 skipped 4: 
+E CHAPI038 1067 con 547 esc 4 skipped 3: 
+E CHAPI038 1067 con 547 esc 5 skipped 2: 
+E CHAPI038 1067 con 547 esc 6 skipped 1: 
+E CHAPI038 1067 con 547 esc 7 skipped 0: 
+E CHAPI038 1662 con 548 esc 1 skipped 2: 
+E CHAPI038 1662 con 548 esc 2 skipped 1: 
+E CHAPI038 1662 con 548 esc 3 skipped 0: 
+E CHAPI038 1924 sel 550 esc 1 skipped 0: 
+E CHAPI038 2086 con 14 esc 1 skipped 2: 2476:551d 2508:551e 2539:551f 2611:551g
+E CHAPI038 2086 con 14 esc 2 skipped 1: 2476:551d 2508:551e 2539:551f 2611:551g
+E CHAPI038 2086 con 14 esc 3 skipped 0: 2476:551d 2508:551e 2539:551f 2611:551g
+E CHAPI038 2086 con 14 esc 4 skipped 3: 
+E CHAPI038 2086 con 14 esc 5 skipped 2: 
+E CHAPI038 2086 con 14 esc 6 skipped 1: 
+E CHAPI038 2086 con 14 esc 7 skipped 0: 
+E CHAPI038 2143 sel 551 esc 1 skipped 2: 2476:551d 2508:551e 2539:551f 2611:551g
+E CHAPI038 2143 sel 551 esc 2 skipped 1: 2476:551d 2508:551e 2539:551f 2611:551g
+E CHAPI038 2143 sel 551 esc 3 skipped 0: 2476:551d 2508:551e 2539:551f 2611:551g
+E CHAPI038 2143 sel 551 esc 4 skipped 3: 
+E CHAPI038 2143 sel 551 esc 5 skipped 2: 
+E CHAPI038 2143 sel 551 esc 6 skipped 1: 
+E CHAPI038 2143 sel 551 esc 7 skipped 0: 
+E CHAPI038 2784 sel 549 esc 1 skipped 4: 
+E CHAPI038 2784 sel 549 esc 2 skipped 3: 
+E CHAPI038 2784 sel 549 esc 3 skipped 2: 
+E CHAPI038 2784 sel 549 esc 4 skipped 1: 
+E CHAPI038 2784 sel 549 esc 5 skipped 0: 
+E CHAPI038 3323 con 552 esc 1 skipped 0: 
+E CHAPI039 267 con 555 esc 1 skipped 2: 
+E CHAPI039 267 con 555 esc 2 skipped 1: 
+E CHAPI039 267 con 555 esc 3 skipped 0: 
+E CHAPI039 539 con 556 esc 1 skipped 0: 
+E CHAPI039 761 con 557 esc 1 skipped 3: 
+E CHAPI039 761 con 557 esc 2 skipped 2: 
+E CHAPI039 761 con 557 esc 3 skipped 1: 
+E CHAPI039 761 con 557 esc 4 skipped 0: 
+E CHAPI039 1119 con 558 esc 1 skipped 0: 
+E CHAPI039 1242 con 559 esc 1 skipped 2: 
+E CHAPI039 1242 con 559 esc 2 skipped 1: 
+E CHAPI039 1242 con 559 esc 3 skipped 0: 
+E CHAPI039 1560 con 560 esc 1 skipped 0: 
+E CHAPI039 1669 sel 561 esc 1 skipped 4: 
+E CHAPI039 1669 sel 561 esc 2 skipped 3: 
+E CHAPI039 1669 sel 561 esc 3 skipped 2: 
+E CHAPI039 1669 sel 561 esc 4 skipped 1: 
+E CHAPI039 1669 sel 561 esc 5 skipped 0: 
+E CHAPI040 883 con 570 esc 1 skipped 0: 
+E CHAPI040 1014 con 571 esc 1 skipped 0: 
+E CHAPI040 1167 con 572 esc 1 skipped 0: 
+E CHAPI040 1401 con 573 esc 1 skipped 2: 
+E CHAPI040 1401 con 573 esc 2 skipped 1: 
+E CHAPI040 1401 con 573 esc 3 skipped 0: 
+E CHAPI040 1758 sel 561 esc 1 skipped 4: 
+E CHAPI040 1758 sel 561 esc 2 skipped 3: 
+E CHAPI040 1758 sel 561 esc 3 skipped 2: 
+E CHAPI040 1758 sel 561 esc 4 skipped 1: 
+E CHAPI040 1758 sel 561 esc 5 skipped 0: 
+E CHAPI040 2964 con 244 esc 1 skipped 0: 
+E CHAPI040 3236 tim2 237 esc 1 skipped 0: 
+E CHAPI041 223 tim2 581 esc 1 skipped 1: 
+E CHAPI041 223 tim2 581 esc 2 skipped 0: 
+E CHAPI041 426 con 582 esc 1 skipped 0: 
+E CHAPI041 571 con 583 esc 1 skipped 0: 
+E CHAPI041 709 con 584 esc 1 skipped 2: 919:585a
+E CHAPI041 709 con 584 esc 2 skipped 1: 919:585a
+E CHAPI041 709 con 584 esc 3 skipped 0: 919:585a
+E CHAPI041 709 con 584 esc 4 skipped 0: 
+E CHAPI041 911 con 585 esc 1 skipped 0: 
+E CHAPI041 1086 con 586 esc 1 skipped 1: 
+E CHAPI041 1086 con 586 esc 2 skipped 0: 
+E CHAPI041 1412 con 587 esc 1 skipped 1: 
+E CHAPI041 1412 con 587 esc 2 skipped 0: 
+E CHAPI041 1574 sel 588 esc 1 skipped 6: 2030:588h
+E CHAPI041 1574 sel 588 esc 2 skipped 5: 2030:588h
+E CHAPI041 1574 sel 588 esc 3 skipped 4: 2030:588h
+E CHAPI041 1574 sel 588 esc 4 skipped 3: 2030:588h
+E CHAPI041 1574 sel 588 esc 5 skipped 2: 2030:588h
+E CHAPI041 1574 sel 588 esc 6 skipped 1: 2030:588h
+E CHAPI041 1574 sel 588 esc 7 skipped 0: 2030:588h
+E CHAPI041 1574 sel 588 esc 8 skipped 0: 
+E CHAPI041 2177 sel 590 esc 1 skipped 2: 
+E CHAPI041 2177 sel 590 esc 2 skipped 1: 
+E CHAPI041 2177 sel 590 esc 3 skipped 0: 
+E CHAPI041 2385 sel 589 esc 1 skipped 2: 
+E CHAPI041 2385 sel 589 esc 2 skipped 1: 
+E CHAPI041 2385 sel 589 esc 3 skipped 0: 
+E CHAPI041 3551 con 244 esc 1 skipped 0: 
+E CHAPI041 4201 tim2 237 esc 1 skipped 0: 
+E CHAPI041 5387 sel 561 esc 1 skipped 4: 
+E CHAPI041 5387 sel 561 esc 2 skipped 3: 
+E CHAPI041 5387 sel 561 esc 3 skipped 2: 
+E CHAPI041 5387 sel 561 esc 4 skipped 1: 
+E CHAPI041 5387 sel 561 esc 5 skipped 0: 
+E CHAPI043 342 tim1 595 esc 1 skipped 0: 
+E CHAPI043 460 sel 10 esc 1 skipped 0: 
+E CHAPI043 514 sel 10 esc 1 skipped 0: 
+E CHAPI043 587 con 596 esc 1 skipped 0: 
+E CHAPI043 1151 tim1 34 esc 1 skipped 0: 
+E CHAPI043 1219 tim1 34 esc 1 skipped 0: 
+E CHAPI043 1293 tim2 597 esc 1 skipped 0: 
+E CHAPI043 1455 tim2 34 esc 1 skipped 0: 
+E CHAPI043 1508 con 598 esc 1 skipped 0: 
+E CHAPI043 1924 sel 10 esc 1 skipped 0: 
+E CHAPI044 306 tim2 600 esc 1 skipped 0: 
+E CHAPI044 703 sel 601 esc 1 skipped 0: 
+E CHAPI046 5270 tim2 169 esc 1 skipped 0: 
+E CHAPI047 1583 tim2 169 esc 1 skipped 0: 
+E CHAPI048 274 sel 610 esc 1 skipped 0: 444:610b 502:610c 552:610d 586:610e 686:610f 724:610g 933:610h 1080:610i 1181:610j 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 2 skipped 0: 502:610c 552:610d 586:610e 686:610f 724:610g 933:610h 1080:610i 1181:610j 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 3 skipped 1: 586:610e 686:610f 724:610g 933:610h 1080:610i 1181:610j 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 4 skipped 0: 586:610e 686:610f 724:610g 933:610h 1080:610i 1181:610j 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 5 skipped 1: 724:610g 933:610h 1080:610i 1181:610j 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 6 skipped 0: 724:610g 933:610h 1080:610i 1181:610j 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 7 skipped 1: 1080:610i 1181:610j 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 8 skipped 0: 1080:610i 1181:610j 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 9 skipped 1: 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 10 skipped 0: 1235:610k 1294:610l
+E CHAPI048 274 sel 610 esc 11 skipped 0: 1294:610l
+E CHAPI048 274 sel 610 esc 12 skipped 0: 
+E CHAPI048 2396 tim2 169 esc 1 skipped 0: 
+E CHAPI049 1485 tim2 169 esc 1 skipped 0: 
+E CHAPI050 407 con 630 esc 1 skipped 0: 
+E CHAPI050 477 sel 631 esc 1 skipped 0: 
+E CHAPI050 713 tim1 620 esc 1 skipped 2: 
+E CHAPI050 713 tim1 620 esc 2 skipped 1: 
+E CHAPI050 713 tim1 620 esc 3 skipped 0: 
+E CHAPI050 966 con 621 esc 1 skipped 1: 
+E CHAPI050 966 con 621 esc 2 skipped 0: 
+E CHAPI050 1115 con 622 esc 1 skipped 1: 
+E CHAPI050 1115 con 622 esc 2 skipped 0: 
+E CHAPI050 1313 con 623 esc 1 skipped 1: 
+E CHAPI050 1313 con 623 esc 2 skipped 0: 
+E CHAPI050 1526 con 624 esc 1 skipped 1: 1700:624c 1850:624d 1890:624e 2007:624f 2040:624g 2166:624h 2209:624i 2252:624j
+E CHAPI050 1526 con 624 esc 2 skipped 0: 1700:624c 1850:624d 1890:624e 2007:624f 2040:624g 2166:624h 2209:624i 2252:624j
+E CHAPI050 1526 con 624 esc 3 skipped 5: 2209:624i 2252:624j
+E CHAPI050 1526 con 624 esc 4 skipped 4: 2209:624i 2252:624j
+E CHAPI050 1526 con 624 esc 5 skipped 3: 2209:624i 2252:624j
+E CHAPI050 1526 con 624 esc 6 skipped 2: 2209:624i 2252:624j
+E CHAPI050 1526 con 624 esc 7 skipped 1: 2209:624i 2252:624j
+E CHAPI050 1526 con 624 esc 8 skipped 0: 2209:624i 2252:624j
+E CHAPI050 1526 con 624 esc 9 skipped 1: 
+E CHAPI050 1526 con 624 esc 10 skipped 0: 
+E CHAPI050 3687 tim2 169 esc 1 skipped 0: 
+E CHAPI051 386 sel 286 esc 1 skipped 0: 
+E CHAPI051 731 con 630 esc 1 skipped 0: 
+E CHAPI051 836 sel 631 esc 1 skipped 0: 
+E CHAPI051 976 sel 169 esc 1 skipped 0: 
+E CHAPI051 1064 sel 267 esc 1 skipped 0: 
+E CHAPI051 1380 con 632 esc 1 skipped 1: 
+E CHAPI051 1380 con 632 esc 2 skipped 0: 
+E CHAPI051 1593 con 633 esc 1 skipped 0: 
+E CHAPI052 220 sel 286 esc 1 skipped 0: 
+E CHAPI052 565 con 632 esc 1 skipped 1: 
+E CHAPI052 565 con 632 esc 2 skipped 0: 
+E CHAPI052 778 con 633 esc 1 skipped 0: 
+E CHAPI052 911 sel 169 esc 1 skipped 0: 
+E CHAPI052 999 sel 267 esc 1 skipped 0: 
+E CHAPI052 3273 tim1 640 esc 1 skipped 1: 
+E CHAPI052 3273 tim1 640 esc 2 skipped 0: 
+E CHAPI052 3469 sel 641 esc 1 skipped 0: 
+E CHAPI052 3606 con 642 esc 1 skipped 0: 
+E CHAPI052 3810 con 643 esc 1 skipped 1: 
+E CHAPI052 3810 con 643 esc 2 skipped 0: 
+E CHAPI052 4025 con 644 esc 1 skipped 3: 
+E CHAPI052 4025 con 644 esc 2 skipped 2: 
+E CHAPI052 4025 con 644 esc 3 skipped 1: 
+E CHAPI052 4025 con 644 esc 4 skipped 0: 
+E CHAPI052 4418 con 645 esc 1 skipped 9: 
+E CHAPI052 4418 con 645 esc 2 skipped 8: 
+E CHAPI052 4418 con 645 esc 3 skipped 7: 
+E CHAPI052 4418 con 645 esc 4 skipped 6: 
+E CHAPI052 4418 con 645 esc 5 skipped 5: 
+E CHAPI052 4418 con 645 esc 6 skipped 4: 
+E CHAPI052 4418 con 645 esc 7 skipped 3: 
+E CHAPI052 4418 con 645 esc 8 skipped 2: 
+E CHAPI052 4418 con 645 esc 9 skipped 1: 
+E CHAPI052 4418 con 645 esc 10 skipped 0: 
+E CHAPI052 5276 sel 10 esc 1 skipped 0: 5475:650b 5511:650c 5552:650d 5650:650e 5712:650f
+E CHAPI052 5276 sel 10 esc 2 skipped 4: 
+E CHAPI052 5276 sel 10 esc 3 skipped 3: 
+E CHAPI052 5276 sel 10 esc 4 skipped 2: 
+E CHAPI052 5276 sel 10 esc 5 skipped 1: 
+E CHAPI052 5276 sel 10 esc 6 skipped 0: 
+E CHAPI052 5330 tim1 34 esc 1 skipped 0: 5475:650b 5511:650c 5552:650d 5650:650e 5712:650f
+E CHAPI052 5330 tim1 34 esc 2 skipped 4: 
+E CHAPI052 5330 tim1 34 esc 3 skipped 3: 
+E CHAPI052 5330 tim1 34 esc 4 skipped 2: 
+E CHAPI052 5330 tim1 34 esc 5 skipped 1: 
+E CHAPI052 5330 tim1 34 esc 6 skipped 0: 
+E CHAPI052 5394 con 650 esc 1 skipped 0: 5475:650b 5511:650c 5552:650d 5650:650e 5712:650f
+E CHAPI052 5394 con 650 esc 2 skipped 4: 
+E CHAPI052 5394 con 650 esc 3 skipped 3: 
+E CHAPI052 5394 con 650 esc 4 skipped 2: 
+E CHAPI052 5394 con 650 esc 5 skipped 1: 
+E CHAPI052 5394 con 650 esc 6 skipped 0: 
+E CHAPI052 5860 con 646 esc 1 skipped 2: 
+E CHAPI052 5860 con 646 esc 2 skipped 1: 
+E CHAPI052 5860 con 646 esc 3 skipped 0: 
+E CHAPI052 6044 con 647 esc 1 skipped 3: 
+E CHAPI052 6044 con 647 esc 2 skipped 2: 
+E CHAPI052 6044 con 647 esc 3 skipped 1: 
+E CHAPI052 6044 con 647 esc 4 skipped 0: 
+E CHAPI052 6427 con 648 esc 1 skipped 1: 
+E CHAPI052 6427 con 648 esc 2 skipped 0: 
+E CHAPI052 6564 con 649 esc 1 skipped 1: 
+E CHAPI052 6564 con 649 esc 2 skipped 0: 
+E CHAPI052 6822 sel 286 esc 1 skipped 0: 
+E CHAPI053 254 tim2 655 esc 1 skipped 2: 404:655d 421:655e
+E CHAPI053 254 tim2 655 esc 2 skipped 1: 404:655d 421:655e
+E CHAPI053 254 tim2 655 esc 3 skipped 0: 404:655d 421:655e
+E CHAPI053 254 tim2 655 esc 4 skipped 1: 
+E CHAPI053 254 tim2 655 esc 5 skipped 0: 
+E CHAPI053 639 sel 286 esc 1 skipped 0: 
+E CHAPI053 2842 sel 169 esc 1 skipped 0: 
+E CHAPI054 616 tim2 34 esc 1 skipped 7: 
+E CHAPI054 616 tim2 34 esc 2 skipped 6: 
+E CHAPI054 616 tim2 34 esc 3 skipped 5: 
+E CHAPI054 616 tim2 34 esc 4 skipped 4: 
+E CHAPI054 616 tim2 34 esc 5 skipped 3: 
+E CHAPI054 616 tim2 34 esc 6 skipped 2: 
+E CHAPI054 616 tim2 34 esc 7 skipped 1: 
+E CHAPI054 616 tim2 34 esc 8 skipped 0: 
+E CHAPI054 659 tim2 660 esc 1 skipped 4: 
+E CHAPI054 659 tim2 660 esc 2 skipped 3: 
+E CHAPI054 659 tim2 660 esc 3 skipped 2: 
+E CHAPI054 659 tim2 660 esc 4 skipped 1: 
+E CHAPI054 659 tim2 660 esc 5 skipped 0: 
+E CHAPI054 941 sel 661 esc 1 skipped 0: 
+E CHAPI054 1504 tim2 668 esc 1 skipped 0: 
+E CHAPI054 1826 con 663 esc 1 skipped 3: 
+E CHAPI054 1826 con 663 esc 2 skipped 2: 
+E CHAPI054 1826 con 663 esc 3 skipped 1: 
+E CHAPI054 1826 con 663 esc 4 skipped 0: 
+E CHAPI054 2155 con 663 esc 1 skipped 3: 
+E CHAPI054 2155 con 663 esc 2 skipped 2: 
+E CHAPI054 2155 con 663 esc 3 skipped 1: 
+E CHAPI054 2155 con 663 esc 4 skipped 0: 
+E CHAPI054 2485 con 663 esc 1 skipped 3: 
+E CHAPI054 2485 con 663 esc 2 skipped 2: 
+E CHAPI054 2485 con 663 esc 3 skipped 1: 
+E CHAPI054 2485 con 663 esc 4 skipped 0: 
+E CHAPI054 2815 con 663 esc 1 skipped 3: 
+E CHAPI054 2815 con 663 esc 2 skipped 2: 
+E CHAPI054 2815 con 663 esc 3 skipped 1: 
+E CHAPI054 2815 con 663 esc 4 skipped 0: 
+E CHAPI054 3146 con 663 esc 1 skipped 3: 
+E CHAPI054 3146 con 663 esc 2 skipped 2: 
+E CHAPI054 3146 con 663 esc 3 skipped 1: 
+E CHAPI054 3146 con 663 esc 4 skipped 0: 
+E CHAPI054 3476 con 664 esc 1 skipped 4: 
+E CHAPI054 3476 con 664 esc 2 skipped 3: 
+E CHAPI054 3476 con 664 esc 3 skipped 2: 
+E CHAPI054 3476 con 664 esc 4 skipped 1: 
+E CHAPI054 3476 con 664 esc 5 skipped 0: 
+E CHAPI054 3803 con 664 esc 1 skipped 4: 
+E CHAPI054 3803 con 664 esc 2 skipped 3: 
+E CHAPI054 3803 con 664 esc 3 skipped 2: 
+E CHAPI054 3803 con 664 esc 4 skipped 1: 
+E CHAPI054 3803 con 664 esc 5 skipped 0: 
+E CHAPI054 4131 con 664 esc 1 skipped 4: 
+E CHAPI054 4131 con 664 esc 2 skipped 3: 
+E CHAPI054 4131 con 664 esc 3 skipped 2: 
+E CHAPI054 4131 con 664 esc 4 skipped 1: 
+E CHAPI054 4131 con 664 esc 5 skipped 0: 
+E CHAPI054 4459 con 664 esc 1 skipped 4: 
+E CHAPI054 4459 con 664 esc 2 skipped 3: 
+E CHAPI054 4459 con 664 esc 3 skipped 2: 
+E CHAPI054 4459 con 664 esc 4 skipped 1: 
+E CHAPI054 4459 con 664 esc 5 skipped 0: 
+E CHAPI054 4788 con 664 esc 1 skipped 4: 
+E CHAPI054 4788 con 664 esc 2 skipped 3: 
+E CHAPI054 4788 con 664 esc 3 skipped 2: 
+E CHAPI054 4788 con 664 esc 4 skipped 1: 
+E CHAPI054 4788 con 664 esc 5 skipped 0: 
+E CHAPI054 5117 con 665 esc 1 skipped 7: 
+E CHAPI054 5117 con 665 esc 2 skipped 6: 
+E CHAPI054 5117 con 665 esc 3 skipped 5: 
+E CHAPI054 5117 con 665 esc 4 skipped 4: 
+E CHAPI054 5117 con 665 esc 5 skipped 3: 
+E CHAPI054 5117 con 665 esc 6 skipped 2: 
+E CHAPI054 5117 con 665 esc 7 skipped 1: 
+E CHAPI054 5117 con 665 esc 8 skipped 0: 
+E CHAPI054 5672 con 666 esc 1 skipped 2: 
+E CHAPI054 5672 con 666 esc 2 skipped 1: 
+E CHAPI054 5672 con 666 esc 3 skipped 0: 
+E CHAPI054 6010 con 666 esc 1 skipped 2: 
+E CHAPI054 6010 con 666 esc 2 skipped 1: 
+E CHAPI054 6010 con 666 esc 3 skipped 0: 
+E CHAPI054 6349 con 666 esc 1 skipped 2: 
+E CHAPI054 6349 con 666 esc 2 skipped 1: 
+E CHAPI054 6349 con 666 esc 3 skipped 0: 
+E CHAPI054 6688 con 666 esc 1 skipped 2: 
+E CHAPI054 6688 con 666 esc 2 skipped 1: 
+E CHAPI054 6688 con 666 esc 3 skipped 0: 
+E CHAPI054 7028 con 666 esc 1 skipped 2: 
+E CHAPI054 7028 con 666 esc 2 skipped 1: 
+E CHAPI054 7028 con 666 esc 3 skipped 0: 
+E CHAPI054 7367 con 667 esc 1 skipped 1: 
+E CHAPI054 7367 con 667 esc 2 skipped 0: 
+E CHAPI054 7594 con 667 esc 1 skipped 1: 
+E CHAPI054 7594 con 667 esc 2 skipped 0: 
+E CHAPI054 7822 con 667 esc 1 skipped 1: 
+E CHAPI054 7822 con 667 esc 2 skipped 0: 
+E CHAPI054 8050 con 667 esc 1 skipped 1: 
+E CHAPI054 8050 con 667 esc 2 skipped 0: 
+E CHAPI054 8279 con 667 esc 1 skipped 1: 
+E CHAPI054 8279 con 667 esc 2 skipped 0: 
+E CHAPI054 8492 con 669 esc 1 skipped 1: 
+E CHAPI054 8492 con 669 esc 2 skipped 0: 
+E CHAPI054 8737 con 669 esc 1 skipped 1: 
+E CHAPI054 8737 con 669 esc 2 skipped 0: 
+E CHAPI054 8982 con 670 esc 1 skipped 1: 
+E CHAPI054 8982 con 670 esc 2 skipped 0: 
+E CHAPI054 9186 con 670 esc 1 skipped 1: 
+E CHAPI054 9186 con 670 esc 2 skipped 0: 
+E CHAPI054 9390 con 671 esc 1 skipped 2: 
+E CHAPI054 9390 con 671 esc 2 skipped 1: 
+E CHAPI054 9390 con 671 esc 3 skipped 0: 
+E CHAPI054 9702 con 671 esc 1 skipped 2: 
+E CHAPI054 9702 con 671 esc 2 skipped 1: 
+E CHAPI054 9702 con 671 esc 3 skipped 0: 
+E CHAPI054 10014 con 672 esc 1 skipped 9: 
+E CHAPI054 10014 con 672 esc 2 skipped 8: 
+E CHAPI054 10014 con 672 esc 3 skipped 7: 
+E CHAPI054 10014 con 672 esc 4 skipped 6: 
+E CHAPI054 10014 con 672 esc 5 skipped 5: 
+E CHAPI054 10014 con 672 esc 6 skipped 4: 
+E CHAPI054 10014 con 672 esc 7 skipped 3: 
+E CHAPI054 10014 con 672 esc 8 skipped 2: 
+E CHAPI054 10014 con 672 esc 9 skipped 1: 
+E CHAPI054 10014 con 672 esc 10 skipped 0: 
+E CHAPI054 10960 sel 673 esc 1 skipped 0: 
+E CHAPI054 11351 con 674 esc 1 skipped 7: 
+E CHAPI054 11351 con 674 esc 2 skipped 6: 
+E CHAPI054 11351 con 674 esc 3 skipped 5: 
+E CHAPI054 11351 con 674 esc 4 skipped 4: 
+E CHAPI054 11351 con 674 esc 5 skipped 3: 
+E CHAPI054 11351 con 674 esc 6 skipped 2: 
+E CHAPI054 11351 con 674 esc 7 skipped 1: 
+E CHAPI054 11351 con 674 esc 8 skipped 0: 
+E CHAPI054 12140 con 675 esc 1 skipped 1: 
+E CHAPI054 12140 con 675 esc 2 skipped 0: 
+E CHAPI054 12539 sel 676 esc 1 skipped 0: 
+E CHAPI054 12655 sel 676 esc 1 skipped 0: 
+E CHAPI054 12839 tim2 677 esc 1 skipped 4: 
+E CHAPI054 12839 tim2 677 esc 2 skipped 3: 
+E CHAPI054 12839 tim2 677 esc 3 skipped 2: 
+E CHAPI054 12839 tim2 677 esc 4 skipped 1: 
+E CHAPI054 12839 tim2 677 esc 5 skipped 0: 
+E CHAPI055 765 tim2 678 esc 1 skipped 1: 
+E CHAPI055 765 tim2 678 esc 2 skipped 0: 
+E CHAPI055 953 sel 10 esc 1 skipped 0: 
+E CHAPI055 1007 tim2 679 esc 1 skipped 0: 
+E CHAPI055 1332 sel 680 esc 1 skipped 0: 
+E CHAPI055 1703 con 681 esc 1 skipped 0: 
+E CHAPI055 2080 sel 682 esc 1 skipped 0: 
+E CHAPI055 2146 con 683 esc 1 skipped 0: 
+E CHAPI055 2340 tim1 684 esc 1 skipped 6: 
+E CHAPI055 2340 tim1 684 esc 2 skipped 5: 
+E CHAPI055 2340 tim1 684 esc 3 skipped 4: 
+E CHAPI055 2340 tim1 684 esc 4 skipped 3: 
+E CHAPI055 2340 tim1 684 esc 5 skipped 2: 
+E CHAPI055 2340 tim1 684 esc 6 skipped 1: 
+E CHAPI055 2340 tim1 684 esc 7 skipped 0: 
+E CHAPI055 2904 tim1 719 esc 1 skipped 4: 
+E CHAPI055 2904 tim1 719 esc 2 skipped 3: 
+E CHAPI055 2904 tim1 719 esc 3 skipped 2: 
+E CHAPI055 2904 tim1 719 esc 4 skipped 1: 
+E CHAPI055 2904 tim1 719 esc 5 skipped 0: 
+E CHAPI055 3349 con 722 esc 1 skipped 0: 
+E CHAPI055 3487 con 722 esc 1 skipped 0: 
+E CHAPI055 3659 tim1 687 esc 1 skipped 0: 
+E CHAPI055 3748 con 688 esc 1 skipped 0: 
+E CHAPI055 3937 con 685 esc 1 skipped 0: 
+E CHAPI055 4289 con 689 esc 1 skipped 0: 
+E CHAPI055 4487 con 690 esc 1 skipped 0: 
+E CHAPI055 4800 con 690 esc 1 skipped 0: 
+E CHAPI055 5113 con 690 esc 1 skipped 0: 
+E CHAPI055 5437 sel 691 esc 1 skipped 0: 
+E CHAPI055 5877 tim1 693 esc 1 skipped 4: 
+E CHAPI055 5877 tim1 693 esc 2 skipped 3: 
+E CHAPI055 5877 tim1 693 esc 3 skipped 2: 
+E CHAPI055 5877 tim1 693 esc 4 skipped 1: 
+E CHAPI055 5877 tim1 693 esc 5 skipped 0: 
+E CHAPI055 6333 con 708 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 6333 con 708 esc 2 skipped 6: 
+E CHAPI055 6333 con 708 esc 3 skipped 5: 
+E CHAPI055 6333 con 708 esc 4 skipped 4: 
+E CHAPI055 6333 con 708 esc 5 skipped 3: 
+E CHAPI055 6333 con 708 esc 6 skipped 2: 
+E CHAPI055 6333 con 708 esc 7 skipped 1: 
+E CHAPI055 6333 con 708 esc 8 skipped 0: 
+E CHAPI055 6477 con 700 esc 1 skipped 6: 
+E CHAPI055 6477 con 700 esc 2 skipped 5: 
+E CHAPI055 6477 con 700 esc 3 skipped 4: 
+E CHAPI055 6477 con 700 esc 4 skipped 3: 
+E CHAPI055 6477 con 700 esc 5 skipped 2: 
+E CHAPI055 6477 con 700 esc 6 skipped 1: 
+E CHAPI055 6477 con 700 esc 7 skipped 0: 
+E CHAPI055 7264 con 713 esc 1 skipped 0: 
+E CHAPI055 7547 con 713 esc 1 skipped 0: 
+E CHAPI055 7845 con 713 esc 1 skipped 0: 
+E CHAPI055 8136 con 713 esc 1 skipped 0: 
+E CHAPI055 8425 con 695 esc 1 skipped 0: 8701:701a 8776:701b 8839:701c
+E CHAPI055 8425 con 695 esc 2 skipped 2: 
+E CHAPI055 8425 con 695 esc 3 skipped 1: 
+E CHAPI055 8425 con 695 esc 4 skipped 0: 
+E CHAPI055 8564 con 696 esc 1 skipped 0: 8701:701a 8776:701b 8839:701c
+E CHAPI055 8564 con 696 esc 2 skipped 2: 
+E CHAPI055 8564 con 696 esc 3 skipped 1: 
+E CHAPI055 8564 con 696 esc 4 skipped 0: 
+E CHAPI055 8701 con 701 esc 1 skipped 2: 
+E CHAPI055 8701 con 701 esc 2 skipped 1: 
+E CHAPI055 8701 con 701 esc 3 skipped 0: 
+E CHAPI055 9098 con 694 esc 1 skipped 0: 
+E CHAPI055 9369 con 702 esc 1 skipped 0: 9797:716a 9837:716b 9895:716c 9957:716d
+E CHAPI055 9369 con 702 esc 2 skipped 3: 
+E CHAPI055 9369 con 702 esc 3 skipped 2: 
+E CHAPI055 9369 con 702 esc 4 skipped 1: 
+E CHAPI055 9369 con 702 esc 5 skipped 0: 
+E CHAPI055 9538 con 703 esc 1 skipped 0: 9797:716a 9837:716b 9895:716c 9957:716d
+E CHAPI055 9538 con 703 esc 2 skipped 3: 
+E CHAPI055 9538 con 703 esc 3 skipped 2: 
+E CHAPI055 9538 con 703 esc 4 skipped 1: 
+E CHAPI055 9538 con 703 esc 5 skipped 0: 
+E CHAPI055 9687 con 715 esc 1 skipped 0: 9797:716a 9837:716b 9895:716c 9957:716d
+E CHAPI055 9687 con 715 esc 2 skipped 3: 
+E CHAPI055 9687 con 715 esc 3 skipped 2: 
+E CHAPI055 9687 con 715 esc 4 skipped 1: 
+E CHAPI055 9687 con 715 esc 5 skipped 0: 
+E CHAPI055 9797 con 716 esc 1 skipped 3: 
+E CHAPI055 9797 con 716 esc 2 skipped 2: 
+E CHAPI055 9797 con 716 esc 3 skipped 1: 
+E CHAPI055 9797 con 716 esc 4 skipped 0: 
+E CHAPI055 10186 con 704 esc 1 skipped 0: 10532:706a 10654:706b
+E CHAPI055 10186 con 704 esc 2 skipped 1: 
+E CHAPI055 10186 con 704 esc 3 skipped 0: 
+E CHAPI055 10358 con 705 esc 1 skipped 0: 10532:706a 10654:706b
+E CHAPI055 10358 con 705 esc 2 skipped 1: 
+E CHAPI055 10358 con 705 esc 3 skipped 0: 
+E CHAPI055 10532 con 706 esc 1 skipped 1: 
+E CHAPI055 10532 con 706 esc 2 skipped 0: 
+E CHAPI055 10826 tim1 713 esc 1 skipped 0: 
+E CHAPI055 11132 con 686 esc 1 skipped 0: 11338:697a 11387:697b
+E CHAPI055 11132 con 686 esc 2 skipped 1: 
+E CHAPI055 11132 con 686 esc 3 skipped 0: 
+E CHAPI055 11253 con 717 esc 1 skipped 0: 11338:697a 11387:697b
+E CHAPI055 11253 con 717 esc 2 skipped 1: 
+E CHAPI055 11253 con 717 esc 3 skipped 0: 
+E CHAPI055 11338 con 697 esc 1 skipped 1: 
+E CHAPI055 11338 con 697 esc 2 skipped 0: 
+E CHAPI055 11688 con 698 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 11688 con 698 esc 2 skipped 6: 
+E CHAPI055 11688 con 698 esc 3 skipped 5: 
+E CHAPI055 11688 con 698 esc 4 skipped 4: 
+E CHAPI055 11688 con 698 esc 5 skipped 3: 
+E CHAPI055 11688 con 698 esc 6 skipped 2: 
+E CHAPI055 11688 con 698 esc 7 skipped 1: 
+E CHAPI055 11688 con 698 esc 8 skipped 0: 
+E CHAPI055 11839 con 699 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 11839 con 699 esc 2 skipped 6: 
+E CHAPI055 11839 con 699 esc 3 skipped 5: 
+E CHAPI055 11839 con 699 esc 4 skipped 4: 
+E CHAPI055 11839 con 699 esc 5 skipped 3: 
+E CHAPI055 11839 con 699 esc 6 skipped 2: 
+E CHAPI055 11839 con 699 esc 7 skipped 1: 
+E CHAPI055 11839 con 699 esc 8 skipped 0: 
+E CHAPI055 11996 con 712 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 11996 con 712 esc 2 skipped 6: 
+E CHAPI055 11996 con 712 esc 3 skipped 5: 
+E CHAPI055 11996 con 712 esc 4 skipped 4: 
+E CHAPI055 11996 con 712 esc 5 skipped 3: 
+E CHAPI055 11996 con 712 esc 6 skipped 2: 
+E CHAPI055 11996 con 712 esc 7 skipped 1: 
+E CHAPI055 11996 con 712 esc 8 skipped 0: 
+E CHAPI055 12169 con 712 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 12169 con 712 esc 2 skipped 6: 
+E CHAPI055 12169 con 712 esc 3 skipped 5: 
+E CHAPI055 12169 con 712 esc 4 skipped 4: 
+E CHAPI055 12169 con 712 esc 5 skipped 3: 
+E CHAPI055 12169 con 712 esc 6 skipped 2: 
+E CHAPI055 12169 con 712 esc 7 skipped 1: 
+E CHAPI055 12169 con 712 esc 8 skipped 0: 
+E CHAPI055 12235 con 714 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 12235 con 714 esc 2 skipped 6: 
+E CHAPI055 12235 con 714 esc 3 skipped 5: 
+E CHAPI055 12235 con 714 esc 4 skipped 4: 
+E CHAPI055 12235 con 714 esc 5 skipped 3: 
+E CHAPI055 12235 con 714 esc 6 skipped 2: 
+E CHAPI055 12235 con 714 esc 7 skipped 1: 
+E CHAPI055 12235 con 714 esc 8 skipped 0: 
+E CHAPI055 12407 con 718 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 12407 con 718 esc 2 skipped 6: 
+E CHAPI055 12407 con 718 esc 3 skipped 5: 
+E CHAPI055 12407 con 718 esc 4 skipped 4: 
+E CHAPI055 12407 con 718 esc 5 skipped 3: 
+E CHAPI055 12407 con 718 esc 6 skipped 2: 
+E CHAPI055 12407 con 718 esc 7 skipped 1: 
+E CHAPI055 12407 con 718 esc 8 skipped 0: 
+E CHAPI055 12586 con 720 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 12586 con 720 esc 2 skipped 6: 
+E CHAPI055 12586 con 720 esc 3 skipped 5: 
+E CHAPI055 12586 con 720 esc 4 skipped 4: 
+E CHAPI055 12586 con 720 esc 5 skipped 3: 
+E CHAPI055 12586 con 720 esc 6 skipped 2: 
+E CHAPI055 12586 con 720 esc 7 skipped 1: 
+E CHAPI055 12586 con 720 esc 8 skipped 0: 
+E CHAPI055 12725 con 721 esc 1 skipped 0: 6477:700a 6549:700b 6595:700c 6660:700d 6691:700e 6761:700f 6854:700g
+E CHAPI055 12725 con 721 esc 2 skipped 6: 
+E CHAPI055 12725 con 721 esc 3 skipped 5: 
+E CHAPI055 12725 con 721 esc 4 skipped 4: 
+E CHAPI055 12725 con 721 esc 5 skipped 3: 
+E CHAPI055 12725 con 721 esc 6 skipped 2: 
+E CHAPI055 12725 con 721 esc 7 skipped 1: 
+E CHAPI055 12725 con 721 esc 8 skipped 0: 
+E CHAPI056 1342 tim2 730 esc 1 skipped 4: 
+E CHAPI056 1342 tim2 730 esc 2 skipped 3: 
+E CHAPI056 1342 tim2 730 esc 3 skipped 2: 
+E CHAPI056 1342 tim2 730 esc 4 skipped 1: 
+E CHAPI056 1342 tim2 730 esc 5 skipped 0: 
+E CHAPI056 1704 tim2 731 esc 1 skipped 0: 
+E CHAPI056 1896 con 744 esc 1 skipped 0: 1987:747a 2009:747b
+E CHAPI056 1896 con 744 esc 2 skipped 1: 
+E CHAPI056 1896 con 744 esc 3 skipped 0: 
+E CHAPI056 1987 con 747 esc 1 skipped 1: 
+E CHAPI056 1987 con 747 esc 2 skipped 0: 
+E CHAPI056 2529 sel 735 esc 1 skipped 0: 
+E CHAPI056 2687 con 733 esc 1 skipped 0: 3053:737a 3099:737b 3143:737c
+E CHAPI056 2687 con 733 esc 2 skipped 2: 
+E CHAPI056 2687 con 733 esc 3 skipped 1: 
+E CHAPI056 2687 con 733 esc 4 skipped 0: 
+E CHAPI056 2873 con 734 esc 1 skipped 0: 3053:737a 3099:737b 3143:737c
+E CHAPI056 2873 con 734 esc 2 skipped 2: 
+E CHAPI056 2873 con 734 esc 3 skipped 1: 
+E CHAPI056 2873 con 734 esc 4 skipped 0: 
+E CHAPI056 3053 con 737 esc 1 skipped 2: 
+E CHAPI056 3053 con 737 esc 2 skipped 1: 
+E CHAPI056 3053 con 737 esc 3 skipped 0: 
+E CHAPI056 3276 con 741 esc 1 skipped 0: 3489:743a 1987:747a 2009:747b
+E CHAPI056 3276 con 741 esc 2 skipped 0: 1987:747a 2009:747b
+E CHAPI056 3276 con 741 esc 3 skipped 1: 
+E CHAPI056 3276 con 741 esc 4 skipped 0: 
+E CHAPI056 3408 con 742 esc 1 skipped 0: 3489:743a 1987:747a 2009:747b
+E CHAPI056 3408 con 742 esc 2 skipped 0: 1987:747a 2009:747b
+E CHAPI056 3408 con 742 esc 3 skipped 1: 
+E CHAPI056 3408 con 742 esc 4 skipped 0: 
+E CHAPI056 3489 con 743 esc 1 skipped 0: 1987:747a 2009:747b
+E CHAPI056 3489 con 743 esc 2 skipped 1: 
+E CHAPI056 3489 con 743 esc 3 skipped 0: 
+E CHAPI056 3606 con 736 esc 1 skipped 3: 
+E CHAPI056 3606 con 736 esc 2 skipped 2: 
+E CHAPI056 3606 con 736 esc 3 skipped 1: 
+E CHAPI056 3606 con 736 esc 4 skipped 0: 
+E CHAPI056 3977 con 749 esc 1 skipped 0: 4310:751a
+E CHAPI056 3977 con 749 esc 2 skipped 0: 
+E CHAPI056 4157 con 750 esc 1 skipped 0: 4310:751a
+E CHAPI056 4157 con 750 esc 2 skipped 0: 
+E CHAPI056 4310 con 751 esc 1 skipped 0: 
+E CHAPI056 4479 con 742 esc 1 skipped 0: 3489:743a 1987:747a 2009:747b
+E CHAPI056 4479 con 742 esc 2 skipped 0: 1987:747a 2009:747b
+E CHAPI056 4479 con 742 esc 3 skipped 1: 
+E CHAPI056 4479 con 742 esc 4 skipped 0: 
+E CHAPI056 4604 con 752 esc 1 skipped 1: 1987:747a 2009:747b
+E CHAPI056 4604 con 752 esc 2 skipped 0: 1987:747a 2009:747b
+E CHAPI056 4604 con 752 esc 3 skipped 1: 
+E CHAPI056 4604 con 752 esc 4 skipped 0: 
+E CHAPI056 4857 con 748 esc 1 skipped 3: 6052:738a 6119:738b 6169:738c 6191:738d 6273:738e 6317:738f 6379:738g 6414:738h 6436:738i 6463:738j 6519:738k 6562:738l 6608:738m 6656:738n 6676:738o 6759:738p 6800:738q 6874:738r 6930:738s 6989:738t 7020:738u 7104:738v 7123:738w
+E CHAPI056 4857 con 748 esc 2 skipped 2: 6052:738a 6119:738b 6169:738c 6191:738d 6273:738e 6317:738f 6379:738g 6414:738h 6436:738i 6463:738j 6519:738k 6562:738l 6608:738m 6656:738n 6676:738o 6759:738p 6800:738q 6874:738r 6930:738s 6989:738t 7020:738u 7104:738v 7123:738w
+E CHAPI056 4857 con 748 esc 3 skipped 1: 6052:738a 6119:738b 6169:738c 6191:738d 6273:738e 6317:738f 6379:738g 6414:738h 6436:738i 6463:738j 6519:738k 6562:738l 6608:738m 6656:738n 6676:738o 6759:738p 6800:738q 6874:738r 6930:738s 6989:738t 7020:738u 7104:738v 7123:738w
+E CHAPI056 4857 con 748 esc 4 skipped 0: 6052:738a 6119:738b 6169:738c 6191:738d 6273:738e 6317:738f 6379:738g 6414:738h 6436:738i 6463:738j 6519:738k 6562:738l 6608:738m 6656:738n 6676:738o 6759:738p 6800:738q 6874:738r 6930:738s 6989:738t 7020:738u 7104:738v 7123:738w
+E CHAPI056 4857 con 748 esc 5 skipped 22: 
+E CHAPI056 4857 con 748 esc 6 skipped 21: 
+E CHAPI056 4857 con 748 esc 7 skipped 20: 
+E CHAPI056 4857 con 748 esc 8 skipped 19: 
+E CHAPI056 4857 con 748 esc 9 skipped 18: 
+E CHAPI056 4857 con 748 esc 10 skipped 17: 
+E CHAPI056 4857 con 748 esc 11 skipped 16: 
+E CHAPI056 4857 con 748 esc 12 skipped 15: 
+E CHAPI056 4857 con 748 esc 13 skipped 14: 
+E CHAPI056 4857 con 748 esc 14 skipped 13: 
+E CHAPI056 4857 con 748 esc 15 skipped 12: 
+E CHAPI056 4857 con 748 esc 16 skipped 11: 
+E CHAPI056 4857 con 748 esc 17 skipped 10: 
+E CHAPI056 4857 con 748 esc 18 skipped 9: 
+E CHAPI056 4857 con 748 esc 19 skipped 8: 
+E CHAPI056 4857 con 748 esc 20 skipped 7: 
+E CHAPI056 4857 con 748 esc 21 skipped 6: 
+E CHAPI056 4857 con 748 esc 22 skipped 5: 
+E CHAPI056 4857 con 748 esc 23 skipped 4: 
+E CHAPI056 4857 con 748 esc 24 skipped 3: 
+E CHAPI056 4857 con 748 esc 25 skipped 2: 
+E CHAPI056 4857 con 748 esc 26 skipped 1: 
+E CHAPI056 4857 con 748 esc 27 skipped 0: 
+E CHAPI056 5114 con 732 esc 1 skipped 4: 
+E CHAPI056 5114 con 732 esc 2 skipped 3: 
+E CHAPI056 5114 con 732 esc 3 skipped 2: 
+E CHAPI056 5114 con 732 esc 4 skipped 1: 
+E CHAPI056 5114 con 732 esc 5 skipped 0: 
+E CHAPI056 5517 con 739 esc 1 skipped 1: 
+E CHAPI056 5517 con 739 esc 2 skipped 0: 
+E CHAPI056 5758 con 740 esc 1 skipped 1: 
+E CHAPI056 5758 con 740 esc 2 skipped 0: 
+E CHAPI056 6052 con 738 esc 1 skipped 22: 
+E CHAPI056 6052 con 738 esc 2 skipped 21: 
+E CHAPI056 6052 con 738 esc 3 skipped 20: 
+E CHAPI056 6052 con 738 esc 4 skipped 19: 
+E CHAPI056 6052 con 738 esc 5 skipped 18: 
+E CHAPI056 6052 con 738 esc 6 skipped 17: 
+E CHAPI056 6052 con 738 esc 7 skipped 16: 
+E CHAPI056 6052 con 738 esc 8 skipped 15: 
+E CHAPI056 6052 con 738 esc 9 skipped 14: 
+E CHAPI056 6052 con 738 esc 10 skipped 13: 
+E CHAPI056 6052 con 738 esc 11 skipped 12: 
+E CHAPI056 6052 con 738 esc 12 skipped 11: 
+E CHAPI056 6052 con 738 esc 13 skipped 10: 
+E CHAPI056 6052 con 738 esc 14 skipped 9: 
+E CHAPI056 6052 con 738 esc 15 skipped 8: 
+E CHAPI056 6052 con 738 esc 16 skipped 7: 
+E CHAPI056 6052 con 738 esc 17 skipped 6: 
+E CHAPI056 6052 con 738 esc 18 skipped 5: 
+E CHAPI056 6052 con 738 esc 19 skipped 4: 
+E CHAPI056 6052 con 738 esc 20 skipped 3: 
+E CHAPI056 6052 con 738 esc 21 skipped 2: 
+E CHAPI056 6052 con 738 esc 22 skipped 1: 
+E CHAPI056 6052 con 738 esc 23 skipped 0: 
+E CHAPI056 7407 sel 745 esc 1 skipped 0: 
+E CHAPI056 7786 sel 746 esc 1 skipped 0: 
+E CHAPI056 8220 sel 756 esc 1 skipped 0: 
+E CHAPI056 8661 con 753 esc 1 skipped 1: 
+E CHAPI056 8661 con 753 esc 2 skipped 0: 
+E CHAPI056 8832 con 754 esc 1 skipped 0: 
+E CHAPI056 8958 con 754 esc 1 skipped 0: 
+E CHAPI056 9132 con 755 esc 1 skipped 6: 
+E CHAPI056 9132 con 755 esc 2 skipped 5: 
+E CHAPI056 9132 con 755 esc 3 skipped 4: 
+E CHAPI056 9132 con 755 esc 4 skipped 3: 
+E CHAPI056 9132 con 755 esc 5 skipped 2: 
+E CHAPI056 9132 con 755 esc 6 skipped 1: 
+E CHAPI056 9132 con 755 esc 7 skipped 0: 
+E CHAPI056 9760 sel 286 esc 1 skipped 0: 
+E CHAPI056 10104 con 169 esc 1 skipped 0: 
+E CHAPI056 10191 sel 267 esc 1 skipped 0: 
+E CHAPI056 10520 sel 285 esc 1 skipped 0: 
+E CHAPI056 10628 sel 287 esc 1 skipped 0: 
+E CHAPI056 10721 sel 286 esc 1 skipped 0: 
+E CHAPI056 11078 tim2 291 esc 1 skipped 0: 
+E CHAPI056 11580 tim2 14 esc 1 skipped 0: 
+E CHAPI056 11614 sel 10 esc 1 skipped 0: 
+E CHAPI056 11648 sel 10 esc 1 skipped 0: 
+E CHAPI056 11721 tim2 34 esc 1 skipped 0: 
+E CHAPI056 11794 tim2 34 esc 1 skipped 0: 
+E CHAPI056 11834 tim2 34 esc 1 skipped 0: 
+E CHAPI056 11868 sel 290 esc 1 skipped 0: 
+E CHAPI056 14160 sel 269 esc 1 skipped 0: 
+E CHAPI057 742 tim1 765 esc 1 skipped 2: 
+E CHAPI057 742 tim1 765 esc 2 skipped 1: 
+E CHAPI057 742 tim1 765 esc 3 skipped 0: 
+E CHAPI057 1136 con 291 esc 1 skipped 3: 
+E CHAPI057 1136 con 291 esc 2 skipped 2: 
+E CHAPI057 1136 con 291 esc 3 skipped 1: 
+E CHAPI057 1136 con 291 esc 4 skipped 0: 
+E CHAPI057 1193 sel 10 esc 1 skipped 6: 
+E CHAPI057 1193 sel 10 esc 2 skipped 5: 
+E CHAPI057 1193 sel 10 esc 3 skipped 4: 
+E CHAPI057 1193 sel 10 esc 4 skipped 3: 
+E CHAPI057 1193 sel 10 esc 5 skipped 2: 
+E CHAPI057 1193 sel 10 esc 6 skipped 1: 
+E CHAPI057 1193 sel 10 esc 7 skipped 0: 
+E CHAPI057 1265 sel 766 esc 1 skipped 6: 
+E CHAPI057 1265 sel 766 esc 2 skipped 5: 
+E CHAPI057 1265 sel 766 esc 3 skipped 4: 
+E CHAPI057 1265 sel 766 esc 4 skipped 3: 
+E CHAPI057 1265 sel 766 esc 5 skipped 2: 
+E CHAPI057 1265 sel 766 esc 6 skipped 1: 
+E CHAPI057 1265 sel 766 esc 7 skipped 0: 
+E CHAPI057 1916 sel 767 esc 1 skipped 3: 
+E CHAPI057 1916 sel 767 esc 2 skipped 2: 
+E CHAPI057 1916 sel 767 esc 3 skipped 1: 
+E CHAPI057 1916 sel 767 esc 4 skipped 0: 
+E CHAPI057 2199 con 773 esc 1 skipped 0: 
+E CHAPI057 2333 con 773 esc 1 skipped 0: 
+E CHAPI057 2466 con 774 esc 1 skipped 1: 
+E CHAPI057 2466 con 774 esc 2 skipped 0: 
+E CHAPI057 2785 con 768 esc 1 skipped 1: 3015:775a 3065:775b 3078:775c
+E CHAPI057 2785 con 768 esc 2 skipped 0: 3015:775a 3065:775b 3078:775c
+E CHAPI057 2785 con 768 esc 3 skipped 2: 
+E CHAPI057 2785 con 768 esc 4 skipped 1: 
+E CHAPI057 2785 con 768 esc 5 skipped 0: 
+E CHAPI057 2899 con 772 esc 1 skipped 2: 3015:775a 3065:775b 3078:775c
+E CHAPI057 2899 con 772 esc 2 skipped 1: 3015:775a 3065:775b 3078:775c
+E CHAPI057 2899 con 772 esc 3 skipped 0: 3015:775a 3065:775b 3078:775c
+E CHAPI057 2899 con 772 esc 4 skipped 2: 
+E CHAPI057 2899 con 772 esc 5 skipped 1: 
+E CHAPI057 2899 con 772 esc 6 skipped 0: 
+E CHAPI057 3015 con 775 esc 1 skipped 2: 
+E CHAPI057 3015 con 775 esc 2 skipped 1: 
+E CHAPI057 3015 con 775 esc 3 skipped 0: 
+E CHAPI057 3261 con 769 esc 1 skipped 0: 
+E CHAPI057 3461 con 770 esc 1 skipped 0: 
+E CHAPI057 3601 con 771 esc 1 skipped 2: 
+E CHAPI057 3601 con 771 esc 2 skipped 1: 
+E CHAPI057 3601 con 771 esc 3 skipped 0: 
+E CHAPI057 3820 con 776 esc 1 skipped 0: 3601:771a 3650:771b 3674:771c
+E CHAPI057 3820 con 776 esc 2 skipped 2: 
+E CHAPI057 3820 con 776 esc 3 skipped 1: 
+E CHAPI057 3820 con 776 esc 4 skipped 0: 
+E CHAPI057 3926 sel 777 esc 1 skipped 0: 
+E CHAPI057 4069 sel 778 esc 1 skipped 0: 
+E CHAPI057 4216 con 779 esc 1 skipped 16: 
+E CHAPI057 4216 con 779 esc 2 skipped 15: 
+E CHAPI057 4216 con 779 esc 3 skipped 14: 
+E CHAPI057 4216 con 779 esc 4 skipped 13: 
+E CHAPI057 4216 con 779 esc 5 skipped 12: 
+E CHAPI057 4216 con 779 esc 6 skipped 11: 
+E CHAPI057 4216 con 779 esc 7 skipped 10: 
+E CHAPI057 4216 con 779 esc 8 skipped 9: 
+E CHAPI057 4216 con 779 esc 9 skipped 8: 
+E CHAPI057 4216 con 779 esc 10 skipped 7: 
+E CHAPI057 4216 con 779 esc 11 skipped 6: 
+E CHAPI057 4216 con 779 esc 12 skipped 5: 
+E CHAPI057 4216 con 779 esc 13 skipped 4: 
+E CHAPI057 4216 con 779 esc 14 skipped 3: 
+E CHAPI057 4216 con 779 esc 15 skipped 2: 
+E CHAPI057 4216 con 779 esc 16 skipped 1: 
+E CHAPI057 4216 con 779 esc 17 skipped 0: 
+E CHAPI057 5022 sel 780 esc 1 skipped 0: 
+E CHAPI057 5457 sel 781 esc 1 skipped 0: 
+E CHAPI057 5701 sel 781 esc 1 skipped 4: 
+E CHAPI057 5701 sel 781 esc 2 skipped 3: 
+E CHAPI057 5701 sel 781 esc 3 skipped 2: 
+E CHAPI057 5701 sel 781 esc 4 skipped 1: 
+E CHAPI057 5701 sel 781 esc 5 skipped 0: 
+E CHAPI057 6110 con 782 esc 1 skipped 0: 
+E CHAPI057 6236 sel 783 esc 1 skipped 0: 
+E CHAPI057 6306 sel 783 esc 1 skipped 0: 
+E CHAPI057 6363 con 784 esc 1 skipped 0: 
+E CHAPI057 6531 sel 792 esc 1 skipped 0: 
+E CHAPI057 6775 sel 792 esc 1 skipped 4: 
+E CHAPI057 6775 sel 792 esc 2 skipped 3: 
+E CHAPI057 6775 sel 792 esc 3 skipped 2: 
+E CHAPI057 6775 sel 792 esc 4 skipped 1: 
+E CHAPI057 6775 sel 792 esc 5 skipped 0: 
+E CHAPI057 7184 con 793 esc 1 skipped 0: 
+E CHAPI057 7296 con 794 esc 1 skipped 0: 
+E CHAPI057 7414 con 786 esc 1 skipped 9: 
+E CHAPI057 7414 con 786 esc 2 skipped 8: 
+E CHAPI057 7414 con 786 esc 3 skipped 7: 
+E CHAPI057 7414 con 786 esc 4 skipped 6: 
+E CHAPI057 7414 con 786 esc 5 skipped 5: 
+E CHAPI057 7414 con 786 esc 6 skipped 4: 
+E CHAPI057 7414 con 786 esc 7 skipped 3: 
+E CHAPI057 7414 con 786 esc 8 skipped 2: 
+E CHAPI057 7414 con 786 esc 9 skipped 1: 
+E CHAPI057 7414 con 786 esc 10 skipped 0: 
+E CHAPI057 8254 con 787 esc 1 skipped 5: 
+E CHAPI057 8254 con 787 esc 2 skipped 4: 
+E CHAPI057 8254 con 787 esc 3 skipped 3: 
+E CHAPI057 8254 con 787 esc 4 skipped 2: 
+E CHAPI057 8254 con 787 esc 5 skipped 1: 
+E CHAPI057 8254 con 787 esc 6 skipped 0: 
+E CHAPI057 8954 tim2 788 esc 1 skipped 0: 
+E CHAPI057 9241 tim2 789 esc 1 skipped 3: 9543:789e 9569:789f 9592:789g 9674:789h 9701:789i 9752:789j 9795:789k
+E CHAPI057 9241 tim2 789 esc 2 skipped 2: 9543:789e 9569:789f 9592:789g 9674:789h 9701:789i 9752:789j 9795:789k
+E CHAPI057 9241 tim2 789 esc 3 skipped 1: 9543:789e 9569:789f 9592:789g 9674:789h 9701:789i 9752:789j 9795:789k
+E CHAPI057 9241 tim2 789 esc 4 skipped 0: 9543:789e 9569:789f 9592:789g 9674:789h 9701:789i 9752:789j 9795:789k
+E CHAPI057 9241 tim2 789 esc 5 skipped 6: 
+E CHAPI057 9241 tim2 789 esc 6 skipped 5: 
+E CHAPI057 9241 tim2 789 esc 7 skipped 4: 
+E CHAPI057 9241 tim2 789 esc 8 skipped 3: 
+E CHAPI057 9241 tim2 789 esc 9 skipped 2: 
+E CHAPI057 9241 tim2 789 esc 10 skipped 1: 
+E CHAPI057 9241 tim2 789 esc 11 skipped 0: 
+E CHAPI057 9951 con 790 esc 1 skipped 1: 
+E CHAPI057 9951 con 790 esc 2 skipped 0: 
+E CHAPI057 10119 con 791 esc 1 skipped 2: 
+E CHAPI057 10119 con 791 esc 2 skipped 1: 
+E CHAPI057 10119 con 791 esc 3 skipped 0: 
+E CHAPI057 10350 con 785 esc 1 skipped 0: 
+E CHAPI057 10439 sel 291 esc 1 skipped 0: 
+E CHAPI058 41 sel 810 esc 1 skipped 8: 
+E CHAPI058 41 sel 810 esc 2 skipped 7: 
+E CHAPI058 41 sel 810 esc 3 skipped 6: 
+E CHAPI058 41 sel 810 esc 4 skipped 5: 
+E CHAPI058 41 sel 810 esc 5 skipped 4: 
+E CHAPI058 41 sel 810 esc 6 skipped 3: 
+E CHAPI058 41 sel 810 esc 7 skipped 2: 
+E CHAPI058 41 sel 810 esc 8 skipped 1: 
+E CHAPI058 41 sel 810 esc 9 skipped 0: 
+E CHAPI058 809 con 811 esc 1 skipped 2: 
+E CHAPI058 809 con 811 esc 2 skipped 1: 
+E CHAPI058 809 con 811 esc 3 skipped 0: 
+E CHAPI058 994 con 812 esc 1 skipped 5: 
+E CHAPI058 994 con 812 esc 2 skipped 4: 
+E CHAPI058 994 con 812 esc 3 skipped 3: 
+E CHAPI058 994 con 812 esc 4 skipped 2: 
+E CHAPI058 994 con 812 esc 5 skipped 1: 
+E CHAPI058 994 con 812 esc 6 skipped 0: 
+E CHAPI058 1278 con 813 esc 1 skipped 1: 
+E CHAPI058 1278 con 813 esc 2 skipped 0: 
+E CHAPI058 1450 sel 814 esc 1 skipped 0: 
+E CHAPI058 1575 sel 815 esc 1 skipped 0: 
+E CHAPI058 1660 con 816 esc 1 skipped 3: 
+E CHAPI058 1660 con 816 esc 2 skipped 2: 
+E CHAPI058 1660 con 816 esc 3 skipped 1: 
+E CHAPI058 1660 con 816 esc 4 skipped 0: 
+E CHAPI058 1874 con 817 esc 1 skipped 7: 
+E CHAPI058 1874 con 817 esc 2 skipped 6: 
+E CHAPI058 1874 con 817 esc 3 skipped 5: 
+E CHAPI058 1874 con 817 esc 4 skipped 4: 
+E CHAPI058 1874 con 817 esc 5 skipped 3: 
+E CHAPI058 1874 con 817 esc 6 skipped 2: 
+E CHAPI058 1874 con 817 esc 7 skipped 1: 
+E CHAPI058 1874 con 817 esc 8 skipped 0: 
+E CHAPI058 2302 con 818 esc 1 skipped 6: 
+E CHAPI058 2302 con 818 esc 2 skipped 5: 
+E CHAPI058 2302 con 818 esc 3 skipped 4: 
+E CHAPI058 2302 con 818 esc 4 skipped 3: 
+E CHAPI058 2302 con 818 esc 5 skipped 2: 
+E CHAPI058 2302 con 818 esc 6 skipped 1: 
+E CHAPI058 2302 con 818 esc 7 skipped 0: 
+E CHAPI058 2853 con 819 esc 1 skipped 3: 
+E CHAPI058 2853 con 819 esc 2 skipped 2: 
+E CHAPI058 2853 con 819 esc 3 skipped 1: 
+E CHAPI058 2853 con 819 esc 4 skipped 0: 
+E CHAPI058 3006 sel 820 esc 1 skipped 0: 
+E CHAPI058 3167 con 14 esc 1 skipped 0: 3283:821b 3345:821c 3414:821d 3485:821e 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 2 skipped 0: 3345:821c 3414:821d 3485:821e 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 3 skipped 0: 3414:821d 3485:821e 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 4 skipped 0: 3485:821e 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 5 skipped 0: 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 6 skipped 11: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 7 skipped 10: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 8 skipped 9: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 9 skipped 8: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 10 skipped 7: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 11 skipped 6: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 12 skipped 5: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 13 skipped 4: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 14 skipped 3: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 15 skipped 2: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 16 skipped 1: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 17 skipped 0: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3167 con 14 esc 18 skipped 4: 
+E CHAPI058 3167 con 14 esc 19 skipped 3: 
+E CHAPI058 3167 con 14 esc 20 skipped 2: 
+E CHAPI058 3167 con 14 esc 21 skipped 1: 
+E CHAPI058 3167 con 14 esc 22 skipped 0: 
+E CHAPI058 3197 tim1 821 esc 1 skipped 0: 3283:821b 3345:821c 3414:821d 3485:821e 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 2 skipped 0: 3345:821c 3414:821d 3485:821e 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 3 skipped 0: 3414:821d 3485:821e 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 4 skipped 0: 3485:821e 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 5 skipped 0: 3551:821f 3586:821g 3611:821h 3697:821i 3743:821j 3781:821k 3807:821l 4030:821m 4124:821n 4146:821o 4192:821p 4257:821q 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 6 skipped 11: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 7 skipped 10: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 8 skipped 9: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 9 skipped 8: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 10 skipped 7: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 11 skipped 6: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 12 skipped 5: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 13 skipped 4: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 14 skipped 3: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 15 skipped 2: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 16 skipped 1: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 17 skipped 0: 4311:821r 4337:821s 4383:821t 4439:821u 4462:821v
+E CHAPI058 3197 tim1 821 esc 18 skipped 4: 
+E CHAPI058 3197 tim1 821 esc 19 skipped 3: 
+E CHAPI058 3197 tim1 821 esc 20 skipped 2: 
+E CHAPI058 3197 tim1 821 esc 21 skipped 1: 
+E CHAPI058 3197 tim1 821 esc 22 skipped 0: 
+E CHAPI059 545 sel 830 esc 1 skipped 0: 
+E CHAPI059 704 con 831 esc 1 skipped 3: 
+E CHAPI059 704 con 831 esc 2 skipped 2: 
+E CHAPI059 704 con 831 esc 3 skipped 1: 
+E CHAPI059 704 con 831 esc 4 skipped 0: 
+E CHAPI059 991 con 840 esc 1 skipped 0: 
+E CHAPI059 1384 sel 832 esc 1 skipped 0: 
+E CHAPI059 1473 sel 833 esc 1 skipped 0: 
+E CHAPI060 115 sel 840 esc 1 skipped 0: 
+E CHAPI060 495 sel 841 esc 1 skipped 0: 
+E CHAPI060 634 sel 842 esc 1 skipped 0: 
+E CHAPI060 774 sel 843 esc 1 skipped 0: 115:840a
+E CHAPI060 774 sel 843 esc 2 skipped 0: 
+E CHAPI061 3532 sel 865 esc 1 skipped 0: 
+E CHAPI062 314 sel 857 esc 1 skipped 0: 
+E CHAPI062 392 con 862 esc 1 skipped 1: 
+E CHAPI062 392 con 862 esc 2 skipped 0: 
+E CHAPI062 442 con 858 esc 1 skipped 1: 
+E CHAPI062 442 con 858 esc 2 skipped 0: 
+E CHAPI062 567 con 863 esc 1 skipped 1: 
+E CHAPI062 567 con 863 esc 2 skipped 0: 
+E CHAPI062 976 con 14 esc 1 skipped 4: 
+E CHAPI062 976 con 14 esc 2 skipped 3: 
+E CHAPI062 976 con 14 esc 3 skipped 2: 
+E CHAPI062 976 con 14 esc 4 skipped 1: 
+E CHAPI062 976 con 14 esc 5 skipped 0: 
+E CHAPI062 1044 sel 864 esc 1 skipped 4: 
+E CHAPI062 1044 sel 864 esc 2 skipped 3: 
+E CHAPI062 1044 sel 864 esc 3 skipped 2: 
+E CHAPI062 1044 sel 864 esc 4 skipped 1: 
+E CHAPI062 1044 sel 864 esc 5 skipped 0: 
+E CHAPI063 422 sel 857 esc 1 skipped 0: 
+E CHAPI063 611 con 876 esc 1 skipped 0: 786:877a 810:877b 865:877c 897:877d 920:877e
+E CHAPI063 611 con 876 esc 2 skipped 4: 
+E CHAPI063 611 con 876 esc 3 skipped 3: 
+E CHAPI063 611 con 876 esc 4 skipped 2: 
+E CHAPI063 611 con 876 esc 5 skipped 1: 
+E CHAPI063 611 con 876 esc 6 skipped 0: 
+E CHAPI063 724 con 877 esc 1 skipped 4: 
+E CHAPI063 724 con 877 esc 2 skipped 3: 
+E CHAPI063 724 con 877 esc 3 skipped 2: 
+E CHAPI063 724 con 877 esc 4 skipped 1: 
+E CHAPI063 724 con 877 esc 5 skipped 0: 
+E CHAPI063 1034 con 875 esc 1 skipped 0: 
+E CHAPI063 1144 sel 878 esc 1 skipped 2: 
+E CHAPI063 1144 sel 878 esc 2 skipped 1: 
+E CHAPI063 1144 sel 878 esc 3 skipped 0: 
+E CHAPI063 1392 con 879 esc 1 skipped 0: 
+E CHAPI063 1603 con 880 esc 1 skipped 0: 
+E CHAPI063 1896 tim1 881 esc 1 skipped 1: 
+E CHAPI063 1896 tim1 881 esc 2 skipped 0: 
+E CHAPI063 2092 con 882 esc 1 skipped 0: 
+E CHAPI063 2205 con 883 esc 1 skipped 1: 2354:883c 2525:903a
+E CHAPI063 2205 con 883 esc 2 skipped 0: 2354:883c 2525:903a
+E CHAPI063 2205 con 883 esc 3 skipped 0: 2525:903a
+E CHAPI063 2205 con 883 esc 4 skipped 0: 
+E CHAPI063 2525 tim2 903 esc 1 skipped 0: 
+E CHAPI063 2749 con 884 esc 1 skipped 1: 2919:884c
+E CHAPI063 2749 con 884 esc 2 skipped 0: 2919:884c
+E CHAPI063 2749 con 884 esc 3 skipped 0: 
+E CHAPI063 3142 tim2 34 esc 1 skipped 0: 
+E CHAPI063 3202 tim2 34 esc 1 skipped 0: 
+E CHAPI063 3262 tim2 34 esc 1 skipped 0: 
+E CHAPI063 3322 tim2 34 esc 1 skipped 0: 
+E CHAPI063 3382 tim2 34 esc 1 skipped 0: 
+E CHAPI063 3442 tim2 909 esc 1 skipped 0: 
+E CHAPI063 3651 con 885 esc 1 skipped 0: 3742:885b
+E CHAPI063 3651 con 885 esc 2 skipped 0: 
+E CHAPI063 3903 con 910 esc 1 skipped 0: 3974:910b
+E CHAPI063 3903 con 910 esc 2 skipped 0: 
+E CHAPI063 4135 con 904 esc 1 skipped 0: 4188:904b
+E CHAPI063 4135 con 904 esc 2 skipped 0: 
+E CHAPI063 4341 con 905 esc 1 skipped 0: 4394:905b
+E CHAPI063 4341 con 905 esc 2 skipped 0: 
+E CHAPI063 4549 con 906 esc 1 skipped 0: 4602:906b
+E CHAPI063 4549 con 906 esc 2 skipped 0: 
+E CHAPI063 4757 con 907 esc 1 skipped 0: 4810:907b
+E CHAPI063 4757 con 907 esc 2 skipped 0: 
+E CHAPI063 4980 con 908 esc 1 skipped 0: 5033:908b 5179:908c
+E CHAPI063 4980 con 908 esc 2 skipped 0: 5179:908c
+E CHAPI063 4980 con 908 esc 3 skipped 0: 
+E CHAPI063 5390 con 886 esc 1 skipped 0: 5471:886b
+E CHAPI063 5390 con 886 esc 2 skipped 0: 
+E CHAPI063 5647 con 887 esc 1 skipped 0: 
+E CHAPI063 5883 sel 889 esc 1 skipped 0: 
+E CHAPI063 6081 sel 888 esc 1 skipped 1: 
+E CHAPI063 6081 sel 888 esc 2 skipped 0: 
+E CHAPI063 6363 sel 890 esc 1 skipped 1: 
+E CHAPI063 6363 sel 890 esc 2 skipped 0: 
+E CHAPI063 6540 con 891 esc 1 skipped 1: 
+E CHAPI063 6540 con 891 esc 2 skipped 0: 
+E CHAPI063 6705 tim2 895 esc 1 skipped 0: 
+E CHAPI063 6781 tim2 894 esc 1 skipped 0: 
+E CHAPI063 6855 tim2 893 esc 1 skipped 0: 
+E CHAPI063 6934 tim2 892 esc 1 skipped 0: 
+E CHAPI063 7067 sel 902 esc 1 skipped 0: 
+E CHAPI064 61 tim2 896 esc 1 skipped 0: 284:896b 336:896c 367:896d 499:896e 539:896f 580:896g 643:896h
+E CHAPI064 61 tim2 896 esc 2 skipped 2: 499:896e 539:896f 580:896g 643:896h
+E CHAPI064 61 tim2 896 esc 3 skipped 1: 499:896e 539:896f 580:896g 643:896h
+E CHAPI064 61 tim2 896 esc 4 skipped 0: 499:896e 539:896f 580:896g 643:896h
+E CHAPI064 61 tim2 896 esc 5 skipped 3: 
+E CHAPI064 61 tim2 896 esc 6 skipped 2: 
+E CHAPI064 61 tim2 896 esc 7 skipped 1: 
+E CHAPI064 61 tim2 896 esc 8 skipped 0: 
+E CHAPI065 389 sel 840 esc 1 skipped 0: 
+E CHAPI065 755 sel 897 esc 1 skipped 0: 
+E CHAPI065 6133 con 899 esc 1 skipped 4: 
+E CHAPI065 6133 con 899 esc 2 skipped 3: 
+E CHAPI065 6133 con 899 esc 3 skipped 2: 
+E CHAPI065 6133 con 899 esc 4 skipped 1: 
+E CHAPI065 6133 con 899 esc 5 skipped 0: 
+E CHAPI065 6587 con 901 esc 1 skipped 0: 
+E CHAPI066 549 con 14 esc 1 skipped 3: 
+E CHAPI066 549 con 14 esc 2 skipped 2: 
+E CHAPI066 549 con 14 esc 3 skipped 1: 
+E CHAPI066 549 con 14 esc 4 skipped 0: 
+E CHAPI066 589 tim2 930 esc 1 skipped 3: 
+E CHAPI066 589 tim2 930 esc 2 skipped 2: 
+E CHAPI066 589 tim2 930 esc 3 skipped 1: 
+E CHAPI066 589 tim2 930 esc 4 skipped 0: 
+E CHAPI066 1056 tim2 931 esc 1 skipped 1: 1175:931c 1245:931d 1341:931e
+E CHAPI066 1056 tim2 931 esc 2 skipped 0: 1175:931c 1245:931d 1341:931e
+E CHAPI066 1056 tim2 931 esc 3 skipped 2: 
+E CHAPI066 1056 tim2 931 esc 4 skipped 1: 
+E CHAPI066 1056 tim2 931 esc 5 skipped 0: 
+E CHAPI066 1799 con 932 esc 1 skipped 0: 
+E CHAPI066 1885 con 933 esc 1 skipped 0: 
+E CHAPI066 2079 con 933 esc 1 skipped 0: 
+E CHAPI066 2273 con 933 esc 1 skipped 0: 
+E CHAPI066 2464 con 934 esc 1 skipped 0: 
+E CHAPI066 2678 con 935 esc 1 skipped 10: 
+E CHAPI066 2678 con 935 esc 2 skipped 9: 
+E CHAPI066 2678 con 935 esc 3 skipped 8: 
+E CHAPI066 2678 con 935 esc 4 skipped 7: 
+E CHAPI066 2678 con 935 esc 5 skipped 6: 
+E CHAPI066 2678 con 935 esc 6 skipped 5: 
+E CHAPI066 2678 con 935 esc 7 skipped 4: 
+E CHAPI066 2678 con 935 esc 8 skipped 3: 
+E CHAPI066 2678 con 935 esc 9 skipped 2: 
+E CHAPI066 2678 con 935 esc 10 skipped 1: 
+E CHAPI066 2678 con 935 esc 11 skipped 0: 
+E CHAPI066 3585 con 936 esc 1 skipped 0: 
+E CHAPI066 3748 con 936 esc 1 skipped 0: 
+E CHAPI066 3908 sel 10 esc 1 skipped 0: 
+E CHAPI066 3985 sel 937 esc 1 skipped 0: 
+E CHAPI066 4125 con 952 esc 1 skipped 5: 
+E CHAPI066 4125 con 952 esc 2 skipped 4: 
+E CHAPI066 4125 con 952 esc 3 skipped 3: 
+E CHAPI066 4125 con 952 esc 4 skipped 2: 
+E CHAPI066 4125 con 952 esc 5 skipped 1: 
+E CHAPI066 4125 con 952 esc 6 skipped 0: 
+E CHAPI066 4539 con 953 esc 1 skipped 0: 
+E CHAPI066 4673 sel 938 esc 1 skipped 4: 
+E CHAPI066 4673 sel 938 esc 2 skipped 3: 
+E CHAPI066 4673 sel 938 esc 3 skipped 2: 
+E CHAPI066 4673 sel 938 esc 4 skipped 1: 
+E CHAPI066 4673 sel 938 esc 5 skipped 0: 
+E CHAPI066 5708 con 939 esc 1 skipped 11: 
+E CHAPI066 5708 con 939 esc 2 skipped 10: 
+E CHAPI066 5708 con 939 esc 3 skipped 9: 
+E CHAPI066 5708 con 939 esc 4 skipped 8: 
+E CHAPI066 5708 con 939 esc 5 skipped 7: 
+E CHAPI066 5708 con 939 esc 6 skipped 6: 
+E CHAPI066 5708 con 939 esc 7 skipped 5: 
+E CHAPI066 5708 con 939 esc 8 skipped 4: 
+E CHAPI066 5708 con 939 esc 9 skipped 3: 
+E CHAPI066 5708 con 939 esc 10 skipped 2: 
+E CHAPI066 5708 con 939 esc 11 skipped 1: 
+E CHAPI066 5708 con 939 esc 12 skipped 0: 
+E CHAPI066 6209 con 940 esc 1 skipped 9: 
+E CHAPI066 6209 con 940 esc 2 skipped 8: 
+E CHAPI066 6209 con 940 esc 3 skipped 7: 
+E CHAPI066 6209 con 940 esc 4 skipped 6: 
+E CHAPI066 6209 con 940 esc 5 skipped 5: 
+E CHAPI066 6209 con 940 esc 6 skipped 4: 
+E CHAPI066 6209 con 940 esc 7 skipped 3: 
+E CHAPI066 6209 con 940 esc 8 skipped 2: 
+E CHAPI066 6209 con 940 esc 9 skipped 1: 
+E CHAPI066 6209 con 940 esc 10 skipped 0: 
+E CHAPI066 6804 sel 941 esc 1 skipped 0: 
+E CHAPI066 7121 sel 942 esc 1 skipped 10: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 2 skipped 9: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 3 skipped 8: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 4 skipped 7: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 5 skipped 6: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 6 skipped 5: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 7 skipped 4: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 8 skipped 3: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 9 skipped 2: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 10 skipped 1: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 11 skipped 0: 8054:942l 8082:942m 8132:942n 8176:942o
+E CHAPI066 7121 sel 942 esc 12 skipped 3: 
+E CHAPI066 7121 sel 942 esc 13 skipped 2: 
+E CHAPI066 7121 sel 942 esc 14 skipped 1: 
+E CHAPI066 7121 sel 942 esc 15 skipped 0: 
+E CHAPI066 8348 con 943 esc 1 skipped 0: 
+E CHAPI067 498 con 944 esc 1 skipped 0: 
+E CHAPI067 726 con 945 esc 1 skipped 0: 
+E CHAPI067 864 con 946 esc 1 skipped 0: 
+E CHAPI067 961 con 947 esc 1 skipped 0: 1043:947b 1253:947c 1437:947d 1639:947e 1796:947f 1973:947g 2147:947h
+E CHAPI067 961 con 947 esc 2 skipped 0: 1253:947c 1437:947d 1639:947e 1796:947f 1973:947g 2147:947h
+E CHAPI067 961 con 947 esc 3 skipped 1: 1639:947e 1796:947f 1973:947g 2147:947h
+E CHAPI067 961 con 947 esc 4 skipped 0: 1639:947e 1796:947f 1973:947g 2147:947h
+E CHAPI067 961 con 947 esc 5 skipped 0: 1796:947f 1973:947g 2147:947h
+E CHAPI067 961 con 947 esc 6 skipped 2: 
+E CHAPI067 961 con 947 esc 7 skipped 1: 
+E CHAPI067 961 con 947 esc 8 skipped 0: 
+E CHAPI067 2330 con 948 esc 1 skipped 0: 
+E CHAPI067 2443 con 948 esc 1 skipped 3: 
+E CHAPI067 2443 con 948 esc 2 skipped 2: 
+E CHAPI067 2443 con 948 esc 3 skipped 1: 
+E CHAPI067 2443 con 948 esc 4 skipped 0: 
+E CHAPI067 2904 sel 949 esc 1 skipped 2: 
+E CHAPI067 2904 sel 949 esc 2 skipped 1: 
+E CHAPI067 2904 sel 949 esc 3 skipped 0: 
+E CHAPI067 3211 sel 950 esc 1 skipped 2: 
+E CHAPI067 3211 sel 950 esc 2 skipped 1: 
+E CHAPI067 3211 sel 950 esc 3 skipped 0: 
+E CHAPI067 3591 tim2 954 esc 1 skipped 5: 
+E CHAPI067 3591 tim2 954 esc 2 skipped 4: 
+E CHAPI067 3591 tim2 954 esc 3 skipped 3: 
+E CHAPI067 3591 tim2 954 esc 4 skipped 2: 
+E CHAPI067 3591 tim2 954 esc 5 skipped 1: 
+E CHAPI067 3591 tim2 954 esc 6 skipped 0: 
+E CHAPI067 4018 con 955 esc 1 skipped 3: 
+E CHAPI067 4018 con 955 esc 2 skipped 2: 
+E CHAPI067 4018 con 955 esc 3 skipped 1: 
+E CHAPI067 4018 con 955 esc 4 skipped 0: 
+E CHAPI067 4343 con 956 esc 1 skipped 0: 
+E CHAPI067 4554 con 957 esc 1 skipped 6: 6398:964a 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 4554 con 957 esc 2 skipped 5: 6398:964a 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 4554 con 957 esc 3 skipped 4: 6398:964a 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 4554 con 957 esc 4 skipped 3: 6398:964a 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 4554 con 957 esc 5 skipped 2: 6398:964a 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 4554 con 957 esc 6 skipped 1: 6398:964a 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 4554 con 957 esc 7 skipped 0: 6398:964a 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 4554 con 957 esc 8 skipped 0: 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 4554 con 957 esc 9 skipped 9: 
+E CHAPI067 4554 con 957 esc 10 skipped 8: 
+E CHAPI067 4554 con 957 esc 11 skipped 7: 
+E CHAPI067 4554 con 957 esc 12 skipped 6: 
+E CHAPI067 4554 con 957 esc 13 skipped 5: 
+E CHAPI067 4554 con 957 esc 14 skipped 4: 
+E CHAPI067 4554 con 957 esc 15 skipped 3: 
+E CHAPI067 4554 con 957 esc 16 skipped 2: 
+E CHAPI067 4554 con 957 esc 17 skipped 1: 
+E CHAPI067 4554 con 957 esc 18 skipped 0: 
+E CHAPI067 5154 con 958 esc 1 skipped 0: 
+E CHAPI067 5273 con 959 esc 1 skipped 0: 
+E CHAPI067 5448 con 960 esc 1 skipped 0: 
+E CHAPI067 5584 con 961 esc 1 skipped 0: 
+E CHAPI067 5762 con 962 esc 1 skipped 0: 
+E CHAPI067 5904 con 963 esc 1 skipped 0: 5999:963b 6097:963c 6220:963d 6319:963e
+E CHAPI067 5904 con 963 esc 2 skipped 1: 6220:963d 6319:963e
+E CHAPI067 5904 con 963 esc 3 skipped 0: 6220:963d 6319:963e
+E CHAPI067 5904 con 963 esc 4 skipped 1: 
+E CHAPI067 5904 con 963 esc 5 skipped 0: 
+E CHAPI067 6398 con 964 esc 1 skipped 0: 6556:964b 6624:964c 6646:964d 6710:964e 6767:964f 6814:964g 6865:964h 6950:964i 7031:964j 7074:964k
+E CHAPI067 6398 con 964 esc 2 skipped 9: 
+E CHAPI067 6398 con 964 esc 3 skipped 8: 
+E CHAPI067 6398 con 964 esc 4 skipped 7: 
+E CHAPI067 6398 con 964 esc 5 skipped 6: 
+E CHAPI067 6398 con 964 esc 6 skipped 5: 
+E CHAPI067 6398 con 964 esc 7 skipped 4: 
+E CHAPI067 6398 con 964 esc 8 skipped 3: 
+E CHAPI067 6398 con 964 esc 9 skipped 2: 
+E CHAPI067 6398 con 964 esc 10 skipped 1: 
+E CHAPI067 6398 con 964 esc 11 skipped 0: 
+E CHAPI067 7416 con 965 esc 1 skipped 0: 
+E CHAPI067 7635 con 966 esc 1 skipped 0: 11173:976a 11331:976b 11397:976c 11569:976d 11604:976e
+E CHAPI067 7635 con 966 esc 2 skipped 4: 
+E CHAPI067 7635 con 966 esc 3 skipped 3: 
+E CHAPI067 7635 con 966 esc 4 skipped 2: 
+E CHAPI067 7635 con 966 esc 5 skipped 1: 
+E CHAPI067 7635 con 966 esc 6 skipped 0: 
+E CHAPI067 7734 con 967 esc 1 skipped 0: 11173:976a 11331:976b 11397:976c 11569:976d 11604:976e
+E CHAPI067 7734 con 967 esc 2 skipped 4: 
+E CHAPI067 7734 con 967 esc 3 skipped 3: 
+E CHAPI067 7734 con 967 esc 4 skipped 2: 
+E CHAPI067 7734 con 967 esc 5 skipped 1: 
+E CHAPI067 7734 con 967 esc 6 skipped 0: 
+E CHAPI067 7832 con 968 esc 1 skipped 0: 11173:976a 11331:976b 11397:976c 11569:976d 11604:976e
+E CHAPI067 7832 con 968 esc 2 skipped 4: 
+E CHAPI067 7832 con 968 esc 3 skipped 3: 
+E CHAPI067 7832 con 968 esc 4 skipped 2: 
+E CHAPI067 7832 con 968 esc 5 skipped 1: 
+E CHAPI067 7832 con 968 esc 6 skipped 0: 
+E CHAPI067 7987 con 969 esc 1 skipped 9: 
+E CHAPI067 7987 con 969 esc 2 skipped 8: 
+E CHAPI067 7987 con 969 esc 3 skipped 7: 
+E CHAPI067 7987 con 969 esc 4 skipped 6: 
+E CHAPI067 7987 con 969 esc 5 skipped 5: 
+E CHAPI067 7987 con 969 esc 6 skipped 4: 
+E CHAPI067 7987 con 969 esc 7 skipped 3: 
+E CHAPI067 7987 con 969 esc 8 skipped 2: 
+E CHAPI067 7987 con 969 esc 9 skipped 1: 
+E CHAPI067 7987 con 969 esc 10 skipped 0: 
+E CHAPI067 8902 con 970 esc 1 skipped 1: 
+E CHAPI067 8902 con 970 esc 2 skipped 0: 
+E CHAPI067 9190 con 971 esc 1 skipped 5: 11078:974a 11099:974b
+E CHAPI067 9190 con 971 esc 2 skipped 4: 11078:974a 11099:974b
+E CHAPI067 9190 con 971 esc 3 skipped 3: 11078:974a 11099:974b
+E CHAPI067 9190 con 971 esc 4 skipped 2: 11078:974a 11099:974b
+E CHAPI067 9190 con 971 esc 5 skipped 1: 11078:974a 11099:974b
+E CHAPI067 9190 con 971 esc 6 skipped 0: 11078:974a 11099:974b
+E CHAPI067 9190 con 971 esc 7 skipped 1: 
+E CHAPI067 9190 con 971 esc 8 skipped 0: 
+E CHAPI067 10237 con 972 esc 1 skipped 5: 
+E CHAPI067 10237 con 972 esc 2 skipped 4: 
+E CHAPI067 10237 con 972 esc 3 skipped 3: 
+E CHAPI067 10237 con 972 esc 4 skipped 2: 
+E CHAPI067 10237 con 972 esc 5 skipped 1: 
+E CHAPI067 10237 con 972 esc 6 skipped 0: 
+E CHAPI067 10856 con 973 esc 1 skipped 1: 
+E CHAPI067 10856 con 973 esc 2 skipped 0: 
+E CHAPI067 11078 con 974 esc 1 skipped 1: 
+E CHAPI067 11078 con 974 esc 2 skipped 0: 
+E CHAPI067 11173 con 976 esc 1 skipped 4: 
+E CHAPI067 11173 con 976 esc 2 skipped 3: 
+E CHAPI067 11173 con 976 esc 3 skipped 2: 
+E CHAPI067 11173 con 976 esc 4 skipped 1: 
+E CHAPI067 11173 con 976 esc 5 skipped 0: 
+E CHAPI067 11862 con 977 esc 1 skipped 0: 
+E CHAPI067 11955 con 978 esc 1 skipped 4: 
+E CHAPI067 11955 con 978 esc 2 skipped 3: 
+E CHAPI067 11955 con 978 esc 3 skipped 2: 
+E CHAPI067 11955 con 978 esc 4 skipped 1: 
+E CHAPI067 11955 con 978 esc 5 skipped 0: 
+E CHAPI067 12518 con 982 esc 1 skipped 1: 12604:982c 14218:984a 14271:984b 14295:984c
+E CHAPI067 12518 con 982 esc 2 skipped 0: 12604:982c 14218:984a 14271:984b 14295:984c
+E CHAPI067 12518 con 982 esc 3 skipped 0: 14218:984a 14271:984b 14295:984c
+E CHAPI067 12518 con 982 esc 4 skipped 2: 
+E CHAPI067 12518 con 982 esc 5 skipped 1: 
+E CHAPI067 12518 con 982 esc 6 skipped 0: 
+E CHAPI067 12786 con 983 esc 1 skipped 0: 14218:984a 14271:984b 14295:984c
+E CHAPI067 12786 con 983 esc 2 skipped 2: 
+E CHAPI067 12786 con 983 esc 3 skipped 1: 
+E CHAPI067 12786 con 983 esc 4 skipped 0: 
+E CHAPI067 12973 con 979 esc 1 skipped 3: 
+E CHAPI067 12973 con 979 esc 2 skipped 2: 
+E CHAPI067 12973 con 979 esc 3 skipped 1: 
+E CHAPI067 12973 con 979 esc 4 skipped 0: 
+E CHAPI067 13319 con 14 esc 1 skipped 3: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13319 con 14 esc 2 skipped 2: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13319 con 14 esc 3 skipped 1: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13319 con 14 esc 4 skipped 0: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13319 con 14 esc 5 skipped 3: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13319 con 14 esc 6 skipped 2: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13319 con 14 esc 7 skipped 1: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13319 con 14 esc 8 skipped 0: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13319 con 14 esc 9 skipped 2: 
+E CHAPI067 13319 con 14 esc 10 skipped 1: 
+E CHAPI067 13319 con 14 esc 11 skipped 0: 
+E CHAPI067 13388 con 14 esc 1 skipped 3: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13388 con 14 esc 2 skipped 2: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13388 con 14 esc 3 skipped 1: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13388 con 14 esc 4 skipped 0: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13388 con 14 esc 5 skipped 3: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13388 con 14 esc 6 skipped 2: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13388 con 14 esc 7 skipped 1: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13388 con 14 esc 8 skipped 0: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13388 con 14 esc 9 skipped 2: 
+E CHAPI067 13388 con 14 esc 10 skipped 1: 
+E CHAPI067 13388 con 14 esc 11 skipped 0: 
+E CHAPI067 13455 tim1 980 esc 1 skipped 3: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13455 tim1 980 esc 2 skipped 2: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13455 tim1 980 esc 3 skipped 1: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13455 tim1 980 esc 4 skipped 0: 13698:981a 13735:981b 13748:981c 13813:981d 13856:981e 13886:981f 13947:981g
+E CHAPI067 13455 tim1 980 esc 5 skipped 3: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13455 tim1 980 esc 6 skipped 2: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13455 tim1 980 esc 7 skipped 1: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13455 tim1 980 esc 8 skipped 0: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13455 tim1 980 esc 9 skipped 2: 
+E CHAPI067 13455 tim1 980 esc 10 skipped 1: 
+E CHAPI067 13455 tim1 980 esc 11 skipped 0: 
+E CHAPI067 13698 tim1 981 esc 1 skipped 3: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13698 tim1 981 esc 2 skipped 2: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13698 tim1 981 esc 3 skipped 1: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13698 tim1 981 esc 4 skipped 0: 13856:981e 13886:981f 13947:981g
+E CHAPI067 13698 tim1 981 esc 5 skipped 2: 
+E CHAPI067 13698 tim1 981 esc 6 skipped 1: 
+E CHAPI067 13698 tim1 981 esc 7 skipped 0: 
+E CHAPI067 14218 tim2 984 esc 1 skipped 2: 
+E CHAPI067 14218 tim2 984 esc 2 skipped 1: 
+E CHAPI067 14218 tim2 984 esc 3 skipped 0: 
+E CHAPI067 14532 tim1 985 esc 1 skipped 0: 14635:985b 14662:985c 14702:985d 14769:985e 14817:985f 14858:985g 14964:985h 15000:985i 15039:985j 15070:985k 15191:985l 15241:985m
+E CHAPI067 14532 tim1 985 esc 2 skipped 5: 14964:985h 15000:985i 15039:985j 15070:985k 15191:985l 15241:985m
+E CHAPI067 14532 tim1 985 esc 3 skipped 4: 14964:985h 15000:985i 15039:985j 15070:985k 15191:985l 15241:985m
+E CHAPI067 14532 tim1 985 esc 4 skipped 3: 14964:985h 15000:985i 15039:985j 15070:985k 15191:985l 15241:985m
+E CHAPI067 14532 tim1 985 esc 5 skipped 2: 14964:985h 15000:985i 15039:985j 15070:985k 15191:985l 15241:985m
+E CHAPI067 14532 tim1 985 esc 6 skipped 1: 14964:985h 15000:985i 15039:985j 15070:985k 15191:985l 15241:985m
+E CHAPI067 14532 tim1 985 esc 7 skipped 0: 14964:985h 15000:985i 15039:985j 15070:985k 15191:985l 15241:985m
+E CHAPI067 14532 tim1 985 esc 8 skipped 5: 
+E CHAPI067 14532 tim1 985 esc 9 skipped 4: 
+E CHAPI067 14532 tim1 985 esc 10 skipped 3: 
+E CHAPI067 14532 tim1 985 esc 11 skipped 2: 
+E CHAPI067 14532 tim1 985 esc 12 skipped 1: 
+E CHAPI067 14532 tim1 985 esc 13 skipped 0: 
+E CHAPI068 581 tim2 1006 esc 1 skipped 3: 916:1006e 1008:1006f 1108:1006g 1173:1006h 1239:1006i
+E CHAPI068 581 tim2 1006 esc 2 skipped 2: 916:1006e 1008:1006f 1108:1006g 1173:1006h 1239:1006i
+E CHAPI068 581 tim2 1006 esc 3 skipped 1: 916:1006e 1008:1006f 1108:1006g 1173:1006h 1239:1006i
+E CHAPI068 581 tim2 1006 esc 4 skipped 0: 916:1006e 1008:1006f 1108:1006g 1173:1006h 1239:1006i
+E CHAPI068 581 tim2 1006 esc 5 skipped 4: 
+E CHAPI068 581 tim2 1006 esc 6 skipped 3: 
+E CHAPI068 581 tim2 1006 esc 7 skipped 2: 
+E CHAPI068 581 tim2 1006 esc 8 skipped 1: 
+E CHAPI068 581 tim2 1006 esc 9 skipped 0: 
+E CHAPI068 1395 sel 986 esc 1 skipped 4: 
+E CHAPI068 1395 sel 986 esc 2 skipped 3: 
+E CHAPI068 1395 sel 986 esc 3 skipped 2: 
+E CHAPI068 1395 sel 986 esc 4 skipped 1: 
+E CHAPI068 1395 sel 986 esc 5 skipped 0: 
+E CHAPI068 2071 sel 987 esc 1 skipped 2: 
+E CHAPI068 2071 sel 987 esc 2 skipped 1: 
+E CHAPI068 2071 sel 987 esc 3 skipped 0: 
+E CHAPI068 2254 con 988 esc 1 skipped 11: 
+E CHAPI068 2254 con 988 esc 2 skipped 10: 
+E CHAPI068 2254 con 988 esc 3 skipped 9: 
+E CHAPI068 2254 con 988 esc 4 skipped 8: 
+E CHAPI068 2254 con 988 esc 5 skipped 7: 
+E CHAPI068 2254 con 988 esc 6 skipped 6: 
+E CHAPI068 2254 con 988 esc 7 skipped 5: 
+E CHAPI068 2254 con 988 esc 8 skipped 4: 
+E CHAPI068 2254 con 988 esc 9 skipped 3: 
+E CHAPI068 2254 con 988 esc 10 skipped 2: 
+E CHAPI068 2254 con 988 esc 11 skipped 1: 
+E CHAPI068 2254 con 988 esc 12 skipped 0: 
+E CHAPI068 3439 con 989 esc 1 skipped 0: 
+E CHAPI068 3570 con 990 esc 1 skipped 0: 
+E CHAPI068 3725 con 991 esc 1 skipped 4: 
+E CHAPI068 3725 con 991 esc 2 skipped 3: 
+E CHAPI068 3725 con 991 esc 3 skipped 2: 
+E CHAPI068 3725 con 991 esc 4 skipped 1: 
+E CHAPI068 3725 con 991 esc 5 skipped 0: 
+E CHAPI068 3989 con 992 esc 1 skipped 4: 
+E CHAPI068 3989 con 992 esc 2 skipped 3: 
+E CHAPI068 3989 con 992 esc 3 skipped 2: 
+E CHAPI068 3989 con 992 esc 4 skipped 1: 
+E CHAPI068 3989 con 992 esc 5 skipped 0: 
+E CHAPI068 4251 con 993 esc 1 skipped 0: 
+E CHAPI068 4437 con 999 esc 1 skipped 0: 
+E CHAPI068 4698 con 1000 esc 1 skipped 0: 
+E CHAPI068 5014 con 994 esc 1 skipped 0: 
+E CHAPI068 5148 con 995 esc 1 skipped 0: 
+E CHAPI068 5347 con 996 esc 1 skipped 0: 
+E CHAPI068 5496 con 997 esc 1 skipped 0: 
+E CHAPI068 5689 con 998 esc 1 skipped 0: 
+E CHAPI068 5920 con 1001 esc 1 skipped 0: 
+E CHAPI068 6010 con 1002 esc 1 skipped 0: 
+E CHAPI068 6138 sel 1003 esc 1 skipped 0: 
+E CHAPI068 6278 sel 10 esc 1 skipped 0: 
+E CHAPI068 6340 sel 10 esc 1 skipped 0: 
+E CHAPI068 6416 sel 10 esc 1 skipped 0: 
+E CHAPI068 6559 tim1 34 esc 1 skipped 0: 6691:1004b
+E CHAPI068 6559 tim1 34 esc 2 skipped 0: 
+E CHAPI068 6621 con 1004 esc 1 skipped 0: 6691:1004b
+E CHAPI068 6621 con 1004 esc 2 skipped 0: 
+E CHAPI068 7082 tim1 1005 esc 1 skipped 6: 7525:1005h 7637:1005i 7723:1005j
+E CHAPI068 7082 tim1 1005 esc 2 skipped 5: 7525:1005h 7637:1005i 7723:1005j
+E CHAPI068 7082 tim1 1005 esc 3 skipped 4: 7525:1005h 7637:1005i 7723:1005j
+E CHAPI068 7082 tim1 1005 esc 4 skipped 3: 7525:1005h 7637:1005i 7723:1005j
+E CHAPI068 7082 tim1 1005 esc 5 skipped 2: 7525:1005h 7637:1005i 7723:1005j
+E CHAPI068 7082 tim1 1005 esc 6 skipped 1: 7525:1005h 7637:1005i 7723:1005j
+E CHAPI068 7082 tim1 1005 esc 7 skipped 0: 7525:1005h 7637:1005i 7723:1005j
+E CHAPI068 7082 tim1 1005 esc 8 skipped 2: 
+E CHAPI068 7082 tim1 1005 esc 9 skipped 1: 
+E CHAPI068 7082 tim1 1005 esc 10 skipped 0: 
+E CHAPI069 315 con 1019 esc 1 skipped 0: 
+E CHAPI069 586 tim1 1020 esc 1 skipped 0: 
+E CHAPI069 681 sel 1021 esc 1 skipped 0: 
+E CHAPI069 805 sel 1022 esc 1 skipped 0: 
+E CHAPI069 928 sel 1023 esc 1 skipped 0: 
+E CHAPI069 1043 sel 1024 esc 1 skipped 0: 
+E CHAPI070 1046 con 1035 esc 1 skipped 0: 
+E CHAPI070 1157 con 1036 esc 1 skipped 0: 
+E CHAPI070 1254 con 1037 esc 1 skipped 0: 
+E CHAPI070 1343 tim2 1038 esc 1 skipped 0: 
+E CHAPI070 1440 con 1039 esc 1 skipped 0: 
+E CHAPI070 1582 con 1040 esc 1 skipped 0: 
+E CHAPI070 1803 tim2 1041 esc 1 skipped 0: 
+E CHAPI070 1961 sel 1021 esc 1 skipped 0: 
+E CHAPI070 2085 sel 1022 esc 1 skipped 0: 
+E CHAPI070 2208 sel 1023 esc 1 skipped 0: 
+E CHAPI070 2323 sel 1024 esc 1 skipped 0: 
+E CHAPI071 386 con 1042 esc 1 skipped 0: 
+E CHAPI071 604 con 1050 esc 1 skipped 0: 641:1050b
+E CHAPI071 604 con 1050 esc 2 skipped 0: 
+E CHAPI071 912 con 1051 esc 1 skipped 0: 
+E CHAPI071 1071 con 1052 esc 1 skipped 0: 
+E CHAPI071 1183 con 1053 esc 1 skipped 0: 
+E CHAPI071 1351 con 1054 esc 1 skipped 0: 
+E CHAPI071 1471 con 1055 esc 1 skipped 0: 
+E CHAPI071 1540 con 1056 esc 1 skipped 0: 
+E CHAPI071 1609 con 1057 esc 1 skipped 0: 
+E CHAPI071 1701 con 1058 esc 1 skipped 0: 
+E CHAPI071 1804 con 1059 esc 1 skipped 0: 
+E CHAPI071 1942 con 1060 esc 1 skipped 0: 
+E CHAPI071 2049 con 1061 esc 1 skipped 0: 
+E CHAPI071 2304 con 1062 esc 1 skipped 0: 
+E CHAPI071 2497 con 1062 esc 1 skipped 0: 2688:1062b
+E CHAPI071 2497 con 1062 esc 2 skipped 0: 
+E CHAPI072 1638 con 1071 esc 1 skipped 17: 
+E CHAPI072 1638 con 1071 esc 2 skipped 16: 
+E CHAPI072 1638 con 1071 esc 3 skipped 15: 
+E CHAPI072 1638 con 1071 esc 4 skipped 14: 
+E CHAPI072 1638 con 1071 esc 5 skipped 13: 
+E CHAPI072 1638 con 1071 esc 6 skipped 12: 
+E CHAPI072 1638 con 1071 esc 7 skipped 11: 
+E CHAPI072 1638 con 1071 esc 8 skipped 10: 
+E CHAPI072 1638 con 1071 esc 9 skipped 9: 
+E CHAPI072 1638 con 1071 esc 10 skipped 8: 
+E CHAPI072 1638 con 1071 esc 11 skipped 7: 
+E CHAPI072 1638 con 1071 esc 12 skipped 6: 
+E CHAPI072 1638 con 1071 esc 13 skipped 5: 
+E CHAPI072 1638 con 1071 esc 14 skipped 4: 
+E CHAPI072 1638 con 1071 esc 15 skipped 3: 
+E CHAPI072 1638 con 1071 esc 16 skipped 2: 
+E CHAPI072 1638 con 1071 esc 17 skipped 1: 
+E CHAPI072 1638 con 1071 esc 18 skipped 0: 
+E CHAPI072 2645 con 1051 esc 1 skipped 0: 
+E CHAPI072 2804 con 1052 esc 1 skipped 0: 
+E CHAPI072 2916 con 1053 esc 1 skipped 0: 
+E CHAPI072 3084 con 1054 esc 1 skipped 0: 
+E CHAPI072 3204 con 1055 esc 1 skipped 0: 
+E CHAPI072 3273 con 1056 esc 1 skipped 0: 
+E CHAPI072 3342 con 1057 esc 1 skipped 0: 
+E CHAPI072 3434 con 1058 esc 1 skipped 0: 
+E CHAPI072 3537 con 1059 esc 1 skipped 0: 
+E CHAPI072 3675 con 1060 esc 1 skipped 0: 
+E CHAPI072 3782 con 1061 esc 1 skipped 0: 
+E CHAPI072 3953 con 1062 esc 1 skipped 0: 
+E CHAPI072 4146 con 1062 esc 1 skipped 0: 4337:1062b
+E CHAPI072 4146 con 1062 esc 2 skipped 0: 
+E CHAPI077 397 sel 1080 esc 1 skipped 4: 
+E CHAPI077 397 sel 1080 esc 2 skipped 3: 
+E CHAPI077 397 sel 1080 esc 3 skipped 2: 
+E CHAPI077 397 sel 1080 esc 4 skipped 1: 
+E CHAPI077 397 sel 1080 esc 5 skipped 0: 
+E CHAPI077 755 sel 1081 esc 1 skipped 4: 
+E CHAPI077 755 sel 1081 esc 2 skipped 3: 
+E CHAPI077 755 sel 1081 esc 3 skipped 2: 
+E CHAPI077 755 sel 1081 esc 4 skipped 1: 
+E CHAPI077 755 sel 1081 esc 5 skipped 0: 
+E CHAPI077 1244 con 1082 esc 1 skipped 1: 
+E CHAPI077 1244 con 1082 esc 2 skipped 0: 
+E CHAPI077 1392 con 1083 esc 1 skipped 3: 
+E CHAPI077 1392 con 1083 esc 2 skipped 2: 
+E CHAPI077 1392 con 1083 esc 3 skipped 1: 
+E CHAPI077 1392 con 1083 esc 4 skipped 0: 
+E CHAPI077 1852 sel 1084 esc 1 skipped 0: 
+E CHAPI078 482 sel 1093 esc 1 skipped 0: 
+E CHAPI078 610 sel 1094 esc 1 skipped 0: 
+E CHAPI078 717 sel 1095 esc 1 skipped 0: 
+E CHAPI078 840 sel 1096 esc 1 skipped 4: 
+E CHAPI078 840 sel 1096 esc 2 skipped 3: 
+E CHAPI078 840 sel 1096 esc 3 skipped 2: 
+E CHAPI078 840 sel 1096 esc 4 skipped 1: 
+E CHAPI078 840 sel 1096 esc 5 skipped 0: 
+E CHAPI078 1223 sel 1097 esc 1 skipped 0: 
+E CHAPI078 1510 con 1098 esc 1 skipped 0: 
+E CHAPI078 1675 con 1099 esc 1 skipped 0: 
+E CHAPI078 2126 con 1101 esc 1 skipped 1: 
+E CHAPI078 2126 con 1101 esc 2 skipped 0: 
+E CHAPI078 2430 con 1102 esc 1 skipped 0: 2523:1102b 2566:1102c
+E CHAPI078 2430 con 1102 esc 2 skipped 1: 
+E CHAPI078 2430 con 1102 esc 3 skipped 0: 
+E CHAPI079 639 tim2 1107 esc 1 skipped 9: 
+E CHAPI079 639 tim2 1107 esc 2 skipped 8: 
+E CHAPI079 639 tim2 1107 esc 3 skipped 7: 
+E CHAPI079 639 tim2 1107 esc 4 skipped 6: 
+E CHAPI079 639 tim2 1107 esc 5 skipped 5: 
+E CHAPI079 639 tim2 1107 esc 6 skipped 4: 
+E CHAPI079 639 tim2 1107 esc 7 skipped 3: 
+E CHAPI079 639 tim2 1107 esc 8 skipped 2: 
+E CHAPI079 639 tim2 1107 esc 9 skipped 1: 
+E CHAPI079 639 tim2 1107 esc 10 skipped 0: 
+E CHAPI079 1482 con 1108 esc 1 skipped 0: 
+E CHAPI079 1677 sel 1109 esc 1 skipped 0: 
+E CHAPI079 1822 sel 1110 esc 1 skipped 4: 
+E CHAPI079 1822 sel 1110 esc 2 skipped 3: 
+E CHAPI079 1822 sel 1110 esc 3 skipped 2: 
+E CHAPI079 1822 sel 1110 esc 4 skipped 1: 
+E CHAPI079 1822 sel 1110 esc 5 skipped 0: 
+E CHAPI079 2155 con 1111 esc 1 skipped 5: 
+E CHAPI079 2155 con 1111 esc 2 skipped 4: 
+E CHAPI079 2155 con 1111 esc 3 skipped 3: 
+E CHAPI079 2155 con 1111 esc 4 skipped 2: 
+E CHAPI079 2155 con 1111 esc 5 skipped 1: 
+E CHAPI079 2155 con 1111 esc 6 skipped 0: 
+E CHAPI079 2453 con 1112 esc 1 skipped 5: 
+E CHAPI079 2453 con 1112 esc 2 skipped 4: 
+E CHAPI079 2453 con 1112 esc 3 skipped 3: 
+E CHAPI079 2453 con 1112 esc 4 skipped 2: 
+E CHAPI079 2453 con 1112 esc 5 skipped 1: 
+E CHAPI079 2453 con 1112 esc 6 skipped 0: 
+E CHAPI079 2901 con 1113 esc 1 skipped 0: 
+E CHAPI079 3203 con 244 esc 1 skipped 0: 
+E CHAPI082 7077 tim2 1125 esc 1 skipped 0: 
+E CHAPI082 7346 tim2 1126 esc 1 skipped 0: 
+E CHAPI082 7637 tim2 1127 esc 1 skipped 0: 
+E CHAPI082 7908 tim2 1128 esc 1 skipped 0: 
+E CHAPI082 8193 tim2 1129 esc 1 skipped 0: 
+E CHAPI082 8446 tim2 1130 esc 1 skipped 0: 
+E CHAPI082 8702 tim2 1131 esc 1 skipped 0: 
+E CHAPI082 8946 tim2 1125 esc 1 skipped 0: 
+E CHAPI082 9215 tim2 1126 esc 1 skipped 0: 
+E CHAPI082 9506 tim2 1127 esc 1 skipped 0: 
+E CHAPI082 9777 tim2 1128 esc 1 skipped 0: 
+E CHAPI082 10062 tim2 1129 esc 1 skipped 0: 
+E CHAPI082 10315 tim2 1130 esc 1 skipped 0: 
+E CHAPI082 10571 tim2 1131 esc 1 skipped 0: 
+E CHAPI083 485 tim2 1145 esc 1 skipped 0: 
+E CHAPI083 1287 con 1147 esc 1 skipped 0: 
+E CHAPI084 435 tim1 1155 esc 1 skipped 2: 649:1155d 678:1155e
+E CHAPI084 435 tim1 1155 esc 2 skipped 1: 649:1155d 678:1155e
+E CHAPI084 435 tim1 1155 esc 3 skipped 0: 649:1155d 678:1155e
+E CHAPI084 435 tim1 1155 esc 4 skipped 1: 
+E CHAPI084 435 tim1 1155 esc 5 skipped 0: 
+E CHAPI084 1360 con 1157 esc 1 skipped 0: 
+E CHAPI085 751 con 1170 esc 1 skipped 0: 

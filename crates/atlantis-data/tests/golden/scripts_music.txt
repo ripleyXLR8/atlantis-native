@@ -1,0 +1,8 @@
+# The music and NewSound name tables of atlantis.exe (2001 English build, 714240 bytes), read from the
+# loaded image: the 13-byte records at 0x00495eec (StartMusik=N opens record N - 1) and the pointer
+# table at 0x00496224 up to its "FIN" entry (NewSound=N plays entry N). Names upper-cased, joined with
+# '\n', md5.
+music_count 31
+music_names 4b377a7d713cd332c5d4a42dad030e65
+newsound_count 137
+newsound_names 2fb022b4dc572a331c26586e3b4527eb

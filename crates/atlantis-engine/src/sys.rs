@@ -78,6 +78,10 @@ pub struct Cursor {
     pub hot_y: i32,
 }
 
+/// A callback run before each engine step with the time (see
+/// [`Sys::add_timer`]).
+pub type Timer = Box<dyn FnMut(u64)>;
+
 pub struct Sys {
     /// The frame shown at the next present, RGB565 640x480.
     pub screen: RefCell<Vec<u16>>,
@@ -93,6 +97,7 @@ pub struct Sys {
     locked: Cell<bool>,
     warp_request: Cell<Option<(i32, i32)>>,
     keys_held: RefCell<Vec<Key>>,
+    timers: RefCell<Vec<Timer>>,
 }
 
 impl Sys {
@@ -111,7 +116,15 @@ impl Sys {
             locked: Cell::new(false),
             warp_request: Cell::new(None),
             keys_held: RefCell::new(Vec::new()),
+            timers: RefCell::new(Vec::new()),
         })
+    }
+
+    /// Runs `f` with the time before each engine step, whatever loop the
+    /// engine is in: the original's 200 Hz timer callback (`FUN_00431150`)
+    /// runs that way, beside the game's loops.
+    pub fn add_timer(&self, f: Timer) {
+        self.timers.borrow_mut().push(f);
     }
 
     /// Milliseconds since the start (the original reads timeGetTime).
@@ -279,6 +292,9 @@ impl Runner {
             return false;
         };
         self.sys.now_ms.set(now_ms);
+        for t in self.sys.timers.borrow_mut().iter_mut() {
+            t(now_ms);
+        }
         let mut cx = Context::from_waker(Waker::noop());
         self.sys.yielded.set(false);
         match task.as_mut().poll(&mut cx) {

@@ -14,13 +14,16 @@ use std::rc::Rc;
 
 use atlantis_data::sprite::{read_spr_file, SprSprite};
 use atlantis_data::sprite_list::{NpcClickRect, SpriteTransEntry};
-use atlantis_data::wam::{CentrePos, Place, Wam};
+use atlantis_data::wam::{CentrePos, Place, Transition, Wam};
 use atlantis_data::{Game, SpritePlaceEntry};
 
 use crate::ambient::{AmbientSounds, MixerAmbientOutput};
+use crate::con::{ConClocks, Vars};
 use crate::cursor::WarpCursorState;
-use crate::hooks::{DirectLoader, Loader, NoScripts, ScriptHooks};
+use crate::hooks::{Departure, DirectLoader, Loader, ScriptHooks};
 use crate::look::{WarpMomentum, WarpPointer};
+use crate::music::Music;
+use crate::scripts::Scripts;
 use crate::sys::Sys;
 use crate::warp::Warp;
 
@@ -49,6 +52,39 @@ pub enum Event {
         frames: u32,
         sprites: usize,
     },
+    /// A chapter's CON script was loaded and its /INIT block run.
+    ChapterLoaded(u32),
+    /// A CON section started (its chapter and number), and how: "sel",
+    /// "con", "tim1", "tim2" or "go".
+    Section {
+        chapter: u32,
+        id: i32,
+        kind: &'static str,
+    },
+    /// A /set command ran (the command as written).
+    Set(String),
+    /// A dialog line was handed to the dialog presenter: section, track
+    /// letter, speaker.
+    Line {
+        section: i32,
+        letter: char,
+        speaker: String,
+    },
+    /// A music track started (StartMusik).
+    Music(i32),
+    /// A NewSound sample started: its table entry and file.
+    NewSound(i32, String),
+    /// A game over (GameOver=N).
+    GameOver(i32),
+}
+
+/// Why the place loop ends (`_abortCommand`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Abort {
+    /// A new game (a game over without a checkpoint).
+    NewGame,
+    /// Exit was set (CHAPI085's Exit=86): the end of the game.
+    Finished,
 }
 
 /// What [`run`] needs besides the platform and the game.
@@ -63,7 +99,7 @@ impl Default for Options {
     fn default() -> Self {
         Options {
             loader: Rc::new(DirectLoader),
-            hooks: Box::new(NoScripts),
+            hooks: Box::new(Scripts::new()),
             trace: None,
         }
     }
@@ -74,7 +110,8 @@ pub struct Engine {
     pub sys: Rc<Sys>,
     pub game: Game,
     pub(crate) loader: Rc<dyn Loader>,
-    pub(crate) trace: Option<Rc<RefCell<Vec<Event>>>>,
+    /// Receives the [`Event`]s when set.
+    pub trace: Option<Rc<RefCell<Vec<Event>>>>,
 
     // The area.
     pub wam: Wam,
@@ -95,8 +132,26 @@ pub struct Engine {
     /// LastVue.
     pub last_vue: u16,
     pub chapter: u32,
-    /// 0x006ce078, the CHAPTERTIME origin.
-    pub chapter_start_ms: u64,
+    /// The CON clocks (ChapterTime, Time1, Time2).
+    pub clocks: ConClocks,
+    /// The CON variables.
+    pub vars: Vars,
+    /// The music and the NewSound sample.
+    pub music: Music,
+    /// Set when the place loop has to end.
+    pub abort: Option<Abort>,
+    /// A CON section plays from a click (0x00496170).
+    pub section_play: bool,
+    /// A script Vue= named a place the WAM does not have: the variable VUE
+    /// reads it until the next place change.
+    pub vue_override: Option<i32>,
+    /// The inventory records (0x006ce138): the object id of each, in
+    /// order. TODO(phase 3): the bar, the icons, the object in hand.
+    pub inventory: Vec<i32>,
+    /// The place table slots as the WAM loads wrote them (0x006cd894 + the
+    /// records' transition arrays), stale entries included: a departure
+    /// Vue= reads entry i of the new place's record.
+    pub(crate) place_table_slots: Vec<Vec<Transition>>,
     /// The hidden persos (HidePerso): their sprites start inactive.
     pub hidden_persos: Vec<i32>,
     /// The CON variable ZOOM: the next transition turn zooms in.
@@ -157,6 +212,7 @@ impl Engine {
         // The effects volume 0x00495e73 at full scale.
         ambient.effects_volume = 127;
         let ambient_out = MixerAmbientOutput::new(sys.mixer.clone());
+        let music = Music::new(&sys);
         Engine {
             sys,
             game,
@@ -172,7 +228,14 @@ impl Engine {
             arrival_after_load: false,
             last_vue: 0,
             chapter: 0,
-            chapter_start_ms: 0,
+            clocks: ConClocks::default(),
+            vars: Vars::default(),
+            music,
+            abort: None,
+            section_play: false,
+            vue_override: None,
+            inventory: Vec::new(),
+            place_table_slots: Vec::new(),
             hidden_persos: Vec::new(),
             zoom: false,
             angle_warp: (0, 0),
@@ -232,9 +295,28 @@ impl Engine {
         self.current_place.and_then(|i| self.wam.places.get(i))
     }
 
+    /// The game clock (`FUN_00451d0c`, timeGetTime less its epoch).
+    pub fn now(&self) -> u32 {
+        self.sys.millis() as u32
+    }
+
     /// CHAPTERTIME: `FUN_0041c75c`, (now - start) / 1000.
     pub fn chapter_time(&self) -> i32 {
-        (self.sys.millis().wrapping_sub(self.chapter_start_ms) / 1000) as i32
+        self.clocks.chapter_time(self.now())
+    }
+
+    /// The window closed, or the place loop has to end.
+    pub fn should_abort(&self) -> bool {
+        self.sys.should_quit() || self.abort.is_some()
+    }
+
+    /// `FUN_0041c75c`, at the start of every warp frame (0x0041c086).
+    pub fn update_con_clocks(&mut self) {
+        let now = self.now();
+        self.vars.set("random", (now & 0xff) as i32);
+        self.vars.set("chaptertime", self.clocks.chapter_time(now));
+        self.vars.set("time1", self.clocks.timer_value(1, now));
+        self.vars.set("time2", self.clocks.timer_value(2, now));
     }
 
     /// Sets the view angles (an /INIT AngleWarpX / AngleWarpY, a test).
@@ -256,13 +338,20 @@ impl Engine {
     /// A WAM file, its centre table and sprite lists (`setupWAMByName`,
     /// `FUN_00421ebc`).
     pub async fn load_wam(&mut self, name: &str) -> bool {
+        self.load_wam_with(name, true).await
+    }
+
+    /// `record`: the place table slots are written (`setupWAMByName`; the
+    /// chapter's own WAM load `setupChapterWAM` does not).
+    async fn load_wam_with(&mut self, name: &str, record: bool) -> bool {
         let Some(data) = self.read(&format!("WAM\\{name}")).await else {
             return false;
         };
         self.wam = Wam::parse(&data);
         self.wam_name = name.to_ascii_uppercase();
-        // TODO(phase 2): recordPlaceTable, the stale transition slots a
-        // departure Vue= reads (transitionAfterDepartureVue).
+        if record {
+            self.record_place_table();
+        }
         self.load_ambient_centres().await;
         self.load_sprite_list().await;
         self.load_spf_list().await;
@@ -309,29 +398,52 @@ impl Engine {
     }
 
     /// The new game: `changeChapter(1)` / `FUN_0042de5c` without a
-    /// checkpoint, then `FUN_00423760`.
-    pub async fn new_game(&mut self, hooks: &mut dyn ScriptHooks) {
-        self.hidden_persos.clear();
-        // FUN_0042de5c step 4: ZOOM = NEWSOUND = 0.
+    /// checkpoint, then `FUN_00423760` on the boot pass. `in_play`: a new
+    /// game from play (a game over without a checkpoint), which keeps the
+    /// rest of the state (`keepState`).
+    pub async fn new_game(&mut self, hooks: &mut dyn ScriptHooks, in_play: bool) {
+        // A direct chapter start begins with no hidden persos; the CON
+        // /INIT block establishes the initial set.
+        if !in_play {
+            self.hidden_persos.clear();
+        }
+        // FUN_0042de5c step 4 (both branches): ZOOM = NEWSOUND = 0; NEWSOUND
+        // is one of the variables the chapter change keeps.
         self.zoom = false;
+        self.vars.set("zoom", 0);
+        self.vars.set("newsound", 0);
         self.next_place_id = None;
         self.arrival_scan_pending = false;
-        self.set_view(0.0, 0.0);
-        if !self.load_wam(NEW_GAME_WAM).await {
+        // The view angles: no function of the load path writes them, only
+        // an /INIT AngleWarpX / AngleWarpY; at boot they are 0 (.bss), kept
+        // otherwise.
+        if !in_play {
+            self.set_view(0.0, 0.0);
+        }
+        if !self.load_wam_with(NEW_GAME_WAM, false).await {
             log::error!("cannot start a new game: {NEW_GAME_WAM} missing");
             return;
         }
         self.chapter = 1;
-        // FUN_00423760 restarts the chapter clock when a game starts.
-        self.chapter_start_ms = self.sys.millis();
+        if !in_play {
+            // The record FUN_0042c054 sets up before the player menu: object
+            // 257 alone. FUN_00423760 zeroes the timer offsets and restarts
+            // Time1 when a game starts.
+            self.inventory = vec![257];
+            let now = self.now();
+            self.clocks.time1_offset = 0;
+            self.clocks.time2_offset = 0;
+            self.clocks.time1_start = now;
+        }
         // LastVue = 1 (0x004195fb, 0x0042e285).
         self.last_vue = 1;
-        hooks.chapter_loaded(self, 1).await;
+        hooks.chapter_loaded(self, 1, in_play).await;
         // An /INIT Vue= has entered its place already.
         if self.next_place_id.is_none() && !self.arrival_scan_pending {
             self.next_place_id = Some(NEW_GAME_VUE);
         }
-        // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x0042777d).
+        // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x0042777d), whatever the
+        // /INIT Vue= of chapter 1 did.
         self.arrival_after_load = true;
     }
 
@@ -347,12 +459,22 @@ impl Engine {
     }
 
     /// The place loop (`gameStep`, `FUN_00423ad8`): enter the pending
-    /// place, run the warp view, act on the click.
+    /// place and run its arrival scan, run the warp view, act on the click.
+    /// Returns when the game is quit or [`Engine::abort`] is set.
     pub async fn game_step(&mut self, hooks: &mut dyn ScriptHooks) {
         loop {
-            if self.sys.should_quit() {
+            if self.should_abort() {
                 break;
             }
+            // The place loop returns as soon as Exit is set (0x00423b26,
+            // 0x00423bb3, 0x00423cf0); the main loop then ends the game
+            // when it is 86 (0x00419787).
+            if self.vars.get("exit") != 0 {
+                self.abort = Some(Abort::Finished);
+                break;
+            }
+            // Enter a pending place (a new game, a move, a script Vue=), then
+            // run its arrival /sel scan, which may chain on.
             if self.next_place_id.is_some() {
                 let mut arrivee = self.current_place_id.map_or(-1, i32::from);
                 let scan = self.take_arrival_after_load(&mut arrivee);
@@ -377,6 +499,9 @@ impl Engine {
             if self.next_place_id.is_some() || self.arrival_scan_pending {
                 continue;
             }
+            if self.should_abort() {
+                break;
+            }
             if !self.warp_loaded {
                 // Nowhere to look (a missing panorama): wait for the quit.
                 self.sys.frame().await;
@@ -385,34 +510,49 @@ impl Engine {
 
             let action = self.handle_warp(hooks).await;
             if action == WARP_ABORT {
-                if self.sys.should_quit() {
+                if self.should_abort() {
                     break;
                 }
                 continue;
             }
 
             // A click with no NPC under the pointer: the zone goes to
-            // ClicZone; with a zone the /con click scan runs. A move then
-            // needs an empty hand (0x00423d2b).
+            // ClicZone (0x00423c1c), and with a zone or an object in hand
+            // FUN_004278a0 runs the /con click scan (0x00427b8c..0x00427bc2).
+            self.vars.set("cliczone", action as i32);
             let mut zone = action;
             if (1000..1017).contains(&zone) && hooks.puzzle_zone(self, zone - 1000).await {
                 zone = 0;
+                if self.should_abort() {
+                    break;
+                }
             }
             if zone == 999 {
                 hooks.zone_999(self).await;
                 zone = 0;
+                if self.should_abort() {
+                    break;
+                }
             }
-            if action != 0 {
-                hooks.zone_click(self, action).await;
-            }
-            if self.sys.should_quit() {
+            hooks.zone_click(self, action).await;
+            if self.should_abort() {
                 break;
             }
+            self.vars.set("cliczone", 0);
             if self.arrival_scan_pending {
                 continue; // a Vue= in a section entered another place
             }
-            // @ 0x00423d4b: a move needs an entry for the zone in the place.
+            // A move needs an empty hand (0x00423d2b)...
+            if self.vars.get("objetenmain") != 0 {
+                continue;
+            }
+            // ...and an entry for the zone in the place (@ 0x00423d4b).
+            if zone == 0 || zone >= 10000 {
+                continue;
+            }
             let Some(place) = self.place() else { continue };
+            // FUN_00423ad8's i: the first transition of the place whose
+            // destination is the zone.
             let Some(index) = place
                 .transitions
                 .iter()
@@ -420,28 +560,42 @@ impl Engine {
             else {
                 continue;
             };
-            if zone == 0 || zone >= 10000 {
-                continue;
-            }
             let dest = zone as u16;
             self.next_place_id = Some(dest);
-            // LastVue = the place being left (0x00423dcf).
+            // LastVue = the place being left (0x00423dcf), before the
+            // departure scan.
             self.last_vue = self.current_place_id.unwrap_or(0);
+            // Game over ends the pass as it is (0x00423e13); then an
+            // AbortDepart, set by this scan or any scan since the last
+            // arrival preparation, ends the move with ArriveeVue, AbortDepart
+            // and DepartVue cleared, so a Vue= of the scan gets no arrival
+            // scan (0x00423e2b..0x00423e7e).
             let outcome = hooks.departure_scan(self, dest).await;
-            if self.arrival_scan_pending && outcome == crate::hooks::Departure::Go {
+            let game_over = outcome == Departure::GameOver;
+            if outcome == Departure::Abort {
+                self.arrival_scan_pending = false;
+            }
+            if self.arrival_scan_pending {
                 // A Vue= inside a departure section already entered its
-                // place; the original goes on with the turn and video of
-                // entry `index` of the new place's record.
-                // TODO(phase 2): transitionAfterDepartureVue(index).
-                let _ = index;
+                // place (CHAPI005 /113, CHAPI062 /864, CHAPI077 /010); the
+                // place loop goes on with the turn and video of entry i of
+                // the new place's record.
                 self.next_place_id = None;
+                if !self.should_abort() && !game_over {
+                    self.transition_after_departure_vue(index).await;
+                    self.vars.move_ended(); // 0x00424089
+                }
                 continue;
             }
             match (outcome, self.next_place_id.take()) {
-                (crate::hooks::Departure::Go, Some(dest)) if !self.sys.should_quit() => {
-                    // TODO(phase 2): TESTTIME1 = 0 and Time1 restarts
-                    // (@ 0x00423e8d); moveEnded (0x00424089).
+                (Departure::Go, Some(dest)) if !self.should_abort() => {
+                    // A departure that is not aborted stops timer 1 and
+                    // restarts Time1 (@ 0x00423e8d).
+                    self.vars.set("testtime1", 0);
+                    self.clocks.time1_start = self.now();
+                    self.clocks.time1_offset = 0;
                     self.execute_transition(dest).await;
+                    self.vars.move_ended(); // 0x00424089
                 }
                 _ => {}
             }
@@ -469,7 +623,20 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
     e.load_cursor_sprites().await;
     // TODO(phase 3): the start-up videos (LOGO15N, PREINTRO) and the player
     // screen before the game.
-    e.new_game(hooks.as_mut()).await;
-    e.game_step(hooks.as_mut()).await;
+    let mut in_play = false;
+    loop {
+        e.abort = None;
+        e.new_game(hooks.as_mut(), in_play).await;
+        e.game_step(hooks.as_mut()).await;
+        match e.abort {
+            // A game over reloads the player's checkpoint (0x0041975d ->
+            // FUN_0042de5c); without one, chapter 1, place 1.
+            // TODO(phase 3): the checkpoints.
+            Some(Abort::NewGame) if !e.sys.should_quit() => in_play = true,
+            // Exit == 86 (CHAPI085): FUN_0041a66c, END.TGA for up to 7 s,
+            // then the credits FUN_0041a72c. TODO(phase 3).
+            _ => break,
+        }
+    }
     e.stop_ambient();
 }
