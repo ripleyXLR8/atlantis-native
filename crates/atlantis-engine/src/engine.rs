@@ -321,12 +321,66 @@ pub struct Engine {
 /// The cursor has to be chosen again (`kWarpCursorUnset`).
 pub(crate) const CURSOR_UNSET: i32 = -2;
 
+/// The clock `FUN_004320bc` draws from, which redraws while the value &
+/// 0x7f is above 100: the original's clock moves while it spins. The
+/// engine's clock only moves between frames, so a draw of 101..127 spun
+/// forever (the window hung after a conversation, a video, a place
+/// change); each further read within one frame reads 1 ms later.
+pub(crate) fn spinning_clock(sys: Rc<Sys>) -> impl FnMut() -> u32 {
+    let mut last = (u64::MAX, 0u64);
+    move || {
+        let now = sys.millis();
+        last = if last.0 == now {
+            (now, last.1 + 1)
+        } else {
+            (now, 0)
+        };
+        (now + last.1) as u32
+    }
+}
+
+#[cfg(test)]
+mod spinning_clock_tests {
+    use super::*;
+    use crate::ambient::AmbientSounds;
+    use crate::audio::Mixer;
+    use atlantis_data::wam::AmbientObject;
+
+    #[test]
+    fn reads_advance_within_a_frame_and_the_variant_pick_ends() {
+        let sys = Sys::new(Mixer::new());
+        let mut clock = spinning_clock(sys.clone());
+        // Sys starts at 0 ms: 0, then 1 ms per read in the same frame.
+        assert_eq!((clock(), clock(), clock()), (0, 1, 2));
+        // Within a frame whose clock reads 115 (& 0x7f above 100) the
+        // variant pick ends (it spun forever with the frame's clock).
+        for t in [101u64, 115, 127, 128 + 110] {
+            let sys = Sys::new(Mixer::new());
+            let s = sys.clone();
+            let picked = Rc::new(std::cell::Cell::new(false));
+            let p = picked.clone();
+            let mut r = crate::sys::Runner::new(sys, async move {
+                let mut a = AmbientSounds::new();
+                a.set_clock(spinning_clock(s));
+                let obj = AmbientObject {
+                    weights: [50, 50, 0, 0],
+                    ..Default::default()
+                };
+                assert!(a.pick_variant(&obj, 2).is_some());
+                p.set(true);
+            });
+            r.step(t);
+            assert!(picked.get(), "clock {t}");
+        }
+    }
+}
+
 impl Engine {
     pub fn new(sys: Rc<Sys>, game: Game, loader: Rc<dyn Loader>) -> Engine {
         let mut ambient = AmbientSounds::new();
         let clock_sys = sys.clone();
         // FUN_004320bc draws from timeGetTime - 0x00bcb5b8 (FUN_00451d0c).
-        ambient.set_clock(move || clock_sys.millis() as u32);
+        ambient.set_clock(spinning_clock(clock_sys));
         // The effects volume 0x00495e73 at full scale.
         ambient.effects_volume = 127;
         let ambient_out = MixerAmbientOutput::new(sys.mixer.clone());
