@@ -111,6 +111,8 @@ pub struct App {
     locked: bool,
     /// The window's title: the port and the game's release.
     title: String,
+    /// The window's icon: the player's atlantis.exe icon.
+    icon: Option<atlantis_data::exe_icon::Icon>,
     /// The lock fell back to confining the pointer (Windows, X11): the
     /// system pointer is then kept at the centre of the window.
     confined: bool,
@@ -159,6 +161,7 @@ impl App {
             col_map: Vec::new(),
             locked: false,
             title: "Atlantis Native".to_string(),
+            icon: None,
             confined: false,
             focused: true,
             raw_motion: false,
@@ -189,6 +192,18 @@ impl App {
         if let Some(w) = &self.window {
             w.set_title(&self.title);
         }
+        self
+    }
+
+    /// The window's icon, read from the player's `atlantis.exe` (the port
+    /// distributes none of the game's data).
+    fn window_icon(&self) -> Option<winit::window::Icon> {
+        let i = self.icon.as_ref()?;
+        winit::window::Icon::from_rgba(i.rgba.clone(), i.width, i.height).ok()
+    }
+
+    pub fn with_icon(mut self, icon: Option<atlantis_data::exe_icon::Icon>) -> App {
+        self.icon = icon;
         self
     }
 
@@ -533,7 +548,14 @@ impl ApplicationHandler for App {
         }
         let attrs = Window::default_attributes()
             .with_title(self.title.clone())
+            .with_window_icon(self.window_icon())
             .with_inner_size(LogicalSize::new(W as f64 * 1.5, H as f64 * 1.5));
+        // Windows takes the taskbar and Alt+Tab icon separately.
+        #[cfg(target_os = "windows")]
+        let attrs = {
+            use winit::platform::windows::WindowAttributesExtWindows;
+            attrs.with_taskbar_icon(self.window_icon())
+        };
         #[cfg(target_arch = "wasm32")]
         let attrs = {
             use winit::platform::web::WindowAttributesExtWebSys;

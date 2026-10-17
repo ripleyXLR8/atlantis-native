@@ -198,10 +198,12 @@ fn main() {
     };
     let edition = game.edition();
     log::info!("{edition}, {}", atlantis_app::version_string());
+    let icon = game.icon.clone();
     let (sys, runner) = start_game(game, options);
     let mut app = App::new(sys, Some(runner))
         .with_graphics(graphics, Some(saves))
-        .with_edition(&edition);
+        .with_edition(&edition)
+        .with_icon(icon);
     if let Err(e) = el.run_app(&mut app) {
         error_box(&format!("The window failed: {e}"));
         std::process::exit(1);

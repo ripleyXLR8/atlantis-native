@@ -32,11 +32,14 @@ pub struct Game {
     pub big: BigArchive,
     /// The GOG release: files unpacked next to stub archives.
     pub unpacked: bool,
+    /// The executable's icon, for the window (from the player's copy).
+    pub icon: Option<crate::exe_icon::Icon>,
 }
 
 impl Game {
     pub fn open(src: Arc<dyn FileSource>) -> Result<Game, GameError> {
         let exe_bytes = src.read("atlantis.exe").ok_or(GameError::NoExecutable)?;
+        let icon = crate::exe_icon::exe_icon(&exe_bytes);
         let exe = ExeTables::read(&exe_bytes)
             .ok_or(GameError::UnknownExecutable(exe_bytes.len() as u64))?;
         // The GOG release has a SCENAR directory beside its stubs.
@@ -50,7 +53,12 @@ impl Game {
             return Err(GameError::NoArchives);
         }
         big.set_loose(unpacked);
-        Ok(Game { exe, big, unpacked })
+        Ok(Game {
+            exe,
+            big,
+            unpacked,
+            icon,
+        })
     }
 }
 

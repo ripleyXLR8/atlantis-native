@@ -374,9 +374,12 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 | 5 | the 17 puzzles |
 | 6 | packages for each platform, web build, folder picker, saves in the browser |
 
-The web build has been built in CI but little tried in browsers. There is
-no application icon yet (the game's own pictures are not used: they are
-not ours to distribute).
+The web build has been built in CI but little tried in browsers. The window
+(title bar, taskbar, Alt+Tab) shows the icon of the player's own
+`atlantis.exe`, read at start-up like the executable's tables; the files
+we distribute have no icon yet (the game's pictures are not ours to
+distribute), so the program file and the macOS app keep the system's
+default icon.
 
 ## Known differences from the original
 

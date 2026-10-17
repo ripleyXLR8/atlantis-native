@@ -7,6 +7,7 @@
 
 pub mod big;
 pub mod exe;
+pub mod exe_icon;
 pub mod files;
 pub mod game;
 pub mod head;
