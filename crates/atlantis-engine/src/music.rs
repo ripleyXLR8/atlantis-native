@@ -23,6 +23,7 @@ use atlantis_codecs::decode_apc;
 use crate::audio::{Mixer, Pcm, Source, VoiceId};
 use crate::con_script::{con_music_apply, con_music_list};
 use crate::engine::Engine;
+use crate::persist::Settings;
 use crate::sys::Sys;
 
 /// The music volume of the original and its fades, moved by the 200 Hz
@@ -550,7 +551,9 @@ pub struct Music {
     pub open_track: i32,
     /// The tracks the original would find in its install folder (bit i =
     /// track index i). The original's copies live in its install folder;
-    /// the port reads the tracks from the archives and only notes them.
+    /// the port reads the tracks from the archives and only notes them, in
+    /// the settings ([`crate::Settings::music_on_disk`]), so that the set
+    /// outlives the session as the folder does.
     pub on_disk: u32,
     /// Play the tracks through the original's streaming ring (set by
     /// [`crate::Enhancements::minor_bug_fixes`] off).
@@ -825,6 +828,19 @@ impl Engine {
             self.music_copy_through_screen_buffer(idx).await;
         }
         self.music.on_disk = on_disk;
+        self.save_music_on_disk(on_disk);
+    }
+
+    /// The tracks on disk written to the settings file when they changed;
+    /// the file's other settings are kept as stored.
+    fn save_music_on_disk(&mut self, bits: u32) {
+        if self.settings.music_on_disk == bits {
+            return;
+        }
+        self.settings.music_on_disk = bits;
+        let mut s = Settings::load(self.saves.as_ref()).unwrap_or(self.settings);
+        s.music_on_disk = bits;
+        s.save(self.saves.as_ref());
     }
 
     /// `FUN_0041f380`: the track is copied in 0x80000-byte reads through
@@ -1004,6 +1020,46 @@ mod tests {
                 .map(|(a, b, n)| format!("{a},{b},{n}"))
                 .collect();
             assert_eq!(got.join(";"), c.runs, "{}", c.name);
+        }
+    }
+}
+
+#[cfg(test)]
+mod on_disk_tests {
+    use super::*;
+    use crate::persist::MemStore;
+    use crate::test_support::with_engine;
+
+    /// The tracks LoadMusik copied are kept in the settings: in the next
+    /// session the same LoadMusik copies nothing (each copy goes through
+    /// the IX video buffer and shows at the start of the next video).
+    #[test]
+    fn music_on_disk_outlives_the_session() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "music_on_disk_outlives_the_session",
+            move |mut e| async move {
+                let store = Rc::new(MemStore::new());
+                e.saves = store.clone();
+                let cmd = b"/set(loadmusik=3,5)\r\n";
+                e.music_list_command(true, cmd, 15).await;
+                let first = (e.music.on_disk, !e.ix_buffers.is_empty());
+                let stored = Settings::load(store.as_ref()).map(|s| s.music_on_disk);
+                // The next session: a new engine state, the same store.
+                e.music.on_disk = 0;
+                e.settings = Settings::default();
+                e.ix_buffers.clear();
+                e.load_settings(Settings::default());
+                let reloaded = e.music.on_disk;
+                e.music_list_command(true, cmd, 15).await;
+                *g2.borrow_mut() = Some((first, stored, reloaded, e.ix_buffers.is_empty()));
+            },
+            |_, _| {},
+        );
+        if ran {
+            let got = *got.borrow();
+            assert_eq!(got, Some(((0x14, true), Some(0x14), 0x14, true)));
         }
     }
 }

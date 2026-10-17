@@ -142,7 +142,9 @@ The same folder holds `settings.ini`: the options of the game's menus
 (subtitles, OMNI 3D mode, the master, music, effects and voices volumes,
 which the original also keeps in each checkpoint and sets again when one
 is loaded) and the [enhancements](#enhancements), one `name = on|off` line
-each.
+each. It also keeps `music_on_disk`, the music tracks the original game
+would have copied to its folder (it reads them from the archives here),
+so that this set outlives the session as the original's copies do.
 
 The web build keeps its players, checkpoints and settings in the
 browser's storage (`localStorage`, one entry per file, kept per site and

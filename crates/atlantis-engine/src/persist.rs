@@ -162,6 +162,10 @@ pub struct Settings {
     /// 0x00495e72..0x00495e74).
     pub volumes: [u8; 4],
     pub enhancements: Enhancements,
+    /// The music tracks the original would find copied in its install
+    /// folder (bit i = track index i, LoadMusik / DelMusik): like that
+    /// folder, the set outlives the session.
+    pub music_on_disk: u32,
 }
 
 impl Default for Settings {
@@ -171,6 +175,7 @@ impl Default for Settings {
             omni3d_mode2: false,
             volumes: [127; 4],
             enhancements: Enhancements::default(),
+            music_on_disk: 0,
         }
     }
 }
@@ -193,6 +198,13 @@ impl Settings {
                 "0" | "false" | "off" | "no" => Some(false),
                 _ => None,
             };
+            if k == "music_on_disk" {
+                match u32::from_str_radix(v, 16) {
+                    Ok(bits) => s.music_on_disk = bits,
+                    Err(_) => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
+                }
+                continue;
+            }
             let n = v.parse::<u8>().ok().map(|n| n.min(127));
             match (k.as_str(), b, n) {
                 ("subtitles", Some(b), _) => s.subtitles = b,
@@ -224,7 +236,9 @@ impl Settings {
              # Enhancements: where the port may differ from the original game\n\
              minor_bug_fixes = {}\n\
              restored_content = {}\n\
-             ui_ux = {}\n",
+             ui_ux = {}\n\
+             # The music tracks LoadMusik copied (hexadecimal bit set)\n\
+             music_on_disk = {:x}\n",
             b(self.subtitles),
             b(self.omni3d_mode2),
             self.volumes[0],
@@ -234,6 +248,7 @@ impl Settings {
             b(self.enhancements.minor_bug_fixes),
             b(self.enhancements.restored_content),
             b(self.enhancements.ui_ux),
+            self.music_on_disk,
         )
     }
 
@@ -258,8 +273,10 @@ mod tests {
             omni3d_mode2: true,
             volumes: [1, 2, 3, 127],
             enhancements: Enhancements::original(),
+            music_on_disk: 0x8001_00a5,
         };
         assert_eq!(Settings::parse(&s.to_text()), s);
+        assert_eq!(Settings::parse("music_on_disk = 1F").music_on_disk, 0x1f);
         assert_eq!(
             Settings::parse("volume_music = 300\nbad"),
             Settings {
