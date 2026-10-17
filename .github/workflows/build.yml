@@ -1,0 +1,27 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  macos-arm64:
+    runs-on: macos-14   # Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test (game data tests skip without ATLANTIS_DATA)
+        run: cargo test --release --workspace
+      - name: Build
+        run: cargo build --release -p atlantis-app
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp target/release/atlantis-native dist/
+          cp README.md LICENSE dist/
+          tar -C dist -czf atlantis-native-macos-arm64.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-macos-arm64
+          path: atlantis-native-macos-arm64.tar.gz
