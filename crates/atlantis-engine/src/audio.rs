@@ -41,7 +41,10 @@ pub struct Mixer(Arc<Mutex<State>>);
 
 impl Default for Mixer {
     fn default() -> Self {
-        Mixer(Arc::new(Mutex::new(State { master: 255, ..State::default() })))
+        Mixer(Arc::new(Mutex::new(State {
+            master: 255,
+            ..State::default()
+        })))
     }
 }
 
@@ -54,7 +57,14 @@ impl Mixer {
         let mut s = self.0.lock().unwrap();
         s.next_id += 1;
         let id = s.next_id;
-        s.voices.push(Voice { id, pcm, pos: 0.0, looping, volume, balance });
+        s.voices.push(Voice {
+            id,
+            pcm,
+            pos: 0.0,
+            looping,
+            volume,
+            balance,
+        });
         id
     }
 
@@ -70,8 +80,29 @@ impl Mixer {
         self.0.lock().unwrap().voices.iter().any(|v| v.id == id)
     }
 
+    /// The number of voices playing.
+    pub fn voice_count(&self) -> usize {
+        self.0.lock().unwrap().voices.len()
+    }
+
+    /// A voice's volume and balance, `None` once it has ended.
+    pub fn voice_volume(&self, id: VoiceId) -> Option<(u8, i8)> {
+        let s = self.0.lock().unwrap();
+        s.voices
+            .iter()
+            .find(|v| v.id == id)
+            .map(|v| (v.volume, v.balance))
+    }
+
     pub fn set_volume(&self, id: VoiceId, volume: u8, balance: i8) {
-        if let Some(v) = self.0.lock().unwrap().voices.iter_mut().find(|v| v.id == id) {
+        if let Some(v) = self
+            .0
+            .lock()
+            .unwrap()
+            .voices
+            .iter_mut()
+            .find(|v| v.id == id)
+        {
             v.volume = volume;
             v.balance = balance;
         }
@@ -110,7 +141,13 @@ impl Mixer {
                 }
                 let i = v.pos as usize;
                 let t = (v.pos - i as f64) as f32;
-                let j = if i + 1 < frames { i + 1 } else if v.looping { 0 } else { i };
+                let j = if i + 1 < frames {
+                    i + 1
+                } else if v.looping {
+                    0
+                } else {
+                    i
+                };
                 let sample = |frame: usize, c: usize| {
                     f32::from(v.pcm.samples[frame * src_ch + c.min(src_ch - 1)]) / 32768.0
                 };
@@ -139,7 +176,11 @@ mod tests {
     #[test]
     fn one_shot_ends_and_balance_attenuates_far_side() {
         let m = Mixer::new();
-        let pcm = Pcm { rate: 100, channels: 1, samples: Arc::new(vec![16384; 10]) };
+        let pcm = Pcm {
+            rate: 100,
+            channels: 1,
+            samples: Arc::new(vec![16384; 10]),
+        };
         let id = m.play(pcm, false, 255, 127);
         let mut out = vec![0.0; 2 * 8];
         m.fill(&mut out, 100, 2);

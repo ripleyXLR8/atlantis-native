@@ -1,0 +1,475 @@
+//! The game: its state, the new-game start and the place loop.
+//!
+//! Translated from ScummVM's CryOmni3D Atlantis engine (`engine.cpp`
+//! `run` / `gameStep`, `place.cpp` `changeChapter` / `setupChapterWAM`;
+//! GPLv3, the ScummVM team), which follows `atlantis.exe`'s main loop and
+//! place loop `FUN_00423ad8`.
+//!
+//! The engine is one async task ([`run`]): where the original presents a
+//! frame and polls its events, the code awaits [`Sys::frame`].
+
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
+use std::rc::Rc;
+
+use atlantis_data::sprite::{read_spr_file, SprSprite};
+use atlantis_data::sprite_list::{NpcClickRect, SpriteTransEntry};
+use atlantis_data::wam::{CentrePos, Place, Wam};
+use atlantis_data::{Game, SpritePlaceEntry};
+
+use crate::ambient::{AmbientSounds, MixerAmbientOutput};
+use crate::cursor::WarpCursorState;
+use crate::hooks::{DirectLoader, Loader, NoScripts, ScriptHooks};
+use crate::look::{WarpMomentum, WarpPointer};
+use crate::sys::Sys;
+use crate::warp::Warp;
+
+/// The action [`Engine::handle_warp`] returns when it leaves without a
+/// click (quit, a script that entered another place).
+pub const WARP_ABORT: u32 = 66666;
+
+/// The WAM of a new game and its start place: `FUN_0042de5c` without a
+/// checkpoint (0x0042e26e..0x0042e29e) loads `wam\atlan1.wam` and sets the
+/// requested vue 0x0049692c = 1; the view angles 0x00bcb59c / 0x00bcb598
+/// keep their .bss value, 0.
+pub const NEW_GAME_WAM: &str = "ATLAN1.WAM";
+pub const NEW_GAME_VUE: u16 = 1;
+
+/// What happened, for tests and tools.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Event {
+    /// A WAM was loaded.
+    WamLoaded(String),
+    /// A place was entered (its panorama shown).
+    PlaceEntered { wam: String, place: u16 },
+    /// A video was played: its name, the frames shown and the number of
+    /// SPF sprites drawn over it.
+    Video {
+        name: String,
+        frames: u32,
+        sprites: usize,
+    },
+}
+
+/// What [`run`] needs besides the platform and the game.
+pub struct Options {
+    pub loader: Rc<dyn Loader>,
+    pub hooks: Box<dyn ScriptHooks>,
+    /// Receives the [`Event`]s when set.
+    pub trace: Option<Rc<RefCell<Vec<Event>>>>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            loader: Rc::new(DirectLoader),
+            hooks: Box::new(NoScripts),
+            trace: None,
+        }
+    }
+}
+
+/// The game state of navigation. Fields are public for the script hooks.
+pub struct Engine {
+    pub sys: Rc<Sys>,
+    pub game: Game,
+    pub(crate) loader: Rc<dyn Loader>,
+    pub(crate) trace: Option<Rc<RefCell<Vec<Event>>>>,
+
+    // The area.
+    pub wam: Wam,
+    pub wam_name: String,
+    /// The place shown (0x006cd7c0), `None` before the first.
+    pub current_place_id: Option<u16>,
+    /// Its record in `wam.places`; `None` after a sub-WAM swap until the
+    /// next place change.
+    pub current_place: Option<usize>,
+    /// The place to enter next.
+    pub next_place_id: Option<u16>,
+    /// A script Vue= entered a place: the place loop runs its arrival scan.
+    pub arrival_scan_pending: bool,
+    pub arrival_from_vue: u16,
+    /// The first arrival scan after a chapter load reads ArriveeVue =
+    /// LastVue.
+    pub(crate) arrival_after_load: bool,
+    /// LastVue.
+    pub last_vue: u16,
+    pub chapter: u32,
+    /// 0x006ce078, the CHAPTERTIME origin.
+    pub chapter_start_ms: u64,
+    /// The hidden persos (HidePerso): their sprites start inactive.
+    pub hidden_persos: Vec<i32>,
+    /// The CON variable ZOOM: the next transition turn zooms in.
+    pub zoom: bool,
+    /// ANGLEWARPX / ANGLEWARPY of the last warp frame.
+    pub angle_warp: (i32, i32),
+
+    // The place sprites.
+    pub sprite_list: Vec<SpritePlaceEntry>,
+    pub spf_list: Vec<SpriteTransEntry>,
+    pub(crate) npc_rects: Vec<NpcClickRect>,
+    /// Per view, the row of the current animation (NEWWSPRANIM).
+    pub sprite_anim_current: Vec<usize>,
+    pub(crate) sprite_anim_last: [u32; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
+    pub(crate) sprite_anim_tick: u32,
+    /// WSPRFRAME.
+    pub wspr_frame: i32,
+    /// 0x00496188 == 1 (a talking-head line): the persos are not drawn.
+    pub sprites_hide_npcs: bool,
+    /// The SPW files of the place, by name.
+    pub(crate) spw_cache: HashMap<String, Rc<Vec<u8>>>,
+
+    // The view.
+    pub warp: Warp,
+    /// The panorama as loaded, and with the place sprites drawn on it.
+    pub(crate) cyclo: Vec<u16>,
+    pub(crate) cyclo_h: usize,
+    pub(crate) warp_surface: Vec<u16>,
+    pub warp_loaded: bool,
+    pub(crate) momentum: WarpMomentum,
+    pub(crate) pointer: WarpPointer,
+    pub(crate) pointer_mouse_mark: (i32, i32),
+    pub(crate) cursor_sprites: Vec<SprSprite>,
+    pub(crate) cursor_state: WarpCursorState,
+    pub(crate) cursor_shown: i32,
+    pub(crate) cursor_next_ms: u64,
+
+    /// The two IX frame buffers, kept from video to video (malloc(0x12c000)
+    /// @ 0x00418f83).
+    pub(crate) ix_buffers: Vec<u16>,
+
+    // The ambient sounds.
+    pub(crate) ambient: AmbientSounds,
+    pub(crate) ambient_out: MixerAmbientOutput,
+    /// The centre table 0x00554510 (`FUN_004315b4`), never cleared.
+    pub(crate) centres: BTreeMap<i32, CentrePos>,
+}
+
+/// The cursor has to be chosen again (`kWarpCursorUnset`).
+pub(crate) const CURSOR_UNSET: i32 = -2;
+
+impl Engine {
+    pub fn new(sys: Rc<Sys>, game: Game, loader: Rc<dyn Loader>) -> Engine {
+        let mut ambient = AmbientSounds::new();
+        let clock_sys = sys.clone();
+        // FUN_004320bc draws from timeGetTime - 0x00bcb5b8 (FUN_00451d0c).
+        ambient.set_clock(move || clock_sys.millis() as u32);
+        // The effects volume 0x00495e73 at full scale.
+        ambient.effects_volume = 127;
+        let ambient_out = MixerAmbientOutput::new(sys.mixer.clone());
+        Engine {
+            sys,
+            game,
+            loader,
+            trace: None,
+            wam: Wam::default(),
+            wam_name: String::new(),
+            current_place_id: None,
+            current_place: None,
+            next_place_id: None,
+            arrival_scan_pending: false,
+            arrival_from_vue: 0,
+            arrival_after_load: false,
+            last_vue: 0,
+            chapter: 0,
+            chapter_start_ms: 0,
+            hidden_persos: Vec::new(),
+            zoom: false,
+            angle_warp: (0, 0),
+            sprite_list: Vec::new(),
+            spf_list: Vec::new(),
+            npc_rects: Vec::new(),
+            sprite_anim_current: vec![0; 512],
+            sprite_anim_last: [0; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
+            sprite_anim_tick: 0,
+            wspr_frame: 0,
+            sprites_hide_npcs: false,
+            spw_cache: HashMap::new(),
+            warp: Warp::new(),
+            cyclo: Vec::new(),
+            cyclo_h: 0,
+            warp_surface: Vec::new(),
+            warp_loaded: false,
+            momentum: WarpMomentum::default(),
+            pointer: WarpPointer::default(),
+            pointer_mouse_mark: (0, 0),
+            cursor_sprites: Vec::new(),
+            cursor_state: WarpCursorState::default(),
+            cursor_shown: CURSOR_UNSET,
+            cursor_next_ms: 0,
+            ix_buffers: Vec::new(),
+            ambient,
+            ambient_out,
+            centres: BTreeMap::new(),
+        }
+    }
+
+    pub(crate) fn emit(&self, e: Event) {
+        log::info!("{e:?}");
+        if let Some(t) = &self.trace {
+            t.borrow_mut().push(e);
+        }
+    }
+
+    /// Reads an archive member (`openBigFileStream`: the name upper-cased).
+    pub async fn read(&self, name: &str) -> Option<Vec<u8>> {
+        let names = [name.to_string()];
+        self.loader.prefetch(&self.game.big, &names).await;
+        let data = self.game.big.read(name);
+        if data.is_none() {
+            log::warn!("{name} not found");
+        }
+        data
+    }
+
+    /// Makes several members readable at once (one fetch on the web).
+    pub async fn prefetch(&self, names: &[String]) {
+        self.loader.prefetch(&self.game.big, names).await;
+    }
+
+    /// The current place record.
+    pub fn place(&self) -> Option<&Place> {
+        self.current_place.and_then(|i| self.wam.places.get(i))
+    }
+
+    /// CHAPTERTIME: `FUN_0041c75c`, (now - start) / 1000.
+    pub fn chapter_time(&self) -> i32 {
+        (self.sys.millis().wrapping_sub(self.chapter_start_ms) / 1000) as i32
+    }
+
+    /// Sets the view angles (an /INIT AngleWarpX / AngleWarpY, a test).
+    pub fn set_view(&mut self, alpha: f32, beta: f32) {
+        self.warp.set_alpha(alpha);
+        self.warp.set_beta(beta);
+    }
+
+    /// The CURSEURS.SPR cursors (`loadCursorSprites`, 64x64 at most).
+    pub(crate) async fn load_cursor_sprites(&mut self) {
+        let (w, h) = atlantis_data::sprite::limits::CURSORS;
+        self.cursor_sprites = match self.read("SPRITE\\2D\\CURSEURS.SPR").await {
+            Some(d) => read_spr_file(&d, w, h).unwrap_or_default(),
+            None => Vec::new(),
+        };
+        log::info!("{} cursor sprites", self.cursor_sprites.len());
+    }
+
+    /// A WAM file, its centre table and sprite lists (`setupWAMByName`,
+    /// `FUN_00421ebc`).
+    pub async fn load_wam(&mut self, name: &str) -> bool {
+        let Some(data) = self.read(&format!("WAM\\{name}")).await else {
+            return false;
+        };
+        self.wam = Wam::parse(&data);
+        self.wam_name = name.to_ascii_uppercase();
+        // TODO(phase 2): recordPlaceTable, the stale transition slots a
+        // departure Vue= reads (transitionAfterDepartureVue).
+        self.load_ambient_centres().await;
+        self.load_sprite_list().await;
+        self.load_spf_list().await;
+        self.emit(Event::WamLoaded(self.wam_name.clone()));
+        true
+    }
+
+    /// `FUN_004315b4`: file reference 2 (by position) names the centre
+    /// table, `sprlist\` + name; entries are added, never cleared.
+    async fn load_ambient_centres(&mut self) {
+        let Some(name) = self.wam.file_refs.get(2).filter(|n| !n.is_empty()).cloned() else {
+            return;
+        };
+        if let Some(d) = self.read(&format!("SPRLIST\\{name}")).await {
+            atlantis_data::wam::parse_centre_vue(&d, &mut self.centres);
+        }
+    }
+
+    /// The SPW list (`loadSpritePlaceList`, `FUN_00424a20`), then
+    /// `FUN_00427d30` for the hidden persos.
+    pub(crate) async fn load_sprite_list(&mut self) {
+        self.sprite_list.clear();
+        self.sprite_anim_current.iter_mut().for_each(|c| *c = 0);
+        if self.wam.spw_list.is_empty() {
+            return;
+        }
+        let name = format!("SPRLIST\\{}", self.wam.spw_list);
+        if let Some(d) = self.read(&name).await {
+            self.sprite_list = atlantis_data::sprite_list::parse_sprite_list(&d);
+            atlantis_data::sprite_anim::apply_hidden(&mut self.sprite_list, &self.hidden_persos);
+        }
+    }
+
+    /// The SPF list of the transitions' sprites (`loadSpfList`).
+    async fn load_spf_list(&mut self) {
+        self.spf_list.clear();
+        if self.wam.spf_list.is_empty() {
+            return;
+        }
+        let name = format!("SPRLIST\\{}", self.wam.spf_list);
+        if let Some(d) = self.read(&name).await {
+            self.spf_list = atlantis_data::sprite_list::parse_spf_list(&d);
+        }
+    }
+
+    /// The new game: `changeChapter(1)` / `FUN_0042de5c` without a
+    /// checkpoint, then `FUN_00423760`.
+    pub async fn new_game(&mut self, hooks: &mut dyn ScriptHooks) {
+        self.hidden_persos.clear();
+        // FUN_0042de5c step 4: ZOOM = NEWSOUND = 0.
+        self.zoom = false;
+        self.next_place_id = None;
+        self.arrival_scan_pending = false;
+        self.set_view(0.0, 0.0);
+        if !self.load_wam(NEW_GAME_WAM).await {
+            log::error!("cannot start a new game: {NEW_GAME_WAM} missing");
+            return;
+        }
+        self.chapter = 1;
+        // FUN_00423760 restarts the chapter clock when a game starts.
+        self.chapter_start_ms = self.sys.millis();
+        // LastVue = 1 (0x004195fb, 0x0042e285).
+        self.last_vue = 1;
+        hooks.chapter_loaded(self, 1).await;
+        // An /INIT Vue= has entered its place already.
+        if self.next_place_id.is_none() && !self.arrival_scan_pending {
+            self.next_place_id = Some(NEW_GAME_VUE);
+        }
+        // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x0042777d).
+        self.arrival_after_load = true;
+    }
+
+    /// The first arrival scan after a chapter load: ARRIVEEVUE = LastVue,
+    /// no scan when it is 0. Every other scan keeps the origin given.
+    fn take_arrival_after_load(&mut self, arrivee: &mut i32) -> bool {
+        if !self.arrival_after_load {
+            return true;
+        }
+        self.arrival_after_load = false;
+        *arrivee = i32::from(self.last_vue);
+        *arrivee != 0
+    }
+
+    /// The place loop (`gameStep`, `FUN_00423ad8`): enter the pending
+    /// place, run the warp view, act on the click.
+    pub async fn game_step(&mut self, hooks: &mut dyn ScriptHooks) {
+        loop {
+            if self.sys.should_quit() {
+                break;
+            }
+            if self.next_place_id.is_some() {
+                let mut arrivee = self.current_place_id.map_or(-1, i32::from);
+                let scan = self.take_arrival_after_load(&mut arrivee);
+                self.do_place_change().await;
+                self.arrival_scan_pending = false;
+                if let (Some(vue), true) =
+                    (self.current_place_id, scan && self.current_place.is_some())
+                {
+                    hooks.arrival_scan(self, vue, arrivee).await;
+                }
+            } else if self.arrival_scan_pending {
+                // A script Vue= already entered the place (@ 0x00423b48).
+                self.arrival_scan_pending = false;
+                let mut arrivee = i32::from(self.arrival_from_vue);
+                let scan = self.take_arrival_after_load(&mut arrivee);
+                if let (Some(vue), true) =
+                    (self.current_place_id, scan && self.current_place.is_some())
+                {
+                    hooks.arrival_scan(self, vue, arrivee).await;
+                }
+            }
+            if self.next_place_id.is_some() || self.arrival_scan_pending {
+                continue;
+            }
+            if !self.warp_loaded {
+                // Nowhere to look (a missing panorama): wait for the quit.
+                self.sys.frame().await;
+                continue;
+            }
+
+            let action = self.handle_warp(hooks).await;
+            if action == WARP_ABORT {
+                if self.sys.should_quit() {
+                    break;
+                }
+                continue;
+            }
+
+            // A click with no NPC under the pointer: the zone goes to
+            // ClicZone; with a zone the /con click scan runs. A move then
+            // needs an empty hand (0x00423d2b).
+            let mut zone = action;
+            if (1000..1017).contains(&zone) && hooks.puzzle_zone(self, zone - 1000).await {
+                zone = 0;
+            }
+            if zone == 999 {
+                hooks.zone_999(self).await;
+                zone = 0;
+            }
+            if action != 0 {
+                hooks.zone_click(self, action).await;
+            }
+            if self.sys.should_quit() {
+                break;
+            }
+            if self.arrival_scan_pending {
+                continue; // a Vue= in a section entered another place
+            }
+            // @ 0x00423d4b: a move needs an entry for the zone in the place.
+            let Some(place) = self.place() else { continue };
+            let Some(index) = place
+                .transitions
+                .iter()
+                .position(|t| u32::from(t.dst_place) == zone)
+            else {
+                continue;
+            };
+            if zone == 0 || zone >= 10000 {
+                continue;
+            }
+            let dest = zone as u16;
+            self.next_place_id = Some(dest);
+            // LastVue = the place being left (0x00423dcf).
+            self.last_vue = self.current_place_id.unwrap_or(0);
+            let outcome = hooks.departure_scan(self, dest).await;
+            if self.arrival_scan_pending && outcome == crate::hooks::Departure::Go {
+                // A Vue= inside a departure section already entered its
+                // place; the original goes on with the turn and video of
+                // entry `index` of the new place's record.
+                // TODO(phase 2): transitionAfterDepartureVue(index).
+                let _ = index;
+                self.next_place_id = None;
+                continue;
+            }
+            match (outcome, self.next_place_id.take()) {
+                (crate::hooks::Departure::Go, Some(dest)) if !self.sys.should_quit() => {
+                    // TODO(phase 2): TESTTIME1 = 0 and Time1 restarts
+                    // (@ 0x00423e8d); moveEnded (0x00424089).
+                    self.execute_transition(dest).await;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// `FUN_00431e98` on the way out (0x004197a0).
+    pub fn stop_ambient(&mut self) {
+        if self.ambient.active() {
+            self.ambient.stop_all(&mut self.ambient_out);
+        }
+    }
+}
+
+/// The game, from the new-game start: the engine task the front end runs
+/// with a [`crate::sys::Runner`].
+pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
+    let Options {
+        loader,
+        mut hooks,
+        trace,
+    } = opts;
+    let mut e = Engine::new(sys, game, loader);
+    e.trace = trace;
+    e.load_cursor_sprites().await;
+    // TODO(phase 3): the start-up videos (LOGO15N, PREINTRO) and the player
+    // screen before the game.
+    e.new_game(hooks.as_mut()).await;
+    e.game_step(hooks.as_mut()).await;
+    e.stop_ambient();
+}

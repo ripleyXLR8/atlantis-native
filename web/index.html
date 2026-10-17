@@ -20,8 +20,7 @@
      choose the game folder (with <code>atlantis.exe</code> and the
      <code>BIGCD*.BIG</code> files, or the GOG.com installation folder).
      The files stay on your computer.</p>
-  <p><input type="file" id="dir" webkitdirectory>
-     panorama <input id="pano" value="ATL16001" size="10"></p>
+  <p><input type="file" id="dir" webkitdirectory></p>
   <p id="err"></p>
 </div>
 <script type="module">
@@ -29,7 +28,7 @@
   await init();
   document.getElementById("dir").addEventListener("change", async (e) => {
     try {
-      await start(e.target.files, document.getElementById("pano").value);
+      await start(e.target.files);
       document.getElementById("pick").style.display = "none";
     } catch (err) {
       document.getElementById("err").textContent = String(err);

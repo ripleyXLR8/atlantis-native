@@ -172,6 +172,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "web-time",
  "winit",
 ]
 
@@ -195,7 +196,10 @@ dependencies = [
 name = "atlantis-engine"
 version = "0.1.0"
 dependencies = [
+ "atlantis-codecs",
+ "atlantis-data",
  "libm",
+ "log",
  "md-5",
 ]
 

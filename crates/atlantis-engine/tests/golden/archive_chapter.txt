@@ -1,0 +1,12 @@
+# The new-game start of atlantis.exe (2001 English build, 714240 bytes): FUN_0042de5c (static reading),
+# FUN_00421ebc / FUN_00421b4c run under emulation.
+exe|newgame_wam atlan1.wam
+exe|newgame_chapter_byte 1
+exe|newgame_vue 1
+ATLAN1.WAM|record0_id 1
+ATLAN1.WAM|vue1_index 0
+ATLAN1.WAM|vue1_cyclo atl16001.hnm
+ATLAN2.WAM|record0_id 22
+ATLAN3.WAM|record0_id 58
+ATLAN4.WAM|record0_id 70
+ATLAN5.WAM|record0_id 123

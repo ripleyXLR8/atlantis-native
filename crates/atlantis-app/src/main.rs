@@ -1,28 +1,78 @@
-//! Desktop entry point: `atlantis-native <game dir> [panorama]`, panorama a
-//! CYCLO\\ name such as ATL16001 (default).
+//! Desktop entry point: `atlantis-native <game dir>`.
+//!
+//! `atlantis-native --headless <game dir> [frames]` runs the engine without
+//! a window for a number of frames (default 600) with no input, and prints
+//! what happened: a check that the game starts.
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
+    use std::cell::RefCell;
+    use std::rc::Rc;
     use std::sync::Arc;
 
-    use atlantis_app::{open_viewer, App};
+    use atlantis_app::{start_game, App};
     use atlantis_data::{Game, StdDir};
+    use atlantis_engine::audio::Mixer;
+    use atlantis_engine::Options;
     use winit::event_loop::EventLoop;
 
     env_logger::init();
-    let mut args = std::env::args().skip(1);
-    let viewer = args.next().map(|dir| {
-        let name = args.next().unwrap_or_else(|| "ATL16001".into());
-        Game::open(Arc::new(StdDir::new(dir)))
-            .map_err(|e| e.to_string())
-            .and_then(|g| open_viewer(&g, &name))
-            .unwrap_or_else(|e| {
-                eprintln!("{e}");
-                std::process::exit(1);
-            })
-    });
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let open = |dir: &str| {
+        Game::open(Arc::new(StdDir::new(dir))).unwrap_or_else(|e| {
+            eprintln!("{dir}: {e}");
+            std::process::exit(1);
+        })
+    };
+
+    if args.first().map(String::as_str) == Some("--headless") {
+        let Some(dir) = args.get(1) else {
+            eprintln!("usage: atlantis-native --headless <game dir> [frames]");
+            std::process::exit(2);
+        };
+        let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let options = Options {
+            trace: Some(trace.clone()),
+            ..Options::default()
+        };
+        let (sys, mut runner) = start_game(open(dir), options);
+        let mut alive = true;
+        for i in 0..frames {
+            alive = runner.step(i * 16);
+            if !alive {
+                break;
+            }
+        }
+        for e in trace.borrow().iter() {
+            println!("{e:?}");
+        }
+        let screen = sys.screen.borrow();
+        let distinct = screen
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        println!(
+            "{frames} frames, engine {}, {distinct} colours on screen",
+            if alive { "running" } else { "ended" }
+        );
+        return;
+    }
+
+    let Some(dir) = args.first() else {
+        eprintln!("usage: atlantis-native <game dir>");
+        // Without a game: the window with a test pattern.
+        let el = EventLoop::new().unwrap();
+        el.run_app(&mut App::new(
+            atlantis_engine::sys::Sys::new(Mixer::new()),
+            None,
+        ))
+        .unwrap();
+        return;
+    };
+    let (sys, runner) = start_game(open(dir), Options::default());
     let el = EventLoop::new().unwrap();
-    el.run_app(&mut App::new(viewer)).unwrap();
+    el.run_app(&mut App::new(sys, Some(runner))).unwrap();
 }
 
 #[cfg(target_arch = "wasm32")]

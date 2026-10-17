@@ -103,6 +103,8 @@ pub struct HnmVideo<D: AsRef<[u8]> = Vec<u8>> {
     next_start: u64,
     /// Sound sample frames per video frame, once known.
     frame_samples: u64,
+    /// The delay of a frame without sound.
+    regular_delay_ms: u64,
 }
 
 impl<D: AsRef<[u8]>> HnmVideo<D> {
@@ -172,6 +174,7 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
             time_rate,
             next_start: 0,
             frame_samples: 0,
+            regular_delay_ms: REGULAR_FRAME_DELAY_MS,
             data,
         })
     }
@@ -197,6 +200,14 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
     /// Whether this is a warp (panorama, IW) file rather than a video.
     pub fn is_warp(&self) -> bool {
         self.warp
+    }
+
+    /// Sets the delay of the frames of a file without sound (66 ms by
+    /// default): the engine plays the moves' transition videos at 30 ms a
+    /// frame and the cinematics at 65 ms (ScummVM's `setRegularFrameDelay`).
+    /// Call it before the first frame.
+    pub fn set_regular_frame_delay(&mut self, ms: u64) {
+        self.regular_delay_ms = ms;
     }
 
     /// When the next frame is due, in milliseconds from the start: 66 ms a
@@ -301,7 +312,7 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
             match frame_delay {
                 // No sound: a regular delay
                 None => {
-                    self.next_start += REGULAR_FRAME_DELAY_MS * self.time_rate;
+                    self.next_start += self.regular_delay_ms * self.time_rate;
                     return;
                 }
                 // The first frame holds the sound of the 32 following

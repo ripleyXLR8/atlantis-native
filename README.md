@@ -9,7 +9,11 @@ reverse engineering the original game's executable. The goal is the
 original game, pixel for pixel and sample for sample, with optional fixes of
 the original's bugs.
 
-**Status: early work (phase 0).** Nothing is playable yet.
+**Status: phase 1 (navigation).** A new game starts where the original's
+does (ATLAN1.WAM, place 1) and you can look around and walk between the
+places of Atlantis, with the transition videos, the animated place sprites
+and the ambient sounds. There are no scripts, dialogs, inventory, menus or
+puzzles yet: the story does not advance.
 
 ## You need the game
 
@@ -26,6 +30,14 @@ Atlantis Native contains no game data. You need your own copy of the game:
 cargo build --release
 cargo run --release -- /path/to/game
 ```
+
+Controls (phase 1): move the mouse to look around (the pointer is captured
+by the window, as the original takes it fullscreen), F5 / F6 / F7 / F8 turn
+and tilt the view, click where the cursor animates to go there, Escape
+quits (the in-game menu comes with phase 3).
+
+`atlantis-native --headless /path/to/game [frames]` runs the engine without
+a window and prints what it did.
 
 Tests that need the game files read the game directory from the
 `ATLANTIS_DATA` environment variable and are skipped without it:
@@ -45,6 +57,25 @@ original game's own code; they contain no game data.
 | `atlantis-codecs` | HNM6 panoramas and videos, APC sound |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis-app` | the window, input and audio (winit, softbuffer, cpal) |
+
+The engine is one async task: where the original's loops present a frame
+and poll their events, the engine awaits the next frame, and the front end
+runs it one step per displayed frame. The same code runs on desktop and in
+the browser.
+
+Where the original runs its scripts from navigation (arrival and departure
+scans, click scans, timers, characters and objects clicked, puzzle zones,
+the inventory bar and the menu), the engine calls the `ScriptHooks` trait
+(`crates/atlantis-engine/src/hooks.rs`), which does nothing in phase 1.
+
+### The web build
+
+`web/build.sh` builds it; the page asks for the game folder. The engine
+reads the player's files through an asynchronous loader that fetches each
+archive member before it is read, so the browser runs the same game as the
+desktop. It has been built but not tried in a browser yet. A browser grants
+the pointer capture only on a click: until then the view turns with the
+pointer's own motion. Sound starts on the first click.
 
 Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 `0x00496570`, ...) so that each behaviour can be traced to the original code.

@@ -6,8 +6,19 @@
 
 #![forbid(unsafe_code)]
 
+pub mod ambient;
 pub mod audio;
+pub mod cursor;
+pub mod engine;
+pub mod hooks;
+pub mod look;
+mod navigation;
+pub mod place;
 pub mod sys;
+pub mod turn;
+pub mod video_skip;
 pub mod warp;
 
+pub use engine::{run, Engine, Event, Options};
+pub use hooks::{Departure, DirectLoader, Loader, NoScripts, ScriptHooks};
 pub use warp::Warp;

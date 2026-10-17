@@ -46,7 +46,10 @@ pub fn start(mixer: Mixer) -> Option<cpal::Stream> {
     }
     .map_err(|e| log::warn!("audio output: {e}"))
     .ok()?;
-    stream.play().map_err(|e| log::warn!("audio output: {e}")).ok()?;
+    stream
+        .play()
+        .map_err(|e| log::warn!("audio output: {e}"))
+        .ok()?;
     log::info!("audio output: {rate} Hz, {channels} channels");
     Some(stream)
 }
