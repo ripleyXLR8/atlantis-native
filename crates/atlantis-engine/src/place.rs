@@ -201,6 +201,12 @@ impl Engine {
         };
         let mut changed = false;
         let current = self.sprite_anim_current[usize::from(vue)];
+        // FUN_00425304 writes the CON variable WSPRFRAME itself (the frame
+        // of the view's current animation row), which the scripts test:
+        // CHAPI013's flower pot falls on the pacing slave only while
+        // Wsprframe is in 8..33 or 70..96. It starts from the variable, so
+        // a script's write stays until the next step changes it.
+        let mut wspr = self.vars.get("wsprframe");
         while now.wrapping_sub(t) as i32 >= 0 {
             changed |= animate_place_sprites(
                 &mut self.sprite_list,
@@ -208,12 +214,14 @@ impl Engine {
                 current,
                 t,
                 &mut self.sprite_anim_last,
-                &mut self.wspr_frame,
+                &mut wspr,
                 self.sprites_hide_npcs,
             );
             t = t.wrapping_add(1);
         }
         self.sprite_anim_tick = now;
+        self.wspr_frame = wspr;
+        self.vars.set("wsprframe", wspr);
         if changed {
             self.recomposite_sprite_layer();
         }
@@ -689,5 +697,52 @@ impl Engine {
         self.music.new_sound_playing = true;
         self.music.new_sound_last = value;
         self.emit(Event::NewSound(value, name));
+    }
+}
+
+#[cfg(test)]
+mod wsprframe_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// The slave pacing in the ATLAN5 alley (SPWATL5.TXT, perso 529, type
+    /// 1, 104 frames at view 126): the animation feeds WSPRFRAME, which
+    /// CHAPI013's flower pot tests (it stayed 0).
+    #[test]
+    fn place_animation_feeds_wsprframe() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let seen = Rc::new(std::cell::RefCell::new(Vec::new()));
+        let seen2 = seen.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam_with("ATLAN5.WAM", true).await);
+            e.next_place_id = Some(126);
+            e.do_place_change().await;
+            for _ in 0..400 {
+                e.animate_sprites();
+                seen2.borrow_mut().push(e.vars.get("wsprframe"));
+                e.sys.frame().await;
+            }
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        let seen = seen.borrow();
+        // 400 frames of 16 ms: a step every 70 ms, past frame 33.
+        assert!(
+            seen.iter().any(|&f| (8..=33).contains(&f)),
+            "{:?}",
+            &seen[..40]
+        );
+        assert!(*seen.iter().max().unwrap() > 33);
     }
 }
