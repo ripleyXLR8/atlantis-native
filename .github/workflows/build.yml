@@ -40,3 +40,30 @@ jobs:
         run: |
           gh release view nightly >/dev/null 2>&1 || gh release create nightly --prerelease --title "Nightly build" --notes "Built from the latest commit on main. Early work: not playable yet."
           gh release upload nightly atlantis-native-macos-arm64.dmg --clobber
+
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test (game data tests skip without ATLANTIS_DATA)
+        run: cargo test --release --workspace
+      - name: Build
+        run: cargo build --release -p atlantis-app
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/release/atlantis-native.exe, README.md, LICENSE dist/
+          Compress-Archive -Path dist/* -DestinationPath atlantis-native-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-windows-x64
+          path: atlantis-native-windows-x64.zip
+      - name: Publish to the nightly release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view nightly >/dev/null 2>&1 || gh release create nightly --prerelease --title "Nightly build" --notes "Built from the latest commit on main. Early work."
+          gh release upload nightly atlantis-native-windows-x64.zip --clobber
