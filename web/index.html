@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlantis Native</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #000; color: #ddd; font: 15px system-ui, sans-serif;
+         display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+  #pick { margin: 16px; max-width: 640px; line-height: 1.5; }
+  canvas { width: min(100vw, calc((100vh - 16px) * 4 / 3)); aspect-ratio: 4 / 3;
+           image-rendering: pixelated; outline: none; }
+  #err { color: #f88; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="pick">
+  <p><b>Atlantis Native</b> needs your copy of <i>Atlantis: The Lost Tales</i>:
+     choose the game folder (with <code>atlantis.exe</code> and the
+     <code>BIGCD*.BIG</code> files, or the GOG.com installation folder).
+     The files stay on your computer.</p>
+  <p><input type="file" id="dir" webkitdirectory>
+     panorama <input id="pano" value="ATL16001" size="10"></p>
+  <p id="err"></p>
+</div>
+<script type="module">
+  import init, { start } from "./pkg/atlantis_app.js";
+  await init();
+  document.getElementById("dir").addEventListener("change", async (e) => {
+    try {
+      await start(e.target.files, document.getElementById("pano").value);
+      document.getElementById("pick").style.display = "none";
+    } catch (err) {
+      document.getElementById("err").textContent = String(err);
+    }
+  });
+</script>
+</body>
+</html>

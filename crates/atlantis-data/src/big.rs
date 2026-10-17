@@ -125,6 +125,24 @@ impl BigArchive {
         }
     }
 
+    /// Where a member's bytes are: (file, offset, size). For the web build,
+    /// which fetches that range before reading it.
+    pub fn locate(&self, name: &str) -> Option<(String, u64, usize)> {
+        let k = key(name);
+        match self.entries.get(&k) {
+            Some(e) => {
+                let (file, base) = &self.discs[e.disc];
+                Some((
+                    file.clone(),
+                    u64::from(*base) + u64::from(e.adr),
+                    e.size as usize,
+                ))
+            }
+            None if self.loose => Some((k.clone(), 0, usize::try_from(self.src.size(&k)?).ok()?)),
+            None => None,
+        }
+    }
+
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.entries.keys().map(String::as_str)
     }

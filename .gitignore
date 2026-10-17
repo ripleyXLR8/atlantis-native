@@ -1,3 +1,4 @@
 /target
 /game
 *.local.toml
+/web/pkg
