@@ -25,6 +25,8 @@ pub mod puzzle;
 pub mod scripts;
 pub mod subtitles;
 pub mod sys;
+#[cfg(test)]
+mod test_support;
 pub mod turn;
 pub mod ui;
 pub mod video_skip;

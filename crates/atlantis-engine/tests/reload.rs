@@ -1,6 +1,7 @@
 //! A reload asked by a game over or the load picker (`Engine::abort` set)
 //! runs the chapter's whole /INIT: it used to stop after the first
-//! command, since the /INIT loop stops on an abort.
+//! command, since the /INIT loop stopped on an abort. The /INIT runner
+//! `FUN_00425eb0` has no exit test: every command runs, whatever happens.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,7 +12,7 @@ use atlantis_engine::audio::Mixer;
 use atlantis_engine::hooks::DirectLoader;
 use atlantis_engine::scripts::Scripts;
 use atlantis_engine::sys::{Runner, Sys};
-use atlantis_engine::{Abort, Engine};
+use atlantis_engine::{Abort, Engine, ScriptHooks};
 
 #[test]
 fn reload_after_game_over_runs_the_whole_init() {
@@ -44,6 +45,38 @@ fn reload_after_game_over_runs_the_whole_init() {
         }
     }
     let (subjects_601, hidden_262) = result.borrow().clone().expect("the reload did not finish");
+    assert_eq!(subjects_601, vec![12, 1, 2]);
+    assert!(hidden_262);
+}
+
+/// The /INIT runs whole even with an abort pending when the CON loads.
+#[test]
+fn init_runs_whole_with_an_abort_pending() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+        eprintln!("ATLANTIS_DATA not set: skipped");
+        return;
+    };
+    let g = Game::open(Arc::new(StdDir::new(dir))).unwrap();
+    let sys = Sys::new(Mixer::new());
+    let s2 = sys.clone();
+    let result = Rc::new(RefCell::new(None));
+    let r2 = result.clone();
+    let mut runner = Runner::new(sys.clone(), async move {
+        let mut e = Engine::new(s2, g, Rc::new(DirectLoader));
+        let mut scripts = Scripts::default();
+        e.abort = Some(Abort::NewGame);
+        scripts.chapter_loaded(&mut e, 1, false).await;
+        *r2.borrow_mut() = Some((
+            scripts.subjects.subjects(601).to_vec(),
+            e.hidden_persos.contains(&262),
+        ));
+    });
+    for t in 0..100_000u64 {
+        if !runner.step(t * 16) {
+            break;
+        }
+    }
+    let (subjects_601, hidden_262) = result.borrow().clone().expect("the load did not finish");
     assert_eq!(subjects_601, vec![12, 1, 2]);
     assert!(hidden_262);
 }

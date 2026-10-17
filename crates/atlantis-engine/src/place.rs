@@ -76,6 +76,22 @@ impl Engine {
         });
     }
 
+    /// The current place's view loaded again, as `FUN_004240fc` does after
+    /// a puzzle: its panorama (the pointer left at (0x140, 0x140)) and its
+    /// sprites (frame 0, the NPC click areas rebuilt). The place is not
+    /// entered again: no place event, the mouse is not moved.
+    pub(crate) async fn reload_current_view(&mut self) {
+        let Some(index) = self.current_place else {
+            return;
+        };
+        let Some(cyclo) = self.wam.places.get(index).map(|p| p.cyclo.clone()) else {
+            return;
+        };
+        if self.load_cyclo(&cyclo).await {
+            self.composite_npc_sprites().await;
+        }
+    }
+
     /// The panorama `CYCLO\<name>` (`loadCycloHNM`, `FUN_0044a424`).
     async fn load_cyclo(&mut self, name: &str) -> bool {
         let mut path = format!("CYCLO\\{name}");

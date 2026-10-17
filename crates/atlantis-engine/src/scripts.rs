@@ -319,6 +319,15 @@ impl Scripts {
                     let name = self.names.name(i).to_string();
                     e.vars.set(&name, value);
                 }
+                // FUN_0042de5c step 4, after the reads: ZOOM = NEWSOUND = 0
+                // (0x0042e2b5 / 0x0042e2d1) and the last NewSound 0x006cd87c
+                // = 0, before the chapter change polls NewSound. A NewSound
+                // the checkpoint holds (CHAPI044 /010: NewSound=67 then
+                // Chapter=45) is never played on a reload.
+                e.vars.set("zoom", 0);
+                e.vars.set("newsound", 0);
+                e.zoom = false;
+                e.music.new_sound_last = 0;
             }
             let name = format!("SCENAR\\CHAPI{chapter:03}.CON");
             let Some(data) = e.read(&name).await else {
@@ -335,16 +344,14 @@ impl Scripts {
         })
     }
 
-    /// `FUN_00425eb0`: the /INIT commands, with the loading flag set.
+    /// `FUN_00425eb0`: the /INIT commands, with the loading flag set. Every
+    /// command runs: the loop has no exit test (no shipped /INIT holds a
+    /// Chapter= or a GameOver=).
     async fn exec_init(&mut self, e: &mut Engine) {
         let was = std::mem::replace(&mut self.init_running, true);
         let cmds = self.script.init_cmds().to_vec();
-        let chapter = self.chapter;
         for (cmd, offset) in cmds {
             self.exec_set(e, Some(offset), &cmd).await;
-            if self.chapter != chapter || e.should_abort() {
-                break;
-            }
         }
         self.init_running = was;
     }
@@ -446,14 +453,11 @@ impl Scripts {
                         .await;
                 }
                 "cinema" => e.play_cinema(value).await,
-                // ChangeCd=n: the disc prompt for disc n (@ 0x0042a4c4); the
-                // port reads every disc at once and only notes the disc,
-                // which the checkpoints keep.
-                "changecd" => {
-                    if (1..=4).contains(&value) {
-                        e.disc = value as u8;
-                    }
-                }
+                // ChangeCd=n: the disc prompt for disc n (@ 0x0042a4c4:
+                // FUN_0041eda8((n - 1) & 0xff), which clamps the disc index
+                // to 3). The port reads every disc at once: no prompt, it
+                // only notes the disc, which the checkpoints keep.
+                "changecd" => e.disc = change_cd_disc(value),
                 // HideGuest / ShowGuest store no variable.
                 "hideguest" | "showguest" => e.guests_shown = key == "showguest",
                 // AddGuest / SubGuest (FUN_0042b480 / FUN_0042b6c0): the
@@ -846,7 +850,9 @@ impl Scripts {
     }
 
     /// `FUN_004240fc`: FinPuzzle = the puzzle's result, the view is
-    /// reloaded, StartPuzzle = 0, one /sel scan, then FinPuzzle = 0. It
+    /// reloaded (the place's panorama, the pointer at (0x140, 0x140), its
+    /// sprites back to frame 0), StartPuzzle = 0, one /sel scan, then
+    /// FinPuzzle = 0. It
     /// first stops the ambient sounds (FUN_00431e98 @ 0x0042417e); around
     /// it the music goes down by half (0x00495ea4 = 50, 0x00495eac = 2),
     /// then back up with 80 % again.
@@ -859,6 +865,7 @@ impl Scripts {
         if e.should_abort() {
             return;
         }
+        e.reload_current_view().await;
         e.vars.set("startpuzzle", 0);
         self.run_sel_scan(e).await;
         e.vars.set("finpuzzle", 0);
@@ -1075,6 +1082,12 @@ fn eval_entry(
     )
 }
 
+/// ChangeCd=n: the disc `FUN_0041eda8` is called for, `(n - 1) & 0xff`
+/// clamped to index 3, plus 1 (n = 0 or n > 4 asks for disc 4).
+pub fn change_cd_disc(value: i32) -> u8 {
+    ((value.wrapping_sub(1) & 0xff) as u8).min(3) + 1
+}
+
 /// N of a "gameover=N" command, 0 for any other.
 fn gameover_value(cmd: &str) -> i32 {
     match cmd.get(..9) {
@@ -1184,13 +1197,15 @@ impl ScriptHooks for Scripts {
         })
     }
 
+    /// The game-over counters are not part of the checkpoint and outlive
+    /// its load (0x6cccac is cleared at start-up only), so a second death
+    /// after the reload gets the second narration.
     fn restore_script_state(&mut self, _e: &mut Engine, state: &ScriptState) {
         self.counters.iter_mut().for_each(|c| *c = 0);
         for (c, &v) in self.counters.iter_mut().zip(&state.counters) {
             *c = v;
         }
         self.inc_perso = i32::from(state.inc_perso);
-        self.game_over_count.clear();
         self.pending_vars = Some(state.vars);
     }
 
@@ -1250,5 +1265,160 @@ impl ScriptHooks for Scripts {
                 Departure::Go
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hooks::ScriptHooks;
+    use crate::test_support::with_engine;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[test]
+    fn change_cd_clamps_the_disc() {
+        let got: Vec<u8> = [1, 2, 3, 4, 5, 0, -1, 255, 257]
+            .iter()
+            .map(|&v| change_cd_disc(v))
+            .collect();
+        assert_eq!(got, [1, 2, 3, 4, 4, 4, 4, 4, 1]);
+    }
+
+    /// ChangeCd outside 1..=4 asks for disc 4 (it was ignored).
+    #[test]
+    fn change_cd_command_clamps_the_disc() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "change_cd_command_clamps_the_disc",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                for v in [2, 0, 1, 9, 3] {
+                    s.exec_set(&mut e, None, &format!("changecd={v}")).await;
+                    g2.borrow_mut().push(e.disc);
+                }
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        assert_eq!(*got, [2, 4, 1, 4, 3]);
+    }
+
+    struct GameOvers(Rc<RefCell<Vec<GameOverRequest>>>);
+
+    impl DialogPresenter for GameOvers {
+        fn game_over<'a>(
+            &'a mut self,
+            _e: &'a mut Engine,
+            req: &'a GameOverRequest,
+        ) -> HookFuture<'a, ()> {
+            self.0.borrow_mut().push(req.clone());
+            ready(())
+        }
+    }
+
+    /// CHAPI003 /45 (GameOver=2, then two narrator lines): with the
+    /// alternative narration (the 1999 build, or the restored content), a
+    /// second death after the checkpoint reload plays the second line; the
+    /// reload used to clear the counters.
+    #[test]
+    fn second_game_over_after_a_reload_plays_the_second_narration() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "second_game_over_after_a_reload_plays_the_second_narration",
+            move |mut e| async move {
+                e.enhancements.restored_content = true;
+                let mut s = Scripts::with_dialog(Box::new(GameOvers(g2)));
+                s.chapter_loaded(&mut e, 3, false).await;
+                for _ in 0..2 {
+                    let sec = s.script.sections().iter().find(|x| x.id == 45).cloned();
+                    s.play_section(&mut e, sec.unwrap(), "con", None).await;
+                    assert_eq!(e.abort, Some(Abort::NewGame));
+                    // The reload's script side (load_checkpoint).
+                    e.abort = None;
+                    let state = s.script_state(&e, 3);
+                    s.restore_script_state(&mut e, &state);
+                    s.chapter_loaded(&mut e, 3, true).await;
+                }
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        let letters: Vec<char> = got.iter().map(|r| r.narrator.as_ref().unwrap().1).collect();
+        assert_eq!(letters, ['C', 'D']);
+        assert_ne!(got[0].narrator, got[1].narrator);
+    }
+
+    /// A NewSound the checkpoint holds (CHAPI044 /010: NewSound=67, then
+    /// Chapter=45) is not played on the reload: NEWSOUND = 0 after the
+    /// checkpoint's variables are applied.
+    #[test]
+    fn checkpoint_newsound_is_cleared_on_load() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "checkpoint_newsound_is_cleared_on_load",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                let mut state = s.script_state(&e, 1);
+                let k = (0..s.names.len().min(7))
+                    .find(|&i| s.names.name(i) == "newsound")
+                    .expect("NEWSOUND is not a persistent variable");
+                state.vars[k] = 67;
+                e.write_checkpoint(&state);
+                e.music.new_sound_last = 12;
+                e.load_checkpoint(&mut s, true).await;
+                *g2.borrow_mut() = Some((e.vars.get("newsound"), e.music.new_sound_last));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let got = *got.borrow();
+        assert_eq!(got, Some((0, 0)));
+    }
+
+    /// After a puzzle the view is loaded again (FUN_004240fc): the pointer
+    /// back at (0x140, 0x140), StartPuzzle and FinPuzzle cleared.
+    #[test]
+    fn puzzle_zone_reloads_the_view() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "puzzle_zone_reloads_the_view",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                assert!(e.load_wam_with("ATLAN1.WAM", true).await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.pointer.pos = (5, 5);
+                // StartPuzzle 17: no such puzzle, refused at once with 0.
+                e.vars.set("startpuzzle", 17);
+                let taken = s.puzzle_zone(&mut e, 17).await;
+                *g2.borrow_mut() = Some((
+                    taken,
+                    e.pointer.pos,
+                    e.vars.get("startpuzzle"),
+                    e.vars.get("finpuzzle"),
+                ));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let got = *got.borrow();
+        assert_eq!(got, Some((true, (0x140, 0x140), 0, 0)));
     }
 }
