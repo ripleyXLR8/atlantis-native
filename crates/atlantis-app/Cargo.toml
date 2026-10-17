@@ -1,0 +1,21 @@
+[package]
+name = "atlantis-app"
+description = "Atlantis Native: window, input and audio around the game engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "atlantis-native"
+path = "src/main.rs"
+
+[dependencies]
+atlantis-data = { path = "../atlantis-data" }
+atlantis-codecs = { path = "../atlantis-codecs" }
+atlantis-engine = { path = "../atlantis-engine" }
+log = "0.4"
+winit = "0.30"
+softbuffer = "0.4"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11"

@@ -1,0 +1,12 @@
+[package]
+name = "atlantis-engine"
+description = "Atlantis: The Lost Tales engine: panoramic view and game logic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+libm = "=0.2.16"
+
+[dev-dependencies]
+md-5 = "0.10"

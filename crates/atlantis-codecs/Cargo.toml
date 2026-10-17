@@ -1,0 +1,12 @@
+[package]
+name = "atlantis-codecs"
+description = "Atlantis: The Lost Tales codecs: HNM6 panoramas"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+atlantis-data = { path = "../atlantis-data" }
+md-5 = "0.10"
