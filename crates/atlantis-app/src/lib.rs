@@ -54,6 +54,8 @@ impl Viewport {
     }
 }
 
+static RGB_LUT: std::sync::OnceLock<Vec<u32>> = std::sync::OnceLock::new();
+
 pub struct App {
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
@@ -64,6 +66,8 @@ pub struct App {
     start: Instant,
     next_frame: Instant,
     viewport: Viewport,
+    /// Source column of each window column, for the current width.
+    col_map: Vec<usize>,
     /// The pointer lock as applied to the window.
     locked: bool,
     /// Raw device motion arrives (desktop): window cursor motion is then
@@ -94,6 +98,7 @@ impl App {
             start: now,
             next_frame: now,
             viewport: Viewport::default(),
+            col_map: Vec::new(),
             locked: false,
             raw_motion: false,
             last_cursor: None,
@@ -196,14 +201,33 @@ impl App {
         } else {
             &self.pattern
         };
+        // RGB565 -> XRGB8888 table and source column per window column,
+        // built once (the per-pixel arithmetic was the cost in the browser).
+        let lut = RGB_LUT.get_or_init(|| {
+            (0..=u16::MAX as u32)
+                .map(|p| {
+                    let (r, g, b) = ((p >> 11) & 31, (p >> 5) & 63, p & 31);
+                    (r << 3 | r >> 2) << 16 | (g << 2 | g >> 4) << 8 | (b << 3 | b >> 2)
+                })
+                .collect()
+        });
+        if self.col_map.len() != dw {
+            self.col_map = (0..dw).map(|x| x * W / dw).collect();
+        }
         buf.fill(0);
+        let mut prev_src = usize::MAX;
         for y in 0..dh {
-            let src_row = &frame[(y * H / dh) * W..][..W];
-            let dst_row = &mut buf[(oy + y) * sw + ox..][..dw];
-            for (x, d) in dst_row.iter_mut().enumerate() {
-                let p = u32::from(src_row[x * W / dw]);
-                let (r, g, b) = ((p >> 11) & 31, (p >> 5) & 63, p & 31);
-                *d = (r << 3 | r >> 2) << 16 | (g << 2 | g >> 4) << 8 | (b << 3 | b >> 2);
+            let src_y = y * H / dh;
+            let start = (oy + y) * sw + ox;
+            if src_y == prev_src {
+                // same source row as the line above: copy it
+                buf.copy_within(start - sw..start - sw + dw, start);
+                continue;
+            }
+            prev_src = src_y;
+            let src_row = &frame[src_y * W..][..W];
+            for (d, &x) in buf[start..start + dw].iter_mut().zip(&self.col_map) {
+                *d = lut[usize::from(src_row[x])];
             }
         }
         buf.present().unwrap();
