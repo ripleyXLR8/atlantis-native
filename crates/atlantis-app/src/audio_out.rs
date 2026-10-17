@@ -20,7 +20,11 @@ pub fn start(mixer: Mixer) -> Option<cpal::Stream> {
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_output_stream(
             &config.into(),
-            move |out: &mut [f32], _| mixer.fill(out, rate, channels),
+            move |out: &mut [f32], _| {
+                #[cfg(not(target_arch = "wasm32"))]
+                crate::watchdog::audio_beat();
+                mixer.fill(out, rate, channels)
+            },
             |e| log::warn!("audio stream: {e}"),
             None,
         ),
@@ -29,6 +33,8 @@ pub fn start(mixer: Mixer) -> Option<cpal::Stream> {
             device.build_output_stream(
                 &config.into(),
                 move |out: &mut [i16], _| {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    crate::watchdog::audio_beat();
                     buf.resize(out.len(), 0.0);
                     mixer.fill(&mut buf, rate, channels);
                     for (o, s) in out.iter_mut().zip(&buf) {

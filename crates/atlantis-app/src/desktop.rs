@@ -16,6 +16,8 @@ pub const GAME_FOLDER_FILE: &str = "game-folder.txt";
 /// The log file of a run without a terminal, in the per-user data folder,
 /// rewritten at every start.
 pub const LOG_FILE: &str = "atlantis-native.log";
+/// The log of the session before.
+pub const PREV_LOG_FILE: &str = "atlantis-native.previous.log";
 
 /// The per-user data folder, or a folder next to the current one when the
 /// system gives none.
@@ -33,6 +35,9 @@ pub fn init_log(force_stderr: bool) -> Option<PathBuf> {
     if !to_stderr {
         let dir = data_dir();
         let path = dir.join(LOG_FILE);
+        // Keep the previous session's log: after a hang or a crash the
+        // player restarts the game, which would overwrite the evidence.
+        let _ = std::fs::rename(&path, dir.join(PREV_LOG_FILE));
         if let Ok(file) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::File::create(&path))
         {
             env_logger::Builder::new()

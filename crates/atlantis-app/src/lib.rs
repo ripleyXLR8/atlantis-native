@@ -22,6 +22,8 @@ use winit::window::{CursorGrabMode, Window, WindowId};
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod watchdog;
 #[cfg(target_arch = "wasm32")]
 mod web;
 
@@ -31,6 +33,8 @@ const H: usize = SCREEN_H;
 /// The engine's pace: one step per frame of 1/60 s. The original's loops
 /// are not paced; ScummVM's port waits for the display.
 const FRAME: Duration = Duration::from_micros(16_667);
+/// An engine step longer than this is logged.
+const SLOW_STEP: Duration = Duration::from_millis(100);
 
 /// Where the 640x480 picture sits in the window.
 #[derive(Clone, Copy, Default)]
@@ -55,6 +59,17 @@ impl Viewport {
             self.ox + (f64::from(x) + 0.5) * self.scale,
             self.oy + (f64::from(y) + 0.5) * self.scale,
         )
+    }
+}
+
+/// Marks the event-loop thread idle again when a handler returns.
+#[cfg(not(target_arch = "wasm32"))]
+struct WatchdogLeave;
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Drop for WatchdogLeave {
+    fn drop(&mut self) {
+        watchdog::leave();
     }
 }
 
@@ -139,6 +154,12 @@ impl App {
         }
         let ms = now.duration_since(self.start).as_millis() as u64;
         let alive = runner.step(ms);
+        let took = now.elapsed();
+        if took > SLOW_STEP {
+            // A step this long keeps the window from answering the system
+            // (Windows closes a window that does not for ~5 s).
+            log::warn!("slow engine step: {} ms at {ms} ms", took.as_millis());
+        }
         self.apply_pointer();
         alive
     }
@@ -271,6 +292,10 @@ fn engine_key(key: &Key) -> Option<EngineKey> {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, el: &ActiveEventLoop) {
+        #[cfg(not(target_arch = "wasm32"))]
+        watchdog::enter(watchdog::Phase::Resumed);
+        #[cfg(not(target_arch = "wasm32"))]
+        let _guard = WatchdogLeave;
         if self.window.is_some() {
             return;
         }
@@ -298,6 +323,10 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        #[cfg(not(target_arch = "wasm32"))]
+        watchdog::enter(watchdog::Phase::AboutToWait);
+        #[cfg(not(target_arch = "wasm32"))]
+        let _guard = WatchdogLeave;
         // In the browser the redraw loop keeps itself going (see
         // RedrawRequested).
         #[cfg(target_arch = "wasm32")]
@@ -318,6 +347,10 @@ impl ApplicationHandler for App {
     }
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
+        #[cfg(not(target_arch = "wasm32"))]
+        watchdog::enter(watchdog::Phase::DeviceEvent);
+        #[cfg(not(target_arch = "wasm32"))]
+        let _guard = WatchdogLeave;
         if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
             // Raw motion: what the relative look reads, in pixels of the
             // 640x480 screen the original ran fullscreen in.
@@ -329,16 +362,24 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        #[cfg(not(target_arch = "wasm32"))]
+        watchdog::enter(watchdog::Phase::WindowEvent);
+        #[cfg(not(target_arch = "wasm32"))]
+        let _guard = WatchdogLeave;
         match event {
             WindowEvent::CloseRequested => {
                 self.sys.push_input(Input::Quit);
                 el.exit();
             }
             WindowEvent::RedrawRequested => {
+                #[cfg(not(target_arch = "wasm32"))]
+                watchdog::enter(watchdog::Phase::EngineStep);
                 if !self.step() {
                     el.exit();
                     return;
                 }
+                #[cfg(not(target_arch = "wasm32"))]
+                watchdog::enter(watchdog::Phase::Redraw);
                 self.redraw();
                 #[cfg(target_arch = "wasm32")]
                 if self.runner.is_some() {

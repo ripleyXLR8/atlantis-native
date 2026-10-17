@@ -52,6 +52,7 @@ fn main() {
     let log_file = init_log(headless);
     // No terminal: the panics and the errors in message boxes.
     install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
+    atlantis_app::watchdog::start();
     if let Some(path) = &log_file {
         log::info!("log in {}", path.display());
     }
@@ -127,7 +128,12 @@ fn main() {
         // 16 ms of sound per frame at 22050 Hz, stereo.
         let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
         for i in 0..frames {
+            let t0 = std::time::Instant::now();
             alive = runner.step(i * 16);
+            let took = t0.elapsed();
+            if took.as_millis() > 100 {
+                eprintln!("slow engine step: {} ms at frame {i}", took.as_millis());
+            }
             sys.mixer.fill(&mut sound, 22050, 2);
             if !alive {
                 break;
