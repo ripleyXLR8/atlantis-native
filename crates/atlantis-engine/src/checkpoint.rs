@@ -177,6 +177,13 @@ impl Engine {
     /// its /INIT run, the volumes applied); without one, a new game at
     /// chapter 1 (`in_play`: from play, which keeps the rest of the state).
     pub async fn load_checkpoint(&mut self, hooks: &mut dyn ScriptHooks, in_play: bool) {
+        // The walk that asked for the reload (a game over, the load picker)
+        // set `abort`; the rebuild runs with it cleared, or the chapter's
+        // /INIT stopped after its first command (`exec_init` stops on an
+        // abort) and the persos, subjects and sprites it sets were left as
+        // the checkpoint had them (the slave of ATLAN5 stayed hidden after
+        // a game over in chapter 13).
+        self.abort = None;
         self.stop_ambient();
         self.bar_first = 0; // 0x0042e2ec
         self.vars.set("objetenmain", 0);
