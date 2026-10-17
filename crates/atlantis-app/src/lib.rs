@@ -122,6 +122,10 @@ impl App {
             return true;
         };
         let now = Instant::now();
+        // The browser paces the frames itself (requestAnimationFrame, one
+        // RedrawRequested per screen refresh): a timer before the redraw
+        // made the two delays add up and dropped frames.
+        #[cfg(not(target_arch = "wasm32"))]
         if now < self.next_frame {
             return true;
         }
@@ -290,16 +294,23 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
-        if self.runner.is_none() {
-            el.set_control_flow(ControlFlow::Wait);
-            return;
-        }
-        if Instant::now() >= self.next_frame {
-            if let Some(w) = &self.window {
-                w.request_redraw();
+        // In the browser the redraw loop keeps itself going (see
+        // RedrawRequested).
+        #[cfg(target_arch = "wasm32")]
+        el.set_control_flow(ControlFlow::Wait);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if self.runner.is_none() {
+                el.set_control_flow(ControlFlow::Wait);
+                return;
             }
+            if Instant::now() >= self.next_frame {
+                if let Some(w) = &self.window {
+                    w.request_redraw();
+                }
+            }
+            el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
         }
-        el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
     }
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
@@ -325,6 +336,12 @@ impl ApplicationHandler for App {
                     return;
                 }
                 self.redraw();
+                #[cfg(target_arch = "wasm32")]
+                if self.runner.is_some() {
+                    if let Some(w) = &self.window {
+                        w.request_redraw();
+                    }
+                }
             }
             WindowEvent::Resized(_) => {
                 if let Some(w) = &self.window {
