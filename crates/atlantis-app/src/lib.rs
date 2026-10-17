@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use atlantis_data::Game;
 use atlantis_engine::audio::Mixer;
-use atlantis_engine::hd::{self, tile_for_output};
+use atlantis_engine::hd::{self, tile_for_output, HdCompositor, HdFrame, HdText};
 use atlantis_engine::options_menu::{MenuAction, MenuValues, OptionsMenu};
 use atlantis_engine::persist::{Graphics, Settings};
 use atlantis_engine::subtitles::SubtitleFont;
@@ -117,6 +117,9 @@ pub struct App {
     graphics: Graphics,
     /// Where the graphics mode is saved (`settings.ini`).
     saves: Option<Rc<dyn SaveStore>>,
+    /// The HD mode's composition, and the options menu's text drawn sharp.
+    compositor: HdCompositor,
+    menu_text: HdText,
 }
 
 impl App {
@@ -149,13 +152,18 @@ impl App {
             paused_at: None,
             graphics: Graphics::Original,
             saves: None,
+            compositor: HdCompositor::new(),
+            menu_text: HdText::default(),
         }
     }
 
     /// The graphics mode to start with, and the store its changes in the
-    /// options menu are saved to.
+    /// options menu are saved to (the HD options are read from it).
     pub fn with_graphics(mut self, graphics: Graphics, saves: Option<Rc<dyn SaveStore>>) -> App {
         self.graphics = graphics;
+        if let Some(s) = saves.as_ref().and_then(|s| Settings::load(s.as_ref())) {
+            self.sys.set_hd_options(s.hd);
+        }
         self.saves = saves;
         self
     }
@@ -210,6 +218,17 @@ impl App {
                     s.save(saves.as_ref());
                 }
             }
+            MenuAction::SetHd(o) => {
+                // The engine renders the view again at the next frame, the
+                // composition takes them at the next redraw.
+                self.sys.set_hd_options(o);
+                log::info!("HD options: {o:?}");
+                if let Some(saves) = &self.saves {
+                    let mut s = Settings::load(saves.as_ref()).unwrap_or_default();
+                    s.hd = o;
+                    s.save(saves.as_ref());
+                }
+            }
             MenuAction::SetEnhancements(x) => {
                 // The engine reads them where it uses them: in force at once
                 // (the music mode from the next track).
@@ -230,6 +249,7 @@ impl App {
     fn menu_values(&self) -> MenuValues {
         MenuValues {
             graphics: self.graphics,
+            hd: self.sys.hd_options(),
             enhancements: self.sys.enhancements(),
         }
     }
@@ -346,22 +366,43 @@ impl App {
         } else {
             &self.pattern
         };
+        let hd_mode = tile.is_some();
         if self.menu.is_open() {
             self.menu_frame.clear();
             self.menu_frame.extend_from_slice(frame);
             let values = MenuValues {
                 graphics: self.graphics,
+                hd: self.sys.hd_options(),
                 enhancements: self.sys.enhancements(),
             };
             let font = self.menu_font.get_or_insert_with(SubtitleFont::new);
-            self.menu.draw(&mut self.menu_frame, font, values);
+            let text = hd_mode.then_some(&mut self.menu_text);
+            self.menu
+                .draw_recording(&mut self.menu_frame, font, values, text);
             frame = &self.menu_frame;
         }
         buf.fill(0);
-        if self.runner.is_some() && self.sys.hd_shown() {
+        if hd_mode {
+            // HD: the layer, the interface art upscaled, the text sharp.
+            let running = self.runner.is_some();
             let layer = self.sys.hd.borrow();
-            hd::compose(frame, &layer, &mut buf[..], sw, ox, oy, dw, dh);
-            drop(layer);
+            let text = self.sys.hd_text.borrow();
+            let mut texts: Vec<&HdText> = Vec::new();
+            if running && self.sys.hd_text_shown() {
+                texts.push(&text);
+            }
+            if self.menu.is_open() {
+                texts.push(&self.menu_text);
+            }
+            let f = HdFrame {
+                screen: frame,
+                layer: (running && self.sys.hd_shown()).then_some(&*layer),
+                texts: &texts,
+                photo: running && self.sys.photo_shown(),
+            };
+            self.compositor
+                .compose(f, self.sys.hd_options(), &mut buf[..], sw, ox, oy, dw, dh);
+            drop((layer, text));
             buf.present().unwrap();
             return;
         }

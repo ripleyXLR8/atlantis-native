@@ -225,6 +225,74 @@ impl SubtitleFont {
         }
     }
 
+    /// The glyphs [`SubtitleFont::draw`] draws for `text` at x = `x`
+    /// with the width limit `max_w`: each byte with its pen position.
+    fn layout(&self, text: &[u8], x: i32, max_w: i32) -> Vec<(u8, i32)> {
+        let right = x + max_w + 1;
+        let mut pen = x;
+        let mut out = Vec::with_capacity(text.len());
+        for &b in text {
+            let g = &self.glyphs[usize::from(b)];
+            if pen + g.left + g.w > right {
+                break;
+            }
+            out.push((b, pen));
+            pen += g.advance;
+        }
+        out
+    }
+
+    /// [`SubtitleFont::draw`] at a larger scale, for the HD mode: the same
+    /// glyphs at the same places of the 640x480 screen, the screen mapped
+    /// to the `dw` x `dh` pixels at (`ox`, `oy`) of `out` (XRGB8888,
+    /// `stride` pixels per row), rasterised from the outlines at that
+    /// size and blended by their coverage (smoothed), in `color`
+    /// (XRGB8888). Nothing is drawn outside those pixels.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_hd(
+        &self,
+        out: &mut [u32],
+        stride: usize,
+        (ox, oy, dw, dh): (usize, usize, usize, usize),
+        text: &[u8],
+        x: i32,
+        y: i32,
+        max_w: i32,
+        color: u32,
+    ) {
+        let font = FontRef::try_from_slice(FONT_DATA).expect("bundled subtitle font");
+        let (sx, sy) = (dw as f32 / 640.0, dh as f32 / 480.0);
+        let upem = font.units_per_em().unwrap_or(2048.0);
+        let scale = PxScale::from(SUBTITLE_EM_PX * sy * font.height_unscaled() / upem);
+        let base = oy as f32 + (y + self.ascent) as f32 * sy;
+        let (x1, y1) = ((ox + dw) as i32, (oy + dh) as i32);
+        for (b, pen) in self.layout(text, x, max_w) {
+            let c = cp1252(b);
+            let id = font.glyph_id(c);
+            if c < ' ' || id.0 == 0 {
+                continue;
+            }
+            let pos = point(ox as f32 + pen as f32 * sx, base);
+            let Some(outline) = font.outline_glyph(id.with_scale_and_position(scale, pos)) else {
+                continue;
+            };
+            let bounds = outline.px_bounds();
+            let (bx, by) = (bounds.min.x as i32, bounds.min.y as i32);
+            outline.draw(|gx, gy, cov| {
+                let (px, py) = (bx + gx as i32, by + gy as i32);
+                if px < ox as i32 || py < oy as i32 || px >= x1 || py >= y1 {
+                    return;
+                }
+                let a = (cov.clamp(0.0, 1.0) * 256.0) as u32;
+                if a == 0 {
+                    return;
+                }
+                let d = &mut out[py as usize * stride + px as usize];
+                *d = crate::upscale::lerp888(*d, color, a.min(256));
+            });
+        }
+    }
+
     /// The subtitle lines over a 640x480 RGB565 picture (`FUN_00430178`):
     /// line i of n at (5, [`subtitle_line_y`]) in white over its black
     /// shadow at (+1, +1). `y_offset` moves them down (a picture taller
@@ -261,6 +329,26 @@ impl SubtitleFont {
             );
         }
     }
+}
+
+/// The text items of [`SubtitleFont::draw_subtitles`] for the HD mode
+/// (see [`crate::hd::HdText`]): the shadow then the text of each line,
+/// moved by (`dx`, `dy`) on the screen.
+pub fn subtitle_items(lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
+    let mut items = Vec::with_capacity(2 * lines.len());
+    for (i, line) in lines.iter().enumerate() {
+        let y = subtitle_line_y(i, lines.len()) + dy;
+        for (o, color) in [(1, SUBTITLE_SHADOW), (0, SUBTITLE_COLOR)] {
+            items.push(crate::hd::TextItem {
+                x: SUBTITLE_X + dx + o,
+                y: y + o,
+                max_w: SUBTITLE_WIDTH,
+                color,
+                text: line.clone(),
+            });
+        }
+    }
+    items
 }
 
 #[cfg(test)]
@@ -331,6 +419,67 @@ mod tests {
                 assert!((434..434 + 16).contains(&y), "pixel at row {y}");
             }
         }
+    }
+
+    #[test]
+    fn hd_text_draws_the_same_glyphs_larger() {
+        let f = SubtitleFont::new();
+        let line = b" Hello, Seth! This line is long enough".to_vec();
+        // At scale 1 the smoothed glyphs fall where the 640 ones are.
+        let mut lo = vec![0u16; 640 * 480];
+        f.draw(&mut lo, 640, 480, &line, 5, 434, SUBTITLE_WIDTH, 0xffff);
+        let (w, h) = (1920, 1440);
+        let mut hd = vec![0u32; w * h];
+        f.draw_hd(
+            &mut hd,
+            w,
+            (0, 0, w, h),
+            &line,
+            5,
+            434,
+            SUBTITLE_WIDTH,
+            0x00ff_ffff,
+        );
+        let lit: Vec<usize> = (0..w * h).filter(|&i| hd[i] & 0xff > 0x80).collect();
+        assert!(lit.len() > 9 * 200, "{} lit pixels", lit.len());
+        // Most of the HD text lies over the 640 text's pixels (the
+        // outlines are the same, at 3 times the size).
+        let over = lit
+            .iter()
+            .filter(|&&i| {
+                let (x, y) = (i % w / 3, i / w / 3);
+                (y.saturating_sub(1)..y + 2)
+                    .any(|yy| (x.saturating_sub(1)..x + 2).any(|xx| lo[yy * 640 + xx] != 0))
+            })
+            .count();
+        assert!(over * 100 >= lit.len() * 98, "{over} of {}", lit.len());
+        // Smoothed: partly covered pixels.
+        assert!(hd.iter().any(|&p| p & 0xff > 0 && p & 0xff < 0xff));
+        // Clipped to the picture.
+        let mut small = vec![0u32; 100 * 100];
+        f.draw_hd(
+            &mut small,
+            100,
+            (10, 10, 80, 60),
+            &line,
+            5,
+            0,
+            SUBTITLE_WIDTH,
+            0x00ff_ffff,
+        );
+        for (i, &p) in small.iter().enumerate() {
+            if p != 0 {
+                let (x, y) = (i % 100, i / 100);
+                assert!((10..90).contains(&x) && (10..70).contains(&y));
+            }
+        }
+        let items = subtitle_items(&[line.clone(), line], 0, 0);
+        assert_eq!(items.len(), 4);
+        assert_eq!(
+            (items[0].x, items[0].y, items[0].color),
+            (6, subtitle_line_y(0, 2) + 1, 0)
+        );
+        assert_eq!((items[3].x, items[3].y), (5, subtitle_line_y(1, 2)));
     }
 
     #[test]

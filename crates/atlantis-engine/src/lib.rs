@@ -31,6 +31,7 @@ pub mod sys;
 mod test_support;
 pub mod turn;
 pub mod ui;
+pub mod upscale;
 pub mod video_skip;
 pub mod warp;
 

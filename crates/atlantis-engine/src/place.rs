@@ -463,6 +463,10 @@ impl Engine {
                     None => break,
                 }
             }
+            // HD: a video's frame is smoothed as a photograph.
+            if !first {
+                self.sys.mark_photo();
+            }
             if presented && stop_after_frame {
                 self.sys.frame().await; // the frame presented at 0x0041be2e
                 break;

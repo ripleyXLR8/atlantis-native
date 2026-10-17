@@ -113,6 +113,15 @@ fn blit_centred(screen: &mut [u16], src: &[u16], w: usize, h: usize) {
     }
 }
 
+/// HD: the subtitle `lines` just drawn on the screen (`under` before,
+/// `after` with them; moved by (`dx`, `dy`)), for the front end to draw
+/// sharp (see [`crate::hd::HdText`]).
+fn record_subtitles(e: &Engine, under: &[u16], after: &[u16], lines: &[Vec<u8>], dx: i32, dy: i32) {
+    let items = crate::subtitles::subtitle_items(lines, dx, dy);
+    e.sys.hd_text.borrow_mut().set(items, under, after);
+    e.sys.hd_text_mark();
+}
+
 /// What a line hands to the line player (`playSingleConLine`'s
 /// arguments).
 struct SingleLine<'a> {
@@ -676,13 +685,13 @@ impl Dialogs {
         // The narrator's subtitle (FUN_0042ffe8 / FUN_00430178, as a line's).
         if let (Some((text, _)), true) = (narrator, game_over_subtitle_drawn(e.subtitles)) {
             let font = self.font();
-            font.draw_subtitles(
-                &mut frame,
-                SCREEN_W,
-                SCREEN_H,
-                &split_subtitle(&latin1_bytes(text)),
-                0,
-            );
+            let lines = split_subtitle(&latin1_bytes(text));
+            let under = e.sys.hd_tile().is_some().then(|| frame.clone());
+            font.draw_subtitles(&mut frame, SCREEN_W, SCREEN_H, &lines, 0);
+            if let Some(under) = under {
+                // (it stands while the screen shows it, see Sys::hd_text)
+                record_subtitles(e, &under, &frame, &lines, 0, 0);
+            }
         }
         e.sys.screen.borrow_mut().copy_from_slice(&frame);
         e.sys.frame().await;
@@ -858,6 +867,7 @@ impl LinePlayer {
             &self.hd.pre_head,
             &self.composite,
             drawn.then_some((&self.hd.head_pixels[..], &self.hd.head_mask[..])),
+            e.sys.hd_options().smooth_interface,
         );
         layer.base.copy_from_slice(&self.composite);
         drop(layer);
@@ -1009,6 +1019,17 @@ impl LinePlayer {
                 // The original draws on the 640x480 screen (FUN_00430178).
                 let off = (h as i32 - SCREEN_H as i32) / 2;
                 font.draw_subtitles(&mut compose, w, h, sub_lines, off);
+                if e.sys.hd_tile().is_some() && !sub_lines.is_empty() {
+                    // HD: the screen without the subtitle, for the sharp
+                    // one; the lines where blit_centred puts them.
+                    blit_centred(&mut screen, &self.composite, w, h);
+                    let under = screen.clone();
+                    blit_centred(&mut screen, &compose, w, h);
+                    let bx = ((SCREEN_W as i32 - w as i32) / 2).max(0);
+                    let by = ((SCREEN_H as i32 - h as i32) / 2).max(0);
+                    record_subtitles(e, &under, &screen, sub_lines, bx, off + by);
+                    return;
+                }
                 blit_centred(&mut screen, &compose, w, h);
                 return;
             }
@@ -1027,7 +1048,11 @@ impl LinePlayer {
         } else {
             bg.fill(0);
         }
+        let under = (e.sys.hd_tile().is_some() && !sub_lines.is_empty()).then(|| bg.clone());
         font.draw_subtitles(&mut bg, SCREEN_W, SCREEN_H, sub_lines, 0);
+        if let Some(under) = under {
+            record_subtitles(e, &under, &bg, sub_lines, 0, 0);
+        }
         e.sys.screen.borrow_mut().copy_from_slice(&bg);
         self.bg = bg;
     }

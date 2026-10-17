@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use crate::enhancements::Enhancements;
+use crate::hd::{HdOptions, PanoFilter};
 
 /// A flat folder of named files (names compared without regard to case).
 pub trait SaveStore {
@@ -197,6 +198,8 @@ pub struct Settings {
     pub music_on_disk: u32,
     /// The port's graphics mode.
     pub graphics: Graphics,
+    /// The HD mode's picture options.
+    pub hd: HdOptions,
 }
 
 impl Default for Settings {
@@ -208,6 +211,7 @@ impl Default for Settings {
             enhancements: Enhancements::default(),
             music_on_disk: 0,
             graphics: Graphics::Original,
+            hd: HdOptions::default(),
         }
     }
 }
@@ -237,6 +241,21 @@ impl Settings {
                 }
                 continue;
             }
+            if k == "hd_panorama" {
+                match PanoFilter::from_name(v) {
+                    Some(f) => s.hd.panorama = f,
+                    None => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
+                }
+                continue;
+            }
+            if k == "hd_interface" {
+                match v.to_ascii_lowercase().as_str() {
+                    "smooth" => s.hd.smooth_interface = true,
+                    "pixels" => s.hd.smooth_interface = false,
+                    _ => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
+                }
+                continue;
+            }
             if k == "music_on_disk" {
                 match u32::from_str_radix(v, 16) {
                     Ok(bits) => s.music_on_disk = bits,
@@ -255,6 +274,8 @@ impl Settings {
                 ("minor_bug_fixes", Some(b), _) => s.enhancements.minor_bug_fixes = b,
                 ("restored_content", Some(b), _) => s.enhancements.restored_content = b,
                 ("ui_ux", Some(b), _) => s.enhancements.ui_ux = b,
+                ("hd_sharpen", Some(b), _) => s.hd.sharpen = b,
+                ("hd_sharp_subtitles", Some(b), _) => s.hd.sharp_subtitles = b,
                 _ => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
             }
         }
@@ -279,7 +300,13 @@ impl Settings {
              # The music tracks LoadMusik copied (hexadecimal bit set)\n\
              music_on_disk = {:x}\n\
              # The port's graphics (options menu, F10): original or hd\n\
-             graphics = {}\n",
+             graphics = {}\n\
+             # HD mode: panorama filter (bicubic or bilinear), its sharpening,\n\
+             # the interface art (smooth: xBR, or pixels), sharp subtitles\n\
+             hd_panorama = {}\n\
+             hd_sharpen = {}\n\
+             hd_interface = {}\n\
+             hd_sharp_subtitles = {}\n",
             b(self.subtitles),
             b(self.omni3d_mode2),
             self.volumes[0],
@@ -291,6 +318,14 @@ impl Settings {
             b(self.enhancements.ui_ux),
             self.music_on_disk,
             self.graphics.name(),
+            self.hd.panorama.name(),
+            b(self.hd.sharpen),
+            if self.hd.smooth_interface {
+                "smooth"
+            } else {
+                "pixels"
+            },
+            b(self.hd.sharp_subtitles),
         )
     }
 
@@ -317,6 +352,12 @@ mod tests {
             enhancements: Enhancements::original(),
             music_on_disk: 0x8001_00a5,
             graphics: Graphics::Hd,
+            hd: HdOptions {
+                panorama: PanoFilter::Bilinear,
+                sharpen: false,
+                smooth_interface: false,
+                sharp_subtitles: false,
+            },
         };
         assert_eq!(Settings::parse(&s.to_text()), s);
         assert_eq!(Settings::parse("music_on_disk = 1F").music_on_disk, 0x1f);
@@ -326,6 +367,20 @@ mod tests {
             Graphics::Original
         );
         assert_eq!(Settings::default().graphics, Graphics::Original);
+        // The HD options: the better-looking ones by default; each key.
+        let d = Settings::default().hd;
+        assert_eq!(d.panorama, PanoFilter::Bicubic);
+        assert!(d.sharpen && d.smooth_interface && d.sharp_subtitles);
+        assert_eq!(
+            Settings::parse(&Settings::default().to_text()),
+            Settings::default()
+        );
+        let p = Settings::parse(
+            "hd_panorama = Bilinear\nhd_sharpen = off\nhd_interface = pixels\nhd_sharp_subtitles = 0",
+        );
+        assert_eq!(p.hd, s.hd);
+        assert_eq!(Settings::parse("hd_panorama = lanczos").hd, d);
+        assert_eq!(Settings::parse("hd_interface = blurry").hd, d);
         assert_eq!(
             Settings::parse("volume_music = 300\nbad"),
             Settings {

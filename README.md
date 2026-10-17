@@ -89,7 +89,9 @@ port's way out; the original has none).
 
 F10 opens the port's options menu, over whatever the game shows (the game
 pauses, its sound too): the graphics, Original or HD (see
-[HD mode](#hd-mode)), and the three groups of [enhancements](#enhancements),
+[HD mode](#hd-mode)), the HD mode's picture options ("Panorama filter",
+"Panorama sharpening", "Interface", "Sharp subtitles"; greyed in the
+Original graphics), and the three groups of [enhancements](#enhancements),
 "Fix original bugs", "Restored content" and "Modern UI/UX", on or off.
 A change applies at once (the music mode from the next track) and is saved
 in `settings.ini`. Up / Down choose an entry, Enter, Space, Left / Right
@@ -157,9 +159,13 @@ which the original also keeps in each checkpoint and sets again when one
 is loaded) and the [enhancements](#enhancements), one `name = on|off` line
 each. It also keeps `music_on_disk`, the music tracks the original game
 would have copied to its folder (it reads them from the archives here),
-so that this set outlives the session as the original's copies do, and
+so that this set outlives the session as the original's copies do,
 `graphics = original|hd`, the graphics mode of the options menu (F10;
-`original` by default).
+`original` by default), and the HD mode's picture options (see
+[HD mode](#hd-mode)): `hd_panorama = bicubic|bilinear`,
+`hd_sharpen = on|off`, `hd_interface = smooth|pixels` and
+`hd_sharp_subtitles = on|off` (by default `bicubic`, `on`, `smooth`,
+`on`).
 
 The web build keeps its players, checkpoints and settings in the
 browser's storage (`localStorage`, one entry per file, kept per site and
@@ -260,36 +266,78 @@ settings screen.
 
 The original draws everything at 640x480, and the port shows it scaled to
 the window (nearest, in its 4:3 proportions). In the HD mode (options menu,
-F10, or `--hd`) two things are drawn at the window's resolution instead:
+F10, or `--hd`) the picture is made at the window's resolution:
 
 - the panoramic view (in navigation, the turns before a move, the
   inventory bar's backdrop, the dialog lines and the subject menu over the
   panorama): the same projection as the original's, sampled from the
-  panorama (its sprites composited) with bilinear filtering;
+  panorama (its sprites composited);
 - the 3D talking heads, rasterised at that resolution with the
-  projection scaled.
+  projection scaled;
+- the subtitles (and the options menu's text), drawn from the font's
+  outlines at that resolution, smoothed;
+- the rest, the original's 640x480 art (the cursor, the inventory bar,
+  the guests' portraits, the menus, the puzzles, the dialog videos'
+  bodies, the videos), upscaled.
 
-Everything else stays the original's 640x480 art, scaled as in the
-original mode: the cursor, the inventory bar, the guests' portraits, the
-subtitles, the menus, the videos, the puzzles, the dialog videos' bodies.
 The engine still draws its 640x480 frame unchanged (the scripts, the hit
-tests and the tests see the same pixels); for a frame that shows the
-panorama it also draws the HD picture and the 640x480 picture that this
-one stands for, and the front end shows the HD pixel wherever the frame
-still shows that picture, the frame's own pixel (scaled) where something
-was drawn over it. Frames without a panorama are shown as in the original
-mode.
+tests and the tests see the same pixels, whatever the options); for a
+frame that shows the panorama it also draws the HD picture and the
+640x480 picture that this one stands for, and the front end shows the HD
+pixel wherever the frame still shows that picture, the frame's own pixel
+(upscaled) where something was drawn over it. The engine also records
+the subtitle lines it draws (their places, colours and shadows, and the
+picture before and after them): the front end puts back what was under
+the 640x480 glyphs (the HD view, or the upscaled image) wherever the
+frame still shows them, so that no blocky glyph shows around the sharp
+ones, then draws the lines at the window's scale, glyph for glyph where
+the original draws them. A cursor drawn over a subtitle stays.
+
+The options (options menu, F10; `settings.ini`):
+
+- Panorama filter, Bicubic (default) or Bilinear. Bicubic upsamples the
+  panorama to twice its size with Catmull-Rom (each channel kept between
+  its two central texels, so that edges do not ring), which the view then
+  samples bilinearly: as sharp as a bicubic view (the view magnifies the
+  panorama 1.5 to 6 times) at the cost of a bilinear one.
+- Panorama sharpening, On (default) or Off: a mild unsharp mask of the
+  panorama (5/8 of the difference from its 3x3 blur), each pixel kept
+  within its neighbours' range, so without halos.
+- Interface, Smooth (default) or Pixels. Smooth upscales the 640x480 art
+  with xBR (after Hyllian's 2xBR, written for the port; twice for 4x, 2x
+  up to a 1600-pixel-wide picture), then resamples it bilinearly to the
+  window's size; the videos' frames (moves, cinematics), which are
+  photographs, are upscaled bilinearly instead (the engine marks them),
+  as the dialog videos' bodies are. Pixels shows them as the original
+  mode does (nearest).
+- Sharp subtitles, On (default) or Off.
 
 The HD size is a multiple of the original's 40x30 grid of 16x16 tiles:
 tiles of the window's picture width / 40 pixels, rounded up, at most 64 (4
 times 640x480; 32, twice, in the web build). The view is rendered again
-only when it changes (the angles, the field of view, the sprites); on
-desktop it is split over the processor's cores. On an 8-thread laptop
-processor the HD view takes about 2 ms at 1280x960, 4 ms at 1920x1440 and
-7 ms at 2560x1920, and the front end's composition about as much.
-`crates/atlantis-engine/src/hd.rs` holds the HD layer and its composition;
-the generalised renderer is `Warp::render_tiles` in `warp.rs` (at 16-pixel
-tiles it gives the original's pixels, which the tests check).
+only when it changes (the angles, the field of view, the sprites, the
+options); the prepared panorama (sharpened, doubled) is computed again
+only in the 64x64 tiles a sprite's animation changed; the xBR art only in
+the 16x16 blocks that changed and are shown. On desktop the work is split
+over the processor's cores; the web build runs it on one. On an 8-thread
+laptop processor (`cargo test --release --test hd -- --ignored
+--nocapture hd_timings`):
+
+| | 1280x960 | 1920x1440 | 2560x1920 |
+|---|---|---|---|
+| HD view, bilinear | 1.5 ms | 3.2 ms | 5.4 ms |
+| HD view, bicubic (doubled panorama) | 1.7 ms | 3.6 ms | 5.4 ms |
+| composition, view and a changing bar | 1.7 ms | 3.5 ms | 5.0 ms |
+| composition, full-screen art, still | 1.3 ms | 6.5 ms | 4.5 ms |
+| composition, full-screen art, first frame (xBR) | 7 ms | 36 ms | 29 ms |
+
+Preparing a new panorama (sharpened and doubled) takes about 14 ms, once
+per place; a sprite's animation frame about 2 ms.
+`crates/atlantis-engine/src/hd.rs` holds the HD layer, the options and
+the composition; `upscale.rs` the filters (bicubic weights, sharpening,
+the panorama's preparation, xBR); the generalised renderer is
+`Warp::render_tiles` in `warp.rs` (at 16-pixel tiles it gives the
+original's pixels, which the tests check).
 
 ### Subtitles
 

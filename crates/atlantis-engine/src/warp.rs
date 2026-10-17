@@ -440,6 +440,81 @@ impl Warp {
         });
     }
 
+    /// [`Warp::render_bilinear`] from a panorama upsampled to twice its
+    /// size (`pano2`, 4096 pixels per row, twice the rows; see
+    /// [`prepare_panorama`]): the HD view with its "Bicubic" filter, at
+    /// the cost of a bilinear one. Past the source's last row a pixel
+    /// reads as 0, as in [`Warp::render`].
+    ///
+    /// [`prepare_panorama`]: crate::upscale::prepare_panorama
+    pub fn render_bilinear_2x(&mut self, pano2: &[u32], tile: usize, out: &mut [u32]) {
+        let w2 = 2 * PANO_W;
+        let rows2 = (pano2.len() / w2) as u32;
+        self.render_tiles(tile, out, |px, py| {
+            // px as a 12.20 column of the doubled panorama; a texel's
+            // centre is half a doubled texel into it.
+            let x = px.wrapping_sub(1 << 19);
+            let c0 = x >> 20;
+            let c1 = (c0 + 1) & (w2 as u32 - 1);
+            let fx = (x >> 12) & 0xff;
+            // The row with 11 fraction bits, doubled.
+            let y = ((py & 0x1f_ffff) << 1).wrapping_sub(1 << 10);
+            let r0 = y >> 11;
+            let fy = (y >> 3) & 0xff;
+            if r0 >= rows2 {
+                return 0;
+            }
+            let r1 = if r0 + 1 < rows2 { r0 + 1 } else { r0 };
+            let (o0, o1) = ((r0 as usize) * w2, (r1 as usize) * w2);
+            let top = lerp888(pano2[o0 + c0 as usize], pano2[o0 + c1 as usize], fx);
+            let bottom = lerp888(pano2[o1 + c0 as usize], pano2[o1 + c1 as usize], fx);
+            lerp888(top, bottom, fy)
+        });
+    }
+
+    /// [`Warp::render_tiles`] with bicubic (Catmull-Rom) sampling of a
+    /// panorama in XRGB8888, as [`Warp::render_bilinear`] otherwise: the
+    /// HD view with its "Bicubic" filter. Each channel is kept within the
+    /// range of the four nearest texels, so that hard edges do not ring.
+    /// Rows above and below the source's are its first and last.
+    pub fn render_bicubic(&mut self, pano: &[u32], tile: usize, out: &mut [u32]) {
+        let rows = (pano.len() / PANO_W) as u32;
+        let wt = crate::upscale::catmull_rom_weights();
+        self.render_tiles(tile, out, |px, py| {
+            let x = px.wrapping_sub(1 << 20);
+            let y = py.wrapping_sub(1 << 10);
+            let c0 = x >> 21;
+            let fx = ((x >> 13) & 0xff) as usize;
+            let r0 = (y >> 11) & 0x3ff;
+            let fy = ((y >> 3) & 0xff) as usize;
+            if r0 >= rows {
+                return 0;
+            }
+            let mask = PANO_W as u32 - 1;
+            let cols = [
+                (c0.wrapping_sub(1) & mask) as usize,
+                c0 as usize,
+                ((c0 + 1) & mask) as usize,
+                ((c0 + 2) & mask) as usize,
+            ];
+            let last = rows - 1;
+            let rs = [
+                r0.saturating_sub(1),
+                r0,
+                (r0 + 1).min(last),
+                (r0 + 2).min(last),
+            ];
+            let mut t = [[0u32; 4]; 4];
+            for (row, &r) in t.iter_mut().zip(&rs) {
+                let o = r as usize * PANO_W;
+                for (p, &c) in row.iter_mut().zip(&cols) {
+                    *p = pano[o + c];
+                }
+            }
+            crate::upscale::bicubic16(&t, &wt[fx], &wt[fy])
+        });
+    }
+
     /// The grid's panorama point under a screen point, bilinearly
     /// interpolated in the 16x16 tile: `(column, v)` with `v` counted from
     /// the grid's own vertical origin (ScummVM's `mapMouseCoords`).

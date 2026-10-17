@@ -210,3 +210,60 @@ fn hd_view_follows_the_original_view() {
     }
     assert!(same * 100 >= SCREEN_W * SCREEN_H * 95, "{same}");
 }
+
+/// The HD view's "Bicubic" filter: the panorama doubled with Catmull-Rom
+/// and sampled bilinearly comes close to the direct bicubic sampling,
+/// keeps a constant panorama constant, and is deterministic; the edges
+/// past the source read as 0 as with the other samplers.
+#[test]
+fn hd_bicubic_view() {
+    use atlantis_engine::upscale::prepare_panorama;
+    use atlantis_engine::warp::hd_size;
+    // A smooth panorama (the photographs are): sums of slow waves.
+    let surface: Vec<u16> = (0..PANO_W * 768)
+        .map(|i| {
+            let (x, y) = ((i % PANO_W) as f64, (i / PANO_W) as f64);
+            let v = |f: f64, p: f64| (x * f + y * f * 0.7 + p).sin() * 0.5 + 0.5;
+            let (r, g, b) = (v(0.11, 0.0), v(0.05, 1.0), v(0.2, 2.0));
+            ((r * 31.0) as u16) << 11 | ((g * 63.0) as u16) << 5 | (b * 31.0) as u16
+        })
+        .collect();
+    let mut pano = Vec::new();
+    prepare_panorama(&surface, PANO_W, false, false, &mut pano);
+    let mut pano2 = Vec::new();
+    prepare_panorama(&surface, PANO_W, false, true, &mut pano2);
+    let tile = 48;
+    let (w, h) = hd_size(tile);
+    let mut direct = vec![0u32; w * h];
+    let mut doubled = vec![0u32; w * h];
+    view(WARP_FOV_DEG, 2.5, 0.2).render_bicubic(&pano, tile, &mut direct);
+    view(WARP_FOV_DEG, 2.5, 0.2).render_bilinear_2x(&pano2, tile, &mut doubled);
+    let mut again = vec![1u32; w * h];
+    view(WARP_FOV_DEG, 2.5, 0.2).render_bilinear_2x(&pano2, tile, &mut again);
+    assert_eq!(doubled, again);
+    let diff: u64 = direct
+        .iter()
+        .zip(&doubled)
+        .map(|(&a, &b)| {
+            [16, 8, 0]
+                .iter()
+                .map(|&s| ((a >> s & 0xff) as i64 - (b >> s & 0xff) as i64).unsigned_abs())
+                .sum::<u64>()
+        })
+        .sum();
+    let mean = diff as f64 / (3 * w * h) as f64;
+    assert!(mean < 1.5, "mean difference {mean}");
+    let flat = vec![0x0040_8020u32; 4 * PANO_W * 768];
+    let mut out = vec![0u32; w * h];
+    view(WARP_FOV_DEG, 1.0, 0.0).render_bilinear_2x(&flat, tile, &mut out);
+    assert!(out.iter().all(|&p| p == 0x0040_8020));
+    let flat1 = vec![0x0040_8020u32; PANO_W * 768];
+    view(WARP_FOV_DEG, 1.0, 0.0).render_bicubic(&flat1, tile, &mut out);
+    assert!(out.iter().all(|&p| p == 0x0040_8020));
+    // The limit views at the widest dialog FOV: every pixel written.
+    for beta in [-1.0, 1.0] {
+        let mut out = vec![0xdead_beefu32; w * h];
+        view(48.26, 5.5, beta).render_bilinear_2x(&pano2, tile, &mut out);
+        assert!(out.iter().all(|&p| p != 0xdead_beef));
+    }
+}

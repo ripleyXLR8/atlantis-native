@@ -16,7 +16,7 @@ use std::rc::Rc;
 use std::task::{Context, Poll, Waker};
 
 use crate::audio::Mixer;
-use crate::hd::HdLayer;
+use crate::hd::{HdLayer, HdOptions, HdText};
 use crate::warp::{SCREEN_H, SCREEN_W};
 
 /// Input, in 640x480 screen coordinates.
@@ -97,6 +97,17 @@ pub struct Sys {
     /// The HD layer stands for the frame being drawn / the frame shown.
     hd_marked: Cell<bool>,
     hd_shown: Cell<bool>,
+    /// The HD mode's picture options, shared with the options menu.
+    hd_options: Cell<HdOptions>,
+    /// The text of the frame, for the HD mode to draw sharp (see
+    /// [`HdText`]), and whether it stands for the frame being drawn / the
+    /// frame shown.
+    pub hd_text: RefCell<HdText>,
+    text_marked: Cell<bool>,
+    text_shown: Cell<bool>,
+    /// The frame being drawn / shown is a video's.
+    photo_marked: Cell<bool>,
+    photo_shown: Cell<bool>,
     pub cursor: RefCell<Option<Cursor>>,
     pub mixer: Mixer,
     now_ms: Cell<u64>,
@@ -121,6 +132,12 @@ impl Sys {
             enhancements: Cell::new(crate::enhancements::Enhancements::default()),
             hd_marked: Cell::new(false),
             hd_shown: Cell::new(false),
+            hd_options: Cell::new(HdOptions::default()),
+            hd_text: RefCell::new(HdText::default()),
+            text_marked: Cell::new(false),
+            text_shown: Cell::new(false),
+            photo_marked: Cell::new(false),
+            photo_shown: Cell::new(false),
             cursor: RefCell::new(None),
             mixer,
             now_ms: Cell::new(0),
@@ -302,6 +319,39 @@ impl Sys {
         self.hd_shown.get() && self.hd_tile().is_some()
     }
 
+    /// The HD mode's picture options in force.
+    pub fn hd_options(&self) -> HdOptions {
+        self.hd_options.get()
+    }
+
+    /// Sets them (at start, and from the options menu at any time).
+    pub fn set_hd_options(&self, o: HdOptions) {
+        self.hd_options.set(o);
+    }
+
+    /// The engine side: [`Sys::hd_text`] holds the text of the frame
+    /// being drawn. It stands for that frame, and for the next ones while
+    /// the screen stays the same.
+    pub fn hd_text_mark(&self) {
+        self.text_marked.set(true);
+    }
+
+    /// The front-end side: the frame last presented has its text in
+    /// [`Sys::hd_text`].
+    pub fn hd_text_shown(&self) -> bool {
+        self.text_shown.get() && self.hd_tile().is_some()
+    }
+
+    /// The engine side: the frame being drawn is a video's (photographic).
+    pub fn mark_photo(&self) {
+        self.photo_marked.set(true);
+    }
+
+    /// The front-end side: the frame last presented is a video's.
+    pub fn photo_shown(&self) -> bool {
+        self.photo_shown.get()
+    }
+
     /// The pointer position the engine asked for since the last call, for
     /// the front end to move the system pointer to.
     pub fn take_warp_request(&self) -> Option<(i32, i32)> {
@@ -323,6 +373,16 @@ impl Future for FrameFuture<'_> {
             self.started = true;
             self.sys.yielded.set(true);
             self.sys.hd_shown.set(self.sys.hd_marked.replace(false));
+            // The text stands for later frames too while the screen shows
+            // it unchanged (a still image held for a voice).
+            let marked = self.sys.text_marked.replace(false);
+            let kept = !marked
+                && self.sys.text_shown.get()
+                && *self.sys.screen.borrow() == self.sys.hd_text.borrow().after;
+            self.sys.text_shown.set(marked || kept);
+            self.sys
+                .photo_shown
+                .set(self.sys.photo_marked.replace(false));
             Poll::Pending
         }
     }
