@@ -43,7 +43,7 @@ fn english_cd_1997() {
         eprintln!("ATLANTIS_DATA_1997 not set: skipped");
         return;
     };
-    assert_eq!(edition(&dir).unwrap(), "CD, English (1997 build)");
+    assert_eq!(edition(&dir).unwrap(), "CD, English (May 1997 build)");
 }
 
 #[test]
@@ -52,5 +52,14 @@ fn french_cd_1997() {
         eprintln!("ATLANTIS_DATA_FR1997 not set: skipped");
         return;
     };
-    assert_eq!(edition(&dir).unwrap(), "CD, French (1997 build)");
+    assert_eq!(edition(&dir).unwrap(), "CD, French (August 1997 build)");
+}
+
+#[test]
+fn french_cd_may_1997() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_FR1997_MAY") else {
+        eprintln!("ATLANTIS_DATA_FR1997_MAY not set: skipped");
+        return;
+    };
+    assert_eq!(edition(&dir).unwrap(), "CD, French (May 1997 build)");
 }

@@ -17,6 +17,7 @@ pub mod sprite;
 pub mod sprite_anim;
 pub mod sprite_blend;
 pub mod sprite_list;
+pub mod text;
 pub mod wam;
 
 pub use big::BigArchive;
@@ -25,4 +26,5 @@ pub use files::{FileSource, MemFiles, StdDir};
 pub use game::{Edition, Game, GameError};
 pub use sprite::{read_spr_file, Image565, SprSprite};
 pub use sprite_list::SpritePlaceEntry;
+pub use text::TextCodePage;
 pub use wam::{Place, Wam};

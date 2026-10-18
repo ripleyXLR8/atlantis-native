@@ -2,12 +2,13 @@
 //! music track names (0x00495eec) and the NewSound names (0x00496224).
 //!
 //! Needs the game (`ATLANTIS_DATA`, `ATLANTIS_DATA_1997` for the English
-//! retail CD's 1997 build and `ATLANTIS_DATA_FR1997` for the French retail
-//! CD's August 1997 build); skipped without it.
+//! retail CD's 1997 build, `ATLANTIS_DATA_FR1997` for the French retail
+//! CD's August 1997 build and `ATLANTIS_DATA_FR1997_MAY` for its May 1997
+//! build); skipped without it.
 
 mod common;
 
-use common::{game, game_1997, game_fr1997, golden_map, md5_hex};
+use common::{game, game_1997, game_fr1997, game_fr1997_may, golden_map, md5_hex};
 
 fn joined(names: &[String]) -> String {
     names
@@ -104,5 +105,51 @@ fn tables_of_the_french_1997_build() {
     }
     if let Some(en) = game_1997("tables_of_the_french_1997_build (English 1997)") {
         assert_eq!(exe.credit_widths, en.exe.credit_widths);
+    }
+}
+
+/// The French May 1997 build (atlantis-cd-fr-688640): DGROUP at
+/// 0x00480000, file offset 0x6c600; the English 1997 build's bytes but for
+/// the player row ("NOUVEAU JOUEUR", no '#', also the label, 0x0048654a)
+/// and the credits widths (0x004866d9), whose E, b, d, g, n and t are one
+/// pixel narrower.
+#[test]
+fn tables_of_the_french_may_1997_build() {
+    let Some(fr) = game_fr1997_may("tables_of_the_french_may_1997_build") else {
+        return;
+    };
+    let exe = &fr.exe;
+    assert_eq!(exe.build.name, "atlantis-cd-fr-688640");
+    check_sound_tables(&fr);
+    assert_eq!(exe.new_player_marker, b"NOUVEAU JOUEUR");
+    assert_eq!(exe.new_player_label, b"NOUVEAU JOUEUR");
+    assert_eq!(exe.inventory_object_ids.len(), 51);
+    assert_eq!(exe.inventory_object_ids[39], 0);
+    assert_eq!(exe.guest_sprite_ids.len(), 9);
+    let narrow = b"Ebdgnt";
+    assert_eq!(
+        narrow.map(|c| exe.credit_widths[usize::from(c)]),
+        [6, 8, 8, 8, 7, 5]
+    );
+    assert_eq!(
+        [
+            exe.credit_widths[0x1c],
+            exe.credit_widths[0x1e],
+            exe.credit_widths[0x1f]
+        ],
+        [17, 2, 10]
+    );
+    if let Some(en) = game_1997("tables_of_the_french_may_1997_build (English 1997)") {
+        let e = &en.exe;
+        assert_eq!(exe.inventory_object_ids, e.inventory_object_ids);
+        assert_eq!(exe.guest_sprite_ids, e.guest_sprite_ids);
+        for c in 0..256 {
+            let less = u8::from(narrow.contains(&(c as u8)));
+            assert_eq!(
+                exe.credit_widths[c] + less,
+                e.credit_widths[c],
+                "byte {c:#x}"
+            );
+        }
     }
 }

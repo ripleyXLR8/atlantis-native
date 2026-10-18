@@ -1,6 +1,8 @@
 //! What the port needs from the player's `atlantis.exe`: which build it is,
 //! and the tables baked into its data segment.
 
+use crate::text::TextCodePage;
+
 /// One build of atlantis.exe: where its tables sit, and its code differences
 /// from the 2001 reference that change behaviour.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -9,6 +11,8 @@ pub struct ExeBuild {
     pub size: u32,
     /// The year the executable was built (shown with the release).
     pub year: u16,
+    /// The month, for the 1997 builds (two French builds that year).
+    pub month: Option<&'static str>,
     /// DGROUP's virtual address (less the image base) and raw pointer.
     pub dgroup_vaddr: u32,
     pub dgroup_raw: u32,
@@ -92,18 +96,39 @@ pub struct ExeBuild {
     /// @ 0x004256ee..0x0042587b); the reference starts it after the image
     /// is shown (FUN_00426590).
     pub game_over_voice_at_entry: bool,
+    /// LoadMusik copies all or nothing on its first listed track
+    /// (atlantis-cd-fr-688640 FUN_0041e830): nothing when that track's copy
+    /// is there or it is the open track (0x0041e862..0x0041e891), else
+    /// every listed track, without a test (0x0041e926..0x0041e96e). The
+    /// other builds test each track (FUN_0041f1d0; atlantis-cd-en-688128
+    /// FUN_0041e7c0).
+    pub music_load_all_or_nothing: bool,
+    /// LOADMUSIK runs only when the current music volume (the faded one)
+    /// is at least this (atlantis-cd-fr-688640 FUN_00429184 @
+    /// 0x00429c5e: `cmp byte ptr [0x485e71], 5; jae`); 0 for no test.
+    pub music_load_min_volume: u8,
+    /// StartMusik of the open track re-arms the fade-in (FUN_0042a100 @
+    /// 0x0042ae3f..0x0042ae4d); atlantis-cd-fr-688640 does nothing
+    /// (FUN_00429184 @ 0x00429d47..0x00429d51).
+    pub music_restart_rearms_fade: bool,
+    /// The code page of the release's texts, for what the port shows
+    /// through Unicode (the original takes the bytes as they are).
+    pub text_code_page: TextCodePage,
 }
 
 /// The reference (a 2001 English build), the GOG build (a 1999 build, the
-/// same code for its five languages; its tables are 4 bytes further) and
-/// the English retail CD's build of May 1997 (its data segment 0x10000
-/// lower) and the French retail CD's build of August 1997 (laid out as the
-/// English one, the sound table and player row 4 bytes lower).
-pub const BUILDS: [ExeBuild; 4] = [
+/// same code for its five languages; its tables are 4 bytes further), the
+/// English retail CD's build of May 1997 (its data segment 0x10000 lower),
+/// the French retail CD's build of August 1997 (laid out as the English
+/// one, the sound table and player row 4 bytes lower) and the French
+/// retail CD's first build, of May 1997 (the English one's code and
+/// layout, its tables from the names array on 4 bytes further).
+pub const BUILDS: [ExeBuild; 5] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
         year: 2001,
+        month: None,
         dgroup_vaddr: 0x9_0000,
         dgroup_raw: 0x7_1200,
         music_va: 0x0049_5eec,
@@ -130,11 +155,16 @@ pub const BUILDS: [ExeBuild; 4] = [
         load_picker_clamp: true,
         music_first_value_rule: false,
         game_over_voice_at_entry: false,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        text_code_page: TextCodePage::Windows1252,
     },
     ExeBuild {
         name: "atlantis-gog-714752",
         size: 714_752,
         year: 1999,
+        month: None,
         dgroup_vaddr: 0x9_0000,
         dgroup_raw: 0x7_1200,
         music_va: 0x0049_5eec,
@@ -161,11 +191,16 @@ pub const BUILDS: [ExeBuild; 4] = [
         load_picker_clamp: true,
         music_first_value_rule: false,
         game_over_voice_at_entry: false,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        text_code_page: TextCodePage::Windows1252,
     },
     ExeBuild {
         name: "atlantis-cd-en-688128",
         size: 688_128,
         year: 1997,
+        month: Some("May"),
         dgroup_vaddr: 0x8_0000,
         dgroup_raw: 0x6_c400,
         music_va: 0x0048_5eec,
@@ -193,6 +228,10 @@ pub const BUILDS: [ExeBuild; 4] = [
         load_picker_clamp: false,
         music_first_value_rule: true,
         game_over_voice_at_entry: true,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        text_code_page: TextCodePage::Windows1252,
     },
     // A 1997 build sharing most of atlantis-cd-en-688128's code, with the
     // reference's GDI subtitles (FUN_0041a834, FUN_0042e84c, FUN_0042e9cc),
@@ -202,6 +241,7 @@ pub const BUILDS: [ExeBuild; 4] = [
         name: "atlantis-cd-fr-687104",
         size: 687_104,
         year: 1997,
+        month: Some("August"),
         dgroup_vaddr: 0x8_0000,
         dgroup_raw: 0x6_ba00,
         music_va: 0x0048_5eec,
@@ -242,6 +282,58 @@ pub const BUILDS: [ExeBuild; 4] = [
         music_first_value_rule: false,
         // FUN_00425430: the voice after the image (@ 0x0042559e..0x00425650).
         game_over_voice_at_entry: false,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        text_code_page: TextCodePage::Windows1252,
+    },
+    // The first French pressing: atlantis-cd-en-688128's code (every
+    // function pairs; most differences are the calling convention of its
+    // own, older cdecl CRYO.DLL), with French data strings, its own credits
+    // widths and its own music copy rules.
+    ExeBuild {
+        name: "atlantis-cd-fr-688640",
+        size: 688_640,
+        year: 1997,
+        month: Some("May"),
+        dgroup_vaddr: 0x8_0000,
+        dgroup_raw: 0x6_c600,
+        music_va: 0x0048_5eec,
+        // WinMain @ 0x0041950d; the names in 0x004ab37c..0x004abb90.
+        sound_names_va: 0x0048_61d0,
+        sound_names_range: (0x004a_0000, 0x004b_0000),
+        // "NOUVEAU JOUEUR", no '#'; the names array follows at 0x00486559.
+        new_player_va: 0x0048_654a,
+        inventory_va: 0x0048_678c,
+        guest_va: 0x0048_6860,
+        // E, b, d, g, n, t one pixel narrower than in the other builds.
+        credit_widths_va: 0x0048_66d9,
+        marker_is_label: true,
+        cursor_id_rule: false,
+        rhea_camera2: false,
+        // The game-over screen is en-688128's: no per-section counter, the
+        // voice at entry.
+        alt_game_over_narration: false,
+        // FONTS.BIN: breaker FUN_0042eab4, drawer FUN_0042ec80.
+        bitmap_subtitles: true,
+        subtitle_click_cycle: false,
+        players_1997: true,
+        // Names typed 0x20..0x7a and upper-cased, as en-688128.
+        upper_case_names: true,
+        hexa_forces_402: false,
+        queen_reveal: (5, 75),
+        rat_deadline_pacing: true,
+        rat_search_restart: false,
+        warp_cursor_steps: 1,
+        load_knob_starts_at_bar: false,
+        load_picker_clamp: false,
+        // FUN_00429184 @ 0x00429c52 (LOADMUSIK) and DELMUSIK as en-688128.
+        music_first_value_rule: true,
+        game_over_voice_at_entry: true,
+        music_load_all_or_nothing: true,
+        music_load_min_volume: 5,
+        music_restart_rearms_fade: false,
+        text_code_page: TextCodePage::Dos850,
     },
 ];
 
@@ -267,7 +359,8 @@ pub struct ExeTables {
     /// Player-screen row marker and label (0x00496570; FUN_0041e8a8 /
     /// FUN_00420d8c read them by address), e.g. "#New Player"; the 1997
     /// builds' marker is their label, "New Player" (atlantis-cd-en-688128
-    /// 0x0048654a), "NOUVEAU JOUEUR" (atlantis-cd-fr-687104 0x00486546).
+    /// 0x0048654a), "NOUVEAU JOUEUR" (atlantis-cd-fr-687104 0x00486546,
+    /// atlantis-cd-fr-688640 0x0048654a).
     pub new_player_marker: Vec<u8>,
     pub new_player_label: Vec<u8>,
     /// Object id per OBJETS1.SPR sprite, up to the -1 terminator.

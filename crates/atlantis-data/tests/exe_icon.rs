@@ -44,3 +44,12 @@ fn icon_of_the_french_1997_build() {
     let icon = g.icon.expect("an icon");
     assert_eq!((icon.width, icon.height), (32, 32));
 }
+
+#[test]
+fn icon_of_the_french_may_1997_build() {
+    let Some(g) = common::game_fr1997_may("icon_of_the_french_may_1997_build") else {
+        return;
+    };
+    let icon = g.icon.expect("an icon");
+    assert_eq!((icon.width, icon.height), (32, 32));
+}

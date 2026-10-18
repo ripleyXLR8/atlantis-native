@@ -71,6 +71,8 @@ pub struct Edition {
     pub language: Option<&'static str>,
     /// The year the executable was built.
     pub build_year: u16,
+    /// Its month, for the 1997 builds.
+    pub build_month: Option<&'static str>,
 }
 
 impl std::fmt::Display for Edition {
@@ -79,7 +81,10 @@ impl std::fmt::Display for Edition {
         if let Some(l) = self.language {
             write!(f, ", {l}")?;
         }
-        write!(f, " ({} build)", self.build_year)
+        match self.build_month {
+            Some(m) => write!(f, " ({m} {} build)", self.build_year),
+            None => write!(f, " ({} build)", self.build_year),
+        }
     }
 }
 
@@ -109,6 +114,7 @@ impl Game {
             release: if gog { "GOG.com" } else { "CD" },
             language,
             build_year: self.exe.build.year,
+            build_month: self.exe.build.month,
         }
     }
 }
