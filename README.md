@@ -33,6 +33,32 @@ reverse engineering the original executable. Each behaviour is traced to an
 address in the original code. On top of that come optional fixes of the
 original's bugs and an optional HD mode.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/macos-player-screen.jpg" width="49%" alt="The player screen on macOS, HD mode">
+  <img src="docs/screenshots/dialog-hd.jpg" width="49%" alt="A dialog with its 3D talking head, HD mode">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/original-vs-hd.jpg" width="98%" alt="The same view in the original's 640x480 and in the HD mode">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/widescreen.jpg" width="98%" alt="Widescreen: the panorama fills a 16:9 window">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/game-library.png" width="70%" alt="The game library: several editions of the game">
+</p>
+
+<sub>From top to bottom: the player screen (macOS, HD mode); a dialog with
+its 3D talking head drawn at the window's resolution; the same view in
+the original's 640x480 and in the HD mode; widescreen; the game library.
+The game's pictures and text are © Microids (Cryo Interactive
+Entertainment), shown here to illustrate the engine; Atlantis Native
+contains none of them.</sub>
+
 ## Features
 
 - 🖥️ **Windows, macOS (Apple Silicon), Linux and the web**: one engine, the
