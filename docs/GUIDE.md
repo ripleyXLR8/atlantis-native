@@ -139,9 +139,10 @@ or the checkbox, Space ticks it.
 It shows rarely: never on the first launch, only once the program has
 been started at least 3 times and games have run for 2 hours in all (the
 time in the F10 menu does not count), and then at most once every 7
-days. It never shows when the program is started with a game folder or a
-testing option (`--headless`, `--puzzle`, `--new-game`), nor in the web
-build.
+days. A run started with a game folder or a testing option (`--headless`,
+`--puzzle`, `--new-game`, `--support-screen`) neither shows it nor
+counts: its launch and its play time are left out. Nor does it show in
+the web build.
 
 To turn it off for good, tick **Don't show this again** before closing
 it, or set `never = on` in `support.ini` in the per-user folder (see

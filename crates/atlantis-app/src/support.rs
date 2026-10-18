@@ -717,7 +717,7 @@ impl crate::session::Session {
     /// Writes the play time counted since the last time to `support.ini`.
     pub(crate) fn save_play_time(&mut self) {
         let secs = self.play_clock.take();
-        if secs > 0 {
+        if secs > 0 && self.counts_play {
             SupportState::update(self.data_dir(), |s| {
                 s.played_seconds = s.played_seconds.saturating_add(secs)
             });
@@ -1048,6 +1048,13 @@ mod tests {
         let session = app.session_mut().unwrap();
         session.play_clock.tick(t);
         session.play_clock.tick(t + Duration::from_millis(1500));
+        app.save_play_time();
+        assert_eq!(SupportState::load(&d).played_seconds, 1);
+        // A run with a game folder or a testing option counts nothing.
+        let session = app.session_mut().unwrap();
+        session.counts_play = false;
+        session.play_clock.tick(t + Duration::from_millis(2000));
+        session.play_clock.tick(t + Duration::from_millis(3900));
         app.save_play_time();
         assert_eq!(SupportState::load(&d).played_seconds, 1);
         let _ = std::fs::remove_dir_all(&d);

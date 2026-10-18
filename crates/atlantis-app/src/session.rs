@@ -103,6 +103,9 @@ pub struct Session {
     shift_until: Option<Instant>,
     /// The play time not yet written to `support.ini` (see
     /// [`crate::support`]).
+    /// Whether this run's play time counts towards the support screen
+    /// (not for a run with a game folder or a testing option).
+    pub counts_play: bool,
     pub(crate) play_clock: PlayClock,
 }
 
@@ -127,6 +130,7 @@ impl Session {
             known: Vec::new(),
             shift_until: None,
             play_clock: PlayClock::default(),
+            counts_play: true,
         }
     }
 

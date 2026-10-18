@@ -187,13 +187,17 @@ fn main() {
         error_box(&format!("No window can be opened: {e}"));
         std::process::exit(1);
     });
-    let session = Session::new(data_dir(), original, force_hd, force_wide, start);
+    // A run with a game folder or a testing option: it neither counts
+    // towards the support screen (launches, play time) nor shows it.
+    let scripted = !args.is_empty() || new_game || puzzle.is_some() || force_support;
+    let mut session = Session::new(data_dir(), original, force_hd, force_wide, start);
+    session.counts_play = !scripted;
     let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
-    // The launch counted; the support screen when it is due (not on a run
-    // with a game folder or a testing option), or asked for.
-    let scripted = !args.is_empty() || new_game || puzzle.is_some();
+    // The launch counted; the support screen when it is due, or asked for.
     let mut counts = SupportState::load(&data_dir());
-    counts.launches = counts.launches.saturating_add(1);
+    if !scripted {
+        counts.launches = counts.launches.saturating_add(1);
+    }
     let now = unix_now();
     let due = !scripted && should_show(&counts, now);
     if due {
