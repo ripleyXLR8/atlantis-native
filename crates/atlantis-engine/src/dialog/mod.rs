@@ -705,13 +705,42 @@ impl Dialogs {
     /// GereGameOver (`showGameOver`, `FUN_00426590`).
     async fn game_over_impl(&mut self, e: &mut Engine, req: &GameOverRequest) {
         e.stop_ambient(); // FUN_00426590 @ 0x004265d5
-                          // @ 0x00426616..0x00426647: NEWSOUND set, the NewSound sample fades.
+        let narrator = req.narrator.as_ref().filter(|(t, _)| !t.is_empty());
+        // The narrator's voice, WAV\ATA<section><letter>.APC.
+        let voice = match narrator {
+            Some((_, letter)) => {
+                let apc = format!("WAV\\{}", game_over_voice_name(req.section, *letter));
+                let pcm = if e.game.big.contains(&apc) {
+                    e.read(&apc).await.and_then(|d| apc_pcm(&d))
+                } else {
+                    None
+                };
+                pcm.map(|p| (p, apc))
+            }
+            None => None,
+        };
+        // The 1997 build starts it here, before the image
+        // (atlantis-cd-en-688128 FUN_004256a4 @ 0x004256ee..0x0042587b). It
+        // starts it with or without a narrator line and leaves it playing
+        // when there is none (0x004258c1, 0x00425a2b), which none of the
+        // data's 144 game overs meets: it is started only with the line.
+        let mut started = None;
+        if e.game.exe.build.game_over_voice_at_entry {
+            if let Some((pcm, apc)) = &voice {
+                started = Some(e.sys.mixer.play(pcm.clone(), false, e.voice_volume, 0));
+                e.emit(Event::Voice(apc.clone()));
+            }
+        }
+        // @ 0x00426616..0x00426647: NEWSOUND set, the NewSound sample fades.
         if game_over_fades_new_sound(e.vars.get("newsound")) {
             e.music.fade_out_new_sound(e.effects_volume());
         }
         let name = format!("IMAGES\\{}", game_over_image_name(req.n));
         let Some(img) = e.read(&name).await.and_then(|d| read_tga15(&d)) else {
             log::warn!("game over: cannot load {name}");
+            if let Some(v) = started {
+                e.sys.mixer.stop(v);
+            }
             return;
         };
         let mut frame = vec![0u16; N];
@@ -720,7 +749,6 @@ impl Dialogs {
             frame[y * SCREEN_W..y * SCREEN_W + n]
                 .copy_from_slice(&img.pixels[y * img.width..y * img.width + n]);
         }
-        let narrator = req.narrator.as_ref().filter(|(t, _)| !t.is_empty());
         // The narrator's subtitle (FUN_0042ffe8 / FUN_00430178, as a line's).
         if let (Some((text, _)), true) = (narrator, game_over_subtitle_drawn(e.subtitles)) {
             let font = self.subtitler(e).await;
@@ -744,21 +772,15 @@ impl Dialogs {
             section_play: e.section_play,
             ..VideoSkipState::default()
         };
-        let pcm = match narrator {
-            Some((_, letter)) => {
-                let apc = format!("WAV\\{}", game_over_voice_name(req.section, *letter));
-                let pcm = if e.game.big.contains(&apc) {
-                    e.read(&apc).await.and_then(|d| apc_pcm(&d))
-                } else {
-                    None
-                };
-                pcm.map(|p| (p, apc))
-            }
-            None => None,
-        };
-        if let Some((pcm, apc)) = pcm {
-            let v = e.sys.mixer.play(pcm, false, e.voice_volume, 0);
-            e.emit(Event::Voice(apc));
+        if let Some((pcm, apc)) = voice {
+            let v = match started {
+                Some(v) => v,
+                None => {
+                    let v = e.sys.mixer.play(pcm, false, e.voice_volume, 0);
+                    e.emit(Event::Voice(apc));
+                    v
+                }
+            };
             // @ 0x00426b0c: until the sample ends, a left press or Escape
             // (when it would open the menu).
             while !e.should_abort() {

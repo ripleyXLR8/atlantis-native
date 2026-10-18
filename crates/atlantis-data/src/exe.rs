@@ -74,6 +74,11 @@ pub struct ExeBuild {
     /// playing track (atlantis-cd-en-688128 FUN_00429044 @ 0x00429b12,
     /// 0x00429b85).
     pub music_first_value_rule: bool,
+    /// The game-over narrator's voice is loaded and started at the
+    /// screen's entry, before the image (atlantis-cd-en-688128 FUN_004256a4
+    /// @ 0x004256ee..0x0042587b); the reference starts it after the image
+    /// is shown (FUN_00426590).
+    pub game_over_voice_at_entry: bool,
 }
 
 /// The reference (a 2001 English build), the GOG build (a 1999 build, the
@@ -108,6 +113,7 @@ pub const BUILDS: [ExeBuild; 3] = [
         warp_cursor_steps: 2,
         load_picker_clamp: true,
         music_first_value_rule: false,
+        game_over_voice_at_entry: false,
     },
     ExeBuild {
         name: "atlantis-gog-714752",
@@ -136,6 +142,7 @@ pub const BUILDS: [ExeBuild; 3] = [
         warp_cursor_steps: 2,
         load_picker_clamp: true,
         music_first_value_rule: false,
+        game_over_voice_at_entry: false,
     },
     ExeBuild {
         name: "atlantis-cd-en-688128",
@@ -165,6 +172,7 @@ pub const BUILDS: [ExeBuild; 3] = [
         warp_cursor_steps: 1,
         load_picker_clamp: false,
         music_first_value_rule: true,
+        game_over_voice_at_entry: true,
     },
 ];
 
