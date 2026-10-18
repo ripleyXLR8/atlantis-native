@@ -55,9 +55,9 @@ Compressed images (`.zip`, `.7z`, `.chd`) must be extracted first.
 ### Supported editions
 
 The English CD (1997 and 2001 builds), the French CD (May and August
-1997), the German CD (August 1997), the Dutch CD (June 1997), the CD
-with Cryo's patch 1.01 (over the English, French, German or Dutch CD),
-and the GOG.com release in
+1997), the German CD (August 1997), the Dutch and Swedish CDs (June
+1997), the CD with Cryo's patch 1.01 (over the English, French, German,
+Dutch or Swedish CD), and the GOG.com release in
 English, French, German, Spanish and Italian. Another edition is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -256,8 +256,8 @@ picked folder on its first start.
   Sans, which has the metrics of the original's Arial (see
   [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French
   and German CDs'; the 1997 English CD's, the May 1997 French CD's and
-  the Dutch CD's are drawn with their own pixel font, as they did (the
-  accents included).
+  the Dutch and Swedish CDs' are drawn with their own pixel font, as they
+  did (the accents included).
 - The engine runs at a steady 60 steps per second; the original's loops
   run as fast as the machine allows.
 - The [enhancements](TECHNICAL.md#enhancements) on by default: the music loops

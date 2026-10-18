@@ -103,6 +103,37 @@ fn dutch_cd_with_patch_101() {
     assert!(!g.exe.build.startup_logo_rp);
 }
 
+#[test]
+fn swedish_cd_1997() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_SV1997") else {
+        eprintln!("ATLANTIS_DATA_SV1997 not set: skipped");
+        return;
+    };
+    assert_eq!(edition(&dir).unwrap(), "CD, Swedish (June 1997 build)");
+}
+
+/// The patch 1.01 executable installed over the Swedish CD
+/// (`ATLANTIS_DATA_PATCH101_SV`: the patch's atlantis.exe beside the
+/// Swedish BIGCD1..4.BIG): the patch's build, its interface French, its
+/// name entry and subtitles its own.
+#[test]
+fn swedish_cd_with_patch_101() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_PATCH101_SV") else {
+        eprintln!("ATLANTIS_DATA_PATCH101_SV not set: skipped");
+        return;
+    };
+    let g = Game::open(Arc::new(StdDir::new(&dir))).unwrap();
+    assert_eq!(g.exe.build.name, "atlantis-patch-fr-714240");
+    assert_eq!(
+        g.edition().to_string(),
+        "CD, patch 1.01, French (1999 build)"
+    );
+    assert!(!g.exe.build.name_entry_dos_letters && !g.exe.build.subtitle_cut_back_only);
+    // The Swedish archives: SELEMENU.TXT's "VÄLJ SPELARNAMN" (0x8e Ä).
+    let sel = g.big.read("SPRLIST\\SELEMENU.TXT").unwrap();
+    assert!(sel.windows(15).any(|w| w == b"V\x8eLJ SPELARNAMN"));
+}
+
 /// The patch 1.01 executable installed over the German CD
 /// (`ATLANTIS_DATA_PATCH101_DE`: the patch's atlantis.exe beside the German
 /// BIGCD1..4.BIG): the patch's build, its interface French.

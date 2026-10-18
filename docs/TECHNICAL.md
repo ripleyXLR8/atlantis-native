@@ -193,7 +193,8 @@ which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
 thresholded to one bit, so every platform draws the same pixels; the text
 bytes are read in the release's code page (`TextCodePage` in
 `crates/atlantis-data/src/text.rs`): Windows-1252, but for the May 1997
-French CD and the Dutch CD, whose texts are in the DOS code page 850.
+French CD and the Dutch and Swedish CDs, whose texts are in the DOS code
+page 850.
 The font is bundled
 in `assets/fonts`.
 
@@ -208,17 +209,22 @@ way, ten of its rows wider than the screen; its texts are in the DOS code
 page, whose accented letters (`0x82` é, `0x85` à...) are those of the
 font's IBM PC glyphs, so the accents show as they should, byte for byte.
 So does the Dutch CD (`é ë è ï ú`), eight of its rows wider than the
-screen.
+screen. The Swedish CD (`ä å ö Ä Å Ö é`) breaks its rows another way: always
+at the last space before the end of the 75-byte window, never at a space
+after it, so none of its rows is over 75 bytes or wider than the screen
+(`split_subtitle_1997_back`). A run of 75 bytes without a space, which no
+shipped text has, makes that original fault; the port cuts it at 75
+bytes.
 Whatever shows these texts otherwise (the outline font, tests) reads
 them as code page 850.
 
 ### Game builds
 
-The port knows eight builds of `atlantis.exe` (`ExeBuild` in
+The port knows nine builds of `atlantis.exe` (`ExeBuild` in
 `crates/atlantis-data/src/exe.rs`), found by their size and the PE
 header's timestamp (the 2001 build and the patch 1.01 build have the same
-size, as have the August 1997 French and German builds, and the English
-and Dutch 1997 retail builds); their tables are read where each build has them, and the code
+size, as have the August 1997 French and German builds, and the English,
+Dutch and Swedish 1997 retail builds); their tables are read where each build has them, and the code
 differences that change what a player sees follow the build:
 
 | | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French and German retail CDs (August 1997) | French retail CD (May 1997) |
@@ -262,6 +268,18 @@ plays the R&P Electronic Media logo (`UBB_VUE\LOGORP.HNM`, 60 frames,
 silent) after the Cryo logo and its one-second pause, before PREINTRO,
 at the cinema pace. Its texts are in the DOS code page.
 
+The Swedish retail CD's build (June 1997) is the English May 1997
+build's code too, with every table at the English build's address: its
+new-player row reads `Ny spelare`. It has the Dutch build's name entry
+(0x20 to 0xa7, kept as typed) but not its R&P logo, and three changes
+of its own: the subtitle rows are broken at the last space of the
+75-byte window (see [Subtitles](#subtitles)); the name entry also takes
+`Ä Å Ö ä å ö` and stores them as the DOS code page bytes the player-name
+font draws (0x8e 0x8f 0x99 0x84 0x86 0x94); the LOAD scrollbar's knob
+starts at y 0 but is clamped at the bar's top, and a row click counts
+the list's offset, as in the later builds. Its texts are in the DOS code
+page.
+
 The original opens one archive at a time, the inserted disc's. What it
 loads at start-up (the menus, the CD and error texts, EPI.TXT, the menu
 font, PREINTRO.TGA, and in the 2001, 1999 and August 1997 builds
@@ -269,10 +287,12 @@ CREDITS.TXT) comes from the disc it starts from, disc 1 in the port;
 what it reads when it uses it comes from the disc in the drive: the
 player-name fonts FONTMIN / FONTMIN2 (on entering the LOAD list and the
 player screen) and, in the 1997 builds of the English May code (English,
-French May, Dutch), CREDITS.TXT. The archive keeps the copies of each
+French May, Dutch, Swedish), CREDITS.TXT. The archive keeps the copies of each
 disc (`BigArchive::set_disc_copy`), and the port reads these members
-from the current disc's archive. Only the Dutch CD has copies that
-differ: its disc 2 holds an older revision (the menus at fixed places,
+from the current disc's archive. Only the Dutch CD has copies of these
+that differ (the Swedish discs 2 to 4 hold older CD texts, EPI.TXT and
+SELEMENU.TXT, which the original never shows, and the same CREDITS.TXT
+and FONTMIN fonts as disc 1): its disc 2 holds an older revision (the menus at fixed places,
 EPI.TXT's typos, `Musiek`, CREDITS.TXT one line shorter,
 PREINTRO.TGA without the R&P and Cryo logos, FONTMIN fonts with other
 `j` and `'` hotspots). So
@@ -282,12 +302,15 @@ disc.
 
 Cryo's Windows patch 1.01 (`AT1CDINT.EXE`, December 1999) replaces
 `atlantis.exe` (and `cryo.dll`) in a CD installation, English, French,
-German or Dutch, and keeps its `BIGCD1.BIG` … `BIGCD4.BIG`. Its executable is the
+German, Dutch or Swedish, and keeps its `BIGCD1.BIG` … `BIGCD4.BIG`. Its executable is the
 1999 build that GOG.com later edited for its release: everything in the
 GOG.com column applies to it, and its tables are at the GOG.com build's
 addresses. Its interface is French whatever the CD (the new-player row
 reads `NOUVEAU JOUEUR`), so the options menu shows *CD, patch 1.01,
-French (1999 build)*. GOG.com's own edits of that build (no pause when
+French (1999 build)*. Over the Dutch or Swedish CD, whose texts are in
+the DOS code page, it draws them as Windows-1252, as it passes them to
+Windows: the accented letters show as other signs (the Swedish `ä` as
+`„`), and its name entry has no Swedish letters. GOG.com's own edits of that build (no pause when
 the window is inactive, no free-space checks, a delay before each row
 copy, no start-up CD scan, an immediate exit on closing) concern how the
 original runs on a later system, not the game; the port handles the
@@ -362,12 +385,15 @@ English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
 retail CD, `ATLANTIS_DATA_FR1997_MAY` one of the May 1997 French retail CD
 (the first pressing), `ATLANTIS_DATA_DE1997` one of the German retail CD,
 `ATLANTIS_DATA_NL1997` one of the Dutch retail CD,
+`ATLANTIS_DATA_SV1997` one of the Swedish retail CD,
 `ATLANTIS_DATA_PATCH101` a CD installation with the patch 1.01
 executable, `ATLANTIS_DATA_PATCH101_DE` the patch's `atlantis.exe` beside
-the German CD's archives, `ATLANTIS_DATA_PATCH101_NL` the same beside the
-Dutch CD's, `ATLANTIS_ISO_FR` / `ATLANTIS_ISO_DE` / `ATLANTIS_BIN_EN` /
-`ATLANTIS_BIN_NL` folders of the French and German CDs' ISO images and
-the English and Dutch CDs' raw .bin images (for the disc-image reader),
+the German CD's archives, `ATLANTIS_DATA_PATCH101_NL` /
+`ATLANTIS_DATA_PATCH101_SV` the same beside the Dutch / Swedish CD's,
+`ATLANTIS_ISO_FR` / `ATLANTIS_ISO_DE` / `ATLANTIS_ISO_SV` /
+`ATLANTIS_BIN_EN` / `ATLANTIS_BIN_NL` folders of the French, German and
+Swedish CDs' ISO images and the English and Dutch CDs' raw .bin images
+(for the disc-image reader),
 `ATLANTIS_ISO_UNKNOWN` a folder of images of an edition not supported
 (the report test, skipped when the edition opens), `ATLANTIS_GOG` a folder of the GOG.com languages'
 trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
@@ -377,7 +403,7 @@ installation, for the tests of those builds:
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
 ATLANTIS_DATA_FR1997=/path/to/fr1997 ATLANTIS_DATA_FR1997_MAY=/path/to/fr1997may \
 ATLANTIS_DATA_DE1997=/path/to/de1997 ATLANTIS_DATA_NL1997=/path/to/nl1997 \
-ATLANTIS_DATA_PATCH101=/path/to/patch101 \
+ATLANTIS_DATA_SV1997=/path/to/sv1997 ATLANTIS_DATA_PATCH101=/path/to/patch101 \
 cargo test --release
 ```
 

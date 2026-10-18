@@ -1,6 +1,6 @@
-//! The game read straight from its CD images: the French CD's ISO images
-//! and the German CD's ISO images (2048-byte sectors), the English and
-//! Dutch CDs' raw images (2352-byte sectors).
+//! The game read straight from its CD images: the French, German and
+//! Swedish CDs' ISO images (2048-byte sectors), the English and Dutch CDs'
+//! raw images (2352-byte sectors).
 use std::sync::Arc;
 
 use atlantis_data::disc_image::DiscSet;
@@ -57,5 +57,21 @@ fn dutch_cd_raw_images() {
         g.big.set_disc_copy(None);
         let disc1 = g.big.read("SPRLIST\\CREDITS.TXT").unwrap();
         assert_eq!((disc1.len(), disc2.len()), (5034, 5031));
+    }
+}
+
+#[test]
+fn swedish_cd_iso_images() {
+    if let Some(g) = open("ATLANTIS_ISO_SV") {
+        assert_eq!(g.exe.build.name, "atlantis-cd-sv-688128");
+        assert_eq!(g.edition().to_string(), "CD, Swedish (June 1997 build)");
+        assert!(!g.big.contains("UBB_VUE\\LOGORP.HNM"));
+        // Disc 2's own revision of SELEMENU.TXT, read from its image.
+        g.big.set_disc_copy(Some(2));
+        let disc2 = g.big.read("SPRLIST\\SELEMENU.TXT").unwrap();
+        g.big.set_disc_copy(None);
+        let disc1 = g.big.read("SPRLIST\\SELEMENU.TXT").unwrap();
+        assert!(disc1.windows(11).any(|w| w == b"SPELARNAMN\r"));
+        assert!(disc2.windows(11).any(|w| w == b"SPELARNAMM\r"));
     }
 }

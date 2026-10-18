@@ -37,7 +37,7 @@ use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;
 use crate::music::apc_pcm;
 use crate::scripts::{DialogPresenter, GameOverRequest, LineOutcome, LineRequest};
-use crate::subtitles::{BitmapFont, SubtitleFont, Subtitler};
+use crate::subtitles::{BitmapBreaker, BitmapFont, SubtitleFont, Subtitler};
 use crate::sys::{Input, Key, MouseButton};
 use crate::video_skip::VideoSkipState;
 use crate::warp::{DIALOG_CAM_FOV_DEG, SCREEN_H, SCREEN_W};
@@ -234,7 +234,15 @@ impl Dialogs {
                 .await
                 .and_then(|d| BitmapFont::new(&d))
             {
-                Some(f) => s = Some(Subtitler::Bitmap(std::sync::Arc::new(f))),
+                Some(f) => {
+                    // atlantis-cd-sv-688128 FUN_0042ea7c: the back space only.
+                    let breaker = if e.game.exe.build.subtitle_cut_back_only {
+                        BitmapBreaker::Back
+                    } else {
+                        BitmapBreaker::Nearest
+                    };
+                    s = Some(Subtitler::Bitmap(std::sync::Arc::new(f), breaker))
+                }
                 None => log::warn!("DIALOG\\FONTS.BIN missing: the subtitles in Arial"),
             }
         }

@@ -5,7 +5,8 @@
 //! retail CD's 1997 build, `ATLANTIS_DATA_FR1997` for the French retail
 //! CD's August 1997 build, `ATLANTIS_DATA_FR1997_MAY` for its May 1997
 //! build, `ATLANTIS_DATA_DE1997` for the German retail CD's build,
-//! `ATLANTIS_DATA_NL1997` for the Dutch retail CD's build and
+//! `ATLANTIS_DATA_NL1997` for the Dutch retail CD's build,
+//! `ATLANTIS_DATA_SV1997` for the Swedish retail CD's build and
 //! `ATLANTIS_DATA_PATCH101` for a CD install with Cryo's patch 1.01);
 //! skipped without it.
 
@@ -13,7 +14,7 @@ mod common;
 
 use common::{
     game, game_1997, game_de1997, game_fr1997, game_fr1997_may, game_nl1997, game_patch101,
-    golden_map, md5_hex,
+    game_sv1997, golden_map, md5_hex,
 };
 
 fn joined(names: &[String]) -> String {
@@ -385,4 +386,124 @@ fn dutch_archives_disc_copies() {
     };
     assert!(son(2).windows(6).any(|w| w == b"Musiek"));
     assert!(son(1).windows(6).any(|w| w == b"Muziek"));
+}
+
+/// The Swedish 1997 build (atlantis-cd-sv-688128): the English May build's
+/// code, DGROUP layout and every table at its address with its bytes; its
+/// own PE stamp; the player row "Ny spelare" (no '#', also the label, at
+/// 0x0048654a). Every flag is en-688128's but the name entry (0x20..0xa7,
+/// case kept, the Swedish letters as DOS bytes), the LOAD clamp (the knob
+/// still at y 0), the subtitle breaker (back space only) and the DOS code
+/// page of its texts.
+#[test]
+fn tables_of_the_swedish_1997_build() {
+    let Some(sv) = game_sv1997("tables_of_the_swedish_1997_build") else {
+        return;
+    };
+    let exe = &sv.exe;
+    assert_eq!(exe.build.name, "atlantis-cd-sv-688128");
+    check_sound_tables(&sv);
+    assert_eq!(exe.new_player_marker, b"Ny spelare");
+    assert_eq!(exe.new_player_label, b"Ny spelare");
+    assert_eq!(exe.inventory_object_ids.len(), 51);
+    assert_eq!(exe.inventory_object_ids[39], 0);
+    assert_eq!(exe.guest_sprite_ids.len(), 9);
+    let en_build = atlantis_data::exe::BUILDS
+        .iter()
+        .find(|b| b.name == "atlantis-cd-en-688128")
+        .unwrap();
+    let mut b = *exe.build;
+    assert!(b.subtitle_cut_back_only && b.name_entry_dos_letters);
+    assert!(!b.upper_case_names && b.players_1997 && b.credits_read_per_run);
+    assert!(b.load_picker_clamp && !b.load_knob_starts_at_bar);
+    assert!(!b.startup_logo_rp && b.bitmap_subtitles);
+    assert_eq!(b.month, Some("June"));
+    assert_eq!(b.text_code_page, atlantis_data::TextCodePage::Dos850);
+    b.name = en_build.name;
+    b.pe_timestamp = en_build.pe_timestamp;
+    b.month = en_build.month;
+    b.upper_case_names = en_build.upper_case_names;
+    b.load_picker_clamp = en_build.load_picker_clamp;
+    b.text_code_page = en_build.text_code_page;
+    b.subtitle_cut_back_only = en_build.subtitle_cut_back_only;
+    b.name_entry_dos_letters = en_build.name_entry_dos_letters;
+    assert_eq!(&b, en_build);
+    if let Some(en) = game_1997("tables_of_the_swedish_1997_build (English 1997)") {
+        let e = &en.exe;
+        assert_eq!(exe.inventory_object_ids, e.inventory_object_ids);
+        assert_eq!(exe.guest_sprite_ids, e.guest_sprite_ids);
+        assert_eq!(exe.credit_widths, e.credit_widths);
+        assert_eq!(exe.music_names, e.music_names);
+        assert_eq!(exe.newsound_names, e.newsound_names);
+    }
+}
+
+/// The Swedish CD's archives: the members several discs carry are the same
+/// bytes on each, but for the CD texts (disc 4's differs from discs 2 and
+/// 3's, both older than disc 1's), EPI.TXT and SELEMENU.TXT (an older
+/// revision on discs 2..4). CREDITS.TXT and the FONTMIN fonts, which the
+/// original reads from the disc in the drive, are the same on every disc.
+#[test]
+fn swedish_archives_disc_copies() {
+    let Some(sv) = game_sv1997("swedish_archives_disc_copies") else {
+        return;
+    };
+    let big = &sv.big;
+    let mut names: Vec<String> = big.names().map(str::to_string).collect();
+    names.sort();
+    let mut differ = Vec::new();
+    let mut several = 0;
+    for n in &names {
+        let discs = big.discs_of(n);
+        if discs.len() < 2 {
+            continue;
+        }
+        several += 1;
+        let copies: Vec<Vec<u8>> = discs
+            .iter()
+            .map(|&d| {
+                big.set_disc_copy(Some(d));
+                big.read(n).unwrap()
+            })
+            .collect();
+        big.set_disc_copy(None);
+        let odd: Vec<u8> = discs
+            .iter()
+            .zip(&copies)
+            .filter(|(_, c)| *c != &copies[0])
+            .map(|(&d, _)| d)
+            .collect();
+        if !odd.is_empty() {
+            assert_eq!(discs, [1, 2, 3, 4], "{n}");
+            differ.push(format!("{n} {odd:?}"));
+        }
+    }
+    assert_eq!(several, 1292);
+    for n in [
+        "SPRITE\\2D\\FONTMIN.SPR",
+        "SPRITE\\2D\\FONTMIN2.SPR",
+        "SPRLIST\\CREDITS.TXT",
+    ] {
+        assert_eq!(big.discs_of(n), [1, 2, 3, 4], "{n}");
+    }
+    let want: Vec<String> = [
+        "SPRLIST\\CD1MENU.TXT [2, 3, 4]",
+        "SPRLIST\\CD2MENU.TXT [2, 3, 4]",
+        "SPRLIST\\CD3MENU.TXT [2, 3, 4]",
+        "SPRLIST\\CD4MENU.TXT [2, 3, 4]",
+        "SPRLIST\\EPI.TXT [2, 3, 4]",
+        "SPRLIST\\SELEMENU.TXT [2, 3, 4]",
+    ]
+    .map(String::from)
+    .to_vec();
+    assert_eq!(differ, want);
+    // CD1MENU: discs 2 and 3 share one revision, disc 4 another.
+    let cd1 = |d| {
+        big.set_disc_copy(Some(d));
+        let t = big.read("SPRLIST\\CD1MENU.TXT").unwrap();
+        big.set_disc_copy(None);
+        t
+    };
+    assert_eq!(cd1(2), cd1(3));
+    assert_ne!(cd1(2), cd1(4));
 }

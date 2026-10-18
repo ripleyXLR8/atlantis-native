@@ -481,6 +481,36 @@ pub fn bitmap_line_y(i: usize, n: usize) -> i32 {
 /// A 75-byte window without a space would loop for ever in the original;
 /// no shipped text has one, and the port cuts it at 75 bytes.
 pub fn split_subtitle_1997(text: &[u8]) -> Vec<Vec<u8>> {
+    split_bitmap_rows(text, BitmapBreaker::Nearest)
+}
+
+/// atlantis-cd-sv-688128 FUN_0042ea7c: [`split_subtitle_1997`]'s window
+/// and scans, but every row is cut at the space found backwards (the
+/// length left less 75 - b per row; `0x0042eb50`, the forward choice
+/// removed), so no row is over 75 bytes.
+///
+/// A window whose only space is the row's own first byte gives the
+/// original a row of 0 bytes and no progress: it writes rows past its
+/// 8 x 0x55-byte buffer until it faults (under emulation; what a real
+/// machine does is [UNKNOWN]). No shipped text has such a run of 75 bytes
+/// without a space; the port cuts it at the window end (75 bytes), an
+/// implementation choice.
+pub fn split_subtitle_1997_back(text: &[u8]) -> Vec<Vec<u8>> {
+    split_bitmap_rows(text, BitmapBreaker::Back)
+}
+
+/// How a bitmap-subtitle row is cut (see [`ExeBuild::subtitle_cut_back_only`]).
+///
+/// [`ExeBuild::subtitle_cut_back_only`]: atlantis_data::exe::ExeBuild::subtitle_cut_back_only
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BitmapBreaker {
+    /// The nearer space, forward or back (atlantis-cd-en-688128 FUN_0042e970).
+    Nearest,
+    /// The space back from the window end (atlantis-cd-sv-688128 FUN_0042ea7c).
+    Back,
+}
+
+fn split_bitmap_rows(text: &[u8], breaker: BitmapBreaker) -> Vec<Vec<u8>> {
     let mut b = Vec::with_capacity(text.len() + 3);
     b.push(b' ');
     b.extend_from_slice(text);
@@ -522,7 +552,7 @@ pub fn split_subtitle_1997(text: &[u8]) -> Vec<Vec<u8>> {
                 break;
             }
         }
-        let (end, step) = if f < back {
+        let (end, step) = if f < back && breaker == BitmapBreaker::Nearest {
             (p + f, BITMAP_WINDOW + f)
         } else if p - back > start {
             (p - back, BITMAP_WINDOW - back)
@@ -544,7 +574,7 @@ pub fn split_subtitle_1997(text: &[u8]) -> Vec<Vec<u8>> {
 #[derive(Clone)]
 pub enum Subtitler {
     Gdi(std::rc::Rc<SubtitleFont>),
-    Bitmap(std::sync::Arc<BitmapFont>),
+    Bitmap(std::sync::Arc<BitmapFont>, BitmapBreaker),
 }
 
 impl Subtitler {
@@ -552,7 +582,7 @@ impl Subtitler {
     pub fn split(&self, text: &[u8]) -> Vec<Vec<u8>> {
         match self {
             Subtitler::Gdi(_) => split_subtitle(text),
-            Subtitler::Bitmap(_) => split_subtitle_1997(text),
+            Subtitler::Bitmap(_, breaker) => split_bitmap_rows(text, *breaker),
         }
     }
 
@@ -567,7 +597,7 @@ impl Subtitler {
     ) {
         match self {
             Subtitler::Gdi(f) => f.draw_subtitles(dst, width, height, lines, y_offset),
-            Subtitler::Bitmap(f) => f.draw_subtitles(dst, width, lines, y_offset),
+            Subtitler::Bitmap(f, _) => f.draw_subtitles(dst, width, lines, y_offset),
         }
     }
 
@@ -575,7 +605,7 @@ impl Subtitler {
     pub fn items(&self, lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
         match self {
             Subtitler::Gdi(f) => subtitle_items(lines, dx, dy, f.code_page()),
-            Subtitler::Bitmap(f) => {
+            Subtitler::Bitmap(f, _) => {
                 let mut items = Vec::with_capacity(2 * lines.len());
                 for (i, line) in lines.iter().enumerate() {
                     let y = bitmap_line_y(i, lines.len()) + dy;
@@ -663,6 +693,70 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0].len(), 100);
         assert_eq!(lines.concat().len(), 151);
+    }
+
+    /// The synthetic texts of the emulation of atlantis-cd-sv-688128
+    /// FUN_0042ea7c and atlantis-cd-en-688128 FUN_0042e970: the row lengths
+    /// of each (the leading space included).
+    #[test]
+    fn back_breaker_matches_original() {
+        let words = |w: &str, n: usize| vec![w; n].join(" ");
+        let fox = "The quick brown fox jumps over the lazy dog, then the lazy dog \
+                   wakes up and chases the fox around the field.";
+        let cases: [(String, &[usize], &[usize]); 8] = [
+            ("Short line.".into(), &[12], &[12]),
+            (
+                format!("{} ", words(&"y".repeat(49), 2)),
+                &[50, 51],
+                &[50, 51],
+            ),
+            ("x".repeat(74), &[75], &[75]),
+            (
+                format!("{} ", words(&"x".repeat(60), 3)),
+                &[61, 61, 62],
+                &[61, 61, 62],
+            ),
+            (words("word", 30), &[75, 75], &[75, 75]),
+            (words("abcdefghi", 25), &[70, 70, 70, 40], &[70, 70, 70, 40]),
+            (fox.into(), &[72, 37], &[76, 33]),
+            (
+                format!("{} {} ccc ddd", words("aaaaaaa", 9), "b".repeat(30)),
+                &[72, 39],
+                &[72, 39],
+            ),
+        ];
+        let lens = |rows: Vec<Vec<u8>>| rows.iter().map(Vec::len).collect::<Vec<_>>();
+        for (text, sv, en) in cases {
+            let t = text.as_bytes();
+            assert_eq!(lens(split_subtitle_1997_back(t)), sv, "{text}");
+            assert_eq!(lens(split_subtitle_1997(t)), en, "{text}");
+            assert_eq!(split_subtitle_1997_back(t).concat().len(), t.len() + 1);
+        }
+        let fox_rows = split_subtitle_1997_back(fox.as_bytes());
+        assert!(fox_rows[0].ends_with(b"wakes up"));
+        assert!(fox_rows[1].starts_with(b" and chases"));
+    }
+
+    /// A run of 75 bytes or more with no space (the original faults; no
+    /// shipped text has one): the port cuts it at the window end.
+    #[test]
+    fn back_breaker_cuts_a_spaceless_run_at_75() {
+        let lens = |n: usize| -> Vec<usize> {
+            split_subtitle_1997_back(&vec![b'x'; n])
+                .iter()
+                .map(Vec::len)
+                .collect()
+        };
+        assert_eq!(lens(75), [75, 1]);
+        assert_eq!(lens(81), [75, 7]);
+        assert_eq!(lens(86), [75, 12]);
+        assert_eq!(lens(200), [75, 75, 51]);
+        // A word past the window after a space: cut at the space, then at
+        // 75 bytes.
+        let text = format!("ab {}", "z".repeat(160));
+        let rows = split_subtitle_1997_back(text.as_bytes());
+        let l: Vec<usize> = rows.iter().map(Vec::len).collect();
+        assert_eq!(l, [3, 75, 75, 11]);
     }
 
     /// Line i of n at y = 0x1ce - (n - i + 1) * 14: one line at 434, lines
@@ -769,7 +863,7 @@ mod tests {
         let lit: Vec<usize> = (0..w * h).filter(|&i| hd[i] != 0).collect();
         assert_eq!(lit.len(), 9);
         assert_eq!((lit[0] % w, lit[0] / w), (13 * 3, 100 * 3));
-        let s = Subtitler::Bitmap(f);
+        let s = Subtitler::Bitmap(f, BitmapBreaker::Nearest);
         let items = s.items(&[b" A".to_vec()], 0, 0);
         assert_eq!(items.len(), 2);
         assert_eq!((items[0].x, items[0].y), (6, bitmap_line_y(0, 1) + 1));

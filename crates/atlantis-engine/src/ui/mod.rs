@@ -331,7 +331,9 @@ impl Engine {
     /// picker and the player screen load them on entry
     /// (atlantis-cd-en-714240 FUN_0041cf78 @ 0x0041cfc2, FUN_0041dea4 @
     /// 0x0041def3; atlantis-cd-nl-688128 FUN_0041c9e0 @
-    /// 0x0041ca29..0x0041caaa, FUN_0041d70c @ 0x0041d75b..0x0041d7c3).
+    /// 0x0041ca29..0x0041caaa, FUN_0041d70c @ 0x0041d75b..0x0041d7c3;
+    /// atlantis-cd-sv-688128 FUN_0041c9b0 @ 0x0041ca0d / 0x0041ca75,
+    /// FUN_0041d704 @ 0x0041d766 / 0x0041d7ce).
     /// Read again only when that copy is not the one loaded.
     pub async fn load_fontmin_from_current_disc(&mut self) {
         const FONTMIN: &str = "SPRITE\\2D\\FONTMIN.SPR";

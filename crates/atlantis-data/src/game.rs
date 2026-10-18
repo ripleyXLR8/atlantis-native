@@ -109,9 +109,9 @@ impl Game {
     /// build from its player-screen row (the five GOG languages share one
     /// executable; only this string differs). The 1997 builds' rows have no
     /// '#': "New Player" (English), "NOUVEAU JOUEUR" (French), "NEUER
-    /// SPIELER" (German), "Nieuwe speler" (Dutch). The 1.01
-    /// patch's executable is French ("#NOUVEAU JOUEUR") over whichever CD it
-    /// was installed on: the language is its interface's.
+    /// SPIELER" (German), "Nieuwe speler" (Dutch), "Ny spelare" (Swedish).
+    /// The 1.01 patch's executable is French ("#NOUVEAU JOUEUR") over
+    /// whichever CD it was installed on: the language is its interface's.
     pub fn edition(&self) -> Edition {
         let name = self.exe.build.name;
         let marker = self.exe.new_player_marker.as_slice();
@@ -122,6 +122,8 @@ impl Game {
             Some("German")
         } else if starts(b"Nieuwe speler") {
             Some("Dutch")
+        } else if starts(b"Ny spelare") {
+            Some("Swedish")
         } else if starts(b"#NUEVO") {
             Some("Spanish")
         } else if starts(b"#NUOVO") {

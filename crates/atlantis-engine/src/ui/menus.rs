@@ -20,8 +20,8 @@ use atlantis_data::sprite::read_tga15;
 use super::credits::{credits_events, CreditsEvent};
 use super::layout::{
     font_min_load_list_width, menu_grid_hit, menu_number, menu_volume_from_knob, menu_walk_hit,
-    name_key_code, spell_sharp_s, subtitle_toggle_click, walk_menu_text, FontMin, LoadPickerScroll,
-    MenuWalk,
+    name_entry_byte, spell_sharp_s, subtitle_toggle_click, walk_menu_text, FontMin,
+    LoadPickerScroll, MenuWalk,
 };
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
@@ -205,6 +205,7 @@ impl Engine {
         let mut selected: Option<usize> = None;
         let mut typed: Option<Vec<u8>> = None; // on the "new player" row
         let upper_case = self.game.exe.build.upper_case_names;
+        let dos_letters = self.game.exe.build.name_entry_dos_letters;
         let list_font = if self.game.exe.build.players_1997 {
             FontMin::PlayerList1997
         } else {
@@ -239,16 +240,17 @@ impl Engine {
             // the last one is replaced; backspace restores a dot (so does
             // atlantis-cd-fr-687104 FUN_0041d45c @ 0x0041d847). The English
             // 1997 build takes 0x20..0x7a and stores a..z as A..Z
-            // (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1..0x0041daf8).
+            // (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1..0x0041daf8);
+            // the Swedish build also stores `Ä Å Ö ä å ö` as DOS code page
+            // bytes (atlantis-cd-sv-688128 FUN_0041d704 @
+            // 0x0041dafa..0x0041dbe9; see name_entry_byte).
             if let Some(buf) = typed.as_mut() {
                 for &c in &mi.chars {
-                    let mut code = name_key_code(c);
-                    let last = if upper_case { 0x7a } else { 0xa7 };
-                    if !(0x20..=last).contains(&code) || (buf.is_empty() && code == b' ') {
+                    let Some(code) = name_entry_byte(c, upper_case, dos_letters) else {
                         continue;
-                    }
-                    if upper_case {
-                        code = code.to_ascii_uppercase();
+                    };
+                    if buf.is_empty() && code == b' ' {
+                        continue;
                     }
                     if buf.len() >= NAME_MAX_CHARS {
                         buf.pop();

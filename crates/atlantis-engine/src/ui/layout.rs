@@ -647,9 +647,72 @@ pub fn name_key_code(c: char) -> u8 {
         .map_or(0, |&(_, b)| b)
 }
 
+/// The byte the name entry stores for a typed character, `None` when it is
+/// refused (the leading-space and length rules aside). `upper_case`: the
+/// English 1997 build's 0x20..0x7a with a..z stored as A..Z
+/// (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1..0x0041daf8); else
+/// 0x20..0xa7 as typed (FUN_0041dea4). `dos_letters`: the Swedish build
+/// also takes the Windows-1252 `Ä Å Ö ä å ö` and stores the DOS code page
+/// bytes FONTMIN draws (atlantis-cd-sv-688128 FUN_0041d704 @
+/// 0x0041dafa..0x0041dbe9: 0xc4 -> 0x8e, 0xc5 -> 0x8f, 0xd6 -> 0x99,
+/// 0xe4 -> 0x84, 0xe5 -> 0x86, 0xf6 -> 0x94).
+pub fn name_entry_byte(c: char, upper_case: bool, dos_letters: bool) -> Option<u8> {
+    let code = name_key_code(c);
+    if dos_letters {
+        const LETTERS: [(u8, u8); 6] = [
+            (0xc4, 0x8e),
+            (0xc5, 0x8f),
+            (0xd6, 0x99),
+            (0xe4, 0x84),
+            (0xe5, 0x86),
+            (0xf6, 0x94),
+        ];
+        if let Some(&(_, b)) = LETTERS.iter().find(|&&(w, _)| w == code) {
+            return Some(b);
+        }
+    }
+    let last = if upper_case { 0x7a } else { 0xa7 };
+    if !(0x20..=last).contains(&code) {
+        return None;
+    }
+    Some(if upper_case {
+        code.to_ascii_uppercase()
+    } else {
+        code
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The three name entry rules: the English 1997 build's, the others',
+    /// the Swedish build's letters.
+    #[test]
+    fn name_entry_bytes() {
+        let typed = |s: &str, upper, dos| -> Vec<Option<u8>> {
+            s.chars().map(|c| name_entry_byte(c, upper, dos)).collect()
+        };
+        assert_eq!(
+            typed("az{\u{e9}", true, false),
+            [Some(b'A'), Some(b'Z'), None, None]
+        );
+        assert_eq!(
+            typed("az\u{a7}\u{a8}\u{e4}\u{2026}", false, false),
+            [Some(b'a'), Some(b'z'), Some(0xa7), None, None, Some(0x85)]
+        );
+        let sv = typed("\u{c4}\u{c5}\u{d6}\u{e4}\u{e5}\u{f6}", false, true);
+        assert_eq!(sv, [0x8e, 0x8f, 0x99, 0x84, 0x86, 0x94].map(Some));
+        // Other letters past 0xa7 stay refused; the range is the others'.
+        assert_eq!(
+            typed("\u{e9}\u{fc}\u{c9}az ", false, true),
+            [None, None, None, Some(b'a'), Some(b'z'), Some(b' ')]
+        );
+        // Code page 850 reads the stored bytes as the typed letters.
+        for (c, b) in "\u{c4}\u{c5}\u{d6}\u{e4}\u{e5}\u{f6}".chars().zip(sv) {
+            assert_eq!(atlantis_data::TextCodePage::Dos850.char_of(b.unwrap()), c);
+        }
+    }
 
     #[test]
     fn name_key_codes() {
