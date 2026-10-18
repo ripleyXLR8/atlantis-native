@@ -320,9 +320,25 @@ pub fn con_music_list(text: &[u8], pos: u32) -> Vec<u8> {
 /// 0x20, skips the playing track (`current` = index + 1, 0x00772915) and
 /// copies a track that is not there (its index goes to the result);
 /// DelMusik removes every listed track but the playing one.
-pub fn con_music_apply(load: bool, list: &[u8], current: i32, on_disk: &mut u32) -> Vec<u8> {
+///
+/// With `first_value_rule` (the 1997 build, atlantis-cd-en-688128
+/// FUN_00429044 @ 0x00429b12 / 0x00429b85) neither command does anything
+/// when its first value is the playing track. That build's DelMusik
+/// (FUN_0041ee78) also deletes the playing track's file, which is open
+/// then; whether the delete succeeds is not established, so the playing
+/// track stays as in the reference.
+pub fn con_music_apply(
+    load: bool,
+    list: &[u8],
+    current: i32,
+    on_disk: &mut u32,
+    first_value_rule: bool,
+) -> Vec<u8> {
     let mut copies = Vec::new();
     if list.is_empty() || (load && list[0] >= 0x20) {
+        return copies;
+    }
+    if first_value_rule && i32::from(list[0]) + 1 == current {
         return copies;
     }
     for &idx in list {

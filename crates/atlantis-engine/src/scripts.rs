@@ -923,11 +923,16 @@ impl Scripts {
                             // The narrator's voice is ATA<section><letter>,
                             // the letter counting the lines before it
                             // (FUN_00426590 @ 0x004267ea, 0x004268b2..).
+                            // The 1997 build takes the executor's current
+                            // letter (atlantis-cd-en-688128 FUN_004256a4 @
+                            // 0x004256ee), the same file for every game
+                            // over of the shipped scripts.
                             let mut narrator = con_game_over_narrator(&sec.items, i)
                                 .map(|l| (l.text.clone(), con_track_letter(line_idx)));
                             // The 1999 build: the second death in a section
                             // plays the next narrator line.
-                            // The 2001 build with the restored content too.
+                            // The 2001 and 1997 builds with the restored
+                            // content too.
                             let alt = e.game.exe.build.alt_game_over_narration
                                 || e.enhancements().restored_content;
                             if let (Some((text, letter)), true) = (narrator.as_mut(), alt) {

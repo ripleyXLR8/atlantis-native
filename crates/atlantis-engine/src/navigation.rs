@@ -35,8 +35,17 @@ use crate::warp::{SCREEN_H, SCREEN_W};
 /// held (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba).
 const VIEW_KEY_STEP: f64 = 0.034906;
 
-/// The cursor animation's step (the port's pace of `FUN_00422fcc`).
+/// The cursor animation's step (the port's pace of `FUN_00422fcc`), for
+/// the reference's two steps per warp frame (`FUN_0041bfa0` draws the
+/// cursor at 0x0041c48e and again at 0x0041c535).
 const CURSOR_STEP_MS: u64 = 80;
+
+/// The step for a build that advances the animation `steps` times per
+/// warp frame: the 1997 build draws it once (atlantis-cd-en-688128
+/// FUN_0041bbd8), so its animation runs at half the reference's rate.
+fn cursor_step_ms(steps: u8) -> u64 {
+    CURSOR_STEP_MS * 2 / u64::from(steps.clamp(1, 2))
+}
 
 /// What the loop read from the events of a frame.
 #[derive(Default)]
@@ -263,7 +272,7 @@ impl Engine {
             // nothing; with an object in hand, its animation over the icon.
             let now = self.sys.millis();
             if self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms {
-                self.cursor_next_ms = now + CURSOR_STEP_MS;
+                self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
                 let input = WarpCursorInput {
                     zone: action,
                     id: centre_perso,
@@ -526,6 +535,12 @@ mod tests {
     use crate::test_support::{button, with_engine};
     use std::cell::{Cell, RefCell};
     use std::rc::Rc;
+
+    #[test]
+    fn cursor_pace_per_build() {
+        assert_eq!(cursor_step_ms(2), CURSOR_STEP_MS);
+        assert_eq!(cursor_step_ms(1), 2 * CURSOR_STEP_MS);
+    }
 
     /// A timer section that moved the player while the bar was open (as a
     /// Vue= does: the arrival scan queued) on the bar's first frame; the

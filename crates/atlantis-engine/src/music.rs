@@ -822,7 +822,8 @@ impl Engine {
     pub async fn music_list_command(&mut self, load: bool, text: &[u8], pos: u32) {
         let list = con_music_list(text, pos);
         let mut on_disk = self.music.on_disk;
-        let copies = con_music_apply(load, &list, self.music.track_id, &mut on_disk);
+        let rule = self.game.exe.build.music_first_value_rule;
+        let copies = con_music_apply(load, &list, self.music.track_id, &mut on_disk, rule);
         for idx in copies {
             self.music_copy_through_screen_buffer(idx).await;
         }

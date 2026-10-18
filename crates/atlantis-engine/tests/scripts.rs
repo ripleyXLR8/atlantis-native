@@ -1452,11 +1452,32 @@ fn musik_lists_match_original() {
             &con_music_list(text.as_bytes(), p),
             current,
             &mut on_disk,
+            false,
         );
         let got: Vec<String> = got.iter().map(u8::to_string).collect();
         assert_eq!(got.join(","), copies, "{line}");
         assert_eq!(on_disk, bits(after), "{line}");
     }
+    // The 1997 build: nothing when the first value is the playing track
+    // (atlantis-cd-en-688128 FUN_00429044); otherwise as above.
+    let run97 = |line: &str, current: i32, before: &str| {
+        let text = format!("{line}\r\n/1\r\n");
+        let p = text.find('=').unwrap() as u32 + 1;
+        let mut on_disk = bits(before);
+        let list = con_music_list(text.as_bytes(), p);
+        let got = con_music_apply(
+            line.contains("loadmusik"),
+            &list,
+            current,
+            &mut on_disk,
+            true,
+        );
+        (got, on_disk)
+    };
+    assert_eq!(run97("/set(loadmusik=3,5)", 3, ""), (vec![], 0));
+    assert_eq!(run97("/set(loadmusik=3,5)", 5, ""), (vec![2], bits("2")));
+    assert_eq!(run97("/set(delmusik=3,5)", 3, "2,4"), (vec![], bits("2,4")));
+    assert_eq!(run97("/set(delmusik=3,5)", 1, "2,4"), (vec![], 0));
 }
 
 /// The music ring of the original with the position law measured under
