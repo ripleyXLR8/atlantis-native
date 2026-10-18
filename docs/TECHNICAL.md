@@ -73,8 +73,8 @@ Where the port may differ from the original by choice, `Options` holds an
 
 | Group | Default | What it changes |
 |---|---|---|
-| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it) |
-| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 build, a second death in a section plays the next narrator line, as the 1999 build does |
+| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); with the 1997 build, the hexagon puzzle always shows its pieces, as the later builds do |
+| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and 1997 builds, a second death in a section plays the next narrator line, as the 1999 build does |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
 `--original` turns all three off. Otherwise they are read from
@@ -95,7 +95,8 @@ F10, or `--hd`) the picture is made at the window's resolution:
 - the 3D talking heads, rasterised at that resolution with the
   projection scaled;
 - the subtitles (and the options menu's text), drawn from the font's
-  outlines at that resolution, smoothed;
+  outlines at that resolution, smoothed; the 1997 build's pixel font as
+  sharp blocks, each of its pixels the size of a 640x480 pixel;
 - the rest, the original's 640x480 art (the cursor, the inventory bar,
   the guests' portraits, the menus, the puzzles, the dialog videos'
   bodies, the videos), upscaled.
@@ -130,7 +131,10 @@ The options (options menu, F10; `settings.ini`):
   photographs, are upscaled bilinearly instead (the engine marks them),
   as the dialog videos' bodies are. Pixels shows them as the original
   mode does (nearest).
-- Sharp subtitles, On (default) or Off.
+- Sharp subtitles, On (default) or Off. With the 1997 build, whose
+  subtitles are an 8x8 pixel font, On draws its pixels as sharp blocks
+  (no outlines to draw from); Off upscales them with the rest of the
+  interface art (xBR when Interface is Smooth).
 - Widescreen, Off (default) or On. In a window wider than 4:3, the bars
   beside the picture show the panorama: the view is rendered with more
   tile columns on each side (`Warp::set_side_tiles`), whose grid points
@@ -171,11 +175,50 @@ original's pixels, which the tests check).
 
 ### Subtitles
 
-The original draws its subtitles with the system's Arial at 13 pixels, not
-smoothed. The port draws them with Liberation Sans, which has Arial's
-metrics, at the same size, rasterised by `ab_glyph` and thresholded to one
-bit, so every platform draws the same pixels; the text bytes are read as
-Windows-1252. The font is bundled in `assets/fonts`.
+The 2001 and GOG.com builds draw their subtitles with the system's Arial
+at 13 pixels, not smoothed. The port draws them with Liberation Sans,
+which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
+thresholded to one bit, so every platform draws the same pixels; the text
+bytes are read as Windows-1252. The font is bundled in `assets/fonts`.
+
+The 1997 English CD has no Windows text: it draws its subtitles with the
+8x8 pixel font `DIALOG\FONTS.BIN` of the game's archives (one glyph per
+byte, the IBM PC set), white over a black shadow, in rows 10 pixels apart
+broken in a 75-byte window, and the port does the same (`BitmapFont`,
+`split_subtitle_1997`). The original does not clip its rows: the three
+shipped rows wider than the screen go on at the left of the next pixel
+row, as they do here.
+
+### Game builds
+
+The port knows three builds of `atlantis.exe` (`ExeBuild` in
+`crates/atlantis-data/src/exe.rs`), found by their size; their tables are
+read where each build has them, and the code differences that change
+what a player sees follow the build:
+
+| | 2001 English CD | GOG.com (1999) | English retail CD (1997) |
+|---|---|---|---|
+| subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows |
+| SUBTITLES item | three-click cycle | three-click cycle | plain toggle |
+| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor |
+| Rhea always on camera 2 | yes | no | no |
+| second death in a section | same narrator line | next line | same line |
+| players.atl | 97 bytes | 97 bytes | 95 bytes; names in capitals, 0x20..0x7a |
+| hexagon puzzle pieces | always | always | with object 402 in hand or FLAGTEMP6 = 2 |
+| ogre queen reveal | 3 frames of 1 s | 3 frames of 1 s | 5 frames of 0.375 s |
+| rat puzzle pass | 5 ticks after each | 5 ticks after each | a 5-tick deadline |
+| warp cursor animation | two steps a frame | two steps a frame | one step a frame |
+| LOAD scrollbar (12+ checkpoints) | knob from the bar's top | knob from the bar's top | knob from y 0, not clamped |
+| LOADMUSIK / DELMUSIK | as listed | as listed | nothing when the first track plays |
+
+The port's cursor animation steps every 80 ms for the two steps a frame
+of the later builds, every 160 ms for the 1997 build. Where the analysis
+of the 1997 build leaves an effect open, the port keeps the 2001 build's
+behaviour: its DelMusik also deletes the playing track's (open) file, its
+rat puzzle's trajectory search past the end of a trajectory, a LOAD row
+past the list. Its game-over narration is started at entry from the
+current dialog letter, which is the 2001 build's letter for every game
+over of the shipped scripts.
 
 ### The web build
 
@@ -194,10 +237,14 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 ## Tests
 
 Tests that need the game files read the game directory from the
-`ATLANTIS_DATA` environment variable and are skipped without it:
+`ATLANTIS_DATA` environment variable (the 2001 English CD) and are
+skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
+English retail CD, `ATLANTIS_GOG` a folder of the GOG.com languages'
+trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
+installation, for the tests of those builds:
 
 ```sh
-ATLANTIS_DATA=/path/to/game cargo test --release
+ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 cargo test --release
 ```
 
 The expected values in the tests are digests and numbers computed by the

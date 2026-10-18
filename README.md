@@ -76,7 +76,11 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | Release | Languages | What to point it at |
 |---|---|---|
 | CD (2001 build) | English | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
+| CD, retail release (1997 build) | English | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
+
+Each build plays as it shipped: the 1997 English CD, for one, draws its
+subtitles in its own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
 
 The game you chose is shown in the window's title and at the foot of the
 options menu, e.g. *GOG.com, French (1999 build)*.
