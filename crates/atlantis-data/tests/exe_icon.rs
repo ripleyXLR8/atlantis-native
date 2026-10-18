@@ -1,4 +1,6 @@
 //! The icon read from the player's atlantis.exe.
+mod common;
+
 use atlantis_data::exe_icon::exe_icon;
 
 #[test]
@@ -31,5 +33,14 @@ fn icon_of_the_1997_build() {
     };
     let exe = std::fs::read(format!("{dir}/atlantis.exe")).unwrap();
     let icon = exe_icon(&exe).expect("an icon");
+    assert_eq!((icon.width, icon.height), (32, 32));
+}
+
+#[test]
+fn icon_of_the_french_1997_build() {
+    let Some(g) = common::game_fr1997("icon_of_the_french_1997_build") else {
+        return;
+    };
+    let icon = g.icon.expect("an icon");
     assert_eq!((icon.width, icon.height), (32, 32));
 }

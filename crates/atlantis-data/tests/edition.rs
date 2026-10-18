@@ -45,3 +45,12 @@ fn english_cd_1997() {
     };
     assert_eq!(edition(&dir).unwrap(), "CD, English (1997 build)");
 }
+
+#[test]
+fn french_cd_1997() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_FR1997") else {
+        eprintln!("ATLANTIS_DATA_FR1997 not set: skipped");
+        return;
+    };
+    assert_eq!(edition(&dir).unwrap(), "CD, French (1997 build)");
+}

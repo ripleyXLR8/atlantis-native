@@ -86,13 +86,13 @@ impl std::fmt::Display for Edition {
 impl Game {
     /// The release: the executable's build, and the language of the GOG
     /// build from its player-screen row (the five GOG languages share one
-    /// executable; only this string differs). The 1997 English build's row
-    /// is "New Player", without the '#'.
+    /// executable; only this string differs). The 1997 builds' rows have no
+    /// '#': "New Player" (English), "NOUVEAU JOUEUR" (French).
     pub fn edition(&self) -> Edition {
         let gog = self.exe.build.name.starts_with("atlantis-gog");
         let marker = self.exe.new_player_marker.as_slice();
         let starts = |p: &[u8]| marker.len() >= p.len() && &marker[..p.len()] == p;
-        let language = if starts(b"#NOUVEAU") {
+        let language = if starts(b"#NOUVEAU") || starts(b"NOUVEAU JOUEUR") {
             Some("French")
         } else if starts(b"#NEUE") {
             Some("German")

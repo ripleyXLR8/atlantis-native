@@ -41,12 +41,19 @@ pub struct ExeBuild {
     /// (counter 0x00496098); a plain toggle without it
     /// (atlantis-cd-en-688128 FUN_0041cfa4 @ 0x0041d01b).
     pub subtitle_click_cycle: bool,
-    /// The 1997 player list (atlantis-cd-en-688128): names typed 0x20..0x7a
-    /// with a..z stored upper case (FUN_0041d6d0 @ 0x0041dab1), no '#' rule
-    /// in the list (FUN_0041fff4), a 95-byte players.atl (5 chapters, 5
-    /// letters: FUN_0041d6d0, FUN_0041e030, FUN_0042c164), the rows after
-    /// the last not cleared by a deletion (FUN_0041e030).
+    /// The 1997 player list (atlantis-cd-en-688128, atlantis-cd-fr-687104):
+    /// no '#' rule in the list (en-688128 FUN_0041fff4, fr-687104
+    /// FUN_0041fd6c), a 95-byte players.atl (5 chapters, 5 letters:
+    /// en-688128 FUN_0041d6d0, FUN_0041e030, FUN_0042c164; fr-687104 reader
+    /// WinMain @ 0x00418d29, writers FUN_0041d45c, FUN_0041dda0,
+    /// FUN_0042bf74), the rows after the last not cleared by a deletion
+    /// (en-688128 FUN_0041e030, fr-687104 FUN_0041dda0).
     pub players_1997: bool,
+    /// Names typed 0x20..0x7a with a..z stored upper case
+    /// (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1); else 0x20..0xa7,
+    /// case kept (FUN_0041dea4; atlantis-cd-fr-687104 FUN_0041d45c @
+    /// 0x0041d847).
+    pub upper_case_names: bool,
     /// FUN_004406fc @ 0x0044076e: OBJETENMAIN set to 402 before the test,
     /// so the hexagon pieces are always placed (atlantis-cd-en-688128
     /// FUN_0043c570 tests the object the player holds).
@@ -65,10 +72,16 @@ pub struct ExeBuild {
     /// reference (FUN_0041bfa0 @ 0x0041c48e..0x0041c535), one in
     /// atlantis-cd-en-688128 (FUN_0041bbd8).
     pub warp_cursor_steps: u8,
-    /// FUN_0041cf78: the LOAD scrollbar knob starts at y 0x7b and is
-    /// clamped there (0x0041d1fa, 0x0041d2d0), and a row click counts the
-    /// scroll offset; atlantis-cd-en-688128 FUN_0041c9a8 starts it at 0,
-    /// does not clamp, and tests the row alone.
+    /// FUN_0041cf78 @ 0x0041d1fa: the LOAD scrollbar knob starts at y 0x7b;
+    /// at 0 in atlantis-cd-en-688128 (FUN_0041c9a8 @ 0x0041cc23) and
+    /// atlantis-cd-fr-687104 (FUN_0041c708 @ 0x0041c98a).
+    pub load_knob_starts_at_bar: bool,
+    /// FUN_0041cf78: a drag above the LOAD bar clamps the knob to y 0x7b
+    /// (0x0041d2d0), and a row click tests row + offset < count
+    /// (0x0041d37b); so does atlantis-cd-fr-687104 (FUN_0041c708 @
+    /// 0x0041ca60..0x0041ca76, 0x0041cb0b..0x0041cb1b), while
+    /// atlantis-cd-en-688128 FUN_0041c9a8 does not clamp and tests the row
+    /// alone.
     pub load_picker_clamp: bool,
     /// LOADMUSIK / DELMUSIK do nothing when their first value is the
     /// playing track (atlantis-cd-en-688128 FUN_00429044 @ 0x00429b12,
@@ -84,8 +97,9 @@ pub struct ExeBuild {
 /// The reference (a 2001 English build), the GOG build (a 1999 build, the
 /// same code for its five languages; its tables are 4 bytes further) and
 /// the English retail CD's build of May 1997 (its data segment 0x10000
-/// lower).
-pub const BUILDS: [ExeBuild; 3] = [
+/// lower) and the French retail CD's build of August 1997 (laid out as the
+/// English one, the sound table and player row 4 bytes lower).
+pub const BUILDS: [ExeBuild; 4] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
@@ -106,11 +120,13 @@ pub const BUILDS: [ExeBuild; 3] = [
         bitmap_subtitles: false,
         subtitle_click_cycle: true,
         players_1997: false,
+        upper_case_names: false,
         hexa_forces_402: true,
         queen_reveal: (3, 200),
         rat_deadline_pacing: false,
         rat_search_restart: true,
         warp_cursor_steps: 2,
+        load_knob_starts_at_bar: true,
         load_picker_clamp: true,
         music_first_value_rule: false,
         game_over_voice_at_entry: false,
@@ -135,11 +151,13 @@ pub const BUILDS: [ExeBuild; 3] = [
         bitmap_subtitles: false,
         subtitle_click_cycle: true,
         players_1997: false,
+        upper_case_names: false,
         hexa_forces_402: true,
         queen_reveal: (3, 200),
         rat_deadline_pacing: false,
         rat_search_restart: true,
         warp_cursor_steps: 2,
+        load_knob_starts_at_bar: true,
         load_picker_clamp: true,
         music_first_value_rule: false,
         game_over_voice_at_entry: false,
@@ -165,14 +183,65 @@ pub const BUILDS: [ExeBuild; 3] = [
         bitmap_subtitles: true,
         subtitle_click_cycle: false,
         players_1997: true,
+        upper_case_names: true,
         hexa_forces_402: false,
         queen_reveal: (5, 75),
         rat_deadline_pacing: true,
         rat_search_restart: false,
         warp_cursor_steps: 1,
+        load_knob_starts_at_bar: false,
         load_picker_clamp: false,
         music_first_value_rule: true,
         game_over_voice_at_entry: true,
+    },
+    // A 1997 build sharing most of atlantis-cd-en-688128's code, with the
+    // reference's GDI subtitles (FUN_0041a834, FUN_0042e84c, FUN_0042e9cc),
+    // name entry, ogre timing, rat pacing, music copy rules and LOAD clamp,
+    // and the GOG build's alternative game-over narrations.
+    ExeBuild {
+        name: "atlantis-cd-fr-687104",
+        size: 687_104,
+        year: 1997,
+        dgroup_vaddr: 0x8_0000,
+        dgroup_raw: 0x6_ba00,
+        music_va: 0x0048_5eec,
+        // WinMain @ 0x004190d9; the names in 0x004ab37c..0x004abb90.
+        sound_names_va: 0x0048_61cc,
+        sound_names_range: (0x004a_0000, 0x004b_0000),
+        // "NOUVEAU JOUEUR", no '#' (WinMain @ 0x00418da7, FUN_0041d45c).
+        new_player_va: 0x0048_6546,
+        inventory_va: 0x0048_6788,
+        guest_va: 0x0048_685c,
+        credit_widths_va: 0x0048_66d5,
+        marker_is_label: true,
+        // FUN_00421f40: no rule for ids 0x219 / 0x21a.
+        cursor_id_rule: false,
+        // FUN_00427240: no forced camera.
+        rhea_camera2: false,
+        // FUN_00425430: the per-section counter 0x006bccac
+        // (0x0042565f..0x00425719, + 1 @ 0x00425875).
+        alt_game_over_narration: true,
+        bitmap_subtitles: false,
+        // FUN_0041cd30: a plain toggle.
+        subtitle_click_cycle: false,
+        players_1997: true,
+        upper_case_names: false,
+        // FUN_0043c210: OBJETENMAIN not forced.
+        hexa_forces_402: false,
+        // FUN_0043eb5c @ 0x0043ecce..0x0043ece6.
+        queen_reveal: (3, 200),
+        // FUN_004356a0 @ 0x00435a92..0x00435aa5: 5 ticks after each pass.
+        rat_deadline_pacing: false,
+        // FUN_004348fc: the search not restarted.
+        rat_search_restart: false,
+        // FUN_0041b938.
+        warp_cursor_steps: 1,
+        load_knob_starts_at_bar: false,
+        load_picker_clamp: true,
+        // FUN_00428e64 acts whatever the playing track.
+        music_first_value_rule: false,
+        // FUN_00425430: the voice after the image (@ 0x0042559e..0x00425650).
+        game_over_voice_at_entry: false,
     },
 ];
 
@@ -197,7 +266,8 @@ pub struct ExeTables {
     pub build: &'static ExeBuild,
     /// Player-screen row marker and label (0x00496570; FUN_0041e8a8 /
     /// FUN_00420d8c read them by address), e.g. "#New Player"; the 1997
-    /// build's marker is its label, "New Player" (0x0048654a).
+    /// builds' marker is their label, "New Player" (atlantis-cd-en-688128
+    /// 0x0048654a), "NOUVEAU JOUEUR" (atlantis-cd-fr-687104 0x00486546).
     pub new_player_marker: Vec<u8>,
     pub new_player_label: Vec<u8>,
     /// Object id per OBJETS1.SPR sprite, up to the -1 terminator.
