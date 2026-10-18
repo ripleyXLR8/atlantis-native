@@ -64,6 +64,13 @@ jobs:
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp packaging/macos/Info.plist "$app/Contents/"
           cp target/release/atlantis-native "$app/Contents/MacOS/"
+          # The app's icon, from the project's 1024 px drawing.
+          set=AppIcon.iconset; mkdir -p $set
+          for s in 16 32 128 256 512; do
+            sips -z $s $s assets/icon/atlantis-native-1024.png --out $set/icon_${s}x${s}.png >/dev/null
+            sips -z $((2*s)) $((2*s)) assets/icon/atlantis-native-1024.png --out $set/icon_${s}x${s}@2x.png >/dev/null
+          done
+          iconutil -c icns $set -o "$app/Contents/Resources/AppIcon.icns"
           chmod +x "$app/Contents/MacOS/atlantis-native"
           cp README.md LICENSE dist/
           ln -s /Applications dist/Applications

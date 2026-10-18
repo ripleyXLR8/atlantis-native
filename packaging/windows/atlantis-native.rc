@@ -1,0 +1,3 @@
+// The program file's icon (Explorer, shortcuts): the project's own icon.
+// The window shows the icon of the player's atlantis.exe at run time.
+1 ICON "../../assets/icon/atlantis-native.ico"

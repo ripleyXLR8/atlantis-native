@@ -113,8 +113,9 @@ picked folder on its first start.
 
 ## The icon
 
-The window (title bar, taskbar, Alt+Tab) shows the icon of your own
-`atlantis.exe`, read at start-up like the executable's tables. The files
-we distribute have no icon (the game's pictures are not ours to
-distribute), so the program file and the macOS app keep the system's
-default icon.
+The program file (Windows Explorer, shortcuts) and the macOS app carry
+the project's own icon: a full moon over the sea with Atlantis' spiral
+tower (`assets/icon/`, drawn by `make_icon.py`). While the game runs, the
+window (title bar, taskbar, Alt+Tab) and the macOS Dock show the icon of
+your own `atlantis.exe`, read at start-up like the executable's tables
+(the game's pictures are not ours to distribute).

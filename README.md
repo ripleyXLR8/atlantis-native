@@ -162,6 +162,9 @@ writes its saves, settings and log to your own user folder.
 GNU General Public License, version 3 or later (see `LICENSE`). The code is
 derived from ScummVM's CryOmni3D engine, Copyright (C) the ScummVM team.
 
+The program's icon (`assets/icon/`, drawn by `make_icon.py`) is the
+project's own, under the same licence.
+
 The subtitle font, Liberation Sans Regular
 (`assets/fonts/LiberationSans-Regular.ttf`, Copyright (c) 2010 Google
 Corporation, Copyright (c) 2012 Red Hat, Inc.), is licensed under the SIL

@@ -43,3 +43,7 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = ["File", "FileList", "Blob", "Window", "Storage"] }
 console_error_panic_hook = "0.1"
 console_log = "1"
+
+[build-dependencies]
+# The Windows program file's icon resource (rc.exe or windres).
+embed-resource = "3"

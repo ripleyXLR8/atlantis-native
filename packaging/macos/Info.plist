@@ -7,6 +7,7 @@
   <key>CFBundleIdentifier</key><string>io.github.ripleyxlr8.atlantis-native</string>
   <key>CFBundleExecutable</key><string>atlantis-native</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundleVersion</key><string>0.1.0</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
