@@ -117,6 +117,9 @@ pub struct TextItem {
     pub max_w: i32,
     pub color: u16,
     pub text: Vec<u8>,
+    /// The 1997 build's bitmap font (its pixels drawn as sharp blocks),
+    /// instead of the outline font.
+    pub bitmap: Option<std::sync::Arc<crate::subtitles::BitmapFont>>,
 }
 
 /// The text of a frame, for the HD mode to draw at the output's
@@ -367,6 +370,18 @@ impl HdCompositor {
                 .get_or_insert_with(crate::subtitles::SubtitleFont::new);
             for t in f.texts {
                 for it in &t.items {
+                    if let Some(b) = &it.bitmap {
+                        b.draw_hd(
+                            out,
+                            stride,
+                            (ox, oy, dw, dh),
+                            &it.text,
+                            it.x,
+                            it.y,
+                            lut[usize::from(it.color)],
+                        );
+                        continue;
+                    }
                     font.draw_hd(
                         out,
                         stride,

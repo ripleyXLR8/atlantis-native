@@ -37,7 +37,7 @@ use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;
 use crate::music::apc_pcm;
 use crate::scripts::{DialogPresenter, GameOverRequest, LineOutcome, LineRequest};
-use crate::subtitles::{split_subtitle, SubtitleFont};
+use crate::subtitles::{BitmapFont, SubtitleFont, Subtitler};
 use crate::sys::{Input, Key, MouseButton};
 use crate::video_skip::VideoSkipState;
 use crate::warp::{DIALOG_CAM_FOV_DEG, SCREEN_H, SCREEN_W};
@@ -116,8 +116,16 @@ fn blit_centred(screen: &mut [u16], src: &[u16], w: usize, h: usize) {
 /// HD: the subtitle `lines` just drawn on the screen (`under` before,
 /// `after` with them; moved by (`dx`, `dy`)), for the front end to draw
 /// sharp (see [`crate::hd::HdText`]).
-fn record_subtitles(e: &Engine, under: &[u16], after: &[u16], lines: &[Vec<u8>], dx: i32, dy: i32) {
-    let items = crate::subtitles::subtitle_items(lines, dx, dy);
+fn record_subtitles(
+    e: &Engine,
+    font: &Subtitler,
+    under: &[u16],
+    after: &[u16],
+    lines: &[Vec<u8>],
+    dx: i32,
+    dy: i32,
+) {
+    let items = font.items(lines, dx, dy);
     e.sys.hd_text.borrow_mut().set(items, under, after);
     e.sys.hd_text_mark();
 }
@@ -163,6 +171,9 @@ pub struct Dialogs {
     /// OBJETS1.SPR: the object icons, for the given object.
     object_sprites: Option<Rc<Vec<SprSprite>>>,
     font: Option<Rc<SubtitleFont>>,
+    /// The subtitles of the build (the 1997 build's FONTS.BIN, read at
+    /// the first line).
+    subtitler: Option<Subtitler>,
 }
 
 impl Dialogs {
@@ -204,6 +215,29 @@ impl Dialogs {
         self.font
             .get_or_insert_with(|| Rc::new(SubtitleFont::new()))
             .clone()
+    }
+
+    /// The build's subtitles: the GDI Arial layout, or the 1997 build's
+    /// `DIALOG\FONTS.BIN` (atlantis-cd-en-688128 0x004191c2..0x004191f9
+    /// loads it at start-up; the reference's layout when it is missing).
+    async fn subtitler(&mut self, e: &Engine) -> Subtitler {
+        if let Some(s) = &self.subtitler {
+            return s.clone();
+        }
+        let mut s = None;
+        if e.game.exe.build.bitmap_subtitles {
+            match e
+                .read("DIALOG\\FONTS.BIN")
+                .await
+                .and_then(|d| BitmapFont::new(&d))
+            {
+                Some(f) => s = Some(Subtitler::Bitmap(std::sync::Arc::new(f))),
+                None => log::warn!("DIALOG\\FONTS.BIN missing: the subtitles in Arial"),
+            }
+        }
+        let s = s.unwrap_or_else(|| Subtitler::Gdi(self.font()));
+        self.subtitler = Some(s.clone());
+        s
     }
 
     /// Draws the arrow cursor at the mouse.
@@ -340,7 +374,7 @@ impl Dialogs {
     /// or a left click (or Escape with a talking head).
     async fn play_single(&mut self, e: &mut Engine, l: &SingleLine<'_>) -> Played {
         let mut out = Played::default();
-        let font = self.font();
+        let font = self.subtitler(e).await;
         let objects = Self::sprites(e, &mut self.object_sprites, "OBJETS1.SPR").await;
 
         // The camera's FOV (0x00428a0e / 0x00428ad4), put back after.
@@ -369,7 +403,7 @@ impl Dialogs {
         }
 
         let sub_lines = if e.subtitles && !l.text.is_empty() {
-            split_subtitle(&latin1_bytes(l.text))
+            font.split(&latin1_bytes(l.text))
         } else {
             Vec::new()
         };
@@ -684,13 +718,13 @@ impl Dialogs {
         let narrator = req.narrator.as_ref().filter(|(t, _)| !t.is_empty());
         // The narrator's subtitle (FUN_0042ffe8 / FUN_00430178, as a line's).
         if let (Some((text, _)), true) = (narrator, game_over_subtitle_drawn(e.subtitles)) {
-            let font = self.font();
-            let lines = split_subtitle(&latin1_bytes(text));
+            let font = self.subtitler(e).await;
+            let lines = font.split(&latin1_bytes(text));
             let under = e.sys.hd_tile().is_some().then(|| frame.clone());
             font.draw_subtitles(&mut frame, SCREEN_W, SCREEN_H, &lines, 0);
             if let Some(under) = under {
                 // (it stands while the screen shows it, see Sys::hd_text)
-                record_subtitles(e, &under, &frame, &lines, 0, 0);
+                record_subtitles(e, &font, &under, &frame, &lines, 0, 0);
             }
         }
         e.sys.screen.borrow_mut().copy_from_slice(&frame);
@@ -879,7 +913,7 @@ impl LinePlayer {
     fn draw_frame(
         &mut self,
         e: &mut Engine,
-        font: &SubtitleFont,
+        font: &Subtitler,
         objects: &[SprSprite],
         sub_lines: &[Vec<u8>],
     ) {
@@ -1028,7 +1062,7 @@ impl LinePlayer {
                     blit_centred(&mut screen, &compose, w, h);
                     let bx = ((SCREEN_W as i32 - w as i32) / 2).max(0);
                     let by = ((SCREEN_H as i32 - h as i32) / 2).max(0);
-                    record_subtitles(e, &under, &screen, sub_lines, bx, off + by);
+                    record_subtitles(e, font, &under, &screen, sub_lines, bx, off + by);
                     return;
                 }
                 blit_centred(&mut screen, &compose, w, h);
@@ -1052,7 +1086,7 @@ impl LinePlayer {
         let under = (e.sys.hd_tile().is_some() && !sub_lines.is_empty()).then(|| bg.clone());
         font.draw_subtitles(&mut bg, SCREEN_W, SCREEN_H, sub_lines, 0);
         if let Some(under) = under {
-            record_subtitles(e, &under, &bg, sub_lines, 0, 0);
+            record_subtitles(e, font, &under, &bg, sub_lines, 0, 0);
         }
         e.sys.screen.borrow_mut().copy_from_slice(&bg);
         self.bg = bg;

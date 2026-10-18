@@ -1,5 +1,7 @@
 //! The dialog subtitles: the line breaks of `FUN_0042ffe8`, the layout of
-//! `FUN_00430178` and the font.
+//! `FUN_00430178` and the font; for the 1997 build (atlantis-cd-en-688128),
+//! its own: the 8x8 bitmap font `DIALOG\FONTS.BIN`, the breaks of
+//! `FUN_0042e970` and the layout of `FUN_0042eb3c` ([`BitmapFont`]).
 //!
 //! Translated from ScummVM's CryOmni3D Atlantis engine
 //! (`subtitle_layout.cpp`, `engine.cpp` `subtitleFont`, the subtitle draw of
@@ -331,6 +333,248 @@ impl SubtitleFont {
     }
 }
 
+/// The 1997 build's subtitle font: `DIALOG\FONTS.BIN` of the archives,
+/// 256 glyphs of 8 x 8 bytes, glyph = the raw byte, a non-zero byte a
+/// pixel (atlantis-cd-en-688128 loads it at start-up, 0x004191c2..
+/// 0x004191f9, and draws with FUN_00410800). The shapes are the IBM PC
+/// set.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BitmapFont {
+    glyphs: Vec<u8>,
+}
+
+/// The size of `DIALOG\FONTS.BIN`.
+pub const BITMAP_FONT_SIZE: usize = 256 * 64;
+
+/// The row height and the x of the 1997 layout (atlantis-cd-en-688128
+/// FUN_0042eb3c).
+pub const BITMAP_ROW_H: i32 = 10;
+
+/// FUN_0042e970's window: a text of fewer than 0x4c bytes (its leading
+/// space included) is one row; else rows of a 75-byte window.
+const BITMAP_WINDOW: usize = 0x4b;
+
+impl BitmapFont {
+    /// The font from the file's bytes, `None` for another size.
+    pub fn new(data: &[u8]) -> Option<BitmapFont> {
+        (data.len() == BITMAP_FONT_SIZE).then(|| BitmapFont {
+            glyphs: data.to_vec(),
+        })
+    }
+
+    /// Whether pixel (`col`, `row`) of glyph `b` is set.
+    fn on(&self, b: u8, col: usize, row: usize) -> bool {
+        self.glyphs[usize::from(b) * 64 + row * 8 + col] != 0
+    }
+
+    /// FUN_00410800: `text` at (x, y) on a buffer of `width` pixels per
+    /// row, 8 pixels per byte, the set pixels in `color`. There is no
+    /// clipping: the pixels are addressed as y * width + x, so a glyph
+    /// past the right edge goes on at the left of the next pixel row (the
+    /// port drops what falls outside the buffer).
+    pub fn draw(&self, dst: &mut [u16], width: usize, text: &[u8], x: i32, y: i32, color: u16) {
+        self.for_each_pixel(width, text, x, y, |i| {
+            if let Some(p) = usize::try_from(i).ok().and_then(|i| dst.get_mut(i)) {
+                *p = color;
+            }
+        });
+    }
+
+    /// The linear index (y * width + x) of each pixel FUN_00410800 sets.
+    fn for_each_pixel(&self, width: usize, text: &[u8], x: i32, y: i32, mut f: impl FnMut(i64)) {
+        let w = width as i64;
+        let mut base = i64::from(y) * w + i64::from(x);
+        for &b in text {
+            for row in 0..8 {
+                for col in 0..8 {
+                    if self.on(b, col, row) {
+                        f(base + row as i64 * w + col as i64);
+                    }
+                }
+            }
+            base += 8;
+        }
+    }
+
+    /// The subtitle rows over a picture of `width` x `height`
+    /// (atlantis-cd-en-688128 FUN_0042eb3c): row i of n, black at (6,
+    /// y + 1) then white at (5, y), y = 0x1ce - (n - i + 1) * 10.
+    /// `y_offset` moves them down (a picture taller than the screen).
+    pub fn draw_subtitles(&self, dst: &mut [u16], width: usize, lines: &[Vec<u8>], y_offset: i32) {
+        for (i, line) in lines.iter().enumerate() {
+            let y = bitmap_line_y(i, lines.len()) + y_offset;
+            self.draw(dst, width, line, SUBTITLE_X + 1, y + 1, SUBTITLE_SHADOW);
+            self.draw(dst, width, line, SUBTITLE_X, y, SUBTITLE_COLOR);
+        }
+    }
+
+    /// [`BitmapFont::draw`] for the HD mode: each font pixel of the
+    /// 640x480 screen a sharp block of the `dw` x `dh` pixels at (`ox`,
+    /// `oy`) of `out` (XRGB8888, `stride` pixels per row), in `color`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_hd(
+        &self,
+        out: &mut [u32],
+        stride: usize,
+        (ox, oy, dw, dh): (usize, usize, usize, usize),
+        text: &[u8],
+        x: i32,
+        y: i32,
+        color: u32,
+    ) {
+        let (sw, sh) = (crate::warp::SCREEN_W, crate::warp::SCREEN_H);
+        self.for_each_pixel(sw, text, x, y, |i| {
+            let Ok(i) = usize::try_from(i) else { return };
+            let (px, py) = (i % sw, i / sw);
+            if py >= sh {
+                return;
+            }
+            let (x0, x1) = (ox + px * dw / sw, ox + (px + 1) * dw / sw);
+            let (y0, y1) = (oy + py * dh / sh, oy + (py + 1) * dh / sh);
+            for row in y0..y1 {
+                if let Some(r) = out.get_mut(row * stride + x0..row * stride + x1) {
+                    r.fill(color);
+                }
+            }
+        });
+    }
+}
+
+/// atlantis-cd-en-688128 FUN_0042eb3c: row `i` of `n` at y = 0x1ce -
+/// (n - i + 1) * 10.
+pub fn bitmap_line_y(i: usize, n: usize) -> i32 {
+    0x1ce - (n as i32 - i as i32 + 1) * BITMAP_ROW_H
+}
+
+/// atlantis-cd-en-688128 FUN_0042e970 on the subtitle buffer (a space, the
+/// byte after ']', then the text): fewer than 0x4c bytes make one row;
+/// else, with p the end of a 75-byte window from the row's start, the
+/// scans forward (f) and back (b) from p to a space (a CR stops a scan
+/// one byte past it); if f < b the row runs to the forward space, else to
+/// the back one, and that space starts the next row; until the length
+/// left (less 75 + f, or 75 - b, per row) is not positive or under 0x4c.
+///
+/// The bytes after the text's NUL are what earlier lines left in the
+/// buffer; the port takes a CR there, as the emulation of the original
+/// (forward scans that reach the end of the text stop 2 bytes past it).
+/// A 75-byte window without a space would loop for ever in the original;
+/// no shipped text has one, and the port cuts it at 75 bytes.
+pub fn split_subtitle_1997(text: &[u8]) -> Vec<Vec<u8>> {
+    let mut b = Vec::with_capacity(text.len() + 3);
+    b.push(b' ');
+    b.extend_from_slice(text);
+    let len = b.len();
+    if len < BITMAP_WINDOW + 1 {
+        return vec![b];
+    }
+    b.extend_from_slice(b"\0\r");
+    // The byte at i (NUL past the buffer: the scans stop at the CR).
+    let at = |i: usize| b.get(i).copied().unwrap_or(0);
+    let mut lines = Vec::new();
+    let mut start = 0usize;
+    let mut remaining = len as i64;
+    loop {
+        if remaining < (BITMAP_WINDOW + 1) as i64 {
+            lines.push(b[start.min(len)..len].to_vec());
+            break;
+        }
+        let p = start + BITMAP_WINDOW;
+        let mut f = 0usize;
+        loop {
+            let c = at(p + f);
+            if c == b' ' {
+                break;
+            }
+            f += 1;
+            if c == b'\r' || p + f >= b.len() {
+                break;
+            }
+        }
+        let mut back = 0usize;
+        loop {
+            let c = at(p - back);
+            if c == b' ' {
+                break;
+            }
+            back += 1;
+            if c == b'\r' || back > p {
+                break;
+            }
+        }
+        let (end, step) = if f < back {
+            (p + f, BITMAP_WINDOW + f)
+        } else if p - back > start {
+            (p - back, BITMAP_WINDOW - back)
+        } else {
+            (p, BITMAP_WINDOW) // no space in the window: cut
+        };
+        lines.push(b[start..end.min(len)].to_vec());
+        remaining -= step as i64;
+        start = end;
+        if remaining <= 0 {
+            break;
+        }
+    }
+    lines
+}
+
+/// The subtitles of a build: the reference's GDI Arial layout, or the 1997
+/// build's bitmap font and layout.
+#[derive(Clone)]
+pub enum Subtitler {
+    Gdi(std::rc::Rc<SubtitleFont>),
+    Bitmap(std::sync::Arc<BitmapFont>),
+}
+
+impl Subtitler {
+    /// The rows of a subtitle text.
+    pub fn split(&self, text: &[u8]) -> Vec<Vec<u8>> {
+        match self {
+            Subtitler::Gdi(_) => split_subtitle(text),
+            Subtitler::Bitmap(_) => split_subtitle_1997(text),
+        }
+    }
+
+    /// The rows over a picture of `width` x `height` RGB565 pixels.
+    pub fn draw_subtitles(
+        &self,
+        dst: &mut [u16],
+        width: usize,
+        height: usize,
+        lines: &[Vec<u8>],
+        y_offset: i32,
+    ) {
+        match self {
+            Subtitler::Gdi(f) => f.draw_subtitles(dst, width, height, lines, y_offset),
+            Subtitler::Bitmap(f) => f.draw_subtitles(dst, width, lines, y_offset),
+        }
+    }
+
+    /// The text items for the HD mode (see [`subtitle_items`]).
+    pub fn items(&self, lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
+        match self {
+            Subtitler::Gdi(_) => subtitle_items(lines, dx, dy),
+            Subtitler::Bitmap(f) => {
+                let mut items = Vec::with_capacity(2 * lines.len());
+                for (i, line) in lines.iter().enumerate() {
+                    let y = bitmap_line_y(i, lines.len()) + dy;
+                    for (o, color) in [(1, SUBTITLE_SHADOW), (0, SUBTITLE_COLOR)] {
+                        items.push(crate::hd::TextItem {
+                            x: SUBTITLE_X + dx + o,
+                            y: y + o,
+                            max_w: i32::MAX,
+                            color,
+                            text: line.clone(),
+                            bitmap: Some(f.clone()),
+                        });
+                    }
+                }
+                items
+            }
+        }
+    }
+}
+
 /// The text items of [`SubtitleFont::draw_subtitles`] for the HD mode
 /// (see [`crate::hd::HdText`]): the shadow then the text of each line,
 /// moved by (`dx`, `dy`) on the screen.
@@ -345,6 +589,7 @@ pub fn subtitle_items(lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::Tex
                 max_w: SUBTITLE_WIDTH,
                 color,
                 text: line.clone(),
+                bitmap: None,
             });
         }
     }
@@ -480,6 +725,27 @@ mod tests {
             (6, subtitle_line_y(0, 2) + 1, 0)
         );
         assert_eq!((items[3].x, items[3].y), (5, subtitle_line_y(1, 2)));
+    }
+
+    /// HD: each pixel of the 8x8 font a sharp block at the output's
+    /// scale, where the 640x480 pixel is.
+    #[test]
+    fn bitmap_hd_draws_blocks() {
+        let mut data = vec![0u8; BITMAP_FONT_SIZE];
+        data[usize::from(b'A') * 64] = 1; // glyph 'A': its top-left pixel
+        let f = std::sync::Arc::new(BitmapFont::new(&data).unwrap());
+        assert!(BitmapFont::new(&data[1..]).is_none());
+        let (w, h) = (1920, 1440);
+        let mut hd = vec![0u32; w * h];
+        f.draw_hd(&mut hd, w, (0, 0, w, h), b" A", 5, 100, 0xffffff);
+        let lit: Vec<usize> = (0..w * h).filter(|&i| hd[i] != 0).collect();
+        assert_eq!(lit.len(), 9);
+        assert_eq!((lit[0] % w, lit[0] / w), (13 * 3, 100 * 3));
+        let s = Subtitler::Bitmap(f);
+        let items = s.items(&[b" A".to_vec()], 0, 0);
+        assert_eq!(items.len(), 2);
+        assert_eq!((items[0].x, items[0].y), (6, bitmap_line_y(0, 1) + 1));
+        assert!(items[1].bitmap.is_some());
     }
 
     #[test]
