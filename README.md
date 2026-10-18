@@ -174,6 +174,9 @@ Atlantis Native is free. If you enjoy it, you can
 the work going (more editions, fixes, the HD and widescreen modes).
 The link is also in the game: "Buy me a coffee..." in the F10 menu,
 and at the foot of the game library.
+Now and then (rarely, never more than once a week) a small thank-you
+screen at start-up offers the same links; "Don't show this again" turns
+it off (see the [guide](docs/GUIDE.md#the-support-screen)).
 
 ## Licence
 

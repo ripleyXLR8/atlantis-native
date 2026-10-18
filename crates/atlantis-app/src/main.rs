@@ -32,6 +32,12 @@
 //! once, with object `id` in hand, reports its FinPuzzle, then starts a new
 //! game.
 //!
+//! Now and then at start-up (after a few launches and two hours of play, at
+//! most once a week, never with a game folder or a testing option on the
+//! command line) a support screen thanks the player, with links to the
+//! project's pages; "Don't show this again" turns it off for good, and
+//! `--support-screen` shows it at once (see `atlantis_app::support`).
+//!
 //! The players, the checkpoints (the original's `players.atl` and
 //! `p<letter><chapter>.gam`) and `settings.ini` are kept in the per-user
 //! data folder (`~/.local/share/atlantis-native/<build>` on Linux,
@@ -52,6 +58,7 @@ fn main() {
         data_dir, error_box, first_start, init_log, install_panic_hook, open_game, try_open,
     };
     use atlantis_app::session::{shift_held, startup, Session, Startup};
+    use atlantis_app::support::{should_show, unix_now, SupportState};
     use atlantis_app::{start_game, App};
     use atlantis_engine::audio::Mixer;
     use atlantis_engine::sys::Sys;
@@ -84,6 +91,7 @@ fn main() {
     let force_hd = flag("--hd") || force_wide;
     let new_game = flag("--new-game");
     let launcher = flag("--launcher");
+    let force_support = flag("--support-screen");
     let mut value = |name: &str| -> Option<i32> {
         let i = args.iter().position(|a| a == name)?;
         args.remove(i);
@@ -165,7 +173,7 @@ fn main() {
         return;
     }
 
-    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--launcher] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]";
+    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--launcher] [--support-screen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]";
     if args.len() > 1 || args.first().is_some_and(|a| a.starts_with('-')) {
         error_box(&format!("{USAGE}\n\n'{}' not understood", args.join(" ")));
         std::process::exit(2);
@@ -181,49 +189,73 @@ fn main() {
     });
     let session = Session::new(data_dir(), original, force_hd, force_wide, start);
     let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
-    match args.first() {
-        // A game folder on the command line: played as it is.
-        Some(dir) => {
-            let game = open_game(Path::new(dir)).unwrap_or_else(|e| {
-                error_box(&e);
-                std::process::exit(1);
-            });
-            app.play_game(game, None);
-        }
-        None => {
-            let library = app
-                .session()
-                .map(|s| s.library().clone())
-                .unwrap_or_default();
-            let first = library.folders().first().cloned();
-            // The library's one game, opened once.
-            let opened = (library.len() == 1 && !requested)
-                .then(|| first.as_deref().and_then(|d| try_open(d).ok()))
-                .flatten();
-            let choice = startup(library.len(), requested, || opened.is_some());
-            match choice {
-                Startup::FirstStart => match first_start() {
-                    Some((game, dir)) => app.play_game(game, Some(&dir)),
-                    None => {
-                        eprintln!("{USAGE}");
-                        return;
+    // The launch counted; the support screen when it is due (not on a run
+    // with a game folder or a testing option), or asked for.
+    let scripted = !args.is_empty() || new_game || puzzle.is_some();
+    let mut counts = SupportState::load(&data_dir());
+    counts.launches = counts.launches.saturating_add(1);
+    let now = unix_now();
+    let due = !scripted && should_show(&counts, now);
+    if due {
+        counts.last_shown = now;
+    }
+    counts.save(&data_dir());
+    // What the program starts with (after the support screen, if shown);
+    // false: nothing to play, the program ends.
+    let dir_arg = args.first().cloned();
+    let begin = move |app: &mut App| -> bool {
+        match dir_arg {
+            // A game folder on the command line: played as it is.
+            Some(dir) => {
+                let game = open_game(Path::new(&dir)).unwrap_or_else(|e| {
+                    error_box(&e);
+                    std::process::exit(1);
+                });
+                app.play_game(game, None);
+            }
+            None => {
+                let library = app
+                    .session()
+                    .map(|s| s.library().clone())
+                    .unwrap_or_default();
+                let first = library.folders().first().cloned();
+                // The library's one game, opened once.
+                let opened = (library.len() == 1 && !requested)
+                    .then(|| first.as_deref().and_then(|d| try_open(d).ok()))
+                    .flatten();
+                let choice = startup(library.len(), requested, || opened.is_some());
+                match choice {
+                    Startup::FirstStart => match first_start() {
+                        Some((game, dir)) => app.play_game(game, Some(&dir)),
+                        None => {
+                            eprintln!("{USAGE}");
+                            return false;
+                        }
+                    },
+                    Startup::PlayFirst => {
+                        let (Some(game), Some(dir)) = (opened, first) else {
+                            unreachable!("the first game opened");
+                        };
+                        log::info!("game folder {}", dir.display());
+                        app.play_game(game, Some(&dir));
+                        if let Some(s) = app.session_mut() {
+                            s.shift_grace();
+                        }
                     }
-                },
-                Startup::PlayFirst => {
-                    let (Some(game), Some(dir)) = (opened, first) else {
-                        unreachable!("the first game opened");
-                    };
-                    log::info!("game folder {}", dir.display());
-                    app.play_game(game, Some(&dir));
-                    if let Some(s) = app.session_mut() {
-                        s.shift_grace();
-                    }
+                    Startup::Launcher => app.show_launcher(None),
                 }
-                Startup::Launcher => app.show_launcher(None),
             }
         }
+        true
+    };
+    if due || force_support {
+        app.show_support(data_dir(), Box::new(begin));
+    } else if !begin(&mut app) {
+        return;
     }
-    if let Err(e) = el.run_app(&mut app) {
+    let run = el.run_app(&mut app);
+    app.save_play_time();
+    if let Err(e) = run {
         error_box(&format!("The window failed: {e}"));
         std::process::exit(1);
     }

@@ -126,6 +126,30 @@ program is closed. (Earlier versions kept one folder in
 `game-folder.txt`: it is taken over.) A game folder given on the command
 line is played without the library and not added to it.
 
+## The support screen
+
+Now and then, at start-up, before the game library or the game, a small
+screen thanks you for playing, with links to the project's
+[Buy Me a Coffee](https://buymeacoffee.com/ripleyxlr8) page and its
+[GitHub page](https://github.com/ripleyXLR8/atlantis-native) (a star
+there helps too). **Let's play!**, Escape or Enter goes on to the game;
+opening a link keeps the screen open. Tab or Left / Right choose a button
+or the checkbox, Space ticks it.
+
+It shows rarely: never on the first launch, only once the program has
+been started at least 3 times and games have run for 2 hours in all (the
+time in the F10 menu does not count), and then at most once every 7
+days. It never shows when the program is started with a game folder or a
+testing option (`--headless`, `--puzzle`, `--new-game`), nor in the web
+build.
+
+To turn it off for good, tick **Don't show this again** before closing
+it, or set `never = on` in `support.ini` in the per-user folder (see
+[Players, checkpoints and settings](#players-checkpoints-and-settings));
+the file also holds the counts it goes by (`launches`, `played_seconds`,
+`last_shown`). `atlantis-native --support-screen` shows it at once,
+whatever the counts say.
+
 ## Command line
 
 The game folder can be left out of each of these: the game library
@@ -135,6 +159,10 @@ decides (except with `--headless`).
 with one game in it (holding Shift at start-up does the same). The Windows
 release build has no console: redirect its output to a file
 (`atlantis-native.exe --headless C:\game > out.txt`) to read it.
+
+`atlantis-native --support-screen` shows the
+[support screen](#the-support-screen) at start-up, whatever its counts
+say.
 
 `atlantis-native --new-game /path/to/game` skips the start-up videos and
 the player screen.
@@ -177,8 +205,9 @@ files are kept in a per-user folder, one per game build:
 | macOS | `~/Library/Application Support/atlantis-native/<build>` |
 | Windows | `%APPDATA%\atlantis-native\<build>` |
 
-(`games.txt`, the game library, and `atlantis-native.log` are in the
-`atlantis-native` folder itself.)
+(`games.txt`, the game library, `support.ini`, the counts of the
+[support screen](#the-support-screen), and `atlantis-native.log` are in
+the `atlantis-native` folder itself.)
 
 On its first start with a game whose folder holds an original
 `players.atl` (an installation the original game played), the port copies
@@ -247,4 +276,6 @@ the project's own icon: a full moon over the sea with Atlantis' spiral
 tower (`assets/icon/`, drawn by `make_icon.py`). While the game runs, the
 window (title bar, taskbar, Alt+Tab) and the macOS Dock show the icon of
 your own `atlantis.exe`, read at start-up like the executable's tables
-(the game's pictures are not ours to distribute).
+(the game's pictures are not ours to distribute). The support screen
+shows it at 84x84 (`atlantis-native-84.rgb565`, made by
+`make_support_icon.py`).

@@ -4,8 +4,9 @@
 //! layer of the frames that have one in the HD mode
 //! ([`atlantis_engine::hd`]). It also runs the port's options menu (F10),
 //! and on the desktop the game library's screen ([`launcher`]), where the
-//! player chooses the edition to play; the running game can be stopped
-//! and another started without leaving the program.
+//! player chooses the edition to play, and now and then at start-up the
+//! support screen ([`support`]); the running game can be stopped and
+//! another started without leaving the program.
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
@@ -40,6 +41,8 @@ pub mod library;
 pub mod session;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod setup;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod support;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod watchdog;
 #[cfg(target_arch = "wasm32")]
@@ -170,6 +173,9 @@ pub struct App {
     /// The game library and its screen (desktop).
     #[cfg(not(target_arch = "wasm32"))]
     session: Option<session::Session>,
+    /// The support screen, while it is shown (desktop).
+    #[cfg(not(target_arch = "wasm32"))]
+    support: Option<support::Shown>,
 }
 
 impl App {
@@ -211,6 +217,8 @@ impl App {
             menu_text: HdText::default(),
             #[cfg(not(target_arch = "wasm32"))]
             session: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            support: None,
         }
     }
 
@@ -338,6 +346,10 @@ impl App {
         if self.runner.take().is_some() {
             log::info!("game stopped");
         }
+        self.save_play_time();
+        if let Some(s) = &mut self.session {
+            s.play_clock.pause();
+        }
         self.audio = None;
         self.audio_pending = true;
         if self.menu.is_open() {
@@ -375,6 +387,11 @@ impl App {
         }
         self.menu.open();
         self.paused_at = Some(Instant::now());
+        // The time in the menu is not play.
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(s) = &mut self.session {
+            s.play_clock.pause();
+        }
         self.sys.mixer.set_paused(true);
         if let Some(w) = &self.window {
             let _ = w.set_cursor_grab(CursorGrabMode::None);
@@ -490,6 +507,8 @@ impl App {
         let ms = now.duration_since(self.start).as_millis() as u64;
         let alive = runner.step(ms);
         let took = now.elapsed();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.tick_play_time(now);
         if took > SLOW_STEP {
             // A step this long keeps the window from answering the system
             // (Windows closes a window that does not for ~5 s).
@@ -580,13 +599,15 @@ impl App {
         };
         surface.resize(sw, sh).unwrap();
         let mut buf = surface.buffer_mut().unwrap();
-        // The game library's screen, drawn in `launcher_frame`.
+        // The support screen or the game library's screen, drawn in
+        // `launcher_frame`.
         #[cfg(not(target_arch = "wasm32"))]
-        let launcher = session::draw_launcher(
-            self.session.as_ref(),
-            &mut self.launcher_frame,
-            &mut self.menu_font,
-        );
+        let launcher = support::draw_support(self.support.as_ref(), &mut self.launcher_frame)
+            || session::draw_launcher(
+                self.session.as_ref(),
+                &mut self.launcher_frame,
+                &mut self.menu_font,
+            );
         #[cfg(target_arch = "wasm32")]
         let launcher = false;
         let (sw, sh) = (size.width as usize, size.height as usize);
@@ -805,7 +826,7 @@ impl ApplicationHandler for App {
         #[cfg(not(target_arch = "wasm32"))]
         let _guard = WatchdogLeave;
         #[cfg(not(target_arch = "wasm32"))]
-        if self.launcher_event(el, &event) {
+        if self.support_event(el, &event) || self.launcher_event(el, &event) {
             return;
         }
         match event {

@@ -108,6 +108,9 @@ pub struct SubtitleFont {
     /// The ascent in whole pixels (rounded up), from the line's top to the
     /// baseline.
     ascent: i32,
+    /// The pixels per em ([`SUBTITLE_EM_PX`] but for the port's own
+    /// screens' titles).
+    em_px: f32,
 }
 
 impl Default for SubtitleFont {
@@ -126,11 +129,21 @@ impl SubtitleFont {
     /// page texts of atlantis-cd-fr-688640 drawn with it (the build itself
     /// draws them in its bitmap font, glyph = byte) read as code page 850.
     pub fn with_code_page(code_page: TextCodePage) -> SubtitleFont {
+        Self::build(code_page, SUBTITLE_EM_PX)
+    }
+
+    /// The font at `em_px` pixels per em, for Windows-1252 texts (the
+    /// titles of the port's own screens).
+    pub fn with_size(em_px: f32) -> SubtitleFont {
+        Self::build(TextCodePage::Windows1252, em_px)
+    }
+
+    fn build(code_page: TextCodePage, em_px: f32) -> SubtitleFont {
         let font = FontRef::try_from_slice(FONT_DATA).expect("bundled subtitle font");
         let upem = font.units_per_em().unwrap_or(2048.0);
         // ab_glyph scales by the line height (ascent - descent); the size is
         // given per em.
-        let scale = PxScale::from(SUBTITLE_EM_PX * font.height_unscaled() / upem);
+        let scale = PxScale::from(em_px * font.height_unscaled() / upem);
         let scaled = font.as_scaled(scale);
         let ascent = scaled.ascent().ceil() as i32;
         let glyphs = (0..=255u8)
@@ -175,6 +188,7 @@ impl SubtitleFont {
             glyphs,
             code_page,
             ascent,
+            em_px,
         }
     }
 
@@ -272,7 +286,7 @@ impl SubtitleFont {
         let font = FontRef::try_from_slice(FONT_DATA).expect("bundled subtitle font");
         let (sx, sy) = (dw as f32 / 640.0, dh as f32 / 480.0);
         let upem = font.units_per_em().unwrap_or(2048.0);
-        let scale = PxScale::from(SUBTITLE_EM_PX * sy * font.height_unscaled() / upem);
+        let scale = PxScale::from(self.em_px * sy * font.height_unscaled() / upem);
         let base = oy as f32 + (y + self.ascent) as f32 * sy;
         let (x1, y1) = ((ox + dw) as i32, (oy + dh) as i32);
         for (b, pen) in self.layout(text, x, max_w) {

@@ -18,6 +18,7 @@ use winit::keyboard::{Key, NamedKey};
 use crate::desktop;
 use crate::launcher::{Launcher, LauncherAction, LauncherEntry, LauncherKey};
 use crate::library::Library;
+use crate::support::PlayClock;
 use crate::{options_with_settings, start_game, App};
 
 /// How long after an automatic start Shift still opens the game library
@@ -100,6 +101,9 @@ pub struct Session {
     known: Vec<LauncherEntry>,
     /// Until when Shift opens the game library (after an automatic start).
     shift_until: Option<Instant>,
+    /// The play time not yet written to `support.ini` (see
+    /// [`crate::support`]).
+    pub(crate) play_clock: PlayClock,
 }
 
 impl Session {
@@ -122,7 +126,13 @@ impl Session {
             launcher: None,
             known: Vec::new(),
             shift_until: None,
+            play_clock: PlayClock::default(),
         }
+    }
+
+    /// The per-user data folder.
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
     }
 
     pub fn library(&self) -> &Library {
