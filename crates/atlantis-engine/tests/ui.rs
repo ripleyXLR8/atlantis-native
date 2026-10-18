@@ -146,7 +146,7 @@ fn menu_rules_match_original() {
             "SUBCLICKS" => {
                 let (mut on, mut counter) = (false, 0u8);
                 for v in ints(rest) {
-                    subtitle_toggle_click(&mut on, &mut counter);
+                    subtitle_toggle_click(&mut on, &mut counter, true);
                     assert_eq!(i32::from(on), v);
                 }
             }
@@ -432,7 +432,7 @@ fn load_picker_matches_original() {
         let f: Vec<&str> = l.split(' ').collect();
         match f[0] {
             "K" => {
-                let sb = LoadPickerScroll::new(f[1].parse().unwrap());
+                let sb = LoadPickerScroll::new(f[1].parse().unwrap(), true);
                 // 0: the record keeps the x of LOADMENU.TXT (600).
                 let x = if sb.knob_x != 0 { sb.knob_x } else { 600 };
                 assert_eq!(x.to_string(), f[2], "{l}");
@@ -440,7 +440,7 @@ fn load_picker_matches_original() {
             }
             "S" => {
                 let count: i32 = f[1].parse().unwrap();
-                let mut sb = LoadPickerScroll::new(count);
+                let mut sb = LoadPickerScroll::new(count, true);
                 // The emulation's first frame: mouse at y 200, nothing latched.
                 sb.frame(false, false, 200);
                 let rows: Vec<String> = (0..480)

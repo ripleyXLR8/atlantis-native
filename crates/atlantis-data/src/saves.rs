@@ -17,9 +17,10 @@ pub const NAME_LEN: usize = 17;
 pub const NAME_MAX_CHARS: usize = 16;
 /// `players.atl` of the English builds: 5 names, 6 chapter bytes, 6 letters.
 pub const PLAYERS_SIZE: usize = 97;
-/// A 95-byte `players.atl` written by a French retail build: 5 chapter
-/// bytes and 5 letters, as far as one file shows (the split is inferred
-/// from the size).
+/// A 95-byte `players.atl`: 5 chapter bytes and 5 letters, written by the
+/// 1997 retail builds (the English one's writers FUN_0041d6d0,
+/// FUN_0041e030 and FUN_0042c164 of atlantis-cd-en-688128 write 0x55 + 5
+/// + 5 bytes; the French file has the same size).
 pub const PLAYERS_SIZE_FR: usize = 95;
 /// A checkpoint: a raw dump of 25 globals, 2639 bytes.
 pub const CHECKPOINT_SIZE: usize = 2639;
@@ -48,6 +49,10 @@ pub struct Players {
     pub count: usize,
     /// The row marker of the build (0x00496570, e.g. `#New Player`).
     pub marker: Vec<u8>,
+    /// The 1997 builds' list: a 95-byte file, and a deletion leaves the
+    /// rows after the last one as they were (atlantis-cd-en-688128
+    /// FUN_0041e030).
+    pub layout_1997: bool,
 }
 
 fn cstr(b: &[u8]) -> &[u8] {
@@ -71,6 +76,7 @@ impl Players {
             letters: [b'a', b'b', b'c', b'd', b'e', 0],
             count: 1,
             marker: marker.to_vec(),
+            layout_1997: false,
         };
         strcpy(&mut p.rows[0], marker);
         p
@@ -113,14 +119,15 @@ impl Players {
     }
 
     /// The file the writers write: names (0x55 bytes), chapters (6),
-    /// letters (6).
+    /// letters (6); 5 and 5 for the 1997 layout.
     pub fn to_bytes(&self) -> Vec<u8> {
+        let n = if self.layout_1997 { 5 } else { 6 };
         let mut out = Vec::with_capacity(PLAYERS_SIZE);
         for row in &self.rows {
             out.extend_from_slice(row);
         }
-        out.extend_from_slice(&self.chapters);
-        out.extend_from_slice(&self.letters);
+        out.extend_from_slice(&self.chapters[..n]);
+        out.extend_from_slice(&self.letters[..n]);
         out
     }
 
@@ -164,7 +171,9 @@ impl Players {
     /// chapters and letters); the deleted player's letter goes to slot 4,
     /// its chapter there becomes 0. With five players the last row becomes
     /// the marker and the count stays 5; otherwise the rows from the new
-    /// count on are emptied. Returns the deleted player's letter.
+    /// count on are emptied (the 1997 layout empties the new count's row
+    /// only: atlantis-cd-en-688128 FUN_0041e030 has no loop over the
+    /// others). Returns the deleted player's letter.
     pub fn delete(&mut self, row: usize) -> Option<u8> {
         if row >= self.count || self.is_new_row(row) {
             return None;
@@ -185,7 +194,12 @@ impl Players {
             strcpy(&mut self.rows[MAX_PLAYERS - 1], &marker);
         } else {
             self.count -= 1;
-            for r in self.count..MAX_PLAYERS {
+            let end = if self.layout_1997 {
+                self.count + 1
+            } else {
+                MAX_PLAYERS
+            };
+            for r in self.count..end {
                 self.rows[r] = [0; NAME_LEN];
             }
         }
@@ -509,6 +523,34 @@ mod tests {
         q.delete(1);
         assert_eq!((q.count, q.player_count()), (5, 4));
         assert!(q.is_new_row(4));
+    }
+
+    /// The 1997 layout: 95 bytes (chapters 0x55..0x5a, letters
+    /// 0x5a..0x5f), and a deletion empties the new count's row only.
+    #[test]
+    fn layout_1997() {
+        let marker = b"New Player";
+        let mut p = Players::new(marker);
+        p.layout_1997 = true;
+        p.create(b"ALICE").unwrap();
+        p.chapters[0] = 3;
+        let b = p.to_bytes();
+        assert_eq!(b.len(), PLAYERS_SIZE_FR);
+        assert_eq!(b[0x55], 3);
+        assert_eq!(&b[0x5a..0x5f], b"abcde");
+        let mut q = Players::read(&b, marker).unwrap();
+        assert_eq!(
+            (q.count, q.name(0), q.name(1)),
+            (2, &b"ALICE"[..], &marker[..])
+        );
+        // Stale rows past the list stay where FUN_0041e030 leaves them.
+        q.layout_1997 = true;
+        q.rows[4][..3].copy_from_slice(b"OLD");
+        q.delete(0).unwrap();
+        assert_eq!(q.count, 1);
+        assert!(q.is_new_row(0));
+        assert_eq!(q.name(1), b"");
+        assert_eq!((q.name(3), q.name(4)), (&b"OLD"[..], &b"OLD"[..]));
     }
 
     #[test]

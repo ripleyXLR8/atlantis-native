@@ -197,6 +197,12 @@ impl Engine {
         let (grid_x, grid_y, grid_w, grid_h) = (175, 248, 320, 22);
         let mut selected: Option<usize> = None;
         let mut typed: Option<Vec<u8>> = None; // on the "new player" row
+        let names_1997 = self.game.exe.build.players_1997;
+        let list_font = if names_1997 {
+            FontMin::PlayerList1997
+        } else {
+            FontMin::PlayerList
+        };
         let mut last_click: Option<(usize, u64)> = None;
         self.wait_buttons_up().await;
         while self.sys.poll_event().is_some() {}
@@ -223,12 +229,18 @@ impl Engine {
             }
             // Name entry, only on the "new player" row (@ 0x0041e283):
             // codes 0x20..0xa7, a leading space refused; at 16 characters
-            // the last one is replaced; backspace restores a dot.
+            // the last one is replaced; backspace restores a dot. The 1997
+            // build takes 0x20..0x7a and stores a..z as A..Z
+            // (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1..0x0041daf8).
             if let Some(buf) = typed.as_mut() {
                 for &c in &mi.chars {
-                    let code = name_key_code(c);
-                    if !(0x20..=0xa7).contains(&code) || (buf.is_empty() && code == b' ') {
+                    let mut code = name_key_code(c);
+                    let last = if names_1997 { 0x7a } else { 0xa7 };
+                    if !(0x20..=last).contains(&code) || (buf.is_empty() && code == b' ') {
                         continue;
+                    }
+                    if names_1997 {
+                        code = code.to_ascii_uppercase();
                     }
                     if buf.len() >= NAME_MAX_CHARS {
                         buf.pop();
@@ -304,7 +316,7 @@ impl Engine {
                 let name = self.players.name(j).to_vec();
                 self.ui.draw_font_min(
                     &mut s,
-                    FontMin::PlayerList,
+                    list_font,
                     &name,
                     185,
                     grid_y + (j as i32 + 1) * grid_h,
@@ -447,7 +459,8 @@ impl Engine {
                     }
                     Some(3) => {
                         let mut on = self.subtitles;
-                        subtitle_toggle_click(&mut on, &mut self.subtitle_clicks);
+                        let cycle = self.game.exe.build.subtitle_click_cycle;
+                        subtitle_toggle_click(&mut on, &mut self.subtitle_clicks, cycle);
                         self.subtitles = on;
                         self.settings.subtitles = on;
                         changed = true;
@@ -602,7 +615,8 @@ impl Engine {
             .map(|&c| epi_episode_name(&self.epi_text, u32::from(c)))
             .collect();
         let count = chapters.len();
-        let mut sb = LoadPickerScroll::new(count as i32);
+        let clamp = self.game.exe.build.load_picker_clamp;
+        let mut sb = LoadPickerScroll::new(count as i32, clamp);
         let mut title: Option<(Vec<u8>, i32)> = None;
         let mut selected: Option<usize> = None;
         let mut last_click: Option<(usize, u64)> = None;
@@ -647,8 +661,14 @@ impl Engine {
             }
             sb.frame(track_latched, down, my);
             let scroll = usize::from(sb.offset);
+            // A row counts when row + offset < count (0x0041d37b); the
+            // 1997 build tests the row alone (atlantis-cd-en-688128
+            // FUN_0041c9a8 @ 0x0041cd87) and takes entry row + offset
+            // (0x0041cdaa). Past the list it would read an empty record
+            // (its chapter -1 then walks EPI.TXT without an end): the port
+            // takes no such row.
             let row_hover = menu_grid_hit(45, 108, 400, 22, 1, 11, true, mx, my)
-                .filter(|&g| g < 11)
+                .filter(|&g| g < 11 && (clamp || (g as usize) < count))
                 .map(|g| scroll + g as usize)
                 .filter(|&r| r < count);
             let button = menu.hit(mx, my).filter(|r| [5, 6, 7].contains(r));

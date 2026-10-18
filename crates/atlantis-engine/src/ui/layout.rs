@@ -376,6 +376,9 @@ pub enum FontMin {
     /// `FUN_00420d8c`, the player list: a space advances 20, not drawn;
     /// '#' is neither drawn nor advanced.
     PlayerList,
+    /// The 1997 build's player list (atlantis-cd-en-688128 FUN_0041fff4):
+    /// as [`FontMin::PlayerList`], '#' drawn as any glyph.
+    PlayerList1997,
     /// `FUN_00420f60`, the name field: a space advances 20, not drawn;
     /// glyph 0x2e advances 20.
     NameField,
@@ -433,7 +436,9 @@ pub fn font_min_load_list_width(text: &[u8]) -> i32 {
 }
 
 /// `FUN_0041cf78`'s scrollbar (0x0041d1f3..0x0041d24b at entry,
-/// 0x0041d273..0x0041d2e6 each frame).
+/// 0x0041d273..0x0041d2e6 each frame); with `clamp` false, the 1997
+/// build's (atlantis-cd-en-688128 FUN_0041c9a8): the knob starts at y 0
+/// (0x0041cc23) and is not clamped above the bar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LoadPickerScroll {
     pub drag_on: bool,
@@ -444,27 +449,32 @@ pub struct LoadPickerScroll {
     pub knob_y: i32,
     /// The list offset 0x00496605.
     pub offset: u8,
+    /// The 2001 knob start and clamp.
+    pub clamp: bool,
 }
 
 impl LoadPickerScroll {
     /// With 11 files or fewer the knob is off-screen and never moves; else
     /// step = 0xd7 / (count - 10).
-    pub fn new(count: i32) -> LoadPickerScroll {
+    pub fn new(count: i32, clamp: bool) -> LoadPickerScroll {
+        let knob_y = if clamp { 0x7b } else { 0 };
         if count <= 11 {
             LoadPickerScroll {
                 drag_on: false,
                 step: 1,
                 knob_x: i32::from(0xffce_u16 as i16),
-                knob_y: 0x7b,
+                knob_y,
                 offset: 0,
+                clamp,
             }
         } else {
             LoadPickerScroll {
                 drag_on: true,
                 step: 0xd7 / (count - 10),
                 knob_x: 0,
-                knob_y: 0x7b,
+                knob_y,
                 offset: 0,
+                clamp,
             }
         }
     }
@@ -481,7 +491,7 @@ impl LoadPickerScroll {
         }
         self.knob_y = i32::from((mouse_y - 10) as u16);
         self.offset = ((self.knob_y - 0x7b) / self.step) as u8;
-        if mouse_y - 10 < 0x7b {
+        if self.clamp && mouse_y - 10 < 0x7b {
             self.knob_y = 0x7b;
             self.offset = 0;
         }
@@ -497,8 +507,13 @@ pub fn menu_volume_from_knob(x: i32) -> u8 {
 
 /// The options menu's SUBTITLES item (`FUN_0041d5f4`): on = !on; the
 /// counter 0x00496098 steps; at 2 it forces off, at 3 it returns to 0.
-pub fn subtitle_toggle_click(on: &mut bool, counter: &mut u8) {
+/// Without `cycle` (the 1997 build, atlantis-cd-en-688128 FUN_0041cfa4 @
+/// 0x0041d01b): on = !on alone.
+pub fn subtitle_toggle_click(on: &mut bool, counter: &mut u8, cycle: bool) {
     *on = !*on;
+    if !cycle {
+        return;
+    }
     *counter = counter.wrapping_add(1);
     if *counter == 2 {
         *on = false;
@@ -569,6 +584,37 @@ mod tests {
         assert_eq!(name_key_code('\u{e9}'), 0xe9);
         assert_eq!(name_key_code('\u{101}'), 0);
         assert_eq!(name_key_code('\u{81}'), 0x81);
+    }
+
+    /// The 1997 build: '#' is a glyph of the player list, the SUBTITLES
+    /// item a plain toggle, the LOAD knob starting at 0 and not clamped.
+    #[test]
+    fn rules_of_the_1997_build() {
+        let idx = |r| -> Vec<u8> {
+            font_min_blits(r, b"A#B", 0, 0)
+                .iter()
+                .map(|b| b.idx + 0x20)
+                .collect()
+        };
+        assert_eq!(idx(FontMin::PlayerList), b"AB");
+        assert_eq!(idx(FontMin::PlayerList1997), b"A#B");
+        let (mut on, mut n) = (false, 0);
+        let seq: Vec<bool> = (0..4)
+            .map(|_| {
+                subtitle_toggle_click(&mut on, &mut n, false);
+                on
+            })
+            .collect();
+        assert_eq!(seq, [true, false, true, false]);
+        assert_eq!(n, 0);
+        let mut sb = LoadPickerScroll::new(20, false);
+        assert_eq!((sb.knob_y, sb.step), (0, 21));
+        sb.frame(true, true, 0x80);
+        assert_eq!((sb.knob_y, sb.offset), (0x76, 0));
+        let mut sb = LoadPickerScroll::new(20, true);
+        assert_eq!(sb.knob_y, 0x7b);
+        sb.frame(true, true, 0x80);
+        assert_eq!((sb.knob_y, sb.offset), (0x7b, 0));
     }
 
     #[test]

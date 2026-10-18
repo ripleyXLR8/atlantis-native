@@ -38,11 +38,17 @@ impl Engine {
             .read(PLAYERS_FILE)
             .and_then(|d| Players::read(&d, &marker))
         {
-            self.players = p;
+            self.players = self.with_build_layout(p);
             return;
         }
-        self.players = Players::new(&marker);
+        self.players = self.with_build_layout(Players::new(&marker));
         self.import_original_saves();
+    }
+
+    /// The list as the build writes it (the 1997 build: 95 bytes).
+    fn with_build_layout(&self, mut p: Players) -> Players {
+        p.layout_1997 = self.game.exe.build.players_1997;
+        p
     }
 
     /// The original's files in the game folder (an installation the
@@ -79,7 +85,7 @@ impl Engine {
             "{PLAYERS_FILE} of the game folder taken over: {} players, {n} checkpoints",
             p.player_count()
         );
-        self.players = p;
+        self.players = self.with_build_layout(p);
         self.save_players();
     }
 
