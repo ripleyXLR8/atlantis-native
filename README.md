@@ -135,6 +135,23 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
   enhancements, how the HD mode works, subtitles, the web build, tests,
   roadmap.
 
+## Code signing policy
+
+Windows builds are to be signed with a free code signing certificate
+provided by [SignPath.io](https://about.signpath.io/), certificate by
+[SignPath Foundation](https://signpath.org/) (in progress: until then
+the builds are unsigned).
+
+- Committers and reviewers: [ripleyXLR8](https://github.com/ripleyXLR8)
+- Approvers: [ripleyXLR8](https://github.com/ripleyXLR8)
+
+Only the executable built by this repository's GitHub Actions workflow
+from its own sources is signed; every release is approved by hand.
+
+Privacy: this program does not transfer any information to other
+networked systems. It only reads the game files you point it at and
+writes its saves, settings and log to your own user folder.
+
 ## Licence
 
 GNU General Public License, version 3 or later (see `LICENSE`). The code is

@@ -64,6 +64,11 @@ jobs:
   windows-x64:
     needs: release
     runs-on: windows-latest
+    env:
+      # Code signing through SignPath Foundation (see the code signing
+      # policy in the README): on once the secret and the variables are
+      # set in the repository's settings; unsigned builds otherwise.
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -71,11 +76,30 @@ jobs:
         run: cargo test --release --workspace
       - name: Build
         run: cargo build --release -p atlantis-app
+      - name: Upload the unsigned executable
+        id: unsigned
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-windows-x64-unsigned
+          path: target/release/atlantis-native.exe
+      - name: Sign (SignPath)
+        if: env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory dist | Out-Null
-          Copy-Item target/release/atlantis-native.exe, README.md, LICENSE dist/
+          $exe = if (Test-Path signed/atlantis-native.exe) { "signed/atlantis-native.exe" } else { "target/release/atlantis-native.exe" }
+          Copy-Item $exe, README.md, LICENSE dist/
           Compress-Archive -Path dist/* -DestinationPath atlantis-native-windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:
