@@ -74,6 +74,13 @@ those of the latest commit:
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
 | Web (a static site to serve over HTTP) | `atlantis-native-web.zip` |
 
+> **Windows:** the program is not code-signed (a certificate costs money
+> each year), so Windows SmartScreen may warn that it "protected your PC"
+> the first time. Click **More info**, then **Run anyway**. It opens
+> normally from then on. Download Atlantis Native only from its
+> [releases page](https://github.com/ripleyXLR8/atlantis-native/releases):
+> the builds there are made by this repository's public workflow.
+
 > **macOS:** the app is signed ad hoc but not notarised by Apple (that
 > needs a paid Apple Developer account), so macOS blocks it the first
 > time. Since macOS 15 a right-click is not enough:
