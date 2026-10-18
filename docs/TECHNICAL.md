@@ -73,8 +73,8 @@ Where the port may differ from the original by choice, `Options` holds an
 
 | Group | Default | What it changes |
 |---|---|---|
-| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 build, the hexagon puzzle always shows its pieces, as the later builds do |
-| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and 1997 builds, a second death in a section plays the next narrator line, as the 1999 build does |
+| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 builds, the hexagon puzzle always shows its pieces, as the later builds do |
+| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and English 1997 builds, a second death in a section plays the next narrator line, as the 1999 and French 1997 builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
 `--original` turns all three off. Otherwise they are read from
@@ -187,8 +187,8 @@ original's pixels, which the tests check).
 
 ### Subtitles
 
-The 2001 and GOG.com builds draw their subtitles with the system's Arial
-at 13 pixels, not smoothed. The port draws them with Liberation Sans,
+The 2001, GOG.com and French 1997 builds draw their subtitles with the
+system's Arial at 13 pixels, not smoothed. The port draws them with Liberation Sans,
 which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
 thresholded to one bit, so every platform draws the same pixels; the text
 bytes are read as Windows-1252. The font is bundled in `assets/fonts`.
@@ -203,34 +203,42 @@ row, as they do here.
 
 ### Game builds
 
-The port knows three builds of `atlantis.exe` (`ExeBuild` in
+The port knows four builds of `atlantis.exe` (`ExeBuild` in
 `crates/atlantis-data/src/exe.rs`), found by their size; their tables are
 read where each build has them, and the code differences that change
 what a player sees follow the build:
 
-| | 2001 English CD | GOG.com (1999) | English retail CD (1997) |
-|---|---|---|---|
-| subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows |
-| SUBTITLES item | three-click cycle | three-click cycle | plain toggle |
-| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor |
-| Rhea always on camera 2 | yes | no | no |
-| second death in a section | same narrator line | next line | same line |
-| players.atl | 97 bytes | 97 bytes | 95 bytes; names in capitals, 0x20..0x7a |
-| hexagon puzzle pieces | always | always | with object 402 in hand or FLAGTEMP6 = 2 |
-| ogre queen reveal | 3 frames of 1 s | 3 frames of 1 s | 5 frames of 0.375 s |
-| rat puzzle pass | 5 ticks after each | 5 ticks after each | a 5-tick deadline |
-| warp cursor animation | two steps a frame | two steps a frame | one step a frame |
-| LOAD scrollbar (12+ checkpoints) | knob from the bar's top | knob from the bar's top | knob from y 0, not clamped |
-| LOADMUSIK / DELMUSIK | as listed | as listed | nothing when the first track plays |
+| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French retail CD (August 1997) |
+|---|---|---|---|---|
+| subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows | Arial |
+| SUBTITLES item | three-click cycle | three-click cycle | plain toggle | plain toggle |
+| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor | talk cursor |
+| Rhea always on camera 2 | yes | no | no | no |
+| second death in a section | same narrator line | next line | same line | next line |
+| game-over voice | after the image | after the image | before the image | after the image |
+| players.atl | 97 bytes | 97 bytes | 95 bytes; names in capitals, 0x20..0x7a | 95 bytes |
+| new-player row | `#` marker, label without it | `#` marker, label without it | the label itself | the label itself |
+| hexagon puzzle pieces | always | always | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 |
+| ogre queen reveal | 3 frames of 1 s | 3 frames of 1 s | 5 frames of 0.375 s | 3 frames of 1 s |
+| rat puzzle pass | 5 ticks after each | 5 ticks after each | a 5-tick deadline | 5 ticks after each |
+| warp cursor animation | two steps a frame | two steps a frame | one step a frame | one step a frame |
+| LOAD scrollbar (12+ checkpoints) | knob from the bar's top | knob from the bar's top | knob from y 0, not clamped | knob from y 0, clamped at the bar's top |
+| LOADMUSIK / DELMUSIK | as listed | as listed | nothing when the first track plays | as listed |
+
+In every build the player-name font (FONTMIN) has advances for 101
+glyphs, and the original reads those of the glyphs past them from the
+credits font's table that follows it; the port does the same with each
+build's table (in the French 1997 build a typed `£` advances 2 pixels,
+in the 2001 build 14).
 
 The port's cursor animation steps every 80 ms for the two steps a frame
-of the later builds, every 160 ms for the 1997 build. Where the analysis
-of the 1997 build leaves an effect open, the port keeps the 2001 build's
-behaviour: its DelMusik also deletes the playing track's (open) file, its
-rat puzzle's trajectory search past the end of a trajectory, a LOAD row
-past the list. Its game-over narration is started at entry from the
-current dialog letter, which is the 2001 build's letter for every game
-over of the shipped scripts.
+of the later builds, every 160 ms for the 1997 builds. Where the analysis
+of the 1997 builds leaves an effect open, the port keeps the 2001 build's
+behaviour: the English one's DelMusik also deletes the playing track's
+(open) file, both builds' rat puzzle trajectory search past the end of a
+trajectory, a LOAD row past the list. The English one's game-over
+narration is started at entry from the current dialog letter, which is
+the 2001 build's letter for every game over of the shipped scripts.
 
 ### The web build
 
@@ -251,12 +259,14 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 Tests that need the game files read the game directory from the
 `ATLANTIS_DATA` environment variable (the 2001 English CD) and are
 skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
-English retail CD, `ATLANTIS_GOG` a folder of the GOG.com languages'
+English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
+retail CD, `ATLANTIS_GOG` a folder of the GOG.com languages'
 trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
 installation, for the tests of those builds:
 
 ```sh
-ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 cargo test --release
+ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
+ATLANTIS_DATA_FR1997=/path/to/fr1997 cargo test --release
 ```
 
 The expected values in the tests are digests and numbers computed by the

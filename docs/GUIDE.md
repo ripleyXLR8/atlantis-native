@@ -63,9 +63,10 @@ it move up with their files. (The original deletes the files of the letter
 of the row, which after an earlier deletion can be another player's and
 leaves the deleted player's files behind.)
 
-The files are those the build you play writes: the 1997 English CD
-writes a 95-byte `players.atl` (five chapter and letter bytes, where the
-later builds write six) and stores typed names in capitals.
+The files are those the build you play writes: the 1997 English and
+French CDs write a 95-byte `players.atl` (five chapter and letter bytes,
+where the later builds write six), and the English one stores typed names
+in capitals.
 
 The same folder holds `settings.ini`: the options of the game's menus
 (subtitles, OMNI 3D mode, the master, music, effects and voices volumes,
@@ -95,8 +96,8 @@ picked folder on its first start.
   deleting a player deletes its own checkpoints.
 - The subtitles of the 2001 and GOG.com builds are drawn with Liberation
   Sans, which has the metrics of the original's Arial (see
-  [Subtitles](TECHNICAL.md#subtitles)); the 1997 English CD's are drawn
-  with its own pixel font, as it did.
+  [Subtitles](TECHNICAL.md#subtitles)), as are the 1997 French CD's; the
+  1997 English CD's are drawn with its own pixel font, as it did.
 - The engine runs at a steady 60 steps per second; the original's loops
   run as fast as the machine allows.
 - The [enhancements](TECHNICAL.md#enhancements) on by default: the music loops
