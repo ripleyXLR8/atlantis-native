@@ -21,7 +21,7 @@ use std::sync::Arc;
 use atlantis_codecs::decode_apc;
 
 use crate::audio::{Mixer, Pcm, Source, VoiceId};
-use crate::con_script::{con_music_apply, con_music_list};
+use crate::con_script::{con_music_apply, con_music_list, con_music_load_all_or_nothing};
 use crate::engine::Engine;
 use crate::persist::Settings;
 use crate::sys::Sys;
@@ -66,7 +66,9 @@ pub struct MusicFade {
 impl Default for MusicFade {
     fn default() -> Self {
         MusicFade {
-            cur: 0,
+            // The data segment's initial byte (0x00495e71, atlantis-cd-fr-688640
+            // 0x00485e71: 0x6e in every build); each track's start sets 0.
+            cur: 0x6e,
             mode: 0,
             down_target: -1,
             up_target: 0,
@@ -779,12 +781,18 @@ impl Engine {
     }
 
     /// StartMusik=N (`FUN_0042a100` @ 0x0042ad9d..0x0042ae0f).
+    /// The open track again re-arms the fade-in (0x0042ae3f..0x0042ae4d);
+    /// atlantis-cd-fr-688640 does nothing then (FUN_00429184 @
+    /// 0x00429d47..0x00429d51), whatever the enhancements: a volume left
+    /// down by a fade stays down until the next fade-in.
     pub async fn music_start_command(&mut self, track: i32) {
         if track == self.music.track_id && self.music.current_file {
-            self.music.with_fade(|f| {
-                f.mode = 1;
-                f.up_target = i32::from(f.vol);
-            });
+            if self.game.exe.build.music_restart_rearms_fade {
+                self.music.with_fade(|f| {
+                    f.mode = 1;
+                    f.up_target = i32::from(f.vol);
+                });
+            }
             return;
         }
         // Closing the open stream for another track resets the input flags,
@@ -819,11 +827,40 @@ impl Engine {
     /// without the WAIT menu a copy shows): the original copies the tracks
     /// to its install folder or deletes them; playback itself reads the
     /// archive.
+    ///
+    /// atlantis-cd-fr-688640 has its own LOADMUSIK (decision of the port:
+    /// the build's rules by default, the per-track copy of the other builds
+    /// with the minor bug fixes, so that no listed track is left uncopied):
+    /// - it runs only when the current music volume 0x00485e71 is 5 or more
+    ///   (FUN_00429184 @ 0x00429c5e), so with the music volume option below
+    ///   5 or within 125 ms of a StartMusik the tracks are not copied;
+    /// - its LoadMusik copies all or nothing on the first listed track
+    ///   (FUN_0041e830, [`con_music_load_all_or_nothing`]).
+    ///
+    /// With the minor bug fixes the volume test is dropped and the tracks
+    /// are copied one by one as atlantis-cd-en-688128 does (the first-value
+    /// rule of that build kept). Playback reads the archive in either case
+    /// (the copies are modelled for their trace in the video buffer), so
+    /// no StartMusik goes silent here.
     pub async fn music_list_command(&mut self, load: bool, text: &[u8], pos: u32) {
         let list = con_music_list(text, pos);
         let mut on_disk = self.music.on_disk;
-        let rule = self.game.exe.build.music_first_value_rule;
-        let copies = con_music_apply(load, &list, self.music.track_id, &mut on_disk, rule);
+        let build = self.game.exe.build;
+        let rule = build.music_first_value_rule;
+        let current = self.music.track_id;
+        let fixes = self.enhancements().minor_bug_fixes;
+        let copies = if load && build.music_load_all_or_nothing && !fixes {
+            // The executor's first-value test (0x00429c52) is also
+            // LoadMusik's own (0x0041e862..0x0041e891), so only the volume is tested
+            // here.
+            if self.music.fade().cur < build.music_load_min_volume {
+                Vec::new()
+            } else {
+                con_music_load_all_or_nothing(&list, current, &mut on_disk)
+            }
+        } else {
+            con_music_apply(load, &list, current, &mut on_disk, rule)
+        };
         for idx in copies {
             self.music_copy_through_screen_buffer(idx).await;
         }
@@ -1061,5 +1098,97 @@ mod on_disk_tests {
             let got = *got.borrow();
             assert_eq!(got, Some(((0x14, true), Some(0x14), 0x14, true)));
         }
+    }
+}
+
+#[cfg(test)]
+mod fr688640_tests {
+    use super::*;
+    use crate::enhancements::Enhancements;
+    use crate::persist::MemStore;
+    use crate::test_support::with_engine_in;
+
+    /// atlantis-cd-fr-688640's LOADMUSIK: nothing below a current music
+    /// volume of 5 (FUN_00429184 @ 0x00429c5e), all or nothing on its first
+    /// track (FUN_0041e830); with the minor bug fixes, one by one.
+    #[test]
+    fn may_1997_music_copies() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine_in(
+            "ATLANTIS_DATA_FR1997_MAY",
+            "may_1997_music_copies",
+            move |mut e| async move {
+                assert_eq!(e.game.exe.build.name, "atlantis-cd-fr-688640");
+                e.saves = Rc::new(MemStore::new());
+                let load = async |e: &mut Engine, fixes: bool, cur: u8, cmd: &[u8]| {
+                    e.set_enhancements(Enhancements {
+                        minor_bug_fixes: fixes,
+                        ..Enhancements::default()
+                    });
+                    e.music.with_fade(|f| f.cur = cur);
+                    e.music_list_command(true, cmd, 15).await;
+                    e.music.on_disk
+                };
+                let mut out = Vec::new();
+                // The volume test: 4 copies nothing, 5 copies the list.
+                out.push(load(&mut e, false, 4, b"/set(loadmusik=3,5)\r\n").await);
+                out.push(load(&mut e, false, 5, b"/set(loadmusik=3,5)\r\n").await);
+                // The first track there: the others are not copied.
+                out.push(load(&mut e, false, 127, b"/set(loadmusik=3,7)\r\n").await);
+                // The first track missing: all copied (3 again).
+                out.push(load(&mut e, false, 127, b"/set(loadmusik=9,3)\r\n").await);
+                // The first track the open one: nothing.
+                e.music.track_id = 11;
+                out.push(load(&mut e, false, 127, b"/set(loadmusik=11,2)\r\n").await);
+                e.music.track_id = 0;
+                // The minor bug fixes: one by one, whatever the volume.
+                out.push(load(&mut e, true, 0, b"/set(loadmusik=3,7)\r\n").await);
+                *g2.borrow_mut() = out;
+            },
+            |_, _| {},
+        );
+        if ran {
+            let b = |l: &[u32]| l.iter().fold(0u32, |a, &i| a | 1 << i);
+            assert_eq!(
+                *got.borrow(),
+                vec![
+                    0,
+                    b(&[2, 4]),
+                    b(&[2, 4]),
+                    b(&[2, 4, 8]),
+                    b(&[2, 4, 8]),
+                    b(&[2, 4, 6, 8])
+                ]
+            );
+        }
+    }
+
+    /// StartMusik of the open track: the reference re-arms the fade-in
+    /// (FUN_0042a100 @ 0x0042ae3f), atlantis-cd-fr-688640 does nothing
+    /// (FUN_00429184 @ 0x00429d51).
+    #[test]
+    fn restart_of_the_open_track() {
+        fn run(var: &'static str, want: u8) {
+            let got = Rc::new(RefCell::new(None));
+            let g2 = got.clone();
+            let ran = with_engine_in(
+                var,
+                "restart_of_the_open_track",
+                move |mut e| async move {
+                    e.music.track_id = 4;
+                    e.music.current_file = true;
+                    e.music.with_fade(|f| f.mode = 0);
+                    e.music_start_command(4).await;
+                    *g2.borrow_mut() = Some(e.music.fade().mode);
+                },
+                |_, _| {},
+            );
+            if ran {
+                assert_eq!(*got.borrow(), Some(want), "{var}");
+            }
+        }
+        run("ATLANTIS_DATA", 1);
+        run("ATLANTIS_DATA_FR1997_MAY", 0);
     }
 }

@@ -1,5 +1,6 @@
 //! Helpers of the in-crate tests that need the game: set `ATLANTIS_DATA`
-//! to the game directory; without it the tests are skipped.
+//! to the game directory (or the variable a test names for another
+//! release); without it the tests are skipped.
 
 use std::future::Future;
 use std::rc::Rc;
@@ -18,10 +19,21 @@ use crate::sys::{Input, MouseButton, Runner, Sys};
 pub(crate) fn with_engine<Fut: Future<Output = ()> + 'static>(
     test: &str,
     task: impl FnOnce(Engine) -> Fut,
+    each_frame: impl FnMut(&Rc<Sys>, u64),
+) -> bool {
+    with_engine_in("ATLANTIS_DATA", test, task, each_frame)
+}
+
+/// [`with_engine`] over the game folder that the variable `var` names
+/// (`ATLANTIS_DATA_FR1997_MAY`...).
+pub(crate) fn with_engine_in<Fut: Future<Output = ()> + 'static>(
+    var: &str,
+    test: &str,
+    task: impl FnOnce(Engine) -> Fut,
     mut each_frame: impl FnMut(&Rc<Sys>, u64),
 ) -> bool {
-    let Some(dir) = std::env::var_os("ATLANTIS_DATA") else {
-        eprintln!("ATLANTIS_DATA not set: {test} skipped");
+    let Some(dir) = std::env::var_os(var) else {
+        eprintln!("{var} not set: {test} skipped");
         return false;
     };
     let game = Game::open(Arc::new(StdDir::new(dir))).expect("cannot open the game directory");

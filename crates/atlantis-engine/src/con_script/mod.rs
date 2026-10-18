@@ -6,8 +6,8 @@ pub mod script;
 pub mod vars;
 
 pub use eval::{
-    con_angle_radians, con_music_apply, con_music_list, evaluate, parse_con_set, ConClocks,
-    ConKeyBuffer, ConSetCommand, ConSubjects, ConVariableNames,
+    con_angle_radians, con_music_apply, con_music_list, con_music_load_all_or_nothing, evaluate,
+    parse_con_set, ConClocks, ConKeyBuffer, ConSetCommand, ConSubjects, ConVariableNames,
 };
 pub use script::{
     arrival_after_chapter_load, con_alt_game_over_narration, con_entry_allowed, con_escape_skip,

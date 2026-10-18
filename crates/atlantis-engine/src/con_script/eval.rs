@@ -358,6 +358,30 @@ pub fn con_music_apply(
     copies
 }
 
+/// LoadMusik of atlantis-cd-fr-688640 (FUN_0041e830), all or nothing on
+/// the first listed track: nothing when its index is 0x20 or more, when its
+/// copy is there (FUN_0041ee40) or when it is the open track (`current` =
+/// index + 1, 0x007e1f01) (0x0041e862..0x0041e891); otherwise every listed
+/// track is copied (FUN_0041e9d0), with no test of its copy or of the open
+/// track (0x0041e926..0x0041e96e). So a list whose first track is there
+/// copies none of the others, and one whose first track is missing copies
+/// the present ones again. The result is the copied indexes, in order; an
+/// index past the 32 the set holds is left out (the original copies the
+/// name it reads past the table, which names no archive member).
+pub fn con_music_load_all_or_nothing(list: &[u8], current: i32, on_disk: &mut u32) -> Vec<u8> {
+    let Some(&first) = list.first() else {
+        return Vec::new();
+    };
+    if first >= 0x20 || *on_disk & (1u32 << first) != 0 || i32::from(first) + 1 == current {
+        return Vec::new();
+    }
+    let copies: Vec<u8> = list.iter().copied().filter(|&idx| idx < 32).collect();
+    for &idx in &copies {
+        *on_disk |= 1u32 << idx;
+    }
+    copies
+}
+
 /// `FUN_0042a100`, AngleWarpX= / AngleWarpY=: the view angle in radians,
 /// value * pi / 180 computed on the x87 and stored as a float (pi is the
 /// float `FUN_0045179a` keeps at 0x00bcb594).

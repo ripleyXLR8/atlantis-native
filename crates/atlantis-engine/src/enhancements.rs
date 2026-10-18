@@ -16,7 +16,12 @@ pub struct Enhancements {
     /// - the dialog SPF overlay (the guards' coif, the pilot's scarf) is
     ///   drawn over the talking head; the original draws it into the
     ///   locked surface, which the back-buffer copy then overwrites
-    ///   (`FUN_0042ee88` @ 0x0042f57e), so it is never seen.
+    ///   (`FUN_0042ee88` @ 0x0042f57e), so it is never seen;
+    /// - with the French May 1997 build, LOADMUSIK copies its tracks one by
+    ///   one whatever the music volume, as the other builds do; off, it
+    ///   copies nothing below a current music volume of 5 and all or
+    ///   nothing on its first track (atlantis-cd-fr-688640 FUN_00429184 @
+    ///   0x00429c5e, FUN_0041e830).
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

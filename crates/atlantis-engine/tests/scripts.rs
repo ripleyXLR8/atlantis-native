@@ -25,8 +25,9 @@ use atlantis_engine::audio::Mixer;
 use atlantis_engine::con_script::script::{latin1_bytes, ConText};
 use atlantis_engine::con_script::{
     arrival_after_chapter_load, con_angle_radians, con_entry_allowed, con_escape_skip,
-    con_music_apply, con_music_list, con_track_letter, evaluate, parse_con_set, ConClocks, ConItem,
-    ConKeyBuffer, ConScript, ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
+    con_music_apply, con_music_list, con_music_load_all_or_nothing, con_track_letter, evaluate,
+    parse_con_set, ConClocks, ConItem, ConKeyBuffer, ConScript, ConSection, ConSubjects,
+    ConVariableNames, CON_PLAY_COUNTERS,
 };
 use atlantis_engine::hooks::DirectLoader;
 use atlantis_engine::music::MusicRing;
@@ -1478,6 +1479,30 @@ fn musik_lists_match_original() {
     assert_eq!(run97("/set(loadmusik=3,5)", 5, ""), (vec![2], bits("2")));
     assert_eq!(run97("/set(delmusik=3,5)", 3, "2,4"), (vec![], bits("2,4")));
     assert_eq!(run97("/set(delmusik=3,5)", 1, "2,4"), (vec![], 0));
+    // The French May 1997 build's LoadMusik (atlantis-cd-fr-688640
+    // FUN_0041e830): all or nothing on the first track.
+    let all = |line: &str, current: i32, before: &str| {
+        let text = format!("{line}\r\n/1\r\n");
+        let p = text.find('=').unwrap() as u32 + 1;
+        let mut on_disk = bits(before);
+        let list = con_music_list(text.as_bytes(), p);
+        let got = con_music_load_all_or_nothing(&list, current, &mut on_disk);
+        (got, on_disk)
+    };
+    // The first track there or open: nothing.
+    assert_eq!(all("/set(loadmusik=3,5)", 0, "2"), (vec![], bits("2")));
+    assert_eq!(all("/set(loadmusik=3,5)", 3, ""), (vec![], 0));
+    // Else every track, those there and the open one included.
+    assert_eq!(
+        all("/set(loadmusik=3,5,7)", 7, "4"),
+        (vec![2, 4, 6], bits("2,4,6"))
+    );
+    // The index walk is the other builds' (10 desynchronises it).
+    assert_eq!(
+        all("/set(loadmusik=9,10,11)", 0, ""),
+        (vec![8, 9], bits("8,9"))
+    );
+    assert_eq!(all("/set(loadmusik=33)", 0, ""), (vec![], 0));
 }
 
 /// The music ring of the original with the position law measured under
