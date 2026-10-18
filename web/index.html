@@ -13,9 +13,15 @@
            image-rendering: pixelated; outline: none; }
   #err { color: #f88; white-space: pre-wrap; }
   a { color: #8cf; }
+  #full { position: fixed; top: 8px; right: 8px; display: none; z-index: 10;
+          background: #222c; color: #ddd; border: 1px solid #666; border-radius: 4px;
+          padding: 4px 10px; font: 13px system-ui, sans-serif; cursor: pointer; opacity: .6; }
+  #full:hover { opacity: 1; }
+  canvas:fullscreen { width: 100vw; height: 100vh; background: #000; }
 </style>
 </head>
 <body>
+<button id="full" title="Full screen (F11)">⛶ Full screen</button>
 <div id="pick">
   <p><b>Atlantis Native</b> is a new engine for <i>Atlantis: The Lost Tales</i>.
      It does not include the game itself: the pictures, videos, voices and
@@ -41,6 +47,17 @@
     try {
       await start(e.target.files);
       document.getElementById("pick").style.display = "none";
+      // Full screen from a click on the page's button (the game also
+      // takes F11 and Alt+Enter); hidden while full screen.
+      const full = document.getElementById("full");
+      full.style.display = "block";
+      full.addEventListener("click", () => {
+        const c = document.querySelector("canvas");
+        (c || document.documentElement).requestFullscreen?.();
+      });
+      document.addEventListener("fullscreenchange", () => {
+        full.style.display = document.fullscreenElement ? "none" : "block";
+      });
     } catch (err) {
       const box = document.getElementById("err");
       const [text, url] = String(err).split("\n\nREPORT:");

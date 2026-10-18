@@ -26,7 +26,7 @@ use winit::dpi::{LogicalSize, PhysicalPosition};
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{Key, NamedKey};
-use winit::window::{CursorGrabMode, Window, WindowId};
+use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
@@ -138,6 +138,8 @@ pub struct App {
     col_map: Vec<usize>,
     /// The pointer lock as applied to the window.
     locked: bool,
+    /// Alt is held (Alt+Enter: full screen).
+    alt: bool,
     /// The window's title: the port and the game's release.
     title: String,
     /// The window's icon: the player's atlantis.exe icon.
@@ -197,6 +199,7 @@ impl App {
             viewport: Viewport::default(),
             col_map: Vec::new(),
             locked: false,
+            alt: false,
             title: "Atlantis Native".to_string(),
             icon: None,
             confined: false,
@@ -377,6 +380,14 @@ impl App {
     /// Whether a game is running (not the game library's screen).
     pub fn has_game(&self) -> bool {
         self.runner.is_some()
+    }
+
+    /// Full screen on or off (borderless, on the window's monitor; in
+    /// the browser the canvas fills the screen).
+    fn toggle_fullscreen(&mut self) {
+        let Some(w) = &self.window else { return };
+        let full = w.fullscreen().is_some();
+        w.set_fullscreen((!full).then_some(Fullscreen::Borderless(None)));
     }
 
     /// Opens the options menu: the game pauses (its clock and its sound),
@@ -928,9 +939,19 @@ impl ApplicationHandler for App {
                     }
                 }
             }
+            WindowEvent::ModifiersChanged(m) => self.alt = m.state().alt_key(),
             WindowEvent::KeyboardInput { event, .. } => {
                 let key = engine_key(&event.logical_key);
                 let pressed = event.state == ElementState::Pressed;
+                // F11 or Alt+Enter: full screen (the port's keys; in the
+                // browser the page takes every key, so F11 comes here).
+                let enter = matches!(event.logical_key, Key::Named(NamedKey::Enter));
+                if key == Some(EngineKey::F(11)) || (enter && self.alt) {
+                    if pressed && !event.repeat {
+                        self.toggle_fullscreen();
+                    }
+                    return;
+                }
                 if self.menu.is_open() {
                     // The menu takes every key (with the repeats, to move).
                     if let (Some(k), true) = (key, pressed) {

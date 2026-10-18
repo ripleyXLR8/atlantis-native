@@ -153,6 +153,11 @@ the file also holds the counts it goes by (`launches`, `played_seconds`,
 `last_shown`). `atlantis-native --support-screen` shows it at once,
 whatever the counts say.
 
+## Full screen
+
+F11 or Alt+Enter switches full screen on and off (desktop and browser);
+the web page also has a **Full screen** button at its top right.
+
 ## Command line
 
 The game folder can be left out of each of these: the game library
