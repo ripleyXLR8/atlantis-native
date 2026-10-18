@@ -112,6 +112,8 @@ pub struct Sys {
     /// The frame being drawn / shown is a video's.
     photo_marked: Cell<bool>,
     photo_shown: Cell<bool>,
+    /// The screen of the frame presented last.
+    last_screen: RefCell<Vec<u16>>,
     pub cursor: RefCell<Option<Cursor>>,
     pub mixer: Mixer,
     now_ms: Cell<u64>,
@@ -144,6 +146,7 @@ impl Sys {
             text_shown: Cell::new(false),
             photo_marked: Cell::new(false),
             photo_shown: Cell::new(false),
+            last_screen: RefCell::new(Vec::new()),
             cursor: RefCell::new(None),
             mixer,
             now_ms: Cell::new(0),
@@ -389,7 +392,24 @@ impl Future for FrameFuture<'_> {
         } else {
             self.started = true;
             self.sys.yielded.set(true);
-            self.sys.hd_shown.set(self.sys.hd_marked.replace(false));
+            // The HD layer and a video's mark stand for later frames too
+            // while the screen stays the same: a frame presented without a
+            // redraw (the click that starts a move, the destination's
+            // panorama read before its video, the first video frame not
+            // due yet, the frames after the video's last until the next
+            // view) would otherwise show the 640x480 picture alone, a flash
+            // in widescreen.
+            let same = *self.sys.screen.borrow() == *self.sys.last_screen.borrow();
+            let marked = self.sys.hd_marked.replace(false);
+            let kept = !marked && self.sys.hd_shown.get() && same;
+            self.sys.hd_shown.set(marked || kept);
+            let marked = self.sys.photo_marked.replace(false);
+            let kept = !marked && self.sys.photo_shown.get() && same;
+            self.sys.photo_shown.set(marked || kept);
+            self.sys
+                .last_screen
+                .borrow_mut()
+                .clone_from(&self.sys.screen.borrow());
             // The text stands for later frames too while the screen shows
             // it unchanged (a still image held for a voice).
             let marked = self.sys.text_marked.replace(false);
@@ -397,9 +417,6 @@ impl Future for FrameFuture<'_> {
                 && self.sys.text_shown.get()
                 && *self.sys.screen.borrow() == self.sys.hd_text.borrow().after;
             self.sys.text_shown.set(marked || kept);
-            self.sys
-                .photo_shown
-                .set(self.sys.photo_marked.replace(false));
             Poll::Pending
         }
     }

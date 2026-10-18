@@ -393,7 +393,13 @@ fn move_video_panorama_sides() {
     h.click();
     let mut ts = Vec::new();
     let mut sides = None;
+    // Every frame of the move shows a wide picture: the HD layer or a
+    // video's frame (none with the 640x480 picture alone).
+    let mut bare = 0;
     assert!(h.run_until(3000, || {
+        if !sys.hd_shown() && !sys.photo_shown() {
+            bare += 1;
+        }
         let v = sys.hd_video.borrow();
         if v.active {
             ts.push(v.t);
@@ -401,6 +407,7 @@ fn move_video_panorama_sides() {
         }
         places_entered(&trace).len() > entered
     }));
+    assert_eq!(bare, 0, "frames without a wide picture during the move");
     let (start, end, w, hgt) = sides.expect("no panorama beside the move video");
     assert_eq!((w, hgt), (side_tiles * tile, 30 * tile));
     assert_eq!(start.len(), 2 * w * hgt);
@@ -410,7 +417,13 @@ fn move_video_panorama_sides() {
     assert!(!sys.hd_video.borrow().active, "ended with the video");
     // The arrival's HD view: its sides against the destination's.
     let n = seen.borrow().angles.len();
-    assert!(h.run_until(400, || seen.borrow().angles.len() > n));
+    assert!(h.run_until(400, || {
+        if !sys.hd_shown() && !sys.photo_shown() {
+            bare += 1;
+        }
+        seen.borrow().angles.len() > n
+    }));
+    assert_eq!(bare, 0, "frames without a wide picture at the arrival");
     h.run(3);
     let layer = sys.hd.borrow();
     assert_eq!(layer.side, w);
