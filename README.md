@@ -74,8 +74,17 @@ those of the latest commit:
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
 | Web (a static site to serve over HTTP) | `atlantis-native-web.zip` |
 
-> **macOS:** the app is not notarised. The first time, right-click it and
-> choose Open (or allow it in System Settings › Privacy & Security).
+> **macOS:** the app is signed ad hoc but not notarised by Apple (that
+> needs a paid Apple Developer account), so macOS blocks it the first
+> time. Since macOS 15 a right-click is not enough:
+>
+> 1. Open **Atlantis Native** once (macOS says it cannot verify it).
+> 2. Go to **System Settings → Privacy & Security** and click
+>    **Open Anyway** next to the message about Atlantis Native.
+> 3. Confirm with **Open**. It opens normally from then on.
+>
+> Or, in the Terminal:
+> `xattr -dr com.apple.quarantine "/Applications/Atlantis Native.app"`
 
 ## You need the game
 
