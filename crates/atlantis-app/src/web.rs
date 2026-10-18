@@ -218,6 +218,17 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
         let text = crate::guide::explain(&top, "you chose", e);
         format!("{text}\n\nHelp: {}", crate::guide::HELP_URL).into()
     };
+    // An edition not supported yet: the page shows a link to a report
+    // filled in with its identifiers.
+    let report = |files: &WebFiles| -> JsValue {
+        let e =
+            atlantis_data::GameError::UnknownExecutable(files.size("atlantis.exe").unwrap_or(0));
+        let text = crate::guide::explain(&top, "you chose", &e);
+        let url = crate::guide::EditionReport::collect(files, &top, false)
+            .map(|r| r.url("web", &crate::version_string()))
+            .unwrap_or_else(|| crate::guide::NEW_ISSUE_URL.to_string());
+        format!("{text}\n\nREPORT:{url}").into()
+    };
     let sizes = by_key
         .iter()
         .map(|(k, f)| (k.clone(), f.size() as u64))
@@ -258,7 +269,10 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
         }
     }
 
-    let game = Game::open(web.clone()).map_err(|e| explain(&e))?;
+    let game = Game::open(web.clone()).map_err(|e| match e {
+        atlantis_data::GameError::UnknownExecutable(_) => report(&web),
+        e => explain(&e),
+    })?;
     let saves: Rc<dyn SaveStore> = match WebStore::new(game.exe.build.name) {
         Some(store) => Rc::new(store),
         None => {

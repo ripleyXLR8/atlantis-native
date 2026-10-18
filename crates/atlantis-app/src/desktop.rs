@@ -323,6 +323,22 @@ pub fn first_start() -> Option<(Game, PathBuf)> {
     pick_game_folder("Quit")
 }
 
+/// Opens the project's new-issue page in the browser, filled in with the
+/// identifiers of the edition in `dir` (its files or its disc images).
+fn report_edition(dir: &Path) {
+    let names = setup::names_in(dir);
+    let report = if names.iter().any(|n| n == "atlantis.exe") {
+        crate::guide::EditionReport::collect(&StdDir::new(dir), &names, false)
+    } else {
+        atlantis_data::disc_image::DiscSet::open_folder(dir)
+            .and_then(|set| crate::guide::EditionReport::collect(&set, &names, true))
+    };
+    match report {
+        Some(r) => setup::open_url(&r.url(std::env::consts::OS, &crate::version_string())),
+        None => setup::open_url(crate::guide::NEW_ISSUE_URL),
+    }
+}
+
 /// The game folder the player chooses in the system's folder picker, with
 /// a message saying what to do when the folder is not right (its third
 /// button labelled `give_up`), and the offer to copy the discs when the
@@ -352,12 +368,22 @@ pub fn pick_game_folder(give_up: &str) -> Option<(Game, PathBuf)> {
             }
             Err(e) => {
                 log::warn!("{}: {e}", root.display());
-                match ask(
-                    &setup::explain(&root, &e),
-                    "Choose another folder",
-                    "Help",
-                    give_up,
-                ) {
+                let text = setup::explain(&root, &e);
+                if matches!(e, GameError::UnknownExecutable(_)) {
+                    // An edition not supported yet: a report in one click.
+                    match ask(
+                        &text,
+                        "Report it on GitHub",
+                        "Choose another folder",
+                        give_up,
+                    ) {
+                        Choice::First => report_edition(&root),
+                        Choice::Second => {}
+                        Choice::Third => return None,
+                    }
+                    continue;
+                }
+                match ask(&text, "Choose another folder", "Help", give_up) {
                     Choice::First => {}
                     Choice::Second => setup::open_url(setup::HELP_URL),
                     Choice::Third => return None,

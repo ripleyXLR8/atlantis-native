@@ -51,8 +51,10 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
              does not know: an edition of the game that is not supported yet.\n\n\
              Supported: the English CD (1997 and 2001), the French CD (1997), the CD with \
              Cryo's patch 1.01, and GOG.com (English, French, German, Spanish, Italian).\n\n\
-             You can help support your edition: open an issue on the project's page with \
-             the size above and where your copy comes from."
+             You can help support your edition: report it to the project. The report \
+             opens on the project's GitHub page, filled in with the files' identifiers \
+             (sizes and checksums, no personal data); nothing is sent until you submit it \
+             there."
         ),
         GameError::NoExecutable => {
             if any_ext(&["iso", "bin", "cue", "mdf", "mds", "nrg", "img", "chd"]) {
@@ -96,5 +98,165 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
                 )
             }
         }
+    }
+}
+
+/// The page that opens a new issue on the project.
+pub const NEW_ISSUE_URL: &str = "https://github.com/ripleyXLR8/atlantis-native/issues/new";
+
+/// What identifies an edition Atlantis Native does not know, for a report
+/// to the project: the executable's and the archives' identifiers and the
+/// names of the files at the top of the game folder (never its path, nor
+/// anything about the player).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct EditionReport {
+    pub exe_size: u64,
+    pub pe_timestamp: Option<u32>,
+    pub exe_md5: String,
+    /// The md5 of the first 5000 bytes (ScummVM's detection key).
+    pub exe_head_md5: String,
+    /// Each BIGCD archive: its name, size and md5 of its first 5000 bytes.
+    pub archives: Vec<(String, u64, String)>,
+    pub from_images: bool,
+    pub files: Vec<String>,
+}
+
+fn md5_hex(data: &[u8]) -> String {
+    use md5::{Digest, Md5};
+    Md5::digest(data)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+impl EditionReport {
+    /// The identifiers of the game in `src`; `None` without atlantis.exe.
+    pub fn collect(
+        src: &dyn atlantis_data::FileSource,
+        files: &[String],
+        from_images: bool,
+    ) -> Option<EditionReport> {
+        let exe = src.read("atlantis.exe")?;
+        let archives = (1..=4)
+            .filter_map(|n| {
+                let name = format!("BIGCD{n}.BIG");
+                let size = src.size(&name)?;
+                let head = src.read_at(&name, 0, 5000.min(size as usize))?;
+                Some((name, size, md5_hex(&head)))
+            })
+            .collect();
+        let mut files: Vec<String> = files.to_vec();
+        files.sort();
+        files.truncate(60);
+        Some(EditionReport {
+            exe_size: exe.len() as u64,
+            pe_timestamp: atlantis_data::exe::pe_timestamp(&exe),
+            exe_md5: md5_hex(&exe),
+            exe_head_md5: md5_hex(&exe[..exe.len().min(5000)]),
+            archives,
+            from_images,
+            files,
+        })
+    }
+
+    /// The issue's title and body (Markdown).
+    pub fn issue(&self, platform: &str, version: &str) -> (String, String) {
+        let title = format!("New edition: atlantis.exe of {} bytes", self.exe_size);
+        let mut body = String::from(
+            "Atlantis Native did not recognise this edition of the game.\n\n\
+             **Where does this copy come from?** (CD with its language and publisher, \
+             DVD, download, patch...): \n\n\
+             ## Identifiers (filled in by Atlantis Native)\n\n",
+        );
+        body.push_str(&format!(
+            "| | |\n|---|---|\n| atlantis.exe size | {} |\n| PE timestamp | {} |\n\
+             | md5 | `{}` |\n| md5 of the first 5000 bytes | `{}` |\n| read from disc images | {} |\n",
+            self.exe_size,
+            self.pe_timestamp.map_or("none".to_string(), |t| format!("0x{t:08x}")),
+            self.exe_md5,
+            self.exe_head_md5,
+            if self.from_images { "yes" } else { "no" },
+        ));
+        for (name, size, head) in &self.archives {
+            body.push_str(&format!("| {name} | {size} bytes, head md5 `{head}` |\n"));
+        }
+        body.push_str(&format!(
+            "\nFiles in the folder: {}\n\n{version} on {platform}\n",
+            self.files.join(", ")
+        ));
+        (title, body)
+    }
+
+    /// The link that opens the issue, filled in, on the project's page.
+    pub fn url(&self, platform: &str, version: &str) -> String {
+        let (title, body) = self.issue(platform, version);
+        format!(
+            "{NEW_ISSUE_URL}?labels=new%20edition&title={}&body={}",
+            percent_encode(&title),
+            percent_encode(&body)
+        )
+    }
+}
+
+/// `s` encoded for a URL's query (everything but the unreserved
+/// characters).
+pub fn percent_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use atlantis_data::MemFiles;
+
+    #[test]
+    fn report_of_an_unknown_edition() {
+        let mut files = MemFiles::new();
+        files.insert("atlantis.exe", b"MZ not a real exe".to_vec());
+        files.insert("BIGCD1.BIG", vec![1u8; 9000]);
+        let names = vec!["ATLANTIS.EXE".to_string(), "BIGCD1.BIG".to_string()];
+        let r = EditionReport::collect(&files, &names, false).unwrap();
+        assert_eq!(r.exe_size, 17);
+        assert_eq!(r.pe_timestamp, None);
+        assert_eq!(r.archives.len(), 1);
+        assert_eq!(r.archives[0].1, 9000);
+        let url = r.url("windows", "Atlantis Native 0.1.0");
+        assert!(url.starts_with(NEW_ISSUE_URL));
+        assert!(url.contains("title=New%20edition%3A%20atlantis.exe%20of%2017%20bytes"));
+        assert!(!url.contains(' ') && !url.contains('\n'));
+        let (_, body) = r.issue("windows", "v");
+        assert!(body.contains(&r.exe_md5) && body.contains("BIGCD1.BIG"));
+        assert_eq!(percent_encode("a b/é"), "a%20b%2F%C3%A9");
+    }
+
+    /// The report of a real edition read from its disc images
+    /// (`ATLANTIS_ISO_UNKNOWN`: a folder of images of an edition not
+    /// supported): every identifier, and a link short enough for GitHub.
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn report_from_disc_images() {
+        let Ok(dir) = std::env::var("ATLANTIS_ISO_UNKNOWN") else {
+            eprintln!("ATLANTIS_ISO_UNKNOWN not set: skipped");
+            return;
+        };
+        let set = atlantis_data::disc_image::DiscSet::open_folder(dir.as_ref()).unwrap();
+        let names: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_ascii_lowercase())
+            .collect();
+        let r = EditionReport::collect(&set, &names, true).unwrap();
+        assert_eq!(r.archives.len(), 4);
+        let url = r.url("linux", "Atlantis Native test");
+        eprintln!("{}\n{} characters", r.issue("linux", "test").1, url.len());
+        assert!(url.len() < 8000);
     }
 }

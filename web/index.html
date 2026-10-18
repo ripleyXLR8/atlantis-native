@@ -42,7 +42,15 @@
       await start(e.target.files);
       document.getElementById("pick").style.display = "none";
     } catch (err) {
-      document.getElementById("err").textContent = String(err);
+      const box = document.getElementById("err");
+      const [text, url] = String(err).split("\n\nREPORT:");
+      box.textContent = text;
+      if (url) {
+        const a = document.createElement("a");
+        a.href = url; a.target = "_blank"; a.rel = "noopener";
+        a.textContent = "Report this edition on GitHub";
+        box.append("\n\n", a);
+      }
     }
   });
 </script>

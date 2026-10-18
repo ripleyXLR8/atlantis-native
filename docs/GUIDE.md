@@ -57,9 +57,14 @@ Compressed images (`.zip`, `.7z`, `.chd`) must be extracted first.
 The English CD (1997 and 2001 builds), the French CD (May and August
 1997), the CD with Cryo's patch 1.01, and the GOG.com release in
 English, French, German, Spanish and Italian. Another edition is
-refused with the size of its `atlantis.exe`: open an issue on the
-project's page with it and where your copy comes from, to help support
-it.
+refused with the size of its `atlantis.exe`, and the message offers to
+report it in one click: **Report it on GitHub** opens a new issue on the
+project's page in your browser, filled in with the identifiers of the
+files (the size, date and checksums of `atlantis.exe`, the size and
+checksum of the start of each `BIGCD` archive, the names of the files in
+the folder; never the folder's path). Add where your copy comes from and
+submit it: nothing is sent before. The web build shows the same report
+as a link.
 
 ### When the folder is refused
 

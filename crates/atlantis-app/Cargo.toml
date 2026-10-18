@@ -21,6 +21,8 @@ winit = "0.30"
 softbuffer = "0.4"
 cpal = "0.15"
 web-time = "1"
+# The identifiers of an unknown edition in the report to the project.
+md-5 = "0.10"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"

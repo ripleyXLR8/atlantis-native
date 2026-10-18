@@ -43,7 +43,8 @@ fn has_disc_images(dir: &Path) -> bool {
     })
 }
 
-fn names_in(dir: &Path) -> Vec<String> {
+/// The names of the files at the top of `dir` (lower case).
+pub fn names_in(dir: &Path) -> Vec<String> {
     std::fs::read_dir(dir)
         .map(|entries| {
             entries
