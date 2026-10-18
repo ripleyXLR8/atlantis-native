@@ -14,7 +14,7 @@ use atlantis_data::sprite::{limits, read_spr_file, SprSprite};
 
 use crate::engine::Engine;
 use crate::warp::{SCREEN_H, SCREEN_W};
-use layout::{font_min_blits, FontMin, MenuWalk};
+use layout::{font_min_blits, FontMin, FontMinAdvances, MenuWalk};
 
 /// The sprite banks of the interface (`SPRITE\2D\`).
 #[derive(Clone, Debug, Default)]
@@ -25,6 +25,8 @@ pub struct UiAssets {
     /// FONTMIN.SPR, the player-name font; FONTMIN2.SPR, its hovered glyphs.
     pub fontmin: Vec<SprSprite>,
     pub fontmin2: Vec<SprSprite>,
+    /// FONTMIN's advances, past its table the build's credits table's.
+    pub fontmin_advance: FontMinAdvances,
     /// CREDBLAN.SPR / CREDBLEU.SPR, the credits fonts.
     pub credblan: Vec<SprSprite>,
     pub credbleu: Vec<SprSprite>,
@@ -105,7 +107,7 @@ impl UiAssets {
         } else {
             &self.fontmin
         };
-        for b in font_min_blits(r, text, x, y) {
+        for b in font_min_blits(r, text, x, y, &self.fontmin_advance) {
             if let Some(spr) = bank.get(usize::from(b.idx)) {
                 draw_sprite(screen, spr, b.x, b.y);
             }
@@ -286,6 +288,7 @@ impl Engine {
             fontmax2: bank(self, "FONTMAX2.SPR", d).await,
             fontmin: bank(self, "FONTMIN.SPR", d).await,
             fontmin2: bank(self, "FONTMIN2.SPR", d).await,
+            fontmin_advance: FontMinAdvances::new(&self.game.exe.credit_widths),
             credblan: bank(self, "CREDBLAN.SPR", d).await,
             credbleu: bank(self, "CREDBLEU.SPR", d).await,
             sprmenu: bank(self, "SPRMENU.SPR", d).await,

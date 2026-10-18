@@ -31,7 +31,7 @@ use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::ui::credits::credits_events;
 use atlantis_engine::ui::layout::{
     font_min_blits, font_min_load_list_width, menu_grid_hit, menu_volume_from_knob, menu_walk_hit,
-    subtitle_toggle_click, walk_menu_text, FontMin, LoadPickerScroll, MenuWalk,
+    subtitle_toggle_click, walk_menu_text, FontMin, FontMinAdvances, LoadPickerScroll, MenuWalk,
 };
 use atlantis_engine::ui::menus::{ingame_menu_outcome, MenuOutcome};
 use atlantis_engine::ui::{guest_edge_original, object_icon, Guests};
@@ -165,11 +165,13 @@ fn menu_rules_match_original() {
         }
     }
     assert_eq!(grid, 672);
+    // ASCII names: glyphs inside FONTMIN's own table.
+    let adv = FontMinAdvances::default();
     let blits = |r: FontMin, texts: &[&str], x: i32, y0: i32| -> Vec<Vec<i32>> {
         texts
             .iter()
             .enumerate()
-            .flat_map(|(j, t)| font_min_blits(r, t.as_bytes(), x, y0 + 22 * j as i32))
+            .flat_map(|(j, t)| font_min_blits(r, t.as_bytes(), x, y0 + 22 * j as i32, &adv))
             .map(|b| vec![b.x, b.y, i32::from(b.idx) + 0x20])
             .collect()
     };
@@ -427,12 +429,13 @@ fn load_picker_matches_original() {
         return;
     };
     let epi = g.big.read("SPRLIST\\EPI.TXT").unwrap();
+    let adv = FontMinAdvances::new(&g.exe.credit_widths);
     let (mut k, mut s, mut t) = (0, 0, 0);
     for l in lines(include_str!("golden/ui_load_picker.txt")) {
         let f: Vec<&str> = l.split(' ').collect();
         match f[0] {
             "K" => {
-                let sb = LoadPickerScroll::new(f[1].parse().unwrap(), true);
+                let sb = LoadPickerScroll::new(f[1].parse().unwrap(), true, true);
                 // 0: the record keeps the x of LOADMENU.TXT (600).
                 let x = if sb.knob_x != 0 { sb.knob_x } else { 600 };
                 assert_eq!(x.to_string(), f[2], "{l}");
@@ -440,7 +443,7 @@ fn load_picker_matches_original() {
             }
             "S" => {
                 let count: i32 = f[1].parse().unwrap();
-                let mut sb = LoadPickerScroll::new(count, true);
+                let mut sb = LoadPickerScroll::new(count, true, true);
                 // The emulation's first frame: mouse at y 200, nothing latched.
                 sb.frame(false, false, 200);
                 let rows: Vec<String> = (0..480)
@@ -456,8 +459,8 @@ fn load_picker_matches_original() {
             "T" => {
                 let ch: u32 = f[1].parse().unwrap();
                 let title = epi_episode_name(&epi, ch);
-                let x = (640 - font_min_load_list_width(&title)) / 2;
-                let got: String = font_min_blits(FontMin::NameField, &title, x, 0x50)
+                let x = (640 - font_min_load_list_width(&title, &adv)) / 2;
+                let got: String = font_min_blits(FontMin::NameField, &title, x, 0x50, &adv)
                     .iter()
                     .map(|b| format!(" {}@{},{}", b.idx, b.x, b.y))
                     .collect();

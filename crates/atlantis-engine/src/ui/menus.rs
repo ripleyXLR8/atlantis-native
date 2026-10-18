@@ -197,8 +197,8 @@ impl Engine {
         let (grid_x, grid_y, grid_w, grid_h) = (175, 248, 320, 22);
         let mut selected: Option<usize> = None;
         let mut typed: Option<Vec<u8>> = None; // on the "new player" row
-        let names_1997 = self.game.exe.build.players_1997;
-        let list_font = if names_1997 {
+        let upper_case = self.game.exe.build.upper_case_names;
+        let list_font = if self.game.exe.build.players_1997 {
             FontMin::PlayerList1997
         } else {
             FontMin::PlayerList
@@ -229,17 +229,18 @@ impl Engine {
             }
             // Name entry, only on the "new player" row (@ 0x0041e283):
             // codes 0x20..0xa7, a leading space refused; at 16 characters
-            // the last one is replaced; backspace restores a dot. The 1997
-            // build takes 0x20..0x7a and stores a..z as A..Z
+            // the last one is replaced; backspace restores a dot (so does
+            // atlantis-cd-fr-687104 FUN_0041d45c @ 0x0041d847). The English
+            // 1997 build takes 0x20..0x7a and stores a..z as A..Z
             // (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1..0x0041daf8).
             if let Some(buf) = typed.as_mut() {
                 for &c in &mi.chars {
                     let mut code = name_key_code(c);
-                    let last = if names_1997 { 0x7a } else { 0xa7 };
+                    let last = if upper_case { 0x7a } else { 0xa7 };
                     if !(0x20..=last).contains(&code) || (buf.is_empty() && code == b' ') {
                         continue;
                     }
-                    if names_1997 {
+                    if upper_case {
                         code = code.to_ascii_uppercase();
                     }
                     if buf.len() >= NAME_MAX_CHARS {
@@ -615,8 +616,9 @@ impl Engine {
             .map(|&c| epi_episode_name(&self.epi_text, u32::from(c)))
             .collect();
         let count = chapters.len();
-        let clamp = self.game.exe.build.load_picker_clamp;
-        let mut sb = LoadPickerScroll::new(count as i32, clamp);
+        let build = self.game.exe.build;
+        let clamp = build.load_picker_clamp;
+        let mut sb = LoadPickerScroll::new(count as i32, build.load_knob_starts_at_bar, clamp);
         let mut title: Option<(Vec<u8>, i32)> = None;
         let mut selected: Option<usize> = None;
         let mut last_click: Option<(usize, u64)> = None;
@@ -624,7 +626,7 @@ impl Engine {
         let player = self.player.min(MAX_PLAYERS - 1);
         let choose = |e: &mut Engine, i: usize, title: &mut Option<(Vec<u8>, i32)>| {
             e.players.chapters[player] = chapters[i];
-            let w = font_min_load_list_width(&names[i]);
+            let w = font_min_load_list_width(&names[i], &e.ui.fontmin_advance);
             *title = Some((names[i].clone(), (640 - w) / 2));
         };
         loop {
@@ -661,8 +663,9 @@ impl Engine {
             }
             sb.frame(track_latched, down, my);
             let scroll = usize::from(sb.offset);
-            // A row counts when row + offset < count (0x0041d37b); the
-            // 1997 build tests the row alone (atlantis-cd-en-688128
+            // A row counts when row + offset < count (0x0041d37b;
+            // atlantis-cd-fr-687104 FUN_0041c708 @ 0x0041cb0b..0x0041cb1b);
+            // the English 1997 build tests the row alone (atlantis-cd-en-688128
             // FUN_0041c9a8 @ 0x0041cd87) and takes entry row + offset
             // (0x0041cdaa). Past the list it would read an empty record
             // (its chapter -1 then walks EPI.TXT without an end): the port

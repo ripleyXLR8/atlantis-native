@@ -62,20 +62,48 @@ pub const FONTMAX_WIDTHS: [u8; 137] = [
     17, 24, 0, 25, 20, 18, 13, 20, 20, 20, 24, 2, 12, 16,
 ];
 
-/// The FONTMIN pen advances (0x00496697, indexed by `c - 0x20`; control
-/// bytes use index 0x20).
-pub const FONTMIN_ADVANCE: [u8; 137] = [
+/// The FONTMIN pen advances (0x00496697, 101 bytes indexed by `c - 0x20`;
+/// control bytes use index 0x20). Equal in every known build
+/// (atlantis-cd-fr-687104 0x00486670).
+pub const FONTMIN_ADVANCE: [u8; 101] = [
     15, 8, 13, 6, 13, 20, 17, 6, 13, 20, 11, 6, 4, 20, 15, 12, 17, 8, 16, 16, 14, 13, 15, 13, 16,
     15, 7, 6, 6, 6, 6, 20, 6, 17, 19, 18, 19, 16, 16, 19, 18, 12, 12, 17, 16, 24, 20, 23, 17, 22,
     17, 15, 19, 20, 17, 23, 22, 18, 17, 7, 16, 6, 10, 6, 7, 16, 16, 15, 15, 16, 12, 16, 17, 8, 9,
     16, 7, 19, 16, 17, 16, 15, 13, 12, 10, 17, 15, 19, 17, 15, 14, 16, 6, 17, 11, 16, 17, 17, 15,
-    16, 15, 16, 16, 16, 15, 15, 15, 11, 10, 10, 18, 18, 16, 17, 17, 17, 17, 15, 23, 19, 15, 19, 0,
-    21, 17, 16, 10, 17, 17, 10, 20, 14, 14, 13, 3, 5, 8,
+    16, 15,
 ];
 
-/// The FONTMIN advance of glyph `idx`.
-pub fn font_min_advance(idx: usize) -> i32 {
-    FONTMIN_ADVANCE.get(idx).map_or(0, |&a| i32::from(a))
+/// The advances the FONTMIN drawers read: they index 0x00496697 with
+/// `c - 0x20` and no bound, so glyph `i` >= 101 reads on into the credits
+/// advance table that follows it (0x004966fc = FONTMIN + 101;
+/// atlantis-cd-fr-687104 0x00486670 / 0x004866d5), the build's byte
+/// `i - 101`: in atlantis-cd-fr-687104 the typed 0xa1, 0xa3 and 0xa4
+/// advance 17, 2 and 10, in the reference 10, 14 and 14.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FontMinAdvances([u8; 0x100 - 0x20]);
+
+impl FontMinAdvances {
+    /// The advances of a build from its credits advance table.
+    pub fn new(credit_widths: &[u8; 256]) -> FontMinAdvances {
+        let mut a = [0u8; 0x100 - 0x20];
+        let n = FONTMIN_ADVANCE.len();
+        a[..n].copy_from_slice(&FONTMIN_ADVANCE);
+        let rest = a.len() - n;
+        a[n..].copy_from_slice(&credit_widths[..rest]);
+        FontMinAdvances(a)
+    }
+
+    /// The advance of glyph `idx`.
+    pub fn get(&self, idx: u8) -> i32 {
+        self.0.get(usize::from(idx)).map_or(0, |&a| i32::from(a))
+    }
+}
+
+/// Without an executable: the glyphs past the table advance 0.
+impl Default for FontMinAdvances {
+    fn default() -> FontMinAdvances {
+        FontMinAdvances::new(&[0; 256])
+    }
 }
 
 fn fontmax_width(c: i32) -> i32 {
@@ -395,7 +423,13 @@ pub struct FontMinBlit {
     pub idx: u8,
 }
 
-pub fn font_min_blits(r: FontMin, text: &[u8], x: i32, y: i32) -> Vec<FontMinBlit> {
+pub fn font_min_blits(
+    r: FontMin,
+    text: &[u8],
+    x: i32,
+    y: i32,
+    adv: &FontMinAdvances,
+) -> Vec<FontMinBlit> {
     let mut out = Vec::new();
     let mut cx = x;
     for &c in text {
@@ -415,30 +449,32 @@ pub fn font_min_blits(r: FontMin, text: &[u8], x: i32, y: i32) -> Vec<FontMinBli
         cx += if r == FontMin::NameField && idx == 0x2e {
             20
         } else {
-            font_min_advance(usize::from(idx))
+            adv.get(idx)
         };
     }
     out
 }
 
 /// The width `FUN_00420b48` records for a load-list row (0x00611e80).
-pub fn font_min_load_list_width(text: &[u8]) -> i32 {
+pub fn font_min_load_list_width(text: &[u8], adv: &FontMinAdvances) -> i32 {
     text.iter()
         .map(|&c| {
             let idx = if c < 0x20 { 0x20 } else { c - 0x20 };
             if idx == 0x20 {
                 6
             } else {
-                font_min_advance(usize::from(idx))
+                adv.get(idx)
             }
         })
         .sum()
 }
 
 /// `FUN_0041cf78`'s scrollbar (0x0041d1f3..0x0041d24b at entry,
-/// 0x0041d273..0x0041d2e6 each frame); with `clamp` false, the 1997
-/// build's (atlantis-cd-en-688128 FUN_0041c9a8): the knob starts at y 0
-/// (0x0041cc23) and is not clamped above the bar.
+/// 0x0041d273..0x0041d2e6 each frame). The 1997 builds start the knob at
+/// y 0 (atlantis-cd-en-688128 FUN_0041c9a8 @ 0x0041cc23,
+/// atlantis-cd-fr-687104 FUN_0041c708 @ 0x0041c98a); with `clamp` false,
+/// the English one's, it is not clamped above the bar (the French one
+/// clamps it, FUN_0041c708 @ 0x0041ca60..0x0041ca76).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LoadPickerScroll {
     pub drag_on: bool,
@@ -449,15 +485,16 @@ pub struct LoadPickerScroll {
     pub knob_y: i32,
     /// The list offset 0x00496605.
     pub offset: u8,
-    /// The 2001 knob start and clamp.
+    /// The clamp above the bar.
     pub clamp: bool,
 }
 
 impl LoadPickerScroll {
     /// With 11 files or fewer the knob is off-screen and never moves; else
-    /// step = 0xd7 / (count - 10).
-    pub fn new(count: i32, clamp: bool) -> LoadPickerScroll {
-        let knob_y = if clamp { 0x7b } else { 0 };
+    /// step = 0xd7 / (count - 10). The knob starts at y 0x7b when
+    /// `at_bar`, else at 0.
+    pub fn new(count: i32, at_bar: bool, clamp: bool) -> LoadPickerScroll {
+        let knob_y = if at_bar { 0x7b } else { 0 };
         if count <= 11 {
             LoadPickerScroll {
                 drag_on: false,
@@ -591,7 +628,7 @@ mod tests {
     #[test]
     fn rules_of_the_1997_build() {
         let idx = |r| -> Vec<u8> {
-            font_min_blits(r, b"A#B", 0, 0)
+            font_min_blits(r, b"A#B", 0, 0, &FontMinAdvances::default())
                 .iter()
                 .map(|b| b.idx + 0x20)
                 .collect()
@@ -607,14 +644,45 @@ mod tests {
             .collect();
         assert_eq!(seq, [true, false, true, false]);
         assert_eq!(n, 0);
-        let mut sb = LoadPickerScroll::new(20, false);
+        let mut sb = LoadPickerScroll::new(20, false, false);
         assert_eq!((sb.knob_y, sb.step), (0, 21));
         sb.frame(true, true, 0x80);
         assert_eq!((sb.knob_y, sb.offset), (0x76, 0));
-        let mut sb = LoadPickerScroll::new(20, true);
+        let mut sb = LoadPickerScroll::new(20, true, true);
         assert_eq!(sb.knob_y, 0x7b);
         sb.frame(true, true, 0x80);
         assert_eq!((sb.knob_y, sb.offset), (0x7b, 0));
+        // atlantis-cd-fr-687104 FUN_0041c708: the knob from 0, clamped.
+        let mut sb = LoadPickerScroll::new(20, false, true);
+        assert_eq!(sb.knob_y, 0);
+        sb.frame(true, true, 0x80);
+        assert_eq!((sb.knob_y, sb.offset), (0x7b, 0));
+    }
+
+    #[test]
+    fn fontmin_reads_on_into_the_credits_table() {
+        let mut credits = [0u8; 256];
+        credits[0x1c] = 17;
+        credits[0x1e] = 2;
+        credits[0x1f] = 10;
+        credits[122] = 9;
+        let adv = FontMinAdvances::new(&credits);
+        assert_eq!(adv.get(0x21), 17); // 'A'
+        assert_eq!(adv.get(100), 15);
+        assert_eq!(
+            [
+                adv.get(0xa1 - 0x20),
+                adv.get(0xa3 - 0x20),
+                adv.get(0xa4 - 0x20)
+            ],
+            [17, 2, 10]
+        );
+        assert_eq!(adv.get(0xff - 0x20), 9);
+        let xs: Vec<i32> = font_min_blits(FontMin::NameField, b"\xa3\xa4A", 0, 0, &adv)
+            .iter()
+            .map(|b| b.x)
+            .collect();
+        assert_eq!(xs, [0, 2, 12]);
     }
 
     #[test]
