@@ -2,6 +2,68 @@
 
 [Back to the README](../README.md)
 
+## Getting the game files
+
+Atlantis Native is a new engine: it does not include the game. The
+pictures, videos, voices and music of *Atlantis: The Lost Tales* belong
+to its publisher, so Atlantis Native plays them from your own copy. It
+only reads the files and never changes them; it never runs the game's
+programs.
+
+On its first start it looks for the game on your computer (the GOG.com
+installation, a copy in a usual place) and offers it; otherwise it
+explains what it needs and asks for the folder. It remembers the folder.
+
+### From GOG.com
+
+Install the game with GOG Galaxy or the offline installer, then choose
+the folder it was installed to (for example
+`C:\GOG Games\Atlantis The Lost Tales`). The installer itself (a
+`setup_atlantis_...exe` file) is not enough: run it first. On macOS,
+choose the game's app: Atlantis Native looks inside it.
+
+### From the CD
+
+The CD release spreads its files over four discs, one archive each:
+`BIGCD1.BIG` on disc 1, `BIGCD2.BIG` on disc 2, and so on. Make a folder
+and copy into it:
+
+- `atlantis.exe` from disc 1;
+- `BIGCD1.BIG`, `BIGCD2.BIG`, `BIGCD3.BIG` and `BIGCD4.BIG`, one from
+  each disc.
+
+Then choose that folder. A folder the CD's installer made
+(`C:\Cryo\Atlantis`, for example) is not enough on its own: the
+original game reads the archives from the disc, so copy them into it.
+Disc images (`.iso`, `.bin`/`.cue`): open them (double-click on Windows
+10 and later, or 7-Zip) and copy the same files.
+
+### Supported editions
+
+The English CD (1997 and 2001 builds), the French CD (May and August
+1997), the CD with Cryo's patch 1.01, and the GOG.com release in
+English, French, German, Spanish and Italian. Another edition is
+refused with the size of its `atlantis.exe`: open an issue on the
+project's page with it and where your copy comes from, to help support
+it.
+
+### When the folder is refused
+
+The message says what is wrong and what to do:
+
+| Message | What to do |
+|---|---|
+| holds the game, but not all of it | copy the `BIGCD` files it lists, from the discs it names |
+| holds atlantis.exe but none of the game's archives | copy `BIGCD1.BIG` to `BIGCD4.BIG` from the four discs |
+| holds game archives but not atlantis.exe | copy `atlantis.exe` from disc 1 |
+| holds disc images | open the images and copy the files out of them |
+| holds the GOG.com installer | run the installer, then choose the installed folder |
+| holds an atlantis.exe that Atlantis Native does not know | an edition not supported yet (see above) |
+| does not hold Atlantis: The Lost Tales | choose the folder that holds `atlantis.exe` |
+
+Choosing the folder above the game's works too: Atlantis Native looks a
+few levels down for `atlantis.exe`.
+
 ## Command line
 
 The game folder can be left out of each of these: the remembered one is

@@ -6,7 +6,9 @@ use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use atlantis_data::{Game, StdDir};
+use atlantis_data::{Game, GameError, StdDir};
+
+use crate::setup;
 use atlantis_engine::persist::user_data_dir;
 
 /// The file of the per-user data folder that holds the game folder last
@@ -78,7 +80,40 @@ pub fn error_box(text: &str) {
 
 /// Opens the game in `dir`.
 pub fn open_game(dir: &Path) -> Result<Game, String> {
-    Game::open(Arc::new(StdDir::new(dir))).map_err(|e| format!("{}: {e}", dir.display()))
+    try_open(dir).map_err(|e| format!("{}: {e}", dir.display()))
+}
+
+fn try_open(dir: &Path) -> Result<Game, GameError> {
+    Game::open(Arc::new(StdDir::new(dir)))
+}
+
+/// The answer to a three-button question.
+enum Choice {
+    First,
+    Second,
+    Third,
+}
+
+/// A question in the system's message box with three labelled buttons
+/// (closing the box counts as the third).
+fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
+    let r = rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Info)
+        .set_title("Atlantis Native")
+        .set_description(text)
+        .set_buttons(rfd::MessageButtons::YesNoCancelCustom(
+            first.to_string(),
+            second.to_string(),
+            third.to_string(),
+        ))
+        .show();
+    match r {
+        rfd::MessageDialogResult::Custom(s) if s == first => Choice::First,
+        rfd::MessageDialogResult::Yes => Choice::First,
+        rfd::MessageDialogResult::Custom(s) if s == second => Choice::Second,
+        rfd::MessageDialogResult::No => Choice::Second,
+        _ => Choice::Third,
+    }
 }
 
 fn remembered_folder() -> Option<PathBuf> {
@@ -101,9 +136,12 @@ fn remember_folder(dir: &Path) {
 }
 
 /// The game when no folder is given on the command line: the folder
-/// chosen last time if it still holds the game, else the one the player
-/// chooses in the system's folder picker (asked again after an error, and
-/// remembered). `None` when the player cancels or there is no picker.
+/// chosen last time if it still holds the game; else an installation found
+/// on the computer, if the player takes it; else the folder the player
+/// chooses in the system's folder picker, after an explanation of why the
+/// game's files are needed, with a message saying what to do when the
+/// folder is not right (remembered once right). `None` when the player
+/// quits.
 pub fn choose_game() -> Option<Game> {
     if let Some(dir) = remembered_folder() {
         match open_game(&dir) {
@@ -114,22 +152,70 @@ pub fn choose_game() -> Option<Game> {
             Err(e) => log::warn!("the remembered game folder: {e}"),
         }
     }
-    loop {
-        let dir = rfd::FileDialog::new()
-            .set_title(
-                "Choose the folder of Atlantis: The Lost Tales (with atlantis.exe and BIGCD*.BIG, or the GOG.com installation)",
-            )
-            .pick_folder()?;
-        match open_game(&dir) {
-            Ok(game) => {
-                remember_folder(&dir);
+    // An installation on this computer (GOG.com's, a copy in a usual place).
+    let mut offered = false;
+    for dir in setup::candidate_folders() {
+        let Some(root) = setup::find_game_root(&dir, 4) else {
+            continue;
+        };
+        let Ok(game) = try_open(&root) else {
+            continue;
+        };
+        offered = true;
+        let text = format!(
+            "Atlantis: The Lost Tales was found on this computer:\n\n{}\n\nPlay it from this folder?",
+            root.display()
+        );
+        match ask(&text, "Use this folder", "Choose another folder", "Quit") {
+            Choice::First => {
+                remember_folder(&root);
                 return Some(game);
             }
-            Err(e) => error_box(&format!(
-                "This folder does not hold a game Atlantis Native knows:\n\n{e}\n\n\
-                 Choose the folder with atlantis.exe and BIGCD1.BIG .. BIGCD4.BIG \
-                 (the CD release), or the GOG.com installation folder."
-            )),
+            Choice::Second => break,
+            Choice::Third => return None,
+        }
+    }
+    if !offered {
+        loop {
+            match ask(
+                setup::WELCOME,
+                "Choose the game folder",
+                "How to get the game",
+                "Quit",
+            ) {
+                Choice::First => break,
+                Choice::Second => setup::open_url(setup::HELP_URL),
+                Choice::Third => return None,
+            }
+        }
+    }
+    loop {
+        let dir = rfd::FileDialog::new()
+            .set_title("Choose the folder of Atlantis: The Lost Tales (the one with atlantis.exe)")
+            .pick_folder()?;
+        // The folder above the game's, or a macOS app bundle, holds it
+        // further down.
+        let root = setup::find_game_root(&dir, 4).unwrap_or_else(|| dir.clone());
+        let result = try_open(&root).map(|g| (g, root.clone()));
+        match result {
+            Ok((game, root)) => {
+                remember_folder(&root);
+                log::info!("game folder {}", root.display());
+                return Some(game);
+            }
+            Err(e) => {
+                log::warn!("{}: {e}", root.display());
+                match ask(
+                    &setup::explain(&root, &e),
+                    "Choose another folder",
+                    "Help",
+                    "Quit",
+                ) {
+                    Choice::First => {}
+                    Choice::Second => setup::open_url(setup::HELP_URL),
+                    Choice::Third => return None,
+                }
+            }
         }
     }
 }

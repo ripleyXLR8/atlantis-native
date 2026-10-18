@@ -194,6 +194,30 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
         let rel = rel.split_once('/').map_or(rel.as_str(), |(_, r)| r);
         by_key.insert(key(rel), f);
     }
+    // The player may pick the folder above the game's: take the shallowest
+    // folder that holds atlantis.exe as the game's.
+    if !by_key.contains_key("atlantis.exe") {
+        let prefix = by_key
+            .keys()
+            .filter_map(|k| k.strip_suffix("/atlantis.exe"))
+            .min_by_key(|p| p.matches('/').count())
+            .map(|p| format!("{p}/"));
+        if let Some(prefix) = prefix {
+            by_key = by_key
+                .into_iter()
+                .filter_map(|(k, f)| k.strip_prefix(&prefix).map(|r| (r.to_string(), f)))
+                .collect();
+        }
+    }
+    let top: Vec<String> = by_key
+        .keys()
+        .filter(|k| !k.contains('/'))
+        .cloned()
+        .collect();
+    let explain = |e: &atlantis_data::GameError| -> JsValue {
+        let text = crate::guide::explain(&top, "you chose", e);
+        format!("{text}\n\nHelp: {}", crate::guide::HELP_URL).into()
+    };
     let sizes = by_key
         .iter()
         .map(|(k, f)| (k.clone(), f.size() as u64))
@@ -214,7 +238,7 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
     };
     let exe = by_key
         .get("atlantis.exe")
-        .ok_or("atlantis.exe is not in the chosen folder")?;
+        .ok_or_else(|| explain(&atlantis_data::GameError::NoExecutable))?;
     add("atlantis.exe", 0, fetch(exe, 0, exe.size() as u64).await?);
     for n in 1..=4 {
         let name = format!("bigcd{n}.big");
@@ -234,7 +258,7 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
         }
     }
 
-    let game = Game::open(web.clone()).map_err(|e| e.to_string())?;
+    let game = Game::open(web.clone()).map_err(|e| explain(&e))?;
     let saves: Rc<dyn SaveStore> = match WebStore::new(game.exe.build.name) {
         Some(store) => Rc::new(store),
         None => {

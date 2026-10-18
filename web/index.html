@@ -12,15 +12,25 @@
   canvas { width: min(100vw, calc((100vh - 16px) * 4 / 3)); aspect-ratio: 4 / 3;
            image-rendering: pixelated; outline: none; }
   #err { color: #f88; white-space: pre-wrap; }
+  a { color: #8cf; }
 </style>
 </head>
 <body>
 <div id="pick">
-  <p><b>Atlantis Native</b> needs your copy of <i>Atlantis: The Lost Tales</i>:
-     choose the game folder (with <code>atlantis.exe</code> and the
-     <code>BIGCD*.BIG</code> files, or the GOG.com installation folder).
-     The files stay on your computer; the players and checkpoints are
-     kept in this browser.</p>
+  <p><b>Atlantis Native</b> is a new engine for <i>Atlantis: The Lost Tales</i>.
+     It does not include the game itself: the pictures, videos, voices and
+     music belong to the game's publisher, so it plays them from
+     <b>your own copy</b> of the game.</p>
+  <p>Choose the folder of your game:</p>
+  <ul>
+    <li><b>GOG.com</b>: the folder where the game is installed.</li>
+    <li><b>CD</b>: a folder holding <code>atlantis.exe</code> and
+        <code>BIGCD1.BIG</code> to <code>BIGCD4.BIG</code>, copied from the
+        four discs (each disc holds one <code>BIGCD</code> file).</li>
+  </ul>
+  <p>The files stay on your computer: the browser only reads them. The
+     players and checkpoints are kept in this browser.
+     <a href="https://github.com/ripleyXLR8/atlantis-native/blob/main/docs/GUIDE.md#getting-the-game-files">How to get the game files</a></p>
   <p><input type="file" id="dir" webkitdirectory></p>
   <p id="err"></p>
 </div>

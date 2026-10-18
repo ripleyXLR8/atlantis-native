@@ -11,6 +11,9 @@ pub enum GameError {
     NoExecutable,
     UnknownExecutable(u64),
     NoArchives,
+    /// The CD release's archives (one per disc) that are not in the
+    /// folder: their numbers, 1..4.
+    MissingArchives(Vec<u8>),
 }
 
 impl std::fmt::Display for GameError {
@@ -21,6 +24,10 @@ impl std::fmt::Display for GameError {
                 write!(f, "atlantis.exe ({n} bytes) is not a known build")
             }
             GameError::NoArchives => write!(f, "BIGCD1.BIG not found and no unpacked game files"),
+            GameError::MissingArchives(n) => {
+                let names: Vec<String> = n.iter().map(|n| format!("BIGCD{n}.BIG")).collect();
+                write!(f, "{} not found", names.join(", "))
+            }
         }
     }
 }
@@ -45,12 +52,21 @@ impl Game {
         // The GOG release has a SCENAR directory beside its stubs.
         let unpacked = src.has_dir("SCENAR");
         let mut big = BigArchive::new(src);
-        let mut any = false;
-        for n in 1..=4 {
-            any |= big.mount(&format!("BIGCD{n}.BIG"));
+        let mut missing = Vec::new();
+        for n in 1..=4u8 {
+            if !big.mount(&format!("BIGCD{n}.BIG")) {
+                missing.push(n);
+            }
         }
-        if !any && !unpacked {
-            return Err(GameError::NoArchives);
+        // The CD release needs its four archives (one per disc); the GOG
+        // release reads its unpacked files.
+        if !unpacked {
+            if missing.len() == 4 {
+                return Err(GameError::NoArchives);
+            }
+            if !missing.is_empty() {
+                return Err(GameError::MissingArchives(missing));
+            }
         }
         big.set_loose(unpacked);
         Ok(Game {

@@ -90,6 +90,9 @@ Atlantis Native contains **no game data**. Bring your own copy:
 Each build plays as it shipped: the 1997 English CD and the May 1997
 French CD, for one, draw their subtitles in their own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
 
+How to get the files from your CD or GOG.com: see
+[Getting the game files](docs/GUIDE.md#getting-the-game-files).
+
 The game you chose is shown in the window's title and at the foot of the
 options menu, e.g. *GOG.com, French (1999 build)*.
 

@@ -16,8 +16,11 @@ fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         println!("cargo:rerun-if-changed=../../packaging/windows/atlantis-native.rc");
         println!("cargo:rerun-if-changed=../../assets/icon/atlantis-native.ico");
-        embed_resource::compile("../../packaging/windows/atlantis-native.rc", embed_resource::NONE)
-            .manifest_optional()
-            .unwrap();
+        embed_resource::compile(
+            "../../packaging/windows/atlantis-native.rc",
+            embed_resource::NONE,
+        )
+        .manifest_optional()
+        .unwrap();
     }
 }

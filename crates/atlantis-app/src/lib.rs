@@ -28,6 +28,9 @@ mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
 pub mod dock_icon;
+pub mod guide;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod setup;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod watchdog;
 #[cfg(target_arch = "wasm32")]
