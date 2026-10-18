@@ -82,6 +82,9 @@ impl Drop for WatchdogLeave {
 /// (one thread renders it there).
 #[cfg(not(target_arch = "wasm32"))]
 const HD_MAX_TILE: usize = hd::MAX_TILE;
+/// Widescreen: at most this many tile columns on each side (a 2.4:1
+/// window).
+const HD_MAX_SIDE_TILES: usize = 16;
 #[cfg(target_arch = "wasm32")]
 const HD_MAX_TILE: usize = 32;
 
@@ -205,6 +208,13 @@ impl App {
     pub fn with_icon(mut self, icon: Option<atlantis_data::exe_icon::Icon>) -> App {
         self.icon = icon;
         self
+    }
+
+    /// `--widescreen`: the widescreen option on for this run (not saved).
+    pub fn force_widescreen(&mut self) {
+        let mut o = self.sys.hd_options();
+        o.widescreen = true;
+        self.sys.set_hd_options(o);
     }
 
     pub fn with_graphics(mut self, graphics: Graphics, saves: Option<Rc<dyn SaveStore>>) -> App {
@@ -439,6 +449,15 @@ impl App {
             Graphics::Original => None,
         };
         self.sys.set_hd_tile(tile);
+        // Widescreen: the tile columns of panorama that fill the black
+        // bars on each side (a tile is dw / 40 output pixels wide).
+        let side = match tile {
+            Some(_) if self.sys.hd_options().widescreen && dw > 0 => {
+                (ox * 40).div_ceil(dw).min(HD_MAX_SIDE_TILES)
+            }
+            _ => 0,
+        };
+        self.sys.set_hd_side_tiles(side);
         let screen = self.sys.screen.borrow();
         let mut frame: &[u16] = if self.runner.is_some() {
             &screen

@@ -41,7 +41,8 @@ original's bugs and an optional HD mode.
   so the pixels match on every platform.
 - ✨ **HD mode** (optional): the panoramas and 3D heads rendered at your
   window's resolution, sharp subtitles, and the interface art upscaled with
-  xBR.
+  xBR. With **Widescreen** on, the panorama fills the whole of a wide
+  window, the projection carried on past the original's edges.
 - 🐞 **Bug fixes** (optional): seamless music loops, talking-head overlays
   drawn correctly, and other fixes of the original's bugs. One switch turns
   them all off for the game exactly as it shipped.

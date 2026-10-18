@@ -88,6 +88,10 @@ pub struct HdOptions {
     /// The subtitles (and the options menu's text) drawn at the output's
     /// resolution from the font's outlines.
     pub sharp_subtitles: bool,
+    /// Widescreen: in a window wider than 4:3, the panoramic view fills
+    /// the sides (the 4:3 picture, its interface and hit areas unchanged
+    /// in the middle; black sides where there is no panorama).
+    pub widescreen: bool,
 }
 
 impl Default for HdOptions {
@@ -97,6 +101,7 @@ impl Default for HdOptions {
             sharpen: true,
             smooth_interface: true,
             sharp_subtitles: true,
+            widescreen: false,
         }
     }
 }
@@ -180,7 +185,7 @@ pub struct HdCompositor {
 }
 
 struct Axes {
-    key: (usize, usize, usize, usize, usize),
+    key: (usize, usize, usize, usize, usize, usize, usize, usize),
     /// 640x480 to the output.
     x: crate::upscale::Axis,
     y: crate::upscale::Axis,
@@ -190,6 +195,9 @@ struct Axes {
     /// The layer's column of each output column.
     lx: Vec<usize>,
     ly: Vec<usize>,
+    /// Widescreen: the layer's column of each side column (the left
+    /// side's, then the right side's).
+    side_lx: Vec<usize>,
 }
 
 /// The xBR factor for an output `dw` pixels wide: 2x up to 1600 pixels,
@@ -238,8 +246,13 @@ impl HdCompositor {
             }
         }
         let factor = interface_factor(dw);
-        let (lw, lh) = f.layer.map_or((1, 1), |l| (l.width, l.height));
-        let key = (dw, dh, factor, lw, lh);
+        let (lw, lh, side) = f.layer.map_or((1, 1, 0), |l| (l.width, l.height, l.side));
+        let cw = lw - 2 * side;
+        // Widescreen: the output columns of each side the layer covers.
+        let sd = if side > 0 { side * dw / cw } else { 0 };
+        let left = ox.min(sd);
+        let right = (stride - ox - dw).min(sd);
+        let key = (dw, dh, factor, lw, lh, side, left, right);
         if self.axes.as_ref().is_none_or(|a| a.key != key) {
             self.axes = Some(Axes {
                 key,
@@ -247,7 +260,19 @@ impl HdCompositor {
                 y: Axis::new(h, dh),
                 ux: Axis::new(factor * w, dw),
                 uy: Axis::new(factor * h, dh),
-                lx: (0..dw).map(|x| x * lw / dw).collect(),
+                lx: (0..dw).map(|x| side + x * cw / dw).collect(),
+                side_lx: (0..left + right)
+                    .map(|i| {
+                        // Output column relative to the picture's left edge.
+                        let rel = if i < left {
+                            i as isize - left as isize
+                        } else {
+                            (dw + i - left) as isize
+                        };
+                        let c = side as isize + (rel * cw as isize).div_euclid(dw as isize);
+                        c.clamp(0, lw as isize - 1) as usize
+                    })
+                    .collect(),
                 ly: (0..dh).map(|y| y * lh / dh).collect(),
             });
         }
@@ -303,6 +328,18 @@ impl HdCompositor {
                 let y = first + i;
                 let sy = axes.y.nearest[y];
                 let src = &frame[sy * w..][..w];
+                if let (Some(l), false) = (layer, axes.side_lx.is_empty()) {
+                    let hd = &l.pixels[axes.ly[y] * l.width..][..l.width];
+                    let (lft, _) = (key.6, key.7);
+                    for (i, &c) in axes.side_lx.iter().enumerate() {
+                        let x = if i < lft {
+                            ox - lft + i
+                        } else {
+                            ox + dw + i - lft
+                        };
+                        row[x] = hd[c];
+                    }
+                }
                 let row = &mut row[ox..ox + dw];
                 let base = layer.map(|l| &l.base[sy * w..][..w]);
                 let hd = layer.map(|l| &l.pixels[axes.ly[y] * l.width..][..l.width]);
@@ -351,8 +388,12 @@ impl HdCompositor {
 pub struct HdLayer {
     /// The tile size it was drawn at (16 = 640x480).
     pub tile: usize,
+    /// The whole width, sides included, and the height.
     pub width: usize,
     pub height: usize,
+    /// Widescreen: the columns of panorama on each side of the 4:3
+    /// picture (0 without), which is `width - 2 * side` wide.
+    pub side: usize,
     /// XRGB8888, `width` x `height`.
     pub pixels: Vec<u32>,
     /// RGB565 640x480: the picture `pixels` stands for.
@@ -360,14 +401,21 @@ pub struct HdLayer {
 }
 
 impl HdLayer {
-    /// Sizes the layer for `tile` (its content is then undefined).
-    pub fn resize(&mut self, tile: usize) {
+    /// Sizes the layer for `tile`, with `side_tiles` tile columns on each
+    /// side (its content is then undefined).
+    pub fn resize(&mut self, tile: usize, side_tiles: usize) {
         let (w, h) = hd_size(tile);
         self.tile = tile;
-        self.width = w;
+        self.side = side_tiles * tile;
+        self.width = w + 2 * self.side;
         self.height = h;
-        self.pixels.resize(w * h, 0);
+        self.pixels.resize(self.width * h, 0);
         self.base.resize(SCREEN_W * SCREEN_H, 0);
+    }
+
+    /// The width of the 4:3 picture, without the sides.
+    pub fn centre_width(&self) -> usize {
+        self.width - 2 * self.side
     }
 }
 
@@ -402,7 +450,9 @@ pub fn compose(
     let lut = rgb565_to_888();
     let (w, h) = (SCREEN_W, SCREEN_H);
     let src_col: Vec<usize> = (0..dw).map(|x| x * w / dw).collect();
-    let hd_col: Vec<usize> = (0..dw).map(|x| x * layer.width / dw).collect();
+    let hd_col: Vec<usize> = (0..dw)
+        .map(|x| layer.side + x * layer.centre_width() / dw)
+        .collect();
     for y in 0..dh {
         let sy = y * h / dh;
         let hy = y * layer.height / dh;
@@ -440,6 +490,7 @@ fn low_res_map(n: usize, tile: usize) -> Vec<usize> {
 pub fn compose_dialog(
     layer: &mut HdLayer,
     tile: usize,
+    side_tiles: usize,
     view: &[u32],
     pano: &[u16],
     pre_head: &[u16],
@@ -448,9 +499,12 @@ pub fn compose_dialog(
     smooth: bool,
 ) {
     use crate::upscale::{sample_bilinear, Axis};
-    layer.resize(tile);
+    layer.resize(tile, side_tiles);
     let lut = rgb565_to_888();
-    let (w, h) = (layer.width, layer.height);
+    // The 4:3 picture; the view (and the layer) has `side` more columns
+    // on each side (widescreen), which show the view.
+    let (w, h) = (layer.centre_width(), layer.height);
+    let (side, lw) = (layer.side, layer.width);
     let cols = low_res_map(w, tile);
     let footprint = head.map(|_| head_footprint(pre_head, composite));
     // The body (a video) upscaled bilinearly with a smooth interface.
@@ -461,8 +515,12 @@ pub fn compose_dialog(
     for (hy, sy) in low_res_map(h, tile).into_iter().enumerate() {
         let p = &pano[sy * SCREEN_W..][..SCREEN_W];
         let c = &composite[sy * SCREEN_W..][..SCREEN_W];
-        let v = &view[hy * w..][..w];
-        let out = &mut layer.pixels[hy * w..][..w];
+        let full = &view[hy * lw..][..lw];
+        let line = &mut layer.pixels[hy * lw..][..lw];
+        line[..side].copy_from_slice(&full[..side]);
+        line[side + w..].copy_from_slice(&full[side + w..]);
+        let v = &full[side..side + w];
+        let out = &mut line[side..side + w];
         for (x, (d, &sx)) in out.iter_mut().zip(&cols).enumerate() {
             *d = if c[sx] == p[sx] {
                 v[x]
@@ -512,6 +570,7 @@ struct ViewKey {
     hfov: u32,
     surface: u64,
     tile: usize,
+    side: usize,
     filter: PanoFilter,
     sharpen: bool,
 }
@@ -550,6 +609,7 @@ impl Engine {
             hfov: self.warp.hfov().to_bits(),
             surface: self.hd.surface_gen,
             tile,
+            side: self.sys.hd_side_tiles(),
             filter: opts.panorama,
             sharpen: opts.sharpen,
         };
@@ -568,7 +628,8 @@ impl Engine {
             );
             self.hd.pano_gen = Some(gen);
         }
-        let (w, h) = hd_size(tile);
+        self.warp.set_side_tiles(self.sys.hd_side_tiles());
+        let (w, h) = self.warp.tiles_size(tile);
         self.hd.view.resize(w * h, 0);
         match opts.panorama {
             PanoFilter::Bilinear => {
@@ -614,8 +675,10 @@ impl Engine {
         }
         self.hd_render_view(tile);
         let mut layer = self.sys.hd.borrow_mut();
-        if self.hd.layer_key != self.hd.view_key || layer.tile != tile {
-            layer.resize(tile);
+        let side = self.warp.side_tiles();
+        if self.hd.layer_key != self.hd.view_key || layer.tile != tile || layer.side != side * tile
+        {
+            layer.resize(tile, side);
             layer.pixels.copy_from_slice(&self.hd.view);
             self.hd.layer_key = self.hd.view_key;
         }
@@ -663,7 +726,7 @@ mod tests {
     #[test]
     fn compose_takes_the_layer_where_the_screen_is_its_base() {
         let mut layer = HdLayer::default();
-        layer.resize(32);
+        layer.resize(32, 0);
         layer.pixels.fill(0x0012_3456);
         layer.base.fill(7);
         let mut screen = vec![7u16; SCREEN_W * SCREEN_H];
@@ -681,6 +744,7 @@ mod tests {
         HdOptions {
             smooth_interface: false,
             sharp_subtitles: false,
+            widescreen: false,
             ..HdOptions::default()
         }
     }
@@ -688,7 +752,7 @@ mod tests {
     #[test]
     fn compositor_with_pixels_is_the_plain_composition() {
         let mut layer = HdLayer::default();
-        layer.resize(32);
+        layer.resize(32, 0);
         for (i, p) in layer.pixels.iter_mut().enumerate() {
             *p = (i as u32).wrapping_mul(2_654_435_761) >> 8;
         }
@@ -709,10 +773,77 @@ mod tests {
         }
     }
 
+    /// Widescreen: the layer's sides fill the bars beside the 4:3
+    /// picture; the picture itself is composed as without sides.
+    #[test]
+    fn compositor_fills_the_bars_with_the_sides() {
+        let side_tiles = 4;
+        let mut wide = HdLayer::default();
+        wide.resize(32, side_tiles);
+        assert_eq!(wide.side, 128);
+        assert_eq!(wide.width, 1280 + 256);
+        let mut narrow = HdLayer::default();
+        narrow.resize(32, 0);
+        for y in 0..wide.height {
+            for x in 0..wide.width {
+                let v = ((x as u32) << 12) | y as u32;
+                wide.pixels[y * wide.width + x] = v;
+                if (wide.side..wide.side + 1280).contains(&x) {
+                    narrow.pixels[y * 1280 + x - wide.side] = v;
+                }
+            }
+        }
+        let screen: Vec<u16> = (0..SCREEN_W * SCREEN_H).map(|i| (i % 5) as u16).collect();
+        wide.base = screen.iter().map(|&p| if p == 2 { 9 } else { p }).collect();
+        narrow.base = wide.base.clone();
+        // A 16:9 window: 1280x960 picture with 213-pixel bars... at 1706.
+        let (sw, sh, ox) = (1706, 960, 213);
+        let frame = |l| HdFrame {
+            screen: &screen,
+            layer: Some(l),
+            texts: &[],
+            photo: false,
+        };
+        let mut got = vec![0u32; sw * sh];
+        HdCompositor::new().compose(frame(&wide), pixels_opts(), &mut got, sw, ox, 0, 1280, 960);
+        let mut want = vec![0u32; sw * sh];
+        HdCompositor::new().compose(
+            frame(&narrow),
+            pixels_opts(),
+            &mut want,
+            sw,
+            ox,
+            0,
+            1280,
+            960,
+        );
+        for y in 0..sh {
+            assert_eq!(
+                got[y * sw + ox..][..1280],
+                want[y * sw + ox..][..1280],
+                "row {y}"
+            );
+            // The 128 side columns fill the bar next to the picture,
+            // continuing the layer's columns; past them, black.
+            assert_eq!(got[y * sw + ox - 1], wide.pixels[y * wide.width + 127]);
+            assert_eq!(got[y * sw + ox - 128], wide.pixels[y * wide.width]);
+            assert_eq!(got[y * sw + ox - 129], 0);
+            assert_eq!(
+                got[y * sw + ox + 1280],
+                wide.pixels[y * wide.width + 128 + 1280]
+            );
+            assert_eq!(
+                got[y * sw + ox + 1280 + 127],
+                wide.pixels[y * wide.width + wide.width - 1]
+            );
+            assert_eq!(got[y * sw + ox + 1280 + 128], 0);
+        }
+    }
+
     #[test]
     fn compositor_smooths_flat_art_flat_and_keeps_the_layer() {
         let mut layer = HdLayer::default();
-        layer.resize(36);
+        layer.resize(36, 0);
         layer.pixels.fill(0x0012_3456);
         let mut screen = vec![0x1234u16; SCREEN_W * SCREEN_H];
         layer.base = screen.clone();
@@ -755,7 +886,7 @@ mod tests {
     fn sharp_text_replaces_the_low_res_glyphs() {
         let font = crate::subtitles::SubtitleFont::new();
         let mut layer = HdLayer::default();
-        layer.resize(48);
+        layer.resize(48, 0);
         layer.pixels.fill(0x0020_4060);
         let under = vec![0x2104u16; SCREEN_W * SCREEN_H];
         layer.base = under.clone();
@@ -822,6 +953,7 @@ mod tests {
         compose_dialog(
             &mut layer,
             tile,
+            0,
             &view,
             &pano,
             &pre,

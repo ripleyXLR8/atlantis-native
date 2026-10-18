@@ -18,6 +18,13 @@ bug (see [Enhancements](TECHNICAL.md#enhancements)).
 `atlantis-native --hd /path/to/game` starts in the [HD mode](TECHNICAL.md#hd-mode),
 whatever `settings.ini` says.
 
+`atlantis-native --widescreen /path/to/game` starts in the HD mode with
+the widescreen option on, for this run (`settings.ini` is not changed).
+
+The environment variable `ATLANTIS_NATIVE_DATA` names another folder for
+the per-user data (saves, settings, log): trial runs that must not touch
+your own saves.
+
 `atlantis-native --headless /path/to/game [frames]` runs a new game without
 a window, with no input and the sound mixed and dropped, and prints what it
 did (the places, videos, sections, dialog lines and voices).
@@ -67,8 +74,8 @@ so that this set outlives the session as the original's copies do,
 `original` by default), and the HD mode's picture options (see
 [HD mode](TECHNICAL.md#hd-mode)): `hd_panorama = bicubic|bilinear`,
 `hd_sharpen = on|off`, `hd_interface = smooth|pixels` and
-`hd_sharp_subtitles = on|off` (by default `bicubic`, `on`, `smooth`,
-`on`).
+`hd_sharp_subtitles = on|off` and `hd_widescreen = on|off` (by default
+`bicubic`, `on`, `smooth`, `on`, `off`).
 
 The web build keeps its players, checkpoints and settings in the
 browser's storage (`localStorage`, one entry per file, kept per site and

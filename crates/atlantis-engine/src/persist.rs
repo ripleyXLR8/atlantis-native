@@ -130,13 +130,18 @@ mod dir {
     /// The per-user data folder of the port: `$XDG_DATA_HOME/atlantis-native`
     /// (or `~/.local/share/atlantis-native`) on Linux and the other Unix
     /// systems, `~/Library/Application Support/atlantis-native` on macOS,
-    /// `%APPDATA%\atlantis-native` on Windows.
+    /// `%APPDATA%\atlantis-native` on Windows; or the folder
+    /// `ATLANTIS_NATIVE_DATA` names (tests and trial runs that must not
+    /// touch the player's saves).
     pub fn user_data_dir() -> Option<PathBuf> {
         let env = |k: &str| {
             std::env::var_os(k)
                 .filter(|v| !v.is_empty())
                 .map(PathBuf::from)
         };
+        if let Some(dir) = env("ATLANTIS_NATIVE_DATA") {
+            return Some(dir);
+        }
         let base = if cfg!(windows) {
             env("APPDATA")
         } else if cfg!(target_os = "macos") {
@@ -276,6 +281,7 @@ impl Settings {
                 ("ui_ux", Some(b), _) => s.enhancements.ui_ux = b,
                 ("hd_sharpen", Some(b), _) => s.hd.sharpen = b,
                 ("hd_sharp_subtitles", Some(b), _) => s.hd.sharp_subtitles = b,
+                ("hd_widescreen", Some(b), _) => s.hd.widescreen = b,
                 _ => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
             }
         }
@@ -302,11 +308,13 @@ impl Settings {
              # The port's graphics (options menu, F10): original or hd\n\
              graphics = {}\n\
              # HD mode: panorama filter (bicubic or bilinear), its sharpening,\n\
-             # the interface art (smooth: xBR, or pixels), sharp subtitles\n\
+             # the interface art (smooth: xBR, or pixels), sharp subtitles,\n\
+             # widescreen (the panorama fills the sides of a wide window)\n\
              hd_panorama = {}\n\
              hd_sharpen = {}\n\
              hd_interface = {}\n\
-             hd_sharp_subtitles = {}\n",
+             hd_sharp_subtitles = {}\n\
+             hd_widescreen = {}\n",
             b(self.subtitles),
             b(self.omni3d_mode2),
             self.volumes[0],
@@ -326,6 +334,7 @@ impl Settings {
                 "pixels"
             },
             b(self.hd.sharp_subtitles),
+            b(self.hd.widescreen),
         )
     }
 
@@ -357,6 +366,7 @@ mod tests {
                 sharpen: false,
                 smooth_interface: false,
                 sharp_subtitles: false,
+                widescreen: false,
             },
         };
         assert_eq!(Settings::parse(&s.to_text()), s);

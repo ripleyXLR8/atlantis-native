@@ -862,6 +862,7 @@ impl LinePlayer {
         crate::hd::compose_dialog(
             &mut layer,
             tile,
+            e.warp.side_tiles(),
             &e.hd.view,
             &self.hd.pano,
             &self.hd.pre_head,

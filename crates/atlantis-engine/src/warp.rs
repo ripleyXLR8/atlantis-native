@@ -124,6 +124,19 @@ pub struct Warp {
     /// 41 points starting at index 2.
     coords: [i32; COORDS_LEN],
     coords_dirty: bool,
+
+    /// The tangent step between grid columns and the vertical scale
+    /// factor, kept for the widescreen grid.
+    step: f32,
+    b5c: f32,
+    /// Widescreen (a port addition): tile columns rendered by
+    /// [`Warp::render_tiles`] on each side of the original 40, the same
+    /// projection carried on (0: the original's view).
+    side_tiles: usize,
+    /// The grid with the side columns (`2 + 31 rows x (41 + 2 x side)
+    /// points x 2`), for `side_tiles` > 0.
+    wide: Vec<i32>,
+    wide_key: Option<(u32, u32, u32, usize)>,
 }
 
 impl Default for Warp {
@@ -160,6 +173,11 @@ impl Warp {
             row_col_scale: [[0.0; HALF_COLS]; GRID_ROWS],
             coords: [0; COORDS_LEN],
             coords_dirty: true,
+            step: 0.0,
+            b5c: 0.0,
+            side_tiles: 0,
+            wide: Vec::new(),
+            wide_key: None,
         };
         w.set_hfov(WARP_FOV_DEG);
         w
@@ -186,6 +204,8 @@ impl Warp {
         let b5c = (384.0 / libm::sin(pi * 155.0 / 180.0 * 0.5)) as f32;
         let step = (libm::tan(f64::from(h) * 0.5) * 16.0 / 320.0) as f32;
         self.pan_scale = (PAN_FULL / f64::from(self.two_pi)) as f32;
+        self.step = step;
+        self.b5c = b5c;
 
         for i in 0..GRID_ROWS {
             let t = (i as f64 - 15.0) * f64::from(step);
@@ -249,6 +269,72 @@ impl Warp {
     /// 0x00bcab58.
     pub fn beta_limit(&self) -> f64 {
         f64::from(self.vfov) * 0.9
+    }
+
+    /// Widescreen (a port addition): [`Warp::render_tiles`] renders
+    /// `tiles` more tile columns on each side, carrying the projection on
+    /// (the 40 columns of the original's view are its pixels, unchanged).
+    pub fn set_side_tiles(&mut self, tiles: usize) {
+        self.side_tiles = tiles;
+    }
+
+    /// The tile columns on each side (see [`Warp::set_side_tiles`]).
+    pub fn side_tiles(&self) -> usize {
+        self.side_tiles
+    }
+
+    /// The output size of [`Warp::render_tiles`] at `tile`: [`hd_size`]
+    /// with the side columns.
+    pub fn tiles_size(&self, tile: usize) -> (usize, usize) {
+        let (w, h) = hd_size(tile);
+        (w + 2 * self.side_tiles * tile, h)
+    }
+
+    /// The grid with `side_tiles` columns more on each side: the
+    /// original's points copied, the side points by the same formulas
+    /// (`FUN_00451915`'s, carried past the screen's edges).
+    fn update_wide(&mut self) {
+        self.update_coords();
+        let e = self.side_tiles;
+        let key = (
+            self.alpha.to_bits(),
+            self.beta.to_bits(),
+            self.hfov_deg.to_bits(),
+            e,
+        );
+        if self.wide_key == Some(key) {
+            return;
+        }
+        let cols = GRID_COLS + 2 * e;
+        let rs = cols * 2;
+        self.wide.clear();
+        self.wide.resize(2 + GRID_ROWS * rs, 0);
+        let pan_scale = f64::from(self.pan_scale);
+        let base = f64::from((PAN_FULL - f64::from(self.alpha) * pan_scale) as f32);
+        for i in 0..GRID_ROWS {
+            let v = f64::from(self.beta) + f64::from(self.row_angle[i]);
+            let s = f64::from(libm::sin(v) as f32);
+            let r = f64::from((f64::from(self.row_hyp[i]) * libm::cos(v)) as f32);
+            let c = f64::from(self.row_hyp[i]);
+            let src = &self.coords[2 + ROW_STRIDE * i..2 + ROW_STRIDE * (i + 1)];
+            let row = &mut self.wide[2 + rs * i..2 + rs * (i + 1)];
+            row[2 * e..2 * e + ROW_STRIDE].copy_from_slice(src);
+            for k in 1..=e {
+                // Column -k of the original's grid, and its mirror 40 + k.
+                let u = ((-(k as f64) - 20.0) * f64::from(self.step)) as f32;
+                let den = (f64::from(u) * f64::from(u) + c * c).sqrt();
+                let scale = (c * f64::from(self.b5c) * 65536.0 / den) as f32;
+                let d = f64::from((libm::atan2(f64::from(u), r) * pan_scale) as f32);
+                let y = (ROW_ORIGIN - s * f64::from(scale)) as i32;
+                let left = 2 * (e - k);
+                let right = 2 * (e + 40 + k);
+                row[left] = (base + d) as i32;
+                row[left + 1] = y;
+                row[right] = (base - d) as i32;
+                row[right + 1] = y;
+            }
+        }
+        self.wide_key = Some(key);
     }
 
     /// `FUN_00451915(alpha, beta)`: the grid of panorama coordinates. The
@@ -377,16 +463,22 @@ impl Warp {
         F: Fn(u32, u32) -> T + Sync,
     {
         assert!(tile > 0, "tile size 0");
-        let (w, h) = hd_size(tile);
+        let (w, h) = self.tiles_size(tile);
         assert!(out.len() >= w * h, "output smaller than {w}x{h}");
-        self.update_coords();
-        let c = &self.coords;
+        let cols = SCREEN_W / 16 + 2 * self.side_tiles;
+        let c: &[i32] = if self.side_tiles == 0 {
+            self.update_coords();
+            &self.coords
+        } else {
+            self.update_wide();
+            &self.wide
+        };
         let band = w * tile; // one row of tiles
         let out = &mut out[..w * h];
         let threads = render_threads(w * h);
         if threads <= 1 {
             for (tile_y, rows) in out.chunks_mut(band).enumerate() {
-                tile_row(c, tile, tile_y, rows, &sample);
+                tile_row(c, cols, tile, tile_y, rows, &sample);
             }
             return;
         }
@@ -396,7 +488,7 @@ impl Warp {
                 let sample = &sample;
                 s.spawn(move || {
                     for (i, rows) in chunk.chunks_mut(band).enumerate() {
-                        tile_row(c, tile, k * per + i, rows, sample);
+                        tile_row(c, cols, tile, k * per + i, rows, sample);
                     }
                 });
             }
@@ -597,7 +689,8 @@ fn lerp888(a: u32, b: u32, w: u32) -> u32 {
 /// with `tile` for the original's 16 (the shifts by 4 and 9 are the
 /// divisions by 16 and 16 * 32).
 fn tile_row<T>(
-    c: &[i32; COORDS_LEN],
+    c: &[i32],
+    cols: usize,
     tile: usize,
     tile_y: usize,
     rows: &mut [T],
@@ -605,21 +698,23 @@ fn tile_row<T>(
 ) {
     let n = tile as i32;
     let d = |v: i32, k: i32| v.div_euclid(k);
-    let w = SCREEN_W / 16 * tile;
-    let mut off = 2 + tile_y * ROW_STRIDE;
-    for tile_x in 0..SCREEN_W / 16 {
+    let w = cols * tile;
+    // Points per grid row x 2: the next row's point is `rs` further.
+    let rs = (cols + 1) * 2;
+    let mut off = 2 + tile_y * rs;
+    for tile_x in 0..cols {
         let mut x1 = d(c[off + 2].wrapping_sub(c[off]), n);
         let mut y1 = d(c[off + 3].wrapping_sub(c[off + 1]), n);
-        let x1n = d(c[off + 84].wrapping_sub(c[off + 82]), n);
-        let y1n = d(c[off + 85].wrapping_sub(c[off + 83]), n);
+        let x1n = d(c[off + rs + 2].wrapping_sub(c[off + rs]), n);
+        let y1n = d(c[off + rs + 3].wrapping_sub(c[off + rs + 1]), n);
 
         let dx1 = d(x1n.wrapping_sub(x1), n);
         let dy1 = d(y1n.wrapping_sub(y1), n * 32);
 
         y1 >>= 5;
 
-        let dx2 = d(c[off + 82].wrapping_sub(c[off]), n);
-        let dy2 = d(c[off + 83].wrapping_sub(c[off + 1]), n * 32);
+        let dx2 = d(c[off + rs].wrapping_sub(c[off]), n);
+        let dy2 = d(c[off + rs + 1].wrapping_sub(c[off + 1]), n * 32);
         let mut x2 = c[off].wrapping_mul(2).wrapping_add(dx2) >> 1;
         let mut y2 = (c[off + 1] >> 5).wrapping_mul(2).wrapping_add(dy2) >> 1;
 

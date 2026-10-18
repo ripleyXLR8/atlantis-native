@@ -68,7 +68,8 @@ fn main() {
         None => false,
     };
     let original = flag("--original");
-    let force_hd = flag("--hd");
+    let force_wide = flag("--widescreen");
+    let force_hd = flag("--hd") || force_wide;
     let new_game = flag("--new-game");
     let mut value = |name: &str| -> Option<i32> {
         let i = args.iter().position(|a| a == name)?;
@@ -162,7 +163,7 @@ fn main() {
 
     if args.len() > 1 || args.first().is_some_and(|a| a.starts_with('-')) {
         error_box(&format!(
-            "usage: atlantis-native [--original] [--hd] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]\n\n\
+            "usage: atlantis-native [--original] [--hd] [--widescreen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]\n\n\
              '{}' not understood",
             args.join(" ")
         ));
@@ -183,7 +184,7 @@ fn main() {
             Some(game) => game,
             None => {
                 eprintln!(
-                    "usage: atlantis-native [--original] [--hd] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]"
+                    "usage: atlantis-native [--original] [--hd] [--widescreen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]"
                 );
                 return;
             }
@@ -204,6 +205,9 @@ fn main() {
         .with_graphics(graphics, Some(saves))
         .with_edition(&edition)
         .with_icon(icon);
+    if force_wide {
+        app.force_widescreen();
+    }
     if let Err(e) = el.run_app(&mut app) {
         error_box(&format!("The window failed: {e}"));
         std::process::exit(1);

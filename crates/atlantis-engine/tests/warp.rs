@@ -267,3 +267,65 @@ fn hd_bicubic_view() {
         assert!(out.iter().all(|&p| p != 0xdead_beef));
     }
 }
+
+/// Widescreen: the side columns carry the projection on; the 40 columns
+/// of the original's view are its pixels, unchanged, at every tile size.
+#[test]
+fn widescreen_keeps_the_original_view_in_the_middle() {
+    let pano = panorama();
+    for fov in [WARP_FOV_DEG, 20.68, 48.26] {
+        for i in 0..12 {
+            let (a, b) = (f64::from(i) * 0.53 - 0.5, f64::from(i % 5) * 0.25 - 0.5);
+            let mut original = view(fov, a, b);
+            let mut screen = vec![0u16; SCREEN_W * SCREEN_H];
+            original.render(&pano, &mut screen);
+            for (side, tile) in [(7usize, 16usize), (3, 16), (7, 24)] {
+                let mut w = view(fov, a, b);
+                w.set_side_tiles(side);
+                let (ww, wh) = w.tiles_size(tile);
+                assert_eq!((ww, wh), ((40 + 2 * side) * tile, 30 * tile));
+                let mut wide = vec![0u16; ww * wh];
+                w.render_scaled(&pano, tile, &mut wide);
+                let mut narrow = vec![0u16; 40 * tile * wh];
+                let mut n = view(fov, a, b);
+                n.render_scaled(&pano, tile, &mut narrow);
+                let cw = 40 * tile;
+                for y in 0..wh {
+                    assert_eq!(
+                        &wide[y * ww + side * tile..][..cw],
+                        &narrow[y * cw..][..cw],
+                        "fov {fov} alpha {a} beta {b} side {side} tile {tile} row {y}"
+                    );
+                }
+                if tile == 16 {
+                    assert_eq!(&narrow[..], &screen[..]);
+                }
+                // The sides continue the view: the column next to the
+                // original's edge samples next to it in the panorama.
+                let left = &wide[(wh / 2) * ww..][..side * tile];
+                assert!(left.iter().any(|&p| p != 0), "side pixels drawn");
+            }
+        }
+    }
+}
+
+/// The side columns are the view a wider field of view would show there:
+/// a point of the side maps to the panorama direction the same projection
+/// gives beyond the edge (the yaw grows past the edge, no seam).
+#[test]
+fn widescreen_sides_continue_the_yaw() {
+    let mut w = view(WARP_FOV_DEG, 1.0, 0.0);
+    w.set_side_tiles(6);
+    // The column coordinate (11 integer bits) along the middle row.
+    let (ww, wh) = w.tiles_size(16);
+    let mut cols = vec![0u32; ww * wh];
+    w.render_tiles(16, &mut cols, |px, _| px >> 21);
+    let row = &cols[(wh / 2) * ww..][..ww];
+    // Panorama columns along the row increase steadily (mod 2048).
+    let mut prev = row[0];
+    for (x, &c) in row.iter().enumerate().skip(1) {
+        let step = (c + 2048 - prev) % 2048;
+        assert!(step <= 3, "column {x}: {prev} -> {c}");
+        prev = c;
+    }
+}

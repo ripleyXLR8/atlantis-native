@@ -131,6 +131,16 @@ The options (options menu, F10; `settings.ini`):
   as the dialog videos' bodies are. Pixels shows them as the original
   mode does (nearest).
 - Sharp subtitles, On (default) or Off.
+- Widescreen, Off (default) or On. In a window wider than 4:3, the bars
+  beside the picture show the panorama: the view is rendered with more
+  tile columns on each side (`Warp::set_side_tiles`), whose grid points
+  carry the original's formulas (`FUN_00451915`'s) past the screen's
+  edges; the 40 columns of the original's view are its pixels, unchanged
+  (a test checks it), so the 4:3 picture, its interface and its hit areas
+  stay as they are. The sides show where the frame has an HD layer (the
+  panoramic view, the dialog lines over it); the videos, menus and
+  puzzles keep black bars. At most 16 tile columns per side (a 2.4:1
+  window).
 
 The HD size is a multiple of the original's 40x30 grid of 16x16 tiles:
 tiles of the window's picture width / 40 pixels, rounded up, at most 64 (4

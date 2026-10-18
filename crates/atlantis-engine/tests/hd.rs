@@ -225,6 +225,7 @@ fn hd_mode_keeps_the_frames_and_draws_the_view() {
                 sharpen: false,
                 smooth_interface: false,
                 sharp_subtitles: false,
+                widescreen: false,
             });
             r
         });
@@ -421,7 +422,7 @@ fn hd_timings() {
             warp.render_bilinear_2x(&pano2, tile, &mut out);
         });
         let mut layer = HdLayer::default();
-        layer.resize(tile);
+        layer.resize(tile, 0);
         let mut win = vec![0u32; w * h];
         let comp = time(&mut |_| compose(&screen, &layer, &mut win, w, 0, 0, w, h));
         // The new composition: the layer everywhere but a bar (cursor-like

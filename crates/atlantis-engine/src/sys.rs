@@ -90,6 +90,7 @@ pub struct Sys {
     pub hd: RefCell<HdLayer>,
     /// The HD tile size the front end asks for (0: HD off).
     hd_tile: Cell<usize>,
+    hd_side: Cell<usize>,
     /// The optional differences from the original game, shared with the
     /// front end's options menu: the engine reads them where it uses them,
     /// so a change applies at once.
@@ -129,6 +130,7 @@ impl Sys {
             screen: RefCell::new(vec![0; SCREEN_W * SCREEN_H]),
             hd: RefCell::new(HdLayer::default()),
             hd_tile: Cell::new(0),
+            hd_side: Cell::new(0),
             enhancements: Cell::new(crate::enhancements::Enhancements::default()),
             hd_marked: Cell::new(false),
             hd_shown: Cell::new(false),
@@ -294,6 +296,17 @@ impl Sys {
     /// only. Set by the front end from its output size.
     pub fn set_hd_tile(&self, tile: Option<usize>) {
         self.hd_tile.set(tile.filter(|&t| t > 16).unwrap_or(0));
+    }
+
+    /// Widescreen (HD mode): the tile columns of panorama the HD layer
+    /// adds on each side of the 4:3 picture, to fill a wider window. Set
+    /// by the front end; 0 for the 4:3 picture.
+    pub fn set_hd_side_tiles(&self, tiles: usize) {
+        self.hd_side.set(tiles);
+    }
+
+    pub fn hd_side_tiles(&self) -> usize {
+        self.hd_side.get()
     }
 
     /// The HD tile size asked for, `None` when HD is off.
