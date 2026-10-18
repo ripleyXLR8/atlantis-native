@@ -6,6 +6,7 @@
 //! traceable to the original code.
 
 pub mod big;
+pub mod disc_image;
 pub mod exe;
 pub mod exe_icon;
 pub mod files;

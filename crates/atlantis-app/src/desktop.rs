@@ -83,8 +83,24 @@ pub fn open_game(dir: &Path) -> Result<Game, String> {
     try_open(dir).map_err(|e| format!("{}: {e}", dir.display()))
 }
 
+/// The game in `dir`: its files, or the images of its CDs.
 fn try_open(dir: &Path) -> Result<Game, GameError> {
-    Game::open(Arc::new(StdDir::new(dir)))
+    match Game::open(Arc::new(StdDir::new(dir))) {
+        Err(e @ (GameError::NoExecutable | GameError::NoArchives)) => {
+            match atlantis_data::disc_image::DiscSet::open_folder(dir) {
+                Some(set) => {
+                    log::info!(
+                        "{}: the game from {} disc images",
+                        dir.display(),
+                        set.images.len()
+                    );
+                    Game::open(Arc::new(set))
+                }
+                None => Err(e),
+            }
+        }
+        r => r,
+    }
 }
 
 /// The answer to a three-button question.
@@ -135,6 +151,102 @@ fn remember_folder(dir: &Path) {
     }
 }
 
+/// A question with two labelled buttons: true for the first.
+fn ask2(text: &str, first: &str, second: &str) -> bool {
+    let r = rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Info)
+        .set_title("Atlantis Native")
+        .set_description(text)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            first.to_string(),
+            second.to_string(),
+        ))
+        .show();
+    matches!(r, rfd::MessageDialogResult::Ok)
+        || matches!(r, rfd::MessageDialogResult::Custom(s) if s == first)
+}
+
+/// Copies the game from the player's four CDs, one after the other, into
+/// a folder of the per-user data folder (as OpenRA installs its content
+/// from the discs). Returns that folder once complete; `None` when the
+/// player cancels. A copy cut short goes on from where it was.
+fn copy_from_discs() -> Option<PathBuf> {
+    let dest = data_dir().join("game-files");
+    let mut wrong: Option<u8> = None;
+    loop {
+        let (discs, exe) = setup::still_needed(&dest);
+        if discs.is_empty() && !exe {
+            return Some(dest);
+        }
+        // atlantis.exe is on disc 1.
+        let next = if exe { 1 } else { discs[0] };
+        if let Some((root, n)) = setup::find_disc() {
+            if discs.contains(&n) || (exe && n == 1) {
+                match setup::copy_disc(&root, &dest) {
+                    Ok(names) => {
+                        log::info!("copied {} from disc {n}", names.join(", "));
+                        wrong = None;
+                        continue;
+                    }
+                    Err(e) => {
+                        error_box(&format!(
+                            "The copy from disc {n} failed:\n\n{e}\n\n\
+                             Check that the disc is clean and that there is room on the \
+                             computer, then try again."
+                        ));
+                        return None;
+                    }
+                }
+            }
+            wrong = Some(n);
+        }
+        let left: Vec<String> = (1..=4u8)
+            .filter(|n| discs.contains(n) || (exe && *n == 1))
+            .map(|n| n.to_string())
+            .collect();
+        let mut text = String::new();
+        if let Some(n) = wrong {
+            text.push_str(&format!("Disc {n} is copied already.\n\n"));
+        }
+        text.push_str(&format!(
+            "Insert disc {next} of Atlantis: The Lost Tales, then click Copy.\n\n\
+             Still to copy: disc {}. Each disc takes a minute or two: the next message \
+             appears when it is done.\n\nThe files go to {}.",
+            left.join(", "),
+            dest.display()
+        ));
+        if !ask2(&text, "Copy", "Cancel") {
+            return None;
+        }
+    }
+}
+
+/// Offers to copy the game from the disc at `root` (number `n`); the game
+/// copied, or `None`.
+fn offer_disc_copy(root: &Path, n: u8) -> Option<Game> {
+    let text = format!(
+        "Disc {n} of Atlantis: The Lost Tales is in {}.\n\n\
+         Atlantis Native can copy the game from your four discs into a folder on this \
+         computer (about 2.3 GB; a minute or two per disc), then play it without the \
+         discs.\n\nCopy the game from the discs?",
+        root.display()
+    );
+    if !ask2(&text, "Copy from the discs", "Not now") {
+        return None;
+    }
+    let dest = copy_from_discs()?;
+    match try_open(&dest) {
+        Ok(game) => {
+            remember_folder(&dest);
+            Some(game)
+        }
+        Err(e) => {
+            error_box(&setup::explain(&dest, &e));
+            None
+        }
+    }
+}
+
 /// The game when no folder is given on the command line: the folder
 /// chosen last time if it still holds the game; else an installation found
 /// on the computer, if the player takes it; else the folder the player
@@ -175,6 +287,14 @@ pub fn choose_game() -> Option<Game> {
             Choice::Third => return None,
         }
     }
+    // A disc of the game in a drive: copy the four discs.
+    if !offered {
+        if let Some((root, n)) = setup::find_disc() {
+            if let Some(game) = offer_disc_copy(&root, n) {
+                return Some(game);
+            }
+        }
+    }
     if !offered {
         loop {
             match ask(
@@ -193,6 +313,15 @@ pub fn choose_game() -> Option<Game> {
         let dir = rfd::FileDialog::new()
             .set_title("Choose the folder of Atlantis: The Lost Tales (the one with atlantis.exe)")
             .pick_folder()?;
+        // A CD drive: copy the discs.
+        if let Some(n) = setup::disc_number(&dir) {
+            if try_open(&dir).is_err() {
+                if let Some(game) = offer_disc_copy(&dir, n) {
+                    return Some(game);
+                }
+                continue;
+            }
+        }
         // The folder above the game's, or a macOS app bundle, holds it
         // further down.
         let root = setup::find_game_root(&dir, 4).unwrap_or_else(|| dir.clone());

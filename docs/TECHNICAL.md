@@ -297,7 +297,7 @@ Tests that need the game files read the game directory from the
 skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
 English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
 retail CD, `ATLANTIS_DATA_FR1997_MAY` one of the May 1997 French retail CD
-(the first pressing), `ATLANTIS_DATA_PATCH101` a CD installation with the
+(the first pressing), `ATLANTIS_DATA_PATCH101 (and ATLANTIS_ISO_FR / ATLANTIS_BIN_EN: folders of the French CD's ISO images and the English CD's raw .bin images, for the disc-image reader)` a CD installation with the
 patch 1.01 executable, `ATLANTIS_GOG` a folder of the GOG.com languages'
 trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
 installation, for the tests of those builds:

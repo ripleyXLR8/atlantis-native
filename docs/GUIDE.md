@@ -35,8 +35,21 @@ and copy into it:
 Then choose that folder. A folder the CD's installer made
 (`C:\Cryo\Atlantis`, for example) is not enough on its own: the
 original game reads the archives from the disc, so copy them into it.
-Disc images (`.iso`, `.bin`/`.cue`): open them (double-click on Windows
-10 and later, or 7-Zip) and copy the same files.
+
+Simpler: put disc 1 in the drive when Atlantis Native starts for the
+first time (or choose the drive in the folder picker). It offers to copy
+the game from the four discs itself: it asks for each disc in turn and
+copies its files (about 2.3 GB in all, a minute or two per disc) into
+the `game-files` folder of its per-user folder, then plays from there
+without the discs. A copy cut short goes on where it stopped.
+
+### From images of the CDs
+
+Atlantis Native reads the game straight from images of its four CDs:
+put the images in one folder and choose it (the image file names do not
+matter). It reads `.iso` images, raw `.bin` images (with or without
+their `.cue`, as Redump's), `.img`, `.mdf` and Nero `.nrg` images.
+Compressed images (`.zip`, `.7z`, `.chd`) must be extracted first.
 
 ### Supported editions
 
@@ -56,7 +69,8 @@ The message says what is wrong and what to do:
 | holds the game, but not all of it | copy the `BIGCD` files it lists, from the discs it names |
 | holds atlantis.exe but none of the game's archives | copy `BIGCD1.BIG` to `BIGCD4.BIG` from the four discs |
 | holds game archives but not atlantis.exe | copy `atlantis.exe` from disc 1 |
-| holds disc images | open the images and copy the files out of them |
+| holds disc images that Atlantis Native cannot read | extract compressed images, or copy the files out of them |
+| the disc images hold the game, but not all of its four discs | add the images of the discs it lists |
 | holds the GOG.com installer | run the installer, then choose the installed folder |
 | holds an atlantis.exe that Atlantis Native does not know | an edition not supported yet (see above) |
 | does not hold Atlantis: The Lost Tales | choose the folder that holds `atlantis.exe` |

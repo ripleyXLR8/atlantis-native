@@ -17,6 +17,14 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
             .any(|n| exts.iter().any(|e| n.ends_with(&format!(".{e}"))))
     };
     match err {
+        GameError::MissingArchives(missing) if any_ext(&["iso", "bin", "img", "mdf", "nrg"]) => {
+            let list: Vec<String> = missing.iter().map(|n| format!("disc {n}")).collect();
+            format!(
+                "The disc images in {shown} hold the game, but not all of its four discs. \
+                 Add the images of: {}.",
+                list.join(", ")
+            )
+        }
         GameError::MissingArchives(missing) => {
             let list: Vec<String> = missing
                 .iter()
@@ -47,9 +55,11 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
              the size above and where your copy comes from."
         ),
         GameError::NoExecutable => {
-            if any_ext(&["iso", "bin", "cue", "mdf", "mds", "nrg", "img"]) {
+            if any_ext(&["iso", "bin", "cue", "mdf", "mds", "nrg", "img", "chd"]) {
                 format!(
-                    "The folder {shown} holds disc images.\n\n\
+                    "The folder {shown} holds disc images that Atlantis Native cannot read \
+                     (it reads .iso, .bin, .img, .mdf and .nrg images of the game's CDs, \
+                     not compressed ones).\n\n\
                      Open each image (double-click it on Windows 10 and later, or use \
                      7-Zip) and copy atlantis.exe from disc 1 and BIGCD1.BIG to \
                      BIGCD4.BIG from the four discs into one folder, then choose that \
@@ -74,7 +84,8 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
             } else if any_ext(&["zip", "7z", "rar"]) {
                 format!(
                     "The folder {shown} holds archives (zip, 7z, rar).\n\n\
-                     Extract them first, then choose the folder that holds atlantis.exe."
+                     Extract them first (disc images inside them can then be read as \
+                     they are), then choose the folder that holds the extracted files."
                 )
             } else {
                 format!(
