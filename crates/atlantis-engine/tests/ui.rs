@@ -71,7 +71,7 @@ const VECTORS: &str = include_str!("golden/ui_menu_vectors.txt");
 /// first blit, the sprite.
 fn walk_records(text: &[u8], menu: i32, a: i32, b: i32) -> Vec<String> {
     let mut walk = MenuWalk::default();
-    walk_menu_text(text, menu, -1, a, b, &mut walk);
+    walk_menu_text(text, menu, -1, a, b, false, &mut walk);
     walk.records
         .iter()
         .enumerate()
@@ -307,7 +307,7 @@ fn shipped_menus_match_original() {
                 String::new()
             };
             let mut walk = MenuWalk::default();
-            walk_menu_text(&text, f as i32, -1, a, b, &mut walk);
+            walk_menu_text(&text, f as i32, -1, a, b, false, &mut walk);
             let rects: Vec<String> = walk
                 .records
                 .iter()
@@ -341,7 +341,15 @@ fn ingame_menu_hit_map_matches_original() {
         return;
     };
     let mut walk = MenuWalk::default();
-    walk_menu_text(&menu_text(&g, "MAINMENU.TXT"), 0, -1, 0, 0, &mut walk);
+    walk_menu_text(
+        &menu_text(&g, "MAINMENU.TXT"),
+        0,
+        -1,
+        0,
+        0,
+        false,
+        &mut walk,
+    );
     let mut rows = 0;
     for l in lines(include_str!("golden/ui_ingame_menu.txt")) {
         let Some(rest) = l.strip_prefix("G ") else {
@@ -548,7 +556,7 @@ fn record_centre(g: &Game, menu: &str, number: i32, r: usize) -> (i32, i32) {
 
 fn record_centre_text(text: &[u8], number: i32, r: usize) -> (i32, i32) {
     let mut walk = MenuWalk::default();
-    walk_menu_text(text, number, -1, 0, 0, &mut walk);
+    walk_menu_text(text, number, -1, 0, 0, false, &mut walk);
     let rec = walk.records[r];
     (
         i32::from(rec.x) + i32::from(rec.w) / 2,

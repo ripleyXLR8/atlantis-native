@@ -101,6 +101,16 @@ const HD_MAX_SIDE_TILES: usize = 16;
 #[cfg(target_arch = "wasm32")]
 const HD_MAX_TILE: usize = 32;
 
+/// Opens the project's Buy Me a Coffee page in the browser.
+pub fn open_support_page() {
+    #[cfg(not(target_arch = "wasm32"))]
+    setup::open_url(guide::SUPPORT_URL);
+    #[cfg(target_arch = "wasm32")]
+    if let Some(w) = web_sys::window() {
+        let _ = w.open_with_url_and_target(guide::SUPPORT_URL, "_blank");
+    }
+}
+
 /// The port's version and the commit it was built from.
 pub fn version_string() -> String {
     let commit = env!("ATLANTIS_NATIVE_COMMIT");
@@ -434,6 +444,7 @@ impl App {
                 #[cfg(not(target_arch = "wasm32"))]
                 self.show_launcher(None);
             }
+            MenuAction::OpenSupport => open_support_page(),
         }
         if let Some(w) = &self.window {
             w.request_redraw();

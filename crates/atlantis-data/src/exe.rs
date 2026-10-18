@@ -126,9 +126,11 @@ pub struct ExeBuild {
 /// the French retail CD's build of August 1997 (laid out as the English
 /// one, the sound table and player row 4 bytes lower) and the French
 /// retail CD's first build, of May 1997 (the English one's code and
-/// layout, its tables from the names array on 4 bytes further), and the
-/// build of Cryo's patch 1.01 (the GOG build before GOG's edits).
-pub const BUILDS: [ExeBuild; 6] = [
+/// layout, its tables from the names array on 4 bytes further), the
+/// German retail CD's build of August 1997 (the French August build's code,
+/// its tables from the credits widths on 1 byte lower) and the build of
+/// Cryo's patch 1.01 (the GOG build before GOG's edits).
+pub const BUILDS: [ExeBuild; 7] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
@@ -348,6 +350,56 @@ pub const BUILDS: [ExeBuild; 6] = [
         music_restart_rearms_fade: true,
         text_code_page: TextCodePage::Windows1252,
     },
+    // The German retail CD's build: atlantis-cd-fr-687104's code byte for
+    // byte (its BEGTEXT section is the French one's) and its DGROUP layout,
+    // told apart by the PE stamp. The data strings are German: the player
+    // row "NEUER SPIELER" (one byte shorter than "NOUVEAU JOUEUR") moves
+    // the names array to 0x00486554 and the credits widths to 0x004866d4;
+    // FONTMAX (0x004865e6) and FONTMIN (0x0048666f) hold the other builds'
+    // bytes, and the inventory, guest, music and sound tables are at the
+    // French build's addresses. Every flag is fr-687104's.
+    ExeBuild {
+        name: "atlantis-cd-de-687104",
+        size: 687_104,
+        pe_timestamp: 0x33f8_3e81,
+        year: 1997,
+        month: Some("August"),
+        dgroup_vaddr: 0x8_0000,
+        dgroup_raw: 0x6_ba00,
+        music_va: 0x0048_5eec,
+        // The names in 0x004ab37c..0x004abb90, as fr-687104's.
+        sound_names_va: 0x0048_61cc,
+        sound_names_range: (0x004a_0000, 0x004b_0000),
+        // "NEUER SPIELER", no '#' (read as fr-687104's: WinMain @ 0x00418da7,
+        // FUN_0041d45c).
+        new_player_va: 0x0048_6546,
+        inventory_va: 0x0048_6788,
+        guest_va: 0x0048_685c,
+        credit_widths_va: 0x0048_66d4,
+        marker_is_label: true,
+        cursor_id_rule: false,
+        rhea_camera2: false,
+        alt_game_over_narration: true,
+        bitmap_subtitles: false,
+        subtitle_click_cycle: false,
+        players_1997: true,
+        upper_case_names: false,
+        hexa_forces_402: false,
+        queen_reveal: (3, 200),
+        rat_deadline_pacing: false,
+        rat_search_restart: false,
+        warp_cursor_steps: 1,
+        load_knob_starts_at_bar: false,
+        load_picker_clamp: true,
+        music_first_value_rule: false,
+        game_over_voice_at_entry: false,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        // The CON texts; the SPRLIST texts are glyph indices (their umlauts
+        // at the DOS code page's places, 0x81 0x84 0x8e 0x94 0x99 0x9a).
+        text_code_page: TextCodePage::Windows1252,
+    },
     // The first French pressing: atlantis-cd-en-688128's code (every
     // function pairs; most differences are the calling convention of its
     // own, older cdecl CRYO.DLL), with French data strings, its own credits
@@ -443,7 +495,8 @@ pub struct ExeTables {
     /// FUN_00420d8c read them by address), e.g. "#New Player"; the 1997
     /// builds' marker is their label, "New Player" (atlantis-cd-en-688128
     /// 0x0048654a), "NOUVEAU JOUEUR" (atlantis-cd-fr-687104 0x00486546,
-    /// atlantis-cd-fr-688640 0x0048654a).
+    /// atlantis-cd-fr-688640 0x0048654a), "NEUER SPIELER"
+    /// (atlantis-cd-de-687104 0x00486546).
     pub new_player_marker: Vec<u8>,
     pub new_player_label: Vec<u8>,
     /// Object id per OBJETS1.SPR sprite, up to the -1 terminator.
@@ -574,6 +627,11 @@ mod tests {
         assert_eq!(build_of(&reference).unwrap().name, "atlantis-cd-en-714240");
         let patch = fake_exe(714_240, 0x385a_4dc6);
         assert_eq!(build_of(&patch).unwrap().name, "atlantis-patch-fr-714240");
+        // The French and German August 1997 builds: one size, two stamps.
+        let fr = fake_exe(687_104, 0x33ef_1516);
+        assert_eq!(build_of(&fr).unwrap().name, "atlantis-cd-fr-687104");
+        let de = fake_exe(687_104, 0x33f8_3e81);
+        assert_eq!(build_of(&de).unwrap().name, "atlantis-cd-de-687104");
     }
 
     #[test]

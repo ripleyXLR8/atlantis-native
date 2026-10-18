@@ -1,5 +1,6 @@
 //! The game read straight from its CD images: the French CD's ISO images
-//! (2048-byte sectors) and the English CD's raw images (2352-byte sectors).
+//! and the German CD's ISO images (2048-byte sectors), the English CD's raw
+//! images (2352-byte sectors).
 use std::sync::Arc;
 
 use atlantis_data::disc_image::DiscSet;
@@ -32,5 +33,14 @@ fn english_cd_raw_images() {
             .read("WAV\\ATA0001A.APC")
             .expect("a voice from disc 1..4");
         assert!(data.len() > 1000);
+    }
+}
+
+#[test]
+fn german_cd_iso_images() {
+    if let Some(g) = open("ATLANTIS_ISO_DE") {
+        assert_eq!(g.exe.build.name, "atlantis-cd-de-687104");
+        assert_eq!(g.edition().to_string(), "CD, German (August 1997 build)");
+        assert!(g.big.contains("SPRLIST\\EPI.TXT"));
     }
 }

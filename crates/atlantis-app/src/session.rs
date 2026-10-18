@@ -372,6 +372,7 @@ impl App {
         };
         match action {
             LauncherAction::None | LauncherAction::Quit => {}
+            LauncherAction::Support => crate::open_support_page(),
             LauncherAction::Play(i) => {
                 let Some(dir) = session.library.folders().get(i).cloned() else {
                     return;

@@ -4,12 +4,15 @@
 //! Needs the game (`ATLANTIS_DATA`, `ATLANTIS_DATA_1997` for the English
 //! retail CD's 1997 build, `ATLANTIS_DATA_FR1997` for the French retail
 //! CD's August 1997 build, `ATLANTIS_DATA_FR1997_MAY` for its May 1997
-//! build and `ATLANTIS_DATA_PATCH101` for a CD install with Cryo's patch
-//! 1.01); skipped without it.
+//! build, `ATLANTIS_DATA_DE1997` for the German retail CD's build and
+//! `ATLANTIS_DATA_PATCH101` for a CD install with Cryo's patch 1.01);
+//! skipped without it.
 
 mod common;
 
-use common::{game, game_1997, game_fr1997, game_fr1997_may, game_patch101, golden_map, md5_hex};
+use common::{
+    game, game_1997, game_de1997, game_fr1997, game_fr1997_may, game_patch101, golden_map, md5_hex,
+};
 
 fn joined(names: &[String]) -> String {
     names
@@ -108,6 +111,58 @@ fn tables_of_the_french_1997_build() {
     }
     if let Some(en) = game_1997("tables_of_the_french_1997_build (English 1997)") {
         assert_eq!(exe.credit_widths, en.exe.credit_widths);
+    }
+}
+
+/// The German 1997 build (atlantis-cd-de-687104): the French August
+/// build's code and DGROUP layout, its own PE stamp; the player row
+/// "NEUER SPIELER" (no '#', also the label), the credits widths one byte
+/// lower (0x004866d4), with the French build's bytes up to the padding
+/// before the inventory table; the other tables at
+/// the French build's addresses, with its bytes.
+#[test]
+fn tables_of_the_german_1997_build() {
+    let Some(de) = game_de1997("tables_of_the_german_1997_build") else {
+        return;
+    };
+    let exe = &de.exe;
+    assert_eq!(exe.build.name, "atlantis-cd-de-687104");
+    check_sound_tables(&de);
+    assert_eq!(exe.new_player_marker, b"NEUER SPIELER");
+    assert_eq!(exe.new_player_label, b"NEUER SPIELER");
+    assert_eq!(exe.inventory_object_ids.len(), 51);
+    assert_eq!(exe.inventory_object_ids[39], 0);
+    assert_eq!(exe.guest_sprite_ids.len(), 9);
+    // The FONTMIN drawers' bytes for 0xa1, 0xa3, 0xa4 and for `ß` (0xe1,
+    // glyph 193: credits byte 92).
+    assert_eq!(
+        [
+            exe.credit_widths[0x1c],
+            exe.credit_widths[0x1e],
+            exe.credit_widths[0x1f],
+            exe.credit_widths[92]
+        ],
+        [17, 2, 10, 7]
+    );
+    // Every flag as the French August build's.
+    let fr_build = atlantis_data::exe::BUILDS
+        .iter()
+        .find(|b| b.name == "atlantis-cd-fr-687104")
+        .unwrap();
+    let mut b = *exe.build;
+    b.name = fr_build.name;
+    b.pe_timestamp = fr_build.pe_timestamp;
+    b.credit_widths_va = fr_build.credit_widths_va;
+    assert_eq!(&b, fr_build);
+    if let Some(fr) = game_fr1997("tables_of_the_german_1997_build (French August)") {
+        let f = &fr.exe;
+        assert_eq!(exe.inventory_object_ids, f.inventory_object_ids);
+        assert_eq!(exe.guest_sprite_ids, f.guest_sprite_ids);
+        // The French bytes, one address lower, up to the padding before
+        // the inventory table (0x00486788 in both builds).
+        assert_eq!(exe.credit_widths[..0xb2], f.credit_widths[..0xb2]);
+        assert_eq!(exe.music_names, f.music_names);
+        assert_eq!(exe.newsound_names, f.newsound_names);
     }
 }
 

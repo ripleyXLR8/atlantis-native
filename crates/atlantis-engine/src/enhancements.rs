@@ -21,7 +21,11 @@ pub struct Enhancements {
     ///   one whatever the music volume, as the other builds do; off, it
     ///   copies nothing below a current music volume of 5 and all or
     ///   nothing on its first track (atlantis-cd-fr-688640 FUN_00429184 @
-    ///   0x00429c5e, FUN_0041e830).
+    ///   0x00429c5e, FUN_0041e830);
+    /// - `ß` (0xe1, the German CD's EPI.TXT) in the sprite-font texts is
+    ///   drawn and measured as two 's'; off, as the original: glyph 193,
+    ///   past the fonts' 137 sprites, is not drawn and the pen moves by the
+    ///   advance table's byte (7 in atlantis-cd-de-687104, FUN_00410430).
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

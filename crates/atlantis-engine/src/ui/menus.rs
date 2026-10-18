@@ -20,7 +20,8 @@ use atlantis_data::sprite::read_tga15;
 use super::credits::{credits_events, CreditsEvent};
 use super::layout::{
     font_min_load_list_width, menu_grid_hit, menu_number, menu_volume_from_knob, menu_walk_hit,
-    name_key_code, subtitle_toggle_click, walk_menu_text, FontMin, LoadPickerScroll, MenuWalk,
+    name_key_code, spell_sharp_s, subtitle_toggle_click, walk_menu_text, FontMin, LoadPickerScroll,
+    MenuWalk,
 };
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
@@ -52,6 +53,9 @@ pub(crate) struct Menu {
     pub text: Vec<u8>,
     pub number: i32,
     pub walk: MenuWalk,
+    /// The port's `ß` fix ([`spell_sharp_s`]), from the minor bug fixes
+    /// when the menu was opened.
+    pub sharp_s_as_ss: bool,
 }
 
 impl Menu {
@@ -65,6 +69,7 @@ impl Menu {
             hover,
             toggle_a,
             toggle_b,
+            self.sharp_s_as_ss,
             &mut self.walk,
         );
     }
@@ -134,6 +139,7 @@ impl Engine {
             text,
             number,
             walk: MenuWalk::default(),
+            sharp_s_as_ss: self.enhancements().minor_bug_fixes,
         };
         m.walk(None, 0, 0);
         Some(m)
@@ -313,8 +319,9 @@ impl Engine {
             menu.walk(hover_rec, 0, 0);
             let mut s = bg.clone();
             self.ui.draw_menu(&mut s, &menu.walk);
+            let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
             for j in 0..self.players.count {
-                let name = self.players.name(j).to_vec();
+                let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
                 self.ui.draw_font_min(
                     &mut s,
                     list_font,
@@ -611,9 +618,15 @@ impl Engine {
             return 7;
         };
         let chapters = self.player_checkpoints();
+        // The rows, their widths and the title, with the port's `ß` fix
+        // (the original draws no glyph for 0xe1 and advances 7).
+        let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
         let names: Vec<Vec<u8>> = chapters
             .iter()
-            .map(|&c| epi_episode_name(&self.epi_text, u32::from(c)))
+            .map(|&c| {
+                let name = epi_episode_name(&self.epi_text, u32::from(c));
+                spell_sharp_s(&name, sharp_s_as_ss).into_owned()
+            })
             .collect();
         let count = chapters.len();
         let build = self.game.exe.build;
@@ -737,6 +750,8 @@ impl Engine {
             self.music_switch_track(26).await;
         }
         let text = self.read("SPRLIST\\CREDITS.TXT").await.unwrap_or_default();
+        // The port's `ß` fix, for consistency (no known CREDITS.TXT holds 0xe1).
+        let text = spell_sharp_s(&text, self.enhancements().minor_bug_fixes);
         let events = credits_events(&text, &self.game.exe.credit_widths);
         let start = self.sys.millis();
         let mut buffer = vec![0u16; N];

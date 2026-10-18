@@ -49,8 +49,9 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
         GameError::UnknownExecutable(size) => format!(
             "The folder {shown} holds an atlantis.exe ({size} bytes) that Atlantis Native \
              does not know: an edition of the game that is not supported yet.\n\n\
-             Supported: the English CD (1997 and 2001), the French CD (1997), the CD with \
-             Cryo's patch 1.01, and GOG.com (English, French, German, Spanish, Italian).\n\n\
+             Supported: the English CD (1997 and 2001), the French CD (1997), the German \
+             CD (1997), the CD with Cryo's patch 1.01, and GOG.com (English, French, \
+             German, Spanish, Italian).\n\n\
              You can help support your edition: report it to the project. The report \
              opens on the project's GitHub page, filled in with the files' identifiers \
              (sizes and checksums, no personal data); nothing is sent until you submit it \
@@ -100,6 +101,9 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
         }
     }
 }
+
+/// The project's Buy Me a Coffee page.
+pub const SUPPORT_URL: &str = "https://buymeacoffee.com/ripleyxlr8";
 
 /// The page that opens a new issue on the project.
 pub const NEW_ISSUE_URL: &str = "https://github.com/ripleyXLR8/atlantis-native/issues/new";
@@ -239,7 +243,8 @@ mod tests {
 
     /// The report of a real edition read from its disc images
     /// (`ATLANTIS_ISO_UNKNOWN`: a folder of images of an edition not
-    /// supported): every identifier, and a link short enough for GitHub.
+    /// supported, skipped when the edition opens): every identifier, and a
+    /// link short enough for GitHub.
     #[test]
     #[cfg(not(target_arch = "wasm32"))]
     fn report_from_disc_images() {
@@ -248,12 +253,20 @@ mod tests {
             return;
         };
         let set = atlantis_data::disc_image::DiscSet::open_folder(dir.as_ref()).unwrap();
+        let set = std::sync::Arc::new(set);
+        if let Ok(g) = atlantis_data::Game::open(set.clone()) {
+            eprintln!(
+                "ATLANTIS_ISO_UNKNOWN holds a supported edition ({}): skipped",
+                g.edition()
+            );
+            return;
+        }
         let names: Vec<String> = std::fs::read_dir(&dir)
             .unwrap()
             .flatten()
             .map(|e| e.file_name().to_string_lossy().to_ascii_lowercase())
             .collect();
-        let r = EditionReport::collect(&set, &names, true).unwrap();
+        let r = EditionReport::collect(&*set, &names, true).unwrap();
         assert_eq!(r.archives.len(), 4);
         let url = r.url("linux", "Atlantis Native test");
         eprintln!("{}\n{} characters", r.issue("linux", "test").1, url.len());

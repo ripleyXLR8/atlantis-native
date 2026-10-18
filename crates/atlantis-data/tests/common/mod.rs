@@ -89,6 +89,16 @@ pub fn game_fr1997_may(test: &str) -> Option<Game> {
     Some(Game::open(Arc::new(StdDir::new(dir))).expect("cannot open the game directory"))
 }
 
+/// The German retail CD's game folder (the August 1997 build,
+/// `ATLANTIS_DATA_DE1997`), `None` (the test skipped) without it.
+pub fn game_de1997(test: &str) -> Option<Game> {
+    let Some(dir) = std::env::var_os("ATLANTIS_DATA_DE1997") else {
+        eprintln!("ATLANTIS_DATA_DE1997 not set: {test} skipped");
+        return None;
+    };
+    Some(Game::open(Arc::new(StdDir::new(dir))).expect("cannot open the game directory"))
+}
+
 /// A CD install with Cryo's patch 1.01 executable
 /// (`ATLANTIS_DATA_PATCH101`), `None` (the test skipped) without it.
 pub fn game_patch101(test: &str) -> Option<Game> {

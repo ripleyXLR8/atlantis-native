@@ -73,7 +73,7 @@ Where the port may differ from the original by choice, `Options` holds an
 
 | Group | Default | What it changes |
 |---|---|---|
-| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 builds, the hexagon puzzle always shows its pieces, as the later builds do; with the May 1997 French build, LOADMUSIK copies its tracks one by one whatever the music volume, as the other builds do (see [Game builds](#game-builds)) |
+| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 builds, the hexagon puzzle always shows its pieces, as the later builds do; with the May 1997 French build, LOADMUSIK copies its tracks one by one whatever the music volume, as the other builds do (see [Game builds](#game-builds)); with the German CD, the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
@@ -187,7 +187,7 @@ original's pixels, which the tests check).
 
 ### Subtitles
 
-The 2001, GOG.com and August 1997 French builds draw their subtitles
+The 2001, GOG.com and August 1997 French and German builds draw their subtitles
 with the system's Arial at 13 pixels, not smoothed. The port draws them with Liberation Sans,
 which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
 thresholded to one bit, so every platform draws the same pixels; the text
@@ -211,13 +211,13 @@ them as code page 850.
 
 ### Game builds
 
-The port knows six builds of `atlantis.exe` (`ExeBuild` in
+The port knows seven builds of `atlantis.exe` (`ExeBuild` in
 `crates/atlantis-data/src/exe.rs`), found by their size and the PE
 header's timestamp (the 2001 build and the patch 1.01 build have the same
-size); their tables are read where each build has them, and the code
+size, as have the August 1997 French and German builds); their tables are read where each build has them, and the code
 differences that change what a player sees follow the build:
 
-| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French retail CD (August 1997) | French retail CD (May 1997) |
+| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French and German retail CDs (August 1997) | French retail CD (May 1997) |
 |---|---|---|---|---|---|
 | subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows | Arial | 8x8 font, 10-pixel rows (DOS code page texts) |
 | SUBTITLES item | three-click cycle | three-click cycle | plain toggle | plain toggle | plain toggle |
@@ -235,6 +235,18 @@ differences that change what a player sees follow the build:
 | LOADMUSIK / DELMUSIK | as listed | as listed | nothing when the first track plays | as listed | nothing when the first track plays; LOADMUSIK only at a current music volume of 5 or more, and all or nothing on its first track |
 | StartMusik of the playing track | fade-in re-armed | fade-in re-armed | fade-in re-armed | fade-in re-armed | nothing |
 | credits letters E b d g n t | | | | | one pixel narrower |
+
+The German retail CD's build (August 1997) is the August 1997 French
+build's code byte for byte, built again with German strings: everything
+in that column applies to it. Its new-player row reads `NEUER SPIELER`,
+and as that string is one byte shorter, its credits font table (which
+the player-name font's glyphs past 101 read, see below) starts one byte
+earlier. Its CON texts are Windows-1252; its menu, LOAD-list and credits
+texts hold the umlauts at the DOS code page's places, where the sprite
+fonts have their glyphs. Those fonts have no `ß`: the three LOAD-list
+names that spell it (`verläßt` twice, `Außerhalb`) show a gap of 7
+pixels in its place in the original, and two `s` in the port with the
+minor bug fixes (see [Enhancements](#enhancements)).
 
 Cryo's Windows patch 1.01 (`AT1CDINT.EXE`, December 1999) replaces
 `atlantis.exe` (and `cryo.dll`) in a CD installation, English, French or
@@ -316,15 +328,22 @@ Tests that need the game files read the game directory from the
 skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
 English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
 retail CD, `ATLANTIS_DATA_FR1997_MAY` one of the May 1997 French retail CD
-(the first pressing), `ATLANTIS_DATA_PATCH101 (and ATLANTIS_ISO_FR / ATLANTIS_BIN_EN: folders of the French CD's ISO images and the English CD's raw .bin images, for the disc-image reader)` a CD installation with the
-patch 1.01 executable, `ATLANTIS_GOG` a folder of the GOG.com languages'
+(the first pressing), `ATLANTIS_DATA_DE1997` one of the German retail CD,
+`ATLANTIS_DATA_PATCH101` a CD installation with the patch 1.01
+executable, `ATLANTIS_DATA_PATCH101_DE` the patch's `atlantis.exe` beside
+the German CD's archives, `ATLANTIS_ISO_FR` / `ATLANTIS_ISO_DE` /
+`ATLANTIS_BIN_EN` folders of the French and German CDs' ISO images and
+the English CD's raw .bin images (for the disc-image reader),
+`ATLANTIS_ISO_UNKNOWN` a folder of images of an edition not supported
+(the report test, skipped when the edition opens), `ATLANTIS_GOG` a folder of the GOG.com languages'
 trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
 installation, for the tests of those builds:
 
 ```sh
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
 ATLANTIS_DATA_FR1997=/path/to/fr1997 ATLANTIS_DATA_FR1997_MAY=/path/to/fr1997may \
-ATLANTIS_DATA_PATCH101=/path/to/patch101 cargo test --release
+ATLANTIS_DATA_DE1997=/path/to/de1997 ATLANTIS_DATA_PATCH101=/path/to/patch101 \
+cargo test --release
 ```
 
 The expected values in the tests are digests and numbers computed by the

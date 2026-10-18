@@ -70,6 +70,8 @@ pub enum LauncherAction {
     Find,
     /// Take entry `i` off the list.
     Remove(usize),
+    /// Open the project's Buy Me a Coffee page.
+    Support,
     Quit,
 }
 
@@ -89,6 +91,12 @@ const BUTTON_H: i32 = 26;
 const BUTTON_GAP: i32 = 9;
 const MESSAGE_Y: i32 = BUTTON_Y + BUTTON_H + 14;
 const HELP_Y: i32 = BOX_Y + BOX_H - 26;
+/// The link to the project's Buy Me a Coffee page, above the help line.
+const SUPPORT_TEXT: &[u8] = b"Enjoying Atlantis Native? Buy me a coffee";
+const SUPPORT_Y: i32 = HELP_Y - 22;
+const SUPPORT_W: i32 = 320;
+const SUPPORT_X: i32 = BOX_X + (BOX_W - SUPPORT_W) / 2;
+const LINK: u16 = 0xfea0;
 /// Two clicks on a row this close (ms) play it.
 const DOUBLE_CLICK_MS: u64 = 500;
 
@@ -360,10 +368,19 @@ impl Launcher {
             return LauncherAction::None;
         }
         self.last_click = None;
+        if Self::on_support_link(x, y) {
+            return LauncherAction::Support;
+        }
         match Self::button_at(x, y) {
             Some(b) => self.press(b),
             None => LauncherAction::None,
         }
+    }
+
+    /// Whether a screen point is on the Buy Me a Coffee link.
+    fn on_support_link(x: i32, y: i32) -> bool {
+        (SUPPORT_X..SUPPORT_X + SUPPORT_W).contains(&x)
+            && (SUPPORT_Y - 2..SUPPORT_Y + 18).contains(&y)
     }
 
     /// The mouse wheel: `rows` down (negative: up).
@@ -480,6 +497,9 @@ impl Launcher {
                 TEXT,
             );
         }
+        let x = centre(SUPPORT_TEXT);
+        text(screen, SUPPORT_TEXT, x, SUPPORT_Y, BOX_W, LINK);
+        fill(screen, x, SUPPORT_Y + 15, font.width(SUPPORT_TEXT), 1, LINK);
         let t = b"Arrows choose, Enter or double-click plays, Del removes, Esc quits";
         text(screen, t, centre(t), HELP_Y, BOX_W, DIM);
     }
@@ -663,5 +683,18 @@ mod tests {
         assert!(b.starts_with(b"...") && b.ends_with(b"/Atlantis"));
         assert_eq!(fit_left(&font, "/short", 300), b"/short");
         assert_eq!(bytes("Jeux\u{e9}\u{4e2d}"), b"Jeux\xe9?");
+    }
+
+    #[test]
+    fn the_support_link() {
+        let mut l = Launcher::new(Vec::new());
+        assert_eq!(
+            l.click(SUPPORT_X + SUPPORT_W / 2, SUPPORT_Y + 6, 0),
+            LauncherAction::Support
+        );
+        assert_eq!(
+            l.click(SUPPORT_X - 5, SUPPORT_Y + 6, 0),
+            LauncherAction::None
+        );
     }
 }

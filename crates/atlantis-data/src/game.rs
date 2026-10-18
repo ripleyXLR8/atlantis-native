@@ -108,7 +108,8 @@ impl Game {
     /// The release: the executable's build, and the language of the GOG
     /// build from its player-screen row (the five GOG languages share one
     /// executable; only this string differs). The 1997 builds' rows have no
-    /// '#': "New Player" (English), "NOUVEAU JOUEUR" (French). The 1.01
+    /// '#': "New Player" (English), "NOUVEAU JOUEUR" (French), "NEUER
+    /// SPIELER" (German). The 1.01
     /// patch's executable is French ("#NOUVEAU JOUEUR") over whichever CD it
     /// was installed on: the language is its interface's.
     pub fn edition(&self) -> Edition {
@@ -117,7 +118,7 @@ impl Game {
         let starts = |p: &[u8]| marker.len() >= p.len() && &marker[..p.len()] == p;
         let language = if starts(b"#NOUVEAU") || starts(b"NOUVEAU JOUEUR") {
             Some("French")
-        } else if starts(b"#NEUE") {
+        } else if starts(b"#NEUE") || starts(b"NEUER SPIELER") {
             Some("German")
         } else if starts(b"#NUEVO") {
             Some("Spanish")

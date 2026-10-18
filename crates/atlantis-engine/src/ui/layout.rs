@@ -107,6 +107,33 @@ impl Default for FontMinAdvances {
     }
 }
 
+/// `ß` in the DOS code page of the SPRLIST texts (the German EPI.TXT's
+/// "verläßt", "Außerhalb", atlantis-cd-de-687104). No sprite font has a
+/// glyph for it: FONTMIN and FONTMAX glyph `0xe1 - 0x20` = 193 is past
+/// their 137 sprites, so the original draws nothing (`FUN_00410430`) and
+/// moves the pen by the advance table's byte 193 (FONTMIN: the credits
+/// widths' byte 92, 7 in atlantis-cd-de-687104).
+pub const SHARP_S: u8 = 0xe1;
+
+/// A sprite-font text as the port draws and measures it: with the minor
+/// bug fixes ([`crate::enhancements::Enhancements::minor_bug_fixes`]),
+/// [`SHARP_S`] is spelled "ss" (the glyph and advance of 's' twice), so
+/// "verläßt" reads "verlässt"; otherwise the bytes as they are.
+pub fn spell_sharp_s(text: &[u8], sharp_s_as_ss: bool) -> std::borrow::Cow<'_, [u8]> {
+    if !sharp_s_as_ss || !text.contains(&SHARP_S) {
+        return std::borrow::Cow::Borrowed(text);
+    }
+    let mut out = Vec::with_capacity(text.len() + 4);
+    for &c in text {
+        if c == SHARP_S {
+            out.extend_from_slice(b"ss");
+        } else {
+            out.push(c);
+        }
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 fn fontmax_width(c: i32) -> i32 {
     usize::try_from(c)
         .ok()
@@ -185,15 +212,25 @@ fn slot(walk: &mut MenuWalk, n: usize) -> &mut MenuRecord {
 /// positioned text; `//` and `&&` the options toggles (menu 2, lines 3 and
 /// 5); `/sprj=` `/sprr=` `/sprc=` `/spr=` sprite records; then the byte:
 /// CR (the next byte is consumed), space and other control bytes (pen +
-/// 22), or a FONTMAX glyph.
+/// 22), or a FONTMAX glyph. With `sharp_s_as_ss` (the port's fix, see
+/// [`spell_sharp_s`]), a [`SHARP_S`] byte is drawn and measured as two
+/// 's' glyphs; the records and the walk are the original's.
 pub fn walk_menu_text(
     t: &[u8],
     menu: i32,
     hover_line: i32,
     toggle_a: i32,
     toggle_b: i32,
+    sharp_s_as_ss: bool,
     walk: &mut MenuWalk,
 ) {
+    let ss = |c: u8| -> i32 {
+        if sharp_s_as_ss && c == SHARP_S {
+            2 * fontmax_width(i32::from(b's') - 0x20)
+        } else {
+            fontmax_width(i32::from(c) - 0x20)
+        }
+    };
     walk.ops.clear();
     let size = t.len();
     let mut count = 0usize;
@@ -219,13 +256,7 @@ pub fn walk_menu_text(
             p = walk_step(p, y, 2, true);
             let w: i32 = (p..size)
                 .take_while(|&q| t[q] != 0x0d)
-                .map(|q| {
-                    if t[q] >= 0x20 {
-                        fontmax_width(i32::from(t[q]) - 0x20)
-                    } else {
-                        0
-                    }
-                })
+                .map(|q| if t[q] >= 0x20 { ss(t[q]) } else { 0 })
                 .sum();
             pen_x = (640 - w) / 2;
             pen_y = y;
@@ -345,17 +376,25 @@ pub fn walk_menu_text(
         }
         c -= 0x20;
         if draw {
-            walk.ops.push(MenuOp {
-                sprite: false,
-                alt_bank: false,
-                hover_font: hover,
-                x: pen_x as i16,
-                y: pen_y as i16,
-                index: c,
-                line,
-                record: count as i32 - 1,
-            });
-            pen_x += fontmax_width(c);
+            let sharp_s = sharp_s_as_ss && c == i32::from(SHARP_S) - 0x20;
+            let (glyph, n) = if sharp_s {
+                (i32::from(b's') - 0x20, 2)
+            } else {
+                (c, 1)
+            };
+            for _ in 0..n {
+                walk.ops.push(MenuOp {
+                    sprite: false,
+                    alt_bank: false,
+                    hover_font: hover,
+                    x: pen_x as i16,
+                    y: pen_y as i16,
+                    index: glyph,
+                    line,
+                    record: count as i32 - 1,
+                });
+                pen_x += fontmax_width(glyph);
+            }
         }
         p += 1;
     }
@@ -684,6 +723,69 @@ mod tests {
             .map(|b| b.x)
             .collect();
         assert_eq!(xs, [0, 2, 12]);
+    }
+
+    /// `ß` (0xe1): no glyph, the advance of the table's byte 193 (the
+    /// credits byte 92); with the fix, two 's' glyphs with their advances,
+    /// in the rows and in the width the title is centred with.
+    #[test]
+    fn sharp_s_both_ways() {
+        let mut credits = [0u8; 256];
+        credits[92] = 7;
+        let adv = FontMinAdvances::new(&credits);
+        let text = b"verl\x84\xe1t";
+        // The original: glyph 193 (past the 137 sprites, so not drawn).
+        let raw = font_min_blits(FontMin::LoadList, &spell_sharp_s(text, false), 0, 0, &adv);
+        let idx: Vec<u8> = raw.iter().map(|b| b.idx).collect();
+        assert_eq!(idx, [0x56, 0x45, 0x52, 0x4c, 0x64, 193, 0x54]);
+        assert_eq!(raw[6].x - raw[5].x, 7);
+        let w_raw = font_min_load_list_width(&spell_sharp_s(text, false), &adv);
+        assert_eq!(w_raw, raw[6].x + adv.get(0x54));
+        // The fix: "verlässt".
+        let fixed_text = spell_sharp_s(text, true);
+        assert_eq!(&*fixed_text, b"verl\x84sst");
+        let fixed = font_min_blits(FontMin::LoadList, &fixed_text, 0, 0, &adv);
+        let idx: Vec<u8> = fixed.iter().map(|b| b.idx).collect();
+        assert_eq!(idx, [0x56, 0x45, 0x52, 0x4c, 0x64, 0x53, 0x53, 0x54]);
+        let s_adv = adv.get(0x53);
+        assert_eq!(fixed[6].x - fixed[5].x, s_adv);
+        assert_eq!(fixed[7].x - fixed[6].x, s_adv);
+        let w_fixed = font_min_load_list_width(&fixed_text, &adv);
+        assert_eq!(w_fixed, w_raw - 7 + 2 * s_adv);
+        // Texts without 0xe1 are borrowed as they are.
+        assert!(matches!(
+            spell_sharp_s(b"abc", true),
+            std::borrow::Cow::Borrowed(_)
+        ));
+    }
+
+    /// The menu walk: 0xe1 one glyph 193 with the FONTMAX advance (0, past
+    /// the table) as in the original; with the fix two 's' glyphs, and the
+    /// centred line measured with them.
+    #[test]
+    fn sharp_s_in_menu_walk() {
+        let text = b"<>,100,\xe1a\r\n/fin";
+        let mut walk = MenuWalk::default();
+        let glyphs = |w: &MenuWalk| -> Vec<(i32, i16)> {
+            w.ops
+                .iter()
+                .filter(|o| !o.sprite)
+                .map(|o| (o.index, o.x))
+                .collect()
+        };
+        let (s, a) = (fontmax_width(0x53), fontmax_width(0x41));
+        walk_menu_text(text, 1, -1, 0, 0, false, &mut walk);
+        let x0 = ((640 - a) / 2) as i16;
+        assert_eq!(glyphs(&walk), [(193, x0), (0x41, x0)]);
+        assert_eq!(i32::from(walk.records[0].w), a);
+        walk_menu_text(text, 1, -1, 0, 0, true, &mut walk);
+        let x0 = ((640 - a - 2 * s) / 2) as i16;
+        let s16 = s as i16;
+        assert_eq!(
+            glyphs(&walk),
+            [(0x53, x0), (0x53, x0 + s16), (0x41, x0 + 2 * s16)]
+        );
+        assert_eq!(i32::from(walk.records[0].w), a + 2 * s);
     }
 
     #[test]

@@ -27,12 +27,14 @@ pub enum Entry {
     BugFixes,
     RestoredContent,
     UiUx,
+    /// Open the project's Buy Me a Coffee page in the browser.
+    Support,
     Close,
     /// Stop this game and choose another in the game library.
     Library,
 }
 
-const ENTRIES: [Entry; 12] = [
+const ENTRIES: [Entry; 13] = [
     Entry::Graphics,
     Entry::PanoramaFilter,
     Entry::Sharpen,
@@ -43,6 +45,7 @@ const ENTRIES: [Entry; 12] = [
     Entry::BugFixes,
     Entry::RestoredContent,
     Entry::UiUx,
+    Entry::Support,
     Entry::Close,
     Entry::Library,
 ];
@@ -76,6 +79,8 @@ pub enum MenuAction {
     Close,
     /// Stop the game and show the game library (the menu closed).
     OpenLibrary,
+    /// Open the project's Buy Me a Coffee page (the menu stays open).
+    OpenSupport,
 }
 
 /// The values the menu shows.
@@ -206,6 +211,7 @@ impl OptionsMenu {
                 self.close();
                 return MenuAction::OpenLibrary;
             }
+            Entry::Support => return MenuAction::OpenSupport,
         }
         if entry.hd_only() {
             MenuAction::SetHd(hd)
@@ -232,6 +238,7 @@ impl OptionsMenu {
             Entry::UiUx => "Modern comforts, e.g. no error box (off by default)",
             Entry::Close => "Back to the game",
             Entry::Library => "Stop this game and choose another edition",
+            Entry::Support => "Enjoying it? Support the project (opens the browser)",
         }
     }
 
@@ -267,7 +274,12 @@ impl OptionsMenu {
                 MenuAction::None
             }
             Key::Enter | Key::Space => self.activate(self.selected(), v),
-            Key::Left | Key::Right if !matches!(self.selected(), Entry::Close | Entry::Library) => {
+            Key::Left | Key::Right
+                if !matches!(
+                    self.selected(),
+                    Entry::Close | Entry::Library | Entry::Support
+                ) =>
+            {
                 self.activate(self.selected(), v)
             }
             _ => MenuAction::None,
@@ -396,6 +408,11 @@ impl OptionsMenu {
                     text(t, centre(t), y + 4, c);
                     continue;
                 }
+                Entry::Support => {
+                    let t = "Buy me a coffee...";
+                    text(t, centre(t), y + 4, c);
+                    continue;
+                }
             };
             text(label, BOX_X + 16, y + 4, c);
             let t = format!("< {value} >");
@@ -450,7 +467,7 @@ mod tests {
     use super::*;
 
     /// The menu without the game library's entry (the web build).
-    const BOX_H: i32 = TITLE_H + 11 * ROW_H + FOOTER_H;
+    const BOX_H: i32 = TITLE_H + 12 * ROW_H + FOOTER_H;
     const BOX_Y: i32 = (SCREEN_H as i32 - BOX_H) / 2;
 
     const DEFAULTS: Enhancements = Enhancements {
@@ -490,7 +507,7 @@ mod tests {
             m.key(Key::Right, HD),
             MenuAction::SetGraphics(Graphics::Original)
         );
-        for _ in 0..4 {
+        for _ in 0..5 {
             assert_eq!(m.key(Key::Down, ORIG), MenuAction::None);
         }
         assert_eq!(m.selected(), Entry::Close);
@@ -515,6 +532,8 @@ mod tests {
             MenuAction::SetGraphics(Graphics::Hd)
         );
         m.pointer(320, gy + 10 * ROW_H);
+        assert_eq!(m.selected(), Entry::Support);
+        m.pointer(320, gy + 11 * ROW_H);
         assert_eq!(m.selected(), Entry::Close);
         assert_eq!(m.click(320, BOX_Y + 2, ORIG), MenuAction::None);
         assert!(m.is_open());
@@ -624,7 +643,7 @@ mod tests {
         m.draw(&mut plain, &font, ORIG);
         assert!(s == plain, "same pixels with or without recording");
         assert!(t.after == s);
-        assert_eq!(t.items.len(), 1 + 10 * 2 + 1 + 2);
+        assert_eq!(t.items.len(), 1 + 10 * 2 + 2 + 2);
         assert!(t.items.iter().any(|i| i.color == GREYED));
         assert!(t.items.iter().any(|i| i.text == b"< Bicubic >"));
         // Without the text, the menu's boxes.
@@ -688,7 +707,7 @@ mod tests {
         // The last row, under Close, by the pointer.
         m.open();
         assert!(m.box_y() >= 0 && m.box_y() + m.box_h() <= SCREEN_H as i32);
-        let y = m.box_y() + TITLE_H + 11 * ROW_H + 5;
+        let y = m.box_y() + TITLE_H + 12 * ROW_H + 5;
         assert_eq!(m.click(320, y, HD), MenuAction::OpenLibrary);
         let font = SubtitleFont::new();
         let mut s = vec![0u16; SCREEN_W * SCREEN_H];
@@ -696,5 +715,17 @@ mod tests {
         m.open();
         m.draw_recording(&mut s, &font, HD, Some(&mut t));
         assert!(t.items.iter().any(|i| i.text == b"Game library..."));
+    }
+
+    #[test]
+    fn the_support_entry_opens_the_page() {
+        let mut m = OptionsMenu::new();
+        m.open();
+        m.key(Key::Up, ORIG);
+        m.key(Key::Up, ORIG);
+        assert_eq!(m.selected(), Entry::Support);
+        assert_eq!(m.key(Key::Left, ORIG), MenuAction::None);
+        assert_eq!(m.key(Key::Enter, ORIG), MenuAction::OpenSupport);
+        assert!(m.is_open(), "the menu stays open");
     }
 }

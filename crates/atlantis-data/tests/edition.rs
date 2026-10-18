@@ -65,6 +65,35 @@ fn french_cd_may_1997() {
 }
 
 #[test]
+fn german_cd_1997() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_DE1997") else {
+        eprintln!("ATLANTIS_DATA_DE1997 not set: skipped");
+        return;
+    };
+    assert_eq!(edition(&dir).unwrap(), "CD, German (August 1997 build)");
+}
+
+/// The patch 1.01 executable installed over the German CD
+/// (`ATLANTIS_DATA_PATCH101_DE`: the patch's atlantis.exe beside the German
+/// BIGCD1..4.BIG): the patch's build, its interface French.
+#[test]
+fn german_cd_with_patch_101() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_PATCH101_DE") else {
+        eprintln!("ATLANTIS_DATA_PATCH101_DE not set: skipped");
+        return;
+    };
+    let g = Game::open(Arc::new(StdDir::new(&dir))).unwrap();
+    assert_eq!(g.exe.build.name, "atlantis-patch-fr-714240");
+    assert_eq!(
+        g.edition().to_string(),
+        "CD, patch 1.01, French (1999 build)"
+    );
+    // The German archives: EPI.TXT spells "verläßt" in the DOS code page.
+    let epi = g.big.read("SPRLIST\\EPI.TXT").unwrap();
+    assert!(epi.windows(7).any(|w| w == b"verl\x84\xe1t"));
+}
+
+#[test]
 fn cd_with_patch_101() {
     let Ok(dir) = std::env::var("ATLANTIS_DATA_PATCH101") else {
         eprintln!("ATLANTIS_DATA_PATCH101 not set: skipped");

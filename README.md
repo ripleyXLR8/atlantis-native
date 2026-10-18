@@ -87,6 +87,7 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | CD, retail release (May 1997 build) | English | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (August 1997 build, 4 CDs) | French | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release, first pressing (May 1997 build, 4 CDs) | French | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
+| CD, retail release (August 1997 build, 4 CDs) | German | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD with Cryo's patch 1.01 (`AT1CDINT.EXE`, 1999 build) | English, French or German CD (French interface) | the folder with the patched `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
 
@@ -171,6 +172,8 @@ writes its saves, settings and log to your own user folder.
 Atlantis Native is free. If you enjoy it, you can
 [buy me a coffee](https://buymeacoffee.com/ripleyxlr8) ☕: it helps keep
 the work going (more editions, fixes, the HD and widescreen modes).
+The link is also in the game: "Buy me a coffee..." in the F10 menu,
+and at the foot of the game library.
 
 ## Licence
 
