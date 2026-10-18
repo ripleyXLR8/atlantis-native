@@ -85,6 +85,11 @@ pub struct HexaGame {
     pub object_in_hand: i32,
     /// FLAGTEMP6.
     pub flag_temp6: i32,
+    /// The 2001 entry's OBJETENMAIN = 402 before the test (0x0044076e).
+    /// Without it (the 1997 build, atlantis-cd-en-688128 FUN_0043c570) the
+    /// pieces are placed only when the player enters holding object 402
+    /// or with FLAGTEMP6 = 2.
+    pub force_held_402: bool,
     pub result: i32,
     pub map: Vec<u8>,
     pub map_file: Vec<u8>,
@@ -107,6 +112,7 @@ impl HexaGame {
             cursor: PuzzleCursor::default(),
             object_in_hand: 0,
             flag_temp6: 0,
+            force_held_402: true,
             result: 0,
             map: Vec::new(),
             map_file,
@@ -213,9 +219,14 @@ impl HexaGame {
     /// `FUN_004406fc`.
     fn set_up(&mut self) {
         // The entry sets OBJETENMAIN to 0x192 and then tests it, so the
-        // pieces are always there and FlagTemp6 is always 1.
+        // pieces are always there and FlagTemp6 is always 1. The 1997
+        // build tests the object in hand as it is: no pieces (class -1)
+        // and FlagTemp6 left as it was, unless the player holds 402 or
+        // FlagTemp6 is 2 (atlantis-cd-en-688128 FUN_0043c570).
         let mut count = 0;
-        self.object_in_hand = 0x192;
+        if self.force_held_402 {
+            self.object_in_hand = 0x192;
+        }
         if self.object_in_hand == 0x192 {
             count += 1;
             self.flag_temp6 = 1;
@@ -450,6 +461,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let sounds = PuzzleSounds::load(e, &["HEXA1", "HEXA2", "HEXA3", "HEXA4", "HEXA5"]).await;
     let mut game = HexaGame::new(map, coverage);
     game.cursor = e.puzzles.cursor;
+    // The 1997 build's entry rule; the minor bug fixes keep the 2001
+    // forcing, so that the pieces are always there.
+    game.force_held_402 = e.game.exe.build.hexa_forces_402 || e.enhancements().minor_bug_fixes;
+    game.object_in_hand = e.vars.get("objetenmain");
+    game.flag_temp6 = e.vars.get("flagtemp6");
     let mut host = Host(PuzzleHost::new(e, hooks));
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;
@@ -457,12 +473,46 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let r = game.run(&mut host).await;
     let e = host.0.e;
     e.puzzles.cursor = game.cursor;
-    // FUN_004406fc set OBJETENMAIN to 0 and FlagTemp6 to 1.
+    // FUN_004406fc set OBJETENMAIN to 0 and FlagTemp6 to 1 (the 1997
+    // build: to 1 when 402 was in hand, else left).
     e.vars.set("objetenmain", 0);
     e.vars.set("flagtemp6", game.flag_temp6);
     if e.should_abort() {
         1
     } else {
         r
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn set_up(force: bool, held: i32, flag: i32) -> (Vec<i16>, i32, i32) {
+        let mut g = HexaGame::new(vec![0; 640 * 480], Vec::new());
+        g.map = g.map_file.clone();
+        g.force_held_402 = force;
+        g.object_in_hand = held;
+        g.flag_temp6 = flag;
+        g.set_up();
+        (
+            g.pieces.iter().map(|p| p.cls).collect(),
+            g.flag_temp6,
+            g.object_in_hand,
+        )
+    }
+
+    /// FUN_004406fc places the three pieces whatever the player holds;
+    /// atlantis-cd-en-688128 FUN_0043c570 only with 402 in hand or
+    /// FLAGTEMP6 = 2, and leaves FLAGTEMP6 otherwise.
+    #[test]
+    fn pieces_rule_of_each_build() {
+        let all = vec![1, 1, 1];
+        let none = vec![-1, -1, -1];
+        assert_eq!(set_up(true, 0, 0), (all.clone(), 1, 0));
+        assert_eq!(set_up(false, 0, 0), (none, 0, 0));
+        assert_eq!(set_up(false, 0x192, 0), (all.clone(), 1, 0));
+        assert_eq!(set_up(false, 0, 2), (all.clone(), 2, 0));
+        assert_eq!(set_up(false, 0x101, 2), (all, 2, 0));
     }
 }

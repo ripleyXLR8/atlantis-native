@@ -378,6 +378,10 @@ pub struct OgreGame {
     pub mx: i32,
     pub my: i32,
     pub click: bool,
+    /// The queen reveal's frames and ticks per frame: 3 x 200
+    /// (FUN_004436f4), 5 x 75 in the 1997 build (atlantis-cd-en-688128
+    /// FUN_0043eebc); (0, 0) stands for the 2001 values.
+    pub reveal: (u8, u16),
 }
 
 impl OgreGame {
@@ -482,20 +486,26 @@ impl OgreGame {
 
     /// `FUN_004436f4`: nothing when the queen shares an ogre's cell; else
     /// cyclo4, then 3 frames: the board, her cell plain / lit / plain, the
-    /// queen; 200 ticks each.
+    /// queen; 200 ticks each. The 1997 build shows 5 frames of 75 ticks,
+    /// plain / lit / plain / lit / plain (atlantis-cd-en-688128
+    /// FUN_0043eebc).
     pub async fn reveal(&mut self, io: &mut impl OgreIo) {
         let p = self.rules.p;
         if (2..=3).any(|o| p[QUEEN].x == p[o].x && p[QUEEN].y == p[o].y) {
             return;
         }
+        let (frames, ticks) = match self.reveal {
+            (0, _) => (3, 0xc8),
+            r => r,
+        };
         io.play_sound(4);
         let mut lit = false;
-        for _ in 0..3 {
+        for _ in 0..frames {
             self.draw_board(io, false, 0, 0);
             Self::draw_cell(io, p[QUEEN].x, p[QUEEN].y, lit);
             Self::draw_piece(io, &p[QUEEN], 1);
             lit = !lit;
-            self.show(io, 0xc8).await;
+            self.show(io, u32::from(ticks)).await;
         }
     }
 
@@ -753,6 +763,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let sounds = PuzzleSounds::load(e, &SOUNDS).await;
     // FUN_0043a1e0 seeded the puzzle LCG from the clock.
     let mut game = OgreGame::new(&mut e.puzzles.lcg_seed);
+    game.reveal = e.game.exe.build.queen_reveal;
     // The mouse unlocked, then at the screen centre on entry; the mouse of
     // the previous pass (0x004960ec / 0x004960f0) starts there too.
     let mut host = Host(PuzzleHost::new(e, hooks));

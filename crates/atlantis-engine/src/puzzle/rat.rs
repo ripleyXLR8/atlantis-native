@@ -808,6 +808,15 @@ pub struct RatGame {
     pub slots: Vec<Slot>,
     /// 0x00772d94, set by the wheel's hold (0x00435d24).
     pub wheel_y: i32,
+    /// The 1997 build's pass pacing (atlantis-cd-en-688128 FUN_00435a0c @
+    /// 0x00435df9..0x00435e0e): wait until the tick reaches `next_tick`
+    /// (0x007e2d4c), then `next_tick` = tick + 5.
+    pub deadline_pacing: bool,
+    pub next_tick: u32,
+    /// The 1997 build's T0023 (atlantis-cd-en-688128 FUN_00434c6c): the
+    /// search for the first point left of the rat goes on from the
+    /// trajectory's position instead of point 0.
+    pub keep_search_position: bool,
     mx: i32,
     my: i32,
     click: bool,
@@ -889,9 +898,15 @@ impl RatGame {
         if self.rules.b(RATS) != 0 {
             self.draw_rats_left(io);
         }
-        // Each pass lasts at least 5 ticks (0x0077375c).
-        let t = io.ticks().wrapping_add(5);
-        io.wait_until(t);
+        // Each pass lasts at least 5 ticks (0x0077375c); the 1997 build
+        // waits for the deadline the previous pass set, then sets the next.
+        if self.deadline_pacing {
+            io.wait_until(self.next_tick);
+            self.next_tick = io.ticks().wrapping_add(5);
+        } else {
+            let t = io.ticks().wrapping_add(5);
+            io.wait_until(t);
+        }
         if io.ticks() > self.rules.i(AMBIENT_AT) as u32 {
             if io.random_value() % 3 == 0
                 && self.rules.b(STARTED) == 1
@@ -1292,10 +1307,16 @@ impl RatGame {
                 self.rules.set_rb(26, ABOVE, 1);
                 self.rules.set_rb(23, ABOVE, 1);
                 // T0023 starts at the first point whose x is not right of
-                // the rat's.
+                // the rat's (0x00437b6f clears the position first; the
+                // 1997 build searches on from where the trajectory was:
+                // past its end the original reads beyond the points, the
+                // port moves nothing).
                 let rx = self.rules.f(RAT_X);
+                let keep = self.keep_search_position;
                 let s = &mut self.slots[0x16];
-                s.pos = 0;
+                if !keep {
+                    s.pos = 0;
+                }
                 while (s.pos as usize) + 1 < s.x.len() && s.x[s.pos as usize] > rx {
                     s.pos += 1;
                 }
@@ -1734,6 +1755,8 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let sounds = PuzzleSounds::load(e, &SOUNDS).await;
     let rules = e.puzzles.rat.take().unwrap_or_default();
     let mut game = RatGame::new(rules, slots);
+    game.deadline_pacing = e.game.exe.build.rat_deadline_pacing;
+    game.keep_search_position = !e.game.exe.build.rat_search_restart;
     let mut host = Host {
         host: PuzzleHost::new(e, hooks),
         rat,
