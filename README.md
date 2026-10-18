@@ -72,7 +72,7 @@ those of the latest commit:
 | Windows 10 and later, 64-bit | `atlantis-native-windows-x64.zip` |
 | macOS 11 and later, Apple Silicon | `atlantis-native-macos-arm64.dmg` |
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
-| Web (a static site to serve over HTTP) | `atlantis-native-web.zip` |
+| Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 > **Windows:** the program is not code-signed (a certificate costs money
 > each year), so Windows SmartScreen may warn that it "protected your PC"
@@ -184,6 +184,17 @@ from its own sources is signed; every release is approved by hand.
 Privacy: this program does not transfer any information to other
 networked systems. It only reads the game files you point it at and
 writes its saves, settings and log to your own user folder.
+
+## AI use
+
+Atlantis Native was written for the most part by an AI (Anthropic's
+Claude, through Claude Code), directed and reviewed by its maintainer:
+the commits it wrote carry a `Co-Authored-By: Claude` line. The engine
+follows the original game's code, reverse engineered and checked against
+it: the tests compare the port's results with the original's own code run
+under emulation (subtitles, talking heads, puzzles, tables), pixel for
+pixel where it matters, on every edition supported. Reports of anything
+that differs from the original are welcome.
 
 ## Support the project
 

@@ -188,7 +188,11 @@ jobs:
         with:
           name: atlantis-native-web
           path: atlantis-native-web.zip
+      # Only on the nightly release: launchers such as Quiver take an
+      # unlabelled .zip for a Windows build, so the numbered releases carry
+      # the three platform packages alone.
       - name: Publish to the release
+        if: env.RELEASE == 'nightly'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$RELEASE" atlantis-native-web.zip --clobber
