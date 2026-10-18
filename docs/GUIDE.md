@@ -12,7 +12,8 @@ programs.
 
 On its first start it looks for the game on your computer (the GOG.com
 installation, a copy in a usual place) and offers it; otherwise it
-explains what it needs and asks for the folder. It remembers the folder.
+explains what it needs and asks for the folder. It remembers the folder
+in its [game library](#several-editions-the-game-library).
 
 ### From GOG.com
 
@@ -78,10 +79,54 @@ The message says what is wrong and what to do:
 Choosing the folder above the game's works too: Atlantis Native looks a
 few levels down for `atlantis.exe`.
 
+## Several editions: the game library
+
+Atlantis Native keeps a list of the game folders you have played: the
+game library. With one game in it, the game starts at once, as before.
+With two or more (the GOG.com release and the CD, the English and the
+French CD...), the program opens on the library's screen to choose the
+one to play, the last played selected. Each game is shown as its
+edition, *GOG.com, French (1999 build)* or *CD, English (May 1997
+build)* (with *from disc images* when it is read from images of the
+CDs), and its folder.
+
+| Action | Mouse | Keyboard |
+|---|---|---|
+| Choose a game | click it | Up / Down |
+| Play it | double-click it, or **Play** | Enter |
+| Add a game folder | **Add a game folder...** (the folder picker) | A |
+| Find the installations on this computer | **Find installations** | F |
+| Take a game off the list (no file is deleted) | **Remove** | Delete |
+| Quit | **Quit** | Escape |
+
+**Find installations** looks where the first start looks (GOG.com's
+installation, the usual places, the mounted discs and disc images, the
+copy made from the discs), adds the games not listed yet and says how
+many it found. A folder that no longer holds the game (moved, renamed,
+on a drive not plugged in) is shown in red as *not found*: **Locate...**
+(in place of Play) asks where it is now, or remove it.
+
+To open the library's screen with one game in it: hold **Shift** while
+the program starts, or start it with `--launcher`. While you play, the
+last entry of the options menu (F10), **Game library...**, stops the
+game and goes back to the screen to play another edition (the progress
+since the last checkpoint is not kept, as when quitting). The settings,
+players and checkpoints are kept per build of the game (see
+[Players, checkpoints and settings](#players-checkpoints-and-settings)).
+
+The list is the file `games.txt` in the per-user folder, one game folder
+per line, the last played first; it can be edited by hand while the
+program is closed. (Earlier versions kept one folder in
+`game-folder.txt`: it is taken over.) A game folder given on the command
+line is played without the library and not added to it.
+
 ## Command line
 
-The game folder can be left out of each of these: the remembered one is
-used, or the picker asks for it (except with `--headless`). The Windows
+The game folder can be left out of each of these: the game library
+decides (except with `--headless`).
+
+`atlantis-native --launcher` opens on the game library's screen, even
+with one game in it (holding Shift at start-up does the same). The Windows
 release build has no console: redirect its output to a file
 (`atlantis-native.exe --headless C:\game > out.txt`) to read it.
 
@@ -126,8 +171,8 @@ files are kept in a per-user folder, one per game build:
 | macOS | `~/Library/Application Support/atlantis-native/<build>` |
 | Windows | `%APPDATA%\atlantis-native\<build>` |
 
-(`game-folder.txt` and `atlantis-native.log` are in the `atlantis-native`
-folder itself.)
+(`games.txt`, the game library, and `atlantis-native.log` are in the
+`atlantis-native` folder itself.)
 
 On its first start with a game whose folder holds an original
 `players.atl` (an installation the original game played), the port copies

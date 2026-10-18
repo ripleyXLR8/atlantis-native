@@ -3,8 +3,9 @@
 //! not have. The game is paused while it is open.
 //!
 //! Entries: the graphics mode (see [`crate::hd`]), the three groups of
-//! [`Enhancements`] (the names of the ScummVM port's options), and Close;
-//! the entries are a list so that more can follow.
+//! [`Enhancements`] (the names of the ScummVM port's options), Close, and
+//! on the desktop "Game library..." (back to the list of the player's
+//! game folders, to play another edition).
 
 use crate::enhancements::Enhancements;
 use crate::hd::{HdOptions, HdText, PanoFilter, TextItem, VideoSides};
@@ -27,9 +28,11 @@ pub enum Entry {
     RestoredContent,
     UiUx,
     Close,
+    /// Stop this game and choose another in the game library.
+    Library,
 }
 
-const ENTRIES: [Entry; 11] = [
+const ENTRIES: [Entry; 12] = [
     Entry::Graphics,
     Entry::PanoramaFilter,
     Entry::Sharpen,
@@ -41,6 +44,7 @@ const ENTRIES: [Entry; 11] = [
     Entry::RestoredContent,
     Entry::UiUx,
     Entry::Close,
+    Entry::Library,
 ];
 
 impl Entry {
@@ -70,6 +74,8 @@ pub enum MenuAction {
     SetEnhancements(Enhancements),
     /// The menu closed.
     Close,
+    /// Stop the game and show the game library (the menu closed).
+    OpenLibrary,
 }
 
 /// The values the menu shows.
@@ -92,9 +98,7 @@ const TITLE_H: i32 = 34;
 /// The footer: two lines on the game and the port, the selected entry's
 /// description, the keys.
 const FOOTER_H: i32 = 86;
-const BOX_H: i32 = TITLE_H + ENTRIES.len() as i32 * ROW_H + FOOTER_H;
 const BOX_X: i32 = (SCREEN_W as i32 - BOX_W) / 2;
-const BOX_Y: i32 = (SCREEN_H as i32 - BOX_H) / 2;
 
 const BG: u16 = 0x18e3;
 const BORDER: u16 = 0xbdf7;
@@ -112,6 +116,8 @@ pub struct OptionsMenu {
     /// Shown at the foot of the menu: the game's release, the port's
     /// version (set by the front end).
     info: Vec<String>,
+    /// The front end has a game library: the "Game library..." entry.
+    library: bool,
 }
 
 impl OptionsMenu {
@@ -122,6 +128,29 @@ impl OptionsMenu {
     /// The lines shown at the foot of the menu (at most two).
     pub fn set_info(&mut self, lines: Vec<String>) {
         self.info = lines;
+    }
+
+    /// Whether the menu has the "Game library..." entry (the desktop).
+    pub fn set_library(&mut self, on: bool) {
+        self.library = on;
+        self.selected = self.selected.min(self.entries().len() - 1);
+    }
+
+    /// The entries shown.
+    fn entries(&self) -> &'static [Entry] {
+        if self.library {
+            &ENTRIES
+        } else {
+            &ENTRIES[..ENTRIES.len() - 1]
+        }
+    }
+
+    fn box_h(&self) -> i32 {
+        TITLE_H + self.entries().len() as i32 * ROW_H + FOOTER_H
+    }
+
+    fn box_y(&self) -> i32 {
+        (SCREEN_H as i32 - self.box_h()) / 2
     }
 
     pub fn is_open(&self) -> bool {
@@ -139,7 +168,7 @@ impl OptionsMenu {
 
     /// The selected entry.
     pub fn selected(&self) -> Entry {
-        ENTRIES[self.selected]
+        self.entries()[self.selected]
     }
 
     fn activate(&mut self, entry: Entry, v: MenuValues) -> MenuAction {
@@ -173,6 +202,10 @@ impl OptionsMenu {
                 self.close();
                 return MenuAction::Close;
             }
+            Entry::Library => {
+                self.close();
+                return MenuAction::OpenLibrary;
+            }
         }
         if entry.hd_only() {
             MenuAction::SetHd(hd)
@@ -198,16 +231,19 @@ impl OptionsMenu {
             Entry::RestoredContent => "Restores lines the original never plays (off by default)",
             Entry::UiUx => "Modern comforts, e.g. no error box (off by default)",
             Entry::Close => "Back to the game",
+            Entry::Library => "Stop this game and choose another edition",
         }
     }
 
     /// The next entry from the selected one in `dir` (+1 / -1) that can be
     /// changed.
-    fn step(&mut self, dir: usize, v: MenuValues) {
-        let n = ENTRIES.len();
+    fn step(&mut self, forward: bool, v: MenuValues) {
+        let entries = self.entries();
+        let n = entries.len();
+        let dir = if forward { 1 } else { n - 1 };
         for _ in 0..n {
             self.selected = (self.selected + dir) % n;
-            if v.enabled(ENTRIES[self.selected]) {
+            if v.enabled(entries[self.selected]) {
                 break;
             }
         }
@@ -223,15 +259,15 @@ impl OptionsMenu {
                 MenuAction::Close
             }
             Key::Up => {
-                self.step(ENTRIES.len() - 1, v);
+                self.step(false, v);
                 MenuAction::None
             }
             Key::Down => {
-                self.step(1, v);
+                self.step(true, v);
                 MenuAction::None
             }
             Key::Enter | Key::Space => self.activate(self.selected(), v),
-            Key::Left | Key::Right if self.selected() != Entry::Close => {
+            Key::Left | Key::Right if !matches!(self.selected(), Entry::Close | Entry::Library) => {
                 self.activate(self.selected(), v)
             }
             _ => MenuAction::None,
@@ -239,18 +275,18 @@ impl OptionsMenu {
     }
 
     /// The entry under a 640x480 screen point.
-    fn entry_at(x: i32, y: i32) -> Option<usize> {
+    fn entry_at(&self, x: i32, y: i32) -> Option<usize> {
         if !(BOX_X..BOX_X + BOX_W).contains(&x) {
             return None;
         }
-        let r = y - (BOX_Y + TITLE_H);
-        (r >= 0 && r < ENTRIES.len() as i32 * ROW_H).then_some((r / ROW_H) as usize)
+        let r = y - (self.box_y() + TITLE_H);
+        (r >= 0 && r < self.entries().len() as i32 * ROW_H).then_some((r / ROW_H) as usize)
     }
 
     /// The pointer moved to a 640x480 screen point: the entry under it is
     /// selected.
     pub fn pointer(&mut self, x: i32, y: i32) {
-        if let Some(i) = Self::entry_at(x, y) {
+        if let Some(i) = self.entry_at(x, y) {
             self.selected = i;
         }
     }
@@ -258,11 +294,12 @@ impl OptionsMenu {
     /// A click at a 640x480 screen point: the entry under it changes;
     /// outside the box the menu closes.
     pub fn click(&mut self, x: i32, y: i32, v: MenuValues) -> MenuAction {
-        if let Some(i) = Self::entry_at(x, y) {
+        if let Some(i) = self.entry_at(x, y) {
             self.selected = i;
-            return self.activate(ENTRIES[i], v);
+            return self.activate(self.entries()[i], v);
         }
-        let inside = (BOX_X..BOX_X + BOX_W).contains(&x) && (BOX_Y..BOX_Y + BOX_H).contains(&y);
+        let (box_y, box_h) = (self.box_y(), self.box_h());
+        let inside = (BOX_X..BOX_X + BOX_W).contains(&x) && (box_y..box_y + box_h).contains(&y);
         if inside {
             MenuAction::None
         } else {
@@ -273,15 +310,16 @@ impl OptionsMenu {
 
     /// The menu's boxes (x, y, w, h, colour) and text.
     fn layout(&self, font: &SubtitleFont, v: MenuValues) -> (Vec<[i32; 5]>, Vec<TextItem>) {
+        let (box_y, box_h) = (self.box_y(), self.box_h());
         let mut fills = vec![
             [
                 BOX_X - 1,
-                BOX_Y - 1,
+                box_y - 1,
                 BOX_W + 2,
-                BOX_H + 2,
+                box_h + 2,
                 i32::from(BORDER),
             ],
-            [BOX_X, BOX_Y, BOX_W, BOX_H, i32::from(BG)],
+            [BOX_X, box_y, BOX_W, box_h, i32::from(BG)],
         ];
         let mut texts = Vec::new();
         let mut text = |t: &str, x: i32, y: i32, c: u16| {
@@ -299,9 +337,9 @@ impl OptionsMenu {
         let right = |t: &str| BOX_X + BOX_W - 16 - font.width(t.as_bytes());
         let on = |b: bool| if b { "On" } else { "Off" };
         let t = "Atlantis Native options";
-        text(t, centre(t), BOX_Y + 10, TEXT);
-        for (i, &e) in ENTRIES.iter().enumerate() {
-            let y = BOX_Y + TITLE_H + i as i32 * ROW_H;
+        text(t, centre(t), box_y + 10, TEXT);
+        for (i, &e) in self.entries().iter().enumerate() {
+            let y = box_y + TITLE_H + i as i32 * ROW_H;
             let sel = i == self.selected;
             if sel {
                 fills.push([BOX_X + 6, y, BOX_W - 12, ROW_H - 2, i32::from(HIGHLIGHT)]);
@@ -353,18 +391,23 @@ impl OptionsMenu {
                     text("Close", centre("Close"), y + 4, c);
                     continue;
                 }
+                Entry::Library => {
+                    let t = "Game library...";
+                    text(t, centre(t), y + 4, c);
+                    continue;
+                }
             };
             text(label, BOX_X + 16, y + 4, c);
             let t = format!("< {value} >");
             text(&t, right(&t), y + 4, c);
         }
         for (i, line) in self.info.iter().take(2).enumerate() {
-            text(line, centre(line), BOX_Y + BOX_H - 82 + i as i32 * 18, DIM);
+            text(line, centre(line), box_y + box_h - 82 + i as i32 * 18, DIM);
         }
         let d = Self::description(self.selected(), v);
-        text(d, centre(d), BOX_Y + BOX_H - 44, TEXT);
+        text(d, centre(d), box_y + box_h - 44, TEXT);
         let k = "Arrows, Enter or click; Escape or F10 closes";
-        text(k, centre(k), BOX_Y + BOX_H - 22, DIM);
+        text(k, centre(k), box_y + box_h - 22, DIM);
         (fills, texts)
     }
 
@@ -405,6 +448,10 @@ impl OptionsMenu {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The menu without the game library's entry (the web build).
+    const BOX_H: i32 = TITLE_H + 11 * ROW_H + FOOTER_H;
+    const BOX_Y: i32 = (SCREEN_H as i32 - BOX_H) / 2;
 
     const DEFAULTS: Enhancements = Enhancements {
         minor_bug_fixes: true,
@@ -621,5 +668,33 @@ mod tests {
         assert_eq!(s[0], 0x1234);
         assert_eq!(s[(BOX_Y as usize + 2) * SCREEN_W + BOX_X as usize + 2], BG);
         assert!(s.contains(&SELECTED));
+    }
+
+    #[test]
+    fn the_library_entry_stops_the_game() {
+        let mut m = OptionsMenu::new();
+        m.open();
+        // Without a game library (the web build): no entry.
+        m.key(Key::Up, ORIG);
+        assert_eq!(m.selected(), Entry::Close);
+        m.set_library(true);
+        m.open();
+        m.key(Key::Up, ORIG);
+        assert_eq!(m.selected(), Entry::Library);
+        assert_eq!(m.key(Key::Left, ORIG), MenuAction::None);
+        assert!(m.is_open());
+        assert_eq!(m.key(Key::Enter, ORIG), MenuAction::OpenLibrary);
+        assert!(!m.is_open());
+        // The last row, under Close, by the pointer.
+        m.open();
+        assert!(m.box_y() >= 0 && m.box_y() + m.box_h() <= SCREEN_H as i32);
+        let y = m.box_y() + TITLE_H + 11 * ROW_H + 5;
+        assert_eq!(m.click(320, y, HD), MenuAction::OpenLibrary);
+        let font = SubtitleFont::new();
+        let mut s = vec![0u16; SCREEN_W * SCREEN_H];
+        let mut t = HdText::default();
+        m.open();
+        m.draw_recording(&mut s, &font, HD, Some(&mut t));
+        assert!(t.items.iter().any(|i| i.text == b"Game library..."));
     }
 }

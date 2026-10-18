@@ -276,6 +276,25 @@ trajectory, a LOAD row past the list. The English one's game-over
 narration is started at entry from the current dialog letter, which is
 the 2001 build's letter for every game over of the shipped scripts.
 
+### The desktop front end and the game library
+
+`crates/atlantis-app/src/main.rs` decides what the window starts with:
+the game folder of the command line, else the game library
+(`library.rs`, the file `games.txt`) through `session::startup`: its one
+game, the first-start flow of `desktop.rs` (detection, explanations, the
+folder picker, the copy from the discs) when it is empty, or the
+library's screen (`launcher.rs`, the state, input and drawing on the
+640x480 screen; `session.rs` carries out its actions). The `App` can
+drop its engine and start another without restarting the process:
+`App::stop_game` drops the `Runner` (the engine's async task: the
+engine runs on the event-loop thread and its worker threads are scoped
+to each frame, so nothing is left running) and closes the sound stream,
+frees the pointer and closes the menu; `App::install_game` takes the new
+`Sys` and `Runner`, reopens the sound stream on the new mixer, and puts
+the new release's title, icon and settings store (one per build) in
+place. A test checks that the old `Sys` is freed. The web build keeps
+its single folder picked in the page.
+
 ### The web build
 
 `web/build.sh` builds it (`atlantis-native-web.zip` on the nightly

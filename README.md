@@ -54,6 +54,8 @@ original's bugs and an optional HD mode.
   checkpoints are taken over on the first start.
 - ⚙️ **Options menu** (F10): graphics, HD settings and enhancements,
   changed at once while you play.
+- 📚 **Game library**: several editions (GOG.com, CD, disc images...) in
+  one list, to choose the one to play at start-up or switch from F10.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
   proportions, the mouse captured while you look around.
 
@@ -101,6 +103,9 @@ options menu, e.g. *GOG.com, French (1999 build)*.
 1. Download and unpack the build for your system.
 2. Double-click **atlantis-native** (on macOS, **Atlantis Native**).
 3. The first time, choose your game folder. It is remembered.
+   With more than one edition, the
+   [game library](docs/GUIDE.md#several-editions-the-game-library) lets
+   you choose the one to play (hold Shift at start-up to open it).
 
 That's it: the Cryo logo plays, create a player, and Atlantis awaits.
 
@@ -118,7 +123,7 @@ From a terminal you can also pass the folder:
 | Skip a talking head's lines | Escape |
 | Inventory | right click (the bar's edges scroll it) |
 | In-game menu (load, options, quit) | Escape in the panoramic view |
-| **Port options** (graphics, HD, bug fixes) | **F10**, at any time; the game pauses |
+| **Port options** (graphics, HD, bug fixes, game library) | **F10**, at any time; the game pauses |
 | Diagnostic overlay | F9 |
 
 On the player screen, click the last row to type a new name, then Enter

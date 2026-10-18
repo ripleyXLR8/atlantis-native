@@ -2,7 +2,10 @@
 //! input into engine events, runs the engine task one step per displayed
 //! frame and shows its 640x480 frames scaled to the window, with the HD
 //! layer of the frames that have one in the HD mode
-//! ([`atlantis_engine::hd`]). It also runs the port's options menu (F10).
+//! ([`atlantis_engine::hd`]). It also runs the port's options menu (F10),
+//! and on the desktop the game library's screen ([`launcher`]), where the
+//! player chooses the edition to play; the running game can be stopped
+//! and another started without leaving the program.
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
@@ -29,6 +32,12 @@ mod audio_out;
 pub mod desktop;
 pub mod dock_icon;
 pub mod guide;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod launcher;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod library;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod session;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod setup;
 #[cfg(not(target_arch = "wasm32"))]
@@ -139,6 +148,8 @@ pub struct App {
     menu: OptionsMenu,
     menu_font: Option<SubtitleFont>,
     menu_frame: Vec<u16>,
+    /// The game library's screen (desktop).
+    launcher_frame: Vec<u16>,
     paused_at: Option<Instant>,
     graphics: Graphics,
     /// Where the graphics mode is saved (`settings.ini`).
@@ -146,6 +157,9 @@ pub struct App {
     /// The HD mode's composition, and the options menu's text drawn sharp.
     compositor: HdCompositor,
     menu_text: HdText,
+    /// The game library and its screen (desktop).
+    #[cfg(not(target_arch = "wasm32"))]
+    session: Option<session::Session>,
 }
 
 impl App {
@@ -179,27 +193,41 @@ impl App {
             menu: OptionsMenu::new(),
             menu_font: None,
             menu_frame: Vec::new(),
+            launcher_frame: Vec::new(),
             paused_at: None,
             graphics: Graphics::Original,
             saves: None,
             compositor: HdCompositor::new(),
             menu_text: HdText::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            session: None,
         }
     }
 
-    /// The graphics mode to start with, and the store its changes in the
-    /// options menu are saved to (the HD options are read from it).
     /// The game's release (see [`atlantis_data::Edition`]): in the
     /// window's title and at the foot of the options menu, with the
     /// port's version.
     pub fn with_edition(mut self, edition: &atlantis_data::Edition) -> App {
-        self.title = format!("Atlantis Native - {edition}");
-        self.menu
-            .set_info(vec![format!("Game: {edition}"), version_string()]);
+        self.set_edition(Some(edition));
+        self
+    }
+
+    /// [`App::with_edition`] on a running front end; `None` without a game.
+    fn set_edition(&mut self, edition: Option<&atlantis_data::Edition>) {
+        match edition {
+            Some(edition) => {
+                self.title = format!("Atlantis Native - {edition}");
+                self.menu
+                    .set_info(vec![format!("Game: {edition}"), version_string()]);
+            }
+            None => {
+                self.title = "Atlantis Native".to_string();
+                self.menu.set_info(vec![version_string()]);
+            }
+        }
         if let Some(w) = &self.window {
             w.set_title(&self.title);
         }
-        self
     }
 
     /// The window's icon, read from the player's `atlantis.exe` (the port
@@ -214,6 +242,31 @@ impl App {
         self
     }
 
+    /// [`App::with_icon`] on a running front end (the window's, the
+    /// taskbar's and the Dock's icon change at once; without an icon they
+    /// keep theirs).
+    #[cfg(not(target_arch = "wasm32"))]
+    fn set_icon(&mut self, icon: Option<atlantis_data::exe_icon::Icon>) {
+        if icon.is_none() {
+            return;
+        }
+        self.icon = icon;
+        if let Some(w) = &self.window {
+            w.set_window_icon(self.window_icon());
+            #[cfg(target_os = "windows")]
+            {
+                use winit::platform::windows::WindowExtWindows;
+                w.set_taskbar_icon(self.window_icon());
+            }
+        }
+        #[cfg(target_os = "macos")]
+        if self.window.is_some() {
+            if let Some(icon) = &self.icon {
+                dock_icon::set(icon);
+            }
+        }
+    }
+
     /// `--widescreen`: the widescreen option on for this run (not saved).
     pub fn force_widescreen(&mut self) {
         let mut o = self.sys.hd_options();
@@ -221,13 +274,87 @@ impl App {
         self.sys.set_hd_options(o);
     }
 
+    /// The graphics mode to start with, and the store its changes in the
+    /// options menu are saved to (the HD options are read from it).
     pub fn with_graphics(mut self, graphics: Graphics, saves: Option<Rc<dyn SaveStore>>) -> App {
+        self.set_graphics(graphics, saves);
+        self
+    }
+
+    fn set_graphics(&mut self, graphics: Graphics, saves: Option<Rc<dyn SaveStore>>) {
         self.graphics = graphics;
         if let Some(s) = saves.as_ref().and_then(|s| Settings::load(s.as_ref())) {
             self.sys.set_hd_options(s.hd);
         }
         self.saves = saves;
-        self
+    }
+
+    /// Starts the engine task `runner` on `sys` in place of the game
+    /// running, if any (see [`App::stop_game`]): its graphics mode and
+    /// store, its release and icon in the window, its sound.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn install_game(
+        &mut self,
+        (sys, runner): (Rc<Sys>, Runner),
+        graphics: Graphics,
+        saves: Rc<dyn SaveStore>,
+        edition: &atlantis_data::Edition,
+        icon: Option<atlantis_data::exe_icon::Icon>,
+    ) {
+        self.stop_game();
+        self.sys = sys;
+        self.runner = Some(runner);
+        self.set_graphics(graphics, Some(saves));
+        self.set_edition(Some(edition));
+        self.set_icon(icon);
+        let now = Instant::now();
+        self.start = now;
+        self.next_frame = now;
+        if let Some(w) = self.window.clone() {
+            // The game draws its own cursors.
+            w.set_cursor_visible(false);
+            self.start_audio();
+            w.request_redraw();
+        }
+    }
+
+    /// Stops the game running, if any: its engine task is dropped (the
+    /// engine runs on this thread; its worker threads are scoped to each
+    /// frame, so none is left), its sound stream closed, the pointer
+    /// freed and the options menu closed. The front end is then without a
+    /// game, on a blank system.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn stop_game(&mut self) {
+        if self.runner.take().is_some() {
+            log::info!("game stopped");
+        }
+        self.audio = None;
+        self.audio_pending = true;
+        if self.menu.is_open() {
+            self.menu.close();
+        }
+        self.paused_at = None;
+        self.sys = Sys::new(Mixer::new());
+        self.saves = None;
+        self.locked = false;
+        self.confined = false;
+        self.raw_motion = false;
+        self.last_cursor = None;
+        self.rel_acc = (0.0, 0.0);
+        self.compositor = HdCompositor::new();
+        self.menu_text = HdText::default();
+        self.menu_frame.clear();
+        self.set_edition(None);
+        if let Some(w) = &self.window {
+            let _ = w.set_cursor_grab(CursorGrabMode::None);
+            w.set_cursor_visible(true);
+            w.request_redraw();
+        }
+    }
+
+    /// Whether a game is running (not the game library's screen).
+    pub fn has_game(&self) -> bool {
+        self.runner.is_some()
     }
 
     /// Opens the options menu: the game pauses (its clock and its sound),
@@ -301,6 +428,11 @@ impl App {
                     s.enhancements = x;
                     s.save(saves.as_ref());
                 }
+            }
+            MenuAction::OpenLibrary => {
+                // (the web build has no game library: no such entry)
+                #[cfg(not(target_arch = "wasm32"))]
+                self.show_launcher(None);
             }
         }
         if let Some(w) = &self.window {
@@ -437,6 +569,15 @@ impl App {
         };
         surface.resize(sw, sh).unwrap();
         let mut buf = surface.buffer_mut().unwrap();
+        // The game library's screen, drawn in `launcher_frame`.
+        #[cfg(not(target_arch = "wasm32"))]
+        let launcher = session::draw_launcher(
+            self.session.as_ref(),
+            &mut self.launcher_frame,
+            &mut self.menu_font,
+        );
+        #[cfg(target_arch = "wasm32")]
+        let launcher = false;
         let (sw, sh) = (size.width as usize, size.height as usize);
         // Nearest scaling keeping the 4:3 aspect, black bars.
         let scale = (sw as f64 / W as f64).min(sh as f64 / H as f64);
@@ -449,8 +590,8 @@ impl App {
         };
         // The HD tile the engine draws its next frames at.
         let tile = match self.graphics {
-            Graphics::Hd => tile_for_output(sw, sh, HD_MAX_TILE),
-            Graphics::Original => None,
+            Graphics::Hd if !launcher => tile_for_output(sw, sh, HD_MAX_TILE),
+            _ => None,
         };
         self.sys.set_hd_tile(tile);
         // Widescreen: the tile columns of panorama that fill the black
@@ -463,7 +604,9 @@ impl App {
         };
         self.sys.set_hd_side_tiles(side);
         let screen = self.sys.screen.borrow();
-        let mut frame: &[u16] = if self.runner.is_some() {
+        let mut frame: &[u16] = if launcher {
+            &self.launcher_frame
+        } else if self.runner.is_some() {
             &screen
         } else {
             &self.pattern
@@ -650,6 +793,10 @@ impl ApplicationHandler for App {
         watchdog::enter(watchdog::Phase::WindowEvent);
         #[cfg(not(target_arch = "wasm32"))]
         let _guard = WatchdogLeave;
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.launcher_event(el, &event) {
+            return;
+        }
         match event {
             WindowEvent::CloseRequested => {
                 self.sys.push_input(Input::Quit);

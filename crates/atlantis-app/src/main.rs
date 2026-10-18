@@ -1,15 +1,24 @@
 //! Desktop entry point: `atlantis-native [<game dir>]`.
 //!
-//! Without a game folder (a double click), the folder chosen last time is
-//! used if it still holds the game; else the system's folder picker asks
-//! for it, and it is remembered (`game-folder.txt` in the per-user data
-//! folder). Errors are shown in message boxes. Without a terminal the log
-//! goes to `atlantis-native.log` in the same folder.
+//! Without a game folder (a double click), the game library decides
+//! (`games.txt` in the per-user data folder, one game folder per line, the
+//! last played first): its one game starts at once; with two games or
+//! more, or when its game no longer opens, or with Shift held at start-up
+//! or `--launcher`, the game library's screen shows them to choose from.
+//! The first time (an empty library) an installation found on the
+//! computer is offered, else the system's folder picker asks for the
+//! folder, which joins the library. A game folder on the command line is
+//! played as it is (not added to the library). Errors are shown in message
+//! boxes. Without a terminal the log goes to `atlantis-native.log` in the
+//! same folder.
 //!
 //! `atlantis-native --headless <game dir> [frames]` runs the engine without
 //! a window for a number of frames (default 600) with no input, and prints
 //! what happened: a check that the game starts. The sound is mixed and
 //! dropped, so that the voices end as they would.
+//!
+//! The options menu's "Game library..." entry (F10) stops the game and
+//! shows the game library's screen, to play another edition.
 //!
 //! `--hd` starts in the HD mode (the panoramic view and the talking heads
 //! at the window's resolution), whatever `settings.ini` says; F10 opens the
@@ -39,11 +48,14 @@ fn main() {
     use std::path::Path;
     use std::rc::Rc;
 
-    use atlantis_app::desktop::{choose_game, error_box, init_log, install_panic_hook, open_game};
-    use atlantis_app::{options_with_settings, start_game, App};
-    use atlantis_data::Game;
-    use atlantis_engine::persist::{user_data_dir, DirStore};
-    use atlantis_engine::{Enhancements, Graphics, Options, SaveStore, Settings, Start};
+    use atlantis_app::desktop::{
+        data_dir, error_box, first_start, init_log, install_panic_hook, open_game, try_open,
+    };
+    use atlantis_app::session::{shift_held, startup, Session, Startup};
+    use atlantis_app::{start_game, App};
+    use atlantis_engine::audio::Mixer;
+    use atlantis_engine::sys::Sys;
+    use atlantis_engine::{Enhancements, Options, Start};
     use winit::event_loop::EventLoop;
 
     let mut args: Vec<String> = std::env::args()
@@ -71,6 +83,7 @@ fn main() {
     let force_wide = flag("--widescreen");
     let force_hd = flag("--hd") || force_wide;
     let new_game = flag("--new-game");
+    let launcher = flag("--launcher");
     let mut value = |name: &str| -> Option<i32> {
         let i = args.iter().position(|a| a == name)?;
         args.remove(i);
@@ -90,15 +103,6 @@ fn main() {
         Some(id) => Start::Puzzle { id, object },
         None if new_game => Start::NewGame,
         None => Start::Boot,
-    };
-    // The saves of each build in their own folder (the player lists of the
-    // languages differ in their marker row).
-    let store_for = |game: &Game| -> Rc<dyn SaveStore> {
-        let dir = user_data_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("atlantis-native-data"))
-            .join(game.exe.build.name);
-        log::info!("saves in {}", dir.display());
-        Rc::new(DirStore::new(dir))
     };
 
     if args.first().map(String::as_str) == Some("--headless") {
@@ -161,52 +165,63 @@ fn main() {
         return;
     }
 
+    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--launcher] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]";
     if args.len() > 1 || args.first().is_some_and(|a| a.starts_with('-')) {
-        error_box(&format!(
-            "usage: atlantis-native [--original] [--hd] [--widescreen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]\n\n\
-             '{}' not understood",
-            args.join(" ")
-        ));
+        error_box(&format!("{USAGE}\n\n'{}' not understood", args.join(" ")));
         std::process::exit(2);
     }
+    // Shift held as the program starts (read before the window opens, as
+    // long as the key is still down).
+    let requested = launcher || shift_held();
     // The event loop first: on macOS winit must own the application before
     // the folder picker or a message box creates it.
     let el = EventLoop::new().unwrap_or_else(|e| {
         error_box(&format!("No window can be opened: {e}"));
         std::process::exit(1);
     });
-    let game = match args.first() {
-        Some(dir) => open_game(Path::new(dir)).unwrap_or_else(|e| {
-            error_box(&e);
-            std::process::exit(1);
-        }),
-        None => match choose_game() {
-            Some(game) => game,
-            None => {
-                eprintln!(
-                    "usage: atlantis-native [--original] [--hd] [--widescreen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]"
-                );
-                return;
+    let session = Session::new(data_dir(), original, force_hd, force_wide, start);
+    let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
+    match args.first() {
+        // A game folder on the command line: played as it is.
+        Some(dir) => {
+            let game = open_game(Path::new(dir)).unwrap_or_else(|e| {
+                error_box(&e);
+                std::process::exit(1);
+            });
+            app.play_game(game, None);
+        }
+        None => {
+            let library = app
+                .session()
+                .map(|s| s.library().clone())
+                .unwrap_or_default();
+            let first = library.folders().first().cloned();
+            // The library's one game, opened once.
+            let opened = (library.len() == 1 && !requested)
+                .then(|| first.as_deref().and_then(|d| try_open(d).ok()))
+                .flatten();
+            let choice = startup(library.len(), requested, || opened.is_some());
+            match choice {
+                Startup::FirstStart => match first_start() {
+                    Some((game, dir)) => app.play_game(game, Some(&dir)),
+                    None => {
+                        eprintln!("{USAGE}");
+                        return;
+                    }
+                },
+                Startup::PlayFirst => {
+                    let (Some(game), Some(dir)) = (opened, first) else {
+                        unreachable!("the first game opened");
+                    };
+                    log::info!("game folder {}", dir.display());
+                    app.play_game(game, Some(&dir));
+                    if let Some(s) = app.session_mut() {
+                        s.shift_grace();
+                    }
+                }
+                Startup::Launcher => app.show_launcher(None),
             }
-        },
-    };
-    let saves = store_for(&game);
-    let options = options_with_settings(saves.clone(), original, start);
-    let graphics = if force_hd {
-        Graphics::Hd
-    } else {
-        Settings::load(saves.as_ref()).unwrap_or_default().graphics
-    };
-    let edition = game.edition();
-    log::info!("{edition}, {}", atlantis_app::version_string());
-    let icon = game.icon.clone();
-    let (sys, runner) = start_game(game, options);
-    let mut app = App::new(sys, Some(runner))
-        .with_graphics(graphics, Some(saves))
-        .with_edition(&edition)
-        .with_icon(icon);
-    if force_wide {
-        app.force_widescreen();
+        }
     }
     if let Err(e) = el.run_app(&mut app) {
         error_box(&format!("The window failed: {e}"));

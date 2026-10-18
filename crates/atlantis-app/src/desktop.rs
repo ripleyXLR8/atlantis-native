@@ -1,19 +1,21 @@
-//! Desktop conveniences: the game folder chosen in the system's folder
-//! picker and remembered, error message boxes, and the log file of a run
-//! without a terminal (a double click).
+//! Desktop conveniences: finding the game (the first-start flow, the
+//! system's folder picker, the installations on the computer, the copy
+//! from the discs), error message boxes, and the log file of a run
+//! without a terminal (a double click). The game folders used are kept in
+//! the game library ([`crate::library`]).
 
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use atlantis_data::{Game, GameError, StdDir};
 
+use crate::launcher::LauncherEntry;
+use crate::library::same_folder;
 use crate::setup;
-use atlantis_engine::persist::user_data_dir;
-
-/// The file of the per-user data folder that holds the game folder last
-/// chosen in the picker (its path, UTF-8).
-pub const GAME_FOLDER_FILE: &str = "game-folder.txt";
+use atlantis_engine::persist::{user_data_dir, DirStore};
+use atlantis_engine::SaveStore;
 
 /// The log file of a run without a terminal, in the per-user data folder,
 /// rewritten at every start.
@@ -78,13 +80,27 @@ pub fn error_box(text: &str) {
         .show();
 }
 
+/// The store of the players, checkpoints and settings of `game`'s build:
+/// each build in its own folder of the per-user data folder (the player
+/// lists of the languages differ in their marker row).
+pub fn store_for(game: &Game) -> Rc<dyn SaveStore> {
+    let dir = data_dir().join(game.exe.build.name);
+    log::info!("saves in {}", dir.display());
+    Rc::new(DirStore::new(dir))
+}
+
 /// Opens the game in `dir`.
 pub fn open_game(dir: &Path) -> Result<Game, String> {
     try_open(dir).map_err(|e| format!("{}: {e}", dir.display()))
 }
 
 /// The game in `dir`: its files, or the images of its CDs.
-fn try_open(dir: &Path) -> Result<Game, GameError> {
+pub fn try_open(dir: &Path) -> Result<Game, GameError> {
+    open_with_kind(dir).map(|(game, _)| game)
+}
+
+/// The game in `dir`, and whether it was read from disc images.
+pub fn open_with_kind(dir: &Path) -> Result<(Game, bool), GameError> {
     match Game::open(Arc::new(StdDir::new(dir))) {
         Err(e @ (GameError::NoExecutable | GameError::NoArchives)) => {
             match atlantis_data::disc_image::DiscSet::open_folder(dir) {
@@ -94,12 +110,43 @@ fn try_open(dir: &Path) -> Result<Game, GameError> {
                         dir.display(),
                         set.images.len()
                     );
-                    Game::open(Arc::new(set))
+                    Game::open(Arc::new(set)).map(|g| (g, true))
                 }
                 None => Err(e),
             }
         }
-        r => r,
+        r => r.map(|g| (g, false)),
+    }
+}
+
+/// How the game library shows a game: its edition, or why it does not
+/// open.
+pub fn edition_label(game: &Game, from_images: bool) -> String {
+    if from_images {
+        format!("{}, from disc images", game.edition())
+    } else {
+        game.edition().to_string()
+    }
+}
+
+/// The game library's entry for `dir`.
+pub fn describe(dir: &Path) -> LauncherEntry {
+    let (label, found) = match open_with_kind(dir) {
+        Ok((game, images)) => (edition_label(&game, images), true),
+        Err(e) => {
+            log::info!("{}: {e}", dir.display());
+            let why = if dir.exists() {
+                "Not found: this folder no longer holds the game"
+            } else {
+                "Not found: the folder was moved, renamed, or is on a drive not plugged in"
+            };
+            (why.to_string(), false)
+        }
+    };
+    LauncherEntry {
+        path: dir.to_path_buf(),
+        label,
+        found,
     }
 }
 
@@ -129,25 +176,6 @@ fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
         rfd::MessageDialogResult::Custom(s) if s == second => Choice::Second,
         rfd::MessageDialogResult::No => Choice::Second,
         _ => Choice::Third,
-    }
-}
-
-fn remembered_folder() -> Option<PathBuf> {
-    let text = std::fs::read_to_string(data_dir().join(GAME_FOLDER_FILE)).ok()?;
-    let line = text.lines().next()?.trim();
-    (!line.is_empty()).then(|| PathBuf::from(line))
-}
-
-fn remember_folder(dir: &Path) {
-    let Some(text) = dir.to_str() else {
-        log::warn!("{}: not UTF-8, not remembered", dir.display());
-        return;
-    };
-    let base = data_dir();
-    let written = std::fs::create_dir_all(&base)
-        .and_then(|()| std::fs::write(base.join(GAME_FOLDER_FILE), format!("{text}\n")));
-    if let Err(e) = written {
-        log::warn!("{}: {e}", base.join(GAME_FOLDER_FILE).display());
     }
 }
 
@@ -222,8 +250,8 @@ fn copy_from_discs() -> Option<PathBuf> {
 }
 
 /// Offers to copy the game from the disc at `root` (number `n`); the game
-/// copied, or `None`.
-fn offer_disc_copy(root: &Path, n: u8) -> Option<Game> {
+/// copied and its folder, or `None`.
+fn offer_disc_copy(root: &Path, n: u8) -> Option<(Game, PathBuf)> {
     let text = format!(
         "Disc {n} of Atlantis: The Lost Tales is in {}.\n\n\
          Atlantis Native can copy the game from your four discs into a folder on this \
@@ -236,10 +264,7 @@ fn offer_disc_copy(root: &Path, n: u8) -> Option<Game> {
     }
     let dest = copy_from_discs()?;
     match try_open(&dest) {
-        Ok(game) => {
-            remember_folder(&dest);
-            Some(game)
-        }
+        Ok(game) => Some((game, dest)),
         Err(e) => {
             error_box(&setup::explain(&dest, &e));
             None
@@ -247,23 +272,12 @@ fn offer_disc_copy(root: &Path, n: u8) -> Option<Game> {
     }
 }
 
-/// The game when no folder is given on the command line: the folder
-/// chosen last time if it still holds the game; else an installation found
-/// on the computer, if the player takes it; else the folder the player
-/// chooses in the system's folder picker, after an explanation of why the
-/// game's files are needed, with a message saying what to do when the
-/// folder is not right (remembered once right). `None` when the player
-/// quits.
-pub fn choose_game() -> Option<Game> {
-    if let Some(dir) = remembered_folder() {
-        match open_game(&dir) {
-            Ok(game) => {
-                log::info!("game folder {}", dir.display());
-                return Some(game);
-            }
-            Err(e) => log::warn!("the remembered game folder: {e}"),
-        }
-    }
+/// The first start (the game library is empty): an installation found
+/// on the computer, if the player takes it; else the copy from a disc in
+/// a drive; else the folder the player chooses in the system's folder
+/// picker, after an explanation of why the game's files are needed. The
+/// game and its folder; `None` when the player quits.
+pub fn first_start() -> Option<(Game, PathBuf)> {
     // An installation on this computer (GOG.com's, a copy in a usual place).
     let mut offered = false;
     for dir in setup::candidate_folders() {
@@ -279,10 +293,7 @@ pub fn choose_game() -> Option<Game> {
             root.display()
         );
         match ask(&text, "Use this folder", "Choose another folder", "Quit") {
-            Choice::First => {
-                remember_folder(&root);
-                return Some(game);
-            }
+            Choice::First => return Some((game, root)),
             Choice::Second => break,
             Choice::Third => return None,
         }
@@ -290,8 +301,8 @@ pub fn choose_game() -> Option<Game> {
     // A disc of the game in a drive: copy the four discs.
     if !offered {
         if let Some((root, n)) = setup::find_disc() {
-            if let Some(game) = offer_disc_copy(&root, n) {
-                return Some(game);
+            if let Some(found) = offer_disc_copy(&root, n) {
+                return Some(found);
             }
         }
     }
@@ -309,6 +320,15 @@ pub fn choose_game() -> Option<Game> {
             }
         }
     }
+    pick_game_folder("Quit")
+}
+
+/// The game folder the player chooses in the system's folder picker, with
+/// a message saying what to do when the folder is not right (its third
+/// button labelled `give_up`), and the offer to copy the discs when the
+/// folder is a CD drive. The game and its folder; `None` when the player
+/// cancels.
+pub fn pick_game_folder(give_up: &str) -> Option<(Game, PathBuf)> {
     loop {
         let dir = rfd::FileDialog::new()
             .set_title("Choose the folder of Atlantis: The Lost Tales (the one with atlantis.exe)")
@@ -316,8 +336,8 @@ pub fn choose_game() -> Option<Game> {
         // A CD drive: copy the discs.
         if let Some(n) = setup::disc_number(&dir) {
             if try_open(&dir).is_err() {
-                if let Some(game) = offer_disc_copy(&dir, n) {
-                    return Some(game);
+                if let Some(found) = offer_disc_copy(&dir, n) {
+                    return Some(found);
                 }
                 continue;
             }
@@ -325,12 +345,10 @@ pub fn choose_game() -> Option<Game> {
         // The folder above the game's, or a macOS app bundle, holds it
         // further down.
         let root = setup::find_game_root(&dir, 4).unwrap_or_else(|| dir.clone());
-        let result = try_open(&root).map(|g| (g, root.clone()));
-        match result {
-            Ok((game, root)) => {
-                remember_folder(&root);
+        match try_open(&root) {
+            Ok(game) => {
                 log::info!("game folder {}", root.display());
-                return Some(game);
+                return Some((game, root));
             }
             Err(e) => {
                 log::warn!("{}: {e}", root.display());
@@ -338,7 +356,7 @@ pub fn choose_game() -> Option<Game> {
                     &setup::explain(&root, &e),
                     "Choose another folder",
                     "Help",
-                    "Quit",
+                    give_up,
                 ) {
                     Choice::First => {}
                     Choice::Second => setup::open_url(setup::HELP_URL),
@@ -347,4 +365,30 @@ pub fn choose_game() -> Option<Game> {
             }
         }
     }
+}
+
+/// The game folders found on this computer: the usual installation
+/// places, the mounted discs and disc images, and the copy from the discs
+/// (only the folders that open as the game, each once).
+pub fn find_installations() -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = setup::candidate_folders()
+        .iter()
+        .filter_map(|d| setup::find_game_root(d, 4))
+        .collect();
+    roots.extend(
+        setup::disc_roots()
+            .iter()
+            .filter_map(|d| setup::find_game_root(d, 1)),
+    );
+    roots.push(data_dir().join("game-files"));
+    let mut out: Vec<PathBuf> = Vec::new();
+    for r in roots {
+        if out.iter().any(|o| same_folder(o, &r)) {
+            continue;
+        }
+        if try_open(&r).is_ok() {
+            out.push(r);
+        }
+    }
+    out
 }
