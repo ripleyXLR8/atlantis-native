@@ -27,6 +27,7 @@ use winit::window::{CursorGrabMode, Window, WindowId};
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
+pub mod dock_icon;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod watchdog;
 #[cfg(target_arch = "wasm32")]
@@ -589,6 +590,10 @@ impl ApplicationHandler for App {
         }
         let context = softbuffer::Context::new(window.clone()).unwrap();
         self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
+        #[cfg(target_os = "macos")]
+        if let Some(icon) = &self.icon {
+            dock_icon::set(icon);
+        }
         self.window = Some(window);
         // A desktop can open the sound device at once.
         #[cfg(not(target_arch = "wasm32"))]

@@ -29,6 +29,12 @@ env_logger = "0.11"
 # link at build time.
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 
+# The Dock icon (macOS takes it from the application, not the window).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSImage", "NSResponder"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 cpal = { version = "0.15", features = ["wasm-bindgen"] }
 wasm-bindgen = "0.2"
