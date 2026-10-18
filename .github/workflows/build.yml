@@ -3,10 +3,17 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
-  contents: write   # the rolling "nightly" release
+  contents: write   # the rolling "nightly" release and the versioned ones
+
+# A push to main updates the rolling "nightly" pre-release; a tag v*
+# publishes the release of that version (notes from
+# docs/releases/<tag>.md).
+env:
+  RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'nightly' }}
 
 # The nightly release's assets keep the same names from one build to the
 # next (installers download them by name):
@@ -20,15 +27,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create or update the nightly release
+      - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes="Built from the latest commit on main ($GITHUB_SHA). Playable from start to end; you need your own copy of the game. See the README for the downloads and their use."
-          if gh release view nightly >/dev/null 2>&1; then
-            gh release edit nightly --notes "$notes"
+          if [ "$RELEASE" = nightly ]; then
+            notes="Built from the latest commit on main ($GITHUB_SHA). Playable from start to end; you need your own copy of the game. See the README for the downloads and their use."
+            if gh release view nightly >/dev/null 2>&1; then
+              gh release edit nightly --notes "$notes"
+            else
+              gh release create nightly --prerelease --title "Nightly build" --notes "$notes"
+            fi
           else
-            gh release create nightly --prerelease --title "Nightly build" --notes "$notes"
+            notes_file="docs/releases/$RELEASE.md"
+            [ -f "$notes_file" ] || { echo "missing $notes_file"; exit 1; }
+            if gh release view "$RELEASE" >/dev/null 2>&1; then
+              gh release edit "$RELEASE" --notes-file "$notes_file"
+            else
+              gh release create "$RELEASE" --verify-tag --title "Atlantis Native ${RELEASE#v}" --notes-file "$notes_file"
+            fi
           fi
 
   macos-arm64:
@@ -56,10 +73,10 @@ jobs:
         with:
           name: atlantis-native-macos-arm64
           path: atlantis-native-macos-arm64.dmg
-      - name: Publish to the nightly release
+      - name: Publish to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload nightly atlantis-native-macos-arm64.dmg --clobber
+        run: gh release upload "$RELEASE" atlantis-native-macos-arm64.dmg --clobber
 
   windows-x64:
     needs: release
@@ -105,11 +122,11 @@ jobs:
         with:
           name: atlantis-native-windows-x64
           path: atlantis-native-windows-x64.zip
-      - name: Publish to the nightly release
+      - name: Publish to the release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload nightly atlantis-native-windows-x64.zip --clobber
+        run: gh release upload "$RELEASE" atlantis-native-windows-x64.zip --clobber
 
   linux-x64:
     needs: release
@@ -135,10 +152,10 @@ jobs:
         with:
           name: atlantis-native-linux-x64
           path: atlantis-native-linux-x64.tar.gz
-      - name: Publish to the nightly release
+      - name: Publish to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload nightly atlantis-native-linux-x64.tar.gz --clobber
+        run: gh release upload "$RELEASE" atlantis-native-linux-x64.tar.gz --clobber
 
   web:
     needs: release
@@ -164,7 +181,7 @@ jobs:
         with:
           name: atlantis-native-web
           path: atlantis-native-web.zip
-      - name: Publish to the nightly release
+      - name: Publish to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload nightly atlantis-native-web.zip --clobber
+        run: gh release upload "$RELEASE" atlantis-native-web.zip --clobber

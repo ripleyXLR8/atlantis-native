@@ -8,7 +8,7 @@ A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997),
 written in Rust, for Windows, macOS, Linux and your browser.
 
 [![Build](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml/badge.svg)](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml)
-[![Nightly](https://img.shields.io/badge/download-nightly-blue)](https://github.com/ripleyXLR8/atlantis-native/releases/tag/nightly)
+[![Release](https://img.shields.io/github/v/release/ripleyXLR8/atlantis-native)](https://github.com/ripleyXLR8/atlantis-native/releases/latest)
 [![Licence: GPL v3+](https://img.shields.io/badge/licence-GPLv3%2B-green)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-lightgrey)
 ![Rust](https://img.shields.io/badge/made%20with-Rust-orange)
@@ -59,8 +59,10 @@ original's bugs and an optional HD mode.
 
 ## Download
 
-Builds of the latest commit, on the
-[nightly release](https://github.com/ripleyXLR8/atlantis-native/releases/tag/nightly):
+The [latest release](https://github.com/ripleyXLR8/atlantis-native/releases/latest)
+holds the builds of the current version; the
+[nightly release](https://github.com/ripleyXLR8/atlantis-native/releases/tag/nightly)
+those of the latest commit:
 
 | System | File |
 |---|---|
