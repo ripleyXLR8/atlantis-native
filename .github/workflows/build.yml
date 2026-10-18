@@ -32,7 +32,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$RELEASE" = nightly ]; then
-            notes="Built from the latest commit on main ($GITHUB_SHA). Playable from start to end; you need your own copy of the game. See the README for the downloads and their use."
+            notes="Built from the latest commit on main ($GITHUB_SHA). Playable from start to end; you need your own copy of the game. See the README for the downloads and their use. If you enjoy it: https://buymeacoffee.com/ripleyxlr8"
             if gh release view nightly >/dev/null 2>&1; then
               gh release edit nightly --notes "$notes"
             else

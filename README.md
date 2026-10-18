@@ -12,6 +12,7 @@ written in Rust, for Windows, macOS, Linux and your browser.
 [![Licence: GPL v3+](https://img.shields.io/badge/licence-GPLv3%2B-green)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-lightgrey)
 ![Rust](https://img.shields.io/badge/made%20with-Rust-orange)
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-ripleyxlr8-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/ripleyxlr8)
 
 [Download](#download) · [Quick start](#quick-start) · [Features](#features) · [Controls](#controls) · [Player's guide](docs/GUIDE.md) · [Technical notes](docs/TECHNICAL.md)
 
@@ -164,6 +165,12 @@ from its own sources is signed; every release is approved by hand.
 Privacy: this program does not transfer any information to other
 networked systems. It only reads the game files you point it at and
 writes its saves, settings and log to your own user folder.
+
+## Support the project
+
+Atlantis Native is free. If you enjoy it, you can
+[buy me a coffee](https://buymeacoffee.com/ripleyxlr8) ☕: it helps keep
+the work going (more editions, fixes, the HD and widescreen modes).
 
 ## Licence
 
