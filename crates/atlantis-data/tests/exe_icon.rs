@@ -53,3 +53,12 @@ fn icon_of_the_french_may_1997_build() {
     let icon = g.icon.expect("an icon");
     assert_eq!((icon.width, icon.height), (32, 32));
 }
+
+#[test]
+fn icon_of_the_patch_101_build() {
+    let Some(g) = common::game_patch101("icon_of_the_patch_101_build") else {
+        return;
+    };
+    let icon = g.icon.expect("an icon");
+    assert_eq!((icon.width, icon.height), (32, 32));
+}

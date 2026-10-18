@@ -9,6 +9,10 @@ use crate::text::TextCodePage;
 pub struct ExeBuild {
     pub name: &'static str,
     pub size: u32,
+    /// The COFF header's TimeDateStamp: with the size, what tells the
+    /// builds apart (the reference and the 1999 patch build have the same
+    /// size; the 1999 patch and GOG builds the same stamp).
+    pub pe_timestamp: u32,
     /// The year the executable was built (shown with the release).
     pub year: u16,
     /// The month, for the 1997 builds (two French builds that year).
@@ -122,11 +126,13 @@ pub struct ExeBuild {
 /// the French retail CD's build of August 1997 (laid out as the English
 /// one, the sound table and player row 4 bytes lower) and the French
 /// retail CD's first build, of May 1997 (the English one's code and
-/// layout, its tables from the names array on 4 bytes further).
-pub const BUILDS: [ExeBuild; 5] = [
+/// layout, its tables from the names array on 4 bytes further), and the
+/// build of Cryo's patch 1.01 (the GOG build before GOG's edits).
+pub const BUILDS: [ExeBuild; 6] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
+        pe_timestamp: 0x3b82_75d6,
         year: 2001,
         month: None,
         dgroup_vaddr: 0x9_0000,
@@ -163,6 +169,7 @@ pub const BUILDS: [ExeBuild; 5] = [
     ExeBuild {
         name: "atlantis-gog-714752",
         size: 714_752,
+        pe_timestamp: 0x385a_4dc6,
         year: 1999,
         month: None,
         dgroup_vaddr: 0x9_0000,
@@ -196,9 +203,62 @@ pub const BUILDS: [ExeBuild; 5] = [
         music_restart_rearms_fade: true,
         text_code_page: TextCodePage::Windows1252,
     },
+    // Cryo's Windows patch AT1CDINT.EXE ("1.01"), installed over the
+    // English, French and German CD installs, whose BIGCD1..4.BIG it keeps.
+    // The 1999 build GOG later edited: the same bytes as GOG's French
+    // executable but for GOG's code patches (which concern the original's
+    // platform), its drive strings (0x00495eb4, 0x004961a0..0x004961ab),
+    // its manifest and its PE header. DGROUP is laid out as the
+    // reference's; the tables are GOG's, at the same addresses (the
+    // reference's bytes but for the player row).
+    ExeBuild {
+        name: "atlantis-patch-fr-714240",
+        size: 714_240,
+        pe_timestamp: 0x385a_4dc6,
+        year: 1999,
+        month: None,
+        dgroup_vaddr: 0x9_0000,
+        dgroup_raw: 0x7_1200,
+        music_va: 0x0049_5eec,
+        sound_names_va: 0x0049_61e0,
+        sound_names_range: (0x004b_0000, 0x004d_0000),
+        // "#NOUVEAU JOUEUR", then the label "NOUVEAU JOUEUR".
+        new_player_va: 0x0049_6570,
+        inventory_va: 0x0049_67b4,
+        guest_va: 0x0049_6888,
+        credit_widths_va: 0x0049_6700,
+        marker_is_label: false,
+        // FUN_00422fcc: no test of ids 0x219 / 0x21a (the reference's
+        // 0x0042313d..0x00423156).
+        cursor_id_rule: false,
+        // FUN_004283b4: no forced camera (the reference's FUN_0042844c @
+        // 0x0042892e).
+        rhea_camera2: false,
+        // FUN_00426570: the per-section counter added to the narrator
+        // letter, that many lines skipped (0x004267ce..0x00426882).
+        alt_game_over_narration: true,
+        bitmap_subtitles: false,
+        subtitle_click_cycle: true,
+        players_1997: false,
+        upper_case_names: false,
+        hexa_forces_402: true,
+        queen_reveal: (3, 200),
+        rat_deadline_pacing: false,
+        rat_search_restart: true,
+        warp_cursor_steps: 2,
+        load_knob_starts_at_bar: true,
+        load_picker_clamp: true,
+        music_first_value_rule: false,
+        game_over_voice_at_entry: false,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        text_code_page: TextCodePage::Windows1252,
+    },
     ExeBuild {
         name: "atlantis-cd-en-688128",
         size: 688_128,
+        pe_timestamp: 0x3388_6fd1,
         year: 1997,
         month: Some("May"),
         dgroup_vaddr: 0x8_0000,
@@ -240,6 +300,7 @@ pub const BUILDS: [ExeBuild; 5] = [
     ExeBuild {
         name: "atlantis-cd-fr-687104",
         size: 687_104,
+        pe_timestamp: 0x33ef_1516,
         year: 1997,
         month: Some("August"),
         dgroup_vaddr: 0x8_0000,
@@ -294,6 +355,7 @@ pub const BUILDS: [ExeBuild; 5] = [
     ExeBuild {
         name: "atlantis-cd-fr-688640",
         size: 688_640,
+        pe_timestamp: 0x3381_8054,
         year: 1997,
         month: Some("May"),
         dgroup_vaddr: 0x8_0000,
@@ -337,9 +399,30 @@ pub const BUILDS: [ExeBuild; 5] = [
     },
 ];
 
-/// The build of an executable of `size` bytes, `None` when unknown.
-pub fn build_for_size(size: u64) -> Option<&'static ExeBuild> {
-    BUILDS.iter().find(|b| u64::from(b.size) == size)
+/// The TimeDateStamp of a PE file's COFF header (at e_lfanew + 8, after the
+/// "PE\0\0" signature), `None` when the bytes are not a PE file.
+pub fn pe_timestamp(exe: &[u8]) -> Option<u32> {
+    let u32_at = |at: usize| {
+        exe.get(at..at + 4)
+            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+    };
+    if exe.get(..2)? != b"MZ" {
+        return None;
+    }
+    let pe = usize::try_from(u32_at(0x3c)?).ok()?;
+    if exe.get(pe..pe + 4)? != b"PE\0\0" {
+        return None;
+    }
+    u32_at(pe + 8)
+}
+
+/// The build of an executable, by its size and PE timestamp; `None` when
+/// unknown.
+pub fn build_of(exe: &[u8]) -> Option<&'static ExeBuild> {
+    let stamp = pe_timestamp(exe)?;
+    BUILDS
+        .iter()
+        .find(|b| b.size as usize == exe.len() && b.pe_timestamp == stamp)
 }
 
 // The image base of the known builds.
@@ -440,7 +523,7 @@ fn i32_list(exe: &[u8], off: usize, max: usize) -> Vec<i32> {
 impl ExeTables {
     /// Reads the tables of a known build; `None` for an unknown executable.
     pub fn read(exe: &[u8]) -> Option<ExeTables> {
-        let build = build_for_size(exe.len() as u64)?;
+        let build = build_of(exe)?;
         let marker_off = build.file_offset(build.new_player_va);
         let new_player_marker = cstr(exe, marker_off);
         let new_player_label = if build.marker_is_label {
@@ -462,5 +545,44 @@ impl ExeTables {
             music_names: music_names(build, exe),
             newsound_names: newsound_names(build, exe),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A file of `size` bytes with only an MZ header pointing at a PE header
+    /// stamped `stamp`.
+    fn fake_exe(size: usize, stamp: u32) -> Vec<u8> {
+        let mut exe = vec![0u8; size];
+        exe[..2].copy_from_slice(b"MZ");
+        exe[0x3c..0x40].copy_from_slice(&0x80u32.to_le_bytes());
+        exe[0x80..0x84].copy_from_slice(b"PE\0\0");
+        exe[0x88..0x8c].copy_from_slice(&stamp.to_le_bytes());
+        exe
+    }
+
+    #[test]
+    fn size_and_stamp_tell_every_build() {
+        for b in &BUILDS {
+            let exe = fake_exe(b.size as usize, b.pe_timestamp);
+            assert_eq!(build_of(&exe).map(|f| f.name), Some(b.name));
+        }
+        // The reference and the patch: one size, two stamps.
+        let reference = fake_exe(714_240, 0x3b82_75d6);
+        assert_eq!(build_of(&reference).unwrap().name, "atlantis-cd-en-714240");
+        let patch = fake_exe(714_240, 0x385a_4dc6);
+        assert_eq!(build_of(&patch).unwrap().name, "atlantis-patch-fr-714240");
+    }
+
+    #[test]
+    fn unknown_stamp_or_no_pe_header_is_unknown() {
+        assert!(build_of(&fake_exe(714_240, 0x1234_5678)).is_none());
+        let mut exe = fake_exe(714_240, 0x3b82_75d6);
+        exe[0x80] = b'X';
+        assert!(build_of(&exe).is_none());
+        assert!(build_of(&vec![0u8; 714_240]).is_none());
+        assert!(build_of(b"MZ").is_none());
     }
 }

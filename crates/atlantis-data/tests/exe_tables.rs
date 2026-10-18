@@ -3,12 +3,13 @@
 //!
 //! Needs the game (`ATLANTIS_DATA`, `ATLANTIS_DATA_1997` for the English
 //! retail CD's 1997 build, `ATLANTIS_DATA_FR1997` for the French retail
-//! CD's August 1997 build and `ATLANTIS_DATA_FR1997_MAY` for its May 1997
-//! build); skipped without it.
+//! CD's August 1997 build, `ATLANTIS_DATA_FR1997_MAY` for its May 1997
+//! build and `ATLANTIS_DATA_PATCH101` for a CD install with Cryo's patch
+//! 1.01); skipped without it.
 
 mod common;
 
-use common::{game, game_1997, game_fr1997, game_fr1997_may, golden_map, md5_hex};
+use common::{game, game_1997, game_fr1997, game_fr1997_may, game_patch101, golden_map, md5_hex};
 
 fn joined(names: &[String]) -> String {
     names
@@ -23,6 +24,8 @@ fn music_and_newsound_tables_match_original() {
     let Some(game) = game("music_and_newsound_tables_match_original") else {
         return;
     };
+    // The reference, not the patch build of the same size.
+    assert_eq!(game.exe.build.name, "atlantis-cd-en-714240");
     check_sound_tables(&game);
 }
 
@@ -151,5 +154,47 @@ fn tables_of_the_french_may_1997_build() {
                 "byte {c:#x}"
             );
         }
+    }
+}
+
+/// The patch 1.01 build (atlantis-patch-fr-714240): the reference's size,
+/// told apart by its PE stamp; DGROUP laid out as the reference's, the
+/// tables at the GOG build's addresses (the credits widths, inventory and
+/// guest tables 4 bytes further) with the reference's bytes, but for the
+/// player row: "#NOUVEAU JOUEUR", then the label "NOUVEAU JOUEUR".
+#[test]
+fn tables_of_the_patch_101_build() {
+    let Some(p) = game_patch101("tables_of_the_patch_101_build") else {
+        return;
+    };
+    let exe = &p.exe;
+    assert_eq!(exe.build.name, "atlantis-patch-fr-714240");
+    check_sound_tables(&p);
+    assert_eq!(exe.new_player_marker, b"#NOUVEAU JOUEUR");
+    assert_eq!(exe.new_player_label, b"NOUVEAU JOUEUR");
+    assert_eq!(exe.inventory_object_ids.len(), 51);
+    assert_eq!(exe.inventory_object_ids[39], 0);
+    assert_eq!(exe.guest_sprite_ids.len(), 9);
+    // The 1999 code: as the GOG build's.
+    let b = exe.build;
+    assert!(!b.cursor_id_rule && !b.rhea_camera2 && b.alt_game_over_narration);
+    if let Some(reference) = game("tables_of_the_patch_101_build (reference)") {
+        let r = &reference.exe;
+        assert_eq!(exe.inventory_object_ids, r.inventory_object_ids);
+        assert_eq!(exe.guest_sprite_ids, r.guest_sprite_ids);
+        assert_eq!(exe.credit_widths, r.credit_widths);
+        assert_eq!(exe.music_names, r.music_names);
+        assert_eq!(exe.newsound_names, r.newsound_names);
+    }
+    if let Ok(gog) = std::env::var("ATLANTIS_GOG_FR") {
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(gog)))
+            .unwrap();
+        let g = &g.exe;
+        assert_eq!(g.build.name, "atlantis-gog-714752");
+        assert_eq!(exe.new_player_marker, g.new_player_marker);
+        assert_eq!(exe.new_player_label, g.new_player_label);
+        assert_eq!(exe.inventory_object_ids, g.inventory_object_ids);
+        assert_eq!(exe.guest_sprite_ids, g.guest_sprite_ids);
+        assert_eq!(exe.credit_widths, g.credit_widths);
     }
 }

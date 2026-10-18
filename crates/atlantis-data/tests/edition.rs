@@ -63,3 +63,15 @@ fn french_cd_may_1997() {
     };
     assert_eq!(edition(&dir).unwrap(), "CD, French (May 1997 build)");
 }
+
+#[test]
+fn cd_with_patch_101() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_PATCH101") else {
+        eprintln!("ATLANTIS_DATA_PATCH101 not set: skipped");
+        return;
+    };
+    assert_eq!(
+        edition(&dir).unwrap(),
+        "CD, patch 1.01, French (1999 build)"
+    );
+}

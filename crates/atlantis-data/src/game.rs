@@ -65,7 +65,7 @@ impl Game {
 /// Which release of the game a folder holds, for display.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Edition {
-    /// "CD" or "GOG.com".
+    /// "CD", "CD, patch 1.01" or "GOG.com".
     pub release: &'static str,
     /// "English", "French", ... (`None` when not recognised).
     pub language: Option<&'static str>,
@@ -92,9 +92,11 @@ impl Game {
     /// The release: the executable's build, and the language of the GOG
     /// build from its player-screen row (the five GOG languages share one
     /// executable; only this string differs). The 1997 builds' rows have no
-    /// '#': "New Player" (English), "NOUVEAU JOUEUR" (French).
+    /// '#': "New Player" (English), "NOUVEAU JOUEUR" (French). The 1.01
+    /// patch's executable is French ("#NOUVEAU JOUEUR") over whichever CD it
+    /// was installed on: the language is its interface's.
     pub fn edition(&self) -> Edition {
-        let gog = self.exe.build.name.starts_with("atlantis-gog");
+        let name = self.exe.build.name;
         let marker = self.exe.new_player_marker.as_slice();
         let starts = |p: &[u8]| marker.len() >= p.len() && &marker[..p.len()] == p;
         let language = if starts(b"#NOUVEAU") || starts(b"NOUVEAU JOUEUR") {
@@ -111,7 +113,13 @@ impl Game {
             None
         };
         Edition {
-            release: if gog { "GOG.com" } else { "CD" },
+            release: if name.starts_with("atlantis-gog") {
+                "GOG.com"
+            } else if name.starts_with("atlantis-patch") {
+                "CD, patch 1.01"
+            } else {
+                "CD"
+            },
             language,
             build_year: self.exe.build.year,
             build_month: self.exe.build.month,
