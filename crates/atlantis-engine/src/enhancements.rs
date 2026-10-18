@@ -25,7 +25,12 @@ pub struct Enhancements {
     /// - `ß` (0xe1, the German CD's EPI.TXT) in the sprite-font texts is
     ///   drawn and measured as two 's'; off, as the original: glyph 193,
     ///   past the fonts' 137 sprites, is not drawn and the pen moves by the
-    ///   advance table's byte (7 in atlantis-cd-de-687104, FUN_00410430).
+    ///   advance table's byte (7 in atlantis-cd-de-687104, FUN_00410430);
+    /// - with the Dutch CD, CREDITS.TXT and the FONTMIN fonts are disc 1's
+    ///   newest revision whatever the disc; off, the current disc's copy, as
+    ///   the original reads them from the disc in the drive: disc 2 holds an
+    ///   older revision (CREDITS.TXT one line shorter, FONTMIN's `j` and
+    ///   `'` hotspots).
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

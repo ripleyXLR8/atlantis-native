@@ -50,8 +50,8 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
             "The folder {shown} holds an atlantis.exe ({size} bytes) that Atlantis Native \
              does not know: an edition of the game that is not supported yet.\n\n\
              Supported: the English CD (1997 and 2001), the French CD (1997), the German \
-             CD (1997), the CD with Cryo's patch 1.01, and GOG.com (English, French, \
-             German, Spanish, Italian).\n\n\
+             CD (1997), the Dutch CD (1997), the CD with Cryo's patch 1.01, and GOG.com \
+             (English, French, German, Spanish, Italian).\n\n\
              You can help support your edition: report it to the project. The report \
              opens on the project's GitHub page, filled in with the files' identifiers \
              (sizes and checksums, no personal data); nothing is sent until you submit it \

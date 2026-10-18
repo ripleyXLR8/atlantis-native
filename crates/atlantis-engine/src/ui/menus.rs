@@ -195,6 +195,7 @@ impl Engine {
     pub async fn player_screen(&mut self) -> Option<usize> {
         let bg = self.load_picture("PREINTRO.TGA").await;
         let mut menu = self.load_menu("SELEMENU.TXT").await?;
+        self.load_fontmin_from_current_disc().await;
         // The records OK (5) and DELETE (6): the title, four sprites, then
         // the two labels (FUN_0041dea4 tests them by number).
         const OK: usize = 5;
@@ -617,6 +618,7 @@ impl Engine {
         let Some(mut menu) = self.load_menu("LOADMENU.TXT").await else {
             return 7;
         };
+        self.load_fontmin_from_current_disc().await;
         let chapters = self.player_checkpoints();
         // The rows, their widths and the title, with the port's `ß` fix
         // (the original draws no glyph for 0xe1 and advances 7).
@@ -749,7 +751,16 @@ impl Engine {
         if self.music.handle_set && self.music.open_track != 22 {
             self.music_switch_track(26).await;
         }
-        let text = self.read("SPRLIST\\CREDITS.TXT").await.unwrap_or_default();
+        // Read at each run from the disc in the drive by the 1997 builds of
+        // the English May code; loaded with the menus at start-up, from the
+        // boot disc (disc 1 here), by the others (ExeBuild::credits_read_per_run).
+        const CREDITS: &str = "SPRLIST\\CREDITS.TXT";
+        let text = if self.game.exe.build.credits_read_per_run {
+            self.read_from_current_disc(CREDITS).await
+        } else {
+            self.read(CREDITS).await
+        }
+        .unwrap_or_default();
         // The port's `ß` fix, for consistency (no known CREDITS.TXT holds 0xe1).
         let text = spell_sharp_s(&text, self.enhancements().minor_bug_fixes);
         let events = credits_events(&text, &self.game.exe.credit_widths);

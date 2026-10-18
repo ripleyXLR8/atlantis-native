@@ -25,6 +25,8 @@ pub struct UiAssets {
     /// FONTMIN.SPR, the player-name font; FONTMIN2.SPR, its hovered glyphs.
     pub fontmin: Vec<SprSprite>,
     pub fontmin2: Vec<SprSprite>,
+    /// Where the FONTMIN.SPR loaded was read (archive file, offset).
+    pub fontmin_from: Option<(String, u64)>,
     /// FONTMIN's advances, past its table the build's credits table's.
     pub fontmin_advance: FontMinAdvances,
     /// CREDBLAN.SPR / CREDBLEU.SPR, the credits fonts.
@@ -288,6 +290,11 @@ impl Engine {
             fontmax2: bank(self, "FONTMAX2.SPR", d).await,
             fontmin: bank(self, "FONTMIN.SPR", d).await,
             fontmin2: bank(self, "FONTMIN2.SPR", d).await,
+            fontmin_from: self
+                .game
+                .big
+                .locate("SPRITE\\2D\\FONTMIN.SPR")
+                .map(|(file, at, _)| (file, at)),
             fontmin_advance: FontMinAdvances::new(&self.game.exe.credit_widths),
             credblan: bank(self, "CREDBLAN.SPR", d).await,
             credbleu: bank(self, "CREDBLEU.SPR", d).await,
@@ -305,6 +312,54 @@ impl Engine {
             self.epi_text = t;
         }
         self.ui = std::rc::Rc::new(a);
+    }
+
+    /// A member the original reads from the open archive at the time it
+    /// uses it, so from the disc in the drive: the current disc's copy
+    /// (0x00772913). With the minor bug fixes, the first copy, disc 1's:
+    /// the Dutch CD's disc 2 holds an older revision of CREDITS.TXT and
+    /// FONTMIN / FONTMIN2 (the others carry the same bytes on every disc).
+    pub async fn read_from_current_disc(&self, name: &str) -> Option<Vec<u8>> {
+        let disc = (!self.enhancements().minor_bug_fixes).then_some(self.disc);
+        self.game.big.set_disc_copy(disc);
+        let data = self.read(name).await;
+        self.game.big.set_disc_copy(None);
+        data
+    }
+
+    /// FONTMIN.SPR and FONTMIN2.SPR from the current disc, as the LOAD
+    /// picker and the player screen load them on entry
+    /// (atlantis-cd-en-714240 FUN_0041cf78 @ 0x0041cfc2, FUN_0041dea4 @
+    /// 0x0041def3; atlantis-cd-nl-688128 FUN_0041c9e0 @
+    /// 0x0041ca29..0x0041caaa, FUN_0041d70c @ 0x0041d75b..0x0041d7c3).
+    /// Read again only when that copy is not the one loaded.
+    pub async fn load_fontmin_from_current_disc(&mut self) {
+        const FONTMIN: &str = "SPRITE\\2D\\FONTMIN.SPR";
+        let disc = (!self.enhancements().minor_bug_fixes).then_some(self.disc);
+        self.game.big.set_disc_copy(disc);
+        let from = self
+            .game
+            .big
+            .locate(FONTMIN)
+            .map(|(file, at, _)| (file, at));
+        self.game.big.set_disc_copy(None);
+        if from.is_none() || from == self.ui.fontmin_from {
+            return;
+        }
+        let d = limits::DEFAULT;
+        let bank = |data: Option<Vec<u8>>| {
+            data.and_then(|d2| read_spr_file(&d2, d.0, d.1))
+                .unwrap_or_default()
+        };
+        let fontmin = bank(self.read_from_current_disc(FONTMIN).await);
+        let fontmin2 = bank(
+            self.read_from_current_disc("SPRITE\\2D\\FONTMIN2.SPR")
+                .await,
+        );
+        let ui = std::rc::Rc::make_mut(&mut self.ui);
+        ui.fontmin = fontmin;
+        ui.fontmin2 = fontmin2;
+        ui.fontmin_from = from;
     }
 
     /// The arrow cursor (CURSEURS.SPR frame 6, `FUN_0042d558`) at the

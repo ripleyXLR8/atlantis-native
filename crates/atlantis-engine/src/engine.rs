@@ -893,7 +893,8 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
 impl Engine {
     /// The start-up videos (0x0041960a..0x004196cc): LOGO15N.HNM and
     /// PREINTRO.HNM with their sounds, through the transition player at the
-    /// cinema pace, a 200-tick (1 s) wait that reads no input between them.
+    /// cinema pace, a 200-tick (1 s) wait that reads no input between them;
+    /// the Dutch build plays LOGORP.HNM after the wait.
     pub async fn play_startup(&mut self) {
         use crate::place::CINEMA_FRAME_MS;
         self.play_transition_video("LOGO15N.HNM", None, CINEMA_FRAME_MS)
@@ -902,6 +903,13 @@ impl Engine {
         while self.sys.millis() - start < 1000 && !self.sys.should_quit() {
             while self.sys.poll_event().is_some() {}
             self.sys.frame().await;
+        }
+        // The Dutch build: the R&P Electronic Media logo, through the same
+        // player at the cinema pace, its NEWSOUND left as it is (WinMain @
+        // 0x0041958d..0x004195bf; the archives hold no LOGORP.APC).
+        if self.game.exe.build.startup_logo_rp {
+            self.play_transition_video("LOGORP.HNM", None, CINEMA_FRAME_MS)
+                .await;
         }
         self.play_transition_video("PREINTRO.HNM", None, CINEMA_FRAME_MS)
             .await;

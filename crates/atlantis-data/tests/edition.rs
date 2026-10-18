@@ -73,6 +73,36 @@ fn german_cd_1997() {
     assert_eq!(edition(&dir).unwrap(), "CD, German (August 1997 build)");
 }
 
+#[test]
+fn dutch_cd_1997() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_NL1997") else {
+        eprintln!("ATLANTIS_DATA_NL1997 not set: skipped");
+        return;
+    };
+    assert_eq!(edition(&dir).unwrap(), "CD, Dutch (June 1997 build)");
+}
+
+/// The patch 1.01 executable installed over the Dutch CD
+/// (`ATLANTIS_DATA_PATCH101_NL`: the patch's atlantis.exe beside the Dutch
+/// BIGCD1..4.BIG): the patch's build, its interface French.
+#[test]
+fn dutch_cd_with_patch_101() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_PATCH101_NL") else {
+        eprintln!("ATLANTIS_DATA_PATCH101_NL not set: skipped");
+        return;
+    };
+    let g = Game::open(Arc::new(StdDir::new(&dir))).unwrap();
+    assert_eq!(g.exe.build.name, "atlantis-patch-fr-714240");
+    assert_eq!(
+        g.edition().to_string(),
+        "CD, patch 1.01, French (1999 build)"
+    );
+    // The Dutch archives (the R&P logo only they carry), which the patch's
+    // start-up does not play.
+    assert!(g.big.contains("UBB_VUE\\LOGORP.HNM"));
+    assert!(!g.exe.build.startup_logo_rp);
+}
+
 /// The patch 1.01 executable installed over the German CD
 /// (`ATLANTIS_DATA_PATCH101_DE`: the patch's atlantis.exe beside the German
 /// BIGCD1..4.BIG): the patch's build, its interface French.
