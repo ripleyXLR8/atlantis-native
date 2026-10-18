@@ -424,7 +424,12 @@ impl Dialogs {
         let head = match l.dial_row {
             Some(row) if talking_head && full_screen_ubb && (2..=5).contains(&l.cam) => {
                 let syc = format!("ATA{:04}{}.SYC", l.section, l.letter);
-                let head = self.load_head(e, row, l.cam, &syc).await;
+                let mut head = self.load_head(e, row, l.cam, &syc).await;
+                if let Some(h) = head.as_mut() {
+                    // The rest pose of some head animations at frame 0
+                    // (an original bug, fixed as an enhancement).
+                    h.set_rest_key_fix(e.enhancements().minor_bug_fixes);
+                }
                 if head.is_none() {
                     // A head file is missing (lines without a .SYC never get
                     // here: they are played voice-only).

@@ -388,6 +388,9 @@ pub struct DialogHead {
 
     frames: i32,
     frame: i32,
+    /// Enhancement (minor bug fixes): frame 0 of the head animation is
+    /// drawn with frame 1's pose (see [`DialogHead::set_rest_key_fix`]).
+    rest_key_fix: bool,
     idx: usize,
     next: i32,
     prev: i32,
@@ -537,6 +540,7 @@ impl DialogHead {
             nodes,
             // FUN_0044da90: FUN_00468534(...) + 1
             frames: tracks[0].last.wrapping_add(1),
+            rest_key_fix: false,
             tracks,
             shapes,
             meshes,
@@ -692,7 +696,11 @@ impl DialogHead {
         if self.frame >= self.frames {
             return;
         }
-        let fr = self.frame;
+        let fr = if self.rest_key_fix && self.frame == 0 && self.frames > 1 {
+            1
+        } else {
+            self.frame
+        };
         // (frame * (256 - 255) + frame * 255) / 256, the blend of the frame
         // with itself at weight 255
         let f = f32r(f64::from(fr.wrapping_mul(256)) * f64::from(1.0f32 / 256.0f32));
@@ -741,6 +749,18 @@ impl DialogHead {
     /// `FUN_0044dd10`: the UBB frame index drives the head animation.
     pub fn set_frame(&mut self, frame: i32) {
         self.frame = frame;
+    }
+
+    /// Enhancement (minor bug fixes). The original evaluates the head
+    /// animation at the UBB frame index, so frame 0 (the first frame of a
+    /// line and of every loop of its video) uses the first key of each
+    /// track. In some `*A.3DA` files that key is a rest pose that is not
+    /// part of the loop (Meljanz, Actyon, Servage, the Queen, Gimbas...):
+    /// the 3D lower face is drawn up to 35 pixels away from the video's face
+    /// for that one frame. With the fix, frame 0 is drawn with frame 1's
+    /// pose, which every loop's last frame also matches in those files.
+    pub fn set_rest_key_fix(&mut self, on: bool) {
+        self.rest_key_fix = on;
     }
 
     /// `FUN_0044e2e0`: the neutral mouth.

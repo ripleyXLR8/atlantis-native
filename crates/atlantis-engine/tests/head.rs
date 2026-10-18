@@ -246,3 +246,132 @@ fn scaled_heads() {
     eprintln!("{checked} scaled frames checked");
     assert!(checked >= 20, "{checked}");
 }
+
+const LOOP_GOLDEN: &str = include_str!("golden/video_head_loop.txt");
+
+/// The centroid of the drawn pixels of a 640-wide buffer.
+fn centroid(buf: &[u16]) -> (usize, f64, f64) {
+    let (mut n, mut sx, mut sy) = (0usize, 0usize, 0usize);
+    for (i, &p) in buf.iter().enumerate() {
+        if p != 0 {
+            n += 1;
+            sx += i % 640;
+            sy += i / 640;
+        }
+    }
+    let d = n.max(1) as f64;
+    (n, sx as f64 / d, sy as f64 / d)
+}
+
+/// The head across two loops of its UBB (frame index 0..30, then 0 and 1)
+/// against the original: Meljanz (row 522) at its four cameras and Actyon
+/// (row 523) at cameras 3 and 4. The original draws frame 0 of every loop
+/// away from frames 30 and 1 (up to 12 pixels for Meljanz, 35 for Actyon):
+/// the port does the same without the minor bug fixes.
+#[test]
+fn head_loop_matches_the_original() {
+    let Some(g) = game("head_loop_matches_the_original") else {
+        return;
+    };
+    if g.exe.build.name != "atlantis-cd-en-714240" {
+        eprintln!("not the traced build, head_loop_matches_the_original skipped");
+        return;
+    }
+    let init = DialInit::parse(&g.big.read("DIALOG\\INITDIAL.TXT").expect("INITDIAL.TXT"));
+    let mut buf = vec![0u16; 640 * 480];
+    let mut heads: HashMap<(i32, i32), DialogHead> = HashMap::new();
+    let mut checked = 0;
+    for line in LOOP_GOLDEN.lines().filter(|l| !l.starts_with('#')) {
+        let f: Vec<&str> = line.split_whitespace().collect();
+        let n = |i: usize| f[i].parse::<i32>().expect("golden number");
+        let (row, cam, idx, ms) = (n(0), n(1), n(3), n(4));
+        let head = heads.entry((row, cam)).or_insert_with(|| {
+            load(&g, &init, row, cam, "ATA0041A.SYC")
+                .unwrap_or_else(|| panic!("head {row} cam {cam} does not load"))
+        });
+        head.set_frame(idx);
+        let r = head.lipsync(ms);
+        head.transform();
+        buf.fill(0);
+        head.render(&mut buf, 640);
+        let le: Vec<u8> = buf.iter().flat_map(|p| p.to_le_bytes()).collect();
+        assert_eq!(r, n(5), "{line}: lipsync");
+        assert_eq!(md5_hex(&le), f[6], "{line}: pixels");
+        checked += 1;
+    }
+    assert_eq!(checked, 198);
+}
+
+/// The minor bug fix of the head animation's frame 0, on every head of the
+/// INITDIAL table at each of its cameras (neutral mouth, one loop of the
+/// animation): without it, the heads whose first key is a rest pose jump
+/// at frame 0 (by 2 pixels or more, and more than their largest step
+/// elsewhere in the loop); with it, frame 0 is drawn as frame 1 and no head moves
+/// between frames 30, 0 and 1 by more than its largest step elsewhere in
+/// the loop.
+#[test]
+fn rest_key_fix_on_every_head() {
+    let Some(g) = game("rest_key_fix_on_every_head") else {
+        return;
+    };
+    let init = DialInit::parse(&g.big.read("DIALOG\\INITDIAL.TXT").expect("INITDIAL.TXT"));
+    let mut rows: Vec<i32> = init.rows.keys().copied().collect();
+    rows.sort_unstable();
+    let mut buf = vec![0u16; 640 * 480];
+    let dist = |a: (f64, f64), b: (f64, f64)| ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
+    let (mut heads, mut jumped) = (0, std::collections::BTreeSet::new());
+    for row in rows {
+        let r = &init.rows[&row];
+        for cam in 2..=5 {
+            let Some(head) = load(&g, &init, row, cam, "ATA0001A.SYC") else {
+                continue;
+            };
+            let mut cs = [Vec::new(), Vec::new()];
+            let mut frame0 = [Vec::new(), Vec::new()];
+            for (fix, c) in cs.iter_mut().enumerate() {
+                let mut h = head.clone();
+                h.set_rest_key_fix(fix == 1);
+                for f in 0..31 {
+                    h.set_frame(f);
+                    h.neutral();
+                    h.transform();
+                    buf.fill(0);
+                    h.render(&mut buf, 640);
+                    let (_, x, y) = centroid(&buf);
+                    c.push((x, y));
+                    if f <= 1 {
+                        frame0[fix].push(buf.clone());
+                    }
+                }
+            }
+            heads += 1;
+            // largest step between frames 1..30
+            let step = (1..30)
+                .map(|i| dist(cs[0][i], cs[0][i + 1]))
+                .fold(0.0, f64::max);
+            let jump = |c: &[(f64, f64)]| dist(c[0], c[1]).min(dist(c[30], c[0]));
+            if jump(&cs[0]) >= 2.0 && jump(&cs[0]) > step {
+                jumped.insert(r.anim_3da.to_ascii_uppercase());
+            }
+            // with the fix: frame 0 is frame 1, no larger step at the loop
+            assert_eq!(
+                frame0[1][0], frame0[1][1],
+                "{row} cam {cam}: frame 0 is not frame 1"
+            );
+            let wrap = dist(cs[1][30], cs[1][0]);
+            assert!(
+                wrap <= step + 1.0,
+                "{row} cam {cam}: {wrap:.1} pixels from frame 30 to 0, largest step {step:.1}"
+            );
+        }
+    }
+    eprintln!("{heads} heads; jump at frame 0 without the fix: {jumped:?}");
+    assert!(heads >= 100, "{heads}");
+    let want: std::collections::BTreeSet<String> = [
+        "GROAN1A", "MELJAN1A", "PECHAN2A", "RHEAAN1A", "RPTQAN1A", "SEVAN1A",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    assert_eq!(jumped, want);
+}

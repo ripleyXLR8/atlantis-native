@@ -101,7 +101,8 @@ picked folder on its first start.
   run as fast as the machine allows.
 - The [enhancements](TECHNICAL.md#enhancements) on by default: the music loops
   seamlessly; the SPF overlays of some talking heads are drawn over the
-  head. `--original` turns them off.
+  head; the 3D mouth of some talking heads no longer jumps on the first
+  frame of each loop of the video. `--original` turns them off.
 - Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).
