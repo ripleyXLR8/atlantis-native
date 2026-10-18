@@ -50,7 +50,8 @@ pub struct MenuWalk {
     pub ops: Vec<MenuOp>,
 }
 
-/// The FONTMAX measuring widths (0x0049660e, indexed by `c - 0x20`):
+/// The FONTMAX measuring widths (0x0049660e, indexed by `c - 0x20`; equal
+/// in every known build, atlantis-cd-fr-688640 0x004865eb):
 /// `FUN_004206c8` centres labels with them, and the pen advances by them
 /// while drawing (0x004202cc).
 pub const FONTMAX_WIDTHS: [u8; 137] = [
@@ -64,7 +65,7 @@ pub const FONTMAX_WIDTHS: [u8; 137] = [
 
 /// The FONTMIN pen advances (0x00496697, 101 bytes indexed by `c - 0x20`;
 /// control bytes use index 0x20). Equal in every known build
-/// (atlantis-cd-fr-687104 0x00486670).
+/// (atlantis-cd-fr-687104 0x00486670, atlantis-cd-fr-688640 0x00486674).
 pub const FONTMIN_ADVANCE: [u8; 101] = [
     15, 8, 13, 6, 13, 20, 17, 6, 13, 20, 11, 6, 4, 20, 15, 12, 17, 8, 16, 16, 14, 13, 15, 13, 16,
     15, 7, 6, 6, 6, 6, 20, 6, 17, 19, 18, 19, 16, 16, 19, 18, 12, 12, 17, 16, 24, 20, 23, 17, 22,

@@ -205,6 +205,8 @@ pub struct TextItem {
     /// The 1997 build's bitmap font (its pixels drawn as sharp blocks),
     /// instead of the outline font.
     pub bitmap: Option<std::sync::Arc<crate::subtitles::BitmapFont>>,
+    /// How the outline font reads the bytes (the release's code page).
+    pub code_page: atlantis_data::TextCodePage,
 }
 
 /// The text of a frame, for the HD mode to draw at the output's
@@ -269,7 +271,8 @@ pub struct HdCompositor {
     scaler: crate::upscale::InterfaceScaler,
     frame: Vec<u16>,
     rgb: Vec<u32>,
-    font: Option<crate::subtitles::SubtitleFont>,
+    /// The outline fonts, one per code page met.
+    fonts: Vec<crate::subtitles::SubtitleFont>,
     /// The axis maps for the current output size and factor.
     axes: Option<Axes>,
 }
@@ -303,6 +306,41 @@ pub fn interface_factor(dw: usize) -> usize {
 impl HdCompositor {
     pub fn new() -> HdCompositor {
         HdCompositor::default()
+    }
+
+    /// The frame's text drawn at the output's resolution: a bitmap font's
+    /// glyphs as sharp blocks, an outline font's lines rasterised at that
+    /// size in the item's code page.
+    fn draw_text_items(
+        &mut self,
+        f: &HdFrame<'_>,
+        out: &mut [u32],
+        stride: usize,
+        area: (usize, usize, usize, usize),
+        lut: &[u32],
+    ) {
+        for t in f.texts {
+            for it in &t.items {
+                let color = lut[usize::from(it.color)];
+                if let Some(b) = &it.bitmap {
+                    b.draw_hd(out, stride, area, &it.text, it.x, it.y, color);
+                    continue;
+                }
+                let i = match self
+                    .fonts
+                    .iter()
+                    .position(|g| g.code_page() == it.code_page)
+                {
+                    Some(i) => i,
+                    None => {
+                        self.fonts
+                            .push(crate::subtitles::SubtitleFont::with_code_page(it.code_page));
+                        self.fonts.len() - 1
+                    }
+                };
+                self.fonts[i].draw_hd(out, stride, area, &it.text, it.x, it.y, it.max_w, color);
+            }
+        }
     }
 
     /// The picture of `f` scaled to `dw` x `dh` pixels at (`ox`, `oy`) of
@@ -462,36 +500,8 @@ impl HdCompositor {
         if let Some(v) = video_bars {
             self.fill_video_bars(v, f.video_pano, out, stride, (ox, oy, dw, dh));
         }
-        if opts.sharp_subtitles && f.texts.iter().any(|t| !t.items.is_empty()) {
-            let font = self
-                .font
-                .get_or_insert_with(crate::subtitles::SubtitleFont::new);
-            for t in f.texts {
-                for it in &t.items {
-                    if let Some(b) = &it.bitmap {
-                        b.draw_hd(
-                            out,
-                            stride,
-                            (ox, oy, dw, dh),
-                            &it.text,
-                            it.x,
-                            it.y,
-                            lut[usize::from(it.color)],
-                        );
-                        continue;
-                    }
-                    font.draw_hd(
-                        out,
-                        stride,
-                        (ox, oy, dw, dh),
-                        &it.text,
-                        it.x,
-                        it.y,
-                        it.max_w,
-                        lut[usize::from(it.color)],
-                    );
-                }
-            }
+        if opts.sharp_subtitles {
+            self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut);
         }
     }
 }
@@ -659,25 +669,7 @@ impl HdCompositor {
                 *d = sample_bilinear(&rgb, SCREEN_W, ax.lin[x], ay.lin[zy]);
             }
         }
-        if f.texts.iter().any(|t| !t.items.is_empty()) {
-            let font = self
-                .font
-                .get_or_insert_with(crate::subtitles::SubtitleFont::new);
-            for t in f.texts {
-                for it in &t.items {
-                    font.draw_hd(
-                        out,
-                        stride,
-                        (ox, oy, dw, dh),
-                        &it.text,
-                        it.x,
-                        it.y,
-                        it.max_w,
-                        lut[usize::from(it.color)],
-                    );
-                }
-            }
-        }
+        self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut);
     }
 }
 
@@ -1357,7 +1349,12 @@ mod tests {
         font.draw_subtitles(&mut after, SCREEN_W, SCREEN_H, &lines, 0);
         let mut text = HdText::default();
         text.set(
-            crate::subtitles::subtitle_items(&lines, 0, 0),
+            crate::subtitles::subtitle_items(
+                &lines,
+                0,
+                0,
+                atlantis_data::TextCodePage::Windows1252,
+            ),
             &under,
             &after,
         );

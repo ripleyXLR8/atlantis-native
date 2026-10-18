@@ -17,6 +17,7 @@
 //! draws the same pixels.
 
 use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
+use atlantis_data::TextCodePage;
 
 /// The subtitle font, Liberation Sans Regular.
 static FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/LiberationSans-Regular.ttf");
@@ -85,20 +86,6 @@ pub fn subtitle_line_y(i: usize, n: usize) -> i32 {
     0x1ce - (n as i32 - i as i32 + 1) * 14
 }
 
-/// Windows-1252 for the bytes 0x80..0x9f (the original's GDI draws the
-/// text in the ANSI code page); the other bytes are Latin-1.
-fn cp1252(b: u8) -> char {
-    const HIGH: [u16; 32] = [
-        0x20ac, 0, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039,
-        0x0152, 0, 0x017d, 0, 0, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc,
-        0x2122, 0x0161, 0x203a, 0x0153, 0, 0x017e, 0x0178,
-    ];
-    match b {
-        0x80..=0x9f => char::from_u32(u32::from(HIGH[usize::from(b - 0x80)])).unwrap_or('\0'),
-        _ => char::from(b),
-    }
-}
-
 /// One rasterised glyph: its coverage thresholded to on / off.
 #[derive(Clone, Debug, Default)]
 struct GlyphBits {
@@ -115,6 +102,9 @@ struct GlyphBits {
 /// The subtitle font, rasterised once for the 256 byte values.
 pub struct SubtitleFont {
     glyphs: Vec<GlyphBits>,
+    /// How the text bytes read as letters (the original's GDI draws them
+    /// in the ANSI code page, Windows-1252).
+    code_page: TextCodePage,
     /// The ascent in whole pixels (rounded up), from the line's top to the
     /// baseline.
     ascent: i32,
@@ -127,7 +117,15 @@ impl Default for SubtitleFont {
 }
 
 impl SubtitleFont {
+    /// The font for Windows-1252 texts.
     pub fn new() -> SubtitleFont {
+        Self::with_code_page(TextCodePage::Windows1252)
+    }
+
+    /// The font for the texts of a release in `code_page`: the DOS code
+    /// page texts of atlantis-cd-fr-688640 drawn with it (the build itself
+    /// draws them in its bitmap font, glyph = byte) read as code page 850.
+    pub fn with_code_page(code_page: TextCodePage) -> SubtitleFont {
         let font = FontRef::try_from_slice(FONT_DATA).expect("bundled subtitle font");
         let upem = font.units_per_em().unwrap_or(2048.0);
         // ab_glyph scales by the line height (ascent - descent); the size is
@@ -137,7 +135,7 @@ impl SubtitleFont {
         let ascent = scaled.ascent().ceil() as i32;
         let glyphs = (0..=255u8)
             .map(|b| {
-                let c = cp1252(b);
+                let c = code_page.char_of(b);
                 if c < ' ' {
                     return GlyphBits::default();
                 }
@@ -173,7 +171,16 @@ impl SubtitleFont {
                 }
             })
             .collect();
-        SubtitleFont { glyphs, ascent }
+        SubtitleFont {
+            glyphs,
+            code_page,
+            ascent,
+        }
+    }
+
+    /// The code page the font reads the bytes in.
+    pub fn code_page(&self) -> TextCodePage {
+        self.code_page
     }
 
     /// The width of `text` in pixels.
@@ -269,7 +276,7 @@ impl SubtitleFont {
         let base = oy as f32 + (y + self.ascent) as f32 * sy;
         let (x1, y1) = ((ox + dw) as i32, (oy + dh) as i32);
         for (b, pen) in self.layout(text, x, max_w) {
-            let c = cp1252(b);
+            let c = self.code_page.char_of(b);
             let id = font.glyph_id(c);
             if c < ' ' || id.0 == 0 {
                 continue;
@@ -553,7 +560,7 @@ impl Subtitler {
     /// The text items for the HD mode (see [`subtitle_items`]).
     pub fn items(&self, lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
         match self {
-            Subtitler::Gdi(_) => subtitle_items(lines, dx, dy),
+            Subtitler::Gdi(f) => subtitle_items(lines, dx, dy, f.code_page()),
             Subtitler::Bitmap(f) => {
                 let mut items = Vec::with_capacity(2 * lines.len());
                 for (i, line) in lines.iter().enumerate() {
@@ -566,6 +573,7 @@ impl Subtitler {
                             color,
                             text: line.clone(),
                             bitmap: Some(f.clone()),
+                            code_page: TextCodePage::default(),
                         });
                     }
                 }
@@ -578,7 +586,12 @@ impl Subtitler {
 /// The text items of [`SubtitleFont::draw_subtitles`] for the HD mode
 /// (see [`crate::hd::HdText`]): the shadow then the text of each line,
 /// moved by (`dx`, `dy`) on the screen.
-pub fn subtitle_items(lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
+pub fn subtitle_items(
+    lines: &[Vec<u8>],
+    dx: i32,
+    dy: i32,
+    code_page: TextCodePage,
+) -> Vec<crate::hd::TextItem> {
     let mut items = Vec::with_capacity(2 * lines.len());
     for (i, line) in lines.iter().enumerate() {
         let y = subtitle_line_y(i, lines.len()) + dy;
@@ -590,6 +603,7 @@ pub fn subtitle_items(lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::Tex
                 color,
                 text: line.clone(),
                 bitmap: None,
+                code_page,
             });
         }
     }
@@ -718,7 +732,7 @@ mod tests {
                 assert!((10..90).contains(&x) && (10..70).contains(&y));
             }
         }
-        let items = subtitle_items(&[line.clone(), line], 0, 0);
+        let items = subtitle_items(&[line.clone(), line], 0, 0, TextCodePage::Windows1252);
         assert_eq!(items.len(), 4);
         assert_eq!(
             (items[0].x, items[0].y, items[0].color),

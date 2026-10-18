@@ -211,9 +211,12 @@ impl Dialogs {
         slot.clone().unwrap_or_default()
     }
 
-    fn font(&mut self) -> Rc<SubtitleFont> {
+    /// The outline font, reading the bytes in the release's code page
+    /// (the DOS code page texts of atlantis-cd-fr-688640 as code page 850).
+    fn font(&mut self, e: &Engine) -> Rc<SubtitleFont> {
+        let code_page = e.game.exe.build.text_code_page;
         self.font
-            .get_or_insert_with(|| Rc::new(SubtitleFont::new()))
+            .get_or_insert_with(|| Rc::new(SubtitleFont::with_code_page(code_page)))
             .clone()
     }
 
@@ -235,7 +238,7 @@ impl Dialogs {
                 None => log::warn!("DIALOG\\FONTS.BIN missing: the subtitles in Arial"),
             }
         }
-        let s = s.unwrap_or_else(|| Subtitler::Gdi(self.font()));
+        let s = s.unwrap_or_else(|| Subtitler::Gdi(self.font(e)));
         self.subtitler = Some(s.clone());
         s
     }
@@ -328,7 +331,11 @@ impl Dialogs {
             // FUN_0042ee88 @ 0x0042f036..0x0042f048: the modal error box
             // (dialog 0x65, code 0xc), then nothing of the line; the letter
             // still counts (0x00428b21). Not shown with the UI/UX
-            // enhancements.
+            // enhancements. atlantis-cd-fr-688640's own CRYO.DLL returns 0,
+            // not -1, for the failed open, so its FUN_00433038 does not see
+            // the failure and reads a header from handle 0 (FUN_00432f10);
+            // what the player gets then is not established, and the port
+            // does as here for that build too.
             log::warn!(
                 "section {} line {}: no INITDIAL row {row}",
                 req.section,
@@ -578,7 +585,7 @@ impl Dialogs {
     /// over the screen and waits for OK (a click on it, Enter, Space or
     /// Escape).
     async fn error_box(&mut self, e: &Engine, text: &str) {
-        let font = self.font();
+        let font = self.font(e);
         let base = e.sys.screen.borrow().clone();
         let bytes = latin1_bytes(text);
         let w = (font.width(&bytes) + 40).clamp(160, SCREEN_W as i32 - 20);
