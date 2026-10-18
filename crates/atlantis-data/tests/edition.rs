@@ -36,3 +36,12 @@ fn gog_languages() {
         );
     }
 }
+
+#[test]
+fn english_cd_1997() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_1997") else {
+        eprintln!("ATLANTIS_DATA_1997 not set: skipped");
+        return;
+    };
+    assert_eq!(edition(&dir).unwrap(), "CD, English (1997 build)");
+}

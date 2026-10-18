@@ -58,6 +58,16 @@ pub fn game(test: &str) -> Option<Game> {
     Some(Game::open(Arc::new(StdDir::new(dir))).expect("cannot open the game directory"))
 }
 
+/// The English retail CD's game folder of the 1997 build
+/// (`ATLANTIS_DATA_1997`), `None` (the test skipped) without it.
+pub fn game_1997(test: &str) -> Option<Game> {
+    let Some(dir) = std::env::var_os("ATLANTIS_DATA_1997") else {
+        eprintln!("ATLANTIS_DATA_1997 not set: {test} skipped");
+        return None;
+    };
+    Some(Game::open(Arc::new(StdDir::new(dir))).expect("cannot open the game directory"))
+}
+
 /// C printf's `%.9g` for a float widened to double.
 pub fn g9(v: f32) -> String {
     let v = f64::from(v);

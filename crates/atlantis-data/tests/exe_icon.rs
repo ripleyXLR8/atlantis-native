@@ -22,3 +22,14 @@ fn reference_and_gog_icons() {
         assert_eq!(exe_icon(&g), Some(icon));
     }
 }
+
+#[test]
+fn icon_of_the_1997_build() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_1997") else {
+        eprintln!("ATLANTIS_DATA_1997 not set: skipped");
+        return;
+    };
+    let exe = std::fs::read(format!("{dir}/atlantis.exe")).unwrap();
+    let icon = exe_icon(&exe).expect("an icon");
+    assert_eq!((icon.width, icon.height), (32, 32));
+}
