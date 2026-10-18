@@ -112,6 +112,57 @@ fn swedish_cd_1997() {
     assert_eq!(edition(&dir).unwrap(), "CD, Swedish (June 1997 build)");
 }
 
+#[test]
+fn spanish_cd_1997() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_ES1997") else {
+        eprintln!("ATLANTIS_DATA_ES1997 not set: skipped");
+        return;
+    };
+    assert_eq!(edition(&dir).unwrap(), "CD, Spanish (August 1997 build)");
+}
+
+#[test]
+fn italian_cd_1997() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA_IT1997") else {
+        eprintln!("ATLANTIS_DATA_IT1997 not set: skipped");
+        return;
+    };
+    assert_eq!(edition(&dir).unwrap(), "CD, Italian (July 1997 build)");
+}
+
+/// Whether one of the archive's menu files holds `word`.
+fn menus_hold(g: &Game, word: &[u8]) -> bool {
+    ["MAINMENU", "LOADMENU", "OPTMENU", "SUREMENU", "SONMENU"]
+        .iter()
+        .filter_map(|m| g.big.read(&format!("SPRLIST\\{m}.TXT")))
+        .any(|t| t.windows(word.len()).any(|w| w == word))
+}
+
+/// The patch 1.01 executable installed over the Spanish and Italian CDs
+/// (`ATLANTIS_DATA_PATCH101_ES` / `_IT`: the patch's atlantis.exe beside
+/// that CD's BIGCD1..4.BIG): the patch's build, its interface French, the
+/// CD's own menus.
+#[test]
+fn spanish_italian_cds_with_patch_101() {
+    for (var, word) in [
+        ("ATLANTIS_DATA_PATCH101_ES", &b"Cancelar"[..]),
+        ("ATLANTIS_DATA_PATCH101_IT", &b"Annulla"[..]),
+    ] {
+        let Ok(dir) = std::env::var(var) else {
+            eprintln!("{var} not set: skipped");
+            continue;
+        };
+        let g = Game::open(Arc::new(StdDir::new(&dir))).unwrap();
+        assert_eq!(g.exe.build.name, "atlantis-patch-fr-714240");
+        assert_eq!(
+            g.edition().to_string(),
+            "CD, patch 1.01, French (1999 build)"
+        );
+        assert_eq!(g.exe.build.menu_positioned_byte_width, 22);
+        assert!(menus_hold(&g, word), "{var}");
+    }
+}
+
 /// The patch 1.01 executable installed over the Swedish CD
 /// (`ATLANTIS_DATA_PATCH101_SV`: the patch's atlantis.exe beside the
 /// Swedish BIGCD1..4.BIG): the patch's build, its interface French, its

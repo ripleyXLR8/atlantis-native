@@ -145,6 +145,19 @@ pub struct ExeBuild {
     /// bytes FONTMIN draws, 0x8e 0x8f 0x99 0x84 0x86 0x94
     /// (atlantis-cd-sv-688128 FUN_0041d704 @ 0x0041dafa..0x0041dbe9).
     pub name_entry_dos_letters: bool,
+    /// The menu walk's zone for a positioned (`<x,y>`) line: this many
+    /// pixels per byte up to the CR (`imul ebx,[ebp-0x28],0x16`, 22, in
+    /// FUN_0041fb6c and every build but one; atlantis-cd-it-687104
+    /// FUN_0041ecb4 @ 0x0041f068..0x0041f06d: `mov ebx,[ebp-0x28]; shl
+    /// ebx,4`, 16).
+    pub menu_positioned_byte_width: u8,
+    /// The menu walk draws a FONTMAX byte above 0xa8 as a space (pen + 22,
+    /// nothing drawn): atlantis-cd-it-687104 FUN_0041ecb4 @ 0x0041f235
+    /// (`cmp dword [ebp-0x28],0xa8; jle`), the test of atlantis-cd-en-688128
+    /// FUN_0041ef34 @ 0x0041f4b3 (not modelled for that build). The other
+    /// builds turn only the bytes below 0x20 into spaces. No shipped menu
+    /// byte is above 0xa8.
+    pub menu_high_bytes_as_space: bool,
 }
 
 /// The reference (a 2001 English build), the GOG build (a 1999 build, the
@@ -160,8 +173,12 @@ pub struct ExeBuild {
 /// retail CD's build of June 1997 (the English May build's code, its
 /// tables from the credits widths on 3 or 4 bytes further) and the Swedish
 /// retail CD's build of June 1997 (the English May build's code and
-/// tables, with its own subtitle breaker, name entry and LOAD clamp).
-pub const BUILDS: [ExeBuild; 9] = [
+/// tables, with its own subtitle breaker, name entry and LOAD clamp), the
+/// Spanish retail CD's build of August 1997 (the French August build's code
+/// with the reference's rat search restart, the German build's addresses)
+/// and the Italian retail CD's build of July 1997 (the French August
+/// build's code with its own menu zones, the credits widths 1 byte further).
+pub const BUILDS: [ExeBuild; 11] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
@@ -202,6 +219,8 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: false,
         subtitle_cut_back_only: false,
         name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
     },
     ExeBuild {
         name: "atlantis-gog-714752",
@@ -243,6 +262,8 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: false,
         subtitle_cut_back_only: false,
         name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
     },
     // Cryo's Windows patch AT1CDINT.EXE ("1.01"), installed over the
     // English, French and German CD installs, whose BIGCD1..4.BIG it keeps.
@@ -299,6 +320,8 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: false,
         subtitle_cut_back_only: false,
         name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
     },
     ExeBuild {
         name: "atlantis-cd-en-688128",
@@ -341,6 +364,8 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: true,
         subtitle_cut_back_only: false,
         name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
     },
     // A 1997 build sharing most of atlantis-cd-en-688128's code, with the
     // reference's GDI subtitles (FUN_0041a834, FUN_0042e84c, FUN_0042e9cc),
@@ -400,6 +425,8 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: false,
         subtitle_cut_back_only: false,
         name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
     },
     // The German retail CD's build: atlantis-cd-fr-687104's code byte for
     // byte (its BEGTEXT section is the French one's) and its DGROUP layout,
@@ -454,6 +481,122 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: false,
         subtitle_cut_back_only: false,
         name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
+    },
+    // The Spanish retail CD's build (August 1997): atlantis-cd-fr-687104's
+    // code but for one line, the rat puzzle's T0023 search restarting at
+    // point 0 as in the reference (FUN_004348fc @ 0x00434933: `mov word
+    // [0x00762b54],0`, the reference's FUN_00437b38 @ 0x00437b6f), told
+    // apart by the PE stamp. The player row "Jugador nuevo" (one byte
+    // shorter than "NOUVEAU JOUEUR") puts the tables at the German build's
+    // addresses: FONTMAX 0x004865e6, FONTMIN 0x0048666f, credits widths
+    // 0x004866d4 (with the reference's bytes: 0x1c, 0x1e, 0x1f = 10, 14,
+    // 14); inventory, guest, music and sound tables at the French build's.
+    ExeBuild {
+        name: "atlantis-cd-es-687104",
+        size: 687_104,
+        pe_timestamp: 0x3405_51c4,
+        year: 1997,
+        month: Some("August"),
+        dgroup_vaddr: 0x8_0000,
+        dgroup_raw: 0x6_ba00,
+        music_va: 0x0048_5eec,
+        // The names in 0x004ab37c..0x004abb90, as fr-687104's.
+        sound_names_va: 0x0048_61cc,
+        sound_names_range: (0x004a_0000, 0x004b_0000),
+        // "Jugador nuevo", no '#' (read as fr-687104's: WinMain @
+        // 0x00418da7, FUN_0041d45c).
+        new_player_va: 0x0048_6546,
+        inventory_va: 0x0048_6788,
+        guest_va: 0x0048_685c,
+        credit_widths_va: 0x0048_66d4,
+        marker_is_label: true,
+        cursor_id_rule: false,
+        rhea_camera2: false,
+        alt_game_over_narration: true,
+        bitmap_subtitles: false,
+        subtitle_click_cycle: false,
+        players_1997: true,
+        upper_case_names: false,
+        hexa_forces_402: false,
+        queen_reveal: (3, 200),
+        rat_deadline_pacing: false,
+        // FUN_004348fc @ 0x00434933.
+        rat_search_restart: true,
+        warp_cursor_steps: 1,
+        load_knob_starts_at_bar: false,
+        load_picker_clamp: true,
+        music_first_value_rule: false,
+        game_over_voice_at_entry: false,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        // The CON texts (Windows-1252); the SPRLIST texts are glyph
+        // indices (code page 850 letters, each with a glyph).
+        text_code_page: TextCodePage::Windows1252,
+        startup_logo_rp: false,
+        credits_read_per_run: false,
+        subtitle_cut_back_only: false,
+        name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
+    },
+    // The Italian retail CD's build (July 1997, eleven days before
+    // atlantis-cd-fr-687104): the French August build's code but for the
+    // menu walk FUN_0041ecb4 (positioned zones of 16 px per byte, FONTMAX
+    // bytes above 0xa8 drawn as spaces), told apart by the PE stamp. The
+    // player row "Nuovo Giocatore" (one byte longer than "NOUVEAU
+    // JOUEUR") moves FONTMAX to 0x004865e8, FONTMIN to 0x00486671 and the
+    // credits widths to 0x004866d6 (the French bytes); inventory, guest,
+    // music and sound tables at the French build's addresses.
+    ExeBuild {
+        name: "atlantis-cd-it-687104",
+        size: 687_104,
+        pe_timestamp: 0x33e0_8f0f,
+        year: 1997,
+        month: Some("July"),
+        dgroup_vaddr: 0x8_0000,
+        dgroup_raw: 0x6_ba00,
+        music_va: 0x0048_5eec,
+        // The names in 0x004ab37c..0x004abb90, as fr-687104's.
+        sound_names_va: 0x0048_61cc,
+        sound_names_range: (0x004a_0000, 0x004b_0000),
+        // "Nuovo Giocatore", no '#' (read as fr-687104's).
+        new_player_va: 0x0048_6546,
+        inventory_va: 0x0048_6788,
+        guest_va: 0x0048_685c,
+        credit_widths_va: 0x0048_66d6,
+        marker_is_label: true,
+        cursor_id_rule: false,
+        rhea_camera2: false,
+        alt_game_over_narration: true,
+        bitmap_subtitles: false,
+        subtitle_click_cycle: false,
+        players_1997: true,
+        upper_case_names: false,
+        hexa_forces_402: false,
+        queen_reveal: (3, 200),
+        rat_deadline_pacing: false,
+        rat_search_restart: false,
+        warp_cursor_steps: 1,
+        load_knob_starts_at_bar: false,
+        load_picker_clamp: true,
+        music_first_value_rule: false,
+        game_over_voice_at_entry: false,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        // The CON texts (Windows-1252); the SPRLIST texts are glyph
+        // indices (code page 850 letters, each with a glyph).
+        text_code_page: TextCodePage::Windows1252,
+        startup_logo_rp: false,
+        credits_read_per_run: false,
+        subtitle_cut_back_only: false,
+        name_entry_dos_letters: false,
+        // FUN_0041ecb4 @ 0x0041f068 and @ 0x0041f235.
+        menu_positioned_byte_width: 16,
+        menu_high_bytes_as_space: true,
     },
     // The first French pressing: atlantis-cd-en-688128's code (every
     // function pairs; most differences are the calling convention of its
@@ -507,6 +650,8 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: true,
         subtitle_cut_back_only: false,
         name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
     },
     // The Dutch retail CD's build: atlantis-cd-en-688128's code (the same
     // size, told apart by the PE stamp) but for the R&P logo at start-up
@@ -572,6 +717,8 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: true,
         subtitle_cut_back_only: false,
         name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
     },
     // The Swedish retail CD's build: atlantis-cd-en-688128's code rebuilt
     // on 1997-06-11 (the same size, told apart by the PE stamp), every
@@ -632,6 +779,8 @@ pub const BUILDS: [ExeBuild; 9] = [
         credits_read_per_run: true,
         subtitle_cut_back_only: true,
         name_entry_dos_letters: true,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
     },
 ];
 
@@ -682,7 +831,9 @@ pub struct ExeTables {
     /// atlantis-cd-fr-688640 0x0048654a), "NEUER SPIELER"
     /// (atlantis-cd-de-687104 0x00486546), "Nieuwe speler"
     /// (atlantis-cd-nl-688128 0x0048654a), "Ny spelare"
-    /// (atlantis-cd-sv-688128 0x0048654a).
+    /// (atlantis-cd-sv-688128 0x0048654a), "Jugador nuevo"
+    /// (atlantis-cd-es-687104 0x00486546), "Nuovo Giocatore"
+    /// (atlantis-cd-it-687104 0x00486546).
     pub new_player_marker: Vec<u8>,
     pub new_player_label: Vec<u8>,
     /// Object id per OBJETS1.SPR sprite, up to the -1 terminator.
@@ -813,11 +964,16 @@ mod tests {
         assert_eq!(build_of(&reference).unwrap().name, "atlantis-cd-en-714240");
         let patch = fake_exe(714_240, 0x385a_4dc6);
         assert_eq!(build_of(&patch).unwrap().name, "atlantis-patch-fr-714240");
-        // The French and German August 1997 builds: one size, two stamps.
+        // The French, German, Spanish and Italian 1997 builds: one size.
         let fr = fake_exe(687_104, 0x33ef_1516);
         assert_eq!(build_of(&fr).unwrap().name, "atlantis-cd-fr-687104");
         let de = fake_exe(687_104, 0x33f8_3e81);
         assert_eq!(build_of(&de).unwrap().name, "atlantis-cd-de-687104");
+        // The Spanish and Italian builds: the same size, two more stamps.
+        let es = fake_exe(687_104, 0x3405_51c4);
+        assert_eq!(build_of(&es).unwrap().name, "atlantis-cd-es-687104");
+        let it = fake_exe(687_104, 0x33e0_8f0f);
+        assert_eq!(build_of(&it).unwrap().name, "atlantis-cd-it-687104");
         // The English May, Dutch and Swedish June 1997 builds: one size,
         // three stamps.
         let en = fake_exe(688_128, 0x3388_6fd1);

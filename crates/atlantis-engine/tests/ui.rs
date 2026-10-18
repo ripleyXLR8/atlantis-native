@@ -31,7 +31,8 @@ use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::ui::credits::credits_events;
 use atlantis_engine::ui::layout::{
     font_min_blits, font_min_load_list_width, menu_grid_hit, menu_volume_from_knob, menu_walk_hit,
-    subtitle_toggle_click, walk_menu_text, FontMin, FontMinAdvances, LoadPickerScroll, MenuWalk,
+    subtitle_toggle_click, walk_menu_text, FontMin, FontMinAdvances, LoadPickerScroll, MenuRules,
+    MenuWalk,
 };
 use atlantis_engine::ui::menus::{ingame_menu_outcome, MenuOutcome};
 use atlantis_engine::ui::{guest_edge_original, object_icon, Guests};
@@ -71,7 +72,7 @@ const VECTORS: &str = include_str!("golden/ui_menu_vectors.txt");
 /// first blit, the sprite.
 fn walk_records(text: &[u8], menu: i32, a: i32, b: i32) -> Vec<String> {
     let mut walk = MenuWalk::default();
-    walk_menu_text(text, menu, -1, a, b, false, &mut walk);
+    walk_menu_text(text, menu, -1, a, b, MenuRules::default(), &mut walk);
     walk.records
         .iter()
         .enumerate()
@@ -307,7 +308,7 @@ fn shipped_menus_match_original() {
                 String::new()
             };
             let mut walk = MenuWalk::default();
-            walk_menu_text(&text, f as i32, -1, a, b, false, &mut walk);
+            walk_menu_text(&text, f as i32, -1, a, b, MenuRules::default(), &mut walk);
             let rects: Vec<String> = walk
                 .records
                 .iter()
@@ -347,7 +348,7 @@ fn ingame_menu_hit_map_matches_original() {
         -1,
         0,
         0,
-        false,
+        MenuRules::default(),
         &mut walk,
     );
     let mut rows = 0;
@@ -556,7 +557,7 @@ fn record_centre(g: &Game, menu: &str, number: i32, r: usize) -> (i32, i32) {
 
 fn record_centre_text(text: &[u8], number: i32, r: usize) -> (i32, i32) {
     let mut walk = MenuWalk::default();
-    walk_menu_text(text, number, -1, 0, 0, false, &mut walk);
+    walk_menu_text(text, number, -1, 0, 0, MenuRules::default(), &mut walk);
     let rec = walk.records[r];
     (
         i32::from(rec.x) + i32::from(rec.w) / 2,

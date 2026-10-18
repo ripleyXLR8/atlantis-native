@@ -56,8 +56,9 @@ Compressed images (`.zip`, `.7z`, `.chd`) must be extracted first.
 
 The English CD (1997 and 2001 builds), the French CD (May and August
 1997), the German CD (August 1997), the Dutch and Swedish CDs (June
-1997), the CD with Cryo's patch 1.01 (over the English, French, German,
-Dutch or Swedish CD), and the GOG.com release in
+1997), the Spanish CD (August 1997), the Italian CD (July 1997), the CD
+with Cryo's patch 1.01 (over the English, French, German, Dutch,
+Swedish, Spanish or Italian CD), and the GOG.com release in
 English, French, German, Spanish and Italian. Another edition is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -255,7 +256,7 @@ picked folder on its first start.
 - The subtitles of the 2001 and GOG.com builds are drawn with Liberation
   Sans, which has the metrics of the original's Arial (see
   [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French
-  and German CDs'; the 1997 English CD's, the May 1997 French CD's and
+  and German CDs' and the Spanish and Italian CDs'; the 1997 English CD's, the May 1997 French CD's and
   the Dutch and Swedish CDs' are drawn with their own pixel font, as they
   did (the accents included).
 - The engine runs at a steady 60 steps per second; the original's loops
@@ -267,7 +268,9 @@ picked folder on its first start.
   LOAD list's fonts lack is drawn as "ss" (the original leaves a gap);
   on the Dutch CD, the credits text and the player-name fonts are disc
   1's whatever the disc (the original shows disc 2's older revision while
-  disc 2 is in use).
+  disc 2 is in use); on the Italian CD, the buttons and lines of the
+  menus answer over the whole drawn word (the original's zones stop
+  short of it: the right end of `OK` and `Annulla` does not answer).
   `--original` turns them off.
 - Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are

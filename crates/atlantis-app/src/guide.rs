@@ -50,8 +50,9 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
             "The folder {shown} holds an atlantis.exe ({size} bytes) that Atlantis Native \
              does not know: an edition of the game that is not supported yet.\n\n\
              Supported: the English CD (1997 and 2001), the French CD (1997), the German \
-             CD (1997), the Dutch CD (1997), the Swedish CD (1997), the CD with Cryo's \
-             patch 1.01, and GOG.com (English, French, German, Spanish, Italian).\n\n\
+             CD (1997), the Dutch CD (1997), the Swedish CD (1997), the Spanish CD (1997), \
+             the Italian CD (1997), the CD with Cryo's patch 1.01, and GOG.com (English, \
+             French, German, Spanish, Italian).\n\n\
              You can help support your edition: report it to the project. The report \
              opens on the project's GitHub page, filled in with the files' identifiers \
              (sizes and checksums, no personal data); nothing is sent until you submit it \
@@ -241,10 +242,41 @@ mod tests {
         assert_eq!(percent_encode("a b/é"), "a%20b%2F%C3%A9");
     }
 
+    /// A real executable the port does not know: the Spanish CD's
+    /// (`ATLANTIS_DATA_ES1997`) with another PE stamp, a build of its size
+    /// that no entry names. The game does not open, and the report carries
+    /// the stamp and the archive's identifiers.
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn report_of_an_executable_with_an_unknown_stamp() {
+        use atlantis_data::{FileSource, StdDir};
+        let Ok(dir) = std::env::var("ATLANTIS_DATA_ES1997") else {
+            eprintln!("ATLANTIS_DATA_ES1997 not set: skipped");
+            return;
+        };
+        let mut exe = StdDir::new(&dir).read("atlantis.exe").unwrap();
+        let pe = u32::from_le_bytes(exe[0x3c..0x40].try_into().unwrap()) as usize;
+        exe[pe + 8..pe + 12].copy_from_slice(&0x3400_0000u32.to_le_bytes());
+        let mut files = MemFiles::new();
+        files.insert("atlantis.exe", exe);
+        files.insert("BIGCD1.BIG", vec![2u8; 6000]);
+        let files = std::sync::Arc::new(files);
+        let err = atlantis_data::Game::open(files.clone()).err().unwrap();
+        assert!(matches!(err, GameError::UnknownExecutable(687_104)));
+        let names = vec!["ATLANTIS.EXE".to_string(), "BIGCD1.BIG".to_string()];
+        let r = EditionReport::collect(&*files, &names, false).unwrap();
+        assert_eq!(r.exe_size, 687_104);
+        assert_eq!(r.pe_timestamp, Some(0x3400_0000));
+        assert_eq!(r.archives.len(), 1);
+        let text = explain(&names, "the folder", &err);
+        assert!(text.contains("687104 bytes") && text.contains("the Spanish CD (1997)"));
+    }
+
     /// The report of a real edition read from its disc images
     /// (`ATLANTIS_ISO_UNKNOWN`: a folder of images of an edition not
     /// supported, skipped when the edition opens): every identifier, and a
-    /// link short enough for GitHub.
+    /// link short enough for GitHub. Every local image set is supported
+    /// since the Spanish and Italian CDs, so it is skipped there.
     #[test]
     #[cfg(not(target_arch = "wasm32"))]
     fn report_from_disc_images() {

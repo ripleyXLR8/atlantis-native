@@ -21,7 +21,7 @@ use super::credits::{credits_events, CreditsEvent};
 use super::layout::{
     font_min_load_list_width, menu_grid_hit, menu_number, menu_volume_from_knob, menu_walk_hit,
     name_entry_byte, spell_sharp_s, subtitle_toggle_click, walk_menu_text, FontMin,
-    LoadPickerScroll, MenuWalk,
+    LoadPickerScroll, MenuRules, MenuWalk,
 };
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
@@ -53,9 +53,9 @@ pub(crate) struct Menu {
     pub text: Vec<u8>,
     pub number: i32,
     pub walk: MenuWalk,
-    /// The port's `ß` fix ([`spell_sharp_s`]), from the minor bug fixes
-    /// when the menu was opened.
-    pub sharp_s_as_ss: bool,
+    /// The build's walk rules, with the port's fixes from the minor bug
+    /// fixes when the menu was opened ([`MenuRules::of_build`]).
+    pub rules: MenuRules,
 }
 
 impl Menu {
@@ -69,7 +69,7 @@ impl Menu {
             hover,
             toggle_a,
             toggle_b,
-            self.sharp_s_as_ss,
+            self.rules,
             &mut self.walk,
         );
     }
@@ -139,7 +139,7 @@ impl Engine {
             text,
             number,
             walk: MenuWalk::default(),
-            sharp_s_as_ss: self.enhancements().minor_bug_fixes,
+            rules: MenuRules::of_build(self.game.exe.build, self.enhancements().minor_bug_fixes),
         };
         m.walk(None, 0, 0);
         Some(m)

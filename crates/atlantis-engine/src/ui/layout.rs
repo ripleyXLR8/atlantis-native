@@ -205,6 +205,51 @@ fn slot(walk: &mut MenuWalk, n: usize) -> &mut MenuRecord {
     &mut walk.records[n]
 }
 
+/// The build's and the port's rules of the menu walk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MenuRules {
+    /// The port's `ß` fix (see [`spell_sharp_s`]): a [`SHARP_S`] byte is
+    /// drawn and measured as two 's' glyphs; the records and the walk are
+    /// the original's.
+    pub sharp_s_as_ss: bool,
+    /// The zone width per byte of a positioned (`<x,y>`) line: 22, 16 in
+    /// atlantis-cd-it-687104 (`ExeBuild::menu_positioned_byte_width`).
+    pub positioned_byte_width: i32,
+    /// A byte above 0xa8 is a space (atlantis-cd-it-687104 FUN_0041ecb4 @
+    /// 0x0041f235, `ExeBuild::menu_high_bytes_as_space`).
+    pub high_bytes_as_space: bool,
+}
+
+/// The reference's walk, without the port's fix.
+impl Default for MenuRules {
+    fn default() -> MenuRules {
+        MenuRules {
+            sharp_s_as_ss: false,
+            positioned_byte_width: 22,
+            high_bytes_as_space: false,
+        }
+    }
+}
+
+impl MenuRules {
+    /// The rules of a build: its own, with the minor bug fixes
+    /// ([`crate::enhancements::Enhancements::minor_bug_fixes`]) the `ß`
+    /// fix and the 22-px positioned zones of every other build (the
+    /// Italian build's 16 px per byte fall short of the drawn word: `OK`
+    /// 11 px, `Annulla` 18 px).
+    pub fn of_build(build: &atlantis_data::exe::ExeBuild, minor_bug_fixes: bool) -> MenuRules {
+        MenuRules {
+            sharp_s_as_ss: minor_bug_fixes,
+            positioned_byte_width: if minor_bug_fixes {
+                22
+            } else {
+                i32::from(build.menu_positioned_byte_width)
+            },
+            high_bytes_as_space: build.menu_high_bytes_as_space,
+        }
+    }
+}
+
 /// `FUN_0041fb6c`, the menu walk of menu `menu`, with the hovered line
 /// `hover_line` (0x006cd850) and the options toggles `toggle_a` /
 /// `toggle_b` (0x004960a8 SUBTITLES / 0x004960ac OMNI 3D). At each
@@ -212,18 +257,18 @@ fn slot(walk: &mut MenuWalk, n: usize) -> &mut MenuRecord {
 /// positioned text; `//` and `&&` the options toggles (menu 2, lines 3 and
 /// 5); `/sprj=` `/sprr=` `/sprc=` `/spr=` sprite records; then the byte:
 /// CR (the next byte is consumed), space and other control bytes (pen +
-/// 22), or a FONTMAX glyph. With `sharp_s_as_ss` (the port's fix, see
-/// [`spell_sharp_s`]), a [`SHARP_S`] byte is drawn and measured as two
-/// 's' glyphs; the records and the walk are the original's.
+/// 22), or a FONTMAX glyph. The build's and the port's rules are `rules`
+/// ([`MenuRules`]).
 pub fn walk_menu_text(
     t: &[u8],
     menu: i32,
     hover_line: i32,
     toggle_a: i32,
     toggle_b: i32,
-    sharp_s_as_ss: bool,
+    rules: MenuRules,
     walk: &mut MenuWalk,
 ) {
+    let sharp_s_as_ss = rules.sharp_s_as_ss;
     let ss = |c: u8| -> i32 {
         if sharp_s_as_ss && c == SHARP_S {
             2 * fontmax_width(i32::from(b's') - 0x20)
@@ -276,7 +321,9 @@ pub fn walk_menu_text(
             p = walk_step(p, y, 2, true);
             pen_x = x;
             pen_y = y;
-            let w = 0x16 * (to_cr(p).saturating_sub(p)) as i32;
+            // `imul ebx,[ebp-0x28],0x16`; `shl ebx,4` in
+            // atlantis-cd-it-687104 (FUN_0041ecb4 @ 0x0041f068).
+            let w = rules.positioned_byte_width * (to_cr(p).saturating_sub(p)) as i32;
             let r = slot(walk, count);
             r.x = (x - 11) as i16;
             r.y = (y - 28) as i16;
@@ -367,7 +414,7 @@ pub fn walk_menu_text(
             draw = false;
             line += 1;
         }
-        if c < 0x20 && c != 0x0d {
+        if (c < 0x20 && c != 0x0d) || (rules.high_bytes_as_space && c > 0xa8) {
             c = 0x20;
         }
         if c == 0x20 {
@@ -837,11 +884,22 @@ mod tests {
                 .collect()
         };
         let (s, a) = (fontmax_width(0x53), fontmax_width(0x41));
-        walk_menu_text(text, 1, -1, 0, 0, false, &mut walk);
+        walk_menu_text(text, 1, -1, 0, 0, MenuRules::default(), &mut walk);
         let x0 = ((640 - a) / 2) as i16;
         assert_eq!(glyphs(&walk), [(193, x0), (0x41, x0)]);
         assert_eq!(i32::from(walk.records[0].w), a);
-        walk_menu_text(text, 1, -1, 0, 0, true, &mut walk);
+        walk_menu_text(
+            text,
+            1,
+            -1,
+            0,
+            0,
+            MenuRules {
+                sharp_s_as_ss: true,
+                ..MenuRules::default()
+            },
+            &mut walk,
+        );
         let x0 = ((640 - a - 2 * s) / 2) as i16;
         let s16 = s as i16;
         assert_eq!(

@@ -30,7 +30,12 @@ pub struct Enhancements {
     ///   newest revision whatever the disc; off, the current disc's copy, as
     ///   the original reads them from the disc in the drive: disc 2 holds an
     ///   older revision (CREDITS.TXT one line shorter, FONTMIN's `j` and
-    ///   `'` hotspots).
+    ///   `'` hotspots);
+    /// - with the Italian CD, a positioned menu line (`<x,y>`) answers over
+    ///   22 px per byte as in every other build, so the whole drawn word
+    ///   highlights and takes the click; off, 16 px per byte as the original
+    ///   (atlantis-cd-it-687104 FUN_0041ecb4 @ 0x0041f068): the right ends
+    ///   of `OK` (11 px) and `Annulla` (18 px) do not answer.
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

@@ -1307,8 +1307,9 @@ impl RatGame {
                 self.rules.set_rb(26, ABOVE, 1);
                 self.rules.set_rb(23, ABOVE, 1);
                 // T0023 starts at the first point whose x is not right of
-                // the rat's (0x00437b6f clears the position first; the
-                // 1997 build searches on from where the trajectory was:
+                // the rat's (0x00437b6f clears the position first, as does
+                // atlantis-cd-es-687104 FUN_004348fc @ 0x00434933; the
+                // other 1997 builds search on from where the trajectory was:
                 // past its end the original reads beyond the points, the
                 // port moves nothing).
                 let rx = self.rules.f(RAT_X);

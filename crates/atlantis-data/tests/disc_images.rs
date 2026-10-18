@@ -1,6 +1,8 @@
 //! The game read straight from its CD images: the French, German and
 //! Swedish CDs' ISO images (2048-byte sectors), the English and Dutch CDs'
-//! raw images (2352-byte sectors).
+//! raw images and the Spanish CD's Alcohol 120% `.mdf` images (2352-byte
+//! sectors), the Italian CD's Nero `.nrg` images (2048-byte sectors after
+//! a 307200-byte lead-in).
 use std::sync::Arc;
 
 use atlantis_data::disc_image::DiscSet;
@@ -73,5 +75,28 @@ fn swedish_cd_iso_images() {
         let disc1 = g.big.read("SPRLIST\\SELEMENU.TXT").unwrap();
         assert!(disc1.windows(11).any(|w| w == b"SPELARNAMN\r"));
         assert!(disc2.windows(11).any(|w| w == b"SPELARNAMM\r"));
+    }
+}
+
+#[test]
+fn spanish_cd_mdf_images() {
+    if let Some(g) = open("ATLANTIS_MDF_ES") {
+        assert_eq!(g.exe.build.name, "atlantis-cd-es-687104");
+        assert_eq!(g.edition().to_string(), "CD, Spanish (August 1997 build)");
+        assert_eq!(g.exe.new_player_marker, b"Jugador nuevo");
+        let data = g.big.read("WAV\\ATA0001A.APC").expect("a voice");
+        assert!(data.len() > 1000);
+    }
+}
+
+#[test]
+fn italian_cd_nrg_images() {
+    if let Some(g) = open("ATLANTIS_NRG_IT") {
+        assert_eq!(g.exe.build.name, "atlantis-cd-it-687104");
+        assert_eq!(g.edition().to_string(), "CD, Italian (July 1997 build)");
+        assert_eq!(g.exe.new_player_marker, b"Nuovo Giocatore");
+        assert!(g.big.contains("IMAGES\\END.TGA"));
+        let data = g.big.read("WAV\\ATA0001A.APC").expect("a voice");
+        assert!(data.len() > 1000);
     }
 }
