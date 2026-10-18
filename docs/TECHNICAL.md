@@ -211,10 +211,11 @@ them as code page 850.
 
 ### Game builds
 
-The port knows five builds of `atlantis.exe` (`ExeBuild` in
-`crates/atlantis-data/src/exe.rs`), found by their size; their tables are
-read where each build has them, and the code differences that change
-what a player sees follow the build:
+The port knows six builds of `atlantis.exe` (`ExeBuild` in
+`crates/atlantis-data/src/exe.rs`), found by their size and the PE
+header's timestamp (the 2001 build and the patch 1.01 build have the same
+size); their tables are read where each build has them, and the code
+differences that change what a player sees follow the build:
 
 | | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French retail CD (August 1997) | French retail CD (May 1997) |
 |---|---|---|---|---|---|
@@ -234,6 +235,19 @@ what a player sees follow the build:
 | LOADMUSIK / DELMUSIK | as listed | as listed | nothing when the first track plays | as listed | nothing when the first track plays; LOADMUSIK only at a current music volume of 5 or more, and all or nothing on its first track |
 | StartMusik of the playing track | fade-in re-armed | fade-in re-armed | fade-in re-armed | fade-in re-armed | nothing |
 | credits letters E b d g n t | | | | | one pixel narrower |
+
+Cryo's Windows patch 1.01 (`AT1CDINT.EXE`, December 1999) replaces
+`atlantis.exe` (and `cryo.dll`) in a CD installation, English, French or
+German, and keeps its `BIGCD1.BIG` … `BIGCD4.BIG`. Its executable is the
+1999 build that GOG.com later edited for its release: everything in the
+GOG.com column applies to it, and its tables are at the GOG.com build's
+addresses. Its interface is French whatever the CD (the new-player row
+reads `NOUVEAU JOUEUR`), so the options menu shows *CD, patch 1.01,
+French (1999 build)*. GOG.com's own edits of that build (no pause when
+the window is inactive, no free-space checks, a delay before each row
+copy, no start-up CD scan, an immediate exit on closing) concern how the
+original runs on a later system, not the game; the port handles the
+window, the disk and the pace in its own way for every build.
 
 In every build the player-name font (FONTMIN) has advances for 101
 glyphs, and the original reads those of the glyphs past them from the
@@ -283,14 +297,15 @@ Tests that need the game files read the game directory from the
 skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
 English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
 retail CD, `ATLANTIS_DATA_FR1997_MAY` one of the May 1997 French retail CD
-(the first pressing), `ATLANTIS_GOG` a folder of the GOG.com languages'
+(the first pressing), `ATLANTIS_DATA_PATCH101` a CD installation with the
+patch 1.01 executable, `ATLANTIS_GOG` a folder of the GOG.com languages'
 trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
 installation, for the tests of those builds:
 
 ```sh
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
 ATLANTIS_DATA_FR1997=/path/to/fr1997 ATLANTIS_DATA_FR1997_MAY=/path/to/fr1997may \
-cargo test --release
+ATLANTIS_DATA_PATCH101=/path/to/patch101 cargo test --release
 ```
 
 The expected values in the tests are digests and numbers computed by the
