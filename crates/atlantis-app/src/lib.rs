@@ -385,6 +385,19 @@ impl App {
     /// Full screen on or off (borderless, on the window's monitor; in
     /// the browser the canvas fills the screen).
     fn toggle_fullscreen(&mut self) {
+        // In the browser, the page's own full screen: it caps the canvas's
+        // size (see web/index.html), which the canvas's own full screen
+        // cannot.
+        #[cfg(target_arch = "wasm32")]
+        {
+            let toggle = web_sys::window()
+                .and_then(|w| js_sys::Reflect::get(&w, &"atlantisToggleFullscreen".into()).ok());
+            use wasm_bindgen::JsCast;
+            if let Some(f) = toggle.and_then(|f| f.dyn_into::<js_sys::Function>().ok()) {
+                let _ = f.call0(&wasm_bindgen::JsValue::NULL);
+                return;
+            }
+        }
         let Some(w) = &self.window else { return };
         let full = w.fullscreen().is_some();
         w.set_fullscreen((!full).then_some(Fullscreen::Borderless(None)));

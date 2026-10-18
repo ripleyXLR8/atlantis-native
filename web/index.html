@@ -47,17 +47,41 @@
     try {
       await start(e.target.files);
       document.getElementById("pick").style.display = "none";
-      // Full screen from a click on the page's button (the game also
-      // takes F11 and Alt+Enter); hidden while full screen.
+      // Full screen: the page fills the screen, but the canvas keeps at
+      // most CAP_W x CAP_H pixels (the game draws every pixel of it on
+      // one core each frame) and the browser scales it up to the screen.
+      // F11 and Alt+Enter in the game call atlantisToggleFullscreen too.
+      const CAP_W = 1600, CAP_H = 1200;
       const full = document.getElementById("full");
-      full.style.display = "block";
-      full.addEventListener("click", () => {
+      const layout = () => {
         const c = document.querySelector("canvas");
-        (c || document.documentElement).requestFullscreen?.();
-      });
-      document.addEventListener("fullscreenchange", () => {
+        if (!c) return;
+        if (document.fullscreenElement) {
+          const dpr = window.devicePixelRatio || 1;
+          const sw = window.innerWidth, sh = window.innerHeight;
+          const k = Math.min(1, CAP_W / (sw * dpr), CAP_H / (sh * dpr));
+          const cw = sw * k, ch = sh * k; // CSS pixels before the scaling
+          Object.assign(c.style, {
+            position: "fixed", left: "0", top: "0",
+            width: cw + "px", height: ch + "px", aspectRatio: "auto",
+            transformOrigin: "0 0", transform: `scale(${sw / cw})`,
+            imageRendering: "auto",
+          });
+        } else {
+          for (const p of ["position", "left", "top", "width", "height",
+                           "aspectRatio", "transformOrigin", "transform",
+                           "imageRendering"]) c.style[p] = "";
+        }
         full.style.display = document.fullscreenElement ? "none" : "block";
-      });
+      };
+      window.atlantisToggleFullscreen = () => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen?.();
+      };
+      full.style.display = "block";
+      full.addEventListener("click", window.atlantisToggleFullscreen);
+      document.addEventListener("fullscreenchange", layout);
+      window.addEventListener("resize", layout);
     } catch (err) {
       const box = document.getElementById("err");
       const [text, url] = String(err).split("\n\nREPORT:");
