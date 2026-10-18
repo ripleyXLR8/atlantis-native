@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use crate::enhancements::Enhancements;
-use crate::hd::{HdOptions, PanoFilter};
+use crate::hd::{HdOptions, PanoFilter, VideoSides};
 
 /// A flat folder of named files (names compared without regard to case).
 pub trait SaveStore {
@@ -282,6 +282,9 @@ impl Settings {
                 ("hd_sharpen", Some(b), _) => s.hd.sharpen = b,
                 ("hd_sharp_subtitles", Some(b), _) => s.hd.sharp_subtitles = b,
                 ("hd_widescreen", Some(b), _) => s.hd.widescreen = b,
+                ("hd_video_sides", _, _) if VideoSides::from_name(v).is_some() => {
+                    s.hd.video_sides = VideoSides::from_name(v).unwrap_or_default();
+                }
                 _ => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
             }
         }
@@ -309,12 +312,14 @@ impl Settings {
              graphics = {}\n\
              # HD mode: panorama filter (bicubic or bilinear), its sharpening,\n\
              # the interface art (smooth: xBR, or pixels), sharp subtitles,\n\
-             # widescreen (the panorama fills the sides of a wide window)\n\
+             # widescreen (the panorama fills the sides of a wide window) and\n\
+             # the bars beside the videos (black, blur, zoom or panorama)\n\
              hd_panorama = {}\n\
              hd_sharpen = {}\n\
              hd_interface = {}\n\
              hd_sharp_subtitles = {}\n\
-             hd_widescreen = {}\n",
+             hd_widescreen = {}\n\
+             hd_video_sides = {}\n",
             b(self.subtitles),
             b(self.omni3d_mode2),
             self.volumes[0],
@@ -335,6 +340,7 @@ impl Settings {
             },
             b(self.hd.sharp_subtitles),
             b(self.hd.widescreen),
+            self.hd.video_sides.name(),
         )
     }
 
@@ -367,6 +373,7 @@ mod tests {
                 smooth_interface: false,
                 sharp_subtitles: false,
                 widescreen: false,
+                video_sides: VideoSides::Black,
             },
         };
         assert_eq!(Settings::parse(&s.to_text()), s);

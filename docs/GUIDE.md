@@ -78,8 +78,9 @@ so that this set outlives the session as the original's copies do,
 `original` by default), and the HD mode's picture options (see
 [HD mode](TECHNICAL.md#hd-mode)): `hd_panorama = bicubic|bilinear`,
 `hd_sharpen = on|off`, `hd_interface = smooth|pixels` and
-`hd_sharp_subtitles = on|off` and `hd_widescreen = on|off` (by default
-`bicubic`, `on`, `smooth`, `on`, `off`).
+`hd_sharp_subtitles = on|off`, `hd_widescreen = on|off` and
+`hd_video_sides = black|blur|zoom|panorama` (by default `bicubic`, `on`,
+`smooth`, `on`, `off`, `black`).
 
 The web build keeps its players, checkpoints and settings in the
 browser's storage (`localStorage`, one entry per file, kept per site and

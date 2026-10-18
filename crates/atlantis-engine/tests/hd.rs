@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::hd::{
-    compose, rgb565_to_888, HdCompositor, HdFrame, HdOptions, HdText, PanoFilter,
+    compose, rgb565_to_888, HdCompositor, HdFrame, HdOptions, HdText, PanoFilter, VideoSides,
 };
 use atlantis_engine::options_menu::{MenuValues, OptionsMenu};
 use atlantis_engine::subtitles::SubtitleFont;
@@ -135,6 +135,7 @@ fn picture(
                 layer: sys.hd_shown().then_some(&*layer),
                 texts: &texts,
                 photo: sys.photo_shown(),
+                video_pano: None,
             };
             HdCompositor::new().compose(f, HdOptions::default(), &mut out, w, 0, 0, w, h);
         }
@@ -226,6 +227,7 @@ fn hd_mode_keeps_the_frames_and_draws_the_view() {
                 smooth_interface: false,
                 sharp_subtitles: false,
                 widescreen: false,
+                video_sides: VideoSides::Black,
             });
             r
         });
@@ -441,6 +443,7 @@ fn hd_timings() {
                 layer: Some(&layer),
                 texts: &[],
                 photo: false,
+                video_pano: None,
             };
             c.compose(f, opts, &mut win, w, 0, 0, w, h);
         });
@@ -449,6 +452,7 @@ fn hd_timings() {
             layer: None,
             texts: &[],
             photo,
+            video_pano: None,
         };
         let full = time(&mut |_| {
             let mut c = HdCompositor::new();

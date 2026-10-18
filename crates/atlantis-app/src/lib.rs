@@ -485,6 +485,7 @@ impl App {
             let running = self.runner.is_some();
             let layer = self.sys.hd.borrow();
             let text = self.sys.hd_text.borrow();
+            let video = self.sys.hd_video.borrow();
             let mut texts: Vec<&HdText> = Vec::new();
             if running && self.sys.hd_text_shown() {
                 texts.push(&text);
@@ -497,10 +498,11 @@ impl App {
                 layer: (running && self.sys.hd_shown()).then_some(&*layer),
                 texts: &texts,
                 photo: running && self.sys.photo_shown(),
+                video_pano: Some(&*video).filter(|v| running && v.active),
             };
             self.compositor
                 .compose(f, self.sys.hd_options(), &mut buf[..], sw, ox, oy, dw, dh);
-            drop((layer, text));
+            drop((layer, text, video));
             buf.present().unwrap();
             return;
         }

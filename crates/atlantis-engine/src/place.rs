@@ -272,9 +272,22 @@ impl Engine {
             // FUN_004212cc ends by setting the destination angles
             // (0x00421b01..0x00421b31), before the video, so FUN_0043259c's
             // ambient glide uses them.
+            // Widescreen: the panoramas beside the video (the sides of the
+            // view the turn ended on, the destination's).
+            let crosses = self
+                .wam
+                .sub_wams
+                .iter()
+                .any(|s| s.src_place == cur && s.dst_place == next);
+            let dest = (!crosses)
+                .then(|| self.wam.places.iter().find(|p| p.id == next))
+                .flatten()
+                .map(|p| (p.cyclo.clone(), t.dst_alpha, t.dst_beta));
+            self.hd_video_panorama_start(dest).await;
             self.set_view(t.dst_alpha, t.dst_beta);
             self.play_transition_video(&t.video, Some((cur, next)), TRANSITION_FRAME_MS)
                 .await;
+            self.sys.hd_video.borrow_mut().active = false;
         }
         // A sub-WAM swaps the area when (src, dst) crosses into another WAM
         // (FUN_00422ad0). The place id stays the one being left: the
@@ -455,6 +468,10 @@ impl Engine {
                         spf_frame += 1;
                         shown += 1;
                         presented = true;
+                        if hnm.frame_count() > 1 {
+                            self.sys.hd_video.borrow_mut().t =
+                                (shown - 1) as f32 / (hnm.frame_count() - 1) as f32;
+                        }
                     }
                     Some(Err(e)) => {
                         log::warn!("{name}: {e}");

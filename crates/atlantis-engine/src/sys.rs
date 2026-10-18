@@ -88,6 +88,9 @@ pub struct Sys {
     pub screen: RefCell<Vec<u16>>,
     /// The HD picture of the frame, when it has one (see [`crate::hd`]).
     pub hd: RefCell<HdLayer>,
+    /// Widescreen: the panorama beside a move's video (see
+    /// [`crate::hd::VideoSides::Panorama`]).
+    pub hd_video: RefCell<crate::hd::VideoPanorama>,
     /// The HD tile size the front end asks for (0: HD off).
     hd_tile: Cell<usize>,
     hd_side: Cell<usize>,
@@ -129,6 +132,7 @@ impl Sys {
         Rc::new(Sys {
             screen: RefCell::new(vec![0; SCREEN_W * SCREEN_H]),
             hd: RefCell::new(HdLayer::default()),
+            hd_video: RefCell::new(crate::hd::VideoPanorama::default()),
             hd_tile: Cell::new(0),
             hd_side: Cell::new(0),
             enhancements: Cell::new(crate::enhancements::Enhancements::default()),

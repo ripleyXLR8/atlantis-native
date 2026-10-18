@@ -33,6 +33,9 @@ struct Aim {
     seen: Rc<RefCell<Seen>>,
     prefer: Option<u16>,
     start: Option<(&'static str, u16)>,
+    /// Aims at the first arrival only (the view then stays as the move
+    /// leaves it).
+    first_only: bool,
 }
 
 impl Aim {
@@ -41,6 +44,7 @@ impl Aim {
             seen: seen.clone(),
             prefer: None,
             start: None,
+            first_only: false,
         }
     }
 }
@@ -68,6 +72,9 @@ impl ScriptHooks for Aim {
     ) -> HookFuture<'a, ()> {
         let mut seen = self.seen.borrow_mut();
         seen.arrivals.push((vue, arrivee));
+        if self.first_only && seen.arrivals.len() > 1 {
+            return ready(());
+        }
         seen.target = None;
         let place = e.place().unwrap().clone();
         let mut w = e.warp.clone();
@@ -338,4 +345,91 @@ fn ambient_sounds_and_sub_wam() {
     assert!(h.run_until(10, || mixer.voice_count() == 0));
     sys.push_input(Input::Quit);
     assert!(!h.run(10));
+}
+
+/// Widescreen with the panorama beside the move videos: the sides of the
+/// view left and of the destination are taken before the video, its
+/// progress runs 0..1, and the destination's sides are those the view
+/// shows on arrival (the same panorama and angles; the arrival's view
+/// also has its sprites, so nearly equal).
+#[test]
+fn move_video_panorama_sides() {
+    use atlantis_engine::hd::{HdOptions, VideoSides};
+    let Some(dir) = std::env::var_os("ATLANTIS_DATA") else {
+        eprintln!("ATLANTIS_DATA not set: skipped");
+        return;
+    };
+    let game = Game::open(Arc::new(StdDir::new(dir))).unwrap();
+    let sys = Sys::new(Mixer::new());
+    let (tile, side_tiles) = (24, 4);
+    sys.set_hd_tile(Some(tile));
+    sys.set_hd_side_tiles(side_tiles);
+    sys.set_hd_options(HdOptions {
+        widescreen: true,
+        video_sides: VideoSides::Panorama,
+        ..HdOptions::default()
+    });
+    let trace = Rc::new(RefCell::new(Vec::new()));
+    let seen = Rc::new(RefCell::new(Seen::default()));
+    let opts = Options {
+        hooks: Box::new(Aim {
+            first_only: true,
+            ..Aim::new(&seen)
+        }),
+        trace: Some(trace.clone()),
+        start: Start::NewGame,
+        ..Options::default()
+    };
+    let runner = Runner::new(sys.clone(), atlantis_engine::run(sys.clone(), game, opts));
+    let mut h = Harness {
+        sys: sys.clone(),
+        runner,
+        now: 1000,
+        frames: 0,
+    };
+    assert!(h.run_until(200, || !seen.borrow().angles.is_empty()));
+    let entered = places_entered(&trace).len();
+    h.run(5);
+    h.click();
+    let mut ts = Vec::new();
+    let mut sides = None;
+    assert!(h.run_until(3000, || {
+        let v = sys.hd_video.borrow();
+        if v.active {
+            ts.push(v.t);
+            sides.get_or_insert_with(|| (v.start.clone(), v.end.clone(), v.width, v.height));
+        }
+        places_entered(&trace).len() > entered
+    }));
+    let (start, end, w, hgt) = sides.expect("no panorama beside the move video");
+    assert_eq!((w, hgt), (side_tiles * tile, 30 * tile));
+    assert_eq!(start.len(), 2 * w * hgt);
+    assert_eq!(end.len(), start.len(), "the destination's sides");
+    assert!(ts.first().copied().unwrap_or(1.0) <= 0.1);
+    assert!(ts.last().copied().unwrap_or(0.0) >= 0.9, "{ts:?}");
+    assert!(!sys.hd_video.borrow().active, "ended with the video");
+    // The arrival's HD view: its sides against the destination's.
+    let n = seen.borrow().angles.len();
+    assert!(h.run_until(400, || seen.borrow().angles.len() > n));
+    h.run(3);
+    let layer = sys.hd.borrow();
+    assert_eq!(layer.side, w);
+    let mut diff = 0u64;
+    let mut count = 0u64;
+    for s in 0..2 {
+        for y in 0..hgt {
+            for x in 0..w {
+                let lx = if s == 0 { x } else { layer.width - w + x };
+                let a = layer.pixels[y * layer.width + lx];
+                let b = end[s * w * hgt + y * w + x];
+                for k in [0, 8, 16] {
+                    diff += u64::from(((a >> k) & 0xff).abs_diff((b >> k) & 0xff));
+                }
+                count += 3;
+            }
+        }
+    }
+    let mean = diff as f64 / count as f64;
+    eprintln!("destination sides vs arrival view: mean difference {mean:.2}");
+    assert!(mean < 12.0, "mean difference {mean}");
 }

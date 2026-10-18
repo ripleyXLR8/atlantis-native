@@ -7,7 +7,7 @@
 //! the entries are a list so that more can follow.
 
 use crate::enhancements::Enhancements;
-use crate::hd::{HdOptions, HdText, PanoFilter, TextItem};
+use crate::hd::{HdOptions, HdText, PanoFilter, TextItem, VideoSides};
 use crate::persist::Graphics;
 use crate::subtitles::SubtitleFont;
 use crate::sys::Key;
@@ -22,19 +22,21 @@ pub enum Entry {
     Interface,
     SharpSubtitles,
     Widescreen,
+    VideoSides,
     BugFixes,
     RestoredContent,
     UiUx,
     Close,
 }
 
-const ENTRIES: [Entry; 10] = [
+const ENTRIES: [Entry; 11] = [
     Entry::Graphics,
     Entry::PanoramaFilter,
     Entry::Sharpen,
     Entry::Interface,
     Entry::SharpSubtitles,
     Entry::Widescreen,
+    Entry::VideoSides,
     Entry::BugFixes,
     Entry::RestoredContent,
     Entry::UiUx,
@@ -51,6 +53,7 @@ impl Entry {
                 | Entry::Interface
                 | Entry::SharpSubtitles
                 | Entry::Widescreen
+                | Entry::VideoSides
         )
     }
 }
@@ -162,6 +165,7 @@ impl OptionsMenu {
             Entry::Interface => hd.smooth_interface = !hd.smooth_interface,
             Entry::SharpSubtitles => hd.sharp_subtitles = !hd.sharp_subtitles,
             Entry::Widescreen => hd.widescreen = !hd.widescreen,
+            Entry::VideoSides => hd.video_sides = hd.video_sides.next(),
             Entry::BugFixes => x.minor_bug_fixes = !x.minor_bug_fixes,
             Entry::RestoredContent => x.restored_content = !x.restored_content,
             Entry::UiUx => x.ui_ux = !x.ui_ux,
@@ -189,6 +193,7 @@ impl OptionsMenu {
             Entry::Interface => "Menus, bars and videos: Smooth (xBR) or Pixels",
             Entry::SharpSubtitles => "Subtitles drawn at the window's resolution",
             Entry::Widescreen => "The panorama fills the sides of a wide window",
+            Entry::VideoSides => "Widescreen: the bars beside the videos",
             Entry::BugFixes => "Fixes bugs of the original release (on by default)",
             Entry::RestoredContent => "Restores lines the original never plays (off by default)",
             Entry::UiUx => "Modern comforts, e.g. no error box (off by default)",
@@ -331,6 +336,15 @@ impl OptionsMenu {
                 ),
                 Entry::SharpSubtitles => ("Sharp subtitles", on(v.hd.sharp_subtitles)),
                 Entry::Widescreen => ("Widescreen", on(v.hd.widescreen)),
+                Entry::VideoSides => (
+                    "Video sides",
+                    match v.hd.video_sides {
+                        VideoSides::Black => "Black",
+                        VideoSides::Blur => "Blurred",
+                        VideoSides::Zoom => "Zoomed",
+                        VideoSides::Panorama => "Panorama",
+                    },
+                ),
                 Entry::BugFixes => ("Fix original bugs", on(v.enhancements.minor_bug_fixes)),
                 Entry::RestoredContent => ("Restored content", on(v.enhancements.restored_content)),
                 Entry::UiUx => ("Modern UI/UX", on(v.enhancements.ui_ux)),
@@ -402,6 +416,7 @@ mod tests {
         smooth_interface: true,
         sharp_subtitles: true,
         widescreen: false,
+        video_sides: VideoSides::Black,
     };
     const ORIG: MenuValues = MenuValues {
         graphics: Graphics::Original,
@@ -451,7 +466,7 @@ mod tests {
             m.click(320, gy, ORIG),
             MenuAction::SetGraphics(Graphics::Hd)
         );
-        m.pointer(320, gy + 9 * ROW_H);
+        m.pointer(320, gy + 10 * ROW_H);
         assert_eq!(m.selected(), Entry::Close);
         assert_eq!(m.click(320, BOX_Y + 2, ORIG), MenuAction::None);
         assert!(m.is_open());
@@ -514,6 +529,7 @@ mod tests {
             HdOptions {
                 sharp_subtitles: false,
                 widescreen: false,
+                video_sides: VideoSides::Black,
                 ..HD_OPTS
             },
         ];
@@ -560,7 +576,7 @@ mod tests {
         m.draw(&mut plain, &font, ORIG);
         assert!(s == plain, "same pixels with or without recording");
         assert!(t.after == s);
-        assert_eq!(t.items.len(), 1 + 9 * 2 + 1 + 2);
+        assert_eq!(t.items.len(), 1 + 10 * 2 + 1 + 2);
         assert!(t.items.iter().any(|i| i.color == GREYED));
         assert!(t.items.iter().any(|i| i.text == b"< Bicubic >"));
         // Without the text, the menu's boxes.

@@ -145,6 +145,18 @@ The options (options menu, F10; `settings.ini`):
   panoramic view, the dialog lines over it); the videos, menus and
   puzzles keep black bars. At most 16 tile columns per side (a 2.4:1
   window).
+- Video sides (with Widescreen): what fills the bars beside a video's
+  frame, which has no picture past its edges. Black (default); Blurred:
+  the frame's outer quarter, mirrored at its edge, averaged in 20x20
+  blocks, box-blurred and darkened away from the picture; Zoomed: the
+  frame enlarged to the window's width (bilinear), its top and bottom
+  cut, the subtitles drawn where the 4:3 picture has them; Panorama: for
+  a move's video, the side columns of the HD view the turn ended on,
+  crossfading over the video to those of the destination's panorama at
+  the destination angles (decoded and rendered before the video, without
+  its sprites; not known for a move into another area, which keeps the
+  view left), with the blurred edges weighing 4t(1 - t) in the middle;
+  the cinematics get the blurred edges.
 
 The HD size is a multiple of the original's 40x30 grid of 16x16 tiles:
 tiles of the window's picture width / 40 pixels, rounded up, at most 64 (4
