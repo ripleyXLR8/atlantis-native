@@ -283,8 +283,57 @@ pub struct HdCompositor {
     rgb: Vec<u32>,
     /// The outline fonts, one per code page met.
     fonts: Vec<crate::subtitles::SubtitleFont>,
-    /// The axis maps for the current output size and factor.
+    /// The axis maps for the current output size and factor, and how
+    /// many times they were made (see [`GpuPlan::axes_gen`]).
     axes: Option<Axes>,
+    axes_gen: u64,
+}
+
+/// How the pixels that are not the HD layer's are scaled.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UiScale {
+    /// As blocks.
+    Nearest,
+    /// Bilinearly (a video's frame).
+    Bilinear,
+    /// The xBR-upscaled art, resampled bilinearly to the output.
+    Xbr,
+}
+
+/// What [`HdCompositor::prepare`] decided for a frame.
+struct Prep {
+    video_bars: Option<VideoSides>,
+    ui: UiScale,
+    factor: usize,
+}
+
+/// A frame's composition as [`HdCompositor::compose`] does it, for a
+/// renderer elsewhere (the browser's graphics card) to do the same: the
+/// frame (its text uncovered), how its pixels are scaled, the upscaled
+/// interface art and its changed blocks, the maps from the output's
+/// columns and rows to the sources, and the layer.
+pub struct GpuPlan<'a> {
+    pub frame: &'a [u16],
+    pub ui: UiScale,
+    pub factor: usize,
+    /// The `factor` x interface art, and its blocks computed since the
+    /// last plan (of `up_tile` pixels).
+    pub up: &'a [u32],
+    pub up_changes: crate::upscale::PanoChanges,
+    pub up_tile: usize,
+    pub x: &'a crate::upscale::Axis,
+    pub y: &'a crate::upscale::Axis,
+    pub ux: &'a crate::upscale::Axis,
+    pub uy: &'a crate::upscale::Axis,
+    pub lx: &'a [usize],
+    pub ly: &'a [usize],
+    /// Widescreen: the layer's column of each side column, the left
+    /// side's (`left` of them) then the right side's.
+    pub side_lx: &'a [usize],
+    pub left: usize,
+    pub right: usize,
+    /// Changes when the maps above do.
+    pub axes_gen: u64,
 }
 
 struct Axes {
@@ -372,96 +421,36 @@ impl HdCompositor {
         dw: usize,
         dh: usize,
     ) {
-        use crate::upscale::{for_each_band, sample_bilinear, Axis};
+        self.compose_with(f, opts, out, stride, (ox, oy, dw, dh), true);
+    }
+
+    /// [`HdCompositor::compose`], the text drawn only with `texts`.
+    pub fn compose_with(
+        &mut self,
+        f: HdFrame<'_>,
+        opts: HdOptions,
+        out: &mut [u32],
+        stride: usize,
+        (ox, oy, dw, dh): (usize, usize, usize, usize),
+        texts: bool,
+    ) {
+        use crate::upscale::{for_each_band, sample_bilinear};
         if dw == 0 || dh == 0 {
             return;
         }
         let (w, h) = (SCREEN_W, SCREEN_H);
-        self.frame.clear();
-        self.frame.extend_from_slice(f.screen);
-        // Widescreen sides of a video (a frame without an HD layer).
-        let video_bars = (f.photo && f.layer.is_none() && opts.widescreen && ox > 0)
-            .then_some(opts.video_sides)
-            .filter(|&v| v != VideoSides::Black);
-        if opts.sharp_subtitles || video_bars == Some(VideoSides::Zoom) {
-            for t in f.texts {
-                t.uncover(&mut self.frame);
-            }
-        }
+        let Prep {
+            video_bars,
+            ui,
+            factor,
+        } = self.prepare(&f, opts, stride, ox, dw, dh);
         if video_bars == Some(VideoSides::Zoom) {
             self.compose_zoom(f, out, stride, (ox, oy, dw, dh));
             return;
         }
-        let factor = interface_factor(dw);
-        let (lw, lh, side) = f.layer.map_or((1, 1, 0), |l| (l.width, l.height, l.side));
-        let cw = lw - 2 * side;
-        // Widescreen: the output columns of each side the layer covers.
-        let sd = if side > 0 { side * dw / cw } else { 0 };
-        let left = ox.min(sd);
-        let right = (stride - ox - dw).min(sd);
-        let key = (dw, dh, factor, lw, lh, side, left, right);
-        if self.axes.as_ref().is_none_or(|a| a.key != key) {
-            self.axes = Some(Axes {
-                key,
-                x: Axis::new(w, dw),
-                y: Axis::new(h, dh),
-                ux: Axis::new(factor * w, dw),
-                uy: Axis::new(factor * h, dh),
-                lx: (0..dw).map(|x| side + x * cw / dw).collect(),
-                side_lx: (0..left + right)
-                    .map(|i| {
-                        // Output column relative to the picture's left edge.
-                        let rel = if i < left {
-                            i as isize - left as isize
-                        } else {
-                            (dw + i - left) as isize
-                        };
-                        let c = side as isize + (rel * cw as isize).div_euclid(dw as isize);
-                        c.clamp(0, lw as isize - 1) as usize
-                    })
-                    .collect(),
-                ly: (0..dh).map(|y| y * lh / dh).collect(),
-            });
-        }
+        let key = self.axes.as_ref().expect("axes").key;
         let lut = rgb565_to_888();
         let frame = &self.frame;
-        // How the pixels that are not the layer's are scaled.
-        #[derive(Clone, Copy, PartialEq)]
-        enum Ui {
-            Nearest,
-            Bilinear,
-            Xbr,
-        }
-        let ui = match (opts.smooth_interface, f.photo) {
-            (false, _) => Ui::Nearest,
-            (true, true) => Ui::Bilinear,
-            (true, false) => Ui::Xbr,
-        };
-        if ui == Ui::Bilinear {
-            self.rgb.clear();
-            self.rgb.extend(frame.iter().map(|&p| lut[usize::from(p)]));
-        }
-        if ui == Ui::Xbr {
-            // With a layer, only the blocks that show something else
-            // (and their neighbours, which the resampling reads).
-            let need = f.layer.map(|l| {
-                let mut b = vec![false; (w / 16) * (h / 16)];
-                for y in 0..h {
-                    for x in 0..w {
-                        if frame[y * w + x] != l.base[y * w + x] {
-                            b[(y / 16) * (w / 16) + x / 16] = true;
-                        }
-                    }
-                }
-                b
-            });
-            self.scaler.update(frame, factor, |bx, by| match &need {
-                None => true,
-                Some(b) => (by.saturating_sub(1)..(by + 2).min(h / 16)).any(|y| {
-                    (bx.saturating_sub(1)..(bx + 2).min(w / 16)).any(|x| b[y * (w / 16) + x])
-                }),
-            });
-        }
         let axes = self.axes.as_ref().expect("axes");
         // The view on the graphics card (`HdLayer::on_card`): its pixels
         // are left transparent (0) and the rest is opaque (alpha 0xff), a
@@ -506,10 +495,12 @@ impl HdCompositor {
                     }
                     *d = opaque
                         | match ui {
-                            Ui::Nearest => lut[usize::from(p)],
-                            Ui::Bilinear => sample_bilinear(rgb, w, axes.x.lin[x], axes.y.lin[y]),
-                            Ui::Xbr if exact => up[y * uw + x],
-                            Ui::Xbr => sample_bilinear(up, uw, axes.ux.lin[x], axes.uy.lin[y]),
+                            UiScale::Nearest => lut[usize::from(p)],
+                            UiScale::Bilinear => {
+                                sample_bilinear(rgb, w, axes.x.lin[x], axes.y.lin[y])
+                            }
+                            UiScale::Xbr if exact => up[y * uw + x],
+                            UiScale::Xbr => sample_bilinear(up, uw, axes.ux.lin[x], axes.uy.lin[y]),
                         };
                 }
             }
@@ -517,8 +508,173 @@ impl HdCompositor {
         if let Some(v) = video_bars {
             self.fill_video_bars(v, f.video_pano, out, stride, (ox, oy, dw, dh));
         }
-        if opts.sharp_subtitles {
+        if opts.sharp_subtitles && texts {
             self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut, opaque);
+        }
+    }
+
+    /// [`HdCompositor::compose`]'s work for a renderer elsewhere: the
+    /// frame prepared as `compose` prepares it, or None for a frame it
+    /// composes otherwise (a video's widescreen sides).
+    #[allow(clippy::too_many_arguments)]
+    pub fn gpu_plan<'a>(
+        &'a mut self,
+        f: &HdFrame<'_>,
+        opts: HdOptions,
+        stride: usize,
+        ox: usize,
+        dw: usize,
+        dh: usize,
+    ) -> Option<GpuPlan<'a>> {
+        if dw == 0 || dh == 0 {
+            return None;
+        }
+        self.scaler.track = true;
+        let prep = self.prepare(f, opts, stride, ox, dw, dh);
+        if prep.video_bars.is_some() {
+            return None;
+        }
+        let up_changes = self.scaler.take_changes();
+        let a = self.axes.as_ref()?;
+        Some(GpuPlan {
+            frame: &self.frame,
+            ui: prep.ui,
+            factor: prep.factor,
+            up: self.scaler.pixels(),
+            up_changes,
+            up_tile: self.scaler.block_size(),
+            x: &a.x,
+            y: &a.y,
+            ux: &a.ux,
+            uy: &a.uy,
+            lx: &a.lx,
+            ly: &a.ly,
+            side_lx: &a.side_lx,
+            left: a.key.6,
+            right: a.key.7,
+            axes_gen: self.axes_gen,
+        })
+    }
+
+    /// The frame's sharp text alone into `out` (`stride` pixels per row,
+    /// cleared by the caller) as a premultiplied overlay (alpha in the top
+    /// byte), drawn where [`HdCompositor::compose`] draws it; false when
+    /// there is none.
+    pub fn draw_texts_overlay(
+        &mut self,
+        f: &HdFrame<'_>,
+        opts: HdOptions,
+        out: &mut [u32],
+        stride: usize,
+        area: (usize, usize, usize, usize),
+    ) -> bool {
+        if !opts.sharp_subtitles || f.texts.iter().all(|t| t.items.is_empty()) {
+            return false;
+        }
+        self.draw_text_items(f, out, stride, area, rgb565_to_888(), 0xff00_0000);
+        true
+    }
+
+    /// The frame and the maps of a composition: the frame with its text
+    /// uncovered, the video's sides, how the pixels are scaled, the axes,
+    /// the upscaled art brought up to date.
+    fn prepare(
+        &mut self,
+        f: &HdFrame<'_>,
+        opts: HdOptions,
+        stride: usize,
+        ox: usize,
+        dw: usize,
+        dh: usize,
+    ) -> Prep {
+        use crate::upscale::Axis;
+        let (w, h) = (SCREEN_W, SCREEN_H);
+        self.frame.clear();
+        self.frame.extend_from_slice(f.screen);
+        // Widescreen sides of a video (a frame without an HD layer).
+        let video_bars = (f.photo && f.layer.is_none() && opts.widescreen && ox > 0)
+            .then_some(opts.video_sides)
+            .filter(|&v| v != VideoSides::Black);
+        if opts.sharp_subtitles || video_bars == Some(VideoSides::Zoom) {
+            for t in f.texts {
+                t.uncover(&mut self.frame);
+            }
+        }
+        if video_bars == Some(VideoSides::Zoom) {
+            return Prep {
+                video_bars,
+                ui: UiScale::Nearest,
+                factor: 2,
+            };
+        }
+        let factor = interface_factor(dw);
+        let (lw, lh, side) = f.layer.map_or((1, 1, 0), |l| (l.width, l.height, l.side));
+        let cw = lw - 2 * side;
+        // Widescreen: the output columns of each side the layer covers.
+        let sd = if side > 0 { side * dw / cw } else { 0 };
+        let left = ox.min(sd);
+        let right = (stride - ox - dw).min(sd);
+        let key = (dw, dh, factor, lw, lh, side, left, right);
+        if self.axes.as_ref().is_none_or(|a| a.key != key) {
+            self.axes_gen = self.axes_gen.wrapping_add(1);
+            self.axes = Some(Axes {
+                key,
+                x: Axis::new(w, dw),
+                y: Axis::new(h, dh),
+                ux: Axis::new(factor * w, dw),
+                uy: Axis::new(factor * h, dh),
+                lx: (0..dw).map(|x| side + x * cw / dw).collect(),
+                side_lx: (0..left + right)
+                    .map(|i| {
+                        // Output column relative to the picture's left edge.
+                        let rel = if i < left {
+                            i as isize - left as isize
+                        } else {
+                            (dw + i - left) as isize
+                        };
+                        let c = side as isize + (rel * cw as isize).div_euclid(dw as isize);
+                        c.clamp(0, lw as isize - 1) as usize
+                    })
+                    .collect(),
+                ly: (0..dh).map(|y| y * lh / dh).collect(),
+            });
+        }
+        let lut = rgb565_to_888();
+        let frame = &self.frame;
+        let ui = match (opts.smooth_interface, f.photo) {
+            (false, _) => UiScale::Nearest,
+            (true, true) => UiScale::Bilinear,
+            (true, false) => UiScale::Xbr,
+        };
+        if ui == UiScale::Bilinear {
+            self.rgb.clear();
+            self.rgb.extend(frame.iter().map(|&p| lut[usize::from(p)]));
+        }
+        if ui == UiScale::Xbr {
+            // With a layer, only the blocks that show something else
+            // (and their neighbours, which the resampling reads).
+            let need = f.layer.map(|l| {
+                let mut b = vec![false; (w / 16) * (h / 16)];
+                for y in 0..h {
+                    for x in 0..w {
+                        if frame[y * w + x] != l.base[y * w + x] {
+                            b[(y / 16) * (w / 16) + x / 16] = true;
+                        }
+                    }
+                }
+                b
+            });
+            self.scaler.update(frame, factor, |bx, by| match &need {
+                None => true,
+                Some(b) => (by.saturating_sub(1)..(by + 2).min(h / 16)).any(|y| {
+                    (bx.saturating_sub(1)..(bx + 2).min(w / 16)).any(|x| b[y * (w / 16) + x])
+                }),
+            });
+        }
+        Prep {
+            video_bars,
+            ui,
+            factor,
         }
     }
 }

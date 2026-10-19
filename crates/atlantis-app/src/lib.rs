@@ -145,6 +145,14 @@ pub struct App {
     /// The HD view drawn by the graphics card (shared with the engine).
     #[cfg(target_arch = "wasm32")]
     gl_view: Option<Rc<std::cell::RefCell<gl_present::GlView>>>,
+    /// The HD picture composed by the graphics card, the frame's sharp
+    /// text as an overlay for it, and the rows that overlay used.
+    #[cfg(target_arch = "wasm32")]
+    gl_compose: Option<gl_present::GlCompose>,
+    #[cfg(target_arch = "wasm32")]
+    gl_text: Vec<u32>,
+    #[cfg(target_arch = "wasm32")]
+    gl_text_rows: Option<(usize, usize)>,
     #[cfg(target_arch = "wasm32")]
     gl_small: Vec<u32>,
     sys: Rc<Sys>,
@@ -217,6 +225,12 @@ impl App {
             gl_frame: Vec::new(),
             #[cfg(target_arch = "wasm32")]
             gl_view: None,
+            #[cfg(target_arch = "wasm32")]
+            gl_compose: None,
+            #[cfg(target_arch = "wasm32")]
+            gl_text: Vec::new(),
+            #[cfg(target_arch = "wasm32")]
+            gl_text_rows: None,
             #[cfg(target_arch = "wasm32")]
             gl_small: Vec::new(),
             sys,
@@ -764,7 +778,13 @@ impl App {
                 .draw_recording(&mut self.menu_frame, font, values, text);
             frame = &self.menu_frame;
         }
-        if hd_mode || !gl_on {
+        // (the graphics card's composition needs no buffer: cleared when
+        // the processor composes)
+        #[cfg(target_arch = "wasm32")]
+        let card_compose = hd_mode && self.gl_compose.is_some();
+        #[cfg(not(target_arch = "wasm32"))]
+        let card_compose = false;
+        if (hd_mode || !gl_on) && !card_compose {
             buf.fill(0);
         }
         if hd_mode {
@@ -787,6 +807,24 @@ impl App {
                 photo: running && self.sys.photo_shown(),
                 video_pano: Some(&*video).filter(|v| running && v.active),
             };
+            #[cfg(target_arch = "wasm32")]
+            if card_compose {
+                let c = CardCompose {
+                    gl: self.gl.as_mut(),
+                    gc: self.gl_compose.as_mut(),
+                    view: self.gl_view.as_ref(),
+                    compositor: &mut self.compositor,
+                    text: &mut self.gl_text,
+                    text_rows: &mut self.gl_text_rows,
+                    sys: &self.sys,
+                };
+                if compose_on_card(c, f, window_size, k, (sw, sh), (ox, oy, dw, dh)) {
+                    drop((layer, text, video));
+                    return;
+                }
+                // (composed by the processor after all)
+                buf.fill(0);
+            }
             // The view on the graphics card: its drawing and its rectangle
             // (the picture's, with the widescreen sides).
             let card = (f.layer.is_some_and(|l| l.on_card)).then(|| {
@@ -970,6 +1008,10 @@ impl ApplicationHandler for App {
                     *self.sys.view_renderer.borrow_mut() =
                         Some(Box::new(gl_present::SharedView(v.clone())));
                     self.gl_view = Some(v);
+                    self.gl_compose = self
+                        .gl
+                        .as_ref()
+                        .and_then(|p| gl_present::GlCompose::new(p.context()));
                     self.sys.view_check.set(setting == "check");
                     log::info!(
                         "HD view: graphics card{}",
@@ -1228,4 +1270,122 @@ pub fn start_game(game: Game, options: atlantis_engine::Options) -> (Rc<Sys>, Ru
         atlantis_engine::run(sys.clone(), game, options),
     );
     (sys, runner)
+}
+
+/// The parts of the app [`compose_on_card`] uses.
+#[cfg(target_arch = "wasm32")]
+struct CardCompose<'a> {
+    gl: Option<&'a mut gl_present::GlPresenter>,
+    gc: Option<&'a mut gl_present::GlCompose>,
+    view: Option<&'a Rc<std::cell::RefCell<gl_present::GlView>>>,
+    compositor: &'a mut HdCompositor,
+    text: &'a mut Vec<u32>,
+    text_rows: &'a mut Option<(usize, usize)>,
+    sys: &'a Sys,
+}
+
+/// The HD frame `f` composed by the graphics card and shown (the
+/// canvas `window` pixels, `k` times the frame's `size`, the picture
+/// at `area`); false when it cannot (a video's widescreen sides, the
+/// card's view missing), the processor composing it then. With the
+/// view check on, the card's picture is compared with the processor's.
+#[cfg(target_arch = "wasm32")]
+#[allow(clippy::too_many_arguments)]
+fn compose_on_card(
+    c: CardCompose<'_>,
+    f: HdFrame<'_>,
+    window: (u32, u32),
+    k: f64,
+    (sw, sh): (usize, usize),
+    area: (usize, usize, usize, usize),
+) -> bool {
+    let CardCompose {
+        gl,
+        gc,
+        view,
+        compositor,
+        text: gl_text,
+        text_rows,
+        sys,
+    } = c;
+    let (Some(gl), Some(gc)) = (gl, gc) else {
+        return false;
+    };
+    let opts = sys.hd_options();
+    let (ox, _, dw, dh) = area;
+    let view = view.map(|v| v.borrow());
+    let card_view = f
+        .layer
+        .filter(|l| l.on_card)
+        .map(|l| view.as_ref().and_then(|v| v.picture(l.card_gen)));
+    if matches!(card_view, Some(None)) {
+        return false;
+    }
+    // The sharp text, a premultiplied overlay over the rows it uses.
+    gl_text.resize(sw * sh, 0);
+    if let Some((a, b)) = text_rows.take() {
+        if let Some(rows) = gl_text.get_mut(a * sw..b * sw) {
+            rows.fill(0);
+        }
+    }
+    let rows = if compositor.draw_texts_overlay(&f, opts, gl_text, sw, area) {
+        let text = &*gl_text;
+        let used = |y: &usize| text[y * sw..][..sw].iter().any(|&p| p != 0);
+        let first = (0..sh).find(used);
+        let last = (0..sh).rev().find(used);
+        first
+            .zip(last)
+            .map(|(a, b)| (a.saturating_sub(1), (b + 2).min(sh)))
+    } else {
+        None
+    };
+    *text_rows = rows;
+    let Some(plan) = compositor.gpu_plan(&f, opts, sw, ox, dw, dh) else {
+        return false;
+    };
+    let layer = f.layer.map(|l| gl_present::ComposeLayer {
+        layer: l,
+        view: card_view.flatten(),
+    });
+    if gc.compose(plan, layer, (sw, sh), area).is_none() {
+        return false;
+    }
+    drop(view);
+    if sys.view_check.get() {
+        let mut card = vec![0u32; sw * sh];
+        let mut cpu = vec![0u32; sw * sh];
+        if gc.read_back(&mut card) {
+            compositor.compose_with(f, opts, &mut cpu, sw, area, false);
+            let diff = card.iter().zip(&cpu).filter(|(a, b)| a != b).count();
+            let first = card.iter().zip(&cpu).position(|(a, b)| a != b);
+            log::info!(
+                "HD compose check {sw}x{sh}: {diff} pixels differ{}",
+                first.map_or(String::new(), |i| format!(
+                    " (first at {},{}: card {:06x}, processor {:06x})",
+                    i % sw,
+                    i / sw,
+                    card[i],
+                    cpu[i]
+                ))
+            );
+        }
+    }
+    let Some(tex) = gc.picture() else {
+        return false;
+    };
+    let r = |v: usize| (v as f64 * k).round() as i32;
+    let (ww, wh) = window;
+    let whole = (0, 0, ww as i32, wh as i32);
+    match rows {
+        Some((a, b)) => gl.present(
+            window,
+            &gl_text[a * sw..b * sw],
+            (sw as u32, (b - a) as u32),
+            (0, r(a), ww as i32, r(b) - r(a)),
+            true,
+            Some((tex, whole)),
+        ),
+        None => gl.present(window, &[], (0, 0), whole, true, Some((tex, whole))),
+    }
+    true
 }

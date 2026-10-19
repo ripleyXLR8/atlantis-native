@@ -9,7 +9,7 @@
 | `atlantis-data` | BigFile archives, executable tables, game detection |
 | `atlantis-codecs` | HNM6 panoramas and videos, APC sound |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
-| `atlantis-app` | the window, input and audio (winit, softbuffer, cpal; in the browser WebGL 2 presents the frames and draws the HD view with the engine's integer formulas, bit for bit) |
+| `atlantis-app` | the window, input and audio (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
 and poll their events, the engine awaits the next frame, and the front end
@@ -405,6 +405,30 @@ archive member before it is read, so the browser runs the same game as the
 desktop. A browser grants
 the pointer capture only on a click: until then the view turns with the
 pointer's own motion. Sound starts on the first click.
+
+In the browser the graphics card does the HD mode's heavy work, with the
+engine's own integer arithmetic so that the picture is the same, pixel
+for pixel:
+
+- The HD view: a fragment shader runs `Warp::render_tiles`'s tile
+  interpolation and the bilinear samplers on an integer copy of the
+  prepared panorama, sent whole for a new panorama and by its changed
+  tiles otherwise (`PanoramaPrep::take_changes`). Where the engine needs
+  the view's pixels (a dialog's head is composed over it, the widescreen
+  video sides) it draws them on the processor on demand.
+- The composition: `HdCompositor::gpu_plan` prepares a frame as `compose`
+  does (the text uncovered, the scale maps, the xBR art brought up to date
+  and its changed blocks); a shader runs `compose`'s loop per output pixel
+  with the maps sent as integer tables, the layer being the card's view or
+  the engine's pixels. The sharp text is still rasterised by the
+  processor, into a premultiplied overlay over the rows it uses. A video's
+  widescreen sides are composed by the processor.
+- The presentation: the composed frame, at most 1280x960 pixels (no
+  taller than the HD view), is enlarged to the canvas by the card.
+
+`localStorage["atlantis-native/gpu-view"]`: `off` keeps all of it on the
+processor; `check` reads the card's view and composition back and logs
+how many pixels differ from the processor's (0 in every test so far).
 
 Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 `0x00496570`, ...) so that each behaviour can be traced to the original code.

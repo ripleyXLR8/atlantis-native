@@ -814,6 +814,11 @@ pub struct InterfaceScaler {
     out: Vec<u32>,
     mid_valid: Vec<bool>,
     out_valid: Vec<bool>,
+    /// Whether the blocks computed are kept (for a copy of the picture
+    /// elsewhere, see [`InterfaceScaler::take_changes`]), and those not
+    /// yet taken.
+    pub track: bool,
+    changes: PanoChanges,
 }
 
 /// Runs `f(by, bx, band, band_row0)` for the blocks `todo[by]` of each
@@ -874,6 +879,16 @@ impl InterfaceScaler {
         &self.out
     }
 
+    /// The side of a block of [`PanoChanges::Tiles`], in upscaled pixels.
+    pub fn block_size(&self) -> usize {
+        BLOCK * self.factor
+    }
+
+    /// The blocks computed since the last call (with `track` set).
+    pub fn take_changes(&mut self) -> PanoChanges {
+        std::mem::take(&mut self.changes)
+    }
+
     /// Brings the blocks `need(bx, by)` of the `factor` x picture of
     /// `screen` (640x480 RGB565) up to date.
     pub fn update(&mut self, screen: &[u16], factor: usize, need: impl Fn(usize, usize) -> bool) {
@@ -891,6 +906,9 @@ impl InterfaceScaler {
             self.out = vec![0; factor * factor * SCREEN_W * SCREEN_H];
             self.mid_valid = vec![false; BW * BH];
             self.out_valid = vec![false; BW * BH];
+            if self.track {
+                self.changes = PanoChanges::All;
+            }
         } else if screen != self.prev.as_slice() {
             // The blocks that changed invalidate themselves and their
             // neighbours (xBR reads 2 source pixels around, 3 at 4x).
@@ -991,6 +1009,22 @@ impl InterfaceScaler {
                 self.out_valid[by * BW + bx] = true;
             }
         }
+        if self.track && self.changes != PanoChanges::All {
+            let mut list = match std::mem::take(&mut self.changes) {
+                PanoChanges::Tiles(l) => l,
+                _ => Vec::new(),
+            };
+            for (by, row) in out_todo.iter().enumerate() {
+                list.extend(row.iter().map(|&bx| (bx, by)));
+            }
+            self.changes = if list.len() >= BW * BH {
+                PanoChanges::All
+            } else if list.is_empty() {
+                PanoChanges::None
+            } else {
+                PanoChanges::Tiles(list)
+            };
+        }
     }
 }
 
@@ -1027,8 +1061,6 @@ impl Axis {
     }
 }
 
-/// `a` to `b` at `w` / 256, per channel of XRGB8888.
-#[inline]
 /// [`lerp888`] with the top byte (an alpha) blended too: the same for
 /// XRGB pixels (top bytes 0).
 pub(crate) fn lerp8888(a: u32, b: u32, w: u32) -> u32 {
@@ -1036,6 +1068,8 @@ pub(crate) fn lerp8888(a: u32, b: u32, w: u32) -> u32 {
     lerp888(a, b, w) | top
 }
 
+/// `a` to `b` at `w` / 256, per channel of XRGB8888.
+#[inline]
 pub(crate) fn lerp888(a: u32, b: u32, w: u32) -> u32 {
     let iw = 256 - w;
     let rb = (((a & 0xff_00ff) * iw + (b & 0xff_00ff) * w) >> 8) & 0xff_00ff;
