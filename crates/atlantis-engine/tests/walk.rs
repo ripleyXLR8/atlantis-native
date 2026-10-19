@@ -414,7 +414,6 @@ fn move_video_panorama_sides() {
     assert_eq!(end.len(), start.len(), "the destination's sides");
     assert!(ts.first().copied().unwrap_or(1.0) <= 0.1);
     assert!(ts.last().copied().unwrap_or(0.0) >= 0.9, "{ts:?}");
-    assert!(!sys.hd_video.borrow().active, "ended with the video");
     // The arrival's HD view: its sides against the destination's.
     let n = seen.borrow().angles.len();
     assert!(h.run_until(400, || {
@@ -423,6 +422,9 @@ fn move_video_panorama_sides() {
         }
         seen.borrow().angles.len() > n
     }));
+    // (the video's sides stay until the destination's view is shown, the
+    // video's last frame being on screen while it loads)
+    assert!(!sys.hd_video.borrow().active, "ended with the arrival's view");
     assert_eq!(bare, 0, "frames without a wide picture at the arrival");
     h.run(3);
     let layer = sys.hd.borrow();

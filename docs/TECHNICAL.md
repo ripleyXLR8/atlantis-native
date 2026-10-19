@@ -157,13 +157,17 @@ The options (options menu, F10; `settings.ini`):
   its sprites; not known for a move into another area, which keeps the
   view left), with the blurred edges weighing 4t(1 - t) in the middle;
   the cinematics get the blurred edges.
-  A move's video in Zoom mode zooms in over the first 30% of the video
-  (eased) from the 4:3 picture beside the place's panorama, and back out
-  over the last 30% beside the destination's (the Panorama mode's sides);
-  past the picture the zoomed frame is blended with the sides, opaque at
-  the picture's edge, and the half of each side next to the picture shows
-  the frame's blurred edges at full brightness, which hide the seam the
-  panorama makes (the videos are not quite at the panoramas' scale).
+  A move's video in Zoom mode starts as the 4:3 picture beside the
+  place's panorama and zooms in over the first 30% of the video (eased),
+  then back out over the last 30% beside the destination's panorama: the
+  whole picture is enlarged, the frame from the video, the sides from the
+  panorama, so that they keep continuing each other. The sides are
+  rendered at the video's own angles (the transition's start angles, and
+  the destination's): measured on ATLAN1's moves, a video's first and last
+  frames are the panorama at those angles (scale 0.997 to 1.009, no
+  offset), while the turn before the video stops a few pixels short of
+  them. The video's last frame keeps its sides until the destination's
+  view is shown (it stays on screen while the destination loads).
   In every mode the video's sides reach no further than the panorama's
   (16 tile columns, `hd::MAX_SIDE_TILES`): in a window wider than 2.4:1
   the zoomed frame is the 2.4:1 width and the rest stays black, so a

@@ -283,11 +283,15 @@ impl Engine {
                 .then(|| self.wam.places.iter().find(|p| p.id == next))
                 .flatten()
                 .map(|p| (p.cyclo.clone(), t.dst_alpha, t.dst_beta));
-            self.hd_video_panorama_start(dest).await;
+            self.hd_video_panorama_start(Some((t.src_alpha, t.src_beta)), dest)
+                .await;
             self.set_view(t.dst_alpha, t.dst_beta);
             self.play_transition_video(&t.video, Some((cur, next)), TRANSITION_FRAME_MS)
                 .await;
-            self.sys.hd_video.borrow_mut().active = false;
+            // The video's last frame stays on screen while the destination
+            // loads: its sides stay those of the video's end (switched off
+            // when the destination's view is shown, `hd_show_view_over`).
+            self.sys.hd_video.borrow_mut().t = 1.0;
         }
         // A sub-WAM swaps the area when (src, dst) crosses into another WAM
         // (FUN_00422ad0). The place id stays the one being left: the
@@ -358,6 +362,11 @@ impl Engine {
         places: Option<(u16, u16)>,
         frame_ms: u64,
     ) {
+        // A cinematic is not a move: no panorama beside it (a move's is
+        // set up just before its video).
+        if places.is_none() {
+            self.sys.hd_video.borrow_mut().active = false;
+        }
         // WAM records name .UBB files; the archive stores .HNM.
         let name = if video.to_ascii_uppercase().ends_with(".UBB") {
             with_ext(video, "HNM")

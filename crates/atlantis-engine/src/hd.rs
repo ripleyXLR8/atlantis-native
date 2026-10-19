@@ -453,7 +453,8 @@ impl HdCompositor {
         // and back out to it (see `zoom_over`); the other videos are
         // zoomed throughout.
         let moving = zoom_moving(&f);
-        if video_bars == Some(VideoSides::Zoom) && !moving {
+        let full = f.video_pano.is_some_and(|p| zoom_share(p.t) >= 1.0);
+        if video_bars == Some(VideoSides::Zoom) && (!moving || full) {
             self.compose_zoom(f, out, stride, (ox, oy, dw, dh));
             return;
         }
@@ -525,7 +526,7 @@ impl HdCompositor {
                     true,
                 );
                 let t = f.video_pano.map_or(0.0, |p| p.t);
-                self.zoom_over(out, stride, (ox, oy, dw, dh), zoom_share(t));
+                self.zoom_all(out, stride, (ox, oy, dw, dh), zoom_share(t));
             }
             Some(v) => self.fill_video_bars(v, f.video_pano, out, stride, (ox, oy, dw, dh), false),
             None => {}
@@ -766,10 +767,10 @@ impl HdCompositor {
 
     /// Widescreen: the bars beside a video's frame drawn at (`ox`, `oy`)
     /// `dw` x `dh` of `out`.
-    /// `soft_edge`: with the panorama, the blurred edges also take the
-    /// half of each bar next to the picture, fully at the picture's edge
-    /// (they continue the frame where the panorama, not quite at the
-    /// video's scale, would show a seam).
+    /// `zoom` ([`VideoSides::Zoom`]'s zoom in and out of a move): the
+    /// place's panorama alone over the first half of the video, the
+    /// destination's over the second (each continues its end of the video),
+    /// the blurred edges when the destination's is not known.
     #[allow(clippy::too_many_arguments)]
     fn fill_video_bars(
         &self,
@@ -778,7 +779,7 @@ impl HdCompositor {
         out: &mut [u32],
         stride: usize,
         (ox, oy, dw, dh): (usize, usize, usize, usize),
-        soft_edge: bool,
+        zoom: bool,
     ) {
         let blur = self.edge_blur();
         let (bw, bh) = (SCREEN_W / 20, SCREEN_H / 20);
@@ -812,6 +813,13 @@ impl HdCompositor {
         // in its middle.
         let pano = pano.filter(|p| v == VideoSides::Panorama && p.active && p.width > 0);
         let blur_w = match pano {
+            Some(p) if zoom => {
+                if p.t >= 0.5 && p.end.len() != p.start.len() {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
             Some(p) => 4.0 * p.t * (1.0 - p.t),
             None => 1.0,
         };
@@ -834,13 +842,7 @@ impl HdCompositor {
                     };
                     let b = sample(fx, fy);
                     // Darker away from the picture.
-                    let mut k = 0.62 - 0.22 * (d as f32 / bar as f32);
-                    if soft_edge {
-                        // (at full brightness next to the picture, which
-                        // they continue)
-                        let near = (1.0 - 2.0 * d as f32 / bar as f32).max(0.0);
-                        k += (1.0 - k) * near;
-                    }
+                    let k = 0.62 - 0.22 * (d as f32 / bar as f32);
                     let mut c = b.map(|v| v * k);
                     if let Some(p) = pano {
                         // The side picture's column at this distance: the
@@ -852,17 +854,17 @@ impl HdCompositor {
                             let sx = if side == 0 { p.width - 1 - col } else { col };
                             let at = |v: &[u32]| v[side * p.width * p.height + hy * p.width + sx];
                             let s0 = unpack(at(&p.start));
-                            let s = if p.end.len() == p.start.len() {
+                            let s = if p.end.len() != p.start.len() {
+                                s0
+                            } else if zoom {
+                                if p.t < 0.5 {
+                                    s0
+                                } else {
+                                    unpack(at(&p.end))
+                                }
+                            } else {
                                 let e = unpack(at(&p.end));
                                 [0, 1, 2].map(|i| s0[i] * (1.0 - p.t) + e[i] * p.t)
-                            } else {
-                                s0
-                            };
-                            let blur_w = if soft_edge {
-                                let near = (1.0 - 2.0 * d as f32 / bar as f32).max(0.0);
-                                blur_w.max(near * near * (3.0 - 2.0 * near))
-                            } else {
-                                blur_w
                             };
                             let pano_w = 1.0 - blur_w;
                             c = [0, 1, 2].map(|i| s[i] * pano_w + c[i] * blur_w);
@@ -874,21 +876,20 @@ impl HdCompositor {
         }
     }
 
-    /// Widescreen, [`VideoSides::Zoom`] during a move's video: the frame
-    /// enlarged by `e` (0: the 4:3 picture, 1: the width the sides reach,
-    /// as [`HdCompositor::compose_zoom`]) about the picture's centre, over
-    /// the picture and its panorama sides already drawn; past the 4:3
-    /// picture it is blended with the sides, opaque at the picture's edge
-    /// and `e` at its own (no seam at the picture's edge).
-    fn zoom_over(
+    /// Widescreen, [`VideoSides::Zoom`] during a move's video: the whole
+    /// picture already drawn (the 4:3 frame and its panorama sides, which
+    /// continue it) enlarged by `e` about the picture's centre (0: as it
+    /// is, 1: the frame at the width the sides reach, as
+    /// [`HdCompositor::compose_zoom`]); the frame is sampled from the video
+    /// itself, the sides from the picture.
+    fn zoom_all(
         &self,
         out: &mut [u32],
         stride: usize,
         (ox, oy, dw, dh): (usize, usize, usize, usize),
         e: f32,
     ) {
-        use crate::upscale::{lerp888, sample_bilinear, Axis};
-        if e <= 0.0 || dw == 0 {
+        if e <= 0.0 || dw == 0 || dh == 0 {
             return;
         }
         let sh = out.len() / stride;
@@ -897,38 +898,45 @@ impl HdCompositor {
             ox - ox.min(reach_px),
             ox + dw + (stride - ox - dw).min(reach_px),
         );
-        let vw = (dw as f32 + (x_hi - x_lo - dw) as f32 * e).round() as usize;
-        let vh = vw * SCREEN_H / SCREEN_W;
-        let vx0 = (ox + dw / 2) as isize - (vw / 2) as isize;
-        let vy0 = (oy + dh / 2) as isize - (vh / 2) as isize;
+        let full = (x_hi - x_lo) as f32 / dw as f32;
+        let s = 1.0 + (full - 1.0) * e;
+        let (cx, cy) = ((ox + dw / 2) as f32, (oy + dh / 2) as f32);
         let lut = rgb565_to_888();
         let rgb: Vec<u32> = self.frame.iter().map(|&p| lut[usize::from(p)]).collect();
-        let (ax, ay) = (Axis::new(SCREEN_W, vw), Axis::new(SCREEN_H, vh));
-        // How far the frame reaches past the picture's sides.
-        let over = ((vw - dw) / 2).max(1) as f32;
-        let ys = vy0.max(0) as usize..((vy0 + vh as isize).max(0) as usize).min(sh);
-        let xs = vx0.max(x_lo as isize) as usize..((vx0 + vw as isize).max(0) as usize).min(x_hi);
-        for y in ys {
-            let zy = (y as isize - vy0) as usize;
-            let dy = if y < oy {
-                oy - y
-            } else {
-                y.saturating_sub(oy + dh - 1)
-            };
+        // The picture before the zoom (the sides are read from it).
+        let before: Vec<u32> = out.to_vec();
+        let bilinear = |src: &[u32], w: usize, h: usize, x: f32, y: f32| -> u32 {
+            let x = x.clamp(0.0, (w - 1) as f32);
+            let y = y.clamp(0.0, (h - 1) as f32);
+            let (x0, y0) = (x as usize, y as usize);
+            let (x1, y1) = ((x0 + 1).min(w - 1), (y0 + 1).min(h - 1));
+            let (fx, fy) = (
+                ((x - x0 as f32) * 256.0) as u32,
+                ((y - y0 as f32) * 256.0) as u32,
+            );
+            let top = crate::upscale::lerp888(src[y0 * w + x0], src[y0 * w + x1], fx);
+            let bottom = crate::upscale::lerp888(src[y1 * w + x0], src[y1 * w + x1], fx);
+            crate::upscale::lerp888(top, bottom, fy)
+        };
+        for y in 0..sh {
+            let v = cy + (y as f32 + 0.5 - cy) / s - 0.5;
             let row = &mut out[y * stride..][..stride];
-            for x in xs.clone() {
-                let zx = (x as isize - vx0) as usize;
-                let v = sample_bilinear(&rgb, SCREEN_W, ax.lin[zx], ay.lin[zy]);
-                // The distance past the picture: 0 inside it.
-                let dx = if x < ox {
-                    ox - x
+            for (x, d) in row.iter_mut().enumerate().take(x_hi).skip(x_lo) {
+                let u = cx + (x as f32 + 0.5 - cx) / s - 0.5;
+                let inside = u >= ox as f32 - 0.5
+                    && u < (ox + dw) as f32 - 0.5
+                    && v >= oy as f32 - 0.5
+                    && v < (oy + dh) as f32 - 0.5;
+                *d = if inside {
+                    // The video's own pixels.
+                    let fx = (u + 0.5 - ox as f32) * SCREEN_W as f32 / dw as f32 - 0.5;
+                    let fy = (v + 0.5 - oy as f32) * SCREEN_H as f32 / dh as f32 - 0.5;
+                    bilinear(&rgb, SCREEN_W, SCREEN_H, fx, fy)
                 } else {
-                    x.saturating_sub(ox + dw - 1)
+                    // The sides, kept within the reach.
+                    let u = u.clamp(x_lo as f32, (x_hi - 1) as f32);
+                    bilinear(&before, stride, sh, u, v)
                 };
-                let d = dx.max(dy) as f32;
-                let k = (e + (1.0 - e) * (1.0 - d / over)).clamp(0.0, 1.0);
-                let w8 = (k * 256.0).round() as u32;
-                row[x] = if w8 >= 256 { v } else { lerp888(row[x], v, w8) };
             }
         }
     }
@@ -1404,6 +1412,8 @@ impl Engine {
         }
         drop(layer);
         self.sys.hd_mark();
+        // A move's video is over once a view is shown.
+        self.sys.hd_video.borrow_mut().active = false;
     }
 
     /// Widescreen, [`VideoSides::Panorama`]: before a move's video, the
@@ -1411,7 +1421,11 @@ impl Engine {
     /// destination's panorama (`to`: its CYCLO name and the destination
     /// angles; `None` when the move changes area, whose panorama is not
     /// known yet). Without a destination the sides fade to the blur.
-    pub(crate) async fn hd_video_panorama_start(&mut self, to: Option<(String, f32, f32)>) {
+    pub(crate) async fn hd_video_panorama_start(
+        &mut self,
+        from: Option<(f32, f32)>,
+        to: Option<(String, f32, f32)>,
+    ) {
         self.sys.hd_video.borrow_mut().active = false;
         let opts = self.sys.hd_options();
         let side_tiles = self.sys.hd_side_tiles();
@@ -1433,7 +1447,28 @@ impl Engine {
             return;
         }
         let side = side_tiles * tile;
-        let start = VideoPanorama::sides_of(&self.hd.view, vw, vh, side);
+        // The sides at the video's own first angles (`from`, the
+        // transition's): the turn before it stops a little short of them,
+        // and the video's first frame is the panorama seen from there.
+        let start = match from {
+            Some((alpha, beta)) => {
+                let mut w = self.warp.clone();
+                w.set_alpha(alpha);
+                w.set_beta(beta);
+                w.set_side_tiles(side_tiles);
+                let mut view = vec![0u32; vw * vh];
+                match opts.panorama {
+                    PanoFilter::Bilinear => {
+                        w.render_bilinear(self.hd.pano.pixels(), tile, &mut view)
+                    }
+                    PanoFilter::Bicubic => {
+                        w.render_bilinear_2x(self.hd.pano.pixels(), tile, &mut view)
+                    }
+                }
+                VideoPanorama::sides_of(&view, vw, vh, side)
+            }
+            None => VideoPanorama::sides_of(&self.hd.view, vw, vh, side),
+        };
         let mut end = Vec::new();
         if let Some((cyclo, alpha, beta)) = to {
             // As `load_cyclo`: a .tga name stands for the .hnm.
@@ -1744,23 +1779,14 @@ mod tests {
             t: 0.0,
         };
         // At both ends: the 4:3 picture beside the panorama, as the
-        // Panorama mode shows it, but for the blurred edges (at full
-        // brightness) taking the half of the bars next to the picture.
+        // Panorama mode shows it.
         for t in [0.0, 1.0] {
             p.t = t;
-            let z = video_compose(VideoSides::Zoom, Some(&p), true);
-            let pano = video_compose(VideoSides::Panorama, Some(&p), true);
-            for y in [0, 480, 959] {
-                let r = y * 1706;
-                assert_eq!(
-                    z[r + 213..r + 1493],
-                    pano[r + 213..r + 1493],
-                    "picture, t = {t}"
-                );
-                assert_eq!(z[r..r + 100], pano[r..r + 100], "far side, t = {t}");
-                // The frame's own edge (red), not darkened, next to it.
-                assert_eq!(z[r + 212], 0x00ff_0000, "blurred edge, t = {t}");
-            }
+            assert_eq!(
+                video_compose(VideoSides::Zoom, Some(&p), true),
+                video_compose(VideoSides::Panorama, Some(&p), true),
+                "t = {t}"
+            );
         }
         // In the middle: zoomed as without a panorama.
         p.t = 0.5;
@@ -1768,15 +1794,19 @@ mod tests {
             video_compose(VideoSides::Zoom, Some(&p), true),
             video_compose(VideoSides::Zoom, None, true)
         );
-        // On the way: the frame larger than the 4:3 picture, the sides
-        // part video, part panorama.
+        // On the way: the whole picture enlarged, the frame past its 4:3
+        // place (red at x = 150, left of the picture's x = 213) and the
+        // sides pushed out (green further left).
         p.t = 0.15;
         let z = video_compose(VideoSides::Zoom, Some(&p), true);
-        let px = z[480 * 1706 + 150];
+        let at = |x: usize| z[480 * 1706 + x];
         assert!(
-            px >> 16 > 0x20 && (px >> 8) & 0xff > 0x20,
-            "a blend: {px:06x}"
+            at(150) >> 16 > 0xc0 && (at(150) >> 8) & 0xff < 0x40,
+            "frame: {:06x}",
+            at(150)
         );
+        // (the place's panorama alone, which the frame continues)
+        assert_eq!(at(20), 0x0000_ff00, "side: {:06x}", at(20));
         assert!(zoom_share(0.15) > 0.0 && zoom_share(0.15) < 1.0);
         assert_eq!(zoom_share(0.3), 1.0);
         assert_eq!(zoom_share(0.0), 0.0);
