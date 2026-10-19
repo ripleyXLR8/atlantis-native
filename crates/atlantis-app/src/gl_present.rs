@@ -332,15 +332,20 @@ pub struct GlView {
     vao: web_sys::WebGlVertexArrayObject,
     pano: WebGlTexture,
     grid: WebGlTexture,
-    target: WebGlTexture,
+    /// Two pictures, drawn in turn: the frame shown may still be of the
+    /// view before the last drawn (the engine draws the next view before
+    /// showing it, e.g. while a move loads its destination).
+    targets: [WebGlTexture; 2],
     fbo: web_sys::WebGlFramebuffer,
     loc: [Option<WebGlUniformLocation>; 5],
     max_texture: usize,
     /// The panorama texture's size (None: to be sent whole).
     pano_size: Option<(usize, usize)>,
-    target_size: (usize, usize),
-    /// The drawing the frame buffer holds (`ViewJob::gen`).
-    drawn_gen: Option<u64>,
+    target_sizes: [(usize, usize); 2],
+    /// The drawing each picture holds (`ViewJob::gen`), and the picture
+    /// drawn next.
+    drawn_gens: [Option<u64>; 2],
+    next: usize,
 }
 
 impl GlView {
@@ -368,7 +373,7 @@ impl GlView {
         };
         let pano = integer_texture()?;
         let grid = integer_texture()?;
-        let target = integer_texture()?;
+        let targets = [integer_texture()?, integer_texture()?];
         let fbo = gl.create_framebuffer()?;
         let vao = gl.create_vertex_array()?;
         Some(GlView {
@@ -377,13 +382,14 @@ impl GlView {
             vao,
             pano,
             grid,
-            target,
+            targets,
             fbo,
             loc,
             max_texture,
             pano_size: None,
-            target_size: (0, 0),
-            drawn_gen: None,
+            target_sizes: [(0, 0); 2],
+            drawn_gens: [None; 2],
+            next: 0,
         })
     }
 
@@ -482,10 +488,18 @@ impl GlView {
             );
         // The frame buffer the view is drawn into.
         let (w, h) = (job.width, job.height);
+        let i = self.next;
         gl.bind_framebuffer(Gl::FRAMEBUFFER, Some(&self.fbo));
-        if self.target_size != (w, h) {
+        gl.framebuffer_texture_2d(
+            Gl::FRAMEBUFFER,
+            Gl::COLOR_ATTACHMENT0,
+            Gl::TEXTURE_2D,
+            Some(&self.targets[i]),
+            0,
+        );
+        if self.target_sizes[i] != (w, h) {
             gl.active_texture(Gl::TEXTURE2);
-            gl.bind_texture(Gl::TEXTURE_2D, Some(&self.target));
+            gl.bind_texture(Gl::TEXTURE_2D, Some(&self.targets[i]));
             let _ = gl.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
                 Gl::TEXTURE_2D,
                 0,
@@ -497,21 +511,14 @@ impl GlView {
                 Gl::UNSIGNED_BYTE,
                 None,
             );
-            gl.framebuffer_texture_2d(
-                Gl::FRAMEBUFFER,
-                Gl::COLOR_ATTACHMENT0,
-                Gl::TEXTURE_2D,
-                Some(&self.target),
-                0,
-            );
             // (checked once per size: the check waits for the card)
             if gl.check_framebuffer_status(Gl::FRAMEBUFFER) != Gl::FRAMEBUFFER_COMPLETE {
                 gl.bind_framebuffer(Gl::FRAMEBUFFER, None);
-                self.target_size = (0, 0);
+                self.target_sizes[i] = (0, 0);
                 self.pano_size = None;
                 return false;
             }
-            self.target_size = (w, h);
+            self.target_sizes[i] = (w, h);
         }
         gl.use_program(Some(&self.program));
         gl.bind_vertex_array(Some(&self.vao));
@@ -523,7 +530,8 @@ impl GlView {
         gl.uniform1i(l_rows.as_ref(), ph as i32);
         gl.viewport(0, 0, w as i32, h as i32);
         gl.draw_arrays(Gl::TRIANGLES, 0, 3);
-        self.drawn_gen = Some(job.gen);
+        self.drawn_gens[i] = Some(job.gen);
+        self.next = 1 - i;
         let mut read = Ok(());
         if let Some(out) = out {
             // Row 0 of the frame buffer is the view's first row.
@@ -544,7 +552,7 @@ impl GlView {
         gl.active_texture(Gl::TEXTURE0);
         if read.is_err() {
             self.pano_size = None;
-            self.drawn_gen = None;
+            self.drawn_gens[i] = None;
             return false;
         }
         true
@@ -553,7 +561,8 @@ impl GlView {
     /// The view of drawing `gen`, as a texture, when the frame buffer
     /// holds it.
     pub fn picture(&self, gen: u64) -> Option<&WebGlTexture> {
-        (self.drawn_gen == Some(gen)).then_some(&self.target)
+        let i = self.drawn_gens.iter().position(|&g| g == Some(gen))?;
+        Some(&self.targets[i])
     }
 }
 
