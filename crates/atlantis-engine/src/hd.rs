@@ -38,6 +38,16 @@ pub const MAX_TILE: usize = 64;
 /// 4:3 picture fitted in it), at most `max_tile`: the smallest tile whose
 /// HD size covers the picture, `None` when the picture is not larger than
 /// 640x480.
+/// Widescreen: at most this many tile columns of panorama on each side of
+/// the 4:3 picture (a 2.4:1 picture); a video's sides end there too.
+pub const MAX_SIDE_TILES: usize = 16;
+
+/// Widescreen: how far the sides reach from a picture `dw` pixels wide
+/// (its `MAX_SIDE_TILES` tile columns, a tile being `dw / 40` pixels).
+pub fn side_reach(dw: usize) -> usize {
+    dw * MAX_SIDE_TILES / (SCREEN_W / 16)
+}
+
 pub fn tile_for_output(width: usize, height: usize, max_tile: usize) -> Option<usize> {
     let pw = width.min(height * 4 / 3);
     let tile = pw.div_ceil(SCREEN_W / 16).min(max_tile.min(MAX_TILE));
@@ -610,12 +620,14 @@ impl HdCompositor {
             }
             None => (0.0, 1.0),
         };
-        let right_w = stride - ox - dw;
+        // (no further than the panorama's sides reach)
+        let reach_px = side_reach(dw);
+        let (left_w, right_w) = (ox.min(reach_px), (stride - ox - dw).min(reach_px));
         for y in 0..dh {
             let fy = (y as f32 + 0.5) * bh as f32 / dh as f32 - 0.5;
             let row = &mut out[(oy + y) * stride..][..stride];
             for side in 0..2 {
-                let bar = if side == 0 { ox } else { right_w };
+                let bar = if side == 0 { left_w } else { right_w };
                 for d in 0..bar {
                     // d: the distance from the picture's edge.
                     let x = if side == 0 { ox - 1 - d } else { ox + dw + d };
@@ -654,9 +666,10 @@ impl HdCompositor {
         }
     }
 
-    /// Widescreen, [`VideoSides::Zoom`]: the frame enlarged to the
-    /// window's width (bilinear), its top and bottom cut; the frame's text
-    /// is then drawn where the 4:3 picture has it.
+    /// Widescreen, [`VideoSides::Zoom`]: the frame enlarged to the width
+    /// the panorama's sides reach (the window's, up to a 2.4:1 picture;
+    /// bilinear), its top and bottom cut; the frame's text is then drawn
+    /// where the 4:3 picture has it.
     fn compose_zoom(
         &mut self,
         f: HdFrame<'_>,
@@ -668,15 +681,18 @@ impl HdCompositor {
         let lut = rgb565_to_888();
         let rgb: Vec<u32> = self.frame.iter().map(|&p| lut[usize::from(p)]).collect();
         let sh = out.len() / stride;
-        // The 4:3 picture at the window's width.
-        let zh = stride * SCREEN_H / SCREEN_W;
-        let ax = Axis::new(SCREEN_W, stride);
+        // The 4:3 picture at the width the sides reach.
+        let reach_px = side_reach(dw);
+        let x0 = ox - ox.min(reach_px);
+        let zw = dw + ox.min(reach_px) + (stride - ox - dw).min(reach_px);
+        let zh = zw * SCREEN_H / SCREEN_W;
+        let ax = Axis::new(SCREEN_W, zw);
         let ay = Axis::new(SCREEN_H, zh);
         let top = zh.saturating_sub(sh) / 2;
         let pad = sh.saturating_sub(zh) / 2;
         for y in 0..sh.min(zh) {
             let zy = top + y;
-            let row = &mut out[(pad + y) * stride..][..stride];
+            let row = &mut out[(pad + y) * stride + x0..][..zw];
             for (x, d) in row.iter_mut().enumerate() {
                 *d = sample_bilinear(&rgb, SCREEN_W, ax.lin[x], ay.lin[zy]);
             }
@@ -1401,6 +1417,49 @@ mod tests {
         // The halves meet at the window's middle.
         assert_eq!(z[480 * 1706 + 850] >> 16, 0xff);
         assert_eq!(z[480 * 1706 + 856] & 0xff, 0xff);
+    }
+
+    /// A video frame in a 32:9 window (5120x1440): 1920x1440 picture at
+    /// x = 1600, wider than the 2.4:1 the panorama's sides reach.
+    fn video_compose_ultrawide(v: VideoSides) -> Vec<u32> {
+        let screen: Vec<u16> = (0..SCREEN_W * SCREEN_H)
+            .map(|i| if i % SCREEN_W < 320 { 0xf800 } else { 0x001f })
+            .collect();
+        let f = HdFrame {
+            screen: &screen,
+            layer: None,
+            texts: &[],
+            photo: true,
+            video_pano: None,
+        };
+        let mut out = vec![0u32; 5120 * 1440];
+        HdCompositor::new().compose(f, video_opts(v), &mut out, 5120, 1600, 0, 1920, 1440);
+        out
+    }
+
+    #[test]
+    fn video_sides_end_where_the_panorama_does() {
+        // The sides reach 16 tiles of 48 pixels: 768 pixels each side,
+        // columns 832..4288.
+        let (a, b) = (1600 - 768, 1600 + 1920 + 768);
+        for v in [VideoSides::Zoom, VideoSides::Blur] {
+            let o = video_compose_ultrawide(v);
+            for y in [0, 720, 1439] {
+                let row = &o[y * 5120..][..5120];
+                assert_eq!(row[a - 1], 0, "{v:?}: black left of the reach");
+                assert_eq!(row[b], 0, "{v:?}: black right of the reach");
+                assert!(row[..a].iter().chain(&row[b..]).all(|&p| p == 0));
+                assert_ne!(row[a], 0, "{v:?}: drawn at the reach's left edge");
+                assert_ne!(row[b - 1], 0, "{v:?}: drawn at the reach's right edge");
+            }
+        }
+        // Zoom: the 4:3 frame at 3456 wide, its halves meeting in the
+        // middle.
+        let z = video_compose_ultrawide(VideoSides::Zoom);
+        assert_eq!(z[720 * 5120 + a] >> 16, 0xff, "left edge red");
+        assert_eq!(z[720 * 5120 + b - 1] & 0xff, 0xff, "right edge blue");
+        assert_eq!(z[720 * 5120 + 2550] >> 16, 0xff);
+        assert_eq!(z[720 * 5120 + 2570] & 0xff, 0xff);
     }
 
     #[test]

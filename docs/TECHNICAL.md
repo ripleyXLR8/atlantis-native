@@ -157,6 +157,10 @@ The options (options menu, F10; `settings.ini`):
   its sprites; not known for a move into another area, which keeps the
   view left), with the blurred edges weighing 4t(1 - t) in the middle;
   the cinematics get the blurred edges.
+  In every mode the video's sides reach no further than the panorama's
+  (16 tile columns, `hd::MAX_SIDE_TILES`): in a window wider than 2.4:1
+  the zoomed frame is the 2.4:1 width and the rest stays black, so a
+  video keeps the frame of the views around it.
 
 The HD size is a multiple of the original's 40x30 grid of 16x16 tiles:
 tiles of the window's picture width / 40 pixels, rounded up, at most 64 (4

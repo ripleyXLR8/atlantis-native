@@ -100,9 +100,6 @@ impl Drop for WatchdogLeave {
 /// (one thread renders it there).
 #[cfg(not(target_arch = "wasm32"))]
 const HD_MAX_TILE: usize = hd::MAX_TILE;
-/// Widescreen: at most this many tile columns on each side (a 2.4:1
-/// window).
-const HD_MAX_SIDE_TILES: usize = 16;
 #[cfg(target_arch = "wasm32")]
 /// In the browser the HD layer is drawn on one core: tiles of 24 (an HD
 /// view of 960x720) cost 4.5 ms a frame against 8.1 ms at 32 (measured in
@@ -739,7 +736,7 @@ impl App {
         // bars on each side (a tile is dw / 40 output pixels wide).
         let side = match tile {
             Some(_) if self.sys.hd_options().widescreen && dw > 0 => {
-                (ox * 40).div_ceil(dw).min(HD_MAX_SIDE_TILES)
+                (ox * 40).div_ceil(dw).min(hd::MAX_SIDE_TILES)
             }
             _ => 0,
         };
