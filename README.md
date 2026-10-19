@@ -73,8 +73,9 @@ contains none of them.</sub>
   xBR. With **Widescreen** on, the panorama fills the whole of a wide
   window, the projection carried on past the original's edges; beside
   the videos, black bars, the frame's edges blurred, the frame zoomed to
-  the width, or (for the moves) the panoramas of the places left and
-  reached (up to a 2.4:1 picture, black beyond on wider screens).
+  the width (easing in and out of a move), or (for the moves) the
+  panoramas of the places left and reached (up to a 2.4:1 picture, black
+  beyond on wider screens).
 - 🐞 **Bug fixes** (optional): seamless music loops, talking-head overlays
   drawn correctly, and other fixes of the original's bugs. One switch turns
   them all off for the game exactly as it shipped.

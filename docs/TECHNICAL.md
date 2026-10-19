@@ -157,6 +157,13 @@ The options (options menu, F10; `settings.ini`):
   its sprites; not known for a move into another area, which keeps the
   view left), with the blurred edges weighing 4t(1 - t) in the middle;
   the cinematics get the blurred edges.
+  A move's video in Zoom mode zooms in over the first 30% of the video
+  (eased) from the 4:3 picture beside the place's panorama, and back out
+  over the last 30% beside the destination's (the Panorama mode's sides);
+  past the picture the zoomed frame is blended with the sides, opaque at
+  the picture's edge, and the half of each side next to the picture shows
+  the frame's blurred edges at full brightness, which hide the seam the
+  panorama makes (the videos are not quite at the panoramas' scale).
   In every mode the video's sides reach no further than the panorama's
   (16 tile columns, `hd::MAX_SIDE_TILES`): in a window wider than 2.4:1
   the zoomed frame is the 2.4:1 width and the rest stays black, so a
