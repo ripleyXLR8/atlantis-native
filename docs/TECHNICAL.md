@@ -9,7 +9,7 @@
 | `atlantis-data` | BigFile archives, executable tables, game detection |
 | `atlantis-codecs` | HNM6 panoramas and videos, APC sound |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
-| `atlantis-app` | the window, input and audio (winit, softbuffer, cpal) |
+| `atlantis-app` | the window, input and audio (winit, softbuffer, cpal; WebGL 2 presents the frames in the browser) |
 
 The engine is one async task: where the original's loops present a frame
 and poll their events, the engine awaits the next frame, and the front end

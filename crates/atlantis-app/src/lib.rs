@@ -32,6 +32,8 @@ mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
 pub mod dock_icon;
+#[cfg(target_arch = "wasm32")]
+mod gl_present;
 pub mod guide;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod launcher;
@@ -107,6 +109,12 @@ const HD_MAX_SIDE_TILES: usize = 16;
 /// WebAssembly).
 const HD_MAX_TILE: usize = 24;
 
+/// In the browser with WebGL, the frames are drawn at most this many
+/// pixels (1280x960) whatever the canvas's size, and the graphics card
+/// enlarges them: the engine draws every pixel on one core there.
+#[cfg(target_arch = "wasm32")]
+const WEB_MAX_PIXELS: usize = 1280 * 960;
+
 /// Opens the project's Buy Me a Coffee page in the browser.
 pub fn open_support_page() {
     #[cfg(not(target_arch = "wasm32"))]
@@ -130,6 +138,15 @@ pub fn version_string() -> String {
 pub struct App {
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// The browser: WebGL presents the frames (the 2D canvas, `surface`,
+    /// without it), drawn first into `gl_frame` (an HD frame at most
+    /// `WEB_MAX_PIXELS`) or `gl_small` (the original's 640x480).
+    #[cfg(target_arch = "wasm32")]
+    gl: Option<gl_present::GlPresenter>,
+    #[cfg(target_arch = "wasm32")]
+    gl_frame: Vec<u32>,
+    #[cfg(target_arch = "wasm32")]
+    gl_small: Vec<u32>,
     sys: Rc<Sys>,
     runner: Option<Runner>,
     /// Shown without a game: a test pattern.
@@ -194,6 +211,12 @@ impl App {
         App {
             window: None,
             surface: None,
+            #[cfg(target_arch = "wasm32")]
+            gl: None,
+            #[cfg(target_arch = "wasm32")]
+            gl_frame: Vec::new(),
+            #[cfg(target_arch = "wasm32")]
+            gl_small: Vec::new(),
             sys,
             runner,
             pattern,
@@ -616,16 +639,53 @@ impl App {
     }
 
     fn redraw(&mut self) {
-        let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
+        let Some(window) = &self.window else {
             return;
         };
         let size = window.inner_size();
-        let (Some(sw), Some(sh)) = (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
+        let (Some(nw), Some(nh)) = (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
         else {
             return;
         };
-        surface.resize(sw, sh).unwrap();
-        let mut buf = surface.buffer_mut().unwrap();
+        // The size the frame is drawn at: the window's; in the browser with
+        // WebGL at most WEB_MAX_PIXELS of it, `k` times the window's.
+        #[cfg(target_arch = "wasm32")]
+        let (size, k) = if self.gl.is_some() {
+            let (ww, wh) = (size.width as f64, size.height as f64);
+            let k = (WEB_MAX_PIXELS as f64 / (ww * wh)).sqrt().min(1.0);
+            let s =
+                winit::dpi::PhysicalSize::new(((ww * k) as u32).max(1), ((wh * k) as u32).max(1));
+            (s, size.width as f64 / s.width as f64)
+        } else {
+            (size, 1.0)
+        };
+        #[cfg(target_arch = "wasm32")]
+        let window_size = (nw.get(), nh.get());
+        #[cfg(target_arch = "wasm32")]
+        let gl_on = self.gl.is_some();
+        #[cfg(not(target_arch = "wasm32"))]
+        let gl_on = false;
+        let mut soft_buf = None;
+        #[cfg(target_arch = "wasm32")]
+        let buf: &mut [u32] = if gl_on {
+            self.gl_frame
+                .resize(size.width as usize * size.height as usize, 0);
+            &mut self.gl_frame
+        } else {
+            let Some(surface) = &mut self.surface else {
+                return;
+            };
+            surface.resize(nw, nh).unwrap();
+            soft_buf.insert(surface.buffer_mut().unwrap())
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        let buf: &mut [u32] = {
+            let Some(surface) = &mut self.surface else {
+                return;
+            };
+            surface.resize(nw, nh).unwrap();
+            soft_buf.insert(surface.buffer_mut().unwrap())
+        };
         // The support screen or the game library's screen, drawn in
         // `launcher_frame`.
         #[cfg(not(target_arch = "wasm32"))]
@@ -647,6 +707,15 @@ impl App {
             oy: oy as f64,
             scale,
         };
+        // The pointer is in window pixels.
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.viewport = Viewport {
+                ox: ox as f64 * k,
+                oy: oy as f64 * k,
+                scale: scale * k,
+            };
+        }
         // The HD tile the engine draws its next frames at.
         let tile = match self.graphics {
             Graphics::Hd if !launcher => tile_for_output(sw, sh, HD_MAX_TILE),
@@ -685,7 +754,9 @@ impl App {
                 .draw_recording(&mut self.menu_frame, font, values, text);
             frame = &self.menu_frame;
         }
-        buf.fill(0);
+        if hd_mode || !gl_on {
+            buf.fill(0);
+        }
         if hd_mode {
             // HD: the layer, the interface art upscaled, the text sharp.
             let running = self.runner.is_some();
@@ -709,7 +780,39 @@ impl App {
             self.compositor
                 .compose(f, self.sys.hd_options(), &mut buf[..], sw, ox, oy, dw, dh);
             drop((layer, text, video));
-            buf.present().unwrap();
+            #[cfg(target_arch = "wasm32")]
+            if let Some(gl) = &mut self.gl {
+                // The whole frame enlarged to the canvas.
+                let (ww, wh) = window_size;
+                gl.present(
+                    window_size,
+                    &self.gl_frame,
+                    (sw as u32, sh as u32),
+                    (0, 0, ww as i32, wh as i32),
+                    true,
+                );
+            }
+            if let Some(b) = soft_buf {
+                b.present().unwrap();
+            }
+            return;
+        }
+        // WebGL: the original's 640x480 pixels go to the graphics card as
+        // they are and it scales them into the picture.
+        #[cfg(target_arch = "wasm32")]
+        if let Some(gl) = &mut self.gl {
+            let lut = hd::rgb565_to_888();
+            self.gl_small.clear();
+            self.gl_small
+                .extend(frame.iter().map(|&p| lut[usize::from(p)]));
+            let r = |v: usize| (v as f64 * k).round() as i32;
+            gl.present(
+                window_size,
+                &self.gl_small,
+                (W as u32, H as u32),
+                (r(ox), r(oy), r(ox + dw) - r(ox), r(oy + dh) - r(oy)),
+                false,
+            );
             return;
         }
         // RGB565 -> XRGB8888 table and source column per window column,
@@ -733,7 +836,9 @@ impl App {
                 *d = lut[usize::from(src_row[x])];
             }
         }
-        buf.present().unwrap();
+        if let Some(b) = soft_buf {
+            b.present().unwrap();
+        }
     }
 }
 
@@ -793,8 +898,29 @@ impl ApplicationHandler for App {
         if self.runner.is_some() {
             window.set_cursor_visible(false);
         }
-        let context = softbuffer::Context::new(window.clone()).unwrap();
-        self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
+        // The browser: WebGL when it has it (a canvas keeps the first kind
+        // of context it gives, so it is asked first).
+        #[cfg(target_arch = "wasm32")]
+        {
+            use winit::platform::web::WindowExtWebSys;
+            self.gl = window.canvas().and_then(gl_present::GlPresenter::new);
+            log::info!(
+                "presentation: {}",
+                if self.gl.is_some() {
+                    "WebGL 2"
+                } else {
+                    "2D canvas"
+                }
+            );
+        }
+        #[cfg(target_arch = "wasm32")]
+        let soft = self.gl.is_none();
+        #[cfg(not(target_arch = "wasm32"))]
+        let soft = true;
+        if soft {
+            let context = softbuffer::Context::new(window.clone()).unwrap();
+            self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
+        }
         #[cfg(target_os = "macos")]
         if let Some(icon) = &self.icon {
             dock_icon::set(icon);

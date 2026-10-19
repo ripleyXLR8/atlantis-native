@@ -47,33 +47,20 @@
     try {
       await start(e.target.files);
       document.getElementById("pick").style.display = "none";
-      // Full screen: the page fills the screen, but the canvas keeps at
-      // most CAP_W x CAP_H pixels (the game draws every pixel of it on
-      // one core each frame: 3.6 ms at 1280x960 against 5.4 ms at
-      // 1600x1200) and the browser scales it up to the screen.
-      // F11 and Alt+Enter in the game call atlantisToggleFullscreen too.
-      const CAP_W = 1280, CAP_H = 960;
+      // Full screen: the page's, the canvas filling the screen (the game
+      // draws at most 1280x960 pixels and WebGL enlarges them). F11 and
+      // Alt+Enter in the game call atlantisToggleFullscreen too.
       const full = document.getElementById("full");
       const layout = () => {
         const c = document.querySelector("canvas");
         if (!c) return;
-        if (document.fullscreenElement) {
-          const dpr = window.devicePixelRatio || 1;
-          const sw = window.innerWidth, sh = window.innerHeight;
-          const k = Math.min(1, CAP_W / (sw * dpr), CAP_H / (sh * dpr));
-          const cw = sw * k, ch = sh * k; // CSS pixels before the scaling
-          Object.assign(c.style, {
-            position: "fixed", left: "0", top: "0",
-            width: cw + "px", height: ch + "px", aspectRatio: "auto",
-            transformOrigin: "0 0", transform: `scale(${sw / cw})`,
-            imageRendering: "auto",
-          });
-        } else {
-          for (const p of ["position", "left", "top", "width", "height",
-                           "aspectRatio", "transformOrigin", "transform",
-                           "imageRendering"]) c.style[p] = "";
-        }
-        full.style.display = document.fullscreenElement ? "none" : "block";
+        const on = !!document.fullscreenElement;
+        Object.assign(c.style, on
+          ? { position: "fixed", left: "0", top: "0", width: "100vw",
+              height: "100vh", aspectRatio: "auto" }
+          : { position: "", left: "", top: "", width: "", height: "",
+              aspectRatio: "" });
+        full.style.display = on ? "none" : "block";
       };
       window.atlantisToggleFullscreen = () => {
         if (document.fullscreenElement) document.exitFullscreen();
