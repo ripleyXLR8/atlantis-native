@@ -1075,6 +1075,25 @@ fn low_res_map(n: usize, tile: usize) -> Vec<usize> {
     (0..n).map(|i| i * 16 / tile).collect()
 }
 
+/// Widescreen: the columns a dialog's character is moved by in the layer
+/// (`side` columns each side of the 4:3 picture). The original's
+/// characters often stand cut by the screen's edge; with the panorama past
+/// it the cut would show in the middle of a wide screen, so a character
+/// touching one edge of the picture (and not the other) is moved to the
+/// wide picture's edge.
+fn dialog_shift(is_char: &impl Fn(usize) -> bool, side: usize) -> isize {
+    if side == 0 {
+        return 0;
+    }
+    let touching =
+        |x: usize| (0..SCREEN_H).filter(|&y| is_char(y * SCREEN_W + x)).count() > SCREEN_H / 20;
+    match (touching(0), touching(SCREEN_W - 1)) {
+        (true, false) => -(side as isize),
+        (false, true) => side as isize,
+        _ => 0,
+    }
+}
+
 /// A dialog line's HD picture into `layer` (sized for `tile`): the HD view
 /// `view` where the 640x480 composite (`composite`: the UBB body and the
 /// head over the view) shows the panorama (`pano`, the 640x480 view), the
@@ -1084,7 +1103,8 @@ fn low_res_map(n: usize, tile: usize) -> Vec<usize> {
 /// head is kept to the original-size head's footprint (where `pre_head`,
 /// the composite before the head, differs from `composite`) and the
 /// pixels next to it: a sliver face that only the larger raster draws
-/// stays out.
+/// stays out. With widescreen the character may be moved to the wide
+/// picture's edge (see `dialog_shift`).
 #[allow(clippy::too_many_arguments)]
 pub fn compose_dialog(
     layer: &mut HdLayer,
@@ -1094,6 +1114,8 @@ pub fn compose_dialog(
     pano: &[u16],
     pre_head: &[u16],
     composite: &[u16],
+    over: &[u16],
+    body: &[u8],
     head: Option<(&[u16], &[u8])>,
     smooth: bool,
 ) {
@@ -1107,28 +1129,48 @@ pub fn compose_dialog(
     let (side, lw) = (layer.side, layer.width);
     let cols = low_res_map(w, tile);
     let footprint = head.map(|_| head_footprint(pre_head, composite));
+    // The character: whatever differs from the view, and the body video's
+    // pixels (some equal the view's), but for those the head's drawing put
+    // back to the view (it clears part of the video's face first).
+    let pre = (pre_head.len() == composite.len()).then_some(pre_head);
+    let is_char = |i: usize| {
+        if composite[i] != pano[i] {
+            return true;
+        }
+        let cleared = pre.is_some_and(|p| p[i] != composite[i]);
+        !cleared && body.get(i).is_some_and(|&b| b != 0)
+    };
+    let shift = dialog_shift(&is_char, side);
+    // `over`: the composite with the overlay drawn over the head (the
+    // SPF), or `composite` again.
+    let over = if over.len() == composite.len() {
+        over
+    } else {
+        composite
+    };
     // The body (a video) upscaled bilinearly with a smooth interface.
     let smooth = smooth.then(|| {
-        let rgb: Vec<u32> = composite.iter().map(|&p| lut[usize::from(p)]).collect();
+        let rgb: Vec<u32> = over.iter().map(|&p| lut[usize::from(p)]).collect();
         (rgb, Axis::new(SCREEN_W, w), Axis::new(SCREEN_H, h))
     });
     for (hy, sy) in low_res_map(h, tile).into_iter().enumerate() {
-        let p = &pano[sy * SCREEN_W..][..SCREEN_W];
         let c = &composite[sy * SCREEN_W..][..SCREEN_W];
-        let full = &view[hy * lw..][..lw];
         let line = &mut layer.pixels[hy * lw..][..lw];
-        line[..side].copy_from_slice(&full[..side]);
-        line[side + w..].copy_from_slice(&full[side + w..]);
-        let v = &full[side..side + w];
-        let out = &mut line[side..side + w];
-        for (x, (d, &sx)) in out.iter_mut().zip(&cols).enumerate() {
-            *d = if c[sx] == p[sx] {
-                v[x]
-            } else if let Some((rgb, ax, ay)) = &smooth {
-                sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
-            } else {
-                lut[usize::from(c[sx])]
-            };
+        // The view, then the character (the body and the head) over it,
+        // `shift` columns aside (see `dialog_shift`).
+        line.copy_from_slice(&view[hy * lw..][..lw]);
+        let at = |x: usize| (side + x).checked_add_signed(shift).filter(|&c| c < lw);
+        for (x, &sx) in cols.iter().enumerate() {
+            if !is_char(sy * SCREEN_W + sx) {
+                continue;
+            }
+            if let Some(d) = at(x) {
+                line[d] = if let Some((rgb, ax, ay)) = &smooth {
+                    sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
+                } else {
+                    lut[usize::from(c[sx])]
+                };
+            }
         }
         if let (Some((hp, hm)), Some(f)) = (head, &footprint) {
             let hp = &hp[hy * w..][..w];
@@ -1136,8 +1178,24 @@ pub fn compose_dialog(
             let f = &f[sy * SCREEN_W..][..SCREEN_W];
             for x in 0..w {
                 if hm[x] != 0 && f[cols[x]] != 0 {
-                    out[x] = lut[usize::from(hp[x])];
+                    if let Some(d) = at(x) {
+                        line[d] = lut[usize::from(hp[x])];
+                    }
                 }
+            }
+        }
+        // The overlay over the head, with the character.
+        let o = &over[sy * SCREEN_W..][..SCREEN_W];
+        for (x, &sx) in cols.iter().enumerate() {
+            if o[sx] == c[sx] {
+                continue;
+            }
+            if let Some(d) = at(x) {
+                line[d] = if let Some((rgb, ax, ay)) = &smooth {
+                    sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
+                } else {
+                    lut[usize::from(o[sx])]
+                };
             }
         }
     }
@@ -1949,6 +2007,70 @@ mod tests {
     }
 
     #[test]
+    fn widescreen_dialog_moves_an_edge_cut_character_to_the_edge() {
+        let (tile, side_tiles) = (16, 4);
+        let side = side_tiles * tile;
+        let (w, h) = (640 + 2 * side, 480);
+        let view = vec![0x0011_1111u32; w * h];
+        let pano = vec![0u16; SCREEN_W * SCREEN_H];
+        // A body in the 100 left columns, cut by the screen's edge.
+        let mut composite = pano.clone();
+        for y in 100..480 {
+            for x in 0..100 {
+                composite[y * SCREEN_W + x] = 0xf800;
+            }
+        }
+        let mut layer = HdLayer::default();
+        // The body's pixels, a black band among them equal to the view's
+        // (known by the body video's runs only).
+        let mut body = vec![0u8; SCREEN_W * SCREEN_H];
+        for y in 100..480 {
+            for x in 0..100 {
+                body[y * SCREEN_W + x] = 1;
+            }
+        }
+        for x in 0..100 {
+            composite[300 * SCREEN_W + x] = 0;
+        }
+        compose_dialog(
+            &mut layer, tile, side_tiles, &view, &pano, &composite, &composite, &composite, &body,
+            None, false,
+        );
+        let at = |x: usize, y: usize| layer.pixels[y * w + x];
+        // The band moves with the body (black, not the view).
+        assert_eq!(at(50, 300), 0);
+        assert_eq!(at(side + 50, 300), 0x0011_1111);
+        // Moved left by the side: its cut edge at the wide picture's edge,
+        // the view where it stood.
+        assert_eq!(at(0, 200), 0x00ff_0000);
+        assert_eq!(at(99, 200), 0x00ff_0000);
+        assert_eq!(at(100, 200), 0x0011_1111);
+        assert_eq!(at(side + 50, 200), 0x0011_1111);
+        // A character inside the picture stays where it is.
+        let mut composite = pano.clone();
+        for y in 100..480 {
+            for x in 200..300 {
+                composite[y * SCREEN_W + x] = 0xf800;
+            }
+        }
+        compose_dialog(
+            &mut layer,
+            tile,
+            side_tiles,
+            &view,
+            &pano,
+            &composite,
+            &composite,
+            &composite,
+            &[],
+            None,
+            false,
+        );
+        assert_eq!(layer.pixels[300 * w + side + 250], 0x00ff_0000);
+        assert_eq!(layer.pixels[300 * w + 250], 0x0011_1111);
+    }
+
+    #[test]
     fn dialog_layer_keeps_the_body_and_draws_the_head() {
         let tile = 32;
         let (w, h) = hd_size(tile);
@@ -1971,6 +2093,8 @@ mod tests {
             &pano,
             &pre,
             &post,
+            &post,
+            &[],
             Some((&head, &mask)),
             false,
         );

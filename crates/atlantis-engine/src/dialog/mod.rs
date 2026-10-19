@@ -27,7 +27,7 @@ use std::rc::Rc;
 
 use atlantis_codecs::UbbVideo;
 use atlantis_data::sprite::{composite_spf_frame, read_spr_file, read_tga15, spw_frame_count};
-use atlantis_data::sprite_blend::{blend_ubb_pixel565, compose_ubb_ia};
+use atlantis_data::sprite_blend::{blend_ubb_pixel565, compose_ubb_ia, ubb_ia_coverage};
 use atlantis_data::SprSprite;
 
 use crate::audio::VoiceId;
@@ -884,6 +884,12 @@ struct LineHd {
     /// before the head.
     pano: Vec<u16>,
     pre_head: Vec<u16>,
+    /// The composite before the SPF overlay (the HD layer draws the
+    /// overlay over the head, with the character).
+    pre_overlay: Vec<u16>,
+    /// The pixels the body video drew in this frame (its runs, see
+    /// `ubb_ia_coverage`): the character, which a wide picture may move.
+    body: Vec<u8>,
     valid: bool,
 }
 
@@ -943,7 +949,9 @@ impl LinePlayer {
             &e.hd.view,
             &self.hd.pano,
             &self.hd.pre_head,
+            &self.hd.pre_overlay,
             &self.composite,
+            &self.hd.body,
             drawn.then_some((&self.hd.head_pixels[..], &self.hd.head_mask[..])),
             e.sys.hd_options().smooth_interface,
         );
@@ -1011,6 +1019,9 @@ impl LinePlayer {
                         blend_ubb_pixel565,
                     );
                     decoded = true;
+                    if hd_tile.is_some() {
+                        self.hd.body = ubb_ia_coverage(f.ia, self.composite.len());
+                    }
                     if hd_tile.is_some() && self.head.is_some() && !self.hd.pano.is_empty() {
                         self.hd.pre_head.clone_from(&self.composite);
                     }
@@ -1054,8 +1065,12 @@ impl LinePlayer {
                 head.transform();
                 head.render(&mut self.composite, w);
             }
-            if let (Some(tile), true) = (hd_tile, full && self.hd.pano.len() == N) {
-                self.draw_hd(e, tile, frame_index as i32, ended_before, head_t);
+            // HD: the layer is made once the SPF overlay is drawn (it belongs
+            // to the character, which a wide picture may move), from the
+            // composite before it and after it.
+            let hd_now = hd_tile.filter(|_| full && self.hd.pano.len() == N);
+            if hd_now.is_some() {
+                self.hd.pre_overlay.clone_from(&self.composite);
             }
 
             // The SPF overlay: the original draws it into the locked
@@ -1070,6 +1085,9 @@ impl LinePlayer {
                     self.spf_frame
                 };
                 composite_spf_frame(spf, k, &mut self.composite, w, h);
+            }
+            if let Some(tile) = hd_now {
+                self.draw_hd(e, tile, frame_index as i32, ended_before, head_t);
             }
             // The given object (0x0049619c): its OBJETS1.SPR icon, drawn by
             // the talking-head loop only (0x0042f52d).

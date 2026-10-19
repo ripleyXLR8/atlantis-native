@@ -135,6 +135,37 @@ pub fn compose_ubb_ia(
     }
 }
 
+/// The pixels [`compose_ubb_ia`] draws with `opcodes` over a frame of `n`
+/// pixels: 1 where a run draws (opaque or blended), 0 where it skips.
+pub fn ubb_ia_coverage(opcodes: &[u8], n: usize) -> Vec<u8> {
+    let mut cover = vec![0u8; n];
+    let (mut op, mut pos) = (0usize, 0usize);
+    while op + 2 <= opcodes.len() && pos < n {
+        let run_hi = usize::from(opcodes[op + 1]);
+        let (run, next, draws) = match opcodes[op] {
+            0 if op + 4 <= opcodes.len() => {
+                let run =
+                    run_hi | usize::from(opcodes[op + 2]) << 8 | usize::from(opcodes[op + 3]) << 16;
+                if run == 0 {
+                    break;
+                }
+                (run, op + 4, false)
+            }
+            1 if op + 3 <= opcodes.len() => (run_hi, op + 3, true),
+            2 if op + 2 + run_hi <= opcodes.len() => (run_hi, op + 2 + run_hi, true),
+            _ => break,
+        };
+        if draws {
+            for c in cover.iter_mut().skip(pos).take(run) {
+                *c = 1;
+            }
+        }
+        pos += run;
+        op = next;
+    }
+    cover
+}
+
 /// The menu backdrop dim, FUN_004108e0 (called by FUN_0041cc28 before the
 /// in-game menu and the disc prompt): p - ((p & mask) >> 1), mask 0xf79e in
 /// 5-6-5 (key 0x235), 0xfbde in 5-5-5 (key 0x613). Red and blue become
@@ -161,6 +192,21 @@ mod tests {
     // FUN_0042b930 / FUN_00452ac8 tables applied by the original blitters
     // over every (factor 0..31, destination 0..65535) pair, for two source
     // colours (emulated digests).
+    #[test]
+    fn ubb_coverage_follows_the_runs() {
+        // skip 3, draw 2 opaque, skip 1, draw 2 blended
+        let ops = [0, 3, 0, 0, 1, 2, 0xff, 0, 1, 0, 0, 2, 2, 0x80, 0x40];
+        assert_eq!(
+            ubb_ia_coverage(&ops, 10),
+            vec![0, 0, 0, 1, 1, 0, 1, 1, 0, 0]
+        );
+        let pal = [0x1234u16; 256];
+        let mut dst = vec![0u16; 10];
+        compose_ubb_ia(&mut dst, &[0; 10], &pal, &ops, |c, _, _| c);
+        let drawn: Vec<u8> = dst.iter().map(|&p| u8::from(p != 0)).collect();
+        assert_eq!(drawn, ubb_ia_coverage(&ops, 10));
+    }
+
     #[test]
     fn spr_blend_exhaustive() {
         for (src, want) in [

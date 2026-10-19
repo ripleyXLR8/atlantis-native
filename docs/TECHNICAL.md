@@ -144,7 +144,12 @@ The options (options menu, F10; `settings.ini`):
   stay as they are. The sides show where the frame has an HD layer (the
   panoramic view, the dialog lines over it); the videos, menus and
   puzzles keep black bars. At most 16 tile columns per side (a 2.4:1
-  window).
+  window). A dialog's character cut by one edge of the 4:3 picture (the
+  original's often are) is moved to the wide picture's edge, with its 3D
+  head and its SPF overlay, so that the cut does not show in the middle
+  of the screen: its pixels are those the body video's runs draw
+  (`ubb_ia_coverage`; some equal the view's), the head's and the
+  overlay's, but not those the head's drawing puts back to the view.
 - Video sides (with Widescreen): what fills the bars beside a video's
   frame, which has no picture past its edges. Black (default); Blurred:
   the frame's outer quarter, mirrored at its edge, averaged in 20x20

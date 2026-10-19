@@ -424,7 +424,10 @@ fn move_video_panorama_sides() {
     }));
     // (the video's sides stay until the destination's view is shown, the
     // video's last frame being on screen while it loads)
-    assert!(!sys.hd_video.borrow().active, "ended with the arrival's view");
+    assert!(
+        !sys.hd_video.borrow().active,
+        "ended with the arrival's view"
+    );
     assert_eq!(bare, 0, "frames without a wide picture at the arrival");
     h.run(3);
     let layer = sys.hd.borrow();
