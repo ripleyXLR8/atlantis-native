@@ -102,7 +102,10 @@ const HD_MAX_TILE: usize = hd::MAX_TILE;
 /// window).
 const HD_MAX_SIDE_TILES: usize = 16;
 #[cfg(target_arch = "wasm32")]
-const HD_MAX_TILE: usize = 32;
+/// In the browser the HD layer is drawn on one core: tiles of 24 (an HD
+/// view of 960x720) cost 4.5 ms a frame against 8.1 ms at 32 (measured in
+/// WebAssembly).
+const HD_MAX_TILE: usize = 24;
 
 /// Opens the project's Buy Me a Coffee page in the browser.
 pub fn open_support_page() {

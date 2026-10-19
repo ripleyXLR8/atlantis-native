@@ -1,9 +1,2 @@
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"
-
-# The web build: WebAssembly's 128-bit SIMD (every current browser has it:
-# Chrome/Edge 91, Firefox 89, Safari 16.4) lets the pixel loops (the HD
-# view, the composition, the upscalers) be vectorised. Integer and
-# float operations keep their exact IEEE results: no fast-math.
-[target.wasm32-unknown-unknown]
-rustflags = ["-C", "target-feature=+simd128"]

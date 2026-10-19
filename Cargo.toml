@@ -12,6 +12,3 @@ repository = "https://github.com/ripleyXLR8/atlantis-native"
 # Bit-exact results against the original need IEEE arithmetic as written;
 # Rust never contracts to FMA or reorders floating point, at any level.
 opt-level = 3
-# Whole-program optimisation: the engine's hot loops cross crates.
-lto = "fat"
-codegen-units = 1
