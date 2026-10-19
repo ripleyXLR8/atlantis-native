@@ -4,49 +4,210 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlantis Native</title>
+<meta name="description" content="Play Atlantis: The Lost Tales (Cryo, 1997) in your browser with your own copy of the game.">
+<link rel="icon" href="favicon.png">
 <style>
-  :root { color-scheme: dark; }
-  body { margin: 0; background: #000; color: #ddd; font: 15px system-ui, sans-serif;
-         display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-  #pick { margin: 16px; max-width: 640px; line-height: 1.5; }
+  :root {
+    color-scheme: dark;
+    --night: #040a1c;
+    --deep: #0a1838;
+    --sea: #0d3a5c;
+    --gold: #e0b45a;
+    --gold-light: #fbe3a0;
+    --gold-dark: #8a5a1c;
+    --text: #d8dce8;
+    --muted: #8f9bb8;
+    --serif: "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh; color: var(--text); background: #000;
+    font: 16px/1.6 var(--serif);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  /* The landing page: night over Atlantis (CSS only, none of the game's
+     pictures). */
+  body.landing {
+    background:
+      radial-gradient(ellipse at 50% 112%, rgba(30, 120, 160, .55), transparent 60%),
+      linear-gradient(180deg, var(--night) 0%, var(--deep) 55%, var(--sea) 100%);
+    background-attachment: fixed;
+  }
+  body.landing::before {
+    /* the stars */
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .75;
+    background-image:
+      radial-gradient(1px 1px at 12% 18%, #fff, transparent),
+      radial-gradient(1px 1px at 28% 8%, #cde, transparent),
+      radial-gradient(1.5px 1.5px at 41% 22%, #fff, transparent),
+      radial-gradient(1px 1px at 55% 11%, #fff, transparent),
+      radial-gradient(1px 1px at 63% 31%, #bcd, transparent),
+      radial-gradient(1.5px 1.5px at 88% 36%, #fff, transparent),
+      radial-gradient(1px 1px at 7% 42%, #dde, transparent),
+      radial-gradient(1px 1px at 93% 9%, #fff, transparent),
+      radial-gradient(1px 1px at 35% 38%, #9ab, transparent),
+      radial-gradient(1.5px 1.5px at 19% 30%, #fff, transparent),
+      radial-gradient(1px 1px at 71% 6%, #cde, transparent),
+      radial-gradient(1px 1px at 48% 44%, #fff, transparent);
+  }
+  body.landing::after {
+    /* the moon */
+    content: ""; position: fixed; top: 64px; right: 9%; width: 84px; height: 84px;
+    border-radius: 50%; pointer-events: none;
+    background:
+      radial-gradient(circle at 34% 38%, rgba(160, 170, 195, .55) 0 9px, transparent 10px),
+      radial-gradient(circle at 62% 64%, rgba(160, 170, 195, .45) 0 6px, transparent 7px),
+      radial-gradient(circle at 40% 35%, #fffdf2, #e3e7f2 60%, #c5cde0);
+    box-shadow: 0 0 30px 6px rgba(225, 235, 255, .35), 0 0 120px 40px rgba(150, 175, 255, .15);
+  }
+  main {
+    position: relative; width: min(680px, 100% - 32px);
+    margin: 48px 0 24px; text-align: center;
+  }
+  .emblem {
+    width: 128px; height: 128px; border-radius: 50%;
+    border: 3px solid var(--gold);
+    box-shadow: 0 0 0 6px rgba(224, 180, 90, .18), 0 0 40px rgba(180, 200, 255, .35);
+  }
+  h1 {
+    margin: 18px 0 0; font-weight: normal; letter-spacing: .32em;
+    font-size: clamp(40px, 9vw, 72px); line-height: 1.1; padding-left: .32em;
+    background: linear-gradient(180deg, var(--gold-light) 10%, var(--gold) 50%, var(--gold-dark) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .8));
+  }
+  .tagline {
+    margin: 4px 0 0; color: var(--gold-light); letter-spacing: .25em;
+    text-transform: uppercase; font-size: 15px;
+  }
+  .ornament {
+    display: flex; align-items: center; gap: 12px; margin: 22px auto;
+    width: min(420px, 90%); color: var(--gold);
+  }
+  .ornament::before, .ornament::after {
+    content: ""; flex: 1; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold));
+  }
+  .ornament::after { background: linear-gradient(90deg, var(--gold), transparent); }
+  .panel {
+    position: relative; text-align: left; padding: 28px 32px;
+    background: linear-gradient(180deg, rgba(8, 20, 48, .88), rgba(4, 12, 30, .92));
+    border: 1px solid var(--gold-dark);
+    outline: 1px solid rgba(224, 180, 90, .35); outline-offset: 4px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .6);
+  }
+  .panel::before, .panel::after {
+    /* gold diamonds on the frame */
+    content: ""; position: absolute; left: 50%; width: 12px; height: 12px;
+    background: var(--gold); transform: translateX(-50%) rotate(45deg);
+    box-shadow: 0 0 8px rgba(224, 180, 90, .6);
+  }
+  .panel::before { top: -11px; }
+  .panel::after { bottom: -11px; }
+  .panel p { margin: 0 0 14px; }
+  .panel b { color: var(--gold-light); font-weight: normal; }
+  .panel ul { margin: 0 0 14px; padding-left: 22px; }
+  .panel li { margin: 6px 0; }
+  .panel li::marker { color: var(--gold); content: "◆  "; font-size: 11px; }
+  code { font: 14px ui-monospace, Consolas, monospace; color: var(--gold-light); }
+  a { color: #9fd0ff; }
+  .choose { text-align: center; margin: 26px 0 8px; }
+  .button {
+    display: inline-block; cursor: pointer; user-select: none;
+    padding: 12px 34px; font: 18px var(--serif); letter-spacing: .12em;
+    color: #1a1006; text-transform: uppercase;
+    background: linear-gradient(180deg, var(--gold-light), var(--gold) 55%, #b07a30);
+    border: 1px solid #fff2c8; border-radius: 3px;
+    box-shadow: 0 0 0 1px var(--gold-dark), 0 4px 18px rgba(224, 180, 90, .35);
+    transition: transform .12s, box-shadow .12s;
+  }
+  .button:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px var(--gold-dark), 0 6px 26px rgba(224, 180, 90, .55); }
+  .button:focus-within { outline: 2px solid #fff; outline-offset: 3px; }
+  #dir { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  #status { min-height: 1.6em; text-align: center; color: var(--muted); margin: 0; }
+  #err { color: #ff9a8a; white-space: pre-wrap; margin: 12px 0 0; }
+  .small { color: var(--muted); font-size: 14px; }
+  footer {
+    width: min(680px, 100% - 32px); text-align: center; margin: 8px 0 32px;
+    color: var(--muted); font-size: 13px; line-height: 1.7; position: relative;
+  }
+  footer a { color: var(--gold); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  body:not(.landing) main, body:not(.landing) footer { display: none; }
+  @media (max-width: 900px) {
+    body.landing::after { display: none; }
+  }
+  @media (max-width: 520px) {
+    main { margin-top: 28px; }
+    .panel { padding: 22px 18px; }
+    .emblem { width: 96px; height: 96px; }
+    .tagline { letter-spacing: .12em; font-size: 13px; }
+    .button { padding: 12px 18px; letter-spacing: .06em; font-size: 16px; }
+  }
+  /* The game. */
   canvas { width: min(100vw, calc((100vh - 16px) * 4 / 3)); aspect-ratio: 4 / 3;
            image-rendering: pixelated; outline: none; }
-  #err { color: #f88; white-space: pre-wrap; }
-  a { color: #8cf; }
-  #full { position: fixed; top: 8px; right: 8px; display: none; z-index: 10;
-          background: #222c; color: #ddd; border: 1px solid #666; border-radius: 4px;
-          padding: 4px 10px; font: 13px system-ui, sans-serif; cursor: pointer; opacity: .6; }
-  #full:hover { opacity: 1; }
   canvas:fullscreen { width: 100vw; height: 100vh; background: #000; }
+  #full { position: fixed; top: 8px; right: 8px; display: none; z-index: 10;
+          background: rgba(8, 20, 48, .8); color: var(--gold-light); border: 1px solid var(--gold-dark);
+          border-radius: 3px; padding: 4px 12px; font: 13px var(--serif); cursor: pointer; opacity: .6; }
+  #full:hover { opacity: 1; }
 </style>
 </head>
-<body>
+<body class="landing">
 <button id="full" title="Full screen (F11)">⛶ Full screen</button>
-<div id="pick">
-  <p><b>Atlantis Native</b> is a new engine for <i>Atlantis: The Lost Tales</i>.
-     It does not include the game itself: the pictures, videos, voices and
-     music belong to the game's publisher, so it plays them from
-     <b>your own copy</b> of the game.</p>
-  <p>Choose the folder of your game:</p>
-  <ul>
-    <li><b>GOG.com</b>: the folder where the game is installed.</li>
-    <li><b>CD</b>: a folder holding <code>atlantis.exe</code> and
-        <code>BIGCD1.BIG</code> to <code>BIGCD4.BIG</code>, copied from the
-        four discs (each disc holds one <code>BIGCD</code> file).</li>
-  </ul>
-  <p>The files stay on your computer: the browser only reads them. The
-     players and checkpoints are kept in this browser.
-     <a href="https://github.com/ripleyXLR8/atlantis-native/blob/main/docs/GUIDE.md#getting-the-game-files">How to get the game files</a></p>
-  <p><input type="file" id="dir" webkitdirectory></p>
-  <p id="err"></p>
-</div>
+<main id="pick">
+  <img class="emblem" src="emblem.png" alt="">
+  <h1>ATLANTIS</h1>
+  <p class="tagline">The Lost Tales · in your browser</p>
+  <div class="ornament">◆</div>
+  <div class="panel">
+    <p>Seth, the queen's new guard, arrives in Atlantis just as Queen Rhea
+       disappears. <b>Atlantis Native</b> is a new engine for Cryo's 1997
+       adventure: the whole game, faithful to the original, playable here.</p>
+    <p>It does not include the game itself: its pictures, videos, voices and
+       music belong to its publisher, so it plays them from
+       <b>your own copy</b>. Choose the folder of your game:</p>
+    <ul>
+      <li><b>GOG.com</b>: the folder where the game is installed.</li>
+      <li><b>CD</b>: a folder holding <code>atlantis.exe</code> and
+          <code>BIGCD1.BIG</code> to <code>BIGCD4.BIG</code>, copied from the
+          four discs.</li>
+    </ul>
+    <div class="choose">
+      <label class="button">Choose your game folder
+        <input type="file" id="dir" webkitdirectory></label>
+    </div>
+    <p id="status"></p>
+    <p id="err"></p>
+    <p class="small">Your files stay on your computer: the browser only reads
+       them, and the players and saves are kept in this browser.
+       <a href="https://github.com/ripleyXLR8/atlantis-native/blob/main/docs/GUIDE.md#getting-the-game-files">How to get the game files</a>.
+       Best with a mouse and a keyboard; F10 opens the options, F11 the full screen.</p>
+  </div>
+</main>
+<footer>
+  <a href="https://github.com/ripleyXLR8/atlantis-native">Atlantis Native on GitHub</a> ·
+  <a href="https://github.com/ripleyXLR8/atlantis-native/releases/latest">Windows, macOS and Linux versions</a> ·
+  <a href="https://github.com/ripleyXLR8/atlantis-native/blob/main/docs/GUIDE.md">Player's guide</a> ·
+  <a href="https://buymeacoffee.com/ripleyxlr8">Buy me a coffee</a><br>
+  Free software under the GPL. <i>Atlantis: The Lost Tales</i> © Microids
+  (Cryo Interactive Entertainment); this project is not affiliated with them.
+</footer>
 <script type="module">
   import init, { start } from "./pkg/atlantis_app.js";
+  const status = document.getElementById("status");
+  status.textContent = "Loading the engine…";
   await init();
+  status.textContent = "";
   document.getElementById("dir").addEventListener("change", async (e) => {
+    const box = document.getElementById("err");
+    box.textContent = "";
+    status.textContent = "Opening the game…";
     try {
       await start(e.target.files);
-      document.getElementById("pick").style.display = "none";
+      document.body.classList.remove("landing");
       // Full screen: the page's, the canvas filling the screen (the game
       // draws at most 1280x960 pixels and WebGL enlarges them). F11 and
       // Alt+Enter in the game call atlantisToggleFullscreen too.
@@ -71,7 +232,7 @@
       document.addEventListener("fullscreenchange", layout);
       window.addEventListener("resize", layout);
     } catch (err) {
-      const box = document.getElementById("err");
+      status.textContent = "";
       const [text, url] = String(err).split("\n\nREPORT:");
       box.textContent = text;
       if (url) {

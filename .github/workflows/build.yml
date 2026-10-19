@@ -182,7 +182,7 @@ jobs:
       - name: Package (the static site)
         run: |
           mkdir -p dist/atlantis-native-web
-          cp -r web/index.html web/pkg README.md LICENSE dist/atlantis-native-web/
+          cp -r web/index.html web/emblem.png web/favicon.png web/pkg README.md LICENSE dist/atlantis-native-web/
           (cd dist && zip -r ../atlantis-native-web.zip atlantis-native-web)
       - uses: actions/upload-artifact@v4
         with:
