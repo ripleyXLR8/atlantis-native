@@ -351,6 +351,23 @@ pub struct PanoramaPrep {
     double: bool,
     prev: Vec<u16>,
     out: Vec<u32>,
+    /// Whether the changes are kept (for a copy of the prepared panorama
+    /// elsewhere, see [`PanoramaPrep::take_changes`]), and those not yet
+    /// taken.
+    pub track: bool,
+    changes: PanoChanges,
+}
+
+/// The prepared panorama's parts computed again since the last
+/// [`PanoramaPrep::take_changes`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum PanoChanges {
+    #[default]
+    None,
+    /// All of it (a new size, new options, a new panorama).
+    All,
+    /// These tiles (column, row) of [`PanoramaPrep::tile_size`] pixels.
+    Tiles(Vec<(usize, usize)>),
 }
 
 impl PanoramaPrep {
@@ -361,6 +378,26 @@ impl PanoramaPrep {
     /// The prepared panorama: `w` x `h`, or twice that when doubled.
     pub fn pixels(&self) -> &[u32] {
         &self.out
+    }
+
+    /// The prepared panorama's width and height.
+    pub fn size(&self) -> (usize, usize) {
+        let s = if self.double { 2 } else { 1 };
+        (s * self.w, s * self.h)
+    }
+
+    /// The side of a tile of [`PanoChanges::Tiles`], in prepared pixels.
+    pub fn tile_size(&self) -> usize {
+        if self.double {
+            2 * PT
+        } else {
+            PT
+        }
+    }
+
+    /// The changes since the last call (with `track` set).
+    pub fn take_changes(&mut self) -> PanoChanges {
+        std::mem::take(&mut self.changes)
     }
 
     /// Brings the prepared panorama up to date with `surface` (`w`
@@ -414,6 +451,24 @@ impl PanoramaPrep {
         let count = todo.iter().map(Vec::len).sum();
         if count == 0 {
             return 0;
+        }
+        if self.track {
+            if fresh {
+                self.changes = PanoChanges::All;
+            } else if let PanoChanges::None | PanoChanges::Tiles(_) = self.changes {
+                let mut list = match std::mem::take(&mut self.changes) {
+                    PanoChanges::Tiles(l) => l,
+                    _ => Vec::new(),
+                };
+                for (ty, txs) in todo.iter().enumerate() {
+                    list.extend(txs.iter().map(|&tx| (tx, ty)));
+                }
+                self.changes = if list.len() >= tw * th {
+                    PanoChanges::All
+                } else {
+                    PanoChanges::Tiles(list)
+                };
+            }
         }
         let s = if double { 2 } else { 1 };
         let ow = s * w;
@@ -974,6 +1029,13 @@ impl Axis {
 
 /// `a` to `b` at `w` / 256, per channel of XRGB8888.
 #[inline]
+/// [`lerp888`] with the top byte (an alpha) blended too: the same for
+/// XRGB pixels (top bytes 0).
+pub(crate) fn lerp8888(a: u32, b: u32, w: u32) -> u32 {
+    let top = (((a >> 24) * (256 - w) + (b >> 24) * w) >> 8) << 24;
+    lerp888(a, b, w) | top
+}
+
 pub(crate) fn lerp888(a: u32, b: u32, w: u32) -> u32 {
     let iw = 256 - w;
     let rb = (((a & 0xff_00ff) * iw + (b & 0xff_00ff) * w) >> 8) & 0xff_00ff;

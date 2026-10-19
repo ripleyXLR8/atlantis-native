@@ -457,6 +457,22 @@ impl Warp {
     /// # Panics
     ///
     /// If `tile` is 0 or `out` is smaller than [`hd_size`]`(tile)`.
+    /// The grid of panorama points [`Warp::render_tiles`] interpolates
+    /// (two leading values, then rows of `cols + 1` points of two values
+    /// each, 31 rows) and its number of tile columns: what a renderer
+    /// elsewhere (the browser's graphics card) needs to draw the same view.
+    /// The angles are wrapped as a render wraps them.
+    pub fn grid(&mut self) -> (&[i32], usize) {
+        let cols = SCREEN_W / 16 + 2 * self.side_tiles;
+        if self.side_tiles == 0 {
+            self.update_coords();
+            (&self.coords, cols)
+        } else {
+            self.update_wide();
+            (&self.wide, cols)
+        }
+    }
+
     pub fn render_tiles<T, F>(&mut self, tile: usize, out: &mut [T], sample: F)
     where
         T: Send,

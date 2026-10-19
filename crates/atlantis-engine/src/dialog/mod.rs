@@ -934,6 +934,7 @@ impl LinePlayer {
             hh.render_masked(&mut self.hd.head_pixels, w, &mut self.hd.head_mask);
             drawn = true;
         }
+        e.hd_view_on_cpu(tile);
         let mut layer = e.sys.hd.borrow_mut();
         crate::hd::compose_dialog(
             &mut layer,

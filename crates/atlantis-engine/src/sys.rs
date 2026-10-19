@@ -127,6 +127,11 @@ pub struct Sys {
     warp_request: Cell<Option<(i32, i32)>>,
     keys_held: RefCell<Vec<Key>>,
     timers: RefCell<Vec<Timer>>,
+    /// The front end's renderer of the HD view (the browser's graphics
+    /// card), used instead of the engine's own when set; with
+    /// `view_check`, the engine's is run too and the two compared.
+    pub view_renderer: RefCell<Option<Box<dyn crate::hd::ViewRenderer>>>,
+    pub view_check: Cell<bool>,
 }
 
 impl Sys {
@@ -160,6 +165,8 @@ impl Sys {
             warp_request: Cell::new(None),
             keys_held: RefCell::new(Vec::new()),
             timers: RefCell::new(Vec::new()),
+            view_renderer: RefCell::new(None),
+            view_check: Cell::new(false),
         })
     }
 

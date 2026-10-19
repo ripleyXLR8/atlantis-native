@@ -311,7 +311,9 @@ impl SubtitleFont {
                     return;
                 }
                 let d = &mut out[py as usize * stride + px as usize];
-                *d = crate::upscale::lerp888(*d, color, a.min(256));
+                // (the alpha too: a premultiplied overlay, see
+                // `HdFrame::on_card`)
+                *d = crate::upscale::lerp8888(*d, color, a.min(256));
             });
         }
     }

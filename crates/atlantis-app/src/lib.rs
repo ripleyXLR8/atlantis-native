@@ -145,6 +145,9 @@ pub struct App {
     gl: Option<gl_present::GlPresenter>,
     #[cfg(target_arch = "wasm32")]
     gl_frame: Vec<u32>,
+    /// The HD view drawn by the graphics card (shared with the engine).
+    #[cfg(target_arch = "wasm32")]
+    gl_view: Option<Rc<std::cell::RefCell<gl_present::GlView>>>,
     #[cfg(target_arch = "wasm32")]
     gl_small: Vec<u32>,
     sys: Rc<Sys>,
@@ -215,6 +218,8 @@ impl App {
             gl: None,
             #[cfg(target_arch = "wasm32")]
             gl_frame: Vec::new(),
+            #[cfg(target_arch = "wasm32")]
+            gl_view: None,
             #[cfg(target_arch = "wasm32")]
             gl_small: Vec::new(),
             sys,
@@ -785,19 +790,49 @@ impl App {
                 photo: running && self.sys.photo_shown(),
                 video_pano: Some(&*video).filter(|v| running && v.active),
             };
+            // The view on the graphics card: its drawing and its rectangle
+            // (the picture's, with the widescreen sides).
+            let card = (f.layer.is_some_and(|l| l.on_card)).then(|| {
+                let cw = layer.width - 2 * layer.side;
+                let sd = if layer.side > 0 {
+                    layer.side * dw / cw
+                } else {
+                    0
+                };
+                (layer.card_gen, ox as i64 - sd as i64, dw + 2 * sd)
+            });
             self.compositor
                 .compose(f, self.sys.hd_options(), &mut buf[..], sw, ox, oy, dw, dh);
             drop((layer, text, video));
+            #[cfg(not(target_arch = "wasm32"))]
+            let _ = card;
             #[cfg(target_arch = "wasm32")]
             if let Some(gl) = &mut self.gl {
-                // The whole frame enlarged to the canvas.
+                // The whole frame enlarged to the canvas, over the card's
+                // view.
                 let (ww, wh) = window_size;
+                let view = self.gl_view.as_ref().map(|v| v.borrow());
+                let under = card.and_then(|(gen, x, w)| {
+                    let r = |v: f64| (v * k).round() as i32;
+                    let rect = (
+                        r(x as f64),
+                        r(oy as f64),
+                        r((x + w as i64) as f64) - r(x as f64),
+                        r((oy + dh) as f64) - r(oy as f64),
+                    );
+                    let t = view.as_ref().and_then(|v| v.picture(gen));
+                    if t.is_none() {
+                        log::warn!("HD view {gen} not on the graphics card");
+                    }
+                    t.map(|t| (t, rect))
+                });
                 gl.present(
                     window_size,
                     &self.gl_frame,
                     (sw as u32, sh as u32),
                     (0, 0, ww as i32, wh as i32),
                     true,
+                    under,
                 );
             }
             if let Some(b) = soft_buf {
@@ -820,6 +855,7 @@ impl App {
                 (W as u32, H as u32),
                 (r(ox), r(oy), r(ox + dw) - r(ox), r(oy + dh) - r(oy)),
                 false,
+                None,
             );
             return;
         }
@@ -920,6 +956,30 @@ impl ApplicationHandler for App {
                     "2D canvas"
                 }
             );
+            // The HD view on the graphics card too; `atlantis-native/gpu-view`
+            // in the page's storage: "off" keeps it on the processor,
+            // "check" compares the two.
+            let setting = web_sys::window()
+                .and_then(|w| w.local_storage().ok().flatten())
+                .and_then(|s| s.get_item("atlantis-native/gpu-view").ok().flatten())
+                .unwrap_or_default();
+            if setting != "off" {
+                if let Some(v) = self
+                    .gl
+                    .as_ref()
+                    .and_then(|p| gl_present::GlView::new(p.context()))
+                {
+                    let v = Rc::new(std::cell::RefCell::new(v));
+                    *self.sys.view_renderer.borrow_mut() =
+                        Some(Box::new(gl_present::SharedView(v.clone())));
+                    self.gl_view = Some(v);
+                    self.sys.view_check.set(setting == "check");
+                    log::info!(
+                        "HD view: graphics card{}",
+                        if setting == "check" { " (checked)" } else { "" }
+                    );
+                }
+            }
         }
         #[cfg(target_arch = "wasm32")]
         let soft = self.gl.is_none();

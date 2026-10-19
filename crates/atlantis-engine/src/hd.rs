@@ -318,10 +318,11 @@ impl HdCompositor {
         stride: usize,
         area: (usize, usize, usize, usize),
         lut: &[u32],
+        opaque: u32,
     ) {
         for t in f.texts {
             for it in &t.items {
-                let color = lut[usize::from(it.color)];
+                let color = opaque | lut[usize::from(it.color)];
                 if let Some(b) = &it.bitmap {
                     b.draw_hd(out, stride, area, &it.text, it.x, it.y, color);
                     continue;
@@ -452,6 +453,11 @@ impl HdCompositor {
             });
         }
         let axes = self.axes.as_ref().expect("axes");
+        // The view on the graphics card (`HdLayer::on_card`): its pixels
+        // are left transparent (0) and the rest is opaque (alpha 0xff), a
+        // premultiplied overlay the front end draws over its view.
+        let holes = layer_on_card(f.layer);
+        let opaque = if holes { 0xff00_0000 } else { 0 };
         let up = self.scaler.pixels();
         let rgb = &self.rgb;
         let layer = f.layer;
@@ -473,7 +479,7 @@ impl HdCompositor {
                         } else {
                             ox + dw + i - lft
                         };
-                        row[x] = hd[c];
+                        row[x] = if holes { 0 } else { hd[c] };
                     }
                 }
                 let row = &mut row[ox..ox + dw];
@@ -484,16 +490,17 @@ impl HdCompositor {
                     let p = src[sx];
                     if let (Some(b), Some(hd)) = (base, hd) {
                         if p == b[sx] {
-                            *d = hd[axes.lx[x]];
+                            *d = if holes { 0 } else { hd[axes.lx[x]] };
                             continue;
                         }
                     }
-                    *d = match ui {
-                        Ui::Nearest => lut[usize::from(p)],
-                        Ui::Bilinear => sample_bilinear(rgb, w, axes.x.lin[x], axes.y.lin[y]),
-                        Ui::Xbr if exact => up[y * uw + x],
-                        Ui::Xbr => sample_bilinear(up, uw, axes.ux.lin[x], axes.uy.lin[y]),
-                    };
+                    *d = opaque
+                        | match ui {
+                            Ui::Nearest => lut[usize::from(p)],
+                            Ui::Bilinear => sample_bilinear(rgb, w, axes.x.lin[x], axes.y.lin[y]),
+                            Ui::Xbr if exact => up[y * uw + x],
+                            Ui::Xbr => sample_bilinear(up, uw, axes.ux.lin[x], axes.uy.lin[y]),
+                        };
                 }
             }
         });
@@ -501,9 +508,14 @@ impl HdCompositor {
             self.fill_video_bars(v, f.video_pano, out, stride, (ox, oy, dw, dh));
         }
         if opts.sharp_subtitles {
-            self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut);
+            self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut, opaque);
         }
     }
+}
+
+/// Whether `layer`'s view is on the graphics card (see [`HdLayer::on_card`]).
+fn layer_on_card(layer: Option<&HdLayer>) -> bool {
+    layer.is_some_and(|l| l.on_card)
 }
 
 impl HdCompositor {
@@ -669,7 +681,7 @@ impl HdCompositor {
                 *d = sample_bilinear(&rgb, SCREEN_W, ax.lin[x], ay.lin[zy]);
             }
         }
-        self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut);
+        self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut, 0);
     }
 }
 
@@ -688,6 +700,12 @@ pub struct HdLayer {
     pub pixels: Vec<u32>,
     /// RGB565 640x480: the picture `pixels` stands for.
     pub base: Vec<u16>,
+    /// The view is on the front end's renderer (the graphics card), as
+    /// its drawing `card_gen`: `pixels` are not drawn then, and the front
+    /// end composes the picture over its own copy (see
+    /// [`ViewRenderer`]).
+    pub on_card: bool,
+    pub card_gen: u64,
 }
 
 impl HdLayer {
@@ -790,6 +808,7 @@ pub fn compose_dialog(
 ) {
     use crate::upscale::{sample_bilinear, Axis};
     layer.resize(tile, side_tiles);
+    layer.on_card = false;
     let lut = rgb565_to_888();
     // The 4:3 picture; the view (and the layer) has `side` more columns
     // on each side (widescreen), which show the view.
@@ -865,6 +884,43 @@ struct ViewKey {
     sharpen: bool,
 }
 
+/// What a renderer of the HD view outside the engine needs: the view is
+/// that of [`Warp::render_bilinear_2x`] (`doubled`) or
+/// [`Warp::render_bilinear`] of `pano` with the grid of [`Warp::grid`],
+/// `width` x `height` pixels.
+///
+/// [`Warp::render_bilinear_2x`]: crate::warp::Warp::render_bilinear_2x
+/// [`Warp::render_bilinear`]: crate::warp::Warp::render_bilinear
+/// [`Warp::grid`]: crate::warp::Warp::grid
+pub struct ViewJob<'a> {
+    pub grid: &'a [i32],
+    pub cols: usize,
+    pub tile: usize,
+    pub width: usize,
+    pub height: usize,
+    pub doubled: bool,
+    /// The prepared panorama (XRGB8888), its size, and the side of the
+    /// tiles `changes` counts in.
+    pub pano: &'a [u32],
+    pub pano_size: (usize, usize),
+    pub pano_tile: usize,
+    /// The panorama's parts changed since the last job.
+    pub changes: crate::upscale::PanoChanges,
+    /// The drawing's number, which [`HdLayer::card_gen`] names.
+    pub gen: u64,
+}
+
+/// A renderer of the HD view outside the engine (see [`Sys::view_renderer`]).
+///
+/// [`Sys::view_renderer`]: crate::sys::Sys::view_renderer
+pub trait ViewRenderer {
+    /// Draws the view of `job`, kept for the front end's picture, and
+    /// into `out` (`width` x `height`) as well when given (read back,
+    /// which waits for the renderer); false when it cannot, the engine
+    /// then drawing it (the next job brings all of the panorama again).
+    fn render(&mut self, job: ViewJob<'_>, out: Option<&mut [u32]>) -> bool;
+}
+
 /// The engine's HD state.
 #[derive(Default)]
 pub(crate) struct HdState {
@@ -875,8 +931,11 @@ pub(crate) struct HdState {
     /// generation, sharpening and filter it is of.
     pano: crate::upscale::PanoramaPrep,
     pano_gen: Option<(u64, bool, PanoFilter)>,
-    /// The HD view and what it shows.
+    /// The HD view and what it shows; `view_on_cpu` false when only the
+    /// outside renderer drew it (`card_gen`, its drawing's number).
     pub(crate) view: Vec<u32>,
+    view_on_cpu: bool,
+    card_gen: u64,
     view_key: Option<ViewKey>,
     /// The view [`Sys::hd`](crate::sys::Sys::hd) holds (`None`: something
     /// else, or nothing).
@@ -908,6 +967,13 @@ impl Engine {
         }
         let t0 = web_time_now();
         let gen = (self.hd.surface_gen, opts.sharpen, opts.panorama);
+        let outside = self.sys.view_renderer.borrow().is_some();
+        if outside != self.hd.pano.track {
+            // A renderer appeared or went: it gets all of the panorama.
+            self.hd.pano_gen = None;
+            self.hd.pano = crate::upscale::PanoramaPrep::new();
+            self.hd.pano.track = outside;
+        }
         if self.hd.pano_gen != Some(gen) {
             // (again only in the tiles that changed)
             self.hd.pano.update(
@@ -921,14 +987,72 @@ impl Engine {
         self.warp.set_side_tiles(self.sys.hd_side_tiles());
         let (w, h) = self.warp.tiles_size(tile);
         self.hd.view.resize(w * h, 0);
-        match opts.panorama {
-            PanoFilter::Bilinear => {
-                self.warp
-                    .render_bilinear(self.hd.pano.pixels(), tile, &mut self.hd.view)
+        let doubled = opts.panorama == PanoFilter::Bicubic;
+        let mut drawn = false;
+        let check = self.sys.view_check.get();
+        if let Some(r) = self.sys.view_renderer.borrow_mut().as_mut() {
+            self.hd.card_gen = self.hd.card_gen.wrapping_add(1);
+            let changes = self.hd.pano.take_changes();
+            let (grid, cols) = self.warp.grid();
+            let job = ViewJob {
+                grid,
+                cols,
+                tile,
+                width: w,
+                height: h,
+                doubled,
+                pano: self.hd.pano.pixels(),
+                pano_size: self.hd.pano.size(),
+                pano_tile: self.hd.pano.tile_size(),
+                changes,
+                gen: self.hd.card_gen,
+            };
+            drawn = r.render(job, check.then_some(&mut self.hd.view[..]));
+            if !drawn {
+                // (the renderer is sent all of the panorama next time)
+                log::warn!("HD view: the outside renderer failed, drawn by the engine");
             }
-            PanoFilter::Bicubic => {
-                self.warp
-                    .render_bilinear_2x(self.hd.pano.pixels(), tile, &mut self.hd.view)
+        }
+        self.hd.view_on_cpu = !drawn || check;
+        if drawn && check {
+            let mut check = vec![0u32; w * h];
+            match opts.panorama {
+                PanoFilter::Bilinear => {
+                    self.warp
+                        .render_bilinear(self.hd.pano.pixels(), tile, &mut check)
+                }
+                PanoFilter::Bicubic => {
+                    self.warp
+                        .render_bilinear_2x(self.hd.pano.pixels(), tile, &mut check)
+                }
+            }
+            let diff = check
+                .iter()
+                .zip(&self.hd.view)
+                .filter(|(a, b)| a != b)
+                .count();
+            let first = check.iter().zip(&self.hd.view).position(|(a, b)| a != b);
+            log::info!(
+                "HD view check {w}x{h} tile {tile}: {diff} pixels differ{}",
+                first.map_or(String::new(), |i| format!(
+                    " (first at {},{}: engine {:06x}, outside {:06x})",
+                    i % w,
+                    i / w,
+                    check[i],
+                    self.hd.view[i]
+                ))
+            );
+        }
+        if !drawn {
+            match opts.panorama {
+                PanoFilter::Bilinear => {
+                    self.warp
+                        .render_bilinear(self.hd.pano.pixels(), tile, &mut self.hd.view)
+                }
+                PanoFilter::Bicubic => {
+                    self.warp
+                        .render_bilinear_2x(self.hd.pano.pixels(), tile, &mut self.hd.view)
+                }
             }
         }
         // The render above wrapped the angles as the 640x480 one does.
@@ -943,6 +1067,21 @@ impl Engine {
                 t0.elapsed().as_secs_f64() * 1e3
             );
         }
+    }
+
+    /// The HD view's pixels on the processor (after [`Engine::hd_render_view`],
+    /// for the uses other than the front end's picture), drawn now when
+    /// only the outside renderer drew it.
+    pub(crate) fn hd_view_on_cpu(&mut self, tile: usize) {
+        if self.hd.view_on_cpu {
+            return;
+        }
+        let pano = self.hd.pano.pixels();
+        match self.sys.hd_options().panorama {
+            PanoFilter::Bilinear => self.warp.render_bilinear(pano, tile, &mut self.hd.view),
+            PanoFilter::Bicubic => self.warp.render_bilinear_2x(pano, tile, &mut self.hd.view),
+        }
+        self.hd.view_on_cpu = true;
     }
 
     /// The frame being drawn shows the view as [`Warp::render`] has just
@@ -969,7 +1108,11 @@ impl Engine {
         if self.hd.layer_key != self.hd.view_key || layer.tile != tile || layer.side != side * tile
         {
             layer.resize(tile, side);
-            layer.pixels.copy_from_slice(&self.hd.view);
+            layer.on_card = !self.hd.view_on_cpu;
+            layer.card_gen = self.hd.card_gen;
+            if self.hd.view_on_cpu {
+                layer.pixels.copy_from_slice(&self.hd.view);
+            }
             self.hd.layer_key = self.hd.view_key;
         }
         match base {
@@ -999,6 +1142,7 @@ impl Engine {
             return;
         }
         self.hd_render_view(tile);
+        self.hd_view_on_cpu(tile);
         let (vw, vh) = self.warp.tiles_size(tile);
         if self.hd.view.len() != vw * vh {
             return;
