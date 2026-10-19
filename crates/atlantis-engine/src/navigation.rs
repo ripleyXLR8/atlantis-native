@@ -401,19 +401,24 @@ impl Engine {
 
             // The view: FUN_0041bfa0 steps 2..5. The stored angles first
             // take F5 / F6 (turn) and F8 / F7 (tilt) with the left button
-            // up (FUN_0041a298 at the end of the previous frame).
+            // up (FUN_0041a298 at the end of the previous frame); the port
+            // adds the arrow keys, which the original's view ignores, as
+            // the same keys: left F5, right F6, up F7, down F8 (a larger
+            // beta looks down).
             let (mut alpha, mut beta) = (self.warp.alpha(), self.warp.beta());
             if !self.sys.buttons().0 {
-                if self.sys.key_held(Key::F(5)) {
+                let held =
+                    |f: u8, arrow: Key| self.sys.key_held(Key::F(f)) || self.sys.key_held(arrow);
+                if held(5, Key::Left) {
                     alpha = (f64::from(alpha) + VIEW_KEY_STEP) as f32;
                 }
-                if self.sys.key_held(Key::F(6)) {
+                if held(6, Key::Right) {
                     alpha = (f64::from(alpha) - VIEW_KEY_STEP) as f32;
                 }
-                if self.sys.key_held(Key::F(8)) {
+                if held(8, Key::Down) {
                     beta = (f64::from(beta) + VIEW_KEY_STEP) as f32;
                 }
-                if self.sys.key_held(Key::F(7)) {
+                if held(7, Key::Up) {
                     beta = (f64::from(beta) - VIEW_KEY_STEP) as f32;
                 }
             }

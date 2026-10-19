@@ -173,14 +173,14 @@ From a terminal you can also pass the folder:
 
 | Action | Control |
 |---|---|
-| Look around | move the mouse (or F5 / F6 / F7 / F8) |
+| Look around | move the mouse, or the arrow keys (or F5 / F6 / F7 / F8) |
 | Go somewhere, talk, use | left click where the cursor animates |
 | Next dialog line | left click |
 | Skip a talking head's lines | Escape |
 | Inventory | right click (the bar's edges scroll it) |
 | In-game menu (load, options, quit) | Escape in the panoramic view |
 | **Port options** (graphics, HD, bug fixes, game library) | **F10**, at any time; the game pauses |
-| Full screen | F11 or Alt+Enter |
+| Full screen | F, F11 or Alt+Enter |
 | Diagnostic overlay | F9 |
 
 On the player screen, click the last row to type a new name, then Enter

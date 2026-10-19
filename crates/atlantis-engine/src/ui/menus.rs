@@ -106,6 +106,7 @@ pub fn ingame_menu_outcome(record: Option<usize>, load_exit: u8, quit_exit: u8) 
 
 impl Engine {
     pub(crate) fn poll_menu_input(&self) -> MenuInput {
+        self.sys.mark_menu_input();
         let mut mi = MenuInput::default();
         while let Some(ev) = self.sys.poll_event() {
             match ev {

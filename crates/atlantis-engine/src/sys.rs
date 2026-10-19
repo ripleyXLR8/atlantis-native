@@ -132,6 +132,9 @@ pub struct Sys {
     /// `view_check`, the engine's is run too and the two compared.
     pub view_renderer: RefCell<Option<Box<dyn crate::hd::ViewRenderer>>>,
     pub view_check: Cell<bool>,
+    /// When a game menu last read the keyboard (its text entry takes every
+    /// letter: the front end's letter keys stay off then).
+    menu_input_ms: Cell<Option<u64>>,
 }
 
 impl Sys {
@@ -167,6 +170,7 @@ impl Sys {
             timers: RefCell::new(Vec::new()),
             view_renderer: RefCell::new(None),
             view_check: Cell::new(false),
+            menu_input_ms: Cell::new(None),
         })
     }
 
@@ -202,6 +206,19 @@ impl Sys {
     }
 
     /// Whether a key is held down (the original reads F5..F8 that way).
+    /// A game menu reads the keyboard this frame (see [`Sys::in_menu`]).
+    pub fn mark_menu_input(&self) {
+        self.menu_input_ms.set(Some(self.now_ms.get()));
+    }
+
+    /// A game menu read the keyboard within the last quarter second: its
+    /// text entry may be taking the letters.
+    pub fn in_menu(&self) -> bool {
+        self.menu_input_ms
+            .get()
+            .is_some_and(|t| self.now_ms.get().saturating_sub(t) <= 250)
+    }
+
     pub fn key_held(&self, key: Key) -> bool {
         self.keys_held.borrow().contains(&key)
     }

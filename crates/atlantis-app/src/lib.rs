@@ -1260,7 +1260,12 @@ impl ApplicationHandler for App {
                 // F11 or Alt+Enter: full screen (the port's keys; in the
                 // browser the page takes every key, so F11 comes here).
                 let enter = matches!(event.logical_key, Key::Named(NamedKey::Enter));
-                if key == Some(EngineKey::F(11)) || (enter && self.alt) {
+                // F too, but not while a game menu may be taking letters.
+                let f = matches!(key, Some(EngineKey::Char('f' | 'F')))
+                    && !self.alt
+                    && !self.menu.is_open()
+                    && !self.sys.in_menu();
+                if key == Some(EngineKey::F(11)) || (enter && self.alt) || f {
                     if pressed && !event.repeat {
                         self.toggle_fullscreen();
                     }

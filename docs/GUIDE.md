@@ -155,8 +155,14 @@ whatever the counts say.
 
 ## Full screen
 
-F11 or Alt+Enter switches full screen on and off (desktop and browser);
-the web page also has a **Full screen** button at its top right.
+F, F11 or Alt+Enter switches full screen on and off (desktop and browser;
+F not while a game menu takes typing, such as a player's name); the web
+page also has a **Full screen** button at its top right.
+
+## Looking around with the keyboard
+
+In the panoramic view, the arrow keys turn (← →) and tilt (↑ ↓) the view,
+as the original's F5 / F6 and F7 / F8 do.
 
 ## Command line
 
