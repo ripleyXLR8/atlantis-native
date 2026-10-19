@@ -215,3 +215,41 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  # itch.io: each numbered release pushed with butler, once the page exists:
+  # the repository variable ITCH_GAME ("user/game") and the secret
+  # BUTLER_API_KEY (itch.io > Settings > API keys). Channels: the platform
+  # in their name tags the downloads; html5 is marked "playable in browser"
+  # on the itch.io edit page after its first push.
+  itch:
+    needs: [macos-arm64, windows-x64, linux-x64, web]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.ITCH_GAME != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Unpack the builds
+        run: |
+          mkdir -p itch/windows itch/linux itch/mac itch/web unpacked
+          unzip -q artifacts/atlantis-native-windows-x64/atlantis-native-windows-x64.zip -d itch/windows
+          tar -xzf artifacts/atlantis-native-linux-x64/atlantis-native-linux-x64.tar.gz -C itch/linux
+          cp artifacts/atlantis-native-macos-arm64/atlantis-native-macos-arm64.dmg itch/mac/
+          unzip -q artifacts/atlantis-native-web/atlantis-native-web.zip -d unpacked
+          cp -r unpacked/atlantis-native-web/. itch/web/
+          ls -R itch | head -40
+      - name: Install butler
+        run: |
+          curl -sSfL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler && chmod +x butler/butler
+          butler/butler -V
+      - name: Push to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_GAME: ${{ vars.ITCH_GAME }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          butler/butler push itch/windows "$ITCH_GAME:windows-x64" --userversion "$version"
+          butler/butler push itch/mac "$ITCH_GAME:macos-arm64" --userversion "$version"
+          butler/butler push itch/linux "$ITCH_GAME:linux-x64" --userversion "$version"
+          butler/butler push itch/web "$ITCH_GAME:html5" --userversion "$version"
