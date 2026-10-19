@@ -140,7 +140,7 @@
   canvas { position: relative; z-index: 1; margin: 16px;
            box-shadow: 0 0 0 1px rgba(227, 154, 58, .55), 0 0 0 4px rgba(4, 12, 34, .9),
                        0 0 0 5px rgba(227, 154, 58, .3), 0 12px 40px rgba(0, 0, 0, .65);
-           width: min(100vw - 32px, calc((100vh - 32px) * 4 / 3)); aspect-ratio: 4 / 3;
+           /* (the game sizes it: 4:3, or wider with widescreen) */
            image-rendering: pixelated; outline: none; }
   canvas:fullscreen { width: 100vw; height: 100vh; background: #000; }
   /* (full screen: the picture alone, no frame) */

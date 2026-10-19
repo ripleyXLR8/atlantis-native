@@ -654,7 +654,49 @@ impl App {
         }
     }
 
+    /// In the browser, outside full screen: the canvas as large as the
+    /// page allows (less the frame's margin), 4:3, or wider with the HD
+    /// mode's widescreen (up to the 2.4:1 its sides reach); the browser
+    /// then reports the new size as a resize.
+    #[cfg(target_arch = "wasm32")]
+    fn fit_canvas(&self) {
+        use winit::platform::web::WindowExtWebSys;
+        let (Some(w), Some(page)) = (&self.window, web_sys::window()) else {
+            return;
+        };
+        if page
+            .document()
+            .and_then(|d| d.fullscreen_element())
+            .is_some()
+        {
+            return;
+        }
+        let Some(canvas) = w.canvas() else { return };
+        let size =
+            |v: Result<wasm_bindgen::JsValue, _>| v.ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+        // (16 pixels of margin and the frame's 5 on each side)
+        let avail_w = (size(page.inner_width()) - 42.0).max(320.0);
+        let avail_h = (size(page.inner_height()) - 42.0).max(240.0);
+        let h = avail_h.min(avail_w * 3.0 / 4.0);
+        let wide = self.graphics == Graphics::Hd && self.sys.hd_options().widescreen;
+        let w = if wide {
+            avail_w.min(h * 2.4)
+        } else {
+            h * 4.0 / 3.0
+        };
+        let (w, h) = (format!("{}px", w.floor()), format!("{}px", h.floor()));
+        let style = canvas.style();
+        if style.get_property_value("width").ok().as_deref() != Some(w.as_str())
+            || style.get_property_value("height").ok().as_deref() != Some(h.as_str())
+        {
+            let _ = style.set_property("width", &w);
+            let _ = style.set_property("height", &h);
+        }
+    }
+
     fn redraw(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        self.fit_canvas();
         let Some(window) = &self.window else {
             return;
         };
