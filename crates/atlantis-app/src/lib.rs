@@ -648,13 +648,21 @@ impl App {
             return;
         };
         // The size the frame is drawn at: the window's; in the browser with
-        // WebGL at most WEB_MAX_PIXELS of it, `k` times the window's.
+        // WebGL at most WEB_MAX_PIXELS of it, `k` times the window's, and
+        // in HD a picture no taller than the HD view (its pixels are then
+        // copied, and the graphics card alone enlarges them).
         #[cfg(target_arch = "wasm32")]
         let (size, k) = if self.gl.is_some() {
             let (ww, wh) = (size.width as f64, size.height as f64);
-            let k = (WEB_MAX_PIXELS as f64 / (ww * wh)).sqrt().min(1.0);
-            let s =
-                winit::dpi::PhysicalSize::new(((ww * k) as u32).max(1), ((wh * k) as u32).max(1));
+            let mut k = (WEB_MAX_PIXELS as f64 / (ww * wh)).sqrt().min(1.0);
+            if self.graphics == Graphics::Hd {
+                let picture_h = wh.min(ww * H as f64 / W as f64);
+                k = k.min((HD_MAX_TILE * H / 16) as f64 / picture_h);
+            }
+            let s = winit::dpi::PhysicalSize::new(
+                ((ww * k).round() as u32).max(1),
+                ((wh * k).round() as u32).max(1),
+            );
             (s, size.width as f64 / s.width as f64)
         } else {
             (size, 1.0)
