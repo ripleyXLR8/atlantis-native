@@ -14,6 +14,8 @@ written in Rust, for Windows, macOS, Linux and your browser.
 ![Rust](https://img.shields.io/badge/made%20with-Rust-orange)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-ripleyxlr8-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/ripleyxlr8)
 
+**[▶ Play in your browser](https://ripleyxlr8.github.io/atlantis-native/)** (your own copy of the game needed)
+
 [Download](#download) · [Quick start](#quick-start) · [Features](#features) · [Controls](#controls) · [Player's guide](docs/GUIDE.md) · [Technical notes](docs/TECHNICAL.md)
 
 </div>
@@ -99,6 +101,11 @@ those of the latest commit:
 | macOS 11 and later, Apple Silicon | `atlantis-native-macos-arm64.dmg` |
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
+
+The web version of the latest commit is also online:
+**https://ripleyxlr8.github.io/atlantis-native/** (Chrome, Edge, Firefox
+or Safari). Pick your game folder there: its files are read inside your
+browser and never sent anywhere; the saves stay in that browser.
 
 > **Windows:** the program is not code-signed (a certificate costs money
 > each year), so Windows SmartScreen may warn that it "protected your PC"
@@ -211,7 +218,9 @@ from its own sources is signed; every release is approved by hand.
 
 Privacy: this program does not transfer any information to other
 networked systems. It only reads the game files you point it at and
-writes its saves, settings and log to your own user folder.
+writes its saves, settings and log to your own user folder (in the web
+version, to your browser's storage: the page is downloaded from GitHub
+Pages, the game files and saves never leave your computer).
 
 ## AI use
 
