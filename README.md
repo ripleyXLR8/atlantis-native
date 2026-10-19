@@ -180,6 +180,7 @@ From a terminal you can also pass the folder:
 | Inventory | right click (the bar's edges scroll it) |
 | In-game menu (load, options, quit) | Escape in the panoramic view |
 | **Port options** (graphics, HD, bug fixes, game library) | **F10**, at any time; the game pauses |
+| Full screen | F11 or Alt+Enter |
 | Diagnostic overlay | F9 |
 
 On the player screen, click the last row to type a new name, then Enter

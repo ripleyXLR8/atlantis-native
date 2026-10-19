@@ -143,6 +143,29 @@
            /* (the game sizes it: 4:3, or wider with widescreen) */
            image-rendering: pixelated; outline: none; }
   canvas:fullscreen { width: 100vw; height: 100vh; background: #000; }
+  /* The keys beside the frame while playing, when the game leaves them
+     room (it sets body.show-keys: fit_canvas in lib.rs). */
+  .keys { display: none; }
+  body.show-keys:not(.landing) .keys {
+    display: block; position: fixed; top: 50%; transform: translateY(-50%); z-index: 2;
+    width: 168px; color: var(--muted); font-size: 13px; line-height: 1.35;
+  }
+  :root:fullscreen .keys { display: none !important; }
+  .keys.left { left: 16px; text-align: right; }
+  .keys.right { right: 16px; text-align: left; }
+  .keys h2 {
+    margin: 0 0 12px; font-weight: normal; font-size: 13px;
+    border-bottom: 1px solid rgba(227, 154, 58, .45); padding-bottom: 6px;
+  }
+  .keys dl { margin: 0; }
+  .keys dt { margin: 12px 0 3px; }
+  .keys dd { margin: 0; color: var(--text); font-size: 12.5px; }
+  kbd {
+    display: inline-block; min-width: 1.6em; padding: 1px 6px; margin: 0 1px;
+    font: 12px var(--serif); color: #ffd28a; text-align: center;
+    background: rgba(4, 12, 34, .85); border: 1px solid rgba(227, 154, 58, .6);
+    border-radius: 3px; box-shadow: inset 0 -1px 0 rgba(227, 154, 58, .35);
+  }
   /* (full screen: the picture alone, no frame) */
   :root:fullscreen canvas, canvas:fullscreen { box-shadow: none; margin: 0; }
   #full { position: fixed; top: 8px; right: 8px; display: none; z-index: 10;
@@ -180,6 +203,22 @@
   </defs>
 </svg>
 <button id="full" title="Full screen (F11)">⛶ Full screen</button>
+<aside class="keys left">
+  <h2 class="gold">Explore</h2>
+  <dl>
+    <dt><kbd>Mouse</kbd> or <kbd>F5</kbd>–<kbd>F8</kbd></dt><dd>look around</dd>
+    <dt><kbd>Left click</kbd></dt><dd>go, talk, use (where the cursor animates); next line</dd>
+    <dt><kbd>Right click</kbd></dt><dd>inventory (its edges scroll it)</dd>
+  </dl>
+</aside>
+<aside class="keys right">
+  <h2 class="gold">Menus</h2>
+  <dl>
+    <dt><kbd>Esc</kbd></dt><dd>game menu (in the view: load, options, quit); skips a talking head's lines</dd>
+    <dt><kbd>F10</kbd></dt><dd>Atlantis Native's options (graphics, HD, widescreen, bug fixes)</dd>
+    <dt><kbd>F11</kbd> or <kbd>Alt</kbd>+<kbd>Enter</kbd></dt><dd>full screen</dd>
+  </dl>
+</aside>
 <main id="pick">
   <h1 class="logo">Atlantis</h1>
   <div class="tagline">

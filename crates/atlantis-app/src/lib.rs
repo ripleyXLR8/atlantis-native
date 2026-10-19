@@ -112,6 +112,13 @@ const HD_MAX_TILE: usize = 24;
 #[cfg(target_arch = "wasm32")]
 const WEB_MAX_PIXELS: usize = 1280 * 960;
 
+/// The web page shows the keys in columns beside a 4:3 game from this page
+/// width (CSS pixels), each this wide with its margins.
+#[cfg(target_arch = "wasm32")]
+const SIDE_KEYS_MIN_WIDTH: f64 = 1100.0;
+#[cfg(target_arch = "wasm32")]
+const SIDE_KEYS_WIDTH: f64 = 196.0;
+
 /// Opens the project's Buy Me a Coffee page in the browser.
 pub fn open_support_page() {
     #[cfg(not(target_arch = "wasm32"))]
@@ -675,10 +682,26 @@ impl App {
         let size =
             |v: Result<wasm_bindgen::JsValue, _>| v.ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
         // (16 pixels of margin and the frame's 5 on each side)
-        let avail_w = (size(page.inner_width()) - 42.0).max(320.0);
+        let page_w = size(page.inner_width());
         let avail_h = (size(page.inner_height()) - 42.0).max(240.0);
-        let h = avail_h.min(avail_w * 3.0 / 4.0);
         let wide = self.graphics == Graphics::Hd && self.sys.hd_options().widescreen;
+        // The columns of keys beside the frame (`.keys` in web/index.html):
+        // a 4:3 picture leaves them their room on a page wide enough; a
+        // wide one comes first, the keys showing only in the margins it
+        // leaves.
+        let (avail_w, keys) = if wide {
+            let avail_w = (page_w - 42.0).max(320.0);
+            let w = avail_w.min(avail_h.min(avail_w * 3.0 / 4.0) * 2.4);
+            (avail_w, (page_w - w) / 2.0 >= SIDE_KEYS_WIDTH)
+        } else if page_w >= SIDE_KEYS_MIN_WIDTH {
+            ((page_w - 42.0 - 2.0 * SIDE_KEYS_WIDTH).max(320.0), true)
+        } else {
+            ((page_w - 42.0).max(320.0), false)
+        };
+        if let Some(body) = page.document().and_then(|d| d.body()) {
+            let _ = body.class_list().toggle_with_force("show-keys", keys);
+        }
+        let h = avail_h.min(avail_w * 3.0 / 4.0);
         let w = if wide {
             avail_w.min(h * 2.4)
         } else {
