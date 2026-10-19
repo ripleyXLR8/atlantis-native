@@ -177,6 +177,12 @@ fn is_original_save(key: &str) -> bool {
 }
 
 /// Called by the page with the picked folder.
+/// The port's version and commit, for the page.
+#[wasm_bindgen]
+pub fn version() -> String {
+    crate::version_string()
+}
+
 #[wasm_bindgen]
 pub async fn start(files: FileList) -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
