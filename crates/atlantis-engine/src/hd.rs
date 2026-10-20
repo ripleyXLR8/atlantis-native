@@ -826,54 +826,58 @@ impl HdCompositor {
         // (no further than the panorama's sides reach)
         let reach_px = side_reach(dw);
         let (left_w, right_w) = (ox.min(reach_px), (stride - ox - dw).min(reach_px));
-        for y in 0..dh {
-            let fy = (y as f32 + 0.5) * bh as f32 / dh as f32 - 0.5;
-            let row = &mut out[(oy + y) * stride..][..stride];
-            for side in 0..2 {
-                let bar = if side == 0 { left_w } else { right_w };
-                for d in 0..bar {
-                    // d: the distance from the picture's edge.
-                    let x = if side == 0 { ox - 1 - d } else { ox + dw + d };
-                    let u = (d as f32 + 0.5) / bar as f32 * reach;
-                    let fx = if side == 0 {
-                        u - 0.5
-                    } else {
-                        bw as f32 - u - 0.5
-                    };
-                    let b = sample(fx, fy);
-                    // Darker away from the picture.
-                    let k = 0.62 - 0.22 * (d as f32 / bar as f32);
-                    let mut c = b.map(|v| v * k);
-                    if let Some(p) = pano {
-                        // The side picture's column at this distance: the
-                        // sides have the picture's scale, its 40 * tile
-                        // HD columns over `dw` output pixels.
-                        let col = d * 40 * p.tile / dw.max(1);
-                        if col < p.width {
-                            let hy = (y * p.height / dh).min(p.height - 1);
-                            let sx = if side == 0 { p.width - 1 - col } else { col };
-                            let at = |v: &[u32]| v[side * p.width * p.height + hy * p.width + sx];
-                            let s0 = unpack(at(&p.start));
-                            let s = if p.end.len() != p.start.len() {
-                                s0
-                            } else if zoom {
-                                if p.t < 0.5 {
+        let rows = &mut out[oy * stride..(oy + dh) * stride];
+        crate::upscale::for_each_band(rows, stride, |first, band| {
+            for (i, row) in band.chunks_mut(stride).enumerate() {
+                let y = first + i;
+                let fy = (y as f32 + 0.5) * bh as f32 / dh as f32 - 0.5;
+                for side in 0..2 {
+                    let bar = if side == 0 { left_w } else { right_w };
+                    for d in 0..bar {
+                        // d: the distance from the picture's edge.
+                        let x = if side == 0 { ox - 1 - d } else { ox + dw + d };
+                        let u = (d as f32 + 0.5) / bar as f32 * reach;
+                        let fx = if side == 0 {
+                            u - 0.5
+                        } else {
+                            bw as f32 - u - 0.5
+                        };
+                        let b = sample(fx, fy);
+                        // Darker away from the picture.
+                        let k = 0.62 - 0.22 * (d as f32 / bar as f32);
+                        let mut c = b.map(|v| v * k);
+                        if let Some(p) = pano {
+                            // The side picture's column at this distance: the
+                            // sides have the picture's scale, its 40 * tile
+                            // HD columns over `dw` output pixels.
+                            let col = d * 40 * p.tile / dw.max(1);
+                            if col < p.width {
+                                let hy = (y * p.height / dh).min(p.height - 1);
+                                let sx = if side == 0 { p.width - 1 - col } else { col };
+                                let at =
+                                    |v: &[u32]| v[side * p.width * p.height + hy * p.width + sx];
+                                let s0 = unpack(at(&p.start));
+                                let s = if p.end.len() != p.start.len() {
                                     s0
+                                } else if zoom {
+                                    if p.t < 0.5 {
+                                        s0
+                                    } else {
+                                        unpack(at(&p.end))
+                                    }
                                 } else {
-                                    unpack(at(&p.end))
-                                }
-                            } else {
-                                let e = unpack(at(&p.end));
-                                [0, 1, 2].map(|i| s0[i] * (1.0 - p.t) + e[i] * p.t)
-                            };
-                            let pano_w = 1.0 - blur_w;
-                            c = [0, 1, 2].map(|i| s[i] * pano_w + c[i] * blur_w);
+                                    let e = unpack(at(&p.end));
+                                    [0, 1, 2].map(|i| s0[i] * (1.0 - p.t) + e[i] * p.t)
+                                };
+                                let pano_w = 1.0 - blur_w;
+                                c = [0, 1, 2].map(|i| s[i] * pano_w + c[i] * blur_w);
+                            }
                         }
+                        row[x] = pack(c);
                     }
-                    row[x] = pack(c);
                 }
             }
-        }
+        });
     }
 
     /// Widescreen, [`VideoSides::Zoom`] during a move's video: the whole
@@ -905,40 +909,58 @@ impl HdCompositor {
         let rgb: Vec<u32> = self.frame.iter().map(|&p| lut[usize::from(p)]).collect();
         // The picture before the zoom (the sides are read from it).
         let before: Vec<u32> = out.to_vec();
-        let bilinear = |src: &[u32], w: usize, h: usize, x: f32, y: f32| -> u32 {
-            let x = x.clamp(0.0, (w - 1) as f32);
-            let y = y.clamp(0.0, (h - 1) as f32);
-            let (x0, y0) = (x as usize, y as usize);
-            let (x1, y1) = ((x0 + 1).min(w - 1), (y0 + 1).min(h - 1));
-            let (fx, fy) = (
-                ((x - x0 as f32) * 256.0) as u32,
-                ((y - y0 as f32) * 256.0) as u32,
-            );
-            let top = crate::upscale::lerp888(src[y0 * w + x0], src[y0 * w + x1], fx);
-            let bottom = crate::upscale::lerp888(src[y1 * w + x0], src[y1 * w + x1], fx);
-            crate::upscale::lerp888(top, bottom, fy)
-        };
-        for y in 0..sh {
-            let v = cy + (y as f32 + 0.5 - cy) / s - 0.5;
-            let row = &mut out[y * stride..][..stride];
-            for (x, d) in row.iter_mut().enumerate().take(x_hi).skip(x_lo) {
-                let u = cx + (x as f32 + 0.5 - cx) / s - 0.5;
-                let inside = u >= ox as f32 - 0.5
-                    && u < (ox + dw) as f32 - 0.5
-                    && v >= oy as f32 - 0.5
-                    && v < (oy + dh) as f32 - 0.5;
-                *d = if inside {
-                    // The video's own pixels.
-                    let fx = (u + 0.5 - ox as f32) * SCREEN_W as f32 / dw as f32 - 0.5;
-                    let fy = (v + 0.5 - oy as f32) * SCREEN_H as f32 / dh as f32 - 0.5;
-                    bilinear(&rgb, SCREEN_W, SCREEN_H, fx, fy)
-                } else {
-                    // The sides, kept within the reach.
-                    let u = u.clamp(x_lo as f32, (x_hi - 1) as f32);
-                    bilinear(&before, stride, sh, u, v)
-                };
-            }
+        // The bilinear sampling of `zoom_all`'s first version, per pixel
+        // (clamp, truncate, fraction in 256ths), is separable: each
+        // column and each row is computed once.
+        #[derive(Clone, Copy)]
+        struct Tap {
+            a: usize,
+            b: usize,
+            f: u32,
         }
+        let tap = |n: usize, x: f32| -> Tap {
+            let x = x.clamp(0.0, (n - 1) as f32);
+            let a = x as usize;
+            Tap {
+                a,
+                b: (a + 1).min(n - 1),
+                f: ((x - a as f32) * 256.0) as u32,
+            }
+        };
+        // Per column: within the frame, the frame's tap, the sides' tap.
+        let cols: Vec<(bool, Tap, Tap)> = (x_lo..x_hi)
+            .map(|x| {
+                let u = cx + (x as f32 + 0.5 - cx) / s - 0.5;
+                let inside = u >= ox as f32 - 0.5 && u < (ox + dw) as f32 - 0.5;
+                let fx = (u + 0.5 - ox as f32) * SCREEN_W as f32 / dw as f32 - 0.5;
+                let side = u.clamp(x_lo as f32, (x_hi - 1) as f32);
+                (inside, tap(SCREEN_W, fx), tap(stride, side))
+            })
+            .collect();
+        let lerp = crate::upscale::lerp888;
+        let sample = |src: &[u32], w: usize, cx: Tap, cy: Tap| -> u32 {
+            let top = lerp(src[cy.a * w + cx.a], src[cy.a * w + cx.b], cx.f);
+            let bottom = lerp(src[cy.b * w + cx.a], src[cy.b * w + cx.b], cx.f);
+            lerp(top, bottom, cy.f)
+        };
+        crate::upscale::for_each_band(&mut out[..sh * stride], stride, |first, band| {
+            for (i, row) in band.chunks_mut(stride).enumerate() {
+                let y = first + i;
+                let v = cy + (y as f32 + 0.5 - cy) / s - 0.5;
+                let inside_y = v >= oy as f32 - 0.5 && v < (oy + dh) as f32 - 0.5;
+                let fy = (v + 0.5 - oy as f32) * SCREEN_H as f32 / dh as f32 - 0.5;
+                let (ty, sy) = (tap(SCREEN_H, fy), tap(sh, v));
+                for (d, &(inside_x, tx, sx)) in row[x_lo..x_hi].iter_mut().zip(&cols) {
+                    *d = if inside_x && inside_y {
+                        // The video's own pixels.
+                        sample(&rgb, SCREEN_W, tx, ty)
+                    } else {
+                        // The sides, kept within the reach.
+                        sample(&before, stride, sx, sy)
+                    };
+                }
+            }
+        });
     }
 
     /// Widescreen, [`VideoSides::Zoom`]: the frame enlarged to the width
@@ -965,13 +987,15 @@ impl HdCompositor {
         let ay = Axis::new(SCREEN_H, zh);
         let top = zh.saturating_sub(sh) / 2;
         let pad = sh.saturating_sub(zh) / 2;
-        for y in 0..sh.min(zh) {
-            let zy = top + y;
-            let row = &mut out[(pad + y) * stride + x0..][..zw];
-            for (x, d) in row.iter_mut().enumerate() {
-                *d = sample_bilinear(&rgb, SCREEN_W, ax.lin[x], ay.lin[zy]);
+        let rows = &mut out[pad * stride..(pad + sh.min(zh)) * stride];
+        crate::upscale::for_each_band(rows, stride, |first, band| {
+            for (i, row) in band.chunks_mut(stride).enumerate() {
+                let zy = top + first + i;
+                for (x, d) in row[x0..x0 + zw].iter_mut().enumerate() {
+                    *d = sample_bilinear(&rgb, SCREEN_W, ax.lin[x], ay.lin[zy]);
+                }
             }
-        }
+        });
         self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut, 0);
     }
 }
@@ -1822,6 +1846,106 @@ mod tests {
         assert_eq!(z[720 * 5120 + b - 1] & 0xff, 0xff, "right edge blue");
         assert_eq!(z[720 * 5120 + 2550] >> 16, 0xff);
         assert_eq!(z[720 * 5120 + 2570] & 0xff, 0xff);
+    }
+
+    /// A video frame on a 1280x800 screen (a Raspberry Pi's): the 4:3
+    /// picture 1067x800 at x = 106, a photo-like gradient.
+    fn video_compose_pi(v: VideoSides, pano: Option<&VideoPanorama>) -> Vec<u32> {
+        let screen: Vec<u16> = (0..SCREEN_W * SCREEN_H)
+            .map(|i| {
+                ((i % SCREEN_W) * 31 / SCREEN_W) as u16
+                    | (((i / SCREEN_W) * 63 / SCREEN_H) as u16) << 5
+            })
+            .collect();
+        let f = HdFrame {
+            screen: &screen,
+            layer: None,
+            texts: &[],
+            photo: true,
+            video_pano: pano,
+        };
+        let mut out = vec![0u32; 1280 * 800];
+        HdCompositor::new().compose(f, video_opts(v), &mut out, 1280, 106, 0, 1067, 800);
+        out
+    }
+
+    fn pi_pano() -> VideoPanorama {
+        let (side, h) = (64, 800);
+        VideoPanorama {
+            active: true,
+            tile: 27,
+            width: side,
+            height: h,
+            start: (0..2 * side * h)
+                .map(|i| (i as u32).wrapping_mul(2654435761) & 0xff_ffff)
+                .collect(),
+            end: (0..2 * side * h)
+                .map(|i| (i as u32).wrapping_mul(40503) & 0xff_ffff)
+                .collect(),
+            t: 0.0,
+        }
+    }
+
+    fn digest(o: &[u32]) -> u64 {
+        o.iter().fold(0xcbf2_9ce4_8422_2325, |h, &v| {
+            (h ^ u64::from(v)).wrapping_mul(0x0100_0000_01b3)
+        })
+    }
+
+    /// The zoom's pixels, as its first (single-threaded, per-pixel)
+    /// version drew them, through a move and for a cinematic.
+    #[test]
+    fn zoom_pixels_unchanged() {
+        let mut p = pi_pano();
+        let expected = [
+            (None, 0x0306_8096_4ffa_d3e5),
+            (Some(0.05), 0x325e_b164_6773_2337),
+            (Some(0.15), 0xa167_69d4_dcf0_fae3),
+            (Some(0.25), 0x6957_0fd3_82ee_89ef),
+            (Some(0.5), 0x0306_8096_4ffa_d3e5),
+            (Some(0.8), 0x82e4_c17b_093f_e997),
+            (Some(0.95), 0x09e7_0d84_e101_9b8b),
+        ];
+        for (t, want) in expected {
+            let pano = t.map(|t| {
+                p.t = t;
+                &p
+            });
+            let got = digest(&video_compose_pi(VideoSides::Zoom, pano));
+            assert_eq!(got, want, "t = {t:?}: {got:016x}");
+        }
+    }
+
+    /// `cargo test --release -p atlantis-engine zoom_pi_timings -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn zoom_pi_timings() {
+        let mut p = pi_pano();
+        for t in [
+            None,
+            Some(0.05),
+            Some(0.15),
+            Some(0.25),
+            Some(0.5),
+            Some(0.8),
+            Some(0.95),
+        ] {
+            let pano = t.map(|t| {
+                p.t = t;
+                &p
+            });
+            let start = std::time::Instant::now();
+            let n = 20;
+            let mut o = Vec::new();
+            for _ in 0..n {
+                o = video_compose_pi(VideoSides::Zoom, pano);
+            }
+            println!(
+                "t {t:?}: {:.2} ms, digest {:016x}",
+                start.elapsed().as_secs_f64() * 1000.0 / n as f64,
+                digest(&o)
+            );
+        }
     }
 
     #[test]
