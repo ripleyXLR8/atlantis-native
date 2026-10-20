@@ -163,10 +163,13 @@ The options (options menu, F10; `settings.ini`):
   view left), with the blurred edges weighing 4t(1 - t) in the middle;
   the cinematics get the blurred edges.
   A move's video in Zoom mode starts as the 4:3 picture beside the
-  place's panorama and zooms in over the first 30% of the video (eased),
-  then back out over the last 30% beside the destination's panorama: the
+  place's panorama and zooms in over the first 15% of the video (eased),
+  then back out over the last 15% beside the destination's panorama: the
   whole picture is enlarged, the frame from the video, the sides from the
-  panorama, so that they keep continuing each other. The sides are
+  panorama, so that they keep continuing each other. While the sides show,
+  each join of the frame and a side is blurred over 20 pixels (at an
+  800-pixel-high picture, in proportion otherwise), the more the nearer
+  the join. The sides are
   rendered at the video's own angles (the transition's start angles, and
   the destination's): measured on ATLAN1's moves, a video's first and last
   frames are the panorama at those angles (scale 0.997 to 1.009, no

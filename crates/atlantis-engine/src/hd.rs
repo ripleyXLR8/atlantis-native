@@ -135,7 +135,12 @@ impl VideoSides {
 
 /// The share of a move's video, at each end, over which
 /// [`VideoSides::Zoom`] zooms in from the 4:3 picture and back out.
-const ZOOM_RAMP: f32 = 0.3;
+const ZOOM_RAMP: f32 = 0.15;
+
+/// The width, in output pixels at an 800-pixel-high picture (in
+/// proportion otherwise), of the blur over each join of a move's video and
+/// its panorama sides while [`VideoSides::Zoom`] shows them.
+const ZOOM_SEAM_BLUR: usize = 20;
 
 /// The panorama beside a move's video ([`VideoSides::Panorama`], and
 /// [`VideoSides::Zoom`] while it zooms in and out): the
@@ -527,6 +532,7 @@ impl HdCompositor {
                 );
                 let t = f.video_pano.map_or(0.0, |p| p.t);
                 self.zoom_all(out, stride, (ox, oy, dw, dh), zoom_share(t));
+                blur_zoom_seams(out, stride, (ox, oy, dw, dh), zoom_share(t));
             }
             Some(v) => self.fill_video_bars(v, f.video_pano, out, stride, (ox, oy, dw, dh), false),
             None => {}
@@ -716,6 +722,83 @@ fn zoom_share(t: f32) -> f32 {
     x * x * (3.0 - 2.0 * x)
 }
 
+/// [`HdCompositor::zoom_all`]'s enlargement at zoom share `e` of a frame
+/// drawn at (`ox`, `dw`) on rows `stride` wide, and the columns its sides
+/// reach.
+fn zoom_scale(stride: usize, ox: usize, dw: usize, e: f32) -> (f32, usize, usize) {
+    let reach_px = side_reach(dw);
+    let (x_lo, x_hi) = (
+        ox - ox.min(reach_px),
+        ox + dw + (stride - ox - dw).min(reach_px),
+    );
+    let full = (x_hi - x_lo) as f32 / dw as f32;
+    (1.0 + (full - 1.0) * e, x_lo, x_hi)
+}
+
+/// Widescreen, [`VideoSides::Zoom`] during a move's video: the joins of
+/// the frame and its panorama sides, where [`HdCompositor::zoom_all`] put
+/// them, blurred over `ZOOM_SEAM_BLUR` pixels: each pixel within it takes
+/// the average of the row's pixels around it (a 9-pixel window at an
+/// 800-pixel-high picture), the more the nearer the join.
+fn blur_zoom_seams(
+    out: &mut [u32],
+    stride: usize,
+    (ox, _, dw, dh): (usize, usize, usize, usize),
+    e: f32,
+) {
+    if e >= 1.0 || dw == 0 || dh == 0 {
+        return;
+    }
+    let sh = out.len() / stride;
+    let (s, x_lo, x_hi) = zoom_scale(stride, ox, dw, e.max(0.0));
+    let cx = (ox + dw / 2) as f32;
+    // The joins: where the frame's edges land (u = ox - 0.5, ox + dw - 0.5
+    // in `zoom_all`), as column boundaries.
+    let seams = [ox as f32, (ox + dw) as f32].map(|u| cx + (u - cx) * s);
+    let half = ((ZOOM_SEAM_BLUR * dh).div_ceil(800) / 2).max(1) as f32;
+    let radius = ((4 * dh).div_ceil(800)).max(1) as isize;
+    crate::upscale::for_each_band(&mut out[..sh * stride], stride, |_, band| {
+        let mut src = vec![0u32; stride];
+        for row in band.chunks_mut(stride) {
+            src.copy_from_slice(row);
+            for seam in seams {
+                let lo = ((seam - half).floor().max(x_lo as f32)) as usize;
+                let hi = ((seam + half).ceil().min(x_hi as f32)) as usize;
+                for x in lo..hi {
+                    // 1 at the join, 0 at the band's edges.
+                    let k = 1.0 - ((x as f32 + 0.5 - seam).abs() / half).min(1.0);
+                    if k <= 0.0 {
+                        continue;
+                    }
+                    let mut acc = [0u32; 3];
+                    let mut n = 0u32;
+                    for dx in -radius..=radius {
+                        let xx = x as isize + dx;
+                        if xx < x_lo as isize || xx >= x_hi as isize {
+                            continue;
+                        }
+                        let p = src[xx as usize];
+                        acc[0] += (p >> 16) & 0xff;
+                        acc[1] += (p >> 8) & 0xff;
+                        acc[2] += p & 0xff;
+                        n += 1;
+                    }
+                    let p = src[x];
+                    let mix = |c: u32, shift: u32| -> u32 {
+                        let a = ((p >> shift) & 0xff) as f32;
+                        let b = c as f32 / n as f32;
+                        ((a + (b - a) * k).round() as u32).min(255)
+                    };
+                    row[x] = (p & 0xff00_0000)
+                        | mix(acc[0], 16) << 16
+                        | mix(acc[1], 8) << 8
+                        | mix(acc[2], 0);
+                }
+            }
+        }
+    });
+}
+
 /// Whether `layer`'s view is on the graphics card (see [`HdLayer::on_card`]).
 fn layer_on_card(layer: Option<&HdLayer>) -> bool {
     layer.is_some_and(|l| l.on_card)
@@ -897,13 +980,7 @@ impl HdCompositor {
             return;
         }
         let sh = out.len() / stride;
-        let reach_px = side_reach(dw);
-        let (x_lo, x_hi) = (
-            ox - ox.min(reach_px),
-            ox + dw + (stride - ox - dw).min(reach_px),
-        );
-        let full = (x_hi - x_lo) as f32 / dw as f32;
-        let s = 1.0 + (full - 1.0) * e;
+        let (s, x_lo, x_hi) = zoom_scale(stride, ox, dw, e);
         let (cx, cy) = ((ox + dw / 2) as f32, (oy + dh / 2) as f32);
         let lut = rgb565_to_888();
         let rgb: Vec<u32> = self.frame.iter().map(|&p| lut[usize::from(p)]).collect();
@@ -1892,19 +1969,21 @@ mod tests {
         })
     }
 
-    /// The zoom's pixels, as its first (single-threaded, per-pixel)
-    /// version drew them, through a move and for a cinematic.
+    /// The zoom's pixels through a move (its seam blur at both ends, the
+    /// zoom in and out, the frame alone) and for a cinematic: a check that
+    /// a change of how they are computed leaves them as they are.
     #[test]
     fn zoom_pixels_unchanged() {
         let mut p = pi_pano();
         let expected = [
             (None, 0x0306_8096_4ffa_d3e5),
-            (Some(0.05), 0x325e_b164_6773_2337),
-            (Some(0.15), 0xa167_69d4_dcf0_fae3),
-            (Some(0.25), 0x6957_0fd3_82ee_89ef),
+            (Some(0.0), 0xdd1a_e709_6d8a_8305),
+            (Some(0.05), 0xd69e_43cd_a660_d34f),
+            (Some(0.1), 0x0cdf_96ce_fb17_886c),
             (Some(0.5), 0x0306_8096_4ffa_d3e5),
-            (Some(0.8), 0x82e4_c17b_093f_e997),
-            (Some(0.95), 0x09e7_0d84_e101_9b8b),
+            (Some(0.9), 0x9201_44a4_2998_8cf0),
+            (Some(0.95), 0x1035_f477_d6bb_9b16),
+            (Some(1.0), 0x3967_779e_cd57_c7d5),
         ];
         for (t, want) in expected {
             let pano = t.map(|t| {
@@ -1923,12 +2002,13 @@ mod tests {
         let mut p = pi_pano();
         for t in [
             None,
+            Some(0.0),
             Some(0.05),
-            Some(0.15),
-            Some(0.25),
+            Some(0.1),
             Some(0.5),
-            Some(0.8),
+            Some(0.9),
             Some(0.95),
+            Some(1.0),
         ] {
             let pano = t.map(|t| {
                 p.t = t;
@@ -1961,13 +2041,23 @@ mod tests {
             t: 0.0,
         };
         // At both ends: the 4:3 picture beside the panorama, as the
-        // Panorama mode shows it.
+        // Panorama mode shows it, but for the blur over the joins (12
+        // pixels each side of x = 213 and 1493 at this 960-pixel height).
+        let joined = |x: usize| x.abs_diff(213) <= 12 || x.abs_diff(1493) <= 12;
         for t in [0.0, 1.0] {
             p.t = t;
-            assert_eq!(
-                video_compose(VideoSides::Zoom, Some(&p), true),
-                video_compose(VideoSides::Panorama, Some(&p), true),
-                "t = {t}"
+            let z = video_compose(VideoSides::Zoom, Some(&p), true);
+            let pano = video_compose(VideoSides::Panorama, Some(&p), true);
+            for (i, (a, b)) in z.iter().zip(&pano).enumerate() {
+                if !joined(i % 1706) {
+                    assert_eq!(a, b, "t = {t}, at ({}, {})", i % 1706, i / 1706);
+                }
+            }
+            // The join is blurred: red and green mixed at x = 213.
+            let j = z[480 * 1706 + 213];
+            assert!(
+                j >> 16 & 0xff > 0x20 && j >> 8 & 0xff > 0x20,
+                "join {j:06x}"
             );
         }
         // In the middle: zoomed as without a panorama.
@@ -1979,7 +2069,7 @@ mod tests {
         // On the way: the whole picture enlarged, the frame past its 4:3
         // place (red at x = 150, left of the picture's x = 213) and the
         // sides pushed out (green further left).
-        p.t = 0.15;
+        p.t = 0.075;
         let z = video_compose(VideoSides::Zoom, Some(&p), true);
         let at = |x: usize| z[480 * 1706 + x];
         assert!(
@@ -1989,8 +2079,8 @@ mod tests {
         );
         // (the place's panorama alone, which the frame continues)
         assert_eq!(at(20), 0x0000_ff00, "side: {:06x}", at(20));
-        assert!(zoom_share(0.15) > 0.0 && zoom_share(0.15) < 1.0);
-        assert_eq!(zoom_share(0.3), 1.0);
+        assert!(zoom_share(0.075) > 0.0 && zoom_share(0.075) < 1.0);
+        assert_eq!(zoom_share(0.15), 1.0);
         assert_eq!(zoom_share(0.0), 0.0);
     }
 

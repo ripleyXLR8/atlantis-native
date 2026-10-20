@@ -451,3 +451,99 @@ fn move_video_panorama_sides() {
     eprintln!("destination sides vs arrival view: mean difference {mean:.2}");
     assert!(mean < 12.0, "mean difference {mean}");
 }
+
+/// A move's video in the Zoom mode on a 1280x800 screen, every frame
+/// written to `ATLANTIS_DUMP_DIR` as `zoom_NNNN.ppm` (to look at the zoom
+/// and its joins; `--ignored`).
+#[test]
+#[ignore]
+fn move_video_zoom_dump() {
+    use atlantis_engine::hd::{HdCompositor, HdFrame, HdOptions, HdText, VideoSides};
+    let (Some(dir), Some(dump)) = (
+        std::env::var_os("ATLANTIS_DATA"),
+        std::env::var_os("ATLANTIS_DUMP_DIR"),
+    ) else {
+        eprintln!("ATLANTIS_DATA or ATLANTIS_DUMP_DIR not set: skipped");
+        return;
+    };
+    let game = Game::open(Arc::new(StdDir::new(dir))).unwrap();
+    let sys = Sys::new(Mixer::new());
+    // The 4:3 picture 1067x800 at x = 106: tiles of 27 pixels, 4 beside.
+    let (sw, shh, ox, dw) = (1280usize, 800usize, 106usize, 1067usize);
+    sys.set_hd_tile(Some(27));
+    sys.set_hd_side_tiles(4);
+    let opts_hd = HdOptions {
+        widescreen: true,
+        video_sides: VideoSides::Zoom,
+        ..HdOptions::default()
+    };
+    sys.set_hd_options(opts_hd);
+    let trace = Rc::new(RefCell::new(Vec::new()));
+    let seen = Rc::new(RefCell::new(Seen::default()));
+    let opts = Options {
+        hooks: Box::new(Aim {
+            first_only: true,
+            ..Aim::new(&seen)
+        }),
+        trace: Some(trace.clone()),
+        start: Start::NewGame,
+        ..Options::default()
+    };
+    let runner = Runner::new(sys.clone(), atlantis_engine::run(sys.clone(), game, opts));
+    let mut h = Harness {
+        sys: sys.clone(),
+        runner,
+        now: 1000,
+        frames: 0,
+    };
+    assert!(h.run_until(200, || !seen.borrow().angles.is_empty()));
+    let entered = places_entered(&trace).len();
+    h.run(5);
+    let mut comp = HdCompositor::new();
+    let mut n = 0;
+    let mut write = |sys: &Sys, n: &mut u32| {
+        let screen = sys.screen.borrow();
+        let layer = sys.hd.borrow();
+        let text = sys.hd_text.borrow();
+        let texts: Vec<&HdText> = if sys.hd_text_shown() {
+            vec![&text]
+        } else {
+            vec![]
+        };
+        let video = sys.hd_video.borrow();
+        let f = HdFrame {
+            screen: &screen,
+            layer: sys.hd_shown().then_some(&*layer),
+            texts: &texts,
+            photo: sys.photo_shown(),
+            video_pano: Some(&*video),
+        };
+        let mut out = vec![0u32; sw * shh];
+        comp.compose(f, opts_hd, &mut out, sw, ox, 0, dw, shh);
+        let mut ppm = format!("P6\n{sw} {shh}\n255\n").into_bytes();
+        for p in &out {
+            ppm.extend([(p >> 16) as u8, (p >> 8) as u8, *p as u8]);
+        }
+        std::fs::write(
+            std::path::Path::new(&dump).join(format!("zoom_{n:04}.ppm")),
+            ppm,
+        )
+        .unwrap();
+        *n += 1;
+    };
+    // A few frames before, the move, and a few after.
+    for _ in 0..10 {
+        h.run(1);
+        write(&sys, &mut n);
+    }
+    h.click();
+    let mut after = 0;
+    while after < 30 && n < 2000 {
+        assert!(h.run(1));
+        write(&sys, &mut n);
+        if places_entered(&trace).len() > entered {
+            after += 1;
+        }
+    }
+    eprintln!("{n} frames written");
+}
