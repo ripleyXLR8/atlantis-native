@@ -101,6 +101,7 @@ those of the latest commit:
 | Windows 10 and later, 64-bit | `atlantis-native-windows-x64.zip` |
 | macOS 11 and later, Apple Silicon | `atlantis-native-macos-arm64.dmg` |
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
+| Linux 64-bit ARM, such as a Raspberry Pi 4 or 5 (glibc 2.35+, ALSA) | `atlantis-native-linux-arm64.tar.gz` |
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 The web version of the latest commit is also online:
