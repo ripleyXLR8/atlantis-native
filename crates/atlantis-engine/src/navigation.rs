@@ -209,7 +209,11 @@ impl Engine {
         // The entry block clears 0x00496120 and 0x004960c4 (0x0041bff4).
         self.bar.flags_reset();
         self.sys.set_mouse_pos(320, 240);
-        // Drain stale clicks from the place change.
+        // The view on screen at once: the original's loop draws it on its
+        // first pass; the port's wait below must not leave the move's last
+        // video frame (or the previous place) on screen meanwhile.
+        self.render_view();
+        // Drain stale clicks from the place change (the port's).
         for _ in 0..5 {
             if self.sys.should_quit() {
                 break;
