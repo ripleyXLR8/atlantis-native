@@ -1295,7 +1295,12 @@ impl ApplicationHandler for App {
                 if event.repeat {
                     return;
                 }
-                if key == Some(EngineKey::F(10)) {
+                // O too, for keyboards without function keys, but not while
+                // a game menu may be taking letters.
+                let o = matches!(key, Some(EngineKey::Char('o' | 'O')))
+                    && !self.alt
+                    && !self.sys.in_menu();
+                if key == Some(EngineKey::F(10)) || o {
                     // The port's options menu: not the engine's key.
                     if pressed {
                         self.open_menu();

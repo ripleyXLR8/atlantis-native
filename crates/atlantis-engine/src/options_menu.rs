@@ -258,10 +258,10 @@ impl OptionsMenu {
 
     /// A key pressed while the menu is open: Up / Down choose an entry
     /// (skipping the greyed ones), Enter / Space (and Left / Right on a
-    /// setting) change it, Escape and F10 close the menu.
+    /// setting) change it, Escape, F10 and O close the menu.
     pub fn key(&mut self, key: Key, v: MenuValues) -> MenuAction {
         match key {
-            Key::Escape | Key::F(10) => {
+            Key::Escape | Key::F(10) | Key::Char('o' | 'O') => {
                 self.close();
                 MenuAction::Close
             }
@@ -423,7 +423,7 @@ impl OptionsMenu {
         }
         let d = Self::description(self.selected(), v);
         text(d, centre(d), box_y + box_h - 44, TEXT);
-        let k = "Arrows, Enter or click; Escape or F10 closes";
+        let k = "Arrows, Enter or click; Escape, F10 or O closes";
         text(k, centre(k), box_y + box_h - 22, DIM);
         (fills, texts)
     }
@@ -519,6 +519,9 @@ mod tests {
         assert_eq!(m.key(Key::Up, ORIG), MenuAction::None);
         assert_eq!(m.selected(), Entry::Close);
         assert_eq!(m.key(Key::F(10), ORIG), MenuAction::Close);
+        m.open();
+        assert_eq!(m.key(Key::Char('o'), ORIG), MenuAction::Close);
+        assert!(!m.is_open());
         assert!(!m.is_open());
     }
 

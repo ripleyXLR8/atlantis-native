@@ -82,7 +82,7 @@ contains none of them.</sub>
 - 💾 **Your saves, compatible**: the game saves at every chapter, in the
   original's own file format. An existing installation's players and
   checkpoints are taken over on the first start.
-- ⚙️ **Options menu** (F10): graphics, HD settings and enhancements,
+- ⚙️ **Options menu** (F10, or O): graphics, HD settings and enhancements,
   changed at once while you play.
 - 📚 **Game library**: several editions (GOG.com, CD, disc images...) in
   one list, to choose the one to play at start-up or switch from F10.
@@ -180,7 +180,7 @@ From a terminal you can also pass the folder:
 | Skip a talking head's lines | Escape |
 | Inventory | right click (the bar's edges scroll it) |
 | In-game menu (load, options, quit) | Escape in the panoramic view |
-| **Port options** (graphics, HD, bug fixes, game library) | **F10**, at any time; the game pauses |
+| **Port options** (graphics, HD, bug fixes, game library) | **F10** (or **O**, for a keyboard without function keys), at any time; the game pauses |
 | Full screen | F, F11 or Alt+Enter |
 | Diagnostic overlay | F9 |
 

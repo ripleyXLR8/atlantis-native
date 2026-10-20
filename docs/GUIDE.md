@@ -290,7 +290,8 @@ picked folder on its first start.
 - Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).
-- F10 opens the port's options menu; the [HD mode](TECHNICAL.md#hd-mode) it offers is
+- F10 (or O, for a keyboard without function keys; not while a game menu
+  takes letters) opens the port's options menu; the [HD mode](TECHNICAL.md#hd-mode) it offers is
   off by default.
 
 ## The icon
