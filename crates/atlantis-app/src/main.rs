@@ -24,6 +24,9 @@
 //! at the window's resolution), whatever `settings.ini` says; F10 opens the
 //! port's options menu, where it can be switched.
 //!
+//! `--fullscreen` opens the window in full screen (F, F11 or Alt+Enter
+//! switches it back).
+//!
 //! `--original` (before the game directory) turns every enhancement off:
 //! the original game, bug for bug. `--new-game` skips the start-up videos
 //! and the player screen.
@@ -92,6 +95,7 @@ fn main() {
     let new_game = flag("--new-game");
     let launcher = flag("--launcher");
     let force_support = flag("--support-screen");
+    let fullscreen = flag("--fullscreen");
     let mut value = |name: &str| -> Option<i32> {
         let i = args.iter().position(|a| a == name)?;
         args.remove(i);
@@ -173,7 +177,7 @@ fn main() {
         return;
     }
 
-    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--launcher] [--support-screen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]";
+    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--fullscreen] [--launcher] [--support-screen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]";
     if args.len() > 1 || args.first().is_some_and(|a| a.starts_with('-')) {
         error_box(&format!("{USAGE}\n\n'{}' not understood", args.join(" ")));
         std::process::exit(2);
@@ -192,7 +196,9 @@ fn main() {
     let scripted = !args.is_empty() || new_game || puzzle.is_some() || force_support;
     let mut session = Session::new(data_dir(), original, force_hd, force_wide, start);
     session.counts_play = !scripted;
-    let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
+    let mut app = App::new(Sys::new(Mixer::new()), None)
+        .with_session(session)
+        .with_fullscreen(fullscreen);
     // The launch counted; the support screen when it is due, or asked for.
     let mut counts = SupportState::load(&data_dir());
     if !scripted {

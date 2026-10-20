@@ -190,6 +190,10 @@ whatever `settings.ini` says.
 `atlantis-native --widescreen /path/to/game` starts in the HD mode with
 the widescreen option on, for this run (`settings.ini` is not changed).
 
+`atlantis-native --fullscreen /path/to/game` opens the window in full
+screen (F, F11 or Alt+Enter switches it back): for a launcher such as the
+Ports of Batocera on a Raspberry Pi.
+
 The environment variable `ATLANTIS_NATIVE_DATA` names another folder for
 the per-user data (saves, settings, log): trial runs that must not touch
 your own saves.

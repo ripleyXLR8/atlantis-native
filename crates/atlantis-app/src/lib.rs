@@ -177,6 +177,8 @@ pub struct App {
     alt: bool,
     /// The window's title: the port and the game's release.
     title: String,
+    /// The window opens in full screen (`--fullscreen`).
+    start_fullscreen: bool,
     /// The window's icon: the player's atlantis.exe icon.
     icon: Option<atlantis_data::exe_icon::Icon>,
     /// The lock fell back to confining the pointer (Windows, X11): the
@@ -216,6 +218,12 @@ pub struct App {
 }
 
 impl App {
+    /// Opens the window in full screen (F switches it back).
+    pub fn with_fullscreen(mut self, on: bool) -> App {
+        self.start_fullscreen = on;
+        self
+    }
+
     /// A front end for `runner` (the engine task on `sys`), or a test
     /// pattern without one.
     pub fn new(sys: Rc<Sys>, runner: Option<Runner>) -> App {
@@ -250,6 +258,7 @@ impl App {
             locked: false,
             alt: false,
             title: "Atlantis Native".to_string(),
+            start_fullscreen: false,
             icon: None,
             confined: false,
             focused: true,
@@ -1025,7 +1034,11 @@ impl ApplicationHandler for App {
         let attrs = Window::default_attributes()
             .with_title(self.title.clone())
             .with_window_icon(self.window_icon())
-            .with_inner_size(LogicalSize::new(W as f64 * 1.5, H as f64 * 1.5));
+            .with_inner_size(LogicalSize::new(W as f64 * 1.5, H as f64 * 1.5))
+            .with_fullscreen(
+                self.start_fullscreen
+                    .then_some(Fullscreen::Borderless(None)),
+            );
         // Windows takes the taskbar and Alt+Tab icon separately.
         #[cfg(target_os = "windows")]
         let attrs = {
