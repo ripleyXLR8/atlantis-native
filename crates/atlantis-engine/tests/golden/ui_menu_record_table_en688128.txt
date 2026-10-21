@@ -1,0 +1,54 @@
+# The menus' record table of atlantis.exe (May 1997 English build, 688128 bytes; table 0x006026b0, stride 0x81, 16 records per menu): the menu walk, its sprite records, the hit test and the
+# LOAD picker's entry stores (FUN_0041fb6c, FUN_004207c0, FUN_004210c0, FUN_0041cf78 0x0041d1f3..0x0041d24b
+# or the build's equivalents) run under emulation over the build's SPRLIST menu files.
+# counts: records written by each menu file's walk on a zeroed table (N = 16 per menu)
+count MAINMENU menu  0 records  3
+count LOADMENU menu  1 records  8
+count OPTMENU  menu  2 records  7
+count NEWMENU  menu  3 records  0
+count SELEMENU menu  4 records  7
+count SONMENU  menu  5 records 18  overflow 2 into menu 6
+count SUREMENU menu  6 records  5
+count CD1MENU  menu  7 records  4
+count CD2MENU  menu  8 records  4
+count CD3MENU  menu  9 records  4
+count CD4MENU  menu 10 records  4
+count WAIT     menu 11 records  3
+count ERROR1   menu 12 records  3
+count ERROR2   menu 13 records  3
+count ERROR3   menu 14 records  3
+# sequence: SUREMENU, SONMENU, SUREMENU on a zeroed table
+step 1 SUREMENU count 5
+  menu 6 block: count 5 records 0-4 (169,222,308,28) (130,220,10,10) (500,260,10,10) (159,372,44,28) (389,372,132,28)
+  SPRMENU blits (x, y, index): (130,220,5) (500,260,6)
+step 2 SONMENU count 18
+  SONMENU records 16.. (119,422,44,28) (419,422,132,28)
+  menu 6 block: count 119 records 0-4 (-23040,11265,7168,-23808) (-23039,-31743,7168,0) (500,260,10,10) (159,372,44,28) (389,372,132,28)
+  SPRMENU blits (x, y, index): (285,126,3) (285,166,3) (285,206,3) (285,246,3) (460,125,13) (465,165,13) (470,205,13) (490,245,13) (320,370,0)
+step 3 SUREMENU count 5
+  menu 6 block: count 5 records 0-4 (169,222,308,28) (-23039,-31743,10,10) (500,260,10,10) (159,372,44,28) (389,372,132,28)
+  SPRMENU blits (x, y, index): (-23039,-31743,5) (500,260,6)
+# stale: menu 6 hit test before its walk vs after it (4-px grid, 0xff = none)
+stale menus 7-14 empty: count before the walk 119, after 5
+  before   2 after   2 points 4
+  before   3 after   3 points 66
+  before   4 after   4 points 198
+  before 255 after   0 points 539  differs
+  before 255 after 255 points 18393
+stale after every menu: count before the walk 119, after 5
+  before   2 after   2 points 4
+  before   3 after   3 points 66
+  before   4 after   4 points 198
+  before  33 after 255 points 84  differs
+  before  35 after 255 points 1116  differs
+  before  65 after 255 points 1008  differs
+  before  66 after 255 points 5508  differs
+  before  67 after   0 points 217  differs
+  before  67 after 255 points 1962  differs
+  before  80 after   0 points 322  differs
+  before  80 after 255 points 8436  differs
+  before 255 after 255 points 279
+# loadknob: the LOAD picker's entry stores run as shipped (5 then 20 files), then the walk
+visit 1 (11 files or fewer: x 0xffce, y 0): record 4 (-50,130,32,32) blits (601,95,4) (60,140,5) (540,320,6) (-50,130,13)
+# visit 2: x 0xffce before the picker entry, 0xffce after it
+visit 2 (more than 11 files: y 0 only): record 4 (-50,130,32,32) blits (601,95,4) (60,140,5) (540,320,6) (-50,130,13)

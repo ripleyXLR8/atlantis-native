@@ -54,6 +54,117 @@ pub struct MenuWalk {
     pub ops: Vec<MenuOp>,
 }
 
+/// The original's menu record table: one static table for the whole run
+/// (every build), 15 blocks of a count byte and `records_per_menu`
+/// records {s16 x, y, w, h}, block m at m * stride, stride = 1 + 8 *
+/// records_per_menu: 0x006126b0 / 0xa1 / 20 in the reference
+/// (FUN_0041fb6c, FUN_004207c0, FUN_004210c0) and every other build but
+/// two, 0x006026b0 / 0x81 / 16 in atlantis-cd-en-688128 (FUN_0041ef34
+/// `imul eax,eax,0x81` @ 0x0041ef84) and atlantis-cd-fr-688640
+/// (FUN_0041efa4 @ 0x0041eff4; `ExeBuild::menu_records_per_menu`). A walk
+/// zeroes the menu's count byte only (@ 0x0041fbc2; atlantis-cd-en-688128
+/// @ 0x0041ef8a) and writes record k =
+/// count at m * stride + 1 + 8k with no bound, so a menu of more records
+/// writes into the next menu's block: SONMENU.TXT's 18 records in a
+/// 16-record build put its records 16 and 17 over SUREMENU's count byte
+/// and records 0 and 1, and SUREMENU's left ornament (`/spr=5`, which
+/// keeps a stored x / y) is then drawn off screen for the session. Nothing
+/// else writes the table but the LOAD picker (record 4 of menu 1, the
+/// knob) and the sound menu's sliders (records 5..8 of menu 5). Past the
+/// 15 blocks lies other memory of the original (what, unknown): no
+/// shipped menu reaches there; the port keeps zeros.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MenuRecordTable {
+    stride: usize,
+    bytes: Vec<u8>,
+}
+
+impl MenuRecordTable {
+    /// The menus of the table ([`menu_number`]).
+    pub const MENUS: usize = 15;
+
+    /// A zeroed table (the original's at start-up).
+    pub fn new(records_per_menu: usize) -> MenuRecordTable {
+        let stride = 1 + 8 * records_per_menu;
+        MenuRecordTable {
+            stride,
+            bytes: vec![0; MenuRecordTable::MENUS * stride],
+        }
+    }
+
+    pub fn records_per_menu(&self) -> usize {
+        (self.stride - 1) / 8
+    }
+
+    fn byte(&self, off: usize) -> u8 {
+        self.bytes.get(off).copied().unwrap_or(0)
+    }
+
+    fn put_byte(&mut self, off: usize, v: u8) {
+        if self.bytes.len() <= off {
+            self.bytes.resize(off + 1, 0);
+        }
+        self.bytes[off] = v;
+    }
+
+    fn word(&self, off: usize) -> i16 {
+        i16::from_le_bytes([self.byte(off), self.byte(off + 1)])
+    }
+
+    /// The count byte of `menu`.
+    pub fn count(&self, menu: usize) -> u8 {
+        self.byte(menu * self.stride)
+    }
+
+    fn set_count(&mut self, menu: usize, n: u8) {
+        self.put_byte(menu * self.stride, n);
+    }
+
+    /// Record `k` of `menu`, wherever it lies (another menu's block for k
+    /// past the records per menu).
+    pub fn record(&self, menu: usize, k: usize) -> MenuRecord {
+        let o = menu * self.stride + 1 + 8 * k;
+        MenuRecord {
+            x: self.word(o),
+            y: self.word(o + 2),
+            w: self.word(o + 4),
+            h: self.word(o + 6),
+        }
+    }
+
+    pub fn set_record(&mut self, menu: usize, k: usize, r: MenuRecord) {
+        let o = menu * self.stride + 1 + 8 * k;
+        for (i, v) in [r.x, r.y, r.w, r.h].into_iter().enumerate() {
+            let [lo, hi] = v.to_le_bytes();
+            self.put_byte(o + 2 * i, lo);
+            self.put_byte(o + 2 * i + 1, hi);
+        }
+    }
+
+    /// The records 0 .. count of `menu` as stored (another menu's overflow
+    /// included): what the hit test `FUN_004210c0` reads.
+    pub fn records(&self, menu: usize) -> Vec<MenuRecord> {
+        (0..usize::from(self.count(menu)))
+            .map(|k| self.record(menu, k))
+            .collect()
+    }
+}
+
+/// The LOAD picker's writes of its knob, record 4 of menu 1, before a walk
+/// (`FUN_0041cf78`): the y always (0x0041d1fa at entry, 0x0041d2b0 while
+/// dragging; atlantis-cd-en-688128 0x0041cc23 / 0x0041ccd9), the x 0xffce
+/// only with 11 files or fewer (0x0041d21a; atlantis-cd-en-688128
+/// 0x0041cc43) and never back: in the session's table a later visit with
+/// more files keeps the knob off screen.
+pub fn load_picker_knob_record(stored: MenuRecord, s: &LoadPickerScroll) -> MenuRecord {
+    let mut r = stored;
+    if s.knob_x != 0 {
+        r.x = s.knob_x as i16;
+    }
+    r.y = s.knob_y as i16;
+    r
+}
+
 /// The FONTMAX measuring widths (0x0049660e, indexed by `c - 0x20`; equal
 /// in every known build, atlantis-cd-fr-688640 0x004865eb):
 /// `FUN_004206c8` centres labels with them, and the pen advances by them
@@ -209,6 +320,40 @@ fn slot(walk: &mut MenuWalk, n: usize) -> &mut MenuRecord {
     &mut walk.records[n]
 }
 
+/// Where a walk keeps its records: the session's table, as the original
+/// (its menu's block and the count byte, `inc byte ptr`), or the walk's
+/// own records.
+struct WalkRecords<'a> {
+    table: Option<(&'a mut MenuRecordTable, usize)>,
+    count: usize,
+}
+
+impl WalkRecords<'_> {
+    /// Record `count` as the walk finds it.
+    fn get(&self, walk: &MenuWalk) -> MenuRecord {
+        match &self.table {
+            Some((t, m)) => t.record(*m, self.count),
+            None => walk.records.get(self.count).copied().unwrap_or_default(),
+        }
+    }
+
+    /// Writes record `count` and counts it.
+    fn put(&mut self, walk: &mut MenuWalk, r: MenuRecord) {
+        match &mut self.table {
+            Some((t, m)) => {
+                t.set_record(*m, self.count, r);
+                let n = t.count(*m).wrapping_add(1);
+                t.set_count(*m, n);
+                self.count = usize::from(n);
+            }
+            None => {
+                *slot(walk, self.count) = r;
+                self.count += 1;
+            }
+        }
+    }
+}
+
 /// The build's and the port's rules of the menu walk.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MenuRules {
@@ -279,7 +424,8 @@ impl MenuRules {
 /// 5); `/sprj=` `/sprr=` `/sprc=` `/spr=` sprite records; then the byte:
 /// CR (the next byte is consumed), space and other control bytes (pen +
 /// 22), or a FONTMAX glyph. The build's and the port's rules are `rules`
-/// ([`MenuRules`]).
+/// ([`MenuRules`]). The records are the walk's own
+/// ([`walk_menu_text_in`] keeps them in the session's table).
 pub fn walk_menu_text(
     t: &[u8],
     menu: i32,
@@ -289,6 +435,35 @@ pub fn walk_menu_text(
     rules: MenuRules,
     walk: &mut MenuWalk,
 ) {
+    walk_menu_text_in(t, menu, hover_line, toggle_a, toggle_b, rules, walk, None);
+}
+
+/// [`walk_menu_text`] with the session's record table: the walk reads the
+/// stored records from the menu's block (whatever an earlier walk, another
+/// menu's overflow or the LOAD picker left there) and writes them back;
+/// `walk.records` then receives the menu's count records. Without a table
+/// (or a menu number), the walk's own records, unbounded.
+#[allow(clippy::too_many_arguments)]
+pub fn walk_menu_text_in(
+    t: &[u8],
+    menu: i32,
+    hover_line: i32,
+    toggle_a: i32,
+    toggle_b: i32,
+    rules: MenuRules,
+    walk: &mut MenuWalk,
+    table: Option<&mut MenuRecordTable>,
+) {
+    let table_menu = usize::try_from(menu)
+        .ok()
+        .filter(|&m| m < MenuRecordTable::MENUS);
+    let mut rec = WalkRecords {
+        table: table.zip(table_menu),
+        count: 0,
+    };
+    if let Some((t, m)) = &mut rec.table {
+        t.set_count(*m, 0); // the count byte only (@ 0x0041fbc2)
+    }
     let sharp_s_as_ss = rules.sharp_s_as_ss;
     let ss = |c: u8| -> i32 {
         if sharp_s_as_ss && c == SHARP_S {
@@ -299,7 +474,6 @@ pub fn walk_menu_text(
     };
     walk.ops.clear();
     let size = t.len();
-    let mut count = 0usize;
     let mut p = 0usize;
     let mut line = 0i32;
     let (mut pen_x, mut pen_y) = (0i32, 0i32);
@@ -332,12 +506,13 @@ pub fn walk_menu_text(
                 .sum();
             pen_x = (640 - w) / 2;
             pen_y = y;
-            let r = slot(walk, count);
-            r.x = (pen_x - 11) as i16;
-            r.y = (y - 28) as i16;
-            r.w = w as i16;
-            r.h = 28;
-            count += 1;
+            let r = MenuRecord {
+                x: (pen_x - 11) as i16,
+                y: (y - 28) as i16,
+                w: w as i16,
+                h: 28,
+            };
+            rec.put(walk, r);
         }
         if walk_at(t, p, b"<") {
             // 0x0041fe42
@@ -351,12 +526,13 @@ pub fn walk_menu_text(
             // `imul ebx,[ebp-0x28],0x16`; `shl ebx,4` in
             // atlantis-cd-it-687104 (FUN_0041ecb4 @ 0x0041f068).
             let w = rules.positioned_byte_width * (to_cr(p).saturating_sub(p)) as i32;
-            let r = slot(walk, count);
-            r.x = (x - 11) as i16;
-            r.y = (y - 28) as i16;
-            r.w = w as i16;
-            r.h = 28;
-            count += 1;
+            let r = MenuRecord {
+                x: (x - 11) as i16,
+                y: (y - 28) as i16,
+                w: w as i16,
+                h: 28,
+            };
+            rec.put(walk, r);
         }
         if walk_at(t, p, b"//") {
             // 0x0041ffb7
@@ -425,7 +601,7 @@ pub fn walk_menu_text(
             // 0x00420412); the blit takes both (0x00420a7f..0x00420a95), in
             // every build: a slider keeps its knob, and the LOAD knob is
             // drawn where the picker put it.
-            let r = slot(walk, count);
+            let mut r = rec.get(walk);
             let mut bx = x;
             if r.x == 0 {
                 r.x = x as i16;
@@ -448,9 +624,9 @@ pub fn walk_menu_text(
                 y: by as i16,
                 index: idx,
                 line,
-                record: count as i32,
+                record: rec.count as i32,
             });
-            count += 1;
+            rec.put(walk, r);
             p = to_cr(p) + 1; // past the CR
             draw = false;
             line += 1;
@@ -490,15 +666,20 @@ pub fn walk_menu_text(
                     y: pen_y as i16,
                     index: glyph,
                     line,
-                    record: count as i32 - 1,
+                    record: rec.count as i32 - 1,
                 });
                 pen_x += fontmax_width(glyph);
             }
         }
         p += 1;
     }
-    walk.records.truncate(count);
-    walk.records.resize(count, MenuRecord::default());
+    match &rec.table {
+        Some((t, m)) => walk.records = t.records(*m),
+        None => {
+            walk.records.truncate(rec.count);
+            walk.records.resize(rec.count, MenuRecord::default());
+        }
+    }
 }
 
 /// `FUN_004210c0`: the first record strictly containing the point, its

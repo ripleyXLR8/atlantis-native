@@ -20,9 +20,9 @@ use atlantis_data::LoadList;
 
 use super::credits::{credits_events, CreditsEvent};
 use super::layout::{
-    font_min_load_list_width, menu_grid_hit, menu_number, menu_volume_from_knob, menu_walk_hit,
-    name_entry_byte, spell_sharp_s, subtitle_toggle_click, walk_menu_text, FontMin,
-    LoadPickerScroll, MenuRules, MenuWalk,
+    font_min_load_list_width, load_picker_knob_record, menu_grid_hit, menu_number,
+    menu_volume_from_knob, menu_walk_hit, name_entry_byte, spell_sharp_s, subtitle_toggle_click,
+    walk_menu_text_in, FontMin, LoadPickerScroll, MenuRecord, MenuRecordTable, MenuRules, MenuWalk,
 };
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
@@ -60,11 +60,25 @@ pub(crate) struct Menu {
 }
 
 impl Menu {
+    /// The menu's block in the record table.
+    fn table_menu(&self) -> Option<usize> {
+        usize::try_from(self.number)
+            .ok()
+            .filter(|&m| m < MenuRecordTable::MENUS)
+    }
+
     /// Walks the file (`FUN_0041fb6c`) with the hovered line and the
-    /// options toggles.
-    pub fn walk(&mut self, hover: Option<usize>, toggle_a: i32, toggle_b: i32) {
+    /// options toggles, its records in the session's `table`
+    /// ([`Engine::menu_table`]) or, without one, its own.
+    pub fn walk(
+        &mut self,
+        hover: Option<usize>,
+        toggle_a: i32,
+        toggle_b: i32,
+        table: Option<&mut MenuRecordTable>,
+    ) {
         let hover = hover.map_or(-1, |h| h as i32);
-        walk_menu_text(
+        walk_menu_text_in(
             &self.text,
             self.number,
             hover,
@@ -72,12 +86,43 @@ impl Menu {
             toggle_b,
             self.rules,
             &mut self.walk,
+            table,
         );
     }
 
-    /// The record under the point (`FUN_004210c0`).
-    pub fn hit(&self, x: i32, y: i32) -> Option<usize> {
-        menu_walk_hit(&self.walk.records, x, y)
+    /// The record under the point (`FUN_004210c0`), read from the table as
+    /// it stands (what the walks and the pickers left there).
+    pub fn hit(&self, x: i32, y: i32, table: Option<&MenuRecordTable>) -> Option<usize> {
+        match (table, self.table_menu()) {
+            (Some(t), Some(m)) => menu_walk_hit(&t.records(m), x, y),
+            _ => menu_walk_hit(&self.walk.records, x, y),
+        }
+    }
+
+    /// Record `k` as the next walk will find it.
+    pub fn stored_record(&self, k: usize, table: Option<&MenuRecordTable>) -> MenuRecord {
+        match (table, self.table_menu()) {
+            (Some(t), Some(m)) => t.record(m, k),
+            _ => self.walk.records.get(k).copied().unwrap_or_default(),
+        }
+    }
+
+    /// Writes record `k` for the next walk (the LOAD knob, the sliders).
+    pub fn set_stored_record(
+        &mut self,
+        k: usize,
+        r: MenuRecord,
+        table: Option<&mut MenuRecordTable>,
+    ) {
+        match (table, self.table_menu()) {
+            (Some(t), Some(m)) => t.set_record(m, k, r),
+            _ => {
+                if self.walk.records.len() <= k {
+                    self.walk.records.resize(k + 1, MenuRecord::default());
+                }
+                self.walk.records[k] = r;
+            }
+        }
     }
 }
 
@@ -132,19 +177,18 @@ impl Engine {
         mi
     }
 
-    /// `SPRLIST\<name>`, `None` when the archive lacks it.
+    /// `SPRLIST\<name>`, `None` when the archive lacks it. Not walked
+    /// yet: each menu walks it before its first hit test, with its toggles.
     pub(crate) async fn load_menu(&self, name: &str) -> Option<Menu> {
         let text = self.read(&format!("SPRLIST\\{name}")).await?;
         self.emit(crate::engine::Event::Menu(name.to_string()));
         let number = menu_number(name).map_or(-1, |n| n as i32);
-        let mut m = Menu {
+        Some(Menu {
             text,
             number,
             walk: MenuWalk::default(),
             rules: MenuRules::of_build(self.game.exe.build, self.enhancements().minor_bug_fixes),
-        };
-        m.walk(None, 0, 0);
-        Some(m)
+        })
     }
 
     /// `images\<name>` full screen, black around it.
@@ -214,6 +258,7 @@ impl Engine {
             FontMin::PlayerList
         };
         let mut last_click: Option<(usize, u64)> = None;
+        menu.walk(None, 0, 0, self.menu_table());
         self.wait_buttons_up().await;
         while self.sys.poll_event().is_some() {}
         loop {
@@ -226,7 +271,7 @@ impl Engine {
             let hover_row = menu_grid_hit(grid_x, grid_y, grid_w, grid_h, 1, rows, true, mx, my)
                 .filter(|&r| r < rows)
                 .map(|r| r as usize);
-            let hover_rec = menu.hit(mx, my);
+            let hover_rec = menu.hit(mx, my, self.menu_table().as_deref());
             let mut commit = false;
             let mut leave = false;
             if mi.escape {
@@ -321,7 +366,7 @@ impl Engine {
             // The frame: the backdrop, the menu, the rows (FUN_00420d8c:
             // x 185, y 270 + 22 j, FONTMIN2 under the mouse), the name field
             // (FUN_00420f60 at (160, 190)).
-            menu.walk(hover_rec, 0, 0);
+            menu.walk(hover_rec, 0, 0, self.menu_table());
             let mut s = bg.clone();
             self.ui.draw_menu(&mut s, &menu.walk);
             let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
@@ -376,6 +421,7 @@ impl Engine {
         let Some(mut menu) = self.load_menu("SUREMENU.TXT").await else {
             return true;
         };
+        menu.walk(None, 0, 0, self.menu_table());
         self.wait_buttons_up().await;
         loop {
             if self.should_abort() {
@@ -386,14 +432,16 @@ impl Engine {
                 return false;
             }
             let (mx, my) = self.sys.mouse();
-            let hit = menu.hit(mx, my).filter(|&r| r == 3 || r == 4);
+            let hit = menu
+                .hit(mx, my, self.menu_table().as_deref())
+                .filter(|&r| r == 3 || r == 4);
             if mi.left_press {
                 if let Some(r) = hit {
                     self.wait_buttons_up().await;
                     return r == 3;
                 }
             }
-            menu.walk(hit, 0, 0);
+            menu.walk(hit, 0, 0, self.menu_table());
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -409,6 +457,7 @@ impl Engine {
         let Some(mut menu) = self.load_menu("MAINMENU.TXT").await else {
             return MenuOutcome::Resume;
         };
+        menu.walk(None, 0, 0, self.menu_table());
         self.wait_buttons_up().await;
         while self.sys.poll_event().is_some() {}
         let mut outcome = MenuOutcome::Resume;
@@ -418,7 +467,7 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
-            let hit = menu.hit(mx, my);
+            let hit = menu.hit(mx, my, self.menu_table().as_deref());
             if mi.left_press {
                 self.wait_buttons_up().await;
                 match hit {
@@ -438,7 +487,7 @@ impl Engine {
                 }
                 break;
             }
-            menu.walk(hit, 0, 0);
+            menu.walk(hit, 0, 0, self.menu_table());
             let mut s = bg.clone();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -455,21 +504,17 @@ impl Engine {
         let Some(mut menu) = self.load_menu("OPTMENU.TXT").await else {
             return;
         };
-        // The toggles as sprite records (the Chinese builds): the hit table
-        // 0x006026b0 keeps the records from one visit to the next, and the
-        // id 9 record of a walk with SUBTITLES off keeps the x / y stored
-        // before (see MenuRules::toggle_in_step); the first walk is made
-        // with the toggles (atlantis-cd-zh-tw-696832 FUN_0041d5c0 @
-        // 0x0041d5e7..0x0041d5ec).
-        let toggle_sprites = self.game.exe.build.menu_toggle_sprites;
-        if toggle_sprites {
-            menu.walk.records = self.opt_menu_records.clone();
-            menu.walk(
-                None,
-                i32::from(self.subtitles),
-                i32::from(self.settings.omni3d_mode2),
-            );
-        }
+        // The first walk is made with the toggles (atlantis-cd-zh-tw-696832
+        // FUN_0041d5c0 @ 0x0041d5e7..0x0041d5ec): with the toggles as
+        // sprite records (the Chinese builds), the id 9 record of a walk
+        // with SUBTITLES off keeps the x / y the session's table holds from
+        // an earlier visit (see MenuRules::toggle_in_step).
+        menu.walk(
+            None,
+            i32::from(self.subtitles),
+            i32::from(self.settings.omni3d_mode2),
+            self.menu_table(),
+        );
         // The hovered record is the one under the pointer, whatever it is
         // (@ 0x0041d5f1..0x0041d600): with the sprite menus the labels
         // SUBTITLES and OMNI 3D (records 2 and 4) are drawn hovered too
@@ -482,7 +527,7 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
-            let under = menu.hit(mx, my);
+            let under = menu.hit(mx, my, self.menu_table().as_deref());
             let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
             if mi.left_press {
                 self.wait_buttons_up().await;
@@ -512,13 +557,11 @@ impl Engine {
                 if sprite_menus { under } else { hit },
                 i32::from(self.subtitles),
                 i32::from(self.settings.omni3d_mode2),
+                self.menu_table(),
             );
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
-        }
-        if toggle_sprites {
-            self.opt_menu_records = menu.walk.records.clone();
         }
         if changed {
             self.save_settings();
@@ -536,26 +579,36 @@ impl Engine {
         let Some(mut menu) = self.load_menu("SONMENU.TXT").await else {
             return;
         };
+        // The walk writes its 18 records into the session's table (the
+        // reference FUN_0041d940, atlantis-cd-en-688128 FUN_0041d218 @
+        // 0x0041d2b9): in a 16-record build its records 16 and 17 land on
+        // SUREMENU's count byte and records 0-1. The knobs are its records
+        // 5..8, whose x the sliders write (atlantis-cd-en-688128 @
+        // 0x0041d2b2) and the walk keeps (son_knob_x mirrors them).
+        menu.walk(None, 0, 0, self.menu_table());
         for t in 0..4 {
-            match menu.walk.records.get(5 + t) {
-                Some(r) if self.son_knob_x[t] == 0 => self.son_knob_x[t] = i32::from(r.x),
-                _ => {}
+            if self.son_knob_x[t] == 0 {
+                let r = menu.stored_record(5 + t, self.menu_table().as_deref());
+                self.son_knob_x[t] = i32::from(r.x);
             }
         }
+        let set_knobs = |e: &mut Engine, menu: &mut Menu| {
+            for t in 0..4 {
+                let mut r = menu.stored_record(5 + t, e.menu_table().as_deref());
+                r.x = e.son_knob_x[t] as i16;
+                menu.set_stored_record(5 + t, r, e.menu_table());
+            }
+        };
         let mut grabbed: Option<usize> = None;
         let mut commit = false;
         loop {
             if self.should_abort() {
                 break;
             }
-            for t in 0..4 {
-                if let Some(r) = menu.walk.records.get_mut(5 + t) {
-                    r.x = self.son_knob_x[t] as i16;
-                }
-            }
+            set_knobs(self, &mut menu);
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
-            let hit = menu.hit(mx, my);
+            let hit = menu.hit(mx, my, self.menu_table().as_deref());
             let down = self.sys.buttons().0;
             if mi.left_press {
                 grabbed = hit;
@@ -578,12 +631,8 @@ impl Engine {
                     _ => {}
                 }
             }
-            for t in 0..4 {
-                if let Some(r) = menu.walk.records.get_mut(5 + t) {
-                    r.x = self.son_knob_x[t] as i16;
-                }
-            }
-            menu.walk(hit, 0, 0);
+            set_knobs(self, &mut menu);
+            menu.walk(hit, 0, 0, self.menu_table());
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -662,6 +711,12 @@ impl Engine {
         let build = self.game.exe.build;
         let clamp = build.load_picker_clamp;
         let mut sb = LoadPickerScroll::new(count as i32, build.load_knob_starts_at_bar, clamp);
+        // The entry's stores of the knob (0x0041d1f3..0x0041d24b), then the
+        // first walk.
+        let knob =
+            load_picker_knob_record(menu.stored_record(4, self.menu_table().as_deref()), &sb);
+        menu.set_stored_record(4, knob, self.menu_table());
+        menu.walk(None, 0, 0, self.menu_table());
         let sprite_rows = matches!(build.load_list, LoadList::Sprites { .. });
         let mut title: Option<(Vec<u8>, i32)> = None;
         // The Chinese builds' title: EPICHI2 frame `row` at x.
@@ -719,7 +774,7 @@ impl Engine {
             if mi.left_press {
                 // WM_LBUTTONDOWN latches the record under the pointer
                 // (0x00419c47): the track when strictly inside it.
-                track_latched = menu.hit(mx, my) == Some(1);
+                track_latched = menu.hit(mx, my, self.menu_table().as_deref()) == Some(1);
             }
             if !down {
                 track_latched = false;
@@ -737,7 +792,9 @@ impl Engine {
                 .filter(|&g| g < 11 && (clamp || (g as usize) < count))
                 .map(|g| scroll + g as usize)
                 .filter(|&r| r < count);
-            let button = menu.hit(mx, my).filter(|r| [5, 6, 7].contains(r));
+            let button = menu
+                .hit(mx, my, self.menu_table().as_deref())
+                .filter(|r| [5, 6, 7].contains(r));
             if mi.left_press && !track_latched {
                 if let Some(r) = row_hover {
                     selected = Some(r);
@@ -756,14 +813,13 @@ impl Engine {
                     return b as u8;
                 }
             }
-            // The knob: drawn at its stored record position.
-            if let Some(r) = menu.walk.records.get_mut(4) {
-                if sb.knob_x != 0 {
-                    r.x = sb.knob_x as i16;
-                }
-                r.y = sb.knob_y as i16;
-            }
-            menu.walk(button, 0, 0);
+            // The knob, record 4: the picker writes it, the walk draws it
+            // at its stored x / y (in the session's table, an x 0xffce
+            // stays for the later visits).
+            let knob =
+                load_picker_knob_record(menu.stored_record(4, self.menu_table().as_deref()), &sb);
+            menu.set_stored_record(4, knob, self.menu_table());
+            menu.walk(button, 0, 0, self.menu_table());
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             if sprite_rows {

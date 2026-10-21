@@ -303,6 +303,9 @@ fn tables_of_the_dutch_1997_build() {
     b.upper_case_names = en_build.upper_case_names;
     b.startup_logo_rp = en_build.startup_logo_rp;
     b.text_code_page = en_build.text_code_page;
+    // 20 records per menu (the menu walk's `imul eax,eax,0xa1` @
+    // 0x0041efa4), not the English build's 16.
+    b.menu_records_per_menu = en_build.menu_records_per_menu;
     assert_eq!(&b, en_build);
     if let Some(en) = game_1997("tables_of_the_dutch_1997_build (English 1997)") {
         let e = &en.exe;
@@ -428,6 +431,9 @@ fn tables_of_the_swedish_1997_build() {
     b.text_code_page = en_build.text_code_page;
     b.subtitle_cut_back_only = en_build.subtitle_cut_back_only;
     b.name_entry_dos_letters = en_build.name_entry_dos_letters;
+    // 20 records per menu (the menu walk's `imul eax,eax,0xa1` @
+    // 0x0041f090), not the English build's 16.
+    b.menu_records_per_menu = en_build.menu_records_per_menu;
     assert_eq!(&b, en_build);
     if let Some(en) = game_1997("tables_of_the_swedish_1997_build (English 1997)") {
         let e = &en.exe;

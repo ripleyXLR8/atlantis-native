@@ -46,7 +46,14 @@ pub struct Enhancements {
     ///   pointer steps back one byte also when the id stays 9, so the
     ///   record's x is 0 and each later field is read from inside the one
     ///   before (a record placed by an earlier walk keeps its place, but
-    ///   its click area takes the shifted width and height).
+    ///   its click area takes the shifted width and height);
+    /// - each menu keeps its own click records, from zero at every visit;
+    ///   off, the original's one record table for the session
+    ///   (`ui::layout::MenuRecordTable`): with the May 1997 English and
+    ///   French builds the sound menu's last two records spill over the ARE
+    ///   YOU SURE ? menu's and move its left ornament off screen for the
+    ///   session, and in every build the LOAD scrollbar's knob, hidden by a
+    ///   visit with 11 checkpoints or fewer, stays hidden on later visits.
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

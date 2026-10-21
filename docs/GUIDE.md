@@ -303,7 +303,12 @@ picked folder on its first start.
   across two characters, and stay as in the original; on the Chinese
   CDs, the options' SUBTITLES toggle answers over its own sprite while
   SUBTITLES is off (the original reads its record one byte out of step,
-  so its click area takes a wrong width and height).
+  so its click area takes a wrong width and height); each menu sets its
+  click areas afresh at every visit (the original keeps one table of
+  them for the whole session: on the May 1997 English and French
+  CDs, after the sound options, the ARE YOU SURE ? prompt loses its left
+  ornament, and on every CD the LOAD list's scrollbar knob, hidden while
+  11 checkpoints or fewer were listed, stays hidden).
   `--original` turns them off.
 - On the Traditional Chinese CD, the one subtitle with no punctuation
   mark in its first 75 bytes (a game-over narration) is cut at 75 bytes;

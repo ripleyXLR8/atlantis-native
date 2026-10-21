@@ -167,6 +167,15 @@ pub struct ExeBuild {
     /// builds turn only the bytes below 0x20 into spaces. No shipped menu
     /// byte is above 0xa8.
     pub menu_high_bytes_as_space: bool,
+    /// The records per menu of the menus' record table (one static table
+    /// of 15 blocks, a count byte and this many records of 8 bytes each,
+    /// with no bound on the count: extra records spill into the next
+    /// menu's block): 20 (stride 0xa1, `imul eax,eax,0xa1` in FUN_0041fb6c
+    /// @ 0x0041fbbc), 16 (stride 0x81) in atlantis-cd-en-688128
+    /// (FUN_0041ef34 @ 0x0041ef84) and atlantis-cd-fr-688640 (FUN_0041efa4
+    /// @ 0x0041eff4), whose SONMENU.TXT's 18 records then overwrite
+    /// SUREMENU's count byte and first two records.
+    pub menu_records_per_menu: u8,
     /// The GDI subtitle breaker's cut marks: the reference's 100-byte
     /// window cut at a space (FUN_0042ffe8), or the Chinese builds'
     /// 75-byte window cut after double-byte punctuation (FUN_0042f424 of
@@ -342,6 +351,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -396,6 +406,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -463,6 +474,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -516,6 +528,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 16,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -586,6 +599,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -651,6 +665,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -718,6 +733,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -783,6 +799,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         // FUN_0041ecb4 @ 0x0041f068 and @ 0x0041f235.
         menu_positioned_byte_width: 16,
         menu_high_bytes_as_space: true,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -847,6 +864,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 16,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -923,6 +941,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -994,6 +1013,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: true,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -1082,6 +1102,7 @@ pub const ZH_TW: ExeBuild = ExeBuild {
     // 0x20 as spaces @ 0x0041fc19.
     menu_positioned_byte_width: 22,
     menu_high_bytes_as_space: false,
+    menu_records_per_menu: 20,
     cjk_breaker: CjkBreaker::Big5,
     subtitle_row_step: 18,
     menu_sprite_banks: Some(["SPRCHI1.SPR", "SPRCHI2.SPR"]),
@@ -1411,10 +1432,20 @@ mod tests {
         assert!(steps.windows(2).all(|w| w[0] < w[1]));
     }
 
-    /// The 1997 players.atl row rule in every 1997 build.
+    /// The menus' record table: 16 records per menu in the English May
+    /// 1997 code's English and French builds (`imul eax,eax,0x81`), 20 in
+    /// the others (`0xa1`, the Dutch and Swedish builds of that code too);
+    /// the 1997 players.atl row rule in every 1997 build.
     #[test]
-    fn player_rows_rule() {
+    fn menu_records_and_player_rows() {
         for b in &BUILDS {
+            let short = matches!(b.name, "atlantis-cd-en-688128" | "atlantis-cd-fr-688640");
+            assert_eq!(
+                b.menu_records_per_menu,
+                if short { 16 } else { 20 },
+                "{}",
+                b.name
+            );
             assert_eq!(b.players_1997, b.year == 1997, "{}", b.name);
         }
     }

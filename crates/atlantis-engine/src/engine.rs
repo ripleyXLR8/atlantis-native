@@ -246,9 +246,10 @@ pub struct Engine {
     pub subtitle_clicks: u8,
     /// The sound menu's knobs, kept for the session (0 = the file's).
     pub son_knob_x: [i32; 4],
-    /// OPTMENU's hit table records, kept for the session when its toggles
-    /// are sprite records (`ExeBuild::menu_toggle_sprites`).
-    pub(crate) opt_menu_records: Vec<crate::ui::layout::MenuRecord>,
+    /// The menus' record table, one for the session as the original's
+    /// (zeroed at start-up; see [`crate::ui::layout::MenuRecordTable`]);
+    /// not used with the minor bug fixes ([`Engine::menu_table`]).
+    pub(crate) menu_records: crate::ui::layout::MenuRecordTable,
     /// The captions of the CINEMA video playing (`ExeBuild::cinema_captions`).
     pub(crate) cinema_captions: Option<crate::place::CinemaCaptionState>,
     pub(crate) channel_test_voice: Option<crate::audio::VoiceId>,
@@ -358,6 +359,9 @@ impl Engine {
         ambient.effects_volume = 127;
         let ambient_out = MixerAmbientOutput::new(sys.mixer.clone());
         let music = Music::new(&sys);
+        let menu_records = crate::ui::layout::MenuRecordTable::new(usize::from(
+            game.exe.build.menu_records_per_menu,
+        ));
         Engine {
             sys,
             game,
@@ -392,7 +396,7 @@ impl Engine {
             settings: Settings::default(),
             subtitle_clicks: 0,
             son_knob_x: [0; 4],
-            opt_menu_records: Vec::new(),
+            menu_records,
             cinema_captions: None,
             channel_test_voice: None,
             voice_volume: 255,
@@ -489,6 +493,24 @@ impl Engine {
     /// with the options menu through [`Sys`], so a change applies at once).
     pub fn enhancements(&self) -> Enhancements {
         self.sys.enhancements()
+    }
+
+    /// The menus' record table of the session, as the original keeps it
+    /// (the build's records per menu); `None` with the minor bug fixes:
+    /// each menu then keeps its own records, from zero at every visit, so
+    /// that the sound menu's records 16 and 17 no longer move the ARE YOU
+    /// SURE ? ornament off screen in the two 16-record builds, and the
+    /// LOAD knob hidden by a visit with 11 checkpoints or fewer comes back
+    /// on a later visit with more.
+    pub(crate) fn menu_table(&mut self) -> Option<&mut crate::ui::layout::MenuRecordTable> {
+        if self.enhancements().minor_bug_fixes {
+            return None;
+        }
+        let n = usize::from(self.game.exe.build.menu_records_per_menu);
+        if self.menu_records.records_per_menu() != n {
+            self.menu_records = crate::ui::layout::MenuRecordTable::new(n);
+        }
+        Some(&mut self.menu_records)
     }
 
     pub fn set_enhancements(&mut self, x: Enhancements) {
