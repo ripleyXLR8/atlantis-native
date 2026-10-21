@@ -197,3 +197,47 @@ fn simplified_chinese_cd_raw_images() {
         assert_eq!(undecoded, 0);
     }
 }
+
+/// ScummVM's detection keys of a release's files (the md5 of the first
+/// 5000 bytes of `atlantis.exe` and of `BIGCD1.BIG`, the archive's size):
+/// the files the port tells apart by the executable's size and PE
+/// timestamp are those of these keys.
+fn detection_keys(var: &str) -> Option<(String, String, u64)> {
+    use atlantis_data::FileSource;
+    use md5::{Digest, Md5};
+    let dir = std::env::var(var).ok()?;
+    let set = DiscSet::open_folder(dir.as_ref()).expect("CD images");
+    let head = |name: &str| {
+        let bytes = set.read_at(name, 0, 5000).expect(name);
+        format!("{:x}", Md5::digest(bytes))
+    };
+    Some((
+        head("atlantis.exe"),
+        head("BIGCD1.BIG"),
+        set.size("BIGCD1.BIG").unwrap(),
+    ))
+}
+
+#[test]
+fn chinese_cd_detection_keys() {
+    if let Some(k) = detection_keys("ATLANTIS_ISO_ZH_TW") {
+        assert_eq!(
+            k,
+            (
+                "f40f1e6a240730d325168f4224da8457".into(),
+                "7f65366bdac230d7735250a22c98d01e".into(),
+                636_420_567
+            )
+        );
+    }
+    if let Some(k) = detection_keys("ATLANTIS_BIN_ZH_CN") {
+        assert_eq!(
+            k,
+            (
+                "591701abaaaa4efa3751da60a42fb7ad".into(),
+                "920fff5d0adda30f14a5699554b4f529".into(),
+                636_421_642
+            )
+        );
+    }
+}
