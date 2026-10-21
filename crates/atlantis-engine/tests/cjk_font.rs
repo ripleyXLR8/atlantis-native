@@ -16,7 +16,8 @@ use atlantis_data::disc_image::DiscSet;
 use atlantis_data::{Game, TextCodePage};
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::subtitles::{
-    split_subtitle_cjk, subtitle_row_y, CjkSplit, FaceSource, FontFace, SubtitleFont, SUBTITLE_COLOR, SUBTITLE_SHADOW, SUBTITLE_X,
+    split_subtitle_cjk, subtitle_row_y, CjkSplit, FaceSource, FontFace, SubtitleFont,
+    SUBTITLE_COLOR, SUBTITLE_SHADOW, SUBTITLE_X,
 };
 use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::{Event, MemStore, Options, Start};

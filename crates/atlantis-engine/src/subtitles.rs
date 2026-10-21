@@ -428,8 +428,14 @@ impl GlyphBits {
                         u * u * a.y + 2.0 * u * t * b.y + t * t * c.y,
                     )),
                     ab_glyph::OutlineCurve::Cubic(a, b, c, d) => at(point(
-                        u * u * u * a.x + 3.0 * u * u * t * b.x + 3.0 * u * t * t * c.x + t * t * t * d.x,
-                        u * u * u * a.y + 3.0 * u * u * t * b.y + 3.0 * u * t * t * c.y + t * t * t * d.y,
+                        u * u * u * a.x
+                            + 3.0 * u * u * t * b.x
+                            + 3.0 * u * t * t * c.x
+                            + t * t * t * d.x,
+                        u * u * u * a.y
+                            + 3.0 * u * u * t * b.y
+                            + 3.0 * u * t * t * c.y
+                            + t * t * t * d.y,
                     )),
                 };
                 if let Some(f) = from {
@@ -457,7 +463,11 @@ impl GlyphBits {
         let spans = |c: f32, horizontal: bool| -> Vec<(f32, f32)> {
             let mut cross: Vec<(f32, i32)> = Vec::new();
             for &(a, b) in &lines {
-                let (a, b) = if horizontal { (a, b) } else { ((a.1, a.0), (b.1, b.0)) };
+                let (a, b) = if horizontal {
+                    (a, b)
+                } else {
+                    ((a.1, a.0), (b.1, b.0))
+                };
                 // (u, v): v the scan direction's normal
                 let (au, av, bu, bv) = (a.0, a.1, b.0, b.1);
                 if av == bv {

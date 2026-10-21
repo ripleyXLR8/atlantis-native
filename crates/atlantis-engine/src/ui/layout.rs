@@ -1078,7 +1078,12 @@ mod tests {
         assert_eq!(walk.records[0].y, 0x7b);
         for b in BUILDS.iter() {
             let rules = MenuRules::of_build(b, false);
-            assert_eq!(rules.sprite_stored_y, b.text_code_page.is_double_byte(), "{}", b.name);
+            assert_eq!(
+                rules.sprite_stored_y,
+                b.text_code_page.is_double_byte(),
+                "{}",
+                b.name
+            );
         }
     }
 
