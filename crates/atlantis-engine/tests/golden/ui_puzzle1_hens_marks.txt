@@ -1,0 +1,6 @@
+# StartPuzzle 1, the hens FUN_004441e8 of atlantis.exe (2001 English build), run twice on one memory image under
+# emulation: the marks after the second run's set-up, after a first run that left them shown at (262 + 20i, 457)
+# (shown, x, y), then the x of mark 0 on the frames of its drop (y 397..412) in a weighing won at (420, 360).
+second run marks: (0,262,457) (0,282,457) (0,302,457) (0,322,457)
+second run weighing at (420, 360): win
+second run drop x: 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262 262

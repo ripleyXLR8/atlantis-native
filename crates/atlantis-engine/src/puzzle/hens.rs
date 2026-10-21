@@ -169,9 +169,11 @@ pub struct HensGame {
 }
 
 impl Default for HensGame {
-    /// `FUN_004441e8`'s set-up.
+    /// The first run's state: `FUN_004441e8`'s set-up on the marks of the
+    /// data section, whose x and y no set-up writes (307, 399: bytes 33 01
+    /// 8f 01 at 0x00496e92 + 6i).
     fn default() -> Self {
-        HensGame {
+        let mut g = HensGame {
             hens: HENS,
             marks: [Mark {
                 shown: 0,
@@ -182,7 +184,9 @@ impl Default for HensGame {
             won: 0,
             marked: 0,
             leave: false,
-        }
+        };
+        g.reset();
+        g
     }
 }
 
@@ -197,6 +201,21 @@ fn target_pos(t: i16) -> (i32, i32) {
 }
 
 impl HensGame {
+    /// `FUN_004441e8`'s set-up (0x00444200..0x00444287), with the records
+    /// of the data section. It writes only the first short of each mark
+    /// (0x0044425a..0x00444275): the marks keep their x and y, in the
+    /// original the last run's ([`play`] carries them over).
+    pub fn reset(&mut self) {
+        self.hens = HENS;
+        for m in &mut self.marks {
+            m.shown = 0;
+        }
+        self.carried = 0;
+        self.won = 0;
+        self.marked = 0;
+        self.leave = false;
+    }
+
     /// The position of target `t` (1..15).
     pub fn target_pos(t: usize) -> (i32, i32) {
         let (x, y) = TARGETS[t];
@@ -517,7 +536,11 @@ impl HensIo for Host<'_> {
             Sound::Drop => "POULE3",
             Sound::Even => "POULE4",
             Sound::Win => "POULE5",
-            // Sample 0x007739e8 is not loaded by this puzzle.
+            // Sample 0x007739e8 is not loaded by this puzzle: nothing. If
+            // puzzle 4 ran earlier in the process the record still points at
+            // flip7's pool buffer, overwritten by PUZPOUL2.SPR, and the
+            // original decodes sprite bytes as sound (a stale pointer,
+            // undefined behaviour, not reproduced).
             Sound::Lose => return,
         };
         self.h.play_sound(name, SamplePlayer::Ca28);
@@ -527,8 +550,9 @@ impl HensIo for Host<'_> {
     }
 }
 
-/// StartPuzzle 1: 255 when solved, 2 when the player leaves, 1 when a
-/// file is missing or the game is quit.
+/// StartPuzzle 1: 255 when solved, 2 when the player leaves, 1 when the
+/// game is quit. Here only: 1 when a file is missing; `FUN_004441e8` tests
+/// none of its loads (0x0044429a..0x0044431c).
 pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let (Some(bg), Some(b0), Some(b1), Some(b2)) = (
         load_tga(e, "PUZPOUL1.TGA").await,
@@ -540,7 +564,14 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         return 1;
     };
     let sounds = PuzzleSounds::load(e, &["POULE1", "POULE2", "POULE3", "POULE4", "POULE5"]).await;
+    // The marks' x and y carry over from the last run, as in the
+    // original's memory: a won weighing draws its mark's drop at the x
+    // left there.
     let mut game = HensGame::default();
+    if let Some(marks) = e.puzzles.hen_marks {
+        game.marks = marks;
+        game.reset();
+    }
     let mut host = Host {
         h: PuzzleHost::new(e, hooks),
         banks: [b0, b1, b2],
@@ -548,6 +579,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     host.h.screen.pictures = vec![bg];
     host.h.sounds = sounds;
     let r = game.run(&mut host).await;
+    host.h.e.puzzles.hen_marks = Some(game.marks);
     if host.h.e.should_abort() {
         1
     } else {

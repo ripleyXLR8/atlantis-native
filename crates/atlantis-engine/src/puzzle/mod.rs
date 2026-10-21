@@ -269,6 +269,8 @@ pub struct PuzzleState {
     /// The snakes of the last snakes run (their places and pieces are not
     /// reset).
     pub snakes: Option<[snakes::Snake; snakes::NUM_SNAKES]>,
+    /// The hens' marks of the last hens run (their x and y are not reset).
+    pub hen_marks: Option<[hens::Mark; hens::NUM_MARKS]>,
     /// The rat's run state (static data at 0x004969c0, partly reset by
     /// each run).
     pub rat: Option<rat::RatRules>,
@@ -284,6 +286,7 @@ impl Default for PuzzleState {
             crabs: None,
             eclipse: None,
             snakes: None,
+            hen_marks: None,
             rat: None,
         }
     }
