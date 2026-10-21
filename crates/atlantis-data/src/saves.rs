@@ -197,12 +197,20 @@ impl Players {
     /// the marker and the count stays 5; otherwise the rows from the new
     /// count on are emptied (the 1997 layout empties the new count's row
     /// only: atlantis-cd-en-688128 FUN_0041e030 has no loop over the
-    /// others). Returns the deleted player's letter.
+    /// others). The Chinese builds' list ([`Players::sixth_row`]) shifts
+    /// the 17 bytes after the rows into row 4 and, without five players,
+    /// writes the rows with `strcpy` (see the branch). Returns the deleted
+    /// player's letter.
     pub fn delete(&mut self, row: usize) -> Option<u8> {
         if row >= self.count || self.is_new_row(row) {
             return None;
         }
         let letter = self.letters[row];
+        // The five-player test reads row 4 before the shift
+        // (atlantis-cd-zh-tw-696832 FUN_0041e65c @ 0x0041e6bb..0x0041e6d5);
+        // the other layouts' shift leaves row 4 as it is, so the test
+        // reads the same row there.
+        let five = self.count == MAX_PLAYERS && !self.is_new_row(MAX_PLAYERS - 1);
         for i in row..MAX_PLAYERS {
             if i + 1 < MAX_PLAYERS {
                 self.rows[i] = self.rows[i + 1];
@@ -214,10 +222,30 @@ impl Players {
         }
         self.letters[4] = letter;
         self.chapters[4] = 0;
-        let five = self.count == MAX_PLAYERS && !self.is_new_row(MAX_PLAYERS - 1);
         if five {
             let marker = self.marker.clone();
             strcpy(&mut self.rows[MAX_PLAYERS - 1], &marker);
+        } else if self.sixth_row.is_some() {
+            // atlantis-cd-zh-tw-696832 FUN_0041e65c: row 4 = "" @ 0x0041e736;
+            // the old count's last row = the marker when the count is 5
+            // and that row (row 4, just emptied) is not the marker, else ""
+            // @ 0x0041e754..0x0041e7b4; the rows from the old count on =
+            // "" @ 0x0041e7b9..0x0041e7e8; the count drops @ 0x0041e7ea.
+            // With four players and the marker in row 4, row 4 keeps the
+            // marker past the new count.
+            strcpy(&mut self.rows[MAX_PLAYERS - 1], b"");
+            let last = self.count - 1;
+            let marker = self.marker.clone();
+            let s: &[u8] = if self.count == MAX_PLAYERS && !self.is_new_row(last) {
+                &marker
+            } else {
+                b""
+            };
+            strcpy(&mut self.rows[last], s);
+            for r in self.count..MAX_PLAYERS {
+                strcpy(&mut self.rows[r], b"");
+            }
+            self.count -= 1;
         } else {
             self.count -= 1;
             let end = if self.layout_1997 {
@@ -586,6 +614,24 @@ mod tests {
         q.delete(0);
         assert!(q.is_new_row(4));
         assert_eq!(q.name(3), b"E");
+        // Four players and the marker in row 4: the test reads row 4
+        // before the shift, so the count drops to 4 and row 4 keeps the
+        // marker past it (FUN_0041e65c @ 0x0041e6bb, 0x0041e754..0x0041e7ea).
+        let mut q = Players::new(marker);
+        q.sixth_row = Some([0; NAME_LEN]);
+        for n in [&b"A"[..], b"B", b"C", b"D"] {
+            q.create(n).unwrap();
+        }
+        assert_eq!(q.count, 5);
+        q.delete(0);
+        assert_eq!(q.count, 4);
+        assert_eq!(q.player_count(), 3);
+        assert_eq!(q.name(2), b"D");
+        assert!(q.is_new_row(3) && q.is_new_row(4));
+        // A new name takes row 3; the marker is not left between players.
+        assert_eq!(q.create(b"F"), Some(3));
+        assert_eq!((q.count, q.player_count()), (5, 4));
+        assert!(q.is_new_row(4));
     }
 
     /// The 1997 layout: 95 bytes (chapters 0x55..0x5a, letters
