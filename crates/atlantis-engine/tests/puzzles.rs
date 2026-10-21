@@ -272,9 +272,15 @@ fn crt_rand_from_seed_1() {
     let want = [
         16838, 5758, 10113, 17515, 31051, 5627, 23010, 7419, 16212, 4086, 2749, 12767,
     ];
-    let mut seed = 1;
+    let mut seed = puzzle::CRT_RAND_START_SEED;
     for w in want {
         assert_eq!(puzzle::crt_rand_next(&mut seed), w);
+    }
+    // The engine's one stream (what the rat, the crab and the ogre draw
+    // from in turn): the same sequence from the launch, no restart.
+    let mut state = puzzle::PuzzleState::default();
+    for w in want {
+        assert_eq!(state.crt_rand(), w);
     }
 }
 

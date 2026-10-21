@@ -324,7 +324,9 @@ pub fn decode_spw_pixels(data: &[u8], dst: &mut [u16], width: usize, height: usi
 }
 
 /// Draws frame `frame` of an SPF onto `dst`. Like FUN_004256e8 (test at
-/// 0x004257b6), nothing is drawn once `frame` reaches the frame count.
+/// 0x004257b6), nothing is drawn once `frame` reaches the frame count, of
+/// which it reads only the low byte (byte load @ 0x00425764); no shipped
+/// SPF has more than 139 frames.
 pub fn composite_spf_frame(
     data: &[u8],
     frame: usize,
@@ -332,7 +334,8 @@ pub fn composite_spf_frame(
     width: usize,
     height: usize,
 ) {
-    if frame as u64 >= u64::from(spw_frame_count(data)) {
+    let count = data.get(4).copied().unwrap_or(0);
+    if frame >= usize::from(count) {
         return;
     }
     decode_spw_pixels(data, dst, width, height, frame);
@@ -480,6 +483,21 @@ mod tests {
         let before = md5_le(&p);
         composite_spf_frame(&d, 1, &mut p, CYC_W, CYC_H);
         assert_eq!(md5_le(&p), before);
+    }
+
+    // The frame count is the low byte of the header dword (0x00425764): a
+    // count of 0x100 draws nothing, a count of 0x101 draws frame 0.
+    #[test]
+    fn spf_count_low_byte() {
+        let mut d = synthetic_spw();
+        d[4..8].copy_from_slice(&0x100u32.to_le_bytes());
+        let mut p = background(CYC_W * CYC_H);
+        let before = md5_le(&p);
+        composite_spf_frame(&d, 0, &mut p, CYC_W, CYC_H);
+        assert_eq!(md5_le(&p), before);
+        d[4..8].copy_from_slice(&0x101u32.to_le_bytes());
+        composite_spf_frame(&d, 0, &mut p, CYC_W, CYC_H);
+        assert_eq!(md5_le(&p), "8db0dea5bf37a5fbe798b92e8b5f9949");
     }
 
     #[test]

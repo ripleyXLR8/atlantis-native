@@ -220,6 +220,9 @@ impl PuzzleCursor {
     }
 }
 
+/// The seed of the C rand at launch: srand (0x00453cf5) has no caller.
+pub const CRT_RAND_START_SEED: u32 = 1;
+
 /// The C rand of `atlantis.exe` (Watcom, @ 0x00453cd1). srand
 /// (0x00453cf5) has no caller, so the seed starts at 1 at every launch.
 pub fn crt_rand_next(seed: &mut u32) -> i32 {
@@ -250,7 +253,9 @@ pub fn puzzle_lcg_next(seed: &mut u16, n: i32) -> i32 {
 pub struct PuzzleState {
     /// The shared cursor animation.
     pub cursor: PuzzleCursor,
-    /// The C rand's seed (shared by the rat, crab and ogre puzzles).
+    /// The C rand's seed: one stream for the whole launch, shared by the
+    /// rat (`FUN_00438fd4` @ 0x00439418), the crab (`FUN_0043ede8` @
+    /// 0x0043ee25) and the ogre (`FUN_00442a0c`), never reseeded.
     pub crt_rand_seed: u32,
     /// The puzzle LCG 0x007bec20, seeded by the dispatcher.
     pub lcg_seed: u16,
@@ -273,7 +278,7 @@ impl Default for PuzzleState {
     fn default() -> Self {
         PuzzleState {
             cursor: PuzzleCursor::default(),
-            crt_rand_seed: 1,
+            crt_rand_seed: CRT_RAND_START_SEED,
             lcg_seed: 0,
             meta: None,
             crabs: None,
