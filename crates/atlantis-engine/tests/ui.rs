@@ -897,7 +897,7 @@ fn credits_play_headless() {
         Rc::new(MemStore::new()),
         move |mut e, _s| {
             Box::pin(async move {
-                e.play_credits().await;
+                e.play_credits(None).await;
             })
         },
         move |h, n| {
@@ -912,6 +912,73 @@ fn credits_play_headless() {
         },
     );
     assert!(*frames.borrow() < 700);
+}
+
+/// The 1 s wait between LOGO15N and PREINTRO reads no input but loses
+/// none (GetAsyncKeyState): a click during it ends PREINTRO at its first
+/// poll, after its first frame, with one more frame presented.
+#[test]
+fn startup_wait_keeps_a_click_for_the_next_video() {
+    let Some(g) = game("startup_wait_keeps_a_click_for_the_next_video") else {
+        return;
+    };
+    let sys = Sys::new(Mixer::new());
+    let trace = Rc::new(RefCell::new(Vec::new()));
+    let opts = Options {
+        trace: Some(trace.clone()),
+        saves: Rc::new(MemStore::new()),
+        ..Options::default()
+    };
+    let mut h = Headless::new(sys.clone(), atlantis_engine::run(sys.clone(), g, opts));
+    let videos = |t: &Rc<RefCell<Vec<Event>>>| {
+        t.borrow()
+            .iter()
+            .filter_map(|e| match e {
+                Event::Video { name, frames, .. } => Some((name.clone(), *frames)),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    h.steps(30);
+    h.click(320, 240);
+    assert!(h.until(200, |_| videos(&trace).len() == 1));
+    // In the wait.
+    h.click(320, 240);
+    assert!(h.until(300, |_| videos(&trace).len() == 2));
+    assert_eq!(videos(&trace)[1], ("PREINTRO.HNM".to_string(), 2));
+    sys.push_input(Input::Quit);
+    h.steps(10);
+}
+
+/// The credits poll as `FUN_0041a298`: a right press toggles the bar
+/// request 0x004960c4, which keeps Escape from ending them until a second
+/// right press clears it.
+#[test]
+fn credits_escape_waits_for_the_bar_request() {
+    let Some(g) = game("credits_escape_waits_for_the_bar_request") else {
+        return;
+    };
+    let frames = Rc::new(RefCell::new(0usize));
+    let f2 = frames.clone();
+    with_engine(
+        g,
+        Rc::new(MemStore::new()),
+        move |mut e, _s| {
+            Box::pin(async move {
+                e.play_credits(None).await;
+            })
+        },
+        move |h, n| {
+            *f2.borrow_mut() = n;
+            match n {
+                600 | 620 => h.button(MouseButton::Right, 320, 240),
+                610 | 630 => h.key(Key::Escape),
+                _ => {}
+            }
+        },
+    );
+    let n = *frames.borrow();
+    assert!((630..700).contains(&n), "{n}");
 }
 
 /// An original installation's `players.atl` and checkpoints are taken over

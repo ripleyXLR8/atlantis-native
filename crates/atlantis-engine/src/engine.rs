@@ -808,7 +808,14 @@ impl Engine {
                 // A Vue= inside a departure section already entered its
                 // place (CHAPI005 /113, CHAPI062 /864, CHAPI077 /010); the
                 // place loop goes on with the turn and video of entry i of
-                // the new place's record.
+                // the new place's record. ARRIVEEVUE = 0x006cd7c0 after the
+                // scan (0x00423def), which the Vue= set to the place entered
+                // (FUN_0042a100 @ 0x0042a6fd): the next pass's arrival scan
+                // runs with ArriveeVue = Vue = that place, LastVue = the
+                // place left.
+                let here = self.current_place_id.unwrap_or(0);
+                self.vars.set("arriveevue", i32::from(here));
+                self.arrival_from_vue = here;
                 self.next_place_id = None;
                 if !self.should_abort() && !game_over {
                     self.transition_after_departure_vue(index).await;
@@ -934,15 +941,20 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
 impl Engine {
     /// The start-up videos (0x0041960a..0x004196cc): LOGO15N.HNM and
     /// PREINTRO.HNM with their sounds, through the transition player at the
-    /// cinema pace, a 200-tick (1 s) wait that reads no input between them;
-    /// the Dutch build plays LOGORP.HNM after the wait.
+    /// cinema pace, a 200-tick (1 s) wait between them; the Dutch build
+    /// plays LOGORP.HNM after the wait.
     pub async fn play_startup(&mut self) {
         use crate::place::CINEMA_FRAME_MS;
         self.play_transition_video("LOGO15N.HNM", None, CINEMA_FRAME_MS)
             .await;
+        // The busy wait (0x00419662..0x0041967c, no call) reads no input but
+        // loses none: FUN_0042e624 fills the key table from
+        // GetAsyncKeyState, so the next video's first FUN_0041a298 poll sees
+        // a press made during the wait (a left button: 0x0049611c = 1;
+        // Escape: 0x00496124 = 0), unless it was already down at LOGO15N's
+        // last poll. The input events stay queued for that poll.
         let start = self.sys.millis();
         while self.sys.millis() - start < 1000 && !self.sys.should_quit() {
-            while self.sys.poll_event().is_some() {}
             self.sys.frame().await;
         }
         // The Dutch build: the R&P Electronic Media logo, through the same
