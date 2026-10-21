@@ -238,14 +238,27 @@ impl PuzzleInput {
     /// The events since the last read, then the mouse. A press and its
     /// release between two reads still count as a click.
     pub fn read(&mut self, sys: &Sys) -> PuzzleMouse {
+        self.read_with(sys, |_| {})
+    }
+
+    /// [`PuzzleInput::read`], with each left press (true) and release
+    /// (false) since the last read passed to `on_left` in order.
+    pub fn read_with(&mut self, sys: &Sys, mut on_left: impl FnMut(bool)) -> PuzzleMouse {
         let mut pressed = false;
         while let Some(ev) = sys.poll_event() {
-            if let Input::MouseDown {
-                button: MouseButton::Left,
-                ..
-            } = ev
-            {
-                pressed = true;
+            match ev {
+                Input::MouseDown {
+                    button: MouseButton::Left,
+                    ..
+                } => {
+                    pressed = true;
+                    on_left(true);
+                }
+                Input::MouseUp {
+                    button: MouseButton::Left,
+                    ..
+                } => on_left(false),
+                _ => {}
             }
         }
         let (left, right) = sys.buttons();

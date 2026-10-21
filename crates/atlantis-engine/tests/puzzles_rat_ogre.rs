@@ -140,11 +140,16 @@ fn rat_slots(g: &Game) -> Vec<Slot> {
         .collect()
 }
 
+/// The compared state: 0x004969c0..0x00496cd7, the result, 0x00772d90,
+/// 0x00772d94, and the animation entry 0x00496eea..0x00496eef of the rat
+/// byte's data-section value 0x68.
 fn rat_state(g: &RatGame) -> Vec<u8> {
     let mut st = g.rules.mem[..rat::STATE_SIZE].to_vec();
     st.extend_from_slice(&g.rules.result.to_le_bytes());
     st.extend_from_slice(&g.rules.clock_ticked.to_le_bytes());
     st.extend_from_slice(&g.wheel_y.to_le_bytes());
+    let e = (0x0049_6eea - rat::BASE) as usize;
+    st.extend_from_slice(&g.rules.mem[e..e + 6]);
     st
 }
 
@@ -290,6 +295,43 @@ impl RatIo for RatReplay<'_> {
     }
 }
 
+/// One play replayed from `rules` with the timer at `clock`: the game as
+/// the play left it, and the timer.
+fn rat_replay(
+    name: &str,
+    rules: RatRules,
+    slots: &[Slot],
+    lines: &[&str],
+    clock: u32,
+    want: i32,
+) -> (RatGame, u32) {
+    let mut game = RatGame::new(rules, slots.to_vec());
+    let mut io = RatReplay {
+        lines,
+        next: 0,
+        open: false,
+        frames: 0,
+        mismatches: 0,
+        first_mismatch: String::new(),
+        overrun: false,
+        draws: String::new(),
+        sounds: String::new(),
+        clock,
+        rands: Vec::new(),
+    };
+    let got = block_on(game.run(&mut io));
+    io.close(&game);
+    assert_eq!(io.first_mismatch, "", "{name}");
+    assert_eq!(io.mismatches, 0, "{name}");
+    assert!(!io.overrun, "{name}: ran past its passes");
+    assert_eq!(io.frames, lines.len(), "{name}: passes");
+    assert_eq!(got, want, "{name}: result");
+    (game, io.clock)
+}
+
+/// Every scenario; a "play 2" block replays a second play from the state
+/// the first left (the original's globals last as long as the program:
+/// `rat::play` keeps them in `PuzzleState::rat`), the timer going on.
 #[test]
 fn rat_runs_vs_original() {
     let Some(g) = game("rat_runs_vs_original") else {
@@ -298,34 +340,40 @@ fn rat_runs_vs_original() {
     let slots = rat_slots(&g);
     let lines = golden(include_str!("golden/ui_puzzle4_run.txt"));
     let sc = scenarios(&lines, 3);
-    let mut passes = 0;
+    let (mut passes, mut plays) = (0, 0);
     for s in &sc {
         let name = s.tok[1];
-        let mut game = RatGame::new(RatRules::default(), slots.clone());
-        let mut io = RatReplay {
-            lines: &s.lines,
-            next: 0,
-            open: false,
-            frames: 0,
-            mismatches: 0,
-            first_mismatch: String::new(),
-            overrun: false,
-            draws: String::new(),
-            sounds: String::new(),
-            clock: 1000,
-            rands: Vec::new(),
-        };
-        let got = block_on(game.run(&mut io));
-        io.close(&game);
-        assert_eq!(io.first_mismatch, "", "{name}");
-        assert_eq!(io.mismatches, 0, "{name}");
-        assert!(!io.overrun, "{name}: ran past its passes");
-        assert_eq!(io.frames, s.lines.len(), "{name}: passes");
-        assert_eq!(got, s.tok[5].parse::<i32>().unwrap(), "{name}: result");
-        passes += io.frames;
+        let want = s.tok[5].parse::<i32>().unwrap();
+        let (game, clock) = rat_replay(name, RatRules::default(), &slots, &s.lines, 1000, want);
+        passes += s.lines.len();
+        plays += 1;
+        // The line after the scenario's passes.
+        let at = lines
+            .iter()
+            .position(|l| l.starts_with(&format!("scenario {name} ")))
+            .unwrap()
+            + 1
+            + s.lines.len();
+        if let Some(h) = lines.get(at).and_then(|l| l.strip_prefix("play 2 ")) {
+            let tok: Vec<&str> = h.split(' ').collect();
+            assert_eq!((tok[0], tok[2]), ("frames", "result"));
+            let n: usize = tok[1].parse().unwrap();
+            let p2 = &lines[at + 1..at + 1 + n];
+            rat_replay(
+                &format!("{name} play 2"),
+                game.rules,
+                &slots,
+                p2,
+                clock,
+                tok[3].parse().unwrap(),
+            );
+            passes += n;
+            plays += 1;
+        }
     }
-    assert_eq!(sc.len(), 4);
-    eprintln!("rat: {} runs, {passes} passes matched", sc.len());
+    assert_eq!(sc.len(), 5);
+    assert_eq!(plays, 6);
+    eprintln!("rat: {plays} plays, {passes} passes matched");
 }
 
 #[test]
@@ -438,17 +486,29 @@ impl Engine {
 /// frame of 25 ms (the 5 ticks every pass waits for), as the emulated
 /// timer counts them. The C rand differs (it only picks the ambient
 /// sounds).
+///
+/// The scripted players set the held flag directly, which a button cannot
+/// do: the window procedure sets it from the button's messages, one a pass
+/// and none on a press edge, so it goes up the pass after a press and down
+/// on the pass of a release. The button is pressed the pass before each
+/// rise of the held flag, released on each fall, and kept down through a
+/// one-pass drop between two held passes (a button cannot be released and
+/// pressed again within a pass without a click).
 fn rat_in_engine(name: &str) -> (i32, usize) {
     let g = game("rat_in_engine").unwrap();
     let lines = golden(include_str!("golden/ui_puzzle4_run.txt"));
     let sc = scenarios(&lines, 3);
     let s = sc.iter().find(|s| s.tok[1] == name).unwrap();
+    let input: Vec<_> = s.lines.iter().map(|l| pass_input(l)).collect();
+    let held = |i: usize| -> bool {
+        let Some(p) = input.get(i) else { return false };
+        p.3 || (i > 0 && input[i - 1].3 && input.get(i + 1).is_some_and(|q| q.3 && !q.2))
+    };
     let mut e = Engine::new(g, 4, 25);
     let mut colours = 0;
     let mut n = 0;
-    for (i, l) in s.lines.iter().enumerate() {
-        let (x, y, click, held, _) = pass_input(l);
-        e.pass(x, y, click, held);
+    for (i, &(x, y, click, _, _)) in input.iter().enumerate() {
+        e.pass(x, y, click, held(i) || held(i + 1));
         n += 1;
         if e.result().is_some() {
             break;
