@@ -6,9 +6,9 @@
 //! `showSubjectMenu`, `drawGivenObject`; `menus.cpp` `showGameOver`; GPLv3,
 //! the ScummVM team), which follow `atlantis.exe`: the section executor
 //! `FUN_0042844c`, the line player `FUN_0042ee88`, the voice-only players
-//! `FUN_00430258` (`off`, or a line without its `.syc`) and `FUN_004305e8`
-//! (`off0`), the subject menu `FUN_004261a0` / `FUN_00425828` and
-//! GereGameOver `FUN_00426590`.
+//! `FUN_00430258` (`off`, or a line without its `.syc`), `FUN_004305e8`
+//! (`off0`) and `FUN_00430884` (`off1`), the subject menu `FUN_004261a0` /
+//! `FUN_00425828` and GereGameOver `FUN_00426590`.
 //!
 //! [`Dialogs`] implements [`DialogPresenter`]; the section walk itself is in
 //! [`crate::scripts`].
@@ -142,8 +142,10 @@ struct SingleLine<'a> {
     spf: Option<String>,
     /// 2..5 for a talking head, 0 for a voice-only line.
     cam: i32,
-    /// `off0`: the subtitle over the screen as it stands.
+    /// `off0` / `off1`: the subtitle over the screen as it stands.
     keep_screen: bool,
+    /// `off1`: the screen buffer becomes the screen once the voice loads.
+    screen_buffer: bool,
     /// A voice-only line that redraws the view (`FUN_00430258`).
     voice_off: bool,
     /// The INITDIAL row of the head, for the 3D head.
@@ -277,9 +279,13 @@ impl Dialogs {
         );
         // off / off0 / off1: no talking head; off0 (FUN_004305e8) draws the
         // subtitle over the screen as it stands, with no view redraw. off1
-        // (FUN_00430884) is used by no shipped CON file.
+        // (FUN_00430884; atlantis-cd-zh-tw-696832 FUN_0042fe7c, called @
+        // 0x0042e3a6 when off0's flag 0x004860b8 is clear and 0x004860bc
+        // set) is off0's code with the screen buffer copied to the screen
+        // once the voice has loaded (play_single). The GOG.com scripts have
+        // 30 off1 headers, the Chinese ones 29, the others none.
         let off = header.off;
-        let keep_screen = header.off0;
+        let keep_screen = header.off0 || header.off1;
         let row = dial_row(header.seth && !off, perso, req.inc_perso as u8);
         // FUN_0042ee88 step 3: a line whose wav\ata<NNNN><letter>.syc is
         // missing (FUN_0042f9e8 fails) is played voice-only by FUN_00430258,
@@ -363,6 +369,7 @@ impl Dialogs {
                 spf,
                 cam: if voice_only { 0 } else { cam },
                 keep_screen,
+                screen_buffer: header.off1,
                 voice_off: voice_only && !keep_screen,
             };
             played = self.play_single(e, &single).await;
@@ -497,6 +504,14 @@ impl Dialogs {
         match pcm {
             None => log::info!("no {apc}: line skipped"),
             Some(pcm) => {
+                // off1: with the voice loaded (a CRYO_APC 1.20 header; a
+                // missing file or another header returns before anything is
+                // drawn), the screen buffer becomes the screen, before the
+                // voice starts and the subtitle goes over it.
+                if l.screen_buffer {
+                    player.kept_screen = Some(off1_screen(&e.ix_buffers));
+                    player.kept_hd = false;
+                }
                 let mixer = e.sys.mixer.clone();
                 let mut voice: Option<VoiceId> = None;
                 let start_voice = |e: &Engine, voice: &mut Option<VoiceId>| {
@@ -843,11 +858,37 @@ impl Dialogs {
     }
 }
 
+/// The screen of an `off1` line (`FUN_00430884`; atlantis-cd-zh-tw-696832
+/// `FUN_0042fe7c`): the screen buffer 0x004860d4 (0x004960d4 in the 2001
+/// build), the first of the two IX buffers that start-up allocates
+/// (malloc(0x12c000) stored @ 0x00418f9d) and nothing clears, so it holds
+/// what the last video or loadmusik copy left (`ix_buffers`; zeros before
+/// any). Once the voice has loaded (`FUN_00417cc4`'s "CRYO_APC" "1.20"
+/// test @ 0x00417d33..0x00417d6c passed, 0x0042ff95; the file freed @
+/// 0x00430025), the surface is locked (0x0043002a..0x0043004e) and
+/// FUN_00410f36 copies 0x1e0 x 0x500 bytes of it to the surface
+/// (0x00430074..0x0043008a; in this build a flat copy of rows * 0x500
+/// bytes, 0x00410f40..0x00410f6d), then the surface is unlocked
+/// (0x00430092..0x004300a5), the voice started (0x004300ce..0x004300ed),
+/// the subtitle drawn and presented (0x00430108..0x00430124). The 2001
+/// build copies it to the back buffer 0x004960d8 first, then the back
+/// buffer to the surface, 0x500 bytes a row at the surface's pitch
+/// (0x00430a86..0x00430abb): on the port's 640-pixel screen the same
+/// picture. The wait and what follows are off0's (`FUN_0042fbe0`, the same
+/// code but the copy).
+pub fn off1_screen(ix_buffers: &[u16]) -> Vec<u16> {
+    let mut out = vec![0; N];
+    let n = ix_buffers.len().min(N);
+    out[..n].copy_from_slice(&ix_buffers[..n]);
+    out
+}
+
 /// The frame loop state of a line (`playSingleConLine`'s `drawFrame`).
 struct LinePlayer {
     talking_head: bool,
     voice_off_step: bool,
-    /// off0: the screen as it stood, the subtitle's background.
+    /// off0: the screen as it stood, the subtitle's background; off1: the
+    /// screen buffer, once the voice has loaded.
     kept_screen: Option<Vec<u16>>,
     ubb: Option<UbbVideo<Vec<u8>>>,
     spf: Option<Vec<u8>>,
@@ -1182,5 +1223,300 @@ impl DialogPresenter for Dialogs {
         req: &'a GameOverRequest,
     ) -> HookFuture<'a, ()> {
         Box::pin(self.game_over_impl(e, req))
+    }
+}
+
+#[cfg(test)]
+mod off1_tests {
+    use std::cell::RefCell;
+    use std::future::Future;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    use atlantis_data::disc_image::DiscSet;
+    use atlantis_data::{Game, StdDir};
+    use md5::{Digest, Md5};
+
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::con_script::{con_track_letter, ConItem, ConLine, ConScript};
+    use crate::hooks::DirectLoader;
+    use crate::sys::{Runner, Sys};
+    use crate::test_support::button;
+
+    /// The screen buffer FUN_00430884 / FUN_004307d0 were run on under
+    /// emulation: byte i = (i * 7 + (i >> 11)) & 0xff over 640 x 480 x 2
+    /// bytes; the second IX buffer 0xaa.
+    fn pattern_block() -> Vec<u16> {
+        let byte = |i: usize| ((i * 7 + (i >> 11)) & 0xff) as u16;
+        let mut block: Vec<u16> = (0..N).map(|j| byte(2 * j) | byte(2 * j + 1) << 8).collect();
+        block.resize(2 * N, 0xaaaa);
+        block
+    }
+
+    fn md5_565(px: &[u16]) -> String {
+        let bytes: Vec<u8> = px.iter().flat_map(|p| p.to_le_bytes()).collect();
+        Md5::digest(&bytes)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
+    }
+
+    /// The copy of FUN_00430884 / FUN_004307d0 (run under emulation: the
+    /// surface at pitch 0x500 after a voice that loads, md5 df9e2805...)
+    /// and of atlantis-cd-zh-tw-696832 FUN_0042fe7c (its flat 0x96000-byte
+    /// copy gives the same 640-pixel screen).
+    #[test]
+    fn off1_screen_is_the_first_ix_buffer() {
+        let block = pattern_block();
+        let screen = off1_screen(&block);
+        assert_eq!(md5_565(&block[..N]), "df9e28051d159698bcf01dedcd011fa4");
+        assert_eq!(md5_565(&screen), "df9e28051d159698bcf01dedcd011fa4");
+        // Before any video: the buffer the port has not filled is zero.
+        assert!(off1_screen(&[]).iter().all(|&p| p == 0));
+        let short = off1_screen(&block[..100]);
+        assert_eq!(&short[..100], &block[..100]);
+        assert!(short[100..].iter().all(|&p| p == 0));
+    }
+
+    /// The voice gate (FUN_00417cc4 @ 0x00417d33..0x00417d6c): "CRYO_APC"
+    /// then "1.20", else no voice and nothing drawn (the emulated cases of
+    /// a bad magic and a bad version).
+    #[test]
+    fn off1_voice_gate() {
+        let mut apc = b"CRYO_APC1.20".to_vec();
+        for v in [0u32, 22050, 0, 0, 0] {
+            apc.extend(v.to_le_bytes());
+        }
+        assert!(apc_pcm(&apc).is_some());
+        let mut magic = apc.clone();
+        magic[7] = b'X';
+        assert!(apc_pcm(&magic).is_none());
+        let mut version = apc.clone();
+        version[11] = b'1';
+        assert!(apc_pcm(&version).is_none());
+    }
+
+    struct Seen {
+        frames: usize,
+        /// Frames whose pixels outside the subtitle rows were the screen
+        /// buffer.
+        buffer: usize,
+        /// Frames left as the screen stood before the line.
+        untouched: usize,
+        /// Frames with pixels in the subtitle rows not the screen buffer.
+        subtitled: usize,
+    }
+
+    /// Runs `task` (a [`play_line`]) frame by frame, a left click after 20
+    /// frames: what the frames before it showed, and the LinePlayed
+    /// events. `whole_screen`: the screen buffer is looked for on every
+    /// row, else outside the subtitle's rows 400..460.
+    fn play<Fut: Future<Output = ()> + 'static>(
+        sys: Rc<Sys>,
+        task: Fut,
+        trace: &Rc<RefCell<Vec<Event>>>,
+        whole_screen: bool,
+    ) -> (Seen, Vec<(bool, usize)>) {
+        let block = pattern_block();
+        let mut seen = Seen {
+            frames: 0,
+            buffer: 0,
+            untouched: 0,
+            subtitled: 0,
+        };
+        let mut runner = Runner::new(sys.clone(), task);
+        let mut frame = 0u64;
+        while runner.step(frame * 16) {
+            frame += 1;
+            assert!(frame < 10_000, "the line did not end");
+            if frame == 20 {
+                button(&sys, MouseButton::Left, true);
+            }
+            if frame == 22 {
+                button(&sys, MouseButton::Left, false);
+            }
+            if frame >= 20 {
+                continue;
+            }
+            let s = sys.screen.borrow();
+            let rows = |r: std::ops::Range<usize>| r.start * SCREEN_W..r.end * SCREEN_W;
+            let outside = |want: &dyn Fn(usize) -> u16| {
+                if whole_screen {
+                    (0..N).all(|i| s[i] == want(i))
+                } else {
+                    rows(0..400)
+                        .chain(rows(460..SCREEN_H))
+                        .all(|i| s[i] == want(i))
+                }
+            };
+            seen.frames += 1;
+            if outside(&|i| block[i]) {
+                seen.buffer += 1;
+                if rows(400..460).any(|i| s[i] != block[i]) {
+                    seen.subtitled += 1;
+                }
+            }
+            if s.iter().all(|&p| p == 0x1234) {
+                seen.untouched += 1;
+            }
+        }
+        let played = trace
+            .borrow()
+            .iter()
+            .filter_map(|e| match e {
+                Event::LinePlayed {
+                    voice, subtitles, ..
+                } => Some((*voice, *subtitles)),
+                _ => None,
+            })
+            .collect();
+        (seen, played)
+    }
+
+    /// An engine over `g`, its events traced.
+    fn engine(g: Game) -> (Rc<Sys>, Engine, Rc<RefCell<Vec<Event>>>) {
+        let sys = Sys::new(Mixer::new());
+        let mut e = Engine::new(sys.clone(), g, Rc::new(DirectLoader));
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        e.trace = Some(trace.clone());
+        (sys, e, trace)
+    }
+
+    fn request(section: i32, letter: char, line: ConLine) -> LineRequest {
+        LineRequest {
+            section,
+            letter,
+            line,
+            perso: 514,
+            interactive: false,
+            inc_perso: 0,
+        }
+    }
+
+    /// Line `req` over a screen filled with 0x1234, `block` as the IX
+    /// buffers.
+    async fn play_line(mut e: Engine, req: LineRequest, block: Vec<u16>, subtitles: bool) {
+        e.ix_buffers = block;
+        e.subtitles = subtitles;
+        e.sys.screen.borrow_mut().fill(0x1234);
+        let mut d = Dialogs::new();
+        d.line(&mut e, &req).await;
+    }
+
+    /// An off1 line in the 2001 build (FUN_00430884): with its voice
+    /// (CHAPI001 /2 A's file), the screen buffer under the subtitle until
+    /// the click; without one (no ATA9999A.APC), nothing drawn.
+    #[test]
+    fn off1_line_shows_the_screen_buffer_once_the_voice_loads() {
+        for (section, voice) in [(2, true), (9999, false)] {
+            let line = ConLine {
+                speaker: "Seth".into(),
+                params: "off1".into(),
+                text: "Off one".into(),
+                ..ConLine::default()
+            };
+            let Some(dir) = std::env::var_os("ATLANTIS_DATA") else {
+                eprintln!("ATLANTIS_DATA not set: skipped");
+                return;
+            };
+            let g = Game::open(Arc::new(StdDir::new(dir))).expect("the game directory");
+            let (sys, e, trace) = engine(g);
+            let task = play_line(e, request(section, 'A', line), pattern_block(), true);
+            let (seen, played) = play(sys, task, &trace, false);
+            if voice {
+                assert_eq!(played, vec![(true, 1)]);
+                assert_eq!(seen.buffer, seen.frames, "every frame on the buffer");
+                assert_eq!(seen.subtitled, seen.frames, "and the subtitle");
+                assert!(seen.frames > 10);
+            } else {
+                assert_eq!(played, vec![(false, 1)]);
+                assert_eq!(seen.untouched, seen.frames);
+            }
+        }
+    }
+
+    /// The off1 lines of a release's scripts, with the section and the
+    /// letter of each.
+    fn off1_lines(g: &Game) -> Vec<(i32, char, ConLine)> {
+        let mut out = Vec::new();
+        // The chapters' scripts, in the archives or loose (GOG.com).
+        for n in 0..1000 {
+            let Some(data) = g.big.read(&format!("SCENAR\\CHAPI{n:03}.CON")) else {
+                continue;
+            };
+            let script = ConScript::parse(&data);
+            for sec in script.sections() {
+                let lines = sec.items.iter().filter_map(|it| match it {
+                    ConItem::Line(l) => Some(l),
+                    _ => None,
+                });
+                for (i, l) in lines.enumerate() {
+                    if LineHeader::parse(l).off1 {
+                        out.push((sec.id, con_track_letter(i), l.clone()));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// A release's off1 headers (`count` of them); the first one whose
+    /// voice is there (or `want`), played by the off1 player's port with
+    /// the subtitles off, shows the screen buffer, the whole screen.
+    fn release_off1(g: Game, build: &str, count: usize, want: Option<(i32, char)>) {
+        assert_eq!(g.exe.build.name, build);
+        let lines = off1_lines(&g);
+        assert_eq!(lines.len(), count);
+        let (section, letter, line) = lines
+            .into_iter()
+            .find(|(s, l, _)| match want {
+                Some(w) => w == (*s, *l),
+                None => g.big.contains(&format!("WAV\\ATA{s:04}{l}.APC")),
+            })
+            .expect("an off1 line with its voice");
+        let (sys, e, trace) = engine(g);
+        let task = play_line(e, request(section, letter, line), pattern_block(), false);
+        let (seen, played) = play(sys, task, &trace, true);
+        eprintln!(
+            "{build}: /{section} {letter} {} frames, {} on the buffer",
+            seen.frames, seen.buffer
+        );
+        assert_eq!(played, vec![(true, 0)]);
+        assert!(seen.frames > 10);
+        assert_eq!(seen.buffer, seen.frames);
+    }
+
+    /// The Chinese CDs (FUN_0042fe7c): 29 off1 headers each.
+    fn chinese_off1(var: &str, build: &str) {
+        let Some(dir) = std::env::var_os(var) else {
+            eprintln!("{var} not set: skipped");
+            return;
+        };
+        let set = DiscSet::open_folder(dir.as_ref()).expect("CD images");
+        let g = Game::open(Arc::new(set)).expect("the game from its images");
+        release_off1(g, build, 29, None);
+    }
+
+    #[test]
+    fn traditional_chinese_off1_line_shows_the_screen_buffer() {
+        chinese_off1("ATLANTIS_ISO_ZH_TW", "atlantis-cd-zh-tw-696832");
+    }
+
+    #[test]
+    fn simplified_chinese_off1_line_shows_the_screen_buffer() {
+        chinese_off1("ATLANTIS_BIN_ZH_CN", "atlantis-cd-zh-cn-692736");
+    }
+
+    /// The GOG.com release (FUN_004307d0): 30 off1 headers; CHAPI031
+    /// /377 A, the line the off1 player was emulated on.
+    #[test]
+    fn gog_off1_line_shows_the_screen_buffer() {
+        let Some(dir) = std::env::var_os("ATLANTIS_GOG_FR") else {
+            eprintln!("ATLANTIS_GOG_FR not set: skipped");
+            return;
+        };
+        let g = Game::open(Arc::new(StdDir::new(dir))).expect("the game directory");
+        release_off1(g, "atlantis-gog-714752", 30, Some((377, 'A')));
     }
 }

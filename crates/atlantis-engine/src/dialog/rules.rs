@@ -107,6 +107,12 @@ pub struct LineHeader {
     pub off: bool,
     /// "off0" (`FUN_004305e8`): the subtitle over the screen as it stands.
     pub off0: bool,
+    /// "off1" (`FUN_00430884`; atlantis-cd-zh-tw-696832 `FUN_0042fe7c`,
+    /// flag 0x004860bc set @ 0x00427f6a..0x00427f8d): the screen buffer
+    /// under the subtitle. The 1997 executables hold no "off1" string and
+    /// their scripts no such header; the 2001, GOG.com and Chinese builds
+    /// test it.
+    pub off1: bool,
 }
 
 impl LineHeader {
@@ -136,6 +142,7 @@ impl LineHeader {
             seth: line.speaker.starts_with("Seth"),
             off: tail_is(b"off", 3) || tail_is(b"off0", 4) || tail_is(b"off1", 4),
             off0: tail_is(b"off0", 4),
+            off1: tail_is(b"off1", 4),
         }
     }
 }
@@ -440,6 +447,7 @@ mod tests {
             seth,
             off,
             off0: false,
+            off1: false,
         }
     }
 
@@ -520,7 +528,11 @@ mod tests {
         let h = LineHeader::parse(&line("Seth", "off"));
         assert!(h.seth && h.off && !h.off0);
         let h = LineHeader::parse(&line("Gimbas", "off0"));
-        assert!(h.off && h.off0);
+        assert!(h.off && h.off0 && !h.off1);
+        let h = LineHeader::parse(&line("Commander", "off1"));
+        assert!(h.off && h.off1 && !h.off0);
+        let h = LineHeader::parse(&line("Seth", "off1"));
+        assert!(h.seth && h.off && h.off1);
         assert!(LineHeader::parse(&line("Seth", "")).seth);
         assert!(!LineHeader::parse(&line("seth", "")).seth);
         assert_eq!(LineHeader::parse(&line("Seth", "")), header(0, true, false));
