@@ -238,6 +238,8 @@ after it, so none of its rows is over 75 bytes or wider than the screen
 (`split_subtitle_1997_back`). A run of 75 bytes without a space, which no
 shipped text has, makes that original fault; the port cuts it at 75
 bytes.
+Whatever shows these texts otherwise (the outline font, tests) reads
+them as code page 850.
 
 The Chinese CDs break their rows in a 75-byte window too, but cut after a
 double-byte punctuation mark, found backwards from the window's end
@@ -256,9 +258,12 @@ mark gives empty rows. A first window without a mark sends the
 original's scan back past the start of its buffer (one Traditional
 line, CHAPI084's game-over narration, 80 bytes): what it then does is
 unknown, and the port cuts that row at the last character boundary
-within 75 bytes.
-Whatever shows these texts otherwise (the outline font, tests) reads
-them as code page 850.
+within 75 bytes. The buffer holds the line as the dialog code copies it,
+up to the CR, so the blanks that end most Traditional lines (and some
+Simplified ones) count: with its final space, a text of 75 bytes is two
+rows, the second mostly the space alone (17 Traditional lines, 2
+Simplified ones). The other builds' breakers are given the text without
+them.
 
 ### Game builds
 

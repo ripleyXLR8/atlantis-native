@@ -5,7 +5,8 @@
 //! only: the rows per line, the rows that do not decode, and the MD5 of
 //! every row's place in its line's buffer (`start+length`, the rows of a
 //! line joined by `,`, the lines by a newline, in the order of the sorted
-//! CON names).
+//! CON names). The lines the CON parser hands to the dialog presenter,
+//! final blanks included, are checked to be lines of that scan.
 //!
 //! Needs the folders of the discs' images: set `ATLANTIS_ISO_ZH_TW` (the
 //! Traditional CD's ISO images) and `ATLANTIS_BIN_ZH_CN` (the Simplified
@@ -15,6 +16,8 @@ use std::sync::Arc;
 
 use atlantis_data::disc_image::DiscSet;
 use atlantis_data::Game;
+use atlantis_engine::con_script::script::{latin1_bytes, ConText};
+use atlantis_engine::con_script::{ConItem, ConScript};
 use atlantis_engine::subtitles::{cjk_subtitle_rows, CjkSplit};
 use md5::{Digest, Md5};
 
@@ -115,6 +118,45 @@ fn rows(g: &Game, split: CjkSplit, runaway: Option<(&str, usize)>) -> Rows {
     r
 }
 
+/// The game's path: every dialog line the CON parser hands to the
+/// presenter, its text and final blanks (`ConLine::trail`) put together as
+/// the dialog code copies them, is one of the lines of [`dialog_lines`],
+/// so its rows are those checked against the original. Returns the lines
+/// the sections hold and those of them with final blanks (each line
+/// counted once).
+fn parsed_lines(g: &Game) -> (usize, usize) {
+    let mut by_file: std::collections::HashMap<String, Vec<Vec<u8>>> = Default::default();
+    for (n, t) in dialog_lines(g) {
+        by_file.entry(n).or_default().push(t);
+    }
+    let (mut lines, mut blanks) = (0, 0);
+    for (name, texts) in &by_file {
+        let script = ConScript::parse(&g.big.read(name).unwrap());
+        let t = ConText(script.text());
+        let mut seen = std::collections::HashSet::new();
+        let sections = (0..t.len())
+            .filter(|&p| t.is_header(p))
+            .filter_map(|p| script.goto_section(t.atoi(p + 1)))
+            .chain(script.sections().iter().cloned());
+        for sec in sections {
+            for item in &sec.items {
+                let ConItem::Line(l) = item else { continue };
+                if l.text.is_empty() {
+                    assert!(l.trail.is_empty());
+                    continue;
+                }
+                let copied = latin1_bytes(&(l.text.clone() + &l.trail));
+                assert!(texts.contains(&copied), "{name}: {l:?}");
+                if seen.insert(copied) {
+                    lines += 1;
+                    blanks += usize::from(!l.trail.is_empty());
+                }
+            }
+        }
+    }
+    (lines, blanks)
+}
+
 /// The Traditional CD: every row as the original's; the one line with no
 /// mark in its first 75 bytes (CHAPI084, 80 bytes) cut by the port at 75.
 #[test]
@@ -146,6 +188,7 @@ fn traditional_rows_match_original() {
         );
         assert_eq!(cjk_subtitle_rows(&lines[at].1, split), [1..76, 76..81]);
     }
+    assert_eq!(parsed_lines(&g), (2241, 1944));
 }
 
 /// The Simplified CD: every row as the original's, the rows started on an
@@ -182,4 +225,5 @@ fn simplified_rows_match_original() {
             md5: "f10d8dec4548e256615b0cd324696c87".into(),
         }
     );
+    assert_eq!(parsed_lines(&g), (2258, 100));
 }

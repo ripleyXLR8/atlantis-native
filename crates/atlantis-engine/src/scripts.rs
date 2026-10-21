@@ -65,8 +65,10 @@ pub struct GameOverRequest {
     pub section: i32,
     /// GameOver=N.
     pub n: i32,
-    /// The narrator's text and the track letter of its voice, when the line
-    /// after the command is a narrator line.
+    /// The narrator's text, with its final blanks (`ConLine::trail`: the
+    /// game over copies the line up to the CR too, atlantis-cd-zh-tw-696832
+    /// FUN_00425e80 @ 0x004262d4..0x004262ef), and the track letter of its
+    /// voice, when the line after the command is a narrator line.
     pub narrator: Option<(String, char)>,
 }
 
@@ -928,7 +930,7 @@ impl Scripts {
                             // 0x004256ee), the same file for every game
                             // over of the shipped scripts.
                             let mut narrator = con_game_over_narrator(&sec.items, i)
-                                .map(|l| (l.text.clone(), con_track_letter(line_idx)));
+                                .map(|l| (l.text.clone() + &l.trail, con_track_letter(line_idx)));
                             // The 1999 build: the second death in a section
                             // plays the next narrator line.
                             // The 2001 and 1997 builds with the restored
@@ -940,7 +942,7 @@ impl Scripts {
                                 let pick = con_alt_game_over_narration(&sec.items, i, count);
                                 if pick > 0 {
                                     if let ConItem::Line(l) = &sec.items[i + 1 + pick] {
-                                        text.clone_from(&l.text);
+                                        *text = l.text.clone() + &l.trail;
                                     }
                                     *letter = char::from(*letter as u8 + pick as u8);
                                 }

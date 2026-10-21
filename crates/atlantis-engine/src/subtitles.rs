@@ -593,12 +593,22 @@ impl Subtitler {
         self
     }
 
-    /// The rows of a subtitle text.
+    /// The rows of a subtitle text, given as the dialog code copies it, up
+    /// to the CR (its final blanks, [`crate::con_script::ConLine::trail`],
+    /// included): the Chinese builds' breaker counts them; the other
+    /// breakers are given the text without them, as before.
     pub fn split(&self, text: &[u8]) -> Vec<Vec<u8>> {
+        let trimmed = || {
+            let n = text
+                .iter()
+                .rposition(|&c| !matches!(c, b' ' | b'\t'))
+                .map_or(0, |i| i + 1);
+            &text[..n]
+        };
         match self {
-            Subtitler::Gdi(_, None) => split_subtitle(text),
+            Subtitler::Gdi(_, None) => split_subtitle(trimmed()),
             Subtitler::Gdi(_, Some(cjk)) => split_subtitle_cjk(text, *cjk),
-            Subtitler::Bitmap(_, breaker) => split_bitmap_rows(text, *breaker),
+            Subtitler::Bitmap(_, breaker) => split_bitmap_rows(trimmed(), *breaker),
         }
     }
 

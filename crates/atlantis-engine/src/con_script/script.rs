@@ -30,7 +30,14 @@ pub struct ConLine {
     pub speaker: String,
     /// e.g. "cam3", "off" (comma-separated in the source).
     pub params: String,
+    /// The text, trimmed at its end.
     pub text: String,
+    /// The blanks the trim took from the end of a non-empty text: the
+    /// dialog code copies the text up to the CR, so they are in the
+    /// subtitle buffer too (atlantis-cd-zh-tw-696832 FUN_00427cc0 @
+    /// 0x00427ff9..0x00428014, the same in atlantis-cd-zh-cn-692736), where
+    /// the Chinese builds' breaker counts them.
+    pub trail: String,
     /// `[Speaker, X, Y, camN]`: the two integer tokens after the speaker,
     /// panorama angles the dialog code writes into the view before the line.
     pub angle: Option<(i32, i32)>,
@@ -461,8 +468,12 @@ fn scan_command(t: ConText, mut pos: u32, sec: &mut ConSection) -> Next {
 fn read_body(t: ConText, mut pos: u32, sec: &mut ConSection) {
     while pos < t.len() {
         if t.at(pos) == b'[' {
-            sec.items
-                .push(ConItem::Line(parse_dialog_line(rtrim(t.line(pos)))));
+            let line = t.line(pos);
+            let mut l = parse_dialog_line(rtrim(line));
+            if !l.text.is_empty() {
+                l.trail = latin1(&line[rtrim(line).len()..]);
+            }
+            sec.items.push(ConItem::Line(l));
             // The dialog code copies the text up to the CR (0x00428785).
             while pos < t.len() && t.at(pos) != b'\r' {
                 pos += 1;

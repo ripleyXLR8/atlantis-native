@@ -136,6 +136,8 @@ struct SingleLine<'a> {
     section: i32,
     letter: char,
     text: &'a str,
+    /// The text's final blanks ([`crate::con_script::ConLine::trail`]).
+    trail: &'a str,
     /// The UBB (`DIALOG\PERSO\<name>.UBB`), none for a voice-only line.
     video: Option<String>,
     /// The camera's SPF overlay (`DIALOG\PERSO\<name>.SPF`).
@@ -362,6 +364,7 @@ impl Dialogs {
                 section: req.section,
                 letter: req.letter,
                 text: &req.line.text,
+                trail: &req.line.trail,
                 dial_row: (!voice_only && video.is_some()).then_some(row),
                 video,
                 spf,
@@ -422,7 +425,7 @@ impl Dialogs {
         }
 
         let sub_lines = if e.subtitles && !l.text.is_empty() {
-            font.split(&latin1_bytes(l.text))
+            font.split(&latin1_bytes(&[l.text, l.trail].concat()))
         } else {
             Vec::new()
         };

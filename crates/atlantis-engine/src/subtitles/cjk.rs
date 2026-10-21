@@ -111,7 +111,8 @@ impl CjkSplit {
 }
 
 /// `FUN_0042f424` on the subtitle buffer: the rows, as ranges of the
-/// buffer (a space, then `text`).
+/// buffer (a space, then `text`: the line's text as the dialog code copies
+/// it, up to the CR, its final blanks included).
 ///
 /// The buffer under 76 bytes is one row, the space included. Otherwise,
 /// while `left` is over 75: the scan goes back from `e` (k = 1, 2...) to
@@ -138,17 +139,21 @@ impl CjkSplit {
 /// ended there; it does the same for any scan that finds no cut within
 /// 75 bytes.
 pub fn cjk_subtitle_rows(text: &[u8], split: CjkSplit) -> Vec<Range<usize>> {
-    let mut b = Vec::with_capacity(text.len() + 3);
+    let mut b = Vec::with_capacity(text.len() + 1);
     b.push(b' ');
     b.extend_from_slice(text);
     let len = b.len();
     if len as isize <= WINDOW {
         return std::iter::once(0..len).collect();
     }
-    // After the text, the bytes earlier lines left in the buffer; the port
-    // takes a CR, as the emulation of the original. Before the buffer,
-    // NULs.
-    b.extend_from_slice(b"\0\r");
+    // Nothing past the text is read: the first window ends at 75, inside
+    // the buffer; with `p` the lead byte of the last cut, a later window
+    // ends at `e = p + 75` and `left` is at most `len - p - 1`, so while
+    // `left` is over 75 the scan ends two bytes before the NUL at the
+    // latest; the checks read `p + 1` or `p + 2`, and the copies stop at
+    // the NUL. (After it lie the bytes of longer earlier lines: the
+    // dialog code writes only the NUL, atlantis-cd-zh-tw-696832 @
+    // 0x00428014.)
     let at = |i: isize| -> u8 {
         usize::try_from(i)
             .ok()
@@ -458,8 +463,23 @@ mod tests {
         assert_eq!(lens(&s), [60, 63, 20]);
         assert_eq!(lens(&s.clone().with_minor_bug_fixes(true)), [60, 62, 20]);
         // The other builds: the 100-byte window cut at a space.
-        let s = Subtitler::Gdi(font, None).with_minor_bug_fixes(true);
+        let s = Subtitler::Gdi(font.clone(), None).with_minor_bug_fixes(true);
         assert_eq!(s.split(&t), crate::subtitles::split_subtitle(&t));
+
+        // A final blank: 72 bytes, `。`, a space. The Chinese breaker counts
+        // it (a buffer of 76 bytes: the row, then the space alone, as the
+        // original's emulation on 17 shipped Traditional lines); the
+        // others are given the text without it.
+        let mut t = text(TEN_BIG5, &[P::Ten(3)]);
+        t.extend_from_slice(&TEN_BIG5[..12]);
+        t.extend_from_slice(b"\xa1\x43");
+        let blank = [t.as_slice(), b" "].concat();
+        let s = Subtitler::Gdi(font.clone(), CjkSplit::of_build(&ZH_TW, false));
+        assert_eq!(s.split(&t), [[b" ".as_slice(), &t].concat()]);
+        assert_eq!(s.split(&blank), [t.clone(), b" ".to_vec()]);
+        let s = Subtitler::Gdi(font, None);
+        assert_eq!(s.split(&blank), s.split(&t));
+        assert_eq!(s.split(b"a \t"), s.split(b"a"));
     }
 
     #[test]
