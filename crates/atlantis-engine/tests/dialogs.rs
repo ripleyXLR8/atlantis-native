@@ -31,7 +31,10 @@ use atlantis_engine::dialog::game_over::{
     game_over_fades_new_sound, game_over_image_name, game_over_subtitle_drawn,
     game_over_voice_name, game_over_wait_ends,
 };
-use atlantis_engine::dialog::rules::{head_open_fails, DialInit};
+use atlantis_engine::dialog::rules::{
+    head_open_fail_text, head_open_fails, line_fov, line_view, pick_dial_cam, Angles, DialInit,
+    LineHeader, HEAD_OPEN_FAIL_TEXT,
+};
 use atlantis_engine::dialog::subject_menu::{menu_draws, menu_hit, menu_subject};
 use atlantis_engine::hooks::{DirectLoader, ScriptHooks};
 use atlantis_engine::scripts::resolve_speaker_perso;
@@ -155,7 +158,8 @@ fn initdial_matches_original_parser() {
 }
 
 /// Every talking-head line of the game opens its UBB except the 7 whose
-/// INITDIAL row has no record, whose head open fails.
+/// INITDIAL row has no record, whose head open fails. (The camera of a head
+/// line is one the draw can pick, a UBB other than "none".)
 #[test]
 fn head_open_fails_match_original() {
     let Some(g) = game("head_open_fails_match_original") else {
@@ -166,7 +170,14 @@ fn head_open_fails_match_original() {
     for l in lines(include_str!("golden/video_dialog_heads.txt")) {
         let f: Vec<&str> = l.split(' ').collect();
         let row: i32 = f[3].parse().unwrap();
-        let fails_here = head_open_fails(false, t.rows.contains_key(&row));
+        let rec = t.rows.get(&row);
+        let ubb = rec.map_or("", |r| {
+            r.cam_ubb
+                .iter()
+                .find(|u| !u.eq_ignore_ascii_case("none"))
+                .map_or("none", String::as_str)
+        });
+        let fails_here = head_open_fails(false, rec.is_some(), ubb);
         match f[2] {
             "head" => {
                 heads += 1;
@@ -180,7 +191,183 @@ fn head_open_fails_match_original() {
         }
     }
     assert_eq!((heads, fails, bad), (2048, 7, 0));
-    assert!(!head_open_fails(true, false), "voice-only: no UBB opened");
+    assert!(
+        !head_open_fails(true, false, ""),
+        "voice-only: no UBB opened"
+    );
+}
+
+/// An explicit camN on a row whose INITDIAL UBB for that camera is "none":
+/// `FUN_0042844c` keeps the camera (0x004287cf skips the draw loops) and
+/// `FUN_0042ee88` opens "dialog\perso\" + the stored name, which the
+/// original parser stores as "none.ubb"; no archive member has that name,
+/// so the open fails as for a row without a record: the error box naming
+/// it, the line not played (0x0042f00f..0x0042f056). Checked on every
+/// (row, camera) of the original's table: a "none.ubb" camera fails, the
+/// others open a member of the archives. No shipped explicit-camera line
+/// lands on a "none" camera.
+#[test]
+fn head_open_fails_on_none_cam() {
+    let Some(g) = game("head_open_fails_on_none_cam") else {
+        return;
+    };
+    let golden = golden_map(include_str!("golden/video_dialog_initdial.txt"));
+    let t = dial_init(&g);
+    assert_eq!(t.rows.len(), 67);
+    let (mut none_cams, mut bad) = (0, 0);
+    for (id, r) in &t.rows {
+        for cam in 2..=5 {
+            let key = format!("{id}.ubb{cam}");
+            let Some(&orig) = golden.get(key.as_str()) else {
+                bad += 1;
+                continue;
+            };
+            let member = format!("DIALOG\\PERSO\\{orig}").to_ascii_uppercase();
+            let opens = g.big.contains(&member);
+            let ubb = &r.cam_ubb[cam - 2];
+            let fails = head_open_fails(false, true, ubb);
+            none_cams += usize::from(orig == "none.ubb");
+            if fails == opens {
+                bad += 1;
+                eprintln!("{key}: {orig}");
+            }
+            if fails
+                && head_open_fail_text(&format!("{ubb}.ubb"))
+                    != format!("{HEAD_OPEN_FAIL_TEXT}{orig}")
+            {
+                bad += 1;
+            }
+        }
+    }
+    assert_eq!((none_cams, bad), (16, 0));
+    // The box of a row without a record names "dialog\perso\" alone.
+    assert_eq!(head_open_fail_text(""), HEAD_OPEN_FAIL_TEXT);
+}
+
+/// The camera's FOV over every dialog line of the game, the section
+/// executor `FUN_0042844c` run under emulation on its 926 walks. The walk
+/// as the port's `Scripts` runs it (ClicPerso from the walk's start, 0
+/// after every line) through the port's code: the speaker lookup, the
+/// header flags, the camera, the view and its FOV (`line_fov`, the warp at
+/// 75.137 before). Checked: the perso is the original's ClicPerso on every
+/// talking head, a camN line gets the original's camera, the FOV while
+/// the line plays is the original's (the camera's on 2044 lines; 75.137,
+/// the walk's entry FOV, on the 4 lines with ClicPerso below 0x200, each
+/// the first line of its walk), and the head's UBB opens. A drawn camera
+/// comes from the clock in both: those lines take the original's for the
+/// FOV.
+#[test]
+fn dialog_cam_fov_matches_original() {
+    use atlantis_engine::warp::{DIALOG_CAM_FOV_DEG, WARP_FOV_DEG};
+    let Some(g) = game("dialog_cam_fov_matches_original") else {
+        return;
+    };
+    let t = dial_init(&g);
+    let mut scripts: HashMap<String, ConScript> = HashMap::new();
+    let kept = Angles {
+        alpha: 30f64.to_radians(),
+        beta: 5f64.to_radians(),
+    };
+    let beta_max = 50f64.to_radians() * 0.9;
+    let (mut walks, mut nlines, mut heads, mut cam_fovs, mut entries, mut explicit, mut bad) =
+        (0, 0, 0, 0, 0, 0, 0);
+    let (mut con, mut clic, mut last_cam) = (String::new(), 0, 0);
+    for l in lines(include_str!("golden/video_dialog_line_fov.txt")) {
+        let f: Vec<&str> = l.split(' ').collect();
+        if f[0] == "==" {
+            walks += 1;
+            con = format!("SCENAR\\{}.CON", f[1]);
+            clic = f[3].parse().unwrap();
+            last_cam = 0;
+            continue;
+        }
+        nlines += 1;
+        let (num, letter) = f[0].split_at(f[0].len() - 1);
+        let section: i32 = num.parse().unwrap();
+        let idx = usize::from(letter.as_bytes()[0] - b'A');
+        let script = scripts
+            .entry(con.clone())
+            .or_insert_with(|| ConScript::parse(&read(&g, &con)));
+        let sec = script
+            .sections()
+            .iter()
+            .find(|s| s.id == section)
+            .unwrap_or_else(|| panic!("{con} /{section}"));
+        let line = sec
+            .items
+            .iter()
+            .filter_map(|it| match it {
+                ConItem::Line(l) => Some(l),
+                _ => None,
+            })
+            .nth(idx)
+            .unwrap_or_else(|| panic!("{con} {}", f[0]));
+        assert_eq!(
+            con_track_letter(idx).to_ascii_uppercase(),
+            letter.chars().next().unwrap()
+        );
+        // The line as Scripts::play_section and Dialogs::line take it.
+        let perso = if clic != 0 {
+            clic
+        } else {
+            atlantis_engine::scripts::resolve_speaker_perso(&line.speaker)
+        };
+        let header = LineHeader::parse(line);
+        let mut clock = 0;
+        let cam = pick_dial_cam(&t, perso, &header, last_cam, true, &mut clock);
+        last_cam = cam;
+        clic = 0;
+        if f.len() == 3 && f[1] == "fails" {
+            let row: i32 = f[2].parse().unwrap();
+            let rec = t.rows.get(&row);
+            if !head_open_fails(false, rec.is_some(), rec.map_or("", |r| &r.cam_ubb[0])) {
+                bad += 1;
+                eprintln!("{con} {l}: the port opens it");
+            }
+        }
+        if f.len() < 3 || f[1] != "head" {
+            continue;
+        }
+        heads += 1;
+        let row: i32 = f[2].parse().unwrap();
+        let orig_cam: i32 = f[3][3..].parse().unwrap();
+        let orig_clic: i32 = f[5].parse().unwrap();
+        let mut ok = perso == orig_clic && !header.off;
+        if header.explicit_cam != 0 {
+            explicit += 1;
+            ok &= cam == orig_cam;
+        }
+        let rec = t.rows.get(&row);
+        ok &= !head_open_fails(
+            false,
+            rec.is_some(),
+            rec.map_or("", |r| &r.cam_ubb[(orig_cam - 2) as usize]),
+        );
+        let angle = line
+            .angle
+            .map(|(x, y)| (f64::from(x).to_radians(), f64::from(y).to_radians()));
+        let view = line_view(kept, header.seth && !header.off, perso, angle, beta_max);
+        let during = line_fov(true, &view, header.off, orig_cam).unwrap_or(WARP_FOV_DEG);
+        let orig = if f[7] == "entry" {
+            entries += 1;
+            WARP_FOV_DEG
+        } else {
+            cam_fovs += 1;
+            assert!(
+                DIALOG_CAM_FOV_DEG.contains(&f[7].parse::<f32>().unwrap()),
+                "{l}"
+            );
+            f[7].parse().unwrap()
+        };
+        ok &= (during - orig).abs() < 0.0005;
+        if !ok {
+            bad += 1;
+            eprintln!("{con} {l}: port perso {perso} cam {cam} FOV {during}");
+        }
+    }
+    assert_eq!((walks, nlines, heads), (926, 2373, 2048));
+    assert_eq!((cam_fovs, entries, explicit), (2044, 4, 248));
+    assert_eq!(bad, 0);
 }
 
 fn u32_at(g: &Game, name: &str, off: usize) -> Option<u32> {
@@ -908,6 +1095,54 @@ fn off_line_plays_voice_only() {
     assert_eq!(line_played(&ev), vec![(None, 0, true, 1)]);
     assert!(ev.contains(&Event::Voice("WAV\\ATA0002A.APC".into())));
     assert!(best > 100, "{best} subtitle pixels");
+}
+
+/// Escape on a voice-only line (CHAPI001 /2 A, `off`): `FUN_00430258`'s
+/// wait leaves on 0x00496124 != 1 (0x00430586), which `FUN_0041a298`
+/// clears on Escape when bow mode, the bar request and OBJETENMAIN are all
+/// 0 (0x0041a419), without the dialog-skip flag 0x00496134: the line ends
+/// at once and the walk would go on. With an object in hand Escape does
+/// nothing and the line plays to the end of its voice.
+#[test]
+fn escape_ends_a_voice_only_line() {
+    use atlantis_engine::DialogPresenter;
+    for held in [0, 1] {
+        let Some(g) = game("escape_ends_a_voice_only_line") else {
+            return;
+        };
+        let (mut escaped, mut after) = (false, 0usize);
+        let ev = with_new_game(
+            g,
+            Default::default(),
+            move |mut e, s| {
+                Box::pin(async move {
+                    e.vars.set("objetenmain", held);
+                    let line = first_line(&s, 2);
+                    let perso = resolve_speaker_perso(&line.speaker);
+                    let mut d = Dialogs::new();
+                    let out = d.play_line(&mut e, &request(2, line, perso)).await;
+                    assert!(!out.escape_skip, "no dialog-skip flag");
+                })
+            },
+            |h, ev| {
+                let played = ev.iter().any(|e| matches!(e, Event::LinePlayed { .. }));
+                if escaped && !played {
+                    after += 1;
+                } else if !escaped && ev.contains(&Event::Voice("WAV\\ATA0002A.APC".into())) {
+                    h.sys
+                        .push_input(Input::KeyDown(atlantis_engine::sys::Key::Escape));
+                    escaped = true;
+                }
+            },
+        );
+        assert!(escaped);
+        assert_eq!(line_played(&ev), vec![(None, 0, true, 1)]);
+        if held == 0 {
+            assert!(after <= 3, "{after} frames after Escape");
+        } else {
+            assert!(after > 30, "{after} frames after Escape");
+        }
+    }
 }
 
 /// An `off0` line (`FUN_004305e8`): the subtitle over the screen as it

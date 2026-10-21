@@ -1,0 +1,3306 @@
+# The talking head and camera FOV of every dialog line of the CHAPInnn.CON files: the section executor
+# FUN_0042844c of atlantis.exe (2001 English build, 714240 bytes) run under emulation on all 926 sections,
+# player at 30/5 degrees.
+# == <CON> <section> <ClicPerso at the walk's start>, then each line the walk runs: <section><letter>, and
+# for a talking head: head <INITDIAL row> cam<N> clic <ClicPerso as 0x00428a9d tests it> fov <the last
+# FUN_0045179a FOV of the walk at the call of FUN_0042ee88 (0x00428b1c), 'entry' = none since the walk began>;
+# fails <row>: the row has no INITDIAL record, the head open fails. Voice-only lines carry nothing more.
+== CHAPI001 1 0
+1A head 667 cam3 clic 667 fov 30
+== CHAPI001 2 0
+2A
+== CHAPI001 3 600
+3A head 512 cam4 clic 600 fov 48
+3B head 604 cam3 clic 604 fov 30
+== CHAPI001 4 600
+4A head 512 cam4 clic 600 fov 48
+4B head 604 cam3 clic 604 fov 30
+== CHAPI001 5 600
+5A head 512 cam4 clic 600 fov 48
+5B head 604 cam3 clic 604 fov 30
+== CHAPI001 6 600
+6A head 512 cam4 clic 600 fov 48
+6B head 604 cam3 clic 604 fov 30
+== CHAPI001 7 600
+7A head 512 cam4 clic 600 fov 48
+7B head 604 cam3 clic 604 fov 30
+== CHAPI001 8 600
+8A head 512 cam4 clic 600 fov 48
+8B head 604 cam3 clic 604 fov 30
+== CHAPI001 9 600
+9A head 512 cam4 clic 600 fov 48
+9B head 604 cam3 clic 604 fov 30
+== CHAPI001 11 601
+11A head 512 cam4 clic 601 fov 48
+11B head 601 cam2 clic 601 fov 20.68
+== CHAPI001 12 601
+12A head 512 cam4 clic 601 fov 48
+12B head 601 cam2 clic 601 fov 20.68
+== CHAPI001 13 601
+13A head 512 cam4 clic 601 fov 48
+13B head 601 cam2 clic 601 fov 20.68
+13C head 512 cam4 clic 514 fov 48
+13D head 601 cam2 clic 601 fov 20.68
+== CHAPI002 2 0
+2A
+== CHAPI002 15 602
+15A head 512 cam4 clic 602 fov 48
+15B head 602 cam2 clic 602 fov 20.68
+== CHAPI002 16 602
+16A head 512 cam4 clic 602 fov 48
+16B head 602 cam2 clic 602 fov 20.68
+== CHAPI002 17 602
+17A head 512 cam4 clic 602 fov 48
+17B head 602 cam2 clic 602 fov 20.68
+== CHAPI002 18 603
+18A head 512 cam4 clic 603 fov 48
+18B head 604 cam3 clic 604 fov 30
+18C head 512 cam5 clic 514 fov 48.26
+18D head 604 cam4 clic 604 fov 48
+== CHAPI002 19 603
+19A head 603 cam4 clic 603 fov 48
+== CHAPI002 20 603
+20A head 603 cam4 clic 603 fov 48
+== CHAPI002 21 0
+21A head 604 cam4 clic 604 fov 48
+21B head 512 cam2 clic 514 fov 20.68
+21C head 604 cam4 clic 604 fov 48
+== CHAPI002 22 603
+22A head 512 cam4 clic 603 fov 48
+22B head 604 cam3 clic 604 fov 30
+== CHAPI002 23 603
+23A head 512 cam4 clic 603 fov 48
+23B head 604 cam3 clic 604 fov 30
+== CHAPI002 24 603
+24A head 512 cam4 clic 603 fov 48
+24B head 604 cam3 clic 604 fov 30
+== CHAPI002 26 603
+26A head 603 cam4 clic 603 fov 48
+== CHAPI002 27 603
+27A head 512 cam4 clic 603 fov 48
+27B head 604 cam3 clic 604 fov 30
+== CHAPI002 28 604
+28A head 512 cam4 clic 604 fov 48
+28B head 604 cam3 clic 604 fov 30
+== CHAPI002 29 604
+29A head 512 cam4 clic 604 fov 48
+29B head 604 cam3 clic 604 fov 30
+== CHAPI002 30 605
+30A head 512 cam4 clic 605 fov 48
+30B head 604 cam3 clic 604 fov 30
+== CHAPI002 31 605
+31A head 512 cam4 clic 605 fov 48
+31B head 604 cam3 clic 604 fov 30
+== CHAPI002 32 0
+32A head 604 cam4 clic 604 fov 48
+== CHAPI002 33 0
+33A head 604 cam4 clic 604 fov 48
+== CHAPI002 58 605
+58A head 512 cam4 clic 605 fov 48
+58B head 604 cam3 clic 604 fov 30
+== CHAPI003 35 0
+35A head 520 cam3 clic 520 fov 30
+35B head 512 cam5 clic 514 fov 48.26
+35C head 520 cam3 clic 520 fov 30
+35D head 512 cam5 clic 514 fov 48.26
+35E head 520 cam2 clic 520 fov 20.68
+== CHAPI003 36 0
+36A
+== CHAPI003 37 520
+37A head 512 cam4 clic 520 fov 48
+40A head 521 cam2 clic 521 fov 20.68
+40B head 520 cam2 clic 520 fov 20.68
+40C head 521 cam5 clic 521 fov 48.26
+40D head 520 cam4 clic 520 fov 48
+40E head 521 cam5 clic 521 fov 48.26
+40F head 520 cam3 clic 520 fov 30
+40G head 521 cam2 clic 521 fov 20.68
+40H head 512 cam5 clic 514 fov 48.26
+40I head 521 cam2 clic 521 fov 20.68
+40J head 521 cam5 clic 521 fov 48.26
+40K head 512 cam2 clic 514 fov 20.68
+== CHAPI003 38 520
+38A head 512 cam4 clic 520 fov 48
+38B head 520 cam2 clic 520 fov 20.68
+40A head 521 cam2 clic 521 fov 20.68
+40B head 520 cam4 clic 520 fov 48
+40C head 521 cam5 clic 521 fov 48.26
+40D head 520 cam3 clic 520 fov 30
+40E head 521 cam5 clic 521 fov 48.26
+40F head 520 cam5 clic 520 fov 48.26
+40G head 521 cam2 clic 521 fov 20.68
+40H head 512 cam4 clic 514 fov 48
+40I head 521 cam2 clic 521 fov 20.68
+40J head 521 cam5 clic 521 fov 48.26
+40K head 512 cam2 clic 514 fov 20.68
+== CHAPI003 39 520
+39A head 512 cam4 clic 520 fov 48
+39B head 520 cam2 clic 520 fov 20.68
+40A head 521 cam2 clic 521 fov 20.68
+40B head 520 cam4 clic 520 fov 48
+40C head 521 cam5 clic 521 fov 48.26
+40D head 520 cam3 clic 520 fov 30
+40E head 521 cam5 clic 521 fov 48.26
+40F head 520 cam5 clic 520 fov 48.26
+40G head 521 cam2 clic 521 fov 20.68
+40H head 512 cam4 clic 514 fov 48
+40I head 521 cam2 clic 521 fov 20.68
+40J head 521 cam5 clic 521 fov 48.26
+40K head 512 cam2 clic 514 fov 20.68
+== CHAPI003 40 0
+40A head 521 cam2 clic 521 fov 20.68
+40B head 520 cam4 clic 520 fov 48
+40C head 521 cam5 clic 521 fov 48.26
+40D head 520 cam3 clic 520 fov 30
+40E head 521 cam5 clic 521 fov 48.26
+40F head 520 cam5 clic 520 fov 48.26
+40G head 521 cam2 clic 521 fov 20.68
+40H head 512 cam4 clic 514 fov 48
+40I head 521 cam2 clic 521 fov 20.68
+40J head 521 cam5 clic 521 fov 48.26
+40K head 512 cam2 clic 514 fov 20.68
+== CHAPI003 41 0
+41A head 522 cam3 clic 522 fov 30
+== CHAPI003 42 522
+42A head 522 cam2 clic 522 fov 20.68
+42B head 522 cam4 clic 522 fov 48
+42C head 520 cam2 clic 520 fov 20.68
+42D head 522 cam2 clic 522 fov 20.68
+42E head 520 cam4 clic 520 fov 48
+== CHAPI003 43 522
+43A head 512 cam4 clic 522 fov 48
+43B head 522 cam2 clic 522 fov 20.68
+43C head 512 cam4 clic 514 fov 48
+43D head 520 cam2 clic 520 fov 20.68
+43E head 522 cam2 clic 522 fov 20.68
+43F head 522 cam4 clic 522 fov 48
+43G head 520 cam2 clic 520 fov 20.68
+== CHAPI003 44 0
+44A
+== CHAPI003 45 520
+45A head 512 cam4 clic 520 fov 48
+45B head 520 cam2 clic 520 fov 20.68
+== CHAPI003 46 0
+46A head 522 cam4 clic 522 fov 48
+== CHAPI003 49 520
+49A head 512 cam4 clic 520 fov 48
+49B head 520 cam2 clic 520 fov 20.68
+49C head 512 cam4 clic 514 fov 48
+49D head 520 cam2 clic 520 fov 20.68
+== CHAPI003 50 520
+50A head 512 cam4 clic 520 fov 48
+== CHAPI003 51 520
+51A head 512 cam4 clic 520 fov 48
+51B head 520 cam2 clic 520 fov 20.68
+== CHAPI003 52 520
+52A head 512 cam4 clic 520 fov 48
+52B head 522 cam2 clic 522 fov 20.68
+== CHAPI003 53 0
+53A head 522 cam4 clic 522 fov 48
+== CHAPI004 32 0
+32A head 604 cam4 clic 604 fov 48
+== CHAPI004 33 0
+33A head 604 cam4 clic 604 fov 48
+== CHAPI004 54 606
+54A head 512 cam4 clic 606 fov 48
+54B head 606 cam2 clic 606 fov 20.68
+54C head 512 cam4 clic 514 fov 48
+54D head 606 cam2 clic 606 fov 20.68
+== CHAPI004 55 602
+55A head 512 cam4 clic 602 fov 48
+55B head 602 cam2 clic 602 fov 20.68
+55C head 512 cam4 clic 514 fov 48
+55D head 602 cam2 clic 602 fov 20.68
+== CHAPI004 56 603
+56A head 512 cam4 clic 603 fov 48
+56B head 604 cam3 clic 604 fov 30
+== CHAPI004 57 601
+57A head 512 cam4 clic 601 fov 48
+57B head 601 cam2 clic 601 fov 20.68
+== CHAPI004 113 0
+113A head 520 cam4 clic 520 fov 48
+== CHAPI004 1200 604
+1200A head 512 cam4 clic 604 fov 48
+1200B head 604 cam3 clic 604 fov 30
+== CHAPI004 1201 605
+1201A head 512 cam4 clic 605 fov 48
+1201B head 604 cam3 clic 604 fov 30
+== CHAPI005 60 0
+60A head 524 cam3 clic 524 fov 30
+60B head 512 cam5 clic 514 fov 48.26
+60C head 524 cam4 clic 524 fov 48
+60D head 512 cam2 clic 514 fov 20.68
+60E head 524 cam4 clic 524 fov 48
+== CHAPI005 61 523
+61A head 512 cam4 clic 523 fov 48
+61B head 524 cam3 clic 524 fov 30
+== CHAPI005 62 523
+62A head 512 cam4 clic 523 fov 48
+62B head 524 cam3 clic 524 fov 30
+== CHAPI005 63 524
+63A head 512 cam4 clic 524 fov 48
+63B head 524 cam3 clic 524 fov 30
+== CHAPI005 64 524
+64A head 524 cam4 clic 524 fov 48
+64B head 512 cam2 clic 514 fov 20.68
+64C head 524 cam4 clic 524 fov 48
+== CHAPI005 70 0
+70A head 524 cam4 clic 524 fov 48
+70B head 512 cam2 clic 514 fov 20.68
+70C head 524 cam4 clic 524 fov 48
+== CHAPI005 75 523
+75A head 512 cam4 clic 523 fov 48
+75B head 524 cam3 clic 524 fov 30
+75C head 512 cam5 clic 514 fov 48.26
+75D head 524 cam4 clic 524 fov 48
+75E head 512 cam2 clic 514 fov 20.68
+75F head 524 cam4 clic 524 fov 48
+== CHAPI005 76 523
+76A head 512 cam4 clic 523 fov 48
+76B head 524 cam3 clic 524 fov 30
+== CHAPI005 77 523
+77A head 523 cam4 clic 523 fov 48
+77B head 524 cam3 clic 524 fov 30
+== CHAPI005 78 523
+78A head 512 cam4 clic 523 fov 48
+78B head 524 cam3 clic 524 fov 30
+78C head 512 cam5 clic 514 fov 48.26
+78D head 524 cam4 clic 524 fov 48
+78E head 524 cam3 clic 524 fov 30
+== CHAPI005 85 607
+85A head 512 cam4 clic 607 fov 48
+85B head 604 cam3 clic 604 fov 30
+== CHAPI005 86 607
+86A head 512 cam4 clic 607 fov 48
+88A head 604 cam3 clic 604 fov 30
+== CHAPI005 87 607
+87A head 512 cam4 clic 607 fov 48
+88A head 604 cam3 clic 604 fov 30
+== CHAPI005 88 0
+88A head 604 cam4 clic 604 fov 48
+== CHAPI005 89 0
+89A head 604 cam4 clic 604 fov 48
+== CHAPI005 90 0
+== CHAPI005 91 0
+91A head 604 cam4 clic 604 fov 48
+91B head 512 cam2 clic 514 fov 20.68
+91C head 604 cam4 clic 604 fov 48
+== CHAPI005 92 607
+92A head 607 cam4 clic 607 fov 48
+== CHAPI005 93 607
+93A head 512 cam4 clic 607 fov 48
+93B head 604 cam3 clic 604 fov 30
+== CHAPI005 94 607
+94A head 512 cam4 clic 607 fov 48
+94B head 604 cam3 clic 604 fov 30
+== CHAPI005 95 607
+95A head 512 cam4 clic 607 fov 48
+95B head 604 cam3 clic 604 fov 30
+== CHAPI005 96 607
+96A head 512 cam4 clic 607 fov 48
+96B head 604 cam3 clic 604 fov 30
+== CHAPI005 97 0
+97A head 604 cam4 clic 604 fov 48
+== CHAPI005 98 607
+98A head 512 cam4 clic 607 fov 48
+98B head 604 cam3 clic 604 fov 30
+== CHAPI005 99 0
+99A head 604 cam4 clic 604 fov 48
+== CHAPI005 100 607
+100A head 512 cam4 clic 607 fov 48
+89A head 604 cam3 clic 604 fov 30
+== CHAPI005 101 607
+101A head 512 cam4 clic 607 fov 48
+89A head 604 cam3 clic 604 fov 30
+== CHAPI005 102 607
+102A head 512 cam4 clic 607 fov 48
+== CHAPI005 103 0
+103A head 604 cam4 clic 604 fov 48
+== CHAPI005 109 607
+109A head 512 cam4 clic 607 fov 48
+112A head 604 cam3 clic 604 fov 30
+== CHAPI005 110 607
+110A head 512 cam4 clic 607 fov 48
+112A head 604 cam3 clic 604 fov 30
+== CHAPI005 112 607
+112A head 607 cam4 clic 607 fov 48
+== CHAPI005 113 0
+113A head 520 cam4 clic 520 fov 48
+== CHAPI006 66 524
+66A head 512 cam4 clic 524 fov 48
+66B head 524 cam3 clic 524 fov 30
+== CHAPI006 67 524
+67A head 512 cam4 clic 524 fov 48
+67B head 524 cam3 clic 524 fov 30
+67C head 512 cam5 clic 514 fov 48.26
+67D head 524 cam4 clic 524 fov 48
+== CHAPI006 68 524
+68A head 512 cam4 clic 524 fov 48
+68B head 524 cam3 clic 524 fov 30
+68C head 512 cam5 clic 514 fov 48.26
+68D head 524 cam4 clic 524 fov 48
+68E head 512 cam2 clic 514 fov 20.68
+68F head 524 cam4 clic 524 fov 48
+68G head 512 cam2 clic 514 fov 20.68
+68H head 524 cam4 clic 524 fov 48
+== CHAPI006 69 524
+69A head 512 cam4 clic 524 fov 48
+69B head 524 cam3 clic 524 fov 30
+== CHAPI006 85 607
+85A head 512 cam4 clic 607 fov 48
+85B head 604 cam3 clic 604 fov 30
+== CHAPI006 86 607
+86A head 512 cam4 clic 607 fov 48
+88A head 604 cam3 clic 604 fov 30
+== CHAPI006 87 607
+87A head 512 cam4 clic 607 fov 48
+88A head 604 cam3 clic 604 fov 30
+== CHAPI006 88 0
+88A head 604 cam4 clic 604 fov 48
+== CHAPI006 89 0
+89A head 604 cam4 clic 604 fov 48
+== CHAPI006 90 0
+== CHAPI006 91 0
+91A head 604 cam4 clic 604 fov 48
+91B head 512 cam2 clic 514 fov 20.68
+91C head 604 cam4 clic 604 fov 48
+== CHAPI006 92 607
+92A head 607 cam4 clic 607 fov 48
+== CHAPI006 93 607
+93A head 512 cam4 clic 607 fov 48
+93B head 604 cam3 clic 604 fov 30
+== CHAPI006 94 607
+94A head 512 cam4 clic 607 fov 48
+94B head 604 cam3 clic 604 fov 30
+== CHAPI006 95 607
+95A head 512 cam4 clic 607 fov 48
+95B head 604 cam3 clic 604 fov 30
+== CHAPI006 96 607
+96A head 512 cam4 clic 607 fov 48
+96B head 604 cam3 clic 604 fov 30
+== CHAPI006 97 0
+97A head 604 cam4 clic 604 fov 48
+== CHAPI006 98 607
+98A head 512 cam4 clic 607 fov 48
+98B head 604 cam3 clic 604 fov 30
+== CHAPI006 99 0
+99A head 604 cam4 clic 604 fov 48
+== CHAPI006 100 607
+100A head 512 cam4 clic 607 fov 48
+89A head 604 cam3 clic 604 fov 30
+== CHAPI006 101 607
+101A head 512 cam4 clic 607 fov 48
+89A head 604 cam3 clic 604 fov 30
+== CHAPI006 102 607
+102A head 512 cam4 clic 607 fov 48
+== CHAPI006 103 0
+103A head 604 cam4 clic 604 fov 48
+== CHAPI006 109 607
+109A head 512 cam4 clic 607 fov 48
+112A head 604 cam3 clic 604 fov 30
+== CHAPI006 110 607
+110A head 512 cam4 clic 607 fov 48
+112A head 604 cam3 clic 604 fov 30
+== CHAPI006 112 607
+112A head 607 cam4 clic 607 fov 48
+== CHAPI009 85 607
+85A head 512 cam4 clic 607 fov 48
+85B head 604 cam3 clic 604 fov 30
+== CHAPI009 86 607
+86A head 512 cam4 clic 607 fov 48
+88A head 604 cam3 clic 604 fov 30
+== CHAPI009 87 607
+87A head 512 cam4 clic 607 fov 48
+88A head 604 cam3 clic 604 fov 30
+== CHAPI009 88 0
+88A head 604 cam4 clic 604 fov 48
+== CHAPI009 89 0
+89A head 604 cam4 clic 604 fov 48
+== CHAPI009 90 0
+== CHAPI009 91 0
+91A head 604 cam4 clic 604 fov 48
+91B head 512 cam2 clic 514 fov 20.68
+91C head 604 cam4 clic 604 fov 48
+== CHAPI009 92 607
+92A head 607 cam4 clic 607 fov 48
+== CHAPI009 93 607
+93A head 512 cam4 clic 607 fov 48
+93B head 604 cam3 clic 604 fov 30
+== CHAPI009 94 607
+94A head 512 cam4 clic 607 fov 48
+94B head 604 cam3 clic 604 fov 30
+== CHAPI009 95 607
+95A head 512 cam4 clic 607 fov 48
+95B head 604 cam3 clic 604 fov 30
+== CHAPI009 96 607
+96A head 512 cam4 clic 607 fov 48
+96B head 604 cam3 clic 604 fov 30
+== CHAPI009 97 0
+97A head 604 cam4 clic 604 fov 48
+== CHAPI009 98 607
+98A head 512 cam4 clic 607 fov 48
+98B head 604 cam3 clic 604 fov 30
+== CHAPI009 99 0
+99A head 604 cam4 clic 604 fov 48
+== CHAPI009 100 607
+100A head 512 cam4 clic 607 fov 48
+89A head 604 cam3 clic 604 fov 30
+== CHAPI009 101 607
+101A head 512 cam4 clic 607 fov 48
+89A head 604 cam3 clic 604 fov 30
+== CHAPI009 102 607
+102A head 512 cam4 clic 607 fov 48
+== CHAPI009 103 0
+103A head 604 cam4 clic 604 fov 48
+== CHAPI009 109 607
+109A head 512 cam4 clic 607 fov 48
+112A head 604 cam3 clic 604 fov 30
+== CHAPI009 110 607
+110A head 512 cam4 clic 607 fov 48
+112A head 604 cam3 clic 604 fov 30
+== CHAPI009 112 607
+112A head 607 cam4 clic 607 fov 48
+== CHAPI009 114 601
+114A head 512 cam4 clic 601 fov 48
+114B head 601 cam2 clic 601 fov 20.68
+== CHAPI009 115 601
+115A head 512 cam4 clic 601 fov 48
+115B head 601 cam2 clic 601 fov 20.68
+== CHAPI009 116 601
+116A head 512 cam4 clic 601 fov 48
+116B head 601 cam2 clic 601 fov 20.68
+== CHAPI009 117 601
+117A head 601 cam4 clic 601 fov 48
+== CHAPI009 118 0
+118A head 604 cam4 clic 604 fov 48
+118B head 604 cam5 clic 604 fov 48.26
+118C head 604 cam4 clic 604 fov 48
+118D head 512 cam4 clic 514 fov 48
+118E head 604 cam5 clic 604 fov 48.26
+118F head 604 cam4 clic 604 fov 48
+== CHAPI011 125 0
+125A head 525 cam2 clic 525 fov 20.68
+125B head 512 cam5 clic 514 fov 48.26
+125C head 525 cam5 clic 525 fov 48.26
+125D head 512 cam5 clic 514 fov 48.26
+125E head 525 cam2 clic 525 fov 20.68
+== CHAPI011 126 525
+126A head 512 cam5 clic 525 fov 48.26
+126B head 525 cam4 clic 525 fov 48
+128A head 525 cam2 clic 525 fov 20.68
+== CHAPI011 127 525
+127A head 512 cam5 clic 525 fov 48.26
+127B head 525 cam2 clic 525 fov 20.68
+128A head 525 cam4 clic 525 fov 48
+== CHAPI011 128 0
+128A head 525 cam4 clic 525 fov 48
+== CHAPI011 134 609
+134A head 512 cam2 clic 609 fov 20.68
+134B head 609 cam2 clic 609 fov 20.68
+== CHAPI011 135 609
+135A head 609 cam2 clic 609 fov 20.68
+== CHAPI011 136 609
+136A head 609 cam2 clic 609 fov 20.68
+== CHAPI011 137 609
+137A head 512 cam2 clic 609 fov 20.68
+137B head 609 cam2 clic 609 fov 20.68
+137C head 512 cam4 clic 514 fov 48
+137D head 609 cam3 clic 609 fov 30
+== CHAPI011 138 609
+138A head 512 cam2 clic 609 fov 20.68
+138B head 609 cam2 clic 609 fov 20.68
+== CHAPI011 139 604
+139A head 604 cam4 clic 604 fov 48
+== CHAPI011 140 605
+140A head 605 cam4 clic 605 fov 48
+== CHAPI011 141 0
+141A head 604 cam4 clic 604 fov 48
+== CHAPI011 142 0
+142A head 604 cam4 clic 604 fov 48
+== CHAPI011 143 603
+143A head 512 cam4 clic 603 fov 48
+143B head 604 cam3 clic 604 fov 30
+== CHAPI011 144 0
+144A head 604 cam4 clic 604 fov 48
+== CHAPI011 145 526
+145A head 512 cam4 clic 526 fov 48
+145B head 526 cam2 clic 526 fov 20.68
+145C head 512 cam4 clic 514 fov 48
+145D head 526 cam2 clic 526 fov 20.68
+== CHAPI011 146 526
+146A head 512 cam4 clic 526 fov 48
+146B head 526 cam2 clic 526 fov 20.68
+146C head 512 cam4 clic 514 fov 48
+146D head 526 cam2 clic 526 fov 20.68
+== CHAPI011 147 526
+147A head 512 cam4 clic 526 fov 48
+147B head 526 cam2 clic 526 fov 20.68
+147C head 512 cam4 clic 514 fov 48
+147D head 526 cam2 clic 526 fov 20.68
+147E head 512 cam4 clic 514 fov 48
+147F head 526 cam2 clic 526 fov 20.68
+== CHAPI011 148 526
+148A head 512 cam4 clic 526 fov 48
+148B head 526 cam2 clic 526 fov 20.68
+148C head 512 cam4 clic 514 fov 48
+148D head 526 cam2 clic 526 fov 20.68
+== CHAPI011 149 526
+149A head 512 cam4 clic 526 fov 48
+149B head 526 cam2 clic 526 fov 20.68
+149C head 512 cam4 clic 514 fov 48
+149D head 526 cam2 clic 526 fov 20.68
+149E head 512 cam4 clic 514 fov 48
+149F head 526 cam2 clic 526 fov 20.68
+149G head 512 cam4 clic 514 fov 48
+149H head 526 cam2 clic 526 fov 20.68
+== CHAPI011 150 526
+150A head 512 cam4 clic 526 fov 48
+150B head 526 cam2 clic 526 fov 20.68
+150C head 512 cam4 clic 514 fov 48
+150D head 526 cam2 clic 526 fov 20.68
+== CHAPI011 151 527
+151A head 512 cam4 clic 527 fov 48
+151B head 521 cam2 clic 521 fov 20.68
+151C head 512 cam4 clic 514 fov 48
+151D head 521 cam2 clic 521 fov 20.68
+151E head 512 cam4 clic 514 fov 48
+151F head 521 cam2 clic 521 fov 20.68
+151G head 512 cam4 clic 514 fov 48
+151H head 521 cam2 clic 521 fov 20.68
+151I head 512 cam4 clic 514 fov 48
+151J head 521 cam2 clic 521 fov 20.68
+151K head 512 cam4 clic 514 fov 48
+151L head 521 cam2 clic 521 fov 20.68
+== CHAPI011 152 527
+152A head 512 cam4 clic 527 fov 48
+152B head 521 cam2 clic 521 fov 20.68
+152C head 512 cam4 clic 514 fov 48
+152D head 521 cam2 clic 521 fov 20.68
+152E head 512 cam2 clic 514 fov 20.68
+152F head 521 cam4 clic 521 fov 48
+152G head 521 cam2 clic 521 fov 20.68
+152H head 512 cam4 clic 514 fov 48
+152I head 521 cam2 clic 521 fov 20.68
+== CHAPI011 153 527
+153A head 512 cam4 clic 527 fov 48
+153B head 521 cam2 clic 521 fov 20.68
+153C head 512 cam4 clic 514 fov 48
+153D head 521 cam2 clic 521 fov 20.68
+== CHAPI011 154 527
+154A head 512 cam4 clic 527 fov 48
+154B head 521 cam2 clic 521 fov 20.68
+== CHAPI011 155 527
+155A head 512 cam4 clic 527 fov 48
+155B head 521 cam2 clic 521 fov 20.68
+155C head 512 cam4 clic 514 fov 48
+155D head 521 cam2 clic 521 fov 20.68
+== CHAPI011 156 527
+156A head 512 cam4 clic 527 fov 48
+156B head 521 cam2 clic 521 fov 20.68
+== CHAPI011 157 527
+157A head 512 cam4 clic 527 fov 48
+157B head 521 cam2 clic 521 fov 20.68
+157C head 512 cam4 clic 514 fov 48
+157D head 521 cam2 clic 521 fov 20.68
+157E head 512 cam4 clic 514 fov 48
+157F head 521 cam2 clic 521 fov 20.68
+== CHAPI011 158 527
+158A head 527 cam4 clic 527 fov 48
+158B head 512 cam2 clic 514 fov 20.68
+== CHAPI011 159 0
+159A
+== CHAPI011 160 0
+160A
+== CHAPI011 162 0
+162A head 520 cam5 clic 520 fov 48.26
+162B head 512 cam4 clic 514 fov 48
+162C head 520 cam2 clic 520 fov 20.68
+162D head 512 cam4 clic 514 fov 48
+162E head 520 cam2 clic 520 fov 20.68
+162F head 512 cam4 clic 514 fov 48
+162G head 520 cam2 clic 520 fov 20.68
+162H head 512 cam4 clic 514 fov 48
+162I head 520 cam2 clic 520 fov 20.68
+== CHAPI011 164 520
+164A head 520 cam4 clic 520 fov 48
+== CHAPI011 165 520
+165A head 520 cam4 clic 520 fov 48
+== CHAPI011 166 520
+166A head 512 cam4 clic 520 fov 48
+166B head 520 cam2 clic 520 fov 20.68
+== CHAPI011 167 0
+167A head 520 cam5 clic 520 fov 48.26
+167B head 512 cam4 clic 514 fov 48
+167C head 520 cam2 clic 520 fov 20.68
+167D head 512 cam4 clic 514 fov 48
+167E head 520 cam2 clic 520 fov 20.68
+167F head 512 cam4 clic 514 fov 48
+167G head 520 cam2 clic 520 fov 20.68
+== CHAPI011 168 0
+168A head 520 cam5 clic 520 fov 48.26
+168B head 512 cam4 clic 514 fov 48
+168C head 520 cam2 clic 520 fov 20.68
+168D head 512 cam4 clic 514 fov 48
+168E head 520 cam2 clic 520 fov 20.68
+168F head 512 cam4 clic 514 fov 48
+168G head 520 cam2 clic 520 fov 20.68
+== CHAPI012 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI012 170 0
+== CHAPI012 267 0
+267A head 604 cam5 clic 604 fov 48.26
+== CHAPI013 170 0
+== CHAPI013 172 0
+== CHAPI013 173 0
+== CHAPI013 175 602
+175A head 512 cam4 clic 602 fov 48
+175B head 602 cam2 clic 602 fov 20.68
+== CHAPI013 176 0
+176A head 604 cam4 clic 604 fov 48
+== CHAPI013 179 0
+179A
+== CHAPI013 180 529
+180A fails 529
+== CHAPI014 170 0
+== CHAPI014 175 602
+175A head 512 cam4 clic 602 fov 48
+175B head 602 cam2 clic 602 fov 20.68
+== CHAPI014 176 0
+176A head 604 cam4 clic 604 fov 48
+== CHAPI014 182 0
+182A
+== CHAPI015 170 0
+== CHAPI015 176 0
+176A head 604 cam4 clic 604 fov 48
+== CHAPI015 185 0
+185A head 521 cam5 clic 521 fov 48.26
+== CHAPI015 186 531
+186A head 512 cam5 clic 531 fov 48.26
+186B head 521 cam2 clic 521 fov 20.68
+== CHAPI015 187 531
+187A head 512 cam2 clic 531 fov 20.68
+187B head 521 cam5 clic 521 fov 48.26
+187C head 512 cam5 clic 514 fov 48.26
+187D head 521 cam5 clic 521 fov 48.26
+== CHAPI015 188 531
+188A head 512 cam2 clic 531 fov 20.68
+188B head 521 cam5 clic 521 fov 48.26
+== CHAPI015 189 0
+189A head 522 cam2 clic 522 fov 20.68
+189B head 521 cam5 clic 521 fov 48.26
+189C head 512 cam3 clic 514 fov 30
+189D head 521 cam5 clic 521 fov 48.26
+189E head 512 cam3 clic 514 fov 30
+189F head 521 cam3 clic 521 fov 30
+189G head 512 cam5 clic 514 fov 48.26
+189H head 522 cam2 clic 522 fov 20.68
+== CHAPI015 190 0
+190A head 522 cam4 clic 522 fov 48
+== CHAPI015 191 0
+== CHAPI015 192 0
+192A
+== CHAPI015 193 277
+193A
+== CHAPI015 195 277
+195A
+== CHAPI015 1210 0
+== CHAPI015 1211 0
+== CHAPI015 1212 0
+== CHAPI015 1214 0
+== CHAPI015 1215 0
+== CHAPI016 170 0
+== CHAPI016 176 0
+176A head 604 cam4 clic 604 fov 48
+== CHAPI016 192 0
+192A
+== CHAPI016 204 602
+204A head 512 cam4 clic 602 fov 48
+204B head 602 cam2 clic 602 fov 20.68
+== CHAPI016 205 0
+205A
+== CHAPI016 206 0
+206A head 520 cam2 clic 520 fov 20.68
+206B
+206C head 520 cam3 clic 520 fov 30
+== CHAPI016 207 539
+207A head 512 cam4 clic 539 fov 48
+207B head 520 cam2 clic 520 fov 20.68
+207C head 512 cam4 clic 514 fov 48
+207D head 520 cam2 clic 520 fov 20.68
+207E head 512 cam4 clic 514 fov 48
+207F head 520 cam2 clic 520 fov 20.68
+== CHAPI016 209 539
+209A head 512 cam4 clic 539 fov 48
+209B head 520 cam2 clic 520 fov 20.68
+== CHAPI016 210 539
+210A head 512 cam4 clic 539 fov 48
+210B head 520 cam2 clic 520 fov 20.68
+210C head 512 cam4 clic 514 fov 48
+210D head 520 cam2 clic 520 fov 20.68
+210E head 512 cam4 clic 514 fov 48
+210F head 520 cam2 clic 520 fov 20.68
+210G head 512 cam4 clic 514 fov 48
+== CHAPI016 212 0
+== CHAPI016 244 0
+244A head 512 cam4 clic 514 fov 48
+== CHAPI016 1211 0
+== CHAPI017 170 0
+== CHAPI017 176 0
+176A head 604 cam4 clic 604 fov 48
+== CHAPI017 212 0
+== CHAPI017 1211 0
+== CHAPI018 170 0
+== CHAPI018 176 0
+176A head 604 cam4 clic 604 fov 48
+== CHAPI018 212 0
+== CHAPI018 225 0
+225A
+== CHAPI018 226 0
+226A head 540 cam4 clic 540 fov 48
+226B head 512 cam2 clic 514 fov 20.68
+226C head 540 cam4 clic 540 fov 48
+== CHAPI018 227 540
+227A head 512 cam4 clic 540 fov 48
+227B head 540 cam2 clic 540 fov 20.68
+227C head 512 cam4 clic 514 fov 48
+227D head 540 cam2 clic 540 fov 20.68
+== CHAPI018 228 540
+228A head 540 cam4 clic 540 fov 48
+== CHAPI018 229 540
+229A head 540 cam4 clic 540 fov 48
+== CHAPI018 230 540
+230A head 512 cam4 clic 540 fov 48
+230B head 540 cam2 clic 540 fov 20.68
+230C head 512 cam4 clic 514 fov 48
+230D head 540 cam2 clic 540 fov 20.68
+== CHAPI018 231 540
+231A head 512 cam4 clic 540 fov 48
+231B head 540 cam2 clic 540 fov 20.68
+231C head 512 cam4 clic 514 fov 48
+231D head 540 cam2 clic 540 fov 20.68
+231E head 512 cam4 clic 514 fov 48
+231F head 540 cam2 clic 540 fov 20.68
+== CHAPI018 232 540
+232A head 540 cam4 clic 540 fov 48
+== CHAPI018 233 540
+233A head 512 cam4 clic 540 fov 48
+233B head 540 cam2 clic 540 fov 20.68
+233C head 512 cam4 clic 514 fov 48
+233D head 540 cam2 clic 540 fov 20.68
+233E head 512 cam4 clic 514 fov 48
+233F head 540 cam2 clic 540 fov 20.68
+== CHAPI018 234 540
+234A head 540 cam4 clic 540 fov 48
+== CHAPI018 235 540
+235A head 540 cam4 clic 540 fov 48
+235B
+== CHAPI018 236 540
+236A head 540 cam4 clic 540 fov 48
+== CHAPI018 237 0
+237A head 604 cam4 clic 604 fov 48
+== CHAPI018 238 0
+238A
+238B
+238C
+238D
+== CHAPI018 239 0
+239A head 540 cam4 clic 540 fov 48
+== CHAPI018 240 0
+240A head 540 cam4 clic 540 fov 48
+== CHAPI018 241 540
+241A head 540 cam4 clic 540 fov 48
+== CHAPI018 242 0
+242A head 540 cam4 clic 540 fov 48
+== CHAPI018 243 0
+243A head 540 cam4 clic 540 fov 48
+== CHAPI018 244 0
+244A head 512 cam4 clic 514 fov 48
+== CHAPI018 1211 0
+== CHAPI020 170 0
+== CHAPI020 176 0
+176A head 604 cam4 clic 604 fov 48
+== CHAPI020 212 0
+== CHAPI020 237 0
+237A head 604 cam4 clic 604 fov 48
+== CHAPI020 244 0
+244A head 512 cam4 clic 514 fov 48
+== CHAPI020 260 540
+260A head 540 cam4 clic 540 fov 48
+260B head 512 cam2 clic 514 fov 20.68
+260C head 540 cam4 clic 540 fov 48
+260D
+260E head 540 cam2 clic 540 fov 20.68
+260F
+260G head 540 cam4 clic 540 fov 48
+== CHAPI020 261 0
+261A
+== CHAPI020 1211 0
+== CHAPI021 265 0
+265A head 563 cam5 clic 563 fov 48.26
+265B head 525 cam4 clic 525 fov 48
+265C
+265D
+265E head 563 cam2 clic 563 fov 20.68
+265F head 525 cam2 clic 525 fov 20.68
+265G head 563 cam2 clic 563 fov 20.68
+265H head 525 cam4 clic 525 fov 48
+265I head 563 cam5 clic 563 fov 48.26
+265J head 525 cam3 clic 525 fov 30
+265K
+265L
+== CHAPI021 269 0
+269A
+== CHAPI021 270 282
+270A
+== CHAPI022 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI022 170 0
+== CHAPI022 267 0
+267A head 604 cam5 clic 604 fov 48.26
+== CHAPI022 269 0
+269A
+== CHAPI023 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI023 170 0
+== CHAPI023 271 0
+271A
+271B
+271C
+271D
+== CHAPI023 272 0
+272A
+272B
+272C
+272D
+== CHAPI023 273 0
+273A
+273B
+273C head 604 cam3 clic 604 fov 30
+== CHAPI023 274 0
+274A head 604 cam3 clic 604 fov 30
+== CHAPI023 1210 0
+== CHAPI024 275 0
+275A head 520 cam4 clic 520 fov 48
+275B head 512 cam2 clic 514 fov 20.68
+275C head 520 cam4 clic 520 fov 48
+275D head 602 cam2 clic 602 fov 20.68
+275E head 520 cam4 clic 520 fov 48
+275F head 512 cam2 clic 514 fov 20.68
+275G head 520 cam4 clic 520 fov 48
+== CHAPI024 276 0
+276A
+== CHAPI024 277 541
+277A head 512 cam4 clic 541 fov 48
+277B head 520 cam2 clic 520 fov 20.68
+== CHAPI024 278 541
+278A head 512 cam4 clic 541 fov 48
+278B head 520 cam2 clic 520 fov 20.68
+== CHAPI024 279 541
+279A head 512 cam4 clic 541 fov 48
+279B head 520 cam2 clic 520 fov 20.68
+== CHAPI024 280 0
+280A head 520 cam4 clic 520 fov 48
+280B head 602 cam2 clic 602 fov 20.68
+== CHAPI024 281 542
+281A head 512 cam4 clic 542 fov 48
+281B head 520 cam2 clic 520 fov 20.68
+281C head 512 cam2 clic 514 fov 20.68
+281D head 520 cam2 clic 520 fov 20.68
+281E head 512 cam2 clic 514 fov 20.68
+281F head 520 cam2 clic 520 fov 20.68
+== CHAPI024 1210 0
+== CHAPI025 170 0
+== CHAPI025 286 0
+286A head 604 cam4 clic 604 fov 48
+== CHAPI026 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI026 170 0
+== CHAPI026 267 0
+267A head 604 cam5 clic 604 fov 48.26
+== CHAPI026 269 0
+269A
+== CHAPI026 283 0
+== CHAPI026 285 0
+285A head 604 cam5 clic 604 fov 48.26
+== CHAPI026 286 0
+286A head 604 cam4 clic 604 fov 48
+== CHAPI026 287 0
+287A head 604 cam5 clic 604 fov 48.26
+== CHAPI026 290 0
+290A head 604 cam4 clic 604 fov 48
+== CHAPI026 291 0
+291A head 604 cam5 clic 604 fov 48.26
+== CHAPI027 283 0
+== CHAPI027 290 0
+290A head 604 cam4 clic 604 fov 48
+== CHAPI027 291 0
+291A head 604 cam5 clic 604 fov 48.26
+== CHAPI027 294 0
+294A head 512 cam2 clic 514 fov 20.68
+== CHAPI028 300 0
+300A
+300B head 543 cam2 clic 543 fov 20.68
+== CHAPI028 301 543
+301A head 543 cam4 clic 543 fov 48
+301B head 512 cam2 clic 514 fov 20.68
+301C head 543 cam2 clic 543 fov 20.68
+== CHAPI028 302 543
+302A head 543 cam4 clic 543 fov 48
+302B head 512 cam5 clic 514 fov 48.26
+302C head 543 cam3 clic 543 fov 30
+302D head 512 cam2 clic 514 fov 20.68
+302E head 543 cam5 clic 543 fov 48.26
+302F head 512 cam5 clic 514 fov 48.26
+302G head 543 cam3 clic 543 fov 30
+302H head 512 cam5 clic 514 fov 48.26
+302I head 543 cam5 clic 543 fov 48.26
+302J head 512 cam5 clic 514 fov 48.26
+302K head 543 cam3 clic 543 fov 30
+302L head 512 cam2 clic 514 fov 20.68
+302M head 543 cam2 clic 543 fov 20.68
+== CHAPI028 303 543
+303A head 512 cam5 clic 543 fov 48.26
+303B head 543 cam3 clic 543 fov 30
+303C head 512 cam2 clic 514 fov 20.68
+303D head 543 cam5 clic 543 fov 48.26
+== CHAPI028 304 543
+304A head 512 cam5 clic 543 fov 48.26
+301A head 543 cam4 clic 543 fov 48
+301B head 512 cam2 clic 514 fov 20.68
+301C head 543 cam2 clic 543 fov 20.68
+== CHAPI028 305 543
+305A head 512 cam2 clic 543 fov 20.68
+303A head 512 cam5 clic 514 fov 48.26
+303B head 543 cam3 clic 543 fov 30
+303C head 512 cam2 clic 514 fov 20.68
+303D head 543 cam5 clic 543 fov 48.26
+== CHAPI028 306 0
+306A head 543 cam2 clic 543 fov 20.68
+== CHAPI028 307 543
+307A head 543 cam4 clic 543 fov 48
+307B head 512 cam2 clic 514 fov 20.68
+307C head 543 cam2 clic 543 fov 20.68
+307D head 512 cam5 clic 514 fov 48.26
+307E head 543 cam4 clic 543 fov 48
+307F head 512 cam5 clic 514 fov 48.26
+307G head 543 cam3 clic 543 fov 30
+307H head 512 cam5 clic 514 fov 48.26
+307I head 543 cam5 clic 543 fov 48.26
+307J head 512 cam2 clic 514 fov 20.68
+307K head 543 cam2 clic 543 fov 20.68
+== CHAPI028 308 543
+308A head 543 cam4 clic 543 fov 48
+== CHAPI028 311 543
+311A head 543 cam2 clic 543 fov 20.68
+== CHAPI028 312 543
+312A head 543 cam2 clic 543 fov 20.68
+== CHAPI028 313 0
+313A head 543 cam2 clic 543 fov 20.68
+== CHAPI028 314 0
+== CHAPI029 325 0
+325A head 543 cam4 clic 543 fov 48
+325B head 512 cam2 clic 514 fov 20.68
+325C head 543 cam4 clic 543 fov 48
+325D head 512 cam2 clic 514 fov 20.68
+325E head 543 cam4 clic 543 fov 48
+== CHAPI029 326 544
+326A head 544 cam4 clic 544 fov 48
+== CHAPI029 327 544
+327A head 544 cam4 clic 544 fov 48
+== CHAPI029 328 544
+328A head 512 cam4 clic 544 fov 48
+328B head 543 cam2 clic 543 fov 20.68
+== CHAPI029 329 0
+329A head 543 cam4 clic 543 fov 48
+329B head 512 cam2 clic 514 fov 20.68
+329C head 543 cam4 clic 543 fov 48
+329D head 512 cam2 clic 514 fov 20.68
+329E head 543 cam4 clic 543 fov 48
+== CHAPI029 330 544
+330A head 544 cam4 clic 544 fov 48
+== CHAPI029 331 544
+331A head 544 cam4 clic 544 fov 48
+== CHAPI029 332 544
+332A head 544 cam4 clic 544 fov 48
+== CHAPI029 333 0
+333A head 604 cam3 clic 604 fov 30
+== CHAPI030 36 0
+36A
+== CHAPI030 340 0
+340A head 551 cam4 clic 551 fov 48
+== CHAPI030 341 551
+341A head 512 cam4 clic 551 fov 48
+341B head 551 cam2 clic 551 fov 20.68
+== CHAPI030 343 551
+343A head 512 cam4 clic 551 fov 48
+343B head 551 cam2 clic 551 fov 20.68
+== CHAPI030 344 551
+344A head 551 cam4 clic 551 fov 48
+344B head 512 cam2 clic 514 fov 20.68
+== CHAPI030 345 0
+345A head 604 cam4 clic 604 fov 48
+== CHAPI030 346 551
+346A head 551 cam2 clic 551 fov 20.68
+346B head 551 cam5 clic 551 fov 48.26
+346C head 604 cam4 clic 604 fov 48
+== CHAPI030 348 551
+348A head 551 cam4 clic 551 fov 48
+348B head 512 cam2 clic 514 fov 20.68
+== CHAPI030 349 551
+349A head 551 cam4 clic 551 fov 48
+== CHAPI030 350 0
+350A head 551 cam4 clic 551 fov 48
+== CHAPI030 352 0
+352A head 604 cam5 clic 604 fov 48.26
+== CHAPI030 353 0
+353A head 551 cam4 clic 551 fov 48
+== CHAPI030 354 0
+354A head 604 cam4 clic 604 fov 48
+== CHAPI030 355 300
+355A
+355B head 513 cam4 clic 514 fov 48
+== CHAPI030 356 551
+356A head 551 cam4 clic 551 fov 48
+== CHAPI030 357 551
+357A head 551 cam4 clic 551 fov 48
+== CHAPI030 358 555
+358A head 512 cam4 clic 555 fov 48
+358B head 604 cam3 clic 604 fov 30
+358C head 512 cam5 clic 514 fov 48.26
+358D head 604 cam4 clic 604 fov 48
+== CHAPI030 359 0
+359A head 604 cam4 clic 604 fov 48
+359B head 512 cam2 clic 514 fov 20.68
+359C head 512 cam4 clic 514 fov 48
+359D head 604 cam3 clic 604 fov 30
+359E head 512 cam5 clic 514 fov 48.26
+359F head 512 cam3 clic 514 fov 30
+== CHAPI030 360 0
+360A head 604 cam4 clic 604 fov 48
+360B head 604 cam3 clic 604 fov 30
+360C head 512 cam5 clic 514 fov 48.26
+360D head 512 cam3 clic 514 fov 30
+== CHAPI030 363 551
+363A head 551 cam4 clic 551 fov 48
+== CHAPI030 364 0
+364A head 512 cam4 clic 514 fov 48
+== CHAPI030 366 555
+366A head 555 cam4 clic 555 fov 48
+366B head 512 cam2 clic 514 fov 20.68
+366C head 512 cam4 clic 514 fov 48
+366D head 604 cam3 clic 604 fov 30
+366E head 512 cam5 clic 514 fov 48.26
+366F head 512 cam3 clic 514 fov 30
+== CHAPI031 36 0
+36A
+== CHAPI031 363 551
+363A head 551 cam4 clic 551 fov 48
+== CHAPI031 367 0
+367A head 604 cam5 clic 604 fov 48.26
+== CHAPI031 368 0
+368A head 604 cam5 clic 604 fov 48.26
+== CHAPI031 369 0
+369A head 604 cam5 clic 604 fov 48.26
+== CHAPI031 370 552
+370A head 512 cam4 clic 552 fov 48
+370B head 604 cam3 clic 604 fov 30
+370C head 604 cam5 clic 604 fov 48.26
+370D head 512 cam3 clic 514 fov 30
+370E head 512 cam5 clic 514 fov 48.26
+370F head 604 cam4 clic 604 fov 48
+== CHAPI031 371 552
+371A head 512 cam4 clic 552 fov 48
+371B head 604 cam3 clic 604 fov 30
+371C head 512 cam5 clic 514 fov 48.26
+371D head 512 cam3 clic 514 fov 30
+371E head 604 cam5 clic 604 fov 48.26
+== CHAPI031 372 0
+372A head 604 cam5 clic 604 fov 48.26
+== CHAPI031 373 552
+373A head 552 cam4 clic 552 fov 48
+== CHAPI031 374 0
+374A head 604 cam4 clic 604 fov 48
+374B head 512 cam2 clic 514 fov 20.68
+374C head 604 cam4 clic 604 fov 48
+374D head 512 cam2 clic 514 fov 20.68
+374E head 604 cam4 clic 604 fov 48
+374F head 512 cam2 clic 514 fov 20.68
+== CHAPI031 375 0
+375A head 604 cam4 clic 604 fov 48
+== CHAPI031 376 0
+376A head 604 cam4 clic 604 fov 48
+== CHAPI031 377 0
+377A
+377B
+377C
+377D
+== CHAPI031 378 0
+378A head 604 cam4 clic 604 fov 48
+== CHAPI031 379 553
+379A head 553 cam4 clic 553 fov 48
+== CHAPI031 382 0
+382A head 604 cam4 clic 604 fov 48
+382B head 512 cam2 clic 514 fov 20.68
+382C head 604 cam4 clic 604 fov 48
+382D head 604 cam3 clic 604 fov 30
+382E head 512 cam5 clic 514 fov 48.26
+== CHAPI031 383 552
+383A head 512 cam4 clic 552 fov 48
+383B head 604 cam3 clic 604 fov 30
+383C head 512 cam5 clic 514 fov 48.26
+383D head 512 cam3 clic 514 fov 30
+383E head 604 cam5 clic 604 fov 48.26
+== CHAPI031 384 0
+384A head 604 cam4 clic 604 fov 48
+== CHAPI031 385 0
+385A head 604 cam5 clic 604 fov 48.26
+== CHAPI031 388 553
+== CHAPI031 390 0
+390A head 512 cam4 clic 514 fov 48
+== CHAPI031 391 0
+391A head 604 cam4 clic 604 fov 48
+== CHAPI031 392 553
+392A
+== CHAPI031 393 0
+393A
+393B
+== CHAPI032 386 0
+== CHAPI032 387 0
+387A
+== CHAPI032 389 557
+389A
+== CHAPI032 400 0
+400A head 560 cam2 clic 560 fov 20.68
+== CHAPI032 401 0
+401A head 560 cam2 clic 560 fov 20.68
+== CHAPI032 403 560
+403A head 512 cam4 clic 560 fov 48
+403B head 560 cam2 clic 560 fov 20.68
+403C head 512 cam4 clic 514 fov 48
+403D head 560 cam2 clic 560 fov 20.68
+403E head 512 cam4 clic 514 fov 48
+403F head 560 cam2 clic 560 fov 20.68
+403G head 512 cam4 clic 514 fov 48
+403H head 560 cam2 clic 560 fov 20.68
+== CHAPI032 404 560
+404A head 512 cam4 clic 560 fov 48
+404B head 560 cam2 clic 560 fov 20.68
+404C head 512 cam4 clic 514 fov 48
+404D head 560 cam2 clic 560 fov 20.68
+404E head 512 cam4 clic 514 fov 48
+404F head 560 cam2 clic 560 fov 20.68
+404G head 512 cam4 clic 514 fov 48
+404H head 560 cam2 clic 560 fov 20.68
+== CHAPI032 405 560
+405A head 560 cam2 clic 560 fov 20.68
+405B head 512 cam2 clic 514 fov 20.68
+405C head 560 cam2 clic 560 fov 20.68
+== CHAPI032 406 304
+406A
+406B
+406C head 514 cam4 clic 514 fov 48
+406D head 560 cam2 clic 560 fov 20.68
+== CHAPI032 407 304
+407A
+407B head 560 cam2 clic 560 fov 20.68
+== CHAPI032 408 560
+408A head 560 cam2 clic 560 fov 20.68
+408B head 512 cam2 clic 514 fov 20.68
+408C head 560 cam2 clic 560 fov 20.68
+== CHAPI032 409 0
+409A head 560 cam2 clic 560 fov 20.68
+409B head 512 cam2 clic 514 fov 20.68
+409C head 560 cam2 clic 560 fov 20.68
+409D head 512 cam2 clic 514 fov 20.68
+409E head 560 cam2 clic 560 fov 20.68
+== CHAPI032 410 560
+410A head 560 cam2 clic 560 fov 20.68
+== CHAPI032 411 0
+411A head 560 cam2 clic 560 fov 20.68
+== CHAPI032 412 0
+412A head 560 cam2 clic 560 fov 20.68
+== CHAPI032 413 0
+413A
+== CHAPI032 414 0
+414A head 561 cam4 clic 561 fov 48
+414B head 561 cam3 clic 561 fov 30
+414C head 512 cam5 clic 514 fov 48.26
+414D head 561 cam4 clic 561 fov 48
+414E head 512 cam2 clic 514 fov 20.68
+414F head 561 cam4 clic 561 fov 48
+414G head 512 cam2 clic 514 fov 20.68
+414H head 561 cam4 clic 561 fov 48
+== CHAPI032 415 561
+415A head 512 cam4 clic 561 fov 48
+415B head 561 cam3 clic 561 fov 30
+415C head 512 cam5 clic 514 fov 48.26
+415D head 561 cam4 clic 561 fov 48
+415E head 512 cam2 clic 514 fov 20.68
+415F head 561 cam4 clic 561 fov 48
+415G head 512 cam2 clic 514 fov 20.68
+415H head 561 cam4 clic 561 fov 48
+415I head 512 cam2 clic 514 fov 20.68
+415J head 561 cam4 clic 561 fov 48
+== CHAPI032 416 561
+416A head 512 cam4 clic 561 fov 48
+416B head 561 cam3 clic 561 fov 30
+== CHAPI032 417 561
+417A head 512 cam4 clic 561 fov 48
+417B head 561 cam3 clic 561 fov 30
+417C head 512 cam5 clic 514 fov 48.26
+417D head 561 cam4 clic 561 fov 48
+417E head 512 cam2 clic 514 fov 20.68
+417F head 561 cam4 clic 561 fov 48
+417G head 512 cam2 clic 514 fov 20.68
+417H head 561 cam4 clic 561 fov 48
+== CHAPI032 418 0
+418A head 604 cam4 clic 604 fov 48
+== CHAPI032 419 561
+419A head 512 cam4 clic 561 fov 48
+419B head 561 cam3 clic 561 fov 30
+419C head 512 cam5 clic 514 fov 48.26
+419D head 561 cam4 clic 561 fov 48
+== CHAPI032 420 0
+420A
+== CHAPI032 422 0
+422A
+422B head 604 cam4 clic 604 fov 48
+== CHAPI032 423 0
+423A head 604 cam4 clic 604 fov 48
+== CHAPI032 424 552
+424A head 552 cam4 clic 552 fov 48
+== CHAPI032 425 552
+425A head 552 cam4 clic 552 fov 48
+== CHAPI032 426 0
+426A head 604 cam4 clic 604 fov 48
+== CHAPI032 427 0
+427A head 604 cam4 clic 604 fov 48
+== CHAPI032 428 0
+428A head 604 cam4 clic 604 fov 48
+== CHAPI032 429 0
+429A head 604 cam4 clic 604 fov 48
+== CHAPI032 430 0
+430A
+== CHAPI032 431 0
+431A
+== CHAPI032 432 0
+432A
+== CHAPI032 433 0
+433A head 604 cam4 clic 604 fov 48
+== CHAPI032 434 556
+434A head 512 cam4 clic 556 fov 48
+434B head 604 cam3 clic 604 fov 30
+434C head 562 cam5 clic 562 fov 48.26
+434D head 512 cam3 clic 514 fov 30
+434E head 604 cam5 clic 604 fov 48.26
+== CHAPI032 435 556
+435A head 512 cam4 clic 556 fov 48
+435B head 604 cam3 clic 604 fov 30
+435C head 562 cam5 clic 562 fov 48.26
+435D head 604 cam4 clic 604 fov 48
+435E head 562 cam2 clic 562 fov 20.68
+435F head 604 cam4 clic 604 fov 48
+== CHAPI032 436 0
+436A head 604 cam4 clic 604 fov 48
+== CHAPI032 437 0
+437A head 604 cam4 clic 604 fov 48
+== CHAPI032 438 556
+438A head 512 cam4 clic 556 fov 48
+438B head 604 cam3 clic 604 fov 30
+438C head 512 cam5 clic 514 fov 48.26
+== CHAPI032 439 556
+439A head 512 cam4 clic 556 fov 48
+439B head 604 cam3 clic 604 fov 30
+439C head 512 cam5 clic 514 fov 48.26
+439D head 604 cam4 clic 604 fov 48
+439E head 562 cam2 clic 562 fov 20.68
+439F head 512 cam4 clic 514 fov 48
+439G head 604 cam3 clic 604 fov 30
+== CHAPI032 440 551
+440A head 551 cam4 clic 551 fov 48
+== CHAPI032 441 0
+441A
+== CHAPI032 442 0
+442A head 551 cam4 clic 551 fov 48
+== CHAPI033 437 0
+437A head 604 cam4 clic 604 fov 48
+== CHAPI033 447 0
+447A head 562 cam4 clic 562 fov 48
+447B head 512 cam2 clic 514 fov 20.68
+== CHAPI033 448 0
+448A head 604 cam5 clic 604 fov 48.26
+== CHAPI033 449 0
+449A head 543 cam4 clic 543 fov 48
+449B head 512 cam2 clic 514 fov 20.68
+449C head 543 cam4 clic 543 fov 48
+449D head 512 cam2 clic 514 fov 20.68
+449E head 543 cam4 clic 543 fov 48
+449F head 512 cam2 clic 514 fov 20.68
+449G head 543 cam4 clic 543 fov 48
+449H head 512 cam2 clic 514 fov 20.68
+449I head 562 cam4 clic 562 fov 48
+449J head 512 cam2 clic 514 fov 20.68
+449K head 562 cam4 clic 562 fov 48
+449L head 543 cam2 clic 543 fov 20.68
+449M head 512 cam4 clic 514 fov 48
+449N head 543 cam2 clic 543 fov 20.68
+449O head 512 cam4 clic 514 fov 48
+== CHAPI033 450 0
+450A head 604 cam4 clic 604 fov 48
+== CHAPI033 451 0
+451A
+== CHAPI033 452 0
+452A head 604 cam4 clic 604 fov 48
+== CHAPI033 453 0
+453A
+453B
+453C
+453D
+== CHAPI033 454 0
+454A
+== CHAPI033 460 0
+460A
+== CHAPI033 462 0
+462A
+== CHAPI033 464 0
+464A head 604 cam4 clic 604 fov 48
+== CHAPI033 465 0
+465A head 512 cam4 clic 514 fov 48
+465B
+== CHAPI033 1220 0
+1220A
+== CHAPI034 345 0
+345A head 604 cam4 clic 604 fov 48
+== CHAPI034 431 567
+431A
+== CHAPI034 455 0
+455A head 567 cam3 clic 567 fov 30
+455B head 512 cam5 clic 514 fov 48.26
+455C head 567 cam3 clic 567 fov 30
+455D head 512 cam5 clic 514 fov 48.26
+455E head 567 cam3 clic 567 fov 30
+455F head 512 cam5 clic 514 fov 48.26
+455G head 567 cam3 clic 567 fov 30
+455H head 512 cam5 clic 514 fov 48.26
+455I head 567 cam3 clic 567 fov 30
+455J
+== CHAPI034 456 0
+456A head 567 cam4 clic 567 fov 48
+== CHAPI034 457 0
+457A head 567 cam4 clic 567 fov 48
+457B head 512 cam2 clic 514 fov 20.68
+457C head 567 cam4 clic 567 fov 48
+457D
+457E head 567 cam2 clic 567 fov 20.68
+== CHAPI034 458 0
+458A head 567 cam4 clic 567 fov 48
+== CHAPI034 459 0
+459A head 567 cam4 clic 567 fov 48
+459B head 567 cam2 clic 567 fov 20.68
+459C head 512 cam4 clic 514 fov 48
+459D head 567 cam2 clic 567 fov 20.68
+== CHAPI034 463 567
+463A head 567 cam4 clic 567 fov 48
+== CHAPI034 470 0
+470A head 567 cam4 clic 567 fov 48
+470B head 512 cam2 clic 514 fov 20.68
+470C head 567 cam4 clic 567 fov 48
+== CHAPI034 471 0
+471A head 567 cam4 clic 567 fov 48
+471B head 512 cam2 clic 514 fov 20.68
+471C head 512 cam4 clic 514 fov 48
+471D head 567 cam2 clic 567 fov 20.68
+471E head 512 cam4 clic 514 fov 48
+471F head 567 cam2 clic 567 fov 20.68
+== CHAPI034 472 567
+472A head 567 cam4 clic 567 fov 48
+== CHAPI034 474 567
+474A head 567 cam4 clic 567 fov 48
+== CHAPI034 475 0
+475A head 567 cam4 clic 567 fov 48
+475B head 512 cam2 clic 514 fov 20.68
+475C head 512 cam4 clic 514 fov 48
+475D head 567 cam2 clic 567 fov 20.68
+475E head 512 cam4 clic 514 fov 48
+475F head 567 cam2 clic 567 fov 20.68
+== CHAPI034 476 0
+476A head 567 cam4 clic 567 fov 48
+476B head 512 cam2 clic 514 fov 20.68
+476C head 512 cam4 clic 514 fov 48
+476D head 567 cam2 clic 567 fov 20.68
+== CHAPI034 477 0
+477A head 567 cam4 clic 567 fov 48
+477B head 512 cam2 clic 514 fov 20.68
+477C head 512 cam4 clic 514 fov 48
+477D head 567 cam2 clic 567 fov 20.68
+== CHAPI034 478 0
+478A head 567 cam4 clic 567 fov 48
+478B head 512 cam2 clic 514 fov 20.68
+478C head 567 cam4 clic 567 fov 48
+== CHAPI034 1223 0
+1223A head 512 cam4 clic 514 fov 48
+== CHAPI034 1224 0
+1224A head 512 cam4 clic 514 fov 48
+== CHAPI035 479 567
+479A head 512 cam4 clic 567 fov 48
+479B head 567 cam2 clic 567 fov 20.68
+== CHAPI035 480 567
+480A head 512 cam4 clic 567 fov 48
+480B head 567 cam2 clic 567 fov 20.68
+== CHAPI035 481 567
+481A head 512 cam4 clic 567 fov 48
+481B head 567 cam2 clic 567 fov 20.68
+481C head 512 cam4 clic 514 fov 48
+481D head 567 cam2 clic 567 fov 20.68
+== CHAPI035 482 567
+482A head 512 cam4 clic 567 fov 48
+482B head 567 cam2 clic 567 fov 20.68
+482C head 512 cam4 clic 514 fov 48
+482D head 567 cam2 clic 567 fov 20.68
+482E head 512 cam4 clic 514 fov 48
+482F head 567 cam2 clic 567 fov 20.68
+482G head 512 cam4 clic 514 fov 48
+482H head 567 cam2 clic 567 fov 20.68
+== CHAPI035 483 567
+483A head 512 cam4 clic 567 fov 48
+483B head 567 cam2 clic 567 fov 20.68
+483C head 512 cam4 clic 514 fov 48
+483D head 567 cam2 clic 567 fov 20.68
+== CHAPI035 484 567
+484A head 512 cam4 clic 567 fov 48
+484B head 567 cam2 clic 567 fov 20.68
+484C head 512 cam4 clic 514 fov 48
+484D head 567 cam2 clic 567 fov 20.68
+484E head 512 cam4 clic 514 fov 48
+484F head 567 cam2 clic 567 fov 20.68
+484G head 512 cam4 clic 514 fov 48
+484H head 567 cam2 clic 567 fov 20.68
+== CHAPI035 485 567
+485A head 567 cam4 clic 567 fov 48
+== CHAPI035 486 567
+486A head 567 cam4 clic 567 fov 48
+== CHAPI035 487 567
+487A head 567 cam4 clic 567 fov 48
+== CHAPI035 488 567
+488A head 567 cam4 clic 567 fov 48
+== CHAPI035 489 567
+489A head 567 cam4 clic 567 fov 48
+== CHAPI035 490 567
+490A head 567 cam4 clic 567 fov 48
+== CHAPI035 491 567
+491A head 567 cam4 clic 567 fov 48
+510A head 567 cam2 clic 567 fov 20.68
+== CHAPI035 492 0
+492A head 567 cam4 clic 567 fov 48
+510A head 567 cam2 clic 567 fov 20.68
+== CHAPI035 499 567
+499A head 512 cam4 clic 567 fov 48
+499B head 567 cam2 clic 567 fov 20.68
+499C head 512 cam4 clic 514 fov 48
+499D head 567 cam2 clic 567 fov 20.68
+499E head 512 cam4 clic 514 fov 48
+499F head 567 cam2 clic 567 fov 20.68
+== CHAPI035 500 567
+500A head 567 cam4 clic 567 fov 48
+== CHAPI035 510 0
+510A head 567 cam4 clic 567 fov 48
+== CHAPI036 515 0
+515A
+515B head 563 cam2 clic 563 fov 20.68
+515C
+515D
+515E head 563 cam5 clic 563 fov 48.26
+515F
+515G head 563 cam5 clic 563 fov 48.26
+515H
+515I
+515J head 563 cam2 clic 563 fov 20.68
+515K head 563 cam5 clic 563 fov 48.26
+515L
+515M head 563 cam2 clic 563 fov 20.68
+515N
+== CHAPI037 520 0
+520A
+520B head 567 cam4 clic 567 fov 48
+520C head 571 cam2 clic 571 fov 20.68
+520D head 567 cam4 clic 567 fov 48
+520E head 571 cam2 clic 571 fov 20.68
+520F head 567 cam4 clic 567 fov 48
+520G head 571 cam2 clic 571 fov 20.68
+520H head 567 cam4 clic 567 fov 48
+520I head 571 cam2 clic 571 fov 20.68
+520J head 567 cam4 clic 567 fov 48
+== CHAPI037 521 598
+521A head 512 cam4 clic 598 fov 48
+521B head 567 cam2 clic 567 fov 20.68
+534A head 567 cam4 clic 567 fov 48
+534B head 512 cam2 clic 514 fov 20.68
+534C head 567 cam4 clic 567 fov 48
+== CHAPI037 522 598
+522A head 512 cam4 clic 598 fov 48
+522B head 567 cam2 clic 567 fov 20.68
+== CHAPI037 523 598
+523A head 512 cam4 clic 598 fov 48
+523B head 567 cam2 clic 567 fov 20.68
+523C head 512 cam4 clic 514 fov 48
+523D head 567 cam2 clic 567 fov 20.68
+== CHAPI037 524 571
+524A head 512 cam4 clic 571 fov 48
+524B head 571 cam2 clic 571 fov 20.68
+524C head 512 cam4 clic 514 fov 48
+524D head 571 cam2 clic 571 fov 20.68
+524E head 512 cam4 clic 514 fov 48
+524F head 571 cam2 clic 571 fov 20.68
+== CHAPI037 525 571
+525A head 512 cam4 clic 571 fov 48
+525B head 571 cam2 clic 571 fov 20.68
+== CHAPI037 526 571
+526A head 512 cam4 clic 571 fov 48
+526B head 571 cam2 clic 571 fov 20.68
+== CHAPI037 527 598
+527A fails 598
+== CHAPI037 528 0
+528A head 567 cam4 clic 567 fov 48
+528B head 512 cam2 clic 514 fov 20.68
+528C head 567 cam4 clic 567 fov 48
+534A head 567 cam2 clic 567 fov 20.68
+534B head 512 cam4 clic 514 fov 48
+534C head 567 cam2 clic 567 fov 20.68
+== CHAPI037 529 598
+529A head 512 cam4 clic 598 fov 48
+531A head 567 cam2 clic 567 fov 20.68
+== CHAPI037 530 598
+530A head 512 cam4 clic 598 fov 48
+531A head 567 cam2 clic 567 fov 20.68
+== CHAPI037 531 0
+531A head 567 cam4 clic 567 fov 48
+== CHAPI037 532 0
+532A head 571 cam4 clic 571 fov 48
+== CHAPI037 533 0
+533A head 571 cam4 clic 571 fov 48
+== CHAPI037 534 0
+534A head 567 cam4 clic 567 fov 48
+534B head 512 cam2 clic 514 fov 20.68
+534C head 567 cam4 clic 567 fov 48
+== CHAPI037 535 598
+535A head 512 cam4 clic 598 fov 48
+535B head 567 cam2 clic 567 fov 20.68
+== CHAPI037 536 0
+536A head 571 cam4 clic 571 fov 48
+536B head 512 cam2 clic 514 fov 20.68
+== CHAPI037 537 598
+537A head 512 cam4 clic 598 fov 48
+537B head 567 cam2 clic 567 fov 20.68
+== CHAPI038 545 0
+545A head 524 cam4 clic 524 fov 48
+545B head 512 cam2 clic 514 fov 20.68
+545C head 524 cam4 clic 524 fov 48
+== CHAPI038 546 524
+546A head 524 cam4 clic 524 fov 48
+546B head 512 cam2 clic 514 fov 20.68
+546C head 524 cam4 clic 524 fov 48
+546D head 512 cam2 clic 514 fov 20.68
+546E head 524 cam4 clic 524 fov 48
+== CHAPI038 547 524
+547A head 524 cam4 clic 524 fov 48
+547B head 512 cam2 clic 514 fov 20.68
+547C head 524 cam4 clic 524 fov 48
+547D head 512 cam2 clic 514 fov 20.68
+547E head 524 cam4 clic 524 fov 48
+547F head 512 cam2 clic 514 fov 20.68
+547G head 524 cam4 clic 524 fov 48
+== CHAPI038 548 524
+548A head 524 cam4 clic 524 fov 48
+548B head 512 cam2 clic 514 fov 20.68
+548C head 524 cam4 clic 524 fov 48
+== CHAPI038 549 0
+549A head 524 cam4 clic 524 fov 48
+549B head 512 cam2 clic 514 fov 20.68
+549C head 524 cam4 clic 524 fov 48
+549D head 512 cam2 clic 514 fov 20.68
+549E head 524 cam4 clic 524 fov 48
+== CHAPI038 550 0
+550A head 524 cam4 clic 524 fov 48
+== CHAPI038 551 0
+551A head 512 cam4 clic 514 fov 48
+551B head 524 cam3 clic 524 fov 30
+551C head 512 cam5 clic 514 fov 48.26
+551D head 524 cam3 clic 524 fov 30
+551E head 524 cam5 clic 524 fov 48.26
+551F head 512 cam3 clic 514 fov 30
+551G head 524 cam5 clic 524 fov 48.26
+== CHAPI038 552 524
+552A head 524 cam4 clic 524 fov 48
+== CHAPI039 555 601
+555A head 601 cam4 clic 601 fov 48
+555B head 512 cam2 clic 514 fov 20.68
+555C head 601 cam4 clic 601 fov 48
+== CHAPI039 556 601
+556A head 601 cam4 clic 601 fov 48
+== CHAPI039 557 600
+557A head 512 cam4 clic 600 fov 48
+557B head 604 cam3 clic 604 fov 30
+557C head 512 cam5 clic 514 fov 48.26
+557D head 604 cam4 clic 604 fov 48
+== CHAPI039 558 600
+558A head 600 cam4 clic 600 fov 48
+== CHAPI039 559 600
+559A head 600 cam4 clic 600 fov 48
+559B head 512 cam2 clic 514 fov 20.68
+559C head 604 cam4 clic 604 fov 48
+== CHAPI039 560 603
+560A head 603 cam4 clic 603 fov 48
+== CHAPI039 561 0
+561A head 604 cam4 clic 604 fov 48
+561B head 512 cam2 clic 514 fov 20.68
+561C head 604 cam4 clic 604 fov 48
+561D head 512 cam2 clic 514 fov 20.68
+561E head 604 cam4 clic 604 fov 48
+== CHAPI040 237 0
+237A head 604 cam4 clic 604 fov 48
+== CHAPI040 244 0
+244A head 512 cam4 clic 514 fov 48
+== CHAPI040 561 0
+561A head 604 cam4 clic 604 fov 48
+561B head 512 cam2 clic 514 fov 20.68
+561C head 604 cam4 clic 604 fov 48
+561D head 512 cam2 clic 514 fov 20.68
+561E head 604 cam4 clic 604 fov 48
+== CHAPI040 570 606
+570A head 606 cam4 clic 606 fov 48
+== CHAPI040 571 606
+571A head 606 cam4 clic 606 fov 48
+== CHAPI040 572 606
+572A head 606 cam4 clic 606 fov 48
+== CHAPI040 573 606
+573A head 606 cam4 clic 606 fov 48
+573B head 512 cam2 clic 514 fov 20.68
+573C head 606 cam4 clic 606 fov 48
+== CHAPI041 237 0
+237A head 604 cam4 clic 604 fov 48
+== CHAPI041 244 0
+244A head 512 cam4 clic 514 fov 48
+== CHAPI041 561 0
+561A head 604 cam4 clic 604 fov 48
+561B head 512 cam2 clic 514 fov 20.68
+561C head 604 cam4 clic 604 fov 48
+561D head 512 cam2 clic 514 fov 20.68
+561E head 604 cam4 clic 604 fov 48
+== CHAPI041 581 0
+581A head 540 cam4 clic 540 fov 48
+581B
+== CHAPI041 582 540
+582A head 540 cam4 clic 540 fov 48
+== CHAPI041 583 540
+583A head 540 cam4 clic 540 fov 48
+== CHAPI041 584 540
+584A head 540 cam4 clic 540 fov 48
+584B
+584C head 512 cam2 clic 514 fov 20.68
+585A head 540 cam4 clic 540 fov 48
+== CHAPI041 585 540
+585A head 540 cam4 clic 540 fov 48
+== CHAPI041 586 540
+586A head 540 cam4 clic 540 fov 48
+586B head 540 cam2 clic 540 fov 20.68
+== CHAPI041 587 540
+587A head 540 cam4 clic 540 fov 48
+587B
+== CHAPI041 588 0
+588A head 540 cam4 clic 540 fov 48
+588B head 512 cam2 clic 514 fov 20.68
+588C head 540 cam4 clic 540 fov 48
+588D
+588E head 540 cam2 clic 540 fov 20.68
+588F head 512 cam4 clic 514 fov 48
+588G head 540 cam2 clic 540 fov 20.68
+588H head 540 cam4 clic 540 fov 48
+== CHAPI041 589 0
+589A head 540 cam4 clic 540 fov 48
+589B
+589C head 540 cam2 clic 540 fov 20.68
+== CHAPI041 590 0
+590A head 540 cam4 clic 540 fov 48
+590B
+590C head 540 cam2 clic 540 fov 20.68
+== CHAPI043 595 0
+595A head 522 cam5 clic 522 fov 48.26
+== CHAPI043 596 574
+596A head 574 cam2 clic 574 fov 20.68
+== CHAPI043 597 0
+597A
+== CHAPI043 598 0
+598A head 522 cam2 clic 522 fov 20.68
+== CHAPI044 600 0
+600A
+== CHAPI044 601 0
+601A
+== CHAPI044 602 0
+== CHAPI044 603 0
+== CHAPI044 604 0
+== CHAPI046 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI046 170 0
+== CHAPI047 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI047 170 0
+== CHAPI048 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI048 170 0
+== CHAPI048 610 0
+610A
+610B head 512 cam4 clic 514 fov 48
+610C
+610D head 512 cam2 clic 514 fov 20.68
+610E
+610F head 512 cam4 clic 514 fov 48
+610G
+610H head 512 cam2 clic 514 fov 20.68
+610I
+610J head 512 cam4 clic 514 fov 48
+610K
+610L
+== CHAPI049 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI049 170 0
+== CHAPI050 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI050 170 0
+== CHAPI050 620 0
+620A head 524 cam4 clic 524 fov 48
+620B head 512 cam2 clic 514 fov 20.68
+620C head 524 cam4 clic 524 fov 48
+== CHAPI050 621 524
+621A head 512 cam4 clic 524 fov 48
+621B head 524 cam3 clic 524 fov 30
+== CHAPI050 622 524
+622A head 512 cam4 clic 524 fov 48
+622B head 524 cam3 clic 524 fov 30
+== CHAPI050 623 524
+623A head 512 cam4 clic 524 fov 48
+623B head 524 cam3 clic 524 fov 30
+== CHAPI050 624 524
+624A head 512 cam4 clic 524 fov 48
+624B head 524 cam3 clic 524 fov 30
+624C
+624D head 512 cam5 clic 514 fov 48.26
+624E head 524 cam4 clic 524 fov 48
+624F head 512 cam2 clic 514 fov 20.68
+624G head 524 cam4 clic 524 fov 48
+624H head 512 cam2 clic 514 fov 20.68
+624I head 524 cam5 clic 524 fov 48.26
+624J head 524 cam3 clic 524 fov 30
+== CHAPI050 630 600
+630A head 600 cam4 clic 600 fov 48
+== CHAPI050 631 0
+631A head 604 cam4 clic 604 fov 48
+== CHAPI051 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI051 170 0
+== CHAPI051 267 0
+267A head 604 cam5 clic 604 fov 48.26
+== CHAPI051 283 0
+== CHAPI051 286 0
+286A head 604 cam4 clic 604 fov 48
+== CHAPI051 630 600
+630A head 600 cam4 clic 600 fov 48
+== CHAPI051 631 0
+631A head 604 cam4 clic 604 fov 48
+== CHAPI051 632 611
+632A head 512 cam4 clic 611 fov 48
+632B
+== CHAPI051 633 611
+633A
+== CHAPI052 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI052 170 0
+== CHAPI052 267 0
+267A head 604 cam5 clic 604 fov 48.26
+== CHAPI052 283 0
+== CHAPI052 286 0
+286A head 604 cam4 clic 604 fov 48
+== CHAPI052 632 611
+632A head 512 cam4 clic 611 fov 48
+632B
+== CHAPI052 633 611
+633A
+== CHAPI052 640 0
+640A head 571 cam2 clic 571 fov 20.68
+640B head 571 cam4 clic 571 fov 48
+== CHAPI052 641 0
+641A head 571 cam4 clic 571 fov 48
+== CHAPI052 642 0
+642A head 571 cam4 clic 571 fov 48
+== CHAPI052 643 576
+643A head 512 cam4 clic 576 fov 48
+643B head 571 cam2 clic 571 fov 20.68
+== CHAPI052 644 576
+644A head 512 cam4 clic 576 fov 48
+644B head 571 cam2 clic 571 fov 20.68
+644C head 512 cam4 clic 514 fov 48
+644D head 571 cam2 clic 571 fov 20.68
+== CHAPI052 645 576
+645A head 512 cam4 clic 576 fov 48
+645B head 571 cam2 clic 571 fov 20.68
+645C head 512 cam4 clic 514 fov 48
+645D head 571 cam2 clic 571 fov 20.68
+645E head 512 cam4 clic 514 fov 48
+645F head 571 cam2 clic 571 fov 20.68
+645G head 512 cam4 clic 514 fov 48
+645H head 571 cam2 clic 571 fov 20.68
+645I head 512 cam4 clic 514 fov 48
+645J head 571 cam2 clic 571 fov 20.68
+== CHAPI052 646 577
+646A head 512 cam4 clic 577 fov 48
+646B head 663 cam2 clic 663 fov 20.68
+646C head 571 cam2 clic 571 fov 20.68
+== CHAPI052 647 577
+647A head 512 cam4 clic 577 fov 48
+647B head 663 cam3 clic 663 fov 30
+647C head 571 cam2 clic 571 fov 20.68
+647D head 512 cam4 clic 514 fov 48
+== CHAPI052 648 577
+648A head 512 cam4 clic 577 fov 48
+648B head 663 cam2 clic 663 fov 20.68
+== CHAPI052 649 0
+649A head 571 cam4 clic 571 fov 48
+649B head 512 cam2 clic 514 fov 20.68
+== CHAPI052 650 576
+650A head 576 cam2 clic 576 fov 20.68
+650B
+650C head 663 cam2 clic 663 fov 20.68
+650D head 571 cam4 clic 571 fov 48
+650E head 663 cam2 clic 663 fov 20.68
+650F head 571 cam2 clic 571 fov 20.68
+== CHAPI053 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI053 170 0
+== CHAPI053 283 0
+== CHAPI053 286 0
+286A head 604 cam4 clic 604 fov 48
+== CHAPI053 655 0
+655A head 663 cam4 clic 663 fov 48
+655B head 512 cam2 clic 514 fov 20.68
+655C head 663 cam4 clic 663 fov 48
+655D head 512 cam2 clic 514 fov 20.68
+655E
+== CHAPI054 660 0
+660A head 526 cam2 clic 526 fov 20.68
+660B head 582 cam4 clic 582 fov 48
+660C head 526 cam2 clic 526 fov 20.68
+660D head 582 cam2 clic 582 fov 20.68
+660E head 526 cam2 clic 526 fov 20.68
+== CHAPI054 661 0
+661A head 526 cam4 clic 526 fov 48
+== CHAPI054 662 578
+== CHAPI054 663 578
+663A head 512 cam4 clic 578 fov 48
+663B head 526 cam2 clic 526 fov 20.68
+663C head 582 cam4 clic 582 fov 48
+663D head 526 cam4 clic 526 fov 48
+== CHAPI054 664 578
+664A head 512 cam4 clic 578 fov 48
+664B head 526 cam2 clic 526 fov 20.68
+664C head 582 cam4 clic 582 fov 48
+664D head 512 cam2 clic 514 fov 20.68
+664E head 526 cam4 clic 526 fov 48
+== CHAPI054 665 578
+665A head 512 cam4 clic 578 fov 48
+665B head 526 cam2 clic 526 fov 20.68
+665C head 512 cam4 clic 514 fov 48
+665D head 582 cam2 clic 582 fov 20.68
+665E head 526 cam4 clic 526 fov 48
+665F head 512 cam4 clic 514 fov 48
+665G head 582 cam2 clic 582 fov 20.68
+665H head 526 cam4 clic 526 fov 48
+== CHAPI054 666 578
+666A head 512 cam4 clic 578 fov 48
+666B head 582 cam2 clic 582 fov 20.68
+666C head 526 cam4 clic 526 fov 48
+== CHAPI054 667 578
+667A head 512 cam4 clic 578 fov 48
+667B head 526 cam2 clic 526 fov 20.68
+== CHAPI054 668 0
+668A head 526 cam4 clic 526 fov 48
+== CHAPI054 669 532
+669A head 512 cam4 clic 532 fov 48
+669B head 526 cam2 clic 526 fov 20.68
+== CHAPI054 670 532
+670A head 512 cam4 clic 532 fov 48
+670B head 526 cam2 clic 526 fov 20.68
+== CHAPI054 671 578
+671A head 512 cam4 clic 578 fov 48
+671B head 582 cam2 clic 582 fov 20.68
+671C head 526 cam4 clic 526 fov 48
+== CHAPI054 672 578
+672A head 512 cam4 clic 578 fov 48
+672B head 582 cam2 clic 582 fov 20.68
+672C head 512 cam4 clic 514 fov 48
+672D head 526 cam2 clic 526 fov 20.68
+672E head 512 cam4 clic 514 fov 48
+672F head 526 cam2 clic 526 fov 20.68
+672G head 512 cam4 clic 514 fov 48
+672H head 582 cam2 clic 582 fov 20.68
+672I head 526 cam4 clic 526 fov 48
+672J head 582 cam2 clic 582 fov 20.68
+== CHAPI054 673 0
+673A head 526 cam4 clic 526 fov 48
+== CHAPI054 674 578
+674A head 512 cam4 clic 578 fov 48
+674B head 526 cam4 clic 526 fov 48
+674C head 512 cam2 clic 514 fov 20.68
+674D head 582 cam4 clic 582 fov 48
+674E head 512 cam2 clic 514 fov 20.68
+674F head 582 cam4 clic 582 fov 48
+674G head 526 cam2 clic 526 fov 20.68
+674H head 582 cam4 clic 582 fov 48
+== CHAPI054 675 532
+675A head 512 cam4 clic 532 fov 48
+675B head 526 cam2 clic 526 fov 20.68
+== CHAPI054 676 0
+676A
+== CHAPI054 677 0
+677A
+677B
+677C
+677D
+677E
+== CHAPI055 662 578
+== CHAPI055 678 0
+678A
+678B
+== CHAPI055 679 0
+679A head 521 cam4 clic 521 fov 48
+== CHAPI055 680 0
+680A
+== CHAPI055 681 580
+681A fails 580
+== CHAPI055 682 0
+682A head 522 cam4 clic 522 fov 48
+== CHAPI055 683 580
+683A fails 580
+== CHAPI055 684 0
+684A
+684B
+684C
+684D
+684E
+684F
+684G
+== CHAPI055 685 585
+685A
+== CHAPI055 686 584
+686A head 512 cam4 clic 584 fov 48
+697A head 522 cam2 clic 522 fov 20.68
+697B head 582 cam2 clic 582 fov 20.68
+== CHAPI055 687 0
+687A head 521 cam2 clic 521 fov 20.68
+== CHAPI055 688 582
+688A head 582 cam4 clic 582 fov 48
+== CHAPI055 689 584
+689A
+== CHAPI055 690 584
+690A
+== CHAPI055 691 0
+691A
+== CHAPI055 693 0
+693A head 522 cam2 clic 522 fov 20.68
+693B head 582 cam4 clic 582 fov 48
+693C head 522 cam2 clic 522 fov 20.68
+693D head 582 cam2 clic 582 fov 20.68
+693E head 522 cam2 clic 522 fov 20.68
+== CHAPI055 694 584
+694A
+== CHAPI055 695 583
+695A head 512 cam4 clic 583 fov 48
+701A head 582 cam2 clic 582 fov 20.68
+701B head 521 cam2 clic 521 fov 20.68
+701C head 522 cam2 clic 522 fov 20.68
+== CHAPI055 696 583
+696A head 512 cam4 clic 583 fov 48
+701A head 582 cam2 clic 582 fov 20.68
+701B head 521 cam2 clic 521 fov 20.68
+701C head 522 cam2 clic 522 fov 20.68
+== CHAPI055 697 0
+697A head 522 cam2 clic 522 fov 20.68
+697B head 582 cam4 clic 582 fov 48
+== CHAPI055 698 586
+698A head 512 cam4 clic 586 fov 48
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam2 clic 582 fov 20.68
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam4 clic 582 fov 48
+700E head 512 cam2 clic 514 fov 20.68
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam4 clic 582 fov 48
+== CHAPI055 699 586
+699A head 512 cam4 clic 586 fov 48
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam2 clic 582 fov 20.68
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam4 clic 582 fov 48
+700E head 512 cam2 clic 514 fov 20.68
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam4 clic 582 fov 48
+== CHAPI055 700 0
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam4 clic 582 fov 48
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam2 clic 582 fov 20.68
+700E head 512 cam4 clic 514 fov 48
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam2 clic 582 fov 20.68
+== CHAPI055 701 0
+701A head 582 cam4 clic 582 fov 48
+701B head 521 cam2 clic 521 fov 20.68
+701C head 522 cam2 clic 522 fov 20.68
+== CHAPI055 702 587
+702A head 512 cam4 clic 587 fov 48
+716A head 582 cam2 clic 582 fov 20.68
+716B head 522 cam2 clic 522 fov 20.68
+716C head 582 cam4 clic 582 fov 48
+716D head 522 cam2 clic 522 fov 20.68
+== CHAPI055 703 587
+703A head 512 cam4 clic 587 fov 48
+716A head 582 cam2 clic 582 fov 20.68
+716B head 522 cam2 clic 522 fov 20.68
+716C head 582 cam4 clic 582 fov 48
+716D head 522 cam2 clic 522 fov 20.68
+== CHAPI055 704 583
+704A head 512 cam4 clic 583 fov 48
+706A
+706B head 582 cam2 clic 582 fov 20.68
+== CHAPI055 705 583
+705A head 512 cam4 clic 583 fov 48
+706A
+706B head 582 cam2 clic 582 fov 20.68
+== CHAPI055 706 583
+706A
+706B head 582 cam4 clic 582 fov 48
+== CHAPI055 708 586
+708A head 512 cam4 clic 586 fov 48
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam2 clic 582 fov 20.68
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam4 clic 582 fov 48
+700E head 512 cam2 clic 514 fov 20.68
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam4 clic 582 fov 48
+== CHAPI055 712 584
+712A head 512 cam4 clic 584 fov 48
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam2 clic 582 fov 20.68
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam4 clic 582 fov 48
+700E head 512 cam2 clic 514 fov 20.68
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam4 clic 582 fov 48
+== CHAPI055 713 583
+713A
+== CHAPI055 714 585
+714A head 512 cam4 clic 585 fov 48
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam2 clic 582 fov 20.68
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam4 clic 582 fov 48
+700E head 512 cam2 clic 514 fov 20.68
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam4 clic 582 fov 48
+== CHAPI055 715 583
+715A head 512 cam4 clic 583 fov 48
+716A head 582 cam2 clic 582 fov 20.68
+716B head 522 cam2 clic 522 fov 20.68
+716C head 582 cam4 clic 582 fov 48
+716D head 522 cam2 clic 522 fov 20.68
+== CHAPI055 716 0
+716A head 582 cam4 clic 582 fov 48
+716B head 522 cam2 clic 522 fov 20.68
+716C head 582 cam2 clic 582 fov 20.68
+716D head 522 cam2 clic 522 fov 20.68
+== CHAPI055 717 584
+717A head 512 cam4 clic 584 fov 48
+697A head 522 cam2 clic 522 fov 20.68
+697B head 582 cam2 clic 582 fov 20.68
+== CHAPI055 718 585
+718A head 512 cam4 clic 585 fov 48
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam2 clic 582 fov 20.68
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam4 clic 582 fov 48
+700E head 512 cam2 clic 514 fov 20.68
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam4 clic 582 fov 48
+== CHAPI055 719 0
+719A head 582 cam4 clic 582 fov 48
+719B head 512 cam2 clic 514 fov 20.68
+719C head 582 cam4 clic 582 fov 48
+719D head 512 cam2 clic 514 fov 20.68
+719E head 582 cam4 clic 582 fov 48
+== CHAPI055 720 583
+720A head 512 cam4 clic 583 fov 48
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam2 clic 582 fov 20.68
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam4 clic 582 fov 48
+700E head 512 cam2 clic 514 fov 20.68
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam4 clic 582 fov 48
+== CHAPI055 721 583
+721A head 512 cam4 clic 583 fov 48
+700A head 522 cam2 clic 522 fov 20.68
+700B head 582 cam2 clic 582 fov 20.68
+700C head 521 cam2 clic 521 fov 20.68
+700D head 582 cam4 clic 582 fov 48
+700E head 512 cam2 clic 514 fov 20.68
+700F head 522 cam2 clic 522 fov 20.68
+700G head 582 cam4 clic 582 fov 48
+== CHAPI055 722 582
+722A head 582 cam4 clic 582 fov 48
+== CHAPI056 169 0
+169A head 604 cam5 clic 604 fov 48.26
+== CHAPI056 170 0
+== CHAPI056 267 0
+267A head 604 cam5 clic 604 fov 48.26
+== CHAPI056 269 0
+269A
+== CHAPI056 283 0
+== CHAPI056 285 0
+285A head 604 cam5 clic 604 fov 48.26
+== CHAPI056 286 0
+286A head 604 cam4 clic 604 fov 48
+== CHAPI056 287 0
+287A head 604 cam5 clic 604 fov 48.26
+== CHAPI056 290 0
+290A head 604 cam4 clic 604 fov 48
+== CHAPI056 291 0
+291A head 604 cam5 clic 604 fov 48.26
+== CHAPI056 730 0
+730A head 663 cam4 clic 663 fov 48
+730B head 512 cam2 clic 514 fov 20.68
+730C head 663 cam4 clic 663 fov 48
+730D head 512 cam2 clic 514 fov 20.68
+730E head 663 cam4 clic 663 fov 48
+== CHAPI056 731 0
+731A head 663 cam3 clic 663 fov 30
+== CHAPI056 732 587
+732A head 587 cam4 clic 587 fov 48
+732B head 512 cam2 clic 514 fov 20.68
+732C head 663 cam4 clic 663 fov 48
+732D head 512 cam2 clic 514 fov 20.68
+732E head 663 cam4 clic 663 fov 48
+== CHAPI056 733 587
+733A head 512 cam4 clic 587 fov 48
+737A head 663 cam2 clic 663 fov 20.68
+737B head 512 cam4 clic 514 fov 48
+737C head 663 cam2 clic 663 fov 20.68
+== CHAPI056 734 587
+734A head 512 cam4 clic 587 fov 48
+737A head 663 cam2 clic 663 fov 20.68
+737B head 512 cam4 clic 514 fov 48
+737C head 663 cam2 clic 663 fov 20.68
+== CHAPI056 735 0
+735A
+== CHAPI056 736 587
+736A head 512 cam4 clic 587 fov 48
+736B head 663 cam2 clic 663 fov 20.68
+736C head 512 cam4 clic 514 fov 48
+736D head 663 cam2 clic 663 fov 20.68
+== CHAPI056 737 0
+737A head 663 cam4 clic 663 fov 48
+737B head 512 cam2 clic 514 fov 20.68
+737C head 663 cam4 clic 663 fov 48
+== CHAPI056 738 587
+738A head 587 cam4 clic 587 fov 48
+738B head 512 cam2 clic 514 fov 20.68
+738C head 663 cam4 clic 663 fov 48
+738D head 512 cam2 clic 514 fov 20.68
+738E head 663 cam4 clic 663 fov 48
+738F head 512 cam2 clic 514 fov 20.68
+738G head 663 cam4 clic 663 fov 48
+738H head 512 cam2 clic 514 fov 20.68
+738I head 663 cam4 clic 663 fov 48
+738J head 512 cam2 clic 514 fov 20.68
+738K head 663 cam4 clic 663 fov 48
+738L head 512 cam2 clic 514 fov 20.68
+738M head 663 cam4 clic 663 fov 48
+738N head 512 cam2 clic 514 fov 20.68
+738O head 663 cam4 clic 663 fov 48
+738P head 512 cam2 clic 514 fov 20.68
+738Q head 663 cam4 clic 663 fov 48
+738R head 512 cam2 clic 514 fov 20.68
+738S head 663 cam4 clic 663 fov 48
+738T head 512 cam2 clic 514 fov 20.68
+738U head 663 cam4 clic 663 fov 48
+738V head 512 cam2 clic 514 fov 20.68
+738W head 663 cam4 clic 663 fov 48
+== CHAPI056 739 587
+739A head 512 cam4 clic 587 fov 48
+739B head 663 cam2 clic 663 fov 20.68
+== CHAPI056 740 587
+740A head 512 cam4 clic 587 fov 48
+740B head 663 cam2 clic 663 fov 20.68
+== CHAPI056 741 587
+741A head 512 cam4 clic 587 fov 48
+743A head 663 cam2 clic 663 fov 20.68
+747A head 512 cam4 clic 514 fov 48
+747B head 663 cam2 clic 663 fov 20.68
+== CHAPI056 742 587
+742A head 512 cam4 clic 587 fov 48
+743A head 663 cam2 clic 663 fov 20.68
+747A head 512 cam4 clic 514 fov 48
+747B head 663 cam2 clic 663 fov 20.68
+== CHAPI056 743 0
+743A head 663 cam4 clic 663 fov 48
+747A head 512 cam2 clic 514 fov 20.68
+747B head 663 cam4 clic 663 fov 48
+== CHAPI056 744 329
+744A head 585 cam4 clic 329 fov entry
+747A head 512 cam2 clic 514 fov 20.68
+747B head 663 cam4 clic 663 fov 48
+== CHAPI056 745 0
+745A head 522 cam4 clic 522 fov 48
+== CHAPI056 746 0
+746A head 604 cam4 clic 604 fov 48
+== CHAPI056 747 0
+747A head 512 cam4 clic 514 fov 48
+747B head 663 cam2 clic 663 fov 20.68
+== CHAPI056 748 587
+748A head 587 cam4 clic 587 fov 48
+748B head 512 cam2 clic 514 fov 20.68
+748C head 663 cam4 clic 663 fov 48
+748D head 512 cam2 clic 514 fov 20.68
+738A head 663 cam4 clic 663 fov 48
+738B head 512 cam2 clic 514 fov 20.68
+738C head 663 cam4 clic 663 fov 48
+738D head 512 cam2 clic 514 fov 20.68
+738E head 663 cam4 clic 663 fov 48
+738F head 512 cam2 clic 514 fov 20.68
+738G head 663 cam4 clic 663 fov 48
+738H head 512 cam2 clic 514 fov 20.68
+738I head 663 cam4 clic 663 fov 48
+738J head 512 cam2 clic 514 fov 20.68
+738K head 663 cam4 clic 663 fov 48
+738L head 512 cam2 clic 514 fov 20.68
+738M head 663 cam4 clic 663 fov 48
+738N head 512 cam2 clic 514 fov 20.68
+738O head 663 cam4 clic 663 fov 48
+738P head 512 cam2 clic 514 fov 20.68
+738Q head 663 cam4 clic 663 fov 48
+738R head 512 cam2 clic 514 fov 20.68
+738S head 663 cam4 clic 663 fov 48
+738T head 512 cam2 clic 514 fov 20.68
+738U head 663 cam4 clic 663 fov 48
+738V head 512 cam2 clic 514 fov 20.68
+738W head 663 cam4 clic 663 fov 48
+== CHAPI056 749 587
+749A head 512 cam4 clic 587 fov 48
+751A head 663 cam2 clic 663 fov 20.68
+== CHAPI056 750 587
+750A head 512 cam4 clic 587 fov 48
+751A head 663 cam2 clic 663 fov 20.68
+== CHAPI056 751 0
+751A head 663 cam4 clic 663 fov 48
+== CHAPI056 752 587
+752A head 512 cam4 clic 587 fov 48
+752B head 663 cam2 clic 663 fov 20.68
+747A head 512 cam4 clic 514 fov 48
+747B head 663 cam2 clic 663 fov 20.68
+== CHAPI056 753 587
+753A head 512 cam4 clic 587 fov 48
+753B head 663 cam2 clic 663 fov 20.68
+== CHAPI056 754 587
+754A head 587 cam4 clic 587 fov 48
+== CHAPI056 755 587
+755A head 512 cam4 clic 587 fov 48
+755B head 663 cam2 clic 663 fov 20.68
+755C head 512 cam4 clic 514 fov 48
+755D head 663 cam2 clic 663 fov 20.68
+755E head 512 cam4 clic 514 fov 48
+755F head 663 cam2 clic 663 fov 20.68
+755G head 512 cam4 clic 514 fov 48
+== CHAPI056 756 0
+756A head 604 cam4 clic 604 fov 48
+== CHAPI056 1211 0
+== CHAPI057 765 0
+765A head 663 cam4 clic 663 fov 48
+765B head 512 cam2 clic 514 fov 20.68
+765C head 663 cam4 clic 663 fov 48
+== CHAPI057 766 0
+766A head 663 cam4 clic 663 fov 48
+766B head 512 cam2 clic 514 fov 20.68
+766C head 663 cam4 clic 663 fov 48
+766D head 512 cam2 clic 514 fov 20.68
+766E head 663 cam4 clic 663 fov 48
+766F head 512 cam2 clic 514 fov 20.68
+766G head 663 cam4 clic 663 fov 48
+== CHAPI057 767 0
+767A head 663 cam4 clic 663 fov 48
+767B head 512 cam2 clic 514 fov 20.68
+767C head 663 cam4 clic 663 fov 48
+767D head 512 cam2 clic 514 fov 20.68
+== CHAPI057 768 591
+768A head 591 cam4 clic 591 fov 48
+768B head 512 cam2 clic 514 fov 20.68
+775A head 663 cam4 clic 663 fov 48
+775B head 512 cam2 clic 514 fov 20.68
+775C head 663 cam4 clic 663 fov 48
+== CHAPI057 769 591
+769A head 591 cam4 clic 591 fov 48
+== CHAPI057 770 591
+770A head 591 cam4 clic 591 fov 48
+== CHAPI057 771 591
+771A head 591 cam4 clic 591 fov 48
+771B head 512 cam2 clic 514 fov 20.68
+771C head 663 cam4 clic 663 fov 48
+== CHAPI057 772 591
+772A head 512 cam4 clic 591 fov 48
+772B head 663 cam2 clic 663 fov 20.68
+772C head 512 cam4 clic 514 fov 48
+775A head 663 cam2 clic 663 fov 20.68
+775B head 512 cam4 clic 514 fov 48
+775C head 663 cam2 clic 663 fov 20.68
+== CHAPI057 773 591
+773A head 591 cam4 clic 591 fov 48
+== CHAPI057 774 591
+774A head 512 cam4 clic 591 fov 48
+774B head 663 cam2 clic 663 fov 20.68
+== CHAPI057 775 0
+775A head 663 cam4 clic 663 fov 48
+775B head 512 cam2 clic 514 fov 20.68
+775C head 663 cam4 clic 663 fov 48
+== CHAPI057 776 591
+776A head 512 cam4 clic 591 fov 48
+771A head 663 cam2 clic 663 fov 20.68
+771B head 512 cam4 clic 514 fov 48
+771C head 663 cam2 clic 663 fov 20.68
+== CHAPI057 777 0
+777A head 604 cam4 clic 604 fov 48
+== CHAPI057 778 0
+778A head 604 cam4 clic 604 fov 48
+== CHAPI057 779 618
+779A head 512 cam4 clic 618 fov 48
+779B head 604 cam3 clic 604 fov 30
+779C head 512 cam5 clic 514 fov 48.26
+779D head 604 cam4 clic 604 fov 48
+779E head 512 cam2 clic 514 fov 20.68
+779F head 604 cam4 clic 604 fov 48
+779G head 512 cam2 clic 514 fov 20.68
+779H head 604 cam4 clic 604 fov 48
+779I head 512 cam2 clic 514 fov 20.68
+779J head 604 cam4 clic 604 fov 48
+779K head 512 cam2 clic 514 fov 20.68
+779L head 604 cam4 clic 604 fov 48
+779M head 512 cam2 clic 514 fov 20.68
+779N head 604 cam4 clic 604 fov 48
+779O head 512 cam2 clic 514 fov 20.68
+779P head 604 cam4 clic 604 fov 48
+779Q head 512 cam2 clic 514 fov 20.68
+== CHAPI057 780 0
+780A head 604 cam4 clic 604 fov 48
+== CHAPI057 781 0
+781A head 604 cam4 clic 604 fov 48
+== CHAPI057 782 619
+782A fails 619
+== CHAPI057 784 619
+784A
+== CHAPI057 785 592
+785A
+== CHAPI057 786 621
+786A head 512 cam4 clic 621 fov 48
+786B head 667 cam2 clic 667 fov 20.68
+786C head 512 cam4 clic 514 fov 48
+786D head 667 cam2 clic 667 fov 20.68
+786E head 512 cam4 clic 514 fov 48
+786F head 667 cam2 clic 667 fov 20.68
+786G head 512 cam4 clic 514 fov 48
+786H head 667 cam2 clic 667 fov 20.68
+786I head 512 cam4 clic 514 fov 48
+786J head 667 cam2 clic 667 fov 20.68
+== CHAPI057 787 621
+787A head 512 cam4 clic 621 fov 48
+787B head 667 cam2 clic 667 fov 20.68
+787C head 512 cam4 clic 514 fov 48
+787D head 667 cam2 clic 667 fov 20.68
+787E head 512 cam4 clic 514 fov 48
+787F head 667 cam2 clic 667 fov 20.68
+== CHAPI057 788 0
+788A
+== CHAPI057 789 0
+789A head 663 cam4 clic 663 fov 48
+789B head 512 cam2 clic 514 fov 20.68
+789C head 663 cam4 clic 663 fov 48
+789D head 512 cam2 clic 514 fov 20.68
+789E
+789F head 512 cam4 clic 514 fov 48
+789G
+789H head 512 cam2 clic 514 fov 20.68
+789I head 663 cam4 clic 663 fov 48
+789J
+789K
+== CHAPI057 790 0
+790A
+790B
+== CHAPI057 791 0
+791A head 512 cam4 clic 514 fov 48
+791B
+791C
+== CHAPI057 792 0
+792A head 604 cam4 clic 604 fov 48
+== CHAPI057 793 620
+793A fails 620
+== CHAPI057 794 619
+794A fails 619
+== CHAPI058 810 0
+810A head 663 cam4 clic 663 fov 48
+810B head 512 cam2 clic 514 fov 20.68
+810C head 663 cam4 clic 663 fov 48
+810D head 512 cam2 clic 514 fov 20.68
+810E head 663 cam4 clic 663 fov 48
+810F head 512 cam2 clic 514 fov 20.68
+810G head 663 cam4 clic 663 fov 48
+810H head 512 cam2 clic 514 fov 20.68
+810I head 663 cam4 clic 663 fov 48
+== CHAPI058 811 587
+811A head 512 cam4 clic 587 fov 48
+811B head 663 cam2 clic 663 fov 20.68
+811C head 512 cam4 clic 514 fov 48
+== CHAPI058 812 587
+812A head 512 cam4 clic 587 fov 48
+812B head 663 cam2 clic 663 fov 20.68
+812C head 512 cam4 clic 514 fov 48
+812D head 663 cam2 clic 663 fov 20.68
+812E head 512 cam4 clic 514 fov 48
+812F head 663 cam2 clic 663 fov 20.68
+== CHAPI058 813 587
+813A head 512 cam4 clic 587 fov 48
+813B head 663 cam2 clic 663 fov 20.68
+== CHAPI058 814 0
+814A
+== CHAPI058 815 0
+815A head 663 cam4 clic 663 fov 48
+== CHAPI058 816 650
+816A head 512 cam4 clic 650 fov 48
+816B head 650 cam2 clic 650 fov 20.68
+816C head 512 cam4 clic 514 fov 48
+816D head 663 cam2 clic 663 fov 20.68
+== CHAPI058 817 650
+817A head 512 cam4 clic 650 fov 48
+817B head 650 cam2 clic 650 fov 20.68
+817C head 512 cam4 clic 514 fov 48
+817D head 650 cam2 clic 650 fov 20.68
+817E head 663 cam4 clic 663 fov 48
+817F head 650 cam2 clic 650 fov 20.68
+817G head 512 cam4 clic 514 fov 48
+817H head 650 cam2 clic 650 fov 20.68
+== CHAPI058 818 650
+818A head 650 cam4 clic 650 fov 48
+818B head 512 cam2 clic 514 fov 20.68
+818C head 650 cam4 clic 650 fov 48
+818D head 663 cam2 clic 663 fov 20.68
+818E head 512 cam4 clic 514 fov 48
+818F head 650 cam2 clic 650 fov 20.68
+818G head 512 cam4 clic 514 fov 48
+== CHAPI058 819 650
+819A head 512 cam4 clic 650 fov 48
+819B head 663 cam2 clic 663 fov 20.68
+819C head 512 cam4 clic 514 fov 48
+819D head 650 cam2 clic 650 fov 20.68
+== CHAPI058 820 0
+820A
+== CHAPI058 821 0
+821A
+821B
+821C
+821D
+821E
+821F
+821G head 650 cam4 clic 650 fov 48
+821H head 512 cam2 clic 514 fov 20.68
+821I head 663 cam4 clic 663 fov 48
+821J head 512 cam2 clic 514 fov 20.68
+821K head 663 cam4 clic 663 fov 48
+821L head 512 cam2 clic 514 fov 20.68
+821M head 663 cam4 clic 663 fov 48
+821N head 512 cam2 clic 514 fov 20.68
+821O head 650 cam4 clic 650 fov 48
+821P head 512 cam2 clic 514 fov 20.68
+821Q
+821R
+821S head 650 cam4 clic 650 fov 48
+821T head 663 cam3 clic 663 fov 30
+821U head 650 cam2 clic 650 fov 20.68
+821V head 650 cam2 clic 650 fov 20.68
+== CHAPI059 830 0
+830A
+== CHAPI059 831 0
+831A
+831B
+831C
+831D
+== CHAPI059 832 0
+832A
+== CHAPI059 833 0
+833A
+== CHAPI059 840 0
+840A
+== CHAPI060 840 0
+840A
+== CHAPI060 841 0
+841A
+== CHAPI060 842 0
+842A
+== CHAPI060 843 0
+843A
+840A
+== CHAPI061 851 0
+== CHAPI061 852 659
+== CHAPI061 865 0
+865A
+== CHAPI062 852 0
+== CHAPI062 857 0
+857A
+== CHAPI062 858 657
+858A head 512 cam4 clic 657 fov 48
+858B
+== CHAPI062 863 405
+863A
+863B head 512 cam4 clic 514 fov 48
+== CHAPI062 864 0
+864A
+864B
+864C
+864D
+864E
+== CHAPI063 857 0
+857A
+== CHAPI063 875 0
+875A
+== CHAPI063 876 0
+876A head 663 cam2 clic 663 fov 20.68
+877A head 663 cam4 clic 663 fov 48
+877B
+877C head 663 cam2 clic 663 fov 20.68
+877D head 512 cam4 clic 514 fov 48
+877E head 663 cam2 clic 663 fov 20.68
+== CHAPI063 877 0
+877A head 663 cam4 clic 663 fov 48
+877B
+877C head 663 cam2 clic 663 fov 20.68
+877D head 512 cam4 clic 514 fov 48
+877E head 663 cam2 clic 663 fov 20.68
+== CHAPI063 878 0
+878A head 663 cam4 clic 663 fov 48
+878B head 512 cam2 clic 514 fov 20.68
+878C head 663 cam4 clic 663 fov 48
+== CHAPI063 879 663
+879A head 663 cam4 clic 663 fov 48
+== CHAPI063 880 663
+880A head 663 cam4 clic 663 fov 48
+== CHAPI063 881 0
+881A head 663 cam4 clic 663 fov 48
+881B head 512 cam2 clic 514 fov 20.68
+== CHAPI063 882 0
+882A head 663 cam4 clic 663 fov 48
+== CHAPI063 883 663
+883A head 512 cam4 clic 663 fov 48
+883B
+883C
+903A head 663 cam2 clic 663 fov 20.68
+== CHAPI063 884 663
+884A head 512 cam4 clic 663 fov 48
+884B
+884C
+== CHAPI063 885 0
+885A
+885B
+== CHAPI063 886 663
+886A head 512 cam4 clic 663 fov 48
+886B
+== CHAPI063 887 0
+887A
+== CHAPI063 888 0
+888A head 663 cam4 clic 663 fov 48
+888B head 512 cam2 clic 514 fov 20.68
+== CHAPI063 889 0
+889A head 663 cam4 clic 663 fov 48
+== CHAPI063 890 0
+890A
+890B
+== CHAPI063 891 665
+891A head 512 cam4 clic 665 fov 48
+891B
+== CHAPI063 892 0
+892A head 663 cam4 clic 663 fov 48
+== CHAPI063 893 0
+893A head 663 cam4 clic 663 fov 48
+== CHAPI063 894 0
+894A head 663 cam4 clic 663 fov 48
+== CHAPI063 895 0
+895A head 663 cam4 clic 663 fov 48
+== CHAPI063 902 0
+902A head 512 cam4 clic 514 fov 48
+== CHAPI063 903 0
+903A head 663 cam4 clic 663 fov 48
+== CHAPI063 904 0
+904A
+904B
+== CHAPI063 905 0
+905A
+905B
+== CHAPI063 906 0
+906A
+906B
+== CHAPI063 907 0
+907A
+907B
+== CHAPI063 908 0
+908A
+908B
+908C
+== CHAPI063 909 0
+909A
+== CHAPI063 910 0
+910A
+910B
+== CHAPI064 896 0
+896A head 663 cam4 clic 663 fov 48
+896B head 663 cam2 clic 663 fov 20.68
+896C head 512 cam4 clic 514 fov 48
+896D head 663 cam2 clic 663 fov 20.68
+896E head 512 cam4 clic 514 fov 48
+896F head 663 cam2 clic 663 fov 20.68
+896G head 512 cam2 clic 514 fov 20.68
+896H head 512 cam5 clic 514 fov 48.26
+== CHAPI065 840 0
+840A
+== CHAPI065 897 0
+897A
+== CHAPI065 898 0
+== CHAPI065 899 667
+899A head 512 cam4 clic 667 fov 48
+899B
+899C head 512 cam2 clic 514 fov 20.68
+899D
+899E head 512 cam4 clic 514 fov 48
+== CHAPI065 900 0
+== CHAPI065 901 323
+901A head 579 cam4 clic 323 fov entry
+== CHAPI066 930 0
+930A head 667 cam4 clic 667 fov 48
+930B head 512 cam2 clic 514 fov 20.68
+930C head 667 cam4 clic 667 fov 48
+930D head 512 cam2 clic 514 fov 20.68
+== CHAPI066 931 0
+931A head 667 cam4 clic 667 fov 48
+931B head 512 cam2 clic 514 fov 20.68
+931C
+931D head 512 cam4 clic 514 fov 48
+931E head 667 cam2 clic 667 fov 20.68
+== CHAPI066 932 681
+932A
+== CHAPI066 933 681
+933A head 681 cam4 clic 681 fov 48
+== CHAPI066 934 681
+934A head 681 cam4 clic 681 fov 48
+== CHAPI066 935 682
+935A head 682 cam4 clic 682 fov 48
+935B head 667 cam2 clic 667 fov 20.68
+935C head 682 cam4 clic 682 fov 48
+935D head 667 cam2 clic 667 fov 20.68
+935E head 682 cam4 clic 682 fov 48
+935F head 512 cam2 clic 514 fov 20.68
+935G head 667 cam4 clic 667 fov 48
+935H head 512 cam2 clic 514 fov 20.68
+935I head 682 cam4 clic 682 fov 48
+935J head 512 cam2 clic 514 fov 20.68
+935K head 682 cam4 clic 682 fov 48
+== CHAPI066 936 682
+936A head 682 cam4 clic 682 fov 48
+== CHAPI066 937 0
+937A head 682 cam4 clic 682 fov 48
+== CHAPI066 938 0
+938A head 682 cam4 clic 682 fov 48
+938B head 512 cam2 clic 514 fov 20.68
+938C head 682 cam4 clic 682 fov 48
+938D head 667 cam2 clic 667 fov 20.68
+938E head 682 cam4 clic 682 fov 48
+== CHAPI066 939 0
+939A
+939B
+939C
+939D
+939E
+939F
+939G
+939H
+939I
+939J
+939K
+939L
+== CHAPI066 940 0
+940A
+940B
+940C
+940D
+940E
+940F
+940G
+940H
+940I
+940J
+== CHAPI066 941 0
+941A head 682 cam4 clic 682 fov 48
+== CHAPI066 942 0
+942A head 682 cam4 clic 682 fov 48
+942B head 667 cam2 clic 667 fov 20.68
+942C head 682 cam4 clic 682 fov 48
+942D head 667 cam2 clic 667 fov 20.68
+942E head 682 cam4 clic 682 fov 48
+942F head 667 cam2 clic 667 fov 20.68
+942G head 682 cam4 clic 682 fov 48
+942H head 667 cam2 clic 667 fov 20.68
+942I head 682 cam4 clic 682 fov 48
+942J head 667 cam2 clic 667 fov 20.68
+942K head 682 cam4 clic 682 fov 48
+942L
+942M head 682 cam2 clic 682 fov 20.68
+942N head 512 cam4 clic 514 fov 48
+942O head 682 cam2 clic 682 fov 20.68
+== CHAPI066 943 0
+943A head 682 cam4 clic 682 fov 48
+== CHAPI066 952 682
+952A head 682 cam4 clic 682 fov 48
+952B head 512 cam2 clic 514 fov 20.68
+952C head 682 cam4 clic 682 fov 48
+952D head 512 cam2 clic 514 fov 20.68
+952E head 667 cam4 clic 667 fov 48
+952F head 682 cam2 clic 682 fov 20.68
+== CHAPI066 953 682
+953A head 682 cam4 clic 682 fov 48
+== CHAPI067 944 682
+944A head 682 cam4 clic 682 fov 48
+== CHAPI067 945 682
+945A head 682 cam4 clic 682 fov 48
+== CHAPI067 946 682
+946A head 682 cam4 clic 682 fov 48
+== CHAPI067 947 682
+947A head 682 cam4 clic 682 fov 48
+947B
+947C
+947D head 682 cam2 clic 682 fov 20.68
+947E
+947F
+947G head 682 cam2 clic 682 fov 20.68
+947H head 682 cam5 clic 682 fov 48.26
+== CHAPI067 948 682
+948A head 682 cam4 clic 682 fov 48
+== CHAPI067 949 0
+949A head 682 cam4 clic 682 fov 48
+949B head 512 cam2 clic 514 fov 20.68
+949C head 682 cam4 clic 682 fov 48
+== CHAPI067 950 0
+950A head 682 cam4 clic 682 fov 48
+950B head 512 cam2 clic 514 fov 20.68
+950C head 682 cam4 clic 682 fov 48
+== CHAPI067 954 0
+954A head 682 cam4 clic 682 fov 48
+954B head 512 cam2 clic 514 fov 20.68
+954C head 682 cam4 clic 682 fov 48
+954D head 512 cam2 clic 514 fov 20.68
+954E head 682 cam4 clic 682 fov 48
+954F head 512 cam2 clic 514 fov 20.68
+== CHAPI067 955 682
+955A head 682 cam4 clic 682 fov 48
+955B head 512 cam2 clic 514 fov 20.68
+955C head 682 cam4 clic 682 fov 48
+955D head 512 cam2 clic 514 fov 20.68
+== CHAPI067 956 682
+956A head 682 cam4 clic 682 fov 48
+== CHAPI067 957 682
+957A head 682 cam4 clic 682 fov 48
+957B head 512 cam2 clic 514 fov 20.68
+957C head 682 cam4 clic 682 fov 48
+957D head 512 cam2 clic 514 fov 20.68
+957E head 682 cam4 clic 682 fov 48
+957F head 512 cam2 clic 514 fov 20.68
+957G head 682 cam4 clic 682 fov 48
+964A head 682 cam2 clic 682 fov 20.68
+964B head 682 cam2 clic 682 fov 20.68
+964C head 543 cam4 clic 543 fov 48
+964D head 512 cam2 clic 514 fov 20.68
+964E head 682 cam4 clic 682 fov 48
+964F head 512 cam2 clic 514 fov 20.68
+964G head 682 cam4 clic 682 fov 48
+964H head 543 cam2 clic 543 fov 20.68
+964I head 512 cam4 clic 514 fov 48
+964J head 543 cam2 clic 543 fov 20.68
+964K head 682 cam4 clic 682 fov 48
+== CHAPI067 958 682
+958A head 682 cam4 clic 682 fov 48
+== CHAPI067 959 682
+959A head 682 cam4 clic 682 fov 48
+== CHAPI067 960 682
+960A head 682 cam4 clic 682 fov 48
+== CHAPI067 961 682
+961A head 682 cam4 clic 682 fov 48
+== CHAPI067 962 682
+962A head 682 cam4 clic 682 fov 48
+== CHAPI067 963 682
+963A
+963B
+963C head 682 cam4 clic 682 fov 48
+963D
+963E
+== CHAPI067 964 0
+964A head 682 cam2 clic 682 fov 20.68
+964B head 682 cam4 clic 682 fov 48
+964C head 543 cam2 clic 543 fov 20.68
+964D head 512 cam4 clic 514 fov 48
+964E head 682 cam2 clic 682 fov 20.68
+964F head 512 cam4 clic 514 fov 48
+964G head 682 cam2 clic 682 fov 20.68
+964H head 543 cam4 clic 543 fov 48
+964I head 512 cam2 clic 514 fov 20.68
+964J head 543 cam4 clic 543 fov 48
+964K head 682 cam2 clic 682 fov 20.68
+== CHAPI067 965 682
+965A head 682 cam4 clic 682 fov 48
+== CHAPI067 966 685
+966A head 512 cam4 clic 685 fov 48
+976A head 543 cam2 clic 543 fov 20.68
+976B head 512 cam4 clic 514 fov 48
+976C head 543 cam2 clic 543 fov 20.68
+976D head 512 cam4 clic 514 fov 48
+976E head 543 cam2 clic 543 fov 20.68
+== CHAPI067 967 685
+967A head 512 cam4 clic 685 fov 48
+976A head 543 cam2 clic 543 fov 20.68
+976B head 512 cam4 clic 514 fov 48
+976C head 543 cam2 clic 543 fov 20.68
+976D head 512 cam4 clic 514 fov 48
+976E head 543 cam2 clic 543 fov 20.68
+== CHAPI067 968 685
+968A head 512 cam4 clic 685 fov 48
+976A head 543 cam2 clic 543 fov 20.68
+976B head 512 cam4 clic 514 fov 48
+976C head 543 cam2 clic 543 fov 20.68
+976D head 512 cam4 clic 514 fov 48
+976E head 543 cam2 clic 543 fov 20.68
+== CHAPI067 969 685
+969A head 512 cam4 clic 685 fov 48
+969B head 543 cam2 clic 543 fov 20.68
+969C head 512 cam4 clic 514 fov 48
+969D head 543 cam2 clic 543 fov 20.68
+969E head 512 cam4 clic 514 fov 48
+969F head 543 cam2 clic 543 fov 20.68
+969G head 512 cam4 clic 514 fov 48
+969H head 543 cam2 clic 543 fov 20.68
+969I head 512 cam4 clic 514 fov 48
+969J head 543 cam2 clic 543 fov 20.68
+== CHAPI067 970 685
+970A head 512 cam4 clic 685 fov 48
+970B head 682 cam2 clic 682 fov 20.68
+== CHAPI067 971 685
+971A head 512 cam4 clic 685 fov 48
+971B head 543 cam2 clic 543 fov 20.68
+971C head 512 cam4 clic 514 fov 48
+971D head 543 cam2 clic 543 fov 20.68
+971E head 512 cam4 clic 514 fov 48
+971F head 543 cam2 clic 543 fov 20.68
+974A head 512 cam4 clic 514 fov 48
+974B head 543 cam2 clic 543 fov 20.68
+== CHAPI067 972 685
+972A head 512 cam4 clic 685 fov 48
+972B head 543 cam2 clic 543 fov 20.68
+972C head 512 cam4 clic 514 fov 48
+972D head 543 cam2 clic 543 fov 20.68
+972E head 512 cam4 clic 514 fov 48
+972F head 543 cam2 clic 543 fov 20.68
+== CHAPI067 973 685
+973A head 512 cam4 clic 685 fov 48
+973B head 543 cam2 clic 543 fov 20.68
+== CHAPI067 974 0
+974A head 512 cam4 clic 514 fov 48
+974B head 543 cam2 clic 543 fov 20.68
+== CHAPI067 976 0
+976A head 543 cam4 clic 543 fov 48
+976B head 512 cam2 clic 514 fov 20.68
+976C head 543 cam4 clic 543 fov 48
+976D head 512 cam2 clic 514 fov 20.68
+976E head 543 cam4 clic 543 fov 48
+== CHAPI067 977 685
+977A head 512 cam4 clic 685 fov 48
+== CHAPI067 978 0
+978A head 682 cam4 clic 682 fov 48
+978B head 512 cam2 clic 514 fov 20.68
+978C head 682 cam4 clic 682 fov 48
+978D head 512 cam2 clic 514 fov 20.68
+978E head 682 cam4 clic 682 fov 48
+== CHAPI067 979 543
+979A head 512 cam4 clic 543 fov 48
+979B head 543 cam2 clic 543 fov 20.68
+979C head 512 cam4 clic 514 fov 48
+979D head 543 cam2 clic 543 fov 20.68
+== CHAPI067 980 0
+980A head 512 cam4 clic 514 fov 48
+980B head 543 cam2 clic 543 fov 20.68
+980C head 512 cam4 clic 514 fov 48
+980D head 543 cam2 clic 543 fov 20.68
+981A head 543 cam4 clic 543 fov 48
+981B head 512 cam2 clic 514 fov 20.68
+981C head 543 cam4 clic 543 fov 48
+981D head 512 cam2 clic 514 fov 20.68
+981E head 543 cam4 clic 543 fov 48
+981F head 512 cam2 clic 514 fov 20.68
+981G head 543 cam4 clic 543 fov 48
+== CHAPI067 981 0
+981A head 543 cam4 clic 543 fov 48
+981B head 512 cam2 clic 514 fov 20.68
+981C head 543 cam4 clic 543 fov 48
+981D head 512 cam2 clic 514 fov 20.68
+981E head 543 cam4 clic 543 fov 48
+981F head 512 cam2 clic 514 fov 20.68
+981G head 543 cam4 clic 543 fov 48
+== CHAPI067 982 543
+982A head 543 cam4 clic 543 fov 48
+982B head 512 cam2 clic 514 fov 20.68
+982C head 543 cam4 clic 543 fov 48
+984A head 682 cam2 clic 682 fov 20.68
+984B head 543 cam4 clic 543 fov 48
+984C head 682 cam2 clic 682 fov 20.68
+== CHAPI067 983 543
+983A head 543 cam4 clic 543 fov 48
+984A head 682 cam2 clic 682 fov 20.68
+984B head 543 cam4 clic 543 fov 48
+984C head 682 cam2 clic 682 fov 20.68
+== CHAPI067 984 0
+984A head 682 cam4 clic 682 fov 48
+984B head 543 cam2 clic 543 fov 20.68
+984C head 682 cam4 clic 682 fov 48
+== CHAPI067 985 0
+985A head 682 cam4 clic 682 fov 48
+985B head 683 cam2 clic 683 fov 20.68
+985C head 682 cam4 clic 682 fov 48
+985D head 683 cam2 clic 683 fov 20.68
+985E head 682 cam4 clic 682 fov 48
+985F head 683 cam2 clic 683 fov 20.68
+985G head 682 cam4 clic 682 fov 48
+985H head 684 cam2 clic 684 fov 20.68
+985I head 682 cam4 clic 682 fov 48
+985J head 684 cam2 clic 684 fov 20.68
+985K head 682 cam4 clic 682 fov 48
+985L head 684 cam2 clic 684 fov 20.68
+985M head 682 cam4 clic 682 fov 48
+== CHAPI068 986 0
+986A head 682 cam4 clic 682 fov 48
+986B head 512 cam2 clic 514 fov 20.68
+986C head 682 cam4 clic 682 fov 48
+986D head 512 cam2 clic 514 fov 20.68
+986E head 682 cam4 clic 682 fov 48
+== CHAPI068 987 0
+987A head 682 cam4 clic 682 fov 48
+987B head 512 cam2 clic 514 fov 20.68
+987C head 682 cam4 clic 682 fov 48
+== CHAPI068 988 682
+988A head 512 cam4 clic 682 fov 48
+988B head 682 cam2 clic 682 fov 20.68
+988C head 512 cam4 clic 514 fov 48
+988D head 682 cam2 clic 682 fov 20.68
+988E head 512 cam4 clic 514 fov 48
+988F head 543 cam2 clic 543 fov 20.68
+988G head 512 cam4 clic 514 fov 48
+988H head 543 cam2 clic 543 fov 20.68
+988I head 512 cam4 clic 514 fov 48
+988J head 682 cam2 clic 682 fov 20.68
+988K head 543 cam4 clic 543 fov 48
+988L head 682 cam2 clic 682 fov 20.68
+== CHAPI068 989 682
+989A head 682 cam4 clic 682 fov 48
+== CHAPI068 990 682
+990A head 682 cam4 clic 682 fov 48
+== CHAPI068 991 543
+991A head 512 cam4 clic 543 fov 48
+991B head 543 cam2 clic 543 fov 20.68
+991C head 512 cam4 clic 514 fov 48
+991D head 543 cam2 clic 543 fov 20.68
+991E head 512 cam4 clic 514 fov 48
+== CHAPI068 992 543
+992A head 543 cam4 clic 543 fov 48
+992B head 512 cam2 clic 514 fov 20.68
+992C head 543 cam4 clic 543 fov 48
+992D head 512 cam2 clic 514 fov 20.68
+992E head 543 cam4 clic 543 fov 48
+== CHAPI068 993 543
+993A head 543 cam4 clic 543 fov 48
+== CHAPI068 994 682
+994A head 682 cam4 clic 682 fov 48
+== CHAPI068 995 682
+995A head 682 cam4 clic 682 fov 48
+== CHAPI068 996 682
+996A head 682 cam4 clic 682 fov 48
+== CHAPI068 997 543
+997A head 543 cam4 clic 543 fov 48
+== CHAPI068 998 323
+998A head 579 cam4 clic 323 fov entry
+== CHAPI068 999 0
+999A head 543 cam4 clic 543 fov 48
+== CHAPI068 1000 543
+1000A head 543 cam4 clic 543 fov 48
+== CHAPI068 1001 543
+1001A head 543 cam4 clic 543 fov 48
+== CHAPI068 1002 582
+1002A head 582 cam4 clic 582 fov 48
+== CHAPI068 1003 0
+1003A
+== CHAPI068 1004 682
+1004A head 682 cam2 clic 682 fov 20.68
+1004B head 682 cam5 clic 682 fov 48.26
+== CHAPI068 1005 0
+1005A head 682 cam4 clic 682 fov 48
+1005B head 683 cam2 clic 683 fov 20.68
+1005C head 682 cam4 clic 682 fov 48
+1005D head 683 cam2 clic 683 fov 20.68
+1005E head 512 cam4 clic 514 fov 48
+1005F head 683 cam2 clic 683 fov 20.68
+1005G head 682 cam4 clic 682 fov 48
+1005H
+1005I head 683 cam2 clic 683 fov 20.68
+1005J head 682 cam4 clic 682 fov 48
+== CHAPI068 1006 0
+1006A head 543 cam4 clic 543 fov 48
+1006B head 684 cam2 clic 684 fov 20.68
+1006C head 543 cam4 clic 543 fov 48
+1006D head 684 cam2 clic 684 fov 20.68
+1006E head 682 cam4 clic 682 fov 48
+1006F head 512 cam2 clic 514 fov 20.68
+1006G head 682 cam4 clic 682 fov 48
+1006H head 512 cam2 clic 514 fov 20.68
+1006I head 682 cam4 clic 682 fov 48
+== CHAPI069 1019 323
+1019A head 579 cam4 clic 323 fov entry
+== CHAPI069 1020 0
+1020A
+== CHAPI069 1021 0
+1021A
+== CHAPI069 1022 0
+1022A
+== CHAPI069 1023 0
+1023A
+== CHAPI069 1024 0
+1024A
+== CHAPI070 1021 0
+1021A
+== CHAPI070 1022 0
+1022A
+== CHAPI070 1023 0
+1023A
+== CHAPI070 1024 0
+1024A
+== CHAPI070 1035 687
+1035A head 512 cam4 clic 687 fov 48
+== CHAPI070 1036 687
+1036A head 512 cam4 clic 687 fov 48
+== CHAPI070 1037 687
+1037A head 512 cam4 clic 687 fov 48
+== CHAPI070 1038 0
+1038A
+== CHAPI070 1039 687
+1039A head 512 cam4 clic 687 fov 48
+== CHAPI070 1040 687
+1040A
+== CHAPI070 1041 0
+1041A
+== CHAPI071 1042 0
+1042A
+== CHAPI071 1050 688
+1050A
+1050B
+== CHAPI071 1051 688
+1051A
+== CHAPI071 1052 688
+1052A
+== CHAPI071 1053 688
+1053A
+== CHAPI071 1054 688
+1054A
+== CHAPI071 1055 688
+1055A
+== CHAPI071 1056 688
+1056A
+== CHAPI071 1057 688
+1057A
+== CHAPI071 1058 688
+1058A
+== CHAPI071 1059 688
+1059A
+== CHAPI071 1060 688
+1060A
+== CHAPI071 1061 688
+1061A
+== CHAPI071 1062 688
+1062A
+== CHAPI072 1051 688
+1051A
+== CHAPI072 1052 688
+1052A
+== CHAPI072 1053 688
+1053A
+== CHAPI072 1054 688
+1054A
+== CHAPI072 1055 688
+1055A
+== CHAPI072 1056 688
+1056A
+== CHAPI072 1057 688
+1057A
+== CHAPI072 1058 688
+1058A
+== CHAPI072 1059 688
+1059A
+== CHAPI072 1060 688
+1060A
+== CHAPI072 1061 688
+1061A
+== CHAPI072 1062 688
+1062A
+== CHAPI072 1071 0
+1071A head 543 cam4 clic 543 fov 48
+1071B head 512 cam2 clic 514 fov 20.68
+1071C head 543 cam4 clic 543 fov 48
+1071D head 512 cam2 clic 514 fov 20.68
+1071E head 543 cam4 clic 543 fov 48
+1071F head 512 cam2 clic 514 fov 20.68
+1071G head 543 cam4 clic 543 fov 48
+1071H head 512 cam2 clic 514 fov 20.68
+1071I head 543 cam4 clic 543 fov 48
+1071J head 512 cam2 clic 514 fov 20.68
+1071K head 543 cam4 clic 543 fov 48
+1071L head 512 cam2 clic 514 fov 20.68
+1071M head 543 cam4 clic 543 fov 48
+1071N head 512 cam2 clic 514 fov 20.68
+1071O head 543 cam4 clic 543 fov 48
+1071P head 512 cam2 clic 514 fov 20.68
+1071Q head 543 cam4 clic 543 fov 48
+1071R head 512 cam2 clic 514 fov 20.68
+== CHAPI077 1080 0
+1080A head 524 cam4 clic 524 fov 48
+1080B head 512 cam2 clic 514 fov 20.68
+1080C head 524 cam4 clic 524 fov 48
+1080D head 512 cam2 clic 514 fov 20.68
+1080E head 524 cam4 clic 524 fov 48
+== CHAPI077 1081 0
+1081A head 524 cam4 clic 524 fov 48
+1081B head 512 cam2 clic 514 fov 20.68
+1081C head 524 cam4 clic 524 fov 48
+1081D head 512 cam2 clic 514 fov 20.68
+1081E head 524 cam4 clic 524 fov 48
+== CHAPI077 1082 524
+1082A head 512 cam4 clic 524 fov 48
+1082B head 524 cam3 clic 524 fov 30
+== CHAPI077 1083 524
+1083A head 512 cam4 clic 524 fov 48
+1083B head 524 cam3 clic 524 fov 30
+1083C head 512 cam5 clic 514 fov 48.26
+1083D head 524 cam4 clic 524 fov 48
+== CHAPI077 1084 0
+1084A
+== CHAPI078 1093 0
+1093A
+== CHAPI078 1094 0
+1094A
+== CHAPI078 1095 0
+1095A
+== CHAPI078 1096 0
+1096A
+1096B
+1096C
+1096D
+1096E
+== CHAPI078 1097 0
+1097A
+== CHAPI078 1098 0
+1098A
+== CHAPI078 1099 0
+1099A
+== CHAPI078 1100 0
+== CHAPI078 1101 0
+1101A
+1101B
+== CHAPI078 1102 0
+1102A head 663 cam5 clic 663 fov 48.26
+1102B
+1102C
+== CHAPI078 1103 0
+== CHAPI078 1106 0
+== CHAPI079 244 0
+244A head 512 cam4 clic 514 fov 48
+== CHAPI079 1107 0
+1107A head 512 cam4 clic 514 fov 48
+1107B head 597 cam2 clic 597 fov 20.68
+1107C head 512 cam4 clic 514 fov 48
+1107D head 597 cam5 clic 597 fov 48.26
+1107E head 512 cam3 clic 514 fov 30
+1107F head 597 cam5 clic 597 fov 48.26
+1107G head 512 cam3 clic 514 fov 30
+1107H head 597 cam5 clic 597 fov 48.26
+1107I head 512 cam3 clic 514 fov 30
+1107J head 597 cam5 clic 597 fov 48.26
+== CHAPI079 1108 597
+1108A head 597 cam4 clic 597 fov 48
+== CHAPI079 1109 0
+1109A
+== CHAPI079 1110 0
+1110A head 540 cam4 clic 540 fov 48
+1110B
+1110C head 540 cam2 clic 540 fov 20.68
+1110D head 512 cam4 clic 514 fov 48
+1110E head 540 cam2 clic 540 fov 20.68
+== CHAPI079 1111 540
+1111A head 512 cam4 clic 540 fov 48
+1111B head 540 cam2 clic 540 fov 20.68
+1111C head 512 cam4 clic 514 fov 48
+1111D head 540 cam2 clic 540 fov 20.68
+1111E
+1111F head 540 cam4 clic 540 fov 48
+== CHAPI079 1112 540
+1112A head 512 cam4 clic 540 fov 48
+1112B head 540 cam2 clic 540 fov 20.68
+1112C head 512 cam4 clic 514 fov 48
+1112D head 540 cam2 clic 540 fov 20.68
+1112E head 512 cam4 clic 514 fov 48
+1112F head 540 cam2 clic 540 fov 20.68
+== CHAPI079 1113 0
+1113A head 540 cam4 clic 540 fov 48
+== CHAPI082 1125 0
+1125A
+== CHAPI082 1126 0
+1126A
+== CHAPI082 1127 0
+1127A
+== CHAPI082 1128 0
+1128A
+== CHAPI082 1129 0
+1129A
+== CHAPI082 1130 0
+1130A
+== CHAPI082 1131 0
+1131A
+== CHAPI082 1132 0
+== CHAPI083 1145 0
+1145A head 525 cam2 clic 525 fov 20.68
+== CHAPI083 1146 0
+== CHAPI083 1147 0
+1147A head 525 cam2 clic 525 fov 20.68
+== CHAPI084 1155 0
+1155A
+1155B
+1155C
+1155D head 525 cam2 clic 525 fov 20.68
+1155E
+== CHAPI084 1156 0
+== CHAPI084 1157 0
+1157A head 525 cam2 clic 525 fov 20.68
+== CHAPI084 1158 0
+== CHAPI085 1161 0
+== CHAPI085 1170 0
+1170A

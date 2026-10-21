@@ -23,9 +23,10 @@ pub struct DialInitEntry {
     pub cam_spf: [String; 4],
     /// Column 4: the mouth animation (`DIALOG\PERSO\<base>.3DA`).
     pub anim_m: String,
-    /// Column 5: the scene mesh (`DIALOG\PERSO\<base>.S3D`).
+    /// Column 5: the lip-sync and camera set-up
+    /// (`DIALOG\PERSO\<base>.S3D`).
     pub s3d: String,
-    /// Column 2: the body mesh (`.3DC`).
+    /// Column 2: the head mesh (a type-1 F3DC, `.3DC`).
     pub anim_3dc: String,
     /// Column 3: the head animation (`.3DA`).
     pub anim_3da: String,
@@ -158,11 +159,14 @@ impl LineHeader {
 ///   0x00428979..0x004289e3);
 /// - perso 0x230 is forced to camera 2 in the 2001 build (0x0042892e).
 ///
-/// The draws read the millisecond clock, as the original's: its loop spins
-/// until the clock gives a usable camera. `clock` is that clock, advanced by
-/// a millisecond for each rejected draw (a spin of a few milliseconds,
-/// shorter than a frame). With fewer than two usable cameras the original
-/// would loop forever; the port stops after 64 draws.
+/// The draws read the millisecond clock (`FUN_00451d0c`, timeGetTime), not
+/// rand, as the original's: its loop spins until the clock gives a usable
+/// camera. `clock` is that clock, advanced by a millisecond for each
+/// rejected draw (a spin of a few milliseconds, shorter than a frame). With
+/// fewer than two usable cameras the original would loop forever; the port
+/// stops after 64 draws and keeps the last drawn camera (a hang guard,
+/// unreachable with the shipped INITDIAL, whose rows all have two usable
+/// cameras or more).
 pub fn pick_dial_cam(
     table: &DialInit,
     perso: i32,
@@ -229,17 +233,30 @@ pub fn dial_row(seth_path: bool, clic_perso: i32, inc_perso: u8) -> i32 {
         }
 }
 
-/// A talking-head line (not voice-only) whose row has no INITDIAL record:
-/// its UBB name is empty, so `FUN_0042ee88` opens "dialog\perso\" alone;
-/// the open fails, an error box is shown (dialog 0x65, code 0xc) and the
-/// line returns before its subtitle and voice (0x0042f00f..0x0042f056).
-pub fn head_open_fails(voice_only: bool, have_record: bool) -> bool {
-    !voice_only && !have_record
+/// A talking-head line (not voice-only) whose UBB does not open. A row
+/// with no INITDIAL record has an empty UBB name, so `FUN_0042ee88` opens
+/// "dialog\perso\" alone (`FUN_00434814` @ 0x0042f005); an explicit camN
+/// whose INITDIAL UBB is "none" (`FUN_0042844c` keeps it: the draw loops
+/// are skipped, 0x004287cf) has the name "none.ubb", which no archive
+/// holds. The open fails, an error box is shown (dialog 0x65, code 0xc) and
+/// the line returns before its subtitle and voice (0x0042f00f..0x0042f056);
+/// the letter still counts (0x00428b21). `cam_ubb`: the record's name for
+/// the line's camera ("none" kept). No line of the shipped CON files lands
+/// an explicit camera on a "none" one.
+pub fn head_open_fails(voice_only: bool, have_record: bool, cam_ubb: &str) -> bool {
+    !voice_only && (!have_record || cam_ubb.is_empty() || cam_ubb.eq_ignore_ascii_case("none"))
 }
 
 /// The text of that error box: "Fichier introuvable : " (0x004bbf18) and
-/// the path, "dialog\perso\" (0x004bbbfc) and the empty UBB name.
+/// the path, "dialog\perso\" (0x004bbbfc) and the UBB name
+/// (0x0042ef9d..0x0042f031).
 pub const HEAD_OPEN_FAIL_TEXT: &str = "Fichier introuvable : dialog\\perso\\";
+
+/// The error box's text for the UBB name the original appends: "" without
+/// a record, "none.ubb" for a "none" camera (the parser appends ".ubb").
+pub fn head_open_fail_text(ubb_name: &str) -> String {
+    format!("{HEAD_OPEN_FAIL_TEXT}{ubb_name}")
+}
 
 /// View angles, radians.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -257,6 +274,30 @@ pub struct LineView {
     pub kept: Angles,
     /// The walk's end angles become `kept` before the line.
     pub entry_update: bool,
+    /// The camera's FOV is set (`FUN_0045179a(FOV[cam])`); else no FOV
+    /// call, the FOV in effect stays (see [`line_fov`]).
+    pub cam_fov: bool,
+}
+
+/// The panorama's FOV over a talking-head line: the camera's
+/// ([`DIALOG_CAM_FOV_DEG`], the table 0x00496080) when the line sets one
+/// ([`LineView::cam_fov`]: `FUN_0042844c` @ 0x00428a14 / 0x00428ada), not
+/// for a voice-only line (`FUN_00430258` draws at 75.137 whatever was set,
+/// 0x0043044c; off0 / off1 do not redraw the view) nor without a panorama;
+/// `None`: the FOV in effect stays. The original resets 75.137 after every
+/// line (0x00428b43..0x00428b4d); the port puts back the FOV it had before
+/// the line, which is [`WARP_FOV_DEG`]. For the four shipped talking heads
+/// with no FOV call (ClicPerso below 0x200, each the first line of its
+/// walk) the original's FOV is the one the walk started with, 75.137.
+///
+/// [`DIALOG_CAM_FOV_DEG`]: crate::warp::DIALOG_CAM_FOV_DEG
+/// [`WARP_FOV_DEG`]: crate::warp::WARP_FOV_DEG
+pub fn line_fov(warp_loaded: bool, view: &LineView, voice_only: bool, cam: i32) -> Option<f32> {
+    if !warp_loaded || voice_only || !view.cam_fov {
+        return None;
+    }
+    let i = usize::try_from(cam - 2).ok()?;
+    crate::warp::DIALOG_CAM_FOV_DEG.get(i).copied()
 }
 
 /// `FUN_00451915`: beta kept within +-max, else the limit.
@@ -301,16 +342,21 @@ pub fn line_view(
         view: kept,
         kept,
         entry_update: false,
+        cam_fov: false,
     };
     if seth_path {
-        // 0x004289ef..0x00428a75: entry angles := kept; the grid at
-        // (alpha + pi, 0).
+        // 0x004289ef..0x00428a75: entry angles := kept; FOV of the camera
+        // (0x004289ff..0x00428a14); the grid at (alpha + pi, 0).
         l.entry_update = true;
+        l.cam_fov = true;
         l.view.alpha = wrap_alpha(kept.alpha + std::f64::consts::PI);
         l.view.beta = 0.0;
     } else if clic_perso >= 0x200 {
-        // 0x00428a9d..0x00428ae7 (off lines too): the grid at (alpha, 0).
+        // 0x00428a9d..0x00428ae7 (off lines too): FOV 75.137 then the
+        // camera's (0x00428ab6..0x00428ada); the grid at (alpha, 0). Below
+        // 0x200 (JL 0x00428afc) none of this runs: no FOV call.
         l.entry_update = true;
+        l.cam_fov = true;
         l.view.beta = 0.0;
     }
     if let Some((x, y)) = angle {
@@ -415,6 +461,36 @@ mod tests {
             ],
             (30, 5),
         );
+    }
+
+    /// The camera's FOV is set only on the Seth path (0x004289ff) and for
+    /// ClicPerso >= 0x200 (0x00428a9d; JL 0x00428afc skips the FOV calls).
+    /// The FOV in effect at the call of FUN_0042ee88 (0x00428b1c), the
+    /// original run under emulation: CHAPI056 /744 A (ClicPerso 329) and
+    /// CHAPI065 /901 A (323): no FOV call; CHAPI003 /40 A (521, explicit
+    /// angles and cam2): cam 2's; CHAPI056 /747 A (Seth, 514) and /747 B
+    /// (663): the camera's.
+    #[test]
+    fn cam_fov() {
+        let kept = Angles {
+            alpha: rad(30.0),
+            beta: rad(5.0),
+        };
+        let v = |seth: bool, perso: i32, angle: Option<(f64, f64)>| {
+            line_view(kept, seth, perso, angle, rad(50.0) * 0.9)
+        };
+        assert!(!v(false, 329, None).cam_fov);
+        assert!(!v(false, 323, None).cam_fov);
+        let lascoyt = v(false, 521, Some((rad(269.0), 0.0)));
+        assert!(lascoyt.cam_fov);
+        assert_eq!(line_fov(true, &lascoyt, false, 2), Some(20.68));
+        assert!(v(true, 514, None).cam_fov);
+        assert!(v(false, 663, None).cam_fov);
+        // Not over a voice-only line, nor without a panorama.
+        assert_eq!(line_fov(true, &lascoyt, true, 2), None);
+        assert_eq!(line_fov(false, &lascoyt, false, 2), None);
+        assert_eq!(line_fov(true, &v(false, 329, None), false, 4), None);
+        assert_eq!(line_fov(true, &v(true, 514, None), false, 4), Some(48.0));
     }
 
     #[test]

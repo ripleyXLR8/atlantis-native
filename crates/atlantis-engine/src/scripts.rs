@@ -893,12 +893,6 @@ impl Scripts {
                 id: sec.id,
                 kind,
             });
-            // A body that starts with a dialog line lowers the music when no
-            // fade runs (@ 0x004284e8); every section ends by raising it
-            // (@ 0x00428d8b, on the only exit).
-            if matches!(sec.items.first(), Some(ConItem::Line(_))) {
-                e.music.duck(true, None);
-            }
             // The executor saves ClicPerso (0x004284c2) and the view angles
             // (0x00428483 / 0x0042848b) at entry and sets them back at the
             // end (0x00428cb2); in between ClicPerso is cleared after every
@@ -960,6 +954,12 @@ impl Scripts {
                         }
                     }
                     ConItem::Line(line) => {
+                        // Every dialog line lowers the music when no fade
+                        // runs (0x004284e8..0x004284f1, at the head of the
+                        // per-line loop, so also a line after /set
+                        // commands); the walk ends by raising it
+                        // (0x00428d8b, on the only exit).
+                        e.music.duck(true, None);
                         // FUN_00428f58 runs only when ClicPerso is 0
                         // (0x00428689) and writes its result there.
                         let mut perso = e.vars.get("clicperso");
@@ -1279,6 +1279,48 @@ impl ScriptHooks for Scripts {
 mod tests {
     use super::*;
     use crate::hooks::ScriptHooks;
+
+    /// The 29 literals of `FUN_00428f58`'s chain that no speaker token of
+    /// the CON files reaches, each as a token, with the ClicPerso the
+    /// original writes (run under emulation), so that a wrong literal,
+    /// length or id in any entry fails.
+    #[test]
+    fn speaker_chain_literals() {
+        let cases = [
+            ("agat", 520),
+            ("lasc", 521),
+            ("melj", 522),
+            ("sorc", 567),
+            ("Pech", 524),
+            ("pech", 524),
+            ("acty", 524),
+            ("creo", 525),
+            ("chas", 540),
+            ("passant9", 602),
+            ("carv", 602),
+            ("passant6", 601),
+            ("passante7", 606),
+            ("hect", 543),
+            ("cuis", 551),
+            ("rein", 560),
+            ("reinem", 561),
+            ("reinep", 562),
+            ("garc", 526),
+            ("servan", 609),
+            ("servag", 582),
+            ("chie", 650),
+            ("anna", 663),
+            ("escl", 597),
+            ("hona", 682),
+            ("sama", 683),
+            ("naka", 684),
+            ("lona", 576),
+            ("gimb", 563),
+        ];
+        for (token, id) in cases {
+            assert_eq!(resolve_speaker_perso(token), id, "{token}");
+        }
+    }
     use crate::test_support::with_engine;
     use std::cell::RefCell;
     use std::rc::Rc;

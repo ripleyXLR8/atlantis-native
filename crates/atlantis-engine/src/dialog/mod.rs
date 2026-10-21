@@ -42,15 +42,15 @@ use crate::subtitles::{
 };
 use crate::sys::{Input, Key, MouseButton};
 use crate::video_skip::VideoSkipState;
-use crate::warp::{DIALOG_CAM_FOV_DEG, SCREEN_H, SCREEN_W};
+use crate::warp::{SCREEN_H, SCREEN_W};
 
 use game_over::{
     game_over_fades_new_sound, game_over_image_name, game_over_subtitle_drawn,
     game_over_voice_name, game_over_wait_ends,
 };
 use rules::{
-    dial_row, head_open_fails, line_view, pick_dial_cam, Angles, DialInit, LineHeader,
-    HEAD_OPEN_FAIL_TEXT,
+    dial_row, head_open_fail_text, head_open_fails, line_fov, line_view, pick_dial_cam, Angles,
+    DialInit, LineHeader,
 };
 use subject_menu::{menu_draws, menu_hit, menu_subject};
 
@@ -327,10 +327,15 @@ impl Dialogs {
         let mut head_fails = false;
         let mut video = None;
         let mut spf = None;
+        // The name FUN_0042ee88 appends to "dialog\perso\" (0x0042ef9d..
+        // 0x0042effb): the parser's name + ".ubb", empty without a record.
+        let mut ubb_name = String::new();
         if !voice_only {
             let rec = init.rows.get(&row);
-            head_fails = head_open_fails(voice_only, rec.is_some());
+            let cam_ubb = rec.map_or("", |r| r.cam_ubb[(cam - 2) as usize].as_str());
+            head_fails = head_open_fails(voice_only, rec.is_some(), cam_ubb);
             if let Some(r) = rec {
+                ubb_name = format!("{cam_ubb}.ubb");
                 let ubb = &r.cam_ubb[(cam - 2) as usize];
                 if !ubb.is_empty() && !ubb.eq_ignore_ascii_case("none") {
                     video = Some(format!("DIALOG\\PERSO\\{}.UBB", ubb.to_ascii_uppercase()));
@@ -379,12 +384,12 @@ impl Dialogs {
             // what the player gets then is not established, and the port
             // does as here for that build too.
             log::warn!(
-                "section {} line {}: no INITDIAL row {row}",
+                "section {} line {}: row {row} cam {cam}, no UBB '{ubb_name}'",
                 req.section,
                 req.letter
             );
             if !e.enhancements().ui_ux {
-                self.error_box(e, HEAD_OPEN_FAIL_TEXT).await;
+                self.error_box(e, &head_open_fail_text(&ubb_name)).await;
             }
         } else {
             video_name.clone_from(&video);
@@ -401,7 +406,23 @@ impl Dialogs {
                 screen_buffer: off1,
                 voice_off: voice_only && !keep_screen,
             };
+            // The camera's FOV over the line (rules::line_fov): set only on
+            // the Seth path (0x004289ff..0x00428a14) and for ClicPerso >=
+            // 0x200 (0x00428a9d..0x00428ada); a talking head with ClicPerso
+            // below 0x200 (CHAPI056 /744 A, the first line of its walk) sets
+            // none and keeps the FOV the walk started with, 75.137. The
+            // voice-only players draw at 75.137 whatever was set
+            // (FUN_00430258 @ 0x0043044c) or do not redraw the view (off0,
+            // off1). Put back after the line.
+            let fov = line_fov(e.warp_loaded, &view, voice_only, cam);
+            let saved_fov = e.warp.hfov();
+            if let Some(f) = fov {
+                e.warp.set_hfov(f);
+            }
             played = self.play_single(e, &single).await;
+            if fov.is_some() {
+                e.warp.set_hfov(saved_fov);
+            }
         }
         // FUN_00451915(0x00bcb59c, 0x00bcb598) after every line (0x00428b5e).
         set_view(e, view.kept);
@@ -420,21 +441,13 @@ impl Dialogs {
     }
 
     /// One dialog line (`playSingleConLine`): the UBB video looped over the
-    /// panorama at the camera's field of view, the voice
-    /// `WAV\ATA<section><letter>.APC` and the subtitle, until the voice ends
-    /// or a left click (or Escape with a talking head).
+    /// panorama (at the camera's field of view, which the caller sets), the
+    /// voice `WAV\ATA<section><letter>.APC` and the subtitle, until the
+    /// voice ends, a left click or Escape.
     async fn play_single(&mut self, e: &mut Engine, l: &SingleLine<'_>) -> Played {
         let mut out = Played::default();
         let font = self.subtitler(e).await;
         let objects = Self::sprites(e, &mut self.object_sprites, "OBJETS1.SPR").await;
-
-        // The camera's FOV (0x00428a0e / 0x00428ad4), put back after.
-        let saved_fov = e.warp.hfov();
-        let mut fov_changed = false;
-        if e.warp_loaded && (2..=5).contains(&l.cam) {
-            e.warp.set_hfov(DIALOG_CAM_FOV_DEG[(l.cam - 2) as usize]);
-            fov_changed = true;
-        }
 
         let mut ubb = None;
         if let Some(name) = &l.video {
@@ -511,12 +524,27 @@ impl Dialogs {
             head,
             head_time0: None,
             head_ended: false,
+            head_cut: false,
         };
 
-        // The line lasts as long as its voice; a talking head (0x00496188
-        // set) also ends on Escape (FUN_0041a298 @ 0x0041a3c0), which sets
-        // the skip flag 0x00496134.
-        let escape_skips = l.cam != 0;
+        // The line lasts as long as its voice (FUN_0042ee88 / FUN_00430258):
+        // it ends when the sample is done or on a left click (0x0049611c).
+        // Escape is read by FUN_0041a298 (VideoSkipState::poll): a line with
+        // a talking head runs with 0x00496188 set, so Escape ends it and
+        // sets the dialog-skip flag 0x00496134 (0x0041a3d2); the voice-only
+        // players (off, off0, off1, no .syc) clear 0x00496188 first, so
+        // Escape ends the line only when bow mode, the bar request and
+        // OBJETENMAIN are all 0 (0x00496124 = 0, 0x0041a419; their loops
+        // test it, e.g. 0x00430586), without the skip flag: the following
+        // lines play, and the players put 0x00496124 and 0x00496138 back
+        // (0x004305b7, 0x004305c1), so no menu opens.
+        let mut escape_poll = VideoSkipState {
+            talking_head: l.cam != 0,
+            bow_mode: e.bow_mode,
+            object_in_hand: e.vars.get("objetenmain") != 0,
+            section_play: e.section_play,
+            ..VideoSkipState::default()
+        };
         drain(e).await;
         // FUN_00430258 lowers the music when no fade runs (@ 0x0043027f) and
         // raises it once the voice has played (@ 0x004305a6); without the
@@ -562,7 +590,10 @@ impl Dialogs {
                             break;
                         }
                     }
-                    player.draw_frame(e, &font, &objects, &sub_lines);
+                    player.draw_frame(e, &font, &objects, &sub_lines, voice.is_some());
+                    if player.head_cut {
+                        break;
+                    }
                     if voice.is_none() && (player.shown >= 2 || player.ubb.is_none()) {
                         start_voice(e, &mut voice);
                     }
@@ -573,9 +604,14 @@ impl Dialogs {
                     if fi.right_press {
                         e.bar.right_pressed(e.section_play, false);
                     }
-                    let escape = escape_skips && fi.escape;
+                    // The bar request as the right presses left it.
+                    escape_poll.bar_request = e.bar.request;
+                    let escape = fi.escape && escape_poll.poll(false, false, true);
                     if escape || fi.left_press || e.sys.buttons().0 {
-                        out.escape = escape;
+                        // With a talking head Escape also sets the dialog-skip
+                        // flag 0x00496134 that FUN_0042844c reads after the
+                        // line.
+                        out.escape = escape && escape_poll.talking_head;
                         break;
                     }
                 }
@@ -593,9 +629,6 @@ impl Dialogs {
         if talking_head {
             e.sprites_hide_npcs = false;
             e.recomposite_sprite_layer();
-        }
-        if fov_changed {
-            e.warp.set_hfov(saved_fov);
         }
         out
     }
@@ -740,6 +773,10 @@ impl Dialogs {
                         s.draw(&mut frame, SCREEN_W, SCREEN_H, icon.x, icon.y);
                     }
                 }
+                // FUN_004261a0 @ 0x00426393: FUN_0042bc58, the guests not
+                // hidden (FUN_00425828 hides all but the clicked one for a
+                // follower).
+                e.draw_guests(&mut frame, None);
                 Self::draw_arrow(e, &mut frame);
                 e.sys.screen.borrow_mut().copy_from_slice(&frame);
             }
@@ -937,6 +974,9 @@ struct LinePlayer {
     head_time0: Option<u64>,
     /// The lip-sync track has ended: the neutral mouth.
     head_ended: bool,
+    /// The lip-sync ended before the voice started: `FUN_0042ee88` leaves
+    /// its loop before drawing (0x0042f47b..0x0042f48c -> 0x0042f6e3).
+    head_cut: bool,
     /// The kept screen had an HD layer, which still stands for it.
     kept_hd: bool,
     /// The HD picture of the line (the port's HD mode).
@@ -1037,6 +1077,7 @@ impl LinePlayer {
         font: &Subtitler,
         objects: &[SprSprite],
         sub_lines: &[Vec<u8>],
+        voice_started: bool,
     ) {
         if self.talking_head {
             e.animate_sprites();
@@ -1131,6 +1172,14 @@ impl LinePlayer {
                     if head.lipsync(t) < 0 {
                         self.head_ended = true;
                     }
+                }
+                // A negative lip-sync result (kept once it went negative)
+                // while the sample status 0x006ce108 is still 0, i.e. before
+                // the voice starts, ends the line with nothing drawn
+                // (0x0042f47b..0x0042f48c). No shipped .syc ends that early.
+                if self.head_ended && !voice_started {
+                    self.head_cut = true;
+                    return;
                 }
                 head.transform();
                 head.render(&mut self.composite, w);
