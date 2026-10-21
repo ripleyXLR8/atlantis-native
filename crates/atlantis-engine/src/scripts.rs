@@ -1512,7 +1512,7 @@ mod tests {
             "puzzle_zone_reloads_the_view",
             move |mut e| async move {
                 let mut s = Scripts::new();
-                assert!(e.load_wam_with("ATLAN1.WAM", true).await);
+                assert!(e.load_wam("ATLAN1.WAM").await);
                 e.next_place_id = Some(1);
                 e.do_place_change().await;
                 e.pointer.pos = (5, 5);

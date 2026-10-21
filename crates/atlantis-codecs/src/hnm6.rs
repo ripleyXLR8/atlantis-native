@@ -1175,6 +1175,21 @@ impl Hnm6Decoder {
         &self.block[self.cur..self.cur + self.w * self.h]
     }
 
+    /// The last decoded frame, to draw into.
+    pub(crate) fn frame_mut(&mut self) -> &mut [u16] {
+        let n = self.w * self.h;
+        &mut self.block[self.cur..self.cur + n]
+    }
+
+    /// Video mode: the frame decoded before the last one, in the buffer
+    /// the next frame is decoded into (and read from by its motion
+    /// copies). `None` in warp mode.
+    pub(crate) fn previous_frame_mut(&mut self) -> Option<&mut [u16]> {
+        let n = self.w * self.h;
+        self.video_mode
+            .then(move || &mut self.block[self.old..self.old + n])
+    }
+
     pub(crate) fn into_block(self) -> Vec<u16> {
         self.block
     }

@@ -320,6 +320,10 @@ pub struct Engine {
     pub(crate) pointer_mouse_mark: (i32, i32),
     pub(crate) cursor_sprites: Vec<SprSprite>,
     pub(crate) cursor_state: WarpCursorState,
+    /// The double-click flag 0x00496118 and the press Windows pairs with
+    /// the next for WM_LBUTTONDBLCLK (set during the turn, tested before a
+    /// move's video @ 0x00423f8a).
+    pub(crate) turn_double_click: crate::turn::TurnDoubleClick,
     pub(crate) cursor_shown: i32,
     pub(crate) cursor_next_ms: u64,
 
@@ -442,6 +446,7 @@ impl Engine {
             pointer_mouse_mark: (0, 0),
             cursor_sprites: Vec::new(),
             cursor_state: WarpCursorState::default(),
+            turn_double_click: Default::default(),
             cursor_shown: CURSOR_UNSET,
             cursor_next_ms: 0,
             ix_buffers: Vec::new(),
@@ -559,22 +564,16 @@ impl Engine {
     }
 
     /// A WAM file, its centre table and sprite lists (`setupWAMByName`,
-    /// `FUN_00421ebc`).
+    /// `FUN_00421ebc`). The loader writes the fixed place records on every
+    /// load, the chapter's WAM included (a new game @ 0x004237b5, a load
+    /// @ 0x0042e354): the place table slots.
     pub async fn load_wam(&mut self, name: &str) -> bool {
-        self.load_wam_with(name, true).await
-    }
-
-    /// `record`: the place table slots are written (`setupWAMByName`; the
-    /// chapter's own WAM load `setupChapterWAM` does not).
-    pub(crate) async fn load_wam_with(&mut self, name: &str, record: bool) -> bool {
         let Some(data) = self.read(&format!("WAM\\{name}")).await else {
             return false;
         };
         self.wam = Wam::parse(&data);
         self.wam_name = name.to_ascii_uppercase();
-        if record {
-            self.record_place_table();
-        }
+        self.record_place_table();
         self.load_ambient_centres().await;
         self.load_sprite_list().await;
         self.load_spf_list().await;
@@ -649,7 +648,7 @@ impl Engine {
         if !in_play {
             self.set_view(0.0, 0.0);
         }
-        if !self.load_wam_with(NEW_GAME_WAM, false).await {
+        if !self.load_wam(NEW_GAME_WAM).await {
             log::error!("cannot start a new game: {NEW_GAME_WAM} missing");
             return;
         }

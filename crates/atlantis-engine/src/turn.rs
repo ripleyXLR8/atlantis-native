@@ -166,3 +166,69 @@ fn step(
     *alpha = (f64::from(*speed_x) / 3000.0 + f64::from(*alpha)) as f32;
     *beta = (f64::from(*beta) - f64::from(*speed_y) / 4000.0) as f32;
 }
+
+/// The double-click flag 0x00496118 that a move tests before its video:
+/// `FUN_00423ad8` @ 0x00423f8a jumps past the HNM open `FUN_00448c70`, the
+/// SPF sprites `FUN_0041b81c`, the ambient glide `FUN_0043259c` and the
+/// play loop `FUN_0041bc74` when it is set, to the flag reset @ 0x00424013;
+/// the place then changes at once. The window procedure sets it on
+/// WM_LBUTTONDBLCLK (0x00419b49 -> 0x00419c79..0x00419c8b) when the cursor
+/// state 0x004968ac is 5 (`FUN_00422fcc`'s navigate cursor, zone 1..511) or
+/// the menu request 0x00496138 is 1; the window class has CS_DBLCLKS
+/// (style 0xb @ 0x0042e4eb). The turn `FUN_004212cc` pumps the messages on
+/// every frame (`FUN_0041a298` @ 0x00421670 / 0x00421a5a) and does not call
+/// `FUN_00422fcc` (0x0049616c = 1), so the navigate state of the clicked
+/// zone holds through it: a double click whose second press comes during
+/// the turn skips the video.
+///
+/// When Windows sends WM_LBUTTONDBLCLK is the system's rule, not the
+/// binary's: a second press within the double-click time of the first,
+/// inside a rectangle centred on it (GetDoubleClickTime, SM_CXDOUBLECLK /
+/// SM_CYDOUBLECLK), 500 ms and 4 x 4 pixels by default (inferred: the
+/// Windows defaults; the player's setting is not known).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TurnDoubleClick {
+    /// 0x00496118.
+    pub flag: bool,
+    /// A first press is kept.
+    armed: bool,
+    first_ms: u64,
+    first: (i32, i32),
+}
+
+impl TurnDoubleClick {
+    /// GetDoubleClickTime()'s default.
+    pub const TIME_MS: u64 = 500;
+    /// SM_CXDOUBLECLK / SM_CYDOUBLECLK's default.
+    pub const RECT_SIZE: i32 = 4;
+
+    /// A left press that is not the second of a pair (the click that ends
+    /// the warp loop).
+    pub fn first_press(&mut self, ms: u64, x: i32, y: i32) {
+        self.armed = true;
+        self.first_ms = ms;
+        self.first = (x, y);
+    }
+
+    /// A later left press; `cursor_mode` is 0x004968ac, `menu_request`
+    /// 0x00496138. True when it is a double click (whether or not it sets
+    /// the flag); the press after a double click starts a new pair.
+    pub fn press(&mut self, ms: u64, x: i32, y: i32, cursor_mode: u8, menu_request: bool) -> bool {
+        let (dx, dy) = (x - self.first.0, y - self.first.1);
+        let half = Self::RECT_SIZE / 2;
+        let double = self.armed
+            && ms.wrapping_sub(self.first_ms) < Self::TIME_MS
+            && (-half..=half).contains(&dx)
+            && (-half..=half).contains(&dy);
+        if double {
+            self.armed = false;
+            // 0x00419c79: CMP byte [0x004968ac],5 / CMP [0x00496138],1
+            if cursor_mode == 5 || menu_request {
+                self.flag = true;
+            }
+        } else {
+            self.first_press(ms, x, y);
+        }
+        double
+    }
+}

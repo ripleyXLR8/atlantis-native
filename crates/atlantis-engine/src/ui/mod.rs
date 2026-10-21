@@ -414,21 +414,22 @@ impl Engine {
         ui.fontmin_from = from;
     }
 
-    /// The arrow cursor (CURSEURS.SPR frame 6, `FUN_0042d558`) at the
-    /// mouse, or the object in hand.
+    /// The pointer of the bar loops, `FUN_0042d558`: CURSEURS.SPR frame 6
+    /// at the mouse (0x0042d5b9..0x0042d5dd), then the object in hand over
+    /// it at the same position when OBJETENMAIN != 0
+    /// (0x0042d600..0x0042d627).
     pub(crate) fn draw_pointer(&self, screen: &mut [u16]) {
         let (x, y) = self.sys.mouse();
+        if let Some(spr) = self.cursor_sprites.get(6) {
+            draw_sprite(screen, spr, x, y);
+        }
         let held = self.vars.get("objetenmain");
         if held != 0 {
             if let Some(spr) = object_icon(&self.game.exe.inventory_object_ids, held)
                 .and_then(|i| self.ui.object(i))
             {
                 draw_sprite(screen, spr, x, y);
-                return;
             }
-        }
-        if let Some(spr) = self.cursor_sprites.get(6) {
-            draw_sprite(screen, spr, x, y);
         }
     }
 

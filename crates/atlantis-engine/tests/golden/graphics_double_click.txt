@@ -1,0 +1,22 @@
+# WM_LBUTTONDBLCLK through the window procedure 0x00419ae0 of atlantis.exe (2001 English build, 714240 bytes) run under emulation:
+# the double-click flag 0x00496118 after it, for each cursor state byte 0x004968ac and menu request 0x00496138. Then FUN_00423ad8
+# 0x00423f78..0x0042404f with the flag clear or set: the functions it calls and the flag after.
+WM_LBUTTONDBLCLK cursor 0 0x496138 0 -> [0x496118] 0
+WM_LBUTTONDBLCLK cursor 0 0x496138 1 -> [0x496118] 1
+WM_LBUTTONDBLCLK cursor 1 0x496138 0 -> [0x496118] 0
+WM_LBUTTONDBLCLK cursor 1 0x496138 1 -> [0x496118] 1
+WM_LBUTTONDBLCLK cursor 2 0x496138 0 -> [0x496118] 0
+WM_LBUTTONDBLCLK cursor 2 0x496138 1 -> [0x496118] 1
+WM_LBUTTONDBLCLK cursor 3 0x496138 0 -> [0x496118] 0
+WM_LBUTTONDBLCLK cursor 3 0x496138 1 -> [0x496118] 1
+WM_LBUTTONDBLCLK cursor 4 0x496138 0 -> [0x496118] 0
+WM_LBUTTONDBLCLK cursor 4 0x496138 1 -> [0x496118] 1
+WM_LBUTTONDBLCLK cursor 5 0x496138 0 -> [0x496118] 1
+WM_LBUTTONDBLCLK cursor 5 0x496138 1 -> [0x496118] 1
+WM_LBUTTONDBLCLK cursor 6 0x496138 0 -> [0x496118] 0
+WM_LBUTTONDBLCLK cursor 6 0x496138 1 -> [0x496118] 1
+WM_LBUTTONDBLCLK cursor 7 0x496138 0 -> [0x496118] 0
+WM_LBUTTONDBLCLK cursor 7 0x496138 1 -> [0x496118] 1
+flag 0 422f2c 0 -> calls ['0x422f2c', '0x448c70', '0x41b81c', '0x43259c', '0x41bc74', '0x448ea0', '0x41bbd0'] flag_after 0
+flag 1 422f2c 0 -> calls ['0x422f2c'] flag_after 0
+flag 0 422f2c 1 -> calls ['0x422f2c'] flag_after 0

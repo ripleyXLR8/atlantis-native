@@ -206,30 +206,25 @@ impl Engine {
         // a mouse motion since the engine last wrote it is the WM_MOUSEMOVE
         // that set it in the original.
         self.sync_pointer_mouse();
-        // The entry block clears 0x00496120 and 0x004960c4 (0x0041bff4).
+        // The entry block clears 0x00496120 and 0x004960c4 (0x0041bff4),
+        // and the double-click flag 0x00496118 (0x0041bfc2).
         self.bar.flags_reset();
-        self.sys.set_mouse_pos(320, 240);
-        // The view on screen at once: the original's loop draws it on its
-        // first pass; the port's wait below must not leave the move's last
-        // video frame (or the previous place) on screen meanwhile.
-        self.render_view();
-        // Drain stale clicks from the place change (the port's).
-        for _ in 0..5 {
-            if self.sys.should_quit() {
-                break;
-            }
-            while self.sys.poll_event().is_some() {}
-            self.sys.delay(20).await;
-        }
-        self.wait_buttons_up().await;
-        self.sys.set_mouse_pos(320, 240);
+        self.turn_double_click.flag = false;
+        // No wait at the entry (0x0041bfb8..0x0041c01e; the first frame
+        // polls FUN_0041a298 @ 0x0041c5f2). A click is a press edge
+        // (FUN_0042e624's latch): a button still down from a press an
+        // earlier poll saw is none, and a press no poll has seen yet (during
+        // a video's last frame, a place load) is one. The engine's input
+        // events are those edges.
+        self.sys
+            .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+        self.mark_pointer_mouse();
         self.sys.set_mouse_locked(true);
         self.sys.take_mouse_relative();
 
         self.cursor_shown = CURSOR_UNSET;
         // The arrow frame starts at 0 on every entry (0x0041c017).
         self.arrow_frame = 0;
-        let mut bow_button_held = self.sys.buttons().0;
         // FUN_00431a1c at 0x0041c012: the place's ambient sounds.
         self.ambient_enter_place().await;
 
@@ -237,15 +232,18 @@ impl Engine {
         let mut left_pressed = false;
         while !left_pressed && !exit {
             let fi = self.poll_frame_input();
+            // Each frame starts by clearing the double-click flag
+            // (0x0041c04a).
+            self.turn_double_click.flag = false;
             self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
                                       // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
-            let mut clicked = fi.left_press || self.sys.buttons().0;
+            // A press edge (FUN_0042e624): a held button is no click.
+            let mut clicked = fi.left_press;
             // Bow mode consumes the click (0x0041c631): no zone or
             // character action; the press edge feeds the shot test after
             // the frame is drawn.
-            let bow_click = self.bow_mode && clicked && !bow_button_held;
-            bow_button_held = clicked;
+            let bow_click = self.bow_mode && clicked;
             if self.bow_mode {
                 clicked = false;
             }
@@ -274,8 +272,11 @@ impl Engine {
 
             // The cursor (FUN_00422fcc): talk (NPC) > navigate (zone) >
             // nothing; with an object in hand, its animation over the icon.
+            // Step 10 of FUN_0041bfa0 (0x0041c4b4) and its helper
+            // FUN_0041afd0 (0x0041b00e) skip it in bow mode (0x00496164):
+            // its animation state does not advance.
             let now = self.sys.millis();
-            if self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms {
+            if !self.bow_mode && (self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms) {
                 self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
                 let input = WarpCursorInput {
                     zone: action,
@@ -297,27 +298,47 @@ impl Engine {
                 self.sys
                     .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                 self.mark_pointer_mouse();
-                // FUN_004278a0 starts the click animation (0x004278b5).
-                self.cursor_state.click_anim = true;
                 // ClicZone = the zone under the pointer: the warp loop
                 // returns it with the NPC (0x0041c71e) and the place loop
                 // stores it before FUN_004278a0 (0x00423c1c); it returns to
                 // 0 on the next pass.
                 self.vars.set("cliczone", action as i32);
-                hooks.npc_click(self, centre_perso, action).await;
+                // The place loop runs the puzzle-zone runner FUN_004240fc
+                // (0x00423c42) before FUN_004278a0 (0x00423d12) on every
+                // click: it does not test the id 0x006cd7e4, so an armed
+                // puzzle zone under a character runs the puzzle first
+                // (PALAIS2/3 vue 290 NPC 540 over zone 1002, FORET3/4 vue 52
+                // NPC 567 over zone 1008). Quit, GAMEOVER or EXIT then end
+                // the pass before FUN_004278a0 (0x00423ca5..0x00423d0d).
+                let puzzle_ran =
+                    (1000..1017).contains(&action) && hooks.puzzle_zone(self, action - 1000).await;
+                let pass_ended = puzzle_ran
+                    && (self.should_abort()
+                        || self.vars.get("gameover") != 0
+                        || self.vars.get("exit") != 0);
+                if !pass_ended {
+                    // FUN_004278a0 starts the click animation (0x004278b5).
+                    self.cursor_state.click_anim = true;
+                    hooks.npc_click(self, centre_perso, action).await;
+                }
                 self.vars.set("cliczone", 0);
                 self.sync_pointer_mouse();
-                if self.should_abort() || self.arrival_scan_pending {
+                // A puzzle ran: the place loop takes over (the warp loop
+                // entered again reloads the ambient sounds FUN_004240fc
+                // stopped, 0x0041c012).
+                if self.should_abort() || self.arrival_scan_pending || puzzle_ran {
                     action = WARP_ABORT;
                     exit = true;
                 } else {
                     // No recentre: the loop goes on with the pointer the
-                    // dialog left.
+                    // dialog left. The click the dialog ended on, if still
+                    // held, is no new press (the dialog's polls took it).
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
-                    self.sys.set_mouse_pos(320, 240);
+                    self.sys
+                        .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                    self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
-                    self.wait_buttons_up().await;
                     // The original's warp loop returns the clicked character
                     // (0x0041c71e) after this frame's timers (0x0041c369);
                     // the place loop runs the conversation (0x00423c1c) and
@@ -341,8 +362,10 @@ impl Engine {
             // the request; each frame starts by clearing the flags
             // (0x0041c04a..0x0041c07c). Escape opens the in-game menu with
             // no bow, no request and an empty hand (0x0041c5f7).
+            // A right press edge: a held right button does not open the bar
+            // again.
             let pending = self.bar.warp_frame_start();
-            let mut bar = !exit && (fi.right_press || self.sys.buttons().1 || pending);
+            let mut bar = !exit && (fi.right_press || pending);
             if bar && self.bow_mode {
                 // In bow mode the request only lowers the bow
                 // (0x0041c6af..0x0041c6c8: FUN_0042d368).
@@ -379,11 +402,11 @@ impl Engine {
                     self.sys.take_mouse_relative();
                     // FUN_0042c098 closes the bar with the pointer at
                     // (320, 240) (@ 0x0042c275).
-                    self.sys.set_mouse_pos(320, 240);
                     self.pointer.recentre();
+                    self.sys
+                        .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                    self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
-                    self.wait_buttons_up().await;
-                    bow_button_held = false;
                 }
             } else if !exit && fi.escape && !self.bow_mode && self.vars.get("objetenmain") == 0 {
                 self.sys.set_mouse_locked(false);
@@ -398,8 +421,10 @@ impl Engine {
                 } else {
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
+                    self.sys
+                        .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                    self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
-                    self.wait_buttons_up().await;
                 }
             }
 
@@ -465,16 +490,21 @@ impl Engine {
             // flag (FUN_0042a100 @ 0x0042a630..0x0042a749), so the loop runs
             // on in the new place and the arrival scan comes after the next
             // click.
+            let exit_before_timers = exit;
             if !exit && hooks.warp_frame(self).await {
                 self.sync_pointer_mouse();
                 if self.should_abort() {
                     action = WARP_ABORT;
                     exit = true;
                 } else {
+                    // A press the section's polls saw, if still held, is no
+                    // new one.
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
+                    self.sys
+                        .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                    self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
-                    self.wait_buttons_up().await;
                 }
             }
 
@@ -483,6 +513,12 @@ impl Engine {
             if !exit && self.vars.get("exit") != 0 {
                 action = WARP_ABORT;
                 exit = true;
+            }
+            // Leaving here (0x0041c387 / 0x0041c3a2 -> 0x0041c71e), the
+            // frame ends at once: no sprites, render, bow step or
+            // FUN_00432178.
+            if exit && !exit_before_timers {
+                break;
             }
             if !exit {
                 self.animate_sprites();
@@ -501,7 +537,10 @@ impl Engine {
                 self.draw_guests(&mut s, None);
                 *self.sys.screen.borrow_mut() = s;
             }
-            self.draw_cursor();
+            // No cursor and no icon in bow mode (0x0041c412, 0x0041c4b4).
+            if !self.bow_mode {
+                self.draw_cursor();
+            }
             if self.debug_overlay.get() {
                 self.draw_debug_overlay();
             }
@@ -531,6 +570,16 @@ impl Engine {
         self.sys
             .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
         self.mark_pointer_mouse();
+        // The click that ended the loop is the press Windows pairs a second
+        // one with for WM_LBUTTONDBLCLK (TurnDoubleClick).
+        if left_pressed {
+            let now = self.sys.millis();
+            self.turn_double_click
+                .first_press(now, self.pointer.pos.0, self.pointer.pos.1);
+        }
+        // Wait until the click that ended the loop is released (the port's:
+        // the original goes on at once and its later loops' polls latch the
+        // held button).
         self.wait_buttons_up().await;
         log::debug!("handle_warp: action {action}");
         action
@@ -594,7 +643,7 @@ mod tests {
         let ran = with_engine(
             "bar_timer_vue_keeps_the_warp_loop",
             move |mut e| async move {
-                assert!(e.load_wam_with("ATLAN1.WAM", true).await);
+                assert!(e.load_wam("ATLAN1.WAM").await);
                 e.next_place_id = Some(1);
                 let mut hooks = BarVue {
                     fired: false,
@@ -678,7 +727,7 @@ mod tests {
         let ran = with_engine(
             "timers_after_a_conversation_read_fresh_clocks",
             move |mut e| async move {
-                assert!(e.load_wam_with("ATLAN1.WAM", true).await);
+                assert!(e.load_wam("ATLAN1.WAM").await);
                 // A place and a view with a character under the pointer.
                 let ids: Vec<u16> = e.wam.places.iter().map(|p| p.id).collect();
                 let mut view = None;

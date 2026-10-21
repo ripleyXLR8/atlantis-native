@@ -221,7 +221,7 @@ impl Engine {
         // The 25 fields: the hidden persos before the WAM's sprite list.
         self.hidden_persos = cp.hidden.iter().map(|&h| i32::from(h)).collect();
         let wam = cp.wam_name();
-        if !self.load_wam_with(&wam, true).await {
+        if !self.load_wam(&wam).await {
             log::error!("checkpoint: {wam} missing, new game");
             self.new_game(hooks, in_play).await;
             return;

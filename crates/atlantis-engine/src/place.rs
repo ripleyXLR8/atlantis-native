@@ -318,8 +318,14 @@ impl Engine {
             self.hd_video_panorama_start(Some((t.src_alpha, t.src_beta)), dest)
                 .await;
             self.set_view(t.dst_alpha, t.dst_beta);
-            self.play_transition_video(&t.video, Some((cur, next)), TRANSITION_FRAME_MS)
-                .await;
+            // 0x00423f8a: a double click during the turn skips the video
+            // (and its SPF sprites and ambient glide); the flag is reset
+            // either way (0x00424013).
+            if !self.turn_double_click.flag {
+                self.play_transition_video(&t.video, Some((cur, next)), TRANSITION_FRAME_MS)
+                    .await;
+            }
+            self.turn_double_click.flag = false;
             // The video's last frame stays on screen while the destination
             // loads: its sides stay those of the video's end (switched off
             // when the destination's view is shown, `hd_show_view_over`).
@@ -345,7 +351,8 @@ impl Engine {
     }
 
     /// `FUN_004212cc`: the turn's frames, each drawn as the warp loop draws
-    /// one (place sprites, the view) without input or cursor. With ZOOM the
+    /// one (place sprites, the view) without cursor, each with the ambient
+    /// update `FUN_00432178`. With ZOOM the
     /// field of view narrows by 3 degrees a frame from 75.187; the turn
     /// ends with `FUN_0045179a(75.187)`, which lasts until the next
     /// panorama load sets the warp's 75.137, and ZOOM = 0.
@@ -365,11 +372,34 @@ impl Engine {
             if self.sys.should_quit() {
                 break;
             }
-            while self.sys.poll_event().is_some() {}
+            // The messages FUN_0041a298 pumps (0x00421670 / 0x00421a5a): a
+            // left press here can be the second of a double click whose
+            // first ended the warp loop (TurnDoubleClick, 0x00496118). The
+            // menu request 0x00496138 the turn's poll can set is not
+            // modelled.
+            while let Some(ev) = self.sys.poll_event() {
+                if let Input::MouseDown {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                } = ev
+                {
+                    let now = self.sys.millis();
+                    let mode = self.cursor_state.mode;
+                    self.turn_double_click.press(now, x, y, mode, false);
+                }
+            }
             if f.fov_set {
                 self.warp.set_hfov(f.fov);
             }
             self.set_view(f.alpha, f.beta);
+            // FUN_00432178 on every turn frame, with the frame's angles
+            // stored and before FUN_00451915 (0x004212cc, both phases): the
+            // ambient gains follow the turning view, so the glide
+            // FUN_0043259c starts from the last turn frame's; NewSound is
+            // polled.
+            self.poll_new_sound().await;
+            self.ambient_frame();
             self.animate_sprites();
             self.render_view();
             if self.guests_shown && self.guests.count != 0 {
@@ -473,6 +503,8 @@ impl Engine {
             ..VideoSkipState::default()
         });
         let (w, h) = (hnm.width(), hnm.height());
+        // The composite of the frame on screen, while it has overlays.
+        let mut overlay: Option<Vec<u16>> = None;
         loop {
             if self.sys.should_quit()
                 || (hnm.frame_count() != 0 && hnm.frames_decoded() >= hnm.frame_count())
@@ -480,8 +512,21 @@ impl Engine {
                 break;
             }
             if self.sys.millis() - start >= hnm.next_frame_start_ms() {
-                match hnm.next_frame() {
-                    Some(Ok(frame)) => {
+                let decoded = match hnm.next_frame() {
+                    Some(Ok(_)) => Some(Ok(())),
+                    Some(Err(e)) => Some(Err(e)),
+                    None => None,
+                };
+                // The previous frame's overlays into its buffer, the out
+                // buffer of the next decode.
+                if let (Some(Ok(())), Some(c)) = (&decoded, overlay.take()) {
+                    if let Some(prev) = hnm.previous_frame_mut() {
+                        prev.copy_from_slice(&c);
+                    }
+                }
+                match decoded {
+                    Some(Ok(())) => {
+                        let frame = hnm.frame();
                         {
                             let mut screen = self.sys.screen.borrow_mut();
                             for y in 0..h.min(SCREEN_H) {
@@ -500,8 +545,35 @@ impl Engine {
                                     SCREEN_H,
                                 );
                             }
-                            if self.guests_shown && self.guests.count != 0 {
+                            // Not on the frame presented after an Escape
+                            // poll: that poll sets the menu request
+                            // 0x00496138 (0x0041a423), cleared only after
+                            // that present (0x0041be4a, 0x0041bf79).
+                            let guests =
+                                self.guests_shown && self.guests.count != 0 && !run.s.menu_request;
+                            if guests {
                                 self.draw_guests(&mut screen, None);
+                            }
+                            // The presenter draws these overlays INTO the
+                            // frame's decode buffer (0x0041b187..0x0041b192,
+                            // then the copy to the surface @ 0x0041b1ff),
+                            // and FUN_0041bc74 presents frame k only after
+                            // decoding frame k + 1 (0x0041bde7), so the
+                            // decode of frame k + 2, which writes into
+                            // frame k's buffer, reads them in its in-place
+                            // motion copies. The port presents each frame
+                            // at once and writes the composite back into
+                            // its buffer once the next frame is decoded,
+                            // the last one after the loop (0x0041be45),
+                            // which the next video keeps.
+                            if !spfs.is_empty() || guests {
+                                let mut c = frame.to_vec();
+                                for y in 0..h.min(SCREEN_H) {
+                                    let n = w.min(SCREEN_W);
+                                    c[y * w..y * w + n]
+                                        .copy_from_slice(&screen[y * SCREEN_W..y * SCREEN_W + n]);
+                                }
+                                overlay = Some(c);
                             }
                             // Then, on the screen, a CINEMA caption
                             // (atlantis-cd-zh-tw-696832 FUN_0041afa0 @
@@ -559,6 +631,7 @@ impl Engine {
                     }
                     Some(Err(e)) => {
                         log::warn!("{name}: {e}");
+                        overlay = None;
                         break;
                     }
                     None => break,
@@ -575,6 +648,10 @@ impl Engine {
         // volume (FUN_0041bc74 @ 0x0041be69..0x0041be9e arms 0x00495eb0 =
         // 2). Then 0x00496124 = 1, 0x00496134 = 0 and the input flags are
         // cleared (0x0041be55..0x0041bf8d).
+        // The last frame's overlays into its own buffer (0x0041be45).
+        if let Some(c) = overlay.take() {
+            hnm.frame_mut().copy_from_slice(&c);
+        }
         let fade = run.finish(frame_ms == CINEMA_FRAME_MS, &mut self.bar);
         if fade && self.music.new_sound_active() {
             self.music.fade_out_new_sound(self.effects_volume());
@@ -644,7 +721,11 @@ impl Engine {
             return;
         };
         let cam = self.centre(id);
-        let t = self.chapter_time();
+        // The pause test and the pause start read the CON variable
+        // CHAPTERTIME (@ 0x0043220f, 0x004323e9), which only FUN_0041c75c
+        // writes (@ 0x0041c7c0), at the start of a warp frame: it stands
+        // still in the bar, the turn and the videos.
+        let t = self.vars.get("chaptertime");
         let (a, b) = (self.warp.alpha(), self.warp.beta());
         let place = place.clone();
         self.ambient.frame(
@@ -682,7 +763,8 @@ impl Engine {
         let Some(place) = self.place().cloned() else {
             return;
         };
-        let t = self.chapter_time();
+        // CHAPTERTIME as the warp frame left it (@ 0x004327ce, 0x00432978).
+        let t = self.vars.get("chaptertime");
         self.ambient
             .video_frame(&mut self.ambient_out, &place, &self.wam.ambient_objects, t);
     }
@@ -734,10 +816,12 @@ impl Engine {
         self.turn_to_transition(t.src_alpha, t.src_beta).await;
         // 0x00421b01..0x00421b31, before the video.
         self.set_view(t.dst_alpha, t.dst_beta);
-        if t.video.contains('.') {
+        // The same double-click test (0x00423f8a) and reset (0x00424013).
+        if t.video.contains('.') && !self.turn_double_click.flag {
             self.play_transition_video(&t.video, Some((cur, cur)), TRANSITION_FRAME_MS)
                 .await;
         }
+        self.turn_double_click.flag = false;
     }
 
     /// Cinema=N: `CINEM<NNN>.HNM` full screen with its sound, at the cinema
@@ -882,7 +966,7 @@ mod wsprframe_tests {
         let seen2 = seen.clone();
         let mut r = Runner::new(sys.clone(), async move {
             let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
-            assert!(e.load_wam_with("ATLAN5.WAM", true).await);
+            assert!(e.load_wam("ATLAN5.WAM").await);
             e.next_place_id = Some(126);
             e.do_place_change().await;
             for _ in 0..400 {

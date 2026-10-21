@@ -237,6 +237,21 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
         self.decoder.frame()
     }
 
+    /// The last decoded frame's buffer, to draw into: the original's frame
+    /// presenter draws the overlays of a video into it (atlantis.exe
+    /// `FUN_0041b064` @ 0x0041b187..0x0041b192), so that the next frames'
+    /// motion copies read them.
+    pub fn frame_mut(&mut self) -> &mut [u16] {
+        self.decoder.frame_mut()
+    }
+
+    /// An IX video: the buffer of the frame decoded before the last one,
+    /// which the next frame is decoded into (its in-place motion copies
+    /// read it first). `None` for a warp file.
+    pub fn previous_frame_mut(&mut self) -> Option<&mut [u16]> {
+        self.decoder.previous_frame_mut()
+    }
+
     /// Gives back the frame buffer block, to decode the next video into.
     pub fn into_buffers(self) -> Vec<u16> {
         match self.spare {
