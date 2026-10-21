@@ -35,7 +35,14 @@ pub struct Enhancements {
     ///   22 px per byte as in every other build, so the whole drawn word
     ///   highlights and takes the click; off, 16 px per byte as the original
     ///   (atlantis-cd-it-687104 FUN_0041ecb4 @ 0x0041f068): the right ends
-    ///   of `OK` (11 px) and `Annulla` (18 px) do not answer.
+    ///   of `OK` (11 px) and `Annulla` (18 px) do not answer;
+    /// - with the Chinese CDs, the options' SUBTITLES record is read in
+    ///   step while SUBTITLES is off; off, as the original
+    ///   (atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x0042022b): its text
+    ///   pointer steps back one byte also when the id stays 9, so the
+    ///   record's x is 0 and each later field is read from inside the one
+    ///   before (a record placed by an earlier walk keeps its place, but
+    ///   its click area takes the shifted width and height).
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

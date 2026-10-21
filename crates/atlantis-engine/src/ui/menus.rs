@@ -16,6 +16,7 @@
 
 use atlantis_data::saves::{checkpoint_chapter, epi_episode_name, MAX_PLAYERS, NAME_MAX_CHARS};
 use atlantis_data::sprite::read_tga15;
+use atlantis_data::LoadList;
 
 use super::credits::{credits_events, CreditsEvent};
 use super::layout::{
@@ -454,6 +455,26 @@ impl Engine {
         let Some(mut menu) = self.load_menu("OPTMENU.TXT").await else {
             return;
         };
+        // The toggles as sprite records (the Chinese builds): the hit table
+        // 0x006026b0 keeps the records from one visit to the next, and the
+        // id 9 record of a walk with SUBTITLES off keeps the x / y stored
+        // before (see MenuRules::toggle_in_step); the first walk is made
+        // with the toggles (atlantis-cd-zh-tw-696832 FUN_0041d5c0 @
+        // 0x0041d5e7..0x0041d5ec).
+        let toggle_sprites = self.game.exe.build.menu_toggle_sprites;
+        if toggle_sprites {
+            menu.walk.records = self.opt_menu_records.clone();
+            menu.walk(
+                None,
+                i32::from(self.subtitles),
+                i32::from(self.settings.omni3d_mode2),
+            );
+        }
+        // The hovered record is the one under the pointer, whatever it is
+        // (@ 0x0041d5f1..0x0041d600): with the sprite menus the labels
+        // SUBTITLES and OMNI 3D (records 2 and 4) are drawn hovered too
+        // (the text menus never draw lines 2 and 4 of this menu hovered).
+        let sprite_menus = self.game.exe.build.menu_sprite_banks.is_some();
         let mut changed = false;
         loop {
             if self.should_abort() {
@@ -461,7 +482,8 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
-            let hit = menu.hit(mx, my).filter(|r| [1, 3, 5, 6].contains(r));
+            let under = menu.hit(mx, my);
+            let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
             if mi.left_press {
                 self.wait_buttons_up().await;
                 match hit {
@@ -487,13 +509,16 @@ impl Engine {
                 }
             }
             menu.walk(
-                hit,
+                if sprite_menus { under } else { hit },
                 i32::from(self.subtitles),
                 i32::from(self.settings.omni3d_mode2),
             );
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
+        }
+        if toggle_sprites {
+            self.opt_menu_records = menu.walk.records.clone();
         }
         if changed {
             self.save_settings();
@@ -637,12 +662,32 @@ impl Engine {
         let build = self.game.exe.build;
         let clamp = build.load_picker_clamp;
         let mut sb = LoadPickerScroll::new(count as i32, build.load_knob_starts_at_bar, clamp);
+        let sprite_rows = matches!(build.load_list, LoadList::Sprites { .. });
         let mut title: Option<(Vec<u8>, i32)> = None;
+        // The Chinese builds' title: EPICHI2 frame `row` at x.
+        let mut title_frame: Option<(usize, i32)> = None;
         let mut selected: Option<usize> = None;
         let mut last_click: Option<(usize, u64)> = None;
         let mut track_latched = false;
         let player = self.player.min(MAX_PLAYERS - 1);
-        let choose = |e: &mut Engine, i: usize, title: &mut Option<(Vec<u8>, i32)>| {
+        let choose = |e: &mut Engine,
+                      i: usize,
+                      title: &mut Option<(Vec<u8>, i32)>,
+                      title_frame: &mut Option<(usize, i32)>| {
+            if sprite_rows {
+                // atlantis-cd-zh-tw-696832 FUN_0041ce00: the chapter of the
+                // row's position in the table, not the file's
+                // (@ 0x0041d413..0x0041d44d), the title frame centred by
+                // the width table (@ 0x0041d3d0..0x0041d3ee); the title is
+                // drawn while the file's EPI.TXT line copied to 0x00602080
+                // is not empty (@ 0x0041d37c..0x0041d3aa, 0x0041d452..0x0041d476).
+                let exe = &e.game.exe;
+                e.players.chapters[player] =
+                    load_list_chapter(&exe.load_chapters, &exe.load_widths, i);
+                let w = e.game.exe.load_widths.get(i).copied().unwrap_or(0);
+                *title_frame = (!names[i].is_empty()).then_some((i, (640 - i32::from(w)) / 2));
+                return;
+            }
             e.players.chapters[player] = chapters[i];
             let w = font_min_load_list_width(&names[i], &e.ui.fontmin_advance);
             *title = Some((names[i].clone(), (640 - w) / 2));
@@ -669,7 +714,7 @@ impl Engine {
                     Some(i) => (i + 1).min(count - 1),
                 };
                 selected = Some(i);
-                choose(self, i, &mut title);
+                choose(self, i, &mut title, &mut title_frame);
             }
             if mi.left_press {
                 // WM_LBUTTONDOWN latches the record under the pointer
@@ -696,7 +741,7 @@ impl Engine {
             if mi.left_press && !track_latched {
                 if let Some(r) = row_hover {
                     selected = Some(r);
-                    choose(self, r, &mut title);
+                    choose(self, r, &mut title, &mut title_frame);
                     let now = self.sys.millis();
                     if last_click.is_some_and(|(l, t)| l == r && now - t <= DOUBLE_CLICK_MS) {
                         self.wait_buttons_up().await;
@@ -721,6 +766,11 @@ impl Engine {
             menu.walk(button, 0, 0);
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
+            if sprite_rows {
+                self.draw_load_sprite_rows(&mut s, count, scroll, (mx, my), title_frame);
+                self.present(&s, true).await;
+                continue;
+            }
             // FUN_00420b48: rows at x 55, baseline 130 + 22 i.
             for i in 0..11 {
                 let Some(name) = names.get(scroll + i) else {
@@ -740,6 +790,37 @@ impl Engine {
                     .draw_font_min(&mut s, FontMin::NameField, t, *x, 0x50, true);
             }
             self.present(&s, true).await;
+        }
+    }
+
+    /// The Chinese builds' LOAD rows and title (atlantis-cd-zh-tw-696832):
+    /// FUN_004205a4 draws EPICHI1 frames `offset` .. `offset` + min(count,
+    /// 11) at (0x37, 0x6e + 22 row), whatever files the rows hold (a list
+    /// scrolled one row past its end shows the next frame), EPICHI2 for
+    /// the grid row under the pointer (@ 0x004205c1..0x00420691; the grid
+    /// of FUN_00420c08 @ 0x0041d277..0x0041d2a0); FUN_004208bc then draws
+    /// the title, EPICHI2 frame `row` at (x, 0x3c) (@ 0x00420a22..0x00420a8d).
+    /// A frame past the banks' 74 is not drawn (FUN_00410430).
+    fn draw_load_sprite_rows(
+        &self,
+        s: &mut [u16],
+        count: usize,
+        scroll: usize,
+        (mx, my): (i32, i32),
+        title_frame: Option<(usize, i32)>,
+    ) {
+        let grid = menu_grid_hit(45, 108, 400, 22, 1, 11, true, mx, my);
+        for row in 0..count.min(11) {
+            let hovered = grid == Some(row as i32);
+            let bank = &self.ui.load_banks[usize::from(hovered)];
+            if let Some(spr) = bank.get(scroll + row) {
+                draw_sprite(s, spr, 0x37, 0x6e + 22 * row as i32);
+            }
+        }
+        if let Some((frame, x)) = title_frame {
+            if let Some(spr) = self.ui.load_banks[1].get(frame) {
+                draw_sprite(s, spr, x, 0x3c);
+            }
         }
     }
 
@@ -819,6 +900,16 @@ impl Engine {
     }
 }
 
+/// The chapter a LOAD row of the Chinese builds loads: entry `row` of the
+/// chapter table (atlantis-cd-zh-tw-696832 0x00486619, read @ 0x0041d432
+/// with no bound), which past its 74 entries reads on into the width table
+/// that follows it (0x00486663): a 75th checkpoint (`p<L>99.gam`) loads
+/// chapter 80. The picker lists at most 0x80 files, so the read stays in
+/// the two tables.
+pub fn load_list_chapter(chapters: &[u8], widths: &[u8], row: usize) -> u8 {
+    chapters.iter().chain(widths).nth(row).copied().unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -831,5 +922,17 @@ mod tests {
         assert_eq!(ingame_menu_outcome(Some(2), 6, 3), MenuOutcome::Quit);
         assert_eq!(ingame_menu_outcome(Some(2), 6, 4), MenuOutcome::Resume);
         assert_eq!(ingame_menu_outcome(None, 6, 3), MenuOutcome::Resume);
+    }
+
+    /// A LOAD row of the Chinese builds loads its position's entry of the
+    /// chapter table, past it the width table's.
+    #[test]
+    fn load_list_chapters_by_row() {
+        let chapters = [2, 3, 4];
+        let widths = [80, 98];
+        let got: Vec<u8> = (0..6)
+            .map(|r| load_list_chapter(&chapters, &widths, r))
+            .collect();
+        assert_eq!(got, [2, 3, 4, 80, 98, 0]);
     }
 }

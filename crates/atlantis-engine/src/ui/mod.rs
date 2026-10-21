@@ -40,6 +40,14 @@ pub struct UiAssets {
     pub guests: Vec<SprSprite>,
     /// OBJETS0.SPR, the inventory bar.
     pub bar: Option<SprSprite>,
+    /// The menus' `/sprj=` `/sprr=` `/sprc=` banks (normal, hovered): the
+    /// Chinese builds' SPRCHI1.SPR / SPRCHI2.SPR
+    /// ([`atlantis_data::exe::ExeBuild::menu_sprite_banks`]); empty for the
+    /// other builds, which never load them.
+    pub menu_banks: [Vec<SprSprite>; 2],
+    /// The LOAD list's rows (normal, hovered) by position: the Chinese
+    /// builds' EPICHI1.SPR / EPICHI2.SPR ([`atlantis_data::exe::LoadList`]).
+    pub load_banks: [Vec<SprSprite>; 2],
 }
 
 /// A whole screen.
@@ -75,14 +83,22 @@ pub fn dim_screen(screen: &mut [u16]) {
 impl UiAssets {
     /// The blits of a menu walk: SPRMENU sprites and FONTMAX glyphs
     /// (FONTMAX2 on the hovered line), in file order. The alternate bank of
-    /// `/sprj=` `/sprr=` `/sprc=` is never loaded by the executable.
+    /// `/sprj=` `/sprr=` `/sprc=` is never loaded by the executable but in
+    /// the Chinese builds, which draw it from SPRCHI1, SPRCHI2 on the
+    /// hovered line (atlantis-cd-zh-tw-696832 FUN_004201e8 @
+    /// 0x004204fa..0x00420543).
     pub fn draw_menu(&self, screen: &mut [u16], walk: &MenuWalk) {
         for op in &walk.ops {
             let bank = if op.sprite {
                 if op.alt_bank {
-                    continue;
+                    match &self.menu_banks {
+                        [normal, _] if normal.is_empty() => continue,
+                        [_, hovered] if op.hover_font => hovered,
+                        [normal, _] => normal,
+                    }
+                } else {
+                    &self.sprmenu
                 }
-                &self.sprmenu
             } else if op.hover_font && !self.fontmax2.is_empty() {
                 &self.fontmax2
             } else {
@@ -285,9 +301,33 @@ impl Engine {
             }
         }
         let d = limits::DEFAULT;
+        let build = self.game.exe.build;
+        // The Chinese builds load their menu words instead of FONTMAX /
+        // FONTMAX2 (atlantis-cd-zh-tw-696832 FUN_0042676c @
+        // 0x004267a2..0x00426874), and the LOAD rows' banks
+        // (FUN_0041ce00 @ 0x0041cf19..0x0041cfae, at each entry of the
+        // picker: the four discs hold the same copies).
+        let (fontmax, fontmax2, menu_banks) = match build.menu_sprite_banks {
+            Some([a, b]) => (
+                Vec::new(),
+                Vec::new(),
+                [bank(self, a, d).await, bank(self, b, d).await],
+            ),
+            None => (
+                bank(self, "FONTMAX.SPR", d).await,
+                bank(self, "FONTMAX2.SPR", d).await,
+                [Vec::new(), Vec::new()],
+            ),
+        };
+        let load_banks = match build.load_list {
+            atlantis_data::LoadList::Sprites { banks: [a, b], .. } => {
+                [bank(self, a, d).await, bank(self, b, d).await]
+            }
+            atlantis_data::LoadList::EpiText => [Vec::new(), Vec::new()],
+        };
         let mut a = UiAssets {
-            fontmax: bank(self, "FONTMAX.SPR", d).await,
-            fontmax2: bank(self, "FONTMAX2.SPR", d).await,
+            fontmax,
+            fontmax2,
             fontmin: bank(self, "FONTMIN.SPR", d).await,
             fontmin2: bank(self, "FONTMIN2.SPR", d).await,
             fontmin_from: self
@@ -302,6 +342,8 @@ impl Engine {
             objects: bank(self, "OBJETS1.SPR", d).await,
             guests: bank(self, "SUIVEUR.SPR", d).await,
             bar: None,
+            menu_banks,
+            load_banks,
         };
         a.bar = bank(self, "OBJETS0.SPR", limits::INVENTORY_BAR)
             .await

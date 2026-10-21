@@ -26,9 +26,13 @@ pub struct MenuOp {
     /// A sprite of SPRMENU.SPR (or of the alternate bank), else a glyph.
     pub sprite: bool,
     /// `/sprj=` `/sprr=` `/sprc=`: the bank 0x006cd874, which the
-    /// executable never loads.
+    /// executable never loads (the Chinese builds load their menu words
+    /// there, [`atlantis_data::exe::ExeBuild::menu_sprite_banks`]).
     pub alt_bank: bool,
-    /// The glyph is drawn with FONTMAX2 (the hovered line).
+    /// The glyph is drawn with FONTMAX2 (the hovered line); a sprite of the
+    /// alternate bank is drawn from the second bank (the hovered line's
+    /// flag 0x004860a0, atlantis-cd-zh-tw-696832 FUN_004201e8 @
+    /// 0x004204fa..0x0042053d).
     pub hover_font: bool,
     /// The pen (glyph) or the record position (sprite).
     pub x: i16,
@@ -218,6 +222,19 @@ pub struct MenuRules {
     /// A byte above 0xa8 is a space (atlantis-cd-it-687104 FUN_0041ecb4 @
     /// 0x0041f235, `ExeBuild::menu_high_bytes_as_space`).
     pub high_bytes_as_space: bool,
+    /// The options toggles as sprite records (`ExeBuild::menu_toggle_sprites`):
+    /// a record of id 9 in menu 2 is drawn as id 9 + SUBTITLES (`toggle_a`),
+    /// one of id 12 as 13 when OMNI 3D (`toggle_b`) is 1
+    /// (atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x00420212..0x00420242).
+    pub toggle_sprites: bool,
+    /// The port's fix of the id 9 record ([`MenuRules::toggle_sprites`]):
+    /// the original steps its text pointer back one byte to make room for
+    /// the two digits of id 10 (@ 0x0042022b), also when the id stays 9, so
+    /// with SUBTITLES off the record reads its x at the comma (0) and each
+    /// later field from inside the one before (a slot that holds an x / y
+    /// keeps them, a fresh one stores the shifted values); with the minor
+    /// bug fixes the step back is taken only for id 10.
+    pub toggle_in_step: bool,
 }
 
 /// The reference's walk, without the port's fix.
@@ -227,6 +244,8 @@ impl Default for MenuRules {
             sharp_s_as_ss: false,
             positioned_byte_width: 22,
             high_bytes_as_space: false,
+            toggle_sprites: false,
+            toggle_in_step: false,
         }
     }
 }
@@ -246,6 +265,8 @@ impl MenuRules {
                 i32::from(build.menu_positioned_byte_width)
             },
             high_bytes_as_space: build.menu_high_bytes_as_space,
+            toggle_sprites: build.menu_toggle_sprites,
+            toggle_in_step: minor_bug_fixes,
         }
     }
 }
@@ -290,7 +311,13 @@ pub fn walk_menu_text(
     };
     while p < size && !walk_at(t, p, b"/fin") {
         let mut draw = true;
-        let mut hover = (line == hover_line && line != 0) || (line == hover_line && menu == 0);
+        // The hovered line's flag 0x004860a0 (atlantis-cd-zh-tw-696832
+        // FUN_0041f5a0 @ 0x0041f6c9..0x0041f707): menu 2's lines 2 and 4
+        // take FONTMAX back (@ 0x0041f711..0x0041f72a) but keep the flag, so
+        // their sprite records are drawn hovered.
+        let hover_line_flag =
+            (line == hover_line && line != 0) || (line == hover_line && menu == 0);
+        let mut hover = hover_line_flag;
         if (line == 2 || line == 4) && menu == 2 {
             hover = false;
         }
@@ -367,7 +394,23 @@ pub fn walk_menu_text(
             }
             p += word.len();
             // FUN_004207c0: I (1-2 digits), X, Y, W (1-3 digits), H.
-            let idx = walk_atoi(t, p);
+            let mut idx = walk_atoi(t, p);
+            if rules.toggle_sprites {
+                // atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x00420212..0x0042022b:
+                // in menu 2, id 9 + SUBTITLES, the pointer one byte back.
+                if idx == 9 && menu == 2 {
+                    idx += toggle_a;
+                    if !rules.toggle_in_step || idx > 9 {
+                        p -= 1;
+                    }
+                }
+                // @ 0x0042022e..0x00420242: id 12 becomes 13 with OMNI 3D
+                // 1, in any menu. The menus other than OPTMENU walk with 0
+                // here; none of the shipped ones holds an id 12 record.
+                if idx == 12 && toggle_b == 1 {
+                    idx = 13;
+                }
+            }
             p = walk_step(p, idx, 2, false);
             let x = walk_atoi(t, p);
             p = walk_step(p, x, 2, true);
@@ -397,7 +440,7 @@ pub fn walk_menu_text(
             walk.ops.push(MenuOp {
                 sprite: true,
                 alt_bank: v < 3,
-                hover_font: false,
+                hover_font: v < 3 && hover_line_flag,
                 x: bx as i16,
                 y: by as i16,
                 index: idx,
@@ -913,6 +956,86 @@ mod tests {
             [(0x53, x0), (0x53, x0 + s16), (0x41, x0 + 2 * s16)]
         );
         assert_eq!(i32::from(walk.records[0].w), a + 2 * s);
+    }
+
+    /// The Chinese builds' options toggles as sprite records: id 9 +
+    /// SUBTITLES, id 12 -> 13 with OMNI 3D; with SUBTITLES off the record
+    /// is read one byte out of step (x 0, the rest shifted), and keeps the
+    /// x / y a previous walk stored; the sprite is drawn there.
+    #[test]
+    fn toggle_sprite_records() {
+        let text = b"/sprc=2,260,50,150,32\r\n/sprc=8,160,250,100,32\r\n/sprc=9,345,267,51,33\r\n/sprc=12,344,300,250,32\r\n/fin\r\n";
+        let rules = MenuRules {
+            toggle_sprites: true,
+            ..MenuRules::default()
+        };
+        let sprites = |w: &MenuWalk| -> Vec<(i32, i16, i16, bool)> {
+            w.ops
+                .iter()
+                .map(|o| (o.index, o.x, o.y, o.hover_font))
+                .collect()
+        };
+        let mut walk = MenuWalk::default();
+        walk_menu_text(text, 2, 1, 1, 1, rules, &mut walk);
+        assert!(walk.ops.iter().all(|o| o.sprite && o.alt_bank));
+        assert_eq!(
+            sprites(&walk)[2..],
+            [(10, 345, 267, false), (13, 344, 300, false)]
+        );
+        assert_eq!(
+            walk.records[2],
+            MenuRecord {
+                x: 345,
+                y: 267,
+                w: 51,
+                h: 33
+            }
+        );
+        // SUBTITLES off: x 0 (atoi of ","), y 45, w 267, h 51; the stored
+        // x / y kept.
+        walk_menu_text(text, 2, -1, 0, 0, rules, &mut walk);
+        assert_eq!(
+            sprites(&walk)[2..],
+            [(9, 345, 267, false), (12, 344, 300, false)]
+        );
+        assert_eq!(
+            walk.records[2],
+            MenuRecord {
+                x: 345,
+                y: 267,
+                w: 267,
+                h: 51
+            }
+        );
+        // In a first walk the shifted values are stored.
+        let mut fresh = MenuWalk::default();
+        walk_menu_text(text, 2, -1, 0, 0, rules, &mut fresh);
+        assert_eq!(sprites(&fresh)[2], (9, 0, 45, false));
+        // The minor bug fixes read it in step.
+        let fixed = MenuRules {
+            toggle_in_step: true,
+            ..rules
+        };
+        let mut fresh = MenuWalk::default();
+        walk_menu_text(text, 2, -1, 0, 0, fixed, &mut fresh);
+        assert_eq!(sprites(&fresh)[2], (9, 345, 267, false));
+        assert_eq!((fresh.records[2].w, fresh.records[2].h), (51, 33));
+        // Hovered lines: the label of line 1 too (menu 2's lines 2 and 4
+        // keep the flag); line 0 never, but in menu 0.
+        walk_menu_text(text, 2, 1, 1, 0, rules, &mut walk);
+        assert!(sprites(&walk)[1].3);
+        walk_menu_text(text, 2, 0, 1, 0, rules, &mut walk);
+        assert!(!sprites(&walk)[0].3);
+        walk_menu_text(text, 0, 0, 1, 0, rules, &mut walk);
+        assert!(sprites(&walk)[0].3);
+        // Id 9 changes in menu 2 only, id 12 in any menu; without the
+        // rule, neither.
+        walk_menu_text(text, 1, -1, 1, 1, rules, &mut fresh);
+        let ids: Vec<i32> = fresh.ops.iter().map(|o| o.index).collect();
+        assert_eq!(ids, [2, 8, 9, 13]);
+        walk_menu_text(text, 2, -1, 1, 1, MenuRules::default(), &mut fresh);
+        let ids: Vec<i32> = fresh.ops.iter().map(|o| o.index).collect();
+        assert_eq!(ids, [2, 8, 9, 12]);
     }
 
     /// A sprite record keeps a stored non-zero x and y and is drawn there
