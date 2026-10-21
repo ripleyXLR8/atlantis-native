@@ -273,7 +273,11 @@ picked folder on its first start.
   [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French
   and German CDs' and the Spanish and Italian CDs'; the 1997 English CD's, the May 1997 French CD's and
   the Dutch and Swedish CDs' are drawn with their own pixel font, as they
-  did (the accents included).
+  did (the accents included). The Chinese CDs' are drawn with the
+  player's own MingLiU or SimSun when `mingliu.ttc` (Traditional) or
+  `simsun.ttc` (Simplified), from a Windows `Fonts` folder, is put in the
+  game folder (or beside the disc images), else with the bundled Noto
+  Serif TC or SC.
 - The engine runs at a steady 60 steps per second; the original's loops
   run as fast as the machine allows.
 - The [enhancements](TECHNICAL.md#enhancements) on by default: the music loops

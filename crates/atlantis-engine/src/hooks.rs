@@ -142,6 +142,16 @@ impl ScriptHooks for NoScripts {}
 pub trait Loader {
     /// Makes `names` (archive member names) readable through `big`.
     fn prefetch<'a>(&'a self, big: &'a BigArchive, names: &'a [String]) -> HookFuture<'a, ()>;
+
+    /// A file of the player's beside the game's files (see
+    /// [`FileSource::read_beside`](atlantis_data::FileSource::read_beside)).
+    fn read_beside<'a>(
+        &'a self,
+        big: &'a BigArchive,
+        name: &'a str,
+    ) -> HookFuture<'a, Option<Vec<u8>>> {
+        ready(big.source().read_beside(name))
+    }
 }
 
 /// Files that are always readable (desktop, tests).

@@ -15,6 +15,17 @@
 //! arial.ttf. The font is bundled (`assets/fonts`, SIL Open Font Licence
 //! 1.1) and rasterised by `ab_glyph`, so every target, the web included,
 //! draws the same pixels.
+//!
+//! The Chinese builds ask GDI for a face no Windows has, which a Chinese
+//! Windows answers with its MingLiU or SimSun ([`CJK_SUBTITLE_EM_PX`]): the
+//! port draws with the player's own `mingliu.ttc` / `simsun.ttc` when it
+//! is beside the game's files, else with Noto Serif TC / SC (the same Ming
+//! / Song style; bundled, cut to the characters of the releases' scripts,
+//! SIL Open Font Licence 1.1), at 16 pixels per em, monochrome, the bytes
+//! read as Big5 / GBK.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
 use atlantis_data::TextCodePage;
@@ -22,8 +33,27 @@ use atlantis_data::TextCodePage;
 /// The subtitle font, Liberation Sans Regular.
 static FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/LiberationSans-Regular.ttf");
 
+/// The CJK subtitle fonts of the port, Noto Serif TC and SC Regular, cut
+/// to the characters of the Chinese releases' chapter scripts with ASCII
+/// and the punctuation (`assets/fonts/make_cjk_subset.py`).
+static NOTO_SERIF_TC: &[u8] = include_bytes!("../../../assets/fonts/NotoSerifTC-Subset.otf");
+static NOTO_SERIF_SC: &[u8] = include_bytes!("../../../assets/fonts/NotoSerifSC-Subset.otf");
+
 /// The pixels per em of the subtitle font.
 pub const SUBTITLE_EM_PX: f32 = 13.0;
+
+/// The pixels per em of the Chinese builds' subtitle font.
+/// atlantis-cd-zh-tw-696832 FUN_0041ad5c @ 0x0041ad77..0x0041ad99 (and
+/// atlantis-cd-zh-cn-692736's, the same) calls CreateFontA(16, 0, 0, 0,
+/// FW_DONTCARE, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, "MingLi") (the height
+/// from WinMain @ 0x00418f89, the name at 0x004ac2e8); no Windows has a
+/// face "MingLi", so GDI takes the default face of the system's character
+/// set, MingLiU on a Traditional Chinese Windows, SimSun on a Simplified
+/// one (inferred), whose cell is their em: 16 pixels per em. The size
+/// Windows renders it at and whether it drew those faces' embedded 16-pixel
+/// bitmaps are [UNKNOWN]; the port draws the outlines at 16 pixels per em,
+/// thresholded (monochrome), as it does Arial's.
+pub const CJK_SUBTITLE_EM_PX: f32 = 16.0;
 
 /// `FUN_00430178`: the x of every subtitle line.
 pub const SUBTITLE_X: i32 = 5;
@@ -34,6 +64,9 @@ pub const SUBTITLE_WIDTH: i32 = 640 - 5 - 5;
 /// Text colour and shadow (white, black shadow at +1, +1).
 pub const SUBTITLE_COLOR: u16 = 0xffff;
 pub const SUBTITLE_SHADOW: u16 = 0x0000;
+
+/// `FUN_00430178`'s row step: the lines 14 pixels apart.
+pub const SUBTITLE_ROW_STEP: i32 = 14;
 
 /// `FUN_0042ffe8` on the subtitle buffer `FUN_0042844c` fills: a space (the
 /// byte after ']') then the text. Under 101 bytes it is one line; otherwise
@@ -83,7 +116,211 @@ pub fn split_subtitle(text: &[u8]) -> Vec<Vec<u8>> {
 
 /// `FUN_00430178`: line `i` of `n` is drawn at y = 0x1ce - (n - i + 1) * 14.
 pub fn subtitle_line_y(i: usize, n: usize) -> i32 {
-    0x1ce - (n as i32 - i as i32 + 1) * 14
+    subtitle_row_y(i, n, SUBTITLE_ROW_STEP)
+}
+
+/// Line `i` of `n` rows `step` pixels apart: y = 0x1ce - (n - i + 1) *
+/// step (`FUN_00430178`: 14; atlantis-cd-zh-tw-696832 and
+/// atlantis-cd-zh-cn-692736 FUN_0042f798 @ 0x0042f7f8, 0x0042f828: 18).
+pub fn subtitle_row_y(i: usize, n: usize, step: i32) -> i32 {
+    0x1ce - (n as i32 - i as i32 + 1) * step
+}
+
+/// Where a subtitle face comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FaceSource {
+    /// A font the port bundles.
+    Bundled,
+    /// The player's own font file, beside the game's files.
+    Player,
+}
+
+#[derive(Clone)]
+enum FaceData {
+    Bundled(&'static [u8]),
+    Player(Arc<[u8]>),
+}
+
+/// An outline font file and the face of it the subtitles are drawn with
+/// (a collection, `.ttc`, holds several).
+#[derive(Clone)]
+pub struct FontFace {
+    data: FaceData,
+    index: u32,
+}
+
+impl PartialEq for FontFace {
+    /// The same face of the same file (by address: the files are shared).
+    fn eq(&self, other: &FontFace) -> bool {
+        std::ptr::eq(self.bytes(), other.bytes()) && self.index == other.index
+    }
+}
+
+impl Eq for FontFace {}
+
+impl std::fmt::Debug for FontFace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "FontFace({:?}, {} bytes, face {})",
+            self.source(),
+            self.bytes().len(),
+            self.index
+        )
+    }
+}
+
+/// The player's font for the subtitles of a release in `code_page`: its
+/// file, beside the game's, and the family of the face to draw with. The
+/// Chinese builds' request for the face "MingLi" in DEFAULT_CHARSET (see
+/// [`CJK_SUBTITLE_EM_PX`]) gives on a Traditional Chinese Windows (code
+/// page 950) MingLiU, of `mingliu.ttc`, on a Simplified one (936) SimSun,
+/// of `simsun.ttc` (inferred). `None` for the other code pages: the port
+/// draws Arial's texts with its own font.
+pub fn player_font(code_page: TextCodePage) -> Option<(&'static str, &'static str)> {
+    match code_page {
+        TextCodePage::Windows950 => Some(("mingliu.ttc", "MingLiU")),
+        TextCodePage::Windows936 => Some(("simsun.ttc", "SimSun")),
+        TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+    }
+}
+
+/// The face of `data` (a font, or a collection) whose family is `family`;
+/// the first face that reads when none is; `None` when no face reads.
+pub fn pick_face(data: &[u8], family: &str) -> Option<u32> {
+    let n = ttf_parser::fonts_in_collection(data).unwrap_or(1);
+    let mut first = None;
+    for i in 0..n {
+        let Ok(face) = ttf_parser::Face::parse(data, i) else {
+            continue;
+        };
+        first.get_or_insert(i);
+        let named = face.names().into_iter().any(|n| {
+            n.name_id == ttf_parser::name_id::FAMILY
+                && n.to_string()
+                    .is_some_and(|s| s.eq_ignore_ascii_case(family))
+        });
+        if named {
+            return Some(i);
+        }
+    }
+    first
+}
+
+/// Whether a face's outlines draw right only through its hinting programs,
+/// which `ab_glyph` does not run: FreeType lists MingLiU and PMingLiU as
+/// such ("tricky") up to their version 7.00 (Windows 7's), which is not.
+fn needs_hinting(family: &str, revision: f32) -> bool {
+    ["MingLiU", "PMingLiU"]
+        .iter()
+        .any(|f| f.eq_ignore_ascii_case(family))
+        && revision < 7.0
+}
+
+impl FontFace {
+    /// The port's font for texts in `code_page`: Liberation Sans, or for
+    /// Big5 Noto Serif TC, for GBK Noto Serif SC.
+    pub fn bundled(code_page: TextCodePage) -> FontFace {
+        let data = match code_page {
+            TextCodePage::Windows950 => NOTO_SERIF_TC,
+            TextCodePage::Windows936 => NOTO_SERIF_SC,
+            TextCodePage::Windows1252 | TextCodePage::Dos850 => FONT_DATA,
+        };
+        FontFace {
+            data: FaceData::Bundled(data),
+            index: 0,
+        }
+    }
+
+    /// The player's font file `data` for texts in `code_page` (see
+    /// [`player_font`]): its face of that family (or its first), `None`
+    /// when no face reads or the face needs its hinting to draw right.
+    pub fn player(code_page: TextCodePage, data: Vec<u8>) -> Option<FontFace> {
+        let (_, family) = player_font(code_page)?;
+        let index = pick_face(&data, family)?;
+        let face = ttf_parser::Face::parse(&data, index).ok()?;
+        let name = face
+            .names()
+            .into_iter()
+            .filter(|n| n.name_id == ttf_parser::name_id::FAMILY)
+            .find_map(|n| n.to_string())
+            .unwrap_or_default();
+        // head: the font revision, a 16.16 number at byte 4.
+        let revision = face
+            .raw_face()
+            .table(ttf_parser::Tag::from_bytes(b"head"))
+            .and_then(|h| h.get(4..8))
+            .map_or(0.0, |r| {
+                i32::from_be_bytes([r[0], r[1], r[2], r[3]]) as f32 / 65536.0
+            });
+        if needs_hinting(&name, revision) {
+            log::warn!("{name} {revision:.2}: its glyphs need its hinting; not used");
+            return None;
+        }
+        FontRef::try_from_slice_and_index(&data, index).ok()?;
+        Some(FontFace {
+            data: FaceData::Player(data.into()),
+            index,
+        })
+    }
+
+    /// The face of a release in `code_page`'s subtitles: the player's
+    /// `file` when there is one and it reads ([`FontFace::player`]), else
+    /// the port's ([`FontFace::bundled`]).
+    pub fn for_release(code_page: TextCodePage, file: Option<Vec<u8>>) -> FontFace {
+        let name = player_font(code_page).map_or("", |(n, _)| n);
+        match file.map(|d| FontFace::player(code_page, d)) {
+            Some(Some(face)) => {
+                log::info!("subtitles: the player's {name} (face {})", face.index);
+                return face;
+            }
+            Some(None) => log::warn!("{name}: not a font the port can use"),
+            None if !name.is_empty() => log::info!("no {name} beside the game's files"),
+            None => {}
+        }
+        FontFace::bundled(code_page)
+    }
+
+    /// The bytes of the file.
+    fn bytes(&self) -> &[u8] {
+        match &self.data {
+            FaceData::Bundled(d) => d,
+            FaceData::Player(d) => d,
+        }
+    }
+
+    /// Where the face comes from.
+    pub fn source(&self) -> FaceSource {
+        match self.data {
+            FaceData::Bundled(_) => FaceSource::Bundled,
+            FaceData::Player(_) => FaceSource::Player,
+        }
+    }
+
+    /// The face, for `ab_glyph` (checked when the face was made).
+    fn font(&self) -> FontRef<'_> {
+        FontRef::try_from_slice_and_index(self.bytes(), self.index).expect("subtitle font")
+    }
+
+    /// Whether the face has a glyph for `c`.
+    pub fn has_char(&self, c: char) -> bool {
+        self.font().glyph_id(c).0 != 0
+    }
+
+    /// The ascent of a double-byte code page's line at `em_px`, in whole
+    /// pixels: GDI's (the Windows ascent, rounded, as Wine computes it) for
+    /// the player's face, whose cell is its em; for the port's, the top of
+    /// its ideographs' em box (the typographic ascent, 0.88 em), where
+    /// MingLiU's and SimSun's are (14 pixels).
+    fn cjk_ascent(&self, em_px: f32) -> Option<i32> {
+        let face = ttf_parser::Face::parse(self.bytes(), self.index).ok()?;
+        let os2 = face.tables().os2?;
+        let units = match self.source() {
+            FaceSource::Player => os2.windows_ascender(),
+            FaceSource::Bundled => os2.typographic_ascender(),
+        };
+        Some((f32::from(units) * em_px / f32::from(face.units_per_em())).round() as i32)
+    }
 }
 
 /// One rasterised glyph: its coverage thresholded to on / off.
@@ -99,18 +336,91 @@ struct GlyphBits {
     bits: Vec<bool>,
 }
 
-/// The subtitle font, rasterised once for the 256 byte values.
+impl GlyphBits {
+    /// The glyph of `c` at `scale`, none for a control character or a
+    /// character the font lacks: the pixels at least half covered; with
+    /// `dropout`, also those at least a fifth covered that are a stroke's
+    /// most covered across it (more than the pixel after it and at least
+    /// the one before it, vertically or horizontally): the thin horizontals
+    /// of a Ming / Song face at 16 pixels, which cover no pixel by half,
+    /// are kept as a TrueType rasteriser's dropout control keeps them (an
+    /// approximation of it).
+    fn of(font: &FontRef<'_>, scale: PxScale, c: char, dropout: bool) -> GlyphBits {
+        if c < ' ' {
+            return GlyphBits::default();
+        }
+        let id = font.glyph_id(c);
+        if id.0 == 0 {
+            return GlyphBits::default();
+        }
+        let advance = font.as_scaled(scale).h_advance(id).round() as i32;
+        let glyph = id.with_scale_and_position(scale, point(0.0, 0.0));
+        let Some(outline) = font.outline_glyph(glyph) else {
+            return GlyphBits {
+                advance,
+                ..GlyphBits::default()
+            };
+        };
+        let bounds = outline.px_bounds();
+        let (w, h) = (bounds.width() as i32, bounds.height() as i32);
+        let mut cover = vec![0f32; (w * h).max(0) as usize];
+        outline.draw(|x, y, c| {
+            if let Some(p) = cover.get_mut(y as usize * w as usize + x as usize) {
+                *p = c;
+            }
+        });
+        let at = |x: i32, y: i32| {
+            if x < 0 || y < 0 || x >= w || y >= h {
+                0.0
+            } else {
+                cover[(y * w + x) as usize]
+            }
+        };
+        let mut bits = Vec::with_capacity(cover.len());
+        for y in 0..h {
+            for x in 0..w {
+                let c = at(x, y);
+                let peak =
+                    |(bx, by): (i32, i32), (ax, ay): (i32, i32)| c >= at(bx, by) && c > at(ax, ay);
+                bits.push(
+                    c >= 0.5
+                        || (dropout
+                            && c >= 0.2
+                            && (peak((x, y - 1), (x, y + 1)) || peak((x - 1, y), (x + 1, y)))),
+                );
+            }
+        }
+        GlyphBits {
+            advance,
+            left: bounds.min.x as i32,
+            top: bounds.min.y as i32,
+            w,
+            h,
+            bits,
+        }
+    }
+}
+
+/// The subtitle font: rasterised once for the 256 byte values, or, in a
+/// double-byte code page, for each character the first time it is drawn.
 pub struct SubtitleFont {
     glyphs: Vec<GlyphBits>,
+    /// A double-byte code page's glyphs, by character.
+    cjk_glyphs: Mutex<HashMap<char, GlyphBits>>,
     /// How the text bytes read as letters (the original's GDI draws them
-    /// in the ANSI code page, Windows-1252).
+    /// in the ANSI code page, Windows-1252; Big5 or GBK for the Chinese
+    /// builds).
     code_page: TextCodePage,
+    /// The font file and face.
+    face: FontFace,
     /// The ascent in whole pixels (rounded up), from the line's top to the
     /// baseline.
     ascent: i32,
     /// The pixels per em ([`SUBTITLE_EM_PX`] but for the port's own
-    /// screens' titles).
+    /// screens' titles, and [`CJK_SUBTITLE_EM_PX`]).
     em_px: f32,
+    /// The rows' step of [`SubtitleFont::draw_subtitles`].
+    row_step: i32,
 }
 
 impl Default for SubtitleFont {
@@ -127,68 +437,69 @@ impl SubtitleFont {
 
     /// The font for the texts of a release in `code_page`: the DOS code
     /// page texts of atlantis-cd-fr-688640 drawn with it (the build itself
-    /// draws them in its bitmap font, glyph = byte) read as code page 850.
+    /// draws them in its bitmap font, glyph = byte) read as code page 850;
+    /// the Big5 and GBK texts of the Chinese builds with the port's CJK
+    /// font.
     pub fn with_code_page(code_page: TextCodePage) -> SubtitleFont {
-        Self::build(code_page, SUBTITLE_EM_PX)
+        Self::with_face(code_page, FontFace::bundled(code_page))
+    }
+
+    /// The font for texts in `code_page` drawn with `face` (at
+    /// [`CJK_SUBTITLE_EM_PX`] in a double-byte code page, else at
+    /// [`SUBTITLE_EM_PX`]).
+    pub fn with_face(code_page: TextCodePage, face: FontFace) -> SubtitleFont {
+        let em_px = if code_page.is_double_byte() {
+            CJK_SUBTITLE_EM_PX
+        } else {
+            SUBTITLE_EM_PX
+        };
+        Self::build(code_page, em_px, face)
     }
 
     /// The font at `em_px` pixels per em, for Windows-1252 texts (the
     /// titles of the port's own screens).
     pub fn with_size(em_px: f32) -> SubtitleFont {
-        Self::build(TextCodePage::Windows1252, em_px)
+        Self::build(
+            TextCodePage::Windows1252,
+            em_px,
+            FontFace::bundled(TextCodePage::Windows1252),
+        )
     }
 
-    fn build(code_page: TextCodePage, em_px: f32) -> SubtitleFont {
-        let font = FontRef::try_from_slice(FONT_DATA).expect("bundled subtitle font");
+    /// The font with its rows `step` pixels apart (see
+    /// [`subtitle_row_y`]).
+    pub fn with_row_step(mut self, step: u8) -> SubtitleFont {
+        self.row_step = i32::from(step);
+        self
+    }
+
+    /// The scale of `font` at `em_px` pixels per em: ab_glyph scales by
+    /// the line height (ascent - descent).
+    fn scale(font: &FontRef<'_>, em_px: f32) -> PxScale {
         let upem = font.units_per_em().unwrap_or(2048.0);
-        // ab_glyph scales by the line height (ascent - descent); the size is
-        // given per em.
-        let scale = PxScale::from(em_px * font.height_unscaled() / upem);
-        let scaled = font.as_scaled(scale);
-        let ascent = scaled.ascent().ceil() as i32;
-        let glyphs = (0..=255u8)
-            .map(|b| {
-                let c = code_page.char_of(b);
-                if c < ' ' {
-                    return GlyphBits::default();
-                }
-                let id = font.glyph_id(c);
-                if id.0 == 0 {
-                    return GlyphBits::default();
-                }
-                let advance = scaled.h_advance(id).round() as i32;
-                let glyph = id.with_scale_and_position(scale, point(0.0, 0.0));
-                let Some(outline) = font.outline_glyph(glyph) else {
-                    return GlyphBits {
-                        advance,
-                        ..GlyphBits::default()
-                    };
-                };
-                let bounds = outline.px_bounds();
-                let (w, h) = (bounds.width() as i32, bounds.height() as i32);
-                let mut bits = vec![false; (w * h).max(0) as usize];
-                outline.draw(|x, y, c| {
-                    if c >= 0.5 {
-                        if let Some(p) = bits.get_mut(y as usize * w as usize + x as usize) {
-                            *p = true;
-                        }
-                    }
-                });
-                GlyphBits {
-                    advance,
-                    left: bounds.min.x as i32,
-                    top: bounds.min.y as i32,
-                    w,
-                    h,
-                    bits,
-                }
-            })
-            .collect();
+        PxScale::from(em_px * font.height_unscaled() / upem)
+    }
+
+    fn build(code_page: TextCodePage, em_px: f32, face: FontFace) -> SubtitleFont {
+        let font = face.font();
+        let scale = Self::scale(&font, em_px);
+        let mut ascent = font.as_scaled(scale).ascent().ceil() as i32;
+        let mut glyphs = Vec::new();
+        if code_page.is_double_byte() {
+            ascent = face.cjk_ascent(em_px).unwrap_or(ascent);
+        } else {
+            glyphs = (0..=255u8)
+                .map(|b| GlyphBits::of(&font, scale, code_page.char_of(b), false))
+                .collect();
+        }
         SubtitleFont {
             glyphs,
+            cjk_glyphs: Mutex::new(HashMap::new()),
             code_page,
+            face,
             ascent,
             em_px,
+            row_step: SUBTITLE_ROW_STEP,
         }
     }
 
@@ -197,11 +508,50 @@ impl SubtitleFont {
         self.code_page
     }
 
+    /// The font file and face it draws with.
+    pub fn face(&self) -> &FontFace {
+        &self.face
+    }
+
+    /// The rows' step of [`SubtitleFont::draw_subtitles`].
+    pub fn row_step(&self) -> i32 {
+        self.row_step
+    }
+
+    /// `f` on each glyph of `text` with its character, in order: one per
+    /// byte; in a double-byte code page one per character, a lead byte and
+    /// the byte after it making one (as GDI reads the bytes in the ANSI
+    /// code page; a byte or pair with no character draws nothing).
+    fn each_glyph(&self, text: &[u8], mut f: impl FnMut(char, &GlyphBits) -> bool) {
+        if self.code_page.is_double_byte() {
+            let font = self.face.font();
+            let scale = Self::scale(&font, self.em_px);
+            let mut cache = self.cjk_glyphs.lock().unwrap_or_else(|e| e.into_inner());
+            for c in self.code_page.decode(text).chars() {
+                let g = cache
+                    .entry(c)
+                    .or_insert_with(|| GlyphBits::of(&font, scale, c, true));
+                if !f(c, g) {
+                    break;
+                }
+            }
+        } else {
+            for &b in text {
+                if !f(self.code_page.char_of(b), &self.glyphs[usize::from(b)]) {
+                    break;
+                }
+            }
+        }
+    }
+
     /// The width of `text` in pixels.
     pub fn width(&self, text: &[u8]) -> i32 {
-        text.iter()
-            .map(|&b| self.glyphs[usize::from(b)].advance)
-            .sum()
+        let mut w = 0;
+        self.each_glyph(text, |_, g| {
+            w += g.advance;
+            true
+        });
+        w
     }
 
     /// Draws `text` with the top of its line at (x, y) on an RGB565 buffer
@@ -223,10 +573,9 @@ impl SubtitleFont {
         let right = x + max_w + 1;
         let mut pen = x;
         let base = y + self.ascent;
-        for &b in text {
-            let g = &self.glyphs[usize::from(b)];
+        self.each_glyph(text, |_, g| {
             if pen + g.left + g.w > right {
-                break;
+                return false;
             }
             for gy in 0..g.h {
                 let dy = base + g.top + gy;
@@ -245,23 +594,24 @@ impl SubtitleFont {
                 }
             }
             pen += g.advance;
-        }
+            true
+        });
     }
 
     /// The glyphs [`SubtitleFont::draw`] draws for `text` at x = `x`
-    /// with the width limit `max_w`: each byte with its pen position.
-    fn layout(&self, text: &[u8], x: i32, max_w: i32) -> Vec<(u8, i32)> {
+    /// with the width limit `max_w`: each character with its pen position.
+    fn layout(&self, text: &[u8], x: i32, max_w: i32) -> Vec<(char, i32)> {
         let right = x + max_w + 1;
         let mut pen = x;
         let mut out = Vec::with_capacity(text.len());
-        for &b in text {
-            let g = &self.glyphs[usize::from(b)];
+        self.each_glyph(text, |c, g| {
             if pen + g.left + g.w > right {
-                break;
+                return false;
             }
-            out.push((b, pen));
+            out.push((c, pen));
             pen += g.advance;
-        }
+            true
+        });
         out
     }
 
@@ -283,14 +633,12 @@ impl SubtitleFont {
         max_w: i32,
         color: u32,
     ) {
-        let font = FontRef::try_from_slice(FONT_DATA).expect("bundled subtitle font");
+        let font = self.face.font();
         let (sx, sy) = (dw as f32 / 640.0, dh as f32 / 480.0);
-        let upem = font.units_per_em().unwrap_or(2048.0);
-        let scale = PxScale::from(self.em_px * sy * font.height_unscaled() / upem);
+        let scale = Self::scale(&font, self.em_px * sy);
         let base = oy as f32 + (y + self.ascent) as f32 * sy;
         let (x1, y1) = ((ox + dw) as i32, (oy + dh) as i32);
-        for (b, pen) in self.layout(text, x, max_w) {
-            let c = self.code_page.char_of(b);
+        for (c, pen) in self.layout(text, x, max_w) {
             let id = font.glyph_id(c);
             if c < ' ' || id.0 == 0 {
                 continue;
@@ -318,10 +666,10 @@ impl SubtitleFont {
         }
     }
 
-    /// The subtitle lines over a 640x480 RGB565 picture (`FUN_00430178`):
-    /// line i of n at (5, [`subtitle_line_y`]) in white over its black
-    /// shadow at (+1, +1). `y_offset` moves them down (a picture taller
-    /// than the screen).
+    /// The subtitle lines over a 640x480 RGB565 picture (`FUN_00430178`,
+    /// the Chinese builds' FUN_0042f798): line i of n at (5,
+    /// [`subtitle_row_y`]) in white over its black shadow at (+1, +1).
+    /// `y_offset` moves them down (a picture taller than the screen).
     pub fn draw_subtitles(
         &self,
         dst: &mut [u16],
@@ -331,7 +679,7 @@ impl SubtitleFont {
         y_offset: i32,
     ) {
         for (i, line) in lines.iter().enumerate() {
-            let y = subtitle_line_y(i, lines.len()) + y_offset;
+            let y = subtitle_row_y(i, lines.len(), self.row_step) + y_offset;
             self.draw(
                 dst,
                 width,
@@ -353,6 +701,19 @@ impl SubtitleFont {
                 SUBTITLE_COLOR,
             );
         }
+    }
+
+    /// The text items of [`SubtitleFont::draw_subtitles`] for the HD mode
+    /// (see [`crate::hd::HdText`]), drawn with this font's face.
+    pub fn items(&self, lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
+        gdi_items(
+            lines,
+            dx,
+            dy,
+            self.code_page,
+            Some(self.face.clone()),
+            self.row_step,
+        )
     }
 }
 
@@ -606,7 +967,7 @@ impl Subtitler {
     /// The text items for the HD mode (see [`subtitle_items`]).
     pub fn items(&self, lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
         match self {
-            Subtitler::Gdi(f) => subtitle_items(lines, dx, dy, f.code_page()),
+            Subtitler::Gdi(f) => f.items(lines, dx, dy),
             Subtitler::Bitmap(f, _) => {
                 let mut items = Vec::with_capacity(2 * lines.len());
                 for (i, line) in lines.iter().enumerate() {
@@ -620,6 +981,7 @@ impl Subtitler {
                             text: line.clone(),
                             bitmap: Some(f.clone()),
                             code_page: TextCodePage::default(),
+                            face: None,
                         });
                     }
                 }
@@ -638,9 +1000,22 @@ pub fn subtitle_items(
     dy: i32,
     code_page: TextCodePage,
 ) -> Vec<crate::hd::TextItem> {
+    gdi_items(lines, dx, dy, code_page, None, SUBTITLE_ROW_STEP)
+}
+
+/// [`subtitle_items`] in `face` (the code page's bundled font for `None`),
+/// the rows `step` pixels apart.
+fn gdi_items(
+    lines: &[Vec<u8>],
+    dx: i32,
+    dy: i32,
+    code_page: TextCodePage,
+    face: Option<FontFace>,
+    step: i32,
+) -> Vec<crate::hd::TextItem> {
     let mut items = Vec::with_capacity(2 * lines.len());
     for (i, line) in lines.iter().enumerate() {
-        let y = subtitle_line_y(i, lines.len()) + dy;
+        let y = subtitle_row_y(i, lines.len(), step) + dy;
         for (o, color) in [(1, SUBTITLE_SHADOW), (0, SUBTITLE_COLOR)] {
             items.push(crate::hd::TextItem {
                 x: SUBTITLE_X + dx + o,
@@ -650,6 +1025,7 @@ pub fn subtitle_items(
                 text: line.clone(),
                 bitmap: None,
                 code_page,
+                face: face.clone(),
             });
         }
     }
@@ -883,5 +1259,221 @@ mod tests {
                 assert_eq!(dst[y * 640 + x], 0);
             }
         }
+    }
+
+    /// "中文字幕" and "你好，世界。" in Big5 (the test's own text).
+    const BIG5_LINES: [&[u8]; 2] = [
+        b" \xa4\xa4\xa4\xe5\xa6\x72\xb9\xf5",
+        b" \xa7\x41\xa6\x6e\xa1\x41\xa5\x40\xac\xc9\xa1\x43",
+    ];
+
+    /// The pixels `font` draws for `line` alone at (x, y).
+    fn lit(font: &SubtitleFont, line: &[u8], x: i32, y: i32) -> Vec<bool> {
+        let mut b = vec![0u16; 640 * 480];
+        font.draw(&mut b, 640, 480, line, x, y, SUBTITLE_WIDTH, 0xffff);
+        b.iter().map(|&p| p != 0).collect()
+    }
+
+    /// The first and last pixel rows of `px`.
+    fn rows(px: &[bool]) -> (usize, usize) {
+        let ys: Vec<usize> = (0..px.len()).filter(|&i| px[i]).map(|i| i / 640).collect();
+        (*ys.iter().min().unwrap(), *ys.iter().max().unwrap())
+    }
+
+    /// The Chinese builds' rows (atlantis-cd-zh-tw-696832 FUN_0042f798):
+    /// line i of n at (5, 0x1ce - (n - i + 1) * 18), white over the black
+    /// shadow drawn first at (+1, +1), the Big5 pairs as characters of the
+    /// bundled Noto Serif TC at 16 pixels per em (an ideograph 16 pixels
+    /// wide), within the 16-pixel cell under the row's y.
+    #[test]
+    fn cjk_rows_and_shadow() {
+        let f = SubtitleFont::with_code_page(TextCodePage::Windows950).with_row_step(18);
+        assert_eq!(f.face().source(), FaceSource::Bundled);
+        assert_eq!(f.ascent, 14);
+        assert_eq!(f.width(b"\xa4\xa4\xa4\xe5"), 32);
+        let lines: Vec<Vec<u8>> = BIG5_LINES.iter().map(|l| l.to_vec()).collect();
+        let mut dst = vec![0x1234u16; 640 * 480];
+        f.draw_subtitles(&mut dst, 640, 480, &lines, 0);
+        let ys = [subtitle_row_y(0, 2, 18), subtitle_row_y(1, 2, 18)];
+        assert_eq!(ys, [0x1ce - 3 * 18, 0x1ce - 2 * 18]);
+        let mut white = vec![false; 640 * 480];
+        let mut shadow = vec![false; 640 * 480];
+        for (line, &y) in lines.iter().zip(&ys) {
+            let (w, s) = (lit(&f, line, 5, y), lit(&f, line, 6, y + 1));
+            let (top, bottom) = rows(&w);
+            assert!(
+                top >= y as usize && bottom < y as usize + 16,
+                "{top}..{bottom}"
+            );
+            assert_eq!(rows(&s), (top + 1, bottom + 1));
+            for i in 0..w.len() {
+                white[i] |= w[i];
+                shadow[i] |= s[i];
+            }
+        }
+        // The rows 18 pixels apart, glyph for glyph (both start with an
+        // ideograph whose top is at the same height).
+        for i in 0..dst.len() {
+            let want = if white[i] {
+                SUBTITLE_COLOR
+            } else if shadow[i] {
+                SUBTITLE_SHADOW
+            } else {
+                0x1234
+            };
+            assert_eq!(dst[i], want, "pixel ({}, {})", i % 640, i / 640);
+        }
+        assert!(white.iter().filter(|&&p| p).count() > 300);
+        // The same text, the bytes paired from the lead byte: a lone lead
+        // byte at the end draws nothing.
+        let mut a = vec![0u16; 640 * 480];
+        let mut b = vec![0u16; 640 * 480];
+        f.draw(
+            &mut a,
+            640,
+            480,
+            b"\xa4\xa4",
+            5,
+            100,
+            SUBTITLE_WIDTH,
+            0xffff,
+        );
+        f.draw(
+            &mut b,
+            640,
+            480,
+            b"\xa4\xa4\xa4",
+            5,
+            100,
+            SUBTITLE_WIDTH,
+            0xffff,
+        );
+        assert_eq!(a, b);
+        assert_eq!(f.width(b"\xa4\xa4\xa4"), 16);
+    }
+
+    /// The Simplified build's text (GBK) in Noto Serif SC; the other
+    /// builds keep Liberation Sans and 14-pixel rows.
+    #[test]
+    fn faces_by_code_page() {
+        let sc = SubtitleFont::with_code_page(TextCodePage::Windows936);
+        assert_eq!(sc.ascent, 14);
+        assert_eq!(sc.width(b"\xd6\xd0\xce\xc4"), 32);
+        assert!(sc.face().has_char('厖') && sc.face().has_char('棗'));
+        assert_eq!(sc.row_step(), SUBTITLE_ROW_STEP);
+        for cp in [TextCodePage::Windows1252, TextCodePage::Dos850] {
+            let f = SubtitleFont::with_code_page(cp);
+            assert_eq!(*f.face(), FontFace::bundled(TextCodePage::Windows1252));
+            assert_eq!((f.ascent, f.row_step()), (12, 14));
+        }
+        assert_ne!(
+            FontFace::bundled(TextCodePage::Windows950),
+            FontFace::bundled(TextCodePage::Windows936)
+        );
+    }
+
+    /// A font collection (`.ttc`) of `fonts`: each font's table offsets
+    /// moved by where it lands.
+    fn collection(fonts: &[&[u8]]) -> Vec<u8> {
+        let mut out = b"ttcf".to_vec();
+        out.extend(0x0001_0000u32.to_be_bytes());
+        out.extend((fonts.len() as u32).to_be_bytes());
+        let mut at = 12 + 4 * fonts.len();
+        let mut starts = Vec::new();
+        for f in fonts {
+            starts.push(at);
+            out.extend((at as u32).to_be_bytes());
+            at += (f.len() + 3) & !3;
+        }
+        for (f, &start) in fonts.iter().zip(&starts) {
+            out.resize(start, 0);
+            let mut f = f.to_vec();
+            let tables = usize::from(u16::from_be_bytes([f[4], f[5]]));
+            for t in 0..tables {
+                let r = 12 + 16 * t + 8;
+                let off = u32::from_be_bytes([f[r], f[r + 1], f[r + 2], f[r + 3]]);
+                f[r..r + 4].copy_from_slice(&(off + start as u32).to_be_bytes());
+            }
+            out.extend(f);
+        }
+        out
+    }
+
+    /// The player's font first, by its family in a collection; the port's
+    /// when there is none, it does not read, or it needs its hinting.
+    #[test]
+    fn font_loading_falls_back() {
+        let tc = TextCodePage::Windows950;
+        assert_eq!(player_font(tc), Some(("mingliu.ttc", "MingLiU")));
+        assert_eq!(
+            player_font(TextCodePage::Windows936),
+            Some(("simsun.ttc", "SimSun"))
+        );
+        assert_eq!(player_font(TextCodePage::Windows1252), None);
+        // None, or a file that is no font: the bundled face.
+        assert_eq!(FontFace::for_release(tc, None), FontFace::bundled(tc));
+        let junk = FontFace::for_release(tc, Some(b"not a font at all".to_vec()));
+        assert_eq!(junk, FontFace::bundled(tc));
+        assert_eq!(junk.source(), FaceSource::Bundled);
+        // A collection: the face of the family asked for, else the first.
+        let ttc = collection(&[NOTO_SERIF_TC, NOTO_SERIF_SC]);
+        assert_eq!(pick_face(&ttc, "Noto Serif SC"), Some(1));
+        assert_eq!(pick_face(&ttc, "noto serif tc"), Some(0));
+        assert_eq!(pick_face(&ttc, "MingLiU"), Some(0));
+        assert_eq!(pick_face(NOTO_SERIF_SC, "SimSun"), Some(0));
+        assert_eq!(
+            pick_face(b"ttcf\0\x01\0\0\0\0\0\x01\0\0\0\x10", "MingLiU"),
+            None
+        );
+        let player = FontFace::for_release(tc, Some(ttc));
+        assert_eq!(player.source(), FaceSource::Player);
+        assert!(player.has_char('中'));
+        // Drawn with GDI's ascent (the Windows ascent: 1151 / 1000 em).
+        let f = SubtitleFont::with_face(tc, player.clone()).with_row_step(18);
+        assert_eq!(f.ascent, 18);
+        assert_eq!(f.width(b"\xa4\xa4\xa4\xe5"), 32);
+        let items = f.items(&[BIG5_LINES[0].to_vec()], 0, 0);
+        assert_eq!(items[0].face.as_ref(), Some(&player));
+        // MingLiU before version 7.00 needs its hinting.
+        assert!(needs_hinting("MingLiU", 3.21) && needs_hinting("PMingLiU", 5.03));
+        assert!(!needs_hinting("MingLiU", 7.0) && !needs_hinting("SimSun", 5.24));
+    }
+
+    /// HD: the Chinese rows' items carry the face and the 18-pixel step;
+    /// the characters drawn larger over the 640 ones.
+    #[test]
+    fn cjk_hd_draws_the_same_glyphs_larger() {
+        let f = SubtitleFont::with_code_page(TextCodePage::Windows950).with_row_step(18);
+        let line = BIG5_LINES[1].to_vec();
+        let items = f.items(&[BIG5_LINES[0].to_vec(), line.clone()], 0, 0);
+        assert_eq!(items.len(), 4);
+        assert_eq!((items[0].x, items[0].y), (6, subtitle_row_y(0, 2, 18) + 1));
+        assert_eq!((items[3].x, items[3].y), (5, subtitle_row_y(1, 2, 18)));
+        assert_eq!(items[3].code_page, TextCodePage::Windows950);
+        assert_eq!(items[3].face.as_ref(), Some(f.face()));
+        let lo = lit(&f, &line, 5, 400);
+        let (w, h) = (1920, 1440);
+        let mut hd = vec![0u32; w * h];
+        f.draw_hd(
+            &mut hd,
+            w,
+            (0, 0, w, h),
+            &line,
+            5,
+            400,
+            SUBTITLE_WIDTH,
+            0x00ff_ffff,
+        );
+        let on: Vec<usize> = (0..w * h).filter(|&i| hd[i] & 0xff > 0x80).collect();
+        assert!(on.len() > 9 * 150, "{} lit pixels", on.len());
+        let over = on
+            .iter()
+            .filter(|&&i| {
+                let (x, y) = (i % w / 3, i / w / 3);
+                (y.saturating_sub(1)..y + 2)
+                    .any(|yy| (x.saturating_sub(1)..x + 2).any(|xx| lo[yy * 640 + xx]))
+            })
+            .count();
+        assert!(over * 100 >= on.len() * 97, "{over} of {}", on.len());
     }
 }

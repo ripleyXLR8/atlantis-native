@@ -451,6 +451,12 @@ impl Engine {
         data
     }
 
+    /// A file of the player's beside the game's files, not an archive
+    /// member (their own subtitle font).
+    pub async fn read_beside(&self, name: &str) -> Option<Vec<u8>> {
+        self.loader.read_beside(&self.game.big, name).await
+    }
+
     /// Makes several members readable at once (one fetch on the web).
     pub async fn prefetch(&self, names: &[String]) {
         self.loader.prefetch(&self.game.big, names).await;

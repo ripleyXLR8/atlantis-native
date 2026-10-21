@@ -10,6 +10,7 @@ atlantis-data = { path = "../atlantis-data" }
 atlantis-codecs = { path = "../atlantis-codecs" }
 libm = "=0.2.16"
 ab_glyph = "0.2"
+ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
 log = "0.4"
 
 [dev-dependencies]

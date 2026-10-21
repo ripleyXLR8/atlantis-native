@@ -37,7 +37,7 @@ use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;
 use crate::music::apc_pcm;
 use crate::scripts::{DialogPresenter, GameOverRequest, LineOutcome, LineRequest};
-use crate::subtitles::{BitmapBreaker, BitmapFont, SubtitleFont, Subtitler};
+use crate::subtitles::{player_font, BitmapBreaker, BitmapFont, FontFace, SubtitleFont, Subtitler};
 use crate::sys::{Input, Key, MouseButton};
 use crate::video_skip::VideoSkipState;
 use crate::warp::{DIALOG_CAM_FOV_DEG, SCREEN_H, SCREEN_W};
@@ -212,12 +212,26 @@ impl Dialogs {
     }
 
     /// The outline font, reading the bytes in the release's code page
-    /// (the DOS code page texts of atlantis-cd-fr-688640 as code page 850).
-    fn font(&mut self, e: &Engine) -> Rc<SubtitleFont> {
-        let code_page = e.game.exe.build.text_code_page;
-        self.font
-            .get_or_insert_with(|| Rc::new(SubtitleFont::with_code_page(code_page)))
-            .clone()
+    /// (the DOS code page texts of atlantis-cd-fr-688640 as code page 850);
+    /// for the Chinese builds the player's own font beside the game's
+    /// files, else the port's ([`FontFace::for_release`]), the rows of the
+    /// build's step.
+    async fn font(&mut self, e: &Engine) -> Rc<SubtitleFont> {
+        if let Some(f) = &self.font {
+            return f.clone();
+        }
+        let build = &e.game.exe.build;
+        let code_page = build.text_code_page;
+        let file = match player_font(code_page) {
+            Some((name, _)) => e.read_beside(name).await,
+            None => None,
+        };
+        let face = FontFace::for_release(code_page, file);
+        let f = Rc::new(
+            SubtitleFont::with_face(code_page, face).with_row_step(build.subtitle_row_step),
+        );
+        self.font = Some(f.clone());
+        f
     }
 
     /// The build's subtitles: the GDI Arial layout, or the 1997 build's
@@ -246,7 +260,10 @@ impl Dialogs {
                 None => log::warn!("DIALOG\\FONTS.BIN missing: the subtitles in Arial"),
             }
         }
-        let s = s.unwrap_or_else(|| Subtitler::Gdi(self.font(e)));
+        let s = match s {
+            Some(s) => s,
+            None => Subtitler::Gdi(self.font(e).await),
+        };
         self.subtitler = Some(s.clone());
         s
     }
@@ -593,7 +610,7 @@ impl Dialogs {
     /// over the screen and waits for OK (a click on it, Enter, Space or
     /// Escape).
     async fn error_box(&mut self, e: &Engine, text: &str) {
-        let font = self.font(e);
+        let font = self.font(e).await;
         let base = e.sys.screen.borrow().clone();
         let bytes = latin1_bytes(text);
         let w = (font.width(&bytes) + 40).clamp(160, SCREEN_W as i32 - 20);

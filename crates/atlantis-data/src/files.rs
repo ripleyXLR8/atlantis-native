@@ -22,6 +22,13 @@ pub trait FileSource: Send + Sync {
         let size = self.size(name)?;
         self.read_at(name, 0, usize::try_from(size).ok()?)
     }
+
+    /// A file of the player's beside the game's files, not one of the
+    /// game's (a font of their Windows): in the game directory, or beside
+    /// the images of the discs.
+    fn read_beside(&self, name: &str) -> Option<Vec<u8>> {
+        self.read(name)
+    }
 }
 
 /// Files of a directory on disk. Names are matched without regard to case

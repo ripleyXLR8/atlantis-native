@@ -343,6 +343,7 @@ impl OptionsMenu {
                 text: t.as_bytes().to_vec(),
                 bitmap: None,
                 code_page: atlantis_data::TextCodePage::Windows1252,
+                face: None,
             });
         };
         let centre = |t: &str| BOX_X + (BOX_W - font.width(t.as_bytes())) / 2;

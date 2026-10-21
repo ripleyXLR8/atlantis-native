@@ -209,6 +209,7 @@ dependencies = [
  "libm",
  "log",
  "md-5",
+ "ttf-parser",
 ]
 
 [[package]]

@@ -227,6 +227,9 @@ pub struct TextItem {
     pub bitmap: Option<std::sync::Arc<crate::subtitles::BitmapFont>>,
     /// How the outline font reads the bytes (the release's code page).
     pub code_page: atlantis_data::TextCodePage,
+    /// The outline font's face (the player's own CJK font), `None` for
+    /// the port's font of the code page.
+    pub face: Option<crate::subtitles::FontFace>,
 }
 
 /// The text of a frame, for the HD mode to draw at the output's
@@ -291,7 +294,7 @@ pub struct HdCompositor {
     scaler: crate::upscale::InterfaceScaler,
     frame: Vec<u16>,
     rgb: Vec<u32>,
-    /// The outline fonts, one per code page met.
+    /// The outline fonts, one per code page and face met.
     fonts: Vec<crate::subtitles::SubtitleFont>,
     /// The axis maps for the current output size and factor, and how
     /// many times they were made (see [`GpuPlan::axes_gen`]).
@@ -379,7 +382,7 @@ impl HdCompositor {
 
     /// The frame's text drawn at the output's resolution: a bitmap font's
     /// glyphs as sharp blocks, an outline font's lines rasterised at that
-    /// size in the item's code page.
+    /// size in the item's code page and face.
     fn draw_text_items(
         &mut self,
         f: &HdFrame<'_>,
@@ -396,15 +399,21 @@ impl HdCompositor {
                     b.draw_hd(out, stride, area, &it.text, it.x, it.y, color);
                     continue;
                 }
+                let face = it
+                    .face
+                    .clone()
+                    .unwrap_or_else(|| crate::subtitles::FontFace::bundled(it.code_page));
                 let i = match self
                     .fonts
                     .iter()
-                    .position(|g| g.code_page() == it.code_page)
+                    .position(|g| g.code_page() == it.code_page && *g.face() == face)
                 {
                     Some(i) => i,
                     None => {
-                        self.fonts
-                            .push(crate::subtitles::SubtitleFont::with_code_page(it.code_page));
+                        self.fonts.push(crate::subtitles::SubtitleFont::with_face(
+                            it.code_page,
+                            face,
+                        ));
                         self.fonts.len() - 1
                     }
                 };
