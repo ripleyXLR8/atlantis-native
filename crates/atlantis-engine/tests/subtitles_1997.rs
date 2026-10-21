@@ -137,7 +137,8 @@ fn subtitle_pixels_match_original() {
     assert_eq!((count(0xffff), count(0)), (1811, 1036));
 }
 
-/// Every dialog line of the CON files through the breaker: the emulation's
+/// Every dialog line of the CON files through the breaker, each as the
+/// first line after start-up (a zero tail after its NUL): the emulation's
 /// statistics (rows per line, the longest row, the rows wider than the
 /// screen).
 #[test]
@@ -180,8 +181,8 @@ fn con_lines_match_original() {
         }
     }
     assert_eq!(lines, 2540);
-    assert_eq!(hist, [0, 1947, 513, 66, 10, 4, 0, 0]);
-    assert_eq!((longest, over79, over84), (81, 3, 0));
+    assert_eq!(hist, [0, 1924, 528, 73, 11, 4, 0, 0]);
+    assert_eq!((longest, over79, over84), (81, 2, 0));
 }
 
 /// A new game, headless: the first dialog line's subtitle is drawn with

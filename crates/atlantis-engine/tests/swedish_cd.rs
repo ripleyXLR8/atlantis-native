@@ -93,8 +93,9 @@ fn stats(texts: &[Vec<u8>], split: fn(&[u8]) -> Vec<Vec<u8>>) -> ([usize; 7], us
 }
 
 /// The 2539 dialog lines through this build's breaker and through
-/// en-688128's: the emulation's statistics of both, and how many lines
-/// they break differently.
+/// en-688128's, each as the first line after start-up (a zero tail after
+/// its NUL): the emulation's statistics of both, and how many lines they
+/// break differently.
 #[test]
 fn con_lines_match_original() {
     let Some(g) = game("con_lines_match_original") else {
@@ -110,7 +111,7 @@ fn con_lines_match_original() {
     );
     assert_eq!(
         stats(&texts, split_subtitle_1997),
-        ([0, 1951, 500, 74, 10, 4, 0], 81, 292, 17)
+        ([0, 1920, 525, 80, 10, 4, 0], 81, 255, 16)
     );
     let (mut differ, mut more, mut fewer) = (0, 0, 0);
     for t in &texts {
@@ -122,7 +123,7 @@ fn con_lines_match_original() {
         }
         assert_eq!(sv.concat().len(), t.len() + 1);
     }
-    assert_eq!((differ, more, fewer), (277, 43, 0));
+    assert_eq!((differ, more, fewer), (242, 6, 0));
 }
 
 /// The CON files' bytes above 0x7f, and the letters code page 850 reads in

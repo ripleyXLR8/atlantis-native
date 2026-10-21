@@ -15,10 +15,12 @@
 //! the track letters, /go, the Escape skip, the game over) is here.
 
 use crate::checkpoint::ScriptState;
+use crate::con_script::script::latin1_bytes;
 use crate::con_script::{
     con_alt_game_over_narration, con_angle_radians, con_entry_allowed, con_escape_skip,
-    con_game_over_narrator, con_track_letter, evaluate, parse_con_set, vars, ConItem, ConKeyBuffer,
-    ConLine, ConScript, ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
+    con_game_over_narrator, con_line_buffer_text, con_narrator_buffer_text, con_track_letter,
+    evaluate, parse_con_set, vars, ConItem, ConKeyBuffer, ConLine, ConScript, ConSection,
+    ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
 };
 use crate::engine::{Abort, Engine, Event};
 use crate::hooks::{ready, Departure, HookFuture, ScriptHooks};
@@ -931,6 +933,7 @@ impl Scripts {
                             // content too.
                             let alt = e.game.exe.build.alt_game_over_narration
                                 || e.enhancements().restored_content;
+                            let mut narrator_item = i + 1;
                             if let (Some((text, letter)), true) = (narrator.as_mut(), alt) {
                                 let count = self.game_over_count.entry(sec.id).or_default();
                                 let pick = con_alt_game_over_narration(&sec.items, i, count);
@@ -939,7 +942,18 @@ impl Scripts {
                                         *text = l.text.clone() + &l.trail;
                                     }
                                     *letter = char::from(*letter as u8 + pick as u8);
+                                    narrator_item += pick;
                                 }
+                            }
+                            // The game-over screen copies the narrator line
+                            // into the subtitle text buffer, shown or not
+                            // (atlantis-cd-en-688128 FUN_004256a4 @
+                            // 0x00425a31..0x00425a50).
+                            if let (Some(_), Some(ConItem::Line(l))) =
+                                (&narrator, sec.items.get(narrator_item))
+                            {
+                                e.subtitle_text
+                                    .store(con_narrator_buffer_text(&latin1_bytes(&l.raw)));
                             }
                             game_over = Some(GameOverRequest {
                                 section: sec.id,
@@ -960,6 +974,12 @@ impl Scripts {
                         // commands); the walk ends by raising it
                         // (0x00428d8b, on the only exit).
                         e.music.duck(true, None);
+                        // The executor copies every `[` line it runs into the
+                        // subtitle text buffer, shown or not, before the line
+                        // plays (atlantis-cd-en-688128 FUN_00427420 @
+                        // 0x00427707..0x00427722): the 1997 breakers read it.
+                        e.subtitle_text
+                            .store(con_line_buffer_text(&latin1_bytes(&line.raw)));
                         // FUN_00428f58 runs only when ClicPerso is 0
                         // (0x00428689) and writes its result there.
                         let mut perso = e.vars.get("clicperso");

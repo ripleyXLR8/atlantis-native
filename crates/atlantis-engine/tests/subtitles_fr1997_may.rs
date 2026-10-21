@@ -65,7 +65,8 @@ fn dialog_texts(g: &Game) -> Vec<Vec<u8>> {
     out
 }
 
-/// Every dialog line through the breaker: the emulation's statistics (rows
+/// Every dialog line through the breaker, each as the first line after
+/// start-up (a zero tail after its NUL): the emulation's statistics (rows
 /// per line, the longest row, the rows wider than the screen).
 #[test]
 fn con_lines_match_original() {
@@ -85,8 +86,8 @@ fn con_lines_match_original() {
         }
     }
     assert_eq!(texts.len(), 2540);
-    assert_eq!(hist, [0, 1891, 555, 73, 16, 4, 1, 0]);
-    assert_eq!((longest, over79, over84), (81, 10, 0));
+    assert_eq!(hist, [0, 1852, 589, 76, 18, 4, 1, 0]);
+    assert_eq!((longest, over79, over84), (81, 8, 0));
 }
 
 /// The texts' bytes above 0x7f, and the letters code page 850 reads in
@@ -143,15 +144,17 @@ fn accented_subtitle_pixels_match_original() {
         .into_iter()
         .find(|t| t.iter().filter(|&&c| c >= 0x80).count() >= 4 && t.len() > 80)
         .unwrap();
+    // 3 rows as the first line after start-up: the second window's last
+    // word runs into the zero tail, the backward cut.
     let rows = split_subtitle_1997(&text);
-    assert_eq!(rows.len(), 2);
+    assert_eq!(rows.len(), 3);
     let mut screen = vec![0x8410u16; 640 * 480];
     font.draw_subtitles(&mut screen, 640, &rows, 0);
     let crop: Vec<u8> = screen[400 * 640..]
         .iter()
         .flat_map(|p| p.to_le_bytes())
         .collect();
-    assert_eq!(md5_hex(&crop), "5075300cccd4cf3498268d079fffcf30");
+    assert_eq!(md5_hex(&crop), "77d722e2c8e31f315ddc366b53b73a2d");
     let count = |c: u16| screen.iter().filter(|&&p| p == c).count();
     assert_eq!((count(0xffff), count(0)), (2427, 1428));
 }

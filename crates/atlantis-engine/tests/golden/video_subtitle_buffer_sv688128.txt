@@ -1,0 +1,27 @@
+# The subtitle text buffer of atlantis-cd-sv-688128 (atlantis.exe md5 f429f2a6863f6e9f6d11d9ab03d2b2d9): text 0x00603f68 (0x400 bytes), rows 0x00603cc0, breaker FUN_0042ea7c;
+# its start-up clear, the executor's and the game-over screen's copy loops and the breaker run
+# unmodified under emulation. Numbers and file names only (the texts of the fresh rows removed).
+# fresh: each text as the first line after the start-up clear; cr = the old harness's CR model
+fresh len  11 -> rows [12]
+fresh len 100 -> rows [50,51]
+fresh len  74 -> rows [75]
+fresh len  75 -> rows no-return
+fresh len  81 -> rows no-return
+fresh len 183 -> rows [61,61,62]
+fresh len 149 -> rows [75,75]
+fresh len 249 -> rows [70,70,70,40]
+fresh len 108 -> rows [72,37]
+fresh len  77 -> rows [61,17] past
+fresh len  76 -> rows [71,6] past
+fresh len  80 -> rows [72,9] past
+fresh len 170 -> rows [70,70,31]
+# history: start-up clear, then the writes in order; rows after each
+history stale_space: ex [41,42] ; ex [61,17] ; tail 007120717100000000000000000000000000000000000000
+history stale_nospace: ex [61,31] past ; ex [61,17] past ; tail 007171717171717171717171717100000000000000000000
+history shorter_then_longer: ex [73] ; ex [61,17] past ; ex [71,6] past ; tail 000000000000000000000000000000000000000000000000
+history game_over: go [41,57] ; ex [61,17] ; tail 006e6e20656e64206f66207468652073746f727900000000
+history trailing_blanks: ex [61,20] ; ex [61,17] ; tail 002020000000000000000000000000000000000000000000
+history no_blank_after_bracket: ex [60,17] past ; tail 000000000000000000000000000000000000000000000000
+# scan of every [ line of the CON files, fresh: {'lines': 2539, 'max_rows': 5, 'rows_hist': {1: 1920, 2: 520, 3: 85, 4: 9, 5: 5}, 'max_row_len': 75, 'rows_over_79': 0, 'rows_over_84': 0, 'past': 89, 'dependent': 0, 'max_text': 324}
+# lines whose fresh rows differ from the CR model: 0
+# file-order walk after one start-up clear: 0 lines whose rows differ from fresh, 0 whose rows depend on the memory after the buffer

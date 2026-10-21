@@ -41,6 +41,11 @@ pub struct ConLine {
     /// `[Speaker, X, Y, camN]`: the two integer tokens after the speaker,
     /// panorama angles the dialog code writes into the view before the line.
     pub angle: Option<(i32, i32)>,
+    /// The line as the file has it, from its '[' up to (not including) its
+    /// CR, its final blanks kept: what the section executor and the
+    /// game-over screen copy into the 1997 builds' subtitle text buffer
+    /// ([`con_line_buffer_text`], [`con_narrator_buffer_text`]).
+    pub raw: String,
 }
 
 /// One item of a section's walk: a dialog line or a /set command, in the
@@ -150,6 +155,30 @@ pub fn con_entry_allowed(sec: &ConSection, counters: &[u8]) -> bool {
 /// names in the archives.
 pub fn con_track_letter(line_idx: usize) -> char {
     char::from(b'A'.wrapping_add(line_idx as u8))
+}
+
+/// The bytes the section executor copies into the subtitle text buffer for
+/// a `[` line (the bytes of [`ConLine::raw`]): from the byte after the line's
+/// first ']' up to the CR (atlantis-cd-en-688128 `FUN_00427420` @
+/// 0x0042764a..0x00427653, the ']' search, then the copy
+/// 0x00427707..0x00427722; the reference's `FUN_0042844c` copies the same
+/// way, 0x00428785), final blanks kept. The copy is a do-while: a ']' right
+/// before the CR would copy the CR, the LF and the next line; no shipped
+/// line has one, the port copies nothing then.
+pub fn con_line_buffer_text(raw: &[u8]) -> &[u8] {
+    match raw.iter().position(|&c| c == b']') {
+        Some(close) if close + 1 < raw.len() => &raw[close + 1..],
+        _ => &[],
+    }
+}
+
+/// The game-over screen's copy of its narrator line (atlantis-cd-en-688128
+/// `FUN_004256a4` @ 0x00425a31..0x00425a50): from the line's 13th byte (the
+/// byte after "[Narratrice]" in all 144 game overs of every 1997 release)
+/// up to the CR. A line of 12 bytes or fewer would copy its CR and on; none
+/// is shipped, the port copies nothing then.
+pub fn con_narrator_buffer_text(raw: &[u8]) -> &[u8] {
+    raw.get(12..).unwrap_or(&[])
 }
 
 /// The narrator line of a game over: `FUN_00426590` reads the line right
@@ -278,6 +307,17 @@ impl ConText<'_> {
     }
 
     /// The bytes from `pos` to the end of the line.
+    /// From `pos` up to (not including) the next CR, the stop of the
+    /// executor's copy loops.
+    pub fn up_to_cr(&self, pos: u32) -> &[u8] {
+        let mut end = pos;
+        while end < self.len() && self.at(end) != b'\r' {
+            end += 1;
+        }
+        let start = (pos as usize).min(end as usize);
+        &self.0[start..end as usize]
+    }
+
     pub fn line(&self, pos: u32) -> &[u8] {
         let end = self.line_end(pos) as usize;
         let start = (pos as usize).min(end);
@@ -473,6 +513,7 @@ fn read_body(t: ConText, mut pos: u32, sec: &mut ConSection) {
             if !l.text.is_empty() {
                 l.trail = latin1(&line[rtrim(line).len()..]);
             }
+            l.raw = latin1(t.up_to_cr(pos));
             sec.items.push(ConItem::Line(l));
             // The dialog code copies the text up to the CR (0x00428785).
             while pos < t.len() && t.at(pos) != b'\r' {

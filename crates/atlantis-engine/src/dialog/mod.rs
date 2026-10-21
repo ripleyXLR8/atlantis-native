@@ -469,7 +469,7 @@ impl Dialogs {
         }
 
         let sub_lines = if e.subtitles && !l.text.is_empty() {
-            font.split(&latin1_bytes(&[l.text, l.trail].concat()))
+            font.split_line(&latin1_bytes(&[l.text, l.trail].concat()), &e.subtitle_text)
         } else {
             Vec::new()
         };
@@ -850,7 +850,7 @@ impl Dialogs {
         // The narrator's subtitle (FUN_0042ffe8 / FUN_00430178, as a line's).
         if let (Some((text, _)), true) = (narrator, game_over_subtitle_drawn(e.subtitles)) {
             let font = self.subtitler(e).await;
-            let lines = font.split(&latin1_bytes(text));
+            let lines = font.split_line(&latin1_bytes(text), &e.subtitle_text);
             let under = e.sys.hd_tile().is_some().then(|| frame.clone());
             font.draw_subtitles(&mut frame, SCREEN_W, SCREEN_H, &lines, 0);
             if let Some(under) = under {

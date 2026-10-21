@@ -11,7 +11,7 @@ pub use eval::{
 };
 pub use script::{
     arrival_after_chapter_load, con_alt_game_over_narration, con_entry_allowed, con_escape_skip,
-    con_game_over_narrator, con_track_letter, ConCondition, ConItem, ConLine, ConScript,
-    ConSection, CON_PLAY_COUNTERS,
+    con_game_over_narrator, con_line_buffer_text, con_narrator_buffer_text, con_track_letter,
+    ConCondition, ConItem, ConLine, ConScript, ConSection, CON_PLAY_COUNTERS,
 };
 pub use vars::Vars;

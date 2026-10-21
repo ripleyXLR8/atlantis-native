@@ -248,10 +248,19 @@ The 1997 English CD has no Windows text: it draws its subtitles with the
 8x8 pixel font `DIALOG\FONTS.BIN` of the game's archives (one glyph per
 byte, the IBM PC set), white over a black shadow, in rows 10 pixels apart
 broken in a 75-byte window, and the port does the same (`BitmapFont`,
-`split_subtitle_1997`). The original does not clip its rows: the three
-shipped rows wider than the screen go on at the left of the next pixel
-row, as they do here. The May 1997 French CD draws its subtitles the same
-way, ten of its rows wider than the screen; its texts are in the DOS code
+`split_subtitle_1997`). The original does not clip its rows: the rows
+wider than the screen (two of the shipped texts', each shown as the first
+line after start-up) go on at the left of the next pixel row, as they do
+here. The text is broken in a 1 KB buffer that only the dialog lines and
+the game-over narration write, each a NUL after its text and the rest
+left as it was, and cleared once at start-up: when a text's last word
+crosses the window's end the breaker reads on past the NUL, into zeros or
+what an earlier, longer line left there, so a line's rows can depend on
+the lines shown before it (18 English lines read in file order). The port
+keeps that buffer as the original does (`SubtitleTextBuffer`, written for
+every line the scripts run, shown or not). The May 1997 French CD draws
+its subtitles the same way, eight of its rows wider than the screen; its
+texts are in the DOS code
 page, whose accented letters (`0x82` é, `0x85` à...) are those of the
 font's IBM PC glyphs, so the accents show as they should, byte for byte.
 So does the Dutch CD (`é ë è ï ú`), eight of its rows wider than the
@@ -285,8 +294,8 @@ within 75 bytes. The buffer holds the line as the dialog code copies it,
 up to the CR, so the blanks that end most Traditional lines (and some
 Simplified ones) count: with its final space, a text of 75 bytes is two
 rows, the second mostly the space alone (17 Traditional lines, 2
-Simplified ones). The other builds' breakers are given the text without
-them.
+Simplified ones). So do the 1997 builds' breakers (the buffer above);
+the 2001 build's is given the text without them.
 
 ### Game builds
 

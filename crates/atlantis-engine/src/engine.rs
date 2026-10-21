@@ -296,6 +296,13 @@ pub struct Engine {
     pub(crate) debug_font: std::cell::OnceCell<crate::subtitles::SubtitleFont>,
     /// 0x00496188 == 1 (a talking-head line): the persos are not drawn.
     pub sprites_hide_npcs: bool,
+    /// The 1997 builds' subtitle text buffer: zeroed with the engine, as
+    /// the original's start-up clear (`FUN_00422bd0`, once per run: loading
+    /// a game or starting a new one keeps it); written for every `[` line
+    /// the section executor runs and for a game-over narrator line
+    /// (`Scripts`), whether the subtitles are shown or not. Their breaker
+    /// reads its bytes past the NUL.
+    pub subtitle_text: crate::subtitles::SubtitleTextBuffer,
     /// The SPW files of the place, by name.
     pub(crate) spw_cache: HashMap<String, Rc<Vec<u8>>>,
 
@@ -419,6 +426,7 @@ impl Engine {
             debug_overlay: std::cell::Cell::new(false),
             debug_font: std::cell::OnceCell::new(),
             sprites_hide_npcs: false,
+            subtitle_text: Default::default(),
             spw_cache: HashMap::new(),
             warp: Warp::new(),
             cyclo: Vec::new(),

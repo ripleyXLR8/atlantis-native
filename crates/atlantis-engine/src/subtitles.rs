@@ -990,36 +990,87 @@ pub fn bitmap_line_y(i: usize, n: usize) -> i32 {
     0x1ce - (n as i32 - i as i32 + 1) * BITMAP_ROW_H
 }
 
-/// atlantis-cd-en-688128 FUN_0042e970 on the subtitle buffer (a space, the
-/// byte after ']', then the text): fewer than 0x4c bytes make one row;
-/// else, with p the end of a 75-byte window from the row's start, the
-/// scans forward (f) and back (b) from p to a space (a CR stops a scan
-/// one byte past it); if f < b the row runs to the forward space, else to
-/// the back one, and that space starts the next row; until the length
-/// left (less 75 + f, or 75 - b, per row) is not positive or under 0x4c.
+/// The subtitle text buffer of the bitmap-subtitle builds of 1997
+/// ([`ExeBuild::bitmap_subtitles`]): atlantis-cd-en-688128 0x00603d68,
+/// atlantis-cd-fr-688640 0x00603ac0, atlantis-cd-nl-688128 and
+/// atlantis-cd-sv-688128 0x00603f68, 0x400 bytes in each (the object at
+/// 0x00604168 / 0x00603ec0 / 0x00604368 follows it). It is zeroed once, at
+/// start-up (`FUN_00422bd0` @ 0x00422c58, called from the WinMain start-up
+/// code @ 0x00419499), and written only by the section executor for every
+/// `[` line it runs (`FUN_00427420` @ 0x00427707..0x00427722) and by the
+/// game-over screen for its narrator line (`FUN_004256a4` @
+/// 0x00425a31..0x00425a50): the bytes up to the line's CR, then a NUL, the
+/// rest left as it was. So after the NUL it holds zeros, or the tail of an
+/// earlier, longer text, which the row breaker reads.
 ///
-/// The bytes after the text's NUL are what earlier lines left in the
-/// buffer; the port takes a CR there, as the emulation of the original
-/// (forward scans that reach the end of the text stop 2 bytes past it).
-/// A 75-byte window without a space would loop for ever in the original;
-/// no shipped text has one, and the port cuts it at 75 bytes.
-pub fn split_subtitle_1997(text: &[u8]) -> Vec<Vec<u8>> {
-    split_bitmap_rows(text, BitmapBreaker::Nearest)
+/// [`ExeBuild::bitmap_subtitles`]: atlantis_data::exe::ExeBuild::bitmap_subtitles
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SubtitleTextBuffer {
+    buf: [u8; SubtitleTextBuffer::SIZE],
 }
 
-/// atlantis-cd-sv-688128 FUN_0042ea7c: [`split_subtitle_1997`]'s window
-/// and scans, but every row is cut at the space found backwards (the
-/// length left less 75 - b per row; `0x0042eb50`, the forward choice
-/// removed), so no row is over 75 bytes.
-///
-/// A window whose only space is the row's own first byte gives the
-/// original a row of 0 bytes and no progress: it writes rows past its
-/// 8 x 0x55-byte buffer until it faults (under emulation; what a real
-/// machine does is [UNKNOWN]). No shipped text has such a run of 75 bytes
-/// without a space; the port cuts it at the window end (75 bytes), an
-/// implementation choice.
+impl Default for SubtitleTextBuffer {
+    fn default() -> Self {
+        SubtitleTextBuffer {
+            buf: [0; SubtitleTextBuffer::SIZE],
+        }
+    }
+}
+
+impl SubtitleTextBuffer {
+    pub const SIZE: usize = 0x400;
+
+    /// `FUN_00422bd0`'s clear.
+    pub fn clear(&mut self) {
+        self.buf.fill(0);
+    }
+
+    /// A copy loop: `bytes`, then a NUL. A text of 0x400 bytes or more
+    /// would run on into the object after the buffer; none is shipped (the
+    /// longest dialog line has 435 bytes), the port cuts it.
+    pub fn store(&mut self, bytes: &[u8]) {
+        let n = bytes.len().min(Self::SIZE - 1);
+        self.buf[..n].copy_from_slice(&bytes[..n]);
+        self.buf[n] = 0;
+    }
+
+    /// The bytes up to the NUL.
+    pub fn text(&self) -> &[u8] {
+        let n = self.buf.iter().position(|&c| c == 0).unwrap_or(Self::SIZE);
+        &self.buf[..n]
+    }
+
+    /// The byte at `i`, 0 past the buffer.
+    pub fn at(&self, i: usize) -> u8 {
+        self.buf.get(i).copied().unwrap_or(0)
+    }
+
+    /// The buffer as the first line after start-up leaves it: `text`, a
+    /// NUL, zeros.
+    pub fn fresh(text: &[u8]) -> SubtitleTextBuffer {
+        let mut b = SubtitleTextBuffer::default();
+        b.store(text);
+        b
+    }
+}
+
+/// atlantis-cd-en-688128 FUN_0042e970 on a fresh subtitle text buffer, a
+/// space (the byte after ']') then the text ([`split_bitmap_buffer`]).
+pub fn split_subtitle_1997(text: &[u8]) -> Vec<Vec<u8>> {
+    split_bitmap_buffer(&fresh_buffer(text), BitmapBreaker::Nearest)
+}
+
+/// atlantis-cd-sv-688128 FUN_0042ea7c on a fresh subtitle text buffer
+/// ([`split_bitmap_buffer`]): [`split_subtitle_1997`]'s window and scans,
+/// but every row is cut at the space found backwards (the length left less
+/// 75 - b per row; `0x0042eb50`, the forward choice removed), so no row is
+/// over 75 bytes.
 pub fn split_subtitle_1997_back(text: &[u8]) -> Vec<Vec<u8>> {
-    split_bitmap_rows(text, BitmapBreaker::Back)
+    split_bitmap_buffer(&fresh_buffer(text), BitmapBreaker::Back)
+}
+
+fn fresh_buffer(text: &[u8]) -> SubtitleTextBuffer {
+    SubtitleTextBuffer::fresh(&[b" ", text].concat())
 }
 
 /// How a bitmap-subtitle row is cut (see [`ExeBuild::subtitle_cut_back_only`]).
@@ -1033,61 +1084,125 @@ pub enum BitmapBreaker {
     Back,
 }
 
-fn split_bitmap_rows(text: &[u8], breaker: BitmapBreaker) -> Vec<Vec<u8>> {
-    let mut b = Vec::with_capacity(text.len() + 3);
-    b.push(b' ');
-    b.extend_from_slice(text);
-    let len = b.len();
-    if len < BITMAP_WINDOW + 1 {
-        return vec![b];
-    }
-    b.extend_from_slice(b"\0\r");
-    // The byte at i (NUL past the buffer: the scans stop at the CR).
-    let at = |i: usize| b.get(i).copied().unwrap_or(0);
-    let mut lines = Vec::new();
-    let mut start = 0usize;
-    let mut remaining = len as i64;
-    loop {
-        if remaining < (BITMAP_WINDOW + 1) as i64 {
-            lines.push(b[start.min(len)..len].to_vec());
-            break;
-        }
-        let p = start + BITMAP_WINDOW;
-        let mut f = 0usize;
-        loop {
-            let c = at(p + f);
-            if c == b' ' {
-                break;
-            }
-            f += 1;
-            if c == b'\r' || p + f >= b.len() {
-                break;
-            }
-        }
-        let mut back = 0usize;
-        loop {
-            let c = at(p - back);
-            if c == b' ' {
-                break;
-            }
-            back += 1;
-            if c == b'\r' || back > p {
-                break;
-            }
-        }
-        let (end, step) = if f < back && breaker == BitmapBreaker::Nearest {
-            (p + f, BITMAP_WINDOW + f)
-        } else if p - back > start {
-            (p - back, BITMAP_WINDOW - back)
+/// The rows of the subtitle text buffer: atlantis-cd-en-688128
+/// `FUN_0042e970` (atlantis-cd-fr-688640 `FUN_0042eab4`, atlantis-cd-nl-688128
+/// `FUN_0042e990`, the same code), or atlantis-cd-sv-688128 `FUN_0042ea7c`
+/// with [`BitmapBreaker::Back`].
+///
+/// The text is the buffer up to its NUL (strlen @ 0x0042e9ce): up to 75
+/// bytes, one row; otherwise, from the end p of a 75-byte window from the
+/// row's start, it scans forward (f) and back (b) for a space (a CR stops a
+/// scan one byte further) and breaks at the nearer one, the forward one
+/// when f < b: the row is the 75 + f or 75 - b bytes up to the space, the
+/// space starts the next row; the last row (75 bytes or fewer left) is the
+/// rest. The scans read the buffer itself, the bytes after the NUL
+/// included: when the text's last word crosses the window end the forward
+/// scan runs into the zeros of the start-up clear (then b wins) or into
+/// the tail of an earlier, longer text, whose spaces can make the forward
+/// cut win, so the rows depend on what was shown before, as in the
+/// original. A forward scan that leaves the 0x400-byte buffer reads the
+/// object after it; its count is then at least 0x400 - p, more than 75
+/// (so more than any b) for every text shorter than 0x3b5 bytes, the
+/// backward cut whatever that memory holds: the port stops the scan there
+/// and counts it as not found (no text of 0x3b5 bytes or more is shipped).
+///
+/// A 75-byte window with no space after the row's first byte makes the
+/// original loop: [`BitmapBreaker::Nearest`] copies 0 bytes per pass and
+/// NULs a row buffer each time, until it NULs the text's first byte and
+/// the back scan runs below the buffer (emulated: 10 empty rows), and
+/// [`BitmapBreaker::Back`] writes rows past its 8 x 0x55-byte buffer until
+/// it faults (under emulation; what a real machine does is [UNKNOWN] in
+/// both). No shipped text has such a window (the longest space-free run of
+/// the dialog lines is 16 bytes). The port cuts the row at the forward
+/// space (75 + f, or the rest of the text when there is none), or at 75
+/// bytes for [`BitmapBreaker::Back`], as the ScummVM port does.
+///
+/// The rows are stored 0x55 bytes apart with no bound on their length: a
+/// row of 85 bytes or more would run into the next row's buffer; the
+/// shipped rows are at most 81 bytes long, not reproduced.
+pub fn split_bitmap_buffer(buf: &SubtitleTextBuffer, breaker: BitmapBreaker) -> Vec<Vec<u8>> {
+    const W: i64 = BITMAP_WINDOW as i64;
+    const NOT_FOUND: i64 = 0x10000;
+    let b = buf.text();
+    let len = b.len() as i64;
+    // The byte at i, a space before the buffer.
+    let at = |i: i64| {
+        if i < 0 {
+            b' '
         } else {
-            (p, BITMAP_WINDOW) // no space in the window: cut
-        };
-        lines.push(b[start..end.min(len)].to_vec());
-        remaining -= step as i64;
-        start = end;
-        if remaining <= 0 {
+            buf.at(i as usize)
+        }
+    };
+    let row = |from: i64, n: i64| -> Vec<u8> {
+        let from = from.clamp(0, len) as usize;
+        let to = (from as i64 + n.max(0)).min(len) as usize;
+        b[from..to].to_vec()
+    };
+    // 0x0042e9dd: up to 75 bytes, the whole text (strcpy @ 0x0042eb1f).
+    if len <= W {
+        return vec![b.to_vec()];
+    }
+    let mut lines = Vec::new();
+    let (mut remaining, mut start, mut p) = (len, 0i64, W);
+    while remaining > 0 {
+        // 0x0042e9fc: 75 bytes or fewer left, the last row (0x0042eadb).
+        if remaining <= W {
+            lines.push(row(start, len));
             break;
         }
+        // 0x0042ea06..0x0042ea21: forward from p to a space; a CR ends the
+        // scan one byte further.
+        let mut f = 0i64;
+        while at(p + f) != b' ' {
+            let c = at(p + f);
+            f += 1;
+            if c == b'\r' {
+                break;
+            }
+            if p + f >= SubtitleTextBuffer::SIZE as i64 {
+                f = NOT_FOUND;
+                break;
+            }
+        }
+        // 0x0042ea23..0x0042ea42: back from p, the same way.
+        let mut k = 0i64;
+        while at(p - k) != b' ' {
+            let c = at(p - k);
+            k += 1;
+            if c == b'\r' {
+                break;
+            }
+        }
+        let n;
+        if breaker == BitmapBreaker::Back {
+            // atlantis-cd-sv-688128 FUN_0042ea7c @ 0x0042eb50: always the
+            // backward cut, 75 - b bytes; the next row starts at the space.
+            if W - k <= 0 {
+                // no space in the window: cut at its end (see above)
+                n = W;
+                lines.push(row(start, n));
+                start = p;
+            } else {
+                n = W - k;
+                lines.push(row(start, n));
+                start = p - k;
+            }
+            p = start + W;
+        } else if f < k || W - k <= 0 {
+            // 0x0042ea4c: 75 + f bytes (strncpy stops at the NUL); the
+            // second test is the port's (see above).
+            n = W + f;
+            lines.push(row(start, n));
+            start = p + f;
+            p += n;
+        } else {
+            // 0x0042ea90: 75 - b bytes.
+            n = W - k;
+            lines.push(row(start, n));
+            start = p - k;
+            p = start + W;
+        }
+        remaining -= n;
     }
     lines
 }
@@ -1110,10 +1225,22 @@ impl Subtitler {
         self
     }
 
+    /// The rows of a dialog line's or a game-over narrator's subtitle: the
+    /// 1997 bitmap builds break the subtitle text buffer `buffer`, which the
+    /// caller has filled with that text ([`SubtitleTextBuffer`], its tail
+    /// included); the others `text` ([`Subtitler::split`]).
+    pub fn split_line(&self, text: &[u8], buffer: &SubtitleTextBuffer) -> Vec<Vec<u8>> {
+        match self {
+            Subtitler::Bitmap(_, breaker) => split_bitmap_buffer(buffer, *breaker),
+            _ => self.split(text),
+        }
+    }
+
     /// The rows of a subtitle text, given as the dialog code copies it, up
     /// to the CR (its final blanks, [`crate::con_script::ConLine::trail`],
     /// included): the Chinese builds' breaker counts them; the other
-    /// breakers are given the text without them, as before.
+    /// breakers are given the text without them, as before (the bitmap
+    /// breaker on a fresh buffer, " " + the text).
     pub fn split(&self, text: &[u8]) -> Vec<Vec<u8>> {
         let trimmed = || {
             let n = text
@@ -1125,7 +1252,9 @@ impl Subtitler {
         match self {
             Subtitler::Gdi(_, None) => split_subtitle(trimmed()),
             Subtitler::Gdi(_, Some(cjk)) => split_subtitle_cjk(text, *cjk),
-            Subtitler::Bitmap(_, breaker) => split_bitmap_rows(trimmed(), *breaker),
+            Subtitler::Bitmap(_, breaker) => {
+                split_bitmap_buffer(&fresh_buffer(trimmed()), *breaker)
+            }
         }
     }
 
@@ -1251,6 +1380,29 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0].len(), 100);
         assert_eq!(lines.concat().len(), 151);
+    }
+
+    /// The windows without a space after the row's first byte, which no
+    /// shipped text has: as the first line after start-up the original
+    /// loops (FUN_0042e970: 10 empty rows for x * 75 under emulation) or
+    /// faults (FUN_0042ea7c), what a real machine does is not known. The
+    /// port's cuts, the ScummVM port's: the bitmap breaker at the forward
+    /// space or the end of the text, the Swedish one at 75 bytes.
+    #[test]
+    fn windows_without_a_space() {
+        let lens = |rows: Vec<Vec<u8>>| rows.iter().map(Vec::len).collect::<Vec<_>>();
+        let x = |n: usize| "x".repeat(n);
+        let short = format!("short {}", x(80));
+        assert_eq!(lens(split_subtitle_1997(x(75).as_bytes())), [76]);
+        assert_eq!(
+            lens(split_subtitle_1997(format!("{} tail", x(76)).as_bytes())),
+            [77, 5]
+        );
+        let rows = split_subtitle_1997(short.as_bytes());
+        assert_eq!(rows[0], b" short");
+        assert_eq!(lens(rows), [6, 81]);
+        assert_eq!(lens(split_subtitle_1997_back(x(75).as_bytes())), [75, 1]);
+        assert_eq!(lens(split_subtitle_1997_back(short.as_bytes())), [6, 75, 6]);
     }
 
     /// The synthetic texts of the emulation of atlantis-cd-sv-688128

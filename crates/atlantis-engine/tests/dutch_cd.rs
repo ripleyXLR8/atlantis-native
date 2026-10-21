@@ -74,7 +74,8 @@ fn distinct_texts(g: &Game) -> Vec<Vec<u8>> {
     texts
 }
 
-/// Every dialog line through the breaker: the emulation's statistics over
+/// Every dialog line through the breaker, each as the first line after
+/// start-up (a zero tail after its NUL): the emulation's statistics over
 /// the distinct texts (rows per text, the longest row, the rows wider than
 /// the screen, none past the 0x55-byte row buffer).
 #[test]
@@ -96,7 +97,7 @@ fn con_lines_match_original() {
         }
     }
     assert_eq!(texts.len(), 1945);
-    assert_eq!(hist, [0, 1510, 355, 67, 9, 4, 0, 0]);
+    assert_eq!(hist, [0, 1484, 379, 69, 9, 4, 0, 0]);
     assert_eq!((longest, over79, over84), (81, 8, 0));
 }
 
