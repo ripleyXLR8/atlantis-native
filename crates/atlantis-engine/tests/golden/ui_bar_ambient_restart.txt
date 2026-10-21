@@ -1,0 +1,66 @@
+# The ambient sounds during the inventory bar's slide-in FUN_0042c2c4, slide-out FUN_0042c59c and the pick-up's
+# hold loop FUN_0042cc98 of atlantis.exe (2001 English build, 714240 bytes), run under emulation with
+# FUN_00432178, FUN_004320bc and FUN_00450ed8. Samples: 0 done (2), 1 playing (4), 2 stopped (8); clock 70
+# (variant 1); object 2's weight 150 sets the loop flag (loop count 0). timer=<phase>:<frame>:<variable> sets the
+# variable from the timers FUN_0042be3c on that frame. Tokens: stop:i, start:i:variant:loopcount, pan:i:pan,
+# vol:i:volume. ambient = FUN_00432178 ran (its FUN_00432a64 tail reached). Hold passes: the pointer and the press
+# edge FUN_0041a298 reads (an input of the run), first shown record after the pass; exit: passes, first, end
+# (0x00496928).
+scenario slide_in_out timer=-
+slide_in_out phase=in frame=0 slotY=492 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=in frame=1 slotY=485 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=in frame=2 slotY=478 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=in frame=3 slotY=471 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=in frame=4 slotY=464 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=in frame=5 slotY=457 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=in frame=6 slotY=450 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=in frame=7 slotY=443 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=0 slotY=443 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=1 slotY=450 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=2 slotY=457 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=3 slotY=464 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=4 slotY=471 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=5 slotY=478 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=6 slotY=485 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=7 slotY=492 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=8 slotY=499 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=9 slotY=506 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_out phase=out frame=10 slotY=513 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+scenario slide_in_gameover_f3 timer=in:3:GAMEOVER
+slide_in_gameover_f3 phase=in frame=0 slotY=492 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_gameover_f3 phase=in frame=1 slotY=485 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_gameover_f3 phase=in frame=2 slotY=478 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_in_gameover_f3 phase=in frame=3 slotY=471 timer=GAMEOVER ambient=0 calls=-
+scenario slide_in_exit_f0 timer=in:0:EXIT
+slide_in_exit_f0 phase=in frame=0 slotY=492 timer=EXIT ambient=0 calls=-
+scenario slide_out_gameover_f5 timer=out:5:GAMEOVER
+slide_out_gameover_f5 phase=in frame=0 slotY=492 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=in frame=1 slotY=485 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=in frame=2 slotY=478 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=in frame=3 slotY=471 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=in frame=4 slotY=464 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=in frame=5 slotY=457 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=in frame=6 slotY=450 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=in frame=7 slotY=443 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=out frame=0 slotY=443 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=out frame=1 slotY=450 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=out frame=2 slotY=457 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=out frame=3 slotY=464 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=out frame=4 slotY=471 timer=- ambient=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+slide_out_gameover_f5 phase=out frame=5 slotY=478 timer=GAMEOVER ambient=0 calls=-
+scenario hold_right_3 records=5 first=0
+hold_right_3 pass=0 mouse=300,440 edge=- ambient=1 first=0 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+hold_right_3 pass=1 mouse=300,440 edge=- ambient=1 first=0 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+hold_right_3 pass=2 mouse=300,440 edge=right ambient=1 first=0 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+hold_right_3 exit passes=3 first=0 end=9
+scenario hold_left_scroll records=12 first=0
+hold_left_scroll pass=0 mouse=300,440 edge=- ambient=1 first=0 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+hold_left_scroll pass=1 mouse=631,440 edge=left ambient=1 first=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+hold_left_scroll exit passes=2 first=1 end=10
+scenario hold_right_scroll_back records=12 first=1
+hold_right_scroll_back pass=0 mouse=300,440 edge=- ambient=1 first=1 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+hold_right_scroll_back pass=1 mouse=2,440 edge=right ambient=1 first=0 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+hold_right_scroll_back exit passes=2 first=0 end=9
+scenario hold_left_first_pass records=12 first=0
+hold_left_first_pass pass=0 mouse=300,300 edge=left ambient=1 first=0 calls=stop:0,start:0:1:1,pan:0:55,vol:0:127,pan:1:63,vol:1:50,stop:2,start:2:1:0,pan:2:99,vol:2:127
+hold_left_first_pass exit passes=1 first=0 end=9

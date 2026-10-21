@@ -225,6 +225,10 @@ pub struct Engine {
     pub inventory: Vec<i32>,
     /// The first record the bar shows (0x00496924).
     pub bar_first: usize,
+    /// The visible slot whose x the last pick-up set (`FUN_004278a0` @
+    /// 0x00427ae2, [`crate::ui::bar::pickup_slot_x`]), until the next
+    /// slide-in resets the slot table.
+    pub bar_pickup_slot: Option<usize>,
     /// The bar request and the right-press flag.
     pub bar: BarSession,
     /// The guests following the player, and whether they are shown
@@ -381,6 +385,7 @@ impl Engine {
             vue_override: None,
             inventory: Vec::new(),
             bar_first: 0,
+            bar_pickup_slot: None,
             bar: BarSession::default(),
             guests: Guests::default(),
             guests_shown: true,
