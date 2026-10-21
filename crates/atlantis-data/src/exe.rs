@@ -197,6 +197,15 @@ pub struct ExeBuild {
     /// writers FUN_0041dd14 @ 0x0041e574, FUN_0041e65c @ 0x0041e9b0,
     /// FUN_0042cb1c @ 0x0042d147).
     pub players_names_block: u8,
+    /// An `off1` dialog line is played by the off1 player: off0's, with the
+    /// screen buffer copied to the screen once the voice has loaded
+    /// (atlantis-cd-zh-tw-696832 FUN_0042fe7c, called @ 0x0042e3a6). The
+    /// other builds play such a line as an `off` line, the view redrawn:
+    /// the 1997 builds have no off1 header; the GOG.com build's executable
+    /// has the player (FUN_004307d0) and its scripts 30 such lines, which
+    /// the port keeps playing as `off` lines, as before it knew the player
+    /// (a difference from that build); the other builds' scripts have none.
+    pub off1_player: bool,
 }
 
 /// The cut marks of the GDI subtitle breaker ([`ExeBuild::cjk_breaker`]).
@@ -332,6 +341,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     ExeBuild {
         name: "atlantis-gog-714752",
@@ -383,6 +393,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     // Cryo's Windows patch AT1CDINT.EXE ("1.01"), installed over the
     // English, French and German CD installs, whose BIGCD1..4.BIG it keeps.
@@ -449,6 +460,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     ExeBuild {
         name: "atlantis-cd-en-688128",
@@ -501,6 +513,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     // A 1997 build sharing most of atlantis-cd-en-688128's code, with the
     // reference's GDI subtitles (FUN_0041a834, FUN_0042e84c, FUN_0042e9cc),
@@ -570,6 +583,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     // The German retail CD's build: atlantis-cd-fr-687104's code byte for
     // byte (its BEGTEXT section is the French one's) and its DGROUP layout,
@@ -634,6 +648,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     // The Spanish retail CD's build (August 1997): atlantis-cd-fr-687104's
     // code but for one line, the rat puzzle's T0023 search restarting at
@@ -700,6 +715,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     // The Italian retail CD's build (July 1997, eleven days before
     // atlantis-cd-fr-687104): the French August build's code but for the
@@ -764,6 +780,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     // The first French pressing: atlantis-cd-en-688128's code (every
     // function pairs; most differences are the calling convention of its
@@ -827,6 +844,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     // The Dutch retail CD's build: atlantis-cd-en-688128's code (the same
     // size, told apart by the PE stamp) but for the R&P logo at start-up
@@ -902,6 +920,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     // The Swedish retail CD's build: atlantis-cd-en-688128's code rebuilt
     // on 1997-06-11 (the same size, told apart by the PE stamp), every
@@ -972,6 +991,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
+        off1_player: false,
     },
     ZH_TW,
     ZH_CN,
@@ -1078,6 +1098,8 @@ pub const ZH_TW: ExeBuild = ExeBuild {
     }),
     subtitles_on_at_start: true,
     players_names_block: 102,
+    // FUN_0042fe7c; the scripts' 29 off1 headers.
+    off1_player: true,
 };
 
 /// The Simplified Chinese 4-CD release's build (atlantis-cd-zh-cn-692736,
@@ -1343,6 +1365,7 @@ mod tests {
             assert_eq!(b.load_list, LoadList::EpiText, "{}", b.name);
             assert_eq!(b.cinema_captions, None, "{}", b.name);
             assert_eq!(b.players_names_block, 85, "{}", b.name);
+            assert!(!b.off1_player, "{}", b.name);
             assert!(!b.text_code_page.is_double_byte(), "{}", b.name);
         }
         assert_eq!(
@@ -1364,7 +1387,7 @@ mod tests {
         assert_eq!(cn, ZH_TW);
         for b in [&ZH_TW, &ZH_CN] {
             assert_eq!(b.subtitle_row_step, 18);
-            assert!(b.subtitles_on_at_start && b.menu_toggle_sprites);
+            assert!(b.subtitles_on_at_start && b.menu_toggle_sprites && b.off1_player);
             assert_eq!(b.players_names_block, 0x66);
             assert_eq!(b.cinema_captions.map(|c| c.cinema), Some(20));
             // The DGROUP file offsets: zh-tw 0x6dc00 + (VA - 0x480000).

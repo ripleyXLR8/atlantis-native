@@ -308,9 +308,12 @@ impl Dialogs {
         // 0x0042e3a6 when off0's flag 0x004860b8 is clear and 0x004860bc
         // set) is off0's code with the screen buffer copied to the screen
         // once the voice has loaded (play_single). The GOG.com scripts have
-        // 30 off1 headers, the Chinese ones 29, the others none.
+        // 30 off1 headers, the Chinese ones 29, the others none; the port
+        // plays them with that player for the Chinese builds only, the
+        // others as off lines (`ExeBuild::off1_player`).
         let off = header.off;
-        let keep_screen = header.off0 || header.off1;
+        let off1 = header.off1 && e.game.exe.build.off1_player;
+        let keep_screen = header.off0 || off1;
         let row = dial_row(header.seth && !off, perso, req.inc_perso as u8);
         // FUN_0042ee88 step 3: a line whose wav\ata<NNNN><letter>.syc is
         // missing (FUN_0042f9e8 fails) is played voice-only by FUN_00430258,
@@ -395,7 +398,7 @@ impl Dialogs {
                 spf,
                 cam: if voice_only { 0 } else { cam },
                 keep_screen,
-                screen_buffer: header.off1,
+                screen_buffer: off1,
                 voice_off: voice_only && !keep_screen,
             };
             played = self.play_single(e, &single).await;
@@ -1430,9 +1433,11 @@ mod off1_tests {
         d.line(&mut e, &req).await;
     }
 
-    /// An off1 line in the 2001 build (FUN_00430884): with its voice
-    /// (CHAPI001 /2 A's file), the screen buffer under the subtitle until
-    /// the click; without one (no ATA9999A.APC), nothing drawn.
+    /// An off1 line played by the off1 player on the 2001 build's data
+    /// (FUN_00430884; the build's `off1_player` set for the test, the port
+    /// sets it for the Chinese builds only): with its voice (CHAPI001 /2
+    /// A's file), the screen buffer under the subtitle until the click;
+    /// without one (no ATA9999A.APC), nothing drawn.
     #[test]
     fn off1_line_shows_the_screen_buffer_once_the_voice_loads() {
         for (section, voice) in [(2, true), (9999, false)] {
@@ -1446,7 +1451,12 @@ mod off1_tests {
                 eprintln!("ATLANTIS_DATA not set: skipped");
                 return;
             };
-            let g = Game::open(Arc::new(StdDir::new(dir))).expect("the game directory");
+            let mut g = Game::open(Arc::new(StdDir::new(dir))).expect("the game directory");
+            assert!(!g.exe.build.off1_player);
+            g.exe.build = Box::leak(Box::new(atlantis_data::exe::ExeBuild {
+                off1_player: true,
+                ..*g.exe.build
+            }));
             let (sys, e, trace) = engine(g);
             let task = play_line(e, request(section, 'A', line), pattern_block(), true);
             let (seen, played) = play(sys, task, &trace, false);
@@ -1488,8 +1498,9 @@ mod off1_tests {
     }
 
     /// A release's off1 headers (`count` of them); the first one whose
-    /// voice is there (or `want`), played by the off1 player's port with
-    /// the subtitles off, shows the screen buffer, the whole screen.
+    /// voice is there (or `want`), played with the subtitles off, shows the
+    /// screen buffer, the whole screen, when the build has the off1 player
+    /// (`ExeBuild::off1_player`), never otherwise.
     fn release_off1(g: Game, build: &str, count: usize, want: Option<(i32, char)>) {
         assert_eq!(g.exe.build.name, build);
         let lines = off1_lines(&g);
@@ -1501,6 +1512,7 @@ mod off1_tests {
                 None => g.big.contains(&format!("WAV\\ATA{s:04}{l}.APC")),
             })
             .expect("an off1 line with its voice");
+        let player = g.exe.build.off1_player;
         let (sys, e, trace) = engine(g);
         let task = play_line(e, request(section, letter, line), pattern_block(), false);
         let (seen, played) = play(sys, task, &trace, true);
@@ -1510,7 +1522,7 @@ mod off1_tests {
         );
         assert_eq!(played, vec![(true, 0)]);
         assert!(seen.frames > 10);
-        assert_eq!(seen.buffer, seen.frames);
+        assert_eq!(seen.buffer, if player { seen.frames } else { 0 });
     }
 
     /// The Chinese CDs (FUN_0042fe7c): 29 off1 headers each.
@@ -1534,10 +1546,11 @@ mod off1_tests {
         chinese_off1("ATLANTIS_BIN_ZH_CN", "atlantis-cd-zh-cn-692736");
     }
 
-    /// The GOG.com release (FUN_004307d0): 30 off1 headers; CHAPI031
-    /// /377 A, the line the off1 player was emulated on.
+    /// The GOG.com release: 30 off1 headers (CHAPI031 /377 A, the line
+    /// its executable's off1 player FUN_004307d0 was emulated on), which
+    /// the port plays as off lines, as before it knew that player.
     #[test]
-    fn gog_off1_line_shows_the_screen_buffer() {
+    fn gog_off1_line_played_as_an_off_line() {
         let Some(dir) = std::env::var_os("ATLANTIS_GOG_FR") else {
             eprintln!("ATLANTIS_GOG_FR not set: skipped");
             return;
