@@ -73,7 +73,7 @@ jobs:
           done
           iconutil -c icns $set -o "$app/Contents/Resources/AppIcon.icns"
           chmod +x "$app/Contents/MacOS/atlantis-native"
-          cp README.md LICENSE dist/
+          cp README.md LICENSE assets/fonts/LICENSE-* dist/
           ln -s /Applications dist/Applications
           codesign --force --deep -s - "$app"   # ad-hoc signature
           hdiutil create -volname "Atlantis Native" -srcfolder dist -ov -format UDZO atlantis-native-macos-arm64.dmg
@@ -124,7 +124,7 @@ jobs:
         run: |
           New-Item -ItemType Directory dist | Out-Null
           $exe = if (Test-Path signed/atlantis-native.exe) { "signed/atlantis-native.exe" } else { "target/release/atlantis-native.exe" }
-          Copy-Item $exe, README.md, LICENSE dist/
+          Copy-Item $exe, README.md, LICENSE, assets/fonts/LICENSE-* dist/
           Compress-Archive -Path dist/* -DestinationPath atlantis-native-windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:
@@ -153,7 +153,7 @@ jobs:
       - name: Package
         run: |
           mkdir -p dist/atlantis-native
-          cp target/release/atlantis-native README.md LICENSE dist/atlantis-native/
+          cp target/release/atlantis-native README.md LICENSE assets/fonts/LICENSE-* dist/atlantis-native/
           strip dist/atlantis-native/atlantis-native
           tar -C dist -czf atlantis-native-linux-x64.tar.gz atlantis-native
       - uses: actions/upload-artifact@v4
@@ -182,7 +182,7 @@ jobs:
       - name: Package
         run: |
           mkdir -p dist/atlantis-native
-          cp target/release/atlantis-native README.md LICENSE dist/atlantis-native/
+          cp target/release/atlantis-native README.md LICENSE assets/fonts/LICENSE-* dist/atlantis-native/
           strip dist/atlantis-native/atlantis-native
           tar -C dist -czf atlantis-native-linux-arm64.tar.gz atlantis-native
       - uses: actions/upload-artifact@v4
@@ -212,7 +212,7 @@ jobs:
       - name: Package (the static site)
         run: |
           mkdir -p dist/atlantis-native-web
-          cp -r web/index.html web/emblem.png web/favicon.png web/pkg README.md LICENSE dist/atlantis-native-web/
+          cp -r web/index.html web/emblem.png web/favicon.png web/pkg README.md LICENSE assets/fonts/LICENSE-* dist/atlantis-native-web/
           (cd dist && zip -r ../atlantis-native-web.zip atlantis-native-web)
       - uses: actions/upload-artifact@v4
         with:
