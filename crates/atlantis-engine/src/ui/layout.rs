@@ -383,8 +383,14 @@ pub fn walk_menu_text(
             } else {
                 bx = i32::from(r.x); // a slider keeps its knob
             }
+            // The stored y too (the reference @ 0x004209b0;
+            // atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x00420412): the LOAD
+            // knob is drawn where the picker put it.
+            let mut by = y;
             if r.y == 0 {
                 r.y = y as i16;
+            } else {
+                by = i32::from(r.y);
             }
             r.w = w as i16;
             r.h = h as i16;
@@ -393,7 +399,7 @@ pub fn walk_menu_text(
                 alt_bank: v < 3,
                 hover_font: false,
                 x: bx as i16,
-                y: y as i16,
+                y: by as i16,
                 index: idx,
                 line,
                 record: count as i32,
@@ -907,6 +913,25 @@ mod tests {
             [(0x53, x0), (0x53, x0 + s16), (0x41, x0 + 2 * s16)]
         );
         assert_eq!(i32::from(walk.records[0].w), a + 2 * s);
+    }
+
+    /// A sprite record keeps a stored non-zero x and y and is drawn there
+    /// (the LOAD knob).
+    #[test]
+    fn sprite_record_drawn_at_stored_position() {
+        let text = b"/spr=13,600,130,32,32\r\n/fin\r\n";
+        let mut walk = MenuWalk {
+            records: vec![MenuRecord {
+                x: 0,
+                y: 0x7b,
+                w: 0,
+                h: 0,
+            }],
+            ops: Vec::new(),
+        };
+        walk_menu_text(text, 1, -1, 0, 0, MenuRules::default(), &mut walk);
+        assert_eq!((walk.ops[0].x, walk.ops[0].y), (600, 0x7b));
+        assert!(!walk.ops[0].alt_bank);
     }
 
     #[test]
