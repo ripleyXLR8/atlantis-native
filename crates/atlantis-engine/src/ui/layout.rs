@@ -937,7 +937,12 @@ pub fn name_key_code(c: char) -> u8 {
 /// 0x0041dafa..0x0041dbe9: 0xc4 -> 0x8e, 0xc5 -> 0x8f, 0xd6 -> 0x99,
 /// 0xe4 -> 0x84, 0xe5 -> 0x86, 0xf6 -> 0x94).
 pub fn name_entry_byte(c: char, upper_case: bool, dos_letters: bool) -> Option<u8> {
-    let code = name_key_code(c);
+    name_entry_code(name_key_code(c), upper_case, dos_letters)
+}
+
+/// [`name_entry_byte`] for the code the window stores
+/// ([`name_key_code`]).
+pub fn name_entry_code(code: u8, upper_case: bool, dos_letters: bool) -> Option<u8> {
     if dos_letters {
         const LETTERS: [(u8, u8); 6] = [
             (0xc4, 0x8e),

@@ -308,7 +308,9 @@ picked folder on its first start.
   them for the whole session: on the May 1997 English and French
   CDs, after the sound options, the ARE YOU SURE ? prompt loses its left
   ornament, and on every CD the LOAD list's scrollbar knob, hidden while
-  11 checkpoints or fewer were listed, stays hidden).
+  11 checkpoints or fewer were listed, stays hidden); with five players,
+  OK on the fifth starts it with its name (the original empties that
+  name, and the nameless player can no longer be chosen).
   `--original` turns them off.
 - On the Traditional Chinese CD, the one subtitle with no punctuation
   mark in its first 75 bytes (a game-over narration) is cut at 75 bytes;
@@ -320,7 +322,6 @@ picked folder on its first start.
 - On the GOG.com release, the 30 dialog lines marked `off1` are played
   with the view redrawn; the original shows the picture the last video
   (or music load) left under their subtitle (the port does so on the Chinese CDs only).
-- Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).
 - F10 (or O, for a keyboard without function keys; not while a game menu

@@ -14,15 +14,20 @@
 //! are found by record number, as the original does, so that the menus of
 //! every language work.
 
-use atlantis_data::saves::{checkpoint_chapter, epi_episode_name, MAX_PLAYERS, NAME_MAX_CHARS};
+use std::collections::VecDeque;
+
+use atlantis_data::saves::{checkpoint_chapter, epi_episode_name, MAX_PLAYERS};
 use atlantis_data::sprite::read_tga15;
 use atlantis_data::LoadList;
 
 use super::credits::{credits_events, CreditsEvent};
 use super::layout::{
     font_min_load_list_width, load_picker_knob_record, menu_grid_hit, menu_number,
-    menu_volume_from_knob, menu_walk_hit, name_entry_byte, spell_sharp_s, subtitle_toggle_click,
+    menu_volume_from_knob, menu_walk_hit, name_key_code, spell_sharp_s, subtitle_toggle_click,
     walk_menu_text_in, FontMin, LoadPickerScroll, MenuRecord, MenuRecordTable, MenuRules, MenuWalk,
+};
+use super::player_screen::{
+    player_screen_exit, MenuDoubleClick, PlayerScreenExit, PlayerScreenState,
 };
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
@@ -43,10 +48,12 @@ pub(crate) struct MenuInput {
     pub right_press: bool,
     pub escape: bool,
     pub enter: bool,
-    pub backspace: bool,
-    pub chars: Vec<char>,
     pub up: bool,
     pub down: bool,
+    /// The WM_CHAR codes of the keys, in order (the code the original's
+    /// window stores, `name_key_code`; 8 Backspace, 0x0d Enter, 0x1b
+    /// Escape).
+    pub codes: Vec<u8>,
 }
 
 /// A loaded menu file and its walk state.
@@ -164,13 +171,24 @@ impl Engine {
                     button: MouseButton::Right,
                     ..
                 } => mi.right_press = true,
-                Input::KeyDown(Key::Escape) => mi.escape = true,
-                Input::KeyDown(Key::Enter) => mi.enter = true,
-                Input::KeyDown(Key::Backspace) => mi.backspace = true,
+                Input::KeyDown(Key::Escape) => {
+                    mi.escape = true;
+                    mi.codes.push(0x1b);
+                }
+                Input::KeyDown(Key::Enter) => {
+                    mi.enter = true;
+                    mi.codes.push(0x0d);
+                }
+                Input::KeyDown(Key::Backspace) => mi.codes.push(8),
                 Input::KeyDown(Key::Up) => mi.up = true,
                 Input::KeyDown(Key::Down) => mi.down = true,
-                Input::KeyDown(Key::Space) => mi.chars.push(' '),
-                Input::KeyDown(Key::Char(c)) => mi.chars.push(c),
+                Input::KeyDown(Key::Space) => mi.codes.push(b' '),
+                Input::KeyDown(Key::Char(c)) => {
+                    let code = name_key_code(c);
+                    if code != 0 {
+                        mi.codes.push(code);
+                    }
+                }
                 _ => {}
             }
         }
@@ -236,28 +254,32 @@ impl Engine {
     }
 
     /// The player screen `FUN_0041dea4`: pick a player, type a new one on
-    /// the "new player" row, delete one. Returns the player's row, `None`
-    /// when the game is quit (window closed, or Escape: the port's way out).
+    /// the "new player" row, delete one (the blocks of
+    /// [`PlayerScreenState`], in the original's order). Returns the
+    /// player's row, `None` when the window is closed: the loop reads no
+    /// Escape (it ends only on OK, Enter or a double click with a valid
+    /// name; WM_CHAR 0x1b is no name character).
     pub async fn player_screen(&mut self) -> Option<usize> {
         let bg = self.load_picture("PREINTRO.TGA").await;
         let mut menu = self.load_menu("SELEMENU.TXT").await?;
         self.load_fontmin_from_current_disc().await;
-        // The records OK (5) and DELETE (6): the title, four sprites, then
-        // the two labels (FUN_0041dea4 tests them by number).
-        const OK: usize = 5;
-        const DELETE: usize = 6;
-        // The rows: FUN_004211f0 at (175, 248), cells 320 x 22, one column.
+        // The rows: FUN_004211f0 at (175, 248), cells 320 x 22, one column,
+        // 0x00496606 rows (0x0041e08e); its inclusive far edges give an
+        // index past the list, which the original copies from the names
+        // array (what it holds there is not known): the port takes it as a
+        // click off the rows.
         let (grid_x, grid_y, grid_w, grid_h) = (175, 248, 320, 22);
-        let mut selected: Option<usize> = None;
-        let mut typed: Option<Vec<u8>> = None; // on the "new player" row
-        let upper_case = self.game.exe.build.upper_case_names;
-        let dos_letters = self.game.exe.build.name_entry_dos_letters;
-        let list_font = if self.game.exe.build.players_1997 {
+        let build = self.game.exe.build;
+        let (upper_case, dos_letters) = (build.upper_case_names, build.name_entry_dos_letters);
+        let list_font = if build.players_1997 {
             FontMin::PlayerList1997
         } else {
             FontMin::PlayerList
         };
-        let mut last_click: Option<(usize, u64)> = None;
+        let mut st = PlayerScreenState::default();
+        let mut dbl = MenuDoubleClick::default();
+        // The window procedure's WM_CHAR codes, one a frame.
+        let mut keys: VecDeque<u8> = VecDeque::new();
         menu.walk(None, 0, 0, self.menu_table());
         self.wait_buttons_up().await;
         while self.sys.poll_event().is_some() {}
@@ -266,135 +288,79 @@ impl Engine {
                 return None;
             }
             let mi = self.poll_menu_input();
+            keys.extend(&mi.codes);
+            if let Some(k) = keys.pop_front() {
+                st.key = k;
+            }
             let (mx, my) = self.sys.mouse();
             let rows = self.players.count as i32;
             let hover_row = menu_grid_hit(grid_x, grid_y, grid_w, grid_h, 1, rows, true, mx, my)
-                .filter(|&r| r < rows)
-                .map(|r| r as usize);
-            let hover_rec = menu.hit(mx, my, self.menu_table().as_deref());
-            let mut commit = false;
-            let mut leave = false;
-            if mi.escape {
-                if typed.is_some() {
-                    typed = None;
-                    selected = None;
-                } else {
-                    return None;
+                .filter(|&r| r < rows);
+            let record = menu.hit(mx, my, self.menu_table().as_deref());
+            // WM_LBUTTONDBLCLK sets the flag wherever the press lands; the
+            // port arms it before the frame's click block (which of the two
+            // the original runs first on the second press is not known).
+            if mi.left_press && dbl.press(self.sys.millis(), (mx, my)) {
+                st.dbl_flag = true;
+            }
+            if st.click(
+                mi.left_press,
+                record,
+                hover_row.unwrap_or(-1),
+                &self.players,
+            ) {
+                // FUN_0041e8a8: ARE YOU SURE ? over the bare title backdrop,
+                // then the delete.
+                let row = st.row as usize;
+                let confirmed = self.confirm(&bg).await;
+                if confirmed {
+                    self.delete_player(row);
+                }
+                self.wait_buttons_up().await;
+                st.delete_done(confirmed);
+            }
+            // FUN_00420f60 draws the field before the name entry
+            // (0x0041e20d): what is shown lags the blink by one frame.
+            let shown = st.field.clone();
+            let mut exit = st.exit_before_draw(&self.players, upper_case, dos_letters);
+            if exit == PlayerScreenExit::None {
+                // The frame: the backdrop, the menu, the rows (FUN_00420d8c:
+                // x 185, y 270 + 22 j, FONTMIN2 under the mouse), the name
+                // field (FUN_00420f60 at (160, 190)) when not empty.
+                menu.walk(record, 0, 0, self.menu_table());
+                let mut s = bg.clone();
+                self.ui.draw_menu(&mut s, &menu.walk);
+                let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
+                for j in 0..self.players.count {
+                    let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
+                    self.ui.draw_font_min(
+                        &mut s,
+                        list_font,
+                        &name,
+                        185,
+                        grid_y + (j as i32 + 1) * grid_h,
+                        hover_row == Some(j as i32),
+                    );
+                }
+                if !shown.is_empty() {
+                    self.ui
+                        .draw_font_min(&mut s, FontMin::NameField, &shown, 160, 190, true);
+                }
+                self.present(&s, true).await;
+                exit = st.exit_after_draw(mi.left_press, record);
+                if exit == PlayerScreenExit::None {
+                    continue;
                 }
             }
-            // Name entry, only on the "new player" row (@ 0x0041e283):
-            // codes 0x20..0xa7, a leading space refused; at 16 characters
-            // the last one is replaced; backspace restores a dot (so does
-            // atlantis-cd-fr-687104 FUN_0041d45c @ 0x0041d847). The English
-            // 1997 build takes 0x20..0x7a and stores a..z as A..Z
-            // (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1..0x0041daf8);
-            // the Swedish build also stores `Ä Å Ö ä å ö` as DOS code page
-            // bytes (atlantis-cd-sv-688128 FUN_0041d704 @
-            // 0x0041dafa..0x0041dbe9; see name_entry_byte).
-            if let Some(buf) = typed.as_mut() {
-                for &c in &mi.chars {
-                    let Some(code) = name_entry_byte(c, upper_case, dos_letters) else {
-                        continue;
-                    };
-                    if buf.is_empty() && code == b' ' {
-                        continue;
-                    }
-                    if buf.len() >= NAME_MAX_CHARS {
-                        buf.pop();
-                    }
-                    buf.push(code);
-                }
-                if mi.backspace {
-                    buf.pop();
-                }
-                if mi.enter {
-                    commit = true;
-                }
+            // The exit and its commit; players.atl written on record 5.
+            let keep_fifth_name = self.enhancements().minor_bug_fixes;
+            let end = player_screen_exit(&mut st, exit, record, &mut self.players, keep_fifth_name);
+            if end.write {
+                self.save_players();
             }
-            if mi.left_press {
-                let now = self.sys.millis();
-                if hover_rec == Some(OK) {
-                    if typed.is_some() {
-                        commit = true;
-                    } else if selected.is_some() {
-                        leave = true;
-                    }
-                } else if hover_rec == Some(DELETE) {
-                    if let (Some(row), None) = (selected, &typed) {
-                        if self.confirm(&bg).await {
-                            self.delete_player(row);
-                            selected = None;
-                        }
-                        self.wait_buttons_up().await;
-                    }
-                } else if let Some(row) = hover_row {
-                    let double =
-                        last_click.is_some_and(|(r, t)| r == row && now - t <= DOUBLE_CLICK_MS);
-                    last_click = Some((row, now));
-                    if self.players.is_new_row(row) {
-                        if typed.is_none() {
-                            typed = Some(Vec::new());
-                        }
-                        selected = None;
-                        if double {
-                            commit = true;
-                        }
-                    } else {
-                        typed = None;
-                        selected = Some(row);
-                        if double {
-                            leave = true;
-                        }
-                    }
-                }
+            if let Some(row) = end.chosen {
+                return Some(row);
             }
-            if commit {
-                if let Some(buf) = &typed {
-                    if let Some(row) = self.players.create(buf) {
-                        self.save_players();
-                        return Some(row);
-                    }
-                }
-            }
-            if leave {
-                if let Some(row) = selected {
-                    self.save_players();
-                    return Some(row);
-                }
-            }
-
-            // The frame: the backdrop, the menu, the rows (FUN_00420d8c:
-            // x 185, y 270 + 22 j, FONTMIN2 under the mouse), the name field
-            // (FUN_00420f60 at (160, 190)).
-            menu.walk(hover_rec, 0, 0, self.menu_table());
-            let mut s = bg.clone();
-            self.ui.draw_menu(&mut s, &menu.walk);
-            let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
-            for j in 0..self.players.count {
-                let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
-                self.ui.draw_font_min(
-                    &mut s,
-                    list_font,
-                    &name,
-                    185,
-                    grid_y + (j as i32 + 1) * grid_h,
-                    hover_row == Some(j),
-                );
-            }
-            let field = match (&typed, selected) {
-                (Some(buf), _) => {
-                    let mut f = buf.clone();
-                    f.resize(NAME_MAX_CHARS, b'.');
-                    Some(f)
-                }
-                (None, Some(row)) => Some(self.players.name(row).to_vec()),
-                _ => None,
-            };
-            if let Some(f) = field {
-                self.ui
-                    .draw_font_min(&mut s, FontMin::NameField, &f, 160, 190, true);
-            }
-            self.present(&s, true).await;
         }
     }
 

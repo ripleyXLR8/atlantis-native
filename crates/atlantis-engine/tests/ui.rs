@@ -771,6 +771,44 @@ fn checkpoints_written_and_loaded() {
     );
 }
 
+/// The player screen as the original reads its input: Escape does
+/// nothing; a click on the new player row gives 16 dots; from the 16th
+/// character on each key replaces the last; Enter commits the name.
+#[test]
+fn player_screen_typing_past_16_characters() {
+    let Some(g) = game("player_screen_typing_past_16_characters") else {
+        return;
+    };
+    let store = Rc::new(MemStore::new());
+    let out = Rc::new(RefCell::new(None));
+    let o = out.clone();
+    with_engine(
+        g,
+        store.clone(),
+        move |mut e, _s| {
+            Box::pin(async move {
+                *o.borrow_mut() = Some(e.player_screen().await);
+            })
+        },
+        move |h, n| match n {
+            20 => h.key(Key::Escape),
+            30 => h.click(200, 259),
+            40 => {
+                for c in "ABCDEFGHIJKLMNOPQ".chars() {
+                    h.key(Key::Char(c));
+                }
+                h.steps(2);
+                h.key(Key::Enter);
+            }
+            _ => {}
+        },
+    );
+    assert_eq!(*out.borrow(), Some(Some(0)));
+    let players = Players::read(&store.read(PLAYERS_FILE).unwrap(), b"#New Player").unwrap();
+    assert_eq!(players.name(0), b"ABCDEFGHIJKLMNOQ");
+    assert!(players.is_new_row(1));
+}
+
 /// The inventory bar: a left click on a cell takes its object in hand, a
 /// right click empties the hand; the object picked up stays in hand on a
 /// right click (`FUN_0042cc98`).

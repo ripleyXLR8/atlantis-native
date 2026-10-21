@@ -196,13 +196,22 @@ impl Players {
         if !self.is_new_row(row) {
             return None;
         }
+        Some(self.store_in_last_row(name))
+    }
+
+    /// `FUN_0041dea4`'s store of a typed name (the Enter commit @
+    /// 0x0041e3ee..0x0041e436, the exit commit @ 0x0041e710..0x0041e758):
+    /// `strcpy` into the last row, whatever it holds, then the marker
+    /// appended when fewer than 5 rows exist. Returns the row.
+    pub fn store_in_last_row(&mut self, name: &[u8]) -> usize {
+        let row = self.count.saturating_sub(1);
         strcpy(&mut self.rows[row], name);
         if self.count < MAX_PLAYERS {
             let marker = self.marker.clone();
             strcpy(&mut self.rows[self.count], &marker);
             self.count += 1;
         }
-        Some(row)
+        row
     }
 
     /// `FUN_0041e8a8`: the rows after `row` move up one slot (names,

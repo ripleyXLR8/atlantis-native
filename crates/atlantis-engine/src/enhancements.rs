@@ -53,7 +53,11 @@ pub struct Enhancements {
     ///   French builds the sound menu's last two records spill over the ARE
     ///   YOU SURE ? menu's and move its left ornament off screen for the
     ///   session, and in every build the LOAD scrollbar's knob, hidden by a
-    ///   visit with 11 checkpoints or fewer, stays hidden on later visits.
+    ///   visit with 11 checkpoints or fewer, stays hidden on later visits;
+    /// - with five players, OK on the fifth starts it with its name; off,
+    ///   as the original (`FUN_0041dea4` @ 0x0041e6c6..0x0041e72f), OK runs
+    ///   the commit of a typed name, empty, over the fifth name: that player
+    ///   stays listed with no name, unselectable.
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so
