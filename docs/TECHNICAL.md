@@ -332,6 +332,24 @@ starts at y 0 but is clamped at the bar's top, and a row click counts
 the list's offset, as in the later builds. Its texts are in the DOS code
 page.
 
+The Traditional Chinese 4-CD release's build (July 1998) and the
+Simplified Chinese one's (March 1999) are the French August 1997 build's
+code moved toward the 2001 build by an intermediate 1998 build (the
+three-click SUBTITLES item, the LOAD scrollbar's knob and clamp, the rat
+puzzle's restarted search, the 2001 credits widths), with changes of
+their own; the Simplified build is the Traditional one with another
+subtitle breaker. Their tables are at the same addresses (the
+new-player row `New Player`, no `#`), and their texts are double-byte:
+Big5 (code page 950) and GBK (code page 936), decoded with `encoding_rs`.
+Their discs are detected, whether copied or as images (the Simplified
+discs name their files in lower case), and the game runs; the Chinese
+subtitles, the menus and chapter names drawn as sprites, the opening
+captions and their other rules (`ExeBuild::cjk_breaker`,
+`subtitle_row_step`, `menu_sprite_banks`, `menu_toggle_sprites`,
+`load_list`, `cinema_captions`, `subtitles_on_at_start`,
+`players_names_block`) are fields of their build entries, not drawn
+yet.
+
 The original opens one archive at a time, the inserted disc's. What it
 loads at start-up (the menus, the CD and error texts, EPI.TXT, the menu
 font, PREINTRO.TGA, and in the 2001, 1999 and August 1997 builds
@@ -475,6 +493,8 @@ the German CD's archives, `ATLANTIS_DATA_PATCH101_NL` /
 Swedish CDs' ISO images and the English and Dutch CDs' raw .bin images,
 `ATLANTIS_MDF_ES` / `ATLANTIS_NRG_IT` folders of the Spanish CD's .mdf and
 the Italian CD's Nero .nrg images (for the disc-image reader),
+`ATLANTIS_ISO_ZH_TW` / `ATLANTIS_BIN_ZH_CN` folders of the Traditional
+Chinese CD's ISO images and the Simplified Chinese CD's raw .bin images,
 `ATLANTIS_ISO_UNKNOWN` a folder of images of an edition not supported
 (the report test, skipped when the edition opens), `ATLANTIS_GOG` a folder of the GOG.com languages'
 trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com

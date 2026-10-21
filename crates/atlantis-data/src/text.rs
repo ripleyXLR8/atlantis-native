@@ -4,7 +4,8 @@
 //! the ANSI code page, its bitmap and sprite fonts take the byte as the
 //! glyph index. A port that shows them through Unicode (an outline font,
 //! logs, tests) must decode them in the code page of the release's
-//! archives.
+//! archives. The Chinese releases' texts are double-byte (Big5, GBK):
+//! their characters are decoded by `encoding_rs` (MIT / Apache-2.0).
 
 /// How a release's text bytes read as letters.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -20,6 +21,17 @@ pub enum TextCodePage {
     /// `DIALOG\FONTS.BIN` byte for byte (atlantis-cd-fr-688640 FUN_0042ec80
     /// with FUN_00410800: glyph = byte).
     Dos850,
+    /// Code page 950, Big5: the Traditional Chinese release's CON texts
+    /// (atlantis-cd-zh-tw-696832 passes them to TextOutA, read in the
+    /// system's ANSI code page: FUN_0042f798; lead bytes 0xa1..0xf4, every
+    /// pair valid Big5). Decoded as the WHATWG Big5 of `encoding_rs`, which
+    /// is code page 950 at every pair of the shipped texts.
+    Windows950,
+    /// Code page 936, GBK: the Simplified Chinese release's CON texts
+    /// (atlantis-cd-zh-cn-692736, the same TextOutA path), GB2312 with a
+    /// few GBK pairs (`85 85`, `97 97`, `A8 44`). Decoded as the WHATWG GBK
+    /// of `encoding_rs` (0x80 alone is `€`, as in code page 936).
+    Windows936,
 }
 
 /// Windows-1252 for 0x80..0x9f (0 where the code page has no character);
@@ -46,26 +58,67 @@ const CP850_80: [u16; 128] = [
 ];
 
 impl TextCodePage {
-    /// The character of one byte (`'\0'` where the code page has none).
+    /// The `encoding_rs` decoder of a double-byte code page.
+    fn encoding(self) -> Option<&'static encoding_rs::Encoding> {
+        match self {
+            TextCodePage::Windows950 => Some(encoding_rs::BIG5),
+            TextCodePage::Windows936 => Some(encoding_rs::GBK),
+            TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+        }
+    }
+
+    /// Whether the code page has two-byte characters (a lead byte, then a
+    /// trail byte).
+    pub fn is_double_byte(self) -> bool {
+        self.encoding().is_some()
+    }
+
+    /// Whether `b` starts a two-byte character: 0x81..0xfe in code pages
+    /// 950 and 936; never in the single-byte code pages.
+    pub fn is_lead_byte(self, b: u8) -> bool {
+        self.is_double_byte() && (0x81..=0xfe).contains(&b)
+    }
+
+    /// The character of one byte (`'\0'` where the code page has none; a
+    /// lead byte of a double-byte code page alone has none).
     pub fn char_of(self, b: u8) -> char {
         let u = match (self, b) {
             (_, 0..=0x7f) => u32::from(b),
             (TextCodePage::Windows1252, 0x80..=0x9f) => u32::from(CP1252_80[usize::from(b - 0x80)]),
             (TextCodePage::Windows1252, _) => u32::from(b),
             (TextCodePage::Dos850, _) => u32::from(CP850_80[usize::from(b - 0x80)]),
+            (TextCodePage::Windows950 | TextCodePage::Windows936, _) => {
+                return self.decode(&[b]).chars().next().unwrap_or('\0');
+            }
         };
         char::from_u32(u).unwrap_or('\0')
     }
 
-    /// The text of `bytes`.
+    /// The text of `bytes`; in a double-byte code page a byte pair is one
+    /// character, and a byte or pair the code page has no character for is
+    /// `'\0'`.
     pub fn decode(self, bytes: &[u8]) -> String {
-        bytes.iter().map(|&b| self.char_of(b)).collect()
+        match self.encoding() {
+            Some(enc) => enc
+                .decode_without_bom_handling(bytes)
+                .0
+                .chars()
+                .map(|c| {
+                    if c == char::REPLACEMENT_CHARACTER {
+                        '\0'
+                    } else {
+                        c
+                    }
+                })
+                .collect(),
+            None => bytes.iter().map(|&b| self.char_of(b)).collect(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::TextCodePage::{Dos850, Windows1252};
+    use super::TextCodePage::{Dos850, Windows1252, Windows936, Windows950};
 
     #[test]
     fn french_letters() {
@@ -80,5 +133,50 @@ mod tests {
         assert_eq!(Windows1252.decode(&[0xe9, 0xe0, 0xe8, 0xe7]), "éàèç");
         assert_eq!(Dos850.decode(b"Seth"), "Seth");
         assert_eq!(Windows1252.char_of(0x81), '\0');
+    }
+
+    /// The subtitle breakers' cut marks, as the executables compare them
+    /// (atlantis-cd-zh-tw-696832 FUN_0042f424 @ 0x0042f510..0x0042f566,
+    /// atlantis-cd-zh-cn-692736 FUN_0042f424 @ 0x0042f510..0x0042f568).
+    #[test]
+    fn chinese_punctuation() {
+        assert_eq!(
+            Windows950
+                .decode(&[0xa1, 0x41, 0xa1, 0x43, 0xa1, 0x46, 0xa1, 0x48, 0xa1, 0x49, 0xa1, 0x4b]),
+            "，。；？！…"
+        );
+        assert_eq!(
+            Windows936.decode(&[0xa3, 0xac, 0xa1, 0xa3, 0xa3, 0xbf, 0xa3, 0xa1, 0xa1, 0xa1]),
+            "，。？！\u{3000}"
+        );
+    }
+
+    #[test]
+    fn chinese_characters() {
+        // 中文 in each code page, between ASCII.
+        assert_eq!(
+            Windows950.decode(b"[Seth] \xa4\xa4\xa4\xe5!"),
+            "[Seth] 中文!"
+        );
+        assert_eq!(
+            Windows936.decode(b"[Seth] \xd6\xd0\xce\xc4!"),
+            "[Seth] 中文!"
+        );
+        // The GBK pairs outside GB2312 of the Simplified texts.
+        assert_eq!(
+            Windows936.decode(&[0x85, 0x85, 0x97, 0x97, 0xa8, 0x44]),
+            "厖棗―"
+        );
+        // A lead byte without its trail byte, and a byte with no character.
+        assert_eq!(Windows950.decode(&[b'a', 0xa4]), "a\0");
+        assert_eq!(Windows950.decode(&[0xff, b'b']), "\0b");
+        assert_eq!(Windows950.char_of(0xa4), '\0');
+        assert_eq!(Windows950.char_of(b'S'), 'S');
+        assert_eq!(Windows936.char_of(0x80), '€');
+        assert!(Windows950.is_lead_byte(0xa4) && Windows936.is_lead_byte(0x85));
+        assert!(!Windows950.is_lead_byte(b'a') && !Windows1252.is_lead_byte(0xa4));
+        assert!(Windows936.is_double_byte() && !Dos850.is_double_byte());
+        // The single-byte code pages are unchanged.
+        assert_eq!(Windows1252.decode(&[0xa4, 0xa4]), "¤¤");
     }
 }

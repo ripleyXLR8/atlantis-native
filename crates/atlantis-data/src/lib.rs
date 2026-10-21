@@ -22,7 +22,7 @@ pub mod text;
 pub mod wam;
 
 pub use big::BigArchive;
-pub use exe::{ExeBuild, ExeTables};
+pub use exe::{CinemaCaptions, CjkBreaker, ExeBuild, ExeTables, LoadList};
 pub use files::{FileSource, MemFiles, StdDir};
 pub use game::{Edition, Game, GameError};
 pub use sprite::{read_spr_file, Image565, SprSprite};

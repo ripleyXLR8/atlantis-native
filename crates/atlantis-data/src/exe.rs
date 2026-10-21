@@ -158,6 +158,107 @@ pub struct ExeBuild {
     /// builds turn only the bytes below 0x20 into spaces. No shipped menu
     /// byte is above 0xa8.
     pub menu_high_bytes_as_space: bool,
+    /// The GDI subtitle breaker's cut marks: the reference's 100-byte
+    /// window cut at a space (FUN_0042ffe8), or the Chinese builds'
+    /// 75-byte window cut after double-byte punctuation (FUN_0042f424 of
+    /// atlantis-cd-zh-tw-696832: Big5 marks @ 0x0042f510..0x0042f566; of
+    /// atlantis-cd-zh-cn-692736: GB2312 marks and the ideographic space
+    /// @ 0x0042f510..0x0042f568).
+    pub cjk_breaker: CjkBreaker,
+    /// The GDI subtitle drawer's row step in pixels: row i of n at y =
+    /// 0x1ce - (n - i + 1) * step (FUN_00430178: 14; atlantis-cd-zh-tw-696832
+    /// FUN_0042f798 @ 0x0042f7f8, 0x0042f828: `imul eax,eax,0x12`, 18). The
+    /// bitmap subtitles have their own (10).
+    pub subtitle_row_step: u8,
+    /// The menus' `/sprc=` records drawn from these two banks of
+    /// `SPRITE\2D` (normal, hovered) instead of FONTMAX / FONTMAX2, which
+    /// are then not loaded (atlantis-cd-zh-tw-696832 FUN_0042676c @
+    /// 0x004267a2..0x00426874: `sprchi1.spr` into 0x006bd874, `sprchi2.spr`
+    /// into 0x006bd878); `None`: the FONTMAX text menus.
+    pub menu_sprite_banks: Option<[&'static str; 2]>,
+    /// The options menu's toggles drawn as sprites of the menu banks: the
+    /// record parser turns id 9 of menu 2 into 9 + SUBTITLES (0x004860a8;
+    /// 9 off, 10 on) and id 12 into 13 when the OMNI 3D flag (0x004860ac) is
+    /// 1 (atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x00420212..0x00420225,
+    /// 0x0042022e..0x00420242; the id 12 test is made in every menu).
+    pub menu_toggle_sprites: bool,
+    /// What the LOAD list shows for its rows.
+    pub load_list: LoadList,
+    /// Captions burnt over one CINEMA video as sprites.
+    pub cinema_captions: Option<CinemaCaptions>,
+    /// SUBTITLES (0x004860a8) is set at every start-up
+    /// (atlantis-cd-zh-tw-696832 WinMain @ 0x0041971f: `mov [0x4860a8],1`);
+    /// the other builds leave the file's 0.
+    pub subtitles_on_at_start: bool,
+    /// The size of `players.atl`'s names block: 0x55 = 85 bytes (5 rows of
+    /// 17; the reference reads 97 bytes, the 1997 builds 95), or 0x66 = 102
+    /// in the Chinese builds, a 114-byte file with its 6 chapters and 6
+    /// letters (atlantis-cd-zh-tw-696832 WinMain @ 0x0041921a: `push 0x66`;
+    /// writers FUN_0041dd14 @ 0x0041e574, FUN_0041e65c @ 0x0041e9b0,
+    /// FUN_0042cb1c @ 0x0042d147).
+    pub players_names_block: u8,
+}
+
+/// The cut marks of the GDI subtitle breaker ([`ExeBuild::cjk_breaker`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CjkBreaker {
+    /// The reference's breaker (FUN_0042ffe8), or the 1997 builds' own.
+    None,
+    /// atlantis-cd-zh-tw-696832 FUN_0042f424: a 75-byte window; backwards
+    /// from its end, after `A1 41` `，`, `A1 43` `。`, `A1 46` `；`, `A1 48`
+    /// `？`, `A1 49` `！`, `A1 4B` `…` or at a CR (@ 0x0042f510..0x0042f566).
+    Big5,
+    /// atlantis-cd-zh-cn-692736 FUN_0042f424: the same window; after `A3 AC`
+    /// `，`, `A1 A3` `。`, `A3 BF` `？`, `A3 A1` `！`, or before `A1 A1` (the
+    /// ideographic space, the next row starting one byte past its lead
+    /// byte), or at a CR (@ 0x0042f510..0x0042f568, 0x0042f599..0x0042f5ef).
+    Gb2312,
+}
+
+/// The rows of the LOAD list ([`ExeBuild::load_list`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LoadList {
+    /// Each row its checkpoint's `SPRLIST\EPI.TXT` line in FONTMIN, the
+    /// chapter from its file name (FUN_00420b48).
+    EpiText,
+    /// Row i drawn as frame i of the first bank (the second when hovered),
+    /// whatever the checkpoint; a pick sets the chapter to `chapters_va[i]`
+    /// and shows frame i of the second bank centred by `widths_va[i]`
+    /// (atlantis-cd-zh-tw-696832: banks loaded by FUN_0042676c into
+    /// 0x006bd86c / 0x006bd870; rows FUN_004205a4 @ 0x0042060b..0x00420691;
+    /// the pick FUN_0041ce00 @ 0x0041d413..0x0041d44d; the title FUN_004208bc
+    /// @ 0x00420a22..0x00420a8d).
+    Sprites {
+        /// The banks of `SPRITE\2D` (normal, hovered).
+        banks: [&'static str; 2],
+        /// The chapter of each row (`rows` bytes).
+        chapters_va: u32,
+        /// The width of each row's title frame (`rows` bytes).
+        widths_va: u32,
+        /// The entries of both tables (the frames of the banks).
+        rows: u8,
+    },
+}
+
+/// Captions drawn over a CINEMA video ([`ExeBuild::cinema_captions`]):
+/// atlantis-cd-zh-tw-696832's CON `CINEMA=20` loads the bank and resets the
+/// frame 0x004865a0 (FUN_00429958 @ 0x00429fbe..0x0042a053, freed @
+/// 0x0042a224..0x0042a235); while that video plays, the video frame
+/// presenter FUN_0041afa0 draws the frame at (x, y) when `after` < t <
+/// `before` (t = ticks of the 200 Hz timer since 0x004865a4), then steps
+/// the frame from k to k + 1 once t > `steps[k]`, in order
+/// (@ 0x0041b105..0x0041b2bc).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CinemaCaptions {
+    /// The CINEMA value (0x004865a1 compared @ 0x00429fcd, 0x0041b105).
+    pub cinema: u8,
+    /// The bank of `SPRITE\2D` (0x006bd868).
+    pub bank: &'static str,
+    pub x: i16,
+    pub y: i16,
+    pub after: u16,
+    pub before: u16,
+    pub steps: [u16; 10],
 }
 
 /// The reference (a 2001 English build), the GOG build (a 1999 build, the
@@ -176,9 +277,11 @@ pub struct ExeBuild {
 /// tables, with its own subtitle breaker, name entry and LOAD clamp), the
 /// Spanish retail CD's build of August 1997 (the French August build's code
 /// with the reference's rat search restart, the German build's addresses)
-/// and the Italian retail CD's build of July 1997 (the French August
-/// build's code with its own menu zones, the credits widths 1 byte further).
-pub const BUILDS: [ExeBuild; 11] = [
+/// the Italian retail CD's build of July 1997 (the French August
+/// build's code with its own menu zones, the credits widths 1 byte further)
+/// and the Traditional and Simplified Chinese CDs' builds of July 1998 and
+/// March 1999 ([`ZH_TW`] and [`ZH_CN`]).
+pub const BUILDS: [ExeBuild; 13] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
@@ -221,6 +324,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     ExeBuild {
         name: "atlantis-gog-714752",
@@ -264,6 +375,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     // Cryo's Windows patch AT1CDINT.EXE ("1.01"), installed over the
     // English, French and German CD installs, whose BIGCD1..4.BIG it keeps.
@@ -322,6 +441,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     ExeBuild {
         name: "atlantis-cd-en-688128",
@@ -366,6 +493,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     // A 1997 build sharing most of atlantis-cd-en-688128's code, with the
     // reference's GDI subtitles (FUN_0041a834, FUN_0042e84c, FUN_0042e9cc),
@@ -427,6 +562,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     // The German retail CD's build: atlantis-cd-fr-687104's code byte for
     // byte (its BEGTEXT section is the French one's) and its DGROUP layout,
@@ -483,6 +626,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     // The Spanish retail CD's build (August 1997): atlantis-cd-fr-687104's
     // code but for one line, the rat puzzle's T0023 search restarting at
@@ -541,6 +692,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     // The Italian retail CD's build (July 1997, eleven days before
     // atlantis-cd-fr-687104): the French August build's code but for the
@@ -597,6 +756,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         // FUN_0041ecb4 @ 0x0041f068 and @ 0x0041f235.
         menu_positioned_byte_width: 16,
         menu_high_bytes_as_space: true,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     // The first French pressing: atlantis-cd-en-688128's code (every
     // function pairs; most differences are the calling convention of its
@@ -652,6 +819,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     // The Dutch retail CD's build: atlantis-cd-en-688128's code (the same
     // size, told apart by the PE stamp) but for the R&P logo at start-up
@@ -719,6 +894,14 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
     // The Swedish retail CD's build: atlantis-cd-en-688128's code rebuilt
     // on 1997-06-11 (the same size, told apart by the PE stamp), every
@@ -781,8 +964,140 @@ pub const BUILDS: [ExeBuild; 11] = [
         name_entry_dos_letters: true,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
     },
+    ZH_TW,
+    ZH_CN,
 ];
+
+/// The Traditional Chinese 4-CD release's build (atlantis-cd-zh-tw-696832,
+/// 1998-07-17). Its code line is atlantis-cd-fr-687104's moved toward the
+/// reference by an unsupported 1998 build (the "Perfect Edition"
+/// executable, atlantis-pe-2018-695296), with fourteen changes of its own:
+/// GDI subtitles in the system code page with a Big5 breaker and rows 18
+/// px apart, the menus, the LOAD list and the opening captions drawn as
+/// sprites, SUBTITLES on at start-up and a 114-byte players.atl. Every
+/// table the port reads holds the reference's bytes but the player row
+/// (`New Player`, no '#', 0x004865a8) and the two LOAD tables.
+pub const ZH_TW: ExeBuild = ExeBuild {
+    name: "atlantis-cd-zh-tw-696832",
+    size: 696_832,
+    pe_timestamp: 0x35af_1f09,
+    year: 1998,
+    month: None,
+    dgroup_vaddr: 0x8_0000,
+    dgroup_raw: 0x6_dc00,
+    music_va: 0x0048_5eec,
+    // The names in 0x004ab49c..0x004abcb0.
+    sound_names_va: 0x0048_61dc,
+    sound_names_range: (0x004a_0000, 0x004b_0000),
+    // "New Player", then the names array (0x004865b3, initially "New
+    // Player" too): the marker is the label, drawn as stored.
+    new_player_va: 0x0048_65a8,
+    inventory_va: 0x0048_688c,
+    guest_va: 0x0048_6960,
+    // The reference's 256 widths.
+    credit_widths_va: 0x0048_67d8,
+    marker_is_label: true,
+    // FUN_00422990: no rule for ids 0x219 / 0x21a.
+    cursor_id_rule: false,
+    // FUN_00427cc0: no forced camera.
+    rhea_camera2: false,
+    // FUN_00425e80: the per-section counter, the voice after the image.
+    alt_game_over_narration: true,
+    // GDI: font FUN_0041ad5c, breaker FUN_0042f424, drawer FUN_0042f798.
+    bitmap_subtitles: false,
+    // FUN_0041d5c0 @ 0x0041d658..0x0041d67a.
+    subtitle_click_cycle: true,
+    // The '#' rule (FUN_004206e8) and the deletion's loop (FUN_0041e65c)
+    // of the reference; the names block of its own (players_names_block).
+    players_1997: false,
+    // FUN_0041dd14 @ 0x0041e0fd: 0x20..0xa7, case kept.
+    upper_case_names: false,
+    // FUN_0043d4b0: OBJETENMAIN not forced.
+    hexa_forces_402: false,
+    // FUN_0043fdfc.
+    queen_reveal: (3, 200),
+    // FUN_00436938: 5 ticks after each pass.
+    rat_deadline_pacing: false,
+    // FUN_00435b8c @ 0x00435bc3: `mov word [0x762b74],0`.
+    rat_search_restart: true,
+    // FUN_0041c030.
+    warp_cursor_steps: 1,
+    // FUN_0041ce00 @ 0x0041d17a: `mov word [0x602774],0x7b`, with the clamp.
+    load_knob_starts_at_bar: true,
+    load_picker_clamp: true,
+    // FUN_00429958 acts whatever the playing track.
+    music_first_value_rule: false,
+    game_over_voice_at_entry: false,
+    music_load_all_or_nothing: false,
+    music_load_min_volume: 0,
+    music_restart_rearms_fade: true,
+    // The CON texts; the SPRLIST texts are Windows-1252 glyph indices.
+    text_code_page: TextCodePage::Windows950,
+    startup_logo_rp: false,
+    // FUN_0042676c @ 0x0042697f: once at start-up, with the menus.
+    credits_read_per_run: false,
+    subtitle_cut_back_only: false,
+    name_entry_dos_letters: false,
+    // FUN_0041f5a0 @ 0x0041f968 (`imul ebx,[ebp-0x28],0x16`), bytes below
+    // 0x20 as spaces @ 0x0041fc19.
+    menu_positioned_byte_width: 22,
+    menu_high_bytes_as_space: false,
+    cjk_breaker: CjkBreaker::Big5,
+    subtitle_row_step: 18,
+    menu_sprite_banks: Some(["SPRCHI1.SPR", "SPRCHI2.SPR"]),
+    menu_toggle_sprites: true,
+    load_list: LoadList::Sprites {
+        banks: ["EPICHI1.SPR", "EPICHI2.SPR"],
+        // FUN_0041ce00 @ 0x0041d432, FUN_004208bc.
+        chapters_va: 0x0048_6619,
+        widths_va: 0x0048_6663,
+        rows: 74,
+    },
+    cinema_captions: Some(CinemaCaptions {
+        cinema: 20,
+        bank: "SUBCHINE.SPR",
+        // @ 0x0041b13b..0x0041b15c: (0xa, 0x1ae).
+        x: 10,
+        y: 430,
+        // @ 0x0041b11d, 0x0041b12f: 0x4b0, 0x4970.
+        after: 1200,
+        before: 18800,
+        // @ 0x0041b16f, 0x0041b192 .. 0x0041b2aa.
+        steps: [
+            2200, 4400, 5000, 7200, 7800, 9400, 10600, 12600, 14800, 16400,
+        ],
+    }),
+    subtitles_on_at_start: true,
+    players_names_block: 102,
+};
+
+/// The Simplified Chinese 4-CD release's build (atlantis-cd-zh-cn-692736,
+/// 1999-03-18): [`ZH_TW`]'s program, data layout and Traditional Chinese
+/// sprites with two functions changed, the subtitle breaker (GB2312 marks,
+/// FUN_0042f424) and the hens' weighing (FUN_004412ec, a developer's frame
+/// capture removed); DGROUP 0xe00 bytes lower in the file. The functions
+/// after the breaker sit 0x24 bytes lower (the drawer FUN_0042f774, rows
+/// 18 px apart @ 0x0042f7d4, 0x0042f804).
+pub const ZH_CN: ExeBuild = ExeBuild {
+    name: "atlantis-cd-zh-cn-692736",
+    size: 692_736,
+    pe_timestamp: 0x36f1_1f20,
+    year: 1999,
+    dgroup_raw: 0x6_ce00,
+    // The CON texts, GB2312 with a few GBK pairs.
+    text_code_page: TextCodePage::Windows936,
+    cjk_breaker: CjkBreaker::Gb2312,
+    ..ZH_TW
+};
 
 /// The TimeDateStamp of a PE file's COFF header (at e_lfanew + 8, after the
 /// "PE\0\0" signature), `None` when the bytes are not a PE file.
@@ -850,6 +1165,11 @@ pub struct ExeTables {
     /// table at 0x00496224 (17 WAM names at 0x004961e0 come first), up to
     /// its "FIN" entry. The poller FUN_00432a64 plays "wav\" + entry N.
     pub newsound_names: Vec<String>,
+    /// [`LoadList::Sprites`]: the chapter each LOAD row loads, and the
+    /// width of each row's title frame (atlantis-cd-zh-tw-696832
+    /// 0x00486619, 0x00486663); empty for the other builds.
+    pub load_chapters: Vec<u8>,
+    pub load_widths: Vec<u8>,
 }
 
 /// The number of music tracks (StartMusik=1..31).
@@ -924,6 +1244,21 @@ impl ExeTables {
         let mut credit_widths = [0u8; 256];
         let cw = build.file_offset(build.credit_widths_va);
         credit_widths.copy_from_slice(&exe[cw..cw + 256]);
+        let (load_chapters, load_widths) = match build.load_list {
+            LoadList::EpiText => (Vec::new(), Vec::new()),
+            LoadList::Sprites {
+                chapters_va,
+                widths_va,
+                rows,
+                ..
+            } => {
+                let table = |va: u32| {
+                    let at = build.file_offset(va);
+                    exe[at..at + usize::from(rows)].to_vec()
+                };
+                (table(chapters_va), table(widths_va))
+            }
+        };
         Some(ExeTables {
             build,
             new_player_marker,
@@ -934,6 +1269,8 @@ impl ExeTables {
             credit_widths,
             music_names: music_names(build, exe),
             newsound_names: newsound_names(build, exe),
+            load_chapters,
+            load_widths,
         })
     }
 }
@@ -982,6 +1319,62 @@ mod tests {
         assert_eq!(build_of(&nl).unwrap().name, "atlantis-cd-nl-688128");
         let sv = fake_exe(688_128, 0x339e_656f);
         assert_eq!(build_of(&sv).unwrap().name, "atlantis-cd-sv-688128");
+        // The Chinese builds: sizes of their own.
+        let tw = fake_exe(696_832, 0x35af_1f09);
+        assert_eq!(build_of(&tw).unwrap().name, "atlantis-cd-zh-tw-696832");
+        let cn = fake_exe(692_736, 0x36f1_1f20);
+        assert_eq!(build_of(&cn).unwrap().name, "atlantis-cd-zh-cn-692736");
+        assert!(build_of(&fake_exe(696_832, 0x36f1_1f20)).is_none());
+    }
+
+    /// The Chinese builds' new fields; every other build keeps the
+    /// reference's values of them.
+    #[test]
+    fn chinese_fields() {
+        for b in &BUILDS[..11] {
+            assert_eq!(b.cjk_breaker, CjkBreaker::None, "{}", b.name);
+            assert_eq!(b.subtitle_row_step, 14, "{}", b.name);
+            assert_eq!(b.menu_sprite_banks, None, "{}", b.name);
+            assert!(
+                !b.menu_toggle_sprites && !b.subtitles_on_at_start,
+                "{}",
+                b.name
+            );
+            assert_eq!(b.load_list, LoadList::EpiText, "{}", b.name);
+            assert_eq!(b.cinema_captions, None, "{}", b.name);
+            assert_eq!(b.players_names_block, 85, "{}", b.name);
+            assert!(!b.text_code_page.is_double_byte(), "{}", b.name);
+        }
+        assert_eq!(
+            (ZH_TW.cjk_breaker, ZH_CN.cjk_breaker),
+            (CjkBreaker::Big5, CjkBreaker::Gb2312)
+        );
+        assert_eq!(ZH_TW.text_code_page, TextCodePage::Windows950);
+        assert_eq!(ZH_CN.text_code_page, TextCodePage::Windows936);
+        // zh-cn is zh-tw but for its identity, file layout, code page and
+        // breaker.
+        let mut cn = ZH_CN;
+        cn.name = ZH_TW.name;
+        cn.size = ZH_TW.size;
+        cn.pe_timestamp = ZH_TW.pe_timestamp;
+        cn.year = ZH_TW.year;
+        cn.dgroup_raw = ZH_TW.dgroup_raw;
+        cn.text_code_page = ZH_TW.text_code_page;
+        cn.cjk_breaker = ZH_TW.cjk_breaker;
+        assert_eq!(cn, ZH_TW);
+        for b in [&ZH_TW, &ZH_CN] {
+            assert_eq!(b.subtitle_row_step, 18);
+            assert!(b.subtitles_on_at_start && b.menu_toggle_sprites);
+            assert_eq!(b.players_names_block, 0x66);
+            assert_eq!(b.cinema_captions.map(|c| c.cinema), Some(20));
+            // The DGROUP file offsets: zh-tw 0x6dc00 + (VA - 0x480000).
+            assert_eq!(
+                b.file_offset(0x0048_65a8),
+                0x741a8 - (0x6dc00 - b.dgroup_raw as usize)
+            );
+        }
+        let steps = ZH_TW.cinema_captions.unwrap().steps;
+        assert!(steps.windows(2).all(|w| w[0] < w[1]));
     }
 
     #[test]

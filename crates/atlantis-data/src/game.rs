@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::big::BigArchive;
 use crate::exe::ExeTables;
 use crate::files::FileSource;
+use crate::text::TextCodePage;
 
 #[derive(Debug)]
 pub enum GameError {
@@ -113,11 +114,17 @@ impl Game {
     /// "Jugador nuevo" (Spanish), "Nuovo Giocatore" (Italian).
     /// The 1.01 patch's executable is French ("#NOUVEAU JOUEUR") over
     /// whichever CD it was installed on: the language is its interface's.
+    /// The Chinese builds keep the English row ("New Player", no '#'): their
+    /// language is their texts' code page's.
     pub fn edition(&self) -> Edition {
         let name = self.exe.build.name;
         let marker = self.exe.new_player_marker.as_slice();
         let starts = |p: &[u8]| marker.len() >= p.len() && &marker[..p.len()] == p;
-        let language = if starts(b"#NOUVEAU") || starts(b"NOUVEAU JOUEUR") {
+        let language = if self.exe.build.text_code_page == TextCodePage::Windows950 {
+            Some("Traditional Chinese")
+        } else if self.exe.build.text_code_page == TextCodePage::Windows936 {
+            Some("Simplified Chinese")
+        } else if starts(b"#NOUVEAU") || starts(b"NOUVEAU JOUEUR") {
             Some("French")
         } else if starts(b"#NEUE") || starts(b"NEUER SPIELER") {
             Some("German")
