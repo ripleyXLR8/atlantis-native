@@ -235,15 +235,6 @@ pub struct MenuRules {
     /// keeps them, a fresh one stores the shifted values); with the minor
     /// bug fixes the step back is taken only for id 10.
     pub toggle_in_step: bool,
-    /// A sprite record that holds a y is drawn at it, not at the y of the
-    /// menu's text, as it is at its stored x: the original reloads the
-    /// stored y (the reference FUN_004207c0 @ 0x004209b0;
-    /// atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x00420412), so the LOAD
-    /// knob is drawn where the picker put it. Set for the Chinese builds
-    /// (the builds with sprite menus, `ExeBuild::menu_sprite_banks`); the
-    /// others keep the port's draw at the text's y, as before (their knob
-    /// stays at the file's place: a difference).
-    pub sprite_stored_y: bool,
 }
 
 /// The reference's walk, without the port's fix.
@@ -255,7 +246,6 @@ impl Default for MenuRules {
             high_bytes_as_space: false,
             toggle_sprites: false,
             toggle_in_step: false,
-            sprite_stored_y: false,
         }
     }
 }
@@ -277,7 +267,6 @@ impl MenuRules {
             high_bytes_as_space: build.menu_high_bytes_as_space,
             toggle_sprites: build.menu_toggle_sprites,
             toggle_in_step: minor_bug_fixes,
-            sprite_stored_y: build.menu_sprite_banks.is_some(),
         }
     }
 }
@@ -430,20 +419,23 @@ pub fn walk_menu_text(
             let w = walk_atoi(t, p);
             p = walk_step(p, w, 2, true);
             let h = walk_atoi(t, p);
+            // FUN_004207c0 stores the parsed x / y only into a zero field
+            // and otherwise reloads the stored one (x @ 0x00420910, y @
+            // 0x004209b0; atlantis-cd-zh-tw-696832 FUN_004201e8 @
+            // 0x00420412); the blit takes both (0x00420a7f..0x00420a95), in
+            // every build: a slider keeps its knob, and the LOAD knob is
+            // drawn where the picker put it.
             let r = slot(walk, count);
             let mut bx = x;
             if r.x == 0 {
                 r.x = x as i16;
             } else {
-                bx = i32::from(r.x); // a slider keeps its knob
+                bx = i32::from(r.x);
             }
-            // The stored y too, with `sprite_stored_y` (the reference @
-            // 0x004209b0; atlantis-cd-zh-tw-696832 FUN_004201e8 @
-            // 0x00420412): the LOAD knob is drawn where the picker put it.
             let mut by = y;
             if r.y == 0 {
                 r.y = y as i16;
-            } else if rules.sprite_stored_y {
+            } else {
                 by = i32::from(r.y);
             }
             r.w = w as i16;
@@ -979,7 +971,6 @@ mod tests {
         let text = b"/sprc=2,260,50,150,32\r\n/sprc=8,160,250,100,32\r\n/sprc=9,345,267,51,33\r\n/sprc=12,344,300,250,32\r\n/fin\r\n";
         let rules = MenuRules {
             toggle_sprites: true,
-            sprite_stored_y: true,
             ..MenuRules::default()
         };
         let sprites = |w: &MenuWalk| -> Vec<(i32, i16, i16, bool)> {
@@ -1052,39 +1043,58 @@ mod tests {
     }
 
     /// A sprite record keeps a stored non-zero x and y and is drawn there
-    /// (the LOAD knob) with `sprite_stored_y`; without it, at the text's y.
+    /// (the LOAD knob), whatever the build; its w / h are written again.
     #[test]
     fn sprite_record_drawn_at_stored_position() {
         let text = b"/spr=13,600,130,32,32\r\n/fin\r\n";
+        for b in BUILDS.iter() {
+            let mut walk = MenuWalk {
+                records: vec![MenuRecord {
+                    x: 0,
+                    y: 0x7b,
+                    w: 0,
+                    h: 0,
+                }],
+                ops: Vec::new(),
+            };
+            walk_menu_text(text, 1, -1, 0, 0, MenuRules::of_build(b, false), &mut walk);
+            assert_eq!((walk.ops[0].x, walk.ops[0].y), (600, 0x7b), "{}", b.name);
+            assert!(!walk.ops[0].alt_bank);
+            assert_eq!(walk.records[0].y, 0x7b);
+        }
+    }
+
+    /// A redraw over a stored sprite record: its x / y kept and blitted
+    /// there, w / h written again; a fresh record takes the text's. Values
+    /// of the original walk run under emulation with record 0 set to (50,
+    /// 77, 0, 0) beforehand: record (50, 77, 30, 40), sprite 3 at (50, 77);
+    /// the positioned line's record (-6, -19, 22, 28).
+    #[test]
+    fn walk_redraw_keeps_stored_position() {
+        let text = b"/spr=3,100,200,30,40\r\n<5,9>X\r\n/fin\r\n";
         let mut walk = MenuWalk {
             records: vec![MenuRecord {
-                x: 0,
-                y: 0x7b,
+                x: 50,
+                y: 77,
                 w: 0,
                 h: 0,
             }],
             ops: Vec::new(),
         };
-        let rules = MenuRules {
-            sprite_stored_y: true,
-            ..MenuRules::default()
-        };
-        walk_menu_text(text, 1, -1, 0, 0, rules, &mut walk);
-        assert_eq!((walk.ops[0].x, walk.ops[0].y), (600, 0x7b));
-        assert!(!walk.ops[0].alt_bank);
-        walk.ops.clear();
         walk_menu_text(text, 1, -1, 0, 0, MenuRules::default(), &mut walk);
-        assert_eq!((walk.ops[0].x, walk.ops[0].y), (600, 130));
-        assert_eq!(walk.records[0].y, 0x7b);
-        for b in BUILDS.iter() {
-            let rules = MenuRules::of_build(b, false);
-            assert_eq!(
-                rules.sprite_stored_y,
-                b.text_code_page.is_double_byte(),
-                "{}",
-                b.name
-            );
-        }
+        let rec = |r: &MenuRecord| (r.x, r.y, r.w, r.h);
+        let recs: Vec<_> = walk.records.iter().map(rec).collect();
+        assert_eq!(recs, [(50, 77, 30, 40), (-6, -19, 22, 28)]);
+        let sprites: Vec<_> = walk
+            .ops
+            .iter()
+            .filter(|o| o.sprite)
+            .map(|o| (o.index, o.x, o.y))
+            .collect();
+        assert_eq!(sprites, [(3, 50, 77)]);
+        let mut fresh = MenuWalk::default();
+        walk_menu_text(text, 1, -1, 0, 0, MenuRules::default(), &mut fresh);
+        assert_eq!((fresh.ops[0].x, fresh.ops[0].y), (100, 200));
     }
 
     #[test]

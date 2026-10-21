@@ -314,10 +314,7 @@ picked folder on its first start.
   seconds after the opening began); what that shows is not known.
 - On the GOG.com release, the 30 dialog lines marked `off1` are played
   with the view redrawn; the original shows the picture the last video
-  (or music load) left under their subtitle (the port does so on the Chinese CDs only). In
-  every edition but the Chinese ones, the LOAD list's scrollbar knob is
-  drawn at its place in the menu file; the original draws it where the
-  list is scrolled.
+  (or music load) left under their subtitle (the port does so on the Chinese CDs only).
 - Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).
