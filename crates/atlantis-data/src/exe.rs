@@ -29,9 +29,14 @@ pub struct ExeBuild {
     pub inventory_va: u32,     // FUN_0042b328's object table
     pub guest_va: u32,         // FUN_0042b480's guest sprite table
     pub credit_widths_va: u32, // credits font advance table
-    /// The marker is followed by the label the row shows (`#New Player`,
-    /// then the names array); the 1997 build stores and shows the marker
-    /// itself (`New Player`, atlantis-cd-en-688128 FUN_0041fff4).
+    /// The marker has no '#' and is drawn as it is (`New Player`,
+    /// atlantis-cd-en-688128 FUN_0041fff4); otherwise the player list
+    /// draws the marker (`#New Player`) with its '#' skipped (FUN_00420d8c
+    /// @ 0x00420eff). The string after the marker's NUL in the later
+    /// builds is not a label: it is the initial content of names[0] of the
+    /// players.atl image (0x0049657c), which the file (ReadFile @
+    /// 0x00419221) or the marker (strcpy @ 0x004191f6) overwrites before
+    /// any draw; no code reads it as a label.
     pub marker_is_label: bool,
     /// FUN_00422fcc @ 0x0042313d: ids 0x219 / 0x21a get the navigate cursor.
     pub cursor_id_rule: bool,
@@ -55,7 +60,11 @@ pub struct ExeBuild {
     /// en-688128 FUN_0041d6d0, FUN_0041e030, FUN_0042c164; fr-687104 reader
     /// WinMain @ 0x00418d29, writers FUN_0041d45c, FUN_0041dda0,
     /// FUN_0042bf74), the rows after the last not cleared by a deletion
-    /// (en-688128 FUN_0041e030, fr-687104 FUN_0041dda0).
+    /// (en-688128 FUN_0041e030, fr-687104 FUN_0041dda0), the rows of the
+    /// file counted up to the marker only, an empty name being a row
+    /// (en-688128 WinMain @ 0x00419194..0x004191b1, fr-687104 @
+    /// 0x00418da7..0x00418dc4; the reference also stops at an empty name,
+    /// @ 0x0041928f..0x004192cf). Set for every 1997 build.
     pub players_1997: bool,
     /// Names typed 0x20..0x7a with a..z stored upper case
     /// (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1); else 0x20..0xa7,
@@ -343,8 +352,10 @@ pub const BUILDS: [ExeBuild; 13] = [
         players_names_block: 85,
         off1_player: false,
     },
+    // The GOG.com build: named after its French executable; the five
+    // language executables are that one with the player row changed.
     ExeBuild {
-        name: "atlantis-gog-714752",
+        name: "atlantis-gog-fr-714752",
         size: 714_752,
         pe_timestamp: 0x385a_4dc6,
         year: 1999,
@@ -1398,6 +1409,14 @@ mod tests {
         }
         let steps = ZH_TW.cinema_captions.unwrap().steps;
         assert!(steps.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    /// The 1997 players.atl row rule in every 1997 build.
+    #[test]
+    fn player_rows_rule() {
+        for b in &BUILDS {
+            assert_eq!(b.players_1997, b.year == 1997, "{}", b.name);
+        }
     }
 
     #[test]

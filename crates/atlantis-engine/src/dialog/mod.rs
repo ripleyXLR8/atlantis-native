@@ -1556,6 +1556,6 @@ mod off1_tests {
             return;
         };
         let g = Game::open(Arc::new(StdDir::new(dir))).expect("the game directory");
-        release_off1(g, "atlantis-gog-714752", 30, Some((377, 'A')));
+        release_off1(g, "atlantis-gog-fr-714752", 30, Some((377, 'A')));
     }
 }
