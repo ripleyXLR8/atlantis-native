@@ -91,9 +91,13 @@ impl MusicFade {
     pub fn tick(&mut self) {
         self.ticks = self.ticks.wrapping_add(1);
         // FUN_0042f7a8: the target is computed on the first tick; already
-        // reached, the fade ends without a step.
+        // reached, the fade ends without a step and the function returns
+        // (@ 0x0042f832..0x0042f843, jump to the epilogue 0x0042f96b), so
+        // the NewSound fade-out below is not processed on that tick.
+        // FUN_0042f974 (the fade up) is a separate call of FUN_00431150
+        // (@ 0x0043117d) and still runs.
+        let mut done = false;
         if self.mode == 2 {
-            let mut done = false;
             if self.down_target == -1 {
                 self.up_target = i32::from(self.vol);
                 self.down_target = (i32::from(self.vol)
@@ -116,7 +120,8 @@ impl MusicFade {
                 }
             }
         }
-        if self.sfx_mode == 2 {
+        // The NewSound fade-out (@ 0x0042f89d..0x0042f961).
+        if !done && self.sfx_mode == 2 {
             if self.ticks.wrapping_sub(self.sfx_last) > 4 {
                 self.sfx_last = self.ticks;
                 self.sfx_vol = (self.sfx_vol - 2).max(0);
@@ -695,12 +700,16 @@ impl Engine {
         self.game.exe.music_names.get(i).cloned()
     }
 
-    /// The original spins on the fade (calling only the music refill) until
-    /// the timer callback has finished it; the screen does not change
-    /// meanwhile.
+    /// The original spins on the fade (calling only the music refill
+    /// `FUN_0043318c`, which reads no input) until the timer callback has
+    /// finished it; the screen does not change meanwhile and input made
+    /// during the spin is seen by the next poll, `FUN_0042e624`'s
+    /// GetAsyncKeyState pass (`FUN_0042a100` @ 0x0042ad98..0x0042ada6,
+    /// 0x0042aed0..0x0042aede). So the events stay queued for the next
+    /// poll; a quit is only delayed (the fade is timer driven, at most 99
+    /// steps of 25 ms).
     async fn music_wait_fade_end(&self) {
         while self.music.fade().mode != 0 && !self.sys.should_quit() {
-            while self.sys.poll_event().is_some() {}
             self.sys.frame().await;
         }
     }
@@ -830,18 +839,20 @@ impl Engine {
     ///
     /// atlantis-cd-fr-688640 has its own LOADMUSIK (decision of the port:
     /// the build's rules by default, the per-track copy of the other builds
-    /// with the minor bug fixes, so that no listed track is left uncopied):
+    /// with the minor bug fixes, so that a list whose first track is there
+    /// leaves no other listed track uncopied):
     /// - it runs only when the current music volume 0x00485e71 is 5 or more
     ///   (FUN_00429184 @ 0x00429c5e), so with the music volume option below
     ///   5 or within 125 ms of a StartMusik the tracks are not copied;
     /// - its LoadMusik copies all or nothing on the first listed track
     ///   (FUN_0041e830, [`con_music_load_all_or_nothing`]).
     ///
-    /// With the minor bug fixes the volume test is dropped and the tracks
-    /// are copied one by one as atlantis-cd-en-688128 does (the first-value
-    /// rule of that build kept). Playback reads the archive in either case
-    /// (the copies are modelled for their trace in the video buffer), so
-    /// no StartMusik goes silent here.
+    /// With the minor bug fixes only the copy changes: the tracks are
+    /// copied one by one as atlantis-cd-en-688128 does (the first-value
+    /// rule of that build kept), and the volume test stays the build's.
+    /// Playback reads the archive in either case (the copies are modelled
+    /// for their trace in the video buffer), so no StartMusik goes silent
+    /// here.
     pub async fn music_list_command(&mut self, load: bool, text: &[u8], pos: u32) {
         let list = con_music_list(text, pos);
         let mut on_disk = self.music.on_disk;
@@ -849,15 +860,14 @@ impl Engine {
         let rule = build.music_first_value_rule;
         let current = self.music.track_id;
         let fixes = self.enhancements().minor_bug_fixes;
-        let copies = if load && build.music_load_all_or_nothing && !fixes {
-            // The executor's first-value test (0x00429c52) is also
-            // LoadMusik's own (0x0041e862..0x0041e891), so only the volume is tested
-            // here.
-            if self.music.fade().cur < build.music_load_min_volume {
-                Vec::new()
-            } else {
-                con_music_load_all_or_nothing(&list, current, &mut on_disk)
-            }
+        // The volume test (FUN_00429184 @ 0x00429c5e), with or without the
+        // minor bug fixes; music_load_min_volume is 0 in every other build.
+        // The executor's first-value test (0x00429c52) is also LoadMusik's
+        // own (0x0041e862..0x0041e891).
+        let copies = if load && self.music.fade().cur < build.music_load_min_volume {
+            Vec::new()
+        } else if load && build.music_load_all_or_nothing && !fixes {
+            con_music_load_all_or_nothing(&list, current, &mut on_disk)
         } else {
             con_music_apply(load, &list, current, &mut on_disk, rule)
         };
@@ -1059,6 +1069,90 @@ mod tests {
             assert_eq!(got.join(";"), c.runs, "{}", c.name);
         }
     }
+
+    /// `FUN_0042f7a8`'s second part, the NewSound fade-out
+    /// (0x0042f89d..0x0042f961), armed (0x00495eb0 = 2) alone and with a
+    /// music fade-down, against `FUN_00431150` run unmodified under
+    /// emulation: the music volume, the mode, the dword 0x006ce128 and
+    /// 0x00495eb0 after each tick, as runs "volume,mode,sfxvolume,
+    /// sfxmode,count". "duck_at_target" pins the early return
+    /// (@ 0x0042f832..0x0042f843): no NewSound step on that tick.
+    #[test]
+    fn sfx_fades_match_original() {
+        // name, cur, mode, vol, sfx volume, sfx last step, ticks run, runs
+        // (ticks 1000, last step 0, percent 80).
+        let from_127 = std::iter::once("0,0,127,2,4".to_string())
+            .chain((1..=125).rev().step_by(2).map(|v| format!("0,0,{v},2,5")))
+            .chain(std::iter::once("0,0,0,0,11".to_string()))
+            .collect::<Vec<_>>()
+            .join(";");
+        let with_duck = (0..25)
+            .flat_map(|k| {
+                let (m, s) = (99 - k, 50 - 2 * k);
+                let mode = if s > 2 { 2 } else { 0 };
+                [
+                    format!("{m},2,{s},2,4"),
+                    format!("{m},2,{},{mode},1", s - 2),
+                ]
+            })
+            .chain((60..=74).rev().map(|m| format!("{m},2,0,0,5")))
+            .collect::<Vec<_>>()
+            .join(";");
+        let cases: [(&str, u8, u8, u8, i32, u32, usize, String); 4] = [
+            ("sfx_from_127", 0, 0, 100, 127, 1000, 330, from_127),
+            (
+                "sfx_odd_3",
+                0,
+                0,
+                100,
+                3,
+                998,
+                20,
+                "0,0,3,2,2;0,0,1,2,5;0,0,0,0,13".into(),
+            ),
+            (
+                "sfx_duck_at_target",
+                20,
+                2,
+                100,
+                10,
+                996,
+                30,
+                "20,0,10,2,1;20,0,8,2,5;20,0,6,2,5;20,0,4,2,5;20,0,2,2,5;20,0,0,0,9".into(),
+            ),
+            ("sfx_with_duck", 100, 2, 100, 50, 1000, 200, with_duck),
+        ];
+        for (name, cur, mode, vol, sfx_vol, sfx_last, n, want) in cases {
+            let mut f = MusicFade {
+                cur,
+                mode,
+                down_target: -1,
+                up_target: i32::from(vol),
+                percent: 80,
+                vol,
+                ticks: 1000,
+                last_step: 0,
+                sfx_mode: 2,
+                sfx_vol,
+                sfx_last,
+                ..MusicFade::default()
+            };
+            let mut runs: Vec<((u8, u8, i32, u8), usize)> = Vec::new();
+            for _ in 0..n {
+                f.tick();
+                let k = (f.cur, f.mode, f.sfx_vol, f.sfx_mode);
+                match runs.last_mut() {
+                    Some(r) if r.0 == k => r.1 += 1,
+                    _ => runs.push((k, 1)),
+                }
+            }
+            let got: Vec<String> = runs
+                .iter()
+                .map(|((a, b, c, d), n)| format!("{a},{b},{c},{d},{n}"))
+                .collect();
+            assert_eq!(got.join(";"), want, "{name}");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1110,7 +1204,8 @@ mod fr688640_tests {
 
     /// atlantis-cd-fr-688640's LOADMUSIK: nothing below a current music
     /// volume of 5 (FUN_00429184 @ 0x00429c5e), all or nothing on its first
-    /// track (FUN_0041e830); with the minor bug fixes, one by one.
+    /// track (FUN_0041e830); with the minor bug fixes, one by one, the
+    /// volume test kept.
     #[test]
     fn may_1997_music_copies() {
         let got = Rc::new(RefCell::new(Vec::new()));
@@ -1142,8 +1237,10 @@ mod fr688640_tests {
                 e.music.track_id = 11;
                 out.push(load(&mut e, false, 127, b"/set(loadmusik=11,2)\r\n").await);
                 e.music.track_id = 0;
-                // The minor bug fixes: one by one, whatever the volume.
-                out.push(load(&mut e, true, 0, b"/set(loadmusik=3,7)\r\n").await);
+                // The minor bug fixes: the volume test kept (4 copies
+                // nothing), then one by one.
+                out.push(load(&mut e, true, 4, b"/set(loadmusik=3,7)\r\n").await);
+                out.push(load(&mut e, true, 5, b"/set(loadmusik=3,7)\r\n").await);
                 *g2.borrow_mut() = out;
             },
             |_, _| {},
@@ -1156,6 +1253,7 @@ mod fr688640_tests {
                     0,
                     b(&[2, 4]),
                     b(&[2, 4]),
+                    b(&[2, 4, 8]),
                     b(&[2, 4, 8]),
                     b(&[2, 4, 8]),
                     b(&[2, 4, 6, 8])

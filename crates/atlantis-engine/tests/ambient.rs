@@ -14,8 +14,8 @@ use std::sync::Arc;
 use atlantis_data::wam::{AmbientObject, AmbientRef, CentrePos, Place, Wam};
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::ambient::{
-    ambient_gains, miles_pan_balance, AmbientSampleOutput, AmbientSounds, MilesSampleStatus,
-    EAR_ANGLE, SLOTS, SMP_DONE, SMP_PLAYING, SMP_STOPPED,
+    ambient_gains, ambient_glide_step, miles_pan_balance, AmbientSampleOutput, AmbientSounds,
+    MilesSampleStatus, EAR_ANGLE, SLOTS, SMP_DONE, SMP_PLAYING, SMP_STOPPED,
 };
 
 /// A recording sample output with a settable status per slot.
@@ -195,6 +195,117 @@ fn gains_match_original() {
     assert_eq!(bad, 0);
 }
 
+/// An object at the camera: the distance is 0, both ear gains are the
+/// indefinite 0x80000000, and FUN_00432178's "a + b == 0" fix and its pan
+/// a * 127 / (a + b) wrap in 32 bits (ADD / IMUL / IDIV @
+/// 0x004324aa..0x004324bb): FUN_00432178 run unmodified under emulation
+/// stores +0x1e = 0x80000000, +0x22 = 1 and sets pan 1, volume 0.
+#[test]
+fn gains_at_the_camera() {
+    let r = AmbientRef {
+        object_id: 1,
+        t: 0.0,
+        m: 200.0,
+        c: 3.0,
+    };
+    let cam = CentrePos::default();
+    let g = ambient_gains([0.0; 3], 1.0, &cam, &r, 0.0, 0.0, EAR_ANGLE);
+    assert_eq!(
+        (g.right, g.left, g.out26, g.pan, g.volume),
+        (i32::MIN, 1, 3, 1, 0)
+    );
+    let r = AmbientRef {
+        object_id: 1,
+        t: 0.5,
+        m: 300.0,
+        c: 2.0,
+    };
+    let cam = CentrePos {
+        x: 5.0,
+        y: 7.0,
+        z: 1.0,
+    };
+    let g = ambient_gains([5.0, 7.0, 1.0], 1.0, &cam, &r, 0.3, 0.1, EAR_ANGLE);
+    assert_eq!(
+        (g.right, g.left, g.out26, g.pan, g.volume),
+        (i32::MIN, 1, 2, 1, 0)
+    );
+}
+
+/// FUN_0043259c's steps, inexact quotients included (fdivp at 53 bits, fstp
+/// float), against its pan step code (0x004326cf..0x004326f2) and volume
+/// step code (0x00432724..0x00432747) run unmodified under emulation with
+/// the game's x87 control word: (target, last as float bits, frames) ->
+/// the step as float bits (the same for both).
+#[test]
+fn glide_step_matches_original() {
+    const CASES: [(i32, u32, i32, u32); 12] = [
+        (63, 0x4128_0000, 7, 0x40f0_0000),
+        (63, 0x4120_0000, 4, 0x4154_0000),
+        (127, 0x3e99_999a, 3, 0x4228_eeef),
+        (0, 0x4214_6666, 13, 0xc036_a56a),
+        (1, 0x42fd_cccd, 25, 0xc0a1_26ea),
+        (100, 0x42c7_6666, 7, 0x3d2f_8b6e),
+        (0, 0x0000_0000, 1, 0x0000_0000),
+        (127, 0x42fe_0000, 9, 0x0000_0000),
+        (37, 0x4010_0000, 11, 0x404a_2e8c),
+        (5, 0x4281_3333, 3, 0xc19e_eeef),
+        (88, 0x4155_eb85, 17, 0x408c_7ae1),
+        (20, 0x419f_3333, 6, 0x3c88_88ab),
+    ];
+    for (k, &(target, last, frames, want)) in CASES.iter().enumerate() {
+        let step = ambient_glide_step(target, f32::from_bits(last), frames);
+        assert_eq!(step.to_bits(), want, "case {k}");
+    }
+}
+
+/// The pause over a video reads the CON variable CHAPTERTIME, which only
+/// the warp frame start writes (FUN_0041c75c), so it stands still during
+/// the video. FUN_00432758 run unmodified under emulation: a pending pause
+/// (count 2, start 10, delay 5, status 2) makes no pick and no restart at
+/// CHAPTERTIME 10, 12 and 15 and restarts at 16 and 2000 (start back to
+/// 0); a draw of -1 arms the pause with start = CHAPTERTIME (42) and stops
+/// the sample. Here `video_frame` given those values.
+#[test]
+fn video_pause_reads_chaptertime() {
+    let p = place(135, &[1]);
+    for (ct, restart, start_after) in [
+        (10, false, 10),
+        (12, false, 10),
+        (15, false, 10),
+        (16, true, 0),
+        (2000, true, 0),
+    ] {
+        let mut a = AmbientSounds::new();
+        clock(&mut a, &[0, 0, 0, 0]);
+        let mut out = FakeOut::new();
+        let objs = vec![object(1, [50, 50, 0, 0], 2)];
+        a.records[0].count = 2;
+        a.records[0].current = 0;
+        a.records[0].delay = 5;
+        a.records[0].start = 10;
+        a.records[0].object = Some(0);
+        out.st[0] = SMP_DONE;
+        a.video_frame(&mut out, &p, &objs, ct);
+        assert_eq!(out.has("start 0 0 0 0"), restart, "chaptertime {ct}");
+        assert_eq!(a.records[0].start, start_after, "chaptertime {ct}");
+    }
+    // Arming: start 0, count 2, the draw gives -1 (no weight).
+    let mut a = AmbientSounds::new();
+    clock(&mut a, &[0]);
+    let mut out = FakeOut::new();
+    let objs = vec![object(1, [0, 0, 0, 0], 2)];
+    a.records[0].count = 2;
+    a.records[0].current = 0;
+    a.records[0].delay = 5;
+    a.records[0].start = 0;
+    a.records[0].object = Some(0);
+    out.st[0] = SMP_DONE;
+    a.video_frame(&mut out, &p, &objs, 42);
+    assert_eq!(a.records[0].start, 42);
+    assert!(out.has("stop 0"));
+}
+
 /// FUN_004320bc: draw = clock & 0x7f, redrawn above 100; the first variant
 /// whose running sum exceeds it; none past the last; a weight above 100
 /// counts as weight - 100 and sets the loop flag when scanned.
@@ -300,8 +411,9 @@ fn frame() {
 }
 
 /// FUN_0043259c / FUN_00432758 (static reading): steps = (gain at the
-/// destination - last value) / frames; each video frame adds them and sets
-/// the truncated values; a finished sample (status 2 only) with more than
+/// destination - last value) / frames (the step value itself:
+/// `glide_step_matches_original`; here `prepare_glide`'s wiring); each
+/// video frame adds them and sets the truncated values; a finished sample (status 2 only) with more than
 /// one variant restarts, keeping a finite loop count.
 #[test]
 fn video_glide() {
@@ -331,8 +443,11 @@ fn video_glide() {
         EAR_ANGLE,
     );
     a.prepare_glide(&p, &objs, &dst, 0.5, 0.0, 4);
-    assert_eq!(a.step_pan[0], ((f64::from(g.pan) - 10.0) / 4.0) as f32);
-    assert_eq!(a.step_vol[0], (f64::from(g.volume) / 4.0) as f32);
+    assert_eq!(a.step_pan[0], ambient_glide_step(i32::from(g.pan), 10.0, 4));
+    assert_eq!(
+        a.step_vol[0],
+        ambient_glide_step(i32::from(g.volume), 0.0, 4)
+    );
     for _ in 1..=4 {
         out.log.clear();
         a.video_frame(&mut out, &p, &objs, 100);

@@ -30,6 +30,24 @@ fn trunc_int(v: f64) -> i32 {
     v as i32
 }
 
+/// pan = a * 127 / (a + b) in 32 bits as the original (ADD / IMUL / CDQ /
+/// IDIV, `FUN_00432178` @ 0x004324aa..0x004324bb, `FUN_0043259c` @
+/// 0x004326b9..0x004326ca): the sum and the product wrap. Only a gain
+/// outside 0..255 (the indefinite 0x80000000 of [`trunc_int`], an object at
+/// the camera) is affected. A sum of -1 with a product of `i32::MIN` is a
+/// divide error in the original and gives the product here.
+fn ambient_pan32(a: i32, b: i32) -> i32 {
+    a.wrapping_mul(127).wrapping_div(a.wrapping_add(b))
+}
+
+/// One glide step of `FUN_0043259c`: (target - last) / frames, as fild
+/// int32, fsub float, fild int32 0x00896c50, fdivp, fstp float at the
+/// game's 53-bit x87 precision (@ 0x004326cf..0x004326ec pan,
+/// 0x00432724..0x00432741 volume).
+pub fn ambient_glide_step(target: i32, last: f32, frames: i32) -> f32 {
+    ((f64::from(target) - f64::from(last)) / f64::from(frames)) as f32
+}
+
 /// `FUN_00450ed8` and `FUN_00432178`'s pan / volume for one object.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AmbientGains {
@@ -110,8 +128,7 @@ pub fn ambient_gains(
     if out.right.wrapping_add(out.left) == 0 {
         out.left = 1;
     }
-    let sum = i64::from(out.right) + i64::from(out.left);
-    let pan = ((i64::from(out.right) * 127) / sum) as i32;
+    let pan = ambient_pan32(out.right, out.left);
     let vol = out.right.max(out.left) / 2;
     out.pan = (pan & 0xff) as u8;
     out.volume = (vol & 0xff) as u8;
@@ -425,13 +442,10 @@ impl AmbientSounds {
             let o = &objects[ro];
             let pos = [-o.pos[1], o.pos[0], -o.pos[2]];
             let g = ambient_gains(pos, o.loudness, cam, r, alpha, beta, EAR_ANGLE);
-            let sum = i64::from(g.right) + i64::from(g.left);
-            let pan = ((i64::from(g.right) * 127) / sum) as i32;
+            let pan = ambient_pan32(g.right, g.left);
             let vol = g.right.max(g.left) / 2;
-            self.step_pan[i] =
-                ((f64::from(pan) - f64::from(self.cur_pan[i])) / f64::from(frames)) as f32;
-            self.step_vol[i] =
-                ((f64::from(vol) - f64::from(self.cur_vol[i])) / f64::from(frames)) as f32;
+            self.step_pan[i] = ambient_glide_step(pan, self.cur_pan[i], frames);
+            self.step_vol[i] = ambient_glide_step(vol, self.cur_vol[i], frames);
         }
     }
 
@@ -620,7 +634,16 @@ fn mixer_volume(v: u8) -> u8 {
 /// heard 1.38 times fast in the original too).
 pub const SAMPLE_RATE: u32 = 22050;
 
-/// The six Miles samples on the engine's [`Mixer`].
+/// The six Miles samples on the engine's [`Mixer`]. Their voices are scaled
+/// by the master volume alone, as Miles scales a sample only by the digital
+/// master volume (MSS32.DLL 0x2000dc60: master x volume / 127):
+/// `FUN_00432178` / `FUN_00432758` rewrite the six volumes on every frame
+/// with max(a, b) / 2, never with the effects byte 0x00495e73, and the
+/// puzzles' effects set their own volume. Where the original writes the
+/// byte to the handles ([`AmbientSounds::stop_all`] before the stop; also
+/// the sound menu's OK @ 0x0041d8c4..0x0041d8f5 and the checkpoint load @
+/// 0x0042e436..0x0042e46c, which the port leaves out), it holds only until
+/// the next ambient frame.
 pub struct MixerAmbientOutput {
     mixer: Mixer,
     voices: [Option<VoiceId>; SLOTS],

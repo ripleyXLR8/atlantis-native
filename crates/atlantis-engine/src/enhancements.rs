@@ -18,10 +18,10 @@ pub struct Enhancements {
     ///   locked surface, which the back-buffer copy then overwrites
     ///   (`FUN_0042ee88` @ 0x0042f57e), so it is never seen;
     /// - with the French May 1997 build, LOADMUSIK copies its tracks one by
-    ///   one whatever the music volume, as the other builds do; off, it
-    ///   copies nothing below a current music volume of 5 and all or
-    ///   nothing on its first track (atlantis-cd-fr-688640 FUN_00429184 @
-    ///   0x00429c5e, FUN_0041e830);
+    ///   one, as the other builds do; off, all or nothing on its first
+    ///   track (atlantis-cd-fr-688640 FUN_0041e830). Either way it copies
+    ///   nothing below a current music volume of 5 (FUN_00429184 @
+    ///   0x00429c5e);
     /// - `ß` (0xe1, the German CD's EPI.TXT) in the sprite-font texts is
     ///   drawn and measured as two 's'; off, as the original: glyph 193,
     ///   past the fonts' 137 sprites, is not drawn and the pen moves by the
