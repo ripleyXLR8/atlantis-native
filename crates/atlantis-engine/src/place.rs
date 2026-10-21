@@ -27,6 +27,38 @@ pub const TRANSITION_FRAME_MS: u64 = 6 * 5;
 /// The frame delay of a cinematic (Cinema=, the start-up videos).
 pub const CINEMA_FRAME_MS: u64 = 13 * 5;
 
+/// The captions burnt over a CINEMA video as sprites
+/// ([`atlantis_data::CinemaCaptions`]): its bank and the frame counter
+/// 0x004865a0, which the CINEMA= command resets (atlantis-cd-zh-tw-696832
+/// FUN_00429958 @ 0x00429fbe).
+pub(crate) struct CinemaCaptionState {
+    pub spec: atlantis_data::CinemaCaptions,
+    pub bank: Vec<atlantis_data::sprite::SprSprite>,
+    pub frame: u8,
+}
+
+impl CinemaCaptionState {
+    /// One call of the video frame presenter at `t` ticks of the 200 Hz
+    /// timer since the video started (0x004865a4, set by FUN_0041bd04 @
+    /// 0x0041bdc0): when `after` < t < `before`, the frame to draw, then the
+    /// counter stepped from k to k + 1 once t > `steps[k]`, the ten tests in
+    /// order, so several steps can happen in one call
+    /// (atlantis-cd-zh-tw-696832 FUN_0041afa0 @ 0x0041b105..0x0041b2bc).
+    pub fn present(&mut self, t: u32) -> Option<u8> {
+        let c = &self.spec;
+        if t <= u32::from(c.after) || t >= u32::from(c.before) {
+            return None;
+        }
+        let drawn = self.frame;
+        for (k, &step) in c.steps.iter().enumerate() {
+            if t > u32::from(step) && usize::from(self.frame) == k {
+                self.frame += 1;
+            }
+        }
+        Some(drawn)
+    }
+}
+
 /// `name` with its extension replaced (or added).
 fn with_ext(name: &str, ext: &str) -> String {
     match name.rfind('.') {
@@ -466,6 +498,18 @@ impl Engine {
                         if self.guests_shown && self.guests.count != 0 {
                             self.draw_guests(&mut screen, None);
                         }
+                        // Then, on the screen, a CINEMA caption
+                        // (atlantis-cd-zh-tw-696832 FUN_0041afa0 @
+                        // 0x0041b13b..0x0041b15c).
+                        if let Some(c) = self.cinema_captions.as_mut() {
+                            let t = (self.sys.millis() - start) / 5;
+                            let t = u32::try_from(t).unwrap_or(u32::MAX);
+                            if let Some(spr) = c.present(t).and_then(|f| c.bank.get(usize::from(f)))
+                            {
+                                let (x, y) = (i32::from(c.spec.x), i32::from(c.spec.y));
+                                spr.draw(&mut screen, SCREEN_W, SCREEN_H, x, y);
+                            }
+                        }
                         drop(screen);
                         // FUN_0041bc74 decodes the first frame before its
                         // loop; each pass decodes the next, then runs
@@ -695,8 +739,38 @@ impl Engine {
     /// pace (`FUN_0042a100` @ 0x0042a7c0..0x0042a954).
     pub async fn play_cinema(&mut self, n: i32) {
         let name = format!("CINEM{n:03}.HNM");
+        // The Chinese builds' captions: CINEMA=20 loads SUBCHINE.SPR and
+        // resets the frame counter (atlantis-cd-zh-tw-696832 FUN_00429958 @
+        // 0x00429fbe..0x0042a053), frees the bank after the video
+        // (@ 0x0042a224..0x0042a235). The CINEMA value stays 20 after it
+        // (0x004865a1 is written only there), so a later video of
+        // FUN_0041bd04 past 1200 ticks would blit from the freed bank; the
+        // port draws the captions over this video only.
+        self.cinema_captions = None;
+        if let Some(spec) = self
+            .game
+            .exe
+            .build
+            .cinema_captions
+            .filter(|c| i32::from(c.cinema) == n)
+        {
+            let bank = self
+                .read(&format!("SPRITE\\2D\\{}", spec.bank))
+                .await
+                .and_then(|d| {
+                    let (w, h) = atlantis_data::sprite::limits::DEFAULT;
+                    atlantis_data::sprite::read_spr_file(&d, w, h)
+                })
+                .unwrap_or_default();
+            self.cinema_captions = Some(CinemaCaptionState {
+                spec,
+                bank,
+                frame: 0,
+            });
+        }
         self.play_transition_video(&name, None, CINEMA_FRAME_MS)
             .await;
+        self.cinema_captions = None;
     }
 
     /// `FUN_00432a64`, the NewSound poller. The loop flag 0x00496194 is 0
@@ -747,6 +821,36 @@ impl Engine {
         self.music.new_sound_playing = true;
         self.music.new_sound_last = value;
         self.emit(Event::NewSound(value, name));
+    }
+}
+
+#[cfg(test)]
+mod caption_tests {
+    use super::CinemaCaptionState;
+
+    /// atlantis-cd-zh-tw-696832's CINEMA 20 captions: nothing up to tick
+    /// 1200 and from 18800; the frame drawn, then stepped, several steps
+    /// in one call when the presenter is late.
+    #[test]
+    fn caption_frames_by_tick() {
+        let mut c = CinemaCaptionState {
+            spec: atlantis_data::exe::ZH_TW.cinema_captions.unwrap(),
+            bank: Vec::new(),
+            frame: 0,
+        };
+        assert_eq!(c.present(1200), None);
+        assert_eq!(c.present(1201), Some(0));
+        assert_eq!(c.present(2200), Some(0));
+        assert_eq!(c.present(2201), Some(0));
+        assert_eq!(c.frame, 1);
+        // Late: 4400 and 5000 both passed, two steps after drawing frame 1.
+        assert_eq!(c.present(5001), Some(1));
+        assert_eq!(c.frame, 3);
+        assert_eq!(c.present(16401), Some(3));
+        assert_eq!(c.frame, 10);
+        assert_eq!(c.present(18799), Some(10));
+        assert_eq!(c.present(18800), None);
+        assert_eq!(c.frame, 10);
     }
 }
 

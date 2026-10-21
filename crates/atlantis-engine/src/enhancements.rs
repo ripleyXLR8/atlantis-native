@@ -40,6 +40,13 @@ pub struct Enhancements {
     ///   ideographic space starts after the whole space; off, on its second
     ///   byte, as the original (atlantis-cd-zh-cn-692736 FUN_0042f424 @
     ///   0x0042f5ef), so that row reads its characters one byte out of step.
+    /// - with the Chinese CDs, the options' SUBTITLES record is read in
+    ///   step while SUBTITLES is off; off, as the original
+    ///   (atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x0042022b): its text
+    ///   pointer steps back one byte also when the id stays 9, so the
+    ///   record's x is 0 and each later field is read from inside the one
+    ///   before (a record placed by an earlier walk keeps its place, but
+    ///   its click area takes the shifted width and height).
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

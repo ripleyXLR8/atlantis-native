@@ -45,9 +45,15 @@ impl Engine {
         self.import_original_saves();
     }
 
-    /// The list as the build writes it (the 1997 build: 95 bytes).
+    /// The list as the build writes it (the 1997 build: 95 bytes; the
+    /// Chinese builds: 114 bytes, ExeBuild::players_names_block).
     fn with_build_layout(&self, mut p: Players) -> Players {
-        p.layout_1997 = self.game.exe.build.players_1997;
+        let build = self.game.exe.build;
+        p.layout_1997 = build.players_1997;
+        p.sixth_row = match build.players_names_block {
+            0x66 => Some(p.sixth_row.unwrap_or_default()),
+            _ => None,
+        };
         p
     }
 

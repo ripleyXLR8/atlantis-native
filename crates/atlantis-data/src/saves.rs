@@ -22,6 +22,12 @@ pub const PLAYERS_SIZE: usize = 97;
 /// FUN_0041e030 and FUN_0042c164 of atlantis-cd-en-688128 write 0x55 + 5
 /// + 5 bytes; the French file has the same size).
 pub const PLAYERS_SIZE_FR: usize = 95;
+/// A 114-byte `players.atl`: a names block of 0x66 = 102 bytes (the five
+/// rows and the 17 bytes after them, 0x00486608..0x00486618), 6 chapters, 6
+/// letters, read and written by the Chinese builds (atlantis-cd-zh-tw-696832
+/// WinMain @ 0x00419212..0x00419262; writers FUN_0041dd14 @ 0x0041e574,
+/// FUN_0041e65c @ 0x0041e9b0, FUN_0042cb1c @ 0x0042d147).
+pub const PLAYERS_SIZE_ZH: usize = 114;
 /// A checkpoint: a raw dump of 25 globals, 2639 bytes.
 pub const CHECKPOINT_SIZE: usize = 2639;
 /// The inventory records a checkpoint holds (0x10e bytes of 9).
@@ -53,6 +59,12 @@ pub struct Players {
     /// rows after the last one as they were (atlantis-cd-en-688128
     /// FUN_0041e030).
     pub layout_1997: bool,
+    /// The Chinese builds' list ([`PLAYERS_SIZE_ZH`]): the 17 bytes after
+    /// the five rows, which only the file and the deletion's shift read
+    /// (row 4 = strcpy of them, atlantis-cd-zh-tw-696832 FUN_0041e65c @
+    /// 0x0041e6f2..0x0041e70b, 0x0041e80c..0x0041e825); `None` for the
+    /// 85-byte names block.
+    pub sixth_row: Option<[u8; NAME_LEN]>,
 }
 
 fn cstr(b: &[u8]) -> &[u8] {
@@ -77,24 +89,32 @@ impl Players {
             count: 1,
             marker: marker.to_vec(),
             layout_1997: false,
+            sixth_row: None,
         };
         strcpy(&mut p.rows[0], marker);
         p
     }
 
-    /// Reads a `players.atl` (97 or 95 bytes); `None` for another size.
+    /// Reads a `players.atl` (97, 95 or 114 bytes); `None` for another size.
     pub fn read(data: &[u8], marker: &[u8]) -> Option<Players> {
         let mut p = Players::new(marker);
-        let (n, letter_base) = match data.len() {
-            PLAYERS_SIZE => (6, 0x5b),
-            PLAYERS_SIZE_FR => (5, 0x5a),
+        let (n, block) = match data.len() {
+            PLAYERS_SIZE => (6, 0x55),
+            PLAYERS_SIZE_FR => (5, 0x55),
+            PLAYERS_SIZE_ZH => (6, 0x66),
             _ => return None,
         };
+        let letter_base = block + n;
         for (i, row) in p.rows.iter_mut().enumerate() {
             row.copy_from_slice(&data[NAME_LEN * i..NAME_LEN * (i + 1)]);
         }
+        if block == 0x66 {
+            let mut extra = [0u8; NAME_LEN];
+            extra.copy_from_slice(&data[0x55..0x66]);
+            p.sixth_row = Some(extra);
+        }
         p.chapters = [0; 6];
-        p.chapters[..n].copy_from_slice(&data[0x55..0x55 + n]);
+        p.chapters[..n].copy_from_slice(&data[block..block + n]);
         p.letters = [0; 6];
         p.letters[..n].copy_from_slice(&data[letter_base..letter_base + n]);
         p.count = p.count_rows();
@@ -119,12 +139,16 @@ impl Players {
     }
 
     /// The file the writers write: names (0x55 bytes), chapters (6),
-    /// letters (6); 5 and 5 for the 1997 layout.
+    /// letters (6); 5 and 5 for the 1997 layout; names 0x66 bytes with the
+    /// Chinese one.
     pub fn to_bytes(&self) -> Vec<u8> {
         let n = if self.layout_1997 { 5 } else { 6 };
-        let mut out = Vec::with_capacity(PLAYERS_SIZE);
+        let mut out = Vec::with_capacity(PLAYERS_SIZE_ZH);
         for row in &self.rows {
             out.extend_from_slice(row);
+        }
+        if let Some(extra) = &self.sixth_row {
+            out.extend_from_slice(extra);
         }
         out.extend_from_slice(&self.chapters[..n]);
         out.extend_from_slice(&self.letters[..n]);
@@ -182,6 +206,8 @@ impl Players {
         for i in row..MAX_PLAYERS {
             if i + 1 < MAX_PLAYERS {
                 self.rows[i] = self.rows[i + 1];
+            } else if let Some(extra) = self.sixth_row {
+                strcpy(&mut self.rows[i], cstr(&extra));
             }
             self.chapters[i] = self.chapters[i + 1];
             self.letters[i] = self.letters[i + 1];
@@ -523,6 +549,43 @@ mod tests {
         q.delete(1);
         assert_eq!((q.count, q.player_count()), (5, 4));
         assert!(q.is_new_row(4));
+    }
+
+    /// The Chinese builds' 114-byte file: names block 0x66 bytes (the
+    /// rows and 17 more), chapters 0x66..0x6c, letters 0x6c..0x72; the
+    /// deletion's shift copies the 17 bytes' string into row 4.
+    #[test]
+    fn layout_114() {
+        let marker = b"New Player";
+        let mut b = vec![0u8; PLAYERS_SIZE_ZH];
+        for (i, n) in [&b"Alice"[..], b"Bob", marker].iter().enumerate() {
+            b[17 * i..17 * i + n.len()].copy_from_slice(n);
+        }
+        b[85..88].copy_from_slice(b"Zed");
+        b[0x66] = 9;
+        b[0x67] = 4;
+        b[0x6c..0x72].copy_from_slice(b"abcdef");
+        let mut p = Players::read(&b, marker).unwrap();
+        assert_eq!((p.count, p.chapters[0], p.chapters[1]), (3, 9, 4));
+        assert_eq!(&p.letters, b"abcdef");
+        assert_eq!(p.sixth_row.map(|r| r[..3].to_vec()), Some(b"Zed".to_vec()));
+        assert_eq!(p.to_bytes(), b);
+        p.delete(0);
+        assert_eq!(p.name(0), b"Bob");
+        assert!(p.is_new_row(1));
+        // Row 4 got "Zed" from the shift, then was emptied as a row past
+        // the count.
+        assert_eq!(p.name(4), b"");
+        assert_eq!(p.to_bytes().len(), PLAYERS_SIZE_ZH);
+        // Five players: row 4 = "Zed", then the marker over it.
+        let mut q = Players::new(marker);
+        q.sixth_row = Some(*b"Zed\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+        for n in [&b"A"[..], b"B", b"C", b"D", b"E"] {
+            q.create(n).unwrap();
+        }
+        q.delete(0);
+        assert!(q.is_new_row(4));
+        assert_eq!(q.name(3), b"E");
     }
 
     /// The 1997 layout: 95 bytes (chapters 0x55..0x5a, letters

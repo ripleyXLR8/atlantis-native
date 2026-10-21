@@ -246,6 +246,11 @@ pub struct Engine {
     pub subtitle_clicks: u8,
     /// The sound menu's knobs, kept for the session (0 = the file's).
     pub son_knob_x: [i32; 4],
+    /// OPTMENU's hit table records, kept for the session when its toggles
+    /// are sprite records (`ExeBuild::menu_toggle_sprites`).
+    pub(crate) opt_menu_records: Vec<crate::ui::layout::MenuRecord>,
+    /// The captions of the CINEMA video playing (`ExeBuild::cinema_captions`).
+    pub(crate) cinema_captions: Option<crate::place::CinemaCaptionState>,
     pub(crate) channel_test_voice: Option<crate::audio::VoiceId>,
     /// The voices' volume, 0..255.
     pub voice_volume: u8,
@@ -387,6 +392,8 @@ impl Engine {
             settings: Settings::default(),
             subtitle_clicks: 0,
             son_knob_x: [0; 4],
+            opt_menu_records: Vec::new(),
+            cinema_captions: None,
             channel_test_voice: None,
             voice_volume: 255,
             players: Players::new(b"#New Player"),
@@ -824,6 +831,10 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
     let mut e = Engine::new(sys, game, loader);
     e.trace = trace;
     e.set_enhancements(enhancements);
+    // The Chinese builds set SUBTITLES at every start-up, whatever was
+    // chosen before (atlantis-cd-zh-tw-696832 WinMain @ 0x0041971f); a
+    // checkpoint load still sets the one it holds.
+    let subtitles = subtitles || e.game.exe.build.subtitles_on_at_start;
     e.subtitles = subtitles;
     e.saves = saves;
     e.load_settings(Settings {
