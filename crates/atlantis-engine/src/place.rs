@@ -18,7 +18,7 @@ use crate::engine::{Engine, Event};
 use crate::music::apc_pcm;
 use crate::sys::{Input, MouseButton};
 use crate::turn::{transition_turn, TURN_END_FOV_DEG};
-use crate::video_skip::VideoSkipState;
+use crate::video_skip::{VideoSkipRun, VideoSkipState};
 use crate::warp::{Warp, PANO_W, SCREEN_H, SCREEN_W, WARP_FOV_DEG};
 
 /// The frame delay of a move's transition video: 6 ticks of the 200 Hz
@@ -459,20 +459,19 @@ impl Engine {
         let start = self.sys.millis();
         let mut first = true;
         let mut spf_frame = 0usize;
-        let mut shown = 0u32;
-        // FUN_0041bc74's input: a left click, or Escape with the conditions
-        // of FUN_0041a298 (video_skip); after that poll the next frame is
-        // still presented.
+        // FUN_0041bc74's frame control (VideoSkipRun): a poll after each
+        // presented frame but the last, with the conditions of
+        // FUN_0041a298 (video_skip); after the poll that ends the video the
+        // next frame is still presented.
         // The bar request as it stands: set for a Cinema= of a timer the
         // bar loop runs, so that Escape does not end it then.
-        let mut skip = VideoSkipState {
+        let mut run = VideoSkipRun::new(VideoSkipState {
             object_in_hand: self.vars.get("objetenmain") != 0,
             section_play: self.section_play,
             bow_mode: self.bow_mode,
             bar_request: self.bar.request,
             ..VideoSkipState::default()
-        };
-        let mut stop_after_frame = false;
+        });
         let (w, h) = (hnm.width(), hnm.height());
         loop {
             if self.sys.should_quit()
@@ -480,37 +479,44 @@ impl Engine {
             {
                 break;
             }
-            let mut presented = false;
             if self.sys.millis() - start >= hnm.next_frame_start_ms() {
                 match hnm.next_frame() {
                     Some(Ok(frame)) => {
-                        let mut screen = self.sys.screen.borrow_mut();
-                        for y in 0..h.min(SCREEN_H) {
-                            let n = w.min(SCREEN_W);
-                            screen[y * SCREEN_W..y * SCREEN_W + n]
-                                .copy_from_slice(&frame[y * w..y * w + n]);
-                        }
-                        // The frame presenter FUN_0041b064 draws the SPF
-                        // sprites, then the guests' portraits.
-                        for spf in &spfs {
-                            composite_spf_frame(spf, spf_frame, &mut screen, SCREEN_W, SCREEN_H);
-                        }
-                        if self.guests_shown && self.guests.count != 0 {
-                            self.draw_guests(&mut screen, None);
-                        }
-                        // Then, on the screen, a CINEMA caption
-                        // (atlantis-cd-zh-tw-696832 FUN_0041afa0 @
-                        // 0x0041b13b..0x0041b15c).
-                        if let Some(c) = self.cinema_captions.as_mut() {
-                            let t = (self.sys.millis() - start) / 5;
-                            let t = u32::try_from(t).unwrap_or(u32::MAX);
-                            if let Some(spr) = c.present(t).and_then(|f| c.bank.get(usize::from(f)))
-                            {
-                                let (x, y) = (i32::from(c.spec.x), i32::from(c.spec.y));
-                                spr.draw(&mut screen, SCREEN_W, SCREEN_H, x, y);
+                        {
+                            let mut screen = self.sys.screen.borrow_mut();
+                            for y in 0..h.min(SCREEN_H) {
+                                let n = w.min(SCREEN_W);
+                                screen[y * SCREEN_W..y * SCREEN_W + n]
+                                    .copy_from_slice(&frame[y * w..y * w + n]);
+                            }
+                            // The frame presenter FUN_0041b064 draws the SPF
+                            // sprites, then the guests' portraits.
+                            for spf in &spfs {
+                                composite_spf_frame(
+                                    spf,
+                                    spf_frame,
+                                    &mut screen,
+                                    SCREEN_W,
+                                    SCREEN_H,
+                                );
+                            }
+                            if self.guests_shown && self.guests.count != 0 {
+                                self.draw_guests(&mut screen, None);
+                            }
+                            // Then, on the screen, a CINEMA caption
+                            // (atlantis-cd-zh-tw-696832 FUN_0041afa0 @
+                            // 0x0041b13b..0x0041b15c).
+                            if let Some(c) = self.cinema_captions.as_mut() {
+                                let t = (self.sys.millis() - start) / 5;
+                                let t = u32::try_from(t).unwrap_or(u32::MAX);
+                                if let Some(spr) =
+                                    c.present(t).and_then(|f| c.bank.get(usize::from(f)))
+                                {
+                                    let (x, y) = (i32::from(c.spec.x), i32::from(c.spec.y));
+                                    spr.draw(&mut screen, SCREEN_W, SCREEN_H, x, y);
+                                }
                             }
                         }
-                        drop(screen);
                         // FUN_0041bc74 decodes the first frame before its
                         // loop; each pass decodes the next, then runs
                         // FUN_00432758.
@@ -519,12 +525,37 @@ impl Engine {
                         }
                         first = false;
                         spf_frame += 1;
-                        shown += 1;
-                        presented = true;
                         if hnm.frame_count() > 1 {
                             self.sys.hd_video.borrow_mut().t =
-                                (shown - 1) as f32 / (hnm.frame_count() - 1) as f32;
+                                (run.presented) as f32 / (hnm.frame_count() - 1) as f32;
                         }
+                        // HD: a video's frame is smoothed as a photograph.
+                        self.sys.mark_photo();
+                        // The frame after the ending poll (0x0041be2e) or the
+                        // last one: no poll follows it.
+                        let last =
+                            hnm.frame_count() != 0 && hnm.frames_decoded() >= hnm.frame_count();
+                        if run.frame_presented(last) {
+                            self.sys.frame().await;
+                            break;
+                        }
+                        // FUN_0041a298, once per presented frame (0x0041bdf7).
+                        let (mut left, mut right, mut escape) = (false, false, false);
+                        while let Some(ev) = self.sys.poll_event() {
+                            match ev {
+                                Input::MouseDown {
+                                    button: MouseButton::Left,
+                                    ..
+                                } => left = true,
+                                Input::MouseDown {
+                                    button: MouseButton::Right,
+                                    ..
+                                } => right = true,
+                                Input::KeyDown(crate::sys::Key::Escape) => escape = true,
+                                _ => {}
+                            }
+                        }
+                        run.poll(left, right, escape);
                     }
                     Some(Err(e)) => {
                         log::warn!("{name}: {e}");
@@ -532,34 +563,9 @@ impl Engine {
                     }
                     None => break,
                 }
-            }
-            // HD: a video's frame is smoothed as a photograph.
-            if !first {
+            } else if !first {
+                // HD: a video's frame is smoothed as a photograph.
                 self.sys.mark_photo();
-            }
-            if presented && stop_after_frame {
-                self.sys.frame().await; // the frame presented at 0x0041be2e
-                break;
-            }
-            if !stop_after_frame {
-                let (mut left, mut right, mut escape) = (false, false, false);
-                while let Some(ev) = self.sys.poll_event() {
-                    match ev {
-                        Input::MouseDown {
-                            button: MouseButton::Left,
-                            ..
-                        } => left = true,
-                        Input::MouseDown {
-                            button: MouseButton::Right,
-                            ..
-                        } => right = true,
-                        Input::KeyDown(crate::sys::Key::Escape) => escape = true,
-                        _ => {}
-                    }
-                }
-                if skip.poll(left, right, escape) {
-                    stop_after_frame = true;
-                }
             }
             self.sys.frame().await;
         }
@@ -567,14 +573,13 @@ impl Engine {
         // (FUN_0042a100 @ 0x0042a907..0x0042a954 stops nothing); one cut
         // short fades it out, 2 volume steps every 25 ms from the effects
         // volume (FUN_0041bc74 @ 0x0041be69..0x0041be9e arms 0x00495eb0 =
-        // 2). Then the input flags are cleared (0x0041bf5b..0x0041bf8d).
-        if stop_after_frame
-            && skip.fades(frame_ms == CINEMA_FRAME_MS)
-            && self.music.new_sound_active()
-        {
+        // 2). Then 0x00496124 = 1, 0x00496134 = 0 and the input flags are
+        // cleared (0x0041be55..0x0041bf8d).
+        let fade = run.finish(frame_ms == CINEMA_FRAME_MS, &mut self.bar);
+        if fade && self.music.new_sound_active() {
             self.music.fade_out_new_sound(self.effects_volume());
         }
-        self.bar.flags_reset();
+        let shown = run.presented;
         self.ix_buffers = hnm.into_buffers();
         self.emit(Event::Video {
             name,

@@ -5,8 +5,8 @@
 //!
 //! The frame loop `FUN_0041bc74` (every video: a move's transition, a CON
 //! Cinema=, the start-up logos) goes on while 0x00496124 != 0 and the click
-//! flag 0x0049611c == 0, and its input poll is `FUN_0041a298`, one per
-//! frame:
+//! flag 0x0049611c == 0, and its input poll is `FUN_0041a298`, one after
+//! each presented frame but the last ([`VideoSkipRun`]):
 //!
 //! - a left-button press sets 0x0049611c (and nothing else is read);
 //! - a right-button press toggles the bar request 0x004960c4 unless a CON
@@ -38,6 +38,10 @@ pub struct VideoSkipState {
     pub click: bool,
     /// 0x00496124.
     pub keep_running: bool,
+    /// 0x00496134, the CON executor's dialog-skip flag (`FUN_0042844c` @
+    /// 0x00428b6d): set by Escape with a talking head, cleared again by the
+    /// video's end (0x0041be5f), so no reader sees the video's value.
+    pub skip_flag: bool,
 }
 
 impl Default for VideoSkipState {
@@ -51,6 +55,7 @@ impl Default for VideoSkipState {
             menu_request: false,
             click: false,
             keep_running: true,
+            skip_flag: false,
         }
     }
 }
@@ -68,6 +73,7 @@ impl VideoSkipState {
         }
         if escape_press {
             if self.talking_head {
+                self.skip_flag = true;
                 self.click = true;
             } else if !self.bow_mode && !self.bar_request && !self.object_in_hand {
                 self.keep_running = false;
@@ -80,6 +86,65 @@ impl VideoSkipState {
     /// After the loop: whether the sound fades out (cinema mode only).
     pub fn fades(&self, cinema_mode: bool) -> bool {
         cinema_mode && (self.click || self.menu_request)
+    }
+}
+
+/// The frame control of `FUN_0041bc74`. Each loop pass presents the frame
+/// decoded in the pass before (`FUN_0041b064` @ 0x0041bdec) and then polls
+/// (`FUN_0041a298` @ 0x0041bdf7); every loop exit presents one more frame,
+/// the last decoded one (0x0041be2e), with no poll after it. So each frame
+/// is shown once, a poll follows every frame but the last, and after the
+/// poll that ends the video one more frame is shown.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct VideoSkipRun {
+    pub s: VideoSkipState,
+    /// A poll ended the loop.
+    pub stop_after_frame: bool,
+    pub done: bool,
+    /// 0x00496104.
+    pub presented: u32,
+}
+
+impl VideoSkipRun {
+    pub fn new(s: VideoSkipState) -> VideoSkipRun {
+        VideoSkipRun {
+            s,
+            ..VideoSkipRun::default()
+        }
+    }
+
+    /// After each presented frame (`last_frame`: the video has no frame
+    /// after it, `FUN_00448ed8` == 0); true when the loop must break.
+    pub fn frame_presented(&mut self, last_frame: bool) -> bool {
+        self.presented += 1;
+        if self.stop_after_frame || last_frame {
+            self.done = true;
+        }
+        self.done
+    }
+
+    /// The poll that follows a presented frame.
+    pub fn poll(&mut self, left_press: bool, right_press: bool, escape_press: bool) {
+        if self.done || self.stop_after_frame {
+            return;
+        }
+        if self.s.poll(left_press, right_press, escape_press) {
+            self.stop_after_frame = true;
+        }
+    }
+
+    /// The end of `FUN_0041bc74`: the fade decision (0x0041be69..0x0041be9e),
+    /// then 0x00496124 = 1, 0x00496134 = 0 (0x0041be55, 0x0041be5f) and the
+    /// flag resets of 0x0041bf5b..0x0041bf8d. True when the sound fades.
+    pub fn finish(&mut self, cinema_mode: bool, bar: &mut crate::ui::BarSession) -> bool {
+        let fade = self.s.fades(cinema_mode);
+        self.s.keep_running = true;
+        self.s.skip_flag = false;
+        self.s.click = false;
+        self.s.menu_request = false;
+        self.s.bar_request = false;
+        bar.flags_reset();
+        fade
     }
 }
 
