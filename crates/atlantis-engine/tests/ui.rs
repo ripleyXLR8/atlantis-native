@@ -771,6 +771,51 @@ fn checkpoints_written_and_loaded() {
     );
 }
 
+/// The load picker as the original reads its input: a chapter-0
+/// checkpoint is not listed (FUN_00420b48 skips it); a click on the grid's
+/// right edge (x 445, index 11 + row) selects the entry below the visible
+/// rows (0x0041d37b: row + offset < count is the only bound); Escape does
+/// nothing; a double click away from every record then ends the picker
+/// (0x0041d4ad), for a reload of the chapter clicked.
+#[test]
+fn load_picker_edge_row_and_double_click_anywhere() {
+    let Some(g) = game("load_picker_edge_row_and_double_click_anywhere") else {
+        return;
+    };
+    let epi = g.big.read("SPRLIST\\EPI.TXT").unwrap();
+    let load = record_centre(&g, "MAINMENU.TXT", 0, 0);
+    // 13 checkpoints whose titles are not empty, and a chapter-0 file.
+    let listed: Vec<u32> = (2..87)
+        .filter(|&c| !epi_episode_name(&epi, c).is_empty())
+        .take(13)
+        .collect();
+    let store = Rc::new(MemStore::new());
+    for c in std::iter::once(0).chain(listed.iter().copied()) {
+        store.write(&format!("pa{c}.gam"), b"");
+    }
+    let out = Rc::new(RefCell::new(None));
+    let o = out.clone();
+    with_engine(
+        g,
+        store,
+        move |mut e, _s| {
+            Box::pin(async move {
+                let outcome = e.ingame_menu().await;
+                *o.borrow_mut() = Some((outcome, e.players.chapters[0]));
+            })
+        },
+        move |h, n| match n {
+            30 => h.click(load.0, load.1),
+            // Row 1 of the right edge: index 12.
+            60 => h.click(445, 108 + 22 + 5),
+            70 => h.key(Key::Escape),
+            100 | 101 => h.click(630, 470),
+            _ => {}
+        },
+    );
+    assert_eq!(*out.borrow(), Some((MenuOutcome::Reload, listed[12] as u8)));
+}
+
 /// The player screen as the original reads its input: Escape does
 /// nothing; a click on the new player row gives 16 dots; from the 16th
 /// character on each key replaces the last; Enter commits the name.

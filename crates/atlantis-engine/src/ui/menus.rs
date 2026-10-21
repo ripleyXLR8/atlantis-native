@@ -37,10 +37,6 @@ use crate::warp::{SCREEN_H, SCREEN_W};
 
 const N: usize = SCREEN_W * SCREEN_H;
 
-/// Windows' default double-click interval (the window class has
-/// CS_DBLCLKS; the original reads WM_LBUTTONDBLCLK).
-const DOUBLE_CLICK_MS: u64 = 500;
-
 /// The input of one frame of a menu loop.
 #[derive(Default)]
 pub(crate) struct MenuInput {
@@ -382,7 +378,7 @@ impl Engine {
     }
 
     /// The confirmation `FUN_0041ec7c` (SUREMENU) over `bg`: true for OK
-    /// (record 3), false for Cancel (record 4) or Escape (the port's).
+    /// (record 3), false for Cancel (record 4); it reads no key.
     pub(crate) async fn confirm(&mut self, bg: &[u16]) -> bool {
         let Some(mut menu) = self.load_menu("SUREMENU.TXT").await else {
             return true;
@@ -394,9 +390,6 @@ impl Engine {
                 return false;
             }
             let mi = self.poll_menu_input();
-            if mi.escape {
-                return false;
-            }
             let (mx, my) = self.sys.mouse();
             let hit = menu
                 .hit(mx, my, self.menu_table().as_deref())
@@ -637,6 +630,10 @@ impl Engine {
 
     /// The current player's checkpoints, ascending chapters (the picker's
     /// `p<letter>*.gam`, sorted).
+    /// A chapter-0 file is left out: the original lists it but its rows
+    /// drawer skips it (`atoi(name + 2) - 1 == -1`, FUN_00420b48 @
+    /// 0x00420be0..0x00420bed), and its click would walk EPI.TXT without
+    /// an end; no build writes one.
     pub(crate) fn player_checkpoints(&self) -> Vec<u8> {
         let letter = self.players.letters[self.player.min(MAX_PLAYERS - 1)];
         let mut v: Vec<u8> = self
@@ -644,6 +641,7 @@ impl Engine {
             .list()
             .iter()
             .filter_map(|n| checkpoint_chapter(n, letter))
+            .filter(|&c| c != 0)
             .collect();
         v.sort_unstable();
         v.dedup();
@@ -655,8 +653,9 @@ impl Engine {
     /// by their EPI.TXT names, 11 rows and a scrollbar. A row click stores
     /// its chapter in the player's chapter byte (memory only); records 5
     /// RESTART EPISODE (the byte = the current chapter, once there is a
-    /// file), 6 OK and a double click on a row end it for a reload; 7
-    /// Cancel. Returns the record it ended on (255 for a double click).
+    /// file) and 6 OK end it for a reload, 7 Cancel; so does a double click
+    /// anywhere once a title is shown, as the record under the pointer.
+    /// Returns the record it ended on (255 for a double click off them).
     pub(crate) async fn load_picker(&mut self, bg: &[u16]) -> u8 {
         let Some(mut menu) = self.load_menu("LOADMENU.TXT").await else {
             return 7;
@@ -688,7 +687,11 @@ impl Engine {
         // The Chinese builds' title: EPICHI2 frame `row` at x.
         let mut title_frame: Option<(usize, i32)> = None;
         let mut selected: Option<usize> = None;
-        let mut last_click: Option<(usize, u64)> = None;
+        // The double-click flag 0x00496118: set by any double click,
+        // wherever it lands, and cleared only when the picker ends
+        // (0x0041d50f).
+        let mut dbl = MenuDoubleClick::default();
+        let mut dbl_flag = false;
         let mut track_latched = false;
         let player = self.player.min(MAX_PLAYERS - 1);
         let choose = |e: &mut Engine,
@@ -720,11 +723,9 @@ impl Engine {
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
             let down = self.sys.buttons().0;
-            // Port keys (the original reads none here): Escape cancels,
-            // Enter is OK, Up / Down a row click.
-            if mi.escape {
-                return 7;
-            }
+            // Port keys (the original reads none here; Escape does
+            // nothing, as in the original): Enter is OK, Up / Down a row
+            // click.
             if mi.enter {
                 return 6;
             }
@@ -747,31 +748,47 @@ impl Engine {
             }
             sb.frame(track_latched, down, my);
             let scroll = usize::from(sb.offset);
-            // A row counts when row + offset < count (0x0041d37b;
-            // atlantis-cd-fr-687104 FUN_0041c708 @ 0x0041cb0b..0x0041cb1b);
-            // the English 1997 build tests the row alone (atlantis-cd-en-688128
-            // FUN_0041c9a8 @ 0x0041cd87) and takes entry row + offset
-            // (0x0041cdaa). Past the list it would read an empty record
-            // (its chapter -1 then walks EPI.TXT without an end): the port
-            // takes no such row.
+            // A row counts when row + offset < count, the only bound
+            // (0x0041d37b; atlantis-cd-fr-687104 FUN_0041c708 @
+            // 0x0041cb0b..0x0041cb1b): the grid's inclusive far edges (x
+            // 445, y 350), which give 11..22, select the entry below the
+            // visible rows (its title shown, its chapter stored, no visible
+            // row lit). The English 1997 build tests the row alone
+            // (atlantis-cd-en-688128 FUN_0041c9a8 @ 0x0041cd87) and takes
+            // entry row + offset (0x0041cdaa): past the list it would read
+            // an empty record (its chapter -1 then walks EPI.TXT without an
+            // end): the port takes no such row.
             let row_hover = menu_grid_hit(45, 108, 400, 22, 1, 11, true, mx, my)
-                .filter(|&g| g < 11 && (clamp || (g as usize) < count))
                 .map(|g| scroll + g as usize)
                 .filter(|&r| r < count);
             let button = menu
                 .hit(mx, my, self.menu_table().as_deref())
                 .filter(|r| [5, 6, 7].contains(r));
+            if mi.left_press && dbl.press(self.sys.millis(), (mx, my)) {
+                dbl_flag = true;
+            }
             if mi.left_press && !track_latched {
                 if let Some(r) = row_hover {
                     selected = Some(r);
                     choose(self, r, &mut title, &mut title_frame);
-                    let now = self.sys.millis();
-                    if last_click.is_some_and(|(l, t)| l == r && now - t <= DOUBLE_CLICK_MS) {
-                        self.wait_buttons_up().await;
-                        return 255;
-                    }
-                    last_click = Some((r, now));
-                } else if let Some(b) = button {
+                }
+            }
+            // 0x0041d4ad: once a title is shown, the double-click flag ends
+            // the picker in that frame, whatever the pointer is over (a
+            // double click before the row click counts too), as a press on
+            // the hovered record would: RESTART EPISODE stores the chapter,
+            // Cancel reloads nothing (0x0041d519, FUN_0041c838).
+            let title_shown =
+                title.as_ref().is_some_and(|(t, _)| !t.is_empty()) || title_frame.is_some();
+            if dbl_flag && title_shown {
+                self.wait_buttons_up().await;
+                if button == Some(5) && count > 0 {
+                    self.players.chapters[player] = self.chapter as u8;
+                }
+                return button.map_or(255, |b| b as u8);
+            }
+            if mi.left_press && !track_latched {
+                if let Some(b) = button {
                     self.wait_buttons_up().await;
                     if b == 5 && count > 0 {
                         self.players.chapters[player] = self.chapter as u8;

@@ -279,13 +279,22 @@ fn italian_shipped_menu_zones_both_ways() {
 
 /// The in-game menu's QUIT GAME, then a click on the confirmation right of
 /// the `OK` zone the original draws (x 214 of record 159..207, inside the
-/// 22-px record 159..225), then Escape: the original ignores the click
-/// (the game goes on), the port with the minor bug fixes takes it (the
-/// game ends).
+/// 22-px record 159..225), then Cancel and Escape: the original ignores the
+/// click (Cancel leaves the confirmation, the game goes on), the port with
+/// the minor bug fixes takes it (the game ends; Escape cuts the credits
+/// short).
 fn quit_click(g: Game, fixes: bool) -> MenuOutcome {
     let quit = {
         let text = g.big.read("SPRLIST\\MAINMENU.TXT").unwrap();
         let r = walk(&text, 0, MenuRules::of_build(g.exe.build, fixes)).records[2];
+        (
+            i32::from(r.x) + i32::from(r.w) / 2,
+            i32::from(r.y) + i32::from(r.h) / 2,
+        )
+    };
+    let cancel = {
+        let text = g.big.read("SPRLIST\\SUREMENU.TXT").unwrap();
+        let r = walk(&text, 6, MenuRules::of_build(g.exe.build, fixes)).records[4];
         (
             i32::from(r.x) + i32::from(r.w) / 2,
             i32::from(r.y) + i32::from(r.h) / 2,
@@ -327,7 +336,8 @@ fn quit_click(g: Game, fixes: bool) -> MenuOutcome {
         n += 1;
         assert!(n < 50_000, "the menu does not end");
         // Once the game is set up: QUIT GAME, the click right of OK, then
-        // Escape (it leaves the confirmation, or cuts the credits short).
+        // Cancel (it leaves the confirmation; the credits ignore it) and
+        // Escape (it cuts the credits short; the confirmation reads no key).
         match (stage, n % 60) {
             (0, 0) if n > 600 => {
                 click(quit.0, quit.1);
@@ -346,16 +356,19 @@ fn quit_click(g: Game, fixes: bool) -> MenuOutcome {
                 stage = 4;
             }
             (4.., 0) => {
+                click(cancel.0, cancel.1);
                 sys.push_input(Input::KeyDown(Key::Escape));
                 sys.push_input(Input::KeyUp(Key::Escape));
                 stage += 1;
             }
+            (5.., 5) => release(cancel.0, cancel.1),
             _ => {}
         }
     }
     let outcome = out.borrow().unwrap();
     eprintln!("fixes {fixes}: {outcome:?} after {n} frames, {stage} stages");
-    // The menu stayed up until the click on the confirmation and Escape.
+    // The menu stayed up until the click on the confirmation, Cancel and
+    // Escape.
     assert!(stage >= 5, "the menu ended at stage {stage}");
     outcome
 }
