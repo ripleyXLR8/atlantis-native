@@ -1,7 +1,8 @@
 //! The dialog subtitles: the line breaks of `FUN_0042ffe8`, the layout of
 //! `FUN_00430178` and the font; for the 1997 build (atlantis-cd-en-688128),
 //! its own: the 8x8 bitmap font `DIALOG\FONTS.BIN`, the breaks of
-//! `FUN_0042e970` and the layout of `FUN_0042eb3c` ([`BitmapFont`]).
+//! `FUN_0042e970` and the layout of `FUN_0042eb3c` ([`BitmapFont`]); for
+//! the Chinese builds, the breaks of their `FUN_0042f424` ([`cjk`]).
 //!
 //! Translated from ScummVM's CryOmni3D Atlantis engine
 //! (`subtitle_layout.cpp`, `engine.cpp` `subtitleFont`, the subtitle draw of
@@ -18,6 +19,9 @@
 
 use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
 use atlantis_data::TextCodePage;
+
+pub mod cjk;
+pub use cjk::{cjk_subtitle_rows, split_subtitle_cjk, CjkSplit};
 
 /// The subtitle font, Liberation Sans Regular.
 static FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/LiberationSans-Regular.ttf");
@@ -571,19 +575,29 @@ fn split_bitmap_rows(text: &[u8], breaker: BitmapBreaker) -> Vec<Vec<u8>> {
     lines
 }
 
-/// The subtitles of a build: the reference's GDI Arial layout, or the 1997
-/// build's bitmap font and layout.
+/// The subtitles of a build: the reference's GDI Arial layout (with the
+/// Chinese builds' breaker), or the 1997 build's bitmap font and layout.
 #[derive(Clone)]
 pub enum Subtitler {
-    Gdi(std::rc::Rc<SubtitleFont>),
+    Gdi(std::rc::Rc<SubtitleFont>, Option<CjkSplit>),
     Bitmap(std::sync::Arc<BitmapFont>, BitmapBreaker),
 }
 
 impl Subtitler {
+    /// The subtitles with the minor bug fixes on or off (the Chinese
+    /// breaker's skip after an ideographic space, see [`CjkSplit`]).
+    pub fn with_minor_bug_fixes(mut self, on: bool) -> Subtitler {
+        if let Subtitler::Gdi(_, Some(cjk)) = &mut self {
+            cjk.minor_bug_fixes = on;
+        }
+        self
+    }
+
     /// The rows of a subtitle text.
     pub fn split(&self, text: &[u8]) -> Vec<Vec<u8>> {
         match self {
-            Subtitler::Gdi(_) => split_subtitle(text),
+            Subtitler::Gdi(_, None) => split_subtitle(text),
+            Subtitler::Gdi(_, Some(cjk)) => split_subtitle_cjk(text, *cjk),
             Subtitler::Bitmap(_, breaker) => split_bitmap_rows(text, *breaker),
         }
     }
@@ -598,7 +612,7 @@ impl Subtitler {
         y_offset: i32,
     ) {
         match self {
-            Subtitler::Gdi(f) => f.draw_subtitles(dst, width, height, lines, y_offset),
+            Subtitler::Gdi(f, _) => f.draw_subtitles(dst, width, height, lines, y_offset),
             Subtitler::Bitmap(f, _) => f.draw_subtitles(dst, width, lines, y_offset),
         }
     }
@@ -606,7 +620,7 @@ impl Subtitler {
     /// The text items for the HD mode (see [`subtitle_items`]).
     pub fn items(&self, lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
         match self {
-            Subtitler::Gdi(f) => subtitle_items(lines, dx, dy, f.code_page()),
+            Subtitler::Gdi(f, _) => subtitle_items(lines, dx, dy, f.code_page()),
             Subtitler::Bitmap(f, _) => {
                 let mut items = Vec::with_capacity(2 * lines.len());
                 for (i, line) in lines.iter().enumerate() {

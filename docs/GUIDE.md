@@ -285,8 +285,14 @@ picked folder on its first start.
   1's whatever the disc (the original shows disc 2's older revision while
   disc 2 is in use); on the Italian CD, the buttons and lines of the
   menus answer over the whole drawn word (the original's zones stop
-  short of it: the right end of `OK` and `Annulla` does not answer).
+  short of it: the right end of `OK` and `Annulla` does not answer); on
+  the Simplified Chinese CD, the subtitle row after an ideographic space
+  starts after the whole space (the original starts it in the middle of
+  the space, and that row's characters come out wrong).
   `--original` turns them off.
+- On the Traditional Chinese CD, the one subtitle with no punctuation
+  mark in its first 75 bytes (a game-over narration) is cut at 75 bytes;
+  what the original does with it is not known.
 - Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).

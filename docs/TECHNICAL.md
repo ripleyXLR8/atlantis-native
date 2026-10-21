@@ -73,7 +73,7 @@ Where the port may differ from the original by choice, `Options` holds an
 
 | Group | Default | What it changes |
 |---|---|---|
-| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 builds, the hexagon puzzle always shows its pieces, as the later builds do; with the May 1997 French build, LOADMUSIK copies its tracks one by one whatever the music volume, as the other builds do (see [Game builds](#game-builds)); with the German CD, the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts; with the Dutch CD, the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)); with the Italian CD, a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
+| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 builds, the hexagon puzzle always shows its pieces, as the later builds do; with the May 1997 French build, LOADMUSIK copies its tracks one by one whatever the music volume, as the other builds do (see [Game builds](#game-builds)); with the German CD, the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts; with the Dutch CD, the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)); with the Italian CD, a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)); with the Simplified Chinese CD, the subtitle row after an ideographic space starts after the whole space, not on its second byte (see [Subtitles](#subtitles)) |
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
@@ -238,6 +238,25 @@ after it, so none of its rows is over 75 bytes or wider than the screen
 (`split_subtitle_1997_back`). A run of 75 bytes without a space, which no
 shipped text has, makes that original fault; the port cuts it at 75
 bytes.
+
+The Chinese CDs break their rows in a 75-byte window too, but cut after a
+double-byte punctuation mark, found backwards from the window's end
+without following the lead bytes (`subtitles/cjk.rs`): the Traditional
+build after Big5 `，。；？！…`, the Simplified one after GB2312 `，。？！`
+or before an ideographic space `　`, the next row then starting on the
+space's second byte, so that row's characters are read one byte out of
+step (72 rows of the shipped texts). The port does the same, row for row
+(the tests compare every dialog line with the original functions run
+under emulation); with the minor bug fixes, the row after an ideographic
+space starts after the whole space (27 of those rows mended; the others
+come from a mark the scan reads across two characters, `。　` read as
+`！`). The original's arithmetic is kept as it is: after the first row
+the checks read one byte past the mark, and a later window without a
+mark gives empty rows. A first window without a mark sends the
+original's scan back past the start of its buffer (one Traditional
+line, CHAPI084's game-over narration, 80 bytes): what it then does is
+unknown, and the port cuts that row at the last character boundary
+within 75 bytes.
 Whatever shows these texts otherwise (the outline font, tests) reads
 them as code page 850.
 

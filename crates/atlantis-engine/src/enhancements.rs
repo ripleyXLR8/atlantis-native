@@ -35,7 +35,11 @@ pub struct Enhancements {
     ///   22 px per byte as in every other build, so the whole drawn word
     ///   highlights and takes the click; off, 16 px per byte as the original
     ///   (atlantis-cd-it-687104 FUN_0041ecb4 @ 0x0041f068): the right ends
-    ///   of `OK` (11 px) and `Annulla` (18 px) do not answer.
+    ///   of `OK` (11 px) and `Annulla` (18 px) do not answer;
+    /// - with the Simplified Chinese CD, the subtitle row after an
+    ///   ideographic space starts after the whole space; off, on its second
+    ///   byte, as the original (atlantis-cd-zh-cn-692736 FUN_0042f424 @
+    ///   0x0042f5ef), so that row reads its characters one byte out of step.
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so
