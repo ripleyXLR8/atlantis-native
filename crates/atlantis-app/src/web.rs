@@ -103,6 +103,24 @@ impl Loader for WebLoader {
             *self.web.members.lock().unwrap() = fetched;
         })
     }
+
+    /// The whole file among those the player gave.
+    fn read_beside<'a>(
+        &'a self,
+        _big: &'a BigArchive,
+        name: &'a str,
+    ) -> HookFuture<'a, Option<Vec<u8>>> {
+        Box::pin(async move {
+            let f = self.files.get(&key(name))?;
+            match fetch(f, 0, f.size() as u64).await {
+                Ok(bytes) => Some(bytes),
+                Err(e) => {
+                    log::warn!("{name}: {e:?}");
+                    None
+                }
+            }
+        })
+    }
 }
 
 /// The save files in the browser's `localStorage`: one key

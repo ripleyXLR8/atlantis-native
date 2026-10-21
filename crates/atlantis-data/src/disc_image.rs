@@ -236,6 +236,12 @@ impl FileSource for DiscSet {
     fn has_dir(&self, name: &str) -> bool {
         self.images.iter().any(|i| i.has_dir(name))
     }
+
+    /// The file in the images' folder (not in the images).
+    fn read_beside(&self, name: &str) -> Option<Vec<u8>> {
+        let dir = self.images.first()?.path().parent()?;
+        crate::files::StdDir::new(dir).read(name)
+    }
 }
 
 #[cfg(test)]
@@ -323,5 +329,28 @@ mod tests {
         for f in [p, q, r] {
             let _ = std::fs::remove_file(f);
         }
+    }
+
+    /// A file of the player's beside the images is read from the folder,
+    /// not from the images.
+    #[test]
+    fn read_beside_the_images() {
+        let dir = std::env::temp_dir().join(format!("atlantis-beside-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let iso: Vec<u8> = iso_sectors().iter().flatten().copied().collect();
+        std::fs::write(dir.join("disc1.iso"), &iso).unwrap();
+        std::fs::write(dir.join("MingLiU.TTC"), b"font").unwrap();
+        let set = DiscSet::open_folder(&dir).expect("one image");
+        assert_eq!(
+            set.read_beside("mingliu.ttc").as_deref(),
+            Some(&b"font"[..])
+        );
+        assert_eq!(set.read("mingliu.ttc"), None);
+        assert_eq!(set.read_beside("simsun.ttc"), None);
+        assert_eq!(
+            set.read("game/atlantis.exe").as_deref(),
+            Some(&b"hello"[..])
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

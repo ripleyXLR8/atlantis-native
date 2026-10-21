@@ -260,5 +260,12 @@ The subtitle font, Liberation Sans Regular
 Corporation, Copyright (c) 2012 Red Hat, Inc.), is licensed under the SIL
 Open Font License, version 1.1 (see `assets/fonts/LICENSE-LiberationSans`).
 
+The Chinese subtitle fonts, subsets of Noto Serif TC Regular and Noto
+Serif SC Regular (`assets/fonts/NotoSerifTC-Subset.otf`,
+`NotoSerifSC-Subset.otf`, from the notofonts/noto-cjk release
+Serif2.003, Copyright (c) 2017-2024 Adobe), are licensed under the SIL
+Open Font License, version 1.1 (see `assets/fonts/LICENSE-NotoSerifCJK`).
+Noto is a trademark of Google Inc.
+
 *Atlantis: The Lost Tales* is a trademark of its owners. This project is not
 affiliated with them.

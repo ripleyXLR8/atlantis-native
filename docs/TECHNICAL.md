@@ -221,6 +221,25 @@ page 850.
 The font is bundled
 in `assets/fonts`.
 
+The Chinese CDs ask Windows for a face named `MingLi` with a 16-pixel
+cell, which no Windows has: a Chinese Windows draws their subtitles with
+its MingLiU (Traditional) or SimSun (Simplified), the bytes read in its
+code page (Big5, GBK), in rows 18 pixels apart over the black shadow.
+The port draws them with the player's own `mingliu.ttc` / `simsun.ttc`
+when one is beside the game's files or the discs' images (the face of
+that name in the collection), else with Noto Serif TC / SC, the same
+Ming / Song style, bundled as subsets to the characters of the two
+releases' scripts plus ASCII and the punctuation
+(`assets/fonts/make_cjk_subset.py` reads the characters from the discs),
+at 16 pixels per em, monochrome: the pixels at least half covered, and
+the thin horizontal strokes, which cover no pixel by half at that size,
+kept as a TrueType rasteriser's dropout control keeps them. The size
+Windows renders the face at, and whether it drew its embedded 16-pixel
+bitmaps, are not known. MingLiU before version 7.00 (Windows XP's and
+older) draws right only through its hinting, which the port does not
+run, and is not used. In the HD mode the sharp subtitles use the same
+face at the output's resolution.
+
 The 1997 English CD has no Windows text: it draws its subtitles with the
 8x8 pixel font `DIALOG\FONTS.BIN` of the game's archives (one glyph per
 byte, the IBM PC set), white over a black shadow, in rows 10 pixels apart
