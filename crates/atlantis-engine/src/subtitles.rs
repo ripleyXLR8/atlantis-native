@@ -526,15 +526,27 @@ impl SubtitleFont {
     /// byte; in a double-byte code page one per character, a lead byte and
     /// the byte after it making one (as GDI reads the bytes in the ANSI
     /// code page; a byte or pair with no character draws nothing).
+    ///
+    /// In a double-byte code page a character of a pair the face has no
+    /// glyph for (the code page's user-defined area, private use, which a
+    /// Simplified row read one byte out of step can hold) draws nothing
+    /// but keeps its cell, one em: MingLiU and SimSun give every two-byte
+    /// character the same full-width advance, their em, so the characters
+    /// after it stay where the original draws them (inferred; what those
+    /// faces draw for such a character is [UNKNOWN]).
     fn each_glyph(&self, text: &[u8], mut f: impl FnMut(char, &GlyphBits) -> bool) {
         if self.code_page.is_double_byte() {
             let font = self.face.font();
             let scale = Self::scale(&font, self.em_px);
             let mut cache = self.cjk_glyphs.lock().unwrap_or_else(|e| e.into_inner());
             for c in self.code_page.decode(text).chars() {
-                let g = cache
-                    .entry(c)
-                    .or_insert_with(|| GlyphBits::of(&font, scale, c, true));
+                let g = cache.entry(c).or_insert_with(|| {
+                    let mut g = GlyphBits::of(&font, scale, c, true);
+                    if !c.is_ascii() && font.glyph_id(c).0 == 0 {
+                        g.advance = self.em_px.round() as i32;
+                    }
+                    g
+                });
                 if !f(c, g) {
                     break;
                 }
@@ -1384,6 +1396,10 @@ mod tests {
         assert_eq!(sc.ascent, 14);
         assert_eq!(sc.width(b"\xd6\xd0\xce\xc4"), 32);
         assert!(sc.face().has_char('厖') && sc.face().has_char('棗'));
+        // AA A1, in the user-defined area (U+E000), no glyph: its cell.
+        assert!(!sc.face().has_char('\u{e000}'));
+        assert_eq!(sc.width(b"\xaa\xa1\xd6\xd0"), 32);
+        assert_eq!(sc.layout(b"\xaa\xa1\xd6\xd0", 0, 640)[1], ('中', 16));
         assert_eq!(sc.row_step(), SUBTITLE_ROW_STEP);
         for cp in [TextCodePage::Windows1252, TextCodePage::Dos850] {
             let f = SubtitleFont::with_code_page(cp);

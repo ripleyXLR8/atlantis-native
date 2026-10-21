@@ -2,14 +2,14 @@
 """Makes the bundled CJK subtitle fonts, NotoSerifTC-Subset.otf and
 NotoSerifSC-Subset.otf next to this script: Noto Serif TC / SC Regular
 (SIL Open Font License 1.1, no Reserved Font Name) cut down to the
-characters of the Chinese releases' chapter scripts, plus ASCII and the
-punctuation.
+characters of the Chinese releases' chapter scripts and of the subtitle
+rows their breakers cut, plus ASCII and the punctuation.
 
 The fonts come from the official release Serif2.003 of
 https://github.com/notofonts/noto-cjk (14_NotoSerifSC.zip, 15_NotoSerifTC.zip:
 SubsetOTF/SC/NotoSerifSC-Regular.otf, SubsetOTF/TC/NotoSerifTC-Regular.otf).
 The characters are read from the player's discs at run time by
-`cargo run -p atlantis-data --example con_chars` (nothing of the game is
+`cargo run -p atlantis-engine --example con_chars` (nothing of the game is
 kept here).
 
     python3 assets/fonts/make_cjk_subset.py \\
@@ -34,7 +34,7 @@ UNICODES = "U+0020-007E,U+20AC,U+2010-2027,U+2030-205E,U+3000-303F,U+FF01-FF65"
 
 def con_chars(folder):
     out = subprocess.run(
-        ["cargo", "run", "-q", "--release", "-p", "atlantis-data", "--example", "con_chars", "--", folder],
+        ["cargo", "run", "-q", "--release", "-p", "atlantis-engine", "--example", "con_chars", "--", folder],
         cwd=ROOT,
         check=True,
         capture_output=True,

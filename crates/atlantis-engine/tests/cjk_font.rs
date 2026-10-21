@@ -16,7 +16,7 @@ use atlantis_data::disc_image::DiscSet;
 use atlantis_data::{Game, TextCodePage};
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::subtitles::{
-    subtitle_row_y, FaceSource, FontFace, SubtitleFont, SUBTITLE_COLOR, SUBTITLE_SHADOW, SUBTITLE_X,
+    split_subtitle_cjk, subtitle_row_y, CjkSplit, FaceSource, FontFace, SubtitleFont, SUBTITLE_COLOR, SUBTITLE_SHADOW, SUBTITLE_X,
 };
 use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::{Event, MemStore, Options, Start};
@@ -58,8 +58,11 @@ fn game_with_font(var: &str, name: &str) -> Option<(Game, std::path::PathBuf)> {
 }
 
 /// Every character the scripts' bytes read as (their pairs from the start
-/// of the file) has a glyph in the bundled font, but those of the code
-/// page's user-defined area (private use), which no font has.
+/// of the file, and those of every subtitle row the build's breaker cuts
+/// from a dialog line, with and without the minor bug fixes: a row can
+/// start on a character's second byte) has a glyph in the bundled font,
+/// but those of the code page's user-defined area (private use), which no
+/// font has.
 fn scripts_in_bundled_font(var: &str, cp: TextCodePage) {
     let Some(g) = game(var) else { return };
     assert_eq!(g.exe.build.text_code_page, cp);
@@ -72,8 +75,29 @@ fn scripts_in_bundled_font(var: &str, cp: TextCodePage) {
         .collect();
     assert!(names.len() > 70, "{} scripts", names.len());
     let mut chars = std::collections::BTreeSet::new();
+    let splits: Vec<CjkSplit> = [false, true]
+        .into_iter()
+        .map(|fixes| CjkSplit::of_build(g.exe.build, fixes).unwrap())
+        .collect();
     for n in &names {
-        chars.extend(cp.decode(&g.big.read(n).unwrap()).chars());
+        let data = g.big.read(n).unwrap();
+        chars.extend(cp.decode(&data).chars());
+        for line in data.split(|&c| c == b'\n') {
+            let line = line.strip_suffix(b"\r").unwrap_or(line);
+            let Some(close) = line.iter().position(|&c| c == b']') else {
+                continue;
+            };
+            if line.first() != Some(&b'[') {
+                continue;
+            }
+            let text = &line[close + 1..];
+            let text = text.strip_prefix(b" ").unwrap_or(text);
+            for &split in &splits {
+                for row in split_subtitle_cjk(text, split) {
+                    chars.extend(cp.decode(&row).chars());
+                }
+            }
+        }
     }
     let missing: Vec<char> = chars
         .iter()
