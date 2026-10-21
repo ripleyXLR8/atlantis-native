@@ -151,6 +151,13 @@ pub struct Guests {
     /// raises them 7 a frame and the slide-out lowers them back. Not reset
     /// with the list.
     pub portrait_y: i32,
+    /// 0x00496144 (0 in the exe image): set by a follower portrait click
+    /// (`FUN_0042c8ac` @ 0x0042cc1d), cleared only at the end of a
+    /// conversation (`FUN_00425828` @ 0x00425bdb), so the object-in-hand
+    /// path, which returns at 0x004258b7, leaves it set for the next
+    /// conversation. Not reset with the list (no memset of `FUN_004239f4`
+    /// covers it).
+    pub talk: bool,
 }
 
 impl Default for Guests {
@@ -160,6 +167,7 @@ impl Default for Guests {
             sprite: [0; Guests::SLOTS],
             count: 0,
             portrait_y: 350,
+            talk: false,
         }
     }
 }
