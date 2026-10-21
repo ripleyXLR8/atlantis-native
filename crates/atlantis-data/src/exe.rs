@@ -198,13 +198,13 @@ pub struct ExeBuild {
     /// FUN_0042cb1c @ 0x0042d147).
     pub players_names_block: u8,
     /// An `off1` dialog line is played by the off1 player: off0's, with the
-    /// screen buffer copied to the screen once the voice has loaded
-    /// (atlantis-cd-zh-tw-696832 FUN_0042fe7c, called @ 0x0042e3a6). The
-    /// other builds play such a line as an `off` line, the view redrawn:
-    /// the 1997 builds have no off1 header; the GOG.com build's executable
-    /// has the player (FUN_004307d0) and its scripts 30 such lines, which
-    /// the port keeps playing as `off` lines, as before it knew the player
-    /// (a difference from that build); the other builds' scripts have none.
+    /// screen buffer copied to the screen once the voice has loaded. The
+    /// 2001 build's FUN_00430884, the GOG.com and French patch builds'
+    /// FUN_004307d0 (the same code; the GOG.com scripts have 30 such
+    /// lines, the reference's none), the Chinese builds' FUN_0042fe7c
+    /// (atlantis-cd-zh-tw-696832, called @ 0x0042e3a6; 29 lines). The 1997
+    /// executables hold no "off1" string nor its player, and their scripts
+    /// no such header: the port plays one as an `off` line there.
     pub off1_player: bool,
 }
 
@@ -341,7 +341,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
-        off1_player: false,
+        off1_player: true,
     },
     ExeBuild {
         name: "atlantis-gog-714752",
@@ -393,7 +393,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
-        off1_player: false,
+        off1_player: true,
     },
     // Cryo's Windows patch AT1CDINT.EXE ("1.01"), installed over the
     // English, French and German CD installs, whose BIGCD1..4.BIG it keeps.
@@ -460,7 +460,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         cinema_captions: None,
         subtitles_on_at_start: false,
         players_names_block: 85,
-        off1_player: false,
+        off1_player: true,
     },
     ExeBuild {
         name: "atlantis-cd-en-688128",
@@ -1353,6 +1353,13 @@ mod tests {
     /// reference's values of them.
     #[test]
     fn chinese_fields() {
+        // The 2001 code line's off1 player (FUN_00430884, FUN_004307d0).
+        for b in &BUILDS[..3] {
+            assert!(b.off1_player, "{}", b.name);
+        }
+        for b in &BUILDS[3..11] {
+            assert!(!b.off1_player, "{}", b.name);
+        }
         for b in &BUILDS[..11] {
             assert_eq!(b.cjk_breaker, CjkBreaker::None, "{}", b.name);
             assert_eq!(b.subtitle_row_step, 14, "{}", b.name);
@@ -1365,7 +1372,6 @@ mod tests {
             assert_eq!(b.load_list, LoadList::EpiText, "{}", b.name);
             assert_eq!(b.cinema_captions, None, "{}", b.name);
             assert_eq!(b.players_names_block, 85, "{}", b.name);
-            assert!(!b.off1_player, "{}", b.name);
             assert!(!b.text_code_page.is_double_byte(), "{}", b.name);
         }
         assert_eq!(

@@ -424,10 +424,9 @@ block, a deletion with four players keeping the New Player row past the
 count, as the original does); an `off1` dialog line (29 in each
 release's scripts) is played by the off1 player: off0's, with the screen
 buffer (the first IX buffer, what the last video or LOADMUSIK copy left)
-copied to the screen once the voice has loaded. The GOG.com executable
-has that player too, for its scripts' 30 `off1` lines, but the port keeps
-playing those as `off` lines, the view redrawn, as before (a
-difference).
+copied to the screen once the voice has loaded. The 2001 code line has
+that player too (the GOG.com scripts' 30 `off1` lines), the 1997
+executables not (`off1_player`).
 
 The original opens one archive at a time, the inserted disc's. What it
 loads at start-up (the menus, the CD and error texts, EPI.TXT, the menu
