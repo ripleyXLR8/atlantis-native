@@ -37,7 +37,9 @@ use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;
 use crate::music::apc_pcm;
 use crate::scripts::{DialogPresenter, GameOverRequest, LineOutcome, LineRequest};
-use crate::subtitles::{player_font, BitmapBreaker, BitmapFont, FontFace, SubtitleFont, Subtitler};
+use crate::subtitles::{
+    player_font, BitmapBreaker, BitmapFont, CjkSplit, FontFace, SubtitleFont, Subtitler,
+};
 use crate::sys::{Input, Key, MouseButton};
 use crate::video_skip::VideoSkipState;
 use crate::warp::{DIALOG_CAM_FOV_DEG, SCREEN_H, SCREEN_W};
@@ -136,6 +138,8 @@ struct SingleLine<'a> {
     section: i32,
     letter: char,
     text: &'a str,
+    /// The text's final blanks ([`crate::con_script::ConLine::trail`]).
+    trail: &'a str,
     /// The UBB (`DIALOG\PERSO\<name>.UBB`), none for a voice-only line.
     video: Option<String>,
     /// The camera's SPF overlay (`DIALOG\PERSO\<name>.SPF`).
@@ -236,10 +240,12 @@ impl Dialogs {
 
     /// The build's subtitles: the GDI Arial layout, or the 1997 build's
     /// `DIALOG\FONTS.BIN` (atlantis-cd-en-688128 0x004191c2..0x004191f9
-    /// loads it at start-up; the reference's layout when it is missing).
+    /// loads it at start-up; the reference's layout when it is missing);
+    /// with the minor bug fixes of the moment.
     async fn subtitler(&mut self, e: &Engine) -> Subtitler {
+        let fixes = e.enhancements().minor_bug_fixes;
         if let Some(s) = &self.subtitler {
-            return s.clone();
+            return s.clone().with_minor_bug_fixes(fixes);
         }
         let mut s = None;
         if e.game.exe.build.bitmap_subtitles {
@@ -260,9 +266,11 @@ impl Dialogs {
                 None => log::warn!("DIALOG\\FONTS.BIN missing: the subtitles in Arial"),
             }
         }
+        // The Chinese builds' breaker (FUN_0042f424).
+        let cjk = CjkSplit::of_build(e.game.exe.build, fixes);
         let s = match s {
             Some(s) => s,
-            None => Subtitler::Gdi(self.font(e).await),
+            None => Subtitler::Gdi(self.font(e).await, cjk),
         };
         self.subtitler = Some(s.clone());
         s
@@ -375,6 +383,7 @@ impl Dialogs {
                 section: req.section,
                 letter: req.letter,
                 text: &req.line.text,
+                trail: &req.line.trail,
                 dial_row: (!voice_only && video.is_some()).then_some(row),
                 video,
                 spf,
@@ -435,7 +444,7 @@ impl Dialogs {
         }
 
         let sub_lines = if e.subtitles && !l.text.is_empty() {
-            font.split(&latin1_bytes(l.text))
+            font.split(&latin1_bytes(&[l.text, l.trail].concat()))
         } else {
             Vec::new()
         };
