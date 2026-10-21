@@ -292,7 +292,10 @@ picked folder on its first start.
   short of it: the right end of `OK` and `Annulla` does not answer); on
   the Simplified Chinese CD, the subtitle row after an ideographic space
   starts after the whole space (the original starts it in the middle of
-  the space, and that row's characters come out wrong).
+  the space, and that row's characters come out wrong); on the Chinese
+  CDs, the options' SUBTITLES toggle answers over its own sprite while
+  SUBTITLES is off (the original reads its record one byte out of step,
+  so its click area takes a wrong width and height).
   `--original` turns them off.
 - On the Traditional Chinese CD, the one subtitle with no punctuation
   mark in its first 75 bytes (a game-over narration) is cut at 75 bytes;

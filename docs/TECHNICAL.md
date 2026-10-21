@@ -385,13 +385,12 @@ subtitle breaker. Their tables are at the same addresses (the
 new-player row `New Player`, no `#`), and their texts are double-byte:
 Big5 (code page 950) and GBK (code page 936), decoded with `encoding_rs`.
 Their discs are detected, whether copied or as images (the Simplified
-discs name their files in lower case), and the game runs; the Chinese
-subtitles, the menus and chapter names drawn as sprites, the opening
-captions and their other rules (`ExeBuild::cjk_breaker`,
-`subtitle_row_step`, `menu_sprite_banks`, `menu_toggle_sprites`,
-`load_list`, `cinema_captions`, `subtitles_on_at_start`,
-`players_names_block`) are fields of their build entries, not drawn
-yet.
+discs name their files in lower case), and the game runs. Their own
+rules (`ExeBuild::cjk_breaker`, `subtitle_row_step`,
+`menu_sprite_banks`, `menu_toggle_sprites`, `load_list`,
+`cinema_captions`, `subtitles_on_at_start`, `players_names_block`) are
+fields of their build entries; their subtitles are described in
+[Subtitles](#subtitles).
 
 Their interface is drawn as theirs: the menus are sprite records of
 SPRCHI1.SPR (SPRCHI2.SPR on the hovered record, labels included), the
