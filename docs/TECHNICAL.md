@@ -290,7 +290,7 @@ them.
 
 ### Game builds
 
-The port knows eleven builds of `atlantis.exe` (`ExeBuild` in
+The port knows thirteen builds of `atlantis.exe` (`ExeBuild` in
 `crates/atlantis-data/src/exe.rs`), found by their size and the PE
 header's timestamp (the 2001 build and the patch 1.01 build have the same
 size, as have the August 1997 French and German builds and the Spanish
@@ -392,9 +392,13 @@ Their discs are detected, whether copied or as images (the Simplified
 discs name their files in lower case), and the game runs. Their own
 rules (`ExeBuild::cjk_breaker`, `subtitle_row_step`,
 `menu_sprite_banks`, `menu_toggle_sprites`, `load_list`,
-`cinema_captions`, `subtitles_on_at_start`, `players_names_block`) are
-fields of their build entries; their subtitles are described in
-[Subtitles](#subtitles).
+`cinema_captions`, `subtitles_on_at_start`, `players_names_block`,
+`off1_player`) are fields of their build entries; their subtitles are
+described in [Subtitles](#subtitles). Their discs are the ones ScummVM
+detects by the md5 of the first 5000 bytes of `atlantis.exe` and
+`BIGCD1.BIG` and the archive's size (a disc test checks it); the port,
+as for every build, tells them apart by the executable's size and PE
+timestamp.
 
 Their interface is drawn as theirs: the menus are sprite records of
 SPRCHI1.SPR (SPRCHI2.SPR on the hovered record, labels included), the
@@ -405,9 +409,25 @@ bug fixes read it in step);
 the LOAD list shows EPICHI1.SPR frame *n* on row *n* (EPICHI2.SPR when
 hovered) whatever checkpoint the row holds, and a row loads the chapter
 of the executable's table at its position, its title centred by the
-table's width; the opening cinematic (`CINEMA=20`) has its captions from
-SUBCHINE.SPR on the 200 Hz ticks of the original; SUBTITLES is on at
-every start-up; `players.atl` is 114 bytes (a 102-byte names block).
+table's width, and the scrollbar's knob is drawn at the place the
+picker gives its record (the original reloads a sprite record's stored
+y, `MenuRules::sprite_stored_y`; the other builds' original does too, but
+the port keeps drawing their knob at the menu file's place, as it did
+before: a difference); the opening cinematic (`CINEMA=20`) has its
+captions from SUBCHINE.SPR on the 200 Hz ticks of the original, over
+that video only (the original keeps the CINEMA number 20 until the next
+CINEMA command and frees the bank after the video, so another video
+played within 94 s of the opening's start, when it is cut short, would
+be drawn over from the freed bank: what shows is not known); SUBTITLES is
+on at every start-up; `players.atl` is 114 bytes (a 102-byte names
+block, a deletion with four players keeping the New Player row past the
+count, as the original does); an `off1` dialog line (29 in each
+release's scripts) is played by the off1 player: off0's, with the screen
+buffer (the first IX buffer, what the last video or LOADMUSIK copy left)
+copied to the screen once the voice has loaded. The GOG.com executable
+has that player too, for its scripts' 30 `off1` lines, but the port keeps
+playing those as `off` lines, the view redrawn, as before (a
+difference).
 
 The original opens one archive at a time, the inserted disc's. What it
 loads at start-up (the menus, the CD and error texts, EPI.TXT, the menu

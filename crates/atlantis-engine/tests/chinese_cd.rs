@@ -1,7 +1,8 @@
 //! The Traditional and Simplified Chinese CDs (atlantis-cd-zh-tw-696832,
 //! atlantis-cd-zh-cn-692736) played from their disc images: the start-up,
-//! the player screen, a new game up to the in-game menu. The Chinese
-//! subtitles, menus and captions are not drawn yet; the game runs.
+//! the player screen, a new game up to the in-game menu. Their subtitles,
+//! menus and captions are checked by `cjk_font.rs`,
+//! `chinese_subtitles.rs` and `chinese_ui.rs`.
 //!
 //! Needs the folders of the discs' images: set `ATLANTIS_ISO_ZH_TW` (the
 //! Traditional CD's ISO images) and `ATLANTIS_BIN_ZH_CN` (the Simplified

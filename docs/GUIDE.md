@@ -58,8 +58,10 @@ The English CD (1997 and 2001 builds), the French CD (May and August
 1997), the German CD (August 1997), the Dutch and Swedish CDs (June
 1997), the Spanish CD (August 1997), the Italian CD (July 1997), the CD
 with Cryo's patch 1.01 (over the English, French, German, Dutch,
-Swedish, Spanish or Italian CD), and the GOG.com release in
-English, French, German, Spanish and Italian. Another edition is
+Swedish, Spanish or Italian CD), the GOG.com release in
+English, French, German, Spanish and Italian, and the Traditional
+Chinese CD (1998) and the Simplified Chinese CD (1999), copied or as
+images. Another edition is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
 project's page in your browser, filled in with the identifiers of the
@@ -277,7 +279,10 @@ picked folder on its first start.
   player's own MingLiU or SimSun when `mingliu.ttc` (Traditional) or
   `simsun.ttc` (Simplified), from a Windows `Fonts` folder, is put in the
   game folder (or beside the disc images), else with the bundled Noto
-  Serif TC or SC.
+  Serif TC or SC. A MingLiU older than version 7.00 (the one of Windows
+  XP and earlier) is not used, although it is the player's own: its
+  characters draw right only through the font's hinting programs, which
+  the port does not run, so Noto Serif TC is drawn instead.
 - The engine runs at a steady 60 steps per second; the original's loops
   run as fast as the machine allows.
 - The [enhancements](TECHNICAL.md#enhancements) on by default: the music loops
@@ -292,7 +297,10 @@ picked folder on its first start.
   short of it: the right end of `OK` and `Annulla` does not answer); on
   the Simplified Chinese CD, the subtitle row after an ideographic space
   starts after the whole space (the original starts it in the middle of
-  the space, and that row's characters come out wrong); on the Chinese
+  the space, and that row's characters come out wrong): this mends 27 of
+  the 72 shipped rows that come out wrong; the other 45 start in the
+  middle of a character where the original reads a punctuation mark
+  across two characters, and stay as in the original; on the Chinese
   CDs, the options' SUBTITLES toggle answers over its own sprite while
   SUBTITLES is off (the original reads its record one byte out of step,
   so its click area takes a wrong width and height).
@@ -300,6 +308,16 @@ picked folder on its first start.
 - On the Traditional Chinese CD, the one subtitle with no punctuation
   mark in its first 75 bytes (a game-over narration) is cut at 75 bytes;
   what the original does with it is not known.
+- On the Chinese CDs, the opening video's captions are drawn over that
+  video only. When it is cut short, the original goes on drawing them
+  from memory it has freed over the videos of the next moments (until 94
+  seconds after the opening began); what that shows is not known.
+- On the GOG.com release, the 30 dialog lines marked `off1` are played
+  with the view redrawn; the original shows the picture the last video
+  (or music load) left under their subtitle (the port does so on the Chinese CDs only). In
+  every edition but the Chinese ones, the LOAD list's scrollbar knob is
+  drawn at its place in the menu file; the original draws it where the
+  list is scrolled.
 - Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).

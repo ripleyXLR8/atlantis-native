@@ -145,9 +145,14 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | CD, retail release (July 1997 build, 4 CDs) | Italian | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD with Cryo's patch 1.01 (`AT1CDINT.EXE`, 1999 build) | English, French, German, Dutch, Swedish, Spanish or Italian CD (French interface) | the folder with the patched `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
+| CD, Traditional Chinese release (1998 build, 4 CDs) | Traditional Chinese subtitles and menus, English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
+| CD, Simplified Chinese release (1999 build, 4 CDs) | Simplified Chinese subtitles (Traditional Chinese menus, as shipped), English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
 
 Each build plays as it shipped: the 1997 English CD, the May 1997
 French CD and the Dutch and Swedish CDs, for one, draw their subtitles in their own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
+The Chinese CDs' subtitles are drawn with your own Windows `mingliu.ttc`
+(Traditional) or `simsun.ttc` (Simplified) when you put it in the game
+folder, else with the bundled Noto Serif TC or SC.
 
 How to get the files from your CD or GOG.com: see
 [Getting the game files](docs/GUIDE.md#getting-the-game-files).
