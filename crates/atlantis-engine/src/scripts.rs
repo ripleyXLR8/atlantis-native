@@ -16,9 +16,10 @@
 
 use crate::checkpoint::ScriptState;
 use crate::con_script::{
-    con_alt_game_over_narration, con_angle_radians, con_entry_allowed, con_escape_skip,
-    con_game_over_narrator, con_track_letter, evaluate, parse_con_set, vars, ConItem, ConKeyBuffer,
-    ConLine, ConScript, ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
+    apply_con_subject_set, con_alt_game_over_narration, con_angle_radians, con_entry_allowed,
+    con_escape_skip, con_game_over_narrator, con_track_letter, evaluate, parse_con_set, vars,
+    ConItem, ConKeyBuffer, ConLine, ConScript, ConSection, ConSubjects, ConVariableNames,
+    CON_PLAY_COUNTERS,
 };
 use crate::engine::{Abort, Engine, Event};
 use crate::hooks::{ready, Departure, HookFuture, ScriptHooks};
@@ -433,8 +434,9 @@ impl Scripts {
             match key {
                 // EnableSuj,perso=suj,... / DisableSuj,perso=suj,...
                 // (@ 0x0042a4ef..0x0042a560) on the text from the first digit.
-                "enablesuj" => self.subjects.enable(text!(), set.value_pos),
-                "disablesuj" => self.subjects.disable(text!(), set.value_pos),
+                "enablesuj" | "disablesuj" => {
+                    apply_con_subject_set(&mut self.subjects, &set, text!());
+                }
                 // Time1=N / Time2=N restart the timer at N seconds; the
                 // variable is written by the clock update (@ 0x0042a321,
                 // 0x0042a392).
@@ -798,9 +800,10 @@ impl Scripts {
         // With enabled subjects the menu lists them in table order and is
         // shown first (0x00425930..0x00425a8a). Then the eligible /con
         // entries are walked in file order (FUN_004281f8) and the first
-        // that fits plays (0x00425abe..0x00425b75): an entry with no /suj
-        // line always fits; one with a /suj line fits when the perso has no
-        // subjects, or when its list holds the chosen subject
+        // that fits plays (0x00425abe..0x00425b75): an entry whose body does
+        // not start with /Suj or /suj always fits (a /suj line further down
+        // is not a gate, ConSection::suj_ids); one that does fits when the
+        // perso has no subjects, or when its list holds the chosen subject
         // (FUN_004264a8); a click outside the grid stops the walk at the
         // first /suj entry; an empty grid cell gives subject 0, which no
         // list holds.

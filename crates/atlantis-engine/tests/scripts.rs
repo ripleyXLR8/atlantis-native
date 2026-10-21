@@ -24,10 +24,10 @@ use atlantis_data::{Game, StdDir};
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::con_script::script::{latin1_bytes, ConText};
 use atlantis_engine::con_script::{
-    arrival_after_chapter_load, con_angle_radians, con_entry_allowed, con_escape_skip,
-    con_music_apply, con_music_list, con_music_load_all_or_nothing, con_track_letter, evaluate,
-    parse_con_set, ConClocks, ConItem, ConKeyBuffer, ConScript, ConSection, ConSubjects,
-    ConVariableNames, CON_PLAY_COUNTERS,
+    apply_con_subject_set, arrival_after_chapter_load, con_angle_radians, con_entry_allowed,
+    con_escape_skip, con_music_apply, con_music_list, con_music_load_all_or_nothing,
+    con_track_letter, evaluate, parse_con_set, ConClocks, ConItem, ConKeyBuffer, ConScript,
+    ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
 };
 use atlantis_engine::hooks::DirectLoader;
 use atlantis_engine::music::MusicRing;
@@ -293,17 +293,35 @@ fn synthetic_parse_matches_original() {
             "{name}"
         );
     }
-    // The angles of a dialog header and the /suj lists.
+    // The /suj gate: only the first line of a /con entry's body, "/Suj" or
+    // "/suj" (FUN_00425828 @ 0x00425ad3), the list as FUN_004264a8 walks it;
+    // a /suj line further down is plain text.
     let script = ConScript::parse(
-        b"/1\r\n/con(ClicPerso=600)\r\n/suj1,2\r\n[Seth, 12, -3, cam2] x\r\n/000\r\n",
+        b"/1\r\n/con(ClicPerso=600)\r\n/suj1,2\r\n[Seth,12,3,cam2] x\r\n/2\r\n/con(ClicPerso=600)\r\n[Seth] y\r\n/suj3\r\n/3\r\n/Con(ClicPerso=600)\r\n/Suj12,100,4\r\n/4\r\n/con(ClicPerso=600)\r\n/SUJ5\r\n/000\r\n",
     );
-    let sec = &script.sections()[0];
-    assert_eq!(sec.suj_ids, vec![1, 2]);
-    assert_eq!(sec.clic_perso, 600);
-    match &sec.items[0] {
-        ConItem::Line(l) => assert_eq!(l.angle, Some((12, -3))),
-        other => panic!("{other:?}"),
-    }
+    let sujs: Vec<Vec<i32>> = script
+        .sections()
+        .iter()
+        .map(|s| s.suj_ids.clone())
+        .collect();
+    assert_eq!(sujs, [vec![1, 2], vec![], vec![12, 100, 4], vec![]]);
+    // The header angles (FUN_0042844c @ 0x0042852b): a digit right after
+    // each ',' before the ']', Y = X when only X is given.
+    let angle = |header: &str| {
+        let text = format!("/1\r\n/sel(Vue=1)\r\n{header} x\r\n/000\r\n");
+        match &ConScript::parse(text.as_bytes()).sections()[0].items[0] {
+            ConItem::Line(l) => l.angle,
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(angle("[Seth,12,30,cam2]"), Some((12, 30)));
+    assert_eq!(angle("[Seth,12,cam2]"), Some((12, 12)));
+    assert_eq!(angle("[Seth,12]"), Some((12, 12)));
+    assert_eq!(angle("[Seth,12,-3,cam2]"), Some((12, 12)));
+    assert_eq!(angle("[Seth, 12, 30, cam2]"), None);
+    assert_eq!(angle("[Seth,-12,30]"), None);
+    assert_eq!(angle("[Seth,cam2]"), None);
+    assert_eq!(angle("[Seth] a,1"), None);
 }
 
 /// /con play limits: the entries the original /con scanner finds with
@@ -1228,28 +1246,14 @@ fn canon_subjects(t: &ConSubjects) -> String {
 }
 
 /// One /set line as the golden generator runs it (the line, then
-/// "\r\n/1\r\n"): the key up to one of "=<>!#,", the value at the first
-/// digit among the 16 bytes from there; the key matched by prefix.
-fn apply_suj(t: &mut ConSubjects, line: &[u8]) {
+/// "\r\n/1\r\n"), through the port's /set parse (the key looked up by
+/// prefix in VARIAS.CON, as `FUN_00429d20`) and subject dispatch (the
+/// ENABLESUJ / DISABLESUJ dispatch of `FUN_0042a100`).
+fn apply_suj(names: &ConVariableNames, t: &mut ConSubjects, line: &[u8]) {
     let mut buf = line.to_vec();
     buf.extend_from_slice(b"\r\n/1\r\n");
-    let mut p = buf
-        .iter()
-        .position(|&c| c == b'(')
-        .map_or(buf.len(), |p| p + 1);
-    let mut key = Vec::new();
-    while p < buf.len() && !b"=<>!#,".contains(&buf[p]) {
-        key.push(buf[p].to_ascii_lowercase());
-        p += 1;
-    }
-    let v = (0..16)
-        .map(|i| p + i)
-        .find(|&q| buf.get(q).is_some_and(u8::is_ascii_digit))
-        .unwrap_or(p) as u32;
-    if key.starts_with(b"enable") {
-        t.enable(&buf, v);
-    } else if key.starts_with(b"disable") {
-        t.disable(&buf, v);
+    if let Some(set) = parse_con_set(names, &buf, 0) {
+        apply_con_subject_set(t, &set, &buf);
     }
 }
 
@@ -1258,7 +1262,7 @@ fn apply_suj(t: &mut ConSubjects, line: &[u8]) {
 /// line, not compared).
 #[test]
 fn subject_sequences_match_original() {
-    let cases: [(&str, &[&str], &[&str]); 11] = [
+    let cases: [(&str, &[&str], &[&str]); 14] = [
         (
             "enable_dup_order",
             &["/set(enableSuj,600=12,5,1,2)", "/set(enableSuj,600=5,7)"],
@@ -1323,11 +1327,33 @@ fn subject_sequences_match_original() {
             &["/set(enableSuj,600=1, 2)"],
             &["RUNAWAY"],
         ),
+        // No digit in the 16 bytes after the key (FUN_0042a100 returns 0
+        // without a call), a list of letters, and a key that names the
+        // variable DISABLE.
+        (
+            "no_digit",
+            &["/set(enableSuj,600=4)", "/set(enableSuj,abcdefghijklmnopq)"],
+            &["600:4", "600:4"],
+        ),
+        (
+            "letters_list",
+            &["/set(enableSuj,600=abcdefghijklmnopq)"],
+            &["600:0"],
+        ),
+        (
+            "disable_key_not_disablesuj",
+            &["/set(enableSuj,600=4)", "/set(Disable,600=4)"],
+            &["600:4", "600:4"],
+        ),
     ];
+    let Some(g) = game("subject_sequences_match_original") else {
+        return;
+    };
+    let names = varias(&g);
     for (name, cmds, steps) in cases {
         let mut t = ConSubjects::default();
         for (i, (cmd, step)) in cmds.iter().zip(steps.iter()).enumerate() {
-            apply_suj(&mut t, cmd.as_bytes());
+            apply_suj(&names, &mut t, cmd.as_bytes());
             if *step == "RUNAWAY" {
                 break;
             }
@@ -1337,8 +1363,8 @@ fn subject_sequences_match_original() {
     // Lookups outside 0x200..0x2ff find nothing; an EnableSuj for such a
     // perso changes nothing.
     let mut t = ConSubjects::default();
-    apply_suj(&mut t, b"/set(enableSuj,999=1)");
-    apply_suj(&mut t, b"/set(enableSuj,600=4)");
+    apply_suj(&names, &mut t, b"/set(enableSuj,999=1)");
+    apply_suj(&names, &mut t, b"/set(enableSuj,600=4)");
     assert_eq!(canon_subjects(&t), "600:4");
     assert!(t.subjects(0x1ff).is_empty() && t.subjects(0x300).is_empty());
     assert!(t.has(600, 4) && !t.has(600, 5));
@@ -1353,6 +1379,7 @@ fn subject_commands_match_original() {
     let Some(g) = game("subject_commands_match_original") else {
         return;
     };
+    let names = varias(&g);
     let golden = golden_map(include_str!("golden/scripts_suj.txt"));
     let (mut with_lines, mut bad) = (0, Vec::new());
     for f in con_files(&g, "SCENAR\\") {
@@ -1374,7 +1401,7 @@ fn subject_commands_match_original() {
                 .iter()
                 .position(|&c| c == b'\r' || c == b'\n')
                 .map_or(data.len(), |e| i + e);
-            apply_suj(&mut t, &data[i..end]);
+            apply_suj(&names, &mut t, &data[i..end]);
             digest += &canon_subjects(&t);
             digest.push('\n');
             n += 1;
@@ -1492,10 +1519,11 @@ fn musik_lists_match_original() {
     // The first track there or open: nothing.
     assert_eq!(all("/set(loadmusik=3,5)", 0, "2"), (vec![], bits("2")));
     assert_eq!(all("/set(loadmusik=3,5)", 3, ""), (vec![], 0));
-    // Else every track, those there and the open one included.
+    // Else every track, those there included; the open one's copy fails
+    // (its file is held open with share mode 0) and it stays installed.
     assert_eq!(
         all("/set(loadmusik=3,5,7)", 7, "4"),
-        (vec![2, 4, 6], bits("2,4,6"))
+        (vec![2, 4], bits("2,4,6"))
     );
     // The index walk is the other builds' (10 desynchronises it).
     assert_eq!(
