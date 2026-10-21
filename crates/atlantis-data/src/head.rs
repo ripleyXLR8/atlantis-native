@@ -104,6 +104,9 @@ pub struct HeadNode {
     /// The 1.15 rotation.
     pub m: [i32; 9],
     pub verts: Vec<[i32; 3]>,
+    /// A vertex record has flag 0x80 (its +0, the only flag `FUN_004618b0`
+    /// keeps).
+    pub vertex_flag80: bool,
     /// The face planes' normals.
     pub planes: Vec<[i32; 3]>,
     pub radius: i32,
@@ -161,7 +164,11 @@ impl F3dc {
             let nv = f.u32(s + 0x7c)?;
             let va = rel(f.u32(s + 0x80)?);
             for v in 0..nv {
-                let b = va.wrapping_add(0x28 * v + 4);
+                let rec = va.wrapping_add(0x28 * v);
+                if f.u32(rec)? & 0x80 != 0 {
+                    n.vertex_flag80 = true;
+                }
+                let b = rec.wrapping_add(4);
                 n.verts.push([f.i32(b)?, f.i32(b + 4)?, f.i32(b + 8)?]);
             }
             let npl = f.u32(s + 0x94)?;

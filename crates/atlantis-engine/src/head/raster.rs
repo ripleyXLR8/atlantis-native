@@ -434,10 +434,15 @@ impl DialogHead {
         self.raster.entries.len() - 1
     }
 
-    /// The depth of edge `ei` at `x`.
-    fn depth_at(&self, ei: usize, x: i32) -> f64 {
+    /// The depth of edge `ei` at `x`, as the x87 holds it before a store.
+    fn depth_at_x87(&self, ei: usize, x: i32) -> f64 {
         let e = &self.edges[ei];
-        f32r(((i64::from(x) - i64::from(e.x)) >> 16) as f64 * f64::from(e.dizdx) + f64::from(e.iz))
+        ((i64::from(x) - i64::from(e.x)) >> 16) as f64 * f64::from(e.dizdx) + f64::from(e.iz)
+    }
+
+    /// The depth of edge `ei` at `x`, stored as a float.
+    fn depth_at(&self, ei: usize, x: i32) -> f64 {
+        f32r(self.depth_at_x87(ei, x))
     }
 
     /// `FUN_0045b824`: inserts entry `nw` in the front-to-back stack whose
@@ -447,10 +452,13 @@ impl DialogHead {
         let nf = &self.edges[self.raster.entries[nw].first];
         let znew = f64::from(nf.iz);
         let dznew = f64::from(nf.dizdx);
+        // 0x0045b86a: znew + 100 stays on the x87 stack (not rounded to
+        // float); 0x0045b8b7: the inner loop's limit is stored as a float.
+        let lim_top = znew + EPS;
         let lim = f32r(znew + EPS);
         let ent = |s: &Self, i: usize| s.raster.entries[i];
         let edge_top = &self.edges[ent(self, top).cur];
-        if ztop < znew || (ztop < lim && f64::from(edge_top.dizdx) < dznew) {
+        if ztop < znew || (ztop < lim_top && f64::from(edge_top.dizdx) < dznew) {
             let mut e = top;
             while ent(self, e).xr <= ent(self, nw).xr {
                 e = ent(self, e).behind;
@@ -472,8 +480,12 @@ impl DialogHead {
                         self.raster.entries[e7].cur = nx;
                         e3 = nx;
                     }
-                    let z7 = self.depth_at(e3, x);
-                    if z7 < znew || (z7 < lim && f64::from(self.edges[e3].dizdx) < dznew) {
+                    // 0x0045b8f7: FST keeps the unrounded value for the
+                    // compare with znew; the limit test reloads the float
+                    // store (0x0045b904).
+                    let z7x = self.depth_at_x87(e3, x);
+                    let z7 = f32r(z7x);
+                    if z7x < znew || (z7 < lim && f64::from(self.edges[e3].dizdx) < dznew) {
                         self.raster.entries[e6].behind = nw;
                         self.raster.entries[nw].behind = e7;
                         return top;
@@ -878,5 +890,87 @@ impl DialogHead {
         for e in &mut self.edges {
             e.entry = NONE;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn edge(x: i32, iz: f32, dizdx: f32, next: usize) -> Edge {
+        Edge {
+            x,
+            iz,
+            dizdx,
+            next,
+            ..Edge::default()
+        }
+    }
+
+    fn entry(xr: i32, first: usize, behind: usize) -> Entry {
+        Entry {
+            xr,
+            first,
+            cur: first,
+            behind,
+            ..Entry::new(0)
+        }
+    }
+
+    /// `FUN_0045b824` compares the unrounded x87 depth (FST 0x0045b8f7,
+    /// FCOMP 0x0045b8fb) with the new entry's 1/z: a depth just under 1/z
+    /// that rounds to it as a float puts the new entry in front of the
+    /// stack entry. Expected links from the original run under emulation.
+    #[test]
+    fn depth_insert_inner_near_tie() {
+        let mut h = DialogHead::default();
+        let x = 10 << 16;
+        // edges: 0 the end, 1 the top's, 2 the inner entry's, 3 the new one's
+        h.edges = vec![
+            edge(0x7fff_ffff, 0.0, 0.0, NONE),
+            edge(x, 1000.0, 0.0, 0),
+            edge(
+                x - (1 << 16),
+                f32::from_bits(0x3f7f_ffff),
+                (3.0 / 67_108_864.0) as f32,
+                0,
+            ),
+            edge(x, 1.0, 0.0, 0),
+        ];
+        // entries: 0 the inner one (e7), 1 the top, 2 the new one
+        h.raster.entries = vec![
+            entry(100 << 16, 2, NONE),
+            entry(20 << 16, 1, 0),
+            entry(50 << 16, 3, NONE),
+        ];
+        let ret = h.depth_insert(1, 2, x);
+        assert_eq!(ret, 1, "the top is kept");
+        assert_eq!(
+            h.raster.entries[1].behind, 2,
+            "the new entry behind the top"
+        );
+        assert_eq!(
+            h.raster.entries[2].behind, 0,
+            "the inner entry behind the new one"
+        );
+    }
+
+    /// `FUN_0045b824` compares the top's depth with the unrounded
+    /// znew + 100 (0x0045b86a..0x0045b874): 2^26 + 96 against 2^26 + 100,
+    /// which a float store would round to 2^26 + 96. Expected links from
+    /// the original run under emulation.
+    #[test]
+    fn depth_insert_top_near_tie() {
+        let mut h = DialogHead::default();
+        let x = 10 << 16;
+        h.edges = vec![
+            edge(0x7fff_ffff, 0.0, 0.0, NONE),
+            edge(x, 67_108_960.0, 0.0, 0),
+            edge(x, 67_108_864.0, 1.0, 0),
+        ];
+        h.raster.entries = vec![entry(60 << 16, 1, NONE), entry(50 << 16, 2, NONE)];
+        let ret = h.depth_insert(0, 1, x);
+        assert_eq!(ret, 1, "the new entry is the top");
+        assert_eq!(h.raster.entries[1].behind, 0, "the old top behind it");
     }
 }

@@ -106,11 +106,17 @@ fn trig() -> &'static TrigTables {
 /// `FUN_0045d460`: the slerp of two 1.15 quaternions, weight 0..256.
 fn slerp(q0: &[i32; 4], q1: &[i32; 4], w: i32) -> [i32; 4] {
     let t = trig();
-    let dot = (i64::from(q0[0]) * i64::from(q1[0])
-        + i64::from(q0[1]) * i64::from(q1[1])
-        + i64::from(q0[2]) * i64::from(q1[2])
-        + i64::from(q0[3]) * i64::from(q1[3]))
-        >> 15;
+    // 32-bit IMUL / ADD then SAR 15 (0x0045d46a..0x0045d493)
+    let dot = i64::from(
+        wrap32(
+            i64::from(q0[0]) * i64::from(q1[0])
+                + i64::from(q0[1]) * i64::from(q1[1])
+                + i64::from(q0[2]) * i64::from(q1[2])
+                + i64::from(q0[3]) * i64::from(q1[3]),
+        ) >> 15,
+    );
+    // The opposite-quaternion branch (0x0045d5ab) is not ported: no rotation
+    // key pair of the shipped *A.3DA files reaches it.
     if dot + 0x8000 <= 20 {
         log::warn!("dialog head: FUN_0045d460 opposite-quaternion branch (0x0045d5ab) not ported");
     }
@@ -371,6 +377,7 @@ pub fn texture_paths(mesh: &F3dc) -> Vec<String> {
 
 /// The 3D head of a dialog line.
 #[derive(Clone)]
+#[cfg_attr(test, derive(Default))]
 pub struct DialogHead {
     nodes: Vec<Node>,
     tracks: Vec<HeadTrack>,
@@ -484,6 +491,19 @@ impl DialogHead {
         // s3d meshes shown (FUN_0044c284)
         for n in &mut nodes {
             n.d.flags |= 4;
+        }
+        // Not ported, no shipped .3DC sets these flags: node flag 0x10
+        // (FUN_00463398 0x004634a1..0x004634f3: a culled node is drawn when
+        // its parent is not, and FUN_004619f0 transforms the parent's 0x80
+        // vertices) and vertex flag 0x80 (FUN_004618b0: visible, 0x40, as
+        // soon as z >= near).
+        for n in &nodes {
+            if n.d.flags & 0x10 != 0 {
+                log::warn!("dialog head: node flag 0x10 (FUN_00463398 0x004634a1) not ported");
+            }
+            if n.d.vertex_flag80 {
+                log::warn!("dialog head: vertex flag 0x80 (FUN_004618b0, FUN_004619f0) not ported");
+            }
         }
         for &m in &meshes {
             nodes[m].d.flags &= !4;
@@ -768,12 +788,24 @@ impl DialogHead {
         let e = self.phon[26];
         for r in 0..self.meshes.len() {
             let mesh = self.meshes[r];
+            // the >= 0 tests of 0x0044e55d / 0x0044e5a7 are on the mapped
+            // row value
+            let s1 = if e[2] >= 0 && e[3] >= 0 {
+                self.row_shape(r, e[2])
+            } else {
+                -1
+            };
+            let s2 = if e[4] >= 0 && e[5] >= 0 {
+                self.row_shape(r, e[4])
+            } else {
+                -1
+            };
             self.morph(mesh, self.row_shape(r, e[0]), 255);
-            if e[2] >= 0 && e[3] >= 0 {
-                self.morph(mesh, self.row_shape(r, e[2]), e[3]);
+            if s1 >= 0 {
+                self.morph(mesh, s1, e[3]);
             }
-            if e[4] >= 0 && e[5] >= 0 {
-                self.morph(mesh, self.row_shape(r, e[4]), e[5]);
+            if s2 >= 0 {
+                self.morph(mesh, s2, e[5]);
             }
         }
         self.head_anim();
@@ -835,13 +867,16 @@ impl DialogHead {
             f64::from(nn[3].wrapping_mul(b)) * c,
             f64::from(nn[5].wrapping_mul(b)) * c,
         ];
-        let s = [pp[0], pp[2], pp[4], nn[0], nn[2], nn[4]];
+        let idx = [pp[0], pp[2], pp[4], nn[0], nn[2], nn[4]];
         for r in 0..self.meshes.len() {
+            // the row value, -1 for a negative table index; the >= 0 test of
+            // 0x0044f054 is on this mapped value
+            let s = idx.map(|i| if i < 0 { -1 } else { self.row_shape(r, i) });
             for k in 0..6 {
                 if 0.0 > w[k] || s[k] < 0 {
                     continue;
                 }
-                self.morph(self.meshes[r], self.row_shape(r, s[k]), truncd(w[k]));
+                self.morph(self.meshes[r], s[k], truncd(w[k]));
             }
         }
         self.head_anim();
@@ -999,9 +1034,19 @@ impl DialogHead {
             if f & 0x40 != 0 {
                 ProjectedVertex {
                     flags: f,
-                    x: tdiv(i64::from(c[0]) * i64::from(fx), i64::from(c[2])).wrapping_add(cx),
-                    y: tdiv(i64::from(c[1]) * i64::from(fy), i64::from(c[2])).wrapping_add(cy),
-                    iz: (f64::from(1_073_741_824.0f32) / f64::from(c[2] as f32)) as f32,
+                    // 32-bit IMUL then CDQ / IDIV (0x00463084, 0x004630a8);
+                    // FILD of the exact z (0x00463091)
+                    x: tdiv(
+                        i64::from(wrap32(i64::from(c[0]) * i64::from(fx))),
+                        i64::from(c[2]),
+                    )
+                    .wrapping_add(cx),
+                    y: tdiv(
+                        i64::from(wrap32(i64::from(c[1]) * i64::from(fy))),
+                        i64::from(c[2]),
+                    )
+                    .wrapping_add(cy),
+                    iz: (f64::from(1_073_741_824.0f32) / f64::from(c[2])) as f32,
                 }
             } else {
                 ProjectedVertex {
