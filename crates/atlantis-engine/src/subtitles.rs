@@ -343,13 +343,9 @@ struct GlyphBits {
 impl GlyphBits {
     /// The glyph of `c` at `scale`, none for a control character or a
     /// character the font lacks: the pixels at least half covered; with
-    /// `dropout`, also those at least a fifth covered that are a stroke's
-    /// most covered across it (more than the pixel after it and at least
-    /// the one before it, vertically or horizontally): the thin horizontals
-    /// of a Ming / Song face at 16 pixels, which cover no pixel by half,
-    /// are kept as a TrueType rasteriser's dropout control keeps them (an
-    /// approximation of it).
-    fn of(font: &FontRef<'_>, scale: PxScale, c: char, dropout: bool) -> GlyphBits {
+    /// `scan`, the pixels a TrueType rasteriser's scan conversion turns on
+    /// ([`GlyphBits::scan_converted`]).
+    fn of(font: &FontRef<'_>, scale: PxScale, c: char, scan: bool) -> GlyphBits {
         if c < ' ' {
             return GlyphBits::default();
         }
@@ -358,6 +354,12 @@ impl GlyphBits {
             return GlyphBits::default();
         }
         let advance = font.as_scaled(scale).h_advance(id).round() as i32;
+        if scan {
+            return GlyphBits {
+                advance,
+                ..Self::scan_converted(font, scale, id)
+            };
+        }
         let glyph = id.with_scale_and_position(scale, point(0.0, 0.0));
         let Some(outline) = font.outline_glyph(glyph) else {
             return GlyphBits {
@@ -373,31 +375,163 @@ impl GlyphBits {
                 *p = c;
             }
         });
-        let at = |x: i32, y: i32| {
-            if x < 0 || y < 0 || x >= w || y >= h {
-                0.0
-            } else {
-                cover[(y * w + x) as usize]
-            }
-        };
-        let mut bits = Vec::with_capacity(cover.len());
-        for y in 0..h {
-            for x in 0..w {
-                let c = at(x, y);
-                let peak =
-                    |(bx, by): (i32, i32), (ax, ay): (i32, i32)| c >= at(bx, by) && c > at(ax, ay);
-                bits.push(
-                    c >= 0.5
-                        || (dropout
-                            && c >= 0.2
-                            && (peak((x, y - 1), (x, y + 1)) || peak((x - 1, y), (x + 1, y)))),
-                );
-            }
-        }
+        let bits = cover.iter().map(|&c| c >= 0.5).collect();
         GlyphBits {
             advance,
             left: bounds.min.x as i32,
             top: bounds.min.y as i32,
+            w,
+            h,
+            bits,
+        }
+    }
+
+    /// The glyph `id` at `scale` as the TrueType scan converter turns its
+    /// outline into pixels in monochrome (the rules of the OpenType
+    /// specification's "TrueType instructions", scan conversion and
+    /// dropout control, as GDI's rasteriser applies them; no hinting):
+    ///
+    /// 1. a pixel whose centre is inside the outline (non-zero winding) is
+    ///    on;
+    /// 2. a pixel whose centre is on the outline is on;
+    /// 3. where a scan line through the pixel centres (a row or a column)
+    ///    enters and leaves the outline between two adjacent centres and
+    ///    neither pixel is on by 1 and 2, the one nearer the midpoint of
+    ///    the two crossings is on (dropout control, which keeps the thin
+    ///    horizontals of a Ming / Song face at 16 pixels).
+    ///
+    /// The curves are followed as 16 straight pieces each.
+    fn scan_converted(font: &FontRef<'_>, scale: PxScale, id: ab_glyph::GlyphId) -> GlyphBits {
+        let Some(outline) = font.outline(id) else {
+            return GlyphBits::default();
+        };
+        let scaled = font.as_scaled(scale);
+        let (hs, vs) = (scaled.h_scale_factor(), scaled.v_scale_factor());
+        // Pixels, y down from the baseline.
+        let at = |p: ab_glyph::Point| (p.x * hs, -p.y * vs);
+        let mut lines: Vec<((f32, f32), (f32, f32))> = Vec::new();
+        const PIECES: usize = 16;
+        for curve in &outline.curves {
+            let mut from = None;
+            for i in 0..=PIECES {
+                let t = i as f32 / PIECES as f32;
+                let u = 1.0 - t;
+                let p = match *curve {
+                    ab_glyph::OutlineCurve::Line(a, b) => {
+                        if i > 0 && i < PIECES {
+                            continue;
+                        }
+                        at(point(a.x * u + b.x * t, a.y * u + b.y * t))
+                    }
+                    ab_glyph::OutlineCurve::Quad(a, b, c) => at(point(
+                        u * u * a.x + 2.0 * u * t * b.x + t * t * c.x,
+                        u * u * a.y + 2.0 * u * t * b.y + t * t * c.y,
+                    )),
+                    ab_glyph::OutlineCurve::Cubic(a, b, c, d) => at(point(
+                        u * u * u * a.x + 3.0 * u * u * t * b.x + 3.0 * u * t * t * c.x + t * t * t * d.x,
+                        u * u * u * a.y + 3.0 * u * u * t * b.y + 3.0 * u * t * t * c.y + t * t * t * d.y,
+                    )),
+                };
+                if let Some(f) = from {
+                    lines.push((f, p));
+                }
+                from = Some(p);
+            }
+        }
+        if lines.is_empty() {
+            return GlyphBits::default();
+        }
+        let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+        for &((ax, ay), (bx, by)) in &lines {
+            x0 = x0.min(ax).min(bx);
+            y0 = y0.min(ay).min(by);
+            x1 = x1.max(ax).max(bx);
+            y1 = y1.max(ay).max(by);
+        }
+        let (left, top) = (x0.floor() as i32, y0.floor() as i32);
+        let (w, h) = (x1.ceil() as i32 - left + 1, y1.ceil() as i32 - top + 1);
+        // The spans of the scan line at `c` (a pixel centre) along the
+        // lines' `u` coordinate (x for a row, y for a column): the
+        // crossings with their winding, paired where the winding leaves 0
+        // and comes back to it.
+        let spans = |c: f32, horizontal: bool| -> Vec<(f32, f32)> {
+            let mut cross: Vec<(f32, i32)> = Vec::new();
+            for &(a, b) in &lines {
+                let (a, b) = if horizontal { (a, b) } else { ((a.1, a.0), (b.1, b.0)) };
+                // (u, v): v the scan direction's normal
+                let (au, av, bu, bv) = (a.0, a.1, b.0, b.1);
+                if av == bv {
+                    continue;
+                }
+                let (dir, lo, hi) = if av < bv { (1, av, bv) } else { (-1, bv, av) };
+                if c < lo || c >= hi {
+                    continue;
+                }
+                cross.push((au + (c - av) * (bu - au) / (bv - av), dir));
+            }
+            cross.sort_by(|a, b| a.0.total_cmp(&b.0));
+            let mut out = Vec::new();
+            let mut wind = 0;
+            let mut start = 0.0;
+            for (u, d) in cross {
+                if wind == 0 {
+                    start = u;
+                }
+                wind += d;
+                if wind == 0 {
+                    out.push((start, u));
+                }
+            }
+            out
+        };
+        let mut bits = vec![false; (w * h) as usize];
+        let idx = |x: i32, y: i32| (y * w + x) as usize;
+        let mut row_spans = Vec::with_capacity(h as usize);
+        let mut col_spans = Vec::with_capacity(w as usize);
+        // Rules 1 and 2 along the rows.
+        for y in 0..h {
+            let spans = spans((top + y) as f32 + 0.5, true);
+            for &(a, b) in &spans {
+                let first = (a - 0.5 - left as f32).ceil() as i32;
+                let last = (b - 0.5 - left as f32).floor() as i32;
+                for x in first.max(0)..=last.min(w - 1) {
+                    bits[idx(x, y)] = true;
+                }
+            }
+            row_spans.push(spans);
+        }
+        for x in 0..w {
+            col_spans.push(spans((left + x) as f32 + 0.5, false));
+        }
+        // Rule 3, against the pixels of rules 1 and 2.
+        let base = bits.clone();
+        let on = |x: i32, y: i32| x >= 0 && y >= 0 && x < w && y < h && base[idx(x, y)];
+        for (y, spans) in row_spans.iter().enumerate() {
+            let y = y as i32;
+            for &(a, b) in spans {
+                let lo = (a - 0.5 - left as f32).floor() as i32;
+                if (b - 0.5 - left as f32).floor() as i32 != lo || on(lo, y) || on(lo + 1, y) {
+                    continue;
+                }
+                let x = (((a + b) / 2.0).floor() as i32 - left).clamp(0, w - 1);
+                bits[idx(x, y)] = true;
+            }
+        }
+        for (x, spans) in col_spans.iter().enumerate() {
+            let x = x as i32;
+            for &(a, b) in spans {
+                let lo = (a - 0.5 - top as f32).floor() as i32;
+                if (b - 0.5 - top as f32).floor() as i32 != lo || on(x, lo) || on(x, lo + 1) {
+                    continue;
+                }
+                let y = (((a + b) / 2.0).floor() as i32 - top).clamp(0, h - 1);
+                bits[idx(x, y)] = true;
+            }
+        }
+        GlyphBits {
+            advance: 0,
+            left,
+            top,
             w,
             h,
             bits,
@@ -1386,6 +1520,28 @@ mod tests {
         );
         assert_eq!(a, b);
         assert_eq!(f.width(b"\xa4\xa4\xa4"), 16);
+    }
+
+    /// The CJK glyphs' scan conversion: the three thin horizontals of 三,
+    /// under a pixel high at 16 pixels per em, each a row of at least 10
+    /// pixels (dropout control); the Latin path's glyphs stay the pixels
+    /// half covered.
+    #[test]
+    fn cjk_scan_conversion_keeps_thin_strokes() {
+        for cp in [TextCodePage::Windows950, TextCodePage::Windows936] {
+            let f = SubtitleFont::with_code_page(cp);
+            let font = f.face.font();
+            let scale = SubtitleFont::scale(&font, CJK_SUBTITLE_EM_PX);
+            let g = GlyphBits::of(&font, scale, '三', true);
+            assert_eq!(g.advance, 16);
+            let runs = (0..g.h)
+                .filter(|&y| {
+                    let row = &g.bits[(y * g.w) as usize..((y + 1) * g.w) as usize];
+                    row.split(|&b| !b).any(|r| r.len() >= 10)
+                })
+                .count();
+            assert_eq!(runs, 3, "{cp:?}");
+        }
     }
 
     /// The Simplified build's text (GBK) in Noto Serif SC; the other

@@ -231,9 +231,13 @@ that name in the collection), else with Noto Serif TC / SC, the same
 Ming / Song style, bundled as subsets to the characters of the two
 releases' scripts plus ASCII and the punctuation
 (`assets/fonts/make_cjk_subset.py` reads the characters from the discs),
-at 16 pixels per em, monochrome: the pixels at least half covered, and
-the thin horizontal strokes, which cover no pixel by half at that size,
-kept as a TrueType rasteriser's dropout control keeps them. The size
+at 16 pixels per em, monochrome, by the TrueType scan conversion rules
+(a pixel whose centre is inside the outline or on it is on; where a row
+or a column of pixel centres crosses a stroke between two centres and
+neither pixel is on, the one nearer the stroke is on: the dropout control
+that keeps the thin horizontals of a Ming / Song face at that size). A
+two-byte character the face has no glyph for (the code page's
+user-defined area) draws nothing but keeps its full-width cell. The size
 Windows renders the face at, and whether it drew its embedded 16-pixel
 bitmaps, are not known. MingLiU before version 7.00 (Windows XP's and
 older) draws right only through its hinting, which the port does not
