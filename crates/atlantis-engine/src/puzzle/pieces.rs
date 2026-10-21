@@ -83,7 +83,10 @@ pub struct PiecesGame {
     pub result: i32,
 }
 
-/// A byte of the raw BMP at [x - y * 640 + base], 0 off the file.
+/// A byte of the raw BMP at [x - y * 640 + base], 0 off the file. 0x4b438
+/// is the file size, so a click on the top row (y = 0) is off the file;
+/// there the original reads the next pool allocation, puzsrp2c.spr
+/// (`FUN_004459c0`), which is not reproduced.
 pub fn map_value(map: &[u8], x: i32, y: i32, base: i32) -> u8 {
     let i = x - y * 640 + base;
     usize::try_from(i)
@@ -129,7 +132,7 @@ impl PiecesGame {
     }
 
     /// `FUN_004460c8`. Values above 13 index past the original's arrays;
-    /// the shipped map has none.
+    /// the shipped map has none below the top row.
     pub fn click(&mut self, x: i32, y: i32) -> Click {
         let v = map_value(&self.map, x, y, CLICK_BASE);
         if v == 0 {

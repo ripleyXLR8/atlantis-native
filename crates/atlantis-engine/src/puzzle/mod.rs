@@ -365,7 +365,7 @@ mod entry_tests {
         let seen = Rc::new(Cell::new(None));
         let s2 = seen.clone();
         let ran = with_engine(
-            "puzzle_entry_centres_the_mouse",
+            "puzzle_entry_keeps_the_mouse",
             move |mut e| async move {
                 e.sys.set_mouse_pos(10, 10);
                 play_puzzle(&mut e, &mut NoScripts, id).await;
@@ -380,13 +380,14 @@ mod entry_tests {
         ran.then(|| seen.get().expect("the puzzle ended at once"))
     }
 
-    /// The eclipse (0) and the ogre (2) put the mouse at the screen centre
-    /// on entry.
+    /// The eclipse (0) and the ogre (2) leave the mouse where the zone
+    /// click left it: the original has no SetCursorPos between the zone
+    /// click and the puzzle loop.
     #[test]
-    fn eclipse_and_ogre_centre_the_mouse() {
+    fn eclipse_and_ogre_keep_the_mouse() {
         for id in [0, 2] {
             if let Some(m) = mouse_after_entry(id) {
-                assert_eq!(m, (320, 240), "puzzle {id}");
+                assert_eq!(m, (10, 10), "puzzle {id}");
             }
         }
     }

@@ -764,11 +764,14 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     // FUN_0043a1e0 seeded the puzzle LCG from the clock.
     let mut game = OgreGame::new(&mut e.puzzles.lcg_seed);
     game.reveal = e.game.exe.build.queen_reveal;
-    // The mouse unlocked, then at the screen centre on entry; the mouse of
-    // the previous pass (0x004960ec / 0x004960f0) starts there too.
+    // The mouse unlocked. No SetCursorPos before the loop (the import slot
+    // 0x00c302f8 has no reader in FUN_004240fc, FUN_0043a1e0, FUN_00448ad0
+    // or FUN_0044203c; FUN_004439c4's is the held-piece clamp): the puzzle
+    // starts with the pointer where the warp loop left it at the zone
+    // click. The mouse of the previous pass (0x004960ec / 0x004960f0, as
+    // the FUN_004439c4 clamp at 0x00442178 leaves it) starts there too.
     let mut host = Host(PuzzleHost::new(e, hooks));
-    host.0.e.sys.set_mouse_pos(320, 240);
-    (game.mx, game.my) = (320, 240);
+    (game.mx, game.my) = host.0.e.sys.mouse();
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;
     host.0.sounds = sounds;

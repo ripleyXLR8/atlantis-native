@@ -652,12 +652,13 @@ fn pieces_vs_original() {
         tuple6(&start.counters)
     ));
 
-    // The click map from the start state.
+    // The click map from the start state, rows 1..479: row 0 is past the
+    // BMP (the original reads puzsrp2c.spr there, see `pieces::map_value`).
     let mut all = String::new();
     let mut counts = [0u32; 128];
     let mut rep = [None; 13];
-    for y in 0..480 {
-        if y > 0 {
+    for y in 1..480 {
+        if y > 1 {
             all.push('\n');
         }
         for x in 0..640 {

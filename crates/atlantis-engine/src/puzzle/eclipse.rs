@@ -313,13 +313,16 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         game.records[0].curr = c0;
         game.records[1].curr = c1;
     }
-    // The mouse unlocked, then at the screen centre on entry.
+    // The mouse unlocked. No SetCursorPos before the loop (the import slot
+    // 0x00c302f8 has no reader in FUN_004240fc, FUN_0043a1e0, FUN_00448ad0
+    // or FUN_0044154c): the puzzle starts with the pointer where the warp
+    // loop left it at the zone click, which the warp exit has put in the
+    // mouse.
     let mut host = Host {
         h: PuzzleHost::new(e, hooks),
         pz1l,
         pz2l,
     };
-    host.h.e.sys.set_mouse_pos(320, 240);
     host.h.screen.pictures = vec![bg];
     host.h.sounds = sounds;
     let r = game.run(&mut host).await;
