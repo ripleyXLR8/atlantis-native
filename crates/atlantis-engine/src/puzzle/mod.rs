@@ -60,8 +60,8 @@ pub mod taquin;
 pub mod throne;
 
 pub use assets::{
-    load_class_map, load_spr, load_tga, read_coverage, read_puzzle_file, Coverage, PuzzleHost,
-    PuzzleInput, PuzzleMouse, PuzzleScreen, PuzzleSounds, SamplePlayer, MAP_SIZE,
+    load_class_map, load_spr, load_tga, read_coverage, read_puzzle_file, right_press, Coverage,
+    PuzzleHost, PuzzleInput, PuzzleMouse, PuzzleScreen, PuzzleSounds, SamplePlayer, MAP_SIZE,
 };
 
 use crate::engine::{Engine, Event};

@@ -256,7 +256,8 @@ impl HexaGame {
         (0..17).any(|k| self.place_piece(i, x + i32::from(DROP_DX[k]), y + i32::from(DROP_DY[k])))
     }
 
-    /// `FUN_00440bfc`.
+    /// `FUN_00440bfc`, on the right flag of `FUN_0041a298` (one pass per
+    /// press, so the repeat counter never passes 1).
     fn right_button(&mut self, io: &mut impl HexaIo) {
         if self.right {
             if self.repeat == 0 && self.held != 0 {

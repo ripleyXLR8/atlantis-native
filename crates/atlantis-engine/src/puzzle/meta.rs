@@ -136,7 +136,9 @@ pub trait MetaIo {
 }
 
 /// What the original keeps between the stages: the pieces, their count,
-/// the picture and the hand.
+/// the picture and the grab offset. The hand, 0x007bebf4 and the repeat
+/// counter are not kept: `FUN_0043a1e0` clears 0x007bebf8 / 0x007bebf4 /
+/// 0x007bebf0 before every StartPuzzle (0x0043a206..0x0043a21a).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MetaMemory {
     pub pieces: [Piece; NUM_PIECES],
@@ -144,9 +146,6 @@ pub struct MetaMemory {
     pub picture: i16,
     pub grab_x: i32,
     pub grab_y: i32,
-    pub repeat: i32,
-    pub unk_f4: i32,
-    pub held: i32,
 }
 
 /// The metal pieces' state.
@@ -162,7 +161,8 @@ pub struct MetaGame {
     /// 0x007bebe8, 0x007bebec.
     pub grab_x: i32,
     pub grab_y: i32,
-    /// 0x007bebf0: the right button's repeat counter.
+    /// 0x007bebf0: the right button's repeat counter (0 or 1: one right
+    /// press per press, [`crate::puzzle::right_press`]).
     pub repeat: i32,
     /// 0x007bebf4.
     pub unk_f4: i32,
@@ -219,9 +219,6 @@ impl MetaGame {
             picture: self.picture,
             grab_x: self.grab_x,
             grab_y: self.grab_y,
-            repeat: self.repeat,
-            unk_f4: self.unk_f4,
-            held: self.held,
         }
     }
 
@@ -231,9 +228,6 @@ impl MetaGame {
         self.picture = m.picture;
         self.grab_x = m.grab_x;
         self.grab_y = m.grab_y;
-        self.repeat = m.repeat;
-        self.unk_f4 = m.unk_f4;
-        self.held = m.held;
     }
 
     fn read_boundary(&mut self, io: &mut impl MetaIo) {
@@ -443,7 +437,8 @@ impl MetaGame {
             .all(|p| p.cls == self.variant)
     }
 
-    /// `FUN_00448084`.
+    /// `FUN_00448084`, on the right flag of `FUN_0041a298` (one pass per
+    /// press, so the repeat counter never passes 1).
     fn right_button(&mut self, io: &mut impl MetaIo) {
         if self.right {
             if self.repeat == 0 {

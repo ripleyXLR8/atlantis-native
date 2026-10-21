@@ -214,24 +214,41 @@ pub struct PuzzleMouse {
     pub y: i32,
     /// The left button went down since the last read.
     pub click: bool,
-    /// The right button is down (`FUN_0041a298` reports it while it is
-    /// held; the puzzles keep their own repeat counters).
+    /// The right button went down at this read (see [`right_press`]).
     pub right: bool,
 }
 
-/// The input of a puzzle: the left button's state at the last read.
+/// The right flag `FUN_0041a298` leaves (0x00496120): `FUN_0042e6dc` puts
+/// VK_RBUTTON (0x006140c2) in edge mode, so `FUN_0042e624` raises its bit 2
+/// on the first poll of a press only, and `FUN_0041a298` tests it only when
+/// the left button's bit 2 is clear (0x0041a2b5..0x0041a2e9): one pass per
+/// press, lost when the left button goes down on the same poll; a held
+/// button counts once. `down`: the right button at this poll; `prev_down`:
+/// at the previous poll (updated); `left_press`: the left button went down
+/// at this poll.
+pub fn right_press(down: bool, prev_down: &mut bool, left_press: bool) -> bool {
+    let press = down && !*prev_down && !left_press;
+    *prev_down = down;
+    press
+}
+
+/// The input of a puzzle: the buttons' state at the last read.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PuzzleInput {
     prev_left: bool,
+    prev_right: bool,
 }
 
 impl PuzzleInput {
     /// Starts with the button state as it is (a button still down from
-    /// the zone's click is no click) and the events dropped.
+    /// the zone's click is no click, and the edge-mode keys of the
+    /// original have seen it already) and the events dropped.
     pub fn new(sys: &Sys) -> PuzzleInput {
         while sys.poll_event().is_some() {}
+        let (left, right) = sys.buttons();
         PuzzleInput {
-            prev_left: sys.buttons().0,
+            prev_left: left,
+            prev_right: right,
         }
     }
 
@@ -265,6 +282,7 @@ impl PuzzleInput {
         let (x, y) = sys.mouse();
         let click = (left && !self.prev_left) || pressed;
         self.prev_left = left;
+        let right = right_press(right, &mut self.prev_right, click);
         PuzzleMouse { x, y, click, right }
     }
 }
@@ -366,8 +384,9 @@ impl<'a> PuzzleHost<'a> {
         }
     }
 
-    /// A CURSEURS frame. What `FUN_00410430` does with the animation's
-    /// frame -1 is unknown; nothing is drawn.
+    /// A CURSEURS frame. `FUN_00410430` reads the frame as an unsigned
+    /// 16-bit word and draws nothing when it is not below the bank's count
+    /// (0x0041045e..0x00410465), so the animation's frame -1 draws nothing.
     pub fn draw_cursor(&mut self, frame: i32, x: i32, y: i32) {
         let Ok(f) = usize::try_from(frame) else {
             return;
