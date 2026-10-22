@@ -9,8 +9,8 @@
 | `atlantis-data` | BigFile archives, executable tables, game detection |
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
-| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera; for now a new game shows its first view |
+| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, the `.db` 3D scenes and head maps, the dialog scripts |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the 3D dialog heads and the lip-sync; for now a new game shows its first view |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -630,6 +630,28 @@ runs yet: no cinematic, no script, no move. `--headless <folder> [frames]
   dialog video stream does: the frames are premultiplied, a = 31 copies
   the video, a = 0 keeps the background, and in between the background is
   scaled by (31 − a) / 32 with the original's tables.
+- **Dialog heads** (`head.rs`, `raster3d.rs`, `lipsync.rs`; not shown
+  in play yet): a speaker's head is a `.db` scene written by Cryo's 3ds Max
+  exporter (`crates/atlantis2-data/src/db.rs`: meshes, a node hierarchy
+  with key-frame tracks, materials, the mouth shapes as morph targets,
+  cameras) with a 512x512 16-bit RLE TGA texture and two eye-blink maps
+  (`tga.rs`). The scene is posed at the body video's frame number, its
+  mouth mixed from the mood's 7 visemes, and the head drawn by a
+  transcription of the original's C pipeline: the object → camera matrix,
+  the transform and clip codes, the back-face test, the projection, and
+  the rasteriser `Zi32Texture1516FastPerspective1516C` (a fan of
+  triangles, perspective every 32 pixels, nearest texel, a 32-bit Z
+  buffer), every float store and x87 rounding as the original's. The eyes
+  blink at random (2 % a frame, then three frames closed, half closed,
+  open), with the C runtime's own `rand`. The lip-sync analyses the voice
+  by blocks of 256 samples (energy and a histogram of zero-crossing
+  intervals) and turns it every frame into the 7 weights through the
+  speaker's 10x7 `[Matrice]` of `scenar\info<world>.txt`, smoothed by
+  `[Smooth]`, `[Offset]` seconds ahead of the voice (`dialog.rs` reads
+  the scripts). Frames, Z buffers, intermediate buffers and the weights
+  of every Tibet line are the original's, bit for bit, at either x87
+  precision for the lip-sync; `cargo run --release --example head_png`
+  draws a head to a PNG.
 
 ## Tests
 
@@ -662,7 +684,7 @@ trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
 installation, for the tests of those builds. For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
-copies); the expected frames, matrices and zone picks come from the
+copies); the expected frames, matrices, zone picks, heads and lip-sync weights come from the
 original `atlantis2.exe` run under emulation:
 
 ```sh

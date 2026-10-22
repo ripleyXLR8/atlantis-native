@@ -8,13 +8,19 @@
 //! - [`files`]: the install folder and the four discs, with the disc rule
 //!   of the `MONDE` script variable;
 //! - [`wam`]: the `WAM V2.8` place files (views, moves, 3D click zones);
-//! - [`con`]: what a new game starts with, read from `chapi000.con`.
+//! - [`con`]: what a new game starts with, read from `chapi000.con`;
+//! - [`db`]: the `.db` 3D scenes (the dialog heads, the 3D puzzles);
+//! - [`tga`]: the heads' texture maps;
+//! - [`dialog`]: the dialog scripts' speakers and lines.
 
 #![forbid(unsafe_code)]
 
 pub mod con;
+pub mod db;
+pub mod dialog;
 pub mod exe;
 pub mod files;
+pub mod tga;
 pub mod wam;
 
 pub use exe::{identify, Build, ExeError};
