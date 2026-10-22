@@ -154,7 +154,8 @@ impl LipSync {
     /// `pow` as `_CIpow` (@ 0x005aeb00) computes it at the precision.
     fn pow(&self, x: f64, y: f64) -> f64 {
         match self.fpu {
-            Fpu::Double => libm::pow(x, y),
+            // (0x0e7f: not transcribed; the 53-bit result, see `Fpu::r`.)
+            Fpu::Double | Fpu::Chop => libm::pow(x, y),
             Fpu::Single => {
                 // FYL2X (not rounded), FRNDINT, the fraction rounded,
                 // F2XM1 + 1 rounded, FSCALE.

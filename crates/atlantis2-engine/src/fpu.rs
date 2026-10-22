@@ -84,6 +84,20 @@ impl Fpu {
         }
     }
 
+    /// The result of an x87 operation computed exactly or as a double,
+    /// at this precision: the double itself at 53 bits, rounded to a float
+    /// at 24 bits. The heads and the lip-sync were transcribed this way for
+    /// 0x027f and 0x007f; under [`Fpu::Chop`] this keeps the double
+    /// (rounded to nearest), which can differ from the original's
+    /// truncation in the last bit.
+    #[inline(always)]
+    pub fn r(self, x: f64) -> f64 {
+        match self {
+            Fpu::Single => x as f32 as f64,
+            Fpu::Double | Fpu::Chop => x,
+        }
+    }
+
     /// a + b (`fadd`).
     #[inline(always)]
     pub fn add(self, a: f64, b: f64) -> f64 {
