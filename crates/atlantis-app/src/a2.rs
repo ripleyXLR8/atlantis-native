@@ -13,6 +13,9 @@
 //! in it, in the folders directly inside it, and in the folders given with
 //! `--discs`.
 //!
+//! `--original` turns the enhancements off (the minor bug fixes: the
+//! music tracks heard to their end), as for the first game.
+//!
 //! Testing aids: `--view <id>[,<yaw>,<pitch>]` starts in another view of
 //! the place (angles in degrees), `--dialog <n>` plays dialog `n` at once
 //! over the view (a click goes to the next line, as in the original), with
@@ -24,7 +27,7 @@ use std::rc::Rc;
 
 use atlantis2_data::files::OpenError;
 use atlantis2_data::A2Files;
-use atlantis2_engine::{Engine, Fpu, Variant};
+use atlantis2_engine::{Engine, Enhancements, Fpu, Variant};
 use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -88,7 +91,7 @@ impl A2Start {
 /// Opens the game folder and starts a new game, the cube drawn by
 /// `warpPII` (the reference renderer) for a process whose x87 control word
 /// starts as Win32's default.
-pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
+pub fn open(dir: &Path, discs: &[PathBuf], enhancements: Enhancements) -> Result<Engine, String> {
     let (files, build) = A2Files::open_dir(dir, discs).map_err(|e| match e {
         OpenError::NoDisc => format!(
             "{}: {e}, or give their folder with --discs <folder>",
@@ -106,6 +109,7 @@ pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
     // the scripts choose the place and play the opening film.
     let mut engine = Engine::boot(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
         .map_err(|e| format!("{}: {e}", dir.display()))?;
+    engine.enhancements = enhancements;
     // The original seeds `rand` with GetTickCount() (@ 0x0047d740).
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -126,8 +130,9 @@ pub fn headless(
     frames: u64,
     screenshot: Option<&Path>,
     start: &A2Start,
+    enhancements: Enhancements,
 ) -> Result<(), String> {
-    let mut engine = open(dir, discs)?;
+    let mut engine = open(dir, discs, enhancements)?;
     start.apply(&mut engine)?;
     let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
     let mut sound = vec![0.0f32; 2 * 22050 / 60];

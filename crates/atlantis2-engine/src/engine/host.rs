@@ -17,7 +17,7 @@ use atlantis_codecs::decode_apc;
 use super::{load_objects_bank, load_wam, Engine, Event};
 use crate::crt::Rand;
 use crate::dialog::{Dialog, FrameContext, TickContext};
-use crate::music::{self, Mark};
+use crate::music;
 use crate::script::{AnimOp, DialStart, Host, Keys, Script};
 use crate::sound::{volume_to_attenuation, Pcm, VOICE_EFFECTS, VOICE_MUSIC};
 
@@ -83,9 +83,9 @@ impl Engine {
         self.con.as_deref_mut()
     }
 
-    /// The music playing on voice 0, if any.
+    /// The music file the player streams, if any.
     pub fn music_playing(&self) -> Option<i32> {
-        self.player.file.as_ref().map(|f| f.0)
+        self.player.stream.music()
     }
 
     /// Whether the scripts asked the game to quit (`EXIT`).
@@ -110,25 +110,28 @@ impl Engine {
     }
 
     /// The music state machine (@ 0x00476fc0), on every dispatcher pass:
-    /// the opens pending (1 from the start, 2 at a mark), the fade (3), the
-    /// end of a track (4), the stop (5).
-    pub(super) fn music_frame(&mut self) {
+    /// the opens pending (1 from the start, 2 at a mark), the fade (3) and
+    /// then, as in 4, the ring's refill, the stop (5). True when the
+    /// refill wrote the ring.
+    pub(super) fn music_frame(&mut self) -> bool {
         match self.music.state {
             1 => self.music_open(false),
             2 => self.music_open(true),
-            3 => self.fade_step(),
-            4 if !self.voices.is_playing(VOICE_MUSIC) && self.player.file.is_some() => {
-                self.music_end_of_track()
+            3 => {
+                self.fade_step();
+                return self.music_refill();
             }
+            4 => return self.music_refill(),
             5 => {
                 // FUN_004778f0: the voice stopped, the file closed.
                 self.voices.stop(VOICE_MUSIC);
-                self.player.file = None;
+                self.player.stream.close();
                 self.music.state = 0;
                 self.event(Event::MusicStop);
             }
             _ => {}
         }
+        false
     }
 
     /// Play music `n` (`FUN_0047a200(n, mark, loops)`): nothing when it is
@@ -140,7 +143,7 @@ impl Engine {
         }
         self.player.current = n;
         self.player.mark = mark;
-        self.player.loops = loops;
+        self.player.stream.loops = loops;
         let next = if mark == 0 { 1 } else { 2 };
         if self.music.state != 0 {
             self.music.switch(next);
@@ -149,110 +152,116 @@ impl Engine {
         }
     }
 
-    /// States 1 and 2: the current music opened from its start
-    /// (FUN_00477410, which also seeds `rand` with the tick count) or at
-    /// its mark (FUN_00477160, `GotoMark`), played on voice 0 at the start
-    /// volume (14 in a dialog, else the music volume).
+    /// States 1 and 2: the current music opened (two tries), from its
+    /// start (FUN_00477410: the first 0x80000 bytes decoded into the music
+    /// buffer, the volume 0, `srand` of the tick count; FUN_00477470: voice
+    /// 0 created from the buffer, looping, then the start volume) or at
+    /// its mark (FUN_004774f0: voice 0 created from the music buffer as it
+    /// is; `GotoMark`; FUN_00477540: played at the start volume). The start
+    /// volume is 14 in a dialog, else the music volume.
     fn music_open(&mut self, at_mark: bool) {
         let n = self.player.current;
+        if !(self.music_file_open(n) || self.music_file_open(n)) {
+            self.music.state = 0;
+            self.stream_events();
+            return;
+        }
         if !at_mark {
+            self.player.stream.decode_start();
+            self.music.volume = 0;
             // `srand` of the 15 Hz count (@ 0x0047743f reads the counter
             // the 15 Hz task increments, @ 0x006569d8).
             self.rand = Rand::new(self.ticks);
         }
-        let mark = if at_mark { self.player.mark } else { 0 };
-        if self.music_file(n, mark) {
-            self.music.volume = if self.music.in_dialog {
-                DIALOG_START_VOLUME
-            } else {
-                self.music.max
-            };
-            self.voices
-                .set_attenuation(VOICE_MUSIC, self.music.attenuation());
-            self.music.state = 4;
+        let s = &self.player.stream;
+        let pcm = Pcm {
+            rate: s.rate,
+            channels: s.channels,
+            samples: Arc::new(s.buffer.clone()),
+        };
+        let att = if at_mark {
+            -10000
         } else {
-            self.music.state = 0;
+            self.music.attenuation()
+        };
+        self.voices.play(VOICE_MUSIC, pcm, true, att, 0);
+        if at_mark {
+            let mut ring = self.voices.music_ring();
+            self.player
+                .stream
+                .goto_mark(self.player.mark, &mut self.rand, &mut ring);
+        }
+        self.music.volume = self.start_volume();
+        self.voices
+            .set_attenuation(VOICE_MUSIC, self.music.attenuation());
+        self.music.state = 4;
+        // The mark played: `GotoMark`'s, 0 from the start (where the
+        // original leaves @ 0x006725a4 as it was).
+        let mark = if at_mark {
+            self.player.stream.current_mark
+        } else {
+            0
+        };
+        self.player.stream.events.clear();
+        self.event(Event::Music { music: n, mark });
+    }
+
+    /// The music's start volume: 14 in a dialog, else the music volume.
+    fn start_volume(&self) -> i32 {
+        if self.music.in_dialog {
+            DIALOG_START_VOLUME
+        } else {
+            self.music.max
         }
     }
 
-    /// Opens music `n` at `mark` (−1 a random one, 0 its start, k ≥ 1 the
-    /// `.spp` record k − 1) on voice 0; false when the file is missing.
-    fn music_file(&mut self, n: i32, mark: i32) -> bool {
-        let name = music::music_name(n);
-        let data = match &self.player.file {
-            Some((m, d, _)) if *m == n => Some(d.clone()),
-            _ => self.files.read(Folder::ApcMusic, &name).map(Arc::new),
-        };
-        let Some(data) = data else {
-            log::warn!("{name}: not found, no music");
+    /// FUN_00477160 on music `n`: false when the file is missing or fails
+    /// its check.
+    fn music_file_open(&mut self, n: i32) -> bool {
+        let Some(file) = self.music_data(n) else {
             return false;
         };
-        // The marks are read from the disc beside the file (the install's
-        // `music\` copies are empty until `LOADMUSIK`).
-        let marks: Vec<Mark> = self
-            .files
-            .read(Folder::ApcMusic, &music::spp_name(n))
-            .or_else(|| self.files.read(Folder::Music, &music::spp_name(n)))
-            .and_then(|d| music::parse_spp(&d))
-            .unwrap_or_default();
-        let mut k = mark;
-        if k < 0 {
-            k = music::random_mark(&mut self.rand, marks.len() as i32, self.player.current_mark);
-        }
-        let record = usize::try_from(k - 1).ok().and_then(|i| marks.get(i));
-        if k > 0 && record.is_none() {
-            log::error!("AtlMuzik_GotoMark({k}): {name} has {} marks", marks.len());
-            k = 0;
-        }
-        let Some(pcm) = music::decode_music(&data, record) else {
-            log::warn!("{name}: not a music file");
-            return false;
-        };
-        self.player.current_mark = k;
-        self.player.file = Some((n, data, marks));
-        let att = self.music.attenuation();
-        self.voices.play(VOICE_MUSIC, pcm, false, att, 0);
-        self.event(Event::Music { music: n, mark: k });
-        true
+        self.player.stream.open(file)
     }
 
-    /// The end of the track (`check_buffer_music` @ 0x00477590 at the end
-    /// of the data): loops left rewind it; else the end-of-track callback
-    /// (@ 0x00485080) draws the next one from the `startmusik` list (its
-    /// mark 0 when the list has one entry), without making it the current
-    /// music. With an empty list the original loops the last 5.9 s of the
-    /// ring; Native plays the track again from its start.
-    fn music_end_of_track(&mut self) {
-        let Some(playing) = self.player.file.as_ref().map(|f| f.0) else {
-            return;
-        };
-        if self.player.loops >= 2 {
-            self.player.loops -= 1;
-            self.music_file(playing, 0);
-            return;
-        }
-        let list = self.player.list.clone();
-        match music::select(
-            &mut self.rand,
-            &list,
+    /// Music `n`'s file and marks, read from the discs (the install's
+    /// `music\` copies are empty until `LOADMUSIK`, which, like `delmusik`,
+    /// does nothing here).
+    fn music_data(&self, n: i32) -> Option<music::MusicData> {
+        load_music(&self.files, n)
+    }
+
+    /// The ring's refill (`check_buffer_music` @ 0x00477590), the end of a
+    /// track drawing the next one from the `startmusik` list; the minor
+    /// bug fixes play every track to its end.
+    fn music_refill(&mut self) -> bool {
+        let files = &self.files;
+        let mut load = |n: i32| load_music(files, n);
+        let mut ring = self.voices.music_ring();
+        let wrote = self.player.stream.refill(
+            &mut ring,
+            &self.player.list,
             self.player.current,
-            self.player.current_mark,
-        ) {
-            Some((e, count)) => {
-                let mark = if count == 1 { 0 } else { e.mark };
-                self.player.loops = e.loops;
-                // The same file at a mark other than −1 restarts at 0.
-                let mark = if e.music == playing && mark != -1 {
-                    0
-                } else {
-                    mark
-                };
-                if !self.music_file(e.music, mark) {
-                    self.music.state = 0;
+            &mut self.rand,
+            &mut load,
+            self.enhancements.minor_bug_fixes,
+        );
+        self.stream_events();
+        wrote
+    }
+
+    /// The streamer's events as the engine's.
+    fn stream_events(&mut self) {
+        for e in std::mem::take(&mut self.player.stream.events) {
+            match e {
+                music::StreamEvent::Open(n) => self.event(Event::Music {
+                    music: n,
+                    mark: self.player.stream.current_mark,
+                }),
+                music::StreamEvent::Recopy(n) => {
+                    log::info!("{}: rewind refused, the ring loops", music::music_name(n))
                 }
-            }
-            None => {
-                self.music_file(playing, 0);
+                music::StreamEvent::Cursor(..) => {}
             }
         }
     }
@@ -637,7 +646,7 @@ impl Host for Engine {
             &mut self.rand,
             &list,
             self.player.current,
-            self.player.current_mark,
+            self.player.stream.current_mark,
         ) {
             self.play_music(e.music, e.mark, e.loops);
         }
@@ -667,4 +676,23 @@ impl Host for Engine {
     fn credits(&mut self) {
         log::info!("CREDITS: the credits are not ported");
     }
+}
+
+/// Music `n`'s file and marks from the discs (`muzik%02d.apc`, `.spp`).
+fn load_music(files: &atlantis2_data::A2Files, n: i32) -> Option<music::MusicData> {
+    let name = music::music_name(n);
+    let Some(data) = files.read(Folder::ApcMusic, &name) else {
+        log::warn!("{name}: not found, no music");
+        return None;
+    };
+    let marks = files
+        .read(Folder::ApcMusic, &music::spp_name(n))
+        .or_else(|| files.read(Folder::Music, &music::spp_name(n)))
+        .and_then(|d| music::parse_spp(&d))
+        .unwrap_or_default();
+    Some(music::MusicData {
+        music: n,
+        data: Arc::new(data),
+        marks,
+    })
 }

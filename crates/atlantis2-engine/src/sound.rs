@@ -287,6 +287,11 @@ impl Voices {
         matches!(self.lock().get(voice), Some(Some(_)))
     }
 
+    /// Voice 0 as the music player's ring ([`crate::music::Ring`]).
+    pub fn music_ring(&self) -> MusicRing<'_> {
+        MusicRing(self)
+    }
+
     /// Mixes every voice into `out` (interleaved f32, `channels` per
     /// frame, at `rate`), replacing its content.
     pub fn fill(&self, out: &mut [f32], rate: u32, channels: usize) {
@@ -339,6 +344,37 @@ impl Voices {
         }
         for s in out.iter_mut() {
             *s = s.clamp(-1.0, 1.0);
+        }
+    }
+}
+
+/// Voice 0's buffer as the music ring: its play cursor in bytes (the
+/// frame under the position), and its samples written in place.
+pub struct MusicRing<'a>(&'a Voices);
+
+impl crate::music::Ring for MusicRing<'_> {
+    fn cursor(&self) -> Option<i32> {
+        let voices = self.0.lock();
+        let v = voices.get(VOICE_MUSIC)?.as_ref()?;
+        let ch = i32::from(v.pcm.channels.max(1));
+        Some(v.pos as i32 * ch * 2)
+    }
+
+    fn set_cursor(&mut self, at: i32) {
+        if let Some(Some(v)) = self.0.lock().get_mut(VOICE_MUSIC) {
+            let ch = i32::from(v.pcm.channels.max(1));
+            v.pos = f64::from(at / (ch * 2));
+        }
+    }
+
+    fn write(&mut self, at: i32, samples: &[i16]) {
+        if let Some(Some(v)) = self.0.lock().get_mut(VOICE_MUSIC) {
+            let buf = Arc::make_mut(&mut v.pcm.samples);
+            let start = (at.max(0) / 2) as usize;
+            let end = (start + samples.len()).min(buf.len());
+            if start < end {
+                buf[start..end].copy_from_slice(&samples[..end - start]);
+            }
         }
     }
 }

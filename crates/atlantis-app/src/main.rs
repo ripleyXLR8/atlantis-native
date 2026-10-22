@@ -35,11 +35,11 @@
 //! is and saves the screen; `--view <id>[,<yaw>,<pitch>]` starts in another
 //! view, `--dialog <n>` plays a dialog at once (testing aids). Only the command line opens Atlantis II for now:
 //! the launcher, the game library and the web build know the first game
-//! alone. The first game's options are refused in this mode, and `--discs`
-//! and `--screenshot` with the first game.
+//! alone. The first game's options but `--original` are refused in this
+//! mode, and `--discs` and `--screenshot` with the first game.
 //!
-//! `--original` (before the game directory) turns every enhancement off:
-//! the original game, bug for bug. `--new-game` skips the start-up videos
+//! `--original` (before the game directory) turns every enhancement off,
+//! in both games: the original game, bug for bug. `--new-game` skips the start-up videos
 //! and the player screen.
 //!
 //! `--puzzle <n> [--object <id>]` (a testing aid) plays StartPuzzle `n` at
@@ -165,10 +165,15 @@ fn main() {
         view,
         dialog: dialog.map(|d| d.max(0) as u32),
     };
+    // `--original` holds for both games.
+    let a2_enhancements = if original {
+        atlantis2_engine::Enhancements::original()
+    } else {
+        atlantis2_engine::Enhancements::default()
+    };
     // The options of one game only, refused for the other rather than
     // ignored.
     let first_game_flags: Vec<&str> = [
-        ("--original", original),
         ("--hd", force_hd && !force_wide),
         ("--widescreen", force_wide),
         ("--new-game", new_game),
@@ -220,6 +225,7 @@ fn main() {
             frames,
             screenshot.as_deref(),
             &a2_start,
+            a2_enhancements,
         ) {
             eprintln!("{e}");
             std::process::exit(1);
@@ -293,7 +299,7 @@ fn main() {
     // A folder of Atlantis II: its own mode.
     if is_a2 {
         refuse(&first_game_flags, "Atlantis II's mode");
-        let run = atlantis_app::a2::open(Path::new(&args[0]), &discs)
+        let run = atlantis_app::a2::open(Path::new(&args[0]), &discs, a2_enhancements)
             .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen, &a2_start));
         if let Err(e) = run {
             error_box(&e);

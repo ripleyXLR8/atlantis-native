@@ -184,7 +184,9 @@ say.
 the player screen.
 
 `atlantis-native --original /path/to/game` plays the original game, bug for
-bug (see [Enhancements](TECHNICAL.md#enhancements)).
+bug (see [Enhancements](TECHNICAL.md#enhancements)); with Atlantis II too
+(its music tracks then lose their last ~5.8 s when another follows, as
+in the original).
 
 `atlantis-native --hd /path/to/game` starts in the [HD mode](TECHNICAL.md#hd-mode),
 whatever `settings.ini` says.

@@ -4,12 +4,15 @@
 //! @ 0x004851f0). The player's states and fades are in [`crate::sound`];
 //! the engine runs them.
 //!
-//! The original streams a track through a 0x80000-byte ring kept about
-//! 5.8 s ahead of what is heard, and switches to the next track when the
-//! decoder (not the listener) reaches the end. Native decodes a track whole
-//! and switches when it has been heard to its end: the original's cut of
-//! the last ~5.8 s of a track followed by another is not reproduced (an
-//! open choice, see `docs/TECHNICAL.md`).
+//! The player's streaming ([`Stream`]) is the original's: voice 0 loops
+//! over a 0x80000-byte ring which `check_buffer_music` (@ 0x00477590)
+//! refills 0x4000 bytes at a time about 5.8 s ahead of the play cursor.
+//! When the decoder (not the listener) reaches the end of a track, the
+//! next one is written behind the cursor and the cursor moved there: the
+//! last ~5.8 s of a track followed by another are never heard. With no
+//! next track (an empty `startmusik` list) or loops left, the rewind fails
+//! and the ring keeps looping its last 5.9 s. The minor bug fixes play
+//! every track to its end instead (see `docs/TECHNICAL.md`).
 
 use std::sync::Arc;
 
@@ -17,6 +20,13 @@ use atlantis_codecs::{ApcDecoder, ApcHeader, APC_HEADER_SIZE};
 
 use crate::crt::Rand;
 use crate::sound::Pcm;
+
+/// The ring's size in bytes (voice 0's buffer, @ 0x00476c90).
+pub const RING_BYTES: i32 = 0x80000;
+/// What one refill writes, bytes (0x1000 file bytes decoded).
+const CHUNK: i32 = 0x4000;
+/// How far `GotoMark` moves the write offset back (@ 0x00477f53).
+const GOTO_BACK: i32 = 0x14000;
 
 /// The music file of track `n` (@ 0x005deb38: `muzik%02d.apc`).
 pub fn music_name(n: i32) -> String {
@@ -220,6 +230,431 @@ pub fn select(
         idx as usize
     };
     e.get(idx).map(|&x| (x, n))
+}
+
+/// Voice 0's DirectSound buffer as the music player sees it: the play
+/// cursor and the bytes it locks.
+pub trait Ring {
+    /// `GetCurrentPosition`'s play cursor, in bytes; `None` without a
+    /// buffer.
+    fn cursor(&self) -> Option<i32>;
+    /// `SetCurrentPosition`, in bytes.
+    fn set_cursor(&mut self, at: i32);
+    /// Writes `samples` (16-bit) at byte offset `at` (a lock, the copy, the
+    /// unlock).
+    fn write(&mut self, at: i32, samples: &[i16]);
+}
+
+/// A music file as the player opens it: its number, bytes and marks.
+#[derive(Clone, Debug)]
+pub struct MusicData {
+    pub music: i32,
+    pub data: Arc<Vec<u8>>,
+    pub marks: Vec<Mark>,
+}
+
+/// What the player did, for the engine's events and the tests.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StreamEvent {
+    /// A music file opened (by a start or at the end of a track).
+    Open(i32),
+    /// The play cursor moved by `GotoMark`: to, from (bytes).
+    Cursor(i32, i32),
+    /// The rewind's file check failed: the copy deleted and copied again
+    /// (`remove`, `LOADMUSIK`), the file closed.
+    Recopy(i32),
+}
+
+/// The open file (@ 0x00672174) and where it is read.
+#[derive(Clone, Debug)]
+struct OpenFile {
+    file: MusicData,
+    read: usize,
+}
+
+/// The music streamer (`AtlMuzik`, @ 0x00672138..0x006725c4): the file,
+/// the decoder state, the PCM position and size, the ring's write offset,
+/// the music buffer, the mark played and the loops left.
+#[derive(Clone, Debug)]
+pub struct Stream {
+    file: Option<OpenFile>,
+    dec: Option<ApcDecoder>,
+    /// The PCM bytes decoded from the file (@ 0x00672178).
+    pub pos: i32,
+    /// The PCM size in bytes (@ 0x0067217c); the file size during an
+    /// open.
+    pub total: i32,
+    /// The ring's write offset (@ 0x00672180).
+    pub write: i32,
+    /// The voice's rate and channels (@ 0x005dc9cc, 0x005dc9d4).
+    pub rate: u32,
+    pub channels: u16,
+    /// The music buffer (@ 0x0067216c): a start from the beginning
+    /// decodes its first 0x80000 bytes there, and every new voice 0 is
+    /// created from it.
+    pub buffer: Vec<i16>,
+    /// The mark played (@ 0x006725a4), set by `GotoMark` only.
+    pub current_mark: i32,
+    /// The loops left (@ 0x006725c4).
+    pub loops: i32,
+    pub events: Vec<StreamEvent>,
+}
+
+impl Default for Stream {
+    fn default() -> Self {
+        Stream {
+            file: None,
+            dec: None,
+            pos: 0,
+            total: 0,
+            write: 0,
+            rate: 22050,
+            channels: 2,
+            buffer: vec![0; RING_BYTES as usize / 2],
+            current_mark: 0,
+            loops: 0,
+            events: Vec::new(),
+        }
+    }
+}
+
+/// The ring offset after `w` (the write offset wraps at the ring's end).
+fn wrap(w: i32) -> i32 {
+    if w == RING_BYTES {
+        0
+    } else {
+        if w > RING_BYTES {
+            log::error!("check_buffer_music: music offset {w:#x} past the ring");
+        }
+        w
+    }
+}
+
+impl Stream {
+    /// The music open, if any.
+    pub fn music(&self) -> Option<i32> {
+        self.file.as_ref().map(|f| f.file.music)
+    }
+
+    /// Closes the file (`FUN_00403cb0`, and the marks freed by
+    /// FUN_004778f0).
+    pub fn close(&mut self) {
+        self.file = None;
+    }
+
+    /// `FUN_00477160`: opens `file` (only `.apc` music exists, the ADPCM
+    /// mode 0), checks it (`init_read_music_data`) and loads its marks;
+    /// the write offset and position back to 0. False when the check
+    /// fails (the file closed).
+    pub fn open(&mut self, file: MusicData) -> bool {
+        self.total = file.data.len() as i32;
+        self.file = Some(OpenFile { file, read: 0 });
+        if !self.init_read(false) {
+            self.file = None;
+            return false;
+        }
+        self.write = 0;
+        self.pos = 0;
+        self.events
+            .push(StreamEvent::Open(self.music().unwrap_or(0)));
+        true
+    }
+
+    /// `init_read_music_data` (FUN_00477b00) on the file at its read
+    /// position: the header, the decoder state, the voice format, and the
+    /// size check `|(total − 0x20) · 4 − frames · channels · 2| ≤ 4`, where
+    /// `total` is the file size at an open but the PCM size at a rewind
+    /// (`fixed`: the file size, the check the code means). A failed check
+    /// closes the file and copies it again.
+    fn init_read(&mut self, fixed: bool) -> bool {
+        let Some(f) = self.file.as_mut() else {
+            return false;
+        };
+        let data = f.file.data.clone();
+        let header = data
+            .get(f.read..f.read + APC_HEADER_SIZE)
+            .and_then(|h| ApcHeader::parse(h).ok());
+        f.read += APC_HEADER_SIZE.min(data.len().saturating_sub(f.read));
+        let Some(header) = header else {
+            log::error!("init_read_music_data: not an APC file");
+            return false;
+        };
+        self.dec = Some(ApcDecoder::new(&header));
+        self.rate = header.sample_rate;
+        self.channels = header.channels();
+        let checked = if fixed { data.len() as i32 } else { self.total };
+        let size = (checked.wrapping_sub(0x20)).wrapping_mul(4);
+        self.total = (header.frames as i32)
+            .wrapping_mul(i32::from(self.channels))
+            .wrapping_mul(2);
+        self.pos = 0;
+        if size.wrapping_sub(self.total).wrapping_abs() > 4 {
+            // `Fichier musique corrompu`: remove, LOADMUSIK N.
+            log::info!("init_read_music_data: file {size} / PCM {}", self.total);
+            let music = f.file.music;
+            self.file = None;
+            self.events.push(StreamEvent::Recopy(music));
+            return false;
+        }
+        true
+    }
+
+    /// Feeds `n` file bytes to the decoder (`FUN_00403bf0` and the stream
+    /// decoder FUN_00593f60).
+    fn feed(&mut self, n: usize, out: &mut Vec<i16>) {
+        let (Some(f), Some(dec)) = (self.file.as_mut(), self.dec.as_mut()) else {
+            return;
+        };
+        let end = (f.read + n).min(f.file.data.len());
+        let start = f.read.min(end);
+        if end - start != n {
+            log::error!("read_music_data: {} of {n} bytes", end - start);
+        }
+        dec.decode(&f.file.data[start..end], out);
+        f.read = end;
+    }
+
+    /// `read_music_data` (FUN_00477950): `len` PCM bytes, 0x1000 file
+    /// bytes per 0x4000 while more than 0x4000 are left, then `len / 4`.
+    /// Returns the samples and `len`.
+    fn read_data(&mut self, len: i32) -> (Vec<i16>, i32) {
+        let mut out = Vec::new();
+        let mut ret = 0;
+        let mut len = len;
+        if len == 0 {
+            log::error!("read_music_data: len 0");
+        }
+        if len > CHUNK {
+            ret += (len - 1) & !(CHUNK - 1);
+            while len > CHUNK {
+                self.feed(0x1000, &mut out);
+                len -= CHUNK;
+            }
+        }
+        if len != 0 {
+            let n = (len + ((len >> 31) & 3)) >> 2;
+            self.feed(n.max(0) as usize, &mut out);
+            ret += len;
+        }
+        (out, ret)
+    }
+
+    /// FUN_00477410 after the open: the first 0x80000 bytes decoded into
+    /// the music buffer, the write offset 0.
+    pub fn decode_start(&mut self) {
+        let (samples, n) = self.read_data(RING_BYTES);
+        let k = samples.len().min(self.buffer.len());
+        self.buffer[..k].copy_from_slice(&samples[..k]);
+        self.pos = n;
+        self.write = 0;
+    }
+
+    /// `AtlMuzik_GotoMark` (FUN_00477e80): mark `k` (−1 a random one, 0
+    /// the start, k ≥ 1 record k − 1 over the decoder state); the write
+    /// offset moved back 0x14000 bytes, four 0x4000-byte chunks decoded
+    /// from there and the play cursor set where they start.
+    pub fn goto_mark(&mut self, k: i32, rand: &mut Rand, ring: &mut dyn Ring) -> bool {
+        let Some(offset) = self.seek_mark(k, rand) else {
+            return false;
+        };
+        let mut w = self.write - GOTO_BACK;
+        if w < 0 {
+            w = self.write + (RING_BYTES - GOTO_BACK);
+        }
+        self.write = w;
+        self.file_seek(offset as usize + APC_HEADER_SIZE);
+        let start = self.write;
+        self.pos = offset.wrapping_mul(4);
+        for _ in 0..4 {
+            let (samples, _) = self.read_data(CHUNK);
+            ring.write(self.write, &samples);
+            self.pos += CHUNK;
+            if self.total < self.pos {
+                log::error!("AtlMuzik_GotoMark: too close to the end");
+            }
+            self.write = wrap(self.write + CHUNK);
+        }
+        let from = ring.cursor().unwrap_or(0);
+        ring.set_cursor(start);
+        self.events.push(StreamEvent::Cursor(start, from));
+        true
+    }
+
+    /// The decoder side of `GotoMark`: the mark drawn (−1), the decoder
+    /// state from the header (0) or from the record; the mark played set.
+    /// Returns the record's offset (0 for the start).
+    fn seek_mark(&mut self, k: i32, rand: &mut Rand) -> Option<i32> {
+        let marks = self.file.as_ref()?.file.marks.clone();
+        let mut k = k;
+        if k == -1 {
+            k = random_mark(rand, marks.len() as i32, self.current_mark);
+        }
+        let mut offset = 0;
+        if k == 0 {
+            self.file_seek(0);
+            let data = self.file.as_ref()?.file.data.clone();
+            if let Ok(h) = ApcHeader::parse(&data) {
+                self.dec = Some(ApcDecoder::new(&h));
+            }
+        } else {
+            match usize::try_from(k - 1).ok().and_then(|i| marks.get(i)) {
+                Some(m) => {
+                    offset = m.offset as i32;
+                    self.dec = Some(ApcDecoder::resume(m.stereo, m.predictors, m.step_indexes));
+                }
+                None => {
+                    // A fatal error in the original.
+                    log::error!("AtlMuzik_GotoMark({k}): {} marks", marks.len());
+                    return None;
+                }
+            }
+        }
+        self.current_mark = k;
+        Some(offset)
+    }
+
+    fn file_seek(&mut self, at: usize) {
+        if let Some(f) = self.file.as_mut() {
+            f.read = at;
+        }
+    }
+
+    /// `check_buffer_music` (FUN_00477590): when the play cursor has left
+    /// the chunk at the write offset, the next 0x4000 bytes decoded there.
+    /// At the end of the data, with no loops left, the end-of-track
+    /// callback (@ 0x00485080: [`select`] on `list`, its mark 0 when the
+    /// list has one entry) gives the next music, which opens and goes to
+    /// its mark (`GotoMark`: behind the cursor, what the ring still held of
+    /// the old track dropped); with none, or loops left, the file is
+    /// rewound, and the rewind's check closes it: the ring loops on.
+    /// `load` reads a music file. `fixes` (the minor bug fixes): the next
+    /// music, or the rewound one, is written right after the old track's
+    /// end, which is heard to its last sample. True when the ring was
+    /// written.
+    #[allow(clippy::too_many_arguments)]
+    pub fn refill(
+        &mut self,
+        ring: &mut dyn Ring,
+        list: &[u8],
+        current_music: i32,
+        rand: &mut Rand,
+        load: &mut dyn FnMut(i32) -> Option<MusicData>,
+        fixes: bool,
+    ) -> bool {
+        if self.file.is_none() {
+            return false;
+        }
+        let Some(p) = ring.cursor() else {
+            return false;
+        };
+        if self.write <= p && p <= self.write + CHUNK {
+            return false;
+        }
+        let mut len = CHUNK;
+        if RING_BYTES < self.write + CHUNK {
+            len = RING_BYTES - self.write;
+            if len == 0 {
+                return true;
+            }
+        }
+        let fits = self.pos + len <= self.total;
+        let mut rest = 0;
+        if !fits {
+            rest = len - (self.total - self.pos);
+            len = self.total - self.pos;
+        }
+        if len != 0 {
+            let (samples, _) = self.read_data(len);
+            ring.write(self.write, &samples);
+        }
+        if fits {
+            self.pos += len;
+            self.write = wrap(self.write + len);
+            return true;
+        }
+        if self.loops < 2 {
+            if let Some((e, count)) = select(rand, list, current_music, self.current_mark) {
+                let mut mark = if count == 1 { 0 } else { e.mark };
+                let old = self.music();
+                self.file = None;
+                // The same file at a mark other than −1 restarts at 0.
+                if old == Some(e.music) && mark != -1 {
+                    mark = 0;
+                }
+                let Some(file) = load(e.music) else {
+                    log::warn!("{}: not found, no music", music_name(e.music));
+                    return false;
+                };
+                if fixes {
+                    if !self.continue_with(file, mark, len, rest, rand, ring) {
+                        return false;
+                    }
+                    self.loops = e.loops;
+                    return true;
+                }
+                if !self.open(file) {
+                    return false;
+                }
+                self.goto_mark(mark, rand, ring);
+                self.loops = e.loops;
+                return true;
+            }
+        } else {
+            self.loops -= 1;
+        }
+        self.file_seek(0);
+        if !self.init_read(fixes) {
+            self.file = None;
+            return false;
+        }
+        // Reached only with the fixes: the rewound file goes on in the
+        // chunk.
+        self.write_rest(len, rest, ring);
+        true
+    }
+
+    /// The fixed end of a track: `file` opened at `mark` and decoded into
+    /// the rest of the chunk, right after the old track's last sample.
+    fn continue_with(
+        &mut self,
+        file: MusicData,
+        mark: i32,
+        len: i32,
+        rest: i32,
+        rand: &mut Rand,
+        ring: &mut dyn Ring,
+    ) -> bool {
+        let music = file.music;
+        self.total = file.data.len() as i32;
+        self.file = Some(OpenFile { file, read: 0 });
+        if !self.init_read(true) {
+            self.file = None;
+            return false;
+        }
+        self.events.push(StreamEvent::Open(music));
+        let Some(offset) = self.seek_mark(mark, rand) else {
+            self.file = None;
+            return false;
+        };
+        self.file_seek(offset as usize + APC_HEADER_SIZE);
+        self.pos = offset.wrapping_mul(4);
+        self.write_rest(len, rest, ring);
+        true
+    }
+
+    /// The rest of the chunk after the old track's end, from the file's
+    /// position (no more than it holds).
+    fn write_rest(&mut self, len: i32, rest: i32, ring: &mut dyn Ring) {
+        let n = rest.min(self.total - self.pos).max(0);
+        if n > 0 {
+            let (samples, n) = self.read_data(n);
+            ring.write(self.write + len, &samples);
+            self.pos += n;
+            self.write = wrap(self.write + len + n);
+        } else {
+            self.write = wrap(self.write + len);
+        }
+    }
 }
 
 #[cfg(test)]

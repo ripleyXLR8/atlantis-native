@@ -79,6 +79,16 @@ Where the port may differ from the original by choice, `Options` holds an
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
+Atlantis II has its own `Enhancements` (`crates/atlantis2-engine/src/enhancements.rs`),
+for now `minor_bug_fixes` alone, on by default: every music track is heard
+to its end, the next one of the `startmusik` list starting right after
+its last sample (the original drops the last ~5.8 s of a track followed
+by another), and a track that ends with an empty list, or with loops
+left, plays again from its start (the original loops the last 5.9 s of
+its ring until another music command); see the Music item of
+[Atlantis II](#atlantis-ii-in-progress). `--original` turns it off there
+too.
+
 `--original` turns all three off. Otherwise they are read from
 `settings.ini` (see [Players, checkpoints and settings](GUIDE.md#players-checkpoints-and-settings)),
 which the first start writes with the defaults; the options menu (F10)
@@ -745,27 +755,46 @@ view 4.
 - **Music** (`music.rs`, the player's states in `engine/host.rs`):
   `startmusik` draws a track from its list as the original does (one
   entry; two, the other one in 85 % of the draws when the current music
-  is among them; more, a random index), and the track opens on voice 0,
-  from its start or at a mark of its `.spp` (a given one, or one drawn
-  at random): the decoder state the record keeps, the data read from
-  the record's offset. A music playing first fades out; a new one starts
-  at the music volume (14 in a dialog); `stopmusik` fades out and stops;
-  the films (20 %) and the dialogs (16 %) duck it with the fade machine
-  of the dialogs (127 units a second). At the end of a track the list
-  draws the next one (its start when the list has one entry), loops
-  (`*n`) replay it. The files are read from the discs (the install's
-  `music\` copies are empty until `LOADMUSIK`, which, like `delmusik`,
-  does nothing here). Every track decoded from its start and from each of
-  the 83 marks, the random marks and the list choices are the
-  original's (tests/music.rs); an opening from the start seeds `rand`
-  with the 15 Hz count, as the original does. Known differences: a track is decoded whole
-  and switched when it has been heard to its end, where the original's
-  ring switches about 5.8 s earlier (the last 5.8 s of a track followed
-  by another are never heard there); with an empty
-  list the original loops the ring's last 5.9 s, Native the whole track;
-  the music player shares the C runtime's `rand` with the dialogs, which
-  the original also shares with the place animations (two generators
-  here).
+  is among them; more, a random index). The player is the original's
+  streamer: voice 0 loops over a ring of 0x80000 bytes (5.94 s of 22050
+  Hz stereo), created from the music buffer; a start from the beginning
+  decodes the track's first 0x80000 bytes there (and seeds `rand` with
+  the 15 Hz count), a start at a mark (a given one or one drawn at
+  random) restores the `.spp` record's decoder state, moves the write
+  offset back 0x14000 bytes, decodes four 0x4000-byte chunks there and
+  puts the play cursor where they start. On each pass (`check_buffer_music`
+  @ 0x00477590, in the playing and fading states) a chunk of 0x4000 bytes
+  (0x1000 file bytes) is decoded at the write offset once the play cursor
+  has left it, so the ring stays about 5.8 s ahead of what is heard. At
+  the end of the data the end-of-track callback draws the next track from
+  the list (its start when the list has one entry), which opens and goes
+  to its mark behind the cursor: what the ring still held of the old
+  track is never heard, the decoded bytes ahead of the cursor (the ring
+  less the chunk the cursor has just left and what it has played of the
+  next, a little under 0x7c000 bytes) and the track's last partial chunk
+  (up to 0x4000 bytes): 511740 to 521212 bytes, 5.80 to 5.91 s, in the
+  runs of the original under emulation. With an empty
+  list, or with loops left (`*n`), the original rewinds the file, but the
+  rewind's check compares the PCM size with the file's, fails, closes
+  the file (and copies it again): the ring loops on, the track's last
+  0x7c000 bytes or so with a fragment of what the ring held one turn
+  before, until another music command. Native does both as the original
+  (`tests/music_player.rs` replays the original's runs under emulation,
+  with a play cursor moving 0x1000 or 1468 bytes per pass: every event,
+  position and md5 of what is heard), unless the minor bug fixes are on
+  (the default, see [Enhancements](#enhancements)): then the next track,
+  or the rewound one, is decoded right after the old one's last sample in
+  the same chunk, and every track is heard to its end. A music playing
+  first fades out; a new one starts at the music volume (14 in a dialog);
+  `stopmusik` fades out and stops; the films (20 %) and the dialogs
+  (16 %) duck it with the fade machine of the dialogs (127 units a
+  second). The files are read from the discs (the install's `music\`
+  copies are empty until `LOADMUSIK`, which, like `delmusik`, does
+  nothing here). Every track decoded from its start and from each of the
+  83 marks, the random marks and the list choices are the original's
+  (tests/music.rs). Known differences: the music player shares the C
+  runtime's `rand` with the dialogs, which the original also shares with
+  the place animations (two generators here).
 - **Alpha masks:** the dialog videos carry an `AL` chunk per frame (runs of
   (n, a) pairs, a = 0..31), which the decoder keeps for the caller
   (`HnmVideo::alpha`) and `AlphaTables::blend` draws as the original's

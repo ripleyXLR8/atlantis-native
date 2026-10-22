@@ -21,6 +21,7 @@ use crate::anim::{restore, Anim, Texel};
 use crate::camera::{deg_to_rad, zone_aim, Camera, WARP_FOV};
 use crate::crt::Rand;
 use crate::dialog::{Dialog, DialogError, DialogScript, FrameContext, TickContext};
+use crate::enhancements::Enhancements;
 use crate::fpu::Fpu;
 use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
 use crate::script::Script;
@@ -332,6 +333,9 @@ pub struct Engine {
     dialog_prev_loop: LoopType,
     /// The music's volume and fades.
     pub music: MusicVolume,
+    /// Where the port may differ from the original (default: the minor
+    /// bug fixes on).
+    pub enhancements: Enhancements,
     voices: Voices,
     /// The C runtime's `rand` (seeded by the dialog object's `srand`).
     pub rand: Rand,
@@ -376,14 +380,11 @@ pub struct Engine {
 struct Player {
     /// `current_music` (@ 0x00673f30), 0 none.
     current: i32,
-    /// The mark the next open goes to (−1 a random one).
+    /// The mark the next open goes to (−1 a random one, @ 0x006725a0).
     mark: i32,
-    /// The mark played (@ 0x006725a4).
-    current_mark: i32,
-    /// The loops left (@ 0x006725c4).
-    loops: i32,
-    /// The file being played: its bytes and marks.
-    file: Option<(i32, std::sync::Arc<Vec<u8>>, Vec<crate::music::Mark>)>,
+    /// The streamer: the file, the ring's write offset, the mark played,
+    /// the loops left.
+    stream: crate::music::Stream,
     /// The `startmusik` list (`Interp_MusikScript` @ 0x006d0444).
     list: Vec<u8>,
 }
@@ -624,6 +625,7 @@ impl Engine {
             // No music plays until a script starts one: the fades only run
             // then, as `FUN_004770c0` is refused while stopped.
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
+            enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),
             font: None,
