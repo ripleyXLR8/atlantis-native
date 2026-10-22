@@ -330,6 +330,14 @@ differences that change what a player sees follow the build:
 | LOADMUSIK / DELMUSIK | as listed | as listed | nothing when the first track plays | as listed | nothing when the first track plays; LOADMUSIK only at a current music volume of 5 or more, and all or nothing on its first track | as listed |
 | StartMusik of the playing track | fade-in re-armed | fade-in re-armed | fade-in re-armed | fade-in re-armed | nothing | fade-in re-armed |
 | credits letters E b d g n t | | | | | one pixel narrower | |
+| `off1` dialog lines | off1 player (none in the scripts) | off1 player (30 lines) | no such player or line | no such player or line | no such player or line | off1 player (29 lines) |
+
+Two rules that the port once kept for the Chinese builds alone now follow
+the original in every build: a menu's sprite record is drawn at the y the
+record holds (the LOAD scrollbar's knob at the place the picker gives it,
+not the menu file's), and an `off1` line is played by the off1 player
+wherever the executable has it (the GOG.com scripts' 30 such lines,
+which the port played as `off` lines, the view redrawn, before).
 
 The German retail CD's build (August 1997) is the August 1997 French
 build's code byte for byte, built again with German strings: everything
