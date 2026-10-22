@@ -7,6 +7,8 @@ use crate::text::TextCodePage;
 /// from the 2001 reference that change behaviour.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExeBuild {
+    /// The build's name. It also keys the player's saves (the desktop data
+    /// folder, the web storage prefix): a released name must not change.
     pub name: &'static str,
     pub size: u32,
     /// The COFF header's TimeDateStamp: with the size, what tells the
@@ -362,10 +364,13 @@ pub const BUILDS: [ExeBuild; 13] = [
         players_names_block: 85,
         off1_player: true,
     },
-    // The GOG.com build: named after its French executable; the five
-    // language executables are that one with the player row changed.
+    // The GOG.com build: its French executable; the five language
+    // executables are that one with the player row changed. The name is
+    // also the key of the player's saves (the desktop data folder, the web
+    // storage prefix) since the first release, so it keeps the "-fr"-less
+    // spelling those saves were written under.
     ExeBuild {
-        name: "atlantis-gog-fr-714752",
+        name: "atlantis-gog-714752",
         size: 714_752,
         pe_timestamp: 0x385a_4dc6,
         year: 1999,

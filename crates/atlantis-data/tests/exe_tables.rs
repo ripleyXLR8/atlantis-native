@@ -249,7 +249,7 @@ fn tables_of_the_patch_101_build() {
         let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(gog)))
             .unwrap();
         let g = &g.exe;
-        assert_eq!(g.build.name, "atlantis-gog-fr-714752");
+        assert_eq!(g.build.name, "atlantis-gog-714752");
         assert_eq!(exe.new_player_marker, g.new_player_marker);
         assert_eq!(exe.new_player_label, g.new_player_label);
         assert_eq!(exe.inventory_object_ids, g.inventory_object_ids);
