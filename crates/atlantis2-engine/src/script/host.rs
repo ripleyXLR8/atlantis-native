@@ -79,8 +79,13 @@ pub trait Host {
     fn read_chapter(&mut self, chapter: i32) -> Option<Vec<u8>>;
 
     /// `AtlWam_Load` (@ 0x0040fee0): load a place file (a failure is
-    /// fatal in the original). No view is shown until a `vue=`.
-    fn load_wam(&mut self, name: &str) {}
+    /// fatal in the original). No view is shown until a `vue=`. False
+    /// when the host refuses the place (a world the port does not have
+    /// yet): the section that asked for it ends there
+    /// ([`super::Script::travel_refused`]).
+    fn load_wam(&mut self, name: &str) -> bool {
+        true
+    }
 
     /// `AtlWam_FindView` (@ 0x004121a0): whether the current place has
     /// that view.

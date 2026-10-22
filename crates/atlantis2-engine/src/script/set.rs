@@ -107,9 +107,14 @@ impl Script {
                     wam.push(self.b(src, i));
                     i += 1;
                 }
+                let name: String = wam.iter().map(|&c| char::from(c)).collect();
+                if !host.load_wam(&name) {
+                    // A place the port does not have (not the original's:
+                    // its failure is fatal): the section ends here.
+                    self.travel_refused = true;
+                    return None;
+                }
                 self.wam = wam;
-                let name: String = self.wam.iter().map(|&c| char::from(c)).collect();
-                host.load_wam(&name);
                 return Some(self.after_cr(src, p));
             }
         }

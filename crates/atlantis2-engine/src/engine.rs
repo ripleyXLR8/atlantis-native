@@ -36,6 +36,8 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod host;
 mod menus;
+mod puzzles;
+pub use puzzles::{mandala_hook_applies, ported_place, MANDALAS};
 mod saves;
 mod subjects;
 mod ui;
@@ -104,8 +106,12 @@ pub enum Event {
     VideoEnd,
     /// An object taken from the panorama (`CLICOBJET`).
     Take { id: i32 },
-    /// A click on a zone the puzzle hooks take (@ 0x0049b910): not ported.
-    PuzzleHook { zone: usize },
+    /// A click on a zone the puzzle hooks take (@ 0x0049b910): the zone's
+    /// index in the view, and `CLICZONE` as the hook finds it.
+    PuzzleHook { zone: usize, cliczone: i32 },
+    /// The scripts asked for a place of a world the port does not have
+    /// yet (`changewam`): refused, the game stays where it is.
+    WorldNotPorted(String),
     /// A `/set` line of the chapter scripts ran: the chapter and the line
     /// number in its file.
     Set { chapter: i32, line: usize },
@@ -414,6 +420,9 @@ pub struct Engine {
     /// `TrajSound`'s file name (@ 0x00673198), until the next move with a
     /// video.
     traj_sound: Option<String>,
+    /// The scripts asked for a place the port does not have
+    /// ([`Engine::refuse_place`]), handled once they are back.
+    refused_place: Option<String>,
     /// The video end asks the next warp draw for the music at 100 %
     /// (@ 0x00656999, FUN_0040bb90).
     music_after_video: bool,
@@ -733,6 +742,7 @@ impl Engine {
             player: Player::default(),
             pending_sound: None,
             traj_sound: None,
+            refused_place: None,
             music_after_video: false,
             hidden: None,
             film_dialog: None,
@@ -1517,19 +1527,6 @@ impl Engine {
             2 => log::warn!("zone {zi}: moves to other places are not ported"),
             _ => {}
         }
-    }
-
-    /// FUN_0049b910: the puzzles' own click handling, by warp prefix and
-    /// view. Tibet's is the mandala placing of view 10 (zone types 3, 4,
-    /// 50, @ 0x004954f0), which returns 0; not ported.
-    fn puzzle_hooks(&mut self, zi: usize, zone: &Zone) -> bool {
-        let tibet = self
-            .current_view()
-            .is_some_and(|v| v.name.len() >= 2 && v.name[..2].eq_ignore_ascii_case("ti"));
-        if tibet && self.view == 10 && matches!(zone.kind, 3 | 4 | 50) {
-            self.event(Event::PuzzleHook { zone: zi });
-        }
-        false
     }
 
     /// FUN_0049cc40: the move set-up of a type-1 zone.
