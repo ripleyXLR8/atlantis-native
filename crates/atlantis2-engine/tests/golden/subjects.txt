@@ -4,7 +4,7 @@
 # layout: the menu's draw (0x0047fb20, its centring helper 0x0047bdb0) on spr\sujtibet.spr for
 #   0..16 subjects (entry values and flags below): every AtlSpr_Aff (bank#frame@x,y, mode 1 =
 #   AFF_SPRTRS50) and warning; the origin (0x006cf298, 0x006cf29c) the draw leaves.
-# hit: the menu's click (0x0047fd00, grid 0x00485620) after the draw, for 1..16 subjects whose
+# hit: the menu's click (0x0047fd00, grid 0x00485620) after the draw, for 0..16 subjects whose
 #   entry i holds 100 + i (all 16), at every pointer position of the region below, the click
 #   flag set: the md5 of the int32 results (row-major, little endian) and per result its
 #   bounding box (screen pixels) and pixel count; outside the region every result is -2.
@@ -57,6 +57,7 @@ layout 14 origin 636,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@
 layout 15 origin 636,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242; subjects#8@578,304; subjects#0@574,304; subjects#9@574,367; subjects#0@574,366; subjects#11@636,180 mode 1; subjects#0@636,180; subjects#0@636,242; subjects#0@630,298; subjects#0@636,304 | warning:AtlSpr_Aff_centre:num spr incorrect : %d bank %X
 layout 16 origin 636,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242; subjects#8@578,304; subjects#0@574,304; subjects#9@574,367; subjects#0@574,366; subjects#11@636,180 mode 1; subjects#0@636,180; subjects#0@636,242; subjects#0@630,298; subjects#0@636,304; subjects#1@640,374; subjects#0@636,366 | warning:AtlSpr_Aff_centre:num spr incorrect : %d bank %X
 # hit: entry i holds 100 + i (all 16 entries); the click flag set at every pointer position; map = the int32 results for x 380..639, y 60..479, row-major, little endian; boxes in screen pixels
+hit 0 origin 450,366 md5 145e5af117fd3a0298b0bd4a97449234 | -2:380..639,60..479,n109137 100:434..496,350..350,n63
 hit 1 origin 450,304 md5 a6d54fb896804d67635842289e8265bf | -2:380..639,60..479,n105231 100:434..495,288..349,n3844 101:434..496,288..350,n124 102:496..496,350..350,n1
 hit 2 origin 450,242 md5 12838be5a268cd4e33a940332b2193c8 | -2:380..639,60..479,n101325 100:434..495,226..287,n3844 101:434..495,288..349,n3844 102:434..496,226..350,n124 103:496..496,288..349,n62 104:496..496,350..350,n1
 hit 3 origin 450,180 md5 e567fa8430f33a93231f1c289b5ef0d7 | -2:380..639,60..479,n97419 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..496,164..350,n124 104:496..496,226..287,n62 105:496..496,288..349,n62 106:496..496,350..350,n1

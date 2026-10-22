@@ -3,9 +3,13 @@
 //! cell a click picks for every list length, the shaman's subject lists
 //! along chapter 75 as the questions and the story change them, and the
 //! menu in the warp frame (opening, drawing, closing, a choice that starts
-//! a dialog). Then a game asks the shaman every subject, as a player does:
+//! a dialog). Then a game asks the two shamans what can be asked before a
+//! boat is placed (the golden's first ten questions), as a player does:
 //! the view turned to put him under the centre, a click, the pointer moved
-//! to a cell, a click, the dialog listened to.
+//! to a cell, a click, the dialog listened to; and the astral journey of
+//! view 10, offered by the scripts' key. The later questions (the astral
+//! journey in view 7, the crystal's other dialogs, chapter 78) need a boat
+//! placed and the travel to a world: the chapter test asks them.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the tests are skipped.
@@ -285,13 +289,13 @@ fn the_cells_and_the_click_grid_match_the_original() {
         assert!(r.e.subject_menu.open);
     }
     r.e.subject_menu.open = false;
-    r.e.script_state_mut().unwrap().subjects = saved;
+    r.e.script_state_mut().unwrap().subjects = saved.clone();
 
     // The click grid, entry i holding 100 + i (past the count too).
     let hits = rows("hit ");
-    assert_eq!(hits.len(), 17);
-    for (n, row) in hits.iter().take(16).enumerate() {
-        let count = n as i32 + 1;
+    assert_eq!(hits.len(), 18);
+    for (n, row) in hits.iter().take(17).enumerate() {
+        let count = n as i32;
         let values: Vec<i32> = (0..16).map(|i| 100 + i).collect();
         let t = table_with(shaman, count, &values, &[1; 16]);
         let y0 = first_row(count);
@@ -317,7 +321,32 @@ fn the_cells_and_the_click_grid_match_the_original() {
         );
         assert_eq!(*row, got);
     }
-    assert_eq!(hits[16], "hit noclick -1");
+    // Without the click flag the menu answers nothing (-1): the engine,
+    // the menu of 16 open, the pointer on a cell as in the harness.
+    assert_eq!(hits[17], "hit noclick -1");
+    let values: Vec<i32> = (0..16).map(|i| 100 + i).collect();
+    {
+        let s = r.e.script_state_mut().unwrap();
+        s.subjects = table_with(shaman, 16, &values, &[1; 16]);
+        let k = s.keys.clicperso;
+        s.vars[k] = shaman;
+    }
+    let sujet = r.e.script_state().unwrap().var("SUJET").unwrap();
+    r.e.subject_menu.open = true;
+    r.step();
+    r.e.pointer = (450, 300);
+    assert!(hit(16, r.e.subject_menu.first_row, r.e.pointer).is_some());
+    r.e.trace = true;
+    let events = r.step();
+    assert!(!r.e.click_flag());
+    assert!(
+        !events.iter().any(|e| matches!(e, Event::Subject { .. })),
+        "{events:?}"
+    );
+    assert!(r.e.subject_menu.open);
+    assert_eq!(r.e.script_state().unwrap().var("SUJET").unwrap(), sujet);
+    r.e.subject_menu.open = false;
+    r.e.script_state_mut().unwrap().subjects = saved;
 }
 
 /// The host of the chapter rows: the original's harness stubs the dialogs,
@@ -556,12 +585,13 @@ struct FrameRow {
     after: BTreeMap<String, String>,
 }
 
-/// The state keys the port compares: all but the click flag and the turn
-/// speeds (cleared every warp frame; no mouse motion here).
-const KEYS: [&str; 9] = [
+/// The state keys the port compares: all but the turn speeds (cleared
+/// every warp frame; no mouse motion here).
+const KEYS: [&str; 10] = [
     "menu",
     "CLICPERSO",
     "SUJET",
+    "click",
     "aux",
     "hit",
     "cursor",
@@ -748,6 +778,7 @@ fn after(e: &Engine) -> BTreeMap<String, String> {
         ("menu", u8::from(e.subject_menu.open).to_string()),
         ("CLICPERSO", s.var("CLICPERSO").unwrap().to_string()),
         ("SUJET", s.var("SUJET").unwrap().to_string()),
+        ("click", u8::from(e.click_flag()).to_string()),
         ("aux", e.click_aux.to_string()),
         ("hit", hit.to_string()),
         ("cursor", cursor),
@@ -890,6 +921,16 @@ impl Run {
         let count = self.e.script_state().unwrap().subjects.count(character);
         assert!(evs.contains(&Event::SubjectMenu { character, count }));
     }
+
+    /// The move zone of the current view that leads to view `to`.
+    fn zone_to(&self, to: u32) -> usize {
+        let view = self.e.place().1;
+        let zones = &self.e.wam().view(view).unwrap().zones;
+        zones
+            .iter()
+            .position(|z| z.kind == 1 && z.value == to as i32)
+            .unwrap_or_else(|| panic!("no move from view {view} to {to}"))
+    }
 }
 
 /// The dialogs the golden's questions start, in its order.
@@ -904,7 +945,7 @@ fn golden_dialogs() -> Vec<u32> {
 }
 
 #[test]
-fn a_tibet_game_asks_the_shaman_every_subject() {
+fn a_tibet_game_asks_the_shamans_until_a_boat_is_placed() {
     let Some(files) = game() else { return };
     let mut r = chapter_75(files);
     let names = r.e.script_state().unwrap().names.clone();
@@ -977,18 +1018,28 @@ fn a_tibet_game_asks_the_shaman_every_subject() {
     r.step();
     r.e.right_click();
     r.step();
+    // Back to the shaman of view 7: the piece of mandala.
+    let back = r.zone_to(7);
+    r.walk(back, 7);
+    if r.e.loop_type == LoopType::Dialog {
+        r.listen();
+    }
+    r.talk_to(shaman);
+    assert_eq!(r.ask(shaman, "MORCEAU_MANDALA"), want[5]);
+    r.walk(1, 8);
     r.walk(1, 9);
     r.walk(1, 10);
     assert_eq!(r.e.script_state().unwrap().flags[202], 1);
     // The shaman of view 10: the hero (now the mandala is offered), the
-    // mandala, the piece of mandala; then the astral journey, which the
-    // scripts offer when the game leaves for a world (here by its key).
+    // mandala, the piece of mandala, the crystal; then the astral
+    // journey, which the scripts offer when the first boat placed sends
+    // the game to a world (here offered by their key, not played).
     let mut got = Vec::new();
-    for subject in ["HEROS_TIBET", "MANDALA", "MORCEAU_MANDALA"] {
+    for subject in ["HEROS_TIBET", "MANDALA", "MORCEAU_MANDALA", "CRISTAL"] {
         r.talk_to(shaman10);
         got.push(r.ask(shaman10, subject));
     }
-    assert_eq!(got, [want[6], want[7], want[8]]);
+    assert_eq!(got, want[6..10]);
     r.e.run_command(b"(enablesuj=SHAMANW10,VOYAGE_ASTRAL)");
     r.talk_to(shaman10);
     let n = r.ask(shaman10, "VOYAGE_ASTRAL");

@@ -56,16 +56,14 @@ pub fn cell(count: i32, i: i32) -> (i32, i32) {
 
 /// The entry a click at `pointer` picks in a list of `count` subjects
 /// whose draw left `first_row`; none outside the grid (the menu closes).
+/// The index is not checked against the count; with no subject the grid
+/// has no row, and its top line (x 434..496) answers entry 0.
 pub fn hit(count: i32, first_row: i32, pointer: (i32, i32)) -> Option<usize> {
     let (x0, y0) = (COLUMN_X - 16, first_row - 16);
     let columns = count / 5 + 1;
     let rows = count.min(PER_COLUMN);
     let (px, py) = pointer;
     if px < x0 || px > x0 + CELL * columns || py < y0 || py > y0 + CELL * rows {
-        return None;
-    }
-    if rows <= 0 {
-        // The original divides by 0 here; no list reaches it in the game.
         return None;
     }
     usize::try_from((px - x0) / CELL * rows + (py - y0) / CELL).ok()
@@ -90,6 +88,11 @@ mod tests {
         assert_eq!(hit(1, 304, (496, 349)), Some(1));
         assert_eq!(hit(1, 304, (496, 350)), Some(2));
         assert_eq!(hit(1, 304, (433, 300)), None);
+        // No subject: the line y0 - 16 answers entry 0.
+        assert_eq!(hit(0, 366, (434, 350)), Some(0));
+        assert_eq!(hit(0, 366, (496, 350)), Some(0));
+        assert_eq!(hit(0, 366, (497, 350)), None);
+        assert_eq!(hit(0, 366, (450, 351)), None);
         // Nine subjects: two columns of the grid for three drawn.
         assert_eq!(hit(9, 180, (560, 200)), None);
     }

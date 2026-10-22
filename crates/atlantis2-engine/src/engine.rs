@@ -1823,6 +1823,12 @@ impl Engine {
         }
     }
 
+    /// The warp frame's click flag (@ 0x006569c9): set by a click, cleared
+    /// at the end of the frame that sees it.
+    pub fn click_flag(&self) -> bool {
+        self.click
+    }
+
     /// The sprite under the centre a click hit (its slot, @ 0x00661640)
     /// and the cursor state of the last draw (@ 0x006c2df4).
     pub fn sprite_under_centre(&self) -> (Option<usize>, i32) {

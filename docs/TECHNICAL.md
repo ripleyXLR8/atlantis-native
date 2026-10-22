@@ -858,13 +858,19 @@ after a short game with three saves.
   clicked; a click on an empty cell of the last column, or on the
   one-pixel edge after the last row or column, answers the entry the
   memory holds there (past the list, or the next character's record);
-  asked subjects stay offered. The cells and the grid for every count,
+  a menu open on a character with no subject (its flag can be set with
+  a count of 0: the Yucatán statue's hook does not test the count, a load
+  keeps the flag) has a grid of no row, whose top line (y = 350, x
+  434..496) answers entry 0, any other click closing it; asked subjects
+  stay offered. The cells and the grid for every count,
   the shaman's lists along chapter 75 and the menu in the warp frame
   (opening, drawing, a right click, closing, choices that start dialogs
   and what the scripts see after them) are the original's
   (`tests/subjects.rs` against its emulated run); the same test file
-  plays a game that asks both shamans every subject by turning the view,
-  clicking and moving the pointer. Not here: the blackbird game's fixed
+  plays a game that asks both shamans by turning the view, clicking and
+  moving the pointer, every question that can be asked before a boat is
+  placed, then the astral journey that the scripts' key offers (placing
+  a boat leaves for an unported world). Not here: the blackbird game's fixed
   menu of songs (Ireland's puzzle, the mode @ 0x006d2754 = 2), the
   Yucatán statue's hook that opens a menu (`YU` view 122). The menu's
   coordinates are constants of the code, so the original's 800 x 600 mode
