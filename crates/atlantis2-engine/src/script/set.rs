@@ -642,7 +642,10 @@ impl Script {
     /// FUN_004754f0: an object in the bag, in the current world.
     pub fn bag_add(&mut self, host: &mut dyn Host, id: i32, sprite: u8) {
         if self.bag.iter().any(|e| e.id == id) {
-            self.warn("Inventaire_PrendObj(id,nspr) %d deja pris", &id.to_string());
+            self.warn(
+                "Inventaire_PrendObj_id_nspr(%d) : deja pris!",
+                &id.to_string(),
+            );
             return;
         }
         let monde = self.vars[self.keys.monde];
@@ -654,7 +657,12 @@ impl Script {
         if self.bag.len() > 0x59 {
             self.fail(format!("Inventaire: {} objets", self.bag.len()));
         }
-        host.bag_layout();
+        host.bag_layout(self.visible_objects());
+    }
+
+    /// The entries of the bag shown in the current world (FUN_00475870).
+    pub fn visible_objects(&self) -> i32 {
+        crate::bag::visible_count(&self.bag, self.vars[self.keys.monde])
     }
 
     /// `SACADOS=NOT_NAME` (FUN_00475720 → FUN_00475680).

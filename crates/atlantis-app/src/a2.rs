@@ -5,13 +5,15 @@
 //! zone (the turn, the transition video, the arrival), the place animations
 //! playing. The chapter scripts run the game as the original's: the opening
 //! film, the music, the dialogs they call (a left click goes to the next
-//! line, Escape ends a dialog). Escape opens the main menu (options,
-//! volumes, load and save, quit) and closes it again; in the menus the
-//! pointer is the game's own. A mode of its own, beside the first game's
-//! front end: a window, the screen scaled to it, the sound; no bag or
-//! subject menu yet. The saves (`save\ATLpp_ss.SAV`, the original's
-//! format) and `atlant2.cfg` are kept in the `atlantis2` folder of the
-//! port's data folder.
+//! line, Escape ends a dialog). The right button opens the bag bar at the
+//! bottom of the screen (the mouse then moves a pointer over it; a click
+//! puts an object in the hand, drawn at the screen centre). Escape opens
+//! the main menu (options, volumes, load and save, quit) and closes it
+//! again; in the menus the pointer is the game's own. A mode of its own,
+//! beside the first game's front end: a window, the screen scaled to it,
+//! the sound; no subject menu yet. The saves (`save\ATLpp_ss.SAV`, the
+//! original's format) and `atlant2.cfg` are kept in the `atlantis2` folder
+//! of the port's data folder.
 //!
 //! The game folder is the installed one (`atlantis2.exe`, `wam\`,
 //! `scenar\`...); the discs (CD images or copies of the CDs) are looked for
@@ -24,7 +26,11 @@
 //! Testing aids: `--view <id>[,<yaw>,<pitch>]` starts in another view of
 //! the place (angles in degrees), `--dialog <n>` plays dialog `n` at once
 //! over the view (a click goes to the next line, as in the original), with
-//! its voices, `--menu <page>` shows a menu page.
+//! its voices, `--menu <page>` shows a menu page; `--take
+//! <object>[,<object>...]` puts objects in the bag and `--hold <object>`
+//! one in the hand (by their `defnames.con` names, as the scripts'
+//! `sacados` and `objetenmain` do), `--bag` opens the bag bar and
+//! `--pointer <x>,<y>` puts the mouse pointer there.
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -60,7 +66,7 @@ const KEY_TURN: i32 = 8;
 const FRAME: Duration = Duration::from_micros(16_667);
 
 /// Where a run starts besides the new game's first view (testing aids).
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct A2Start {
     /// A view of the place and its angles in degrees.
     pub view: Option<(u32, f32, f32)>,
@@ -68,6 +74,13 @@ pub struct A2Start {
     pub dialog: Option<u32>,
     /// A menu page shown at once.
     pub menu: Option<PageKind>,
+    /// Objects put in the bag, one put in the hand (`defnames.con`
+    /// names).
+    pub take: Vec<String>,
+    pub hold: Option<String>,
+    /// The bag bar opened, the pointer moved.
+    pub bag: bool,
+    pub pointer: Option<(i32, i32)>,
 }
 
 impl A2Start {
@@ -78,6 +91,12 @@ impl A2Start {
         let yaw = it.next().map_or(Some(0.0), |s| s.parse().ok())?;
         let pitch = it.next().map_or(Some(0.0), |s| s.parse().ok())?;
         Some((id, yaw, pitch))
+    }
+
+    /// Parses `--pointer`'s value: `<x>,<y>`.
+    pub fn parse_pointer(v: &str) -> Option<(i32, i32)> {
+        let (x, y) = v.split_once(',')?;
+        Some((x.trim().parse().ok()?, y.trim().parse().ok()?))
     }
 
     /// Parses `--menu`'s value.
@@ -97,7 +116,12 @@ impl A2Start {
     /// a new game at once (headless runs and the testing aids), then the
     /// view, the dialog and the menu page asked for.
     pub fn begin(&self, engine: &mut Engine, headless: bool) -> Result<(), String> {
-        let at_once = self.view.is_some() || self.dialog.is_some();
+        let at_once = self.view.is_some()
+            || self.dialog.is_some()
+            || !self.take.is_empty()
+            || self.hold.is_some()
+            || self.bag
+            || self.pointer.is_some();
         if self.menu == Some(PageKind::Player) || !(headless || at_once || self.menu.is_some()) {
             engine.open_player_menu();
             return Ok(());
@@ -112,10 +136,11 @@ impl A2Start {
         Ok(())
     }
 
-    /// Enters the view and starts the dialog (the opening film ended
-    /// first).
+    /// Enters the view, starts the dialog, fills the bag and the hand,
+    /// opens the bar (the opening film ended first).
     pub fn apply(&self, engine: &mut Engine) -> Result<(), String> {
-        if self.view.is_some() || self.dialog.is_some() {
+        let bag_aids = !self.take.is_empty() || self.hold.is_some() || self.bag;
+        if self.view.is_some() || self.dialog.is_some() || bag_aids {
             engine.end_video();
         }
         if let Some((id, yaw, pitch)) = self.view {
@@ -125,6 +150,18 @@ impl A2Start {
         }
         if let Some(n) = self.dialog {
             engine.start_dialog(n).map_err(|e| e.to_string())?;
+        }
+        for name in &self.take {
+            engine.run_command(format!("(sacados={name})").as_bytes());
+        }
+        if let Some(name) = &self.hold {
+            engine.run_command(format!("(objetenmain={name})").as_bytes());
+        }
+        if self.bag {
+            engine.right_click();
+        }
+        if let Some(p) = self.pointer {
+            engine.pointer = p;
         }
         Ok(())
     }
@@ -523,7 +560,10 @@ impl ApplicationHandler for A2App {
                     self.keys = [false; 4];
                 }
             }
-            WindowEvent::CursorMoved { position, .. } => {
+            // The window's pointer is the game's in the menus (and while
+            // the mouse is not held); held, the raw motion moves it (the
+            // bag bar's pointer).
+            WindowEvent::CursorMoved { position, .. } if in_menu || !self.locked => {
                 if let Some((x, y)) = self.to_screen(position) {
                     self.engine.pointer(x, y);
                 }
@@ -547,7 +587,7 @@ impl ApplicationHandler for A2App {
                 button,
                 ..
             } => {
-                if !self.locked {
+                if !self.locked && !in_menu {
                     self.grab(true);
                 } else if button == MouseButton::Left {
                     // The click flag (@ 0x006569c9) is the left button's
@@ -555,6 +595,8 @@ impl ApplicationHandler for A2App {
                     // the bag.
                     let now = self.started.elapsed().as_secs_f64();
                     self.engine.click(now);
+                } else if button == MouseButton::Right {
+                    self.engine.right_click();
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {

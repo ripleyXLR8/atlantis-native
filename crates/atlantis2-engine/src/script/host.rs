@@ -209,9 +209,10 @@ pub trait Host {
         true
     }
 
-    /// The bag bar after an object was put in (@ 0x00475870, then
-    /// @ 0x004757b0 until it returns 0: the bar scrolls to its end).
-    fn bag_layout(&mut self) {}
+    /// The bag bar after an object was put in: `visible` is the count of
+    /// the current world's entries (@ 0x00475870, kept @ 0x00671ee8), then
+    /// @ 0x004757b0 until it returns 0: the bar scrolls to its end.
+    fn bag_layout(&mut self, visible: i32) {}
 
     /// `MESSAGE_CLIC` (@ 0x00476790): the message viewer (loop type 10).
     fn message_clic(&mut self, text: &str) {}

@@ -241,8 +241,8 @@ impl SubtitleFont {
         SubtitleFont::named(ttf, font_txt, "AtlFT_Dialog")
     }
 
-    /// Font `id` of `font_txt` (`AtlFT_POPUP` for the menus' texts) from
-    /// `ttf`.
+    /// Font `id` of `font_txt` (`AtlFT_POPUP` for the menus' texts and the
+    /// bag's names, 10 points: 13 pixels per em) from `ttf`.
     pub fn named(ttf: Vec<u8>, font_txt: &FontTxt, id: &str) -> Option<SubtitleFont> {
         let entry = font_txt.font(id)?;
         // CreateFontA(−MulDiv(height, LOGPIXELSY, 72)) at 96 DPI.

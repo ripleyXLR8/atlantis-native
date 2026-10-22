@@ -16,13 +16,17 @@ use atlantis2_data::save::{
 use super::Engine;
 use crate::script::{BagEntry, Shown, Subject};
 
-/// The entries Native keeps only as bytes: the dowsing rod (13..16) and
-/// the puzzles (20..32). The dialog flag (33) is written from the running
+/// The entries Native keeps only as bytes: the dowsing rod's 15
+/// (@ 0x006d84f4, its role not read) and the puzzles (20..32). The dialog flag (33) is written from the running
 /// dialog and not read back: a save made from the menus has no dialog
 /// running, Escape ends it before the main menu opens (@ 0x004762f0).
-const KEPT: [usize; 17] = [
-    13, 14, 15, 16, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-];
+const KEPT: [usize; 14] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
+
+/// The dowsing rod's entries: shown (@ 0x006d84fd, one byte), its frame
+/// (@ 0x006d8500) and its step (@ 0x005e2efc).
+const ROD_ACTIVE: usize = 13;
+const ROD_FRAME: usize = 14;
+const ROD_STEP: usize = 16;
 
 /// Why a save could not be loaded.
 #[derive(Debug)]
@@ -195,6 +199,10 @@ impl Engine {
         d.set_i32(entry::SHOWN_COUNT, s.shown.len() as i32);
         // 19: the cursor's frame (FUN_0047bf20: 0 when it has no bank).
         d.set_i32(entry::CURSOR, self.cursor.shown.unwrap_or(0));
+        // 13, 14, 16: the dowsing rod.
+        d.entry_mut(ROD_ACTIVE)[0] = u8::from(self.rod.active);
+        d.set_i32(ROD_FRAME, self.rod.frame);
+        d.set_i32(ROD_STEP, self.rod.step);
         // 33: the dialog flag.
         d.entry_mut(entry::DIALOG)[0] = u8::from(self.dialog.is_some());
         // 34: the subjects, per character a count and 16 entries.
@@ -413,6 +421,16 @@ impl Engine {
         if self.cursor.shown.is_some() {
             self.cursor.shown = Some(d.i32(entry::CURSOR));
         }
+        // The dowsing rod: its state copied back with the globals,
+        // `baton.spr` loaded again when it was shown.
+        self.rod.active = d.entry(ROD_ACTIVE)[0] != 0;
+        self.rod.frame = d.i32(ROD_FRAME);
+        self.rod.step = d.i32(ROD_STEP);
+        self.rod.bank = if self.rod.active {
+            self.load_bank(b"baton.spr")
+        } else {
+            None
+        };
         // Chapters 39, 46 and 83 run their `/INIT` again.
         if matches!(chapter, 39 | 46 | 83) {
             self.with_script(|s, h| s.run_init(h));

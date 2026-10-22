@@ -33,14 +33,17 @@ impl Engine {
     /// when the scripts do not run this game. The click flags and the
     /// start angles of the next view entry are the engine's, given to the
     /// script before and taken back after; the object in hand is the
-    /// script's.
+    /// script's; a cursor pair the script cleared (`objetenmain=0`,
+    /// @ 0x0047bf40) is cleared in the engine too.
     pub(crate) fn with_script<R>(
         &mut self,
         f: impl FnOnce(&mut Script, &mut dyn Host) -> R,
     ) -> Option<R> {
         let mut s = self.con.take()?;
         s.click = self.click;
+        s.click_aux = self.click_aux;
         s.double_click = self.double;
+        let cursor_pair = (s.hand_drawn, s.hand_x);
         (s.start_x, s.start_y) = self.arrival;
         s.set_fpu(self.camera.fpu);
         if self.trace && s.lines.is_none() {
@@ -48,7 +51,11 @@ impl Engine {
         }
         let r = f(&mut s, self);
         self.click = s.click;
+        self.click_aux = s.click_aux;
         self.double = s.double_click;
+        if (s.hand_drawn, s.hand_x) != cursor_pair && !s.hand_drawn {
+            self.cursor.shown = None;
+        }
         self.arrival = (s.start_x, s.start_y);
         let k = &s.keys;
         self.hand = s
@@ -658,11 +665,16 @@ impl Host for Engine {
 
     fn set_monde(&mut self, monde: i32) -> bool {
         self.event(Event::Monde(monde));
+        self.monde = monde;
         self.files.set_monde(monde);
         self.objects_bank = load_objects_bank(&self.files, monde);
         self.load_world_texts(monde);
         // Every disc is read where it is: the disc asked for is there.
         true
+    }
+
+    fn bag_layout(&mut self, visible: i32) {
+        self.bar.taken(visible);
     }
 
     fn message_clic(&mut self, text: &str) {

@@ -11,6 +11,7 @@
 use atlantis2_data::con::NewGame;
 use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::dialog::{FontTxt, World};
+use atlantis2_data::messages::ObjectNames;
 use atlantis2_data::spr::{SprBank, Target};
 use atlantis2_data::spw::{FaceBox, Spw};
 use atlantis2_data::wam::{self, View, WamError, Zone};
@@ -18,6 +19,7 @@ use atlantis2_data::{A2Files, Folder, Wam};
 use atlantis_codecs::{DecodeError, HnmVideo};
 
 use crate::anim::{restore, Anim, Texel};
+use crate::bag::{Bar, Overlays, Rod, UiDraw};
 use crate::camera::{deg_to_rad, zone_aim, Camera, WARP_FOV};
 use crate::crt::Rand;
 use crate::dialog::{Dialog, DialogError, DialogScript, FrameContext, TickContext};
@@ -25,7 +27,7 @@ use crate::enhancements::Enhancements;
 use crate::fpu::Fpu;
 use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
 use crate::menu::Menu;
-use crate::script::Script;
+use crate::script::{BagEntry, Script};
 use crate::sound::{MusicVolume, Pcm, Voices};
 use crate::subtitle::SubtitleFont;
 use crate::turn::Turn;
@@ -34,6 +36,7 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 mod host;
 mod menus;
 mod saves;
+mod ui;
 
 pub use saves::SaveError;
 
@@ -120,6 +123,10 @@ pub enum Event {
     /// A sound started on voice 2 (a film's track, `NEWSOUND`,
     /// `TrajSound`).
     Sound(String),
+    /// The right button opened or closed the bag bar.
+    Bag { open: bool },
+    /// An object picked from the bag bar.
+    BagPick { id: i32 },
 }
 
 /// The script variables a scan sees.
@@ -328,9 +335,29 @@ pub struct Engine {
     objects_bank: Option<SprBank>,
     /// The centre marker option (@ 0x005db84c, on by default).
     pub centre_marker: bool,
-    /// The objects taken, in order (the bag, @ 0x004754f0: not ported
-    /// beyond the list).
+    /// The ids of the objects taken by a click, in order.
     pub bag: Vec<i32>,
+    /// Without the scripts, the bag's entries those takes make (with the
+    /// scripts the bag is theirs).
+    own_bag: Vec<BagEntry>,
+    /// `MONDE` when the scripts do not run.
+    monde: i32,
+    /// The bag bar, the overlays of the special objects, the dowsing rod.
+    pub bar: Bar,
+    pub overlays: Overlays,
+    pub rod: Rod,
+    /// The mouse pointer (@ 0x006569c0 / 0x006569bc), in screen pixels:
+    /// drawn and read while the bar is open.
+    pub pointer: (i32, i32),
+    /// The click's companion flag (@ 0x006569a0): set by the right button,
+    /// cleared with the click at the end of each warp frame.
+    pub click_aux: i32,
+    /// What the last pass drew over the panorama and the centre: the
+    /// rod, the overlays, the bar and the pointer.
+    pub ui_draws: Vec<UiDraw>,
+    /// `Messages.txt`'s object names, the popup font of the bar.
+    object_names: ObjectNames,
+    popup_font: Option<SubtitleFont>,
     /// The object in hand: its id and sprite in the world's objects bank
     /// (the pair @ 0x00673f68 / 0x00673f94, drawn under the cursor).
     pub hand: Option<(i32, i32)>,
@@ -453,7 +480,7 @@ fn texel_of(dir: [f32; 3]) -> Option<Texel> {
 }
 
 /// The world's objects bank `/set(monde=N)` loads (@ 0x00484df0).
-fn objects_bank_name(monde: i32) -> Option<&'static str> {
+pub fn objects_bank_name(monde: i32) -> Option<&'static str> {
     Some(match monde {
         1 => "objeire.spr",
         2 | 6 => "objyuc.spr",
@@ -608,6 +635,15 @@ impl Engine {
             log::warn!("spr\\interfac.spr missing or unreadable: no cursor");
         }
         let objects_bank = load_objects_bank(&files, monde);
+        // The bag's start-up (@ 0x00474810) reads the object names (a
+        // missing file is fatal there).
+        let object_names = match files.read(Folder::Loc, "Messages.txt") {
+            Some(d) => ObjectNames::parse(&d),
+            None => {
+                log::warn!("loc\\Messages.txt not found: no object names");
+                ObjectNames::default()
+            }
+        };
         let camera = Camera::new(fpu, width, height);
         Engine {
             files,
@@ -649,6 +685,16 @@ impl Engine {
             objects_bank,
             centre_marker: true,
             bag: Vec::new(),
+            own_bag: Vec::new(),
+            monde,
+            bar: Bar::default(),
+            overlays: Overlays::new(),
+            rod: Rod::default(),
+            pointer: (0, 0),
+            click_aux: 0,
+            ui_draws: Vec::new(),
+            object_names,
+            popup_font: None,
             hand: None,
             trace: false,
             events: Vec::new(),
@@ -781,8 +827,10 @@ impl Engine {
         }
     }
 
-    /// A mouse move, in mickeys (relative pointer motion).
+    /// A mouse move, in mickeys (relative pointer motion): the pointer
+    /// and the turn speeds.
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
+        self.move_pointer(dx, dy);
         self.look.mouse(self.camera.fpu, dx, dy);
     }
 
@@ -909,10 +957,13 @@ impl Engine {
                 .files
                 .read(Folder::Loc, "Font.txt")
                 .map(|d| FontTxt::parse(&d));
-            self.font = font_txt.and_then(|f| {
-                let file = f.font("AtlFT_Dialog")?.file.clone();
-                SubtitleFont::new(self.files.read(Folder::Loc, &file)?, &f)
-            });
+            let load = |id: &str| {
+                let f = font_txt.as_ref()?;
+                let file = f.font(id)?.file.clone();
+                SubtitleFont::named(self.files.read(Folder::Loc, &file)?, f, id)
+            };
+            self.font = load("AtlFT_Dialog");
+            self.popup_font = load("AtlFT_POPUP");
             if self.font.is_none() {
                 log::warn!("loc\\Font.txt or its font missing: no subtitles");
             }
@@ -1024,6 +1075,7 @@ impl Engine {
     /// pixels is done.
     pub fn pass(&mut self, out: Option<&mut [u16]>) {
         self.centre_draws.clear();
+        self.ui_draws.clear();
         // The music state machine (@ 0x00476fc0, called @ 0x0049ce32).
         self.music_frame();
         match self.loop_type {
@@ -1058,14 +1110,22 @@ impl Engine {
             }
         } else {
             // The limits are the script's `LIMITEANGLEWARPX` / `Y`, read
-            // every frame.
+            // every frame. Not while the bag bar or a full-screen overlay
+            // is open (nor the subject menu, a dialog, the parchment or the
+            // pause, which the port does not have here).
             if let Some(s) = &self.con {
                 self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
                 self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
             }
-            self.look.frame(&mut self.camera);
+            if !self.bar.open && !self.overlays.cover {
+                self.look.frame(&mut self.camera);
+            }
         }
         self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+        // The overlays' clicks (@ 0x0047efd0).
+        if self.overlays.any() {
+            self.overlay_clicks();
+        }
         // 2. The draw (@ 0x0045a9f0); after a video, the music back to
         // 100 % first (FUN_0040bb90).
         if std::mem::take(&mut self.music_after_video) {
@@ -1094,6 +1154,7 @@ impl Engine {
         }
         // 4. The click flags.
         self.click = false;
+        self.click_aux = 0;
         // 5. The move completes.
         if self.move_pending {
             self.complete_move();
@@ -1124,7 +1185,7 @@ impl Engine {
     /// The warp draw (@ 0x0045a9f0): sprites into the faces, the cube, the
     /// faces restored, the animation step; the cursor and the centre
     /// marker; the cursor chosen for the next frame.
-    fn draw(&mut self, out: Option<&mut [u16]>) {
+    fn draw(&mut self, mut out: Option<&mut [u16]>) {
         if self.faces[0].is_empty() {
             // No view entered yet (a script that has not reached `vue=`).
             if let Some(out) = out {
@@ -1143,8 +1204,13 @@ impl Engine {
         self.sprite_state = hit.cursor;
         self.sprite_hit = hit.slot;
         let (w, h) = (self.renderer.width(), self.renderer.height());
-        self.centre_draws = self.centre_plan(w, h);
-        if let Some(out) = out {
+        // FUN_0045af10 draws nothing while the bar is open.
+        self.centre_draws = if self.bar.open {
+            Vec::new()
+        } else {
+            self.centre_plan(w, h)
+        };
+        if let Some(out) = out.as_deref_mut() {
             let (m, p) = (self.camera.matrix(), self.camera.projection());
             self.renderer.fpu = self.camera.fpu;
             self.renderer.render(&self.work, &m, p, out);
@@ -1160,15 +1226,30 @@ impl Engine {
             self.spw_flag = false;
             self.anim.step();
         }
-        // The cursor for the next frame (after FUN_0045af10 drew this one).
+        // The cursor for the next frame (after FUN_0045af10 drew this one),
+        // unless the bar (or a dialog) is open.
         let zone_kind = self.centre().map(|(_, z)| z.kind);
-        if self.sprite_state != 0 {
-            self.cursor
-                .choose(0, self.sprite_state, &mut self.cursor_flag);
-        } else if let Some(kind) = zone_kind {
-            self.cursor.choose(kind, 0, &mut self.cursor_flag);
-        } else {
-            self.cursor.hide();
+        if !self.bar.open && self.dialog.is_none() {
+            if self.sprite_state != 0 {
+                self.cursor
+                    .choose(0, self.sprite_state, &mut self.cursor_flag);
+            } else if let Some(kind) = zone_kind {
+                self.cursor.choose(kind, 0, &mut self.cursor_flag);
+            } else {
+                self.cursor.hide();
+            }
+        }
+        // FUN_00475320: the dowsing rod, the overlays (the parchment never
+        // opens); then the bar and the pointer.
+        self.rod_frame();
+        if self.overlays.any() {
+            self.overlay_draw();
+        }
+        if self.bar.open && self.dialog.is_none() {
+            self.bag_frame();
+        }
+        if let Some(out) = out {
+            self.paint_ui(out, w, h);
         }
     }
 
@@ -1277,6 +1358,8 @@ impl Engine {
         };
         let (id, click, kind, sprite) = (slot.id, slot.click, slot.kind, slot.object_sprite);
         match click {
+            // Not while the bag bar is open.
+            1 if self.bar.open => {}
             1 => {
                 // An object to take: hidden for good, in the bag, as the
                 // cursor (@ 0x0047bef0, until the next cursor choice) and
@@ -1284,9 +1367,20 @@ impl Engine {
                 // objects bank.
                 self.vars.clicobjet = id;
                 self.anim.take(n);
-                self.bag.push(id);
-                self.cursor.shown = Some(sprite);
-                self.cursor.bank = CursorBank::Objects;
+                if !self.bag.contains(&id) {
+                    self.bag.push(id);
+                }
+                if self.con.is_none() && !self.own_bag.iter().any(|e| e.id == id) {
+                    let world = if self.monde == 6 { 2 } else { self.monde };
+                    self.own_bag.push(BagEntry {
+                        sprite: sprite as u8,
+                        id,
+                        world,
+                    });
+                    let visible = crate::bag::visible_count(&self.own_bag, self.monde);
+                    self.bar.taken(visible);
+                }
+                self.set_cursor_pair(CursorBank::Objects, sprite);
                 self.vars.objet_en_main = id;
                 self.hand = Some((id, sprite));
                 self.event(Event::Take { id });
@@ -1321,7 +1415,7 @@ impl Engine {
     /// (click kind 2), the click scan, then `CLICPERSO` = `CLICOBJET` = 0
     /// (`SUJET` = −2, not ported) and the click cleared.
     fn click_scan(&mut self) {
-        if !self.click {
+        if !self.click || self.bar.open {
             return;
         }
         let mut character = None;
@@ -1365,8 +1459,9 @@ impl Engine {
 
     /// FUN_0049ca80: a click on the zone under the centre.
     fn zone_click(&mut self) {
-        // Not while a dialog runs (@ 0x006cfb54).
-        if !self.click || self.dialog.is_some() {
+        // Not while the bag bar is open or a dialog runs (@ 0x00671ef0,
+        // 0x006cfb54).
+        if !self.click || self.bar.open || self.dialog.is_some() {
             return;
         }
         let Some((zi, zone)) = self.centre().map(|(i, z)| (i, z.clone())) else {
@@ -1547,12 +1642,7 @@ impl Engine {
         }
         if self.sprite_hit.is_none() {
             // FUN_0047bf40: the hand emptied.
-            self.cursor.shown = None;
-            self.vars.objet_en_main = 0;
-            self.hand = None;
-            if let Some(s) = self.con.as_mut() {
-                s.empty_hand();
-            }
+            self.drop_hand();
         }
     }
 
@@ -1787,6 +1877,36 @@ impl Engine {
         self.arrival = (yaw, pitch);
         self.vars.last_vue = self.view;
         self.enter_view(view, yaw, pitch)
+    }
+
+    /// `RunOneCommand` (@ 0x00481800): a `(KEY=value)` command run by the
+    /// scripts' `/set` handler, as the engine's own code runs some (for
+    /// tests and tools: an object put in the bag or the hand). Nothing
+    /// without the scripts.
+    pub fn run_command(&mut self, command: &[u8]) {
+        self.with_script(|s, h| s.run_command(h, command));
+    }
+
+    /// A click on the sprite of slot `n` of the view, as the warp frame
+    /// handles it (@ 0x0045a650): for tests and tools.
+    pub fn take_slot(&mut self, n: usize) {
+        self.sprite_hit = Some(n);
+        self.sprite_click();
+    }
+
+    /// The per-view reset of an arrival frame (@ 0x00483ce0): for tests
+    /// and tools.
+    pub fn reset_view(&mut self) {
+        self.per_view_reset();
+        if let Some(s) = self.con.as_mut() {
+            s.view_reset();
+        }
+    }
+
+    /// What the centre routine (FUN_0045af10) would draw now: the hand,
+    /// the cursor and the marker.
+    pub fn plan_centre(&self) -> Vec<CentreDraw> {
+        self.centre_plan(self.width(), self.height())
     }
 }
 

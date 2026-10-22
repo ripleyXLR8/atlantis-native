@@ -14,11 +14,13 @@
 //! original does, its effects outside the script tables going through
 //! [`script::Host`], which the engine implements. The menus ([`menu`])
 //! are the original's pages and state machine, with the saves of the
-//! original's format (`atlantis2_data::save`) behind them.
+//! original's format (`atlantis2_data::save`) behind them. The bag bar,
+//! the object in hand and the overlays some objects open are in [`bag`].
 
 #![forbid(unsafe_code)]
 
 pub mod anim;
+pub mod bag;
 pub mod camera;
 pub mod crt;
 pub mod dialog;

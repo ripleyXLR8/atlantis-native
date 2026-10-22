@@ -1,0 +1,357 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83), its own functions on synthetic SPW slots: the object
+# table, the objects bank of each world, the takes of Tibet's boats, the bag and hand keys of
+# the scripts, the bag's visible count and scroll, the centre draw of hand and cursor.
+# Names of defnames.con entries are written {S:I} (section, index); bank handles by the
+# bank's file name (interfac = spr\interfac.spr, objtibet = spr\objtibet.spr, none = null).
+# The changes' keys cursor_spr / cursor_bank are the hand's frame and bank, hand_flag / hand_x
+# the cursor's bank and frame (the producer's names).
+obj 0 sprite 0
+obj 1 sprite 0
+obj 2 sprite 0
+obj 3 sprite 26
+obj 4 sprite 26
+obj 5 sprite 5
+obj 6 sprite 23
+obj 7 sprite 16
+obj 8 sprite 16
+obj 9 sprite 14
+obj 10 sprite 0
+obj 11 sprite 0
+obj 12 sprite 18
+obj 13 sprite 7
+obj 14 sprite 8
+obj 15 sprite 13
+obj 16 sprite 0
+obj 17 sprite 9
+obj 18 sprite 10
+obj 19 sprite 11
+obj 20 sprite 11
+obj 21 sprite 12
+obj 22 sprite 0
+obj 23 sprite 0
+obj 24 sprite 0
+obj 25 sprite 0
+obj 26 sprite 0
+obj 27 sprite 0
+obj 28 sprite 17
+obj 29 sprite 0
+obj 30 sprite 0
+obj 31 sprite 1
+obj 32 sprite 15
+obj 33 sprite 25
+obj 34 sprite 27
+obj 35 sprite 2
+obj 36 sprite 5
+obj 37 sprite 5
+obj 38 sprite 5
+obj 39 sprite 5
+obj 40 sprite 5
+obj 41 sprite 3
+obj 42 sprite 4
+obj 43 sprite 0
+obj 44 sprite 0
+obj 45 sprite 0
+obj 46 sprite 22
+obj 47 sprite 0
+obj 48 sprite 20
+obj 49 sprite 6
+obj 50 sprite 24
+obj 51 sprite 0
+obj 52 sprite 6
+obj 53 sprite 2
+obj 54 sprite 19
+obj 55 sprite 19
+obj 56 sprite 7
+obj 57 sprite 3
+obj 58 sprite 19
+obj 59 sprite 19
+obj 60 sprite 8
+obj 61 sprite 1
+obj 62 sprite 19
+obj 63 sprite 19
+obj 64 sprite 0
+obj 65 sprite 0
+obj 66 sprite 0
+obj 67 sprite 6
+obj 68 sprite 6
+obj 69 sprite 6
+obj 70 sprite 6
+obj 71 sprite 6
+obj 72 sprite 6
+obj 73 sprite 6
+obj 74 sprite 0
+obj 75 sprite 0
+obj 76 sprite 0
+obj 77 sprite 0
+obj 78 sprite 0
+obj 79 sprite 0
+obj 80 sprite 0
+obj 81 sprite 0
+obj 82 sprite 0
+obj 83 sprite 22
+obj 84 sprite 26
+obj 85 sprite 0
+obj 86 sprite 0
+obj 87 sprite 0
+obj 88 sprite 0
+obj 89 sprite 0
+obj 90 sprite 2
+obj 91 sprite 3
+obj 92 sprite 4
+obj 93 sprite 0
+obj 94 sprite 1
+obj 95 sprite 0
+obj 96 sprite 12
+obj 97 sprite 13
+obj 98 sprite 14
+obj 99 sprite 15
+obj 100 sprite 0
+obj 101 sprite 28
+obj 102 sprite 5
+obj 103 sprite 23
+obj 104 sprite 24
+obj 105 sprite 0
+obj 106 sprite 0
+obj 107 sprite 0
+obj 108 sprite 0
+obj 109 sprite 0
+obj 110 sprite 0
+obj 111 sprite 0
+obj 112 sprite 0
+obj 113 sprite 0
+obj 114 sprite 0
+obj 115 sprite 16
+obj 116 sprite 8
+obj 117 sprite 9
+obj 118 sprite 10
+obj 119 sprite 6
+obj 120 sprite 7
+obj 121 sprite 11
+obj 122 sprite 0
+obj 123 sprite 0
+obj 124 sprite 0
+obj 125 sprite 0
+obj 126 sprite 0
+obj 127 sprite 0
+obj 128 sprite 0
+obj 129 sprite 0
+obj 130 sprite 0
+obj 131 sprite 0
+obj 132 sprite 0
+obj 133 sprite 0
+obj 134 sprite 0
+obj 135 sprite 0
+obj 136 sprite 0
+obj 137 sprite 17
+obj 138 sprite 18
+obj 139 sprite 19
+obj 140 sprite 20
+obj 141 sprite 21
+obj 142 sprite 25
+obj 143 sprite 0
+obj 144 sprite 0
+obj 145 sprite 1
+obj 146 sprite 2
+obj 147 sprite 3
+obj 148 sprite 4
+obj 149 sprite 11
+obj 150 sprite 6
+obj 151 sprite 5
+obj 152 sprite 9
+obj 153 sprite 8
+obj 154 sprite 10
+obj 155 sprite 0
+obj 156 sprite 0
+obj 157 sprite 0
+obj 158 sprite 0
+obj 159 sprite 0
+obj 160 sprite 0
+obj 161 sprite 0
+obj 162 sprite 0
+obj 163 sprite 0
+obj 164 sprite 0
+obj 165 sprite 0
+obj 166 sprite 0
+obj 167 sprite 4
+obj 168 sprite 29
+obj 169 sprite 12
+obj 170 sprite 30
+obj 171 sprite 1
+obj 172 sprite 2
+obj 173 sprite 3
+obj 174 sprite 4
+obj 175 sprite 5
+obj 176 sprite 6
+obj 177 sprite 7
+obj 178 sprite 8
+obj 179 sprite 9
+obj 180 sprite 10
+obj 181 sprite 11
+obj 182 sprite 12
+obj 183 sprite 13
+obj 184 sprite 14
+obj 185 sprite 15
+obj 186 sprite 16
+obj 187 sprite 0
+obj 188 sprite 0
+obj 189 sprite 0
+obj 190 sprite 0
+obj 191 sprite 0
+obj 192 sprite 0
+obj 193 sprite 0
+obj 194 sprite 0
+obj 195 sprite 0
+obj 196 sprite 0
+obj 197 sprite 0
+obj 198 sprite 5
+obj 199 sprite 28
+obj 200 sprite 7
+obj 201 sprite 29
+obj 202 sprite 0
+obj 203 sprite 0
+obj 204 sprite 0
+obj 205 sprite 0
+obj 206 sprite 0
+obj 207 sprite 0
+obj_count 208
+monde 0 calls -
+monde 0 objbank none
+monde 0 after hand=none,0;cursor=none,-1;OBJETENMAIN=0
+monde 1 calls AtlCD_Change(1,1);AtlSpr_FreeBank(6758132);AtlSpr_LoadBank(objeire.spr,0)->objeire;AtlSpr_FreeBank(7142236);AtlSpr_LoadBank(sujeire.spr,0)->sujeire;AtlDial_LoadTexts('dialIR.txt','comIR.txt','infoIR.txt',1)
+monde 1 objbank objeire
+monde 1 after hand=none,0;cursor=none,-1;OBJETENMAIN=0
+monde 2 calls AtlCD_Change(2,1);AtlSpr_FreeBank(6758132);AtlSpr_LoadBank(objyuc.spr,0)->objyuc;AtlSpr_FreeBank(7142236);AtlSpr_LoadBank(sujyuc.spr,0)->sujyuc;AtlDial_LoadTexts('dialYU.txt','comYU.txt','infoYU.txt',2)
+monde 2 objbank objyuc
+monde 2 after hand=none,0;cursor=none,-1;OBJETENMAIN=0
+monde 3 calls AtlCD_Change(3,1);AtlSpr_FreeBank(6758132);AtlSpr_LoadBank(objchine.spr,0)->objchine;AtlSpr_FreeBank(7142236);AtlSpr_LoadBank(sujchine.spr,0)->sujchine;AtlDial_LoadTexts('dialCH.txt','comCH.txt','infoCH.txt',3)
+monde 3 objbank objchine
+monde 3 after hand=none,0;cursor=none,-1;OBJETENMAIN=0
+monde 4 calls AtlCD_Change(4,1);AtlSpr_FreeBank(6758132);AtlSpr_LoadBank(objshamb.spr,0)->objshamb;AtlSpr_FreeBank(7142236);AtlSpr_LoadBank(sujshamb.spr,0)->sujshamb;AtlDial_LoadTexts('dialSH.txt','comSH.txt','infoSH.txt',4)
+monde 4 objbank objshamb
+monde 4 after hand=none,0;cursor=none,-1;OBJETENMAIN=0
+monde 5 calls AtlCD_Tibet();AtlSpr_FreeBank(6758132);AtlSpr_LoadBank(objtibet.spr,0)->objtibet;AtlSpr_FreeBank(7142236);AtlSpr_LoadBank(sujtibet.spr,0)->sujtibet;AtlDial_LoadTexts('dialTI.txt','comTI.txt','infoTI.txt',5)
+monde 5 objbank objtibet
+monde 5 after hand=none,0;cursor=none,-1;OBJETENMAIN=0
+monde 6 calls AtlCD_Change(4,1);AtlSpr_FreeBank(6758132);AtlSpr_LoadBank(objyuc.spr,0)->objyuc;AtlSpr_FreeBank(7142236);AtlSpr_LoadBank(sujyuc.spr,0)->sujyuc;AtlDial_LoadTexts('dialYU.txt','comYU.txt','infoYU.txt',2)
+monde 6 objbank objyuc
+monde 6 after hand=none,0;cursor=none,-1;OBJETENMAIN=0
+monde 7 calls -
+monde 7 objbank none
+monde 7 after hand=none,0;cursor=none,-1;OBJETENMAIN=0
+take v5 {1:61} slot_sprite 1
+take v5 {1:61} changes var[11]=61;var[28]=61;bag=61/spr1/w5;vis=61/0/2;cursor_spr=1;cursor_bank=objtibet;hand_flag=objtibet;hand_x=1
+take v5 {1:61} pairs hand=objtibet,1;cursor=objtibet,1;OBJETENMAIN=61
+take v5 {1:61} visible 1
+take v5 {1:61} CLICOBJET 61
+take v5 {1:61} slot +0x10 0 +0x30 0 errors -
+reset v5 after_take pairs hand=none,0;cursor=objtibet,1;OBJETENMAIN=0
+take v8 {1:53} slot_sprite 2
+take v8 {1:53} changes var[11]=53;var[28]=53;bag=61/spr1/w5;53/spr2/w5;vis=61/0/2;53/0/2;cursor_spr=2;cursor_bank=objtibet;hand_x=2
+take v8 {1:53} pairs hand=objtibet,2;cursor=objtibet,2;OBJETENMAIN=53
+take v8 {1:53} visible 2
+take v8 {1:53} CLICOBJET 53
+take v8 {1:53} slot +0x10 0 +0x30 0 errors -
+reset v8 after_take pairs hand=none,0;cursor=objtibet,2;OBJETENMAIN=0
+take v9 {1:57} slot_sprite 3
+take v9 {1:57} changes var[11]=57;var[28]=57;bag=61/spr1/w5;53/spr2/w5;57/spr3/w5;vis=61/0/2;53/0/2;57/0/2;cursor_spr=3;cursor_bank=objtibet;hand_x=3
+take v9 {1:57} pairs hand=objtibet,3;cursor=objtibet,3;OBJETENMAIN=57
+take v9 {1:57} visible 3
+take v9 {1:57} CLICOBJET 57
+take v9 {1:57} slot +0x10 0 +0x30 0 errors -
+reset v9 after_take pairs hand=none,0;cursor=objtibet,3;OBJETENMAIN=0
+take bag_open changes -
+take again_shown changes var[11]=61;var[28]=61;cursor_spr=1;cursor_bank=objtibet;hand_x=1
+take again_shown errors warning:Inventaire_PrendObj_id_nspr(%d):dejapris! slot +0x30 after 0
+take click3 {1:6} changes var[11]=6
+take click3 {1:6} vars ClicObjet=6 ClicPerso=0 bag 61/spr1/w5;53/spr2/w5;57/spr3/w5 pairs hand=none,0;cursor=objtibet,1;OBJETENMAIN=0
+take click4 {1:6} changes var[10]=6
+take click4 {1:6} vars ClicObjet=0 ClicPerso=6 bag 61/spr1/w5;53/spr2/w5;57/spr3/w5 pairs hand=none,0;cursor=objtibet,1;OBJETENMAIN=0
+cond (flag200=0)&(sacados={1:53})|(sacados={1:57})|(sacados={1:61}) 1
+cond (sacados=NOT_{1:198}) 1
+cond (sacados={1:198}) 0
+cond (sacados={1:52}) 0
+hand {1:53} pairs hand=objtibet,2;cursor=objtibet,1;OBJETENMAIN=53
+hook {1:53} {4:52} calls RunOneCommand('(NewSound=400)')
+hook {1:53} {4:52} changes var[182]=1;var[188]=1
+cond (cliczone={4:52})&(objetenmain={1:53}) 1
+set /set(poseirb=1) changes var[132]=1
+set /set(showobjet={1:54}) changes vis=61/0/2;53/0/2;57/0/2;54/1/2
+set /set(objetenmain=0) changes var[28]=0;cursor_spr=0;cursor_bank=none;hand_flag=none;hand_x=-1
+set /set(sacados=NOT_{1:53}) changes bag=61/spr1/w5;57/spr3/w5
+after {1:53} {4:52} bag 61/spr1/w5;57/spr3/w5
+after {1:53} {4:52} pairs hand=none,0;cursor=none,-1;OBJETENMAIN=0
+hand {1:57} pairs hand=objtibet,3;cursor=none,-1;OBJETENMAIN=57
+hook {1:57} {4:49} calls -
+hook {1:57} {4:49} changes -
+cond (cliczone={4:49})&(objetenmain={1:52}) 0
+after {1:57} {4:49} bag 61/spr1/w5;57/spr3/w5
+after {1:57} {4:49} pairs hand=objtibet,3;cursor=none,-1;OBJETENMAIN=57
+hand {1:57} pairs hand=objtibet,3;cursor=none,-1;OBJETENMAIN=57
+hook {1:57} {4:53} calls RunOneCommand('(NewSound=400)')
+hook {1:57} {4:53} changes var[183]=2;var[188]=2
+cond (cliczone={4:53})&(objetenmain={1:57}) 1
+set /set(posechb=1) changes var[133]=1
+set /set(showobjet={1:58}) changes vis=61/0/2;53/0/2;57/0/2;54/1/2;58/1/2
+set /set(objetenmain=0) changes var[28]=0;cursor_spr=0;cursor_bank=none
+set /set(sacados=NOT_{1:57}) changes bag=61/spr1/w5
+after {1:57} {4:53} bag 61/spr1/w5
+after {1:57} {4:53} pairs hand=none,0;cursor=none,-1;OBJETENMAIN=0
+return /set(monde=5) changes var[91]=5
+return /set(monde=5) calls AtlCD_Tibet();AtlSpr_FreeBank(6758132);AtlSpr_LoadBank(objtibet.spr,0)->objtibet;AtlSpr_FreeBank(7142236);AtlSpr_LoadBank(sujtibet.spr,0)->sujtibet;AtlDial_LoadTexts('dialTI.txt','comTI.txt','infoTI.txt',5) objbank objtibet
+return /set(sacados={1:52}) changes bag=61/spr1/w5;52/spr6/w5
+return /set(sacados={1:52}) calls - objbank objtibet
+return /set(objetenmain={1:52}) changes var[28]=52;cursor_spr=6;cursor_bank=objtibet
+return /set(objetenmain={1:52}) calls - objbank objtibet
+return pairs hand=objtibet,6;cursor=none,-1;OBJETENMAIN=52
+return after_arrival_reset pairs hand=none,0;cursor=none,-1;OBJETENMAIN=0
+return bag 61/spr1/w5;52/spr6/w5
+notinbag /set(objetenmain={1:6}) bag 61/spr1/w5;52/spr6/w5 pairs hand=objtibet,23;cursor=none,-1;OBJETENMAIN=6
+gift /set(sacados={1:199}) changes bag=61/spr1/w5;52/spr6/w5;199/spr28/w5
+gift /set(sacados={1:200}) changes bag=61/spr1/w5;52/spr6/w5;199/spr28/w5;200/spr7/w5
+gift /set(sacados={1:201}) changes bag=61/spr1/w5;52/spr6/w5;199/spr28/w5;200/spr7/w5;201/spr29/w5
+gift /set(ChangeObjectWorld={1:199},1) changes bag=61/spr1/w5;52/spr6/w5;199/spr28/w1;200/spr7/w5;201/spr29/w5
+gift /set(ChangeObjectWorld={1:200},2) changes bag=61/spr1/w5;52/spr6/w5;199/spr28/w1;200/spr7/w2;201/spr29/w5
+gift /set(ChangeObjectWorld={1:201},3) changes bag=61/spr1/w5;52/spr6/w5;199/spr28/w1;200/spr7/w2;201/spr29/w3
+gift /set(sacados={1:198}) changes bag=61/spr1/w5;52/spr6/w5;199/spr28/w1;200/spr7/w2;201/spr29/w3;198/spr5/w5
+gift /set(objetenmain={1:198}) changes var[28]=198;cursor_spr=5;cursor_bank=objtibet
+gift bag 61/spr1/w5;52/spr6/w5;199/spr28/w1;200/spr7/w2;201/spr29/w3;198/spr5/w5
+gift pairs hand=objtibet,5;cursor=none,-1;OBJETENMAIN=198
+visible monde 1 1
+visible monde 2 1
+visible monde 3 1
+visible monde 4 0
+visible monde 5 3
+visible monde 6 1
+crystal /set(sacados=NOT_{1:199}) changes bag=61/spr1/w5;52/spr6/w5;200/spr7/w2;201/spr29/w3;198/spr5/w5
+crystal /set(sacados=NOT_{1:200}) changes bag=61/spr1/w5;52/spr6/w5;201/spr29/w3;198/spr5/w5
+crystal /set(sacados=NOT_{1:201}) changes bag=61/spr1/w5;52/spr6/w5;198/spr5/w5
+crystal /set(sacados=NOT_{1:198}) changes bag=61/spr1/w5;52/spr6/w5
+crystal /set(sacados={1:167}) changes bag=61/spr1/w5;52/spr6/w5;167/spr4/w5
+crystal /set(sacados={1:168}) changes bag=61/spr1/w5;52/spr6/w5;167/spr4/w5;168/spr29/w5
+crystal /set(sacados={1:169}) changes bag=61/spr1/w5;52/spr6/w5;167/spr4/w5;168/spr29/w5;169/spr12/w5
+crystal /set(sacados={1:170}) changes bag=61/spr1/w5;52/spr6/w5;167/spr4/w5;168/spr29/w5;169/spr12/w5;170/spr30/w5
+crystal /set(ChangeObjectWorld={1:168},1) changes bag=61/spr1/w5;52/spr6/w5;167/spr4/w5;168/spr29/w1;169/spr12/w5;170/spr30/w5
+crystal /set(ChangeObjectWorld={1:169},2) changes bag=61/spr1/w5;52/spr6/w5;167/spr4/w5;168/spr29/w1;169/spr12/w2;170/spr30/w5
+crystal /set(ChangeObjectWorld={1:170},3) changes bag=61/spr1/w5;52/spr6/w5;167/spr4/w5;168/spr29/w1;169/spr12/w2;170/spr30/w3
+crystal /set(ChangeObjectWorld={1:167},5) changes -
+crystal bag 61/spr1/w5;52/spr6/w5;167/spr4/w5;168/spr29/w1;169/spr12/w2;170/spr30/w3
+crystal pairs hand=objtibet,5;cursor=none,-1;OBJETENMAIN=198
+cond (cliczone={4:57})&(objetenmain={1:167}) 1
+crystal visible monde 1 1
+crystal visible monde 2 1
+crystal visible monde 3 1
+crystal visible monde 5 3
+draw hand=none,0;cursor=none,-1 ret0 -
+draw hand=objtibet,5;cursor=none,-1 ret0 AtlSpr_Aff(objtibet,5,320,240,0)
+draw hand=objtibet,0;cursor=none,-1 ret0 AtlSpr_Aff(objtibet,0,320,240,0)
+draw hand=objtibet,-1;cursor=none,-1 ret0 -
+draw hand=none,5;cursor=none,-1 ret0 -
+draw hand=objtibet,5;cursor=interfac,13 ret1 AtlSpr_Aff(objtibet,5,320,240,0);AtlSpr_Aff(interfac,13,320,240,0)
+draw hand=none,0;cursor=interfac,25 ret1 AtlSpr_Aff(interfac,25,320,240,0)
+draw hand=objtibet,5;cursor=objtibet,5 ret1 AtlSpr_Aff(objtibet,5,320,240,0);AtlSpr_Aff(objtibet,5,320,240,0)
+draw hand=objtibet,0;cursor=interfac,0 ret1 AtlSpr_Aff(objtibet,0,320,240,0);AtlSpr_Aff(interfac,0,320,240,0)
+scroll bag 61/spr1/w5;52/spr6/w5;167/spr4/w5;168/spr29/w1;169/spr12/w2;170/spr30/w3;67/spr6/w5;68/spr6/w5;69/spr6/w5;70/spr6/w5;71/spr6/w5;72/spr6/w5;73/spr6/w5
+scroll visible 10 first 2 slots 8
+layout640 visible 10 first 0 slots 8

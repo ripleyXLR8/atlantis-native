@@ -16,6 +16,10 @@ impl Engine {
             .menu
             .take()
             .unwrap_or_else(|| Box::new(Menu::new(&self.files)));
+        // The menus read the game's one pointer (@ 0x006569c0,
+        // 0x006569bc), the one the bag bar reads too.
+        m.input.x = self.pointer.0.clamp(0, WIDTH as i32 - 1);
+        m.input.y = self.pointer.1.clamp(0, HEIGHT as i32 - 1);
         let r = f(&mut m, self);
         self.menu = Some(m);
         r
@@ -76,9 +80,12 @@ impl Engine {
         self.escape_down = down;
     }
 
-    /// The pointer at (x, y) of the 640 x 480 screen (FUN_0040c420
-    /// clamps it to the screen).
+    /// The pointer at (x, y) of the screen (FUN_0040c420 clamps it to the
+    /// screen): the game's one pointer (@ 0x006569c0, 0x006569bc), which
+    /// the menus and the bag bar both read.
     pub fn pointer(&mut self, x: i32, y: i32) {
+        let (w, h) = (self.width() as i32, self.height() as i32);
+        self.pointer = (x.clamp(0, w - 1), y.clamp(0, h - 1));
         if let Some(m) = self.menu.as_mut() {
             m.input.x = x.clamp(0, WIDTH as i32 - 1);
             m.input.y = y.clamp(0, HEIGHT as i32 - 1);

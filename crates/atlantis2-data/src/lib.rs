@@ -20,7 +20,8 @@
 //! - [`save`]: the original's saves (`save\ATLpp_ss.SAV`, the `ZapFile`
 //!   container) and `atlant2.cfg`;
 //! - [`dialog`]: the dialog scripts' speakers and lines, their texts, the
-//!   worlds' file sets and heroes, and `Font.txt`.
+//!   worlds' file sets and heroes, and `Font.txt`;
+//! - [`messages`]: the object names the bag bar shows.
 
 #![forbid(unsafe_code)]
 
@@ -31,6 +32,7 @@ pub mod dialog;
 pub mod exe;
 pub mod files;
 pub mod menu_txt;
+pub mod messages;
 pub mod save;
 pub mod spr;
 pub mod spw;

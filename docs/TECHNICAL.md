@@ -9,8 +9,8 @@
 | `atlantis-data` | BigFile archives, executable tables, game detection |
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
-| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter |
+| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -609,7 +609,8 @@ first click sends the game to chapter 75, the first arrival in view 7
 plays the shaman's greeting (dialog 360) and the section goes on after
 it. A left click ends a film and goes to a dialog's next line; Escape ends
 a dialog, and in the panorama opens the main menu (options, volumes,
-load and save, quit; below). Not yet: the start-up intro videos, the bag bar, the subject menu (so
+load and save, quit; below); the right button opens and closes the bag
+bar. Not yet: the start-up intro videos, the subject menu (so
 the shaman's other dialogs, which the scripts call on a subject, cannot be
 asked for), the puzzles. `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
@@ -618,7 +619,10 @@ screen;
 plays a dialog at once and `--menu <page>` shows a menu page (`player`,
 `main`, `options`, `sound`, `load`, `credits`; testing aids, which end the
 opening film first),
-e.g. `--view 7,-164.394,14.96 --dialog 360`. `Engine::new_game` keeps the
+e.g. `--view 7,-164.394,14.96 --dialog 360`; `--take <object>[,...]` puts
+objects in the bag and `--hold <object>` one in the hand (by their
+`defnames.con` names, through the scripts' `sacados` and `objetenmain`),
+`--bag` opens the bar and `--pointer <x>,<y>` places the mouse pointer. `Engine::new_game` keeps the
 start without the scripts (the view `/INIT` names) for the tests against
 the original's moves. The example `cargo run --release -p atlantis2-engine
 --example tibet_tour <install> <discs> <out>` writes pictures of three
@@ -755,6 +759,69 @@ after a short game with three saves.
   as the original does for a character without subjects. Moves to other
   places (type-2 zones), transition sprites and the zoom of a turn are
   not ported (none in Tibet).
+- **Bag** (`bag.rs`, `engine/ui.rs`): the bag is the scripts' table (90
+  entries of sprite, object, world; `sacados`, the take of an object
+  sprite, `ChangeObjectWorld`), the object in hand a (bank, frame) pair
+  beside the cursor's, `OBJETENMAIN` the object's id. An object's sprite
+  is its first `defnames.con` parameter, a frame of the current world's
+  objects bank (`objeire`, `objyuc`, `objchine`, `objshamb`, `objtibet`;
+  `objyuc` for world 6; `objeire` from start-up until the first
+  `monde`). The right button in the panorama opens the bar (`interfac.spr`
+  frame 0 at the bottom, the pointer frame 40 at the screen centre; the
+  mouse then moves the pointer, one pixel per count, and no longer turns
+  the view) and closes it (the hand emptied, the cursor pair kept). The
+  bar shows the entries of the current world only (6 counted as 2), eight
+  cells of 80 pixels at 640 wide (ten wider), from the first shown entry,
+  which a take moves to the end; the pointer within 10 pixels of the
+  right edge (5 of the left) and in the bottom 80 rows scrolls one entry
+  per 0.1 s; over a cell the object's name of `Messages.txt`
+  (`[ObjectNameList]`, keys compared case included, a repeated key
+  keeping its last name, a missing one an empty text) is drawn in
+  `AtlFT_POPUP` (10 points) centred on the cell, kept on the screen, its
+  top at H − 70, black one pixel down and right then white; a click in
+  the bottom 80 rows on cell x / 80 puts its object in the hand and the
+  cursor, sets `OBJETENMAIN`, stops the turn, uses the click and closes
+  the bar. While the bar is open the centre draws nothing, the cursor is
+  not chosen, a click takes no object, moves nowhere and runs no click
+  scan (a sprite of click kind 3 or 4 still sets `CLICOBJET` /
+  `CLICPERSO`). The object in hand is drawn at the screen centre under the
+  cursor (hand bank set and frame ≥ 0, frame 0 included), and right after
+  a take or a pick the cursor shows the object too until the next cursor
+  choice. The world change empties the hand pair but keeps `OBJETENMAIN`;
+  the per-view reset empties both but keeps the cursor pair; removing an
+  object from the bag keeps it in the hand. Special objects: the dowsing
+  rod (`BATON_SOURCE`: `baton.spr` at (W / 2, H − 240) swinging between
+  frame 0 and `NEARW77` − 1, one frame per panorama frame, `SOURCIER` = 1,
+  the hand empty; put away when the bar opens or `NEARW77` = 0); the
+  forms, the fan, the ring and the space-travel balls (`BOULE_SHAMAN*`)
+  open an overlay at the screen centre (`form.spr` with the stamps of
+  `essai_laby1..3` or the symbols of solution row `soluce_laby` through
+  the executable's frame table, `anneau.spr`, the ball's own bank centred
+  by its size) that puts the object, the hand and the cursor aside; the
+  forms, fan and ring stop the mouse look, the ball does not: it
+  animates while the zone under the centre is the one its third
+  parameter names (one frame per panorama frame), and a click there sets
+  `SpaceTravel` = 0 then 1 and runs a scan (chapter 75 then plays film
+  200 and goes to chapter 83 for Tibet's ball); any other click gives
+  the object back and closes the overlay. The parchment (`PARCHEMIN` in
+  view 10 of an Irish place) needs a byte (@ 0x006d05f0) that no code of
+  the original writes: it never opens, here neither. The bag's model,
+  the takes of Tibet's boats, the bag and hand keys, the visible counts,
+  the scroll to the end and the centre draw of hand and cursor are the
+  original's (`tests/objects.rs` against its emulated run); the bar's
+  frame, scroll, names, pick, the overlays and the dowsing rod follow its
+  code as read (no emulated golden of them yet) and are run with the
+  game's files in the same test file. Not known: how `Messages.txt`'s
+  reader splits a line (the port takes the rest of the line after the
+  blanks as the name, as the shipped names hold spaces); the text's two
+  colours (the calls pass 0 and −1, taken as black and white as for the
+  subtitles); the frame of a stamp or symbol whose value is outside the
+  executable's table (the original reads past it; the port draws
+  nothing). The bar scrolls one entry when more than the float 0.1
+  (0.10000000149 s) has passed since its last scroll.
+  The first frame after the bar closes shows its pointer frame at the
+  screen centre, as the original's cursor pair still holds it until the
+  next cursor choice.
 - **Sound:** the voices of the original (0 the music, 1 the dialog
   voice, 2 the films' tracks and the effects) mixed as DirectSound does
   (`sound.rs`). Tibet has no place sound (`tibet.wam` has none and is not
@@ -910,10 +977,11 @@ after a short game with three saves.
   it), `dial` (the dialog loop; a failed start leaves the section waiting,
   as in the original), `startmusik`, `stopmusik`, `NEWSOUND`, `TrajSound`,
   `monde` (the disc rule, the objects bank, the dialog texts), the bag and
-  the hand. No-ops, logged: `ZoomStart`, `ZoomPsychoStart` (the zoom of
+  the hand (`sacados` scrolls the bar to its end, `objetenmain=0` also
+  hides the cursor). No-ops, logged: `ZoomStart`, `ZoomPsychoStart` (the zoom of
   a move), `ANIM_THE_FRAME` (the playing byte), the special events
   (`TestSpecialEvent`), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
-  read where it is), `MESSAGE_CLIC`, `ViewBigSpr`, the bag bar's layout (`CREDITS` shows the
+  read where it is), `MESSAGE_CLIC`, `ViewBigSpr` (`CREDITS` shows the
   credits); `NextWarpInvalide` is stored but the view entry does not read
   it; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. A fatal error of
@@ -986,9 +1054,12 @@ after a short game with three saves.
   the original's does: the 35 globals back, the chapter's script loaded,
   the world set (the hand emptied), the place loaded and the saved view
   entered at the saved angles with no arrival scan and no per-view reset,
-  the saved music, chapters 39, 46 and 83 run their `/INIT` again. The
-  puzzles and the dowsing rod are kept as the bytes of the last load
-  until their studies are ported; the dialog flag is written from the
+  the saved music (the music ring restarted at a drawn mark, after a fade
+  when another track plays), the dowsing rod (shown, frame, step;
+  `baton.spr` loaded again when shown), chapters 39, 46 and 83 run their
+  `/INIT` again. The puzzles and the rod's entry 15 (@ 0x006d84f4, role
+  not read) are kept as the bytes of the last load until their studies
+  are ported; the dialog flag is written from the
   running dialog and not read back (a save made from the menus has no
   dialog running: Escape ends it before the main menu opens). Chosen here: a section
   waiting to go on and a queued command are dropped at a load (the
