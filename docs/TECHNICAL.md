@@ -1337,4 +1337,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
+| next | the other worlds without their puzzles: Ireland on `a2/ireland` (its places, chapters, dialogs, place sounds, transition sprites, the way back to Tibet), then Yucatán, China, Shamballa |
 
