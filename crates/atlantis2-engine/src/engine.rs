@@ -23,6 +23,7 @@ use crate::crt::Rand;
 use crate::dialog::{Dialog, DialogError, DialogScript, FrameContext, TickContext};
 use crate::fpu::Fpu;
 use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
+use crate::menu::Menu;
 use crate::script::Script;
 use crate::sound::{MusicVolume, Pcm, Voices};
 use crate::subtitle::SubtitleFont;
@@ -30,6 +31,10 @@ use crate::turn::Turn;
 use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod host;
+mod menus;
+mod saves;
+
+pub use saves::SaveError;
 
 /// The scheduler's tick: 15 a second (the dialogs' sequencer, the music
 /// fades, the animations, the videos).
@@ -154,6 +159,8 @@ pub enum LoopType {
     Video,
     /// 2: a dialog (@ 0x004616f0).
     Dialog,
+    /// 5: the menus (@ 0x00486eb0).
+    Menu,
 }
 
 /// The script variables the navigation sets (`defnames.con` names).
@@ -368,6 +375,27 @@ pub struct Engine {
     hidden: Option<(Option<usize>, Vec<String>)>,
     /// A dialog played over a film (`cinema=N,M`, FUN_004801a0).
     film_dialog: Option<Dialog>,
+    /// The menus (`AtlMenu_MainInit` @ 0x00485c00), taken out while a
+    /// menu frame runs so that the engine can be its host.
+    menu: Option<Box<Menu>>,
+    /// The loop type a menu returns to (@ 0x006d16e0).
+    menu_prev_loop: LoopType,
+    /// The player number (@ 0x005dcf70): the saves' file names.
+    pub player_number: u8,
+    /// The folder of the saves (`save\` in it) and `atlant2.cfg`; none:
+    /// nothing is read or written.
+    data_dir: Option<std::path::PathBuf>,
+    /// The time a save is stamped with (`GetLocalTime`).
+    pub wall_clock: fn() -> atlantis2_data::save::SystemTime,
+    /// The saved entries Native keeps as bytes (the dowsing rod, the
+    /// puzzles, the dialog flag): those of the last load, written back by
+    /// the next save.
+    save_extra: atlantis2_data::save::SaveData,
+    /// The options of `atlant2.cfg` the engine does not use itself (the
+    /// screen size of the options page, full screen).
+    pub cfg_extra: atlantis2_data::save::Cfg,
+    /// The menus asked the program to end.
+    quit_requested: bool,
 }
 
 /// The music player's own state (@ 0x00673f30, 0x006725a0..0x006725c4):
@@ -641,6 +669,14 @@ impl Engine {
             music_after_video: false,
             hidden: None,
             film_dialog: None,
+            menu: None,
+            menu_prev_loop: LoopType::Warp,
+            player_number: 0,
+            data_dir: None,
+            wall_clock: atlantis2_data::save::SystemTime::default,
+            save_extra: atlantis2_data::save::SaveData::default(),
+            cfg_extra: atlantis2_data::save::Cfg::default(),
+            quit_requested: false,
         }
     }
 
@@ -749,6 +785,13 @@ impl Engine {
     /// During a dialog the click goes to it: the next line (the dialog's
     /// tick reads and clears the flag, @ 0x004801d0).
     pub fn click(&mut self, now: f64) {
+        if self.loop_type == LoopType::Menu {
+            if let Some(m) = self.menu.as_mut() {
+                m.input.click = true;
+                m.input.held = true;
+            }
+            return;
+        }
         if let Some(d) = self.dialog.as_mut() {
             d.click();
             return;
@@ -768,6 +811,9 @@ impl Engine {
         self.ticks = self.ticks.wrapping_add(1);
         self.spw_flag = true;
         self.cursor_flag = true;
+        if let Some(m) = self.menu.as_mut() {
+            m.tick_flag = true;
+        }
         let t = self.clock;
         // The script clocks (@ 0x0040cabd..0x0040cb4e).
         let last = self.last_tick;
@@ -973,6 +1019,7 @@ impl Engine {
                     self.render(out);
                 }
             }
+            LoopType::Menu => self.menu_pass(out),
         }
     }
 

@@ -1,12 +1,17 @@
-//! Atlantis II, as far as it goes: a new game opens on its first view (Tibet,
-//! `tibet.wam` view 2); the player looks around with the mouse or the arrow
-//! keys and walks from view to view with a left click on a move zone (the
-//! turn, the transition video, the arrival), the place animations playing.
-//! The chapter scripts run the game as the original's: the opening film,
-//! the music, the dialogs they call (a left click goes to the next line,
-//! Escape ends a dialog). A minimal mode of its own, beside the first
-//! game's front end: a window, the screen scaled to it, the sound; no menus,
-//! bag or subject menu yet.
+//! Atlantis II, as far as it goes: the player menu opens first (a symbol
+//! continues that player's newest save or starts a new game, on Tibet's
+//! first view, `tibet.wam` view 2); the player looks around with the mouse
+//! or the arrow keys and walks from view to view with a left click on a move
+//! zone (the turn, the transition video, the arrival), the place animations
+//! playing. The chapter scripts run the game as the original's: the opening
+//! film, the music, the dialogs they call (a left click goes to the next
+//! line, Escape ends a dialog). Escape opens the main menu (options,
+//! volumes, load and save, quit) and closes it again; in the menus the
+//! pointer is the game's own. A mode of its own, beside the first game's
+//! front end: a window, the screen scaled to it, the sound; no bag or
+//! subject menu yet. The saves (`save\ATLpp_ss.SAV`, the original's
+//! format) and `atlant2.cfg` are kept in the `atlantis2` folder of the
+//! port's data folder.
 //!
 //! The game folder is the installed one (`atlantis2.exe`, `wam\`,
 //! `scenar\`...); the discs (CD images or copies of the CDs) are looked for
@@ -16,18 +21,21 @@
 //! Testing aids: `--view <id>[,<yaw>,<pitch>]` starts in another view of
 //! the place (angles in degrees), `--dialog <n>` plays dialog `n` at once
 //! over the view (a click goes to the next line, as in the original), with
-//! its voices.
+//! its voices, `--menu <page>` shows a menu page.
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use atlantis2_data::files::OpenError;
+use atlantis2_data::save::SystemTime;
 use atlantis2_data::A2Files;
-use atlantis2_engine::{Engine, Fpu, Variant};
+use atlantis2_engine::menu::PageKind;
+use atlantis2_engine::{Engine, Fpu, LoopType, Variant};
 use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
+use winit::dpi::PhysicalPosition;
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
@@ -55,6 +63,8 @@ pub struct A2Start {
     pub view: Option<(u32, f32, f32)>,
     /// A dialog played at once.
     pub dialog: Option<u32>,
+    /// A menu page shown at once.
+    pub menu: Option<PageKind>,
 }
 
 impl A2Start {
@@ -65,6 +75,38 @@ impl A2Start {
         let yaw = it.next().map_or(Some(0.0), |s| s.parse().ok())?;
         let pitch = it.next().map_or(Some(0.0), |s| s.parse().ok())?;
         Some((id, yaw, pitch))
+    }
+
+    /// Parses `--menu`'s value.
+    pub fn parse_menu(v: &str) -> Option<PageKind> {
+        Some(match v.to_ascii_lowercase().as_str() {
+            "player" => PageKind::Player,
+            "main" => PageKind::Main,
+            "options" => PageKind::Options,
+            "sound" => PageKind::Sound,
+            "load" => PageKind::Load,
+            "credits" => PageKind::Credits,
+            _ => return None,
+        })
+    }
+
+    /// How the game starts: the player menu (the original's start-up), or
+    /// a new game at once (headless runs and the testing aids), then the
+    /// view, the dialog and the menu page asked for.
+    pub fn begin(&self, engine: &mut Engine, headless: bool) -> Result<(), String> {
+        let at_once = self.view.is_some() || self.dialog.is_some();
+        if self.menu == Some(PageKind::Player) || !(headless || at_once || self.menu.is_some()) {
+            engine.open_player_menu();
+            return Ok(());
+        }
+        engine.start_new_game().map_err(|e| e.to_string())?;
+        self.apply(engine)?;
+        match self.menu {
+            Some(PageKind::Credits) => engine.open_credits(),
+            Some(page) => engine.open_menu_page(page),
+            None => {}
+        }
+        Ok(())
     }
 
     /// Enters the view and starts the dialog (the opening film ended
@@ -85,10 +127,31 @@ impl A2Start {
     }
 }
 
-/// Opens the game folder and starts a new game, the cube drawn by
-/// `warpPII` (the reference renderer) for a process whose x87 control word
-/// starts as Win32's default.
-pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
+/// The time of a save: the system's clock in UTC (the original stamps
+/// local time).
+fn utc_now() -> SystemTime {
+    let d = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    SystemTime::from_unix(d.as_secs() as i64, d.subsec_millis() as u16)
+}
+
+/// The folder of the saves and `atlant2.cfg`.
+pub fn data_dir() -> PathBuf {
+    crate::desktop::data_dir().join("atlantis2")
+}
+
+/// Opens the game folder and starts the game as `start` says, the cube
+/// drawn by `warpPII` (the reference renderer) for a process whose x87
+/// control word starts as Win32's default.
+pub fn open(dir: &Path, discs: &[PathBuf], start: &A2Start) -> Result<Engine, String> {
+    let mut engine = boot(dir, discs)?;
+    start.begin(&mut engine, false)?;
+    Ok(engine)
+}
+
+/// The game folder opened and the game booted, with its saves' folder.
+fn boot(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
     let (files, build) = A2Files::open_dir(dir, discs).map_err(|e| match e {
         OpenError::NoDisc => format!(
             "{}: {e}, or give their folder with --discs <folder>",
@@ -102,18 +165,17 @@ pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
         build.id,
         files.disc_numbers()
     );
-    // Start-up, then the menu's new game (the menus are not there yet):
-    // the scripts choose the place and play the opening film.
+    // Start-up: the script tables and chapter 0; the player menu or a new
+    // game follows.
     let mut engine = Engine::boot(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
         .map_err(|e| format!("{}: {e}", dir.display()))?;
+    engine.set_data_dir(Some(data_dir()));
+    engine.wall_clock = utc_now;
     // The original seeds `rand` with GetTickCount() (@ 0x0047d740).
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u32);
     engine.anim.rand = atlantis2_engine::anim::MsvcRand(seed);
-    engine
-        .start_new_game()
-        .map_err(|e| format!("{}: {e}", dir.display()))?;
     Ok(engine)
 }
 
@@ -127,8 +189,12 @@ pub fn headless(
     screenshot: Option<&Path>,
     start: &A2Start,
 ) -> Result<(), String> {
-    let mut engine = open(dir, discs)?;
-    start.apply(&mut engine)?;
+    let mut engine = boot(dir, discs)?;
+    start.begin(&mut engine, true)?;
+    if start.menu.is_some() {
+        // The pointer at the screen centre.
+        engine.pointer(WIDTH as i32 / 2, HEIGHT as i32 / 2);
+    }
     let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
     let mut sound = vec![0.0f32; 2 * 22050 / 60];
     for i in 0..frames {
@@ -172,6 +238,9 @@ pub fn headless(
     if let Some(s) = engine.script_state() {
         println!("chapter {}, {:?} loop", s.chapter, engine.loop_type);
     }
+    if let Some(page) = engine.menu().and_then(|m| m.kind()) {
+        println!("menu page {page:?}");
+    }
     match engine.music_playing() {
         Some(m) => println!("music {m}, volume {}", engine.music.volume),
         None => println!("no music, volume {}", engine.music.volume),
@@ -185,8 +254,7 @@ pub fn headless(
 }
 
 /// Opens a window on the game; returns when it is closed.
-pub fn run_window(mut engine: Engine, fullscreen: bool, start: &A2Start) -> Result<(), String> {
-    start.apply(&mut engine)?;
+pub fn run_window(engine: Engine, fullscreen: bool) -> Result<(), String> {
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let voices = engine.voices().clone();
     let audio =
@@ -202,6 +270,7 @@ pub fn run_window(mut engine: Engine, fullscreen: bool, start: &A2Start) -> Resu
         motion: (0.0, 0.0),
         keys: [false; 4],
         locked: false,
+        focused: true,
         next_frame: Instant::now(),
     };
     el.run_app(&mut app)
@@ -223,6 +292,7 @@ struct A2App {
     /// Left, right, up, down held.
     keys: [bool; 4],
     locked: bool,
+    focused: bool,
     next_frame: Instant,
 }
 
@@ -246,17 +316,46 @@ impl A2App {
     }
 
     fn step(&mut self) {
+        // In the menus the pointer is the game's own, moved by the mouse
+        // over the window; in the game the mouse turns the view.
+        let in_menu = self.engine.loop_type == LoopType::Menu;
+        if in_menu && self.locked {
+            self.grab(false);
+            if let Some(w) = &self.window {
+                w.set_cursor_visible(false);
+            }
+        } else if !in_menu && !self.locked && self.focused {
+            self.grab(true);
+        }
         let (mx, my) = (self.motion.0.trunc(), self.motion.1.trunc());
         self.motion.0 -= mx;
         self.motion.1 -= my;
         let [left, right, up, down] = self.keys.map(i32::from);
         let dx = mx as i32 + (right - left) * KEY_TURN;
         let dy = my as i32 + (down - up) * KEY_TURN;
-        if dx != 0 || dy != 0 {
+        if (dx != 0 || dy != 0) && !in_menu {
             self.engine.mouse_motion(dx, dy);
         }
         self.engine.set_clock(self.started.elapsed().as_secs_f64());
         self.engine.pass(Some(&mut self.screen));
+    }
+
+    /// Where the 640x480 screen is in the window: its offset and scale.
+    fn layout(&self) -> Option<(f64, f64, f64)> {
+        let size = self.window.as_ref()?.inner_size();
+        let (ww, wh) = (f64::from(size.width), f64::from(size.height));
+        let scale = (ww / f64::from(WIDTH)).min(wh / f64::from(HEIGHT));
+        if scale <= 0.0 {
+            return None;
+        }
+        let (dw, dh) = (f64::from(WIDTH) * scale, f64::from(HEIGHT) * scale);
+        Some(((ww - dw).trunc() / 2.0, (wh - dh).trunc() / 2.0, scale))
+    }
+
+    /// A window position on the 640x480 screen.
+    fn to_screen(&self, p: PhysicalPosition<f64>) -> Option<(i32, i32)> {
+        let (ox, oy, scale) = self.layout()?;
+        Some((((p.x - ox) / scale) as i32, ((p.y - oy) / scale) as i32))
     }
 
     /// The 640x480 screen scaled to the window (nearest pixel, kept in
@@ -345,11 +444,38 @@ impl ApplicationHandler for A2App {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        let in_menu = self.engine.loop_type == LoopType::Menu;
         match event {
-            WindowEvent::CloseRequested => el.exit(),
-            WindowEvent::Focused(false) => {
-                self.grab(false);
-                self.keys = [false; 4];
+            WindowEvent::CloseRequested => {
+                // `atlant2.cfg` is written at exit (FUN_0047f530).
+                self.engine.write_cfg();
+                el.exit();
+            }
+            WindowEvent::Focused(on) => {
+                self.focused = on;
+                if !on {
+                    self.grab(false);
+                    self.keys = [false; 4];
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                if let Some((x, y)) = self.to_screen(position) {
+                    self.engine.pointer(x, y);
+                }
+            }
+            WindowEvent::MouseInput {
+                state,
+                button: MouseButton::Left,
+                ..
+            } if in_menu => {
+                // The click flag (@ 0x006569c9) and the held flag
+                // (@ 0x006569ca).
+                if state == ElementState::Pressed {
+                    let now = self.started.elapsed().as_secs_f64();
+                    self.engine.click(now);
+                } else {
+                    self.engine.release();
+                }
             }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
@@ -368,17 +494,14 @@ impl ApplicationHandler for A2App {
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
+                if down && !event.repeat {
+                    self.engine.key_down();
+                }
                 match event.logical_key {
-                    // Escape ends a dialog (@ 0x004762f0, loop type 2).
-                    Key::Named(NamedKey::Escape) if down && self.engine.dialog().is_some() => {
-                        self.engine.end_dialog();
-                    }
-                    Key::Named(NamedKey::Escape) if down => {
-                        if self.locked {
-                            self.grab(false);
-                        } else {
-                            el.exit();
-                        }
+                    // Escape (@ 0x004762f0): the main menu from the game,
+                    // the end of a dialog, the main menu closed.
+                    Key::Named(NamedKey::Escape) if down && !event.repeat => {
+                        self.engine.escape();
                     }
                     Key::Named(NamedKey::ArrowLeft) => self.keys[0] = down,
                     Key::Named(NamedKey::ArrowRight) => self.keys[1] = down,
@@ -397,8 +520,9 @@ impl ApplicationHandler for A2App {
                 let now = Instant::now();
                 if now >= self.next_frame {
                     self.step();
-                    // `EXIT` in a script quits the game.
+                    // `EXIT` in a script, or the menus, quit the game.
                     if self.engine.quit() {
+                        self.engine.write_cfg();
                         el.exit();
                     }
                     self.next_frame += FRAME;
