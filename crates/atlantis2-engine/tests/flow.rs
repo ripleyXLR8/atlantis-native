@@ -128,7 +128,7 @@ impl Run {
             .iter()
             .filter_map(|d| match d {
                 UiDraw::Sprite { bank, frame, x, y } => Some((*bank, *frame, *x, *y)),
-                UiDraw::Text { .. } => None,
+                _ => None,
             })
             .collect()
     }

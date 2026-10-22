@@ -611,7 +611,7 @@ fn the_bag_bar() {
         .iter()
         .filter_map(|d| match d {
             UiDraw::Sprite { bank, frame, x, y } => Some((*bank, *frame, *x, *y)),
-            UiDraw::Text { .. } => None,
+            _ => None,
         })
         .collect();
     // The bar, eight cells from the third object (scrolled to the end),
@@ -662,7 +662,7 @@ fn the_bag_bar() {
                 colour,
                 bytes,
             } => Some((*x, *y, *colour, bytes.clone())),
-            UiDraw::Sprite { .. } => None,
+            _ => None,
         })
         .collect();
     assert_eq!(texts.len(), 2);

@@ -668,6 +668,7 @@ impl Host for Engine {
         self.monde = monde;
         self.files.set_monde(monde);
         self.objects_bank = load_objects_bank(&self.files, monde);
+        self.load_subjects_bank(monde);
         self.load_world_texts(monde);
         // Every disc is read where it is: the disc asked for is there.
         true

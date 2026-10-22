@@ -228,7 +228,9 @@ fn centre_and_sprite_clicks_match_the_original() {
         d.enter_at(view, y, p);
         got.insert(name, d.run(&header(name), &[], 10, &none(0)));
     }
-    // M (the subject menu) is not ported; every other case is compared.
+    // M opens the subject menu from the harness's subject table, which
+    // `Engine::new_game` (no scripts) does not have: the menu's frames are
+    // compared in `tests/subjects.rs`. Every other case is compared here.
     assert_eq!(cases.len(), got.len() + 1, "the golden's cases");
     for name in ["T", "P", "R", "Z1", "Z2", "Z3", "Z4"] {
         let rows = &got[name];

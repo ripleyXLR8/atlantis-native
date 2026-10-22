@@ -59,6 +59,14 @@ pub enum UiDraw {
         x: i32,
         y: i32,
     },
+    /// `AtlSpr_Aff` mode 1 (`AFF_SPRTRS50`): the sprite at 50 % over the
+    /// screen, its hot spot at (x, y).
+    Translucent {
+        bank: UiBank,
+        frame: i32,
+        x: i32,
+        y: i32,
+    },
     /// One line of text in the popup font (`AtlFT_POPUP`), its cell's
     /// top-left corner at (x, y), colour 0xRRGGBB.
     Text {
@@ -69,7 +77,7 @@ pub enum UiDraw {
     },
 }
 
-/// The banks the bar and the overlays draw from.
+/// The banks the bar, the overlays and the subject menu draw from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UiBank {
     /// `spr\interfac.spr` (@ 0x006719fc): frame 0 the bar, 40 the pointer.
@@ -85,6 +93,9 @@ pub enum UiBank {
     /// The space-travel ball's bank (@ 0x006c2e60), named by the object's
     /// second `defnames.con` parameter.
     Ball,
+    /// The world's subjects bank (`spr\suj*.spr`, @ 0x006cfb5c): frame 0
+    /// the ring of a cell, the others the subjects.
+    Subjects,
 }
 
 /// The bar's layout and scroll (@ 0x00671ee0..0x00671ef0).

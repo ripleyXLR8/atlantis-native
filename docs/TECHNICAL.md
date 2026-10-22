@@ -610,9 +610,9 @@ plays the shaman's greeting (dialog 360) and the section goes on after
 it. A left click ends a film and goes to a dialog's next line; Escape ends
 a dialog, and in the panorama opens the main menu (options, volumes,
 load and save, quit; below); the right button opens and closes the bag
-bar. Not yet: the start-up intro videos, the subject menu (so
-the shaman's other dialogs, which the scripts call on a subject, cannot be
-asked for), the puzzles. `--headless <folder> [frames] --screenshot
+bar; a left click on a character with subjects opens the menu of the
+subjects to ask him about (below). Not yet: the start-up intro videos,
+the puzzles. `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
 `--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
@@ -622,7 +622,9 @@ opening film first),
 e.g. `--view 7,-164.394,14.96 --dialog 360`; `--take <object>[,...]` puts
 objects in the bag and `--hold <object>` one in the hand (by their
 `defnames.con` names, through the scripts' `sacados` and `objetenmain`),
-`--bag` opens the bar and `--pointer <x>,<y>` places the mouse pointer. `Engine::new_game` keeps the
+`--bag` opens the bar, `--pointer <x>,<y>` places the mouse pointer and
+`--talk` clicks the character under the centre (e.g. `--view 7,70,5
+--talk --pointer 475,329`: the shaman's menu, the pointer on a subject). `Engine::new_game` keeps the
 start without the scripts (the view `/INIT` names) for the tests against
 the original's moves. The example `cargo run --release -p atlantis2-engine
 --example tibet_tour <install> <discs> <out>` writes pictures of three
@@ -710,7 +712,8 @@ after a short game with three saves.
   flag, `CHEVAL`'s frame variable (no Tibet state uses them).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
-  `spr_p5.dll`'s `AFF_SPR` and its tables for RGB565, the last row and
+  `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
+  subjects already asked) and their tables for RGB565, the last row and
   column of the screen never drawn; the one bank with a 0x400-byte
   (B, G, R, x) colour table, `Ponpirog.SPR`, converted as the DLL does
   for RGB565) at the screen centre: 1..12 over a move zone, 25..39 over
@@ -753,10 +756,8 @@ after a short game with three saves.
   the next transition (the music at 20 %), and the arrival scan runs in
   the frame after the arrival; without them (`Engine::new_game`) the
   scans are only recorded as events. The mandala puzzle's clicks in
-  view 10 are only logged. The subject menu is not ported: on a character
-  with subjects (the shaman, at the start of the game) the original opens
-  it and runs no click scan in that frame; the port runs the click scan
-  as the original does for a character without subjects. Moves to other
+  view 10 are only logged. On a character with subjects the click opens
+  the subject menu instead and runs no click scan (below). Moves to other
   places (type-2 zones), transition sprites and the zoom of a turn are
   not ported (none in Tibet).
 - **Bag** (`bag.rs`, `engine/ui.rs`): the bag is the scripts' table (90
@@ -822,6 +823,52 @@ after a short game with three saves.
   The first frame after the bar closes shows its pointer frame at the
   screen centre, as the original's cursor pair still holds it until the
   next cursor choice.
+- **Subject menu** (`subjects.rs`, `engine/subjects.rs`,
+  `script/subjects.rs`): the subjects of each character are the scripts'
+  table kept as the original's memory (256 records of a count and 16
+  entries {value, index, flag}; `enablesuj` appends after the count or
+  re-enables, `disablesuj` clears a flag, `killsuj` moves the entries
+  after it down, the one past the end included, `clearsuj` zeroes the
+  count only), saved as it is. A click on a character's sprite (click
+  kind 2) whose count is above 0, with an empty hand, no full-screen
+  overlay and the bar closed, sets `CLICPERSO` and opens the menu: the
+  cursor becomes the pointer frame 40, the mouse moves it and no longer
+  turns the view, the centre shows only its marker, the cursor is not
+  chosen and that frame runs no zone click and no click scan. Each frame
+  draws the subjects in 62-pixel cells, columns of 4 from x = 450 (the
+  first row at 366 − 62 × count below 5 subjects, else at 180; the next
+  column only at entries 4, 8 and 12): the subject's frame of the world's
+  `suj*.spr` (loaded by `monde`) centred on the cell's (25, 25), at 50 %
+  (`AFF_SPRTRS50`, in `atlantis2-data`'s `spr.rs`) when its flag is not 1
+  (the scripts disable a subject once asked), then the ring (frame 0)
+  centred on (31, 31); then the pointer. A click after the draw answers:
+  in the grid of `count / 5 + 1` columns of `min(count, 4)` rows from
+  (434, first row − 16), edges included, numbered column by column, the
+  entry there sets `SUJET` to its value and the subject scan runs (as
+  `CtrlScenarIN`, going on to the next true entry while a body ends at a
+  section header: the shaman's sections start a dialog); elsewhere the
+  menu closes (`CLICPERSO` = 0, `SUJET` = −2, the hand emptied and the
+  cursor hidden). Either way the turn stops and the click is used; after
+  a choice the cursor pair still shows the pointer frame at the centre
+  in the next warp frame, and `CLICPERSO` / `SUJET` keep their values
+  until the dialog's end. A right click with the menu open only stops the
+  turn (the original also moves the system's cursor to the window's
+  centre, which is not the game's pointer). The original's quirks are
+  kept: with 9, 13 or 14 subjects the last column drawn cannot be
+  clicked; a click on an empty cell of the last column, or on the
+  one-pixel edge after the last row or column, answers the entry the
+  memory holds there (past the list, or the next character's record);
+  asked subjects stay offered. The cells and the grid for every count,
+  the shaman's lists along chapter 75 and the menu in the warp frame
+  (opening, drawing, a right click, closing, choices that start dialogs
+  and what the scripts see after them) are the original's
+  (`tests/subjects.rs` against its emulated run); the same test file
+  plays a game that asks both shamans every subject by turning the view,
+  clicking and moving the pointer. Not here: the blackbird game's fixed
+  menu of songs (Ireland's puzzle, the mode @ 0x006d2754 = 2), the
+  Yucatán statue's hook that opens a menu (`YU` view 122). The menu's
+  coordinates are constants of the code, so the original's 800 x 600 mode
+  keeps them.
 - **Sound:** the voices of the original (0 the music, 1 the dialog
   voice, 2 the films' tracks and the effects) mixed as DirectSound does
   (`sound.rs`). Tibet has no place sound (`tibet.wam` has none and is not
@@ -1065,9 +1112,8 @@ after a short game with three saves.
   waiting to go on and a queued command are dropped at a load (the
   original's flags are not saved: what it does with them is not known);
   a save is stamped with the local time, as the original's; the subject
-  table's
-  entries past a character's count are written as 0 (the original keeps
-  what its removals left there). `atlant2.cfg` (11 options, 35 bytes) is
+  table is saved as the memory holds it, the entries past a count
+  included. `atlant2.cfg` (11 options, 35 bytes) is
   read at start and written at exit. The encoder, the decoder, a slot's
   file byte for byte and the options file are the original's
   (`crates/atlantis2-data/tests/zapfile.rs`); the menus, a save and a load
@@ -1111,7 +1157,9 @@ script results and save files come from the original `atlantis2.exe` run under e
 (Tibet's moves pass by pass, the place animations tick by tick, the
 screen centre and the clicks on sprites pass by pass with the texel under
 the centre given, every SPW frame of Tibet and the first of every other
-file, every `AFF_SPR` of the installed banks; names of `defnames.con`
+file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks, the
+subject menu's cells and click grid, the shaman's subjects along chapter
+75; names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):
 

@@ -29,6 +29,7 @@ use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
 use crate::menu::Menu;
 use crate::script::{BagEntry, Script};
 use crate::sound::{MusicVolume, Pcm, Voices};
+use crate::subjects::SubjectMenu;
 use crate::subtitle::SubtitleFont;
 use crate::turn::Turn;
 use crate::warp::{faces_from_hnm, Renderer, Variant};
@@ -36,9 +37,11 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 mod host;
 mod menus;
 mod saves;
+mod subjects;
 mod ui;
 
 pub use saves::SaveError;
+pub use subjects::subjects_bank_name;
 
 /// The scheduler's tick: 15 a second (the dialogs' sequencer, the music
 /// fades, the animations, the videos).
@@ -127,6 +130,10 @@ pub enum Event {
     Bag { open: bool },
     /// An object picked from the bag bar.
     BagPick { id: i32 },
+    /// A click on a character opened its subject menu (@ 0x0045a7c0).
+    SubjectMenu { character: i32, count: i32 },
+    /// The subject menu answered: a subject's value, or none (closed).
+    Subject { character: i32, value: Option<i32> },
 }
 
 /// The script variables a scan sees.
@@ -333,6 +340,11 @@ pub struct Engine {
     cursor_bank: Option<SprBank>,
     /// The world's objects bank (`spr\obj*.spr`, @ 0x00671ef4).
     objects_bank: Option<SprBank>,
+    /// The world's subjects bank (`spr\suj*.spr`, @ 0x006cfb5c), loaded by
+    /// `/set(monde=N)` only.
+    subjects_bank: Option<SprBank>,
+    /// The subject menu of a character.
+    pub subject_menu: SubjectMenu,
     /// The centre marker option (@ 0x005db84c, on by default).
     pub centre_marker: bool,
     /// The ids of the objects taken by a click, in order.
@@ -683,6 +695,8 @@ impl Engine {
             cursor: Cursor::default(),
             cursor_bank,
             objects_bank,
+            subjects_bank: None,
+            subject_menu: SubjectMenu::default(),
             centre_marker: true,
             bag: Vec::new(),
             own_bag: Vec::new(),
@@ -1110,14 +1124,14 @@ impl Engine {
             }
         } else {
             // The limits are the script's `LIMITEANGLEWARPX` / `Y`, read
-            // every frame. Not while the bag bar or a full-screen overlay
-            // is open (nor the subject menu, a dialog, the parchment or the
-            // pause, which the port does not have here).
+            // every frame. Not while the bag bar, the subject menu or a
+            // full-screen overlay is open (nor a dialog, the parchment or
+            // the pause, which the port does not have here).
             if let Some(s) = &self.con {
                 self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
                 self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
             }
-            if !self.bar.open && !self.overlays.cover {
+            if !self.bar.open && !self.subject_menu.open && !self.overlays.cover {
                 self.look.frame(&mut self.camera);
             }
         }
@@ -1204,7 +1218,8 @@ impl Engine {
         self.sprite_state = hit.cursor;
         self.sprite_hit = hit.slot;
         let (w, h) = (self.renderer.width(), self.renderer.height());
-        // FUN_0045af10 draws nothing while the bar is open.
+        // FUN_0045af10 draws nothing while the bar is open, only the
+        // marker while the subject menu is.
         self.centre_draws = if self.bar.open {
             Vec::new()
         } else {
@@ -1227,9 +1242,9 @@ impl Engine {
             self.anim.step();
         }
         // The cursor for the next frame (after FUN_0045af10 drew this one),
-        // unless the bar (or a dialog) is open.
+        // unless the bar, the subject menu (or a dialog) is open.
         let zone_kind = self.centre().map(|(_, z)| z.kind);
-        if !self.bar.open && self.dialog.is_none() {
+        if !self.bar.open && !self.subject_menu.open && self.dialog.is_none() {
             if self.sprite_state != 0 {
                 self.cursor
                     .choose(0, self.sprite_state, &mut self.cursor_flag);
@@ -1240,17 +1255,21 @@ impl Engine {
             }
         }
         // FUN_00475320: the dowsing rod, the overlays (the parchment never
-        // opens); then the bar and the pointer.
+        // opens); then the bar or the subject menu, and the pointer.
         self.rod_frame();
         if self.overlays.any() {
             self.overlay_draw();
         }
-        if self.bar.open && self.dialog.is_none() {
+        if self.bar.open && !self.subject_menu.open && self.dialog.is_none() {
             self.bag_frame();
+        } else if self.subject_menu.open {
+            self.subjects_draw();
         }
         if let Some(out) = out {
             self.paint_ui(out, w, h);
         }
+        // After the picture, the subject menu answers this frame's click.
+        self.subjects_click();
     }
 
     /// FUN_0045af10: at the screen centre (FUN_0047bfd0) the object in
@@ -1260,7 +1279,8 @@ impl Engine {
     fn centre_plan(&self, w: usize, h: usize) -> Vec<CentreDraw> {
         let (cx, cy) = (w as i32 / 2, h as i32 / 2);
         let mut plan = Vec::new();
-        if let Some((_, sprite)) = self.hand {
+        // FUN_0047bfd0, not while the subject menu is open.
+        if let Some((_, sprite)) = self.hand.filter(|_| !self.subject_menu.open) {
             if sprite >= 0 {
                 plan.push(CentreDraw::Sprite {
                     bank: CursorBank::Objects,
@@ -1270,7 +1290,7 @@ impl Engine {
                 });
             }
         }
-        if let Some(frame) = self.cursor.shown {
+        if let Some(frame) = self.cursor.shown.filter(|_| !self.subject_menu.open) {
             plan.push(CentreDraw::Sprite {
                 bank: self.cursor.bank,
                 frame,
@@ -1400,22 +1420,20 @@ impl Engine {
             _ => {}
         }
         if click == 2 {
-            // The subject menu of a character (FUN_0045a7c0) needs the
-            // dialogs: not ported.
-            let section = if kind == 1 { 0 } else { 1 };
-            log::info!(
-                "{}: the subject menu is not ported",
-                self.name_of(section, id)
-            );
+            self.open_subjects();
+            if !self.subject_menu.open {
+                let section = if kind == 1 { 0 } else { 1 };
+                log::debug!("{}: no subject menu", self.name_of(section, id));
+            }
         }
     }
 
-    /// FUN_0045a870, on a click (with no subject menu and no bag open,
-    /// neither ported): `CLICPERSO` = the character under the centre
-    /// (click kind 2), the click scan, then `CLICPERSO` = `CLICOBJET` = 0
-    /// (`SUJET` = −2, not ported) and the click cleared.
+    /// FUN_0045a870, on a click with no subject menu and no bag open:
+    /// `CLICPERSO` = the character under the centre (click kind 2), the
+    /// click scan, then `CLICPERSO` = `CLICOBJET` = 0, `SUJET` = −2 and the
+    /// click cleared.
     fn click_scan(&mut self) {
-        if !self.click || self.bar.open {
+        if !self.click || self.bar.open || self.subject_menu.open {
             return;
         }
         let mut character = None;
@@ -1459,9 +1477,9 @@ impl Engine {
 
     /// FUN_0049ca80: a click on the zone under the centre.
     fn zone_click(&mut self) {
-        // Not while the bag bar is open or a dialog runs (@ 0x00671ef0,
-        // 0x006cfb54).
-        if !self.click || self.bar.open || self.dialog.is_some() {
+        // Not while the subject menu or the bag bar is open or a dialog
+        // runs (@ 0x006617b0, 0x00671ef0, 0x006cfb54).
+        if !self.click || self.subject_menu.open || self.bar.open || self.dialog.is_some() {
             return;
         }
         let Some((zi, zone)) = self.centre().map(|(i, z)| (i, z.clone())) else {

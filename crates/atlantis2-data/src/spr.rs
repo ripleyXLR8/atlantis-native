@@ -3,8 +3,9 @@
 //!
 //! The executable loads them (@ 0x0059d9b2) and `spr_p5.dll` draws them;
 //! the game calls three of its modes through `AtlSpr_Aff` (@ 0x0047bc40):
-//! 0 `AFF_SPR`, 1 `AFF_SPRTRS50`, 2 `AFF_SPRECL` (5, 0, 0). Only `AFF_SPR`
-//! is here, for an RGB565 screen (the cursors).
+//! 0 `AFF_SPR`, 1 `AFF_SPRTRS50`, 2 `AFF_SPRECL` (5, 0, 0). `AFF_SPR` and
+//! `AFF_SPRTRS50` are here, for an RGB565 screen (the cursors, the bag, the
+//! subject menu, whose subjects already asked are drawn at 50 %).
 //!
 //! Layout after the 8-byte magic: u32 flags; the RGB555 colour table
 //! (0x200 bytes) when flags & 4, or a table of 256 (B, G, R, x) bytes
@@ -116,6 +117,19 @@ fn shade(c: u16, f: u8) -> u16 {
 /// `half(c)` with the 565 mask 0xf7de (spr_p5.dll @ 0x1003e124).
 fn half(c: u16) -> u16 {
     (c & 0xf7de) >> 1
+}
+
+/// How `AtlSpr_Aff` (@ 0x0047bc40) blends a sprite: its fifth argument.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    /// 0, `AFF_SPR` (spr_p5.dll @ 0x100028e5).
+    Opaque,
+    /// 1, `AFF_SPRTRS50` (spr_p5.dll @ 0x100029e8): the sprite at 50 % over
+    /// the screen. Palette runs `half(c) + half(dst)`, pair runs `half(c) +
+    /// shade(dst, f >> 1)`, shade runs `shade(dst, f >> 1)` (0x74 family,
+    /// blitter @ 0x10005b58) or, with no factor byte, `half(dst) +
+    /// half(half(dst))` (0x274 family, @ 0x100065f5..0x1000678f).
+    Half,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -283,17 +297,32 @@ impl SprBank {
     /// when nothing could be drawn (no such sprite, a family the blitters
     /// of this port do not have).
     pub fn draw(&self, t: &mut Target, x: Option<i32>, y: i32, index: usize) -> bool {
+        self.draw_mode(t, x, y, index, Mode::Opaque)
+    }
+
+    /// `AFF_SPR` or `AFF_SPRTRS50` of sprite `index`, as [`SprBank::draw`].
+    /// The original's `AFF_SPRTRS50` also has a blitter for the 0x278
+    /// family (@ 0x100060b8), which no shipped bank uses: not here.
+    pub fn draw_mode(
+        &self,
+        t: &mut Target,
+        x: Option<i32>,
+        y: i32,
+        index: usize,
+        mode: Mode,
+    ) -> bool {
         // The two families of the shipped banks: 0x74 / 0x874 / 0x878 (a
         // factor byte in shade runs, @ 0x100039d5 and, for 0x878, its own
         // blitter @ 0x10002fc3, which draws every sprite of the one 0x878
         // bank as the first does) and 0x274 / 0xa74 (none, `half`,
         // @ 0x10003ef8).
         let kind = (self.flags & 0x3ff) >> 1;
-        let half_shade = match kind {
-            0x3a | 0x3c => false,
-            0x13a => true,
+        let half_shade = match (kind, mode) {
+            (0x3a | 0x3c, _) => false,
+            (0x13a, _) => true,
             _ => return false,
         };
+        let half_mode = mode == Mode::Half;
         let Some(info) = self.info(index) else {
             return false;
         };
@@ -337,7 +366,13 @@ impl SprBank {
                             let Some(&i) = d.get(p) else { return true };
                             p += 1;
                             if inside(sx) {
-                                t.pixels[line + sx as usize] = self.pal[usize::from(i)];
+                                let px = &mut t.pixels[line + sx as usize];
+                                let c = self.pal[usize::from(i)];
+                                *px = if half_mode {
+                                    half(c).wrapping_add(half(*px))
+                                } else {
+                                    c
+                                };
                             }
                             sx += 1;
                         }
@@ -350,7 +385,12 @@ impl SprBank {
                             p += 2;
                             if inside(sx) {
                                 let px = &mut t.pixels[line + sx as usize];
-                                *px = self.pal[usize::from(i)].wrapping_add(shade(*px, f));
+                                let c = self.pal[usize::from(i)];
+                                *px = if half_mode {
+                                    half(c).wrapping_add(shade(*px, f >> 1))
+                                } else {
+                                    c.wrapping_add(shade(*px, f))
+                                };
                             }
                             sx += 1;
                         }
@@ -366,9 +406,12 @@ impl SprBank {
                         for _ in 0..n {
                             if inside(sx) {
                                 let px = &mut t.pixels[line + sx as usize];
-                                *px = match f {
-                                    Some(f) => shade(*px, f),
-                                    None => half(*px),
+                                *px = match (f, half_mode) {
+                                    (Some(f), false) => shade(*px, f),
+                                    (Some(f), true) => shade(*px, f >> 1),
+                                    (None, false) => half(*px),
+                                    // @ 0x10006773: half(dst) + half(half(dst)).
+                                    (None, true) => half(*px).wrapping_add(half(half(*px))),
                                 };
                             }
                             sx += 1;
