@@ -8,7 +8,8 @@
 //! to the shaman, his subjects asked through the subject menu, Ireland's
 //! boat taken, the walk to the hut, the boat picked from the bag bar and
 //! laid on its zone (the mandala hook, chapter 75's section, the film),
-//! the trip to Ireland and its first dialog, Liam asked, the walk to the
+//! the trip to Ireland and its first dialog, Liam asked (his 3D head, as
+//! every dialog's, drawn by the Pentium II's routines), the walk to the
 //! place of Brigid's cross (its hooks noted, the puzzle solved by the
 //! testing aid: the goddess), a save and a load in Ireland, and the way
 //! back to Tibet as chapter 16 makes it.
@@ -62,6 +63,8 @@ struct Run {
     /// Added to the click times of [`Run::tap`]: clicks far apart, never
     /// a double click.
     gap: f64,
+    /// Passes that drew a dialog line's 3D head (its lip-sync running).
+    head_passes: u64,
 }
 
 impl Run {
@@ -82,6 +85,7 @@ impl Run {
             pass: 0,
             screen: vec![0; 640 * 480],
             gap: 0.0,
+            head_passes: 0,
         }
     }
 
@@ -95,6 +99,16 @@ impl Run {
         self.pass += 1;
         let fatal = self.e.script_state().and_then(|s| s.fatal.clone());
         assert!(fatal.is_none(), "{fatal:?}");
+        // A dialog's heads follow the panorama's CPU: the Pentium II's
+        // routines (the default `warpPII`), under the 0x0e7f the warp
+        // frames and the II set-up leave, handed back to the engine.
+        if let Some(d) = self.e.dialog() {
+            assert_eq!(d.variant(), Variant::PII);
+            assert_eq!((d.fpu(), self.e.fpu()), (Fpu::Chop, Fpu::Chop));
+            if d.lipsync().is_some() {
+                self.head_passes += 1;
+            }
+        }
     }
 
     fn wait(&mut self, n: u64) {
@@ -689,11 +703,14 @@ fn a_game_from_tibet_to_ireland_and_back() {
     ireland_lines_as_the_original(&evs);
 
     // Liam, the first character, in view 5: his one subject (dialog 2),
-    // after which chapter 2 sends the game to chapter 5.
+    // after which chapter 2 sends the game to chapter 5. His answer is
+    // spoken by a 3D head, drawn by the Pentium II's routines (`step`).
     let liam = r.id(defnames::PERSONNAGES, "LIAM_SCRIPT");
+    r.head_passes = 0;
     let asked = r.ask_all(liam);
     assert_eq!(asked.len(), 1);
     assert_eq!(asked[0].1, 2);
+    assert!(r.head_passes > 0, "no head drawn for Liam's answer");
     assert_eq!(r.e.script_state().unwrap().chapter, 5);
 
     // The first views: 4 (Liam again), 3 (chapter 5 sends the game to
