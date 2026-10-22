@@ -117,6 +117,11 @@ pub trait Host {
     /// The place's animation records.
     fn anim(&mut self, op: AnimOp) {}
 
+    /// The show / hide table's row of (`id`, `kind`) was set
+    /// (FUN_0048c730, the script's [`super::Script::shown`]): the view
+    /// entries read it to choose the records shown (FUN_0048c7b0).
+    fn show_table(&mut self, id: i32, shown: bool, kind: i32) {}
+
     /// The current frame of the first animation record of `id` (any
     /// kind), for the `NUMFRAMEOBJET` / `NUMFRAMEPERSO` conditions
     /// (`CondValue` @ 0x00481300); `None` when it has none.

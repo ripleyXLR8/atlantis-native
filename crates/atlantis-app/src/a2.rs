@@ -2,8 +2,11 @@
 //! `tibet.wam` view 2); the player looks around with the mouse or the arrow
 //! keys and walks from view to view with a left click on a move zone (the
 //! turn, the transition video, the arrival), the place animations playing.
-//! A minimal mode of its own, beside the first game's front end: a window,
-//! the screen scaled to it, the dialog voices; no menus yet.
+//! The chapter scripts run the game as the original's: the opening film,
+//! the music, the dialogs they call (a left click goes to the next line,
+//! Escape ends a dialog). A minimal mode of its own, beside the first
+//! game's front end: a window, the screen scaled to it, the sound; no menus,
+//! bag or subject menu yet.
 //!
 //! The game folder is the installed one (`atlantis2.exe`, `wam\`,
 //! `scenar\`...); the discs (CD images or copies of the CDs) are looked for
@@ -64,8 +67,12 @@ impl A2Start {
         Some((id, yaw, pitch))
     }
 
-    /// Enters the view and starts the dialog.
+    /// Enters the view and starts the dialog (the opening film ended
+    /// first).
     pub fn apply(&self, engine: &mut Engine) -> Result<(), String> {
+        if self.view.is_some() || self.dialog.is_some() {
+            engine.end_video();
+        }
         if let Some((id, yaw, pitch)) = self.view {
             engine
                 .enter_view(id, yaw.to_radians(), pitch.to_radians())
@@ -95,13 +102,18 @@ pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
         build.id,
         files.disc_numbers()
     );
-    let mut engine = Engine::new_game(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
+    // Start-up, then the menu's new game (the menus are not there yet):
+    // the scripts choose the place and play the opening film.
+    let mut engine = Engine::boot(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
         .map_err(|e| format!("{}: {e}", dir.display()))?;
     // The original seeds `rand` with GetTickCount() (@ 0x0047d740).
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u32);
     engine.anim.rand = atlantis2_engine::anim::MsvcRand(seed);
+    engine
+        .start_new_game()
+        .map_err(|e| format!("{}: {e}", dir.display()))?;
     Ok(engine)
 }
 
@@ -157,7 +169,13 @@ pub fn headless(
             );
         }
     }
-    println!("music volume {}", engine.music.volume);
+    if let Some(s) = engine.script_state() {
+        println!("chapter {}, {:?} loop", s.chapter, engine.loop_type);
+    }
+    match engine.music_playing() {
+        Some(m) => println!("music {m}, volume {}", engine.music.volume),
+        None => println!("no music, volume {}", engine.music.volume),
+    }
     if let Some(path) = screenshot {
         let png = atlantis2_engine::png::encode_rgb565(&screen, WIDTH as usize, HEIGHT as usize);
         std::fs::write(path, png).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -351,6 +369,10 @@ impl ApplicationHandler for A2App {
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
                 match event.logical_key {
+                    // Escape ends a dialog (@ 0x004762f0, loop type 2).
+                    Key::Named(NamedKey::Escape) if down && self.engine.dialog().is_some() => {
+                        self.engine.end_dialog();
+                    }
                     Key::Named(NamedKey::Escape) if down => {
                         if self.locked {
                             self.grab(false);
@@ -375,6 +397,10 @@ impl ApplicationHandler for A2App {
                 let now = Instant::now();
                 if now >= self.next_frame {
                     self.step();
+                    // `EXIT` in a script quits the game.
+                    if self.engine.quit() {
+                        el.exit();
+                    }
                     self.next_frame += FRAME;
                     if self.next_frame < now {
                         self.next_frame = now + FRAME;

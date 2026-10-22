@@ -258,6 +258,9 @@ pub struct Script {
     /// `SetVariables` is called with.
     #[doc(hidden)]
     pub trace: Option<Vec<usize>>,
+    /// For logs: the chapter and the line number of each chapter line
+    /// `SetVariables` runs.
+    pub lines: Option<Vec<(i32, usize)>>,
 }
 
 impl Script {
@@ -319,6 +322,7 @@ impl Script {
             warnings: Vec::new(),
             stub_run_init: false,
             trace: None,
+            lines: None,
         })
     }
 

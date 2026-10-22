@@ -138,9 +138,9 @@ impl MusicVolume {
 
     /// `FUN_004770c0(pct)`: fade to `pct` % of the music volume (only
     /// while a music plays: the sound card, a music voice and a state are
-    /// checked).
+    /// checked; an open still pending, states 1 and 2, has no voice yet).
     pub fn set_percent(&mut self, pct: i32) {
-        if self.state == 0 {
+        if matches!(self.state, 0..=2) {
             return;
         }
         let pct = pct.clamp(0, 100);

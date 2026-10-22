@@ -23,10 +23,13 @@ use crate::crt::Rand;
 use crate::dialog::{Dialog, DialogError, DialogScript, FrameContext, TickContext};
 use crate::fpu::Fpu;
 use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
-use crate::sound::{MusicVolume, Voices};
+use crate::script::Script;
+use crate::sound::{MusicVolume, Pcm, Voices};
 use crate::subtitle::SubtitleFont;
 use crate::turn::Turn;
 use crate::warp::{faces_from_hnm, Renderer, Variant};
+
+mod host;
 
 /// The scheduler's tick: 15 a second (the dialogs' sequencer, the music
 /// fades, the animations, the videos).
@@ -43,6 +46,8 @@ pub enum EngineError {
     /// The view's warp file is on no disc found.
     NoWarp(String),
     BadWarp(String, DecodeError),
+    /// A fatal error of the chapter scripts (the original stops there).
+    Script(String),
 }
 
 impl std::fmt::Display for EngineError {
@@ -54,6 +59,7 @@ impl std::fmt::Display for EngineError {
             EngineError::NoView(w, v) => write!(f, "{w} has no view {v}"),
             EngineError::NoWarp(n) => write!(f, "datas_a2\\warp\\{n} not found on the discs"),
             EngineError::BadWarp(n, e) => write!(f, "datas_a2\\warp\\{n}: {e}"),
+            EngineError::Script(e) => write!(f, "script: {e}"),
         }
     }
 }
@@ -88,6 +94,26 @@ pub enum Event {
     Take { id: i32 },
     /// A click on a zone the puzzle hooks take (@ 0x0049b910): not ported.
     PuzzleHook { zone: usize },
+    /// A `/set` line of the chapter scripts ran: the chapter and the line
+    /// number in its file.
+    Set { chapter: i32, line: usize },
+    /// `AtlWam_Load` (`changewam`).
+    Wam(String),
+    /// `Interp_SetMonde` (`monde`).
+    Monde(i32),
+    /// A dialog started (`AtlDial_start`), or could not.
+    DialogStart { number: u32, started: bool },
+    /// A dialog line began.
+    DialogLine(String),
+    /// The dialog loop ended (@ 0x004808a0).
+    DialogEnd,
+    /// A music opened (`muzik%02d.apc`) at a mark (0 its start).
+    Music { music: i32, mark: i32 },
+    /// The music stopped (`stopmusik`'s fade done).
+    MusicStop,
+    /// A sound started on voice 2 (a film's track, `NEWSOUND`,
+    /// `TrajSound`).
+    Sound(String),
 }
 
 /// The script variables a scan sees.
@@ -300,7 +326,7 @@ pub struct Engine {
     pub trace: bool,
     pub events: Vec<Event>,
     /// The world's dialog scripts (loaded with the world, @ 0x0047fe50).
-    script: Option<DialogScript>,
+    dial_script: Option<DialogScript>,
     dialog: Option<Dialog>,
     /// The loop type a dialog returns to (@ 0x006cf2b4).
     dialog_prev_loop: LoopType,
@@ -314,10 +340,52 @@ pub struct Engine {
     pub subtitles: bool,
     /// The dialog voice volume, 0..127 (@ 0x005df974).
     pub voice_volume: i32,
-    /// The scheduler's clock (seconds) and its next tick.
+    /// The effects volume, 0..127 (@ 0x005dd2bc).
+    pub fx_volume: i32,
+    /// The scheduler's clock (seconds), its next tick and the time of the
+    /// last one (the 15 Hz task's previous run, @ 0x00656a10).
     clock: f64,
     next_tick: f64,
+    last_tick: f64,
     zbuf: Vec<u32>,
+    /// The CON interpreter when the scripts run the game
+    /// ([`Engine::boot`]); taken out while it runs, so that the engine is
+    /// its [`crate::script::Host`].
+    con: Option<Box<Script>>,
+    /// The music player's files and choices (the fades are in `music`).
+    player: Player,
+    /// A sound loaded for the next video (`cine%03d.apc` @ 0x0047a320, or
+    /// the `TrajSound` of a move), played on voice 2 when it starts.
+    pending_sound: Option<(String, Pcm)>,
+    /// `TrajSound`'s file name (@ 0x00673198), until the next move with a
+    /// video.
+    traj_sound: Option<String>,
+    /// The video end asks the next warp draw for the music at 100 %
+    /// (@ 0x00656999, FUN_0040bb90).
+    music_after_video: bool,
+    /// The place animation hidden while its character speaks
+    /// (@ 0x006c2e78): the slot and the names it was found for.
+    hidden: Option<(Option<usize>, Vec<String>)>,
+    /// A dialog played over a film (`cinema=N,M`, FUN_004801a0).
+    film_dialog: Option<Dialog>,
+}
+
+/// The music player's own state (@ 0x00673f30, 0x006725a0..0x006725c4):
+/// what plays and what the next open does.
+#[derive(Clone, Debug, Default)]
+struct Player {
+    /// `current_music` (@ 0x00673f30), 0 none.
+    current: i32,
+    /// The mark the next open goes to (−1 a random one).
+    mark: i32,
+    /// The mark played (@ 0x006725a4).
+    current_mark: i32,
+    /// The loops left (@ 0x006725c4).
+    loops: i32,
+    /// The file being played: its bytes and marks.
+    file: Option<(i32, std::sync::Arc<Vec<u8>>, Vec<crate::music::Mark>)>,
+    /// The `startmusik` list (`Interp_MusikScript` @ 0x006d0444).
+    list: Vec<u8>,
 }
 
 /// The texel of the cube under a direction: the face (cube order) and the
@@ -363,6 +431,19 @@ fn objects_bank_name(monde: i32) -> Option<&'static str> {
     })
 }
 
+/// The world's objects bank, logged when missing.
+fn load_objects_bank(files: &A2Files, monde: i32) -> Option<SprBank> {
+    objects_bank_name(monde).and_then(|n| {
+        let bank = files
+            .read(Folder::Spr, n)
+            .and_then(|d| SprBank::parse(&d).ok());
+        if bank.is_none() {
+            log::warn!("spr\\{n} missing or unreadable: no object in hand");
+        }
+        bank
+    })
+}
+
 /// ARGB to RGB565.
 fn rgb565(argb: u32) -> u16 {
     let (r, g, b) = ((argb >> 16) & 0xff, (argb >> 8) & 0xff, argb & 0xff);
@@ -402,6 +483,81 @@ impl Engine {
             start.pitch_deg
         );
         files.set_monde(start.monde);
+        let mut engine = Engine::blank(files, variant, fpu, width, height, start.monde);
+        engine.load_world_texts(start.monde);
+        let mut wam = load_wam(&engine.files, &start.wam)?;
+        wam.apply_defnames(&engine.names);
+        engine.wam = wam;
+        engine.wam_name = start.wam.clone();
+        engine.arrival = (
+            deg_to_rad(engine.camera.fpu, start.yaw_deg),
+            deg_to_rad(engine.camera.fpu, start.pitch_deg),
+        );
+        engine.enter_view(start.view, engine.arrival.0, engine.arrival.1)?;
+        // `/set(vue=N)` ends with the per-view reset.
+        engine.per_view_reset();
+        Ok(engine)
+    }
+
+    /// The game run by the chapter scripts, as the original's start-up
+    /// (@ 0x0049d680): the script tables, chapter 0 loaded. Nothing is
+    /// shown until [`Engine::start_new_game`] (the menu's new game). The
+    /// arguments are [`Engine::new_game`]'s.
+    pub fn boot(
+        files: A2Files,
+        variant: Variant,
+        fpu: Fpu,
+        width: u32,
+        height: u32,
+    ) -> Result<Engine, EngineError> {
+        let defnames = files
+            .read(Folder::Scenar, "defnames.con")
+            .ok_or(EngineError::NoStart)?;
+        let script = Script::new(&defnames).map_err(EngineError::Script)?;
+        // The bag's start-up (@ 0x00474810) loads the Irish objects bank
+        // before any world is set.
+        let mut engine = Engine::blank(files, variant, fpu, width, height, 1);
+        // The start angles of the next view entry are one state with the
+        // script's (−9° and 26° in the data section).
+        engine.arrival = (script.start_x, script.start_y);
+        engine.con = Some(Box::new(script));
+        if engine.with_script(|s, h| s.boot(h)) != Some(true) {
+            return Err(engine.script_error().unwrap_or(EngineError::NoStart));
+        }
+        Ok(engine)
+    }
+
+    /// The menu's new game (@ 0x00488f12): chapter 0's `/INIT`, which
+    /// chooses the world, the place and the first view, then plays the
+    /// opening cinematic; its last lines (the music) run when the film
+    /// ends, and from then on the warp frames run the scans
+    /// ([`crate::script`]).
+    pub fn start_new_game(&mut self) -> Result<(), EngineError> {
+        self.with_script(|s, h| s.new_game(h));
+        match self.script_error() {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
+    }
+
+    /// The scripts' fatal error, if one stopped them.
+    fn script_error(&self) -> Option<EngineError> {
+        self.con
+            .as_ref()
+            .and_then(|s| s.fatal.clone())
+            .map(EngineError::Script)
+    }
+
+    /// The engine before any place is loaded: the sprite banks of the
+    /// interface and of world `monde`'s objects, the sound, no view.
+    fn blank(
+        files: A2Files,
+        variant: Variant,
+        fpu: Fpu,
+        width: u32,
+        height: u32,
+        monde: i32,
+    ) -> Engine {
         let names = match files.read(Folder::Scenar, "defnames.con") {
             Some(d) => DefNames::parse(&d).unwrap_or_else(|e| {
                 log::warn!("{e}");
@@ -412,29 +568,18 @@ impl Engine {
                 DefNames::default()
             }
         };
-        let mut wam = load_wam(&files, &start.wam)?;
-        wam.apply_defnames(&names);
         let cursor_bank = files
             .read(Folder::Spr, "interfac.spr")
             .and_then(|d| SprBank::parse(&d).ok());
         if cursor_bank.is_none() {
             log::warn!("spr\\interfac.spr missing or unreadable: no cursor");
         }
-        // `/set(monde=N)` (@ 0x00484df0): the world's objects bank.
-        let objects_bank = objects_bank_name(start.monde).and_then(|n| {
-            let bank = files
-                .read(Folder::Spr, n)
-                .and_then(|d| SprBank::parse(&d).ok());
-            if bank.is_none() {
-                log::warn!("spr\\{n} missing or unreadable: no object in hand");
-            }
-            bank
-        });
+        let objects_bank = load_objects_bank(&files, monde);
         let camera = Camera::new(fpu, width, height);
-        let mut engine = Engine {
+        Engine {
             files,
-            wam,
-            wam_name: start.wam.clone(),
+            wam: Wam::default(),
+            wam_name: String::new(),
             names,
             view: 0,
             faces: Default::default(),
@@ -473,7 +618,7 @@ impl Engine {
             hand: None,
             trace: false,
             events: Vec::new(),
-            script: None,
+            dial_script: None,
             dialog: None,
             dialog_prev_loop: LoopType::Warp,
             // No music plays until a script starts one: the fades only run
@@ -484,19 +629,19 @@ impl Engine {
             font: None,
             subtitles: true,
             voice_volume: crate::sound::DEFAULT_VOICE_VOLUME,
+            fx_volume: crate::sound::DEFAULT_FX_VOLUME,
             clock: 0.0,
             next_tick: 0.0,
+            last_tick: 0.0,
             zbuf: vec![0; (width * height) as usize],
-        };
-        engine.load_world_texts(start.monde);
-        engine.arrival = (
-            deg_to_rad(engine.camera.fpu, start.yaw_deg),
-            deg_to_rad(engine.camera.fpu, start.pitch_deg),
-        );
-        engine.enter_view(start.view, engine.arrival.0, engine.arrival.1)?;
-        // `/set(vue=N)` ends with the per-view reset.
-        engine.per_view_reset();
-        Ok(engine)
+            con: None,
+            player: Player::default(),
+            pending_sound: None,
+            traj_sound: None,
+            music_after_video: false,
+            hidden: None,
+            film_dialog: None,
+        }
     }
 
     /// The per-view reset (@ 0x00483ce0), run by `/set(vue=N)` and in the
@@ -549,6 +694,10 @@ impl Engine {
         self.camera.set_fov(WARP_FOV, w, h);
         self.look.stop();
         self.load_animations(id);
+        // A slot hidden for a speaker is gone with the old view's slots.
+        if let Some((slot, _)) = self.hidden.as_mut() {
+            *slot = None;
+        }
         // No sound in Tibet: the place sounds (@ 0x0047ad30) come with the
         // first world that has some.
         self.turn = None;
@@ -620,13 +769,21 @@ impl Engine {
         self.spw_flag = true;
         self.cursor_flag = true;
         let t = self.clock;
-        if let Some(att) = self.music.step(t) {
-            self.voices.set_attenuation(crate::sound::VOICE_MUSIC, att);
+        // The script clocks (@ 0x0040cabd..0x0040cb4e).
+        let last = self.last_tick;
+        self.last_tick = t;
+        if let Some(s) = self.con.as_mut() {
+            s.tick(t, last);
+        }
+        self.fade_step();
+        if self.loop_type != LoopType::Dialog {
+            return;
         }
         let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
         let Some(d) = self.dialog.as_mut() else {
             return;
         };
+        let line = d.current();
         let mut ctx = TickContext {
             files: &self.files,
             camera: &mut self.camera,
@@ -636,8 +793,25 @@ impl Engine {
             clock: t,
             screen,
         };
-        if !d.tick(&mut ctx) {
+        let going = d.tick(&mut ctx);
+        if going {
+            if d.current() != line {
+                if let Some(l) = d.current_line() {
+                    let id = l.id.clone();
+                    self.event(Event::DialogLine(id));
+                }
+            }
+            self.sync_hidden();
+        } else {
             self.end_dialog();
+        }
+    }
+
+    /// The music fade step (@ 0x00476e80) at the clock, its volume given to
+    /// the music voice.
+    fn fade_step(&mut self) {
+        if let Some(att) = self.music.step(self.clock) {
+            self.voices.set_attenuation(crate::sound::VOICE_MUSIC, att);
         }
     }
 
@@ -663,7 +837,7 @@ impl Engine {
     /// The world's dialog texts (`MONDE`'s world change, @ 0x0047fe50) and
     /// the subtitle font (`AtlFont_MainInit` @ 0x00404140).
     fn load_world_texts(&mut self, monde: i32) {
-        self.script = World::of_monde(monde).and_then(|w| {
+        self.dial_script = World::of_monde(monde).and_then(|w| {
             DialogScript::load(&self.files, w)
                 .map_err(|e| log::warn!("dialog scripts: {e}"))
                 .ok()
@@ -692,12 +866,20 @@ impl Engine {
     pub fn start_dialog(&mut self, number: u32) -> Result<(), DialogError> {
         if self.dialog.is_some() {
             log::warn!("SetVariables : AtlDial_start : a dialog is running");
-            self.end_dialog();
+            self.stop_dialog();
         }
+        let out = self.dial_open(number);
+        self.music.set_percent(16);
+        out
+    }
+
+    /// `AtlDial_start` (@ 0x0047ff60) itself: the dialog loop, or the
+    /// failure's reset (the music asked back to 100 %).
+    pub(crate) fn dial_open(&mut self, number: u32) -> Result<(), DialogError> {
         self.music.in_dialog = true;
         // Without the world's dialog scripts the initialisation fails as a
         // missing dialog does (@ 0x00480098): the same reset follows.
-        let result = match self.script.as_ref() {
+        let result = match self.dial_script.as_ref() {
             Some(script) => Dialog::initialise(number, script, &self.files, &mut self.rand),
             None => Err(DialogError::NoFile("the world's dialog scripts".into())),
         };
@@ -719,18 +901,34 @@ impl Engine {
                 Err(e)
             }
         };
-        self.music.set_percent(16);
+        self.event(Event::DialogStart {
+            number,
+            started: out.is_ok(),
+        });
         out
     }
 
     /// The end of the dialog (@ 0x004808a0): the music back to 100 %, the
-    /// previous loop type back.
+    /// previous loop type back, then the script section the dialog
+    /// interrupted goes on (`CLICPERSO` = 0, `SUJET` = −2 first).
     pub fn end_dialog(&mut self) {
+        let running = self.dialog.is_some();
+        self.stop_dialog();
+        if running {
+            self.with_script(|s, h| s.dialog_ended(h));
+        }
+    }
+
+    /// The end of the dialog without the script's part (a dialog stopped
+    /// by another `dial`, whose section is the one running).
+    pub(crate) fn stop_dialog(&mut self) {
         let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
         if let Some(mut d) = self.dialog.take() {
             d.end(&mut self.camera, &self.voices, screen);
             self.loop_type = self.dialog_prev_loop;
+            self.event(Event::DialogEnd);
         }
+        self.sync_hidden();
         self.music.in_dialog = false;
         self.music.set_percent(100);
     }
@@ -746,7 +944,7 @@ impl Engine {
 
     /// The world's dialog scripts.
     pub fn script(&self) -> Option<&DialogScript> {
-        self.script.as_ref()
+        self.dial_script.as_ref()
     }
 
     /// The subtitle font.
@@ -764,6 +962,8 @@ impl Engine {
     /// pixels is done.
     pub fn pass(&mut self, out: Option<&mut [u16]>) {
         self.centre_draws.clear();
+        // The music state machine (@ 0x00476fc0, called @ 0x0049ce32).
+        self.music_frame();
         match self.loop_type {
             LoopType::Warp => self.warp_pass(out),
             LoopType::Video => self.video_pass(out),
@@ -794,16 +994,28 @@ impl Engine {
                 self.move_pending = true;
             }
         } else {
+            // The limits are the script's `LIMITEANGLEWARPX` / `Y`, read
+            // every frame.
+            if let Some(s) = &self.con {
+                self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
+                self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
+            }
             self.look.frame(&mut self.camera);
         }
         self.centre_zone = self.pick_centre().map(|i| (self.view, i));
-        // 2. The draw (@ 0x0045a9f0).
+        // 2. The draw (@ 0x0045a9f0); after a video, the music back to
+        // 100 % first (FUN_0040bb90).
+        if std::mem::take(&mut self.music_after_video) {
+            self.music.set_percent(100);
+        }
         self.draw(out.as_deref_mut());
         // 3. The clicks and the scans, unless turning.
         if self.turn.is_none() {
             self.sprite_click();
             self.zone_click();
-            if self.vars.arrivee_vue != 0 {
+            if self.con.is_some() {
+                self.gere_frame();
+            } else if self.vars.arrivee_vue != 0 {
                 // Interp_GereFrame (@ 0x00484b70): the per-view reset
                 // (@ 0x00483ce0, which also drops this frame's click),
                 // the hand gets `Objetenmain_NextWarp` (a script key, 0
@@ -822,14 +1034,18 @@ impl Engine {
         // 5. The move completes.
         if self.move_pending {
             self.complete_move();
-            // AtlHnm_start shows the video's first frame at once.
-            if let (Some(v), Some(out)) = (&self.video, out) {
-                let (w, h) = (self.renderer.width(), self.renderer.height());
-                blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
-            }
+        }
+        // AtlHnm_start shows the video's first frame at once (a transition,
+        // or a film a scan started).
+        if let (Some(v), Some(out)) = (&self.video, out) {
+            let (w, h) = (self.renderer.width(), self.renderer.height());
+            blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
         }
         // 6.
         self.vars.cliczone = 0;
+        if let Some(s) = self.con.as_mut() {
+            s.vars[s.keys.cliczone] = 0;
+        }
     }
 
     /// The zone under the screen centre (@ 0x00458fe0).
@@ -846,6 +1062,13 @@ impl Engine {
     /// faces restored, the animation step; the cursor and the centre
     /// marker; the cursor chosen for the next frame.
     fn draw(&mut self, out: Option<&mut [u16]>) {
+        if self.faces[0].is_empty() {
+            // No view entered yet (a script that has not reached `vue=`).
+            if let Some(out) = out {
+                out.fill(0);
+            }
+            return;
+        }
         let centre = self
             .forced_centre
             .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
@@ -1005,9 +1228,18 @@ impl Engine {
                 self.hand = Some((id, sprite));
                 self.event(Event::Take { id });
                 log::info!("Objet pris en spw : {}", self.name_of(1, id));
+                // The script's side: `CLICOBJET`, the show / hide table,
+                // the bag, `OBJETENMAIN` and the hand.
+                self.with_script(|s, h| s.take_object(h, id, sprite as u8));
             }
-            3 => self.vars.clicobjet = id,
-            4 => self.vars.clicperso = id,
+            3 => {
+                self.vars.clicobjet = id;
+                self.set_script_var(|k| k.clicobjet, id);
+            }
+            4 => {
+                self.vars.clicperso = id;
+                self.set_script_var(|k| k.clicperso, id);
+            }
             _ => {}
         }
         if click == 2 {
@@ -1029,13 +1261,16 @@ impl Engine {
         if !self.click {
             return;
         }
+        let mut character = None;
         if let Some(slot) = self.sprite_hit.and_then(|n| self.anim.slots.get(n)) {
             if slot.click == 2 {
                 self.vars.clicperso = slot.id;
+                character = Some(slot.id);
             }
         }
         let vars = self.scan_vars(0);
         self.event(Event::ClickScan(vars));
+        self.with_script(|s, h| s.click_scan(h, character));
         self.vars.clicperso = 0;
         self.vars.clicobjet = 0;
         self.click = false;
@@ -1067,7 +1302,8 @@ impl Engine {
 
     /// FUN_0049ca80: a click on the zone under the centre.
     fn zone_click(&mut self) {
-        if !self.click {
+        // Not while a dialog runs (@ 0x006cfb54).
+        if !self.click || self.dialog.is_some() {
             return;
         }
         let Some((zi, zone)) = self.centre().map(|(i, z)| (i, z.clone())) else {
@@ -1075,6 +1311,7 @@ impl Engine {
         };
         if self.sprite_hit.is_some() {
             self.vars.cliczone = zone.value;
+            self.set_script_var(|k| k.cliczone, zone.value);
             self.puzzle_hooks(zi, &zone);
             return;
         }
@@ -1085,12 +1322,19 @@ impl Engine {
         };
         let vars = self.scan_vars(target);
         self.event(Event::DepartScan(vars));
-        // ABORTDEPART is never set without the scripts.
+        // `CtrlScenarOUT` (@ 0x00483cc0) with `DEPARTVUE` = the target;
+        // `ABORTDEPART` (or a section that dropped the click) ends the
+        // click there.
+        let target = (zone.kind == 1 || zone.kind == 2).then_some(zone.value);
+        if self.with_script(|s, h| s.departure_scan(h, target)) == Some(false) {
+            return;
+        }
         if self.puzzle_hooks(zi, &zone) {
             return;
         }
         if zone.kind > 2 && zone.kind < 88888 {
             self.vars.cliczone = zone.value;
+            self.set_script_var(|k| k.cliczone, zone.value);
         }
         match zone.kind {
             1 => self.move_setup(&zone),
@@ -1116,8 +1360,19 @@ impl Engine {
     fn move_setup(&mut self, zone: &Zone) {
         let fpu = self.camera.fpu;
         let target = zone.value as u32;
-        // NEXTVUE (a script key) is not ported: the zone's view.
-        self.next_view = self.wam.view(target).map(|v| v.id);
+        // `NEXTVUE` ≠ 0: it is reset and the view its `/set` looked up is
+        // kept; else the zone's view.
+        let next = self.con.as_mut().and_then(|s| {
+            let k = s.keys.nextvue;
+            (s.vars[k] != 0).then(|| {
+                s.vars[k] = 0;
+                s.next_view
+            })
+        });
+        self.next_view = match next {
+            Some(v) => v.and_then(|v| self.wam.view(v as u32)).map(|v| v.id),
+            None => self.wam.view(target).map(|v| v.id),
+        };
         let aim = || zone_aim(fpu, &zone.points);
         if self.next_view.is_none() {
             let (y, p) = aim();
@@ -1192,6 +1447,11 @@ impl Engine {
         let old = self.view;
         self.vars.last_vue = old;
         self.vars.arrivee_vue = next;
+        // `LASTVUE`, `VUE` and `ARRIVEEVUE` for the arrival scan of the next
+        // frame.
+        if let Some(s) = self.con.as_mut() {
+            s.arrive(next as i32);
+        }
         if let Err(e) = self.enter_view(next, self.arrival.0, self.arrival.1) {
             log::error!("{e}");
             return;
@@ -1210,8 +1470,15 @@ impl Engine {
                 log::warn!("transition sprites are not ported");
             }
         }
-        // UDADA (a script key) is 0 without the scripts.
-        if let (Some(d), false) = (&dest, self.double) {
+        // `UDADA` ≠ 0 skips the video, as a double click does.
+        let udada = self.con.as_ref().and_then(|s| s.var("UDADA")).unwrap_or(0);
+        if let (Some(d), false, 0) = (&dest, self.double, udada) {
+            // FUN_0047a350: a `TrajSound` set before the move plays with
+            // the video, the music at 20 %.
+            if let Some(name) = self.traj_sound.take() {
+                self.music.set_percent(20);
+                self.pending_sound = self.load_sound(&name);
+            }
             // The name is used as a printf format by the original.
             self.start_video(&d.video.clone());
         }
@@ -1220,6 +1487,9 @@ impl Engine {
             self.cursor.shown = None;
             self.vars.objet_en_main = 0;
             self.hand = None;
+            if let Some(s) = self.con.as_mut() {
+                s.empty_hand();
+            }
         }
     }
 
@@ -1227,6 +1497,10 @@ impl Engine {
     /// frame at once and switches to the video loop; false (a cut) when the
     /// file is on no disc or is not a video.
     fn start_video(&mut self, name: &str) -> bool {
+        if self.loop_type == LoopType::Video {
+            log::warn!("AtlHnm_start({name}) : deja en AtlMain_loop_HNM");
+            return false;
+        }
         let opened = self
             .files
             .read(Folder::Hnm, name)
@@ -1236,7 +1510,13 @@ impl Engine {
                 name: name.to_string(),
                 frames: None,
             });
-            log::info!("{name}: no transition video, a cut");
+            log::info!("{name}: no video, a cut");
+            // The music back to 100 % (outside a dialog), the sound loaded
+            // for the video dropped.
+            if self.dialog.is_none() {
+                self.music.set_percent(100);
+            }
+            self.pending_sound = None;
             return false;
         };
         let frames = hnm.frame_count();
@@ -1244,7 +1524,14 @@ impl Engine {
             name: name.to_string(),
             frames: Some(frames),
         });
-        // A transition has no sound of its own in Tibet (no `TrajSound`).
+        // The sound loaded for it (a film's track, a `TrajSound`) starts
+        // on voice 2 (FUN_0047a650(id, 2)) at the effects volume.
+        if let Some((sound, pcm)) = self.pending_sound.take() {
+            let att = self.fx_attenuation();
+            self.voices
+                .play(crate::sound::VOICE_EFFECTS, pcm, false, att, 0);
+            self.event(Event::Sound(sound));
+        }
         let end = !matches!(hnm.next_frame(), Some(Ok(_))) || hnm.frames_decoded() >= frames;
         self.event(Event::VideoFrame(0));
         self.video = Some(Video {
@@ -1258,13 +1545,15 @@ impl Engine {
 
     /// `AtlMain_loop_HNM` (@ 0x0040c060): a new frame at each 15 Hz tick;
     /// the end, a click or a double click ends it.
-    fn video_pass(&mut self, out: Option<&mut [u16]>) {
+    fn video_pass(&mut self, mut out: Option<&mut [u16]>) {
         let Some(v) = &mut self.video else {
             self.loop_type = LoopType::Warp;
             return;
         };
+        let (w, h) = (self.renderer.width(), self.renderer.height());
+        let new_tick = v.tick != self.ticks;
         let mut shown = None;
-        if v.tick != self.ticks {
+        if new_tick {
             v.tick = self.ticks;
             if !v.end {
                 match v.hnm.next_frame() {
@@ -1275,28 +1564,49 @@ impl Engine {
                     v.end = true;
                 }
             }
-            if let Some(out) = out {
-                let (w, h) = (self.renderer.width(), self.renderer.height());
-                blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
-            }
-            let end = v.end;
-            if let Some(k) = shown {
-                self.event(Event::VideoFrame(k));
-            }
-            if !end && !self.click && !self.double {
-                return;
-            }
-        } else {
-            if let Some(out) = out {
-                let (w, h) = (self.renderer.width(), self.renderer.height());
-                blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
-            }
+        }
+        if let Some(out) = out.as_deref_mut() {
+            blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
+        }
+        let end = v.end;
+        if let Some(k) = shown {
+            self.event(Event::VideoFrame(k));
+        }
+        // `cinema=N,M`: the dialog's step after each frame (FUN_00480830,
+        // FUN_00480840): its lines and subtitles over the film.
+        self.film_dialog_step(new_tick, out);
+        if !new_tick || (!end && !self.click && !self.double) {
             return;
         }
+        self.finish_video();
+    }
+
+    /// Ends the video at once, as a click does (a testing aid).
+    pub fn end_video(&mut self) {
+        if self.video.is_some() {
+            self.finish_video();
+        }
+    }
+
+    /// The end of the video loop (@ 0x0040c060, FUN_0040bae0).
+    fn finish_video(&mut self) {
         self.click = false;
         self.video = None;
         self.loop_type = LoopType::Warp;
         self.event(Event::VideoEnd);
+        // FUN_0040bae0: the video's sound stops; the next warp draw asks
+        // for the music at 100 % unless a dialog runs; a dialog played
+        // over the film ends with it (FUN_00480a40).
+        self.voices.stop(crate::sound::VOICE_EFFECTS);
+        if self.dialog.is_none() {
+            self.music_after_video = true;
+        }
+        if let Some(mut d) = self.film_dialog.take() {
+            let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
+            d.end(&mut self.camera, &self.voices, screen);
+        }
+        // The section the film interrupted goes on.
+        self.with_script(|s, h| s.video_ended(h));
     }
 
     /// Draws the current screen into `out` without running a pass: the
@@ -1315,7 +1625,9 @@ impl Engine {
             blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
             return;
         }
-        if matches!(kind, None | Some(0) | Some(1)) {
+        if self.faces[0].is_empty() {
+            out.fill(0);
+        } else if matches!(kind, None | Some(0) | Some(1)) {
             let centre = texel_of(self.camera.ray(self.camera.cx, self.camera.cy));
             let (dirty, _) = self.anim.draw(&mut self.work, centre, false);
             let (m, p) = (self.camera.matrix(), self.camera.projection());

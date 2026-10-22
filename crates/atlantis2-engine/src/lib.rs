@@ -26,6 +26,7 @@ pub mod head;
 pub mod hnm_stream;
 pub mod lipsync;
 pub mod look;
+pub mod music;
 pub mod png;
 pub mod raster3d;
 pub mod script;

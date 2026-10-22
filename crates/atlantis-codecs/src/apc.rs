@@ -141,6 +141,24 @@ impl ApcDecoder {
         }
     }
 
+    /// A decoder resuming in the middle of a stream from a saved state:
+    /// each channel's predictor and step index (Atlantis II's `.spp` music
+    /// marks keep them, with the step the index gives).
+    pub fn resume(stereo: bool, predictors: [i32; 2], step_indexes: [u32; 2]) -> Self {
+        let status = |c: usize| {
+            let step_index = (step_indexes[c] as usize).min(IMA_STEPS.len() - 1);
+            Status {
+                last: predictors[c],
+                step_index,
+                step: IMA_STEPS[step_index].into(),
+            }
+        };
+        ApcDecoder {
+            status: [status(0), status(1)],
+            stereo,
+        }
+    }
+
     pub fn stereo(&self) -> bool {
         self.stereo
     }

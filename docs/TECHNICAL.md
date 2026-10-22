@@ -581,18 +581,27 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 ## Atlantis II (in progress)
 
 A folder holding `atlantis2.exe` opens Atlantis II (`crates/atlantis-app/src/a2.rs`):
-a new game shows its first view, Tibet's `tibet.wam` view 2 at yaw −90°,
-pitch 0, read from `scenar\chapi000.con`; the mouse or the arrow keys
-turn it within the original's limits (pitch ±70°, yaw free), the place
-animations play, the cursor at the screen centre tells what is under it,
-and a left click on a move zone walks to the next view as the original
-does: the turn, the transition video, the arrival. Not yet: the
-cinematics, the scripts (so no puzzle, no music), the menus, the bag.
-`--headless <folder> [frames] --screenshot <file.png>` runs that many
-frames and saves the screen; `--view <id>[,<yaw>,<pitch>]` starts in
-another view and `--dialog <n>` plays a dialog at once (testing aids),
-e.g. `--view 7,-164.394,14.96 --dialog 360`, Tibet's first dialog where
-the game plays it. The example `cargo run --release -p atlantis2-engine
+a new game runs the chapter scripts as the original's start-up and
+menu do (there is no menu yet): chapter 0's `/INIT` sets the world, the
+place and Tibet's first view (`tibet.wam` view 2 at yaw −90°, pitch 0),
+plays the opening film with its sound track and then starts the music;
+the mouse or the arrow keys turn the view within the script's limits
+(pitch ±70° by default, yaw free), the place animations play, the cursor
+at the screen centre tells what is under it, a left click on a move zone
+walks to the next view as the original does (the turn, the transition
+video, the arrival), and the scans of the warp frame run the scripts: the
+first click sends the game to chapter 75, the first arrival in view 7
+plays the shaman's greeting (dialog 360) and the section goes on after
+it. A left click ends a film and goes to a dialog's next line; Escape ends
+a dialog. Not yet: the menus, the bag bar, the subject menu (so the
+shaman's other dialogs, which the scripts call on a subject, cannot be
+asked for), the puzzles. `--headless <folder> [frames] --screenshot
+<file.png>` runs that many frames of 1/60 s and saves the screen;
+`--view <id>[,<yaw>,<pitch>]` starts in another view and `--dialog <n>`
+plays a dialog at once (testing aids, which end the opening film first),
+e.g. `--view 7,-164.394,14.96 --dialog 360`. `Engine::new_game` keeps the
+start without the scripts (the view `/INIT` names) for the tests against
+the original's moves. The example `cargo run --release -p atlantis2-engine
 --example tibet_tour <install> <discs> <out>` writes pictures of three
 views with their animations and a recorded walk from the first view to
 view 4.
@@ -648,10 +657,13 @@ view 4.
   60 frames a second. The arrow keys stand for 8 mickeys a frame each (a
   port convenience).
 - **Time:** as in the original, the frame dispatcher runs once per
-  drawn frame (`Engine::pass`) and a 15 Hz task (`Engine::tick`, @
-  0x0040caa0) paces the videos, the place animations and the cursor; the
-  window ticks every 1/15 s and draws at 60 frames a second, the headless
-  mode ticks every fourth frame. A move's turn is counted in frames, as in
+  drawn frame (`Engine::pass`: the music's state machine, then the loop
+  of the moment: panorama, video or dialog) and a 15 Hz task
+  (`Engine::tick`, @ 0x0040caa0) paces the videos, the place animations,
+  the cursor, the music fades, the dialog's lines and the script clocks;
+  `Engine::set_clock` runs the ticks due at the scheduler's clock (a
+  stall of over a second drops the ticks missed). The window draws at 60
+  frames a second, the headless mode runs frames of 1/60 s. A move's turn is counted in frames, as in
   the original (`engine.rs`).
 - **Place animations:** the SPW files of `datas_a2\spw\` are banks of
   frames with up to six sprites each, one per cube face, in the first
@@ -666,7 +678,11 @@ view 4.
   original's `rand` (MSVC's, seeded from the clock as the original seeds
   it with `GetTickCount`) and hands over after playing to the end of its
   file (`anim.rs`). The faces are drawn on and put back after every
-  frame. Not ported: frame lists (+0x2c ≠ 1), state chains, the odd-tick
+  frame. While a character speaks in a dialog, its first shown slot
+  whose id is one of the speaker's `[IdText]` names is hidden, and shown
+  again when the speaker changes or the dialog ends (@ 0x00461870; which
+  slot when several match is not known [inferred: the first shown one]).
+  Not ported: frame lists (+0x2c ≠ 1), state chains, the odd-tick
   flag, `CHEVAL`'s frame variable (no Tibet state uses them).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
@@ -706,19 +722,49 @@ view 4.
   hand cleared, the limits back to ±70° in pitch and none in yaw, and
   that frame's click dropped (no click scan). A click on a sprite sets
   `CLICOBJET` (an object) or `CLICPERSO` (a character) for the click
-  scan, which clears them after. Without the scripts: the departure,
-  click and arrival scans run nothing, `NEXTVUE`, `UDADA`, `ABORTDEPART`,
-  `Objetenmain_NextWarp` and `TrajSound` keep their defaults (0, no
-  transition sound), the mandala puzzle's clicks in view 10 are only
-  logged. The subject menu is not ported: on a character with subjects
-  (the shaman, at the start of the game) the original opens it and runs
-  no click scan in that frame; the port runs the click scan as the
-  original does for a character without subjects. Moves to other places
-  (type-2 zones), transition sprites and the zoom of a turn are not
-  ported (none in Tibet).
-- **Sound:** none yet. Tibet has no place sound (`tibet.wam` has none
-  and is not in the executable's listener table) and its two transition
-  videos have no sound track; its music starts from the scripts.
+  scan, which clears them after. With the scripts (below) the departure
+  scan runs with `DEPARTVUE` = the target and `ABORTDEPART` (or a section
+  that drops the click) ends the click there, `NEXTVUE` replaces the next
+  move's view, `UDADA` skips the transition video, `TrajSound` plays with
+  the next transition (the music at 20 %), and the arrival scan runs in
+  the frame after the arrival; without them (`Engine::new_game`) the
+  scans are only recorded as events. The mandala puzzle's clicks in
+  view 10 are only logged. The subject menu is not ported: on a character
+  with subjects (the shaman, at the start of the game) the original opens
+  it and runs no click scan in that frame; the port runs the click scan
+  as the original does for a character without subjects. Moves to other
+  places (type-2 zones), transition sprites and the zoom of a turn are
+  not ported (none in Tibet).
+- **Sound:** the voices of the original (0 the music, 1 the dialog
+  voice, 2 the films' tracks and the effects) mixed as DirectSound does
+  (`sound.rs`). Tibet has no place sound (`tibet.wam` has none and is not
+  in the executable's listener table) and its two transition videos have
+  no sound track. A film's track (`cineNNN.apc`) plays on voice 2 at the
+  effects volume from the film's first frame and stops with it; after a
+  film the next panorama frame asks for the music at 100 %.
+- **Music** (`music.rs`, the player's states in `engine/host.rs`):
+  `startmusik` draws a track from its list as the original does (one
+  entry; two, the other one in 85 % of the draws when the current music
+  is among them; more, a random index), and the track opens on voice 0,
+  from its start or at a mark of its `.spp` (a given one, or one drawn
+  at random): the decoder state the record keeps, the data read from
+  the record's offset. A music playing first fades out; a new one starts
+  at the music volume (14 in a dialog); `stopmusik` fades out and stops;
+  the films (20 %) and the dialogs (16 %) duck it with the fade machine
+  of the dialogs (127 units a second). At the end of a track the list
+  draws the next one (its start when the list has one entry), loops
+  (`*n`) replay it. The files are read from the discs (the install's
+  `music\` copies are empty until `LOADMUSIK`, which, like `delmusik`,
+  does nothing here). Every track decoded from its start and from each of
+  the 83 marks, the random marks and the list choices are the
+  original's (tests/music.rs). Known differences: a track is decoded whole
+  and switched when it has been heard to its end, where the original's
+  ring switches about 5.8 s earlier (the last 5.8 s of a track followed
+  by another are never heard there: an owner's choice); with an empty
+  list the original loops the ring's last 5.9 s, Native the whole track;
+  the music player shares the C runtime's `rand` with the dialogs, which
+  the original also shares with the place animations (two generators
+  here).
 - **Alpha masks:** the dialog videos carry an `AL` chunk per frame (runs of
   (n, a) pairs, a = 0..31), which the decoder keeps for the caller
   (`HnmVideo::alpha`) and `AlphaTables::blend` draws as the original's
@@ -774,10 +820,12 @@ view 4.
   font's outlines filled where at least half covered: GDI also runs the
   font's hinting, which this does not, so a few pixels of a glyph differ
   from the original's (the one known difference). The voices are mixed as
-  DirectSound mixes its buffers (gain 10^(attenuation / 2000)). Not there
-  yet: the music itself (the fades are ready for it), the speaker's place
-  animation hidden while it speaks (the place animations are not drawn
-  yet), and the `voixoff0` and `cinema` lines' pictures. The lines, the
+  DirectSound mixes its buffers (gain 10^(attenuation / 2000)). With
+  `cinema=N,M` dialog M plays over film N: its tick after each video frame
+  and its subtitles over the frame, ended with the film (FUN_0040c030;
+  what the dialog step draws there is the dialog frame's own rule, no
+  Tibet film has one). Not there yet: the `voixoff0` and `cinema` lines'
+  pictures. The lines, the
   video frames and their numbers, the composed frames, every subtitle's
   layout and the fades are the original's (tests/dialogs.rs).
 - **Scripts:** the chapter scripts `scenar\chapiNNN.con` keep the first
@@ -794,10 +842,51 @@ view 4.
   `RANDOM` takes the 15 Hz tick count & 0xff) and when
   each scan runs in the panorama frame. What a command does outside those
   tables (a place, a view, a film, a dialog, music, a disc, a menu) goes
-  through its `Host` trait, one method per function of the original, so
-  that navigation, videos and dialogs plug in as they come. The engine
-  does not run the interpreter yet: a new game still reads its start from
-  `/INIT` directly.
+  through its `Host` trait, one method per function of the original. The
+  engine is that host (`engine/host.rs`) and runs the interpreter where
+  the original does: start-up and the menu's new game
+  (`Engine::boot`, `Engine::start_new_game`), the 15 Hz clocks, the warp
+  frame's sprite click (`CLICOBJET`, `CLICPERSO`, the take), departure
+  scan, `Interp_GereFrame` (the arrival scan after the per-view reset,
+  `ABORTDEPART`, the angles, the timers) and click scan, the arrival of a
+  move (`LASTVUE`, `VUE`, `ARRIVEEVUE`), and the ends of the video and
+  dialog loops, which let an interrupted section go on. The script's
+  limits are read by the mouse look every frame; the start angles of the
+  next view entry and the click flags are one state shared with the
+  navigation; the object in hand is the script's. The hooks wired:
+  `changewam` (any place file), `vue`, `nextvue`, `anglewarpx/y`,
+  `anglewarpxnow/ynow` (the camera set to the angle [inferred: the
+  original sets the scene node's rotation]), the four zone keys (the type
+  of the zones of that value in the first such view of the current place
+  ± 88888), `ABORTDEPART`, the show / hide table and the animation keys on
+  the view's slots (`hideperso`, `showperso`, `hideobjet`, `showobjet`,
+  `PLAYANIMP` / `O`, `CONTINUEANIM`, `STOPANIM`, `GOTOFRAME*`,
+  `ADDFRAME*`, `ChangeAnimGotoPerso`, and the `NUMFRAME*` conditions;
+  only the first four occur in Tibet, the others follow the original's
+  handlers of the other worlds and no Native test checks them yet), `cinema` (the film at 15
+  frames a second with its sound track, the music at 20 %, dialog `M` over
+  it), `dial` (the dialog loop; a failed start leaves the section waiting,
+  as in the original), `startmusik`, `stopmusik`, `NEWSOUND`, `TrajSound`,
+  `monde` (the disc rule, the objects bank, the dialog texts), the bag and
+  the hand. No-ops, logged: `ZoomStart`, `ZoomPsychoStart` (the zoom of
+  a move), `ANIM_THE_FRAME` (the playing byte), the special events
+  (`TestSpecialEvent`), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  read where it is), `MESSAGE_CLIC`, `ViewBigSpr`, `CREDITS`, the bag bar's
+  layout; `NextWarpInvalide` is stored but the view entry does not read
+  it; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
+  variables are script state only, as in the original. A fatal error of
+  the scripts (an unknown name, a missing chapter) stops them and is
+  logged; the game itself goes on. The original's own unknowns stay open:
+  how the menu resets the variables of a new game (the
+  port starts from the start-up's tables), and whether its first scan is
+  a click (the port follows the code: `vue=2` sets `ARRIVEEVUE` to 0, so
+  no arrival scan, and the first click runs chapter 0's first section,
+  which loads chapter 75).
+  `tests/play.rs` runs a new game headless from the start-up through the
+  film, the music, the first click, the walk to view 7 and its dialog to
+  view 10, and compares the lines the scans run with the original's
+  (`scripts_con_tibet_scan.txt`: lines 14 and 15 around dialog 360, line
+  294 in view 10) and the dialog's lines with `dialog_script_ti.txt`.
 
 ## Tests
 

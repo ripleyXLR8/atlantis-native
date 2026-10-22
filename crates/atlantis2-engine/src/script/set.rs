@@ -32,6 +32,17 @@ impl Script {
         if let (Some(t), Src::Chapter) = (self.trace.as_mut(), src) {
             t.push(p);
         }
+        if let (true, Src::Chapter) = (self.lines.is_some(), src) {
+            let end = p.min(self.chapter_size);
+            let line = 1 + self.chapter_text[..end]
+                .iter()
+                .filter(|&&c| c == LF)
+                .count();
+            let chapter = self.chapter;
+            if let Some(l) = self.lines.as_mut() {
+                l.push((chapter, line));
+            }
+        }
         // The key's index stays 0 (CHAPTER) when no `(` is found within the
         // chapter's size (@ 0x00481941).
         let mut key = 0usize;
@@ -675,12 +686,14 @@ impl Script {
             host.anim(AnimOp::Hide { kind, id });
         }
         self.show_row(id, false, kind);
+        host.show_table(id, false, kind);
     }
 
     /// FUN_0048c610: show.
     fn show(&mut self, host: &mut dyn Host, id: i32, kind: i32, number: i32) {
         host.anim(AnimOp::Show { kind, id, number });
         self.show_row(id, true, kind);
+        host.show_table(id, true, kind);
     }
 
     /// FUN_0048c730: the row of (id, kind) updated, or appended.
