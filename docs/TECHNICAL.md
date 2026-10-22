@@ -592,10 +592,22 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 
 A folder holding `atlantis2.exe` opens Atlantis II (`crates/atlantis-app/src/a2.rs`):
 the player menu comes first, as in the original (five symbols: a symbol
-continues that player's newest save, or starts a new game). The original
-then starts its intro videos (`intro%02d.hnm` with their `.apc`,
-@ 0x0049d9c0), which the port does not play yet: how they chain and how
-they share the screen with the player menu are not read. A new game
+continues that player's newest save, or starts a new game). As the
+original's start-up (@ 0x0049d680, last two calls), the player page is
+built first and the intro videos then take the screen over it
+(`Engine::start_intro`, @ 0x0049d9c0): `intro%02d.hnm` from 00, each with
+its `intro%02d.apc` on voice 2 at the effects volume, the next one started
+when one ends (@ 0x0040c0ee), until a file the current disc does not have;
+then the video loop gives the screen back to the loop type it started
+from (@ 0x00616890), the menu, whose frame draws the player page. So disc
+1 plays two videos and the other discs one (the same as disc 1's second);
+no music plays, no cursor is drawn. A left click ends the current video
+at the next tick and the next one starts; a double click ends them all,
+since the video end clears the click flag but not the double click's
+(@ 0x0040c0c7); Escape does nothing in the video loop. They play at every
+start: nothing records that they were seen. `--no-intro` skips them;
+`--intro` plays them in a headless run (which otherwise starts a new game
+at once) or with `--menu player`. A new game
 runs the chapter scripts as the original's start-up and menu do:
 chapter 0's `/INIT` sets the world, the
 place and Tibet's first view (`tibet.wam` view 2 at yaw −90°, pitch 0),
@@ -610,7 +622,7 @@ plays the shaman's greeting (dialog 360) and the section goes on after
 it. A left click ends a film and goes to a dialog's next line; Escape ends
 a dialog, and in the panorama opens the main menu (options, volumes,
 load and save, quit; below); the right button opens and closes the bag
-bar. Not yet: the start-up intro videos, the subject menu (so
+bar. Not yet: the subject menu (so
 the shaman's other dialogs, which the scripts call on a subject, cannot be
 asked for), the puzzles. `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the

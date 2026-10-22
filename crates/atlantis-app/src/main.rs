@@ -36,7 +36,9 @@
 //! <file.png>]` plays a new game, prints where it is and saves the screen;
 //! `--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
 //! plays a dialog at once, `--menu <page>` (`player`, `main`, `options`,
-//! `sound`, `load`, `credits`) shows a menu page (testing aids). Only the
+//! `sound`, `load`, `credits`) shows a menu page (testing aids). The intro
+//! videos play before the player menu, as in the original: `--no-intro`
+//! skips them, `--intro` plays them in a headless run. Only the
 //! command line opens Atlantis II for now:
 //! the launcher, the game library and the web build know the first game
 //! alone. The first game's options but `--original` are refused in this
@@ -209,6 +211,23 @@ fn main() {
         }
         None => false,
     };
+    // Atlantis II's start-up intro: `--intro`, `--no-intro`.
+    let mut flag = |name: &str| match args.iter().position(|a| a == name) {
+        Some(i) => {
+            args.remove(i);
+            true
+        }
+        None => false,
+    };
+    let intro = match (flag("--intro"), flag("--no-intro")) {
+        (true, true) => {
+            eprintln!("--intro and --no-intro together");
+            std::process::exit(2);
+        }
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        (false, false) => None,
+    };
     let a2_start = atlantis_app::a2::A2Start {
         view,
         dialog: dialog.map(|d| d.max(0) as u32),
@@ -221,6 +240,7 @@ fn main() {
         hold,
         bag,
         pointer,
+        intro,
     };
     // `--original` holds for both games.
     let a2_enhancements = if original {
@@ -252,6 +272,8 @@ fn main() {
         ("--hold", a2_start.hold.is_some()),
         ("--bag", a2_start.bag),
         ("--pointer", a2_start.pointer.is_some()),
+        ("--intro", intro == Some(true)),
+        ("--no-intro", intro == Some(false)),
     ]
     .into_iter()
     .filter_map(|(name, on)| on.then_some(name))

@@ -265,9 +265,12 @@ impl Cursor {
     }
 }
 
-/// A transition video playing.
+/// A video playing (a transition, a film, the intro).
 struct Video {
     hnm: HnmVideo,
+    name: String,
+    /// The loop type it returns to (@ 0x00616890).
+    prev: LoopType,
     /// The tick counter when the last frame was shown (@ 0x006569dc).
     tick: u32,
     end: bool,
@@ -328,6 +331,10 @@ pub struct Engine {
     /// Whether any SPW was ever loaded (@ 0x006c2df8).
     spw_loaded: bool,
     video: Option<Video>,
+    /// The start-up intro: playing (@ 0x006d85f1) and the number of its
+    /// next file (@ 0x006d85f4).
+    intro_playing: bool,
+    intro_next: u32,
     pub vars: Vars,
     pub cursor: Cursor,
     cursor_bank: Option<SprBank>,
@@ -561,8 +568,11 @@ impl Engine {
 
     /// The game run by the chapter scripts, as the original's start-up
     /// (@ 0x0049d680): the script tables, chapter 0 loaded. Nothing is
-    /// shown until [`Engine::start_new_game`] (the menu's new game). The
-    /// arguments are [`Engine::new_game`]'s.
+    /// shown until [`Engine::start_new_game`] (the menu's new game); the
+    /// original's start-up ends with the player menu
+    /// ([`Engine::open_player_menu`]) and the intro
+    /// ([`Engine::start_intro`]), which the caller starts. The arguments
+    /// are [`Engine::new_game`]'s.
     pub fn boot(
         files: A2Files,
         variant: Variant,
@@ -679,6 +689,8 @@ impl Engine {
             cursor_flag: false,
             spw_loaded: false,
             video: None,
+            intro_playing: false,
+            intro_next: 0,
             vars: Vars::default(),
             cursor: Cursor::default(),
             cursor_bank,
@@ -1689,6 +1701,8 @@ impl Engine {
         self.event(Event::VideoFrame(0));
         self.video = Some(Video {
             hnm,
+            name: name.to_string(),
+            prev: self.loop_type,
             tick: self.ticks,
             end,
         });
@@ -1739,6 +1753,40 @@ impl Engine {
         self.finish_video();
     }
 
+    /// The start-up intro (FUN_0049d9c0), the last step of the original's
+    /// start-up after the player menu is built ([`Engine::boot`] then
+    /// [`Engine::open_player_menu`]): `intro%02d.hnm` from 00, each with
+    /// its `intro%02d.apc` on voice 2, the next one at the end of each
+    /// (a click ends one, a double click all: its flag stays set), until a
+    /// file the current disc does not have; then the loop type the first
+    /// started from (the menu) is back. Played at every start.
+    pub fn start_intro(&mut self) {
+        self.intro_playing = true;
+        let n = self.intro_next;
+        // One pass of the music player (the thunk @ 0x0047a280), the
+        // sound loaded (FUN_0047a320), `AtlHnm_start`.
+        self.music_frame();
+        self.pending_sound = self.load_sound(&format!("intro{n:02}.apc"));
+        if self.start_video(&format!("intro{n:02}.hnm")) {
+            self.intro_next += 1;
+        } else {
+            self.intro_playing = false;
+            self.intro_next = 1;
+        }
+    }
+
+    /// Whether the start-up intro plays.
+    pub fn intro_playing(&self) -> bool {
+        self.intro_playing
+    }
+
+    /// The video playing: its file name and the frames shown.
+    pub fn video_playing(&self) -> Option<(&str, u32)> {
+        self.video
+            .as_ref()
+            .map(|v| (v.name.as_str(), v.hnm.frames_decoded()))
+    }
+
     /// Ends the video at once, as a click does (a testing aid).
     pub fn end_video(&mut self) {
         if self.video.is_some() {
@@ -1746,11 +1794,12 @@ impl Engine {
         }
     }
 
-    /// The end of the video loop (@ 0x0040c060, FUN_0040bae0).
+    /// The end of the video loop (@ 0x0040c060, FUN_0040bae0): the click
+    /// flag cleared (not the double click's, @ 0x0040c0c7), the loop type
+    /// the video started from back.
     fn finish_video(&mut self) {
         self.click = false;
-        self.video = None;
-        self.loop_type = LoopType::Warp;
+        self.loop_type = self.video.take().map_or(LoopType::Warp, |v| v.prev);
         self.event(Event::VideoEnd);
         // FUN_0040bae0: the video's sound stops; the next warp draw asks
         // for the music at 100 % unless a dialog runs; a dialog played
@@ -1758,6 +1807,11 @@ impl Engine {
         self.voices.stop(crate::sound::VOICE_EFFECTS);
         if self.dialog.is_none() {
             self.music_after_video = true;
+        }
+        // The intro's next file (@ 0x0040c0ee), in place of the place
+        // sounds after a film (FUN_0047b280, not ported).
+        if self.intro_playing {
+            self.start_intro();
         }
         if let Some(mut d) = self.film_dialog.take() {
             d.remove(&self.voices);
