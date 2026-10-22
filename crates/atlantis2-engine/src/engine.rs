@@ -123,14 +123,14 @@ impl Engine {
             look: Look::default(),
             script: None,
             dialog: None,
-            // A music playing at its default volume (no player yet: the
-            // fades are kept for when there is one).
-            music: MusicVolume::new(fpu, 100, 100, 4),
+            // No music plays (there is no player yet): the fades only run
+            // once one does, as `FUN_004770c0` is refused while stopped.
+            music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
             voices: Voices::new(),
             rand: Rand::new(0),
             font: None,
             subtitles: true,
-            voice_volume: 127,
+            voice_volume: crate::sound::DEFAULT_VOICE_VOLUME,
             clock: 0.0,
             next_tick: 0.0,
             zbuf: vec![0; (width * height) as usize],
@@ -195,18 +195,21 @@ impl Engine {
 
     /// `/set(dial=N)`: `AtlDial_start` (@ 0x0047ff60), a running dialog
     /// stopped first; the views' angles are saved; then the music fades to
-    /// 16 % (@ 0x004818f0, after the start, whether it worked or not).
+    /// 16 % (`SetVariables` @ 0x004818f0, at 0x004826ce: after the start,
+    /// whether it worked or not; a failed start first resets the dialog
+    /// flag and asks for 100 %, @ 0x00480098).
     pub fn start_dialog(&mut self, number: u32) -> Result<(), DialogError> {
         if self.dialog.is_some() {
             log::warn!("SetVariables : AtlDial_start : a dialog is running");
             self.end_dialog();
         }
         self.music.in_dialog = true;
-        let script = self
-            .script
-            .as_ref()
-            .ok_or_else(|| DialogError::NoFile("the world's dialog scripts".into()))?;
-        let result = Dialog::initialise(number, script, &self.files, &mut self.rand);
+        // Without the world's dialog scripts the initialisation fails as a
+        // missing dialog does (@ 0x00480098): the same reset follows.
+        let result = match self.script.as_ref() {
+            Some(script) => Dialog::initialise(number, script, &self.files, &mut self.rand),
+            None => Err(DialogError::NoFile("the world's dialog scripts".into())),
+        };
         let out = match result {
             Ok(mut d) => {
                 let (y, p) = self.camera.angles();

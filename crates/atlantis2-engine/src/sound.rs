@@ -30,6 +30,26 @@ pub fn attenuation_table() -> [i32; 128] {
     att
 }
 
+/// The pan table built with the attenuation table (@ 0x0047ac20, at
+/// 0x006733b4): hundredths of dB for the pans 0..127, trunc((i − 63) ×
+/// 158.0) clamped to −10000..10000 (`sound_volume.txt`).
+pub fn pan_table() -> [i32; 128] {
+    let mut pan = [0i32; 128];
+    for (i, p) in pan.iter_mut().enumerate() {
+        // FILD (i − 0x3f), FMUL double 158.0 @ 0x005c66b0, _ftol.
+        *p = ftol((i as i32 - 63) as f64 * 158.0).clamp(-10000, 10000);
+    }
+    pan
+}
+
+/// The levels before `atlant2.cfg` is read: the master volume (@
+/// 0x005dd2b8), the effects (@ 0x005dd2bc), the music (@ 0x005dc9dc) and
+/// the voices (@ 0x005df974), as `sound_volume.txt` reads them.
+pub const DEFAULT_MASTER: i32 = 256;
+pub const DEFAULT_FX_VOLUME: i32 = 127;
+pub const DEFAULT_MUSIC_VOLUME: i32 = 100;
+pub const DEFAULT_VOICE_VOLUME: i32 = 127;
+
 /// `FUN_0047acf0(v)` with the master volume `master` (0..256, @
 /// 0x005dd2b8): the attenuation of volume `v`, index (master · v) / 256
 /// toward zero, at most 127, a negative index giving entry 0.
@@ -84,7 +104,7 @@ impl MusicVolume {
         MusicVolume {
             fpu,
             att: attenuation_table(),
-            master: 256,
+            master: DEFAULT_MASTER,
             max,
             volume,
             state,

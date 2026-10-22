@@ -20,7 +20,7 @@
 //! 16-bit surface without smoothing). GDI also runs the font's hinting
 //! program, which moves the outlines to the pixel grid; that is not done
 //! here, so a few pixels of each glyph differ from the original's: the
-//! one known limit of the subtitles (as the first game's decision 0004).
+//! one known limit of the subtitles (the first game's port has the same one).
 //!
 //! The breaking rules (`FUN_004611e0`, checked against the original under
 //! emulation: `subtitles.txt`):

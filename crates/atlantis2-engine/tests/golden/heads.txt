@@ -1,11 +1,11 @@
-# Copied from atlantis2-re evidence/golden/head_shs1.txt, head_h5s1.txt and head_ais1.txt (derived
-# values only: MD5s, counts, boxes), one line per frame in a different layout.
-# Producer: atlantis2-re/tools/emu/head_render.py golden; binary atlantis2-cd-fr-2199552
+# Recorded from the original's head renderer under emulation for three heads (derived values
+# only: MD5s, counts, boxes), one line per frame.
+# Binary atlantis2-cd-fr-2199552
 # (MD5 5e218f7fa9754532ae1d7a4275443fef); CPU type 1 (the C rasteriser variants); the static
 # initialisers 0x004c3420 and 0x005909c0 stopped early. Stubs (beyond the harness's CRT, file and
 # module stubs): the log functions, the error reporters (stop the run), _getptd (_holdrand = 1),
 # time (returns 0, so srand(0)), the Win32 critical sections, interlocked counters, heap (bump
-# heap), handle and clock calls; rand / srand run as they are. Full list: the producer's docstring.
+# heap), handle and clock calls; rand / srand run as they are.
 # Dialog heads drawn by the original atlantis2.exe (French CD build of 1999, 2199552 bytes)
 # with its own code run under emulation: the .db loader and texture loader (0x004626b0),
 # the pose at a body-video frame (0x00463140), the mouth (0x004631a0: the idle babble, or

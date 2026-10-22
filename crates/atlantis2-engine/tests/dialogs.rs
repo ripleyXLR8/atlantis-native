@@ -9,7 +9,8 @@
 //! - `tests/golden/subtitles.txt`: the line breaks and positions of every
 //!   subtitle of the five worlds;
 //! - `tests/golden/music_fade_*.txt`, `sound_volume.txt`: the music fades
-//!   (the dialogs duck the music to 16 %) and the volume table;
+//!   (the dialogs duck the music to 16 %), the volume and pan tables and
+//!   the default levels;
 //! - a whole Tibet dialog played by the engine: lines, voices, video,
 //!   panorama shots, music.
 //!
@@ -27,7 +28,10 @@ use atlantis2_engine::crt::Rand;
 use atlantis2_engine::dialog::{compose, load_head, Dialog, DialogScript};
 use atlantis2_engine::hnm_stream::HnmStream;
 use atlantis2_engine::raster3d::{HEIGHT, WIDTH};
-use atlantis2_engine::sound::{attenuation_table, volume_to_attenuation, MusicVolume};
+use atlantis2_engine::sound::{
+    attenuation_table, pan_table, volume_to_attenuation, MusicVolume, DEFAULT_FX_VOLUME,
+    DEFAULT_MASTER, DEFAULT_MUSIC_VOLUME, DEFAULT_VOICE_VOLUME,
+};
 use atlantis2_engine::subtitle::{layout, SubtitleFont};
 use atlantis2_engine::{Engine, Fpu, Variant};
 use md5::{Digest, Md5};
@@ -336,16 +340,23 @@ fn subtitles_match_the_original() {
     );
 }
 
-/// The volume table and the music fades, under the three control words.
+/// The volume and pan tables, the default levels and the music fades,
+/// under the three control words. Every row is compared but the name and
+/// handle of the `after` rows and the `idle_start` row: they are the music
+/// player's (the file opened, a start while stopped), which Native does
+/// not have yet.
 #[test]
 fn music_fades_and_volumes_match_the_original() {
     let att = attenuation_table();
+    let pan = pan_table();
     let mut n = 0;
     for line in VOLUME.lines().filter(|l| !l.starts_with('#')) {
         let (key, v) = line.split_once(' ').unwrap();
         let v: i32 = v.parse().unwrap();
         if let Some(i) = key.strip_prefix("voltab.") {
             assert_eq!(att[i.parse::<usize>().unwrap()], v, "{key}");
+        } else if let Some(i) = key.strip_prefix("pantab.") {
+            assert_eq!(pan[i.parse::<usize>().unwrap()], v, "{key}");
         } else if let Some(rest) = key.strip_prefix("vol2att.m") {
             let (m, vol) = rest.split_once(".v").unwrap();
             assert_eq!(
@@ -353,13 +364,23 @@ fn music_fades_and_volumes_match_the_original() {
                 v,
                 "{key}"
             );
+        } else {
+            let want = match key {
+                "defaults.master" => DEFAULT_MASTER,
+                "defaults.fx" => DEFAULT_FX_VOLUME,
+                "defaults.music" => DEFAULT_MUSIC_VOLUME,
+                "defaults.voice" => DEFAULT_VOICE_VOLUME,
+                _ => panic!("{key}"),
+            };
+            assert_eq!(want, v, "{key}");
         }
         n += 1;
     }
-    assert_eq!(n, 128 + 9 * 139);
+    assert_eq!(n, 2 * 128 + 9 * 139 + 4);
     for (golden, fpu) in FADES {
         let mut m: Option<MusicVolume> = None;
         let mut rows = 0;
+        let mut fatal = None;
         for line in golden.lines().filter(|l| !l.starts_with('#')) {
             let (key, rest) = line.split_once(' ').unwrap();
             let kv: BTreeMap<&str, &str> = rest
@@ -367,12 +388,25 @@ fn music_fades_and_volumes_match_the_original() {
                 .filter_map(|w| w.split_once('='))
                 .collect();
             let tag = format!("{:04x} {key}", fpu.control_word());
-            if key.ends_with(".do") {
+            if key == "fatal" {
+                fatal = Some(rest.to_string());
+            } else if key.ends_with(".do") {
                 let w: Vec<&str> = rest.split_whitespace().collect();
                 match w[0] {
                     "init" => {
+                        // The harness sets these three and keeps the
+                        // other fade globals.
                         let g = |k: &str| kv[k].parse::<i32>().unwrap();
-                        m = Some(MusicVolume::new(fpu, g("maxvol"), g("vol"), g("state")));
+                        match m.as_mut() {
+                            None => {
+                                m = Some(MusicVolume::new(fpu, g("maxvol"), g("vol"), g("state")))
+                            }
+                            Some(m) => {
+                                m.max = g("maxvol");
+                                m.volume = g("vol");
+                                m.state = g("state");
+                            }
+                        }
                     }
                     "setpct" => m.as_mut().unwrap().set_percent(w[1].parse().unwrap()),
                     "stop" => m.as_mut().unwrap().stop(),
@@ -411,9 +445,29 @@ fn music_fades_and_volumes_match_the_original() {
                 );
                 assert_eq!(got, want, "{tag}");
                 rows += 1;
+            } else if key.ends_with(".after") {
+                // A music switch's end: the target is the music volume.
+                assert_eq!(
+                    m.as_ref().unwrap().target.to_string(),
+                    kv["target"],
+                    "{tag}"
+                );
+                rows += 1;
+            } else if key.ends_with(".idle_pct") {
+                // FUN_004770c0(20) while no music plays: refused, the
+                // previous target kept.
+                let m = m.as_mut().unwrap();
+                m.set_percent(20);
+                let got = (m.state, m.target);
+                let want = (kv["state"].parse().unwrap(), kv["target"].parse().unwrap());
+                assert_eq!(got, want, "{tag}");
+                rows += 1;
+            } else {
+                assert!(key.ends_with(".idle_start"), "{tag}");
             }
         }
         assert!(rows > 400, "{rows}");
+        assert_eq!(fatal.as_deref(), Some("0"));
     }
 }
 
@@ -421,7 +475,11 @@ fn music_fades_and_volumes_match_the_original() {
 /// from the arrival in view 7: the three lines follow their voices, the
 /// first voice is the one the lip-sync golden analysed, the video loops
 /// frames 1..40, the hero's line is a reverse shot with its own field of
-/// view, the music ducks to 16 % and comes back.
+/// view, the music ducks to 16 % and comes back. Native has no music
+/// player yet, so no music plays and the duck is refused, as the original
+/// refuses it (the fade golden's `idle_pct`); the test then sets the
+/// player's state to "playing" (4) at the default volume, as the fade
+/// golden's `init` does, to see the duck.
 #[test]
 fn dialog_360_plays_end_to_end() {
     let Some(files) = game() else { return };
@@ -429,6 +487,12 @@ fn dialog_360_plays_end_to_end() {
     // The cut from view 6 (zone 0's aim).
     e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
         .unwrap();
+    e.start_dialog(360).unwrap();
+    assert_eq!((e.music.state, e.music.volume), (0, 0));
+    e.end_dialog();
+    assert_eq!((e.music.state, e.music.volume), (0, 0));
+    e.music.state = 4;
+    e.music.volume = DEFAULT_MUSIC_VOLUME;
     e.start_dialog(360).unwrap();
     let want: BTreeMap<&str, &str> = LIPSYNC
         .lines()

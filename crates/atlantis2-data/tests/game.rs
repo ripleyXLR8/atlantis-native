@@ -527,7 +527,7 @@ fn dialog_scripts() {
     assert!(heads > 0);
 }
 
-/// The texts of `loc\Dial*.txt` (formats/loc-txt.md): 1214 lines and 358
+/// The texts of `loc\Dial*.txt`: 1214 lines and 358
 /// dialogs, the same ids in the same order as `com*.txt`, texts of at most
 /// 327 bytes (342 with the id and the speaker); the worlds' file sets;
 /// `Font.txt`.

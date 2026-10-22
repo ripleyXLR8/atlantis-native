@@ -23,7 +23,7 @@ use atlantis2_engine::{Engine, Fpu, Variant};
 use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{DeviceEvent, DeviceId, ElementState, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
@@ -330,11 +330,15 @@ impl ApplicationHandler for A2App {
             }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
+                button,
                 ..
             } => {
                 if !self.locked {
                     self.grab(true);
-                } else {
+                } else if button == MouseButton::Left {
+                    // The click flag (@ 0x006569c9) is the left button's
+                    // (input callback FUN_0040c510); the right one opens
+                    // the bag.
                     self.engine.click();
                 }
             }

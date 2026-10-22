@@ -680,8 +680,10 @@ aids until the scripts run them), e.g. `--view 7,-164.394,14.96 --dialog
   frames when it opens one) and the head is posed at the same frame number;
   the panorama takes the speaker's field of view for the line's camera,
   levels its pitch at the first line, and turns by π whenever the hero
-  takes over or leaves the word (reverse shots); the music fades to 16 %
-  at 127 volume units a second and back to 100 % at the end. Each frame
+  takes over or leaves the word (reverse shots); a playing music fades to
+  16 % at 127 volume units a second and back to 100 % at the end (with no
+  music playing the original refuses the fade, and so does this). A left
+  click goes to the next line. Each frame
   draws the panorama, the body video through its mask, the head with the
   lip-sync of the voice's current time, and the subtitle. The subtitles
   break and place their lines as the original's code does (a byte with the

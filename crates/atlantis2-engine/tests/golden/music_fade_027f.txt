@@ -1,8 +1,13 @@
 # The music fade of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
 # 5e218f7fa9754532ae1d7a4275443fef) under emulation, x87 control word 0x027f: FUN_004770c0 (a
 # percentage), FUN_00477090 (stop), FUN_00477dc0 (another music), the arming FUN_00476e30 and the
-# step FUN_00476e80 at given clocks. Producer: an emulation harness running the original code; stub:
-# the voice's SetVolume (recorded). Derived values only.
+# step FUN_00476e80 at given clocks. Producer: an emulation harness running the original code; stubs:
+# the logs, the fatal reporter FUN_00480cd0 (counted) and the voice's SetVolume FUN_0040fa20 (recorded). Derived values only.
+# Rows: `<n>.do` what the harness did (`init` sets the music volume, the current volume and the
+# state, the other fade globals kept), `<n>.armed` the fade after it, `<n>.step` after FUN_00476e80
+# at the clock; `<n>.after` the target, name and handle after a music switch; `<n>.idle_start`
+# FUN_00477dc0 while no music plays; `<n>.idle_pct` FUN_004770c0 refused while no music plays;
+# `fatal` the count of fatal reports.
 0001.do init maxvol=100 vol=100 state=4
 0002.do setpct 20
 0003.armed startvol=100 target=20 duration=3f214285 start_time=bf800000
@@ -404,6 +409,7 @@
 0399.step clock=40495dddddddddde t=50.7333 vol=7 state=3 next=2 target=0 set=-3396
 0400.step clock=4049666666666666 t=50.8000 vol=0 state=3 next=2 target=0 set=-10000
 0401.step clock=40496eeeeeeeeeef t=50.8667 vol=0 state=2 next=2 target=100 set=-
+0402.after target=100 name=muzik20.apc handle=0
 0403.do init maxvol=100 vol=100 state=4
 0404.do start 0
 0405.armed startvol=100 target=0 duration=3f499326 start_time=bf800000
@@ -421,6 +427,7 @@
 0417.step clock=40495dddddddddde t=50.7333 vol=7 state=3 next=1 target=0 set=-3396
 0418.step clock=4049666666666666 t=50.8000 vol=0 state=3 next=1 target=0 set=-10000
 0419.step clock=40496eeeeeeeeeef t=50.8667 vol=0 state=1 next=1 target=100 set=-
+0420.after target=100 name=muzik20.apc handle=0
 0421.do init maxvol=100 vol=100 state=4
 0422.do setpct 16
 0423.step clock=408f400000000000 t=1000.0000 vol=100 state=3 next=4 target=16 set=-
@@ -464,4 +471,7 @@
 0461.step clock=40e3882bbbbbbbbb t=40001.3667 vol=16 state=3 next=4 target=16 set=-1752
 0462.step clock=40e3882ddddddddd t=40001.4333 vol=16 state=4 next=4 target=16 set=-
 0463.do init maxvol=100 vol=0 state=0
+0464.idle_start state=2 mark=-1 loops=0
 0465.do init maxvol=100 vol=0 state=0
+0466.idle_pct state=0 target=16
+fatal 0

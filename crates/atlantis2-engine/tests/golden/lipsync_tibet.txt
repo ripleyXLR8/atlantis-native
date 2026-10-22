@@ -2,11 +2,10 @@
 # atlantis2.exe (French CD build of 1999, 2199552 bytes) under emulation: atof (0x005ae620) for
 # the speakers' numbers, the APC decoder (0x00593e30), the analyser (0x0059f720), the evaluator
 # (0x0059fa40) and the morph mix (0x004631a0 with 0x004daea0 / 0x004daf20).
-# Copied from atlantis2-re evidence/golden/lipsync_tibet.txt (derived values only: float bits and MD5s).
-# Producer: atlantis2-re/tools/emu/lipsync.py; binary atlantis2-cd-fr-2199552 (MD5 5e218f7fa9754532ae1d7a4275443fef).
+# Derived values only: float bits and MD5s. Binary atlantis2-cd-fr-2199552 (MD5 5e218f7fa9754532ae1d7a4275443fef).
 # Stubs: operator new / malloc / free (a2msvc bump heap) and FUN_0046a810, the morph-key lookup, replaced
-# by a Python lookup of the .db morph keys, so the vertices MD5s depend on that stub; the rest is in
-# the producer's docstring.
+# by a Python lookup of the .db morph keys, so the vertices MD5s depend on that stub; the rest are the
+# harness's CRT, file and module stubs.
 # Floats as IEEE-754 single hex words; frames every 1/15 s, t = float32(k * (1/15) + Offset) (the
 # product in double, as the producer and tests/heads.rs compute it), from
 # k = 0 to int(samples / 22050 / (1/15)) + 3; per control word (027f, 007f): md5 of all the
