@@ -299,12 +299,20 @@ impl SubtitleFont {
 
     /// Draws `calls` into `out` (`w` x `h` RGB565).
     pub fn draw(&self, out: &mut [u16], w: usize, h: usize, calls: &[TextOut]) {
+        self.draw_with(calls, |px, py, colour| {
+            if px >= 0 && py >= 0 && (px as usize) < w && (py as usize) < h {
+                out[py as usize * w + px as usize] = rgb565(colour);
+            }
+        });
+    }
+
+    /// The pixels of `calls`: `put(x, y, colour)` for each pixel set.
+    pub fn draw_with(&self, calls: &[TextOut], mut put: impl FnMut(i32, i32, u32)) {
         let upem = self.font.units_per_em().unwrap_or(2048.0);
         // ab_glyph's scale is the unscaled height (ascent − descent) in
         // pixels: one em is `ppem` pixels.
         let scale = PxScale::from(f32::from(self.ppem) * self.font.height_unscaled() / upem);
         for call in calls {
-            let colour = rgb565(call.colour);
             let mut pen = call.x;
             let base = (call.y + self.ascent) as f32;
             for &b in &call.bytes {
@@ -319,15 +327,22 @@ impl SubtitleFont {
                         if c < 0.5 {
                             return;
                         }
-                        let (px, py) = (bb.min.x as i32 + x as i32, bb.min.y as i32 + y as i32);
-                        if px >= 0 && py >= 0 && (px as usize) < w && (py as usize) < h {
-                            out[py as usize * w + px as usize] = colour;
-                        }
+                        put(
+                            bb.min.x as i32 + x as i32,
+                            bb.min.y as i32 + y as i32,
+                            call.colour,
+                        );
                     });
                 }
                 pen += self.advance(b);
             }
         }
+    }
+
+    /// `Font.txt`'s height in points (@ 0x00404c50: the font record's
+    /// +0x44), the step between the lines of the subtitles and the credits.
+    pub fn line_step(&self) -> i32 {
+        self.line_step
     }
 }
 

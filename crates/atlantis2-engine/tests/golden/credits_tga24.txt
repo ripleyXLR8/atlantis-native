@@ -1,0 +1,11 @@
+# Synthetic 640x480 24-bit TGAs loaded by the original atlantis2.exe (French CD build of 1999,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation into the credits' new page surface:
+# CMnMenu::LoadTga (0x00472830) after the credits builder. Pixel (x, y) = bytes B, G, R
+# x & 255, y & 255, (x + y) & 255; type 2 or 10 (raw packets of up to 128 pixels inside
+# each row), top-down or bottom-up. The last field: whether the surface equals the
+# file's pixels copied unchanged, top row first.
+# tga24 TYPE TOP_DOWN FILE_MD5 SURFACE_MD5 SAME_AS_FILE_PIXELS
+tga24 2 1 6d3d6fd00ac8518762786f4868081546 108e48a2f091cd7337f81c3cbf621773 yes
+tga24 2 0 4f96a9e5fdab20b3b67896f4987fd2cd 108e48a2f091cd7337f81c3cbf621773 yes
+tga24 10 1 2be8febaf3b7857e13cac2ee4977a20c 108e48a2f091cd7337f81c3cbf621773 yes
+tga24 10 0 9ab09209ff1994ac56fdca5b3e47c4c5 108e48a2f091cd7337f81c3cbf621773 yes
