@@ -33,16 +33,24 @@ impl Engine {
     /// in the game folder, taken over with its checkpoints; else a new one.
     pub(crate) fn load_players(&mut self) {
         let marker = self.game.exe.new_player_marker.clone();
+        let rule = self.players_row_rule();
         if let Some(p) = self
             .saves
             .read(PLAYERS_FILE)
-            .and_then(|d| Players::read(&d, &marker))
+            .and_then(|d| Players::read_rows(&d, &marker, rule))
         {
             self.players = self.with_build_layout(p);
             return;
         }
         self.players = self.with_build_layout(Players::new(&marker));
         self.import_original_saves();
+    }
+
+    /// The build's players.atl row rule ([`Players::read_rows`]): the rows
+    /// also end at an empty name but in the 1997 builds, whose reader
+    /// stops at the marker only.
+    fn players_row_rule(&self) -> bool {
+        !self.game.exe.build.players_1997
     }
 
     /// The list as the build writes it (the 1997 build: 95 bytes; the
@@ -66,7 +74,7 @@ impl Engine {
         let Some(data) = src.read(PLAYERS_FILE) else {
             return;
         };
-        let Some(p) = Players::read(&data, &marker) else {
+        let Some(p) = Players::read_rows(&data, &marker, self.players_row_rule()) else {
             log::warn!("{PLAYERS_FILE} of the game folder not understood");
             return;
         };

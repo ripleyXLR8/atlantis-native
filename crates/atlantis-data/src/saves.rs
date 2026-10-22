@@ -95,8 +95,22 @@ impl Players {
         p
     }
 
-    /// Reads a `players.atl` (97, 95 or 114 bytes); `None` for another size.
+    /// Reads a `players.atl` (97, 95 or 114 bytes) with the row rule of
+    /// the 1999 and later builds (see [`Players::read_rows`]); `None` for
+    /// another size.
     pub fn read(data: &[u8], marker: &[u8]) -> Option<Players> {
+        Players::read_rows(data, marker, true)
+    }
+
+    /// Reads a `players.atl` with a build's row rule: the rows end at the
+    /// first name that is the marker or, with `empty_name_ends_rows`, empty
+    /// (the reference's reader @ 0x0041928f..0x004192cf, a second strcmp
+    /// against ""; also the 1999 and Chinese builds). The 1997 builds'
+    /// readers test the marker only (atlantis-cd-en-688128 @
+    /// 0x00419194..0x004191b1, atlantis-cd-fr-687104 @
+    /// 0x00418da7..0x00418dc4, the same loop in the other 1997 builds), so
+    /// a row with an empty name before the marker is a player's row.
+    pub fn read_rows(data: &[u8], marker: &[u8], empty_name_ends_rows: bool) -> Option<Players> {
         let mut p = Players::new(marker);
         let (n, block) = match data.len() {
             PLAYERS_SIZE => (6, 0x55),
@@ -117,18 +131,18 @@ impl Players {
         p.chapters[..n].copy_from_slice(&data[block..block + n]);
         p.letters = [0; 6];
         p.letters[..n].copy_from_slice(&data[letter_base..letter_base + n]);
-        p.count = p.count_rows();
+        p.count = p.count_rows(empty_name_ends_rows);
         Some(p)
     }
 
     /// The row count rule of the reader (0x00419275..0x004192e0): the index
-    /// of the first name that is the marker or empty, plus the marker row
-    /// when fewer than 5.
-    fn count_rows(&self) -> usize {
+    /// of the first name that is the marker (or empty, with
+    /// `empty_name_ends_rows`), plus the marker row when fewer than 5.
+    fn count_rows(&self, empty_name_ends_rows: bool) -> usize {
         let n = (0..MAX_PLAYERS)
             .find(|&i| {
                 let name = self.name(i);
-                name.is_empty() || name == self.marker.as_slice()
+                (empty_name_ends_rows && name.is_empty()) || name == self.marker.as_slice()
             })
             .unwrap_or(MAX_PLAYERS);
         if n < MAX_PLAYERS {
@@ -182,13 +196,22 @@ impl Players {
         if !self.is_new_row(row) {
             return None;
         }
+        Some(self.store_in_last_row(name))
+    }
+
+    /// `FUN_0041dea4`'s store of a typed name (the Enter commit @
+    /// 0x0041e3ee..0x0041e436, the exit commit @ 0x0041e710..0x0041e758):
+    /// `strcpy` into the last row, whatever it holds, then the marker
+    /// appended when fewer than 5 rows exist. Returns the row.
+    pub fn store_in_last_row(&mut self, name: &[u8]) -> usize {
+        let row = self.count.saturating_sub(1);
         strcpy(&mut self.rows[row], name);
         if self.count < MAX_PLAYERS {
             let marker = self.marker.clone();
             strcpy(&mut self.rows[self.count], &marker);
             self.count += 1;
         }
-        Some(row)
+        row
     }
 
     /// `FUN_0041e8a8`: the rows after `row` move up one slot (names,
@@ -528,6 +551,40 @@ mod tests {
         b[86] = 7;
         b[91..97].copy_from_slice(b"abcdef");
         b
+    }
+
+    /// The row count with an empty name before the marker: names ALICE,
+    /// "", BOB, the marker, chapters 3 0 7. The readers run under emulation
+    /// (atlantis-cd-en-688128 and atlantis-cd-fr-687104 with their markers,
+    /// 95 bytes; the reference with `#New Player`, 97 bytes): the 1997 ones
+    /// count 4 rows (three players and the marker's), the reference 2
+    /// (ALICE and the marker's row).
+    #[test]
+    fn rows_end_at_an_empty_name_in_the_later_builds_only() {
+        for (marker, size, rule_2001) in [
+            (&b"New Player"[..], PLAYERS_SIZE_FR, false),
+            (b"NOUVEAU JOUEUR", PLAYERS_SIZE_FR, false),
+            (MARKER, PLAYERS_SIZE, true),
+        ] {
+            let mut b = vec![0u8; size];
+            b[..5].copy_from_slice(b"ALICE");
+            b[34..37].copy_from_slice(b"BOB");
+            b[51..51 + marker.len()].copy_from_slice(marker);
+            b[85] = 3;
+            b[87] = 7;
+            let letters = if rule_2001 { 0x5b } else { 0x5a };
+            b[letters..letters + 5].copy_from_slice(b"abcde");
+            let p = Players::read_rows(&b, marker, rule_2001).unwrap();
+            assert_eq!(p.count, if rule_2001 { 2 } else { 4 });
+            assert_eq!(
+                (p.name(0), p.name(1), p.name(2)),
+                (&b"ALICE"[..], &b""[..], &b"BOB"[..])
+            );
+            assert_eq!((p.chapters[0], p.chapters[2]), (3, 7));
+            assert_eq!(p.letters[2], b'c');
+            // The 1997 file read with the later builds' rule stops at row 1.
+            assert_eq!(Players::read_rows(&b, marker, true).unwrap().count, 2);
+        }
     }
 
     #[test]

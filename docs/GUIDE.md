@@ -303,7 +303,14 @@ picked folder on its first start.
   across two characters, and stay as in the original; on the Chinese
   CDs, the options' SUBTITLES toggle answers over its own sprite while
   SUBTITLES is off (the original reads its record one byte out of step,
-  so its click area takes a wrong width and height).
+  so its click area takes a wrong width and height); each menu sets its
+  click areas afresh at every visit (the original keeps one table of
+  them for the whole session: on the May 1997 English and French
+  CDs, after the sound options, the ARE YOU SURE ? prompt loses its left
+  ornament, and on every CD the LOAD list's scrollbar knob, hidden while
+  11 checkpoints or fewer were listed, stays hidden); with five players,
+  OK on the fifth starts it with its name (the original empties that
+  name, and the nameless player can no longer be chosen).
   `--original` turns them off.
 - On the Traditional Chinese CD, the one subtitle with no punctuation
   mark in its first 75 bytes (a game-over narration) is cut at 75 bytes;
@@ -312,10 +319,6 @@ picked folder on its first start.
   video only. When it is cut short, the original goes on drawing them
   from memory it has freed over the videos of the next moments (until 94
   seconds after the opening began); what that shows is not known.
-- In every edition but the Chinese ones, the LOAD list's scrollbar knob
-  is drawn at its place in the menu file; the original draws it where the
-  list is scrolled.
-- Escape on the player screen quits.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).
 - F10 (or O, for a keyboard without function keys; not while a game menu

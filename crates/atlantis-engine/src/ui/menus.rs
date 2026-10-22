@@ -14,15 +14,20 @@
 //! are found by record number, as the original does, so that the menus of
 //! every language work.
 
-use atlantis_data::saves::{checkpoint_chapter, epi_episode_name, MAX_PLAYERS, NAME_MAX_CHARS};
+use std::collections::VecDeque;
+
+use atlantis_data::saves::{checkpoint_chapter, epi_episode_name, MAX_PLAYERS};
 use atlantis_data::sprite::read_tga15;
 use atlantis_data::LoadList;
 
 use super::credits::{credits_events, CreditsEvent};
 use super::layout::{
-    font_min_load_list_width, menu_grid_hit, menu_number, menu_volume_from_knob, menu_walk_hit,
-    name_entry_byte, spell_sharp_s, subtitle_toggle_click, walk_menu_text, FontMin,
-    LoadPickerScroll, MenuRules, MenuWalk,
+    font_min_load_list_width, load_picker_knob_record, menu_grid_hit, menu_number,
+    menu_volume_from_knob, menu_walk_hit, name_key_code, spell_sharp_s, subtitle_toggle_click,
+    walk_menu_text_in, FontMin, LoadPickerScroll, MenuRecord, MenuRecordTable, MenuRules, MenuWalk,
+};
+use super::player_screen::{
+    player_screen_exit, MenuDoubleClick, PlayerScreenExit, PlayerScreenState,
 };
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
@@ -32,10 +37,6 @@ use crate::warp::{SCREEN_H, SCREEN_W};
 
 const N: usize = SCREEN_W * SCREEN_H;
 
-/// Windows' default double-click interval (the window class has
-/// CS_DBLCLKS; the original reads WM_LBUTTONDBLCLK).
-const DOUBLE_CLICK_MS: u64 = 500;
-
 /// The input of one frame of a menu loop.
 #[derive(Default)]
 pub(crate) struct MenuInput {
@@ -43,10 +44,12 @@ pub(crate) struct MenuInput {
     pub right_press: bool,
     pub escape: bool,
     pub enter: bool,
-    pub backspace: bool,
-    pub chars: Vec<char>,
     pub up: bool,
     pub down: bool,
+    /// The WM_CHAR codes of the keys, in order (the code the original's
+    /// window stores, `name_key_code`; 8 Backspace, 0x0d Enter, 0x1b
+    /// Escape).
+    pub codes: Vec<u8>,
 }
 
 /// A loaded menu file and its walk state.
@@ -60,11 +63,25 @@ pub(crate) struct Menu {
 }
 
 impl Menu {
+    /// The menu's block in the record table.
+    fn table_menu(&self) -> Option<usize> {
+        usize::try_from(self.number)
+            .ok()
+            .filter(|&m| m < MenuRecordTable::MENUS)
+    }
+
     /// Walks the file (`FUN_0041fb6c`) with the hovered line and the
-    /// options toggles.
-    pub fn walk(&mut self, hover: Option<usize>, toggle_a: i32, toggle_b: i32) {
+    /// options toggles, its records in the session's `table`
+    /// ([`Engine::menu_table`]) or, without one, its own.
+    pub fn walk(
+        &mut self,
+        hover: Option<usize>,
+        toggle_a: i32,
+        toggle_b: i32,
+        table: Option<&mut MenuRecordTable>,
+    ) {
         let hover = hover.map_or(-1, |h| h as i32);
-        walk_menu_text(
+        walk_menu_text_in(
             &self.text,
             self.number,
             hover,
@@ -72,12 +89,43 @@ impl Menu {
             toggle_b,
             self.rules,
             &mut self.walk,
+            table,
         );
     }
 
-    /// The record under the point (`FUN_004210c0`).
-    pub fn hit(&self, x: i32, y: i32) -> Option<usize> {
-        menu_walk_hit(&self.walk.records, x, y)
+    /// The record under the point (`FUN_004210c0`), read from the table as
+    /// it stands (what the walks and the pickers left there).
+    pub fn hit(&self, x: i32, y: i32, table: Option<&MenuRecordTable>) -> Option<usize> {
+        match (table, self.table_menu()) {
+            (Some(t), Some(m)) => menu_walk_hit(&t.records(m), x, y),
+            _ => menu_walk_hit(&self.walk.records, x, y),
+        }
+    }
+
+    /// Record `k` as the next walk will find it.
+    pub fn stored_record(&self, k: usize, table: Option<&MenuRecordTable>) -> MenuRecord {
+        match (table, self.table_menu()) {
+            (Some(t), Some(m)) => t.record(m, k),
+            _ => self.walk.records.get(k).copied().unwrap_or_default(),
+        }
+    }
+
+    /// Writes record `k` for the next walk (the LOAD knob, the sliders).
+    pub fn set_stored_record(
+        &mut self,
+        k: usize,
+        r: MenuRecord,
+        table: Option<&mut MenuRecordTable>,
+    ) {
+        match (table, self.table_menu()) {
+            (Some(t), Some(m)) => t.set_record(m, k, r),
+            _ => {
+                if self.walk.records.len() <= k {
+                    self.walk.records.resize(k + 1, MenuRecord::default());
+                }
+                self.walk.records[k] = r;
+            }
+        }
     }
 }
 
@@ -119,32 +167,42 @@ impl Engine {
                     button: MouseButton::Right,
                     ..
                 } => mi.right_press = true,
-                Input::KeyDown(Key::Escape) => mi.escape = true,
-                Input::KeyDown(Key::Enter) => mi.enter = true,
-                Input::KeyDown(Key::Backspace) => mi.backspace = true,
+                Input::KeyDown(Key::Escape) => {
+                    mi.escape = true;
+                    mi.codes.push(0x1b);
+                }
+                Input::KeyDown(Key::Enter) => {
+                    mi.enter = true;
+                    mi.codes.push(0x0d);
+                }
+                Input::KeyDown(Key::Backspace) => mi.codes.push(8),
                 Input::KeyDown(Key::Up) => mi.up = true,
                 Input::KeyDown(Key::Down) => mi.down = true,
-                Input::KeyDown(Key::Space) => mi.chars.push(' '),
-                Input::KeyDown(Key::Char(c)) => mi.chars.push(c),
+                Input::KeyDown(Key::Space) => mi.codes.push(b' '),
+                Input::KeyDown(Key::Char(c)) => {
+                    let code = name_key_code(c);
+                    if code != 0 {
+                        mi.codes.push(code);
+                    }
+                }
                 _ => {}
             }
         }
         mi
     }
 
-    /// `SPRLIST\<name>`, `None` when the archive lacks it.
+    /// `SPRLIST\<name>`, `None` when the archive lacks it. Not walked
+    /// yet: each menu walks it before its first hit test, with its toggles.
     pub(crate) async fn load_menu(&self, name: &str) -> Option<Menu> {
         let text = self.read(&format!("SPRLIST\\{name}")).await?;
         self.emit(crate::engine::Event::Menu(name.to_string()));
         let number = menu_number(name).map_or(-1, |n| n as i32);
-        let mut m = Menu {
+        Some(Menu {
             text,
             number,
             walk: MenuWalk::default(),
             rules: MenuRules::of_build(self.game.exe.build, self.enhancements().minor_bug_fixes),
-        };
-        m.walk(None, 0, 0);
-        Some(m)
+        })
     }
 
     /// `images\<name>` full screen, black around it.
@@ -192,28 +250,33 @@ impl Engine {
     }
 
     /// The player screen `FUN_0041dea4`: pick a player, type a new one on
-    /// the "new player" row, delete one. Returns the player's row, `None`
-    /// when the game is quit (window closed, or Escape: the port's way out).
+    /// the "new player" row, delete one (the blocks of
+    /// [`PlayerScreenState`], in the original's order). Returns the
+    /// player's row, `None` when the window is closed: the loop reads no
+    /// Escape (it ends only on OK, Enter or a double click with a valid
+    /// name; WM_CHAR 0x1b is no name character).
     pub async fn player_screen(&mut self) -> Option<usize> {
         let bg = self.load_picture("PREINTRO.TGA").await;
         let mut menu = self.load_menu("SELEMENU.TXT").await?;
         self.load_fontmin_from_current_disc().await;
-        // The records OK (5) and DELETE (6): the title, four sprites, then
-        // the two labels (FUN_0041dea4 tests them by number).
-        const OK: usize = 5;
-        const DELETE: usize = 6;
-        // The rows: FUN_004211f0 at (175, 248), cells 320 x 22, one column.
+        // The rows: FUN_004211f0 at (175, 248), cells 320 x 22, one column,
+        // 0x00496606 rows (0x0041e08e); its inclusive far edges give an
+        // index past the list, which the original copies from the names
+        // array (what it holds there is not known): the port takes it as a
+        // click off the rows.
         let (grid_x, grid_y, grid_w, grid_h) = (175, 248, 320, 22);
-        let mut selected: Option<usize> = None;
-        let mut typed: Option<Vec<u8>> = None; // on the "new player" row
-        let upper_case = self.game.exe.build.upper_case_names;
-        let dos_letters = self.game.exe.build.name_entry_dos_letters;
-        let list_font = if self.game.exe.build.players_1997 {
+        let build = self.game.exe.build;
+        let (upper_case, dos_letters) = (build.upper_case_names, build.name_entry_dos_letters);
+        let list_font = if build.players_1997 {
             FontMin::PlayerList1997
         } else {
             FontMin::PlayerList
         };
-        let mut last_click: Option<(usize, u64)> = None;
+        let mut st = PlayerScreenState::default();
+        let mut dbl = MenuDoubleClick::default();
+        // The window procedure's WM_CHAR codes, one a frame.
+        let mut keys: VecDeque<u8> = VecDeque::new();
+        menu.walk(None, 0, 0, self.menu_table());
         self.wait_buttons_up().await;
         while self.sys.poll_event().is_some() {}
         loop {
@@ -221,135 +284,79 @@ impl Engine {
                 return None;
             }
             let mi = self.poll_menu_input();
+            keys.extend(&mi.codes);
+            if let Some(k) = keys.pop_front() {
+                st.key = k;
+            }
             let (mx, my) = self.sys.mouse();
             let rows = self.players.count as i32;
             let hover_row = menu_grid_hit(grid_x, grid_y, grid_w, grid_h, 1, rows, true, mx, my)
-                .filter(|&r| r < rows)
-                .map(|r| r as usize);
-            let hover_rec = menu.hit(mx, my);
-            let mut commit = false;
-            let mut leave = false;
-            if mi.escape {
-                if typed.is_some() {
-                    typed = None;
-                    selected = None;
-                } else {
-                    return None;
+                .filter(|&r| r < rows);
+            let record = menu.hit(mx, my, self.menu_table().as_deref());
+            // WM_LBUTTONDBLCLK sets the flag wherever the press lands; the
+            // port arms it before the frame's click block (which of the two
+            // the original runs first on the second press is not known).
+            if mi.left_press && dbl.press(self.sys.millis(), (mx, my)) {
+                st.dbl_flag = true;
+            }
+            if st.click(
+                mi.left_press,
+                record,
+                hover_row.unwrap_or(-1),
+                &self.players,
+            ) {
+                // FUN_0041e8a8: ARE YOU SURE ? over the bare title backdrop,
+                // then the delete.
+                let row = st.row as usize;
+                let confirmed = self.confirm(&bg).await;
+                if confirmed {
+                    self.delete_player(row);
+                }
+                self.wait_buttons_up().await;
+                st.delete_done(confirmed);
+            }
+            // FUN_00420f60 draws the field before the name entry
+            // (0x0041e20d): what is shown lags the blink by one frame.
+            let shown = st.field.clone();
+            let mut exit = st.exit_before_draw(&self.players, upper_case, dos_letters);
+            if exit == PlayerScreenExit::None {
+                // The frame: the backdrop, the menu, the rows (FUN_00420d8c:
+                // x 185, y 270 + 22 j, FONTMIN2 under the mouse), the name
+                // field (FUN_00420f60 at (160, 190)) when not empty.
+                menu.walk(record, 0, 0, self.menu_table());
+                let mut s = bg.clone();
+                self.ui.draw_menu(&mut s, &menu.walk);
+                let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
+                for j in 0..self.players.count {
+                    let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
+                    self.ui.draw_font_min(
+                        &mut s,
+                        list_font,
+                        &name,
+                        185,
+                        grid_y + (j as i32 + 1) * grid_h,
+                        hover_row == Some(j as i32),
+                    );
+                }
+                if !shown.is_empty() {
+                    self.ui
+                        .draw_font_min(&mut s, FontMin::NameField, &shown, 160, 190, true);
+                }
+                self.present(&s, true).await;
+                exit = st.exit_after_draw(mi.left_press, record);
+                if exit == PlayerScreenExit::None {
+                    continue;
                 }
             }
-            // Name entry, only on the "new player" row (@ 0x0041e283):
-            // codes 0x20..0xa7, a leading space refused; at 16 characters
-            // the last one is replaced; backspace restores a dot (so does
-            // atlantis-cd-fr-687104 FUN_0041d45c @ 0x0041d847). The English
-            // 1997 build takes 0x20..0x7a and stores a..z as A..Z
-            // (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1..0x0041daf8);
-            // the Swedish build also stores `Ä Å Ö ä å ö` as DOS code page
-            // bytes (atlantis-cd-sv-688128 FUN_0041d704 @
-            // 0x0041dafa..0x0041dbe9; see name_entry_byte).
-            if let Some(buf) = typed.as_mut() {
-                for &c in &mi.chars {
-                    let Some(code) = name_entry_byte(c, upper_case, dos_letters) else {
-                        continue;
-                    };
-                    if buf.is_empty() && code == b' ' {
-                        continue;
-                    }
-                    if buf.len() >= NAME_MAX_CHARS {
-                        buf.pop();
-                    }
-                    buf.push(code);
-                }
-                if mi.backspace {
-                    buf.pop();
-                }
-                if mi.enter {
-                    commit = true;
-                }
+            // The exit and its commit; players.atl written on record 5.
+            let keep_fifth_name = self.enhancements().minor_bug_fixes;
+            let end = player_screen_exit(&mut st, exit, record, &mut self.players, keep_fifth_name);
+            if end.write {
+                self.save_players();
             }
-            if mi.left_press {
-                let now = self.sys.millis();
-                if hover_rec == Some(OK) {
-                    if typed.is_some() {
-                        commit = true;
-                    } else if selected.is_some() {
-                        leave = true;
-                    }
-                } else if hover_rec == Some(DELETE) {
-                    if let (Some(row), None) = (selected, &typed) {
-                        if self.confirm(&bg).await {
-                            self.delete_player(row);
-                            selected = None;
-                        }
-                        self.wait_buttons_up().await;
-                    }
-                } else if let Some(row) = hover_row {
-                    let double =
-                        last_click.is_some_and(|(r, t)| r == row && now - t <= DOUBLE_CLICK_MS);
-                    last_click = Some((row, now));
-                    if self.players.is_new_row(row) {
-                        if typed.is_none() {
-                            typed = Some(Vec::new());
-                        }
-                        selected = None;
-                        if double {
-                            commit = true;
-                        }
-                    } else {
-                        typed = None;
-                        selected = Some(row);
-                        if double {
-                            leave = true;
-                        }
-                    }
-                }
+            if let Some(row) = end.chosen {
+                return Some(row);
             }
-            if commit {
-                if let Some(buf) = &typed {
-                    if let Some(row) = self.players.create(buf) {
-                        self.save_players();
-                        return Some(row);
-                    }
-                }
-            }
-            if leave {
-                if let Some(row) = selected {
-                    self.save_players();
-                    return Some(row);
-                }
-            }
-
-            // The frame: the backdrop, the menu, the rows (FUN_00420d8c:
-            // x 185, y 270 + 22 j, FONTMIN2 under the mouse), the name field
-            // (FUN_00420f60 at (160, 190)).
-            menu.walk(hover_rec, 0, 0);
-            let mut s = bg.clone();
-            self.ui.draw_menu(&mut s, &menu.walk);
-            let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
-            for j in 0..self.players.count {
-                let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
-                self.ui.draw_font_min(
-                    &mut s,
-                    list_font,
-                    &name,
-                    185,
-                    grid_y + (j as i32 + 1) * grid_h,
-                    hover_row == Some(j),
-                );
-            }
-            let field = match (&typed, selected) {
-                (Some(buf), _) => {
-                    let mut f = buf.clone();
-                    f.resize(NAME_MAX_CHARS, b'.');
-                    Some(f)
-                }
-                (None, Some(row)) => Some(self.players.name(row).to_vec()),
-                _ => None,
-            };
-            if let Some(f) = field {
-                self.ui
-                    .draw_font_min(&mut s, FontMin::NameField, &f, 160, 190, true);
-            }
-            self.present(&s, true).await;
         }
     }
 
@@ -371,29 +378,29 @@ impl Engine {
     }
 
     /// The confirmation `FUN_0041ec7c` (SUREMENU) over `bg`: true for OK
-    /// (record 3), false for Cancel (record 4) or Escape (the port's).
+    /// (record 3), false for Cancel (record 4); it reads no key.
     pub(crate) async fn confirm(&mut self, bg: &[u16]) -> bool {
         let Some(mut menu) = self.load_menu("SUREMENU.TXT").await else {
             return true;
         };
+        menu.walk(None, 0, 0, self.menu_table());
         self.wait_buttons_up().await;
         loop {
             if self.should_abort() {
                 return false;
             }
             let mi = self.poll_menu_input();
-            if mi.escape {
-                return false;
-            }
             let (mx, my) = self.sys.mouse();
-            let hit = menu.hit(mx, my).filter(|&r| r == 3 || r == 4);
+            let hit = menu
+                .hit(mx, my, self.menu_table().as_deref())
+                .filter(|&r| r == 3 || r == 4);
             if mi.left_press {
                 if let Some(r) = hit {
                     self.wait_buttons_up().await;
                     return r == 3;
                 }
             }
-            menu.walk(hit, 0, 0);
+            menu.walk(hit, 0, 0, self.menu_table());
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -409,6 +416,7 @@ impl Engine {
         let Some(mut menu) = self.load_menu("MAINMENU.TXT").await else {
             return MenuOutcome::Resume;
         };
+        menu.walk(None, 0, 0, self.menu_table());
         self.wait_buttons_up().await;
         while self.sys.poll_event().is_some() {}
         let mut outcome = MenuOutcome::Resume;
@@ -418,7 +426,7 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
-            let hit = menu.hit(mx, my);
+            let hit = menu.hit(mx, my, self.menu_table().as_deref());
             if mi.left_press {
                 self.wait_buttons_up().await;
                 match hit {
@@ -438,7 +446,7 @@ impl Engine {
                 }
                 break;
             }
-            menu.walk(hit, 0, 0);
+            menu.walk(hit, 0, 0, self.menu_table());
             let mut s = bg.clone();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -455,21 +463,17 @@ impl Engine {
         let Some(mut menu) = self.load_menu("OPTMENU.TXT").await else {
             return;
         };
-        // The toggles as sprite records (the Chinese builds): the hit table
-        // 0x006026b0 keeps the records from one visit to the next, and the
-        // id 9 record of a walk with SUBTITLES off keeps the x / y stored
-        // before (see MenuRules::toggle_in_step); the first walk is made
-        // with the toggles (atlantis-cd-zh-tw-696832 FUN_0041d5c0 @
-        // 0x0041d5e7..0x0041d5ec).
-        let toggle_sprites = self.game.exe.build.menu_toggle_sprites;
-        if toggle_sprites {
-            menu.walk.records = self.opt_menu_records.clone();
-            menu.walk(
-                None,
-                i32::from(self.subtitles),
-                i32::from(self.settings.omni3d_mode2),
-            );
-        }
+        // The first walk is made with the toggles (atlantis-cd-zh-tw-696832
+        // FUN_0041d5c0 @ 0x0041d5e7..0x0041d5ec): with the toggles as
+        // sprite records (the Chinese builds), the id 9 record of a walk
+        // with SUBTITLES off keeps the x / y the session's table holds from
+        // an earlier visit (see MenuRules::toggle_in_step).
+        menu.walk(
+            None,
+            i32::from(self.subtitles),
+            i32::from(self.settings.omni3d_mode2),
+            self.menu_table(),
+        );
         // The hovered record is the one under the pointer, whatever it is
         // (@ 0x0041d5f1..0x0041d600): with the sprite menus the labels
         // SUBTITLES and OMNI 3D (records 2 and 4) are drawn hovered too
@@ -482,7 +486,7 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
-            let under = menu.hit(mx, my);
+            let under = menu.hit(mx, my, self.menu_table().as_deref());
             let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
             if mi.left_press {
                 self.wait_buttons_up().await;
@@ -513,13 +517,11 @@ impl Engine {
                 if sprite_menus { under } else { hit },
                 i32::from(self.subtitles),
                 i32::from(self.settings.omni3d_mode2),
+                self.menu_table(),
             );
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
-        }
-        if toggle_sprites {
-            self.opt_menu_records = menu.walk.records.clone();
         }
         if changed {
             self.save_settings();
@@ -537,26 +539,36 @@ impl Engine {
         let Some(mut menu) = self.load_menu("SONMENU.TXT").await else {
             return;
         };
+        // The walk writes its 18 records into the session's table (the
+        // reference FUN_0041d940, atlantis-cd-en-688128 FUN_0041d218 @
+        // 0x0041d2b9): in a 16-record build its records 16 and 17 land on
+        // SUREMENU's count byte and records 0-1. The knobs are its records
+        // 5..8, whose x the sliders write (atlantis-cd-en-688128 @
+        // 0x0041d2b2) and the walk keeps (son_knob_x mirrors them).
+        menu.walk(None, 0, 0, self.menu_table());
         for t in 0..4 {
-            match menu.walk.records.get(5 + t) {
-                Some(r) if self.son_knob_x[t] == 0 => self.son_knob_x[t] = i32::from(r.x),
-                _ => {}
+            if self.son_knob_x[t] == 0 {
+                let r = menu.stored_record(5 + t, self.menu_table().as_deref());
+                self.son_knob_x[t] = i32::from(r.x);
             }
         }
+        let set_knobs = |e: &mut Engine, menu: &mut Menu| {
+            for t in 0..4 {
+                let mut r = menu.stored_record(5 + t, e.menu_table().as_deref());
+                r.x = e.son_knob_x[t] as i16;
+                menu.set_stored_record(5 + t, r, e.menu_table());
+            }
+        };
         let mut grabbed: Option<usize> = None;
         let mut commit = false;
         loop {
             if self.should_abort() {
                 break;
             }
-            for t in 0..4 {
-                if let Some(r) = menu.walk.records.get_mut(5 + t) {
-                    r.x = self.son_knob_x[t] as i16;
-                }
-            }
+            set_knobs(self, &mut menu);
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
-            let hit = menu.hit(mx, my);
+            let hit = menu.hit(mx, my, self.menu_table().as_deref());
             let down = self.sys.buttons().0;
             if mi.left_press {
                 grabbed = hit;
@@ -579,12 +591,8 @@ impl Engine {
                     _ => {}
                 }
             }
-            for t in 0..4 {
-                if let Some(r) = menu.walk.records.get_mut(5 + t) {
-                    r.x = self.son_knob_x[t] as i16;
-                }
-            }
-            menu.walk(hit, 0, 0);
+            set_knobs(self, &mut menu);
+            menu.walk(hit, 0, 0, self.menu_table());
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -623,6 +631,10 @@ impl Engine {
 
     /// The current player's checkpoints, ascending chapters (the picker's
     /// `p<letter>*.gam`, sorted).
+    /// A chapter-0 file is left out: the original lists it but its rows
+    /// drawer skips it (`atoi(name + 2) - 1 == -1`, FUN_00420b48 @
+    /// 0x00420be0..0x00420bed), and its click would walk EPI.TXT without
+    /// an end; no build writes one.
     pub(crate) fn player_checkpoints(&self) -> Vec<u8> {
         let letter = self.players.letters[self.player.min(MAX_PLAYERS - 1)];
         let mut v: Vec<u8> = self
@@ -630,6 +642,7 @@ impl Engine {
             .list()
             .iter()
             .filter_map(|n| checkpoint_chapter(n, letter))
+            .filter(|&c| c != 0)
             .collect();
         v.sort_unstable();
         v.dedup();
@@ -641,8 +654,9 @@ impl Engine {
     /// by their EPI.TXT names, 11 rows and a scrollbar. A row click stores
     /// its chapter in the player's chapter byte (memory only); records 5
     /// RESTART EPISODE (the byte = the current chapter, once there is a
-    /// file), 6 OK and a double click on a row end it for a reload; 7
-    /// Cancel. Returns the record it ended on (255 for a double click).
+    /// file) and 6 OK end it for a reload, 7 Cancel; so does a double click
+    /// anywhere once a title is shown, as the record under the pointer.
+    /// Returns the record it ended on (255 for a double click off them).
     pub(crate) async fn load_picker(&mut self, bg: &[u16]) -> u8 {
         let Some(mut menu) = self.load_menu("LOADMENU.TXT").await else {
             return 7;
@@ -663,12 +677,22 @@ impl Engine {
         let build = self.game.exe.build;
         let clamp = build.load_picker_clamp;
         let mut sb = LoadPickerScroll::new(count as i32, build.load_knob_starts_at_bar, clamp);
+        // The entry's stores of the knob (0x0041d1f3..0x0041d24b), then the
+        // first walk.
+        let knob =
+            load_picker_knob_record(menu.stored_record(4, self.menu_table().as_deref()), &sb);
+        menu.set_stored_record(4, knob, self.menu_table());
+        menu.walk(None, 0, 0, self.menu_table());
         let sprite_rows = matches!(build.load_list, LoadList::Sprites { .. });
         let mut title: Option<(Vec<u8>, i32)> = None;
         // The Chinese builds' title: EPICHI2 frame `row` at x.
         let mut title_frame: Option<(usize, i32)> = None;
         let mut selected: Option<usize> = None;
-        let mut last_click: Option<(usize, u64)> = None;
+        // The double-click flag 0x00496118: set by any double click,
+        // wherever it lands, and cleared only when the picker ends
+        // (0x0041d50f).
+        let mut dbl = MenuDoubleClick::default();
+        let mut dbl_flag = false;
         let mut track_latched = false;
         let player = self.player.min(MAX_PLAYERS - 1);
         let choose = |e: &mut Engine,
@@ -700,11 +724,9 @@ impl Engine {
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
             let down = self.sys.buttons().0;
-            // Port keys (the original reads none here): Escape cancels,
-            // Enter is OK, Up / Down a row click.
-            if mi.escape {
-                return 7;
-            }
+            // Port keys (the original reads none here; Escape does
+            // nothing, as in the original): Enter is OK, Up / Down a row
+            // click.
             if mi.enter {
                 return 6;
             }
@@ -720,36 +742,54 @@ impl Engine {
             if mi.left_press {
                 // WM_LBUTTONDOWN latches the record under the pointer
                 // (0x00419c47): the track when strictly inside it.
-                track_latched = menu.hit(mx, my) == Some(1);
+                track_latched = menu.hit(mx, my, self.menu_table().as_deref()) == Some(1);
             }
             if !down {
                 track_latched = false;
             }
             sb.frame(track_latched, down, my);
             let scroll = usize::from(sb.offset);
-            // A row counts when row + offset < count (0x0041d37b;
-            // atlantis-cd-fr-687104 FUN_0041c708 @ 0x0041cb0b..0x0041cb1b);
-            // the English 1997 build tests the row alone (atlantis-cd-en-688128
-            // FUN_0041c9a8 @ 0x0041cd87) and takes entry row + offset
-            // (0x0041cdaa). Past the list it would read an empty record
-            // (its chapter -1 then walks EPI.TXT without an end): the port
-            // takes no such row.
+            // A row counts when row + offset < count, the only bound
+            // (0x0041d37b; atlantis-cd-fr-687104 FUN_0041c708 @
+            // 0x0041cb0b..0x0041cb1b): the grid's inclusive far edges (x
+            // 445, y 350), which give 11..22, select the entry below the
+            // visible rows (its title shown, its chapter stored, no visible
+            // row lit). The English 1997 build tests the row alone
+            // (atlantis-cd-en-688128 FUN_0041c9a8 @ 0x0041cd87) and takes
+            // entry row + offset (0x0041cdaa): past the list it would read
+            // an empty record (its chapter -1 then walks EPI.TXT without an
+            // end): the port takes no such row.
             let row_hover = menu_grid_hit(45, 108, 400, 22, 1, 11, true, mx, my)
-                .filter(|&g| g < 11 && (clamp || (g as usize) < count))
                 .map(|g| scroll + g as usize)
                 .filter(|&r| r < count);
-            let button = menu.hit(mx, my).filter(|r| [5, 6, 7].contains(r));
+            let button = menu
+                .hit(mx, my, self.menu_table().as_deref())
+                .filter(|r| [5, 6, 7].contains(r));
+            if mi.left_press && dbl.press(self.sys.millis(), (mx, my)) {
+                dbl_flag = true;
+            }
             if mi.left_press && !track_latched {
                 if let Some(r) = row_hover {
                     selected = Some(r);
                     choose(self, r, &mut title, &mut title_frame);
-                    let now = self.sys.millis();
-                    if last_click.is_some_and(|(l, t)| l == r && now - t <= DOUBLE_CLICK_MS) {
-                        self.wait_buttons_up().await;
-                        return 255;
-                    }
-                    last_click = Some((r, now));
-                } else if let Some(b) = button {
+                }
+            }
+            // 0x0041d4ad: once a title is shown, the double-click flag ends
+            // the picker in that frame, whatever the pointer is over (a
+            // double click before the row click counts too), as a press on
+            // the hovered record would: RESTART EPISODE stores the chapter,
+            // Cancel reloads nothing (0x0041d519, FUN_0041c838).
+            let title_shown =
+                title.as_ref().is_some_and(|(t, _)| !t.is_empty()) || title_frame.is_some();
+            if dbl_flag && title_shown {
+                self.wait_buttons_up().await;
+                if button == Some(5) && count > 0 {
+                    self.players.chapters[player] = self.chapter as u8;
+                }
+                return button.map_or(255, |b| b as u8);
+            }
+            if mi.left_press && !track_latched {
+                if let Some(b) = button {
                     self.wait_buttons_up().await;
                     if b == 5 && count > 0 {
                         self.players.chapters[player] = self.chapter as u8;
@@ -757,14 +797,13 @@ impl Engine {
                     return b as u8;
                 }
             }
-            // The knob: drawn at its stored record position.
-            if let Some(r) = menu.walk.records.get_mut(4) {
-                if sb.knob_x != 0 {
-                    r.x = sb.knob_x as i16;
-                }
-                r.y = sb.knob_y as i16;
-            }
-            menu.walk(button, 0, 0);
+            // The knob, record 4: the picker writes it, the walk draws it
+            // at its stored x / y (in the session's table, an x 0xffce
+            // stays for the later visits).
+            let knob =
+                load_picker_knob_record(menu.stored_record(4, self.menu_table().as_deref()), &sb);
+            menu.set_stored_record(4, knob, self.menu_table());
+            menu.walk(button, 0, 0, self.menu_table());
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             if sprite_rows {

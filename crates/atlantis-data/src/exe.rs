@@ -29,9 +29,14 @@ pub struct ExeBuild {
     pub inventory_va: u32,     // FUN_0042b328's object table
     pub guest_va: u32,         // FUN_0042b480's guest sprite table
     pub credit_widths_va: u32, // credits font advance table
-    /// The marker is followed by the label the row shows (`#New Player`,
-    /// then the names array); the 1997 build stores and shows the marker
-    /// itself (`New Player`, atlantis-cd-en-688128 FUN_0041fff4).
+    /// The marker has no '#' and is drawn as it is (`New Player`,
+    /// atlantis-cd-en-688128 FUN_0041fff4); otherwise the player list
+    /// draws the marker (`#New Player`) with its '#' skipped (FUN_00420d8c
+    /// @ 0x00420eff). The string after the marker's NUL in the later
+    /// builds is not a label: it is the initial content of names[0] of the
+    /// players.atl image (0x0049657c), which the file (ReadFile @
+    /// 0x00419221) or the marker (strcpy @ 0x004191f6) overwrites before
+    /// any draw; no code reads it as a label.
     pub marker_is_label: bool,
     /// FUN_00422fcc @ 0x0042313d: ids 0x219 / 0x21a get the navigate cursor.
     pub cursor_id_rule: bool,
@@ -55,7 +60,11 @@ pub struct ExeBuild {
     /// en-688128 FUN_0041d6d0, FUN_0041e030, FUN_0042c164; fr-687104 reader
     /// WinMain @ 0x00418d29, writers FUN_0041d45c, FUN_0041dda0,
     /// FUN_0042bf74), the rows after the last not cleared by a deletion
-    /// (en-688128 FUN_0041e030, fr-687104 FUN_0041dda0).
+    /// (en-688128 FUN_0041e030, fr-687104 FUN_0041dda0), the rows of the
+    /// file counted up to the marker only, an empty name being a row
+    /// (en-688128 WinMain @ 0x00419194..0x004191b1, fr-687104 @
+    /// 0x00418da7..0x00418dc4; the reference also stops at an empty name,
+    /// @ 0x0041928f..0x004192cf). Set for every 1997 build.
     pub players_1997: bool,
     /// Names typed 0x20..0x7a with a..z stored upper case
     /// (atlantis-cd-en-688128 FUN_0041d6d0 @ 0x0041dab1); else 0x20..0xa7,
@@ -158,6 +167,15 @@ pub struct ExeBuild {
     /// builds turn only the bytes below 0x20 into spaces. No shipped menu
     /// byte is above 0xa8.
     pub menu_high_bytes_as_space: bool,
+    /// The records per menu of the menus' record table (one static table
+    /// of 15 blocks, a count byte and this many records of 8 bytes each,
+    /// with no bound on the count: extra records spill into the next
+    /// menu's block): 20 (stride 0xa1, `imul eax,eax,0xa1` in FUN_0041fb6c
+    /// @ 0x0041fbbc), 16 (stride 0x81) in atlantis-cd-en-688128
+    /// (FUN_0041ef34 @ 0x0041ef84) and atlantis-cd-fr-688640 (FUN_0041efa4
+    /// @ 0x0041eff4), whose SONMENU.TXT's 18 records then overwrite
+    /// SUREMENU's count byte and first two records.
+    pub menu_records_per_menu: u8,
     /// The GDI subtitle breaker's cut marks: the reference's 100-byte
     /// window cut at a space (FUN_0042ffe8), or the Chinese builds'
     /// 75-byte window cut after double-byte punctuation (FUN_0042f424 of
@@ -333,6 +351,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -343,8 +362,10 @@ pub const BUILDS: [ExeBuild; 13] = [
         players_names_block: 85,
         off1_player: true,
     },
+    // The GOG.com build: named after its French executable; the five
+    // language executables are that one with the player row changed.
     ExeBuild {
-        name: "atlantis-gog-714752",
+        name: "atlantis-gog-fr-714752",
         size: 714_752,
         pe_timestamp: 0x385a_4dc6,
         year: 1999,
@@ -385,6 +406,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -452,6 +474,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -505,6 +528,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 16,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -575,6 +599,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -640,6 +665,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -707,6 +733,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -772,6 +799,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         // FUN_0041ecb4 @ 0x0041f068 and @ 0x0041f235.
         menu_positioned_byte_width: 16,
         menu_high_bytes_as_space: true,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -836,6 +864,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 16,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -912,6 +941,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: false,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -983,6 +1013,7 @@ pub const BUILDS: [ExeBuild; 13] = [
         name_entry_dos_letters: true,
         menu_positioned_byte_width: 22,
         menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
         cjk_breaker: CjkBreaker::None,
         subtitle_row_step: 14,
         menu_sprite_banks: None,
@@ -1071,6 +1102,7 @@ pub const ZH_TW: ExeBuild = ExeBuild {
     // 0x20 as spaces @ 0x0041fc19.
     menu_positioned_byte_width: 22,
     menu_high_bytes_as_space: false,
+    menu_records_per_menu: 20,
     cjk_breaker: CjkBreaker::Big5,
     subtitle_row_step: 18,
     menu_sprite_banks: Some(["SPRCHI1.SPR", "SPRCHI2.SPR"]),
@@ -1404,6 +1436,24 @@ mod tests {
         }
         let steps = ZH_TW.cinema_captions.unwrap().steps;
         assert!(steps.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    /// The menus' record table: 16 records per menu in the English May
+    /// 1997 code's English and French builds (`imul eax,eax,0x81`), 20 in
+    /// the others (`0xa1`, the Dutch and Swedish builds of that code too);
+    /// the 1997 players.atl row rule in every 1997 build.
+    #[test]
+    fn menu_records_and_player_rows() {
+        for b in &BUILDS {
+            let short = matches!(b.name, "atlantis-cd-en-688128" | "atlantis-cd-fr-688640");
+            assert_eq!(
+                b.menu_records_per_menu,
+                if short { 16 } else { 20 },
+                "{}",
+                b.name
+            );
+            assert_eq!(b.players_1997, b.year == 1997, "{}", b.name);
+        }
     }
 
     #[test]

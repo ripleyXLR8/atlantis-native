@@ -54,7 +54,18 @@ pub struct Enhancements {
     ///   and the first shown at 9, the whole bar at 506 and 513);
     /// - after a pick-up the new record's icon is drawn in its slot like
     ///   the others; off, as the original (`FUN_004278a0` @ 0x00427ae2), at
-    ///   x 70 c + 35, 7 px left, in the hold loop and the slide-out.
+    ///   x 70 c + 35, 7 px left, in the hold loop and the slide-out;
+    /// - each menu keeps its own click records, from zero at every visit;
+    ///   off, the original's one record table for the session
+    ///   (`ui::layout::MenuRecordTable`): with the May 1997 English and
+    ///   French builds the sound menu's last two records spill over the ARE
+    ///   YOU SURE ? menu's and move its left ornament off screen for the
+    ///   session, and in every build the LOAD scrollbar's knob, hidden by a
+    ///   visit with 11 checkpoints or fewer, stays hidden on later visits;
+    /// - with five players, OK on the fifth starts it with its name; off,
+    ///   as the original (`FUN_0041dea4` @ 0x0041e6c6..0x0041e72f), OK runs
+    ///   the commit of a typed name, empty, over the fifth name: that player
+    ///   stays listed with no name, unselectable.
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

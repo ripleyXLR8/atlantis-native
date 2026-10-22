@@ -9,6 +9,7 @@ pub mod bar;
 pub mod credits;
 pub mod layout;
 pub mod menus;
+pub mod player_screen;
 
 use atlantis_data::sprite::{limits, read_spr_file, SprSprite};
 
