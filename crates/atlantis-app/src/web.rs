@@ -7,7 +7,8 @@
 //!
 //! The Chinese releases' subtitle fonts are not in the program: the page
 //! fetches the one the release needs from `fonts/` beside it
-//! (`web/build.sh` copies them there), the others never load.
+//! (`web/build.sh` copies them there) when the folder does not hold the
+//! player's own font; the others never load.
 //!
 //! The players, checkpoints and settings are kept in the browser's
 //! `localStorage` ([`WebStore`]), one key per file. The original's
@@ -314,9 +315,32 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
         atlantis_data::GameError::UnknownExecutable(_) => report(&web),
         e => explain(&e),
     })?;
-    // A Chinese release's subtitle font, before anything draws a subtitle.
+    // A Chinese release's subtitle font, before anything draws a subtitle:
+    // none when the folder holds the player's own font, which the engine
+    // takes first (`FontFace::for_release`).
     let code_page = game.exe.build.text_code_page;
-    if let Some(name) = atlantis_engine::subtitles::cjk_font_file(code_page) {
+    let player_font = match atlantis_engine::subtitles::player_font(code_page)
+        .and_then(|(name, _)| by_key.get(&key(name)).map(|f| (name, f)))
+    {
+        Some((name, f)) => match fetch(f, 0, 4.min(f.size() as u64)).await {
+            Ok(head) if atlantis_engine::subtitles::is_font_header(&head) => {
+                log::info!("subtitles: the player's {name}, no font fetched");
+                true
+            }
+            Ok(_) => {
+                log::warn!("{name}: not a font");
+                false
+            }
+            Err(e) => {
+                log::warn!("{name}: {e:?}");
+                false
+            }
+        },
+        None => false,
+    };
+    if let Some(name) =
+        atlantis_engine::subtitles::cjk_font_file(code_page).filter(|_| !player_font)
+    {
         let url = format!("fonts/{name}");
         match fetch_url(&url).await {
             Ok(data) => {

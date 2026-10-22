@@ -249,6 +249,17 @@ pub fn player_font(code_page: TextCodePage) -> Option<(&'static str, &'static st
     }
 }
 
+/// Whether `head`, a file's first bytes, starts as a font or a font
+/// collection does (`ttcf`, a TrueType or OpenType sfnt version). The web
+/// page reads only these bytes of the player's font to know it need not
+/// fetch the port's.
+pub fn is_font_header(head: &[u8]) -> bool {
+    matches!(
+        head.get(..4),
+        Some(b"ttcf" | b"OTTO" | b"true" | [0, 1, 0, 0])
+    )
+}
+
 /// The face of `data` (a font, or a collection) whose family is `family`;
 /// the first face that reads when none is; `None` when no face reads.
 pub fn pick_face(data: &[u8], family: &str) -> Option<u32> {
@@ -1808,6 +1819,22 @@ mod tests {
         }
         for cp in [TextCodePage::Windows1252, TextCodePage::Dos850] {
             assert_eq!((cjk_font_file(cp), bundled_cjk(cp)), (None, None));
+        }
+    }
+
+    /// The header test of the web page: the port's fonts and a collection
+    /// of them read as fonts, and so does each face the player's font can
+    /// give ([`FontFace::player`] reads it); other bytes do not.
+    #[test]
+    fn font_headers() {
+        for data in [NOTO_SERIF_TC, NOTO_SERIF_SC] {
+            assert!(is_font_header(data));
+            let ttc = collection(&[data]);
+            assert!(is_font_header(&ttc));
+            assert!(FontFace::player(TextCodePage::Windows936, ttc).is_some());
+        }
+        for head in [&b""[..], b"OTT", b"PK\x03\x04", b"\0\0\0\0", b"wOFF"] {
+            assert!(!is_font_header(head), "{head:?}");
         }
     }
 

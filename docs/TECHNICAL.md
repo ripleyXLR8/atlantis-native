@@ -533,7 +533,9 @@ archive member before it is read, so the browser runs the same game as the
 desktop. The Chinese subtitle fonts (about 0.5 MB each) are not built
 into the web program as they are into the desktop one: `web/build.sh`
 copies them into `web/fonts`, and the page fetches the one a Chinese
-release needs once the release is known, before the game starts; the
+release needs once the release is known, before the game starts, unless
+the picked folder holds the player's own `mingliu.ttc` or `simsun.ttc`
+(its first bytes those of a font), which the engine draws with; the
 other releases never load them (the program is 2.7 MB instead of
 3.7 MB). A browser grants
 the pointer capture only on a click: until then the view turns with the
