@@ -647,7 +647,11 @@ the original's moves. The example `cargo run --release -p atlantis2-engine
 --example tibet_tour <install> <discs> <out>` writes pictures of three
 views with their animations and a recorded walk from the first view to
 view 4; `--example menu_png <data folder> <prefix>` draws the menu pages
-after a short game with three saves.
+after a short game with three saves; `--example ireland_tour <install>
+<discs> <out>` lays Ireland's boat and draws the trip (the departure
+film, the arrival's dialog, Liam and his subject menu, a transition
+with its sprites, the cross's view, the goddess, the way back to
+Tibet) into `ireland-*.png`.
 
 - **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
   timestamp 0x38030926), recognised by its size and timestamp and
