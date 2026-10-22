@@ -33,6 +33,11 @@
 //! `sacados` and `objetenmain` do), `--bag` opens the bag bar,
 //! `--pointer <x>,<y>` puts the mouse pointer there and `--talk` clicks
 //! the character under the screen centre (its subject menu opens).
+//!
+//! At start-up the intro videos play before the player menu, as in the
+//! original (a click skips one, a double click all of them); `--no-intro`
+//! skips them, `--intro` plays them in a headless run (which otherwise
+//! starts a new game at once) or with `--menu player`.
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -86,6 +91,11 @@ pub struct A2Start {
     /// A click at the start: on a character under the centre, its subject
     /// menu.
     pub talk: bool,
+    /// The start-up intro videos: `Some(false)` skips them (`--no-intro`),
+    /// `Some(true)` plays them where they would not be (`--intro`: a
+    /// headless run or `--menu player`); `None` plays them when the game
+    /// starts on the player menu as the original does.
+    pub intro: Option<bool>,
 }
 
 impl A2Start {
@@ -117,9 +127,10 @@ impl A2Start {
         })
     }
 
-    /// How the game starts: the player menu (the original's start-up), or
-    /// a new game at once (headless runs and the testing aids), then the
-    /// view, the dialog and the menu page asked for.
+    /// How the game starts: the player menu with the intro videos over it
+    /// (the original's start-up), or a new game at once (headless runs and
+    /// the testing aids), then the view, the dialog and the menu page asked
+    /// for.
     pub fn begin(&self, engine: &mut Engine, headless: bool) -> Result<(), String> {
         let at_once = self.view.is_some()
             || self.dialog.is_some()
@@ -128,8 +139,17 @@ impl A2Start {
             || self.bag
             || self.pointer.is_some()
             || self.talk;
-        if self.menu == Some(PageKind::Player) || !(headless || at_once || self.menu.is_some()) {
+        let start_up = !(headless || at_once || self.menu.is_some());
+        if self.menu == Some(PageKind::Player)
+            || start_up
+            || (self.intro == Some(true) && !at_once && self.menu.is_none())
+        {
+            // The player page is built, then the intro takes the screen
+            // until its last video ends (FUN_0049d680's last two calls).
             engine.open_player_menu();
+            if self.intro.unwrap_or(start_up) {
+                engine.start_intro();
+            }
             return Ok(());
         }
         engine.start_new_game().map_err(|e| e.to_string())?;
@@ -348,6 +368,14 @@ pub fn headless(
     }
     if let Some(s) = engine.script_state() {
         println!("chapter {}, {:?} loop", s.chapter, engine.loop_type);
+    }
+    if let Some((name, frames)) = engine.video_playing() {
+        let intro = if engine.intro_playing() {
+            " (intro)"
+        } else {
+            ""
+        };
+        println!("video {name}{intro}, {frames} frames shown");
     }
     if let Some(page) = engine.menu().and_then(|m| m.kind()) {
         println!("menu page {page:?}");
@@ -596,7 +624,10 @@ impl ApplicationHandler for A2App {
                 button,
                 ..
             } => {
-                if !self.locked && !in_menu {
+                // A click ends a video (the intro's too) whether or not
+                // the pointer is held.
+                let in_video = self.engine.loop_type == LoopType::Video;
+                if !self.locked && !in_menu && !(in_video && button == MouseButton::Left) {
                     self.grab(true);
                 } else if button == MouseButton::Left {
                     // The click flag (@ 0x006569c9) is the left button's
