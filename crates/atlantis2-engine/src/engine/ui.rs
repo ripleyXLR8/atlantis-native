@@ -195,10 +195,11 @@ impl Engine {
         let bag = self.bag_entries().to_vec();
         self.bar.layout(w as usize, visible_count(&bag, monde));
         let (px, py) = self.pointer;
-        if px > w - 10 && py > h - 80 && self.bar.scroll_due(self.clock) {
+        let fpu = self.camera.fpu;
+        if px > w - 10 && py > h - 80 && self.bar.scroll_due(fpu, self.clock) {
             self.bar.scroll_right();
         }
-        if px < 5 && py > h - 80 && self.bar.scroll_due(self.clock) {
+        if px < 5 && py > h - 80 && self.bar.scroll_due(fpu, self.clock) {
             self.bar.scroll_left();
         }
         let bar = |x| UiDraw::Sprite {

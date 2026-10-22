@@ -14,12 +14,17 @@
 
 use atlantis2_data::spr::SprBank;
 
+use crate::fpu::Fpu;
 use crate::script::BagEntry;
 
 /// The sprite byte of an entry that holds nothing (the table's init
 /// pattern @ 0x00474810, and what a removal writes past the last entry):
 /// such an entry is never shown.
 pub const NO_SPRITE: u8 = 99;
+
+/// The bar's scroll delay in seconds: a float (@ 0x005c6320, read by
+/// `fcomp dword` @ 0x004752fd).
+pub const SCROLL_DELAY: f32 = 0.1;
 
 /// Whether entry `e` is shown in world `monde` (FUN_004754d0 →
 /// FUN_00475490, and the sprite test of FUN_00475870 / FUN_004757e0).
@@ -145,11 +150,12 @@ impl Bar {
         while self.scroll_right() {}
     }
 
-    /// FUN_004752f0: true, and the time kept, when more than 0.1 s passed
-    /// since the last scroll (the scheduler's clock, FUN_0040ca90).
-    pub fn scroll_due(&mut self, now: f64) -> bool {
-        if now - f64::from(self.scrolled_at) > 0.1 {
-            self.scrolled_at = now as f32;
+    /// FUN_004752f0: true, and the time kept (`fstp dword`), when the
+    /// time since the last scroll (the scheduler's clock, FUN_0040ca90,
+    /// minus the kept float) is more than the float 0.1 @ 0x005c6320.
+    pub fn scroll_due(&mut self, fpu: Fpu, now: f64) -> bool {
+        if fpu.sub(now, f64::from(self.scrolled_at)) > f64::from(SCROLL_DELAY) {
+            self.scrolled_at = fpu.f32(now);
             return true;
         }
         false
@@ -326,9 +332,12 @@ mod tests {
     #[test]
     fn scroll_waits_a_tenth_of_a_second() {
         let mut bar = Bar::default();
-        assert!(bar.scroll_due(0.2));
-        assert!(!bar.scroll_due(0.25));
-        assert!(bar.scroll_due(0.31));
+        let fpu = Fpu::default();
+        assert!(bar.scroll_due(fpu, 0.5));
+        assert!(!bar.scroll_due(fpu, 0.55));
+        // The delay is the float 0.1, a little more than the double.
+        assert!(!bar.scroll_due(fpu, 0.6000000001));
+        assert!(bar.scroll_due(fpu, 0.6000000015));
     }
 
     #[test]

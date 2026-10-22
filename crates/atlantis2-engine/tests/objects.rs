@@ -17,11 +17,15 @@
 use std::path::PathBuf;
 
 use atlantis2_data::defnames::{self, DefNames};
-use atlantis2_data::A2Files;
+use atlantis2_data::dialog::FontTxt;
+use atlantis2_data::messages::ObjectNames;
+use atlantis2_data::spr::SprBank;
+use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::bag::{UiBank, UiDraw};
 use atlantis2_engine::engine::objects_bank_name;
 use atlantis2_engine::script::{Host, Script};
-use atlantis2_engine::{CentreDraw, CursorBank, Engine, Fpu, Variant};
+use atlantis2_engine::subtitle::SubtitleFont;
+use atlantis2_engine::{CentreDraw, CursorBank, Engine, Event, Fpu, LoopType, Variant};
 
 const GOLDEN: &str = include_str!("golden/objects.txt");
 
@@ -632,11 +636,13 @@ fn the_bag_bar() {
     // The centre draws nothing while the bar is open; the view does not
     // turn.
     assert!(e.centre_draws.is_empty());
+    let angles = e.angles_deg();
     // The left edge scrolls one object per 0.1 s.
     e.mouse_motion(-400, 200);
     assert_eq!(e.pointer, (0, 440));
     e.set_clock(1.0);
     e.pass(None);
+    assert_eq!(e.angles_deg(), angles);
     assert_eq!(e.bar.first, 1);
     e.pass(None);
     assert_eq!(e.bar.first, 1);
@@ -646,11 +652,16 @@ fn the_bag_bar() {
     // Over the second cell: its name, black then white, above the bar.
     e.mouse_motion(120, 0);
     e.pass(None);
-    let texts: Vec<(i32, i32, u32)> = e
+    let texts: Vec<(i32, i32, u32, Vec<u8>)> = e
         .ui_draws
         .iter()
         .filter_map(|d| match d {
-            UiDraw::Text { x, y, colour, .. } => Some((*x, *y, *colour)),
+            UiDraw::Text {
+                x,
+                y,
+                colour,
+                bytes,
+            } => Some((*x, *y, *colour, bytes.clone())),
             UiDraw::Sprite { .. } => None,
         })
         .collect();
@@ -658,6 +669,24 @@ fn the_bag_bar() {
     assert_eq!((texts[0].1, texts[0].2), (411, 0));
     assert_eq!((texts[1].1, texts[1].2), (410, 0xff_ffff));
     assert_eq!(texts[0].0, texts[1].0 + 1);
+    // The text is the object's `Messages.txt` name, in `AtlFT_POPUP`
+    // centred on the cell: x = 40 + 80 k − width / 2.
+    let files = e.files();
+    let names = ObjectNames::parse(&files.read(Folder::Loc, "Messages.txt").unwrap());
+    let name = names.get(obj_name(&e, 53).as_bytes()).to_vec();
+    assert!(!name.is_empty());
+    assert_eq!((&texts[0].3, &texts[1].3), (&name, &name));
+    let font_txt = FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
+    let file = font_txt.font("AtlFT_POPUP").unwrap().file.clone();
+    let popup = SubtitleFont::named(
+        files.read(Folder::Loc, &file).unwrap(),
+        &font_txt,
+        "AtlFT_POPUP",
+    )
+    .unwrap();
+    let width = popup.extent(&name).0;
+    assert!(width > 0);
+    assert_eq!(texts[1].0, (40 + 80 - width / 2).clamp(0, 640 - width));
     // A click on the second cell: the object in the hand, the bar closed.
     e.click(2.0);
     e.pass(Some(&mut screen));
@@ -683,6 +712,265 @@ fn the_bag_bar() {
     e.right_click();
     assert!(!e.bar.open);
     assert_eq!((e.vars.objet_en_main, e.hand), (0, None));
+}
+
+/// Only object `id` in the bag, the bar opened and its first cell
+/// clicked at `t` seconds.
+fn pick_only(e: &mut Engine, id: i32, t: f64) {
+    e.script_state_mut().unwrap().bag.clear();
+    e.run_command(format!("(sacados={})", obj_name(e, id)).as_bytes());
+    assert!(!e.overlays.any());
+    e.right_click();
+    assert!(e.bar.open);
+    let (px, py) = e.pointer;
+    e.mouse_motion(40 - px, 440 - py);
+    e.click(t);
+    e.pass(None);
+    assert!(!e.bar.open);
+}
+
+/// The sprites of bank `bank` the last pass asked for.
+fn sprites_of(e: &Engine, bank: UiBank) -> Vec<(i32, i32, i32)> {
+    e.ui_draws
+        .iter()
+        .filter_map(|d| match d {
+            UiDraw::Sprite {
+                bank: b,
+                frame,
+                x,
+                y,
+            } if *b == bank => Some((*frame, *x, *y)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn set(e: &mut Engine, name: &str, v: i32) {
+    assert!(e.script_state_mut().unwrap().set_var(name, v), "{name}");
+}
+
+fn var(e: &Engine, name: &str) -> i32 {
+    e.script_state().unwrap().var(name).unwrap()
+}
+
+/// The special objects picked from the bag, by the original's code
+/// (FUN_0047ec50 opens, FUN_0047efd0 clicks, FUN_0047ef20 closes,
+/// FUN_0047f0b0 draws, FUN_0049c6e0 the dowsing rod).
+#[test]
+fn the_special_objects() {
+    let Some(files) = game() else { return };
+    let mut e = new_game(files);
+    let names = defnames_of(&e);
+    let id = |n: &[u8]| names.id(defnames::OBJETS, n).unwrap() as i32;
+    // The frame table @ 0x005df744 as the notes list it (its first 16
+    // values).
+    const T: [i32; 16] = [0, 4, 3, 2, 1, 6, 5, 1, 4, 6, 2, 5, 3, 3, 1, 4];
+    let mut t = 10.0;
+    let mut click = |e: &mut Engine| {
+        t += 1.0;
+        e.click(t);
+        e.pass(None);
+    };
+
+    // A form: what the pick put in the hand is put aside, the pointer
+    // frame shown; frame 0 at the centre, then form 2's two stamps at
+    // y − 120 and y; the view does not turn.
+    e.enter_at(2, 0.0, 0.0).unwrap();
+    set(&mut e, "essai_laby1", 2);
+    set(&mut e, "essai_laby2", 5);
+    let form = id(b"FORMULAIRE_2");
+    let sprite = sprite_of(&e, form);
+    pick_only(&mut e, form, 1.0);
+    assert!(e.overlays.form && e.overlays.cover);
+    assert_eq!(e.overlays.centre, (320, 240));
+    assert_eq!((e.vars.objet_en_main, e.hand), (0, None));
+    assert_eq!(var(&e, "OBJETENMAIN"), 0);
+    assert_eq!(
+        (e.cursor.bank, e.cursor.shown),
+        (CursorBank::Interface, Some(40))
+    );
+    let o = &e.overlays;
+    assert_eq!(
+        (
+            o.saved_objetenmain,
+            o.saved_cursor_frame,
+            o.saved_hand_frame,
+            o.saved_hand_objects
+        ),
+        (form, sprite, sprite, true)
+    );
+    let angles = e.angles_deg();
+    e.mouse_motion(200, 50);
+    e.pass(None);
+    e.pass(None);
+    assert_eq!(e.angles_deg(), angles);
+    assert_eq!(
+        sprites_of(&e, UiBank::Form),
+        [(0, 320, 240), (T[2], 320, 120), (T[5], 320, 240)]
+    );
+    // A click gives back the object and the hand (and the cursor, which
+    // the warp draw then chooses again for the next frame), and closes.
+    click(&mut e);
+    assert!(!e.overlays.any() && !e.overlays.cover);
+    assert_eq!(e.vars.objet_en_main, form);
+    assert_eq!(e.hand, Some((form, sprite)));
+    assert!(sprites_of(&e, UiBank::Form).is_empty());
+
+    // The fan: frame 7, then row r's symbols T[T[4 + 3r + j]] at
+    // (x − 130, y − 50), (x, y − 100), (x + 130, y − 50).
+    set(&mut e, "soluce_laby", 3);
+    pick_only(&mut e, id(b"EVENTAIL"), 20.0);
+    assert!(e.overlays.fan && e.overlays.cover);
+    e.pass(None);
+    let row = |r: usize| {
+        let mut v = vec![(7, 320, 240)];
+        for (j, (x, y)) in [(190, 190), (320, 140), (450, 190)].into_iter().enumerate() {
+            v.push((T[T[4 + 3 * r + j] as usize], x, y));
+        }
+        v
+    };
+    assert_eq!(sprites_of(&e, UiBank::Form), row(3));
+    // A row outside 1..10: row 1, and the variable too.
+    set(&mut e, "soluce_laby", 0);
+    e.pass(None);
+    assert_eq!(sprites_of(&e, UiBank::Form), row(1));
+    assert_eq!(var(&e, "soluce_laby"), 1);
+    click(&mut e);
+    assert!(!e.overlays.any());
+
+    // The ring: `anneau.spr` frame 0 at the centre.
+    pick_only(&mut e, id(b"ANNEAU_GRAVE"), 30.0);
+    assert!(e.overlays.ring && e.overlays.cover);
+    e.pass(None);
+    assert_eq!(sprites_of(&e, UiBank::Ring), [(0, 320, 240)]);
+    click(&mut e);
+    assert!(!e.overlays.any());
+
+    // The ball, in the view of the zone its third parameter names: its
+    // bank is the second; frame 0 centred by its size while the centre is
+    // elsewhere, and the view still turns.
+    let ball = id(b"BOULE_SHAMAN");
+    let param = |n| {
+        let t = names
+            .param_text_of(defnames::OBJETS, ball as usize, n)
+            .unwrap();
+        atlantis2_engine::bag::param_word(t).to_vec()
+    };
+    let (bank_name, zone_name) = (param(2), param(3));
+    let bank = SprBank::parse(
+        &e.files()
+            .read(
+                atlantis2_data::Folder::Spr,
+                &String::from_utf8_lossy(&bank_name),
+            )
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(bank.len() > 2);
+    let (view, zone) = e
+        .wam()
+        .places
+        .iter()
+        .flat_map(|p| p.views.iter())
+        .find_map(|v| {
+            let z = v.zones.iter().position(|z| {
+                z.name
+                    .as_ref()
+                    .is_some_and(|n| n.as_bytes().eq_ignore_ascii_case(&zone_name))
+            })?;
+            Some((v.id, z))
+        })
+        .expect("the ball's zone");
+    e.enter_at(view, 0.0, 0.0).unwrap();
+    // The first click of the game sends it to chapter 75.
+    click(&mut e);
+    assert_eq!(e.script_state().unwrap().chapter, 75);
+    let (yaw, pitch) = e.zone_aim(view, zone).unwrap();
+    e.camera.enter(yaw + 1.0, pitch);
+    pick_only(&mut e, ball, 40.0);
+    assert!(e.overlays.ball && !e.overlays.cover);
+    assert_eq!(e.overlays.ball_frames, bank.len() as i32);
+    e.pass(None);
+    let info = bank.info(0).unwrap();
+    assert_eq!(
+        sprites_of(&e, UiBank::Ball),
+        [(0, 320 - i32::from(info.w) / 2, 240 - i32::from(info.h) / 2)]
+    );
+    let angles = e.angles_deg();
+    e.mouse_motion(30, 0);
+    e.pass(None);
+    assert_ne!(e.angles_deg(), angles);
+    // The centre on the zone: one frame per warp frame.
+    e.camera.enter(yaw, pitch);
+    e.pass(None);
+    assert!(e
+        .centre_zone()
+        .and_then(|(_, z)| z.name.as_ref())
+        .is_some_and(|n| n.as_bytes().eq_ignore_ascii_case(&zone_name)));
+    e.pass(None);
+    assert_eq!(e.overlays.ball_frame, 2);
+    let info = bank.info(2).unwrap();
+    assert_eq!(
+        sprites_of(&e, UiBank::Ball),
+        [(2, 320 - i32::from(info.w) / 2, 240 - i32::from(info.h) / 2)]
+    );
+    // A click there: closed (`SpaceTravel` = 0), then `SpaceTravel` = 1
+    // and a scan, whose section of chapter 75 plays film 200; the hand
+    // stays empty.
+    e.trace = true;
+    e.events.clear();
+    click(&mut e);
+    assert!(!e.overlays.any());
+    assert_eq!(var(&e, "OBJETENMAIN"), 0);
+    assert_eq!(e.hand, None);
+    assert!(e.events.iter().any(|ev| matches!(
+        ev,
+        Event::VideoStart { name, .. } if name.ends_with("200.hnm")
+    )));
+    assert_eq!(e.loop_type, LoopType::Video);
+}
+
+/// The dowsing rod (FUN_0049c6e0): taken from the bag it empties the
+/// hand and sets `SOURCIER`; drawn at (W / 2, H − 240), its frame swings
+/// between 0 and `NEARW77`; `NEARW77` = 0 puts it away.
+#[test]
+fn the_dowsing_rod() {
+    let Some(files) = game() else { return };
+    let mut e = new_game(files);
+    e.enter_at(2, 0.0, 0.0).unwrap();
+    let rod = defnames_of(&e)
+        .id(defnames::OBJETS, b"BATON_SOURCE")
+        .unwrap() as i32;
+    set(&mut e, "NEARW77", 3);
+    pick_only(&mut e, rod, 1.0);
+    assert!(e.rod.active);
+    assert!(e.rod.bank.as_ref().is_some_and(|b| b.len() >= 3));
+    assert_eq!(var(&e, "SOURCIER"), 1);
+    assert_eq!((var(&e, "OBJETENMAIN"), e.hand), (0, None));
+    assert_eq!(e.cursor.shown, None);
+    assert!(!e.overlays.any());
+    // The rod is drawn before the bar picks: from the next pass the
+    // frames are 0, 1, 2, then back at `NEARW77` (2, 1, 0) and at −1
+    // (0, 1).
+    let mut frames = Vec::new();
+    for _ in 0..8 {
+        e.pass(None);
+        let s = sprites_of(&e, UiBank::Rod);
+        assert_eq!(s.len(), 1);
+        assert_eq!((s[0].1, s[0].2), (320, 240));
+        frames.push(s[0].0);
+    }
+    assert_eq!(frames, [0, 1, 2, 2, 1, 0, 0, 1]);
+    // `NEARW77` = 0: put away.
+    set(&mut e, "NEARW77", 0);
+    e.pass(None);
+    assert!(!e.rod.active && e.rod.bank.is_none());
+    assert!(sprites_of(&e, UiBank::Rod).is_empty());
+    assert_eq!(var(&e, "SOURCIER"), 0);
+    assert_eq!(
+        (var(&e, "OBJETENMAIN"), e.hand, e.cursor.shown),
+        (0, None, None)
+    );
 }
 
 fn defnames_of(e: &Engine) -> DefNames {

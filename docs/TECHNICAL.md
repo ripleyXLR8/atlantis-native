@@ -788,14 +788,16 @@ view 4.
   the takes of Tibet's boats, the bag and hand keys, the visible counts,
   the scroll to the end and the centre draw of hand and cursor are the
   original's (`tests/objects.rs` against its emulated run); the bar's
-  frame, scroll, names, pick and the overlays follow its code as read
-  (no emulated golden of them yet). Not known: how `Messages.txt`'s
+  frame, scroll, names, pick, the overlays and the dowsing rod follow its
+  code as read (no emulated golden of them yet) and are run with the
+  game's files in the same test file. Not known: how `Messages.txt`'s
   reader splits a line (the port takes the rest of the line after the
   blanks as the name, as the shipped names hold spaces); the text's two
   colours (the calls pass 0 and −1, taken as black and white as for the
   subtitles); the frame of a stamp or symbol whose value is outside the
   executable's table (the original reads past it; the port draws
-  nothing); the 0.1 s scroll timer's constant (taken as the double 0.1).
+  nothing). The bar scrolls one entry when more than the float 0.1
+  (0.10000000149 s) has passed since its last scroll.
   The first frame after the bar closes shows its pointer frame at the
   screen centre, as the original's cursor pair still holds it until the
   next cursor choice.
