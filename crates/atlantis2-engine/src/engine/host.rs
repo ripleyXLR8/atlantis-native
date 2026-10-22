@@ -156,7 +156,8 @@ impl Engine {
     fn music_open(&mut self, at_mark: bool) {
         let n = self.player.current;
         if !at_mark {
-            // `srand(tick)`: the 15 Hz count [INFERRED: which tick].
+            // `srand` of the 15 Hz count (@ 0x0047743f reads the counter
+            // the 15 Hz task increments, @ 0x006569d8).
             self.rand = Rand::new(self.ticks);
         }
         let mark = if at_mark { self.player.mark } else { 0 };
@@ -314,29 +315,28 @@ impl Engine {
         }
     }
 
-    /// A dialog over a film (`cinema=N,M`): after each new video frame its
-    /// tick, and on every pass its draw over the frame.
+    /// A dialog over a film (`cinema=N,M`), on the video loop's new ticks
+    /// only (@ 0x0040c068): its step (@ 0x00480830, the line sequencer
+    /// alone, its result ignored), then its draw over the frame
+    /// (@ 0x00480840). The film's end ends it.
     pub(super) fn film_dialog_step(&mut self, new_tick: bool, out: Option<&mut [u16]>) {
         let (w, h) = (self.renderer.width(), self.renderer.height());
         let Some(d) = self.film_dialog.as_mut() else {
             return;
         };
-        if new_tick {
-            let mut ctx = TickContext {
-                files: &self.files,
-                camera: &mut self.camera,
-                voices: &self.voices,
-                voice_volume: self.voice_volume,
-                master: self.music.master,
-                clock: self.clock,
-                screen: (w as u32, h as u32),
-            };
-            if !d.tick(&mut ctx) {
-                d.end(&mut self.camera, &self.voices, (w as u32, h as u32));
-                self.film_dialog = None;
-                return;
-            }
+        if !new_tick {
+            return;
         }
+        let mut ctx = TickContext {
+            files: &self.files,
+            camera: &mut self.camera,
+            voices: &self.voices,
+            voice_volume: self.voice_volume,
+            master: self.music.master,
+            clock: self.clock,
+            screen: (w as u32, h as u32),
+        };
+        d.film_step(&mut ctx);
         if let Some(out) = out {
             let mut frame = FrameContext {
                 clock: self.clock,
@@ -457,14 +457,16 @@ impl Host for Engine {
     fn anim(&mut self, op: AnimOp) {
         let slots = &mut self.anim.slots;
         match op {
+            // Both stop at the first matching record (FUN_0048c6b0 jumps
+            // to the table update on its first hit, FUN_0048c610 too).
             AnimOp::Hide { kind, id } => {
-                for s in slots.iter_mut().filter(|s| s.id == id && s.kind == kind) {
+                if let Some(s) = slots.iter_mut().find(|s| s.id == id && s.kind == kind) {
                     s.active = false;
                     s.frame = 0;
                 }
             }
             AnimOp::Show { kind, id, number } => {
-                for s in slots.iter_mut().filter(|s| {
+                if let Some(s) = slots.iter_mut().find(|s| {
                     s.id == id && s.kind == kind && (number == 0 || s.state.anim as i32 == number)
                 }) {
                     s.active = true;

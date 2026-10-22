@@ -745,37 +745,46 @@ impl Engine {
 
     /// A left button press at `now` seconds (the input callback
     /// @ 0x0040c510): a click, and a double click when it follows the
-    /// previous one by less than 0.2 s.
+    /// previous one by less than 0.2 s, in every loop (the callback tests
+    /// the loop type only for the right button).
     /// During a dialog the click goes to it: the next line (the dialog's
     /// tick reads and clears the flag, @ 0x004801d0).
     pub fn click(&mut self, now: f64) {
+        self.double = self.last_click.is_some_and(|t| now - t < 0.2);
+        self.last_click = Some(now);
+        let double = self.double;
+        self.event(Event::Click { double });
         if let Some(d) = self.dialog.as_mut() {
             d.click();
             return;
         }
         self.click = true;
-        self.double = self.last_click.is_some_and(|t| now - t < 0.2);
-        self.last_click = Some(now);
-        let double = self.double;
-        self.event(Event::Click { double });
     }
 
     /// The 15 Hz task (@ 0x0040caa0) at the current clock: the counter and
-    /// the flags of the animations and the cursor, the music fade step, and
-    /// in the dialog loop the dialog's tick (@ 0x004801d0) and its end
-    /// (@ 0x004808a0) when it has no line left.
+    /// the flags of the animations and the cursor, the music fade step, in
+    /// the dialog loop the dialog's tick and end, then the script clocks.
     pub fn tick(&mut self) {
         self.ticks = self.ticks.wrapping_add(1);
         self.spw_flag = true;
         self.cursor_flag = true;
         let t = self.clock;
-        // The script clocks (@ 0x0040cabd..0x0040cb4e).
+        self.fade_step();
+        // The dialog's step and end come before the script clocks
+        // (@ 0x0040caeb, 0x0040caf4, then 0x0040caf9..0x0040cb4e): a
+        // section resumed by the dialog's end sees the clocks of the
+        // previous tick.
+        self.dialog_tick(t);
         let last = self.last_tick;
         self.last_tick = t;
         if let Some(s) = self.con.as_mut() {
             s.tick(t, last);
         }
-        self.fade_step();
+    }
+
+    /// In the dialog loop, the dialog's tick (@ 0x004801d0) and its end
+    /// (@ 0x004808a0) when it has no line left.
+    fn dialog_tick(&mut self, t: f64) {
         if self.loop_type != LoopType::Dialog {
             return;
         }
@@ -1565,8 +1574,13 @@ impl Engine {
                 }
             }
         }
-        if let Some(out) = out.as_deref_mut() {
-            blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
+        // The original's loop draws on its new ticks only (@ 0x0040c068);
+        // the port also redraws the frame between them, the same pixels,
+        // except under a film's dialog, which is drawn once per tick.
+        if new_tick || self.film_dialog.is_none() {
+            if let Some(out) = out.as_deref_mut() {
+                blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
+            }
         }
         let end = v.end;
         if let Some(k) = shown {
@@ -1602,8 +1616,7 @@ impl Engine {
             self.music_after_video = true;
         }
         if let Some(mut d) = self.film_dialog.take() {
-            let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
-            d.end(&mut self.camera, &self.voices, screen);
+            d.remove(&self.voices);
         }
         // The section the film interrupted goes on.
         self.with_script(|s, h| s.video_ended(h));

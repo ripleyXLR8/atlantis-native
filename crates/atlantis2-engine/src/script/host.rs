@@ -35,12 +35,12 @@
 /// `#OBJETS#`, then `#PERSONNAGES#`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AnimOp {
-    /// `hideperso` / `hideobjet` without `,x` (FUN_0048c6b0): the records
-    /// of `id` and `kind` get visible = 0 and frame = 0.
+    /// `hideperso` / `hideobjet` without `,x` (FUN_0048c6b0): the first
+    /// record of `id` and `kind` gets visible = 0 and frame = 0.
     Hide { kind: i32, id: i32 },
-    /// `showperso` / `showobjet` (FUN_0048c610): the records of `id` and
-    /// `kind` get visible = 1; with `number` ≠ 0, only the record playing
-    /// animation `number`.
+    /// `showperso` / `showobjet` (FUN_0048c610): the first record of `id`
+    /// and `kind` gets visible = 1; with `number` ≠ 0, the first one
+    /// playing animation `number`.
     Show { kind: i32, id: i32, number: i32 },
     /// `PLAYANIMP` / `PLAYANIMO` (branches of `SetVariables`
     /// @ 0x004818f0): switch `id` to its record playing animation `number`.

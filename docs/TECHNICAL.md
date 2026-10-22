@@ -757,10 +757,11 @@ view 4.
   `music\` copies are empty until `LOADMUSIK`, which, like `delmusik`,
   does nothing here). Every track decoded from its start and from each of
   the 83 marks, the random marks and the list choices are the
-  original's (tests/music.rs). Known differences: a track is decoded whole
+  original's (tests/music.rs); an opening from the start seeds `rand`
+  with the 15 Hz count, as the original does. Known differences: a track is decoded whole
   and switched when it has been heard to its end, where the original's
   ring switches about 5.8 s earlier (the last 5.8 s of a track followed
-  by another are never heard there: an owner's choice); with an empty
+  by another are never heard there); with an empty
   list the original loops the ring's last 5.9 s, Native the whole track;
   the music player shares the C runtime's `rand` with the dialogs, which
   the original also shares with the place animations (two generators
@@ -821,8 +822,9 @@ view 4.
   font's hinting, which this does not, so a few pixels of a glyph differ
   from the original's (the one known difference). The voices are mixed as
   DirectSound mixes its buffers (gain 10^(attenuation / 2000)). With
-  `cinema=N,M` dialog M plays over film N: its tick after each video frame
-  and its subtitles over the frame, ended with the film (FUN_0040c030;
+  `cinema=N,M` dialog M plays over film N: at each video tick its line
+  sequencer alone (no click, no camera change; its end is ignored), then
+  its draw over the frame, the dialog removed when the film ends (FUN_0040c030;
   what the dialog step draws there is the dialog frame's own rule, no
   Tibet film has one). Not there yet: the `voixoff0` and `cinema` lines'
   pictures. The lines, the
@@ -860,6 +862,7 @@ view 4.
   of the zones of that value in the first such view of the current place
   ± 88888), `ABORTDEPART`, the show / hide table and the animation keys on
   the view's slots (`hideperso`, `showperso`, `hideobjet`, `showobjet`,
+  each on the first matching slot only,
   `PLAYANIMP` / `O`, `CONTINUEANIM`, `STOPANIM`, `GOTOFRAME*`,
   `ADDFRAME*`, `ChangeAnimGotoPerso`, and the `NUMFRAME*` conditions;
   only the first four occur in Tibet, the others follow the original's

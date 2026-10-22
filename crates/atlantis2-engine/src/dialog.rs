@@ -652,6 +652,19 @@ impl Dialog {
             camera.yaw(PI_F);
             camera.set_fov(crate::camera::WARP_FOV, screen.0, screen.1);
         }
+        self.remove(voices);
+    }
+
+    /// The step of a dialog played over a film (@ 0x00480830): the line
+    /// sequencer alone, its result ignored (the film's end ends the
+    /// dialog). No click, no camera.
+    pub fn film_step(&mut self, ctx: &mut TickContext) {
+        self.sequencer(ctx);
+    }
+
+    /// `Remove` (@ 0x00460290): the voice stops and the dialog is emptied;
+    /// all a dialog over a film gets at the film's end (@ 0x00480a40).
+    pub fn remove(&mut self, voices: &Voices) {
         self.hidden = None;
         voices.stop(VOICE_DIALOG);
         self.current = None;

@@ -118,7 +118,7 @@ pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
 }
 
 /// `--headless`: runs `frames` frames of 1/60 s without input (the 15 Hz
-/// tick every fourth frame), prints where the game is, and writes the
+/// ticks run on the scheduler's clock), prints where the game is, and writes the
 /// screen to `screenshot` (PNG) when given.
 pub fn headless(
     dir: &Path,

@@ -344,6 +344,27 @@ mod tests {
     }
 
     #[test]
+    fn lf_lines_and_names_after_the_end() {
+        let d = DefNames::parse(
+            b"// comment\n#PERSONNAGES#\nDUMMY\n  shaman // the old man\n#OBJETS#\nDUMMY\nCHEVAL,26\n\
+              #ZONES_CLIC#\nDUMMY\nzone_a\n#END_OF_FILE#\nLATE\n",
+        )
+        .unwrap();
+        assert_eq!(d.id(0, b"shaman)"), Ok(1));
+        assert!(matches!(
+            d.id(0, b"SHAMANW10"),
+            Err(NameError::Unknown(0, _))
+        ));
+        assert_eq!(d.param(1, b"cheval"), 26);
+        assert_eq!(d.param(0, b"SHAMAN"), 0);
+        assert_eq!(d.id(4, b"ZONE_A"), Ok(1));
+        assert_eq!(d.name(4, 1), Some(&b"ZONE_A"[..]));
+        // A name after `#END_OF_FILE#` belongs to no section.
+        assert_eq!(d.len(4), 2);
+        assert!(matches!(d.id(4, b"LATE"), Err(NameError::Unknown(4, _))));
+    }
+
+    #[test]
     fn refused_files() {
         assert_eq!(
             DefNames::parse(b"#VARIABLES#\r\nA\r\n").unwrap_err(),
