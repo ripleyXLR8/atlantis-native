@@ -1,0 +1,106 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# SetVariables (0x004818f0) on synthetic lines LINE CRLF /000 CRLF, in order, from
+# chapter 75 at view 7 with {3:229} = 377: offset returned, calls, every change of
+# the variables, flags, subjects (value/index/enabled), bag (id/sprite/world), show/hide
+# table (id/shown/kind) and globals, warnings. The dialog and resume flags are cleared
+# before each line.
+# Names of defnames.con entries that are not strings of the executable are written
+# {S:I} (section, index; :l in lower case); the test fills them in from the game's file.
+# Stubbed, recorded with their arguments: logging (0x004816e0, 0x00401dc0, the warning
+# 0x00480c20 and the fatal 0x00480cd0, which returns), and every callee with an effect
+# outside the script tables: WAM load and view lookup / entry (fake view records), video
+# start, sound and music, dialog start / stop, CD and world change, camera turn and zoom,
+# message and picture viewers, credits, zone enabling, bag layout, the music step,
+# LoadCurrentChap and (set, tibet, tibet_scan) RunInit.
+/set(flag500=1) | ret=16 | calls=- | changes=flag[500]=1
+/set(FLAG7=3) | ret=14 | calls=- | changes=flag[7]=3
+/set(flag7=-2) | ret=15 | calls=- | changes=flag[7]=-2
+/set(Flag008=4) | ret=16 | calls=- | changes=flag[8]=4
+/set(flag7++) | ret=14 | calls=- | changes=flag[7]=0
+/set(flag 9=2) | ret=15 | calls=- | changes=var[1]=2
+/set({3:18:l}=5) | ret=18 | calls=- | changes=var[18]=5
+/set({3:18:l}++) | ret=18 | calls=- | changes=var[18]=6
+/set({3:18:l}--) | ret=18 | calls=- | changes=var[18]=5
+/set({3:200:l}=1) | ret=19 | calls=- | changes=var[200]=1
+/set({3:216}=1) | ret=21 | calls=- | changes=var[216]=1
+/set({3:130:l}=1) | ret=16 | calls=- | changes=var[130]=1
+/set({3:218}++) | ret=18 | calls=- | changes=var[218]=1
+/set({3:218}++) | ret=18 | calls=- | changes=var[218]=2
+/set({3:218}--) | ret=18 | calls=- | changes=var[218]=1
+/set({3:218}=++) | ret=19 | calls=- | changes=var[218]=0
+/set({3:213:l}=1) | ret=20 | calls=- | changes=var[213]=1
+/set({3:213:l}=0) | ret=20 | calls=- | changes=var[213]=0
+/set({3:230}=5) | ret=32 | calls=- | changes=var[230]=5
+/set(VignetteSave=11) | ret=22 | calls=- | changes=var[179]=11
+/set(testtime1=1) | ret=18 | calls=- | changes=var[79]=1
+/set(time1=7) | ret=14 | calls=- | changes=var[78]=7
+/set(time1=0) | ret=14 | calls=- | changes=var[78]=0
+/set({3:218}=-3) | ret=19 | calls=- | changes=var[218]=-3
+/set({3:218}=12abc) | ret=22 | calls=- | changes=var[218]=12
+/set({3:218}=abc) | ret=20 | calls=- | changes=var[218]=0
+/set(etoiles_fini=1) | ret=21 | calls=- | changes=var[173]=1
+/set(finperle=1) | ret=17 | calls=- | changes=var[105]=1
+/set(udada=1) | ret=14 | calls=- | changes=var[180]=1
+/set(anglewarpx=-90) | ret=21 | calls=- | changes=angle_x_rad=-1.570796 warp_x=-1.570796 warp_y=0.0
+/set(ANGLEWARPY=30) | ret=20 | calls=- | changes=angle_y_rad=0.523599 warp_y=0.523599
+/set(ANGLEWARPY=0) | ret=19 | calls=- | changes=angle_y_rad=0.0 warp_y=0.0
+/set(anglewarpxnow=75) | ret=23 | calls=AtlWarp_SetAngleXNow(1.309) | changes=angle_x_rad=1.308997
+/set(AngleWarpYNow=-10) | ret=24 | calls=AtlWarp_SetAngleYNow(-0.174533) | changes=angle_y_rad=-0.174533
+/set(limiteanglewarpy=50) | ret=26 | calls=- | changes=var[46]=50
+/set(limiteanglewarpx=999) | ret=27 | calls=- | changes=var[45]=-1
+/set(ZoomStart=1.5) | ret=20 | calls=AtlWarp_ZoomStart(1.5, 35) | changes=-
+/set(ZoomPsychoStart=2,0.25) | ret=29 | calls=AtlWarp_ZoomPsychoStart(2, 0.25) | changes=-
+/set(changewam=tibet.wam) | ret=26 | calls=AtlWam_Load('tibet.wam') | changes=wam='tibet.wam'
+/set(cinema=69) | ret=16 | calls=AtlMuzik_Volume(20) Input_Refresh() AtlSound_CinemaApc('cine069.apc') Input_Refresh() AtlHnm_start('cine069.hnm') | changes=resume_pending=1
+/set(cinema=21,12) | ret=19 | calls=AtlMuzik_Volume(20) Input_Refresh() AtlSound_CinemaApc('cine021.apc') Input_Refresh() AtlHnm_startAt('cine021.hnm', 12) | changes=resume_pending=1
+/set(cinema=???) | ret=17 | calls=- | changes=-
+/set(TrajSound=traj01) | ret=23 | calls=- | changes=traj='traj01.apc'
+/set(cinema=?) | ret=15 | calls=- | changes=-
+/set(LOADMUSIK=1,2,3) | ret=22 | calls=AtlMuzik_Load('1,2,3)') | changes=-
+/set(delmusik=20,21,22) | ret=24 | calls=AtlMuzik_Del('20,21,22)') | changes=-
+/set(startmusik=20-3) | ret=22 | calls=AtlMuzik_Start(0x006d0444)() | changes=musik='20-3)'
+/set(stopmusik=1) | ret=18 | calls=AtlMuzik_Stop() | changes=-
+/set(newsound=12) | ret=18 | calls=AtlSound_NewSound('sound012.apc') | changes=-
+/set(stopsound=1) | ret=18 | calls=- | changes=- | errors=warning:SetVariables() : STOPSOUND a faire
+/set(enablesuj={0:1},{0:1},{2:52}) | ret=39 | calls=- | changes=subj[1]=10/46/1;12/52/1
+/set(enablesuj={0:1},{2:45}) | ret=31 | calls=- | changes=subj[1]=10/46/1;12/52/1;6/45/1
+/set(disablesuj={0:1},{2:45}) | ret=32 | calls=- | changes=subj[1]=10/46/1;12/52/1;6/45/0
+/set(enablesuj={0:1},{2:45}) | ret=31 | calls=- | changes=subj[1]=10/46/1;12/52/1;6/45/1
+/set(killsuj={0:1},{0:1}) | ret=28 | calls=- | changes=subj[1]=12/52/1;6/45/1
+/set(clearsuj={0:1}) | ret=22 | calls=- | changes=subj[1]=
+/set(sacados={1:198}) | ret=27 | calls=Inventaire_Layout() Inventaire_Step() | changes=bag=198/spr5/w0
+/set(sacados={1:198}) | ret=27 | calls=- | changes=- | errors=warning:PrendObj(%s) : deja pris!!
+/set(sacados={1:167}) | ret=29 | calls=Inventaire_Layout() Inventaire_Step() | changes=bag=198/spr5/w0;167/spr4/w0
+/set(ChangeObjectWorld={1:198},3) | ret=39 | calls=- | changes=bag=198/spr5/w3;167/spr4/w0
+/set(sacados=NOT_{1:198}) | ret=31 | calls=- | changes=bag=167/spr4/w0
+/set(objetenmain={1:167}) | ret=33 | calls=- | changes=var[28]=167 cursor_spr=4
+/set(objetenmain=0) | ret=20 | calls=- | changes=var[28]=0 cursor_spr=0
+/set(hideperso={0:32}) | ret=29 | calls=- | changes=vis=32/0/1
+/set(showperso={0:5}) | ret=28 | calls=- | changes=vis=32/0/1;5/1/1
+/set(showperso={0:5},3) | ret=30 | calls=- | changes=-
+/set(hideperso={0:5},1) | ret=30 | calls=- | changes=vis=32/0/1;5/0/1
+/set(hideobjet={1:127}) | ret=28 | calls=- | changes=vis=32/0/1;5/0/1;127/0/2
+/set(showobjet={1:54}) | ret=28 | calls=- | changes=vis=32/0/1;5/0/1;127/0/2;54/1/2
+/set(hideguest=1) | ret=18 | calls=- | changes=showguest=0
+/set(showguest=1) | ret=18 | calls=- | changes=showguest=1
+/set(incperso=1) | ret=17 | calls=- | changes=incperso=1
+/set(incperso=99) | ret=18 | calls=- | changes=incperso=0
+/set(addguest=1) | ret=17 | calls=- | changes=-
+/set(subguest=1) | ret=17 | calls=- | changes=-
+/set(disable=1) | ret=16 | calls=- | changes=-
+/set(sujet=3) | ret=14 | calls=- | changes=-
+/set(deposeobj={1:6}) | ret=23 | calls=- | changes=- | errors=warning:SetVariables() : DEPOSEOBJ a faire
+/set(dial=360) | ret=15 | calls=AtlDial_start(360) AtlMuzik_Volume(16) | changes=resume_pending=1
+/set(dial={3:229}) | ret=23 | calls=AtlDial_start(377) AtlMuzik_Volume(16) | changes=resume_pending=1
+/set(monde=5) | ret=14 | calls=Interp_SetMonde(5, 1) | changes=var[91]=5
+/set(changecd=2) | ret=17 | calls=AtlCD_Change(1, 1) | changes=-
+/set(nextvue=12) | ret=17 | calls=AtlWam_FindView(12) | changes=var[13]=12 next_view_ptr=view#12
+/set(vue=10) | ret=13 | calls=AtlWam_FindView(10) AtlWarp_EnterView(view#10) | changes=var[1]=0 var[4]=7 var[7]=7 var[12]=10 var[46]=70 cur_view_no=10
+/set(chapter=75) | ret=17 | calls=LoadCurrentChap(75) RunInit() | changes=chapter_reload=1
+/set(MESSAGE_CLIC=12) | ret=22 | calls=MessageClic('12)', 0) | changes=-
+/set(ViewBigSpr=bigspr01) | ret=26 | calls=ViewBigSpr_Start('bigspr01)') | changes=-
+/set(DisableZoneClicNWNZ=10,3) | ret=31 | calls=AtlWam_EnableZone(vue, zone, on)(10, 3, 0) | changes=var[219]=10
+/set(EnableZoneClicNWNameZ=10,{4:52}) | ret=40 | calls=AtlWam_EnableZone(vue, zone, on)(10, 52, 1) | changes=var[240]=10
+/set(exit=1) | ret=13 | calls=- | changes=var[77]=1 quit=1

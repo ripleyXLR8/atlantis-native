@@ -1,0 +1,15 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# Lines counted ('++') where the walks run a line twice: RunInit (0x00484040) on the
+# `init` chapter, with flag 2 clear and set; a chapter change by CtrlScenarIN (0x00483c90)
+# from the `from` chapter, LoadCurrentChap stubbed to put the `to` chapter in the buffer (and
+# recorded); RunInit called directly on the `to` chapter (a new game's path). | = CRLF.
+# init chapter: /INIT|/set(time2++)|/010|/con(flag2=1)|/set(time1++)|/set(time1++)|/set(time1++)|/000|/FININIT|/000|
+# from chapter: /INIT|/FININIT|/001|/con(flag1=1)|/set(chapter=99)|/set(flag3=1)|/000|
+# to chapter: /INIT|/set(time1++)|/set(time2++)|/FININIT|/000|
+init flag2=0: time1=0 time2=1 flag3=0
+init flag2=1: time1=5 time2=1 flag3=0
+scan chapter: time1=2 time2=1 flag3=0 ret=46 calls=LoadCurrentChap(99)
+new game init: time1=1 time2=1 flag3=0
+errors -

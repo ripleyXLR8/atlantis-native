@@ -8,15 +8,19 @@
 //! - [`files`]: the install folder and the four discs, with the disc rule
 //!   of the `MONDE` script variable;
 //! - [`wam`]: the `WAM V2.8` place files (views, moves, 3D click zones);
-//! - [`con`]: what a new game starts with, read from `chapi000.con`.
+//! - [`con`]: what a new game starts with, read from `chapi000.con`, and
+//!   the C number conversions of the CON interpreter;
+//! - [`defnames`]: `defnames.con`, the names the CON scripts use.
 
 #![forbid(unsafe_code)]
 
 pub mod con;
+pub mod defnames;
 pub mod exe;
 pub mod files;
 pub mod wam;
 
+pub use defnames::DefNames;
 pub use exe::{identify, Build, ExeError};
 pub use files::{A2Files, Folder};
 pub use wam::Wam;

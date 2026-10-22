@@ -4,7 +4,9 @@
 //! build of 1999, 2199552 bytes) so that each behaviour stays traceable to
 //! the original code. For now it shows a view: the cube panorama drawn as
 //! the original draws it, turned with the mouse within the original's
-//! limits; a new game opens on its first view.
+//! limits; a new game opens on its first view. The CON interpreter
+//! ([`script`]) runs the chapter scripts as the original does, its effects
+//! outside the script tables going through [`script::Host`].
 
 #![forbid(unsafe_code)]
 
@@ -13,9 +15,11 @@ pub mod engine;
 pub mod fpu;
 pub mod look;
 pub mod png;
+pub mod script;
 pub mod warp;
 
 pub use camera::Camera;
 pub use engine::{Engine, EngineError};
 pub use fpu::Fpu;
+pub use script::Script;
 pub use warp::{Renderer, Variant};
