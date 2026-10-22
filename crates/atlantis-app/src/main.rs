@@ -161,9 +161,43 @@ fn main() {
         }
         None => None,
     };
+    // Atlantis II's bag aids: `--take <names>`, `--hold <name>`, `--bag`,
+    // `--pointer <x>,<y>`.
+    let mut text_value = |name: &str| -> Option<String> {
+        let i = args.iter().position(|a| a == name)?;
+        args.remove(i);
+        if i >= args.len() {
+            eprintln!("{name} needs a value");
+            std::process::exit(2);
+        }
+        Some(args.remove(i))
+    };
+    let take = text_value("--take");
+    let hold = text_value("--hold");
+    let pointer = text_value("--pointer").map(|v| {
+        atlantis_app::a2::A2Start::parse_pointer(&v).unwrap_or_else(|| {
+            eprintln!("--pointer {v}: not <x>,<y>");
+            std::process::exit(2);
+        })
+    });
+    let bag = match args.iter().position(|a| a == "--bag") {
+        Some(i) => {
+            args.remove(i);
+            true
+        }
+        None => false,
+    };
     let a2_start = atlantis_app::a2::A2Start {
         view,
         dialog: dialog.map(|d| d.max(0) as u32),
+        take: take
+            .iter()
+            .flat_map(|t| t.split(','))
+            .map(str::to_string)
+            .collect(),
+        hold,
+        bag,
+        pointer,
     };
     // The options of one game only, refused for the other rather than
     // ignored.
@@ -185,6 +219,10 @@ fn main() {
         ("--screenshot", screenshot.is_some()),
         ("--dialog", dialog.is_some()),
         ("--view", view.is_some()),
+        ("--take", !a2_start.take.is_empty()),
+        ("--hold", a2_start.hold.is_some()),
+        ("--bag", a2_start.bag),
+        ("--pointer", a2_start.pointer.is_some()),
     ]
     .into_iter()
     .filter_map(|(name, on)| on.then_some(name))

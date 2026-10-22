@@ -4,9 +4,11 @@
 //! turn, the transition video, the arrival), the place animations playing.
 //! The chapter scripts run the game as the original's: the opening film,
 //! the music, the dialogs they call (a left click goes to the next line,
-//! Escape ends a dialog). A minimal mode of its own, beside the first
-//! game's front end: a window, the screen scaled to it, the sound; no menus,
-//! bag or subject menu yet.
+//! Escape ends a dialog). The right button opens the bag bar at the bottom
+//! of the screen (the mouse then moves a pointer over it; a click puts an
+//! object in the hand, drawn at the screen centre). A minimal mode of its
+//! own, beside the first game's front end: a window, the screen scaled to
+//! it, the sound; no menus or subject menu yet.
 //!
 //! The game folder is the installed one (`atlantis2.exe`, `wam\`,
 //! `scenar\`...); the discs (CD images or copies of the CDs) are looked for
@@ -16,7 +18,10 @@
 //! Testing aids: `--view <id>[,<yaw>,<pitch>]` starts in another view of
 //! the place (angles in degrees), `--dialog <n>` plays dialog `n` at once
 //! over the view (a click goes to the next line, as in the original), with
-//! its voices.
+//! its voices; `--take <object>[,<object>...]` puts objects in the bag and
+//! `--hold <object>` one in the hand (by their `defnames.con` names, as the
+//! scripts' `sacados` and `objetenmain` do), `--bag` opens the bag bar and
+//! `--pointer <x>,<y>` puts the mouse pointer there.
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -49,12 +54,19 @@ const KEY_TURN: i32 = 8;
 const FRAME: Duration = Duration::from_micros(16_667);
 
 /// Where a run starts besides the new game's first view (testing aids).
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct A2Start {
     /// A view of the place and its angles in degrees.
     pub view: Option<(u32, f32, f32)>,
     /// A dialog played at once.
     pub dialog: Option<u32>,
+    /// Objects put in the bag, one put in the hand (`defnames.con`
+    /// names).
+    pub take: Vec<String>,
+    pub hold: Option<String>,
+    /// The bag bar opened, the pointer moved.
+    pub bag: bool,
+    pub pointer: Option<(i32, i32)>,
 }
 
 impl A2Start {
@@ -67,10 +79,17 @@ impl A2Start {
         Some((id, yaw, pitch))
     }
 
-    /// Enters the view and starts the dialog (the opening film ended
-    /// first).
+    /// Parses `--pointer`'s value: `<x>,<y>`.
+    pub fn parse_pointer(v: &str) -> Option<(i32, i32)> {
+        let (x, y) = v.split_once(',')?;
+        Some((x.trim().parse().ok()?, y.trim().parse().ok()?))
+    }
+
+    /// Enters the view, starts the dialog, fills the bag and the hand,
+    /// opens the bar (the opening film ended first).
     pub fn apply(&self, engine: &mut Engine) -> Result<(), String> {
-        if self.view.is_some() || self.dialog.is_some() {
+        let bag_aids = !self.take.is_empty() || self.hold.is_some() || self.bag;
+        if self.view.is_some() || self.dialog.is_some() || bag_aids {
             engine.end_video();
         }
         if let Some((id, yaw, pitch)) = self.view {
@@ -80,6 +99,18 @@ impl A2Start {
         }
         if let Some(n) = self.dialog {
             engine.start_dialog(n).map_err(|e| e.to_string())?;
+        }
+        for name in &self.take {
+            engine.run_command(format!("(sacados={name})").as_bytes());
+        }
+        if let Some(name) = &self.hold {
+            engine.run_command(format!("(objetenmain={name})").as_bytes());
+        }
+        if self.bag {
+            engine.right_click();
+        }
+        if let Some(p) = self.pointer {
+            engine.pointer = p;
         }
         Ok(())
     }
@@ -364,6 +395,8 @@ impl ApplicationHandler for A2App {
                     // the bag.
                     let now = self.started.elapsed().as_secs_f64();
                     self.engine.click(now);
+                } else if button == MouseButton::Right {
+                    self.engine.right_click();
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {

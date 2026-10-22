@@ -12,11 +12,13 @@
 //! ([`subtitle`]), the reverse shots and the music ducked.
 //! The CON interpreter ([`script`]) runs the chapter scripts as the
 //! original does, its effects outside the script tables going through
-//! [`script::Host`], which the engine implements.
+//! [`script::Host`], which the engine implements. The bag bar, the object
+//! in hand and the overlays some objects open are in [`bag`].
 
 #![forbid(unsafe_code)]
 
 pub mod anim;
+pub mod bag;
 pub mod camera;
 pub mod crt;
 pub mod dialog;

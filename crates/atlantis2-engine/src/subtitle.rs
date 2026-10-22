@@ -238,7 +238,13 @@ pub struct SubtitleFont {
 impl SubtitleFont {
     /// The dialog font of `font_txt` from `ttf`, the bytes of its file.
     pub fn new(ttf: Vec<u8>, font_txt: &FontTxt) -> Option<SubtitleFont> {
-        let entry = font_txt.font("AtlFT_Dialog")?;
+        SubtitleFont::named(ttf, font_txt, "AtlFT_Dialog")
+    }
+
+    /// The font `id` of `font_txt` (`AtlFT_POPUP` for the bag's names,
+    /// 10 points: 13 pixels per em) from `ttf`.
+    pub fn named(ttf: Vec<u8>, font_txt: &FontTxt, id: &str) -> Option<SubtitleFont> {
+        let entry = font_txt.font(id)?;
         // CreateFontA(−MulDiv(height, LOGPIXELSY, 72)) at 96 DPI.
         let ppem = ((i64::from(entry.height) * 96 + 36) / 72) as u16;
         let widths = hdmx_widths(&ttf, ppem as u8);

@@ -17,7 +17,8 @@
 //! - [`db`]: the `.db` 3D scenes (the dialog heads, the 3D puzzles);
 //! - [`tga`]: the heads' texture maps;
 //! - [`dialog`]: the dialog scripts' speakers and lines, their texts, the
-//!   worlds' file sets and heroes, and `Font.txt`.
+//!   worlds' file sets and heroes, and `Font.txt`;
+//! - [`messages`]: the object names the bag bar shows.
 
 #![forbid(unsafe_code)]
 
@@ -27,6 +28,7 @@ pub mod defnames;
 pub mod dialog;
 pub mod exe;
 pub mod files;
+pub mod messages;
 pub mod spr;
 pub mod spw;
 pub mod tga;

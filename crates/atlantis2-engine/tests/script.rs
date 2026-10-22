@@ -205,7 +205,7 @@ impl Host for Rec {
         self.push(format!("AtlCD_Change({disc}, 1)"));
         true
     }
-    fn bag_layout(&mut self) {
+    fn bag_layout(&mut self, _visible: i32) {
         self.push("Inventaire_Layout()".into());
         self.push("Inventaire_Step()".into());
     }
