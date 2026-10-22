@@ -150,6 +150,29 @@ fn synthetic_parse_leading_nul_name() {
     assert_eq!(canon_all(&w), synthetic::K_CANON_LEADING_NUL);
 }
 
+// The NPC view enumerator FUN_0045240c stops at view 0x1ff (0x00452465):
+// the 17th bitmap dword (views 512..543) is never listed, the 16th's top bit
+// (view 511) is.
+#[test]
+fn synthetic_npc_views_stop_at_0x1ff() {
+    let mut data = synthetic::K_WAM_STANDARD.to_vec();
+    let name = b"a001q001.spw";
+    let at = data
+        .windows(name.len())
+        .position(|w| w == name)
+        .expect("NPC 601's sprite name");
+    // The block: index (2), perso (4), sprite (13), then the bitmap at +0x1e.
+    let bitmap = at - 6 + 0x1e;
+    let before = Wam::parse(&data).npcs[0].vues.clone();
+    data[bitmap + 15 * 4 + 3] |= 0x80;
+    data[bitmap + 16 * 4..bitmap + 17 * 4].copy_from_slice(&[0xff; 4]);
+    let w = Wam::parse(&data);
+    assert_eq!(w.npcs[0].perso_id, 601);
+    let mut want = before;
+    want.push(511);
+    assert_eq!(w.npcs[0].vues, want);
+}
+
 fn read_wam(big: &BigArchive, name: &str) -> Wam {
     let data = big
         .read(&format!("WAM\\{name}"))

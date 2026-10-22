@@ -8,7 +8,7 @@
 //! The engine is one async task ([`run`]): where the original presents a
 //! frame and polls its events, the code awaits [`Sys::frame`].
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
@@ -209,6 +209,13 @@ pub struct Engine {
     pub chapter: u32,
     /// The CON clocks (ChapterTime, Time1, Time2).
     pub clocks: ConClocks,
+    /// The epoch 0x00bcb5b8 of the game clock `FUN_00451d0c`
+    /// ([`Engine::game_clock_ms`]), taken by `FUN_00451cec` at boot
+    /// (WinMain @ 0x004193e8 -> `FUN_0041b7f0` @ 0x0041b80d: the engine's
+    /// creation here), at the inventory bar's exit (0x0042c844) and after
+    /// the in-game menu (0x0041cb84) ([`Engine::rebase_con_clocks`]).
+    /// Shared with the ambient sounds' clock.
+    pub(crate) clock_epoch: Rc<Cell<u64>>,
     /// The CON variables.
     pub vars: Vars,
     /// The music and the NewSound sample.
@@ -325,6 +332,10 @@ pub struct Engine {
     pub(crate) pointer_mouse_mark: (i32, i32),
     pub(crate) cursor_sprites: Vec<SprSprite>,
     pub(crate) cursor_state: WarpCursorState,
+    /// The double-click flag 0x00496118 and the press Windows pairs with
+    /// the next for WM_LBUTTONDBLCLK (set during the turn, tested before a
+    /// move's video @ 0x00423f8a).
+    pub(crate) turn_double_click: crate::turn::TurnDoubleClick,
     pub(crate) cursor_shown: i32,
     pub(crate) cursor_next_ms: u64,
 
@@ -342,12 +353,13 @@ pub struct Engine {
 /// The cursor has to be chosen again (`kWarpCursorUnset`).
 pub(crate) const CURSOR_UNSET: i32 = -2;
 
-/// The clock `FUN_004320bc` draws from, which redraws while the value &
-/// 0x7f is above 100: the original's clock moves while it spins. The
-/// engine's clock only moves between frames, so a draw of 101..127 spun
-/// forever (the window hung after a conversation, a video, a place
-/// change); each further read within one frame reads 1 ms later.
-pub(crate) fn spinning_clock(sys: Rc<Sys>) -> impl FnMut() -> u32 {
+/// The clock `FUN_004320bc` draws from, the game clock `FUN_00451d0c`
+/// (timeGetTime less the epoch 0x00bcb5b8, `epoch` here), which redraws
+/// while the value & 0x7f is above 100: the original's clock moves while it
+/// spins. The engine's clock only moves between frames, so a draw of
+/// 101..127 spun forever (the window hung after a conversation, a video, a
+/// place change); each further read within one frame reads 1 ms later.
+pub(crate) fn spinning_clock(sys: Rc<Sys>, epoch: Rc<Cell<u64>>) -> impl FnMut() -> u32 {
     let mut last = (u64::MAX, 0u64);
     move || {
         let now = sys.millis();
@@ -356,7 +368,7 @@ pub(crate) fn spinning_clock(sys: Rc<Sys>) -> impl FnMut() -> u32 {
         } else {
             (now, 0)
         };
-        (now + last.1) as u32
+        (now.wrapping_sub(epoch.get()) + last.1) as u32
     }
 }
 
@@ -364,8 +376,10 @@ impl Engine {
     pub fn new(sys: Rc<Sys>, game: Game, loader: Rc<dyn Loader>) -> Engine {
         let mut ambient = AmbientSounds::new();
         let clock_sys = sys.clone();
+        // FUN_00451cec @ 0x0041b80d: the game clock starts at boot.
+        let clock_epoch = Rc::new(Cell::new(sys.millis()));
         // FUN_004320bc draws from timeGetTime - 0x00bcb5b8 (FUN_00451d0c).
-        ambient.set_clock(spinning_clock(clock_sys));
+        ambient.set_clock(spinning_clock(clock_sys, clock_epoch.clone()));
         // The effects volume 0x00495e73 at full scale.
         ambient.effects_volume = 127;
         let ambient_out = MixerAmbientOutput::new(sys.mixer.clone());
@@ -389,6 +403,7 @@ impl Engine {
             last_vue: 0,
             chapter: 0,
             clocks: ConClocks::default(),
+            clock_epoch,
             vars: Vars::default(),
             music,
             abort: None,
@@ -448,6 +463,7 @@ impl Engine {
             pointer_mouse_mark: (0, 0),
             cursor_sprites: Vec::new(),
             cursor_state: WarpCursorState::default(),
+            turn_double_click: Default::default(),
             cursor_shown: CURSOR_UNSET,
             cursor_next_ms: 0,
             ix_buffers: Vec::new(),
@@ -491,9 +507,18 @@ impl Engine {
         self.current_place.and_then(|i| self.wam.places.get(i))
     }
 
-    /// The game clock (`FUN_00451d0c`, timeGetTime less its epoch).
+    /// The time the CON clocks are counted in: ChapterTime, Time1 and
+    /// Time2 are differences of two readings of the game clock
+    /// `FUN_00451d0c`, so any base serves; this one is the engine's.
     pub fn now(&self) -> u32 {
         self.sys.millis() as u32
+    }
+
+    /// The game clock `FUN_00451d0c`: timeGetTime() - [0x00bcb5b8], the
+    /// milliseconds since its epoch was last taken (`FUN_00451cec`: boot,
+    /// the inventory bar's exit, the in-game menu).
+    pub fn game_clock_ms(&self) -> u32 {
+        self.sys.millis().wrapping_sub(self.clock_epoch.get()) as u32
     }
 
     /// CHAPTERTIME: `FUN_0041c75c`, (now - start) / 1000.
@@ -538,16 +563,20 @@ impl Engine {
     /// bar and a resumed in-game menu (`FUN_0041c838` @ 0x0041cb84): Time1
     /// and Time2 resume from the values they stood at, ChapterTime starts
     /// again from 0.
+    /// `FUN_00451cec` first restarts the game clock at about 0.
     pub fn rebase_con_clocks(&mut self) {
+        self.clock_epoch.set(self.sys.millis());
         let (t1, t2) = (self.vars.get("time1"), self.vars.get("time2"));
         let now = self.now();
         self.clocks.rebase(now, t1, t2);
     }
 
     /// `FUN_0041c75c`, at the start of every warp frame (0x0041c086).
+    /// Random is the low byte of the game clock (0x0041c774).
     pub fn update_con_clocks(&mut self) {
         let now = self.now();
-        self.vars.set("random", (now & 0xff) as i32);
+        self.vars
+            .set("random", (self.game_clock_ms() & 0xff) as i32);
         self.vars.set("chaptertime", self.clocks.chapter_time(now));
         self.vars.set("time1", self.clocks.timer_value(1, now));
         self.vars.set("time2", self.clocks.timer_value(2, now));
@@ -570,22 +599,16 @@ impl Engine {
     }
 
     /// A WAM file, its centre table and sprite lists (`setupWAMByName`,
-    /// `FUN_00421ebc`).
+    /// `FUN_00421ebc`). The loader writes the fixed place records on every
+    /// load, the chapter's WAM included (a new game @ 0x004237b5, a load
+    /// @ 0x0042e354): the place table slots.
     pub async fn load_wam(&mut self, name: &str) -> bool {
-        self.load_wam_with(name, true).await
-    }
-
-    /// `record`: the place table slots are written (`setupWAMByName`; the
-    /// chapter's own WAM load `setupChapterWAM` does not).
-    pub(crate) async fn load_wam_with(&mut self, name: &str, record: bool) -> bool {
         let Some(data) = self.read(&format!("WAM\\{name}")).await else {
             return false;
         };
         self.wam = Wam::parse(&data);
         self.wam_name = name.to_ascii_uppercase();
-        if record {
-            self.record_place_table();
-        }
+        self.record_place_table();
         self.load_ambient_centres().await;
         self.load_sprite_list().await;
         self.load_spf_list().await;
@@ -660,7 +683,7 @@ impl Engine {
         if !in_play {
             self.set_view(0.0, 0.0);
         }
-        if !self.load_wam_with(NEW_GAME_WAM, false).await {
+        if !self.load_wam(NEW_GAME_WAM).await {
             log::error!("cannot start a new game: {NEW_GAME_WAM} missing");
             return;
         }
@@ -819,7 +842,14 @@ impl Engine {
                 // A Vue= inside a departure section already entered its
                 // place (CHAPI005 /113, CHAPI062 /864, CHAPI077 /010); the
                 // place loop goes on with the turn and video of entry i of
-                // the new place's record.
+                // the new place's record. ARRIVEEVUE = 0x006cd7c0 after the
+                // scan (0x00423def), which the Vue= set to the place entered
+                // (FUN_0042a100 @ 0x0042a6fd): the next pass's arrival scan
+                // runs with ArriveeVue = Vue = that place, LastVue = the
+                // place left.
+                let here = self.current_place_id.unwrap_or(0);
+                self.vars.set("arriveevue", i32::from(here));
+                self.arrival_from_vue = here;
                 self.next_place_id = None;
                 if !self.should_abort() && !game_over {
                     self.transition_after_departure_vue(index).await;
@@ -945,15 +975,20 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
 impl Engine {
     /// The start-up videos (0x0041960a..0x004196cc): LOGO15N.HNM and
     /// PREINTRO.HNM with their sounds, through the transition player at the
-    /// cinema pace, a 200-tick (1 s) wait that reads no input between them;
-    /// the Dutch build plays LOGORP.HNM after the wait.
+    /// cinema pace, a 200-tick (1 s) wait between them; the Dutch build
+    /// plays LOGORP.HNM after the wait.
     pub async fn play_startup(&mut self) {
         use crate::place::CINEMA_FRAME_MS;
         self.play_transition_video("LOGO15N.HNM", None, CINEMA_FRAME_MS)
             .await;
+        // The busy wait (0x00419662..0x0041967c, no call) reads no input but
+        // loses none: FUN_0042e624 fills the key table from
+        // GetAsyncKeyState, so the next video's first FUN_0041a298 poll sees
+        // a press made during the wait (a left button: 0x0049611c = 1;
+        // Escape: 0x00496124 = 0), unless it was already down at LOGO15N's
+        // last poll. The input events stay queued for that poll.
         let start = self.sys.millis();
         while self.sys.millis() - start < 1000 && !self.sys.should_quit() {
-            while self.sys.poll_event().is_some() {}
             self.sys.frame().await;
         }
         // The Dutch build: the R&P Electronic Media logo, through the same
@@ -996,7 +1031,7 @@ mod spinning_clock_tests {
     #[test]
     fn reads_advance_within_a_frame_and_the_variant_pick_ends() {
         let sys = Sys::new(Mixer::new());
-        let mut clock = spinning_clock(sys.clone());
+        let mut clock = spinning_clock(sys.clone(), Rc::new(Cell::new(0)));
         // Sys starts at 0 ms: 0, then 1 ms per read in the same frame.
         assert_eq!((clock(), clock(), clock()), (0, 1, 2));
         // Within a frame whose clock reads 115 (& 0x7f above 100) the
@@ -1008,7 +1043,7 @@ mod spinning_clock_tests {
             let p = picked.clone();
             let mut r = crate::sys::Runner::new(sys, async move {
                 let mut a = AmbientSounds::new();
-                a.set_clock(spinning_clock(s));
+                a.set_clock(spinning_clock(s, Rc::new(Cell::new(0))));
                 let obj = AmbientObject {
                     weights: [50, 50, 0, 0],
                     ..Default::default()
@@ -1060,6 +1095,41 @@ mod exit_and_menu_tests {
         }
         let got = got.borrow();
         assert_eq!(*got, [0, 7]);
+    }
+
+    /// The game clock FUN_00451d0c counts from its epoch: the engine's
+    /// creation (boot), then each rebase (FUN_00451cec); Random is its low
+    /// byte (0x0041c774).
+    #[test]
+    fn game_clock_restarts_with_the_con_clocks() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "game_clock_restarts_with_the_con_clocks",
+            move |mut e| async move {
+                e.sys.delay(500).await;
+                let before = e.game_clock_ms();
+                e.update_con_clocks();
+                let random = e.vars.get("random");
+                e.rebase_con_clocks();
+                let after = e.game_clock_ms();
+                e.update_con_clocks();
+                *g2.borrow_mut() = Some((
+                    before,
+                    random == (before & 0xff) as i32,
+                    after,
+                    e.vars.get("random"),
+                ));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let (before, random_ok, after, random) = got.borrow().unwrap();
+        assert!(before >= 500, "{before}");
+        assert!(random_ok);
+        assert_eq!((after, random), (0, 0));
     }
 
     /// Exit set on the first chapter load.

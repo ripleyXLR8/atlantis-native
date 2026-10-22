@@ -314,8 +314,11 @@ pub async fn play_puzzle(e: &mut Engine, hooks: &mut dyn ScriptHooks, id: i32) -
         e.emit(Event::Puzzle { id, result: r });
         return r;
     }
-    // The dispatcher seeds the puzzle LCG from the clock.
-    e.puzzles.lcg_seed = e.sys.millis() as u16;
+    // The dispatcher seeds the puzzle LCG 0x007bec20 with the low 16 bits of
+    // the game clock FUN_00451d0c (0x0043a1fb..0x0043a200), the milliseconds
+    // since its epoch was last taken (FUN_00451cec: boot, toolbar exit,
+    // in-game menu).
+    e.puzzles.lcg_seed = e.game_clock_ms() as u16;
     let kind = PuzzleKind::of(id);
     let result = match kind {
         Some(PuzzleKind::Eclipse) => eclipse::play(e, hooks).await,

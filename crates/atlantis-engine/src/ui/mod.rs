@@ -152,6 +152,13 @@ pub struct Guests {
     /// raises them 7 a frame and the slide-out lowers them back. Not reset
     /// with the list.
     pub portrait_y: i32,
+    /// 0x00496144 (0 in the exe image): set by a follower portrait click
+    /// (`FUN_0042c8ac` @ 0x0042cc1d), cleared only at the end of a
+    /// conversation (`FUN_00425828` @ 0x00425bdb), so the object-in-hand
+    /// path, which returns at 0x004258b7, leaves it set for the next
+    /// conversation. Not reset with the list (no memset of `FUN_004239f4`
+    /// covers it).
+    pub talk: bool,
 }
 
 impl Default for Guests {
@@ -161,6 +168,7 @@ impl Default for Guests {
             sprite: [0; Guests::SLOTS],
             count: 0,
             portrait_y: 350,
+            talk: false,
         }
     }
 }
@@ -407,21 +415,22 @@ impl Engine {
         ui.fontmin_from = from;
     }
 
-    /// The arrow cursor (CURSEURS.SPR frame 6, `FUN_0042d558`) at the
-    /// mouse, or the object in hand.
+    /// The pointer of the bar loops, `FUN_0042d558`: CURSEURS.SPR frame 6
+    /// at the mouse (0x0042d5b9..0x0042d5dd), then the object in hand over
+    /// it at the same position when OBJETENMAIN != 0
+    /// (0x0042d600..0x0042d627).
     pub(crate) fn draw_pointer(&self, screen: &mut [u16]) {
         let (x, y) = self.sys.mouse();
+        if let Some(spr) = self.cursor_sprites.get(6) {
+            draw_sprite(screen, spr, x, y);
+        }
         let held = self.vars.get("objetenmain");
         if held != 0 {
             if let Some(spr) = object_icon(&self.game.exe.inventory_object_ids, held)
                 .and_then(|i| self.ui.object(i))
             {
                 draw_sprite(screen, spr, x, y);
-                return;
             }
-        }
-        if let Some(spr) = self.cursor_sprites.get(6) {
-            draw_sprite(screen, spr, x, y);
         }
     }
 

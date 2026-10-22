@@ -35,8 +35,9 @@ use atlantis_engine::ui::layout::{
     MenuWalk,
 };
 use atlantis_engine::ui::menus::{ingame_menu_outcome, MenuOutcome};
-use atlantis_engine::ui::{guest_edge_original, object_icon, Guests};
-use atlantis_engine::video_skip::VideoSkipState;
+use atlantis_engine::ui::{guest_edge_original, object_icon, BarSession, Guests};
+
+use atlantis_engine::video_skip::{VideoSkipRun, VideoSkipState};
 use atlantis_engine::{Dialogs, Engine, Event, MemStore, Options, SaveStore, Scripts};
 use md5::{Digest, Md5};
 
@@ -258,6 +259,76 @@ fn ingame_menu_rules_match_original() {
         }
     }
     assert_eq!((o, m), (64, 24));
+}
+
+/// What ends a video: `FUN_0041bc74` with its poll `FUN_0041a298`, 7
+/// inputs in 128 flag states on a 10-frame video, against the port's frame
+/// control as the video player runs it (`frame_presented` after each
+/// presented frame, `poll` after each frame but the last, `finish` after
+/// the loop).
+#[test]
+fn video_skip_matches_original() {
+    const FRAMES: u32 = 10;
+    let mut rows = 0;
+    for l in lines(include_str!("golden/video_skip_input.txt")) {
+        let (head, out) = l.split_once(": ").unwrap();
+        let t: Vec<&str> = head.split(' ').collect();
+        let input = t[1];
+        let flag = |name: &str| {
+            let i = t.iter().position(|&x| x == name).unwrap();
+            t[i + 1] == "1"
+        };
+        let o: Vec<&str> = out.split(' ').collect();
+        let want = |name: &str| -> u32 {
+            let i = o.iter().position(|&x| x == name).unwrap();
+            o[i + 1].parse().unwrap()
+        };
+        let mut run = VideoSkipRun::new(VideoSkipState {
+            bow_mode: flag("bow"),
+            bar_request: flag("bar"),
+            object_in_hand: flag("objet"),
+            talking_head: flag("head"),
+            section_play: flag("section"),
+            menu_request: flag("menu"),
+            ..VideoSkipState::default()
+        });
+        let mut bar = BarSession {
+            request: flag("bar"),
+            ..BarSession::default()
+        };
+        // The presses come at poll 2 (and 4 for the second key of
+        // rbutton+escape); poll k follows frame k - 1.
+        for f in 0..FRAMES {
+            if run.frame_presented(f + 1 == FRAMES) {
+                break;
+            }
+            let poll = f + 1;
+            let left = input == "lbutton" && poll == 2;
+            let right = (input == "rbutton" || input == "rbutton+escape") && poll == 2;
+            let esc = (input == "escape" && poll == 2) || (input == "rbutton+escape" && poll == 4);
+            run.poll(left, right, esc);
+        }
+        let fade = if run.finish(flag("cinema"), &mut bar) {
+            2
+        } else {
+            0
+        };
+        let got = [
+            ("frames", run.presented),
+            ("ended", u32::from(run.stop_after_frame)),
+            ("fade", fade),
+            ("keep", u32::from(run.s.keep_running)),
+            ("menu", u32::from(run.s.menu_request)),
+            ("bar", u32::from(bar.request)),
+            ("click", u32::from(run.s.click)),
+            ("skipflag", u32::from(run.s.skip_flag)),
+        ];
+        for (k, v) in got {
+            assert_eq!(v, want(k), "{l}: {k}");
+        }
+        rows += 1;
+    }
+    assert_eq!(rows, 7 * 128);
 }
 
 /// `FUN_0042bdb8` on the edge pixels: the original reads the bytes before
@@ -909,7 +980,7 @@ fn credits_play_headless() {
         Rc::new(MemStore::new()),
         move |mut e, _s| {
             Box::pin(async move {
-                e.play_credits().await;
+                e.play_credits(None).await;
             })
         },
         move |h, n| {
@@ -924,6 +995,73 @@ fn credits_play_headless() {
         },
     );
     assert!(*frames.borrow() < 700);
+}
+
+/// The 1 s wait between LOGO15N and PREINTRO reads no input but loses
+/// none (GetAsyncKeyState): a click during it ends PREINTRO at its first
+/// poll, after its first frame, with one more frame presented.
+#[test]
+fn startup_wait_keeps_a_click_for_the_next_video() {
+    let Some(g) = game("startup_wait_keeps_a_click_for_the_next_video") else {
+        return;
+    };
+    let sys = Sys::new(Mixer::new());
+    let trace = Rc::new(RefCell::new(Vec::new()));
+    let opts = Options {
+        trace: Some(trace.clone()),
+        saves: Rc::new(MemStore::new()),
+        ..Options::default()
+    };
+    let mut h = Headless::new(sys.clone(), atlantis_engine::run(sys.clone(), g, opts));
+    let videos = |t: &Rc<RefCell<Vec<Event>>>| {
+        t.borrow()
+            .iter()
+            .filter_map(|e| match e {
+                Event::Video { name, frames, .. } => Some((name.clone(), *frames)),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    h.steps(30);
+    h.click(320, 240);
+    assert!(h.until(200, |_| videos(&trace).len() == 1));
+    // In the wait.
+    h.click(320, 240);
+    assert!(h.until(300, |_| videos(&trace).len() == 2));
+    assert_eq!(videos(&trace)[1], ("PREINTRO.HNM".to_string(), 2));
+    sys.push_input(Input::Quit);
+    h.steps(10);
+}
+
+/// The credits poll as `FUN_0041a298`: a right press toggles the bar
+/// request 0x004960c4, which keeps Escape from ending them until a second
+/// right press clears it.
+#[test]
+fn credits_escape_waits_for_the_bar_request() {
+    let Some(g) = game("credits_escape_waits_for_the_bar_request") else {
+        return;
+    };
+    let frames = Rc::new(RefCell::new(0usize));
+    let f2 = frames.clone();
+    with_engine(
+        g,
+        Rc::new(MemStore::new()),
+        move |mut e, _s| {
+            Box::pin(async move {
+                e.play_credits(None).await;
+            })
+        },
+        move |h, n| {
+            *f2.borrow_mut() = n;
+            match n {
+                600 | 620 => h.button(MouseButton::Right, 320, 240),
+                610 | 630 => h.key(Key::Escape),
+                _ => {}
+            }
+        },
+    );
+    let n = *frames.borrow();
+    assert!((630..700).contains(&n), "{n}");
 }
 
 /// An original installation's `players.atl` and checkpoints are taken over

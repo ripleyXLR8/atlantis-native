@@ -179,6 +179,23 @@ pub fn parse_con_set(names: &ConVariableNames, text: &[u8], pos: u32) -> Option<
     None
 }
 
+/// `FUN_0042a100` @ 0x0042a4ef..0x0042a560: a /set whose key names
+/// ENABLESUJ runs `FUN_00425f6c`, one that names DISABLESUJ runs
+/// `FUN_0042606c`, on the text from the first digit after the key
+/// (`value_pos`). The key is matched by VARIAS.CON index ([`parse_con_set`]'s
+/// prefix lookup), so a key such as "Disable" that names another variable is
+/// not a subject command; a /set with no digit after its key does nothing
+/// (0x0042a2e5..0x0042a2eb, [`parse_con_set`] gives `None`). False when the
+/// command names another variable.
+pub fn apply_con_subject_set(subjects: &mut ConSubjects, set: &ConSetCommand, text: &[u8]) -> bool {
+    match set.name.as_str() {
+        "enablesuj" => subjects.enable(text, set.value_pos),
+        "disablesuj" => subjects.disable(text, set.value_pos),
+        _ => return false,
+    }
+    true
+}
+
 /// The per-perso subject table (0x00602f10): 0x100 records of 0xe1 bytes,
 /// record perso - 0x200, holding the subject ids in the order they were
 /// enabled.
@@ -368,6 +385,15 @@ pub fn con_music_apply(
 /// the present ones again. The result is the copied indexes, in order; an
 /// index past the 32 the set holds is left out (the original copies the
 /// name it reads past the table, which names no archive member).
+///
+/// The copy of the playing track is attempted but fails before its read
+/// loop [INFERRED: Win32 share rules]: FUN_004316cc holds the installed
+/// file open with share mode 0 (@ 0x00431747), so the CREATE_ALWAYS open @
+/// 0x0041eb3a and the CreateDirectoryA on the existing folder @ 0x0041eb74
+/// fail and it returns 0; the track stays installed and is not in the
+/// result. Not modelled: after a failed StartMusik, or after FUN_0041a638
+/// closes the handle (@ 0x0041ab67), 0x007e1f01 still names a track that is
+/// no longer held open and its copy would succeed.
 pub fn con_music_load_all_or_nothing(list: &[u8], current: i32, on_disk: &mut u32) -> Vec<u8> {
     let Some(&first) = list.first() else {
         return Vec::new();
@@ -375,8 +401,11 @@ pub fn con_music_load_all_or_nothing(list: &[u8], current: i32, on_disk: &mut u3
     if first >= 0x20 || *on_disk & (1u32 << first) != 0 || i32::from(first) + 1 == current {
         return Vec::new();
     }
-    let copies: Vec<u8> = list.iter().copied().filter(|&idx| idx < 32).collect();
-    for &idx in &copies {
+    let mut copies = Vec::new();
+    for &idx in list.iter().filter(|&&idx| idx < 32) {
+        if i32::from(idx) + 1 != current {
+            copies.push(idx);
+        }
         *on_disk |= 1u32 << idx;
     }
     copies

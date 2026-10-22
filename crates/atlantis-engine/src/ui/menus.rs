@@ -33,6 +33,7 @@ use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
 use crate::music::apc_pcm;
 use crate::sys::{Input, Key, MouseButton};
+use crate::video_skip::VideoSkipState;
 use crate::warp::{SCREEN_H, SCREEN_W};
 
 const N: usize = SCREEN_W * SCREEN_H;
@@ -439,7 +440,7 @@ impl Engine {
                         let ok = self.confirm(&bg).await;
                         outcome = ingame_menu_outcome(hit, 0, if ok { 3 } else { 4 });
                         if outcome == MenuOutcome::Quit {
-                            self.play_credits().await;
+                            self.play_credits(None).await;
                         }
                     }
                     _ => {}
@@ -867,14 +868,34 @@ impl Engine {
     /// The credits `FUN_0041a72c`: OBJETENMAIN = 0, the ambient sounds
     /// stop; with a music handle and a track other than 22 the music
     /// switches to track 26; the pages of CREDITS.TXT, each presented after
-    /// its time; Escape ends them. Then the music fades out and the screen
-    /// is cleared.
-    pub async fn play_credits(&mut self) {
+    /// its time; Escape ends them under `FUN_0041a298`'s conditions. Then
+    /// the music fades out and the screen is cleared. `input` is the poll
+    /// state the END.TGA wait of `FUN_0041a66c` leaves (the bar and menu
+    /// requests), `None` after the quit path, where the in-game menu's exit
+    /// cleared them (0x0041cbff / 0x0041cc09).
+    pub async fn play_credits(&mut self, input: Option<VideoSkipState>) {
         self.vars.set("objetenmain", 0);
         self.stop_ambient();
+        // FUN_0041a298's state for the credits' polls: the bar request
+        // 0x004960c4 and the menu request 0x00496138 as the END.TGA wait
+        // left them; OBJETENMAIN is 0 now; bow mode 0x00496164 as it
+        // stands; no line (0x00496188) and no section (0x00496170) plays.
+        let mut skip = VideoSkipState {
+            bow_mode: self.bow_mode,
+            ..VideoSkipState::default()
+        };
+        if let Some(i) = input {
+            skip.bar_request = i.bar_request;
+            skip.menu_request = i.menu_request;
+        }
         if self.music.handle_set && self.music.open_track != 22 {
+            // The same branch clears the input flags (0x0041a8b1..0x0041a8e3).
+            skip.bar_request = false;
+            skip.menu_request = false;
             self.music_switch_track(26).await;
         }
+        // 0x00496124 = 1 before the loop.
+        skip.keep_running = true;
         // Read at each run from the disc in the drive by the 1997 builds of
         // the English May code; loaded with the menus at start-up, from the
         // boot disc (disc 1 here), by the others (ExeBuild::credits_read_per_run).
@@ -907,8 +928,15 @@ impl Engine {
                     }
                 }
                 CreditsEvent::Present(tick) | CreditsEvent::Clear(tick) => {
+                    // FUN_0041a298 clears 0x00496124 on an Escape press while
+                    // 0x00496164, 0x004960c4 and OBJETENMAIN are 0. A left
+                    // press does nothing; a right press toggles the bar
+                    // request 0x004960c4, which gates Escape
+                    // (0x0041a2e9..0x0041a337, 0x0041a3f1).
                     while self.sys.millis() - start < u64::from(tick) * 5 {
-                        if self.sys.should_quit() || self.poll_menu_input().escape {
+                        let mi = self.poll_menu_input();
+                        skip.poll(mi.left_press, mi.right_press, mi.escape);
+                        if self.sys.should_quit() || !skip.keep_running {
                             break 'pages;
                         }
                         self.sys.frame().await;
@@ -930,13 +958,27 @@ impl Engine {
         let end = self.load_picture("END.TGA").await;
         let start = self.sys.millis();
         while self.sys.poll_event().is_some() {}
+        // 0x0049611c = 0 (0x0041a6d8), then FUN_0041a298 polls until it sets
+        // it again (a left press) or 0x578 ticks pass. The same polls take
+        // right presses and Escape, whose state the credits inherit: a right
+        // press toggles the bar request 0x004960c4, which gates Escape
+        // there. The bar request starts as it stands (CHAPI085's Cinema=210
+        // cleared it and 0x00496138, 0x0042a939 / 0x0042a925).
+        let mut input = VideoSkipState {
+            bow_mode: self.bow_mode,
+            bar_request: self.bar.request,
+            object_in_hand: self.vars.get("objetenmain") != 0,
+            ..VideoSkipState::default()
+        };
         while !self.sys.should_quit() && self.sys.millis() - start < 0x578 * 5 {
-            if self.poll_menu_input().left_press {
+            let mi = self.poll_menu_input();
+            input.poll(mi.left_press, mi.right_press, mi.escape);
+            if input.click {
                 break;
             }
             self.present(&end, false).await;
         }
-        self.play_credits().await;
+        self.play_credits(Some(input)).await;
     }
 }
 

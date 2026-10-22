@@ -15,7 +15,7 @@ use std::sync::Arc;
 use atlantis_data::wam::{Place, Wam, Zone};
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::look::{angle_warp_degrees, warp_look_frame, WarpMomentum};
-use atlantis_engine::turn::{transition_turn, TURN_END_FOV_DEG};
+use atlantis_engine::turn::{transition_turn, TurnDoubleClick, TURN_END_FOV_DEG};
 use atlantis_engine::warp::{Warp, WARP_FOV_DEG};
 use md5::{Digest, Md5};
 
@@ -201,6 +201,92 @@ fn transition_turn_matches_original() {
     assert_eq!(out.len(), want.len());
     for (got, want) in out.iter().zip(&want) {
         assert_eq!(got, want);
+    }
+}
+
+/// The double-click flag 0x00496118 that skips a move's video: the
+/// cursor-state / menu-request condition of the original window procedure
+/// for WM_LBUTTONDBLCLK, then the port's model of the Windows pairing
+/// (500 ms, 4 x 4 pixels).
+#[test]
+fn double_click_matches_original() {
+    let mut n = 0;
+    for l in lines(include_str!("golden/graphics_double_click.txt")) {
+        // WM_LBUTTONDBLCLK cursor C 0x496138 M -> [0x496118] F
+        let t: Vec<&str> = l.split(' ').collect();
+        if t[0] != "WM_LBUTTONDBLCLK" {
+            continue;
+        }
+        let (cursor, menu, flag): (u8, u8, u8) = (
+            t[2].parse().unwrap(),
+            t[4].parse().unwrap(),
+            t[7].parse().unwrap(),
+        );
+        let mut d = TurnDoubleClick::default();
+        d.first_press(1000, 320, 240);
+        assert!(d.press(1100, 321, 239, cursor, menu != 0), "{l}");
+        assert_eq!(d.flag, flag != 0, "{l}");
+        n += 1;
+    }
+    assert_eq!(n, 16);
+
+    // A second press later than the double-click time, or outside the
+    // rectangle, is a new first press; the press after a double click
+    // starts a new pair.
+    let mut late = TurnDoubleClick::default();
+    late.first_press(1000, 320, 240);
+    assert!(!late.press(1000 + TurnDoubleClick::TIME_MS, 320, 240, 5, false));
+    assert!(!late.flag);
+    assert!(late.press(1100 + TurnDoubleClick::TIME_MS, 320, 240, 5, false));
+    assert!(late.flag);
+    let mut distant = TurnDoubleClick::default();
+    distant.first_press(1000, 320, 240);
+    assert!(!distant.press(1050, 323, 240, 5, false));
+    assert!(!distant.flag);
+    let mut third = TurnDoubleClick::default();
+    third.first_press(1000, 320, 240);
+    assert!(third.press(1050, 320, 240, 4, false));
+    assert!(!third.flag);
+    assert!(!third.press(1100, 320, 240, 5, false));
+    assert!(!third.flag);
+    // No first press kept: never a double click.
+    let mut none = TurnDoubleClick::default();
+    assert!(!none.press(10, 320, 240, 5, false));
+    assert!(!none.flag);
+}
+
+/// Off-node points of `FUN_0045166f`: at (320, 240) x & 15 = y & 15 = 0,
+/// so its three bilinear terms (0x00451712..0x00451782) weigh 0; these
+/// screen points have non-zero x & 15 and y & 15. The expected values come
+/// from the original function run under emulation after
+/// `FUN_0045179a(75.137, 50)` and `FUN_00451915(alpha, beta)`. The warp
+/// loop hit-tests the pointer wherever it is.
+#[test]
+fn off_node_points_match_original() {
+    let pts = [(333, 247), (7, 471), (639, 479), (100, 13)];
+    type Case = (f32, f32, [(i32, i32); 4]);
+    let cases: [Case; 4] = [
+        (0.0, 0.0, [(10, 390), (1837, 543), (213, 547), (1889, 213)]),
+        (
+            1.0,
+            0.25,
+            [(1732, 487), (1482, 609), (1965, 612), (1576, 295)],
+        ),
+        (3.0, -0.5, [(1081, 201), (880, 386), (1261, 391), (838, 83)]),
+        (
+            6.0,
+            0.75,
+            [(106, 656), (1771, 696), (468, 696), (1994, 472)],
+        ),
+    ];
+    for (a, b, want) in cases {
+        let mut w = Warp::new();
+        w.set_hfov(WARP_FOV_DEG);
+        w.set_alpha(a);
+        w.set_beta(b);
+        for ((x, y), o) in pts.iter().zip(want) {
+            assert_eq!(w.screen_to_panorama(*x, *y), o, "{a} {b} ({x}, {y})");
+        }
     }
 }
 

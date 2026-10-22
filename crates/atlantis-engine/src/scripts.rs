@@ -17,10 +17,10 @@
 use crate::checkpoint::ScriptState;
 use crate::con_script::script::latin1_bytes;
 use crate::con_script::{
-    con_alt_game_over_narration, con_angle_radians, con_entry_allowed, con_escape_skip,
-    con_game_over_narrator, con_line_buffer_text, con_narrator_buffer_text, con_track_letter,
-    evaluate, parse_con_set, vars, ConItem, ConKeyBuffer, ConLine, ConScript, ConSection,
-    ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
+    apply_con_subject_set, con_alt_game_over_narration, con_angle_radians, con_entry_allowed,
+    con_escape_skip, con_game_over_narrator, con_line_buffer_text, con_narrator_buffer_text,
+    con_track_letter, evaluate, parse_con_set, vars, ConItem, ConKeyBuffer, ConLine, ConScript,
+    ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
 };
 use crate::engine::{Abort, Engine, Event};
 use crate::hooks::{ready, Departure, HookFuture, ScriptHooks};
@@ -435,8 +435,9 @@ impl Scripts {
             match key {
                 // EnableSuj,perso=suj,... / DisableSuj,perso=suj,...
                 // (@ 0x0042a4ef..0x0042a560) on the text from the first digit.
-                "enablesuj" => self.subjects.enable(text!(), set.value_pos),
-                "disablesuj" => self.subjects.disable(text!(), set.value_pos),
+                "enablesuj" | "disablesuj" => {
+                    apply_con_subject_set(&mut self.subjects, &set, text!());
+                }
                 // Time1=N / Time2=N restart the timer at N seconds; the
                 // variable is written by the clock update (@ 0x0042a321,
                 // 0x0042a392).
@@ -529,9 +530,14 @@ impl Scripts {
                     e.poll_new_sound().await;
                 }
                 // StopSound: the NewSound sample stops, whatever N.
+                // FUN_0042b290 also clears the poller's playing flag
+                // 0x00772912 (@ 0x0042b2d8) but not the last value
+                // 0x006cd87c, so the next non-zero NewSound starts, the same
+                // value included.
                 "stopsound" => {
                     e.vars.set("newsound", 0);
                     e.music.stop_new_sound();
+                    e.music.new_sound_playing = false;
                 }
                 // ArcMagique=N: the magic-bow animation (@ 0x0042aa09), then
                 // the store.
@@ -712,10 +718,15 @@ impl Scripts {
         played
     }
 
-    /// `FUN_00425cf4` (flag 0x00496170 set: a play is counted), then
-    /// `FUN_00425dd0`: clicking zone 2000+N with object N in hand puts the
-    /// object back into the place when the place's sprite list holds it.
+    /// `FUN_00425cf4`, then `FUN_00425dd0`: clicking zone 2000+N with
+    /// object N in hand puts the object back into the place when the
+    /// place's sprite list holds it. 0x00496170 is set around the scan, the
+    /// play and the put-back (0x00425d2c..0x00425d82) for every caller (a
+    /// character with an object in hand, an object click, a zone click): the
+    /// executor counts the play (0x00428493) and `FUN_0041a298` ignores the
+    /// right press's bar toggle (0x0041a305) during the section.
     async fn run_con_click(&mut self, e: &mut Engine) {
+        e.section_play = true;
         self.begin_scan();
         let restored = e.enhancements().restored_content;
         let found = self.script.find_con_click_entry(&self.counters, |sec| {
@@ -742,6 +753,7 @@ impl Scripts {
                 e.vars.set("objetenmain", 0);
             }
         }
+        e.section_play = false; // 0x00425d82
         e.vars.set("clicperso", 0);
         e.vars.set("cliczone", 0);
     }
@@ -784,25 +796,36 @@ impl Scripts {
     async fn interact_npc(&mut self, e: &mut Engine, perso: i32) {
         e.vars.set("clicperso", perso);
         // @ 0x00425867..0x004258b7: with an object in hand there is no
-        // conversation; the /con click scan runs and the object leaves the
-        // hand.
+        // conversation; the /con click scan runs (FUN_00425cf4 sets
+        // 0x00496170 around its scan and play) and the object leaves the
+        // hand. The return at 0x004258b7 skips the followers' save, hide and
+        // restore and leaves 0x00496144 (Guests::talk) as it is.
         if e.vars.get("objetenmain") != 0 {
-            e.section_play = true;
             self.run_con_click(e).await;
-            e.section_play = false;
             e.vars.set("objetenmain", 0);
             return;
         }
         // @ 0x004258c4: 0x00496170 = 1 up to its end (0x00425b7a).
         e.section_play = true;
         self.dialog.new_conversation();
+        // 0x004258ce..0x004258fe: the followers' sprites are saved, and
+        // restored at the end when 0x00496144 is set (0x00425ba0..0x00425bdb),
+        // which clears it.
+        let saved_guests = e.guests.sprite;
+        let end_follower_talk = |e: &mut Engine| {
+            if e.guests.talk {
+                e.guests.sprite = saved_guests;
+                e.guests.talk = false;
+            }
+        };
 
         // With enabled subjects the menu lists them in table order and is
         // shown first (0x00425930..0x00425a8a). Then the eligible /con
         // entries are walked in file order (FUN_004281f8) and the first
-        // that fits plays (0x00425abe..0x00425b75): an entry with no /suj
-        // line always fits; one with a /suj line fits when the perso has no
-        // subjects, or when its list holds the chosen subject
+        // that fits plays (0x00425abe..0x00425b75): an entry whose body does
+        // not start with /Suj or /suj always fits (a /suj line further down
+        // is not a gate, ConSection::suj_ids); one that does fits when the
+        // perso has no subjects, or when its list holds the chosen subject
         // (FUN_004264a8); a click outside the grid stops the walk at the
         // first /suj entry; an empty grid cell gives subject 0, which no
         // list holds.
@@ -810,9 +833,19 @@ impl Scripts {
         let menu = !sujs.is_empty();
         let mut chosen = None;
         if menu {
+            // 0x00425944..0x004259b4: with 0x00496144 set, every follower but
+            // the clicked perso is hidden, for the menu and the entry's play.
+            if e.guests.talk {
+                for i in 0..e.guests.count.min(crate::ui::Guests::SLOTS) {
+                    if e.guests.id[i] != perso {
+                        e.guests.sprite[i] = crate::ui::Guests::HIDDEN;
+                    }
+                }
+            }
             chosen = self.dialog.subject_menu(e, perso, &sujs).await;
             if e.should_abort() {
                 e.section_play = false;
+                end_follower_talk(e);
                 return;
             }
         }
@@ -851,6 +884,7 @@ impl Scripts {
         }
         e.section_play = false;
         e.vars.set("clicperso", 0);
+        end_follower_talk(e);
     }
 
     /// `FUN_004240fc`: FinPuzzle = the puzzle's result, the view is
@@ -1206,21 +1240,14 @@ impl ScriptHooks for Scripts {
         Box::pin(self.run_con_timers(e, false))
     }
 
-    /// `FUN_00425828` with 0x00496144 = 1: the other guests are hidden
-    /// only when the guest has enabled subjects (the loop at 0x0042594d
-    /// runs on the subject path), then restored.
+    /// `FUN_0042c8ac` @ 0x0042cc1d: a follower portrait click sets
+    /// 0x00496144, then runs `FUN_00425828` (0x0042cc57). The conversation
+    /// hides the other followers on its subject path, restores them and
+    /// clears the flag; with an object in hand the flag stays set.
     fn talk_to_guest<'a>(&'a mut self, e: &'a mut Engine, id: i32) -> HookFuture<'a, ()> {
         Box::pin(async move {
-            let saved = e.guests.sprite;
-            if !self.subjects.subjects(id).is_empty() {
-                for i in 0..e.guests.count {
-                    if e.guests.id[i] != id {
-                        e.guests.sprite[i] = crate::ui::Guests::HIDDEN;
-                    }
-                }
-            }
+            e.guests.talk = true;
             self.interact_npc(e, id).await;
-            e.guests.sprite = saved;
         })
     }
 
@@ -1431,6 +1458,80 @@ mod tests {
         assert_ne!(got[0].narrator, got[1].narrator);
     }
 
+    /// StopSound clears the NewSound poller's playing flag (FUN_0042b290 @
+    /// 0x0042b2d8) and keeps the last value, so the same NewSound starts
+    /// again.
+    #[test]
+    fn stopsound_lets_the_same_newsound_start_again() {
+        let got = Rc::new(RefCell::new((0, Vec::new())));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "stopsound_lets_the_same_newsound_start_again",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                let n = (1..e.game.exe.newsound_names.len())
+                    .find(|&v| {
+                        e.game
+                            .big
+                            .contains(&format!("WAV\\{}", e.game.exe.newsound_names[v]))
+                    })
+                    .expect("a NewSound sample");
+                g2.borrow_mut().0 = n as i32;
+                let cmds = [
+                    format!("newsound={n}"),
+                    "stopsound=1".into(),
+                    format!("newsound={n}"),
+                ];
+                for cmd in cmds {
+                    s.exec_set(&mut e, None, &cmd).await;
+                    g2.borrow_mut()
+                        .1
+                        .push((e.music.new_sound_playing, e.music.new_sound_last));
+                }
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let (n, got) = &*got.borrow();
+        assert_eq!(*got, [(true, *n), (false, *n), (true, *n)]);
+    }
+
+    /// The follower-talk flag 0x00496144: a portrait click with an object
+    /// in hand leaves it set (FUN_00425828 returns at 0x004258b7) and the
+    /// followers as they are.
+    #[test]
+    fn follower_talk_flag_outlives_an_object_click() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "follower_talk_flag_outlives_an_object_click",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                e.guests.add(587, &[587, 600]);
+                e.guests.add(600, &[587, 600]);
+                let sprites = e.guests.sprite;
+                e.vars.set("objetenmain", 257);
+                s.talk_to_guest(&mut e, 587).await;
+                *g2.borrow_mut() = Some((
+                    e.guests.talk,
+                    e.guests.sprite == sprites,
+                    e.section_play,
+                    e.vars.get("objetenmain"),
+                ));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let got = *got.borrow();
+        assert_eq!(got, Some((true, true, false, 0)));
+    }
+
     /// A NewSound the checkpoint holds (CHAPI044 /010: NewSound=67, then
     /// Chapter=45) is not played on the reload: NEWSOUND = 0 after the
     /// checkpoint's variables are applied.
@@ -1472,7 +1573,7 @@ mod tests {
             "puzzle_zone_reloads_the_view",
             move |mut e| async move {
                 let mut s = Scripts::new();
-                assert!(e.load_wam_with("ATLAN1.WAM", true).await);
+                assert!(e.load_wam("ATLAN1.WAM").await);
                 e.next_place_id = Some(1);
                 e.do_place_change().await;
                 e.pointer.pos = (5, 5);

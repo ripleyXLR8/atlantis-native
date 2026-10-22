@@ -81,7 +81,10 @@ pub struct NpcEntry {
     pub rect_h: i16,
     /// The views the NPC appears in: block +0x1e, 17 dwords read as a
     /// bitmap (bit b of dword k = view 32 * k + b), in the order
-    /// FUN_0045240c enumerates them. View 0 is left out: in the original a
+    /// FUN_0045240c enumerates them. The enumerator stops at view 0x1ff
+    /// (0x00452465), so dword 16 (views 512..543) is read but never listed;
+    /// no shipped block sets it, and place ids are below 512 (the
+    /// 512-entry place tables). View 0 is left out: in the original a
     /// set view-0 bit ends the list at once (its low word 0 reads as the
     /// end) and the enumerator's state then makes the next entry continue
     /// this bitmap; no block of the shipped WAMs sets that bit, so neither
@@ -312,6 +315,11 @@ impl Wam {
             let mut vues = Vec::new();
             for k in 0..17u16 {
                 let bits = s.u32();
+                // FUN_0045240c enumerates views 1..0x1ff: it stops at 0x1ff
+                // (0x00452465), so dword 16 is read but never listed.
+                if k == 16 {
+                    continue;
+                }
                 let first = if k == 0 { 1 } else { 0 };
                 for b in first..32u16 {
                     if bits >> b & 1 != 0 {

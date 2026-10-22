@@ -15,7 +15,8 @@
 //!   N plays, `/con*` any number;
 //! - `/tim1`, `/Tim1`, `/tim2`, `/Tim2`: timer entries (`FUN_0042bef4`,
 //!   `FUN_0042bfa4`);
-//! - `/sujN`: the dialog subject gate of the entry it follows;
+//! - `/Suj`, `/suj`: the subject gate of a /con entry, only as the first
+//!   line of its body (`FUN_00425828`);
 //! - `/set`, `/Set`: a game-state command; `/go`, `/Go`: a jump to "/N";
 //! - `[Speaker,params] text`: a dialog line; `#`: a comment.
 //!
@@ -38,8 +39,12 @@ pub struct ConLine {
     /// 0x00427ff9..0x00428014, the same in atlantis-cd-zh-cn-692736), where
     /// the Chinese builds' breaker counts them.
     pub trail: String,
-    /// `[Speaker, X, Y, camN]`: the two integer tokens after the speaker,
-    /// panorama angles the dialog code writes into the view before the line.
+    /// `[Speaker,X,Y,camN]`: the view angles in degrees the dialog code
+    /// writes into the view before the line (`FUN_0042844c` @
+    /// 0x0042852b..0x004285fa): set when the byte right after the line's
+    /// first ',' (before its ']') is a digit, with no blank or sign skipped;
+    /// Y is read after the next ',' when that one is also before the ']'
+    /// and followed by a digit, else Y = X.
     pub angle: Option<(i32, i32)>,
     /// The line as the file has it, from its '[' up to (not including) its
     /// CR, its final blanks kept: what the section executor and the
@@ -67,19 +72,6 @@ impl ConItem {
     }
 }
 
-/// One term of an entry line's condition, used only to find ClicPerso and
-/// ClicZone; the evaluation itself reads the text (`con::eval`).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConCondition {
-    /// The key, lower case.
-    pub key: String,
-    /// '=', '<', '>' or '!'.
-    pub op: u8,
-    pub value: i32,
-    /// '&', '|' or 0 (the end of the list).
-    pub next_sep: u8,
-}
-
 /// An entry point found by one of the original's scanners (/sel, /con,
 /// /tim1, /tim2), or a section header no scanner reaches (`is_entry`
 /// false: only reachable through /go).
@@ -98,12 +90,12 @@ pub struct ConSection {
     pub is_timer: bool,
     /// 1 or 2.
     pub timer_num: i32,
-    /// ClicPerso=N of the condition (0 = none).
-    pub clic_perso: i32,
-    /// ClicZone=N of the condition (0 = none).
-    pub clic_zone: i32,
-    /// The /suj list (`/suj1,2`: the entry fits when either subject is
-    /// chosen); empty when the entry has no /suj line.
+    /// The subject gate of a /con entry: non-empty when its body starts
+    /// with "/Suj" or "/suj" (`FUN_00425828` @ 0x00425ad3..0x00425af9, 4
+    /// bytes, those two spellings only; a /suj line further down the body
+    /// is plain text). The numbers `FUN_004264a8` reads from 4 bytes on, in
+    /// its order (`/suj1,2`: the entry fits the chosen subject 1 or 2, when
+    /// that subject is enabled for the clicked perso).
     pub suj_ids: Vec<i32>,
     /// /goN redirect (0 = none).
     pub goto_id: i32,
@@ -113,7 +105,6 @@ pub struct ConSection {
     pub line_offset: u32,
     /// Where the executor starts.
     pub body_offset: u32,
-    pub conditions: Vec<ConCondition>,
     /// What the section executor runs, up to the /go.
     pub items: Vec<ConItem>,
 }
@@ -349,53 +340,6 @@ fn atoi_bytes(s: &[u8]) -> i32 {
     ConText(s).atoi(0)
 }
 
-/// `(key op val)&(key op val)|...`: the terms, keys lower-cased; malformed
-/// fragments are skipped.
-fn parse_conditions(s: &[u8]) -> Vec<ConCondition> {
-    let mut out = Vec::new();
-    let mut p = 0;
-    let at = |i: usize| s.get(i).copied().unwrap_or(0);
-    while p < s.len() {
-        while p < s.len() && s[p] != b'(' {
-            p += 1;
-        }
-        if p >= s.len() {
-            break;
-        }
-        p += 1;
-        let start = p;
-        while p < s.len() && s[p] != b')' {
-            p += 1;
-        }
-        if p >= s.len() {
-            break;
-        }
-        let cond = &s[start..p];
-        p += 1;
-        let Some(op_at) = cond.iter().position(|c| b"=<>!".contains(c)) else {
-            continue;
-        };
-        let mut cc = ConCondition {
-            key: latin1(&cond[..op_at]).to_ascii_lowercase(),
-            op: cond[op_at],
-            value: atoi_bytes(&cond[op_at + 1..]),
-            next_sep: 0,
-        };
-        while at(p) == b' ' {
-            p += 1;
-        }
-        if at(p) == b'|' || at(p) == b'&' {
-            cc.next_sep = at(p);
-            p += 1;
-        }
-        while at(p) == b' ' {
-            p += 1;
-        }
-        out.push(cc);
-    }
-    out
-}
-
 /// `[Speaker,params] text` (the line trimmed at its end).
 fn parse_dialog_line(line: &[u8]) -> ConLine {
     let mut close = 1;
@@ -423,35 +367,25 @@ fn parse_dialog_line(line: &[u8]) -> ConLine {
             cl.params = latin1(&block[comma + 1..]);
         }
     }
-    // `[Speaker, X, Y, camN]`: a leading pair of integer tokens is (X, Y).
-    let params = &block[block
-        .iter()
-        .position(|&c| c == b',')
-        .map_or(block.len(), |c| c + 1)..];
-    if !params.is_empty() {
-        let tokens: Vec<&[u8]> = params
-            .split(|&c| c == b',')
-            .map(|t| {
-                let a = t
-                    .iter()
-                    .position(|&c| c != b' ' && c != b'\t')
-                    .unwrap_or(t.len());
-                let b = t
-                    .iter()
-                    .rposition(|&c| c != b' ' && c != b'\t')
-                    .map_or(a, |b| b + 1);
-                &t[a..b.max(a)]
-            })
-            .collect();
-        let is_int = |s: &[u8]| {
-            let digits = match s.first() {
-                Some(b'-' | b'+') => &s[1..],
-                _ => s,
+    // The header angles, FUN_0042844c @ 0x0042852b..0x004285fa: the first
+    // ',' and the first ']' from the '[' (strchr); when that ',' comes
+    // before the ']' and the byte right after it is a digit, X = atoi there
+    // (no blank or sign skipped before the digit). Then the next ',': when
+    // it also comes before the ']' and is followed by a digit, Y = atoi
+    // there, else Y = X (0x004285ee). The original's strchr runs on past
+    // the line; the port looks in the line only (every shipped header has
+    // its ']' on its line).
+    let digit_after = |c: usize| line.get(c + 1).is_some_and(u8::is_ascii_digit);
+    if let Some(c1) = line.iter().position(|&c| c == b',') {
+        if c1 < close && digit_after(c1) {
+            let x = atoi_bytes(&line[c1 + 1..]);
+            let y = match line[c1 + 1..].iter().position(|&c| c == b',') {
+                Some(d) if c1 + 1 + d < close && digit_after(c1 + 1 + d) => {
+                    atoi_bytes(&line[c1 + 2 + d..])
+                }
+                _ => x,
             };
-            !digits.is_empty() && digits.iter().all(u8::is_ascii_digit)
-        };
-        if tokens.len() >= 2 && is_int(tokens[0]) && is_int(tokens[1]) {
-            cl.angle = Some((atoi_bytes(tokens[0]), atoi_bytes(tokens[1])));
+            cl.angle = Some((x, y));
         }
     }
     cl
@@ -537,6 +471,35 @@ fn read_body(t: ConText, mut pos: u32, sec: &mut ConSection) {
         pos += 1;
         if t.is_header(pos) {
             return;
+        }
+    }
+}
+
+/// `FUN_00425828` @ 0x00425ad3..0x00425af9: a /con entry has a subject
+/// gate when the 4 bytes at its body start are "/Suj" or "/suj"
+/// (`FUN_0044a83f`, no case folding, no digit needed); a /suj line further
+/// down the body is plain text that `FUN_0042831c` skips. The list is what
+/// `FUN_004264a8` reads from 4 bytes on (0x004264e5..0x00426575): v =
+/// atoi(p), then p += 2, + 1 when v > 9, + 1 when v > 99, until the byte at
+/// p or the one before it is a CR. The port stops at the end of the text.
+fn read_subject_gate(t: ConText, sec: &mut ConSection) {
+    let b = sec.body_offset;
+    if !t.matches(b, b"/Suj") && !t.matches(b, b"/suj") {
+        return;
+    }
+    let mut p = b + 4;
+    loop {
+        let v = t.atoi(p);
+        sec.suj_ids.push(v);
+        p += 2;
+        if v > 9 {
+            p += 1;
+        }
+        if v > 99 {
+            p += 1;
+        }
+        if t.at(p) == b'\r' || t.at(p - 1) == b'\r' || p >= t.len() {
+            break;
         }
     }
 }
@@ -737,18 +700,13 @@ impl ConScript {
                 };
                 sec.cond_offset = Some(en.eval_offset);
                 sec.line_offset = t.line_start(en.eval_offset);
-                sec.conditions = parse_conditions(t.line(en.eval_offset));
-                for cc in &sec.conditions {
-                    match cc.key.as_str() {
-                        "clicperso" => sec.clic_perso = cc.value,
-                        "cliczone" => sec.clic_zone = cc.value,
-                        _ => {}
-                    }
-                }
                 // The evaluator stops at the end of the line; the body starts
                 // two bytes later (callers of FUN_004298ac add 2).
                 sec.body_offset = t.line_end(en.eval_offset) + 2;
                 read_body(t, sec.body_offset, &mut sec);
+                if sec.is_con {
+                    read_subject_gate(t, &mut sec);
+                }
             } else {
                 let (offset, id) = headers[h];
                 h += 1;
@@ -760,30 +718,6 @@ impl ConScript {
             s.sections.push(sec);
         }
 
-        // /sujN[,M,...] lines: the subject gate of the entry they follow.
-        let mut pos = 0;
-        while pos < t.len() {
-            let line = rtrim(t.line(pos));
-            if line.len() >= 5
-                && line[..4].eq_ignore_ascii_case(b"/suj")
-                && line[4].is_ascii_digit()
-            {
-                if let Some(owner) = s
-                    .sections
-                    .iter_mut()
-                    .rev()
-                    .find(|sec| sec.is_entry && sec.line_offset < pos)
-                {
-                    let mut ids = &line[4..];
-                    while !ids.is_empty() {
-                        owner.suj_ids.push(atoi_bytes(ids));
-                        let comma = ids.iter().position(|&c| c == b',');
-                        ids = comma.map_or(&[][..], |c| &ids[c + 1..]);
-                    }
-                }
-            }
-            pos = t.line_end(pos) + 1;
-        }
         s
     }
 

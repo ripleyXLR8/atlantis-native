@@ -184,3 +184,45 @@ fn ix_persistent_buffers() {
         block = video.into_buffers();
     }
 }
+
+/// The overlays drawn into the decode buffers: the original's presenter
+/// draws a frame's overlays into its buffer, which the decode two frames
+/// later writes into and whose motion copies read it. Here a marker 0xf81f
+/// over x 540..639, y 350..449 is written into the previous frame's buffer
+/// after each decode from frame 1 on; the md5s come from the original
+/// decoder with the same marker written into its out buffer before each
+/// decode from frame 2 on.
+#[test]
+fn ix_overlay_write_back() {
+    let Some(game) = game() else { return };
+    let golden = golden(include_str!("golden/video_ix_overlay.txt"));
+    assert_eq!(golden.len(), 5);
+    let (mut compared, mut bad) = (0, Vec::new());
+    for (name, frames) in &golden {
+        let data = game
+            .big
+            .read(&format!("{DIR}{name}"))
+            .expect("missing video");
+        let mut video =
+            HnmVideo::with_buffers(data, vec![0u16; 2 * 640 * 480]).expect("cannot open video");
+        let (w, h) = (video.width(), video.height());
+        for (&k, want) in frames {
+            let frame = video
+                .next_frame()
+                .expect("video ended")
+                .expect("decode error");
+            compared += 1;
+            if md5_hex(frame) != *want {
+                bad.push(format!("{name} {k}"));
+            }
+            if k >= 1 {
+                let prev = video.previous_frame_mut().expect("an IX video");
+                for y in 350..450.min(h) {
+                    prev[y * w + 540..y * w + 640.min(w)].fill(0xf81f);
+                }
+            }
+        }
+    }
+    assert_eq!(compared, 125);
+    assert!(bad.is_empty(), "{bad:?}");
+}
