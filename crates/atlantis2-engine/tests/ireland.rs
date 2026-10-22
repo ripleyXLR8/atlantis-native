@@ -487,3 +487,152 @@ fn the_horse_keeps_its_frame_across_views() {
     let slot = e.anim.slots.iter().position(|s| s.id == horse).unwrap();
     assert_eq!(e.anim.slots[slot].frame, 0);
 }
+
+/// The values a key takes in the Irish chapters' `/set` lines (not the
+/// `#` ones), by the text after `KEY=` up to `)`.
+fn set_values(files: &A2Files, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for chapter in CHAPTERS.iter().skip(1) {
+        let data = files
+            .read(
+                atlantis2_data::Folder::Scenar,
+                &format!("chapi{chapter:03}.con"),
+            )
+            .unwrap();
+        for line in data.split(|&c| c == b'\n') {
+            let line: String = line.iter().map(|&c| char::from(c)).collect();
+            let line = line.trim();
+            if line.starts_with('#') {
+                continue;
+            }
+            let lower = line.to_ascii_lowercase();
+            let head = format!("/set({key}=");
+            if let Some(i) = lower.find(&head) {
+                let v = &line[i + head.len()..];
+                let v = v.split(')').next().unwrap().to_string();
+                if !out.contains(&v) {
+                    out.push(v);
+                }
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn every_irish_dialog_plays() {
+    let Some(files) = game() else { return };
+    let mut numbers: Vec<u32> = set_values(&files, "dial")
+        .iter()
+        .filter_map(|v| v.parse().ok())
+        .collect();
+    // The dialog over film 19 (`cinema=19,71`).
+    numbers.push(71);
+    numbers.sort_unstable();
+    assert!(numbers.len() >= 70, "{numbers:?}");
+    let mut e = in_ireland(files);
+    let mut screen = vec![0u16; 640 * 480];
+    let mut lines = 0;
+    for n in numbers {
+        e.events.clear();
+        e.start_dialog(n)
+            .unwrap_or_else(|err| panic!("dialog {n}: {err}"));
+        assert_eq!(e.loop_type, LoopType::Dialog, "dialog {n}");
+        // Played with the heads and bodies drawn, a click every 20 passes.
+        let mut ended = false;
+        for pass in 0..20_000 {
+            if pass % 20 == 19 {
+                e.click(f64::from(pass) * 10.0 + f64::from(n) * 1e6);
+            }
+            e.tick();
+            e.pass(Some(&mut screen));
+            if e.events.contains(&Event::DialogEnd) {
+                ended = true;
+                break;
+            }
+        }
+        assert!(ended, "dialog {n} does not end");
+        lines += e
+            .events
+            .iter()
+            .filter(|x| matches!(x, Event::DialogLine(_)))
+            .count();
+        settle(&mut e);
+    }
+    assert!(lines > 200, "{lines}");
+}
+
+#[test]
+fn irish_subjects_objects_and_music_are_on_the_discs() {
+    let Some(files) = game() else { return };
+    let e = in_ireland(files);
+    let s = e.script_state().unwrap();
+    let names = s.names.clone();
+    let bank = |name: &str| {
+        atlantis2_data::spr::SprBank::parse(
+            &e.files()
+                .read(atlantis2_data::Folder::Spr, name)
+                .unwrap_or_else(|| panic!("spr\\{name}")),
+        )
+        .unwrap()
+    };
+    // Every subject the chapters enable has its picture in the world's
+    // subjects bank (its parameter is the frame).
+    let subjects = bank("sujeire.spr");
+    let mut n = 0;
+    for list in set_values(e.files(), "enablesuj") {
+        for subject in list.split(',').skip(1) {
+            let frame = names.param(defnames::SUJETS, subject.as_bytes());
+            assert!(
+                subjects.info(frame as usize).is_some(),
+                "{subject}: frame {frame} of sujeire.spr"
+            );
+            n += 1;
+        }
+    }
+    assert!(n > 30);
+    // Every object the chapters put in the bag, and every object a click
+    // takes in an Irish place, has its picture in the objects bank.
+    let objects = bank("objeire.spr");
+    let mut taken: Vec<String> = set_values(e.files(), "sacados")
+        .into_iter()
+        .filter(|v| !v.to_ascii_uppercase().starts_with("NOT_"))
+        .collect();
+    let mut e2 = bare(game().unwrap(), "bigile1.wam", 5);
+    for place in PLACES {
+        e2.load_place(place);
+        for ent in &e2.wam().entities {
+            if ent.kind == 2 && ent.state_records().any(|st| st.click == 1) {
+                taken.push(ent.con_name.clone());
+            }
+        }
+    }
+    taken.sort();
+    taken.dedup();
+    assert!(taken.len() > 15, "{taken:?}");
+    for object in &taken {
+        let frame = names.param(defnames::OBJETS, object.as_bytes());
+        assert!(
+            objects.info(frame as usize).is_some(),
+            "{object}: frame {frame} of objeire.spr"
+        );
+    }
+    // Every music the chapters' lists name is on disc 1 with its marks.
+    let mut musics = Vec::new();
+    for list in set_values(e.files(), "startmusik") {
+        for entry in atlantis2_engine::music::parse_list(list.as_bytes()) {
+            if !musics.contains(&entry.music) {
+                musics.push(entry.music);
+            }
+        }
+    }
+    musics.sort_unstable();
+    assert_eq!(musics, [1, 2, 3, 4, 5]);
+    for m in musics {
+        let name = atlantis2_engine::music::music_name(m);
+        assert!(e
+            .files()
+            .read_from_disc(1, atlantis2_data::Folder::ApcMusic, &name)
+            .is_some());
+    }
+}
