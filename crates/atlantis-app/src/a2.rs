@@ -1,7 +1,9 @@
 //! Atlantis II, as far as it goes: a new game opens on its first view (Tibet,
-//! `tibet.wam` view 2), which the player looks around in with the mouse or
-//! the arrow keys. A minimal mode of its own, beside the first game's
-//! front end: a window, the view scaled to it, nothing else yet.
+//! `tibet.wam` view 2); the player looks around with the mouse or the arrow
+//! keys and walks from view to view with a left click on a move zone (the
+//! turn, the transition video, the arrival), the place animations playing.
+//! A minimal mode of its own, beside the first game's front end: a window,
+//! the screen scaled to it, no sound, menus or scripts yet.
 //!
 //! The game folder is the installed one (`atlantis2.exe`, `wam\`,
 //! `scenar\`...); the discs (CD images or copies of the CDs) are looked for
@@ -18,7 +20,7 @@ use atlantis2_engine::{Engine, Fpu, Variant};
 use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{DeviceEvent, DeviceId, ElementState, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
@@ -38,6 +40,9 @@ const KEY_TURN: i32 = 8;
 /// one frame per 1/60 s.
 const FRAME: Duration = Duration::from_micros(16_667);
 
+/// The period of the original's 15 Hz task (@ 0x0040caa0).
+const TICK: Duration = Duration::from_micros(66_667);
+
 /// Opens the game folder and starts a new game, the cube drawn by
 /// `warpPII` (the reference renderer) for a process whose x87 control word
 /// starts as Win32's default.
@@ -55,12 +60,19 @@ pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
         build.id,
         files.disc_numbers()
     );
-    Engine::new_game(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
-        .map_err(|e| format!("{}: {e}", dir.display()))
+    let mut engine = Engine::new_game(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
+        .map_err(|e| format!("{}: {e}", dir.display()))?;
+    // The original seeds `rand` with GetTickCount() (@ 0x0047d740).
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u32);
+    engine.anim.rand = atlantis2_engine::anim::MsvcRand(seed);
+    Ok(engine)
 }
 
-/// `--headless`: runs `frames` frames without input, prints where the
-/// game is, and writes the screen to `screenshot` (PNG) when given.
+/// `--headless`: runs `frames` frames without input (a 15 Hz tick every
+/// fourth frame), prints where the game is, and writes the screen to
+/// `screenshot` (PNG) when given.
 pub fn headless(
     dir: &Path,
     discs: &[PathBuf],
@@ -69,10 +81,15 @@ pub fn headless(
 ) -> Result<(), String> {
     let mut engine = open(dir, discs)?;
     let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
-    for _ in 0..frames {
-        engine.frame();
+    for i in 0..frames {
+        if i % 4 == 0 {
+            engine.tick();
+        }
+        engine.pass(Some(&mut screen));
     }
-    engine.render(&mut screen);
+    if frames == 0 {
+        engine.render(&mut screen);
+    }
     let (wam, view) = engine.place();
     let (yaw, pitch) = engine.angles_deg();
     println!("Atlantis II, {}", crate::version_string());
@@ -110,6 +127,8 @@ pub fn run_window(engine: Engine, fullscreen: bool) -> Result<(), String> {
         keys: [false; 4],
         locked: false,
         next_frame: Instant::now(),
+        next_tick: Instant::now(),
+        started: Instant::now(),
     };
     el.run_app(&mut app)
         .map_err(|e| format!("The window failed: {e}"))
@@ -127,6 +146,10 @@ struct A2App {
     keys: [bool; 4],
     locked: bool,
     next_frame: Instant,
+    /// When the next 15 Hz tick is due.
+    next_tick: Instant,
+    /// The clock of the clicks (the double click is under 0.2 s).
+    started: Instant,
 }
 
 impl A2App {
@@ -158,8 +181,15 @@ impl A2App {
         if dx != 0 || dy != 0 {
             self.engine.mouse_motion(dx, dy);
         }
-        self.engine.frame();
-        self.engine.render(&mut self.screen);
+        let now = Instant::now();
+        if now >= self.next_tick {
+            self.engine.tick();
+            self.next_tick += TICK;
+            if self.next_tick < now {
+                self.next_tick = now + TICK;
+            }
+        }
+        self.engine.pass(Some(&mut self.screen));
     }
 
     /// The 640x480 screen scaled to the window (nearest pixel, kept in
@@ -258,6 +288,11 @@ impl ApplicationHandler for A2App {
                 state: ElementState::Pressed,
                 ..
             } if !self.locked => self.grab(true),
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            } => self.engine.click(self.started.elapsed().as_secs_f64()),
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
                 match event.logical_key {

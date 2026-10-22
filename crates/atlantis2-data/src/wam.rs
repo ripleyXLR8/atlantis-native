@@ -132,6 +132,82 @@ pub struct Entity {
     pub states: Vec<Vec<u32>>,
 }
 
+/// One state of an entity (tag 0x0f): where and how it is shown. The
+/// shorter forms of the record leave the last fields 0.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EntityState {
+    /// +0x00: the state letter (`A`), first character of the SPW name.
+    pub letter: u32,
+    /// +0x04: the animation number.
+    pub anim: u32,
+    /// +0x08: the view where it is shown (@ 0x00459fe0 loads the states of
+    /// the entered view).
+    pub view: u32,
+    /// +0x0c: the view it was made for (part of the SPW name).
+    pub made_for: u32,
+    /// +0x10: the weight of the random choice among the slots of the same
+    /// entity (@ 0x0047d9a0).
+    pub weight: i32,
+    /// +0x14: the random pause between plays (@ 0x0047d7f0).
+    pub delay: i32,
+    /// +0x18: the click kind: 1 object to take, 2 character to talk to, 3
+    /// `CLICOBJET`, 4 `CLICPERSO`; 0 not clickable.
+    pub click: i32,
+    /// +0x1c: the next state, as text (`B2`); 0 = none.
+    pub next: u32,
+    /// +0x20: the first frame.
+    pub first: i32,
+    /// +0x24: the frame count + 1 (0 = the file's count); −1 hides the
+    /// slot after a play.
+    pub end: i32,
+    /// +0x28: shown at load.
+    pub shown: i32,
+    /// +0x2c: 1 = an animated frame, otherwise a list of frames.
+    pub single: i32,
+}
+
+impl EntityState {
+    /// The state from the record's words.
+    pub fn from_words(w: &[u32]) -> EntityState {
+        let g = |i: usize| w.get(i).copied().unwrap_or(0);
+        EntityState {
+            letter: g(0),
+            anim: g(1),
+            view: g(2),
+            made_for: g(3),
+            weight: g(4) as i32,
+            delay: g(5) as i32,
+            click: g(6) as i32,
+            next: g(7),
+            first: g(8) as i32,
+            end: g(9) as i32,
+            shown: g(10) as i32,
+            single: g(11) as i32,
+        }
+    }
+}
+
+impl Entity {
+    /// Its states, decoded.
+    pub fn state_records(&self) -> impl Iterator<Item = EntityState> + '_ {
+        self.states.iter().map(|w| EntityState::from_words(w))
+    }
+
+    /// The SPW file of one of its states (@ 0x00412230, format
+    /// `%s%s%s%s%s.SPW`: prefix, letter, animation, `%03d` of the view
+    /// shown in and of the view made for).
+    pub fn spw_name(&self, s: &EntityState) -> String {
+        format!(
+            "{}{}{}{:03}{:03}.SPW",
+            self.prefix,
+            char::from(s.letter as u8),
+            s.anim,
+            s.view,
+            s.made_for
+        )
+    }
+}
+
 /// Why a file is not a WAM.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WamError {
@@ -385,6 +461,41 @@ impl Wam {
 
     fn last_view(&mut self) -> Option<&mut View> {
         self.places.last_mut()?.views.last_mut()
+    }
+
+    /// The fix-ups of `AtlWam_Load` (@ 0x0040fee0) that need
+    /// `defnames.con`: every entity's id becomes the index of its CON name
+    /// in the section of its kind (@ 0x0040ffc0: 1 characters, 2 objects,
+    /// 3 click zones), every zone of type 3 the index of its name in
+    /// `#ZONES_CLIC#` (@ 0x00410020). A name not in the file stops the
+    /// original; here it is logged and the file's value kept.
+    pub fn apply_defnames(&mut self, names: &crate::defnames::DefNames) {
+        use crate::defnames::Section;
+        for e in &mut self.entities {
+            let section = match e.kind {
+                1 => Section::Characters,
+                2 => Section::Objects,
+                3 => Section::Zones,
+                _ => continue,
+            };
+            match names.index(section, &e.con_name) {
+                Some(i) => e.index = i as u32,
+                None => log::warn!("defnames.con: no {:?} {}", section, e.con_name),
+            }
+        }
+        for z in self
+            .places
+            .iter_mut()
+            .flat_map(|p| p.views.iter_mut())
+            .flat_map(|v| v.zones.iter_mut())
+            .filter(|z| z.kind == 3)
+        {
+            let name = z.name.clone().unwrap_or_default();
+            match names.index(Section::Zones, &name) {
+                Some(i) => z.value = i as i32,
+                None => log::warn!("defnames.con: no zone {name}"),
+            }
+        }
     }
 
     /// The view with id `id` in the first place that has one.

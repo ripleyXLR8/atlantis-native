@@ -1,0 +1,956 @@
+# Moves in tibet.wam run by the original atlantis2.exe (French CD build of 1999, 2199552 bytes)
+# under emulation, x87 control word 0x0e7f (the warpPII steady state): the frame dispatcher
+# (0x0049ce20), the warp frame (0x0045a3b0) with the turn (0x0045b690 / 0x0045b910), the click
+# (0x0049ca80), the move set-up (0x0049cc40), the view entry with the SPW loads (0x00459fe0),
+# AtlHnm_start (0x0040bf60) and the video loop (0x0040c060); the draw (0x0045a9f0) is stubbed
+# (no sprite under the centre), the video's decode replaced by its frame counter.
+# 4 dispatcher passes per 15 Hz tick (the tick before passes 0, 4, 8...); rand seeded with 1000.
+# Reduced from the original's log (script lines left out):
+#   zone vVIEW zINDEX type T value V aim YAW,PITCH   (the zone aims, degrees)
+#   dest vFROM->TO flag F start Y,P end Y,P          (radians, 999 unset)
+#   == CASE: then start / pass / end rows:
+#   pN tTICKS [yaw Y pitch P] CHANGES | EVENTS
+#     changes: loop (0 warp, 1 video), view, turn, zone (index under the centre in the current
+#     view, -1 none), ARRIVEEVUE, LASTVUE, VUE
+#     events: click; depart T (the departure scan, DEPARTVUE); turn Y,P (the turn set-up,
+#     degrees); clickscan Z (CLICZONE); arrive V (ARRIVEEVUE); hook Z (puzzle hook);
+#     enter spw=N (view entry, SPW slots loaded); video F|missing (frames); frame K; close
+#   sweep vV zZ turn_passes N video F|missing frames K | end ...
+#   == animation view V: the slots after the entry, then one SPW step per tick:
+#     tick T SLOT:FRAME/END[hCHAIN] for the active slots
+zone v2 z0 type 1 value 3 aim -89.703,14.676
+zone v3 z0 type 1 value 2 aim 102.306,7.412
+zone v3 z1 type 1 value 4 aim -91.333,-1.154
+zone v4 z0 type 1 value 5 aim -1.590,39.783
+zone v4 z1 type 1 value 3 aim 110.289,1.984
+zone v4 z2 type 1000 value 1 aim -179.760,-11.397
+zone v5 z0 type 1 value 4 aim -0.380,-27.744
+zone v5 z1 type 1 value 6 aim -107.033,13.120
+zone v6 z0 type 1 value 7 aim -164.394,14.960
+zone v6 z1 type 1 value 5 aim 79.122,15.476
+zone v7 z0 type 1 value 6 aim 1.839,12.369
+zone v7 z1 type 1 value 8 aim 147.727,14.374
+zone v8 z0 type 1 value 7 aim -37.671,11.930
+zone v8 z1 type 1 value 9 aim 175.010,18.849
+zone v9 z0 type 1 value 8 aim -23.723,14.360
+zone v9 z1 type 1 value 10 aim -179.343,38.364
+zone v10 z0 type 1 value 9 aim 12.093,5.304
+zone v10 z1 type 3 value 52 aim 179.751,10.725
+zone v10 z2 type 3 value 54 aim -164.312,1.675
+zone v10 z3 type 3 value 53 aim -163.666,-15.032
+zone v10 z4 type 3 value 49 aim 179.949,-24.007
+zone v10 z5 type 3 value 51 aim 164.915,-15.513
+zone v10 z6 type 3 value 50 aim 163.792,1.333
+zone v10 z7 type 3 value 57 aim -179.603,-6.857
+dest v2->3 flag 1 start 4.7124,-0.0000 end 4.7124,-0.0000
+dest v3->2 flag 1 start 1.5708,-0.0000 end 1.5708,-0.0000
+dest v3->4 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v4->3 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v4->5 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v5->4 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v5->6 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v6->5 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v6->7 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v7->6 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v7->8 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v8->7 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v8->9 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v9->8 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v9->10 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+dest v10->9 flag 0 start 999.0000,999.0000 end 999.0000,999.0000
+== A
+start view 2 yaw -90.000 pitch 0.000 centre zone -1
+p0 t1 zone=0
+p2 t1  | click; depart 3; turn 270.000,-0.000; clickscan 0
+end view 2 yaw -90.000 pitch 0.000 loop 0 centre zone 0
+== B
+start view 2 yaw -75.000 pitch 15.000 centre zone 0
+p2 t4 turn=1 | click; depart 3; turn 270.000,-0.000; clickscan 0
+p3 t4 yaw -75.141 pitch 14.859
+p4 t5 yaw -75.424 pitch 14.576
+p5 t5 yaw -75.848 pitch 14.151
+p6 t5 yaw -76.414 pitch 13.586
+p7 t5 yaw -77.121 pitch 12.879
+p8 t6 yaw -77.970 pitch 12.030
+p9 t6 yaw -78.960 pitch 11.040
+p10 t6 yaw -80.091 pitch 9.909
+p11 t6 yaw -81.364 pitch 8.636
+p12 t7 yaw -82.778 pitch 7.222
+p13 t7 yaw -84.334 pitch 5.666
+p14 t7 yaw -85.676 pitch 4.324
+p15 t7 yaw -86.810 pitch 3.190
+p16 t8 yaw -87.742 pitch 2.258
+p17 t8 yaw -88.482 pitch 1.518
+p18 t8 yaw -89.041 pitch 0.959
+p19 t8 yaw -89.438 pitch 0.562
+p20 t9 yaw -89.694 pitch 0.306
+p21 t9 yaw -89.843 pitch 0.157
+p22 t9 yaw -89.921 pitch 0.079
+p23 t9 yaw -90.000 pitch 0.000 loop=1 view=3 turn=0 zone=-1 ARRIVEEVUE=3 VUE=3 | enter spw=1; video 79; frame 0
+p24 t10  | frame 1
+p28 t11  | frame 2
+p32 t12  | frame 3
+p36 t13  | frame 4
+p40 t14  | frame 5
+p44 t15  | frame 6
+p48 t16  | frame 7
+p52 t17  | frame 8
+p56 t18  | frame 9
+p60 t19  | frame 10
+p64 t20  | frame 11
+p68 t21  | frame 12
+p72 t22  | frame 13
+p76 t23  | frame 14
+p80 t24  | frame 15
+p84 t25  | frame 16
+p88 t26  | frame 17
+p92 t27  | frame 18
+p96 t28  | frame 19
+p100 t29  | frame 20
+p104 t30  | frame 21
+p108 t31  | frame 22
+p112 t32  | frame 23
+p116 t33  | frame 24
+p120 t34  | frame 25
+p124 t35  | frame 26
+p128 t36  | frame 27
+p132 t37  | frame 28
+p136 t38  | frame 29
+p140 t39  | frame 30
+p144 t40  | frame 31
+p148 t41  | frame 32
+p152 t42  | frame 33
+p156 t43  | frame 34
+p160 t44  | frame 35
+p164 t45  | frame 36
+p168 t46  | frame 37
+p172 t47  | frame 38
+p176 t48  | frame 39
+p180 t49  | frame 40
+p184 t50  | frame 41
+p188 t51  | frame 42
+p192 t52  | frame 43
+p196 t53  | frame 44
+p200 t54  | frame 45
+p204 t55  | frame 46
+p208 t56  | frame 47
+p212 t57  | frame 48
+p216 t58  | frame 49
+p220 t59  | frame 50
+p224 t60  | frame 51
+p228 t61  | frame 52
+p232 t62  | frame 53
+p236 t63  | frame 54
+p240 t64  | frame 55
+p244 t65  | frame 56
+p248 t66  | frame 57
+p252 t67  | frame 58
+p256 t68  | frame 59
+p260 t69  | frame 60
+p264 t70  | frame 61
+p268 t71  | frame 62
+p272 t72  | frame 63
+p276 t73  | frame 64
+p280 t74  | frame 65
+p284 t75  | frame 66
+p288 t76  | frame 67
+p292 t77  | frame 68
+p296 t78  | frame 69
+p300 t79  | frame 70
+p304 t80  | frame 71
+p308 t81  | frame 72
+p312 t82  | frame 73
+p316 t83  | frame 74
+p320 t84  | frame 75
+p324 t85  | frame 76
+p328 t86  | frame 77
+p332 t87 loop=0 | frame 78; close
+p333 t87 zone=1 ARRIVEEVUE=0 | arrive 3
+end view 3 yaw -90.000 pitch 0.000 loop 0 centre zone 1
+== C
+start view 3 yaw -95.000 pitch 3.000 centre zone 1
+p2 t104 turn=1 | click; depart 4; turn -91.333,-1.154; clickscan 0
+p3 t104 yaw -94.868 pitch 2.850
+p4 t105 yaw -94.603 pitch 2.550
+p5 t105 yaw -94.206 pitch 2.100
+p6 t105 yaw -93.676 pitch 1.501
+p7 t105 yaw -93.015 pitch 0.751
+p8 t106 yaw -92.221 pitch -0.149
+p9 t106 yaw -91.782 pitch -0.646
+p10 t106 yaw -91.557 pitch -0.900
+p11 t106 yaw -91.445 pitch -1.027
+p12 t107 yaw -91.333 pitch -1.154 view=4 turn=0 zone=-1 ARRIVEEVUE=4 VUE=4 | enter spw=1; video missing
+p13 t107 ARRIVEEVUE=0 | arrive 4
+end view 4 yaw -91.333 pitch -1.154 loop 0 centre zone -1
+== D
+start view 3 yaw 80.000 pitch 0.000 centre zone -1
+p0 t119 zone=0
+p2 t119 turn=1 | click; depart 2; turn 90.000,-0.000; clickscan 0
+p3 t119 yaw 80.200 pitch 0.000
+p4 t120 yaw 80.600 pitch 0.000
+p5 t120 yaw 81.200 pitch 0.000
+p6 t120 yaw 82.000 pitch 0.000  | click
+p7 t120 yaw 83.000 pitch 0.000
+p8 t121 yaw 84.200 pitch 0.000
+p9 t121 yaw 85.600 pitch 0.000
+p10 t121 yaw 87.200 pitch 0.000
+p11 t121 yaw 88.343 pitch 0.000
+p12 t122 yaw 89.092 pitch 0.000
+p13 t122 yaw 89.532 pitch 0.000
+p14 t122 yaw 89.765 pitch 0.000
+p15 t122 yaw 89.882 pitch 0.000
+p16 t123 yaw 90.000 pitch 0.000 view=2 turn=0 zone=-1 ARRIVEEVUE=2 LASTVUE=3 VUE=2 | enter spw=1
+p17 t123 ARRIVEEVUE=0 | arrive 2
+end view 2 yaw 90.000 pitch 0.000 loop 0 centre zone -1
+== E
+start view 6 yaw -164.395 pitch 14.960 centre zone -1
+p0 t149 zone=0
+p2 t149 yaw -164.394 pitch 14.960 view=7 zone=-1 ARRIVEEVUE=7 LASTVUE=6 VUE=7 | click; depart 7; turn -164.394,14.960; clickscan 0; enter spw=10; video missing
+p3 t149 ARRIVEEVUE=0 | arrive 7
+end view 7 yaw -164.394 pitch 14.960 loop 0 centre zone -1
+== F
+start view 9 yaw 150.657 pitch 38.364 centre zone -1
+p0 t159 zone=1
+p2 t159 turn=1 | click; depart 10; turn -179.343,38.364; clickscan 0
+p3 t159 yaw 150.857 pitch 38.364
+p4 t160 yaw 151.257 pitch 38.364
+p5 t160 yaw 151.857 pitch 38.364
+p6 t160 yaw 152.657 pitch 38.364
+p7 t160 yaw 153.657 pitch 38.364
+p8 t161 yaw 154.857 pitch 38.364
+p9 t161 yaw 156.257 pitch 38.364
+p10 t161 yaw 157.857 pitch 38.364
+p11 t161 yaw 159.657 pitch 38.364
+p12 t162 yaw 161.657 pitch 38.364
+p13 t162 yaw 163.857 pitch 38.364
+p14 t162 yaw 166.057 pitch 38.364
+p15 t162 yaw 168.091 pitch 38.364
+p16 t163 yaw 169.961 pitch 38.364
+p17 t163 yaw 171.667 pitch 38.364
+p18 t163 yaw 173.211 pitch 38.364
+p19 t163 yaw 174.595 pitch 38.364
+p20 t164 yaw 175.821 pitch 38.364
+p21 t164 yaw 176.892 pitch 38.364
+p22 t164 yaw 177.810 pitch 38.364
+p23 t164 yaw 178.580 pitch 38.364
+p24 t165 yaw 179.208 pitch 38.364
+p25 t165 yaw 179.699 pitch 38.364
+p26 t165 yaw -179.935 pitch 38.364
+p27 t165 yaw -179.683 pitch 38.364
+p28 t166 yaw -179.524 pitch 38.364
+p29 t166 yaw -179.343 pitch 38.364 view=10 turn=0 zone=-1 ARRIVEEVUE=10 LASTVUE=9 VUE=10 | enter spw=9; video missing
+p30 t166 ARRIVEEVUE=0 | arrive 10
+end view 10 yaw -179.343 pitch 38.364 loop 0 centre zone -1
+== G
+start view 4 yaw -179.760 pitch -11.397 centre zone -1
+p0 t189 zone=2
+p2 t189  | click; depart 0; clickscan 1
+end view 4 yaw -179.760 pitch -11.397 loop 0 centre zone 2
+== H
+start view 10 yaw 179.751 pitch 10.725 centre zone -1
+p0 t190 zone=1
+p2 t191  | click; depart 0; hook 1; clickscan 52
+end view 10 yaw 179.751 pitch 10.725 loop 0 centre zone 1
+== I
+start view 10 yaw 0.006 pitch -60.000 centre zone 1
+p0 t192 zone=-1
+p2 t192  | click; clickscan 0
+end view 10 yaw 0.006 pitch -60.000 loop 0 centre zone -1
+== S
+sweep v2 z0 turn_passes 16 video 79 frames 79 | end view 3 yaw -90.000 pitch 0.000 loop 0 centre zone 1
+sweep v3 z0 turn_passes 16 video 79 frames 79 | end view 2 yaw 90.000 pitch 0.000 loop 0 centre zone -1
+sweep v3 z1 turn_passes 0 video missing frames 0 | end view 4 yaw -91.333 pitch -1.154 loop 0 centre zone -1
+sweep v4 z0 turn_passes 0 video missing frames 0 | end view 5 yaw -1.590 pitch 39.783 loop 0 centre zone -1
+sweep v4 z1 turn_passes 0 video missing frames 0 | end view 3 yaw 110.289 pitch 1.984 loop 0 centre zone 0
+sweep v5 z0 turn_passes 0 video missing frames 0 | end view 4 yaw -0.380 pitch -27.744 loop 0 centre zone -1
+sweep v5 z1 turn_passes 0 video missing frames 0 | end view 6 yaw -107.033 pitch 13.120 loop 0 centre zone -1
+sweep v6 z0 turn_passes 0 video missing frames 0 | end view 7 yaw -164.394 pitch 14.960 loop 0 centre zone -1
+sweep v6 z1 turn_passes 0 video missing frames 0 | end view 5 yaw 79.122 pitch 15.476 loop 0 centre zone -1
+sweep v7 z0 turn_passes 0 video missing frames 0 | end view 6 yaw 1.839 pitch 12.369 loop 0 centre zone -1
+sweep v7 z1 turn_passes 0 video missing frames 0 | end view 8 yaw 147.727 pitch 14.374 loop 0 centre zone -1
+sweep v8 z0 turn_passes 0 video missing frames 0 | end view 7 yaw -37.671 pitch 11.930 loop 0 centre zone -1
+sweep v8 z1 turn_passes 0 video missing frames 0 | end view 9 yaw 175.010 pitch 18.849 loop 0 centre zone 1
+sweep v9 z0 turn_passes 0 video missing frames 0 | end view 8 yaw -23.723 pitch 14.360 loop 0 centre zone 0
+sweep v9 z1 turn_passes 0 video missing frames 0 | end view 10 yaw -179.343 pitch 38.364 loop 0 centre zone -1
+sweep v10 z0 turn_passes 0 video missing frames 0 | end view 9 yaw 12.093 pitch 5.304 loop 0 centre zone -1
+== animation view 7: 10 slots loaded
+slot 0 id 57 kind 2 anim 1 weight 0 click 0 active 1 frames 1 start 0 end 1 chain -1 handing 0
+slot 1 id 53 kind 2 anim 1 weight 0 click 0 active 1 frames 1 start 0 end 1 chain -1 handing 0
+slot 2 id 58 kind 2 anim 1 weight 0 click 0 active 0 frames 0 start 0 end 0 chain -1 handing 0
+slot 3 id 59 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 4 id 1 kind 1 anim 1 weight 80 click 2 active 1 frames 90 start 0 end 38 chain -1 handing 0
+slot 5 id 1 kind 1 anim 2 weight 20 click 2 active 0 frames 90 start 0 end 90 chain -1 handing 0
+slot 6 id 54 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 7 id 62 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 8 id 55 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 9 id 63 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+tick 0 0:0/1 1:0/1 4:1/38
+tick 1 0:0/1 1:0/1 4:2/38
+tick 2 0:0/1 1:0/1 4:3/38
+tick 3 0:0/1 1:0/1 4:4/38
+tick 4 0:0/1 1:0/1 4:5/38
+tick 5 0:0/1 1:0/1 4:6/38
+tick 6 0:0/1 1:0/1 4:7/38
+tick 7 0:0/1 1:0/1 4:8/38
+tick 8 0:0/1 1:0/1 4:9/38
+tick 9 0:0/1 1:0/1 4:10/38
+tick 10 0:0/1 1:0/1 4:11/38
+tick 11 0:0/1 1:0/1 4:12/38
+tick 12 0:0/1 1:0/1 4:13/38
+tick 13 0:0/1 1:0/1 4:14/38
+tick 14 0:0/1 1:0/1 4:15/38
+tick 15 0:0/1 1:0/1 4:16/38
+tick 16 0:0/1 1:0/1 4:17/38
+tick 17 0:0/1 1:0/1 4:18/38
+tick 18 0:0/1 1:0/1 4:19/38
+tick 19 0:0/1 1:0/1 4:20/38
+tick 20 0:0/1 1:0/1 4:21/38
+tick 21 0:0/1 1:0/1 4:22/38
+tick 22 0:0/1 1:0/1 4:23/38
+tick 23 0:0/1 1:0/1 4:24/38
+tick 24 0:0/1 1:0/1 4:25/38
+tick 25 0:0/1 1:0/1 4:26/38
+tick 26 0:0/1 1:0/1 4:27/38
+tick 27 0:0/1 1:0/1 4:28/38
+tick 28 0:0/1 1:0/1 4:29/38
+tick 29 0:0/1 1:0/1 4:30/38
+tick 30 0:0/1 1:0/1 4:31/38
+tick 31 0:0/1 1:0/1 4:32/38
+tick 32 0:0/1 1:0/1 4:33/38
+tick 33 0:0/1 1:0/1 4:34/38
+tick 34 0:0/1 1:0/1 4:35/38
+tick 35 0:0/1 1:0/1 4:36/38
+tick 36 0:0/1 1:0/1 4:37/38
+tick 37 0:0/1 1:0/1 4:0/39
+tick 38 0:0/1 1:0/1 4:1/39
+tick 39 0:0/1 1:0/1 4:2/39
+tick 40 0:0/1 1:0/1 4:3/39
+tick 41 0:0/1 1:0/1 4:4/39
+tick 42 0:0/1 1:0/1 4:5/39
+tick 43 0:0/1 1:0/1 4:6/39
+tick 44 0:0/1 1:0/1 4:7/39
+tick 45 0:0/1 1:0/1 4:8/39
+tick 46 0:0/1 1:0/1 4:9/39
+tick 47 0:0/1 1:0/1 4:10/39
+tick 48 0:0/1 1:0/1 4:11/39
+tick 49 0:0/1 1:0/1 4:12/39
+tick 50 0:0/1 1:0/1 4:13/39
+tick 51 0:0/1 1:0/1 4:14/39
+tick 52 0:0/1 1:0/1 4:15/39
+tick 53 0:0/1 1:0/1 4:16/39
+tick 54 0:0/1 1:0/1 4:17/39
+tick 55 0:0/1 1:0/1 4:18/39
+tick 56 0:0/1 1:0/1 4:19/39
+tick 57 0:0/1 1:0/1 4:20/39
+tick 58 0:0/1 1:0/1 4:21/39
+tick 59 0:0/1 1:0/1 4:22/39
+tick 60 0:0/1 1:0/1 4:23/39
+tick 61 0:0/1 1:0/1 4:24/39
+tick 62 0:0/1 1:0/1 4:25/39
+tick 63 0:0/1 1:0/1 4:26/39
+tick 64 0:0/1 1:0/1 4:27/39
+tick 65 0:0/1 1:0/1 4:28/39
+tick 66 0:0/1 1:0/1 4:29/39
+tick 67 0:0/1 1:0/1 4:30/39
+tick 68 0:0/1 1:0/1 4:31/39
+tick 69 0:0/1 1:0/1 4:32/39
+tick 70 0:0/1 1:0/1 4:33/39
+tick 71 0:0/1 1:0/1 4:34/39
+tick 72 0:0/1 1:0/1 4:35/39
+tick 73 0:0/1 1:0/1 4:36/39
+tick 74 0:0/1 1:0/1 4:37/39
+tick 75 0:0/1 1:0/1 4:38/39
+tick 76 0:0/1 1:0/1 4:0/39
+tick 77 0:0/1 1:0/1 4:1/39
+tick 78 0:0/1 1:0/1 4:2/39
+tick 79 0:0/1 1:0/1 4:3/39
+tick 80 0:0/1 1:0/1 4:4/39
+tick 81 0:0/1 1:0/1 4:5/39
+tick 82 0:0/1 1:0/1 4:6/39
+tick 83 0:0/1 1:0/1 4:7/39
+tick 84 0:0/1 1:0/1 4:8/39
+tick 85 0:0/1 1:0/1 4:9/39
+tick 86 0:0/1 1:0/1 4:10/39
+tick 87 0:0/1 1:0/1 4:11/39
+tick 88 0:0/1 1:0/1 4:12/39
+tick 89 0:0/1 1:0/1 4:13/39
+tick 90 0:0/1 1:0/1 4:14/39
+tick 91 0:0/1 1:0/1 4:15/39
+tick 92 0:0/1 1:0/1 4:16/39
+tick 93 0:0/1 1:0/1 4:17/39
+tick 94 0:0/1 1:0/1 4:18/39
+tick 95 0:0/1 1:0/1 4:19/39
+tick 96 0:0/1 1:0/1 4:20/39
+tick 97 0:0/1 1:0/1 4:21/39
+tick 98 0:0/1 1:0/1 4:22/39
+tick 99 0:0/1 1:0/1 4:23/39
+tick 100 0:0/1 1:0/1 4:24/39
+tick 101 0:0/1 1:0/1 4:25/39
+tick 102 0:0/1 1:0/1 4:26/39
+tick 103 0:0/1 1:0/1 4:27/39
+tick 104 0:0/1 1:0/1 4:28/39
+tick 105 0:0/1 1:0/1 4:29/39
+tick 106 0:0/1 1:0/1 4:30/39
+tick 107 0:0/1 1:0/1 4:31/39
+tick 108 0:0/1 1:0/1 4:32/39
+tick 109 0:0/1 1:0/1 4:33/39
+tick 110 0:0/1 1:0/1 4:34/39
+tick 111 0:0/1 1:0/1 4:35/39
+tick 112 0:0/1 1:0/1 4:36/39
+tick 113 0:0/1 1:0/1 4:37/39
+tick 114 0:0/1 1:0/1 4:38/39
+tick 115 0:0/1 1:0/1 4:0/39
+tick 116 0:0/1 1:0/1 4:1/39
+tick 117 0:0/1 1:0/1 4:2/39
+tick 118 0:0/1 1:0/1 4:3/39
+tick 119 0:0/1 1:0/1 4:4/39
+tick 120 0:0/1 1:0/1 4:5/39
+tick 121 0:0/1 1:0/1 4:6/39
+tick 122 0:0/1 1:0/1 4:7/39
+tick 123 0:0/1 1:0/1 4:8/39
+tick 124 0:0/1 1:0/1 4:9/39
+tick 125 0:0/1 1:0/1 4:10/39
+tick 126 0:0/1 1:0/1 4:11/39
+tick 127 0:0/1 1:0/1 4:12/39
+tick 128 0:0/1 1:0/1 4:13/39
+tick 129 0:0/1 1:0/1 4:14/39
+tick 130 0:0/1 1:0/1 4:15/39
+tick 131 0:0/1 1:0/1 4:16/39
+tick 132 0:0/1 1:0/1 4:17/39
+tick 133 0:0/1 1:0/1 4:18/39
+tick 134 0:0/1 1:0/1 4:19/39
+tick 135 0:0/1 1:0/1 4:20/39
+tick 136 0:0/1 1:0/1 4:21/39
+tick 137 0:0/1 1:0/1 4:22/39
+tick 138 0:0/1 1:0/1 4:23/39
+tick 139 0:0/1 1:0/1 4:24/39
+tick 140 0:0/1 1:0/1 4:25/39
+tick 141 0:0/1 1:0/1 4:26/39
+tick 142 0:0/1 1:0/1 4:27/39
+tick 143 0:0/1 1:0/1 4:28/39
+tick 144 0:0/1 1:0/1 4:29/39
+tick 145 0:0/1 1:0/1 4:30/39
+tick 146 0:0/1 1:0/1 4:31/39
+tick 147 0:0/1 1:0/1 4:32/39
+tick 148 0:0/1 1:0/1 4:33/39
+tick 149 0:0/1 1:0/1 4:34/39
+tick 150 0:0/1 1:0/1 4:35/39
+tick 151 0:0/1 1:0/1 4:36/39
+tick 152 0:0/1 1:0/1 4:37/39
+tick 153 0:0/1 1:0/1 4:38/39
+tick 154 0:0/1 1:0/1 4:0/39
+tick 155 0:0/1 1:0/1 4:1/39
+tick 156 0:0/1 1:0/1 4:2/39
+tick 157 0:0/1 1:0/1 4:3/39
+tick 158 0:0/1 1:0/1 4:4/39
+tick 159 0:0/1 1:0/1 4:5/39
+tick 160 0:0/1 1:0/1 4:6/39
+tick 161 0:0/1 1:0/1 4:7/39
+tick 162 0:0/1 1:0/1 4:8/39
+tick 163 0:0/1 1:0/1 4:9/39
+tick 164 0:0/1 1:0/1 4:10/39
+tick 165 0:0/1 1:0/1 4:11/39
+tick 166 0:0/1 1:0/1 4:12/39
+tick 167 0:0/1 1:0/1 4:13/39
+tick 168 0:0/1 1:0/1 4:14/39
+tick 169 0:0/1 1:0/1 4:15/39
+tick 170 0:0/1 1:0/1 4:16/39
+tick 171 0:0/1 1:0/1 4:17/39
+tick 172 0:0/1 1:0/1 4:18/39
+tick 173 0:0/1 1:0/1 4:19/39
+tick 174 0:0/1 1:0/1 4:20/39
+tick 175 0:0/1 1:0/1 4:21/39
+tick 176 0:0/1 1:0/1 4:22/39
+tick 177 0:0/1 1:0/1 4:23/39
+tick 178 0:0/1 1:0/1 4:24/39
+tick 179 0:0/1 1:0/1 4:25/39
+tick 180 0:0/1 1:0/1 4:26/39
+tick 181 0:0/1 1:0/1 4:27/39
+tick 182 0:0/1 1:0/1 4:28/39
+tick 183 0:0/1 1:0/1 4:29/39
+tick 184 0:0/1 1:0/1 4:30/39
+tick 185 0:0/1 1:0/1 4:31/39
+tick 186 0:0/1 1:0/1 4:32/39
+tick 187 0:0/1 1:0/1 4:33/39
+tick 188 0:0/1 1:0/1 4:34/39
+tick 189 0:0/1 1:0/1 4:35/39
+tick 190 0:0/1 1:0/1 4:36/39
+tick 191 0:0/1 1:0/1 4:37/39
+tick 192 0:0/1 1:0/1 4:38/39
+tick 193 0:0/1 1:0/1 4:0/39
+tick 194 0:0/1 1:0/1 4:1/39
+tick 195 0:0/1 1:0/1 4:2/39
+tick 196 0:0/1 1:0/1 4:3/39
+tick 197 0:0/1 1:0/1 4:4/39
+tick 198 0:0/1 1:0/1 4:5/39
+tick 199 0:0/1 1:0/1 4:6/39
+tick 200 0:0/1 1:0/1 4:7/39
+tick 201 0:0/1 1:0/1 4:8/39
+tick 202 0:0/1 1:0/1 4:9/39
+tick 203 0:0/1 1:0/1 4:10/39
+tick 204 0:0/1 1:0/1 4:11/39
+tick 205 0:0/1 1:0/1 4:12/39
+tick 206 0:0/1 1:0/1 4:13/39
+tick 207 0:0/1 1:0/1 4:14/39
+tick 208 0:0/1 1:0/1 4:15/39
+tick 209 0:0/1 1:0/1 4:16/39
+tick 210 0:0/1 1:0/1 4:17/39
+tick 211 0:0/1 1:0/1 4:18/39
+tick 212 0:0/1 1:0/1 4:19/39
+tick 213 0:0/1 1:0/1 4:20/39
+tick 214 0:0/1 1:0/1 4:21/39
+tick 215 0:0/1 1:0/1 4:22/39
+tick 216 0:0/1 1:0/1 4:23/39
+tick 217 0:0/1 1:0/1 4:24/39
+tick 218 0:0/1 1:0/1 4:25/39
+tick 219 0:0/1 1:0/1 4:26/39
+tick 220 0:0/1 1:0/1 4:27/39
+tick 221 0:0/1 1:0/1 4:28/39
+tick 222 0:0/1 1:0/1 4:29/39
+tick 223 0:0/1 1:0/1 4:30/39
+tick 224 0:0/1 1:0/1 4:31/39
+tick 225 0:0/1 1:0/1 4:32/39
+tick 226 0:0/1 1:0/1 4:33/39
+tick 227 0:0/1 1:0/1 4:34/39
+tick 228 0:0/1 1:0/1 4:35/39
+tick 229 0:0/1 1:0/1 4:36/39
+tick 230 0:0/1 1:0/1 4:37/39
+tick 231 0:0/1 1:0/1 4:38/39
+tick 232 0:0/1 1:0/1 4:0/39
+tick 233 0:0/1 1:0/1 4:1/39
+tick 234 0:0/1 1:0/1 4:2/39
+tick 235 0:0/1 1:0/1 4:3/39
+tick 236 0:0/1 1:0/1 4:4/39
+tick 237 0:0/1 1:0/1 4:5/39
+tick 238 0:0/1 1:0/1 4:6/39
+tick 239 0:0/1 1:0/1 4:7/39
+tick 240 0:0/1 1:0/1 4:8/39
+tick 241 0:0/1 1:0/1 4:9/39
+tick 242 0:0/1 1:0/1 4:10/39
+tick 243 0:0/1 1:0/1 4:11/39
+tick 244 0:0/1 1:0/1 4:12/39
+tick 245 0:0/1 1:0/1 4:13/39
+tick 246 0:0/1 1:0/1 4:14/39
+tick 247 0:0/1 1:0/1 4:15/39
+tick 248 0:0/1 1:0/1 4:16/39
+tick 249 0:0/1 1:0/1 4:17/39
+tick 250 0:0/1 1:0/1 4:18/39
+tick 251 0:0/1 1:0/1 4:19/39
+tick 252 0:0/1 1:0/1 4:20/39
+tick 253 0:0/1 1:0/1 4:21/39
+tick 254 0:0/1 1:0/1 4:22/39
+tick 255 0:0/1 1:0/1 4:23/39
+tick 256 0:0/1 1:0/1 4:24/39
+tick 257 0:0/1 1:0/1 4:25/39
+tick 258 0:0/1 1:0/1 4:26/39
+tick 259 0:0/1 1:0/1 4:27/39
+tick 260 0:0/1 1:0/1 4:28/39
+tick 261 0:0/1 1:0/1 4:29/39
+tick 262 0:0/1 1:0/1 4:30/39
+tick 263 0:0/1 1:0/1 4:31/39
+tick 264 0:0/1 1:0/1 4:32/39
+tick 265 0:0/1 1:0/1 4:33/39
+tick 266 0:0/1 1:0/1 4:34/39
+tick 267 0:0/1 1:0/1 4:35/39
+tick 268 0:0/1 1:0/1 4:36/39
+tick 269 0:0/1 1:0/1 4:37/39
+tick 270 0:0/1 1:0/1 4:38/39
+tick 271 0:0/1 1:0/1 4:0/39
+tick 272 0:0/1 1:0/1 4:1/39
+tick 273 0:0/1 1:0/1 4:2/39
+tick 274 0:0/1 1:0/1 4:3/39
+tick 275 0:0/1 1:0/1 4:4/39
+tick 276 0:0/1 1:0/1 4:5/39
+tick 277 0:0/1 1:0/1 4:6/39
+tick 278 0:0/1 1:0/1 4:7/39
+tick 279 0:0/1 1:0/1 4:8/39
+tick 280 0:0/1 1:0/1 4:9/39
+tick 281 0:0/1 1:0/1 4:10/39
+tick 282 0:0/1 1:0/1 4:11/39
+tick 283 0:0/1 1:0/1 4:12/39
+tick 284 0:0/1 1:0/1 4:13/39
+tick 285 0:0/1 1:0/1 4:14/39
+tick 286 0:0/1 1:0/1 4:15/39
+tick 287 0:0/1 1:0/1 4:16/39
+tick 288 0:0/1 1:0/1 4:17/39
+tick 289 0:0/1 1:0/1 4:18/39
+tick 290 0:0/1 1:0/1 4:19/39
+tick 291 0:0/1 1:0/1 4:20/39
+tick 292 0:0/1 1:0/1 4:21/39
+tick 293 0:0/1 1:0/1 4:22/39
+tick 294 0:0/1 1:0/1 4:23/39
+tick 295 0:0/1 1:0/1 4:24/39
+tick 296 0:0/1 1:0/1 4:25/39
+tick 297 0:0/1 1:0/1 4:26/39
+tick 298 0:0/1 1:0/1 4:27/39
+tick 299 0:0/1 1:0/1 4:28/39
+tick 300 0:0/1 1:0/1 4:29/39
+tick 301 0:0/1 1:0/1 4:30/39
+tick 302 0:0/1 1:0/1 4:31/39
+tick 303 0:0/1 1:0/1 4:32/39
+tick 304 0:0/1 1:0/1 4:33/39
+tick 305 0:0/1 1:0/1 4:34/39
+tick 306 0:0/1 1:0/1 4:35/39
+tick 307 0:0/1 1:0/1 4:36/39
+tick 308 0:0/1 1:0/1 4:37/39
+tick 309 0:0/1 1:0/1 4:38/39
+tick 310 0:0/1 1:0/1 4:39/90h5
+tick 311 0:0/1 1:0/1 4:40/90h5
+tick 312 0:0/1 1:0/1 4:41/90h5
+tick 313 0:0/1 1:0/1 4:42/90h5
+tick 314 0:0/1 1:0/1 4:43/90h5
+tick 315 0:0/1 1:0/1 4:44/90h5
+tick 316 0:0/1 1:0/1 4:45/90h5
+tick 317 0:0/1 1:0/1 4:46/90h5
+tick 318 0:0/1 1:0/1 4:47/90h5
+tick 319 0:0/1 1:0/1 4:48/90h5
+tick 320 0:0/1 1:0/1 4:49/90h5
+tick 321 0:0/1 1:0/1 4:50/90h5
+tick 322 0:0/1 1:0/1 4:51/90h5
+tick 323 0:0/1 1:0/1 4:52/90h5
+tick 324 0:0/1 1:0/1 4:53/90h5
+tick 325 0:0/1 1:0/1 4:54/90h5
+tick 326 0:0/1 1:0/1 4:55/90h5
+tick 327 0:0/1 1:0/1 4:56/90h5
+tick 328 0:0/1 1:0/1 4:57/90h5
+tick 329 0:0/1 1:0/1 4:58/90h5
+tick 330 0:0/1 1:0/1 4:59/90h5
+tick 331 0:0/1 1:0/1 4:60/90h5
+tick 332 0:0/1 1:0/1 4:61/90h5
+tick 333 0:0/1 1:0/1 4:62/90h5
+tick 334 0:0/1 1:0/1 4:63/90h5
+tick 335 0:0/1 1:0/1 4:64/90h5
+tick 336 0:0/1 1:0/1 4:65/90h5
+tick 337 0:0/1 1:0/1 4:66/90h5
+tick 338 0:0/1 1:0/1 4:67/90h5
+tick 339 0:0/1 1:0/1 4:68/90h5
+tick 340 0:0/1 1:0/1 4:69/90h5
+tick 341 0:0/1 1:0/1 4:70/90h5
+tick 342 0:0/1 1:0/1 4:71/90h5
+tick 343 0:0/1 1:0/1 4:72/90h5
+tick 344 0:0/1 1:0/1 4:73/90h5
+tick 345 0:0/1 1:0/1 4:74/90h5
+tick 346 0:0/1 1:0/1 4:75/90h5
+tick 347 0:0/1 1:0/1 4:76/90h5
+tick 348 0:0/1 1:0/1 4:77/90h5
+tick 349 0:0/1 1:0/1 4:78/90h5
+tick 350 0:0/1 1:0/1 4:79/90h5
+tick 351 0:0/1 1:0/1 4:80/90h5
+tick 352 0:0/1 1:0/1 4:81/90h5
+tick 353 0:0/1 1:0/1 4:82/90h5
+tick 354 0:0/1 1:0/1 4:83/90h5
+tick 355 0:0/1 1:0/1 4:84/90h5
+tick 356 0:0/1 1:0/1 4:85/90h5
+tick 357 0:0/1 1:0/1 4:86/90h5
+tick 358 0:0/1 1:0/1 4:87/90h5
+tick 359 0:0/1 1:0/1 4:88/90h5
+tick 360 0:0/1 1:0/1 4:89/90h5
+tick 361 0:0/1 1:0/1 5:0/90
+tick 362 0:0/1 1:0/1 5:1/90
+tick 363 0:0/1 1:0/1 5:2/90
+tick 364 0:0/1 1:0/1 5:3/90
+tick 365 0:0/1 1:0/1 5:4/90
+tick 366 0:0/1 1:0/1 5:5/90
+tick 367 0:0/1 1:0/1 5:6/90
+tick 368 0:0/1 1:0/1 5:7/90
+tick 369 0:0/1 1:0/1 5:8/90
+tick 370 0:0/1 1:0/1 5:9/90
+tick 371 0:0/1 1:0/1 5:10/90
+tick 372 0:0/1 1:0/1 5:11/90
+tick 373 0:0/1 1:0/1 5:12/90
+tick 374 0:0/1 1:0/1 5:13/90
+tick 375 0:0/1 1:0/1 5:14/90
+tick 376 0:0/1 1:0/1 5:15/90
+tick 377 0:0/1 1:0/1 5:16/90
+tick 378 0:0/1 1:0/1 5:17/90
+tick 379 0:0/1 1:0/1 5:18/90
+tick 380 0:0/1 1:0/1 5:19/90
+tick 381 0:0/1 1:0/1 5:20/90
+tick 382 0:0/1 1:0/1 5:21/90
+tick 383 0:0/1 1:0/1 5:22/90
+tick 384 0:0/1 1:0/1 5:23/90
+tick 385 0:0/1 1:0/1 5:24/90
+tick 386 0:0/1 1:0/1 5:25/90
+tick 387 0:0/1 1:0/1 5:26/90
+tick 388 0:0/1 1:0/1 5:27/90
+tick 389 0:0/1 1:0/1 5:28/90
+tick 390 0:0/1 1:0/1 5:29/90
+tick 391 0:0/1 1:0/1 5:30/90
+tick 392 0:0/1 1:0/1 5:31/90
+tick 393 0:0/1 1:0/1 5:32/90
+tick 394 0:0/1 1:0/1 5:33/90
+tick 395 0:0/1 1:0/1 5:34/90
+tick 396 0:0/1 1:0/1 5:35/90
+tick 397 0:0/1 1:0/1 5:36/90
+tick 398 0:0/1 1:0/1 5:37/90
+tick 399 0:0/1 1:0/1 5:38/90
+tick 400 0:0/1 1:0/1 5:39/90
+tick 401 0:0/1 1:0/1 5:40/90
+tick 402 0:0/1 1:0/1 5:41/90
+tick 403 0:0/1 1:0/1 5:42/90
+tick 404 0:0/1 1:0/1 5:43/90
+tick 405 0:0/1 1:0/1 5:44/90
+tick 406 0:0/1 1:0/1 5:45/90
+tick 407 0:0/1 1:0/1 5:46/90
+tick 408 0:0/1 1:0/1 5:47/90
+tick 409 0:0/1 1:0/1 5:48/90
+tick 410 0:0/1 1:0/1 5:49/90
+tick 411 0:0/1 1:0/1 5:50/90
+tick 412 0:0/1 1:0/1 5:51/90
+tick 413 0:0/1 1:0/1 5:52/90
+tick 414 0:0/1 1:0/1 5:53/90
+tick 415 0:0/1 1:0/1 5:54/90
+tick 416 0:0/1 1:0/1 5:55/90
+tick 417 0:0/1 1:0/1 5:56/90
+tick 418 0:0/1 1:0/1 5:57/90
+tick 419 0:0/1 1:0/1 5:58/90
+tick 420 0:0/1 1:0/1 5:59/90
+tick 421 0:0/1 1:0/1 5:60/90
+tick 422 0:0/1 1:0/1 5:61/90
+tick 423 0:0/1 1:0/1 5:62/90
+tick 424 0:0/1 1:0/1 5:63/90
+tick 425 0:0/1 1:0/1 5:64/90
+tick 426 0:0/1 1:0/1 5:65/90
+tick 427 0:0/1 1:0/1 5:66/90
+tick 428 0:0/1 1:0/1 5:67/90
+tick 429 0:0/1 1:0/1 5:68/90
+tick 430 0:0/1 1:0/1 5:69/90
+tick 431 0:0/1 1:0/1 5:70/90
+tick 432 0:0/1 1:0/1 5:71/90
+tick 433 0:0/1 1:0/1 5:72/90
+tick 434 0:0/1 1:0/1 5:73/90
+tick 435 0:0/1 1:0/1 5:74/90
+tick 436 0:0/1 1:0/1 5:75/90
+tick 437 0:0/1 1:0/1 5:76/90
+tick 438 0:0/1 1:0/1 5:77/90
+tick 439 0:0/1 1:0/1 5:78/90
+tick 440 0:0/1 1:0/1 5:79/90
+tick 441 0:0/1 1:0/1 5:80/90
+tick 442 0:0/1 1:0/1 5:81/90
+tick 443 0:0/1 1:0/1 5:82/90
+tick 444 0:0/1 1:0/1 5:83/90
+tick 445 0:0/1 1:0/1 5:84/90
+tick 446 0:0/1 1:0/1 5:85/90
+tick 447 0:0/1 1:0/1 5:86/90
+tick 448 0:0/1 1:0/1 5:87/90
+tick 449 0:0/1 1:0/1 5:88/90
+tick 450 0:0/1 1:0/1 5:89/90
+tick 451 0:0/1 1:0/1 5:0/90
+tick 452 0:0/1 1:0/1 5:1/90
+tick 453 0:0/1 1:0/1 5:2/90
+tick 454 0:0/1 1:0/1 5:3/90
+tick 455 0:0/1 1:0/1 5:4/90
+tick 456 0:0/1 1:0/1 5:5/90
+tick 457 0:0/1 1:0/1 5:6/90
+tick 458 0:0/1 1:0/1 5:7/90
+tick 459 0:0/1 1:0/1 5:8/90
+tick 460 0:0/1 1:0/1 5:9/90
+tick 461 0:0/1 1:0/1 5:10/90
+tick 462 0:0/1 1:0/1 5:11/90
+tick 463 0:0/1 1:0/1 5:12/90
+tick 464 0:0/1 1:0/1 5:13/90
+tick 465 0:0/1 1:0/1 5:14/90
+tick 466 0:0/1 1:0/1 5:15/90
+tick 467 0:0/1 1:0/1 5:16/90
+tick 468 0:0/1 1:0/1 5:17/90
+tick 469 0:0/1 1:0/1 5:18/90
+tick 470 0:0/1 1:0/1 5:19/90
+tick 471 0:0/1 1:0/1 5:20/90
+tick 472 0:0/1 1:0/1 5:21/90
+tick 473 0:0/1 1:0/1 5:22/90
+tick 474 0:0/1 1:0/1 5:23/90
+tick 475 0:0/1 1:0/1 5:24/90
+tick 476 0:0/1 1:0/1 5:25/90
+tick 477 0:0/1 1:0/1 5:26/90
+tick 478 0:0/1 1:0/1 5:27/90
+tick 479 0:0/1 1:0/1 5:28/90
+tick 480 0:0/1 1:0/1 5:29/90
+tick 481 0:0/1 1:0/1 5:30/90
+tick 482 0:0/1 1:0/1 5:31/90
+tick 483 0:0/1 1:0/1 5:32/90
+tick 484 0:0/1 1:0/1 5:33/90
+tick 485 0:0/1 1:0/1 5:34/90
+tick 486 0:0/1 1:0/1 5:35/90
+tick 487 0:0/1 1:0/1 5:36/90
+tick 488 0:0/1 1:0/1 5:37/90
+tick 489 0:0/1 1:0/1 5:38/90
+tick 490 0:0/1 1:0/1 5:39/90
+tick 491 0:0/1 1:0/1 5:40/90
+tick 492 0:0/1 1:0/1 5:41/90
+tick 493 0:0/1 1:0/1 5:42/90
+tick 494 0:0/1 1:0/1 5:43/90
+tick 495 0:0/1 1:0/1 5:44/90
+tick 496 0:0/1 1:0/1 5:45/90
+tick 497 0:0/1 1:0/1 5:46/90
+tick 498 0:0/1 1:0/1 5:47/90
+tick 499 0:0/1 1:0/1 5:48/90
+tick 500 0:0/1 1:0/1 5:49/90
+tick 501 0:0/1 1:0/1 5:50/90
+tick 502 0:0/1 1:0/1 5:51/90
+tick 503 0:0/1 1:0/1 5:52/90
+tick 504 0:0/1 1:0/1 5:53/90
+tick 505 0:0/1 1:0/1 5:54/90
+tick 506 0:0/1 1:0/1 5:55/90
+tick 507 0:0/1 1:0/1 5:56/90
+tick 508 0:0/1 1:0/1 5:57/90
+tick 509 0:0/1 1:0/1 5:58/90
+tick 510 0:0/1 1:0/1 5:59/90
+tick 511 0:0/1 1:0/1 5:60/90
+tick 512 0:0/1 1:0/1 5:61/90
+tick 513 0:0/1 1:0/1 5:62/90
+tick 514 0:0/1 1:0/1 5:63/90
+tick 515 0:0/1 1:0/1 5:64/90
+tick 516 0:0/1 1:0/1 5:65/90
+tick 517 0:0/1 1:0/1 5:66/90
+tick 518 0:0/1 1:0/1 5:67/90
+tick 519 0:0/1 1:0/1 5:68/90
+tick 520 0:0/1 1:0/1 5:69/90
+tick 521 0:0/1 1:0/1 5:70/90
+tick 522 0:0/1 1:0/1 5:71/90
+tick 523 0:0/1 1:0/1 5:72/90
+tick 524 0:0/1 1:0/1 5:73/90
+tick 525 0:0/1 1:0/1 5:74/90
+tick 526 0:0/1 1:0/1 5:75/90
+tick 527 0:0/1 1:0/1 5:76/90
+tick 528 0:0/1 1:0/1 5:77/90
+tick 529 0:0/1 1:0/1 5:78/90
+tick 530 0:0/1 1:0/1 5:79/90
+tick 531 0:0/1 1:0/1 5:80/90
+tick 532 0:0/1 1:0/1 5:81/90
+tick 533 0:0/1 1:0/1 5:82/90
+tick 534 0:0/1 1:0/1 5:83/90
+tick 535 0:0/1 1:0/1 5:84/90
+tick 536 0:0/1 1:0/1 5:85/90
+tick 537 0:0/1 1:0/1 5:86/90
+tick 538 0:0/1 1:0/1 5:87/90
+tick 539 0:0/1 1:0/1 5:88/90
+tick 540 0:0/1 1:0/1 5:89/90
+tick 541 0:0/1 1:0/1 5:0/90
+tick 542 0:0/1 1:0/1 5:1/90
+tick 543 0:0/1 1:0/1 5:2/90
+tick 544 0:0/1 1:0/1 5:3/90
+tick 545 0:0/1 1:0/1 5:4/90
+tick 546 0:0/1 1:0/1 5:5/90
+tick 547 0:0/1 1:0/1 5:6/90
+tick 548 0:0/1 1:0/1 5:7/90
+tick 549 0:0/1 1:0/1 5:8/90
+tick 550 0:0/1 1:0/1 5:9/90
+tick 551 0:0/1 1:0/1 5:10/90
+tick 552 0:0/1 1:0/1 5:11/90
+tick 553 0:0/1 1:0/1 5:12/90
+tick 554 0:0/1 1:0/1 5:13/90
+tick 555 0:0/1 1:0/1 5:14/90
+tick 556 0:0/1 1:0/1 5:15/90
+tick 557 0:0/1 1:0/1 5:16/90
+tick 558 0:0/1 1:0/1 5:17/90
+tick 559 0:0/1 1:0/1 5:18/90
+tick 560 0:0/1 1:0/1 5:19/90
+tick 561 0:0/1 1:0/1 5:20/90
+tick 562 0:0/1 1:0/1 5:21/90
+tick 563 0:0/1 1:0/1 5:22/90
+tick 564 0:0/1 1:0/1 5:23/90
+tick 565 0:0/1 1:0/1 5:24/90
+tick 566 0:0/1 1:0/1 5:25/90
+tick 567 0:0/1 1:0/1 5:26/90
+tick 568 0:0/1 1:0/1 5:27/90
+tick 569 0:0/1 1:0/1 5:28/90
+tick 570 0:0/1 1:0/1 5:29/90
+tick 571 0:0/1 1:0/1 5:30/90
+tick 572 0:0/1 1:0/1 5:31/90
+tick 573 0:0/1 1:0/1 5:32/90
+tick 574 0:0/1 1:0/1 5:33/90
+tick 575 0:0/1 1:0/1 5:34/90
+tick 576 0:0/1 1:0/1 5:35/90
+tick 577 0:0/1 1:0/1 5:36/90
+tick 578 0:0/1 1:0/1 5:37/90
+tick 579 0:0/1 1:0/1 5:38/90
+tick 580 0:0/1 1:0/1 5:39/90
+tick 581 0:0/1 1:0/1 5:40/90
+tick 582 0:0/1 1:0/1 5:41/90
+tick 583 0:0/1 1:0/1 5:42/90
+tick 584 0:0/1 1:0/1 5:43/90
+tick 585 0:0/1 1:0/1 5:44/90
+tick 586 0:0/1 1:0/1 5:45/90
+tick 587 0:0/1 1:0/1 5:46/90
+tick 588 0:0/1 1:0/1 5:47/90
+tick 589 0:0/1 1:0/1 5:48/90
+tick 590 0:0/1 1:0/1 5:49/90
+tick 591 0:0/1 1:0/1 5:50/90
+tick 592 0:0/1 1:0/1 5:51/90
+tick 593 0:0/1 1:0/1 5:52/90
+tick 594 0:0/1 1:0/1 5:53/90
+tick 595 0:0/1 1:0/1 5:54/90
+tick 596 0:0/1 1:0/1 5:55/90
+tick 597 0:0/1 1:0/1 5:56/90
+tick 598 0:0/1 1:0/1 5:57/90
+tick 599 0:0/1 1:0/1 5:58/90
+== animation view 10: 9 slots loaded
+slot 0 id 57 kind 2 anim 1 weight 0 click 0 active 1 frames 1 start 0 end 1 chain -1 handing 0
+slot 1 id 53 kind 2 anim 1 weight 0 click 0 active 1 frames 1 start 0 end 1 chain -1 handing 0
+slot 2 id 58 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 3 id 59 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 4 id 2 kind 1 anim 1 weight 0 click 2 active 1 frames 40 start 0 end 40 chain -1 handing 0
+slot 5 id 54 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 6 id 62 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 7 id 55 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+slot 8 id 63 kind 2 anim 1 weight 0 click 0 active 0 frames 1 start 0 end 1 chain -1 handing 0
+tick 0 0:0/1 1:0/1 4:1/40
+tick 1 0:0/1 1:0/1 4:2/40
+tick 2 0:0/1 1:0/1 4:3/40
+tick 3 0:0/1 1:0/1 4:4/40
+tick 4 0:0/1 1:0/1 4:5/40
+tick 5 0:0/1 1:0/1 4:6/40
+tick 6 0:0/1 1:0/1 4:7/40
+tick 7 0:0/1 1:0/1 4:8/40
+tick 8 0:0/1 1:0/1 4:9/40
+tick 9 0:0/1 1:0/1 4:10/40
+tick 10 0:0/1 1:0/1 4:11/40
+tick 11 0:0/1 1:0/1 4:12/40
+tick 12 0:0/1 1:0/1 4:13/40
+tick 13 0:0/1 1:0/1 4:14/40
+tick 14 0:0/1 1:0/1 4:15/40
+tick 15 0:0/1 1:0/1 4:16/40
+tick 16 0:0/1 1:0/1 4:17/40
+tick 17 0:0/1 1:0/1 4:18/40
+tick 18 0:0/1 1:0/1 4:19/40
+tick 19 0:0/1 1:0/1 4:20/40
+tick 20 0:0/1 1:0/1 4:21/40
+tick 21 0:0/1 1:0/1 4:22/40
+tick 22 0:0/1 1:0/1 4:23/40
+tick 23 0:0/1 1:0/1 4:24/40
+tick 24 0:0/1 1:0/1 4:25/40
+tick 25 0:0/1 1:0/1 4:26/40
+tick 26 0:0/1 1:0/1 4:27/40
+tick 27 0:0/1 1:0/1 4:28/40
+tick 28 0:0/1 1:0/1 4:29/40
+tick 29 0:0/1 1:0/1 4:30/40
+tick 30 0:0/1 1:0/1 4:31/40
+tick 31 0:0/1 1:0/1 4:32/40
+tick 32 0:0/1 1:0/1 4:33/40
+tick 33 0:0/1 1:0/1 4:34/40
+tick 34 0:0/1 1:0/1 4:35/40
+tick 35 0:0/1 1:0/1 4:36/40
+tick 36 0:0/1 1:0/1 4:37/40
+tick 37 0:0/1 1:0/1 4:38/40
+tick 38 0:0/1 1:0/1 4:39/40
+tick 39 0:0/1 1:0/1 4:0/40
+tick 40 0:0/1 1:0/1 4:1/40
+tick 41 0:0/1 1:0/1 4:2/40
+tick 42 0:0/1 1:0/1 4:3/40
+tick 43 0:0/1 1:0/1 4:4/40
+tick 44 0:0/1 1:0/1 4:5/40
+tick 45 0:0/1 1:0/1 4:6/40
+tick 46 0:0/1 1:0/1 4:7/40
+tick 47 0:0/1 1:0/1 4:8/40
+tick 48 0:0/1 1:0/1 4:9/40
+tick 49 0:0/1 1:0/1 4:10/40
+tick 50 0:0/1 1:0/1 4:11/40
+tick 51 0:0/1 1:0/1 4:12/40
+tick 52 0:0/1 1:0/1 4:13/40
+tick 53 0:0/1 1:0/1 4:14/40
+tick 54 0:0/1 1:0/1 4:15/40
+tick 55 0:0/1 1:0/1 4:16/40
+tick 56 0:0/1 1:0/1 4:17/40
+tick 57 0:0/1 1:0/1 4:18/40
+tick 58 0:0/1 1:0/1 4:19/40
+tick 59 0:0/1 1:0/1 4:20/40

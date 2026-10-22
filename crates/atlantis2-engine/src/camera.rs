@@ -191,6 +191,28 @@ fn quat_to_matrix(fpu: Fpu, q: [f32; 4]) -> [f32; 9] {
     .map(|v| fpu.f32(v))
 }
 
+/// FUN_004581d0: the yaw and pitch (radians, stored as floats) of a
+/// direction: `fpatan` of (z, x), then of (y, √(z² + x²)).
+pub fn direction_angles(fpu: Fpu, v: [f32; 3]) -> (f32, f32) {
+    let [x, y, z] = v.map(d);
+    let yaw = fpu.f32(libm::atan2(z, x));
+    let h = fpu.sqrt(fpu.add(fpu.mul(z, z), fpu.mul(x, x)));
+    let pitch = fpu.f32(libm::atan2(y, h));
+    (yaw, pitch)
+}
+
+/// FUN_00459300: a zone's aim, the angles of the sum of its points (each
+/// sum stored as a float, in file order).
+pub fn zone_aim(fpu: Fpu, points: &[[f32; 3]]) -> (f32, f32) {
+    let mut s = [0f32; 3];
+    for p in points {
+        for i in 0..3 {
+            s[i] = fpu.f32(fpu.add(d(p[i]), d(s[i])));
+        }
+    }
+    direction_angles(fpu, s)
+}
+
 impl Camera {
     /// The warp's camera for a `width` x `height` screen, after the warp's
     /// initialisation (@ 0x00459a10): 76° field of view, centre (W/2, H/2),
@@ -282,12 +304,7 @@ impl Camera {
     /// the screen centre's direction: yaw = atan2(z, x), pitch = atan2(y,
     /// sqrt(z² + x²)).
     pub fn angles(&self) -> (f32, f32) {
-        let fpu = self.fpu;
-        let [x, y, z] = self.ray(self.cx, self.cy).map(d);
-        let yaw = fpu.f32(libm::atan2(z, x));
-        let h = fpu.sqrt(fpu.add(fpu.mul(z, z), fpu.mul(x, x)));
-        let pitch = fpu.f32(libm::atan2(y, h));
-        (yaw, pitch)
+        direction_angles(self.fpu, self.ray(self.cx, self.cy))
     }
 
     /// The view entry's orientation (FUN_00459fe0 @ 0x0045a0b0..0x0045a1c2):

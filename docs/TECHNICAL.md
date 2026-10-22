@@ -9,8 +9,8 @@
 | `atlantis-data` | BigFile archives, executable tables, game detection |
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
-| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera; for now a new game shows its first view |
+| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -582,10 +582,17 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 
 A folder holding `atlantis2.exe` opens Atlantis II (`crates/atlantis-app/src/a2.rs`):
 a new game shows its first view, Tibet's `tibet.wam` view 2 at yaw −90°,
-pitch 0, read from `scenar\chapi000.con`, and the mouse or the arrow keys
-turn it within the original's limits (pitch ±70°, yaw free). Nothing else
-runs yet: no cinematic, no script, no move. `--headless <folder> [frames]
---screenshot <file.png>` saves the screen.
+pitch 0, read from `scenar\chapi000.con`; the mouse or the arrow keys
+turn it within the original's limits (pitch ±70°, yaw free), the place
+animations play, the cursor at the screen centre tells what is under it,
+and a left click on a move zone walks to the next view as the original
+does: the turn, the transition video, the arrival. Not yet: the
+cinematics, the scripts (so no dialog, no puzzle, no music), the menus,
+the bag, the sound. `--headless <folder> [frames] --screenshot <file.png>`
+runs that many frames and saves the screen; the example
+`cargo run --release -p atlantis2-engine --example tibet_tour <install>
+<discs> <out>` writes pictures of three views with their animations and
+a recorded walk from the first view to view 4.
 
 - **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
   timestamp 0x38030926), recognised by its size and timestamp and
@@ -637,6 +644,62 @@ runs yet: no cinematic, no script, no move. `--headless <folder> [frames]
   The original's warp loop is unpaced; the port turns once per frame at
   60 frames a second. The arrow keys stand for 8 mickeys a frame each (a
   port convenience).
+- **Time:** as in the original, the frame dispatcher runs once per
+  drawn frame (`Engine::pass`) and a 15 Hz task (`Engine::tick`, @
+  0x0040caa0) paces the videos, the place animations and the cursor; the
+  window ticks every 1/15 s and draws at 60 frames a second, the headless
+  mode ticks every fourth frame. A move's turn is counted in frames, as in
+  the original (`engine.rs`).
+- **Place animations:** the SPW files of `datas_a2\spw\` are banks of
+  frames with up to six sprites each, one per cube face, in the first
+  game's sprite rows and blend (`c + dst × (32 − f) / 32`), drawn into the
+  512x512 faces before the cube (`crates/atlantis2-data/src/spw.rs`). At
+  each view entry every state of every entity shown in that view gets a
+  slot (at most 34): first frame, end, click kind, shown or not; the
+  show / hide table (a taken object) overrides "shown". Each tick moves
+  every shown slot one frame on; at its end a slot restarts (its first
+  play one frame shorter, as in the original), stops, or, for a state
+  with a weight, draws among the weighted states of its entity with the
+  original's `rand` (MSVC's, seeded from the clock as the original seeds
+  it with `GetTickCount`) and hands over after playing to the end of its
+  file (`anim.rs`). The faces are drawn on and put back after every
+  frame. Not ported: frame lists (+0x2c ≠ 1), state chains, the odd-tick
+  flag, `CHEVAL`'s frame variable (no Tibet state uses them).
+- **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
+  `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
+  `spr_p5.dll`'s `AFF_SPR` and its tables for RGB565, the last row and
+  column of the screen never drawn) at the screen centre: 1..12 over a
+  move zone, 25..39 over another zone (none from type 1000 on), 13..24 or
+  25..39 over a clickable object or character, one frame on per tick,
+  chosen after the frame is drawn so it shows on the next one; then the
+  5-pixel cross of the "centre marker" option (on by default) in the
+  colour of what is under the centre. The texel under the centre that the
+  sprite test uses is taken from the cube's texture mapping (the original
+  projects through per-face cameras, @ 0x0047db60, not read) [inferred].
+- **Moves:** a click runs the zone click of the original (@ 0x0049ca80):
+  a sprite under the centre takes it (an object of click kind 1 is taken:
+  hidden for good, in the bag list and the hand); otherwise a move zone
+  sets up the move (@ 0x0049cc40): the destination's start and arrival
+  angles or the zone's aim, and a turn (@ 0x0045b690 / 0x0045b910) in a
+  straight line in (yaw, pitch), 0.2° more per frame up to 2.2°, braking
+  over the last 15°, snapping within 0.1°, transcribed with its float
+  stores and x87 rounding. A click on a move whose start angle is already
+  the view's direction does nothing, as in the original (the first view
+  of a new game). When the turn ends the new view is entered at the
+  arrival angles and the destination's video starts at 15 frames a
+  second (its first frame at once); a click or a double click (two clicks
+  under 0.2 s, which also skips the video before it starts) ends it; a
+  video on no disc is a cut (14 of Tibet's 16). The arrival is noted for
+  the scripts at the first frame after it. Without the scripts: the
+  departure, click and arrival scans run nothing, `NEXTVUE`, `UDADA`,
+  `ABORTDEPART` and `TrajSound` keep their defaults (0, no transition
+  sound), the mandala puzzle's clicks in view 10 and the subject menu of
+  a character are only logged; moves to other places (type-2 zones),
+  transition sprites and the zoom of a turn are not ported (none in
+  Tibet).
+- **Sound:** none yet. Tibet has no place sound (`tibet.wam` has none
+  and is not in the executable's listener table) and its two transition
+  videos have no sound track; its music starts from the scripts.
 - **Alpha masks:** the dialog videos carry an `AL` chunk per frame (runs of
   (n, a) pairs, a = 0..31), which the decoder keeps for the caller
   (`HnmVideo::alpha`) and `AlphaTables::blend` draws as the original's
@@ -676,7 +739,9 @@ installation, for the tests of those builds. For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
 copies); the expected frames, matrices and zone picks come from the
-original `atlantis2.exe` run under emulation:
+original `atlantis2.exe` run under emulation (Tibet's moves pass by pass,
+the place animations tick by tick, every SPW frame of Tibet and the
+first of every other file, every `AFF_SPR` of the installed banks):
 
 ```sh
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \

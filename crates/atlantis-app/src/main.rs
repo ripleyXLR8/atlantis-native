@@ -28,8 +28,8 @@
 //! switches it back).
 //!
 //! A folder holding Atlantis II (`atlantis2.exe`) opens Atlantis II's own
-//! minimal mode (`atlantis_app::a2`): a new game on its first view, to look
-//! around in. Its discs (CD images or copies) are looked for in the folder,
+//! minimal mode (`atlantis_app::a2`): a new game in Tibet, to look around
+//! and walk from view to view with a left click. Its discs (CD images or copies) are looked for in the folder,
 //! in the folders directly inside it and in each `--discs <folder>`;
 //! `--headless <folder> [frames] [--screenshot <file.png>]` prints where it
 //! is and saves the screen. Only the command line opens Atlantis II for now:
