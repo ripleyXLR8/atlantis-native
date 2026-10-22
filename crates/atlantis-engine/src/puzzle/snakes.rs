@@ -563,7 +563,8 @@ impl SnakesGame {
 
     /// `FUN_0043c114`: 20 steps of 100 ticks of the 200 Hz timer, the
     /// pieces shown every other step (from the second), drawn before the
-    /// snakes; no cursor.
+    /// snakes; no cursor in the 20 steps (the entry adds it once after
+    /// them, see [`SnakesGame::run`]).
     async fn win_animation(&self, io: &mut impl SnakesIo) {
         let mut hidden = true;
         for _ in 0..0x14 {
@@ -582,8 +583,13 @@ impl SnakesGame {
     /// placed, then phase 2 (`FUN_0043c6bc`); each pass `FUN_0043bebc`,
     /// then the cursor `FUN_0043c7e8` (CURSEURS frame 11 near the edges,
     /// else frame 6). A leave click ends phase 2 before the frame (the
-    /// result test at 0x0043b392 follows `FUN_0043c6bc`), phase 1 after it
-    /// (0x0043b34e). 255 solved, 1 left.
+    /// result test at 0x0043b392 follows `FUN_0043c6bc`), phase 1 after
+    /// it: its loop draws, presents and polls the input (0x0043b344)
+    /// before testing the result at 0x0043b34e, and leaves through the
+    /// phase-2 loop head (0x0043b384), which runs `FUN_0043c6bc` on a press
+    /// taken by that poll before the result is returned (0x0043b392). A
+    /// win (`FUN_0043c114` inside `FUN_0043bebc`) is followed by the cursor
+    /// and one more present in both loops. 255 solved, 1 left.
     pub async fn run(&mut self, io: &mut impl SnakesIo) -> i32 {
         while self.result == 0 {
             let (mx, my, clicked) = io.read_input();
@@ -604,13 +610,36 @@ impl SnakesGame {
             if self.frame(mx, my) {
                 io.play_sound(Sound::Win);
                 self.win_animation(io).await;
-                break;
+                // FUN_0043bebc returns after FUN_0043c114 and the entry
+                // goes on with the cursor (FUN_0043c7e8, 0x0043b28c /
+                // 0x0043b3b2) drawn onto the 20th step still in the back
+                // buffer, then presents it (0x0043b33f / 0x0043b465) before
+                // its result test. Not the pass's drawing: the 20th step
+                // draws the pieces before the snakes.
+            } else {
+                io.draw_background();
+                Self::draw_list(io, &self.draws());
             }
-            io.draw_background();
-            Self::draw_list(io, &self.draws());
             io.draw_sprite('C', mx, my, if at_edge(mx) { 11 } else { 6 });
             io.present(self).await;
-            if self.result != 0 || io.aborted() {
+            if self.result != 0 {
+                if phase1 {
+                    // The poll at 0x0043b344 precedes the test at
+                    // 0x0043b34e, whose exit goes through the phase-2 loop
+                    // head: a new press is run by FUN_0043c6bc
+                    // (0x0043b384..0x0043b38d) before the result is
+                    // returned (0x0043b392).
+                    let (mx, my, clicked) = io.read_input();
+                    if clicked {
+                        let snd = self.steer(mx, my);
+                        if snd != Sound::None {
+                            io.play_sound(snd);
+                        }
+                    }
+                }
+                break;
+            }
+            if io.aborted() {
                 break;
             }
         }
@@ -665,8 +694,10 @@ impl SnakesIo for Host<'_> {
     }
 }
 
-/// StartPuzzle 8: 255 when solved, 1 when the player leaves, a file is
-/// missing or the game is quit.
+/// StartPuzzle 8: 255 when solved, 1 when the player leaves or the game is
+/// quit. Here only: 1 when a file is missing; the entry's one load test
+/// (`FUN_0043a53c`, 0x0043b200..0x0043b210) never fails, `FUN_0043a53c`
+/// always returning 1.
 pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let (Some(bg), Some(frames), Some(pcx)) = (
         load_tga(e, "LABBASE4.TGA").await,

@@ -272,9 +272,15 @@ fn crt_rand_from_seed_1() {
     let want = [
         16838, 5758, 10113, 17515, 31051, 5627, 23010, 7419, 16212, 4086, 2749, 12767,
     ];
-    let mut seed = 1;
+    let mut seed = puzzle::CRT_RAND_START_SEED;
     for w in want {
         assert_eq!(puzzle::crt_rand_next(&mut seed), w);
+    }
+    // The engine's one stream (what the rat, the crab and the ogre draw
+    // from in turn): the same sequence from the launch, no restart.
+    let mut state = puzzle::PuzzleState::default();
+    for w in want {
+        assert_eq!(state.crt_rand(), w);
     }
 }
 
@@ -615,6 +621,146 @@ fn meta_coverage_vs_original() {
             )
         };
         assert_eq!(&got, w);
+    }
+}
+
+/// One poll of a right-button scenario: the buttons down, the flag
+/// `FUN_0041a298` left, the repeat counter after the handler and whether
+/// it turned.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct HoldPoll {
+    left: bool,
+    right: bool,
+    flag: bool,
+    counter: i32,
+    turn: bool,
+}
+
+fn right_hold(name: &str) -> Vec<HoldPoll> {
+    let mut out = Vec::new();
+    let mut inside = false;
+    for l in golden(include_str!("golden/ui_puzzle_right_hold.txt")) {
+        if let Some(rest) = l.strip_prefix("scenario ") {
+            inside = rest.split(' ').next() == Some(name);
+            continue;
+        }
+        if !inside {
+            continue;
+        }
+        let t: Vec<&str> = l.split(' ').collect();
+        assert_eq!(
+            (t[0], t[2], t[4], t[6], t[8], t[10]),
+            ("poll", "left", "right", "flag", "counter", "turn")
+        );
+        out.push(HoldPoll {
+            left: t[3] == "1",
+            right: t[5] == "1",
+            flag: t[7] == "1",
+            counter: t[9].parse().unwrap(),
+            turn: t[11] == "1",
+        });
+    }
+    out
+}
+
+/// `puzzle::right_press` (the right flag the metal pieces and the hexagon
+/// read) against the flag the original's `FUN_0041a298` left, poll by
+/// poll: the right button held for 60 polls, released and pressed again,
+/// and pressed on the poll the left button goes down, while it is held and
+/// alone.
+#[test]
+fn right_press_vs_original() {
+    for name in ["meta_hold", "hexa_hold", "meta_left"] {
+        let polls = right_hold(name);
+        assert_eq!(polls.len(), 65, "{name}");
+        let (mut prev_left, mut prev_right) = (false, false);
+        for (k, p) in polls.iter().enumerate() {
+            let left_press = p.left && !prev_left;
+            prev_left = p.left;
+            let got = puzzle::right_press(p.right, &mut prev_right, left_press);
+            assert_eq!(got, p.flag, "{name} poll {}", k + 1);
+        }
+    }
+}
+
+/// The metal pieces fed with a scenario's buttons, one poll per input
+/// read, through `right_press` as the engine reads them; per pass the
+/// repeat counter after the right-button handler and whether it turned.
+struct Hold {
+    polls: Vec<HoldPoll>,
+    next: usize,
+    prev_left: bool,
+    prev_right: bool,
+    turned: bool,
+    passes: Vec<(i32, bool)>,
+}
+
+impl Hold {
+    fn poll(&mut self) -> (i32, i32, bool, bool) {
+        let p = self.polls.get(self.next).copied();
+        self.next += 1;
+        let (l, r) = p.map_or((false, false), |p| (p.left, p.right));
+        let click = l && !self.prev_left;
+        self.prev_left = l;
+        (
+            320,
+            470,
+            click,
+            puzzle::right_press(r, &mut self.prev_right, click),
+        )
+    }
+}
+
+impl MetaIo for Hold {
+    fn start_input(&mut self) -> (i32, i32, bool, bool) {
+        self.poll()
+    }
+    fn boundary(&mut self, g: &MetaGame) -> (i32, i32, bool, bool) {
+        self.passes.push((g.repeat, self.turned));
+        self.turned = false;
+        self.poll()
+    }
+    fn load_picture(&mut self, _n: i32) {}
+    fn draw_background(&mut self) {}
+    fn draw_sprite(&mut self, _bank: char, _x: i32, _y: i32, _frame: i32) {}
+    fn draw_standard_cursor(&mut self, _x: i32, _y: i32) {}
+    async fn present(&mut self, _g: &MetaGame) {}
+    fn play_sound(&mut self, slot: i32) {
+        if slot == 0 {
+            self.turned = true;
+        }
+    }
+    fn current_place(&mut self) -> i32 {
+        0
+    }
+    fn aborted(&self) -> bool {
+        self.passes.len() >= self.polls.len()
+    }
+}
+
+/// The right button held through the metal pieces: one board turn per
+/// press and a repeat counter that never passes 1, pass by pass against
+/// the original's `FUN_00448084` (scenario meta_hold).
+#[test]
+fn meta_right_hold_vs_original() {
+    let Some(data) = game("meta_right_hold_vs_original") else {
+        return;
+    };
+    let (map, spr) = map_and_sprites(&data, "PZMETAM.BMP", "PZMETAP1.SPR");
+    let polls = right_hold("meta_hold");
+    let mut g = MetaGame::new(map, read_coverage(&spr).unwrap());
+    let mut io = Hold {
+        polls: polls.clone(),
+        next: 0,
+        prev_left: false,
+        prev_right: false,
+        turned: false,
+        passes: Vec::new(),
+    };
+    assert_eq!(block_on(g.run(&mut io, 1)), 2);
+    assert_eq!(io.passes.len(), polls.len());
+    for (k, (p, &(counter, turn))) in polls.iter().zip(&io.passes).enumerate() {
+        assert_eq!((counter, turn), (p.counter, p.turn), "pass {}", k + 1);
     }
 }
 

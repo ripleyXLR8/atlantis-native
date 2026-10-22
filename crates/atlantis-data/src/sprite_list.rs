@@ -134,10 +134,14 @@ fn lines(data: &[u8]) -> Vec<&[u8]> {
 
 /// Parses an SPW list file (SPRLIST\\<Wam::spw_list>). The hidden persos
 /// are applied separately ([`crate::sprite_anim::apply_hidden`]), as
-/// FUN_00427d30 does after each row.
+/// FUN_00427d30 does after each row. The list ends at the first line that
+/// starts with "FIN", as FUN_00424a20 stops there (3-byte strncmp
+/// FUN_0044a83f @ 0x00424a69 and at the loop tail); every shipped list
+/// ends with it.
 pub fn parse_sprite_list(data: &[u8]) -> Vec<SpritePlaceEntry> {
     lines(data)
         .into_iter()
+        .take_while(|l| !l.starts_with(b"FIN"))
         .filter_map(parse_sprite_place_line)
         .collect()
 }
@@ -345,6 +349,14 @@ pub fn object_pickup_rows(entries: &[SpritePlaceEntry], vue: u16, id: i32) -> Ve
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The rows after the FIN line are not read (case-sensitive compare).
+    #[test]
+    fn sprite_list_ends_at_fin() {
+        let l = parse_sprite_list(b"1 0 4 A.SPW\r\nfin\r\n2 0 4 B.SPW\r\nFIN\r\n3 0 4 C.SPW\r\n");
+        let files: Vec<&str> = l.iter().map(|e| e.spw_file.as_str()).collect();
+        assert_eq!(files, ["A.SPW", "B.SPW"]);
+    }
 
     #[test]
     fn row_formats() {

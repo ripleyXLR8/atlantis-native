@@ -60,8 +60,8 @@ pub mod taquin;
 pub mod throne;
 
 pub use assets::{
-    load_class_map, load_spr, load_tga, read_coverage, read_puzzle_file, Coverage, PuzzleHost,
-    PuzzleInput, PuzzleMouse, PuzzleScreen, PuzzleSounds, SamplePlayer, MAP_SIZE,
+    load_class_map, load_spr, load_tga, read_coverage, read_puzzle_file, right_press, Coverage,
+    PuzzleHost, PuzzleInput, PuzzleMouse, PuzzleScreen, PuzzleSounds, SamplePlayer, MAP_SIZE,
 };
 
 use crate::engine::{Engine, Event};
@@ -220,6 +220,9 @@ impl PuzzleCursor {
     }
 }
 
+/// The seed of the C rand at launch: srand (0x00453cf5) has no caller.
+pub const CRT_RAND_START_SEED: u32 = 1;
+
 /// The C rand of `atlantis.exe` (Watcom, @ 0x00453cd1). srand
 /// (0x00453cf5) has no caller, so the seed starts at 1 at every launch.
 pub fn crt_rand_next(seed: &mut u32) -> i32 {
@@ -250,7 +253,9 @@ pub fn puzzle_lcg_next(seed: &mut u16, n: i32) -> i32 {
 pub struct PuzzleState {
     /// The shared cursor animation.
     pub cursor: PuzzleCursor,
-    /// The C rand's seed (shared by the rat, crab and ogre puzzles).
+    /// The C rand's seed: one stream for the whole launch, shared by the
+    /// rat (`FUN_00438fd4` @ 0x00439418), the crab (`FUN_0043ede8` @
+    /// 0x0043ee25) and the ogre (`FUN_00442a0c`), never reseeded.
     pub crt_rand_seed: u32,
     /// The puzzle LCG 0x007bec20, seeded by the dispatcher.
     pub lcg_seed: u16,
@@ -264,6 +269,8 @@ pub struct PuzzleState {
     /// The snakes of the last snakes run (their places and pieces are not
     /// reset).
     pub snakes: Option<[snakes::Snake; snakes::NUM_SNAKES]>,
+    /// The hens' marks of the last hens run (their x and y are not reset).
+    pub hen_marks: Option<[hens::Mark; hens::NUM_MARKS]>,
     /// The rat's run state (static data at 0x004969c0, partly reset by
     /// each run).
     pub rat: Option<rat::RatRules>,
@@ -273,12 +280,13 @@ impl Default for PuzzleState {
     fn default() -> Self {
         PuzzleState {
             cursor: PuzzleCursor::default(),
-            crt_rand_seed: 1,
+            crt_rand_seed: CRT_RAND_START_SEED,
             lcg_seed: 0,
             meta: None,
             crabs: None,
             eclipse: None,
             snakes: None,
+            hen_marks: None,
             rat: None,
         }
     }
@@ -357,7 +365,7 @@ mod entry_tests {
         let seen = Rc::new(Cell::new(None));
         let s2 = seen.clone();
         let ran = with_engine(
-            "puzzle_entry_centres_the_mouse",
+            "puzzle_entry_keeps_the_mouse",
             move |mut e| async move {
                 e.sys.set_mouse_pos(10, 10);
                 play_puzzle(&mut e, &mut NoScripts, id).await;
@@ -372,13 +380,14 @@ mod entry_tests {
         ran.then(|| seen.get().expect("the puzzle ended at once"))
     }
 
-    /// The eclipse (0) and the ogre (2) put the mouse at the screen centre
-    /// on entry.
+    /// The eclipse (0) and the ogre (2) leave the mouse where the zone
+    /// click left it: the original has no SetCursorPos between the zone
+    /// click and the puzzle loop.
     #[test]
-    fn eclipse_and_ogre_centre_the_mouse() {
+    fn eclipse_and_ogre_keep_the_mouse() {
         for id in [0, 2] {
             if let Some(m) = mouse_after_entry(id) {
-                assert_eq!(m, (320, 240), "puzzle {id}");
+                assert_eq!(m, (10, 10), "puzzle {id}");
             }
         }
     }

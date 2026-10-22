@@ -28,7 +28,7 @@ use atlantis_engine::audio::Mixer;
 use atlantis_engine::puzzle::eclipse::{Click as EclipseClick, EclipseGame, EclipseIo, RECORDS};
 use atlantis_engine::puzzle::hens::{self, HensGame, HensIo};
 use atlantis_engine::puzzle::pieces::{self, Click as PiecesClick, PiecesGame};
-use atlantis_engine::puzzle::snakes::{self, SnakesGame};
+use atlantis_engine::puzzle::snakes::{self, SnakesGame, SnakesIo};
 use atlantis_engine::sys::{Input, MouseButton, Runner, Sys};
 use atlantis_engine::{Event, Options, Start};
 use md5::{Digest, Md5};
@@ -522,6 +522,63 @@ fn hens_solve_and_leave() {
     assert!(g.leave);
 }
 
+/// The drop of mark 0: its x on the frames where its y is 397..412.
+#[derive(Default)]
+struct HensDrop {
+    sounds: Vec<hens::Sound>,
+    xs: Vec<String>,
+}
+
+impl HensIo for HensDrop {
+    fn read_input(&mut self) -> (i32, i32, bool) {
+        (0, 0, false)
+    }
+    fn draw_background(&mut self) {}
+    fn draw_sprite(&mut self, _bank: char, _x: i32, _y: i32, _frame: i32) {}
+    async fn present(&mut self, g: &HensGame) {
+        if (397..=412).contains(&g.marks[0].y) {
+            self.xs.push(g.marks[0].x.to_string());
+        }
+    }
+    fn play_sound(&mut self, s: hens::Sound) {
+        self.sounds.push(s);
+    }
+}
+
+/// The marks across two runs: the set-up writes only their first short,
+/// so a second run keeps the last run's x / y, and the drop of the next
+/// won weighing moves mark 0 from there.
+#[test]
+fn hens_marks_carry_over() {
+    let want = golden(include_str!("golden/ui_puzzle1_hens_marks.txt"));
+    let mut g = HensGame::default();
+    for (i, m) in g.marks.iter_mut().enumerate() {
+        *m = hens::Mark {
+            shown: 1,
+            x: 262 + 20 * i as i16,
+            y: 457,
+        };
+    }
+    g.reset();
+    let marks: Vec<String> = g
+        .marks
+        .iter()
+        .map(|m| format!("({},{},{})", m.shown, m.x, m.y))
+        .collect();
+    for n in 2..9 {
+        g.hens[n].target = n as i16;
+    }
+    let mut io = HensDrop::default();
+    block_on(g.click(&mut io, 420, 360));
+    assert_eq!(io.sounds, [hens::Sound::Win]);
+    let out = [
+        format!("second run marks: {}", marks.join(" ")),
+        "second run weighing at (420, 360): win".to_string(),
+        format!("second run drop x: {}", io.xs.join(" ")),
+    ];
+    assert_lines(&out, &want);
+}
+
 /// The clicks that solve the hens from the start: each hen picked at
 /// home and put on its target, then the second button four times.
 fn hens_solution() -> Vec<(i32, i32)> {
@@ -595,12 +652,13 @@ fn pieces_vs_original() {
         tuple6(&start.counters)
     ));
 
-    // The click map from the start state.
+    // The click map from the start state, rows 1..479: row 0 is past the
+    // BMP (the original reads puzsrp2c.spr there, see `pieces::map_value`).
     let mut all = String::new();
     let mut counts = [0u32; 128];
     let mut rep = [None; 13];
-    for y in 0..480 {
-        if y > 0 {
+    for y in 1..480 {
+        if y > 1 {
             all.push('\n');
         }
         for x in 0..640 {
@@ -908,6 +966,107 @@ fn snakes_vs_original() {
     ));
     out.push(format!("solved draws {}", draws_repr(&g)));
     assert_lines(&out, &want);
+}
+
+/// The snakes' run with scripted clicks, one a pass, logging what it does.
+struct SnakesLog {
+    clicks: VecDeque<(i32, i32)>,
+    log: Vec<String>,
+}
+
+impl SnakesIo for SnakesLog {
+    fn read_input(&mut self) -> (i32, i32, bool) {
+        self.log.push("read".to_string());
+        match self.clicks.pop_front() {
+            Some((x, y)) => (x, y, true),
+            None => (320, 240, false),
+        }
+    }
+    fn draw_background(&mut self) {
+        self.log.push("bg".to_string());
+    }
+    fn draw_sprite(&mut self, bank: char, x: i32, y: i32, frame: i32) {
+        self.log.push(format!("{bank} {x} {y} {frame}"));
+    }
+    async fn present(&mut self, _g: &SnakesGame) {
+        self.log.push("present".to_string());
+    }
+    fn play_sound(&mut self, s: snakes::Sound) {
+        self.log.push(format!("sound {s:?}"));
+    }
+    async fn wait_ticks(&mut self, _n: u32) {}
+    fn aborted(&self) -> bool {
+        self.log.len() > 100_000
+    }
+}
+
+/// The exits of `FUN_0043b0f4`: a phase-1 leave goes through the phase-2
+/// loop head, which steers a press taken by the last poll before the
+/// result is returned; a win is followed by the cursor drawn onto the
+/// win animation's last step and one more present.
+#[test]
+fn snakes_exits_as_original() {
+    let Some(data) = game("snakes_exits_as_original") else {
+        return;
+    };
+    let want = golden(include_str!("golden/ui_puzzle8_snakes.txt"));
+    let map = snakes::decode_map(&puzzle_file(&data, "CHEMIN00.PCX")).unwrap();
+    let start = SnakesGame::new(map, Default::default());
+
+    // Phase 1: a click at the edge leaves after the frame; the poll after
+    // it takes a press on snake 0, which is steered.
+    let mut g = start.clone();
+    let (sx, sy) = (g.snakes[0].x + OFFSETS[0].0, g.snakes[0].y + OFFSETS[0].1);
+    let mut steered = start.clone();
+    steered.result = 1;
+    let snd = steered.steer(sx, sy);
+    let mut io = SnakesLog {
+        clicks: VecDeque::from([(10, 240), (sx, sy)]),
+        log: Vec::new(),
+    };
+    assert_eq!(block_on(g.run(&mut io)), 1);
+    assert_eq!(io.log.iter().filter(|l| *l == "read").count(), 2);
+    assert_eq!(g.snakes, steered.snakes);
+    if snd != snakes::Sound::None {
+        assert_eq!(io.log.last().unwrap(), &format!("sound {snd:?}"));
+    }
+
+    // The win: after the 20 steps of the animation, the cursor alone and a
+    // present.
+    let (h, clicks) = snakes_solution(&want);
+    let mut placements = Vec::new();
+    place_all(0, &start, &mut [0; 4], &mut placements);
+    let mut g = placements.iter().find(|p| p.0 == h).unwrap().1.clone();
+    let mut sim = g.clone();
+    let mut xy = VecDeque::new();
+    for &(k, di) in &clicks {
+        let (x, y) = (
+            sim.snakes[k].x + OFFSETS[di].0,
+            sim.snakes[k].y + OFFSETS[di].1,
+        );
+        sim.steer(x, y);
+        xy.push_back((x, y));
+    }
+    let (lx, ly) = *xy.back().unwrap();
+    let mut io = SnakesLog {
+        clicks: xy,
+        log: Vec::new(),
+    };
+    assert_eq!(block_on(g.run(&mut io)), 255);
+    assert_eq!(io.log.iter().filter(|l| *l == "read").count(), clicks.len());
+    let last_read = io.log.iter().rposition(|l| l == "read").unwrap();
+    let tail = &io.log[last_read..];
+    assert_eq!(tail.iter().filter(|l| *l == "present").count(), 21);
+    let n = tail.len();
+    let edge = if snakes::at_edge(lx) { 11 } else { 6 };
+    assert_eq!(
+        tail[n - 3..],
+        [
+            "present".to_string(),
+            format!("C {lx} {ly} {edge}"),
+            "present".to_string()
+        ]
+    );
 }
 
 // The puzzles in the whole engine.

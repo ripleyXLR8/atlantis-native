@@ -15,6 +15,8 @@
 //! over from one run of the puzzle to the next, as in the original (only
 //! the parts [`RatRules::reset`] and [`RatGame::run`] set are reset).
 
+use std::collections::VecDeque;
+
 use atlantis_data::sprite::SprSprite;
 
 use super::{load_spr, load_tga, read_puzzle_file, PuzzleHost, PuzzleSounds, SamplePlayer};
@@ -28,7 +30,13 @@ pub const BASE: u32 = 0x0049_69c0;
 pub const STATE_SIZE: usize = 0x318;
 /// The memory kept: up to 0x0049727f, because the rat's animation entry
 /// (0x00496c7a + 6 * byte) is indexed by any byte value, and before the
-/// first trajectory the byte is still 0x68 from the data section.
+/// first trajectory the byte is still 0x68 from the data section. That
+/// entry is 0x00496eea..0x00496eef, over the start of puzzle 3's cursor
+/// sprite name "puzsrp2c.spr" (0x00496eec, loaded by `FUN_004459c0` @
+/// 0x00445a00): the original corrupts the name for the rest of the program
+/// (see [`RatRules::animate_rat`]). The write stays in this copy and the
+/// rotating pieces load PUZSRP2C.SPR by name, always (a game-breaking bug
+/// of the original, with no original mode).
 pub const MEM_SIZE: usize = 0x8c0;
 /// The machine's parts: 30 records of 0x17 bytes at 0x004969c8.
 pub const NUM_RECORDS: i32 = 30;
@@ -464,7 +472,13 @@ impl RatRules {
             let n = self.i(0x0049_6cd0).wrapping_add(1);
             self.set_i(0x0049_6cd0, n);
         }
-        // The entry: {first, last, current}.
+        // The entry: {first, last, current}. With the data-section byte
+        // 0x68 (the first rat's wait for the lever, mode 0) it is
+        // 0x00496eea..0x00496eef: the original increments the short at
+        // 0x00496eee, inside puzzle 3's sprite name at 0x00496eec, every
+        // frame (0x00439513..0x0043951d) and resets it to 0 after 502
+        // frames (0x0043955c..0x00439563); nothing restores the name. Here
+        // the write stays in `mem` (see [`MEM_SIZE`]).
         let e = 0x0049_6c7a + 6 * u32::from(self.b(RAT_BYTE));
         let step = |s: &mut Self| {
             let v = i32::from(s.s(e + 4)) + 1;
@@ -744,8 +758,10 @@ pub const SOUNDS: [&str; 25] = [
 /// The game's I/O: the C++ `RatGame` virtual functions.
 #[allow(async_fn_in_trait)]
 pub trait RatIo {
-    /// `FUN_0043318c`, the frame boundary: the mouse, a new left click,
-    /// the left button held.
+    /// `FUN_0043318c` (the music stream refill), the first call of each
+    /// pass: where the input is read, which the original's `FUN_0041a298`
+    /// polls at the end of the previous pass (nothing in between reads
+    /// it). The mouse, a new left click, the held flag.
     fn read_input(&mut self, g: &RatGame) -> (i32, i32, bool, bool);
     /// The background copies: 0 and 1, `FUN_00438fd4`'s two copies of the
     /// background; 2, the frame's copy before the present.
@@ -1003,6 +1019,8 @@ impl RatGame {
     pub async fn run(&mut self, io: &mut impl RatIo) -> i32 {
         let r = &mut self.rules;
         r.result = 0;
+        // 0x00438c3f; the rest of the state is kept from the last play.
+        r.set_i(AMBIENT_AT, 0);
         r.set_i(0x0049_6cb0, 0);
         r.set_f(0x0049_6cb4, 98.0);
         r.set_b(RATS, 5);
@@ -1656,6 +1674,11 @@ struct Host<'a> {
     host: PuzzleHost<'a>,
     /// PZFRAT.SPR (0x007bead4); PZFPIECE.SPR is the screen's bank.
     rat: Vec<SprSprite>,
+    /// The held flag 0x00496114.
+    held: bool,
+    /// The left button's WM_LBUTTONDOWN (true) / WM_LBUTTONUP (false) not
+    /// dispatched yet.
+    button_messages: VecDeque<bool>,
     mx: i32,
     my: i32,
     /// The end of the pass's busy wait, in ticks.
@@ -1669,11 +1692,32 @@ impl Host<'_> {
 }
 
 impl RatIo for Host<'_> {
+    /// `FUN_0041a298`'s sampling. The click flag 0x0049611c is the left
+    /// button's press edge (`FUN_0042e624`); on that edge `FUN_0041a298`
+    /// sets it and returns before its message pump (0x0041a2b5..0x0041a2e4).
+    /// The held flag 0x00496114 is written only by the window procedure on
+    /// WM_LBUTTONDOWN / WM_LBUTTONUP (0x00419c47 / 0x00419c6a), and the pump
+    /// of the active window dispatches one message per call (PeekMessage
+    /// without removal, GetMessage, DispatchMessage, 0x0041a483..0x0041a4ce).
+    /// So the held flag follows the button one pass after the click flag,
+    /// and a tap within one pass still gives one held pass. The button
+    /// messages are queued in their order and one is dispatched on each
+    /// pass without a press edge; the other messages sharing that pump
+    /// (mouse moves, ...), which could delay them further, are not
+    /// modelled (unknown).
     fn read_input(&mut self, _g: &RatGame) -> (i32, i32, bool, bool) {
-        let m = self.host.read_input();
-        let held = self.host.e.sys.buttons().0;
+        let queue = &mut self.button_messages;
+        let m = self
+            .host
+            .input
+            .read_with(&self.host.e.sys, |down| queue.push_back(down));
+        if !m.click {
+            if let Some(down) = self.button_messages.pop_front() {
+                self.held = down;
+            }
+        }
         (self.mx, self.my) = (m.x, m.y);
-        (m.x, m.y, m.click, held)
+        (m.x, m.y, m.click, self.held)
     }
     fn draw_background(&mut self, which: i32) {
         // Copy 1 goes to a second buffer and copy 2 is the frame's copy to
@@ -1758,9 +1802,13 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let mut game = RatGame::new(rules, slots);
     game.deadline_pacing = e.game.exe.build.rat_deadline_pacing;
     game.keep_search_position = !e.game.exe.build.rat_search_restart;
+    let host = PuzzleHost::new(e, hooks);
+    let held = host.e.sys.buttons().0;
     let mut host = Host {
-        host: PuzzleHost::new(e, hooks),
+        host,
         rat,
+        held,
+        button_messages: VecDeque::new(),
         mx: 0,
         my: 0,
         deadline: 0,
