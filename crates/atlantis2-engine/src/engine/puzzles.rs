@@ -83,7 +83,7 @@ pub fn ported_place(wam: &str) -> Option<i32> {
         .map(|&(_, m)| m)
 }
 
-/// The four Irish puzzles (`subsystems/puzzles.md` rows 2-5), not ported.
+/// The four Irish puzzles, not ported.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IrishPuzzle {
     /// Brigid's cross, view 2 (FUN_00494120, FUN_00494190).
@@ -203,8 +203,7 @@ impl Engine {
     }
 
     /// What an Irish puzzle's win writes for the scripts, for tests and
-    /// tools while the puzzles are not ported (`subsystems/puzzles.md`,
-    /// "Ireland's hooks without the puzzles"): the cross sets `FINCROIX` = 1
+    /// tools while the puzzles are not ported: the cross sets `FINCROIX` = 1
     /// and runs a `CtrlScenarIN` scan (FUN_00494190 @ 0x00494216..
     /// 0x0049422a); the ogham stones `FINOGHAM` = 1 when it is 0
     /// (FUN_004960a0 @ 0x00496108..0x00496131) and the blackbird

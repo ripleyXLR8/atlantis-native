@@ -9,7 +9,7 @@
 //! the listener's position for each (place, view) of ten places; a place
 //! not in it has no place sound.
 //!
-//! Transcribed from the original (`subsystems/sound.md` of the study):
+//! Transcribed from the original:
 //!
 //! - the view entry (FUN_0047ad30): the listener moves to the new view's
 //!   position (the old one kept as the current listener), each source
