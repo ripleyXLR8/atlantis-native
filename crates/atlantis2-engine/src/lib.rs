@@ -37,6 +37,7 @@ pub mod png;
 pub mod raster3d;
 pub mod script;
 pub mod sound;
+pub mod subjects;
 pub mod subtitle;
 pub mod turn;
 pub mod warp;

@@ -7,6 +7,8 @@
 //!   is over; true and followed by anything else, the `/con` lines after it
 //!   are sub-conditions, the first true one runs its body. One body per
 //!   scan. Section numbers have no effect.
+//! - The subject scan (@ 0x0047fde0) is `CtrlScenarIN` that goes on to
+//!   the next true entry while a body ends at a section header.
 //! - `RunSection` (@ 0x00483f90) runs a body line by line up to the next
 //!   `/con` or header; `RunLine` (@ 0x00484570) runs the first `/set` of a
 //!   line, and after a `#` looks at the next line: so a `#/set(...)` line
@@ -95,6 +97,26 @@ impl Script {
         match self.find_true_con(host, start) {
             Some(body) => self.run_section(host, body),
             None => Some(0),
+        }
+    }
+
+    /// The subject scan (@ 0x0047fde0), run when the subject menu answers
+    /// a subject: from the start of the scans (after `/FININIT`) the body
+    /// of the first true entry runs; while a body ends at a section header
+    /// (`RunSection` gives a position), the next true entry from that
+    /// body's start runs too. A body that ends at a `/con`, or that waits
+    /// (a `dial=`), ends the scan. Unlike `CtrlScenarIN` it logs nothing.
+    pub fn subject_scan(&mut self, host: &mut dyn Host) {
+        if self.fatal.is_some() {
+            return;
+        }
+        let start = self.after_fininit();
+        let mut found = self.find_true_con(host, start);
+        while let Some(body) = found {
+            if self.run_section(host, body).is_none() {
+                break;
+            }
+            found = self.find_true_con(host, body);
         }
     }
 

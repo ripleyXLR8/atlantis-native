@@ -209,6 +209,15 @@ fn main() {
         }
         None => false,
     };
+    // `--talk`: a click on the character under the centre (its subject
+    // menu).
+    let talk = match args.iter().position(|a| a == "--talk") {
+        Some(i) => {
+            args.remove(i);
+            true
+        }
+        None => false,
+    };
     let a2_start = atlantis_app::a2::A2Start {
         view,
         dialog: dialog.map(|d| d.max(0) as u32),
@@ -221,6 +230,7 @@ fn main() {
         hold,
         bag,
         pointer,
+        talk,
     };
     // `--original` holds for both games.
     let a2_enhancements = if original {
@@ -252,6 +262,7 @@ fn main() {
         ("--hold", a2_start.hold.is_some()),
         ("--bag", a2_start.bag),
         ("--pointer", a2_start.pointer.is_some()),
+        ("--talk", a2_start.talk),
     ]
     .into_iter()
     .filter_map(|(name, on)| on.then_some(name))

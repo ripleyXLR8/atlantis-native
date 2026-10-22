@@ -409,7 +409,10 @@ fn state_of(e: &Engine) -> String {
         s.flags.iter().enumerate().filter(|f| *f.1 != 0).collect::<Vec<_>>(),
         s.bag,
         s.shown,
-        s.subjects.iter().enumerate().filter(|l| !l.1.is_empty()).collect::<Vec<_>>(),
+        s.subjects
+            .characters()
+            .map(|c| (c, s.subjects.list(c)))
+            .collect::<Vec<_>>(),
         String::from_utf8_lossy(&s.music),
         e.music_playing().unwrap_or(0),
     )

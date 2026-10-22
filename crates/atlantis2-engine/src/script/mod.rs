@@ -38,12 +38,14 @@ pub mod frame;
 pub mod host;
 pub mod scan;
 pub mod set;
+pub mod subjects;
 
 use atlantis2_data::defnames::{self, DefNames, NameError};
 
 use crate::fpu::Fpu;
 
 pub use host::{AnimOp, DialStart, Host};
+pub use subjects::{Subject, SubjectTable};
 
 pub(crate) const CR: u8 = b'\r';
 pub(crate) const LF: u8 = b'\n';
@@ -61,17 +63,6 @@ pub const FLAGS: usize = 1024;
 pub enum Src {
     Chapter,
     Command,
-}
-
-/// One subject of a character (table @ 0x006c2e88, 0xc4 bytes per
-/// character: a count, then 16 entries of 12 bytes).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Subject {
-    /// The subject's `#SUJETS#` parameter, what `SUJET` is set to.
-    pub value: i32,
-    /// Its `#SUJETS#` index.
-    pub index: i32,
-    pub enabled: bool,
 }
 
 /// One object of the bag (@ 0x00671a10, 12 bytes each, count
@@ -188,8 +179,8 @@ pub struct Script {
     /// The number of the last section header a scan passed (@ 0x006cfb78;
     /// nothing reads it).
     pub section_number: i32,
-    /// Per `#PERSONNAGES#` index.
-    pub subjects: Vec<Vec<Subject>>,
+    /// The subjects of the characters, by `#PERSONNAGES#` index.
+    pub subjects: SubjectTable,
     pub bag: Vec<BagEntry>,
     pub shown: Vec<Shown>,
     /// The cursor sprite (@ 0x00673f94) and whether it is from the object
@@ -269,7 +260,6 @@ impl Script {
     pub fn new(defnames: &[u8]) -> Result<Script, String> {
         let names = DefNames::parse(defnames).map_err(|e| e.to_string())?;
         let keys = Keys::resolve(&names).map_err(|e| e.to_string())?;
-        let persos = names.len(defnames::PERSONNAGES);
         Ok(Script {
             names,
             keys,
@@ -288,7 +278,7 @@ impl Script {
             in_command: false,
             queued: None,
             section_number: 0,
-            subjects: vec![Vec::new(); persos],
+            subjects: SubjectTable::new(),
             bag: Vec::new(),
             shown: Vec::new(),
             cursor_sprite: 0,
@@ -561,17 +551,17 @@ mod tests {
         let mut s = script();
         set(&mut s, "/set(enablesuj=HERO,WEATHER)");
         assert_eq!(
-            s.subjects[1],
+            s.subjects.list(1),
             [Subject {
                 value: 7,
                 index: 1,
-                enabled: true
+                flag: 1
             }]
         );
         set(&mut s, "/set(disablesuj=HERO,WEATHER)");
-        assert!(!s.subjects[1][0].enabled);
+        assert!(!s.subjects.list(1)[0].enabled());
         set(&mut s, "/set(killsuj=HERO,WEATHER)");
-        assert!(s.subjects[1].is_empty());
+        assert!(s.subjects.list(1).is_empty());
         set(&mut s, "/set(sacados=ball)");
         assert_eq!(
             s.bag,

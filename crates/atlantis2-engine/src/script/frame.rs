@@ -196,12 +196,16 @@ impl Script {
         self.set_cursor(i32::from(sprite), true);
     }
 
-    /// The subject menu's answer (@ 0x0045a9f0): `SUJET` = the chosen
-    /// subject's value, or, the menu closed, `CLICPERSO` = 0 and `SUJET` =
-    /// −2.
-    pub fn subject_chosen(&mut self, value: Option<i32>) {
+    /// The subject menu's answer (@ 0x0045a9f0): a subject chosen, `SUJET`
+    /// = its value and the subject scan (@ 0x0047fde0); the menu closed,
+    /// `CLICPERSO` = 0 and `SUJET` = −2. `CLICPERSO` stays the character
+    /// after a choice, until the end of the dialog or the next click scan.
+    pub fn subject_chosen(&mut self, host: &mut dyn Host, value: Option<i32>) {
         match value {
-            Some(v) => self.vars[self.keys.sujet] = v,
+            Some(v) => {
+                self.vars[self.keys.sujet] = v;
+                self.subject_scan(host);
+            }
             None => self.dialog_reset(),
         }
     }

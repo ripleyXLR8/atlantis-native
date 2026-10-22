@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use atlantis2_data::defnames::DefNames;
-use atlantis2_engine::script::{AnimOp, DialStart, Host, Keys, Script};
+use atlantis2_engine::script::{AnimOp, DialStart, Host, Keys, Script, SubjectTable};
 use md5::{Digest, Md5};
 
 const EVAL: &str = include_str!("golden/scripts_con_eval.txt");
@@ -225,21 +225,27 @@ impl Host for Rec {
 struct Snap {
     vars: Vec<i32>,
     flags: Vec<i32>,
-    subj: Vec<String>,
+    subj: Vec<(Vec<u8>, String)>,
     bag: String,
     vis: String,
     globals: Vec<(&'static str, String)>,
 }
 
 fn snap(s: &Script, h: &Rec) -> Snap {
-    let subj = s
-        .subjects
-        .iter()
-        .map(|l| {
-            l.iter()
-                .map(|e| format!("{}/{}/{}", e.value, e.index, u8::from(e.enabled)))
+    // The harness compares the first 110 records' bytes and lists the
+    // changed ones' entries.
+    let rec = SubjectTable::RECORD;
+    let subj = (0..110)
+        .map(|c| {
+            let list = s
+                .subjects
+                .list(c)
+                .iter()
+                .map(|e| format!("{}/{}/{}", e.value, e.index, e.flag))
                 .collect::<Vec<_>>()
-                .join(";")
+                .join(";");
+            let bytes = &s.subjects.bytes()[rec * c as usize..rec * (c as usize + 1)];
+            (bytes.to_vec(), list)
         })
         .collect();
     let bag = s
@@ -309,8 +315,8 @@ fn diff(a: &Snap, b: &Snap) -> Vec<String> {
         }
     }
     for (i, (x, y)) in a.subj.iter().zip(&b.subj).enumerate() {
-        if x != y {
-            out.push(format!("subj[{i}]={y}"));
+        if x.0 != y.0 {
+            out.push(format!("subj[{i}]={}", y.1));
         }
     }
     if a.bag != b.bag {

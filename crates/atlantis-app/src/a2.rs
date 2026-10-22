@@ -11,7 +11,8 @@
 //! the main menu (options, volumes, load and save, quit) and closes it
 //! again; in the menus the pointer is the game's own. A mode of its own,
 //! beside the first game's front end: a window, the screen scaled to it,
-//! the sound; no subject menu yet. The saves (`save\ATLpp_ss.SAV`, the
+//! the sound. A left click on a character opens the menu of the subjects
+//! to ask him about (the mouse then moves a pointer over it). The saves (`save\ATLpp_ss.SAV`, the
 //! original's format) and `atlant2.cfg` are kept in the `atlantis2` folder
 //! of the port's data folder.
 //!
@@ -29,8 +30,9 @@
 //! its voices, `--menu <page>` shows a menu page; `--take
 //! <object>[,<object>...]` puts objects in the bag and `--hold <object>`
 //! one in the hand (by their `defnames.con` names, as the scripts'
-//! `sacados` and `objetenmain` do), `--bag` opens the bag bar and
-//! `--pointer <x>,<y>` puts the mouse pointer there.
+//! `sacados` and `objetenmain` do), `--bag` opens the bag bar,
+//! `--pointer <x>,<y>` puts the mouse pointer there and `--talk` clicks
+//! the character under the screen centre (its subject menu opens).
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -81,6 +83,9 @@ pub struct A2Start {
     /// The bag bar opened, the pointer moved.
     pub bag: bool,
     pub pointer: Option<(i32, i32)>,
+    /// A click at the start: on a character under the centre, its subject
+    /// menu.
+    pub talk: bool,
 }
 
 impl A2Start {
@@ -121,7 +126,8 @@ impl A2Start {
             || !self.take.is_empty()
             || self.hold.is_some()
             || self.bag
-            || self.pointer.is_some();
+            || self.pointer.is_some()
+            || self.talk;
         if self.menu == Some(PageKind::Player) || !(headless || at_once || self.menu.is_some()) {
             engine.open_player_menu();
             return Ok(());
@@ -139,7 +145,7 @@ impl A2Start {
     /// Enters the view, starts the dialog, fills the bag and the hand,
     /// opens the bar (the opening film ended first).
     pub fn apply(&self, engine: &mut Engine) -> Result<(), String> {
-        let bag_aids = !self.take.is_empty() || self.hold.is_some() || self.bag;
+        let bag_aids = !self.take.is_empty() || self.hold.is_some() || self.bag || self.talk;
         if self.view.is_some() || self.dialog.is_some() || bag_aids {
             engine.end_video();
         }
@@ -162,6 +168,9 @@ impl A2Start {
         }
         if let Some(p) = self.pointer {
             engine.pointer = p;
+        }
+        if self.talk {
+            engine.click(engine.clock());
         }
         Ok(())
     }

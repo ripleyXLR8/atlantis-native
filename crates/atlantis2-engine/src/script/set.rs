@@ -17,7 +17,7 @@
 //! key chooses (`CHAPTER`: before the new text's first section header),
 //! or `None` (a fatal error).
 
-use super::{AnimOp, BagEntry, DialStart, Host, Script, Shown, Src, Subject, CR, LF};
+use super::{AnimOp, BagEntry, DialStart, Host, Script, Shown, Src, CR, LF};
 use crate::camera::deg_to_rad;
 use atlantis2_data::con::atof;
 use atlantis2_data::defnames;
@@ -224,9 +224,7 @@ impl Script {
                 let t = self.line_text(src, p + 1);
                 self.warn("SetVariables() : CLEARSUJ(%s) : perso DUMMY", &t);
             }
-            if let Some(list) = self.subjects.get_mut(id as usize) {
-                list.clear();
-            }
+            self.subjects.clear(id);
             return done(self);
         }
         if key == k.dial {
@@ -577,7 +575,7 @@ impl Script {
     /// (@ 0x0047fa70): `PERSO,SUJ1[,SUJ2...]`, subjects matched by their
     /// `#SUJETS#` parameter.
     fn subjects_command(&mut self, src: Src, mut p: usize, key: usize) {
-        let perso = self.id(defnames::PERSONNAGES, src, p) as usize;
+        let perso = self.id(defnames::PERSONNAGES, src, p);
         p = self.after_comma(src, p);
         loop {
             if self.fatal.is_some() {
@@ -585,35 +583,17 @@ impl Script {
             }
             let value = self.param(defnames::SUJETS, src, p);
             if key == self.keys.enablesuj {
-                let index = if self.subjects[perso].iter().any(|s| s.value == value) {
-                    None
+                // The index is looked up only for a new entry.
+                let index = if self.subjects.list(perso).iter().any(|s| s.value == value) {
+                    0
                 } else {
-                    Some(self.id(defnames::SUJETS, src, p))
+                    self.id(defnames::SUJETS, src, p)
                 };
-                let list = &mut self.subjects[perso];
-                match index {
-                    None => {
-                        if let Some(s) = list.iter_mut().find(|s| s.value == value) {
-                            s.enabled = true;
-                        }
-                    }
-                    Some(index) => {
-                        if list.len() >= 16 {
-                            log::warn!("script: more than 16 subjects for character {perso}");
-                        }
-                        list.push(Subject {
-                            value,
-                            index,
-                            enabled: true,
-                        });
-                    }
-                }
+                self.subjects.enable(perso, value, index);
             } else if key == self.keys.disablesuj {
-                if let Some(s) = self.subjects[perso].iter_mut().find(|s| s.value == value) {
-                    s.enabled = false;
-                }
-            } else if let Some(i) = self.subjects[perso].iter().position(|s| s.value == value) {
-                self.subjects[perso].remove(i);
+                self.subjects.disable(perso, value);
+            } else {
+                self.subjects.kill(perso, value);
             }
             while !matches!(self.b(src, p), b',' | b')') && p < self.len(src) {
                 p += 1;

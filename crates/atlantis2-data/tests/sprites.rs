@@ -1,5 +1,6 @@
 //! The place sprites (SPW) and the sprite banks (SPRCRYO) against what the
-//! original code draws (`tests/golden/spw_faces.txt`, `spr_aff.txt`).
+//! original code draws (`tests/golden/spw_faces.txt`, `spr_aff.txt`,
+//! `spr_trs50.txt`).
 //!
 //! Needs the game: `ATLANTIS2_DATA` = the installed folder,
 //! `ATLANTIS2_DISCS` = a folder holding the four CD images. Without them
@@ -7,13 +8,14 @@
 
 use std::path::PathBuf;
 
-use atlantis2_data::spr::{SprBank, Target};
+use atlantis2_data::spr::{Mode, SprBank, Target};
 use atlantis2_data::spw::{Blend, Clip, Spw, FACE};
 use atlantis2_data::{A2Files, Folder};
 use md5::{Digest, Md5};
 
 const SPW_GOLDEN: &str = include_str!("golden/spw_faces.txt");
 const SPR_GOLDEN: &str = include_str!("golden/spr_aff.txt");
+const TRS50_GOLDEN: &str = include_str!("golden/spr_trs50.txt");
 
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
@@ -103,11 +105,23 @@ fn spw_faces_as_the_original_draws_them() {
 #[test]
 fn spr_banks_as_the_original_draws_them() {
     let Some(files) = game() else { return };
+    // Every row of the golden, the 0x878 bank's included.
+    assert_eq!(spr_rows(&files, SPR_GOLDEN, Mode::Opaque), 1949);
+}
+
+#[test]
+fn spr_banks_at_50_percent_as_the_original_draws_them() {
+    let Some(files) = game() else { return };
+    assert_eq!(spr_rows(&files, TRS50_GOLDEN, Mode::Half), 1046);
+}
+
+/// Draws every row of a golden in `mode`; the number of rows checked.
+fn spr_rows(files: &A2Files, golden: &str, mode: Mode) -> usize {
     let (w, h) = (640usize, 480usize);
     let bg = background(w * h);
     let mut current: Option<(String, SprBank)> = None;
     let mut checked = 0;
-    for line in SPR_GOLDEN.lines().filter(|l| !l.starts_with('#')) {
+    for line in golden.lines().filter(|l| !l.starts_with('#')) {
         let (key, want) = line.split_once(' ').unwrap();
         let (bank_name, rest) = key.split_once('#').unwrap();
         let (index, pos) = rest.split_once('@').unwrap();
@@ -137,11 +151,10 @@ fn spr_banks_as_the_original_draws_them() {
                 p => panic!("position {p}"),
             };
             let mut t = Target::screen(&mut px, w, h);
-            assert!(bank.draw(&mut t, x, y, index), "{key}");
+            assert!(bank.draw_mode(&mut t, x, y, index, mode), "{key}");
         }
         assert_eq!(px_md5(&px), want, "{key}");
         checked += 1;
     }
-    // Every row of the golden, the 0x878 bank's included.
-    assert_eq!(checked, 1949);
+    checked
 }

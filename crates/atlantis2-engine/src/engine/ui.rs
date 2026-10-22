@@ -1,4 +1,5 @@
-//! The bag bar, the object in hand and the overlays in the warp frame:
+//! The bag bar, the object in hand and the overlays in the warp frame
+//! (the subject menu is in `subjects.rs`):
 //! the right button (@ 0x0040c510), the bar's frame (@ 0x00474c30) and
 //! the pointer drawn at the mouse (@ 0x0047c090), the overlays some
 //! objects open (@ 0x0047ec50, their clicks @ 0x0047efd0, their close
@@ -12,7 +13,7 @@
 //! ([`Engine::with_script`] copies them back after each call).
 
 use atlantis2_data::defnames;
-use atlantis2_data::spr::{SprBank, Target};
+use atlantis2_data::spr::{Mode, SprBank, Target};
 use atlantis2_data::Folder;
 
 use super::{CursorBank, Engine, Event, LoopType};
@@ -45,7 +46,7 @@ impl Engine {
         }
     }
 
-    fn objetenmain(&self) -> i32 {
+    pub(super) fn objetenmain(&self) -> i32 {
         self.con
             .as_ref()
             .map_or(self.vars.objet_en_main, |s| s.vars[s.keys.objetenmain])
@@ -153,12 +154,17 @@ impl Engine {
     /// centre, closing it empties the hand (`OBJETENMAIN` = 0) and keeps
     /// the cursor pair; both stop the turn. With an overlay open it empties
     /// the hand and hides the cursor (@ 0x0047bf40) and stops the turn.
-    /// The subject menu and the parchment, which also take the button,
-    /// are not open in the port (the subject menu is not ported; the
-    /// parchment never opens, below).
+    /// With the subject menu open it only stops the turn (and the original
+    /// moves the system's cursor to the window's centre, @ 0x0040c3d0,
+    /// which is not the game's pointer). The parchment, which also takes
+    /// the button, never opens (below).
     pub fn right_click(&mut self) {
         if self.loop_type != LoopType::Warp {
             self.click_aux = 1;
+            return;
+        }
+        if self.subject_menu.open {
+            self.look.stop();
             return;
         }
         if self.dialog.is_none() && !self.overlays.any() {
@@ -239,6 +245,12 @@ impl Engine {
             let e = bag[self.bar.shown[cell]];
             self.pick(e);
         }
+        self.pointer_draw();
+    }
+
+    /// FUN_0047c090: the cursor pair drawn at the pointer, when it has a
+    /// bank.
+    pub(super) fn pointer_draw(&mut self) {
         if let Some(frame) = self.cursor.shown {
             let bank = match self.cursor.bank {
                 CursorBank::Interface => UiBank::Interface,
@@ -599,7 +611,13 @@ impl Engine {
     pub(super) fn paint_ui(&self, out: &mut [u16], w: usize, h: usize) {
         for d in &self.ui_draws {
             match d {
-                UiDraw::Sprite { bank, frame, x, y } => {
+                UiDraw::Sprite { bank, frame, x, y }
+                | UiDraw::Translucent { bank, frame, x, y } => {
+                    let mode = if matches!(d, UiDraw::Translucent { .. }) {
+                        Mode::Half
+                    } else {
+                        Mode::Opaque
+                    };
                     let bank = match bank {
                         UiBank::Interface => &self.cursor_bank,
                         UiBank::Objects => &self.objects_bank,
@@ -607,9 +625,11 @@ impl Engine {
                         UiBank::Form => &self.overlays.form_bank,
                         UiBank::Ring => &self.overlays.ring_bank,
                         UiBank::Ball => &self.overlays.ball_bank,
+                        UiBank::Subjects => &self.subjects_bank,
                     };
                     if let (Some(bank), Ok(frame)) = (bank, usize::try_from(*frame)) {
-                        bank.draw(&mut Target::screen(out, w, h), Some(*x), *y, frame);
+                        let t = &mut Target::screen(out, w, h);
+                        bank.draw_mode(t, Some(*x), *y, frame, mode);
                     }
                 }
                 UiDraw::Text {

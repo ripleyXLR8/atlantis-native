@@ -1,0 +1,152 @@
+# The subject menu, run by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation. Names of defnames.con entries are
+# written {S:I} (section, index).
+# layout: the menu's draw (0x0047fb20, its centring helper 0x0047bdb0) on spr\sujtibet.spr for
+#   0..16 subjects (entry values and flags below): every AtlSpr_Aff (bank#frame@x,y, mode 1 =
+#   AFF_SPRTRS50) and warning; the origin (0x006cf298, 0x006cf29c) the draw leaves.
+# hit: the menu's click (0x0047fd00, grid 0x00485620) after the draw, for 0..16 subjects whose
+#   entry i holds 100 + i (all 16), at every pointer position of the region below, the click
+#   flag set: the md5 of the int32 results (row-major, little endian) and per result its
+#   bounding box (screen pixels) and pixel count; outside the region every result is -2.
+# chapter: the subject lists of the two shaman characters along chapter 75 (chapi075.con, the
+#   chapter MD5 below): the new-game state (chapter 0's /INIT lines 22-23), scans (CtrlScenarIN
+#   0x00483c90) for story events, and questions: SUJET = the subject's value, the subject scan
+#   (0x0047fde0), then the dialog's end as 0x004808a0 does it for the scripts (CLICPERSO = 0,
+#   SUJET = -2, the waiting section resumed); lines = the chapter lines /set ran; lists as
+#   count:value/index/flag;...
+# frame: the whole warp frame (dispatcher 0x0049ce20, warp draw 0x0045a9f0, 0x0045a7c0, click
+#   scan 0x0045a870), x87 0x0e7f, 4 passes per 15 Hz tick counted from the first pass, view 7
+#   of tibet.wam at yaw 0, pitch 0, the shaman's sprite under the centre (its texel given), the
+#   pointer set before a pass; dialogs are not run (AtlDial_start recorded), their end is the
+#   script part above. Rows: pK | click / right; the draws (spr BANK#FRAME@X,Y [mode 1], line
+#   X1,Y1-X2,Y2 ARGB), chapi075:LINE for each /set, AtlDial_start(N), the click scan | after the
+#   pass: menu open, CLICPERSO, SUJET, click flag, its companion, sprite hit, cursor pair,
+#   OBJETENMAIN, a section waiting, the turn speeds, the pointer. SetCursorPos = 0x0040c3d0 (the
+#   system cursor to the window's centre on a right click).
+# defnames.con md5 b80c3351c39c1e4678f13388c2dc0c83
+# layout: CLICPERSO = {0:1} (1); entry values 10,12,1,4,2,6,13,3,5,7,8,9,11,14,0,1, flags 1,0,1,2,1,1,0,1,1,1,1,1,0,1,1,1; bank sujtibet.spr md5 cbf3f55b236458c2a2f115ecdfee1d22, 14 sprites
+layout sprite 0 62x62
+layout sprite 1 43x35
+layout sprite 2 50x50
+layout sprite 3 50x50
+layout sprite 4 50x44
+layout sprite 5 50x50
+layout sprite 6 50x50
+layout sprite 7 50x50
+layout sprite 8 43x50
+layout sprite 9 50x49
+layout sprite 10 50x50
+layout sprite 11 50x50
+layout sprite 12 50x50
+layout sprite 13 50x50
+layout 0 origin 450,366 | - | -
+layout 1 origin 450,304 | subjects#10@450,304; subjects#0@450,304 | -
+layout 2 origin 450,242 | subjects#10@450,242; subjects#0@450,242; subjects#12@450,304 mode 1; subjects#0@450,304 | -
+layout 3 origin 450,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304 | -
+layout 4 origin 450,118 | subjects#10@450,118; subjects#0@450,118; subjects#12@450,180 mode 1; subjects#0@450,180; subjects#1@454,250; subjects#0@450,242; subjects#4@450,307 mode 1; subjects#0@450,304 | -
+layout 5 origin 512,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180 | -
+layout 6 origin 512,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242 | -
+layout 7 origin 512,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304 | -
+layout 8 origin 512,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366 | -
+layout 9 origin 574,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180 | -
+layout 10 origin 574,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242 | -
+layout 11 origin 574,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242; subjects#8@578,304; subjects#0@574,304 | -
+layout 12 origin 574,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242; subjects#8@578,304; subjects#0@574,304; subjects#9@574,367; subjects#0@574,366 | -
+layout 13 origin 636,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242; subjects#8@578,304; subjects#0@574,304; subjects#9@574,367; subjects#0@574,366; subjects#11@636,180 mode 1; subjects#0@636,180 | -
+layout 14 origin 636,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242; subjects#8@578,304; subjects#0@574,304; subjects#9@574,367; subjects#0@574,366; subjects#11@636,180 mode 1; subjects#0@636,180; subjects#0@636,242 | warning:AtlSpr_Aff_centre:num spr incorrect : %d bank %X
+layout 15 origin 636,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242; subjects#8@578,304; subjects#0@574,304; subjects#9@574,367; subjects#0@574,366; subjects#11@636,180 mode 1; subjects#0@636,180; subjects#0@636,242; subjects#0@630,298; subjects#0@636,304 | warning:AtlSpr_Aff_centre:num spr incorrect : %d bank %X
+layout 16 origin 636,180 | subjects#10@450,180; subjects#0@450,180; subjects#12@450,242 mode 1; subjects#0@450,242; subjects#1@454,312; subjects#0@450,304; subjects#4@450,369 mode 1; subjects#0@450,366; subjects#2@512,180; subjects#0@512,180; subjects#6@512,242; subjects#0@512,242; subjects#13@512,304 mode 1; subjects#0@512,304; subjects#3@512,366; subjects#0@512,366; subjects#5@574,180; subjects#0@574,180; subjects#7@574,242; subjects#0@574,242; subjects#8@578,304; subjects#0@574,304; subjects#9@574,367; subjects#0@574,366; subjects#11@636,180 mode 1; subjects#0@636,180; subjects#0@636,242; subjects#0@630,298; subjects#0@636,304; subjects#1@640,374; subjects#0@636,366 | warning:AtlSpr_Aff_centre:num spr incorrect : %d bank %X
+# hit: entry i holds 100 + i (all 16 entries); the click flag set at every pointer position; map = the int32 results for x 380..639, y 60..479, row-major, little endian; boxes in screen pixels
+hit 0 origin 450,366 md5 145e5af117fd3a0298b0bd4a97449234 | -2:380..639,60..479,n109137 100:434..496,350..350,n63
+hit 1 origin 450,304 md5 a6d54fb896804d67635842289e8265bf | -2:380..639,60..479,n105231 100:434..495,288..349,n3844 101:434..496,288..350,n124 102:496..496,350..350,n1
+hit 2 origin 450,242 md5 12838be5a268cd4e33a940332b2193c8 | -2:380..639,60..479,n101325 100:434..495,226..287,n3844 101:434..495,288..349,n3844 102:434..496,226..350,n124 103:496..496,288..349,n62 104:496..496,350..350,n1
+hit 3 origin 450,180 md5 e567fa8430f33a93231f1c289b5ef0d7 | -2:380..639,60..479,n97419 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..496,164..350,n124 104:496..496,226..287,n62 105:496..496,288..349,n62 106:496..496,350..350,n1
+hit 4 origin 450,118 md5 7221e406470b0bd6199c01a8f1000718 | -2:380..639,60..479,n93513 100:434..495,102..163,n3844 101:434..495,164..225,n3844 102:434..495,226..287,n3844 103:434..495,288..349,n3844 104:434..496,102..350,n124 105:496..496,164..225,n62 106:496..496,226..287,n62 107:496..496,288..349,n62 108:496..496,350..350,n1
+hit 5 origin 512,180 md5 250fa1e19b8abe0a33964a8a79e31661 | -2:380..639,60..479,n78075 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..558,164..412,n124 109:558..558,226..287,n62 110:558..558,288..349,n62 111:558..558,350..411,n62 112:558..558,412..412,n1
+hit 6 origin 512,180 md5 250fa1e19b8abe0a33964a8a79e31661 | -2:380..639,60..479,n78075 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..558,164..412,n124 109:558..558,226..287,n62 110:558..558,288..349,n62 111:558..558,350..411,n62 112:558..558,412..412,n1
+hit 7 origin 512,180 md5 250fa1e19b8abe0a33964a8a79e31661 | -2:380..639,60..479,n78075 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..558,164..412,n124 109:558..558,226..287,n62 110:558..558,288..349,n62 111:558..558,350..411,n62 112:558..558,412..412,n1
+hit 8 origin 512,180 md5 250fa1e19b8abe0a33964a8a79e31661 | -2:380..639,60..479,n78075 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..558,164..412,n124 109:558..558,226..287,n62 110:558..558,288..349,n62 111:558..558,350..411,n62 112:558..558,412..412,n1
+hit 9 origin 574,180 md5 250fa1e19b8abe0a33964a8a79e31661 | -2:380..639,60..479,n78075 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..558,164..412,n124 109:558..558,226..287,n62 110:558..558,288..349,n62 111:558..558,350..411,n62 112:558..558,412..412,n1
+hit 10 origin 574,180 md5 e96ce5c31d3945e49b775919b8d8ef14 | -2:380..639,60..479,n62637 0:620..620,412..412,n1 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..619,164..412,n3906 109:558..619,226..287,n3844 110:558..619,288..349,n3844 111:558..619,350..411,n3844 112:558..620,164..412,n124 113:620..620,226..287,n62 114:620..620,288..349,n62 115:620..620,350..411,n62
+hit 11 origin 574,180 md5 e96ce5c31d3945e49b775919b8d8ef14 | -2:380..639,60..479,n62637 0:620..620,412..412,n1 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..619,164..412,n3906 109:558..619,226..287,n3844 110:558..619,288..349,n3844 111:558..619,350..411,n3844 112:558..620,164..412,n124 113:620..620,226..287,n62 114:620..620,288..349,n62 115:620..620,350..411,n62
+hit 12 origin 574,180 md5 e96ce5c31d3945e49b775919b8d8ef14 | -2:380..639,60..479,n62637 0:620..620,412..412,n1 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..619,164..412,n3906 109:558..619,226..287,n3844 110:558..619,288..349,n3844 111:558..619,350..411,n3844 112:558..620,164..412,n124 113:620..620,226..287,n62 114:620..620,288..349,n62 115:620..620,350..411,n62
+hit 13 origin 636,180 md5 e96ce5c31d3945e49b775919b8d8ef14 | -2:380..639,60..479,n62637 0:620..620,412..412,n1 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..619,164..412,n3906 109:558..619,226..287,n3844 110:558..619,288..349,n3844 111:558..619,350..411,n3844 112:558..620,164..412,n124 113:620..620,226..287,n62 114:620..620,288..349,n62 115:620..620,350..411,n62
+hit 14 origin 636,180 md5 e96ce5c31d3945e49b775919b8d8ef14 | -2:380..639,60..479,n62637 0:620..620,412..412,n1 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..619,164..412,n3906 109:558..619,226..287,n3844 110:558..619,288..349,n3844 111:558..619,350..411,n3844 112:558..620,164..412,n124 113:620..620,226..287,n62 114:620..620,288..349,n62 115:620..620,350..411,n62
+hit 15 origin 636,180 md5 1f8c571ef45a813ca6832d24820928cc | -2:380..639,60..479,n57906 0:620..639,412..412,n20 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..619,164..412,n3906 109:558..619,226..287,n3844 110:558..619,288..349,n3844 111:558..619,350..411,n3844 112:558..639,164..412,n1302 113:620..639,226..287,n1240 114:620..639,288..349,n1240 115:620..639,350..411,n1240
+hit 16 origin 636,180 md5 1f8c571ef45a813ca6832d24820928cc | -2:380..639,60..479,n57906 0:620..639,412..412,n20 100:434..495,164..225,n3844 101:434..495,226..287,n3844 102:434..495,288..349,n3844 103:434..495,350..411,n3844 104:434..557,164..412,n3906 105:496..557,226..287,n3844 106:496..557,288..349,n3844 107:496..557,350..411,n3844 108:496..619,164..412,n3906 109:558..619,226..287,n3844 110:558..619,288..349,n3844 111:558..619,350..411,n3844 112:558..639,164..412,n1302 113:620..639,226..287,n1240 114:620..639,288..349,n1240 115:620..639,350..411,n1240
+hit noclick -1
+# chapter: chapi000.con md5 0aa4da14110716ebf99b668ff85f652d, chapi075.con md5 4c39855475b5c123725207d39ed760cb, chapi078.con md5 c6ea5dbe5b606e05a1abdabe39fb3ef2
+# characters {0:1} 1, {0:2} 2; lists as count:value/index/flag;...
+chapter newgame | lines - | resumes 0 | - | {0:1} 2:10/46/1;12/52/1 | {0:2} 2:10/46/1;12/52/1 | SUJET 0 CLICPERSO 0 | -
+chapter arrival view 7 | lines 14,15 | resumes 1 | AtlDial_start(360) | {0:1} 2:10/46/1;12/52/1 | {0:2} 2:10/46/1;12/52/1 | SUJET 0 CLICPERSO 0 | -
+ask {0:1} {2:52} value 12 | scan lines 266 | AtlDial_start(368) | SUJET 12 CLICPERSO 1 wait 1 | after the dialog lines 267,268 resumes 1
+chapter after {2:52} | lines 267,268 | resumes 1 | - | {0:1} 2:10/46/1;12/52/0 | {0:2} 2:10/46/1;12/52/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:46} value 10 | scan lines 203 | AtlDial_start(361) | SUJET 10 CLICPERSO 1 wait 1 | after the dialog lines 204,205,206,207,208,209,210,211,212,213,214,215 resumes 1
+chapter after {2:46} | lines 204,205,206,207,208,209,210,211,212,213,214,215 | resumes 1 | - | {0:1} 3:12/52/0;4/47/1;2/55/1 | {0:2} 3:12/52/0;4/47/1;2/55/1 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:52} value 12 | scan lines 270 | AtlDial_start(369) | SUJET 12 CLICPERSO 1 wait 1 | after the dialog lines 271,272 resumes 1
+chapter after {2:52} | lines 271,272 | resumes 1 | - | {0:1} 3:12/52/0;4/47/1;2/55/1 | {0:2} 3:12/52/0;4/47/1;2/55/1 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:55} value 2 | scan lines 217 | AtlDial_start(362) | SUJET 2 CLICPERSO 1 wait 1 | after the dialog lines - resumes 1
+chapter after {2:55} | lines - | resumes 1 | - | {0:1} 3:12/52/0;4/47/1;2/55/1 | {0:2} 3:12/52/0;4/47/1;2/55/1 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:47} value 4 | scan lines 227 | AtlDial_start(364) | SUJET 4 CLICPERSO 1 wait 1 | after the dialog lines - resumes 1
+chapter after {2:47} | lines - | resumes 1 | - | {0:1} 3:12/52/0;4/47/1;2/55/1 | {0:2} 3:12/52/0;4/47/1;2/55/1 | SUJET -2 CLICPERSO 0 | -
+chapter click after the boat | lines 37,38,39 | resumes 0 | - | {0:1} 4:12/52/0;4/47/1;2/55/1;1/48/1 | {0:2} 4:12/52/0;4/47/1;2/55/1;1/48/1 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:48} value 1 | scan lines 242 | AtlDial_start(365) | SUJET 1 CLICPERSO 1 wait 1 | after the dialog lines - resumes 1
+chapter after {2:48} | lines - | resumes 1 | - | {0:1} 4:12/52/0;4/47/1;2/55/1;1/48/1 | {0:2} 4:12/52/0;4/47/1;2/55/1;1/48/1 | SUJET -2 CLICPERSO 0 | -
+chapter arrival view 10 | lines 294 | resumes 0 | - | {0:1} 4:12/52/0;4/47/1;2/55/1;1/48/1 | {0:2} 4:12/52/0;4/47/1;2/55/1;1/48/1 | SUJET -2 CLICPERSO 0 | -
+ask {0:2} {2:55} value 2 | scan lines 219 | AtlDial_start(362) | SUJET 2 CLICPERSO 2 wait 1 | after the dialog lines 220,221,222,223 resumes 1
+chapter after {2:55} | lines 220,221,222,223 | resumes 1 | - | {0:1} 5:12/52/0;4/47/1;2/55/0;1/48/1;6/45/1 | {0:2} 5:12/52/0;4/47/1;2/55/1;1/48/1;6/45/1 | SUJET -2 CLICPERSO 0 | -
+ask {0:2} {2:45} value 6 | scan lines 199 | AtlDial_start(363) | SUJET 6 CLICPERSO 2 wait 1 | after the dialog lines 200,201 resumes 1
+chapter after {2:45} | lines 200,201 | resumes 1 | - | {0:1} 5:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0 | {0:2} 5:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:2} {2:48} value 1 | scan lines 242 | AtlDial_start(365) | SUJET 1 CLICPERSO 2 wait 1 | after the dialog lines - resumes 1
+chapter after {2:48} | lines - | resumes 1 | - | {0:1} 5:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0 | {0:2} 5:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:2} {2:47} value 4 | scan lines 227 | AtlDial_start(364) | SUJET 4 CLICPERSO 2 wait 1 | after the dialog lines - resumes 1
+chapter after {2:47} | lines - | resumes 1 | - | {0:1} 5:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0 | {0:2} 5:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0 | SUJET -2 CLICPERSO 0 | -
+chapter boat placed | lines 147,148,149,150,151,152,153,154,155,156,157,158,159 | resumes 1 | AtlHnm_start('cine040.hnm') LoadCurrentChap(25) | {0:1} 5:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0 | {0:2} 5:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0 | SUJET -2 CLICPERSO 0 | -
+chapter then the click on the zone again | lines 93,94,95,96,97,98,99,100,101,102,103 | resumes 1 | AtlHnm_start('cine040.hnm') LoadCurrentChap(25) | {0:1} 6:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0;13/53/1 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/1 | SUJET -2 CLICPERSO 0 | -
+ask {0:2} {2:53} value 13 | scan lines 274 | AtlDial_start(379) | SUJET 13 CLICPERSO 2 wait 1 | after the dialog lines 275,276 resumes 1
+chapter after {2:53} | lines 275,276 | resumes 1 | - | {0:1} 6:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0;13/53/0 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:53} value 13 | scan lines 274 | AtlDial_start(379) | SUJET 13 CLICPERSO 1 wait 1 | after the dialog lines 275,276 resumes 1
+chapter after {2:53} | lines 275,276 | resumes 1 | - | {0:1} 6:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0;13/53/0 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:47} value 4 | scan lines 229 | AtlDial_start(378) | SUJET 4 CLICPERSO 1 wait 1 | after the dialog lines - resumes 1
+chapter after {2:47} | lines - | resumes 1 | - | {0:1} 6:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0;13/53/0 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:47} value 4 | scan lines 233 | AtlDial_start(375) | SUJET 4 CLICPERSO 1 wait 1 | after the dialog lines - resumes 1
+chapter after {2:47} | lines - | resumes 1 | - | {0:1} 6:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0;13/53/0 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:47} value 4 | scan lines 235 | AtlDial_start(373) | SUJET 4 CLICPERSO 1 wait 1 | after the dialog lines - resumes 1
+chapter after {2:47} | lines - | resumes 1 | - | {0:1} 6:12/52/0;4/47/1;2/55/0;1/48/1;6/45/0;13/53/0 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:47} value 4 | scan lines 237 | AtlDial_start(377) | SUJET 4 CLICPERSO 1 wait 1 | after the dialog lines 238 resumes 1
+chapter after {2:47} | lines 238 | resumes 1 | - | {0:1} 6:12/52/0;4/47/0;2/55/0;1/48/1;6/45/0;13/53/0 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/0 | SUJET -2 CLICPERSO 0 | -
+chapter chapi078:11 | lines - | resumes 0 | - | {0:1} 5:12/52/0;2/55/0;1/48/1;6/45/0;13/53/0 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/0 | SUJET -2 CLICPERSO 0 | -
+ask {0:1} {2:58} value 14 | scan lines 290 | AtlDial_start(385) | SUJET 14 CLICPERSO 1 wait 1 | after the dialog lines 291 resumes 1
+chapter after {2:58} | lines 291 | resumes 1 | - | {0:1} 5:12/52/0;2/55/0;1/48/1;6/45/0;13/53/0 | {0:2} 6:12/52/0;4/47/1;2/55/1;1/48/1;6/45/0;13/53/0 | SUJET -2 CLICPERSO 0 | -
+# frame: view 7 at (0, 0), the shaman (id 1) slot 4 under the centre, texel 0,179,359; the pointer set by the harness before a pass
+# frame: subjects at the start 2:10/46/1;12/52/1
+== O click the shaman, a pass, the pointer moved, a click outside
+p0 | click; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 1 CLICPERSO 1 SUJET 0 click 0 aux 0 hit 4 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 0,0
+p1 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#10@450,242; spr subjects#0@450,242; spr subjects#12@450,304; spr subjects#0@450,304; spr interface#40@0,0 | menu 1 CLICPERSO 1 SUJET 0 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 0,0
+p2 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#10@450,242; spr subjects#0@450,242; spr subjects#12@450,304; spr subjects#0@450,304; spr interface#40@300,200 | menu 1 CLICPERSO 1 SUJET 0 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 300,200
+p3 | click; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#10@450,242; spr subjects#0@450,242; spr subjects#12@450,304; spr subjects#0@450,304; spr interface#40@300,200 | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor none OBJETENMAIN 0 wait 0 turn 0,0 pointer 300,200
+p4 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor interface#26 OBJETENMAIN 0 wait 0 turn 0,0 pointer 300,200
+== C click the shaman, a right click, the pointer on the second cell, a click
+p0 | click; spr interface#26@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 1 CLICPERSO 1 SUJET -2 click 0 aux 0 hit 4 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 300,200
+p1 | right; SetCursorPos; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#10@450,242; spr subjects#0@450,242; spr subjects#12@450,304; spr subjects#0@450,304; spr interface#40@300,200 | menu 1 CLICPERSO 1 SUJET -2 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 300,200
+p2 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#10@450,242; spr subjects#0@450,242; spr subjects#12@450,304; spr subjects#0@450,304; spr interface#40@475,329 | menu 1 CLICPERSO 1 SUJET -2 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 475,329
+p3 | click; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#10@450,242; spr subjects#0@450,242; spr subjects#12@450,304; spr subjects#0@450,304; spr interface#40@475,329; chapi075:266; AtlDial_start(368) | menu 0 CLICPERSO 1 SUJET 12 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 1 turn 0,0 pointer 475,329
+C dialog end | chapi075:267; chapi075:268 | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 475,329 | subjects 2:10/46/1;12/52/0
+== D a pass after the dialog
+p0 | spr interface#40@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor interface#27 OBJETENMAIN 0 wait 0 turn 0,0 pointer 475,329
+== S click the shaman, the pointer on the first cell, a click
+p0 | click; spr interface#27@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 1 CLICPERSO 1 SUJET -2 click 0 aux 0 hit 4 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 475,329
+p1 | click; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#10@450,242; spr subjects#0@450,242; spr subjects#12@450,304 mode 1; spr subjects#0@450,304; spr interface#40@475,267; chapi075:203; AtlDial_start(361) | menu 0 CLICPERSO 1 SUJET 10 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 1 turn 0,0 pointer 475,267
+S dialog end | chapi075:204; chapi075:205; chapi075:206; chapi075:207; chapi075:208; chapi075:209; chapi075:210; chapi075:211; chapi075:212; chapi075:213; chapi075:214; chapi075:215 | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 198 wait 0 turn 0,0 pointer 475,267 | subjects 3:12/52/0;4/47/1;2/55/1
+== E a pass after the dialog; with the ball in hand a click on the shaman opens no menu
+p0 | spr objects#5@320,240; spr interface#40@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor interface#28 OBJETENMAIN 198 wait 0 turn 0,0 pointer 475,267
+p1 | click; spr objects#5@320,240; spr interface#28@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=6,CLICPERSO=1,CLICOBJET=0) | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit 4 cursor interface#29 OBJETENMAIN 198 wait 0 turn 0,0 pointer 475,267
+p2 | spr objects#5@320,240; spr interface#29@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor interface#29 OBJETENMAIN 198 wait 0 turn 0,0 pointer 475,267
+== F the hand emptied by /set(objetenmain=0): the menu of three subjects, the third cell hovered, clicked
+p0 | click; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 1 CLICPERSO 1 SUJET -2 click 0 aux 0 hit 4 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 475,267
+p1 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#12@450,180 mode 1; spr subjects#0@450,180; spr subjects#4@450,245; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@480,300 | menu 1 CLICPERSO 1 SUJET -2 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 480,300
+p2 | click; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr subjects#12@450,180 mode 1; spr subjects#0@450,180; spr subjects#4@450,245; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@480,300; chapi075:217; AtlDial_start(362) | menu 0 CLICPERSO 1 SUJET 2 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 1 turn 0,0 pointer 480,300
+F dialog end |  | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor interface#40 OBJETENMAIN 0 wait 0 turn 0,0 pointer 480,300 | subjects 3:12/52/0;4/47/1;2/55/1
+== G a pass after the dialog
+p0 | spr interface#40@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | menu 0 CLICPERSO 0 SUJET -2 click 0 aux 0 hit -1 cursor interface#29 OBJETENMAIN 0 wait 0 turn 0,0 pointer 480,300
+frame errors -

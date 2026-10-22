@@ -9,12 +9,12 @@ use std::path::{Path, PathBuf};
 
 use atlantis2_data::save::{
     entry, read_save, save_file_name, scan_save, write_save, Cfg, InvalidSave, SaveData,
-    SaveFormat, SaveHeader, BAG_ENTRIES, BAG_UNUSED, SHOWN_ROWS, SLOTS, SUBJECTS_PER_CHARACTER,
-    SUBJECT_CHARACTERS, SUBJECT_RECORD,
+    SaveFormat, SaveHeader, BAG_ENTRIES, BAG_UNUSED, SHOWN_ROWS, SLOTS, SUBJECT_CHARACTERS,
+    SUBJECT_RECORD,
 };
 
 use super::Engine;
-use crate::script::{BagEntry, Shown, Subject};
+use crate::script::{BagEntry, Shown, SubjectTable};
 
 /// The entries Native keeps only as bytes: the dowsing rod's 15
 /// (@ 0x006d84f4, its role not read) and the puzzles (20..32). The dialog flag (33) is written from the running
@@ -205,21 +205,9 @@ impl Engine {
         d.set_i32(ROD_STEP, self.rod.step);
         // 33: the dialog flag.
         d.entry_mut(entry::DIALOG)[0] = u8::from(self.dialog.is_some());
-        // 34: the subjects, per character a count and 16 entries.
-        for c in 0..SUBJECT_CHARACTERS {
-            let rec = d.subject_record_mut(c);
-            rec.fill(0);
-            let Some(list) = s.subjects.get(c) else {
-                continue;
-            };
-            rec[..4].copy_from_slice(&(list.len() as i32).to_le_bytes());
-            for (i, sub) in list.iter().take(SUBJECTS_PER_CHARACTER).enumerate() {
-                let e = &mut rec[4 + 12 * i..16 + 12 * i];
-                e[..4].copy_from_slice(&sub.value.to_le_bytes());
-                e[4..8].copy_from_slice(&sub.index.to_le_bytes());
-                e[8] = u8::from(sub.enabled);
-            }
-        }
+        // 34: the subjects, the table as the memory holds it.
+        d.entry_mut(entry::SUBJECTS)
+            .copy_from_slice(&s.subjects.bytes()[..SUBJECT_RECORD * SUBJECT_CHARACTERS]);
         d
     }
 
@@ -326,21 +314,7 @@ impl Engine {
             })
             .collect();
         // 34: the subjects.
-        for (c, list) in s.subjects.iter_mut().enumerate() {
-            let rec = &d.entry(entry::SUBJECTS)[SUBJECT_RECORD * c..SUBJECT_RECORD * (c + 1)];
-            let n = i32::from_le_bytes(rec[..4].try_into().unwrap())
-                .clamp(0, SUBJECTS_PER_CHARACTER as i32) as usize;
-            *list = (0..n)
-                .map(|i| {
-                    let e = &rec[4 + 12 * i..16 + 12 * i];
-                    Subject {
-                        value: i32::from_le_bytes(e[..4].try_into().unwrap()),
-                        index: i32::from_le_bytes(e[4..8].try_into().unwrap()),
-                        enabled: e[8] != 0,
-                    }
-                })
-                .collect();
-        }
+        s.subjects = SubjectTable::from_bytes(d.entry(entry::SUBJECTS));
         // What the save does not keep: a section waiting to go on and a
         // queued command are dropped [port choice: the original's flag
         // @ 0x006d1699 is not in the table].
