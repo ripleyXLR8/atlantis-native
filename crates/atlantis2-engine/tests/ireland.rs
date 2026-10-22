@@ -9,11 +9,13 @@
 //! `tests/warp.rs`); without them the tests are skipped.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Destination;
 use atlantis2_data::A2Files;
 use atlantis2_engine::engine::{irish_click_hook, irish_entry_hook, IrishPuzzle};
+use atlantis2_engine::sound::{Pcm, VOICE_EFFECTS};
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
 fn game() -> Option<A2Files> {
@@ -270,6 +272,62 @@ fn the_irish_click_hooks_take_no_click() {
         .events
         .iter()
         .any(|x| matches!(x, Event::TurnSetup { .. })));
+}
+
+/// The move-zone hooks' cursor reset (FUN_0047bef0(0, 0)), after the
+/// frame's cursor choice: in view 6 the turn takes frames, and the next
+/// frame draws no cursor (the move cursor without the reset).
+#[test]
+fn the_irish_move_hooks_reset_the_cursor() {
+    let Some(files) = game() else { return };
+    let mut e = bare(files, "bigile1.wam", 6);
+    let zones = e.wam().view(6).unwrap().zones.clone();
+    let m = zones.iter().position(|z| z.kind == 1).unwrap();
+    aim(&mut e, m);
+    assert!(e.cursor.shown.is_some());
+    e.events.clear();
+    e.click(20.0);
+    e.pass(None);
+    assert!(e.events.contains(&Event::PuzzleNotPorted {
+        function: 0x0049_6080
+    }));
+    assert_eq!(e.place(), ("bigile1.wam", 6));
+    assert_eq!(e.cursor.shown, None);
+}
+
+/// Leaving the blackbird's view by a move zone (FUN_004959f0): the cursor
+/// reset, voice 2 stopped (the view entry loaded the game's two answer
+/// sounds; the hook frees them, which stops voice 2), the music back to
+/// 100 %.
+#[test]
+fn leaving_the_blackbirds_view_stops_voice_2_and_restores_the_music() {
+    let Some(files) = game() else { return };
+    let mut e = bare(files, "ilepoete.wam", 73);
+    let zones = e.wam().view(73).unwrap().zones.clone();
+    let m = zones
+        .iter()
+        .position(|z| z.kind == 1 || z.kind == 2)
+        .expect("a move zone in view 73");
+    aim(&mut e, m);
+    let pcm = Pcm {
+        rate: 22050,
+        channels: 1,
+        samples: Arc::new(vec![0; 22050 * 60]),
+    };
+    e.voices().play(VOICE_EFFECTS, pcm, false, 0, 0);
+    // A music playing at 20 %.
+    e.music.state = 4;
+    e.music.set_percent(20);
+    assert_eq!(e.music.target, e.music.max * 20 / 100);
+    e.events.clear();
+    e.click(20.0);
+    e.pass(None);
+    assert!(e.events.contains(&Event::PuzzleNotPorted {
+        function: 0x0049_59f0
+    }));
+    assert_eq!(e.cursor.shown, None);
+    assert!(!e.voices().is_playing(VOICE_EFFECTS));
+    assert_eq!(e.music.target, e.music.max);
 }
 
 #[test]

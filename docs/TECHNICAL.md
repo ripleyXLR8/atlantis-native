@@ -849,8 +849,12 @@ Tibet) into `ireland-*.png`.
   go on to `CLICZONE`, the click scan and the move as in the original;
   their pictures (the frame-list states of `CROIXBRIGIT_SPRITE`,
   `CRANE_SPRITE`, `OGHAM_SPRITE`), sounds and the blackbird's song menu
-  are missing, as are the cursor reset of their move-zone hooks and view
-  73's leave (voice 2 stopped, the music at 100 %). The variables their
+  are missing. What their move-zone hooks do besides the puzzles is
+  ported: in the four views the cursor loses its picture until the next
+  cursor choice (FUN_0047bef0(0, 0), whatever is in hand), and leaving
+  view 73 by a move zone stops voice 2 when the blackbird's two answer
+  sounds are loaded (its view entry loads them, the hook frees them) and
+  sets the music to 100 %. The variables their
   wins write for the scripts are set by `Engine::solve_irish_puzzle`, a
   testing aid: `FINCROIX` = 1 and a scan (the cross), `FINOGHAM` = 1 when
   0 (the stones), `FINMERLE` = 1 (the blackbird); the skull writes none

@@ -163,8 +163,7 @@ impl Engine {
             self.mandala_hook(zone.name.as_deref());
         }
         // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the puzzles are
-        // not ported; their move-zone parts reset the cursor pair and
-        // leave the blackbird game, which never starts here.
+        // not ported; what their move-zone parts do besides is.
         let knife = self
             .names
             .id(defnames::OBJETS, b"COUTEAU_AILILL")
@@ -173,9 +172,37 @@ impl Engine {
             .current_view()
             .and_then(|v| irish_click_hook(v.name.as_bytes(), self.view, zone.kind, knife));
         if let Some(function) = hook {
+            self.irish_move_hook(function);
             self.puzzle_not_ported(function);
         }
         false
+    }
+
+    /// What the Irish move-zone hooks do besides their puzzles. The four
+    /// (FUN_00493d20 in view 42, FUN_00496080 in view 6, FUN_00494170 in
+    /// view 2, FUN_004959f0 in view 73) set the cursor pair to no bank,
+    /// frame 0 (FUN_0047bef0(0, 0), @ 0x00493d2f, 0x0049608f, 0x00494179,
+    /// 0x00495a00), whatever is in hand. FUN_004959f0 then frees the
+    /// blackbird game's two answer sounds with no test (@ 0x00495a09..
+    /// 0x00495a1f): FUN_0047aa30(handle, 2) stops voice 2, whatever it
+    /// plays, when the handle is loaded, and unloads it; the five song
+    /// handles are freed when not −1 and set to −1 (none is ever set
+    /// here: the songs are the puzzle's). Then the music to 100 %
+    /// (FUN_004770c0(100) @ 0x00495a4f, with no condition) and the flag
+    /// @ 0x006d2751 cleared (set only by the blackbird game: always clear
+    /// here).
+    fn irish_move_hook(&mut self, function: u32) {
+        match function {
+            0x0049_3d20 | 0x0049_6080 | 0x0049_4170 => self.clear_cursor_pair(),
+            0x0049_59f0 => {
+                self.clear_cursor_pair();
+                if std::mem::take(&mut self.blackbird_sounds) {
+                    self.voices.stop(crate::sound::VOICE_EFFECTS);
+                }
+                self.music.set_percent(100);
+            }
+            _ => {}
+        }
     }
 
     /// `OBJETENMAIN` as the scripts hold it.
@@ -198,6 +225,11 @@ impl Engine {
             .current_view()
             .and_then(|v| irish_entry_hook(v.name.as_bytes(), self.view));
         if let Some(function) = hook {
+            // FUN_004958f0 loads `merleb.apc` and `merlem.apc` (a failed
+            // load is fatal, @ 0x0049590e, 0x00495934).
+            if function == 0x0049_58f0 {
+                self.blackbird_sounds = true;
+            }
             self.puzzle_not_ported(function);
         }
     }

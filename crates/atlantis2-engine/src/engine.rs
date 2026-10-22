@@ -419,6 +419,10 @@ pub struct Engine {
     dialog_prev_loop: LoopType,
     /// The music's volume and fades.
     pub music: MusicVolume,
+    /// The blackbird game's two answer sounds are loaded (its view entry,
+    /// FUN_004958f0, loads them; its move-zone hook frees them): the port
+    /// keeps only the fact, for the voice their free stops.
+    blackbird_sounds: bool,
     /// Where the port may differ from the original (default: the minor
     /// bug fixes on).
     pub enhancements: Enhancements,
@@ -784,6 +788,7 @@ impl Engine {
             // No music plays until a script starts one: the fades only run
             // then, as `FUN_004770c0` is refused while stopped.
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
+            blackbird_sounds: false,
             enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),
