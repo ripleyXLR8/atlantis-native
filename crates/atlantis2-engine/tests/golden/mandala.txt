@@ -1,0 +1,49 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) and scenar\chapi075.con (MD5
+# 4c39855475b5c123725207d39ed760cb): the view-10 mandala hook (@ 0x004954f0) alone (A-D),
+# then the zone click (@ 0x0049ca80) and the click scan (@ 0x0045a870) of the same frame
+# on chapter 75 (E), variables and flags at 0 but those given. Names of defnames.con
+# entries are written {S:I} (section, index); lower:, space: and cut7: are a zone name
+# in lower case, with a trailing space, cut to 7 characters. `lines` are chapter 75's
+# line numbers.
+ids objects 53 57 61 52 56 60 167
+ids zones 52 53 54 49 50 51 57
+ids variables 188 182 183 184 185 186 187 132 133 134 129 130 131
+A {4:52} hand={1:53}: {3:188}=1 {3:182}=1 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=RunOneCommand('(NewSound=400)')
+A {4:53} hand={1:57}: {3:188}=1 {3:182}=0 {3:183}=1 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=RunOneCommand('(NewSound=400)')
+A {4:54} hand={1:61}: {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=1 {3:185}=0 {3:186}=0 {3:187}=0 calls=RunOneCommand('(NewSound=400)')
+A {4:49} hand={1:52}: {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=1 {3:186}=0 {3:187}=0 calls=RunOneCommand('(NewSound=400)')
+A {4:50} hand={1:56}: {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=1 {3:187}=0 calls=RunOneCommand('(NewSound=400)')
+A {4:51} hand={1:60}: {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=1 calls=RunOneCommand('(NewSound=400)')
+B {4:52} hand={1:52}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+B {4:49} hand={1:53}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+B {4:51} hand={1:56}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+B {4:52} hand=0: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+B {4:57} hand={1:167}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+B {4:57} hand={1:56}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+B lower:{4:52} hand={1:53}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+B space:{4:52} hand={1:53}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+B cut7:{4:52} hand={1:53}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 calls=-
+C {4:50} hand={1:56}: {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=1 {3:187}=0
+C {4:50} hand={1:56}: {3:188}=2 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=2 {3:187}=0
+D order {4:52},{4:53},{4:54},{4:49},{4:50},{4:51}: {3:188}=6 {3:182}=1 {3:183}=2 {3:184}=3 {3:185}=4 {3:186}=5 {3:187}=6
+D order {4:49},{4:50},{4:51},{4:52},{4:53},{4:54}: {3:188}=6 {3:182}=4 {3:183}=5 {3:184}=6 {3:185}=1 {3:186}=2 {3:187}=3
+D order {4:54},{4:52},{4:50},{4:53},{4:51},{4:49}: {3:188}=6 {3:182}=2 {3:183}=4 {3:184}=1 {3:185}=6 {3:186}=3 {3:187}=5
+D order {4:51},{4:50},{4:49},{4:54},{4:53},{4:52}: {3:188}=6 {3:182}=6 {3:183}=5 {3:184}=4 {3:185}=3 {3:186}=2 {3:187}=1
+D last {4:52} ({3:182}=6)
+D last {4:53} ({3:183}=6)
+D last {4:54} ({3:184}=6)
+D last {4:49} ({3:185}=6)
+D last {4:50} ({3:186}=6)
+D last {4:51} ({3:187}=6)
+E {4:52} hand={1:53}: OUT ran=1 lines - | hook {3:76}=0 RunOneCommand('(NewSound=400)') | after {3:76}=52 | IN lines 116,117,118,119,120,121,122,123,124,125,126,127,128,129 resumes=1 | {3:188}=1 {3:182}=1 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=0 pose: {3:132}=1,{3:133}=0,{3:134}=0,{3:129}=0,{3:130}=0,{3:131}=0 | calls=Interp_SetMonde,AtlMuzik_Stop,AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWarp_SetAngleXNow,AtlWam_FindView,AtlWarp_EnterView,AtlMuzik_Del,AtlMuzik_Del,AtlMuzik_Load,LoadCurrentChap,RunInit
+E {4:53} hand={1:57}: OUT ran=1 lines - | hook {3:76}=0 RunOneCommand('(NewSound=400)') | after {3:76}=53 | IN lines 132,133,134,135,136,137,138,139,140,141,142,143,144 resumes=1 | {3:188}=1 {3:182}=0 {3:183}=1 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=0 pose: {3:132}=0,{3:133}=1,{3:134}=0,{3:129}=0,{3:130}=0,{3:131}=0 | calls=Interp_SetMonde,AtlMuzik_Stop,AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWam_FindView,AtlWarp_EnterView,AtlMuzik_Del,AtlMuzik_Del,AtlMuzik_Load,LoadCurrentChap,RunInit
+E {4:54} hand={1:61}: OUT ran=1 lines - | hook {3:76}=0 RunOneCommand('(NewSound=400)') | after {3:76}=54 | IN lines 147,148,149,150,151,152,153,154,155,156,157,158,159 resumes=1 | {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=1 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=0 pose: {3:132}=0,{3:133}=0,{3:134}=1,{3:129}=0,{3:130}=0,{3:131}=0 | calls=Interp_SetMonde,AtlMuzik_Stop,AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWam_FindView,AtlWarp_EnterView,AtlMuzik_Del,AtlMuzik_Del,AtlMuzik_Load,LoadCurrentChap,RunInit
+E {4:49} hand={1:52}: OUT ran=1 lines - | hook {3:76}=0 RunOneCommand('(NewSound=400)') | after {3:76}=49 | IN lines 162,163,164,165 resumes=0 | {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=1 {3:186}=0 {3:187}=0 {3:28}=0 pose: {3:132}=0,{3:133}=0,{3:134}=0,{3:129}=1,{3:130}=0,{3:131}=0 | calls=
+E {4:50} hand={1:56}: OUT ran=1 lines - | hook {3:76}=0 RunOneCommand('(NewSound=400)') | after {3:76}=50 | IN lines 168,169,170,171 resumes=0 | {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=1 {3:187}=0 {3:28}=0 pose: {3:132}=0,{3:133}=0,{3:134}=0,{3:129}=0,{3:130}=1,{3:131}=0 | calls=
+E {4:51} hand={1:60}: OUT ran=1 lines - | hook {3:76}=0 RunOneCommand('(NewSound=400)') | after {3:76}=51 | IN lines 174,175,176,177 resumes=0 | {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=1 {3:28}=0 pose: {3:132}=0,{3:133}=0,{3:134}=0,{3:129}=0,{3:130}=0,{3:131}=1 | calls=
+E {4:50} hand={1:56}, {3:188}=3 before: OUT ran=1 lines - | hook {3:76}=0 RunOneCommand('(NewSound=400)') | after {3:76}=50 | IN lines 168,169,170,171 resumes=0 | {3:188}=4 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=4 {3:187}=0 {3:28}=0 pose: {3:132}=0,{3:133}=0,{3:134}=0,{3:129}=0,{3:130}=1,{3:131}=0 | calls=
+E {4:49} hand=0: OUT ran=1 lines - | hook {3:76}=0 - | after {3:76}=49 | IN lines - resumes=0 | {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=0 pose: {3:132}=0,{3:133}=0,{3:134}=0,{3:129}=0,{3:130}=0,{3:131}=0 | calls=
+E {4:57} hand={1:167}, all posed: OUT ran=1 lines - | hook {3:76}=0 - | after {3:76}=57 | IN lines 180,181,182,183,184,185 resumes=1 | {3:188}=6 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=0 pose: {3:132}=1,{3:133}=1,{3:134}=1,{3:129}=1,{3:130}=1,{3:131}=1 | calls=AtlMuzik_Stop,Interp_SetMonde,AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWam_FindView,AtlWarp_EnterView,LoadCurrentChap,RunInit
+E {4:57} hand={1:167}, {3:131}=0: OUT ran=1 lines - | hook {3:76}=0 - | after {3:76}=57 | IN lines - resumes=0 | {3:188}=5 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=167 pose: {3:132}=1,{3:133}=1,{3:134}=1,{3:129}=1,{3:130}=1,{3:131}=0 | calls=

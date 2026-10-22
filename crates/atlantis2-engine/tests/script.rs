@@ -129,8 +129,9 @@ impl Host for Rec {
         self.push("RunInit()".into());
         self.chapter.clone()
     }
-    fn load_wam(&mut self, name: &str) {
+    fn load_wam(&mut self, name: &str) -> bool {
         self.push(format!("AtlWam_Load('{name}')"));
+        true
     }
     fn has_view(&mut self, view: i32) -> bool {
         self.push(format!("AtlWam_FindView({view})"));
@@ -846,7 +847,7 @@ fn a_new_game_runs_chapter_0s_init() {
             self.rec.push(format!("LoadCurrentChap({chapter})"));
             scenar(&format!("chapi{chapter:03}.con"))
         }
-        fn load_wam(&mut self, name: &str) {
+        fn load_wam(&mut self, name: &str) -> bool {
             self.rec.load_wam(name)
         }
         fn enter_view(&mut self, view: i32, yaw: f32, pitch: f32) {

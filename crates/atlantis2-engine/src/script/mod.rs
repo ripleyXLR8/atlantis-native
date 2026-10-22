@@ -246,6 +246,10 @@ pub struct Script {
     pub tick_flags: [bool; 4],
     /// The first fatal error, after which nothing runs.
     pub fatal: Option<String>,
+    /// The host refused a `changewam` ([`Host::load_wam`]): the walk that
+    /// ran it stops there, the rest of the section is not run. Not the
+    /// original's (a place it cannot load is fatal); the host clears it.
+    pub travel_refused: bool,
     /// The original's warnings (`FUN_00480c20`, their format strings), in
     /// order.
     pub warnings: Vec<String>,
@@ -319,6 +323,7 @@ impl Script {
             seconds: 0.0,
             tick_flags: [false; 4],
             fatal: None,
+            travel_refused: false,
             warnings: Vec::new(),
             stub_run_init: false,
             trace: None,

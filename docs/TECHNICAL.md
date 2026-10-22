@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -610,9 +610,12 @@ plays the shaman's greeting (dialog 360) and the section goes on after
 it. A left click ends a film and goes to a dialog's next line; Escape ends
 a dialog, and in the panorama opens the main menu (options, volumes,
 load and save, quit; below); the right button opens and closes the bag
-bar. Not yet: the start-up intro videos, the subject menu (so
+bar. The mandalas are laid in the shaman's hut (below). Tibet is the only
+world: a trip to another one (a boat laid, the crystal, the space
+travel) plays its film and stays in Tibet. Not yet: the start-up intro
+videos, the subject menu (so
 the shaman's other dialogs, which the scripts call on a subject, cannot be
-asked for), the puzzles. `--headless <folder> [frames] --screenshot
+asked for), the other worlds and their puzzles. `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
 `--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
@@ -752,13 +755,56 @@ after a short game with three saves.
   move's view, `UDADA` skips the transition video, `TrajSound` plays with
   the next transition (the music at 20 %), and the arrival scan runs in
   the frame after the arrival; without them (`Engine::new_game`) the
-  scans are only recorded as events. The mandala puzzle's clicks in
-  view 10 are only logged. The subject menu is not ported: on a character
+  scans are only recorded as events. A zone click in view 10 runs the
+  mandala hook between the departure scan and `CLICZONE` (below). The
+  subject menu is not ported: on a character
   with subjects (the shaman, at the start of the game) the original opens
   it and runs no click scan in that frame; the port runs the click scan
   as the original does for a character without subjects. Moves to other
   places (type-2 zones), transition sprites and the zoom of a turn are
   not ported (none in Tibet).
+- **Mandalas** (`engine/puzzles.rs`): the puzzles' click hook
+  dispatcher of the original (@ 0x0049b910) sends a click on a zone of
+  type 3, 4 or 50 of a view whose warp name starts with `TI` (any case)
+  and whose number is 10 to the mandala hook (@ 0x004954f0), after the
+  departure scan and before `CLICZONE` is set (on the sprite path, after
+  it); the hook never takes the click. It reads `ObjetEnMain` once, then
+  for each of six (object, zone, variable) rows in its order (the Irish,
+  Chinese and Yucatán boats on `ZONE_IRB`, `ZONE_CHB`, `ZONE_YUB`, the
+  three worlds' mandalas on `ZONE_IRA`, `ZONE_CHA`, `ZONE_YUA`), when the
+  zone's name is the row's (byte for byte, case included) and the hand is
+  the row's object: `RunOneCommand("(NewSound=400)")` (`sound400.apc` on
+  voice 2), `NbMandalaPosed` + 1, and the row's `OrdreMandala1..6` = the
+  new count, so each holds the rank its mandala was laid at (the order
+  the Shamballa fireflies later test). No guard: the same placement twice
+  counts twice (the scripts empty the hand in the same click). Chapter
+  75's click scan then does the rest: the `pose..` flag, the laid
+  mandala's sprite shown, the hand and the bag emptied, and for a boat
+  the world change, the music stopped, the departure film
+  (`cine001` / `021` / `040`) and the trip, which stops at its
+  `changewam` (Worlds, below). These variables and the show table are in
+  the save. Against the original's emulated run (`tests/mandala.rs`,
+  `tests/golden/mandala.txt`): the hook on every zone, wrong objects,
+  name variants, twice, four whole orders and each mandala laid last; the
+  click with chapter 75 for the six placements, an empty hand and the
+  crystal (with and without the six flags), line by line up to the
+  place change. Not ported: the solution log the original prints at exit
+  (@ 0x00495650, a fixed list that is not the fireflies' answer) and the
+  fireflies themselves (Shamballa).
+- **Worlds:** only Tibet (`tibet.wam`, world 5) is ported. A `changewam`
+  of the scripts to any other place (the boats' worlds, Shamballa's
+  `voiles.wam` after the crystal, `Planetes.wam` of the space travel) is
+  refused: where the original loads it (a place it cannot load is fatal
+  there), the port notes it (`Event::WorldNotPorted`), ends the section
+  at that line, sets the world back to Tibet's (`Interp_SetMonde`: the
+  cursor, the objects bank, the texts) and runs the per-view reset of the
+  view the game is still in (the hand emptied, as the section's `vue=`
+  would), without entering it again. What the section did before stays:
+  the flags, the bag, the film played, and the music its `stopmusik`
+  stopped (no music until the scripts start one: the original's
+  `startmusik` of the same track does nothing either). Clicking the laid
+  boat again asks for the trip again (chapter 75's second-trip sections).
+  A save whose place is not ported is refused before anything changes.
 - **Bag** (`bag.rs`, `engine/ui.rs`): the bag is the scripts' table (90
   entries of sprite, object, world; `sacados`, the take of an object
   sprite, `ChangeObjectWorld`), the object in hand a (bank, frame) pair

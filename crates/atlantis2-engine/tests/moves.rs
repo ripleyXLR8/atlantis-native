@@ -126,7 +126,7 @@ impl Driver {
                 }),
                 Event::VideoFrame(k) => out.push(format!("frame {k}")),
                 Event::VideoEnd => out.push("close".into()),
-                Event::PuzzleHook { zone } => out.push(format!("hook {zone}")),
+                Event::PuzzleHook { zone, .. } => out.push(format!("hook {zone}")),
                 Event::Take { id } => out.push(format!("take {id}")),
                 // The scripts do not run here (the golden's lines are left
                 // out).

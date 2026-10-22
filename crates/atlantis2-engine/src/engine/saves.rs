@@ -40,6 +40,8 @@ pub enum SaveError {
     NoScripts,
     /// The saved chapter cannot be loaded (fatal in the original).
     Chapter(i32),
+    /// The save is in a place of a world the port does not have yet.
+    NotPorted(String),
 }
 
 impl std::fmt::Display for SaveError {
@@ -50,6 +52,7 @@ impl std::fmt::Display for SaveError {
             SaveError::Invalid(e) => write!(f, "{e}"),
             SaveError::NoScripts => write!(f, "the scripts do not run"),
             SaveError::Chapter(c) => write!(f, "scenar\\chapi{c:03}.con cannot be loaded"),
+            SaveError::NotPorted(w) => write!(f, "{w}: this world is not ported yet"),
         }
     }
 }
@@ -282,6 +285,13 @@ impl Engine {
     pub fn load_data(&mut self, d: &SaveData) -> Result<(), SaveError> {
         if self.con.is_none() {
             return Err(SaveError::NoScripts);
+        }
+        // Not the original's: a place the port does not have is refused
+        // before anything is changed.
+        let wam: String = d.header().wam.iter().map(|&c| char::from(c)).collect();
+        if super::puzzles::ported_place(&wam).is_none() {
+            log::warn!("load: {wam} is in a world not ported yet");
+            return Err(SaveError::NotPorted(wam));
         }
         // FUN_0049bf70 resets the puzzles (not ported: their saved bytes
         // are kept for the next save).

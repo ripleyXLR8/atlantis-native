@@ -70,6 +70,7 @@ impl Engine {
         for (chapter, line) in lines {
             self.event(Event::Set { chapter, line });
         }
+        self.after_refused_place();
         Some(r)
     }
 
@@ -388,7 +389,11 @@ impl Host for Engine {
             .read(Folder::Scenar, &format!("chapi{chapter:03}.con"))
     }
 
-    fn load_wam(&mut self, name: &str) {
+    fn load_wam(&mut self, name: &str) -> bool {
+        if super::puzzles::ported_place(name).is_none() {
+            self.refuse_place(name);
+            return false;
+        }
         self.event(Event::Wam(name.to_string()));
         match load_wam(&self.files, name) {
             Ok(mut wam) => {
@@ -402,6 +407,7 @@ impl Host for Engine {
         // The current view, zone and next view are forgotten.
         self.centre_zone = None;
         self.next_view = None;
+        true
     }
 
     fn has_view(&mut self, view: i32) -> bool {

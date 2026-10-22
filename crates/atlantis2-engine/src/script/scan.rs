@@ -59,7 +59,7 @@ impl Script {
             if self.resume_pending {
                 return r;
             }
-            if self.fatal.is_some() {
+            if self.fatal.is_some() || self.travel_refused {
                 return None;
             }
             p = q + 1;
@@ -208,7 +208,7 @@ impl Script {
         };
         let mut i2 = self.search_set_cool(host, init + 7);
         loop {
-            if self.resume_pending {
+            if self.resume_pending || self.travel_refused {
                 return true;
             }
             if self.fatal.is_some() {
@@ -262,6 +262,7 @@ impl Script {
         }
         match self.set_variables(host, S, p) {
             Some(r) => r,
+            None if self.travel_refused => p,
             None => {
                 let line = self.line_text(S, p);
                 self.fail(format!("SearchSetCool : /set impossible : {line}"));

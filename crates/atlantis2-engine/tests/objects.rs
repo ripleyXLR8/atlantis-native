@@ -7,9 +7,9 @@
 //! steps are replayed in its order: the worlds' banks, the takes of the
 //! three boats in views 5, 8 and 9, the bag and hand keys of the scripts,
 //! the visible counts, the centre draw of hand and cursor, the scroll.
-//! Rows of the original's view-10 hook (the mandala puzzle, not ported)
-//! and the stubbed calls are skipped; a `changes` row is checked on the
-//! state after the step (each change listed holds).
+//! The rows of the stubbed calls are skipped; a `changes` row is checked
+//! on the state after the step (each change listed holds), the view-10
+//! hook's (the mandala puzzle, `tests/mandala.rs`) included.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the test is skipped.
@@ -91,12 +91,12 @@ impl Walk {
         fill(&self.names, s)
     }
 
-    /// The next row, past those of the puzzle hook and the stubbed calls.
+    /// The next row, past those of the stubbed calls.
     fn next(&mut self) -> String {
         loop {
             let r = self.rows.get(self.at).cloned().unwrap_or_default();
             self.at += 1;
-            if !(r.starts_with("hook ") || r.contains(" calls ")) {
+            if !r.contains(" calls ") {
                 return r;
             }
         }
@@ -453,12 +453,15 @@ fn objects_against_the_original() {
         w.cond();
     }
 
-    // 5. Two boats placed in view 10 (the hook's rows skipped), one on a
-    // wrong zone.
+    // 5. Two boats placed in view 10, one on a wrong zone: the hook
+    // (FUN_004954f0), then the click scan's condition and lines.
     for boat in [53, 57, 57] {
         w.set(&format!("/set(objetenmain={{1:{boat}}})"));
         let p = w.pairs();
         w.expect(&format!("hand {{1:{boat}}} pairs {p}"));
+        let zone = w.peek().split(' ').nth(2).unwrap().to_string();
+        w.e.mandala_hook(Some(&zone));
+        w.changes(&format!("hook {{1:{boat}}} {zone}"));
         w.cond();
         w.set_rows("set");
         let zone = w.peek().split(' ').nth(2).unwrap().to_string();
