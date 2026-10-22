@@ -3,8 +3,12 @@
 //! (2352-byte sectors, user data after a 16-byte Mode 1 or 24-byte Mode 2
 //! header) and Nero images (a 300 KiB lead-in before the sectors). The
 //! layout is found by the ISO 9660 primary volume descriptor ("CD001" in
-//! sector 16). The CD release puts one BIGCD archive on each of its four
-//! discs: a [`DiscSet`] serves the files of all the images as one folder.
+//! sector 16). Long names are read from the Joliet tree when the image has
+//! one (a supplementary volume descriptor with a UCS-2 escape), as Windows
+//! does; Atlantis II's discs need it, their ISO 9660 names being 8.3
+//! (`SNA100~1.SPW`). The CD release puts one BIGCD archive on each of its
+//! four discs: a [`DiscSet`] serves the files of all the images as one
+//! folder.
 //! Compressed images (zip, 7z, chd) are not read.
 
 use std::collections::HashMap;
@@ -44,6 +48,8 @@ pub struct DiscImage {
     /// Lower-case path ("dir/name.ext") -> extent.
     files: HashMap<String, Extent>,
     dirs: Vec<String>,
+    /// Names are UCS-2 (big-endian): the Joliet tree.
+    joliet: bool,
 }
 
 fn read_exact_at(file: &Mutex<File>, offset: u64, buf: &mut [u8]) -> bool {
@@ -70,10 +76,30 @@ impl DiscImage {
                 data_offset,
                 files: HashMap::new(),
                 dirs: Vec::new(),
+                joliet: false,
             };
+            // A Joliet supplementary descriptor after the primary one (up to
+            // the set terminator) gives the long names.
+            let mut vd = pvd;
+            for n in 17..32u64 {
+                let mut d = [0u8; 2048];
+                let at = lead_in + n * sector_size + data_offset;
+                if !read_exact_at(&img.file, at, &mut d) || &d[1..6] != b"CD001" || d[0] == 255 {
+                    break;
+                }
+                if d[0] == 2
+                    && d[88] == b'%'
+                    && d[89] == b'/'
+                    && matches!(d[90], b'@' | b'C' | b'E')
+                {
+                    vd = d;
+                    img.joliet = true;
+                    break;
+                }
+            }
             let root = Extent {
-                lba: u64::from(u32::from_le_bytes(pvd[158..162].try_into().ok()?)),
-                size: u64::from(u32::from_le_bytes(pvd[166..170].try_into().ok()?)),
+                lba: u64::from(u32::from_le_bytes(vd[158..162].try_into().ok()?)),
+                size: u64::from(u32::from_le_bytes(vd[166..170].try_into().ok()?)),
             };
             img.walk(root, "", 0);
             return Some(img);
@@ -113,7 +139,17 @@ impl DiscImage {
             if raw == [0] || raw == [1] {
                 continue; // "." and ".."
             }
-            let mut name = String::from_utf8_lossy(raw).to_ascii_lowercase();
+            let mut name = if self.joliet {
+                let units: Vec<u16> = raw
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|&c| u16::from_be_bytes(c))
+                    .collect();
+                String::from_utf16_lossy(&units).to_ascii_lowercase()
+            } else {
+                String::from_utf8_lossy(raw).to_ascii_lowercase()
+            };
             if let Some(i) = name.find(';') {
                 name.truncate(i);
             }
@@ -125,7 +161,7 @@ impl DiscImage {
             let full = format!("{prefix}{name}");
             if rec[25] & 2 != 0 {
                 self.dirs.push(full.clone());
-                if depth < 3 {
+                if depth < 8 {
                     self.walk(ext, &format!("{full}/"), depth + 1);
                 }
             } else {
@@ -329,6 +365,59 @@ mod tests {
         for f in [p, q, r] {
             let _ = std::fs::remove_file(f);
         }
+    }
+
+    /// Joliet: the supplementary tree's long names, as Windows reads them.
+    #[test]
+    fn joliet_long_names() {
+        let mut s = iso_sectors();
+        s.resize(26, [0u8; 2048]);
+        let rec = |name: &[u8], lba: u32, size: u32, dir: bool| -> Vec<u8> {
+            let mut r = vec![0u8; 33 + name.len() + (name.len() + 1) % 2];
+            r[0] = r.len() as u8;
+            r[2..6].copy_from_slice(&lba.to_le_bytes());
+            r[10..14].copy_from_slice(&size.to_le_bytes());
+            r[25] = if dir { 2 } else { 0 };
+            r[32] = name.len() as u8;
+            r[33..33 + name.len()].copy_from_slice(name);
+            r
+        };
+        let mut svd = [0u8; 2048];
+        svd[0] = 2;
+        svd[1..6].copy_from_slice(b"CD001");
+        svd[88..91].copy_from_slice(b"%/E");
+        let root = rec(&[0], 24, 2048, true);
+        svd[156..156 + root.len()].copy_from_slice(&root);
+        s[17] = svd;
+        let long: Vec<u8> = "Datas_A2"
+            .encode_utf16()
+            .flat_map(u16::to_be_bytes)
+            .collect();
+        let file: Vec<u8> = "sna1013013.SPW;1"
+            .encode_utf16()
+            .flat_map(u16::to_be_bytes)
+            .collect();
+        let mut dir = Vec::new();
+        dir.extend(rec(&[0], 24, 2048, true));
+        dir.extend(rec(&[1], 24, 2048, true));
+        dir.extend(rec(&long, 23, 2048, true));
+        s[24][..dir.len()].copy_from_slice(&dir);
+        let mut sub = Vec::new();
+        sub.extend(rec(&[0], 23, 2048, true));
+        sub.extend(rec(&[1], 24, 2048, true));
+        sub.extend(rec(&file, 25, 4, false));
+        s[23][..sub.len()].copy_from_slice(&sub);
+        s[25][..4].copy_from_slice(b"long");
+        let iso: Vec<u8> = s.iter().flatten().copied().collect();
+        let p = write("joliet.iso", &iso);
+        let img = DiscImage::open(&p).expect("image");
+        assert_eq!(
+            img.read("DATAS_A2/SNA1013013.spw").as_deref(),
+            Some(&b"long"[..])
+        );
+        // The primary tree's names are not used then.
+        assert_eq!(img.size("game/atlantis.exe"), None);
+        let _ = std::fs::remove_file(p);
     }
 
     /// A file of the player's beside the images is read from the folder,
