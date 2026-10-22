@@ -744,18 +744,23 @@ fn the_clocks_match_the_original() {
         };
         let last = now;
         now += dt;
+        s.tick_flags = [false; 4];
         s.tick(now, last);
         let got = format!(
-            "ticks={} acc={:.6} random={} time1={} time2={}",
+            "ticks={} acc={:.6} random={} time1={} time2={} flags={}",
             s.ticks,
             f64::from(s.seconds),
             s.var("RANDOM").unwrap(),
             s.var("TIME1").unwrap(),
-            s.var("TIME2").unwrap()
+            s.var("TIME2").unwrap(),
+            s.tick_flags
+                .map(|b| if b { '1' } else { '0' })
+                .iter()
+                .collect::<String>()
         );
         let want = format!(
-            "ticks={} acc={} random={} time1={} time2={}",
-            f["ticks"], f["acc"], f["random"], f["time1"], f["time2"]
+            "ticks={} acc={} random={} time1={} time2={} flags={}",
+            f["ticks"], f["acc"], f["random"], f["time1"], f["time2"], f["flags"]
         );
         assert_eq!(got, want, "{row}");
         n += 1;

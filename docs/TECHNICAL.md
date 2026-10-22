@@ -653,7 +653,8 @@ runs yet: no cinematic, no script, no move. `--headless <folder> [frames]
   interpreter (`crates/atlantis2-engine/src/script/`) is transcribed walk
   by walk: conditions, the `/set` handler with the subjects, the bag, the
   show/hide table and the hand, the scans, `/INIT`, the timers, the 15 Hz
-  clocks (`TIME1`, `TIME2`, `RANDOM` count seconds of real time) and when
+  clocks (`TIME1` and `TIME2` count seconds of real time; at each second
+  `RANDOM` takes the 15 Hz tick count & 0xff) and when
   each scan runs in the panorama frame. What a command does outside those
   tables (a place, a view, a film, a dialog, music, a disc, a menu) goes
   through its `Host` trait, one method per function of the original, so

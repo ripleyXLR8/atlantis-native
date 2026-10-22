@@ -238,6 +238,12 @@ pub struct Script {
     /// (@ 0x006569ec).
     pub ticks: i32,
     pub seconds: f32,
+    /// The four "a tick passed" flags (@ 0x00656a4c, 0x00656a50,
+    /// 0x00656a54, 0x00656a58), set by every tick; their readers clear
+    /// them: the place animations (0x00656a4c, @ 0x0047d7f0), the
+    /// buttons and the frame dispatcher (0x00656a50), the cursor
+    /// (0x00656a54, @ 0x00474500). No Native reader takes them yet.
+    pub tick_flags: [bool; 4],
     /// The first fatal error, after which nothing runs.
     pub fatal: Option<String>,
     /// The original's warnings (`FUN_00480c20`, their format strings), in
@@ -308,6 +314,7 @@ impl Script {
             fpu: Fpu::Double,
             ticks: 0,
             seconds: 0.0,
+            tick_flags: [false; 4],
             fatal: None,
             warnings: Vec::new(),
             stub_run_init: false,

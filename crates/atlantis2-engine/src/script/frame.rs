@@ -242,7 +242,8 @@ impl Script {
     }
 
     /// The 15 Hz tick (@ 0x0040caa0), when the window is active and the
-    /// game not paused: one more tick; the seconds accumulator gains the
+    /// game not paused: one more tick and the four tick flags raised
+    /// (@ 0x0040cabd..0x0040cad8); the seconds accumulator gains the
     /// scheduler time since this task's last run (`now - last`, seconds);
     /// over 10 s it is dropped, from 1 s one second is taken and `RANDOM` =
     /// the tick count & 0xff, `TIME1` and `TIME2` + 1. So the clocks count
@@ -250,6 +251,7 @@ impl Script {
     pub fn tick(&mut self, now: f64, last: f64) {
         let fpu = self.fpu;
         self.ticks = self.ticks.wrapping_add(1);
+        self.tick_flags = [true; 4];
         let sum = fpu.add(fpu.sub(now, last), f64::from(self.seconds));
         self.seconds = fpu.f32(sum);
         if sum > 10.0 {
