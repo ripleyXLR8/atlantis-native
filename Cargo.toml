@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/atlantis-data", "crates/atlantis-codecs", "crates/atlantis-engine", "crates/atlantis-app"]
 
 [workspace.package]
-version = "0.3.2"
+version = "0.4.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/ripleyXLR8/atlantis-native"

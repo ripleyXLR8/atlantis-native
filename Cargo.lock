@@ -157,7 +157,7 @@ checksum = "175571dd1d178ced59193a6fc02dde1b972eb0bc56c892cde9beeceac5bf0f6b"
 
 [[package]]
 name = "atlantis-app"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "atlantis-codecs",
  "atlantis-data",
@@ -184,7 +184,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis-codecs"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "atlantis-data",
  "md-5",
@@ -192,7 +192,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis-data"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "encoding_rs",
  "log",
@@ -201,7 +201,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis-engine"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "ab_glyph",
  "atlantis-codecs",
