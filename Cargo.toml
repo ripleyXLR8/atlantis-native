@@ -1,6 +1,13 @@
 [workspace]
 resolver = "2"
-members = ["crates/atlantis-data", "crates/atlantis-codecs", "crates/atlantis-engine", "crates/atlantis-app"]
+members = [
+    "crates/atlantis-data",
+    "crates/atlantis-codecs",
+    "crates/atlantis-engine",
+    "crates/atlantis2-data",
+    "crates/atlantis2-engine",
+    "crates/atlantis-app",
+]
 
 [workspace.package]
 version = "0.3.2"

@@ -7,9 +7,11 @@
 | Crate | Content |
 |---|---|
 | `atlantis-data` | BigFile archives, executable tables, game detection |
-| `atlantis-codecs` | HNM6 panoramas and videos, APC sound |
+| `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
-| `atlantis-app` | the window, input and audio (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
+| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera; for now a new game shows its first view |
+| `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
 and poll their events, the engine awaits the next frame, and the front end
@@ -576,6 +578,59 @@ how many pixels differ from the processor's (0 in every test so far).
 Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 `0x00496570`, ...) so that each behaviour can be traced to the original code.
 
+## Atlantis II (in progress)
+
+A folder holding `atlantis2.exe` opens Atlantis II (`crates/atlantis-app/src/a2.rs`):
+a new game shows its first view, Tibet's `tibet.wam` view 2 at yaw −90°,
+pitch 0, read from `scenar\chapi000.con`, and the mouse or the arrow keys
+turn it within the original's limits (pitch ±70°, yaw free). Nothing else
+runs yet: no cinematic, no script, no move. `--headless <folder> [frames]
+--screenshot <file.png>` saves the screen.
+
+- **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
+  timestamp 0x38030926), recognised by its size and timestamp and
+  confirmed by its MD5 (`crates/atlantis2-data/src/exe.rs`).
+- **Files:** the install folder holds the places, scripts, texts and
+  sprite banks; everything under `datas_a2\` comes from the current CD.
+  The discs (images or copies) are found in the game folder, in the
+  folders directly inside it and in each `--discs <folder>`, and told apart
+  by the original's marker files (`datas_a2\spf\sphex.spr`, `cerceris`,
+  `bousier`, `mante`). The current disc follows the `MONDE` rule (worlds
+  1..4 on discs 1..4, Tibet on whichever disc is in, 6 on disc 4); six
+  files differ between the discs, so a file is read from the current disc
+  first (`crates/atlantis2-data/src/files.rs`). The discs' long names are
+  in their Joliet trees, which the disc-image reader now reads.
+- **Places:** `WAM V2.8` is a stream of tagged chunks (views, moves, 3D
+  click zones with their corners, sounds, links, entities and their
+  states), read in file order; the zone under the screen centre is the
+  first whose edges all hold the centre's direction
+  (`crates/atlantis2-data/src/wam.rs`).
+- **Panorama:** a cube of six 512x512 faces (the HNM's six frames, `bk dn
+  ft lf rt up`), drawn every frame as six textured quads by a transcription
+  of the original's C rasteriser (`warpC`: a fan of triangles, perspective
+  every 32 pixels, 24.8 fixed point in between, nearest texel), with a
+  76° field of view and a near plane at z = 2
+  (`crates/atlantis2-engine/src/warp.rs`). The original picks its
+  rasteriser by CPU (C, P5, MMX, PII, K6-3D), and they differ by a texel
+  here and there; the C one is the one transcribed.
+- **Camera:** the orientation is a float quaternion turned by axis-angle
+  rotations built through 3x3 matrices, transcribed operation by
+  operation, with the x87's 53-bit or 24-bit precision (`fpu.rs`,
+  `camera.rs`): the matrix is the original's to the last bit, residues
+  included. Which precision the players had is not known (Direct3D may
+  have set 24 bits); the port uses 53 bits, and both are tested.
+- **Turning:** the mouse adds dx / 2000 and −dy / 2000 radians to two
+  speeds, which decay × 0.8 a frame; the limits stop the turn (`look.rs`).
+  The original's warp loop is unpaced; the port turns once per frame at
+  60 frames a second. The arrow keys stand for 8 mickeys a frame each (a
+  port convenience).
+- **Alpha masks:** the dialog videos carry an `AL` chunk per frame (runs of
+  (n, a) pairs, a = 0..31), which the decoder keeps for the caller
+  (`HnmVideo::alpha`) and `AlphaTables::blend` draws as the original's
+  dialog video stream does: the frames are premultiplied, a = 31 copies
+  the video, a = 0 keeps the background, and in between the background is
+  scaled by (31 − a) / 32 with the original's tables.
+
 ## Tests
 
 Tests that need the game files read the game directory from the
@@ -604,7 +659,11 @@ Chinese CD's ISO images and the Simplified Chinese CD's raw .bin images,
 `ATLANTIS_ISO_UNKNOWN` a folder of images of an edition not supported
 (the report test, skipped when the edition opens), `ATLANTIS_GOG` a folder of the GOG.com languages'
 trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
-installation, for the tests of those builds:
+installation, for the tests of those builds. For Atlantis II,
+`ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
+`scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
+copies); the expected frames, matrices and zone picks come from the
+original `atlantis2.exe` run under emulation:
 
 ```sh
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
@@ -629,4 +688,11 @@ original game's own code; they contain no game data.
 | 4 | 3D talking heads |
 | 5 | the 17 puzzles |
 | 6 | packages for each platform, web build, folder picker, saves in the browser |
+
+Atlantis II, on the `a2/m0` branch:
+
+| Milestone | Content |
+|---|---|
+| M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
+| M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
 

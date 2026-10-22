@@ -27,6 +27,13 @@
 //! `--fullscreen` opens the window in full screen (F, F11 or Alt+Enter
 //! switches it back).
 //!
+//! A folder holding Atlantis II (`atlantis2.exe`) opens Atlantis II's own
+//! minimal mode (`atlantis_app::a2`): a new game on its first view, to look
+//! around in. Its discs (CD images or copies) are looked for in the folder,
+//! in the folders directly inside it and in each `--discs <folder>`;
+//! `--headless <folder> [frames] [--screenshot <file.png>]` prints where it
+//! is and saves the screen.
+//!
 //! `--original` (before the game directory) turns every enhancement off:
 //! the original game, bug for bug. `--new-game` skips the start-up videos
 //! and the player screen.
@@ -96,6 +103,26 @@ fn main() {
     let launcher = flag("--launcher");
     let force_support = flag("--support-screen");
     let fullscreen = flag("--fullscreen");
+    // Atlantis II: the folders of its discs, and a screenshot of a
+    // headless run.
+    let mut discs = Vec::new();
+    let mut screenshot = None;
+    while let Some(i) = args
+        .iter()
+        .position(|a| a == "--discs" || a == "--screenshot")
+    {
+        let name = args.remove(i);
+        if i >= args.len() {
+            eprintln!("{name} needs a folder or a file");
+            std::process::exit(2);
+        }
+        let path = std::path::PathBuf::from(args.remove(i));
+        if name == "--discs" {
+            discs.push(path);
+        } else {
+            screenshot = Some(path);
+        }
+    }
     let mut value = |name: &str| -> Option<i32> {
         let i = args.iter().position(|a| a == name)?;
         args.remove(i);
@@ -117,6 +144,20 @@ fn main() {
         None => Start::Boot,
     };
 
+    if args.first().map(String::as_str) == Some("--headless")
+        && args
+            .get(1)
+            .is_some_and(|d| atlantis_app::a2::holds_atlantis2(Path::new(d)))
+    {
+        let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
+        if let Err(e) =
+            atlantis_app::a2::headless(Path::new(&args[1]), &discs, frames, screenshot.as_deref())
+        {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if args.first().map(String::as_str) == Some("--headless") {
         let Some(dir) = args.get(1) else {
             eprintln!(
@@ -177,7 +218,22 @@ fn main() {
         return;
     }
 
-    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--fullscreen] [--launcher] [--support-screen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]";
+    // A folder of Atlantis II: its own mode.
+    if args.len() == 1 && atlantis_app::a2::holds_atlantis2(Path::new(&args[0])) {
+        let run = atlantis_app::a2::open(
+            Path::new(&args[0]),
+            &discs,
+            atlantis2_engine::Fpu::default(),
+        )
+        .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen));
+        if let Err(e) = run {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--fullscreen] [--launcher] [--support-screen] [--new-game | --puzzle <n> [--object <id>]] [--discs <dir>] [<game dir>]";
     if args.len() > 1 || args.first().is_some_and(|a| a.starts_with('-')) {
         error_box(&format!("{USAGE}\n\n'{}' not understood", args.join(" ")));
         std::process::exit(2);

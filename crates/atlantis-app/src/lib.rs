@@ -28,6 +28,8 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod a2;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;

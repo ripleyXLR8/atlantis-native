@@ -162,6 +162,8 @@ dependencies = [
  "atlantis-codecs",
  "atlantis-data",
  "atlantis-engine",
+ "atlantis2-data",
+ "atlantis2-engine",
  "console_error_panic_hook",
  "console_log",
  "cpal",
@@ -187,6 +189,7 @@ name = "atlantis-codecs"
 version = "0.3.2"
 dependencies = [
  "atlantis-data",
+ "atlantis2-data",
  "md-5",
 ]
 
@@ -210,6 +213,27 @@ dependencies = [
  "log",
  "md-5",
  "ttf-parser",
+]
+
+[[package]]
+name = "atlantis2-data"
+version = "0.3.2"
+dependencies = [
+ "atlantis-data",
+ "log",
+ "md-5",
+]
+
+[[package]]
+name = "atlantis2-engine"
+version = "0.3.2"
+dependencies = [
+ "atlantis-codecs",
+ "atlantis-data",
+ "atlantis2-data",
+ "libm",
+ "log",
+ "md-5",
 ]
 
 [[package]]

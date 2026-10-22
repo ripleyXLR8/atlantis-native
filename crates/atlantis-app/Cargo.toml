@@ -16,6 +16,8 @@ path = "src/main.rs"
 atlantis-data = { path = "../atlantis-data" }
 atlantis-codecs = { path = "../atlantis-codecs" }
 atlantis-engine = { path = "../atlantis-engine" }
+atlantis2-data = { path = "../atlantis2-data" }
+atlantis2-engine = { path = "../atlantis2-engine" }
 log = "0.4"
 winit = "0.30"
 softbuffer = "0.4"
