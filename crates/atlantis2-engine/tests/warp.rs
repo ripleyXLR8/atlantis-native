@@ -14,12 +14,14 @@ use std::path::PathBuf;
 use atlantis2_data::con::NewGame;
 use atlantis2_data::wam::{pick, Wam};
 use atlantis2_data::{A2Files, Folder};
-use atlantis2_engine::camera::deg_to_rad;
+use atlantis2_engine::camera::{deg_to_rad, WARP_FOV};
+use atlantis2_engine::look::Look;
 use atlantis2_engine::warp::faces_from_hnm;
 use atlantis2_engine::{Camera, Engine, Fpu, Renderer};
 use md5::{Digest, Md5};
 
 const GOLDEN: &str = include_str!("golden/warp_cube.txt");
+const TURN: &str = include_str!("golden/warp_turn.txt");
 
 fn md5_hex(px: &[u16]) -> String {
     let bytes: Vec<u8> = px.iter().flat_map(|p| p.to_le_bytes()).collect();
@@ -198,12 +200,21 @@ fn panoramas_match_the_original() {
         total += n;
     }
     // 168 x 2 (both precisions) + 60 random + 168 at 800x600 + 15 at 35°
-    // + 12 x 2 of the first view, for ti0002; 168 x 2 + 60 for ir0001.
+    // + 12 x 2 of the first view, for ti0002; 168 x 2 + 60 for ir0001: 999
+    // golden rows, of which 997 distinct (y0 p0 of ti0002 is in both the
+    // full grid and the first view's, at each precision; the golden here
+    // keeps it once).
     assert_eq!(total, 997);
 }
 
 /// A new game opens on the first view as the original draws it, with the
 /// move to view 3 under the centre.
+///
+/// The golden frames are the bare cube (the harness draws no sprite). The
+/// one entity state of view 2 shown at load (NOVA, `wka1002002.SPW`) draws
+/// on face 2 (`up`) only, and this frame samples face 1 alone (atlantis2-re
+/// `warp_cube_orient.txt`, row y-90.p0), so the bare cube is the original's
+/// frame here; looking up far enough to see the sprite is not covered.
 #[test]
 fn new_game_shows_the_first_view() {
     let (rows, _) = rows();
@@ -273,4 +284,88 @@ fn picks_through_the_camera() {
         bad.len(),
         &bad[..bad.len().min(5)]
     );
+}
+
+/// Mouse turns frame by frame from the first view, then view entries from
+/// the turned camera (`tests/golden/warp_turn.txt`: the original's
+/// DirectInput callback @ 0x0040c420, per-frame turn @ 0x0040c6a0 and view
+/// entry @ 0x0045a088..0x0045a204 under emulation): the turning speeds, the
+/// angles read back and the matrix bit for bit after every frame, and the
+/// frame's MD5 when the game is there.
+#[test]
+fn turns_match_the_original() {
+    let faces = game().map(|files| {
+        let hnm = files.read(Folder::Warp, "ti0002.hnm").expect("ti0002.hnm");
+        faces_from_hnm(&hnm).unwrap()
+    });
+    let mut checked = 0;
+    for (cw, fpu) in [("027f", Fpu::Double), ("007f", Fpu::Single)] {
+        let prefix = format!("turn.warpC.{cw}.");
+        let mut cam = Camera::new(fpu, 640, 480);
+        let mut look = Look::default();
+        let mut r = Renderer::new(fpu, 640, 480);
+        let mut out = vec![0xf81fu16; 640 * 480];
+        let mut steps = 0;
+        for line in TURN.lines().filter(|l| l.starts_with(&prefix)) {
+            let (key, value) = line.split_once(' ').unwrap();
+            let rest = &key[prefix.len()..];
+            let bits = |v: &str| -> Vec<u32> {
+                v.split(',')
+                    .map(|b| u32::from_str_radix(b, 16).unwrap())
+                    .collect()
+            };
+            match rest.split_once('.') {
+                None => {
+                    steps += 1;
+                    let f: Vec<&str> = value.split(':').collect();
+                    let n = |i: usize| f[i].parse::<i32>().unwrap();
+                    match f[0] {
+                        "enter0" | "enter" => {
+                            cam.enter(deg_to_rad(fpu, n(1)), deg_to_rad(fpu, n(2)));
+                            cam.set_fov(WARP_FOV, 640, 480);
+                            look.stop();
+                        }
+                        "mouse" => {
+                            look.invert_y = n(3) != 0;
+                            look.mouse(fpu, n(1), n(2));
+                        }
+                        "limits" => (look.limit_y, look.limit_x) = (n(1), n(2)),
+                        "frame" => look.frame(&mut cam),
+                        s => panic!("step {s}"),
+                    }
+                }
+                Some((n, "speed")) => assert_eq!(
+                    vec![look.yaw_speed.to_bits(), look.pitch_speed.to_bits()],
+                    bits(value),
+                    "{cw} {n} speed"
+                ),
+                Some((n, "angles")) => {
+                    let (y, p) = cam.angles();
+                    assert_eq!(
+                        vec![y.to_bits(), p.to_bits()],
+                        bits(value),
+                        "{cw} {n} angles"
+                    );
+                }
+                Some((n, "matrix")) => {
+                    assert_eq!(
+                        cam.matrix().map(f32::to_bits).to_vec(),
+                        bits(value),
+                        "{cw} {n} matrix"
+                    );
+                    checked += 1;
+                }
+                Some((n, "md5")) => {
+                    if let Some(faces) = &faces {
+                        r.render(faces, &cam.matrix(), cam.projection(), &mut out);
+                        assert_eq!(md5_hex(&out), value, "{cw} {n} frame");
+                    }
+                }
+                Some((_, k)) => panic!("key {k}"),
+            }
+        }
+        assert_eq!(steps, 121, "{cw}");
+    }
+    // 65 frames and 4 view entries per control word.
+    assert_eq!(checked, 2 * 69);
 }

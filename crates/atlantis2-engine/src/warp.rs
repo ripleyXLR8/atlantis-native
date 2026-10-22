@@ -8,6 +8,13 @@
 //! @ 0x00573a50), which the original uses on AMD processors and on CPUs
 //! older than the Pentium; transcribed operation by operation so that it
 //! draws the same pixels at either x87 precision ([`Fpu`]).
+//!
+//! It is the interim renderer of M0, not the reference: the reference is
+//! `warpPII` (atlantis2-re decision 0003), which every Intel CPU since the
+//! Pentium II draws with, under the control word 0x0e7f it loads (53-bit
+//! precision, rounding toward zero). `warpPII` is not transcribed yet; its
+//! frames differ from these by one texel in about 4 % of the pixels. Sprites
+//! drawn into the faces (SPW) are not drawn yet either.
 
 use crate::fpu::{f, ftol, Fpu};
 
