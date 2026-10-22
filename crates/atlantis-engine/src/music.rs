@@ -1098,7 +1098,9 @@ mod tests {
             .chain((60..=74).rev().map(|m| format!("{m},2,0,0,5")))
             .collect::<Vec<_>>()
             .join(";");
-        let cases: [(&str, u8, u8, u8, i32, u32, usize, String); 4] = [
+        // (name, cur, mode, vol, sfx_vol, sfx_last, ticks, runs)
+        type Case = (&'static str, u8, u8, u8, i32, u32, usize, String);
+        let cases: [Case; 4] = [
             ("sfx_from_127", 0, 0, 100, 127, 1000, 330, from_127),
             (
                 "sfx_odd_3",
