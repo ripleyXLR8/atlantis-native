@@ -81,7 +81,7 @@ fn fields(line: &str) -> Vec<&str> {
 #[test]
 fn tibet_dialogs_initialise_as_the_original() {
     let Some(files) = game() else { return };
-    let script = DialogScript::load(&files, World::of_monde(5).unwrap()).unwrap();
+    let script = DialogScript::load(&files, World::of_monde(5).unwrap(), Fpu::Double).unwrap();
     let mut rand = Rand::new(0);
     let mut dialogs = 0;
     let mut lines_checked = 0;
@@ -91,7 +91,9 @@ fn tibet_dialogs_initialise_as_the_original() {
         match f[0] {
             "dialog" => {
                 let n: u32 = f[1].parse().unwrap();
-                let d = Dialog::initialise(n, &script, &files, &mut rand).unwrap();
+                // The golden's word: 0x027f (and the C heads).
+                let d = Dialog::initialise(n, &script, &files, &mut rand, Variant::C, Fpu::Double)
+                    .unwrap();
                 assert_eq!(f[3], "1", "{n} ok");
                 assert_eq!(d.lines().len().to_string(), f[5], "{n} lines");
                 assert_eq!(d.speakers().len().to_string(), f[7], "{n} speakers");
@@ -187,7 +189,8 @@ fn dialog_frames_match_the_original() {
             .map(fields)
             .unwrap();
         let mesh = db.strip_suffix("s1.db").unwrap();
-        let mut head = load_head(&files, mesh, 0, Fpu::Double).expect(&db);
+        // The golden's heads: the C routines under 0x027f.
+        let mut head = load_head(&files, mesh, 0, Variant::C, Fpu::Double).expect(&db);
         let data = files
             .read(Folder::Hnm, &format!("dial/{video}"))
             .expect(&video);
@@ -512,6 +515,10 @@ fn dialog_360_plays_end_to_end() {
         e.render(&mut screen);
         min_music = min_music.min(e.music.volume);
         if let Some(d) = e.dialog() {
+            // The heads follow the panorama's CPU: the Pentium II's
+            // routines, under the 0x0e7f warpPII and the II set-up leave.
+            assert_eq!(d.variant(), Variant::PII);
+            assert_eq!((d.fpu(), e.fpu()), (Fpu::Chop, Fpu::Chop));
             if let Some(l) = d.current_line() {
                 if seen.last().is_none_or(|(id, _)| *id != l.id) {
                     seen.push((l.id.clone(), t));

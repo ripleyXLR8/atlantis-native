@@ -361,8 +361,11 @@ impl Engine {
                 font: self.font.as_ref(),
                 subtitles: self.subtitles,
                 screen: (w, h),
+                fpu: self.camera.fpu,
             };
             d.draw(out, &mut self.zbuf, &mut frame);
+            self.camera.fpu = d.fpu();
+            self.renderer.fpu = d.fpu();
         }
     }
 
@@ -603,9 +606,15 @@ impl Host for Engine {
         // (FUN_004801a0 → FUN_0045ebc0; a failure removes it).
         if let (true, Some(m)) = (started, dialog) {
             let d = match self.dial_script.as_ref() {
-                Some(script) => {
-                    Dialog::initialise(m as u32, script, &self.files, &mut self.rand).ok()
-                }
+                Some(script) => Dialog::initialise(
+                    m as u32,
+                    script,
+                    &self.files,
+                    &mut self.rand,
+                    self.renderer.variant,
+                    self.camera.fpu,
+                )
+                .ok(),
                 None => None,
             };
             if d.is_none() {

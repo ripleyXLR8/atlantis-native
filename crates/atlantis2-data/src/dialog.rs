@@ -30,14 +30,27 @@ pub struct Perso {
     pub matrix: Option<[f32; 70]>,
 }
 
-/// `atof` then a float store.
-fn atof(s: &str) -> f32 {
+/// `atof` then a float store (`fstp dword`): the double rounded to the
+/// nearest float, or toward zero when the x87 control word in force rounds
+/// toward zero (0x0e7f, the word the assembly renderers leave).
+fn atof(s: &str, toward_zero: bool) -> f32 {
+    let x = atof_double(s);
+    let y = x as f32;
+    if toward_zero && y.is_finite() && y != 0.0 && f64::from(y).abs() > x.abs() {
+        f32::from_bits(y.to_bits() - 1)
+    } else {
+        y
+    }
+}
+
+/// `atof`'s double (@ 0x005ae620).
+fn atof_double(s: &str) -> f64 {
     // `atof` reads the longest number prefix.
     let end = s
         .char_indices()
         .take_while(|&(i, c)| c.is_ascii_digit() || c == '.' || (i == 0 && (c == '-' || c == '+')))
         .count();
-    s[..end].parse::<f64>().unwrap_or(0.0) as f32
+    s[..end].parse::<f64>().unwrap_or(0.0)
 }
 
 fn text(data: &[u8]) -> String {
@@ -47,6 +60,13 @@ fn text(data: &[u8]) -> String {
 
 /// Reads `info<world>.txt`.
 pub fn parse_info(data: &[u8]) -> Vec<Perso> {
+    parse_info_rounding(data, false)
+}
+
+/// [`parse_info`] with the numbers stored toward zero when `toward_zero`
+/// (the file read while the x87 control word rounds toward zero).
+pub fn parse_info_rounding(data: &[u8], toward_zero: bool) -> Vec<Perso> {
+    let atof = |s: &str| atof(s, toward_zero);
     let mut out = Vec::new();
     let mut cur: Option<Perso> = None;
     let mut matrix: Vec<f32> = Vec::new();

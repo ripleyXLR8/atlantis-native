@@ -984,7 +984,7 @@ impl Engine {
     /// the subtitle font (`AtlFont_MainInit` @ 0x00404140).
     fn load_world_texts(&mut self, monde: i32) {
         self.dial_script = World::of_monde(monde).and_then(|w| {
-            DialogScript::load(&self.files, w)
+            DialogScript::load(&self.files, w, self.camera.fpu)
                 .map_err(|e| log::warn!("dialog scripts: {e}"))
                 .ok()
         });
@@ -1029,7 +1029,14 @@ impl Engine {
         // Without the world's dialog scripts the initialisation fails as a
         // missing dialog does (@ 0x00480098): the same reset follows.
         let result = match self.dial_script.as_ref() {
-            Some(script) => Dialog::initialise(number, script, &self.files, &mut self.rand),
+            Some(script) => Dialog::initialise(
+                number,
+                script,
+                &self.files,
+                &mut self.rand,
+                self.renderer.variant,
+                self.camera.fpu,
+            ),
             None => Err(DialogError::NoFile("the world's dialog scripts".into())),
         };
         let out = match result {
@@ -1869,9 +1876,19 @@ impl Engine {
                 font: self.font.as_ref(),
                 subtitles: self.subtitles,
                 screen: (w, h),
+                fpu: self.camera.fpu,
             };
             d.draw(out, &mut self.zbuf, &mut frame);
+            let fpu = d.fpu();
+            self.set_fpu(fpu);
         }
+    }
+
+    /// The x87 control word the game's code left (the camera's and the
+    /// renderer's copies).
+    pub(crate) fn set_fpu(&mut self, fpu: Fpu) {
+        self.camera.fpu = fpu;
+        self.renderer.fpu = fpu;
     }
 
     /// The warp frame's click flag (@ 0x006569c9): set by a click, cleared

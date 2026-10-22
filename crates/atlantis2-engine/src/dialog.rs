@@ -18,16 +18,24 @@
 //! The engine ([`crate::Engine`]) drives them: `/set(dial=N)` is
 //! [`crate::Engine::start_dialog`].
 //!
-//! The heads and the lip-sync run here at 53-bit precision (control word
-//! 0x027f), the word their goldens were made under; in the game they run
-//! under whatever word the panorama renderer left (0x0e7f after `warpPII`),
-//! which the heads' renderer choice (C or PII, an owner decision) settles.
+//! The heads, the lip-sync and the rest of the dialog's float code run
+//! under the x87 control word the game's code has when the dialog runs: no
+//! code of the executable sets another one between the panorama's frames
+//! and a dialog's (the only control-word loads are the assembly
+//! rasterisers' 0x0e7f and the CRT's save-and-restore pairs), so on the
+//! reference machine (CPU type 8) it is the 0x0e7f `warpPII` leaves, and
+//! the II head rasteriser loads it again at each polygon. The dialog takes
+//! the engine's word ([`Dialog::initialise`], [`TickContext`],
+//! [`FrameContext`]) and hands back the one its heads leave
+//! ([`Dialog::fpu`]). A head is drawn with the routines of the panorama's
+//! CPU ([`Variant`]): `PII` the II rasteriser with the x87 assembly
+//! transform, `C` the C ones.
 
 use std::sync::Arc;
 
 use atlantis2_data::db::Scene;
 use atlantis2_data::dialog::{
-    parse_com, parse_dial, parse_info, ComLine, DialLine, LineKind, Perso, World,
+    parse_com, parse_dial, parse_info_rounding, ComLine, DialLine, LineKind, Perso, World,
 };
 use atlantis2_data::tga::Tga;
 use atlantis2_data::{A2Files, Folder};
@@ -40,6 +48,7 @@ use crate::hnm_stream::HnmStream;
 use crate::lipsync::LipSync;
 use crate::sound::{volume_to_attenuation, Pcm, Voices, VOICE_DIALOG};
 use crate::subtitle::SubtitleFont;
+use crate::warp::Variant;
 
 /// π as the float the reverse shot turns by (0x40490fdb).
 pub const PI_F: f32 = f32::from_bits(0x4049_0fdb);
@@ -92,8 +101,10 @@ pub struct DialogScript {
 }
 
 impl DialogScript {
-    /// `dlg_Dialog::LoadScript` (@ 0x0045dd60) for `world`.
-    pub fn load(files: &A2Files, world: World) -> Result<DialogScript, DialogError> {
+    /// `dlg_Dialog::LoadScript` (@ 0x0045dd60) for `world`, its numbers
+    /// stored as floats under `fpu`, the control word when the world is
+    /// loaded (`monde`, @ 0x0047fe50).
+    pub fn load(files: &A2Files, world: World, fpu: Fpu) -> Result<DialogScript, DialogError> {
         let [dial, com, info] = world.files();
         let read = |folder, name: &str| {
             files
@@ -104,7 +115,7 @@ impl DialogScript {
             world,
             dial: parse_dial(&read(Folder::Loc, &dial)?),
             com: parse_com(&read(Folder::Scenar, &com)?),
-            persos: parse_info(&read(Folder::Scenar, &info)?),
+            persos: parse_info_rounding(&read(Folder::Scenar, &info)?, fpu == Fpu::Chop),
         })
     }
 
@@ -191,6 +202,8 @@ pub struct FrameContext<'a> {
     pub subtitles: bool,
     /// The screen's size.
     pub screen: (usize, usize),
+    /// The x87 control word the game's code has when the frame is drawn.
+    pub fpu: Fpu,
 }
 
 /// A running dialog.
@@ -225,7 +238,10 @@ pub struct Dialog {
     pub saved_pitch: f32,
     /// A click to take into account at the next tick (@ 0x006569c9).
     click: bool,
+    /// The x87 control word as the dialog's code last left it.
     fpu: Fpu,
+    /// The CPU's routines the heads are drawn with.
+    variant: Variant,
 }
 
 impl Dialog {
@@ -238,8 +254,9 @@ impl Dialog {
         script: &DialogScript,
         files: &A2Files,
         rand: &mut Rand,
+        variant: Variant,
+        fpu: Fpu,
     ) -> Result<Dialog, DialogError> {
-        let fpu = Fpu::Double;
         let err = |s: String| DialogError::Script(format!("dial {number}: {s}"));
         let mut lines: Vec<Line> = Vec::new();
         let mut speakers: Vec<Speaker> = Vec::new();
@@ -295,7 +312,7 @@ impl Dialog {
             };
             if let Some(s) = stand {
                 if speakers[p].heads[s].is_none() {
-                    speakers[p].heads[s] = load_head(files, &info.mesh, s, fpu);
+                    speakers[p].heads[s] = load_head(files, &info.mesh, s, variant, fpu);
                 }
             }
             // AddReplique: the camera.
@@ -371,7 +388,19 @@ impl Dialog {
             saved_pitch: 0.0,
             click: false,
             fpu,
+            variant,
         })
+    }
+
+    /// The x87 control word the dialog's code left (0x0e7f once a II head
+    /// has been drawn).
+    pub fn fpu(&self) -> Fpu {
+        self.fpu
+    }
+
+    /// The routines the heads are drawn with.
+    pub fn variant(&self) -> Variant {
+        self.variant
     }
 
     pub fn lines(&self) -> &[Line] {
@@ -446,6 +475,7 @@ impl Dialog {
 
     /// The line sequencer (@ 0x00460ba0). `false` past the last line.
     fn sequencer(&mut self, ctx: &mut TickContext) -> bool {
+        self.fpu = ctx.camera.fpu;
         if self.kind() == 3 {
             self.cinema_ticks += 1;
             if self
@@ -473,6 +503,7 @@ impl Dialog {
                 let n = self.stream.as_ref().map_or(0, HnmStream::number);
                 let p = self.lines[self.current.unwrap()].perso;
                 if let Some(h) = self.speakers[p].heads[s].as_mut() {
+                    h.set_fpu(self.fpu);
                     h.pose(n);
                 }
             }
@@ -515,6 +546,7 @@ impl Dialog {
             }
             let n = self.stream.as_ref().map_or(0, HnmStream::number);
             if let Some(h) = self.speakers[line.perso].heads[s].as_mut() {
+                h.set_fpu(self.fpu);
                 h.reset_idle();
                 h.pose(n);
             }
@@ -693,13 +725,18 @@ impl Dialog {
             return;
         };
         let t = self.lip_time(clock);
+        let fpu = self.fpu;
         let weights = match (self.lipsync.as_mut(), t) {
-            (Some(ls), Some(t)) => Some(ls.eval(t)),
+            (Some(ls), Some(t)) => {
+                ls.set_fpu(fpu);
+                Some(ls.eval(t))
+            }
             _ => None,
         };
         let Some(h) = self.speakers[p].heads[s].as_mut() else {
             return;
         };
+        h.set_fpu(fpu);
         match weights {
             Some(w) => {
                 self.weights = w;
@@ -719,7 +756,9 @@ impl Dialog {
             font,
             subtitles,
             screen,
+            fpu,
         } = *frame;
+        self.fpu = fpu;
         let kind = self.kind();
         if kind < 0 {
             return;
@@ -729,15 +768,20 @@ impl Dialog {
             let l = self.current_line().unwrap();
             let cam = l.camera.unwrap_or(0);
             let (p, s) = (l.perso, l.stand);
-            let head = s.and_then(|s| self.speakers[p].heads[s].as_mut());
-            compose(
+            let mut head = s.and_then(|s| self.speakers[p].heads[s].as_mut());
+            if let Some(h) = head.as_mut() {
+                h.set_fpu(self.fpu);
+            }
+            if let Some(f) = compose(
                 out,
                 zbuf,
                 screen.0,
                 self.stream.as_ref(),
                 head.map(|h| (h, cam)),
                 rand,
-            );
+            ) {
+                self.fpu = f;
+            }
         }
         if subtitles {
             if kind == 3 {
@@ -769,20 +813,26 @@ pub fn compose(
     stream: Option<&HnmStream>,
     head: Option<(&mut Head, usize)>,
     rand: &mut Rand,
-) {
+) -> Option<Fpu> {
     zbuf.fill(0);
     if let Some(st) = stream {
         st.draw(out, pitch, out.len() / pitch.max(1));
     }
-    if let Some((h, cam)) = head {
-        h.display(cam, rand, out, zbuf);
-    }
+    let (h, cam) = head?;
+    h.display(cam, rand, out, zbuf);
+    Some(h.fpu())
 }
 
 /// `dlg_Perso::AddAnime(stand)` (@ 0x00461c70): `<mesh>s<stand + 1>.db`
 /// with its texture map and eye maps; `None` (logged) when the file is
 /// missing or unreadable.
-pub fn load_head(files: &A2Files, mesh: &str, stand: usize, fpu: Fpu) -> Option<Head> {
+pub fn load_head(
+    files: &A2Files,
+    mesh: &str,
+    stand: usize,
+    variant: Variant,
+    fpu: Fpu,
+) -> Option<Head> {
     let name = format!("{mesh}s{}.db", stand + 1);
     let Some(data) = files.read(Folder::ThreeDDial, &name) else {
         log::warn!("bool dlg_Perso::AddAnime(const long p_lStand) ERREUR: impossible de trouver le fichier {name}.");
@@ -799,7 +849,7 @@ pub fn load_head(files: &A2Files, mesh: &str, stand: usize, fpu: Fpu) -> Option<
     };
     let (yf, ymf) = Head::eye_map_names(&map);
     let open = tga(&map)?;
-    Head::new(fpu, &scene, open, tga(&yf), tga(&ymf))
+    Head::new(fpu, variant, &scene, open, tga(&yf), tga(&ymf))
         .map_err(|e| log::warn!("{name}: {e}"))
         .ok()
 }

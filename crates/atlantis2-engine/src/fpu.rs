@@ -84,17 +84,15 @@ impl Fpu {
         }
     }
 
-    /// The result of an x87 operation computed exactly or as a double,
-    /// at this precision: the double itself at 53 bits, rounded to a float
-    /// at 24 bits. The heads and the lip-sync were transcribed this way for
-    /// 0x027f and 0x007f; under [`Fpu::Chop`] this keeps the double
-    /// (rounded to nearest), which can differ from the original's
-    /// truncation in the last bit.
+    /// The word the CRT's math functions switch to while they compute
+    /// (`_trandisp` @ 0x005b5d95: (word & 0x300) | 0x7f, the caller's
+    /// precision with rounding to nearest; restored by @ 0x005b5e1e or
+    /// @ 0x005b5e2b on the way out).
     #[inline(always)]
-    pub fn r(self, x: f64) -> f64 {
+    pub fn nearest(self) -> Fpu {
         match self {
-            Fpu::Single => x as f32 as f64,
-            Fpu::Double | Fpu::Chop => x,
+            Fpu::Chop => Fpu::Double,
+            other => other,
         }
     }
 
