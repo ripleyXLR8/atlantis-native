@@ -523,7 +523,12 @@ release holds the result); serve the folder over HTTP (for example
 `python3 -m http.server -d web 8000`), the page asks for the game folder. The engine
 reads the player's files through an asynchronous loader that fetches each
 archive member before it is read, so the browser runs the same game as the
-desktop. A browser grants
+desktop. The Chinese subtitle fonts (about 0.5 MB each) are not built
+into the web program as they are into the desktop one: `web/build.sh`
+copies them into `web/fonts`, and the page fetches the one a Chinese
+release needs once the release is known, before the game starts; the
+other releases never load them (the program is 2.7 MB instead of
+3.7 MB). A browser grants
 the pointer capture only on a click: until then the view turns with the
 pointer's own motion. Sound starts on the first click.
 

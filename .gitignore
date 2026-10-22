@@ -2,4 +2,5 @@
 /game
 *.local.toml
 /web/pkg
+/web/fonts
 /target-wt

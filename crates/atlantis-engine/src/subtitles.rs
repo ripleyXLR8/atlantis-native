@@ -23,7 +23,9 @@
 //! is beside the game's files, else with Noto Serif TC / SC (the same Ming
 //! / Song style; bundled, cut to the characters of the releases' scripts,
 //! SIL Open Font Licence 1.1), at 16 pixels per em, monochrome, the bytes
-//! read as Big5 / GBK.
+//! read as Big5 / GBK. The web build leaves those two out of its program:
+//! its page fetches the one a Chinese release needs, beside the page, and
+//! hands it over ([`provide_cjk_font`]).
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -39,9 +41,67 @@ static FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/LiberationSans-R
 
 /// The CJK subtitle fonts of the port, Noto Serif TC and SC Regular, cut
 /// to the characters of the Chinese releases' chapter scripts with ASCII
-/// and the punctuation (`assets/fonts/make_cjk_subset.py`).
+/// and the punctuation (`assets/fonts/make_cjk_subset.py`). Built into the
+/// desktop program; the web build fetches them ([`provide_cjk_font`]).
+#[cfg(not(target_arch = "wasm32"))]
 static NOTO_SERIF_TC: &[u8] = include_bytes!("../../../assets/fonts/NotoSerifTC-Subset.otf");
+#[cfg(not(target_arch = "wasm32"))]
 static NOTO_SERIF_SC: &[u8] = include_bytes!("../../../assets/fonts/NotoSerifSC-Subset.otf");
+
+/// The CJK subtitle fonts the web page fetched, Big5's and GBK's.
+#[cfg(target_arch = "wasm32")]
+static FETCHED_CJK: [std::sync::OnceLock<&'static [u8]>; 2] =
+    [std::sync::OnceLock::new(), std::sync::OnceLock::new()];
+
+/// The file name of the port's CJK subtitle font for texts in
+/// `code_page` (in `assets/fonts`), `None` for the single-byte code pages.
+pub fn cjk_font_file(code_page: TextCodePage) -> Option<&'static str> {
+    match code_page {
+        TextCodePage::Windows950 => Some("NotoSerifTC-Subset.otf"),
+        TextCodePage::Windows936 => Some("NotoSerifSC-Subset.otf"),
+        TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+    }
+}
+
+/// The web build: hands over the port's CJK subtitle font for texts in
+/// `code_page` ([`cjk_font_file`]), which its page fetched, before the
+/// game starts. False when `data` is no font (the subtitles then draw no
+/// CJK character) or one was already given. The desktop build has them
+/// built in.
+#[cfg(target_arch = "wasm32")]
+pub fn provide_cjk_font(code_page: TextCodePage, data: Vec<u8>) -> bool {
+    let slot = match code_page {
+        TextCodePage::Windows950 => &FETCHED_CJK[0],
+        TextCodePage::Windows936 => &FETCHED_CJK[1],
+        TextCodePage::Windows1252 | TextCodePage::Dos850 => return false,
+    };
+    if slot.get().is_some() || FontRef::try_from_slice(&data).is_err() {
+        return false;
+    }
+    // Kept for the page's life, as the desktop build's.
+    slot.set(Box::leak(data.into_boxed_slice())).is_ok()
+}
+
+/// The port's CJK subtitle font for texts in `code_page`.
+#[cfg(not(target_arch = "wasm32"))]
+fn bundled_cjk(code_page: TextCodePage) -> Option<&'static [u8]> {
+    match code_page {
+        TextCodePage::Windows950 => Some(NOTO_SERIF_TC),
+        TextCodePage::Windows936 => Some(NOTO_SERIF_SC),
+        TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+    }
+}
+
+/// The port's CJK subtitle font for texts in `code_page`, once the page
+/// has fetched it.
+#[cfg(target_arch = "wasm32")]
+fn bundled_cjk(code_page: TextCodePage) -> Option<&'static [u8]> {
+    match code_page {
+        TextCodePage::Windows950 => FETCHED_CJK[0].get().copied(),
+        TextCodePage::Windows936 => FETCHED_CJK[1].get().copied(),
+        TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+    }
+}
 
 /// The pixels per em of the subtitle font.
 pub const SUBTITLE_EM_PX: f32 = 13.0;
@@ -223,13 +283,15 @@ fn needs_hinting(family: &str, revision: f32) -> bool {
 
 impl FontFace {
     /// The port's font for texts in `code_page`: Liberation Sans, or for
-    /// Big5 Noto Serif TC, for GBK Noto Serif SC.
+    /// Big5 Noto Serif TC, for GBK Noto Serif SC (in the web build, the
+    /// one its page fetched; Liberation Sans if it could not).
     pub fn bundled(code_page: TextCodePage) -> FontFace {
-        let data = match code_page {
-            TextCodePage::Windows950 => NOTO_SERIF_TC,
-            TextCodePage::Windows936 => NOTO_SERIF_SC,
-            TextCodePage::Windows1252 | TextCodePage::Dos850 => FONT_DATA,
-        };
+        let data = bundled_cjk(code_page).unwrap_or_else(|| {
+            if code_page.is_double_byte() {
+                log::warn!("no CJK subtitle font: the subtitles draw no CJK character");
+            }
+            FONT_DATA
+        });
         FontFace {
             data: FaceData::Bundled(data),
             index: 0,
@@ -1577,6 +1639,24 @@ mod tests {
             FontFace::bundled(TextCodePage::Windows950),
             FontFace::bundled(TextCodePage::Windows936)
         );
+    }
+
+    /// The file the web page fetches for a Chinese release is the font the
+    /// desktop build has built in.
+    #[test]
+    fn cjk_font_file_is_the_bundled_font() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/");
+        for (cp, data) in [
+            (TextCodePage::Windows950, NOTO_SERIF_TC),
+            (TextCodePage::Windows936, NOTO_SERIF_SC),
+        ] {
+            let name = cjk_font_file(cp).unwrap();
+            assert_eq!(std::fs::read(format!("{dir}{name}")).unwrap(), data);
+            assert_eq!(bundled_cjk(cp), Some(data));
+        }
+        for cp in [TextCodePage::Windows1252, TextCodePage::Dos850] {
+            assert_eq!((cjk_font_file(cp), bundled_cjk(cp)), (None, None));
+        }
     }
 
     /// A font collection (`.ttc`) of `fonts`: each font's table offsets
