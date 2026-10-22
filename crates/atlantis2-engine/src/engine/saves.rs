@@ -16,10 +16,12 @@ use atlantis2_data::save::{
 use super::Engine;
 use crate::script::{BagEntry, Shown, Subject};
 
-/// The entries Native keeps only as bytes: the dowsing rod (13..16), the
-/// puzzles (20..32) and the dialog flag (33).
-const KEPT: [usize; 18] = [
-    13, 14, 15, 16, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+/// The entries Native keeps only as bytes: the dowsing rod (13..16) and
+/// the puzzles (20..32). The dialog flag (33) is written from the running
+/// dialog and not read back: a save made from the menus has no dialog
+/// running, Escape ends it before the main menu opens (@ 0x004762f0).
+const KEPT: [usize; 17] = [
+    13, 14, 15, 16, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 ];
 
 /// Why a save could not be loaded.

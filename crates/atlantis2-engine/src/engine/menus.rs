@@ -70,11 +70,10 @@ impl Engine {
         }
     }
 
-    /// A key went down (the credits end on any key).
-    pub fn key_down(&mut self) {
-        if let Some(m) = self.menu.as_mut() {
-            m.input.key = true;
-        }
+    /// Escape went down or up: a key state, not an event (the credits
+    /// end while it is held, @ 0x00472378).
+    pub fn escape_key(&mut self, down: bool) {
+        self.escape_down = down;
     }
 
     /// The pointer at (x, y) of the 640 x 480 screen (FUN_0040c420
@@ -100,6 +99,9 @@ impl Engine {
 
     /// The menu loop's frame (@ 0x00486eb0).
     pub(super) fn menu_pass(&mut self, out: Option<&mut [u16]>) {
+        if let Some(m) = self.menu.as_mut() {
+            m.input.escape = self.escape_down;
+        }
         let (w, h) = (self.renderer.width(), self.renderer.height());
         if w != WIDTH || h != HEIGHT {
             // The pages are laid out for 640 x 480 (what 800 x 600 does

@@ -182,8 +182,9 @@ pub struct Input {
     /// (@ 0x006569ca).
     pub click: bool,
     pub held: bool,
-    /// A key went down (the credits' test).
-    pub key: bool,
+    /// Escape held (the credits' test, @ 0x00472378: the key state
+    /// @ 0x006e2b6c of the key table's code 1 @ 0x006e3174).
+    pub escape: bool,
 }
 
 /// A widget's hit box: `left < x < right` and `top < y < bottom`.
@@ -219,8 +220,8 @@ pub enum WidgetKind {
     Button,
     /// Frame 1 while the mouse is in the box (vtable @ 0x005c64ac).
     Hover,
-    /// The frames played while hovered, pressed or always (vtable
-    /// @ 0x005c6424).
+    /// The frames played while hovered with the button up, while pressed,
+    /// or always (vtable @ 0x005c6424).
     Animated {
         count: i32,
         frame: i32,
@@ -1190,7 +1191,6 @@ impl Menu {
         }
         let act = self.action(host);
         self.input.click = false;
-        self.input.key = false;
         self.run(host, act);
     }
 
@@ -1214,7 +1214,7 @@ impl Menu {
             return 0;
         };
         if let Some(c) = &p.credits {
-            if input.key || input.click {
+            if input.escape || input.click {
                 return action::CREDITS_KEY;
             }
             return if c.done { action::CREDITS_END } else { 0 };
@@ -1580,12 +1580,24 @@ impl Page {
                 always,
             } = &mut w.kind
             {
-                // FUN_0046db00: hovered, pressed (until the button is
-                // released) or always: one frame on per tick flag.
-                if *pressed && !input.held {
+                // FUN_0046db00 (the draw, before the action of the frame):
+                // a click in the box of a visible, enabled button presses
+                // it, the button released lets it go
+                // (@ 0x0046db03..0x0046db30).
+                let hit = w.hit.holds(input.x, input.y);
+                if w.visible && w.enabled && input.click && hit {
+                    *pressed = true;
+                }
+                if !input.held {
                     *pressed = false;
                 }
-                if inside || *pressed || *always {
+                if !w.visible {
+                    continue;
+                }
+                // One frame on per tick flag when enabled with the mouse
+                // in the box and the button up, or enabled and pressed, or
+                // always; otherwise frame 0 (@ 0x0046db34..0x0046db81).
+                if (w.enabled && ((hit && !input.held) || *pressed)) || *always {
                     if flag {
                         *frame += 1;
                         if *frame >= *count {
@@ -1835,9 +1847,10 @@ impl Widget {
                     0
                 }
             }
-            WidgetKind::Animated { pressed, .. } => {
+            WidgetKind::Animated { .. } => {
+                // FUN_0046d670 (the button's; the pressed flag is the
+                // draw's).
                 if live && input.click && inside {
-                    *pressed = true;
                     self.action
                 } else {
                     0

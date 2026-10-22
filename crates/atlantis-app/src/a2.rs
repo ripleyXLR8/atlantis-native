@@ -127,13 +127,67 @@ impl A2Start {
     }
 }
 
-/// The time of a save: the system's clock in UTC (the original stamps
-/// local time).
-fn utc_now() -> SystemTime {
+/// The time of a save: the local time, as the original stamps it
+/// (`GetLocalTime`).
+#[cfg(windows)]
+fn local_now() -> SystemTime {
+    use windows_sys::Win32::System::SystemInformation::GetLocalTime;
+    // SAFETY: GetLocalTime only fills the structure it is given.
+    let t = unsafe {
+        let mut t = std::mem::zeroed();
+        GetLocalTime(&mut t);
+        t
+    };
+    SystemTime {
+        year: t.wYear,
+        month: t.wMonth,
+        day_of_week: t.wDayOfWeek,
+        day: t.wDay,
+        hour: t.wHour,
+        minute: t.wMinute,
+        second: t.wSecond,
+        milliseconds: t.wMilliseconds,
+    }
+}
+
+/// The time of a save: the local time, as the original stamps it
+/// (`GetLocalTime`): the browser's time zone.
+#[cfg(target_arch = "wasm32")]
+fn local_now() -> SystemTime {
+    let d = js_sys::Date::new_0();
+    SystemTime {
+        year: d.get_full_year() as u16,
+        month: d.get_month() as u16 + 1,
+        day_of_week: d.get_day() as u16,
+        day: d.get_date() as u16,
+        hour: d.get_hours() as u16,
+        minute: d.get_minutes() as u16,
+        second: d.get_seconds() as u16,
+        milliseconds: d.get_milliseconds() as u16,
+    }
+}
+
+/// The time of a save: the local time, as the original stamps it
+/// (`GetLocalTime`): the clock shifted by the time zone's offset.
+#[cfg(not(any(windows, target_arch = "wasm32")))]
+fn local_now() -> SystemTime {
     let d = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
-    SystemTime::from_unix(d.as_secs() as i64, d.subsec_millis() as u16)
+    let secs = d.as_secs() as i64;
+    let offset = {
+        let t = secs as libc::time_t;
+        // SAFETY: localtime_r only reads `t` and fills `tm`.
+        let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+        if unsafe { libc::localtime_r(&t, &mut tm) }.is_null() {
+            0
+        } else {
+            // `c_long`: 32 bits on 32-bit targets.
+            #[allow(clippy::useless_conversion)]
+            i64::from(tm.tm_gmtoff)
+        }
+    };
+    SystemTime::from_unix(secs + offset, d.subsec_millis() as u16)
 }
 
 /// The folder of the saves and `atlant2.cfg`.
@@ -170,7 +224,7 @@ fn boot(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
     let mut engine = Engine::boot(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
         .map_err(|e| format!("{}: {e}", dir.display()))?;
     engine.set_data_dir(Some(data_dir()));
-    engine.wall_clock = utc_now;
+    engine.wall_clock = local_now;
     // The original seeds `rand` with GetTickCount() (@ 0x0047d740).
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -494,14 +548,14 @@ impl ApplicationHandler for A2App {
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
-                if down && !event.repeat {
-                    self.engine.key_down();
-                }
                 match event.logical_key {
                     // Escape (@ 0x004762f0): the main menu from the game,
                     // the end of a dialog, the main menu closed.
-                    Key::Named(NamedKey::Escape) if down && !event.repeat => {
-                        self.engine.escape();
+                    Key::Named(NamedKey::Escape) => {
+                        self.engine.escape_key(down);
+                        if down && !event.repeat {
+                            self.engine.escape();
+                        }
                     }
                     Key::Named(NamedKey::ArrowLeft) => self.keys[0] = down,
                     Key::Named(NamedKey::ArrowRight) => self.keys[1] = down,

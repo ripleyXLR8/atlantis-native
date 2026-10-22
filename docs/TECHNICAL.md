@@ -582,7 +582,10 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 
 A folder holding `atlantis2.exe` opens Atlantis II (`crates/atlantis-app/src/a2.rs`):
 the player menu comes first, as in the original (five symbols: a symbol
-continues that player's newest save, or starts a new game). A new game
+continues that player's newest save, or starts a new game). The original
+then starts its intro videos (`intro%02d.hnm` with their `.apc`,
+@ 0x0049d9c0), which the port does not play yet: how they chain and how
+they share the screen with the player menu are not read. A new game
 runs the chapter scripts as the original's start-up and menu do:
 chapter 0's `/INIT` sets the world, the
 place and Tibet's first view (`tibet.wam` view 2 at yaw −90°, pitch 0),
@@ -596,7 +599,7 @@ first click sends the game to chapter 75, the first arrival in view 7
 plays the shaman's greeting (dialog 360) and the section goes on after
 it. A left click ends a film and goes to a dialog's next line; Escape ends
 a dialog, and in the panorama opens the main menu (options, volumes,
-load and save, quit; below). Not yet: the bag bar, the subject menu (so
+load and save, quit; below). Not yet: the start-up intro videos, the bag bar, the subject menu (so
 the shaman's other dialogs, which the scripts call on a subject, cannot be
 asked for), the puzzles. `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
@@ -904,8 +907,9 @@ after a short game with three saves.
   line when short). The widget classes are the original's: sprites,
   buttons (the box frame 0's size centred on the position, strict
   inequalities), hover buttons (frame 1 under the mouse), animated
-  buttons (20 frames, one per 15 Hz tick while hovered, pressed or
-  always), two-state and blinking toggles, the volume sliders (gauge and
+  buttons (20 frames, one per 15 Hz tick while the mouse is in the box
+  with the button up, while pressed by a click in the box until the
+  button is released, or always), two-state and blinking toggles, the volume sliders (gauge and
   knob, x0 = x − 65, 115 pixels, the action every frame while held) and
   the load page's list (60-pixel rows, the thumbnail of `save.spr` and the
   date and time in `AtlFT_POPUP`, newest first) with its scroll bar (at
@@ -922,17 +926,15 @@ after a short game with three saves.
   Escape closes the main menu opened from the game (not the player menu).
   The cursor is `curseur.spr` at the mouse; the window then lets the
   pointer go and draws the game's own. Quitting shows the credits (16
-  pictures, 5 s each, a 2 s fade into the next, ended by a key or a
-  click), as does the scripts' `CREDITS`. Built but not opened by the
+  pictures, 5 s each, a 2 s fade into the next, ended by a click or
+  while Escape is held: a key state, not a key press), as does the scripts' `CREDITS`. Built but not opened by the
   game: the disc request (every disc is read where it is), "please wait",
   "disk full" and "write error" (the original opens them only while
   `LOADMUSIK` copies music, which the port does not do). Not known, and
   chosen here: whether the page title (line 0 of each section) is drawn
   (it is not), the credits' texts (`loc\Credits.txt`'s placement is not
-  read: only the pictures show) and their fade (a linear blend), whether
-  the animated buttons all step on the same tick flag (they do here) and
-  need to be enabled to animate under the mouse (they do), what the 800 x
-  600 mode does with the 640 x 480 pages (centred). The list's date and
+  read: only the pictures show) and their fade (a linear blend), what
+  the 800 x 600 mode does with the 640 x 480 pages (centred). The list's date and
   time are written in the French system's formats (`22/10/2026
   14:12:00`); the original asks Windows for the user's.
 - **Saves** (`crates/atlantis2-data/src/save.rs`, the engine's side in
@@ -953,11 +955,14 @@ after a short game with three saves.
   the world set (the hand emptied), the place loaded and the saved view
   entered at the saved angles with no arrival scan and no per-view reset,
   the saved music, chapters 39, 46 and 83 run their `/INIT` again. The
-  puzzles, the dowsing rod and the dialog flag are kept as the bytes of
-  the last load until their studies are ported. Chosen here: a section
+  puzzles and the dowsing rod are kept as the bytes of the last load
+  until their studies are ported; the dialog flag is written from the
+  running dialog and not read back (a save made from the menus has no
+  dialog running: Escape ends it before the main menu opens). Chosen here: a section
   waiting to go on and a queued command are dropped at a load (the
-  original's flags are not saved: what it does with them is not known); a
-  save is stamped in UTC (the original: local time); the subject table's
+  original's flags are not saved: what it does with them is not known);
+  a save is stamped with the local time, as the original's; the subject
+  table's
   entries past a character's count are written as 0 (the original keeps
   what its removals left there). `atlant2.cfg` (11 options, 35 bytes) is
   read at start and written at exit. The encoder, the decoder, a slot's

@@ -308,6 +308,10 @@ pub struct Engine {
     click: bool,
     double: bool,
     last_click: Option<f64>,
+    /// Escape held: the key state (@ 0x006e2b6c, written by the input
+    /// poll @ 0x0058ea8e) of the key that the key table (@ 0x006e3174)
+    /// names for code 1, which the credits read (@ 0x00472378).
+    escape_down: bool,
     /// The 15 Hz counter (@ 0x006569d8) and the flags it sets for the
     /// SPW step (@ 0x00656a4c) and the cursor (@ 0x00656a54).
     pub ticks: u32,
@@ -632,6 +636,7 @@ impl Engine {
             click: false,
             double: false,
             last_click: None,
+            escape_down: false,
             ticks: 0,
             spw_flag: false,
             cursor_flag: false,

@@ -11,11 +11,11 @@
 
 use std::path::PathBuf;
 
-use atlantis2_data::menu_txt::SECTIONS;
+use atlantis2_data::menu_txt::{MenuTxt, Section, SECTIONS};
 use atlantis2_data::save::{
     entry, read_save, scan_save, SaveData, SaveFormat, SystemTime, ENTRIES, SAVE_SIZE,
 };
-use atlantis2_data::A2Files;
+use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::anim::MsvcRand;
 use atlantis2_engine::menu::{action, state, Menu, PageKind, Rect, WidgetKind};
 use atlantis2_engine::{Engine, Fpu, LoopType, Variant};
@@ -31,6 +31,22 @@ fn game() -> Option<A2Files> {
     let (files, _) =
         A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("game folder");
     Some(files)
+}
+
+/// `loc\Menu.txt` read on its own: the widgets' texts are checked
+/// against its lines (the line each widget takes, not the words).
+fn texts() -> MenuTxt {
+    let d = game().unwrap().read(Folder::Loc, "Menu.txt").unwrap();
+    let t = MenuTxt::parse(&d);
+    assert!(t.padded.is_empty());
+    t
+}
+
+/// Line `i` of section `s`, never empty.
+fn line(t: &MenuTxt, s: Section, i: usize) -> &[u8] {
+    let l = t.line(s, i);
+    assert!(!l.is_empty(), "{s:?} {i}");
+    l
 }
 
 /// An empty scratch folder for the saves.
@@ -172,7 +188,11 @@ fn the_texts_and_the_pages() {
         );
         assert_eq!(w.hit.left + w.hit.right, 2 * w.x, "{}", w.name);
     }
-    assert_eq!(p.widget("b_gala.spr").unwrap().text, b"Joueur 1");
+    let tx = texts();
+    assert_eq!(
+        p.widget("b_gala.spr").unwrap().text,
+        line(&tx, Section::Player, 2)
+    );
 
     for (kind, want) in [
         (
@@ -259,7 +279,7 @@ fn the_texts_and_the_pages() {
     );
     assert_eq!(
         p.widget("a_harpe.spr").unwrap().text,
-        "Volume de la musique".as_bytes()
+        line(&texts(), Section::Sound, 3)
     );
 }
 
@@ -304,7 +324,8 @@ fn the_main_menu_its_slides_and_the_options() {
     assert!(!r.e.subtitles && !r.e.centre_marker && r.e.look.invert_y);
     let w = r.menu().page.as_ref().unwrap().widget("s_sub.spr").unwrap();
     assert!(matches!(w.kind, WidgetKind::Toggle { state: false, .. }));
-    assert_eq!(w.text, b"Sans sous-titres");
+    let tx = texts();
+    assert_eq!(w.text, line(&tx, Section::Options, 2));
     // The resolution: 800 x 600 chosen, the button now offers 640 x 480.
     r.press_widget("b_rezo.spr");
     assert_eq!((r.e.cfg().width, r.e.cfg().height), (800, 600));
@@ -315,7 +336,7 @@ fn the_main_menu_its_slides_and_the_options() {
         .unwrap()
         .widget("b_rezo.spr")
         .unwrap();
-    assert!(w.text.ends_with(b"640 480"));
+    assert_eq!(w.text, line(&tx, Section::Options, 8));
     // Back to the main page; Escape closes the menu opened from the game.
     r.press_widget("b_back.spr");
     assert_eq!(r.page(), Some(PageKind::Main));
@@ -418,8 +439,15 @@ fn saving_and_loading_through_the_menus() {
     assert_eq!(r.menu().state, state::ASK_SAVE);
     let p = r.menu().page.as_ref().unwrap();
     assert!(p.widget("c_yn.spr").unwrap().visible);
-    assert_eq!(p.widget("b_oui.spr").unwrap().text, b"Oui");
-    assert_eq!(p.widget("b_non.spr").unwrap().text, b"Abandonner");
+    let tx = texts();
+    assert_eq!(
+        p.widget("b_oui.spr").unwrap().text,
+        line(&tx, Section::Main, 7)
+    );
+    assert_eq!(
+        p.widget("b_non.spr").unwrap().text,
+        line(&tx, Section::Main, 8)
+    );
     r.press_widget("b_oui.spr");
     assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
     let file = std::fs::read(dir.join("save").join("ATL00_00.SAV")).unwrap();
@@ -557,7 +585,10 @@ fn quitting_shows_the_credits() {
     r.press_widget("a_exit.spr");
     assert_eq!(r.menu().state, state::ASK_QUIT);
     let p = r.menu().page.as_ref().unwrap();
-    assert_eq!(p.widget("b_oui.spr").unwrap().text, b"Quitter");
+    assert_eq!(
+        p.widget("b_oui.spr").unwrap().text,
+        line(&texts(), Section::Main, 9)
+    );
     // No: back to the page, every widget enabled.
     r.press_widget("b_non.spr");
     assert_eq!(r.menu().state, state::IDLE);
@@ -581,8 +612,67 @@ fn quitting_shows_the_credits() {
     // The pages show 5 s each and fade 2 s into the next.
     r.wait(60 * 8);
     assert!(!r.e.quit());
-    // A key ends the program.
-    r.e.key_down();
+    // Escape held ends the program (a key state, not an event: a key
+    // pressed and released before has no effect, nor another key).
+    r.e.escape_key(true);
+    r.step();
+    assert!(r.e.quit());
+}
+
+#[test]
+fn the_animated_buttons() {
+    let Some(files) = game() else { return };
+    let mut r = Run::new(files, None);
+    r.new_game();
+    r.e.escape();
+    fn frame(r: &Run) -> i32 {
+        let p = r.menu().page.as_ref().unwrap();
+        match p.widget("a_toolbx.spr").unwrap().kind {
+            WidgetKind::Animated { frame, .. } => frame,
+            _ => panic!("not an animated button"),
+        }
+    }
+    // The mouse in the box, the button up: a frame per tick flag.
+    let (x, y) = r.at("a_toolbx.spr");
+    r.e.pointer(x, y);
+    r.wait(30);
+    assert!(frame(&r) > 0);
+    // The button pressed outside the box and held, then the mouse in the
+    // box: the button is not pressed, frame 0 (FUN_0046db00).
+    r.e.pointer(5, 470);
+    r.e.click(r.pass as f64 / 60.0);
+    r.step();
+    assert_eq!(frame(&r), 0);
+    r.e.pointer(x, y);
+    r.wait(30);
+    assert_eq!(frame(&r), 0);
+    // Released: it animates again.
+    r.e.release();
+    r.wait(30);
+    assert!(frame(&r) > 0);
+    assert_eq!((r.page(), r.menu().state), (Some(PageKind::Main), 0));
+}
+
+#[test]
+fn script_credits_wait_for_escape_held() {
+    let Some(files) = game() else { return };
+    let mut r = Run::new(files, None);
+    r.new_game();
+    // Escape pressed and released in the game (the main menu opened and
+    // closed), then the credits started as by the script key `credits`.
+    for _ in 0..2 {
+        r.e.escape_key(true);
+        r.e.escape();
+        r.step();
+        r.e.escape_key(false);
+        r.step();
+    }
+    assert_eq!(r.e.loop_type, LoopType::Warp);
+    r.e.open_credits();
+    r.wait(60);
+    assert_eq!(r.page(), Some(PageKind::Credits));
+    assert!(!r.e.quit());
+    r.e.escape_key(true);
     r.step();
     assert!(r.e.quit());
 }
