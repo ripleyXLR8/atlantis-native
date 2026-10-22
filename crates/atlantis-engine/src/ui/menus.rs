@@ -1018,3 +1018,79 @@ mod tests {
         assert_eq!(got, [2, 3, 4, 80, 98, 0]);
     }
 }
+
+#[cfg(test)]
+mod record_table_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use crate::test_support::with_engine_in;
+    use crate::Enhancements;
+
+    /// The SPRMENU blits of the golden's line `step <n> SUREMENU`: the
+    /// original's walk under emulation, in the May 1997 English build.
+    fn golden_suremenu_blits(step: u32) -> String {
+        let golden = include_str!("../../tests/golden/ui_menu_record_table_en688128.txt");
+        let head = format!("step {step} SUREMENU");
+        golden
+            .lines()
+            .map(str::trim)
+            .skip_while(|l| !l.starts_with(&head))
+            .find_map(|l| l.strip_prefix("SPRMENU blits (x, y, index): "))
+            .expect("golden line missing")
+            .to_string()
+    }
+
+    /// The engine's menus walk on the session's record table as the
+    /// original does, and on their own records with the minor bug fixes:
+    /// SUREMENU walked after SONMENU in the 16-record build has its left
+    /// ornament off screen (the original's step 3) without the fixes, at
+    /// the text's place (as a first walk, step 1) with them.
+    #[test]
+    fn engine_menus_use_the_session_table_only_without_the_fixes() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine_in(
+            "ATLANTIS_DATA_1997",
+            "engine_menus_use_the_session_table_only_without_the_fixes",
+            move |mut e| async move {
+                for fixes in [false, true] {
+                    e.set_enhancements(Enhancements {
+                        minor_bug_fixes: fixes,
+                        ..Enhancements::default()
+                    });
+                    for name in ["SUREMENU.TXT", "SONMENU.TXT", "SUREMENU.TXT"] {
+                        let mut menu = e.load_menu(name).await.unwrap();
+                        menu.walk(None, 0, 0, e.menu_table());
+                        if name == "SONMENU.TXT" {
+                            continue;
+                        }
+                        let blits: Vec<String> = menu
+                            .walk
+                            .ops
+                            .iter()
+                            .filter(|o| o.sprite && !o.alt_bank)
+                            .map(|o| format!("({},{},{})", o.x, o.y, o.index))
+                            .collect();
+                        g2.borrow_mut().push((fixes, blits.join(" ")));
+                    }
+                }
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let (first, third) = (golden_suremenu_blits(1), golden_suremenu_blits(3));
+        assert_ne!(first, third);
+        assert_eq!(
+            *got.borrow(),
+            [
+                (false, first.clone()),
+                (false, third),
+                (true, first.clone()),
+                (true, first),
+            ]
+        );
+    }
+}
