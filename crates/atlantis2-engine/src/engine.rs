@@ -36,7 +36,7 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 mod host;
 mod menus;
 mod puzzles;
-pub use puzzles::{ported_place, MANDALAS};
+pub use puzzles::{mandala_hook_applies, ported_place, MANDALAS};
 mod saves;
 mod ui;
 

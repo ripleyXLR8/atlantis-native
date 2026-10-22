@@ -788,7 +788,8 @@ after a short game with three saves.
   name variants, twice, four whole orders and each mandala laid last; the
   click with chapter 75 for the six placements, an empty hand and the
   crystal (with and without the six flags), line by line up to the
-  place change. Not ported: the solution log the original prints at exit
+  place change; the dispatcher's choice of the hook for 47 warp names,
+  view numbers and zone types. Not ported: the solution log the original prints at exit
   (@ 0x00495650, a fixed list that is not the fireflies' answer) and the
   fireflies themselves (Shamballa).
 - **Worlds:** only Tibet (`tibet.wam`, world 5) is ported. A `changewam`

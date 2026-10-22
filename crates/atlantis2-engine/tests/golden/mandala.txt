@@ -6,7 +6,9 @@
 # on chapter 75 (E), variables and flags at 0 but those given. Names of defnames.con
 # entries are written {S:I} (section, index); lower:, space: and cut7: are a zone name
 # in lower case, with a trailing space, cut to 7 characters. `lines` are chapter 75's
-# line numbers.
+# line numbers. F: the hook dispatcher (@ 0x0049b910) alone, by the view's warp name
+# (+0x00), its number (+0x10) and the zone's type, the hand empty: hook = the mandala
+# hook entered, AL = the byte returned (1 consumes the click), calls = the stubs called.
 ids objects 53 57 61 52 56 60 167
 ids zones 52 53 54 49 50 51 57
 ids variables 188 182 183 184 185 186 187 132 133 134 129 130 131
@@ -47,3 +49,50 @@ E {4:50} hand={1:56}, {3:188}=3 before: OUT ran=1 lines - | hook {3:76}=0 RunOne
 E {4:49} hand=0: OUT ran=1 lines - | hook {3:76}=0 - | after {3:76}=49 | IN lines - resumes=0 | {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=0 pose: {3:132}=0,{3:133}=0,{3:134}=0,{3:129}=0,{3:130}=0,{3:131}=0 | calls=
 E {4:57} hand={1:167}, all posed: OUT ran=1 lines - | hook {3:76}=0 - | after {3:76}=57 | IN lines 180,181,182,183,184,185 resumes=1 | {3:188}=6 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=0 pose: {3:132}=1,{3:133}=1,{3:134}=1,{3:129}=1,{3:130}=1,{3:131}=1 | calls=AtlMuzik_Stop,Interp_SetMonde,AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWam_FindView,AtlWarp_EnterView,LoadCurrentChap,RunInit
 E {4:57} hand={1:167}, {3:131}=0: OUT ran=1 lines - | hook {3:76}=0 - | after {3:76}=57 | IN lines - resumes=0 | {3:188}=5 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=0 {3:187}=0 {3:28}=167 pose: {3:132}=1,{3:133}=1,{3:134}=1,{3:129}=1,{3:130}=1,{3:131}=0 | calls=
+F name=TI10 view=10 type=1: hook=0 return AL=0 calls=-
+F name=TI10 view=10 type=2: hook=0 return AL=0 calls=-
+F name=TI10 view=10 type=3: hook=1 return AL=0 calls=-
+F name=TI10 view=10 type=4: hook=1 return AL=0 calls=-
+F name=TI10 view=10 type=10: hook=0 return AL=0 calls=-
+F name=TI10 view=10 type=50: hook=1 return AL=0 calls=-
+F name=TI10 view=10 type=1000: hook=0 return AL=0 calls=-
+F name=ti10 view=10 type=3: hook=1 return AL=0 calls=-
+F name=Ti10 view=10 type=3: hook=1 return AL=0 calls=-
+F name=tI10 view=10 type=3: hook=1 return AL=0 calls=-
+F name=TX10 view=10 type=3: hook=0 return AL=0 calls=-
+F name=XI10 view=10 type=3: hook=0 return AL=0 calls=-
+F name=IT10 view=10 type=3: hook=0 return AL=0 calls=-
+F name=T view=10 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=2 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=2 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=2 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=3 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=3 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=3 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=4 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=4 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=4 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=5 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=5 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=5 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=6 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=6 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=6 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=7 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=7 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=7 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=8 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=8 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=8 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=9 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=9 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=9 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=11 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=11 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=11 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=0 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=0 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=0 type=50: hook=0 return AL=0 calls=-
+F name=TI10 view=266 type=3: hook=0 return AL=0 calls=-
+F name=TI10 view=266 type=4: hook=0 return AL=0 calls=-
+F name=TI10 view=266 type=50: hook=0 return AL=0 calls=-

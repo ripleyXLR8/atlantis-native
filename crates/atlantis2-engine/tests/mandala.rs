@@ -4,7 +4,8 @@
 //! (rows A-D, through [`Engine::mandala_hook`]), then the zone click and
 //! the click scan of the same frame on chapter 75 (rows E, through
 //! [`Engine::click`] and a pass, the film a section starts ended by
-//! [`Engine::end_video`]).
+//! [`Engine::end_video`]), and the dispatcher's choice of the hook by warp
+//! name, view and zone type (rows F).
 //!
 //! The original then enters the boat's world (or Shamballa for the
 //! crystal), which the port does not have: there the rows are compared up
@@ -21,7 +22,7 @@ use std::path::PathBuf;
 
 use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::A2Files;
-use atlantis2_engine::engine::{SaveError, MANDALAS};
+use atlantis2_engine::engine::{mandala_hook_applies, SaveError, MANDALAS};
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
 const GOLDEN: &str = include_str!("golden/mandala.txt");
@@ -487,6 +488,8 @@ fn mandalas_against_the_original() {
                 e = chapter_75(game().unwrap());
                 e_row(&mut e, &n, want, &mut t);
             }
+            // The dispatcher's rows: `the_hook_only_in_view_10`.
+            "F" => {}
             other => panic!("unknown row {other}"),
         }
         checked += 1;
@@ -494,10 +497,45 @@ fn mandalas_against_the_original() {
     assert_eq!(checked, rows.len() - 3);
 }
 
-/// The dispatcher (@ 0x0049b910) sends only zone types 3, 4 and 50 of a
-/// `TI` view 10 to the hook.
+/// The dispatcher (@ 0x0049b910) sends a zone click to the hook only in a
+/// view whose warp name starts with `TI` (any case), numbered 10, and only
+/// for zone types 3, 4 and 50: the golden's F rows, every name, number and
+/// type there, against the port's test of the three. Then in the game: a
+/// laid boat reaches the hook, a click on view 10's move zone does not
+/// (the move starts), and no other Tibet view has a zone of those types
+/// (so the view number is tested by the rows only).
 #[test]
 fn the_hook_only_in_view_10() {
+    let rows: Vec<&str> = GOLDEN.lines().filter(|l| l.starts_with("F ")).collect();
+    assert_eq!(rows.len(), 47);
+    let (mut hooked, mut not) = (0, 0);
+    for row in &rows {
+        let (head, tail) = row.split_once(": ").unwrap();
+        let (mut name, mut view, mut kind) = ("", 0u32, 0i32);
+        for kv in head[2..].split(' ') {
+            match kv.split_once('=').unwrap() {
+                ("name", v) => name = v,
+                ("view", v) => view = v.parse().unwrap(),
+                ("type", v) => kind = v.parse().unwrap(),
+                other => panic!("{other:?}"),
+            }
+        }
+        let applies = mandala_hook_applies(name.as_bytes(), view, kind);
+        // The port's dispatcher never consumes a Tibet click (AL = 0) and,
+        // the hand empty, the hook calls nothing.
+        assert_eq!(
+            tail,
+            format!("hook={} return AL=0 calls=-", u8::from(applies)),
+            "{row}"
+        );
+        if applies {
+            hooked += 1;
+        } else {
+            not += 1;
+        }
+    }
+    assert_eq!((hooked, not), (6, 41));
+
     let Some(files) = game() else { return };
     let mut e = chapter_75(files);
     let boat = names(&e)
@@ -514,32 +552,33 @@ fn the_hook_only_in_view_10() {
         .iter()
         .any(|x| matches!(x, Event::PuzzleHook { cliczone: 0, .. })));
     assert_eq!(var(&e, "OrdreMandala1"), 1);
-    // The same zone kinds elsewhere: no hook.
     e.end_video();
     e.pass(None);
-    for view in [2, 5, 7, 9] {
-        e.enter_at(view, 0.0, 0.0).unwrap();
-        let zones = e.wam().view(view).unwrap().zones.clone();
-        for (zi, z) in zones.iter().enumerate() {
-            if !matches!(z.kind, 3 | 4 | 50) {
-                continue;
-            }
-            let (yaw, pitch) = e.zone_aim(view, zi).unwrap();
-            e.camera.enter(yaw, pitch);
-            e.pass(None);
-            if e.centre_zone().map(|(i, _)| i) != Some(zi) {
-                continue;
-            }
-            e.events.clear();
-            e.click(10.0 + f64::from(view) + zi as f64);
-            e.pass(None);
-            assert!(!e
-                .events
-                .iter()
-                .any(|x| matches!(x, Event::PuzzleHook { .. })));
-            e.end_video();
-            e.pass(None);
-        }
+    // View 10's move zone (type 1, to view 9): the departure, no hook.
+    set(&mut e, "ObjetEnMain", 0);
+    let zones = e.wam().view(10).unwrap().zones.clone();
+    let mv = zones.iter().position(|z| z.kind == 1).unwrap();
+    assert_eq!(zones[mv].value, 9);
+    let (yaw, pitch) = e.zone_aim(10, mv).unwrap();
+    e.camera.enter(yaw, pitch);
+    e.pass(None);
+    assert_eq!(e.centre_zone().map(|(i, _)| i), Some(mv));
+    e.events.clear();
+    e.click(20.0);
+    e.pass(None);
+    assert!(e.events.iter().any(|x| matches!(x, Event::DepartScan(_))));
+    assert!(!e
+        .events
+        .iter()
+        .any(|x| matches!(x, Event::PuzzleHook { .. })));
+    // The other views: move zones and view 4's type 1000 only.
+    for view in 2..10 {
+        let zones = &e.wam().view(view).unwrap().zones;
+        assert!(!zones.is_empty());
+        assert!(
+            zones.iter().all(|z| matches!(z.kind, 1 | 1000)),
+            "view {view}"
+        );
     }
 }
 

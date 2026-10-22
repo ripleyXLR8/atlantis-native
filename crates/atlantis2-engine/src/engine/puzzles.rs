@@ -59,15 +59,26 @@ pub fn ported_place(wam: &str) -> Option<i32> {
         .map(|&(_, m)| m)
 }
 
+/// Whether FUN_0049b910 sends a zone click to the mandala hook: a view
+/// whose warp name starts with `TI` (`_strnicmp` over 2 characters,
+/// @ 0x0049bcda), numbered 10 (@ 0x0049bce9), and a zone of type 3, 4
+/// or 50 (the switch @ 0x0049b99d); any other type, view or name: no hook.
+pub fn mandala_hook_applies(view_name: &[u8], view: u32, zone_kind: i32) -> bool {
+    view_name.len() >= 2
+        && view_name[..2].eq_ignore_ascii_case(TIBET_PREFIX)
+        && view == MANDALA_VIEW
+        && matches!(zone_kind, 3 | 4 | 50)
+}
+
 impl Engine {
     /// FUN_0049b910: the puzzles' own handling of a zone click, by warp
     /// prefix and view; true when it consumes the click. Tibet's mandala
     /// hook returns 0 (@ 0x0049bcf9).
     pub(super) fn puzzle_hooks(&mut self, zi: usize, zone: &Zone) -> bool {
-        let tibet = self.current_view().is_some_and(|v| {
-            v.name.len() >= 2 && v.name.as_bytes()[..2].eq_ignore_ascii_case(TIBET_PREFIX)
-        });
-        if tibet && self.view == MANDALA_VIEW && matches!(zone.kind, 3 | 4 | 50) {
+        let applies = self
+            .current_view()
+            .is_some_and(|v| mandala_hook_applies(v.name.as_bytes(), self.view, zone.kind));
+        if applies {
             let cliczone = self
                 .con
                 .as_deref()
