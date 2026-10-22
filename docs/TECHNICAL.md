@@ -9,8 +9,8 @@
 | `atlantis-data` | BigFile archives, executable tables, game detection |
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
-| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`) |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet) |
+| `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -587,12 +587,15 @@ turn it within the original's limits (pitch ±70°, yaw free), the place
 animations play, the cursor at the screen centre tells what is under it,
 and a left click on a move zone walks to the next view as the original
 does: the turn, the transition video, the arrival. Not yet: the
-cinematics, the scripts (so no dialog, no puzzle, no music), the menus,
-the bag, the sound. `--headless <folder> [frames] --screenshot <file.png>`
-runs that many frames and saves the screen; the example
-`cargo run --release -p atlantis2-engine --example tibet_tour <install>
-<discs> <out>` writes pictures of three views with their animations and
-a recorded walk from the first view to view 4.
+cinematics, the scripts (so no puzzle, no music), the menus, the bag.
+`--headless <folder> [frames] --screenshot <file.png>` runs that many
+frames and saves the screen; `--view <id>[,<yaw>,<pitch>]` starts in
+another view and `--dialog <n>` plays a dialog at once (testing aids),
+e.g. `--view 7,-164.394,14.96 --dialog 360`, Tibet's first dialog where
+the game plays it. The example `cargo run --release -p atlantis2-engine
+--example tibet_tour <install> <discs> <out>` writes pictures of three
+views with their animations and a recorded walk from the first view to
+view 4.
 
 - **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
   timestamp 0x38030926), recognised by its size and timestamp and
@@ -722,6 +725,61 @@ a recorded walk from the first view to view 4.
   dialog video stream does: the frames are premultiplied, a = 31 copies
   the video, a = 0 keeps the background, and in between the background is
   scaled by (31 − a) / 32 with the original's tables.
+- **Dialog heads** (`head.rs`, `raster3d.rs`, `lipsync.rs`): a speaker's head is a `.db` scene written by Cryo's 3ds Max
+  exporter (`crates/atlantis2-data/src/db.rs`: meshes, a node hierarchy
+  with key-frame tracks, materials, the mouth shapes as morph targets,
+  cameras) with a 512x512 16-bit RLE TGA texture and two eye-blink maps
+  (`tga.rs`). The scene is posed at the body video's frame number, its
+  mouth mixed from the mood's 7 visemes, and the head drawn by a
+  transcription of the original's C pipeline: the object → camera matrix,
+  the transform and clip codes, the back-face test, the projection, and
+  the rasteriser `Zi32Texture1516FastPerspective1516C` (a fan of
+  triangles, perspective every 32 pixels, nearest texel, a 32-bit Z
+  buffer), every float store and x87 rounding as the original's. The eyes
+  blink at random (2 % a frame, then three frames closed, half closed,
+  open), with the C runtime's own `rand`. The lip-sync analyses the voice
+  by blocks of 256 samples (energy and a histogram of zero-crossing
+  intervals) and turns it every frame into the 7 weights through the
+  speaker's 10x7 `[Matrice]` of `scenar\info<world>.txt`, smoothed by
+  `[Smooth]`, `[Offset]` seconds ahead of the voice (`dialog.rs` reads
+  the scripts). Frames, Z buffers, intermediate buffers and the weights
+  of every Tibet line are the original's, bit for bit, at either x87
+  precision for the lip-sync; `cargo run --release --example head_png`
+  draws a head to a PNG.
+- **Dialogs** (`dialog.rs`, `hnm_stream.rs`, `subtitle.rs`, `sound.rs`):
+  a world's `loc\Dial<XX>.txt` (the texts, Windows-1252),
+  `scenar\com<XX>.txt` (speaker, mood, stand, camera, kind of each line)
+  and `scenar\info<XX>.txt` (the speakers) are read with the world; a
+  dialog collects its lines, loads each speaker's head per stand, and
+  picks each line's camera as the original does (given, kept from the same
+  speaker's previous line, else drawn with `rand`). On the 15 Hz tick a
+  line plays until its voice (`apc\dial\NNN_MM.apc`, decoded whole) has
+  played, or a click; its body video (`hnm\dial\<mesh>s<stand>c<camera>.hnm`)
+  shows frames 1 to its last in a loop (the original's player decodes two
+  frames when it opens one) and the head is posed at the same frame number;
+  the panorama takes the speaker's field of view for the line's camera,
+  levels its pitch at the first line, and turns by π whenever the hero
+  takes over or leaves the word (reverse shots); a playing music fades to
+  16 % at 127 volume units a second and back to 100 % at the end (with no
+  music playing the original refuses the fade, and so does this). A left
+  click goes to the next line. Each frame
+  draws the panorama, the body video through its mask, the head with the
+  lip-sync of the voice's current time, and the subtitle. The subtitles
+  break and place their lines as the original's code does (a byte with the
+  high bit set is taken with the next one, so an accented letter before a
+  space is no break; lines 12 pixels apart, in white over a black copy
+  shifted by one pixel), with the widths of the game's own font,
+  `loc\Atl_Font.ttf`, from its `hdmx` table at 16 pixels per em and its
+  ascent from its `VDMX` table, as GDI uses them. The glyphs are the
+  font's outlines filled where at least half covered: GDI also runs the
+  font's hinting, which this does not, so a few pixels of a glyph differ
+  from the original's (the one known difference). The voices are mixed as
+  DirectSound mixes its buffers (gain 10^(attenuation / 2000)). Not there
+  yet: the music itself (the fades are ready for it), the speaker's place
+  animation hidden while it speaks (the place animations are not drawn
+  yet), and the `voixoff0` and `cinema` lines' pictures. The lines, the
+  video frames and their numbers, the composed frames, every subtitle's
+  layout and the fades are the original's (tests/dialogs.rs).
 
 ## Tests
 
@@ -754,12 +812,13 @@ trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
 installation, for the tests of those builds. For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
-copies); the expected frames, matrices and zone picks come from the
-original `atlantis2.exe` run under emulation (Tibet's moves pass by pass,
-the place animations tick by tick, the screen centre and the clicks on
-sprites pass by pass with the texel under the centre given, every SPW
-frame of Tibet and the first of every other file, every `AFF_SPR` of the
-installed banks):
+copies); the expected frames, matrices, zone picks, heads, lip-sync
+weights, dialog lines, dialog frames, subtitle layouts and music fades
+come from the original `atlantis2.exe` run under emulation (Tibet's moves
+pass by pass, the place animations tick by tick, the screen centre and
+the clicks on sprites pass by pass with the texel under the centre given,
+every SPW frame of Tibet and the first of every other file, every
+`AFF_SPR` of the installed banks):
 
 ```sh
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \

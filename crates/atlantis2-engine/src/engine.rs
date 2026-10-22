@@ -1,7 +1,7 @@
 //! The game, as far as it goes: a new game opens on its first view; the
 //! player looks around, the place animations play, and a click on a move
 //! zone walks to the next view as the original does (turn, transition
-//! video, arrival).
+//! video, arrival); a dialog can be played over the view.
 //!
 //! Time follows the original: the frame dispatcher (@ 0x0049ce20) runs as
 //! often as frames are drawn ([`Engine::pass`]), and a 15 Hz task
@@ -10,6 +10,7 @@
 
 use atlantis2_data::con::NewGame;
 use atlantis2_data::defnames::{DefNames, Section};
+use atlantis2_data::dialog::{FontTxt, World};
 use atlantis2_data::spr::{SprBank, Target};
 use atlantis2_data::spw::{FaceBox, Spw};
 use atlantis2_data::wam::{self, View, WamError, Zone};
@@ -18,10 +19,18 @@ use atlantis_codecs::{DecodeError, HnmVideo};
 
 use crate::anim::{restore, Anim, Texel};
 use crate::camera::{deg_to_rad, zone_aim, Camera, WARP_FOV};
+use crate::crt::Rand;
+use crate::dialog::{Dialog, DialogError, DialogScript, FrameContext, TickContext};
 use crate::fpu::Fpu;
 use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
+use crate::sound::{MusicVolume, Voices};
+use crate::subtitle::SubtitleFont;
 use crate::turn::Turn;
 use crate::warp::{faces_from_hnm, Renderer, Variant};
+
+/// The scheduler's tick: 15 a second (the dialogs' sequencer, the music
+/// fades, the animations, the videos).
+pub const TICK: f64 = 1.0 / 15.0;
 
 /// Why the engine cannot show a view.
 #[derive(Debug)]
@@ -117,6 +126,8 @@ pub enum LoopType {
     Warp,
     /// 1: a video (`AtlMain_loop_HNM` @ 0x0040c060).
     Video,
+    /// 2: a dialog (@ 0x004616f0).
+    Dialog,
 }
 
 /// The script variables the navigation sets (`defnames.con` names).
@@ -288,6 +299,25 @@ pub struct Engine {
     /// Record [`Event`]s into [`Engine::events`].
     pub trace: bool,
     pub events: Vec<Event>,
+    /// The world's dialog scripts (loaded with the world, @ 0x0047fe50).
+    script: Option<DialogScript>,
+    dialog: Option<Dialog>,
+    /// The loop type a dialog returns to (@ 0x006cf2b4).
+    dialog_prev_loop: LoopType,
+    /// The music's volume and fades.
+    pub music: MusicVolume,
+    voices: Voices,
+    /// The C runtime's `rand` (seeded by the dialog object's `srand`).
+    pub rand: Rand,
+    font: Option<SubtitleFont>,
+    /// The subtitles option (@ 0x005df970, on by default).
+    pub subtitles: bool,
+    /// The dialog voice volume, 0..127 (@ 0x005df974).
+    pub voice_volume: i32,
+    /// The scheduler's clock (seconds) and its next tick.
+    clock: f64,
+    next_tick: f64,
+    zbuf: Vec<u32>,
 }
 
 /// The texel of the cube under a direction: the face (cube order) and the
@@ -440,7 +470,22 @@ impl Engine {
             hand: None,
             trace: false,
             events: Vec::new(),
+            script: None,
+            dialog: None,
+            dialog_prev_loop: LoopType::Warp,
+            // No music plays until a script starts one: the fades only run
+            // then, as `FUN_004770c0` is refused while stopped.
+            music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
+            voices: Voices::new(),
+            rand: Rand::new(0),
+            font: None,
+            subtitles: true,
+            voice_volume: crate::sound::DEFAULT_VOICE_VOLUME,
+            clock: 0.0,
+            next_tick: 0.0,
+            zbuf: vec![0; (width * height) as usize],
         };
+        engine.load_world_texts(start.monde);
         engine.arrival = (
             deg_to_rad(engine.camera.fpu, start.yaw_deg),
             deg_to_rad(engine.camera.fpu, start.pitch_deg),
@@ -549,7 +594,13 @@ impl Engine {
     /// A left button press at `now` seconds (the input callback
     /// @ 0x0040c510): a click, and a double click when it follows the
     /// previous one by less than 0.2 s.
+    /// During a dialog the click goes to it: the next line (the dialog's
+    /// tick reads and clears the flag, @ 0x004801d0).
     pub fn click(&mut self, now: f64) {
+        if let Some(d) = self.dialog.as_mut() {
+            d.click();
+            return;
+        }
         self.click = true;
         self.double = self.last_click.is_some_and(|t| now - t < 0.2);
         self.last_click = Some(now);
@@ -557,12 +608,152 @@ impl Engine {
         self.event(Event::Click { double });
     }
 
-    /// The 15 Hz task (@ 0x0040caa0): the counter and the flags of the
-    /// animations and the cursor.
+    /// The 15 Hz task (@ 0x0040caa0) at the current clock: the counter and
+    /// the flags of the animations and the cursor, the music fade step, and
+    /// in the dialog loop the dialog's tick (@ 0x004801d0) and its end
+    /// (@ 0x004808a0) when it has no line left.
     pub fn tick(&mut self) {
         self.ticks = self.ticks.wrapping_add(1);
         self.spw_flag = true;
         self.cursor_flag = true;
+        let t = self.clock;
+        if let Some(att) = self.music.step(t) {
+            self.voices.set_attenuation(crate::sound::VOICE_MUSIC, att);
+        }
+        let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
+        let Some(d) = self.dialog.as_mut() else {
+            return;
+        };
+        let mut ctx = TickContext {
+            files: &self.files,
+            camera: &mut self.camera,
+            voices: &self.voices,
+            voice_volume: self.voice_volume,
+            master: self.music.master,
+            clock: t,
+            screen,
+        };
+        if !d.tick(&mut ctx) {
+            self.end_dialog();
+        }
+    }
+
+    /// The scheduler's clock, seconds.
+    pub fn clock(&self) -> f64 {
+        self.clock
+    }
+
+    /// Moves the clock to `now` (seconds), running the 15 Hz ticks due
+    /// (a stall of more than a second skips the ticks missed).
+    pub fn set_clock(&mut self, now: f64) {
+        if now - self.next_tick > 1.0 {
+            self.next_tick = now;
+        }
+        while self.next_tick <= now {
+            self.clock = self.next_tick;
+            self.tick();
+            self.next_tick += TICK;
+        }
+        self.clock = now;
+    }
+
+    /// The world's dialog texts (`MONDE`'s world change, @ 0x0047fe50) and
+    /// the subtitle font (`AtlFont_MainInit` @ 0x00404140).
+    fn load_world_texts(&mut self, monde: i32) {
+        self.script = World::of_monde(monde).and_then(|w| {
+            DialogScript::load(&self.files, w)
+                .map_err(|e| log::warn!("dialog scripts: {e}"))
+                .ok()
+        });
+        if self.font.is_none() {
+            let font_txt = self
+                .files
+                .read(Folder::Loc, "Font.txt")
+                .map(|d| FontTxt::parse(&d));
+            self.font = font_txt.and_then(|f| {
+                let file = f.font("AtlFT_Dialog")?.file.clone();
+                SubtitleFont::new(self.files.read(Folder::Loc, &file)?, &f)
+            });
+            if self.font.is_none() {
+                log::warn!("loc\\Font.txt or its font missing: no subtitles");
+            }
+        }
+    }
+
+    /// `/set(dial=N)`: `AtlDial_start` (@ 0x0047ff60), a running dialog
+    /// stopped first; the loop type 2 (the previous one kept); the views'
+    /// angles are saved; then the music fades to 16 % (`SetVariables`
+    /// @ 0x004818f0, at 0x004826ce: after the start, whether it worked or
+    /// not; a failed start first resets the dialog flag and asks for
+    /// 100 %, @ 0x00480098).
+    pub fn start_dialog(&mut self, number: u32) -> Result<(), DialogError> {
+        if self.dialog.is_some() {
+            log::warn!("SetVariables : AtlDial_start : a dialog is running");
+            self.end_dialog();
+        }
+        self.music.in_dialog = true;
+        // Without the world's dialog scripts the initialisation fails as a
+        // missing dialog does (@ 0x00480098): the same reset follows.
+        let result = match self.script.as_ref() {
+            Some(script) => Dialog::initialise(number, script, &self.files, &mut self.rand),
+            None => Err(DialogError::NoFile("the world's dialog scripts".into())),
+        };
+        let out = match result {
+            Ok(mut d) => {
+                let (y, p) = self.camera.angles();
+                d.saved_yaw = y;
+                d.saved_pitch = p;
+                self.dialog = Some(d);
+                if self.loop_type != LoopType::Dialog {
+                    self.dialog_prev_loop = self.loop_type;
+                }
+                self.loop_type = LoopType::Dialog;
+                Ok(())
+            }
+            Err(e) => {
+                self.music.in_dialog = false;
+                self.music.set_percent(100);
+                Err(e)
+            }
+        };
+        self.music.set_percent(16);
+        out
+    }
+
+    /// The end of the dialog (@ 0x004808a0): the music back to 100 %, the
+    /// previous loop type back.
+    pub fn end_dialog(&mut self) {
+        let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
+        if let Some(mut d) = self.dialog.take() {
+            d.end(&mut self.camera, &self.voices, screen);
+            self.loop_type = self.dialog_prev_loop;
+        }
+        self.music.in_dialog = false;
+        self.music.set_percent(100);
+    }
+
+    /// The running dialog.
+    pub fn dialog(&self) -> Option<&Dialog> {
+        self.dialog.as_ref()
+    }
+
+    pub fn dialog_mut(&mut self) -> Option<&mut Dialog> {
+        self.dialog.as_mut()
+    }
+
+    /// The world's dialog scripts.
+    pub fn script(&self) -> Option<&DialogScript> {
+        self.script.as_ref()
+    }
+
+    /// The subtitle font.
+    pub fn subtitle_font(&self) -> Option<&SubtitleFont> {
+        self.font.as_ref()
+    }
+
+    /// The sound voices, for the sound output to mix.
+    pub fn voices(&self) -> &Voices {
+        &self.voices
     }
 
     /// One pass of the frame dispatcher (@ 0x0049ce20), drawing into `out`
@@ -573,6 +764,20 @@ impl Engine {
         match self.loop_type {
             LoopType::Warp => self.warp_pass(out),
             LoopType::Video => self.video_pass(out),
+            LoopType::Dialog => {
+                self.frame();
+                if let Some(out) = out {
+                    self.render(out);
+                }
+            }
+        }
+    }
+
+    /// The dialog loop's turn (@ 0x00480840): only a `voixoff` line turns;
+    /// outside a dialog, the mouse look.
+    pub fn frame(&mut self) {
+        if self.dialog.as_ref().is_none_or(|d| d.kind() == 1) {
+            self.look.frame(&mut self.camera);
         }
     }
 
@@ -1092,20 +1297,39 @@ impl Engine {
 
     /// Draws the current screen into `out` without running a pass: the
     /// cube with the place animations as FUN_0045a930 draws it (no cursor,
-    /// no centre marker), or the video's frame.
+    /// no centre marker), or the video's frame. In a dialog
+    /// (@ 0x00480840): nothing before its first line; the panorama for a
+    /// head or `voixoff` line, then the dialog frame over it; for
+    /// `voixoff0` and `cinema` lines the subtitles over what `out` holds.
     pub fn render(&mut self, out: &mut [u16]) {
         let (w, h) = (self.renderer.width(), self.renderer.height());
-        if let Some(v) = &self.video {
+        let kind = self.dialog.as_ref().map(Dialog::kind);
+        if kind == Some(-1) {
+            return;
+        }
+        if let (Some(v), None) = (&self.video, kind) {
             blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
             return;
         }
-        let centre = texel_of(self.camera.ray(self.camera.cx, self.camera.cy));
-        let (dirty, _) = self.anim.draw(&mut self.work, centre, false);
-        let (m, p) = (self.camera.matrix(), self.camera.projection());
-        self.renderer.fpu = self.camera.fpu;
-        self.renderer.render(&self.work, &m, p, out);
-        self.camera.fpu = self.renderer.fpu;
-        restore(&mut self.work, &self.faces, &dirty);
+        if matches!(kind, None | Some(0) | Some(1)) {
+            let centre = texel_of(self.camera.ray(self.camera.cx, self.camera.cy));
+            let (dirty, _) = self.anim.draw(&mut self.work, centre, false);
+            let (m, p) = (self.camera.matrix(), self.camera.projection());
+            self.renderer.fpu = self.camera.fpu;
+            self.renderer.render(&self.work, &m, p, out);
+            self.camera.fpu = self.renderer.fpu;
+            restore(&mut self.work, &self.faces, &dirty);
+        }
+        if let Some(d) = self.dialog.as_mut() {
+            let mut frame = FrameContext {
+                clock: self.clock,
+                rand: &mut self.rand,
+                font: self.font.as_ref(),
+                subtitles: self.subtitles,
+                screen: (w, h),
+            };
+            d.draw(out, &mut self.zbuf, &mut frame);
+        }
     }
 
     /// The sprite under the centre a click hit (its slot, @ 0x00661640)

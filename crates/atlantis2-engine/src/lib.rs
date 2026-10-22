@@ -5,16 +5,28 @@
 //! the original code. For now it plays Tibet's panoramas: the cube drawn as
 //! the original draws it with its place animations, turned with the mouse
 //! within the original's limits, the cursor at the centre, and the moves
-//! between views (turn, transition video, arrival).
+//! between views (turn, transition video, arrival). A dialog ([`dialog`])
+//! plays over the view as the original's: its lines and voices ([`sound`]),
+//! the speaker's body video ([`hnm_stream`]) with the 3D head ([`head`],
+//! [`raster3d`]) and its lip-sync ([`lipsync`]), the subtitles
+//! ([`subtitle`]), the reverse shots and the music ducked.
 
 #![forbid(unsafe_code)]
 
 pub mod anim;
 pub mod camera;
+pub mod crt;
+pub mod dialog;
 pub mod engine;
 pub mod fpu;
+pub mod head;
+pub mod hnm_stream;
+pub mod lipsync;
 pub mod look;
 pub mod png;
+pub mod raster3d;
+pub mod sound;
+pub mod subtitle;
 pub mod turn;
 pub mod warp;
 

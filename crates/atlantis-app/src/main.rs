@@ -32,7 +32,8 @@
 //! and walk from view to view with a left click. Its discs (CD images or copies) are looked for in the folder,
 //! in the folders directly inside it and in each `--discs <folder>`;
 //! `--headless <folder> [frames] [--screenshot <file.png>]` prints where it
-//! is and saves the screen. Only the command line opens Atlantis II for now:
+//! is and saves the screen; `--view <id>[,<yaw>,<pitch>]` starts in another
+//! view, `--dialog <n>` plays a dialog at once (testing aids). Only the command line opens Atlantis II for now:
 //! the launcher, the game library and the web build know the first game
 //! alone. The first game's options are refused in this mode, and `--discs`
 //! and `--screenshot` with the first game.
@@ -141,6 +142,29 @@ fn main() {
     };
     let puzzle = value("--puzzle");
     let object = value("--object");
+    let dialog = value("--dialog");
+    // Atlantis II: `--view <id>[,<yaw>,<pitch>]`.
+    let view = match args.iter().position(|a| a == "--view") {
+        Some(i) if i + 1 < args.len() => {
+            args.remove(i);
+            let v = args.remove(i);
+            Some(
+                atlantis_app::a2::A2Start::parse_view(&v).unwrap_or_else(|| {
+                    eprintln!("--view {v}: not <id>[,<yaw>,<pitch>]");
+                    std::process::exit(2);
+                }),
+            )
+        }
+        Some(_) => {
+            eprintln!("--view needs a view");
+            std::process::exit(2);
+        }
+        None => None,
+    };
+    let a2_start = atlantis_app::a2::A2Start {
+        view,
+        dialog: dialog.map(|d| d.max(0) as u32),
+    };
     // The options of one game only, refused for the other rather than
     // ignored.
     let first_game_flags: Vec<&str> = [
@@ -159,6 +183,8 @@ fn main() {
     let a2_flags: Vec<&str> = [
         ("--discs", !discs.is_empty()),
         ("--screenshot", screenshot.is_some()),
+        ("--dialog", dialog.is_some()),
+        ("--view", view.is_some()),
     ]
     .into_iter()
     .filter_map(|(name, on)| on.then_some(name))
@@ -188,9 +214,13 @@ fn main() {
     {
         refuse(&first_game_flags, "Atlantis II's mode");
         let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
-        if let Err(e) =
-            atlantis_app::a2::headless(Path::new(&args[1]), &discs, frames, screenshot.as_deref())
-        {
+        if let Err(e) = atlantis_app::a2::headless(
+            Path::new(&args[1]),
+            &discs,
+            frames,
+            screenshot.as_deref(),
+            &a2_start,
+        ) {
             eprintln!("{e}");
             std::process::exit(1);
         }
@@ -264,7 +294,7 @@ fn main() {
     if is_a2 {
         refuse(&first_game_flags, "Atlantis II's mode");
         let run = atlantis_app::a2::open(Path::new(&args[0]), &discs)
-            .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen));
+            .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen, &a2_start));
         if let Err(e) = run {
             error_box(&e);
             std::process::exit(1);

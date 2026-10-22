@@ -3,12 +3,17 @@
 //! keys and walks from view to view with a left click on a move zone (the
 //! turn, the transition video, the arrival), the place animations playing.
 //! A minimal mode of its own, beside the first game's front end: a window,
-//! the screen scaled to it, no sound, menus or scripts yet.
+//! the screen scaled to it, the dialog voices; no menus yet.
 //!
 //! The game folder is the installed one (`atlantis2.exe`, `wam\`,
 //! `scenar\`...); the discs (CD images or copies of the CDs) are looked for
 //! in it, in the folders directly inside it, and in the folders given with
 //! `--discs`.
+//!
+//! Testing aids: `--view <id>[,<yaw>,<pitch>]` starts in another view of
+//! the place (angles in degrees), `--dialog <n>` plays dialog `n` at once
+//! over the view (a click goes to the next line, as in the original), with
+//! its voices.
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -40,8 +45,38 @@ const KEY_TURN: i32 = 8;
 /// one frame per 1/60 s.
 const FRAME: Duration = Duration::from_micros(16_667);
 
-/// The period of the original's 15 Hz task (@ 0x0040caa0).
-const TICK: Duration = Duration::from_micros(66_667);
+/// Where a run starts besides the new game's first view (testing aids).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct A2Start {
+    /// A view of the place and its angles in degrees.
+    pub view: Option<(u32, f32, f32)>,
+    /// A dialog played at once.
+    pub dialog: Option<u32>,
+}
+
+impl A2Start {
+    /// Parses `--view`'s value: `<id>[,<yaw>,<pitch>]`.
+    pub fn parse_view(v: &str) -> Option<(u32, f32, f32)> {
+        let mut it = v.split(',').map(str::trim);
+        let id = it.next()?.parse().ok()?;
+        let yaw = it.next().map_or(Some(0.0), |s| s.parse().ok())?;
+        let pitch = it.next().map_or(Some(0.0), |s| s.parse().ok())?;
+        Some((id, yaw, pitch))
+    }
+
+    /// Enters the view and starts the dialog.
+    pub fn apply(&self, engine: &mut Engine) -> Result<(), String> {
+        if let Some((id, yaw, pitch)) = self.view {
+            engine
+                .enter_view(id, yaw.to_radians(), pitch.to_radians())
+                .map_err(|e| e.to_string())?;
+        }
+        if let Some(n) = self.dialog {
+            engine.start_dialog(n).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
 
 /// Opens the game folder and starts a new game, the cube drawn by
 /// `warpPII` (the reference renderer) for a process whose x87 control word
@@ -70,22 +105,25 @@ pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
     Ok(engine)
 }
 
-/// `--headless`: runs `frames` frames without input (a 15 Hz tick every
-/// fourth frame), prints where the game is, and writes the screen to
-/// `screenshot` (PNG) when given.
+/// `--headless`: runs `frames` frames of 1/60 s without input (the 15 Hz
+/// tick every fourth frame), prints where the game is, and writes the
+/// screen to `screenshot` (PNG) when given.
 pub fn headless(
     dir: &Path,
     discs: &[PathBuf],
     frames: u64,
     screenshot: Option<&Path>,
+    start: &A2Start,
 ) -> Result<(), String> {
     let mut engine = open(dir, discs)?;
+    start.apply(&mut engine)?;
     let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
+    let mut sound = vec![0.0f32; 2 * 22050 / 60];
     for i in 0..frames {
-        if i % 4 == 0 {
-            engine.tick();
-        }
+        engine.set_clock(i as f64 / 60.0);
         engine.pass(Some(&mut screen));
+        // The sound is mixed and dropped.
+        engine.voices().fill(&mut sound, 22050, 2);
     }
     if frames == 0 {
         engine.render(&mut screen);
@@ -106,6 +144,20 @@ pub fn headless(
         .collect::<std::collections::BTreeSet<_>>()
         .len();
     println!("{frames} frames, {distinct} colours on screen");
+    if let Some(d) = engine.dialog() {
+        if let Some(l) = d.current_line() {
+            println!(
+                "dialog {}, line {} ({}, stand {:?}, camera {:?}), video frame {}",
+                d.number,
+                l.id,
+                l.speaker,
+                l.stand.map(|s| s + 1),
+                l.camera.map(|c| c + 1),
+                d.stream().map_or(0, |s| s.number())
+            );
+        }
+    }
+    println!("music volume {}", engine.music.volume);
     if let Some(path) = screenshot {
         let png = atlantis2_engine::png::encode_rgb565(&screen, WIDTH as usize, HEIGHT as usize);
         std::fs::write(path, png).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -115,9 +167,15 @@ pub fn headless(
 }
 
 /// Opens a window on the game; returns when it is closed.
-pub fn run_window(engine: Engine, fullscreen: bool) -> Result<(), String> {
+pub fn run_window(mut engine: Engine, fullscreen: bool, start: &A2Start) -> Result<(), String> {
+    start.apply(&mut engine)?;
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
+    let voices = engine.voices().clone();
+    let audio =
+        crate::audio_out::start_with(move |out, rate, channels| voices.fill(out, rate, channels));
     let mut app = A2App {
+        _audio: audio,
+        started: Instant::now(),
         engine,
         fullscreen,
         window: None,
@@ -127,14 +185,16 @@ pub fn run_window(engine: Engine, fullscreen: bool) -> Result<(), String> {
         keys: [false; 4],
         locked: false,
         next_frame: Instant::now(),
-        next_tick: Instant::now(),
-        started: Instant::now(),
     };
     el.run_app(&mut app)
         .map_err(|e| format!("The window failed: {e}"))
 }
 
 struct A2App {
+    /// The sound output (kept alive while the window is open).
+    _audio: Option<cpal::Stream>,
+    /// The game's clock starts with the window.
+    started: Instant,
     engine: Engine,
     fullscreen: bool,
     window: Option<Rc<Window>>,
@@ -146,10 +206,6 @@ struct A2App {
     keys: [bool; 4],
     locked: bool,
     next_frame: Instant,
-    /// When the next 15 Hz tick is due.
-    next_tick: Instant,
-    /// The clock of the clicks (the double click is under 0.2 s).
-    started: Instant,
 }
 
 impl A2App {
@@ -181,14 +237,7 @@ impl A2App {
         if dx != 0 || dy != 0 {
             self.engine.mouse_motion(dx, dy);
         }
-        let now = Instant::now();
-        if now >= self.next_tick {
-            self.engine.tick();
-            self.next_tick += TICK;
-            if self.next_tick < now {
-                self.next_tick = now + TICK;
-            }
-        }
+        self.engine.set_clock(self.started.elapsed().as_secs_f64());
         self.engine.pass(Some(&mut self.screen));
     }
 
@@ -286,13 +335,19 @@ impl ApplicationHandler for A2App {
             }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
+                button,
                 ..
-            } if !self.locked => self.grab(true),
-            WindowEvent::MouseInput {
-                state: ElementState::Pressed,
-                button: MouseButton::Left,
-                ..
-            } => self.engine.click(self.started.elapsed().as_secs_f64()),
+            } => {
+                if !self.locked {
+                    self.grab(true);
+                } else if button == MouseButton::Left {
+                    // The click flag (@ 0x006569c9) is the left button's
+                    // (input callback FUN_0040c510); the right one opens
+                    // the bag.
+                    let now = self.started.elapsed().as_secs_f64();
+                    self.engine.click(now);
+                }
+            }
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
                 match event.logical_key {
