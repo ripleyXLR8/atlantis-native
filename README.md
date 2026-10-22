@@ -16,7 +16,7 @@ written in Rust, for Windows, macOS, Linux and your browser.
 
 **[▶ Play in your browser](https://ripleyxlr8.github.io/atlantis-native/)** (your own copy of the game needed)
 
-[Download](#download) · [Quick start](#quick-start) · [Features](#features) · [Controls](#controls) · [Player's guide](docs/GUIDE.md) · [Technical notes](docs/TECHNICAL.md)
+[繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [Download](#download) · [Quick start](#quick-start) · [Features](#features) · [Controls](#controls) · [Player's guide](docs/GUIDE.md) · [Technical notes](docs/TECHNICAL.md)
 
 </div>
 
