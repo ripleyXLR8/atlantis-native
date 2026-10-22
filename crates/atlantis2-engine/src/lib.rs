@@ -22,6 +22,7 @@
 pub mod anim;
 pub mod bag;
 pub mod camera;
+pub mod credits;
 pub mod crt;
 pub mod dialog;
 pub mod engine;

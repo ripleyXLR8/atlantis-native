@@ -1137,15 +1137,31 @@ after a short game with three saves.
   × general slider × 127 + 0.5, effects and dialogs × 127, truncated).
   Escape closes the main menu opened from the game (not the player menu).
   The cursor is `curseur.spr` at the mouse; the window then lets the
-  pointer go and draws the game's own. Quitting shows the credits (16
-  pictures, 5 s each, a 2 s fade into the next, ended by a click or
-  while Escape is held: a key state, not a key press), as does the scripts' `CREDITS`. Built but not opened by the
+  pointer go and draws the game's own. Quitting shows the credits, as
+  does the scripts' `CREDITS` (`crates/atlantis2-engine/src/credits.rs`,
+  checked frame by frame against the original under emulation,
+  `tests/credits.rs`): the pages of `loc\Credits.txt` (21 in the French
+  release) over the 16 pictures `f_cred01.tga` .. `f_cred16.tga` in turn,
+  each line one step (the popup font's height in points) below the last,
+  a `#` line centred on x = 522 (at 640 wide) and any other at x = 405,
+  white over a black copy one pixel down-right, written on the picture so
+  they fade with it. Each page shows 5 s, then fades into the next over
+  2 s (weight ftol((t − 5) × 127.5) of the time since the page started,
+  under the x87 control word), the change coming at the frame after the
+  fade ends; the last page fades to black and the credits end one frame
+  after that (21 cycles of 7 s and a frame: 147.35 s at 60 frames a
+  second), or at a click or while Escape is held (a key state, not a key
+  press). The fade is the original's table blend: every channel of a
+  picture shows one step darker than in its file, green keeps five bits,
+  and a strong blue takes one from green (the signed shift of the
+  original). Their texts are drawn with the game's TrueType font as the
+  subtitles are (the original's are GDI's: a few pixels of each glyph
+  differ). Built but not opened by the
   game: the disc request (every disc is read where it is), "please wait",
   "disk full" and "write error" (the original opens them only while
   `LOADMUSIK` copies music, which the port does not do). Not known, and
   chosen here: whether the page title (line 0 of each section) is drawn
-  (it is not), the credits' texts (`loc\Credits.txt`'s placement is not
-  read: only the pictures show) and their fade (a linear blend), what
+  (it is not), what
   the 800 x 600 mode does with the 640 x 480 pages (centred). The list's date and
   time are written in the French system's formats (`22/10/2026
   14:12:00`); the original asks Windows for the user's.

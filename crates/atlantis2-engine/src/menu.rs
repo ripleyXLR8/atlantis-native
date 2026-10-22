@@ -22,9 +22,10 @@ use atlantis2_data::dialog::FontTxt;
 use atlantis2_data::menu_txt::{MenuTxt, Section};
 use atlantis2_data::save::{SaveHeader, SystemTime};
 use atlantis2_data::spr::{SprBank, Target};
-use atlantis2_data::tga::Tga;
+use atlantis2_data::tga::{Bgr24, Tga};
 use atlantis2_data::{A2Files, Folder};
 
+use crate::credits::{self, Credits};
 use crate::fpu::{ftol, Fpu};
 use crate::subtitle::{SubtitleFont, TextOut};
 
@@ -307,22 +308,6 @@ pub struct Page {
     pub widgets: Vec<Widget>,
     credits: Option<Credits>,
 }
-
-/// The credits' pages and their timing.
-#[derive(Clone, Debug)]
-struct Credits {
-    /// The clock when the current page started.
-    start: Option<f64>,
-    page: usize,
-    /// How far the page has faded into the next, 0..1.
-    fade: f64,
-    pictures: Vec<Vec<u16>>,
-    done: bool,
-}
-
-/// How long a credits page shows, then fades into the next.
-const CREDITS_SHOW: f64 = 5.0;
-const CREDITS_FADE: f64 = 2.0;
 
 /// The menu system: its texts and banks (`AtlMenu_MainInit`
 /// @ 0x00485c00), the page shown and the state machine's globals.
@@ -880,17 +865,41 @@ impl Menu {
                 );
             }
             PageKind::Credits => {
+                // FUN_0048b730 → FUN_00470550: the 16 pictures in 24-bit
+                // surfaces, the pages of `loc\Credits.txt` (a missing file
+                // is fatal in the original, @ 0x00470c63: no page here, so
+                // the credits end at once).
                 let files = host.files();
-                let pictures = (1..=16)
-                    .map(|i| self.tga(files, &format!("f_cred{i:02}.tga")))
+                let pictures = (0..credits::PICTURES)
+                    .map(|i| {
+                        let name = credits::picture_name(i);
+                        match files.read(Folder::SprMenu, &name).map(|d| Bgr24::parse(&d)) {
+                            Some(Ok(t)) if t.width == WIDTH && t.height == HEIGHT => t.bytes,
+                            other => {
+                                log::warn!(
+                                    "spr\\menu\\{name}: {:?}",
+                                    other.map(|r| r.map(|_| "size"))
+                                );
+                                Vec::new()
+                            }
+                        }
+                    })
                     .collect();
-                page.credits = Some(Credits {
-                    start: None,
-                    page: 0,
-                    fade: 0.0,
-                    pictures,
-                    done: false,
-                });
+                let pages = match files.read(Folder::Loc, "Credits.txt") {
+                    Some(d) => credits::parse(&d),
+                    None => {
+                        log::warn!("loc\\Credits.txt not found: no credits page");
+                        Vec::new()
+                    }
+                };
+                let font = self.font.as_ref();
+                let calls = credits::layout(
+                    &pages,
+                    |b| font.map_or(0, |f| f.extent(b).0),
+                    font.map_or(10, |f| f.line_step()),
+                    WIDTH as i32,
+                );
+                page.credits = Some(Credits::new(pictures, &calls, font));
             }
         }
         self.page = Some(page);
@@ -1184,7 +1193,13 @@ impl Menu {
         let clock = host.clock();
         let input = self.input;
         if let Some(p) = self.page.as_mut() {
-            p.update(&input, ticks, std::mem::take(&mut self.tick_flag), clock);
+            p.update(
+                &input,
+                ticks,
+                std::mem::take(&mut self.tick_flag),
+                host.fpu(),
+                clock,
+            );
         }
         if let Some(out) = out {
             self.draw(out, ticks);
@@ -1559,7 +1574,7 @@ impl Page {
 
     /// What changes with time before the draw: the hover counts, the
     /// animated buttons' frames, the credits' clock.
-    fn update(&mut self, input: &Input, ticks: u32, flag: bool, clock: f64) {
+    fn update(&mut self, input: &Input, ticks: u32, flag: bool, fpu: Fpu, clock: f64) {
         for w in &mut self.widgets {
             let inside = w.visible && w.enabled && w.hit.holds(input.x, input.y);
             w.hover_since = match (inside, w.hover_since) {
@@ -1610,24 +1625,8 @@ impl Page {
             }
         }
         if let Some(c) = &mut self.credits {
-            let start = *c.start.get_or_insert(clock);
-            let n = c.pictures.len();
-            let e = clock - start;
-            let last = c.page + 1 >= n;
-            c.fade = if last {
-                0.0
-            } else {
-                ((e - CREDITS_SHOW) / CREDITS_FADE).clamp(0.0, 1.0)
-            };
-            if e >= CREDITS_SHOW + if last { 0.0 } else { CREDITS_FADE } {
-                if last {
-                    c.done = true;
-                } else {
-                    c.page += 1;
-                    c.fade = 0.0;
-                    c.start = Some(clock);
-                }
-            }
+            // FUN_00470d00 (in the draw, before the action of the frame).
+            c.update(fpu, clock);
         }
     }
 
@@ -1640,7 +1639,7 @@ impl Page {
         input: &Input,
     ) {
         if let Some(c) = &self.credits {
-            draw_credits(c, out);
+            c.draw(out);
             return;
         }
         let n = self.background.len().min(out.len());
@@ -1710,26 +1709,6 @@ fn dim(screen: &[u16]) -> Vec<u16> {
         *o = (p >> 1) & 0x7bef;
     }
     out
-}
-
-/// The credits: the page, or two pages blended while it fades into the
-/// next (FUN_00470d00, FUN_00472bb0; a linear blend here).
-fn draw_credits(c: &Credits, out: &mut [u16]) {
-    let Some(cur) = c.pictures.get(c.page) else {
-        return;
-    };
-    let next = c.pictures.get(c.page + 1).filter(|_| c.fade > 0.0);
-    let a = (c.fade * 256.0) as u32;
-    for (i, o) in out.iter_mut().enumerate().take(cur.len()) {
-        *o = match next {
-            None => cur[i],
-            Some(n) => {
-                let (p, q) = (u32::from(cur[i]), u32::from(n[i]));
-                let ch = |m: u32| ((p & m) * (256 - a) + (q & m) * a) >> 8 & m;
-                (ch(0xf800) | ch(0x07e0) | ch(0x001f)) as u16
-            }
-        };
-    }
 }
 
 impl ListBox {

@@ -47,16 +47,18 @@ impl fmt::Display for TgaError {
 
 impl std::error::Error for TgaError {}
 
-/// A 1-5-5-5 TGA pixel as the game's RGB565 texel.
-fn texel(p: u16) -> u16 {
-    let r = (p >> 10) & 0x1f;
-    let g = (p >> 5) & 0x1f;
-    let b = p & 0x1f;
-    (r << 11) | (g << 6) | b
+/// A decoded file at 8 bits a channel, before the copy into a surface.
+struct Decoded {
+    width: usize,
+    height: usize,
+    bits: u8,
+    /// B, G, R, top row first: a 1-5-5-5 pixel's channels moved to the top
+    /// of their byte (`c << 3`, the copy's rule), a 24-bit pixel as stored.
+    bgr: Vec<[u8; 3]>,
 }
 
-impl Tga {
-    pub fn parse(data: &[u8]) -> Result<Tga, TgaError> {
+impl Decoded {
+    fn parse(data: &[u8]) -> Result<Decoded, TgaError> {
         let h = data.get(..18).ok_or(TgaError::Truncated)?;
         let id_len = h[0] as usize;
         let cmap_type = h[1];
@@ -77,13 +79,14 @@ impl Tga {
         let n = width * height;
         let mut file = Vec::with_capacity(n);
         let size = usize::from(bits / 8);
-        let px = |at: usize| -> Result<u16, TgaError> {
+        let px = |at: usize| -> Result<[u8; 3], TgaError> {
             let b = data.get(at..at + size).ok_or(TgaError::Truncated)?;
             Ok(if size == 2 {
-                texel(u16::from_le_bytes([b[0], b[1]]))
+                let p = u16::from_le_bytes([b[0], b[1]]);
+                let c = |s: u16| (((p >> s) & 0x1f) << 3) as u8;
+                [c(0), c(5), c(10)]
             } else {
-                let (bl, g, r) = (u16::from(b[0]), u16::from(b[1]), u16::from(b[2]));
-                ((r >> 3) << 11) | ((g >> 2) << 5) | (bl >> 3)
+                [b[0], b[1], b[2]]
             })
         };
         if image_type == 2 {
@@ -108,16 +111,63 @@ impl Tga {
             }
             file.truncate(n);
         }
-        let mut pixels = vec![0u16; n];
+        let mut bgr = vec![[0u8; 3]; n];
         for y in 0..height {
             let src = if top_down { y } else { height - 1 - y };
-            for x in 0..width {
-                pixels[y * width + x] = file[src * width + x];
-            }
+            bgr[y * width..(y + 1) * width].copy_from_slice(&file[src * width..(src + 1) * width]);
         }
-        Ok(Tga {
+        Ok(Decoded {
             width,
             height,
+            bits,
+            bgr,
+        })
+    }
+}
+
+/// A map copied into a 24-bit surface (the credits' page surfaces,
+/// pixel format record 0x94 of FUN_004a3ab0: bytes B, G, R): a 1-5-5-5
+/// file's channel `c` becomes `c << 3` (checked under emulation on the 16
+/// credits pictures, `credits.txt`'s `load` rows); a 24-bit file's bytes
+/// are copied as they are [inferred: same masks].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Bgr24 {
+    pub width: usize,
+    pub height: usize,
+    /// B, G, R a pixel, top row first.
+    pub bytes: Vec<u8>,
+}
+
+impl Bgr24 {
+    pub fn parse(data: &[u8]) -> Result<Bgr24, TgaError> {
+        let d = Decoded::parse(data)?;
+        Ok(Bgr24 {
+            width: d.width,
+            height: d.height,
+            bytes: d.bgr.concat(),
+        })
+    }
+}
+
+impl Tga {
+    pub fn parse(data: &[u8]) -> Result<Tga, TgaError> {
+        let d = Decoded::parse(data)?;
+        let pixels = d
+            .bgr
+            .iter()
+            .map(|&[b, g, r]| {
+                let (b, g, r) = (u16::from(b), u16::from(g), u16::from(r));
+                if d.bits == 16 {
+                    // A 1-5-5-5 texel (r, g, b) as `(r << 11) | (g << 6) | b`.
+                    ((r >> 3) << 11) | ((g >> 3) << 6) | (b >> 3)
+                } else {
+                    ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
+                }
+            })
+            .collect();
+        Ok(Tga {
+            width: d.width,
+            height: d.height,
             pixels,
         })
     }
@@ -155,5 +205,12 @@ mod tests {
             vec![(1 << 11) | (0x21 << 5) | 0x1f]
         );
         assert_eq!(Tga::parse(&f[..10]), Err(TgaError::Truncated));
+        // The same files in a 24-bit surface.
+        assert_eq!(Bgr24::parse(&g).unwrap().bytes, vec![0xff, 0x84, 0x0f]);
+        f[2] = 10;
+        assert_eq!(
+            Bgr24::parse(&f).unwrap().bytes,
+            [[0, 0xf8, 0], [0xf8, 0, 0], [0, 0, 0xf8], [0, 0, 0xf8]].concat()
+        );
     }
 }

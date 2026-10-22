@@ -687,3 +687,22 @@ fn the_table_is_the_originals() {
     assert_eq!(ENTRIES.iter().map(|e| e.1).sum::<usize>(), SAVE_SIZE);
     assert_eq!(action::ELSEWHERE, 0x13);
 }
+
+#[test]
+fn the_credits_end_after_the_last_page() {
+    let Some(files) = game() else { return };
+    let mut r = Run::new(files, None);
+    r.e.open_player_menu();
+    r.e.open_credits();
+    let start = r.pass;
+    // 21 pages: 21 cycles of 7 s and a frame (FUN_00470d00), the last
+    // one a fade to black; the frame after it the action 0x1a, then the
+    // program ends (no section waits).
+    while !r.e.quit() {
+        assert!(r.pass - start < 60 * 200, "the credits do not end");
+        r.step();
+    }
+    // (A float clock may land a page change a frame later.)
+    let n = r.pass - start;
+    assert!((21 * 421 + 1..=21 * 422 + 1).contains(&n), "{n} frames");
+}
