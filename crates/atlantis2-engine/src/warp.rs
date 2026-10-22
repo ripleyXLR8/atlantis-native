@@ -25,6 +25,8 @@ use crate::fpu::{f, ftol, Fpu};
 
 mod pii;
 
+pub use pii::MAX_WIDTH as PII_MAX_WIDTH;
+
 /// The rasteriser: which CPU's routines draw the cube.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Variant {
@@ -150,7 +152,8 @@ fn project(
 
 impl Renderer {
     /// A renderer of `variant` for a `width` x `height` screen, the process
-    /// running under the control word `fpu`.
+    /// running under the control word `fpu`. `warpPII` draws screens up to
+    /// [`PII_MAX_WIDTH`] pixels wide, as the original's span buffer does.
     pub fn new(variant: Variant, fpu: Fpu, width: usize, height: usize) -> Renderer {
         Renderer {
             variant,
@@ -182,6 +185,11 @@ impl Renderer {
     ) {
         assert!(out.len() >= self.width * self.height);
         assert!(faces.iter().all(|f| f.len() == FACE_SIZE * FACE_SIZE));
+        assert!(
+            self.variant != Variant::PII || self.width <= pii::MAX_WIDTH,
+            "warpPII draws at most {} pixels across",
+            pii::MAX_WIDTH
+        );
         self.cube(faces, matrix, proj, out);
     }
 

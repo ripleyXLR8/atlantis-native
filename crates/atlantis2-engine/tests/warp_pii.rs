@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::camera::{deg_to_rad, WARP_FOV};
 use atlantis2_engine::look::Look;
-use atlantis2_engine::warp::faces_from_hnm;
+use atlantis2_engine::warp::{faces_from_hnm, PII_MAX_WIDTH};
 use atlantis2_engine::{Camera, Engine, Fpu, Renderer, Variant};
 use md5::{Digest, Md5};
 
@@ -178,6 +178,18 @@ fn synthetic_faces_match_the_original() {
     assert_clean("uv", &bad_m, &bad_f);
 }
 
+/// A screen wider than the original's span buffer allows is refused.
+#[test]
+#[should_panic(expected = "warpPII draws at most")]
+fn a_wider_screen_is_refused() {
+    let faces: [Vec<u16>; 6] = std::array::from_fn(|_| vec![0; 512 * 512]);
+    let w = PII_MAX_WIDTH + 1;
+    let cam = Camera::new(Fpu::Chop, w as u32, 8);
+    let mut r = Renderer::new(Variant::PII, Fpu::Chop, w, 8);
+    let mut out = vec![0u16; w * 8];
+    r.render(&faces, &cam.matrix(), cam.projection(), &mut out);
+}
+
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
         std::env::var_os("ATLANTIS2_DATA"),
@@ -212,8 +224,8 @@ fn panoramas_match_the_original() {
     // fractional angles on both files, the full grid at 800 x 600 and 15
     // angles at 35° on ti0002; the first view's grid (12 entries) in the
     // three states on ti0002, its y0 p0 steady row being in the full grid
-    // already.
-    assert_eq!(total, 2 * (168 + 60) + 168 + 15 + 3 * 12 - 1);
+    // already; 7 more steady angles on ti0002 (yaw 37 and pitch 33).
+    assert_eq!(total, 2 * (168 + 60) + 168 + 15 + 3 * 12 - 1 + 7);
 }
 
 /// A new game opens on the first view as the original draws it when no

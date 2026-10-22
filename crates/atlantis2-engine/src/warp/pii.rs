@@ -35,6 +35,15 @@ const PITCH: usize = FACE_SIZE;
 /// 16 − 9).
 const TEXEL_SHIFT: u32 = 7;
 
+/// The span's integer (u, v) pairs (@ 0x005ed7c0, 8 bytes each up to the
+/// masks @ 0x005edbf8): the first pixel's and one per 32-pixel block.
+const ENDS: usize = 135;
+
+/// The widest screen `warpPII` draws: a span of n pixels takes
+/// ceil(n / 32) − 1 blocks besides its first pixel, at most `ENDS` − 1. A
+/// wider span would write over the masks after the pairs.
+pub const MAX_WIDTH: usize = ENDS * 32;
+
 /// 1 / (t − 1), the table @ 0x005ee018 (stride 8) for the last t pixels of
 /// a span (0 for t = 1); the table @ 0x005ede18 holds t − 1 itself.
 fn inv_tail(t: u32) -> f64 {
@@ -460,7 +469,7 @@ impl Renderer {
         // The integer (u, v) at the first pixel and at each 32nd one after
         // it (@ 0x005ed7c0), and the float of the last one (@ 0x005edc88,
         // 0x005edc80).
-        let mut ends = [(0i32, 0i32); 64];
+        let mut ends = [(0i32, 0i32); ENDS];
         let u0 = x.mul(rw, uu);
         let v0 = x.mul(rw, vv);
         ends[0] = (x.fistp(u0), x.fistp(v0));
@@ -606,6 +615,71 @@ mod tests {
         assert_eq!(bits(12), 0x3dba_2e8c);
         assert_eq!(bits(24), 0x3d32_1643);
         assert_eq!(bits(32), 0x3d04_2108);
+    }
+
+    #[test]
+    fn fcomi_branches_follow_the_flags() {
+        // ja: CF = 0 and ZF = 0, false when equal or unordered.
+        assert!(above(2.0, 1.0));
+        assert!(!above(1.0, 1.0));
+        assert!(!above(f64::NAN, 1.0));
+        // jb: CF = 1, set when below or unordered, clear when equal.
+        assert!(below(1.0, 2.0));
+        assert!(!below(1.0, 1.0));
+        assert!(!below(2.0, 1.0));
+        assert!(below(f64::NAN, 1.0));
+        assert!(below(1.0, f64::NAN));
+    }
+
+    #[test]
+    fn edge_sums_round_toward_zero() {
+        // Every start value is s + ds · fy with ds = −2^-60 and fy = 1: the
+        // fadd under 0x0e7f gives 1 − 2^-53, which the fst dword stores as
+        // the float below 1 (to nearest, the sum would be 1).
+        let p: Vertex = [1.0, 0.0, 1.0, 1.0, 1.0];
+        let q: Vertex = [0.0, 2f64.powi(60), 0.0, 0.0, 0.0];
+        let e = edge(&p, &q, 0, 1, false);
+        assert_eq!(e.dx, -(2f64.powi(-60)));
+        let below_one = f64::from(f32::from_bits(0x3f7f_ffff));
+        assert_eq!([e.x, e.w, e.u, e.v], [below_one; 4]);
+    }
+
+    #[test]
+    fn the_longest_span_fills_the_buffer() {
+        // MAX_WIDTH pixels: the first pixel's pair and 134 blocks, the last
+        // 32 pixels as the tail (a 64-pair buffer would overflow). u = (i + 1) / 16 texel at pixel i (the
+        // left edge half a pixel before the first centre).
+        use crate::warp::Variant;
+        let n = MAX_WIDTH;
+        let mut r = Renderer::new(Variant::PII, Fpu::Chop, n, 1);
+        let du = TEX_SCALE / 512.0 / 16.0;
+        let l = Edge {
+            x: 0.5,
+            w: 1.0,
+            u: 0.5 * du,
+            ..Edge::default()
+        };
+        let g = Gradients {
+            dvdx: 0.0,
+            dvdx32: 0.0,
+            dwdx: 0.0,
+            dwdx32: 0.0,
+            dudx: du,
+            dudx32: 32.0 * du,
+        };
+        let tex: Vec<u16> = (0..512 * 512).map(|i| (i % 512) as u16).collect();
+        let mut out = vec![0xffffu16; n];
+        r.span_pii(0, 0, n as i32, &l, &g, &tex, &mut out);
+        for (i, &t) in out.iter().enumerate() {
+            let want = (i + 1) >> 4;
+            if i < n - 32 {
+                assert_eq!(usize::from(t), want, "pixel {i}");
+            } else {
+                // The tail's step, (end − last) · float(1/31) truncated,
+                // falls just short of du.
+                assert!(want - usize::from(t) <= 1, "pixel {i}: {t}");
+            }
+        }
     }
 
     #[test]

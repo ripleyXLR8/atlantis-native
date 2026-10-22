@@ -615,7 +615,8 @@ runs yet: no cinematic, no script, no move. `--headless <folder> [frames]
   a fan of triangles ordered by their integer rows, perspective every 32
   pixels and at the span's last pixel, 1.31 fixed point texel coordinates
   stepped in 16-bit words in between (so the texel wraps within the face),
-  nearest texel. The C one (`warpC`: perspective every 32 pixels, 24.8
+  nearest texel; its span buffer holds rows of up to 4320 pixels, the
+  widest screen it draws. The C one (`warpC`: perspective every 32 pixels, 24.8
   fixed point in between), which AMD CPUs used, is transcribed too and
   kept for a later option.
 - **Camera:** the orientation is a float quaternion turned by axis-angle
