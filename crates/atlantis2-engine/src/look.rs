@@ -2,7 +2,7 @@
 //! every frame, and the angles are kept within the script's limits.
 
 use crate::camera::Camera;
-use crate::fpu::{f, Fpu};
+use crate::fpu::Fpu;
 
 /// The mouse sensitivity of the data section (@ 0x005da268): a mouse move
 /// of `d` mickeys adds `d / 2000` radians to a turning speed.
@@ -46,16 +46,15 @@ impl Look {
     /// gains dx / S, the pitch speed loses dy / S (gains it with "invert
     /// Y"). Moving right turns right, moving down looks down.
     pub fn mouse(&mut self, fpu: Fpu, dx: i32, dy: i32) {
-        let r = |x: f64| fpu.r(x);
         let s = f64::from(self.sensitivity);
-        let dxf = f(f64::from(dx));
-        self.yaw_speed = r(r(dxf / s) + f64::from(self.yaw_speed)) as f32;
-        let q = r(f64::from(dy) / s);
-        self.pitch_speed = if self.invert_y {
-            r(q + f64::from(self.pitch_speed))
+        let dxf = fpu.f(f64::from(dx));
+        self.yaw_speed = fpu.f32(fpu.add(fpu.div(dxf, s), f64::from(self.yaw_speed)));
+        let q = fpu.div(f64::from(dy), s);
+        self.pitch_speed = fpu.f32(if self.invert_y {
+            fpu.add(q, f64::from(self.pitch_speed))
         } else {
-            r(f64::from(self.pitch_speed) - q)
-        } as f32;
+            fpu.sub(f64::from(self.pitch_speed), q)
+        });
     }
 
     /// Stops turning (@ 0x0040c680, at every view entry).
@@ -70,16 +69,15 @@ impl Look {
     /// brought within the limits, which also stop that turn.
     pub fn frame(&mut self, cam: &mut Camera) {
         let fpu = cam.fpu;
-        let r = |x: f64| fpu.r(x);
         let decay = f64::from(f32::from_bits(0x3f4c_cccd)); // 0.8 @ 0x005c62bc
-        self.yaw_speed = r(f64::from(self.yaw_speed) * decay) as f32;
-        self.pitch_speed = r(f64::from(self.pitch_speed) * decay) as f32;
+        self.yaw_speed = fpu.f32(fpu.mul(f64::from(self.yaw_speed), decay));
+        self.pitch_speed = fpu.f32(fpu.mul(f64::from(self.pitch_speed), decay));
         cam.yaw(self.yaw_speed);
         cam.pitch(self.pitch_speed);
         // limit · π · (1/180) with the floats @ 0x005c678c, 0x005c62b8.
         let pi = f64::from(f32::from_bits(0x4049_0fdb));
         let k = f64::from(f32::from_bits(0x3bb6_0b61));
-        let rad = |deg: i32| f(r(r(f64::from(deg) * pi) * k)) as f32;
+        let rad = |deg: i32| fpu.f32(fpu.mul(fpu.mul(f64::from(deg), pi), k));
         let (lim_y, lim_x) = (rad(self.limit_y), rad(self.limit_x));
         let (yaw, pitch) = cam.angles();
         if self.limit_y != NO_LIMIT {
@@ -102,9 +100,9 @@ impl Look {
 fn over(fpu: Fpu, angle: f32, limit: f32) -> Option<f32> {
     let (a, l) = (f64::from(angle), f64::from(limit));
     if a > l {
-        Some(fpu.r(a - l) as f32)
+        Some(fpu.f32(fpu.sub(a, l)))
     } else if -l > a {
-        Some(fpu.r(a + l) as f32)
+        Some(fpu.f32(fpu.add(a, l)))
     } else {
         None
     }

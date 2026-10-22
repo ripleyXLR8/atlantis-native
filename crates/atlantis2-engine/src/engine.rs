@@ -9,7 +9,7 @@ use atlantis_codecs::DecodeError;
 use crate::camera::{deg_to_rad, Camera, WARP_FOV};
 use crate::fpu::Fpu;
 use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
-use crate::warp::{faces_from_hnm, Renderer};
+use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 /// Why the engine cannot show a view.
 #[derive(Debug)]
@@ -57,8 +57,15 @@ impl Engine {
     /// and its angles (Tibet, `tibet.wam`, view 2, yaw −90°, pitch 0). The
     /// opening cinematic it then plays, and the rest of the script, are not
     /// run yet: the view is shown at once.
+    ///
+    /// `variant` is the CPU's cube renderer, `fpu` the x87 control word the
+    /// process starts with. With `warpPII` the first frame changes it to
+    /// 0x0e7f for good: the first view is entered under `fpu` and every
+    /// later turn, entry and frame runs under 0x0e7f, as in the original if
+    /// no assembly renderer drew before the first view (not known).
     pub fn new_game(
         mut files: A2Files,
+        variant: Variant,
         fpu: Fpu,
         width: u32,
         height: u32,
@@ -85,14 +92,14 @@ impl Engine {
             wam_name: start.wam.clone(),
             view: 0,
             faces: Default::default(),
-            renderer: Renderer::new(fpu, width as usize, height as usize),
+            renderer: Renderer::new(variant, fpu, width as usize, height as usize),
             camera,
             look: Look::default(),
         };
         engine.enter_view(
             start.view,
-            deg_to_rad(fpu, start.yaw_deg),
-            deg_to_rad(fpu, start.pitch_deg),
+            deg_to_rad(engine.camera.fpu, start.yaw_deg),
+            deg_to_rad(engine.camera.fpu, start.pitch_deg),
         )?;
         Ok(engine)
     }
@@ -133,10 +140,23 @@ impl Engine {
         self.look.frame(&mut self.camera);
     }
 
-    /// Draws the view into `out` (width x height RGB565).
+    /// Draws the view into `out` (width x height RGB565). The control word
+    /// the renderer leaves is the one the game's float code runs under next.
     pub fn render(&mut self, out: &mut [u16]) {
         let (m, p) = (self.camera.matrix(), self.camera.projection());
+        self.renderer.fpu = self.camera.fpu;
         self.renderer.render(&self.faces, &m, p, out);
+        self.camera.fpu = self.renderer.fpu;
+    }
+
+    /// The x87 control word the game's float code runs under now.
+    pub fn fpu(&self) -> Fpu {
+        self.camera.fpu
+    }
+
+    /// The cube renderer.
+    pub fn variant(&self) -> Variant {
+        self.renderer.variant
     }
 
     pub fn width(&self) -> usize {

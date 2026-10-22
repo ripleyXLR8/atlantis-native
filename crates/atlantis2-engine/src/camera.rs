@@ -15,7 +15,7 @@
 //! the `rt` face, 90° at `ft`, increasing turns left), pitch positive
 //! looking down. At start-up the node is the identity: yaw 90°, pitch 0.
 
-use crate::fpu::{f, Fpu};
+use crate::fpu::Fpu;
 
 /// The 76° field of view the warp sets (@ 0x00459a10, the float
 /// 0x3fa9c91f, in radians).
@@ -25,7 +25,7 @@ pub const WARP_FOV: f32 = f32::from_bits(0x3fa9_c91f);
 /// `ANGLEWARPY` (@ 0x00481e20: `fild`, `fmul` by the float 0.017453292
 /// @ 0x005c66cc, `fstp dword`).
 pub fn deg_to_rad(fpu: Fpu, deg: i32) -> f32 {
-    f(fpu.r(f64::from(deg) * f64::from(f32::from_bits(0x3c8e_fa35)))) as f32
+    fpu.f32(fpu.mul(f64::from(deg), f64::from(f32::from_bits(0x3c8e_fa35))))
 }
 
 /// The camera: projection and orientation.
@@ -52,50 +52,60 @@ fn d(x: f32) -> f64 {
 
 /// FUN_004c6d10: the rotation matrix (row-major) of an axis and an angle.
 fn axis_angle(fpu: Fpu, axis: [f32; 3], angle: f32) -> [f64; 9] {
-    let r = |x: f64| fpu.r(x);
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let f = |x| fpu.f(x);
     let [ax, ay, az] = axis.map(d);
     // FUN_00492bf0: (x² + y²) + z², then 1 / sqrt, stored.
-    let len2 = r(r(r(ax * ax) + r(ay * ay)) + r(az * az));
-    let inv = f(r(1.0 / r(len2.sqrt())));
+    let len2 = add(add(mul(ax, ax), mul(ay, ay)), mul(az, az));
+    let inv = f(fpu.div(1.0, fpu.sqrt(len2)));
     // FUN_0049a720: the axis scaled.
-    let (nx, ny, nz) = (f(r(inv * ax)), f(r(inv * ay)), f(r(inv * az)));
+    let (nx, ny, nz) = (f(mul(inv, ax)), f(mul(inv, ay)), f(mul(inv, az)));
     let s = libm::sin(d(angle));
     let c = f(libm::cos(d(angle)));
-    let nyx = f(r(ny * nx));
-    let nyz = f(r(ny * nz));
-    let nzx = f(r(nz * nx));
-    let nxs = f(r(nx * s));
-    let nys = f(r(ny * s));
-    let zs = r(s * nz);
-    let t = f(r(1.0 - c));
-    let a = r(t * nyx);
-    let b = r(t * nzx);
-    let cc = r(t * nyz);
+    let nyx = f(mul(ny, nx));
+    let nyz = f(mul(ny, nz));
+    let nzx = f(mul(nz, nx));
+    let nxs = f(mul(nx, s));
+    let nys = f(mul(ny, s));
+    let zs = mul(s, nz);
+    let t = f(sub(1.0, c));
+    let a = mul(t, nyx);
+    let b = mul(t, nzx);
+    let cc = mul(t, nyz);
     [
-        f(r(r(r(nx * nx) * t) + c)),
-        f(r(a - zs)),
-        f(r(b + nys)),
-        f(r(a + zs)),
-        f(r(r(r(ny * ny) * t) + c)),
-        f(r(cc - nxs)),
-        f(r(f(b) - nys)),
-        f(r(cc + nxs)),
-        f(r(r(r(nz * nz) * t) + c)),
+        f(add(mul(mul(nx, nx), t), c)),
+        f(sub(a, zs)),
+        f(add(b, nys)),
+        f(add(a, zs)),
+        f(add(mul(mul(ny, ny), t), c)),
+        f(sub(cc, nxs)),
+        f(sub(f(b), nys)),
+        f(add(cc, nxs)),
+        f(add(mul(mul(nz, nz), t), c)),
     ]
 }
 
 /// FUN_004c8a10: the quaternion of a rotation matrix.
 fn matrix_to_quat(fpu: Fpu, m: &[f64; 9]) -> [f32; 4] {
-    let r = |x: f64| fpu.r(x);
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let f = |x| fpu.f32(x);
     let mut q = [0f32; 4];
-    let tr = r(r(m[4] + m[0]) + m[8]);
+    let tr = add(add(m[4], m[0]), m[8]);
     if tr > 0.0 {
-        let s = r(r(tr + 1.0).sqrt());
-        q[3] = f(r(s * 0.5)) as f32;
-        let k = r(0.5 / s);
-        q[0] = f(r(r(m[7] - m[5]) * k)) as f32;
-        q[1] = f(r(r(m[2] - m[6]) * k)) as f32;
-        q[2] = f(r(r(m[3] - m[1]) * k)) as f32;
+        let s = fpu.sqrt(add(tr, 1.0));
+        q[3] = f(mul(s, 0.5));
+        let k = fpu.div(0.5, s);
+        q[0] = f(mul(sub(m[7], m[5]), k));
+        q[1] = f(mul(sub(m[2], m[6]), k));
+        q[2] = f(mul(sub(m[3], m[1]), k));
         return q;
     }
     // The largest diagonal term (table @ 0x005e4c88: next = 1, 2, 0).
@@ -106,57 +116,79 @@ fn matrix_to_quat(fpu: Fpu, m: &[f64; 9]) -> [f32; 4] {
     }
     let j = NEXT[i];
     let k = NEXT[j];
-    let s = r(r(r(m[i * 4] - r(m[k * 4] + m[j * 4])) + 1.0).sqrt());
-    q[i] = f(r(s * 0.5)) as f32;
-    let h = r(0.5 / s);
-    q[j] = f(r(r(m[j * 3 + i] + m[i * 3 + j]) * h)) as f32;
-    q[k] = f(r(r(m[i + k * 3] + m[i * 3 + k]) * h)) as f32;
-    q[3] = f(r(r(m[k * 3 + j] - m[j * 3 + k]) * h)) as f32;
+    let s = fpu.sqrt(add(sub(m[i * 4], add(m[k * 4], m[j * 4])), 1.0));
+    q[i] = f(mul(s, 0.5));
+    let h = fpu.div(0.5, s);
+    q[j] = f(mul(add(m[j * 3 + i], m[i * 3 + j]), h));
+    q[k] = f(mul(add(m[i + k * 3], m[i * 3 + k]), h));
+    q[3] = f(mul(sub(m[k * 3 + j], m[j * 3 + k]), h));
     q
 }
 
 /// FUN_004a29c0 (and the in-place product of FUN_004a2d00): a · b.
 fn quat_mul(fpu: Fpu, a: [f32; 4], b: [f32; 4]) -> [f32; 4] {
-    let r = |x: f64| fpu.r(x);
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let f = |x| fpu.f32(x);
     let [ax, ay, az, aw] = a.map(d);
     let [bx, by, bz, bw] = b.map(d);
     [
-        f(r(r(r(r(ay * bz) + r(bw * ax)) + r(aw * bx)) - r(by * az))) as f32,
-        f(r(r(r(r(ay * bw) + r(aw * by)) + r(bx * az)) - r(ax * bz))) as f32,
-        f(r(r(r(r(aw * bz) + r(bw * az)) + r(by * ax)) - r(ay * bx))) as f32,
-        f(r(r(r(r(aw * bw) - r(bx * ax)) - r(ay * by)) - r(bz * az))) as f32,
+        f(sub(
+            add(add(mul(ay, bz), mul(bw, ax)), mul(aw, bx)),
+            mul(by, az),
+        )),
+        f(sub(
+            add(add(mul(ay, bw), mul(aw, by)), mul(bx, az)),
+            mul(ax, bz),
+        )),
+        f(sub(
+            add(add(mul(aw, bz), mul(bw, az)), mul(by, ax)),
+            mul(ay, bx),
+        )),
+        f(sub(
+            sub(sub(mul(aw, bw), mul(bx, ax)), mul(ay, by)),
+            mul(bz, az),
+        )),
     ]
 }
 
 /// FUN_004c6e40: the 3 x 3 matrix of a quaternion.
 fn quat_to_matrix(fpu: Fpu, q: [f32; 4]) -> [f32; 9] {
-    let r = |x: f64| fpu.r(x);
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let f = |x| fpu.f(x);
     let [qx, qy, qz, qw] = q.map(d);
-    let x2 = r(qx + qx);
-    let y2 = f(r(qy + qy));
-    let z2 = f(r(qz + qz));
-    let wx = f(r(qw * x2));
-    let wy = f(r(qw * y2));
-    let wz = f(r(qw * z2));
-    let xx = r(x2 * qx);
-    let xy = r(qx * y2);
-    let xz = f(r(qx * z2));
-    let yy = f(r(qy * y2));
-    let yz = f(r(qy * z2));
-    let zz = r(qz * z2);
+    let x2 = add(qx, qx);
+    let y2 = f(add(qy, qy));
+    let z2 = f(add(qz, qz));
+    let wx = f(mul(qw, x2));
+    let wy = f(mul(qw, y2));
+    let wz = f(mul(qw, z2));
+    let xx = mul(x2, qx);
+    let xy = mul(qx, y2);
+    let xz = f(mul(qx, z2));
+    let yy = f(mul(qy, y2));
+    let yz = f(mul(qy, z2));
+    let zz = mul(qz, z2);
     let zzf = f(zz);
     [
-        f(r(1.0 - r(zz + yy))),
-        f(r(xy - wz)),
-        f(r(xz + wy)),
-        f(r(xy + wz)),
-        f(r(1.0 - r(zzf + xx))),
-        f(r(yz - wx)),
-        f(r(xz - wy)),
-        f(r(yz + wx)),
-        f(r(1.0 - r(yy + xx))),
+        sub(1.0, add(zz, yy)),
+        sub(xy, wz),
+        add(xz, wy),
+        add(xy, wz),
+        sub(1.0, add(zzf, xx)),
+        sub(yz, wx),
+        sub(xz, wy),
+        add(yz, wx),
+        sub(1.0, add(yy, xx)),
     ]
-    .map(|v| v as f32)
+    .map(|v| fpu.f32(v))
 }
 
 impl Camera {
@@ -182,15 +214,15 @@ impl Camera {
     /// fx = W / (2 tan(fov / 2)) (`fptan`), fy = fx · (W/H) / (W/H); then
     /// FUN_004a4a30: 1 / fx, 1 / fy.
     pub fn set_fov(&mut self, fov: f32, width: u32, height: u32) {
-        let r = |x: f64| self.fpu.r(x);
-        let t = libm::tan(r(d(fov) * 0.5));
-        let fx = r(f64::from(width) / r(t + t));
-        self.fx = fx as f32;
-        let ratio =
-            r(r(f64::from(width) / f64::from(height)) / r(f64::from(width) / f64::from(height)));
-        self.fy = r(ratio * fx) as f32;
-        self.inv_fx = r(1.0 / d(self.fx)) as f32;
-        self.inv_fy = r(1.0 / d(self.fy)) as f32;
+        let fpu = self.fpu;
+        let (w, h) = (f64::from(width), f64::from(height));
+        let t = libm::tan(fpu.mul(d(fov), 0.5));
+        let fx = fpu.div(w, fpu.add(t, t));
+        self.fx = fpu.f32(fx);
+        let ratio = fpu.div(fpu.div(w, h), fpu.div(w, h));
+        self.fy = fpu.f32(fpu.mul(ratio, fx));
+        self.inv_fx = fpu.f32(fpu.div(1.0, d(self.fx)));
+        self.inv_fy = fpu.f32(fpu.div(1.0, d(self.fy)));
     }
 
     /// The projection as the renderer reads it: fx, fy, cx, cy.
@@ -226,13 +258,23 @@ impl Camera {
     /// at depth 0.0001 (perspective mode), turned by the matrix as
     /// FUN_0045adf0 does. Floats, as stored.
     pub fn ray(&self, sx: f32, sy: f32) -> [f32; 3] {
-        let r = |x: f64| self.fpu.r(x);
-        let z = r(1.0 / d(0.0001f32));
-        let vx = f(r(r(r(d(sx) - d(self.cx)) * d(self.inv_fx)) * z));
-        let vy = f(r(r(r(d(sy) - d(self.cy)) * d(self.inv_fy)) * z));
-        let vz = f(z);
+        let fpu = self.fpu;
+        let (add, sub, mul) = (
+            |a, b| fpu.add(a, b),
+            |a, b| fpu.sub(a, b),
+            |a, b| fpu.mul(a, b),
+        );
+        let z = fpu.div(1.0, d(0.0001f32));
+        let vx = fpu.f(mul(mul(sub(d(sx), d(self.cx)), d(self.inv_fx)), z));
+        let vy = fpu.f(mul(mul(sub(d(sy), d(self.cy)), d(self.inv_fy)), z));
+        let vz = fpu.f(z);
         let m = self.matrix().map(d);
-        let row = |a: usize| f(r(r(r(vz * m[a + 2]) + r(vy * m[a + 1])) + r(vx * m[a]))) as f32;
+        let row = |a: usize| {
+            fpu.f32(add(
+                add(mul(vz, m[a + 2]), mul(vy, m[a + 1])),
+                mul(vx, m[a]),
+            ))
+        };
         [row(0), row(3), row(6)]
     }
 
@@ -240,10 +282,11 @@ impl Camera {
     /// the screen centre's direction: yaw = atan2(z, x), pitch = atan2(y,
     /// sqrt(z² + x²)).
     pub fn angles(&self) -> (f32, f32) {
-        let r = |x: f64| self.fpu.r(x);
+        let fpu = self.fpu;
         let [x, y, z] = self.ray(self.cx, self.cy).map(d);
-        let yaw = libm::atan2(z, x) as f32;
-        let pitch = libm::atan2(y, r(r(r(z * z) + r(x * x)).sqrt())) as f32;
+        let yaw = fpu.f32(libm::atan2(z, x));
+        let h = fpu.sqrt(fpu.add(fpu.mul(z, z), fpu.mul(x, x)));
+        let pitch = fpu.f32(libm::atan2(y, h));
         (yaw, pitch)
     }
 

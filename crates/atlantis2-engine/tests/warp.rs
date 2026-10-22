@@ -1,7 +1,7 @@
-//! The cube renderer and its camera against frames drawn by the original
-//! (`tests/golden/warp_cube.txt`): every golden frame is drawn with the
-//! port's own camera matrix and compared by MD5, and the matrix itself is
-//! compared bit for bit.
+//! The `warpC` cube renderer and its camera against frames drawn by the
+//! original (`tests/golden/warp_cube.txt`): every golden frame is drawn with
+//! the port's own camera matrix and compared by MD5, and the matrix itself
+//! is compared bit for bit. `warpPII`'s are in `tests/warp_pii.rs`.
 //!
 //! The synthetic `uv` frames need no game data. The others need the game:
 //! `ATLANTIS2_DATA` = the installed folder, `ATLANTIS2_DISCS` = a folder
@@ -17,7 +17,7 @@ use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::camera::{deg_to_rad, WARP_FOV};
 use atlantis2_engine::look::Look;
 use atlantis2_engine::warp::faces_from_hnm;
-use atlantis2_engine::{Camera, Engine, Fpu, Renderer};
+use atlantis2_engine::{Camera, Engine, Fpu, Renderer, Variant};
 use md5::{Digest, Md5};
 
 const GOLDEN: &str = include_str!("golden/warp_cube.txt");
@@ -123,7 +123,7 @@ fn check(file: &str, faces: &[Vec<u16>; 6]) -> (usize, Vec<String>, Vec<String>)
         if m.map(f32::to_bits) != row.matrix {
             bad_m.push(key.clone());
         }
-        let mut r = Renderer::new(row.fpu, row.w as usize, row.h as usize);
+        let mut r = Renderer::new(Variant::C, row.fpu, row.w as usize, row.h as usize);
         let mut out = vec![0xf81fu16; (row.w * row.h) as usize];
         r.render(faces, &m, cam.projection(), &mut out);
         assert_eq!(r.out_of_face, 0, "{key}");
@@ -207,20 +207,21 @@ fn panoramas_match_the_original() {
     assert_eq!(total, 997);
 }
 
-/// A new game opens on the first view as the original draws it, with the
-/// move to view 3 under the centre.
+/// A new game drawn by `warpC` opens on the first view as the original
+/// draws it, with the move to view 3 under the centre.
 ///
 /// The golden frames are the bare cube (the harness draws no sprite). The
 /// one entity state of view 2 shown at load (NOVA, `wka1002002.SPW`) draws
-/// on face 2 (`up`) only, and this frame samples face 1 alone (atlantis2-re
-/// `warp_cube_orient.txt`, row y-90.p0), so the bare cube is the original's
-/// frame here; looking up far enough to see the sprite is not covered.
+/// on face 2 (`up`) only, and this frame samples face 1 alone (the
+/// original's frame with the faces filled with a face-id pattern), so the
+/// bare cube is the original's frame here; looking up far enough to see
+/// the sprite is not covered.
 #[test]
 fn new_game_shows_the_first_view() {
     let (rows, _) = rows();
     for fpu in [Fpu::Double, Fpu::Single] {
         let Some(files) = game() else { return };
-        let mut e = Engine::new_game(files, fpu, 640, 480).unwrap();
+        let mut e = Engine::new_game(files, Variant::C, fpu, 640, 480).unwrap();
         assert_eq!(e.place(), ("tibet.wam", 2));
         assert_eq!(e.files().current_disc(), 1);
         let mut out = vec![0u16; 640 * 480];
@@ -303,7 +304,7 @@ fn turns_match_the_original() {
         let prefix = format!("turn.warpC.{cw}.");
         let mut cam = Camera::new(fpu, 640, 480);
         let mut look = Look::default();
-        let mut r = Renderer::new(fpu, 640, 480);
+        let mut r = Renderer::new(Variant::C, fpu, 640, 480);
         let mut out = vec![0xf81fu16; 640 * 480];
         let mut steps = 0;
         for line in TURN.lines().filter(|l| l.starts_with(&prefix)) {
