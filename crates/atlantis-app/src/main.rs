@@ -263,12 +263,8 @@ fn main() {
     // A folder of Atlantis II: its own mode.
     if is_a2 {
         refuse(&first_game_flags, "Atlantis II's mode");
-        let run = atlantis_app::a2::open(
-            Path::new(&args[0]),
-            &discs,
-            atlantis2_engine::Fpu::default(),
-        )
-        .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen));
+        let run = atlantis_app::a2::open(Path::new(&args[0]), &discs)
+            .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen));
         if let Err(e) = run {
             error_box(&e);
             std::process::exit(1);

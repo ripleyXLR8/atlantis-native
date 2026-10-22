@@ -18,4 +18,4 @@ pub mod warp;
 pub use camera::Camera;
 pub use engine::{Engine, EngineError};
 pub use fpu::Fpu;
-pub use warp::Renderer;
+pub use warp::{Renderer, Variant};

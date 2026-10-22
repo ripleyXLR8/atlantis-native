@@ -606,19 +606,31 @@ runs yet: no cinematic, no script, no move. `--headless <folder> [frames]
   first whose edges all hold the centre's direction
   (`crates/atlantis2-data/src/wam.rs`).
 - **Panorama:** a cube of six 512x512 faces (the HNM's six frames, `bk dn
-  ft lf rt up`), drawn every frame as six textured quads by a transcription
-  of the original's C rasteriser (`warpC`: a fan of triangles, perspective
-  every 32 pixels, 24.8 fixed point in between, nearest texel), with a
-  76° field of view and a near plane at z = 2
-  (`crates/atlantis2-engine/src/warp.rs`). The original picks its
-  rasteriser by CPU (C, P5, MMX, PII, K6-3D), and they differ by a texel
-  here and there; the C one is the one transcribed.
+  ft lf rt up`), drawn every frame as six textured quads with a 76° field
+  of view and a near plane at z = 2 (`crates/atlantis2-engine/src/warp.rs`).
+  The original picks its rasteriser by CPU (C, P5, MMX, PII, K6-3D), and
+  they differ by a texel here and there. The port draws with a
+  transcription of the Pentium II one (`warpPII`, `warp/pii.rs`), which
+  every Intel CPU since the Pentium II used: hand-written x87 and MMX code,
+  a fan of triangles ordered by their integer rows, perspective every 32
+  pixels and at the span's last pixel, 1.31 fixed point texel coordinates
+  stepped in 16-bit words in between (so the texel wraps within the face),
+  nearest texel. The C one (`warpC`: perspective every 32 pixels, 24.8
+  fixed point in between), which AMD CPUs used, is transcribed too and
+  kept for a later option.
 - **Camera:** the orientation is a float quaternion turned by axis-angle
   rotations built through 3x3 matrices, transcribed operation by
-  operation, with the x87's 53-bit or 24-bit precision (`fpu.rs`,
-  `camera.rs`): the matrix is the original's to the last bit, residues
-  included. Which precision the players had is not known (Direct3D may
-  have set 24 bits); the port uses 53 bits, and both are tested.
+  operation under the x87 control word (`fpu.rs`, `camera.rs`): the matrix
+  is the original's to the last bit, residues included. `warpPII` loads
+  the control word 0x0e7f (53-bit precision, rounding toward zero) and
+  never restores it, so after its first frame the camera's arithmetic
+  rounds toward zero too; the port models every operation in that mode
+  (the exact error of each sum, product, quotient and square root tells
+  which way the double was rounded). Before it, the process's word
+  applies: 53 bits to nearest (0x027f, Win32's default, the port's
+  choice) or 24 bits (0x007f, which Direct3D may have set; not known). A
+  new game's first view is entered under the process's word, as in the
+  original when no assembly frame was drawn before it (also not known).
 - **Turning:** the mouse adds dx / 2000 and −dy / 2000 radians to two
   speeds, which decay × 0.8 a frame; the limits stop the turn (`look.rs`).
   The original's warp loop is unpaced; the port turns once per frame at

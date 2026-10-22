@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 use atlantis2_data::files::OpenError;
 use atlantis2_data::A2Files;
-use atlantis2_engine::{Engine, Fpu};
+use atlantis2_engine::{Engine, Fpu, Variant};
 use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -38,8 +38,10 @@ const KEY_TURN: i32 = 8;
 /// one frame per 1/60 s.
 const FRAME: Duration = Duration::from_micros(16_667);
 
-/// Opens the game folder and starts a new game.
-pub fn open(dir: &Path, discs: &[PathBuf], fpu: Fpu) -> Result<Engine, String> {
+/// Opens the game folder and starts a new game, the cube drawn by
+/// `warpPII` (the reference renderer) for a process whose x87 control word
+/// starts as Win32's default.
+pub fn open(dir: &Path, discs: &[PathBuf]) -> Result<Engine, String> {
     let (files, build) = A2Files::open_dir(dir, discs).map_err(|e| match e {
         OpenError::NoDisc => format!(
             "{}: {e}, or give their folder with --discs <folder>",
@@ -53,7 +55,8 @@ pub fn open(dir: &Path, discs: &[PathBuf], fpu: Fpu) -> Result<Engine, String> {
         build.id,
         files.disc_numbers()
     );
-    Engine::new_game(files, fpu, WIDTH, HEIGHT).map_err(|e| format!("{}: {e}", dir.display()))
+    Engine::new_game(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
+        .map_err(|e| format!("{}: {e}", dir.display()))
 }
 
 /// `--headless`: runs `frames` frames without input, prints where the
@@ -64,7 +67,7 @@ pub fn headless(
     frames: u64,
     screenshot: Option<&Path>,
 ) -> Result<(), String> {
-    let mut engine = open(dir, discs, Fpu::default())?;
+    let mut engine = open(dir, discs)?;
     let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
     for _ in 0..frames {
         engine.frame();
