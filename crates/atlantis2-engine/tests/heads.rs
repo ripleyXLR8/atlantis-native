@@ -249,12 +249,24 @@ fn floats(v: &[&str]) -> Vec<u32> {
 
 /// One frame of shs1.db (frames 1 and 20) and H5s1.db (frame 1) step by
 /// step: the pose, the mouth, the camera, the transform, the culling, the
-/// projection and the pixels.
+/// projection and the pixels; the C routines under 0x027f.
 #[test]
 fn head_stages_match_the_original() {
     let Some(files) = game() else { return };
+    check_stages(&files, HEADS, Variant::C, Fpu::Double);
+}
+
+/// The same frames step by step with the Pentium II's routines, every
+/// step under 0x0e7f.
+#[test]
+fn pii_head_stages_match_the_original() {
+    let Some(files) = game() else { return };
+    check_stages(&files, HEADS_PII, Variant::PII, Fpu::Chop);
+}
+
+fn check_stages(files: &A2Files, golden: &str, variant: Variant, fpu: Fpu) {
     let mut keys: Vec<(String, i32)> = Vec::new();
-    for l in HEADS.lines().filter(|l| l.starts_with("stage ")) {
+    for l in golden.lines().filter(|l| l.starts_with("stage ")) {
         let f: Vec<&str> = l.split_whitespace().collect();
         let k = (f[1].to_string(), f[2].parse().unwrap());
         if !keys.contains(&k) {
@@ -263,7 +275,7 @@ fn head_stages_match_the_original() {
     }
     assert_eq!(keys.len(), 3);
     for (db, frame) in keys {
-        let want: BTreeMap<&str, Vec<&str>> = HEADS
+        let want: BTreeMap<&str, Vec<&str>> = golden
             .lines()
             .filter(|l| l.starts_with(&format!("stage {db} {frame} ")))
             .map(|l| {
@@ -271,7 +283,7 @@ fn head_stages_match_the_original() {
                 (f[3], f[4..].to_vec())
             })
             .collect();
-        let (mut head, _) = load_head(&files, &db, Variant::C, Fpu::Double);
+        let (mut head, _) = load_head(files, &db, variant, fpu);
         let mut rand = Rand::new(0);
         head.pose(frame);
         let (q, p, s) = head.head_world();

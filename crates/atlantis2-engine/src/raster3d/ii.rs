@@ -380,8 +380,11 @@ impl Scan<'_> {
             CLIP_LEFT
         });
         let xe = if CLIP_RIGHT >= xr { xr } else { CLIP_RIGHT };
-        // (A NaN left x would give the integer indefinite, a write far
-        // left of the row in the original; nothing is drawn here.)
+        // The original tests only `xl < xe` (@ 0x0051ef0a). xl is negative
+        // only as the integer indefinite (a NaN or out-of-range left x, the
+        // left clip being 0): with an in-range right x the original then
+        // spans from x = -2^31, a write outside the picture; nothing is
+        // drawn here (docs/TECHNICAL.md).
         if 0 <= xl && xl < xe {
             self.span(l, g, y, xl, xe, out);
         }

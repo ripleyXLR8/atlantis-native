@@ -1018,8 +1018,15 @@ after a short game with three saves.
   `[Smooth]`, `[Offset]` seconds ahead of the voice (`dialog.rs` reads
   the scripts). Frames, Z buffers, intermediate buffers and the weights
   of every Tibet line are the original's, bit for bit: the heads with
-  both variants (the Pentium II's under 0x0e7f, the C one under 0x027f),
-  the lip-sync under 0x027f, 0x007f and 0x0e7f;
+  both variants (the Pentium II's under 0x0e7f, the C one under 0x027f;
+  for each, three frames also step by step: the head's world pose, the
+  camera, the camera-space and projected vertices, the clip codes and the
+  face bytes), the lip-sync under 0x027f, 0x007f and 0x0e7f. One
+  departure, on purpose: when a row's left edge is a NaN or beyond the
+  32-bit range and its right edge is not, the original's II scan calls
+  its span from x = −2³¹ (`fistp` gives the integer indefinite, and the
+  test is only `xl < xe`), a write outside the picture; the port draws
+  nothing on that row. No frame checked has such a row;
   `cargo run --release --example head_png` draws a head to a PNG (`c` as
   a sixth argument for the C routines).
 - **The dialogs' control word:** the dialog's float code (the heads'

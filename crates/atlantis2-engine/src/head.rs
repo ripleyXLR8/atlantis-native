@@ -1155,26 +1155,31 @@ impl Head {
         (st, cv)
     }
 
-    /// The type-8 back faces (@ 0x00572030 → @ 0x0057fac0): the normal
-    /// from unrounded differences, stored as floats, the test on the
-    /// unrounded normal; drawn when N · c0 ≤ 0.
+    /// The type-8 back faces (@ 0x00572030 → @ 0x0057fac0); see
+    /// [`back_faces_pii`].
     fn back_faces_pii(&self, cv: &[[f64; 3]], codes: &mut [u8]) -> Vec<u8> {
-        let k = self.fpu;
-        let m = |x, y| k.mul(x, y);
-        let mut faces = Vec::with_capacity(self.mesh.corners.len());
-        for tri in &self.mesh.corners {
-            let [c0, c1, c2] = tri.map(|i| cv.get(i as usize).copied().unwrap_or([0.0; 3]));
-            let a: [f64; 3] = std::array::from_fn(|i| k.sub(c1[i], c0[i]));
-            let b: [f64; 3] = std::array::from_fn(|i| k.sub(c2[i], c0[i]));
-            let nx = k.sub(m(b[2], a[1]), m(a[2], b[1]));
-            let ny = k.sub(m(a[2], b[0]), m(a[0], b[2]));
-            let nz = k.sub(m(a[0], b[1]), m(b[0], a[1]));
-            let dot = k.add(m(c0[0], nx), k.add(m(c0[1], ny), m(c0[2], nz)));
-            // `fldz; fcomi; jb`: culled when 0 < dot or unordered.
-            faces.push(mark_front(dot <= 0.0, tri, codes));
-        }
-        faces
+        back_faces_pii(self.fpu, &self.mesh.corners, cv, codes)
     }
+}
+
+/// The type-8 back faces (@ 0x00572030 → @ 0x0057fac0): the normal
+/// from unrounded differences, stored as floats, the test on the
+/// unrounded normal; drawn when N · c0 ≤ 0, culled when unordered.
+fn back_faces_pii(k: Fpu, corners: &[[u16; 3]], cv: &[[f64; 3]], codes: &mut [u8]) -> Vec<u8> {
+    let m = |x, y| k.mul(x, y);
+    let mut faces = Vec::with_capacity(corners.len());
+    for tri in corners {
+        let [c0, c1, c2] = tri.map(|i| cv.get(i as usize).copied().unwrap_or([0.0; 3]));
+        let a: [f64; 3] = std::array::from_fn(|i| k.sub(c1[i], c0[i]));
+        let b: [f64; 3] = std::array::from_fn(|i| k.sub(c2[i], c0[i]));
+        let nx = k.sub(m(b[2], a[1]), m(a[2], b[1]));
+        let ny = k.sub(m(a[2], b[0]), m(a[0], b[2]));
+        let nz = k.sub(m(a[0], b[1]), m(b[0], a[1]));
+        let dot = k.add(m(c0[0], nx), k.add(m(c0[1], ny), m(c0[2], nz)));
+        // `fldz; fcomi; jb`: culled when 0 < dot or unordered.
+        faces.push(mark_front(dot <= 0.0, tri, codes));
+    }
+    faces
 }
 
 /// A face's byte (0 drawn, 0x40 back face); a drawn face's three vertices
@@ -1284,4 +1289,38 @@ fn lerp_position(c: Fpu, t0: f64, a: &Vec3, t1: f64, b: &Vec3, t: f64) -> Vec3 {
         c.f(c.add(y, a[1])),
         c.f(c.add(z, a[2])),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The type-8 back-face rule at its edges, against the original's loop
+    /// (@ 0x0057fac0) run under emulation on the same crafted faces under
+    /// 0x0e7f: a face whose N · c0 is exactly 0 (in a plane through the
+    /// eye, either winding, or degenerate) is drawn, a NaN one is culled.
+    #[test]
+    fn pii_back_faces_at_zero_and_unordered() {
+        let cv = [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 0.0, 5.0],
+            [1.0, 0.0, 5.0],
+            [0.0, 1.0, 5.0],
+            [f64::NAN, 0.0, 5.0],
+        ];
+        let corners = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [3, 4, 5],
+            [3, 5, 4],
+            [3, 3, 3],
+            [6, 4, 5],
+        ];
+        let mut codes = [0x01; 7];
+        let faces = back_faces_pii(Fpu::Chop, &corners, &cv, &mut codes);
+        assert_eq!(faces, [0x00, 0x00, 0x40, 0x00, 0x00, 0x40]);
+        assert_eq!(codes, [0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01]);
+    }
 }
