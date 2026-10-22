@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use atlantis2_data::con::NewGame;
 use atlantis2_data::db::Scene;
-use atlantis2_data::dialog::{parse_com, parse_info, LineKind};
+use atlantis2_data::dialog::{parse_com, parse_dial, parse_info, FontTxt, LineKind, World};
 use atlantis2_data::files::{holds_atlantis2, OpenError};
 use atlantis2_data::tga::Tga;
 use atlantis2_data::wam::{pick, Wam};
@@ -525,4 +525,37 @@ fn dialog_scripts() {
     }
     assert_eq!((lines, persos), (1214, 56));
     assert!(heads > 0);
+}
+
+/// The texts of `loc\Dial*.txt` (formats/loc-txt.md): 1214 lines and 358
+/// dialogs, the same ids in the same order as `com*.txt`, texts of at most
+/// 327 bytes (342 with the id and the speaker); the worlds' file sets;
+/// `Font.txt`.
+#[test]
+fn dialog_texts_and_fonts() {
+    let Some(files) = game() else { return };
+    let (mut lines, mut dialogs, mut longest) = (0, 0, 0);
+    for monde in 1..=5 {
+        let world = World::of_monde(monde).unwrap();
+        let [dial, com, _] = world.files();
+        let d = parse_dial(&files.read(Folder::Loc, &dial).unwrap());
+        let c = parse_com(&files.read(Folder::Scenar, &com).unwrap());
+        assert_eq!(d.len(), c.len(), "{dial}");
+        for (a, b) in d.iter().zip(&c) {
+            assert_eq!(a.id, b.id, "{dial}");
+            assert!(a.numbers().is_some(), "{dial} {}", a.id);
+            assert!(!a.text.contains(&b'\r'), "{dial} {}", a.id);
+            longest = longest.max(a.text.len());
+        }
+        let ids: std::collections::BTreeSet<u32> =
+            d.iter().filter_map(|l| l.numbers()).map(|n| n.0).collect();
+        lines += d.len();
+        dialogs += ids.len();
+    }
+    assert_eq!((lines, dialogs, longest), (1214, 358, 327));
+    let f = FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
+    assert_eq!(f.breaks, [0x20]);
+    assert_eq!(f.fonts.len(), 4);
+    let d = f.font("AtlFT_Dialog").unwrap();
+    assert_eq!((d.file.as_str(), d.height), ("Atl_Font.ttf", 12));
 }

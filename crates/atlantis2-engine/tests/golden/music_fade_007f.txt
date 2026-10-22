@@ -1,0 +1,467 @@
+# The music fade of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation, x87 control word 0x007f: FUN_004770c0 (a
+# percentage), FUN_00477090 (stop), FUN_00477dc0 (another music), the arming FUN_00476e30 and the
+# step FUN_00476e80 at given clocks. Producer: an emulation harness running the original code; stub:
+# the voice's SetVolume (recorded). Derived values only.
+0001.do init maxvol=100 vol=100 state=4
+0002.do setpct 20
+0003.armed startvol=100 target=20 duration=3f214285 start_time=bf800000
+0004.step clock=4024000000000000 t=10.0000 vol=100 state=3 next=4 target=20 set=-
+0005.step clock=4024222222222222 t=10.0667 vol=92 state=3 next=4 target=20 set=-6
+0006.step clock=4024444444444444 t=10.1333 vol=84 state=3 next=4 target=20 set=-11
+0007.step clock=4024666666666666 t=10.2000 vol=75 state=3 next=4 target=20 set=-22
+0008.step clock=4024888888888889 t=10.2667 vol=67 state=3 next=4 target=20 set=-41
+0009.step clock=4024aaaaaaaaaaab t=10.3333 vol=58 state=3 next=4 target=20 set=-79
+0010.step clock=4024cccccccccccd t=10.4000 vol=50 state=3 next=4 target=20 set=-143
+0011.step clock=4024eeeeeeeeeeef t=10.4667 vol=41 state=3 next=4 target=20 set=-278
+0012.step clock=4025111111111111 t=10.5333 vol=33 state=3 next=4 target=20 set=-502
+0013.step clock=4025333333333333 t=10.6000 vol=24 state=3 next=4 target=20 set=-972
+0014.step clock=4025555555555555 t=10.6667 vol=20 state=3 next=4 target=20 set=-1305
+0015.step clock=4025777777777777 t=10.7333 vol=20 state=4 next=4 target=20 set=-
+0016.do init maxvol=100 vol=100 state=4
+0017.do setpct 16
+0018.armed startvol=100 target=16 duration=3f2952a5 start_time=bf800000
+0019.step clock=4024000000000000 t=10.0000 vol=100 state=3 next=4 target=16 set=-
+0020.step clock=4024222222222222 t=10.0667 vol=92 state=3 next=4 target=16 set=-6
+0021.step clock=4024444444444444 t=10.1333 vol=84 state=3 next=4 target=16 set=-11
+0022.step clock=4024666666666666 t=10.2000 vol=75 state=3 next=4 target=16 set=-22
+0023.step clock=4024888888888889 t=10.2667 vol=67 state=3 next=4 target=16 set=-41
+0024.step clock=4024aaaaaaaaaaab t=10.3333 vol=58 state=3 next=4 target=16 set=-79
+0025.step clock=4024cccccccccccd t=10.4000 vol=50 state=3 next=4 target=16 set=-143
+0026.step clock=4024eeeeeeeeeeef t=10.4667 vol=41 state=3 next=4 target=16 set=-278
+0027.step clock=4025111111111111 t=10.5333 vol=33 state=3 next=4 target=16 set=-502
+0028.step clock=4025333333333333 t=10.6000 vol=24 state=3 next=4 target=16 set=-972
+0029.step clock=4025555555555555 t=10.6667 vol=16 state=3 next=4 target=16 set=-1752
+0030.step clock=4025777777777777 t=10.7333 vol=16 state=4 next=4 target=16 set=-
+0031.do init maxvol=100 vol=20 state=4
+0032.do setpct 100
+0033.armed startvol=20 target=100 duration=3f214285 start_time=bf800000
+0034.step clock=4024000000000000 t=10.0000 vol=20 state=3 next=4 target=100 set=-
+0035.step clock=4024222222222222 t=10.0667 vol=28 state=3 next=4 target=100 set=-725
+0036.step clock=4024444444444444 t=10.1333 vol=36 state=3 next=4 target=100 set=-402
+0037.step clock=4024666666666666 t=10.2000 vol=45 state=3 next=4 target=100 set=-207
+0038.step clock=4024888888888889 t=10.2667 vol=53 state=3 next=4 target=100 set=-115
+0039.step clock=4024aaaaaaaaaaab t=10.3333 vol=62 state=3 next=4 target=100 set=-59
+0040.step clock=4024cccccccccccd t=10.4000 vol=70 state=3 next=4 target=100 set=-33
+0041.step clock=4024eeeeeeeeeeef t=10.4667 vol=79 state=3 next=4 target=100 set=-17
+0042.step clock=4025111111111111 t=10.5333 vol=87 state=3 next=4 target=100 set=-9
+0043.step clock=4025333333333333 t=10.6000 vol=96 state=3 next=4 target=100 set=-4
+0044.step clock=4025555555555555 t=10.6667 vol=100 state=3 next=4 target=100 set=-3
+0045.step clock=4025777777777777 t=10.7333 vol=100 state=4 next=4 target=100 set=-
+0046.do init maxvol=100 vol=100 state=4
+0047.do setpct 0
+0048.armed startvol=100 target=0 duration=3f499326 start_time=bf800000
+0049.step clock=4024000000000000 t=10.0000 vol=100 state=3 next=4 target=0 set=-
+0050.step clock=4024222222222222 t=10.0667 vol=92 state=3 next=4 target=0 set=-6
+0051.step clock=4024444444444444 t=10.1333 vol=84 state=3 next=4 target=0 set=-11
+0052.step clock=4024666666666666 t=10.2000 vol=75 state=3 next=4 target=0 set=-22
+0053.step clock=4024888888888889 t=10.2667 vol=67 state=3 next=4 target=0 set=-41
+0054.step clock=4024aaaaaaaaaaab t=10.3333 vol=58 state=3 next=4 target=0 set=-79
+0055.step clock=4024cccccccccccd t=10.4000 vol=50 state=3 next=4 target=0 set=-143
+0056.step clock=4024eeeeeeeeeeef t=10.4667 vol=41 state=3 next=4 target=0 set=-278
+0057.step clock=4025111111111111 t=10.5333 vol=33 state=3 next=4 target=0 set=-502
+0058.step clock=4025333333333333 t=10.6000 vol=24 state=3 next=4 target=0 set=-972
+0059.step clock=4025555555555555 t=10.6667 vol=16 state=3 next=4 target=0 set=-1752
+0060.step clock=4025777777777777 t=10.7333 vol=7 state=3 next=4 target=0 set=-3396
+0061.step clock=402599999999999a t=10.8000 vol=0 state=3 next=4 target=0 set=-10000
+0062.step clock=4025bbbbbbbbbbbc t=10.8667 vol=0 state=4 next=4 target=0 set=-
+0063.do init maxvol=100 vol=100 state=4
+0064.do setpct 20
+0065.armed startvol=100 target=20 duration=3f214285 start_time=bf800000
+0066.step clock=4024000000000000 t=10.0000 vol=100 state=3 next=4 target=20 set=-
+0067.step clock=4024088888888889 t=10.0167 vol=98 state=3 next=4 target=20 set=-4
+0068.step clock=4024111111111111 t=10.0333 vol=96 state=3 next=4 target=20 set=-4
+0069.step clock=402419999999999a t=10.0500 vol=94 state=3 next=4 target=20 set=-5
+0070.step clock=4024222222222222 t=10.0667 vol=92 state=3 next=4 target=20 set=-6
+0071.step clock=40242aaaaaaaaaab t=10.0833 vol=90 state=3 next=4 target=20 set=-7
+0072.step clock=4024333333333333 t=10.1000 vol=88 state=3 next=4 target=20 set=-8
+0073.step clock=40243bbbbbbbbbbc t=10.1167 vol=86 state=3 next=4 target=20 set=-10
+0074.step clock=4024444444444444 t=10.1333 vol=84 state=3 next=4 target=20 set=-11
+0075.step clock=40244ccccccccccd t=10.1500 vol=81 state=3 next=4 target=20 set=-14
+0076.step clock=4024555555555555 t=10.1667 vol=79 state=3 next=4 target=20 set=-17
+0077.step clock=40245dddddddddde t=10.1833 vol=77 state=3 next=4 target=20 set=-19
+0078.step clock=4024666666666666 t=10.2000 vol=75 state=3 next=4 target=20 set=-22
+0079.step clock=40246eeeeeeeeeef t=10.2167 vol=73 state=3 next=4 target=20 set=-26
+0080.step clock=4024777777777777 t=10.2333 vol=71 state=3 next=4 target=20 set=-30
+0081.step clock=4024800000000000 t=10.2500 vol=69 state=3 next=4 target=20 set=-35
+0082.step clock=4024888888888889 t=10.2667 vol=67 state=3 next=4 target=20 set=-41
+0083.step clock=4024911111111111 t=10.2833 vol=65 state=3 next=4 target=20 set=-47
+0084.step clock=402499999999999a t=10.3000 vol=62 state=3 next=4 target=20 set=-59
+0085.step clock=4024a22222222222 t=10.3167 vol=60 state=3 next=4 target=20 set=-68
+0086.step clock=4024aaaaaaaaaaab t=10.3333 vol=58 state=3 next=4 target=20 set=-79
+0087.step clock=4024b33333333333 t=10.3500 vol=56 state=3 next=4 target=20 set=-92
+0088.step clock=4024bbbbbbbbbbbc t=10.3667 vol=54 state=3 next=4 target=20 set=-107
+0089.step clock=4024c44444444444 t=10.3833 vol=52 state=3 next=4 target=20 set=-124
+0090.step clock=4024cccccccccccd t=10.4000 vol=50 state=3 next=4 target=20 set=-143
+0091.step clock=4024d55555555555 t=10.4167 vol=48 state=3 next=4 target=20 set=-166
+0092.step clock=4024ddddddddddde t=10.4333 vol=45 state=3 next=4 target=20 set=-207
+0093.step clock=4024e66666666666 t=10.4500 vol=43 state=3 next=4 target=20 set=-240
+0094.step clock=4024eeeeeeeeeeef t=10.4667 vol=41 state=3 next=4 target=20 set=-278
+0095.step clock=4024f77777777777 t=10.4833 vol=39 state=3 next=4 target=20 set=-322
+0096.step clock=4025000000000000 t=10.5000 vol=37 state=3 next=4 target=20 set=-374
+0097.step clock=4025088888888888 t=10.5167 vol=35 state=3 next=4 target=20 set=-433
+0098.step clock=4025111111111111 t=10.5333 vol=33 state=3 next=4 target=20 set=-502
+0099.step clock=402519999999999a t=10.5500 vol=31 state=3 next=4 target=20 set=-581
+0100.step clock=4025222222222222 t=10.5667 vol=29 state=3 next=4 target=20 set=-673
+0101.step clock=40252aaaaaaaaaab t=10.5833 vol=26 state=3 next=4 target=20 set=-839
+0102.step clock=4025333333333333 t=10.6000 vol=24 state=3 next=4 target=20 set=-972
+0103.step clock=40253bbbbbbbbbbc t=10.6167 vol=22 state=3 next=4 target=20 set=-1127
+0104.step clock=4025444444444444 t=10.6333 vol=20 state=3 next=4 target=20 set=-1305
+0105.step clock=40254ccccccccccd t=10.6500 vol=20 state=4 next=4 target=20 set=-
+0106.do init maxvol=100 vol=100 state=4
+0107.do setpct 20
+0108.armed startvol=100 target=20 duration=3f214285 start_time=bf800000
+0109.step clock=4024000000000000 t=10.0000 vol=100 state=3 next=4 target=20 set=-
+0110.step clock=4024800000000000 t=10.2500 vol=69 state=3 next=4 target=20 set=-35
+0111.step clock=4025000000000000 t=10.5000 vol=37 state=3 next=4 target=20 set=-374
+0112.step clock=4025800000000000 t=10.7500 vol=20 state=3 next=4 target=20 set=-1305
+0113.step clock=4026000000000000 t=11.0000 vol=20 state=4 next=4 target=20 set=-
+0114.do init maxvol=127 vol=127 state=4
+0115.do setpct 20
+0116.armed startvol=127 target=25 duration=3f4d9b36 start_time=bf800000
+0117.step clock=4024000000000000 t=10.0000 vol=127 state=3 next=4 target=25 set=-
+0118.step clock=4024222222222222 t=10.0667 vol=119 state=3 next=4 target=25 set=0
+0119.step clock=4024444444444444 t=10.1333 vol=111 state=3 next=4 target=25 set=-1
+0120.step clock=4024666666666666 t=10.2000 vol=102 state=3 next=4 target=25 set=-3
+0121.step clock=4024888888888889 t=10.2667 vol=94 state=3 next=4 target=25 set=-5
+0122.step clock=4024aaaaaaaaaaab t=10.3333 vol=85 state=3 next=4 target=25 set=-10
+0123.step clock=4024cccccccccccd t=10.4000 vol=77 state=3 next=4 target=25 set=-19
+0124.step clock=4024eeeeeeeeeeef t=10.4667 vol=68 state=3 next=4 target=25 set=-38
+0125.step clock=4025111111111111 t=10.5333 vol=60 state=3 next=4 target=25 set=-68
+0126.step clock=4025333333333333 t=10.6000 vol=51 state=3 next=4 target=25 set=-133
+0127.step clock=4025555555555555 t=10.6667 vol=43 state=3 next=4 target=25 set=-240
+0128.step clock=4025777777777777 t=10.7333 vol=34 state=3 next=4 target=25 set=-466
+0129.step clock=402599999999999a t=10.8000 vol=26 state=3 next=4 target=25 set=-839
+0130.step clock=4025bbbbbbbbbbbc t=10.8667 vol=25 state=3 next=4 target=25 set=-904
+0131.step clock=4025ddddddddddde t=10.9333 vol=25 state=4 next=4 target=25 set=-
+0132.do init maxvol=127 vol=127 state=4
+0133.do setpct 16
+0134.armed startvol=127 target=20 duration=3f57af5f start_time=bf800000
+0135.step clock=4024000000000000 t=10.0000 vol=127 state=3 next=4 target=20 set=-
+0136.step clock=4024222222222222 t=10.0667 vol=119 state=3 next=4 target=20 set=0
+0137.step clock=4024444444444444 t=10.1333 vol=111 state=3 next=4 target=20 set=-1
+0138.step clock=4024666666666666 t=10.2000 vol=102 state=3 next=4 target=20 set=-3
+0139.step clock=4024888888888889 t=10.2667 vol=94 state=3 next=4 target=20 set=-5
+0140.step clock=4024aaaaaaaaaaab t=10.3333 vol=85 state=3 next=4 target=20 set=-10
+0141.step clock=4024cccccccccccd t=10.4000 vol=77 state=3 next=4 target=20 set=-19
+0142.step clock=4024eeeeeeeeeeef t=10.4667 vol=68 state=3 next=4 target=20 set=-38
+0143.step clock=4025111111111111 t=10.5333 vol=60 state=3 next=4 target=20 set=-68
+0144.step clock=4025333333333333 t=10.6000 vol=51 state=3 next=4 target=20 set=-133
+0145.step clock=4025555555555555 t=10.6667 vol=43 state=3 next=4 target=20 set=-240
+0146.step clock=4025777777777777 t=10.7333 vol=34 state=3 next=4 target=20 set=-466
+0147.step clock=402599999999999a t=10.8000 vol=26 state=3 next=4 target=20 set=-839
+0148.step clock=4025bbbbbbbbbbbc t=10.8667 vol=20 state=3 next=4 target=20 set=-1305
+0149.step clock=4025ddddddddddde t=10.9333 vol=20 state=4 next=4 target=20 set=-
+0150.do init maxvol=127 vol=25 state=4
+0151.do setpct 100
+0152.armed startvol=25 target=127 duration=3f4d9b36 start_time=bf800000
+0153.step clock=4024000000000000 t=10.0000 vol=25 state=3 next=4 target=127 set=-
+0154.step clock=4024222222222222 t=10.0667 vol=33 state=3 next=4 target=127 set=-502
+0155.step clock=4024444444444444 t=10.1333 vol=41 state=3 next=4 target=127 set=-278
+0156.step clock=4024666666666666 t=10.2000 vol=50 state=3 next=4 target=127 set=-143
+0157.step clock=4024888888888889 t=10.2667 vol=58 state=3 next=4 target=127 set=-79
+0158.step clock=4024aaaaaaaaaaab t=10.3333 vol=67 state=3 next=4 target=127 set=-41
+0159.step clock=4024cccccccccccd t=10.4000 vol=75 state=3 next=4 target=127 set=-22
+0160.step clock=4024eeeeeeeeeeef t=10.4667 vol=84 state=3 next=4 target=127 set=-11
+0161.step clock=4025111111111111 t=10.5333 vol=92 state=3 next=4 target=127 set=-6
+0162.step clock=4025333333333333 t=10.6000 vol=101 state=3 next=4 target=127 set=-3
+0163.step clock=4025555555555555 t=10.6667 vol=109 state=3 next=4 target=127 set=-1
+0164.step clock=4025777777777777 t=10.7333 vol=118 state=3 next=4 target=127 set=0
+0165.step clock=402599999999999a t=10.8000 vol=126 state=3 next=4 target=127 set=0
+0166.step clock=4025bbbbbbbbbbbc t=10.8667 vol=127 state=3 next=4 target=127 set=0
+0167.step clock=4025ddddddddddde t=10.9333 vol=127 state=4 next=4 target=127 set=-
+0168.do init maxvol=127 vol=127 state=4
+0169.do setpct 0
+0170.armed startvol=127 target=0 duration=3f800000 start_time=bf800000
+0171.step clock=4024000000000000 t=10.0000 vol=127 state=3 next=4 target=0 set=-
+0172.step clock=4024222222222222 t=10.0667 vol=119 state=3 next=4 target=0 set=0
+0173.step clock=4024444444444444 t=10.1333 vol=111 state=3 next=4 target=0 set=-1
+0174.step clock=4024666666666666 t=10.2000 vol=102 state=3 next=4 target=0 set=-3
+0175.step clock=4024888888888889 t=10.2667 vol=94 state=3 next=4 target=0 set=-5
+0176.step clock=4024aaaaaaaaaaab t=10.3333 vol=85 state=3 next=4 target=0 set=-10
+0177.step clock=4024cccccccccccd t=10.4000 vol=77 state=3 next=4 target=0 set=-19
+0178.step clock=4024eeeeeeeeeeef t=10.4667 vol=68 state=3 next=4 target=0 set=-38
+0179.step clock=4025111111111111 t=10.5333 vol=60 state=3 next=4 target=0 set=-68
+0180.step clock=4025333333333333 t=10.6000 vol=51 state=3 next=4 target=0 set=-133
+0181.step clock=4025555555555555 t=10.6667 vol=43 state=3 next=4 target=0 set=-240
+0182.step clock=4025777777777777 t=10.7333 vol=34 state=3 next=4 target=0 set=-466
+0183.step clock=402599999999999a t=10.8000 vol=26 state=3 next=4 target=0 set=-839
+0184.step clock=4025bbbbbbbbbbbc t=10.8667 vol=17 state=3 next=4 target=0 set=-1627
+0185.step clock=4025ddddddddddde t=10.9333 vol=9 state=3 next=4 target=0 set=-2931
+0186.step clock=4026000000000000 t=11.0000 vol=0 state=3 next=4 target=0 set=-10000
+0187.step clock=4026222222222222 t=11.0667 vol=0 state=4 next=4 target=0 set=-
+0188.do init maxvol=127 vol=127 state=4
+0189.do setpct 20
+0190.armed startvol=127 target=25 duration=3f4d9b36 start_time=bf800000
+0191.step clock=4024000000000000 t=10.0000 vol=127 state=3 next=4 target=25 set=-
+0192.step clock=4024088888888889 t=10.0167 vol=125 state=3 next=4 target=25 set=0
+0193.step clock=4024111111111111 t=10.0333 vol=123 state=3 next=4 target=25 set=0
+0194.step clock=402419999999999a t=10.0500 vol=121 state=3 next=4 target=25 set=0
+0195.step clock=4024222222222222 t=10.0667 vol=119 state=3 next=4 target=25 set=0
+0196.step clock=40242aaaaaaaaaab t=10.0833 vol=117 state=3 next=4 target=25 set=-1
+0197.step clock=4024333333333333 t=10.1000 vol=115 state=3 next=4 target=25 set=-1
+0198.step clock=40243bbbbbbbbbbc t=10.1167 vol=113 state=3 next=4 target=25 set=-1
+0199.step clock=4024444444444444 t=10.1333 vol=111 state=3 next=4 target=25 set=-1
+0200.step clock=40244ccccccccccd t=10.1500 vol=108 state=3 next=4 target=25 set=-2
+0201.step clock=4024555555555555 t=10.1667 vol=106 state=3 next=4 target=25 set=-2
+0202.step clock=40245dddddddddde t=10.1833 vol=104 state=3 next=4 target=25 set=-2
+0203.step clock=4024666666666666 t=10.2000 vol=102 state=3 next=4 target=25 set=-3
+0204.step clock=40246eeeeeeeeeef t=10.2167 vol=100 state=3 next=4 target=25 set=-3
+0205.step clock=4024777777777777 t=10.2333 vol=98 state=3 next=4 target=25 set=-4
+0206.step clock=4024800000000000 t=10.2500 vol=96 state=3 next=4 target=25 set=-4
+0207.step clock=4024888888888889 t=10.2667 vol=94 state=3 next=4 target=25 set=-5
+0208.step clock=4024911111111111 t=10.2833 vol=92 state=3 next=4 target=25 set=-6
+0209.step clock=402499999999999a t=10.3000 vol=89 state=3 next=4 target=25 set=-8
+0210.step clock=4024a22222222222 t=10.3167 vol=87 state=3 next=4 target=25 set=-9
+0211.step clock=4024aaaaaaaaaaab t=10.3333 vol=85 state=3 next=4 target=25 set=-10
+0212.step clock=4024b33333333333 t=10.3500 vol=83 state=3 next=4 target=25 set=-12
+0213.step clock=4024bbbbbbbbbbbc t=10.3667 vol=81 state=3 next=4 target=25 set=-14
+0214.step clock=4024c44444444444 t=10.3833 vol=79 state=3 next=4 target=25 set=-17
+0215.step clock=4024cccccccccccd t=10.4000 vol=77 state=3 next=4 target=25 set=-19
+0216.step clock=4024d55555555555 t=10.4167 vol=75 state=3 next=4 target=25 set=-22
+0217.step clock=4024ddddddddddde t=10.4333 vol=72 state=3 next=4 target=25 set=-28
+0218.step clock=4024e66666666666 t=10.4500 vol=70 state=3 next=4 target=25 set=-33
+0219.step clock=4024eeeeeeeeeeef t=10.4667 vol=68 state=3 next=4 target=25 set=-38
+0220.step clock=4024f77777777777 t=10.4833 vol=66 state=3 next=4 target=25 set=-44
+0221.step clock=4025000000000000 t=10.5000 vol=64 state=3 next=4 target=25 set=-51
+0222.step clock=4025088888888888 t=10.5167 vol=62 state=3 next=4 target=25 set=-59
+0223.step clock=4025111111111111 t=10.5333 vol=60 state=3 next=4 target=25 set=-68
+0224.step clock=402519999999999a t=10.5500 vol=58 state=3 next=4 target=25 set=-79
+0225.step clock=4025222222222222 t=10.5667 vol=56 state=3 next=4 target=25 set=-92
+0226.step clock=40252aaaaaaaaaab t=10.5833 vol=53 state=3 next=4 target=25 set=-115
+0227.step clock=4025333333333333 t=10.6000 vol=51 state=3 next=4 target=25 set=-133
+0228.step clock=40253bbbbbbbbbbc t=10.6167 vol=49 state=3 next=4 target=25 set=-154
+0229.step clock=4025444444444444 t=10.6333 vol=47 state=3 next=4 target=25 set=-179
+0230.step clock=40254ccccccccccd t=10.6500 vol=45 state=3 next=4 target=25 set=-207
+0231.step clock=4025555555555555 t=10.6667 vol=43 state=3 next=4 target=25 set=-240
+0232.step clock=40255dddddddddde t=10.6833 vol=41 state=3 next=4 target=25 set=-278
+0233.step clock=4025666666666666 t=10.7000 vol=39 state=3 next=4 target=25 set=-322
+0234.step clock=40256eeeeeeeeeef t=10.7167 vol=36 state=3 next=4 target=25 set=-402
+0235.step clock=4025777777777777 t=10.7333 vol=34 state=3 next=4 target=25 set=-466
+0236.step clock=4025800000000000 t=10.7500 vol=32 state=3 next=4 target=25 set=-540
+0237.step clock=4025888888888888 t=10.7667 vol=30 state=3 next=4 target=25 set=-625
+0238.step clock=4025911111111111 t=10.7833 vol=28 state=3 next=4 target=25 set=-725
+0239.step clock=402599999999999a t=10.8000 vol=26 state=3 next=4 target=25 set=-839
+0240.step clock=4025a22222222222 t=10.8167 vol=25 state=3 next=4 target=25 set=-904
+0241.step clock=4025aaaaaaaaaaab t=10.8333 vol=25 state=4 next=4 target=25 set=-
+0242.do init maxvol=127 vol=127 state=4
+0243.do setpct 20
+0244.armed startvol=127 target=25 duration=3f4d9b36 start_time=bf800000
+0245.step clock=4024000000000000 t=10.0000 vol=127 state=3 next=4 target=25 set=-
+0246.step clock=4024800000000000 t=10.2500 vol=96 state=3 next=4 target=25 set=-4
+0247.step clock=4025000000000000 t=10.5000 vol=64 state=3 next=4 target=25 set=-51
+0248.step clock=4025800000000000 t=10.7500 vol=32 state=3 next=4 target=25 set=-540
+0249.step clock=4026000000000000 t=11.0000 vol=25 state=3 next=4 target=25 set=-904
+0250.step clock=4026800000000000 t=11.2500 vol=25 state=4 next=4 target=25 set=-
+0251.do init maxvol=64 vol=64 state=4
+0252.do setpct 20
+0253.armed startvol=64 target=12 duration=3ed1a347 start_time=bf800000
+0254.step clock=4024000000000000 t=10.0000 vol=64 state=3 next=4 target=12 set=-
+0255.step clock=4024222222222222 t=10.0667 vol=56 state=3 next=4 target=12 set=-92
+0256.step clock=4024444444444444 t=10.1333 vol=48 state=3 next=4 target=12 set=-166
+0257.step clock=4024666666666666 t=10.2000 vol=39 state=3 next=4 target=12 set=-322
+0258.step clock=4024888888888889 t=10.2667 vol=31 state=3 next=4 target=12 set=-581
+0259.step clock=4024aaaaaaaaaaab t=10.3333 vol=22 state=3 next=4 target=12 set=-1127
+0260.step clock=4024cccccccccccd t=10.4000 vol=14 state=3 next=4 target=12 set=-2029
+0261.step clock=4024eeeeeeeeeeef t=10.4667 vol=12 state=3 next=4 target=12 set=-2351
+0262.step clock=4025111111111111 t=10.5333 vol=12 state=4 next=4 target=12 set=-
+0263.do init maxvol=64 vol=64 state=4
+0264.do setpct 16
+0265.armed startvol=64 target=10 duration=3ed9b367 start_time=bf800000
+0266.step clock=4024000000000000 t=10.0000 vol=64 state=3 next=4 target=10 set=-
+0267.step clock=4024222222222222 t=10.0667 vol=56 state=3 next=4 target=10 set=-92
+0268.step clock=4024444444444444 t=10.1333 vol=48 state=3 next=4 target=10 set=-166
+0269.step clock=4024666666666666 t=10.2000 vol=39 state=3 next=4 target=10 set=-322
+0270.step clock=4024888888888889 t=10.2667 vol=31 state=3 next=4 target=10 set=-581
+0271.step clock=4024aaaaaaaaaaab t=10.3333 vol=22 state=3 next=4 target=10 set=-1127
+0272.step clock=4024cccccccccccd t=10.4000 vol=14 state=3 next=4 target=10 set=-2029
+0273.step clock=4024eeeeeeeeeeef t=10.4667 vol=10 state=3 next=4 target=10 set=-2723
+0274.step clock=4025111111111111 t=10.5333 vol=10 state=4 next=4 target=10 set=-
+0275.do init maxvol=64 vol=12 state=4
+0276.do setpct 100
+0277.armed startvol=12 target=64 duration=3ed1a347 start_time=bf800000
+0278.step clock=4024000000000000 t=10.0000 vol=12 state=3 next=4 target=64 set=-
+0279.step clock=4024222222222222 t=10.0667 vol=20 state=3 next=4 target=64 set=-1305
+0280.step clock=4024444444444444 t=10.1333 vol=28 state=3 next=4 target=64 set=-725
+0281.step clock=4024666666666666 t=10.2000 vol=37 state=3 next=4 target=64 set=-374
+0282.step clock=4024888888888889 t=10.2667 vol=45 state=3 next=4 target=64 set=-207
+0283.step clock=4024aaaaaaaaaaab t=10.3333 vol=54 state=3 next=4 target=64 set=-107
+0284.step clock=4024cccccccccccd t=10.4000 vol=62 state=3 next=4 target=64 set=-59
+0285.step clock=4024eeeeeeeeeeef t=10.4667 vol=64 state=3 next=4 target=64 set=-51
+0286.step clock=4025111111111111 t=10.5333 vol=64 state=4 next=4 target=64 set=-
+0287.do init maxvol=64 vol=64 state=4
+0288.do setpct 0
+0289.armed startvol=64 target=0 duration=3f010204 start_time=bf800000
+0290.step clock=4024000000000000 t=10.0000 vol=64 state=3 next=4 target=0 set=-
+0291.step clock=4024222222222222 t=10.0667 vol=56 state=3 next=4 target=0 set=-92
+0292.step clock=4024444444444444 t=10.1333 vol=48 state=3 next=4 target=0 set=-166
+0293.step clock=4024666666666666 t=10.2000 vol=39 state=3 next=4 target=0 set=-322
+0294.step clock=4024888888888889 t=10.2667 vol=31 state=3 next=4 target=0 set=-581
+0295.step clock=4024aaaaaaaaaaab t=10.3333 vol=22 state=3 next=4 target=0 set=-1127
+0296.step clock=4024cccccccccccd t=10.4000 vol=14 state=3 next=4 target=0 set=-2029
+0297.step clock=4024eeeeeeeeeeef t=10.4667 vol=5 state=3 next=4 target=0 set=-3934
+0298.step clock=4025111111111111 t=10.5333 vol=0 state=3 next=4 target=0 set=-10000
+0299.step clock=4025333333333333 t=10.6000 vol=0 state=4 next=4 target=0 set=-
+0300.do init maxvol=64 vol=64 state=4
+0301.do setpct 20
+0302.armed startvol=64 target=12 duration=3ed1a347 start_time=bf800000
+0303.step clock=4024000000000000 t=10.0000 vol=64 state=3 next=4 target=12 set=-
+0304.step clock=4024088888888889 t=10.0167 vol=62 state=3 next=4 target=12 set=-59
+0305.step clock=4024111111111111 t=10.0333 vol=60 state=3 next=4 target=12 set=-68
+0306.step clock=402419999999999a t=10.0500 vol=58 state=3 next=4 target=12 set=-79
+0307.step clock=4024222222222222 t=10.0667 vol=56 state=3 next=4 target=12 set=-92
+0308.step clock=40242aaaaaaaaaab t=10.0833 vol=54 state=3 next=4 target=12 set=-107
+0309.step clock=4024333333333333 t=10.1000 vol=52 state=3 next=4 target=12 set=-124
+0310.step clock=40243bbbbbbbbbbc t=10.1167 vol=50 state=3 next=4 target=12 set=-143
+0311.step clock=4024444444444444 t=10.1333 vol=48 state=3 next=4 target=12 set=-166
+0312.step clock=40244ccccccccccd t=10.1500 vol=45 state=3 next=4 target=12 set=-207
+0313.step clock=4024555555555555 t=10.1667 vol=43 state=3 next=4 target=12 set=-240
+0314.step clock=40245dddddddddde t=10.1833 vol=41 state=3 next=4 target=12 set=-278
+0315.step clock=4024666666666666 t=10.2000 vol=39 state=3 next=4 target=12 set=-322
+0316.step clock=40246eeeeeeeeeef t=10.2167 vol=37 state=3 next=4 target=12 set=-374
+0317.step clock=4024777777777777 t=10.2333 vol=35 state=3 next=4 target=12 set=-433
+0318.step clock=4024800000000000 t=10.2500 vol=33 state=3 next=4 target=12 set=-502
+0319.step clock=4024888888888889 t=10.2667 vol=31 state=3 next=4 target=12 set=-581
+0320.step clock=4024911111111111 t=10.2833 vol=29 state=3 next=4 target=12 set=-673
+0321.step clock=402499999999999a t=10.3000 vol=26 state=3 next=4 target=12 set=-839
+0322.step clock=4024a22222222222 t=10.3167 vol=24 state=3 next=4 target=12 set=-972
+0323.step clock=4024aaaaaaaaaaab t=10.3333 vol=22 state=3 next=4 target=12 set=-1127
+0324.step clock=4024b33333333333 t=10.3500 vol=20 state=3 next=4 target=12 set=-1305
+0325.step clock=4024bbbbbbbbbbbc t=10.3667 vol=18 state=3 next=4 target=12 set=-1512
+0326.step clock=4024c44444444444 t=10.3833 vol=16 state=3 next=4 target=12 set=-1752
+0327.step clock=4024cccccccccccd t=10.4000 vol=14 state=3 next=4 target=12 set=-2029
+0328.step clock=4024d55555555555 t=10.4167 vol=12 state=3 next=4 target=12 set=-2351
+0329.step clock=4024ddddddddddde t=10.4333 vol=12 state=4 next=4 target=12 set=-
+0330.do init maxvol=64 vol=64 state=4
+0331.do setpct 20
+0332.armed startvol=64 target=12 duration=3ed1a347 start_time=bf800000
+0333.step clock=4024000000000000 t=10.0000 vol=64 state=3 next=4 target=12 set=-
+0334.step clock=4024800000000000 t=10.2500 vol=33 state=3 next=4 target=12 set=-502
+0335.step clock=4025000000000000 t=10.5000 vol=12 state=3 next=4 target=12 set=-2351
+0336.step clock=4025800000000000 t=10.7500 vol=12 state=4 next=4 target=12 set=-
+0337.do init maxvol=100 vol=100 state=4
+0338.do setpct 20
+0339.step clock=4034000000000000 t=20.0000 vol=100 state=3 next=4 target=20 set=-
+0340.step clock=4034111111111111 t=20.0667 vol=92 state=3 next=4 target=20 set=-6
+0341.step clock=4034222222222222 t=20.1333 vol=84 state=3 next=4 target=20 set=-11
+0342.step clock=4034333333333333 t=20.2000 vol=75 state=3 next=4 target=20 set=-22
+0343.do setpct 100
+0344.armed startvol=75 target=100 duration=3e499326 start_time=bf800000
+0345.step clock=4034444444444444 t=20.2667 vol=75 state=3 next=4 target=100 set=-
+0346.step clock=4034555555555555 t=20.3333 vol=83 state=3 next=4 target=100 set=-12
+0347.step clock=4034666666666666 t=20.4000 vol=91 state=3 next=4 target=100 set=-7
+0348.step clock=4034777777777777 t=20.4667 vol=100 state=3 next=4 target=100 set=-3
+0349.step clock=4034888888888888 t=20.5333 vol=100 state=4 next=4 target=100 set=-
+0350.do init maxvol=100 vol=100 state=4
+0351.do setpct 0
+0352.step clock=403e000000000000 t=30.0000 vol=100 state=3 next=4 target=0 set=-
+0353.step clock=403e19999999999a t=30.1000 vol=88 state=3 next=4 target=0 set=-8
+0354.step clock=4040400000000000 t=32.5000 vol=88 state=3 next=4 target=0 set=-
+0355.step clock=4040488888888889 t=32.5667 vol=88 state=3 next=4 target=0 set=-
+0356.step clock=4040511111111111 t=32.6333 vol=80 state=3 next=4 target=0 set=-15
+0357.step clock=404059999999999a t=32.7000 vol=72 state=3 next=4 target=0 set=-28
+0358.step clock=4040622222222222 t=32.7667 vol=63 state=3 next=4 target=0 set=-55
+0359.step clock=40406aaaaaaaaaab t=32.8333 vol=55 state=3 next=4 target=0 set=-99
+0360.step clock=4040733333333333 t=32.9000 vol=46 state=3 next=4 target=0 set=-193
+0361.step clock=40407bbbbbbbbbbc t=32.9667 vol=38 state=3 next=4 target=0 set=-347
+0362.step clock=4040844444444444 t=33.0333 vol=29 state=3 next=4 target=0 set=-673
+0363.step clock=40408ccccccccccd t=33.1000 vol=21 state=3 next=4 target=0 set=-1213
+0364.step clock=4040955555555555 t=33.1667 vol=12 state=3 next=4 target=0 set=-2351
+0365.step clock=40409dddddddddde t=33.2333 vol=4 state=3 next=4 target=0 set=-4234
+0366.step clock=4040a66666666666 t=33.3000 vol=0 state=3 next=4 target=0 set=-10000
+0367.step clock=4040aeeeeeeeeeef t=33.3667 vol=0 state=4 next=4 target=0 set=-
+0368.do init maxvol=100 vol=100 state=4
+0369.do stop
+0370.armed startvol=100 target=0 duration=3f499326 start_time=bf800000
+0371.step clock=4044000000000000 t=40.0000 vol=100 state=3 next=5 target=0 set=-
+0372.step clock=4044088888888889 t=40.0667 vol=92 state=3 next=5 target=0 set=-6
+0373.step clock=4044111111111111 t=40.1333 vol=84 state=3 next=5 target=0 set=-11
+0374.step clock=404419999999999a t=40.2000 vol=75 state=3 next=5 target=0 set=-22
+0375.step clock=4044222222222222 t=40.2667 vol=67 state=3 next=5 target=0 set=-41
+0376.step clock=40442aaaaaaaaaab t=40.3333 vol=58 state=3 next=5 target=0 set=-79
+0377.step clock=4044333333333333 t=40.4000 vol=50 state=3 next=5 target=0 set=-143
+0378.step clock=40443bbbbbbbbbbc t=40.4667 vol=41 state=3 next=5 target=0 set=-278
+0379.step clock=4044444444444444 t=40.5333 vol=33 state=3 next=5 target=0 set=-502
+0380.step clock=40444ccccccccccd t=40.6000 vol=24 state=3 next=5 target=0 set=-972
+0381.step clock=4044555555555555 t=40.6667 vol=16 state=3 next=5 target=0 set=-1752
+0382.step clock=40445dddddddddde t=40.7333 vol=7 state=3 next=5 target=0 set=-3396
+0383.step clock=4044666666666666 t=40.8000 vol=0 state=3 next=5 target=0 set=-10000
+0384.step clock=40446eeeeeeeeeef t=40.8667 vol=0 state=5 next=5 target=0 set=-
+0385.do init maxvol=100 vol=100 state=4
+0386.do start 3
+0387.armed startvol=100 target=0 duration=3f499326 start_time=bf800000
+0388.step clock=4049000000000000 t=50.0000 vol=100 state=3 next=2 target=0 set=-
+0389.step clock=4049088888888889 t=50.0667 vol=92 state=3 next=2 target=0 set=-6
+0390.step clock=4049111111111111 t=50.1333 vol=84 state=3 next=2 target=0 set=-11
+0391.step clock=404919999999999a t=50.2000 vol=75 state=3 next=2 target=0 set=-22
+0392.step clock=4049222222222222 t=50.2667 vol=67 state=3 next=2 target=0 set=-41
+0393.step clock=40492aaaaaaaaaab t=50.3333 vol=58 state=3 next=2 target=0 set=-79
+0394.step clock=4049333333333333 t=50.4000 vol=50 state=3 next=2 target=0 set=-143
+0395.step clock=40493bbbbbbbbbbc t=50.4667 vol=41 state=3 next=2 target=0 set=-278
+0396.step clock=4049444444444444 t=50.5333 vol=33 state=3 next=2 target=0 set=-502
+0397.step clock=40494ccccccccccd t=50.6000 vol=24 state=3 next=2 target=0 set=-972
+0398.step clock=4049555555555555 t=50.6667 vol=16 state=3 next=2 target=0 set=-1752
+0399.step clock=40495dddddddddde t=50.7333 vol=7 state=3 next=2 target=0 set=-3396
+0400.step clock=4049666666666666 t=50.8000 vol=0 state=3 next=2 target=0 set=-10000
+0401.step clock=40496eeeeeeeeeef t=50.8667 vol=0 state=2 next=2 target=100 set=-
+0403.do init maxvol=100 vol=100 state=4
+0404.do start 0
+0405.armed startvol=100 target=0 duration=3f499326 start_time=bf800000
+0406.step clock=4049000000000000 t=50.0000 vol=100 state=3 next=1 target=0 set=-
+0407.step clock=4049088888888889 t=50.0667 vol=92 state=3 next=1 target=0 set=-6
+0408.step clock=4049111111111111 t=50.1333 vol=84 state=3 next=1 target=0 set=-11
+0409.step clock=404919999999999a t=50.2000 vol=75 state=3 next=1 target=0 set=-22
+0410.step clock=4049222222222222 t=50.2667 vol=67 state=3 next=1 target=0 set=-41
+0411.step clock=40492aaaaaaaaaab t=50.3333 vol=58 state=3 next=1 target=0 set=-79
+0412.step clock=4049333333333333 t=50.4000 vol=50 state=3 next=1 target=0 set=-143
+0413.step clock=40493bbbbbbbbbbc t=50.4667 vol=41 state=3 next=1 target=0 set=-278
+0414.step clock=4049444444444444 t=50.5333 vol=33 state=3 next=1 target=0 set=-502
+0415.step clock=40494ccccccccccd t=50.6000 vol=24 state=3 next=1 target=0 set=-972
+0416.step clock=4049555555555555 t=50.6667 vol=16 state=3 next=1 target=0 set=-1752
+0417.step clock=40495dddddddddde t=50.7333 vol=7 state=3 next=1 target=0 set=-3396
+0418.step clock=4049666666666666 t=50.8000 vol=0 state=3 next=1 target=0 set=-10000
+0419.step clock=40496eeeeeeeeeef t=50.8667 vol=0 state=1 next=1 target=100 set=-
+0421.do init maxvol=100 vol=100 state=4
+0422.do setpct 16
+0423.step clock=408f400000000000 t=1000.0000 vol=100 state=3 next=4 target=16 set=-
+0424.step clock=408f408888888889 t=1000.0667 vol=92 state=3 next=4 target=16 set=-6
+0425.step clock=408f411111111111 t=1000.1333 vol=84 state=3 next=4 target=16 set=-11
+0426.step clock=408f41999999999a t=1000.2000 vol=75 state=3 next=4 target=16 set=-22
+0427.step clock=408f422222222222 t=1000.2667 vol=67 state=3 next=4 target=16 set=-41
+0428.step clock=408f42aaaaaaaaab t=1000.3333 vol=58 state=3 next=4 target=16 set=-79
+0429.step clock=408f433333333333 t=1000.4000 vol=50 state=3 next=4 target=16 set=-143
+0430.step clock=408f43bbbbbbbbbc t=1000.4667 vol=41 state=3 next=4 target=16 set=-278
+0431.step clock=408f444444444444 t=1000.5333 vol=33 state=3 next=4 target=16 set=-502
+0432.step clock=408f44cccccccccd t=1000.6000 vol=24 state=3 next=4 target=16 set=-972
+0433.step clock=408f455555555555 t=1000.6667 vol=16 state=3 next=4 target=16 set=-1752
+0434.step clock=408f45ddddddddde t=1000.7333 vol=16 state=4 next=4 target=16 set=-
+0435.do init maxvol=100 vol=100 state=4
+0436.do setpct 16
+0437.step clock=40bc204ccccccccd t=7200.3000 vol=100 state=3 next=4 target=16 set=-
+0438.step clock=40bc205dddddddde t=7200.3667 vol=92 state=3 next=4 target=16 set=-6
+0439.step clock=40bc206eeeeeeeef t=7200.4333 vol=84 state=3 next=4 target=16 set=-11
+0440.step clock=40bc208000000000 t=7200.5000 vol=75 state=3 next=4 target=16 set=-22
+0441.step clock=40bc209111111111 t=7200.5667 vol=67 state=3 next=4 target=16 set=-41
+0442.step clock=40bc20a222222222 t=7200.6333 vol=58 state=3 next=4 target=16 set=-79
+0443.step clock=40bc20b333333333 t=7200.7000 vol=50 state=3 next=4 target=16 set=-143
+0444.step clock=40bc20c444444444 t=7200.7667 vol=41 state=3 next=4 target=16 set=-278
+0445.step clock=40bc20d555555556 t=7200.8333 vol=33 state=3 next=4 target=16 set=-502
+0446.step clock=40bc20e666666667 t=7200.9000 vol=24 state=3 next=4 target=16 set=-972
+0447.step clock=40bc20f777777778 t=7200.9667 vol=16 state=3 next=4 target=16 set=-1752
+0448.step clock=40bc210888888889 t=7201.0333 vol=16 state=4 next=4 target=16 set=-
+0449.do init maxvol=100 vol=100 state=4
+0450.do setpct 16
+0451.step clock=40e3881666666666 t=40000.7000 vol=100 state=3 next=4 target=16 set=-
+0452.step clock=40e3881888888888 t=40000.7667 vol=92 state=3 next=4 target=16 set=-6
+0453.step clock=40e3881aaaaaaaaa t=40000.8333 vol=83 state=3 next=4 target=16 set=-12
+0454.step clock=40e3881ccccccccc t=40000.9000 vol=75 state=3 next=4 target=16 set=-22
+0455.step clock=40e3881eeeeeeeef t=40000.9667 vol=67 state=3 next=4 target=16 set=-41
+0456.step clock=40e3882111111111 t=40001.0333 vol=58 state=3 next=4 target=16 set=-79
+0457.step clock=40e3882333333333 t=40001.1000 vol=50 state=3 next=4 target=16 set=-143
+0458.step clock=40e3882555555555 t=40001.1667 vol=41 state=3 next=4 target=16 set=-278
+0459.step clock=40e3882777777777 t=40001.2333 vol=33 state=3 next=4 target=16 set=-502
+0460.step clock=40e3882999999999 t=40001.3000 vol=24 state=3 next=4 target=16 set=-972
+0461.step clock=40e3882bbbbbbbbb t=40001.3667 vol=16 state=3 next=4 target=16 set=-1752
+0462.step clock=40e3882ddddddddd t=40001.4333 vol=16 state=4 next=4 target=16 set=-
+0463.do init maxvol=100 vol=0 state=0
+0465.do init maxvol=100 vol=0 state=0

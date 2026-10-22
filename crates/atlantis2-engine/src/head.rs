@@ -660,6 +660,12 @@ impl Head {
         }
     }
 
+    /// A new line starts (@ 0x00463190): the idle mouth's accumulator back
+    /// to 0.
+    pub fn reset_idle(&mut self) {
+        self.idle_acc = 0.0;
+    }
+
     /// The idle mouth (@ 0x004631a0 without an analyser): every call the
     /// accumulator grows by 0.5; when it reaches 1 a random viseme is
     /// chosen; the mesh moves halfway toward the current one.

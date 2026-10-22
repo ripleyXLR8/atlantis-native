@@ -11,7 +11,8 @@
 //! - [`con`]: what a new game starts with, read from `chapi000.con`;
 //! - [`db`]: the `.db` 3D scenes (the dialog heads, the 3D puzzles);
 //! - [`tga`]: the heads' texture maps;
-//! - [`dialog`]: the dialog scripts' speakers and lines.
+//! - [`dialog`]: the dialog scripts' speakers and lines, their texts, the
+//!   worlds' file sets and heroes, and `Font.txt`.
 
 #![forbid(unsafe_code)]
 
