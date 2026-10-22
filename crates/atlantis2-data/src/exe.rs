@@ -80,6 +80,34 @@ pub fn pe_timestamp(exe: &[u8]) -> Option<u32> {
     ))
 }
 
+/// `len` bytes of `exe` at virtual address `va` (the image base plus the
+/// section's address), through the section table; `None` outside the
+/// sections' file data.
+pub fn bytes_at(exe: &[u8], va: u32, len: usize) -> Option<&[u8]> {
+    let u16_at = |o: usize| Some(u16::from_le_bytes(exe.get(o..o + 2)?.try_into().ok()?));
+    let u32_at = |o: usize| Some(u32::from_le_bytes(exe.get(o..o + 4)?.try_into().ok()?));
+    let pe = u32_at(0x3c)? as usize;
+    pe_timestamp(exe)?;
+    let sections = usize::from(u16_at(pe + 6)?);
+    let optional = usize::from(u16_at(pe + 20)?);
+    let base = u32_at(pe + 24 + 28)?;
+    let rva = va.checked_sub(base)?;
+    let table = pe + 24 + optional;
+    for i in 0..sections {
+        let s = table + 40 * i;
+        let (vsize, vaddr) = (u32_at(s + 8)?, u32_at(s + 12)?);
+        let (rsize, raw) = (u32_at(s + 16)?, u32_at(s + 20)?);
+        if rva >= vaddr && rva < vaddr + vsize.max(rsize) {
+            let off = (raw + rva - vaddr) as usize;
+            if (rva - vaddr) as usize + len > rsize as usize {
+                return None;
+            }
+            return exe.get(off..off + len);
+        }
+    }
+    None
+}
+
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }

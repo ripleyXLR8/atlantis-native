@@ -36,6 +36,7 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod host;
 mod menus;
+mod places;
 mod puzzles;
 pub use puzzles::{
     irish_click_hook, irish_entry_hook, mandala_hook_applies, ported_place, IrishPuzzle, MANDALAS,
@@ -125,6 +126,9 @@ pub enum Event {
     /// A transition sprite bank loaded (`datas_a2\spf\`, @ 0x0047c100), or
     /// not found.
     SpfLoad { name: String, found: bool },
+    /// A place sound started (@ 0x0047b4d0): its slot (voice 3 + slot) and
+    /// file.
+    PlaceSound { slot: usize, name: String },
     /// The scripts asked for a place of a world the port does not have
     /// yet (`changewam`): refused, the game stays where it is.
     WorldNotPorted(String),
@@ -454,6 +458,9 @@ pub struct Engine {
     /// (@ 0x00659188).
     deferred_wam: Option<(String, u32)>,
     deferred_old: u32,
+    /// The place sounds and their decoded files.
+    pub place: crate::place_sound::PlaceSounds,
+    place_pcm: places::PlacePcm,
     /// The scripts asked for a place the port does not have
     /// ([`Engine::refuse_place`]), handled once they are back.
     refused_place: Option<String>,
@@ -604,6 +611,7 @@ impl Engine {
         wam.apply_defnames(&engine.names);
         engine.wam = wam;
         engine.wam_name = start.wam.clone();
+        engine.place_sounds_reset();
         engine.arrival = (
             deg_to_rad(engine.camera.fpu, start.yaw_deg),
             deg_to_rad(engine.camera.fpu, start.pitch_deg),
@@ -703,6 +711,14 @@ impl Engine {
             }
         };
         let camera = Camera::new(fpu, width, height);
+        // The listener table of the place sounds, in the executable.
+        let place = crate::place_sound::PlaceSounds::new(
+            files
+                .install()
+                .read("atlantis2.exe")
+                .map(|exe| crate::place_sound::Listeners::from_exe(&exe))
+                .unwrap_or_default(),
+        );
         let mut anim = Anim::new(0);
         anim.cheval = names.id(defnames::OBJETS, b"CHEVAL").ok().map(|i| i as i32);
         Engine {
@@ -786,6 +802,8 @@ impl Engine {
             spf: Vec::new(),
             deferred_wam: None,
             deferred_old: 0,
+            place,
+            place_pcm: places::PlacePcm::new(),
             refused_place: None,
             music_after_video: false,
             hidden: None,
@@ -853,12 +871,12 @@ impl Engine {
         self.load_animations(id);
         // FUN_0049bd50: the puzzles' set-up of the view.
         self.entry_hooks();
+        // FUN_0047ad30: the place sounds of the view.
+        self.place_sounds_enter();
         // A slot hidden for a speaker is gone with the old view's slots.
         if let Some((slot, _)) = self.hidden.as_mut() {
             *slot = None;
         }
-        // No sound in Tibet: the place sounds (@ 0x0047ad30) come with the
-        // first world that has some.
         self.turn = None;
         Ok(())
     }
@@ -1234,6 +1252,8 @@ impl Engine {
                 self.vars.cliczone = 0;
             }
             self.click_scan();
+            // FUN_0047b390: the place sounds.
+            self.place_sounds_frame();
         }
         // 4. The click flags.
         self.click = false;
@@ -1704,6 +1724,8 @@ impl Engine {
         }
         self.centre_zone = None;
         self.next_view = None;
+        // FUN_0047afc0: the place sounds freed.
+        self.place_sounds_reset();
     }
 
     /// FUN_0047c100(old, new): the transition sprites of the move old →
@@ -1949,8 +1971,11 @@ impl Engine {
                 self.music.set_percent(20);
                 self.pending_sound = self.load_sound(&name);
             }
-            // The name is used as a printf format by the original.
-            self.start_video(&d.video.clone());
+            // The name is used as a printf format by the original; when
+            // the video cannot start, FUN_0047b280 (@ 0x0045a5b2).
+            if !self.start_video(&d.video.clone()) {
+                self.place_sounds_after_video();
+            }
         }
         if self.sprite_hit.is_none() {
             // FUN_0047bf40: the hand emptied.
@@ -1989,6 +2014,8 @@ impl Engine {
             name: name.to_string(),
             frames: Some(frames),
         });
+        // FUN_0047b030: the place sounds' listener steps.
+        self.place_sounds_video_start(frames);
         // The sound loaded for it (a film's track, a `TrajSound`) starts
         // on voice 2 (FUN_0047a650(id, 2)) at the effects volume.
         if let Some((sound, pcm)) = self.pending_sound.take() {
@@ -2050,7 +2077,12 @@ impl Engine {
         // `cinema=N,M`: the dialog's step after each frame (FUN_00480830,
         // FUN_00480840): its lines and subtitles over the film.
         self.film_dialog_step(new_tick, out);
-        if !new_tick || (!end && !self.click && !self.double) {
+        if !new_tick {
+            return;
+        }
+        if !end && !self.click && !self.double {
+            // FUN_0047b090: the place sounds along the video.
+            self.place_sounds_video_frame();
             return;
         }
         self.finish_video();
@@ -2117,6 +2149,9 @@ impl Engine {
         // sounds after a film (FUN_0047b280, not ported).
         if self.intro_playing {
             self.start_intro();
+        } else {
+            // FUN_0047b280: the old view's place sounds dropped.
+            self.place_sounds_after_video();
         }
         if let Some(mut d) = self.film_dialog.take() {
             d.remove(&self.voices);

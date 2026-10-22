@@ -628,8 +628,7 @@ hut (below). Ireland's boat laid there leaves for Ireland (world 1,
 below), which plays to its end without its four puzzles and sends the
 game back to Tibet with Ireland's mandala; a trip to another world (the
 other boats, the crystal, the space travel) plays its film and stays
-where it is. Not yet: the other worlds, Ireland's puzzles and place
-sounds.
+where it is. Not yet: the other worlds and Ireland's puzzles.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -855,8 +854,8 @@ after a short game with three saves.
   ported: no script reaches chapter 1 and its panoramas are on no disc.
   One place animation of `bigile1.wam` (`woA1001001.SPW`, a shadow in
   view 1, hidden at load) is on no disc; it is skipped with the
-  original's message. Not yet: the place sounds of `bigile1.wam`
-  (`subsystems/sound.md` of the study; 8 sources, 33 views).
+  original's message. The place sounds of `bigile1.wam` play (Sound,
+  below).
 - **Worlds:** Tibet (`tibet.wam`, world 5) and Ireland (above) are
   ported. A `changewam` of the scripts to any other place (the other
   boats' worlds, Shamballa's `voiles.wam` after the crystal,
@@ -989,9 +988,30 @@ after a short game with three saves.
   keeps them.
 - **Sound:** the voices of the original (0 the music, 1 the dialog
   voice, 2 the films' tracks and the effects) mixed as DirectSound does
-  (`sound.rs`). Tibet has no place sound (`tibet.wam` has none and is not
-  in the executable's listener table) and its two transition videos have
-  no sound track. A film's track (`cineNNN.apc`) plays on voice 2 at the
+  (`sound.rs`). The place sounds (`place_sound.rs`, `engine/places.rs`)
+  are the original's: the sources of the place file (a position, a
+  level, four files with a probability each) heard on voices 3 to 10
+  from the listener position that a table in the executable gives each
+  view of ten places (read from `atlantis2.exe`; a place not in it, as
+  Tibet, has none). At each view entry the sources the view hears take
+  one of 8 slots unless one holds them already (a slot keeps the view's
+  q it was taken with), their files loaded once by name; each panorama
+  frame that is not turning sets each playing slot's volume and pan from
+  the two ears' gains (the float arithmetic transcribed under the x87
+  control word) and lets each silent slot draw a file (`rand()`, the
+  probabilities) or wait a random number of 15 Hz ticks; a sound starts
+  silent and gets its level the next frame, and a source whose first
+  probability is 100 loops. Along a video the listener moves from the old
+  view's position to the new one's, one step per frame, and the sources
+  the new view does not hear fade over the last two thirds; its end frees
+  their slots, while a move without a video keeps every slot (heard from
+  the new listener). A place file loaded frees them all. The gains, the
+  levels and pans under the three control words, the video's steps and
+  fade, a sound's start and the scheduler are the original's
+  (`tests/place_sounds.rs`, its emulated runs), and so is every bruitage
+  of the shipped places at eight yaws. Ireland's `bigile1.wam` is the
+  only Irish place with sources (8 sources, 33 views); Tibet's two
+  transition videos have no sound track. A film's track (`cineNNN.apc`) plays on voice 2 at the
   effects volume from the film's first frame and stops with it; after a
   film the next panorama frame asks for the music at 100 %.
 - **Music** (`music.rs`, the player's states in `engine/host.rs`):
