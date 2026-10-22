@@ -129,7 +129,8 @@ impl Decoded {
 /// pixel format record 0x94 of FUN_004a3ab0: bytes B, G, R): a 1-5-5-5
 /// file's channel `c` becomes `c << 3` (checked under emulation on the 16
 /// credits pictures, `credits.txt`'s `load` rows); a 24-bit file's bytes
-/// are copied as they are [inferred: same masks].
+/// are copied as they are (checked under emulation on synthetic files of
+/// both types and row orders, `credits_tga24.txt`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bgr24 {
     pub width: usize,

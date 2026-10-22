@@ -306,17 +306,6 @@ impl SubtitleFont {
         });
     }
 
-    /// Draws `calls` into `out`, a `w` x `h` 24-bit surface (bytes B, G, R:
-    /// the credits' page surfaces), a `COLORREF`'s bytes as they are.
-    pub fn draw_bgr24(&self, out: &mut [u8], w: usize, h: usize, calls: &[TextOut]) {
-        self.draw_with(calls, |px, py, c| {
-            if px >= 0 && py >= 0 && (px as usize) < w && (py as usize) < h {
-                let i = 3 * (py as usize * w + px as usize);
-                out[i..i + 3].copy_from_slice(&[(c >> 16) as u8, (c >> 8) as u8, c as u8]);
-            }
-        });
-    }
-
     /// The pixels of `calls`: `put(x, y, colour)` for each pixel set.
     pub fn draw_with(&self, calls: &[TextOut], mut put: impl FnMut(i32, i32, u32)) {
         let upem = self.font.units_per_em().unwrap_or(2048.0);

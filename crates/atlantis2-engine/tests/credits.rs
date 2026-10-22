@@ -227,8 +227,9 @@ fn run(label: &str, pics: Vec<Vec<u8>>, npages: usize) {
         let mut act = 0;
         for off in offsets(!full) {
             let ms = start + off;
-            // FUN_004c3440: the counter (ms) over the frequency (1000.0).
-            c.update(fpu, fpu.div(f64::from(ms), 1000.0));
+            // The harness's counter is the port's: milliseconds over the
+            // frequency 1000.0, the quotient taken by the update.
+            c.update(fpu, u64::from(ms));
             act = if c.done { credits::END } else { 0 };
             seq.push(c.alpha);
             if fixed.contains(&off) {
@@ -316,4 +317,60 @@ fn the_blend_on_synthetic_pictures() {
         n += 1;
     }
     assert_eq!(n, 8);
+}
+
+/// A 640 x 480 24-bit TGA of the harness's pattern (type 2 or 10, rows
+/// top-down or bottom-up), as `credits.py tga24` writes it.
+fn tga24(kind: u8, top_down: bool) -> Vec<u8> {
+    let (w, h) = (WIDTH as u16, HEIGHT as u16);
+    let mut f = vec![0, 0, kind, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    f.extend(w.to_le_bytes());
+    f.extend(h.to_le_bytes());
+    f.extend([24, if top_down { 0x20 } else { 0 }]);
+    let row = |y: usize| -> Vec<[u8; 3]> {
+        (0..WIDTH)
+            .map(|x| [x as u8, y as u8, (x + y) as u8])
+            .collect()
+    };
+    let ys: Vec<usize> = if top_down {
+        (0..HEIGHT).collect()
+    } else {
+        (0..HEIGHT).rev().collect()
+    };
+    for y in ys {
+        let px = row(y);
+        if kind == 2 {
+            f.extend(px.concat());
+            continue;
+        }
+        // No two neighbours are equal: raw packets of up to 128 pixels.
+        for chunk in px.chunks(128) {
+            f.push(chunk.len() as u8 - 1);
+            f.extend(chunk.concat());
+        }
+    }
+    f
+}
+
+/// A 24-bit picture goes into a page surface unchanged, as the original
+/// copies it (`credits_tga24.txt`).
+#[test]
+fn a_24_bit_picture_is_copied_as_it_is() {
+    let golden = include_str!("golden/credits_tga24.txt");
+    let mut n = 0;
+    for r in golden.lines().filter(|l| l.starts_with("tga24 ")) {
+        let r: Vec<&str> = r.split_whitespace().collect();
+        let file = tga24(r[1].parse().unwrap(), r[2] == "1");
+        assert_eq!(md5(&file), r[3], "the harness's file");
+        assert_eq!(
+            md5(&Bgr24::parse(&file).unwrap().bytes),
+            r[4],
+            "type {} top-down {}",
+            r[1],
+            r[2]
+        );
+        assert_eq!(r[5], "yes");
+        n += 1;
+    }
+    assert_eq!(n, 4);
 }

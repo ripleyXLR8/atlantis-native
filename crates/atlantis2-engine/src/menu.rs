@@ -1626,7 +1626,7 @@ impl Page {
         }
         if let Some(c) = &mut self.credits {
             // FUN_00470d00 (in the draw, before the action of the frame).
-            c.update(fpu, clock);
+            c.update(fpu, crate::credits::counter(clock));
         }
     }
 

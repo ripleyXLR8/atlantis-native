@@ -34,7 +34,10 @@
 //! that frame. Then, t seconds after it: alpha 0 for t < 5, ftol((t − 5) ·
 //! 127.5) for t < 7, and 255 at t ≥ 7, which also sets the flag. The time
 //! is the performance counter over its frequency, the arithmetic of the x87
-//! under the control word of the moment ([`Fpu`]).
+//! under the control word of the moment ([`Fpu`]): [`counter_seconds`],
+//! on the port's own counter, the host clock in whole milliseconds at the
+//! frequency 1000 ([`counter`]; the original's counter and frequency are
+//! the machine's).
 //!
 //! **The fade** (FUN_00472bb0). Each channel of the screen is
 //! `T[255 − a][old] + T[a][new]` as a byte, with `T[i][j] = ftol(i · j ·
@@ -177,6 +180,25 @@ pub fn layout(
         .collect()
 }
 
+/// The frequency of the port's counter: milliseconds ([`counter`]).
+pub const COUNTER_FREQUENCY: f64 = 1000.0;
+
+/// The port's counter at the host clock `seconds`: whole milliseconds.
+pub fn counter(seconds: f64) -> u64 {
+    (seconds * COUNTER_FREQUENCY) as u64
+}
+
+/// FUN_004c3440: the 64-bit `counter` over `frequency`, as the x87 computes
+/// it under `fpu` (@ 0x004c3467..0x004c3482): the high dword loaded as a
+/// signed integer times 4294967295.0 (the double @ 0x005c67c0, not 2³²),
+/// plus the low dword as an unsigned one, over the frequency; the loads
+/// are exact, the product, the sum and the quotient round.
+pub fn counter_seconds(fpu: Fpu, counter: u64, frequency: f64) -> f64 {
+    let hi = f64::from((counter >> 32) as u32 as i32);
+    let lo = (counter & 0xffff_ffff) as f64;
+    fpu.div(fpu.add(fpu.mul(hi, 4294967295.0), lo), frequency)
+}
+
 /// The fade's weight at `now` for a page started at `start` (seconds, as
 /// FUN_004c3440 gives them), and whether the fade is over (the "next"
 /// flag): @ 0x00470ef2..0x00470f3e.
@@ -300,13 +322,10 @@ impl Credits {
         }
     }
 
-    /// The new page's surface (B, G, R bytes).
-    pub fn new_surface(&self) -> &[u8] {
-        &self.new
-    }
-
-    /// FUN_00470d00 at the clock `now` (seconds), before the draw.
-    pub fn update(&mut self, fpu: Fpu, now: f64) {
+    /// FUN_00470d00 at the port's counter `counter` ([`counter`]), before
+    /// the draw: the clock is FUN_004c3440's quotient under `fpu`.
+    pub fn update(&mut self, fpu: Fpu, counter: u64) {
+        let now = counter_seconds(fpu, counter, COUNTER_FREQUENCY);
         if self.next {
             self.old.copy_from_slice(&self.new);
             self.page += 1;
@@ -362,16 +381,30 @@ mod tests {
         assert_eq!(alpha(f, 7.0, 0.0), (255, true));
         let pic = vec![vec![8u8; WIDTH * HEIGHT * 3]; 16];
         let mut c = Credits::new(pic, &[vec![], vec![]], None);
-        let mut t = 0.0;
+        let mut ms = 0;
         let mut frames = 0;
         while !c.done {
-            c.update(f, t);
-            t += 0.5;
+            c.update(f, ms);
+            ms += 500;
             frames += 1;
         }
         // Page 1 at 0 s, black at 7.5 s (page 1 fades to it), done at 15 s.
         assert_eq!(c.page, 3);
         assert_eq!(frames, 31);
+    }
+
+    #[test]
+    fn counter_quotient() {
+        // 2.5 s at 1 kHz; above 2^32 counts the high dword weighs
+        // 4294967295, not 2^32 (@ 0x005c67c0).
+        assert_eq!(counter_seconds(Fpu::Double, 2500, 1000.0), 2.5);
+        assert_eq!(counter_seconds(Fpu::Double, 1 << 32, 1.0), 4294967295.0);
+        // Under 0x007f the quotient keeps 24 bits.
+        assert_eq!(
+            counter_seconds(Fpu::Single, 1001, 1000.0),
+            f64::from(1.001f32)
+        );
+        assert_eq!(counter(2.5), 2500);
     }
 
     #[test]

@@ -1148,14 +1148,22 @@ after a short game with three saves.
   they fade with it. Each page shows 5 s, then fades into the next over
   2 s (weight ftol((t − 5) × 127.5) of the time since the page started,
   under the x87 control word), the change coming at the frame after the
-  fade ends; the last page fades to black and the credits end one frame
+  fade ends. The time is the original's counter quotient (the high dword
+  times 4294967295.0 plus the low one, over the frequency, rounded as the
+  control word says) on the port's own counter: the host clock in whole
+  milliseconds at the frequency 1000, the harness's clock (the original's
+  counter is the machine's: the time-stamp counter at the processor's
+  frequency when it has one, else the performance counter; under the
+  24-bit control word its bits, and so a weight or a page change a frame
+  apart, depend on that machine); the last page fades to black and the credits end one frame
   after that (21 cycles of 7 s and a frame: 147.35 s at 60 frames a
   second), or at a click or while Escape is held (a key state, not a key
   press). The fade is the original's table blend: every channel of a
   picture shows one step darker than in its file, green keeps five bits,
   and a strong blue takes one from green (the signed shift of the
-  original). Their texts are drawn with the game's TrueType font as the
-  subtitles are (the original's are GDI's: a few pixels of each glyph
+  original). A 24-bit picture would be copied unchanged (checked on
+  synthetic files; the shipped ones are 16-bit). Their texts are drawn
+  with the game's TrueType font as the subtitles are (the original's are GDI's: a few pixels of each glyph
   differ). Built but not opened by the
   game: the disc request (every disc is read where it is), "please wait",
   "disk full" and "write error" (the original opens them only while

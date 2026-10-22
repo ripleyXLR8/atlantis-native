@@ -702,7 +702,7 @@ fn the_credits_end_after_the_last_page() {
         assert!(r.pass - start < 60 * 200, "the credits do not end");
         r.step();
     }
-    // (A float clock may land a page change a frame later.)
+    // (The millisecond counter may land a page change a frame later.)
     let n = r.pass - start;
     assert!((21 * 421 + 1..=21 * 422 + 1).contains(&n), "{n} frames");
 }
