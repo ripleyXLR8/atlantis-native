@@ -4,12 +4,14 @@
 //! Escape and a save through the menus over the open bar, the save loaded
 //! again through the load page, then continued from the player menu of a
 //! new run (the music started again from the save, at a drawn mark).
-//! Then a Tibet game from the start-up intro, played with the mouse only:
-//! the walk to the shaman, his subjects asked through the subject menu,
-//! a boat taken, the walk to the hut, the boat picked from the bag bar
-//! and laid on its zone (the mandala hook, chapter 75's section, the
-//! film, the trip to the boat's world refused), the puzzle's state kept
-//! by a save and a load.
+//! Then a game from the start-up intro, played with the mouse: the walk
+//! to the shaman, his subjects asked through the subject menu, Ireland's
+//! boat taken, the walk to the hut, the boat picked from the bag bar and
+//! laid on its zone (the mandala hook, chapter 75's section, the film),
+//! the trip to Ireland and its first dialog, Liam asked, the walk to the
+//! place of Brigid's cross (its hooks noted, the puzzle solved by the
+//! testing aid: the goddess), a save and a load in Ireland, and the way
+//! back to Tibet as chapter 16 makes it.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the test is skipped. The saves go to a
@@ -519,7 +521,7 @@ impl Run {
 }
 
 #[test]
-fn a_tibet_game_asks_the_shaman_and_lays_a_mandala() {
+fn a_game_from_tibet_to_ireland_and_back() {
     if game().is_none() {
         return;
     }
