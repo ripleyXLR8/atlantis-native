@@ -14,7 +14,7 @@ use atlantis2_data::defnames;
 use atlantis2_data::Folder;
 use atlantis_codecs::decode_apc;
 
-use super::{load_objects_bank, load_wam, Engine, Event};
+use super::{load_objects_bank, Engine, Event};
 use crate::crt::Rand;
 use crate::dialog::{Dialog, FrameContext, TickContext};
 use crate::music;
@@ -394,19 +394,7 @@ impl Host for Engine {
             self.refuse_place(name);
             return false;
         }
-        self.event(Event::Wam(name.to_string()));
-        match load_wam(&self.files, name) {
-            Ok(mut wam) => {
-                wam.apply_defnames(&self.names);
-                self.wam = wam;
-                self.wam_name = name.to_string();
-            }
-            // Fatal in the original (`Can't load WAM`).
-            Err(e) => log::error!("{e}"),
-        }
-        // The current view, zone and next view are forgotten.
-        self.centre_zone = None;
-        self.next_view = None;
+        self.load_place(name);
         true
     }
 

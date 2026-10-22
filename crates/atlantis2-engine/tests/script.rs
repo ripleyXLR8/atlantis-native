@@ -23,6 +23,7 @@ const TICK: &str = include_str!("golden/scripts_con_tick.txt");
 const TIBET: &str = include_str!("golden/scripts_con_tibet.txt");
 const TIBET_SCAN: &str = include_str!("golden/scripts_con_tibet_scan.txt");
 const NAMES: &str = include_str!("golden/scripts_con_names.txt");
+const IRELAND: &str = include_str!("golden/scripts_worlds_ireland.txt");
 
 fn rows(golden: &str) -> impl Iterator<Item = &str> {
     golden
@@ -458,11 +459,41 @@ fn run_set(
     h.chapter = Some(text.into_bytes());
     s.warnings.clear();
     let before = snap(s, h);
+    let stubbed = Stubbed::before(s);
     let r = s.set_variables(h, atlantis2_engine::script::Src::Chapter, 0);
+    stubbed.after(s, h);
     let after = snap(s, h);
     let changes = diff(&before, &after);
     let warnings = s.warnings.iter().map(|w| format!("warning:{w}")).collect();
     (r, h.calls.clone(), changes, warnings)
+}
+
+/// What the harnesses' stubs leave as it was and the game changes: the
+/// current view, which `AtlWam_Load` forgets (@ 0x0040ff98), and the
+/// cursor, which `Interp_SetMonde` clears (@ 0x00484df0; the port does it
+/// on the script's side). After a line that called them, the state the
+/// stub left is put back.
+struct Stubbed {
+    view: Option<i32>,
+    cursor: (i32, bool),
+}
+
+impl Stubbed {
+    fn before(s: &Script) -> Stubbed {
+        Stubbed {
+            view: s.current_view,
+            cursor: (s.cursor_sprite, s.cursor_objects),
+        }
+    }
+
+    fn after(self, s: &mut Script, h: &Rec) {
+        if h.calls.iter().any(|c| c.starts_with("AtlWam_Load")) {
+            s.current_view = self.view;
+        }
+        if h.calls.iter().any(|c| c.starts_with("Interp_SetMonde")) {
+            (s.cursor_sprite, s.cursor_objects) = self.cursor;
+        }
+    }
 }
 
 #[test]
@@ -573,6 +604,96 @@ fn every_tibet_set_line_matches_the_original() {
     }
     assert!(golden.next().is_none());
     assert_eq!(n, 430);
+}
+
+/// Every `/set` line of chapters 1 to 24 (the demo place and Ireland), each
+/// in place in its chapter's text, the state carried from line to line,
+/// against the original's (`scripts_worlds_ireland.txt`).
+#[test]
+fn every_ireland_set_line_matches_the_original() {
+    let Some(mut s) = game_script() else { return };
+    let names = s.names.clone();
+    let mut h = Rec::default();
+    s.current_view = Some(2);
+    let mut golden = rows(IRELAND).map(|r| fill(&names, r)).peekable();
+    let mut n = 0;
+    for chapter in 1..=24 {
+        let file = format!("chapi{chapter:03}.con");
+        // Ireland's chapters are 2-9, 11-17, 19, 20 and 24.
+        if matches!(chapter, 10 | 18 | 21..=23) {
+            continue;
+        }
+        let data = scenar(&file).unwrap();
+        let mut start = 0;
+        for (no, raw) in data.split(|&c| c == b'\n').enumerate() {
+            let line_start = start;
+            start += raw.len() + 1;
+            let raw = raw.strip_suffix(b"\r").unwrap_or(raw);
+            let blank = raw.iter().take_while(|&&c| c == b' ' || c == b'\t').count();
+            if raw[blank..].starts_with(b"#") {
+                continue;
+            }
+            let Some(p) = raw.windows(4).position(|w| w == b"/set") else {
+                continue;
+            };
+            // The harness: the file in the chapter buffer, the dialog and
+            // resume flags cleared, `SetVariables` on the line's `/set`.
+            s.set_chapter_text(&data);
+            s.resume_pending = false;
+            h.calls.clear();
+            h.chapter = Some(data.clone());
+            s.warnings.clear();
+            let before = snap(&s, &h);
+            let stubbed = Stubbed::before(&s);
+            let at = line_start + p;
+            let r = s.set_variables(&mut h, atlantis2_engine::script::Src::Chapter, at);
+            stubbed.after(&mut s, &h);
+            let after = snap(&s, &h);
+            let changes = diff(&before, &after);
+            let line: String = raw[p..].iter().map(|&c| char::from(c)).collect();
+            let key = line[5..]
+                .trim_start()
+                .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == ' '))
+                .next()
+                .unwrap()
+                .trim()
+                .to_ascii_lowercase();
+            let key =
+                if key.starts_with("flag") && key[4..].starts_with(|c: char| c.is_ascii_digit()) {
+                    "flag#".to_string()
+                } else {
+                    key
+                };
+            let names: Vec<&str> = h
+                .calls
+                .iter()
+                .map(|c| c.split('(').next().unwrap())
+                .collect();
+            let mut got = format!(
+                "{file}:{} key={key} ret={} calls={}:{} changes={}",
+                no + 1,
+                r.map_or(-1, |q| q as i64 - at as i64),
+                h.calls.len(),
+                names.join(","),
+                changes.len()
+            );
+            if s.fatal.is_some() {
+                got.push_str(" fatal");
+            }
+            if !s.warnings.is_empty() {
+                got.push_str(" warn");
+            }
+            let want = golden.next().unwrap_or_default();
+            assert_eq!(
+                got.to_ascii_lowercase(),
+                want.to_ascii_lowercase(),
+                "{changes:?}"
+            );
+            n += 1;
+        }
+    }
+    assert!(golden.next().is_none());
+    assert_eq!(n, 653);
 }
 
 #[test]

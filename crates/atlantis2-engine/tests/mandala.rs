@@ -317,18 +317,21 @@ fn e_row(e: &mut Engine, n: &DefNames, want: &str, t: &mut f64) {
         }
     };
     // The calls the engine's events show (the world, the film, the
-    // place), up to the refusal.
-    let calls: Vec<&str> = ev[scan..refused.map_or(ev.len(), |r| r + 1)]
+    // place), up to the place's load, refused or not.
+    let mut calls: Vec<&str> = ev[scan..refused.map_or(ev.len(), |r| r + 1)]
         .iter()
         .filter_map(|x| match x {
             Event::Monde(_) => Some("Interp_SetMonde"),
             Event::VideoStart {
                 frames: Some(_), ..
             } => Some("AtlHnm_start"),
-            Event::WorldNotPorted(_) => Some("AtlWam_Load"),
+            Event::WorldNotPorted(_) | Event::Wam(_) => Some("AtlWam_Load"),
             _ => None,
         })
         .collect();
+    if let Some(l) = calls.iter().position(|&c| c == "AtlWam_Load") {
+        calls.truncate(l + 1);
+    }
     let pose: Vec<String> = POSE
         .iter()
         .map(|p| format!("{}={}", tok(n, defnames::VARIABLES, p), var(e, p)))
@@ -393,6 +396,15 @@ fn e_row(e: &mut Engine, n: &DefNames, want: &str, t: &mut f64) {
         );
         assert!(!s.travel_refused && s.fatal.is_none() && !s.resume_pending);
         assert_eq!((e.hand, e.vars.objet_en_main), (None, 0));
+    }
+    // Ireland's boat: the trip made, the section's last lines (the place,
+    // its view, chapter 2).
+    if ev.contains(&Event::Wam("bigile1.wam".into())) {
+        assert!(refused.is_none());
+        assert_eq!(e.place(), ("bigile1.wam", 5));
+        let s = e.script_state().unwrap();
+        assert_eq!((s.chapter, s.var("MONDE")), (2, Some(1)));
+        assert!(s.fatal.is_none());
     }
 }
 
@@ -538,11 +550,12 @@ fn the_hook_only_in_view_10() {
 
     let Some(files) = game() else { return };
     let mut e = chapter_75(files);
+    // China's boat (its trip refused: the game stays in view 10).
     let boat = names(&e)
-        .id(defnames::OBJETS, b"MANDALA_BATEAU_IR")
+        .id(defnames::OBJETS, b"MANDALA_BATEAU_CH")
         .unwrap() as i32;
-    // View 10, ZONE_IRB with its boat: laid.
-    aim(&mut e, "ZONE_IRB");
+    // View 10, ZONE_CHB with its boat: laid.
+    aim(&mut e, "ZONE_CHB");
     set(&mut e, "ObjetEnMain", boat);
     e.events.clear();
     e.click(5.0);
@@ -551,7 +564,7 @@ fn the_hook_only_in_view_10() {
         .events
         .iter()
         .any(|x| matches!(x, Event::PuzzleHook { cliczone: 0, .. })));
-    assert_eq!(var(&e, "OrdreMandala1"), 1);
+    assert_eq!(var(&e, "OrdreMandala2"), 1);
     e.end_video();
     e.pass(None);
     // View 10's move zone (type 1, to view 9): the departure, no hook.

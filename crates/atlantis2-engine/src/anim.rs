@@ -108,6 +108,10 @@ pub struct Anim {
     pub table: ShowTable,
     pub rand: MsvcRand,
     blend: Blend,
+    /// `CHEVAL`'s `#OBJETS#` index (`DefName_GetIdName(1, "CHEVAL")`): the
+    /// slots of that id carry the horse's frame across views in
+    /// `FRAMECHEVAL` (@ 0x0047d84d, @ 0x0047c764); none without it.
+    pub cheval: Option<i32>,
 }
 
 /// The texel under the screen centre: (face, column, row).
@@ -122,6 +126,7 @@ impl Anim {
             table: ShowTable::default(),
             rand: MsvcRand(seed),
             blend: Blend::rgb565(),
+            cheval: None,
         }
     }
 
@@ -189,14 +194,21 @@ impl Anim {
     }
 
     /// FUN_0047d7f0 on a 15 Hz tick: every playing slot one frame on, then
-    /// the slots whose play has ended restart, hand over or stop.
-    pub fn step(&mut self) {
+    /// the slots whose play has ended restart, hand over or stop. Returns
+    /// the frame the first loop left in the last slot of `CHEVAL`'s id,
+    /// whatever its kind (the value it writes into `FRAMECHEVAL`,
+    /// @ 0x0047d84d..0x0047d872).
+    pub fn step(&mut self) -> Option<i32> {
+        let mut horse = None;
         for s in self.slots.iter_mut().filter(|s| s.active) {
             s.frame = if s.frame < 0 || s.frame >= s.end - 1 {
                 -1
             } else {
                 s.frame + 1
             };
+            if Some(s.id) == self.cheval {
+                horse = Some(s.frame);
+            }
         }
         for i in 0..self.slots.len() {
             if !self.slots[i].active || self.slots[i].frame != -1 {
@@ -233,6 +245,7 @@ impl Anim {
                 }
             }
         }
+        horse
     }
 
     /// FUN_0047d9a0: a slot that is not chained and whose state has a

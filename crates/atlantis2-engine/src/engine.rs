@@ -37,7 +37,9 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 mod host;
 mod menus;
 mod puzzles;
-pub use puzzles::{mandala_hook_applies, ported_place, MANDALAS};
+pub use puzzles::{
+    irish_click_hook, irish_entry_hook, mandala_hook_applies, ported_place, IrishPuzzle, MANDALAS,
+};
 mod saves;
 mod subjects;
 mod ui;
@@ -109,6 +111,20 @@ pub enum Event {
     /// A click on a zone the puzzle hooks take (@ 0x0049b910): the zone's
     /// index in the view, and `CLICZONE` as the hook finds it.
     PuzzleHook { zone: usize, cliczone: i32 },
+    /// A puzzle hook the port does not have (Ireland's four puzzles): the
+    /// original's function, which would have run here.
+    PuzzleNotPorted { function: u32 },
+    /// A move to another place (a type-2 zone, @ 0x0040fc60): its file,
+    /// the view, and whether it waits for the turn (deferred) or is made
+    /// at once.
+    LinkMove {
+        wam: String,
+        view: u32,
+        deferred: bool,
+    },
+    /// A transition sprite bank loaded (`datas_a2\spf\`, @ 0x0047c100), or
+    /// not found.
+    SpfLoad { name: String, found: bool },
     /// The scripts asked for a place of a world the port does not have
     /// yet (`changewam`): refused, the game stays where it is.
     WorldNotPorted(String),
@@ -287,6 +303,9 @@ struct Video {
     /// The tick counter when the last frame was shown (@ 0x006569dc).
     tick: u32,
     end: bool,
+    /// The frame counter of the frame shown (@ 0x00616884 before its
+    /// increment): the transition sprites' frame.
+    shown: u32,
 }
 
 /// The engine.
@@ -427,6 +446,14 @@ pub struct Engine {
     /// `TrajSound`'s file name (@ 0x00673198), until the next move with a
     /// video.
     traj_sound: Option<String>,
+    /// The transition sprites (@ 0x00673f40, count @ 0x00673fa4), drawn
+    /// over the video's frames.
+    spf: Vec<SprBank>,
+    /// A deferred change of place (@ 0x00659180 / 0x00659184): its file
+    /// and view, made when the move completes; and the view it leaves
+    /// (@ 0x00659188).
+    deferred_wam: Option<(String, u32)>,
+    deferred_old: u32,
     /// The scripts asked for a place the port does not have
     /// ([`Engine::refuse_place`]), handled once they are back.
     refused_place: Option<String>,
@@ -676,6 +703,8 @@ impl Engine {
             }
         };
         let camera = Camera::new(fpu, width, height);
+        let mut anim = Anim::new(0);
+        anim.cheval = names.id(defnames::OBJETS, b"CHEVAL").ok().map(|i| i as i32);
         Engine {
             files,
             wam: Wam::default(),
@@ -689,7 +718,7 @@ impl Engine {
             look: Look::default(),
             // GetTickCount() in the original: a port seeds with its clock
             // (`anim.rand`).
-            anim: Anim::new(0),
+            anim,
             loop_type: LoopType::Warp,
             turn: None,
             move_pending: false,
@@ -754,6 +783,9 @@ impl Engine {
             player: Player::default(),
             pending_sound: None,
             traj_sound: None,
+            spf: Vec::new(),
+            deferred_wam: None,
+            deferred_old: 0,
             refused_place: None,
             music_after_video: false,
             hidden: None,
@@ -819,6 +851,8 @@ impl Engine {
         self.camera.set_fov(WARP_FOV, w, h);
         self.look.stop();
         self.load_animations(id);
+        // FUN_0049bd50: the puzzles' set-up of the view.
+        self.entry_hooks();
         // A slot hidden for a speaker is gone with the old view's slots.
         if let Some((slot, _)) = self.hidden.as_mut() {
             *slot = None;
@@ -857,6 +891,19 @@ impl Engine {
                 Some(spw) => {
                     self.spw_loaded = true;
                     self.anim.load(&name, spw, kind, id, sprite, s);
+                    // The horse's frame kept across views (@ 0x0047c764):
+                    // a slot whose id is `CHEVAL`'s object index, whatever
+                    // its kind, starts at `FRAMECHEVAL`.
+                    if Some(id) == self.anim.cheval {
+                        let frame = self
+                            .con
+                            .as_deref()
+                            .and_then(|c| c.var("FRAMECHEVAL"))
+                            .unwrap_or(0);
+                        if let Some(slot) = self.anim.slots.last_mut().filter(|s| s.id == id) {
+                            slot.frame = frame;
+                        }
+                    }
                 }
                 None => log::warn!("Can't load SPW {name}"),
             }
@@ -1197,9 +1244,8 @@ impl Engine {
         }
         // AtlHnm_start shows the video's first frame at once (a transition,
         // or a film a scan started).
-        if let (Some(v), Some(out)) = (&self.video, out) {
-            let (w, h) = (self.renderer.width(), self.renderer.height());
-            blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
+        if let (Some(_), Some(out)) = (&self.video, out) {
+            self.draw_video(out);
         }
         // 6.
         self.vars.cliczone = 0;
@@ -1261,7 +1307,11 @@ impl Engine {
         restore(&mut self.work, &self.faces, &dirty);
         if self.spw_flag && self.spw_loaded {
             self.spw_flag = false;
-            self.anim.step();
+            if let Some(frame) = self.anim.step() {
+                if let Some(s) = self.con.as_mut() {
+                    s.set_var("FRAMECHEVAL", frame);
+                }
+            }
         }
         // The cursor for the next frame (after FUN_0045af10 drew this one),
         // unless the bar, the subject menu (or a dialog) is open.
@@ -1499,6 +1549,16 @@ impl Engine {
 
     /// FUN_0049ca80: a click on the zone under the centre.
     fn zone_click(&mut self) {
+        // In Ireland's view 73 the blackbird game's click (FUN_00495ae0)
+        // comes first (@ 0x0049ca8e..0x0049cab3): not ported.
+        if self.click {
+            let blackbird = self.current_view().is_some_and(|v| {
+                v.name.len() >= 2 && v.name.as_bytes()[..2].eq_ignore_ascii_case(b"IR")
+            }) && self.view == 73;
+            if blackbird {
+                self.puzzle_not_ported(0x0049_5ae0);
+            }
+        }
         // Not while the subject menu or the bag bar is open or a dialog
         // runs (@ 0x006617b0, 0x00671ef0, 0x006cfb54).
         if !self.click || self.subject_menu.open || self.bar.open || self.dialog.is_some() {
@@ -1536,8 +1596,212 @@ impl Engine {
         }
         match zone.kind {
             1 => self.move_setup(&zone),
-            2 => log::warn!("zone {zi}: moves to other places are not ported"),
+            2 => self.link_setup(&zone),
             _ => {}
+        }
+    }
+
+    /// FUN_0049cbf0: a type-2 zone: the first link of the current place
+    /// file's root place from the current view to the zone's value
+    /// (@ 0x0049cc0b..0x0049cc18) moves to that view of the link's file
+    /// (FUN_0040fc60); none: nothing.
+    fn link_setup(&mut self, zone: &Zone) {
+        let link = self.wam.places.first().and_then(|p| {
+            p.links
+                .iter()
+                .find(|l| l.from_view == self.view && l.to_view as i32 == zone.value)
+                .cloned()
+        });
+        if let Some(l) = link {
+            self.change_place(&l.wam, l.to_view);
+        }
+    }
+
+    /// FUN_0040fc60(file, N): with a destination from the current view to
+    /// N, a deferred change (the file and N kept, the transition sprites
+    /// of that pair when the current file has a view N, then the turn as
+    /// the destination says, made pending at once when none is needed);
+    /// without one, the file is loaded and view N entered at once
+    /// (`LASTVUE` = 0, `VUE` = N, no arrival scan, no video).
+    fn change_place(&mut self, name: &str, n: u32) {
+        if ported_place(name).is_none() {
+            log::warn!("{name}: this world is not ported yet, the game stays here");
+            self.event(Event::WorldNotPorted(name.to_string()));
+            return;
+        }
+        self.deferred_old = 0;
+        let dest = self
+            .current_view()
+            .and_then(|v| v.destinations.iter().find(|d| d.target == n).cloned());
+        self.event(Event::LinkMove {
+            wam: name.to_string(),
+            view: n,
+            deferred: dest.is_some(),
+        });
+        let Some(d) = dest else {
+            // @ 0x0040fc9f..0x0040fcd5.
+            self.load_place(name);
+            if self.wam.view(n).is_some() {
+                if let Some(s) = self.con.as_mut() {
+                    s.current_view = None;
+                    s.set_current_view(n as i32);
+                }
+                self.vars.last_vue = 0;
+                if let Err(e) = self.enter_view(n, self.arrival.0, self.arrival.1) {
+                    log::error!("{e}");
+                }
+            }
+            return;
+        };
+        // @ 0x0040fce0..0x0040fe43.
+        self.deferred_old = self.view;
+        if self.wam.view(n).is_some() {
+            self.load_transition_sprites(self.view, n);
+        }
+        self.deferred_wam = Some((name.to_string(), n));
+        let none = f32::from_bits(0x4479_c000);
+        let pending = if d.angles_as_given != 0 {
+            self.arrival = (d.end_yaw, d.end_pitch);
+            !self.start_turn(d.start_yaw, d.start_pitch)
+        } else {
+            let mut start = (none, none);
+            if d.start_yaw <= 998.0 {
+                start = (d.start_yaw, d.start_pitch);
+            } else if let Some((_, z)) = self.centre() {
+                start = zone_aim(self.camera.fpu, &z.points);
+            }
+            self.arrival = if d.end_yaw <= 998.0 {
+                (d.end_yaw, d.end_pitch)
+            } else {
+                start
+            };
+            if start.0 < 998.0 {
+                !self.start_turn(start.0, start.1)
+            } else {
+                self.turn = None;
+                true
+            }
+        };
+        if pending {
+            self.move_pending = true;
+        }
+    }
+
+    /// `AtlWam_Load` (@ 0x0040fee0): the place file read, the entities'
+    /// and zones' names resolved; the zone under the centre and the move's
+    /// next view forgotten. No view is entered (the scripts' `vue=` or a
+    /// move does it; tests use [`Engine::enter_at`]).
+    pub fn load_place(&mut self, name: &str) {
+        self.event(Event::Wam(name.to_string()));
+        match load_wam(&self.files, name) {
+            Ok(mut wam) => {
+                wam.apply_defnames(&self.names);
+                self.wam = wam;
+                self.wam_name = name.to_string();
+            }
+            // Fatal in the original (`Can't load WAM`).
+            Err(e) => log::error!("{e}"),
+        }
+        self.centre_zone = None;
+        self.next_view = None;
+    }
+
+    /// FUN_0047c100(old, new): the transition sprites of the move old →
+    /// new (a leftover set freed first, with the original's warning): the
+    /// first destination of view `old` (of the current place file) to
+    /// `new` with a sprite list; for each name not hidden
+    /// (FUN_00484d90), the bank `<prefix><old><new>.spr` of the entity of
+    /// that name (FUN_00412410), at most 10.
+    fn load_transition_sprites(&mut self, old: u32, new: u32) {
+        if !self.spf.is_empty() {
+            log::warn!("AtlSpr_init_spf() {} spf not cleared", self.spf.len());
+            self.spf.clear();
+        }
+        let names: Vec<String> = self
+            .wam
+            .view(old)
+            .and_then(|v| {
+                v.destinations
+                    .iter()
+                    .find(|d| d.target == new && !d.sprites.is_empty())
+            })
+            .map(|d| d.sprites.clone())
+            .unwrap_or_default();
+        for name in names {
+            if self.spf_hidden(&name) {
+                continue;
+            }
+            let prefix = self
+                .wam
+                .entities
+                .iter()
+                .find(|e| e.con_name == name)
+                .map(|e| e.prefix.clone())
+                .unwrap_or_default();
+            let file = format!("{prefix}{old:03}{new:03}.spr");
+            let bank = self
+                .files
+                .read(Folder::Spf, &file)
+                .and_then(|d| SprBank::parse(&d).ok());
+            self.event(Event::SpfLoad {
+                name: file.clone(),
+                found: bank.is_some(),
+            });
+            let Some(bank) = bank else {
+                log::warn!("{file}: no transition sprite");
+                continue;
+            };
+            if self.spf.len() >= 10 {
+                // Fatal in the original (`nb_spf>=MAX_SPF`).
+                log::error!("AtlSpr_init_spf() : nb_spf>=MAX_SPF!!");
+                return;
+            }
+            self.spf.push(bank);
+        }
+    }
+
+    /// `Interp_is_perso_hidden` (FUN_00484d90): the name as an object (or
+    /// else as a character) hidden by the show / hide table (a state
+    /// below 1; no row gives 2).
+    fn spf_hidden(&self, name: &str) -> bool {
+        let perso = self
+            .names
+            .id(defnames::PERSONNAGES, name.as_bytes())
+            .unwrap_or(0) as i32;
+        let objet = self
+            .names
+            .id(defnames::OBJETS, name.as_bytes())
+            .unwrap_or(0) as i32;
+        if (perso == 0) == (objet == 0) {
+            log::warn!("Interp_is_perso_hidden(): PB avec SPF {name}");
+        }
+        let (id, kind) = if objet != 0 { (objet, 2) } else { (perso, 1) };
+        self.anim.table.get(id, kind) < 1
+    }
+
+    /// The video's frame centred on the screen, then frame k of each
+    /// transition sprite bank at its default position (FUN_0040bbb0
+    /// @ 0x0040bc58 → FUN_0047c200): k the frame counter; a bank shorter
+    /// than k, or a sprite larger than 640 x 480, is not drawn
+    /// (FUN_0047bc40's checks).
+    fn draw_video(&self, out: &mut [u16]) {
+        let Some(v) = &self.video else {
+            return;
+        };
+        let (w, h) = (self.renderer.width(), self.renderer.height());
+        blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
+        let k = v.shown as usize;
+        let mut t = Target::screen(out, w, h);
+        for bank in &self.spf {
+            if k >= bank.len() {
+                continue;
+            }
+            match bank.info(k) {
+                Some(i) if i.w <= 640 && i.h <= 480 => {
+                    bank.draw(&mut t, None, 0, k);
+                }
+                _ => {}
+            }
         }
     }
 
@@ -1624,13 +1888,36 @@ impl Engine {
     /// entered at the arrival angles, then its transition video.
     fn complete_move(&mut self) {
         self.move_pending = false;
+        // A deferred change of place (@ 0x0045a487..0x0045a4e6): the file
+        // loaded, its view N the next one, `NextWarpInvalide` = 0; the old
+        // view is then the one kept (@ 0x00659188), the current view
+        // being none after the load.
+        let mut old_record = true;
+        if let Some((name, n)) = self.deferred_wam.take() {
+            old_record = false;
+            self.load_place(&name);
+            self.next_view = self.wam.view(n).map(|v| v.id);
+            if self.next_view.is_none() {
+                // Fatal in the original.
+                log::error!("AtlWarp_continue(): load wam {name} : vue {n} introuvable!");
+            }
+            self.set_script_var(|k| k.next_warp_invalide, 0);
+            if let Some(s) = self.con.as_mut() {
+                s.current_view = None;
+            }
+        }
         let Some(next) = self.next_view.take() else {
-            // FUN_0045a630 (after a change of place): not ported.
-            log::warn!("move without a next view");
+            // FUN_0045a630: only `voiles.wam` (Shamballa's fireflies, not
+            // ported) does something there.
+            log::debug!("move without a next view");
             return;
         };
-        let old = self.view;
-        self.vars.last_vue = old;
+        let old = if old_record {
+            self.view
+        } else {
+            self.deferred_old
+        };
+        self.vars.last_vue = if old_record { old } else { 0 };
         self.vars.arrivee_vue = next;
         // `LASTVUE`, `VUE` and `ARRIVEEVUE` for the arrival scan of the next
         // frame.
@@ -1641,6 +1928,10 @@ impl Engine {
             log::error!("{e}");
             return;
         }
+        // FUN_0047c100 (@ 0x0045a54f), when the old view record is there.
+        if old_record {
+            self.load_transition_sprites(old, next);
+        }
         let dest = self
             .wam
             .places
@@ -1649,12 +1940,6 @@ impl Engine {
             .filter(|v| v.id == old)
             .find_map(|v| v.destinations.iter().find(|d| d.target == next))
             .cloned();
-        if let Some(d) = &dest {
-            if !d.sprites.is_empty() {
-                // FUN_0047c100: none in Tibet.
-                log::warn!("transition sprites are not ported");
-            }
-        }
         // `UDADA` ≠ 0 skips the video, as a double click does.
         let udada = self.con.as_ref().and_then(|s| s.var("UDADA")).unwrap_or(0);
         if let (Some(d), false, 0) = (&dest, self.double, udada) {
@@ -1720,6 +2005,7 @@ impl Engine {
             prev: self.loop_type,
             tick: self.ticks,
             end,
+            shown: 0,
         });
         self.loop_type = LoopType::Video;
         true
@@ -1732,14 +2018,16 @@ impl Engine {
             self.loop_type = LoopType::Warp;
             return;
         };
-        let (w, h) = (self.renderer.width(), self.renderer.height());
         let new_tick = v.tick != self.ticks;
         let mut shown = None;
         if new_tick {
             v.tick = self.ticks;
             if !v.end {
                 match v.hnm.next_frame() {
-                    Some(Ok(_)) => shown = Some(v.hnm.frames_decoded() - 1),
+                    Some(Ok(_)) => {
+                        v.shown = v.hnm.frames_decoded() - 1;
+                        shown = Some(v.shown);
+                    }
                     _ => v.end = true,
                 }
                 if v.hnm.frames_decoded() >= v.hnm.frame_count() {
@@ -1750,12 +2038,12 @@ impl Engine {
         // The original's loop draws on its new ticks only (@ 0x0040c068);
         // the port also redraws the frame between them, the same pixels,
         // except under a film's dialog, which is drawn once per tick.
+        let end = v.end;
         if new_tick || self.film_dialog.is_none() {
             if let Some(out) = out.as_deref_mut() {
-                blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
+                self.draw_video(out);
             }
         }
-        let end = v.end;
         if let Some(k) = shown {
             self.event(Event::VideoFrame(k));
         }
@@ -1814,6 +2102,8 @@ impl Engine {
     /// the video started from back.
     fn finish_video(&mut self) {
         self.click = false;
+        // FUN_0047c240 (@ 0x0040c0e1): the transition sprites freed.
+        self.spf.clear();
         self.loop_type = self.video.take().map_or(LoopType::Warp, |v| v.prev);
         self.event(Event::VideoEnd);
         // FUN_0040bae0: the video's sound stops; the next warp draw asks
@@ -1847,8 +2137,8 @@ impl Engine {
         if kind == Some(-1) {
             return;
         }
-        if let (Some(v), None) = (&self.video, kind) {
-            blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
+        if let (Some(_), None) = (&self.video, kind) {
+            self.draw_video(out);
             return;
         }
         if self.faces[0].is_empty() {
@@ -1907,6 +2197,29 @@ impl Engine {
     /// The current place file and view id.
     pub fn place(&self) -> (&str, u32) {
         (&self.wam_name, self.view)
+    }
+
+    /// The place file, to change for tests (a synthetic destination).
+    #[doc(hidden)]
+    pub fn wam_mut(&mut self) -> &mut Wam {
+        &mut self.wam
+    }
+
+    /// The number of transition sprite banks loaded (@ 0x00673fa4).
+    pub fn transition_sprites(&self) -> usize {
+        self.spf.len()
+    }
+
+    /// The transition sprite banks taken out (to draw a frame without
+    /// them) and put back: for tests.
+    #[doc(hidden)]
+    pub fn take_transition_sprites(&mut self) -> Vec<SprBank> {
+        std::mem::take(&mut self.spf)
+    }
+
+    #[doc(hidden)]
+    pub fn put_transition_sprites(&mut self, banks: Vec<SprBank>) {
+        self.spf = banks;
     }
 
     pub fn wam(&self) -> &Wam {
