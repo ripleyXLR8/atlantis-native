@@ -624,9 +624,11 @@ a dialog, and in the panorama opens the main menu (options, volumes,
 load and save, quit; below); the right button opens and closes the bag
 bar; a left click on a character with subjects opens the menu of the
 subjects to ask him about (below). The mandalas are laid in the shaman's
-hut (below). Tibet is the only world: a trip to another one (a boat
-laid, the crystal, the space travel) plays its film and stays in Tibet.
-Not yet: the other worlds and their puzzles.
+hut (below). Ireland's boat laid there leaves for Ireland (world 1,
+below), which plays to its end without its four puzzles and sends the
+game back to Tibet with Ireland's mandala; a trip to another world (the
+other boats, the crystal, the space travel) plays its film and stays
+where it is. Not yet: the other worlds and Ireland's puzzles.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -645,7 +647,11 @@ the original's moves. The example `cargo run --release -p atlantis2-engine
 --example tibet_tour <install> <discs> <out>` writes pictures of three
 views with their animations and a recorded walk from the first view to
 view 4; `--example menu_png <data folder> <prefix>` draws the menu pages
-after a short game with three saves.
+after a short game with three saves; `--example ireland_tour <install>
+<discs> <out>` lays Ireland's boat and draws the trip (the departure
+film, the arrival's dialog, Liam and his subject menu, a transition
+with its sprites, the cross's view, the goddess, the way back to
+Tibet) into `ireland-*.png`.
 
 - **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
   timestamp 0x38030926), recognised by its size and timestamp and
@@ -723,8 +729,13 @@ after a short game with three saves.
   whose id is one of the speaker's `[IdText]` names is hidden, and shown
   again when the speaker changes or the dialog ends (@ 0x00461870; which
   slot when several match is not known [inferred: the first shown one]).
-  Not ported: frame lists (+0x2c ≠ 1), state chains, the odd-tick
-  flag, `CHEVAL`'s frame variable (no Tibet state uses them).
+  The horse (`CHEVAL`'s object index) keeps its frame across views as
+  the original does: each tick writes its slot's new frame into the
+  script variable `FRAMECHEVAL` (@ 0x0047d84d) and a view entry starts a
+  new slot of that id at it (@ 0x0047c764); neither tests the slot's
+  kind. Not ported: frame lists (+0x2c ≠ 1: only Ireland's puzzle
+  pictures, drawn by the puzzles' code), state chains and the odd-tick
+  flag (no Tibet or Irish state uses them).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
   `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
@@ -773,9 +784,23 @@ after a short game with three saves.
   scans are only recorded as events. A zone click in view 10 runs the
   mandala hook between the departure scan and `CLICZONE` (below). On a
   character with subjects the click opens the subject menu instead and
-  runs no click scan (below). Moves to other
-  places (type-2 zones), transition sprites and the zoom of a turn are
-  not ported (none in Tibet).
+  runs no click scan (below). A type-2 zone moves to another place file
+  by its link (@ 0x0049cbf0, @ 0x0040fc60): the first link of the
+  place from the current view to the zone's value; with a destination to
+  that view the change waits for the move's end (the destination's turn,
+  made pending at once when none is needed, the file loaded when the
+  move completes, its view entered with an arrival scan, `LASTVUE` = 0,
+  the video looked up in the new file), without one the file is loaded
+  and the view entered at once (no arrival scan, no video). A
+  `changewam` forgets the current view too, so the next `vue=` sets
+  `LASTVUE` = 0. The transition sprites (`datas_a2\spf\<prefix><from><to>.spr`,
+  one bank per character or object a destination names, unless the
+  show / hide table hides it; at most 10) are loaded after the arrival
+  and drawn over the video: frame k of each bank at its default position
+  over the video's frame k, until the bank runs out; the video's end
+  frees them, and a move without a video leaves them for the next film,
+  as in the original (@ 0x0047c100, 0x0047c200, 0x0040bc58). The zoom of
+  a turn is not ported (no Tibet or Irish script uses it).
 - **Mandalas** (`engine/puzzles.rs`): the puzzles' click hook
   dispatcher of the original (@ 0x0049b910) sends a click on a zone of
   type 3, 4 or 50 of a view whose warp name starts with `TI` (any case)
@@ -805,12 +830,47 @@ after a short game with three saves.
   view numbers and zone types. Not ported: the solution log the original prints at exit
   (@ 0x00495650, a fixed list that is not the fireflies' answer) and the
   fireflies themselves (Shamballa).
-- **Worlds:** only Tibet (`tibet.wam`, world 5) is ported. A `changewam`
-  of the scripts to any other place (the boats' worlds, Shamballa's
-  `voiles.wam` after the crystal, `Planetes.wam` of the space travel) is
+- **Ireland** (world 1, disc 1; `bigile1.wam`, `livre.wam`,
+  `ilepoete.wam`, `ilepoete2.wam`, `puit.wam`; chapters 2-9, 11-17, 19,
+  20 and 24): laying Ireland's boat in the shaman's hut runs chapter 75's
+  section as the original does: the world (disc 1, `objeire.spr`,
+  `sujeire.spr`, the Irish dialog texts and heads), the departure film,
+  `bigile1.wam` view 5 and chapter 2, whose `/INIT` plays the first
+  arrival's dialog. The chapters' sections then run on the same engine
+  as Tibet's (every key they use is handled, `tests/script.rs` checks
+  each of their 653 `/set` lines against the original's handler), and
+  chapter 16 sends the game back to Tibet's view 7 with Ireland's mandala
+  in the bag once the story sets its flag. Its four puzzles are not
+  ported: Brigid's cross (view 2), the skull (views 40-42), the ogham
+  stones (view 6, with `COUTEAU_AILILL` in hand) and the blackbird songs
+  (view 73 of `ilepoete.wam`). The original's dispatcher never takes an
+  Irish click (@ 0x0049baba, @ 0x0049bcf8), so the port notes each hook
+  (`Event::PuzzleNotPorted`, the original's function) and lets the click
+  go on to `CLICZONE`, the click scan and the move as in the original;
+  their pictures (the frame-list states of `CROIXBRIGIT_SPRITE`,
+  `CRANE_SPRITE`, `OGHAM_SPRITE`), sounds and the blackbird's song menu
+  are missing. What their move-zone hooks do besides the puzzles is
+  ported: in the four views the cursor loses its picture until the next
+  cursor choice (FUN_0047bef0(0, 0), whatever is in hand), and leaving
+  view 73 by a move zone stops voice 2 when the blackbird's two answer
+  sounds are loaded (its view entry loads them, the hook frees them) and
+  sets the music to 100 %. The variables their
+  wins write for the scripts are set by `Engine::solve_irish_puzzle`, a
+  testing aid: `FINCROIX` = 1 and a scan (the cross), `FINOGHAM` = 1 when
+  0 (the stones), `FINMERLE` = 1 (the blackbird); the skull writes none
+  (the scripts count it themselves). `demo.wam` (chapter 1) is not
+  ported: no script reaches chapter 1 and its panoramas are on no disc.
+  One place animation of `bigile1.wam` (`woA1001001.SPW`, a shadow in
+  view 1, hidden at load) is on no disc; it is skipped with the
+  original's message. The place sounds of `bigile1.wam` play (Sound,
+  below).
+- **Worlds:** Tibet (`tibet.wam`, world 5) and Ireland (above) are
+  ported. A `changewam` of the scripts to any other place (the other
+  boats' worlds, Shamballa's `voiles.wam` after the crystal,
+  `Planetes.wam` of the space travel, Ireland's `demo.wam`) is
   refused: where the original loads it (a place it cannot load is fatal
   there), the port notes it (`Event::WorldNotPorted`), ends the section
-  at that line, sets the world back to Tibet's (`Interp_SetMonde`: the
+  at that line, sets the world back to the current place's (`Interp_SetMonde`: the
   cursor, the objects bank, the texts) and runs the per-view reset of the
   view the game is still in (the hand emptied, as the section's `vue=`
   would), without entering it again. What the section did before stays:
@@ -936,9 +996,30 @@ after a short game with three saves.
   keeps them.
 - **Sound:** the voices of the original (0 the music, 1 the dialog
   voice, 2 the films' tracks and the effects) mixed as DirectSound does
-  (`sound.rs`). Tibet has no place sound (`tibet.wam` has none and is not
-  in the executable's listener table) and its two transition videos have
-  no sound track. A film's track (`cineNNN.apc`) plays on voice 2 at the
+  (`sound.rs`). The place sounds (`place_sound.rs`, `engine/places.rs`)
+  are the original's: the sources of the place file (a position, a
+  level, four files with a probability each) heard on voices 3 to 10
+  from the listener position that a table in the executable gives each
+  view of ten places (read from `atlantis2.exe`; a place not in it, as
+  Tibet, has none). At each view entry the sources the view hears take
+  one of 8 slots unless one holds them already (a slot keeps the view's
+  q it was taken with), their files loaded once by name; each panorama
+  frame that is not turning sets each playing slot's volume and pan from
+  the two ears' gains (the float arithmetic transcribed under the x87
+  control word) and lets each silent slot draw a file (`rand()`, the
+  probabilities) or wait a random number of 15 Hz ticks; a sound starts
+  silent and gets its level the next frame, and a source whose first
+  probability is 100 loops. Along a video the listener moves from the old
+  view's position to the new one's, one step per frame, and the sources
+  the new view does not hear fade over the last two thirds; its end frees
+  their slots, while a move without a video keeps every slot (heard from
+  the new listener). A place file loaded frees them all. The gains, the
+  levels and pans under the three control words, the video's steps and
+  fade, a sound's start and the scheduler are the original's
+  (`tests/place_sounds.rs`, its emulated runs), and so is every bruitage
+  of the shipped places at eight yaws. Ireland's `bigile1.wam` is the
+  only Irish place with sources (8 sources, 33 views); Tibet's two
+  transition videos have no sound track. A film's track (`cineNNN.apc`) plays on voice 2 at the
   effects volume from the film's first frame and stops with it; after a
   film the next panorama frame asks for the music at 100 %.
 - **Music** (`music.rs`, the player's states in `engine/host.rs`):
@@ -1117,8 +1198,10 @@ after a short game with three saves.
   each on the first matching slot only,
   `PLAYANIMP` / `O`, `CONTINUEANIM`, `STOPANIM`, `GOTOFRAME*`,
   `ADDFRAME*`, `ChangeAnimGotoPerso`, and the `NUMFRAME*` conditions;
-  only the first four occur in Tibet, the others follow the original's
-  handlers of the other worlds and no Native test checks them yet), `cinema` (the film at 15
+  only the first four occur in Tibet; Ireland adds `PLAYANIMP` / `O`,
+  `CONTINUEANIM`, `ADDFRAMEOBJET` and `NUMFRAMEOBJET`, whose lines are
+  checked against the original's handler but whose effect on the slots
+  no Native test compares with the original's yet), `cinema` (the film at 15
   frames a second with its sound track, the music at 20 %, dialog `M` over
   it), `dial` (the dialog loop; a failed start leaves the section waiting,
   as in the original), `startmusik`, `stopmusik`, `NEWSOUND`, `TrajSound`,
@@ -1282,7 +1365,7 @@ screen centre and the clicks on sprites pass by pass with the texel under
 the centre given, every SPW frame of Tibet and the first of every other
 file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks, the
 subject menu's cells and click grid, the shaman's subjects along chapter
-75; names of `defnames.con`
+75, every `/set` line of Ireland's chapters through the handler; names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):
 
@@ -1316,4 +1399,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
+| next | the other worlds without their puzzles: Ireland (its places, chapters, dialogs, place sounds, transition sprites, the way back to Tibet; done, its four puzzles left), then Yucatán, China, Shamballa |
 

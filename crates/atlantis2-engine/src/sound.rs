@@ -283,6 +283,21 @@ impl Voices {
         }
     }
 
+    /// DirectSound's `SetPan` (hundredths of dB, > 0 attenuates the left
+    /// channel).
+    pub fn set_pan(&self, voice: usize, pan: i32) {
+        if let Some(Some(v)) = self.lock().get_mut(voice) {
+            v.pan = pan;
+        }
+    }
+
+    /// The attenuation and pan of a voice that plays.
+    pub fn levels(&self, voice: usize) -> Option<(i32, i32)> {
+        self.lock()
+            .get(voice)
+            .and_then(|v| v.as_ref().map(|v| (v.attenuation, v.pan)))
+    }
+
     pub fn is_playing(&self, voice: usize) -> bool {
         matches!(self.lock().get(voice), Some(Some(_)))
     }

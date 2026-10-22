@@ -88,6 +88,16 @@ impl Engine {
         }
     }
 
+    /// FUN_0047bef0(0, 0): the cursor pair with no bank and frame 0,
+    /// nothing drawn until the next cursor choice (the hand is kept).
+    pub(crate) fn clear_cursor_pair(&mut self) {
+        self.cursor.shown = None;
+        if let Some(s) = self.con.as_mut() {
+            s.hand_drawn = false;
+            s.hand_x = 0;
+        }
+    }
+
     /// FUN_0047bf40: no cursor, `OBJETENMAIN` = 0, the hand emptied.
     pub(crate) fn drop_hand(&mut self) {
         self.cursor.shown = None;

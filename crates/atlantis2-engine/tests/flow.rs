@@ -4,12 +4,14 @@
 //! Escape and a save through the menus over the open bar, the save loaded
 //! again through the load page, then continued from the player menu of a
 //! new run (the music started again from the save, at a drawn mark).
-//! Then a Tibet game from the start-up intro, played with the mouse only:
-//! the walk to the shaman, his subjects asked through the subject menu,
-//! a boat taken, the walk to the hut, the boat picked from the bag bar
-//! and laid on its zone (the mandala hook, chapter 75's section, the
-//! film, the trip to the boat's world refused), the puzzle's state kept
-//! by a save and a load.
+//! Then a game from the start-up intro, played with the mouse: the walk
+//! to the shaman, his subjects asked through the subject menu, Ireland's
+//! boat taken, the walk to the hut, the boat picked from the bag bar and
+//! laid on its zone (the mandala hook, chapter 75's section, the film),
+//! the trip to Ireland and its first dialog, Liam asked, the walk to the
+//! place of Brigid's cross (its hooks noted, the puzzle solved by the
+//! testing aid: the goddess), a save and a load in Ireland, and the way
+//! back to Tibet as chapter 16 makes it.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the test is skipped. The saves go to a
@@ -21,7 +23,7 @@ use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
 use atlantis2_engine::bag::{UiBank, UiDraw};
-use atlantis2_engine::engine::MANDALAS;
+use atlantis2_engine::engine::{IrishPuzzle, MANDALAS};
 use atlantis2_engine::menu::{state, PageKind};
 use atlantis2_engine::subjects::cell;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -344,15 +346,17 @@ impl Run {
     }
 
     /// A click on the move zone to view `to`, the transition video
-    /// clicked away; a dialog the arrival plays listened to.
-    fn walk(&mut self, to: u32) {
+    /// clicked away; a dialog the arrival plays listened to. The events,
+    /// in order.
+    fn walk(&mut self, to: u32) -> Vec<Event> {
         self.wait(15);
         let zone = self.zone_to(to);
         self.aim(zone);
         self.tap();
+        let mut all = Vec::new();
         for _ in 0..600 {
             let evs = self.events();
-            if evs.iter().any(|e| {
+            let video = evs.iter().any(|e| {
                 matches!(
                     e,
                     Event::VideoStart {
@@ -360,18 +364,22 @@ impl Run {
                         ..
                     }
                 )
-            }) {
+            });
+            let arrived = evs.iter().any(|e| matches!(e, Event::ArrivalScan(_)));
+            all.extend(evs);
+            if video {
                 self.wait(15);
                 self.tap();
             }
-            if evs.iter().any(|e| matches!(e, Event::ArrivalScan(_))) {
-                assert_eq!(self.e.place(), ("tibet.wam", to));
+            if arrived {
+                assert_eq!(self.e.place().1, to);
                 self.wait(4);
+                all.extend(std::mem::take(&mut self.e.events));
                 if self.e.loop_type == LoopType::Dialog {
-                    self.listen();
+                    all.extend(self.listen());
                 }
                 assert_eq!(self.e.loop_type, LoopType::Warp);
-                return;
+                return all;
             }
         }
         panic!("no arrival in view {to}");
@@ -513,7 +521,7 @@ impl Run {
 }
 
 #[test]
-fn a_tibet_game_asks_the_shaman_and_lays_a_mandala() {
+fn a_game_from_tibet_to_ireland_and_back() {
     if game().is_none() {
         return;
     }
@@ -640,43 +648,141 @@ fn a_tibet_game_asks_the_shaman_and_lays_a_mandala() {
     r.tap();
     for _ in 0..600 {
         evs.extend(r.events());
-        if r.e.loop_type == LoopType::Warp {
+        if r.e.loop_type != LoopType::Video {
             break;
         }
     }
-    r.wait(4);
+    // The trip to Ireland, as chapter 75's section goes on after the film:
+    // the world (disc 1, Ireland's objects and texts), `bigile1.wam` view
+    // 5, chapter 2, whose `/INIT` plays the first arrival's dialog.
+    if r.e.loop_type == LoopType::Dialog {
+        evs.extend(r.listen());
+    }
     evs.extend(std::mem::take(&mut r.e.events));
-    assert!(evs.iter().any(|e| matches!(e, Event::WorldNotPorted(_))));
-    assert_eq!(r.e.place(), ("tibet.wam", 10));
-    assert_eq!(r.var("MONDE"), 5);
+    assert!(!evs.iter().any(|e| matches!(e, Event::WorldNotPorted(_))));
+    assert!(evs.contains(&Event::Monde(1)));
+    assert!(evs.contains(&Event::Wam("bigile1.wam".into())));
+    assert!(evs.contains(&Event::DialogStart {
+        number: 1,
+        started: true
+    }));
+    assert_eq!(r.e.place(), ("bigile1.wam", 5));
+    assert_eq!(r.e.loop_type, LoopType::Warp);
+    assert_eq!(r.e.files().current_disc(), 1);
     let pose = format!("pose{}", zone[5..].to_ascii_lowercase());
     assert_eq!(
-        (r.var("NbMandalaPosed"), r.var(order), r.var(&pose)),
-        (1, 1, 1)
-    );
-    // The boat has left the bag, the hand is empty, the laid mandala is
-    // shown in the hut.
-    assert!(!r.e.bag_entries().iter().any(|b| b.id == boat));
-    assert_eq!(r.var("OBJETENMAIN"), 0);
-    let laid = r.id(defnames::OBJETS, &format!("MANDALA_{}1", &zone[5..7]));
-    assert!(r.e.anim.slots.iter().any(|s| s.id == laid && s.active));
-
-    // Saved through the menus, loaded by a new run's player menu: the
-    // chapter, the place, the puzzle's state, the bag and both shamans'
-    // subjects are back (the clocks run on in the menus, and the load
-    // makes the view current from none: `LASTVUE` is not compared).
-    let kept = |r: &Run| {
-        let s = r.e.script_state().unwrap();
-        format!(
-            "chapter {} place {:?} laid {} {} {} bag {:?} subjects {:?} {:?}",
-            s.chapter,
-            r.e.place(),
+        (
+            r.e.script_state().unwrap().chapter,
+            r.var("MONDE"),
             r.var("NbMandalaPosed"),
             r.var(order),
             r.var(&pose),
+            r.var("VignetteSave"),
+        ),
+        (2, 1, 1, 1, 1, 1)
+    );
+    // Its first `/INIT` section ran once (the dialog, then its flag).
+    assert_eq!(r.var("firsteire"), 1);
+    // The boat has left the bag, the hand is empty.
+    assert!(!r.e.bag_entries().iter().any(|b| b.id == boat));
+    assert_eq!(r.var("OBJETENMAIN"), 0);
+    ireland_lines_as_the_original(&evs);
+
+    // Liam, the first character, in view 5: his one subject (dialog 2),
+    // after which chapter 2 sends the game to chapter 5.
+    let liam = r.id(defnames::PERSONNAGES, "LIAM_SCRIPT");
+    let asked = r.ask_all(liam);
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0].1, 2);
+    assert_eq!(r.e.script_state().unwrap().chapter, 5);
+
+    // The first views: 4 (Liam again), 3 (chapter 5 sends the game to
+    // chapter 16 on the way), 2, the place of Brigid's cross.
+    let mut walked = Vec::new();
+    for to in [4, 3, 2] {
+        walked.extend(r.walk(to));
+        assert_eq!(r.e.place(), ("bigile1.wam", to));
+    }
+    assert_eq!(r.e.script_state().unwrap().chapter, 16);
+    ireland_lines_as_the_original(&walked);
+    // The cross's entry hook (FUN_00494120), not ported, is noted.
+    assert!(walked.contains(&Event::PuzzleNotPorted {
+        function: 0x0049_4120
+    }));
+    // A click on one of the cross's zones: the hook (FUN_00494190) noted,
+    // the click goes on (`CLICZONE`, the click scan), nothing else.
+    let cross_zone =
+        r.e.wam()
+            .view(2)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.kind == 4)
+            .unwrap();
+    r.aim(cross_zone);
+    r.tap();
+    let evs = r.events();
+    assert!(evs.contains(&Event::PuzzleNotPorted {
+        function: 0x0049_4190
+    }));
+    assert!(evs
+        .iter()
+        .any(|e| matches!(e, Event::ClickScan(v) if v.cliczone != 0)));
+    assert_eq!(
+        (r.e.place(), r.e.loop_type),
+        (("bigile1.wam", 2), LoopType::Warp)
+    );
+
+    // The cross solved by the testing aid (what its win writes:
+    // `FINCROIX` and a scan): chapter 16's section plays the goddess's
+    // film and dialog, and shows her.
+    r.e.solve_irish_puzzle(IrishPuzzle::Cross);
+    let mut evs = std::mem::take(&mut r.e.events);
+    assert!(evs.iter().any(
+        |e| matches!(e, Event::VideoStart { name, frames: Some(_) } if name == "cine015.hnm")
+    ));
+    r.wait(30);
+    r.tap();
+    for _ in 0..600 {
+        evs.extend(r.events());
+        if r.e.loop_type != LoopType::Video {
+            break;
+        }
+    }
+    if r.e.loop_type == LoopType::Dialog {
+        evs.extend(r.listen());
+    }
+    assert!(evs.contains(&Event::DialogStart {
+        number: 56,
+        started: true
+    }));
+    assert_eq!(r.var("flagdeesse"), 1);
+    ireland_lines_as_the_original(&evs);
+    let goddess = r.id(defnames::PERSONNAGES, "DEESSE");
+    assert!(!r
+        .e
+        .script_state()
+        .unwrap()
+        .subjects
+        .list(goddess)
+        .is_empty());
+
+    // Saved in Ireland through the menus, continued by a new run's player
+    // menu: the place, the world and its disc, the chapter and the story.
+    let kept = |r: &Run| {
+        let s = r.e.script_state().unwrap();
+        format!(
+            "chapter {} place {:?} disc {} monde {} laid {} {} {} goddess {} bag {:?} subjects {:?}",
+            s.chapter,
+            r.e.place(),
+            r.e.files().current_disc(),
+            r.var("MONDE"),
+            r.var("NbMandalaPosed"),
+            r.var(order),
+            r.var(&pose),
+            r.var("flagdeesse"),
             s.bag,
-            s.subjects.list(shaman),
-            s.subjects.list(shaman10),
+            s.subjects.list(goddess),
         )
     };
     let before = kept(&r);
@@ -691,5 +797,77 @@ fn a_tibet_game_asks_the_shaman_and_lays_a_mandala() {
     assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
     assert_eq!(kept(&r), before);
     r.wait(30);
-    assert!(r.e.anim.slots.iter().any(|s| s.id == laid && s.active));
+
+    // The way back as chapter 16 makes it, once the story has set its flag
+    // (`flag71` = 1, set here by a command): leaving view 2 for view 1
+    // plays film 19 with dialog 71 over it, and the game is back in Tibet,
+    // view 7, chapter 75, Ireland's mandala in the bag and in hand.
+    r.e.run_command(b"(flag71=1)");
+    r.wait(15);
+    let zone = r.zone_to(1);
+    r.aim(zone);
+    r.tap();
+    let mut evs = Vec::new();
+    for _ in 0..600 {
+        evs.extend(r.events());
+        if evs
+            .iter()
+            .any(|e| matches!(e, Event::VideoStart { name, .. } if name == "cine019.hnm"))
+        {
+            break;
+        }
+    }
+    r.wait(30);
+    r.tap();
+    for _ in 0..600 {
+        evs.extend(r.events());
+        if r.e.loop_type == LoopType::Warp {
+            break;
+        }
+    }
+    // The section ran to its end when the film ended: the mandala in the
+    // bag and in hand, `ARRIVEEVUE` = the view `vue=7` left (2).
+    let mandala = r.id(defnames::OBJETS, "MANDALA_IRLANDE");
+    assert_eq!((r.var("OBJETENMAIN"), r.var("ARRIVEEVUE")), (mandala, 2));
+    // The next panorama frame's `Interp_GereFrame` sees that `ARRIVEEVUE`:
+    // the per-view reset empties the hand, as the original's does.
+    r.wait(4);
+    evs.extend(std::mem::take(&mut r.e.events));
+    assert_eq!((r.var("OBJETENMAIN"), r.var("ARRIVEEVUE")), (0, 0));
+    ireland_lines_as_the_original(&evs);
+    assert!(evs.contains(&Event::Monde(5)));
+    assert!(evs.contains(&Event::Wam("tibet.wam".into())));
+    assert!(!evs.iter().any(|e| matches!(e, Event::WorldNotPorted(_))));
+    assert_eq!(r.e.place(), ("tibet.wam", 7));
+    assert_eq!(
+        (
+            r.e.script_state().unwrap().chapter,
+            r.var("MONDE"),
+            r.e.script_state().unwrap().flags[71]
+        ),
+        (75, 5, 2)
+    );
+    assert!(r.e.bag_entries().iter().any(|b| b.id == mandala));
+}
+
+/// Every `/set` line of an Irish chapter that ran (the events'
+/// chapter and line) is one of the lines the original's handler ran
+/// (`scripts_worlds_ireland.txt`, chapters 1-24): the line numbers the
+/// port reports are the scripts' own.
+fn ireland_lines_as_the_original(evs: &[Event]) {
+    let golden = include_str!("golden/scripts_worlds_ireland.txt");
+    let mut n = 0;
+    for e in evs {
+        if let Event::Set { chapter, line } = e {
+            if (1..=24).contains(chapter) {
+                let head = format!("chapi{chapter:03}.con:{line} ");
+                assert!(
+                    golden.lines().any(|l| l.starts_with(&head)),
+                    "chapter {chapter} line {line}: not a line the original runs"
+                );
+                n += 1;
+            }
+        }
+    }
+    assert!(n > 0 || !evs.iter().any(|e| matches!(e, Event::Set { .. })));
 }

@@ -115,6 +115,9 @@ impl Script {
                     return None;
                 }
                 self.wam = wam;
+                // `AtlWam_Load` forgets the current view (@ 0x0040ff98): the
+                // next `vue=` sets `LASTVUE` = 0.
+                self.current_view = None;
                 return Some(self.after_cr(src, p));
             }
         }

@@ -34,6 +34,7 @@ pub mod lipsync;
 pub mod look;
 pub mod menu;
 pub mod music;
+pub mod place_sound;
 pub mod png;
 pub mod raster3d;
 pub mod script;
