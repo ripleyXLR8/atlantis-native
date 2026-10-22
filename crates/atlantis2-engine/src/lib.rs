@@ -19,6 +19,6 @@ pub mod turn;
 pub mod warp;
 
 pub use camera::Camera;
-pub use engine::{Engine, EngineError, Event, LoopType};
+pub use engine::{CentreDraw, CursorBank, Engine, EngineError, Event, LoopType, ScanVars};
 pub use fpu::Fpu;
 pub use warp::{Renderer, Variant};

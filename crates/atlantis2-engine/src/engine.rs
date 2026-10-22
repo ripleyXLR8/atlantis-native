@@ -56,12 +56,12 @@ impl std::error::Error for EngineError {}
 pub enum Event {
     /// A left click reached the game (and whether it was a double click).
     Click { double: bool },
-    /// `CtrlScenarOUT`, the departure scan, with `DEPARTVUE`.
-    DepartScan { target: i32 },
-    /// The click scan (@ 0x0045a870) with `CLICZONE`.
-    ClickScan { zone: i32 },
-    /// The arrival scan of `Interp_GereFrame` with `ARRIVEEVUE`.
-    ArrivalScan { view: u32 },
+    /// `CtrlScenarOUT`, the departure scan (`DEPARTVUE` = the target).
+    DepartScan(ScanVars),
+    /// The click scan (@ 0x0045a870).
+    ClickScan(ScanVars),
+    /// The arrival scan of `Interp_GereFrame` (`ARRIVEEVUE` = the view).
+    ArrivalScan(ScanVars),
     /// The turn set-up towards (yaw, pitch), radians.
     TurnSetup { yaw: f32, pitch: f32, turning: bool },
     /// A view entered (@ 0x00459fe0).
@@ -79,6 +79,35 @@ pub enum Event {
     Take { id: i32 },
     /// A click on a zone the puzzle hooks take (@ 0x0049b910): not ported.
     PuzzleHook { zone: usize },
+}
+
+/// The script variables a scan sees.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ScanVars {
+    pub departvue: i32,
+    pub arriveevue: u32,
+    pub cliczone: i32,
+    pub clicperso: i32,
+    pub clicobjet: i32,
+}
+
+/// A draw at the screen centre (FUN_0045af10), in its order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CentreDraw {
+    /// `AtlSpr_Aff` (@ 0x0047bc40) of a sprite with its hot spot at
+    /// (x, y).
+    Sprite {
+        bank: CursorBank,
+        frame: i32,
+        x: i32,
+        y: i32,
+    },
+    /// A line (@ 0x004c4620) from one point to another, ARGB.
+    Line {
+        from: (i32, i32),
+        to: (i32, i32),
+        argb: u32,
+    },
 }
 
 /// The loop types of the dispatcher (@ 0x006d8520) the engine has.
@@ -102,6 +131,16 @@ pub struct Vars {
     pub objet_en_main: i32,
 }
 
+/// The bank of the cursor's (bank, frame) pair.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CursorBank {
+    /// `spr\interfac.spr` (@ 0x006719fc).
+    Interface,
+    /// The world's objects bank (@ 0x00671ef4): set by a take
+    /// (@ 0x0045a650) until the next cursor choice.
+    Objects,
+}
+
 /// The cursor (@ 0x00474500): a range of `interfac.spr` frames played on
 /// the 15 Hz flag @ 0x00656a54, and the (bank, frame) pair drawn at the
 /// screen centre (@ 0x00673fa0 / 0x005def58).
@@ -115,6 +154,8 @@ pub struct Cursor {
     pub frame: i32,
     /// The frame drawn, `None` when hidden.
     pub shown: Option<i32>,
+    /// The bank of the frame drawn.
+    pub bank: CursorBank,
 }
 
 impl Default for Cursor {
@@ -124,6 +165,7 @@ impl Default for Cursor {
             end: 0,
             frame: 0,
             shown: None,
+            bank: CursorBank::Interface,
         }
     }
 }
@@ -154,6 +196,7 @@ impl Cursor {
             }
         }
         self.shown = (kind <= 999).then_some(self.frame);
+        self.bank = CursorBank::Interface;
         if *flag {
             *flag = false;
             self.frame += 1;
@@ -208,6 +251,12 @@ pub struct Engine {
     /// Whether the draw finds the sprites under the centre. False
     /// reproduces the harness of the moves golden, which stubs the draw.
     pub sprite_picks: bool,
+    /// The texel under the screen centre the sprite pick uses, instead of
+    /// the camera's: the tests against the original set it as its harness
+    /// does.
+    pub forced_centre: Option<Texel>,
+    /// What the last pass drew at the screen centre.
+    pub centre_draws: Vec<CentreDraw>,
     /// The sprite cursor state of the last draw (@ 0x006c2df4).
     sprite_state: i32,
     /// Input flags: a click (@ 0x006569c9) and a double click
@@ -226,12 +275,15 @@ pub struct Engine {
     pub vars: Vars,
     pub cursor: Cursor,
     cursor_bank: Option<SprBank>,
+    /// The world's objects bank (`spr\obj*.spr`, @ 0x00671ef4).
+    objects_bank: Option<SprBank>,
     /// The centre marker option (@ 0x005db84c, on by default).
     pub centre_marker: bool,
     /// The objects taken, in order (the bag, @ 0x004754f0: not ported
     /// beyond the list).
     pub bag: Vec<i32>,
-    /// The object in hand: its id and sprite in the world's objects bank.
+    /// The object in hand: its id and sprite in the world's objects bank
+    /// (the pair @ 0x00673f68 / 0x00673f94, drawn under the cursor).
     pub hand: Option<(i32, i32)>,
     /// Record [`Event`]s into [`Engine::events`].
     pub trace: bool,
@@ -267,6 +319,18 @@ fn texel_of(dir: [f32; 3]) -> Option<Texel> {
     }
     let texel = |s: f64| (1.0 + 510.0 * (s + 1.0) / 2.0).floor() as i32;
     Some((face, texel(u), texel(v)))
+}
+
+/// The world's objects bank `/set(monde=N)` loads (@ 0x00484df0).
+fn objects_bank_name(monde: i32) -> Option<&'static str> {
+    Some(match monde {
+        1 => "objeire.spr",
+        2 | 6 => "objyuc.spr",
+        3 => "objchine.spr",
+        4 => "objshamb.spr",
+        5 => "objtibet.spr",
+        _ => return None,
+    })
 }
 
 /// ARGB to RGB565.
@@ -323,6 +387,16 @@ impl Engine {
         if cursor_bank.is_none() {
             log::warn!("spr\\interfac.spr missing or unreadable: no cursor");
         }
+        // `/set(monde=N)` (@ 0x00484df0): the world's objects bank.
+        let objects_bank = objects_bank_name(start.monde).and_then(|n| {
+            let bank = files
+                .read(Folder::Spr, n)
+                .and_then(|d| SprBank::parse(&d).ok());
+            if bank.is_none() {
+                log::warn!("spr\\{n} missing or unreadable: no object in hand");
+            }
+            bank
+        });
         let camera = Camera::new(fpu, width, height);
         let mut engine = Engine {
             files,
@@ -346,6 +420,8 @@ impl Engine {
             centre_zone: None,
             sprite_hit: None,
             sprite_picks: true,
+            forced_centre: None,
+            centre_draws: Vec::new(),
             sprite_state: 0,
             click: false,
             double: false,
@@ -358,6 +434,7 @@ impl Engine {
             vars: Vars::default(),
             cursor: Cursor::default(),
             cursor_bank,
+            objects_bank,
             centre_marker: true,
             bag: Vec::new(),
             hand: None,
@@ -369,7 +446,27 @@ impl Engine {
             deg_to_rad(engine.camera.fpu, start.pitch_deg),
         );
         engine.enter_view(start.view, engine.arrival.0, engine.arrival.1)?;
+        // `/set(vue=N)` ends with the per-view reset.
+        engine.per_view_reset();
         Ok(engine)
+    }
+
+    /// The per-view reset (@ 0x00483ce0), run by `/set(vue=N)` and in the
+    /// arrival frame: `CLICPERSO`, `CLICZONE`, `CLICOBJET` = 0, `VUE` = the
+    /// current view, the limits back to ±70° in pitch and none in yaw,
+    /// `OBJETENMAIN` = 0 and the hand emptied (@ 0x0047c0c0(0, 0)), the
+    /// click flag cleared. `CHAPTER`'s copy, `ABORTDEPART`, `SACADOS` and
+    /// `flag` are script state not ported.
+    fn per_view_reset(&mut self) {
+        self.vars.clicperso = 0;
+        self.vars.cliczone = 0;
+        self.vars.clicobjet = 0;
+        self.vars.vue = self.view;
+        self.look.limit_y = DEFAULT_LIMIT_Y;
+        self.look.limit_x = NO_LIMIT;
+        self.vars.objet_en_main = 0;
+        self.hand = None;
+        self.click = false;
     }
 
     fn event(&mut self, e: Event) {
@@ -380,9 +477,9 @@ impl Engine {
 
     /// Enters a view of the current place (@ 0x00459fe0): loads its cube,
     /// orients the camera to the arrival angles (radians), stops the turn,
-    /// sets the 76° field of view and loads the view's place animations;
-    /// the script resets the limits to ±70° in pitch and none in yaw at
-    /// every view change.
+    /// sets the 76° field of view and loads the view's place animations.
+    /// The view's limits are reset later, by the per-view reset
+    /// ([`Engine::per_view_reset`]).
     pub fn enter_view(&mut self, id: u32, yaw: f32, pitch: f32) -> Result<(), EngineError> {
         let view = self
             .wam
@@ -403,8 +500,6 @@ impl Engine {
         let (w, h) = (self.renderer.width() as u32, self.renderer.height() as u32);
         self.camera.set_fov(WARP_FOV, w, h);
         self.look.stop();
-        self.look.limit_y = DEFAULT_LIMIT_Y;
-        self.look.limit_x = NO_LIMIT;
         self.load_animations(id);
         // No sound in Tibet: the place sounds (@ 0x0047ad30) come with the
         // first world that has some.
@@ -474,6 +569,7 @@ impl Engine {
     /// (width x height RGB565) when given. Without `out` everything but the
     /// pixels is done.
     pub fn pass(&mut self, out: Option<&mut [u16]>) {
+        self.centre_draws.clear();
         match self.loop_type {
             LoopType::Warp => self.warp_pass(out),
             LoopType::Video => self.video_pass(out),
@@ -501,17 +597,17 @@ impl Engine {
             self.zone_click();
             if self.vars.arrivee_vue != 0 {
                 // Interp_GereFrame (@ 0x00484b70): the per-view reset
-                // (@ 0x00483ce0) empties the hand, then the arrival scan.
-                self.vars.objet_en_main = 0;
-                self.hand = None;
-                let view = self.vars.arrivee_vue;
-                self.event(Event::ArrivalScan { view });
+                // (@ 0x00483ce0, which also drops this frame's click),
+                // the hand gets `Objetenmain_NextWarp` (a script key, 0
+                // without the scripts), the arrival scan, then
+                // `ARRIVEEVUE` = `CLICZONE` = 0.
+                self.per_view_reset();
+                let vars = self.scan_vars(0);
+                self.event(Event::ArrivalScan(vars));
                 self.vars.arrivee_vue = 0;
+                self.vars.cliczone = 0;
             }
-            if self.click {
-                let zone = self.vars.cliczone;
-                self.event(Event::ClickScan { zone });
-            }
+            self.click_scan();
         }
         // 4. The click flags.
         self.click = false;
@@ -542,7 +638,9 @@ impl Engine {
     /// faces restored, the animation step; the cursor and the centre
     /// marker; the cursor chosen for the next frame.
     fn draw(&mut self, out: Option<&mut [u16]>) {
-        let centre = texel_of(self.camera.ray(self.camera.cx, self.camera.cy));
+        let centre = self
+            .forced_centre
+            .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
         let (dirty, mut hit): (Vec<(usize, FaceBox)>, _) =
             self.anim.draw(&mut self.work, centre, self.click);
         if !self.sprite_picks {
@@ -551,6 +649,7 @@ impl Engine {
         self.sprite_state = hit.cursor;
         self.sprite_hit = hit.slot;
         let (w, h) = (self.renderer.width(), self.renderer.height());
+        self.centre_draws = self.centre_plan(w, h);
         if let Some(out) = out {
             let (m, p) = (self.camera.matrix(), self.camera.projection());
             self.renderer.fpu = self.camera.fpu;
@@ -579,35 +678,79 @@ impl Engine {
         }
     }
 
-    /// FUN_0045af10: the cursor at the screen centre (FUN_0047bfd0, the
-    /// object in hand under it: not drawn, its bank is not known), then
-    /// the 5-pixel cross of the centre marker in the colour of what is
-    /// under the centre.
-    fn draw_centre(&self, out: &mut [u16], w: usize, h: usize) {
+    /// FUN_0045af10: at the screen centre (FUN_0047bfd0) the object in
+    /// hand, then the cursor over it; then the 5-pixel cross of the
+    /// centre marker in the colour of what is under the centre (the zone
+    /// type, or a sprite).
+    fn centre_plan(&self, w: usize, h: usize) -> Vec<CentreDraw> {
         let (cx, cy) = (w as i32 / 2, h as i32 / 2);
-        if let (Some(bank), Some(frame)) = (&self.cursor_bank, self.cursor.shown) {
-            let mut t = Target::screen(out, w, h);
-            bank.draw(&mut t, Some(cx), cy, frame as usize);
+        let mut plan = Vec::new();
+        if let Some((_, sprite)) = self.hand {
+            if sprite >= 0 {
+                plan.push(CentreDraw::Sprite {
+                    bank: CursorBank::Objects,
+                    frame: sprite,
+                    x: cx,
+                    y: cy,
+                });
+            }
         }
-        if !self.centre_marker {
-            return;
+        if let Some(frame) = self.cursor.shown {
+            plan.push(CentreDraw::Sprite {
+                bank: self.cursor.bank,
+                frame,
+                x: cx,
+                y: cy,
+            });
         }
-        let kind = self.centre().map(|(_, z)| z.kind);
-        let mut argb = match kind {
-            Some(1) => 0xff00_00ff,
-            Some(2) => 0xffff_0000,
-            Some(k) if k > 3 && k < 1000 => 0xffff_00ff,
-            _ => 0xffff_ffff,
-        };
-        if self.sprite_state != 0 {
-            argb = 0xff00_ff00;
+        if self.centre_marker {
+            let mut argb = match self.centre().map(|(_, z)| z.kind) {
+                Some(1) => 0xff00_00ff,
+                Some(2) => 0xffff_0000,
+                Some(k) if k > 3 && k < 1000 => 0xffff_00ff,
+                _ => 0xffff_ffff,
+            };
+            if self.sprite_state != 0 {
+                argb = 0xff00_ff00;
+            }
+            plan.push(CentreDraw::Line {
+                from: (cx, cy - 2),
+                to: (cx, cy + 2),
+                argb,
+            });
+            plan.push(CentreDraw::Line {
+                from: (cx - 2, cy),
+                to: (cx + 2, cy),
+                argb,
+            });
         }
-        // The two lines of FUN_004c4620, end points included [INFERRED].
-        let c = rgb565(argb);
-        for k in -2..=2 {
-            for (x, y) in [(cx, cy + k), (cx + k, cy)] {
-                if x >= 0 && y >= 0 && (x as usize) < w && (y as usize) < h {
-                    out[y as usize * w + x as usize] = c;
+        plan
+    }
+
+    /// Draws [`Engine::centre_draws`].
+    fn draw_centre(&self, out: &mut [u16], w: usize, h: usize) {
+        for d in &self.centre_draws {
+            match *d {
+                CentreDraw::Sprite { bank, frame, x, y } => {
+                    let bank = match bank {
+                        CursorBank::Interface => &self.cursor_bank,
+                        CursorBank::Objects => &self.objects_bank,
+                    };
+                    if let (Some(bank), Ok(frame)) = (bank, usize::try_from(frame)) {
+                        bank.draw(&mut Target::screen(out, w, h), Some(x), y, frame);
+                    }
+                }
+                CentreDraw::Line { from, to, argb } => {
+                    // A horizontal or vertical line, end points included
+                    // [INFERRED].
+                    let c = rgb565(argb);
+                    for x in from.0.min(to.0)..=from.0.max(to.0) {
+                        for y in from.1.min(to.1)..=from.1.max(to.1) {
+                            if x >= 0 && y >= 0 && (x as usize) < w && (y as usize) < h {
+                                out[y as usize * w + x as usize] = c;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -641,11 +784,15 @@ impl Engine {
         let (id, click, kind, sprite) = (slot.id, slot.click, slot.kind, slot.object_sprite);
         match click {
             1 => {
-                // An object to take: hidden for good, in the bag and in
-                // the hand (its sprite in the world's objects bank).
+                // An object to take: hidden for good, in the bag, as the
+                // cursor (@ 0x0047bef0, until the next cursor choice) and
+                // in the hand (@ 0x0047c0c0), its sprite in the world's
+                // objects bank.
                 self.vars.clicobjet = id;
                 self.anim.take(n);
                 self.bag.push(id);
+                self.cursor.shown = Some(sprite);
+                self.cursor.bank = CursorBank::Objects;
                 self.vars.objet_en_main = id;
                 self.hand = Some((id, sprite));
                 self.event(Event::Take { id });
@@ -663,6 +810,38 @@ impl Engine {
                 "{}: the subject menu is not ported",
                 self.name_of(section, id)
             );
+        }
+    }
+
+    /// FUN_0045a870, on a click (with no subject menu and no bag open,
+    /// neither ported): `CLICPERSO` = the character under the centre
+    /// (click kind 2), the click scan, then `CLICPERSO` = `CLICOBJET` = 0
+    /// (`SUJET` = −2, not ported) and the click cleared.
+    fn click_scan(&mut self) {
+        if !self.click {
+            return;
+        }
+        if let Some(slot) = self.sprite_hit.and_then(|n| self.anim.slots.get(n)) {
+            if slot.click == 2 {
+                self.vars.clicperso = slot.id;
+            }
+        }
+        let vars = self.scan_vars(0);
+        self.event(Event::ClickScan(vars));
+        self.vars.clicperso = 0;
+        self.vars.clicobjet = 0;
+        self.click = false;
+    }
+
+    /// The variables a scan sees, with `DEPARTVUE` = `departvue` (set
+    /// only around the departure scan).
+    fn scan_vars(&self, departvue: i32) -> ScanVars {
+        ScanVars {
+            departvue,
+            arriveevue: self.vars.arrivee_vue,
+            cliczone: self.vars.cliczone,
+            clicperso: self.vars.clicperso,
+            clicobjet: self.vars.clicobjet,
         }
     }
 
@@ -695,7 +874,8 @@ impl Engine {
         } else {
             0
         };
-        self.event(Event::DepartScan { target });
+        let vars = self.scan_vars(target);
+        self.event(Event::DepartScan(vars));
         // ABORTDEPART is never set without the scripts.
         if self.puzzle_hooks(zi, &zone) {
             return;
@@ -926,6 +1106,12 @@ impl Engine {
         self.renderer.render(&self.work, &m, p, out);
         self.camera.fpu = self.renderer.fpu;
         restore(&mut self.work, &self.faces, &dirty);
+    }
+
+    /// The sprite under the centre a click hit (its slot, @ 0x00661640)
+    /// and the cursor state of the last draw (@ 0x006c2df4).
+    pub fn sprite_under_centre(&self) -> (Option<usize>, i32) {
+        (self.sprite_hit, self.sprite_state)
     }
 
     /// The x87 control word the game's float code runs under now.

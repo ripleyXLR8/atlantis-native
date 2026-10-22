@@ -668,14 +668,22 @@ a recorded walk from the first view to view 4.
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
   `spr_p5.dll`'s `AFF_SPR` and its tables for RGB565, the last row and
-  column of the screen never drawn) at the screen centre: 1..12 over a
-  move zone, 25..39 over another zone (none from type 1000 on), 13..24 or
-  25..39 over a clickable object or character, one frame on per tick,
-  chosen after the frame is drawn so it shows on the next one; then the
-  5-pixel cross of the "centre marker" option (on by default) in the
-  colour of what is under the centre. The texel under the centre that the
-  sprite test uses is taken from the cube's texture mapping (the original
-  projects through per-face cameras, @ 0x0047db60, not read) [inferred].
+  column of the screen never drawn; the one bank with a 0x400-byte
+  (B, G, R, x) colour table, `Ponpirog.SPR`, converted as the DLL does
+  for RGB565) at the screen centre: 1..12 over a move zone, 25..39 over
+  another zone (none from type 1000 on), 13..24 or 25..39 over a
+  clickable object or character, one frame on per tick, chosen after the
+  frame is drawn so it shows on the next one. The object in hand (its
+  sprite in the world's objects bank, `spr\objtibet.spr` for Tibet) is
+  drawn under the cursor; right after a take the cursor itself shows the
+  object for one frame. Then the 5-pixel cross of the "centre marker"
+  option (on by default) in the colour of what is under the centre
+  (zone type or sprite); its two lines are drawn end points included
+  [inferred]. The texel under the centre that the sprite test uses is
+  taken from the cube's texture mapping (the original projects through
+  per-face cameras, @ 0x0047db60, not read) [inferred]; everything after
+  it (the box test, the cursor, the hand, the marker, the take) is
+  checked against the original frame by frame.
 - **Moves:** a click runs the zone click of the original (@ 0x0049ca80):
   a sprite under the centre takes it (an object of click kind 1 is taken:
   hidden for good, in the bag list and the hand); otherwise a move zone
@@ -690,13 +698,21 @@ a recorded walk from the first view to view 4.
   second (its first frame at once); a click or a double click (two clicks
   under 0.2 s, which also skips the video before it starts) ends it; a
   video on no disc is a cut (14 of Tibet's 16). The arrival is noted for
-  the scripts at the first frame after it. Without the scripts: the
-  departure, click and arrival scans run nothing, `NEXTVUE`, `UDADA`,
-  `ABORTDEPART` and `TrajSound` keep their defaults (0, no transition
-  sound), the mandala puzzle's clicks in view 10 and the subject menu of
-  a character are only logged; moves to other places (type-2 zones),
-  transition sprites and the zoom of a turn are not ported (none in
-  Tibet).
+  the scripts at the first frame after it, after the per-view reset
+  (@ 0x00483ce0): `CLICPERSO`, `CLICZONE`, `CLICOBJET` and the object in
+  hand cleared, the limits back to ±70° in pitch and none in yaw, and
+  that frame's click dropped (no click scan). A click on a sprite sets
+  `CLICOBJET` (an object) or `CLICPERSO` (a character) for the click
+  scan, which clears them after. Without the scripts: the departure,
+  click and arrival scans run nothing, `NEXTVUE`, `UDADA`, `ABORTDEPART`,
+  `Objetenmain_NextWarp` and `TrajSound` keep their defaults (0, no
+  transition sound), the mandala puzzle's clicks in view 10 are only
+  logged. The subject menu is not ported: on a character with subjects
+  (the shaman, at the start of the game) the original opens it and runs
+  no click scan in that frame; the port runs the click scan as the
+  original does for a character without subjects. Moves to other places
+  (type-2 zones), transition sprites and the zoom of a turn are not
+  ported (none in Tibet).
 - **Sound:** none yet. Tibet has no place sound (`tibet.wam` has none
   and is not in the executable's listener table) and its two transition
   videos have no sound track; its music starts from the scripts.
@@ -740,8 +756,10 @@ installation, for the tests of those builds. For Atlantis II,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
 copies); the expected frames, matrices and zone picks come from the
 original `atlantis2.exe` run under emulation (Tibet's moves pass by pass,
-the place animations tick by tick, every SPW frame of Tibet and the
-first of every other file, every `AFF_SPR` of the installed banks):
+the place animations tick by tick, the screen centre and the clicks on
+sprites pass by pass with the texel under the centre given, every SPW
+frame of Tibet and the first of every other file, every `AFF_SPR` of the
+installed banks):
 
 ```sh
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \

@@ -105,8 +105,8 @@ fn spr_banks_as_the_original_draws_them() {
     let Some(files) = game() else { return };
     let (w, h) = (640usize, 480usize);
     let bg = background(w * h);
-    let mut current: Option<(String, Option<SprBank>)> = None;
-    let (mut checked, mut skipped) = (0, 0);
+    let mut current: Option<(String, SprBank)> = None;
+    let mut checked = 0;
     for line in SPR_GOLDEN.lines().filter(|l| !l.starts_with('#')) {
         let (key, want) = line.split_once(' ').unwrap();
         let (bank_name, rest) = key.split_once('#').unwrap();
@@ -121,22 +121,10 @@ fn spr_banks_as_the_original_draws_them() {
             let data = files
                 .read(folder, name)
                 .unwrap_or_else(|| panic!("{bank_name} not found"));
-            let bank = match SprBank::parse(&data) {
-                Ok(b) => Some(b),
-                // The one bank with a 0x400-byte colour table (0x878).
-                Err(atlantis2_data::spr::SprError::Unsupported(0x878)) => None,
-                Err(e) => panic!("{bank_name}: {e}"),
-            };
+            let bank = SprBank::parse(&data).unwrap_or_else(|e| panic!("{bank_name}: {e}"));
             current = Some((bank_name.to_string(), bank));
         }
-        let Some(bank) = current.as_ref().unwrap().1.as_ref() else {
-            skipped += 1;
-            continue;
-        };
-        if want == "fault" {
-            skipped += 1;
-            continue;
-        }
+        let bank = &current.as_ref().unwrap().1;
         let mut px = bg.clone();
         if let Some(info) = bank.info(index) {
             let (xo, yo) = (i32::from(info.xoff), i32::from(info.yoff));
@@ -154,5 +142,6 @@ fn spr_banks_as_the_original_draws_them() {
         assert_eq!(px_md5(&px), want, "{key}");
         checked += 1;
     }
-    assert!(checked > 1900, "{checked} checked, {skipped} skipped");
+    // Every row of the golden, the 0x878 bank's included.
+    assert_eq!(checked, 1949);
 }

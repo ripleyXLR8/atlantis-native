@@ -29,7 +29,8 @@ fn game() -> Option<A2Files> {
     Some(files)
 }
 
-/// Python's `math.degrees` / `math.radians` (the harness's conversions).
+/// Radians to degrees and back in double precision, as the golden's
+/// angles were converted.
 fn degrees(r: f32) -> f64 {
     f64::from(r) / (std::f64::consts::PI / 180.0)
 }
@@ -42,7 +43,9 @@ fn fmt3(x: f64) -> String {
     format!("{x:.3}")
 }
 
-/// The harness's `Moves` driver over the engine.
+/// Drives the engine as the golden's cases were run: a 15 Hz tick every
+/// fourth pass, clicks at given passes, one row per pass that changed
+/// something.
 struct Driver {
     e: Engine,
     pass_no: u64,
@@ -107,9 +110,9 @@ impl Driver {
             }
             match ev {
                 Event::Click { .. } => out.push("click".into()),
-                Event::DepartScan { target } => out.push(format!("depart {target}")),
-                Event::ClickScan { zone } => out.push(format!("clickscan {zone}")),
-                Event::ArrivalScan { view } => out.push(format!("arrive {view}")),
+                Event::DepartScan(v) => out.push(format!("depart {}", v.departvue)),
+                Event::ClickScan(v) => out.push(format!("clickscan {}", v.cliczone)),
+                Event::ArrivalScan(v) => out.push(format!("arrive {}", v.arriveevue)),
                 Event::TurnSetup { yaw, pitch, .. } => out.push(format!(
                     "turn {},{}",
                     fmt3(degrees(yaw)),
@@ -133,7 +136,7 @@ impl Driver {
         out
     }
 
-    /// `Moves.run`: `passes` passes, the clicks at their pass (seconds
+    /// Runs `passes` passes, the clicks at their pass (seconds
     /// since the previous click, `None` for a lone click).
     fn run(&mut self, clicks: &BTreeMap<u32, Option<f64>>, passes: u32, out: &mut Vec<String>) {
         let s0 = self.state();
@@ -298,12 +301,18 @@ fn moves_match_the_original() {
     run(&mut d, "H", &[(2, None)], 6);
     d.enter_at(10, 0.0, -60.0);
     run(&mut d, "I", &[(2, None)], 6);
-    for (name, rows) in &secs[1..] {
-        if let Some(g) = got.get(name) {
-            compare(name, g, rows);
-        }
+    // Every case run is compared, and every golden case of that kind run.
+    let cases: Vec<&(String, Vec<String>)> = secs[1..]
+        .iter()
+        .filter(|(n, _)| n.len() == 1 && n != "S")
+        .collect();
+    assert_eq!(cases.len(), got.len(), "the golden's cases");
+    for (name, rows) in cases {
+        let g = got
+            .get(name)
+            .unwrap_or_else(|| panic!("case {name} not run"));
+        compare(name, g, rows);
     }
-    assert_eq!(got.len(), 9);
     // S: every move zone clicked at its aim from a fresh entry.
     let want = &secs.iter().find(|(n, _)| n == "S").unwrap().1;
     let mut sweep = Vec::new();

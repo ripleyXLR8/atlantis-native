@@ -7,7 +7,8 @@
 //! is here, for an RGB565 screen (the cursors).
 //!
 //! Layout after the 8-byte magic: u32 flags; the RGB555 colour table
-//! (0x200 bytes) when flags & 4; u32 count; u32 offsets from the start of
+//! (0x200 bytes) when flags & 4, or a table of 256 (B, G, R, x) bytes
+//! (0x400 bytes) when flags & 8 (`Ponpirog.SPR`); u32 count; u32 offsets from the start of
 //! that array (0 = empty slot); per sprite: a default position (u16 x, y)
 //! when flags & 0x800, u16 w, h, s16 hot spot x, y, u32\[h\] row offsets
 //! from the end of that array, the rows.
@@ -20,8 +21,6 @@ pub enum SprError {
     Truncated,
     /// Not `SPRCRYO ` or `SPRCRYO1` (error 4 of the loader).
     NotSpr,
-    /// Flags & 8 (a 0x400-byte colour table): no shipped bank has it.
-    Unsupported(u32),
 }
 
 impl fmt::Display for SprError {
@@ -29,7 +28,6 @@ impl fmt::Display for SprError {
         match self {
             SprError::Truncated => write!(f, "truncated sprite bank"),
             SprError::NotSpr => write!(f, "not an SPRCRYO sprite bank"),
-            SprError::Unsupported(fl) => write!(f, "sprite bank flags {fl:#x} not supported"),
         }
     }
 }
@@ -210,9 +208,6 @@ impl SprBank {
         }
         let data = data[8..].to_vec();
         let flags = u32_at(&data, 0).ok_or(SprError::Truncated)?;
-        if flags & 8 != 0 {
-            return Err(SprError::Unsupported(flags));
-        }
         let mut at = 4;
         let mut pal = vec![0u16; 256];
         if flags & 4 != 0 {
@@ -220,6 +215,18 @@ impl SprBank {
                 *p = to565(u16_at(&data, at + 2 * i).ok_or(SprError::Truncated)?);
             }
             at += 0x200;
+        }
+        if flags & 8 != 0 {
+            // SPR_CONVPAL16 (spr_p5.dll @ 0x1000249e) for RGB565: the
+            // green's low bit dropped.
+            for (i, p) in pal.iter_mut().enumerate() {
+                let e = data
+                    .get(at + 4 * i..at + 4 * i + 3)
+                    .ok_or(SprError::Truncated)?;
+                let (b, g, r) = (u16::from(e[0]), u16::from(e[1]), u16::from(e[2]));
+                *p = (r >> 3) << 11 | ((g >> 2) & 0xfe) << 5 | (b >> 3);
+            }
+            at += 0x400;
         }
         let count = u32_at(&data, at).ok_or(SprError::Truncated)?;
         Ok(SprBank {
@@ -277,8 +284,10 @@ impl SprBank {
     /// of this port do not have).
     pub fn draw(&self, t: &mut Target, x: Option<i32>, y: i32, index: usize) -> bool {
         // The two families of the shipped banks: 0x74 / 0x874 / 0x878 (a
-        // factor byte in shade runs, @ 0x100039d5 and 0x10002fc3) and 0x274
-        // / 0xa74 (none, `half`, @ 0x10003ef8).
+        // factor byte in shade runs, @ 0x100039d5 and, for 0x878, its own
+        // blitter @ 0x10002fc3, which draws every sprite of the one 0x878
+        // bank as the first does) and 0x274 / 0xa74 (none, `half`,
+        // @ 0x10003ef8).
         let kind = (self.flags & 0x3ff) >> 1;
         let half_shade = match kind {
             0x3a | 0x3c => false,
