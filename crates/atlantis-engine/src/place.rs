@@ -315,21 +315,29 @@ impl Engine {
                 .then(|| self.wam.places.iter().find(|p| p.id == next))
                 .flatten()
                 .map(|p| (p.cyclo.clone(), t.dst_alpha, t.dst_beta));
-            self.hd_video_panorama_start(Some((t.src_alpha, t.src_beta)), dest)
-                .await;
-            self.set_view(t.dst_alpha, t.dst_beta);
             // 0x00423f8a: a double click during the turn skips the video
             // (and its SPF sprites and ambient glide); the flag is reset
             // either way (0x00424013).
-            if !self.turn_double_click.flag {
+            let play = !self.turn_double_click.flag;
+            // Without the video the turn's last frame stays on screen, and
+            // its own sides with it: no video sides.
+            if play {
+                self.hd_video_panorama_start(Some((t.src_alpha, t.src_beta)), dest)
+                    .await;
+            } else {
+                self.sys.hd_video.borrow_mut().active = false;
+            }
+            self.set_view(t.dst_alpha, t.dst_beta);
+            if play {
                 self.play_transition_video(&t.video, Some((cur, next)), TRANSITION_FRAME_MS)
                     .await;
+                // The video's last frame stays on screen while the
+                // destination loads: its sides stay those of the video's
+                // end (switched off when the destination's view is shown,
+                // `hd_show_view_over`).
+                self.sys.hd_video.borrow_mut().t = 1.0;
             }
             self.turn_double_click.flag = false;
-            // The video's last frame stays on screen while the destination
-            // loads: its sides stay those of the video's end (switched off
-            // when the destination's view is shown, `hd_show_view_over`).
-            self.sys.hd_video.borrow_mut().t = 1.0;
         }
         // A sub-WAM swaps the area when (src, dst) crosses into another WAM
         // (FUN_00422ad0). The place id stays the one being left: the
@@ -987,5 +995,65 @@ mod wsprframe_tests {
             &seen[..40]
         );
         assert!(*seen.iter().max().unwrap() > 33);
+    }
+}
+
+#[cfg(test)]
+mod move_video_skip_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// Widescreen HD with panorama sides: a move whose video plays keeps
+    /// the video's sides until the destination's view is shown; a move
+    /// whose video a double click skipped has none, so the turn's last
+    /// frame is not drawn beside the destination's sides.
+    #[test]
+    fn skipped_move_video_has_no_video_sides() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        for skip in [false, true] {
+            let g =
+                atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(&dir)))
+                    .unwrap();
+            let sys = Sys::new(Mixer::new());
+            sys.set_hd_tile(Some(24));
+            sys.set_hd_side_tiles(2);
+            sys.set_hd_options(crate::hd::HdOptions {
+                widescreen: true,
+                video_sides: crate::hd::VideoSides::Panorama,
+                ..Default::default()
+            });
+            let s2 = sys.clone();
+            let out = Rc::new(std::cell::RefCell::new(None));
+            let o2 = out.clone();
+            let mut r = Runner::new(sys.clone(), async move {
+                let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+                assert!(e.load_wam("ATLAN5.WAM").await);
+                e.next_place_id = Some(126);
+                e.do_place_change().await;
+                let next = e
+                    .place()
+                    .and_then(|p| p.transitions.iter().find(|t| t.video.contains('.')))
+                    .map(|t| t.dst_place)
+                    .expect("no move with a video at view 126");
+                e.turn_double_click.flag = skip;
+                e.execute_transition(next).await;
+                let v = e.sys.hd_video.borrow();
+                *o2.borrow_mut() = Some((v.active, v.t));
+            });
+            let mut t = 0;
+            while r.step(t) {
+                t += 16;
+            }
+            let got = out.borrow().expect("the move did not end");
+            if skip {
+                assert!(!got.0, "skipped video: the sides are on");
+            } else {
+                assert_eq!(got, (true, 1.0));
+            }
+        }
     }
 }
