@@ -990,17 +990,26 @@ after a short game with three saves.
   dialog video stream does: the frames are premultiplied, a = 31 copies
   the video, a = 0 keeps the background, and in between the background is
   scaled by (31 − a) / 32 with the original's tables.
-- **Dialog heads** (`head.rs`, `raster3d.rs`, `lipsync.rs`): a speaker's head is a `.db` scene written by Cryo's 3ds Max
+- **Dialog heads** (`head.rs`, `raster3d.rs`, `raster3d/ii.rs`, `lipsync.rs`): a speaker's head is a `.db` scene written by Cryo's 3ds Max
   exporter (`crates/atlantis2-data/src/db.rs`: meshes, a node hierarchy
   with key-frame tracks, materials, the mouth shapes as morph targets,
   cameras) with a 512x512 16-bit RLE TGA texture and two eye-blink maps
   (`tga.rs`). The scene is posed at the body video's frame number, its
   mouth mixed from the mood's 7 visemes, and the head drawn by a
-  transcription of the original's C pipeline: the object → camera matrix,
-  the transform and clip codes, the back-face test, the projection, and
-  the rasteriser `Zi32Texture1516FastPerspective1516C` (a fan of
-  triangles, perspective every 32 pixels, nearest texel, a 32-bit Z
-  buffer), every float store and x87 rounding as the original's. The eyes
+  transcription of the original's pipeline for the panorama's CPU (the
+  same `Variant` as the warp, one reference machine). With `warpPII`, the
+  default, it is the Pentium II's (the original's CPU type 8): the x87
+  assembly world update, object → camera matrix, transform with its clip
+  codes, back-face test (a face is drawn when N · c0 ≤ 0) and projection,
+  and the rasteriser `Zi32Texture16FastPerspective1516II` (a triangle
+  set-up chosen from the vertices' integer rows, the scan, and the MMX
+  span: the texel coordinates every 32 pixels by a division, stepped in
+  fixed point in between from their shifted ends, the last block's step
+  from a float difference), its set-up loading 0x0e7f at each polygon.
+  With `warpC` it is the C pipeline (`Zi32Texture1516FastPerspective1516C`:
+  perspective every 32 pixels from truncated ends) under the process's
+  word, which AMD CPUs drew. A fan of triangles, nearest texel, a 32-bit
+  Z buffer, every float store and x87 rounding as the original's. The eyes
   blink at random (2 % a frame, then three frames closed, half closed,
   open), with the C runtime's own `rand`. The lip-sync analyses the voice
   by blocks of 256 samples (energy and a histogram of zero-crossing
@@ -1008,9 +1017,27 @@ after a short game with three saves.
   speaker's 10x7 `[Matrice]` of `scenar\info<world>.txt`, smoothed by
   `[Smooth]`, `[Offset]` seconds ahead of the voice (`dialog.rs` reads
   the scripts). Frames, Z buffers, intermediate buffers and the weights
-  of every Tibet line are the original's, bit for bit, at either x87
-  precision for the lip-sync; `cargo run --release --example head_png`
-  draws a head to a PNG.
+  of every Tibet line are the original's, bit for bit: the heads with
+  both variants (the Pentium II's under 0x0e7f, the C one under 0x027f),
+  the lip-sync under 0x027f, 0x007f and 0x0e7f;
+  `cargo run --release --example head_png` draws a head to a PNG (`c` as
+  a sixth argument for the C routines).
+- **The dialogs' control word:** the dialog's float code (the heads'
+  load, pose, mouth and transform, the lip-sync) runs
+  under the word the game's code has: after a `warpPII` frame 0x0e7f, as
+  no code of the executable loads another between the panorama's frames
+  and a dialog's (its only control-word loads are the assembly
+  rasterisers' 0x0e7f and the C runtime's save-and-restore pairs; its
+  math functions round to nearest inside, `Fpu::nearest`), and the II
+  rasteriser loads it again at each polygon. The dialog takes the
+  engine's word and hands back the one its heads leave. The numbers of a
+  world's dialog scripts (`[Matrice]`, `[Smooth]`, `[Offset]`,
+  `[Focale]`) are stored as floats under the word in force when the world
+  is loaded (`monde`): toward zero under 0x0e7f, to nearest for a new
+  game's Tibet, read before its first panorama frame. Not known: whether
+  the original draws a panorama frame before a new game's first `monde`
+  (the port does not), and what Direct3D, which the original calls only
+  at start-up and when the display is set up, does to the word.
 - **Dialogs** (`dialog.rs`, `hnm_stream.rs`, `subtitle.rs`, `sound.rs`):
   a world's `loc\Dial<XX>.txt` (the texts, Windows-1252),
   `scenar\com<XX>.txt` (speaker, mood, stand, camera, kind of each line)

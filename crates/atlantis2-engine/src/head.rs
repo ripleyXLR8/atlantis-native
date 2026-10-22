@@ -3,15 +3,22 @@
 //! software pipeline over the body video with a Z buffer of its own
 //! (`dlg_Anim`, @ 0x00462100 and its methods).
 //!
-//! What is drawn, per frame (`dlg_Anim::DisplayFace` @ 0x00463460):
+//! What is drawn, per frame (`dlg_Anim::DisplayFace` @ 0x00463460), with
+//! the routines of the CPU type ([`Variant`], the warp's: the pipeline
+//! @ 0x004d2770 picks them from the same CPU type):
 //!
 //! 1. the eye blink step, which may copy the eyes-closed, half-closed or
 //!    open map over the top of the live texture;
-//! 2. the object → camera matrix of the head object (@ 0x00571760), the
-//!    transform of the mesh's vertices and their clip codes (@ 0x004d00a0);
-//! 3. the back-face test (@ 0x004d12c0) and the projection (@ 0x004d20c0);
-//! 4. the front faces, in the mesh's order, through the rasteriser
-//!    ([`crate::raster3d`]).
+//! 2. the object → camera matrix of the head object, the transform of the
+//!    mesh's vertices and their clip codes: C (@ 0x00571760,
+//!    @ 0x004d00a0), or the x87 assembly of CPU type 8 (@ 0x00571bd0 →
+//!    @ 0x0057eec0, with its own world update @ 0x00584340);
+//! 3. the back-face test and the projection: C (@ 0x004d12c0,
+//!    @ 0x004d20c0) or assembly (@ 0x00572030, @ 0x00572080);
+//! 4. the front faces, in the mesh's order, through the rasteriser: the C
+//!    one ([`crate::raster3d`]) or the Pentium II's
+//!    ([`crate::raster3d::ii`]), which leaves the x87 control word at
+//!    0x0e7f.
 //!
 //! The pose ([`Head::pose`]) evaluates every node's key-frame tracks at
 //! the body video's frame number (@ 0x00463140 → @ 0x004c7810); the mouth
@@ -19,8 +26,9 @@
 //! or, without a voice, the idle babble ([`Head::idle_mouth`]).
 //!
 //! The arithmetic follows the original's x87 code operation by operation
-//! (`f()` a float store, `r()` an x87 result at the [`Fpu`] precision),
-//! so that the pixels and the Z buffer are the original's.
+//! under the control word in force ([`Fpu`]: `c.f()` a float store,
+//! `c.add()` and the like an x87 operation), so that the pixels and the Z
+//! buffer are the original's.
 
 use std::collections::BTreeMap;
 
@@ -28,8 +36,9 @@ use atlantis2_data::db::Scene;
 use atlantis2_data::tga::Tga;
 
 use crate::crt::Rand;
-use crate::fpu::{f, Fpu};
-use crate::raster3d::{draw_polygon, Target, Texture, Vertex};
+use crate::fpu::Fpu;
+use crate::raster3d::{draw_polygon, ii, Target, Texture, Vertex};
+use crate::warp::Variant;
 
 /// The visemes, in the weights' order (@ 0x005dba0c).
 pub const VISEMES: &[u8; 7] = b"diaobsv";
@@ -48,73 +57,71 @@ fn v64(v: [f32; 3]) -> Vec3 {
 }
 
 /// a ⊗ b (@ 0x004a29c0).
-fn qmul(fpu: Fpu, a: &Quat, b: &Quat) -> Quat {
-    let r = |x: f64| fpu.r(x);
+fn qmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
+    let m = |x, y| c.mul(x, y);
     let [ax, ay, az, aw] = *a;
     let [bx, by, bz, bw] = *b;
     [
-        f(r(r(r(r(ay * bz) + r(bw * ax)) + r(aw * bx)) - r(by * az))),
-        f(r(r(r(r(ay * bw) + r(aw * by)) + r(bx * az)) - r(ax * bz))),
-        f(r(r(r(r(aw * bz) + r(bw * az)) + r(by * ax)) - r(ay * bx))),
-        f(r(r(r(r(aw * bw) - r(bx * ax)) - r(ay * by)) - r(bz * az))),
+        c.f(c.sub(c.add(c.add(m(ay, bz), m(bw, ax)), m(aw, bx)), m(by, az))),
+        c.f(c.sub(c.add(c.add(m(ay, bw), m(aw, by)), m(bx, az)), m(ax, bz))),
+        c.f(c.sub(c.add(c.add(m(aw, bz), m(bw, az)), m(by, ax)), m(ay, bx))),
+        c.f(c.sub(c.sub(c.sub(m(aw, bw), m(bx, ax)), m(ay, by)), m(bz, az))),
     ]
 }
 
 /// conj(a) ⊗ b (@ 0x004a2c50).
-fn qcmul(fpu: Fpu, a: &Quat, b: &Quat) -> Quat {
-    let r = |x: f64| fpu.r(x);
+fn qcmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
+    let m = |x, y| c.mul(x, y);
     let [ax, ay, az, aw] = *a;
     let [bx, by, bz, bw] = *b;
     [
-        f(r(r(r(r(bx * aw) - r(bw * ax)) - r(bz * ay)) + r(by * az))),
-        f(r(r(r(r(by * aw) - r(bw * ay)) - r(bx * az)) + r(bz * ax))),
-        f(r(r(r(r(bz * aw) - r(bw * az)) - r(by * ax)) + r(bx * ay))),
-        f(r(r(r(r(bw * aw) + r(bx * ax)) + r(bz * az)) + r(by * ay))),
+        c.f(c.add(c.sub(c.sub(m(bx, aw), m(bw, ax)), m(bz, ay)), m(by, az))),
+        c.f(c.add(c.sub(c.sub(m(by, aw), m(bw, ay)), m(bx, az)), m(bz, ax))),
+        c.f(c.add(c.sub(c.sub(m(bz, aw), m(bw, az)), m(by, ax)), m(bx, ay))),
+        c.f(c.add(c.add(c.add(m(bw, aw), m(bx, ax)), m(bz, az)), m(by, ay))),
     ]
 }
 
 /// The rotation matrix of a quaternion, rows (@ 0x004c6e40).
-fn qmat(fpu: Fpu, q: &Quat) -> [f64; 9] {
-    let r = |x: f64| fpu.r(x);
+fn qmat(c: Fpu, q: &Quat) -> [f64; 9] {
     let [x, y, z, w] = *q;
-    let x2 = r(x + x);
-    let y2 = f(r(y + y));
-    let z2 = f(r(z + z));
-    let wx = f(r(w * x2));
-    let wy = f(r(w * y2));
-    let wz = f(r(w * z2));
-    let xx = r(x2 * x);
-    let xy = r(x * y2);
-    let xz = f(r(x * z2));
-    let yy = f(r(y * y2));
-    let yz = f(r(y * z2));
-    let zz = r(z * z2);
-    let zzf = f(zz);
+    let x2 = c.add(x, x);
+    let y2 = c.f(c.add(y, y));
+    let z2 = c.f(c.add(z, z));
+    let wx = c.f(c.mul(w, x2));
+    let wy = c.f(c.mul(w, y2));
+    let wz = c.f(c.mul(w, z2));
+    let xx = c.mul(x2, x);
+    let xy = c.mul(x, y2);
+    let xz = c.f(c.mul(x, z2));
+    let yy = c.f(c.mul(y, y2));
+    let yz = c.f(c.mul(y, z2));
+    let zz = c.mul(z, z2);
+    let zzf = c.f(zz);
     [
-        f(r(1.0 - r(zz + yy))),
-        f(r(xy - wz)),
-        f(r(xz + wy)),
-        f(r(xy + wz)),
-        f(r(1.0 - r(zzf + xx))),
-        f(r(yz - wx)),
-        f(r(xz - wy)),
-        f(r(yz + wx)),
-        f(r(1.0 - r(yy + xx))),
+        c.f(c.sub(1.0, c.add(zz, yy))),
+        c.f(c.sub(xy, wz)),
+        c.f(c.add(xz, wy)),
+        c.f(c.add(xy, wz)),
+        c.f(c.sub(1.0, c.add(zzf, xx))),
+        c.f(c.sub(yz, wx)),
+        c.f(c.sub(xz, wy)),
+        c.f(c.add(yz, wx)),
+        c.f(c.sub(1.0, c.add(yy, xx))),
     ]
 }
 
 /// The quaternion of a rotation matrix (@ 0x004c8a10).
-fn matq(fpu: Fpu, m: &[f64; 9]) -> Quat {
-    let r = |x: f64| fpu.r(x);
-    let trace = r(r(m[4] + m[0]) + m[8]);
+fn matq(c: Fpu, m: &[f64; 9]) -> Quat {
+    let trace = c.add(c.add(m[4], m[0]), m[8]);
     let mut q = [0.0; 4];
     if trace > 0.0 {
-        let s = r(r(trace + 1.0).sqrt());
-        q[3] = f(r(s * 0.5));
-        let s2 = r(0.5 / s);
-        q[0] = f(r(r(m[7] - m[5]) * s2));
-        q[1] = f(r(r(m[2] - m[6]) * s2));
-        q[2] = f(r(r(m[3] - m[1]) * s2));
+        let s = c.sqrt(c.add(trace, 1.0));
+        q[3] = c.f(c.mul(s, 0.5));
+        let s2 = c.div(0.5, s);
+        q[0] = c.f(c.mul(c.sub(m[7], m[5]), s2));
+        q[1] = c.f(c.mul(c.sub(m[2], m[6]), s2));
+        q[2] = c.f(c.mul(c.sub(m[3], m[1]), s2));
     } else {
         const NEXT: [usize; 3] = [1, 2, 0]; // @ 0x005e4c88
         let mut i = 0;
@@ -126,52 +133,55 @@ fn matq(fpu: Fpu, m: &[f64; 9]) -> Quat {
         }
         let j = NEXT[i];
         let k = NEXT[j];
-        let s = r(r(r(m[i * 4] - r(m[k * 4] + m[j * 4])) + 1.0).sqrt());
-        q[i] = f(r(s * 0.5));
-        let s2 = r(0.5 / s);
-        q[j] = f(r(r(m[j * 3 + i] + m[i * 3 + j]) * s2));
-        q[k] = f(r(r(m[k * 3 + i] + m[i * 3 + k]) * s2));
-        q[3] = f(r(r(m[k * 3 + j] - m[j * 3 + k]) * s2));
+        let s = c.sqrt(c.add(c.sub(m[i * 4], c.add(m[k * 4], m[j * 4])), 1.0));
+        q[i] = c.f(c.mul(s, 0.5));
+        let s2 = c.div(0.5, s);
+        q[j] = c.f(c.mul(c.add(m[j * 3 + i], m[i * 3 + j]), s2));
+        q[k] = c.f(c.mul(c.add(m[k * 3 + i], m[i * 3 + k]), s2));
+        q[3] = c.f(c.mul(c.sub(m[k * 3 + j], m[j * 3 + k]), s2));
     }
     q
 }
 
 /// acos as the CRT computes it (@ 0x005ae2d0): atan2(sqrt((1 + x)(1 − x)),
-/// x) with `fpatan`.
+/// x) with `fpatan`, under the control word with the rounding to nearest
+/// (@ 0x005b5d95 sets (word & 0x300) | 0x7f and @ 0x005b5e1e restores
+/// the caller's).
 fn acos(fpu: Fpu, x: f64) -> f64 {
-    let r = |v: f64| fpu.r(v);
-    let s = r(r(r(1.0 + x) * r(1.0 - x)).sqrt());
+    let c = fpu.nearest();
+    let s = c.sqrt(c.mul(c.add(1.0, x), c.sub(1.0, x)));
     libm::atan2(s, x)
 }
 
 /// Spherical interpolation of two rotation keys (@ 0x004c8b60).
-fn slerp(fpu: Fpu, a: &Quat, b: &Quat, t: f64) -> Quat {
-    let r = |x: f64| fpu.r(x);
-    let mut dot = f(r(
-        r(r(r(a[0] * b[0]) + r(a[2] * b[2])) + r(a[1] * b[1])) + r(a[3] * b[3])
+fn slerp(c: Fpu, a: &Quat, b: &Quat, t: f64) -> Quat {
+    let m = |x, y| c.mul(x, y);
+    let mut dot = c.f(c.add(
+        c.add(c.add(m(a[0], b[0]), m(a[2], b[2])), m(a[1], b[1])),
+        m(a[3], b[3]),
     ));
     let neg = dot < 0.0;
     if neg {
-        dot = f(-dot);
+        dot = c.f(-dot);
     }
     // dot + 1 > FLT_EPSILON always holds here (dot ≥ 0); the original's
     // branch for opposite keys (@ 0x004c8c90) is never taken.
     let eps = f64::from(f32::EPSILON);
     let (k0, mut k1);
-    if r(1.0 - dot) > eps {
-        let ang = acos(fpu, dot);
-        let angf = f(ang);
-        let s = f(libm::sin(ang));
-        k0 = r(libm::sin(r(r(1.0 - t) * angf)) / s);
-        k1 = r(libm::sin(r(angf * t)) / s);
+    if c.sub(1.0, dot) > eps {
+        let ang = acos(c, dot);
+        let angf = c.f(ang);
+        let s = c.f(libm::sin(ang));
+        k0 = c.div(libm::sin(c.mul(c.sub(1.0, t), angf)), s);
+        k1 = c.div(libm::sin(c.mul(angf, t)), s);
     } else {
-        k0 = r(1.0 - t);
+        k0 = c.sub(1.0, t);
         k1 = t;
     }
     if neg {
         k1 = -k1;
     }
-    std::array::from_fn(|i| f(r(r(a[i] * k0) + r(b[i] * k1))))
+    std::array::from_fn(|i| c.f(c.add(m(a[i], k0), m(b[i], k1))))
 }
 
 /// A node of the scene (0x58 bytes, @ 0x004a1d40): local and world
@@ -230,23 +240,23 @@ const REF_H: f64 = 480.0;
 
 impl Camera {
     fn new(fpu: Fpu, c: &atlantis2_data::db::Camera) -> Camera {
-        let r = |x: f64| fpu.r(x);
+        let k = fpu;
         // @ 0x004a49c0, mode 1 (perspective).
         let fov = f64::from(c.fov);
-        let fx = r(REF_W / r(libm::tan(r(fov * 0.5)) * 2.0));
-        let fy = f(r(fx * r(r(REF_W / REF_H) / r(4.0 / 3.0))));
-        let fx = f(fx);
+        let fx = k.div(REF_W, k.mul(libm::tan(k.mul(fov, 0.5)), 2.0));
+        let fy = k.f(k.mul(fx, k.div(k.div(REF_W, REF_H), k.div(4.0, 3.0))));
+        let fx = k.f(fx);
         let (cx, cy) = (320.0, 240.0);
         let (near, far) = (f64::from(c.near), f64::from(c.far));
         // @ 0x004a4e8d: the viewport edges ± 1 pixel.
         let slopes = [
-            f(r(r(r(0.0 - cx) - 1.0) / fx)),
-            f(r(r(r(0.0 - cy) - 1.0) / fy)),
-            f(r(r(r(639.0 - cx) + 1.0) / fx)),
-            f(r(r(r(479.0 - cy) + 1.0) / fy)),
+            k.f(k.div(k.sub(k.sub(0.0, cx), 1.0), fx)),
+            k.f(k.div(k.sub(k.sub(0.0, cy), 1.0), fy)),
+            k.f(k.div(k.add(k.sub(639.0, cx), 1.0), fx)),
+            k.f(k.div(k.add(k.sub(479.0, cy), 1.0), fy)),
         ];
         // @ 0x004a5026.
-        let a = r(far / r(far - near));
+        let a = k.div(far, k.sub(far, near));
         Camera {
             fx,
             fy,
@@ -255,8 +265,8 @@ impl Camera {
             near,
             far,
             slopes,
-            a: f(a),
-            b: f(r(a * near)),
+            a: k.f(a),
+            b: k.f(k.mul(a, near)),
             q: q64(c.rotation),
             p: v64(c.position),
         }
@@ -316,7 +326,12 @@ impl std::error::Error for HeadError {}
 
 /// A speaker's head for one stand: `dlg_Anim`.
 pub struct Head {
+    /// The x87 control word the head's float code runs under now: the
+    /// caller's, then 0x0e7f once the II rasteriser has drawn.
     fpu: Fpu,
+    /// The CPU's routines: the II rasteriser with the x87 assembly
+    /// transform (CPU type 8), or the C ones (CPU type 0).
+    variant: Variant,
     nodes: Vec<Node>,
     tracks: Vec<Option<Track>>,
     head: usize,
@@ -376,6 +391,7 @@ impl Head {
     /// files exist, its eye maps (`dlg_Anim::LoadDataBase` @ 0x004626b0).
     pub fn new(
         fpu: Fpu,
+        variant: Variant,
         scene: &Scene,
         open: Tga,
         closed: Option<Tga>,
@@ -455,6 +471,7 @@ impl Head {
         }
         Ok(Head {
             fpu,
+            variant,
             nodes,
             tracks,
             head,
@@ -506,9 +523,29 @@ impl Head {
         (&self.texture, self.tex_w, self.tex_h)
     }
 
-    /// The head object's world rotation, position and scale.
+    /// The x87 control word the head's code runs under now.
+    pub fn fpu(&self) -> Fpu {
+        self.fpu
+    }
+
+    /// The control word the caller's code has now (the head's next
+    /// operations run under it).
+    pub fn set_fpu(&mut self, fpu: Fpu) {
+        self.fpu = fpu;
+    }
+
+    /// The routines the head is drawn with.
+    pub fn variant(&self) -> Variant {
+        self.variant
+    }
+
+    /// The head object's world rotation, position and scale, as the
+    /// variant's transform computes them.
     pub fn head_world(&mut self) -> ([f32; 4], [f32; 3], f32) {
-        self.update(self.head);
+        match self.variant {
+            Variant::C => self.update(self.head),
+            Variant::PII => self.update_asm(self.head),
+        }
         let n = &self.nodes[self.head];
         (n.wq.map(|x| x as f32), n.wp.map(|x| x as f32), n.ws as f32)
     }
@@ -529,8 +566,7 @@ impl Head {
         let t = f64::from(frame as f32);
         for i in 0..self.nodes.len() {
             let Some(tr) = &self.tracks[i] else { continue };
-            let fpu = self.fpu;
-            let r = |x: f64| fpu.r(x);
+            let c = self.fpu;
             // Rotation (@ 0x004c7810, flag 1).
             let q = if tr.rotations.is_empty() {
                 None
@@ -544,8 +580,8 @@ impl Head {
                     let (t0, a) = tr.rotations[k - 1];
                     let (t1, b) = tr.rotations[k];
                     // @ 0x004c7bc0.
-                    let u = f(r(r(t - t0) / r(t1 - t0)));
-                    slerp(fpu, &a, &b, u)
+                    let u = c.f(c.div(c.sub(t, t0), c.sub(t1, t0)));
+                    slerp(c, &a, &b, u)
                 })
             };
             // Position (flag 2).
@@ -560,7 +596,7 @@ impl Head {
                 } else {
                     let (t0, a) = tr.positions[k - 1];
                     let (t1, b) = tr.positions[k];
-                    lerp_position(fpu, t0, &a, t1, &b, t)
+                    lerp_position(c, t0, &a, t1, &b, t)
                 })
             };
             // Scale (flag 4).
@@ -576,11 +612,11 @@ impl Head {
                     let (t0, a) = tr.scales[k - 1];
                     let (t1, b) = tr.scales[k];
                     // @ 0x004c7c20.
-                    let v = r(r(r(r(b - a) * r(t - t0)) / r(t1 - t0)) + a);
+                    let v = c.add(c.div(c.mul(c.sub(b, a), c.sub(t, t0)), c.sub(t1, t0)), a);
                     if v == 0.0 {
                         1.0
                     } else {
-                        f(v)
+                        c.f(v)
                     }
                 })
             };
@@ -608,8 +644,8 @@ impl Head {
         if self.nodes[i].valid {
             return;
         }
-        let fpu = self.fpu;
-        let r = |x: f64| fpu.r(x);
+        let c = self.fpu;
+        let m = |x, y| c.mul(x, y);
         let Some(pi) = self.nodes[i].parent else {
             let n = &mut self.nodes[i];
             (n.wq, n.wp, n.ws, n.valid) = (n.lq, n.lp, n.ls, true);
@@ -621,21 +657,78 @@ impl Head {
             (p.wq, p.wp, p.ws)
         };
         let n = &mut self.nodes[i];
-        n.wq = qmul(fpu, &pq, &n.lq);
+        n.wq = qmul(c, &pq, &n.lq);
         let [px, py, pz, pw] = pq;
-        let a = f(r(ps * n.lp[0]));
-        let b = f(r(ps * n.lp[1]));
-        let c = r(ps * n.lp[2]);
-        let x0 = f(r(r(r(a * pw) - r(b * pz)) + r(c * py)));
-        let y0 = f(r(r(r(b * pw) - r(c * px)) + r(a * pz)));
-        let z0 = f(r(r(r(c * pw) - r(a * py)) + r(b * px)));
-        let w0 = r(r(r(c * pz) + r(b * py)) + r(a * px));
-        let x1 = f(r(r(r(r(x0 * pw) + r(w0 * px)) + r(z0 * py)) - r(y0 * pz)));
-        let y1 = f(r(r(r(r(x0 * pz) + r(y0 * pw)) + r(w0 * py)) - r(z0 * px)));
-        let z1 = r(r(r(r(w0 * pz) + r(z0 * pw)) + r(y0 * px)) - r(x0 * py));
-        n.wp = [f(r(pp[0] + x1)), f(r(y1 + pp[1])), f(r(z1 + pp[2]))];
-        let s = r(ps * n.ls);
-        n.ws = if s == 0.0 { 1.0 } else { f(s) };
+        let a = c.f(m(ps, n.lp[0]));
+        let b = c.f(m(ps, n.lp[1]));
+        let cc = m(ps, n.lp[2]);
+        let x0 = c.f(c.add(c.sub(m(a, pw), m(b, pz)), m(cc, py)));
+        let y0 = c.f(c.add(c.sub(m(b, pw), m(cc, px)), m(a, pz)));
+        let z0 = c.f(c.add(c.sub(m(cc, pw), m(a, py)), m(b, px)));
+        let w0 = c.add(c.add(m(cc, pz), m(b, py)), m(a, px));
+        let x1 = c.f(c.sub(c.add(c.add(m(x0, pw), m(w0, px)), m(z0, py)), m(y0, pz)));
+        let y1 = c.f(c.sub(c.add(c.add(m(x0, pz), m(y0, pw)), m(w0, py)), m(z0, px)));
+        let z1 = c.sub(c.add(c.add(m(w0, pz), m(z0, pw)), m(y0, px)), m(x0, py));
+        n.wp = [
+            c.f(c.add(pp[0], x1)),
+            c.f(c.add(y1, pp[1])),
+            c.f(c.add(z1, pp[2])),
+        ];
+        let s = m(ps, n.ls);
+        n.ws = if s == 0.0 { 1.0 } else { c.f(s) };
+        n.valid = true;
+    }
+
+    /// The world values of node `i` as the x87 assembly computes them
+    /// (@ 0x00584340, called by the type-8 transform for the camera and the
+    /// object nodes): a child of the root takes its local values; else, from
+    /// the parent's world values (updated first), no float store in
+    /// between and no rule for a zero scale.
+    fn update_asm(&mut self, i: usize) {
+        if self.nodes[i].valid {
+            return;
+        }
+        let c = self.fpu;
+        let m = |x, y| c.mul(x, y);
+        let Some(pi) = self.nodes[i].parent else {
+            let n = &mut self.nodes[i];
+            (n.wq, n.wp, n.ws, n.valid) = (n.lq, n.lp, n.ls, true);
+            return;
+        };
+        self.update_asm(pi);
+        let (pq, pp, ps) = {
+            let p = &self.nodes[pi];
+            (p.wq, p.wp, p.ws)
+        };
+        let n = &mut self.nodes[i];
+        let [px, py, pz, pw] = pq;
+        n.ws = c.f(m(ps, n.ls));
+        let (a, b, cc) = (m(n.lp[0], ps), m(n.lp[1], ps), m(n.lp[2], ps));
+        let x0 = c.add(c.sub(m(a, pw), m(pz, b)), m(py, cc));
+        let y0 = c.add(c.sub(m(b, pw), m(px, cc)), m(pz, a));
+        let z0 = c.add(c.sub(m(cc, pw), m(py, a)), m(px, b));
+        let w0 = c.add(m(a, px), c.add(m(b, py), m(cc, pz)));
+        n.wp = [
+            c.f(c.add(
+                c.add(m(x0, pw), c.sub(c.add(m(px, w0), m(py, z0)), m(pz, y0))),
+                pp[0],
+            )),
+            c.f(c.add(
+                c.add(m(y0, pw), c.sub(c.add(m(py, w0), m(pz, x0)), m(px, z0))),
+                pp[1],
+            )),
+            c.f(c.add(
+                c.add(m(z0, pw), c.sub(c.add(m(w0, pz), m(px, y0)), m(py, x0))),
+                pp[2],
+            )),
+        ];
+        let [lx, ly, lz, lw] = n.lq;
+        n.wq = [
+            c.f(c.sub(c.add(c.add(m(lx, pw), m(px, lw)), m(py, lz)), m(ly, pz))),
+            c.f(c.sub(c.add(c.add(m(ly, pw), m(py, lw)), m(lx, pz)), m(px, lz))),
+            c.f(c.sub(c.add(c.add(m(lz, pw), m(lw, pz)), m(ly, px)), m(py, lx))),
+            c.f(c.sub(c.sub(c.sub(m(pw, lw), m(px, lx)), m(py, ly)), m(pz, lz))),
+        ];
         n.valid = true;
     }
 
@@ -643,18 +736,17 @@ impl Head {
     /// analyser): key `a` of the mood, then a lerp toward each viseme of
     /// positive weight by weight / running sum.
     pub fn mouth(&mut self, mood: u32, weights: &[f32; 7]) {
-        let fpu = self.fpu;
-        let r = move |x: f64| fpu.r(x);
+        let c = self.fpu;
         self.set_mood(mood);
         self.name[5] = b'a';
         self.copy_key();
         let mut s = 0.0;
-        for (c, &w) in weights.iter().enumerate() {
+        for (i, &w) in weights.iter().enumerate() {
             let w = f64::from(w);
             if w > 0.0 {
-                s = f(r(s + w));
-                self.name[5] = VISEMES[c];
-                let k = f(r(w / s));
+                s = c.f(c.add(s, w));
+                self.name[5] = VISEMES[i];
+                let k = c.f(c.div(w, s));
                 self.lerp_key(k);
             }
         }
@@ -670,14 +762,14 @@ impl Head {
     /// accumulator grows by 0.5; when it reaches 1 a random viseme is
     /// chosen; the mesh moves halfway toward the current one.
     pub fn idle_mouth(&mut self, mood: u32, rand: &mut Rand) {
-        let fpu = self.fpu;
-        let r = move |x: f64| fpu.r(x);
-        let acc = r(self.idle_acc + self.idle_speed);
-        self.idle_acc = f(acc);
+        let c = self.fpu;
+        let acc = c.add(self.idle_acc, self.idle_speed);
+        self.idle_acc = c.f(acc);
         if acc >= 1.0 {
-            self.idle_acc = f(r(acc - 1.0));
-            let i = crate::fpu::ftol(r(
-                r(f64::from(rand.rand()) * f64::from(3.051_851e-5_f32)) * 6.0
+            self.idle_acc = c.f(c.sub(acc, 1.0));
+            let i = crate::fpu::ftol(c.mul(
+                c.mul(f64::from(rand.rand()), f64::from(3.051_851e-5_f32)),
+                6.0,
             ));
             self.name[5] = if (0..7).contains(&i) {
                 VISEMES[i as usize]
@@ -713,15 +805,14 @@ impl Head {
     /// Moves the mesh toward the key by `w` (@ 0x004daf20): x stays on
     /// the x87 stack, y and z go through a float between the steps.
     fn lerp_key(&mut self, w: f64) {
-        let fpu = self.fpu;
-        let r = move |x: f64| fpu.r(x);
+        let c = self.fpu;
         let Some(k) = self.key().cloned() else { return };
         for (v, t) in self.vertices.iter_mut().zip(&k) {
-            let nx = f(r(r(r(t[0] - v[0]) * w) + v[0]));
-            let dy = f(r(t[1] - v[1]));
-            let dz = f(r(t[2] - v[2]));
-            let ny = f(r(f(r(dy * w)) + v[1]));
-            let nz = f(r(f(r(dz * w)) + v[2]));
+            let nx = c.f(c.add(c.mul(c.sub(t[0], v[0]), w), v[0]));
+            let dy = c.f(c.sub(t[1], v[1]));
+            let dz = c.f(c.sub(t[2], v[2]));
+            let ny = c.f(c.add(c.f(c.mul(dy, w)), v[1]));
+            let nz = c.f(c.add(c.f(c.mul(dz, w)), v[2]));
             *v = [nx, ny, nz];
         }
     }
@@ -745,7 +836,7 @@ impl Head {
             0 => {
                 let p = self
                     .fpu
-                    .r(f64::from(rand.rand()) * f64::from(3.051_851e-5_f32));
+                    .mul(f64::from(rand.rand()), f64::from(3.051_851e-5_f32));
                 if p <= f64::from(0.02_f32) {
                     self.blink = 3;
                 }
@@ -790,122 +881,41 @@ impl Head {
     }
 
     fn draw(&mut self, cam: usize, pixels: &mut [u16], zbuf: &mut [u32]) -> Stages {
-        let fpu = self.fpu;
-        let r = |x: f64| fpu.r(x);
-        self.update(self.head);
         let c = self.cameras[cam].clone();
-        let n = &self.nodes[self.head];
-        // The object → camera matrix (@ 0x00571760, mode 7); the camera
-        // node is the camera's world pose, scale 1.
-        let cs = 1.0;
-        let is = f(r(1.0 / cs));
-        let dx = r(n.wp[0] - c.p[0]);
-        let dy = f(r(n.wp[1] - c.p[1]));
-        let dz = f(r(n.wp[2] - c.p[2]));
-        let (x, y, z) = (r(dx * is), r(dy * is), r(dz * is));
-        let [qx, qy, qz, qw] = c.q;
-        let tw = f(r(r(r(-r(x * qx)) - r(y * qy)) - r(z * qz)));
-        let tz = f(r(r(r(z * qw) + r(x * qy)) - r(y * qx)));
-        let ty = f(r(r(r(z * qx) + r(y * qw)) - r(x * qz)));
-        let tx = f(r(r(r(y * qz) + r(x * qw)) - r(z * qy)));
-        let t = [
-            f(r(r(r(r(tx * qw) - r(tw * qx)) - r(tz * qy)) + r(ty * qz))),
-            f(r(r(r(r(ty * qw) - r(tw * qy)) - r(tx * qz)) + r(tz * qx))),
-            f(r(r(r(r(tz * qw) - r(tw * qz)) - r(ty * qx)) + r(tx * qy))),
-        ];
-        let factor = r(n.ws * is);
-        let m = qmat(fpu, &qcmul(fpu, &c.q, &n.wq)).map(|e| f(r(factor * e)));
-        // The transform and the clip codes (@ 0x004d00a0, mode 1).
-        let nv = self.vertices.len();
-        let mut st = Stages {
-            camera: Vec::with_capacity(nv),
-            codes: Vec::with_capacity(nv),
-            ..Stages::default()
+        let (mut st, cv) = match self.variant {
+            Variant::C => self.transform_c(&c),
+            Variant::PII => self.transform_pii(&c),
         };
-        let mut cv = Vec::with_capacity(nv);
-        let (mut or, mut and) = (0u8, 0xffu8);
-        for v in &self.vertices {
-            let row = |k: usize| {
-                f(r(r(
-                    r(r(v[1] * m[3 * k + 1]) + r(v[0] * m[3 * k])) + r(v[2] * m[3 * k + 2])
-                ) + t[k]))
-            };
-            let p = [row(0), row(1), row(2)];
-            let mut code = if p[2] < c.near {
-                CLIP_NEAR
-            } else if p[2] > c.far {
-                CLIP_FAR
-            } else {
-                0
-            };
-            if p[0] < r(p[2] * c.slopes[0]) {
-                code |= 1;
-            } else if p[0] > r(p[2] * c.slopes[2]) {
-                code |= 4;
-            }
-            if p[1] < r(p[2] * c.slopes[1]) {
-                code |= 2;
-            } else if p[1] > r(p[2] * c.slopes[3]) {
-                code |= 8;
-            }
-            or |= code;
-            and &= code;
-            st.camera.push(p.map(|x| x as f32));
-            st.codes.push(code);
-            cv.push(p);
-        }
-        if and & 0x3f != 0 {
-            st.rejected = true;
+        if st.rejected {
             return st;
         }
+        let or = st.codes.iter().fold(0, |a, &b| a | b);
         if or != 0 {
             // The original then takes another back-face routine
-            // (@ 0x004d1070) and clips faces crossing the near or far
-            // plane; no head frame of the game needs either.
+            // (@ 0x004d1070, type 8: @ 0x00571ee0) and clips faces crossing
+            // the near or far plane; no head frame of the game needs either.
             log::debug!("head partly outside the view (clip codes {or:#x})");
         }
-        // Back faces (@ 0x004d12c0): N = (c1 − c0) × (c2 − c0), drawn when
-        // N · c0 < 0; the used vertices' codes become 0x80.
-        st.faces = Vec::with_capacity(self.mesh.corners.len());
-        for tri in &self.mesh.corners {
-            let [c0, c1, c2] = tri.map(|i| cv.get(i as usize).copied().unwrap_or([0.0; 3]));
-            let a = [
-                f(r(c2[0] - c0[0])),
-                f(r(c2[1] - c0[1])),
-                f(r(c2[2] - c0[2])),
-            ];
-            let b = [
-                f(r(c1[0] - c0[0])),
-                f(r(c1[1] - c0[1])),
-                f(r(c1[2] - c0[2])),
-            ];
-            let nz = f(r(r(a[1] * b[0]) - r(a[0] * b[1])));
-            let ny = f(r(r(b[2] * a[0]) - r(a[2] * b[0])));
-            let nx = f(r(r(a[2] * b[1]) - r(b[2] * a[1])));
-            let dot = r(r(r(c0[2] * nz) + r(c0[1] * ny)) + r(nx * c0[0]));
-            if dot < 0.0 {
-                st.faces.push(0);
-                for &i in tri {
-                    if let Some(code) = st.codes.get_mut(i as usize) {
-                        *code = USED;
-                    }
-                }
-            } else {
-                st.faces.push(0x40);
-            }
-        }
-        // The projection (@ 0x004d20c0) of the used vertices.
+        st.faces = match self.variant {
+            Variant::C => self.back_faces_c(&cv, &mut st.codes),
+            Variant::PII => self.back_faces_pii(&cv, &mut st.codes),
+        };
+        // The projection of the used vertices (@ 0x004d20c0; type 8
+        // @ 0x00572080 → @ 0x0057fbc0, the same operations in x87
+        // assembly).
+        let k = self.fpu;
+        let nv = cv.len();
         let mut proj = vec![[0.0f64; 4]; nv];
         st.projected = vec![[0.0f32; 4]; nv];
         for (i, p) in cv.iter().enumerate() {
             if st.codes[i] & 0x90 != USED {
                 continue;
             }
-            let w = r(1.0 / p[2]);
-            let sx = f(r(r(r(c.fx * p[0]) * w) + c.cx));
-            let sy = f(r(r(r(c.fy * p[1]) * w) + c.cy));
-            let depth = f(r(c.a - r(w * c.b)));
-            proj[i] = [sx, sy, depth, f(w)];
+            let w = k.div(1.0, p[2]);
+            let sx = k.f(k.add(k.mul(k.mul(c.fx, p[0]), w), c.cx));
+            let sy = k.f(k.add(k.mul(k.mul(c.fy, p[1]), w), c.cy));
+            let depth = k.f(k.sub(c.a, k.mul(w, c.b)));
+            proj[i] = [sx, sy, depth, k.f(w)];
             st.projected[i] = proj[i].map(|x| x as f32);
         }
         // The faces (@ 0x004380b0): one group, the texture of its
@@ -916,6 +926,7 @@ impl Head {
             height: self.tex_h,
         };
         let mut target = Target { pixels, zbuf };
+        let mut drawn = false;
         for (fi, tri) in self.mesh.corners.iter().enumerate() {
             if st.faces[fi] != 0 {
                 continue;
@@ -931,10 +942,253 @@ impl Head {
                     v: uv[1],
                 }
             });
-            draw_polygon(fpu, &mut poly, &tex, &mut target);
+            match self.variant {
+                Variant::C => draw_polygon(k, &mut poly, &tex, &mut target),
+                Variant::PII => ii::draw_polygon(&mut poly, &tex, &mut target),
+            }
+            drawn = true;
+        }
+        if drawn && self.variant == Variant::PII {
+            // The II set-up loaded 0x0e7f and left it.
+            self.fpu = Fpu::Chop;
         }
         st
     }
+
+    /// The C transform: the object → camera matrix (@ 0x00571760, mode 7;
+    /// the camera node is the camera's world pose, scale 1), the camera-
+    /// space vertices and their clip codes (@ 0x004d00a0, mode 1).
+    fn transform_c(&mut self, c: &Camera) -> (Stages, Vec<[f64; 3]>) {
+        let k = self.fpu;
+        let m = |x, y| k.mul(x, y);
+        self.update(self.head);
+        let n = &self.nodes[self.head];
+        let cs = 1.0;
+        let is = k.f(k.div(1.0, cs));
+        let dx = k.sub(n.wp[0], c.p[0]);
+        let dy = k.f(k.sub(n.wp[1], c.p[1]));
+        let dz = k.f(k.sub(n.wp[2], c.p[2]));
+        let (x, y, z) = (m(dx, is), m(dy, is), m(dz, is));
+        let [qx, qy, qz, qw] = c.q;
+        let tw = k.f(k.sub(k.sub(-m(x, qx), m(y, qy)), m(z, qz)));
+        let tz = k.f(k.sub(k.add(m(z, qw), m(x, qy)), m(y, qx)));
+        let ty = k.f(k.sub(k.add(m(z, qx), m(y, qw)), m(x, qz)));
+        let tx = k.f(k.sub(k.add(m(y, qz), m(x, qw)), m(z, qy)));
+        let t = [
+            k.f(k.add(k.sub(k.sub(m(tx, qw), m(tw, qx)), m(tz, qy)), m(ty, qz))),
+            k.f(k.add(k.sub(k.sub(m(ty, qw), m(tw, qy)), m(tx, qz)), m(tz, qx))),
+            k.f(k.add(k.sub(k.sub(m(tz, qw), m(tw, qz)), m(ty, qx)), m(tx, qy))),
+        ];
+        let factor = m(n.ws, is);
+        let mat = qmat(k, &qcmul(k, &c.q, &n.wq)).map(|e| k.f(m(factor, e)));
+        let nv = self.vertices.len();
+        let mut st = Stages {
+            camera: Vec::with_capacity(nv),
+            codes: Vec::with_capacity(nv),
+            ..Stages::default()
+        };
+        let mut cv = Vec::with_capacity(nv);
+        let mut and = 0xffu8;
+        for v in &self.vertices {
+            let row = |r: usize| {
+                k.f(k.add(
+                    k.add(
+                        k.add(m(v[1], mat[3 * r + 1]), m(v[0], mat[3 * r])),
+                        m(v[2], mat[3 * r + 2]),
+                    ),
+                    t[r],
+                ))
+            };
+            let p = [row(0), row(1), row(2)];
+            let mut code = if p[2] < c.near {
+                CLIP_NEAR
+            } else if p[2] > c.far {
+                CLIP_FAR
+            } else {
+                0
+            };
+            if p[0] < m(p[2], c.slopes[0]) {
+                code |= 1;
+            } else if p[0] > m(p[2], c.slopes[2]) {
+                code |= 4;
+            }
+            if p[1] < m(p[2], c.slopes[1]) {
+                code |= 2;
+            } else if p[1] > m(p[2], c.slopes[3]) {
+                code |= 8;
+            }
+            and &= code;
+            st.camera.push(p.map(|x| x as f32));
+            st.codes.push(code);
+            cv.push(p);
+        }
+        st.rejected = and & 0x3f != 0;
+        (st, cv)
+    }
+
+    /// The C back faces (@ 0x004d12c0): N = (c1 − c0) × (c2 − c0) from
+    /// float differences, drawn when N · c0 < 0; the used vertices' codes
+    /// become 0x80.
+    fn back_faces_c(&self, cv: &[[f64; 3]], codes: &mut [u8]) -> Vec<u8> {
+        let k = self.fpu;
+        let m = |x, y| k.mul(x, y);
+        let mut faces = Vec::with_capacity(self.mesh.corners.len());
+        for tri in &self.mesh.corners {
+            let [c0, c1, c2] = tri.map(|i| cv.get(i as usize).copied().unwrap_or([0.0; 3]));
+            let a: [f64; 3] = std::array::from_fn(|i| k.f(k.sub(c2[i], c0[i])));
+            let b: [f64; 3] = std::array::from_fn(|i| k.f(k.sub(c1[i], c0[i])));
+            let nz = k.f(k.sub(m(a[1], b[0]), m(a[0], b[1])));
+            let ny = k.f(k.sub(m(b[2], a[0]), m(a[2], b[0])));
+            let nx = k.f(k.sub(m(a[2], b[1]), m(b[2], a[1])));
+            let dot = k.add(k.add(m(c0[2], nz), m(c0[1], ny)), m(nx, c0[0]));
+            faces.push(mark_front(dot < 0.0, tri, codes));
+        }
+        faces
+    }
+
+    /// The type-8 transform (@ 0x00571bd0 → @ 0x0057eec0, x87 assembly):
+    /// the head node's world pose by the assembly update (@ 0x00584340),
+    /// the matrix computed inline (@ 0x0057eef0), then each vertex and its
+    /// clip codes, compared before the float stores.
+    fn transform_pii(&mut self, c: &Camera) -> (Stages, Vec<[f64; 3]>) {
+        let k = self.fpu;
+        let m = |x, y| k.mul(x, y);
+        self.update_asm(self.head);
+        let n = &self.nodes[self.head];
+        // The camera node: its world pose is its local one (a child of the
+        // scene root), scale 1.
+        let [cx, cy, cz, cw] = c.q;
+        let cs = 1.0;
+        let is = k.div(1.0, cs);
+        let dx = k.sub(n.wp[0], c.p[0]);
+        let dy = k.sub(n.wp[1], c.p[1]);
+        let dz = k.sub(n.wp[2], c.p[2]);
+        let a = k.sub(k.add(m(dx, cw), m(cz, dy)), m(cy, dz));
+        let b = k.sub(k.add(m(dy, cw), m(cx, dz)), m(cz, dx));
+        let e = k.sub(k.add(m(dz, cw), m(cy, dx)), m(cx, dy));
+        let d = k.add(m(dx, cx), k.add(m(dy, cy), m(dz, cz)));
+        let t = [
+            k.f(m(
+                k.add(m(a, cw), k.add(k.sub(m(cx, d), m(cy, e)), m(cz, b))),
+                is,
+            )),
+            k.f(m(
+                k.add(m(b, cw), k.add(k.sub(m(cy, d), m(cz, a)), m(cx, e))),
+                is,
+            )),
+            k.f(m(
+                k.add(m(e, cw), k.add(k.sub(m(d, cz), m(cx, b)), m(cy, a))),
+                is,
+            )),
+        ];
+        let scale = k.f(m(is, n.ws));
+        // conj(q_C) ⊗ q_N.
+        let [ox, oy, oz, ow] = n.wq;
+        let x = k.f(k.add(k.sub(k.sub(m(ox, cw), m(cx, ow)), m(cy, oz)), m(oy, cz)));
+        let y = k.f(k.add(k.sub(k.sub(m(oy, cw), m(cy, ow)), m(ox, cz)), m(cx, oz)));
+        let z = k.f(k.add(k.sub(k.sub(m(oz, cw), m(ow, cz)), m(oy, cx)), m(cy, ox)));
+        let w = k.f(k.add(k.add(k.add(m(cw, ow), m(cx, ox)), m(cy, oy)), m(cz, oz)));
+        let (x2, y2, z2) = (k.add(x, x), k.add(y, y), k.add(z, z));
+        let mat = [
+            k.sub(1.0, k.add(m(y, y2), m(z, z2))),
+            k.sub(m(y2, x), m(w, z2)),
+            k.add(m(z2, x), m(w, y2)),
+            k.add(m(w, z2), m(y2, x)),
+            k.sub(1.0, k.add(m(x, x2), m(z, z2))),
+            k.sub(m(y, z2), m(x2, w)),
+            k.sub(m(z2, x), m(w, y2)),
+            k.add(m(x2, w), m(y, z2)),
+            k.sub(1.0, k.add(m(x, x2), m(y, y2))),
+        ]
+        .map(|v| k.f(m(k.f(v), scale)));
+        let nv = self.vertices.len();
+        let mut st = Stages {
+            camera: Vec::with_capacity(nv),
+            codes: Vec::with_capacity(nv),
+            ..Stages::default()
+        };
+        let mut cv = Vec::with_capacity(nv);
+        let mut and = 0xffu8;
+        // `seta` / `setb` after `fcomi`: false / true when unordered.
+        let above = |a: f64, b: f64| a > b;
+        let below = |a: f64, b: f64| a < b || a.is_nan() || b.is_nan();
+        for v in &self.vertices {
+            let [vx, vy, vz] = *v;
+            let px = k.add(
+                k.add(m(mat[2], vz), k.add(m(mat[1], vy), m(mat[0], vx))),
+                t[0],
+            );
+            let py = k.add(
+                k.add(m(mat[5], vz), k.add(m(mat[4], vy), m(mat[3], vx))),
+                t[1],
+            );
+            let pz = k.add(
+                k.add(k.add(m(vy, mat[7]), m(vx, mat[6])), m(vz, mat[8])),
+                t[2],
+            );
+            let mut code = 0;
+            if above(c.near, pz) {
+                code |= CLIP_NEAR;
+            }
+            if below(c.far, pz) {
+                code |= CLIP_FAR;
+            }
+            if above(m(pz, c.slopes[0]), px) {
+                code |= 1;
+            }
+            if below(m(pz, c.slopes[2]), px) {
+                code |= 4;
+            }
+            if above(m(pz, c.slopes[1]), py) {
+                code |= 2;
+            }
+            if below(m(pz, c.slopes[3]), py) {
+                code |= 8;
+            }
+            and &= code;
+            let p = [k.f(px), k.f(py), k.f(pz)];
+            st.camera.push(p.map(|x| x as f32));
+            st.codes.push(code);
+            cv.push(p);
+        }
+        st.rejected = and & 0x3f != 0;
+        (st, cv)
+    }
+
+    /// The type-8 back faces (@ 0x00572030 → @ 0x0057fac0): the normal
+    /// from unrounded differences, stored as floats, the test on the
+    /// unrounded normal; drawn when N · c0 ≤ 0.
+    fn back_faces_pii(&self, cv: &[[f64; 3]], codes: &mut [u8]) -> Vec<u8> {
+        let k = self.fpu;
+        let m = |x, y| k.mul(x, y);
+        let mut faces = Vec::with_capacity(self.mesh.corners.len());
+        for tri in &self.mesh.corners {
+            let [c0, c1, c2] = tri.map(|i| cv.get(i as usize).copied().unwrap_or([0.0; 3]));
+            let a: [f64; 3] = std::array::from_fn(|i| k.sub(c1[i], c0[i]));
+            let b: [f64; 3] = std::array::from_fn(|i| k.sub(c2[i], c0[i]));
+            let nx = k.sub(m(b[2], a[1]), m(a[2], b[1]));
+            let ny = k.sub(m(a[2], b[0]), m(a[0], b[2]));
+            let nz = k.sub(m(a[0], b[1]), m(b[0], a[1]));
+            let dot = k.add(m(c0[0], nx), k.add(m(c0[1], ny), m(c0[2], nz)));
+            // `fldz; fcomi; jb`: culled when 0 < dot or unordered.
+            faces.push(mark_front(dot <= 0.0, tri, codes));
+        }
+        faces
+    }
+}
+
+/// A face's byte (0 drawn, 0x40 back face); a drawn face's three vertices
+/// get the code 0x80.
+fn mark_front(front: bool, tri: &[u16; 3], codes: &mut [u8]) -> u8 {
+    if !front {
+        return 0x40;
+    }
+    for &i in tri {
+        if let Some(code) = codes.get_mut(i as usize) {
+            *code = USED;
+        }
+    }
+    0
 }
 
 /// The head object and its mesh: the first object, depth first, whose
@@ -1012,19 +1266,22 @@ fn track(d: &atlantis2_data::db::Node) -> Option<Track> {
 }
 
 /// Linear interpolation of two position keys (@ 0x004c7b10).
-fn lerp_position(fpu: Fpu, t0: f64, a: &Vec3, t1: f64, b: &Vec3, t: f64) -> Vec3 {
-    let r = |x: f64| fpu.r(x);
-    let dx = r(b[0] - a[0]);
-    let dy = f(r(b[1] - a[1]));
-    let dz = f(r(b[2] - a[2]));
-    let dt = f(r(t - t0));
-    let x = r(dx * dt);
-    let py = f(r(dy * dt));
-    let pz = f(r(dz * dt));
-    let inv = r(1.0 / r(t1 - t0));
-    let invf = f(inv);
-    let x = r(x * inv);
-    let y = f(r(py * invf));
-    let z = f(r(pz * invf));
-    [f(r(x + a[0])), f(r(y + a[1])), f(r(z + a[2]))]
+fn lerp_position(c: Fpu, t0: f64, a: &Vec3, t1: f64, b: &Vec3, t: f64) -> Vec3 {
+    let dx = c.sub(b[0], a[0]);
+    let dy = c.f(c.sub(b[1], a[1]));
+    let dz = c.f(c.sub(b[2], a[2]));
+    let dt = c.f(c.sub(t, t0));
+    let x = c.mul(dx, dt);
+    let py = c.f(c.mul(dy, dt));
+    let pz = c.f(c.mul(dz, dt));
+    let inv = c.div(1.0, c.sub(t1, t0));
+    let invf = c.f(inv);
+    let x = c.mul(x, inv);
+    let y = c.f(c.mul(py, invf));
+    let z = c.f(c.mul(pz, invf));
+    [
+        c.f(c.add(x, a[0])),
+        c.f(c.add(y, a[1])),
+        c.f(c.add(z, a[2])),
+    ]
 }

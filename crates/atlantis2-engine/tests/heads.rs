@@ -1,9 +1,10 @@
 //! The dialog heads and the lip-sync against the original's own results
-//! (`tests/golden/heads.txt`, `tests/golden/lipsync_tibet.txt`): every
-//! golden frame of three heads is drawn again and compared by MD5 (frame
-//! and Z buffer), the pipeline's intermediate buffers of three frames
-//! likewise, and the lip-sync weights and mouth meshes of every Tibet line
-//! at both x87 precisions.
+//! (`tests/golden/heads.txt`, `tests/golden/heads_pii.txt`,
+//! `tests/golden/lipsync_tibet.txt`): every golden frame of three heads is
+//! drawn again with each variant (the Pentium II's under 0x0e7f, the C one
+//! under 0x027f) and compared by MD5 (frame and Z buffer), the C pipeline's
+//! intermediate buffers of three frames likewise, and the lip-sync weights
+//! and mouth meshes of every Tibet line under three x87 control words.
 //!
 //! They need the game: `ATLANTIS2_DATA` = the installed folder,
 //! `ATLANTIS2_DISCS` = a folder holding the four CD images (or copies of
@@ -13,17 +14,18 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use atlantis2_data::db::Scene;
-use atlantis2_data::dialog::{parse_com, parse_info};
+use atlantis2_data::dialog::{parse_com, parse_info, parse_info_rounding};
 use atlantis2_data::tga::Tga;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::head::Head;
 use atlantis2_engine::lipsync::LipSync;
 use atlantis2_engine::raster3d::{HEIGHT, WIDTH};
-use atlantis2_engine::Fpu;
+use atlantis2_engine::{Fpu, Variant};
 use md5::{Digest, Md5};
 
 const HEADS: &str = include_str!("golden/heads.txt");
+const HEADS_PII: &str = include_str!("golden/heads_pii.txt");
 const LIPSYNC: &str = include_str!("golden/lipsync_tibet.txt");
 
 fn hex(bytes: &[u8]) -> String {
@@ -46,7 +48,7 @@ fn game() -> Option<A2Files> {
     Some(files)
 }
 
-fn load_head(files: &A2Files, db: &str, fpu: Fpu) -> (Head, Vec<u8>) {
+fn load_head(files: &A2Files, db: &str, variant: Variant, fpu: Fpu) -> (Head, Vec<u8>) {
     let data = files.read(Folder::ThreeDDial, db).expect(db);
     let scene = Scene::parse(&data).expect(db);
     let map = Head::texture_name(&scene).expect("texture").to_string();
@@ -56,7 +58,15 @@ fn load_head(files: &A2Files, db: &str, fpu: Fpu) -> (Head, Vec<u8>) {
             .map(|d| Tga::parse(&d).unwrap())
     };
     let (yf, ymf) = Head::eye_map_names(&map);
-    let head = Head::new(fpu, &scene, tga(&map).expect("map"), tga(&yf), tga(&ymf)).unwrap();
+    let head = Head::new(
+        fpu,
+        variant,
+        &scene,
+        tga(&map).expect("map"),
+        tga(&yf),
+        tga(&ymf),
+    )
+    .unwrap();
     (head, data)
 }
 
@@ -133,14 +143,27 @@ fn weights(tag: &str) -> Option<[f32; 7]> {
     Some(w)
 }
 
-/// Every golden frame of the three heads, in the order the original drew
-/// them.
+/// Every golden frame of the three heads drawn with the C routines under
+/// 0x027f, in the order the original drew them.
 #[test]
 fn heads_match_the_original() {
     let Some(files) = game() else { return };
+    check_frames(&files, HEADS, Variant::C, Fpu::Double);
+}
+
+/// The same frames drawn with the Pentium II's routines (the II
+/// rasteriser and the x87 assembly transform), every step under 0x0e7f:
+/// the reference (`heads_pii.txt`).
+#[test]
+fn pii_heads_match_the_original() {
+    let Some(files) = game() else { return };
+    check_frames(&files, HEADS_PII, Variant::PII, Fpu::Chop);
+}
+
+fn check_frames(files: &A2Files, golden: &str, variant: Variant, fpu: Fpu) {
     let mut by_db: BTreeMap<&str, Vec<Vec<&str>>> = BTreeMap::new();
     let mut order = Vec::new();
-    for line in HEADS.lines().filter(|l| l.starts_with("frame ")) {
+    for line in golden.lines().filter(|l| l.starts_with("frame ")) {
         let f: Vec<&str> = line.split_whitespace().collect();
         if !by_db.contains_key(f[1]) {
             order.push(f[1]);
@@ -149,8 +172,8 @@ fn heads_match_the_original() {
     }
     let mut total = 0;
     for db in order {
-        let (mut head, data) = load_head(&files, db, Fpu::Double);
-        let info = HEADS
+        let (mut head, data) = load_head(files, db, variant, fpu);
+        let info = golden
             .lines()
             .find(|l| l.starts_with(&format!("file {db} ")))
             .unwrap();
@@ -168,6 +191,7 @@ fn heads_match_the_original() {
                 f[5].parse().unwrap(),
             );
             head.pose(frame);
+            assert_eq!(head.fpu(), fpu, "{db}: the word the heads leave");
             if tag == "idle" {
                 head.idle_mouth(mood, &mut rand);
             } else {
@@ -213,7 +237,7 @@ fn heads_match_the_original() {
     }
     assert_eq!(
         total,
-        HEADS.lines().filter(|l| l.starts_with("frame ")).count()
+        golden.lines().filter(|l| l.starts_with("frame ")).count()
     );
 }
 
@@ -247,7 +271,7 @@ fn head_stages_match_the_original() {
                 (f[3], f[4..].to_vec())
             })
             .collect();
-        let (mut head, _) = load_head(&files, &db, Fpu::Double);
+        let (mut head, _) = load_head(&files, &db, Variant::C, Fpu::Double);
         let mut rand = Rand::new(0);
         head.pose(frame);
         let (q, p, s) = head.head_world();
@@ -306,7 +330,7 @@ fn head_stages_match_the_original() {
 
 /// The lip-sync of every Tibet line: the speakers' numbers, the decoded
 /// voices, the analysis, the weights of every frame and the mouth meshes,
-/// at both precisions.
+/// under 0x027f, 0x007f and 0x0e7f.
 #[test]
 fn tibet_lipsync_matches_the_original() {
     let Some(files) = game() else { return };
@@ -315,7 +339,11 @@ fn tibet_lipsync_matches_the_original() {
         .filter(|l| !l.starts_with('#'))
         .filter_map(|l| l.split_once(' '))
         .collect();
-    let info = parse_info(&files.read(Folder::Scenar, "infoTI.txt").unwrap());
+    let info_txt = files.read(Folder::Scenar, "infoTI.txt").unwrap();
+    let info = parse_info(&info_txt);
+    // Read under 0x0e7f, the numbers are stored toward zero (the
+    // original's atof then `fstp dword`).
+    let info_chop = parse_info_rounding(&info_txt, true);
     let com = parse_com(&files.read(Folder::Scenar, "comTI.txt").unwrap());
     assert_eq!(com.len(), 82);
     let perso = |name: &str| info.iter().find(|p| p.name == name).unwrap();
@@ -335,12 +363,16 @@ fn tibet_lipsync_matches_the_original() {
     }
     let mut heads: BTreeMap<String, Head> = BTreeMap::new();
     let mut checked = 0;
-    for fpu in [Fpu::Double, Fpu::Single] {
+    for fpu in [Fpu::Double, Fpu::Single, Fpu::Chop] {
         let cw = format!("{:04x}", fpu.control_word());
         let mut bad = Vec::new();
         for line in &com {
             let id = line.id.as_str();
-            let p = perso(&line.speaker);
+            let p = if fpu == Fpu::Chop {
+                info_chop.iter().find(|p| p.name == line.speaker).unwrap()
+            } else {
+                perso(&line.speaker)
+            };
             let k = |s: &str| want[format!("line.{id}.{s}").as_str()];
             let apc = files.read(Folder::ApcDial, &format!("{id}.apc")).expect(id);
             assert_eq!(apc.len().to_string(), k("apc_bytes"), "{id}");
@@ -367,7 +399,7 @@ fn tibet_lipsync_matches_the_original() {
             let db = format!("{}s1.db", p.mesh);
             let head = heads
                 .entry(format!("{db} {cw}"))
-                .or_insert_with(|| load_head(&files, &db, fpu).0);
+                .or_insert_with(|| load_head(&files, &db, Variant::C, fpu).0);
             let frames = (f64::from(n) / 22050.0 / (1.0 / 15.0)) as usize + 4;
             assert_eq!(
                 frames.to_string(),
@@ -399,5 +431,5 @@ fn tibet_lipsync_matches_the_original() {
             &bad[..bad.len().min(6)]
         );
     }
-    assert_eq!(checked, 2 * 82);
+    assert_eq!(checked, 3 * 82);
 }

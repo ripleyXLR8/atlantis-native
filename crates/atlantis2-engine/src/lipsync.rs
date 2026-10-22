@@ -11,7 +11,7 @@
 //! targets with them.
 //!
 //! The operation order, the float stores and the x87 roundings are the
-//! original's, at either precision ([`Fpu`]); the original's quirks are
+//! original's, under each control word ([`Fpu`]); the original's quirks are
 //! kept: the mouth closes for the last `[Offset]` seconds of a line, a
 //! histogram bin holding all of a block's crossings reads 0, and a click
 //! after digital silence can make the weights NaN for the rest of the line
@@ -119,7 +119,7 @@ impl LipSync {
             energy,
             hist,
             emax,
-            duration: f(f64::from(n) * f64::from(SAMPLE_TIME)),
+            duration: fpu.f(fpu.mul(f64::from(n), f64::from(SAMPLE_TIME))),
             smooth: f64::from(smooth),
             prev_t: 100.0,
             raw: [0.0; 4],
@@ -151,10 +151,16 @@ impl LipSync {
         std::array::from_fn(|c| self.matrix[r * 7 + c])
     }
 
-    /// `pow` as `_CIpow` (@ 0x005aeb00) computes it at the precision.
+    /// The control word the caller's code has now.
+    pub fn set_fpu(&mut self, fpu: Fpu) {
+        self.fpu = fpu;
+    }
+
+    /// `pow` as `_CIpow` (@ 0x005aeb00) computes it at the precision, with
+    /// rounding to nearest whatever the caller's rounding (the CRT switches
+    /// to it inside, [`Fpu::nearest`]).
     fn pow(&self, x: f64, y: f64) -> f64 {
-        match self.fpu {
-            // (0x0e7f: not transcribed; the 53-bit result, see `Fpu::r`.)
+        match self.fpu.nearest() {
             Fpu::Double | Fpu::Chop => libm::pow(x, y),
             Fpu::Single => {
                 // FYL2X (not rounded), FRNDINT, the fraction rounded,
@@ -169,19 +175,25 @@ impl LipSync {
 
     /// The 7 weights (`d i a o b s v`) at time `t` (@ 0x0059fa40).
     pub fn eval(&mut self, t: f32) -> [f32; 7] {
-        let fpu = self.fpu;
-        let r = move |x: f64| fpu.r(x);
+        let c = self.fpu;
+        let (add, sub, mul, div) = (
+            move |a, b| c.add(a, b),
+            move |a, b| c.sub(a, b),
+            move |a, b| c.mul(a, b),
+            move |a, b| c.div(a, b),
+        );
+        let st = move |x| c.f(x);
         let t = f64::from(t);
-        let x = r(r(t - self.prev_t) * 15.0);
+        let x = mul(sub(t, self.prev_t), 15.0);
         let k001 = f64::from(0.001_f32);
-        let dt = if x < k001 { k001 } else { f(x) };
-        let rr = r(t / self.duration);
-        let rf = f(rr);
+        let dt = if x < k001 { k001 } else { st(x) };
+        let rr = div(t, self.duration);
+        let rf = st(rr);
         if rr < 0.0 || rf > 1.0 {
             self.prev_t = t;
             return self.row(7).map(|v| v as f32);
         }
-        let mut i = 8 - crate::fpu::ftol(r(r(f64::from(self.n) * rf) * -0.00390625)) as i64;
+        let mut i = 8 - crate::fpu::ftol(mul(mul(f64::from(self.n), rf), -0.00390625)) as i64;
         i = i.max(8);
         i = i.min(self.blocks as i64);
         // Below block 6 the original reads before its arrays; 0 here.
@@ -203,10 +215,10 @@ impl LipSync {
             + 20 * e(i + 3);
         let mx = f64::from(self.emax);
         let pow8 = |v: i64| {
-            let a = r(1.0 - r(cdiv64(v) as i32 as f64 / mx));
-            let a = r(a * a);
-            let a = r(a * a);
-            f(r(a * a))
+            let a = sub(1.0, div(cdiv64(v) as i32 as f64, mx));
+            let a = mul(a, a);
+            let a = mul(a, a);
+            st(mul(a, a))
         };
         let (a8, b8) = (pow8(e1), pow8(e2));
         let k4096 = 0.000244140625;
@@ -225,7 +237,7 @@ impl LipSync {
                     + 66 * (h(c - 4, b) + h(c + 4, b))
                     + 12 * (h(c - 5, b) + h(c + 5, b))
                     + (h(c - 6, b) + h(c + 6, b));
-                let v = f(r(s as f64 * k4096));
+                let v = st(mul(s as f64, k4096));
                 if v > 255.0 {
                     255.0
                 } else {
@@ -235,10 +247,10 @@ impl LipSync {
         };
         let mut g = smooth_hist(i);
         let a1 = self.pow(TWO_THIRDS, dt);
-        let oma1 = r(1.0 - a1);
+        let oma1 = sub(1.0, a1);
         let raw = [g[1], g[2], g[3], g[4]];
         for k in 0..4 {
-            g[1 + k] = f(r(r(a1 * g[1 + k]) + r(oma1 * self.raw[k])));
+            g[1 + k] = st(add(mul(a1, g[1 + k]), mul(oma1, self.raw[k])));
         }
         self.raw = raw;
         let gp = smooth_hist(i + 3);
@@ -250,19 +262,20 @@ impl LipSync {
             f64::from(1.6_f32),
             f64::from(0.2_f32),
         );
-        let p0 = f(r(r(g[0] * k256) * k07));
-        let p1 = f(r(r(r(r(r(g[4] + g[3]) + g[2]) + g[1]) * k256) * k05));
-        let p2 = f(r(r(g[5] * k256) * k12));
-        let p3 = f(r(r(r(g[7] + g[6]) * k256) * k16));
-        let q0 = f(r(r(gp[0] * k256) * k07));
-        let q1 = f(r(r(r(r(r(gp[4] + gp[3]) + gp[2]) + gp[1]) * k256) * k05));
-        let q2 = r(r(gp[5] * k256) * k12); // kept on the x87 stack
-        let q3 = f(r(r(r(gp[7] + gp[6]) * k256) * k16));
+        let sum4 = |h: &[f64; 8]| add(add(add(h[4], h[3]), h[2]), h[1]);
+        let p0 = st(mul(mul(g[0], k256), k07));
+        let p1 = st(mul(mul(sum4(&g), k256), k05));
+        let p2 = st(mul(mul(g[5], k256), k12));
+        let p3 = st(mul(mul(add(g[7], g[6]), k256), k16));
+        let q0 = st(mul(mul(gp[0], k256), k07));
+        let q1 = st(mul(mul(sum4(&gp), k256), k05));
+        let q2 = mul(mul(gp[5], k256), k12); // kept on the x87 stack
+        let q3 = st(mul(mul(add(gp[7], gp[6]), k256), k16));
         let ea = (e(i + 2) + e(i + 1) + e(i)) as f64;
         let eb = (e(i + 4) + e(i + 5) + e(i + 6)) as f64;
         // 0 / 0 is the x87 default NaN.
-        let rho = r(ea / r(eb + ea));
-        let kp = f(r(r(r(1.0 - r(rho * rho)) * r(1.0 - b8)) * a8));
+        let rho = div(ea, add(eb, ea));
+        let kp = st(mul(mul(sub(1.0, mul(rho, rho)), sub(1.0, b8)), a8));
         let (mut best, mut row) = (g[1], 1);
         for k in 0..3 {
             if g[2 + k] > best {
@@ -272,24 +285,25 @@ impl LipSync {
         }
         let mut out = self.row(row);
         let blend = |w: f64, m: [f64; 7], base: [f64; 7]| -> [f64; 7] {
-            let om = r(1.0 - w);
-            std::array::from_fn(|c| f(r(r(w * m[c]) + r(om * base[c]))))
+            let om = sub(1.0, w);
+            std::array::from_fn(|i| st(add(mul(w, m[i]), mul(om, base[i]))))
         };
         if p0 > p1 && p0 > p2 && p0 > p3 {
-            let w = f(r(p0 * f64::from(f32::from_bits(0x3fb6_db6e)))); // 1 / 0.7
+            let w = st(mul(p0, f64::from(f32::from_bits(0x3fb6_db6e)))); // 1 / 0.7
             out = blend(w, self.row(0), out);
         } else if (p2 > p1 && p2 > p3) || (p3 > p1 && p3 > p2) {
-            let w = f(r(p2 / r(p3 + p2)));
+            let w = st(div(p2, add(p3, p2)));
             out = blend(w, self.row(5), self.row(6));
         }
         out = blend(a8, self.row(9), out);
-        if r(q0 * k05) < q1 && q1 > q2 && q1 > q3 && r(q1 * k02) < q0 {
+        if mul(q0, k05) < q1 && q1 > q2 && q1 > q3 && mul(q1, k02) < q0 {
             out = blend(kp, self.row(8), out);
         }
-        let base = r(self.smooth / r(self.smooth + 1.0));
-        let a2 = f(self.pow(base, dt));
-        let om2 = f(r(1.0 - a2));
-        let out: [f64; 7] = std::array::from_fn(|c| f(r(r(a2 * self.prev[c]) + r(om2 * out[c]))));
+        let base = div(self.smooth, add(self.smooth, 1.0));
+        let a2 = st(self.pow(base, dt));
+        let om2 = st(sub(1.0, a2));
+        let out: [f64; 7] =
+            std::array::from_fn(|i| st(add(mul(a2, self.prev[i]), mul(om2, out[i]))));
         self.prev = out;
         self.prev_t = t;
         out.map(|v| v as f32)

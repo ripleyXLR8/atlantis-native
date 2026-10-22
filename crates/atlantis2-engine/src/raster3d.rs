@@ -7,10 +7,14 @@
 //! lighting and no transparency.
 //!
 //! Transcribed operation by operation so that it draws the original's
-//! pixels at either x87 precision ([`Fpu`]): `f()` marks a value the
-//! original stores as a float, `r()` the result of an x87 operation.
+//! pixels under each x87 control word ([`Fpu`]): `c.f()` marks a value the
+//! original stores as a float, `c.add()` and the like an x87 operation.
+//! The C routine sets no control word (it runs under the caller's); the
+//! Pentium II's routine, which loads its own, is in [`ii`].
 
 use crate::fpu::{f, ftol, Fpu};
+
+pub mod ii;
 
 /// The dialog's frame and Z buffer: 640 x 480 whatever the screen mode
 /// (the viewport set by the dialog frame @ 0x00461430).
@@ -130,16 +134,16 @@ pub fn draw_polygon(fpu: Fpu, poly: &mut [Vertex], tex: &Texture, out: &mut Targ
         return;
     }
     let b = Binding::new(tex);
-    let r = |x: f64| fpu.r(x);
+    let c = fpu;
     // Every record: x and y moved to the pixel centres, u and v scaled,
     // then multiplied by w (the perspective flags 0x200002).
     for p in poly.iter_mut() {
-        p.x = f(r(p.x + 0.5));
-        p.y = f(r(p.y + 0.5));
-        p.u = f(r(b.scale_u * p.u));
-        p.v = f(r(b.scale_v * p.v));
-        p.u = f(r(p.u * p.w));
-        p.v = f(r(p.v * p.w));
+        p.x = c.f(c.add(p.x, 0.5));
+        p.y = c.f(c.add(p.y, 0.5));
+        p.u = c.f(c.mul(b.scale_u, p.u));
+        p.v = c.f(c.mul(b.scale_v, p.v));
+        p.u = c.f(c.mul(p.u, p.w));
+        p.v = c.f(c.mul(p.v, p.w));
     }
     for k in 2..poly.len() {
         triangle(fpu, &b, [poly[0], poly[k - 1], poly[k]], tex, out);
@@ -227,7 +231,7 @@ fn triangle(fpu: Fpu, b: &Binding, tri: [Vertex; 3], tex: &Texture, out: &mut Ta
 /// The edge set-up @ 0x00570520; `None` for an empty edge (the original
 /// marks it with dx/dy = FLT_MAX).
 fn edge(fpu: Fpu, a: &Vertex, b: &Vertex, attrs: bool) -> Option<Edge> {
-    let r = |x: f64| fpu.r(x);
+    let c = fpu;
     if ftol(a.y) == ftol(b.y) {
         return None;
     }
@@ -240,24 +244,24 @@ fn edge(fpu: Fpu, a: &Vertex, b: &Vertex, attrs: bool) -> Option<Edge> {
     if yb <= VP_TOP {
         return None;
     }
-    let dx = r(bot.x - top.x);
-    let inv = f(r(1.0 / r(bot.y - top.y)));
+    let dx = c.sub(bot.x, top.x);
+    let inv = c.f(c.div(1.0, c.sub(bot.y, top.y)));
     let y1 = if yb < VP_BOTTOM1 - 1 { yb } else { VP_BOTTOM1 };
     let y0 = ya.max(VP_TOP);
     // The centre of row y0 (y already holds the +0.5).
-    let t = f(r(f64::from(y0 + 1) - top.y));
-    let dxdy = r(dx * inv);
+    let t = c.f(c.sub(f64::from(y0 + 1), top.y));
+    let dxdy = c.mul(dx, inv);
     let mut e = Edge {
         y0,
         y1,
-        x: f(r(r(dxdy * t) + top.x)),
-        dxdy: f(dxdy),
+        x: c.f(c.add(c.mul(dxdy, t), top.x)),
+        dxdy: c.f(dxdy),
         ..Edge::default()
     };
     if attrs {
         let attr = |from: f64, to: f64| -> (f64, f64) {
-            let d = r(r(to - from) * inv);
-            (f(r(r(d * t) + from)), f(d))
+            let d = c.mul(c.sub(to, from), inv);
+            (c.f(c.add(c.mul(d, t), from)), c.f(d))
         };
         (e.w, e.dw) = attr(top.w, bot.w);
         (e.u, e.du) = attr(top.u, bot.u);
@@ -277,23 +281,23 @@ fn scan(
     tex: &Texture,
     out: &mut Target,
 ) {
-    let r = |x: f64| fpu.r(x);
+    let c = fpu;
     let (l, rt) = (edges[upper.0], edges[upper.1]);
-    let k = r(1.0 / r(rt.dxdy - l.dxdy));
-    let gw = r(r(rt.dw - l.dw) * k);
-    let dwdx = f(gw);
+    let k = c.div(1.0, c.sub(rt.dxdy, l.dxdy));
+    let gw = c.mul(c.sub(rt.dw, l.dw), k);
+    let dwdx = c.f(gw);
     let g = Gradients {
         dwdx,
-        dw32: f(r(gw * 32.0)),
-        dz: ftol(r(dwdx * Z_SCALE)),
-        dudx: f(r(r(rt.du - l.du) * k)),
-        dvdx: f(r(r(rt.dv - l.dv) * k)),
+        dw32: c.f(c.mul(gw, 32.0)),
+        dz: ftol(c.mul(dwdx, Z_SCALE)),
+        dudx: c.f(c.mul(c.sub(rt.du, l.du), k)),
+        dvdx: c.f(c.mul(c.sub(rt.dv, l.dv), k)),
         du32: 0.0,
         dv32: 0.0,
     };
     let g = Gradients {
-        du32: f(r(g.dudx * 32.0)),
-        dv32: f(r(g.dvdx * 32.0)),
+        du32: c.f(c.mul(g.dudx, 32.0)),
+        dv32: c.f(c.mul(g.dvdx, 32.0)),
         ..g
     };
     let rows =
@@ -306,12 +310,12 @@ fn scan(
                 }
                 *y += 1;
                 let rr = &mut edges[ri];
-                rr.x = f(r(rr.dxdy + rr.x));
+                rr.x = c.f(c.add(rr.dxdy, rr.x));
                 let ll = &mut edges[li];
-                ll.x = f(r(ll.dxdy + ll.x));
-                ll.w = f(r(ll.dw + ll.w));
-                ll.u = f(r(ll.du + ll.u));
-                ll.v = f(r(ll.dv + ll.v));
+                ll.x = c.f(c.add(ll.dxdy, ll.x));
+                ll.w = c.f(c.add(ll.dw, ll.w));
+                ll.u = c.f(c.add(ll.du, ll.u));
+                ll.v = c.f(c.add(ll.dv, ll.v));
             }
         };
     let end = edges[upper.1].y1.min(edges[upper.0].y1);
@@ -343,18 +347,18 @@ fn span(
     tex: &Texture,
     out: &mut Target,
 ) {
-    let r = |x: f64| fpu.r(x);
+    let c = fpu;
     let row = y as usize * WIDTH;
     // The centre of pixel xs, from the left edge.
-    let d = r(f64::from(xs + 1) - l.x);
-    let df = f(d);
-    let mut uu = r(r(d * g.dudx) + l.u);
-    let vf = f(r(r(df * g.dvdx) + l.v));
-    let mut ww = r(r(df * g.dwdx) + l.w);
-    let mut z = ftol(r(ww * Z_SCALE)) as u32;
-    let rc = r(1.0 / ww);
-    let mut u = ftol(r(rc * uu));
-    let mut v = ftol(r(rc * vf));
+    let d = c.sub(f64::from(xs + 1), l.x);
+    let df = c.f(d);
+    let mut uu = c.add(c.mul(d, g.dudx), l.u);
+    let vf = c.f(c.add(c.mul(df, g.dvdx), l.v));
+    let mut ww = c.add(c.mul(df, g.dwdx), l.w);
+    let mut z = ftol(c.mul(ww, Z_SCALE)) as u32;
+    let rc = c.div(1.0, ww);
+    let mut u = ftol(c.mul(rc, uu));
+    let mut v = ftol(c.mul(rc, vf));
     let n = xe - xs;
     let mut x = xs as usize;
     let mut plot = |x: usize, z: u32, a: i32, bb: i32| {
@@ -367,12 +371,12 @@ fn span(
     let mut vv = vf;
     if n >> 5 > 0 {
         for _ in 0..n >> 5 {
-            ww = r(ww + g.dw32);
-            uu = r(uu + g.du32);
-            vv = r(vv + g.dv32);
-            let rc = r(1.0 / ww);
-            let u2 = ftol(r(rc * uu));
-            let v2 = ftol(r(rc * vv));
+            ww = c.add(ww, g.dw32);
+            uu = c.add(uu, g.du32);
+            vv = c.add(vv, g.dv32);
+            let rc = c.div(1.0, ww);
+            let u2 = ftol(c.mul(rc, uu));
+            let v2 = ftol(c.mul(rc, vv));
             let du = (u2.wrapping_sub(u) >> 5).wrapping_shl(6);
             let dv = (v2.wrapping_sub(v) >> 5).wrapping_shl(6);
             let mut a = u.wrapping_shl(6);
@@ -387,17 +391,17 @@ fn span(
             u = u2;
             v = v2;
         }
-        vv = f(vv);
+        vv = c.f(vv);
     }
     let rem = n & 31;
     if rem > 0 {
         let nf = f64::from(rem);
-        let rr = f(r(1.0 / r(r(nf * g.dwdx) + ww)));
-        let inv_n = f(r(1.0 / nf));
-        let u2 = ftol(r(r(r(nf * g.dudx) + uu) * rr));
-        let du = ftol(r(f64::from(u2.wrapping_sub(u)) * inv_n));
-        let v2 = ftol(r(r(r(nf * g.dvdx) + vv) * rr));
-        let dv = ftol(r(f64::from(v2.wrapping_sub(v)) * inv_n));
+        let rr = c.f(c.div(1.0, c.add(c.mul(nf, g.dwdx), ww)));
+        let inv_n = c.f(c.div(1.0, nf));
+        let u2 = ftol(c.mul(c.add(c.mul(nf, g.dudx), uu), rr));
+        let du = ftol(c.mul(f64::from(u2.wrapping_sub(u)), inv_n));
+        let v2 = ftol(c.mul(c.add(c.mul(nf, g.dvdx), vv), rr));
+        let dv = ftol(c.mul(f64::from(v2.wrapping_sub(v)), inv_n));
         let du = du.wrapping_shl(6);
         let dv = dv.wrapping_shl(6);
         let mut a = u.wrapping_shl(6);
