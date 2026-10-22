@@ -420,9 +420,7 @@ hovered) whatever checkpoint the row holds, and a row loads the chapter
 of the executable's table at its position, its title centred by the
 table's width, and the scrollbar's knob is drawn at the place the
 picker gives its record (the original reloads a sprite record's stored
-y, `MenuRules::sprite_stored_y`; the other builds' original does too, but
-the port keeps drawing their knob at the menu file's place, as it did
-before: a difference); the opening cinematic (`CINEMA=20`) has its
+y, in every build); the opening cinematic (`CINEMA=20`) has its
 captions from SUBCHINE.SPR on the 200 Hz ticks of the original, over
 that video only (the original keeps the CINEMA number 20 until the next
 CINEMA command and frees the bank after the video, so another video

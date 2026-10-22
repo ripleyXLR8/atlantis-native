@@ -500,7 +500,8 @@ impl Engine {
                         changed = true;
                     }
                     Some(5) => {
-                        // 0x0041d706: 0x004960ac = (0x004960ac == 0).
+                        // 0x0041d764..0x0041d794 (hover record 5):
+                        // 0x004960ac = (0x004960ac == 0).
                         self.settings.omni3d_mode2 = !self.settings.omni3d_mode2;
                         changed = true;
                     }

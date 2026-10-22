@@ -46,7 +46,15 @@ pub struct Enhancements {
     ///   pointer steps back one byte also when the id stays 9, so the
     ///   record's x is 0 and each later field is read from inside the one
     ///   before (a record placed by an earlier walk keeps its place, but
-    ///   its click area takes the shifted width and height).
+    ///   its click area takes the shifted width and height);
+    /// - the inventory bar's slide-out draws no icon once the slots are at
+    ///   y 506; off, as the original (`FUN_0042c59c` @ 0x0042c643 reads the
+    ///   y of a record from 9 on past the 9-entry slot table), a scrolled
+    ///   bar still shows 1..4 rows of those icons at 506 (with 16 records
+    ///   and the first shown at 9, the whole bar at 506 and 513);
+    /// - after a pick-up the new record's icon is drawn in its slot like
+    ///   the others; off, as the original (`FUN_004278a0` @ 0x00427ae2), at
+    ///   x 70 c + 35, 7 px left, in the hold loop and the slide-out.
     pub minor_bug_fixes: bool,
     /// Content the original never shows (default off):
     /// - each condition evaluation starts from a clear key buffer, so

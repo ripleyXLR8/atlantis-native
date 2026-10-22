@@ -138,6 +138,11 @@ pub fn spell_sharp_s(text: &[u8], sharp_s_as_ss: bool) -> std::borrow::Cow<'_, [
     std::borrow::Cow::Owned(out)
 }
 
+/// The width of glyph `c` (byte - 0x20). `FUN_004206c8` reads
+/// 0x004965ee[byte] with no bound, so bytes below 0x20 and from 0xa9 read
+/// the strings before the table and the FONTMIN table after it; the port
+/// counts them 0, as for the pen advance (0x004202cc). No shipped menu
+/// holds such a byte.
 fn fontmax_width(c: i32) -> i32 {
     usize::try_from(c)
         .ok()
@@ -235,15 +240,6 @@ pub struct MenuRules {
     /// keeps them, a fresh one stores the shifted values); with the minor
     /// bug fixes the step back is taken only for id 10.
     pub toggle_in_step: bool,
-    /// A sprite record that holds a y is drawn at it, not at the y of the
-    /// menu's text, as it is at its stored x: the original reloads the
-    /// stored y (the reference FUN_004207c0 @ 0x004209b0;
-    /// atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x00420412), so the LOAD
-    /// knob is drawn where the picker put it. Set for the Chinese builds
-    /// (the builds with sprite menus, `ExeBuild::menu_sprite_banks`); the
-    /// others keep the port's draw at the text's y, as before (their knob
-    /// stays at the file's place: a difference).
-    pub sprite_stored_y: bool,
 }
 
 /// The reference's walk, without the port's fix.
@@ -255,7 +251,6 @@ impl Default for MenuRules {
             high_bytes_as_space: false,
             toggle_sprites: false,
             toggle_in_step: false,
-            sprite_stored_y: false,
         }
     }
 }
@@ -277,7 +272,6 @@ impl MenuRules {
             high_bytes_as_space: build.menu_high_bytes_as_space,
             toggle_sprites: build.menu_toggle_sprites,
             toggle_in_step: minor_bug_fixes,
-            sprite_stored_y: build.menu_sprite_banks.is_some(),
         }
     }
 }
@@ -437,13 +431,13 @@ pub fn walk_menu_text(
             } else {
                 bx = i32::from(r.x); // a slider keeps its knob
             }
-            // The stored y too, with `sprite_stored_y` (the reference @
-            // 0x004209b0; atlantis-cd-zh-tw-696832 FUN_004201e8 @
-            // 0x00420412): the LOAD knob is drawn where the picker put it.
+            // The stored y too (the reference @ 0x004209b0;
+            // atlantis-cd-zh-tw-696832 FUN_004201e8 @ 0x00420412): the LOAD
+            // knob is drawn where the picker put it.
             let mut by = y;
             if r.y == 0 {
                 r.y = y as i16;
-            } else if rules.sprite_stored_y {
+            } else {
                 by = i32::from(r.y);
             }
             r.w = w as i16;
@@ -619,9 +613,12 @@ pub fn font_min_load_list_width(text: &[u8], adv: &FontMinAdvances) -> i32 {
 /// `FUN_0041cf78`'s scrollbar (0x0041d1f3..0x0041d24b at entry,
 /// 0x0041d273..0x0041d2e6 each frame). The 1997 builds start the knob at
 /// y 0 (atlantis-cd-en-688128 FUN_0041c9a8 @ 0x0041cc23,
-/// atlantis-cd-fr-687104 FUN_0041c708 @ 0x0041c98a); with `clamp` false,
-/// the English one's, it is not clamped above the bar (the French one
-/// clamps it, FUN_0041c708 @ 0x0041ca60..0x0041ca76).
+/// atlantis-cd-fr-687104 FUN_0041c708 @ 0x0041c98a); with `clamp` false
+/// (atlantis-cd-en-688128, atlantis-cd-fr-688640 FUN_0041ca00,
+/// atlantis-cd-nl-688128 FUN_0041c9e0) it is not clamped above the bar;
+/// atlantis-cd-fr-687104 (and the de / es / it 687104 builds) clamps it
+/// as the reference (FUN_0041c708 @ 0x0041ca60..0x0041ca76), and
+/// atlantis-cd-sv-688128 too (0x0041cd08..0x0041cd1e).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LoadPickerScroll {
     pub drag_on: bool,
@@ -792,7 +789,6 @@ pub fn name_entry_byte(c: char, upper_case: bool, dos_letters: bool) -> Option<u
 #[cfg(test)]
 mod tests {
     use super::*;
-    use atlantis_data::exe::BUILDS;
 
     /// The three name entry rules: the English 1997 build's, the others',
     /// the Swedish build's letters.
@@ -979,7 +975,6 @@ mod tests {
         let text = b"/sprc=2,260,50,150,32\r\n/sprc=8,160,250,100,32\r\n/sprc=9,345,267,51,33\r\n/sprc=12,344,300,250,32\r\n/fin\r\n";
         let rules = MenuRules {
             toggle_sprites: true,
-            sprite_stored_y: true,
             ..MenuRules::default()
         };
         let sprites = |w: &MenuWalk| -> Vec<(i32, i16, i16, bool)> {
@@ -1052,7 +1047,7 @@ mod tests {
     }
 
     /// A sprite record keeps a stored non-zero x and y and is drawn there
-    /// (the LOAD knob) with `sprite_stored_y`; without it, at the text's y.
+    /// (the LOAD knob).
     #[test]
     fn sprite_record_drawn_at_stored_position() {
         let text = b"/spr=13,600,130,32,32\r\n/fin\r\n";
@@ -1065,26 +1060,9 @@ mod tests {
             }],
             ops: Vec::new(),
         };
-        let rules = MenuRules {
-            sprite_stored_y: true,
-            ..MenuRules::default()
-        };
-        walk_menu_text(text, 1, -1, 0, 0, rules, &mut walk);
+        walk_menu_text(text, 1, -1, 0, 0, MenuRules::default(), &mut walk);
         assert_eq!((walk.ops[0].x, walk.ops[0].y), (600, 0x7b));
         assert!(!walk.ops[0].alt_bank);
-        walk.ops.clear();
-        walk_menu_text(text, 1, -1, 0, 0, MenuRules::default(), &mut walk);
-        assert_eq!((walk.ops[0].x, walk.ops[0].y), (600, 130));
-        assert_eq!(walk.records[0].y, 0x7b);
-        for b in BUILDS.iter() {
-            let rules = MenuRules::of_build(b, false);
-            assert_eq!(
-                rules.sprite_stored_y,
-                b.text_code_page.is_double_byte(),
-                "{}",
-                b.name
-            );
-        }
     }
 
     #[test]
