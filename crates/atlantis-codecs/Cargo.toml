@@ -1,6 +1,6 @@
 [package]
 name = "atlantis-codecs"
-description = "Atlantis: The Lost Tales codecs: HNM6 panoramas and videos, UBB2 dialog videos, APC sound"
+description = "Atlantis: The Lost Tales and Atlantis II codecs: HNM6 panoramas and videos (with Atlantis II's alpha masks), UBB2 dialog videos, APC sound"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,4 +9,5 @@ license.workspace = true
 
 [dev-dependencies]
 atlantis-data = { path = "../atlantis-data" }
+atlantis2-data = { path = "../atlantis2-data" }
 md-5 = "0.10"
