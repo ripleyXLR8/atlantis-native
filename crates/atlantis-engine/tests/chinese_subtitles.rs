@@ -2,11 +2,13 @@
 //! atlantis-cd-zh-cn-692736, `FUN_0042f424`) on every dialog line of their
 //! CON files, against the rows of the original functions run unmodified
 //! under emulation on the same lines. The expected values are numbers
-//! only: the rows per line, the rows that do not decode, and the MD5 of
-//! every row's place in its line's buffer (`start+length`, the rows of a
-//! line joined by `,`, the lines by a newline, in the order of the sorted
-//! CON names). The lines the CON parser hands to the dialog presenter,
-//! final blanks included, are checked to be lines of that scan.
+//! only: the rows per line, the rows that do not decode, the MD5 of every
+//! row's place in its line's buffer (`start+length`, the rows of a line
+//! joined by `,`, the lines by a newline, in the order of the sorted CON
+//! names), and the emulation's own MD5 of the rows (the same with each
+//! row's bytes in lower-case hex, `FAULT` for a line whose scan does not
+//! return). The lines the CON parser hands to the dialog presenter, final
+//! blanks included, are checked to be lines of that scan.
 //!
 //! Needs the folders of the discs' images: set `ATLANTIS_ISO_ZH_TW` (the
 //! Traditional CD's ISO images) and `ATLANTIS_BIN_ZH_CN` (the Simplified
@@ -74,6 +76,8 @@ struct Rows {
     /// single byte from 0x80.
     broken: (usize, usize, usize),
     md5: String,
+    /// The MD5 of the rows' bytes, as the emulation writes it.
+    hex_md5: String,
 }
 
 /// The rows of every line; `runaway` names the line (file, length) whose
@@ -87,8 +91,10 @@ fn rows(g: &Game, split: CjkSplit, runaway: Option<(&str, usize)>) -> Rows {
         longest: 0,
         broken: (0, 0, 0),
         md5: String::new(),
+        hex_md5: String::new(),
     };
     let mut places = Vec::new();
+    let mut hex = Vec::new();
     for (name, text) in &lines {
         let rows = cjk_subtitle_rows(text, split);
         r.per_line[rows.len().min(5)] += 1;
@@ -106,7 +112,13 @@ fn rows(g: &Game, split: CjkSplit, runaway: Option<(&str, usize)>) -> Rows {
         r.broken.1 += usize::from(broken);
         if runaway == Some((name.as_str(), text.len())) {
             places.push("FAULT".to_string());
+            hex.push("FAULT".to_string());
         } else {
+            let h: Vec<String> = rows
+                .iter()
+                .map(|x| buf[x.clone()].iter().map(|c| format!("{c:02x}")).collect())
+                .collect();
+            hex.push(h.join(","));
             let p: Vec<String> = rows
                 .iter()
                 .map(|x| format!("{}+{}", x.start, x.len()))
@@ -115,7 +127,23 @@ fn rows(g: &Game, split: CjkSplit, runaway: Option<(&str, usize)>) -> Rows {
         }
     }
     r.md5 = format!("{:x}", Md5::digest(places.join("\n").as_bytes()));
+    r.hex_md5 = format!("{:x}", Md5::digest(hex.join("\n").as_bytes()));
     r
+}
+
+/// Whether every row of `rows` starts and ends at a character boundary
+/// of its line's buffer (a space, then `text`), counted from the text's
+/// start.
+fn in_step(text: &[u8], rows: &[std::ops::Range<usize>], split: CjkSplit) -> bool {
+    let mut starts = vec![false; text.len() + 2];
+    starts[0] = true;
+    let mut i = 1;
+    while i <= text.len() {
+        starts[i] = true;
+        i += 1 + usize::from(split.code_page.is_lead_byte(text[i - 1]));
+    }
+    starts[text.len() + 1] = i == text.len() + 1;
+    rows.iter().all(|x| starts[x.start] && starts[x.end])
 }
 
 /// The game's path: every dialog line the CON parser hands to the
@@ -184,6 +212,7 @@ fn traditional_rows_match_original() {
                 longest: 75,
                 broken: (0, 0, 0),
                 md5: "354c6b87cf663ffb05f2f07e201b7a49".into(),
+                hex_md5: "6b0450476c4cfad5af20ef9a745d01ca".into(),
             }
         );
         assert_eq!(cjk_subtitle_rows(&lines[at].1, split), [1..76, 76..81]);
@@ -192,10 +221,13 @@ fn traditional_rows_match_original() {
 }
 
 /// The Simplified CD: every row as the original's, the rows started on an
-/// ideographic space's second byte included; with the minor bug fixes, as
-/// the original with that skip patched to 2 (@ 0x0042f5ef), which mends
-/// 27 of the 72 rows out of step (the others come from a mark the scan
-/// reads across two characters, `。　` read as `！`).
+/// ideographic space's second byte included (72 rows of 50 lines out of
+/// step). With the minor bug fixes, every row as the original's with the
+/// skip after an ideographic space patched to 2 (@ 0x0042f5ef) and its
+/// marks read at character boundaries only (the pairs of the scan @
+/// 0x0042f510 and of the checks @ 0x0042f599 cleared there under
+/// emulation): every row decodes, and only the 50 lines the original
+/// breaks change.
 #[test]
 fn simplified_rows_match_original() {
     let Some(g) = game("ATLANTIS_BIN_ZH_CN") else {
@@ -203,27 +235,41 @@ fn simplified_rows_match_original() {
     };
     assert_eq!(g.exe.build.name, "atlantis-cd-zh-cn-692736");
     let per_line = [0, 2153, 343, 40, 4, 2];
-    let split = CjkSplit::of_build(g.exe.build, false).unwrap();
+    let original = CjkSplit::of_build(g.exe.build, false).unwrap();
     assert_eq!(
-        rows(&g, split, None),
+        rows(&g, original, None),
         Rows {
             lines: 2542,
             per_line,
             longest: 75,
             broken: (72, 50, 19),
             md5: "e40532b39cffb491b359a1d4fa826d79".into(),
+            hex_md5: "9067901aad1f1e113fbe26ca512023b4".into(),
         }
     );
-    let split = CjkSplit::of_build(g.exe.build, true).unwrap();
+    let fixed = CjkSplit::of_build(g.exe.build, true).unwrap();
+    let r = rows(&g, fixed, None);
     assert_eq!(
-        rows(&g, split, None),
-        Rows {
-            lines: 2542,
-            per_line,
-            longest: 75,
-            broken: (45, 23, 19),
-            md5: "f10d8dec4548e256615b0cd324696c87".into(),
-        }
+        (r.lines, r.longest, r.broken, r.hex_md5.as_str()),
+        (2542, 75, (0, 0, 0), "77504624d3bfa7563aa7acc7a5d0ba32")
     );
+    // Line by line: the rows of every line in step in the original are
+    // kept; the 50 others change, all in step.
+    let (mut kept, mut changed) = (0, 0);
+    for (_, text) in dialog_lines(&g) {
+        let (o, f) = (
+            cjk_subtitle_rows(&text, original),
+            cjk_subtitle_rows(&text, fixed),
+        );
+        assert!(in_step(&text, &f, fixed));
+        if in_step(&text, &o, original) {
+            assert_eq!(o, f);
+            kept += 1;
+        } else {
+            assert_ne!(o, f);
+            changed += 1;
+        }
+    }
+    assert_eq!((kept, changed), (2492, 50));
     assert_eq!(parsed_lines(&g), (2258, 100));
 }

@@ -38,14 +38,18 @@ pub struct CjkSplit {
     /// The cut marks (never [`CjkBreaker::None`] here).
     pub breaker: CjkBreaker,
     /// The texts' code page, for the character boundaries of the port's
-    /// own cut (a window without a mark, see [`cjk_subtitle_rows`]).
+    /// own cut (a window without a mark, see [`cjk_subtitle_rows`]) and of
+    /// the minor bug fixes.
     pub code_page: TextCodePage,
-    /// The minor bug fixes: after an ideographic space the Simplified
-    /// build's next row starts two bytes on, past the whole space, instead
-    /// of on its second byte (27 of the 72 shipped rows out of step). The
-    /// scan still tracks no lead bytes, so a mark read across two
-    /// characters (the trail byte of `。` and the lead byte of `　`, A3 A1,
-    /// read as `！`) still cuts a character (the other 45).
+    /// The minor bug fixes, in the Simplified build: after an ideographic
+    /// space the next row starts two bytes on, past the whole space,
+    /// instead of on its second byte (27 of the 72 shipped rows out of
+    /// step); and the breaker reads a mark only at a character boundary,
+    /// where the original tracks no lead bytes and also takes a pair
+    /// across two characters for a mark (the trail byte of `。` and the
+    /// lead byte of `　`, A3 A1, read as `！`: the other 45). Every row
+    /// then decodes. No change in the Traditional build, whose shipped
+    /// rows all decode.
     pub minor_bug_fixes: bool,
 }
 
@@ -57,6 +61,12 @@ impl CjkSplit {
             code_page: build.text_code_page,
             minor_bug_fixes,
         })
+    }
+
+    /// Whether the breaker reads its marks at character boundaries only
+    /// (the minor bug fixes in the Simplified build).
+    fn at_boundaries(self) -> bool {
+        self.minor_bug_fixes && self.breaker == CjkBreaker::Gb2312
     }
 
     /// Whether the scan stops at the pair (`lead`, `trail`): a punctuation
@@ -138,6 +148,19 @@ impl CjkSplit {
 /// character boundary within 75 bytes and goes on as if a two-byte mark
 /// ended there; it does the same for any scan that finds no cut within
 /// 75 bytes.
+///
+/// With the minor bug fixes, in the Simplified build only, a pair is a
+/// mark only when its first byte starts a character (counted from the
+/// row's start `s`, the lead bytes taking two bytes): the scan passes over
+/// a pair across two characters (zh-cn @ 0x0042f4ed..0x0042f568: the trail
+/// byte of `。` and the lead byte of `　`, A3 A1, read as `！`), and so do
+/// the checks of `add` and `skip` (@ 0x0042f56a..0x0042f5ef), which in
+/// the rows after a mark read its trail byte and the next character's lead
+/// byte: such a pair gives add 0 and skip 2, as the checks' other pairs.
+/// Then every row starts and ends at a character boundary. (The buffer
+/// never holds a CR: the dialog code and the game over copy the line up
+/// to it.) A later window without a mark finds no cut, the last one lying
+/// before `s`, and takes the port's cut.
 pub fn cjk_subtitle_rows(text: &[u8], split: CjkSplit) -> Vec<Range<usize>> {
     let mut b = Vec::with_capacity(text.len() + 1);
     b.push(b' ');
@@ -165,6 +188,19 @@ pub fn cjk_subtitle_rows(text: &[u8], split: CjkSplit) -> Vec<Range<usize>> {
         let s = s.clamp(0, len as isize) as usize;
         s..(s + n.max(0) as usize).min(len)
     };
+    // Whether `pos` starts a character, counted from the row's start `s`
+    // (the lead bytes taking two bytes), for the minor bug fixes; any byte
+    // otherwise.
+    let starts = |s: isize, pos: isize| -> bool {
+        if !split.at_boundaries() {
+            return true;
+        }
+        let mut c = s;
+        while c < pos {
+            c += 1 + isize::from(split.code_page.is_lead_byte(at(c)));
+        }
+        c == pos
+    };
     let mut rows = Vec::new();
     let mut left = len as isize;
     let (mut s, mut e) = (1isize, WINDOW);
@@ -173,10 +209,16 @@ pub fn cjk_subtitle_rows(text: &[u8], split: CjkSplit) -> Vec<Range<usize>> {
             rows.push(row(s, len as isize));
             break;
         }
-        let (count, skip, k) = match (1..=WINDOW).find(|&k| split.is_cut(at(e - k), at(e - k + 1)))
+        let (count, skip, k) = match (1..=WINDOW)
+            .find(|&k| split.is_cut(at(e - k), at(e - k + 1)) && starts(s, e - k))
         {
             Some(k) => {
-                let (add, skip) = split.after_cut(at(s + WINDOW - k), at(s + WINDOW - 1 - k));
+                let (add, skip) = if starts(s, s + WINDOW - 1 - k) {
+                    split.after_cut(at(s + WINDOW - k), at(s + WINDOW - 1 - k))
+                } else {
+                    // add [ebp-0x20] 0, skip [ebp-0x1c] 2 (@ 0x0042f58b)
+                    (0, 2)
+                };
                 // (a count of -1 would be a strncpy of 4 GB; no text
                 // gives one)
                 (WINDOW - k + add, skip, k)
@@ -339,7 +381,10 @@ mod tests {
 
     /// atlantis-cd-zh-cn-692736 FUN_0042f424 under emulation, as above;
     /// with the minor bug fixes, the same function with the skip after an
-    /// ideographic space patched from 1 to 2 (@ 0x0042f5ef).
+    /// ideographic space patched from 1 to 2 (@ 0x0042f5ef) and the pairs
+    /// read by the scan (@ 0x0042f510) and by the checks (@ 0x0042f599)
+    /// cleared when their first byte does not start a character, counted
+    /// from the row's start.
     #[test]
     fn gb2312_rows_match_original() {
         use P::*;
@@ -397,11 +442,30 @@ mod tests {
             ),
             // `。　` ending the text past the window: the scan takes the
             // trail byte of `。` and the lead byte of the space for `！`
-            // (A3 A1); the last row is the space's trail byte alone.
+            // (A3 A1); the last row is the space's trail byte alone. With
+            // the fixes, the cut after `。`, the space the last row.
             (
                 [b"\xd2\xbb".repeat(36), b"\xa1\xa3\xa1\xa1".to_vec()].concat(),
                 vec![1..76, 76..77],
-                vec![1..76, 76..77],
+                vec![1..75, 75..77],
+            ),
+            // A later row whose window ends on `。`, a space after it: the
+            // checks read the trail byte of `。` and the lead byte of the
+            // space as `！` (A3 A1), add 1, and the row takes the space's
+            // lead byte; the next starts on the space. With the fixes, the
+            // row ends after `。`.
+            (
+                t(&[
+                    Ten(3),
+                    B(b"\xa3\xac"),
+                    Ten(3),
+                    B(&TEN_GB[..12]),
+                    B(b"\xa1\xa3"),
+                    B(space),
+                    Ten(1),
+                ]),
+                vec![1..63, 63..138, 137..159],
+                vec![1..63, 63..137, 137..159],
             ),
             (
                 t(&[Ten(2), B(b"\r"), Ten(3)]),
@@ -413,6 +477,23 @@ mod tests {
             assert_eq!(rows(&text, &ZH_CN, false), orig, "{text:02x?}");
             assert_eq!(rows(&text, &ZH_CN, true), fixed, "{text:02x?}");
         }
+    }
+
+    /// With the minor bug fixes, a Simplified later window without a mark:
+    /// the last cut lies before the row's start, so the scan finds none
+    /// and the port cuts at the last character boundary within 75 bytes
+    /// (the original gives empty rows, as in the Traditional build).
+    #[test]
+    fn gb2312_fixed_later_window_without_a_mark() {
+        let t = text(
+            TEN_GB,
+            &[P::Ten(3), P::B(b"\xa3\xac"), P::Ten(5), P::B(b"\xa1\xa3")],
+        );
+        let mut orig = vec![1..63];
+        orig.extend((0..28).map(|_| 63..63));
+        orig.push(63..165);
+        assert_eq!(rows(&t, &ZH_CN, false), orig);
+        assert_eq!(rows(&t, &ZH_CN, true), vec![1..63, 63..137, 137..165]);
     }
 
     /// A first window without a mark: the port's cut at the last character

@@ -1101,8 +1101,9 @@ pub enum Subtitler {
 }
 
 impl Subtitler {
-    /// The subtitles with the minor bug fixes on or off (the Chinese
-    /// breaker's skip after an ideographic space, see [`CjkSplit`]).
+    /// The subtitles with the minor bug fixes on or off (the Simplified
+    /// Chinese breaker's skip after an ideographic space and its marks at
+    /// character boundaries, see [`CjkSplit`]).
     pub fn with_minor_bug_fixes(mut self, on: bool) -> Subtitler {
         if let Subtitler::Gdi(_, Some(cjk)) = &mut self {
             cjk.minor_bug_fixes = on;
