@@ -5,6 +5,10 @@
 //! directory is at most 205 KB) at the start, then each member the engine
 //! reads, fetched just before (the engine's [`Loader`]).
 //!
+//! The Chinese releases' subtitle fonts are not in the program: the page
+//! fetches the one the release needs from `fonts/` beside it
+//! (`web/build.sh` copies them there), the others never load.
+//!
 //! The players, checkpoints and settings are kept in the browser's
 //! `localStorage` ([`WebStore`]), one key per file. The original's
 //! `players.atl` and `p<letter><chapter>.gam` of the picked folder, if
@@ -21,7 +25,7 @@ use atlantis_engine::{SaveStore, Start};
 use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{File, FileList, Storage};
+use web_sys::{File, FileList, Response, Storage};
 use winit::event_loop::EventLoop;
 use winit::platform::web::EventLoopExtWebSys;
 
@@ -74,6 +78,19 @@ impl FileSource for WebFiles {
 async fn fetch(file: &File, offset: u64, len: u64) -> Result<Vec<u8>, JsValue> {
     let blob = file.slice_with_f64_and_f64(offset as f64, (offset + len) as f64)?;
     let buf = JsFuture::from(blob.array_buffer()).await?;
+    Ok(Uint8Array::new(&buf).to_vec())
+}
+
+/// The file at `url`, relative to the page.
+async fn fetch_url(url: &str) -> Result<Vec<u8>, JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    let resp: Response = JsFuture::from(window.fetch_with_str(url))
+        .await?
+        .dyn_into()?;
+    if !resp.ok() {
+        return Err(format!("HTTP {}", resp.status()).into());
+    }
+    let buf = JsFuture::from(resp.array_buffer()?).await?;
     Ok(Uint8Array::new(&buf).to_vec())
 }
 
@@ -297,6 +314,21 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
         atlantis_data::GameError::UnknownExecutable(_) => report(&web),
         e => explain(&e),
     })?;
+    // A Chinese release's subtitle font, before anything draws a subtitle.
+    let code_page = game.exe.build.text_code_page;
+    if let Some(name) = atlantis_engine::subtitles::cjk_font_file(code_page) {
+        let url = format!("fonts/{name}");
+        match fetch_url(&url).await {
+            Ok(data) => {
+                if atlantis_engine::subtitles::provide_cjk_font(code_page, data) {
+                    log::info!("subtitles: {url}");
+                } else {
+                    log::warn!("{url}: not a font");
+                }
+            }
+            Err(e) => log::warn!("{url}: {e:?}"),
+        }
+    }
     let saves: Rc<dyn SaveStore> = match WebStore::new(game.exe.build.name) {
         Some(store) => Rc::new(store),
         None => {

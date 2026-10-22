@@ -73,7 +73,7 @@ Where the port may differ from the original by choice, `Options` holds an
 
 | Group | Default | What it changes |
 |---|---|---|
-| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 builds, the hexagon puzzle always shows its pieces, as the later builds do; with the May 1997 French build, LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)); with the German CD, the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts; with the Dutch CD, the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)); with the Italian CD, a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)); with the Simplified Chinese CD, the subtitle row after an ideographic space starts after the whole space, not on its second byte (see [Subtitles](#subtitles)); with the Chinese CDs, the options' SUBTITLES toggle record is read in step while SUBTITLES is off (the original reads it one byte out of step, so its click area takes the wrong width and height, see [Game builds](#game-builds)); each menu keeps its own click records, from zero at every visit (the original keeps one record table for the whole session, with 16 records per menu in the May 1997 English and French builds and 20 in the others: in those two builds the sound menu's last two records spill over the ARE YOU SURE ? menu's and move its left ornament off screen for the session, and in every build the LOAD scrollbar's knob, hidden by a visit with 11 checkpoints or fewer, stays hidden on the later visits); with five players, OK on the fifth starts it with its name (the original runs the commit of a typed name, empty, over the fifth name: that player stays listed with no name and cannot be chosen) |
+| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 builds, the hexagon puzzle always shows its pieces, as the later builds do; with the May 1997 French build, LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)); with the German CD, the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts; with the Dutch CD, the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)); with the Italian CD, a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)); with the Simplified Chinese CD, the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)); with the Chinese CDs, the options' SUBTITLES toggle record is read in step while SUBTITLES is off (the original reads it one byte out of step, so its click area takes the wrong width and height, see [Game builds](#game-builds)); each menu keeps its own click records, from zero at every visit (the original keeps one record table for the whole session, with 16 records per menu in the May 1997 English and French builds and 20 in the others: in those two builds the sound menu's last two records spill over the ARE YOU SURE ? menu's and move its left ornament off screen for the session, and in every build the LOAD scrollbar's knob, hidden by a visit with 11 checkpoints or fewer, stays hidden on the later visits); with five players, OK on the fifth starts it with its name (the original runs the commit of a typed name, empty, over the fifth name: that player stays listed with no name and cannot be chosen) |
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
@@ -281,12 +281,17 @@ or before an ideographic space `　`, the next row then starting on the
 space's second byte, so that row's characters are read one byte out of
 step (72 rows of the shipped texts). The port does the same, row for row
 (the tests compare every dialog line with the original functions run
-under emulation); with the minor bug fixes, the row after an ideographic
-space starts after the whole space (27 of those rows mended; the others
-come from a mark the scan reads across two characters, `。　` read as
-`！`). The original's arithmetic is kept as it is: after the first row
-the checks read one byte past the mark, and a later window without a
-mark gives empty rows. A first window without a mark sends the
+under emulation); with the minor bug fixes, the Simplified build's row
+after an ideographic space starts after the whole space (27 of those
+rows), and its marks are only read where a character starts, so that no
+mark is read across two characters (`。　` read as `！`: the other 45
+rows); then every row starts and ends between two characters (the tests
+compare every line with the original function run with those two
+changes). The original's arithmetic is kept as it is: after the first
+row the checks read one byte past the mark (with the minor bug fixes, in
+the Simplified build, only when that byte starts a character), and a
+later window without a mark gives empty rows (with the minor bug fixes,
+in the Simplified build, the port's cut below). A first window without a mark sends the
 original's scan back past the start of its buffer (one Traditional
 line, CHAPI084's game-over narration, 80 bytes): what it then does is
 unknown, and the port cuts that row at the last character boundary
@@ -525,7 +530,12 @@ release holds the result); serve the folder over HTTP (for example
 `python3 -m http.server -d web 8000`), the page asks for the game folder. The engine
 reads the player's files through an asynchronous loader that fetches each
 archive member before it is read, so the browser runs the same game as the
-desktop. A browser grants
+desktop. The Chinese subtitle fonts (about 0.5 MB each) are not built
+into the web program as they are into the desktop one: `web/build.sh`
+copies them into `web/fonts`, and the page fetches the one a Chinese
+release needs once the release is known, before the game starts; the
+other releases never load them (the program is 2.7 MB instead of
+3.7 MB). A browser grants
 the pointer capture only on a click: until then the view turns with the
 pointer's own motion. Sound starts on the first click.
 

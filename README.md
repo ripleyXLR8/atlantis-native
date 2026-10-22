@@ -270,9 +270,10 @@ Serif SC Regular (`assets/fonts/NotoSerifTC-Subset.otf`,
 `NotoSerifSC-Subset.otf`, from the notofonts/noto-cjk release
 Serif2.003, Copyright (c) 2017-2024 Adobe), are licensed under the SIL
 Open Font License, version 1.1 (see `assets/fonts/LICENSE-NotoSerifCJK`).
-Noto is a trademark of Google Inc. The fonts are built into the program;
-every package carries their licence files, `LICENSE-LiberationSans` and
-`LICENSE-NotoSerifCJK`, beside `LICENSE`.
+Noto is a trademark of Google Inc. The fonts are built into the program
+(the web version fetches the Chinese ones from its `fonts` folder, for a
+Chinese release only); every package carries their licence files,
+`LICENSE-LiberationSans` and `LICENSE-NotoSerifCJK`, beside `LICENSE`.
 
 *Atlantis: The Lost Tales* is a trademark of its owners. This project is not
 affiliated with them.

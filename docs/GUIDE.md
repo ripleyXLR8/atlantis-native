@@ -295,12 +295,13 @@ picked folder on its first start.
   disc 2 is in use); on the Italian CD, the buttons and lines of the
   menus answer over the whole drawn word (the original's zones stop
   short of it: the right end of `OK` and `Annulla` does not answer); on
-  the Simplified Chinese CD, the subtitle row after an ideographic space
-  starts after the whole space (the original starts it in the middle of
-  the space, and that row's characters come out wrong): this mends 27 of
-  the 72 shipped rows that come out wrong; the other 45 start in the
-  middle of a character where the original reads a punctuation mark
-  across two characters, and stay as in the original; on the Chinese
+  the Simplified Chinese CD, every subtitle row starts and ends between
+  two characters: the row after an ideographic space starts after the
+  whole space (the original starts it in the middle of the space, and
+  that row's characters come out wrong), and a punctuation mark is only
+  taken where a character starts (the original also reads one across two
+  characters and cuts in the middle of one): this mends the 72 shipped
+  rows that come out wrong, in 50 lines; on the Chinese
   CDs, the options' SUBTITLES toggle answers over its own sprite while
   SUBTITLES is off (the original reads its record one byte out of step,
   so its click area takes a wrong width and height); each menu sets its
