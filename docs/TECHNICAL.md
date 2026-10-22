@@ -591,8 +591,13 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 ## Atlantis II (in progress)
 
 A folder holding `atlantis2.exe` opens Atlantis II (`crates/atlantis-app/src/a2.rs`):
-a new game runs the chapter scripts as the original's start-up and
-menu do (there is no menu yet): chapter 0's `/INIT` sets the world, the
+the player menu comes first, as in the original (five symbols: a symbol
+continues that player's newest save, or starts a new game). The original
+then starts its intro videos (`intro%02d.hnm` with their `.apc`,
+@ 0x0049d9c0), which the port does not play yet: how they chain and how
+they share the screen with the player menu are not read. A new game
+runs the chapter scripts as the original's start-up and menu do:
+chapter 0's `/INIT` sets the world, the
 place and Tibet's first view (`tibet.wam` view 2 at yaw −90°, pitch 0),
 plays the opening film with its sound track and then starts the music;
 the mouse or the arrow keys turn the view within the script's limits
@@ -603,18 +608,23 @@ video, the arrival), and the scans of the warp frame run the scripts: the
 first click sends the game to chapter 75, the first arrival in view 7
 plays the shaman's greeting (dialog 360) and the section goes on after
 it. A left click ends a film and goes to a dialog's next line; Escape ends
-a dialog. Not yet: the menus, the bag bar, the subject menu (so the
-shaman's other dialogs, which the scripts call on a subject, cannot be
+a dialog, and in the panorama opens the main menu (options, volumes,
+load and save, quit; below). Not yet: the start-up intro videos, the bag bar, the subject menu (so
+the shaman's other dialogs, which the scripts call on a subject, cannot be
 asked for), the puzzles. `--headless <folder> [frames] --screenshot
-<file.png>` runs that many frames of 1/60 s and saves the screen;
-`--view <id>[,<yaw>,<pitch>]` starts in another view and `--dialog <n>`
-plays a dialog at once (testing aids, which end the opening film first),
+<file.png>` plays a new game for that many frames of 1/60 s and saves the
+screen;
+`--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
+plays a dialog at once and `--menu <page>` shows a menu page (`player`,
+`main`, `options`, `sound`, `load`, `credits`; testing aids, which end the
+opening film first),
 e.g. `--view 7,-164.394,14.96 --dialog 360`. `Engine::new_game` keeps the
 start without the scripts (the view `/INIT` names) for the tests against
 the original's moves. The example `cargo run --release -p atlantis2-engine
 --example tibet_tour <install> <discs> <out>` writes pictures of three
 views with their animations and a recorded walk from the first view to
-view 4.
+view 4; `--example menu_png <data folder> <prefix>` draws the menu pages
+after a short game with three saves.
 
 - **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
   timestamp 0x38030926), recognised by its size and timestamp and
@@ -903,8 +913,8 @@ view 4.
   the hand. No-ops, logged: `ZoomStart`, `ZoomPsychoStart` (the zoom of
   a move), `ANIM_THE_FRAME` (the playing byte), the special events
   (`TestSpecialEvent`), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
-  read where it is), `MESSAGE_CLIC`, `ViewBigSpr`, `CREDITS`, the bag bar's
-  layout; `NextWarpInvalide` is stored but the view entry does not read
+  read where it is), `MESSAGE_CLIC`, `ViewBigSpr`, the bag bar's layout (`CREDITS` shows the
+  credits); `NextWarpInvalide` is stored but the view entry does not read
   it; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
@@ -919,6 +929,79 @@ view 4.
   view 10, and compares the lines the scans run with the original's
   (`scripts_con_tibet_scan.txt`: lines 14 and 15 around dialog 360, line
   294 in view 10) and the dialog's lines with `dialog_script_ti.txt`.
+
+- **Menus** (`crates/atlantis2-engine/src/menu.rs`, the engine's side in
+  `engine/menus.rs`): the original's pages are built in code (loop type
+  5): a 640x480 background (`spr\menu\f_*.tga`, RLE or not, 16 or 24 bits:
+  each channel keeps its top bits, as the heads' maps) or the game screen
+  at half brightness, and widgets of `spr\menu\*.spr` at fixed positions
+  with the tooltips of `loc\Menu.txt` (sections padded with their last
+  line when short). The widget classes are the original's: sprites,
+  buttons (the box frame 0's size centred on the position, strict
+  inequalities), hover buttons (frame 1 under the mouse), animated
+  buttons (20 frames, one per 15 Hz tick while the mouse is in the box
+  with the button up, while pressed by a click in the box until the
+  button is released, or always), two-state and blinking toggles, the volume sliders (gauge and
+  knob, x0 = x − 65, 115 pixels, the action every frame while held) and
+  the load page's list (60-pixel rows, the thumbnail of `save.spr` and the
+  date and time in `AtlFT_POPUP`, newest first) with its scroll bar (at
+  the list's right edge, a 200-pixel track). A tooltip shows after 10
+  ticks in a box, centred on it in white over black. Each frame the
+  widgets are asked in order and the first action wins; the state machine
+  then slides the main page's panels (1 + 2 + ... pixels a frame: 30
+  frames for the options and the disc, 40 for the sound), asks its
+  questions in the yes / no box (save, erase, quit), opens the pages, and
+  sets the options (subtitles, centre marker, inverted mouse, the screen
+  size, which is kept in `atlant2.cfg` but not used: the port draws
+  640x480) and the volumes (general = slider × 256, music = music slider
+  × general slider × 127 + 0.5, effects and dialogs × 127, truncated).
+  Escape closes the main menu opened from the game (not the player menu).
+  The cursor is `curseur.spr` at the mouse; the window then lets the
+  pointer go and draws the game's own. Quitting shows the credits (16
+  pictures, 5 s each, a 2 s fade into the next, ended by a click or
+  while Escape is held: a key state, not a key press), as does the scripts' `CREDITS`. Built but not opened by the
+  game: the disc request (every disc is read where it is), "please wait",
+  "disk full" and "write error" (the original opens them only while
+  `LOADMUSIK` copies music, which the port does not do). Not known, and
+  chosen here: whether the page title (line 0 of each section) is drawn
+  (it is not), the credits' texts (`loc\Credits.txt`'s placement is not
+  read: only the pictures show) and their fade (a linear blend), what
+  the 800 x 600 mode does with the 640 x 480 pages (centred). The list's date and
+  time are written in the French system's formats (`22/10/2026
+  14:12:00`); the original asks Windows for the user's.
+- **Saves** (`crates/atlantis2-data/src/save.rs`, the engine's side in
+  `engine/saves.rs`): the original's format, so its saves and the port's
+  are the same files: `save\ATL<player>_<slot>.SAV`, 99 slots per player,
+  in the `atlantis2` folder of the port's data folder. A save is the 35
+  globals of the original's table back to back (69288 bytes: the place,
+  chapter, view, time and thumbnail of the header, the 300 variables, the
+  1024 flags, the bag with its unused entries in their initial pattern,
+  the camera's angles, the music and its list, the show / hide table, the
+  cursor frame, the puzzles' states, the subjects) in a `ZapFile` (its
+  run-length encoding transcribed: a literal of 10 bytes at least, a fill
+  run after each, even empty; the bytes the original leaves to chance
+  written as 0). A raw file of 69288 bytes loads too and is saved again
+  compressed. Saving writes the player's first free slot; the load page
+  lists the valid ones newest first and can erase one. A load does what
+  the original's does: the 35 globals back, the chapter's script loaded,
+  the world set (the hand emptied), the place loaded and the saved view
+  entered at the saved angles with no arrival scan and no per-view reset,
+  the saved music, chapters 39, 46 and 83 run their `/INIT` again. The
+  puzzles and the dowsing rod are kept as the bytes of the last load
+  until their studies are ported; the dialog flag is written from the
+  running dialog and not read back (a save made from the menus has no
+  dialog running: Escape ends it before the main menu opens). Chosen here: a section
+  waiting to go on and a queued command are dropped at a load (the
+  original's flags are not saved: what it does with them is not known);
+  a save is stamped with the local time, as the original's; the subject
+  table's
+  entries past a character's count are written as 0 (the original keeps
+  what its removals left there). `atlant2.cfg` (11 options, 35 bytes) is
+  read at start and written at exit. The encoder, the decoder, a slot's
+  file byte for byte and the options file are the original's
+  (`crates/atlantis2-data/tests/zapfile.rs`); the menus, a save and a load
+  through them, the newest save chosen by the player menu and the credits
+  are run with the game's files (`crates/atlantis2-engine/tests/menus.rs`).
 
 ## Tests
 
@@ -952,8 +1035,8 @@ installation, for the tests of those builds. For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
 copies); the expected frames, matrices, zone picks, heads, lip-sync
-weights, dialog lines, dialog frames, subtitle layouts, music fades and
-script results come from the original `atlantis2.exe` run under emulation
+weights, dialog lines, dialog frames, subtitle layouts, music fades,
+script results and save files come from the original `atlantis2.exe` run under emulation
 (Tibet's moves pass by pass, the place animations tick by tick, the
 screen centre and the clicks on sprites pass by pass with the texel under
 the centre given, every SPW frame of Tibet and the first of every other

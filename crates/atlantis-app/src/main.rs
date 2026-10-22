@@ -28,12 +28,16 @@
 //! switches it back).
 //!
 //! A folder holding Atlantis II (`atlantis2.exe`) opens Atlantis II's own
-//! minimal mode (`atlantis_app::a2`): a new game in Tibet, to look around
-//! and walk from view to view with a left click. Its discs (CD images or copies) are looked for in the folder,
-//! in the folders directly inside it and in each `--discs <folder>`;
-//! `--headless <folder> [frames] [--screenshot <file.png>]` prints where it
-//! is and saves the screen; `--view <id>[,<yaw>,<pitch>]` starts in another
-//! view, `--dialog <n>` plays a dialog at once (testing aids). Only the command line opens Atlantis II for now:
+//! mode (`atlantis_app::a2`): the player menu, then Tibet, to look around
+//! and walk from view to view with a left click; Escape opens the menus
+//! (options, volumes, saves). Its discs (CD images or copies) are looked
+//! for in the folder, in the folders directly inside it and in each
+//! `--discs <folder>`; `--headless <folder> [frames] [--screenshot
+//! <file.png>]` plays a new game, prints where it is and saves the screen;
+//! `--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
+//! plays a dialog at once, `--menu <page>` (`player`, `main`, `options`,
+//! `sound`, `load`, `credits`) shows a menu page (testing aids). Only the
+//! command line opens Atlantis II for now:
 //! the launcher, the game library and the web build know the first game
 //! alone. The first game's options but `--original` are refused in this
 //! mode, and `--discs` and `--screenshot` with the first game.
@@ -161,9 +165,28 @@ fn main() {
         }
         None => None,
     };
+    // Atlantis II: `--menu <page>`.
+    let menu = match args.iter().position(|a| a == "--menu") {
+        Some(i) if i + 1 < args.len() => {
+            args.remove(i);
+            let v = args.remove(i);
+            Some(
+                atlantis_app::a2::A2Start::parse_menu(&v).unwrap_or_else(|| {
+                    eprintln!("--menu {v}: not player, main, options, sound, load or credits");
+                    std::process::exit(2);
+                }),
+            )
+        }
+        Some(_) => {
+            eprintln!("--menu needs a page");
+            std::process::exit(2);
+        }
+        None => None,
+    };
     let a2_start = atlantis_app::a2::A2Start {
         view,
         dialog: dialog.map(|d| d.max(0) as u32),
+        menu,
     };
     // `--original` holds for both games.
     let a2_enhancements = if original {
@@ -190,6 +213,7 @@ fn main() {
         ("--screenshot", screenshot.is_some()),
         ("--dialog", dialog.is_some()),
         ("--view", view.is_some()),
+        ("--menu", menu.is_some()),
     ]
     .into_iter()
     .filter_map(|(name, on)| on.then_some(name))
@@ -299,8 +323,8 @@ fn main() {
     // A folder of Atlantis II: its own mode.
     if is_a2 {
         refuse(&first_game_flags, "Atlantis II's mode");
-        let run = atlantis_app::a2::open(Path::new(&args[0]), &discs, a2_enhancements)
-            .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen, &a2_start));
+        let run = atlantis_app::a2::open(Path::new(&args[0]), &discs, &a2_start, a2_enhancements)
+            .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen));
         if let Err(e) = run {
             error_box(&e);
             std::process::exit(1);

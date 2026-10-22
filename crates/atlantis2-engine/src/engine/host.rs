@@ -88,9 +88,9 @@ impl Engine {
         self.player.stream.music()
     }
 
-    /// Whether the scripts asked the game to quit (`EXIT`).
+    /// Whether the game quits: the scripts' `EXIT`, or the menus.
     pub fn quit(&self) -> bool {
-        self.con.as_ref().is_some_and(|s| s.quit)
+        self.con.as_ref().is_some_and(|s| s.quit) || self.quit_requested
     }
 
     /// `Interp_GereFrame` (@ 0x00484b70) in the warp frame: on an arrival,
@@ -674,7 +674,8 @@ impl Host for Engine {
     }
 
     fn credits(&mut self) {
-        log::info!("CREDITS: the credits are not ported");
+        // FUN_004818f0 → `AtlMenu_start_Credits` (@ 0x00486e00).
+        self.open_credits();
     }
 }
 

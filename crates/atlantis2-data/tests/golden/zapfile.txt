@@ -1,0 +1,261 @@
+# The saves of the original atlantis2.exe (French CD build of 1999, 2199552 bytes) run under emulation:
+# the save table, the ZapFile encoder and decoder (0x0047e7e0, 0x0047e660) on synthetic buffers
+# (seeded Python random patterns, no game content), a slot save (0x00478df0), load (0x00478f30) and scan
+# (0x00478b50) of synthetic globals, a raw file, refused files, and atlant2.cfg (0x0047f530, 0x0047f590).
+# The stack is filled with 0xcc (the header's bytes 12..15), the byte after the buffer is 0xa5 or 0x00.
+save_table.entries 35
+save_table.bytes 69288
+save_table.00 0x00672a1c:20
+save_table.01 0x006d1694:4
+save_table.02 0x006729d4:4
+save_table.03 0x006729e0:16
+save_table.04 0x006729d8:4
+save_table.05 0x006cfe90:1200
+save_table.06 0x006d0578:4096
+save_table.07 0x00671a10:1080
+save_table.08 0x00671a08:4
+save_table.09 0x006729d0:4
+save_table.10 0x00672a30:4
+save_table.11 0x00672a44:4
+save_table.12 0x006d0444:256
+save_table.13 0x006d84fd:1
+save_table.14 0x006d8500:4
+save_table.15 0x006d84f4:4
+save_table.16 0x005e2efc:4
+save_table.17 0x006afdd0:12288
+save_table.18 0x006c2dfc:4
+save_table.19 0x00672a00:4
+save_table.20 0x006d2684:4
+save_table.21 0x005e1840:17
+save_table.22 0x006d2688:4
+save_table.23 0x005e1854:17
+save_table.24 0x006d268c:4
+save_table.25 0x005e1868:17
+save_table.26 0x006d84d0:4
+save_table.27 0x005e1340:4
+save_table.28 0x006d84e0:4
+save_table.29 0x006d84e4:4
+save_table.30 0x005e1a4c:8
+save_table.31 0x005e20dc:15
+save_table.32 0x006d26b4:4
+save_table.33 0x006cfb54:1
+save_table.34 0x006c2e88:50176
+scan_table.0 0x00672a08:20
+scan_table.1 0x00672f3c:4
+scan_table.2 0x00672a34:4
+scan_table.3 0x006729f0:16
+scan_table.4 0x00672a38:4
+cfg_table.00 0x006569cc:4
+cfg_table.01 0x005da268:4
+cfg_table.02 0x005e2f2c:1
+cfg_table.03 0x005df970:1
+cfg_table.04 0x005db84c:1
+cfg_table.05 0x005dd2b8:4
+cfg_table.06 0x005dd2bc:4
+cfg_table.07 0x006c2e6c:4
+cfg_table.08 0x005df974:4
+cfg_table.09 0x005e2f24:4
+cfg_table.10 0x005e2f28:4
+rle.one_byte.in 1 559aead08264d579
+rle.one_byte.header_tail cccccccc
+rle.one_byte.file_len 30
+rle.one_byte.file_sha256 73704125ad5946dbd9658224cc831c0730843e0c7ac1fc03558bef88ca7e2e19
+rle.one_byte.file_hex 5a415046494c4520312e3000cccccccc01000000010000004100000000a5
+rle.one_byte.runs 2 L1 F0
+rle.one_byte.trailing_bytes 0
+rle.one_byte.zero_fill_byte a5
+rle.one_byte.load ok=1 size=1 same=True
+rle.five.in 5 f0393febe8baaa55
+rle.five.header_tail cccccccc
+rle.five.file_len 34
+rle.five.file_sha256 1eb06b49770cfbb2ac9a5b865c1a13f5b1c7755ab22c28e9a5b19d3d78ed9745
+rle.five.file_hex 5a415046494c4520312e3000cccccccc0500000005000000414243444500000000a5
+rle.five.runs 2 L5 F0
+rle.five.trailing_bytes 0
+rle.five.zero_fill_byte a5
+rle.five.load ok=1 size=5 same=True
+rle.nine_equal.in 9 3e7077fd2f66d689
+rle.nine_equal.header_tail cccccccc
+rle.nine_equal.file_len 38
+rle.nine_equal.file_sha256 20daee41beb0998096e1113d61394bf416ecf5c0eb603b67ea39131cfdbc2a36
+rle.nine_equal.file_hex 5a415046494c4520312e3000cccccccc090000000900000000000000000000000000000000a5
+rle.nine_equal.runs 2 L9 F0
+rle.nine_equal.trailing_bytes 0
+rle.nine_equal.zero_fill_byte a5
+rle.nine_equal.load ok=1 size=9 same=True
+rle.ten_equal.in 10 01d448afd9280654
+rle.ten_equal.header_tail cccccccc
+rle.ten_equal.file_len 39
+rle.ten_equal.file_sha256 f5253c170180d02d196050dcf3e4534a86c43579c3992416fef59822b9adddf9
+rle.ten_equal.file_hex 5a415046494c4520312e3000cccccccc0a0000000a0000000000000000000000000000000000a5
+rle.ten_equal.runs 2 L10 F0
+rle.ten_equal.trailing_bytes 0
+rle.ten_equal.zero_fill_byte a5
+rle.ten_equal.load ok=1 size=10 same=True
+rle.eleven_equal.in 11 71b6c1d53832f789
+rle.eleven_equal.header_tail cccccccc
+rle.eleven_equal.file_len 40
+rle.eleven_equal.file_sha256 9e262397d4590761411a8da517cefa1fb0d774a124eec96fe6516b3a8208fad7
+rle.eleven_equal.file_hex 5a415046494c4520312e3000cccccccc0b0000000b000000000000000000000000000000000000a5
+rle.eleven_equal.runs 2 L11 F0
+rle.eleven_equal.trailing_bytes 0
+rle.eleven_equal.zero_fill_byte a5
+rle.eleven_equal.load ok=1 size=11 same=True
+rle.twenty_equal.in 20 de47c9b27eb8d300
+rle.twenty_equal.header_tail cccccccc
+rle.twenty_equal.file_len 39
+rle.twenty_equal.file_sha256 d6f547b286fcd8e93d0559b9e4924f9ef0481f26bf8cb4c6b9c5990dbf01b0af
+rle.twenty_equal.file_hex 5a415046494c4520312e3000cccccccc140000000a000000000000000000000000000a00000000
+rle.twenty_equal.runs 2 L10 F10
+rle.twenty_equal.trailing_bytes 0
+rle.twenty_equal.load ok=1 size=20 same=True
+rle.a_then_20_zero.in 21 e26e18094c177fcf
+rle.a_then_20_zero.header_tail cccccccc
+rle.a_then_20_zero.file_len 39
+rle.a_then_20_zero.file_sha256 eb70b7073f5ab758712ce312c2640f077a45bdec7954e3c365492b9964a124a5
+rle.a_then_20_zero.file_hex 5a415046494c4520312e3000cccccccc150000000a000000410000000000000000000b00000000
+rle.a_then_20_zero.runs 2 L10 F11
+rle.a_then_20_zero.trailing_bytes 0
+rle.a_then_20_zero.load ok=1 size=21 same=True
+rle.lit10_run10.in 20 1edf8fe81934fe32
+rle.lit10_run10.header_tail cccccccc
+rle.lit10_run10.file_len 39
+rle.lit10_run10.file_sha256 b749e1fef63cf632b43e422fe3ccb465ceee3054fd5f7ff1caa9f640210a51d0
+rle.lit10_run10.file_hex 5a415046494c4520312e3000cccccccc140000000a0000000102030405060708090a0a00000007
+rle.lit10_run10.runs 2 L10 F10
+rle.lit10_run10.trailing_bytes 0
+rle.lit10_run10.load ok=1 size=20 same=True
+rle.lit12_run9_end.in 21 4e76db0ca8c94bc9
+rle.lit12_run9_end.header_tail cccccccc
+rle.lit12_run9_end.file_len 50
+rle.lit12_run9_end.file_sha256 bdf4580e63ed03fb118c72ede4fc612d2f38798706b5ee3771b05698262f4b70
+rle.lit12_run9_end.file_hex 5a415046494c4520312e3000cccccccc15000000150000000102030405060708090a0b0c07070707070707070700000000a5
+rle.lit12_run9_end.runs 2 L21 F0
+rle.lit12_run9_end.trailing_bytes 0
+rle.lit12_run9_end.zero_fill_byte a5
+rle.lit12_run9_end.load ok=1 size=21 same=True
+rle.lit12_run9_end_pe00.in 21 4e76db0ca8c94bc9
+rle.lit12_run9_end_pe00.header_tail cccccccc
+rle.lit12_run9_end_pe00.file_len 50
+rle.lit12_run9_end_pe00.file_sha256 a54bcc5677d5dbf06fd5285b8e8d661cc49f422f25e9418a98243c924e2e96e0
+rle.lit12_run9_end_pe00.file_hex 5a415046494c4520312e3000cccccccc15000000150000000102030405060708090a0b0c0707070707070707070000000000
+rle.lit12_run9_end_pe00.runs 2 L21 F0
+rle.lit12_run9_end_pe00.trailing_bytes 0
+rle.lit12_run9_end_pe00.zero_fill_byte 00
+rle.lit12_run9_end_pe00.load ok=1 size=21 same=True
+rle.lit12_run10_end.in 22 34f24eb267090513
+rle.lit12_run10_end.header_tail cccccccc
+rle.lit12_run10_end.file_len 41
+rle.lit12_run10_end.file_sha256 28b70d783e07cfc38aaecbbd3ec50c1edf1da2dac0fd443464fee706d702a65a
+rle.lit12_run10_end.file_hex 5a415046494c4520312e3000cccccccc160000000c0000000102030405060708090a0b0c0a00000007
+rle.lit12_run10_end.runs 2 L12 F10
+rle.lit12_run10_end.trailing_bytes 0
+rle.lit12_run10_end.load ok=1 size=22 same=True
+rle.run9_inside.in 33 af2be28f4fd811a1
+rle.run9_inside.header_tail cccccccc
+rle.run9_inside.file_len 62
+rle.run9_inside.file_sha256 0d4483ad0ea8264ea5a16e643516edd95d712233d8aa3dcb409d3c81ae2e8531
+rle.run9_inside.file_hex 5a415046494c4520312e3000cccccccc21000000210000000102030405060708090a0b0c0707070707070707071415161718191a1b1c1d1e1f00000000a5
+rle.run9_inside.runs 2 L33 F0
+rle.run9_inside.trailing_bytes 0
+rle.run9_inside.zero_fill_byte a5
+rle.run9_inside.load ok=1 size=33 same=True
+rle.run10_inside.in 34 431a55884a395fca
+rle.run10_inside.header_tail cccccccc
+rle.run10_inside.file_len 62
+rle.run10_inside.file_sha256 2a07f26414e51b9888c6a9bdf7028b64c3263f1915b8aac92c80d297a6cfa327
+rle.run10_inside.file_hex 5a415046494c4520312e3000cccccccc220000000c0000000102030405060708090a0b0c0a000000070c0000001415161718191a1b1c1d1e1f00000000a5
+rle.run10_inside.runs 4 L12 F10 L12 F0
+rle.run10_inside.trailing_bytes 0
+rle.run10_inside.zero_fill_byte a5
+rle.run10_inside.load ok=1 size=34 same=True
+rle.two_runs.in 45 d6dbdad5961e8c3a
+rle.two_runs.header_tail cccccccc
+rle.two_runs.file_len 68
+rle.two_runs.file_sha256 4ff656a47f048e72b205f7062d8d0197701ffbe0791dea9fd95d87e42641036f
+rle.two_runs.file_hex 5a415046494c4520312e3000cccccccc2d0000000f0000000101010101010101010101010101010f000000020f00000003030303030303030303030303030300000000a5
+rle.two_runs.runs 4 L15 F15 L15 F0
+rle.two_runs.trailing_bytes 0
+rle.two_runs.zero_fill_byte a5
+rle.two_runs.load ok=1 size=45 same=True
+rle.alternating_64.in 64 83fd42e005dae0b8
+rle.alternating_64.header_tail cccccccc
+rle.alternating_64.file_len 93
+rle.alternating_64.file_sha256 d177a5d67937166496cf1117b4ff8619d22af074dfbf943878c460bdbf35c322
+rle.alternating_64.file_hex 5a415046494c4520312e3000cccccccc400000004000000000ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00000000a5
+rle.alternating_64.runs 2 L64 F0
+rle.alternating_64.trailing_bytes 0
+rle.alternating_64.zero_fill_byte a5
+rle.alternating_64.load ok=1 size=64 same=True
+rle.alternating_64.load48 overrun buffer=0x40000dd0 (unsigned wrap of the clip test)
+rle.random_300.in 300 e440602d51266218
+rle.random_300.header_tail cccccccc
+rle.random_300.file_len 329
+rle.random_300.file_sha256 9af926354b69df238d2df7f3934cd7ba3c36afac5f3d2b13f78319a3c6e5dcf5
+rle.random_300.runs 2 L300 F0
+rle.random_300.trailing_bytes 0
+rle.random_300.zero_fill_byte a5
+rle.random_300.load ok=1 size=300 same=True
+rle.random_300.load48 ok=1 same=True rest_zero=False
+rle.sparse_69288.in 69288 a25338840998995b
+rle.sparse_69288.header_tail cccccccc
+rle.sparse_69288.file_len 2197
+rle.sparse_69288.file_sha256 6557b0a49a70f668e4f4e79a140b3651b706c712368c9c50d2bd63660a7237fc
+rle.sparse_69288.runs 140 L22 F975 L10 F987 L19 F978 L26 F971 L18 F979 L10 F987 L10 F987 L10 F987 L21 F976 L36 F961 L23 F974 L11 F986 ...(+116)
+rle.sparse_69288.trailing_bytes 0
+rle.sparse_69288.load ok=1 size=69288 same=True
+rle.sparse_69288.load48 ok=1 same=True rest_zero=False
+rle.ff_69288.in 69288 eb0287983c6f9905
+rle.ff_69288.header_tail cccccccc
+rle.ff_69288.file_len 39
+rle.ff_69288.file_sha256 cde397d651cbf53b9de5d973eb092384595e3a69db26a93493bf6e53cda76501
+rle.ff_69288.file_hex 5a415046494c4520312e3000cccccccca80e01000a000000ffffffffffffffffffff9e0e0100ff
+rle.ff_69288.runs 2 L10 F69278
+rle.ff_69288.trailing_bytes 0
+rle.ff_69288.load ok=1 size=69288 same=True
+rle.ff_69288.load48 ok=1 same=True rest_zero=False
+rle.random_69288.in 69288 3fe9180d488e2825
+rle.random_69288.header_tail cccccccc
+rle.random_69288.file_len 69317
+rle.random_69288.file_sha256 93615a93b56602b882c32ec88602db483044c3da32b62e44dfc34a954200e4dc
+rle.random_69288.runs 2 L69288 F0
+rle.random_69288.trailing_bytes 0
+rle.random_69288.zero_fill_byte a5
+rle.random_69288.load ok=1 size=69288 same=True
+rle.random_69288.load48 overrun buffer=0x400bb780 (unsigned wrap of the clip test)
+slot.files a_then_20_zero.zap alternating_64.zap eleven_equal.zap ff_69288.zap five.zap lit10_run10.zap lit12_run10_end.zap lit12_run9_end.zap lit12_run9_end_pe00.zap nine_equal.zap one_byte.zap random_300.zap random_69288.zap run10_inside.zap run9_inside.zap save\ATL03_12.SAV sparse_69288.zap t.zap ten_equal.zap twenty_equal.zap two_runs.zap
+slot.path save\ATL03_12.SAV
+slot.file_len 17700
+slot.file_sha256 36b97115bb74a74bc9b881a7f9680e54560fe1bdbdfd9b5d30d8f45816a8ce44
+slot.header 5a415046494c4520312e3000cccccccca80e0100
+slot.runs 1676 L45 F55 L10 F33 L10 F19 L10 F91 L10 F22 L11 F36 ...(+1664)
+slot.decoded_sha256 72f148ffc80e62229175747a454352cef9f3dd866135f3abe2f90c772844e2ed
+slot.h.wam testplace.wam
+slot.h.chapter 75
+slot.h.view 42
+slot.h.systemtime 1999 10 5 8 14 30 15 250
+slot.h.vignette 5
+slot.entry00 off=0 len=20 74657374706c6163652e77616d00000000000000 matches_memory=True
+slot.entry02 off=24 len=4 2a000000 matches_memory=True
+slot.entry03 off=28 len=16 cf070a00050008000e001e000f00fa00 matches_memory=True
+slot.entry04 off=44 len=4 05000000 matches_memory=True
+slot.entry09 off=6428 len=4 0000b4c2 matches_memory=True
+slot.entry10 off=6432 len=4 00004841 matches_memory=True
+slot.entry11 off=6436 len=4 07000000 matches_memory=True
+slot.entry19 off=19001 len=4 03000000 matches_memory=True
+slot.save_msgs 0
+slot.load ret=1 entries_restored=35/35 calls=FUN_0049bf70,FUN_00479130
+slot.load_msgs 
+slot.scan ret=1 header_copy_equals_first_48=True
+slot.scan_missing ret=0
+raw.load ret=1 calls=FUN_0049bf70,FUN_00479130 msgs=warn ZapFile::OpenAndReadHeader(%s) :%s != %s | log Loaded game: wam=%s, chapitre=%d, vue=%d
+raw.memory_differs_from_file_in_entries 0,2,3,9,10,11,19
+raw.rewritten zap=True len=69317 decodes_to_memory=True sha256=a66411d0fc68a00de805132bff48cedeeba89fd6afb3fd0a1bd3fe82aae8b56d
+raw.note after a raw load the original calls FUN_00479130 then FUN_00478df0 (same slot): FUN_00478eb0 rebuilds the header globals from the live state (here the harness's, FUN_00479130 being stubbed), so those entries differ from the raw file
+bad.zap_wrong_size ret=0 calls=- msgs=warn AtlSaveGame_Load(%d) fichier invalide(%d != %d)
+bad.raw_wrong_size ret=0 calls=- msgs=warn ZapFile::OpenAndReadHeader(%s) :%s != %s | warn AtlSaveGame_Load(%d) fichier invalide(%d != %d)
+bad.bad_magic ret=0 calls=- msgs=warn ZapFile::OpenAndReadHeader(%s) :%s != %s | warn AtlSaveGame_Load(%d) fichier invalide(%d != %d)
+bad.missing ret=0 msgs=-
+cfg.len 35
+cfg.hex 01000000d0070000010100c8000000640000005a0000006e0000002003000058020000
+cfg.read 0x006569cc=1 0x005da268=2000 0x005e2f2c=1 0x005df970=1 0x005db84c=0 0x005dd2b8=200 0x005dd2bc=100 0x005dc9dc=90 0x005df974=110 0x005e2f24=800 0x005e2f28=600

@@ -33,6 +33,13 @@ env_logger = "0.11"
 # link at build time.
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 
+# The local time of the Atlantis II saves (`GetLocalTime` in the original).
+[target.'cfg(all(unix, not(target_arch = "wasm32")))'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation", "Win32_Foundation"] }
+
 # The Dock icon (macOS takes it from the application, not the window).
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

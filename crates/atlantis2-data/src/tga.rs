@@ -1,11 +1,17 @@
-//! The dialog heads' texture maps (`datas_a2\3d\dial\*.tga`): TGA true
-//! colour, 16 bits per pixel (1-5-5-5), run-length encoded (type 10) in
-//! every shipped map; uncompressed 16-bit files (type 2) are read too.
+//! The dialog heads' texture maps (`datas_a2\3d\dial\*.tga`) and the
+//! menus' backgrounds (`spr\menu\f_*.tga`): TGA true colour, 16 bits per
+//! pixel (1-5-5-5) or 24 (B, G, R), run-length encoded (type 10) or not
+//! (type 2). Both are loaded by the same code (the TGA reader @ 0x004c6860
+//! and the surface copy @ 0x004b6cc0, called by `dlg_Perso::LoadTextures`
+//! @ 0x00463a90 and `CMnMenu::LoadTga` @ 0x00472830).
 //!
-//! `dlg_Perso::LoadTextures` (@ 0x00463a90) loads each map into a surface
-//! of the screen's pixel format. On a 16-bit RGB565 screen, the format the
-//! port draws in, a texel (r, g, b) of 5 bits each becomes
-//! `(r << 11) | (g << 6) | b`: green's low bit is 0. The rows are stored
+//! The copy into a surface of the screen's pixel format (@ 0x004b5770)
+//! moves each channel's mask to the destination's, top bits aligned. On a
+//! 16-bit RGB565 screen, the format the port draws in, a texel (r, g, b)
+//! of 5 bits each becomes `(r << 11) | (g << 6) | b`: green's low bit is
+//! 0 (checked on a head's map under emulation); a 24-bit pixel keeps the
+//! top 5, 6 and 5 bits of its channels [inferred from the same rule]. The
+//! rows are stored
 //! top-down (a bottom-up file, descriptor bit 5 clear, is flipped).
 
 use std::fmt;
@@ -61,7 +67,7 @@ impl Tga {
         let height = u16::from_le_bytes([h[14], h[15]]) as usize;
         let bits = h[16];
         let top_down = h[17] & 0x20 != 0;
-        if bits != 16 || !(image_type == 2 || image_type == 10) {
+        if !(bits == 16 || bits == 24) || !(image_type == 2 || image_type == 10) {
             return Err(TgaError::Unsupported { image_type, bits });
         }
         let mut at = 18 + id_len;
@@ -70,14 +76,19 @@ impl Tga {
         }
         let n = width * height;
         let mut file = Vec::with_capacity(n);
+        let size = usize::from(bits / 8);
         let px = |at: usize| -> Result<u16, TgaError> {
-            data.get(at..at + 2)
-                .map(|b| u16::from_le_bytes([b[0], b[1]]))
-                .ok_or(TgaError::Truncated)
+            let b = data.get(at..at + size).ok_or(TgaError::Truncated)?;
+            Ok(if size == 2 {
+                texel(u16::from_le_bytes([b[0], b[1]]))
+            } else {
+                let (bl, g, r) = (u16::from(b[0]), u16::from(b[1]), u16::from(b[2]));
+                ((r >> 3) << 11) | ((g >> 2) << 5) | (bl >> 3)
+            })
         };
         if image_type == 2 {
             for i in 0..n {
-                file.push(px(at + 2 * i)?);
+                file.push(px(at + size * i)?);
             }
         } else {
             while file.len() < n {
@@ -86,12 +97,12 @@ impl Tga {
                 let count = (head & 0x7f) as usize + 1;
                 if head & 0x80 != 0 {
                     let p = px(at)?;
-                    at += 2;
+                    at += size;
                     file.extend(std::iter::repeat_n(p, count));
                 } else {
                     for _ in 0..count {
                         file.push(px(at)?);
-                        at += 2;
+                        at += size;
                     }
                 }
             }
@@ -101,7 +112,7 @@ impl Tga {
         for y in 0..height {
             let src = if top_down { y } else { height - 1 - y };
             for x in 0..width {
-                pixels[y * width + x] = texel(file[src * width + x]);
+                pixels[y * width + x] = file[src * width + x];
             }
         }
         Ok(Tga {
@@ -132,6 +143,17 @@ mod tests {
         assert_eq!(t.pixels, vec![0x1f << 6, 0x1f, 0xf800, 0xf800]);
         f[2] = 1;
         assert!(Tga::parse(&f).is_err());
+        // 1 x 1, type 2, 24 bits: B, G, R keep their top bits.
+        let mut g = vec![0u8; 18];
+        g[2] = 2;
+        g[12] = 1;
+        g[14] = 1;
+        g[16] = 24;
+        g.extend([0xff, 0x84, 0x0f]);
+        assert_eq!(
+            Tga::parse(&g).unwrap().pixels,
+            vec![(1 << 11) | (0x21 << 5) | 0x1f]
+        );
         assert_eq!(Tga::parse(&f[..10]), Err(TgaError::Truncated));
     }
 }

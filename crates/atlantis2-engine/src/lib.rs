@@ -12,7 +12,9 @@
 //! ([`subtitle`]), the reverse shots and the music ducked.
 //! The CON interpreter ([`script`]) runs the chapter scripts as the
 //! original does, its effects outside the script tables going through
-//! [`script::Host`], which the engine implements.
+//! [`script::Host`], which the engine implements. The menus ([`menu`])
+//! are the original's pages and state machine, with the saves of the
+//! original's format (`atlantis2_data::save`) behind them.
 
 #![forbid(unsafe_code)]
 
@@ -27,6 +29,7 @@ pub mod head;
 pub mod hnm_stream;
 pub mod lipsync;
 pub mod look;
+pub mod menu;
 pub mod music;
 pub mod png;
 pub mod raster3d;

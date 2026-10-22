@@ -170,6 +170,7 @@ dependencies = [
  "embed-resource",
  "env_logger",
  "js-sys",
+ "libc",
  "log",
  "md-5",
  "objc2 0.6.5",
@@ -181,6 +182,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "windows-sys 0.59.0",
  "winit",
 ]
 

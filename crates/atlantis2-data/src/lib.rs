@@ -15,7 +15,10 @@
 //! - [`spw`]: the place animations drawn into the cube faces;
 //! - [`spr`]: the `SPRCRYO` sprite banks (cursors);
 //! - [`db`]: the `.db` 3D scenes (the dialog heads, the 3D puzzles);
-//! - [`tga`]: the heads' texture maps;
+//! - [`tga`]: the heads' texture maps and the menus' backgrounds;
+//! - [`menu_txt`]: the menus' texts, `loc\Menu.txt`;
+//! - [`save`]: the original's saves (`save\ATLpp_ss.SAV`, the `ZapFile`
+//!   container) and `atlant2.cfg`;
 //! - [`dialog`]: the dialog scripts' speakers and lines, their texts, the
 //!   worlds' file sets and heroes, and `Font.txt`.
 
@@ -27,6 +30,8 @@ pub mod defnames;
 pub mod dialog;
 pub mod exe;
 pub mod files;
+pub mod menu_txt;
+pub mod save;
 pub mod spr;
 pub mod spw;
 pub mod tga;
