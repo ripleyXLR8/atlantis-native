@@ -32,7 +32,10 @@
 //! around in. Its discs (CD images or copies) are looked for in the folder,
 //! in the folders directly inside it and in each `--discs <folder>`;
 //! `--headless <folder> [frames] [--screenshot <file.png>]` prints where it
-//! is and saves the screen.
+//! is and saves the screen. Only the command line opens Atlantis II for now:
+//! the launcher, the game library and the web build know the first game
+//! alone. The first game's options are refused in this mode, and `--discs`
+//! and `--screenshot` with the first game.
 //!
 //! `--original` (before the game directory) turns every enhancement off:
 //! the original game, bug for bug. `--new-game` skips the start-up videos
@@ -137,7 +140,41 @@ fn main() {
         }))
     };
     let puzzle = value("--puzzle");
-    let object = value("--object").unwrap_or(0);
+    let object = value("--object");
+    // The options of one game only, refused for the other rather than
+    // ignored.
+    let first_game_flags: Vec<&str> = [
+        ("--original", original),
+        ("--hd", force_hd && !force_wide),
+        ("--widescreen", force_wide),
+        ("--new-game", new_game),
+        ("--launcher", launcher),
+        ("--support-screen", force_support),
+        ("--puzzle", puzzle.is_some()),
+        ("--object", object.is_some()),
+    ]
+    .into_iter()
+    .filter_map(|(name, on)| on.then_some(name))
+    .collect();
+    let a2_flags: Vec<&str> = [
+        ("--discs", !discs.is_empty()),
+        ("--screenshot", screenshot.is_some()),
+    ]
+    .into_iter()
+    .filter_map(|(name, on)| on.then_some(name))
+    .collect();
+    let object = object.unwrap_or(0);
+    let refuse = |flags: &[&str], game: &str| {
+        if !flags.is_empty() {
+            let text = format!("{}: not an option of {game}", flags.join(", "));
+            if headless {
+                eprintln!("{text}");
+            } else {
+                error_box(&text);
+            }
+            std::process::exit(2);
+        }
+    };
     let start = match puzzle {
         Some(id) => Start::Puzzle { id, object },
         None if new_game => Start::NewGame,
@@ -149,6 +186,7 @@ fn main() {
             .get(1)
             .is_some_and(|d| atlantis_app::a2::holds_atlantis2(Path::new(d)))
     {
+        refuse(&first_game_flags, "Atlantis II's mode");
         let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
         if let Err(e) =
             atlantis_app::a2::headless(Path::new(&args[1]), &discs, frames, screenshot.as_deref())
@@ -157,6 +195,10 @@ fn main() {
             std::process::exit(1);
         }
         return;
+    }
+    let is_a2 = args.len() == 1 && atlantis_app::a2::holds_atlantis2(Path::new(&args[0]));
+    if !is_a2 {
+        refuse(&a2_flags, "the first game (Atlantis II only)");
     }
     if args.first().map(String::as_str) == Some("--headless") {
         let Some(dir) = args.get(1) else {
@@ -219,7 +261,8 @@ fn main() {
     }
 
     // A folder of Atlantis II: its own mode.
-    if args.len() == 1 && atlantis_app::a2::holds_atlantis2(Path::new(&args[0])) {
+    if is_a2 {
+        refuse(&first_game_flags, "Atlantis II's mode");
         let run = atlantis_app::a2::open(
             Path::new(&args[0]),
             &discs,

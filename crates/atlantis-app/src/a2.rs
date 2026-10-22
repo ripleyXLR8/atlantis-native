@@ -134,7 +134,9 @@ impl A2App {
         if on {
             let ok = w.set_cursor_grab(CursorGrabMode::Locked).is_ok()
                 || w.set_cursor_grab(CursorGrabMode::Confined).is_ok();
-            w.set_cursor_visible(false);
+            // Hidden only when grabbed: without a grab the mouse does not
+            // turn the view, and the player needs to see the pointer.
+            w.set_cursor_visible(!ok);
             self.locked = ok;
         } else {
             let _ = w.set_cursor_grab(CursorGrabMode::None);

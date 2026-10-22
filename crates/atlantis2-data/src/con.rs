@@ -21,7 +21,11 @@ pub fn init_sets(text: &str) -> Vec<(String, String)> {
         if line.eq_ignore_ascii_case("/FININIT") {
             break;
         }
-        if !inside || line.len() < 5 || !line[..5].eq_ignore_ascii_case("/set(") {
+        let set = line
+            .as_bytes()
+            .get(..5)
+            .is_some_and(|b| b.eq_ignore_ascii_case(b"/set("));
+        if !inside || !set {
             continue;
         }
         let body = line[5..].trim_end_matches(')');
@@ -61,7 +65,7 @@ fn atoi(s: &str) -> i32 {
             v.wrapping_mul(10).wrapping_add(i32::from(d - b'0'))
         });
     if neg {
-        -v
+        v.wrapping_neg()
     } else {
         v
     }
@@ -119,5 +123,13 @@ mod tests {
             None
         );
         assert_eq!(atoi(" -12x"), -12);
+        assert_eq!(atoi("-2147483648"), i32::MIN);
+    }
+
+    #[test]
+    fn non_ascii_lines_are_skipped_not_split() {
+        // 'é' (Latin-1 0xe9 decoded to U+00E9) spans bytes 4..6.
+        assert!(init_sets("/INIT\nabcd\u{e9}x\n/set(vue=2)\n").len() == 1);
+        assert!(init_sets("/INIT\n\u{e9}\n/se\n").is_empty());
     }
 }

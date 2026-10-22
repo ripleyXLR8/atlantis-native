@@ -78,6 +78,15 @@ pub fn find_game_root(dir: &Path, depth: usize) -> Option<PathBuf> {
 
 /// What to tell the player about a folder that is not a game folder.
 pub fn explain(dir: &Path, err: &GameError) -> String {
+    // Atlantis II opens from the command line only for now (the launcher,
+    // the library and the web build know the first game alone).
+    if atlantis2_data::files::holds_atlantis2(dir) {
+        return format!(
+            "{} holds Atlantis II.\n\nThis version opens Atlantis II from the command line only, for now:\n\n    atlantis-native \"{}\"",
+            dir.display(),
+            dir.display()
+        );
+    }
     crate::guide::explain(&names_in(dir), &dir.display().to_string(), err)
 }
 

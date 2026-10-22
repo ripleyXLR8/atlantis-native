@@ -177,11 +177,11 @@ fn atoi(b: &[u8]) -> i64 {
     }
     let mut v: i64 = 0;
     while let Some(d) = b.get(i).filter(|c| c.is_ascii_digit()) {
-        v = v * 10 + i64::from(d - b'0');
+        v = v.wrapping_mul(10).wrapping_add(i64::from(d - b'0'));
         i += 1;
     }
     if neg {
-        -v
+        v.wrapping_neg()
     } else {
         v
     }
@@ -198,7 +198,9 @@ impl Wam {
             return Err(WamError::NotWam);
         }
         let dot = banner.iter().position(|&c| c == b'.').unwrap_or(5);
-        let version = (atoi(&banner[5..]) * 100 + atoi(&banner[dot + 1..])) as u32;
+        let version = atoi(&banner[5..])
+            .wrapping_mul(100)
+            .wrapping_add(atoi(&banner[dot + 1..])) as u32;
         let mut wam = Wam {
             version,
             ..Wam::default()
@@ -207,11 +209,14 @@ impl Wam {
         while pos + 8 <= data.len() {
             let tag = u32_at(data, pos);
             let size = u32_at(data, pos + 4) as usize;
-            let Some(p) = data.get(pos + 8..pos + 8 + size) else {
+            let Some(p) = size
+                .checked_add(pos + 8)
+                .and_then(|end| data.get(pos + 8..end))
+            else {
                 log::warn!("WAM chunk {tag:#x} at {pos:#x} cut short");
                 break;
             };
-            pos += 8 + size;
+            pos += 8 + size; // within data.len(): checked above
             if tag & 0xffff_ff00 != TAG_BASE {
                 wam.skipped += 1;
                 continue;
@@ -509,5 +514,17 @@ mod tests {
     fn old_banner_version() {
         let d = name("WAM v2.01 (c)Cryo 1998", 0x20);
         assert_eq!(Wam::parse(&d).unwrap().version, 201);
+    }
+
+    #[test]
+    fn hostile_banner_and_chunk_sizes() {
+        // 27 digits overflow an i64: wrapped, not a panic.
+        let d = name("WAM v999999999999999999999999999.9", 0x20);
+        let _ = Wam::parse(&d).unwrap().version;
+        // A chunk size at the top of the range ends the walk.
+        let mut d = name("WAM v2.8", 0x20);
+        d.extend_from_slice(&0xDEC0_DE0Eu32.to_le_bytes());
+        d.extend_from_slice(&u32::MAX.to_le_bytes());
+        assert!(Wam::parse(&d).is_ok());
     }
 }

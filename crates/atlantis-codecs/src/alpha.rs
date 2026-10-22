@@ -69,7 +69,8 @@ impl AlphaTables {
         pitch: usize,
     ) -> Result<(), DecodeError> {
         let total = width * height;
-        if video.len() < total || pitch < width || dst.len() < (height - 1) * pitch + width {
+        let needed = height.checked_sub(1).map_or(0, |rows| rows * pitch + width);
+        if video.len() < total || pitch < width || dst.len() < needed {
             return Err(DecodeError::Bitstream("alpha: buffer too small"));
         }
         let mut p = 0usize;
@@ -135,6 +136,9 @@ mod tests {
         assert_eq!(dst, [7, 7, 7, 0, 0, 7, 7, 7, 0, 0]);
         assert!(t.blend(&video, &mut dst, &[6, 31], 3, 2, 5).is_err());
         assert!(t.blend(&video, &mut dst, &[2, 31], 3, 2, 5).is_err());
+        // An empty frame (height 0, as a bad header could give) is no
+        // underflow.
+        assert!(t.blend(&[], &mut [], &[], 3, 0, 5).is_ok());
     }
 
     #[test]
