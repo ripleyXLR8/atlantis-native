@@ -636,3 +636,58 @@ fn irish_subjects_objects_and_music_are_on_the_discs() {
             .is_some());
     }
 }
+
+/// A move click (at time `t`, seconds) from `bigile1.wam` view 7 to view
+/// 8 with the scripts running; the events up to the arrival scan.
+fn move_7_to_8(e: &mut Engine, t: f64) -> Vec<Event> {
+    e.enter_at(7, 0.0, 0.0).unwrap();
+    e.script_state_mut().unwrap().set_current_view(7);
+    e.reset_view();
+    e.pass(None);
+    let zones = e.wam().view(7).unwrap().zones.clone();
+    let z = zones
+        .iter()
+        .position(|z| z.kind == 1 && z.value == 8)
+        .unwrap();
+    aim(e, z);
+    e.events.clear();
+    e.click(t);
+    let mut all = Vec::new();
+    for _ in 0..3000 {
+        e.tick();
+        e.pass(None);
+        let evs = std::mem::take(&mut e.events);
+        let arrived = evs.iter().any(|x| matches!(x, Event::ArrivalScan(_)));
+        all.extend(evs);
+        if arrived {
+            break;
+        }
+        if e.loop_type == LoopType::Video && all.len() > 40 {
+            e.end_video();
+        }
+    }
+    all
+}
+
+#[test]
+fn nextvue_and_udada_as_the_chapters_use_them() {
+    let Some(files) = game() else { return };
+    let mut e = in_ireland(files);
+    // `UDADA` = 1 (chapter 8): the move to view 8 without its video.
+    e.run_command(b"(udada=1)");
+    let evs = move_7_to_8(&mut e, 100.0);
+    assert_eq!(e.place(), ("bigile1.wam", 8));
+    assert!(!evs.iter().any(|x| matches!(x, Event::VideoStart { .. })));
+    // Without it, the video plays.
+    e.run_command(b"(udada=0)");
+    let evs = move_7_to_8(&mut e, 200.0);
+    assert!(evs.iter().any(
+        |x| matches!(x, Event::VideoStart { name, frames: Some(_) } if name == "ir007008.HNM")
+    ));
+    // `NEXTVUE` (chapters 15, 24): the next move click enters that view
+    // instead of the zone's, and the variable goes back to 0.
+    e.run_command(b"(nextvue=106)");
+    move_7_to_8(&mut e, 300.0);
+    assert_eq!(e.place(), ("bigile1.wam", 106));
+    assert_eq!(var(&e, "NEXTVUE"), 0);
+}
