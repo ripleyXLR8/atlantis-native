@@ -4,6 +4,12 @@
 //! Escape and a save through the menus over the open bar, the save loaded
 //! again through the load page, then continued from the player menu of a
 //! new run (the music started again from the save, at a drawn mark).
+//! Then a Tibet game from the start-up intro, played with the mouse only:
+//! the walk to the shaman, his subjects asked through the subject menu,
+//! a boat taken, the walk to the hut, the boat picked from the bag bar
+//! and laid on its zone (the mandala hook, chapter 75's section, the
+//! film, the trip to the boat's world refused), the puzzle's state kept
+//! by a save and a load.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the test is skipped. The saves go to a
@@ -15,7 +21,9 @@ use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
 use atlantis2_engine::bag::{UiBank, UiDraw};
+use atlantis2_engine::engine::MANDALAS;
 use atlantis2_engine::menu::{state, PageKind};
+use atlantis2_engine::subjects::cell;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
 fn game() -> Option<A2Files> {
@@ -49,6 +57,9 @@ struct Run {
     e: Engine,
     pass: u64,
     screen: Vec<u16>,
+    /// Added to the click times of [`Run::tap`]: clicks far apart, never
+    /// a double click.
+    gap: f64,
 }
 
 impl Run {
@@ -68,6 +79,7 @@ impl Run {
             e,
             pass: 0,
             screen: vec![0; 640 * 480],
+            gap: 0.0,
         }
     }
 
@@ -151,8 +163,29 @@ impl Run {
     }
 }
 
-fn scratch() -> PathBuf {
-    let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("a2-flow");
+/// Each answer against the original's (`tests/golden/subjects.txt`'s
+/// `ask` rows): when the golden asked `character` about that subject, the
+/// dialog is one it started for it (an answer can depend on what was asked
+/// before; a subject the golden never asked is not checked).
+fn answers_as_the_original(character: i32, asked: &[(i32, u32)]) {
+    let golden = include_str!("golden/subjects.txt");
+    for &(value, dialog) in asked {
+        let head = format!("ask {{0:{character}}} ");
+        let tail = format!(" value {value} |");
+        let rows: Vec<&str> = golden
+            .lines()
+            .filter(|l| l.starts_with(&head) && l.contains(&tail))
+            .collect();
+        let start = format!("AtlDial_start({dialog})");
+        assert!(
+            rows.is_empty() || rows.iter().any(|l| l.contains(&start)),
+            "{character} {value}: dialog {dialog}, the original's {rows:?}"
+        );
+    }
+}
+
+fn scratch(name: &str) -> PathBuf {
+    let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     d
@@ -163,7 +196,7 @@ fn player_menu_new_game_bag_save_and_load() {
     if game().is_none() {
         return;
     }
-    let dir = scratch();
+    let dir = scratch("a2-flow");
     let mut r = Run::new(&dir);
 
     // The player menu; player 4 has no save: a new game, its opening film.
@@ -254,4 +287,409 @@ fn player_menu_new_game_bag_save_and_load() {
         .events
         .iter()
         .any(|e| matches!(e, Event::Music { music: m, .. } if *m == music)));
+}
+
+/// The mouse play of the Tibet game: walks, sprites, subjects, the bar.
+impl Run {
+    /// A left click far from the last one (never a double click).
+    fn tap(&mut self) {
+        self.gap += 10.0;
+        self.e.click(self.now() + self.gap);
+    }
+
+    /// One pass, its events taken.
+    fn events(&mut self) -> Vec<Event> {
+        self.step();
+        std::mem::take(&mut self.e.events)
+    }
+
+    /// The mouse moved to put the pointer at (x, y).
+    fn point(&mut self, x: i32, y: i32) {
+        let (px, py) = self.e.pointer;
+        self.e.mouse_motion(x - px, y - py);
+    }
+
+    fn var(&self, name: &str) -> i32 {
+        self.e.script_state().unwrap().var(name).unwrap()
+    }
+
+    /// The value of subject `name` (its `defnames.con` parameter).
+    fn subject(&self, name: &str) -> i32 {
+        let s = self.e.script_state().unwrap();
+        s.names.param(defnames::SUJETS, name.as_bytes())
+    }
+
+    fn id(&self, section: usize, name: &str) -> i32 {
+        let s = self.e.script_state().unwrap();
+        s.names.id(section, name.as_bytes()).unwrap() as i32
+    }
+
+    /// The move zone of the current view that leads to view `to`.
+    fn zone_to(&self, to: u32) -> usize {
+        let view = self.e.place().1;
+        let zones = &self.e.wam().view(view).unwrap().zones;
+        zones
+            .iter()
+            .position(|z| z.kind == 1 && z.value == to as i32)
+            .unwrap_or_else(|| panic!("no move from view {view} to {to}"))
+    }
+
+    /// Turns the view onto zone `zone` (the centre on it).
+    fn aim(&mut self, zone: usize) {
+        let view = self.e.place().1;
+        let (yaw, pitch) = self.e.zone_aim(view, zone).unwrap();
+        self.e.camera.enter(yaw, pitch);
+        self.step();
+        assert_eq!(self.e.centre_zone().map(|(i, _)| i), Some(zone));
+    }
+
+    /// A click on the move zone to view `to`, the transition video
+    /// clicked away; a dialog the arrival plays listened to.
+    fn walk(&mut self, to: u32) {
+        self.wait(15);
+        let zone = self.zone_to(to);
+        self.aim(zone);
+        self.tap();
+        for _ in 0..600 {
+            let evs = self.events();
+            if evs.iter().any(|e| {
+                matches!(
+                    e,
+                    Event::VideoStart {
+                        frames: Some(_),
+                        ..
+                    }
+                )
+            }) {
+                self.wait(15);
+                self.tap();
+            }
+            if evs.iter().any(|e| matches!(e, Event::ArrivalScan(_))) {
+                assert_eq!(self.e.place(), ("tibet.wam", to));
+                self.wait(4);
+                if self.e.loop_type == LoopType::Dialog {
+                    self.listen();
+                }
+                assert_eq!(self.e.loop_type, LoopType::Warp);
+                return;
+            }
+        }
+        panic!("no arrival in view {to}");
+    }
+
+    /// Turns the view as a player does until a sprite is under the centre
+    /// and clicks it; the events of the click when `done` holds on them.
+    fn click_sprite(&mut self, done: impl Fn(&Event) -> bool) -> Vec<Event> {
+        for pitch in (-8..=8).map(|p| p * 5) {
+            for yaw in (0..72).map(|y| y * 5 - 180) {
+                let (y, p) = ((yaw as f32).to_radians(), (pitch as f32).to_radians());
+                self.e.camera.enter(y, p);
+                self.step();
+                if self.e.sprite_under_centre().1 == 0 {
+                    continue;
+                }
+                self.tap();
+                let evs = self.events();
+                if evs.iter().any(&done) {
+                    return evs;
+                }
+                // Another character's menu: closed by a click outside.
+                if self.e.subject_menu.open {
+                    self.point(0, 0);
+                    self.tap();
+                    self.step();
+                }
+            }
+        }
+        panic!("no sprite answers in view {}", self.e.place().1);
+    }
+
+    /// The running dialog played to its end, a click every 20 passes.
+    fn listen(&mut self) -> Vec<Event> {
+        let mut all = Vec::new();
+        for n in 0..20_000 {
+            if n % 20 == 19 {
+                self.tap();
+            }
+            let evs = self.events();
+            let end = evs.contains(&Event::DialogEnd);
+            all.extend(evs);
+            if end {
+                self.wait(4);
+                return all;
+            }
+        }
+        panic!("the dialog does not end");
+    }
+
+    /// Asks `character` once about each subject his menu offers (the list
+    /// changes with the answers), each through the menu: a click on him,
+    /// the pointer on the subject's cell, a click, the dialog listened to.
+    /// An object an answer puts in the hand goes back to the bag (the bar
+    /// opened and closed). The subjects and their dialogs, in order.
+    fn ask_all(&mut self, character: i32) -> Vec<(i32, u32)> {
+        let mut asked: Vec<(i32, u32)> = Vec::new();
+        loop {
+            let evs = self.click_sprite(|e| matches!(e, Event::SubjectMenu { .. }));
+            let s = self.e.script_state().unwrap();
+            let list = s.subjects.list(character);
+            assert!(evs.contains(&Event::SubjectMenu {
+                character,
+                count: list.len() as i32
+            }));
+            let Some(i) = list
+                .iter()
+                .position(|e| asked.iter().all(|a| a.0 != e.value))
+            else {
+                // All asked: a click outside closes the menu.
+                self.point(100, 100);
+                self.step();
+                self.tap();
+                let evs = self.events();
+                assert!(evs.contains(&Event::Subject {
+                    character,
+                    value: None
+                }));
+                assert!(!self.e.subject_menu.open);
+                return asked;
+            };
+            let value = list[i].value;
+            let (x, y) = cell(list.len() as i32, i as i32);
+            self.point(x + 31, y + 31);
+            self.step();
+            self.tap();
+            let evs = self.events();
+            assert!(evs.contains(&Event::Subject {
+                character,
+                value: Some(value)
+            }));
+            assert!(!self.e.subject_menu.open);
+            let number = evs
+                .iter()
+                .find_map(|e| match e {
+                    Event::DialogStart {
+                        number,
+                        started: true,
+                    } => Some(*number),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("subject {value}: no dialog"));
+            asked.push((value, number));
+            self.listen();
+            assert_eq!(self.e.loop_type, LoopType::Warp);
+            assert_eq!((self.var("CLICPERSO"), self.var("SUJET")), (0, -2));
+            if self.var("OBJETENMAIN") != 0 {
+                self.e.right_click();
+                self.step();
+                self.e.right_click();
+                self.step();
+                assert_eq!(self.var("OBJETENMAIN"), 0);
+            }
+            assert!(asked.len() < 16, "the subjects never run out");
+        }
+    }
+
+    /// The bag bar opened with the right button and object `id`'s cell
+    /// clicked: the object in hand, the bar closed.
+    fn pick(&mut self, id: i32) {
+        self.e.right_click();
+        assert!(self.e.bar.open);
+        self.step();
+        let bag = self.e.bag_entries();
+        let k = self
+            .e
+            .bar
+            .shown
+            .iter()
+            .position(|&n| bag[n].id == id)
+            .expect("the object in a cell of the bar");
+        self.point(40 + 80 * k as i32, 440);
+        self.step();
+        self.tap();
+        self.step();
+        assert!(!self.e.bar.open);
+        assert_eq!(self.var("OBJETENMAIN"), id);
+    }
+}
+
+#[test]
+fn a_tibet_game_asks_the_shaman_and_lays_a_mandala() {
+    if game().is_none() {
+        return;
+    }
+    let dir = scratch("a2-flow-tibet");
+    let mut r = Run::new(&dir);
+
+    // The start-up: the player menu under the intro; a double click ends
+    // every video, the player page is back.
+    r.e.open_player_menu();
+    r.e.start_intro();
+    assert!(r.e.intro_playing());
+    r.wait(30);
+    r.e.click(r.now());
+    r.e.click(r.now() + 0.1);
+    for _ in 0..60 {
+        if r.e.loop_type == LoopType::Menu {
+            break;
+        }
+        r.step();
+    }
+    assert!(!r.e.intro_playing());
+    assert_eq!(r.page(), Some(PageKind::Player));
+
+    // A new game, its film clicked away, the first click (chapter 75).
+    r.press_widget("b_ter.spr");
+    assert_eq!(r.e.loop_type, LoopType::Video);
+    r.wait(30);
+    r.tap();
+    for _ in 0..600 {
+        r.step();
+        if r.e.loop_type == LoopType::Warp {
+            break;
+        }
+    }
+    r.wait(15);
+    assert_eq!(r.e.place(), ("tibet.wam", 2));
+    r.tap();
+    r.wait(15);
+    assert_eq!(r.e.script_state().unwrap().chapter, 75);
+
+    // To the shaman of view 7 (his greeting on the first arrival), then
+    // everything he can be asked.
+    for to in 3..=7 {
+        r.walk(to);
+    }
+    let shaman = r.id(defnames::PERSONNAGES, "SHAMAN");
+    // His subjects, in the order the menu offers them, and the dialogs
+    // their answers play.
+    let asked = r.ask_all(shaman);
+    let want: Vec<(i32, u32)> = [
+        ("SHAMAN", 361),
+        ("TATOUAGE", 369),
+        ("CRISTAL", 364),
+        ("HEROS_TIBET", 362),
+    ]
+    .iter()
+    .map(|&(n, d)| (r.subject(n), d))
+    .collect();
+    assert_eq!(asked, want);
+    answers_as_the_original(shaman, &asked);
+    // A subject asked and still offered is drawn at 50 % (a flag not 1).
+    let s = r.e.script_state().unwrap();
+    assert!(s
+        .subjects
+        .list(shaman)
+        .iter()
+        .any(|e| e.flag != 1 && asked.iter().any(|a| a.0 == e.value)));
+
+    // View 8: its boat taken with a click.
+    r.walk(8);
+    let evs = r.click_sprite(|e| matches!(e, Event::Take { .. }));
+    let boat = evs
+        .iter()
+        .find_map(|e| match e {
+            Event::Take { id } => Some(*id),
+            _ => None,
+        })
+        .unwrap();
+    let (_, zone, order) = *MANDALAS
+        .iter()
+        .find(|(object, _, _)| r.id(defnames::OBJETS, object) == boat)
+        .expect("a boat of the mandala puzzle");
+    assert!(r.e.bag_entries().iter().any(|b| b.id == boat));
+    // Into the hut, the shaman of view 10 asked too.
+    r.walk(9);
+    r.walk(10);
+    let shaman10 = r.id(defnames::PERSONNAGES, "SHAMANW10");
+    let asked10 = r.ask_all(shaman10);
+    let want: Vec<(i32, u32)> = [
+        ("TATOUAGE", 369),
+        ("CRISTAL", 364),
+        ("HEROS_TIBET", 362),
+        ("MORCEAU_MANDALA", 365),
+        ("MANDALA", 363),
+    ]
+    .iter()
+    .map(|&(n, d)| (r.subject(n), d))
+    .collect();
+    assert_eq!(asked10, want);
+    answers_as_the_original(shaman10, &asked10);
+
+    // The boat picked from the bar, the centre on its zone, a click: the
+    // hook (the laid sound, the count and the order), chapter 75's
+    // section (its film), the trip to the boat's world refused.
+    assert_eq!(r.var("NbMandalaPosed"), 0);
+    r.pick(boat);
+    let zi =
+        r.e.wam()
+            .view(10)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.name.as_deref() == Some(zone))
+            .unwrap();
+    r.aim(zi);
+    r.tap();
+    let mut evs = r.events();
+    assert!(evs
+        .iter()
+        .any(|e| matches!(e, Event::PuzzleHook { zone, .. } if *zone == zi)));
+    assert!(evs.contains(&Event::Sound("sound400.apc".into())));
+    assert_eq!(r.e.loop_type, LoopType::Video);
+    r.wait(30);
+    r.tap();
+    for _ in 0..600 {
+        evs.extend(r.events());
+        if r.e.loop_type == LoopType::Warp {
+            break;
+        }
+    }
+    r.wait(4);
+    evs.extend(std::mem::take(&mut r.e.events));
+    assert!(evs.iter().any(|e| matches!(e, Event::WorldNotPorted(_))));
+    assert_eq!(r.e.place(), ("tibet.wam", 10));
+    assert_eq!(r.var("MONDE"), 5);
+    let pose = format!("pose{}", zone[5..].to_ascii_lowercase());
+    assert_eq!(
+        (r.var("NbMandalaPosed"), r.var(order), r.var(&pose)),
+        (1, 1, 1)
+    );
+    // The boat has left the bag, the hand is empty, the laid mandala is
+    // shown in the hut.
+    assert!(!r.e.bag_entries().iter().any(|b| b.id == boat));
+    assert_eq!(r.var("OBJETENMAIN"), 0);
+    let laid = r.id(defnames::OBJETS, &format!("MANDALA_{}1", &zone[5..7]));
+    assert!(r.e.anim.slots.iter().any(|s| s.id == laid && s.active));
+
+    // Saved through the menus, loaded by a new run's player menu: the
+    // chapter, the place, the puzzle's state, the bag and both shamans'
+    // subjects are back (the clocks run on in the menus, and the load
+    // makes the view current from none: `LASTVUE` is not compared).
+    let kept = |r: &Run| {
+        let s = r.e.script_state().unwrap();
+        format!(
+            "chapter {} place {:?} laid {} {} {} bag {:?} subjects {:?} {:?}",
+            s.chapter,
+            r.e.place(),
+            r.var("NbMandalaPosed"),
+            r.var(order),
+            r.var(&pose),
+            s.bag,
+            s.subjects.list(shaman),
+            s.subjects.list(shaman10),
+        )
+    };
+    let before = kept(&r);
+    r.disc_panel();
+    r.press_widget("a_save.spr");
+    r.press_widget("b_oui.spr");
+    assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
+    let mut r = Run::new(&dir);
+    r.e.open_player_menu();
+    r.wait(5);
+    r.press_widget("b_ter.spr");
+    assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
+    assert_eq!(kept(&r), before);
+    r.wait(30);
+    assert!(r.e.anim.slots.iter().any(|s| s.id == laid && s.active));
 }
