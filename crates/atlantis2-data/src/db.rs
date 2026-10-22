@@ -53,7 +53,10 @@ pub struct Mesh {
     pub uvs: [Vec<[f32; 2]>; 3],
     /// Faces per group (one group of every face in the heads).
     pub groups: Vec<u16>,
-    /// One value per corner: the corner's shared vertex.
+    /// One value per corner (record +0x16c), meaning unknown. It equals
+    /// `corners` in 22 of the 28 heads and differs in the other 6, where
+    /// some values exceed the vertex count; the heads' draw uses `corners`
+    /// (the original's run-time corner list equals `corners` in `h2s1.DB`).
     pub corner_vertices: Vec<u16>,
     pub vertex_normals: Vec<[f32; 3]>,
     /// Per-face planes (unit normal, d), version 6 and later.
