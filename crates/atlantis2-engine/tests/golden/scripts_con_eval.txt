@@ -1,0 +1,104 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# DefName_GetIdName (0x004105a0) indices `idx S NAME I`, GetParam (0x00410e50) `param1`,
+# and EvalCondition (0x00480fd0) on '/con' + COND + CRLF: truth, offset of the returned
+# pointer (-1 for none), vars[SACADOS] after it. State: flags 200, 205, 218 = 1,
+# NbMandalaPosed 6, Vue 10, ClicZone {4:52}, ClicPerso {0:2}, ObjetEnMain
+# {1:167}, time1 12, Sujet 6 for the `cond(sujet var 6)` rows then 7, {1:198}
+# put in the bag by FUN_00475610 before the `cond` rows (names given as tokens below).
+# state flag 200 1
+# state flag 205 1
+# state flag 218 1
+# state var 188 6
+# state var 12 10
+# state var 76 52
+# state var 10 2
+# state var 28 167
+# state var 78 12
+# state bag 198 5
+# state sujet 92 6 7
+# Names of defnames.con entries that are not strings of the executable are written
+# {S:I} (section, index; :l in lower case); the test fills them in from the game's file.
+# Stubbed, recorded with their arguments: logging (0x004816e0, 0x00401dc0, the warning
+# 0x00480c20 and the fatal 0x00480cd0, which returns), and every callee with an effect
+# outside the script tables: WAM load and view lookup / entry (fake view records), video
+# start, sound and music, dialog start / stop, CD and world change, camera turn and zoom,
+# message and picture viewers, credits, zone enabling, bag layout, the music step,
+# LoadCurrentChap and (set, tibet, tibet_scan) RunInit.
+idx 3 Chapter 0
+idx 3 flag 1
+idx 3 ClicZone 76
+idx 3 ClicPerso 10
+idx 3 Sujet 92
+idx 3 ObjetEnMain 28
+idx 3 sacados 88
+idx 3 Vue 12
+idx 3 ArriveeVue 4
+idx 3 Random 29
+idx 3 time1 78
+idx 3 NbMandalaPosed 188
+idx 3 {3:213} 213
+idx 3 ClicObjet 11
+idx 0 {0:0} 0
+idx 0 {0:1} 1
+idx 0 {0:2} 2
+idx 1 {1:198} 198
+idx 1 {1:167} 167
+idx 2 {2:45} 45
+idx 2 {2:47} 47
+idx 4 {4:52} 52
+idx 4 {4:57} 57
+idx 3 NO_SUCH_NAME 0 errors fatal:DefName_GetIdName: Nom de %s inconnu:%s
+param1 2 {2:45} 6
+param1 2 {2:47} 4
+param1 1 {1:198} 5
+param1 1 {1:167} 4
+param1 1 {1:53} 2
+cond(sujet var 6) '(sujet={2:45})' -> 1 ret=19
+cond(sujet var 6) '(sujet={2:47})' -> 0 ret=-1
+cond '(flag200=1)' -> 1 ret=15 sacados_var=0
+cond '(flag200=0)' -> 0 ret=-1 sacados_var=0
+cond '(flag201=0)' -> 1 ret=15 sacados_var=0
+cond '(FLAG200=1)' -> 1 ret=15 sacados_var=0
+cond '(Flag205!0)' -> 1 ret=15 sacados_var=0
+cond '(flag205=1)&(flag215=1)|(flag218=1)&(flag214=0)' -> 1 ret=51 sacados_var=0
+cond '(flag205=1)&(flag215=1)|(flag218=0)&(flag214=0)' -> 0 ret=-1 sacados_var=0
+cond '(flag215=1)|(flag218=1)' -> 1 ret=27 sacados_var=0
+cond '(flag218=1)|(flag215=1)' -> 1 ret=27 sacados_var=0
+cond '(flag215=1)|(flag216=1)' -> 0 ret=-1 sacados_var=0
+cond '(flag200=1)|(flag201=1)&(flag202=1)' -> 0 ret=-1 sacados_var=0
+cond '(flag200=0)|(flag201=1)&(flag202=0)' -> 0 ret=-1 sacados_var=0
+cond '(flag200=0)|(flag201=0)&(flag202=0)' -> 1 ret=39 sacados_var=0
+cond '(nbmandalaposed<6)' -> 0 ret=-1 sacados_var=0
+cond '(NbMandalaPosed=6)' -> 1 ret=22 sacados_var=0
+cond '(nbmandalaposed>5)' -> 1 ret=22 sacados_var=0
+cond '(nbmandalaposed!6)' -> 0 ret=-1 sacados_var=0
+cond '(vue=10)' -> 1 ret=12 sacados_var=0
+cond '(VUE=10)' -> 1 ret=12 sacados_var=0
+cond '(vue = 10)' -> 1 ret=14 sacados_var=0
+cond '(vue= 10)' -> 1 ret=13 sacados_var=0
+cond '(cliczone={4:52})' -> 1 ret=23 sacados_var=0
+cond '(cliczone={4:49})' -> 0 ret=-1 sacados_var=0
+cond '(cliczone=3)' -> 0 ret=-1 sacados_var=0
+cond '(clicperso={0:1})|(clicperso={0:2})' -> 1 ret=44 sacados_var=0
+cond '(clicperso={0:1})' -> 0 ret=-1 sacados_var=0
+cond '(sujet={2:45})' -> 0 ret=-1 sacados_var=0
+cond '(sujet={2:47})' -> 0 ret=-1 sacados_var=0
+cond '(sujet=7)' -> 1 ret=13 sacados_var=0
+cond '(objetenmain={1:167})' -> 1 ret=32 sacados_var=0
+cond '(objetenmain!{1:167})' -> 0 ret=-1 sacados_var=0
+cond '(objetenmain={1:198})' -> 0 ret=-1 sacados_var=0
+cond '(sacados={1:198})' -> 1 ret=26 sacados_var=5
+cond '(sacados=NOT_{1:198})' -> 0 ret=-1 sacados_var=5
+cond '(sacados={1:167})' -> 0 ret=-1 sacados_var=5
+cond '(sacados=NOT_{1:167})' -> 1 ret=32 sacados_var=4
+cond '(sacados=not_{1:167:l})' -> 1 ret=32 sacados_var=4
+cond '(time1>10)' -> 1 ret=14 sacados_var=4
+cond '(time1<10)' -> 0 ret=-1 sacados_var=4
+cond '(time1=12)' -> 1 ret=14 sacados_var=4
+cond '(flag200=1)(flag205=1)' -> 1 ret=26 sacados_var=4
+cond '(flag200=0)(flag205=1)' -> 0 ret=-1 sacados_var=4
+cond '(flag200=1)&(flag205=1) trailing' -> 1 ret=36 sacados_var=4
+cond '' -> 1 ret=4 sacados_var=4
+errors -

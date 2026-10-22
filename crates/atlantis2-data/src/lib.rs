@@ -8,8 +8,10 @@
 //! - [`files`]: the install folder and the four discs, with the disc rule
 //!   of the `MONDE` script variable;
 //! - [`wam`]: the `WAM V2.8` place files (views, moves, 3D click zones);
-//! - [`con`]: what a new game starts with, read from `chapi000.con`;
-//! - [`defnames`]: the names of `defnames.con` and their indices;
+//! - [`con`]: what a new game starts with, read from `chapi000.con`, and
+//!   the C number conversions of the CON interpreter;
+//! - [`defnames`]: `defnames.con`, the names the CON scripts and the places
+//!   use;
 //! - [`spw`]: the place animations drawn into the cube faces;
 //! - [`spr`]: the `SPRCRYO` sprite banks (cursors);
 //! - [`db`]: the `.db` 3D scenes (the dialog heads, the 3D puzzles);
@@ -30,6 +32,7 @@ pub mod spw;
 pub mod tga;
 pub mod wam;
 
+pub use defnames::DefNames;
 pub use exe::{identify, Build, ExeError};
 pub use files::{A2Files, Folder};
 pub use wam::Wam;

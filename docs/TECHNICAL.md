@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -780,6 +780,24 @@ view 4.
   yet), and the `voixoff0` and `cinema` lines' pictures. The lines, the
   video frames and their numbers, the composed frames, every subtitle's
   layout and the fades are the original's (tests/dialogs.rs).
+- **Scripts:** the chapter scripts `scenar\chapiNNN.con` keep the first
+  game's text language but not its interpreter: names come from
+  `scenar\defnames.con` (five sections, looked up per key:
+  `crates/atlantis2-data/src/defnames.rs`), compares are signed, a section
+  has a head condition and sub-conditions, and the text is walked byte by
+  byte with the original's quirks (a `#/set` before an empty line runs,
+  `KEY=++` stores 0, two kinds of line run twice in `/INIT`). The
+  interpreter (`crates/atlantis2-engine/src/script/`) is transcribed walk
+  by walk: conditions, the `/set` handler with the subjects, the bag, the
+  show/hide table and the hand, the scans, `/INIT`, the timers, the 15 Hz
+  clocks (`TIME1` and `TIME2` count seconds of real time; at each second
+  `RANDOM` takes the 15 Hz tick count & 0xff) and when
+  each scan runs in the panorama frame. What a command does outside those
+  tables (a place, a view, a film, a dialog, music, a disc, a menu) goes
+  through its `Host` trait, one method per function of the original, so
+  that navigation, videos and dialogs plug in as they come. The engine
+  does not run the interpreter yet: a new game still reads its start from
+  `/INIT` directly.
 
 ## Tests
 
@@ -813,12 +831,14 @@ installation, for the tests of those builds. For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
 copies); the expected frames, matrices, zone picks, heads, lip-sync
-weights, dialog lines, dialog frames, subtitle layouts and music fades
-come from the original `atlantis2.exe` run under emulation (Tibet's moves
-pass by pass, the place animations tick by tick, the screen centre and
-the clicks on sprites pass by pass with the texel under the centre given,
-every SPW frame of Tibet and the first of every other file, every
-`AFF_SPR` of the installed banks):
+weights, dialog lines, dialog frames, subtitle layouts, music fades and
+script results come from the original `atlantis2.exe` run under emulation
+(Tibet's moves pass by pass, the place animations tick by tick, the
+screen centre and the clicks on sprites pass by pass with the texel under
+the centre given, every SPW frame of Tibet and the first of every other
+file, every `AFF_SPR` of the installed banks; names of `defnames.con`
+entries are written by section and index in the script files and filled
+in from the game's file by the tests):
 
 ```sh
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \

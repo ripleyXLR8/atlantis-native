@@ -5,8 +5,9 @@
 //! (@ 0x00484040): its `/set(KEY=value)` lines choose the world (`monde`),
 //! the place (`changewam`), the arrival angles (`ANGLEWARPX` /
 //! `ANGLEWARPY`, degrees) and the view (`vue`), then play the opening
-//! cinematic. Only those keys are read here; the script interpreter comes
-//! later.
+//! cinematic. Only those keys are read here, for the engine's quick start;
+//! the interpreter itself is `atlantis2_engine::script`, which takes the C
+//! conversions it needs ([`atoi`], [`atof`]) from here.
 
 /// The `/set` lines of the `/INIT` section (up to `/FININIT`) of a CON
 /// script, as (key, value), in order. Lines starting with `#` are comments.
@@ -50,18 +51,22 @@ pub struct NewGame {
     pub pitch_deg: i32,
 }
 
-/// C `atoi` (the `/set` handler converts values with it).
-fn atoi(s: &str) -> i32 {
-    let s = s.trim_start();
-    let (neg, digits) = match s.as_bytes().first() {
-        Some(b'-') => (true, &s[1..]),
-        Some(b'+') => (false, &s[1..]),
-        _ => (false, s),
-    };
-    let v = digits
-        .bytes()
-        .take_while(u8::is_ascii_digit)
-        .fold(0i32, |v, d| {
+/// MSVC's `atoi` (@ 0x005adbe4, the one the interpreter calls): white
+/// space (tab to CR, space), one sign, then digits, accumulated with
+/// wrap-around; anything else ends the number.
+pub fn atoi(s: &[u8]) -> i32 {
+    let mut i = 0;
+    while matches!(s.get(i), Some(9..=13 | b' ')) {
+        i += 1;
+    }
+    let neg = s.get(i) == Some(&b'-');
+    if matches!(s.get(i), Some(b'-' | b'+')) {
+        i += 1;
+    }
+    let v = s[i.min(s.len())..]
+        .iter()
+        .take_while(|c| c.is_ascii_digit())
+        .fold(0i32, |v, &d| {
             v.wrapping_mul(10).wrapping_add(i32::from(d - b'0'))
         });
     if neg {
@@ -71,6 +76,51 @@ fn atoi(s: &str) -> i32 {
     }
 }
 
+/// MSVC's `atof` (@ 0x005ae620): white space, a sign, digits with one
+/// decimal point, an optional exponent; 0 when there is no number. The
+/// value is the nearest double (the CRT's conversion is exact for the
+/// short decimals the scripts use).
+pub fn atof(s: &[u8]) -> f64 {
+    let mut i = 0;
+    while matches!(s.get(i), Some(9..=13 | b' ')) {
+        i += 1;
+    }
+    let start = i;
+    if matches!(s.get(i), Some(b'-' | b'+')) {
+        i += 1;
+    }
+    let digits = |i: &mut usize| {
+        let b = *i;
+        while s.get(*i).is_some_and(u8::is_ascii_digit) {
+            *i += 1;
+        }
+        *i - b
+    };
+    let mut n = digits(&mut i);
+    if s.get(i) == Some(&b'.') {
+        i += 1;
+        n += digits(&mut i);
+    }
+    if n == 0 {
+        return 0.0;
+    }
+    let mantissa_end = i;
+    if matches!(s.get(i), Some(b'e' | b'E')) {
+        let mut j = i + 1;
+        if matches!(s.get(j), Some(b'-' | b'+')) {
+            j += 1;
+        }
+        if digits(&mut j) > 0 {
+            i = j;
+        }
+    }
+    let end = if i > mantissa_end { i } else { mantissa_end };
+    std::str::from_utf8(&s[start..end])
+        .ok()
+        .and_then(|t| t.parse().ok())
+        .unwrap_or(0.0)
+}
+
 impl NewGame {
     /// Reads the start from chapter 0's text (keys in any case; the last
     /// line of a key wins). `None` when the place or the view is missing.
@@ -78,11 +128,11 @@ impl NewGame {
         let (mut monde, mut wam, mut view, mut yaw, mut pitch) = (0, None, None, 0, 0);
         for (k, v) in init_sets(text) {
             match k.to_ascii_uppercase().as_str() {
-                "MONDE" => monde = atoi(&v),
+                "MONDE" => monde = atoi(v.as_bytes()),
                 "CHANGEWAM" => wam = Some(v),
-                "VUE" => view = Some(atoi(&v) as u32),
-                "ANGLEWARPX" => yaw = atoi(&v),
-                "ANGLEWARPY" => pitch = atoi(&v),
+                "VUE" => view = Some(atoi(v.as_bytes()) as u32),
+                "ANGLEWARPX" => yaw = atoi(v.as_bytes()),
+                "ANGLEWARPY" => pitch = atoi(v.as_bytes()),
                 _ => {}
             }
         }
@@ -122,8 +172,16 @@ mod tests {
             NewGame::from_chapter0("/INIT\n/set(vue=2)\n/FININIT\n"),
             None
         );
-        assert_eq!(atoi(" -12x"), -12);
-        assert_eq!(atoi("-2147483648"), i32::MIN);
+        assert_eq!(atoi(b" -12x"), -12);
+        assert_eq!(atoi(b"-2147483648"), i32::MIN);
+        assert_eq!(atoi(b"\r\n+7)"), 7);
+        assert_eq!(atoi(b"+)"), 0);
+        assert_eq!(atoi(b"12abc"), 12);
+        assert_eq!(atof(b"1.5)"), 1.5);
+        assert_eq!(atof(b" -0.25,x"), -0.25);
+        assert_eq!(atof(b"2e1"), 20.0);
+        assert_eq!(atof(b"3e)"), 3.0);
+        assert_eq!(atof(b".)"), 0.0);
     }
 
     #[test]

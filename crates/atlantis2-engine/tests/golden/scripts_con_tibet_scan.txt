@@ -1,0 +1,31 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# CtrlScenarIN on chapi075.con (MD5 4c39855475b5c123725207d39ed760cb) from a cleared state
+# with view 10 current: `caseN vI=V... fF=V... : lines L,... resumes=R calls=...` gives the
+# variables (vars[I] = V) and flags set before the scan, the line numbers of the /set lines
+# the handler ran, how often the section was resumed after a dialog or a cinematic (as the
+# end of those loops does, FUN_00483f90 at the resume point) and the stubbed calls.
+# Stubbed, recorded with their arguments: logging (0x004816e0, 0x00401dc0, the warning
+# 0x00480c20 and the fatal 0x00480cd0, which returns), and every callee with an effect
+# outside the script tables: WAM load and view lookup / entry (fake view records), video
+# start, sound and music, dialog start / stop, CD and world change, camera turn and zoom,
+# message and picture viewers, credits, zone enabling, bag layout, the music step,
+# LoadCurrentChap and (set, tibet, tibet_scan) RunInit.
+case1 v4=7 : lines 14,15 resumes=1 calls=AtlDial_start,AtlMuzik_Volume
+case2 v4=7 v200=1 : lines - resumes=0 calls=
+case3 v4=10 : lines 294 resumes=0 calls=
+case4 f260=1 : lines 7,8,9,10,11 resumes=1 calls=AtlDial_start,AtlMuzik_Volume
+case5 v76=52 v28=53 : lines 116,117,118,119,120,121,122,123,124,125,126,127,128,129 resumes=1 calls=Interp_SetMonde,AtlMuzik_Stop,AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWarp_SetAngleXNow,AtlWam_FindView,AtlWarp_EnterView,AtlMuzik_Del,AtlMuzik_Del,AtlMuzik_Load,LoadCurrentChap,RunInit
+case6 v76=52 v132=1 : lines 43,44,45,46,47,48,49,50,51,52,53,54 resumes=1 calls=Interp_SetMonde,AtlMuzik_Stop,AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWarp_SetAngleXNow,AtlWam_FindView,AtlWarp_EnterView,AtlMuzik_Del,AtlMuzik_Del,AtlMuzik_Load,LoadCurrentChap,RunInit
+case7 v76=52 v132=1 f71=2 : lines 56,57,58,59,60,61,62,63,64,65 resumes=0 calls=Interp_SetMonde,AtlWam_Load,AtlWarp_SetAngleXNow,AtlWam_FindView,AtlWarp_EnterView,AtlMuzik_Del,AtlMuzik_Del,AtlMuzik_Load,LoadCurrentChap,RunInit
+case8 v76=52 v132=1 f71=1 : lines - resumes=0 calls=
+case9 v76=57 v28=167 v132=1 v133=1 v134=1 v129=1 v130=1 v131=1 : lines 180,181,182,183,184,185 resumes=1 calls=AtlMuzik_Stop,Interp_SetMonde,AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWam_FindView,AtlWarp_EnterView,LoadCurrentChap,RunInit
+case10 v10=1 v92=6 : lines 199,200,201 resumes=1 calls=AtlDial_start,AtlMuzik_Volume
+case11 v10=2 v92=10 : lines 203,204,205,206,207,208,209,210,211,212,213,214,215 resumes=1 calls=AtlDial_start,AtlMuzik_Volume,Inventaire_Layout,Inventaire_Step,Inventaire_Layout,Inventaire_Step,Inventaire_Layout,Inventaire_Step,Inventaire_Layout,Inventaire_Step
+case12 v10=1 v92=4 : lines 227 resumes=1 calls=AtlDial_start,AtlMuzik_Volume
+case13 v10=1 v92=4 f205=1 : lines 229 resumes=1 calls=AtlDial_start,AtlMuzik_Volume
+case14 v10=1 v92=4 v188=6 f214=1 f205=1 f215=1 : lines 237,238 resumes=1 calls=AtlDial_start,AtlMuzik_Volume
+case15 v10=1 v92=12 : lines 270,271,272 resumes=1 calls=AtlDial_start,AtlMuzik_Volume
+case16 v213=1 : lines 26,27,28,29,30,31,32,33,34 resumes=1 calls=AtlMuzik_Volume,AtlSound_CinemaApc,AtlHnm_start,AtlWam_Load,AtlWam_FindView,AtlWarp_EnterView,LoadCurrentChap,RunInit
+errors -

@@ -10,6 +10,9 @@
 //! the speaker's body video ([`hnm_stream`]) with the 3D head ([`head`],
 //! [`raster3d`]) and its lip-sync ([`lipsync`]), the subtitles
 //! ([`subtitle`]), the reverse shots and the music ducked.
+//! The CON interpreter ([`script`]) runs the chapter scripts as the
+//! original does, its effects outside the script tables going through
+//! [`script::Host`], which the engine implements.
 
 #![forbid(unsafe_code)]
 
@@ -25,6 +28,7 @@ pub mod lipsync;
 pub mod look;
 pub mod png;
 pub mod raster3d;
+pub mod script;
 pub mod sound;
 pub mod subtitle;
 pub mod turn;
@@ -33,4 +37,5 @@ pub mod warp;
 pub use camera::Camera;
 pub use engine::{CentreDraw, CursorBank, Engine, EngineError, Event, LoopType, ScanVars};
 pub use fpu::Fpu;
+pub use script::Script;
 pub use warp::{Renderer, Variant};

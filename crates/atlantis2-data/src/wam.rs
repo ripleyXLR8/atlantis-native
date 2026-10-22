@@ -470,17 +470,17 @@ impl Wam {
     /// `#ZONES_CLIC#` (@ 0x00410020). A name not in the file stops the
     /// original; here it is logged and the file's value kept.
     pub fn apply_defnames(&mut self, names: &crate::defnames::DefNames) {
-        use crate::defnames::Section;
+        use crate::defnames::{OBJETS, PERSONNAGES, ZONES_CLIC};
         for e in &mut self.entities {
             let section = match e.kind {
-                1 => Section::Characters,
-                2 => Section::Objects,
-                3 => Section::Zones,
+                1 => PERSONNAGES,
+                2 => OBJETS,
+                3 => ZONES_CLIC,
                 _ => continue,
             };
-            match names.index(section, &e.con_name) {
-                Some(i) => e.index = i as u32,
-                None => log::warn!("defnames.con: no {:?} {}", section, e.con_name),
+            match names.id(section, e.con_name.as_bytes()) {
+                Ok(i) => e.index = i as u32,
+                Err(err) => log::warn!("defnames.con: {err}"),
             }
         }
         for z in self
@@ -491,9 +491,9 @@ impl Wam {
             .filter(|z| z.kind == 3)
         {
             let name = z.name.clone().unwrap_or_default();
-            match names.index(Section::Zones, &name) {
-                Some(i) => z.value = i as i32,
-                None => log::warn!("defnames.con: no zone {name}"),
+            match names.id(ZONES_CLIC, name.as_bytes()) {
+                Ok(i) => z.value = i as i32,
+                Err(err) => log::warn!("defnames.con: {err}"),
             }
         }
     }

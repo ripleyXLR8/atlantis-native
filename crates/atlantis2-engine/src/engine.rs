@@ -9,7 +9,7 @@
 //! and the cursor. The turn of a move is counted in frames.
 
 use atlantis2_data::con::NewGame;
-use atlantis2_data::defnames::{DefNames, Section};
+use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::dialog::{FontTxt, World};
 use atlantis2_data::spr::{SprBank, Target};
 use atlantis2_data::spw::{FaceBox, Spw};
@@ -403,7 +403,10 @@ impl Engine {
         );
         files.set_monde(start.monde);
         let names = match files.read(Folder::Scenar, "defnames.con") {
-            Some(d) => DefNames::parse(&d),
+            Some(d) => DefNames::parse(&d).unwrap_or_else(|e| {
+                log::warn!("{e}");
+                DefNames::default()
+            }),
             None => {
                 log::warn!("scenar\\defnames.con not found");
                 DefNames::default()
@@ -560,7 +563,7 @@ impl Engine {
         for e in &self.wam.entities {
             for s in e.state_records().filter(|s| s.view == view) {
                 let sprite = if e.kind == 2 {
-                    self.names.param(Section::Objects, &e.con_name)
+                    self.names.param(defnames::OBJETS, e.con_name.as_bytes())
                 } else {
                     0
                 };
@@ -1052,13 +1055,14 @@ impl Engine {
 
     fn name_of(&self, section: u8, id: i32) -> String {
         let s = if section == 0 {
-            Section::Characters
+            defnames::PERSONNAGES
         } else {
-            Section::Objects
+            defnames::OBJETS
         };
-        self.names
-            .name(s, id as usize)
-            .map_or_else(|| id.to_string(), str::to_string)
+        self.names.name(s, id as usize).map_or_else(
+            || id.to_string(),
+            |n| String::from_utf8_lossy(n).into_owned(),
+        )
     }
 
     /// FUN_0049ca80: a click on the zone under the centre.

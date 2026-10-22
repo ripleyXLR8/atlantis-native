@@ -1,0 +1,11 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# RunInit (0x00484040) on the synthetic chapter below (| = CRLF): the flags 1..13 set.
+# chapter: /INIT|/set(flag1=1)|/010|/con(flag2=1)|/set(flag3=1)|/set(flag4=1)|/011|/con(flag5=1)|/set(flag6=1)|#/set(flag7=1)|/set(flag8=1)|/000|/set(flag11=1)|/FININIT|/001|/con(flag9=1)|/set(flag10=1)|/000|
+init none: set flags 1,11
+init f2: set flags 1,3,4,11
+init f5: set flags 1,6,8,11
+init f2+f5: set flags 1,3,4,6,8,11
+init f9: set flags 1,11
+errors -
