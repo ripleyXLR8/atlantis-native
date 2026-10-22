@@ -804,14 +804,19 @@ fn checkpoints_written_and_loaded() {
                 // Another state, then the reload.
                 e.inventory.push(300);
                 e.vars.set("gardecel", 77);
+                // The follower-talk flag 0x00496144, left set by a portrait
+                // click with an object in hand: the checkpoint reader does
+                // not touch it.
+                e.guests.talk = true;
                 e.load_checkpoint(&mut s, true).await;
                 o.borrow_mut().push(format!(
-                    "loaded chapter {} place {:?} inventory {:?} lastvue {} chapter var {}",
+                    "loaded chapter {} place {:?} inventory {:?} lastvue {} chapter var {} talk {}",
                     e.chapter,
                     e.next_place_id,
                     e.inventory,
                     e.last_vue,
-                    e.vars.get("chapter")
+                    e.vars.get("chapter"),
+                    e.guests.talk
                 ));
             })
         },
@@ -836,7 +841,7 @@ fn checkpoints_written_and_loaded() {
     assert_eq!(
         out[1],
         format!(
-            "loaded chapter 2 place Some({}) inventory [257, 259] lastvue {} chapter var 2",
+            "loaded chapter 2 place Some({}) inventory [257, 259] lastvue {} chapter var 2 talk true",
             cp.place_id, cp.last_vue
         )
     );

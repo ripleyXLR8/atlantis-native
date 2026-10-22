@@ -240,8 +240,11 @@ impl Engine {
         self.current_place = None;
         self.current_place_id = None;
         self.inventory = cp.inventory.iter().map(|r| r.id).collect();
+        // The follower-talk flag 0x00496144 is not in the checkpoint and the
+        // reader leaves it as it was (no reference in `FUN_0042de5c`).
         let mut g = Guests {
             portrait_y: self.guests.portrait_y,
+            talk: self.guests.talk,
             ..Guests::default()
         };
         g.count = usize::from(cp.guest_count).min(CHECKPOINT_GUESTS);
