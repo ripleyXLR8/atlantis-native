@@ -1553,13 +1553,11 @@ event, the gong's way back to Tibet) into `china-*.png`.
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
-  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
-  (the playing byte: the slots have it since the figurines,
-  `Slot::playing`, but the key does not write it yet; to settle: read its
-  branch of FUN_004818f0 and the golden rows of `scripts_worlds_anim.txt`,
-  then set the first matching slot's byte), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
-  variables are script state only, as in the original. A fatal error of
+  variables are script state only, as in the original. `ANIM_THE_FRAME`
+  sets the playing byte of the first record of its id, of any kind
+  (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
   logged; the game itself goes on. The original's own unknowns stay open:
   how the menu resets the variables of a new game (the

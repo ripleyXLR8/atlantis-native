@@ -241,6 +241,11 @@ impl Engine {
         let Some(k) = laid else {
             return;
         };
+        // The original ends the click here when the kept slot index is −1
+        // (@ 0x0048dbbb..0x0048dbc5). It never is: the indexes start at 0
+        // and the entry stores only the lookups' results, which are 0 on a
+        // miss (@ 0x0047de9c, 0x0047deeb), so the port's indexes are
+        // unsigned and the branch has no counterpart.
         if let Some(s) = self.anim.slots.get_mut(self.figurine_slots[k - 1]) {
             s.frame = place;
             s.active = true;

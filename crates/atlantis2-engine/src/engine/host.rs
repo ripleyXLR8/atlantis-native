@@ -585,8 +585,13 @@ impl Host for Engine {
                     _ => log::error!("AtlSpw_find_index_anum({id}, {a}, {b})"),
                 }
             }
+            // The first record of the id, whatever its kind (the loop
+            // @ 0x00483371..0x0048339e): its playing byte (+0xbc) = the
+            // value ≠ 0; none: nothing. No chapter uses the key.
             AnimOp::TheFrame { id, on, .. } => {
-                log::info!("ANIM_THE_FRAME({id}, {on}): the playing byte is not ported");
+                if let Some(s) = slots.iter_mut().find(|s| s.id == id) {
+                    s.playing = on;
+                }
             }
         }
     }

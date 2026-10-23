@@ -53,7 +53,8 @@ pub enum AnimOp {
     Stop { id: i32, number: i32 },
     /// `GOTOFRAMEPERSO` / `GOTOFRAMEOBJET`.
     GotoFrame { kind: i32, id: i32, frame: i32 },
-    /// `ANIM_THE_FRAME` (0 or 1).
+    /// `ANIM_THE_FRAME` (0 or 1): the playing byte (+0xbc) of the first
+    /// record of `id`, any kind.
     TheFrame { kind: i32, id: i32, on: bool },
     /// `ADDFRAMEPERSO` / `ADDFRAMEOBJET`.
     AddFrame { kind: i32, id: i32, frames: i32 },
