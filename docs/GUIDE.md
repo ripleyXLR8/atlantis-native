@@ -194,6 +194,17 @@ whatever `settings.ini` says.
 `atlantis-native --widescreen /path/to/game` starts in the HD mode with
 the widescreen option on, for this run (`settings.ini` is not changed).
 
+With Atlantis II, `--hd` and `--widescreen` turn on its HD mode (off by
+default; see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress), item
+HD mode): the panorama is drawn at the window's resolution, and with
+`--widescreen` it also fills the sides of a window wider than 4:3; the
+cursor, the bag bar, the menus and the videos are the original's
+640x480 pictures, smoothly enlarged. Make the window larger (or full
+screen, F11) to see the difference: in a window of 1280x960 or less the
+picture is the original's twice over. `--size 1920x1080` opens the
+window at that size. For example `atlantis-native --widescreen --size
+1920x1080 /path/to/Atlantis_2_Files`.
+
 `atlantis-native --fullscreen /path/to/game` opens the window in full
 screen (F, F11 or Alt+Enter switches it back): for a launcher such as the
 Ports of Batocera on a Raspberry Pi.

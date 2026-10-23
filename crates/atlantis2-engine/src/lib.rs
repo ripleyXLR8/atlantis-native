@@ -30,6 +30,7 @@ pub mod dialog;
 pub mod engine;
 pub mod enhancements;
 pub mod fpu;
+pub mod hd;
 pub mod head;
 pub mod hnm_stream;
 pub mod lipsync;

@@ -87,7 +87,10 @@ by another), and a track that ends with an empty list, or with loops
 left, plays again from its start (the original loops the last 5.9 s of
 its ring until another music command); see the Music item of
 [Atlantis II](#atlantis-ii-in-progress). `--original` turns it off there
-too.
+too. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
+`hd_options`, the first game's `HdOptions`), which `--hd` and
+`--widescreen` turn on; see the HD mode item of
+[Atlantis II](#atlantis-ii-in-progress).
 
 `--original` turns all three off. Otherwise they are read from
 `settings.ini` (see [Players, checkpoints and settings](GUIDE.md#players-checkpoints-and-settings)),
@@ -112,6 +115,10 @@ F10, or `--hd`) the picture is made at the window's resolution:
 - the rest, the original's 640x480 art (the cursor, the inventory bar,
   the guests' portraits, the menus, the puzzles, the dialog videos'
   bodies, the videos), upscaled.
+
+Atlantis II has the same HD mode for its cube panoramas (`--hd`,
+`--widescreen`; see the HD mode item of
+[Atlantis II](#atlantis-ii-in-progress)).
 
 The engine still draws its 640x480 frame unchanged (the scripts, the hit
 tests and the tests see the same pixels, whatever the options); for a
@@ -647,7 +654,13 @@ objects in the bag and `--hold <object>` one in the hand (by their
 `defnames.con` names, through the scripts' `sacados` and `objetenmain`),
 `--bag` opens the bar, `--pointer <x>,<y>` places the mouse pointer and
 `--talk` clicks the character under the centre (e.g. `--view 7,70,5
---talk --pointer 475,329`: the shaman's menu, the pointer on a subject). `Engine::new_game` keeps the
+--talk --pointer 475,329`: the shaman's menu, the pointer on a subject);
+`--command <commands>` runs script commands before the view entry (e.g.
+`--command "(monde=1)(changewam=bigile1.wam)(vue=1)(chapter=3)"`: Ireland,
+`--command "(monde=3)(changewam=chine.wam)(vue=10)"`: China); `--hd`,
+`--widescreen` and `--size <w>x<h>` give the HD mode at that window size,
+and a headless run's screenshot is then the window's picture at that size
+(and its HD timings are printed). `Engine::new_game` keeps the
 start without the scripts (the view `/INIT` names) for the tests against
 the original's moves. The example `cargo run --release -p atlantis2-engine
 --example tibet_tour <install> <discs> <out>` writes pictures of three
@@ -696,6 +709,83 @@ event, the gong's way back to Tibet) into `china-*.png`.
   widest screen it draws. The C one (`warpC`: perspective every 32 pixels, 24.8
   fixed point in between), which AMD CPUs used, is transcribed too and
   kept for a later option.
+- **HD mode** (`crates/atlantis2-engine/src/hd.rs`, `engine/hd.rs`; the
+  window's side in `a2.rs`, `Picture`): the first game's
+  [HD mode](#hd-mode), its layer, options, panorama filters and
+  composition reused (`atlantis_engine::hd`, `atlantis_engine::upscale`).
+  It is `Enhancements::hd` (off by default, and with `--original`),
+  turned on by `--hd`, with the widescreen option by `--widescreen`
+  (`hd_options.widescreen`); the options menu does not offer it yet. With
+  it off the engine does none of this. With it on, the engine's 640x480
+  frame is still the original's, pixel for pixel (the scripts, the picks
+  and the goldens see the same frames; a test plays the three worlds' views
+  both ways); after the cube is drawn, the same view is drawn again at the
+  window's resolution from the same faces (the place animations in them)
+  and the same camera floats, with the 640x480 cube it stands for (the
+  layer's `base`). The size is the first game's: 40 x 30 tiles of the
+  picture's width / 40 pixels rounded up, at most 64 (2560x1920); in a
+  window up to 1280x960 the picture is the original's scaled.
+  The view evaluates the original's projection at each of its pixels: the
+  original projects a camera point to sx = fx·x/z + cx, sy = fy·y/z + cy
+  (fx = fy = 640 / (2 tan 38°) = 409.58, (cx, cy) = (320, 240),
+  `FUN_004a49c0`, `FUN_0045c030`) and samples its pixel i at i + 0.5 (the
+  0.5 the set-up adds, @ 0x0057b3c7); the HD pixel (X, Y), at s = tile / 16
+  times the size, is the screen point ((X − side + 0.5) / s, (Y + 0.5) / s),
+  its ray ((sx − cx) / fx, (sy − cy) / fy, 1) is turned to the world by the
+  camera's matrix as `FUN_0045adf0` turns the centre's, and the face it
+  meets gives the texel coordinates 1 + 510·t of the corners' 1/512 and
+  511/512 (`FUN_0045c790`; the same mapping as the sprite pick's texel
+  under the centre). Tests check it: at the screen centre the ray is the
+  camera's (the zone and sprite picks); for 74000 screen points on 168
+  views the cube point projects back by the original's formulas to the
+  point (within 0.001 pixel), past the 640 columns too; drawn with the
+  original's nearest texel at the original's pixel centres, the view is
+  `warpPII`'s frame in 82.75 % of the pixels on the synthetic faces whose
+  pixels name their texel, the others one texel away (83 % of them lower:
+  its 16-bit steps truncate) but for 740 pixels in 103 million two texels
+  away, where its affine spans (a division every 32 pixels) stray most;
+  `warpC` is the same in 87 %. Where the original takes the nearest texel,
+  the view samples the faces bilinearly, by default bicubically (the faces
+  doubled with Catmull-Rom) and sharpened, the first game's filters
+  (`PanoramaPrep`, on the six faces with a border of 4 texels of each
+  face's own edge, so that no filter reads the next face; only the tiles a
+  sprite's frame changed are computed again). Widescreen: in a window
+  wider than 4:3, tile columns of view on each side (at most 16 a side, a
+  2.4:1 picture), screen points past 0 and 640 on the same formulas: a
+  wider horizontal field of view (92° at 16:9, against the original's
+  76°), the vertical one (60.7°), the angles and their limits unchanged;
+  the centre is the same, so is what is under it. What the original draws
+  over the cube (the cursor and the object in hand at the centre, the bag
+  bar, the subject menu, the overlays, a dialog's body video, the
+  subtitles) and the frames without a cube (the films, the transition
+  videos, the menu pages) are its 640x480 pixels, at their places and in
+  their order: the first game's `HdCompositor` shows the HD view wherever
+  the frame still shows the cube (`base`), and upscales the rest, xBR for
+  the art and bilinearly for a video's frame (black bars beside a video or
+  a menu page); they cannot be improved (pictures made at 640x480). Crisp
+  subtitles and 3D heads at the HD resolution are not done yet. A window
+  pixel is the 640x480 pixel the composition shows there
+  (`window_to_screen`: ⌊(x − ox)·640 / dw⌋, the compositor's nearest map),
+  so a click in the menus, the bar or the subject menu lands on the
+  original's pixel (a test checks every pixel of six window sizes).
+  Timings (release, Intel i7-9700K, 8 cores; `cargo test --release -p
+  atlantis2-engine --test hd -- --ignored --nocapture hd_timings`, and the
+  headless runs `--size 1920x1080 --headless`):
+
+  | | 1920x1080 | 1920x1080 widescreen | 2560x1440 | 2560x1440 widescreen |
+  |---|---|---|---|---|
+  | HD view (bicubic, the faces' update included) | 5.8 ms (1440x1080) | 7.3 ms (1944x1080) | 8.7 ms (1920x1440) | 11.3 ms (2592x1440) |
+  | engine pass with the view | 7 ms | 8.5 ms | 10 ms | 12.5 ms |
+  | composition | 1.7 ms | 1.8 ms | 2.6 ms | 2.9 ms |
+  | frame | 8.7 ms | 10.3 ms | 12.6 ms | 15.4 ms |
+
+  The faces' preparation for a new view takes 13 ms (bicubic; 4.9 ms
+  bilinear), so the first frame of a view takes 30 to 50 ms; then a frame
+  where nothing changed 0.4 ms, a sprite's frame 1.6 ms. The view is
+  computed in blocks of 64 columns by 32 rows, shared out among the cores
+  (one on the web); the projection and the face choice take about a third
+  of it, the bilinear sampling the rest. A frame's HD pass is printed by
+  a headless run with `--size`.
 - **Camera:** the orientation is a float quaternion turned by axis-angle
   rotations built through 3x3 matrices, transcribed operation by
   operation under the x87 control word (`fpu.rs`, `camera.rs`): the matrix
