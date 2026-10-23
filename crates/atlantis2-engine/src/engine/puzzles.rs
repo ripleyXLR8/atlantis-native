@@ -19,12 +19,21 @@
 //!   to its world.
 //! - Ireland's hooks (prefix `IR`): the click hooks of views 2, 6, 42
 //!   and 73 and the entry hooks of views 2, 6, 40-42 and 73 are the cross,
-//!   the ogham stones, the skull and the blackbird songs, which are not
-//!   ported. The dispatcher never consumes an `IR` click
-//!   (@ 0x0049baba, @ 0x0049bcf8), so leaving them out changes no click:
-//!   each is noted ([`Event::PuzzleNotPorted`]) and does nothing. The
-//!   variables their wins would write are set by
-//!   [`Engine::solve_irish_puzzle`] (a testing aid).
+//!   the ogham stones, the skull and the blackbird songs. The dispatcher
+//!   never consumes an `IR` click (@ 0x0049baba, @ 0x0049bcf8). The
+//!   skull is ported ([`Event::PuzzleRan`]); the other three are not:
+//!   leaving them out changes no click, each is noted
+//!   ([`Event::PuzzleNotPorted`]) and does nothing, and the variables
+//!   their wins would write are set by [`Engine::solve_irish_puzzle`] (a
+//!   testing aid).
+//! - The skull (views 40-42 of `bigile1.wam`): FUN_00493cb0 at each
+//!   view entry shows `CRANE_SPRITE`'s frames from the seven-digit state
+//!   (@ 0x005e1a4c), FUN_00493d40 on a click in view 42 lays one of five
+//!   objects on `CRANE_ZONE`: its frame added, the cursor pair cleared,
+//!   its digit written, `(NewSound=7)`. The engine writes no variable and
+//!   leaves the object in hand: chapter 7's sections (the click scan of
+//!   the same frame) count `fincrane`, take the object and, at the fifth,
+//!   play film 2, show Ailill and hide the skull.
 //! - The places the port has: Tibet and Ireland. A `changewam` to any
 //!   other place (the boats' other worlds, Shamballa, the space travel)
 //!   is refused: the section stops there, the world goes back to the
@@ -83,13 +92,11 @@ pub fn ported_place(wam: &str) -> Option<i32> {
         .map(|&(_, m)| m)
 }
 
-/// The four Irish puzzles, not ported.
+/// The Irish puzzles not ported (the testing aid's).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IrishPuzzle {
     /// Brigid's cross, view 2 (FUN_00494120, FUN_00494190).
     Cross,
-    /// The skull, views 40-42 (FUN_00493cb0, FUN_00493d40).
-    Skull,
     /// The ogham stones, view 6 (FUN_00496020, FUN_004960a0).
     Ogham,
     /// The blackbird songs, view 73 (FUN_004958f0, FUN_00495ae0,
@@ -135,6 +142,29 @@ pub fn irish_entry_hook(view_name: &[u8], view: u32) -> Option<u32> {
     }
 }
 
+/// The skull's state at start (@ 0x005e1a4c, `.data`): frames 0 and 1
+/// shown, 2..6 hidden ('9').
+pub const SKULL_START: [u8; 8] = *b"0199999\0";
+
+/// FUN_00493d40's five blocks, in order: the object in hand on
+/// `CRANE_ZONE`, and the frame of `CRANE_SPRITE` it shows, which is also
+/// the digit written at that position of the state (@ 0x00493d9b
+/// `[0x5e1a4e]` = '2' … @ 0x00493f22 `[0x5e1a52]` = '6'; the strings
+/// @ 0x005e1a64..0x005e1a98).
+pub const SKULL_OBJECTS: [(&str, i32); 5] = [
+    ("CRANE_CROIX", 2),
+    ("CRANE_RUCHE", 3),
+    ("CRANE_PUIT", 4),
+    ("CRANE_CHAPELLE", 5),
+    ("CRANE_W18", 6),
+];
+
+/// The skull's sprite (@ 0x005e1a54), zone (@ 0x005e1aa4) and sound
+/// command (@ 0x005e1ab0, FUN_00493f40).
+const SKULL_SPRITE: &[u8] = b"CRANE_SPRITE";
+const SKULL_ZONE: &[u8] = b"CRANE_ZONE";
+const SKULL_SOUND: &[u8] = b"(NewSound=7)";
+
 /// Whether FUN_0049b910 sends a zone click to the mandala hook: a view
 /// whose warp name starts with `TI` (`_strnicmp` over 2 characters,
 /// @ 0x0049bcda), numbered 10 (@ 0x0049bce9), and a zone of type 3, 4
@@ -162,8 +192,9 @@ impl Engine {
             self.event(Event::PuzzleHook { zone: zi, cliczone });
             self.mandala_hook(zone.name.as_deref());
         }
-        // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the puzzles are
-        // not ported; what their move-zone parts do besides is.
+        // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the skull's click and
+        // move-zone hooks run; the other puzzles are not ported (noted),
+        // only what their move-zone hooks do besides.
         let knife = self
             .names
             .id(defnames::OBJETS, b"COUTEAU_AILILL")
@@ -171,9 +202,22 @@ impl Engine {
         let hook = self
             .current_view()
             .and_then(|v| irish_click_hook(v.name.as_bytes(), self.view, zone.kind, knife));
-        if let Some(function) = hook {
-            self.irish_move_hook(function);
-            self.puzzle_not_ported(function);
+        match hook {
+            Some(0x0049_3d40) => {
+                self.event(Event::PuzzleRan {
+                    function: 0x0049_3d40,
+                });
+                self.skull_click(zone);
+            }
+            Some(function @ 0x0049_3d20) => {
+                self.event(Event::PuzzleRan { function });
+                self.irish_move_hook(function);
+            }
+            Some(function) => {
+                self.irish_move_hook(function);
+                self.puzzle_not_ported(function);
+            }
+            None => {}
         }
         false
     }
@@ -219,12 +263,18 @@ impl Engine {
     }
 
     /// The view entry's puzzle set-up (FUN_0049bd50) for the views the
-    /// port has: Ireland's are not ported (noted), Tibet has none.
+    /// port has: Ireland's skull (views 40-42) runs, the other Irish ones
+    /// are not ported (noted), Tibet has none.
     pub(super) fn entry_hooks(&mut self) {
         let hook = self
             .current_view()
             .and_then(|v| irish_entry_hook(v.name.as_bytes(), self.view));
         if let Some(function) = hook {
+            if function == 0x0049_3cb0 {
+                self.event(Event::PuzzleRan { function });
+                self.skull_entry();
+                return;
+            }
             // FUN_004958f0 loads `merleb.apc` and `merlem.apc` (a failed
             // load is fatal, @ 0x0049590e, 0x00495934).
             if function == 0x0049_58f0 {
@@ -234,15 +284,78 @@ impl Engine {
         }
     }
 
+    /// FUN_00493cb0 (the entry of views 40, 41 and 42; its argument, the
+    /// view, is not read): `CRANE_SPRITE`'s id kept (@ 0x00493cc0), frames
+    /// 0..6 each taken out of its list once when there
+    /// (@ 0x00493cc7..0x00493cee), then for each of the seven characters
+    /// of the state, in order, the frame `c − '0'` added when it is 0..8
+    /// (signed byte, @ 0x00493cf2..0x00493d17): '9' hides, and the list
+    /// order is the state's. Public for tests and tools as well.
+    pub fn skull_entry(&mut self) {
+        // `DefName_GetIdName(1, name)` (FUN_004105a0): an unknown name is
+        // the original's fatal error (FUN_00480cd0, @ 0x004106a3: an
+        // emergency save, then the game quits); here the scripts stop and
+        // so does the hook. The game's data never reach it.
+        let id = match self.names.id(defnames::OBJETS, SKULL_SPRITE) {
+            Ok(i) => i as i32,
+            Err(_) => {
+                let msg = format!(
+                    "DefName_GetIdName: Nom de #OBJETS# inconnu:{}",
+                    String::from_utf8_lossy(SKULL_SPRITE)
+                );
+                log::error!("{msg}");
+                self.with_script(|s, _| s.fail(msg));
+                return;
+            }
+        };
+        self.skull_sprite = id;
+        for frame in 0..7 {
+            if self.anim.has_frame(id, frame) {
+                self.anim.sub_frame(id, frame);
+            }
+        }
+        for k in 0..7 {
+            let c = i32::from(self.skull[k] as i8) - i32::from(b'0');
+            if (0..9).contains(&c) {
+                self.anim.add_frame(self.skull_sprite, c);
+            }
+        }
+    }
+
+    /// FUN_00493d40(zone) (a click on a zone of type 3, 4 or 0x32 in view
+    /// 42): for each of the five objects in order, when the zone's value
+    /// (+0x04) is `CRANE_ZONE`'s index and `OBJETENMAIN` (read again each
+    /// time) is the object: its frame added to the list of the id the
+    /// last entry kept (@ 0x006d26a8), the cursor pair cleared
+    /// (FUN_0047bef0(0, 0)), its digit written in the state, then
+    /// `(NewSound=7)` (FUN_00493f40). No guard: the same object twice is
+    /// listed twice. The hand and the bag are the scripts'. Public for
+    /// tests and tools as well (the hook alone, without the dispatcher
+    /// and the scans).
+    pub fn skull_click(&mut self, zone: &Zone) {
+        let zone_id = self.names.id(defnames::ZONES_CLIC, SKULL_ZONE);
+        for (object, frame) in SKULL_OBJECTS {
+            let hand = self.hand_object();
+            let object = self.names.id(defnames::OBJETS, object.as_bytes());
+            let same_zone = zone_id.as_ref().is_ok_and(|&z| z as i32 == zone.value);
+            if !same_zone || !object.is_ok_and(|o| o as i32 == hand) {
+                continue;
+            }
+            self.anim.add_frame(self.skull_sprite, frame);
+            self.clear_cursor_pair();
+            self.skull[frame as usize] = b'0' + frame as u8;
+            self.with_script(|s, h| s.run_command(h, SKULL_SOUND));
+        }
+    }
+
     /// What an Irish puzzle's win writes for the scripts, for tests and
     /// tools while the puzzles are not ported: the cross sets `FINCROIX` = 1
     /// and runs a `CtrlScenarIN` scan (FUN_00494190 @ 0x00494216..
     /// 0x0049422a); the ogham stones `FINOGHAM` = 1 when it is 0
     /// (FUN_004960a0 @ 0x00496108..0x00496131) and the blackbird
     /// `FINMERLE` = 1 (FUN_00495ae0 @ 0x00495b8a..0x00495b97), with no scan
-    /// (the next one sees them); the skull writes no variable (the scripts
-    /// count `fincrane` themselves). The puzzles' sounds and pictures are
-    /// not played.
+    /// (the next one sees them). The puzzles' sounds and pictures are not
+    /// played. (The skull, ported, has no aid: it writes no variable.)
     pub fn solve_irish_puzzle(&mut self, puzzle: IrishPuzzle) {
         self.with_script(|s, h| match puzzle {
             IrishPuzzle::Cross => {
@@ -257,7 +370,6 @@ impl Engine {
             IrishPuzzle::Blackbird => {
                 s.set_var("FINMERLE", 1);
             }
-            IrishPuzzle::Skull => {}
         });
     }
 

@@ -40,6 +40,7 @@ mod places;
 mod puzzles;
 pub use puzzles::{
     irish_click_hook, irish_entry_hook, mandala_hook_applies, ported_place, IrishPuzzle, MANDALAS,
+    SKULL_OBJECTS, SKULL_START,
 };
 mod saves;
 mod subjects;
@@ -112,9 +113,11 @@ pub enum Event {
     /// A click on a zone the puzzle hooks take (@ 0x0049b910): the zone's
     /// index in the view, and `CLICZONE` as the hook finds it.
     PuzzleHook { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (Ireland's four puzzles): the
+    /// A puzzle hook the port does not have (Ireland's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
+    /// An Irish puzzle hook the port has, run: the original's function.
+    PuzzleRan { function: u32 },
     /// A move to another place (a type-2 zone, @ 0x0040fc60): its file,
     /// the view, and whether it waits for the turn (deferred) or is made
     /// at once.
@@ -423,6 +426,13 @@ pub struct Engine {
     /// FUN_004958f0, loads them; its move-zone hook frees them): the port
     /// keeps only the fact, for the voice their free stops.
     blackbird_sounds: bool,
+    /// The skull puzzle's state (@ 0x005e1a4c, save entry 30): seven
+    /// digits and a 0, one per frame of `CRANE_SPRITE`'s list; only a load
+    /// changes it besides the puzzle's click (no new game resets it).
+    pub skull: [u8; 8],
+    /// `CRANE_SPRITE`'s id as the skull's view entry last looked it up
+    /// (@ 0x006d26a8; 0 before any).
+    pub skull_sprite: i32,
     /// Where the port may differ from the original (default: the minor
     /// bug fixes on).
     pub enhancements: Enhancements,
@@ -789,6 +799,8 @@ impl Engine {
             // then, as `FUN_004770c0` is refused while stopped.
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
             blackbird_sounds: false,
+            skull: puzzles::SKULL_START,
+            skull_sprite: 0,
             enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),

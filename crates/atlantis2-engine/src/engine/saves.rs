@@ -17,10 +17,14 @@ use super::Engine;
 use crate::script::{BagEntry, Shown, SubjectTable};
 
 /// The entries Native keeps only as bytes: the dowsing rod's 15
-/// (@ 0x006d84f4, its role not read) and the puzzles (20..32). The dialog flag (33) is written from the running
+/// (@ 0x006d84f4, its role not read) and the puzzles not ported (20..29,
+/// 31, 32). The dialog flag (33) is written from the running
 /// dialog and not read back: a save made from the menus has no dialog
 /// running, Escape ends it before the main menu opens (@ 0x004762f0).
-const KEPT: [usize; 14] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
+const KEPT: [usize; 13] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32];
+
+/// The skull's state (@ 0x005e1a4c, 8 bytes).
+const SKULL: usize = 30;
 
 /// The dowsing rod's entries: shown (@ 0x006d84fd, one byte), its frame
 /// (@ 0x006d8500) and its step (@ 0x005e2efc).
@@ -206,6 +210,8 @@ impl Engine {
         d.entry_mut(ROD_ACTIVE)[0] = u8::from(self.rod.active);
         d.set_i32(ROD_FRAME, self.rod.frame);
         d.set_i32(ROD_STEP, self.rod.step);
+        // 30: the skull's seven digits and their 0.
+        d.entry_mut(SKULL).copy_from_slice(&self.skull);
         // 33: the dialog flag.
         d.entry_mut(entry::DIALOG)[0] = u8::from(self.dialog.is_some());
         // 34: the subjects, the table as the memory holds it.
@@ -286,6 +292,9 @@ impl Engine {
         for k in KEPT {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }
+        // 30: the skull's state, which FUN_0049bf70 does not reset; the
+        // view entry below shows it.
+        self.skull.copy_from_slice(d.entry(SKULL));
         let header = d.header();
         let s = self.con.as_deref_mut().expect("checked above");
         // 1, 5, 6: the chapter, the variables, the flags.
