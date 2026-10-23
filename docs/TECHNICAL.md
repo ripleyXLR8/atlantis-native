@@ -723,8 +723,10 @@ event, the gong's way back to Tibet) into `china-*.png`.
   window's resolution from the same faces (the place animations in them)
   and the same camera floats, with the 640x480 cube it stands for (the
   layer's `base`). The size is the first game's: 40 x 30 tiles of the
-  picture's width / 40 pixels rounded up, at most 64 (2560x1920); in a
-  window up to 1280x960 the picture is the original's scaled.
+  picture's width / 40 pixels rounded up, at most 64 (2560x1920), for
+  any picture wider than 640 pixels (`tile_for_output`: 960x720 has tile
+  24, the default 1280x960 window tile 32); only a window of 640x480 or
+  less shows the 640x480 frame alone.
   The view evaluates the original's projection at each of its pixels: the
   original projects a camera point to sx = fx·x/z + cx, sy = fy·y/z + cy
   (fx = fy = 640 / (2 tan 38°) = 409.58, (cx, cy) = (320, 240),
@@ -744,8 +746,9 @@ event, the gong's way back to Tibet) into `china-*.png`.
   pixels name their texel, the others one texel away (83 % of them lower:
   its 16-bit steps truncate) but for 740 pixels in 103 million two texels
   away, where its affine spans (a division every 32 pixels) stray most;
-  `warpC` is the same in 87 %. Where the original takes the nearest texel,
-  the view samples the faces bilinearly, by default bicubically (the faces
+  `warpC` is the same in 87.06 % of them (310 pixels two texels away; a
+  test checks each). Where the original takes the nearest texel, the view
+  samples the faces bilinearly, by default bicubically (the faces
   doubled with Catmull-Rom) and sharpened, the first game's filters
   (`PanoramaPrep`, on the six faces with a border of 4 texels of each
   face's own edge, so that no filter reads the next face; only the tiles a
@@ -767,18 +770,31 @@ event, the gong's way back to Tibet) into `china-*.png`.
   pixel is the 640x480 pixel the composition shows there
   (`window_to_screen`: ⌊(x − ox)·640 / dw⌋, the compositor's nearest map),
   so a click in the menus, the bar or the subject menu lands on the
-  original's pixel (a test checks every pixel of six window sizes).
-  Timings (release, Intel i7-9700K, 8 cores; `cargo test --release -p
-  atlantis2-engine --test hd -- --ignored --nocapture hd_timings`, and the
-  headless runs `--size 1920x1080 --headless`):
+  original's pixel (a test checks every pixel of six window sizes). The
+  window does this with the HD mode off too, where it draws the frame
+  with the same nearest map: before, a position was divided by the float
+  scale from an offset that could fall on half a pixel, and some clicks
+  named the pixel next to the one drawn under them (one pixel away at
+  most; a test in `a2.rs` compares the two).
+  Timings (release, Intel i7-9700K, 8 cores, the machine otherwise idle;
+  the medians of three headless runs of 300 frames in Tibet's first place,
+  `atlantis-native --hd --size 1920x1080 --view 7,70,5 --headless <game>
+  300`, with `--widescreen` or `--size 2560x1440`, which print the pass,
+  the view part of it and the composition; the view alone from `cargo
+  test --release -p atlantis2-engine --test hd -- --ignored --nocapture
+  hd_timings`, on synthetic faces):
 
   | | 1920x1080 | 1920x1080 widescreen | 2560x1440 | 2560x1440 widescreen |
   |---|---|---|---|---|
-  | HD view (bicubic, the faces' update included) | 5.8 ms (1440x1080) | 7.3 ms (1944x1080) | 8.7 ms (1920x1440) | 11.3 ms (2592x1440) |
-  | engine pass with the view | 7 ms | 8.5 ms | 10 ms | 12.5 ms |
-  | composition | 1.7 ms | 1.8 ms | 2.6 ms | 2.9 ms |
-  | frame | 8.7 ms | 10.3 ms | 12.6 ms | 15.4 ms |
+  | HD view alone (bicubic; `hd_timings`) | 4.8 ms (1440x1080) | 6.3 ms (1944x1080) | 8 ms (1920x1440) | 10.5 ms (2592x1440) |
+  | HD view in the pass (the faces' update included) | 6.4 ms | 7.8 ms | 9.2 ms | 12.4 ms |
+  | engine pass with the view | 7.8 ms | 9.2 ms | 10.6 ms | 13.9 ms |
+  | composition | 2 ms | 2.1 ms | 3.8 ms | 4.2 ms |
+  | frame (pass and composition) | 9.8 ms | 11.4 ms | 14.4 ms | 18.1 ms |
 
+  At 1920x1080 a frame takes well under the 16.7 ms of 60 frames a second;
+  at 2560x1440 with the widescreen sides it takes a little more (about 55
+  frames a second; the composition is the first game's, on one core).
   The faces' preparation for a new view takes 13 ms (bicubic; 4.9 ms
   bilinear), so the first frame of a view takes 30 to 50 ms; then a frame
   where nothing changed 0.4 ms, a sprite's frame 1.6 ms. The view is

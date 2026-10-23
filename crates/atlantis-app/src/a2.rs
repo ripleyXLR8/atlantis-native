@@ -556,19 +556,10 @@ impl A2App {
         self.engine.pass(Some(&mut self.screen));
     }
 
-    /// A window position on the 640x480 screen: the screen pixel the
-    /// window shows there (outside the picture, past its edges).
+    /// A window position on the 640x480 screen ([`window_point`]).
     fn to_screen(&self, p: PhysicalPosition<f64>) -> Option<(i32, i32)> {
         let size = self.window.as_ref()?.inner_size();
-        let rect = picture_rect(size.width as usize, size.height as usize);
-        if rect.2 == 0 || rect.3 == 0 {
-            return None;
-        }
-        Some(window_to_screen(
-            p.x.floor() as i64,
-            p.y.floor() as i64,
-            rect,
-        ))
+        window_point(size.width as usize, size.height as usize, p)
     }
 
     /// The frame in the window: the 640x480 screen scaled to it (nearest
@@ -596,12 +587,7 @@ impl A2App {
             let _ = buf.present();
             return;
         }
-        let scale = (ww as f64 / f64::from(WIDTH)).min(wh as f64 / f64::from(HEIGHT));
-        let (dw, dh) = (
-            (f64::from(WIDTH) * scale) as usize,
-            (f64::from(HEIGHT) * scale) as usize,
-        );
-        let (ox, oy) = ((ww - dw) / 2, (wh - dh) / 2);
+        let (ox, oy, dw, dh) = picture_rect(ww, wh);
         buf.fill(0);
         let xs: Vec<usize> = (0..dw)
             .map(|x| (x * WIDTH as usize / dw.max(1)).min(WIDTH as usize - 1))
@@ -767,6 +753,26 @@ impl ApplicationHandler for A2App {
     }
 }
 
+/// A window position on the 640x480 screen, in a `width` x `height`
+/// window: the screen pixel the window shows under it (outside the
+/// picture, past its edges), HD mode or not (`window_to_screen`, the
+/// nearest map both pictures are drawn with: pixel x of the picture shows
+/// screen column ⌊x · 640 / dw⌋). Before the HD mode a position was
+/// divided by the float scale from an offset that could fall on half a
+/// pixel, which put some clicks one pixel off the pixel shown; see the
+/// test `clicks_hit_the_pixel_drawn`.
+fn window_point(width: usize, height: usize, p: PhysicalPosition<f64>) -> Option<(i32, i32)> {
+    let rect = picture_rect(width, height);
+    if rect.2 == 0 || rect.3 == 0 {
+        return None;
+    }
+    Some(window_to_screen(
+        p.x.floor() as i64,
+        p.y.floor() as i64,
+        rect,
+    ))
+}
+
 /// The window's picture of the engine's frames: the 640x480 screen
 /// scaled, or in the HD mode (`Enhancements::hd`) the first game's
 /// composition (`atlantis_engine::hd::HdCompositor`): the engine's HD view
@@ -907,5 +913,53 @@ mod tests {
         assert_eq!(A2Start::parse_size("1440X1080"), Some((1440, 1080)));
         assert_eq!(A2Start::parse_size("0x1080"), None);
         assert_eq!(A2Start::parse_size("1920"), None);
+    }
+
+    /// With the HD mode off too, a click names the 640x480 pixel the
+    /// window draws under it (`present`: picture pixel x shows screen
+    /// column x · 640 / dw). The mapping before the HD mode (a division by
+    /// the float scale, from an offset that could be half a pixel) is at
+    /// most one pixel away from it, and differs only where it missed the
+    /// pixel drawn.
+    #[test]
+    fn clicks_hit_the_pixel_drawn() {
+        let old = |ww: usize, wh: usize, x: f64, y: f64| {
+            let (ww, wh) = (ww as f64, wh as f64);
+            let scale = (ww / 640.0).min(wh / 480.0);
+            let (dw, dh) = (640.0 * scale, 480.0 * scale);
+            let (ox, oy) = ((ww - dw).trunc() / 2.0, (wh - dh).trunc() / 2.0);
+            (((x - ox) / scale) as i32, ((y - oy) / scale) as i32)
+        };
+        let mut changed = 0;
+        for (ww, wh) in [
+            (1280, 960),
+            (1920, 1080),
+            (1366, 768),
+            (1023, 767),
+            (800, 1000),
+            (1281, 961),
+            (2561, 1441),
+        ] {
+            let (ox, oy, dw, dh) = picture_rect(ww, wh);
+            for y in oy..oy + dh {
+                for x in ox..ox + dw {
+                    let drawn = (
+                        ((x - ox) * WIDTH as usize / dw) as i32,
+                        ((y - oy) * HEIGHT as usize / dh) as i32,
+                    );
+                    let p = PhysicalPosition::new(x as f64 + 0.25, y as f64 + 0.75);
+                    assert_eq!(window_point(ww, wh, p), Some(drawn), "{ww}x{wh} ({x}, {y})");
+                    let o = old(ww, wh, x as f64, y as f64);
+                    assert!(
+                        (o.0 - drawn.0).abs() <= 1 && (o.1 - drawn.1).abs() <= 1,
+                        "{ww}x{wh} ({x}, {y}): {o:?} {drawn:?}"
+                    );
+                    changed += usize::from(o != drawn);
+                }
+            }
+        }
+        // Some window pixels did name another pixel than the one drawn.
+        assert!(changed > 0);
+        eprintln!("{changed} window pixels clicked one pixel off before");
     }
 }

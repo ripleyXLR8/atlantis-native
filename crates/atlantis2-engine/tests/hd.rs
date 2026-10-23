@@ -162,31 +162,44 @@ fn nearest_view(cam: &Camera, tile: usize) -> Vec<u32> {
     out
 }
 
-/// At the original's pixel centres (tile 16; tile 48, every third pixel
-/// from the second), the HD view with the original's nearest texel is
-/// `warpPII`'s frame but where `warpPII`'s approximations move it: its
-/// spans interpolate affinely between divisions 32 pixels apart, and step
-/// in truncated 16-bit words (most often to the texel before), and at a
-/// face's edge its polygon edge may give the pixel to the next face.
-/// Nowhere more than two texels away, more than one only in a few pixels
-/// in a million.
-#[test]
-fn nearest_texels_are_warp_pii_s() {
+/// How the HD view with the original's nearest texel compares with a
+/// variant's frame at the original's pixel centres (tile 16; tile 48,
+/// every third pixel from the second), on the views of [`angles`].
+struct NearestStats {
+    /// Pixels on the same texel, and in all.
+    same: usize,
+    total: usize,
+    /// The largest share of differing pixels in one frame.
+    worst: f64,
+    /// Pixels on a face's edge texel given to the next face.
+    edge: usize,
+    /// The others by how many texels away (9: 9 or more), and how many
+    /// of them on a lower texel.
+    hist: [usize; 10],
+    lower: usize,
+}
+
+fn nearest_against(variant: Variant) -> NearestStats {
     let faces = uv_faces();
-    let (mut same, mut total, mut edge, mut worst) = (0usize, 0usize, 0usize, 0.0f64);
-    let mut hist = [0usize; 10];
-    let mut lower = 0usize;
+    let mut st = NearestStats {
+        same: 0,
+        total: 0,
+        worst: 0.0,
+        edge: 0,
+        hist: [0; 10],
+        lower: 0,
+    };
     for (yaw, pitch) in angles() {
         let cam = camera(yaw, pitch);
-        let mut r = Renderer::new(Variant::PII, cam.fpu, 640, 480);
-        let mut pii = vec![0u16; 640 * 480];
-        r.render(&faces, &cam.matrix(), cam.projection(), &mut pii);
+        let mut r = Renderer::new(variant, cam.fpu, 640, 480);
+        let mut frame = vec![0u16; 640 * 480];
+        r.render(&faces, &cam.matrix(), cam.projection(), &mut frame);
         for (tile, k, o) in [(16, 1, 0), (48, 3, 1)] {
             let hd = nearest_view(&cam, tile);
             let mut s = 0;
             for y in 0..480 {
                 for x in 0..640 {
-                    let a = pii[y * 640 + x];
+                    let a = frame[y * 640 + x];
                     let b = hd[(k * y + o) * 40 * tile + k * x + o];
                     let (ua, va) = (i32::from(a & 0x1ff), i32::from(a >> 9));
                     let (ub, vb) = ((b & 0x3ff) as i32, ((b >> 10) & 0x3ff) as i32);
@@ -197,34 +210,63 @@ fn nearest_texels_are_warp_pii_s() {
                     // On a face's edge texel (1 or 510), the original's
                     // polygon edge may give the pixel to the next face.
                     if [ub, vb].iter().any(|&c| c <= 1 || c >= 510) {
-                        edge += 1;
+                        st.edge += 1;
                         continue;
                     }
                     let dv = (va - vb).rem_euclid(128).min((vb - va).rem_euclid(128));
                     let d = (ua - ub).abs().max(dv) as usize;
-                    hist[d.min(9)] += 1;
-                    lower += usize::from(ua < ub || (va - vb).rem_euclid(128) == 127);
+                    st.hist[d.min(9)] += 1;
+                    st.lower += usize::from(ua < ub || (va - vb).rem_euclid(128) == 127);
                 }
             }
-            same += s;
-            total += 640 * 480;
-            worst = worst.max(1.0 - s as f64 / (640.0 * 480.0));
+            st.same += s;
+            st.total += 640 * 480;
+            st.worst = st.worst.max(1.0 - s as f64 / (640.0 * 480.0));
         }
     }
-    let share = same as f64 / total as f64;
     eprintln!(
-        "HD nearest vs warpPII: {:.2} % of the pixels the same, at worst {:.2} % differ; \
-         {edge} on a face's edge; texels away {hist:?}, {lower} lower",
-        share * 100.0,
-        worst * 100.0
+        "HD nearest vs {variant:?}: {:.2} % of the pixels the same, at worst {:.2} % differ; \
+         {} on a face's edge; texels away {:?}, {} lower",
+        st.same as f64 * 100.0 / st.total as f64,
+        st.worst * 100.0,
+        st.edge,
+        st.hist,
+        st.lower
     );
-    // warpPII: 82.75 % the same, 17.2 % one texel away (83 % of them
-    // lower), 740 pixels of 103 million two texels away, a few on a face's
-    // edge; warpC (the affine spans without the 16-bit steps): 87 %.
+    st
+}
+
+/// At the original's pixel centres, the HD view with the original's
+/// nearest texel is `warpPII`'s frame but where `warpPII`'s
+/// approximations move it: its spans interpolate affinely between
+/// divisions 32 pixels apart, and step in truncated 16-bit words (most
+/// often to the texel before), and at a face's edge its polygon edge may
+/// give the pixel to the next face. Nowhere more than two texels away,
+/// more than one only in a few pixels in a million.
+#[test]
+fn nearest_texels_are_warp_pii_s() {
+    let st = nearest_against(Variant::PII);
+    let share = st.same as f64 / st.total as f64;
+    // 82.75 % the same, 17.2 % one texel away (83 % of them lower), 740
+    // pixels of 103 million two texels away, a few on a face's edge.
     assert!(share > 0.8, "{share}");
-    assert!(hist[2] * 10_000 < total, "{hist:?}");
-    assert!(hist[3..].iter().all(|&n| n == 0), "{hist:?}");
-    assert!(edge * 1000 < total, "{edge}");
+    assert!(st.hist[2] * 10_000 < st.total, "{:?}", st.hist);
+    assert!(st.hist[3..].iter().all(|&n| n == 0), "{:?}", st.hist);
+    assert!(st.edge * 1000 < st.total, "{}", st.edge);
+}
+
+/// The same with `warpC` (the affine spans in 24.8 fixed point, without
+/// `warpPII`'s 16-bit steps): closer still.
+#[test]
+fn nearest_texels_are_warp_c_s() {
+    let st = nearest_against(Variant::C);
+    let share = st.same as f64 / st.total as f64;
+    // 87.06 % the same, the others one texel away but for 310 pixels of
+    // 103 million two texels away, a few on a face's edge.
+    assert!(share > 0.85, "{share}");
+    assert!(st.hist[2] * 10_000 < st.total, "{:?}", st.hist);
+    assert!(st.hist[3..].iter().all(|&n| n == 0), "{:?}", st.hist);
+    assert!(st.edge * 1000 < st.total, "{}", st.edge);
 }
 
 /// Every window pixel of the picture shows the 640x480 pixel
@@ -445,7 +487,9 @@ fn hd_view_shows_the_panorama() {
 /// The HD view's timings (`cargo test --release -p atlantis2-engine
 /// --test hd -- --ignored --nocapture hd_timings`): the faces prepared
 /// (a new view; a frame where nothing changed; a sprite's frame), the
-/// view drawn at 1920x1080 (4:3 and widescreen) and 2560x1440.
+/// view drawn at 1920x1080 and 2560x1440, 4:3 and widescreen (the view
+/// alone: the engine's pass, which a headless run with `--size` times,
+/// also updates the faces and draws the 640x480 frame).
 #[test]
 #[ignore]
 fn hd_timings() {
@@ -490,7 +534,12 @@ fn hd_timings() {
             "{filter:?}: faces prepared: new view {new_view:.2} ms, unchanged {still:.2} ms, \
              a sprite's frame {sprite:.2} ms"
         );
-        for (w, h, wide) in [(1920, 1080, false), (1920, 1080, true), (2560, 1440, true)] {
+        for (w, h, wide) in [
+            (1920, 1080, false),
+            (1920, 1080, true),
+            (2560, 1440, false),
+            (2560, 1440, true),
+        ] {
             let (ox, _, dw, _) = picture_rect(w, h);
             let tile = tile_for_output(w, h, 64).unwrap();
             let side = if wide { side_tiles(ox, dw) * tile } else { 0 };

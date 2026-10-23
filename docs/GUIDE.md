@@ -199,10 +199,11 @@ default; see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress), item
 HD mode): the panorama is drawn at the window's resolution, and with
 `--widescreen` it also fills the sides of a window wider than 4:3; the
 cursor, the bag bar, the menus and the videos are the original's
-640x480 pictures, smoothly enlarged. Make the window larger (or full
-screen, F11) to see the difference: in a window of 1280x960 or less the
-picture is the original's twice over. `--size 1920x1080` opens the
-window at that size. For example `atlantis-native --widescreen --size
+640x480 pictures, smoothly enlarged. Every window larger than 640x480
+gets the HD panorama, drawn at the picture's own size (up to 2560x1920):
+the default window of 1280x960 already does, and the larger the window
+(or full screen, F11), the sharper the panorama. `--size 1920x1080` opens
+the window at that size. For example `atlantis-native --widescreen --size
 1920x1080 /path/to/Atlantis_2_Files`.
 
 `atlantis-native --fullscreen /path/to/game` opens the window in full
