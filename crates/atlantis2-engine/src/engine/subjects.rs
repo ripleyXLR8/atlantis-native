@@ -27,14 +27,15 @@
 //!   game's pointer).
 //!
 //! The blackbird game of Ireland (mode @ 0x006d2754 = 2) shows a fixed
-//! menu of its songs (@ 0x0047fc70, @ 0x00495a70) instead: not here, as
-//! that puzzle.
+//! menu of its birds instead (@ 0x0047fc70, @ 0x00495a70:
+//! `engine/blackbird.rs`), and its modes change what the answer does with
+//! the click (below).
 
 use atlantis2_data::spr::SprBank;
 
 use super::{CursorBank, Engine, Event};
 use crate::bag::{UiBank, UiDraw};
-use crate::subjects::{cell, first_row, hit};
+use crate::subjects::{cell, first_row, hit, last_column, COLUMN_X};
 
 /// The pointer frame of `interfac.spr`.
 const POINTER_FRAME: i32 = 40;
@@ -100,6 +101,7 @@ impl Engine {
         let character = self.subject_character();
         let count = self.subject_count(character);
         self.subject_menu.first_row = first_row(count);
+        self.subject_menu.column_x = last_column(count);
         let entries: Vec<_> = match &self.con {
             // A count past the table reads zeros there.
             Some(s) => (0..count.clamp(0, 4096))
@@ -117,7 +119,7 @@ impl Engine {
 
     /// FUN_0047bdb0 on the subjects bank: frame `frame` centred on (x, y)
     /// by its size (w / 2, h / 2), at 50 % when `half`.
-    fn centred(&mut self, frame: i32, x: i32, y: i32, half: bool) {
+    pub(super) fn centred(&mut self, frame: i32, x: i32, y: i32, half: bool) {
         let Some(bank) = &self.subjects_bank else {
             log::warn!("AtlSpr_Aff_centre, bank=NULL");
             return;
@@ -139,42 +141,59 @@ impl Engine {
     }
 
     /// The answer of the open menu to this frame's click (@ 0x0045a9f0
-    /// after FUN_0047fd00): a subject, or the menu closed.
+    /// after FUN_0047fd00), with the blackbird game's mode (@ 0x006d2754):
+    /// a subject (a value above −1), or the menu closed (−2, outside the
+    /// grid); any other value (an entry holding a negative number) does
+    /// nothing. In the blackbird's mode 2 either answer turns it into 3
+    /// and leaves the click to the zone click (FUN_00495ae0); in modes 1
+    /// and 3 a subject leaves the click too.
     pub(super) fn subjects_click(&mut self) {
         if !self.subject_menu.open || !self.click {
             return;
         }
+        // FUN_0047fd00 sets the column register back to 450 (@ 0x0047fd13).
+        self.subject_menu.column_x = COLUMN_X;
         let character = self.subject_character();
         let count = self.subject_count(character);
-        let entry = hit(count, self.subject_menu.first_row, self.pointer);
-        match entry {
-            None => {
-                self.look.stop();
-                self.subject_menu.open = false;
-                self.sprite_hit = None;
+        let value = match hit(count, self.subject_menu.first_row, self.pointer) {
+            None => -2,
+            Some(i) => self
+                .con
+                .as_ref()
+                .map_or(0, |s| s.subjects.entry(character, i).value),
+        };
+        let mode = self.blackbird.mode;
+        if value > -1 {
+            self.event(Event::Subject {
+                character,
+                value: Some(value),
+            });
+            self.with_script(|s, h| s.subject_chosen(h, Some(value)));
+            self.look.stop();
+            self.subject_menu.open = false;
+            self.sprite_hit = None;
+            if mode == 0 {
                 self.click = false;
-                self.drop_hand();
-                self.vars.clicperso = 0;
-                self.with_script(|s, h| s.subject_chosen(h, None));
-                self.event(Event::Subject {
-                    character,
-                    value: None,
-                });
+            } else if mode == 2 {
+                self.blackbird.mode = 3;
             }
-            Some(i) => {
-                let value = self
-                    .con
-                    .as_ref()
-                    .map_or(0, |s| s.subjects.entry(character, i).value);
-                self.event(Event::Subject {
-                    character,
-                    value: Some(value),
-                });
-                self.with_script(|s, h| s.subject_chosen(h, Some(value)));
-                self.look.stop();
-                self.subject_menu.open = false;
-                self.sprite_hit = None;
-                self.click = false;
+        } else if value == -2 {
+            self.look.stop();
+            self.subject_menu.open = false;
+            self.sprite_hit = None;
+            self.click = false;
+            self.drop_hand();
+            self.vars.clicperso = 0;
+            self.with_script(|s, h| s.subject_chosen(h, None));
+            self.event(Event::Subject {
+                character,
+                value: None,
+            });
+            if mode < 2 {
+                self.blackbird.mode = 0;
+            } else if mode == 2 {
+                self.blackbird.mode = 3;
+                self.click = true;
             }
         }
     }

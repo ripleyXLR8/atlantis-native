@@ -19,12 +19,14 @@
 //!   to its world.
 //! - Ireland's hooks (prefix `IR`): the click hooks of views 2, 6, 42
 //!   and 73 and the entry hooks of views 2, 6, 40-42 and 73 are the cross,
-//!   the ogham stones, the skull and the blackbird songs, which are not
-//!   ported. The dispatcher never consumes an `IR` click
-//!   (@ 0x0049baba, @ 0x0049bcf8), so leaving them out changes no click:
-//!   each is noted ([`Event::PuzzleNotPorted`]) and does nothing. The
-//!   variables their wins would write are set by
-//!   [`Engine::solve_irish_puzzle`] (a testing aid).
+//!   the ogham stones, the skull and the blackbird songs. The blackbird
+//!   songs (view 73) are ported (`engine/blackbird.rs`, each hook run
+//!   noted as [`Event::PuzzleRan`]); the other three are not. The
+//!   dispatcher never consumes an `IR` click (@ 0x0049baba, @ 0x0049bcf8),
+//!   so leaving them out changes no click: each is noted
+//!   ([`Event::PuzzleNotPorted`]) and does nothing. The variables their
+//!   wins would write are set by [`Engine::solve_irish_puzzle`] (a testing
+//!   aid).
 //! - The places the port has: Tibet and Ireland. A `changewam` to any
 //!   other place (the boats' other worlds, Shamballa, the space travel)
 //!   is refused: the section stops there, the world goes back to the
@@ -83,7 +85,8 @@ pub fn ported_place(wam: &str) -> Option<i32> {
         .map(|&(_, m)| m)
 }
 
-/// The four Irish puzzles, not ported.
+/// The Irish puzzles not ported (the blackbird songs, view 73, are:
+/// `engine/blackbird.rs`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IrishPuzzle {
     /// Brigid's cross, view 2 (FUN_00494120, FUN_00494190).
@@ -92,9 +95,6 @@ pub enum IrishPuzzle {
     Skull,
     /// The ogham stones, view 6 (FUN_00496020, FUN_004960a0).
     Ogham,
-    /// The blackbird songs, view 73 (FUN_004958f0, FUN_00495ae0,
-    /// FUN_004959f0).
-    Blackbird,
 }
 
 /// The Irish hook FUN_0049b910 calls on a click of a zone of type `kind`
@@ -162,8 +162,9 @@ impl Engine {
             self.event(Event::PuzzleHook { zone: zi, cliczone });
             self.mandala_hook(zone.name.as_deref());
         }
-        // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the puzzles are
-        // not ported; what their move-zone parts do besides is.
+        // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the blackbird's
+        // are ported; of the others, what their move-zone parts do besides
+        // their puzzles is.
         let knife = self
             .names
             .id(defnames::OBJETS, b"COUTEAU_AILILL")
@@ -171,37 +172,31 @@ impl Engine {
         let hook = self
             .current_view()
             .and_then(|v| irish_click_hook(v.name.as_bytes(), self.view, zone.kind, knife));
-        if let Some(function) = hook {
-            self.irish_move_hook(function);
-            self.puzzle_not_ported(function);
+        match hook {
+            Some(0x0049_59f0) => {
+                self.event(Event::PuzzleRan {
+                    function: 0x0049_59f0,
+                });
+                self.blackbird_leave();
+            }
+            Some(0x0049_5ae0) => self.blackbird_click(),
+            Some(function) => {
+                self.irish_move_hook(function);
+                self.puzzle_not_ported(function);
+            }
+            None => {}
         }
         false
     }
 
-    /// What the Irish move-zone hooks do besides their puzzles. The four
-    /// (FUN_00493d20 in view 42, FUN_00496080 in view 6, FUN_00494170 in
-    /// view 2, FUN_004959f0 in view 73) set the cursor pair to no bank,
-    /// frame 0 (FUN_0047bef0(0, 0), @ 0x00493d2f, 0x0049608f, 0x00494179,
-    /// 0x00495a00), whatever is in hand. FUN_004959f0 then frees the
-    /// blackbird game's two answer sounds with no test (@ 0x00495a09..
-    /// 0x00495a1f): FUN_0047aa30(handle, 2) stops voice 2, whatever it
-    /// plays, when the handle is loaded, and unloads it; the five song
-    /// handles are freed when not −1 and set to −1 (none is ever set
-    /// here: the songs are the puzzle's). Then the music to 100 %
-    /// (FUN_004770c0(100) @ 0x00495a4f, with no condition) and the flag
-    /// @ 0x006d2751 cleared (set only by the blackbird game: always clear
-    /// here).
+    /// What the Irish move-zone hooks of the puzzles not ported do
+    /// besides their puzzles. The three (FUN_00493d20 in view 42,
+    /// FUN_00496080 in view 6, FUN_00494170 in view 2) set the cursor pair
+    /// to no bank, frame 0 (FUN_0047bef0(0, 0), @ 0x00493d2f, 0x0049608f,
+    /// 0x00494179), whatever is in hand.
     fn irish_move_hook(&mut self, function: u32) {
-        match function {
-            0x0049_3d20 | 0x0049_6080 | 0x0049_4170 => self.clear_cursor_pair(),
-            0x0049_59f0 => {
-                self.clear_cursor_pair();
-                if std::mem::take(&mut self.blackbird_sounds) {
-                    self.voices.stop(crate::sound::VOICE_EFFECTS);
-                }
-                self.music.set_percent(100);
-            }
-            _ => {}
+        if matches!(function, 0x0049_3d20 | 0x0049_6080 | 0x0049_4170) {
+            self.clear_cursor_pair();
         }
     }
 
@@ -219,18 +214,21 @@ impl Engine {
     }
 
     /// The view entry's puzzle set-up (FUN_0049bd50) for the views the
-    /// port has: Ireland's are not ported (noted), Tibet has none.
+    /// port has: the blackbird's (view 73) runs, Ireland's others are not
+    /// ported (noted), Tibet has none.
     pub(super) fn entry_hooks(&mut self) {
         let hook = self
             .current_view()
             .and_then(|v| irish_entry_hook(v.name.as_bytes(), self.view));
-        if let Some(function) = hook {
-            // FUN_004958f0 loads `merleb.apc` and `merlem.apc` (a failed
-            // load is fatal, @ 0x0049590e, 0x00495934).
-            if function == 0x0049_58f0 {
-                self.blackbird_sounds = true;
+        match hook {
+            Some(0x0049_58f0) => {
+                self.event(Event::PuzzleRan {
+                    function: 0x0049_58f0,
+                });
+                self.blackbird_entry();
             }
-            self.puzzle_not_ported(function);
+            Some(function) => self.puzzle_not_ported(function),
+            None => {}
         }
     }
 
@@ -238,11 +236,9 @@ impl Engine {
     /// tools while the puzzles are not ported: the cross sets `FINCROIX` = 1
     /// and runs a `CtrlScenarIN` scan (FUN_00494190 @ 0x00494216..
     /// 0x0049422a); the ogham stones `FINOGHAM` = 1 when it is 0
-    /// (FUN_004960a0 @ 0x00496108..0x00496131) and the blackbird
-    /// `FINMERLE` = 1 (FUN_00495ae0 @ 0x00495b8a..0x00495b97), with no scan
-    /// (the next one sees them); the skull writes no variable (the scripts
-    /// count `fincrane` themselves). The puzzles' sounds and pictures are
-    /// not played.
+    /// (FUN_004960a0 @ 0x00496108..0x00496131), with no scan (the next one
+    /// sees it); the skull writes no variable (the scripts count `fincrane`
+    /// themselves). The puzzles' sounds and pictures are not played.
     pub fn solve_irish_puzzle(&mut self, puzzle: IrishPuzzle) {
         self.with_script(|s, h| match puzzle {
             IrishPuzzle::Cross => {
@@ -253,9 +249,6 @@ impl Engine {
                 if s.var("FINOGHAM") == Some(0) {
                     s.set_var("FINOGHAM", 1);
                 }
-            }
-            IrishPuzzle::Blackbird => {
-                s.set_var("FINMERLE", 1);
             }
             IrishPuzzle::Skull => {}
         });

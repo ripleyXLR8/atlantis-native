@@ -100,7 +100,7 @@ impl Engine {
         };
         self.place.table[free] = Some(Entry {
             name: name.to_string(),
-            owner,
+            owner: Some(owner),
             looping: false,
         });
         self.place_pcm.insert(free, pcm);
@@ -290,19 +290,25 @@ impl Engine {
             }
         }
         // The position's gains cleared: the sound starts silent
-        // (FUN_0047a650 from those gains).
-        self.place.gains[entry.owner] = (0, 0);
-        let (g0, g1) = self.place.gains[entry.owner];
-        let (att, pan) = place_sound::pan_volume(
-            self.camera.fpu,
-            &crate::sound::attenuation_table(),
-            self.music.master,
-            self.fx_volume,
-            g0,
-            g1,
-            None,
-            false,
-        );
+        // (FUN_0047a650 from those gains); an entry with no position plays
+        // at the effects volume, centred.
+        let (att, pan) = match entry.owner {
+            Some(owner) => {
+                self.place.gains[owner] = (0, 0);
+                let (g0, g1) = self.place.gains[owner];
+                place_sound::pan_volume(
+                    self.camera.fpu,
+                    &crate::sound::attenuation_table(),
+                    self.music.master,
+                    self.fx_volume,
+                    g0,
+                    g1,
+                    None,
+                    false,
+                )
+            }
+            None => (self.fx_attenuation(), 0),
+        };
         let Some(pcm) = self.place_pcm.get(&(id as usize)).cloned() else {
             return;
         };

@@ -157,7 +157,9 @@ fn every_irish_view_is_entered_with_its_hooks() {
                 .events
                 .iter()
                 .filter_map(|x| match x {
-                    Event::PuzzleNotPorted { function } => Some(*function),
+                    Event::PuzzleNotPorted { function } | Event::PuzzleRan { function } => {
+                        Some(*function)
+                    }
                     _ => None,
                 })
                 .collect();
@@ -295,10 +297,10 @@ fn the_irish_move_hooks_reset_the_cursor() {
     assert_eq!(e.cursor.shown, None);
 }
 
-/// Leaving the blackbird's view by a move zone (FUN_004959f0): the cursor
-/// reset, voice 2 stopped (the view entry loaded the game's two answer
-/// sounds; the hook frees them, which stops voice 2), the music back to
-/// 100 %.
+/// Leaving the blackbird's view by a move zone (FUN_004959f0, ported with
+/// the game: `tests/blackbird.rs`): the cursor reset, voice 2 stopped (the
+/// view entry loaded the game's two answer sounds; the hook frees them,
+/// which stops voice 2), the music back to 100 %.
 #[test]
 fn leaving_the_blackbirds_view_stops_voice_2_and_restores_the_music() {
     let Some(files) = game() else { return };
@@ -322,7 +324,7 @@ fn leaving_the_blackbirds_view_stops_voice_2_and_restores_the_music() {
     e.events.clear();
     e.click(20.0);
     e.pass(None);
-    assert!(e.events.contains(&Event::PuzzleNotPorted {
+    assert!(e.events.contains(&Event::PuzzleRan {
         function: 0x0049_59f0
     }));
     assert_eq!(e.cursor.shown, None);
@@ -339,7 +341,6 @@ fn the_puzzles_wins_set_their_variables() {
     assert_eq!(e.script_state().unwrap().vars, before);
     for (puzzle, name) in [
         (IrishPuzzle::Ogham, "FINOGHAM"),
-        (IrishPuzzle::Blackbird, "FINMERLE"),
         (IrishPuzzle::Cross, "FINCROIX"),
     ] {
         assert_eq!(var(&e, name), 0);

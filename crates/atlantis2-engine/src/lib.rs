@@ -21,6 +21,7 @@
 
 pub mod anim;
 pub mod bag;
+pub mod blackbird;
 pub mod camera;
 pub mod credits;
 pub mod crt;
