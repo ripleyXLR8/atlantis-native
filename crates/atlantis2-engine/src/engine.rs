@@ -53,6 +53,8 @@ pub use puzzles::{
 mod saves;
 mod subjects;
 mod ui;
+mod wheels;
+pub use wheels::{DISC_WHEEL, WHEELS_FIRST, WHEELS_SECOND, WHEEL_DISC};
 
 pub use blackbird::Blackbird;
 pub use saves::SaveError;
@@ -132,7 +134,8 @@ pub enum Event {
     /// A puzzle hook the port does not have (China's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
-    /// A puzzle hook the port has, run: the original's function.
+    /// A puzzle function the port has, run: the original's function (a
+    /// hook, or the wheels' check FUN_0048d310).
     PuzzleRan { function: u32 },
     /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
     CrossLaid { value: i32 },
@@ -479,6 +482,9 @@ pub struct Engine {
     /// `CRANE_SPRITE`'s id as the skull's view entry last looked it up
     /// (@ 0x006d26a8; 0 before any).
     pub skull_sprite: i32,
+    /// The animation records of `RoueK1..5` as the wheels' view entry
+    /// last found them (@ 0x006d189c..0x006d18ac), for their clicks.
+    pub wheel_slots: [usize; 5],
     /// The Ogham stones' 15 bytes (@ 0x005e20dc, the save's entry 31):
     /// set at start-up, written by the puzzle's clicks and by a load, not
     /// by a new game.
@@ -861,6 +867,7 @@ impl Engine {
             lent_vars: None,
             skull: puzzles::SKULL_START,
             skull_sprite: 0,
+            wheel_slots: [0; 5],
             ogham: OGHAM_START,
             ogham_sprite: 0,
             enhancements: Enhancements::default(),

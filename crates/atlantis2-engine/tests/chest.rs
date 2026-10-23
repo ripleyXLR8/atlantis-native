@@ -434,7 +434,7 @@ fn the_entry_and_click_hooks_as_the_original() {
         };
         e.set_puzzle_mode(mode);
         e.events.clear();
-        let al = e.chinese_click(name.as_bytes(), number, &z);
+        let al = e.chinese_click(0, name.as_bytes(), number, &z);
         let hooks: Vec<String> = e
             .events
             .iter()
@@ -568,7 +568,8 @@ fn the_mode_of_the_chest_eats_one_click_outside_views_1_to_7() {
     e.events.clear();
     e.click(20.0);
     e.pass(None);
-    assert!(e.events.contains(&Event::PuzzleNotPorted {
+    // The wheels' click runs (`a2/pz-wheels`).
+    assert!(e.events.contains(&Event::PuzzleRan {
         function: 0x0048_d170
     }));
     // The mode is kept by a save.

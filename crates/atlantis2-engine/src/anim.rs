@@ -95,7 +95,8 @@ pub struct Slot {
     /// step moves only the frames of active slots that play
     /// (@ 0x0047d82c). The puzzles' hooks write it to hold or play a
     /// frame (the figurines' entry and click, the chest's hooks
-    /// @ 0x0049393b, @ 0x00493a7c), and `ANIM_THE_FRAME`.
+    /// @ 0x0049393b, @ 0x00493a7c, the wheels'
+    /// FUN_0048d080 and FUN_0048d170), and `ANIM_THE_FRAME`.
     pub playing: bool,
     /// +0x38: for an object, its first `defnames.con` parameter (its
     /// sprite in the objects' bank).
