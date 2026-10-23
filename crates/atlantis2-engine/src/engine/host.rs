@@ -351,6 +351,7 @@ impl Engine {
     /// (@ 0x00480840). The film's end ends it.
     pub(super) fn film_dialog_step(&mut self, new_tick: bool, out: Option<&mut [u16]>) {
         let (w, h) = (self.renderer.width(), self.renderer.height());
+        let fov_screen = self.fov_screen();
         let Some(d) = self.film_dialog.as_mut() else {
             return;
         };
@@ -364,7 +365,8 @@ impl Engine {
             voice_volume: self.voice_volume,
             master: self.music.master,
             clock: self.clock,
-            screen: (w as u32, h as u32),
+            // The field of view takes the screen's size (@ 0x004803e5).
+            screen: fov_screen,
         };
         d.film_step(&mut ctx);
         if let Some(out) = out {

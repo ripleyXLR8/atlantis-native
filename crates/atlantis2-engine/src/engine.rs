@@ -40,6 +40,7 @@ mod cross;
 mod figurines;
 mod hd;
 pub use figurines::FIGURINE_TARGETS;
+mod display;
 mod dragon;
 mod host;
 mod labyrinth;
@@ -374,6 +375,9 @@ pub struct Engine {
     faces: [Vec<u16>; 6],
     work: [Vec<u16>; 6],
     renderer: Renderer,
+    /// The screen's size and, at 800 x 600, the surface the frame is
+    /// drawn on (`crate::display`, `engine/display.rs`).
+    display: crate::display::Display,
     /// The HD mode's view and state (`engine/hd.rs`).
     hd: hd::HdState,
     pub camera: Camera,
@@ -809,6 +813,7 @@ impl Engine {
             faces: Default::default(),
             work: Default::default(),
             renderer: Renderer::new(variant, fpu, width as usize, height as usize),
+            display: crate::display::Display::new(width as usize, height as usize),
             hd: Default::default(),
             camera,
             look: Look::default(),
@@ -1119,7 +1124,9 @@ impl Engine {
         if self.loop_type != LoopType::Dialog {
             return;
         }
-        let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
+        // The field of view takes the screen's size, not the logical one
+        // (@ 0x004803e5): see `crate::display`.
+        let screen = self.fov_screen();
         let Some(d) = self.dialog.as_mut() else {
             return;
         };
@@ -1242,12 +1249,17 @@ impl Engine {
                 if self.loop_type != LoopType::Dialog {
                     self.dialog_prev_loop = self.loop_type;
                 }
-                self.loop_type = LoopType::Dialog;
+                self.set_loop_type(LoopType::Dialog);
+                self.dialog_mode(number);
                 Ok(())
             }
             Err(e) => {
                 self.music.in_dialog = false;
                 self.music.set_percent(100);
+                // AtlDial_start set the loop type 2, then the previous one
+                // back (@ 0x0047ff7a, 0x0047ffd6): the camera set again
+                // for it (nothing changes at 640 x 480).
+                self.set_loop_type(self.loop_type);
                 Err(e)
             }
         };
@@ -1272,10 +1284,11 @@ impl Engine {
     /// The end of the dialog without the script's part (a dialog stopped
     /// by another `dial`, whose section is the one running).
     pub(crate) fn stop_dialog(&mut self) {
-        let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
+        // The screen's size (@ 0x0048096e).
+        let screen = self.fov_screen();
         if let Some(mut d) = self.dialog.take() {
             d.end(&mut self.camera, &self.voices, screen);
-            self.loop_type = self.dialog_prev_loop;
+            self.set_loop_type(self.dialog_prev_loop);
             self.event(Event::DialogEnd);
         }
         self.sync_hidden();
@@ -1307,10 +1320,9 @@ impl Engine {
         &self.voices
     }
 
-    /// One pass of the frame dispatcher (@ 0x0049ce20), drawing into `out`
-    /// (width x height RGB565) when given. Without `out` everything but the
-    /// pixels is done.
-    pub fn pass(&mut self, mut out: Option<&mut [u16]>) {
+    /// [`Engine::pass`] on the surface the frame is drawn on (the logical
+    /// size, [`Engine::width`] x [`Engine::height`]).
+    pub(crate) fn pass_surface(&mut self, mut out: Option<&mut [u16]>) {
         self.centre_draws.clear();
         self.ui_draws.clear();
         self.hd_pass_start();
@@ -1322,7 +1334,7 @@ impl Engine {
             LoopType::Dialog => {
                 self.frame();
                 if let Some(out) = out.as_deref_mut() {
-                    self.render(out);
+                    self.render_surface(out);
                 }
             }
             LoopType::Menu => self.menu_pass(out.as_deref_mut()),
@@ -1342,7 +1354,7 @@ impl Engine {
     /// to `)`, a CR or 63 characters, loaded from `spr\` (FUN_0047ba80).
     /// The section goes on at once.
     pub(crate) fn open_picture(&mut self, value: &str) {
-        self.loop_type = LoopType::Picture;
+        self.set_loop_type(LoopType::Picture);
         if self.picture.take().is_some() {
             log::warn!("ViewBigSpr_Start() : bank non NULL");
         }
@@ -1380,7 +1392,7 @@ impl Engine {
         }
         self.anim_tick();
         if self.click {
-            self.loop_type = LoopType::Warp;
+            self.set_loop_type(LoopType::Warp);
             self.picture = None;
             self.click = false;
             self.look.stop();
@@ -2299,7 +2311,7 @@ impl Engine {
             end,
             shown: 0,
         });
-        self.loop_type = LoopType::Video;
+        self.set_loop_type(LoopType::Video);
         true
     }
 
@@ -2307,7 +2319,7 @@ impl Engine {
     /// the end, a click or a double click ends it.
     fn video_pass(&mut self, mut out: Option<&mut [u16]>) {
         let Some(v) = &mut self.video else {
-            self.loop_type = LoopType::Warp;
+            self.set_loop_type(LoopType::Warp);
             return;
         };
         let new_tick = v.tick != self.ticks;
@@ -2402,7 +2414,8 @@ impl Engine {
         self.click = false;
         // FUN_0047c240 (@ 0x0040c0e1): the transition sprites freed.
         self.spf.clear();
-        self.loop_type = self.video.take().map_or(LoopType::Warp, |v| v.prev);
+        let prev = self.video.take().map_or(LoopType::Warp, |v| v.prev);
+        self.set_loop_type(prev);
         self.event(Event::VideoEnd);
         // FUN_0040bae0: the video's sound stops; the next warp draw asks
         // for the music at 100 % unless a dialog runs; a dialog played
@@ -2426,13 +2439,14 @@ impl Engine {
         self.with_script(|s, h| s.video_ended(h));
     }
 
-    /// Draws the current screen into `out` without running a pass: the
+    /// [`Engine::render`] on the surface the frame is drawn on (the
+    /// logical size, [`Engine::width`] x [`Engine::height`]): the
     /// cube with the place animations as FUN_0045a930 draws it (no cursor,
     /// no centre marker), or the video's frame. In a dialog
     /// (@ 0x00480840): nothing before its first line; the panorama for a
     /// head or `voixoff` line, then the dialog frame over it; for
     /// `voixoff0` and `cinema` lines the subtitles over what `out` holds.
-    pub fn render(&mut self, out: &mut [u16]) {
+    pub fn render_surface(&mut self, out: &mut [u16]) {
         self.hd_pass_start();
         self.render_frame(out);
         self.hd_pass_end(out);

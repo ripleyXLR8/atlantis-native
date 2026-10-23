@@ -31,6 +31,18 @@
 //! upscaled. `--size <w>x<h>` gives the window's size (in a headless run,
 //! the size of the screenshot, composed as the window would show it).
 //!
+//! F10 (or O) opens the port's options menu
+//! (`atlantis2_engine::options_menu`, the first game's): the graphics
+//! (original or HD) and the HD options, the screen (the original's 640 x
+//! 480 or 800 x 600, `atlantis2_engine::display`), the minor bug fixes;
+//! the game is paused while it is open. Its choices are kept in
+//! `settings.ini` beside the saves (the first game's keys); `--hd`,
+//! `--widescreen` and `--original` hold for the run without changing it.
+//! The screen size is the original's own option, kept in `atlant2.cfg` as
+//! its options page's button keeps it; `--resolution 800x600` chooses it
+//! from the command line. A frame at 800 x 600 is shown scaled to the
+//! window as the 640 x 480 one is.
+//!
 //! Testing aids: `--view <id>[,<yaw>,<pitch>]` starts in another view of
 //! the place (angles in degrees), `--dialog <n>` plays dialog `n` at once
 //! over the view (a click goes to the next line, as in the original), with
@@ -51,14 +63,20 @@
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use atlantis2_data::files::OpenError;
 use atlantis2_data::save::SystemTime;
 use atlantis2_data::A2Files;
 use atlantis2_engine::hd::{picture_rect, side_tiles, tile_for_output, window_to_screen};
 use atlantis2_engine::menu::PageKind;
+use atlantis2_engine::options_menu::{MenuAction, MenuValues, OptionsMenu};
+use atlantis2_engine::settings::{Settings, SETTINGS_FILE};
 use atlantis2_engine::{Engine, Enhancements, Fpu, LoopType, Variant};
-use atlantis_engine::hd::{HdCompositor, HdFrame};
+use atlantis_engine::hd::{HdCompositor, HdFrame, HdText};
+use atlantis_engine::subtitles::SubtitleFont;
+use atlantis_engine::sys::Key as MenuKey;
 use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalPosition;
@@ -113,6 +131,12 @@ pub struct A2Start {
     /// Script commands run at the start (`--command`), before the view
     /// entry: `(monde=1)(changewam=bigile1.wam)(vue=5)` goes to Ireland.
     pub commands: Vec<String>,
+    /// The original's screen size (`--resolution`): its options page's
+    /// choice, kept in `atlant2.cfg`.
+    pub resolution: Option<(u32, u32)>,
+    /// A headless run's screenshot shows the options menu (F10) over the
+    /// last frame (`--options-menu`).
+    pub options_menu: bool,
 }
 
 impl A2Start {
@@ -138,6 +162,14 @@ impl A2Start {
         (w > 0 && h > 0).then_some((w, h))
     }
 
+    /// Parses `--resolution`'s value: `640x480` or `800x600`.
+    pub fn parse_resolution(v: &str) -> Option<(u32, u32)> {
+        match Self::parse_size(v)? {
+            s @ ((640, 480) | (800, 600)) => Some(s),
+            _ => None,
+        }
+    }
+
     /// Parses `--menu`'s value.
     pub fn parse_menu(v: &str) -> Option<PageKind> {
         Some(match v.to_ascii_lowercase().as_str() {
@@ -156,6 +188,9 @@ impl A2Start {
     /// the testing aids), then the view, the dialog and the menu page asked
     /// for.
     pub fn begin(&self, engine: &mut Engine, headless: bool) -> Result<(), String> {
+        if let Some((w, _)) = self.resolution {
+            engine.set_screen_800(w == 800);
+        }
         let at_once = self.view.is_some()
             || !self.commands.is_empty()
             || self.dialog.is_some()
@@ -294,28 +329,57 @@ fn local_now() -> SystemTime {
     SystemTime::from_unix(secs + offset, d.subsec_millis() as u16)
 }
 
-/// The folder of the saves and `atlant2.cfg`.
+/// The folder of the saves, `atlant2.cfg` and `settings.ini`.
 pub fn data_dir() -> PathBuf {
     crate::desktop::data_dir().join("atlantis2")
+}
+
+/// Atlantis II's `settings.ini` (the port's options: the enhancements, the
+/// graphics), written with the defaults when there is none, as the first
+/// game's.
+pub fn stored_settings() -> Settings {
+    let path = data_dir().join(SETTINGS_FILE);
+    match std::fs::read(&path) {
+        Ok(b) => Settings::parse(&String::from_utf8_lossy(&b)),
+        Err(_) => {
+            let s = Settings::default();
+            save_settings(&s);
+            s
+        }
+    }
+}
+
+/// Writes `settings.ini`.
+fn save_settings(s: &Settings) {
+    let dir = data_dir();
+    let path = dir.join(SETTINGS_FILE);
+    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&path, s.to_text())) {
+        log::warn!("{}: {e}", path.display());
+    }
 }
 
 /// Opens the game folder and starts the game as `start` says, the cube
 /// drawn by `warpPII` (the reference renderer) for a process whose x87
 /// control word starts as Win32's default.
+/// Returns the engine and the game's release (for the options menu).
 pub fn open(
     dir: &Path,
     discs: &[PathBuf],
     start: &A2Start,
     enhancements: Enhancements,
-) -> Result<Engine, String> {
-    let mut engine = boot(dir, discs, enhancements)?;
+) -> Result<(Engine, String), String> {
+    let (mut engine, label) = boot(dir, discs, enhancements)?;
     start.begin(&mut engine, false)?;
-    Ok(engine)
+    Ok((engine, label))
 }
 
 /// The game folder opened and the game booted, with its saves' folder
-/// and the enhancements asked for.
-fn boot(dir: &Path, discs: &[PathBuf], enhancements: Enhancements) -> Result<Engine, String> {
+/// and the enhancements asked for; the game's release.
+fn boot(
+    dir: &Path,
+    discs: &[PathBuf],
+    enhancements: Enhancements,
+) -> Result<(Engine, String), String> {
     let (files, build) = A2Files::open_dir(dir, discs).map_err(|e| match e {
         OpenError::NoDisc => format!(
             "{}: {e}, or give their folder with --discs <folder>",
@@ -341,7 +405,7 @@ fn boot(dir: &Path, discs: &[PathBuf], enhancements: Enhancements) -> Result<Eng
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u32);
     engine.anim.rand = atlantis2_engine::anim::MsvcRand(seed);
-    Ok(engine)
+    Ok((engine, format!("Game: {}", build.label)))
 }
 
 /// `--headless`: runs `frames` frames of 1/60 s without input (the 15 Hz
@@ -355,16 +419,16 @@ pub fn headless(
     start: &A2Start,
     enhancements: Enhancements,
 ) -> Result<(), String> {
-    let mut engine = boot(dir, discs, enhancements)?;
+    let (mut engine, label) = boot(dir, discs, enhancements)?;
     start.begin(&mut engine, true)?;
     if start.menu.is_some() {
         // The pointer at the screen centre.
         engine.pointer(WIDTH as i32 / 2, HEIGHT as i32 / 2);
     }
-    let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
+    let mut screen = Vec::new();
     let mut sound = vec![0.0f32; 2 * 22050 / 60];
-    // The window's picture, composed every frame when it is not the
-    // 640x480 screen (the HD mode's timings).
+    // The window's picture, composed every frame when it is given a size
+    // (the HD mode's timings).
     let (sw, sh) = start
         .size
         .map_or((WIDTH as usize, HEIGHT as usize), |(w, h)| {
@@ -372,11 +436,13 @@ pub fn headless(
         });
     let mut picture = Picture::new();
     let mut window = vec![0u32; sw * sh];
-    let compose = (sw, sh) != (WIDTH as usize, HEIGHT as usize);
+    let compose = start.size.is_some();
     let mut times = Timings::default();
     for i in 0..frames {
         engine.set_clock(i as f64 / 60.0);
         picture.prepare(&mut engine, sw, sh);
+        let (w, h) = engine.screen_size();
+        screen.resize(w * h, 0);
         let t0 = Instant::now();
         engine.pass(Some(&mut screen));
         let pass = t0.elapsed();
@@ -390,7 +456,29 @@ pub fn headless(
     }
     if frames == 0 {
         picture.prepare(&mut engine, sw, sh);
+        let (w, h) = engine.screen_size();
+        screen.resize(w * h, 0);
         engine.render(&mut screen);
+    }
+    let (scr_w, scr_h) = screen_dims(&screen);
+    println!("screen {scr_w} x {scr_h}");
+    let mut menu_text = HdText::default();
+    if start.options_menu {
+        // The options menu (F10) over the last frame, as the window shows
+        // it.
+        let mut menu = OptionsMenu::new();
+        menu.set_info(menu_info(&label));
+        menu.open();
+        let values = menu_values(&engine);
+        let font = SubtitleFont::new();
+        menu.draw_recording(
+            &mut screen,
+            scr_w,
+            scr_h,
+            &font,
+            values,
+            Some(&mut menu_text),
+        );
     }
     let (wam, view) = engine.place();
     let (yaw, pitch) = engine.angles_deg();
@@ -443,28 +531,66 @@ pub fn headless(
         println!("{t}");
     }
     if let Some(path) = screenshot.filter(|_| compose) {
-        picture.compose(&engine, &screen, &mut window, sw, sh);
+        picture.compose_with_text(&engine, &screen, &menu_text, &mut window, sw, sh);
         let png = atlantis2_engine::png::encode_xrgb8888(&window, sw, sh);
         std::fs::write(path, png).map_err(|e| format!("{}: {e}", path.display()))?;
         println!("screenshot: {} ({sw}x{sh})", path.display());
     } else if let Some(path) = screenshot {
-        let png = atlantis2_engine::png::encode_rgb565(&screen, WIDTH as usize, HEIGHT as usize);
+        let png = atlantis2_engine::png::encode_rgb565(&screen, scr_w, scr_h);
         std::fs::write(path, png).map_err(|e| format!("{}: {e}", path.display()))?;
-        println!("screenshot: {}", path.display());
+        println!("screenshot: {} ({scr_w}x{scr_h})", path.display());
     }
     Ok(())
 }
 
-/// Opens a window on the game; returns when it is closed.
+/// The size of a screen buffer the engine drew (640 x 480 or 800 x 600,
+/// `Engine::screen_size`).
+fn screen_dims(screen: &[u16]) -> (usize, usize) {
+    use atlantis2_engine::display::{LARGE_H, LARGE_W};
+    if screen.len() == LARGE_W * LARGE_H {
+        (LARGE_W, LARGE_H)
+    } else {
+        (WIDTH as usize, HEIGHT as usize)
+    }
+}
+
+/// The options menu's foot: the game's release, the port.
+fn menu_info(label: &str) -> Vec<String> {
+    vec![label.to_string(), crate::version_string()]
+}
+
+/// What the options menu shows.
+fn menu_values(engine: &Engine) -> MenuValues {
+    MenuValues {
+        enhancements: engine.enhancements,
+        screen_800: engine.cfg().width == 800,
+    }
+}
+
+/// Opens a window on the game; returns when it is closed. `label` names
+/// the game's release in the options menu.
 pub fn run_window(
     engine: Engine,
+    label: String,
     fullscreen: bool,
     size: Option<(u32, u32)>,
 ) -> Result<(), String> {
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let voices = engine.voices().clone();
-    let audio =
-        crate::audio_out::start_with(move |out, rate, channels| voices.fill(out, rate, channels));
+    // The sound stops while the options menu is open (the game paused):
+    // silence, the voices kept where they are.
+    let paused = Arc::new(AtomicBool::new(false));
+    let silent = paused.clone();
+    let audio = crate::audio_out::start_with(move |out, rate, channels| {
+        if silent.load(Ordering::Relaxed) {
+            out.fill(0.0);
+        } else {
+            voices.fill(out, rate, channels);
+        }
+    });
+    let (w, h) = engine.screen_size();
+    let mut menu = OptionsMenu::new();
+    menu.set_info(menu_info(&label));
     let mut app = A2App {
         _audio: audio,
         started: Instant::now(),
@@ -474,7 +600,14 @@ pub fn run_window(
         window: None,
         surface: None,
         picture: Picture::new(),
-        screen: vec![0u16; (WIDTH * HEIGHT) as usize],
+        screen: vec![0u16; w * h],
+        shown: Vec::new(),
+        menu_text: HdText::default(),
+        menu,
+        font: SubtitleFont::new(),
+        paused,
+        paused_at: None,
+        menu_pointer: None,
         motion: (0.0, 0.0),
         keys: [false; 4],
         locked: false,
@@ -488,7 +621,8 @@ pub fn run_window(
 struct A2App {
     /// The sound output (kept alive while the window is open).
     _audio: Option<cpal::Stream>,
-    /// The game's clock starts with the window.
+    /// The game's clock starts with the window (moved on by the time the
+    /// options menu was open).
     started: Instant,
     engine: Engine,
     fullscreen: bool,
@@ -496,9 +630,21 @@ struct A2App {
     size: Option<(u32, u32)>,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// The engine's screen (640 x 480 or 800 x 600).
     screen: Vec<u16>,
+    /// The screen with the options menu drawn over it, the menu's text.
+    shown: Vec<u16>,
+    menu_text: HdText,
     /// The window's picture of the frame (the HD mode's composition).
     picture: Picture,
+    /// The port's options menu (F10, O), its font (the first game's).
+    menu: OptionsMenu,
+    font: SubtitleFont,
+    /// The sound silenced, since when the game is paused (the menu open).
+    paused: Arc<AtomicBool>,
+    paused_at: Option<Instant>,
+    /// The window's pointer on the screen (the options menu's clicks).
+    menu_pointer: Option<(i32, i32)>,
     /// Raw mouse motion not yet given to the engine (fractions kept).
     motion: (f64, f64),
     /// Left, right, up, down held.
@@ -553,27 +699,106 @@ impl A2App {
             self.picture
                 .prepare(&mut self.engine, size.width as usize, size.height as usize);
         }
+        // The screen's size: 800 x 600 after the original's option.
+        let (w, h) = self.engine.screen_size();
+        self.screen.resize(w * h, 0);
         self.engine.pass(Some(&mut self.screen));
     }
 
-    /// A window position on the 640x480 screen: the screen pixel the
+    /// A window position on the screen the frame is laid out for (the
+    /// logical size: 640 x 480, or 800 x 600 in the panorama of the
+    /// 800 x 600 mode; the options menu's, the screen's): the pixel the
     /// window shows there (outside the picture, past its edges).
-    fn to_screen(&self, p: PhysicalPosition<f64>) -> Option<(i32, i32)> {
+    fn to_screen(&self, p: PhysicalPosition<f64>, (lw, lh): (usize, usize)) -> Option<(i32, i32)> {
         let size = self.window.as_ref()?.inner_size();
         let rect = picture_rect(size.width as usize, size.height as usize);
         if rect.2 == 0 || rect.3 == 0 {
             return None;
         }
-        Some(window_to_screen(
-            p.x.floor() as i64,
-            p.y.floor() as i64,
-            rect,
-        ))
+        // The 640 x 480 pixel, then the same place on a larger screen.
+        let x = p.x.floor() as i64;
+        let y = p.y.floor() as i64;
+        if (lw, lh) == (WIDTH as usize, HEIGHT as usize) {
+            return Some(window_to_screen(x, y, rect));
+        }
+        let (ox, oy, dw, dh) = rect;
+        let map = |v: i64, o: usize, d: usize, n: usize| -> i32 {
+            ((v - o as i64) * n as i64).div_euclid(d as i64) as i32
+        };
+        Some((map(x, ox, dw, lw), map(y, oy, dh, lh)))
     }
 
-    /// The frame in the window: the 640x480 screen scaled to it (nearest
-    /// pixel, kept in proportion, black bars), or in the HD mode the
-    /// composition of the HD view and the upscaled screen.
+    /// The logical size: what the engine's pointer is in.
+    fn logical(&self) -> (usize, usize) {
+        (self.engine.width(), self.engine.height())
+    }
+
+    /// Opens the options menu: the game pauses (its clock and its sound),
+    /// the system pointer is free.
+    fn open_menu(&mut self) {
+        if self.menu.is_open() {
+            return;
+        }
+        self.menu.open();
+        self.paused_at = Some(Instant::now());
+        self.paused.store(true, Ordering::Relaxed);
+        self.grab(false);
+        self.keys = [false; 4];
+        if let Some(w) = &self.window {
+            w.request_redraw();
+        }
+    }
+
+    /// The menu closed: the game goes on where it was.
+    fn close_menu(&mut self) {
+        self.menu.close();
+        if let Some(t) = self.paused_at.take() {
+            let now = Instant::now();
+            self.started += now.duration_since(t);
+            self.next_frame = now;
+        }
+        self.paused.store(false, Ordering::Relaxed);
+        self.motion = (0.0, 0.0);
+        if self.engine.loop_type == LoopType::Menu {
+            // The game's pointer is drawn by its menus.
+            if let Some(w) = &self.window {
+                w.set_cursor_visible(false);
+            }
+        } else if self.focused {
+            self.grab(true);
+        }
+    }
+
+    fn menu_action(&mut self, action: MenuAction) {
+        match action {
+            MenuAction::None => {}
+            MenuAction::Close => self.close_menu(),
+            MenuAction::SetEnhancements(x) => {
+                // In force at once: the HD mode at the next frame, the
+                // music's from the next track.
+                self.engine.enhancements = x;
+                log::info!("enhancements: {x:?}");
+                let mut s = stored_settings();
+                s.enhancements = x;
+                save_settings(&s);
+            }
+            MenuAction::SetScreen800(on) => {
+                // The original's option: the screen changes at the next
+                // pass; atlant2.cfg written now (the original writes it at
+                // exit, FUN_0047f530).
+                self.engine.set_screen_800(on);
+                log::info!("screen: {}", if on { "800 x 600" } else { "640 x 480" });
+                self.engine.write_cfg();
+            }
+        }
+        if let Some(w) = &self.window {
+            w.request_redraw();
+        }
+    }
+
+    /// The frame in the window: the screen scaled to it (nearest pixel,
+    /// kept in proportion, black bars), or in the HD mode the composition
+    /// of the HD view and the upscaled screen; the options menu over it.
     fn present(&mut self) {
         let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
             return;
@@ -590,33 +815,44 @@ impl A2App {
             return;
         };
         let (ww, wh) = (size.width as usize, size.height as usize);
-        if self.picture.hd(&self.engine) {
-            self.picture
-                .compose(&self.engine, &self.screen, &mut buf, ww, wh);
-            let _ = buf.present();
-            return;
-        }
-        let scale = (ww as f64 / f64::from(WIDTH)).min(wh as f64 / f64::from(HEIGHT));
-        let (dw, dh) = (
-            (f64::from(WIDTH) * scale) as usize,
-            (f64::from(HEIGHT) * scale) as usize,
-        );
-        let (ox, oy) = ((ww - dw) / 2, (wh - dh) / 2);
-        buf.fill(0);
-        let xs: Vec<usize> = (0..dw)
-            .map(|x| (x * WIDTH as usize / dw.max(1)).min(WIDTH as usize - 1))
-            .collect();
-        for y in 0..dh {
-            let sy = (y * HEIGHT as usize / dh.max(1)).min(HEIGHT as usize - 1);
-            let src = &self.screen[sy * WIDTH as usize..(sy + 1) * WIDTH as usize];
-            let row = &mut buf[(oy + y) * ww + ox..(oy + y) * ww + ox + dw];
-            for (d, &sx) in row.iter_mut().zip(&xs) {
-                let [r, g, b] = atlantis2_engine::png::rgb565_to_rgb(src[sx]);
-                *d = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
-            }
-        }
+        let screen = if self.menu.is_open() {
+            let (sw, sh) = screen_dims(&self.screen);
+            self.shown.clone_from(&self.screen);
+            let values = menu_values(&self.engine);
+            // Its text drawn sharp in the HD mode, as the first game's.
+            self.menu.draw_recording(
+                &mut self.shown,
+                sw,
+                sh,
+                &self.font,
+                values,
+                Some(&mut self.menu_text),
+            );
+            &self.shown
+        } else {
+            self.menu_text.items.clear();
+            &self.screen
+        };
+        self.picture
+            .compose_with_text(&self.engine, screen, &self.menu_text, &mut buf, ww, wh);
         let _ = buf.present();
     }
+}
+
+/// The options menu's key for a window key.
+fn menu_key(key: &Key) -> Option<MenuKey> {
+    Some(match key {
+        Key::Named(NamedKey::Escape) => MenuKey::Escape,
+        Key::Named(NamedKey::Enter) => MenuKey::Enter,
+        Key::Named(NamedKey::Space) => MenuKey::Space,
+        Key::Named(NamedKey::ArrowLeft) => MenuKey::Left,
+        Key::Named(NamedKey::ArrowRight) => MenuKey::Right,
+        Key::Named(NamedKey::ArrowUp) => MenuKey::Up,
+        Key::Named(NamedKey::ArrowDown) => MenuKey::Down,
+        Key::Named(NamedKey::F10) => MenuKey::F(10),
+        Key::Character(c) => MenuKey::Char(c.chars().next()?),
+        _ => return None,
+    })
 }
 
 impl ApplicationHandler for A2App {
@@ -644,6 +880,8 @@ impl ApplicationHandler for A2App {
         self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
         self.window = Some(window);
         self.grab(true);
+        let (w, h) = self.engine.screen_size();
+        self.screen.resize(w * h, 0);
         self.engine.render(&mut self.screen);
     }
 
@@ -658,7 +896,7 @@ impl ApplicationHandler for A2App {
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
-            if self.locked {
+            if self.locked && !self.menu.is_open() {
                 self.motion.0 += dx;
                 self.motion.1 += dy;
             }
@@ -667,6 +905,49 @@ impl ApplicationHandler for A2App {
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         let in_menu = self.engine.loop_type == LoopType::Menu;
+        // The options menu open: it takes the keys and the mouse.
+        if self.menu.is_open() {
+            let dims = screen_dims(&self.screen);
+            match &event {
+                WindowEvent::CursorMoved { position, .. } => {
+                    if let Some((x, y)) = self.to_screen(*position, dims) {
+                        self.menu_pointer = Some((x, y));
+                        self.menu.pointer(x, y, dims.0, dims.1);
+                        if let Some(w) = &self.window {
+                            w.request_redraw();
+                        }
+                    }
+                    return;
+                }
+                WindowEvent::MouseInput {
+                    state: ElementState::Pressed,
+                    button: MouseButton::Left,
+                    ..
+                } => {
+                    if let Some((x, y)) = self.menu_pointer {
+                        let values = menu_values(&self.engine);
+                        let action = self.menu.click(x, y, dims.0, dims.1, values);
+                        self.menu_action(action);
+                    }
+                    return;
+                }
+                WindowEvent::MouseInput { .. } => return,
+                WindowEvent::KeyboardInput { event: k, .. } => {
+                    let full = matches!(k.logical_key, Key::Named(NamedKey::F11));
+                    if !full {
+                        if k.state == ElementState::Pressed {
+                            if let Some(key) = menu_key(&k.logical_key) {
+                                let values = menu_values(&self.engine);
+                                let action = self.menu.key(key, values);
+                                self.menu_action(action);
+                            }
+                        }
+                        return;
+                    }
+                }
+                _ => {}
+            }
+        }
         match event {
             WindowEvent::CloseRequested => {
                 // `atlant2.cfg` is written at exit (FUN_0047f530).
@@ -684,9 +965,13 @@ impl ApplicationHandler for A2App {
             // the mouse is not held); held, the raw motion moves it (the
             // bag bar's pointer).
             WindowEvent::CursorMoved { position, .. } if in_menu || !self.locked => {
-                if let Some((x, y)) = self.to_screen(position) {
+                self.menu_pointer = self.to_screen(position, screen_dims(&self.screen));
+                if let Some((x, y)) = self.to_screen(position, self.logical()) {
                     self.engine.pointer(x, y);
                 }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.menu_pointer = self.to_screen(position, screen_dims(&self.screen));
             }
             WindowEvent::MouseInput {
                 state,
@@ -743,12 +1028,20 @@ impl ApplicationHandler for A2App {
                             w.set_fullscreen((!full).then_some(Fullscreen::Borderless(None)));
                         }
                     }
+                    // The port's options menu (F10, or O for keyboards
+                    // without function keys): not the game's keys.
+                    Key::Named(NamedKey::F10) if down && !event.repeat => self.open_menu(),
+                    Key::Character(ref c)
+                        if down && !event.repeat && c.eq_ignore_ascii_case("o") =>
+                    {
+                        self.open_menu()
+                    }
                     _ => {}
                 }
             }
             WindowEvent::RedrawRequested => {
                 let now = Instant::now();
-                if now >= self.next_frame {
+                if now >= self.next_frame && !self.menu.is_open() {
                     self.step();
                     // `EXIT` in a script, or the menus, quit the game.
                     if self.engine.quit() {
@@ -812,7 +1105,8 @@ impl Picture {
         engine.set_hd_output(tile, side);
     }
 
-    /// The frame `screen` in `out` (`width` x `height`, XRGB8888).
+    /// The frame `screen` (640 x 480, or 800 x 600 outside the HD mode)
+    /// in `out` (`width` x `height`, XRGB8888).
     pub fn compose(
         &mut self,
         engine: &Engine,
@@ -821,13 +1115,30 @@ impl Picture {
         width: usize,
         height: usize,
     ) {
+        self.compose_with_text(engine, screen, &HdText::default(), out, width, height);
+    }
+
+    /// [`Picture::compose`] with `text` drawn sharp in the HD mode (the
+    /// options menu's).
+    pub fn compose_with_text(
+        &mut self,
+        engine: &Engine,
+        screen: &[u16],
+        text: &HdText,
+        out: &mut [u32],
+        width: usize,
+        height: usize,
+    ) {
         let (ox, oy, dw, dh) = picture_rect(width, height);
         out[..width * height].fill(0);
-        if engine.enhancements.hd {
+        // (A frame of 800 x 600 left from before the HD mode was turned
+        // on is scaled as without it.)
+        if engine.enhancements.hd && screen.len() == (WIDTH * HEIGHT) as usize {
+            let texts = [text];
             let f = HdFrame {
                 screen,
                 layer: engine.hd_layer(),
-                texts: &[],
+                texts: if text.items.is_empty() { &[] } else { &texts },
                 photo: engine.hd_photo(),
                 video_pano: None,
             };
@@ -835,11 +1146,19 @@ impl Picture {
             self.compositor.compose(f, opts, out, width, ox, oy, dw, dh);
             return;
         }
+        Self::scale(screen, out, width, height);
+    }
+
+    /// The original graphics: the screen (640 x 480 or 800 x 600) scaled
+    /// to the 4:3 picture of a `width` x `height` window (nearest pixel,
+    /// black bars).
+    fn scale(screen: &[u16], out: &mut [u32], width: usize, height: usize) {
+        let (ox, oy, dw, dh) = picture_rect(width, height);
         let lut = atlantis2_engine::hd::rgb565_to_888();
-        let w = WIDTH as usize;
+        let (w, h) = screen_dims(screen);
         let cols: Vec<usize> = (0..dw).map(|x| x * w / dw).collect();
         for y in 0..dh {
-            let src = &screen[(y * HEIGHT as usize / dh) * w..][..w];
+            let src = &screen[(y * h / dh) * w..][..w];
             let row = &mut out[(oy + y) * width + ox..][..dw];
             for (d, &sx) in row.iter_mut().zip(&cols) {
                 *d = lut[usize::from(src[sx])];
@@ -858,8 +1177,10 @@ struct Timings {
     view: f64,
     compose: f64,
     worst: f64,
-    /// Frames without one (videos, menus): their composition.
+    /// Frames without one (videos, menus, the original graphics): their
+    /// pass and their composition.
     other: u32,
+    other_pass: f64,
     other_compose: f64,
 }
 
@@ -874,6 +1195,7 @@ impl Timings {
             self.worst = self.worst.max(p + c);
         } else {
             self.other += 1;
+            self.other_pass += p;
             self.other_compose += c;
         }
     }
@@ -885,13 +1207,14 @@ impl Timings {
         let ms = |t: f64, n: u32| t * 1e3 / f64::from(n.max(1));
         Some(format!(
             "HD: {} frames with the view: pass {:.2} ms (view {:.2} ms), composition {:.2} ms, \
-             slowest {:.2} ms; {} other frames: composition {:.2} ms",
+             slowest {:.2} ms; {} other frames: pass {:.2} ms, composition {:.2} ms",
             self.n,
             ms(self.pass, self.n),
             ms(self.view, self.n),
             ms(self.compose, self.n),
             self.worst * 1e3,
             self.other,
+            ms(self.other_pass, self.other),
             ms(self.other_compose, self.other)
         ))
     }
@@ -907,5 +1230,22 @@ mod tests {
         assert_eq!(A2Start::parse_size("1440X1080"), Some((1440, 1080)));
         assert_eq!(A2Start::parse_size("0x1080"), None);
         assert_eq!(A2Start::parse_size("1920"), None);
+        assert_eq!(A2Start::parse_resolution("800x600"), Some((800, 600)));
+        assert_eq!(A2Start::parse_resolution("640x480"), Some((640, 480)));
+        assert_eq!(A2Start::parse_resolution("1024x768"), None);
+    }
+
+    #[test]
+    fn screens_and_window_points() {
+        assert_eq!(screen_dims(&vec![0; 800 * 600]), (800, 600));
+        assert_eq!(screen_dims(&vec![0; 640 * 480]), (640, 480));
+        // The non-HD picture of an 800 x 600 screen fills the 4:3 window.
+        let screen: Vec<u16> = (0..800 * 600).map(|i| (i % 800) as u16).collect();
+        let mut out = vec![0u32; 1600 * 1200];
+        let lut = atlantis2_engine::hd::rgb565_to_888();
+        Picture::scale(&screen, &mut out, 1600, 1200);
+        assert_eq!(out[0], lut[0]);
+        assert_eq!(out[1599], lut[799]);
+        assert_eq!(out[1200 * 1600 - 2], lut[799]);
     }
 }

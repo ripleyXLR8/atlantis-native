@@ -118,6 +118,15 @@ impl Engine {
         self.music.max = cfg.music;
         self.voice_volume = cfg.dialogs;
         self.cfg_extra = *cfg;
+        // The screen size (`crate::display`): taken at the next pass.
+        let (w, h) = crate::display::screen_for_cfg(cfg.width);
+        if (w as i32, h as i32) != (cfg.width, cfg.height) {
+            log::warn!(
+                "atlant2.cfg: screen {} x {}, {w} x {h} used",
+                cfg.width,
+                cfg.height
+            );
+        }
     }
 
     /// FUN_0047f530 at exit: `atlant2.cfg` written.

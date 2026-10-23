@@ -41,7 +41,11 @@
 //! skips them, `--intro` plays them in a headless run. `--hd` and
 //! `--widescreen` draw its panorama at the window's resolution, as the
 //! first game's HD mode does, `--size <w>x<h>` sizes its window (and a
-//! headless run's screenshot). Only the
+//! headless run's screenshot); F10 (or O) opens its options menu, whose
+//! choices are kept in its own `settings.ini`; `--resolution 800x600`
+//! chooses the original's 800 x 600 screen (its options page's button,
+//! kept in `atlant2.cfg`), `--options-menu` shows the options menu in a
+//! headless run's screenshot. Only the
 //! command line opens Atlantis II for now:
 //! the launcher, the game library and the web build know the first game
 //! alone. The first game's options but `--original` are refused in this
@@ -208,6 +212,14 @@ fn main() {
             std::process::exit(2);
         })
     });
+    // Atlantis II: the original's screen option (its options page,
+    // atlant2.cfg).
+    let resolution = text_value("--resolution").map(|v| {
+        atlantis_app::a2::A2Start::parse_resolution(&v).unwrap_or_else(|| {
+            eprintln!("--resolution {v}: not 640x480 or 800x600");
+            std::process::exit(2);
+        })
+    });
     let pointer = text_value("--pointer").map(|v| {
         atlantis_app::a2::A2Start::parse_pointer(&v).unwrap_or_else(|| {
             eprintln!("--pointer {v}: not <x>,<y>");
@@ -231,6 +243,7 @@ fn main() {
         None => false,
     };
     let talk = flag("--talk");
+    let options_menu = flag("--options-menu");
     let intro = match (flag("--intro"), flag("--no-intro")) {
         (true, true) => {
             eprintln!("--intro and --no-intro together");
@@ -256,15 +269,25 @@ fn main() {
         intro,
         size,
         commands: command.into_iter().collect(),
+        resolution,
+        options_menu,
     };
-    // `--original`, `--hd` and `--widescreen` hold for both games.
-    let mut a2_enhancements = if original {
+    // `--original`, `--hd` and `--widescreen` hold for both games (for
+    // this run: `settings.ini` is not changed). A headless run starts
+    // from the defaults, a window from Atlantis II's `settings.ini`.
+    let a2_flags_applied = |mut x: atlantis2_engine::Enhancements| {
+        if original {
+            x.minor_bug_fixes = false;
+        }
+        x.hd |= force_hd;
+        x.hd_options.widescreen |= force_wide;
+        x
+    };
+    let a2_enhancements = a2_flags_applied(if original {
         atlantis2_engine::Enhancements::original()
     } else {
         atlantis2_engine::Enhancements::default()
-    };
-    a2_enhancements.hd |= force_hd;
-    a2_enhancements.hd_options.widescreen |= force_wide;
+    });
     // The options of one game only, refused for the other rather than
     // ignored.
     let first_game_flags: Vec<&str> = [
@@ -291,6 +314,8 @@ fn main() {
         ("--intro", intro == Some(true)),
         ("--no-intro", intro == Some(false)),
         ("--size", size.is_some()),
+        ("--resolution", resolution.is_some()),
+        ("--options-menu", options_menu),
         ("--command", !a2_start.commands.is_empty()),
     ]
     .into_iter()
@@ -401,8 +426,11 @@ fn main() {
     // A folder of Atlantis II: its own mode.
     if is_a2 {
         refuse(&first_game_flags, "Atlantis II's mode");
-        let run = atlantis_app::a2::open(Path::new(&args[0]), &discs, &a2_start, a2_enhancements)
-            .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen, size));
+        let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
+        let run = atlantis_app::a2::open(Path::new(&args[0]), &discs, &a2_start, enhancements)
+            .and_then(|(engine, label)| {
+                atlantis_app::a2::run_window(engine, label, fullscreen, size)
+            });
         if let Err(e) = run {
             error_box(&e);
             std::process::exit(1);

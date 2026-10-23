@@ -111,8 +111,9 @@ impl Engine {
         }
         let (w, h) = (self.renderer.width(), self.renderer.height());
         if w != WIDTH || h != HEIGHT {
-            // The pages are laid out for 640 x 480 (what 800 x 600 does
-            // with them is not known).
+            // The pages are laid out for 640 x 480; the menu loop draws
+            // on the 640 x 480 surface (`crate::display`), so this is only
+            // a surface of another size given by a caller.
             let mut page = vec![0u16; WIDTH * HEIGHT];
             self.with_menu(|m, e| m.frame(e, Some(&mut page)));
             if let Some(out) = out {
@@ -151,24 +152,28 @@ impl MenuHost for Engine {
         if self.loop_type != LoopType::Menu {
             self.menu_prev_loop = self.loop_type;
         }
-        self.loop_type = LoopType::Menu;
+        self.set_loop_type(LoopType::Menu);
         // The turn stops while a menu is open.
         self.look.stop();
     }
 
     fn leave_menu_loop(&mut self) {
-        self.loop_type = self.menu_prev_loop;
+        self.set_loop_type(self.menu_prev_loop);
         self.click = false;
     }
 
     fn game_screen(&mut self) -> Vec<u16> {
+        // At 800 wide the backdrop is black (FUN_00470430 tests the
+        // screen's width, FUN_00402dd0).
+        if self.display_large() {
+            return vec![0; WIDTH * HEIGHT];
+        }
         let (w, h) = (self.renderer.width(), self.renderer.height());
         let mut out = vec![0u16; w * h];
-        self.render(&mut out);
+        self.render_surface(&mut out);
         if w == WIDTH && h == HEIGHT {
             out
         } else {
-            // At 800 wide the backdrop is black (FUN_00470430).
             vec![0; WIDTH * HEIGHT]
         }
     }

@@ -715,7 +715,8 @@ event, the gong's way back to Tibet) into `china-*.png`.
   composition reused (`atlantis_engine::hd`, `atlantis_engine::upscale`).
   It is `Enhancements::hd` (off by default, and with `--original`),
   turned on by `--hd`, with the widescreen option by `--widescreen`
-  (`hd_options.widescreen`); the options menu does not offer it yet. With
+  (`hd_options.widescreen`), or by the options menu (F10, below), which
+  keeps it in Atlantis II's `settings.ini`. With
   it off the engine does none of this. With it on, the engine's 640x480
   frame is still the original's, pixel for pixel (the scripts, the picks
   and the goldens see the same frames; a test plays the three worlds' views
@@ -1957,8 +1958,7 @@ event, the gong's way back to Tibet) into `china-*.png`.
   frames for the options and the disc, 40 for the sound), asks its
   questions in the yes / no box (save, erase, quit), opens the pages, and
   sets the options (subtitles, centre marker, inverted mouse, the screen
-  size, which is kept in `atlant2.cfg` but not used: the port draws
-  640x480) and the volumes (general = slider × 256, music = music slider
+  size: 640 x 480 or 800 x 600, kept in `atlant2.cfg`, below) and the volumes (general = slider × 256, music = music slider
   × general slider × 127 + 0.5, effects and dialogs × 127, truncated).
   Escape closes the main menu opened from the game (not the player menu).
   The cursor is `curseur.spr` at the mouse; the window then lets the
@@ -1994,10 +1994,77 @@ event, the gong's way back to Tibet) into `china-*.png`.
   "disk full" and "write error" (the original opens them only while
   `LOADMUSIK` copies music, which the port does not do). Not known, and
   chosen here: whether the page title (line 0 of each section) is drawn
-  (it is not), what
-  the 800 x 600 mode does with the 640 x 480 pages (centred). The list's date and
+  (it is not). At 800 x 600 the pages are drawn at 640 x 480 and
+  enlarged, as in the original (below). The list's date and
   time are written in the French system's formats (`22/10/2026
   14:12:00`); the original asks Windows for the user's.
+- **Screen sizes** (`crates/atlantis2-engine/src/display.rs`,
+  `engine/display.rs`): the original's options page offers 640 x 480 and
+  800 x 600 (its button, action 14, `FUN_00402de0`
+  `AtlDisplay_SetNewScreenSize`; kept in `atlant2.cfg`), and the port has
+  both, as the original's own mode (not an enhancement). At 800 x 600 the
+  original keeps two surfaces, the screen and a 640 x 480 one
+  (`FUN_00402720`), and each loop type change (`FUN_0049da90` →
+  `FUN_00402960`) chooses where the frame is drawn and the size the code
+  lays things out for (@ 0x005d9b9c, 0x005d9ba0). The panorama (and the
+  `MESSAGE_CLIC` box, not ported) is drawn on the screen itself: the cube
+  at 800 x 600 with the same 76° across (fx = 800 / (2 tan 38°) = 511.98,
+  centre (400, 300); 60.7° high, as at 640 x 480), the cursor and the
+  object in hand at its centre, the bag bar with 10 cells and its art
+  twice (`FUN_00475740`, `FUN_00474c30`), the overlays and the dowsing
+  rod placed by the screen's size, the subject menu at its fixed
+  positions. Every other loop type (the films and transition videos, the
+  dialogs, the menu pages, the credits, `ViewBigSpr`'s pictures) is drawn
+  on the 640 x 480 surface exactly as at 640 x 480, then enlarged onto the
+  screen by the original's MMX routine (`FUN_00401202` for RGB565, called
+  by `AtlDisplay_AutoBlit` `FUN_00402c30`): 4 pixels to 5 across and 4
+  rows to 5 down, each channel mixed 1:3, 2:2 and 3:1 with truncating
+  shifts, the first and last copied (`blit_640_to_800`, checked against
+  the routine run under emulation on four synthetic pictures:
+  `tests/display.rs`, `golden/blit800.txt`). A dialog is drawn on the
+  screen itself only when it is one of eleven (`FUN_00480110`: 44, 82..88,
+  187..189, single off-screen voice lines over the panorama in Ireland and
+  Yucatán). The dialogs' field of view takes the screen's width
+  (`FUN_004801d0`, `FUN_004808a0`), not the surface's, so behind a head at
+  800 x 600 the panorama, drawn on the 640 x 480 surface, is 1.25 times
+  narrower than at 640 x 480: the original's way (the head, in its own
+  640 x 480 viewport, is the same). At 800 wide the menus' dimmed backdrop
+  is black (`FUN_00470430`). Each mode change sets the camera again
+  (centre, 76° for the size drawn, under the x87 control word of the
+  moment); at 640 x 480, where the size never changes, the port does
+  nothing of this. The surface changes between passes (a change in the
+  middle of a pass takes effect at the next one; a film started by a
+  panorama frame has its first frame enlarged at once). The window
+  scales the 800 x 600 picture as it scales the 640 x 480 one, and a
+  window pixel maps to the pixel of the size the frame is laid out for.
+  The HD mode keeps 640 x 480 (its picture is drawn from the 640 x 480
+  screen); the choice is kept for when it is off. `--resolution
+  800x600` chooses it from the command line (as the button, so it is
+  written to `atlant2.cfg`). Timings at 1920x1080 (release, i7-9700K;
+  `--size 1920x1080 --headless`): a panorama frame's pass 1.6 ms (1.1 ms at
+  640 x 480), a dialog's 4.4 ms (4.1 ms), a menu's 0.9 ms (0.6 ms), plus
+  1.2 to 1.4 ms to scale the picture to the window.
+- **Options menu and settings** (`crates/atlantis2-engine/src/options_menu.rs`,
+  `settings.rs`; the window's side in `crates/atlantis-app/src/a2.rs`):
+  F10 (or O) opens the first game's options menu, with its box, font,
+  colours, keys and mouse: Graphics (Original or HD), the HD options
+  (panorama filter, sharpening, interface, widescreen, the bars beside the
+  videos: black or blurred; greyed in the original graphics), Screen (640
+  x 480 or 800 x 600, the original's option above; greyed in HD), Fix
+  original bugs, Close. The game is paused while it is open (its clock
+  and its sound); its text is drawn sharp in the HD mode, as the first
+  game's. The choices are written at once to Atlantis II's own
+  `settings.ini`, beside its saves and `atlant2.cfg`, with the first
+  game's keys (`minor_bug_fixes`, `graphics = original|hd`,
+  `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_widescreen`,
+  `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
+  written then too (the original writes it at exit). A window reads
+  `settings.ini` at start (written with the defaults when there is none);
+  `--hd`, `--widescreen` and `--original` (which turns the bug fixes off)
+  hold for the run without changing it; a headless run starts from the
+  defaults. `--options-menu` draws the menu over a headless run's last
+  frame. The web build does not run Atlantis II yet, so it has no such
+  menu for it.
 - **Saves** (`crates/atlantis2-data/src/save.rs`, the engine's side in
   `engine/saves.rs`): the original's format, so its saves and the port's
   are the same files: `save\ATL<player>_<slot>.SAV`, 99 slots per player,
