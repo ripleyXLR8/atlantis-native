@@ -10,6 +10,21 @@ use atlantis2_data::wam::EntityState;
 /// `AtlSpw_load : n>MAX_SPW_VISIBLE`.
 pub const MAX_SLOTS: usize = 0x22;
 
+/// The bytes of a slot's frame table (+0x3c..+0xbc).
+pub const FRAME_TAB: usize = 0x80;
+
+/// A frame table's end (and the fill of a new one, @ 0x0047c68a).
+const TAB_END: u8 = 0xfe;
+
+/// A frame table's entry the draw skips (−1).
+const TAB_SKIP: u8 = 0xff;
+
+/// The frame-table functions' warnings (@ 0x005df40c, 0x005df3d4,
+/// 0x005df440).
+pub const ADD_NOT_FOUND: &str = "AddSpwToFrameTab impossible for - non trouvé - :%d";
+pub const ADD_FULL: &str = "AddSpwToFrameTab impossible - Trop d'entrée - for :%d";
+pub const SUB_NOT_FOUND: &str = "SubSpwToFrameTab impossible !! for :%d %d";
+
 /// MSVC's `rand` (@ 0x005ae42b): `seed = seed × 214013 + 2531011`, bits
 /// 16..30. The game seeds it with `GetTickCount()` at the SPW set-up
 /// (@ 0x0047d740).
@@ -80,6 +95,10 @@ pub struct Slot {
     /// +0x38: for an object, its first `defnames.con` parameter (its
     /// sprite in the objects' bank).
     pub object_sprite: i32,
+    /// +0x3c: the frame table a slot whose state is not a single frame
+    /// (+0x34 ≠ 1) draws: signed frame numbers, −1 skipped, ended by −2
+    /// (0xfe, the whole table's fill at load).
+    pub frame_tab: [u8; FRAME_TAB],
     /// +0xc4: the countdown of the random pause.
     pub delay: i32,
 }
@@ -88,6 +107,12 @@ impl Slot {
     /// The box of its current frame on a face, if it has a sprite there.
     pub fn frame_box(&self, face: usize) -> Option<FaceBox> {
         self.spw.face_box(self.frame, face)
+    }
+
+    /// The box of frame `frame` on a face, if it has a sprite there (a
+    /// frame of its table).
+    pub fn box_of(&self, frame: i32, face: usize) -> Option<FaceBox> {
+        self.spw.face_box(frame, face)
     }
 }
 
@@ -112,6 +137,9 @@ pub struct Anim {
     /// slots of that id carry the horse's frame across views in
     /// `FRAMECHEVAL` (@ 0x0047d84d, @ 0x0047c764); none without it.
     pub cheval: Option<i32>,
+    /// The warnings the frame-table functions logged (FUN_00480c20), by
+    /// their format strings, in order.
+    pub warnings: Vec<&'static str>,
 }
 
 /// The texel under the screen centre: (face, column, row).
@@ -127,6 +155,7 @@ impl Anim {
             rand: MsvcRand(seed),
             blend: Blend::rgb565(),
             cheval: None,
+            warnings: Vec::new(),
         }
     }
 
@@ -189,8 +218,96 @@ impl Anim {
             chain: -1,
             active,
             object_sprite,
+            frame_tab: [TAB_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
         });
+    }
+
+    /// `AddSpwToFrameTab` (@ 0x0047c880): `frame` written over the first
+    /// end mark of the frame table of every slot of id `id` (any kind);
+    /// a full table is left as it is. False, with the original's warning,
+    /// when no slot has that id or when the last slot of that id is full.
+    pub fn add_to_frame_tab(&mut self, id: i32, frame: i32) -> bool {
+        // EAX: −1 until a slot of that id, then that slot's search result
+        // (the index written, or 0x80 when it found no end mark).
+        let mut last: Option<usize> = None;
+        for s in self.slots.iter_mut().filter(|s| s.id == id) {
+            let at = s.frame_tab.iter().position(|&b| b == TAB_END);
+            if let Some(k) = at {
+                s.frame_tab[k] = frame as u8;
+            }
+            last = Some(at.unwrap_or(FRAME_TAB));
+        }
+        match last {
+            None => {
+                log::warn!("AddSpwToFrameTab impossible for - non trouvé - :{id}");
+                self.warnings.push(ADD_NOT_FOUND);
+                false
+            }
+            Some(FRAME_TAB) => {
+                log::warn!("AddSpwToFrameTab impossible - Trop d'entrée - for :{id}");
+                self.warnings.push(ADD_FULL);
+                false
+            }
+            Some(_) => true,
+        }
+    }
+
+    /// `SubSpwToFrameTab` (@ 0x0047c910): in the first slot of id `id`
+    /// whose table reaches an end mark, the last entry equal to `frame`
+    /// (before that mark) takes the table's last entry, which becomes the
+    /// end mark. The search also stops on entry 0x7f once `frame` was
+    /// found; a slot whose table has no end mark is passed over, the
+    /// found entry carried on. False, with the original's warning, when
+    /// that slot does not hold `frame`; true when no slot is searched.
+    pub fn sub_from_frame_tab(&mut self, id: i32, frame: i32) -> bool {
+        let mut found: Option<usize> = None;
+        for s in self.slots.iter_mut().filter(|s| s.id == id) {
+            for k in 0..FRAME_TAB {
+                let b = s.frame_tab[k];
+                if i32::from(b as i8) == frame {
+                    found = Some(k);
+                }
+                if b == TAB_END || found == Some(0x7f) {
+                    let Some(f) = found else {
+                        log::warn!("SubSpwToFrameTab impossible !! for :{id} {frame}");
+                        self.warnings.push(SUB_NOT_FOUND);
+                        return false;
+                    };
+                    // The entry before the stop (@ 0x0047c979). At k = 0
+                    // (`frame` −2 on an empty table) that is the byte
+                    // before the table, +0x3b: the top byte of +0x38.
+                    if k == 0 {
+                        let mut sprite = s.object_sprite.to_le_bytes();
+                        s.frame_tab[f] = sprite[3];
+                        sprite[3] = TAB_END;
+                        s.object_sprite = i32::from_le_bytes(sprite);
+                    } else {
+                        s.frame_tab[f] = s.frame_tab[k - 1];
+                        s.frame_tab[k - 1] = TAB_END;
+                    }
+                    return true;
+                }
+            }
+        }
+        true
+    }
+
+    /// FUN_0047c9c0: whether a slot of id `id` holds `frame` anywhere in
+    /// its 128 bytes (end marks included: −2 is found in any table not
+    /// full).
+    pub fn in_frame_tab(&self, id: i32, frame: i32) -> bool {
+        self.slots
+            .iter()
+            .filter(|s| s.id == id)
+            .any(|s| s.frame_tab.iter().any(|&b| i32::from(b as i8) == frame))
+    }
+
+    /// FUN_0047ca10: the frame tables of the slots of id `id` emptied.
+    pub fn clear_frame_tab(&mut self, id: i32) {
+        for s in self.slots.iter_mut().filter(|s| s.id == id) {
+            s.frame_tab = [TAB_END; FRAME_TAB];
+        }
     }
 
     /// FUN_0047d7f0 on a 15 Hz tick: every playing slot one frame on, then
@@ -322,37 +439,52 @@ impl Anim {
         let mut dirty = Vec::new();
         let mut hit = CentreHit::default();
         for (n, s) in self.slots.iter().enumerate() {
-            // Frame lists (+0x34 ≠ 1) are not ported: every Tibet state is a
-            // single animated frame.
-            if !s.active || s.state.single != 1 {
+            if !s.active {
                 continue;
             }
-            if let Some((face, col, row)) = centre {
-                if s.click != 0 {
-                    let b = s.spw.face_box(s.frame, face).unwrap_or_default();
-                    let (x, y, w, h) = (
-                        i32::from(b.x),
-                        i32::from(b.y),
-                        i32::from(b.w),
-                        i32::from(b.h),
-                    );
-                    if row < y + h + 1 && y < row && x < col && col < x + w + 1 {
-                        match s.kind {
-                            1 | 3 => hit.cursor = 2,
-                            2 | 4 => hit.cursor = 1,
-                            _ => {}
+            // FUN_0047ce60: the current frame of a single-frame state, else
+            // the frame table up to its end mark, −1 entries skipped (the
+            // table is 128 bytes: the original reads on past a full one).
+            // The byte it returns is the cursor state's (≠ 0) after the
+            // last frame drawn, 0 when none is.
+            let frames: Vec<i32> = if s.state.single == 1 {
+                vec![s.frame]
+            } else {
+                s.frame_tab
+                    .iter()
+                    .take_while(|&&b| b != TAB_END)
+                    .filter(|&&b| b != TAB_SKIP)
+                    .map(|&b| i32::from(b as i8))
+                    .collect()
+            };
+            for &frame in &frames {
+                if let Some((face, col, row)) = centre {
+                    if s.click != 0 {
+                        let b = s.spw.face_box(frame, face).unwrap_or_default();
+                        let (x, y, w, h) = (
+                            i32::from(b.x),
+                            i32::from(b.y),
+                            i32::from(b.w),
+                            i32::from(b.h),
+                        );
+                        if row < y + h + 1 && y < row && x < col && col < x + w + 1 {
+                            match s.kind {
+                                1 | 3 => hit.cursor = 2,
+                                2 | 4 => hit.cursor = 1,
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                for (face, pixels) in faces.iter_mut().enumerate() {
+                    if let Some(b) = s.spw.face_box(frame, face) {
+                        if s.spw.draw(frame, face, pixels, Clip::FACE, &self.blend) {
+                            dirty.push((face, b));
                         }
                     }
                 }
             }
-            for (face, pixels) in faces.iter_mut().enumerate() {
-                if let Some(b) = s.spw.face_box(s.frame, face) {
-                    if s.spw.draw(s.frame, face, pixels, Clip::FACE, &self.blend) {
-                        dirty.push((face, b));
-                    }
-                }
-            }
-            if hit.cursor != 0 && click && hit.slot.is_none() && s.click > 0 {
+            if !frames.is_empty() && hit.cursor != 0 && click && hit.slot.is_none() && s.click > 0 {
                 hit.slot = Some(n);
             }
         }
