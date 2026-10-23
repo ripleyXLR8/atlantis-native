@@ -157,10 +157,19 @@ fn every_irish_view_is_entered_with_its_hooks() {
                 .events
                 .iter()
                 .filter_map(|x| match x {
-                    Event::PuzzleNotPorted { function } => Some(*function),
+                    Event::PuzzleNotPorted { function } | Event::PuzzleRan { function } => {
+                        Some(*function)
+                    }
                     _ => None,
                 })
                 .collect();
+            // The ogham stones' entry runs (view 6); the others are noted.
+            assert!(e.events.iter().all(|x| !matches!(
+                x,
+                Event::PuzzleNotPorted {
+                    function: 0x0049_6020
+                }
+            )));
             assert_eq!(
                 noted,
                 irish_entry_hook(name.as_bytes(), id)
@@ -288,7 +297,8 @@ fn the_irish_move_hooks_reset_the_cursor() {
     e.events.clear();
     e.click(20.0);
     e.pass(None);
-    assert!(e.events.contains(&Event::PuzzleNotPorted {
+    // FUN_00496080 is the ogham stones' (ported): it runs.
+    assert!(e.events.contains(&Event::PuzzleRan {
         function: 0x0049_6080
     }));
     assert_eq!(e.place(), ("bigile1.wam", 6));
@@ -338,7 +348,6 @@ fn the_puzzles_wins_set_their_variables() {
     e.solve_irish_puzzle(IrishPuzzle::Skull);
     assert_eq!(e.script_state().unwrap().vars, before);
     for (puzzle, name) in [
-        (IrishPuzzle::Ogham, "FINOGHAM"),
         (IrishPuzzle::Blackbird, "FINMERLE"),
         (IrishPuzzle::Cross, "FINCROIX"),
     ] {
@@ -346,10 +355,6 @@ fn the_puzzles_wins_set_their_variables() {
         e.solve_irish_puzzle(puzzle);
         assert_eq!(var(&e, name), 1, "{name}");
     }
-    // The ogham's win only sets a variable still 0.
-    e.run_command(b"(finogham=5)");
-    e.solve_irish_puzzle(IrishPuzzle::Ogham);
-    assert_eq!(var(&e, "FINOGHAM"), 5);
 }
 
 #[test]

@@ -22,6 +22,9 @@ use crate::script::{BagEntry, Shown, SubjectTable};
 /// running, Escape ends it before the main menu opens (@ 0x004762f0).
 const KEPT: [usize; 14] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
 
+/// The Ogham stones' 15 bytes (@ 0x005e20dc), the engine's.
+const OGHAM: usize = 31;
+
 /// The dowsing rod's entries: shown (@ 0x006d84fd, one byte), its frame
 /// (@ 0x006d8500) and its step (@ 0x005e2efc).
 const ROD_ACTIVE: usize = 13;
@@ -144,6 +147,8 @@ impl Engine {
     /// FUN_00478df0 copies them.
     pub fn save_data(&self) -> SaveData {
         let mut d = self.save_extra.clone();
+        // 31: the Ogham stones (@ 0x005e20dc).
+        d.entry_mut(OGHAM).copy_from_slice(&self.ogham);
         let Some(s) = self.con.as_deref() else {
             return d;
         };
@@ -286,6 +291,7 @@ impl Engine {
         for k in KEPT {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }
+        self.ogham.copy_from_slice(d.entry(OGHAM));
         let header = d.header();
         let s = self.con.as_deref_mut().expect("checked above");
         // 1, 5, 6: the chapter, the variables, the flags.

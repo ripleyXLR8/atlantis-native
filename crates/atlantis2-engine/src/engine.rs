@@ -36,6 +36,8 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod host;
 mod menus;
+mod ogham;
+pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
 mod places;
 mod puzzles;
 pub use puzzles::{
@@ -112,9 +114,11 @@ pub enum Event {
     /// A click on a zone the puzzle hooks take (@ 0x0049b910): the zone's
     /// index in the view, and `CLICZONE` as the hook finds it.
     PuzzleHook { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (Ireland's four puzzles): the
+    /// A puzzle hook the port does not have (Ireland's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
+    /// An Irish puzzle hook the port has, run: the original's function.
+    PuzzleRan { function: u32 },
     /// A move to another place (a type-2 zone, @ 0x0040fc60): its file,
     /// the view, and whether it waits for the turn (deferred) or is made
     /// at once.
@@ -423,6 +427,13 @@ pub struct Engine {
     /// FUN_004958f0, loads them; its move-zone hook frees them): the port
     /// keeps only the fact, for the voice their free stops.
     blackbird_sounds: bool,
+    /// The Ogham stones' 15 bytes (@ 0x005e20dc, the save's entry 31):
+    /// set at start-up, written by the puzzle's clicks and by a load, not
+    /// by a new game.
+    pub ogham: [u8; 15],
+    /// The Ogham sprite's id as the view entry found it (@ 0x006d2768),
+    /// for the clicks.
+    ogham_sprite: i32,
     /// Where the port may differ from the original (default: the minor
     /// bug fixes on).
     pub enhancements: Enhancements,
@@ -789,6 +800,8 @@ impl Engine {
             // then, as `FUN_004770c0` is refused while stopped.
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
             blackbird_sounds: false,
+            ogham: OGHAM_START,
+            ogham_sprite: 0,
             enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),

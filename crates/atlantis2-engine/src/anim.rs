@@ -2,13 +2,23 @@
 //! (`AtlSpw_load` @ 0x0047c4e0, at most 0x22), drawn into the cube faces
 //! before the warp (@ 0x0045b040 → @ 0x0047cf00) and stepped once per
 //! 15 Hz tick (@ 0x0047d7f0), with the random hand-over between the states
-//! of one entity (@ 0x0047d9a0).
+//! of one entity (@ 0x0047d9a0). A state that is not one animated frame
+//! (record +0x2c ≠ 1) draws a list of frames instead, which the puzzles
+//! fill (@ 0x0047c880, @ 0x0047c910, @ 0x0047c9c0).
 
 use atlantis2_data::spw::{Blend, Clip, FaceBox, Spw, FACE};
 use atlantis2_data::wam::EntityState;
 
 /// `AtlSpw_load : n>MAX_SPW_VISIBLE`.
 pub const MAX_SLOTS: usize = 0x22;
+
+/// A slot's frame list (+0x3c): 128 bytes (`MAX_FRAME_TAB`), filled with
+/// [`LIST_END`] at load; the frames are signed bytes.
+pub const FRAME_TAB: usize = 0x80;
+/// The end of a frame list (0xfe, −2).
+pub const LIST_END: u8 = 0xfe;
+/// An entry the draw skips (0xff, −1).
+pub const LIST_SKIP: u8 = 0xff;
 
 /// MSVC's `rand` (@ 0x005ae42b): `seed = seed × 214013 + 2531011`, bits
 /// 16..30. The game seeds it with `GetTickCount()` at the SPW set-up
@@ -80,6 +90,10 @@ pub struct Slot {
     /// +0x38: for an object, its first `defnames.con` parameter (its
     /// sprite in the objects' bank).
     pub object_sprite: i32,
+    /// +0x3c: the frames drawn when the state is not one animated frame
+    /// (+0x34 ≠ 1), in list order up to [`LIST_END`], [`LIST_SKIP`]
+    /// skipped.
+    pub frames: [u8; FRAME_TAB],
     /// +0xc4: the countdown of the random pause.
     pub delay: i32,
 }
@@ -189,6 +203,7 @@ impl Anim {
             chain: -1,
             active,
             object_sprite,
+            frames: [LIST_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
         });
     }
@@ -322,41 +337,140 @@ impl Anim {
         let mut dirty = Vec::new();
         let mut hit = CentreHit::default();
         for (n, s) in self.slots.iter().enumerate() {
-            // Frame lists (+0x34 ≠ 1) are not ported: every Tibet state is a
-            // single animated frame.
-            if !s.active || s.state.single != 1 {
+            if !s.active {
                 continue;
             }
-            if let Some((face, col, row)) = centre {
-                if s.click != 0 {
-                    let b = s.spw.face_box(s.frame, face).unwrap_or_default();
-                    let (x, y, w, h) = (
-                        i32::from(b.x),
-                        i32::from(b.y),
-                        i32::from(b.w),
-                        i32::from(b.h),
-                    );
-                    if row < y + h + 1 && y < row && x < col && col < x + w + 1 {
-                        match s.kind {
-                            1 | 3 => hit.cursor = 2,
-                            2 | 4 => hit.cursor = 1,
-                            _ => {}
+            // FUN_0047ce60: one animated frame (+0x34 = 1 and +0x30 = 1)
+            // draws its current frame; otherwise the list's frames in
+            // order up to 0xfe, 0xff skipped (signed bytes).
+            let list: Vec<i32> = if s.state.single == 1 {
+                vec![s.frame]
+            } else {
+                s.frames
+                    .iter()
+                    .take_while(|&&b| b != LIST_END)
+                    .filter(|&&b| b != LIST_SKIP)
+                    .map(|&b| i32::from(b as i8))
+                    .collect()
+            };
+            for &frame in &list {
+                if let Some((face, col, row)) = centre {
+                    if s.click != 0 {
+                        let b = s.spw.face_box(frame, face).unwrap_or_default();
+                        let (x, y, w, h) = (
+                            i32::from(b.x),
+                            i32::from(b.y),
+                            i32::from(b.w),
+                            i32::from(b.h),
+                        );
+                        if row < y + h + 1 && y < row && x < col && col < x + w + 1 {
+                            match s.kind {
+                                1 | 3 => hit.cursor = 2,
+                                2 | 4 => hit.cursor = 1,
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                for (face, pixels) in faces.iter_mut().enumerate() {
+                    if let Some(b) = s.spw.face_box(frame, face) {
+                        if s.spw.draw(frame, face, pixels, Clip::FACE, &self.blend) {
+                            dirty.push((face, b));
                         }
                     }
                 }
             }
-            for (face, pixels) in faces.iter_mut().enumerate() {
-                if let Some(b) = s.spw.face_box(s.frame, face) {
-                    if s.spw.draw(s.frame, face, pixels, Clip::FACE, &self.blend) {
-                        dirty.push((face, b));
-                    }
-                }
-            }
-            if hit.cursor != 0 && click && hit.slot.is_none() && s.click > 0 {
+            // The byte FUN_0047ce60 returns: FUN_0047cf00's (cursor state
+            // ≠ 0) for the last frame drawn; 0 when a list drew none.
+            if hit.cursor != 0 && !list.is_empty() && click && hit.slot.is_none() && s.click > 0 {
                 hit.slot = Some(n);
             }
         }
         (dirty, hit)
+    }
+
+    /// FUN_0047c880 (`AddSpwToFrameTab`): `frame` (as a byte) written at
+    /// the end of the list of every slot of `id`, whatever its kind and
+    /// state. False, with the original's warning, when no slot has `id` or
+    /// the last such slot's list is full (128 entries: the earlier ones
+    /// are still written).
+    pub fn add_frame(&mut self, id: i32, frame: i32) -> bool {
+        let mut last = None;
+        for s in self.slots.iter_mut().filter(|s| s.id == id) {
+            let at = s.frames.iter().position(|&b| b == LIST_END);
+            if let Some(i) = at {
+                s.frames[i] = frame as u8;
+            }
+            last = Some(at);
+        }
+        match last {
+            None => {
+                log::warn!("AddSpwToFrameTab impossible for - non trouvé - :{id}");
+                false
+            }
+            Some(None) => {
+                log::warn!("AddSpwToFrameTab impossible - Trop d'entrée - for :{id}");
+                false
+            }
+            Some(Some(_)) => true,
+        }
+    }
+
+    /// FUN_0047c910 (`SubSpwToFrameTab`): in the first slot of `id` whose
+    /// list has an end, the last entry equal to `frame` (a signed byte)
+    /// is replaced by the list's last entry, which is then the end. False,
+    /// with a warning, when that list does not hold `frame`; true when no
+    /// slot of `id` has a list with an end (nothing changed). The match
+    /// found in a full list of an earlier slot is carried to the next one
+    /// (@ 0x0047c91a sets it once); the port keeps that, but not the
+    /// write below the list it can lead to (an index 0x7f carried into a
+    /// list whose first byte is the end), out of reach of any data.
+    pub fn sub_frame(&mut self, id: i32, frame: i32) -> bool {
+        let mut found: Option<usize> = None;
+        for s in self.slots.iter_mut().filter(|s| s.id == id) {
+            let mut end = None;
+            for (j, &b) in s.frames.iter().enumerate() {
+                if i32::from(b as i8) == frame {
+                    found = Some(j);
+                }
+                if b == LIST_END || found == Some(0x7f) {
+                    end = Some(j);
+                    break;
+                }
+            }
+            let Some(end) = end else { continue };
+            let Some(at) = found else {
+                log::warn!("SubSpwToFrameTab impossible !! for :{id} {frame}");
+                return false;
+            };
+            if end > 0 {
+                s.frames[at] = s.frames[end - 1];
+                s.frames[end - 1] = LIST_END;
+            }
+            return true;
+        }
+        true
+    }
+
+    /// FUN_0047c9c0: whether a slot of `id` has `frame` (a signed byte)
+    /// anywhere in its 128 bytes, past the end included.
+    pub fn has_frame(&self, id: i32, frame: i32) -> bool {
+        self.slots
+            .iter()
+            .filter(|s| s.id == id)
+            .any(|s| s.frames.iter().any(|&b| i32::from(b as i8) == frame))
+    }
+
+    /// Slot `n`'s frame list up to its end, as signed bytes (for tests and
+    /// tools).
+    pub fn frame_list(&self, n: usize) -> Vec<i32> {
+        self.slots.get(n).map_or(Vec::new(), |s| {
+            s.frames
+                .iter()
+                .take_while(|&&b| b != LIST_END)
+                .map(|&b| i32::from(b as i8))
+                .collect()
+        })
     }
 
     /// Takes an object (FUN_0045a650, click kind 1): hidden for good (the
