@@ -899,8 +899,10 @@ Tibet) into `ireland-*.png`.
   mode stays 1 with the menu closed, so the next click with the pointer
   on the grid starts a round; `random(5)` = 5 makes the question read
   the right sound's handle as a song (dialog 89 + handle, or a fatal
-  error past 10); a song 11 has no file (a fatal error, the game quits).
-  The draws share the engine's `rand` (seeded by the music's start and
+  error past 10); a song 11 has no file (a fatal error). At these fatal
+  errors the original makes its emergency save and quits (FUN_00480cd0);
+  the port does not: it logs the error and stops the scripts, and the
+  round goes on with the other songs. The draws share the engine's `rand` (seeded by the music's start and
   the dialogs, as in the original; the original's place animations draw
   from it too, here they have their own). Against the original's
   emulated run (`tests/blackbird.rs`, `tests/golden/blackbird.txt`):
@@ -911,7 +913,8 @@ Tibet) into `ireland-*.png`.
   `random(5)` = 5 case on three table states), the song under the
   pointer, the bird menu's draws, the leave, and 58 warp frames of a
   game with chapter 20 (the menus, the songs, the answers, a wrong one,
-  the edge column, the win with its film and dialog) pass by pass; and
+  the edge column, the win with its film and dialog) pass by pass, with
+  their sprite draws, scans, sounds, the click flag and the cursor; and
   a game played with the mouse by ear from chapter 20's arrival on the
   island to the standing poet's first subject (dialog 64). Known
   difference: the sound table holds the place sounds and these, not the

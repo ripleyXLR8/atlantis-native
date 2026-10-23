@@ -23,7 +23,7 @@ use atlantis2_engine::place_sound::Entry;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::sound::VOICE_EFFECTS;
 use atlantis2_engine::subjects::cell;
-use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
+use atlantis2_engine::{CursorBank, Engine, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
 const GOLDEN: &str = include_str!("golden/blackbird.txt");
@@ -721,14 +721,30 @@ fn the_song_under_the_pointer_and_the_menu_as_the_original() {
 const FRAME_YAW: f32 = -77.5;
 const FRAME_PITCH: f32 = -10.0;
 
-/// The golden's state columns without the cursor and click ones (the
-/// cursor's animation is the cursor choice's, tested in `tests/centre.rs`).
-fn want_state(w: &str) -> String {
+/// The cursor as the golden prints it: the (bank, frame) pair drawn at
+/// the centre, `none` when hidden.
+fn cursor(e: &Engine) -> String {
+    match e.cursor.shown {
+        None => "none".into(),
+        Some(f) => format!(
+            "{}#{f}",
+            match e.cursor.bank {
+                CursorBank::Interface => "interface",
+                CursorBank::Objects => "objects",
+            }
+        ),
+    }
+}
+
+/// The golden's state columns without the cursor one, for the rows taken
+/// between two passes (a dialog's or a film's end), where the port runs
+/// no cursor choice.
+fn want_state_between(w: &str) -> String {
     let toks: Vec<&str> = w.split(' ').collect();
     let mut out = Vec::new();
     let mut i = 0;
     while i < toks.len() {
-        if toks[i] == "click" || toks[i] == "cursor" {
+        if toks[i] == "cursor" {
             i += 2;
             continue;
         }
@@ -738,14 +754,21 @@ fn want_state(w: &str) -> String {
     out.join(" ")
 }
 
-fn state(e: &Engine) -> String {
+/// The state columns, the cursor among them when `with_cursor`.
+fn state_of(e: &Engine, with_cursor: bool) -> String {
     let s = e.script_state().unwrap();
     format!(
-        "menu {} {{3:10}} {} {{3:92}} {} hit {} {{3:28}} {} {{3:93}} {} | {} | regs {},{}",
+        "menu {} {{3:10}} {} {{3:92}} {} click {} hit {}{} {{3:28}} {} {{3:93}} {} | {} | regs {},{}",
         i32::from(e.subject_menu.open),
         s.var("CLICPERSO").unwrap(),
         s.var("SUJET").unwrap(),
+        i32::from(e.click_flag()),
         e.sprite_under_centre().0.map_or(-1, |n| n as i32),
+        if with_cursor {
+            format!(" cursor {}", cursor(e))
+        } else {
+            String::new()
+        },
         s.var("OBJETENMAIN").unwrap(),
         s.var("FINMERLE").unwrap(),
         bb(&e.blackbird),
@@ -786,8 +809,9 @@ fn want_sounds(col: &str) -> String {
 /// Section L replayed: the engine in view 73 with the harness's state,
 /// then each pass of the golden with its pointer and actions (a click,
 /// voice 2's sound ended, the `rand` state forced), the dialogs and the
-/// film ended after it; the subjects bank's draws, the chapter lines, the
-/// sound calls and the state compared.
+/// film ended after it; the sprite draws (but the cursor's at the screen
+/// centre), the chapter lines, the scans, the sound calls and the state
+/// (with the click flag and the cursor pair) compared.
 #[test]
 fn the_warp_frame_as_the_original() {
     let Some(files) = game() else { return };
@@ -850,22 +874,29 @@ fn the_warp_frame_as_the_original() {
             e.pass(None);
             let evs = std::mem::take(&mut e.events);
             let label = format!("pass {k}");
+            // Every sprite drawn but the cursor at the screen centre (drawn
+            // by the port outside the interface's list: the cursor column
+            // below checks its pair).
+            let centre = |x: &str| x.starts_with("spr interface#") && x.ends_with("@320,240");
             let draws: Vec<String> = e
                 .ui_draws
                 .iter()
                 .filter_map(|d| match d {
-                    UiDraw::Sprite {
-                        bank: UiBank::Subjects,
-                        frame,
-                        x,
-                        y,
-                    } => Some(format!("spr subjects#{frame}@{x},{y}")),
+                    UiDraw::Sprite { bank, frame, x, y } => Some(format!(
+                        "spr {}#{frame}@{x},{y}",
+                        match bank {
+                            UiBank::Interface => "interface".to_string(),
+                            UiBank::Subjects => "subjects".to_string(),
+                            b => format!("{b:?}"),
+                        }
+                    )),
                     _ => None,
                 })
+                .filter(|x| !centre(x))
                 .collect();
             let wd: Vec<&str> = parts[1]
                 .split("; ")
-                .filter(|x| x.starts_with("spr subjects#"))
+                .filter(|x| x.starts_with("spr ") && !centre(x))
                 .collect();
             assert_eq!(draws, wd, "{label}: draws");
             assert_eq!(chapter_lines(&evs), want_lines(parts[1]), "{label}: lines");
@@ -890,7 +921,7 @@ fn the_warp_frame_as_the_original() {
             assert_eq!(scans, ws, "{label}: scans");
             assert_eq!(sounds(&e, &evs), want_sounds(parts[2]), "{label}: sounds");
             let want = format!("{} | {} | {}", parts[3], parts[4], parts[5]);
-            assert_eq!(norm(&state(&e)), norm(&want_state(&want)), "{label}: state");
+            assert_eq!(norm(&state_of(&e, true)), norm(&want), "{label}: state");
             k += 1;
             passes += 1;
         } else if let Some(rest) = l
@@ -914,8 +945,8 @@ fn the_warp_frame_as_the_original() {
             );
             let want = format!("{} | {} | {}", parts[2], parts[3], parts[4]);
             assert_eq!(
-                norm(&state(&e)),
-                norm(&want_state(&want)),
+                norm(&state_of(&e, false)),
+                norm(&want_state_between(&want)),
                 "after pass {}",
                 k - 1
             );
