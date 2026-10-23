@@ -113,9 +113,11 @@ pub enum Event {
     /// A click on a zone the puzzle hooks take (@ 0x0049b910): the zone's
     /// index in the view, and `CLICZONE` as the hook finds it.
     PuzzleHook { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (Ireland's four puzzles): the
+    /// A puzzle hook the port does not have (Ireland's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
+    /// An Irish puzzle hook the port has, run: the original's function.
+    PuzzleRan { function: u32 },
     /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
     CrossLaid { value: i32 },
     /// Brigid's cross taken back from the zone of value `value`.

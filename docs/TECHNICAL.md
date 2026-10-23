@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Brigid's cross |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -734,24 +734,23 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   the original does: each tick writes its slot's new frame into the
   script variable `FRAMECHEVAL` (@ 0x0047d84d) and a view entry starts a
   new slot of that id at it (@ 0x0047c764); neither tests the slot's
-  kind. A state whose record's +0x2c is not 1 (Ireland's puzzle
-  pictures) draws the frames of its slot's frame table instead of its
-  current frame (@ 0x0047ce60): 128 bytes, filled with 0xfe (−2, the
-  end) at load, entries −1 skipped, in table order, each with the centre
-  test of its own box; the byte the draw returns is the cursor state's
-  after the last frame drawn (none drawn: 0), so a slot whose table is
-  empty is never recorded under the centre. The puzzles' code fills the
-  tables: `AddSpwToFrameTab` (@ 0x0047c880: the frame over the first end
-  mark of every slot of that id, whatever its kind),
-  `SubSpwToFrameTab` (@ 0x0047c910: in the first slot of that id only,
-  the last equal entry takes the table's last entry), the test
-  @ 0x0047c9c0 (all 128 bytes, end marks included) and the clear
-  @ 0x0047ca10, with the original's warnings (`anim.rs`, checked
-  against the original's on synthetic slots, full tables included,
-  `tests/cross.rs`). A full table has no end mark and the original's
-  draw reads on past it into the slot's next fields; the port stops at
-  its 128 bytes (no puzzle fills one). Not ported: state chains and the
-  odd-tick flag (no Tibet or Irish state uses them).
+  kind. A state that is not one animated frame (record +0x2c ≠ 1: only
+  Ireland's puzzle pictures in the ported places) draws, instead of its
+  current frame, the frames of its 128-byte list (signed bytes, in list
+  order up to 0xfe, 0xff skipped; empty at load), which the puzzles' code
+  fills: `Anim::add_frame` (@ 0x0047c880: at the end of the list of every
+  slot of the id; false with the original's warning when no slot has it
+  or the last one's list is full), `Anim::sub_frame` (@ 0x0047c910: in
+  the first slot of the id whose list has an end, the last entry equal to
+  the frame takes the list's last entry, which becomes the end: the order
+  changes) and `Anim::has_frame` (@ 0x0047c9c0: any of the 128 bytes,
+  past the end too). Such a slot is hit under the centre only when its
+  list drew a frame (the draw @ 0x0047ce60 returns 0 otherwise). Not
+  ported: the clear and index functions (@ 0x0047ca10, @ 0x0047ca50,
+  unused so far) and the write below a list that the removal makes when
+  a match at index 127 of a full list is carried to the next slot (no
+  data reaches it). State chains and the odd-tick flag are not ported
+  (no Tibet or Irish state uses them).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
   `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the

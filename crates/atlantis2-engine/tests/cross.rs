@@ -24,7 +24,9 @@ use atlantis2_data::defnames;
 use atlantis2_data::spw::Spw;
 use atlantis2_data::wam::EntityState;
 use atlantis2_data::{A2Files, Folder};
-use atlantis2_engine::anim::{Anim, ADD_FULL, ADD_NOT_FOUND, SUB_NOT_FOUND};
+use std::cell::RefCell;
+
+use atlantis2_engine::anim::Anim;
 use atlantis2_engine::engine::irish_click_hook;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::subjects::cell;
@@ -61,18 +63,57 @@ fn tab(t: &[u8]) -> String {
     lst(t.iter().take_while(|&&b| b != 0xfe).map(|&b| b as i8))
 }
 
-/// The warnings logged since the last call, as the golden's tags.
-fn warns(a: &mut Anim) -> String {
-    let w: Vec<&str> = a
-        .warnings
-        .drain(..)
-        .map(|w| match w {
-            ADD_NOT_FOUND => "add-none",
-            ADD_FULL => "add-full",
-            SUB_NOT_FOUND => "sub",
-            _ => "?",
-        })
-        .collect();
+thread_local! {
+    /// The warnings this test's thread logged.
+    static LOGGED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Keeps the warnings in the thread that logs them (each test runs in
+/// its own thread).
+struct Capture;
+
+impl log::Log for Capture {
+    fn enabled(&self, m: &log::Metadata) -> bool {
+        m.level() <= log::Level::Warn
+    }
+
+    fn log(&self, r: &log::Record) {
+        if self.enabled(r.metadata()) {
+            LOGGED.with(|l| l.borrow_mut().push(r.args().to_string()));
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+fn capture() {
+    static CAPTURE: Capture = Capture;
+    if log::set_logger(&CAPTURE).is_ok() {
+        log::set_max_level(log::LevelFilter::Warn);
+    }
+    LOGGED.with(|l| l.borrow_mut().clear());
+}
+
+/// The frame-table warnings logged since the last call, as the golden's
+/// tags (the original's format strings, @ 0x005df40c, 0x005df3d4,
+/// 0x005df440).
+fn warns() -> String {
+    let w: Vec<&str> = LOGGED.with(|l| {
+        l.borrow_mut()
+            .drain(..)
+            .filter_map(|m| {
+                if m.starts_with("AddSpwToFrameTab impossible for - non trouvé - :") {
+                    Some("add-none")
+                } else if m.starts_with("AddSpwToFrameTab impossible - Trop d'entrée - for :") {
+                    Some("add-full")
+                } else if m.starts_with("SubSpwToFrameTab impossible !! for :") {
+                    Some("sub")
+                } else {
+                    None
+                }
+            })
+            .collect()
+    });
     lst(w)
 }
 
@@ -107,6 +148,7 @@ fn the_frame_table_functions_as_the_original() {
             tab(&a.slots[2].frames)
         )
     };
+    capture();
     let golden = rows("A ");
     let mut got = Vec::new();
     let mut a = setup();
@@ -125,7 +167,7 @@ fn the_frame_table_functions_as_the_original() {
         got.push(format!(
             "A {op} {id} {f} -> {} | {t} | warn {}",
             i32::from(r),
-            warns(&mut a)
+            warns()
         ));
     }
     // A table filled to its 128 entries, then searched.
@@ -140,7 +182,7 @@ fn the_frame_table_functions_as_the_original() {
         lst(&rs[126..]),
         lst(&raw[..4]),
         lst(&raw[126..]),
-        warns(&mut a)
+        warns()
     ));
     for f in [27, 99, 26] {
         let r = i32::from(a.has_frame(5, f));
@@ -151,15 +193,15 @@ fn the_frame_table_functions_as_the_original() {
             lst(&raw[25..29]),
             lst(&raw[98..101]),
             lst(&raw[126..]),
-            warns(&mut a)
+            warns()
         ));
     }
-    let mut a = setup();
-    for k in [3, 1, 2] {
-        a.add_frame(27, k);
-    }
-    a.clear_frames(27);
-    got.push(format!("A clear 27 after adds 3 1 2 | {}", tabs(&a)));
+    // FUN_0047ca10 (the clear) is not the cross's (the star map uses it):
+    // its row is the original's only.
+    let golden: Vec<&str> = golden
+        .into_iter()
+        .filter(|r| !r.starts_with("A clear"))
+        .collect();
     assert_eq!(got, golden);
 }
 
@@ -222,7 +264,7 @@ fn fresh(e: &mut Engine, monde: i32, cross: i32) {
     e.set_cross_state(cross);
     e.enter_at(2, 0.0, 0.0).unwrap();
     e.cursor.shown = None;
-    e.anim.warnings.clear();
+    LOGGED.with(|l| l.borrow_mut().clear());
     e.events.clear();
 }
 
@@ -294,6 +336,7 @@ fn lines(evs: &[Event]) -> Vec<usize> {
 #[test]
 fn the_entry_and_click_hooks_as_the_original() {
     let Some(files) = game() else { return };
+    capture();
     let mut e = in_view_2(files);
     let names = e.script_state().unwrap().names.clone();
     let id = |n: &str| names.id(defnames::OBJETS, n.as_bytes()).unwrap() as i32;
@@ -337,21 +380,18 @@ fn the_entry_and_click_hooks_as_the_original() {
             "B state {st0} pre {} times {times} -> {} | warn {}",
             lst(&pre),
             st(&e),
-            warns(&mut e.anim)
+            warns()
         ));
     }
     assert_eq!(got, rows("B state"));
     // No slot of the cross (view 1): the add's warning.
     e.set_cross_state(0);
     e.enter_at(1, 0.0, 0.0).unwrap();
-    e.anim.warnings.clear();
+    LOGGED.with(|l| l.borrow_mut().clear());
     e.set_cross_state(4);
     e.cross_entry();
     assert_eq!(
-        format!(
-            "B no slot of the cross, state 4 -> warn {}",
-            warns(&mut e.anim)
-        ),
+        format!("B no slot of the cross, state 4 -> warn {}", warns()),
         rows("B no slot")[0]
     );
 
@@ -366,7 +406,7 @@ fn the_entry_and_click_hooks_as_the_original() {
             st(e),
             lst(lines(&evs)),
             sounds(&evs),
-            warns(&mut e.anim)
+            warns()
         ));
     }
     let give = |e: &mut Engine, n: &str| {
@@ -558,6 +598,7 @@ fn the_cross_is_drawn_from_its_frame_table_as_the_original() {
             .map(|x| x.parse().unwrap())
             .collect()
     };
+    let spw = Spw::parse(data.clone()).unwrap();
     let mut got = Vec::new();
     let golden: Vec<&str> = rows("G tab");
     for row in &golden {
@@ -576,7 +617,7 @@ fn the_cross_is_drawn_from_its_frame_table_as_the_original() {
             let n = f.iter().zip(&bg).filter(|(a, b)| a != b).count();
             let mut samples = Vec::new();
             for &fr in table.iter().filter(|&&x| x >= 0) {
-                let Some(b) = a.slots[0].box_of(fr, k) else {
+                let Some(b) = spw.face_box(fr, k) else {
                     continue;
                 };
                 let (x, y, w, hh) = (

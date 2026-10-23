@@ -84,8 +84,7 @@ pub fn ported_place(wam: &str) -> Option<i32> {
         .map(|&(_, m)| m)
 }
 
-/// The Irish puzzles not ported (Brigid's cross, view 2, is:
-/// FUN_00494120, FUN_00494190 in `cross.rs`).
+/// The Irish puzzles not ported (the testing aid's).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IrishPuzzle {
     /// The skull, views 40-42 (FUN_00493cb0, FUN_00493d40).
@@ -176,9 +175,10 @@ impl Engine {
                 0x0049_4190 => {
                     let cliczone = self.hand_scan_cliczone();
                     self.event(Event::PuzzleHook { zone: zi, cliczone });
+                    self.event(Event::PuzzleRan { function });
                     self.cross_click(zone.value);
                 }
-                0x0049_4170 => {}
+                0x0049_4170 => self.event(Event::PuzzleRan { function }),
                 _ => self.puzzle_not_ported(function),
             }
         }
@@ -246,6 +246,7 @@ impl Engine {
                 self.blackbird_sounds = true;
             }
             if function == 0x0049_4120 {
+                self.event(Event::PuzzleRan { function });
                 self.cross_entry();
             } else {
                 self.puzzle_not_ported(function);
