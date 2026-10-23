@@ -157,10 +157,19 @@ fn every_irish_view_is_entered_with_its_hooks() {
                 .events
                 .iter()
                 .filter_map(|x| match x {
-                    Event::PuzzleNotPorted { function } => Some(*function),
+                    Event::PuzzleNotPorted { function } | Event::PuzzleRan { function } => {
+                        Some(*function)
+                    }
                     _ => None,
                 })
                 .collect();
+            // The skull's entry runs (views 40-42); the others are noted.
+            assert!(e.events.iter().all(|x| !matches!(
+                x,
+                Event::PuzzleNotPorted {
+                    function: 0x0049_3cb0
+                }
+            )));
             assert_eq!(
                 noted,
                 irish_entry_hook(name.as_bytes(), id)
@@ -334,9 +343,6 @@ fn leaving_the_blackbirds_view_stops_voice_2_and_restores_the_music() {
 fn the_puzzles_wins_set_their_variables() {
     let Some(files) = game() else { return };
     let mut e = in_ireland(files);
-    let before = e.script_state().unwrap().vars.clone();
-    e.solve_irish_puzzle(IrishPuzzle::Skull);
-    assert_eq!(e.script_state().unwrap().vars, before);
     for (puzzle, name) in [
         (IrishPuzzle::Ogham, "FINOGHAM"),
         (IrishPuzzle::Blackbird, "FINMERLE"),

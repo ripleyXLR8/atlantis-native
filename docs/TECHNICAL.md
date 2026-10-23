@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, the Irish skull puzzle |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -625,10 +625,11 @@ load and save, quit; below); the right button opens and closes the bag
 bar; a left click on a character with subjects opens the menu of the
 subjects to ask him about (below). The mandalas are laid in the shaman's
 hut (below). Ireland's boat laid there leaves for Ireland (world 1,
-below), which plays to its end without its four puzzles and sends the
+below), which plays to its end (its skull puzzle ported, its three other
+puzzles not) and sends the
 game back to Tibet with Ireland's mandala; a trip to another world (the
 other boats, the crystal, the space travel) plays its film and stays
-where it is. Not yet: the other worlds and Ireland's puzzles.
+where it is. Not yet: the other worlds and three of Ireland's puzzles.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -733,9 +734,23 @@ Tibet) into `ireland-*.png`.
   the original does: each tick writes its slot's new frame into the
   script variable `FRAMECHEVAL` (@ 0x0047d84d) and a view entry starts a
   new slot of that id at it (@ 0x0047c764); neither tests the slot's
-  kind. Not ported: frame lists (+0x2c ≠ 1: only Ireland's puzzle
-  pictures, drawn by the puzzles' code), state chains and the odd-tick
-  flag (no Tibet or Irish state uses them).
+  kind. A state that is not one animated frame (record +0x2c ≠ 1: only
+  Ireland's puzzle pictures in the ported places) draws, instead of its
+  current frame, the frames of its 128-byte list (signed bytes, in list
+  order up to 0xfe, 0xff skipped; empty at load), which the puzzles' code
+  fills: `Anim::add_frame` (@ 0x0047c880: at the end of the list of every
+  slot of the id; false with the original's warning when no slot has it
+  or the last one's list is full), `Anim::sub_frame` (@ 0x0047c910: in
+  the first slot of the id whose list has an end, the last entry equal to
+  the frame takes the list's last entry, which becomes the end: the order
+  changes) and `Anim::has_frame` (@ 0x0047c9c0: any of the 128 bytes,
+  past the end too). Such a slot is hit under the centre only when its
+  list drew a frame (the draw @ 0x0047ce60 returns 0 otherwise). Not
+  ported: the clear and index functions (@ 0x0047ca10, @ 0x0047ca50,
+  unused so far) and the write below a list that the removal makes when
+  a match at index 127 of a full list is carried to the next slot (no
+  data reaches it). State chains and the odd-tick flag are not ported
+  (no Tibet or Irish state uses them).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
   `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
@@ -830,6 +845,46 @@ Tibet) into `ireland-*.png`.
   view numbers and zone types. Not ported: the solution log the original prints at exit
   (@ 0x00495650, a fixed list that is not the fireflies' answer) and the
   fireflies themselves (Shamballa).
+- **Skull** (`engine/puzzles.rs`, Ireland's views 40-42 of
+  `bigile1.wam`): the view entry of the three views (@ 0x00493cb0, from
+  the entry dispatcher @ 0x0049bd50) keeps `CRANE_SPRITE`'s object index,
+  takes frames 0..6 out of its slot's list once each when there, then
+  adds, for each of the seven characters of the puzzle's state in order,
+  the frame c − '0' when it is 0..8 ('9' hides). The state starts as
+  `0199999` (frames 0 and 1 shown) and nothing resets it but a load: a
+  second new game in the same run keeps it, as the original's does. A
+  click on a zone of type 3, 4 or 50 in view 42 (@ 0x00493d40, from the
+  click dispatcher, which never takes an Irish click) runs five blocks
+  in order: when the zone's value is `CRANE_ZONE`'s index (its name and
+  type are not tested) and `OBJETENMAIN` (read again in each block) is
+  `CRANE_CROIX`, `CRANE_RUCHE`, `CRANE_PUIT`, `CRANE_CHAPELLE` or
+  `CRANE_W18`: frame 2, 3, 4, 5 or 6 added to the list of the index the
+  last entry kept, the cursor pair cleared, that digit written at that
+  position of the state, `RunOneCommand("(NewSound=7)")`. No variable is
+  written and the object stays in hand: chapter 7's click scan of the
+  same frame counts `fincrane`, empties the hand, takes the object from
+  the bag and plays sound 3 (which stops sound 7 on voice 2 in the same
+  frame, as in the original); the fifth object plays film 2, then shows
+  Ailill and hides the skull. No guard: the same object twice is listed
+  twice. The state is save entry 30. Against the original's emulated run
+  (`tests/skull.rs`, `tests/golden/skull.txt`): the frame-list functions
+  on three slots, a full list and no slot; the entry per state string
+  (lists given before, no slot, two slots); the click per object, wrong
+  objects, an empty hand, zone variants, twice, all five, before any
+  entry; the dispatchers' choice by warp name, view and zone type; the
+  click and the scan of chapter 7 for three orders of the five objects,
+  line by line, with the bag, the variables, the list, the state and the
+  two slots shown; the drawing of the lists of the three sprite files
+  into six faces (md5 of each face, pixels, the slot hit with the centre
+  on a listed frame). `the_skull_played_with_the_mouse` plays it from
+  chapter 3's view 28: the walk to views 40, 41, 42 (chapter 7), each
+  object picked from the bag bar and laid with a click, film 2, then
+  Ailill clicked: dialog 31. Not known: whether sound 7 is heard at all
+  on the original (it is replaced by sound 3 in the frame it starts; to
+  settle by listening to the original in the Windows 98 machine) and the
+  box a listed frame equal to the file's frame count would take (read
+  past the frame table; only a crafted save holds such a digit; to settle
+  by emulating FUN_0047cb30 on such a frame).
 - **Ireland** (world 1, disc 1; `bigile1.wam`, `livre.wam`,
   `ilepoete.wam`, `ilepoete2.wam`, `puit.wam`; chapters 2-9, 11-17, 19,
   20 and 24): laying Ireland's boat in the shaman's hut runs chapter 75's
@@ -840,15 +895,16 @@ Tibet) into `ireland-*.png`.
   as Tibet's (every key they use is handled, `tests/script.rs` checks
   each of their 653 `/set` lines against the original's handler), and
   chapter 16 sends the game back to Tibet's view 7 with Ireland's mandala
-  in the bag once the story sets its flag. Its four puzzles are not
-  ported: Brigid's cross (view 2), the skull (views 40-42), the ogham
+  in the bag once the story sets its flag. The skull (views 40-42) is
+  ported (above, `Event::PuzzleRan`); three puzzles are not:
+  Brigid's cross (view 2), the ogham
   stones (view 6, with `COUTEAU_AILILL` in hand) and the blackbird songs
   (view 73 of `ilepoete.wam`). The original's dispatcher never takes an
   Irish click (@ 0x0049baba, @ 0x0049bcf8), so the port notes each hook
   (`Event::PuzzleNotPorted`, the original's function) and lets the click
   go on to `CLICZONE`, the click scan and the move as in the original;
-  their pictures (the frame-list states of `CROIXBRIGIT_SPRITE`,
-  `CRANE_SPRITE`, `OGHAM_SPRITE`), sounds and the blackbird's song menu
+  their pictures (the frame-list states of `CROIXBRIGIT_SPRITE` and
+  `OGHAM_SPRITE`), sounds and the blackbird's song menu
   are missing. What their move-zone hooks do besides the puzzles is
   ported: in the four views the cursor loses its picture until the next
   cursor choice (FUN_0047bef0(0, 0), whatever is in hand), and leaving
@@ -857,8 +913,7 @@ Tibet) into `ireland-*.png`.
   sets the music to 100 %. The variables their
   wins write for the scripts are set by `Engine::solve_irish_puzzle`, a
   testing aid: `FINCROIX` = 1 and a scan (the cross), `FINOGHAM` = 1 when
-  0 (the stones), `FINMERLE` = 1 (the blackbird); the skull writes none
-  (the scripts count it themselves). `demo.wam` (chapter 1) is not
+  0 (the stones), `FINMERLE` = 1 (the blackbird). `demo.wam` (chapter 1) is not
   ported: no script reaches chapter 1 and its panoramas are on no disc.
   One place animation of `bigile1.wam` (`woA1001001.SPW`, a shadow in
   view 1, hidden at load) is on no disc; it is skipped with the
@@ -1310,7 +1365,8 @@ Tibet) into `ireland-*.png`.
   the saved music (the music ring restarted at a drawn mark, after a fade
   when another track plays), the dowsing rod (shown, frame, step;
   `baton.spr` loaded again when shown), chapters 39, 46 and 83 run their
-  `/INIT` again. The puzzles and the rod's entry 15 (@ 0x006d84f4, role
+  `/INIT` again. The skull's state (entry 30) is read and written; the
+  other puzzles and the rod's entry 15 (@ 0x006d84f4, role
   not read) are kept as the bytes of the last load until their studies
   are ported; the dialog flag is written from the
   running dialog and not read back (a save made from the menus has no
@@ -1357,7 +1413,8 @@ trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
 installation, for the tests of those builds. For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
-copies); the expected frames, matrices, zone picks, heads, lip-sync
+copies); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s played game
+writes its screens there (`pz-skull-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
 weights, dialog lines, dialog frames, subtitle layouts, music fades,
 script results and save files come from the original `atlantis2.exe` run under emulation
 (Tibet's moves pass by pass, the place animations tick by tick, the
@@ -1365,7 +1422,9 @@ screen centre and the clicks on sprites pass by pass with the texel under
 the centre given, every SPW frame of Tibet and the first of every other
 file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks, the
 subject menu's cells and click grid, the shaman's subjects along chapter
-75, every `/set` line of Ireland's chapters through the handler; names of `defnames.con`
+75, every `/set` line of Ireland's chapters through the handler, the
+skull puzzle's hooks, frame lists, clicks with chapter 7 and drawing;
+names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):
 
@@ -1399,5 +1458,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds without their puzzles: Ireland (its places, chapters, dialogs, place sounds, transition sprites, the way back to Tibet; done, its four puzzles left), then Yucatán, China, Shamballa |
+| next | the other worlds without their puzzles: Ireland (its places, chapters, dialogs, place sounds, transition sprites, the way back to Tibet; done, with its skull puzzle; its three other puzzles left), then Yucatán, China, Shamballa |
 
