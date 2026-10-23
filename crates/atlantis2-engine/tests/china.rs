@@ -139,12 +139,13 @@ fn bare(files: A2Files, name: &str, view: u32) -> Engine {
     e
 }
 
-/// The puzzle hooks noted in `events`, in order.
+/// The puzzle hooks reached in `events`, in order: run (the turtle
+/// ring's) or noted (the others).
 fn noted(events: &[Event]) -> Vec<u32> {
     events
         .iter()
         .filter_map(|x| match x {
-            Event::PuzzleNotPorted { function } => Some(*function),
+            Event::PuzzleNotPorted { function } | Event::PuzzleRan { function } => Some(*function),
             _ => None,
         })
         .collect()
@@ -225,7 +226,9 @@ fn every_chinese_view_is_entered_with_its_hooks() {
     // `1ma1024025.err.SPW`; the original logs it too).
     assert_eq!(missing_spw, ["1mA1024025.SPW"]);
     // The hooks: the turtle ring in every `CH` view 40-64 (and
-    // `chine.wam`'s view 40), the wheels in `SS` 12-13, the chest and the
+    // `chine.wam`'s view 40, which has no ring: the original's fatal
+    // error, here without the scripts only logged; no move enters it),
+    // the wheels in `SS` 12-13, the chest and the
     // figurines in `SS` 1-7, the clouds in `SS` 31, the souls in every
     // `LA` view.
     let count = |f: u32| hooks.iter().filter(|h| h.2 == f).count();
@@ -474,7 +477,7 @@ fn a_picture_until_a_click() {
         found: true
     }));
     assert_eq!(e.loop_type, LoopType::Picture);
-    // The ring's hook (not ported) did not take the click.
+    // The ring's hook did not take the click.
     assert_eq!(noted(&e.events), [0x0049_c290]);
     let mut screen = vec![0u16; 640 * 480];
     let mut plain = vec![0u16; 640 * 480];

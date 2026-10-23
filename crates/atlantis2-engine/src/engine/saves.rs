@@ -16,9 +16,12 @@ use atlantis2_data::save::{
 use super::Engine;
 use crate::script::{BagEntry, Shown, SubjectTable};
 
-/// The entries Native keeps only as bytes: the dowsing rod's 15
-/// (@ 0x006d84f4, its role not read) and the puzzles not ported (20..29,
-/// 32). The dialog flag (33) is written from the running
+/// The entries Native keeps as the save's bytes: the dowsing rod's 15
+/// (@ 0x006d84f4, its role not read), the puzzles not ported (20..25,
+/// 27, 32), and the puzzle mode (26) with the turtle ring's count and
+/// frame store (28, 29), which the engine reads in place
+/// ([`Engine::puzzle_mode`], [`Engine::ring_count`],
+/// [`Engine::ring_store`]). The dialog flag (33) is written from the running
 /// dialog and not read back: a save made from the menus has no dialog
 /// running, Escape ends it before the main menu opens (@ 0x004762f0).
 const KEPT: [usize; 12] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 32];
@@ -292,8 +295,10 @@ impl Engine {
             log::warn!("load: {wam} is in a world not ported yet");
             return Err(SaveError::NotPorted(wam));
         }
-        // FUN_0049bf70 resets the puzzles (not ported: their saved bytes
-        // are kept for the next save).
+        // FUN_0049bf70 resets the puzzles (its quit functions clear the
+        // modes 1, 2, 3 and 6), then the entries are copied: the mode, the
+        // ring's count and store are the save's; the others not ported
+        // are kept for the next save.
         for k in KEPT {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }

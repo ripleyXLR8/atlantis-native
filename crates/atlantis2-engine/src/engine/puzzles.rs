@@ -32,15 +32,19 @@
 //!   leaves the object in hand: chapter 7's sections (the click scan of
 //!   the same frame) count `fincrane`, take the object and, at the fifth,
 //!   play film 2, show Ailill and hide the skull.
-//! - China's hooks (prefixes `CH`, `SS` and `LA`): the figurines, the
-//!   chest, the five wheels, the pearl and dragon, the turtle ring and the
-//!   labyrinth's souls are not ported. Their hooks are listed as the
+//! - China's hooks (prefixes `CH`, `SS` and `LA`), listed as the
 //!   dispatchers call them ([`chinese_click_hooks`],
-//!   [`chinese_entry_hooks`]) and noted ([`Event::PuzzleNotPorted`]);
-//!   none consumes a click (the dispatcher returns 0 for them), so the
-//!   scripts see every click as in the original. [`ChinesePuzzle`] and
+//!   [`chinese_entry_hooks`]); none consumes a click (the dispatcher
+//!   returns 0 for them), so the scripts see every click as in the
+//!   original. The turtle ring (`CH` views 40-64, `turtle.rs`) is ported,
+//!   its hooks noted as [`Event::PuzzleRan`]; with it the puzzle mode
+//!   (@ 0x006d84d0, save entry 26) and the puzzle tick FUN_0049bfb0,
+//!   which the warp frame runs whenever the mode is not 0. The
+//!   figurines, the chest, the five wheels, the pearl and dragon and the
+//!   labyrinth's souls are not ported: their hooks are noted
+//!   ([`Event::PuzzleNotPorted`]), and [`ChinesePuzzle`] with
 //!   [`Engine::solve_chinese_puzzle`] write what their wins write, for
-//!   tests.
+//!   tests (the ring's write nothing).
 //! - The places the port has: Tibet, Ireland and China. A `changewam` to
 //!   any other place (Yucatán's boat, Shamballa, the space travel) is
 //!   refused: the section stops there, the world goes back to the
@@ -51,7 +55,24 @@
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 
+use super::turtle::RING_MODE;
 use super::{Engine, Event};
+
+/// The save entry of the puzzle mode (@ 0x006d84d0).
+const MODE_ENTRY: usize = 26;
+
+/// FUN_0049bfb0's calls by puzzle mode (@ 0x0049bfb9..0x0049c008): 1 the
+/// spider web, 2 the turtle ring, 3 the labyrinth's souls, 6 the octopus,
+/// 4 the dragon, 7 the Maya marbles (through the thunk @ 0x00493190), in
+/// that order; 5 (the chest) has none.
+const PUZZLE_TICKS: [(i32, u32); 6] = [
+    (1, 0x0049_1610),
+    (2, 0x0049_c400),
+    (3, 0x0048_eb30),
+    (6, 0x0049_aaa0),
+    (4, 0x0049_47b0),
+    (7, 0x0049_3190),
+];
 
 /// The warp prefix of Tibet's views (@ 0x005daff8).
 const TIBET_PREFIX: &[u8] = b"TI";
@@ -330,16 +351,56 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
-        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): not
-        // ported, noted; none consumes the click.
+        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): the
+        // turtle ring's runs, the others are noted; none consumes the
+        // click.
         let hooks = self
             .current_view()
             .map(|v| chinese_click_hooks(v.name.as_bytes(), self.view, zone.kind))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            if function == 0x0049_c290 {
+                self.event(Event::PuzzleRan { function });
+                self.turtle_click(self.view, zone.value);
+            } else {
+                self.puzzle_not_ported(function);
+            }
         }
         false
+    }
+
+    /// The puzzle mode (@ 0x006d84d0, save entry 26): 2 after the turtle
+    /// ring's entry, 0 otherwise in the places the port has. The ring's
+    /// hooks and tick clear it outside its views; the reset FUN_0049bf70
+    /// (start-up, load) clears only its own modules' (1, 2, 3, 6) and a
+    /// load then copies the save's, so a new game keeps it.
+    pub fn puzzle_mode(&self) -> i32 {
+        i32::from_le_bytes(self.save_extra.entry(MODE_ENTRY).try_into().unwrap())
+    }
+
+    /// Sets the puzzle mode, as the hooks and a save's entry 26 do.
+    pub fn set_puzzle_mode(&mut self, mode: i32) {
+        self.save_extra
+            .entry_mut(MODE_ENTRY)
+            .copy_from_slice(&mode.to_le_bytes());
+    }
+
+    /// FUN_0049bfb0, the puzzle tick (from the warp frame when the mode
+    /// is not 0, @ 0x0045a5e8): each mode's tick in the original's order,
+    /// the mode read again before each; the turtle ring's runs, the
+    /// others (no ported place sets their modes) are noted. The pause
+    /// byte (@ 0x006d85f0) that stops it is not in the port.
+    pub fn puzzle_tick(&mut self) {
+        for (mode, function) in PUZZLE_TICKS {
+            if self.puzzle_mode() != mode {
+                continue;
+            }
+            if mode == RING_MODE {
+                self.turtle_tick(self.view);
+            } else {
+                self.puzzle_not_ported(function);
+            }
+        }
     }
 
     /// `CLICZONE` as a hook finds it.
@@ -376,7 +437,8 @@ impl Engine {
 
     /// The view entry's puzzle set-up (FUN_0049bd50) for the views the
     /// port has: Ireland's cross (view 2), skull (views 40-42), ogham
-    /// stones (view 6) and blackbird songs (view 73) run; Tibet has none.
+    /// stones (view 6) and blackbird songs (view 73) run, and China's
+    /// turtle ring (`CH` views 40-64); Tibet has none.
     pub(super) fn entry_hooks(&mut self) {
         let hook = self
             .current_view()
@@ -401,13 +463,18 @@ impl Engine {
             Some(function) => self.puzzle_not_ported(function),
             None => {}
         }
-        // China's: not ported, noted.
+        // China's: the turtle ring's runs, the others are noted.
         let hooks = self
             .current_view()
             .map(|v| chinese_entry_hooks(v.name.as_bytes(), self.view))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            if function == 0x0049_c340 {
+                self.event(Event::PuzzleRan { function });
+                self.turtle_entry(self.view);
+            } else {
+                self.puzzle_not_ported(function);
+            }
         }
     }
 

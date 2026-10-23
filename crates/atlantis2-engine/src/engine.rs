@@ -48,6 +48,8 @@ pub use puzzles::{
 };
 mod saves;
 mod subjects;
+mod turtle;
+pub use turtle::RING_MODE;
 mod ui;
 
 pub use blackbird::Blackbird;
@@ -128,7 +130,8 @@ pub enum Event {
     /// A puzzle hook the port does not have (China's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
-    /// An Irish puzzle hook the port has, run: the original's function.
+    /// A puzzle hook the port has (Ireland's, China's turtle ring), run:
+    /// the original's function.
     PuzzleRan { function: u32 },
     /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
     CrossLaid { value: i32 },
@@ -400,6 +403,11 @@ pub struct Engine {
     pub ticks: u32,
     spw_flag: bool,
     cursor_flag: bool,
+    /// The frame dispatcher's 15 Hz flag (@ 0x00656a50): set by every
+    /// tick (@ 0x0040cace), cleared after every pass of the dispatcher
+    /// (@ 0x0049ce56 .. 0x0049cf29); the turtle ring's tick reads and
+    /// clears it (@ 0x0049c41f..0x0049c433).
+    pub frame_flag: bool,
     /// Whether any SPW was ever loaded (@ 0x006c2df8).
     spw_loaded: bool,
     video: Option<Video>,
@@ -812,6 +820,7 @@ impl Engine {
             escape_down: false,
             ticks: 0,
             spw_flag: false,
+            frame_flag: false,
             cursor_flag: false,
             spw_loaded: false,
             video: None,
@@ -1050,6 +1059,7 @@ impl Engine {
         self.ticks = self.ticks.wrapping_add(1);
         self.spw_flag = true;
         self.cursor_flag = true;
+        self.frame_flag = true;
         if let Some(m) = self.menu.as_mut() {
             m.tick_flag = true;
         }
@@ -1281,6 +1291,9 @@ impl Engine {
             LoopType::Menu => self.menu_pass(out),
             LoopType::Picture => self.picture_pass(out),
         }
+        // Every case of the dispatcher ends with the 15 Hz flag cleared
+        // (@ 0x0049ce56 .. 0x0049cf29).
+        self.frame_flag = false;
     }
 
     /// `ViewBigSpr` (FUN_0048c9d0): loop type 11 (the previous one is not
@@ -1458,6 +1471,11 @@ impl Engine {
         // or a film a scan started).
         if let (Some(_), Some(out)) = (&self.video, out) {
             self.draw_video(out);
+        }
+        // The puzzle tick FUN_0049bfb0 whenever the puzzle mode is not 0
+        // (@ 0x0045a5e0..0x0045a5e8).
+        if self.puzzle_mode() != 0 {
+            self.puzzle_tick();
         }
         // 6.
         self.vars.cliczone = 0;
