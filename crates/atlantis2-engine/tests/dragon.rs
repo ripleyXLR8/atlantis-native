@@ -29,7 +29,7 @@ use atlantis2_data::wam::{EntityState, Zone};
 use atlantis2_data::{A2Files, Folder};
 
 use atlantis2_engine::anim::Anim;
-use atlantis2_engine::engine::{chinese_click_hooks, chinese_entry_hooks, Dragon};
+use atlantis2_engine::engine::{chinese_entry_hooks, Dragon};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
@@ -881,30 +881,32 @@ fn the_dispatchers_as_the_original() {
             w[4].parse().unwrap(),
             w[6].parse().unwrap(),
         );
-        // The chest's mode 5 is cleared by the dispatcher in `SS` views
-        // outside 1-7 (@ 0x0049b96d..0x0049b984): the chest's branch.
-        if mode == 5 && name[..2].eq_ignore_ascii_case("SS") && !(1..8).contains(&number) {
-            assert!(row.ends_with("-> - AL 0 mode 0 st 0"), "{row}");
-            continue;
-        }
+        // The engine's dispatcher (its Chinese part) on the row's warp
+        // name, number, zone type and mode, the zone `CLIC_DRAGON`: the
+        // hooks it reaches (their events; the mode 5 cleared outside
+        // `SS` 1-7 with none), AL, the mode and the dragon's state after.
         entered(&mut e, &[]);
         e.set_puzzle_mode(mode);
-        let hooks = chinese_click_hooks(name.as_bytes(), number, kind);
-        for &f in &hooks {
-            match f {
-                0x0049_45f0 => e.set_puzzle_mode(0),
-                0x0049_4600 => e.dragon_click(&zone(kind, dragon, "CLIC_DRAGON")),
-                _ => {}
-            }
-        }
-        let entered: Vec<String> = hooks.iter().map(|&f| hook_name(f)).collect();
+        e.events.clear();
+        let al = e.chinese_click(name.as_bytes(), number, &zone(kind, dragon, "CLIC_DRAGON"));
+        let entered: Vec<String> = e
+            .events
+            .iter()
+            .filter_map(|x| match x {
+                Event::PuzzleRan { function } | Event::PuzzleNotPorted { function } => {
+                    Some(hook_name(*function))
+                }
+                _ => None,
+            })
+            .collect();
         got.push(format!(
-            "{head} -> {} AL 0 mode {} st {}",
+            "{head} -> {} AL {} mode {} st {}",
             if entered.is_empty() {
                 "-".to_string()
             } else {
                 entered.join(",")
             },
+            i32::from(al),
             e.puzzle_mode(),
             e.dragon.state
         ));
@@ -947,7 +949,12 @@ fn the_dispatchers_as_the_original() {
         }
         entered(&mut e, &[]);
         e.set_puzzle_mode(mode);
+        e.events.clear();
         let f = e.puzzle_tick();
+        // The steps not ported are noted.
+        if let Some(function) = f.filter(|&f| f != 0x0049_47b0) {
+            assert_eq!(e.events, [Event::PuzzleNotPorted { function }]);
+        }
         got.push(format!(
             "F tick mode {mode} pause 0 -> {}",
             f.map_or("-".to_string(), hook_name)

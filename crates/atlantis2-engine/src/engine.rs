@@ -44,8 +44,9 @@ pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
 mod places;
 mod puzzles;
 pub use puzzles::{
-    chinese_click_hooks, chinese_entry_hooks, irish_click_hook, irish_entry_hook,
-    mandala_hook_applies, ported_place, ChinesePuzzle, MANDALAS, SKULL_OBJECTS, SKULL_START,
+    chest_mode_cleared, chinese_click_hooks, chinese_entry_hooks, irish_click_hook,
+    irish_entry_hook, mandala_hook_applies, ported_place, ChinesePuzzle, MANDALAS, SKULL_OBJECTS,
+    SKULL_START,
 };
 mod saves;
 mod subjects;

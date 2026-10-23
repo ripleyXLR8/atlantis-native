@@ -1065,10 +1065,19 @@ event, the gong's way back to Tibet) into `china-*.png`.
   is odd, @ 0x0047d181..0x0047d1aa), its pearl shown when it is there. A round
   (@ 0x00494a40(1)) plays the dragon once round and hides the pearl
   after the fixed sequence `ABBAB` (`Num_sequence_dragon` 0..4, wrapping).
+  Not ported: a `Num_sequence_dragon` below 0 or above 7 (only a save
+  written by hand has one) gives `Perle_cachee` 0 with a warning, where
+  the original reads the byte that far from its table with no bound
+  (@ 0x00494a73: the module's next strings above, whatever precedes the
+  table below; 5..7 read the string's zero bytes in both).
   **The puzzle mode and its step**: the mode (@ 0x006d84d0, save entry
   26) is engine state; the clouds' move zones set it to 0
-  (@ 0x004945f0), nothing else here (a new game keeps it, as the
-  original's reset clears only modes 1, 2, 3 and 6); while it is not 0,
+  (@ 0x004945f0), and the click dispatcher clears a 5 (the chest's
+  mode, from a save here) on a zone click in an `SS` view outside 1-7,
+  running no hook on that click (@ 0x0049b96d..0x0049b984); nothing
+  else here (a new game keeps it, not running the original's reset);
+  the other modes' steps (1, 2, 3, 6, 7: a save made in their rooms)
+  are noted each frame (`Event::PuzzleNotPorted`); while it is not 0,
   every warp frame runs its step after the move's completion, turning or
   not (`Engine::puzzle_tick`, FUN_0049bfb0 @ 0x0045a5e8; the original
   skips it while paused, which the port has not). Mode 4's step
@@ -1572,11 +1581,11 @@ event, the gong's way back to Tibet) into `china-*.png`.
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
-  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
-  (it writes the slots' playing byte, @ 0x004833a1, which the pearl and
-  dragon brought in; the key's write is not ported yet), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
-  variables are script state only, as in the original. A fatal error of
+  variables are script state only, as in the original. `ANIM_THE_FRAME`
+  sets the playing byte of the first record of its id, of any kind
+  (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
   logged; the game itself goes on. The original's own unknowns stay open:
   how the menu resets the variables of a new game (the
