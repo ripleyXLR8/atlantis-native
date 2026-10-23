@@ -168,6 +168,13 @@ impl Renderer {
         self.width
     }
 
+    /// The screen size changed (the 800 x 600 mode's surfaces,
+    /// `crate::display`).
+    pub fn resize(&mut self, width: usize, height: usize) {
+        self.width = width;
+        self.height = height;
+    }
+
     pub fn height(&self) -> usize {
         self.height
     }

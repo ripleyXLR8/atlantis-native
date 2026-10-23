@@ -367,6 +367,23 @@ fn t(texts: &MenuTxt, s: Section, i: usize) -> Vec<u8> {
 }
 
 impl Menu {
+    /// The options page's resolution button after the screen size was
+    /// chosen elsewhere (the port's options menu): its text names the size
+    /// it switches to, as action 14 leaves it (Options[8] at 800 x 600,
+    /// Options[9] at 640 x 480).
+    pub fn screen_changed(&mut self, width: i32) {
+        let text = t(
+            &self.texts,
+            Section::Options,
+            if width == 800 { 8 } else { 9 },
+        );
+        if let Some(p) = self.page.as_mut() {
+            if p.widget("b_rezo.spr").is_some() {
+                p.set_text("b_rezo.spr", text);
+            }
+        }
+    }
+
     /// `AtlMenu_MainInit` (@ 0x00485c00): `loc\Menu.txt` (fatal when
     /// missing in the original; empty texts here), `curseur.spr`, and the
     /// popup font (`AtlFT_POPUP` of `loc\Font.txt`).

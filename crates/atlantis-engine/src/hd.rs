@@ -613,6 +613,21 @@ impl HdCompositor {
         true
     }
 
+    /// The text items of `f.texts` drawn at the output's resolution into
+    /// `out` (XRGB8888, `stride` pixels per row, the 640x480 frame being
+    /// its `area`), whatever `opts.sharp_subtitles`: for a front end that
+    /// draws texts of its own between the picture
+    /// ([`HdCompositor::compose_with`] without its texts) and these.
+    pub fn draw_texts(
+        &mut self,
+        f: &HdFrame<'_>,
+        out: &mut [u32],
+        stride: usize,
+        area: (usize, usize, usize, usize),
+    ) {
+        self.draw_text_items(f, out, stride, area, rgb565_to_888(), 0);
+    }
+
     /// Whether [`HdCompositor::compose`] puts back what was under the
     /// 640x480 glyphs of `f.texts` (the picture at `ox` in the window):
     /// with sharp subtitles, and on a video zoomed to the window's sides
