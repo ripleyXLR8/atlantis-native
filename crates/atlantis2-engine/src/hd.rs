@@ -3,7 +3,7 @@
 //! projection, everything else as the original's 640x480 art.
 //!
 //! The original draws the cube with its polygon rasteriser at 640 x 480
-//! (`FUN_0045c030`, `warpPII`; subsystems/warp.md of the RE notes): a
+//! (`FUN_0045c030`, `warpPII`, see [`crate::warp`]): a
 //! camera point (x, y, z) goes to the screen point sx = fx·x/z + cx,
 //! sy = fy·y/z + cy, with fx = fy = W / (2 tan 38°) (76° across 640
 //! pixels) and (cx, cy) = (320, 240), and the texture coordinates of the
@@ -127,7 +127,7 @@ impl HdProjection {
     }
 
     /// The world direction of the camera-space ray (vx, vy, 1), turned by
-    /// the matrix as `FUN_0045adf0` turns the centre's ([`world`]).
+    /// the matrix as `FUN_0045adf0` turns the centre's.
     pub fn world(&self, vx: f64, vy: f64) -> [f64; 3] {
         world(&self.m, vx, vy)
     }

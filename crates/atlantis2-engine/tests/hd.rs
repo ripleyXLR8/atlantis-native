@@ -68,7 +68,7 @@ fn project(cam: &Camera, p: [f64; 3]) -> (f64, f64) {
 }
 
 /// The point of the cube (half-size 10) at face `face`, texel (u, v):
-/// the inverse of the face table (subsystems/warp.md, "Faces"; the
+/// the inverse of the cube's face table (`warp.rs`, `INDICES`; the
 /// corners' texture coordinates of `FUN_0045c790`).
 fn face_point(face: usize, u: f64, v: f64) -> [f64; 3] {
     let s = |t: f64| ((t - 1.0) / 510.0) * 2.0 - 1.0;
