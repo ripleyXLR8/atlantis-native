@@ -97,7 +97,8 @@ pub struct Slot {
     /// frame (the figurines' entry and click, the chest's hooks
     /// @ 0x0049393b, @ 0x00493a7c, the wheels'
     /// FUN_0048d080 and FUN_0048d170, the clouds' entry @ 0x004944a0, the
-    /// turtle ring's entry @ 0x0049c384) and `ANIM_THE_FRAME`.
+    /// turtle ring's entry @ 0x0049c384, the labyrinth's souls held until
+    /// their passage @ 0x0048e0dc, @ 0x0048ebc9) and `ANIM_THE_FRAME`.
     pub playing: bool,
     /// +0x38: for an object, its first `defnames.con` parameter (its
     /// sprite in the objects' bank).
@@ -113,6 +114,10 @@ pub struct Slot {
     /// the pearl and dragon puzzle's transparent cloud is (0x32,
     /// @ 0x00494bed).
     pub blink: i32,
+    /// The WAM state record the slot was loaded from (entity, state, in
+    /// the place's order): the record pointer +0x24 that FUN_0048eae0
+    /// looks a slot up by.
+    pub record: Option<(usize, usize)>,
 }
 
 impl Slot {
@@ -233,6 +238,7 @@ impl Anim {
             frames: [LIST_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
             blink: 0,
+            record: None,
         });
     }
 

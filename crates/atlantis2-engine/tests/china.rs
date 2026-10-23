@@ -1,14 +1,16 @@
-//! China (world 3) without its puzzles: every Chinese chapter's `/INIT`
-//! run; every view of the five places entered, the puzzles' entry hooks
-//! noted; the click hooks, which take no click; the moves between the
-//! places (type-2 zones and WAM links); `NextWarpInvalide` as chapter 59's
-//! door uses it; the picture viewer (`ViewBigSpr`); a demon's special
-//! event; chapter 46's lantern back to Tibet; every dialog the chapters
-//! start; the subjects, objects and musics on disc 3; the place sounds; a
-//! save in China loaded; the testing aid that writes the puzzles' wins.
+//! China (world 3) apart from its puzzles' own tests: every Chinese
+//! chapter's `/INIT` run; every view of the five places entered with the
+//! puzzles' entry hooks; the click hooks, which take no click; the moves
+//! between the places (type-2 zones and WAM links); `NextWarpInvalide` as
+//! chapter 59's door uses it; the picture viewer (`ViewBigSpr`); a
+//! demon's special event; chapter 46's lantern back to Tibet; every
+//! dialog the chapters start; the subjects, objects and musics on disc 3;
+//! the place sounds; a save in China loaded.
 //!
-//! The five wheels (`SS` 12-13) are ported (`tests/wheels.rs`): their
-//! hooks run here and are counted with the others.
+//! The seven puzzles are ported, each with its own test file
+//! (`tests/figurines.rs`, `chest.rs`, `wheels.rs`, `dragon.rs`,
+//! `turtle.rs`, `labyrinth.rs`; the incense is the scripts'): their hooks
+//! run here and are counted with the others.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the tests are skipped.
@@ -553,15 +555,27 @@ fn a_picture_until_a_click() {
 }
 
 /// A demon's special event as chapter 60 starts it (the rat, view 25, an
-/// empty form given): its animation played on, the sound at frame 51, the
-/// event's end at frame 60 (the record rewound), then the section of
-/// `SpecialEventDone=1` gives back the stamped form and plays the
-/// remembered dialog.
+/// empty form given): its animation played on, the sound at frame 51
+/// (F − 9) when voice 2 is idle then, the event's end at frame 60 (the
+/// record rewound), then the section of `SpecialEventDone=1` gives back
+/// the stamped form and plays the remembered dialog. Each tick mixes
+/// 1/15 s of sound, so a voice ends as the output plays it. Run twice:
+/// with the view's souls passing (their sound 220 on voice 2), and with
+/// the puzzle mode 0, no passage, where the stamp's sound 203 is heard.
 #[test]
 fn a_demons_special_event() {
-    let Some(files) = game() else { return };
+    for souls in [true, false] {
+        let Some(files) = game() else { return };
+        demon_event(files, souls);
+    }
+}
+
+fn demon_event(files: A2Files, souls: bool) {
     let mut e = in_china(files);
     goto(&mut e, "labysol.wam", 25, 60);
+    if !souls {
+        e.set_puzzle_mode(0);
+    }
     let s = e.script_state().unwrap();
     let rat = s.names.id(defnames::PERSONNAGES, b"DEMON_RAT").unwrap() as i32;
     let form1 = s.names.id(defnames::OBJETS, b"FORMULAIRE_1").unwrap() as i32;
@@ -575,10 +589,22 @@ fn a_demons_special_event() {
         e.run_command(c);
     }
     e.events.clear();
+    let stamp = Event::Sound("sound203.apc".into());
+    let passage = Event::Sound("sound220.apc".into());
     let mut frames = Vec::new();
+    // At each tick that leaves the rat at frame 51: voice 2 busy before
+    // it, and sound 203 started by it.
+    let mut at_stamp = Vec::new();
     for _ in 0..4000 {
+        let busy = e.voices().is_playing(2);
+        let n = e.events.len();
         e.tick();
         e.pass(None);
+        if e.anim.slots[slot].frame == 51 {
+            at_stamp.push((busy, e.events[n..].contains(&stamp)));
+        }
+        let mut sound = [0.0f32; 2 * 22050 / 15];
+        e.voices().fill(&mut sound, 22050, 2);
         frames.push(e.anim.slots[slot].frame);
         if var(&e, "TestSpecialEvent") == 0 {
             break;
@@ -586,12 +612,25 @@ fn a_demons_special_event() {
     }
     assert_eq!(var(&e, "TestSpecialEvent"), 0, "{frames:?}");
     assert!(frames.contains(&51));
-    let sound = e
-        .events
-        .iter()
-        .position(|x| *x == Event::Sound("sound203.apc".into()))
-        .expect("sound 203");
-    assert!(e.events[sound..].contains(&Event::DialogStart {
+    // Sound 203 at frame 51 exactly when voice 2 is idle then.
+    let heard = e.events.contains(&stamp);
+    assert_eq!(
+        heard,
+        at_stamp.iter().any(|&(busy, _)| !busy),
+        "{at_stamp:?}"
+    );
+    assert_eq!(heard, at_stamp.iter().any(|&(_, s)| s), "{at_stamp:?}");
+    if souls {
+        // This run: a soul passes from frame 46, its sound 220 still
+        // playing at frame 51, so the stamp's sound is not heard.
+        assert!(e.events.contains(&passage));
+        assert!(!heard, "{at_stamp:?}");
+    } else {
+        assert!(!e.events.contains(&passage));
+        assert!(heard, "{at_stamp:?}");
+    }
+    let from = e.events.iter().position(|x| *x == stamp).unwrap_or(0);
+    assert!(e.events[from..].contains(&Event::DialogStart {
         number: 333,
         started: true
     }));

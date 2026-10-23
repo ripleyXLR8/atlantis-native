@@ -351,7 +351,8 @@ fn the_slots_and_zones_of_the_garden_as_the_original() {
         rows("A view 6 zones")[0]
     );
     // The slots each view loads (the figurines' in full; the others by id,
-    // kind and animation, as the chest's entry is not ported).
+    // kind and animation: the chest's entry holds its slot at another
+    // frame than the golden's harness, which ran the figurines' alone).
     for row in rows("A view ").iter().filter(|r| r.contains(" slots ")) {
         let view: u32 = row.split(' ').nth(2).unwrap().parse().unwrap();
         fresh(&mut e, &[0; 6], 0, view);

@@ -956,10 +956,11 @@ fn the_dispatchers_as_the_original() {
         e.set_puzzle_mode(mode);
         e.events.clear();
         let f = e.puzzle_tick();
-        // The turtle ring's step runs (`a2/pz-turtle`); the steps not
+        // The turtle ring's step runs (`a2/pz-turtle`), and the souls'
+        // (`a2/pz-labyrinth`) with no event, as this one; the steps not
         // ported are noted.
         match f {
-            None | Some(0x0049_47b0) => {}
+            None | Some(0x0049_47b0 | 0x0048_eb30) => {}
             Some(function @ 0x0049_c400) => {
                 assert_eq!(e.events.first(), Some(&Event::PuzzleRan { function }));
             }

@@ -414,8 +414,7 @@ fn the_entry_and_click_hooks_as_the_original() {
     // (the chest's run, the others noted), what it returns and the mode
     // after. The zone's value is no chest zone, so the chest's click only
     // holds the chest. FUN_004945f0 (the clouds' move zones) sets the
-    // mode to 0 in the original and is not ported here: its one row has
-    // the mode 0 before.
+    // mode to 0 (`a2/pz-dragon`): its one row has the mode 0 before.
     fresh(&mut e, 5, 3, 0, 0, 0);
     let mut got = Vec::new();
     for row in rows("D ") {
