@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China without its puzzles (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor; its other puzzles not yet) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -1008,22 +1008,22 @@ event, the gong's way back to Tibet) into `china-*.png`.
   case by case against the original (`scripts_worlds_events.txt`) and
   played in chapter 60 (the rat given a form: sound 203 at frame 51, the
   event's end at frame 60, the stamped form back, the remembered dialog).
-  The puzzles are not ported: the figurines and the chest (`SS` views
-  1-7), the five wheels (`SS` 12-13), the pearl and the dragon (`SS` 31),
-  the turtle ring (`CH` 40-64) and the labyrinth's souls (`LA` 1-60).
-  Their hooks are listed as the original's dispatchers call them
+  The figurines on the floor (`SS` views 1-7) are ported (below). The
+  other puzzles are not: the chest (`SS` views 1-7), the five wheels
+  (`SS` 12-13), the pearl and the dragon (`SS` 31), the turtle ring
+  (`CH` 40-64) and the labyrinth's souls (`LA` 1-60). Their hooks are
+  listed as the original's dispatchers call them
   (`chinese_click_hooks`, `chinese_entry_hooks`) and noted
   (`Event::PuzzleNotPorted`); none takes a click (the dispatcher returns
   0 for all of them), so every click reaches `CLICZONE`, the scans and
   the moves as in the original; without their entries the puzzles'
   sprites keep the states their WAM records and the show / hide table
-  give them at load: the wheels and figurines are not placed from their
-  variables, the ring's frame and the souls are not set, and
-  `PERLE_TROU`, which the clouds' entry hides until the pearl is won
-  (FUN_004944a0), shows in `SS` view 31 and can be taken there (a
-  shortcut the original does not have). `Engine::solve_chinese_puzzle` writes what the
-  figurines', the chest's, the wheels' and the pearl's wins write, for
-  tests; the turtle ring and the souls write no variable (the turtle
+  give them at load: the wheels are not placed from their variables,
+  the ring's frame and the souls are not set, and `PERLE_TROU`, which
+  the clouds' entry hides until the pearl is won (FUN_004944a0), shows
+  in `SS` view 31 and can be taken there (a shortcut the original does
+  not have). `Engine::solve_chinese_puzzle` writes what the chest's, the
+  wheels' and the pearl's wins write, for tests; the turtle ring and the souls write no variable (the turtle
   room's way out is the scripts' count of arrivals, the labyrinth's the
   scripts' form and fan). The incense sticks are the scripts' alone
   (`GOTOFRAMEOBJET`, `showobjet`) and play as written. Four view records
@@ -1044,6 +1044,53 @@ event, the gong's way back to Tibet) into `china-*.png`.
   section from the move, its `/set` lines all the original's), plays
   all 115 dialogs the chapters start, checks the subjects, objects and
   musics on disc 3, and loads a game saved in the turtle room.
+- **The figurines on the floor** (`engine/figurines.rs`, China's
+  `miniature.wam`, `SS` views 1-7; chapters 55, 47 and 48): six
+  figurines lie in the grass of view 13 (the objects `OB_FIG1HERBE` ..
+  `OB_FIG6HERBE`, taken by a click as any object) and are laid on the six
+  places of view 6's floor (the zones `SOL_FIGUR1..6`). On the floor,
+  figurines 1-5 are the characters `FIGURINE1..5` and the sixth is the
+  object `OB_FIG6HERBE`, each a slot with one frame per place. The state
+  is the scripts' (`pos_statue1..6`, the place of each, 0 = not laid;
+  `etat5statues`); the slot indexes the entry keeps (@ 0x006d18b8) are
+  never saved. The entry FUN_0048d680 (every `SS` view 1-7, after the
+  slots are loaded) shows each laid figurine at frame place − 1, its
+  animation stopped (the slot's playing byte +0xbc cleared), and hides
+  the others; in view 7 a figurine on its own place (targets
+  @ 0x005e1084: 4, 3, 5, 1, 2, 6) takes the slot of its animation 2
+  instead (FUN_0047dea0) and plays it from frame 0: the figurines come
+  alive there, and chapter 48 makes them talk and trade the coins for
+  the wheels' discs. The click FUN_0048da20 (view 6, any zone, never
+  taking the click; nothing once `etat5statues` is 1 or on a zone whose
+  name does not start with `SOL_FIGUR`, the place digit its tenth byte):
+  a figurine on that place is taken (in hand and in the bag, the hand
+  and cursor on its sprite, `(pos_statue<k>=0)`) unless it is on its own
+  place, which ends the click; then a figurine held before the click is
+  laid there (out of the bag, `(NewSound=202)`, `(pos_statue<k>=<d>)`),
+  the hand emptied unless a figurine was taken with something held (a
+  swap keeps the taken one in hand). All six on their places:
+  `(etat5statues=1)` (which no chapter reads) and `AtlHnm_start("???")`,
+  which opens nothing (the port's video start: no such file, the music
+  back to 100 %). The slots gained the original's +0x34 (`Slot::single`,
+  from the state's +0x2c at load) and playing byte (`Slot::playing`, set
+  at load; a slot without it keeps its frame at the tick, @ 0x0047d82c).
+  A `vue=` line runs the view entry while the interpreter is out of the
+  engine: `Host::enter_view_with_vars` lends it the script variables for
+  the entry's puzzle set-up. Checked against the original
+  (`tests/figurines.rs`, `tests/golden/figurines.txt`: the slots and
+  zones of views 1-7 and 13, the entry per view and state, the click
+  along a played sequence with its swaps and refusals, the check, the
+  dispatcher, the warp frame with chapter 47, the step in view 7 and the
+  draws of the figurines' frames, the frame equal to the file's count
+  included) and played with the mouse (the six taken in view 13, the
+  walk to view 6, laid with a swap and the refusals, the walk to view 7
+  with film 23, the figurines alive, the sixth's coin and the first
+  figurine's dialogs 281 and 282 for its disc). Quirks kept: in view 7
+  the sixth figurine's slot is always its animation 2 (a one-frame file
+  loaded first), so off its place it shows frame place − 1 of a
+  one-frame file, which draws nothing; the bag's byte of a taken
+  figurine is its sprite; two figurines on one place (a crafted state)
+  are both taken by one click.
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,
@@ -1507,7 +1554,10 @@ event, the gong's way back to Tibet) into `china-*.png`.
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
   credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
-  (the playing byte), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  (the playing byte: the slots have it since the figurines,
+  `Slot::playing`, but the key does not write it yet; to settle: read its
+  branch of FUN_004818f0 and the golden rows of `scripts_worlds_anim.txt`,
+  then set the first matching slot's byte), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
@@ -1705,5 +1755,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles, Yucatán, Shamballa and their puzzles |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), China's figurines (done), then China's other puzzles, Yucatán, Shamballa and their puzzles |
 

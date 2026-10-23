@@ -87,6 +87,14 @@ pub struct Slot {
     pub chain: i32,
     /// +0x30: drawn and stepped.
     pub active: bool,
+    /// +0x34: 1 = the slot draws its current frame, otherwise its frame
+    /// list (@ 0x0047ce77). The state's +0x2c at load; the figurines'
+    /// entry sets it.
+    pub single: i32,
+    /// +0xbc (a byte): set at load; a slot whose byte is clear keeps its
+    /// frame at the tick (@ 0x0047d82c). The figurines' entry and click
+    /// write it.
+    pub playing: bool,
     /// +0x38: for an object, its first `defnames.con` parameter (its
     /// sprite in the objects' bank).
     pub object_sprite: i32,
@@ -206,20 +214,23 @@ impl Anim {
             handing: false,
             chain: -1,
             active,
+            single: state.single,
+            playing: true,
             object_sprite,
             frames: [LIST_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
         });
     }
 
-    /// FUN_0047d7f0 on a 15 Hz tick: every playing slot one frame on, then
+    /// FUN_0047d7f0 on a 15 Hz tick: every active slot whose playing byte
+    /// is set one frame on (@ 0x0047d827..0x0047d832), then
     /// the slots whose play has ended restart, hand over or stop. Returns
     /// the frame the first loop left in the last slot of `CHEVAL`'s id,
     /// whatever its kind (the value it writes into `FRAMECHEVAL`,
     /// @ 0x0047d84d..0x0047d872).
     pub fn step(&mut self) -> Option<i32> {
         let mut horse = None;
-        for s in self.slots.iter_mut().filter(|s| s.active) {
+        for s in self.slots.iter_mut().filter(|s| s.active && s.playing) {
             s.frame = if s.frame < 0 || s.frame >= s.end - 1 {
                 -1
             } else {
@@ -347,7 +358,7 @@ impl Anim {
             // FUN_0047ce60: one animated frame (+0x34 = 1 and +0x30 = 1)
             // draws its current frame; otherwise the list's frames in
             // order up to 0xfe, 0xff skipped (signed bytes).
-            let list: Vec<i32> = if s.state.single == 1 {
+            let list: Vec<i32> = if s.single == 1 {
                 vec![s.frame]
             } else {
                 s.frames

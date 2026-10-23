@@ -74,6 +74,19 @@ impl Engine {
         Some(r)
     }
 
+    /// A script variable by name (`ReadVar` @ 0x00484ff0), from the
+    /// interpreter or, while it runs a `vue=` line, from the variables it
+    /// lent ([`Host::enter_view_with_vars`]); `None` without the scripts or
+    /// for a name not in `#VARIABLES#`.
+    pub(crate) fn script_var_or_lent(&self, name: &str) -> Option<i32> {
+        if let Some(s) = self.con.as_deref() {
+            return s.var(name);
+        }
+        let lent = self.lent_vars.as_ref()?;
+        let i = self.names.id(defnames::VARIABLES, name.as_bytes()).ok()?;
+        lent.get(i).copied()
+    }
+
     /// Writes a script variable (when the scripts run).
     pub(crate) fn set_script_var(&mut self, key: impl FnOnce(&Keys) -> usize, value: i32) {
         if let Some(s) = self.con.as_mut() {
@@ -403,6 +416,16 @@ impl Host for Engine {
 
     fn has_view(&mut self, view: i32) -> bool {
         u32::try_from(view).is_ok_and(|v| self.wam.view(v).is_some())
+    }
+
+    fn enter_view_with_vars(&mut self, view: i32, yaw: f32, pitch: f32, vars: &mut [i32]) {
+        // The interpreter is out of the engine while it runs this: its
+        // variables are lent for the entry (copied back after).
+        self.lent_vars = Some(vars.to_vec());
+        Host::enter_view(self, view, yaw, pitch);
+        if let Some(v) = self.lent_vars.take() {
+            vars.copy_from_slice(&v);
+        }
     }
 
     fn enter_view(&mut self, view: i32, yaw: f32, pitch: f32) {

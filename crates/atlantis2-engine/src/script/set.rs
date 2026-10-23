@@ -564,7 +564,7 @@ impl Script {
         self.set_current_view(value);
         self.view_number = value;
         self.vars[k.vue] = value;
-        host.enter_view(value, self.start_x, self.start_y);
+        host.enter_view_with_vars(value, self.start_x, self.start_y, &mut self.vars);
         self.view_reset();
         self.vars[k.vue] = value;
         self.click = false;

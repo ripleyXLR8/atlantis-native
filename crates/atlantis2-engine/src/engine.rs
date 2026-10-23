@@ -36,6 +36,8 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod blackbird;
 mod cross;
+mod figurines;
+pub use figurines::FIGURINE_TARGETS;
 mod host;
 mod menus;
 mod ogham;
@@ -128,7 +130,7 @@ pub enum Event {
     /// A puzzle hook the port does not have (China's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
-    /// An Irish puzzle hook the port has, run: the original's function.
+    /// A puzzle hook the port has, run: the original's function.
     PuzzleRan { function: u32 },
     /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
     CrossLaid { value: i32 },
@@ -461,6 +463,13 @@ pub struct Engine {
     /// The blackbird songs of Ireland (`engine/blackbird.rs`), never reset
     /// nor saved.
     pub blackbird: Blackbird,
+    /// The slots of the six figurines of the miniature garden as their
+    /// entry last found them (@ 0x006d18b8..0x006d18cc; 0 before any),
+    /// used by their click in view 6 (`engine/figurines.rs`).
+    pub figurine_slots: [usize; 6],
+    /// The script variables while the interpreter runs a `vue=` line (it
+    /// is out of the engine then), for the view entry's puzzle set-up.
+    lent_vars: Option<Vec<i32>>,
     /// The skull puzzle's state (@ 0x005e1a4c, save entry 30): seven
     /// digits and a 0, one per frame of `CRANE_SPRITE`'s list; only a load
     /// changes it besides the puzzle's click (no new game resets it).
@@ -846,6 +855,8 @@ impl Engine {
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
             cross_sprite: 0,
             blackbird: Blackbird::default(),
+            figurine_slots: [0; 6],
+            lent_vars: None,
             skull: puzzles::SKULL_START,
             skull_sprite: 0,
             ogham: OGHAM_START,
