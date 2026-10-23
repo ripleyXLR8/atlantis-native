@@ -32,15 +32,18 @@
 //!   leaves the object in hand: chapter 7's sections (the click scan of
 //!   the same frame) count `fincrane`, take the object and, at the fifth,
 //!   play film 2, show Ailill and hide the skull.
-//! - China's hooks (prefixes `CH`, `SS` and `LA`): the figurines, the
-//!   chest, the five wheels, the pearl and dragon, the turtle ring and the
-//!   labyrinth's souls are not ported. Their hooks are listed as the
+//! - China's hooks (prefixes `CH`, `SS` and `LA`), listed as the
 //!   dispatchers call them ([`chinese_click_hooks`],
-//!   [`chinese_entry_hooks`]) and noted ([`Event::PuzzleNotPorted`]);
-//!   none consumes a click (the dispatcher returns 0 for them), so the
-//!   scripts see every click as in the original. [`ChinesePuzzle`] and
-//!   [`Engine::solve_chinese_puzzle`] write what their wins write, for
-//!   tests.
+//!   [`chinese_entry_hooks`]); none consumes a click (the dispatcher
+//!   returns 0 for them), so the scripts see every click as in the
+//!   original. The pearl and dragon (`SS` view 31, `dragon.rs`) is
+//!   ported, its hooks noted as [`Event::PuzzleRan`]; with it the puzzle
+//!   mode (@ 0x006d84d0, save entry 26) and its per-frame step
+//!   (FUN_0049bfb0, [`Engine::puzzle_tick`]). The figurines, the chest,
+//!   the five wheels, the turtle ring and the labyrinth's souls are not
+//!   ported: their hooks are noted ([`Event::PuzzleNotPorted`]), and
+//!   [`ChinesePuzzle`] with [`Engine::solve_chinese_puzzle`] write what
+//!   their wins write, for tests.
 //! - The places the port has: Tibet, Ireland and China. A `changewam` to
 //!   any other place (Yucatán's boat, Shamballa, the space travel) is
 //!   refused: the section stops there, the world goes back to the
@@ -51,7 +54,11 @@
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 
+use super::dragon::DRAGON_MODE;
 use super::{Engine, Event};
+
+/// The save entry of the puzzle mode (@ 0x006d84d0).
+const MODE_ENTRY: usize = 26;
 
 /// The warp prefix of Tibet's views (@ 0x005daff8).
 const TIBET_PREFIX: &[u8] = b"TI";
@@ -120,9 +127,6 @@ pub enum ChinesePuzzle {
     WheelsFirst,
     /// Their second order: the bridge lowered.
     WheelsSecond,
-    /// The pearl and the dragon in the clouds, `SS` view 31 (FUN_004944a0,
-    /// FUN_00494600, the tick FUN_004947b0).
-    Pearl,
 }
 
 /// The hooks FUN_0049b910 calls for a click on a zone of type `kind` in
@@ -330,16 +334,72 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
-        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): not
-        // ported, noted; none consumes the click.
+        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): the
+        // clouds' run, the others are noted; none consumes the click.
         let hooks = self
             .current_view()
             .map(|v| chinese_click_hooks(v.name.as_bytes(), self.view, zone.kind))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            match function {
+                // The clouds' move zones (FUN_004945f0): the mode back to
+                // 0, which stops the puzzle's step.
+                0x0049_45f0 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.set_puzzle_mode(0);
+                }
+                // The clouds' click (FUN_00494600).
+                0x0049_4600 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.dragon_click(zone);
+                }
+                _ => self.puzzle_not_ported(function),
+            }
         }
         false
+    }
+
+    /// The puzzle mode (@ 0x006d84d0, save entry 26): 4 after the pearl
+    /// and dragon's entry (while the pearl is not won), 0 otherwise in the
+    /// places the port has. The clouds' move zones set it back to 0
+    /// (FUN_004945f0); a load copies the save's; nothing else changes it
+    /// here: the reset FUN_0049bf70 clears only the modes of its own
+    /// modules (1, 2, 3, 6), so a new game keeps a 4.
+    pub fn puzzle_mode(&self) -> i32 {
+        i32::from_le_bytes(self.save_extra.entry(MODE_ENTRY).try_into().unwrap())
+    }
+
+    /// Sets the puzzle mode, as the hooks and a save's entry 26 do.
+    pub fn set_puzzle_mode(&mut self, mode: i32) {
+        self.save_extra
+            .entry_mut(MODE_ENTRY)
+            .copy_from_slice(&mode.to_le_bytes());
+    }
+
+    /// FUN_0049bfb0, once per warp frame while the puzzle mode is not 0
+    /// (`AtlWarp_continue` @ 0x0045a5e8, after the move's completion):
+    /// not while paused (0x006d85f0, which the port does not have), the
+    /// step of the mode (@ 0x0049bfbb..0x0049c007), returned: 1 the
+    /// spider web's FUN_00491610, 2 the turtle ring's FUN_0049c400, 3 the
+    /// souls' FUN_0048eb30, 4 the pearl and dragon's FUN_004947b0, 6 the
+    /// octopus's FUN_0049aaa0, 7 the Maya marbles' (the thunk
+    /// @ 0x00493190); 5 (the chest) and any other mode have none. Only
+    /// the pearl and dragon's is ported and run. Public for tests and
+    /// tools.
+    pub fn puzzle_tick(&mut self) -> Option<u32> {
+        let function = match self.puzzle_mode() {
+            1 => 0x0049_1610,
+            2 => 0x0049_c400,
+            3 => 0x0048_eb30,
+            DRAGON_MODE => 0x0049_47b0,
+            6 => 0x0049_aaa0,
+            7 => 0x0049_3190,
+            _ => return None,
+        };
+        if function == 0x0049_47b0 {
+            self.dragon_tick();
+        }
+        Some(function)
     }
 
     /// `CLICZONE` as a hook finds it.
@@ -401,13 +461,18 @@ impl Engine {
             Some(function) => self.puzzle_not_ported(function),
             None => {}
         }
-        // China's: not ported, noted.
+        // China's: the clouds' runs, the others are noted.
         let hooks = self
             .current_view()
             .map(|v| chinese_entry_hooks(v.name.as_bytes(), self.view))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            if function == 0x0049_44a0 {
+                self.event(Event::PuzzleRan { function });
+                self.dragon_entry();
+            } else {
+                self.puzzle_not_ported(function);
+            }
         }
     }
 
@@ -436,12 +501,6 @@ impl Engine {
     ///   `Pont_Leve` hidden, `Pont_Moitie` shown, `findisque1` = 1,
     ///   `(cinema=24)`; second 5, 3, 1, 4, 2, `Pont_Moitie` hidden,
     ///   `Pont_Baisse` shown, `findisque2` = 1, `(cinema=25)`.
-    /// - The pearl (FUN_004947b0's last right step,
-    ///   @ 0x004948ab..0x00494902): `State_nuages_bas` raised to 5,
-    ///   `(NewSound=210)` (FUN_00494970: 205 + the new state), the low
-    ///   clouds placed from it (FUN_00494990: pictures, not ported),
-    ///   `Action_nuage_bas` = 0, then `FINPERLE` = 1 and `PERLE_TROU`
-    ///   shown.
     pub fn solve_chinese_puzzle(&mut self, puzzle: ChinesePuzzle) {
         match puzzle {
             ChinesePuzzle::Figurines => {
@@ -486,15 +545,6 @@ impl Engine {
                     s.run_command(h, format!("(showobjet={show})").as_bytes());
                     s.set_var(var, 1);
                     s.run_command(h, format!("(cinema={film})").as_bytes());
-                });
-            }
-            ChinesePuzzle::Pearl => {
-                self.with_script(|s, h| {
-                    s.set_var("State_nuages_bas", 5);
-                    s.run_command(h, b"(NewSound=210)");
-                    s.set_var("Action_nuage_bas", 0);
-                    s.set_var("FINPERLE", 1);
-                    s.run_command(h, b"(showobjet=PERLE_TROU)");
                 });
             }
         }

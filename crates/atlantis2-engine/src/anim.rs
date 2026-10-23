@@ -96,6 +96,16 @@ pub struct Slot {
     pub frames: [u8; FRAME_TAB],
     /// +0xc4: the countdown of the random pause.
     pub delay: i32,
+    /// +0xbc (a byte): the slot plays, 1 at load (@ 0x0047c666); the
+    /// step moves only the frames of active slots that play
+    /// (@ 0x0047d82c). The chest's hooks clear it (@ 0x0049393b,
+    /// @ 0x00493a7c) to hold their frame.
+    pub playing: bool,
+    /// +0xc0: 0 at load (@ 0x0047c66b); not 0, the slot is drawn only
+    /// while the 15 Hz counter is odd (@ 0x0047d181..0x0047d1aa), as
+    /// the pearl and dragon puzzle's transparent cloud is (0x32,
+    /// @ 0x00494bed).
+    pub blink: i32,
 }
 
 impl Slot {
@@ -129,6 +139,9 @@ pub struct Anim {
     /// The original's warnings of the frame lists (`FUN_00480c20`: their
     /// format strings), in order, for tests and tools.
     pub warnings: Vec<&'static str>,
+    /// The 15 Hz counter (@ 0x006569d8) as the draw reads it for the
+    /// slots that blink (+0xc0); the engine's tick keeps it.
+    pub counter: u32,
 }
 
 /// The texel under the screen centre: (face, column, row).
@@ -145,6 +158,7 @@ impl Anim {
             blend: Blend::rgb565(),
             cheval: None,
             warnings: Vec::new(),
+            counter: 0,
         }
     }
 
@@ -209,17 +223,21 @@ impl Anim {
             object_sprite,
             frames: [LIST_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
+            playing: true,
+            blink: 0,
         });
     }
 
-    /// FUN_0047d7f0 on a 15 Hz tick: every playing slot one frame on, then
-    /// the slots whose play has ended restart, hand over or stop. Returns
+    /// FUN_0047d7f0 on a 15 Hz tick: every active slot that plays
+    /// (+0x30 and the byte +0xbc, @ 0x0047d827..0x0047d832) one frame
+    /// on, then the active slots whose play has ended (frame −1, whether
+    /// they play or not) restart, hand over or stop. Returns
     /// the frame the first loop left in the last slot of `CHEVAL`'s id,
     /// whatever its kind (the value it writes into `FRAMECHEVAL`,
     /// @ 0x0047d84d..0x0047d872).
     pub fn step(&mut self) -> Option<i32> {
         let mut horse = None;
-        for s in self.slots.iter_mut().filter(|s| s.active) {
+        for s in self.slots.iter_mut().filter(|s| s.active && s.playing) {
             s.frame = if s.frame < 0 || s.frame >= s.end - 1 {
                 -1
             } else {
@@ -375,6 +393,12 @@ impl Anim {
                             }
                         }
                     }
+                }
+                // A slot whose +0xc0 is set is drawn only while the 15 Hz
+                // counter is odd (@ 0x0047d181..0x0047d1aa); the centre
+                // test above is made either way.
+                if s.blink != 0 && self.counter & 1 == 0 {
+                    continue;
                 }
                 for (face, pixels) in faces.iter_mut().enumerate() {
                     if let Some(b) = s.spw.face_box(frame, face) {

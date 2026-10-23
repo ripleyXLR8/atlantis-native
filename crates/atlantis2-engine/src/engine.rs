@@ -36,6 +36,7 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod blackbird;
 mod cross;
+mod dragon;
 mod host;
 mod menus;
 mod ogham;
@@ -51,6 +52,7 @@ mod subjects;
 mod ui;
 
 pub use blackbird::Blackbird;
+pub use dragon::Dragon;
 pub use saves::SaveError;
 pub use subjects::subjects_bank_name;
 
@@ -128,7 +130,8 @@ pub enum Event {
     /// A puzzle hook the port does not have (China's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
-    /// An Irish puzzle hook the port has, run: the original's function.
+    /// A puzzle hook the port has (Ireland's, China's pearl and dragon),
+    /// run: the original's function.
     PuzzleRan { function: u32 },
     /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
     CrossLaid { value: i32 },
@@ -475,6 +478,9 @@ pub struct Engine {
     /// The Ogham sprite's id as the view entry found it (@ 0x006d2768),
     /// for the clicks.
     ogham_sprite: i32,
+    /// The pearl and dragon puzzle's state (`engine/dragon.rs`), never
+    /// reset nor saved.
+    pub dragon: Dragon,
     /// Where the port may differ from the original (default: the minor
     /// bug fixes on).
     pub enhancements: Enhancements,
@@ -850,6 +856,7 @@ impl Engine {
             skull_sprite: 0,
             ogham: OGHAM_START,
             ogham_sprite: 0,
+            dragon: Dragon::default(),
             enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),
@@ -1048,6 +1055,7 @@ impl Engine {
     /// the dialog loop the dialog's tick and end, then the script clocks.
     pub fn tick(&mut self) {
         self.ticks = self.ticks.wrapping_add(1);
+        self.anim.counter = self.ticks;
         self.spw_flag = true;
         self.cursor_flag = true;
         if let Some(m) = self.menu.as_mut() {
@@ -1458,6 +1466,11 @@ impl Engine {
         // or a film a scan started).
         if let (Some(_), Some(out)) = (&self.video, out) {
             self.draw_video(out);
+        }
+        // The puzzles' per-frame step (FUN_0049bfb0, @ 0x0045a5e8): every
+        // warp frame while the puzzle mode is not 0, turning or not.
+        if self.puzzle_mode() != 0 {
+            let _ = self.puzzle_tick();
         }
         // 6.
         self.vars.cliczone = 0;

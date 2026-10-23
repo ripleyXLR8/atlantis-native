@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China without its puzzles (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China without its puzzles (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events) but the pearl and the dragon |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -631,7 +631,7 @@ game back to Tibet with Ireland's mandala. China's boat leaves for China
 (world 3, below), playable without its puzzles, whose gong sends the game
 back to Tibet; a trip to another world (Yucatán's boat, the crystal, the
 space travel) plays its film and stays where it is. Not yet: Yucatán,
-Shamballa and China's puzzles.
+Shamballa and China's puzzles but the pearl and the dragon (below).
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -1008,21 +1008,19 @@ event, the gong's way back to Tibet) into `china-*.png`.
   case by case against the original (`scripts_worlds_events.txt`) and
   played in chapter 60 (the rat given a form: sound 203 at frame 51, the
   event's end at frame 60, the stamped form back, the remembered dialog).
-  The puzzles are not ported: the figurines and the chest (`SS` views
-  1-7), the five wheels (`SS` 12-13), the pearl and the dragon (`SS` 31),
-  the turtle ring (`CH` 40-64) and the labyrinth's souls (`LA` 1-60).
-  Their hooks are listed as the original's dispatchers call them
+  The pearl and the dragon (`SS` 31) is ported (below); the other
+  puzzles are not: the figurines and the chest (`SS` views 1-7), the
+  five wheels (`SS` 12-13), the turtle ring (`CH` 40-64) and the
+  labyrinth's souls (`LA` 1-60). Their hooks are listed as the original's dispatchers call them
   (`chinese_click_hooks`, `chinese_entry_hooks`) and noted
   (`Event::PuzzleNotPorted`); none takes a click (the dispatcher returns
   0 for all of them), so every click reaches `CLICZONE`, the scans and
   the moves as in the original; without their entries the puzzles'
   sprites keep the states their WAM records and the show / hide table
   give them at load: the wheels and figurines are not placed from their
-  variables, the ring's frame and the souls are not set, and
-  `PERLE_TROU`, which the clouds' entry hides until the pearl is won
-  (FUN_004944a0), shows in `SS` view 31 and can be taken there (a
-  shortcut the original does not have). `Engine::solve_chinese_puzzle` writes what the
-  figurines', the chest's, the wheels' and the pearl's wins write, for
+  variables, the chest is not held, the ring's frame and the souls are
+  not set. `Engine::solve_chinese_puzzle` writes what the
+  figurines', the chest's and the wheels' wins write, for
   tests; the turtle ring and the souls write no variable (the turtle
   room's way out is the scripts' count of arrivals, the labyrinth's the
   scripts' form and fan). The incense sticks are the scripts' alone
@@ -1044,6 +1042,74 @@ event, the gong's way back to Tibet) into `china-*.png`.
   section from the move, its `/set` lines all the original's), plays
   all 115 dialogs the chapters start, checks the subjects, objects and
   musics on disc 3, and loads a game saved in the turtle room.
+- **Pearl and dragon** (`engine/dragon.rs`, `miniature.wam` view 31,
+  chapter 58): a dragon (`DRAGON_NUAGE`, one animated state of 80
+  frames, held on frame 50), two clouds with a pearl behind each, five
+  low clouds (frame 1 raised, 0 down) and the pearl with a hole
+  (`PERLE_TROU`, an object to take). The view entry (@ 0x004944a0)
+  keeps the slots of the low clouds and of the dragon (the first slot of
+  each id; none is the original's fatal `pz_dragon find_idx(%d)
+  introuvable`), hides both pearls, holds the dragon (frame 50, its
+  playing byte cleared); with `FINPERLE` = 1 it raises the five low
+  clouds and stops there; otherwise it sets the puzzle mode 4, restores
+  a transparency in progress (`Time_nuage_transparent`,
+  `NuageTransparent`), places the low clouds from `State_nuages_bas` and
+  hides `PERLE_TROU` (its slot and the show / hide table). The click
+  (@ 0x00494600, zone types 3, 4, 0x32, never taking the click) needs
+  the mode 4, no transparency, the dragon still and `FINPERLE` = 0; the
+  zone is told by its name, byte for byte: before the first round
+  `CLIC_DRAGON` starts it; then `CLIC_NUAGE_GAUCHE` / `_DROITE` set
+  `Action_nuage_bas` (1 when the pearl hides on that side, `Perle_cachee`
+  'A' left, 'B' right, else 2) and make that cloud transparent for 30
+  frames (+0xc0 = 0x32: the slot is drawn only while the 15 Hz counter
+  is odd, @ 0x0047d181..0x0047d1aa), its pearl shown when it is there. A round
+  (@ 0x00494a40(1)) plays the dragon once round and hides the pearl
+  after the fixed sequence `ABBAB` (`Num_sequence_dragon` 0..4, wrapping).
+  **The puzzle mode and its step**: the mode (@ 0x006d84d0, save entry
+  26) is engine state; the clouds' move zones set it to 0
+  (@ 0x004945f0), nothing else here (a new game keeps it, as the
+  original's reset clears only modes 1, 2, 3 and 6); while it is not 0,
+  every warp frame runs its step after the move's completion, turning or
+  not (`Engine::puzzle_tick`, FUN_0049bfb0 @ 0x0045a5e8; the original
+  skips it while paused, which the port has not). Mode 4's step
+  (@ 0x004947b0) moves the dragon's state 1 → 2 → 3 one frame each and
+  3 → 0 at a frame that finds it on frame 50, then counts the
+  transparency down; at its end the pearls are hidden, the cloud drawn
+  again, the low clouds raised for a right answer or lowered for a wrong
+  one (above 0) with `(NewSound=%03d)` of 205 + the new count, and at
+  five `FINPERLE` = 1 and `PERLE_TROU` shown; while fewer than five are
+  raised the next round starts. **Timing**: the step and the 30-frame
+  transparency count warp frames, which the original does not pace (the
+  port: 60 a second, half a second of transparency); the dragon's frames
+  move with the 15 Hz step of the place animations. So a dragon woken by
+  a click whose next two warp frames see no 15 Hz step is stopped on
+  frame 50 at once, without its flight (at 60 frames a second, one click
+  in two; the rounds that start by themselves have three frames), as the
+  original at any frame rate above 30 [CONFIRMED-EMULATED]; the flight
+  gives no hint of the side anyway (one animation for both). Unknown:
+  the original's warp frame rate on the machines of its time, so how
+  often its players saw the flight skipped (to settle: time
+  `AtlWarp_continue` in the Win98 VM). The slots
+  now have the original's playing byte (+0xbc, 1 at load: the 15 Hz step
+  moves only the active slots that play) and the blink word (+0xc0, 0 at
+  load). Not ported: an index kept from view 31 that names no slot of
+  the current view (the mode 4 outliving the view: a new game from the
+  menu during a flight) reads and writes nothing, where the original
+  uses the record left in its table. Against the original's emulated run
+  (`tests/dragon.rs`, `tests/golden/dragon.txt`): the entry by
+  variables and mode, without each kind of slot; the click alone along
+  its sequence and variants (names, types, values, modes, the sequence's
+  wrap); the step alone through rounds, wins, wrong answers, the edges
+  of the counts and the step in view 32; frames run at five rates of the
+  15 Hz tick (1, 2, 3, 4 and 8 frames a tick) with a player answering,
+  row by row; both dispatchers and the per-frame one; the clicks with
+  chapter 58's scan to the pearl laid in the mechanism (film 26, chapter
+  59); view 31's twelve files drawn with the blink; the dragon's flight
+  step by step. A game is played with the mouse from chapter 56's view
+  18 to view 30 (chapter 58) and 31, the dragon woken, seven rounds (one
+  wrong answer), the pearl taken, then laid in view 32's mechanism from
+  the bag (chapter 58's lines 19-27, film 26) to view 19 and chapter 59;
+  a save keeps the transparency, the counts and the mode.
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,
@@ -1507,7 +1573,8 @@ event, the gong's way back to Tibet) into `china-*.png`.
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
   credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
-  (the playing byte), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  (it writes the slots' playing byte, @ 0x004833a1, which the pearl and
+  dragon brought in; the key's write is not ported yet), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
@@ -1658,7 +1725,8 @@ installation, for the tests of those builds. For Atlantis II,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
 copies); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
 `tests/ogham.rs`'s played games write their screens there
-(`pz-skull-*.png`, `pz-ogham-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
+(`pz-skull-*.png`, `pz-ogham-*.png`), and with `ATLANTIS2_SHOTS` set
+`tests/dragon.rs`'s (`pz-dragon-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
 weights, dialog lines, dialog frames, subtitle layouts, music fades,
 script results and save files come from the original `atlantis2.exe` run under emulation
 (Tibet's moves pass by pass, the place animations tick by tick, the
@@ -1670,7 +1738,9 @@ subject menu's cells and click grid, the shaman's subjects along chapter
 through the handler, the special events, the zoom of a move,
 Brigid's cross's hooks, frame tables and pictures, the skull puzzle's
 hooks, frame lists, clicks with chapter 7 and drawing, the ogham stones'
-moves and drawing, the blackbird songs' draws, clicks and warp frames;
+moves and drawing, the blackbird songs' draws, clicks and warp frames,
+the pearl and dragon's hooks, steps, frames at five tick rates, clicks
+with chapter 58 and drawing;
 names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):
@@ -1705,5 +1775,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles, Yucatán, Shamballa and their puzzles |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles (the pearl and the dragon done), Yucatán, Shamballa and their puzzles |
 

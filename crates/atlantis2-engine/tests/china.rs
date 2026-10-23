@@ -139,12 +139,13 @@ fn bare(files: A2Files, name: &str, view: u32) -> Engine {
     e
 }
 
-/// The puzzle hooks noted in `events`, in order.
+/// The puzzle hooks reached in `events`, in order: run (the pearl and
+/// dragon's) or noted (the others).
 fn noted(events: &[Event]) -> Vec<u32> {
     events
         .iter()
         .filter_map(|x| match x {
-            Event::PuzzleNotPorted { function } => Some(*function),
+            Event::PuzzleNotPorted { function } | Event::PuzzleRan { function } => Some(*function),
             _ => None,
         })
         .collect()
@@ -885,26 +886,6 @@ fn the_aid_writes_the_wins() {
     e.solve_chinese_puzzle(ChinesePuzzle::WheelsSecond);
     settle(&mut e);
     assert_eq!((var(&e, "findisque1"), var(&e, "findisque2")), (1, 1));
-    e.events.clear();
-    e.solve_chinese_puzzle(ChinesePuzzle::Pearl);
-    assert_eq!(var(&e, "FINPERLE"), 1);
-    assert_eq!(
-        (var(&e, "State_nuages_bas"), var(&e, "Action_nuage_bas")),
-        (5, 0)
-    );
-    assert!(e.events.contains(&Event::Sound("sound210.apc".into())));
-    let pearl = e
-        .script_state()
-        .unwrap()
-        .names
-        .id(defnames::OBJETS, b"PERLE_TROU")
-        .unwrap() as i32;
-    assert!(e
-        .script_state()
-        .unwrap()
-        .shown
-        .iter()
-        .any(|r| r.id == pearl && r.shown));
 }
 
 /// A game saved in China (the turtle room, chapter 46, whose `/INIT` a
