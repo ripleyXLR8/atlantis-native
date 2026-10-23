@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China without its puzzles (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -627,9 +627,11 @@ subjects to ask him about (below). The mandalas are laid in the shaman's
 hut (below). Ireland's boat laid there leaves for Ireland (world 1,
 below), which plays to its end with its four puzzles (Brigid's cross,
 the skull, the ogham stones and the blackbird songs, below) and sends the
-game back to Tibet with Ireland's mandala; a trip to another world (the
-other boats, the crystal, the space travel) plays its film and stays
-where it is. Not yet: the other worlds.
+game back to Tibet with Ireland's mandala. China's boat leaves for China
+(world 3, below), playable without its puzzles, whose gong sends the game
+back to Tibet; a trip to another world (Yucatán's boat, the crystal, the
+space travel) plays its film and stays where it is. Not yet: Yucatán,
+Shamballa and China's puzzles.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -652,7 +654,12 @@ after a short game with three saves; `--example ireland_tour <install>
 <discs> <out>` lays Ireland's boat and draws the trip (the departure
 film, the arrival's dialog, Liam and his subject menu, a transition
 with its sprites, the cross's view, the cross laid on its place, the
-goddess, the way back to Tibet) into `ireland-*.png`.
+goddess, the way back to Tibet) into `ireland-*.png`; `--example
+china_tour <install> <discs> <out>` lays China's boat and draws the trip
+(the departure film, the arrival, the gardener master's menu and answer,
+the turtle room and its picture, the miniature garden and its map, a
+move's zoom, chapter 59's door, the labyrinth and a demon's special
+event, the gong's way back to Tibet) into `china-*.png`.
 
 - **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
   timestamp 0x38030926), recognised by its size and timestamp and
@@ -818,8 +825,27 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   and drawn over the video: frame k of each bank at its default position
   over the video's frame k, until the bank runs out; the video's end
   frees them, and a move without a video leaves them for the next film,
-  as in the original (@ 0x0047c100, 0x0047c200, 0x0040bc58). The zoom of
-  a turn is not ported (no Tibet or Irish script uses it).
+  as in the original (@ 0x0047c100, 0x0047c200, 0x0040bc58). The video
+  of a move to another place is the destination old → new looked up in
+  the new place's file (@ 0x0045a518): between `chine.wam`,
+  `salletortue.wam` and `miniature.wam` there is none (the old view's
+  record in the new file has no destination), as in the original. **The
+  zoom of a move** (`ZoomStart`, China's two moves into and out of the
+  miniature garden's view 10; `turn.rs` `Zoom`): FUN_0045b350 sets the
+  step (value × 0.01, a float product) and, when none is pending, the
+  field of view to 76° and the target to 35°; the turn's set-up turns
+  even under 0.1° while a zoom is pending, and each turn step lowers the
+  field of view by the step while above the target, the move waiting
+  until the turn and the zoom have both ended; at the target with the
+  turn ended, both go back to 76° and the next warp frame skips its draw
+  (FUN_0045b390, FUN_0045b680) (@ 0x0045babe..0x0045bb40). Under 0x0e7f
+  the step is 0.99999994 and the field of view lands on 35 without that
+  reset; under 0x027f it is reset to 76. Checked frame by frame against
+  the original under both words (`tests/moves.rs`,
+  `scripts_worlds_zoom.txt`). The turn step's comparisons are the x87's:
+  a NaN counts as below (`test ah, 1`), which keeps a turn at its end
+  while a zoom holds it (the braking divides by 0 there). The roll of
+  `ZoomPsychoStart` (Shamballa only) is not ported.
 - **Mandalas** (`engine/puzzles.rs`): the puzzles' click hook
   dispatcher of the original (@ 0x0049b910) sends a click on a zone of
   type 3, 4 or 50 of a view whose warp name starts with `TI` (any case)
@@ -948,6 +974,72 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   view 1, hidden at load) is on no disc; it is skipped with the
   original's message. The place sounds of `bigile1.wam` play (Sound,
   below).
+- **China** (world 3, disc 3; `chine.wam`, `miniature.wam` loaded by the
+  scripts, `salletortue.wam`, `labysol.wam`, `labyplaf.wam` reached by
+  their links; chapters 42-48, 55-60): laying China's boat in the
+  shaman's hut runs chapter 75's section as the original does (the world
+  on disc 3, `objchine.spr`, `sujchine.spr`, the Chinese texts and heads,
+  film 21, `chine.wam` view 10, chapter 42 and its music); the gong taken
+  in view 6 or 7 and struck on its zone in view 5 (chapter 42), or the
+  lantern brought back (chapter 46), sends the game back to Tibet's view
+  7 and chapter 75. Every key of the Chinese chapters is handled; their
+  1035 `/set` lines (with Yucatán's 820 before them, the state carried
+  from chapter 1 as the original's run did) match the original's handler
+  (`tests/script.rs`, `scripts_worlds_china.txt`). New for China:
+  the zoom of a move (above); **the picture viewer** (`ViewBigSpr`, loop
+  type 11, `LoopType::Picture`): FUN_0048c9d0 loads `spr\<bank>` (the
+  name up to `)`, a CR or 63 characters; a bank still loaded is freed
+  with the original's warning) and the section goes on; each frame
+  FUN_0048ca50 draws the panorama with its place animations and their
+  step (FUN_0045a930), frame 0 of the bank with its hot spot at the
+  screen centre, and a click goes back to the panorama (loop type 0, not
+  the previous one), the bank freed, the turn speeds stopped; Escape
+  opens the main menu as from the panorama (the key callback's default);
+  **`NextWarpInvalide`** = 1: the next view entry is skipped (@ 0x0045a01a:
+  the view current, no panorama, camera, animations nor sounds; the
+  variable 2), and the warp frames draw nothing while it is 2 (the
+  screen frozen) until a `vue=` or a move to another place clears it, as
+  chapter 59's door uses it over `miniature.wam` view 122, whose
+  panorama is on no disc; **the special events** (`TestSpecialEvent`,
+  FUN_00484880, `script/frame.rs`): events 1-6 are the labyrinth's six
+  demons (view and frame each), events 7 and 8 Yucatán's `CHAC`; checked
+  case by case against the original (`scripts_worlds_events.txt`) and
+  played in chapter 60 (the rat given a form: sound 203 at frame 51, the
+  event's end at frame 60, the stamped form back, the remembered dialog).
+  The puzzles are not ported: the figurines and the chest (`SS` views
+  1-7), the five wheels (`SS` 12-13), the pearl and the dragon (`SS` 31),
+  the turtle ring (`CH` 40-64) and the labyrinth's souls (`LA` 1-60).
+  Their hooks are listed as the original's dispatchers call them
+  (`chinese_click_hooks`, `chinese_entry_hooks`) and noted
+  (`Event::PuzzleNotPorted`); none takes a click (the dispatcher returns
+  0 for all of them), so every click reaches `CLICZONE`, the scans and
+  the moves as in the original; without their entries the puzzles'
+  sprites keep the states their WAM records and the show / hide table
+  give them at load: the wheels and figurines are not placed from their
+  variables, the ring's frame and the souls are not set, and
+  `PERLE_TROU`, which the clouds' entry hides until the pearl is won
+  (FUN_004944a0), shows in `SS` view 31 and can be taken there (a
+  shortcut the original does not have). `Engine::solve_chinese_puzzle` writes what the
+  figurines', the chest's, the wheels' and the pearl's wins write, for
+  tests; the turtle ring and the souls write no variable (the turtle
+  room's way out is the scripts' count of arrivals, the labyrinth's the
+  scripts' form and fan). The incense sticks are the scripts' alone
+  (`GOTOFRAMEOBJET`, `showobjet`) and play as written. Four view records
+  stand only for a link's other end and have no panorama on any disc
+  (`miniature.wam` 47 and 122, `salletortue.wam` 32, `labysol.wam` 123);
+  one place animation (`1mA1024025.SPW`, renamed `.err.SPW` on disc 3)
+  is skipped with the original's message; music 21, which chapter 75's
+  trip copies, is on no disc and no list plays it. The place sounds of
+  `chine.wam` and `miniature.wam` play. Not ported: the space travel
+  from China (chapter 56, `Planetes.wam`: refused, the hub is another
+  world's work). A headless game plays Tibet → China → Tibet with the
+  mouse (`tests/flow.rs` `a_game_from_tibet_to_china_and_back`: China's
+  boat taken and laid, the trip, the gardener master and the worried
+  monk asked about all they offer, the gong taken and struck), and
+  `tests/china.rs` runs every Chinese chapter's `/INIT`, enters every
+  view of the five places with its hooks, moves along every link,
+  plays all 115 dialogs the chapters start, and checks the subjects,
+  objects and musics on disc 3.
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,
@@ -1060,10 +1152,10 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   `NEWSOUND`, film and `TrajSound` tracks the original also keeps there
   while they play, so a handle can differ when one of those is still
   loaded at the view's entry or a round's start.
-- **Worlds:** Tibet (`tibet.wam`, world 5) and Ireland (above) are
-  ported. A `changewam` of the scripts to any other place (the other
-  boats' worlds, Shamballa's `voiles.wam` after the crystal,
-  `Planetes.wam` of the space travel, Ireland's `demo.wam`) is
+- **Worlds:** Tibet (`tibet.wam`, world 5), Ireland and China (above)
+  are ported. A `changewam` of the scripts to any other place (Yucatán's
+  boat, Shamballa's `voiles.wam` after the crystal, `Planetes.wam` of the
+  space travel, Ireland's `demo.wam`) is
   refused: where the original loads it (a place it cannot load is fatal
   there), the port notes it (`Event::WorldNotPorted`), ends the section
   at that line, sets the world back to the current place's (`Interp_SetMonde`: the
@@ -1407,12 +1499,12 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   as in the original), `startmusik`, `stopmusik`, `NEWSOUND`, `TrajSound`,
   `monde` (the disc rule, the objects bank, the dialog texts), the bag and
   the hand (`sacados` scrolls the bar to its end, `objetenmain=0` also
-  hides the cursor). No-ops, logged: `ZoomStart`, `ZoomPsychoStart` (the zoom of
-  a move), `ANIM_THE_FRAME` (the playing byte), the special events
-  (`TestSpecialEvent`), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
-  read where it is), `MESSAGE_CLIC`, `ViewBigSpr` (`CREDITS` shows the
-  credits); `NextWarpInvalide` is stored but the view entry does not read
-  it; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
+  hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
+  picture viewer), `NextWarpInvalide` (the view entry skipped) and the
+  special events (`TestSpecialEvent`; China above), `CREDITS` (the
+  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
+  (the playing byte), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
   logged; the game itself goes on. The original's own unknowns stay open:
@@ -1570,7 +1662,8 @@ screen centre and the clicks on sprites pass by pass with the texel under
 the centre given, every SPW frame of Tibet and the first of every other
 file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks, the
 subject menu's cells and click grid, the shaman's subjects along chapter
-75, every `/set` line of Ireland's chapters through the handler,
+75, every `/set` line of Ireland's, Yucatán's and China's chapters
+through the handler, the special events, the zoom of a move,
 Brigid's cross's hooks, frame tables and pictures, the skull puzzle's
 hooks, frame lists, clicks with chapter 7 and drawing, the ogham stones'
 moves and drawing, the blackbird songs' draws, clicks and warp frames;
@@ -1608,5 +1701,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), then Yucatán, China, Shamballa and their puzzles |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles, Yucatán, Shamballa and their puzzles |
 
