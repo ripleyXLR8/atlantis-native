@@ -103,7 +103,14 @@ impl Engine {
     /// FUN_004938f0 (run by the entry of `SS` views 1-7; public for tests
     /// and tools: the hook alone).
     pub fn chest_entry(&mut self) {
-        if !(1..=7).contains(&self.view) {
+        self.chest_entry_as(self.view);
+    }
+
+    /// FUN_004938f0 with `view` for the view's number (@ 0x004938f5),
+    /// on the current view's slots (public for tests and tools: the
+    /// hook's own view test, as the golden runs it on view 5's slots).
+    pub fn chest_entry_as(&mut self, view: u32) {
+        if !(1..=7).contains(&view) {
             return;
         }
         let Some(id) = self.object_index(CHEST) else {

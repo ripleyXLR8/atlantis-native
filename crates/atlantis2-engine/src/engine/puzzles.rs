@@ -141,7 +141,7 @@ pub enum ChinesePuzzle {
 ///   the figurines FUN_0048da20. (Outside those views, a puzzle mode 5
 ///   left by the chest's entry is cleared by any click, which then runs
 ///   no hook, @ 0x0049b96d..0x0049b984: the engine's
-///   [`Engine::puzzle_hooks`] does that before asking this list.)
+///   [`Engine::chinese_click`] does that before asking this list.)
 /// - Move zones (types 1, 2), `SS` 31 (@ 0x0049ba86): FUN_004945f0 (the
 ///   puzzle mode back to 0).
 /// - Types 3, 4 and 0x32: `CH` 40..64 (@ 0x0049bc5c): the turtle ring
@@ -347,23 +347,26 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
-        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): the
-        // chest's runs, the others are noted; none consumes the click. In
-        // an `SS` view outside 1-7 the mode 5 the chest's entry left is
-        // cleared and the click runs no hook (@ 0x0049b96d..0x0049b984).
-        let mode = self.puzzle_mode();
-        let cleared = self
+        let name = self
             .current_view()
-            .is_some_and(|v| chest_mode_cleared(v.name.as_bytes(), self.view, mode));
-        if cleared {
+            .map(|v| v.name.as_bytes().to_vec())
+            .unwrap_or_default();
+        self.chinese_click(&name, self.view, zone)
+    }
+
+    /// China's part of FUN_0049b910 (@ 0x0049b927, 0x0049ba86,
+    /// 0x0049bc5c..0x0049bcbf) for a zone click in view `view` of a place
+    /// whose warp names start as `view_name`: the chest's hook runs, the
+    /// others are noted; none consumes the click. In an `SS` view outside
+    /// 1-7 the mode 5 the chest's entry left is cleared and the click runs
+    /// no hook (@ 0x0049b96d..0x0049b984). Public for tests and tools: the
+    /// dispatcher on any warp name and number, as the golden runs it.
+    pub fn chinese_click(&mut self, view_name: &[u8], view: u32, zone: &Zone) -> bool {
+        if chest_mode_cleared(view_name, view, self.puzzle_mode()) {
             self.set_puzzle_mode(0);
             return false;
         }
-        let hooks = self
-            .current_view()
-            .map(|v| chinese_click_hooks(v.name.as_bytes(), self.view, zone.kind))
-            .unwrap_or_default();
-        for function in hooks {
+        for function in chinese_click_hooks(view_name, view, zone.kind) {
             if function == 0x0049_3960 {
                 self.event(Event::PuzzleRan { function });
                 self.chest_click(zone.value);
@@ -375,10 +378,15 @@ impl Engine {
     }
 
     /// The puzzle mode (@ 0x006d84d0, save entry 26): 5 after the chest's
-    /// entry, 0 otherwise in the places the port has. Nothing resets it
-    /// but the dispatcher's click (and a load, which copies the save's):
-    /// the reset FUN_0049bf70 clears only the modes of its own modules
-    /// (1, 2, 3, 6), so a new game keeps a 5.
+    /// entry. In the original other puzzles' entries overwrite it: the
+    /// turtle ring's for views 40..64 (2, @ 0x0049c361), the clouds' in
+    /// `SS` 31 (4 unless `FINPERLE` is 1, @ 0x004945a5), the souls' in
+    /// `LA` (3, @ 0x0048df1b); those entries are not on this branch, so
+    /// here a 5 lasts until the click dispatcher clears it
+    /// (@ 0x0049b977) or a load copies the save's entry. The reset
+    /// FUN_0049bf70, which the load runs before the copy, also sets 0
+    /// in views 55, 64 and 75 (FUN_00492dd0 @ 0x00492e69); a new game
+    /// does not run it, so it keeps a 5.
     pub fn puzzle_mode(&self) -> i32 {
         i32::from_le_bytes(self.save_extra.entry(MODE_ENTRY).try_into().unwrap())
     }

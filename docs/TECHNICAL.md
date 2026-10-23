@@ -1068,8 +1068,16 @@ event, the gong's way back to Tibet) into `china-*.png`.
   tick, and the click dispatcher, on the first zone click in an `SS` view
   outside 1-7 with the mode 5, clears it and runs no hook on that click
   (the wheels' first click in view 13 is lost, as in the original);
-  nothing else clears a 5, not a new game (the reset clears only its
-  modules' own modes). Against the original's emulated run
+  a new game keeps a 5, as the original's (it does not run the puzzle
+  reset). In the original, three entries this branch does not have
+  overwrite the mode: the turtle ring's for views 40-64 (2), the
+  clouds' in `SS` 31 (4, unless `FINPERLE` is 1) and the souls' in
+  `LA` (3). Here a 5 lasts through them until a zone click in an
+  `SS` view outside 1-7 clears it, so a save made in the turtle room after the chest
+  writes entry 26 = 5 where the original writes 2, and the first click
+  in `SS` 31 is eaten where the original's is not. Settled by merging
+  the branches that port those entries (`a2/pz-turtle`, `a2/pz-dragon`,
+  `a2/pz-labyrinth`). Against the original's emulated run
   (`tests/chest.rs`, `tests/golden/chest.txt`): the entry by view,
   counter and mode, with no slot; the click alone along the five clicks
   and their variants (types, views, the chopstick already in the bag,
@@ -1545,11 +1553,11 @@ event, the gong's way back to Tibet) into `china-*.png`.
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
-  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
-  (it writes the slots' playing byte, @ 0x004833a1, which the chest
-  brought in; the key's write is not ported yet), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
-  variables are script state only, as in the original. A fatal error of
+  variables are script state only, as in the original. `ANIM_THE_FRAME`
+  sets the playing byte of the first record of its id, of any kind
+  (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
   logged; the game itself goes on. The original's own unknowns stay open:
   how the menu resets the variables of a new game (the

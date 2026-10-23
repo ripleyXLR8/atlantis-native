@@ -27,7 +27,7 @@ use atlantis2_data::wam::EntityState;
 use atlantis2_data::{A2Files, Folder};
 
 use atlantis2_engine::anim::Anim;
-use atlantis2_engine::engine::{chest_mode_cleared, chinese_click_hooks, chinese_entry_hooks};
+use atlantis2_engine::engine::chinese_entry_hooks;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{CursorBank, Engine, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
@@ -297,10 +297,10 @@ fn the_entry_and_click_hooks_as_the_original() {
     let take = zone("PRENDRE_BAGUETTE") as i32;
 
     // B: the entry hook, run by the view's entry on its slots as loaded.
-    // Views 0 and 8 are not in `miniature.wam` with the chest's slots
-    // (the golden puts view 5's slots under those numbers): their rows,
-    // the hook's own view test, are left out; the dispatchers never call
-    // it there (rows E).
+    // Views 0 and 8 have no chest slots in `miniature.wam`: the golden
+    // runs the hook alone on view 5's slots under those numbers (its own
+    // view test), and so does the port (the dispatchers never call it
+    // there, rows E).
     let mut got = Vec::new();
     let mut want = Vec::new();
     for row in rows("B view") {
@@ -310,13 +310,18 @@ fn the_entry_and_click_hooks_as_the_original() {
             w[4].parse().unwrap(),
             w[6].parse().unwrap(),
         );
-        if !(1..=7).contains(&view) {
-            continue;
+        if (1..=7).contains(&view) {
+            fresh(&mut e, view, 3, v, 0, mode);
+            assert!(e.events.contains(&Event::PuzzleRan {
+                function: 0x0049_38f0
+            }));
+        } else {
+            // View 5's slots as loaded (the entry undone), the hook alone.
+            fresh(&mut e, 5, 3, v, 0, mode);
+            e.reload_animations();
+            e.set_puzzle_mode(mode);
+            e.chest_entry_as(view);
         }
-        fresh(&mut e, view, 3, v, 0, mode);
-        assert!(e.events.contains(&Event::PuzzleRan {
-            function: 0x0049_38f0
-        }));
         got.push(format!(
             "B view {view} var {v} mode {mode} -> {} | warn {}",
             st(&e),
@@ -404,12 +409,15 @@ fn the_entry_and_click_hooks_as_the_original() {
     }
     same(&got, &rows("C "));
 
-    // D: the click dispatcher's choice and its clear of the mode 5. The
-    // hooks of the other puzzles are noted only (FUN_004945f0, the
-    // clouds' move zones, clears the mode in the original: its row's
-    // mode after is the original's, not checked against the port).
+    // D: the engine's click dispatcher (its Chinese part) on the golden's
+    // warp name, view number, zone type and mode: the hooks it reaches
+    // (the chest's run, the others noted), what it returns and the mode
+    // after. The zone's value is no chest zone, so the chest's click only
+    // holds the chest. FUN_004945f0 (the clouds' move zones) sets the
+    // mode to 0 in the original and is not ported here: its one row has
+    // the mode 0 before.
+    fresh(&mut e, 5, 3, 0, 0, 0);
     let mut got = Vec::new();
-    let mut want = Vec::new();
     for row in rows("D ") {
         let w: Vec<&str> = row.split(' ').collect();
         let (name, number, kind, mode): (&str, u32, i32, i32) = (
@@ -418,28 +426,37 @@ fn the_entry_and_click_hooks_as_the_original() {
             w[3].parse().unwrap(),
             w[5].parse().unwrap(),
         );
-        let (hooks, after) = if chest_mode_cleared(name.as_bytes(), number, mode) {
-            (Vec::new(), 0)
-        } else {
-            let h = chinese_click_hooks(name.as_bytes(), number, kind);
-            let after = if h.contains(&0x0049_45f0) { 0 } else { mode };
-            (h, after)
+        let z = atlantis2_data::wam::Zone {
+            kind,
+            value: 0,
+            name: None,
+            points: Vec::new(),
         };
+        e.set_puzzle_mode(mode);
+        e.events.clear();
+        let al = e.chinese_click(name.as_bytes(), number, &z);
+        let hooks: Vec<String> = e
+            .events
+            .iter()
+            .filter_map(|x| match x {
+                Event::PuzzleRan { function } | Event::PuzzleNotPorted { function } => {
+                    Some(hook_name(*function))
+                }
+                _ => None,
+            })
+            .collect();
         let hooks = if hooks.is_empty() {
             "-".to_string()
         } else {
-            hooks
-                .into_iter()
-                .map(hook_name)
-                .collect::<Vec<_>>()
-                .join(",")
+            hooks.join(",")
         };
         got.push(format!(
-            "D {name} {number} {kind} mode {mode} -> {hooks} AL 0 mode {after}"
+            "D {name} {number} {kind} mode {mode} -> {hooks} AL {} mode {}",
+            i32::from(al),
+            e.puzzle_mode()
         ));
-        want.push(row.to_string());
     }
-    same(&got, &want);
+    same(&got, &rows("D "));
     // The engine's dispatcher on a real click: the mode 5 cleared by the
     // first click in view 13, which runs no hook.
     fresh(&mut e, 5, 3, 0, 0, 0);

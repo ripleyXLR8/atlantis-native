@@ -2528,6 +2528,13 @@ impl Engine {
         self.sprite_click();
     }
 
+    /// Loads the current view's place animations again, as its entry
+    /// does before the puzzles' set-up, without that set-up: for tests
+    /// and tools (a puzzle hook run alone on the slots as loaded).
+    pub fn reload_animations(&mut self) {
+        self.load_animations(self.view);
+    }
+
     /// The per-view reset of an arrival frame (@ 0x00483ce0): for tests
     /// and tools.
     pub fn reset_view(&mut self) {
