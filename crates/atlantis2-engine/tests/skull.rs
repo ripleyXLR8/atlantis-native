@@ -93,6 +93,20 @@ fn fmt_list(l: &[i32]) -> String {
 }
 
 /// A python list (`[0, -1, 1]`) of the golden's labels.
+/// The frame lists' warnings given since the last call, as the golden
+/// prints them (`-` for none).
+fn warnings(a: &mut Anim) -> String {
+    let w: Vec<String> = std::mem::take(&mut a.warnings)
+        .iter()
+        .map(|w| format!("warning:{w}"))
+        .collect();
+    if w.is_empty() {
+        "-".into()
+    } else {
+        w.join(",")
+    }
+}
+
 fn parse_list(t: &str) -> Vec<i32> {
     let a = t.find('[').unwrap();
     let b = t[a..].find(']').unwrap() + a;
@@ -148,13 +162,11 @@ fn frame_lists_as_the_original() {
             .collect::<Vec<_>>()
             .join(" ")
     };
-    // ret, lists; the original warns exactly when an add or a sub
-    // returns 0.
-    let check = |a: &Anim, label: &str, ret: i32, warns: bool| {
+    // ret, lists, the warnings the call gave.
+    let check = |a: &mut Anim, label: &str, ret: i32| {
         let want = row(&golden, label);
-        let got = format!("ret={ret} | {} | ", lists(a));
-        assert!(want.starts_with(&got), "{label}: {got} against {want}");
-        assert_eq!(want.ends_with("| -"), !warns, "{label}");
+        let got = format!("ret={ret} | {} | {}", lists(a), warnings(a));
+        assert_eq!(got, want, "{label}");
     };
     let id_of = |w: &str| {
         if w == "SPRITE" {
@@ -216,15 +228,15 @@ fn frame_lists_as_the_original() {
         match *op {
             "add" => {
                 let r = a.add_frame(i, *f);
-                check(&a, label, i32::from(r), !r);
+                check(&mut a, label, i32::from(r));
             }
             "sub" => {
                 let r = a.sub_frame(i, *f);
-                check(&a, label, i32::from(r), !r);
+                check(&mut a, label, i32::from(r));
             }
             "has" => {
                 let r = a.has_frame(i, *f);
-                check(&a, label, i32::from(r), false);
+                check(&mut a, label, i32::from(r));
             }
             // FUN_0047ca10 (not used by the port): every list of the id
             // emptied, 0 returned.
@@ -232,7 +244,7 @@ fn frame_lists_as_the_original() {
                 for s in a.slots.iter_mut().filter(|s| s.id == i) {
                     s.frames = [LIST_END; 128];
                 }
-                check(&a, label, 0, false);
+                check(&mut a, label, 0);
             }
         }
     }
@@ -242,20 +254,18 @@ fn frame_lists_as_the_original() {
     }
     let r = a.add_frame(sk, 1);
     check(
-        &a,
+        &mut a,
         "add(SPRITE,1) on a full list (128 entries)",
         i32::from(r),
-        !r,
     );
     let r = a.sub_frame(sk, 6);
-    check(&a, "sub(SPRITE,6) on a full list", i32::from(r), !r);
+    check(&mut a, "sub(SPRITE,6) on a full list", i32::from(r));
     set(&mut a, &[other]);
     let r = a.has_frame(sk, 0);
     check(
-        &a,
+        &mut a,
         &format!("has(SPRITE,0) without a {{1:{sk}}} slot"),
         i32::from(r),
-        false,
     );
 }
 
@@ -350,9 +360,12 @@ fn the_view_entry_as_the_original() {
     let want = row(&golden, &format!("view 42 without a {{1:{sk}}} slot"));
     let mut no = e.anim.slots.remove(slot);
     set_state(&mut e, "0199999");
+    e.skull_sprite = 0;
+    e.anim.warnings.clear();
     e.skull_entry();
     assert!(e.anim.slots.iter().all(|s| s.id != sk));
-    assert!(want.contains(&format!("id={sk}")) && want.matches("warning:").count() == 2);
+    let got = format!("id={} | {}", e.skull_sprite, warnings(&mut e.anim));
+    assert_eq!(Some(got.as_str()), want.split_once(" ").map(|(_, w)| w));
     // Two slots of the sprite: both lists.
     no.frames = [LIST_END; 128];
     e.anim.slots.insert(slot, no.clone());
@@ -501,12 +514,10 @@ fn the_click_as_the_original() {
     set_state(&mut e, "0199999");
     e.skull_sprite = 0;
     let croix = id(&e, defnames::OBJETS, "CRANE_CROIX");
+    e.anim.warnings.clear();
     let got = click(&mut e, &cz, croix, false);
     let want = row(&golden, "without an entry hook (0x006d26a8 = 0)");
-    assert_eq!(
-        format!("{got},warning:AddSpwToFrameTab impossible for - non trouvé - :%d"),
-        want
-    );
+    assert_eq!(format!("{got},{}", warnings(&mut e.anim)), want);
 }
 
 #[test]
@@ -943,7 +954,18 @@ fn the_state_is_saved_and_loaded() {
     // Save entry 30: the eight bytes.
     let off: usize = atlantis2_data::save::entry_offset(30);
     assert_eq!(&d.bytes()[off..off + 8], b"0129499\0");
-    // A new game does not reset it (FUN_0049bf70 leaves it); a load does.
+    // A second new game in the same engine does not reset it
+    // (FUN_0049bf70 leaves it): its view 42 draws the first game's pieces.
+    e.start_new_game().unwrap();
+    e.end_video();
+    for c in [&b"(monde=1)"[..], b"(changewam=bigile1.wam)", b"(vue=42)"] {
+        e.run_command(c);
+    }
+    settle(&mut e);
+    assert_eq!(e.place(), ("bigile1.wam", 42));
+    assert_eq!(&e.skull, b"0129499\0");
+    assert_eq!(e.anim.frame_list(skull_slot(&e)), [0, 1, 2, 4]);
+    // A load does: a fresh engine (the start's state) given the save.
     let mut f = chapter_7_view_42(game().unwrap(), &mut None);
     assert_eq!(f.skull, SKULL_START);
     f.load_data(&d).unwrap();

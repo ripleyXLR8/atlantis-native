@@ -126,6 +126,9 @@ pub struct Anim {
     /// slots of that id carry the horse's frame across views in
     /// `FRAMECHEVAL` (@ 0x0047d84d, @ 0x0047c764); none without it.
     pub cheval: Option<i32>,
+    /// The original's warnings of the frame lists (`FUN_00480c20`: their
+    /// format strings), in order, for tests and tools.
+    pub warnings: Vec<&'static str>,
 }
 
 /// The texel under the screen centre: (face, column, row).
@@ -141,6 +144,7 @@ impl Anim {
             rand: MsvcRand(seed),
             blend: Blend::rgb565(),
             cheval: None,
+            warnings: Vec::new(),
         }
     }
 
@@ -406,10 +410,14 @@ impl Anim {
         match last {
             None => {
                 log::warn!("AddSpwToFrameTab impossible for - non trouvé - :{id}");
+                self.warnings
+                    .push("AddSpwToFrameTab impossible for - non trouvé - :%d");
                 false
             }
             Some(None) => {
                 log::warn!("AddSpwToFrameTab impossible - Trop d'entrée - for :{id}");
+                self.warnings
+                    .push("AddSpwToFrameTab impossible - Trop d'entrée - for :%d");
                 false
             }
             Some(Some(_)) => true,
@@ -421,10 +429,15 @@ impl Anim {
     /// is replaced by the list's last entry, which is then the end. False,
     /// with a warning, when that list does not hold `frame`; true when no
     /// slot of `id` has a list with an end (nothing changed). The match
-    /// found in a full list of an earlier slot is carried to the next one
-    /// (@ 0x0047c91a sets it once); the port keeps that, but not the
-    /// write below the list it can lead to (an index 0x7f carried into a
-    /// list whose first byte is the end), out of reach of any data.
+    /// index is set once (@ 0x0047c91a), not per slot: the last match k
+    /// (0..126) of a full list is carried to the next slot of `id` (a
+    /// match at 127 stops the walk in its own slot, @ 0x0047c948). The
+    /// port keeps that, but not one case: when the list that ends the
+    /// walk has its end at index 0 (k carried into it, or `frame` = −2
+    /// matching that end byte), the original copies the byte below the
+    /// list (slot +0x3b) into entry k and writes the end there
+    /// (@ 0x0047c979..0x0047c988); the port writes neither. Out of reach
+    /// of any data.
     pub fn sub_frame(&mut self, id: i32, frame: i32) -> bool {
         let mut found: Option<usize> = None;
         for s in self.slots.iter_mut().filter(|s| s.id == id) {
@@ -441,6 +454,8 @@ impl Anim {
             let Some(end) = end else { continue };
             let Some(at) = found else {
                 log::warn!("SubSpwToFrameTab impossible !! for :{id} {frame}");
+                self.warnings
+                    .push("SubSpwToFrameTab impossible !! for :%d %d");
                 return false;
             };
             if end > 0 {

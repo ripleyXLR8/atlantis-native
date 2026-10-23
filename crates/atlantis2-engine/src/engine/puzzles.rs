@@ -192,8 +192,9 @@ impl Engine {
             self.event(Event::PuzzleHook { zone: zi, cliczone });
             self.mandala_hook(zone.name.as_deref());
         }
-        // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the puzzles are
-        // not ported; what their move-zone parts do besides is.
+        // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the skull's click and
+        // move-zone hooks run; the other puzzles are not ported (noted),
+        // only what their move-zone hooks do besides.
         let knife = self
             .names
             .id(defnames::OBJETS, b"COUTEAU_AILILL")
@@ -291,10 +292,22 @@ impl Engine {
     /// (signed byte, @ 0x00493cf2..0x00493d17): '9' hides, and the list
     /// order is the state's. Public for tests and tools as well.
     pub fn skull_entry(&mut self) {
-        let id = self
-            .names
-            .id(defnames::OBJETS, SKULL_SPRITE)
-            .map_or(-1, |i| i as i32);
+        // `DefName_GetIdName(1, name)` (FUN_004105a0): an unknown name is
+        // the original's fatal error (FUN_00480cd0, @ 0x004106a3: an
+        // emergency save, then the game quits); here the scripts stop and
+        // so does the hook. The game's data never reach it.
+        let id = match self.names.id(defnames::OBJETS, SKULL_SPRITE) {
+            Ok(i) => i as i32,
+            Err(_) => {
+                let msg = format!(
+                    "DefName_GetIdName: Nom de #OBJETS# inconnu:{}",
+                    String::from_utf8_lossy(SKULL_SPRITE)
+                );
+                log::error!("{msg}");
+                self.with_script(|s, _| s.fail(msg));
+                return;
+            }
+        };
         self.skull_sprite = id;
         for frame in 0..7 {
             if self.anim.has_frame(id, frame) {
