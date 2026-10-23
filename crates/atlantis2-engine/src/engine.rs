@@ -37,6 +37,10 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 mod blackbird;
 mod cross;
 mod host;
+mod labyrinth;
+pub use labyrinth::{
+    soul_cell, soul_drops, soul_open, soul_random, soul_visible, Hood, SOULS_MODE,
+};
 mod menus;
 mod ogham;
 pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
@@ -128,8 +132,13 @@ pub enum Event {
     /// A puzzle hook the port does not have (China's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
-    /// An Irish puzzle hook the port has, run: the original's function.
+    /// A puzzle hook the port has (Ireland's, China's labyrinth souls),
+    /// run: the original's function.
     PuzzleRan { function: u32 },
+    /// A labyrinth soul's passage started (`(NewSound=220)`) or ended
+    /// (`(NewSound=221)`, a sound on no disc) in slot `slot`
+    /// (FUN_0048eb30).
+    SoulPassage { slot: usize, start: bool },
     /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
     CrossLaid { value: i32 },
     /// Brigid's cross taken back from the zone of value `value`.
@@ -402,6 +411,10 @@ pub struct Engine {
     cursor_flag: bool,
     /// Whether any SPW was ever loaded (@ 0x006c2df8).
     spw_loaded: bool,
+    /// The labyrinth entry's counts: the candidate states (@ 0x006d18d8)
+    /// and the souls loaded (@ 0x006d18e0), as the last entry left them.
+    pub souls_candidates: i32,
+    pub souls_loaded: i32,
     video: Option<Video>,
     /// The start-up intro: playing (@ 0x006d85f1) and the number of its
     /// next file (@ 0x006d85f4).
@@ -814,6 +827,8 @@ impl Engine {
             spw_flag: false,
             cursor_flag: false,
             spw_loaded: false,
+            souls_candidates: 0,
+            souls_loaded: 0,
             video: None,
             intro_playing: false,
             intro_next: 0,
@@ -969,17 +984,28 @@ impl Engine {
     fn load_animations(&mut self, view: u32) {
         self.anim.clear();
         let mut loads = Vec::new();
-        for e in &self.wam.entities {
-            for s in e.state_records().filter(|s| s.view == view) {
+        for (ei, e) in self.wam.entities.iter().enumerate() {
+            for (si, s) in e
+                .state_records()
+                .enumerate()
+                .filter(|(_, s)| s.view == view)
+            {
                 let sprite = if e.kind == 2 {
                     self.names.param(defnames::OBJETS, e.con_name.as_bytes())
                 } else {
                     0
                 };
-                loads.push((e.spw_name(&s), e.kind as i32, e.index as i32, sprite, s));
+                loads.push((
+                    e.spw_name(&s),
+                    e.kind as i32,
+                    e.index as i32,
+                    sprite,
+                    s,
+                    (ei, si),
+                ));
             }
         }
-        for (name, kind, id, sprite, s) in loads {
+        for (name, kind, id, sprite, s, record) in loads {
             let spw = self
                 .files
                 .read(Folder::Spw, &name)
@@ -991,7 +1017,11 @@ impl Engine {
             match spw {
                 Some(spw) => {
                     self.spw_loaded = true;
+                    let n = self.anim.slots.len();
                     self.anim.load(&name, spw, kind, id, sprite, s);
+                    if let Some(slot) = self.anim.slots.get_mut(n) {
+                        slot.record = Some(record);
+                    }
                     // The horse's frame kept across views (@ 0x0047c764):
                     // a slot whose id is `CHEVAL`'s object index, whatever
                     // its kind, starts at `FRAMECHEVAL`.
@@ -1458,6 +1488,11 @@ impl Engine {
         // or a film a scan started).
         if let (Some(_), Some(out)) = (&self.video, out) {
             self.draw_video(out);
+        }
+        // The puzzle tick FUN_0049bfb0 whenever the puzzle mode is not 0
+        // (@ 0x0045a5e0..0x0045a5e8), every pass.
+        if self.puzzle_mode() != 0 {
+            self.puzzle_tick();
         }
         // 6.
         self.vars.cliczone = 0;

@@ -1,6 +1,6 @@
 //! China (world 3) without its puzzles: every Chinese chapter's `/INIT`
 //! run; every view of the five places entered, the puzzles' entry hooks
-//! noted; the click hooks, which take no click; the moves between the
+//! noted (the labyrinth's souls', ported, run); the click hooks, which take no click; the moves between the
 //! places (type-2 zones and WAM links); `NextWarpInvalide` as chapter 59's
 //! door uses it; the picture viewer (`ViewBigSpr`); a demon's special
 //! event; chapter 46's lantern back to Tibet; every dialog the chapters
@@ -139,12 +139,13 @@ fn bare(files: A2Files, name: &str, view: u32) -> Engine {
     e
 }
 
-/// The puzzle hooks noted in `events`, in order.
+/// The puzzle hooks reached in `events`, in order: run (the labyrinth's
+/// souls) or noted (the others).
 fn noted(events: &[Event]) -> Vec<u32> {
     events
         .iter()
         .filter_map(|x| match x {
-            Event::PuzzleNotPorted { function } => Some(*function),
+            Event::PuzzleNotPorted { function } | Event::PuzzleRan { function } => Some(*function),
             _ => None,
         })
         .collect()
@@ -541,12 +542,14 @@ fn a_demons_special_event() {
     }
     assert_eq!(var(&e, "TestSpecialEvent"), 0, "{frames:?}");
     assert!(frames.contains(&51));
-    let sound = e
-        .events
-        .iter()
-        .position(|x| *x == Event::Sound("sound203.apc".into()))
-        .expect("sound 203");
-    assert!(e.events[sound..].contains(&Event::DialogStart {
+    // Sound 203 at frame 51, unless voice 2 is busy then: the view's
+    // souls pass with sound 220 on it (the labyrinth's souls,
+    // `engine/labyrinth.rs`), which keeps the stamp's sound unheard.
+    let stamp = Event::Sound("sound203.apc".into());
+    let passage = Event::Sound("sound220.apc".into());
+    assert!(e.events.contains(&stamp) || e.events.contains(&passage));
+    let from = e.events.iter().position(|x| *x == stamp).unwrap_or(0);
+    assert!(e.events[from..].contains(&Event::DialogStart {
         number: 333,
         started: true
     }));

@@ -96,6 +96,15 @@ pub struct Slot {
     pub frames: [u8; FRAME_TAB],
     /// +0xc4: the countdown of the random pause.
     pub delay: i32,
+    /// +0xbc (a byte): the slot plays, 1 at load (@ 0x0047c666); the
+    /// step moves only the frames of active slots that play
+    /// (@ 0x0047d82c). The labyrinth's souls are held (0) until their
+    /// passage (@ 0x0048e0dc, @ 0x0048ebc9).
+    pub playing: bool,
+    /// The WAM state record the slot was loaded from (entity, state, in
+    /// the place's order): the record pointer +0x24 that FUN_0048eae0
+    /// looks a slot up by.
+    pub record: Option<(usize, usize)>,
 }
 
 impl Slot {
@@ -209,17 +218,21 @@ impl Anim {
             object_sprite,
             frames: [LIST_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
+            playing: true,
+            record: None,
         });
     }
 
-    /// FUN_0047d7f0 on a 15 Hz tick: every playing slot one frame on, then
-    /// the slots whose play has ended restart, hand over or stop. Returns
+    /// FUN_0047d7f0 on a 15 Hz tick: every active slot that plays
+    /// (+0x30 and the byte +0xbc, @ 0x0047d827..0x0047d832) one frame
+    /// on, then the active slots whose play has ended (frame −1, whether
+    /// they play or not) restart, hand over or stop. Returns
     /// the frame the first loop left in the last slot of `CHEVAL`'s id,
     /// whatever its kind (the value it writes into `FRAMECHEVAL`,
     /// @ 0x0047d84d..0x0047d872).
     pub fn step(&mut self) -> Option<i32> {
         let mut horse = None;
-        for s in self.slots.iter_mut().filter(|s| s.active) {
+        for s in self.slots.iter_mut().filter(|s| s.active && s.playing) {
             s.frame = if s.frame < 0 || s.frame >= s.end - 1 {
                 -1
             } else {

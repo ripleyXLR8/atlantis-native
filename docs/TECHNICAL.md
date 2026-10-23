@@ -1008,17 +1008,17 @@ event, the gong's way back to Tibet) into `china-*.png`.
   case by case against the original (`scripts_worlds_events.txt`) and
   played in chapter 60 (the rat given a form: sound 203 at frame 51, the
   event's end at frame 60, the stamped form back, the remembered dialog).
-  The puzzles are not ported: the figurines and the chest (`SS` views
-  1-7), the five wheels (`SS` 12-13), the pearl and the dragon (`SS` 31),
-  the turtle ring (`CH` 40-64) and the labyrinth's souls (`LA` 1-60).
-  Their hooks are listed as the original's dispatchers call them
+  The puzzles are not ported, but the labyrinth's souls (below): the
+  figurines and the chest (`SS` views 1-7), the five wheels (`SS`
+  12-13), the pearl and the dragon (`SS` 31) and the turtle ring (`CH`
+  40-64). Their hooks are listed as the original's dispatchers call them
   (`chinese_click_hooks`, `chinese_entry_hooks`) and noted
   (`Event::PuzzleNotPorted`); none takes a click (the dispatcher returns
   0 for all of them), so every click reaches `CLICZONE`, the scans and
   the moves as in the original; without their entries the puzzles'
   sprites keep the states their WAM records and the show / hide table
   give them at load: the wheels and figurines are not placed from their
-  variables, the ring's frame and the souls are not set, and
+  variables, the ring's frame is not set, and
   `PERLE_TROU`, which the clouds' entry hides until the pearl is won
   (FUN_004944a0), shows in `SS` view 31 and can be taken there (a
   shortcut the original does not have). `Engine::solve_chinese_puzzle` writes what the
@@ -1044,6 +1044,57 @@ event, the gong's way back to Tibet) into `china-*.png`.
   section from the move, its `/set` lines all the original's), plays
   all 115 dialogs the chapters start, checks the subjects, objects and
   musics on disc 3, and loads a game saved in the turtle room.
+- **The labyrinth's souls** (`engine/labyrinth.rs`, `labysol.wam` views
+  1-30 and `labyplaf.wam` 31-60, chapter 60): four wandering souls
+  (`AME1..4`, one per corridor direction, their entity's SPW prefix
+  `1a`..`1d`) whose states sit in two template views (509, 510) at a
+  distance (animations 1-3). The view entry's hook (@ 0x0048df10, after
+  the view's own slots) sets the puzzle mode 3, finds the view's cell in
+  one of two 13 x 11 maps (@ 0x005e1184, 0x005e1214; the port keeps
+  which bytes are spaces), tests every state of the place with the
+  original's 20 corridor tests (open and walled cells around the cell, a
+  direction, an animation, a template view; in views 1-30 the
+  directions a ↔ c and b ↔ d, the floor's map turned round), drops one
+  candidate at random for 3-4, two for 5-7, three from 8 (`random(n)` =
+  `rand() · n / 32767`, a budget of 100 misses), loads the others after
+  the view's slots, held and hidden, each with a delay (`random(max(0,
+  (150 − end) · 5) + 45) + 10`, drawn again from `… + 105` while within
+  44 of another soul's, ten tries). The puzzle tick (@ 0x0048eb30, every
+  warp frame while the mode is 3; outside views 1-60 the mode back to 0)
+  counts each soul's delay down **per frame**, then plays its passage
+  once with `(NewSound=220)` and hides it at its last frame with a new
+  delay and `(NewSound=221)`, a sound on no disc. A passage of
+  animation 3 has its click kind cleared in the frame after it appears,
+  when its frame (0 or 1) is still empty: `labyplaf.wam`'s souls, a
+  character in the data, are never clickable, and chapter 60's talks
+  with them never run, as in the original. The delay is kept in the
+  slot's start frame, as the original does; slots now carry the playing
+  byte (+0xbc) and the WAM record they were loaded from (FUN_0048eae0's
+  look-up). The draws are the engine's `rand`, the one the dialogs and
+  the music use (seeded by each music start). With it the puzzle mode
+  (save entry 26, read in place) and the puzzle tick dispatcher
+  FUN_0049bfb0. Checked against the original (`tests/labyrinth.rs`,
+  `tests/golden/labyrinth.txt`): every view's cell and neighbourhood,
+  every view's candidates in both places, the tests on 403 synthetic
+  neighbourhoods, `random(n)` at its edges, the entry in all 60 views
+  for three seeds (slots, delays, the generator's state after), its edge
+  cases, the delay alone (the ten tries), the tick alone, the warp frame
+  pass by pass, a click on a soul, the dispatchers, and the souls' 20
+  files drawn; then chapter 60 played with the mouse (the door from
+  `miniature.wam`, a soul's passage, the buffalo's empty form, the fox
+  woman's fan read, the three demons' stamps in the fan's order across
+  both places, the buffalo's answer: dialog 322, the mushroom,
+  `flag173`). Known differences: the place animations' hand-over draws
+  from their own generator here (the fox woman's weighted states in
+  views 20, 21 and 30 share the souls' generator in the original); a
+  drop draw of `rand()` = 32767 reads, in the original, an uninitialised
+  stack word past the candidates (a 1 there drops nothing more): the
+  port takes it as a miss (not known what the game's stack holds there;
+  to settle, a breakpoint at atlantis2-cd-fr-2199552 @ 0x0048dff2 in a
+  Wine run of the labyrinth, the word read when EAX is the candidate
+  count); the original's fatal errors, which the data never reach,
+  stop the scripts here (34 candidates) or are logged (AtlSpw_load's
+  full slot table, as for every place animation).
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,
@@ -1705,5 +1756,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles, Yucatán, Shamballa and their puzzles |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles (the labyrinth's souls done), Yucatán, Shamballa and their puzzles |
 
