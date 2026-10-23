@@ -18,13 +18,16 @@ use crate::script::{BagEntry, Shown, SubjectTable};
 
 /// The entries Native keeps only as bytes: the dowsing rod's 15
 /// (@ 0x006d84f4, its role not read) and the puzzles not ported (20..29,
-/// 31, 32). The dialog flag (33) is written from the running
+/// 32). The dialog flag (33) is written from the running
 /// dialog and not read back: a save made from the menus has no dialog
 /// running, Escape ends it before the main menu opens (@ 0x004762f0).
-const KEPT: [usize; 13] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32];
+const KEPT: [usize; 12] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 32];
 
 /// The skull's state (@ 0x005e1a4c, 8 bytes).
 const SKULL: usize = 30;
+
+/// The Ogham stones' 15 bytes (@ 0x005e20dc), the engine's.
+const OGHAM: usize = 31;
 
 /// The dowsing rod's entries: shown (@ 0x006d84fd, one byte), its frame
 /// (@ 0x006d8500) and its step (@ 0x005e2efc).
@@ -148,6 +151,8 @@ impl Engine {
     /// FUN_00478df0 copies them.
     pub fn save_data(&self) -> SaveData {
         let mut d = self.save_extra.clone();
+        // 31: the Ogham stones (@ 0x005e20dc).
+        d.entry_mut(OGHAM).copy_from_slice(&self.ogham);
         let Some(s) = self.con.as_deref() else {
             return d;
         };
@@ -293,8 +298,9 @@ impl Engine {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }
         // 30: the skull's state, which FUN_0049bf70 does not reset; the
-        // view entry below shows it.
+        // view entry below shows it. 31: the Ogham stones.
         self.skull.copy_from_slice(d.entry(SKULL));
+        self.ogham.copy_from_slice(d.entry(OGHAM));
         let header = d.header();
         let s = self.con.as_deref_mut().expect("checked above");
         // 1, 5, 6: the chapter, the variables, the flags.

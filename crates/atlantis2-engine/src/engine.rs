@@ -36,6 +36,8 @@ use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod host;
 mod menus;
+mod ogham;
+pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
 mod places;
 mod puzzles;
 pub use puzzles::{
@@ -433,6 +435,13 @@ pub struct Engine {
     /// `CRANE_SPRITE`'s id as the skull's view entry last looked it up
     /// (@ 0x006d26a8; 0 before any).
     pub skull_sprite: i32,
+    /// The Ogham stones' 15 bytes (@ 0x005e20dc, the save's entry 31):
+    /// set at start-up, written by the puzzle's clicks and by a load, not
+    /// by a new game.
+    pub ogham: [u8; 15],
+    /// The Ogham sprite's id as the view entry found it (@ 0x006d2768),
+    /// for the clicks.
+    ogham_sprite: i32,
     /// Where the port may differ from the original (default: the minor
     /// bug fixes on).
     pub enhancements: Enhancements,
@@ -801,6 +810,8 @@ impl Engine {
             blackbird_sounds: false,
             skull: puzzles::SKULL_START,
             skull_sprite: 0,
+            ogham: OGHAM_START,
+            ogham_sprite: 0,
             enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),
