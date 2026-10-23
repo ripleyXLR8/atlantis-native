@@ -748,10 +748,13 @@ Tibet) into `ireland-*.png`.
   holds it and −1 otherwise, is the same test, used by the ogham stones).
   Such a slot is hit under the centre only when its list drew a frame
   (the draw @ 0x0047ce60 returns 0 otherwise). Not ported: the clear
-  (@ 0x0047ca10, unused so far) and the write below a list that the
-  removal makes when a match at index 127 of a full list is carried to
-  the next slot (no data reaches it). State chains and the odd-tick flag
-  are not ported (no Tibet or Irish state uses them).
+  (@ 0x0047ca10, unused so far) and the removal's two writes when the
+  list that ends its walk has its end at index 0 (a match index carried
+  from a full list of an earlier slot of the id, or frame −2 matching
+  that end byte): the byte below the list into the matched entry and the
+  end into that byte, @ 0x0047c979..0x0047c988 (no data reaches them).
+  State chains and the odd-tick flag are not ported (no Tibet or Irish
+  state uses them).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
   `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
@@ -909,19 +912,30 @@ Tibet) into `ireland-*.png`.
   `tests/golden/ogham.txt`): the entry on fresh, stale, two and no slots;
   each zone value from the start and with no slot; every reachable row
   state with its six moves (66, 71 and 71 states, 332706 in all), found
-  again by the port's own breadth-first search, and the shortest solution
-  (11 clicks); the win and the checks after it; the dispatcher's choice
+  again by the port's own breadth-first search with the golden's checks
+  and independence sample, and the shortest solution (11 clicks, the
+  same path); the win and the checks after it; the dispatcher's choice
   by zone type, hand and view name; the drawing of nine lists into six
   faces (md5 of each face, pixels). `the_ogham_stones_played_with_the_mouse`
   plays it from chapter 3's view 7 with the knife in the bag: the walk to
-  view 6 (chapter 15), the knife picked from the bag bar, each of the 11
-  clicks checked against the original's move, a save and a load, zone
-  99: `FINOGHAM` = 1, chapter 15's lines 16-19 (the original's, golden
+  view 6 (chapter 15), the knife picked from the bag bar, zones 99 and 17
+  on the start's bytes (golden G: no win, nothing run), each of the 11
+  clicks checked against the original's move, a save and a load, zone 99
+  with the stick already in the bag (golden G: `FINOGHAM` = 1, nothing
+  run), the save loaded again, zone 99: `FINOGHAM` = 1, chapter 15's lines 16-19 (the original's, golden
   section G), film 3, view 106 with the stick shown. Kept from the
   original: the last place brought back from an empty previous one gets
   frame 3 (row 0's first place), a row turned while its first place is
   empty takes row 0's frames, sound 4 on every click, the clicks use the
-  index the last entry kept.
+  index the last entry kept. Not ported, as no data reaches them (view
+  6's zones have the values 1-18 and 99): the generic branch on a value
+  of 19 or more other than 99 (the original writes byte 0x005e20db +
+  value with no bound, into the target @ 0x005e20ec and what follows,
+  and from value 128 reads list bytes past the list's 128, the slot's
+  next fields and the next slot's record: the port only logs the write
+  and reads 0 past the list), and a click with no `OGHAM_SPRITE` slot
+  (the original edits the record past the last slot, and the edit stays
+  for the next click: the port edits a zeroed list it then drops).
 - **Worlds:** Tibet (`tibet.wam`, world 5) and Ireland (above) are
   ported. A `changewam` of the scripts to any other place (the other
   boats' worlds, Shamballa's `voiles.wam` after the crystal,

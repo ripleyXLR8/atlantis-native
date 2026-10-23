@@ -121,7 +121,9 @@ pub fn ogham_click(
     }
     let k = (value - 1) as usize;
     let gone = |b: u8| b == LIST_SKIP;
-    // Past the list the original reads the slot's next fields, none 0xff.
+    // Past the list (a value from 128, which no zone has) the original
+    // reads the slot's next fields and the next slot's record, with no
+    // bound; the port reads 0 there [not ported: no data reaches it].
     let at = |l: &[u8; FRAME_TAB], i: usize| l.get(i).copied().unwrap_or(0);
     match value {
         1 | 6 | 11 => {
@@ -151,6 +153,9 @@ pub fn ogham_click(
                     list[k] = list[k - 1].wrapping_add(4);
                     match state.get(k - 1).copied() {
                         Some(p) if k < 15 => state[k] = p.wrapping_add(4),
+                        // The original writes @ 0x005e20db + value with no
+                        // bound (from value 19, the target and what
+                        // follows): not ported, no zone has such a value.
                         _ => log::warn!("Ogham: byte {k} past the state"),
                     }
                 }
@@ -179,10 +184,22 @@ impl Engine {
     /// one has them (FUN_0047c9c0, FUN_0047c910); the 15 state bytes
     /// appended to each (FUN_0047c880, signed bytes).
     pub fn ogham_entry(&mut self) {
-        let id = self
-            .names
-            .id(defnames::OBJETS, SPRITE)
-            .map_or(-1, |i| i as i32);
+        // `DefName_GetIdName(1, name)` (FUN_004105a0): an unknown name is
+        // the original's fatal error (FUN_00480cd0, @ 0x004106a3: an
+        // emergency save, then the game quits); here the scripts stop and
+        // so does the hook. The game's data never reach it.
+        let id = match self.names.id(defnames::OBJETS, SPRITE) {
+            Ok(i) => i as i32,
+            Err(_) => {
+                let msg = format!(
+                    "DefName_GetIdName: Nom de #OBJETS# inconnu:{}",
+                    String::from_utf8_lossy(SPRITE)
+                );
+                log::error!("{msg}");
+                self.with_script(|s, _| s.fail(msg));
+                return;
+            }
+        };
         self.ogham_sprite = id;
         for frame in 0..15 {
             if self.anim.has_frame(id, frame) {

@@ -239,6 +239,9 @@ fn every_reachable_row_move_as_the_original() {
     let mut port = Vec::new();
     let mut total = 1usize;
     let mut solution = Vec::new();
+    // The golden's checks, counted over every transition (the port's
+    // click has no error path: its sound is the one call).
+    let (mut same_list, mut one_sound, mut others_kept, mut transitions) = (0, 0, 0, 0);
     for r in 0..3 {
         let zones: Vec<i32> = (1..=5)
             .map(|i| 5 * r as i32 + i)
@@ -253,11 +256,10 @@ fn every_reachable_row_move_as_the_original() {
             let mut moves = Vec::new();
             for &z in &zones {
                 let (t, l, c) = click_from(&s, z, 0, true);
-                assert_eq!(used(&l), &t[..], "the list is the state");
-                assert!(c.sound && !c.won);
-                for i in (0..15).filter(|i| i / 5 != r) {
-                    assert_eq!(t[i], s[i], "another row changed");
-                }
+                transitions += 1;
+                same_list += usize::from(used(&l) == &t[..]);
+                one_sound += usize::from(c.sound && !c.won);
+                others_kept += usize::from((0..15).filter(|i| i / 5 != r).all(|i| t[i] == s[i]));
                 moves.push((z, hex(&t[5 * r..5 * r + 5])));
                 if let std::collections::hash_map::Entry::Vacant(v) = seen.entry(t) {
                     v.insert(Some((s, z)));
@@ -281,6 +283,51 @@ fn every_reachable_row_move_as_the_original() {
         solution.extend(path);
     }
     assert_eq!(port, golden);
+    assert_eq!(
+        format!(
+            "D checks over every transition: list = state {same_list}, one (newsound=4), \
+             no error {one_sound}, other rows unchanged {others_kept}, transitions {transitions}"
+        ),
+        rows("D checks").next().unwrap()
+    );
+    // The golden's independence sample: each reachable row state's six
+    // moves with the other rows in the target, an odd and the initial
+    // state, against the same move with the other rows initial.
+    let odd: [u8; 15] = unhex("0304ffffff10ffffffffff03ffffff").try_into().unwrap();
+    let (mut same, mut sampled) = (0, 0);
+    for r in 0..3 {
+        let zones: Vec<i32> = (1..=5)
+            .map(|i| 5 * r as i32 + i)
+            .chain([16 + r as i32])
+            .collect();
+        let seen: std::collections::BTreeSet<&str> = port
+            .iter()
+            .filter(|p| p.0 == r)
+            .map(|p| p.1.as_str())
+            .collect();
+        for rb in seen {
+            let rb = unhex(rb);
+            for o in [OGHAM_TARGET, odd, OGHAM_START] {
+                for &z in &zones {
+                    let mut s = o;
+                    s[5 * r..5 * r + 5].copy_from_slice(&rb);
+                    let a = click_from(&s, z, 0, true).0;
+                    let mut i = OGHAM_START;
+                    i[5 * r..5 * r + 5].copy_from_slice(&rb);
+                    let b = click_from(&i, z, 0, true).0;
+                    sampled += 1;
+                    same += usize::from(a[5 * r..5 * r + 5] == b[5 * r..5 * r + 5]);
+                }
+            }
+        }
+    }
+    assert_eq!(
+        format!(
+            "D independence sample: {same} of {sampled} row transitions equal with the \
+             other rows in the target, an odd and the initial state"
+        ),
+        rows("D independence").next().unwrap()
+    );
     let line = rows("D the whole puzzle").next().unwrap();
     assert!(line.contains(&format!("{total} reachable states")));
     let want: Vec<i32> = line
@@ -290,9 +337,9 @@ fn every_reachable_row_move_as_the_original() {
         .split(' ')
         .map(|z| z.parse().unwrap())
         .collect();
-    // Breadth first finds the shortest per row; the golden's path is the
-    // first found in its order, so is the port's.
-    assert_eq!(solution.len(), want.len());
+    // Breadth first in the same order: the same path, the shortest per
+    // row.
+    assert_eq!(solution, want);
     let mut s = OGHAM_START;
     for &z in &want {
         s = click_from(&s, z, 0, true).0;
@@ -628,6 +675,65 @@ fn lines_as_the_original(evs: &[Event]) {
     }
 }
 
+/// A golden G row whose click scan runs nothing (no line, no film), by a
+/// click on the first zone of value `value`: the hook's sound, `CLICZONE`
+/// as the click scan sees it, the lines it ran, the bytes, `VUE` and
+/// `FINOGHAM` after. (The hook's own `FINOGHAM` is not observed apart:
+/// with no line run it is the one after.) The golden's click has no
+/// sprite under the centre (@ 0x00661640 = −1), so the spiral of view 6
+/// (`SPIRALE_W6`, over the stones: chapter 15's section 3 reacts to it)
+/// is hidden for the click.
+fn quiet_g_row(r: &mut Run, value: i32, label: &str) {
+    let head = format!("G {label}: ");
+    let want = rows(&head).next().unwrap().strip_prefix(&head).unwrap();
+    r.e.run_command(b"(hideobjet=SPIRALE_W6)");
+    r.wait(2);
+    let evs = r.press_stone(value);
+    r.e.run_command(b"(showobjet=SPIRALE_W6)");
+    r.wait(2);
+    assert!(
+        !evs.iter()
+            .any(|e| matches!(e, Event::ClickScan(v) if v.clicobjet != 0)),
+        "{label}: an object under the centre"
+    );
+    let sound = evs
+        .iter()
+        .filter(|e| matches!(e, Event::Sound(_)))
+        .collect::<Vec<_>>();
+    assert_eq!(sound, [&Event::Sound("sound004.apc".into())], "{label}");
+    let cz = evs
+        .iter()
+        .find_map(|e| match e {
+            Event::ClickScan(v) => Some(v.cliczone),
+            _ => None,
+        })
+        .expect("the click scan");
+    let lines: Vec<String> = evs
+        .iter()
+        .filter_map(|e| match e {
+            Event::Set { line, .. } => Some(line.to_string()),
+            _ => None,
+        })
+        .collect();
+    let lines = if lines.is_empty() {
+        "-".to_string()
+    } else {
+        lines.join(",")
+    };
+    assert!(
+        !evs.iter().any(|e| matches!(e, Event::VideoStart { .. })),
+        "{label}"
+    );
+    let fin = r.var("FINOGHAM");
+    let got = format!(
+        "OUT lines - | hook RunOneCommand('(newsound=4)') {{3:98}}={fin} | ClicZone={cz} | \
+         IN lines {lines} resumes=0 | state={} Vue={} {{3:98}}={fin} | calls=",
+        hex(&r.e.ogham),
+        r.var("VUE")
+    );
+    assert_eq!(got, want, "{label}");
+}
+
 #[test]
 fn the_ogham_stones_played_with_the_mouse() {
     let Some(files) = game() else { return };
@@ -685,6 +791,15 @@ fn the_ogham_stones_played_with_the_mouse() {
     // The knife from the bag, then the original's shortest solution,
     // each click checked against the golden's move from that state.
     r.pick(knife);
+    // Golden G, the click handler and the click scan of chapter 15 on the
+    // initial bytes: zone 99 (no win), then zone 17 (row 1 turned); three
+    // more turns bring row 1 back.
+    quiet_g_row(&mut r, 99, "zone 99, initial, {3:98}=0");
+    quiet_g_row(&mut r, 17, "zone 17, initial");
+    for _ in 0..3 {
+        r.press_stone(17);
+    }
+    assert_eq!(r.e.ogham, OGHAM_START);
     let solution: Vec<i32> = rows("D the whole puzzle")
         .next()
         .unwrap()
@@ -733,6 +848,18 @@ fn the_ogham_stones_played_with_the_mouse() {
     let slot = r.e.anim.slots.iter().position(|s| s.id == sprite).unwrap();
     assert_eq!(used(&r.e.anim.slots[slot].frames), &OGHAM_TARGET[..]);
     assert_eq!(r.e.place(), ("bigile1.wam", 6));
+    if r.var("OBJETENMAIN") != knife {
+        r.pick(knife);
+    }
+
+    // Golden G, zone 99 on the solved bytes with the stick already in the
+    // bag: `FINOGHAM` = 1 by the hook, chapter 15 runs nothing. Then the
+    // save loaded again (`FINOGHAM` 0, the stick not in the bag).
+    r.e.run_command(b"(sacados=BATON_OGHAM)");
+    quiet_g_row(&mut r, 99, "zone 99, solved, {3:98}=0, {1:34} in the bag");
+    r.e.load_data(&saved).unwrap();
+    r.wait(2);
+    assert_eq!((r.e.ogham, r.var("FINOGHAM")), (OGHAM_TARGET, 0));
     if r.var("OBJETENMAIN") != knife {
         r.pick(knife);
     }
@@ -794,7 +921,7 @@ fn the_ogham_stones_played_with_the_mouse() {
     r.wait(10);
     r.shot("5-the-stick");
 
-    // A second click on zone 99 later finds `FINOGHAM` 1: nothing more.
+    // The stones stay solved.
     assert_eq!(r.e.ogham, OGHAM_TARGET);
 }
 
