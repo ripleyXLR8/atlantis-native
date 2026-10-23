@@ -4,8 +4,8 @@
 //! places (type-2 zones and WAM links); `NextWarpInvalide` as chapter 59's
 //! door uses it; the picture viewer (`ViewBigSpr`); a demon's special
 //! event; every dialog the chapters start; the subjects, objects and
-//! musics on disc 3; the place sounds; the testing aid that writes the
-//! puzzles' wins.
+//! musics on disc 3; the place sounds; a save in China loaded; the
+//! testing aid that writes the puzzles' wins.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the tests are skipped.
@@ -799,4 +799,42 @@ fn the_aid_writes_the_wins() {
         .shown
         .iter()
         .any(|r| r.id == pearl && r.shown));
+}
+
+/// A game saved in China (the turtle room, chapter 46, whose `/INIT` a
+/// load runs again) and loaded in a new game: the place, the view, the
+/// world on disc 3, the chapter and the story.
+#[test]
+fn a_save_in_china_loads() {
+    let Some(files) = game() else { return };
+    let mut e = in_china(files);
+    goto(&mut e, "salletortue.wam", 56, 46);
+    e.run_command(b"(indication_tortue=3)");
+    e.run_command(b"(sacados=TORTUE_NOIRE)");
+    let saved = e.save_data();
+    let mut f = Engine::boot(
+        game().unwrap(),
+        Variant::default(),
+        Fpu::default(),
+        640,
+        480,
+    )
+    .unwrap();
+    f.start_new_game().unwrap();
+    f.end_video();
+    assert_eq!(f.files().current_disc(), 1);
+    f.load_data(&saved).unwrap();
+    settle(&mut f);
+    assert_eq!(f.place(), ("salletortue.wam", 56));
+    assert_eq!(f.script_state().unwrap().chapter, 46);
+    assert_eq!(f.files().current_disc(), 3);
+    assert_eq!(var(&f, "MONDE"), 3);
+    assert_eq!(var(&f, "indication_tortue"), 3);
+    let turtle = f
+        .script_state()
+        .unwrap()
+        .names
+        .id(defnames::OBJETS, b"TORTUE_NOIRE")
+        .unwrap() as i32;
+    assert!(f.bag_entries().iter().any(|b| b.id == turtle));
 }
