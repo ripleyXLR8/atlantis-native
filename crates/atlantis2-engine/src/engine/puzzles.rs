@@ -158,8 +158,9 @@ impl Engine {
             self.event(Event::PuzzleHook { zone: zi, cliczone });
             self.mandala_hook(zone.name.as_deref());
         }
-        // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the puzzles are
-        // not ported; what their move-zone parts do besides is.
+        // Ireland's hooks (@ 0x0049ba03, @ 0x0049bbc2): the cross's click and
+        // move-zone hooks run; the other puzzles are not ported (noted),
+        // only what their move-zone hooks do besides.
         let knife = self
             .names
             .id(defnames::OBJETS, b"COUTEAU_AILILL")

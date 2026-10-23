@@ -158,15 +158,22 @@ fn every_irish_view_is_entered_with_its_hooks() {
                 .events
                 .iter()
                 .filter_map(|x| match x {
-                    Event::PuzzleNotPorted { function } => Some(*function),
+                    Event::PuzzleNotPorted { function } | Event::PuzzleRan { function } => {
+                        Some(*function)
+                    }
                     _ => None,
                 })
                 .collect();
-            // The cross's entry hook (view 2) is ported: not noted.
+            // The cross's entry runs (view 2); the others are noted.
+            assert!(e.events.iter().all(|x| !matches!(
+                x,
+                Event::PuzzleNotPorted {
+                    function: 0x0049_4120
+                }
+            )));
             assert_eq!(
                 noted,
                 irish_entry_hook(name.as_bytes(), id)
-                    .filter(|&f| f != 0x0049_4120)
                     .into_iter()
                     .collect::<Vec<_>>()
             );
@@ -179,9 +186,11 @@ fn every_irish_view_is_entered_with_its_hooks() {
     // Every place animation found on a disc but one, which none has (a
     // shadow in view 1, hidden at load; the original logs it too).
     assert_eq!(missing, ["woA1001001.SPW"]);
-    // The ogham stones (6), the skull (40-42), both in `bigile1.wam`; the
-    // blackbird (73) in the poet's island (`ilepoete.wam`).
+    // The cross (view 2), the ogham stones (6), the skull (40-42), all in
+    // `bigile1.wam`; the blackbird (73) in the poet's island
+    // (`ilepoete.wam`).
     let want: Vec<(String, u32, u32)> = [
+        ("bigile1.wam", 2, 0x0049_4120),
         ("bigile1.wam", 6, 0x0049_6020),
         ("bigile1.wam", 40, 0x0049_3cb0),
         ("bigile1.wam", 41, 0x0049_3cb0),
@@ -251,6 +260,9 @@ fn the_irish_click_hooks_take_no_click() {
         .iter()
         .position(|x| matches!(x, Event::PuzzleHook { zone, .. } if *zone == z))
         .expect("the cross's hook");
+    assert!(e.events.contains(&Event::PuzzleRan {
+        function: 0x0049_4190
+    }));
     let scan = e
         .events
         .iter()
@@ -264,6 +276,9 @@ fn the_irish_click_hooks_take_no_click() {
     e.events.clear();
     e.click(20.0);
     e.pass(None);
+    assert!(e.events.contains(&Event::PuzzleRan {
+        function: 0x0049_4170
+    }));
     assert!(!e
         .events
         .iter()

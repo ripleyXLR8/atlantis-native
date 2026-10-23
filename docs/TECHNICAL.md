@@ -747,10 +747,13 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   past the end too). Such a slot is hit under the centre only when its
   list drew a frame (the draw @ 0x0047ce60 returns 0 otherwise). Not
   ported: the clear and index functions (@ 0x0047ca10, @ 0x0047ca50,
-  unused so far) and the write below a list that the removal makes when
-  a match at index 127 of a full list is carried to the next slot (no
-  data reaches it). State chains and the odd-tick flag are not ported
-  (no Tibet or Irish state uses them).
+  unused so far) and the removal's two writes when the list that ends
+  its walk has its end at index 0 (a match index carried from a full
+  list of an earlier slot of the id, or frame −2 matching that end
+  byte): the byte below the list into the matched entry and the end into
+  that byte, @ 0x0047c979..0x0047c988 (no data reaches them). State
+  chains and the odd-tick flag are not ported (no Tibet or Irish state
+  uses them).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
   `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
@@ -865,8 +868,13 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   place plays sound 9. On the place of value 1, `FINCROIX` = 1 and a
   scan: chapter 16's section plays the goddess's film, then her dialog
   56. Kept as the original: the state is the place's value (@ 0x006d26b4,
-  save entry 32), which nothing resets (a new game of the same run keeps
-  it, as the original does); the view entry draws the cross from it;
+  save entry 32), which no instruction but the hook's writes, so the port
+  resets it nowhere, not at a new game of the same run either [whether
+  the original's new game clears it through some block clear is not
+  settled: no direct reference does; emulating the menu's new-game path
+  (state 10 of FUN_00486eb0) with the state set, or laying the cross,
+  starting a new game on Windows 98 and looking at view 2, would settle
+  it]; the view entry draws the cross from it;
   the hook has no guard (laid again while laid elsewhere, by a script
   giving it again, the older picture stays for good); the two sounds of
   a placing play on voice 2 after the scan, so at the win sound 8 stops

@@ -503,23 +503,31 @@ fn the_entry_and_click_hooks_as_the_original() {
         else {
             unreachable!()
         };
-        // The click scan, unless the film the hook's scan started cleared
-        // the click; without it, `CLICZONE` is the zone's value the click
-        // wrote after the hook.
+        // `CLICZONE` as the click handler leaves it (the golden reads it
+        // after FUN_0049ca80); then the click scan, unless the film the
+        // hook's scan started cleared the click.
+        let after = evs
+            .iter()
+            .find_map(|x| match x {
+                Event::ZoneClick { zone: z, cliczone } if *z == zone => Some(*cliczone),
+                _ => None,
+            })
+            .expect("the zone click");
         let scan = evs.iter().position(|e| matches!(e, Event::ClickScan(_)));
-        let (end, after, scanned) = match scan {
+        let (end, scanned) = match scan {
             Some(n) => {
                 let Event::ClickScan(vars) = evs[n] else {
                     unreachable!()
                 };
-                (n, vars.cliczone, 1)
+                assert_eq!(vars.cliczone, after);
+                (n, 1)
             }
             None => {
                 let n = evs
                     .iter()
                     .position(|e| matches!(e, Event::CrossLaid { .. } | Event::CrossTaken { .. }))
                     .map_or(evs.len(), |n| n + 1);
-                (n, v, 0)
+                (n, 0)
             }
         };
         let dialogs = lst(evs.iter().filter_map(|e| match e {

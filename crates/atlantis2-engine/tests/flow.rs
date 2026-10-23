@@ -722,7 +722,11 @@ fn a_game_from_tibet_to_ireland_and_back() {
     }
     assert_eq!(r.e.script_state().unwrap().chapter, 16);
     ireland_lines_as_the_original(&walked);
-    // The cross's entry hook (FUN_00494120) is ported: nothing noted.
+    // The cross's entry hook (FUN_00494120) is ported: it runs, nothing
+    // is noted.
+    assert!(walked.contains(&Event::PuzzleRan {
+        function: 0x0049_4120
+    }));
     assert!(!walked
         .iter()
         .any(|e| matches!(e, Event::PuzzleNotPorted { .. })));
@@ -742,6 +746,9 @@ fn a_game_from_tibet_to_ireland_and_back() {
     r.tap();
     let evs = r.events();
     assert!(evs.iter().any(|e| matches!(e, Event::PuzzleHook { .. })));
+    assert!(evs.contains(&Event::PuzzleRan {
+        function: 0x0049_4190
+    }));
     assert!(evs.contains(&Event::Sound("sound009.apc".into())));
     assert!(evs
         .iter()

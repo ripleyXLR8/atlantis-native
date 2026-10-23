@@ -113,6 +113,10 @@ pub enum Event {
     /// A click on a zone the puzzle hooks take (@ 0x0049b910): the zone's
     /// index in the view, and `CLICZONE` as the hook finds it.
     PuzzleHook { zone: usize, cliczone: i32 },
+    /// The zone click FUN_0049ca80 done on the zone of index `zone`:
+    /// `CLICZONE` as it leaves it (the click scan may not follow: a film a
+    /// hook's scan started drops the click).
+    ZoneClick { zone: usize, cliczone: i32 },
     /// A puzzle hook the port does not have (Ireland's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
@@ -1590,8 +1594,20 @@ impl Engine {
         )
     }
 
-    /// FUN_0049ca80: a click on the zone under the centre.
+    /// FUN_0049ca80: a click on the zone under the centre. When a zone
+    /// was clicked, [`Event::ZoneClick`] notes `CLICZONE` as the handler
+    /// leaves it.
     fn zone_click(&mut self) {
+        if let Some(zone) = self.zone_click_handler() {
+            self.event(Event::ZoneClick {
+                zone,
+                cliczone: self.vars.cliczone,
+            });
+        }
+    }
+
+    /// FUN_0049ca80's body: the zone clicked, if any.
+    fn zone_click_handler(&mut self) -> Option<usize> {
         // In Ireland's view 73 the blackbird game's click (FUN_00495ae0)
         // comes first (@ 0x0049ca8e..0x0049cab3): not ported.
         if self.click {
@@ -1605,16 +1621,14 @@ impl Engine {
         // Not while the subject menu or the bag bar is open or a dialog
         // runs (@ 0x006617b0, 0x00671ef0, 0x006cfb54).
         if !self.click || self.subject_menu.open || self.bar.open || self.dialog.is_some() {
-            return;
+            return None;
         }
-        let Some((zi, zone)) = self.centre().map(|(i, z)| (i, z.clone())) else {
-            return;
-        };
+        let (zi, zone) = self.centre().map(|(i, z)| (i, z.clone()))?;
         if self.sprite_hit.is_some() {
             self.vars.cliczone = zone.value;
             self.set_script_var(|k| k.cliczone, zone.value);
             self.puzzle_hooks(zi, &zone);
-            return;
+            return Some(zi);
         }
         let target = if zone.kind == 1 || zone.kind == 2 {
             zone.value
@@ -1628,10 +1642,10 @@ impl Engine {
         // click there.
         let target = (zone.kind == 1 || zone.kind == 2).then_some(zone.value);
         if self.with_script(|s, h| s.departure_scan(h, target)) == Some(false) {
-            return;
+            return Some(zi);
         }
         if self.puzzle_hooks(zi, &zone) {
-            return;
+            return Some(zi);
         }
         if zone.kind > 2 && zone.kind < 88888 {
             self.vars.cliczone = zone.value;
@@ -1642,6 +1656,7 @@ impl Engine {
             2 => self.link_setup(&zone),
             _ => {}
         }
+        Some(zi)
     }
 
     /// FUN_0049cbf0: a type-2 zone: the first link of the current place

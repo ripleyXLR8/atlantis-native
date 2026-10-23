@@ -8,8 +8,11 @@
 //! dialog. A click on the zone that holds it takes it back.
 //!
 //! - The state (@ 0x006d26b4, save entry 32): the value of the zone that
-//!   holds the cross, 0 when it is not laid. Nothing resets it: not a new
-//!   game, not a load before the save's bytes are copied.
+//!   holds the cross, 0 when it is not laid. No instruction writes it
+//!   but the hook's, and a load copies the save's bytes: the port resets
+//!   it nowhere, not at a new game either. Whether the original's new
+//!   game clears it through some block clear is not settled (no direct
+//!   reference does; see `docs/TECHNICAL.md`).
 //! - The view entry FUN_00494120 (from FUN_0049bd50, after the slots are
 //!   loaded): the slot's id kept (@ 0x006d26b8, `DefName_GetIdName(1,
 //!   "CROIXBRIGIT_SPRITE")`); frame 0 taken out of its table when there
@@ -63,16 +66,22 @@ impl Engine {
             .copy_from_slice(&v.to_le_bytes());
     }
 
-    /// `DefName_GetIdName(1, name)` (−1 with its warning when unknown).
-    fn object_index(&self, name: &[u8]) -> i32 {
+    /// `DefName_GetIdName(1, name)` (FUN_004105a0). An unknown name is
+    /// the original's fatal error (FUN_00480cd0 with "DefName_GetIdName:
+    /// Nom de %s inconnu:%s", @ 0x004106a3: an emergency save, then the
+    /// game quits): here the scripts stop and so does the hook (`None`).
+    /// The game's data never reach it.
+    fn object_index(&mut self, name: &[u8]) -> Option<i32> {
         match self.names.id(defnames::OBJETS, name) {
-            Ok(id) => id as i32,
+            Ok(id) => Some(id as i32),
             Err(_) => {
-                log::warn!(
-                    "DefName_GetIdName({}) : not found",
+                let msg = format!(
+                    "DefName_GetIdName: Nom de #OBJETS# inconnu:{}",
                     String::from_utf8_lossy(name)
                 );
-                -1
+                log::error!("{msg}");
+                self.with_script(|s, _| s.fail(msg));
+                None
             }
         }
     }
@@ -80,7 +89,9 @@ impl Engine {
     /// FUN_00494120: the cross drawn where it was laid (run by the entry
     /// of view 2; public for tests and tools: the hook alone).
     pub fn cross_entry(&mut self) {
-        let id = self.object_index(SPRITE);
+        let Some(id) = self.object_index(SPRITE) else {
+            return;
+        };
         self.cross_sprite = id;
         if self.anim.has_frame(id, 0) {
             self.anim.sub_frame(id, 0);
@@ -95,7 +106,9 @@ impl Engine {
     /// action zone of view 2; public for tests and tools: the hook alone,
     /// without the dispatcher and the scans around it).
     pub fn cross_click(&mut self, value: i32) {
-        let cross = self.object_index(CROSS);
+        let Some(cross) = self.object_index(CROSS) else {
+            return;
+        };
         if self.objetenmain() == cross {
             self.set_objetenmain(0);
             self.set_hand_pair(0, false);
