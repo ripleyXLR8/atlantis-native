@@ -39,6 +39,7 @@ mod chest;
 mod cross;
 mod figurines;
 pub use figurines::FIGURINE_TARGETS;
+mod dragon;
 mod host;
 mod menus;
 mod ogham;
@@ -47,8 +48,7 @@ mod places;
 mod puzzles;
 pub use puzzles::{
     chest_mode_cleared, chinese_click_hooks, chinese_entry_hooks, irish_click_hook,
-    irish_entry_hook, mandala_hook_applies, ported_place, ChinesePuzzle, MANDALAS, SKULL_OBJECTS,
-    SKULL_START,
+    irish_entry_hook, mandala_hook_applies, ported_place, MANDALAS, SKULL_OBJECTS, SKULL_START,
 };
 mod saves;
 mod subjects;
@@ -57,6 +57,7 @@ mod wheels;
 pub use wheels::{DISC_WHEEL, WHEELS_FIRST, WHEELS_SECOND, WHEEL_DISC};
 
 pub use blackbird::Blackbird;
+pub use dragon::Dragon;
 pub use saves::SaveError;
 pub use subjects::subjects_bank_name;
 
@@ -492,6 +493,9 @@ pub struct Engine {
     /// The Ogham sprite's id as the view entry found it (@ 0x006d2768),
     /// for the clicks.
     ogham_sprite: i32,
+    /// The pearl and dragon puzzle's state (`engine/dragon.rs`), never
+    /// reset nor saved.
+    pub dragon: Dragon,
     /// Where the port may differ from the original (default: the minor
     /// bug fixes on).
     pub enhancements: Enhancements,
@@ -870,6 +874,7 @@ impl Engine {
             wheel_slots: [0; 5],
             ogham: OGHAM_START,
             ogham_sprite: 0,
+            dragon: Dragon::default(),
             enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),
@@ -1068,6 +1073,7 @@ impl Engine {
     /// the dialog loop the dialog's tick and end, then the script clocks.
     pub fn tick(&mut self) {
         self.ticks = self.ticks.wrapping_add(1);
+        self.anim.counter = self.ticks;
         self.spw_flag = true;
         self.cursor_flag = true;
         if let Some(m) = self.menu.as_mut() {
@@ -1478,6 +1484,11 @@ impl Engine {
         // or a film a scan started).
         if let (Some(_), Some(out)) = (&self.video, out) {
             self.draw_video(out);
+        }
+        // The puzzles' per-frame step (FUN_0049bfb0, @ 0x0045a5e8): every
+        // warp frame while the puzzle mode is not 0, turning or not.
+        if self.puzzle_mode() != 0 {
+            let _ = self.puzzle_tick();
         }
         // 6.
         self.vars.cliczone = 0;

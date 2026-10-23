@@ -96,7 +96,8 @@ pub struct Slot {
     /// (@ 0x0047d82c). The puzzles' hooks write it to hold or play a
     /// frame (the figurines' entry and click, the chest's hooks
     /// @ 0x0049393b, @ 0x00493a7c, the wheels'
-    /// FUN_0048d080 and FUN_0048d170), and `ANIM_THE_FRAME`.
+    /// FUN_0048d080 and FUN_0048d170, the clouds' entry @ 0x004944a0),
+    /// and `ANIM_THE_FRAME`.
     pub playing: bool,
     /// +0x38: for an object, its first `defnames.con` parameter (its
     /// sprite in the objects' bank).
@@ -107,6 +108,11 @@ pub struct Slot {
     pub frames: [u8; FRAME_TAB],
     /// +0xc4: the countdown of the random pause.
     pub delay: i32,
+    /// +0xc0: 0 at load (@ 0x0047c66b); not 0, the slot is drawn only
+    /// while the 15 Hz counter is odd (@ 0x0047d181..0x0047d1aa), as
+    /// the pearl and dragon puzzle's transparent cloud is (0x32,
+    /// @ 0x00494bed).
+    pub blink: i32,
 }
 
 impl Slot {
@@ -140,6 +146,9 @@ pub struct Anim {
     /// The original's warnings of the frame lists (`FUN_00480c20`: their
     /// format strings), in order, for tests and tools.
     pub warnings: Vec<&'static str>,
+    /// The 15 Hz counter (@ 0x006569d8) as the draw reads it for the
+    /// slots that blink (+0xc0); the engine's tick keeps it.
+    pub counter: u32,
 }
 
 /// The texel under the screen centre: (face, column, row).
@@ -156,6 +165,7 @@ impl Anim {
             blend: Blend::rgb565(),
             cheval: None,
             warnings: Vec::new(),
+            counter: 0,
         }
     }
 
@@ -222,6 +232,7 @@ impl Anim {
             object_sprite,
             frames: [LIST_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
+            blink: 0,
         });
     }
 
@@ -390,6 +401,12 @@ impl Anim {
                             }
                         }
                     }
+                }
+                // A slot whose +0xc0 is set is drawn only while the 15 Hz
+                // counter is odd (@ 0x0047d181..0x0047d1aa); the centre
+                // test above is made either way.
+                if s.blink != 0 && self.counter & 1 == 0 {
+                    continue;
                 }
                 for (face, pixels) in faces.iter_mut().enumerate() {
                     if let Some(b) = s.spw.face_box(frame, face) {

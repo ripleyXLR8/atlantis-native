@@ -43,11 +43,11 @@
 //!   (@ 0x006d84d0, save entry 26), whose value 5 the chest's entry
 //!   leaves: the first zone click in an `SS` view outside 1-7 clears it
 //!   and runs no hook (@ 0x0049b96d..0x0049b984). The five wheels (`SS`
-//!   12-13, `wheels.rs`) run too. The pearl and dragon, the turtle ring and the
+//!   12-13, `wheels.rs`) and the pearl and dragon (`SS` view 31,
+//!   `dragon.rs`, with the mode's per-frame step FUN_0049bfb0,
+//!   [`Engine::puzzle_tick`]) run too. The turtle ring and the
 //!   labyrinth's souls are not ported: their hooks are noted
-//!   ([`Event::PuzzleNotPorted`]), and [`ChinesePuzzle`] with
-//!   [`Engine::solve_chinese_puzzle`] write what their wins write, for
-//!   tests.
+//!   ([`Event::PuzzleNotPorted`]).
 //! - The places the port has: Tibet, Ireland and China. A `changewam` to
 //!   any other place (Yucatán's boat, Shamballa, the space travel) is
 //!   refused: the section stops there, the world goes back to the
@@ -59,6 +59,7 @@ use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 
 use super::chest::CHEST_MODE;
+use super::dragon::DRAGON_MODE;
 use super::{Engine, Event};
 
 /// The save entry of the puzzle mode (@ 0x006d84d0).
@@ -116,16 +117,6 @@ const LABYRINTH_PREFIX: &[u8] = b"LA";
 
 fn prefixed(view_name: &[u8], prefix: &[u8]) -> bool {
     view_name.len() >= 2 && view_name[..2].eq_ignore_ascii_case(prefix)
-}
-
-/// China's puzzles the port does not have, for
-/// [`Engine::solve_chinese_puzzle`] (the figurines, the chest and the
-/// wheels are played).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ChinesePuzzle {
-    /// The pearl and the dragon in the clouds, `SS` view 31 (FUN_004944a0,
-    /// FUN_00494600, the tick FUN_004947b0).
-    Pearl,
 }
 
 /// The hooks FUN_0049b910 calls for a click on a zone of type `kind` in
@@ -353,7 +344,8 @@ impl Engine {
     /// China's part of FUN_0049b910 (@ 0x0049b927, 0x0049ba86,
     /// 0x0049bc5c..0x0049bcbf) for a click on zone `zi` of view `view` of
     /// a place whose warp names start as `view_name`: the ported hooks run
-    /// (the figurines', the chest's, the wheels'), the others are noted;
+    /// (the figurines', the chest's, the wheels', the clouds'), the others
+    /// are noted;
     /// none consumes the click. In an `SS` view outside 1-7 the mode 5 the
     /// chest's entry left is cleared and the click runs no hook
     /// (@ 0x0049b96d..0x0049b984). Public for tests and tools: the
@@ -380,6 +372,17 @@ impl Engine {
                     self.event(Event::PuzzleRan { function });
                     self.wheels_click(zone);
                 }
+                // The clouds' move zones (FUN_004945f0): the mode back to
+                // 0, which stops the puzzle's step.
+                0x0049_45f0 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.set_puzzle_mode(0);
+                }
+                // The clouds' click (FUN_00494600).
+                0x0049_4600 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.dragon_click(zone);
+                }
                 _ => self.puzzle_not_ported(function),
             }
         }
@@ -387,15 +390,15 @@ impl Engine {
     }
 
     /// The puzzle mode (@ 0x006d84d0, save entry 26): 5 after the chest's
-    /// entry. In the original other puzzles' entries overwrite it: the
-    /// turtle ring's for views 40..64 (2, @ 0x0049c361), the clouds' in
-    /// `SS` 31 (4 unless `FINPERLE` is 1, @ 0x004945a5), the souls' in
-    /// `LA` (3, @ 0x0048df1b); those entries are not on this branch, so
-    /// here a 5 lasts until the click dispatcher clears it
-    /// (@ 0x0049b977) or a load copies the save's entry. The reset
+    /// entry, 4 after the pearl and dragon's in `SS` 31 while the pearl is
+    /// not won (@ 0x004945a5). The clouds' move zones set it back to 0
+    /// (FUN_004945f0), the click dispatcher clears a 5 outside `SS` 1-7
+    /// (@ 0x0049b977). The turtle ring's entry for views 40..64 (2,
+    /// @ 0x0049c361) and the souls' in `LA` (3, @ 0x0048df1b) are the
+    /// other writers; a load copies the save's entry. The reset
     /// FUN_0049bf70, which the load runs before the copy, also sets 0
     /// in views 55, 64 and 75 (FUN_00492dd0 @ 0x00492e69); a new game
-    /// does not run it, so it keeps a 5.
+    /// does not run it, so it keeps the mode.
     pub fn puzzle_mode(&self) -> i32 {
         i32::from_le_bytes(self.save_extra.entry(MODE_ENTRY).try_into().unwrap())
     }
@@ -405,6 +408,35 @@ impl Engine {
         self.save_extra
             .entry_mut(MODE_ENTRY)
             .copy_from_slice(&mode.to_le_bytes());
+    }
+
+    /// FUN_0049bfb0, once per warp frame while the puzzle mode is not 0
+    /// (`AtlWarp_continue` @ 0x0045a5e8, after the move's completion):
+    /// not while paused (0x006d85f0, which the port does not have), the
+    /// step of the mode (@ 0x0049bfbb..0x0049c007), returned: 1 the
+    /// spider web's FUN_00491610, 2 the turtle ring's FUN_0049c400, 3 the
+    /// souls' FUN_0048eb30, 4 the pearl and dragon's FUN_004947b0, 6 the
+    /// octopus's FUN_0049aaa0, 7 the Maya marbles' (the thunk
+    /// @ 0x00493190); 5 (the chest) and any other mode have none. Only
+    /// the pearl and dragon's is ported and run; the others (a save made
+    /// in their rooms) are noted ([`Event::PuzzleNotPorted`]). Public for
+    /// tests and tools.
+    pub fn puzzle_tick(&mut self) -> Option<u32> {
+        let function = match self.puzzle_mode() {
+            1 => 0x0049_1610,
+            2 => 0x0049_c400,
+            3 => 0x0048_eb30,
+            DRAGON_MODE => 0x0049_47b0,
+            6 => 0x0049_aaa0,
+            7 => 0x0049_3190,
+            _ => return None,
+        };
+        if function == 0x0049_47b0 {
+            self.dragon_tick();
+        } else {
+            self.puzzle_not_ported(function);
+        }
+        Some(function)
     }
 
     /// `CLICZONE` as a hook finds it.
@@ -487,31 +519,11 @@ impl Engine {
                     self.event(Event::PuzzleRan { function });
                     self.wheels_entry();
                 }
+                0x0049_44a0 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.dragon_entry();
+                }
                 _ => self.puzzle_not_ported(function),
-            }
-        }
-    }
-
-    /// What the win of a Chinese puzzle the port does not have writes, for
-    /// tests: run as the puzzle's code runs it, with `RunOneCommand` and
-    /// the script variables, without a scan where the original has none.
-    ///
-    /// - The pearl (FUN_004947b0's last right step,
-    ///   @ 0x004948ab..0x00494902): `State_nuages_bas` raised to 5,
-    ///   `(NewSound=210)` (FUN_00494970: 205 + the new state), the low
-    ///   clouds placed from it (FUN_00494990: pictures, not ported),
-    ///   `Action_nuage_bas` = 0, then `FINPERLE` = 1 and `PERLE_TROU`
-    ///   shown.
-    pub fn solve_chinese_puzzle(&mut self, puzzle: ChinesePuzzle) {
-        match puzzle {
-            ChinesePuzzle::Pearl => {
-                self.with_script(|s, h| {
-                    s.set_var("State_nuages_bas", 5);
-                    s.run_command(h, b"(NewSound=210)");
-                    s.set_var("Action_nuage_bas", 0);
-                    s.set_var("FINPERLE", 1);
-                    s.run_command(h, b"(showobjet=PERLE_TROU)");
-                });
             }
         }
     }

@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use atlantis2_data::defnames;
 use atlantis2_data::A2Files;
-use atlantis2_engine::engine::{chinese_click_hooks, chinese_entry_hooks, ChinesePuzzle};
+use atlantis2_engine::engine::{chinese_click_hooks, chinese_entry_hooks};
 use atlantis2_engine::{Engine, EngineError, Event, Fpu, LoopType, Variant};
 
 fn game() -> Option<A2Files> {
@@ -883,34 +883,6 @@ fn chinese_place_sounds_play() {
         assert!(started, "{place} view {view}");
     }
     drop(files);
-}
-
-/// The testing aid writes what the puzzles' wins write.
-#[test]
-fn the_aid_writes_the_wins() {
-    let Some(files) = game() else { return };
-    let mut e = in_china(files);
-    goto(&mut e, "miniature.wam", 6, 48);
-    e.events.clear();
-    e.solve_chinese_puzzle(ChinesePuzzle::Pearl);
-    assert_eq!(var(&e, "FINPERLE"), 1);
-    assert_eq!(
-        (var(&e, "State_nuages_bas"), var(&e, "Action_nuage_bas")),
-        (5, 0)
-    );
-    assert!(e.events.contains(&Event::Sound("sound210.apc".into())));
-    let pearl = e
-        .script_state()
-        .unwrap()
-        .names
-        .id(defnames::OBJETS, b"PERLE_TROU")
-        .unwrap() as i32;
-    assert!(e
-        .script_state()
-        .unwrap()
-        .shown
-        .iter()
-        .any(|r| r.id == pearl && r.shown));
 }
 
 /// A game saved in China (the turtle room, chapter 46, whose `/INIT` a
