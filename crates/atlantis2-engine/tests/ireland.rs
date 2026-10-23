@@ -1,6 +1,7 @@
-//! Ireland (world 1) without its four puzzles: every Irish chapter's
-//! `/INIT` run, every view of the six places entered, the puzzles' hooks
-//! noted and the variables their wins write set by the testing aid, the
+//! Ireland (world 1) without three of its four puzzles (Brigid's cross is
+//! ported, `tests/cross.rs`): every Irish chapter's `/INIT` run, every view
+//! of the six places entered, the other puzzles' hooks noted and the
+//! variables their wins write set by the testing aid, the
 //! moves to another place (a type-2 zone, at once or deferred), the
 //! transition sprites over a transition video, and the horse's frame kept
 //! across views (`FRAMECHEVAL`).
@@ -163,12 +164,12 @@ fn every_irish_view_is_entered_with_its_hooks() {
                     _ => None,
                 })
                 .collect();
-            // The skull's (views 40-42) and the ogham stones' (view 6)
-            // entries run; the others are noted.
+            // The cross's (view 2), the skull's (views 40-42) and the ogham
+            // stones' (view 6) entries run; the others are noted.
             assert!(e.events.iter().all(|x| !matches!(
                 x,
                 Event::PuzzleNotPorted {
-                    function: 0x0049_3cb0 | 0x0049_6020
+                    function: 0x0049_4120 | 0x0049_3cb0 | 0x0049_6020
                 }
             )));
             assert_eq!(
@@ -246,8 +247,9 @@ fn the_irish_click_hooks_take_no_click() {
 
     let Some(files) = game() else { return };
     let mut e = bare(files, "bigile1.wam", 2);
-    // A zone of the cross: the hook noted, then `CLICZONE` and the click
-    // scan as for any zone.
+    // A zone of the cross: its hook (FUN_00494190; with an empty hand
+    // only its sound, which needs the scripts: `tests/cross.rs`), then
+    // `CLICZONE` and the click scan as for any zone.
     let zones = e.wam().view(2).unwrap().zones.clone();
     let z = zones.iter().position(|z| z.kind == 4).unwrap();
     aim(&mut e, z);
@@ -257,27 +259,31 @@ fn the_irish_click_hooks_take_no_click() {
     let hook = e
         .events
         .iter()
-        .position(|x| {
-            *x == Event::PuzzleNotPorted {
-                function: 0x0049_4190,
-            }
-        })
+        .position(|x| matches!(x, Event::PuzzleHook { zone, .. } if *zone == z))
         .expect("the cross's hook");
+    assert!(e.events.contains(&Event::PuzzleRan {
+        function: 0x0049_4190
+    }));
     let scan = e
         .events
         .iter()
         .position(|x| matches!(x, Event::ClickScan(v) if v.cliczone == zones[z].value))
         .expect("the click scan");
     assert!(hook < scan);
-    // Its move zone: the hook (FUN_00494170) and the move.
+    // Its move zone: the hook (FUN_00494170, ported: the cursor reset)
+    // and the move.
     let m = zones.iter().position(|z| z.kind == 1).unwrap();
     aim(&mut e, m);
     e.events.clear();
     e.click(20.0);
     e.pass(None);
-    assert!(e.events.contains(&Event::PuzzleNotPorted {
+    assert!(e.events.contains(&Event::PuzzleRan {
         function: 0x0049_4170
     }));
+    assert!(!e
+        .events
+        .iter()
+        .any(|x| matches!(x, Event::PuzzleNotPorted { .. })));
     assert!(e
         .events
         .iter()
@@ -347,7 +353,6 @@ fn the_puzzles_wins_set_their_variables() {
     let mut e = in_ireland(files);
     for (puzzle, name) in [
         (IrishPuzzle::Blackbird, "FINMERLE"),
-        (IrishPuzzle::Cross, "FINCROIX"),
     ] {
         assert_eq!(var(&e, name), 0);
         e.solve_irish_puzzle(puzzle);

@@ -2,7 +2,7 @@
 //! the departure film, the arrival in `bigile1.wam` view 5 with its
 //! dialog, Liam and his subject menu, a transition video with its
 //! sprites, the place of Brigid's cross, the goddess's film and dialog
-//! once the cross is solved by the testing aid, and the way back to
+//! once the cross is laid on its place, and the way back to
 //! Tibet. Some steps put the game where they need it (a view entered, an
 //! object in hand, a story flag) instead of walking there.
 //!
@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 
 use atlantis2_data::defnames;
 use atlantis2_data::A2Files;
-use atlantis2_engine::engine::IrishPuzzle;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::subjects::cell;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -222,8 +221,12 @@ fn main() {
     t.e.reset_view();
     t.wait(30);
     t.save("ireland-8-cross-view.png");
-    // The cross solved by the testing aid: the goddess's film and dialog.
-    t.e.solve_irish_puzzle(IrishPuzzle::Cross);
+    // The cross in hand (as Liam gives it in chapter 19), laid on its
+    // place (the zone of value 1): the goddess's film and dialog.
+    t.e.run_command(b"(sacados=CROIX_BRIGID)");
+    t.e.run_command(b"(objetenmain=CROIX_BRIGID)");
+    t.aim(|z| z.kind == 4 && z.value == 1);
+    t.click();
     t.wait(150);
     t.save("ireland-9-goddess-film.png");
     t.click();

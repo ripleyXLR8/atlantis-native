@@ -34,6 +34,7 @@ use crate::subtitle::SubtitleFont;
 use crate::turn::Turn;
 use crate::warp::{faces_from_hnm, Renderer, Variant};
 
+mod cross;
 mod host;
 mod menus;
 mod ogham;
@@ -115,11 +116,19 @@ pub enum Event {
     /// A click on a zone the puzzle hooks take (@ 0x0049b910): the zone's
     /// index in the view, and `CLICZONE` as the hook finds it.
     PuzzleHook { zone: usize, cliczone: i32 },
+    /// The zone click FUN_0049ca80 done on the zone of index `zone`:
+    /// `CLICZONE` as it leaves it (the click scan may not follow: a film a
+    /// hook's scan started drops the click).
+    ZoneClick { zone: usize, cliczone: i32 },
     /// A puzzle hook the port does not have (Ireland's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
     /// An Irish puzzle hook the port has, run: the original's function.
     PuzzleRan { function: u32 },
+    /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
+    CrossLaid { value: i32 },
+    /// Brigid's cross taken back from the zone of value `value`.
+    CrossTaken { value: i32 },
     /// A move to another place (a type-2 zone, @ 0x0040fc60): its file,
     /// the view, and whether it waits for the turn (deferred) or is made
     /// at once.
@@ -424,6 +433,9 @@ pub struct Engine {
     dialog_prev_loop: LoopType,
     /// The music's volume and fades.
     pub music: MusicVolume,
+    /// Brigid's cross slot's id (@ 0x006d26b8), kept by the view 2
+    /// entry hook (`DefName_GetIdName(1, "CROIXBRIGIT_SPRITE")`).
+    cross_sprite: i32,
     /// The blackbird game's two answer sounds are loaded (its view entry,
     /// FUN_004958f0, loads them; its move-zone hook frees them): the port
     /// keeps only the fact, for the voice their free stops.
@@ -807,6 +819,7 @@ impl Engine {
             // No music plays until a script starts one: the fades only run
             // then, as `FUN_004770c0` is refused while stopped.
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
+            cross_sprite: 0,
             blackbird_sounds: false,
             skull: puzzles::SKULL_START,
             skull_sprite: 0,
@@ -1602,8 +1615,20 @@ impl Engine {
         )
     }
 
-    /// FUN_0049ca80: a click on the zone under the centre.
+    /// FUN_0049ca80: a click on the zone under the centre. When a zone
+    /// was clicked, [`Event::ZoneClick`] notes `CLICZONE` as the handler
+    /// leaves it.
     fn zone_click(&mut self) {
+        if let Some(zone) = self.zone_click_handler() {
+            self.event(Event::ZoneClick {
+                zone,
+                cliczone: self.vars.cliczone,
+            });
+        }
+    }
+
+    /// FUN_0049ca80's body: the zone clicked, if any.
+    fn zone_click_handler(&mut self) -> Option<usize> {
         // In Ireland's view 73 the blackbird game's click (FUN_00495ae0)
         // comes first (@ 0x0049ca8e..0x0049cab3): not ported.
         if self.click {
@@ -1617,16 +1642,14 @@ impl Engine {
         // Not while the subject menu or the bag bar is open or a dialog
         // runs (@ 0x006617b0, 0x00671ef0, 0x006cfb54).
         if !self.click || self.subject_menu.open || self.bar.open || self.dialog.is_some() {
-            return;
+            return None;
         }
-        let Some((zi, zone)) = self.centre().map(|(i, z)| (i, z.clone())) else {
-            return;
-        };
+        let (zi, zone) = self.centre().map(|(i, z)| (i, z.clone()))?;
         if self.sprite_hit.is_some() {
             self.vars.cliczone = zone.value;
             self.set_script_var(|k| k.cliczone, zone.value);
             self.puzzle_hooks(zi, &zone);
-            return;
+            return Some(zi);
         }
         let target = if zone.kind == 1 || zone.kind == 2 {
             zone.value
@@ -1640,10 +1663,10 @@ impl Engine {
         // click there.
         let target = (zone.kind == 1 || zone.kind == 2).then_some(zone.value);
         if self.with_script(|s, h| s.departure_scan(h, target)) == Some(false) {
-            return;
+            return Some(zi);
         }
         if self.puzzle_hooks(zi, &zone) {
-            return;
+            return Some(zi);
         }
         if zone.kind > 2 && zone.kind < 88888 {
             self.vars.cliczone = zone.value;
@@ -1654,6 +1677,7 @@ impl Engine {
             2 => self.link_setup(&zone),
             _ => {}
         }
+        Some(zi)
     }
 
     /// FUN_0049cbf0: a type-2 zone: the first link of the current place

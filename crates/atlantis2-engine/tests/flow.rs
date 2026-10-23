@@ -10,8 +10,8 @@
 //! laid on its zone (the mandala hook, chapter 75's section, the film),
 //! the trip to Ireland and its first dialog, Liam asked (his 3D head, as
 //! every dialog's, drawn by the Pentium II's routines), the walk to the
-//! place of Brigid's cross (its hooks noted, the puzzle solved by the
-//! testing aid: the goddess), a save and a load in Ireland, and the way
+//! place of Brigid's cross (the cross laid on its place with the mouse:
+//! the goddess), a save and a load in Ireland, and the way
 //! back to Tibet as chapter 16 makes it.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
@@ -24,7 +24,7 @@ use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
 use atlantis2_engine::bag::{UiBank, UiDraw};
-use atlantis2_engine::engine::{IrishPuzzle, MANDALAS};
+use atlantis2_engine::engine::MANDALAS;
 use atlantis2_engine::menu::{state, PageKind};
 use atlantis2_engine::subjects::cell;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -722,38 +722,54 @@ fn a_game_from_tibet_to_ireland_and_back() {
     }
     assert_eq!(r.e.script_state().unwrap().chapter, 16);
     ireland_lines_as_the_original(&walked);
-    // The cross's entry hook (FUN_00494120), not ported, is noted.
-    assert!(walked.contains(&Event::PuzzleNotPorted {
+    // The cross's entry hook (FUN_00494120) is ported: it runs, nothing
+    // is noted.
+    assert!(walked.contains(&Event::PuzzleRan {
         function: 0x0049_4120
     }));
-    // A click on one of the cross's zones: the hook (FUN_00494190) noted,
-    // the click goes on (`CLICZONE`, the click scan), nothing else.
-    let cross_zone =
+    assert!(!walked
+        .iter()
+        .any(|e| matches!(e, Event::PuzzleNotPorted { .. })));
+    // A click on one of the cross's places with an empty hand: its hook
+    // (FUN_00494190) plays sound 9, the click goes on (`CLICZONE`, the
+    // click scan), nothing else.
+    let place = |r: &Run, v: i32| {
         r.e.wam()
             .view(2)
             .unwrap()
             .zones
             .iter()
-            .position(|z| z.kind == 4)
-            .unwrap();
-    r.aim(cross_zone);
+            .position(|z| z.kind == 4 && z.value == v)
+            .unwrap()
+    };
+    r.aim(place(&r, 3));
     r.tap();
     let evs = r.events();
-    assert!(evs.contains(&Event::PuzzleNotPorted {
+    assert!(evs.iter().any(|e| matches!(e, Event::PuzzleHook { .. })));
+    assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_4190
     }));
+    assert!(evs.contains(&Event::Sound("sound009.apc".into())));
     assert!(evs
         .iter()
-        .any(|e| matches!(e, Event::ClickScan(v) if v.cliczone != 0)));
+        .any(|e| matches!(e, Event::ClickScan(v) if v.cliczone == 3)));
     assert_eq!(
-        (r.e.place(), r.e.loop_type),
-        (("bigile1.wam", 2), LoopType::Warp)
+        (r.e.place(), r.e.loop_type, r.e.cross_state()),
+        (("bigile1.wam", 2), LoopType::Warp, 0)
     );
 
-    // The cross solved by the testing aid (what its win writes:
-    // `FINCROIX` and a scan): chapter 16's section plays the goddess's
-    // film and dialog, and shows her.
-    r.e.solve_irish_puzzle(IrishPuzzle::Cross);
+    // The cross, as Liam gives it in chapter 19 (the bag and the hand),
+    // back in the bag, picked from the bar and laid on the place of value
+    // 1: `FINCROIX` and chapter 16's section, the goddess's film and
+    // dialog, and she is shown.
+    r.e.run_command(b"(sacados=CROIX_BRIGID)");
+    let cross = r.id(defnames::OBJETS, "CROIX_BRIGID");
+    r.pick(cross);
+    r.aim(place(&r, 1));
+    r.tap();
+    r.step();
+    assert!(r.e.events.contains(&Event::CrossLaid { value: 1 }));
+    assert_eq!((r.e.cross_state(), r.var("FINCROIX")), (1, 1));
     let mut evs = std::mem::take(&mut r.e.events);
     assert!(evs.iter().any(
         |e| matches!(e, Event::VideoStart { name, frames: Some(_) } if name == "cine015.hnm")
