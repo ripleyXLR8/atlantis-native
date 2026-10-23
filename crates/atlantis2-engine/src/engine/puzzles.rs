@@ -32,15 +32,17 @@
 //!   leaves the object in hand: chapter 7's sections (the click scan of
 //!   the same frame) count `fincrane`, take the object and, at the fifth,
 //!   play film 2, show Ailill and hide the skull.
-//! - China's hooks (prefixes `CH`, `SS` and `LA`): the figurines, the
-//!   chest, the five wheels, the pearl and dragon, the turtle ring and the
-//!   labyrinth's souls are not ported. Their hooks are listed as the
+//! - China's hooks (prefixes `CH`, `SS` and `LA`), listed as the
 //!   dispatchers call them ([`chinese_click_hooks`],
-//!   [`chinese_entry_hooks`]) and noted ([`Event::PuzzleNotPorted`]);
-//!   none consumes a click (the dispatcher returns 0 for them), so the
-//!   scripts see every click as in the original. [`ChinesePuzzle`] and
-//!   [`Engine::solve_chinese_puzzle`] write what their wins write, for
-//!   tests.
+//!   [`chinese_entry_hooks`]); none consumes a click (the dispatcher
+//!   returns 0 for them). The figurines of `SS` views 1-7 are ported
+//!   (`figurines.rs`: the entry FUN_0048d680, the click FUN_0048da20 in
+//!   view 6), noted as [`Event::PuzzleRan`]. The chest, the five wheels,
+//!   the pearl and dragon, the turtle ring and the labyrinth's souls are
+//!   not: their hooks are noted ([`Event::PuzzleNotPorted`]), so the
+//!   scripts see every click as in the original, and [`ChinesePuzzle`]
+//!   and [`Engine::solve_chinese_puzzle`] write what their wins write,
+//!   for tests.
 //! - The places the port has: Tibet, Ireland and China. A `changewam` to
 //!   any other place (Yucatán's boat, Shamballa, the space travel) is
 //!   refused: the section stops there, the world goes back to the
@@ -107,12 +109,10 @@ fn prefixed(view_name: &[u8], prefix: &[u8]) -> bool {
     view_name.len() >= 2 && view_name[..2].eq_ignore_ascii_case(prefix)
 }
 
-/// China's puzzles, for [`Engine::solve_chinese_puzzle`].
+/// China's puzzles the port does not have, for
+/// [`Engine::solve_chinese_puzzle`] (the figurines are played).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChinesePuzzle {
-    /// The figurines on the floor, `SS` views 1-7 (FUN_0048d680,
-    /// FUN_0048da20, the check FUN_0048dcb0).
-    Figurines,
     /// The Chinese chest, `SS` view 5 (FUN_004938f0, FUN_00493960).
     Chest,
     /// The five wheels' first order, `SS` view 13 (FUN_0048d080,
@@ -330,14 +330,21 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
-        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): not
-        // ported, noted; none consumes the click.
+        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf):
+        // the figurines' click runs (@ 0x0049b960); the others are not
+        // ported, noted. None consumes the click.
         let hooks = self
             .current_view()
             .map(|v| chinese_click_hooks(v.name.as_bytes(), self.view, zone.kind))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            match function {
+                0x0048_da20 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.figurines_click(zone);
+                }
+                _ => self.puzzle_not_ported(function),
+            }
         }
         false
     }
@@ -401,30 +408,27 @@ impl Engine {
             Some(function) => self.puzzle_not_ported(function),
             None => {}
         }
-        // China's: not ported, noted.
+        // China's: the figurines' entry runs (the tail jump
+        // @ 0x0049bf64); the others are not ported, noted.
         let hooks = self
             .current_view()
             .map(|v| chinese_entry_hooks(v.name.as_bytes(), self.view))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            match function {
+                0x0048_d680 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.figurines_entry();
+                }
+                _ => self.puzzle_not_ported(function),
+            }
         }
     }
 
-    /// What the win of a Chinese puzzle writes, for tests (the puzzles are
-    /// not ported): run as the puzzle's code runs it, with
-    /// `RunOneCommand` and the script variables, without a scan where the
-    /// original has none.
+    /// What the win of a Chinese puzzle the port does not have writes, for
+    /// tests: run as the puzzle's code runs it, with `RunOneCommand` and
+    /// the script variables, without a scan where the original has none.
     ///
-    /// - The figurines (FUN_0048da20's writes, then FUN_0048dcb0):
-    ///   `pos_statue1..6` = 4, 3, 5, 1, 2, 6 (the targets @ 0x005e1084),
-    ///   `(etat5statues=1)`, and `AtlHnm_start("???")` (FUN_0040bf60),
-    ///   run as the port's own `AtlHnm_start`: refused with a warning in
-    ///   the video loop; otherwise the file, which no disc has, does not
-    ///   open, and the music goes back to 100 % unless a dialog runs
-    ///   (@ 0x0040bfbd..0x0040bfc8, loop type 2). The ring refill before
-    ///   the open (FUN_00476e10, @ 0x0040bfa7) has no counterpart in the
-    ///   port's music.
     /// - The chest (FUN_00493960's fifth click on `PRENDRE_BAGUETTE`):
     ///   `frame_coffre_chine` = 4 and `BAGUETTE_PRISE` = 1, the chopstick
     ///   put in the bag and its record hidden. The aid does the last two
@@ -444,14 +448,6 @@ impl Engine {
     ///   shown.
     pub fn solve_chinese_puzzle(&mut self, puzzle: ChinesePuzzle) {
         match puzzle {
-            ChinesePuzzle::Figurines => {
-                for (k, v) in [4, 3, 5, 1, 2, 6].iter().enumerate() {
-                    let c = format!("(pos_statue{}={v})", k + 1);
-                    self.run_command(c.as_bytes());
-                }
-                self.run_command(b"(etat5statues=1)");
-                self.start_video("???");
-            }
             ChinesePuzzle::Chest => {
                 self.with_script(|s, h| {
                     s.set_var("frame_coffre_chine", 4);

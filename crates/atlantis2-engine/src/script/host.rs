@@ -53,7 +53,8 @@ pub enum AnimOp {
     Stop { id: i32, number: i32 },
     /// `GOTOFRAMEPERSO` / `GOTOFRAMEOBJET`.
     GotoFrame { kind: i32, id: i32, frame: i32 },
-    /// `ANIM_THE_FRAME` (0 or 1).
+    /// `ANIM_THE_FRAME` (0 or 1): the playing byte (+0xbc) of the first
+    /// record of `id`, any kind.
     TheFrame { kind: i32, id: i32, on: bool },
     /// `ADDFRAMEPERSO` / `ADDFRAMEOBJET`.
     AddFrame { kind: i32, id: i32, frames: i32 },
@@ -99,6 +100,15 @@ pub trait Host {
     /// place, the camera turned to the start angles (radians, the floats
     /// @ 0x005e2f30 / 0x005e2f34 that `ANGLEWARPX` / `ANGLEWARPY` set).
     fn enter_view(&mut self, view: i32, yaw: f32, pitch: f32) {}
+
+    /// The same, from the `VUE` branch, with the script variables at hand:
+    /// the puzzles' set-up of the view (FUN_0049bd50, inside the entry)
+    /// reads and writes them (`pos_statue1..6` for the figurines). By
+    /// default [`Host::enter_view`].
+    fn enter_view_with_vars(&mut self, view: i32, yaw: f32, pitch: f32, vars: &mut [i32]) {
+        let _ = vars;
+        self.enter_view(view, yaw, pitch);
+    }
 
     /// `anglewarpxnow` / `anglewarpynow` (@ 0x0045ad40 / 0x0045ada0):
     /// turn the current view at once; `yaw` true for the yaw, the angle in

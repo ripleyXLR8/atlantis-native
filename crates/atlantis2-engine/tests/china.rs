@@ -139,12 +139,13 @@ fn bare(files: A2Files, name: &str, view: u32) -> Engine {
     e
 }
 
-/// The puzzle hooks noted in `events`, in order.
+/// The puzzle hooks run or noted in `events`, in order (the figurines'
+/// run, the others are noted).
 fn noted(events: &[Event]) -> Vec<u32> {
     events
         .iter()
         .filter_map(|x| match x {
-            Event::PuzzleNotPorted { function } => Some(*function),
+            Event::PuzzleNotPorted { function } | Event::PuzzleRan { function } => Some(*function),
             _ => None,
         })
         .collect()
@@ -856,18 +857,6 @@ fn the_aid_writes_the_wins() {
     let mut e = in_china(files);
     goto(&mut e, "miniature.wam", 6, 48);
     e.events.clear();
-    e.solve_chinese_puzzle(ChinesePuzzle::Figurines);
-    assert_eq!(var(&e, "etat5statues"), 1);
-    // `AtlHnm_start("???")`: no such film, the section goes on.
-    assert!(e.events.contains(&Event::VideoStart {
-        name: "???".into(),
-        frames: None
-    }));
-    assert_eq!(e.loop_type, LoopType::Warp);
-    let pos: Vec<i32> = (1..=6)
-        .map(|k| var(&e, &format!("pos_statue{k}")))
-        .collect();
-    assert_eq!(pos, [4, 3, 5, 1, 2, 6]);
     e.solve_chinese_puzzle(ChinesePuzzle::Chest);
     let s = e.script_state().unwrap();
     let chopstick = s.names.id(defnames::OBJETS, b"BAGUETTE").unwrap() as i32;

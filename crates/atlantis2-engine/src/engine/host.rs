@@ -74,6 +74,19 @@ impl Engine {
         Some(r)
     }
 
+    /// A script variable by name (`ReadVar` @ 0x00484ff0), from the
+    /// interpreter or, while it runs a `vue=` line, from the variables it
+    /// lent ([`Host::enter_view_with_vars`]); `None` without the scripts or
+    /// for a name not in `#VARIABLES#`.
+    pub(crate) fn script_var_or_lent(&self, name: &str) -> Option<i32> {
+        if let Some(s) = self.con.as_deref() {
+            return s.var(name);
+        }
+        let lent = self.lent_vars.as_ref()?;
+        let i = self.names.id(defnames::VARIABLES, name.as_bytes()).ok()?;
+        lent.get(i).copied()
+    }
+
     /// Writes a script variable (when the scripts run).
     pub(crate) fn set_script_var(&mut self, key: impl FnOnce(&Keys) -> usize, value: i32) {
         if let Some(s) = self.con.as_mut() {
@@ -405,6 +418,16 @@ impl Host for Engine {
         u32::try_from(view).is_ok_and(|v| self.wam.view(v).is_some())
     }
 
+    fn enter_view_with_vars(&mut self, view: i32, yaw: f32, pitch: f32, vars: &mut [i32]) {
+        // The interpreter is out of the engine while it runs this: its
+        // variables are lent for the entry (copied back after).
+        self.lent_vars = Some(vars.to_vec());
+        Host::enter_view(self, view, yaw, pitch);
+        if let Some(v) = self.lent_vars.take() {
+            vars.copy_from_slice(&v);
+        }
+    }
+
     fn enter_view(&mut self, view: i32, yaw: f32, pitch: f32) {
         self.vars.last_vue = self.view;
         if let Err(e) = Engine::enter_view(self, view as u32, yaw, pitch) {
@@ -562,8 +585,13 @@ impl Host for Engine {
                     _ => log::error!("AtlSpw_find_index_anum({id}, {a}, {b})"),
                 }
             }
+            // The first record of the id, whatever its kind (the loop
+            // @ 0x00483371..0x0048339e): its playing byte (+0xbc) = the
+            // value ≠ 0; none: nothing. No chapter uses the key.
             AnimOp::TheFrame { id, on, .. } => {
-                log::info!("ANIM_THE_FRAME({id}, {on}): the playing byte is not ported");
+                if let Some(s) = slots.iter_mut().find(|s| s.id == id) {
+                    s.playing = on;
+                }
             }
         }
     }

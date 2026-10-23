@@ -1,0 +1,471 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83), miniature.wam and CD 3's SPW files: the
+# figurines on the floor of the miniature garden (SS views 1-7; the hooks
+# @ 0x0048d680, 0x0048da20, 0x0048dcb0). Names of defnames.con entries are written
+# {S:I} (section, index). A: ids, targets, view 6's zones, the slots of SS views 1-7 and
+# 13. B: the view entry per view and pos_statue state. C: the click alone along a
+# played sequence, and the check alone. D: the click dispatcher. E: the warp frame
+# with chapter 47, a click on each place. F: the SPW step on view 7's slots. G: a
+# figurine slot drawn on the six faces.
+A figurines 61 62 63 64 65
+A objects 116:8 117:9 118:10 119:6 120:7 121:11
+A variables 137 138 139 140 141 142 143 28
+A targets [4,3,5,1,2,6]
+A view 6 zones 0:1 3 - 1:3 25 {4:25} 2:3 23 {4:23} 3:3 24 {4:24} 4:3 26 {4:26} 5:3 29 {4:29} 6:3 30 {4:30} 7:3 31 {4:31} 8:3 27 {4:27} 9:3 28 {4:28} 10:3 32 {4:32} 11:1 7 - 12:3 63 {4:63} 13:3 63 {4:63}
+A view 1 slots s0:85/2/a1 f4 e5 c5 act1 p0 one1 k0 s1:143/2/a1 f0 e250 c250 act1 p1 one1 k0 s2:86/2/a1 f0 e20 c20 act1 p1 one1 k0 s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s9:102/2/a1 f0 e1 c1 act0 p1 one1 k0 s10:122/2/a1 f0 e20 c20 act0 p1 one1 k0 s11:123/2/a1 f0 e20 c20 act0 p1 one1 k0 s12:124/2/a1 f0 e20 c20 act0 p1 one1 k0 s13:125/2/a1 f0 e20 c20 act0 p1 one1 k0
+A view 2 slots s0:85/2/a1 f4 e5 c5 act1 p0 one1 k0 s1:143/2/a1 f0 e250 c250 act1 p1 one1 k0 s2:86/2/a1 f0 e20 c20 act1 p1 one1 k0 s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s9:102/2/a1 f0 e1 c1 act0 p1 one1 k0 s10:122/2/a1 f0 e20 c20 act0 p1 one1 k0 s11:123/2/a1 f0 e20 c20 act0 p1 one1 k0 s12:124/2/a1 f0 e20 c20 act0 p1 one1 k0 s13:125/2/a1 f0 e20 c20 act0 p1 one1 k0
+A view 3 slots s0:85/2/a1 f4 e5 c5 act1 p0 one1 k0 s1:143/2/a1 f0 e250 c250 act1 p1 one1 k0 s2:86/2/a1 f0 e20 c20 act1 p1 one1 k0 s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s9:102/2/a1 f0 e1 c1 act0 p1 one1 k0 s10:122/2/a1 f20 e38 c39 act0 p1 one1 k0 s11:123/2/a1 f20 e38 c39 act0 p1 one1 k0 s12:124/2/a1 f20 e38 c39 act0 p1 one1 k0 s13:125/2/a1 f20 e38 c39 act0 p1 one1 k0
+A view 4 slots s0:85/2/a1 f4 e5 c5 act1 p0 one1 k0 s1:143/2/a1 f0 e250 c250 act1 p1 one1 k0 s2:86/2/a1 f0 e20 c20 act1 p1 one1 k0 s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s9:102/2/a1 f0 e1 c1 act0 p1 one1 k0 s10:122/2/a1 f0 e20 c20 act0 p1 one1 k0 s11:123/2/a1 f0 e20 c20 act0 p1 one1 k0 s12:124/2/a1 f0 e20 c20 act0 p1 one1 k0 s13:125/2/a1 f0 e20 c20 act0 p1 one1 k0
+A view 5 slots s0:85/2/a1 f4 e5 c5 act1 p0 one1 k0 s1:143/2/a1 f0 e250 c250 act1 p1 one1 k0 s2:86/2/a1 f0 e20 c20 act1 p1 one1 k0 s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s9:102/2/a1 f0 e1 c1 act0 p1 one1 k0 s10:122/2/a1 f0 e20 c20 act0 p1 one1 k0 s11:123/2/a1 f0 e20 c20 act0 p1 one1 k0 s12:124/2/a1 f0 e20 c20 act0 p1 one1 k0 s13:125/2/a1 f0 e20 c20 act0 p1 one1 k0
+A view 6 slots s0:85/2/a1 f4 e5 c5 act1 p0 one1 k0 s1:143/2/a1 f0 e250 c250 act1 p1 one1 k0 s2:86/2/a1 f0 e20 c20 act1 p1 one1 k0 s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s9:102/2/a1 f0 e1 c1 act0 p1 one1 k0 s10:122/2/a1 f20 e38 c39 act0 p1 one1 k0 s11:123/2/a1 f20 e38 c39 act0 p1 one1 k0 s12:124/2/a1 f20 e38 c39 act0 p1 one1 k0 s13:125/2/a1 f20 e38 c39 act0 p1 one1 k0
+A view 7 slots s0:85/2/a1 f4 e5 c5 act1 p0 one1 k0 s1:143/2/a1 f0 e250 c250 act1 p1 one1 k0 s2:86/2/a1 f0 e20 c20 act1 p1 one1 k0 s3:121/2/a2 f0 e1 c1 act0 p1 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:61/1/a2 f0 e40 c40 act0 p1 one1 k2 s7:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s12:64/1/a2 f0 e60 c60 act0 p1 one1 k2 s13:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 s15:122/2/a1 f0 e20 c20 act1 p1 one1 k0 s16:123/2/a1 f0 e20 c20 act1 p1 one1 k0 s17:124/2/a1 f0 e20 c20 act1 p1 one1 k0 s18:125/2/a1 f0 e20 c20 act0 p1 one1 k0
+A view 13 slots s0:119/2/a1 f0 e1 c1 act1 p1 one1 k1 s1:120/2/a1 f0 e1 c1 act1 p1 one1 k1 s2:116/2/a1 f0 e1 c1 act1 p1 one1 k1 s3:117/2/a1 f0 e1 c1 act1 p1 one1 k1 s4:118/2/a1 f0 e1 c1 act1 p1 one1 k1 s5:121/2/a1 f0 e1 c1 act1 p1 one1 k1 s6:126/2/a1 f0 e1 c1 act1 p1 one1 k0 s7:127/2/a1 f0 e1 c1 act0 p1 one1 k0 s8:128/2/a1 f0 e1 c1 act0 p1 one1 k0 s9:129/2/a1 f0 e1 c1 act0 p1 one1 k0 s10:130/2/a1 f0 e1 c1 act0 p1 one1 k0 s11:131/2/a1 f0 e1 c1 act0 p1 one1 k0 s12:132/2/a1 f0 e5 c5 act0 p1 one1 k0 s13:133/2/a1 f0 e5 c5 act0 p1 one1 k0 s14:134/2/a1 f0 e5 c5 act0 p1 one1 k0 s15:135/2/a1 f0 e5 c5 act0 p1 one1 k0 s16:136/2/a1 f0 e5 c5 act0 p1 one1 k0 s17:158/2/a1 f0 e30 c30 act1 p1 one1 k0 s18:64/2/a1 f0 e15 c15 act1 p1 one1 k0
+B view 1 none laid pos [0,0,0,0,0,0] -> pos [0,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 1 none laid again -> same
+B view 1 all on their targets pos [4,3,5,1,2,6] -> pos [4,3,5,1,2,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | errors -
+B view 1 all on their targets again -> same
+B view 1 all off pos [1,2,3,4,5,1] -> pos [1,2,3,4,5,1] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f0 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f1 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f3 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f4 e6 c6 act1 p0 one1 k0 | errors -
+B view 1 all off again -> same
+B view 1 mixed pos [4,0,3,1,6,2] -> pos [4,0,3,1,6,2] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f1 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f5 e6 c6 act1 p0 one1 k0 | errors -
+B view 1 mixed again -> same
+B view 1 six on target only pos [0,0,0,0,0,6] -> pos [0,0,0,0,0,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 1 six on target only again -> same
+B view 1 one on target only pos [4,0,0,0,0,0] -> pos [4,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 1 one on target only again -> same
+B view 1 out-of-range values pos [7,9,-1,100,6,5] -> pos [7,9,-1,100,6,5] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f4 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f6 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f8 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f-2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f99 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f5 e6 c6 act1 p0 one1 k0 | errors -
+B view 1 out-of-range values again -> same
+B view 3 none laid pos [0,0,0,0,0,0] -> pos [0,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 3 none laid again -> same
+B view 3 all on their targets pos [4,3,5,1,2,6] -> pos [4,3,5,1,2,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | errors -
+B view 3 all on their targets again -> same
+B view 3 all off pos [1,2,3,4,5,1] -> pos [1,2,3,4,5,1] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f0 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f1 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f3 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f4 e6 c6 act1 p0 one1 k0 | errors -
+B view 3 all off again -> same
+B view 3 mixed pos [4,0,3,1,6,2] -> pos [4,0,3,1,6,2] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f1 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f5 e6 c6 act1 p0 one1 k0 | errors -
+B view 3 mixed again -> same
+B view 3 six on target only pos [0,0,0,0,0,6] -> pos [0,0,0,0,0,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 3 six on target only again -> same
+B view 3 one on target only pos [4,0,0,0,0,0] -> pos [4,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 3 one on target only again -> same
+B view 3 out-of-range values pos [7,9,-1,100,6,5] -> pos [7,9,-1,100,6,5] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f4 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f6 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f8 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f-2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f99 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f5 e6 c6 act1 p0 one1 k0 | errors -
+B view 3 out-of-range values again -> same
+B view 6 none laid pos [0,0,0,0,0,0] -> pos [0,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 6 none laid again -> same
+B view 6 all on their targets pos [4,3,5,1,2,6] -> pos [4,3,5,1,2,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | errors -
+B view 6 all on their targets again -> same
+B view 6 all off pos [1,2,3,4,5,1] -> pos [1,2,3,4,5,1] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f0 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f1 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f3 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f4 e6 c6 act1 p0 one1 k0 | errors -
+B view 6 all off again -> same
+B view 6 mixed pos [4,0,3,1,6,2] -> pos [4,0,3,1,6,2] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f1 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f5 e6 c6 act1 p0 one1 k0 | errors -
+B view 6 mixed again -> same
+B view 6 six on target only pos [0,0,0,0,0,6] -> pos [0,0,0,0,0,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 6 six on target only again -> same
+B view 6 one on target only pos [4,0,0,0,0,0] -> pos [4,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 6 one on target only again -> same
+B view 6 out-of-range values pos [7,9,-1,100,6,5] -> pos [7,9,-1,100,6,5] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f4 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f6 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f8 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f-2 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f99 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f5 e6 c6 act1 p0 one1 k0 | errors -
+B view 6 out-of-range values again -> same
+B view 7 none laid pos [0,0,0,0,0,0] -> pos [0,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [5,7,9,11,13,3] | s3:121/2/a2 f0 e1 c1 act0 p1 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:61/1/a2 f0 e40 c40 act0 p1 one1 k2 s7:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s12:64/1/a2 f0 e60 c60 act0 p1 one1 k2 s13:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 | errors -
+B view 7 none laid again -> same
+B view 7 all on their targets pos [4,3,5,1,2,6] -> pos [4,3,5,1,2,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [6,8,10,12,14,3] | s3:121/2/a2 f0 e1 c1 act1 p1 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:61/1/a2 f0 e40 c40 act1 p1 one1 k2 s7:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:62/1/a2 f0 e25 c25 act1 p1 one1 k2 s9:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s10:63/1/a2 f0 e20 c20 act1 p1 one1 k2 s11:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s12:64/1/a2 f0 e60 c60 act1 p1 one1 k2 s13:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s14:65/1/a2 f0 e40 c40 act1 p1 one1 k2 | errors -
+B view 7 all on their targets again -> same
+B view 7 all off pos [1,2,3,4,5,1] -> pos [1,2,3,4,5,1] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [5,7,9,11,13,3] | s3:121/2/a2 f0 e1 c1 act1 p0 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act1 p0 one1 k0 s6:61/1/a2 f0 e40 c40 act0 p1 one1 k2 s7:62/1/a1 f1 e6 c6 act1 p0 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f2 e6 c6 act1 p0 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f3 e6 c6 act1 p0 one1 k0 s12:64/1/a2 f0 e60 c60 act0 p1 one1 k2 s13:65/1/a1 f4 e6 c6 act1 p0 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 | errors -
+B view 7 all off again -> same
+B view 7 mixed pos [4,0,3,1,6,2] -> pos [4,0,3,1,6,2] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [6,7,9,12,13,3] | s3:121/2/a2 f1 e1 c1 act1 p0 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:61/1/a2 f0 e40 c40 act1 p1 one1 k2 s7:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f2 e6 c6 act1 p0 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s12:64/1/a2 f0 e60 c60 act1 p1 one1 k2 s13:65/1/a1 f5 e6 c6 act1 p0 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 | errors -
+B view 7 mixed again -> same
+B view 7 six on target only pos [0,0,0,0,0,6] -> pos [0,0,0,0,0,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [5,7,9,11,13,3] | s3:121/2/a2 f0 e1 c1 act1 p1 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:61/1/a2 f0 e40 c40 act0 p1 one1 k2 s7:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s12:64/1/a2 f0 e60 c60 act0 p1 one1 k2 s13:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 | errors -
+B view 7 six on target only again -> same
+B view 7 one on target only pos [4,0,0,0,0,0] -> pos [4,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [6,7,9,11,13,3] | s3:121/2/a2 f0 e1 c1 act0 p1 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:61/1/a2 f0 e40 c40 act1 p1 one1 k2 s7:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s12:64/1/a2 f0 e60 c60 act0 p1 one1 k2 s13:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 | errors -
+B view 7 one on target only again -> same
+B view 7 out-of-range values pos [7,9,-1,100,6,5] -> pos [7,9,-1,100,6,5] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [5,7,9,11,13,3] | s3:121/2/a2 f4 e1 c1 act1 p0 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f6 e6 c6 act1 p0 one1 k0 s6:61/1/a2 f0 e40 c40 act0 p1 one1 k2 s7:62/1/a1 f8 e6 c6 act1 p0 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f-2 e6 c6 act1 p0 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f99 e6 c6 act1 p0 one1 k0 s12:64/1/a2 f0 e60 c60 act0 p1 one1 k2 s13:65/1/a1 f5 e6 c6 act1 p0 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 | errors -
+B view 7 out-of-range values again -> same
+B view 6 table ({1:121} hidden) pos [0,0,0,0,0,3] -> pos [0,0,0,0,0,3] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f2 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+B view 7 table ({1:121} hidden) pos [0,0,0,0,0,6] -> pos [0,0,0,0,0,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [5,7,9,11,13,3] | s3:121/2/a2 f0 e1 c1 act1 p1 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:61/1/a2 f0 e40 c40 act0 p1 one1 k2 s7:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s12:64/1/a2 f0 e60 c60 act0 p1 one1 k2 s13:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 | errors -
+B view 7 table ({1:121} hidden) pos [0,0,0,0,0,2] -> pos [0,0,0,0,0,2] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [5,7,9,11,13,3] | s3:121/2/a2 f1 e1 c1 act1 p0 one1 k3 s4:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s5:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:61/1/a2 f0 e40 c40 act0 p1 one1 k2 s7:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:62/1/a2 f0 e25 c25 act0 p1 one1 k2 s9:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s10:63/1/a2 f0 e20 c20 act0 p1 one1 k2 s11:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s12:64/1/a2 f0 e60 c60 act0 p1 one1 k2 s13:65/1/a1 f0 e6 c6 act0 p1 one1 k0 s14:65/1/a2 f0 e40 c40 act0 p1 one1 k2 | errors -
+C start -> pos [0,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0
+C empty hand, nothing laid on {4:27} -> pos [0,0,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | - | errors -
+C six in the bag, {1:116} held -> pos [0,0,0,0,0,0] etat 0 hand 116 cursor 0#-1 pair 8/OBJ bag [116/8/3,117/9/3,118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f0 e6 c6 act0 p1 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0
+C {1:116} laid off its target on {4:28} -> pos [2,0,0,0,0,0] etat 0 hand 0 cursor 0#0 pair 0/0 bag [117/9/3,118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f1 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (NewSound=202); run (pos_statue1=2); AtlSound_NewSound('sound202.apc') | errors -
+C empty hand: {1:116} taken back on {4:28} -> pos [0,0,0,0,0,0] etat 0 hand 116 cursor OBJ#8 pair 8/OBJ bag [117/9/3,118/10/3,119/6/3,120/7/3,121/11/3,116/8/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f1 e6 c6 act0 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (pos_statue1=0) | errors -
+C {1:116} (in hand) laid on its target on {4:30} -> pos [4,0,0,0,0,0] etat 0 hand 0 cursor 0#0 pair 0/0 bag [117/9/3,118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (NewSound=202); run (pos_statue1=4); AtlSound_NewSound('sound202.apc') | errors -
+C empty hand on a figurine on its target on {4:30} -> pos [4,0,0,0,0,0] etat 0 hand 0 cursor 0#0 pair 0/0 bag [117/9/3,118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | - | errors -
+C {1:117} on a figurine on its target on {4:30} -> pos [4,0,0,0,0,0] etat 0 hand 117 cursor 0#0 pair 9/OBJ bag [117/9/3,118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | - | errors -
+C {1:117} laid off its target on {4:27} -> pos [4,1,0,0,0,0] etat 0 hand 0 cursor 0#0 pair 0/0 bag [118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (NewSound=202); run (pos_statue2=1); AtlSound_NewSound('sound202.apc') | errors -
+C {1:118} on {1:117}'s place: a swap on {4:27} -> pos [4,0,1,0,0,0] etat 0 hand 117 cursor OBJ#9 pair 9/OBJ bag [119/6/3,120/7/3,121/11/3,117/9/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (pos_statue2=0); run (NewSound=202); run (pos_statue3=1); AtlSound_NewSound('sound202.apc') | errors -
+C {1:117} (in hand) laid on its target on {4:29} -> pos [4,3,1,0,0,0] etat 0 hand 0 cursor 0#0 pair 0/0 bag [119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (NewSound=202); run (pos_statue2=3); AtlSound_NewSound('sound202.apc') | errors -
+C {1:119} on {1:118}'s place: a swap onto {1:119}'s target on {4:27} -> pos [4,3,0,1,0,0] etat 0 hand 118 cursor OBJ#10 pair 10/OBJ bag [120/7/3,121/11/3,118/10/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (pos_statue3=0); run (NewSound=202); run (pos_statue4=1); AtlSound_NewSound('sound202.apc') | errors -
+C {1:118} (in hand) laid off its target on {4:28} -> pos [4,3,2,1,0,0] etat 0 hand 0 cursor 0#0 pair 0/0 bag [120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f1 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (NewSound=202); run (pos_statue3=2); AtlSound_NewSound('sound202.apc') | errors -
+C {1:102} on an empty place on {4:32} -> pos [4,3,2,1,0,0] etat 0 hand 102 cursor 0#0 pair 5/OBJ bag [120/7/3,121/11/3,102/5/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f1 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | - | errors -
+C {1:102} on {1:118}'s place: taken, nothing laid on {4:28} -> pos [4,3,0,1,0,0] etat 0 hand 118 cursor OBJ#10 pair 10/OBJ bag [120/7/3,121/11/3,102/5/3,118/10/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f1 e6 c6 act0 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (pos_statue3=0) | errors -
+C {1:118} (in hand) on a zone that is not a place on {4:23} -> pos [4,3,0,1,0,0] etat 0 hand 118 cursor OBJ#10 pair 10/OBJ bag [120/7/3,121/11/3,102/5/3,118/10/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f1 e6 c6 act0 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | - | errors -
+C {1:118} (in hand) laid on its target on {4:31} -> pos [4,3,5,1,0,0] etat 0 hand 0 cursor 0#0 pair 0/0 bag [120/7/3,121/11/3,102/5/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (NewSound=202); run (pos_statue3=5); AtlSound_NewSound('sound202.apc') | errors -
+C {1:120} laid on its target on {4:28} -> pos [4,3,5,1,2,0] etat 0 hand 0 cursor 0#0 pair 0/0 bag [121/11/3,102/5/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | run (NewSound=202); run (pos_statue5=2); AtlSound_NewSound('sound202.apc') | errors -
+C {1:121} laid on its target: the sixth on {4:32} -> pos [4,3,5,1,2,6] etat 1 hand 0 cursor 0#0 pair 0/0 bag [102/5/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | run (NewSound=202); run (pos_statue6=6); run (etat5statues=1); AtlSound_NewSound('sound202.apc'); AtlMuzik_Volume(100); AtlHnm_start(???); hnm_open(hnm\???)=missing | errors -
+C after the win, view 6 entered again -> pos [4,3,5,1,2,6] etat 1 hand 0 cursor 0#0 pair 0/0 bag [102/5/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0
+C empty hand after the win on {4:32} -> pos [4,3,5,1,2,6] etat 1 hand 0 cursor 0#-1 pair 0/0 bag [102/5/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | - | errors -
+C empty hand, etat5statues cleared, on a figurine on its target on {4:32} -> pos [4,3,5,1,2,6] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [102/5/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | - | errors -
+C {1:102}, etat5statues 2 on {4:32} -> pos [4,3,5,1,2,6] etat 2 hand 102 cursor 0#-1 pair 5/OBJ bag [102/5/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | - | errors -
+C the check FUN_0048dcb0 alone: pos, etat5statues -> etat5statues after, calls
+C check pos [4,3,5,1,2,6] etat 0 -> etat 1 | run (etat5statues=1); AtlMuzik_Volume(100); AtlHnm_start(???); hnm_open(hnm\???)=missing | errors -
+C check pos [4,3,5,1,2,6] etat 1 -> etat 1 | - | errors -
+C check pos [4,3,5,1,2,6] etat 2 -> etat 2 | - | errors -
+C check pos [4,3,5,1,2,5] etat 0 -> etat 0 | - | errors -
+C check pos [0,3,5,1,2,6] etat 0 -> etat 0 | - | errors -
+C two on place 2, empty hand on {4:28} -> pos [0,0,0,0,0,0] etat 0 hand 117 cursor OBJ#9 pair 9/OBJ bag [116/8/3,117/9/3,118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f1 e6 c6 act0 p0 one1 k0 s5:62/1/a1 f1 e6 c6 act0 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | run (pos_statue1=0); run (pos_statue2=0) | errors warning:Inventaire_PrendObj_id_nspr(%d) : deja pris!;warning:Inventaire_PrendObj_id_nspr(%d) : deja pris!
+C figurine 2 on figurine 1's target place 4, empty hand on {4:30} -> pos [4,4,0,0,0,0] etat 0 hand 0 cursor 0#-1 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f3 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | - | errors -
+D ss0006.hnm 6 type 3 -> 00493960,0048da20 AL 0
+D ss0006.hnm 6 type 1 -> 00493960,0048da20 AL 0
+D ss0006.hnm 6 type 2 -> 00493960,0048da20 AL 0
+D ss0006.hnm 6 type 4 -> 00493960,0048da20 AL 0
+D ss0006.hnm 6 type 50 -> 00493960,0048da20 AL 0
+D ss0006.hnm 6 type 1000 -> 00493960,0048da20 AL 0
+D SS0006.hnm 6 type 3 -> 00493960,0048da20 AL 0
+D Ss6 6 type 3 -> 00493960,0048da20 AL 0
+D ss0006.hnm 5 type 3 -> 00493960 AL 0
+D ss0006.hnm 7 type 3 -> 00493960 AL 0
+D ss0006.hnm 1 type 3 -> 00493960 AL 0
+D ss0006.hnm 8 type 3 -> - AL 0
+D ss0006.hnm 0 type 3 -> - AL 0
+D ch0006.hnm 6 type 3 -> - AL 0
+D la0006.hnm 6 type 3 -> - AL 0
+F all on their targets pos [4,3,5,1,2,6] slots [3,4,5,6,7,8,9,10,11,12,13,14]
+F all on their targets t1 f0a1 f0a0 f0a0 f1a1 f0a0 f1a1 f0a0 f1a1 f0a0 f1a1 f0a0 f1a1
+F all on their targets t2 f0a1 f0a0 f0a0 f2a1 f0a0 f2a1 f0a0 f2a1 f0a0 f2a1 f0a0 f2a1
+F all on their targets t3 f0a1 f0a0 f0a0 f3a1 f0a0 f3a1 f0a0 f3a1 f0a0 f3a1 f0a0 f3a1
+F all on their targets t4 f0a1 f0a0 f0a0 f4a1 f0a0 f4a1 f0a0 f4a1 f0a0 f4a1 f0a0 f4a1
+F all on their targets t5 f0a1 f0a0 f0a0 f5a1 f0a0 f5a1 f0a0 f5a1 f0a0 f5a1 f0a0 f5a1
+F all on their targets t6 f0a1 f0a0 f0a0 f6a1 f0a0 f6a1 f0a0 f6a1 f0a0 f6a1 f0a0 f6a1
+F all on their targets t7 f0a1 f0a0 f0a0 f7a1 f0a0 f7a1 f0a0 f7a1 f0a0 f7a1 f0a0 f7a1
+F all on their targets t8 f0a1 f0a0 f0a0 f8a1 f0a0 f8a1 f0a0 f8a1 f0a0 f8a1 f0a0 f8a1
+F all on their targets t9 f0a1 f0a0 f0a0 f9a1 f0a0 f9a1 f0a0 f9a1 f0a0 f9a1 f0a0 f9a1
+F all on their targets t10 f0a1 f0a0 f0a0 f10a1 f0a0 f10a1 f0a0 f10a1 f0a0 f10a1 f0a0 f10a1
+F all on their targets t11 f0a1 f0a0 f0a0 f11a1 f0a0 f11a1 f0a0 f11a1 f0a0 f11a1 f0a0 f11a1
+F all on their targets t12 f0a1 f0a0 f0a0 f12a1 f0a0 f12a1 f0a0 f12a1 f0a0 f12a1 f0a0 f12a1
+F all on their targets t13 f0a1 f0a0 f0a0 f13a1 f0a0 f13a1 f0a0 f13a1 f0a0 f13a1 f0a0 f13a1
+F all on their targets t14 f0a1 f0a0 f0a0 f14a1 f0a0 f14a1 f0a0 f14a1 f0a0 f14a1 f0a0 f14a1
+F all on their targets t15 f0a1 f0a0 f0a0 f15a1 f0a0 f15a1 f0a0 f15a1 f0a0 f15a1 f0a0 f15a1
+F all on their targets t16 f0a1 f0a0 f0a0 f16a1 f0a0 f16a1 f0a0 f16a1 f0a0 f16a1 f0a0 f16a1
+F all on their targets t17 f0a1 f0a0 f0a0 f17a1 f0a0 f17a1 f0a0 f17a1 f0a0 f17a1 f0a0 f17a1
+F all on their targets t18 f0a1 f0a0 f0a0 f18a1 f0a0 f18a1 f0a0 f18a1 f0a0 f18a1 f0a0 f18a1
+F all on their targets t19 f0a1 f0a0 f0a0 f19a1 f0a0 f19a1 f0a0 f19a1 f0a0 f19a1 f0a0 f19a1
+F all on their targets t20 f0a1 f0a0 f0a0 f20a1 f0a0 f20a1 f0a0 f0a1 f0a0 f20a1 f0a0 f20a1
+F all on their targets t21 f0a1 f0a0 f0a0 f21a1 f0a0 f21a1 f0a0 f1a1 f0a0 f21a1 f0a0 f21a1
+F all on their targets t22 f0a1 f0a0 f0a0 f22a1 f0a0 f22a1 f0a0 f2a1 f0a0 f22a1 f0a0 f22a1
+F all on their targets t23 f0a1 f0a0 f0a0 f23a1 f0a0 f23a1 f0a0 f3a1 f0a0 f23a1 f0a0 f23a1
+F all on their targets t24 f0a1 f0a0 f0a0 f24a1 f0a0 f24a1 f0a0 f4a1 f0a0 f24a1 f0a0 f24a1
+F all on their targets t25 f0a1 f0a0 f0a0 f25a1 f0a0 f0a1 f0a0 f5a1 f0a0 f25a1 f0a0 f25a1
+F all on their targets t26 f0a1 f0a0 f0a0 f26a1 f0a0 f1a1 f0a0 f6a1 f0a0 f26a1 f0a0 f26a1
+F all on their targets t27 f0a1 f0a0 f0a0 f27a1 f0a0 f2a1 f0a0 f7a1 f0a0 f27a1 f0a0 f27a1
+F all on their targets t28 f0a1 f0a0 f0a0 f28a1 f0a0 f3a1 f0a0 f8a1 f0a0 f28a1 f0a0 f28a1
+F all on their targets t29 f0a1 f0a0 f0a0 f29a1 f0a0 f4a1 f0a0 f9a1 f0a0 f29a1 f0a0 f29a1
+F all on their targets t30 f0a1 f0a0 f0a0 f30a1 f0a0 f5a1 f0a0 f10a1 f0a0 f30a1 f0a0 f30a1
+F all on their targets t31 f0a1 f0a0 f0a0 f31a1 f0a0 f6a1 f0a0 f11a1 f0a0 f31a1 f0a0 f31a1
+F all on their targets t32 f0a1 f0a0 f0a0 f32a1 f0a0 f7a1 f0a0 f12a1 f0a0 f32a1 f0a0 f32a1
+F all on their targets t33 f0a1 f0a0 f0a0 f33a1 f0a0 f8a1 f0a0 f13a1 f0a0 f33a1 f0a0 f33a1
+F all on their targets t34 f0a1 f0a0 f0a0 f34a1 f0a0 f9a1 f0a0 f14a1 f0a0 f34a1 f0a0 f34a1
+F all on their targets t35 f0a1 f0a0 f0a0 f35a1 f0a0 f10a1 f0a0 f15a1 f0a0 f35a1 f0a0 f35a1
+F all on their targets t36 f0a1 f0a0 f0a0 f36a1 f0a0 f11a1 f0a0 f16a1 f0a0 f36a1 f0a0 f36a1
+F all on their targets t37 f0a1 f0a0 f0a0 f37a1 f0a0 f12a1 f0a0 f17a1 f0a0 f37a1 f0a0 f37a1
+F all on their targets t38 f0a1 f0a0 f0a0 f38a1 f0a0 f13a1 f0a0 f18a1 f0a0 f38a1 f0a0 f38a1
+F all on their targets t39 f0a1 f0a0 f0a0 f39a1 f0a0 f14a1 f0a0 f19a1 f0a0 f39a1 f0a0 f39a1
+F all on their targets t40 f0a1 f0a0 f0a0 f0a1 f0a0 f15a1 f0a0 f0a1 f0a0 f40a1 f0a0 f0a1
+F all on their targets t41 f0a1 f0a0 f0a0 f1a1 f0a0 f16a1 f0a0 f1a1 f0a0 f41a1 f0a0 f1a1
+F all on their targets t42 f0a1 f0a0 f0a0 f2a1 f0a0 f17a1 f0a0 f2a1 f0a0 f42a1 f0a0 f2a1
+F all on their targets t43 f0a1 f0a0 f0a0 f3a1 f0a0 f18a1 f0a0 f3a1 f0a0 f43a1 f0a0 f3a1
+F all on their targets t44 f0a1 f0a0 f0a0 f4a1 f0a0 f19a1 f0a0 f4a1 f0a0 f44a1 f0a0 f4a1
+F all on their targets t45 f0a1 f0a0 f0a0 f5a1 f0a0 f20a1 f0a0 f5a1 f0a0 f45a1 f0a0 f5a1
+F all on their targets t46 f0a1 f0a0 f0a0 f6a1 f0a0 f21a1 f0a0 f6a1 f0a0 f46a1 f0a0 f6a1
+F all on their targets t47 f0a1 f0a0 f0a0 f7a1 f0a0 f22a1 f0a0 f7a1 f0a0 f47a1 f0a0 f7a1
+F all on their targets t48 f0a1 f0a0 f0a0 f8a1 f0a0 f23a1 f0a0 f8a1 f0a0 f48a1 f0a0 f8a1
+F all on their targets t49 f0a1 f0a0 f0a0 f9a1 f0a0 f24a1 f0a0 f9a1 f0a0 f49a1 f0a0 f9a1
+F all on their targets t50 f0a1 f0a0 f0a0 f10a1 f0a0 f0a1 f0a0 f10a1 f0a0 f50a1 f0a0 f10a1
+F all on their targets t51 f0a1 f0a0 f0a0 f11a1 f0a0 f1a1 f0a0 f11a1 f0a0 f51a1 f0a0 f11a1
+F all on their targets t52 f0a1 f0a0 f0a0 f12a1 f0a0 f2a1 f0a0 f12a1 f0a0 f52a1 f0a0 f12a1
+F all on their targets t53 f0a1 f0a0 f0a0 f13a1 f0a0 f3a1 f0a0 f13a1 f0a0 f53a1 f0a0 f13a1
+F all on their targets t54 f0a1 f0a0 f0a0 f14a1 f0a0 f4a1 f0a0 f14a1 f0a0 f54a1 f0a0 f14a1
+F all on their targets t55 f0a1 f0a0 f0a0 f15a1 f0a0 f5a1 f0a0 f15a1 f0a0 f55a1 f0a0 f15a1
+F all on their targets t56 f0a1 f0a0 f0a0 f16a1 f0a0 f6a1 f0a0 f16a1 f0a0 f56a1 f0a0 f16a1
+F all on their targets t57 f0a1 f0a0 f0a0 f17a1 f0a0 f7a1 f0a0 f17a1 f0a0 f57a1 f0a0 f17a1
+F all on their targets t58 f0a1 f0a0 f0a0 f18a1 f0a0 f8a1 f0a0 f18a1 f0a0 f58a1 f0a0 f18a1
+F all on their targets t59 f0a1 f0a0 f0a0 f19a1 f0a0 f9a1 f0a0 f19a1 f0a0 f59a1 f0a0 f19a1
+F all on their targets t60 f0a1 f0a0 f0a0 f20a1 f0a0 f10a1 f0a0 f0a1 f0a0 f0a1 f0a0 f20a1
+F all on their targets t61 f0a1 f0a0 f0a0 f21a1 f0a0 f11a1 f0a0 f1a1 f0a0 f1a1 f0a0 f21a1
+F all on their targets t62 f0a1 f0a0 f0a0 f22a1 f0a0 f12a1 f0a0 f2a1 f0a0 f2a1 f0a0 f22a1
+F all on their targets t63 f0a1 f0a0 f0a0 f23a1 f0a0 f13a1 f0a0 f3a1 f0a0 f3a1 f0a0 f23a1
+F all on their targets t64 f0a1 f0a0 f0a0 f24a1 f0a0 f14a1 f0a0 f4a1 f0a0 f4a1 f0a0 f24a1
+F all on their targets t65 f0a1 f0a0 f0a0 f25a1 f0a0 f15a1 f0a0 f5a1 f0a0 f5a1 f0a0 f25a1
+F all on their targets t66 f0a1 f0a0 f0a0 f26a1 f0a0 f16a1 f0a0 f6a1 f0a0 f6a1 f0a0 f26a1
+F all on their targets t67 f0a1 f0a0 f0a0 f27a1 f0a0 f17a1 f0a0 f7a1 f0a0 f7a1 f0a0 f27a1
+F all on their targets t68 f0a1 f0a0 f0a0 f28a1 f0a0 f18a1 f0a0 f8a1 f0a0 f8a1 f0a0 f28a1
+F all on their targets t69 f0a1 f0a0 f0a0 f29a1 f0a0 f19a1 f0a0 f9a1 f0a0 f9a1 f0a0 f29a1
+F all on their targets t70 f0a1 f0a0 f0a0 f30a1 f0a0 f20a1 f0a0 f10a1 f0a0 f10a1 f0a0 f30a1
+F mixed pos [4,0,3,1,6,2] slots [3,4,5,6,7,8,9,10,11,12,13,14]
+F mixed t1 f1a1 f0a0 f0a0 f1a1 f0a0 f0a0 f2a1 f0a0 f0a0 f1a1 f5a1 f0a0
+F mixed t2 f1a1 f0a0 f0a0 f2a1 f0a0 f0a0 f2a1 f0a0 f0a0 f2a1 f5a1 f0a0
+F mixed t3 f1a1 f0a0 f0a0 f3a1 f0a0 f0a0 f2a1 f0a0 f0a0 f3a1 f5a1 f0a0
+F mixed t4 f1a1 f0a0 f0a0 f4a1 f0a0 f0a0 f2a1 f0a0 f0a0 f4a1 f5a1 f0a0
+F mixed t5 f1a1 f0a0 f0a0 f5a1 f0a0 f0a0 f2a1 f0a0 f0a0 f5a1 f5a1 f0a0
+F mixed t6 f1a1 f0a0 f0a0 f6a1 f0a0 f0a0 f2a1 f0a0 f0a0 f6a1 f5a1 f0a0
+F mixed t7 f1a1 f0a0 f0a0 f7a1 f0a0 f0a0 f2a1 f0a0 f0a0 f7a1 f5a1 f0a0
+F mixed t8 f1a1 f0a0 f0a0 f8a1 f0a0 f0a0 f2a1 f0a0 f0a0 f8a1 f5a1 f0a0
+F mixed t9 f1a1 f0a0 f0a0 f9a1 f0a0 f0a0 f2a1 f0a0 f0a0 f9a1 f5a1 f0a0
+F mixed t10 f1a1 f0a0 f0a0 f10a1 f0a0 f0a0 f2a1 f0a0 f0a0 f10a1 f5a1 f0a0
+F mixed t11 f1a1 f0a0 f0a0 f11a1 f0a0 f0a0 f2a1 f0a0 f0a0 f11a1 f5a1 f0a0
+F mixed t12 f1a1 f0a0 f0a0 f12a1 f0a0 f0a0 f2a1 f0a0 f0a0 f12a1 f5a1 f0a0
+F mixed t13 f1a1 f0a0 f0a0 f13a1 f0a0 f0a0 f2a1 f0a0 f0a0 f13a1 f5a1 f0a0
+F mixed t14 f1a1 f0a0 f0a0 f14a1 f0a0 f0a0 f2a1 f0a0 f0a0 f14a1 f5a1 f0a0
+F mixed t15 f1a1 f0a0 f0a0 f15a1 f0a0 f0a0 f2a1 f0a0 f0a0 f15a1 f5a1 f0a0
+F mixed t16 f1a1 f0a0 f0a0 f16a1 f0a0 f0a0 f2a1 f0a0 f0a0 f16a1 f5a1 f0a0
+F mixed t17 f1a1 f0a0 f0a0 f17a1 f0a0 f0a0 f2a1 f0a0 f0a0 f17a1 f5a1 f0a0
+F mixed t18 f1a1 f0a0 f0a0 f18a1 f0a0 f0a0 f2a1 f0a0 f0a0 f18a1 f5a1 f0a0
+F mixed t19 f1a1 f0a0 f0a0 f19a1 f0a0 f0a0 f2a1 f0a0 f0a0 f19a1 f5a1 f0a0
+F mixed t20 f1a1 f0a0 f0a0 f20a1 f0a0 f0a0 f2a1 f0a0 f0a0 f20a1 f5a1 f0a0
+F mixed t21 f1a1 f0a0 f0a0 f21a1 f0a0 f0a0 f2a1 f0a0 f0a0 f21a1 f5a1 f0a0
+F mixed t22 f1a1 f0a0 f0a0 f22a1 f0a0 f0a0 f2a1 f0a0 f0a0 f22a1 f5a1 f0a0
+F mixed t23 f1a1 f0a0 f0a0 f23a1 f0a0 f0a0 f2a1 f0a0 f0a0 f23a1 f5a1 f0a0
+F mixed t24 f1a1 f0a0 f0a0 f24a1 f0a0 f0a0 f2a1 f0a0 f0a0 f24a1 f5a1 f0a0
+F mixed t25 f1a1 f0a0 f0a0 f25a1 f0a0 f0a0 f2a1 f0a0 f0a0 f25a1 f5a1 f0a0
+F mixed t26 f1a1 f0a0 f0a0 f26a1 f0a0 f0a0 f2a1 f0a0 f0a0 f26a1 f5a1 f0a0
+F mixed t27 f1a1 f0a0 f0a0 f27a1 f0a0 f0a0 f2a1 f0a0 f0a0 f27a1 f5a1 f0a0
+F mixed t28 f1a1 f0a0 f0a0 f28a1 f0a0 f0a0 f2a1 f0a0 f0a0 f28a1 f5a1 f0a0
+F mixed t29 f1a1 f0a0 f0a0 f29a1 f0a0 f0a0 f2a1 f0a0 f0a0 f29a1 f5a1 f0a0
+F mixed t30 f1a1 f0a0 f0a0 f30a1 f0a0 f0a0 f2a1 f0a0 f0a0 f30a1 f5a1 f0a0
+F mixed t31 f1a1 f0a0 f0a0 f31a1 f0a0 f0a0 f2a1 f0a0 f0a0 f31a1 f5a1 f0a0
+F mixed t32 f1a1 f0a0 f0a0 f32a1 f0a0 f0a0 f2a1 f0a0 f0a0 f32a1 f5a1 f0a0
+F mixed t33 f1a1 f0a0 f0a0 f33a1 f0a0 f0a0 f2a1 f0a0 f0a0 f33a1 f5a1 f0a0
+F mixed t34 f1a1 f0a0 f0a0 f34a1 f0a0 f0a0 f2a1 f0a0 f0a0 f34a1 f5a1 f0a0
+F mixed t35 f1a1 f0a0 f0a0 f35a1 f0a0 f0a0 f2a1 f0a0 f0a0 f35a1 f5a1 f0a0
+F mixed t36 f1a1 f0a0 f0a0 f36a1 f0a0 f0a0 f2a1 f0a0 f0a0 f36a1 f5a1 f0a0
+F mixed t37 f1a1 f0a0 f0a0 f37a1 f0a0 f0a0 f2a1 f0a0 f0a0 f37a1 f5a1 f0a0
+F mixed t38 f1a1 f0a0 f0a0 f38a1 f0a0 f0a0 f2a1 f0a0 f0a0 f38a1 f5a1 f0a0
+F mixed t39 f1a1 f0a0 f0a0 f39a1 f0a0 f0a0 f2a1 f0a0 f0a0 f39a1 f5a1 f0a0
+F mixed t40 f1a1 f0a0 f0a0 f0a1 f0a0 f0a0 f2a1 f0a0 f0a0 f40a1 f5a1 f0a0
+F mixed t41 f1a1 f0a0 f0a0 f1a1 f0a0 f0a0 f2a1 f0a0 f0a0 f41a1 f5a1 f0a0
+F mixed t42 f1a1 f0a0 f0a0 f2a1 f0a0 f0a0 f2a1 f0a0 f0a0 f42a1 f5a1 f0a0
+F mixed t43 f1a1 f0a0 f0a0 f3a1 f0a0 f0a0 f2a1 f0a0 f0a0 f43a1 f5a1 f0a0
+F mixed t44 f1a1 f0a0 f0a0 f4a1 f0a0 f0a0 f2a1 f0a0 f0a0 f44a1 f5a1 f0a0
+F mixed t45 f1a1 f0a0 f0a0 f5a1 f0a0 f0a0 f2a1 f0a0 f0a0 f45a1 f5a1 f0a0
+F mixed t46 f1a1 f0a0 f0a0 f6a1 f0a0 f0a0 f2a1 f0a0 f0a0 f46a1 f5a1 f0a0
+F mixed t47 f1a1 f0a0 f0a0 f7a1 f0a0 f0a0 f2a1 f0a0 f0a0 f47a1 f5a1 f0a0
+F mixed t48 f1a1 f0a0 f0a0 f8a1 f0a0 f0a0 f2a1 f0a0 f0a0 f48a1 f5a1 f0a0
+F mixed t49 f1a1 f0a0 f0a0 f9a1 f0a0 f0a0 f2a1 f0a0 f0a0 f49a1 f5a1 f0a0
+F mixed t50 f1a1 f0a0 f0a0 f10a1 f0a0 f0a0 f2a1 f0a0 f0a0 f50a1 f5a1 f0a0
+F mixed t51 f1a1 f0a0 f0a0 f11a1 f0a0 f0a0 f2a1 f0a0 f0a0 f51a1 f5a1 f0a0
+F mixed t52 f1a1 f0a0 f0a0 f12a1 f0a0 f0a0 f2a1 f0a0 f0a0 f52a1 f5a1 f0a0
+F mixed t53 f1a1 f0a0 f0a0 f13a1 f0a0 f0a0 f2a1 f0a0 f0a0 f53a1 f5a1 f0a0
+F mixed t54 f1a1 f0a0 f0a0 f14a1 f0a0 f0a0 f2a1 f0a0 f0a0 f54a1 f5a1 f0a0
+F mixed t55 f1a1 f0a0 f0a0 f15a1 f0a0 f0a0 f2a1 f0a0 f0a0 f55a1 f5a1 f0a0
+F mixed t56 f1a1 f0a0 f0a0 f16a1 f0a0 f0a0 f2a1 f0a0 f0a0 f56a1 f5a1 f0a0
+F mixed t57 f1a1 f0a0 f0a0 f17a1 f0a0 f0a0 f2a1 f0a0 f0a0 f57a1 f5a1 f0a0
+F mixed t58 f1a1 f0a0 f0a0 f18a1 f0a0 f0a0 f2a1 f0a0 f0a0 f58a1 f5a1 f0a0
+F mixed t59 f1a1 f0a0 f0a0 f19a1 f0a0 f0a0 f2a1 f0a0 f0a0 f59a1 f5a1 f0a0
+F mixed t60 f1a1 f0a0 f0a0 f20a1 f0a0 f0a0 f2a1 f0a0 f0a0 f0a1 f5a1 f0a0
+F mixed t61 f1a1 f0a0 f0a0 f21a1 f0a0 f0a0 f2a1 f0a0 f0a0 f1a1 f5a1 f0a0
+F mixed t62 f1a1 f0a0 f0a0 f22a1 f0a0 f0a0 f2a1 f0a0 f0a0 f2a1 f5a1 f0a0
+F mixed t63 f1a1 f0a0 f0a0 f23a1 f0a0 f0a0 f2a1 f0a0 f0a0 f3a1 f5a1 f0a0
+F mixed t64 f1a1 f0a0 f0a0 f24a1 f0a0 f0a0 f2a1 f0a0 f0a0 f4a1 f5a1 f0a0
+F mixed t65 f1a1 f0a0 f0a0 f25a1 f0a0 f0a0 f2a1 f0a0 f0a0 f5a1 f5a1 f0a0
+F mixed t66 f1a1 f0a0 f0a0 f26a1 f0a0 f0a0 f2a1 f0a0 f0a0 f6a1 f5a1 f0a0
+F mixed t67 f1a1 f0a0 f0a0 f27a1 f0a0 f0a0 f2a1 f0a0 f0a0 f7a1 f5a1 f0a0
+F mixed t68 f1a1 f0a0 f0a0 f28a1 f0a0 f0a0 f2a1 f0a0 f0a0 f8a1 f5a1 f0a0
+F mixed t69 f1a1 f0a0 f0a0 f29a1 f0a0 f0a0 f2a1 f0a0 f0a0 f9a1 f5a1 f0a0
+F mixed t70 f1a1 f0a0 f0a0 f30a1 f0a0 f0a0 f2a1 f0a0 f0a0 f10a1 f5a1 f0a0
+F none pos [0,0,0,0,0,0] slots [3,4,5,6,7,8,9,10,11,12,13,14]
+F none t1 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t2 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t3 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t4 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t5 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t6 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t7 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t8 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t9 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t10 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t11 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t12 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t13 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t14 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t15 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t16 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t17 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t18 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t19 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t20 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t21 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t22 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t23 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t24 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t25 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t26 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t27 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t28 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t29 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t30 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t31 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t32 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t33 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t34 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t35 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t36 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t37 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t38 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t39 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t40 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t41 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t42 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t43 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t44 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t45 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t46 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t47 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t48 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t49 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t50 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t51 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t52 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t53 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t54 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t55 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t56 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t57 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t58 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t59 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t60 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t61 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t62 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t63 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t64 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t65 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t66 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t67 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t68 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t69 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+F none t70 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0 f0a0
+E click 0: zone 6 {4:30} held {1:116} -> hooks 00493960,0048da20,0048dcb0 | CtrlScenarOUT; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=30,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=30,CLICPERSO=0,CLICOBJET=0) | run (NewSound=202); run (pos_statue1=4); AtlSound_NewSound('sound202.apc') | pos [4,0,0,0,0,0] etat 0 hand 0 cursor 0x11110000#26 pair 0/0 bag [117/9/3,118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f0 e6 c6 act0 p1 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+E click 1: zone 5 {4:29} held {1:117} -> hooks 00493960,0048da20,0048dcb0 | CtrlScenarOUT; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=29,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=29,CLICPERSO=0,CLICOBJET=0) | run (NewSound=202); run (pos_statue2=3); AtlSound_NewSound('sound202.apc') | pos [4,3,0,0,0,0] etat 0 hand 0 cursor 0x11110000#27 pair 0/0 bag [118/10/3,119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p1 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+E click 2: zone 8 {4:27} held {1:118} -> hooks 00493960,0048da20,0048dcb0 | CtrlScenarOUT; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=27,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=27,CLICPERSO=0,CLICOBJET=0) | run (NewSound=202); run (pos_statue3=1); AtlSound_NewSound('sound202.apc') | pos [4,3,1,0,0,0] etat 0 hand 0 cursor 0x11110000#27 pair 0/0 bag [119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+E click 3: zone 8 {4:27} held - -> hooks 00493960,0048da20 | CtrlScenarOUT; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=27,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=27,CLICPERSO=0,CLICOBJET=0) | run (pos_statue3=0) | pos [4,3,0,0,0,0] etat 0 hand 118 cursor 0x11110000#28 pair 10/OBJ bag [119/6/3,120/7/3,121/11/3,118/10/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f0 e6 c6 act0 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+E click 4: zone 7 {4:31} held - -> hooks 00493960,0048da20,0048dcb0 | CtrlScenarOUT; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=31,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=31,CLICPERSO=0,CLICOBJET=0) | run (NewSound=202); run (pos_statue3=5); AtlSound_NewSound('sound202.apc') | pos [4,3,5,0,0,0] etat 0 hand 0 cursor 0x11110000#29 pair 0/0 bag [119/6/3,120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act0 p1 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+E click 5: zone 8 {4:27} held {1:119} -> hooks 00493960,0048da20,0048dcb0 | CtrlScenarOUT; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=27,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=27,CLICPERSO=0,CLICOBJET=0) | run (NewSound=202); run (pos_statue4=1); AtlSound_NewSound('sound202.apc') | pos [4,3,5,1,0,0] etat 0 hand 0 cursor 0x11110000#30 pair 0/0 bag [120/7/3,121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f0 e6 c6 act0 p1 one1 k0 | errors -
+E click 6: zone 9 {4:28} held {1:120} -> hooks 00493960,0048da20,0048dcb0 | CtrlScenarOUT; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=28,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=28,CLICPERSO=0,CLICOBJET=0) | run (NewSound=202); run (pos_statue5=2); AtlSound_NewSound('sound202.apc') | pos [4,3,5,1,2,0] etat 0 hand 0 cursor 0x11110000#30 pair 0/0 bag [121/11/3] idx [4,5,6,7,8,3] | s3:121/2/a1 f0 e6 c6 act0 p1 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | errors -
+E click 7: zone 10 {4:32} held {1:121} -> hooks 00493960,0048da20,0048dcb0 | CtrlScenarOUT; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); AtlHnm_start(???); hnm_open(hnm\???)=missing; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=32,CLICPERSO=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=32,CLICPERSO=0,CLICOBJET=0) | run (NewSound=202); run (pos_statue6=6); run (etat5statues=1); AtlSound_NewSound('sound202.apc'); AtlMuzik_Volume(100); AtlHnm_start(???); hnm_open(hnm\???)=missing | pos [4,3,5,1,2,6] etat 1 hand 0 cursor 0x11110000#31 pair 0/0 bag [] idx [4,5,6,7,8,3] | s3:121/2/a1 f5 e6 c6 act1 p0 one1 k0 s4:61/1/a1 f3 e6 c6 act1 p0 one1 k0 s5:62/1/a1 f2 e6 c6 act1 p0 one1 k0 s6:63/1/a1 f4 e6 c6 act1 p0 one1 k0 s7:64/1/a1 f0 e6 c6 act1 p0 one1 k0 s8:65/1/a1 f1 e6 c6 act1 p0 one1 k0 | errors -
+frame errors -
+G file ZQA1006007.SPW md5 b99244324c1f8a8d7fc50102bc8afeaa frames 6
+G ZQA1006007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 f8a4baf5f03dd589e1a198b3ba6c10ed n1048 box 315,359,49,49 339,383=6389 315,359=4591 363,407=bd9a | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZQA1006007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 fa0587d05f2203c7e74ec55b96b3080c n1019 box 376,205,41,52 396,231=6387 376,205=3a60 416,256=0d87 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZQA1006007 frame 2 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 d51a6debb3dcf71e987cc7365dc2ada1 n1265 box 235,105,52,42 261,126=6b89 235,105=bebf 286,146=08c7 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZQA1006007 frame 3 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 1a53f66e17a5fdff98149c444530c3d4 n1278 box 110,139,50,54 135,166=6347 110,139=39fc 159,192=7afe | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZQA1006007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 4cc878d35cfc3dd8302154bc5cb69e79 n1081 box 133,352,46,56 156,380=5286 133,352=c178 178,407=6783 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZQA1006007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 7576a3eeb3a2b5181ca6493d6803215e n626 box 195,243,25,51 207,268=844d 195,243=d547 219,293=5604 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ZRA1006007.SPW md5 2f8bc3d35875018df54812a7f2030c90 frames 6
+G ZRA1006007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 032bba5e29a5e6fbddb6d186d817fb86 n697 box 316,358,32,35 332,375=52c7 316,358=74d5 347,392=59e0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA1006007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 3bb172836425a8725a377df1aa7f23e7 n710 box 371,217,38,31 390,232=6387 371,217=56b3 408,247=353d | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA1006007 frame 2 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 a35b0b5d1db58fa313a2272addee2d7a n765 box 246,110,27,40 259,130=52c6 246,110=b5e3 272,149=ae99 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA1006007 frame 3 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 813fb715d2bfe306a3f14a608cfda819 n770 box 121,153,36,33 139,169=6389 121,153=17ae 156,185=97af | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA1006007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 b484fd3cdef6d3117233b98f113ee8f9 n767 box 146,353,32,36 162,371=5b48 146,353=393d 177,388=8d3b | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA1006007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 e6891b57be993595924cb7f1ae99d4c6 n470 box 196,253,26,25 209,265=7c4e 196,253=c901 221,277=a33d | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ZSA1006007.SPW md5 0b6a34abd66e644b4b396d7c30148755 frames 6
+G ZSA1006007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 f1afcddb34d4756f0588f406c77d7efa n1098 box 313,357,39,48 332,381=5b48 313,357=2b3b 351,404=0626 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZSA1006007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 b5fa132f578e4d4d019b87371537129c n1254 box 367,210,53,42 393,231=7409 367,210=d52d 419,251=bd6d | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZSA1006007 frame 2 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 fb25dfd1a75bb0faf4b9ced507d932b5 n1026 box 240,104,38,47 259,127=73c9 240,104=66e1 277,150=34a2 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZSA1006007 frame 3 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 b764cdb2c664ff5911e7579892978058 n1264 box 111,145,47,44 134,167=7c0b 111,145=71e8 157,188=82c1 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZSA1006007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 266e1d015ab36069b51ccd8833890cbb n1238 box 138,354,43,46 159,377=6bcb 138,354=b675 180,399=2c57 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZSA1006007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 83ab6e0f569eaa4ac76479a4a989ba40 n749 box 190,249,33,39 206,268=6b88 190,249=57e6 222,287=96f6 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ZMA1006007.SPW md5 c654abfe1c89627b5269147ec2810b44 frames 6
+G ZMA1006007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 28a8a3061ab297c0aca24d690e98f437 n1202 box 312,353,52,52 338,379=5308 312,353=d136 363,404=70c0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA1006007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 30c3d1751a594bb819d1f27294065f69 n1196 box 369,210,57,40 397,230=5b06 369,210=119c 425,249=94d3 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA1006007 frame 2 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 0f94786938b6d87b0ab5ce2b55e7e87e n1133 box 245,96,36,59 263,125=6b48 245,96=065c 280,154=cb16 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA1006007 frame 3 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 58926255dbf3b26a0afa470b812ab1a7 n1399 box 107,137,60,47 137,160=7c0a 107,137=816f 166,183=e7f3 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA1006007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 667701c05823ac451549ff15d7c4c725 n1214 box 137,344,45,59 159,373=5b09 137,344=c2bb 181,402=1768 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA1006007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 eb744624ec49c8996c10e7b1a3df5996 n917 box 176,246,45,36 198,264=5b4a 176,246=6403 220,281=c0d3 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ZPA1006007.SPW md5 04a4f682555e2730ca2cf3ed8ce8ca08 frames 6
+G ZPA1006007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 e97b70cf171fe6be5536c875c4b5f136 n1175 box 317,359,37,51 335,384=4a86 317,359=8200 353,409=6d56 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZPA1006007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bc0b30a94d5b96b06871cf65415f4014 n1122 box 366,212,53,35 392,229=4242 366,212=14dd 418,246=f474 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZPA1006007 frame 2 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 61b6e1f498049b81acad3c1ca7de1057 n1246 box 238,96,35,55 255,123=848d 238,96=b2d7 272,150=1d8c | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZPA1006007 frame 3 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 f1eb3ed4632426d9946cb8e7abbffc48 n1343 box 111,146,47,46 134,169=8409 111,146=e0db 157,191=cf9b | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZPA1006007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 4c8d493e21211255f683a4072266d2c4 n1256 box 135,357,45,48 157,381=6b49 135,357=28a8 179,404=b8e0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZPA1006007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 68b9129448904174f0c3a32650e5c956 n790 box 181,250,38,32 200,266=add2 181,250=36e6 218,281=8464 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ztA1006007.SPW md5 a6455c20e228874a20fb0c1136d24942 frames 6
+G ztA1006007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 529b1287d3b1bcbd34892f240fa7b817 n274 box 318,357,17,24 326,369=6c0c 318,357=4250 334,380=1da6 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA1006007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 69b38c4966c62ed2f3acaaf3c5b859a1 n270 box 372,224,23,19 383,233=6bc9 372,224=fd92 394,242=6373 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA1006007 frame 2 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 6507cd21835b1479fdd36016ec137d1f n275 box 249,131,20,23 259,142=6bca 249,131=aa80 268,153=f188 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA1006007 frame 3 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 87e2e6251d2eadb8b10270f64d484200 n271 box 141,167,21,23 151,178=7c4c 141,167=8552 161,189=6a92 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA1006007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 c90911e9253dc6e59044a217440f7237 n275 box 159,354,22,22 170,365=7c4d 159,354=b102 180,375=c586 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA1006007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 d12d49d3791386f126a96996c870c64c n269 box 198,256,22,19 209,265=848c 198,256=524a 219,274=19f3 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ZQA1007007.SPW md5 51ecd2facd9bd67413735f211c2c0cf4 frames 6
+G ZQA1007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 314a696c97b1a9f234db0279e930940e n5822 box 0,202,131,144 65,274=6307 0,202=8c0b 130,345=de2a | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 ff139fce850e6e596b80b7e48a10162b n772 box 490,211,22,84 501,253=4919 490,211=48c8 511,294=222e
+G ZQA1007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 cd8ad68f998120c0dee8075f2943e15f n3524 box 132,214,97,112 180,270=5ac4 132,214=540e 228,325=c463
+G ZQA1007007 frame 2 AL 0 | f0 3b3a1e5e077b71e90dc2fb6e8721cb25 n3227 box 218,215,89,109 262,269=6b47 218,215=e9a4 306,323=1b64 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZQA1007007 frame 3 AL 0 | f0 b104aefd899d686fad91b494b26bf385 n1068 box 0,221,38,122 19,282=5b06 0,221=a215 37,342=1729 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 1ada7836176f6a9239cb458a2c2d1d3f n5322 box 407,205,105,138 459,274=6df6 407,205=6317 511,342=21c3 | f5 bg box 0,0,0,0
+G ZQA1007007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 a758afbed1491422deac74a68ce4dea5 n4624 box 417,197,95,157 464,275=f3fe 417,197=19a7 511,353=a531 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 8dba9ec4a7deb58dca1a67ed651a2973 n3539 box 0,197,66,157 33,275=9498 0,197=5149 65,353=29b0 | f5 bg box 0,0,0,0
+G ZQA1007007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 84c0329adba7bb3427301f1f91951233 n28781 box 149,128,272,358 285,307=4204 149,128=8ffa 420,485=c61c | f5 bg box 0,0,0,0
+G file ZRA1007007.SPW md5 0082edaee63c62718aeed3a1b2f9433d frames 6
+G ZRA1007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 dbb98b5d3c2738083ecbdaebd7ff641c n4996 box 28,241,76,110 66,296=6b49 28,241=c130 103,350=5911 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA1007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 c52ef3b125544e3689a5e7f401c3e2f6 n2670 box 152,244,58,85 181,286=8448 152,244=b0e9 209,328=531f
+G ZRA1007007 frame 2 AL 0 | f0 34775692d44b9de1756a2fde6353665c n2274 box 239,245,48,81 263,285=8c89 239,245=e4b7 286,325=9cf5 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA1007007 frame 3 AL 0 | f0 5116bbcc35cabdd44699ec4e17eaa015 n75 box 0,290,8,51 4,315=fe57 0,290=afb5 7,340=aec2 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 229ef1300fba93e5e381f00898e411d1 n4298 box 440,243,72,97 476,291=944b 440,243=405f 511,339=a465 | f5 bg box 0,0,0,0
+G ZRA1007007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 5f55a6b5aa50d809c1e5ee7426e6ae07 n4997 box 449,240,63,116 480,298=5b09 449,240=8378 511,355=8355 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 86e5fc52a1b485a1b0791f255c12c635 n1320 box 0,242,35,114 17,299=17f2 0,242=2143 34,355=dedf | f5 bg box 0,0,0,0
+G ZRA1007007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 57907a4d4147c2aa2654f47ab787a8de n26558 box 215,222,166,282 298,363=4246 215,222=17a6 380,503=da8e | f5 bg box 0,0,0,0
+G file ZSA1007007.SPW md5 1c275506a0c7e259ddc5fb3b9b55ceb6 frames 6
+G ZSA1007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 9149198a2e84bc8d775ddb2cddca8925 n7579 box 14,200,113,151 70,275=4203 14,200=552d 126,350=900d | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZSA1007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 a4d67f1dc79fa20784d50680009f62d3 n4088 box 142,211,75,119 179,270=41c1 142,211=355f 216,329=1597
+G ZSA1007007 frame 2 AL 0 | f0 18bfa742f3c0d93d8ad998852a3c3048 n3507 box 228,213,69,113 262,269=4a04 228,213=39e8 296,325=cb20 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZSA1007007 frame 3 AL 0 | f0 4674d8901cd996b4d7f4cccdf972d1bd n106 box 0,261,17,12 8,267=6388 0,261=8ccd 16,272=c60f | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 89c294dc048fed5aa976f10adb5f8625 n6180 box 424,205,88,134 468,272=4a45 424,205=e4c7 511,338=4e13 | f5 bg box 0,0,0,0
+G ZSA1007007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 8636d1af199259f5b96becb6749db4c4 n7645 box 427,197,85,159 469,276=638a 427,197=47d2 511,355=a3fb | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 ddb5452eba27d96b482a5249900d02ae n1584 box 0,204,41,150 20,279=4795 0,204=2100 40,353=b645 | f5 bg box 0,0,0,0
+G ZSA1007007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 5359d75ccd5c2b0d047478e057afbda5 n32196 box 184,132,217,360 292,312=5ac5 184,132=ed5d 400,491=037b | f5 bg box 0,0,0,0
+G file ZMA1007007.SPW md5 2c827f6ea4fc90e8df0beecf8b71b842 frames 6
+G ZMA1007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 8f5ab9d5aaa00d60f670d2ffa0b42e70 n7279 box 22,205,94,151 69,280=39c3 22,205=71a9 115,355=ee6c | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA1007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 fe3f81b819600d7f550d4c80ed305619 n3769 box 156,217,65,113 188,273=2980 156,217=761c 220,329=8e75
+G ZMA1007007 frame 2 AL 0 | f0 cd2822e50eb6c5e25e5aec105d9747a0 n3542 box 240,217,60,112 270,273=3a05 240,217=6050 299,328=f2a0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA1007007 frame 3 AL 0 | f0 6ecb24a403ee8efa11b3576d291102a7 n2096 box 0,227,34,121 17,287=e489 0,227=2143 33,347=c90c | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 707e16ee6134d9f9e6c666ec9afc3b3f n5424 box 439,208,73,140 475,278=52c4 439,208=76e1 511,347=2ac1 | f5 bg box 0,0,0,0
+G ZMA1007007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 44016be1d0cd0870f2848e376d487c9d n4617 box 447,199,65,166 479,282=41e6 447,199=820e 511,364=6207 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 9a0808b50f3504b3e32c9e205792ae9b n5370 box 0,199,50,166 25,282=4a45 0,199=1a04 49,364=0aad | f5 bg box 0,0,0,0
+G ZMA1007007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 cb434a4e6ed6c5fe6746f1939f20ddfd n28948 box 215,163,153,330 291,328=5b08 215,163=858e 367,492=0d47 | f5 bg box 0,0,0,0
+G file ZPA1007007.SPW md5 f4ae2d8e523cbbc896ac67e10de2c8c8 frames 6
+G ZPA1007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 16caecc170701ef9f45f0ca4866462fc n7541 box 30,204,88,144 74,276=6b8a 30,204=f472 117,347=b340 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZPA1007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 eafcef380a2ad3a0b1bce2a39d3a50c5 n4526 box 147,213,62,118 178,272=8449 147,213=2a5b 208,330=92cf
+G ZPA1007007 frame 2 AL 0 | f0 ab10aea900d9a357c2ac0165114c3fd2 n3743 box 226,216,57,110 254,271=8c4b 226,216=4a54 282,325=2417 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZPA1007007 frame 3 AL 0 | f0 2c73432e9519abdb9254747914ff0a4b n154 box 0,240,9,33 4,256=6c3f 0,240=0000 8,272=d453 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 f71795232b89d7235830cd6add2ddec2 n7091 box 429,208,83,134 470,275=94cc 429,208=48b6 511,341=9aed | f5 bg box 0,0,0,0
+G ZPA1007007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 ccb9677276055291743bf3e0740acac2 n7255 box 443,202,69,149 477,276=948e 443,202=560a 511,350=512d | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 071fe70c53b7d5bd510738b2491a1612 n1755 box 0,205,30,147 15,278=c18c 0,205=2101 29,351=0bfc | f5 bg box 0,0,0,0
+G ZPA1007007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 06659e4e930e930f3249c518663ec79c n31154 box 209,141,158,337 288,309=2144 209,141=4757 366,477=eecd | f5 bg box 0,0,0,0
+G file ztA1007007.SPW md5 04ce0ec96a424abc2ee1813fb8899e7f frames 6
+G ztA1007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 44d1ef028212fb1baaaa3970a6912ab6 n1047 box 38,321,67,30 71,336=6c0b 38,321=9b69 104,350=f749 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA1007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 7b2e3379e11e2e0b876120fb579567bb n526 box 158,308,44,20 180,318=7409 158,308=230f 201,327=f270
+G ztA1007007 frame 2 AL 0 | f0 0a086c343074b5bd3e564984d8368d6e n492 box 242,308,39,20 261,318=844c 242,308=0d42 280,327=c58f | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA1007007 frame 3 AL 0 | f0 9b54d9c3e83b59526939f8f084c362eb n11 box 0,334,3,6 1,337=9c39 0,334=7c09 2,339=28b9 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 eca6e8c9fcd2bad14b9fc7bd1bb37564 n886 box 453,319,57,26 481,332=4a46 453,319=3971 509,344=ab58 | f5 bg box 0,0,0,0
+G ztA1007007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 63a3bb7fd8e6792fb731352eef85389b n1023 box 462,325,50,29 487,339=5349 462,325=6319 511,353=73eb | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 535792e5a7ff519175082837f38d8bca n65 box 0,337,10,18 5,346=0c07 0,337=4a46 9,354=fc80 | f5 bg box 0,0,0,0
+G ztA1007007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 fa735b684089b383a6db639859163a7e n5448 box 228,385,100,101 278,435=63cb 228,385=c56e 327,485=4bf5 | f5 bg box 0,0,0,0
+G file ztA2007007.SPW md5 179ca04aef903905fdf3f0abcaecddbd frames 1
+G ztA2007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 80a8d5058ca48102b9dbbdb226780c1b n6471 box 214,388,118,101 273,438=3943 214,388=6b40 331,488=11ad | f5 bg box 0,0,0,0
+G ztA2007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 118,101,0,0
+G ztA2007007 frame 2 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA2007007 frame 3 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA2007007 frame 4 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ztA2007007 frame 5 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ZQA2007007.SPW md5 6e78a1c8cc4d43e2566e463e0db33e0a frames 40
+G ZQA2007007 frame 0 AL 0 | f0 9efa1fc87377c7001b37031100294959 n1514 box 0,224,48,118 24,283=5080 0,224=9344 47,341=d660 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 0c3fd482c0173a079877e49d5d48f021 n4831 box 416,214,96,128 464,278=40d8 416,214=d999 511,341=6a28 | f5 bg box 0,0,0,0
+G ZQA2007007 frame 1 AL 0 | f0 3d746557ac2a407cc98d9737876903e1 n1496 box 0,224,48,118 24,283=5081 0,224=a347 47,341=d660 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 7ff63d604761e5edd47259c34e4277f8 n4829 box 416,214,96,128 464,278=40d8 416,214=d999 511,341=6a28 | f5 bg box 0,0,0,0
+G ZQA2007007 frame 20 AL 0 | f0 b5b576c9b1b5a750b152682719d71759 n1479 box 0,223,48,119 24,282=4880 0,223=6245 47,341=d660 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 6acf325d8b283a0f3ce7e8e111454771 n4831 box 417,214,95,128 464,278=40d8 417,214=77d1 511,341=92cc | f5 bg box 0,0,0,0
+G ZQA2007007 frame 38 AL 0 | f0 15e4d412c487cdf80a6f13480a3205d2 n1501 box 0,224,48,118 24,283=5081 0,224=a347 47,341=d660 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 4b793f774c12f5aa1aafb8f86cfcc7f0 n4836 box 416,214,96,128 464,278=40d8 416,214=d999 511,341=828b | f5 bg box 0,0,0,0
+G ZQA2007007 frame 39 AL 0 | f0 78f8b50448a17a051402e2e7305dccc3 n1506 box 0,224,48,118 24,283=5080 0,224=a347 47,341=d660 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 d7f687ea71914babb340524380a385ce n4823 box 416,214,96,128 464,278=40d8 416,214=d999 511,341=92cc | f5 bg box 0,0,0,0
+G file ZRA2007007.SPW md5 9e67c695f41a93920a2d4cfe7e0ac1ad frames 25
+G ZRA2007007 frame 0 AL 0 | f0 914dbb3908c4d94b1cdb560061cf18bc n2029 box 236,252,44,71 258,287=2080 236,252=12b8 279,322=fc96 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA2007007 frame 1 AL 0 | f0 52e3be612aa07ec1e0a6d5205f8f5191 n2039 box 236,252,46,71 259,287=2080 236,252=12b8 281,322=3905 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA2007007 frame 12 AL 0 | f0 b7d37fc4a04f35145cb3032aac61d8fa n2038 box 234,253,55,70 261,288=4181 234,253=453d 288,322=8c8a | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA2007007 frame 23 AL 0 | f0 805c3655c7fe4cd868bc2401fc781bae n2015 box 236,253,42,70 257,288=4142 236,253=81ac 277,322=c027 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZRA2007007 frame 24 AL 0 | f0 b9961e94c938c18df489450963019bfd n2021 box 236,252,43,71 257,287=2080 236,252=12b8 278,322=5e5f | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ZSA2007007.SPW md5 4df570b2f84b24a86fc00e9afa02879d frames 20
+G ZSA2007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 7213e04bc12e32c295a4ab6afde5617b n5629 box 437,204,75,150 474,279=ddf7 437,204=7ea4 511,353=ad73 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 e001bcc22b8b9189131f42aeba1f5273 n2434 box 0,208,41,146 20,281=257c 0,208=1040 40,353=b645 | f5 bg box 0,0,0,0
+G ZSA2007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bb27244478312926714fab52c5e6af43 n5626 box 438,204,74,150 475,279=7c2e 438,204=1cdc 511,353=ad73 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 882a0375aff6099fbda9a1e15ec24300 n2445 box 0,207,41,147 20,280=b688 0,207=a64b 40,353=b645 | f5 bg box 0,0,0,0
+G ZSA2007007 frame 10 AL 0 | f0 bg box 0,0,0,0 | f1 f928ae671b97f9873bfdb415d73318d4 n5577 box 439,204,73,150 475,279=7c2e 439,204=bb13 511,353=ad73 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 8c0ab3ff780ed597c940c6754a993771 n2544 box 0,206,40,148 20,280=b688 0,206=3080 39,353=180d | f5 bg box 0,0,0,0
+G ZSA2007007 frame 18 AL 0 | f0 bg box 0,0,0,0 | f1 8a87f14e29d3e336df054917b91cc706 n5627 box 437,204,75,150 474,279=ddf7 437,204=7ea4 511,353=ad52 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 6cb4efdf4e23dc2ddcdb79a2bb46870f n2443 box 0,207,41,147 20,280=b688 0,207=a64b 40,353=b645 | f5 bg box 0,0,0,0
+G ZSA2007007 frame 19 AL 0 | f0 bg box 0,0,0,0 | f1 47bbec4de65985a51dfd657a299772e9 n5628 box 437,204,75,150 474,279=ddf7 437,204=7ea4 511,353=ad52 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 44cc763382464c640c00beeed8165ce5 n2435 box 0,207,41,147 20,280=b688 0,207=5a04 40,353=b645 | f5 bg box 0,0,0,0
+G file ZMA2007007.SPW md5 7f2bf563b0b46b2a7f9f4ad62c56d513 frames 60
+G ZMA2007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 c51f02cda0658fbf6d80c5b95312190e n7311 box 9,216,94,140 56,286=0800 9,216=2d4d 102,355=e59b | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA2007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 56b6c4a496b515053f038fe510cc0afb n7279 box 10,216,93,140 56,286=0800 10,216=cb85 102,355=e59b | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA2007007 frame 30 AL 0 | f0 bg box 0,0,0,0 | f1 cbf11fe40cb9ab52b755884383510a6d n7017 box 18,217,83,139 59,286=3982 18,217=2c34 100,355=a92c | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA2007007 frame 58 AL 0 | f0 bg box 0,0,0,0 | f1 476286fc161aebc93184a180f41d2a98 n7311 box 9,216,94,140 56,286=0800 9,216=2d4d 102,355=e59b | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G ZMA2007007 frame 59 AL 0 | f0 bg box 0,0,0,0 | f1 f05fd35d45131571ba4b6fc46cf3a45d n7310 box 9,216,94,140 56,286=0800 9,216=2d4d 102,355=e59b | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bg box 0,0,0,0
+G file ZPA2007007.SPW md5 0d8077a18a5cf4d7f5e3a7bbf62b06eb frames 40
+G ZPA2007007 frame 0 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 3cf2fe04263ff088fea163e1143e595f n4459 box 145,218,69,114 179,275=2144 145,218=18ad 213,331=18d7
+G ZPA2007007 frame 1 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 de7a4ae9d55d0fd56d823a763d93a7a1 n4466 box 145,218,69,114 179,275=2144 145,218=18ad 213,331=18d7
+G ZPA2007007 frame 20 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 2b38d4f8c4ccb55ac3475d5a314fea3f n4448 box 144,218,69,114 178,275=2104 144,218=7a75 212,331=7aa0
+G ZPA2007007 frame 38 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 b57d40458b5add1a32970979cb3109ba n4463 box 145,218,69,114 179,275=2144 145,218=18ad 213,331=18d7
+G ZPA2007007 frame 39 AL 0 | f0 bg box 0,0,0,0 | f1 bg box 0,0,0,0 | f2 bg box 0,0,0,0 | f3 bg box 0,0,0,0 | f4 bg box 0,0,0,0 | f5 bfe53bbed436dc0c4097974a6351933f n4456 box 145,218,69,114 179,275=2144 145,218=18ad 213,331=18d7
