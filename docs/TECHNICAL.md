@@ -1075,10 +1075,28 @@ event, the gong's way back to Tibet) into `china-*.png`.
   trip copies, is on no disc and no list plays it. The place sounds of
   `chine.wam` and `miniature.wam` play. Not ported: the space travel
   from China (chapter 56, `Planetes.wam`: refused, the hub is another
-  world's work). A headless game plays Tibet → China → Tibet with the
-  mouse (`tests/flow.rs` `a_game_from_tibet_to_china_and_back`: China's
-  boat taken and laid, the trip, the gardener master and the worried
-  monk asked about all they offer, the gong taken and struck), and
+  world's work). A headless game plays the whole of China with the
+  mouse only (`tests/flow.rs` `the_whole_of_china_with_the_mouse`, about
+  50 s): from a new game, China's boat laid in the hut, then chapters
+  42-60 stage by stage (the shadow, the abbot and the gardener master's
+  ritual, the turtle room: the ring turned, the turtle laid, the master's
+  eight-move walk to the dragon gate; the chest's chopstick and the
+  incense; the figurines taken in the grass and each tried on the floor
+  until one holds; the coins for the discs; the five wheels in their two
+  orders; the arrow turned to the hunter; the pearl won in five rounds
+  as it hides in the order ABBAB; the door passed three times, the
+  immortal; the labyrinth's forms stamped in the fan's order, the
+  mushroom; the lantern), a save and a load through the menus after the
+  wheels, and the way back with the lantern (the pearl taken back from
+  the mechanism, film 27, down the garden to the turtle room's link and
+  view 40's link: films 32 and 33, Tibet's view 7, China's mandala).
+  Every chapter it goes through is left by one of its own `chapter=`
+  lines, every Chinese puzzle hook runs, none is noted, and every
+  Chinese `/set` line it reports is one the original runs. A shorter one
+  (`a_game_from_tibet_to_china_and_back`) asks the gardener master and
+  the worried monk all they offer and goes back by the gong. With
+  `ATLANTIS2_PNG_DIR` set both write their screens (`china-*.png`, the
+  puzzles' `pz-*-flow-*.png`). And
   `tests/china.rs` runs every Chinese chapter's `/INIT`, enters every
   view of the five places with its hooks, moves along every link,
   plays the lantern's way back from the turtle room (chapter 46's

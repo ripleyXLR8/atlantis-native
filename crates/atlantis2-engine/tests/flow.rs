@@ -17,7 +17,14 @@
 //! the serpent's well, Brigid's cross and the goddess, the salmon, the
 //! glass tower and Nuada's hand), every chapter left by its own script
 //! line, a save and a load in Ireland through the menus, and the way back
-//! to Tibet as chapter 16 makes it.
+//! to Tibet as chapter 16 makes it. China the same way, from a new game:
+//! the trip, then the whole of its story as chapters 42-60 make it
+//! ([`CHINA`]: the shadow, the abbot and the gardener master, the turtle
+//! room and its walk, the chest and the incense, the figurines, their
+//! coins and the five wheels, the arrow, the pearl and the dragon, the
+//! door and the immortal, the labyrinth's forms, the lantern), a save and
+//! a load through the menus, and the way back to Tibet with the lantern;
+//! and a shorter trip back by chapter 42's gong.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the test is skipped. The saves go to a
@@ -28,7 +35,7 @@ use std::path::{Path, PathBuf};
 use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
-use atlantis2_engine::bag::{UiBank, UiDraw};
+use atlantis2_engine::bag::{UiBank, UiDraw, FORM_FRAMES};
 use atlantis2_engine::engine::MANDALAS;
 use atlantis2_engine::menu::{state, PageKind};
 use atlantis2_engine::sound::VOICE_EFFECTS;
@@ -787,9 +794,17 @@ impl Run {
     }
 
     /// The bag bar opened with the right button and object `id`'s cell
-    /// clicked: the object in hand, the bar closed.
+    /// clicked: the object in hand, the bar closed. A special object (a
+    /// form, the fan) opens its overlay: the click that closes it puts the
+    /// object in hand.
     fn pick(&mut self, id: i32) {
         self.choose(id);
+        if self.e.overlays.any() {
+            self.tap();
+            self.step();
+            self.step();
+            assert!(!self.e.overlays.any());
+        }
         assert_eq!(self.var("OBJETENMAIN"), id);
     }
 
@@ -2251,24 +2266,12 @@ fn ireland_lines_as_the_original(evs: &[Event]) {
     assert!(n > 0 || !evs.iter().any(|e| matches!(e, Event::Set { .. })));
 }
 
-/// A game from the start-up intro to China and back, with the mouse: the
-/// walk to the shaman (his greeting), China's boat taken in view 9 and
-/// laid on its zone in the hut (the hook, chapter 75's section, film 21),
-/// the trip (`MONDE` 3 on disc 3, `chine.wam` view 10, chapter 42 and its
-/// music), the gardener master of view 12 and the worried monk of view 25
-/// asked about everything they offer (their answers spoken by the 3D
-/// heads), the gong taken in view 7 and struck on its zone in view 5:
-/// chapter 42's way back to Tibet's view 7 and chapter 75. Every Chinese
-/// `/set` line reported is one the original runs
-/// (`scripts_worlds_china.txt`).
-#[test]
-fn a_game_from_tibet_to_china_and_back() {
-    if game().is_none() {
-        return;
-    }
-    let dir = scratch("a2-flow-china");
-    let mut r = Run::new(&dir);
-    tibet_start(&mut r);
+/// The game from the start-up intro to China, with the mouse: the walk to
+/// the shaman (his greeting), China's boat taken in view 9 and laid on its
+/// zone in the hut (the hook, chapter 75's section, film 21), the trip
+/// (`MONDE` 3 on disc 3, `chine.wam` view 10, chapter 42 and its music).
+fn to_china(r: &mut Run) {
+    tibet_start(r);
     // The shaman's greeting on the way (view 7), China's boat in view 9.
     for to in 3..=9 {
         r.walk(to);
@@ -2319,6 +2322,23 @@ fn a_game_from_tibet_to_china_and_back() {
     r.wait(30);
     assert_eq!(r.e.music_playing(), Some(23));
     r.shot_as("china-2-arrival.png");
+}
+
+/// A game from the start-up intro to China and back, with the mouse:
+/// [`to_china`], the gardener master of view 12 and the worried monk of
+/// view 25 asked about everything they offer (their answers spoken by the
+/// 3D heads), the gong taken in view 7 and struck on its zone in view 5:
+/// chapter 42's way back to Tibet's view 7 and chapter 75. Every Chinese
+/// `/set` line reported is one the original runs
+/// (`scripts_worlds_china.txt`).
+#[test]
+fn a_game_from_tibet_to_china_and_back() {
+    if game().is_none() {
+        return;
+    }
+    let dir = scratch("a2-flow-china");
+    let mut r = Run::new(&dir);
+    to_china(&mut r);
 
     // The gardener master in view 12: everything he offers.
     r.route(&[11, 12]);
@@ -2385,4 +2405,956 @@ fn china_lines_as_the_original(evs: &[Event]) {
         }
     }
     assert!(n > 10, "{n}");
+}
+
+// ---------------------------------------------------------------------------
+// The whole of China, with the mouse.
+
+/// The play of China: what a player does there, besides Ireland's.
+impl Run {
+    /// The fewest moves (type-1 zones of the current place) from the
+    /// current view to view `to`, walked; views in `avoid` are not passed
+    /// through.
+    fn go(&mut self, to: u32, avoid: &[u32]) -> Vec<Event> {
+        let from = self.e.place().1;
+        let wam = self.e.wam();
+        let mut prev = std::collections::HashMap::new();
+        let mut queue = std::collections::VecDeque::from([from]);
+        while let Some(v) = queue.pop_front() {
+            if v == to {
+                break;
+            }
+            for z in wam.view(v).map(|w| w.zones.as_slice()).unwrap_or_default() {
+                let n = z.value as u32;
+                if z.kind != 1 || n == from || prev.contains_key(&n) || wam.view(n).is_none() {
+                    continue;
+                }
+                if avoid.contains(&n) && n != to {
+                    continue;
+                }
+                prev.insert(n, v);
+                queue.push_back(n);
+            }
+        }
+        let mut path = vec![to];
+        while *path.last().unwrap() != from {
+            let at = *path.last().unwrap();
+            path.push(
+                *prev
+                    .get(&at)
+                    .unwrap_or_else(|| panic!("no way from view {from} to {to}")),
+            );
+        }
+        path.pop();
+        path.reverse();
+        let mut all = Vec::new();
+        for v in path {
+            all.extend(self.walk(v));
+        }
+        all
+    }
+
+    /// A click on the move zone to view `to` that the scripts send
+    /// elsewhere (a `NEXTVUE`, a `vue=` at the arrival): played out until
+    /// the panorama is still.
+    fn walk_redirected(&mut self, to: u32) -> Vec<Event> {
+        self.wait(15);
+        let zone = self.zone_to(to);
+        assert!(self.try_aim(zone, true), "no move zone to view {to}");
+        self.tap();
+        let mut all = self.events();
+        all.extend(self.settle());
+        all
+    }
+
+    /// A click on zone `zone` with whatever is in hand (none stowed):
+    /// what follows, played out.
+    fn press_zone(&mut self, zone: usize) -> Vec<Event> {
+        self.aim(zone);
+        self.tap();
+        let mut evs = self.events();
+        evs.extend(self.settle());
+        evs
+    }
+
+    /// A click on character `who`, whose animation moves it: its slots
+    /// looked at again after each try (the labyrinth's demons).
+    fn click_moving(&mut self, who: &str) -> Vec<Event> {
+        let id = self.who(who);
+        for _ in 0..8 {
+            let shown: Vec<usize> = (0..self.e.anim.slots.len())
+                .filter(|&k| {
+                    let s = &self.e.anim.slots[k];
+                    s.id == id && s.active && s.click == 2
+                })
+                .collect();
+            for n in shown {
+                for (yaw, pitch) in self.slot_aims(n) {
+                    let on = |e: &Engine| {
+                        e.sprite_under_centre().1 == 2
+                            && centre_slot(e).is_some_and(|k| e.anim.slots[k].id == id)
+                    };
+                    if self.steer(yaw, pitch, &on) {
+                        self.tap();
+                        let mut evs = self.events();
+                        evs.extend(self.events());
+                        return evs;
+                    }
+                }
+            }
+            self.wait(15);
+        }
+        panic!("{who} never under the centre in view {}", self.e.place().1);
+    }
+
+    /// The `form.spr` frames the bag's overlay draws now, in order.
+    fn form_frames(&mut self) -> Vec<i32> {
+        self.step();
+        self.e
+            .ui_draws
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Sprite {
+                    bank: UiBank::Form,
+                    frame,
+                    ..
+                } => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The bag's overlay closed with a click (the object back in hand).
+    fn close_overlay(&mut self) {
+        self.tap();
+        self.step();
+        self.step();
+        assert!(!self.e.overlays.any());
+    }
+
+    /// The labyrinth's view `to` of `place` (`labysol.wam` or
+    /// `labyplaf.wam`) by the fewest moves, through the link between the
+    /// two places (views 28 and 33) when needed.
+    fn go_laby(&mut self, place: &str, to: u32) -> Vec<Event> {
+        let mut all = Vec::new();
+        if self.e.place().0 != place {
+            let here = if self.e.place().0 == "labysol.wam" {
+                28
+            } else {
+                33
+            };
+            all.extend(self.go(here, &[]));
+            all.extend(self.walk_link());
+            assert_eq!(self.e.place().0, place);
+        }
+        all.extend(self.go(to, &[]));
+        all
+    }
+
+    /// Passes until the dragon of view 31 is still and no cloud is
+    /// transparent (what a player waits for before answering).
+    fn until_still(&mut self) -> Vec<Event> {
+        let mut all = Vec::new();
+        for _ in 0..3000 {
+            if self.e.dragon.state == 0 && self.var("Time_nuage_transparent") == 0 {
+                return all;
+            }
+            all.extend(self.events());
+        }
+        panic!("the dragon never stops");
+    }
+}
+
+/// The views of the current place a move leads to from `view`.
+fn neighbours(e: &Engine, view: u32) -> Vec<u32> {
+    e.wam()
+        .view(view)
+        .map(|v| {
+            v.zones
+                .iter()
+                .filter(|z| z.kind == 1)
+                .map(|z| z.value as u32)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// A walk of exactly `n` moves from `from` ending in `to` that does not
+/// enter `to` before (breadth first over the place's moves).
+fn walk_of(e: &Engine, from: u32, to: u32, n: usize) -> Option<Vec<u32>> {
+    let mut queue = std::collections::VecDeque::from([vec![from]]);
+    while let Some(path) = queue.pop_front() {
+        let last = *path.last().unwrap();
+        if path.len() == n + 1 {
+            if last == to {
+                return Some(path[1..].to_vec());
+            }
+            continue;
+        }
+        if last == to && path.len() > 1 {
+            continue;
+        }
+        for v in neighbours(e, last) {
+            let mut p = path.clone();
+            p.push(v);
+            queue.push_back(p);
+        }
+    }
+    None
+}
+
+/// The sounds the events started, by name.
+fn sounds(evs: &[Event]) -> Vec<String> {
+    evs.iter()
+        .filter_map(|e| match e {
+            Event::Sound(n) => Some(n.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// China's story, stage by stage, as chapters 42-60 make it: each stage
+/// starts and ends in the panorama, the game where the last one left it.
+const CHINA: &[Stage] = &[
+    ("the shadow", the_shadow),
+    ("the abbot", the_abbot),
+    ("the gardener's ritual", the_gardeners_ritual),
+    ("the turtle room", the_turtle_room),
+    ("the turtle's walk", the_turtles_walk),
+    ("the chest", the_chest),
+    ("the incense", the_incense),
+    ("the figurines taken", the_figurines_taken),
+    ("the figurines laid", the_figurines_laid),
+    ("the coins", the_coins),
+    ("the wheels", the_wheels),
+    ("the arrow", the_arrow),
+    ("the pearl", the_pearl),
+    ("the door", the_door),
+    ("the forms", the_forms),
+    ("the lantern", the_lantern),
+];
+
+/// `chine.wam` view 10, chapter 42: views 7, 3, 1, the shadow at the gate,
+/// whose arrival lets everyone be asked about it (chapter 42 lines
+/// 32-35); views 3, 5, 11, 12: the gardener master asked about it
+/// (dialog 222).
+fn the_shadow(r: &mut Run) {
+    assert_eq!((r.e.place(), r.chapter()), (("chine.wam", 10), 42));
+    r.route(&[7, 3, 1]);
+    assert!(r.shown(true, "OMBRE_CHINE"));
+    r.shot_as("china-6-shadow.png");
+    r.route(&[3, 5, 11, 12]);
+    assert_eq!(r.ask("MAITRE_JARDIN", "OMBRE"), 222);
+}
+
+/// Views 11, 10, 19, 30 (chapter 43), 37 (44), 38: the abbot asked about
+/// the shadow (dialog 232, flag 132: the immortal Tan Yun named, the
+/// gardener master to be asked about him) and about the master (233).
+fn the_abbot(r: &mut Run) {
+    r.route(&[11, 10, 19, 30]);
+    assert_eq!(r.chapter(), 43);
+    r.walk(37);
+    assert_eq!(r.chapter(), 44);
+    r.walk(38);
+    assert_eq!(r.ask("ABBE", "OMBRE"), 232);
+    assert_eq!(r.flag(132), 1);
+    assert_eq!(r.ask("ABBE", "MAITRE"), 233);
+    r.shot_as("china-7-abbot.png");
+}
+
+/// Views 37, 30 (43), 19 (42), 10, 11, 12: the gardener master asked about
+/// the immortal (dialog 223: flag 133, the turtle master shown in his
+/// room) and about the turtle room (224: water).
+fn the_gardeners_ritual(r: &mut Run) {
+    r.route(&[37, 30]);
+    assert_eq!(r.chapter(), 43);
+    r.walk(19);
+    assert_eq!(r.chapter(), 42);
+    r.route(&[10, 11, 12]);
+    assert_eq!(r.ask("MAITRE_JARDIN", "IMMORTEL"), 223);
+    assert_eq!(r.flag(133), 1);
+    assert_eq!(r.ask("MAITRE_JARDIN", "SALLE_TORTUE"), 224);
+}
+
+/// Views 11, 10, 19, 30 (43), 31, 32 and its link to the turtle room
+/// (chapter 46):
+/// the first arrival in view 40 is the meeting (dialog 260), the turtle
+/// and the engraved ring in the bag; the ring's entry sets the puzzle mode
+/// 2.
+fn the_turtle_room(r: &mut Run) {
+    r.route(&[11, 10, 19, 30, 31, 32]);
+    assert_eq!(r.chapter(), 43);
+    let evs = r.walk_link();
+    assert_eq!((r.e.place(), r.chapter()), (("salletortue.wam", 40), 46));
+    assert!(dialogs(&evs).contains(&260));
+    assert!(evs.contains(&Event::PuzzleRan {
+        function: 0x0049_c340
+    }));
+    assert_eq!(r.e.puzzle_mode(), 2);
+    assert!(r.in_bag("TORTUE_NOIRE") && r.in_bag("ANNEAU_GRAVE"));
+    assert_eq!(r.flag(134), 1);
+    r.shot_as("china-8-turtle-room.png");
+}
+
+/// The ring turned with its zones in view 56 (the four directions; sound
+/// 218, one frame a tick), the turtle laid on the water in view 57, the
+/// turtle master asked about the tiger's home until he starts his
+/// indications (dialog 266), then a walk of eight moves to view 47 (the
+/// dragon gate): his indications one an arrival (dialogs 268-274), the
+/// seventh arrival silent, the eighth dialog 276, film 22, `miniature.wam`
+/// view 1, chapter 47. (Chapter 46 counts the arrivals only: any walk of
+/// eight moves that ends in view 47 is the one his words describe.)
+fn the_turtles_walk(r: &mut Run) {
+    r.route(&[55, 56]);
+    // A quarter left from frame 0 (9 frames), another (10), one back to
+    // the right: the frames the ring is left on.
+    for (zone, frame) in [
+        ("TORTUE_GAUCHE", 9),
+        ("TORTUE_GAUCHE", 19),
+        ("TORTUE_DROITE", 9),
+    ] {
+        let z = r.zone_named(zone);
+        r.stow();
+        r.aim(z);
+        r.tap();
+        let evs = r.events();
+        assert!(evs.contains(&Event::PuzzleRan {
+            function: 0x0049_c290
+        }));
+        assert_eq!(sounds(&evs), ["sound218.apc"]);
+        assert_ne!(r.e.ring_count(), 0);
+        r.wait(60);
+        assert_eq!((r.e.ring_count(), r.e.ring_store()), (0, frame));
+    }
+    r.shot_as("pz-turtle-flow-ring.png");
+    r.walk(57);
+    let water = r.zone_named("EAU_TORTUE");
+    r.use_on(Some("TORTUE_NOIRE"), water);
+    assert!(!r.in_bag("TORTUE_NOIRE"));
+    let mut heard = Vec::new();
+    for _ in 0..6 {
+        if r.var("indication_tortue") == 1 {
+            break;
+        }
+        heard.push(r.ask("MAITRE_TORTUE", "DEMEURE_TIGRE"));
+    }
+    assert_eq!(r.var("indication_tortue"), 1, "{heard:?}");
+    assert_eq!(heard.last(), Some(&266));
+    let path = walk_of(&r.e, 57, 47, 8).expect("a walk of eight moves");
+    let mut heard = Vec::new();
+    for to in path {
+        if to != 47 {
+            heard.extend(dialogs(&r.walk(to)));
+            continue;
+        }
+        // The arrival in view 47: dialog 276, then film 22 to the next
+        // place.
+        let evs = r.walk_redirected(to);
+        heard.extend(dialogs(&evs));
+        assert!(films(&evs).contains(&22));
+    }
+    assert_eq!(heard, [268, 269, 270, 271, 272, 274, 276]);
+    assert_eq!((r.e.place(), r.chapter()), (("miniature.wam", 1), 47));
+    assert_eq!((r.flag(135), r.flag(136), r.flag(141)), (1, 1, 1));
+    r.shot_as("china-9-miniature.png");
+}
+
+/// Views 4, 5: the chest opened by four clicks on its zone (sounds 211 to
+/// 214), the fifth takes the chopstick.
+fn the_chest(r: &mut Run) {
+    r.route(&[4, 5]);
+    assert_eq!(r.e.puzzle_mode(), 5);
+    let take = r.zone_named("PRENDRE_BAGUETTE");
+    for k in 1..=4 {
+        let evs = r.use_on(None, take);
+        assert!(evs.contains(&Event::PuzzleRan {
+            function: 0x0049_3960
+        }));
+        assert_eq!(sounds(&evs), [format!("sound{}.apc", 210 + k)]);
+    }
+    r.shot_as("pz-chest-flow-open.png");
+    r.use_on(None, take);
+    assert!(r.in_bag("BAGUETTE"));
+    assert_eq!(r.var("BAGUETTE_PRISE"), 1);
+    r.stow();
+}
+
+/// Views 4, 1, 3, 6: the four incense sticks lit with the chopstick in
+/// their order (chapter 47: `EtatPzEncens` 1 to 4), film 23, view 7,
+/// chapter 48.
+fn the_incense(r: &mut Run) {
+    r.route(&[4, 1, 3, 6]);
+    for (k, stick) in ["ENCENS1", "ENCENS2", "ENCENS3"].iter().enumerate() {
+        let z = r.zone_named(stick);
+        r.use_on(Some("BAGUETTE"), z);
+        assert_eq!(r.var("EtatPzEncens"), k as i32 + 1);
+    }
+    r.shot_as("pz-chest-flow-incense.png");
+    let z = r.zone_named("ENCENS4");
+    let evs = r.use_on(Some("BAGUETTE"), z);
+    assert!(films(&evs).contains(&23));
+    assert_eq!((r.e.place(), r.chapter()), (("miniature.wam", 7), 48));
+    assert_eq!(r.flag(142), 1);
+    assert!(!r.in_bag("BAGUETTE"));
+}
+
+/// Views 10 (chapter 55), 11, 12, 13: the six figurines lying in the grass
+/// taken with clicks.
+fn the_figurines_taken(r: &mut Run) {
+    r.walk(10);
+    assert_eq!(r.chapter(), 55);
+    r.route(&[11, 12, 13]);
+    let ids: Vec<i32> = (1..=6).map(|k| r.obj(&format!("OB_FIG{k}HERBE"))).collect();
+    // In the slots' order (an earlier sprite over a later one takes the
+    // click).
+    let grass: Vec<i32> =
+        r.e.anim
+            .slots
+            .iter()
+            .filter(|s| s.active && ids.contains(&s.id))
+            .map(|s| s.id)
+            .collect();
+    assert_eq!(grass.len(), 6);
+    for id in grass {
+        let evs = r.click_on(false, id);
+        assert!(evs.contains(&Event::Take { id }));
+        r.settle();
+        r.stow();
+    }
+    assert!(ids
+        .iter()
+        .all(|&id| r.e.bag_entries().iter().any(|b| b.id == id)));
+    r.shot_as("pz-figurines-flow-taken.png");
+}
+
+/// Views 12, 11, 10, 7 (chapter 48), 6 (film 34, chapter 47): each
+/// figurine laid on a place of the floor and clicked again with an empty
+/// hand: back in hand when the place is not its own, held there for good
+/// when it is (the click ends); the next place tried until it holds. All
+/// six on their own places: `etat5statues`.
+fn the_figurines_laid(r: &mut Run) {
+    r.route(&[12, 11, 10, 7]);
+    assert_eq!(r.chapter(), 48);
+    let evs = r.walk(6);
+    assert!(films(&evs).contains(&34));
+    assert_eq!(r.chapter(), 47);
+    let mut free: Vec<i32> = (1..=6).collect();
+    let mut tries = 0;
+    for k in 1..=6 {
+        let name = format!("OB_FIG{k}HERBE");
+        let id = r.obj(&name);
+        let mut held = None;
+        for &p in &free {
+            let z = r.zone_named(&format!("SOL_FIGUR{p}"));
+            let evs = r.use_on(Some(&name), z);
+            assert!(sounds(&evs).contains(&"sound202.apc".to_string()));
+            tries += 1;
+            if r.var("etat5statues") == 1 {
+                held = Some(p);
+                break;
+            }
+            r.stow();
+            r.use_on(None, z);
+            if r.var("OBJETENMAIN") == id {
+                // Not its place: taken back.
+                r.stow();
+                continue;
+            }
+            held = Some(p);
+            break;
+        }
+        let p = held.unwrap_or_else(|| panic!("figurine {k}: no place holds it"));
+        free.retain(|&x| x != p);
+    }
+    let pos: Vec<i32> = (1..=6).map(|k| r.var(&format!("pos_statue{k}"))).collect();
+    assert_eq!(pos, atlantis2_engine::engine::FIGURINE_TARGETS);
+    assert_eq!(r.var("etat5statues"), 1);
+    assert!(tries > 6);
+    r.wait(2);
+    r.shot_as("pz-figurines-flow-laid.png");
+}
+
+/// View 7 (chapter 47 lines 27-33: film 23, chapter 48): the figurines
+/// alive; the sixth's coin taken with a click, then each of the five given
+/// a coin with a click: its disc (dialogs 281-298), one coin less.
+fn the_coins(r: &mut Run) {
+    let evs = r.walk(7);
+    assert!(films(&evs).contains(&23));
+    assert_eq!(r.chapter(), 48);
+    let sixth = r.obj("OB_FIG6HERBE");
+    let mut evs = r.click_on(false, sixth);
+    evs.extend(r.settle());
+    assert!(r.in_bag("PIECE5"));
+    r.stow();
+    for k in 1..=5 {
+        let coin = format!("PIECE{}", 6 - k);
+        let evs = r.give(&coin, &format!("FIGURINE{k}"));
+        let first = 281 + 4 * (k as u32 - 1);
+        assert_eq!(dialogs(&evs), [first, first + 1], "figurine {k}");
+        assert!(r.in_bag(&format!("DISQUE{k}")));
+        assert!(!r.in_bag(&coin));
+        assert_eq!(r.flag(149 + k as usize), 1);
+        r.stow();
+    }
+    r.shot_as("pz-figurines-flow-discs.png");
+}
+
+/// Views 10 (55), 11, 12, 13: the five discs laid on the axle's places in
+/// the order of the elements that make each other (disc k on place k:
+/// earth, metal, water, wood, fire): film 24, the bridge half lowered;
+/// then in the order of those that overcome each other (water, fire,
+/// metal, wood, earth: places 1-5 hold discs 3, 5, 2, 4, 1), by swaps:
+/// film 25, the bridge lowered.
+fn the_wheels(r: &mut Run) {
+    r.walk(10);
+    assert_eq!(r.chapter(), 55);
+    r.route(&[11, 12, 13]);
+    for k in 1..=5 {
+        let z = r.zone_named(&format!("AXE_5ROUES{k}"));
+        let evs = r.use_on(Some(&format!("DISQUE{k}")), z);
+        assert!(evs.contains(&Event::PuzzleRan {
+            function: 0x0048_d170
+        }));
+        if k == 5 {
+            assert!(films(&evs).contains(&24));
+        }
+    }
+    assert_eq!((r.var("findisque1"), r.var("findisque2")), (1, 0));
+    r.shot_as("pz-wheels-flow-first.png");
+    // Disc 1 taken from place 1, laid on 5 (disc 5 in hand), on 2 (disc
+    // 2), on 3 (disc 3), on 1.
+    let mut evs = Vec::new();
+    for p in [1, 5, 2, 3, 1] {
+        let z = r.zone_named(&format!("AXE_5ROUES{p}"));
+        evs = r.press_zone(z);
+    }
+    assert!(films(&evs).contains(&25));
+    let pos: Vec<i32> = (1..=5).map(|k| r.var(&format!("pos_roue{k}"))).collect();
+    assert_eq!(pos, [5, 3, 1, 4, 2]);
+    assert_eq!(r.var("findisque2"), 1);
+    r.shot_as("pz-wheels-flow-second.png");
+}
+
+/// Views 12, 14 (chapter 55 line 18: chapter 56), 15, 16: the arrow turned
+/// to the hunter with its zone (sound 201), view 17 (the fox woman saved:
+/// flags 162 and 164), 18, 30 (chapter 58).
+fn the_arrow(r: &mut Run) {
+    r.walk(12);
+    let evs = r.walk(14);
+    assert_eq!(r.chapter(), 56);
+    assert!(!evs.is_empty());
+    r.route(&[15, 16]);
+    let z = r.zone_named("CLIC_FL_CHASSEUR");
+    let evs = r.use_on(None, z);
+    assert_eq!(sounds(&evs), ["sound201.apc"]);
+    assert_eq!(r.var("TueChasseur"), 1);
+    r.shot_as("china-10-arrow.png");
+    r.route(&[17, 18, 30]);
+    assert_eq!((r.flag(162), r.flag(163), r.flag(164)), (1, 0, 1));
+    assert_eq!(r.chapter(), 58);
+}
+
+/// View 31: the dragon woken with a click, then the rounds answered as the
+/// pearl hides in the fixed order ABBAB ('A' behind the left cloud),
+/// waiting each time for the dragon to stop: the five low clouds raised
+/// (sounds 206-210), `FINPERLE`; the pearl with a hole taken, laid in the
+/// mechanism of view 32: film 26, view 19, chapter 59.
+fn the_pearl(r: &mut Run) {
+    let evs = r.walk(31);
+    assert!(evs.contains(&Event::PuzzleRan {
+        function: 0x0049_44a0
+    }));
+    assert_eq!(r.e.puzzle_mode(), 4);
+    let z = r.zone_named("CLIC_DRAGON");
+    r.use_on(None, z);
+    let mut heard = Vec::new();
+    for k in 0..5 {
+        r.until_still();
+        let left = b"ABBAB"[k % 5] == b'A';
+        assert_eq!(r.var("Perle_cachee"), if left { 0x41 } else { 0x42 });
+        let z = r.zone_named(if left {
+            "CLIC_NUAGE_GAUCHE"
+        } else {
+            "CLIC_NUAGE_DROITE"
+        });
+        r.aim(z);
+        r.tap();
+        let mut evs = r.events();
+        assert_eq!(r.var("Action_nuage_bas"), 1);
+        if k == 0 {
+            r.wait(6);
+            r.shot_as("pz-dragon-flow-cloud.png");
+        }
+        evs.extend(r.until_still());
+        heard.extend(sounds(&evs));
+    }
+    assert_eq!(
+        heard,
+        [
+            "sound206.apc",
+            "sound207.apc",
+            "sound208.apc",
+            "sound209.apc",
+            "sound210.apc"
+        ]
+    );
+    assert_eq!(r.var("FINPERLE"), 1);
+    r.shot_as("pz-dragon-flow-won.png");
+    r.take("PERLE_TROU");
+    let evs = r.walk(32);
+    assert!(evs.contains(&Event::PuzzleRan {
+        function: 0x0049_45f0
+    }));
+    assert_eq!(r.e.puzzle_mode(), 0);
+    let z = r.zone_named("MECANISME_DRAGON");
+    let evs = r.use_on(Some("PERLE_TROU"), z);
+    assert!(films(&evs).contains(&26));
+    assert_eq!((r.e.place(), r.chapter()), (("miniature.wam", 19), 59));
+}
+
+/// Views 20, 21, 22: the door of view 22 walked through three times (the
+/// first two bring the game back to view 22 with sound 217; the third
+/// plays film 28: the immortal, dialog 300); he is asked about the shadow
+/// (dialog 301, film 29, flag 169: the labyrinth's door open).
+fn the_door(r: &mut Run) {
+    r.route(&[20, 21, 22]);
+    for n in 1..=3 {
+        let evs = r.walk_redirected(122);
+        assert_eq!(r.e.place(), ("miniature.wam", 22));
+        assert_eq!(r.var("nbpassageporte"), n);
+        if n < 3 {
+            assert!(sounds(&evs).contains(&"sound217.apc".to_string()));
+        } else {
+            assert!(films(&evs).contains(&28));
+            assert!(dialogs(&evs).contains(&300));
+        }
+    }
+    assert!(r.shown(true, "IMMORTEL"));
+    r.shot_as("china-11-immortal.png");
+    assert_eq!(r.ask("IMMORTEL", "OMBRE"), 301);
+    assert_eq!(r.flag(169), 1);
+}
+
+/// The labyrinth: view 23 (chapter 59's `NEXTVUE`: view 123), its link
+/// (`labysol.wam` view 3, chapter 60, the souls); the buffalo asked about
+/// the mushroom (dialog 316: the empty form); the fox woman of view 21 met
+/// with an empty hand (dialog 345: her fan); the fan read in the bag (its
+/// three symbols, the demons in their order); each of those demons given
+/// the form (their stamp, a special event, the stamped form back);
+/// the buffalo given the third form: dialog 322, the mushroom (flag 173).
+fn the_forms(r: &mut Run) {
+    r.walk_redirected(23);
+    assert_eq!(r.e.place(), ("miniature.wam", 123));
+    r.walk_link();
+    assert_eq!((r.e.place(), r.chapter()), (("labysol.wam", 3), 60));
+    assert_eq!(r.e.puzzle_mode(), 3);
+    assert_eq!(r.ask("DEMON_BUFFLE", "CHAMPIGNON"), 316);
+    assert!(r.in_bag("FORMULAIRE_VIDE"));
+    r.shot_as("pz-labyrinth-flow-buffalo.png");
+    r.go_laby("labysol.wam", 21);
+    r.stow();
+    let mut evs = r.click_moving("FEMME_RENARDE");
+    evs.extend(r.settle());
+    assert!(dialogs(&evs).contains(&345));
+    assert!(r.in_bag("EVENTAIL"));
+    // The fan read: its three symbols, the demons' stamps in order.
+    let fan = r.obj("EVENTAIL");
+    r.choose(fan);
+    let frames = r.form_frames();
+    let order: Vec<usize> = frames[1..]
+        .iter()
+        .map(|&f| (1..=6).find(|&v| FORM_FRAMES[v] == f).unwrap())
+        .collect();
+    assert_eq!(order.len(), 3);
+    r.shot_as("pz-labyrinth-flow-fan.png");
+    r.close_overlay();
+    r.stow();
+    // The demons by their stamp's number, where they take the form.
+    const DEMONS: [(&str, &str, u32); 6] = [
+        ("DEMON_DOGUE", "labysol.wam", 12),
+        ("DEMON_COCHON", "labysol.wam", 19),
+        ("DEMON_RAT", "labysol.wam", 25),
+        ("DEMON_LAPIN", "labyplaf.wam", 57),
+        ("DEMON_CHEVRE", "labyplaf.wam", 51),
+        ("DEMON_CHEVAL", "labyplaf.wam", 33),
+    ];
+    let forms = [
+        "FORMULAIRE_VIDE",
+        "FORMULAIRE_1",
+        "FORMULAIRE_2",
+        "FORMULAIRE_3",
+    ];
+    for (k, &v) in order.iter().enumerate() {
+        let (name, place, view) = DEMONS[v - 1];
+        r.go_laby(place, view);
+        let form = r.obj(forms[k]);
+        if r.var("OBJETENMAIN") != form {
+            // A form picked from the bar opens its overlay; the click that
+            // closes it gives it back to the hand.
+            r.choose(form);
+            r.close_overlay();
+        }
+        assert_eq!(r.var("OBJETENMAIN"), form);
+        r.click_moving(name);
+        let next = r.obj(forms[k + 1]);
+        for _ in 0..6000 {
+            if r.e.loop_type == LoopType::Dialog {
+                r.listen();
+            }
+            if r.var("OBJETENMAIN") == next && r.e.loop_type == LoopType::Warp {
+                break;
+            }
+            r.events();
+        }
+        assert_eq!(r.var("OBJETENMAIN"), next, "{name}");
+        assert_eq!(r.var(&format!("essai_laby{}", k + 1)), v as i32);
+        r.settle();
+        if k == 0 {
+            r.shot_as("pz-labyrinth-flow-stamp.png");
+        }
+    }
+    r.stow();
+    r.go_laby("labysol.wam", 3);
+    let evs = r.give("FORMULAIRE_3", "DEMON_BUFFLE");
+    assert_eq!(dialogs(&evs), [322]);
+    assert_eq!(r.flag(173), 1);
+    assert!(r.in_bag("CHAMPIGNON"));
+    r.stow();
+    r.shot_as("pz-labyrinth-flow-mushroom.png");
+}
+
+/// Out of the labyrinth by view 3's link (chapter 60: chapter 59, view
+/// 123), view 22: the immortal given the mushroom (dialog 315, film 30):
+/// the lantern (flag 177).
+fn the_lantern(r: &mut Run) {
+    r.walk_link();
+    assert_eq!((r.e.place(), r.chapter()), (("miniature.wam", 123), 59));
+    r.walk(22);
+    let evs = r.give("CHAMPIGNON", "IMMORTEL");
+    assert!(dialogs(&evs).contains(&315));
+    assert!(films(&evs).contains(&30));
+    assert!(r.in_bag("LANTERNE"));
+    assert_eq!(r.flag(177), 1);
+    r.stow();
+    r.shot_as("china-12-lantern.png");
+}
+
+/// The Chinese chapters a game goes through (45 only with the second monk,
+/// 57 is named by no `chapter=` line).
+const CHINESE_CHAPTERS: [i32; 11] = [42, 43, 44, 46, 47, 48, 55, 56, 58, 59, 60];
+
+/// Each chapter of `chapters` was left as its script leaves it: one of its
+/// own `/set(chapter=..)` lines ran (the events' chapter and line).
+fn chapters_ended(e: &Engine, evs: &[Event], chapters: &[i32]) {
+    for &c in chapters {
+        let text = e
+            .files()
+            .read(atlantis2_data::Folder::Scenar, &format!("chapi{c:03}.con"))
+            .unwrap();
+        let ends: Vec<usize> = text
+            .split(|&b| b == b'\n')
+            .enumerate()
+            .filter(|(_, l)| {
+                let l = String::from_utf8_lossy(l).trim().to_ascii_lowercase();
+                l.starts_with("/set(chapter=")
+            })
+            .map(|(i, _)| i + 1)
+            .collect();
+        assert!(!ends.is_empty());
+        assert!(
+            evs.iter()
+                .any(|x| matches!(x, Event::Set { chapter, line } if *chapter == c && ends.contains(line))),
+            "chapter {c} never left by its script (lines {ends:?})"
+        );
+    }
+}
+
+/// The way back with the lantern: views 21, 20, 19, 130, 31 (chapter 58),
+/// 32: the pearl taken back from the mechanism and laid again (film 27:
+/// view 18, chapter 56), views 17, 16, 15, 14, 12 (55), 11, 10, 7 (48), 6
+/// (film 34, 47), 3, 1 and its link to the turtle room (chapter 46), the
+/// walk to view 40 and its link to `chine.wam` view 32: chapter 46's end
+/// of China (films 32 and 33, dialogs 346 and 347), Tibet's view 7,
+/// chapter 75, China's mandala in the bag.
+fn china_way_back(r: &mut Run) -> Vec<Event> {
+    r.route(&[21, 20, 19, 130, 31]);
+    assert_eq!(r.chapter(), 58);
+    r.walk(32);
+    let z = r.zone_named("MECANISME_DRAGON");
+    r.use_on(None, z);
+    assert!(r.in_bag("PERLE_TROU"));
+    let evs = r.press_zone(z);
+    assert!(films(&evs).contains(&27));
+    assert_eq!((r.e.place(), r.chapter()), (("miniature.wam", 18), 56));
+    r.route(&[17, 16, 15, 14, 12]);
+    assert_eq!(r.chapter(), 55);
+    r.route(&[11, 10, 7]);
+    assert_eq!(r.chapter(), 48);
+    r.route(&[6, 3, 1]);
+    assert_eq!(r.chapter(), 47);
+    r.walk_link();
+    assert_eq!((r.e.place(), r.chapter()), (("salletortue.wam", 47), 46));
+    r.go(40, &[]);
+    let evs = r.walk_link();
+    assert!(films(&evs).contains(&32) && films(&evs).contains(&33));
+    let d = dialogs(&evs);
+    assert!(d.contains(&346) && d.contains(&347));
+    evs
+}
+
+/// A game from the start-up intro through the whole of China and back,
+/// with the mouse only (the view turned by mouse moves, every action a
+/// click, every object picked from the bag bar, every subject through the
+/// menus): [`to_china`], then China's story as its chapters 42-60 make it
+/// ([`CHINA`], stage by stage: the shadow and the abbot, the turtle room
+/// and its walk, the chest and the incense, the figurines, their coins and
+/// the five wheels, the arrow, the pearl and the dragon, the door and the
+/// immortal, the labyrinth's forms, the lantern), every puzzle solved as a
+/// player does, and the way back with the lantern to Tibet. Every chapter
+/// it goes through is left by one of its own `chapter=` lines, every
+/// Chinese puzzle hook runs and none is noted, and every Chinese `/set`
+/// line reported is one the original runs.
+#[test]
+fn the_whole_of_china_with_the_mouse() {
+    if game().is_none() {
+        return;
+    }
+    let dir = scratch("a2-flow-china-whole");
+    let mut r = Run::new(&dir);
+    to_china(&mut r);
+    for (name, stage) in CHINA {
+        stage(&mut r);
+        assert_eq!(r.e.loop_type, LoopType::Warp, "after {name}");
+        if *name == "the wheels" {
+            r = saved_and_continued(r, &dir);
+        }
+    }
+    china_way_back(&mut r);
+    r.wait(10);
+    r.shot_as("china-13-back-in-tibet.png");
+    assert_eq!(r.e.place(), ("tibet.wam", 7));
+    assert_eq!((r.chapter(), r.var("MONDE")), (75, 5));
+    assert_eq!(r.var("isChineFinished"), 1);
+    assert!(r.in_bag("MANDALA_CHINE"));
+    let journal = std::mem::take(&mut r.journal);
+    china_lines_as_the_original(&journal);
+    chapters_ended(&r.e, &journal, &CHINESE_CHAPTERS);
+    assert!(!journal
+        .iter()
+        .any(|e| matches!(e, Event::PuzzleNotPorted { .. })));
+    for function in [
+        0x0048_d680u32,
+        0x0048_da20,
+        0x0049_38f0,
+        0x0049_3960,
+        0x0048_d080,
+        0x0048_d170,
+        0x0049_44a0,
+        0x0049_4600,
+        0x0049_45f0,
+        0x0049_c340,
+        0x0049_c290,
+        0x0049_c400,
+        0x0048_df10,
+    ] {
+        assert!(
+            journal.contains(&Event::PuzzleRan { function }),
+            "FUN_{function:08x} never ran"
+        );
+    }
+}
+
+/// The game saved through the menus (Escape, the disc, save, yes) and
+/// continued from the player menu of a new run: the place, the disc, the
+/// chapter, the bag, the puzzles' state and the story as they were.
+fn saved_and_continued(mut r: Run, dir: &Path) -> Run {
+    let kept = |r: &Run| {
+        let s = r.e.script_state().unwrap();
+        let pos: Vec<i32> = (1..=5).map(|k| r.var(&format!("pos_roue{k}"))).collect();
+        format!(
+            "chapter {} place {:?} disc {} monde {} mode {} wheels {pos:?} flags {:?} bag {:?}",
+            s.chapter,
+            r.e.place(),
+            r.e.files().current_disc(),
+            r.var("MONDE"),
+            r.e.puzzle_mode(),
+            &s.flags[130..180],
+            s.bag,
+        )
+    };
+    let before = kept(&r);
+    r.disc_panel();
+    r.press_widget("a_save.spr");
+    r.press_widget("b_oui.spr");
+    assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
+    let journal = std::mem::take(&mut r.journal);
+    let mut r = Run::new(dir);
+    r.journal = journal;
+    r.e.open_player_menu();
+    r.wait(5);
+    r.press_widget("b_ter.spr");
+    assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
+    assert_eq!(kept(&r), before);
+    r.wait(30);
+    r
+}
+
+/// A tool more than a test (ignored): China's stages played one by one,
+/// each from the save the previous one left (`A2_DEV_DIR`, `A2_DEV_FROM`,
+/// `A2_DEV_TO`; stage `CHINA.len()` is the way back), for working on them.
+#[test]
+#[ignore]
+fn china_stages_from_saves() {
+    if game().is_none() {
+        return;
+    }
+    let dir = PathBuf::from(std::env::var("A2_DEV_DIR").unwrap());
+    std::fs::create_dir_all(&dir).unwrap();
+    let env = |k: &str, d: usize| {
+        std::env::var(k)
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(d)
+    };
+    let from = env("A2_DEV_FROM", 0);
+    let to = env("A2_DEV_TO", CHINA.len() + 1);
+    if from == 0 {
+        // A new game: no save for the player menu to continue.
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+    }
+    let mut r = Run::new(&dir);
+    r.e.player_number = 4;
+    if from == 0 {
+        to_china(&mut r);
+        assert!(r.e.save_slot(0));
+    } else {
+        r.e.load_slot(from as u8).unwrap();
+        r.wait(30);
+    }
+    for i in from..to {
+        eprintln!(
+            "stage {i}: pass {} place {:?} chapter {}",
+            r.pass,
+            r.e.place(),
+            r.chapter()
+        );
+        match CHINA.get(i) {
+            Some((_, stage)) => {
+                stage(&mut r);
+                assert!(r.e.save_slot((i + 1) as u8));
+            }
+            None => {
+                china_way_back(&mut r);
+            }
+        }
+    }
+    eprintln!(
+        "done: pass {} place {:?} chapter {}",
+        r.pass,
+        r.e.place(),
+        r.chapter()
+    );
+    let journal = std::mem::take(&mut r.journal);
+    china_lines_as_the_original(&journal);
 }
