@@ -713,8 +713,9 @@ event, the gong's way back to Tibet) into `china-*.png`.
   window's side in `a2.rs`, `Picture`): the first game's
   [HD mode](#hd-mode), its layer, options, panorama filters and
   composition reused (`atlantis_engine::hd`, `atlantis_engine::upscale`).
-  It is `Enhancements::hd` (off by default, and with `--original`),
-  turned on by `--hd`, with the widescreen option by `--widescreen`
+  It is `Enhancements::hd` (off by default; `--original`, which turns the
+  bug fixes off, leaves it as `settings.ini` has it, as the first game's
+  `--original` leaves its graphics mode), turned on by `--hd`, with the widescreen option by `--widescreen`
   (`hd_options.widescreen`), or by the options menu (F10, below), which
   keeps it in Atlantis II's `settings.ini`. With
   it off the engine does none of this. With it on, the engine's 640x480
@@ -724,8 +725,10 @@ event, the gong's way back to Tibet) into `china-*.png`.
   window's resolution from the same faces (the place animations in them)
   and the same camera floats, with the 640x480 cube it stands for (the
   layer's `base`). The size is the first game's: 40 x 30 tiles of the
-  picture's width / 40 pixels rounded up, at most 64 (2560x1920); in a
-  window up to 1280x960 the picture is the original's scaled.
+  picture's width / 40 pixels rounded up, at most 64 (2560x1920), drawn
+  whenever the window's 4:3 picture is wider than 640 pixels (tile above
+  16: the default 1280x960 window has it at tile 32); a picture of
+  640x480 or less is the original's.
   The view evaluates the original's projection at each of its pixels: the
   original projects a camera point to sx = fx·x/z + cx, sy = fy·y/z + cy
   (fx = fy = 640 / (2 tan 38°) = 409.58, (cx, cy) = (320, 240),
@@ -769,20 +772,27 @@ event, the gong's way back to Tibet) into `china-*.png`.
   (`window_to_screen`: ⌊(x − ox)·640 / dw⌋, the compositor's nearest map),
   so a click in the menus, the bar or the subject menu lands on the
   original's pixel (a test checks every pixel of six window sizes).
-  Timings (release, Intel i7-9700K, 8 cores; `cargo test --release -p
-  atlantis2-engine --test hd -- --ignored --nocapture hd_timings`, and the
-  headless runs `--size 1920x1080 --headless`):
+  Timings (release, Intel i7-9700K, 8 cores, nothing else running; the
+  headless run `--hd` or `--widescreen`, `--size <w>x<h> --command
+  "(monde=3)(changewam=chine.wam)(vue=10)" --headless <game> 300`, China's
+  view 10, the middle of three runs; a frame is the pass, which draws the
+  view, and the window's composition):
 
   | | 1920x1080 | 1920x1080 widescreen | 2560x1440 | 2560x1440 widescreen |
   |---|---|---|---|---|
-  | HD view (bicubic, the faces' update included) | 5.8 ms (1440x1080) | 7.3 ms (1944x1080) | 8.7 ms (1920x1440) | 11.3 ms (2592x1440) |
-  | engine pass with the view | 7 ms | 8.5 ms | 10 ms | 12.5 ms |
-  | composition | 1.7 ms | 1.8 ms | 2.6 ms | 2.9 ms |
-  | frame | 8.7 ms | 10.3 ms | 12.6 ms | 15.4 ms |
+  | HD view (in the pass) | 6.0 ms (1440x1080) | 7.6 ms (1944x1080) | 9.6 ms (1920x1440) | 12.5 ms (2592x1440) |
+  | engine pass with the view | 7.1 ms | 8.6 ms | 10.7 ms | 13.6 ms |
+  | composition | 1.9 ms | 2.1 ms | 3.6 ms | 3.9 ms |
+  | frame | 8.9 ms | 10.7 ms | 14.3 ms | 17.5 ms |
+  | slowest frame (the view's first) | 30 ms | 33 ms | 40 ms | 45 ms |
 
-  The faces' preparation for a new view takes 13 ms (bicubic; 4.9 ms
-  bilinear), so the first frame of a view takes 30 to 50 ms; then a frame
-  where nothing changed 0.4 ms, a sprite's frame 1.6 ms. The view is
+  Without the HD mode the same run takes 1.0 ms a pass and 1.1 ms to
+  scale the picture to a 1920x1080 window. The ignored test `cargo test
+  --release -p atlantis2-engine --test hd -- --ignored --nocapture
+  hd_timings` times the view alone on synthetic faces, and the faces'
+  preparation: 13 ms for a new view (bicubic; 4.9 ms bilinear), hence
+  the first frame of a view's 30 to 45 ms; then 0.4 ms when nothing
+  changed, 1.6 ms for a sprite's frame. The view is
   computed in blocks of 64 columns by 32 rows, shared out among the cores
   (one on the web); the projection and the face choice take about a third
   of it, the bilinear sampling the rest. A frame's HD pass is printed by
@@ -2031,8 +2041,15 @@ event, the gong's way back to Tibet) into `china-*.png`.
   640 x 480 viewport, is the same). At 800 wide the menus' dimmed backdrop
   is black (`FUN_00470430`). Each mode change sets the camera again
   (centre, 76° for the size drawn, under the x87 control word of the
-  moment); at 640 x 480, where the size never changes, the port does
-  nothing of this. The surface changes between passes (a change in the
+  moment). The original does this at 640 x 480 too, at every loop type
+  change (`FUN_00402960`); the port does it only at 800 x 600 (and when
+  the size changes), so that the 640 x 480 game stays as it was. The two
+  differ only if a loop type change finds the camera with another centre
+  or field of view: after a dialog that ends on another speaker's line
+  with a `[Focale]` field of view (the end, @ 0x004808a0, sets 76° again
+  only after a hero's line), when the panorama follows in the same view
+  (a new view sets 76°). Not checked yet against the original: a
+  possible difference. The surface changes between passes (a change in the
   middle of a pass takes effect at the next one; a film started by a
   panorama frame has its first frame enlarged at once). The window
   scales the 800 x 600 picture as it scales the 640 x 480 one, and a
@@ -2046,8 +2063,10 @@ event, the gong's way back to Tibet) into `china-*.png`.
   1.2 to 1.4 ms to scale the picture to the window.
 - **Options menu and settings** (`crates/atlantis2-engine/src/options_menu.rs`,
   `settings.rs`; the window's side in `crates/atlantis-app/src/a2.rs`):
-  F10 (or O) opens the first game's options menu, with its box, font,
-  colours, keys and mouse: Graphics (Original or HD), the HD options
+  F10 (or O) opens the first game's options menu: its box, font,
+  colours, keys and mouse are the same code
+  (`atlantis_engine::options_menu::MenuBox`, which the first game's menu
+  is drawn with too), Atlantis II giving its own rows: Graphics (Original or HD), the HD options
   (panorama filter, sharpening, interface, widescreen, the bars beside the
   videos: black or blurred; greyed in the original graphics), Screen (640
   x 480 or 800 x 600, the original's option above; greyed in HD), Fix

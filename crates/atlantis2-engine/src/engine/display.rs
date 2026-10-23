@@ -1,7 +1,8 @@
 //! The engine's part of the 800 x 600 mode ([`crate::display`]): the
 //! screen size from `atlant2.cfg`, the mode of each loop type, the frame
 //! drawn on the 640 x 480 surface and enlarged. At 640 x 480 nothing of
-//! this changes what the engine does.
+//! this changes what the engine does (not even the camera reset the
+//! original does at each loop type change: see `apply_mode`).
 
 use super::{Engine, LoopType};
 use crate::camera::WARP_FOV;
@@ -65,7 +66,11 @@ impl Engine {
     /// the 640 x 480 surface; the warp camera set for the logical size:
     /// centre (W / 2, H / 2) (FUN_004a48f0), 76° across (FUN_004a4950 with
     /// the float π times the double 76 / 180, the constant `WARP_FOV`).
-    /// At 640 x 480, where the size never changes, nothing is done.
+    /// The original sets the camera at every loop type change, at 640 x
+    /// 480 too; the port does it only at 800 x 600 or when the size
+    /// changes, so that the 640 x 480 game stays as it was (a possible
+    /// difference after a dialog ending on another speaker's line with a
+    /// `[Focale]` field of view, not checked yet).
     fn apply_mode(&mut self, native: bool) {
         self.display.native = native;
         let logical = self.display.logical_size();

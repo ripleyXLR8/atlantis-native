@@ -48,6 +48,21 @@ pub fn rgb565_to_rgb(p: u16) -> [u8; 3] {
     ]
 }
 
+/// [`rgb565_to_rgb`] of every RGB565 value, as XRGB8888: the window's
+/// colours in the original graphics (the HD mode's composition has the
+/// first game's, `atlantis_engine::hd::rgb565_to_888`).
+pub fn rgb565_to_xrgb() -> &'static [u32] {
+    static LUT: std::sync::OnceLock<Vec<u32>> = std::sync::OnceLock::new();
+    LUT.get_or_init(|| {
+        (0..=u16::MAX)
+            .map(|p| {
+                let [r, g, b] = rgb565_to_rgb(p);
+                (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b)
+            })
+            .collect()
+    })
+}
+
 /// A PNG file of a `width` x `height` RGB565 picture.
 pub fn encode_rgb565(pixels: &[u16], width: usize, height: usize) -> Vec<u8> {
     assert!(pixels.len() >= width * height);

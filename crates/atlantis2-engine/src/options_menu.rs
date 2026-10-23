@@ -1,7 +1,7 @@
-//! The port's options menu for Atlantis II (F10 or O), the first game's
-//! (`atlantis_engine::options_menu`): the same box, font, colours, keys
-//! and mouse, drawn by the front end over the frame shown while the game
-//! is paused. Settings of the port that the original's menus do not have,
+//! The port's options menu for Atlantis II (F10 or O), on the first
+//! game's options box (`atlantis_engine::options_menu::MenuBox`: its
+//! layout, font, colours, keys and mouse), drawn by the front end over the
+//! frame shown while the game is paused. Settings of the port that the original's menus do not have,
 //! and the original's own 800 x 600 screen, which its options page also
 //! switches.
 //!
@@ -11,7 +11,8 @@
 //! from the 640 x 480 screen), the minor bug fixes
 //! ([`Enhancements::minor_bug_fixes`]), Close.
 
-use atlantis_engine::hd::{HdText, PanoFilter, TextItem, VideoSides};
+use atlantis_engine::hd::{HdText, PanoFilter, VideoSides};
+use atlantis_engine::options_menu::{BoxInput, MenuBox, Row};
 use atlantis_engine::subtitles::SubtitleFont;
 use atlantis_engine::sys::Key;
 
@@ -90,27 +91,13 @@ impl MenuValues {
     }
 }
 
-const BOX_W: i32 = 400;
-const ROW_H: i32 = 24;
-const TITLE_H: i32 = 34;
-/// The footer: two lines on the game and the port, the selected entry's
-/// description, the keys.
-const FOOTER_H: i32 = 86;
-
-// The first game's menu colours (RGB565).
-const BG: u16 = 0x18e3;
-const BORDER: u16 = 0xbdf7;
-const HIGHLIGHT: u16 = 0x3a0c;
-const TEXT: u16 = 0xffff;
-const DIM: u16 = 0x9cf3;
-const GREYED: u16 = 0x632c;
-const SELECTED: u16 = 0xffe0;
+#[cfg(test)]
+use atlantis_engine::options_menu::{BG, BOX_W, GREYED, ROW_H, SELECTED, TEXT, TITLE_H};
 
 /// The menu's state.
 #[derive(Debug, Default)]
 pub struct OptionsMenu {
-    open: bool,
-    selected: usize,
+    menu: MenuBox,
     /// Shown at the foot of the menu: the game's release, the port's
     /// version (set by the front end).
     info: Vec<String>,
@@ -127,30 +114,31 @@ impl OptionsMenu {
     }
 
     pub fn is_open(&self) -> bool {
-        self.open
+        self.menu.is_open()
     }
 
     pub fn open(&mut self) {
-        self.open = true;
-        self.selected = 0;
+        self.menu.open();
     }
 
     pub fn close(&mut self) {
-        self.open = false;
+        self.menu.close();
     }
 
     /// The selected entry.
     pub fn selected(&self) -> Entry {
-        ENTRIES[self.selected]
+        ENTRIES[self.menu.selected()]
     }
 
+    #[cfg(test)]
     fn box_h() -> i32 {
-        TITLE_H + ENTRIES.len() as i32 * ROW_H + FOOTER_H
+        MenuBox::box_h(ENTRIES.len())
     }
 
     /// The box's top left corner on a `w` x `h` screen (centred).
+    #[cfg(test)]
     fn origin(w: usize, h: usize) -> (i32, i32) {
-        ((w as i32 - BOX_W) / 2, (h as i32 - Self::box_h()) / 2)
+        MenuBox::origin(ENTRIES.len(), w, h)
     }
 
     fn activate(&mut self, entry: Entry, v: MenuValues) -> MenuAction {
@@ -208,15 +196,65 @@ impl OptionsMenu {
         }
     }
 
-    /// The next entry from the selected one that can be changed.
-    fn step(&mut self, forward: bool, v: MenuValues) {
-        let n = ENTRIES.len();
-        let dir = if forward { 1 } else { n - 1 };
-        for _ in 0..n {
-            self.selected = (self.selected + dir) % n;
-            if v.enabled(ENTRIES[self.selected]) {
-                break;
-            }
+    /// The rows the box shows for the values `v`.
+    fn rows(v: MenuValues) -> Vec<Row<'static>> {
+        let on = |b: bool| if b { "On" } else { "Off" };
+        let x = v.enhancements;
+        ENTRIES
+            .iter()
+            .map(|&e| {
+                let (label, value) = match e {
+                    Entry::Graphics => ("Graphics", Some(if x.hd { "HD" } else { "Original" })),
+                    Entry::PanoramaFilter => (
+                        "Panorama filter",
+                        Some(match x.hd_options.panorama {
+                            PanoFilter::Bilinear => "Bilinear",
+                            PanoFilter::Bicubic => "Bicubic",
+                        }),
+                    ),
+                    Entry::Sharpen => ("Panorama sharpening", Some(on(x.hd_options.sharpen))),
+                    Entry::Interface => (
+                        "Interface",
+                        Some(if x.hd_options.smooth_interface {
+                            "Smooth"
+                        } else {
+                            "Pixels"
+                        }),
+                    ),
+                    Entry::Widescreen => ("Widescreen", Some(on(x.hd_options.widescreen))),
+                    Entry::VideoSides => (
+                        "Video sides",
+                        Some(match x.hd_options.video_sides {
+                            VideoSides::Blur => "Blurred",
+                            _ => "Black",
+                        }),
+                    ),
+                    Entry::Screen => (
+                        "Screen",
+                        Some(if v.screen_800 {
+                            "800 x 600"
+                        } else {
+                            "640 x 480"
+                        }),
+                    ),
+                    Entry::BugFixes => ("Fix original bugs", Some(on(x.minor_bug_fixes))),
+                    Entry::Close => ("Close", None),
+                };
+                Row {
+                    label,
+                    value,
+                    enabled: v.enabled(e),
+                }
+            })
+            .collect()
+    }
+
+    /// What the box's input `input` does.
+    fn act(&mut self, input: BoxInput, v: MenuValues) -> MenuAction {
+        match input {
+            BoxInput::None => MenuAction::None,
+            BoxInput::Close => MenuAction::Close,
+            BoxInput::Activate(i) => self.activate(ENTRIES[i], v),
         }
     }
 
@@ -224,60 +262,21 @@ impl OptionsMenu {
     /// (skipping the greyed ones), Enter / Space (and Left / Right on a
     /// setting) change it, Escape, F10 and O close the menu.
     pub fn key(&mut self, key: Key, v: MenuValues) -> MenuAction {
-        match key {
-            Key::Escape | Key::F(10) | Key::Char('o' | 'O') => {
-                self.close();
-                MenuAction::Close
-            }
-            Key::Up => {
-                self.step(false, v);
-                MenuAction::None
-            }
-            Key::Down => {
-                self.step(true, v);
-                MenuAction::None
-            }
-            Key::Enter | Key::Space => self.activate(self.selected(), v),
-            Key::Left | Key::Right if self.selected() != Entry::Close => {
-                self.activate(self.selected(), v)
-            }
-            _ => MenuAction::None,
-        }
-    }
-
-    /// The entry under a point of a `w` x `h` screen.
-    fn entry_at(&self, x: i32, y: i32, w: usize, h: usize) -> Option<usize> {
-        let (bx, by) = Self::origin(w, h);
-        if !(bx..bx + BOX_W).contains(&x) {
-            return None;
-        }
-        let r = y - (by + TITLE_H);
-        (r >= 0 && r < ENTRIES.len() as i32 * ROW_H).then_some((r / ROW_H) as usize)
+        let input = self.menu.key(key, &Self::rows(v));
+        self.act(input, v)
     }
 
     /// The pointer moved to a point of a `w` x `h` screen: the entry under
     /// it is selected.
     pub fn pointer(&mut self, x: i32, y: i32, w: usize, h: usize) {
-        if let Some(i) = self.entry_at(x, y, w, h) {
-            self.selected = i;
-        }
+        self.menu.pointer(ENTRIES.len(), x, y, w, h);
     }
 
     /// A click at a point of a `w` x `h` screen: the entry under it
     /// changes; outside the box the menu closes.
     pub fn click(&mut self, x: i32, y: i32, w: usize, h: usize, v: MenuValues) -> MenuAction {
-        if let Some(i) = self.entry_at(x, y, w, h) {
-            self.selected = i;
-            return self.activate(ENTRIES[i], v);
-        }
-        let (bx, by) = Self::origin(w, h);
-        let inside = (bx..bx + BOX_W).contains(&x) && (by..by + Self::box_h()).contains(&y);
-        if inside {
-            MenuAction::None
-        } else {
-            self.close();
-            MenuAction::Close
-        }
+        let input = self.menu.click(ENTRIES.len(), x, y, w, h);
+        self.act(input, v)
     }
 
     /// Draws the menu over a `w` x `h` RGB565 frame, centred.
@@ -296,103 +295,9 @@ impl OptionsMenu {
         v: MenuValues,
         record: Option<&mut HdText>,
     ) {
-        let (bx, by) = Self::origin(w, h);
-        let bh = Self::box_h();
-        let mut fill = |x: i32, y: i32, fw: i32, fh: i32, c: u16| {
-            for yy in y.max(0)..(y + fh).min(h as i32) {
-                for xx in x.max(0)..(x + fw).min(w as i32) {
-                    screen[yy as usize * w + xx as usize] = c;
-                }
-            }
-        };
-        fill(bx - 1, by - 1, BOX_W + 2, bh + 2, BORDER);
-        fill(bx, by, BOX_W, bh, BG);
-        let sel_y = by + TITLE_H + self.selected as i32 * ROW_H;
-        fill(bx + 6, sel_y, BOX_W - 12, ROW_H - 2, HIGHLIGHT);
-        let mut items = Vec::new();
-        let mut text = |t: &str, x: i32, y: i32, c: u16| {
-            items.push(TextItem {
-                x,
-                y,
-                max_w: BOX_W - 20,
-                color: c,
-                text: t.as_bytes().to_vec(),
-                bitmap: None,
-                code_page: atlantis_data::TextCodePage::Windows1252,
-                face: None,
-            });
-        };
-        let centre = |t: &str| bx + (BOX_W - font.width(t.as_bytes())) / 2;
-        let right = |t: &str| bx + BOX_W - 16 - font.width(t.as_bytes());
-        let on = |b: bool| if b { "On" } else { "Off" };
-        let t = "Atlantis Native options";
-        text(t, centre(t), by + 10, TEXT);
-        let x = v.enhancements;
-        for (i, &e) in ENTRIES.iter().enumerate() {
-            let y = by + TITLE_H + i as i32 * ROW_H;
-            let c = match (v.enabled(e), i == self.selected) {
-                (false, _) => GREYED,
-                (true, true) => SELECTED,
-                (true, false) => TEXT,
-            };
-            let (label, value) = match e {
-                Entry::Graphics => ("Graphics", if x.hd { "HD" } else { "Original" }),
-                Entry::PanoramaFilter => (
-                    "Panorama filter",
-                    match x.hd_options.panorama {
-                        PanoFilter::Bilinear => "Bilinear",
-                        PanoFilter::Bicubic => "Bicubic",
-                    },
-                ),
-                Entry::Sharpen => ("Panorama sharpening", on(x.hd_options.sharpen)),
-                Entry::Interface => (
-                    "Interface",
-                    if x.hd_options.smooth_interface {
-                        "Smooth"
-                    } else {
-                        "Pixels"
-                    },
-                ),
-                Entry::Widescreen => ("Widescreen", on(x.hd_options.widescreen)),
-                Entry::VideoSides => (
-                    "Video sides",
-                    match x.hd_options.video_sides {
-                        VideoSides::Blur => "Blurred",
-                        _ => "Black",
-                    },
-                ),
-                Entry::Screen => (
-                    "Screen",
-                    if v.screen_800 {
-                        "800 x 600"
-                    } else {
-                        "640 x 480"
-                    },
-                ),
-                Entry::BugFixes => ("Fix original bugs", on(x.minor_bug_fixes)),
-                Entry::Close => {
-                    text("Close", centre("Close"), y + 4, c);
-                    continue;
-                }
-            };
-            text(label, bx + 16, y + 4, c);
-            let t = format!("< {value} >");
-            text(&t, right(&t), y + 4, c);
-        }
-        for (i, line) in self.info.iter().take(2).enumerate() {
-            text(line, centre(line), by + bh - 82 + i as i32 * 18, DIM);
-        }
         let d = Self::description(self.selected(), v);
-        text(d, centre(d), by + bh - 44, TEXT);
-        let k = "Arrows, Enter or click; Escape, F10 or O closes";
-        text(k, centre(k), by + bh - 22, DIM);
-        let under = record.as_ref().map(|_| screen.to_vec());
-        for it in &items {
-            font.draw(screen, w, h, &it.text, it.x, it.y, it.max_w, it.color);
-        }
-        if let (Some(t), Some(under)) = (record, under) {
-            t.set(items, &under, screen);
-        }
+        self.menu
+            .draw_recording(screen, w, h, font, &Self::rows(v), &self.info, d, record);
     }
 }
 

@@ -1151,10 +1151,11 @@ impl Picture {
 
     /// The original graphics: the screen (640 x 480 or 800 x 600) scaled
     /// to the 4:3 picture of a `width` x `height` window (nearest pixel,
-    /// black bars).
+    /// black bars), its colours [`atlantis2_engine::png::rgb565_to_rgb`]'s
+    /// (as before the HD mode).
     fn scale(screen: &[u16], out: &mut [u32], width: usize, height: usize) {
         let (ox, oy, dw, dh) = picture_rect(width, height);
-        let lut = atlantis2_engine::hd::rgb565_to_888();
+        let lut = atlantis2_engine::png::rgb565_to_xrgb();
         let (w, h) = screen_dims(screen);
         let cols: Vec<usize> = (0..dw).map(|x| x * w / dw).collect();
         for y in 0..dh {
@@ -1242,10 +1243,47 @@ mod tests {
         // The non-HD picture of an 800 x 600 screen fills the 4:3 window.
         let screen: Vec<u16> = (0..800 * 600).map(|i| (i % 800) as u16).collect();
         let mut out = vec![0u32; 1600 * 1200];
-        let lut = atlantis2_engine::hd::rgb565_to_888();
+        let lut = atlantis2_engine::png::rgb565_to_xrgb();
         Picture::scale(&screen, &mut out, 1600, 1200);
         assert_eq!(out[0], lut[0]);
         assert_eq!(out[1599], lut[799]);
         assert_eq!(out[1200 * 1600 - 2], lut[799]);
+    }
+
+    /// Without the HD mode the window is what it was before it: every
+    /// RGB565 value through `png::rgb565_to_rgb`, the picture scaled with
+    /// the same nearest map (the window's code before the HD mode).
+    #[test]
+    fn original_graphics_window_unchanged() {
+        for p in 0..=u16::MAX {
+            let [r, g, b] = atlantis2_engine::png::rgb565_to_rgb(p);
+            let want = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
+            assert_eq!(
+                atlantis2_engine::png::rgb565_to_xrgb()[usize::from(p)],
+                want
+            );
+        }
+        let screen: Vec<u16> = (0..640 * 480u32)
+            .map(|i| (i.wrapping_mul(2_654_435_761) >> 16) as u16)
+            .collect();
+        for (ww, wh) in [(1280, 960), (1920, 1080), (1000, 700), (641, 2000)] {
+            let mut out = vec![0u32; ww * wh];
+            Picture::scale(&screen, &mut out, ww, wh);
+            // The former present().
+            let scale = (ww as f64 / 640.0).min(wh as f64 / 480.0);
+            let (dw, dh) = ((640.0 * scale) as usize, (480.0 * scale) as usize);
+            let (ox, oy) = ((ww - dw) / 2, (wh - dh) / 2);
+            let mut want = vec![0u32; ww * wh];
+            for y in 0..dh {
+                let sy = (y * 480 / dh.max(1)).min(479);
+                for x in 0..dw {
+                    let sx = (x * 640 / dw.max(1)).min(639);
+                    let [r, g, b] = atlantis2_engine::png::rgb565_to_rgb(screen[sy * 640 + sx]);
+                    want[(oy + y) * ww + ox + x] =
+                        (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
+                }
+            }
+            assert!(out == want, "{ww} x {wh}");
+        }
     }
 }

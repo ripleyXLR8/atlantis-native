@@ -203,9 +203,10 @@ it. Its entries:
   [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress), item HD mode); the
   cursor, the bag bar, the menus and the videos are the original's
   640x480 pictures, smoothly enlarged (they cannot be made sharper). Off
-  by default. Make the window larger (or full screen, F11) to see the
-  difference: in a window of 1280x960 or less the picture is the
-  original's twice over.
+  by default. The panorama is drawn finer as soon as the window's picture
+  is wider than 640 pixels (in the window's default size, 1280x960, at
+  twice the original's resolution), and the larger the window (or full
+  screen, F11), the finer it is.
 - With HD on: **Panorama filter** (Bicubic, sharper, or Bilinear),
   **Panorama sharpening**, **Interface** (Smooth or Pixels),
   **Widescreen** (in a window wider than 4:3 the panorama fills the
