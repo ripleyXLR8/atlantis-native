@@ -748,7 +748,8 @@ impl Script {
             AnimOp::GotoFrame { kind, id, frame: n }
         } else if key == k.anim_the_frame {
             if n != 0 && n != 1 {
-                self.fail("SetVariables() : ANIM_THE_FRAME : 0 ou 1".into());
+                // The message @ 0x005dfcb4 (FUN_00480cd0 @ 0x00483369).
+                self.fail("SetVariables(): ANIM_THE_FRAME != 0 ou 1".into());
             }
             AnimOp::TheFrame {
                 kind: 0,

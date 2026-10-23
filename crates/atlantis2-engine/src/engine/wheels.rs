@@ -22,7 +22,8 @@
 //!   types 3, 4 and 0x32, which it never consumes): nothing once
 //!   `findisque2` = 1, nor on a zone whose name does not start with
 //!   `AXE_5ROUES` (`strncmp`, case-sensitive); the place d is the name's
-//!   11th byte − '1'. Every shown wheel at frame d − 1 is hidden and its
+//!   11th byte − '0' (the code subtracts '1' for the frame d − 1, @
+//!   0x0048d1b4..0x0048d1b9). Every shown wheel at frame d − 1 is hidden and its
 //!   disc's `pos_roue` = 0, the last one kept to be taken; then the disc in
 //!   hand, if any, is laid: its wheel at frame d − 1, held and shown, the
 //!   disc out of the hand and the bag (FUN_004756f0), its `pos_roue` = d,
@@ -38,7 +39,8 @@
 //! `pos_roue` variables at each entry. Kept from the original: two discs
 //! on one place (only scripts could do it) are both taken and only the
 //! last reaches the hand and the bag; the place comes from the name's
-//! 11th byte whatever it is (a name of 10 characters gives the frame −50).
+//! 11th byte whatever it is (a name of 10 characters, its 11th byte the
+//! NUL, gives the frame −49 and `pos_roue` −48).
 
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;

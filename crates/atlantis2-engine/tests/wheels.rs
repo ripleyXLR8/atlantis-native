@@ -23,7 +23,7 @@ use atlantis2_data::wam::{EntityState, Zone};
 use atlantis2_data::{A2Files, Folder};
 
 use atlantis2_engine::anim::Anim;
-use atlantis2_engine::engine::{chinese_click_hooks, DISC_WHEEL, WHEEL_DISC};
+use atlantis2_engine::engine::{DISC_WHEEL, WHEEL_DISC};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{CursorBank, Engine, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
@@ -172,26 +172,42 @@ fn st(e: &Engine) -> String {
     )
 }
 
-/// What the original's stubs record for the effects the port has: a
-/// film's start (`AtlHnm_start`), the bag's layout and scroll after an
-/// object is added (FUN_004754f0's `Inventaire_Layout`, `Inventaire_Step`).
-fn calls(evs: &[Event], added: bool) -> String {
+/// What the original's stubs record for the effects the port has, read
+/// from what the engine did: a film's start (`AtlMuzik_Volume(p)` with p
+/// the music's fade target after it, in % of the music volume: a music
+/// plays here, so the cinema's 20 % is there to read; `AtlSound_CinemaApc`
+/// for the sound track the engine started
+/// with the film, `AtlHnm_start` for the film; `Input_Refresh()`, which
+/// has no counterpart in the port, where the stubs record it), the bag's
+/// layout and scroll after an object is added (FUN_004754f0's
+/// `Inventaire_Layout`, `Inventaire_Step`).
+fn calls(e: &Engine, evs: &[Event], added: bool) -> String {
     let mut out = Vec::new();
-    for x in evs {
+    for (i, x) in evs.iter().enumerate() {
         if let Event::VideoStart {
             name,
             frames: Some(_),
         } = x
         {
-            let n = name.to_ascii_lowercase();
-            let apc = n.replace(".hnm", ".apc");
-            out.extend([
-                "AtlMuzik_Volume(20)".to_string(),
-                "Input_Refresh()".into(),
-                format!("AtlSound_CinemaApc('{apc}')"),
-                "Input_Refresh()".into(),
-                format!("AtlHnm_start('{n}')"),
-            ]);
+            assert!(e.music.max != 0 && e.music.state >= 3, "no music to duck");
+            out.push(format!(
+                "AtlMuzik_Volume({})",
+                e.music.target * 100 / e.music.max
+            ));
+            out.push("Input_Refresh()".into());
+            // The track starts with the film (FUN_0047a650 in its start).
+            let track = evs[i + 1..]
+                .iter()
+                .take_while(|x| !matches!(x, Event::VideoStart { .. }))
+                .find_map(|x| match x {
+                    Event::Sound(n) => Some(n.clone()),
+                    _ => None,
+                });
+            if let Some(apc) = track {
+                out.push(format!("AtlSound_CinemaApc('{apc}')"));
+            }
+            out.push("Input_Refresh()".into());
+            out.push(format!("AtlHnm_start('{}')", name.to_ascii_lowercase()));
         }
     }
     // FUN_00475590's bag entry comes after the check's film.
@@ -253,7 +269,7 @@ fn click(e: &mut Engine, name: Option<&str>, t: i32) -> String {
     format!(
         "{} | check {check} | calls {} | warn {}",
         st(e),
-        calls(&evs, added),
+        calls(e, &evs, added),
         warns(e)
     )
 }
@@ -508,7 +524,7 @@ fn the_entry_and_click_hooks_as_the_original() {
             "C check pos {} fin {f1}/{f2} -> {} | calls {} | warn {}",
             lst(&pos),
             st(&e),
-            calls(&evs, false),
+            calls(&e, &evs, false),
             warns(&mut e)
         ));
     }
@@ -533,9 +549,16 @@ fn the_dispatcher_chooses_the_wheels_as_the_original() {
     // FUN_0049b910 for `SS` 13: the wheels' click (which runs the check
     // when a disc is laid) for zone types 3, 4 and 0x32 only; the chest's
     // click alone in views 1-7; nothing for other prefixes or views. The
-    // puzzle mode 5 row (the chest's early-out, which clears the mode and
-    // returns before any hook) is the chest's to port: the port has no
-    // puzzle mode yet.
+    // engine's dispatcher (its Chinese part) runs on each row's warp
+    // name, number and zone type, `DISQUE4` held, on a zone named
+    // `AXE_5ROUES2` (value 2): the hooks it reaches (their events), AL and
+    // `pos_roue4` are the engine's. This branch has no puzzle mode: the
+    // mode 5 rows (the chest's early-out, which clears the mode and
+    // returns before any hook) are the chest's to port (`a2/pz-chest`),
+    // and in the others the original keeps the mode, which is printed as
+    // given.
+    let Some(files) = game() else { return };
+    let mut e = in_miniature(files, 13, 55);
     let mut got = Vec::new();
     let mut want = Vec::new();
     for row in rows("D ") {
@@ -550,21 +573,36 @@ fn the_dispatcher_chooses_the_wheels_as_the_original() {
             assert!(row.ends_with("-> - AL 0 mode 0 pos4 0"));
             continue;
         }
-        let hooks = chinese_click_hooks(name.as_bytes(), number, kind);
-        // The hook lays DISQUE4 on place 2 (the dispatcher's own test).
-        let wheels = hooks.contains(&0x0048_d170);
-        let mut ent: Vec<String> = hooks.iter().map(|f| format!("{f:08x}")).collect();
-        if wheels {
-            ent.push("0048d310".into());
-        }
+        fresh(&mut e, [0; 5], 3);
+        give(&mut e, "DISQUE4");
+        hold(&mut e, Some("DISQUE4"));
+        e.events.clear();
+        let z = Zone {
+            kind,
+            value: 2,
+            name: Some("AXE_5ROUES2".into()),
+            points: Vec::new(),
+        };
+        let al = e.chinese_click(0, name.as_bytes(), number, &z);
+        let ent: Vec<String> = e
+            .events
+            .iter()
+            .filter_map(|x| match x {
+                Event::PuzzleRan { function } | Event::PuzzleNotPorted { function } => {
+                    Some(format!("{function:08x}"))
+                }
+                _ => None,
+            })
+            .collect();
         let ent = if ent.is_empty() {
             "-".to_string()
         } else {
             ent.join(",")
         };
         got.push(format!(
-            "D {name} {number} {kind} mode {mode} -> {ent} AL 0 mode {mode} pos4 {}",
-            if wheels { 2 } else { 0 }
+            "D {name} {number} {kind} mode {mode} -> {ent} AL {} mode {mode} pos4 {}",
+            i32::from(al),
+            var(&e, "pos_roue4")
         ));
         want.push(row.to_string());
     }
@@ -716,7 +754,7 @@ fn the_zone_clicks_and_chapter_55_as_the_original() {
         });
         let abort = i32::from(kind == 1 && moved.is_none());
         let added = e.bag_entries().iter().any(|b| !before.contains(&b.id));
-        let mut c = calls(&evs, added);
+        let mut c = calls(&e, &evs, added);
         if let Some(v) = moved {
             assert_eq!(v, value as u32);
             let mut list = Vec::new();

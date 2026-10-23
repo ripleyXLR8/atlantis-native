@@ -326,14 +326,21 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
-        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): the
-        // wheels' click runs (`wheels.rs`), the others are not ported and
-        // only noted; none consumes the click.
-        let hooks = self
+        let name = self
             .current_view()
-            .map(|v| chinese_click_hooks(v.name.as_bytes(), self.view, zone.kind))
+            .map(|v| v.name.as_bytes().to_vec())
             .unwrap_or_default();
-        for function in hooks {
+        self.chinese_click(zi, &name, self.view, zone)
+    }
+
+    /// China's part of FUN_0049b910 (@ 0x0049b927, 0x0049ba86,
+    /// 0x0049bc5c..0x0049bcbf) for a click on zone `zi` of view `view` of
+    /// a place whose warp names start as `view_name`: the wheels' click
+    /// runs (`wheels.rs`), the others are not ported and only noted; none
+    /// consumes the click. Public for tests and tools: the dispatcher on
+    /// any warp name and number, as the golden runs it.
+    pub fn chinese_click(&mut self, zi: usize, view_name: &[u8], view: u32, zone: &Zone) -> bool {
+        for function in chinese_click_hooks(view_name, view, zone.kind) {
             match function {
                 0x0048_d170 => {
                     let cliczone = self.hand_scan_cliczone();

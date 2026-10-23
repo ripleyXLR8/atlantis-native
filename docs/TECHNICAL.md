@@ -1033,12 +1033,16 @@ event, the gong's way back to Tibet) into `china-*.png`.
   aborting it. The wheels need the place animations' playing byte
   (record +0xbc, set at load): the 15 Hz step moves a slot's frame only
   when it is set (`Slot::playing`); the wheels clear it, and so does
-  `ANIM_THE_FRAME` 0, now ported on it (no chapter uses the key). Kept
+  `ANIM_THE_FRAME` 0, now ported on it (no chapter uses the key; a value
+  other than 0 or 1 is the original's `SetVariables(): ANIM_THE_FRAME !=
+  0 ou 1`, the byte written after it). Kept
   from the original: two discs on one place (only a script could put
   them there) are both taken and only the last reaches the hand and the
   bag. Checked against the original (`tests/wheels.rs`,
   `tests/golden/wheels.txt`: the entry, the click on every kind of zone
-  name, the check, the dispatcher, the zone clicks with chapter 55's
+  name, the check with its film's music and sound track, the engine's
+  dispatcher on each golden row, `ANIM_THE_FRAME` on the held wheels,
+  the zone clicks with chapter 55's
   scans, every wheel frame drawn, a game played with the mouse from
   chapter 48 to chapter 56 across the bridge, the wheels drawn again
   after a load). One case is not the port's yet: in the original a first
@@ -1546,7 +1550,9 @@ event, the gong's way back to Tibet) into `china-*.png`.
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
   credits). No-ops, logged: `ZoomPsychoStart` (its roll), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
-  variables are script state only, as in the original. A fatal error of
+  variables are script state only, as in the original. `ANIM_THE_FRAME`
+  sets the playing byte of the first record of its id, of any kind
+  (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
   logged; the game itself goes on. The original's own unknowns stay open:
   how the menu resets the variables of a new game (the
