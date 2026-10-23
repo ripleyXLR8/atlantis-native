@@ -609,17 +609,16 @@ fn the_dispatchers_as_the_original() {
         e.frame_flag = true;
         e.events.clear();
         e.puzzle_tick();
-        let mut names: Vec<String> = e
+        let names: Vec<String> = e
             .events
             .iter()
             .filter_map(|x| match x {
-                Event::PuzzleNotPorted { function } => Some(hook_name(*function)),
+                Event::PuzzleRan { function } | Event::PuzzleNotPorted { function } => {
+                    Some(hook_name(*function))
+                }
                 _ => None,
             })
             .collect();
-        if mode == RING_MODE {
-            names.insert(0, hook_name(0x0049_c400));
-        }
         got.push(format!(
             "E tick mode {mode} pause 0 -> {} | {}",
             if names.is_empty() {
@@ -825,8 +824,11 @@ fn the_clicks_and_chapter_46_as_the_original() {
         .collect();
     same(&got, &want);
     assert_eq!(e.place(), ("miniature.wam", 1));
-    // Out of the room: the tick in view 1 gave the mode back.
-    assert_eq!(e.puzzle_mode(), 0);
+    // Out of the room the ring's mode is gone. The original's is then 5:
+    // the chest's entry of `SS` views 1-7 sets it on arrival
+    // (@ 0x00493926), which is on `a2/pz-chest`, not here; so the value
+    // is not pinned (the golden does not record it).
+    assert_ne!(e.puzzle_mode(), RING_MODE);
 }
 
 /// A move zone of the current view to view `to` clicked (the centre on
@@ -1658,8 +1660,9 @@ fn the_turtle_room_played_with_the_mouse_to_chapter_47() {
     assert_eq!(r.e.script_state().unwrap().chapter, 47);
     assert_eq!((r.flag(136), r.flag(141)), (1, 1));
     assert_eq!(r.var("indication_tortue"), 11);
-    // Out of the room the ring's tick gave the mode back.
-    assert_eq!(r.e.puzzle_mode(), 0);
+    // Out of the room the ring's mode is gone (the original's is 5, the
+    // chest's entry's in view 1: on `a2/pz-chest`, not here).
+    assert_ne!(r.e.puzzle_mode(), RING_MODE);
     r.shot("9-miniature-chapter-47");
 }
 

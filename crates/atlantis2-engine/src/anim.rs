@@ -96,7 +96,7 @@ pub struct Slot {
     pub frames: [u8; FRAME_TAB],
     /// +0xc4: the countdown of the random pause.
     pub delay: i32,
-    /// +0xbc (a byte): the slot plays, 1 at load (@ 0x0047c666); the
+    /// +0xbc (a byte): the slot plays, 1 at load (@ 0x0047c664); the
     /// step moves only the frames of active slots that play
     /// (@ 0x0047d82c). The turtle ring's entry clears it
     /// (@ 0x0049c384) to hold the ring at its frame.

@@ -140,7 +140,8 @@ fn bare(files: A2Files, name: &str, view: u32) -> Engine {
 }
 
 /// The puzzle hooks reached in `events`, in order: run (the turtle
-/// ring's) or noted (the others).
+/// ring's, its tick FUN_0049c400 too: every warp frame in the room) or
+/// noted (the others).
 fn noted(events: &[Event]) -> Vec<u32> {
     events
         .iter()
@@ -275,7 +276,13 @@ fn the_chinese_click_hooks_take_no_click() {
         ("miniature.wam", 5, "PRENDRE_BAGUETTE", vec![0x0049_3960]),
         ("miniature.wam", 13, "AXE_5ROUES1", vec![0x0048_d170]),
         ("miniature.wam", 31, "CLIC_DRAGON", vec![0x0049_4600]),
-        ("salletortue.wam", 56, "TORTUE_GAUCHE", vec![0x0049_c290]),
+        // The ring's click, then its tick in the same pass (mode 2).
+        (
+            "salletortue.wam",
+            56,
+            "TORTUE_GAUCHE",
+            vec![0x0049_c290, 0x0049_c400],
+        ),
     ];
     let mut e = bare(files, "chine.wam", 10);
     let mut t = 10.0;
@@ -477,8 +484,8 @@ fn a_picture_until_a_click() {
         found: true
     }));
     assert_eq!(e.loop_type, LoopType::Picture);
-    // The ring's hook did not take the click.
-    assert_eq!(noted(&e.events), [0x0049_c290]);
+    // The ring's hook did not take the click; its tick ran in the pass.
+    assert_eq!(noted(&e.events), [0x0049_c290, 0x0049_c400]);
     let mut screen = vec![0u16; 640 * 480];
     let mut plain = vec![0u16; 640 * 480];
     e.tick();

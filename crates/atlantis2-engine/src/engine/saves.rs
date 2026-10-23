@@ -18,10 +18,10 @@ use crate::script::{BagEntry, Shown, SubjectTable};
 
 /// The entries Native keeps as the save's bytes: the dowsing rod's 15
 /// (@ 0x006d84f4, its role not read), the puzzles not ported (20..25,
-/// 27, 32), and the puzzle mode (26) with the turtle ring's count and
-/// frame store (28, 29), which the engine reads in place
-/// ([`Engine::puzzle_mode`], [`Engine::ring_count`],
-/// [`Engine::ring_store`]). The dialog flag (33) is written from the running
+/// 27), and the puzzle mode (26) with the turtle ring's count and frame
+/// store (28, 29) and Brigid's cross (32), which the engine reads in
+/// place ([`Engine::puzzle_mode`], [`Engine::ring_count`],
+/// [`Engine::ring_store`], [`Engine::cross_state`]). The dialog flag (33) is written from the running
 /// dialog and not read back: a save made from the menus has no dialog
 /// running, Escape ends it before the main menu opens (@ 0x004762f0).
 const KEPT: [usize; 12] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 32];

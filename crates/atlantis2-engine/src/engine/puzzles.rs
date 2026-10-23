@@ -387,15 +387,17 @@ impl Engine {
 
     /// FUN_0049bfb0, the puzzle tick (from the warp frame when the mode
     /// is not 0, @ 0x0045a5e8): each mode's tick in the original's order,
-    /// the mode read again before each; the turtle ring's runs, the
-    /// others (no ported place sets their modes) are noted. The pause
-    /// byte (@ 0x006d85f0) that stops it is not in the port.
+    /// the mode read again before each; the turtle ring's runs (noted
+    /// [`Event::PuzzleRan`]), the others (no ported place sets their
+    /// modes) are noted [`Event::PuzzleNotPorted`]. The pause byte
+    /// (@ 0x006d85f0) that stops it is not in the port.
     pub fn puzzle_tick(&mut self) {
         for (mode, function) in PUZZLE_TICKS {
             if self.puzzle_mode() != mode {
                 continue;
             }
             if mode == RING_MODE {
+                self.event(Event::PuzzleRan { function });
                 self.turtle_tick(self.view);
             } else {
                 self.puzzle_not_ported(function);
