@@ -90,6 +90,11 @@ pub struct Slot {
     /// +0x38: for an object, its first `defnames.con` parameter (its
     /// sprite in the objects' bank).
     pub object_sprite: i32,
+    /// +0xbc (a byte): playing, 1 at load (FUN_0047c4e0); the 15 Hz step
+    /// moves the frame of a slot only when it is set as well as +0x30.
+    /// Puzzles clear it to hold a frame (the wheels, FUN_0048d080 and
+    /// FUN_0048d170).
+    pub playing: bool,
     /// +0x3c: the frames drawn when the state is not one animated frame
     /// (+0x34 ≠ 1), in list order up to [`LIST_END`], [`LIST_SKIP`]
     /// skipped.
@@ -207,6 +212,7 @@ impl Anim {
             chain: -1,
             active,
             object_sprite,
+            playing: true,
             frames: [LIST_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
         });
@@ -219,7 +225,7 @@ impl Anim {
     /// @ 0x0047d84d..0x0047d872).
     pub fn step(&mut self) -> Option<i32> {
         let mut horse = None;
-        for s in self.slots.iter_mut().filter(|s| s.active) {
+        for s in self.slots.iter_mut().filter(|s| s.active && s.playing) {
             s.frame = if s.frame < 0 || s.frame >= s.end - 1 {
                 -1
             } else {

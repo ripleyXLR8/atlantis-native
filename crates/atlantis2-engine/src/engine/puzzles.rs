@@ -32,15 +32,16 @@
 //!   leaves the object in hand: chapter 7's sections (the click scan of
 //!   the same frame) count `fincrane`, take the object and, at the fifth,
 //!   play film 2, show Ailill and hide the skull.
-//! - China's hooks (prefixes `CH`, `SS` and `LA`): the figurines, the
-//!   chest, the five wheels, the pearl and dragon, the turtle ring and the
-//!   labyrinth's souls are not ported. Their hooks are listed as the
+//! - China's hooks (prefixes `CH`, `SS` and `LA`), listed as the
 //!   dispatchers call them ([`chinese_click_hooks`],
-//!   [`chinese_entry_hooks`]) and noted ([`Event::PuzzleNotPorted`]);
-//!   none consumes a click (the dispatcher returns 0 for them), so the
-//!   scripts see every click as in the original. [`ChinesePuzzle`] and
-//!   [`Engine::solve_chinese_puzzle`] write what their wins write, for
-//!   tests.
+//!   [`chinese_entry_hooks`]): the five wheels (`SS` 12-13) run
+//!   (`wheels.rs`, noted [`Event::PuzzleRan`]); the figurines, the chest,
+//!   the pearl and dragon, the turtle ring and the labyrinth's souls are
+//!   not ported and only noted ([`Event::PuzzleNotPorted`]). None consumes
+//!   a click (the dispatcher returns 0 for them), so the scripts see every
+//!   click as in the original. [`ChinesePuzzle`] and
+//!   [`Engine::solve_chinese_puzzle`] write what the wins of the puzzles
+//!   not ported write, for tests.
 //! - The places the port has: Tibet, Ireland and China. A `changewam` to
 //!   any other place (Yucatán's boat, Shamballa, the space travel) is
 //!   refused: the section stops there, the world goes back to the
@@ -115,11 +116,6 @@ pub enum ChinesePuzzle {
     Figurines,
     /// The Chinese chest, `SS` view 5 (FUN_004938f0, FUN_00493960).
     Chest,
-    /// The five wheels' first order, `SS` view 13 (FUN_0048d080,
-    /// FUN_0048d170, the check FUN_0048d310): the bridge half lowered.
-    WheelsFirst,
-    /// Their second order: the bridge lowered.
-    WheelsSecond,
     /// The pearl and the dragon in the clouds, `SS` view 31 (FUN_004944a0,
     /// FUN_00494600, the tick FUN_004947b0).
     Pearl,
@@ -330,14 +326,23 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
-        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): not
-        // ported, noted; none consumes the click.
+        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): the
+        // wheels' click runs (`wheels.rs`), the others are not ported and
+        // only noted; none consumes the click.
         let hooks = self
             .current_view()
             .map(|v| chinese_click_hooks(v.name.as_bytes(), self.view, zone.kind))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            match function {
+                0x0048_d170 => {
+                    let cliczone = self.hand_scan_cliczone();
+                    self.event(Event::PuzzleHook { zone: zi, cliczone });
+                    self.event(Event::PuzzleRan { function });
+                    self.wheels_click(zone);
+                }
+                _ => self.puzzle_not_ported(function),
+            }
         }
         false
     }
@@ -401,13 +406,20 @@ impl Engine {
             Some(function) => self.puzzle_not_ported(function),
             None => {}
         }
-        // China's: not ported, noted.
+        // China's: the wheels' entry runs (`wheels.rs`), the others are not
+        // ported and only noted.
         let hooks = self
             .current_view()
             .map(|v| chinese_entry_hooks(v.name.as_bytes(), self.view))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            match function {
+                0x0048_d080 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.wheels_entry();
+                }
+                _ => self.puzzle_not_ported(function),
+            }
         }
     }
 
@@ -432,10 +444,6 @@ impl Engine {
     ///   calls FUN_004755f0 (the bag) and FUN_0048c6b0(id, 2, 1), which
     ///   writes the show / hide table only, then clears the record's
     ///   active flag itself (@ 0x00493a5b).
-    /// - The wheels (FUN_0048d310): first `pos_roue1..5` = 1..5,
-    ///   `Pont_Leve` hidden, `Pont_Moitie` shown, `findisque1` = 1,
-    ///   `(cinema=24)`; second 5, 3, 1, 4, 2, `Pont_Moitie` hidden,
-    ///   `Pont_Baisse` shown, `findisque2` = 1, `(cinema=25)`.
     /// - The pearl (FUN_004947b0's last right step,
     ///   @ 0x004948ab..0x00494902): `State_nuages_bas` raised to 5,
     ///   `(NewSound=210)` (FUN_00494970: 205 + the new state), the low
@@ -458,34 +466,6 @@ impl Engine {
                     s.run_command(h, b"(sacados=BAGUETTE)");
                     s.run_command(h, b"(hideobjet=BAGUETTE)");
                     s.set_var("BAGUETTE_PRISE", 1);
-                });
-            }
-            ChinesePuzzle::WheelsFirst | ChinesePuzzle::WheelsSecond => {
-                let (order, hide, show, var, film) = if puzzle == ChinesePuzzle::WheelsFirst {
-                    (
-                        [1, 2, 3, 4, 5],
-                        "Pont_Leve",
-                        "Pont_Moitie",
-                        "findisque1",
-                        24,
-                    )
-                } else {
-                    (
-                        [5, 3, 1, 4, 2],
-                        "Pont_Moitie",
-                        "Pont_Baisse",
-                        "findisque2",
-                        25,
-                    )
-                };
-                self.with_script(|s, h| {
-                    for (k, v) in order.iter().enumerate() {
-                        s.set_var(&format!("pos_roue{}", k + 1), *v);
-                    }
-                    s.run_command(h, format!("(hideobjet={hide})").as_bytes());
-                    s.run_command(h, format!("(showobjet={show})").as_bytes());
-                    s.set_var(var, 1);
-                    s.run_command(h, format!("(cinema={film})").as_bytes());
                 });
             }
             ChinesePuzzle::Pearl => {

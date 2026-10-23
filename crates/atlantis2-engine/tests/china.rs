@@ -7,6 +7,9 @@
 //! start; the subjects, objects and musics on disc 3; the place sounds; a
 //! save in China loaded; the testing aid that writes the puzzles' wins.
 //!
+//! The five wheels (`SS` 12-13) are ported (`tests/wheels.rs`): their
+//! hooks run here and are counted with the others.
+//!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the tests are skipped.
 
@@ -139,15 +142,31 @@ fn bare(files: A2Files, name: &str, view: u32) -> Engine {
     e
 }
 
-/// The puzzle hooks noted in `events`, in order.
+/// The puzzle hooks noted (not ported) or run (the wheels', ported) in
+/// `events`, in order; the wheels' check (FUN_0048d310, run when a disc
+/// is laid) left out.
 fn noted(events: &[Event]) -> Vec<u32> {
     events
         .iter()
         .filter_map(|x| match x {
             Event::PuzzleNotPorted { function } => Some(*function),
+            Event::PuzzleRan { function } if *function != 0x0048_d310 => Some(*function),
             _ => None,
         })
         .collect()
+}
+
+/// The wheels' hooks (FUN_0048d080, FUN_0048d170) run, never noted as
+/// missing.
+fn wheels_ported(events: &[Event]) -> bool {
+    !events.iter().any(|x| {
+        matches!(
+            x,
+            Event::PuzzleNotPorted {
+                function: 0x0048_d080 | 0x0048_d170
+            }
+        )
+    })
 }
 
 #[test]
@@ -205,6 +224,7 @@ fn every_chinese_view_is_entered_with_its_hooks() {
             }));
             let n = noted(&e.events);
             assert_eq!(n, chinese_entry_hooks(name.as_bytes(), id), "{place} {id}");
+            assert!(wheels_ported(&e.events), "{place} {id}");
             hooks.extend(n.into_iter().map(|f| (place, id, f)));
         }
     }
@@ -287,6 +307,7 @@ fn the_chinese_click_hooks_take_no_click() {
         e.click(t);
         e.pass(None);
         assert_eq!(noted(&e.events), want, "{name}");
+        assert!(wheels_ported(&e.events), "{name}");
         assert!(
             e.events
                 .iter()
@@ -876,15 +897,6 @@ fn the_aid_writes_the_wins() {
         (var(&e, "frame_coffre_chine"), var(&e, "BAGUETTE_PRISE")),
         (4, 1)
     );
-    e.solve_chinese_puzzle(ChinesePuzzle::WheelsFirst);
-    assert_eq!(e.loop_type, LoopType::Video);
-    assert!(e.events.iter().any(
-        |x| matches!(x, Event::VideoStart { name, frames: Some(_) } if name.eq_ignore_ascii_case("cine024.hnm"))
-    ));
-    settle(&mut e);
-    e.solve_chinese_puzzle(ChinesePuzzle::WheelsSecond);
-    settle(&mut e);
-    assert_eq!((var(&e, "findisque1"), var(&e, "findisque2")), (1, 1));
     e.events.clear();
     e.solve_chinese_puzzle(ChinesePuzzle::Pearl);
     assert_eq!(var(&e, "FINPERLE"), 1);

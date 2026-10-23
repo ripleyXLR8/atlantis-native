@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China without its puzzles (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events) with its five wheels, its other puzzles not yet ported |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -1008,22 +1008,60 @@ event, the gong's way back to Tibet) into `china-*.png`.
   case by case against the original (`scripts_worlds_events.txt`) and
   played in chapter 60 (the rat given a form: sound 203 at frame 51, the
   event's end at frame 60, the stamped form back, the remembered dialog).
-  The puzzles are not ported: the figurines and the chest (`SS` views
-  1-7), the five wheels (`SS` 12-13), the pearl and the dragon (`SS` 31),
-  the turtle ring (`CH` 40-64) and the labyrinth's souls (`LA` 1-60).
-  Their hooks are listed as the original's dispatchers call them
-  (`chinese_click_hooks`, `chinese_entry_hooks`) and noted
-  (`Event::PuzzleNotPorted`); none takes a click (the dispatcher returns
-  0 for all of them), so every click reaches `CLICZONE`, the scans and
-  the moves as in the original; without their entries the puzzles'
-  sprites keep the states their WAM records and the show / hide table
-  give them at load: the wheels and figurines are not placed from their
-  variables, the ring's frame and the souls are not set, and
-  `PERLE_TROU`, which the clouds' entry hides until the pearl is won
-  (FUN_004944a0), shows in `SS` view 31 and can be taken there (a
-  shortcut the original does not have). `Engine::solve_chinese_puzzle` writes what the
-  figurines', the chest's, the wheels' and the pearl's wins write, for
-  tests; the turtle ring and the souls write no variable (the turtle
+  **The five wheels and the bridge** (`SS` views 12-13, chapter 55,
+  `engine/wheels.rs`) are ported as the original plays them: the five
+  discs `DISQUE1..5` (the figurines' gifts, chapter 48) are laid on the
+  axle's five places (the zones `AXE_5ROUES1..5` of view 13); each disc
+  has its own wheel sprite `RoueK<k>` (one frame per place) and its
+  variable `pos_roue<k>` (the place, 0 when not laid). The view entry of
+  views 12 and 13 (FUN_0048d080) keeps the five wheels' records (the
+  first record of each id, any kind; none is the original's fatal) and
+  places them from the variables: hidden at 0, otherwise held still at
+  frame place − 1. The click (FUN_0048d170, on zone types 3, 4 and 50,
+  never taking the click) does nothing once `findisque2` is 1 or on a
+  zone whose name does not start with `AXE_5ROUES` (a case-sensitive
+  `strncmp`); the place is the name's 11th byte − '1'. Every wheel shown
+  there is taken off (its variable 0), then the disc in hand is laid
+  (its wheel at that frame, the disc out of the hand and the bag, its
+  variable the place) and the check runs; the disc taken goes to the bag
+  and the hand: a disc laid on a taken place swaps. The check
+  (FUN_0048d310): the order 1 2 3 4 5 with `findisque1` 0 hides
+  `Pont_Leve`, shows `Pont_Moitie`, sets `findisque1` and plays film 24;
+  then 5 3 1 4 2 with `findisque2` 0 hides `Pont_Moitie`, shows
+  `Pont_Baisse`, sets `findisque2` and plays film 25; chapter 55 then
+  lets the move from view 12 to 14 go on to chapter 56 instead of
+  aborting it. The wheels need the place animations' playing byte
+  (record +0xbc, set at load): the 15 Hz step moves a slot's frame only
+  when it is set (`Slot::playing`); the wheels clear it, and so does
+  `ANIM_THE_FRAME` 0, now ported on it (no chapter uses the key). Kept
+  from the original: two discs on one place (only a script could put
+  them there) are both taken and only the last reaches the hand and the
+  bag. Checked against the original (`tests/wheels.rs`,
+  `tests/golden/wheels.txt`: the entry, the click on every kind of zone
+  name, the check, the dispatcher, the zone clicks with chapter 55's
+  scans, every wheel frame drawn, a game played with the mouse from
+  chapter 48 to chapter 56 across the bridge, the wheels drawn again
+  after a load). One case is not the port's yet: in the original a first
+  click outside views 1-7 while the chest's puzzle mode (5) is set only
+  clears the mode (@ 0x0049b96d, the dispatcher returns before any hook,
+  golden row `D ss0013.hnm 13 3 mode 5`); the port has no puzzle mode
+  until the chest is ported, and a game reaches view 13 only through
+  move clicks of views 10-12, the first of which clears it.
+  The other puzzles are not ported: the figurines and the chest (`SS`
+  views 1-7), the pearl and the dragon (`SS` 31), the turtle ring (`CH`
+  40-64) and the labyrinth's souls (`LA` 1-60). Their hooks are listed
+  as the original's dispatchers call them (`chinese_click_hooks`,
+  `chinese_entry_hooks`) and noted (`Event::PuzzleNotPorted`); none
+  takes a click (the dispatcher returns 0 for all of them), so every
+  click reaches `CLICZONE`, the scans and the moves as in the original;
+  without their entries the puzzles' sprites keep the states their WAM
+  records and the show / hide table give them at load: the figurines
+  are not placed from their variables, the ring's frame and the souls
+  are not set, and `PERLE_TROU`, which the clouds' entry hides until the
+  pearl is won (FUN_004944a0), shows in `SS` view 31 and can be taken
+  there (a shortcut the original does not have).
+  `Engine::solve_chinese_puzzle` writes what the figurines', the
+  chest's and the pearl's wins write, for tests; the turtle ring and the souls write no variable (the turtle
   room's way out is the scripts' count of arrivals, the labyrinth's the
   scripts' form and fan). The incense sticks are the scripts' alone
   (`GOTOFRAMEOBJET`, `showobjet`) and play as written. Four view records
@@ -1506,8 +1544,7 @@ event, the gong's way back to Tibet) into `china-*.png`.
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
-  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
-  (the playing byte), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
@@ -1658,7 +1695,9 @@ installation, for the tests of those builds. For Atlantis II,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
 copies); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
 `tests/ogham.rs`'s played games write their screens there
-(`pz-skull-*.png`, `pz-ogham-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
+(`pz-skull-*.png`, `pz-ogham-*.png`), and with `ATLANTIS2_SHOTS` set
+`tests/cross.rs`'s and `tests/wheels.rs`'s (`pz-cross-*.png`,
+`pz-wheels-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
 weights, dialog lines, dialog frames, subtitle layouts, music fades,
 script results and save files come from the original `atlantis2.exe` run under emulation
 (Tibet's moves pass by pass, the place animations tick by tick, the
@@ -1670,7 +1709,8 @@ subject menu's cells and click grid, the shaman's subjects along chapter
 through the handler, the special events, the zoom of a move,
 Brigid's cross's hooks, frame tables and pictures, the skull puzzle's
 hooks, frame lists, clicks with chapter 7 and drawing, the ogham stones'
-moves and drawing, the blackbird songs' draws, clicks and warp frames;
+moves and drawing, the blackbird songs' draws, clicks and warp frames,
+the five wheels' hooks, check, zone clicks with chapter 55 and drawing;
 names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):
@@ -1705,5 +1745,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles, Yucatán, Shamballa and their puzzles |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles (the five wheels done), Yucatán, Shamballa and their puzzles |
 
