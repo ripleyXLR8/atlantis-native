@@ -1006,8 +1006,12 @@ event, the gong's way back to Tibet) into `china-*.png`.
   FUN_00484880, `script/frame.rs`): events 1-6 are the labyrinth's six
   demons (view and frame each), events 7 and 8 Yucatán's `CHAC`; checked
   case by case against the original (`scripts_worlds_events.txt`) and
-  played in chapter 60 (the rat given a form: sound 203 at frame 51, the
-  event's end at frame 60, the stamped form back, the remembered dialog).
+  played in chapter 60 (the rat given a form: sound 203 at frame 51 when
+  voice 2 is idle then, the event's end at frame 60, the stamped form
+  back, the remembered dialog; the test mixes each tick's sound so the
+  voices end, and runs it with the view's souls, whose passage sound 220
+  holds voice 2 at frame 51, and without them, when 203 is heard; the
+  mouse-played chapter 60 checks the same rule at each demon's stamp).
   The puzzles are not ported, but the labyrinth's souls (below): the
   figurines and the chest (`SS` views 1-7), the five wheels (`SS`
   12-13), the pearl and the dragon (`SS` 31) and the turtle ring (`CH`
@@ -1557,10 +1561,11 @@ event, the gong's way back to Tibet) into `china-*.png`.
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
-  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
-  (the playing byte), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
-  variables are script state only, as in the original. A fatal error of
+  variables are script state only, as in the original. `ANIM_THE_FRAME`
+  sets the playing byte of the first record of its id, of any kind
+  (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
   logged; the game itself goes on. The original's own unknowns stay open:
   how the menu resets the variables of a new game (the

@@ -639,7 +639,9 @@ fn centre_slot(e: &Engine) -> Option<usize> {
 }
 
 /// The engine at 60 passes a second, the 15 Hz ticks from its clock,
-/// every pass drawn; the mouse as a player moves it.
+/// every pass drawn and 1/60 s of sound mixed (the voices end as the
+/// sound output plays them, so voice 2 is free again after a sound); the
+/// mouse as a player moves it.
 struct Run {
     e: Engine,
     pass: u64,
@@ -648,6 +650,11 @@ struct Run {
     shots: Option<PathBuf>,
     mouse_signs: (f32, f32),
     journal: Vec<Event>,
+    /// A demon (its id) and the frame F − 9 of its special event: each
+    /// pass that leaves its first slot there is noted in `at_stamp`
+    /// (voice 2 busy before the pass, sound 203 started by it).
+    stamp: Option<(i32, i32)>,
+    at_stamp: Vec<(bool, bool)>,
     sol: Wam,
     plaf: Wam,
 }
@@ -658,8 +665,26 @@ impl Run {
     }
 
     fn step(&mut self) {
+        let busy = self.e.voices().is_playing(2);
+        let n = self.e.events.len();
         self.e.set_clock(self.now());
         self.e.pass(Some(&mut self.screen));
+        if let Some((id, frame)) = self.stamp {
+            if self
+                .e
+                .anim
+                .slots
+                .iter()
+                .find(|s| s.id == id)
+                .map(|s| s.frame)
+                == Some(frame)
+            {
+                let s203 = self.e.events[n..].contains(&Event::Sound("sound203.apc".into()));
+                self.at_stamp.push((busy, s203));
+            }
+        }
+        let mut sound = [0.0f32; 2 * 22050 / 60];
+        self.e.voices().fill(&mut sound, 22050, 2);
         self.pass += 1;
         let fatal = self.e.script_state().and_then(|s| s.fatal.clone());
         assert!(fatal.is_none(), "{fatal:?}");
@@ -1079,6 +1104,11 @@ fn dialogs(evs: &[Event]) -> Vec<u32> {
 
 /// The demons by their number on the form (`essai_labyN`, chapter 60):
 /// the character, its place and the view where it takes the form.
+/// The frame F that ends each demon's special event, in `DEMONS`' order
+/// (the special events 1..6 of FUN_00484880, its tables built
+/// @ 0x004848a7..0x00484a1c).
+const STAMP_FRAMES: [i32; 6] = [70, 75, 60, 76, 70, 70];
+
 const DEMONS: [(&str, &str, u32); 6] = [
     ("DEMON_DOGUE", "labysol.wam", 12),
     ("DEMON_COCHON", "labysol.wam", 19),
@@ -1131,6 +1161,8 @@ fn the_labyrinth_played_with_the_mouse() {
         shots: std::env::var_os("ATLANTIS2_SHOTS").map(PathBuf::from),
         mouse_signs: (1.0, -1.0),
         journal: Vec::new(),
+        stamp: None,
+        at_stamp: Vec::new(),
         sol,
         plaf,
     };
@@ -1255,6 +1287,7 @@ fn the_labyrinth_played_with_the_mouse() {
         "FORMULAIRE_2",
         "FORMULAIRE_3",
     ];
+    let mut stamps_heard = 0;
     for (k, &v) in order.iter().enumerate() {
         let (name, place, view) = DEMONS[v - 1];
         r.go(place, view);
@@ -1268,6 +1301,8 @@ fn the_labyrinth_played_with_the_mouse() {
         }
         assert_eq!(r.var("OBJETENMAIN"), form);
         let demon = r.id(defnames::PERSONNAGES, name);
+        r.stamp = Some((demon, STAMP_FRAMES[v - 1] - 9));
+        r.at_stamp.clear();
         let mut evs = r.click_character(demon);
         // The stamp's animation, then the stamped form and the dialog.
         let next = r.id(defnames::OBJETS, forms[k + 1]);
@@ -1282,16 +1317,24 @@ fn the_labyrinth_played_with_the_mouse() {
         }
         assert_eq!(r.var("OBJETENMAIN"), next, "{name}");
         assert_eq!(r.var(&format!("essai_laby{}", k + 1)), v as i32);
-        // The stamp's sound 203, unless voice 2 is busy at the stamp's
-        // frame: a soul's passage (sound 220) heard then keeps it.
-        assert!(
-            evs.contains(&Event::Sound("sound203.apc".into()))
-                || evs.contains(&Event::Sound("sound220.apc".into())),
-            "{name}"
-        );
+        // The stamp's sound 203 at frame F − 9 exactly when voice 2 is
+        // idle then (the passes mix their sound, so a voice ends as it is
+        // played); a soul's passage (sound 220) heard before keeps it busy.
+        r.stamp = None;
+        let heard = evs.contains(&Event::Sound("sound203.apc".into()));
+        let at = std::mem::take(&mut r.at_stamp);
+        assert!(!at.is_empty(), "{name}");
+        assert_eq!(heard, at.iter().any(|&(busy, _)| !busy), "{name} {at:?}");
+        assert_eq!(heard, at.iter().any(|&(_, s)| s), "{name} {at:?}");
+        if !heard {
+            assert!(evs.contains(&Event::Sound("sound220.apc".into())), "{name}");
+        }
+        stamps_heard += usize::from(heard);
         r.wait(10);
         r.shot(&format!("5-stamp-{}", k + 1));
     }
+    // This run hears the stamp once (the passages are the engine's rand).
+    assert_eq!(stamps_heard, 1);
     // The stamped form read.
     let third = r.id(defnames::OBJETS, "FORMULAIRE_3");
     r.choose(third);
