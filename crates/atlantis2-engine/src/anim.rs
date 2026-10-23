@@ -91,9 +91,11 @@ pub struct Slot {
     /// list (@ 0x0047ce77). The state's +0x2c at load; the figurines'
     /// entry sets it.
     pub single: i32,
-    /// +0xbc (a byte): set at load; a slot whose byte is clear keeps its
-    /// frame at the tick (@ 0x0047d82c). The figurines' entry and click
-    /// write it.
+    /// +0xbc (a byte): the slot plays, 1 at load (@ 0x0047c664); the
+    /// step moves only the frames of active slots that play
+    /// (@ 0x0047d82c). The puzzles' hooks write it to hold or play a
+    /// frame (the figurines' entry and click, the chest's hooks
+    /// @ 0x0049393b, @ 0x00493a7c), and `ANIM_THE_FRAME`.
     pub playing: bool,
     /// +0x38: for an object, its first `defnames.con` parameter (its
     /// sprite in the objects' bank).
@@ -222,9 +224,10 @@ impl Anim {
         });
     }
 
-    /// FUN_0047d7f0 on a 15 Hz tick: every active slot whose playing byte
-    /// is set one frame on (@ 0x0047d827..0x0047d832), then
-    /// the slots whose play has ended restart, hand over or stop. Returns
+    /// FUN_0047d7f0 on a 15 Hz tick: every active slot that plays
+    /// (+0x30 and the byte +0xbc, @ 0x0047d827..0x0047d832) one frame
+    /// on, then the active slots whose play has ended (frame −1, whether
+    /// they play or not) restart, hand over or stop. Returns
     /// the frame the first loop left in the last slot of `CHEVAL`'s id,
     /// whatever its kind (the value it writes into `FRAMECHEVAL`,
     /// @ 0x0047d84d..0x0047d872).

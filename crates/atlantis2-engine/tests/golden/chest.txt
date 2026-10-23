@@ -1,0 +1,204 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) and scenar\chapi047.con (MD5 6a504f463186506bd1e3cb38ceaaf328):
+# the Chinese chest (SS views 1-7). The ids line gives the defnames.con indices of the
+# objects COFFRE_CHINE, BAGUETTE, PIECE5, the parameters of BAGUETTE and PIECE5, the zones
+# PRENDRE_BAGUETTE, ENCENS1..4; the variables line frame_coffre_chine, BAGUETTE_PRISE,
+# OBJETENMAIN, MONDE, CLICZONE. `in` holds chapter 47's line numbers. Each section's own
+# header (## lines) says what its rows hold.
+ids objects 85 102 141 param 5 21 zone 33 23 24 25 26
+ids variables 112 113 28 91 76
+## state: var = frame_coffre_chine, prise = BAGUETTE_PRISE, mode = the puzzle mode 0x006d84d0; the COFFRE_CHINE and BAGUETTE slots (first of their id) as f<frame +0x10>/p<playing +0xbc>/a<active +0x30> (- none); table = BAGUETTE's show / hide entry (kind 2: 0 hidden, 1 shown, 2 none); OBJETENMAIN; the hand pair (frame 0x00673f94, bank 0x00673f68), the cursor pair (bank 0x00673fa0, frame 0x005def58); the bag (id/sprite/world); OBJ = the world's objects bank
+## B: entry hook FUN_004938f0 on miniature.wam's slots (views 1-7 as AtlSpw_load leaves them, every slot playing): view number (the current view +0x10), frame_coffre_chine, the mode before
+B view 0 var 2 mode 0 -> var 2 prise 0 mode 0 chest f0/p1/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 1 var 2 mode 0 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 2 var 2 mode 0 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 3 var 2 mode 0 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 4 var 2 mode 0 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 2 mode 0 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 6 var 2 mode 0 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 7 var 2 mode 0 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick - table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 8 var 2 mode 0 -> var 2 prise 0 mode 0 chest f0/p1/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 0 mode 0 -> var 0 prise 0 mode 5 chest f4/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 1 mode 0 -> var 1 prise 0 mode 5 chest f3/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 3 mode 0 -> var 3 prise 0 mode 5 chest f1/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 4 mode 0 -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 5 mode 0 -> var 5 prise 0 mode 5 chest f-1/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 7 mode 0 -> var 7 prise 0 mode 5 chest f-3/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var -1 mode 0 -> var -1 prise 0 mode 5 chest f5/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var -3 mode 0 -> var -3 prise 0 mode 5 chest f7/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 2 mode 3 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 5 var 2 mode 5 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B view 3 var 2 mode 1 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | warn []
+B no slot of the chest, view 5 -> warn [fatal:pz_coffre vue 5 ! find_idx_pzcoffre(85) introuvable]
+## C: click hook FUN_00493960(zone) after the entry hook: a zone of type t, value v (PRENDRE_BAGUETTE = 33); MONDE 3 unless given; objects given to the bag by FUN_004754f0 and held by FUN_00475340; sounds = the NewSound calls, in order
+C entered 5 -> var 0 prise 0 mode 5 chest f4/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag []
+C move zone 1 4 -> var 0 prise 0 mode 5 chest f4/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [] | warn []
+C take 1 zone 3 33 -> var 1 prise 0 mode 5 chest f3/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound211.apc] | warn []
+C take 2 zone 3 33 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound212.apc] | warn []
+C take 3 zone 3 33 -> var 3 prise 0 mode 5 chest f1/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound213.apc] | warn []
+C take 4 zone 3 33 -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a1 table 1 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound214.apc] | warn []
+C take 5 zone 3 33 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | sounds [] | warn []
+C take 6 zone 3 33 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | sounds [] | warn []
+C other value zone 3 23 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | sounds [] | warn []
+C type zone 4 33 -> var 1 prise 0 mode 5 chest f3/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound211.apc] | warn []
+C type zone 50 33 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound212.apc] | warn []
+C type zone 1 33 -> var 3 prise 0 mode 5 chest f1/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound213.apc] | warn []
+C type zone 0 33 -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a1 table 1 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound214.apc] | warn []
+C view 1 zone 3 33 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [] | warn []
+C view 3 zone 3 33 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [] | warn []
+C view 6 zone 3 33 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [] | warn []
+C view 7 zone 3 33 -> var 2 prise 0 mode 5 chest f2/p0/a1 chopstick - table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [] | warn []
+C given -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [102/5/3]
+C in bag zone 3 33 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | sounds [] | warn [warning:Inventaire_PrendObj_id_nspr(%d) : deja pris!]
+C held -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 2 hand 141 pair (21,OBJ) cursor (0,-1) bag [141/21/3]
+C piece in hand zone 3 33 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [141/21/3,102/5/3] | sounds [] | warn []
+C prise 1 zone 3 33 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [] | warn []
+C var 3 zone 3 33 -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a1 table 1 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound214.apc] | warn []
+C var 5 zone 3 33 -> var 5 prise 1 mode 5 chest f-1/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | sounds [] | warn []
+C var 7 zone 3 33 -> var 7 prise 1 mode 5 chest f-3/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | sounds [] | warn []
+C var -1 zone 3 33 -> var 0 prise 0 mode 5 chest f4/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound210.apc] | warn []
+C var -3 zone 3 33 -> var -2 prise 0 mode 5 chest f6/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound208.apc] | warn []
+C MONDE 5 zone 3 33 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/5] | sounds [] | warn []
+C no chopstick slot -> warn []
+C no chopstick slot zone 3 33 -> warn [fatal:pz_coffre vue 5 ! find_idx_pzcoffre(102) introuvable]
+C show zone 3 33 -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a1 table 1 hand 0 pair (0,0) cursor (0,-1) bag [] | sounds [sound214.apc] | warn []
+C entered 1 -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a1 table 1 hand 0 pair (0,0) cursor (0,-1) bag []
+C entered 6 -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a1 table 1 hand 0 pair (0,0) cursor (0,-1) bag []
+C entered 5 -> var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a1 table 1 hand 0 pair (0,0) cursor (0,-1) bag []
+C take zone 3 33 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | sounds [] | warn []
+C entered 1 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3]
+C entered 5 -> var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3]
+## D: the hook dispatcher FUN_0049b910(zone) alone: the view's warp name (+0x00), number (+0x10), the zone's type (value 33), the mode before -> the hooks entered (the chest's and FUN_004945f0 run, the others' stubbed: named), AL, the mode after
+D ss0005.hnm 0 1 mode 0 -> - AL 0 mode 0
+D ss0005.hnm 0 1 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 0 3 mode 0 -> - AL 0 mode 0
+D ss0005.hnm 0 3 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 1 1 mode 0 -> 00493960 AL 0 mode 0
+D ss0005.hnm 1 1 mode 5 -> 00493960 AL 0 mode 5
+D ss0005.hnm 1 3 mode 0 -> 00493960 AL 0 mode 0
+D ss0005.hnm 1 3 mode 5 -> 00493960 AL 0 mode 5
+D ss0005.hnm 5 1 mode 0 -> 00493960 AL 0 mode 0
+D ss0005.hnm 5 1 mode 5 -> 00493960 AL 0 mode 5
+D ss0005.hnm 5 3 mode 0 -> 00493960 AL 0 mode 0
+D ss0005.hnm 5 3 mode 5 -> 00493960 AL 0 mode 5
+D ss0005.hnm 6 1 mode 0 -> 00493960,figurines-click AL 0 mode 0
+D ss0005.hnm 6 1 mode 5 -> 00493960,figurines-click AL 0 mode 5
+D ss0005.hnm 6 3 mode 0 -> 00493960,figurines-click AL 0 mode 0
+D ss0005.hnm 6 3 mode 5 -> 00493960,figurines-click AL 0 mode 5
+D ss0005.hnm 7 1 mode 0 -> 00493960 AL 0 mode 0
+D ss0005.hnm 7 1 mode 5 -> 00493960 AL 0 mode 5
+D ss0005.hnm 7 3 mode 0 -> 00493960 AL 0 mode 0
+D ss0005.hnm 7 3 mode 5 -> 00493960 AL 0 mode 5
+D ss0005.hnm 8 1 mode 0 -> - AL 0 mode 0
+D ss0005.hnm 8 1 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 8 3 mode 0 -> - AL 0 mode 0
+D ss0005.hnm 8 3 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 13 1 mode 0 -> - AL 0 mode 0
+D ss0005.hnm 13 1 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 13 3 mode 0 -> wheels-click AL 0 mode 0
+D ss0005.hnm 13 3 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 31 1 mode 0 -> 004945f0 AL 0 mode 0
+D ss0005.hnm 31 1 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 31 3 mode 0 -> clouds-click AL 0 mode 0
+D ss0005.hnm 31 3 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 5 2 mode 0 -> 00493960 AL 0 mode 0
+D ss0013.hnm 13 2 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 5 4 mode 0 -> 00493960 AL 0 mode 0
+D ss0013.hnm 13 4 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 5 50 mode 0 -> 00493960 AL 0 mode 0
+D ss0013.hnm 13 50 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 5 0 mode 0 -> 00493960 AL 0 mode 0
+D ss0013.hnm 13 0 mode 5 -> - AL 0 mode 0
+D ss0005.hnm 5 10 mode 0 -> 00493960 AL 0 mode 0
+D ss0013.hnm 13 10 mode 5 -> - AL 0 mode 0
+D SS0005.HNM 5 3 mode 0 -> 00493960 AL 0 mode 0
+D SS0005.HNM 9 3 mode 5 -> - AL 0 mode 0
+D Ss5 5 3 mode 0 -> 00493960 AL 0 mode 0
+D Ss5 9 3 mode 5 -> - AL 0 mode 0
+D sx0005.hnm 5 3 mode 0 -> - AL 0 mode 0
+D sx0005.hnm 9 3 mode 5 -> - AL 0 mode 5
+D ch0005.hnm 5 3 mode 0 -> - AL 0 mode 0
+D ch0005.hnm 9 3 mode 5 -> - AL 0 mode 5
+D S 5 3 mode 0 -> - AL 0 mode 0
+D S 9 3 mode 5 -> - AL 0 mode 5
+D ss0031.hnm 31 3 mode 4 -> clouds-click AL 0 mode 4
+D ch0045.hnm 45 3 mode 5 -> ring-click AL 0 mode 5
+## E: the entry hook dispatcher FUN_0049bd50 alone (the chest's hook runs, the others stubbed: named), the mode before -> the hooks entered, the mode after, the chest slot
+E ss0000.hnm 0 mode 0 -> - mode 0 chest f0/p1/a1 | warn []
+E ss0001.hnm 1 mode 0 -> 004938f0,figurines-entry mode 5 chest f3/p0/a1 | warn []
+E ss0004.hnm 4 mode 0 -> 004938f0,figurines-entry mode 5 chest f3/p0/a1 | warn []
+E ss0005.hnm 5 mode 0 -> 004938f0,figurines-entry mode 5 chest f3/p0/a1 | warn []
+E ss0007.hnm 7 mode 0 -> 004938f0,figurines-entry mode 5 chest f3/p0/a1 | warn []
+E ss0008.hnm 8 mode 0 -> - mode 0 chest f0/p1/a1 | warn []
+E ss0012.hnm 12 mode 0 -> wheels-entry mode 0 chest f0/p1/a1 | warn []
+E ss0013.hnm 13 mode 0 -> wheels-entry mode 0 chest f0/p1/a1 | warn []
+E ss0031.hnm 31 mode 0 -> clouds-entry mode 0 chest f0/p1/a1 | warn []
+E ss0005.hnm 5 mode 2 -> 004938f0,figurines-entry mode 5 chest f3/p0/a1 | warn []
+E SS0006.HNM 6 mode 0 -> 004938f0,figurines-entry mode 5 chest f3/p0/a1 | warn []
+E ch0045.hnm 45 mode 5 -> ring-entry mode 5 chest f0/p1/a1 | warn []
+E la0003.hnm 3 mode 5 -> souls-entry mode 5 chest f0/p1/a1 | warn []
+E ss0031.hnm 31 mode 5 -> clouds-entry mode 5 chest f0/p1/a1 | warn []
+## F: the zone click FUN_0049ca80 (CtrlScenarOUT, the dispatcher, CLICZONE) then the click scan FUN_0045a870 (CtrlScenarIN) on chapi047, a zone of type 3 under the centre, no sprite, RunInit stubbed, then CLICZONE = 0 as the warp frame's last step does: out = the departure scan's lines; hooks = the hooks entered; cliczone = CLICZONE after the handler; click scan = 1 when FUN_0045a870 ran CtrlScenarIN; in = the click scan's lines; sounds; films = AtlHnm_start; resumes = the suspended section resumed (FUN_00483f90) as the film's end does, its lines; chapter = 0x006d1694
+F take 1 view 5 zone 3 33 -> out [] | hooks 00493960 sounds [sound211.apc] | cliczone 33 | click scan 1 | in [] sounds [sound211.apc] films [] | resumes 0 [] chapter 47 | var 1 prise 0 mode 5 chest f3/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | EtatPzEncens 0 flag142 0 | warn []
+F take 2 view 5 zone 3 33 -> out [] | hooks 00493960 sounds [sound212.apc] | cliczone 33 | click scan 1 | in [] sounds [sound212.apc] films [] | resumes 0 [] chapter 47 | var 2 prise 0 mode 5 chest f2/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | EtatPzEncens 0 flag142 0 | warn []
+F take 3 view 5 zone 3 33 -> out [] | hooks 00493960 sounds [sound213.apc] | cliczone 33 | click scan 1 | in [] sounds [sound213.apc] films [] | resumes 0 [] chapter 47 | var 3 prise 0 mode 5 chest f1/p0/a1 chopstick f0/p1/a0 table 2 hand 0 pair (0,0) cursor (0,-1) bag [] | EtatPzEncens 0 flag142 0 | warn []
+F take 4 view 5 zone 3 33 -> out [] | hooks 00493960 sounds [sound214.apc] | cliczone 33 | click scan 1 | in [] sounds [sound214.apc] films [] | resumes 0 [] chapter 47 | var 4 prise 0 mode 5 chest f0/p0/a1 chopstick f0/p1/a1 table 1 hand 0 pair (0,0) cursor (0,-1) bag [] | EtatPzEncens 0 flag142 0 | warn []
+F take 5 view 5 zone 3 33 -> out [] | hooks 00493960 sounds [] | cliczone 33 | click scan 1 | in [] sounds [] films [] | resumes 0 [] chapter 47 | var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | EtatPzEncens 0 flag142 0 | warn []
+F take 6 view 5 zone 3 33 -> out [] | hooks 00493960 sounds [] | cliczone 33 | click scan 1 | in [] sounds [] films [] | resumes 0 [] chapter 47 | var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | EtatPzEncens 0 flag142 0 | warn []
+F ENCENS1 view 6 zone 3 23 -> out [] | hooks 00493960,figurines-click sounds [] | cliczone 23 | click scan 1 | in [44,45,46,47] sounds [] films [] | resumes 0 [] chapter 47 | var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | EtatPzEncens 1 flag142 0 | warn []
+F ENCENS2 view 6 zone 3 24 -> out [] | hooks 00493960,figurines-click sounds [] | cliczone 24 | click scan 1 | in [56,57,58,59] sounds [] films [] | resumes 0 [] chapter 47 | var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | EtatPzEncens 2 flag142 0 | warn []
+F ENCENS3 view 6 zone 3 25 -> out [] | hooks 00493960,figurines-click sounds [] | cliczone 25 | click scan 1 | in [68,69,70,71] sounds [] films [] | resumes 0 [] chapter 47 | var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 102 pair (5,OBJ) cursor (0,-1) bag [102/5/3] | EtatPzEncens 3 flag142 0 | warn []
+F ENCENS4 view 6 zone 3 26 -> out [] | hooks 00493960,figurines-click sounds [] | cliczone 26 | click scan 1 | in [80,81,82,83,84,85,86,87] sounds [] films [cine023.hnm] | resumes 1 [88,89] chapter 48 | var 4 prise 1 mode 5 chest f0/p0/a1 chopstick f0/p1/a0 table 0 hand 0 pair (0,0) cursor (0,-1) bag [] | EtatPzEncens 4 flag142 1 | warn []
+G save entry 26 = 0x006d84d0 4
+## I: the 15 Hz step FUN_0047d7f0 (0x00656a4c set before each, SPW loaded) on view 5's slots after the entry hook, playing as the hook leaves it or set back to 1: the chest slot after each step
+I var 0 playing hook -> f4/p0/a1 f4/p0/a1 f4/p0/a1 f4/p0/a1 f4/p0/a1 f4/p0/a1 f4/p0/a1
+I var 4 playing hook -> f0/p0/a1 f0/p0/a1 f0/p0/a1 f0/p0/a1 f0/p0/a1 f0/p0/a1 f0/p0/a1
+I var 2 playing 1 -> f3/p1/a1 f4/p1/a1 f0/p1/a1 f1/p1/a1 f2/p1/a1 f3/p1/a1 f4/p1/a1
+errors []
+## H: FUN_0047ce60(slot 0, faces, rects) on a single-frame slot (+0x34 = 1, active, click 0) holding CD 3's file at frame f, faces 512 x 512 RGB565 over the background of spw_golden.py (pixel i = (i * 2654435761 mod 2^32) >> 16, md5 4f168fc9c0f17cd896b5ea7f8248e8b6), visible rectangles the whole faces; per face: bg (untouched) or the md5 of its 512 x 512 u16 pixels (little-endian), the changed-pixel count and the pixels at the frame's box centre, first and last corner (x,y=rgb565 hex)
+H file ffa1001001.SPW md5 960003254dae41bc5d68b665e57578bc frames 5
+H ffa1001001.SPW frame 0 AL 0 | f0 9f59c07406e30b4aa852b4ef6191e34d n6833 45,309=18c1 0,255=846e 89,362=e571 | f1 bg | f2 bg | f3 bg | f4 566a0d5c486f02e26d3bf6d1596f08fe n4730 483,309=2081 454,255=1ad0 511,362=41c1 | f5 bg
+H ffa1001001.SPW frame 1 AL 0 | f0 2ed0309114cc262ff79de77b8b6abc1e n6869 45,309=18c1 0,255=846e 89,362=e571 | f1 bg | f2 bg | f3 bg | f4 f9df3a45ec7615be38678c1656438a10 n4730 483,309=2080 454,255=1ad0 511,362=41c1 | f5 bg
+H ffa1001001.SPW frame 2 AL 0 | f0 d1c3460f83fe196f974f476ca03e436d n6898 45,309=18c1 0,255=846e 89,362=e571 | f1 bg | f2 bg | f3 bg | f4 5f36478941fcc3a93e6be326103b462b n4730 483,309=1880 454,255=1ad0 511,362=41c1 | f5 bg
+H ffa1001001.SPW frame 3 AL 0 | f0 b6d9130cea73beb8677501c3bfdff11c n6949 45,309=18c1 0,255=846e 89,362=e571 | f1 bg | f2 bg | f3 bg | f4 0d5096abb9a9bbcbcbecf2d535beb774 n4730 483,309=2080 454,255=1ad0 511,362=41c1 | f5 bg
+H ffa1001001.SPW frame 4 AL 0 | f0 f353169306f6e146fcdb6a96d1af19dc n4872 45,327=0800 0,292=8d9b 89,362=e571 | f1 bg | f2 bg | f3 bg | f4 2aaabb67ff3e0f284ebaed47c918c21c n2753 486,330=1840 460,298=72fe 511,362=41c1 | f5 bg
+H file ffa1002002.SPW md5 1248b250b2e998c3d2607eb8ee944937 frames 5
+H ffa1002002.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 96e284a99547bc0582e257214619bbec n6333 358,293=5981 309,255=7d64 407,330=8fee | f5 bg
+H ffa1002002.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 9ee3a42b91705f565107b36bed342b88 n6333 358,293=5981 309,255=7d64 407,330=8fee | f5 bg
+H ffa1002002.SPW frame 2 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 7c049516f2f5461fcb6731ea19625898 n6333 358,293=3142 309,255=7d64 407,330=8fee | f5 bg
+H ffa1002002.SPW frame 3 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 0ba1d4ee12358aa649ad096df898c9f3 n6385 358,293=7140 309,255=7d64 407,330=8fee | f5 bg
+H ffa1002002.SPW frame 4 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 d7ad9d17acf0a3213cd71f28e0e2f334 n4092 359,309=1840 310,287=fa08 407,330=8fee | f5 bg
+H file ffa1003003.SPW md5 c6994d7de5d9449d9ae7cab1386d3399 frames 5
+H ffa1003003.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 6d692028ab2b6410f20ffdd2bf6c2ab5 n2186 310,277=7980 283,255=6bc2 336,299=3f13 | f5 bg
+H ffa1003003.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 a8fa9e46e6d89e35f026fb8648b2a872 n2186 310,277=7980 283,255=6bc2 336,299=3f13 | f5 bg
+H ffa1003003.SPW frame 2 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 7e8d67470a47138582f9b94a7903cc12 n2186 310,277=6202 283,255=6bc2 336,299=3f13 | f5 bg
+H ffa1003003.SPW frame 3 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 dca4ae89345b01f255465a6c4c601c0a n2189 310,277=8180 283,255=6bc2 336,299=3f13 | f5 bg
+H ffa1003003.SPW frame 4 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 b63d758dcded0300a37bbb79e55764b6 n1324 310,287=1840 283,275=0e84 336,299=3f13 | f5 bg
+H file ffa1004004.SPW md5 386bcbd5b17fddaf9bf38b5db8143252 frames 5
+H ffa1004004.SPW frame 0 AL 0 | f0 1449042996d08030a46a9dabd0949269 n16678 57,379=3183 0,255=846e 114,503=74e9 | f1 bg | f2 bg | f3 bg | f4 9bea9f5a1041374baf9bd2b27f0c0067 n32427 435,378=5243 358,255=c602 511,501=aa27 | f5 bg
+H ffa1004004.SPW frame 1 AL 0 | f0 db2997300f9bf51eb7f81f13b49a387c n16843 57,379=3183 0,255=846e 114,503=74e9 | f1 bg | f2 bg | f3 bg | f4 be7221ebe091d2bf11e7f1dc95be5b2d n32427 435,378=5243 358,255=c602 511,501=aa27 | f5 bg
+H ffa1004004.SPW frame 2 AL 0 | f0 2c2662d4cea3b3e8baeb52a882f04fca n16935 57,379=3183 0,255=846e 114,503=74e9 | f1 bg | f2 bg | f3 bg | f4 7c7f47ffb7fcba077ea4da643328de26 n32426 435,378=5243 358,255=c602 511,501=aa27 | f5 bg
+H ffa1004004.SPW frame 3 AL 0 | f0 c7c2ce6859a7d6b2fc00a1cabb34baf6 n17144 57,379=2983 0,255=846e 114,503=74e9 | f1 bg | f2 bg | f3 bg | f4 ed4afed0c0e8c5954b8c2e0120d049ef n32427 435,378=5243 358,255=c602 511,501=aa27 | f5 bg
+H ffa1004004.SPW frame 4 AL 0 | f0 9f277b7d8d4e2daa19e0805c59151315 n13993 57,414=0800 0,325=dafb 114,503=74e9 | f1 bg | f2 bg | f3 bg | f4 0519a2b3487ad584b5b8dcf68fac8a61 n21658 438,416=0040 364,331=6b90 511,501=aa27 | f5 bg
+H file ffa1005005.SPW md5 6c43313825385c50cece592dabebf0ce frames 5
+H ffa1005005.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 f2ae97b30f636d9c791279b83c804ea5 n57091 274,378=6100 130,255=dc9a 418,500=09f0 | f5 bg
+H ffa1005005.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 46253fa328237c98165b769e9f2345ce n57094 274,378=6100 130,255=dc9a 418,500=09f0 | f5 bg
+H ffa1005005.SPW frame 2 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 d309d5025596b565fdbbf6fb97d39bac n57093 274,378=6100 130,255=dc9a 418,500=09f0 | f5 bg
+H ffa1005005.SPW frame 3 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 79edcc7c7dd33d35a3c47d1e7673af8b n57092 274,378=6140 130,255=dc9a 417,500=6bb8 | f5 bg
+H ffa1005005.SPW frame 4 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 173bdf38cf0d945cfb65753ea5fd2213 n44322 271,416=1081 130,331=ccdb 411,500=b66b | f5 bg
+H file ffa1006006.SPW md5 d559caa6c4b932ac57558a6fd30cfebd frames 5
+H ffa1006006.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 05707ce1ed29de5474746d72fe334be1 n2204 255,278=61c1 230,255=aa45 280,300=09c2 | f5 bg
+H ffa1006006.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 ae2b18f4252f63ba44d8895e720cda90 n2204 255,278=61c1 230,255=aa45 280,300=09c2 | f5 bg
+H ffa1006006.SPW frame 2 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 620da1f14982c60f6a91299313a3f03c n2205 255,278=51c2 230,255=aa45 280,300=09c2 | f5 bg
+H ffa1006006.SPW frame 3 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 96362c1e56f025299c84d00aa32c2efc n2205 255,278=81c2 230,255=aa45 280,300=09c2 | f5 bg
+H ffa1006006.SPW frame 4 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 74054b6121b31cd6c1844ccf157d2ea3 n1313 255,288=1000 230,275=5549 280,300=09c2 | f5 bg
+H file ffa1007007.SPW md5 711ed60e286919417d668a90e1e8cebb frames 5
+H ffa1007007.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 75d27252abf4d1b4bb8110474f6626b8 n2034 258,238=6a43 233,217=0ccb 283,259=278f | f5 bg
+H ffa1007007.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 f9e65da5c8f69a9df35203f1d3707464 n2034 258,238=6a43 233,217=0ccb 283,259=278f | f5 bg
+H ffa1007007.SPW frame 2 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 e7efa57f1a44e19355a64797696ab775 n2034 258,238=6243 233,217=0ccb 283,259=278f | f5 bg
+H ffa1007007.SPW frame 3 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 142855372176eb537e7dec492fa6f5ee n2034 258,238=79c2 233,217=0ccb 283,259=278f | f5 bg
+H ffa1007007.SPW frame 4 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 ac92d8ffcf0964fd36c0fb945f878df4 n1104 258,248=1040 232,237=1998 283,259=278f | f5 bg
+H file bza1005005.SPW md5 7f7c58ef938c4df8908fa8a2a16a3d6b frames 1
+H bza1005005.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 d29ef69d9c04832f9f3b3b679f0730d3 n164 259,345=981f 231,337=e44d 287,353=b5a9 | f5 bg
+H errors []

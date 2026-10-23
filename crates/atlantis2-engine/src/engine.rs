@@ -35,6 +35,7 @@ use crate::turn::{Turn, Zoom};
 use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod blackbird;
+mod chest;
 mod cross;
 mod figurines;
 pub use figurines::FIGURINE_TARGETS;
@@ -45,8 +46,9 @@ pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
 mod places;
 mod puzzles;
 pub use puzzles::{
-    chinese_click_hooks, chinese_entry_hooks, irish_click_hook, irish_entry_hook,
-    mandala_hook_applies, ported_place, ChinesePuzzle, MANDALAS, SKULL_OBJECTS, SKULL_START,
+    chest_mode_cleared, chinese_click_hooks, chinese_entry_hooks, irish_click_hook,
+    irish_entry_hook, mandala_hook_applies, ported_place, ChinesePuzzle, MANDALAS, SKULL_OBJECTS,
+    SKULL_START,
 };
 mod saves;
 mod subjects;
@@ -2534,6 +2536,13 @@ impl Engine {
     pub fn take_slot(&mut self, n: usize) {
         self.sprite_hit = Some(n);
         self.sprite_click();
+    }
+
+    /// Loads the current view's place animations again, as its entry
+    /// does before the puzzles' set-up, without that set-up: for tests
+    /// and tools (a puzzle hook run alone on the slots as loaded).
+    pub fn reload_animations(&mut self) {
+        self.load_animations(self.view);
     }
 
     /// The per-view reset of an arrival frame (@ 0x00483ce0): for tests

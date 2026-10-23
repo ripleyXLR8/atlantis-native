@@ -139,8 +139,8 @@ fn bare(files: A2Files, name: &str, view: u32) -> Engine {
     e
 }
 
-/// The puzzle hooks run or noted in `events`, in order (the figurines'
-/// run, the others are noted).
+/// The puzzle hooks reached in `events`, in order: run (the ported ones) or
+/// noted (the others).
 fn noted(events: &[Event]) -> Vec<u32> {
     events
         .iter()
@@ -262,7 +262,9 @@ fn the_chinese_click_hooks_take_no_click() {
     let Some(files) = game() else { return };
     // Each case: a zone clicked, its hooks noted in order, then `CLICZONE`
     // and the click scan (types 3, 4, 50) or the move (types 1, 2), as
-    // without them.
+    // without them. The chest's entry (views 5 and 6) leaves the puzzle
+    // mode 5: the first click in view 13 clears it and runs no hook
+    // (@ 0x0049b96d..0x0049b984); the case's click is the second.
     let cases: [(&str, u32, &str, Vec<u32>); 5] = [
         (
             "miniature.wam",
@@ -283,6 +285,19 @@ fn the_chinese_click_hooks_take_no_click() {
         let z = zone(&e, named(name));
         let value = e.wam().view(view).unwrap().zones[z].value;
         aim(&mut e, z);
+        if view == 13 {
+            assert_eq!(e.puzzle_mode(), 5);
+            e.events.clear();
+            t += 10.0;
+            e.click(t);
+            e.pass(None);
+            assert_eq!(
+                noted(&e.events),
+                Vec::<u32>::new(),
+                "{name}: the mode cleared"
+            );
+            assert_eq!(e.puzzle_mode(), 0);
+        }
         e.events.clear();
         t += 10.0;
         e.click(t);
@@ -857,14 +872,6 @@ fn the_aid_writes_the_wins() {
     let mut e = in_china(files);
     goto(&mut e, "miniature.wam", 6, 48);
     e.events.clear();
-    e.solve_chinese_puzzle(ChinesePuzzle::Chest);
-    let s = e.script_state().unwrap();
-    let chopstick = s.names.id(defnames::OBJETS, b"BAGUETTE").unwrap() as i32;
-    assert!(e.bag_entries().iter().any(|b| b.id == chopstick));
-    assert_eq!(
-        (var(&e, "frame_coffre_chine"), var(&e, "BAGUETTE_PRISE")),
-        (4, 1)
-    );
     e.solve_chinese_puzzle(ChinesePuzzle::WheelsFirst);
     assert_eq!(e.loop_type, LoopType::Video);
     assert!(e.events.iter().any(

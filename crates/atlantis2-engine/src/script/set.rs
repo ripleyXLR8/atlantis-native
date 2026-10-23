@@ -686,7 +686,7 @@ impl Script {
     }
 
     /// FUN_0048c610: show.
-    fn show(&mut self, host: &mut dyn Host, id: i32, kind: i32, number: i32) {
+    pub(crate) fn show(&mut self, host: &mut dyn Host, id: i32, kind: i32, number: i32) {
         host.anim(AnimOp::Show { kind, id, number });
         self.show_row(id, true, kind);
         host.show_table(id, true, kind);
