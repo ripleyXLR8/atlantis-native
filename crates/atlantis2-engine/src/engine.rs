@@ -34,6 +34,7 @@ use crate::subtitle::SubtitleFont;
 use crate::turn::Turn;
 use crate::warp::{faces_from_hnm, Renderer, Variant};
 
+mod cross;
 mod host;
 mod menus;
 mod places;
@@ -115,6 +116,10 @@ pub enum Event {
     /// A puzzle hook the port does not have (Ireland's four puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
+    /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
+    CrossLaid { value: i32 },
+    /// Brigid's cross taken back from the zone of value `value`.
+    CrossTaken { value: i32 },
     /// A move to another place (a type-2 zone, @ 0x0040fc60): its file,
     /// the view, and whether it waits for the turn (deferred) or is made
     /// at once.
@@ -419,6 +424,9 @@ pub struct Engine {
     dialog_prev_loop: LoopType,
     /// The music's volume and fades.
     pub music: MusicVolume,
+    /// Brigid's cross slot's id (@ 0x006d26b8), kept by the view 2
+    /// entry hook (`DefName_GetIdName(1, "CROIXBRIGIT_SPRITE")`).
+    cross_sprite: i32,
     /// The blackbird game's two answer sounds are loaded (its view entry,
     /// FUN_004958f0, loads them; its move-zone hook frees them): the port
     /// keeps only the fact, for the voice their free stops.
@@ -788,6 +796,7 @@ impl Engine {
             // No music plays until a script starts one: the fades only run
             // then, as `FUN_004770c0` is refused while stopped.
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
+            cross_sprite: 0,
             blackbird_sounds: false,
             enhancements: Enhancements::default(),
             voices: Voices::new(),

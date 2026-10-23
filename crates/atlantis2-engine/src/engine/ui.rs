@@ -53,7 +53,7 @@ impl Engine {
     }
 
     /// `OBJETENMAIN` = `id`.
-    fn set_objetenmain(&mut self, id: i32) {
+    pub(super) fn set_objetenmain(&mut self, id: i32) {
         self.vars.objet_en_main = id;
         self.set_script_var(|k| k.objetenmain, id);
         if let Some(h) = self.hand.as_mut() {
