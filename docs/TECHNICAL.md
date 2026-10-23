@@ -1038,8 +1038,9 @@ event, the gong's way back to Tibet) into `china-*.png`.
   monk asked about all they offer, the gong taken and struck), and
   `tests/china.rs` runs every Chinese chapter's `/INIT`, enters every
   view of the five places with its hooks, moves along every link,
-  plays all 115 dialogs the chapters start, and checks the subjects,
-  objects and musics on disc 3.
+  plays all 115 dialogs the chapters start, checks the subjects,
+  objects and musics on disc 3, and loads a game saved in the turtle
+  room.
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,
