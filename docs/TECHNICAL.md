@@ -786,10 +786,11 @@ event, the gong's way back to Tibet) into `china-*.png`.
   original's texel in 98.7 to 99.3 % of them (the 32-pixel perspective
   steps and the fixed point fall elsewhere over more pixels), no HD pixel
   lies off the original's footprint and its neighbours, and the head has
-  nine times the pixels. The layer is then the first game's dialog picture
+  nine times the pixels; the original's draws after an HD draw are those
+  of a head never drawn in HD (frames, Z buffers and control word, both
+  variants). The layer is then the first game's dialog picture
   (`compose_dialog`, its rows now shared out among the cores): the HD
-  view, the body upscaled over it (bilinearly; as pixels with
-  `hd_interface = pixels`), the HD head where the original's head was
+  view, the body upscaled over it (bilinearly), the HD head where the original's head was
   drawn and the pixels next to it, and with widescreen a character
   touching one edge of the picture moved to the wide picture's edge; the
   dialog's view is drawn once and kept while the camera, the faces and the
@@ -802,13 +803,21 @@ event, the gong's way back to Tibet) into `china-*.png`.
   the window's size (`SubtitleFont::draw_hd`): each glyph at its pen
   position of the original (the `hdmx` advances, the line breaks of the
   original's layout, the `VDMX` ascent), scaled, the outline rasterised at
-  16 (or 13) pixels per em times the scale and blended by its coverage
-  (`hd_sharp_subtitles = off` leaves the 640x480 glyphs, upscaled). The
+  16 (or 13) pixels per em times the scale and blended by its coverage.
+  The window draws them again exactly where the compositor uncovered the
+  640x480 glyphs (`HdCompositor::uncovers_texts`: sharp subtitles, or a
+  video zoomed to the widescreen sides), so no option leaves a text
+  undrawn (a test composes every option against it). Only `--hd` and
+  `--widescreen` reach Atlantis II's `hd_options` for now (no
+  `settings.ini` key or menu yet): its other options keep the first
+  game's defaults (the bicubic, sharpened panorama, the smoothed art,
+  sharp subtitles, black bars beside a video). The
   credits' texts fade with their pages: the old page's at 255 − alpha, the
   new one's at alpha, over the pictures blended without their texts (the
   original blends the pictures with their texts; the two differ by a
   fraction of the fade where both pages have text). A test plays dialog
-  360 both ways (the 640x480 frames the same, the layer the frame before
+  360 both ways, with the Pentium II's routines and the C ones (the
+  640x480 frames the same, the layer the frame before
   the subtitles, the subtitles the original's calls, the HD head in the
   layer), and the bag's names, a menu tooltip and the credits likewise;
   others check the recorded texts' pixels and, at three sizes, that every

@@ -4,6 +4,8 @@
 //!
 //! - a head drawn by [`Head::draw_scaled`] at tile 16 (640x480) is the
 //!   original's frame and Z buffer, bit for bit, with every variant;
+//! - the HD draw leaves nothing behind: the original's draws that follow
+//!   it are those of a head never drawn in HD;
 //! - at tile 48 (three times larger) its pixel at the centre of each
 //!   original pixel is the original's texel nearly everywhere, and it
 //!   covers the original's footprint;
@@ -11,7 +13,7 @@
 //!   compositor's uncovering puts back what was under them;
 //! - with the game (`ATLANTIS2_DATA`, `ATLANTIS2_DISCS`; skipped without):
 //!   a dialog played with the HD mode on gives the 640x480 frames of the
-//!   HD mode off; its layer stands for the frame before the subtitles; the
+//!   HD mode off, with either variant; its layer stands for the frame before the subtitles; the
 //!   subtitles are recorded with the original's layout.
 
 use std::path::PathBuf;
@@ -118,6 +120,35 @@ fn hd_head_at_640x480_is_the_original() {
         }
     }
     assert!(n >= 6 * 14, "{n} frames");
+}
+
+/// The HD draw leaves nothing behind: a head drawn by the original's
+/// pipeline after an HD draw at tile 48 gives the frames and Z buffers of
+/// the same head never drawn in HD (every variant, every camera, the
+/// poses and mouths of [`draw_pair`] in turn).
+#[test]
+fn hd_head_leaves_the_original_draws_unchanged() {
+    let Some(files) = game() else { return };
+    for db in HEADS {
+        for (variant, fpu) in VARIANTS {
+            let mut plain = load_head(&files, db, variant, fpu);
+            let mut hd = load_head(&files, db, variant, fpu);
+            let (mut r1, mut r2) = (Rand::new(7), Rand::new(7));
+            for cam in 0..plain.camera_count() {
+                for frame in (1..=40).step_by(3) {
+                    plain.pose(frame);
+                    plain.mouth(1, &[0.0, 0.0, 0.6, 0.0, 0.4, 0.0, 0.0]);
+                    let mut px = vec![0xf81fu16; WIDTH * HEIGHT];
+                    let mut z = vec![0u32; WIDTH * HEIGHT];
+                    plain.display(cam, &mut r1, &mut px, &mut z);
+                    let p = draw_pair(&mut hd, frame, cam, 48, &mut r2);
+                    assert!(p.px == px, "{db} {variant:?} camera {cam} frame {frame}");
+                    assert!(p.z == z, "{db} {variant:?} camera {cam} frame {frame}: Z");
+                    assert_eq!(plain.fpu(), hd.fpu(), "{db} {variant:?}");
+                }
+            }
+        }
+    }
 }
 
 /// At tile 48 the HD pixel (3x + 1, 3y + 1) is sampled at the centre of
@@ -296,9 +327,10 @@ fn hd_texts_keep_the_original_layout() {
     }
 }
 
-/// A new game's first view with dialog `number` started over it.
-fn dialog(files: A2Files, number: u32, hd: bool) -> Engine {
-    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+/// A new game's first view with dialog `number` started over it, with
+/// the routines of `variant`.
+fn dialog(files: A2Files, number: u32, hd: bool, (variant, fpu): (Variant, Fpu)) -> Engine {
+    let mut e = Engine::boot(files, variant, fpu, 640, 480).unwrap();
     e.enhancements = Enhancements {
         hd,
         ..Enhancements::default()
@@ -321,18 +353,27 @@ fn dialog(files: A2Files, number: u32, hd: bool) -> Engine {
     e
 }
 
-/// Dialog 360 (Tibet's shaman, its four lines): the HD mode on gives the
-/// original's frames; each frame's layer stands for the frame before the
-/// subtitles (the frame differs from it only by the recorded glyphs); the
-/// layer shows the head at the HD size; the subtitles recorded are the
-/// layout of the line on screen.
+/// Dialog 360 (Tibet's shaman, its four lines), with the Pentium II's
+/// routines and the C ones: the HD mode on gives the original's frames
+/// (the HD head's draw leaves nothing behind for the next original draw);
+/// each frame's layer stands for the frame before the subtitles (the
+/// frame differs from it only by the recorded glyphs); the layer shows the
+/// head at the HD size; the subtitles recorded are the layout of the line
+/// on screen.
 #[test]
 fn hd_dialog_keeps_the_original_frames() {
     if game().is_none() {
         return;
     }
-    let mut off = dialog(game().unwrap(), 360, false);
-    let mut on = dialog(game().unwrap(), 360, true);
+    for variant in VARIANTS {
+        dialog_both_ways(variant);
+    }
+}
+
+fn dialog_both_ways(variant: (Variant, Fpu)) {
+    let v = variant.0;
+    let mut off = dialog(game().unwrap(), 360, false, variant);
+    let mut on = dialog(game().unwrap(), 360, true, variant);
     for e in [&mut off, &mut on] {
         e.set_hd_output(Some(24), 3);
     }
@@ -349,7 +390,7 @@ fn hd_dialog_keeps_the_original_frames() {
         }
         off.pass(Some(&mut a));
         on.pass(Some(&mut b));
-        assert!(a == b, "frame {i} differs with the HD mode");
+        assert!(a == b, "{v:?}: frame {i} differs with the HD mode");
         assert!(off.hd_layer().is_none() && off.hd_texts().is_none());
         if on.loop_type != LoopType::Dialog {
             break;
@@ -428,10 +469,10 @@ fn hd_dialog_keeps_the_original_frames() {
             heads += 1;
         }
     }
-    eprintln!("{layers} frames with the layer, {texts} with subtitles, {heads} with a head");
+    eprintln!("{v:?}: {layers} frames with the layer, {texts} with subtitles, {heads} with a head");
     assert!(
         layers > 300 && texts > 300 && heads > 300,
-        "{layers} {texts} {heads}"
+        "{v:?}: {layers} {texts} {heads}"
     );
 }
 
@@ -478,7 +519,7 @@ fn hd_texts_of_the_menus_bag_and_credits() {
         return;
     }
     let boot = |hd| {
-        let mut e = dialog(game().unwrap(), 360, hd);
+        let mut e = dialog(game().unwrap(), 360, hd, VARIANTS[0]);
         e.end_dialog();
         e.set_hd_output(Some(36), 0);
         e

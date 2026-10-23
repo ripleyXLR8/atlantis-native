@@ -613,6 +613,16 @@ impl HdCompositor {
         true
     }
 
+    /// Whether [`HdCompositor::compose`] puts back what was under the
+    /// 640x480 glyphs of `f.texts` (the picture at `ox` in the window):
+    /// with sharp subtitles, and on a video zoomed to the window's sides
+    /// (whose texts are always drawn again at the window's size). A front
+    /// end that draws its texts itself (rather than through
+    /// [`HdText::items`]) draws them again exactly then.
+    pub fn uncovers_texts(f: &HdFrame<'_>, opts: HdOptions, ox: usize) -> bool {
+        opts.sharp_subtitles || video_bars(f, opts, ox) == Some(VideoSides::Zoom)
+    }
+
     /// The frame and the maps of a composition: the frame with its text
     /// uncovered, the video's sides, how the pixels are scaled, the axes,
     /// the upscaled art brought up to date.
@@ -629,11 +639,8 @@ impl HdCompositor {
         let (w, h) = (SCREEN_W, SCREEN_H);
         self.frame.clear();
         self.frame.extend_from_slice(f.screen);
-        // Widescreen sides of a video (a frame without an HD layer).
-        let video_bars = (f.photo && f.layer.is_none() && opts.widescreen && ox > 0)
-            .then_some(opts.video_sides)
-            .filter(|&v| v != VideoSides::Black);
-        if opts.sharp_subtitles || video_bars == Some(VideoSides::Zoom) {
+        let video_bars = video_bars(f, opts, ox);
+        if Self::uncovers_texts(f, opts, ox) {
             for t in f.texts {
                 t.uncover(&mut self.frame);
             }
@@ -1084,6 +1091,14 @@ impl HdCompositor {
         });
         self.draw_text_items(&f, out, stride, (ox, oy, dw, dh), lut, 0);
     }
+}
+
+/// Widescreen: what fills the sides of a video's frame (a frame without
+/// an HD layer), none when they stay black.
+fn video_bars(f: &HdFrame<'_>, opts: HdOptions, ox: usize) -> Option<VideoSides> {
+    (f.photo && f.layer.is_none() && opts.widescreen && ox > 0)
+        .then_some(opts.video_sides)
+        .filter(|&v| v != VideoSides::Black)
 }
 
 /// The HD picture of a frame.
