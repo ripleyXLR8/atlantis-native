@@ -14,7 +14,7 @@ pub const MAX_SLOTS: usize = 0x22;
 pub const FRAME_TAB: usize = 0x80;
 
 /// A frame table's end (and the fill of a new one, @ 0x0047c68a).
-const TAB_END: u8 = 0xfe;
+const LIST_END: u8 = 0xfe;
 
 /// A frame table's entry the draw skips (−1).
 const TAB_SKIP: u8 = 0xff;
@@ -98,7 +98,7 @@ pub struct Slot {
     /// +0x3c: the frame table a slot whose state is not a single frame
     /// (+0x34 ≠ 1) draws: signed frame numbers, −1 skipped, ended by −2
     /// (0xfe, the whole table's fill at load).
-    pub frame_tab: [u8; FRAME_TAB],
+    pub frames: [u8; FRAME_TAB],
     /// +0xc4: the countdown of the random pause.
     pub delay: i32,
 }
@@ -218,7 +218,7 @@ impl Anim {
             chain: -1,
             active,
             object_sprite,
-            frame_tab: [TAB_END; FRAME_TAB],
+            frames: [LIST_END; FRAME_TAB],
             delay: state.delay.wrapping_abs(),
         });
     }
@@ -227,14 +227,14 @@ impl Anim {
     /// end mark of the frame table of every slot of id `id` (any kind);
     /// a full table is left as it is. False, with the original's warning,
     /// when no slot has that id or when the last slot of that id is full.
-    pub fn add_to_frame_tab(&mut self, id: i32, frame: i32) -> bool {
+    pub fn add_frame(&mut self, id: i32, frame: i32) -> bool {
         // EAX: −1 until a slot of that id, then that slot's search result
         // (the index written, or 0x80 when it found no end mark).
         let mut last: Option<usize> = None;
         for s in self.slots.iter_mut().filter(|s| s.id == id) {
-            let at = s.frame_tab.iter().position(|&b| b == TAB_END);
+            let at = s.frames.iter().position(|&b| b == LIST_END);
             if let Some(k) = at {
-                s.frame_tab[k] = frame as u8;
+                s.frames[k] = frame as u8;
             }
             last = Some(at.unwrap_or(FRAME_TAB));
         }
@@ -260,15 +260,15 @@ impl Anim {
     /// found; a slot whose table has no end mark is passed over, the
     /// found entry carried on. False, with the original's warning, when
     /// that slot does not hold `frame`; true when no slot is searched.
-    pub fn sub_from_frame_tab(&mut self, id: i32, frame: i32) -> bool {
+    pub fn sub_frame(&mut self, id: i32, frame: i32) -> bool {
         let mut found: Option<usize> = None;
         for s in self.slots.iter_mut().filter(|s| s.id == id) {
             for k in 0..FRAME_TAB {
-                let b = s.frame_tab[k];
+                let b = s.frames[k];
                 if i32::from(b as i8) == frame {
                     found = Some(k);
                 }
-                if b == TAB_END || found == Some(0x7f) {
+                if b == LIST_END || found == Some(0x7f) {
                     let Some(f) = found else {
                         log::warn!("SubSpwToFrameTab impossible !! for :{id} {frame}");
                         self.warnings.push(SUB_NOT_FOUND);
@@ -279,12 +279,12 @@ impl Anim {
                     // before the table, +0x3b: the top byte of +0x38.
                     if k == 0 {
                         let mut sprite = s.object_sprite.to_le_bytes();
-                        s.frame_tab[f] = sprite[3];
-                        sprite[3] = TAB_END;
+                        s.frames[f] = sprite[3];
+                        sprite[3] = LIST_END;
                         s.object_sprite = i32::from_le_bytes(sprite);
                     } else {
-                        s.frame_tab[f] = s.frame_tab[k - 1];
-                        s.frame_tab[k - 1] = TAB_END;
+                        s.frames[f] = s.frames[k - 1];
+                        s.frames[k - 1] = LIST_END;
                     }
                     return true;
                 }
@@ -296,17 +296,29 @@ impl Anim {
     /// FUN_0047c9c0: whether a slot of id `id` holds `frame` anywhere in
     /// its 128 bytes (end marks included: −2 is found in any table not
     /// full).
-    pub fn in_frame_tab(&self, id: i32, frame: i32) -> bool {
+    pub fn has_frame(&self, id: i32, frame: i32) -> bool {
         self.slots
             .iter()
             .filter(|s| s.id == id)
-            .any(|s| s.frame_tab.iter().any(|&b| i32::from(b as i8) == frame))
+            .any(|s| s.frames.iter().any(|&b| i32::from(b as i8) == frame))
+    }
+
+    /// Slot `n`'s frame table up to its end, as signed bytes (for tests
+    /// and tools).
+    pub fn frame_list(&self, n: usize) -> Vec<i32> {
+        self.slots.get(n).map_or(Vec::new(), |s| {
+            s.frames
+                .iter()
+                .take_while(|&&b| b != LIST_END)
+                .map(|&b| i32::from(b as i8))
+                .collect()
+        })
     }
 
     /// FUN_0047ca10: the frame tables of the slots of id `id` emptied.
-    pub fn clear_frame_tab(&mut self, id: i32) {
+    pub fn clear_frames(&mut self, id: i32) {
         for s in self.slots.iter_mut().filter(|s| s.id == id) {
-            s.frame_tab = [TAB_END; FRAME_TAB];
+            s.frames = [LIST_END; FRAME_TAB];
         }
     }
 
@@ -450,9 +462,9 @@ impl Anim {
             let frames: Vec<i32> = if s.state.single == 1 {
                 vec![s.frame]
             } else {
-                s.frame_tab
+                s.frames
                     .iter()
-                    .take_while(|&&b| b != TAB_END)
+                    .take_while(|&&b| b != LIST_END)
                     .filter(|&&b| b != TAB_SKIP)
                     .map(|&b| i32::from(b as i8))
                     .collect()

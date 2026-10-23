@@ -82,12 +82,12 @@ impl Engine {
     pub fn cross_entry(&mut self) {
         let id = self.object_index(SPRITE);
         self.cross_sprite = id;
-        if self.anim.in_frame_tab(id, 0) {
-            self.anim.sub_from_frame_tab(id, 0);
+        if self.anim.has_frame(id, 0) {
+            self.anim.sub_frame(id, 0);
         }
         let state = self.cross_state();
         if state > 0 {
-            self.anim.add_to_frame_tab(id, state - 1);
+            self.anim.add_frame(id, state - 1);
         }
     }
 
@@ -102,7 +102,7 @@ impl Engine {
             self.drop_hand();
             self.with_script(|s, _| s.bag_remove(cross));
             self.set_cross_state(value);
-            self.anim.add_to_frame_tab(self.cross_sprite, value - 1);
+            self.anim.add_frame(self.cross_sprite, value - 1);
             if value == 1 {
                 self.with_script(|s, h| {
                     s.set_var("FINCROIX", value);
@@ -115,7 +115,7 @@ impl Engine {
             });
             self.event(Event::CrossLaid { value });
         } else if value == self.cross_state() {
-            self.anim.sub_from_frame_tab(self.cross_sprite, value - 1);
+            self.anim.sub_frame(self.cross_sprite, value - 1);
             let sprite = self.names.param(defnames::OBJETS, CROSS);
             self.set_cursor_pair(CursorBank::Objects, sprite);
             // FUN_00475340: `OBJETENMAIN` and the hand pair (the

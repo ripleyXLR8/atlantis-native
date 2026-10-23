@@ -102,9 +102,9 @@ fn the_frame_table_functions_as_the_original() {
     let tabs = |a: &Anim| {
         format!(
             "{} {} {}",
-            tab(&a.slots[0].frame_tab),
-            tab(&a.slots[1].frame_tab),
-            tab(&a.slots[2].frame_tab)
+            tab(&a.slots[0].frames),
+            tab(&a.slots[1].frames),
+            tab(&a.slots[2].frames)
         )
     };
     let golden = rows("A ");
@@ -117,9 +117,9 @@ fn the_frame_table_functions_as_the_original() {
         let w: Vec<&str> = row.split(' ').collect();
         let (op, id, f): (&str, i32, i32) = (w[1], w[2].parse().unwrap(), w[3].parse().unwrap());
         let r = match op {
-            "add" => a.add_to_frame_tab(id, f),
-            "sub" => a.sub_from_frame_tab(id, f),
-            _ => a.in_frame_tab(id, f),
+            "add" => a.add_frame(id, f),
+            "sub" => a.sub_frame(id, f),
+            _ => a.has_frame(id, f),
         };
         let t = tabs(&a);
         got.push(format!(
@@ -131,9 +131,9 @@ fn the_frame_table_functions_as_the_original() {
     // A table filled to its 128 entries, then searched.
     let mut a = setup();
     let rs: Vec<i32> = (0..129)
-        .map(|k| i32::from(a.add_to_frame_tab(5, k % 100)))
+        .map(|k| i32::from(a.add_frame(5, k % 100)))
         .collect();
-    let raw = a.slots[1].frame_tab;
+    let raw = a.slots[1].frames;
     got.push(format!(
         "A full: 129 adds of k mod 100 on id 5 -> {}..{} | bytes 0-3 {} 126-127 {} | warn {}",
         lst(&rs[..3]),
@@ -143,9 +143,9 @@ fn the_frame_table_functions_as_the_original() {
         warns(&mut a)
     ));
     for f in [27, 99, 26] {
-        let r = i32::from(a.in_frame_tab(5, f));
-        let r2 = i32::from(a.sub_from_frame_tab(5, f));
-        let raw = a.slots[1].frame_tab;
+        let r = i32::from(a.has_frame(5, f));
+        let r2 = i32::from(a.sub_frame(5, f));
+        let raw = a.slots[1].frames;
         got.push(format!(
             "A full: has 5 {f} -> {r}, sub 5 {f} -> {r2} | bytes 25-28 {} 98-100 {} 126-127 {} | warn {}",
             lst(&raw[25..29]),
@@ -156,9 +156,9 @@ fn the_frame_table_functions_as_the_original() {
     }
     let mut a = setup();
     for k in [3, 1, 2] {
-        a.add_to_frame_tab(27, k);
+        a.add_frame(27, k);
     }
-    a.clear_frame_tab(27);
+    a.clear_frames(27);
     got.push(format!("A clear 27 after adds 3 1 2 | {}", tabs(&a)));
     assert_eq!(got, golden);
 }
@@ -245,7 +245,7 @@ fn cross_slot(e: &Engine) -> Option<usize> {
 /// cursor pair, the hand pair, the bag, `FINCROIX`, `flagdeesse`.
 fn st(e: &Engine) -> String {
     let s = e.script_state().unwrap();
-    let t = cross_slot(e).map_or("-".to_string(), |n| tab(&e.anim.slots[n].frame_tab));
+    let t = cross_slot(e).map_or("-".to_string(), |n| tab(&e.anim.slots[n].frames));
     let cursor = match (e.cursor.shown, e.cursor.bank) {
         (None, _) => "(0,-1)".to_string(),
         (Some(f), CursorBank::Objects) => format!("(OBJ,{f})"),
@@ -327,7 +327,7 @@ fn the_entry_and_click_hooks_as_the_original() {
         let times: usize = w[6].parse().unwrap();
         fresh(&mut e, 1, 0);
         for &f in &pre {
-            assert!(e.anim.add_to_frame_tab(sprite, f));
+            assert!(e.anim.add_frame(sprite, f));
         }
         e.set_cross_state(st0);
         for _ in 0..times {
@@ -547,7 +547,7 @@ fn the_cross_is_drawn_from_its_frame_table_as_the_original() {
             state(0, click),
         );
         for (k, &f) in table.iter().enumerate() {
-            a.slots[0].frame_tab[k] = f as u8;
+            a.slots[0].frames[k] = f as u8;
         }
         a
     };
@@ -961,7 +961,7 @@ fn the_cross_played_with_the_mouse_from_chapter_19_to_the_goddess() {
     assert_eq!(r.e.script_state().unwrap().chapter, 16);
     assert_eq!((r.e.cross_state(), r.var("FINCROIX")), (0, 0));
     let slot = cross_slot(&r.e).expect("the cross's slot");
-    assert_eq!(tab(&r.e.anim.slots[slot].frame_tab), "[]");
+    assert_eq!(tab(&r.e.anim.slots[slot].frames), "[]");
     r.shot("2-the-place");
 
     // An empty hand on a place: the sound of a move, nothing else.
@@ -976,7 +976,7 @@ fn the_cross_played_with_the_mouse_from_chapter_19_to_the_goddess() {
     assert!(evs.contains(&Event::CrossLaid { value: 5 }));
     assert_eq!(sounds(&evs), "[sound008.apc,sound009.apc]");
     assert_eq!(r.e.cross_state(), 5);
-    assert_eq!(tab(&r.e.anim.slots[slot].frame_tab), "[4]");
+    assert_eq!(tab(&r.e.anim.slots[slot].frames), "[4]");
     assert_eq!(r.var("OBJETENMAIN"), 0);
     assert!(!r.e.bag_entries().iter().any(|b| b.id == cross));
     assert_eq!(r.var("FINCROIX"), 0);
@@ -991,7 +991,7 @@ fn the_cross_played_with_the_mouse_from_chapter_19_to_the_goddess() {
     assert!(evs.contains(&Event::CrossTaken { value: 5 }));
     assert_eq!(r.var("OBJETENMAIN"), cross);
     assert!(r.e.bag_entries().iter().any(|b| b.id == cross));
-    assert_eq!(tab(&r.e.anim.slots[slot].frame_tab), "[]");
+    assert_eq!(tab(&r.e.anim.slots[slot].frames), "[]");
 
     // Laid on the place of value 1: the win. `FINCROIX`, chapter 16's
     // section (lines 5-9): the goddess's film (its track cut by the two
@@ -1059,5 +1059,5 @@ fn the_cross_state_is_saved_and_drawn_again_after_a_load() {
     e.load_data(&d).unwrap();
     assert_eq!(e.cross_state(), 7);
     let n = cross_slot(&e).unwrap();
-    assert_eq!(tab(&e.anim.slots[n].frame_tab), "[6]");
+    assert_eq!(tab(&e.anim.slots[n].frames), "[6]");
 }
