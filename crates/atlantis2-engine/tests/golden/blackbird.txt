@@ -1,0 +1,332 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) and scenar\chapi020.con (MD5
+# 517219f171f8fa963f153b663b201c65): the blackbird songs of Ireland's view 73
+# (ilepoete.wam). Names of defnames.con entries are written {S:I} (section, index).
+# A: the state at start-up, the view's zones and slots, the subjects bank's sizes.
+# B: random(n) (@ 0x004958c0) for every rand() output. C: the five songs (@ 0x004959a0)
+# from srand(seed). D: the view entry (@ 0x004958f0) on sound-table states. E: the
+# grid test (@ 0x00485620) as the game calls it. F: the click (@ 0x00495ae0) in modes
+# without a branch. G: the click in mode 1 (a round). H: the click in mode 3 (an
+# answer). I: the song under the pointer (@ 0x00495a70). J: the fixed menu
+# (@ 0x0047fc70). K: leaving by a move zone (@ 0x004959f0). L: the warp frame
+# (@ 0x0049ce20) pass by pass with chapter 20, the poet under the centre.
+A at start-up (.bss): mode 0 count 0 right 0 flag51 0 songs 0,0,0,0,0 handles 0,0,0,0,0 bad 0 good 0
+A ilepoete.wam view 73 (ir0073.hnm): zones 0:type 1 value 74 1:type 1 value 72; slots 0:id 64 kind 2 click 0 active 1 1:id 32 kind 1 click 2 active 0 2:id 31 kind 1 click 2 active 1 3:id 31 kind 1 click 2 active 0 4:id 33 kind 1 click 0 active 1 5:id 33 kind 1 click 0 active 0 6:id 30 kind 1 click 0 active 1
+A ids: {0:31} 31 {0:32} 32 {3:93} 93 {3:10} 10 {3:92} 92 subjects {2:11} 11 {2:22} 22 {2:19} 19
+A subjects bank sujeire.spr md5 40f92cb6e1599189120a07c6217b8fac, 32 sprites; 0:62x62 26:50x36 27:38x36 28:50x27 29:41x39 30:49x34
+B n=3 md5 443405866b22f9d72711762618eb9b7b | 0:10923@0..10922 1:10922@10923..21844 2:10922@21845..32766 3:1@32767..32767
+B n=5 md5 c8fa74f3784ca16b5ea9595d67b1747e | 0:6554@0..6553 1:6553@6554..13106 2:6554@13107..19660 3:6553@19661..26213 4:6553@26214..32766 5:1@32767..32767
+B n=10 md5 a079311b215c38ef616496ead690713e | 0:3277@0..3276 1:3277@3277..6553 2:3277@6554..9830 3:3276@9831..13106 4:3277@13107..16383 5:3277@16384..19660 6:3276@19661..22936 7:3277@22937..26213 8:3277@26214..29490 9:3276@29491..32766 10:1@32767..32767
+C seed 0: songs 1,3,7,4,10 calls 8 state 7e1dbec8
+C seed 1: songs 1,6,2,9,5 calls 6 state 3d6c1037
+C seed 2: songs 1,9,8,6,5 calls 7 state 38fe7d93
+C seed 3: songs 1,3,8,6,9 calls 9 state ea5147c2
+C seed 4: songs 1,6,9,7,4 calls 9 state aad0dedf
+C seed 5: songs 1,9,4,8,10 calls 6 state 7ac6fb9b
+C seed 6: songs 1,3,10,5,2 calls 5 state 9456bec5
+C seed 7: songs 1,6,5,3,2 calls 6 state 9974714d
+C seed 8: songs 1,9,10,8,4 calls 6 state a8cb2c26
+C seed 9: songs 1,2,6,7,5 calls 6 state b821e6ff
+C seed 10: songs 1,6,5,3,4 calls 9 state 2dce698d
+C seed 11: songs 1,9,7,2,8 calls 5 state 5dcb9e06
+C seed 12: songs 1,2,9,8,4 calls 7 state b2930025
+C seed 13: songs 1,5,8,7,4 calls 5 state ae60c420
+C seed 14: songs 1,9,3,4,7 calls 5 state d6ab572d
+C seed 15: songs 1,2,9,10,7 calls 7 state d70c5a84
+C seed 1000: songs 2,3,9,5,1 calls 5 state 05e5b73f
+C seed 4321: songs 5,6,4,3,2 calls 6 state 14fd1e17
+C seed 12345: songs 3,6,8,7,2 calls 5 state 96c47a5c
+C seed 65535: songs 6,8,5,10,2 calls 5 state 0d59b96a
+C seed 2147483647: songs 1,10,2,4,3 calls 6 state 9ebe9a85
+C seed 4294967295: songs 1,10,2,4,3 calls 6 state 1ebe9a85
+C first rand 32767: songs 11,5,4,2,10 calls 7
+C first two rand 0, 0: songs 1,3,7,4,10 calls 9
+D empty table: mode 7 count 0 right 0 flag51 5 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 0 good 1 | rand calls 6 | pointer 320,240 | table 0:merlem.apc 1:merleb.apc | load merlem.apc>0; load merleb.apc>1 | errors -
+D three entries taken: mode 7 count 0 right 0 flag51 5 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 3 good 4 | rand calls 6 | pointer 320,240 | table 0:merle1.apc 1:merle2.apc 2:merle3.apc 3:merlem.apc 4:merleb.apc | load merle1.apc>0; load merle2.apc>1; load merle3.apc>2; load merlem.apc>3; load merleb.apc>4 | errors -
+D merleb.apc already loaded: mode 7 count 0 right 0 flag51 5 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 1 good 0 | rand calls 6 | pointer 320,240 | table 0:merleb.apc 1:merlem.apc | load merleb.apc>0; load merlem.apc>1 | errors -
+D entry 1 freed between two: mode 7 count 0 right 0 flag51 5 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 1 good 3 | rand calls 6 | pointer 320,240 | table 0:merle1.apc 1:merlem.apc 2:merle3.apc 3:merleb.apc | load merle1.apc>0; load merle2.apc>1; load merle3.apc>2; load merlem.apc>1; load merleb.apc>3 | errors -
+D table full: mode 7 count 0 right 0 flag51 5 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 0 good 0 | rand calls 6 | pointer 320,240 | table 0:merleb.apc 1:x1 2:x2 3:x3 4:x4 5:x5 6:x6 7:x7 8:x8 9:x9 10:x10 11:x11 12:x12 13:x13 14:x14 15:x15 16:x16 17:x17 18:x18 19:x19 20:x20 21:x21 22:x22 23:x23 24:x24 25:x25 26:x26 27:x27 28:x28 29:x29 30:x30 31:x31 32:x32 33:x33 34:x34 35:x35 36:x36 37:x37 38:x38 39:x39 40:x40 41:x41 42:x42 43:x43 44:x44 45:x45 46:x46 47:x47 48:x48 49:x49 | load merlem.apc>0; load merleb.apc>0 | errors fatal:find_free_sound: Sound overflow;fatal:find_free_sound: Sound overflow
+D sound system off: mode 7 count 0 right 0 flag51 5 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad -1 good -1 | rand calls 6 | pointer 320,240 | table  | - | errors fatal:### ERREUR ### ID son non accepté.. : ID_son_merlem;fatal:### ERREUR ### ID son non accepté.. : ID_son_merleb
+E grid mode 1 (x-31, y-31, 62, 62, 1, 3, 1): md5 a0e2ee9c8c698ee956d8bef2bdf7bb36 | -1:400..519,130..479,n30219 0:419..480,149..210,n3844 1:419..480,211..272,n3844 2:419..480,273..334,n3844 3:419..481,149..335,n124 4:481..481,211..272,n62 5:481..481,273..334,n62 6:481..481,335..335,n1
+E grid mode 3 and hover (x-31, y-31, 62, 62, 1, 5, 1): md5 772db7e4d66bbeaaed6f78c711637f88 | -1:400..519,130..479,n22407 0:419..480,149..210,n3844 1:419..480,211..272,n3844 2:419..480,273..334,n3844 3:419..480,335..396,n3844 4:419..480,397..458,n3844 5:419..481,149..459,n124 6:481..481,211..272,n62 7:481..481,273..334,n62 8:481..481,335..396,n62 9:481..481,397..458,n62 10:481..481,459..459,n1
+F mode 0 {3:10} 0 {3:93} 0: mode 0 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 0 {3:10} 0 {3:93} 1: mode 0 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 0 {3:10} 0 {3:93} 2: mode 0 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode 0 {3:10} {0:31} {3:93} 0: mode 1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 0 {3:10} {0:31} {3:93} 1: mode 0 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 0 {3:10} {0:31} {3:93} 2: mode 0 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode 0 {3:10} {0:32} {3:93} 0: mode 0 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 0 {3:10} {0:32} {3:93} 1: mode 0 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 0 {3:10} {0:32} {3:93} 2: mode 0 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} 0 {3:93} 0: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} 0 {3:93} 1: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} 0 {3:93} 2: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} {0:31} {3:93} 0: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} {0:31} {3:93} 1: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} {0:31} {3:93} 2: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} {0:32} {3:93} 0: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} {0:32} {3:93} 1: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 2 {3:10} {0:32} {3:93} 2: mode 2 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} 0 {3:93} 0: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} 0 {3:93} 1: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} 0 {3:93} 2: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} {0:31} {3:93} 0: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} {0:31} {3:93} 1: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} {0:31} {3:93} 2: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} {0:32} {3:93} 0: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} {0:32} {3:93} 1: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode 4 {3:10} {0:32} {3:93} 2: mode 4 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} 0 {3:93} 0: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} 0 {3:93} 1: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} 0 {3:93} 2: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} {0:31} {3:93} 0: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} {0:31} {3:93} 1: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} {0:31} {3:93} 2: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} {0:32} {3:93} 0: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} {0:32} {3:93} 1: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,200 rand calls 0 | - | errors -
+F mode -1 {3:10} {0:32} {3:93} 2: mode -1 count 0 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 2 pointer 450,200 rand calls 0 | - | errors -
+G pointer 450,180 {3:10} {0:31}: mode 2 count 0 right 0 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=92) | errors -
+G pointer 419,149 {3:10} {0:31}: mode 2 count 0 right 0 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=92) | errors -
+G pointer 481,211 {3:10} {0:31}: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 481,211 rand calls 0 | - | errors -
+G pointer 481,335 {3:10} {0:31}: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 481,335 rand calls 0 | - | errors -
+G pointer 482,200 {3:10} {0:31}: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 482,200 rand calls 0 | - | errors -
+G pointer 450,336 {3:10} {0:31}: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,336 rand calls 0 | - | errors -
+G pointer 418,200 {3:10} {0:31}: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 418,200 rand calls 0 | - | errors -
+G pointer 450,148 {3:10} {0:31}: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,148 rand calls 0 | - | errors -
+G pointer 481,149 {3:10} {0:31}: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 481,149 rand calls 0 | - | errors -
+G the right bird by rand(): rand() forced to r, songs 3,7,1,10,5
+G rand 0: mode 2 count 0 right 0 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=92) | errors -
+G rand 6553: mode 2 count 0 right 0 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=92) | errors -
+G rand 6554: mode 2 count 0 right 1 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=96) | errors -
+G rand 13107: mode 2 count 0 right 2 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=90) | errors -
+G rand 13108: mode 2 count 0 right 2 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=90) | errors -
+G rand 19660: mode 2 count 0 right 2 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=90) | errors -
+G rand 19661: mode 2 count 0 right 3 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=99) | errors -
+G rand 26213: mode 2 count 0 right 3 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=99) | errors -
+G rand 26214: mode 2 count 0 right 4 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=94) | errors -
+G rand 32766: mode 2 count 0 right 4 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=94) | errors -
+G rand 32767: mode 2 count 0 right 5 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=90) | errors -
+G a second round: songs reloaded over the first round's handles
+G round 2: mode 2 count 0 right 4 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=94) | errors -
+G each song value as the right one (right 0, songs[0] = v): the command or the error
+G songs[0] -1: mode 2 count 0 right 0 flag51 1 songs -1,2,3,4,5 handles -1,2,3,4,5 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load-fail merle-1.apc; load merle2.apc>2; load merle3.apc>3; load merle4.apc>4; load merle5.apc>5 | errors fatal:### ERREUR ### ID son non accepté.. : ID_son_merle[n];fatal:### ERREUR ### Appeler Eric en urgence    soluce[bonne] incorrect... : %d
+G songs[0] 0: mode 2 count 0 right 0 flag51 1 songs 0,2,3,4,5 handles -1,2,3,4,5 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load-fail merle0.apc; load merle2.apc>2; load merle3.apc>3; load merle4.apc>4; load merle5.apc>5 | errors fatal:### ERREUR ### ID son non accepté.. : ID_son_merle[n];fatal:### ERREUR ### Appeler Eric en urgence    soluce[bonne] incorrect... : %d
+G songs[0] 1: mode 2 count 0 right 0 flag51 1 songs 1,2,3,4,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle1.apc>2; load merle2.apc>3; load merle3.apc>4; load merle4.apc>5; load merle5.apc>6; RunOneCommand (dial=90) | errors -
+G songs[0] 2: mode 2 count 0 right 0 flag51 1 songs 2,2,3,4,5 handles 2,2,3,4,5 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle2.apc>2; load merle3.apc>3; load merle4.apc>4; load merle5.apc>5; RunOneCommand (dial=91) | errors -
+G songs[0] 3: mode 2 count 0 right 0 flag51 1 songs 3,2,3,4,5 handles 2,3,2,4,5 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle2.apc>3; load merle4.apc>4; load merle5.apc>5; RunOneCommand (dial=92) | errors -
+G songs[0] 4: mode 2 count 0 right 0 flag51 1 songs 4,2,3,4,5 handles 2,3,4,2,5 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle4.apc>2; load merle2.apc>3; load merle3.apc>4; load merle5.apc>5; RunOneCommand (dial=93) | errors -
+G songs[0] 5: mode 2 count 0 right 0 flag51 1 songs 5,2,3,4,5 handles 2,3,4,5,2 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle5.apc>2; load merle2.apc>3; load merle3.apc>4; load merle4.apc>5; RunOneCommand (dial=94) | errors -
+G songs[0] 6: mode 2 count 0 right 0 flag51 1 songs 6,2,3,4,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle6.apc>2; load merle2.apc>3; load merle3.apc>4; load merle4.apc>5; load merle5.apc>6; RunOneCommand (dial=95) | errors -
+G songs[0] 7: mode 2 count 0 right 0 flag51 1 songs 7,2,3,4,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle7.apc>2; load merle2.apc>3; load merle3.apc>4; load merle4.apc>5; load merle5.apc>6; RunOneCommand (dial=96) | errors -
+G songs[0] 8: mode 2 count 0 right 0 flag51 1 songs 8,2,3,4,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle8.apc>2; load merle2.apc>3; load merle3.apc>4; load merle4.apc>5; load merle5.apc>6; RunOneCommand (dial=97) | errors -
+G songs[0] 9: mode 2 count 0 right 0 flag51 1 songs 9,2,3,4,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle9.apc>2; load merle2.apc>3; load merle3.apc>4; load merle4.apc>5; load merle5.apc>6; RunOneCommand (dial=98) | errors -
+G songs[0] 10: mode 2 count 0 right 0 flag51 1 songs 10,2,3,4,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle10.apc>2; load merle2.apc>3; load merle3.apc>4; load merle4.apc>5; load merle5.apc>6; RunOneCommand (dial=99) | errors -
+G songs[0] 11: mode 2 count 0 right 0 flag51 1 songs 11,2,3,4,5 handles -1,2,3,4,5 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load-fail merle11.apc; load merle2.apc>2; load merle3.apc>3; load merle4.apc>4; load merle5.apc>5 | errors fatal:### ERREUR ### ID son non accepté.. : ID_son_merle[n];fatal:### ERREUR ### Appeler Eric en urgence    soluce[bonne] incorrect... : %d
+G songs[0] 12: mode 2 count 0 right 0 flag51 1 songs 12,2,3,4,5 handles -1,2,3,4,5 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load-fail merle12.apc; load merle2.apc>2; load merle3.apc>3; load merle4.apc>4; load merle5.apc>5 | errors fatal:### ERREUR ### ID son non accepté.. : ID_son_merle[n];fatal:### ERREUR ### Appeler Eric en urgence    soluce[bonne] incorrect... : %d
+G {3:93} 1, {3:10} 0: the round starts all the same
+G mode 2 count 0 right 0 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 1 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=92) | errors -
+H right 0 pointer 450,180 count 0: mode 1 count 1 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,180 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 0 pointer 450,180 count 1: mode 1 count 2 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,180 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 0 pointer 450,180 count 2: mode 0 count 3 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 1 pointer 450,180 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 0 pointer 450,242 count 0: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,242 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 0 pointer 450,242 count 1: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,242 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 0 pointer 450,242 count 2: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,242 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 0 pointer 300,300 count 0: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 0 pointer 300,300 count 1: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 0 pointer 300,300 count 2: mode 1 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 450,242 count 0: mode 1 count 1 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,242 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 450,242 count 1: mode 1 count 2 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,242 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 450,242 count 2: mode 0 count 3 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 1 pointer 450,242 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 450,304 count 0: mode 1 count 0 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,304 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 450,304 count 1: mode 1 count 0 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,304 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 450,304 count 2: mode 1 count 0 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,304 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 300,300 count 0: mode 1 count 0 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 300,300 count 1: mode 1 count 0 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 1 pointer 300,300 count 2: mode 1 count 0 right 1 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 450,304 count 0: mode 1 count 1 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,304 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 450,304 count 1: mode 1 count 2 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,304 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 450,304 count 2: mode 0 count 3 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 1 pointer 450,304 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 450,366 count 0: mode 1 count 0 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,366 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 450,366 count 1: mode 1 count 0 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,366 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 450,366 count 2: mode 1 count 0 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,366 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 300,300 count 0: mode 1 count 0 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 300,300 count 1: mode 1 count 0 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 2 pointer 300,300 count 2: mode 1 count 0 right 2 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 450,366 count 0: mode 1 count 1 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,366 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 450,366 count 1: mode 1 count 2 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,366 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 450,366 count 2: mode 0 count 3 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 1 pointer 450,366 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 450,428 count 0: mode 1 count 0 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,428 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 450,428 count 1: mode 1 count 0 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,428 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 450,428 count 2: mode 1 count 0 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,428 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 300,300 count 0: mode 1 count 0 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 300,300 count 1: mode 1 count 0 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 3 pointer 300,300 count 2: mode 1 count 0 right 3 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 450,428 count 0: mode 1 count 1 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,428 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 450,428 count 1: mode 1 count 2 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,428 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 450,428 count 2: mode 0 count 3 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 1 pointer 450,428 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 450,180 count 0: mode 1 count 0 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,180 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 450,180 count 1: mode 1 count 0 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,180 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 450,180 count 2: mode 1 count 0 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,180 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 300,300 count 0: mode 1 count 0 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 300,300 count 1: mode 1 count 0 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 4 pointer 300,300 count 2: mode 1 count 0 right 4 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 300,300 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 5 pointer 481,149 count 0: mode 0 count 1 right 5 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 481,149 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 5 pointer 481,210 count 0: mode 0 count 1 right 5 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 481,210 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 5 pointer 481,211 count 0: mode 0 count 0 right 5 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 481,211 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 5 pointer 419,459 count 0: mode 0 count 1 right 5 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 419,459 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 5 pointer 481,459 count 0: mode 0 count 0 right 5 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 481,459 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H right 5 pointer 450,460 count 0: mode 0 count 0 right 5 flag51 0 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 450,460 rand calls 0 | play merlem.apc>v2 att 0 pan 0 | errors -
+H the third right answer with {3:10} {0:31}, {3:93} 0 (the poet test after it)
+H mode 0 count 3 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 1 pointer 450,180 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H a right answer at count 3, 4 (no test of more)
+H count 3: mode 0 count 4 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,180 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H count 4: mode 0 count 5 right 0 flag51 0 songs 1,2,3,4,5 handles -1,-1,-1,-1,-1 bad 0 good 1 {3:93} 0 pointer 450,180 rand calls 0 | play merleb.apc>v2 att 0 pan 0 | errors -
+H right 5 at the round's start (rand() = 32767): the dialog from merleb's handle
+H 0 entries before: mode 2 count 0 right 5 flag51 1 songs 3,7,1,10,5 handles 2,3,4,5,6 bad 0 good 1 {3:93} 0 pointer 320,240 rand calls 1 | load merle3.apc>2; load merle7.apc>3; load merle1.apc>4; load merle10.apc>5; load merle5.apc>6; RunOneCommand (dial=90) | errors -
+H 3 entries before: mode 2 count 0 right 5 flag51 1 songs 3,7,1,10,5 handles 2,5,0,6,7 bad 3 good 4 {3:93} 0 pointer 320,240 rand calls 1 | load merle7.apc>5; load merle10.apc>6; load merle5.apc>7; RunOneCommand (dial=93) | errors -
+H 12 entries before: mode 2 count 0 right 5 flag51 1 songs 3,7,1,10,5 handles 2,6,0,9,4 bad 10 good 11 {3:93} 0 pointer 320,240 rand calls 1 | - | errors fatal:### ERREUR ### Appeler Eric en urgence    soluce[bonne] incorrect... : %d
+I mode 2 voice2 free pointer 450,150: play merle3.apc>v2 att 0 pan 0 | 0x006d056c 2 0x006d0570 0
+I mode 2 voice2 free pointer 450,211: play merle7.apc>v2 att 0 pan 0 | 0x006d056c 3 0x006d0570 1
+I mode 2 voice2 free pointer 450,212: play merle7.apc>v2 att 0 pan 0 | 0x006d056c 3 0x006d0570 1
+I mode 2 voice2 free pointer 481,459: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 free pointer 482,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 free pointer 450,460: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 free pointer 418,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 busy pointer 450,150: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 busy pointer 450,211: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 busy pointer 450,212: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 busy pointer 481,459: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 busy pointer 482,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 busy pointer 450,460: - | 0x006d056c 21845 0x006d0570 21845
+I mode 2 voice2 busy pointer 418,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 free pointer 450,150: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 free pointer 450,211: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 free pointer 450,212: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 free pointer 481,459: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 free pointer 482,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 free pointer 450,460: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 free pointer 418,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 busy pointer 450,150: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 busy pointer 450,211: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 busy pointer 450,212: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 busy pointer 481,459: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 busy pointer 482,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 busy pointer 450,460: - | 0x006d056c 21845 0x006d0570 21845
+I mode 0 voice2 busy pointer 418,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 free pointer 450,150: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 free pointer 450,211: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 free pointer 450,212: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 free pointer 481,459: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 free pointer 482,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 free pointer 450,460: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 free pointer 418,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 busy pointer 450,150: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 busy pointer 450,211: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 busy pointer 450,212: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 busy pointer 481,459: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 busy pointer 482,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 busy pointer 450,460: - | 0x006d056c 21845 0x006d0570 21845
+I mode 1 voice2 busy pointer 418,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 free pointer 450,150: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 free pointer 450,211: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 free pointer 450,212: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 free pointer 481,459: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 free pointer 482,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 free pointer 450,460: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 free pointer 418,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 busy pointer 450,150: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 busy pointer 450,211: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 busy pointer 450,212: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 busy pointer 481,459: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 busy pointer 482,300: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 busy pointer 450,460: - | 0x006d056c 21845 0x006d0570 21845
+I mode 3 voice2 busy pointer 418,300: - | 0x006d056c 21845 0x006d0570 21845
+J draws spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428 | registers 450,180 menu 1 | errors -
+K after the entry (view 73): - | AtlMuzik_Volume(100) | mode 3 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 | table -
+K after a round (view 73): stop v2 | AtlMuzik_Volume(100) | mode 2 count 0 right 0 flag51 0 songs 3,7,1,10,5 handles -1,-1,-1,-1,-1 bad 0 good 1 | table -
+K view 72: - | -
+L poet slot 2 texel (1, 191, 213); after the entry mode 0 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 0 good 1 | load merlem.apc>0; load merleb.apc>1 | subjects 3:24/11/1;1/22/1;2/19/1
+L the centre zone at that angle: -1
+== M a click on the poet: the subject menu opens and the click hook sets mode 1; a pass; the first subject clicked (the round starts)
+p0 - click | spr interface#40@320,240 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit 2 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 0 good 1 | regs 0,0
+p1 -  | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@320,240 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 0 good 1 | regs 450,180
+p2 475,205  | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,205 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles -1,-1,-1,-1,-1 bad 0 good 1 | regs 450,180
+p3 475,205 click rand 20000 | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,205; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31,CLICOBJET=0) | load merle1.apc>2; load merle6.apc>3; load merle2.apc>4; load merle9.apc>5; load merle5.apc>6; dial 98 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+   dialog end | - | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== N the bird menu; the pointer over each bird, voice 2 free or busy
+p4 -  | spr interface#40@320,240; spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@320,240 | - | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p5 450,160  | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,160 | play merle1.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p6 450,160  | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,160 | - | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p7 450,160 end2 | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,160 | play merle1.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p8 450,222  | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,222 | - | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p9 450,222 end2 | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,222 | play merle6.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p10 450,284 end2 | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,284 | play merle2.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p11 450,346 end2 | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,346 | play merle9.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p12 450,408 end2 | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,408 | play merle5.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p13 300,300 end2 | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@300,300 | - | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p14 300,300  | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@300,300 | - | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== O the right bird clicked (index 3, song 9)
+p15 450,346 end2 | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,346 | play merle9.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 3 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p16 450,346 click | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,346; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0,CLICOBJET=0) | stop v2; play merleb.apc>v2 att 0 pan 0 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 0 | mode 0 count 1 right 3 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p17 -  |  | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#26 {3:28} 0 {3:93} 0 | mode 0 count 1 right 3 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p18 -  | spr interface#26@320,240 | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#27 {3:28} 0 {3:93} 0 | mode 0 count 1 right 3 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== P the poet clicked, the second subject (the round starts)
+p19 320,240 end2 | spr interface#27@320,240 | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#27 {3:28} 0 {3:93} 0 | mode 0 count 1 right 3 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p20 - click | spr interface#27@320,240 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit 2 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 1 right 3 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p21 475,267  | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,267 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 1 right 3 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p22 475,267 click rand 30000 | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,267; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31,CLICOBJET=0) | load merle1.apc>2; load merle6.apc>3; load merle2.apc>4; load merle9.apc>5; load merle5.apc>6; dial 94 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 1 right 4 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+   dialog end | - | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 1 right 4 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== Q a wrong bird clicked (index 1, the right one 4)
+p23 450,222 click | spr interface#40@320,240; spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,222; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0,CLICOBJET=0) | play merle6.apc>v2 att 0 pan 0; stop v2; play merlem.apc>v2 att 0 pan 0 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 0 | mode 0 count 0 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p24 -  |  | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#28 {3:28} 0 {3:93} 0 | mode 0 count 0 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== R the poet clicked, a click on the subject menu's edge column (x 482..496): a subject, no round
+p25 320,240 end2 | spr interface#28@320,240 | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#29 {3:28} 0 {3:93} 0 | mode 0 count 0 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p26 - click | spr interface#29@320,240 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit 2 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 0 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p27 490,300  | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@490,300 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 0 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p28 490,300 click | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@490,300; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31,CLICOBJET=0) | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 0 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p29 -  | spr interface#40@320,240 | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#29 {3:28} 0 {3:93} 0 | mode 1 count 0 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== S mode 1 with the menu closed: a click with the pointer on the bird grid starts a round
+p30 450,200 click rand 1000 | spr interface#29@320,240 | load merle1.apc>2; load merle6.apc>3; load merle2.apc>4; load merle9.apc>5; load merle5.apc>6; dial 90 | menu 1 {3:10} 31 {3:92} -2 click 0 hit 2 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 0 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+   dialog end | - | - | menu 1 {3:10} 0 {3:92} -2 click 0 hit 2 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 0 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p31 -  | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@320,240 | - | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 0 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== T a click outside the bird menu: a wrong answer (the right one 0)
+p32 100,100 click | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@100,100; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0,CLICOBJET=0) | play merlem.apc>v2 att 0 pan 0 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 0 | mode 0 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p33 -  |  | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#30 {3:28} 0 {3:93} 0 | mode 0 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== U0 the poet clicked, the third subject (the round starts)
+p34 320,240 end2 | spr interface#30@320,240 | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#31 {3:28} 0 {3:93} 0 | mode 0 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p35 - click | spr interface#31@320,240 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit 2 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p36 475,329  | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,329 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 0 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p37 475,329 click rand 5000 | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,329; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31,CLICOBJET=0) | load merle1.apc>2; load merle6.apc>3; load merle2.apc>4; load merle9.apc>5; load merle5.apc>6; dial 90 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 0 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+   dialog end | - | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 0 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== U0 the right bird (index 0)
+p38 450,160 end2 | spr interface#40@320,240; spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,160 | play merle1.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 0 right 0 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p39 450,160 click | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,160; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0,CLICOBJET=0) | stop v2; play merleb.apc>v2 att 0 pan 0 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 0 | mode 0 count 1 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p40 -  |  | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#31 {3:28} 0 {3:93} 0 | mode 0 count 1 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== U1 the poet clicked, the third subject (the round starts)
+p41 320,240 end2 | spr interface#31@320,240 | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#32 {3:28} 0 {3:93} 0 | mode 0 count 1 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p42 - click | spr interface#32@320,240 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit 2 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 1 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p43 475,329  | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,329 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 1 right 0 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p44 475,329 click rand 12000 | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,329; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31,CLICOBJET=0) | load merle1.apc>2; load merle6.apc>3; load merle2.apc>4; load merle9.apc>5; load merle5.apc>6; dial 95 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 1 right 1 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+   dialog end | - | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 1 right 1 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== U1 the right bird (index 1)
+p45 450,222 end2 | spr interface#40@320,240; spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,222 | play merle6.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 1 right 1 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p46 450,222 click | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,222; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0,CLICOBJET=0) | stop v2; play merleb.apc>v2 att 0 pan 0 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 0 | mode 0 count 2 right 1 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p47 -  |  | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#32 {3:28} 0 {3:93} 0 | mode 0 count 2 right 1 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== U2 the poet clicked, the third subject (the round starts)
+p48 320,240 end2 | spr interface#32@320,240 | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#33 {3:28} 0 {3:93} 0 | mode 0 count 2 right 1 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p49 - click | spr interface#33@320,240 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit 2 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 2 right 1 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p50 475,329  | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,329 | - | menu 1 {3:10} 31 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 1 count 2 right 1 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p51 475,329 click rand 31000 | spr subjects#24@450,180; spr subjects#0@450,180; spr subjects#1@455,242; spr subjects#0@450,242; spr subjects#2@450,304; spr subjects#0@450,304; spr interface#40@475,329; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=31,CLICOBJET=0) | load merle1.apc>2; load merle6.apc>3; load merle2.apc>4; load merle9.apc>5; load merle5.apc>6; dial 94 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 2 right 4 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+   dialog end | - | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 2 right 4 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== U2 the right bird (index 4)
+p52 450,408 end2 | spr interface#40@320,240; spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,408 | play merle5.apc>v2 att 0 pan 0 | menu 1 {3:10} 0 {3:92} -2 click 0 hit -1 cursor interface#40 {3:28} 0 {3:93} 0 | mode 2 count 2 right 4 flag51 1 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p53 450,408 click | spr subjects#26@450,187; spr subjects#0@450,180; spr subjects#27@456,249; spr subjects#0@450,242; spr subjects#28@450,316; spr subjects#0@450,304; spr subjects#29@455,372; spr subjects#0@450,366; spr subjects#30@451,436; spr subjects#0@450,428; spr interface#40@450,408; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0,CLICOBJET=0); chapi020:66; chapi020:67; AtlHnm_start(cine014.hnm); hnm_open(hnm\cine014.hnm)=ok frames=129 | stop v2; play merleb.apc>v2 att 0 pan 0 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 1 | mode 0 count 3 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+   video end, section resumed | chapi020:68; chapi020:69; chapi020:70 | dial 73 | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 1 | mode 0 count 3 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+   dialog end | chapi020:71; chapi020:72; chapi020:73 | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 2 | mode 0 count 3 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p54 -  |  | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 2 | mode 0 count 3 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+== V after the win: a click on the poet
+p55 320,240 end2 |  | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 2 | mode 0 count 3 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p56 - click | scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,{3:10}=0,CLICOBJET=0) | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 2 | mode 0 count 3 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+p57 -  |  | - | menu 0 {3:10} 0 {3:92} -2 click 0 hit -1 cursor none {3:28} 0 {3:93} 2 | mode 0 count 3 right 4 flag51 0 songs 1,6,2,9,5 handles 2,3,4,5,6 bad 0 good 1 | regs 450,180
+frame errors -

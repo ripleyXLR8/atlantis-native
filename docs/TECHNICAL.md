@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Brigid's cross, the Irish skull puzzle and ogham stones |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -625,11 +625,11 @@ load and save, quit; below); the right button opens and closes the bag
 bar; a left click on a character with subjects opens the menu of the
 subjects to ask him about (below). The mandalas are laid in the shaman's
 hut (below). Ireland's boat laid there leaves for Ireland (world 1,
-below), which plays to its end (Brigid's cross, the skull and the ogham
-stones are played; its fourth puzzle is left out) and sends the
+below), which plays to its end with its four puzzles (Brigid's cross,
+the skull, the ogham stones and the blackbird songs, below) and sends the
 game back to Tibet with Ireland's mandala; a trip to another world (the
 other boats, the crystal, the space travel) plays its film and stays
-where it is. Not yet: the other worlds and one of Ireland's puzzles (the blackbird songs).
+where it is. Not yet: the other worlds.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -925,22 +925,16 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   listening to the win on Windows 98 would settle it]. Checked against the original
   (`tests/cross.rs`, the hooks, the zone click with its scans, the
   drawing of every frame, a played game from chapter 19). The skull
-  (views 40-42) and the ogham stones (view 6) are ported too
-  (`Event::PuzzleRan`); one puzzle is not: the blackbird songs
-  (view 73 of `ilepoete.wam`). The original's dispatcher never takes an
-  Irish click (@ 0x0049baba, @ 0x0049bcf8), so the port notes each hook
-  (`Event::PuzzleNotPorted`, the original's function) and lets the click
-  go on to `CLICZONE`, the click scan and the move as in the original;
-  their pictures (the blackbird's song menu) and sounds
-  are missing. What their move-zone hooks do besides the puzzles is
-  ported: in the four views the cursor loses its picture until the next
-  cursor choice (FUN_0047bef0(0, 0), whatever is in hand), and leaving
-  view 73 by a move zone stops voice 2 when the blackbird's two answer
-  sounds are loaded (its view entry loads them, the hook frees them) and
-  sets the music to 100 %. The variables their
-  wins write for the scripts are set by `Engine::solve_irish_puzzle`, a
-  testing aid: `FINMERLE` = 1 (the
-  blackbird). `demo.wam` (chapter 1) is not
+  (views 40-42), the ogham stones (view 6, with `COUTEAU_AILILL` in
+  hand) and the blackbird songs (view 73 of `ilepoete.wam`) are ported
+  too (below); each hook that runs is noted (`Event::PuzzleRan`, the
+  original's function). The original's dispatcher never takes an Irish
+  click (@ 0x0049baba, @ 0x0049bcf8): the click goes on to `CLICZONE`,
+  the click scan and the move as in the original. The move-zone hooks of
+  views 2, 6 and 42 clear the cursor pair (FUN_0047bef0(0, 0), whatever
+  is in hand) until the next cursor choice; view 73's is the blackbird
+  game's leave (below). Every Irish chapter's end is reached by play
+  with the mouse (`tests/flow.rs`). `demo.wam` (chapter 1) is not
   ported: no script reaches chapter 1 and its panoramas are on no disc.
   One place animation of `bigile1.wam` (`woA1001001.SPW`, a shadow in
   view 1, hidden at load) is on no disc; it is skipped with the
@@ -999,6 +993,65 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   and reads 0 past the list), and a click with no `OGHAM_SPRITE` slot
   (the original edits the record past the last slot, and the edit stays
   for the next click: the port edits a zeroed list it then drops).
+- **Blackbird songs** (`blackbird.rs`, `engine/blackbird.rs`): the poet
+  `POETE_ASSIS` of `ilepoete.wam` view 73 (chapter 20) asks which of five
+  blackbirds sings the song he names. The view's entry (@ 0x004958f0)
+  loads the two answer sounds `merlem.apc` (wrong) and `merleb.apc`
+  (right) into the sound table the place sounds use (50 entries, a
+  handle being an entry's index), resets the counter and the five song
+  handles, draws the five songs (1 + `random(10)` each, drawn again while
+  equal to an earlier one, @ 0x004959a0; `random(n)` = `rand()` · n /
+  32767, so n itself when `rand()` = 32767, @ 0x004958c0), sets the
+  cursor pair `interfac.spr` frame 40 and the pointer at the centre. The
+  game's click (@ 0x00495ae0) is the first thing of every click in that
+  view, whatever is open (@ 0x0049ca8e). A click on the poet opens his
+  subject menu (three subjects) and, as he is `CLICPERSO` with
+  `FINMERLE` = 0, sets mode 1; a subject clicked with the pointer on the
+  game's own three-row grid (one column of 62-pixel cells from (419,
+  149): 15 pixels off the menu's cells, both far edges included) starts
+  a round: the right bird drawn (`random(5)`), the five songs
+  `merle<n>.apc` loaded (each old handle freed first, which stops voice
+  2), the poet's question `(dial=89 + song)`, mode 2, the pointer at the
+  centre. In mode 2 the warp draw shows the five birds (frames 26..30 of
+  `sujeire.spr` centred on (475, 205 + 62 k), their rings) instead of the
+  subjects, and the bird under the pointer sings on voice 2 whenever
+  voice 2 is free (@ 0x00495a70). Any click then answers (the subject
+  menu's answer turns mode 2 into 3 and leaves the click to the game,
+  @ 0x0045ab69..0x0045ac72): the bird under the pointer against the
+  right one, `merleb.apc` and the counter + 1, or `merlem.apc` and the
+  counter back to 0 (a click outside the birds is wrong too); three right
+  answers in a row set `FINMERLE` = 1, which chapter 20's click scan of
+  the same frame turns into film 14, the standing poet and dialog 73.
+  Leaving by a move zone (@ 0x004959f0) frees the sounds (stopping voice
+  2), sets the music to 100 % and clears the flag (@ 0x006d2751) that
+  keeps the cursor choice off during a round. The mode is neither saved
+  nor reset by a new game or a load. The quirks are kept: the subject
+  menu's edge column chooses a subject without starting a round, and the
+  mode stays 1 with the menu closed, so the next click with the pointer
+  on the grid starts a round; `random(5)` = 5 makes the question read
+  the right sound's handle as a song (dialog 89 + handle, or a fatal
+  error past 10); a song 11 has no file (a fatal error). At these fatal
+  errors the original makes its emergency save and quits (FUN_00480cd0);
+  the port does not: it logs the error and stops the scripts, and the
+  round goes on with the other songs. The draws share the engine's `rand` (seeded by the music's start and
+  the dialogs, as in the original; the original's place animations draw
+  from it too, here they have their own). Against the original's
+  emulated run (`tests/blackbird.rs`, `tests/golden/blackbird.txt`):
+  `random` for every `rand()` output, the songs from 22 seeds, the entry
+  on five sound-table states, the click in every mode (the poet test,
+  the round's grid and right bird for each `rand()` boundary, every song
+  value, the answers for each right bird, pointer and count, the
+  `random(5)` = 5 case on three table states), the song under the
+  pointer, the bird menu's draws, the leave, and 58 warp frames of a
+  game with chapter 20 (the menus, the songs, the answers, a wrong one,
+  the edge column, the win with its film and dialog) pass by pass, with
+  their sprite draws, scans, sounds, the click flag and the cursor; and
+  a game played with the mouse by ear from chapter 20's arrival on the
+  island to the standing poet's first subject (dialog 64). Known
+  difference: the sound table holds the place sounds and these, not the
+  `NEWSOUND`, film and `TrajSound` tracks the original also keeps there
+  while they play, so a handle can differ when one of those is still
+  loaded at the view's entry or a round's start.
 - **Worlds:** Tibet (`tibet.wam`, world 5) and Ireland (above) are
   ported. A `changewam` of the scripts to any other place (the other
   boats' worlds, Shamballa's `voiles.wam` after the crystal,
@@ -1198,8 +1251,8 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   nothing here). Every track decoded from its start and from each of the
   83 marks, the random marks and the list choices are the original's
   (tests/music.rs). Known differences: the music player shares the C
-  runtime's `rand` with the dialogs, which the original also shares with
-  the place animations (two generators here).
+  runtime's `rand` with the dialogs and the blackbird songs, which the
+  original also shares with the place animations (two generators here).
 - **Alpha masks:** the dialog videos carry an `AL` chunk per frame (runs of
   (n, a) pairs, a = 0..31), which the decoder keeps for the caller
   (`HnmVideo::alpha`) and `AlphaTables::blend` draws as the original's
@@ -1445,11 +1498,12 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   the saved music (the music ring restarted at a drawn mark, after a fade
   when another track plays), the dowsing rod (shown, frame, step;
   `baton.spr` loaded again when shown), chapters 39, 46 and 83 run their
-  `/INIT` again. The skull's state (entry 30) and the ogham stones' bytes
-  (entry 31) are read and written; the other puzzles and the rod's entry
-  15 (@ 0x006d84f4, role
-  not read) are kept as the bytes of the last load until their studies
-  are ported; the dialog flag is written from the
+  `/INIT` again. The skull's state (entry 30), the ogham stones' bytes
+  (entry 31) and Brigid's cross (entry 32, which the engine reads and
+  writes in place) are the engine's; the other worlds' puzzles (entries
+  20..29) and the rod's entry 15 (@ 0x006d84f4, role not read) are kept
+  as the bytes of the last load until their studies are ported (the
+  blackbird songs have no entry: their mode is not saved); the dialog flag is written from the
   running dialog and not read back (a save made from the menus has no
   dialog running: Escape ends it before the main menu opens). Chosen here: a section
   waiting to go on and a queued command are dropped at a load (the
@@ -1506,7 +1560,8 @@ file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks, the
 subject menu's cells and click grid, the shaman's subjects along chapter
 75, every `/set` line of Ireland's chapters through the handler,
 Brigid's cross's hooks, frame tables and pictures, the skull puzzle's
-hooks, frame lists, clicks with chapter 7 and drawing;
+hooks, frame lists, clicks with chapter 7 and drawing, the ogham stones'
+moves and drawing, the blackbird songs' draws, clicks and warp frames;
 names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):
@@ -1541,5 +1596,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds without their puzzles: Ireland (its places, chapters, dialogs, place sounds, transition sprites, the way back to Tibet; done, with Brigid's cross, its skull puzzle and ogham stones; the blackbird songs left), then Yucatán, China, Shamballa |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), then Yucatán, China, Shamballa and their puzzles |
 

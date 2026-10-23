@@ -24,11 +24,14 @@ pub const CELL: i32 = 62;
 /// Subjects per column of the drawing.
 pub const PER_COLUMN: i32 = 4;
 
-/// The menu's state: open (@ 0x006617b0) and the first row the last draw
-/// left (@ 0x006cf29c), which the click reads.
+/// The menu's state: open (@ 0x006617b0), the column (@ 0x006cf298) and
+/// the first row (@ 0x006cf29c) the last draw left, which the clicks read
+/// (the subject menu's sets the column back to 450 first, the blackbird
+/// game's does not).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SubjectMenu {
     pub open: bool,
+    pub column_x: i32,
     pub first_row: i32,
 }
 
@@ -39,6 +42,12 @@ pub fn first_row(count: i32) -> i32 {
     } else {
         180
     }
+}
+
+/// The column the draw leaves in its register (@ 0x006cf298): 450, moved
+/// right by 62 at entries 4, 8 and 12.
+pub fn last_column(count: i32) -> i32 {
+    COLUMN_X + CELL * (count.saturating_sub(1) / PER_COLUMN).clamp(0, 3)
 }
 
 /// The top-left corner of entry `i`'s cell in a list of `count`

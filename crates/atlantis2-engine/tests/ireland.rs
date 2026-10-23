@@ -15,7 +15,7 @@ use std::sync::Arc;
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Destination;
 use atlantis2_data::A2Files;
-use atlantis2_engine::engine::{irish_click_hook, irish_entry_hook, IrishPuzzle};
+use atlantis2_engine::engine::{irish_click_hook, irish_entry_hook};
 use atlantis2_engine::sound::{Pcm, VOICE_EFFECTS};
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
@@ -164,14 +164,13 @@ fn every_irish_view_is_entered_with_its_hooks() {
                     _ => None,
                 })
                 .collect();
-            // The cross's (view 2), the skull's (views 40-42) and the ogham
-            // stones' (view 6) entries run; the others are noted.
-            assert!(e.events.iter().all(|x| !matches!(
-                x,
-                Event::PuzzleNotPorted {
-                    function: 0x0049_4120 | 0x0049_3cb0 | 0x0049_6020
-                }
-            )));
+            // The cross's (view 2), the skull's (views 40-42), the ogham
+            // stones' (view 6) and the blackbird songs' (view 73) entries
+            // all run: none is left noted.
+            assert!(e
+                .events
+                .iter()
+                .all(|x| !matches!(x, Event::PuzzleNotPorted { .. })));
             assert_eq!(
                 noted,
                 irish_entry_hook(name.as_bytes(), id)
@@ -312,10 +311,10 @@ fn the_irish_move_hooks_reset_the_cursor() {
     assert_eq!(e.cursor.shown, None);
 }
 
-/// Leaving the blackbird's view by a move zone (FUN_004959f0): the cursor
-/// reset, voice 2 stopped (the view entry loaded the game's two answer
-/// sounds; the hook frees them, which stops voice 2), the music back to
-/// 100 %.
+/// Leaving the blackbird's view by a move zone (FUN_004959f0, ported with
+/// the game: `tests/blackbird.rs`): the cursor reset, voice 2 stopped (the
+/// view entry loaded the game's two answer sounds; the hook frees them,
+/// which stops voice 2), the music back to 100 %.
 #[test]
 fn leaving_the_blackbirds_view_stops_voice_2_and_restores_the_music() {
     let Some(files) = game() else { return };
@@ -339,25 +338,12 @@ fn leaving_the_blackbirds_view_stops_voice_2_and_restores_the_music() {
     e.events.clear();
     e.click(20.0);
     e.pass(None);
-    assert!(e.events.contains(&Event::PuzzleNotPorted {
+    assert!(e.events.contains(&Event::PuzzleRan {
         function: 0x0049_59f0
     }));
     assert_eq!(e.cursor.shown, None);
     assert!(!e.voices().is_playing(VOICE_EFFECTS));
     assert_eq!(e.music.target, e.music.max);
-}
-
-#[test]
-fn the_puzzles_wins_set_their_variables() {
-    let Some(files) = game() else { return };
-    let mut e = in_ireland(files);
-    for (puzzle, name) in [
-        (IrishPuzzle::Blackbird, "FINMERLE"),
-    ] {
-        assert_eq!(var(&e, name), 0);
-        e.solve_irish_puzzle(puzzle);
-        assert_eq!(var(&e, name), 1, "{name}");
-    }
 }
 
 #[test]

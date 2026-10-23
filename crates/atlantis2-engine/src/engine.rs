@@ -34,6 +34,7 @@ use crate::subtitle::SubtitleFont;
 use crate::turn::Turn;
 use crate::warp::{faces_from_hnm, Renderer, Variant};
 
+mod blackbird;
 mod cross;
 mod host;
 mod menus;
@@ -42,13 +43,14 @@ pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
 mod places;
 mod puzzles;
 pub use puzzles::{
-    irish_click_hook, irish_entry_hook, mandala_hook_applies, ported_place, IrishPuzzle, MANDALAS,
+    irish_click_hook, irish_entry_hook, mandala_hook_applies, ported_place, MANDALAS,
     SKULL_OBJECTS, SKULL_START,
 };
 mod saves;
 mod subjects;
 mod ui;
 
+pub use blackbird::Blackbird;
 pub use saves::SaveError;
 pub use subjects::subjects_bank_name;
 
@@ -164,8 +166,12 @@ pub enum Event {
     /// The music stopped (`stopmusik`'s fade done).
     MusicStop,
     /// A sound started on voice 2 (a film's track, `NEWSOUND`,
-    /// `TrajSound`).
+    /// `TrajSound`, the blackbird game's songs and answers).
     Sound(String),
+    /// A sound decoded into the sound table (@ 0x0047a530 then
+    /// @ 0x0047aad0, a name not loaded yet): its entry, −1 when the file
+    /// could not be read.
+    SoundLoaded { name: String, entry: i32 },
     /// The right button opened or closed the bag bar.
     Bag { open: bool },
     /// An object picked from the bag bar.
@@ -436,10 +442,9 @@ pub struct Engine {
     /// Brigid's cross slot's id (@ 0x006d26b8), kept by the view 2
     /// entry hook (`DefName_GetIdName(1, "CROIXBRIGIT_SPRITE")`).
     cross_sprite: i32,
-    /// The blackbird game's two answer sounds are loaded (its view entry,
-    /// FUN_004958f0, loads them; its move-zone hook frees them): the port
-    /// keeps only the fact, for the voice their free stops.
-    blackbird_sounds: bool,
+    /// The blackbird songs of Ireland (`engine/blackbird.rs`), never reset
+    /// nor saved.
+    pub blackbird: Blackbird,
     /// The skull puzzle's state (@ 0x005e1a4c, save entry 30): seven
     /// digits and a 0, one per frame of `CRANE_SPRITE`'s list; only a load
     /// changes it besides the puzzle's click (no new game resets it).
@@ -820,7 +825,7 @@ impl Engine {
             // then, as `FUN_004770c0` is refused while stopped.
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
             cross_sprite: 0,
-            blackbird_sounds: false,
+            blackbird: Blackbird::default(),
             skull: puzzles::SKULL_START,
             skull_sprite: 0,
             ogham: OGHAM_START,
@@ -1384,7 +1389,11 @@ impl Engine {
         // The cursor for the next frame (after FUN_0045af10 drew this one),
         // unless the bar, the subject menu (or a dialog) is open.
         let zone_kind = self.centre().map(|(_, z)| z.kind);
-        if !self.bar.open && !self.subject_menu.open && self.dialog.is_none() {
+        if !self.bar.open
+            && !self.subject_menu.open
+            && self.dialog.is_none()
+            && !self.blackbird.flag
+        {
             if self.sprite_state != 0 {
                 self.cursor
                     .choose(0, self.sprite_state, &mut self.cursor_flag);
@@ -1395,21 +1404,30 @@ impl Engine {
             }
         }
         // FUN_00475320: the dowsing rod, the overlays (the parchment never
-        // opens); then the bar or the subject menu, and the pointer.
+        // opens); then the bar, the blackbird game's menu in its mode 2
+        // (@ 0x0045aac4) or the subject menu, and the pointer.
         self.rod_frame();
         if self.overlays.any() {
             self.overlay_draw();
         }
         if self.bar.open && !self.subject_menu.open && self.dialog.is_none() {
             self.bag_frame();
+        } else if self.blackbird.mode == 2 {
+            self.blackbird_menu_draw();
+            self.pointer_draw();
         } else if self.subject_menu.open {
             self.subjects_draw();
         }
         if let Some(out) = out {
             self.paint_ui(out, w, h);
         }
-        // After the picture, the subject menu answers this frame's click.
-        self.subjects_click();
+        // After the picture, with the menu open, the blackbird's song under
+        // the pointer, then the subject menu answers this frame's click
+        // (@ 0x0045ab69..0x0045ac72).
+        if self.subject_menu.open {
+            self.blackbird_hover();
+            self.subjects_click();
+        }
     }
 
     /// FUN_0045af10: at the screen centre (FUN_0047bfd0) the object in
@@ -1630,14 +1648,9 @@ impl Engine {
     /// FUN_0049ca80's body: the zone clicked, if any.
     fn zone_click_handler(&mut self) -> Option<usize> {
         // In Ireland's view 73 the blackbird game's click (FUN_00495ae0)
-        // comes first (@ 0x0049ca8e..0x0049cab3): not ported.
-        if self.click {
-            let blackbird = self.current_view().is_some_and(|v| {
-                v.name.len() >= 2 && v.name.as_bytes()[..2].eq_ignore_ascii_case(b"IR")
-            }) && self.view == 73;
-            if blackbird {
-                self.puzzle_not_ported(0x0049_5ae0);
-            }
+        // comes first (@ 0x0049ca8e..0x0049cab3), whatever is open.
+        if self.click && self.in_blackbird_view() {
+            self.blackbird_click();
         }
         // Not while the subject menu or the bag bar is open or a dialog
         // runs (@ 0x006617b0, 0x00671ef0, 0x006cfb54).

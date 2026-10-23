@@ -329,11 +329,13 @@ impl Default for Slot {
 }
 
 /// An entry of the sound table: the file's name and the source whose
-/// gains position it (FUN_0047a530 keeps the first loader's).
+/// gains position it (FUN_0047a530 keeps the first loader's; none for a
+/// sound loaded without a position, as the blackbird game's: it plays at
+/// the effects volume, centred).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Entry {
     pub name: String,
-    pub owner: usize,
+    pub owner: Option<usize>,
     pub looping: bool,
 }
 
