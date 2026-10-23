@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon; its other puzzles not yet) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring; the labyrinth's souls not yet) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -628,10 +628,10 @@ hut (below). Ireland's boat laid there leaves for Ireland (world 1,
 below), which plays to its end with its four puzzles (Brigid's cross,
 the skull, the ogham stones and the blackbird songs, below) and sends the
 game back to Tibet with Ireland's mandala. China's boat leaves for China
-(world 3, below), playable without its puzzles, whose gong sends the game
-back to Tibet; a trip to another world (Yucatán's boat, the crystal, the
+(world 3, below), playable with its puzzles but the labyrinth's souls,
+whose gong sends the game back to Tibet; a trip to another world (Yucatán's boat, the crystal, the
 space travel) plays its film and stays where it is. Not yet: Yucatán,
-Shamballa and China's puzzles but the pearl and the dragon (below).
+Shamballa and China's labyrinth souls (below).
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -1049,16 +1049,16 @@ event, the gong's way back to Tibet) into `china-*.png`.
   puzzle mode (5) is set only clears the mode (@ 0x0049b96d, the
   dispatcher returns before any hook, golden row `D ss0013.hnm 13 3 mode
   5`), as the chest's port does. The figurines on the floor and the chest
-  (`SS` views 1-7) and the pearl and the dragon (`SS` 31) are ported
-  too (below). The other puzzles are not ported: the turtle ring (`CH`
-  40-64) and the labyrinth's souls (`LA` 1-60). Their hooks are listed
+  (`SS` views 1-7), the pearl and the dragon (`SS` 31) and the turtle
+  ring (`CH` 40-64) are ported too (below). The labyrinth's souls (`LA`
+  1-60) are not. Their hooks are listed
   as the original's dispatchers call them (`chinese_click_hooks`,
   `chinese_entry_hooks`) and noted (`Event::PuzzleNotPorted`); none
   takes a click (the dispatcher returns 0 for all of them), so every
   click reaches `CLICZONE`, the scans and the moves as in the original;
   without their entries the puzzles' sprites keep the states their WAM
-  records and the show / hide table give them at load: the ring's frame
-  and the souls are not set. The testing aid that wrote the puzzles'
+  records and the show / hide table give them at load: the souls are
+  not set. The testing aid that wrote the puzzles'
   wins is gone (every win is played); the turtle ring and the souls
   write no variable (the turtle
   room's way out is the scripts' count of arrivals, the labyrinth's the
@@ -1252,6 +1252,49 @@ event, the gong's way back to Tibet) into `china-*.png`.
   wrong answer), the pearl taken, then laid in view 32's mechanism from
   the bag (chapter 58's lines 19-27, film 26) to view 19 and chapter 59;
   a save keeps the transparency, the counts and the mode.
+- **Turtle ring** (`engine/turtle.rs`, China's turtle room,
+  `salletortue.wam` views 40-63, chapter 46): an engraved ring of 39
+  frames (`ANNEAU_GRAVE`, a place animation of every view of the room)
+  that the zones `TORTUE_GAUCHE` and `TORTUE_DROITE` of views 56-63 turn
+  a quarter, one frame per 15 Hz tick, with sound 218. The state is the
+  puzzle mode (2, @ 0x006d84d0, save entry 26), the pending turn count
+  (@ 0x006d84e0, entry 28) and the ring's frame (@ 0x006d84e4, entry 29),
+  kept in the save's bytes. The view entry of `CH` views 40-64
+  (@ 0x0049c340) sets the mode 2 (and, when it was not 2, the frame 0),
+  then holds the last slot of the ring's id (its playing byte cleared, so
+  the 15 Hz SPW step skips it: `anim.rs` `Slot::playing`, +0xbc) at the
+  kept frame when below its end; outside 40-64 it gives the mode 2 back.
+  A click on a zone of type 3, 4 or 50 (@ 0x0049c290, from the click
+  dispatcher, which never takes it) does nothing while a turn is pending;
+  else `TORTUE_GAUCHE` sets the count 9 (10 when the frame is not 0) and
+  `TORTUE_DROITE` −10 (−9 from frame 9), each with `(NewSound=218)`; the
+  mode is not read. The warp frame runs the puzzle tick (@ 0x0049bfb0,
+  `Engine::puzzle_tick`) after its moves and scans whenever the mode is
+  not 0; the ring's (@ 0x0049c400) takes the frame dispatcher's 15 Hz flag
+  (@ 0x00656a50, `Engine::frame_flag`: set by each tick, cleared after
+  every pass) and moves the ring one frame towards a count of 0 (0 after
+  38, 38 before 0), the frame kept; outside 40-64 it gives the mode back,
+  and with no ring in the view it is the original's fatal error. So the
+  left zone rests the ring at 0, 9, 19, 29 in turn and the right one back,
+  and the ring keeps its frame from view to view and in a save. No script
+  reads the ring: it is the player's aid for the turtle master's
+  indications, and the room's win is chapter 46's count of arrivals (six
+  indications, one an arrival in the room, the seventh arrival silent,
+  the eighth in view 47: the film and `miniature.wam`). Three quirks
+  stay: a click during a turn is lost; the mode, count and frame survive a
+  new game (the original's puzzle reset runs at start-up and at a load
+  only); view 58's water zone is of type 10, which the WAM load does not
+  name, so its value stays 1 and the turtle cannot be laid from there.
+  `tests/turtle.rs` checks the entry, the click, the tick, the
+  dispatchers' choice, the clicks with chapter 46's scans, the arrivals of
+  the indications to the win and the ring's 25 files drawn (every frame
+  of views 56-63, five of the others) against the original
+  (`tests/golden/turtle.txt`), plays the room with the mouse from
+  `chine.wam` view 32 in chapter 43 (the meeting, the ring turned both
+  ways, the turtle laid, the master asked about the tiger's home, his
+  indications walked to view 47, chapter 47; the room's moves make a
+  two-coloured graph, so the master is asked from view 57, an even walk
+  from 47), and loads the ring from a save.
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,
@@ -1868,9 +1911,10 @@ installation, for the tests of those builds. For Atlantis II,
 copies); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
 `tests/ogham.rs`'s played games write their screens there
 (`pz-skull-*.png`, `pz-ogham-*.png`), and with `ATLANTIS2_SHOTS` set
-`tests/cross.rs`'s, `tests/chest.rs`'s, `tests/wheels.rs`'s and
-`tests/dragon.rs`'s (`pz-cross-*.png`, `pz-chest-*.png`,
-`pz-wheels-*.png`, `pz-dragon-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
+`tests/cross.rs`'s, `tests/chest.rs`'s, `tests/wheels.rs`'s,
+`tests/dragon.rs`'s and `tests/turtle.rs`'s (`pz-cross-*.png`,
+`pz-chest-*.png`, `pz-wheels-*.png`, `pz-dragon-*.png`,
+`pz-turtle-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
 weights, dialog lines, dialog frames, subtitle layouts, music fades,
 script results and save files come from the original `atlantis2.exe` run under emulation
 (Tibet's moves pass by pass, the place animations tick by tick, the
@@ -1886,7 +1930,8 @@ moves and drawing, the blackbird songs' draws, clicks and warp frames,
 the Chinese chest's hooks, dispatchers, clicks with chapter 47 and
 drawing, the five wheels' hooks, check, zone clicks with chapter 55 and
 drawing, the pearl and dragon's hooks, steps, frames at five tick rates,
-clicks with chapter 58 and drawing;
+clicks with chapter 58 and drawing, the turtle ring's hooks, tick,
+dispatchers, clicks and arrivals with chapter 46 and drawing;
 names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):
@@ -1921,5 +1966,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), China's figurines, chest, five wheels, pearl and dragon (done), then China's other puzzles, Yucatán, Shamballa and their puzzles |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), China's figurines, chest, five wheels, pearl and dragon, turtle ring (done), then China's other puzzles, Yucatán, Shamballa and their puzzles |
 

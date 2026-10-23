@@ -143,8 +143,9 @@ fn bare(files: A2Files, name: &str, view: u32) -> Engine {
 }
 
 /// The puzzle hooks reached in `events`, in order: run (the ported ones) or
-/// noted (the others); the wheels' check (FUN_0048d310, run when a disc
-/// is laid) left out.
+/// noted (the others), the turtle ring's tick FUN_0049c400 too (every
+/// warp frame in the room); the wheels' check (FUN_0048d310, run when a
+/// disc is laid) left out.
 fn noted(events: &[Event]) -> Vec<u32> {
     events
         .iter()
@@ -245,7 +246,9 @@ fn every_chinese_view_is_entered_with_its_hooks() {
     // `1ma1024025.err.SPW`; the original logs it too).
     assert_eq!(missing_spw, ["1mA1024025.SPW"]);
     // The hooks: the turtle ring in every `CH` view 40-64 (and
-    // `chine.wam`'s view 40), the wheels in `SS` 12-13, the chest and the
+    // `chine.wam`'s view 40, which has no ring: the original's fatal
+    // error, here without the scripts only logged; no move enters it),
+    // the wheels in `SS` 12-13, the chest and the
     // figurines in `SS` 1-7, the clouds in `SS` 31, the souls in every
     // `LA` view.
     let count = |f: u32| hooks.iter().filter(|h| h.2 == f).count();
@@ -294,7 +297,13 @@ fn the_chinese_click_hooks_take_no_click() {
         ("miniature.wam", 5, "PRENDRE_BAGUETTE", vec![0x0049_3960]),
         ("miniature.wam", 13, "AXE_5ROUES1", vec![0x0048_d170]),
         ("miniature.wam", 31, "CLIC_DRAGON", vec![0x0049_4600]),
-        ("salletortue.wam", 56, "TORTUE_GAUCHE", vec![0x0049_c290]),
+        // The ring's click, then its tick in the same pass (mode 2).
+        (
+            "salletortue.wam",
+            56,
+            "TORTUE_GAUCHE",
+            vec![0x0049_c290, 0x0049_c400],
+        ),
     ];
     let mut e = bare(files, "chine.wam", 10);
     let mut t = 10.0;
@@ -510,8 +519,8 @@ fn a_picture_until_a_click() {
         found: true
     }));
     assert_eq!(e.loop_type, LoopType::Picture);
-    // The ring's hook (not ported) did not take the click.
-    assert_eq!(noted(&e.events), [0x0049_c290]);
+    // The ring's hook did not take the click; its tick ran in the pass.
+    assert_eq!(noted(&e.events), [0x0049_c290, 0x0049_c400]);
     let mut screen = vec![0u16; 640 * 480];
     let mut plain = vec![0u16; 640 * 480];
     e.tick();

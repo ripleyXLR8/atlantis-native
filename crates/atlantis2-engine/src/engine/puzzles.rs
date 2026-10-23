@@ -45,9 +45,9 @@
 //!   and runs no hook (@ 0x0049b96d..0x0049b984). The five wheels (`SS`
 //!   12-13, `wheels.rs`) and the pearl and dragon (`SS` view 31,
 //!   `dragon.rs`, with the mode's per-frame step FUN_0049bfb0,
-//!   [`Engine::puzzle_tick`]) run too. The turtle ring and the
-//!   labyrinth's souls are not ported: their hooks are noted
-//!   ([`Event::PuzzleNotPorted`]).
+//!   [`Engine::puzzle_tick`]) and the turtle ring (`CH` views 40-64,
+//!   `turtle.rs`) run too. The labyrinth's souls are not ported: their
+//!   hooks are noted ([`Event::PuzzleNotPorted`]).
 //! - The places the port has: Tibet, Ireland and China. A `changewam` to
 //!   any other place (Yucatán's boat, Shamballa, the space travel) is
 //!   refused: the section stops there, the world goes back to the
@@ -60,10 +60,24 @@ use atlantis2_data::wam::Zone;
 
 use super::chest::CHEST_MODE;
 use super::dragon::DRAGON_MODE;
+use super::turtle::RING_MODE;
 use super::{Engine, Event};
 
 /// The save entry of the puzzle mode (@ 0x006d84d0).
 const MODE_ENTRY: usize = 26;
+
+/// FUN_0049bfb0's calls by puzzle mode (@ 0x0049bfb9..0x0049c008): 1 the
+/// spider web, 2 the turtle ring, 3 the labyrinth's souls, 6 the octopus,
+/// 4 the dragon, 7 the Maya marbles (through the thunk @ 0x00493190), in
+/// that order; 5 (the chest) has none.
+const PUZZLE_TICKS: [(i32, u32); 6] = [
+    (1, 0x0049_1610),
+    (2, 0x0049_c400),
+    (3, 0x0048_eb30),
+    (6, 0x0049_aaa0),
+    (4, 0x0049_47b0),
+    (7, 0x0049_3190),
+];
 
 /// The warp prefix of Tibet's views (@ 0x005daff8).
 const TIBET_PREFIX: &[u8] = b"TI";
@@ -344,9 +358,8 @@ impl Engine {
     /// China's part of FUN_0049b910 (@ 0x0049b927, 0x0049ba86,
     /// 0x0049bc5c..0x0049bcbf) for a click on zone `zi` of view `view` of
     /// a place whose warp names start as `view_name`: the ported hooks run
-    /// (the figurines', the chest's, the wheels', the clouds'), the others
-    /// are noted;
-    /// none consumes the click. In an `SS` view outside 1-7 the mode 5 the
+    /// (the figurines', the chest's, the wheels', the clouds', the turtle
+    /// ring's), the others are noted; none consumes the click. In an `SS` view outside 1-7 the mode 5 the
     /// chest's entry left is cleared and the click runs no hook
     /// (@ 0x0049b96d..0x0049b984). Public for tests and tools: the
     /// dispatcher on any warp name and number, as the golden runs it.
@@ -383,6 +396,11 @@ impl Engine {
                     self.event(Event::PuzzleRan { function });
                     self.dragon_click(zone);
                 }
+                // The turtle ring's (@ 0x0049bc5c).
+                0x0049_c290 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.turtle_click(self.view, zone.value);
+                }
                 _ => self.puzzle_not_ported(function),
             }
         }
@@ -391,14 +409,15 @@ impl Engine {
 
     /// The puzzle mode (@ 0x006d84d0, save entry 26): 5 after the chest's
     /// entry, 4 after the pearl and dragon's in `SS` 31 while the pearl is
-    /// not won (@ 0x004945a5). The clouds' move zones set it back to 0
-    /// (FUN_004945f0), the click dispatcher clears a 5 outside `SS` 1-7
-    /// (@ 0x0049b977). The turtle ring's entry for views 40..64 (2,
-    /// @ 0x0049c361) and the souls' in `LA` (3, @ 0x0048df1b) are the
-    /// other writers; a load copies the save's entry. The reset
-    /// FUN_0049bf70, which the load runs before the copy, also sets 0
-    /// in views 55, 64 and 75 (FUN_00492dd0 @ 0x00492e69); a new game
-    /// does not run it, so it keeps the mode.
+    /// not won (@ 0x004945a5), 2 after the turtle ring's for views 40..64
+    /// (@ 0x0049c361). The clouds' move zones set it back to 0
+    /// (FUN_004945f0), the ring's hooks and tick clear it outside its
+    /// views, the click dispatcher clears a 5 outside `SS` 1-7
+    /// (@ 0x0049b977). The souls' entry in `LA` (3, @ 0x0048df1b) is the
+    /// other writer; a load copies the save's entry. The reset
+    /// FUN_0049bf70 (start-up, load) clears only its own modules' modes
+    /// (1, 2, 3, 6), and also sets 0 in views 55, 64 and 75 (FUN_00492dd0
+    /// @ 0x00492e69); a new game does not run it, so it keeps the mode.
     pub fn puzzle_mode(&self) -> i32 {
         i32::from_le_bytes(self.save_extra.entry(MODE_ENTRY).try_into().unwrap())
     }
@@ -410,33 +429,34 @@ impl Engine {
             .copy_from_slice(&mode.to_le_bytes());
     }
 
-    /// FUN_0049bfb0, once per warp frame while the puzzle mode is not 0
-    /// (`AtlWarp_continue` @ 0x0045a5e8, after the move's completion):
-    /// not while paused (0x006d85f0, which the port does not have), the
-    /// step of the mode (@ 0x0049bfbb..0x0049c007), returned: 1 the
-    /// spider web's FUN_00491610, 2 the turtle ring's FUN_0049c400, 3 the
-    /// souls' FUN_0048eb30, 4 the pearl and dragon's FUN_004947b0, 6 the
-    /// octopus's FUN_0049aaa0, 7 the Maya marbles' (the thunk
-    /// @ 0x00493190); 5 (the chest) and any other mode have none. Only
-    /// the pearl and dragon's is ported and run; the others (a save made
-    /// in their rooms) are noted ([`Event::PuzzleNotPorted`]). Public for
-    /// tests and tools.
+    /// FUN_0049bfb0, the puzzle tick, once per warp frame while the
+    /// puzzle mode is not 0 (`AtlWarp_continue` @ 0x0045a5e8, after the
+    /// move's completion, turning or not): each mode's step in the
+    /// original's order ([`PUZZLE_TICKS`], @ 0x0049bfbb..0x0049c007), the
+    /// mode read again before each. The turtle ring's (noted
+    /// [`Event::PuzzleRan`]) and the pearl and dragon's run; the others
+    /// (no ported place sets their modes: a save made in their rooms) are
+    /// noted [`Event::PuzzleNotPorted`]; 5 (the chest) and any other mode
+    /// have none. The pause byte (@ 0x006d85f0) that stops it is not in
+    /// the port. Returns the first step reached. Public for tests and
+    /// tools.
     pub fn puzzle_tick(&mut self) -> Option<u32> {
-        let function = match self.puzzle_mode() {
-            1 => 0x0049_1610,
-            2 => 0x0049_c400,
-            3 => 0x0048_eb30,
-            DRAGON_MODE => 0x0049_47b0,
-            6 => 0x0049_aaa0,
-            7 => 0x0049_3190,
-            _ => return None,
-        };
-        if function == 0x0049_47b0 {
-            self.dragon_tick();
-        } else {
-            self.puzzle_not_ported(function);
+        let mut first = None;
+        for (mode, function) in PUZZLE_TICKS {
+            if self.puzzle_mode() != mode {
+                continue;
+            }
+            first = first.or(Some(function));
+            match mode {
+                RING_MODE => {
+                    self.event(Event::PuzzleRan { function });
+                    self.turtle_tick(self.view);
+                }
+                DRAGON_MODE => self.dragon_tick(),
+                _ => self.puzzle_not_ported(function),
+            }
         }
-        Some(function)
+        first
     }
 
     /// `CLICZONE` as a hook finds it.
@@ -474,7 +494,9 @@ impl Engine {
     /// The view entry's puzzle set-up (FUN_0049bd50) for the views the
     /// port has: Ireland's cross (view 2), skull (views 40-42), ogham
     /// stones (view 6) and blackbird songs (view 73) run, and China's
-    /// chest (`SS` views 1-7); Tibet has none.
+    /// figurines and chest (`SS` views 1-7), wheels (`SS` 12-13), pearl
+    /// and dragon (`SS` 31) and turtle ring (`CH` views 40-64); Tibet has
+    /// none.
     pub(super) fn entry_hooks(&mut self) {
         let hook = self
             .current_view()
@@ -522,6 +544,10 @@ impl Engine {
                 0x0049_44a0 => {
                     self.event(Event::PuzzleRan { function });
                     self.dragon_entry();
+                }
+                0x0049_c340 => {
+                    self.event(Event::PuzzleRan { function });
+                    self.turtle_entry(self.view);
                 }
                 _ => self.puzzle_not_ported(function),
             }

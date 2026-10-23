@@ -956,9 +956,14 @@ fn the_dispatchers_as_the_original() {
         e.set_puzzle_mode(mode);
         e.events.clear();
         let f = e.puzzle_tick();
-        // The steps not ported are noted.
-        if let Some(function) = f.filter(|&f| f != 0x0049_47b0) {
-            assert_eq!(e.events, [Event::PuzzleNotPorted { function }]);
+        // The turtle ring's step runs (`a2/pz-turtle`); the steps not
+        // ported are noted.
+        match f {
+            None | Some(0x0049_47b0) => {}
+            Some(function @ 0x0049_c400) => {
+                assert_eq!(e.events.first(), Some(&Event::PuzzleRan { function }));
+            }
+            Some(function) => assert_eq!(e.events, [Event::PuzzleNotPorted { function }]),
         }
         got.push(format!(
             "F tick mode {mode} pause 0 -> {}",
