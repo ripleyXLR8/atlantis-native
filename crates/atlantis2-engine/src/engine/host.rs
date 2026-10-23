@@ -426,11 +426,14 @@ impl Host for Engine {
     }
 
     fn zoom_start(&mut self, zoom: f32, fov: f32) {
-        log::info!("ZoomStart({zoom}, {fov}): the zoom of a move is not ported");
+        // FUN_0045b350: the next move's turn narrows the field of view.
+        self.zoom.start(self.camera.fpu, zoom, fov);
     }
 
     fn zoom_psycho_start(&mut self, a: f32, b: f32) {
-        log::info!("ZoomPsychoStart({a}, {b}): not ported");
+        // FUN_0045b3b0 (Shamballa's `voiles.wam`): the zoom with a roll of
+        // the camera, which the port's turn does not have yet.
+        log::info!("ZoomPsychoStart({a}, {b}): the roll is not ported");
     }
 
     fn enable_zone(&mut self, view: i32, zone: i32, on: bool) {
@@ -573,8 +576,27 @@ impl Host for Engine {
         self.anim.slots.iter().find(|s| s.id == id).map(|s| s.frame)
     }
 
-    fn special_event(&mut self, event: i32) {
-        log::info!("TestSpecialEvent {event}: the special events are not ported");
+    fn view_id(&mut self) -> i32 {
+        self.view as i32
+    }
+
+    fn slot_frame(&mut self, id: i32, anim: Option<i32>) -> Option<i32> {
+        self.anim
+            .slots
+            .iter()
+            .find(|s| s.id == id && anim.is_none_or(|a| s.state.anim as i32 == a))
+            .map(|s| s.frame)
+    }
+
+    fn slot_rewind(&mut self, id: i32) {
+        if let Some(s) = self.anim.slots.iter_mut().find(|s| s.id == id) {
+            s.frame = 0;
+            s.end = s.state.end;
+        }
+    }
+
+    fn voice_busy(&mut self, voice: i32) -> bool {
+        usize::try_from(voice).is_ok_and(|v| self.voices.is_playing(v))
     }
 
     fn music_step(&mut self) {
@@ -686,7 +708,7 @@ impl Host for Engine {
     }
 
     fn view_big_sprite(&mut self, bank: &str) {
-        log::info!("ViewBigSpr={bank}: the picture viewer is not ported");
+        self.open_picture(bank);
     }
 
     fn credits(&mut self) {

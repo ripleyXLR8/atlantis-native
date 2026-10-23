@@ -403,10 +403,15 @@ impl Run {
     /// The screen written as `flow-ireland-<name>.png` when
     /// `ATLANTIS2_PNG_DIR` is set.
     fn shot(&self, name: &str) {
+        self.shot_as(&format!("flow-ireland-{name}.png"));
+    }
+
+    /// The screen written as `file` in `ATLANTIS2_PNG_DIR`, when set.
+    fn shot_as(&self, file: &str) {
         if let Some(dir) = &self.shots {
             std::fs::create_dir_all(dir).unwrap();
             let png = atlantis2_engine::png::encode_rgb565(&self.screen, 640, 480);
-            std::fs::write(dir.join(format!("flow-ireland-{name}.png")), png).unwrap();
+            std::fs::write(dir.join(file), png).unwrap();
         }
     }
 
@@ -833,6 +838,13 @@ impl Run {
 /// dialog, Liam asked (chapter 5). The laid boat's order variable and
 /// `pose` flag.
 fn to_ireland(r: &mut Run) -> (&'static str, String) {
+    tibet_start(r);
+    to_ireland_from_view_2(r)
+}
+
+/// The start-up intro ended, a new game, its film clicked away, the
+/// first click (chapter 75), in `tibet.wam` view 2.
+fn tibet_start(r: &mut Run) {
     // The start-up: the player menu under the intro; a double click ends
     // every video, the player page is back.
     r.e.open_player_menu();
@@ -866,7 +878,10 @@ fn to_ireland(r: &mut Run) -> (&'static str, String) {
     r.tap();
     r.wait(15);
     assert_eq!(r.e.script_state().unwrap().chapter, 75);
+}
 
+/// [`to_ireland`] from view 2 of a new game's chapter 75.
+fn to_ireland_from_view_2(r: &mut Run) -> (&'static str, String) {
     // To the shaman of view 7 (his greeting on the first arrival), then
     // everything he can be asked.
     for to in 3..=7 {
@@ -2234,4 +2249,140 @@ fn ireland_lines_as_the_original(evs: &[Event]) {
         }
     }
     assert!(n > 0 || !evs.iter().any(|e| matches!(e, Event::Set { .. })));
+}
+
+/// A game from the start-up intro to China and back, with the mouse: the
+/// walk to the shaman (his greeting), China's boat taken in view 9 and
+/// laid on its zone in the hut (the hook, chapter 75's section, film 21),
+/// the trip (`MONDE` 3 on disc 3, `chine.wam` view 10, chapter 42 and its
+/// music), the gardener master of view 12 and the worried monk of view 25
+/// asked about everything they offer (their answers spoken by the 3D
+/// heads), the gong taken in view 7 and struck on its zone in view 5:
+/// chapter 42's way back to Tibet's view 7 and chapter 75. Every Chinese
+/// `/set` line reported is one the original runs
+/// (`scripts_worlds_china.txt`).
+#[test]
+fn a_game_from_tibet_to_china_and_back() {
+    if game().is_none() {
+        return;
+    }
+    let dir = scratch("a2-flow-china");
+    let mut r = Run::new(&dir);
+    tibet_start(&mut r);
+    // The shaman's greeting on the way (view 7), China's boat in view 9.
+    for to in 3..=9 {
+        r.walk(to);
+    }
+    let boat = r.obj("MANDALA_BATEAU_CH");
+    let evs = r.click_sprite(|e| matches!(e, Event::Take { .. }));
+    assert!(evs.contains(&Event::Take { id: boat }));
+    r.walk(10);
+    r.pick(boat);
+    let zi =
+        r.e.wam()
+            .view(10)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.name.as_deref() == Some("ZONE_CHB"))
+            .unwrap();
+    r.aim(zi);
+    r.tap();
+    let mut evs = r.events();
+    assert!(evs.contains(&Event::Sound("sound400.apc".into())));
+    assert_eq!(r.e.loop_type, LoopType::Video);
+    r.wait(60);
+    r.shot_as("china-1-departure-film.png");
+    evs.extend(r.settle());
+    // The trip, as chapter 75's section goes on after the film.
+    assert!(!evs.iter().any(|e| matches!(e, Event::WorldNotPorted(_))));
+    assert!(evs.contains(&Event::Monde(3)));
+    assert!(evs.contains(&Event::Wam("chine.wam".into())));
+    assert!(evs.iter().any(
+        |e| matches!(e, Event::VideoStart { name, frames: Some(_) } if name == "cine021.hnm")
+    ));
+    assert_eq!(r.e.place(), ("chine.wam", 10));
+    assert_eq!(r.e.files().current_disc(), 3);
+    assert_eq!(
+        (
+            r.chapter(),
+            r.var("MONDE"),
+            r.var("NbMandalaPosed"),
+            r.var("OrdreMandala2"),
+            r.var("posechb"),
+            r.var("VignetteSave"),
+            r.var("ChineVisited"),
+        ),
+        (42, 3, 1, 1, 1, 5, 1)
+    );
+    assert!(!r.in_bag("MANDALA_BATEAU_CH"));
+    r.wait(30);
+    assert_eq!(r.e.music_playing(), Some(23));
+    r.shot_as("china-2-arrival.png");
+
+    // The gardener master in view 12: everything he offers.
+    r.route(&[11, 12]);
+    let gardener = r.who("MAITRE_JARDIN");
+    r.head_passes = 0;
+    let asked = r.ask_all(gardener);
+    let want: Vec<(i32, u32)> = [("MAITRE", 220), ("HEROS_CH", 221)]
+        .iter()
+        .map(|&(n, d)| (r.subject(n), d))
+        .collect();
+    assert_eq!(asked, want);
+    assert!(r.head_passes > 0, "no head drawn for the gardener");
+    r.shot_as("china-3-gardener.png");
+
+    // The worried monk of view 25, by views 11, 10, 19 and 26.
+    r.route(&[11, 10, 19, 26, 25]);
+    let monk = r.who("MOINE1");
+    let asked = r.ask_all(monk);
+    let want: Vec<(i32, u32)> = [("MOINE1", 225), ("MAITRE", 230)]
+        .iter()
+        .map(|&(n, d)| (r.subject(n), d))
+        .collect();
+    assert_eq!(asked, want);
+    r.shot_as("china-4-monk.png");
+    assert_eq!(r.chapter(), 42);
+
+    // The gong of view 7, struck on its zone in view 5: the way back.
+    r.route(&[26, 19, 10, 7]);
+    r.take("GONG");
+    r.walk(5);
+    let zone = r.zone_named("GONG_ZONE");
+    let evs2 = r.use_on(Some("GONG"), zone);
+    assert!(evs2.contains(&Event::Sound("sound200.apc".into())));
+    assert!(evs2.contains(&Event::Monde(5)));
+    assert!(evs2.contains(&Event::Wam("tibet.wam".into())));
+    r.wait(10);
+    r.shot_as("china-5-back-in-tibet.png");
+    assert_eq!(r.e.place(), ("tibet.wam", 7));
+    assert_eq!((r.chapter(), r.var("MONDE")), (75, 5));
+    let journal = std::mem::take(&mut r.journal);
+    china_lines_as_the_original(&journal);
+    // No Chinese place on this route has a puzzle hook.
+    assert!(!journal
+        .iter()
+        .any(|e| matches!(e, Event::PuzzleNotPorted { .. })));
+}
+
+/// Every `/set` line of a Chinese chapter that ran (the events' chapter
+/// and line) is one of the lines the original's handler ran
+/// (`scripts_worlds_china.txt`, chapters 42-60).
+fn china_lines_as_the_original(evs: &[Event]) {
+    let golden = include_str!("golden/scripts_worlds_china.txt");
+    let mut n = 0;
+    for e in evs {
+        if let Event::Set { chapter, line } = e {
+            if (42..=60).contains(chapter) {
+                let head = format!("chapi{chapter:03}.con:{line} ");
+                assert!(
+                    golden.lines().any(|l| l.starts_with(&head)),
+                    "chapter {chapter} line {line}: not a line the original runs"
+                );
+                n += 1;
+            }
+        }
+    }
+    assert!(n > 10, "{n}");
 }

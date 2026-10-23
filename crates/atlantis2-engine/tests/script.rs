@@ -24,6 +24,8 @@ const TIBET: &str = include_str!("golden/scripts_con_tibet.txt");
 const TIBET_SCAN: &str = include_str!("golden/scripts_con_tibet_scan.txt");
 const NAMES: &str = include_str!("golden/scripts_con_names.txt");
 const IRELAND: &str = include_str!("golden/scripts_worlds_ireland.txt");
+const CHINA: &str = include_str!("golden/scripts_worlds_china.txt");
+const EVENTS: &str = include_str!("golden/scripts_worlds_events.txt");
 const COMMENT: &str = include_str!("golden/scripts_con_comment.txt");
 
 fn rows(golden: &str) -> impl Iterator<Item = &str> {
@@ -116,6 +118,12 @@ struct Rec {
     calls: Vec<String>,
     chapter: Option<Vec<u8>>,
     traj: Option<String>,
+    /// The current view, the animation records (id, animation, frame,
+    /// end, the state's +0x24) and voice 2's state, for the special
+    /// events.
+    view: i32,
+    slots: Vec<[i32; 5]>,
+    busy: bool,
 }
 
 impl Rec {
@@ -158,7 +166,16 @@ impl Host for Rec {
             i32::from(on)
         ));
     }
-    fn anim(&mut self, _: AnimOp) {}
+    fn anim(&mut self, op: AnimOp) {
+        // The harness logs `ChangeAnimGotoPerso`'s two number reads
+        // (@ 0x00485180) and its call (@ 0x0047df00); the other keys' slot
+        // work is not stubbed there.
+        if let AnimOp::ChangeAnimGotoPerso { id, a, b } = op {
+            self.push("ParseInt()".into());
+            self.push("ParseInt()".into());
+            self.push(format!("ChangeAnimGotoPerso({id}, {a}, {b})"));
+        }
+    }
     fn music_step(&mut self) {
         self.push("Input_Refresh()".into());
     }
@@ -196,6 +213,25 @@ impl Host for Rec {
     }
     fn start_music(&mut self, _: &str) {
         self.push("AtlMuzik_Start(0x006d0444)()".into());
+    }
+    fn view_id(&mut self) -> i32 {
+        self.view
+    }
+    fn slot_frame(&mut self, id: i32, anim: Option<i32>) -> Option<i32> {
+        self.slots
+            .iter()
+            .find(|r| r[0] == id && anim.is_none_or(|a| r[1] == a))
+            .map(|r| r[2])
+    }
+    fn slot_rewind(&mut self, id: i32) {
+        if let Some(r) = self.slots.iter_mut().find(|r| r[0] == id) {
+            r[2] = 0;
+            r[3] = r[4];
+        }
+    }
+    fn voice_busy(&mut self, voice: i32) -> bool {
+        self.push(format!("VoiceState({voice})"));
+        self.busy
     }
     fn stop_music(&mut self) {
         self.push("AtlMuzik_Stop()".into());
@@ -607,6 +643,86 @@ fn every_tibet_set_line_matches_the_original() {
     assert_eq!(n, 430);
 }
 
+/// The `/set` lines of chapter `chapter`, each run in place in its text,
+/// the state carried: one row per line as the golden prints it.
+fn world_rows(s: &mut Script, h: &mut Rec, chapter: i32) -> Vec<(String, Vec<String>)> {
+    let file = format!("chapi{chapter:03}.con");
+    let data = scenar(&file).unwrap();
+    let mut out = Vec::new();
+    let mut start = 0;
+    for (no, raw) in data.split(|&c| c == b'\n').enumerate() {
+        let line_start = start;
+        start += raw.len() + 1;
+        let raw = raw.strip_suffix(b"\r").unwrap_or(raw);
+        let blank = raw.iter().take_while(|&&c| c == b' ' || c == b'\t').count();
+        if raw[blank..].starts_with(b"#") {
+            continue;
+        }
+        let Some(p) = raw.windows(4).position(|w| w == b"/set") else {
+            continue;
+        };
+        // The harness: the file in the chapter buffer, the dialog and
+        // resume flags cleared, `SetVariables` on the line's `/set`.
+        s.set_chapter_text(&data);
+        s.resume_pending = false;
+        h.calls.clear();
+        h.chapter = Some(data.clone());
+        // The golden's harness empties its error list before each line, so
+        // a fatal shows on its own line only.
+        s.warnings.clear();
+        s.fatal = None;
+        let before = snap(s, h);
+        let stubbed = Stubbed::before(s);
+        let at = line_start + p;
+        let r = s.set_variables(h, atlantis2_engine::script::Src::Chapter, at);
+        stubbed.after(s, h);
+        let after = snap(s, h);
+        let changes = diff(&before, &after);
+        let line: String = raw[p..].iter().map(|&c| char::from(c)).collect();
+        let key = line[5..]
+            .trim_start()
+            .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == ' '))
+            .next()
+            .unwrap()
+            .trim()
+            .to_ascii_lowercase();
+        let key = if key.starts_with("flag") && key[4..].starts_with(|c: char| c.is_ascii_digit()) {
+            "flag#".to_string()
+        } else {
+            key
+        };
+        let names: Vec<&str> = h
+            .calls
+            .iter()
+            .map(|c| c.split('(').next().unwrap())
+            .collect();
+        let mut got = format!(
+            "{file}:{} key={key} ret={} calls={}:{} changes={}",
+            no + 1,
+            r.map_or(-1, |q| q as i64 - at as i64),
+            h.calls.len(),
+            names.join(","),
+            changes.len()
+        );
+        if s.fatal.is_some() {
+            got.push_str(" fatal");
+        }
+        if !s.warnings.is_empty() {
+            got.push_str(" warn");
+        }
+        out.push((got, changes));
+    }
+    out
+}
+
+/// The chapters of `scenar\` from `first` to `last`.
+fn chapters(first: i32, last: i32) -> Vec<i32> {
+    let dir = install().unwrap().join("scenar");
+    (first..=last)
+        .filter(|c| dir.join(format!("chapi{c:03}.con")).exists())
+        .collect()
+}
+
 /// Every `/set` line of chapters 1 to 24 (the demo place and Ireland), each
 /// in place in its chapter's text, the state carried from line to line,
 /// against the original's (`scripts_worlds_ireland.txt`).
@@ -619,71 +735,11 @@ fn every_ireland_set_line_matches_the_original() {
     let mut golden = rows(IRELAND).map(|r| fill(&names, r)).peekable();
     let mut n = 0;
     for chapter in 1..=24 {
-        let file = format!("chapi{chapter:03}.con");
         // Ireland's chapters are 2-9, 11-17, 19, 20 and 24.
         if matches!(chapter, 10 | 18 | 21..=23) {
             continue;
         }
-        let data = scenar(&file).unwrap();
-        let mut start = 0;
-        for (no, raw) in data.split(|&c| c == b'\n').enumerate() {
-            let line_start = start;
-            start += raw.len() + 1;
-            let raw = raw.strip_suffix(b"\r").unwrap_or(raw);
-            let blank = raw.iter().take_while(|&&c| c == b' ' || c == b'\t').count();
-            if raw[blank..].starts_with(b"#") {
-                continue;
-            }
-            let Some(p) = raw.windows(4).position(|w| w == b"/set") else {
-                continue;
-            };
-            // The harness: the file in the chapter buffer, the dialog and
-            // resume flags cleared, `SetVariables` on the line's `/set`.
-            s.set_chapter_text(&data);
-            s.resume_pending = false;
-            h.calls.clear();
-            h.chapter = Some(data.clone());
-            s.warnings.clear();
-            let before = snap(&s, &h);
-            let stubbed = Stubbed::before(&s);
-            let at = line_start + p;
-            let r = s.set_variables(&mut h, atlantis2_engine::script::Src::Chapter, at);
-            stubbed.after(&mut s, &h);
-            let after = snap(&s, &h);
-            let changes = diff(&before, &after);
-            let line: String = raw[p..].iter().map(|&c| char::from(c)).collect();
-            let key = line[5..]
-                .trim_start()
-                .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == ' '))
-                .next()
-                .unwrap()
-                .trim()
-                .to_ascii_lowercase();
-            let key =
-                if key.starts_with("flag") && key[4..].starts_with(|c: char| c.is_ascii_digit()) {
-                    "flag#".to_string()
-                } else {
-                    key
-                };
-            let names: Vec<&str> = h
-                .calls
-                .iter()
-                .map(|c| c.split('(').next().unwrap())
-                .collect();
-            let mut got = format!(
-                "{file}:{} key={key} ret={} calls={}:{} changes={}",
-                no + 1,
-                r.map_or(-1, |q| q as i64 - at as i64),
-                h.calls.len(),
-                names.join(","),
-                changes.len()
-            );
-            if s.fatal.is_some() {
-                got.push_str(" fatal");
-            }
-            if !s.warnings.is_empty() {
-                got.push_str(" warn");
-            }
+        for (got, changes) in world_rows(&mut s, &mut h, chapter) {
             let want = golden.next().unwrap_or_default();
             assert_eq!(
                 got.to_ascii_lowercase(),
@@ -695,6 +751,39 @@ fn every_ireland_set_line_matches_the_original() {
     }
     assert!(golden.next().is_none());
     assert_eq!(n, 653);
+}
+
+/// Every `/set` line of chapters 25 to 60 (Yucatán with Xibalba, then
+/// China), each in place in its chapter's text, the state carried from
+/// line to line from chapter 1 on (the first 24 as the Irish test runs
+/// them), against the original's (`scripts_worlds_china.txt`).
+#[test]
+fn every_china_set_line_matches_the_original() {
+    let Some(mut s) = game_script() else { return };
+    let names = s.names.clone();
+    let mut h = Rec::default();
+    s.current_view = Some(2);
+    for chapter in chapters(1, 24) {
+        world_rows(&mut s, &mut h, chapter);
+    }
+    let mut golden = rows(CHINA).map(|r| fill(&names, r));
+    let (mut n, mut china) = (0, 0);
+    for chapter in chapters(25, 60) {
+        for (got, changes) in world_rows(&mut s, &mut h, chapter) {
+            let want = golden.next().unwrap_or_default();
+            assert_eq!(
+                got.to_ascii_lowercase(),
+                want.to_ascii_lowercase(),
+                "{changes:?}"
+            );
+            n += 1;
+            if chapter >= 42 {
+                china += 1;
+            }
+        }
+    }
+    assert!(golden.next().is_none());
+    assert_eq!((n, china), (1855, 1035));
 }
 
 #[test]
@@ -1183,4 +1272,78 @@ fn comment_lines_match_the_original() {
     }
     assert_eq!(n, 8);
     assert!(s.fatal.is_none(), "{:?}", s.fatal);
+}
+
+/// The special events (FUN_00484880) against the original's
+/// (`scripts_worlds_events.txt`): the six demons in and out of their views,
+/// at frames around their thresholds, voice 2 idle or busy; `CHAC`'s two
+/// events; an unknown event and none. The game's names, the golden's
+/// synthetic chapter and records (each demon's first record playing
+/// animation 1 to frame 90, the state's +0x24 = 0; `CHAC`'s animation 2,
+/// +0x24 = 81).
+#[test]
+fn special_events_match_the_original() {
+    let Some(mut s) = game_script() else { return };
+    let text = chapter_of(EVENTS);
+    let id = |s: &Script, section: usize, name: &str| {
+        s.names.id(section, name.as_bytes()).unwrap() as i32
+    };
+    let obj = id(&s, 1, "FORMULAIRE_1");
+    let mut records: Vec<[i32; 5]> = atlantis2_engine::script::DEMONS
+        .iter()
+        .map(|(name, _, _)| [id(&s, 0, name), 1, 0, 90, 0])
+        .collect();
+    records.push([id(&s, 0, "CHAC"), 2, 0, 90, 81]);
+    let mut n = 0;
+    for row in rows(EVENTS) {
+        let (case, want) = row.split_once(" -> ").unwrap();
+        let f: Vec<i32> = case
+            .split_whitespace()
+            .skip(1)
+            .step_by(2)
+            .map(|v| v.parse().unwrap())
+            .collect();
+        let (ev, view, frame, busy) = (f[0], f[1], f[2], f[3] != 0);
+        let mut h = Rec {
+            view,
+            slots: records.clone(),
+            busy,
+            ..Rec::default()
+        };
+        let slot = if (1..=6).contains(&ev) {
+            ev as usize - 1
+        } else {
+            6
+        };
+        h.slots[slot][2] = frame;
+        s.set_chapter_text(&text);
+        s.flags.iter_mut().for_each(|v| *v = 0);
+        s.set_var("TestSpecialEvent", ev);
+        s.set_var("SpecialEventDone", 0);
+        s.set_var("Objetenmain_NextWarp", 0);
+        s.set_var("OBJETENMAIN", obj);
+        s.special_event(&mut h, ev);
+        let calls = if h.calls.is_empty() {
+            "-".to_string()
+        } else {
+            h.calls.join(",")
+        };
+        let got = format!(
+            "TestSpecialEvent={} SpecialEventDone={} flags={}{}{} slot={}/{} NextWarp={} calls={calls}",
+            s.var("TestSpecialEvent").unwrap(),
+            s.var("SpecialEventDone").unwrap(),
+            s.flags[10],
+            s.flags[11],
+            s.flags[12],
+            h.slots[slot][2],
+            h.slots[slot][3],
+            s.var("Objetenmain_NextWarp").unwrap(),
+        );
+        assert_eq!(got, want, "{case}");
+        assert!(s.fatal.is_none());
+        n += 1;
+    }
+    assert_eq!(n, 42);
+    assert_eq!(rows(EVENTS).count(), 42);
+    assert!(EVENTS.contains(&format!("# objet FORMULAIRE_1 = {obj}")));
 }

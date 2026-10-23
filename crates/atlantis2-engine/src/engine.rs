@@ -31,7 +31,7 @@ use crate::script::{BagEntry, Script};
 use crate::sound::{MusicVolume, Pcm, Voices};
 use crate::subjects::SubjectMenu;
 use crate::subtitle::SubtitleFont;
-use crate::turn::Turn;
+use crate::turn::{Turn, Zoom};
 use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod blackbird;
@@ -43,8 +43,8 @@ pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
 mod places;
 mod puzzles;
 pub use puzzles::{
-    irish_click_hook, irish_entry_hook, mandala_hook_applies, ported_place, MANDALAS,
-    SKULL_OBJECTS, SKULL_START,
+    chinese_click_hooks, chinese_entry_hooks, irish_click_hook, irish_entry_hook,
+    mandala_hook_applies, ported_place, ChinesePuzzle, MANDALAS, SKULL_OBJECTS, SKULL_START,
 };
 mod saves;
 mod subjects;
@@ -104,6 +104,9 @@ pub enum Event {
     TurnSetup { yaw: f32, pitch: f32, turning: bool },
     /// A view entered (@ 0x00459fe0).
     Enter { view: u32 },
+    /// A view made current whose entry was skipped by `NextWarpInvalide`
+    /// = 1 (@ 0x0045a01a): no panorama, camera, animations nor sounds.
+    EnterSkipped { view: u32 },
     /// An SPW slot loaded, or a file not found.
     SpwLoad { name: String, found: bool },
     /// `AtlHnm_start` on a transition: the file, and its frame count when
@@ -122,7 +125,7 @@ pub enum Event {
     /// `CLICZONE` as it leaves it (the click scan may not follow: a film a
     /// hook's scan started drops the click).
     ZoneClick { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (Ireland's puzzles): the
+    /// A puzzle hook the port does not have (China's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
     /// An Irish puzzle hook the port has, run: the original's function.
@@ -172,6 +175,11 @@ pub enum Event {
     /// @ 0x0047aad0, a name not loaded yet): its entry, −1 when the file
     /// could not be read.
     SoundLoaded { name: String, entry: i32 },
+    /// `ViewBigSpr` (@ 0x0048c9d0): the picture viewer opened on that
+    /// bank of `spr\`, found or not.
+    Picture { name: String, found: bool },
+    /// A click closed the picture viewer (@ 0x0048ca50).
+    PictureEnd,
     /// The right button opened or closed the bag bar.
     Bag { open: bool },
     /// An object picked from the bag bar.
@@ -222,6 +230,9 @@ pub enum LoopType {
     Dialog,
     /// 5: the menus (@ 0x00486eb0).
     Menu,
+    /// 11: a full-screen picture (`ViewBigSpr`, @ 0x0048ca50) until a
+    /// click.
+    Picture,
 }
 
 /// The script variables the navigation sets (`defnames.con` names).
@@ -350,6 +361,11 @@ pub struct Engine {
     pub anim: Anim,
     pub loop_type: LoopType,
     turn: Option<Turn>,
+    /// The zoom of a move (`ZoomStart`, @ 0x005db850..0x005db858).
+    pub zoom: Zoom,
+    /// The next warp frame skips its draw (@ 0x005db84d = 0, set by the
+    /// end of a zoom, FUN_0045b680; the frame sets it back).
+    draw_skip: bool,
     move_pending: bool,
     next_view: Option<u32>,
     /// The arrival angles (@ 0x005e2f30 / 0x005e2f34), radians.
@@ -484,6 +500,8 @@ pub struct Engine {
     con: Option<Box<Script>>,
     /// The music player's files and choices (the fades are in `music`).
     player: Player,
+    /// The picture of `ViewBigSpr` (@ 0x006d1874).
+    picture: Option<SprBank>,
     /// A sound loaded for the next video (`cine%03d.apc` @ 0x0047a320, or
     /// the `TrajSound` of a move), played on voice 2 when it starts.
     pending_sound: Option<(String, Pcm)>,
@@ -777,6 +795,8 @@ impl Engine {
             anim,
             loop_type: LoopType::Warp,
             turn: None,
+            zoom: Zoom::default(),
+            draw_skip: false,
             move_pending: false,
             next_view: None,
             arrival: (0.0, 0.0),
@@ -843,6 +863,7 @@ impl Engine {
             zbuf: vec![0; (width * height) as usize],
             con: None,
             player: Player::default(),
+            picture: None,
             pending_sound: None,
             traj_sound: None,
             spf: Vec::new(),
@@ -900,6 +921,22 @@ impl Engine {
             .view(id)
             .ok_or_else(|| EngineError::NoView(self.wam_name.clone(), id))?;
         let name = view.name.clone();
+        // `NextWarpInvalide` = 1 (@ 0x0045a01a): the entry is skipped and
+        // the variable becomes 2, under which the warp frames draw nothing
+        // (the screen frozen) until a `vue=` or a move to another place
+        // clears it. The view is current all the same (its caller made it
+        // so), with the old panorama, camera, animations and sounds.
+        let invalid = self
+            .con
+            .as_ref()
+            .is_some_and(|s| s.vars[s.keys.next_warp_invalide] == 1);
+        if invalid {
+            self.set_script_var(|k| k.next_warp_invalide, 2);
+            self.view = id;
+            self.vars.vue = id;
+            self.event(Event::EnterSkipped { view: id });
+            return Ok(());
+        }
         let (hnm, disc) = self
             .files
             .read_with_disc(Folder::Warp, &name)
@@ -1242,6 +1279,93 @@ impl Engine {
                 }
             }
             LoopType::Menu => self.menu_pass(out),
+            LoopType::Picture => self.picture_pass(out),
+        }
+    }
+
+    /// `ViewBigSpr` (FUN_0048c9d0): loop type 11 (the previous one is not
+    /// kept: the end goes back to the panorama); a bank still loaded is
+    /// freed with the original's warning; the bank named by the value up
+    /// to `)`, a CR or 63 characters, loaded from `spr\` (FUN_0047ba80).
+    /// The section goes on at once.
+    pub(crate) fn open_picture(&mut self, value: &str) {
+        self.loop_type = LoopType::Picture;
+        if self.picture.take().is_some() {
+            log::warn!("ViewBigSpr_Start() : bank non NULL");
+        }
+        let name: String = value
+            .chars()
+            .take_while(|&c| !matches!(c, ')' | '\r' | '\0'))
+            .take(63)
+            .collect();
+        self.picture = self.load_bank(name.as_bytes());
+        let found = self.picture.is_some();
+        self.event(Event::Picture { name, found });
+    }
+
+    /// The picture loop (FUN_0048ca50): the panorama as FUN_0045a930
+    /// draws it (the cube and the place animations, their step), frame 0
+    /// of the picture at the screen centre (`AtlSpr_Aff` mode 0, its hot
+    /// spot there), the flip; a click goes back to the panorama (loop type
+    /// 0), the bank freed, the click cleared, the turn speeds stopped
+    /// (FUN_0040c680).
+    fn picture_pass(&mut self, out: Option<&mut [u16]>) {
+        if let Some(out) = out {
+            let (w, h) = (self.renderer.width(), self.renderer.height());
+            self.draw_scene(out);
+            if let Some(bank) = &self.picture {
+                bank.draw(
+                    &mut Target::screen(out, w, h),
+                    Some(w as i32 / 2),
+                    h as i32 / 2,
+                    0,
+                );
+            }
+        } else if self.renderer.variant == Variant::PII && !self.faces[0].is_empty() {
+            self.camera.fpu = Fpu::Chop;
+            self.renderer.fpu = Fpu::Chop;
+        }
+        self.anim_tick();
+        if self.click {
+            self.loop_type = LoopType::Warp;
+            self.picture = None;
+            self.click = false;
+            self.look.stop();
+            self.event(Event::PictureEnd);
+        }
+    }
+
+    /// The picture of `ViewBigSpr` shown, if any.
+    pub fn picture(&self) -> Option<&SprBank> {
+        self.picture.as_ref()
+    }
+
+    /// The cube with the place animations drawn on its faces, nothing
+    /// picked (FUN_0045a930's drawing).
+    fn draw_scene(&mut self, out: &mut [u16]) {
+        if self.faces[0].is_empty() {
+            out.fill(0);
+            return;
+        }
+        let centre = texel_of(self.camera.ray(self.camera.cx, self.camera.cy));
+        let (dirty, _) = self.anim.draw(&mut self.work, centre, false);
+        let (m, p) = (self.camera.matrix(), self.camera.projection());
+        self.renderer.fpu = self.camera.fpu;
+        self.renderer.render(&self.work, &m, p, out);
+        self.camera.fpu = self.renderer.fpu;
+        restore(&mut self.work, &self.faces, &dirty);
+    }
+
+    /// The place animations' 15 Hz step (FUN_0047d7f0, on its flag), the
+    /// horse's frame kept in `FRAMECHEVAL`.
+    fn anim_tick(&mut self) {
+        if self.spw_flag && self.spw_loaded {
+            self.spw_flag = false;
+            if let Some(frame) = self.anim.step() {
+                if let Some(s) = self.con.as_mut() {
+                    s.set_var("FRAMECHEVAL", frame);
+                }
+            }
         }
     }
 
@@ -1258,7 +1382,12 @@ impl Engine {
         // 1. The turn step, or the mouse inertia and the limits
         // (@ 0x0040c6a0); then the zone under the centre.
         if let Some(turn) = &mut self.turn {
-            if !turn.step(&mut self.camera) {
+            let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
+            let step = turn.step(&mut self.camera, &mut self.zoom, screen);
+            if step.skip_draw {
+                self.draw_skip = true;
+            }
+            if !step.going {
                 self.turn = None;
                 self.move_pending = true;
             }
@@ -1285,7 +1414,17 @@ impl Engine {
         if std::mem::take(&mut self.music_after_video) {
             self.music.set_percent(100);
         }
-        self.draw(out.as_deref_mut());
+        // Not while `NextWarpInvalide` is 2 (the screen frozen) nor in the
+        // frame after a zoom's end (@ 0x0045a3fd..0x0045a41a); the flag is
+        // set back either way.
+        let frozen = self
+            .con
+            .as_ref()
+            .is_some_and(|s| s.vars[s.keys.next_warp_invalide] == 2);
+        if !frozen && !self.draw_skip {
+            self.draw(out.as_deref_mut());
+        }
+        self.draw_skip = false;
         // 3. The clicks and the scans, unless turning.
         if self.turn.is_none() {
             self.sprite_click();
@@ -1378,14 +1517,7 @@ impl Engine {
             self.renderer.fpu = Fpu::Chop;
         }
         restore(&mut self.work, &self.faces, &dirty);
-        if self.spw_flag && self.spw_loaded {
-            self.spw_flag = false;
-            if let Some(frame) = self.anim.step() {
-                if let Some(s) = self.con.as_mut() {
-                    s.set_var("FRAMECHEVAL", frame);
-                }
-            }
-        }
+        self.anim_tick();
         // The cursor for the next frame (after FUN_0045af10 drew this one),
         // unless the bar, the subject menu (or a dialog) is open.
         let zone_kind = self.centre().map(|(_, z)| z.kind);
@@ -1968,7 +2100,7 @@ impl Engine {
 
     /// FUN_0045b690: sets up a turn; false when none is needed.
     fn start_turn(&mut self, yaw: f32, pitch: f32) -> bool {
-        let (turn, turning) = Turn::new(&self.camera, yaw, pitch);
+        let (turn, turning) = Turn::new(&self.camera, yaw, pitch, &self.zoom);
         self.event(Event::TurnSetup {
             yaw,
             pitch,
@@ -2251,13 +2383,7 @@ impl Engine {
         if self.faces[0].is_empty() {
             out.fill(0);
         } else if matches!(kind, None | Some(0) | Some(1)) {
-            let centre = texel_of(self.camera.ray(self.camera.cx, self.camera.cy));
-            let (dirty, _) = self.anim.draw(&mut self.work, centre, false);
-            let (m, p) = (self.camera.matrix(), self.camera.projection());
-            self.renderer.fpu = self.camera.fpu;
-            self.renderer.render(&self.work, &m, p, out);
-            self.camera.fpu = self.renderer.fpu;
-            restore(&mut self.work, &self.faces, &dirty);
+            self.draw_scene(out);
         }
         if let Some(d) = self.dialog.as_mut() {
             let mut frame = FrameContext {

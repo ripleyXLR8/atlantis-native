@@ -32,9 +32,18 @@
 //!   leaves the object in hand: chapter 7's sections (the click scan of
 //!   the same frame) count `fincrane`, take the object and, at the fifth,
 //!   play film 2, show Ailill and hide the skull.
-//! - The places the port has: Tibet and Ireland. A `changewam` to any
-//!   other place (the boats' other worlds, Shamballa, the space travel)
-//!   is refused: the section stops there, the world goes back to the
+//! - China's hooks (prefixes `CH`, `SS` and `LA`): the figurines, the
+//!   chest, the five wheels, the pearl and dragon, the turtle ring and the
+//!   labyrinth's souls are not ported. Their hooks are listed as the
+//!   dispatchers call them ([`chinese_click_hooks`],
+//!   [`chinese_entry_hooks`]) and noted ([`Event::PuzzleNotPorted`]);
+//!   none consumes a click (the dispatcher returns 0 for them), so the
+//!   scripts see every click as in the original. [`ChinesePuzzle`] and
+//!   [`Engine::solve_chinese_puzzle`] write what their wins write, for
+//!   tests.
+//! - The places the port has: Tibet, Ireland and China. A `changewam` to
+//!   any other place (Yucatán's boat, Shamballa, the space travel) is
+//!   refused: the section stops there, the world goes back to the
 //!   current place's, the view's per-view reset runs (as the section's
 //!   `vue=` would) and the game stays in the view it was in
 //!   ([`Event::WorldNotPorted`]).
@@ -68,18 +77,117 @@ const LAID_SOUND: &[u8] = b"(NewSound=400)";
 const IRELAND_PREFIX: &[u8] = b"IR";
 
 /// The places the port has, with the world (`MONDE`) the scripts set
-/// before entering them: Tibet's and Ireland's five places (chapters
-/// 2-24). Not `demo.wam`, which only chapter 1 loads: no script jumps to
-/// chapter 1, and none of its nine panoramas (`de0001.hnm` ..
-/// `de0009.hnm`) is on a disc.
-const PORTED_PLACES: [(&str, i32); 6] = [
+/// before entering them: Tibet's, Ireland's five places (chapters 2-24)
+/// and China's five (chapters 42-60: `chine.wam` and `miniature.wam`
+/// loaded by the scripts, `salletortue.wam`, `labysol.wam` and
+/// `labyplaf.wam` reached by their links). Not `demo.wam`, which only
+/// chapter 1 loads: no script jumps to chapter 1, and none of its nine
+/// panoramas (`de0001.hnm` .. `de0009.hnm`) is on a disc.
+const PORTED_PLACES: [(&str, i32); 11] = [
     ("tibet.wam", 5),
     ("bigile1.wam", 1),
     ("livre.wam", 1),
     ("ilepoete.wam", 1),
     ("ilepoete2.wam", 1),
     ("puit.wam", 1),
+    ("chine.wam", 3),
+    ("miniature.wam", 3),
+    ("salletortue.wam", 3),
+    ("labysol.wam", 3),
+    ("labyplaf.wam", 3),
 ];
+
+/// China's warp prefixes (@ 0x005db000 `CH`, 0x005e2ea4 `SS` for
+/// `miniature.wam`, 0x005e2eac `LA` for the labyrinth).
+const CHINA_PREFIX: &[u8] = b"CH";
+const MINIATURE_PREFIX: &[u8] = b"SS";
+const LABYRINTH_PREFIX: &[u8] = b"LA";
+
+fn prefixed(view_name: &[u8], prefix: &[u8]) -> bool {
+    view_name.len() >= 2 && view_name[..2].eq_ignore_ascii_case(prefix)
+}
+
+/// China's puzzles, for [`Engine::solve_chinese_puzzle`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChinesePuzzle {
+    /// The figurines on the floor, `SS` views 1-7 (FUN_0048d680,
+    /// FUN_0048da20, the check FUN_0048dcb0).
+    Figurines,
+    /// The Chinese chest, `SS` view 5 (FUN_004938f0, FUN_00493960).
+    Chest,
+    /// The five wheels' first order, `SS` view 13 (FUN_0048d080,
+    /// FUN_0048d170, the check FUN_0048d310): the bridge half lowered.
+    WheelsFirst,
+    /// Their second order: the bridge lowered.
+    WheelsSecond,
+    /// The pearl and the dragon in the clouds, `SS` view 31 (FUN_004944a0,
+    /// FUN_00494600, the tick FUN_004947b0).
+    Pearl,
+}
+
+/// The hooks FUN_0049b910 calls for a click on a zone of type `kind` in
+/// view `view` of a Chinese place (its warp name's prefix), in its order,
+/// none consuming the click (the dispatcher returns 0):
+///
+/// - `SS` 1..7, any zone, before the type is read
+///   (@ 0x0049b927..0x0049b964): the chest FUN_00493960, and in view 6
+///   the figurines FUN_0048da20. (Outside those views, a puzzle mode 5
+///   left by the chest's entry is cleared by any click, @ 0x0049b96d;
+///   the port's mode stays 0, the chest's entry being a no-op.)
+/// - Move zones (types 1, 2), `SS` 31 (@ 0x0049ba86): FUN_004945f0 (the
+///   puzzle mode back to 0).
+/// - Types 3, 4 and 0x32: `CH` 40..64 (@ 0x0049bc5c): the turtle ring
+///   FUN_0049c290; `SS` 31: the clouds FUN_00494600; `SS` 13: the wheels
+///   FUN_0048d170 (@ 0x0049bc85..0x0049bcbf).
+pub fn chinese_click_hooks(view_name: &[u8], view: u32, kind: i32) -> Vec<u32> {
+    let ss = prefixed(view_name, MINIATURE_PREFIX);
+    if ss && (1..8).contains(&view) {
+        return if view == 6 {
+            vec![0x0049_3960, 0x0048_da20]
+        } else {
+            vec![0x0049_3960]
+        };
+    }
+    match kind {
+        1 | 2 if ss && view == 31 => vec![0x0049_45f0],
+        3 | 4 | 0x32 if prefixed(view_name, CHINA_PREFIX) && (40..=64).contains(&view) => {
+            vec![0x0049_c290]
+        }
+        3 | 4 | 0x32 if ss && view == 31 => vec![0x0049_4600],
+        3 | 4 | 0x32 if ss && view == 13 => vec![0x0048_d170],
+        _ => Vec::new(),
+    }
+}
+
+/// The hooks FUN_0049bd50 calls when view `view` of a Chinese place is
+/// entered, in its order (@ 0x0049be62..0x0049bf62): `CH` 40..64 the
+/// turtle ring FUN_0049c340; `LA` 1..60 the souls FUN_0048df10; `SS` 31
+/// the clouds FUN_004944a0, `SS` 1..7 the chest FUN_004938f0, `SS` 12 and
+/// 13 the wheels FUN_0048d080, `SS` 1..7 the figurines FUN_0048d680.
+pub fn chinese_entry_hooks(view_name: &[u8], view: u32) -> Vec<u32> {
+    let mut hooks = Vec::new();
+    if prefixed(view_name, CHINA_PREFIX) && (40..=64).contains(&view) {
+        hooks.push(0x0049_c340);
+    }
+    if prefixed(view_name, LABYRINTH_PREFIX) && (1..=60).contains(&view) {
+        hooks.push(0x0048_df10);
+    }
+    if prefixed(view_name, MINIATURE_PREFIX) {
+        if view == 31 {
+            hooks.push(0x0049_44a0);
+        }
+        if (1..8).contains(&view) {
+            hooks.push(0x0049_38f0);
+        }
+        if view == 12 || view == 13 {
+            hooks.push(0x0048_d080);
+        }
+        if (1..8).contains(&view) {
+            hooks.push(0x0048_d680);
+        }
+    }
+    hooks
+}
 
 /// Whether the port has a place (`changewam`, a save's place), by its
 /// file name in any case; with the world its scripts set.
@@ -222,6 +330,15 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
+        // China's (@ 0x0049b927, 0x0049ba86, 0x0049bc5c..0x0049bcbf): not
+        // ported, noted; none consumes the click.
+        let hooks = self
+            .current_view()
+            .map(|v| chinese_click_hooks(v.name.as_bytes(), self.view, zone.kind))
+            .unwrap_or_default();
+        for function in hooks {
+            self.puzzle_not_ported(function);
+        }
         false
     }
 
@@ -283,6 +400,103 @@ impl Engine {
             }
             Some(function) => self.puzzle_not_ported(function),
             None => {}
+        }
+        // China's: not ported, noted.
+        let hooks = self
+            .current_view()
+            .map(|v| chinese_entry_hooks(v.name.as_bytes(), self.view))
+            .unwrap_or_default();
+        for function in hooks {
+            self.puzzle_not_ported(function);
+        }
+    }
+
+    /// What the win of a Chinese puzzle writes, for tests (the puzzles are
+    /// not ported): run as the puzzle's code runs it, with
+    /// `RunOneCommand` and the script variables, without a scan where the
+    /// original has none.
+    ///
+    /// - The figurines (FUN_0048da20's writes, then FUN_0048dcb0):
+    ///   `pos_statue1..6` = 4, 3, 5, 1, 2, 6 (the targets @ 0x005e1084),
+    ///   `(etat5statues=1)`, and `AtlHnm_start("???")` (FUN_0040bf60),
+    ///   run as the port's own `AtlHnm_start`: refused with a warning in
+    ///   the video loop; otherwise the file, which no disc has, does not
+    ///   open, and the music goes back to 100 % unless a dialog runs
+    ///   (@ 0x0040bfbd..0x0040bfc8, loop type 2). The ring refill before
+    ///   the open (FUN_00476e10, @ 0x0040bfa7) has no counterpart in the
+    ///   port's music.
+    /// - The chest (FUN_00493960's fifth click on `PRENDRE_BAGUETTE`):
+    ///   `frame_coffre_chine` = 4 and `BAGUETTE_PRISE` = 1, the chopstick
+    ///   put in the bag and its record hidden. The aid does the last two
+    ///   with the script keys `sacados` and `hideobjet`; the original
+    ///   calls FUN_004755f0 (the bag) and FUN_0048c6b0(id, 2, 1), which
+    ///   writes the show / hide table only, then clears the record's
+    ///   active flag itself (@ 0x00493a5b).
+    /// - The wheels (FUN_0048d310): first `pos_roue1..5` = 1..5,
+    ///   `Pont_Leve` hidden, `Pont_Moitie` shown, `findisque1` = 1,
+    ///   `(cinema=24)`; second 5, 3, 1, 4, 2, `Pont_Moitie` hidden,
+    ///   `Pont_Baisse` shown, `findisque2` = 1, `(cinema=25)`.
+    /// - The pearl (FUN_004947b0's last right step,
+    ///   @ 0x004948ab..0x00494902): `State_nuages_bas` raised to 5,
+    ///   `(NewSound=210)` (FUN_00494970: 205 + the new state), the low
+    ///   clouds placed from it (FUN_00494990: pictures, not ported),
+    ///   `Action_nuage_bas` = 0, then `FINPERLE` = 1 and `PERLE_TROU`
+    ///   shown.
+    pub fn solve_chinese_puzzle(&mut self, puzzle: ChinesePuzzle) {
+        match puzzle {
+            ChinesePuzzle::Figurines => {
+                for (k, v) in [4, 3, 5, 1, 2, 6].iter().enumerate() {
+                    let c = format!("(pos_statue{}={v})", k + 1);
+                    self.run_command(c.as_bytes());
+                }
+                self.run_command(b"(etat5statues=1)");
+                self.start_video("???");
+            }
+            ChinesePuzzle::Chest => {
+                self.with_script(|s, h| {
+                    s.set_var("frame_coffre_chine", 4);
+                    s.run_command(h, b"(sacados=BAGUETTE)");
+                    s.run_command(h, b"(hideobjet=BAGUETTE)");
+                    s.set_var("BAGUETTE_PRISE", 1);
+                });
+            }
+            ChinesePuzzle::WheelsFirst | ChinesePuzzle::WheelsSecond => {
+                let (order, hide, show, var, film) = if puzzle == ChinesePuzzle::WheelsFirst {
+                    (
+                        [1, 2, 3, 4, 5],
+                        "Pont_Leve",
+                        "Pont_Moitie",
+                        "findisque1",
+                        24,
+                    )
+                } else {
+                    (
+                        [5, 3, 1, 4, 2],
+                        "Pont_Moitie",
+                        "Pont_Baisse",
+                        "findisque2",
+                        25,
+                    )
+                };
+                self.with_script(|s, h| {
+                    for (k, v) in order.iter().enumerate() {
+                        s.set_var(&format!("pos_roue{}", k + 1), *v);
+                    }
+                    s.run_command(h, format!("(hideobjet={hide})").as_bytes());
+                    s.run_command(h, format!("(showobjet={show})").as_bytes());
+                    s.set_var(var, 1);
+                    s.run_command(h, format!("(cinema={film})").as_bytes());
+                });
+            }
+            ChinesePuzzle::Pearl => {
+                self.with_script(|s, h| {
+                    s.set_var("State_nuages_bas", 5);
+                    s.run_command(h, b"(NewSound=210)");
+                    s.set_var("Action_nuage_bas", 0);
+                    s.set_var("FINPERLE", 1);
+                    s.run_command(h, b"(showobjet=PERLE_TROU)");
+                });
+            }
         }
     }
 
