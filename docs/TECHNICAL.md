@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China without its puzzles (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China without its puzzles (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events) but the chest |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -1008,10 +1008,10 @@ event, the gong's way back to Tibet) into `china-*.png`.
   case by case against the original (`scripts_worlds_events.txt`) and
   played in chapter 60 (the rat given a form: sound 203 at frame 51, the
   event's end at frame 60, the stamped form back, the remembered dialog).
-  The puzzles are not ported: the figurines and the chest (`SS` views
-  1-7), the five wheels (`SS` 12-13), the pearl and the dragon (`SS` 31),
-  the turtle ring (`CH` 40-64) and the labyrinth's souls (`LA` 1-60).
-  Their hooks are listed as the original's dispatchers call them
+  The chest is ported (below); the other puzzles are not: the
+  figurines (`SS` views 1-7), the five wheels (`SS` 12-13), the pearl and
+  the dragon (`SS` 31), the turtle ring (`CH` 40-64) and the labyrinth's
+  souls (`LA` 1-60). Their hooks are listed as the original's dispatchers call them
   (`chinese_click_hooks`, `chinese_entry_hooks`) and noted
   (`Event::PuzzleNotPorted`); none takes a click (the dispatcher returns
   0 for all of them), so every click reaches `CLICZONE`, the scans and
@@ -1022,7 +1022,7 @@ event, the gong's way back to Tibet) into `china-*.png`.
   `PERLE_TROU`, which the clouds' entry hides until the pearl is won
   (FUN_004944a0), shows in `SS` view 31 and can be taken there (a
   shortcut the original does not have). `Engine::solve_chinese_puzzle` writes what the
-  figurines', the chest's, the wheels' and the pearl's wins write, for
+  figurines', the wheels' and the pearl's wins write, for
   tests; the turtle ring and the souls write no variable (the turtle
   room's way out is the scripts' count of arrivals, the labyrinth's the
   scripts' form and fan). The incense sticks are the scripts' alone
@@ -1044,6 +1044,45 @@ event, the gong's way back to Tibet) into `china-*.png`.
   section from the move, its `/set` lines all the original's), plays
   all 115 dialogs the chapters start, checks the subjects, objects and
   musics on disc 3, and loads a game saved in the turtle room.
+- **Chinese chest** (`engine/chest.rs`, `miniature.wam` views 1-7,
+  chapter 47): the chest `COFFRE_CHINE` has one slot in each view, one
+  animated state of five frames (4 shut, 0 open), which the puzzle holds
+  on frame 4 − `frame_coffre_chine`. The view entry (@ 0x004938f0, from
+  the entry dispatcher for `SS` 1-7) finds the chest's slot (the first of
+  its id, any kind, @ 0x00493aa0; none is the original's fatal
+  `pz_coffre vue %d ! find_idx_pzcoffre(%d) introuvable`), sets the
+  puzzle mode to 5 and holds the slot: its playing byte cleared, its
+  frame set. The click (@ 0x00493960, from the click dispatcher on every
+  zone click of `SS` 1-7, before the zone's type is read, never taking
+  the click): in view 5 the chopstick's slot is found too, and on the
+  zone `PRENDRE_BAGUETTE` (by its value) the counter goes up by one with
+  `RunOneCommand("(NewSound=%d)", 210 + counter)` while below 4, the
+  chopstick `BAGUETTE` shown at 4 (FUN_0048c610: its slot and the show /
+  hide table); from 4, while `BAGUETTE_PRISE` is 0, the chopstick goes in
+  the bag and in hand (`OBJETENMAIN` and the hand pair; the cursor pair
+  untouched), its table row hidden (the table only), its slot made
+  inactive, `BAGUETTE_PRISE` = 1; then in every view the chest held
+  again. The slots now have the original's playing byte (+0xbc, 1 at
+  load): the 15 Hz step moves only the active slots that play. **The
+  puzzle mode** (@ 0x006d84d0, save entry 26) is engine state: 5 has no
+  tick, and the click dispatcher, on the first zone click in an `SS` view
+  outside 1-7 with the mode 5, clears it and runs no hook on that click
+  (the wheels' first click in view 13 is lost, as in the original);
+  nothing else clears a 5, not a new game (the reset clears only its
+  modules' own modes). Against the original's emulated run
+  (`tests/chest.rs`, `tests/golden/chest.txt`): the entry by view,
+  counter and mode, with no slot; the click alone along the five clicks
+  and their variants (types, views, the chopstick already in the bag,
+  another object in hand, counters 3, 5, 7, −1, −3, `MONDE` 5, no
+  chopstick slot, views entered after the show and the take); both
+  dispatchers with the mode; the click handler and chapter 47's click
+  scan in view 5 and then with the chopstick on the four incense sticks
+  to film 23 and chapter 48; the save entry; the chest's seven files and
+  the chopstick's drawn (faces' md5s and pixels); the step on the held
+  chest. A game is played with the mouse from chapter 48's view 7 into
+  chapter 47, the chest opened and the chopstick taken in view 5, the
+  sticks lit with it back in view 6 (chapter 47's lines 44-47, 56-59,
+  68-71, 80-89) to chapter 48.
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,
@@ -1507,7 +1546,8 @@ event, the gong's way back to Tibet) into `china-*.png`.
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
   credits). No-ops, logged: `ZoomPsychoStart` (its roll), `ANIM_THE_FRAME`
-  (the playing byte), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  (it writes the slots' playing byte, @ 0x004833a1, which the chest
+  brought in; the key's write is not ported yet), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. A fatal error of
   the scripts (an unknown name, a missing chapter) stops them and is
@@ -1658,7 +1698,9 @@ installation, for the tests of those builds. For Atlantis II,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
 copies); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
 `tests/ogham.rs`'s played games write their screens there
-(`pz-skull-*.png`, `pz-ogham-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
+(`pz-skull-*.png`, `pz-ogham-*.png`), and with `ATLANTIS2_SHOTS` set
+`tests/cross.rs`'s and `tests/chest.rs`'s (`pz-cross-*.png`,
+`pz-chest-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
 weights, dialog lines, dialog frames, subtitle layouts, music fades,
 script results and save files come from the original `atlantis2.exe` run under emulation
 (Tibet's moves pass by pass, the place animations tick by tick, the
@@ -1670,7 +1712,9 @@ subject menu's cells and click grid, the shaman's subjects along chapter
 through the handler, the special events, the zoom of a move,
 Brigid's cross's hooks, frame tables and pictures, the skull puzzle's
 hooks, frame lists, clicks with chapter 7 and drawing, the ogham stones'
-moves and drawing, the blackbird songs' draws, clicks and warp frames;
+moves and drawing, the blackbird songs' draws, clicks and warp frames,
+the Chinese chest's hooks, dispatchers, clicks with chapter 47 and
+drawing;
 names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):
@@ -1705,5 +1749,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles, Yucatán, Shamballa and their puzzles |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), then China's puzzles (the chest done), Yucatán, Shamballa and their puzzles |
 

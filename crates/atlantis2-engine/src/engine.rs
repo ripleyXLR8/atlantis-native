@@ -35,6 +35,7 @@ use crate::turn::{Turn, Zoom};
 use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod blackbird;
+mod chest;
 mod cross;
 mod host;
 mod menus;
@@ -43,8 +44,9 @@ pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
 mod places;
 mod puzzles;
 pub use puzzles::{
-    chinese_click_hooks, chinese_entry_hooks, irish_click_hook, irish_entry_hook,
-    mandala_hook_applies, ported_place, ChinesePuzzle, MANDALAS, SKULL_OBJECTS, SKULL_START,
+    chest_mode_cleared, chinese_click_hooks, chinese_entry_hooks, irish_click_hook,
+    irish_entry_hook, mandala_hook_applies, ported_place, ChinesePuzzle, MANDALAS, SKULL_OBJECTS,
+    SKULL_START,
 };
 mod saves;
 mod subjects;
@@ -128,7 +130,8 @@ pub enum Event {
     /// A puzzle hook the port does not have (China's puzzles): the
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
-    /// An Irish puzzle hook the port has, run: the original's function.
+    /// A puzzle hook the port has (Ireland's, China's chest), run: the
+    /// original's function.
     PuzzleRan { function: u32 },
     /// Brigid's cross laid on the zone of value `value` (FUN_00494190).
     CrossLaid { value: i32 },

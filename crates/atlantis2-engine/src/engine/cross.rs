@@ -71,7 +71,7 @@ impl Engine {
     /// Nom de %s inconnu:%s", @ 0x004106a3: an emergency save, then the
     /// game quits): here the scripts stop and so does the hook (`None`).
     /// The game's data never reach it.
-    fn object_index(&mut self, name: &[u8]) -> Option<i32> {
+    pub(super) fn object_index(&mut self, name: &[u8]) -> Option<i32> {
         match self.names.id(defnames::OBJETS, name) {
             Ok(id) => Some(id as i32),
             Err(_) => {
