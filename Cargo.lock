@@ -233,6 +233,7 @@ dependencies = [
  "ab_glyph",
  "atlantis-codecs",
  "atlantis-data",
+ "atlantis-engine",
  "atlantis2-data",
  "libm",
  "log",

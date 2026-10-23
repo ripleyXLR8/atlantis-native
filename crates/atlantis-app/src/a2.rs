@@ -24,6 +24,13 @@
 //! `--original` turns the enhancements off (the minor bug fixes: the
 //! music tracks heard to their end), as for the first game.
 //!
+//! `--hd` draws the panorama at the window's resolution (the first game's
+//! HD mode, `atlantis2_engine::hd`), `--widescreen` too with the panorama
+//! filling the sides of a window wider than 4:3; the rest (the cursor,
+//! the bag bar, the menus, the videos) is the original's 640x480 art,
+//! upscaled. `--size <w>x<h>` gives the window's size (in a headless run,
+//! the size of the screenshot, composed as the window would show it).
+//!
 //! Testing aids: `--view <id>[,<yaw>,<pitch>]` starts in another view of
 //! the place (angles in degrees), `--dialog <n>` plays dialog `n` at once
 //! over the view (a click goes to the next line, as in the original), with
@@ -32,7 +39,9 @@
 //! one in the hand (by their `defnames.con` names, as the scripts'
 //! `sacados` and `objetenmain` do), `--bag` opens the bag bar,
 //! `--pointer <x>,<y>` puts the mouse pointer there and `--talk` clicks
-//! the character under the screen centre (its subject menu opens).
+//! the character under the screen centre (its subject menu opens);
+//! `--command <commands>` runs script commands at the start, before the
+//! view entry (`(monde=1)(changewam=bigile1.wam)(vue=5)`: Ireland).
 //!
 //! At start-up the intro videos play before the player menu, as in the
 //! original (a click skips one, a double click all of them); `--no-intro`
@@ -46,12 +55,14 @@ use std::rc::Rc;
 use atlantis2_data::files::OpenError;
 use atlantis2_data::save::SystemTime;
 use atlantis2_data::A2Files;
+use atlantis2_engine::hd::{picture_rect, side_tiles, tile_for_output, window_to_screen};
 use atlantis2_engine::menu::PageKind;
 use atlantis2_engine::{Engine, Enhancements, Fpu, LoopType, Variant};
+use atlantis_engine::hd::{HdCompositor, HdFrame};
 use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
 use winit::dpi::PhysicalPosition;
+use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
@@ -96,6 +107,12 @@ pub struct A2Start {
     /// headless run or `--menu player`); `None` plays them when the game
     /// starts on the player menu as the original does.
     pub intro: Option<bool>,
+    /// The window's size (`--size`): a headless run's screenshot is
+    /// composed at that size.
+    pub size: Option<(u32, u32)>,
+    /// Script commands run at the start (`--command`), before the view
+    /// entry: `(monde=1)(changewam=bigile1.wam)(vue=5)` goes to Ireland.
+    pub commands: Vec<String>,
 }
 
 impl A2Start {
@@ -112,6 +129,13 @@ impl A2Start {
     pub fn parse_pointer(v: &str) -> Option<(i32, i32)> {
         let (x, y) = v.split_once(',')?;
         Some((x.trim().parse().ok()?, y.trim().parse().ok()?))
+    }
+
+    /// Parses `--size`'s value: `<w>x<h>`.
+    pub fn parse_size(v: &str) -> Option<(u32, u32)> {
+        let (w, h) = v.split_once(['x', 'X'])?;
+        let (w, h) = (w.trim().parse().ok()?, h.trim().parse().ok()?);
+        (w > 0 && h > 0).then_some((w, h))
     }
 
     /// Parses `--menu`'s value.
@@ -133,6 +157,7 @@ impl A2Start {
     /// for.
     pub fn begin(&self, engine: &mut Engine, headless: bool) -> Result<(), String> {
         let at_once = self.view.is_some()
+            || !self.commands.is_empty()
             || self.dialog.is_some()
             || !self.take.is_empty()
             || self.hold.is_some()
@@ -166,8 +191,18 @@ impl A2Start {
     /// opens the bar (the opening film ended first).
     pub fn apply(&self, engine: &mut Engine) -> Result<(), String> {
         let bag_aids = !self.take.is_empty() || self.hold.is_some() || self.bag || self.talk;
-        if self.view.is_some() || self.dialog.is_some() || bag_aids {
+        if self.view.is_some() || self.dialog.is_some() || bag_aids || !self.commands.is_empty() {
             engine.end_video();
+        }
+        for c in &self.commands {
+            // One command at a time, each from its `(`.
+            for part in c
+                .split_inclusive(')')
+                .map(str::trim)
+                .filter(|p| !p.is_empty())
+            {
+                engine.run_command(part.as_bytes());
+            }
         }
         if let Some((id, yaw, pitch)) = self.view {
             engine
@@ -328,13 +363,33 @@ pub fn headless(
     }
     let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
     let mut sound = vec![0.0f32; 2 * 22050 / 60];
+    // The window's picture, composed every frame when it is not the
+    // 640x480 screen (the HD mode's timings).
+    let (sw, sh) = start
+        .size
+        .map_or((WIDTH as usize, HEIGHT as usize), |(w, h)| {
+            (w as usize, h as usize)
+        });
+    let mut picture = Picture::new();
+    let mut window = vec![0u32; sw * sh];
+    let compose = (sw, sh) != (WIDTH as usize, HEIGHT as usize);
+    let mut times = Timings::default();
     for i in 0..frames {
         engine.set_clock(i as f64 / 60.0);
+        picture.prepare(&mut engine, sw, sh);
+        let t0 = Instant::now();
         engine.pass(Some(&mut screen));
+        let pass = t0.elapsed();
         // The sound is mixed and dropped.
         engine.voices().fill(&mut sound, 22050, 2);
+        if compose {
+            let t1 = Instant::now();
+            picture.compose(&engine, &screen, &mut window, sw, sh);
+            times.add(&engine, pass, t1.elapsed());
+        }
     }
     if frames == 0 {
+        picture.prepare(&mut engine, sw, sh);
         engine.render(&mut screen);
     }
     let (wam, view) = engine.place();
@@ -384,7 +439,15 @@ pub fn headless(
         Some(m) => println!("music {m}, volume {}", engine.music.volume),
         None => println!("no music, volume {}", engine.music.volume),
     }
-    if let Some(path) = screenshot {
+    if let Some(t) = times.report() {
+        println!("{t}");
+    }
+    if let Some(path) = screenshot.filter(|_| compose) {
+        picture.compose(&engine, &screen, &mut window, sw, sh);
+        let png = atlantis2_engine::png::encode_xrgb8888(&window, sw, sh);
+        std::fs::write(path, png).map_err(|e| format!("{}: {e}", path.display()))?;
+        println!("screenshot: {} ({sw}x{sh})", path.display());
+    } else if let Some(path) = screenshot {
         let png = atlantis2_engine::png::encode_rgb565(&screen, WIDTH as usize, HEIGHT as usize);
         std::fs::write(path, png).map_err(|e| format!("{}: {e}", path.display()))?;
         println!("screenshot: {}", path.display());
@@ -393,7 +456,11 @@ pub fn headless(
 }
 
 /// Opens a window on the game; returns when it is closed.
-pub fn run_window(engine: Engine, fullscreen: bool) -> Result<(), String> {
+pub fn run_window(
+    engine: Engine,
+    fullscreen: bool,
+    size: Option<(u32, u32)>,
+) -> Result<(), String> {
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let voices = engine.voices().clone();
     let audio =
@@ -403,8 +470,10 @@ pub fn run_window(engine: Engine, fullscreen: bool) -> Result<(), String> {
         started: Instant::now(),
         engine,
         fullscreen,
+        size,
         window: None,
         surface: None,
+        picture: Picture::new(),
         screen: vec![0u16; (WIDTH * HEIGHT) as usize],
         motion: (0.0, 0.0),
         keys: [false; 4],
@@ -423,9 +492,13 @@ struct A2App {
     started: Instant,
     engine: Engine,
     fullscreen: bool,
+    /// The window's first size (`--size`), else twice 640 x 480.
+    size: Option<(u32, u32)>,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
     screen: Vec<u16>,
+    /// The window's picture of the frame (the HD mode's composition).
+    picture: Picture,
     /// Raw mouse motion not yet given to the engine (fractions kept).
     motion: (f64, f64),
     /// Left, right, up, down held.
@@ -476,29 +549,22 @@ impl A2App {
             self.engine.mouse_motion(dx, dy);
         }
         self.engine.set_clock(self.started.elapsed().as_secs_f64());
+        if let Some(size) = self.window.as_ref().map(|w| w.inner_size()) {
+            self.picture
+                .prepare(&mut self.engine, size.width as usize, size.height as usize);
+        }
         self.engine.pass(Some(&mut self.screen));
     }
 
-    /// Where the 640x480 screen is in the window: its offset and scale.
-    fn layout(&self) -> Option<(f64, f64, f64)> {
-        let size = self.window.as_ref()?.inner_size();
-        let (ww, wh) = (f64::from(size.width), f64::from(size.height));
-        let scale = (ww / f64::from(WIDTH)).min(wh / f64::from(HEIGHT));
-        if scale <= 0.0 {
-            return None;
-        }
-        let (dw, dh) = (f64::from(WIDTH) * scale, f64::from(HEIGHT) * scale);
-        Some(((ww - dw).trunc() / 2.0, (wh - dh).trunc() / 2.0, scale))
-    }
-
-    /// A window position on the 640x480 screen.
+    /// A window position on the 640x480 screen ([`window_point`]).
     fn to_screen(&self, p: PhysicalPosition<f64>) -> Option<(i32, i32)> {
-        let (ox, oy, scale) = self.layout()?;
-        Some((((p.x - ox) / scale) as i32, ((p.y - oy) / scale) as i32))
+        let size = self.window.as_ref()?.inner_size();
+        window_point(size.width as usize, size.height as usize, p)
     }
 
-    /// The 640x480 screen scaled to the window (nearest pixel, kept in
-    /// proportion, black bars).
+    /// The frame in the window: the 640x480 screen scaled to it (nearest
+    /// pixel, kept in proportion, black bars), or in the HD mode the
+    /// composition of the HD view and the upscaled screen.
     fn present(&mut self) {
         let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
             return;
@@ -515,12 +581,13 @@ impl A2App {
             return;
         };
         let (ww, wh) = (size.width as usize, size.height as usize);
-        let scale = (ww as f64 / f64::from(WIDTH)).min(wh as f64 / f64::from(HEIGHT));
-        let (dw, dh) = (
-            (f64::from(WIDTH) * scale) as usize,
-            (f64::from(HEIGHT) * scale) as usize,
-        );
-        let (ox, oy) = ((ww - dw) / 2, (wh - dh) / 2);
+        if self.picture.hd(&self.engine) {
+            self.picture
+                .compose(&self.engine, &self.screen, &mut buf, ww, wh);
+            let _ = buf.present();
+            return;
+        }
+        let (ox, oy, dw, dh) = picture_rect(ww, wh);
         buf.fill(0);
         let xs: Vec<usize> = (0..dw)
             .map(|x| (x * WIDTH as usize / dw.max(1)).min(WIDTH as usize - 1))
@@ -543,9 +610,11 @@ impl ApplicationHandler for A2App {
         if self.window.is_some() {
             return;
         }
-        let mut attrs = Window::default_attributes()
-            .with_title("Atlantis II - Atlantis Native")
-            .with_inner_size(LogicalSize::new(WIDTH * 2, HEIGHT * 2));
+        let mut attrs = Window::default_attributes().with_title("Atlantis II - Atlantis Native");
+        attrs = match self.size {
+            Some((w, h)) => attrs.with_inner_size(PhysicalSize::new(w, h)),
+            None => attrs.with_inner_size(LogicalSize::new(WIDTH * 2, HEIGHT * 2)),
+        };
         if self.fullscreen {
             attrs = attrs.with_fullscreen(Some(Fullscreen::Borderless(None)));
         }
@@ -681,5 +750,216 @@ impl ApplicationHandler for A2App {
             }
             _ => {}
         }
+    }
+}
+
+/// A window position on the 640x480 screen, in a `width` x `height`
+/// window: the screen pixel the window shows under it (outside the
+/// picture, past its edges), HD mode or not (`window_to_screen`, the
+/// nearest map both pictures are drawn with: pixel x of the picture shows
+/// screen column ⌊x · 640 / dw⌋). Before the HD mode a position was
+/// divided by the float scale from an offset that could fall on half a
+/// pixel, which put some clicks one pixel off the pixel shown; see the
+/// test `clicks_hit_the_pixel_drawn`.
+fn window_point(width: usize, height: usize, p: PhysicalPosition<f64>) -> Option<(i32, i32)> {
+    let rect = picture_rect(width, height);
+    if rect.2 == 0 || rect.3 == 0 {
+        return None;
+    }
+    Some(window_to_screen(
+        p.x.floor() as i64,
+        p.y.floor() as i64,
+        rect,
+    ))
+}
+
+/// The window's picture of the engine's frames: the 640x480 screen
+/// scaled, or in the HD mode (`Enhancements::hd`) the first game's
+/// composition (`atlantis_engine::hd::HdCompositor`): the engine's HD view
+/// where the frame shows the cube, the rest of the screen upscaled (xBR
+/// for the art, bilinearly for the videos' frames), widescreen sides.
+pub struct Picture {
+    compositor: HdCompositor,
+}
+
+impl Default for Picture {
+    fn default() -> Self {
+        Picture::new()
+    }
+}
+
+impl Picture {
+    pub fn new() -> Picture {
+        Picture {
+            compositor: HdCompositor::new(),
+        }
+    }
+
+    /// Whether the window shows the HD composition.
+    pub fn hd(&self, engine: &Engine) -> bool {
+        engine.enhancements.hd
+    }
+
+    /// Before a pass: the HD size the engine draws its view at, for a
+    /// `width` x `height` window (none when the picture is not larger than
+    /// 640 x 480), with the widescreen sides that fill the bars.
+    pub fn prepare(&mut self, engine: &mut Engine, width: usize, height: usize) {
+        if !engine.enhancements.hd {
+            engine.set_hd_output(None, 0);
+            return;
+        }
+        let tile = tile_for_output(width, height, atlantis2_engine::hd::MAX_TILE);
+        let (ox, _, dw, _) = picture_rect(width, height);
+        let side = if engine.enhancements.hd_options.widescreen {
+            side_tiles(ox, dw)
+        } else {
+            0
+        };
+        engine.set_hd_output(tile, side);
+    }
+
+    /// The frame `screen` in `out` (`width` x `height`, XRGB8888).
+    pub fn compose(
+        &mut self,
+        engine: &Engine,
+        screen: &[u16],
+        out: &mut [u32],
+        width: usize,
+        height: usize,
+    ) {
+        let (ox, oy, dw, dh) = picture_rect(width, height);
+        out[..width * height].fill(0);
+        if engine.enhancements.hd {
+            let f = HdFrame {
+                screen,
+                layer: engine.hd_layer(),
+                texts: &[],
+                photo: engine.hd_photo(),
+                video_pano: None,
+            };
+            let opts = engine.enhancements.hd_options;
+            self.compositor.compose(f, opts, out, width, ox, oy, dw, dh);
+            return;
+        }
+        let lut = atlantis2_engine::hd::rgb565_to_888();
+        let w = WIDTH as usize;
+        let cols: Vec<usize> = (0..dw).map(|x| x * w / dw).collect();
+        for y in 0..dh {
+            let src = &screen[(y * HEIGHT as usize / dh) * w..][..w];
+            let row = &mut out[(oy + y) * width + ox..][..dw];
+            for (d, &sx) in row.iter_mut().zip(&cols) {
+                *d = lut[usize::from(src[sx])];
+            }
+        }
+    }
+}
+
+/// The frame times of a headless run in the HD mode.
+#[derive(Default)]
+struct Timings {
+    /// Frames with an HD view: the pass (the view included), the view,
+    /// the composition, in seconds; the slowest frame.
+    n: u32,
+    pass: f64,
+    view: f64,
+    compose: f64,
+    worst: f64,
+    /// Frames without one (videos, menus): their composition.
+    other: u32,
+    other_compose: f64,
+}
+
+impl Timings {
+    fn add(&mut self, engine: &Engine, pass: Duration, compose: Duration) {
+        let (p, c) = (pass.as_secs_f64(), compose.as_secs_f64());
+        if engine.hd_layer().is_some() {
+            self.n += 1;
+            self.pass += p;
+            self.view += engine.hd_view_ms() / 1e3;
+            self.compose += c;
+            self.worst = self.worst.max(p + c);
+        } else {
+            self.other += 1;
+            self.other_compose += c;
+        }
+    }
+
+    fn report(&self) -> Option<String> {
+        if self.n == 0 && self.other == 0 {
+            return None;
+        }
+        let ms = |t: f64, n: u32| t * 1e3 / f64::from(n.max(1));
+        Some(format!(
+            "HD: {} frames with the view: pass {:.2} ms (view {:.2} ms), composition {:.2} ms, \
+             slowest {:.2} ms; {} other frames: composition {:.2} ms",
+            self.n,
+            ms(self.pass, self.n),
+            ms(self.view, self.n),
+            ms(self.compose, self.n),
+            self.worst * 1e3,
+            self.other,
+            ms(self.other_compose, self.other)
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sizes() {
+        assert_eq!(A2Start::parse_size("1920x1080"), Some((1920, 1080)));
+        assert_eq!(A2Start::parse_size("1440X1080"), Some((1440, 1080)));
+        assert_eq!(A2Start::parse_size("0x1080"), None);
+        assert_eq!(A2Start::parse_size("1920"), None);
+    }
+
+    /// With the HD mode off too, a click names the 640x480 pixel the
+    /// window draws under it (`present`: picture pixel x shows screen
+    /// column x · 640 / dw). The mapping before the HD mode (a division by
+    /// the float scale, from an offset that could be half a pixel) is at
+    /// most one pixel away from it, and differs only where it missed the
+    /// pixel drawn.
+    #[test]
+    fn clicks_hit_the_pixel_drawn() {
+        let old = |ww: usize, wh: usize, x: f64, y: f64| {
+            let (ww, wh) = (ww as f64, wh as f64);
+            let scale = (ww / 640.0).min(wh / 480.0);
+            let (dw, dh) = (640.0 * scale, 480.0 * scale);
+            let (ox, oy) = ((ww - dw).trunc() / 2.0, (wh - dh).trunc() / 2.0);
+            (((x - ox) / scale) as i32, ((y - oy) / scale) as i32)
+        };
+        let mut changed = 0;
+        for (ww, wh) in [
+            (1280, 960),
+            (1920, 1080),
+            (1366, 768),
+            (1023, 767),
+            (800, 1000),
+            (1281, 961),
+            (2561, 1441),
+        ] {
+            let (ox, oy, dw, dh) = picture_rect(ww, wh);
+            for y in oy..oy + dh {
+                for x in ox..ox + dw {
+                    let drawn = (
+                        ((x - ox) * WIDTH as usize / dw) as i32,
+                        ((y - oy) * HEIGHT as usize / dh) as i32,
+                    );
+                    let p = PhysicalPosition::new(x as f64 + 0.25, y as f64 + 0.75);
+                    assert_eq!(window_point(ww, wh, p), Some(drawn), "{ww}x{wh} ({x}, {y})");
+                    let o = old(ww, wh, x as f64, y as f64);
+                    assert!(
+                        (o.0 - drawn.0).abs() <= 1 && (o.1 - drawn.1).abs() <= 1,
+                        "{ww}x{wh} ({x}, {y}): {o:?} {drawn:?}"
+                    );
+                    changed += usize::from(o != drawn);
+                }
+            }
+        }
+        // Some window pixels did name another pixel than the one drawn.
+        assert!(changed > 0);
+        eprintln!("{changed} window pixels clicked one pixel off before");
     }
 }

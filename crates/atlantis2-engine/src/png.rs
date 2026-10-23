@@ -51,12 +51,29 @@ pub fn rgb565_to_rgb(p: u16) -> [u8; 3] {
 /// A PNG file of a `width` x `height` RGB565 picture.
 pub fn encode_rgb565(pixels: &[u16], width: usize, height: usize) -> Vec<u8> {
     assert!(pixels.len() >= width * height);
-    let mut raw = Vec::with_capacity(height * (1 + 3 * width));
-    for row in pixels.chunks(width).take(height) {
-        raw.push(0); // filter: none
-        for &p in row {
+    encode_rgb(width, height, |row, raw| {
+        for &p in &pixels[row * width..][..width] {
             raw.extend_from_slice(&rgb565_to_rgb(p));
         }
+    })
+}
+
+/// A PNG file of a `width` x `height` XRGB8888 picture (the HD mode's).
+pub fn encode_xrgb8888(pixels: &[u32], width: usize, height: usize) -> Vec<u8> {
+    assert!(pixels.len() >= width * height);
+    encode_rgb(width, height, |row, raw| {
+        for &p in &pixels[row * width..][..width] {
+            raw.extend_from_slice(&[(p >> 16) as u8, (p >> 8) as u8, p as u8]);
+        }
+    })
+}
+
+/// A PNG file of 8-bit RGB rows, `row(y, raw)` appending row y's bytes.
+fn encode_rgb(width: usize, height: usize, row: impl Fn(usize, &mut Vec<u8>)) -> Vec<u8> {
+    let mut raw = Vec::with_capacity(height * (1 + 3 * width));
+    for y in 0..height {
+        raw.push(0); // filter: none
+        row(y, &mut raw);
     }
     let mut z = vec![0x78, 0x01];
     let mut blocks = raw.chunks(65535).peekable();

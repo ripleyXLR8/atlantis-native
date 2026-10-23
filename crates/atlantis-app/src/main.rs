@@ -38,7 +38,10 @@
 //! plays a dialog at once, `--menu <page>` (`player`, `main`, `options`,
 //! `sound`, `load`, `credits`) shows a menu page (testing aids). The intro
 //! videos play before the player menu, as in the original: `--no-intro`
-//! skips them, `--intro` plays them in a headless run. Only the
+//! skips them, `--intro` plays them in a headless run. `--hd` and
+//! `--widescreen` draw its panorama at the window's resolution, as the
+//! first game's HD mode does, `--size <w>x<h>` sizes its window (and a
+//! headless run's screenshot). Only the
 //! command line opens Atlantis II for now:
 //! the launcher, the game library and the web build know the first game
 //! alone. The first game's options but `--original` are refused in this
@@ -197,7 +200,14 @@ fn main() {
         Some(args.remove(i))
     };
     let take = text_value("--take");
+    let command = text_value("--command");
     let hold = text_value("--hold");
+    let size = text_value("--size").map(|v| {
+        atlantis_app::a2::A2Start::parse_size(&v).unwrap_or_else(|| {
+            eprintln!("--size {v}: not <width>x<height>");
+            std::process::exit(2);
+        })
+    });
     let pointer = text_value("--pointer").map(|v| {
         atlantis_app::a2::A2Start::parse_pointer(&v).unwrap_or_else(|| {
             eprintln!("--pointer {v}: not <x>,<y>");
@@ -244,18 +254,20 @@ fn main() {
         pointer,
         talk,
         intro,
+        size,
+        commands: command.into_iter().collect(),
     };
-    // `--original` holds for both games.
-    let a2_enhancements = if original {
+    // `--original`, `--hd` and `--widescreen` hold for both games.
+    let mut a2_enhancements = if original {
         atlantis2_engine::Enhancements::original()
     } else {
         atlantis2_engine::Enhancements::default()
     };
+    a2_enhancements.hd |= force_hd;
+    a2_enhancements.hd_options.widescreen |= force_wide;
     // The options of one game only, refused for the other rather than
     // ignored.
     let first_game_flags: Vec<&str> = [
-        ("--hd", force_hd && !force_wide),
-        ("--widescreen", force_wide),
         ("--new-game", new_game),
         ("--launcher", launcher),
         ("--support-screen", force_support),
@@ -278,6 +290,8 @@ fn main() {
         ("--talk", a2_start.talk),
         ("--intro", intro == Some(true)),
         ("--no-intro", intro == Some(false)),
+        ("--size", size.is_some()),
+        ("--command", !a2_start.commands.is_empty()),
     ]
     .into_iter()
     .filter_map(|(name, on)| on.then_some(name))
@@ -388,7 +402,7 @@ fn main() {
     if is_a2 {
         refuse(&first_game_flags, "Atlantis II's mode");
         let run = atlantis_app::a2::open(Path::new(&args[0]), &discs, &a2_start, a2_enhancements)
-            .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen));
+            .and_then(|engine| atlantis_app::a2::run_window(engine, fullscreen, size));
         if let Err(e) = run {
             error_box(&e);
             std::process::exit(1);

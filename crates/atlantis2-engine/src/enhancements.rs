@@ -1,7 +1,9 @@
 //! Where the port may differ from the original game, by choice: the
 //! groups of the first game's `Enhancements` (those of ScummVM's CryOmni3D
-//! Atlantis engine). The original game, bug for bug, is every group off
-//! ([`Enhancements::original`], `--original`).
+//! Atlantis engine), and the first game's HD mode. The original game, bug
+//! for bug, is every group off ([`Enhancements::original`], `--original`).
+
+use crate::hd::HdOptions;
 
 /// The optional differences from the original game.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,21 +21,36 @@ pub struct Enhancements {
     ///   (@ 0x00477b00), fails and closes the file, and the ring loops its
     ///   last 5.9 s until another music command.
     pub minor_bug_fixes: bool,
+    /// The HD mode (default off; the first game's `graphics = hd`,
+    /// `--hd`): the panorama drawn at the window's resolution with the
+    /// original's projection (see [`crate::hd`]); the engine's 640x480
+    /// frame stays the original's either way.
+    pub hd: bool,
+    /// The HD mode's picture options, the first game's
+    /// (`hd_panorama`, `hd_sharpen`, `hd_interface`,
+    /// `hd_sharp_subtitles`, `hd_widescreen`, `hd_video_sides`); used
+    /// only with [`Enhancements::hd`].
+    pub hd_options: HdOptions,
 }
 
 impl Default for Enhancements {
     fn default() -> Self {
         Enhancements {
             minor_bug_fixes: true,
+            hd: false,
+            hd_options: HdOptions::default(),
         }
     }
 }
 
 impl Enhancements {
-    /// The original game: every group off.
+    /// The original game: every group off (and the original's 640x480
+    /// picture).
     pub fn original() -> Self {
         Enhancements {
             minor_bug_fixes: false,
+            hd: false,
+            hd_options: HdOptions::default(),
         }
     }
 }

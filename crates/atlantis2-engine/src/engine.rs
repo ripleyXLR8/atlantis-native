@@ -38,6 +38,7 @@ mod blackbird;
 mod chest;
 mod cross;
 mod figurines;
+mod hd;
 pub use figurines::FIGURINE_TARGETS;
 mod dragon;
 mod host;
@@ -373,6 +374,8 @@ pub struct Engine {
     faces: [Vec<u16>; 6],
     work: [Vec<u16>; 6],
     renderer: Renderer,
+    /// The HD mode's view and state (`engine/hd.rs`).
+    hd: hd::HdState,
     pub camera: Camera,
     pub look: Look,
     /// The place animations.
@@ -613,30 +616,8 @@ struct Player {
 /// texture coordinates with a = 1/512, b = 511/512 (the cube's corners,
 /// @ 0x0045c790).
 fn texel_of(dir: [f32; 3]) -> Option<Texel> {
-    let [x, y, z] = dir.map(f64::from);
-    let (ax, ay, az) = (x.abs(), y.abs(), z.abs());
-    let (face, u, v) = if az >= ax && az >= ay {
-        if z > 0.0 {
-            (0, x / az, y / az)
-        } else {
-            (1, -x / az, y / az)
-        }
-    } else if ay >= ax {
-        if y < 0.0 {
-            (2, x / ay, z / ay)
-        } else {
-            (3, x / ay, -z / ay)
-        }
-    } else if x < 0.0 {
-        (4, z / ax, y / ax)
-    } else {
-        (5, -z / ax, y / ax)
-    };
-    if !(u.is_finite() && v.is_finite()) {
-        return None;
-    }
-    let texel = |s: f64| (1.0 + 510.0 * (s + 1.0) / 2.0).floor() as i32;
-    Some((face, texel(u), texel(v)))
+    crate::hd::cube_point(dir.map(f64::from))
+        .map(|(face, u, v)| (face, u.floor() as i32, v.floor() as i32))
 }
 
 /// The world's objects bank `/set(monde=N)` loads (@ 0x00484df0).
@@ -828,6 +809,7 @@ impl Engine {
             faces: Default::default(),
             work: Default::default(),
             renderer: Renderer::new(variant, fpu, width as usize, height as usize),
+            hd: Default::default(),
             camera,
             look: Look::default(),
             // GetTickCount() in the original: a port seeds with its clock
@@ -1328,22 +1310,26 @@ impl Engine {
     /// One pass of the frame dispatcher (@ 0x0049ce20), drawing into `out`
     /// (width x height RGB565) when given. Without `out` everything but the
     /// pixels is done.
-    pub fn pass(&mut self, out: Option<&mut [u16]>) {
+    pub fn pass(&mut self, mut out: Option<&mut [u16]>) {
         self.centre_draws.clear();
         self.ui_draws.clear();
+        self.hd_pass_start();
         // The music state machine (@ 0x00476fc0, called @ 0x0049ce32).
         self.music_frame();
         match self.loop_type {
-            LoopType::Warp => self.warp_pass(out),
-            LoopType::Video => self.video_pass(out),
+            LoopType::Warp => self.warp_pass(out.as_deref_mut()),
+            LoopType::Video => self.video_pass(out.as_deref_mut()),
             LoopType::Dialog => {
                 self.frame();
-                if let Some(out) = out {
+                if let Some(out) = out.as_deref_mut() {
                     self.render(out);
                 }
             }
-            LoopType::Menu => self.menu_pass(out),
-            LoopType::Picture => self.picture_pass(out),
+            LoopType::Menu => self.menu_pass(out.as_deref_mut()),
+            LoopType::Picture => self.picture_pass(out.as_deref_mut()),
+        }
+        if let Some(out) = out {
+            self.hd_pass_end(out);
         }
         // Every case of the dispatcher ends with the 15 Hz flag cleared
         // (@ 0x0049ce56 .. 0x0049cf29).
@@ -1420,6 +1406,7 @@ impl Engine {
         self.renderer.fpu = self.camera.fpu;
         self.renderer.render(&self.work, &m, p, out);
         self.camera.fpu = self.renderer.fpu;
+        self.hd_scene(out, &m, p);
         restore(&mut self.work, &self.faces, &dirty);
     }
 
@@ -1525,6 +1512,7 @@ impl Engine {
         // or a film a scan started).
         if let (Some(_), Some(out)) = (&self.video, out) {
             self.draw_video(out);
+            self.hd_video();
         }
         // The puzzles' per-frame step (FUN_0049bfb0, @ 0x0045a5e8): every
         // warp frame while the puzzle mode is not 0, turning or not.
@@ -1582,6 +1570,7 @@ impl Engine {
             self.renderer.fpu = self.camera.fpu;
             self.renderer.render(&self.work, &m, p, out);
             self.camera.fpu = self.renderer.fpu;
+            self.hd_scene(out, &m, p);
             self.draw_centre(out, w, h);
         } else if self.renderer.variant == Variant::PII {
             // warpPII leaves 0x0e7f whether or not the pixels are wanted.
@@ -2345,6 +2334,7 @@ impl Engine {
         if new_tick || self.film_dialog.is_none() {
             if let Some(out) = out.as_deref_mut() {
                 self.draw_video(out);
+                self.hd_video();
             }
         }
         if let Some(k) = shown {
@@ -2443,6 +2433,13 @@ impl Engine {
     /// head or `voixoff` line, then the dialog frame over it; for
     /// `voixoff0` and `cinema` lines the subtitles over what `out` holds.
     pub fn render(&mut self, out: &mut [u16]) {
+        self.hd_pass_start();
+        self.render_frame(out);
+        self.hd_pass_end(out);
+    }
+
+    /// [`Engine::render`]'s drawing.
+    fn render_frame(&mut self, out: &mut [u16]) {
         let (w, h) = (self.renderer.width(), self.renderer.height());
         let kind = self.dialog.as_ref().map(Dialog::kind);
         if kind == Some(-1) {
@@ -2450,6 +2447,7 @@ impl Engine {
         }
         if let (Some(_), None) = (&self.video, kind) {
             self.draw_video(out);
+            self.hd_video();
             return;
         }
         if self.faces[0].is_empty() {
