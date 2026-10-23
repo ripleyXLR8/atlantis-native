@@ -358,8 +358,11 @@ pub fn headless(
     let mut engine = boot(dir, discs, enhancements)?;
     start.begin(&mut engine, true)?;
     if start.menu.is_some() {
-        // The pointer at the screen centre.
-        engine.pointer(WIDTH as i32 / 2, HEIGHT as i32 / 2);
+        // The pointer at the screen centre, or where `--pointer` puts it.
+        let (x, y) = start
+            .pointer
+            .unwrap_or((WIDTH as i32 / 2, HEIGHT as i32 / 2));
+        engine.pointer(x, y);
     }
     let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
     let mut sound = vec![0.0f32; 2 * 22050 / 60];
@@ -830,15 +833,23 @@ impl Picture {
         let (ox, oy, dw, dh) = picture_rect(width, height);
         out[..width * height].fill(0);
         if engine.enhancements.hd {
+            // The frame's texts: their 640x480 glyphs uncovered by the
+            // compositor, then drawn again at this size (sharp
+            // subtitles; Atlantis II's font is drawn by the engine).
+            let texts = engine.hd_texts();
+            let held: Vec<&atlantis_engine::hd::HdText> = texts.iter().map(|t| &t.text).collect();
             let f = HdFrame {
                 screen,
                 layer: engine.hd_layer(),
-                texts: &[],
+                texts: &held,
                 photo: engine.hd_photo(),
                 video_pano: None,
             };
             let opts = engine.enhancements.hd_options;
             self.compositor.compose(f, opts, out, width, ox, oy, dw, dh);
+            if opts.sharp_subtitles {
+                engine.draw_hd_texts(out, width, (ox, oy, dw, dh));
+            }
             return;
         }
         let lut = atlantis2_engine::hd::rgb565_to_888();

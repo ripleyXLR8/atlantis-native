@@ -339,6 +339,57 @@ impl SubtitleFont {
         }
     }
 
+    /// The HD mode (a port addition, the first game's "Sharp subtitles"):
+    /// `call` drawn again at a larger scale, the 640x480 screen mapped to
+    /// the `dw` x `dh` pixels at (`ox`, `oy`) of `out` (XRGB8888, `stride`
+    /// pixels per row). The layout is the original's: each glyph starts at
+    /// its pen position of [`SubtitleFont::draw`] (the `hdmx` advances)
+    /// and the baseline is the `VDMX` ascent below the call's y, both
+    /// scaled; the outline is rasterised at `ppem` times the scale and
+    /// blended by its coverage (smoothed), times `alpha` / 255, in the
+    /// call's colour. Nothing is drawn outside those pixels.
+    pub fn draw_hd(
+        &self,
+        out: &mut [u32],
+        stride: usize,
+        (ox, oy, dw, dh): (usize, usize, usize, usize),
+        call: &TextOut,
+        alpha: u8,
+    ) {
+        let upem = self.font.units_per_em().unwrap_or(2048.0);
+        let (sx, sy) = (dw as f32 / 640.0, dh as f32 / 480.0);
+        let scale = PxScale::from(f32::from(self.ppem) * sy * self.font.height_unscaled() / upem);
+        let base = oy as f32 + (call.y + self.ascent) as f32 * sy;
+        let c = call.colour;
+        let colour = (c & 0xff) << 16 | (c & 0xff00) | (c >> 16) & 0xff;
+        let (x1, y1) = ((ox + dw) as i32, (oy + dh) as i32);
+        let mut pen = call.x;
+        for &b in &call.bytes {
+            let g = Glyph {
+                id: self.glyph(b),
+                scale,
+                position: point(ox as f32 + pen as f32 * sx, base),
+            };
+            if let Some(o) = self.font.outline_glyph(g) {
+                let bb = o.px_bounds();
+                let (bx, by) = (bb.min.x as i32, bb.min.y as i32);
+                o.draw(|gx, gy, cov| {
+                    let (px, py) = (bx + gx as i32, by + gy as i32);
+                    if px < ox as i32 || py < oy as i32 || px >= x1 || py >= y1 {
+                        return;
+                    }
+                    let a = (cov.clamp(0.0, 1.0) * 256.0) as u32 * u32::from(alpha) / 255;
+                    if a == 0 {
+                        return;
+                    }
+                    let d = &mut out[py as usize * stride + px as usize];
+                    *d = atlantis_engine::upscale::lerp8888(*d, colour, a.min(256));
+                });
+            }
+            pen += self.advance(b);
+        }
+    }
+
     /// `Font.txt`'s height in points (@ 0x00404c50: the font record's
     /// +0x44), the step between the lines of the subtitles and the credits.
     pub fn line_step(&self) -> i32 {
@@ -348,7 +399,7 @@ impl SubtitleFont {
 
 /// A GDI colour (0xRRGGBB, red in the low byte for `COLORREF`; the two the
 /// subtitles use are black and white) on a 16-bit 565 surface.
-fn rgb565(c: u32) -> u16 {
+pub(crate) fn rgb565(c: u32) -> u16 {
     let (r, g, b) = (c & 0xff, (c >> 8) & 0xff, (c >> 16) & 0xff);
     (((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)) as u16
 }

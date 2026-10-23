@@ -12,7 +12,7 @@
 //! so every operation here is [`Fpu::Chop`], whatever the caller ran under.
 //! The MMX span's integer lanes are written as plain `u32` operations.
 
-use super::{Binding, Target, Texture, Vertex, WIDTH};
+use super::{Binding, Target, Texture, Vertex};
 use crate::fpu::{f, Fpu};
 
 /// The word the set-up loads (@ 0x005edc78).
@@ -23,12 +23,12 @@ const HALF: f64 = 0.5;
 
 /// The viewport as the rasteriser holds it for the dialog (read under
 /// emulation after `SetViewport` @ 0x004ce450 with 0, 479, 639, 0): first
-/// row (@ 0x006e13d8), last row + 1 (@ 0x006e1440), the span's left clip
-/// as a float (@ 0x006e1418) and right clip (@ 0x006e1410).
+/// row (@ 0x006e13d8) and the span's left clip as a float (@ 0x006e1418);
+/// the last row + 1 (@ 0x006e1440, 480) and the right clip (@ 0x006e1410,
+/// 640) are the target's height and width ([`Target`]: larger in the HD
+/// mode only).
 const VP_TOP: i32 = 0;
-const VP_BOTTOM: i32 = 480;
 const CLIP_LEFT: f64 = 0.0;
-const CLIP_RIGHT: i32 = WIDTH as i32;
 
 /// 32, the block length (@ 0x005edc20), and 2³¹, the Z scale
 /// (@ 0x005edbe0).
@@ -216,12 +216,13 @@ impl Scan<'_> {
     fn general(&mut self, v: [&Vertex; 3], i: [i32; 3], out: &mut Target) {
         let [t, m, b] = v;
         let [it, im, ib] = i;
-        if it >= VP_BOTTOM || ib <= VP_TOP {
+        let vp_bottom = out.height as i32;
+        if it >= vp_bottom || ib <= VP_TOP {
             return;
         }
         let yt = it.max(VP_TOP);
-        let yb = ib.min(VP_BOTTOM);
-        let ym = im.min(VP_BOTTOM);
+        let yb = ib.min(vp_bottom);
+        let ym = im.min(vp_bottom);
         let e = &mut self.edges;
         e[0] = edge(t, b, yt, yb, true);
         if ym <= VP_TOP {
@@ -244,13 +245,13 @@ impl Scan<'_> {
             // The middle vertex on the right: the long edge is the left
             // one for both halves; the lower right edge needs no
             // attributes.
-            if ym == VP_BOTTOM {
+            if ym == vp_bottom {
                 self.scan(0, 1, end, None, out);
             } else {
                 self.edges[2] = edge(m, b, ym, yb, false);
                 self.scan(0, 1, end, Some((0, 2)), out);
             }
-        } else if ym == VP_BOTTOM {
+        } else if ym == vp_bottom {
             self.scan(1, 0, end, None, out);
         } else {
             self.edges[2] = edge(m, b, ym, yb, true);
@@ -268,11 +269,12 @@ impl Scan<'_> {
         ib: i32,
         out: &mut Target,
     ) {
-        if itop >= VP_BOTTOM || ib <= VP_TOP {
+        let vp_bottom = out.height as i32;
+        if itop >= vp_bottom || ib <= VP_TOP {
             return;
         }
         let y0 = itop.max(VP_TOP);
-        let y1 = ib.min(VP_BOTTOM);
+        let y1 = ib.min(vp_bottom);
         self.edges[0] = edge(l, b, y0, y1, true);
         self.edges[1] = edge(r, b, y0, y1, true);
         self.scan(0, 1, y1, None, out);
@@ -288,11 +290,12 @@ impl Scan<'_> {
         ibot: i32,
         out: &mut Target,
     ) {
-        if it >= VP_BOTTOM || ibot <= VP_TOP {
+        let vp_bottom = out.height as i32;
+        if it >= vp_bottom || ibot <= VP_TOP {
             return;
         }
         let y0 = it.max(VP_TOP);
-        let y1 = ibot.min(VP_BOTTOM);
+        let y1 = ibot.min(vp_bottom);
         self.edges[0] = edge(t, l, y0, y1, true);
         self.edges[1] = edge(t, r, y0, y1, true);
         self.scan(0, 1, y1, None, out);
@@ -379,7 +382,8 @@ impl Scan<'_> {
         } else {
             CLIP_LEFT
         });
-        let xe = if CLIP_RIGHT >= xr { xr } else { CLIP_RIGHT };
+        let clip_right = out.width as i32;
+        let xe = if clip_right >= xr { xr } else { clip_right };
         // The original tests only `xl < xe` (@ 0x0051ef0a). xl is negative
         // only as the integer indefinite (a NaN or out-of-range left x, the
         // left clip being 0): with an in-range right x the original then
@@ -443,7 +447,7 @@ impl Scan<'_> {
             wf.to_bits().wrapping_add(0x0f80_0000),
         ))) as u32;
         let dz = g.dz as u32;
-        let row = y as usize * WIDTH;
+        let row = y as usize * out.width;
         let mut x = xl as usize;
         let b = self.b;
         let tex = self.tex;

@@ -22,11 +22,11 @@ pub const WIDTH: usize = 640;
 pub const HEIGHT: usize = 480;
 
 /// The viewport (@ 0x004ce450 with the dialog's rectangle 0, 479, 639, 0):
-/// first row, last row + 1, first column, last column + 1.
+/// first row and first column; the last row + 1 and last column + 1 are
+/// the target's height and width (480 and 640 in the original; the HD
+/// mode's larger frame, [`Target::width`]).
 const VP_TOP: i32 = 0;
-const VP_BOTTOM1: i32 = HEIGHT as i32;
 const VP_LEFT: f64 = 0.0;
-const VP_RIGHT1: i32 = WIDTH as i32;
 
 /// 2³¹, the Z scale (@ 0x005c67b8).
 const Z_SCALE: f64 = 2147483648.0;
@@ -119,11 +119,28 @@ struct Gradients {
     dv32: f64,
 }
 
-/// The rasteriser's destination: a 640 x 480 RGB565 frame and its Z
-/// buffer (32 bits, 0 = infinitely far).
+/// The rasteriser's destination: an RGB565 frame and its Z buffer (32
+/// bits, 0 = infinitely far), `width` x `height` pixels: the viewport
+/// (0, height − 1, width − 1, 0). The original's is always 640 x 480
+/// ([`Target::screen`]); a larger one is the HD mode's (a port addition:
+/// the same routines over more pixels, see `crate::head`).
 pub struct Target<'a> {
     pub pixels: &'a mut [u16],
     pub zbuf: &'a mut [u32],
+    pub width: usize,
+    pub height: usize,
+}
+
+impl<'a> Target<'a> {
+    /// The original's 640 x 480 frame and Z buffer.
+    pub fn screen(pixels: &'a mut [u16], zbuf: &'a mut [u32]) -> Target<'a> {
+        Target {
+            pixels,
+            zbuf,
+            width: WIDTH,
+            height: HEIGHT,
+        }
+    }
 }
 
 /// Draws one polygon (a fan of triangles v0, v(k-1), v(k)) with the
@@ -186,15 +203,16 @@ fn triangle(fpu: Fpu, b: &Binding, tri: [Vertex; 3], tex: &Texture, out: &mut Ta
     }
     // Edges: 0 the long edge, 1 the top short edge, 2 the bottom one.
     let mut edges = [Edge::default(); 3];
-    let Some(long) = edge(fpu, &top, &bot, true) else {
+    let vb = out.height as i32;
+    let Some(long) = edge(fpu, &top, &bot, true, vb) else {
         return;
     };
     edges[0] = long;
     let (left, right, lower);
-    match edge(fpu, &top, &mid, true) {
+    match edge(fpu, &top, &mid, true, vb) {
         None => {
             // Flat top: the bottom short edge and the long edge.
-            edges[2] = edge(fpu, &mid, &bot, true).unwrap_or(Edge {
+            edges[2] = edge(fpu, &mid, &bot, true, vb).unwrap_or(Edge {
                 dxdy: f64::from(f32::MAX),
                 ..Edge::default()
             });
@@ -215,7 +233,7 @@ fn triangle(fpu: Fpu, b: &Binding, tri: [Vertex; 3], tex: &Texture, out: &mut Ta
             // The bottom short edge has no attributes when the middle
             // vertex lies right of both others (it is then a right edge).
             let attrs = !(top.x < mid.x && bot.x < mid.x);
-            lower = edge(fpu, &mid, &bot, attrs).map(|e| {
+            lower = edge(fpu, &mid, &bot, attrs, vb).map(|e| {
                 edges[2] = e;
                 if edges[left].y1 > edges[right].y1 {
                     (left, 2)
@@ -230,14 +248,14 @@ fn triangle(fpu: Fpu, b: &Binding, tri: [Vertex; 3], tex: &Texture, out: &mut Ta
 
 /// The edge set-up @ 0x00570520; `None` for an empty edge (the original
 /// marks it with dx/dy = FLT_MAX).
-fn edge(fpu: Fpu, a: &Vertex, b: &Vertex, attrs: bool) -> Option<Edge> {
+fn edge(fpu: Fpu, a: &Vertex, b: &Vertex, attrs: bool, vp_bottom1: i32) -> Option<Edge> {
     let c = fpu;
     if ftol(a.y) == ftol(b.y) {
         return None;
     }
     let (top, bot) = if b.y < a.y { (b, a) } else { (a, b) };
     let ya = ftol(top.y);
-    if ya >= VP_BOTTOM1 - 1 {
+    if ya >= vp_bottom1 - 1 {
         return None;
     }
     let yb = ftol(bot.y);
@@ -246,7 +264,7 @@ fn edge(fpu: Fpu, a: &Vertex, b: &Vertex, attrs: bool) -> Option<Edge> {
     }
     let dx = c.sub(bot.x, top.x);
     let inv = c.f(c.div(1.0, c.sub(bot.y, top.y)));
-    let y1 = if yb < VP_BOTTOM1 - 1 { yb } else { VP_BOTTOM1 };
+    let y1 = if yb < vp_bottom1 - 1 { yb } else { vp_bottom1 };
     let y0 = ya.max(VP_TOP);
     // The centre of row y0 (y already holds the +0.5).
     let t = c.f(c.sub(f64::from(y0 + 1), top.y));
@@ -304,7 +322,7 @@ fn scan(
         |edges: &mut [Edge; 3], li: usize, ri: usize, y: &mut i32, n: i32, out: &mut Target| {
             for _ in 0..n {
                 let xs = ftol(VP_LEFT).max(ftol(edges[li].x));
-                let xe = ftol(edges[ri].x).min(VP_RIGHT1);
+                let xe = ftol(edges[ri].x).min(out.width as i32);
                 if xs < xe {
                     span(fpu, b, &g, &edges[li], *y, xs, xe, tex, out);
                 }
@@ -348,7 +366,7 @@ fn span(
     out: &mut Target,
 ) {
     let c = fpu;
-    let row = y as usize * WIDTH;
+    let row = y as usize * out.width;
     // The centre of pixel xs, from the left edge.
     let d = c.sub(f64::from(xs + 1), l.x);
     let df = c.f(d);

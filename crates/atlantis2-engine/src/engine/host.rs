@@ -375,6 +375,8 @@ impl Engine {
                 subtitles: self.subtitles,
                 screen: (w, h),
                 fpu: self.camera.fpu,
+                hd: None,
+                texts: Some(self.hd.texts_mut()),
             };
             d.draw(out, &mut self.zbuf, &mut frame);
             self.camera.fpu = d.fpu();

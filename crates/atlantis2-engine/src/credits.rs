@@ -54,6 +54,7 @@
 //! RGB565 only.
 
 use crate::fpu::{ftol, Fpu};
+use crate::hd::{HdTexts, TextFont};
 use crate::subtitle::{SubtitleFont, TextOut};
 
 /// The screen the credits are laid out for.
@@ -242,8 +243,10 @@ type Overlay = Vec<(usize, [u8; 3])>;
 pub struct Credits {
     /// The 16 pictures, 640 x 480 B, G, R (black when missing).
     pictures: Vec<Vec<u8>>,
-    /// Each page's texts on its picture.
+    /// Each page's texts on its picture, and its `TextOutA` calls (the HD
+    /// mode draws them again).
     overlays: Vec<Overlay>,
+    calls: Vec<Vec<TextOut>>,
     old: Vec<u8>,
     new: Vec<u8>,
     /// The page on the new surface; past the pages: black, then done.
@@ -293,6 +296,11 @@ impl Credits {
         let mut c = Credits {
             pictures,
             overlays,
+            calls: if font.is_some() {
+                pages.to_vec()
+            } else {
+                vec![Vec::new(); pages.len()]
+            },
             old: vec![0; size],
             new: vec![0; size],
             page: 0,
@@ -350,6 +358,38 @@ impl Credits {
     /// The frame (FUN_00472bb0 into the 640 x 480 screen).
     pub fn draw(&self, out: &mut [u16]) {
         blend(&self.old, &self.new, self.alpha, out);
+    }
+
+    /// The HD mode (a port addition): [`Credits::draw`], and the texts
+    /// recorded in `texts` (when it records) for the front end to draw
+    /// again at its size: the old page's calls at the weight 255 − alpha,
+    /// the new page's at alpha (the fade's), over the frame the same
+    /// pictures give without their texts.
+    pub fn draw_hd(&self, out: &mut [u16], texts: &mut HdTexts) {
+        self.draw(out);
+        if !texts.is_on() || out.len() != WIDTH * HEIGHT {
+            return;
+        }
+        // The old surface holds page − 1, the new one page (black past
+        // the last page).
+        let n = self.overlays.len();
+        let plain = |i: Option<usize>| i.filter(|&i| i < n).map(|i| &self.pictures[i % PICTURES]);
+        let black = vec![0u8; WIDTH * HEIGHT * 3];
+        let old = self.page.checked_sub(1);
+        let new = Some(self.page);
+        let mut under = vec![0u16; WIDTH * HEIGHT];
+        blend(
+            plain(old).unwrap_or(&black),
+            plain(new).unwrap_or(&black),
+            self.alpha,
+            &mut under,
+        );
+        texts.set_pixels(&under, out);
+        for (page, alpha) in [(old, 255 - self.alpha), (new, self.alpha)] {
+            if let Some(calls) = page.and_then(|i| self.calls.get(i)) {
+                texts.push(TextFont::Popup, calls, alpha);
+            }
+        }
     }
 }
 

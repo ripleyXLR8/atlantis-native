@@ -27,6 +27,7 @@ use atlantis2_data::{A2Files, Folder};
 
 use crate::credits::{self, Credits};
 use crate::fpu::{ftol, Fpu};
+use crate::hd::{HdTexts, TextFont};
 use crate::subtitle::{SubtitleFont, TextOut};
 
 /// The size every page is laid out for.
@@ -315,6 +316,9 @@ pub struct Menu {
     pub texts: MenuTxt,
     cursor: Option<SprBank>,
     font: Option<SubtitleFont>,
+    /// The HD mode's text recorder (a port addition), lent by the engine
+    /// for a frame: the texts the page draws are recorded in it.
+    pub hd_texts: Option<HdTexts>,
     banks: HashMap<String, Option<Arc<SprBank>>>,
     pub page: Option<Page>,
     /// @ 0x006d174c and its counter @ 0x006d1750.
@@ -391,6 +395,7 @@ impl Menu {
             texts,
             cursor,
             font,
+            hd_texts: None,
             banks: HashMap::new(),
             page: None,
             state: 0,
@@ -1202,7 +1207,9 @@ impl Menu {
             );
         }
         if let Some(out) = out {
-            self.draw(out, ticks);
+            let mut t = self.hd_texts.take();
+            self.draw_with(out, ticks, t.as_mut());
+            self.hd_texts = t;
         }
         let act = self.action(host);
         self.input.click = false;
@@ -1211,8 +1218,25 @@ impl Menu {
 
     /// Draws the page and the cursor (no state change).
     pub fn draw(&self, out: &mut [u16], ticks: u32) {
+        self.draw_with(out, ticks, None);
+    }
+
+    /// The popup font (`AtlFT_POPUP`), when loaded.
+    pub fn font(&self) -> Option<&SubtitleFont> {
+        self.font.as_ref()
+    }
+
+    /// [`Menu::draw`], the texts recorded in `texts` (the HD mode).
+    pub fn draw_with(&self, out: &mut [u16], ticks: u32, texts: Option<&mut HdTexts>) {
         let Some(p) = self.page.as_ref() else { return };
-        p.draw(out, ticks, &self.values, self.font.as_ref(), &self.input);
+        p.draw(
+            out,
+            ticks,
+            &self.values,
+            self.font.as_ref(),
+            &self.input,
+            texts,
+        );
         if self.cursor_shown {
             if let Some(c) = &self.cursor {
                 let mut t = Target::screen(out, WIDTH, HEIGHT);
@@ -1637,9 +1661,13 @@ impl Page {
         values: &[f32; 4],
         font: Option<&SubtitleFont>,
         input: &Input,
+        mut rec: Option<&mut HdTexts>,
     ) {
         if let Some(c) = &self.credits {
-            c.draw(out);
+            match rec {
+                Some(t) => c.draw_hd(out, t),
+                None => c.draw(out),
+            }
             return;
         }
         let n = self.background.len().min(out.len());
@@ -1686,7 +1714,10 @@ impl Page {
                     });
                 }
             }
-            f.draw(out, WIDTH, HEIGHT, &texts);
+            match rec.as_deref_mut() {
+                Some(t) => t.draw(TextFont::Popup, f, out, WIDTH, HEIGHT, &texts),
+                None => f.draw(out, WIDTH, HEIGHT, &texts),
+            }
         }
     }
 }

@@ -1263,52 +1263,57 @@ pub fn compose_dialog(
         let rgb: Vec<u32> = over.iter().map(|&p| lut[usize::from(p)]).collect();
         (rgb, Axis::new(SCREEN_W, w), Axis::new(SCREEN_H, h))
     });
-    for (hy, sy) in low_res_map(h, tile).into_iter().enumerate() {
-        let c = &composite[sy * SCREEN_W..][..SCREEN_W];
-        let line = &mut layer.pixels[hy * lw..][..lw];
-        // The view, then the character (the body and the head) over it,
-        // `shift` columns aside (see `dialog_shift`).
-        line.copy_from_slice(&view[hy * lw..][..lw]);
-        let at = |x: usize| (side + x).checked_add_signed(shift).filter(|&c| c < lw);
-        for (x, &sx) in cols.iter().enumerate() {
-            if !is_char(sy * SCREEN_W + sx) {
-                continue;
+    // The rows in bands over the processor's cores (the same pixels).
+    let rows = low_res_map(h, tile);
+    crate::upscale::for_each_band(&mut layer.pixels[..lw * h], lw, |first, band| {
+        for (i, line) in band.chunks_mut(lw).enumerate() {
+            let hy = first + i;
+            let sy = rows[hy];
+            let c = &composite[sy * SCREEN_W..][..SCREEN_W];
+            // The view, then the character (the body and the head) over it,
+            // `shift` columns aside (see `dialog_shift`).
+            line.copy_from_slice(&view[hy * lw..][..lw]);
+            let at = |x: usize| (side + x).checked_add_signed(shift).filter(|&c| c < lw);
+            for (x, &sx) in cols.iter().enumerate() {
+                if !is_char(sy * SCREEN_W + sx) {
+                    continue;
+                }
+                if let Some(d) = at(x) {
+                    line[d] = if let Some((rgb, ax, ay)) = &smooth {
+                        sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
+                    } else {
+                        lut[usize::from(c[sx])]
+                    };
+                }
             }
-            if let Some(d) = at(x) {
-                line[d] = if let Some((rgb, ax, ay)) = &smooth {
-                    sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
-                } else {
-                    lut[usize::from(c[sx])]
-                };
-            }
-        }
-        if let (Some((hp, hm)), Some(f)) = (head, &footprint) {
-            let hp = &hp[hy * w..][..w];
-            let hm = &hm[hy * w..][..w];
-            let f = &f[sy * SCREEN_W..][..SCREEN_W];
-            for x in 0..w {
-                if hm[x] != 0 && f[cols[x]] != 0 {
-                    if let Some(d) = at(x) {
-                        line[d] = lut[usize::from(hp[x])];
+            if let (Some((hp, hm)), Some(f)) = (head, &footprint) {
+                let hp = &hp[hy * w..][..w];
+                let hm = &hm[hy * w..][..w];
+                let f = &f[sy * SCREEN_W..][..SCREEN_W];
+                for x in 0..w {
+                    if hm[x] != 0 && f[cols[x]] != 0 {
+                        if let Some(d) = at(x) {
+                            line[d] = lut[usize::from(hp[x])];
+                        }
                     }
                 }
             }
-        }
-        // The overlay over the head, with the character.
-        let o = &over[sy * SCREEN_W..][..SCREEN_W];
-        for (x, &sx) in cols.iter().enumerate() {
-            if o[sx] == c[sx] {
-                continue;
+            // The overlay over the head, with the character.
+            let o = &over[sy * SCREEN_W..][..SCREEN_W];
+            for (x, &sx) in cols.iter().enumerate() {
+                if o[sx] == c[sx] {
+                    continue;
+                }
+                if let Some(d) = at(x) {
+                    line[d] = if let Some((rgb, ax, ay)) = &smooth {
+                        sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
+                    } else {
+                        lut[usize::from(o[sx])]
+                    };
+                }
             }
-            if let Some(d) = at(x) {
-                line[d] = if let Some((rgb, ax, ay)) = &smooth {
-                    sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
-                } else {
-                    lut[usize::from(o[sx])]
-                };
-            }
         }
-    }
+    });
 }
 
 /// The 640x480 pixels where the head was drawn (`before` and `after`
