@@ -13,7 +13,8 @@
 //!    then the move unless `ABORTDEPART`; on an enabled zone of type > 2,
 //!    `CLICZONE` = its id;
 //! 4. [`Script::gere_frame`] (`Interp_GereFrame` @ 0x00484b70): the queued
-//!    command, the arrival scan, the angles, the timer scans;
+//!    command, the special event ([`Script::special_event`]), the arrival
+//!    scan, the angles, the timer scans;
 //! 5. [`Script::click_scan`] (@ 0x0045a870) on a click with no subject menu
 //!    and no overlay open;
 //! 6. the place sounds;
@@ -30,6 +31,21 @@
 
 use super::{Host, Script};
 use crate::fpu::{ftol, Fpu};
+use atlantis2_data::defnames;
+
+/// The six demons of China's labyrinth and their special events 1..6
+/// (FUN_00484880: the names @ 0x005e0380..0x005e03d3, 16 bytes each, the
+/// views and frames immediates @ 0x004848a7..0x00484a1c): the character,
+/// the view where the event waits for its animation, and the frame it
+/// waits for.
+pub const DEMONS: [(&str, i32, i32); 6] = [
+    ("DEMON_RAT", 25, 60),
+    ("DEMON_DOGUE", 12, 70),
+    ("DEMON_COCHON", 19, 75),
+    ("DEMON_LAPIN", 57, 76),
+    ("DEMON_CHEVRE", 51, 70),
+    ("DEMON_CHEVAL", 33, 70),
+];
 
 impl Script {
     /// Start-up (@ 0x0049d680, the script part): the tables as
@@ -102,7 +118,7 @@ impl Script {
         }
         let event = self.vars[k.testspecialevent];
         if event != 0 {
-            host.special_event(event);
+            self.special_event(host, event);
         }
         if self.vars[k.exit] != 0 {
             log::info!("Interp_GereFrame: EXIT, quitat2=1");
@@ -131,6 +147,86 @@ impl Script {
         self.vars[k.anglewarpx] = self.degrees(yaw);
         self.vars[k.anglewarpy] = self.degrees(pitch);
         self.timer_scans(host);
+    }
+
+    /// The special event `e` (FUN_00484880), run by `Interp_GereFrame`
+    /// every warp frame while `TestSpecialEvent` = e ≠ 0:
+    ///
+    /// - 1..6, a demon of [`DEMONS`]: in its view, the first animation
+    ///   record of the demon (FUN_0047de60, by id, any kind; none is fatal)
+    ///   is waited for: at frame F − 9 exactly, `(NewSound=203)` when voice
+    ///   2 is idle (FUN_0047a9c0(2)); below F nothing more; at F or after,
+    ///   its frame = 0 and its end = its record's +0x24 (not − 1). Then, in
+    ///   any view, `(SpecialEventDone=1)`, `(TestSpecialEvent=0)` and a
+    ///   `CtrlScenarIN` scan; when the view (read again after the scan) is
+    ///   not the demon's, `Objetenmain_NextWarp` = `OBJETENMAIN`.
+    /// - 7, 8: in view 123, the record of `CHAC` playing animation 2
+    ///   (FUN_0047dea0) is waited for until its frame reaches 60; then
+    ///   `(SpecialEventDone=e)`, `(TestSpecialEvent=0)` and a scan.
+    /// - Any other value: nothing (`TestSpecialEvent` stays).
+    pub fn special_event(&mut self, host: &mut dyn Host, e: i32) {
+        let k = self.keys.clone();
+        match e {
+            1..=6 => {
+                let (name, view, frame) = DEMONS[(e - 1) as usize];
+                if host.view_id() == view {
+                    let Some(id) = self.character(name) else {
+                        return;
+                    };
+                    let Some(f) = host.slot_frame(id, None) else {
+                        self.fail(format!(
+                            "AtlSpw_find_index: perso {id} absent de la vue {view}"
+                        ));
+                        return;
+                    };
+                    if f == frame - 9 && !host.voice_busy(2) {
+                        self.run_command(host, b"(NewSound=203)");
+                    }
+                    if host.slot_frame(id, None).unwrap_or(f) < frame {
+                        return;
+                    }
+                    host.slot_rewind(id);
+                }
+                self.run_command(host, b"(SpecialEventDone=1)");
+                self.run_command(host, b"(TestSpecialEvent=0)");
+                self.ctrl_scenar_in(host);
+                if host.view_id() != view {
+                    self.vars[k.objetenmain_next_warp] = self.vars[k.objetenmain];
+                }
+            }
+            7 | 8 => {
+                if host.view_id() == 123 {
+                    let Some(id) = self.character("CHAC") else {
+                        return;
+                    };
+                    match host.slot_frame(id, Some(2)) {
+                        Some(f) if f >= 60 => {}
+                        Some(_) => return,
+                        None => {
+                            self.fail(format!("AtlSpw_find_index_anum: perso {id} anim 2"));
+                            return;
+                        }
+                    }
+                }
+                let done = format!("(SpecialEventDone={e})");
+                self.run_command(host, done.as_bytes());
+                self.run_command(host, b"(TestSpecialEvent=0)");
+                self.ctrl_scenar_in(host);
+            }
+            _ => {}
+        }
+    }
+
+    /// `DefName_GetIdName(0, name)`: a character's index; an unknown name
+    /// is fatal.
+    fn character(&mut self, name: &str) -> Option<i32> {
+        match self.names.id(defnames::PERSONNAGES, name.as_bytes()) {
+            Ok(i) => Some(i as i32),
+            Err(e) => {
+                self.fail(format!("DefName_GetIdName: {e}"));
+                None
+            }
+        }
     }
 
     /// An angle in whole degrees, 0..359 (@ 0x00484d14: × 180, ÷ π, `_ftol`,

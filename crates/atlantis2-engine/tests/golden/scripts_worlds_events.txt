@@ -1,0 +1,49 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83): the special events' handler (0x00484880, called by
+# Interp_GereFrame) on synthetic animation records and the synthetic chapter below.
+# chapter: /INIT|/FININIT|/001|/con(SpecialEventDone=1)|/set(flag10=1)|/001|/con(SpecialEventDone=7)|/set(flag11=1)|/001|/con(SpecialEventDone=8)|/set(flag12=1)|/000|
+# per case: event, current view, demon frame before, voice 2 busy -> after: TestSpecialEvent SpecialEventDone flags10-12 frame/end Objetenmain_NextWarp calls
+event 1 view 25 frame 50 busy 0 -> TestSpecialEvent=1 SpecialEventDone=0 flags=000 slot=50/90 NextWarp=0 calls=-
+event 1 view 25 frame 51 busy 0 -> TestSpecialEvent=1 SpecialEventDone=0 flags=000 slot=51/90 NextWarp=0 calls=VoiceState(2),AtlSound_NewSound('sound203.apc')
+event 1 view 25 frame 51 busy 1 -> TestSpecialEvent=1 SpecialEventDone=0 flags=000 slot=51/90 NextWarp=0 calls=VoiceState(2)
+event 1 view 25 frame 60 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 1 view 25 frame 65 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 1 view 26 frame 0 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/90 NextWarp=97 calls=-
+event 2 view 12 frame 60 busy 0 -> TestSpecialEvent=2 SpecialEventDone=0 flags=000 slot=60/90 NextWarp=0 calls=-
+event 2 view 12 frame 61 busy 0 -> TestSpecialEvent=2 SpecialEventDone=0 flags=000 slot=61/90 NextWarp=0 calls=VoiceState(2),AtlSound_NewSound('sound203.apc')
+event 2 view 12 frame 61 busy 1 -> TestSpecialEvent=2 SpecialEventDone=0 flags=000 slot=61/90 NextWarp=0 calls=VoiceState(2)
+event 2 view 12 frame 70 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 2 view 12 frame 75 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 2 view 13 frame 0 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/90 NextWarp=97 calls=-
+event 3 view 19 frame 65 busy 0 -> TestSpecialEvent=3 SpecialEventDone=0 flags=000 slot=65/90 NextWarp=0 calls=-
+event 3 view 19 frame 66 busy 0 -> TestSpecialEvent=3 SpecialEventDone=0 flags=000 slot=66/90 NextWarp=0 calls=VoiceState(2),AtlSound_NewSound('sound203.apc')
+event 3 view 19 frame 66 busy 1 -> TestSpecialEvent=3 SpecialEventDone=0 flags=000 slot=66/90 NextWarp=0 calls=VoiceState(2)
+event 3 view 19 frame 75 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 3 view 19 frame 80 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 3 view 20 frame 0 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/90 NextWarp=97 calls=-
+event 4 view 57 frame 66 busy 0 -> TestSpecialEvent=4 SpecialEventDone=0 flags=000 slot=66/90 NextWarp=0 calls=-
+event 4 view 57 frame 67 busy 0 -> TestSpecialEvent=4 SpecialEventDone=0 flags=000 slot=67/90 NextWarp=0 calls=VoiceState(2),AtlSound_NewSound('sound203.apc')
+event 4 view 57 frame 67 busy 1 -> TestSpecialEvent=4 SpecialEventDone=0 flags=000 slot=67/90 NextWarp=0 calls=VoiceState(2)
+event 4 view 57 frame 76 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 4 view 57 frame 81 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 4 view 58 frame 0 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/90 NextWarp=97 calls=-
+event 5 view 51 frame 60 busy 0 -> TestSpecialEvent=5 SpecialEventDone=0 flags=000 slot=60/90 NextWarp=0 calls=-
+event 5 view 51 frame 61 busy 0 -> TestSpecialEvent=5 SpecialEventDone=0 flags=000 slot=61/90 NextWarp=0 calls=VoiceState(2),AtlSound_NewSound('sound203.apc')
+event 5 view 51 frame 61 busy 1 -> TestSpecialEvent=5 SpecialEventDone=0 flags=000 slot=61/90 NextWarp=0 calls=VoiceState(2)
+event 5 view 51 frame 70 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 5 view 51 frame 75 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 5 view 52 frame 0 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/90 NextWarp=97 calls=-
+event 6 view 33 frame 60 busy 0 -> TestSpecialEvent=6 SpecialEventDone=0 flags=000 slot=60/90 NextWarp=0 calls=-
+event 6 view 33 frame 61 busy 0 -> TestSpecialEvent=6 SpecialEventDone=0 flags=000 slot=61/90 NextWarp=0 calls=VoiceState(2),AtlSound_NewSound('sound203.apc')
+event 6 view 33 frame 61 busy 1 -> TestSpecialEvent=6 SpecialEventDone=0 flags=000 slot=61/90 NextWarp=0 calls=VoiceState(2)
+event 6 view 33 frame 70 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 6 view 33 frame 75 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/0 NextWarp=0 calls=-
+event 6 view 34 frame 0 busy 0 -> TestSpecialEvent=0 SpecialEventDone=1 flags=100 slot=0/90 NextWarp=97 calls=-
+event 7 view 123 frame 59 busy 0 -> TestSpecialEvent=7 SpecialEventDone=0 flags=000 slot=59/90 NextWarp=0 calls=-
+event 7 view 123 frame 60 busy 0 -> TestSpecialEvent=0 SpecialEventDone=7 flags=010 slot=60/90 NextWarp=0 calls=-
+event 8 view 123 frame 61 busy 0 -> TestSpecialEvent=0 SpecialEventDone=8 flags=001 slot=61/90 NextWarp=0 calls=-
+event 8 view 124 frame 0 busy 0 -> TestSpecialEvent=0 SpecialEventDone=8 flags=001 slot=0/90 NextWarp=0 calls=-
+event 9 view 25 frame 0 busy 0 -> TestSpecialEvent=9 SpecialEventDone=0 flags=000 slot=0/90 NextWarp=0 calls=-
+event 0 view 25 frame 0 busy 0 -> TestSpecialEvent=0 SpecialEventDone=0 flags=000 slot=0/90 NextWarp=0 calls=-
+# objet FORMULAIRE_1 = 97

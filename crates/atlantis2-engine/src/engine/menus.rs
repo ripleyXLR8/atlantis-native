@@ -67,7 +67,7 @@ impl Engine {
     /// menu closes when it is the main menu opened from the game.
     pub fn escape(&mut self) {
         match self.loop_type {
-            LoopType::Warp => self.open_main_menu(),
+            LoopType::Warp | LoopType::Picture => self.open_main_menu(),
             LoopType::Dialog => self.end_dialog(),
             LoopType::Video => {}
             LoopType::Menu => self.with_menu(|m, e| m.escape(e)),

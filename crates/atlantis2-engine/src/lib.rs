@@ -2,10 +2,11 @@
 //!
 //! Comments cite addresses in the original `atlantis2.exe` (the French CD
 //! build of 1999, 2199552 bytes) so that each behaviour stays traceable to
-//! the original code. For now it plays Tibet's panoramas: the cube drawn as
-//! the original draws it with its place animations, turned with the mouse
-//! within the original's limits, the cursor at the centre, and the moves
-//! between views (turn, transition video, arrival). A dialog ([`dialog`])
+//! the original code. It plays Tibet, Ireland and China (without China's
+//! puzzles): the cube drawn as the original draws it with its place
+//! animations, turned with the mouse within the original's limits, the
+//! cursor at the centre, and the moves between views and places (turn,
+//! zoom, transition video, arrival). A dialog ([`dialog`])
 //! plays over the view as the original's: its lines and voices ([`sound`]),
 //! the speaker's body video ([`hnm_stream`]) with the 3D head ([`head`],
 //! [`raster3d`]) and its lip-sync ([`lipsync`]), the subtitles

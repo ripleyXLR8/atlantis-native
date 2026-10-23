@@ -44,6 +44,7 @@ use atlantis2_data::defnames::{self, DefNames, NameError};
 
 use crate::fpu::Fpu;
 
+pub use frame::DEMONS;
 pub use host::{AnimOp, DialStart, Host};
 pub use subjects::{Subject, SubjectTable};
 

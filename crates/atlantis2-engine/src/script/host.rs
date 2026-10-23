@@ -13,7 +13,9 @@
 //!   [`Host::load_wam`], [`Host::has_view`], [`Host::enter_view`],
 //!   [`Host::turn_now`], [`Host::zoom_start`], [`Host::zoom_psycho_start`],
 //!   [`Host::enable_zone`], [`Host::abort_departure`], [`Host::anim`],
-//!   [`Host::anim_frame`], [`Host::special_event`];
+//!   [`Host::anim_frame`], and for the special events
+//!   ([`super::Script::special_event`]) [`Host::view_id`],
+//!   [`Host::slot_frame`], [`Host::slot_rewind`], [`Host::voice_busy`];
 //! - **videos**: [`Host::play_video`], [`Host::cinema_sound`];
 //! - **dialogs**: [`Host::dialog_running`], [`Host::dial_start`],
 //!   [`Host::dial_stop`];
@@ -134,9 +136,28 @@ pub trait Host {
         None
     }
 
-    /// `TESTSPECIALEVENT` ≠ 0 in `Interp_GereFrame`: the chapter events of
-    /// the other worlds (@ 0x00484880). Not reached in Tibet.
-    fn special_event(&mut self, event: i32) {}
+    /// The current view's number (the view record @ 0x006d85d4, +0x10).
+    fn view_id(&mut self) -> i32 {
+        0
+    }
+
+    /// The current frame (+0x10) of the first animation record of `id`
+    /// (FUN_0047de60, any kind), or with `anim` the first of `id` whose
+    /// WAM state plays that animation (FUN_0047dea0); `None` when there
+    /// is none (fatal in the original).
+    fn slot_frame(&mut self, id: i32, anim: Option<i32>) -> Option<i32> {
+        None
+    }
+
+    /// The end of a special event on the first animation record of `id`
+    /// (FUN_00484880 @ 0x00484a83..0x00484a96): its frame 0, its end its
+    /// WAM state's +0x24.
+    fn slot_rewind(&mut self, id: i32) {}
+
+    /// Whether `voice` plays (FUN_0047a9c0).
+    fn voice_busy(&mut self, voice: i32) -> bool {
+        false
+    }
 
     /// The music state machine (@ 0x00476fc0), which the `cinema` key runs
     /// twice around the opening of the film's sound.

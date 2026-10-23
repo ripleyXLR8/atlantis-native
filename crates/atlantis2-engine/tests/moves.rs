@@ -410,3 +410,98 @@ fn animations_match_the_original() {
         compare(&format!("animation {vid}"), &rows, want);
     }
 }
+
+const ZOOM: &str = include_str!("golden/scripts_worlds_zoom.txt");
+
+/// `%.9g`, as the golden prints the fields of view.
+fn g9(v: f32) -> String {
+    let v = f64::from(v);
+    if v == 0.0 {
+        return "0".into();
+    }
+    let e = v.abs().log10().floor() as i32;
+    let decimals = (8 - e).max(0) as usize;
+    let mut t = format!("{v:.decimals$}");
+    if t.contains('.') {
+        t = t.trim_end_matches('0').trim_end_matches('.').to_string();
+    }
+    t
+}
+
+/// `ZoomStart=100` before the move of case B (view 2 at (−75°, 15°), a
+/// click on the move to view 3 at pass 2), under 0x0e7f and 0x027f,
+/// against the original (`scripts_worlds_zoom.txt`, its `ZoomStart`
+/// sections): the field of view one degree less per frame during the
+/// turn, the move held until the zoom ends; under 0x0e7f it lands on 35
+/// and stays there, under 0x027f it is reset to 76. One row per pass that
+/// changed the field of view, the target, the turn, the loop or the view.
+/// (`ZoomPsychoStart`'s roll is not ported: its sections are not run.)
+#[test]
+fn the_zoom_of_a_move_matches_the_original() {
+    if game().is_none() {
+        return;
+    }
+    let mut sections: Vec<(String, Vec<String>)> = Vec::new();
+    for line in ZOOM.lines().filter(|l| !l.starts_with('#')) {
+        if let Some(h) = line.strip_prefix("== ") {
+            sections.push((h.to_string(), Vec::new()));
+        } else {
+            sections.last_mut().unwrap().1.push(line.to_string());
+        }
+    }
+    let mut checked = 0;
+    for (head, want) in sections.iter().filter(|(h, _)| h.contains("ZoomStart=100")) {
+        let (variant, fpu) = if head.starts_with("cw 0x0e7f") {
+            (Variant::PII, Fpu::Chop)
+        } else {
+            assert!(head.starts_with("cw 0x027f"), "{head}");
+            (Variant::C, Fpu::Double)
+        };
+        let mut e = Engine::new_game(game().unwrap(), variant, fpu, 640, 480).unwrap();
+        e.sprite_picks = false;
+        e.anim.rand = MsvcRand(1000);
+        e.enter_at(2, radians(-75.0), radians(15.0)).unwrap();
+        let f = e.fpu();
+        e.zoom.start(f, 100.0, 35.0);
+        let mut got = vec![format!(
+            "set: fov {:.4} target {:.4} step {:.4} roll 0.0000/0.0000",
+            e.zoom.current, e.zoom.target, e.zoom.step
+        )];
+        let mut prev = None;
+        let mut clock = 100.0;
+        for n in 0..160u64 {
+            if n % 4 == 0 {
+                e.tick();
+            }
+            if n == 2 {
+                clock += 10.0;
+                e.click(clock);
+            }
+            e.pass(None);
+            let cur = (
+                e.zoom.current,
+                e.zoom.target,
+                e.turning(),
+                i32::from(e.loop_type == LoopType::Video),
+                e.place().1,
+            );
+            if Some(cur) != prev {
+                let (yaw, pitch) = e.camera.angles();
+                got.push(format!(
+                    "p{n} fov {} target {} roll 0.0000 turn {} loop {} view {} yaw {} pitch {}",
+                    g9(cur.0),
+                    g9(cur.1),
+                    i32::from(cur.2),
+                    cur.3,
+                    cur.4,
+                    fmt3(degrees(yaw)),
+                    fmt3(degrees(pitch))
+                ));
+            }
+            prev = Some(cur);
+        }
+        compare(head, &got, want);
+        checked += 1;
+    }
+    assert_eq!(checked, 2);
+}
