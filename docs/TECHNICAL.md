@@ -981,8 +981,10 @@ event, the gong's way back to Tibet) into `china-*.png`.
   on disc 3, `objchine.spr`, `sujchine.spr`, the Chinese texts and heads,
   film 21, `chine.wam` view 10, chapter 42 and its music); the gong taken
   in view 6 or 7 and struck on its zone in view 5 (chapter 42), or the
-  lantern brought back (chapter 46), sends the game back to Tibet's view
-  7 and chapter 75. Every key of the Chinese chapters is handled; their
+  lantern brought back (chapter 46: films 32 and 33, `chine.wam` view
+  200, dialogs 346 and 347, China's mandala in the bag, the hand empty
+  at the arrival as in the original), sends the game back to Tibet's
+  view 7 and chapter 75. Every key of the Chinese chapters is handled; their
   1035 `/set` lines (with Yucatán's 820 before them, the state carried
   from chapter 1 as the original's run did) match the original's handler
   (`tests/script.rs`, `scripts_worlds_china.txt`). New for China:
@@ -1038,9 +1040,10 @@ event, the gong's way back to Tibet) into `china-*.png`.
   monk asked about all they offer, the gong taken and struck), and
   `tests/china.rs` runs every Chinese chapter's `/INIT`, enters every
   view of the five places with its hooks, moves along every link,
-  plays all 115 dialogs the chapters start, checks the subjects,
-  objects and musics on disc 3, and loads a game saved in the turtle
-  room.
+  plays the lantern's way back from the turtle room (chapter 46's
+  section from the move, its `/set` lines all the original's), plays
+  all 115 dialogs the chapters start, checks the subjects, objects and
+  musics on disc 3, and loads a game saved in the turtle room.
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,

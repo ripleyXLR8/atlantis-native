@@ -418,8 +418,13 @@ impl Engine {
     ///
     /// - The figurines (FUN_0048da20's writes, then FUN_0048dcb0):
     ///   `pos_statue1..6` = 4, 3, 5, 1, 2, 6 (the targets @ 0x005e1084),
-    ///   `(etat5statues=1)`, and the film `???` that does not open
-    ///   (FUN_0040bf60 on `datas_a2\hnm\???`: the music back to 100 %).
+    ///   `(etat5statues=1)`, and `AtlHnm_start("???")` (FUN_0040bf60),
+    ///   run as the port's own `AtlHnm_start`: refused with a warning in
+    ///   the video loop; otherwise the file, which no disc has, does not
+    ///   open, and the music goes back to 100 % unless a dialog runs
+    ///   (@ 0x0040bfbd..0x0040bfc8, loop type 2). The ring refill before
+    ///   the open (FUN_00476e10, @ 0x0040bfa7) has no counterpart in the
+    ///   port's music.
     /// - The chest (FUN_00493960's fifth click on `PRENDRE_BAGUETTE`):
     ///   `frame_coffre_chine` = 4 and `BAGUETTE_PRISE` = 1, the chopstick
     ///   put in the bag and its record hidden. The aid does the last two
@@ -431,8 +436,12 @@ impl Engine {
     ///   `Pont_Leve` hidden, `Pont_Moitie` shown, `findisque1` = 1,
     ///   `(cinema=24)`; second 5, 3, 1, 4, 2, `Pont_Moitie` hidden,
     ///   `Pont_Baisse` shown, `findisque2` = 1, `(cinema=25)`.
-    /// - The pearl (FUN_004947b0 @ 0x004948df..0x00494902): `FINPERLE` = 1
-    ///   and `PERLE_TROU` shown.
+    /// - The pearl (FUN_004947b0's last right step,
+    ///   @ 0x004948ab..0x00494902): `State_nuages_bas` raised to 5,
+    ///   `(NewSound=210)` (FUN_00494970: 205 + the new state), the low
+    ///   clouds placed from it (FUN_00494990: pictures, not ported),
+    ///   `Action_nuage_bas` = 0, then `FINPERLE` = 1 and `PERLE_TROU`
+    ///   shown.
     pub fn solve_chinese_puzzle(&mut self, puzzle: ChinesePuzzle) {
         match puzzle {
             ChinesePuzzle::Figurines => {
@@ -441,7 +450,7 @@ impl Engine {
                     self.run_command(c.as_bytes());
                 }
                 self.run_command(b"(etat5statues=1)");
-                self.music.set_percent(100);
+                self.start_video("???");
             }
             ChinesePuzzle::Chest => {
                 self.with_script(|s, h| {
@@ -481,6 +490,9 @@ impl Engine {
             }
             ChinesePuzzle::Pearl => {
                 self.with_script(|s, h| {
+                    s.set_var("State_nuages_bas", 5);
+                    s.run_command(h, b"(NewSound=210)");
+                    s.set_var("Action_nuage_bas", 0);
                     s.set_var("FINPERLE", 1);
                     s.run_command(h, b"(showobjet=PERLE_TROU)");
                 });

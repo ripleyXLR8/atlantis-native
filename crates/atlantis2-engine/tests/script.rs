@@ -667,6 +667,8 @@ fn world_rows(s: &mut Script, h: &mut Rec, chapter: i32) -> Vec<(String, Vec<Str
         s.resume_pending = false;
         h.calls.clear();
         h.chapter = Some(data.clone());
+        // The golden's harness empties its error list before each line, so
+        // a fatal shows on its own line only.
         s.warnings.clear();
         s.fatal = None;
         let before = snap(s, h);

@@ -3,9 +3,9 @@
 //! noted; the click hooks, which take no click; the moves between the
 //! places (type-2 zones and WAM links); `NextWarpInvalide` as chapter 59's
 //! door uses it; the picture viewer (`ViewBigSpr`); a demon's special
-//! event; every dialog the chapters start; the subjects, objects and
-//! musics on disc 3; the place sounds; a save in China loaded; the
-//! testing aid that writes the puzzles' wins.
+//! event; chapter 46's lantern back to Tibet; every dialog the chapters
+//! start; the subjects, objects and musics on disc 3; the place sounds; a
+//! save in China loaded; the testing aid that writes the puzzles' wins.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the tests are skipped.
@@ -556,6 +556,99 @@ fn a_demons_special_event() {
     assert!(e.bag_entries().iter().any(|b| b.id == form1));
 }
 
+/// Chapter 46's lantern: with the lantern brought back (`flag177` = 1)
+/// and China not finished, the move from the turtle room's view 40 to
+/// `chine.wam` view 32 runs the departure section (lines 53-78): film 32,
+/// `chine.wam` view 200, the lantern out of the bag, dialogs 346 and 347,
+/// film 33, then Tibet (world 5, disc 1) in view 7 with China's mandala
+/// in the bag, `isChineFinished` = 1 and chapter 75. The hand is empty
+/// there, as in the original: the arrival's per-view reset empties it, and
+/// `ObjetEnMain_NextWarp=MANDALA_CHINE` stores `atoi` of a name, 0. Every
+/// `/set` line run is one the original's handler runs.
+#[test]
+fn the_lantern_sends_the_game_back_to_tibet() {
+    let Some(files) = game() else { return };
+    let mut e = in_china(files);
+    goto(&mut e, "salletortue.wam", 40, 46);
+    for c in [
+        &b"(sacados=LANTERNE)"[..],
+        b"(flag177=1)",
+        b"(isChineFinished=0)",
+    ] {
+        e.run_command(c);
+    }
+    let z = zone(&e, |z| z.kind == 2 && z.value == 32);
+    aim(&mut e, z);
+    e.events.clear();
+    e.click(50.0);
+    for _ in 0..2000 {
+        match e.loop_type {
+            LoopType::Video => e.end_video(),
+            LoopType::Dialog => e.end_dialog(),
+            _ => {}
+        }
+        e.tick();
+        e.pass(None);
+        if e.place() == ("tibet.wam", 7) && e.loop_type == LoopType::Warp && !e.turning() {
+            break;
+        }
+    }
+    assert_eq!(e.place(), ("tibet.wam", 7));
+    assert_eq!(e.script_state().unwrap().chapter, 75);
+    assert_eq!((var(&e, "MONDE"), var(&e, "isChineFinished")), (5, 1));
+    assert_eq!(e.files().current_disc(), 1);
+    let at = |p: &dyn Fn(&Event) -> bool| {
+        e.events
+            .iter()
+            .position(p)
+            .unwrap_or_else(|| panic!("{:?}", e.events))
+    };
+    let film = |n: &'static str| move |x: &Event| matches!(x, Event::VideoStart { name, frames: Some(_) } if name.eq_ignore_ascii_case(n));
+    let f32_ = at(&film("cine032.hnm"));
+    let china = at(&|x| *x == Event::Enter { view: 200 });
+    let d346 = at(&|x| {
+        *x == Event::DialogStart {
+            number: 346,
+            started: true,
+        }
+    });
+    let d347 = at(&|x| {
+        *x == Event::DialogStart {
+            number: 347,
+            started: true,
+        }
+    });
+    let f33 = at(&film("cine033.hnm"));
+    let world = at(&|x| *x == Event::Monde(5));
+    let tibet = at(&|x| *x == Event::Wam("tibet.wam".into()));
+    assert!(
+        f32_ < china && china < d346 && d346 < d347 && d347 < f33 && f33 < world && world < tibet
+    );
+    let s = e.script_state().unwrap();
+    let lantern = s.names.id(defnames::OBJETS, b"LANTERNE").unwrap() as i32;
+    let mandala = s.names.id(defnames::OBJETS, b"MANDALA_CHINE").unwrap() as i32;
+    assert!(!e.bag_entries().iter().any(|b| b.id == lantern));
+    assert!(e.bag_entries().iter().any(|b| b.id == mandala));
+    assert_eq!(
+        (var(&e, "OBJETENMAIN"), var(&e, "Objetenmain_NextWarp")),
+        (0, 0)
+    );
+    let lines: Vec<usize> = e
+        .events
+        .iter()
+        .filter_map(|x| match x {
+            Event::Set { chapter: 46, line } => Some(*line),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(lines, (53..=78).collect::<Vec<_>>());
+    let golden = include_str!("golden/scripts_worlds_china.txt");
+    for line in lines {
+        let head = format!("chapi046.con:{line} ");
+        assert!(golden.lines().any(|l| l.starts_with(&head)), "line {line}");
+    }
+}
+
 /// The values of `/set(key=...)` lines of China's chapters (comments
 /// left out), each once, in order.
 fn set_values(files: &A2Files, key: &str) -> Vec<String> {
@@ -762,8 +855,15 @@ fn the_aid_writes_the_wins() {
     let Some(files) = game() else { return };
     let mut e = in_china(files);
     goto(&mut e, "miniature.wam", 6, 48);
+    e.events.clear();
     e.solve_chinese_puzzle(ChinesePuzzle::Figurines);
     assert_eq!(var(&e, "etat5statues"), 1);
+    // `AtlHnm_start("???")`: no such film, the section goes on.
+    assert!(e.events.contains(&Event::VideoStart {
+        name: "???".into(),
+        frames: None
+    }));
+    assert_eq!(e.loop_type, LoopType::Warp);
     let pos: Vec<i32> = (1..=6)
         .map(|k| var(&e, &format!("pos_statue{k}")))
         .collect();
@@ -785,8 +885,14 @@ fn the_aid_writes_the_wins() {
     e.solve_chinese_puzzle(ChinesePuzzle::WheelsSecond);
     settle(&mut e);
     assert_eq!((var(&e, "findisque1"), var(&e, "findisque2")), (1, 1));
+    e.events.clear();
     e.solve_chinese_puzzle(ChinesePuzzle::Pearl);
     assert_eq!(var(&e, "FINPERLE"), 1);
+    assert_eq!(
+        (var(&e, "State_nuages_bas"), var(&e, "Action_nuage_bas")),
+        (5, 0)
+    );
+    assert!(e.events.contains(&Event::Sound("sound210.apc".into())));
     let pearl = e
         .script_state()
         .unwrap()

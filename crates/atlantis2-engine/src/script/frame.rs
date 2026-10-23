@@ -174,8 +174,10 @@ impl Script {
                         return;
                     };
                     let Some(f) = host.slot_frame(id, None) else {
+                        // FUN_0047de60's fatal (@ 0x0047de94), with the
+                        // current view (here the demon's).
                         self.fail(format!(
-                            "AtlSpw_find_index: perso {id} absent de la vue {view}"
+                            "AtlSpw_find_index(): vue {view} ! AtlSpw_find_index({id}) introuvable"
                         ));
                         return;
                     };
@@ -203,7 +205,11 @@ impl Script {
                         Some(f) if f >= 60 => {}
                         Some(_) => return,
                         None => {
-                            self.fail(format!("AtlSpw_find_index_anum: perso {id} anim 2"));
+                            // FUN_0047dea0's fatal (@ 0x0047dee3), in view
+                            // 123.
+                            self.fail(format!(
+                                "AtlSpw_find_index_anum(): vue 123 ! AtlSpw_find_index_anum({id}, 2) introuvable"
+                            ));
                             return;
                         }
                     }
