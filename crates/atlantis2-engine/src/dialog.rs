@@ -43,6 +43,7 @@ use atlantis2_data::{A2Files, Folder};
 use crate::camera::Camera;
 use crate::crt::Rand;
 use crate::fpu::{ftol, Fpu};
+use crate::hd::{DialogHd, HdTexts, TextFont};
 use crate::head::Head;
 use crate::hnm_stream::HnmStream;
 use crate::lipsync::LipSync;
@@ -204,6 +205,11 @@ pub struct FrameContext<'a> {
     pub screen: (usize, usize),
     /// The x87 control word the game's code has when the frame is drawn.
     pub fpu: Fpu,
+    /// The HD mode (a port addition): the frame's pictures captured for
+    /// the HD heads, and the texts recorded for the sharp subtitles;
+    /// `None` without it.
+    pub hd: Option<&'a mut DialogHd>,
+    pub texts: Option<&'a mut HdTexts>,
 }
 
 /// A running dialog.
@@ -757,6 +763,8 @@ impl Dialog {
             subtitles,
             screen,
             fpu,
+            ref mut hd,
+            ref mut texts,
         } = *frame;
         self.fpu = fpu;
         let kind = self.kind();
@@ -772,13 +780,14 @@ impl Dialog {
             if let Some(h) = head.as_mut() {
                 h.set_fpu(self.fpu);
             }
-            if let Some(f) = compose(
+            if let Some(f) = compose_with(
                 out,
                 zbuf,
                 screen.0,
                 self.stream.as_ref(),
                 head.map(|h| (h, cam)),
                 rand,
+                hd.as_deref_mut(),
             ) {
                 self.fpu = f;
             }
@@ -796,7 +805,10 @@ impl Dialog {
                     screen.0 as i32,
                     screen.1 as i32,
                 );
-                font.draw(out, screen.0, screen.1, &calls);
+                match texts.as_deref_mut() {
+                    Some(t) => t.draw(TextFont::Dialog, font, out, screen.0, screen.1, &calls),
+                    None => font.draw(out, screen.0, screen.1, &calls),
+                }
             }
         }
     }
@@ -814,12 +826,68 @@ pub fn compose(
     head: Option<(&mut Head, usize)>,
     rand: &mut Rand,
 ) -> Option<Fpu> {
+    compose_with(out, zbuf, pitch, stream, head, rand, None)
+}
+
+/// [`compose`], and in the HD mode (`hd`, a port addition) the pictures
+/// the HD layer is made of: the picture under the body, the body's
+/// pixels, the picture before the head and after it, and the head drawn
+/// again at the HD size by the same pipeline ([`Head::draw_scaled`]),
+/// with the control word the original draw started under. The 640x480
+/// pixels are [`compose`]'s either way.
+pub fn compose_with(
+    out: &mut [u16],
+    zbuf: &mut [u32],
+    pitch: usize,
+    stream: Option<&HnmStream>,
+    head: Option<(&mut Head, usize)>,
+    rand: &mut Rand,
+    mut hd: Option<&mut DialogHd>,
+) -> Option<Fpu> {
+    // The HD capture needs the original's 640 x 480 frame.
+    if pitch != crate::hd::SCREEN_W || out.len() != crate::hd::SCREEN_W * crate::hd::SCREEN_H {
+        hd = None;
+    }
+    if let Some(d) = hd.as_deref_mut() {
+        d.ready = false;
+        d.drawn = false;
+        d.pano.clear();
+        d.pano.extend_from_slice(out);
+    }
     zbuf.fill(0);
     if let Some(st) = stream {
         st.draw(out, pitch, out.len() / pitch.max(1));
     }
+    if let Some(d) = hd.as_deref_mut() {
+        d.body.resize(out.len(), 0);
+        match stream {
+            Some(st) => st.coverage(&mut d.body, pitch),
+            None => d.body.fill(0),
+        }
+        d.pre_head.clear();
+        d.pre_head.extend_from_slice(out);
+        d.composite.clear();
+        d.composite.extend_from_slice(out);
+        d.ready = true;
+    }
     let (h, cam) = head?;
+    let before = h.fpu();
     h.display(cam, rand, out, zbuf);
+    if let Some(d) = hd {
+        d.composite.clear();
+        d.composite.extend_from_slice(out);
+        let (w, ht) = d.head_size();
+        if w > 0 {
+            d.head.resize(w * ht, 0);
+            d.zbuf.clear();
+            d.zbuf.resize(w * ht, 0);
+            d.drawn = h.draw_scaled(cam, before, d.tile, &mut d.head, &mut d.zbuf, w, ht);
+            // The pixels the rasteriser wrote: their Z is not 0 (a head
+            // pixel's Z is 2³¹ / z, z at most the far plane).
+            d.mask.clear();
+            d.mask.extend(d.zbuf.iter().map(|&z| u8::from(z != 0)));
+        }
+    }
     Some(h.fpu())
 }
 

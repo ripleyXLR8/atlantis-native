@@ -40,9 +40,12 @@
 //! (`HdLayer::base`).
 
 pub use atlantis_engine::hd::{
-    rgb565_to_888, tile_for_output, HdLayer, HdOptions, PanoFilter, MAX_SIDE_TILES, MAX_TILE,
+    rgb565_to_888, tile_for_output, HdLayer, HdOptions, HdText, PanoFilter, MAX_SIDE_TILES,
+    MAX_TILE,
 };
 use atlantis_engine::upscale::PanoramaPrep;
+
+use crate::subtitle::{SubtitleFont, TextOut};
 
 use crate::warp::FACE_SIZE;
 
@@ -356,6 +359,155 @@ pub fn side_tiles(ox: usize, dw: usize) -> usize {
         return 0;
     }
     (ox * (SCREEN_W / 16)).div_ceil(dw).min(MAX_SIDE_TILES)
+}
+
+/// The font a text was drawn with: `AtlFT_Dialog` (the subtitles) or
+/// `AtlFT_POPUP` (the menus' tooltips and lists, the bag's names, the
+/// credits).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextFont {
+    Dialog,
+    Popup,
+}
+
+/// A `TextOutA` call of a frame, for the HD mode to draw again at the
+/// output's resolution: its font, the call (position, colour, bytes, on
+/// the 640x480 screen) and its weight (255, or the credits' fade).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HdTextRun {
+    pub font: TextFont,
+    pub call: TextOut,
+    pub alpha: u8,
+}
+
+/// The texts of a frame ("Sharp subtitles", the first game's
+/// `hd_sharp_subtitles`): the calls drawn, and the first game's
+/// [`HdText`] holding the 640x480 pixels under the glyphs and the glyphs'
+/// own (`under`, `after`; its `items` stay empty: the Atlantis II font is
+/// drawn by [`crate::subtitle::SubtitleFont::draw_hd`]), so that the
+/// compositor shows the picture under the 640x480 glyphs where the frame
+/// still shows them and the sharp glyphs are drawn over it.
+///
+/// Recording is on only in the HD mode ([`HdTexts::begin`]); off, a draw
+/// is the font's own [`SubtitleFont::draw`] and nothing is kept. On, the
+/// 640x480 pixels written are the same.
+#[derive(Clone, Debug, Default)]
+pub struct HdTexts {
+    pub runs: Vec<HdTextRun>,
+    pub text: HdText,
+    /// The pixels a glyph set (their `under` is kept from the first one).
+    set: Vec<u8>,
+    on: bool,
+}
+
+impl HdTexts {
+    /// A frame starts: nothing recorded; recording when `on`.
+    pub fn begin(&mut self, on: bool) {
+        self.runs.clear();
+        self.on = on;
+        let n = SCREEN_W * SCREEN_H;
+        if on {
+            for b in [&mut self.text.under, &mut self.text.after] {
+                b.clear();
+                b.resize(n, 0);
+            }
+            self.set.clear();
+            self.set.resize(n, 0);
+        } else {
+            self.text.under.clear();
+            self.text.after.clear();
+        }
+    }
+
+    /// Whether texts are recorded.
+    pub fn is_on(&self) -> bool {
+        self.on
+    }
+
+    /// `calls` drawn with `font` (`id`) into `out` (`w` x `h` RGB565) as
+    /// [`SubtitleFont::draw`] draws them, and recorded when on (a 640 x
+    /// 480 screen only).
+    pub fn draw(
+        &mut self,
+        id: TextFont,
+        font: &SubtitleFont,
+        out: &mut [u16],
+        w: usize,
+        h: usize,
+        calls: &[TextOut],
+    ) {
+        if !self.on || w != SCREEN_W || h != SCREEN_H {
+            font.draw(out, w, h, calls);
+            return;
+        }
+        let (under, after, set) = (&mut self.text.under, &mut self.text.after, &mut self.set);
+        font.draw_with(calls, |px, py, colour| {
+            if px >= 0 && py >= 0 && (px as usize) < w && (py as usize) < h {
+                let i = py as usize * w + px as usize;
+                if set[i] == 0 {
+                    set[i] = 1;
+                    under[i] = out[i];
+                }
+                let c = crate::subtitle::rgb565(colour);
+                out[i] = c;
+                after[i] = c;
+            }
+        });
+        self.push(id, calls, 255);
+    }
+
+    /// `calls` recorded with weight `alpha` without drawing them (their
+    /// pixels are set with [`HdTexts::set_pixels`]).
+    pub fn push(&mut self, id: TextFont, calls: &[TextOut], alpha: u8) {
+        if self.on {
+            self.runs.extend(calls.iter().map(|c| HdTextRun {
+                font: id,
+                call: c.clone(),
+                alpha,
+            }));
+        }
+    }
+
+    /// The 640x480 picture without the texts (`under`) and with them
+    /// (`after`), for texts drawn elsewhere (the credits' pages).
+    pub fn set_pixels(&mut self, under: &[u16], after: &[u16]) {
+        if self.on {
+            self.text.under.copy_from_slice(under);
+            self.text.after.copy_from_slice(after);
+        }
+    }
+}
+
+/// A dialog frame's pictures for the HD mode (a port addition, the first
+/// game's HD heads): captured while the dialog frame draws its 640x480
+/// picture (@ 0x00461430), then composed into the HD layer by the first
+/// game's `atlantis_engine::hd::compose_dialog`.
+#[derive(Clone, Debug, Default)]
+pub struct DialogHd {
+    /// The HD tile size (the head is drawn `tile` / 16 times larger, into
+    /// 40·tile x 30·tile pixels).
+    pub tile: usize,
+    /// The picture under the body video (the panorama), after the body,
+    /// after the head (640x480).
+    pub pano: Vec<u16>,
+    pub pre_head: Vec<u16>,
+    pub composite: Vec<u16>,
+    /// The pixels the body video drew (its `AL` mask not 0).
+    pub body: Vec<u8>,
+    /// The head at the HD size, its Z buffer, and where it was drawn.
+    pub head: Vec<u16>,
+    pub zbuf: Vec<u32>,
+    pub mask: Vec<u8>,
+    /// A head was drawn; the frame was captured.
+    pub drawn: bool,
+    pub ready: bool,
+}
+
+impl DialogHd {
+    /// The HD head's size: 40·tile x 30·tile.
+    pub fn head_size(&self) -> (usize, usize) {
+        (40 * self.tile, 30 * self.tile)
+    }
 }
 
 #[cfg(test)]

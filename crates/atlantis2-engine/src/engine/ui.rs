@@ -18,6 +18,7 @@ use atlantis2_data::Folder;
 
 use super::{CursorBank, Engine, Event, LoopType};
 use crate::bag::{next_shown, param_word, visible_count, UiBank, UiDraw, FORM_FRAMES};
+use crate::hd::TextFont;
 use crate::script::BagEntry;
 use crate::subtitle::TextOut;
 
@@ -618,7 +619,7 @@ impl Engine {
 
     /// Draws [`Engine::ui_draws`] into `out` (`AtlSpr_Aff` refuses a frame
     /// outside its bank; the texts in the popup font).
-    pub(super) fn paint_ui(&self, out: &mut [u16], w: usize, h: usize) {
+    pub(super) fn paint_ui(&mut self, out: &mut [u16], w: usize, h: usize) {
         for d in &self.ui_draws {
             match d {
                 UiDraw::Sprite { bank, frame, x, y }
@@ -655,7 +656,8 @@ impl Engine {
                             colour: *colour,
                             bytes: bytes.clone(),
                         };
-                        font.draw(out, w, h, &[call]);
+                        let rec = self.hd.texts_mut();
+                        rec.draw(TextFont::Popup, font, out, w, h, &[call]);
                     }
                 }
             }

@@ -196,10 +196,13 @@ the widescreen option on, for this run (`settings.ini` is not changed).
 
 With Atlantis II, `--hd` and `--widescreen` turn on its HD mode (off by
 default; see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress), item
-HD mode): the panorama is drawn at the window's resolution, and with
-`--widescreen` it also fills the sides of a window wider than 4:3; the
-cursor, the bag bar, the menus and the videos are the original's
-640x480 pictures, smoothly enlarged. Every window larger than 640x480
+HD mode): the panorama and the dialogs' 3D heads are drawn at the
+window's resolution, and with `--widescreen` the panorama also fills the
+sides of a window wider than 4:3; the subtitles, the menus' tooltips, the
+bag's names and the credits' texts are drawn sharp from the game's font
+at that size, with the original's line breaks; the cursor, the bag bar,
+the menu pictures, the dialogs' filmed bodies and the videos are the
+original's 640x480 pictures, smoothly enlarged. Every window larger than 640x480
 gets the HD panorama, drawn at the picture's own size (up to 2560x1920):
 the default window of 1280x960 already does, and the larger the window
 (or full screen, F11), the sharper the panorama. `--size 1920x1080` opens

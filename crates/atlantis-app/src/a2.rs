@@ -358,8 +358,11 @@ pub fn headless(
     let mut engine = boot(dir, discs, enhancements)?;
     start.begin(&mut engine, true)?;
     if start.menu.is_some() {
-        // The pointer at the screen centre.
-        engine.pointer(WIDTH as i32 / 2, HEIGHT as i32 / 2);
+        // The pointer at the screen centre, or where `--pointer` puts it.
+        let (x, y) = start
+            .pointer
+            .unwrap_or((WIDTH as i32 / 2, HEIGHT as i32 / 2));
+        engine.pointer(x, y);
     }
     let mut screen = vec![0u16; (WIDTH * HEIGHT) as usize];
     let mut sound = vec![0.0f32; 2 * 22050 / 60];
@@ -830,15 +833,28 @@ impl Picture {
         let (ox, oy, dw, dh) = picture_rect(width, height);
         out[..width * height].fill(0);
         if engine.enhancements.hd {
+            // The frame's texts: their 640x480 glyphs uncovered by the
+            // compositor, then drawn again at this size (sharp
+            // subtitles; Atlantis II's font is drawn by the engine).
+            let texts = engine.hd_texts();
+            let held: Vec<&atlantis_engine::hd::HdText> = texts.iter().map(|t| &t.text).collect();
             let f = HdFrame {
                 screen,
                 layer: engine.hd_layer(),
-                texts: &[],
+                texts: &held,
                 photo: engine.hd_photo(),
                 video_pano: None,
             };
             let opts = engine.enhancements.hd_options;
+            // The texts the compositor uncovers are drawn again: with
+            // sharp subtitles, and over a video zoomed to the sides
+            // whatever that option (the first game's compositor draws its
+            // own texts again then).
+            let redraw = HdCompositor::uncovers_texts(&f, opts, ox);
             self.compositor.compose(f, opts, out, width, ox, oy, dw, dh);
+            if redraw {
+                engine.draw_hd_texts(out, width, (ox, oy, dw, dh));
+            }
             return;
         }
         let lut = atlantis2_engine::hd::rgb565_to_888();
@@ -913,6 +929,63 @@ mod tests {
         assert_eq!(A2Start::parse_size("1440X1080"), Some((1440, 1080)));
         assert_eq!(A2Start::parse_size("0x1080"), None);
         assert_eq!(A2Start::parse_size("1920"), None);
+    }
+
+    /// The compositor puts back what was under the 640x480 glyphs exactly
+    /// when `HdCompositor::uncovers_texts` says so, the case where
+    /// `Picture::compose` draws Atlantis II's texts again (they have no
+    /// `items` for the compositor to draw): with every option and frame
+    /// kind, a glyph either stays in the picture or is redrawn.
+    #[test]
+    fn texts_uncovered_are_drawn_again() {
+        use atlantis_engine::hd::{HdOptions, HdText, VideoSides};
+        let (ww, wh) = (1920, 1080);
+        let (ox, oy, dw, dh) = picture_rect(ww, wh);
+        let (w, h) = (WIDTH as usize, HEIGHT as usize);
+        let under = vec![0x001fu16; w * h];
+        let mut after = under.clone();
+        for y in 200..260 {
+            for x in 300..340 {
+                after[y * w + x] = 0xf800;
+            }
+        }
+        let mut text = HdText::default();
+        text.set(Vec::new(), &under, &after);
+        let held = [&text];
+        let mut out = vec![0u32; ww * wh];
+        let mut c = HdCompositor::default();
+        let mut redrawn = 0;
+        for sides in [
+            VideoSides::Black,
+            VideoSides::Blur,
+            VideoSides::Zoom,
+            VideoSides::Panorama,
+        ] {
+            for sharp in [false, true] {
+                for photo in [false, true] {
+                    let opts = HdOptions {
+                        sharp_subtitles: sharp,
+                        widescreen: true,
+                        video_sides: sides,
+                        ..HdOptions::default()
+                    };
+                    let f = HdFrame {
+                        screen: &after,
+                        layer: None,
+                        texts: &held,
+                        photo,
+                        video_pano: None,
+                    };
+                    let uncovers = HdCompositor::uncovers_texts(&f, opts, ox);
+                    c.compose(f, opts, &mut out, ww, ox, oy, dw, dh);
+                    let red = out.iter().any(|&p| (p >> 16) & 0xff > 0x40);
+                    assert_eq!(red, !uncovers, "{sides:?} sharp {sharp} photo {photo}");
+                    redrawn += usize::from(uncovers && !sharp);
+                }
+            }
+        }
+        // A video zoomed to the sides, without sharp subtitles.
+        assert_eq!(redrawn, 1);
     }
 
     /// With the HD mode off too, a click names the 640x480 pixel the

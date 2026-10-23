@@ -116,8 +116,8 @@ F10, or `--hd`) the picture is made at the window's resolution:
   the guests' portraits, the menus, the puzzles, the dialog videos'
   bodies, the videos), upscaled.
 
-Atlantis II has the same HD mode for its cube panoramas (`--hd`,
-`--widescreen`; see the HD mode item of
+Atlantis II has the same HD mode for its cube panoramas, its dialog
+heads and its texts (`--hd`, `--widescreen`; see the HD mode item of
 [Atlantis II](#atlantis-ii-in-progress)).
 
 The engine still draws its 640x480 frame unchanged (the scripts, the hit
@@ -765,8 +765,63 @@ event, the gong's way back to Tibet) into `china-*.png`.
   their order: the first game's `HdCompositor` shows the HD view wherever
   the frame still shows the cube (`base`), and upscales the rest, xBR for
   the art and bilinearly for a video's frame (black bars beside a video or
-  a menu page); they cannot be improved (pictures made at 640x480). Crisp
-  subtitles and 3D heads at the HD resolution are not done yet. A window
+  a menu page); they cannot be improved (pictures made at 640x480).
+  The dialogs, as the first game's HD heads: a head line's frame
+  (@ 0x00461430) draws the body video through its `AL` mask over the
+  panorama, then the head; the engine keeps the picture under the body,
+  the body's pixels (alpha not 0), the frame before the head and after it,
+  and draws the head a second time into a frame of 40·tile x 30·tile
+  pixels with the same pipeline (`Head::draw_scaled`): the same pose,
+  mouth, blink texture and control word (the one the original draw started
+  under), the camera's projection scaled by s = tile / 16 (fx, fy, cx, cy
+  times s, so the camera point the original projects to (sx, sy) goes to
+  (s·sx, s·sy), the frustum slopes of @ 0x004a4e8d from the larger
+  viewport), the vertices, back faces, Z rule (2³¹ / z, the later face
+  winning a tie) and texture those of the original, and the rasteriser
+  of the variant (the Pentium II's or the C one) with its viewport the
+  larger frame; it samples the nearest texel at the larger frame's pixel
+  centres. Tests check it: at tile 16 it gives the original's frame and Z
+  buffer bit for bit (three heads, both variants, every camera, 14 poses);
+  at tile 48 the HD pixel at the centre of each original pixel is the
+  original's texel in 98.7 to 99.3 % of them (the 32-pixel perspective
+  steps and the fixed point fall elsewhere over more pixels), no HD pixel
+  lies off the original's footprint and its neighbours, and the head has
+  nine times the pixels; the original's draws after an HD draw are those
+  of a head never drawn in HD (frames, Z buffers and control word, both
+  variants). The layer is then the first game's dialog picture
+  (`compose_dialog`, its rows now shared out among the cores): the HD
+  view, the body upscaled over it (bilinearly), the HD head where the original's head was
+  drawn and the pixels next to it, and with widescreen a character
+  touching one edge of the picture moved to the wide picture's edge; the
+  dialog's view is drawn once and kept while the camera, the faces and the
+  options are the same. The texts (the subtitles @ 0x004611e0, the menus'
+  tooltips FUN_0046d750 and save lists, the bag's names, the credits'
+  pages): every `TextOutA` call is recorded with its font (`AtlFT_Dialog`
+  or `AtlFT_POPUP`), and the 640x480 pixels its glyphs set with what was
+  under them (`HdTexts`, the first game's `HdText`); the compositor puts
+  back what was under the 640x480 glyphs, and the call is drawn again at
+  the window's size (`SubtitleFont::draw_hd`): each glyph at its pen
+  position of the original (the `hdmx` advances, the line breaks of the
+  original's layout, the `VDMX` ascent), scaled, the outline rasterised at
+  16 (or 13) pixels per em times the scale and blended by its coverage.
+  The window draws them again exactly where the compositor uncovered the
+  640x480 glyphs (`HdCompositor::uncovers_texts`: sharp subtitles, or a
+  video zoomed to the widescreen sides), so no option leaves a text
+  undrawn (a test composes every option against it). Only `--hd` and
+  `--widescreen` reach Atlantis II's `hd_options` for now (no
+  `settings.ini` key or menu yet): its other options keep the first
+  game's defaults (the bicubic, sharpened panorama, the smoothed art,
+  sharp subtitles, black bars beside a video). The
+  credits' texts fade with their pages: the old page's at 255 − alpha, the
+  new one's at alpha, over the pictures blended without their texts (the
+  original blends the pictures with their texts; the two differ by a
+  fraction of the fade where both pages have text). A test plays dialog
+  360 both ways, with the Pentium II's routines and the C ones (the
+  640x480 frames the same, the layer the frame before
+  the subtitles, the subtitles the original's calls, the HD head in the
+  layer), and the bag's names, a menu tooltip and the credits likewise;
+  others check the recorded texts' pixels and, at three sizes, that every
+  sharp glyph pixel is within a pixel of the original's glyphs, scaled. A window
   pixel is the 640x480 pixel the composition shows there
   (`window_to_screen`: ⌊(x − ox)·640 / dw⌋, the compositor's nearest map),
   so a click in the menus, the bar or the subject menu lands on the
@@ -802,6 +857,27 @@ event, the gong's way back to Tibet) into `china-*.png`.
   (one on the web); the projection and the face choice take about a third
   of it, the bilinear sampling the rest. A frame's HD pass is printed by
   a headless run with `--size`.
+  A dialog's frames (the same machine and method, `--dialog 360 --hd
+  --size 1920x1080 --headless <game> 300`: the shaman's first line):
+
+  | | 1920x1080 | 1920x1080 widescreen | 2560x1440 | 2560x1440 widescreen |
+  |---|---|---|---|---|
+  | HD view (kept) and the dialog's composition, in the pass | 5.4 ms | 5.6 ms | 7.6 ms | 7.5 ms |
+  | engine pass (the HD head included) | 12.4 ms | 12.6 ms | 15.9 ms | 15.8 ms |
+  | composition (the sharp subtitles included) | 2.6 ms | 2.9 ms | 3.8 ms | 4.1 ms |
+  | frame (pass and composition) | 15 ms | 15.4 ms | 19.7 ms | 19.9 ms |
+
+  So about 65 frames a second at 1920x1080 and 50 at 2560x1440 (the body
+  video and the head's pose change 15 times a second, the mouth at every
+  frame). The HD head alone (`cargo test --release -p atlantis2-engine
+  --test hd_heads -- --ignored --nocapture hd_head_timings`, `Ais1.db`,
+  the Pentium II's routines, its pose included) takes 5.7 ms at 1440x1080
+  and 8.1 ms at 1920x1440, against 2.6 ms for the original's draw: the
+  rasteriser is the original's, transcribed with its x87 rounding, on one
+  core (its faces are drawn in order, the later winning a Z tie). A line's
+  first frame takes 60 to 90 ms (the faces prepared, the view drawn, the
+  line's video and voice opened). The menu pages and the credits compose
+  in 4.1 to 4.5 ms at 1920x1080.
 - **Camera:** the orientation is a float quaternion turned by axis-angle
   rotations built through 3x3 matrices, transcribed operation by
   operation under the x87 control word (`fpu.rs`, `camera.rs`): the matrix

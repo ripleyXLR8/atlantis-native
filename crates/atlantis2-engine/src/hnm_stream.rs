@@ -98,6 +98,38 @@ impl HnmStream {
         self.number.max(0)
     }
 
+    /// The HD mode (a port addition): which pixels of a `pitch`-wide
+    /// picture [`HnmStream::draw`] draws the character over, 1 where the
+    /// `AL` mask's alpha is not 0 (every pixel of the frame without a
+    /// mask), else 0, into `out`.
+    pub fn coverage(&self, out: &mut [u8], pitch: usize) {
+        out.fill(0);
+        let (w, h) = (self.video.width(), self.video.height());
+        if w == 0 || pitch < w {
+            return;
+        }
+        let rows = h.min(out.len() / pitch);
+        let Some(runs) = self.video.alpha() else {
+            for y in 0..rows {
+                out[y * pitch..y * pitch + w].fill(1);
+            }
+            return;
+        };
+        let mut p = 0usize;
+        for pair in runs.as_chunks::<2>().0 {
+            let (n, a) = (usize::from(pair[0]) + 1, pair[1]);
+            if a != 0 {
+                for q in p..(p + n).min(w * rows) {
+                    out[(q / w) * pitch + q % w] = 1;
+                }
+            }
+            p += n;
+            if p >= w * h {
+                break;
+            }
+        }
+    }
+
     /// Whether the frame shown has an `AL` mask.
     pub fn has_alpha(&self) -> bool {
         self.video.alpha().is_some()

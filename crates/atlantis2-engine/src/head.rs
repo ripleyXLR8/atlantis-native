@@ -271,6 +271,34 @@ impl Camera {
             p: v64(c.position),
         }
     }
+
+    /// The HD mode (a port addition): the same camera for a frame `tile`
+    /// / 16 times 640 x 480 (`w` x `h` pixels), the screen point (sx, sy)
+    /// of the original becoming (s·sx, s·sy): fx, fy, cx and cy times s
+    /// (s = tile / 16), the frustum slopes of @ 0x004a4e8d from that
+    /// frame's viewport (0..w − 1, 0..h − 1), the pose and the depth map
+    /// unchanged. At tile 16 it is the camera itself.
+    fn scaled(&self, fpu: Fpu, tile: usize, w: usize, h: usize) -> Camera {
+        let k = fpu;
+        let s = tile as f64 / 16.0;
+        let (fx, fy) = (k.f(k.mul(self.fx, s)), k.f(k.mul(self.fy, s)));
+        let (cx, cy) = (k.mul(self.cx, s), k.mul(self.cy, s));
+        let (x1, y1) = ((w - 1) as f64, (h - 1) as f64);
+        let slopes = [
+            k.f(k.div(k.sub(k.sub(0.0, cx), 1.0), fx)),
+            k.f(k.div(k.sub(k.sub(0.0, cy), 1.0), fy)),
+            k.f(k.div(k.add(k.sub(x1, cx), 1.0), fx)),
+            k.f(k.div(k.add(k.sub(y1, cy), 1.0), fy)),
+        ];
+        Camera {
+            fx,
+            fy,
+            cx,
+            cy,
+            slopes,
+            ..self.clone()
+        }
+    }
 }
 
 /// Clip codes of a vertex (pipeline + 0x24).
@@ -882,6 +910,54 @@ impl Head {
 
     fn draw(&mut self, cam: usize, pixels: &mut [u16], zbuf: &mut [u32]) -> Stages {
         let c = self.cameras[cam].clone();
+        self.draw_with(&c, &mut Target::screen(pixels, zbuf))
+    }
+
+    /// The HD mode (a port addition, the first game's HD heads): the head
+    /// as [`Head::display`] last drew it (the same pose, mouth and
+    /// texture; no blink step) drawn again with camera `cam` into a frame
+    /// `tile` / 16 times 640 x 480, `w` x `h` RGB565 pixels with their Z
+    /// buffer (cleared to 0 by the caller), by the same pipeline and
+    /// rasteriser: the camera's projection scaled ([`Camera::scaled`]),
+    /// the vertices and faces those of the original, the pixels the
+    /// rasteriser's at the larger frame's pixel centres. `fpu` is the
+    /// control word the head's code had before the original draw (the
+    /// head's own is left as that draw left it). Returns whether a face
+    /// was drawn.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_scaled(
+        &mut self,
+        cam: usize,
+        fpu: Fpu,
+        tile: usize,
+        pixels: &mut [u16],
+        zbuf: &mut [u32],
+        w: usize,
+        h: usize,
+    ) -> bool {
+        let Some(c) = self.cameras.get(cam) else {
+            return false;
+        };
+        assert!(pixels.len() >= w * h && zbuf.len() >= w * h);
+        let c = c.scaled(fpu, tile, w, h);
+        let after = self.fpu;
+        self.fpu = fpu;
+        let st = self.draw_with(
+            &c,
+            &mut Target {
+                pixels,
+                zbuf,
+                width: w,
+                height: h,
+            },
+        );
+        self.fpu = after;
+        !st.rejected && st.faces.contains(&0)
+    }
+
+    /// The pipeline with camera `c` into `target`.
+    fn draw_with(&mut self, c: &Camera, target: &mut Target) -> Stages {
+        let c = c.clone();
         let (mut st, cv) = match self.variant {
             Variant::C => self.transform_c(&c),
             Variant::PII => self.transform_pii(&c),
@@ -925,7 +1001,6 @@ impl Head {
             width: self.tex_w,
             height: self.tex_h,
         };
-        let mut target = Target { pixels, zbuf };
         let mut drawn = false;
         for (fi, tri) in self.mesh.corners.iter().enumerate() {
             if st.faces[fi] != 0 {
@@ -943,8 +1018,8 @@ impl Head {
                 }
             });
             match self.variant {
-                Variant::C => draw_polygon(k, &mut poly, &tex, &mut target),
-                Variant::PII => ii::draw_polygon(&mut poly, &tex, &mut target),
+                Variant::C => draw_polygon(k, &mut poly, &tex, target),
+                Variant::PII => ii::draw_polygon(&mut poly, &tex, target),
             }
             drawn = true;
         }

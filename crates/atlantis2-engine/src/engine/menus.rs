@@ -126,7 +126,14 @@ impl Engine {
             }
             return;
         }
-        self.with_menu(|m, e| m.frame(e, out));
+        self.with_menu(|m, e| {
+            // The page's texts recorded for the HD mode.
+            m.hd_texts = Some(std::mem::take(e.hd.texts_mut()));
+            m.frame(e, out);
+            if let Some(t) = m.hd_texts.take() {
+                *e.hd.texts_mut() = t;
+            }
+        });
     }
 }
 

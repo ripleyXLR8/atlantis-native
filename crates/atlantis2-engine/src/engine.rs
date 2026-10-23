@@ -1328,9 +1328,7 @@ impl Engine {
             LoopType::Menu => self.menu_pass(out.as_deref_mut()),
             LoopType::Picture => self.picture_pass(out.as_deref_mut()),
         }
-        if let Some(out) = out {
-            self.hd_pass_end(out);
-        }
+        self.hd_pass_end(out.as_deref());
         // Every case of the dispatcher ends with the 15 Hz flag cleared
         // (@ 0x0049ce56 .. 0x0049cf29).
         self.frame_flag = false;
@@ -2435,7 +2433,7 @@ impl Engine {
     pub fn render(&mut self, out: &mut [u16]) {
         self.hd_pass_start();
         self.render_frame(out);
-        self.hd_pass_end(out);
+        self.hd_pass_end(Some(out));
     }
 
     /// [`Engine::render`]'s drawing.
@@ -2455,7 +2453,9 @@ impl Engine {
         } else if matches!(kind, None | Some(0) | Some(1)) {
             self.draw_scene(out);
         }
+        let active = self.hd_active();
         if let Some(d) = self.dialog.as_mut() {
+            let (hd, texts) = self.hd.frame_parts(active);
             let mut frame = FrameContext {
                 clock: self.clock,
                 rand: &mut self.rand,
@@ -2463,10 +2463,13 @@ impl Engine {
                 subtitles: self.subtitles,
                 screen: (w, h),
                 fpu: self.camera.fpu,
+                hd,
+                texts: Some(texts),
             };
             d.draw(out, &mut self.zbuf, &mut frame);
             let fpu = d.fpu();
             self.set_fpu(fpu);
+            self.hd_dialog();
         }
     }
 

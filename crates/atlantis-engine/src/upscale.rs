@@ -1063,7 +1063,7 @@ impl Axis {
 
 /// [`lerp888`] with the top byte (an alpha) blended too: the same for
 /// XRGB pixels (top bytes 0).
-pub(crate) fn lerp8888(a: u32, b: u32, w: u32) -> u32 {
+pub fn lerp8888(a: u32, b: u32, w: u32) -> u32 {
     let top = (((a >> 24) * (256 - w) + (b >> 24) * w) >> 8) << 24;
     lerp888(a, b, w) | top
 }
