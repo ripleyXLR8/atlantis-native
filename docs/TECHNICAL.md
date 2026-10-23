@@ -933,8 +933,16 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   the click scan and the move as in the original. The move-zone hooks of
   views 2, 6 and 42 clear the cursor pair (FUN_0047bef0(0, 0), whatever
   is in hand) until the next cursor choice; view 73's is the blackbird
-  game's leave (below). Every Irish chapter's end is reached by play
-  with the mouse (`tests/flow.rs`). `demo.wam` (chapter 1) is not
+  game's leave (below). A headless game plays the whole of Ireland with
+  the mouse (`tests/flow.rs` `a_game_from_tibet_to_ireland_and_back`:
+  the view turned by mouse moves, every action a click, every object
+  picked from the bag bar, from the arrival to the way back), each
+  puzzle solved as a player does (the skulls found and laid, the ogham
+  stones by the original's shortest path, the horse caught as it runs
+  past, the blackbird songs by ear, the cross laid, taken back and laid
+  on its place), and every chapter it goes through (2-5, 7-9, 11-16, 19,
+  20, 24) is left by one of its own `chapter=` lines; chapters 6 and 17
+  hold sections no line leads to. `demo.wam` (chapter 1) is not
   ported: no script reaches chapter 1 and its panoramas are on no disc.
   One place animation of `bigile1.wam` (`woA1001001.SPW`, a shadow in
   view 1, hidden at load) is on no disc; it is skipped with the
@@ -1356,8 +1364,12 @@ goddess, the way back to Tibet) into `ireland-*.png`.
   `scenar\defnames.con` (five sections, looked up per key:
   `crates/atlantis2-data/src/defnames.rs`), compares are signed, a section
   has a head condition and sub-conditions, and the text is walked byte by
-  byte with the original's quirks (a `#/set` before an empty line runs,
-  `KEY=++` stores 0, two kinds of line run twice in `/INIT`). The
+  byte with the original's quirks (a `#/set` line runs when the line
+  after it holds no `/set`: an empty line, a `/con` or a section header,
+  as chapter 19's line 74, which gives Liam's tree subject; it is skipped
+  before a `/set` line or at the start of a section, checked against the
+  original's scan in `tests/script.rs`; `KEY=++` stores 0, two kinds of
+  line run twice in `/INIT`). The
   interpreter (`crates/atlantis2-engine/src/script/`) is transcribed walk
   by walk: conditions, the `/set` handler with the subjects, the bag, the
   show/hide table and the hand, the scans, `/INIT`, the timers, the 15 Hz

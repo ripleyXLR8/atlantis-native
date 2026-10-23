@@ -24,6 +24,7 @@ const TIBET: &str = include_str!("golden/scripts_con_tibet.txt");
 const TIBET_SCAN: &str = include_str!("golden/scripts_con_tibet_scan.txt");
 const NAMES: &str = include_str!("golden/scripts_con_names.txt");
 const IRELAND: &str = include_str!("golden/scripts_worlds_ireland.txt");
+const COMMENT: &str = include_str!("golden/scripts_con_comment.txt");
 
 fn rows(golden: &str) -> impl Iterator<Item = &str> {
     golden
@@ -1089,4 +1090,97 @@ fn lines_run_twice_as_in_the_original() {
     got.push(format!("new game init: {}", counts(&s)));
     let want: Vec<&str> = rows(REINIT).filter(|r| !r.starts_with("errors")).collect();
     assert_eq!(got, want);
+}
+
+/// The line numbers (from 1) of the positions in `text`.
+fn line_numbers(text: &[u8], positions: &[usize]) -> String {
+    let starts: Vec<usize> = std::iter::once(0)
+        .chain(
+            text.iter()
+                .enumerate()
+                .filter(|(_, &c)| c == b'\n')
+                .map(|(i, _)| i + 1),
+        )
+        .collect();
+    let lines: Vec<String> = positions
+        .iter()
+        .map(|&p| (starts.iter().rposition(|&s0| s0 <= p).unwrap() + 1).to_string())
+        .collect();
+    if lines.is_empty() {
+        "-".into()
+    } else {
+        lines.join(",")
+    }
+}
+
+/// `#/set` lines as the original's CtrlScenarIN runs them: skipped when a
+/// `/set` follows on the next line or when the section starts with it,
+/// run when the next line is a header, a `/con` or empty; chapter 19's
+/// `#/set` (its line 74, between the chest's last `/set` and a header)
+/// runs, which gives Liam's subject.
+#[test]
+fn comment_lines_match_the_original() {
+    let mut h = Rec::default();
+    let mut n = 0;
+    let mut s = Script::new(&synthetic_defnames()).unwrap();
+    for row in rows(COMMENT).filter(|r| r.starts_with("section ")) {
+        let body = &row[row.find('(').unwrap() + 1..row.rfind("): ").unwrap()];
+        let want = &row[row.rfind("): ").unwrap() + 3..];
+        let text = format!("/INIT|/FININIT|/001|/con(flag1=1)|{body}").replace('|', "\r\n");
+        s.set_chapter_text(text.as_bytes());
+        s.flags.iter_mut().for_each(|v| *v = 0);
+        s.flags[1] = 1;
+        s.trace = Some(Vec::new());
+        s.ctrl_scenar_in(&mut h);
+        let lines = line_numbers(text.as_bytes(), &s.trace.take().unwrap());
+        let got = format!(
+            "lines {lines} flags {}",
+            set_flags(&s, 2..30, &BTreeMap::new())
+        );
+        assert_eq!(got, want, "{row}");
+        n += 1;
+    }
+    assert_eq!(n, 5);
+    let Some(mut s) = game_script() else { return };
+    let text = scenar("chapi019.con").unwrap();
+    for row in rows(COMMENT).filter(|r| r.starts_with("chapi019 ")) {
+        let object: i32 = row["chapi019 ClicObjet={1:".len()..]
+            .split('}')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let want = &row[row.find(": ").unwrap() + 2..];
+        s.set_chapter_text(&text);
+        s.vars.iter_mut().for_each(|v| *v = 0);
+        s.flags.iter_mut().for_each(|v| *v = 0);
+        s.subjects = SubjectTable::default();
+        assert!(s.set_var("ClicObjet", object));
+        if object == 36 {
+            assert!(s.set_var("ObjetEnMain", 41));
+        }
+        s.trace = Some(Vec::new());
+        s.resume_pending = false;
+        h.chapter = Some(text.clone());
+        s.ctrl_scenar_in(&mut h);
+        let lines = line_numbers(&text, &s.trace.take().unwrap());
+        let list = s.subjects.list(5);
+        let subjects: Vec<String> = list
+            .iter()
+            .map(|e| format!("{} {} {}", e.value, e.index, e.flag))
+            .collect();
+        let got = format!(
+            "lines {lines} {{0:5}} subjects {} {}",
+            list.len(),
+            if subjects.is_empty() {
+                "-".into()
+            } else {
+                subjects.join(" ")
+            }
+        );
+        assert_eq!(got, want, "{row}");
+        n += 1;
+    }
+    assert_eq!(n, 8);
+    assert!(s.fatal.is_none(), "{:?}", s.fatal);
 }
