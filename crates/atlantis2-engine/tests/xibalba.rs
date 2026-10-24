@@ -240,6 +240,8 @@ fn every_xibalba_view_is_entered_with_its_hooks() {
                 Event::SpwLoad { name, found: false } => Some(name.clone()),
                 _ => None,
             }));
+            // Every puzzle function the entry ran or noted (`PuzzleRan`
+            // included): the view's hooks, and all of them listed below.
             let h = noted(&e.events);
             assert_eq!(
                 h,

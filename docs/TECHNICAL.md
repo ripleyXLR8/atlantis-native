@@ -1507,12 +1507,21 @@ back) into `yucatan-*.png`.
   interpreter to the view's entry, so that the web's commands run inside
   it as the original's re-entrant `RunOneCommand` runs them (the exit by
   chapter 38's `vue=199`). With the HD mode on, the creatures are drawn
-  again over the HD view by the same pipeline with the camera scaled.
+  again over the HD view by the same pipeline with the camera scaled,
+  and the HD picture stands for the 640x480 frame with them (its base),
+  so that the front end shows them at the HD size (`tests/hd.rs` checks
+  what it composes).
   **Checked** against the original's code run under emulation
   (`tests/golden/web.txt`, `tests/web.rs`): the data and models as
   loaded, the step for every node pair, the entries, exits and load,
   the clicks, 2677 frames of passes, four rounds won from view 198 and
-  20 frames drawn, bit for bit. **Not ported**: the clipping of a face
+  20 frames drawn, bit for bit, and in them every object drawn (its clip
+  codes, eye, vertex codes, face bytes and the used vertices'
+  projections). **Not read**: what gives the web's objects a second
+  texture-coordinate channel (bit 1 of the flags, from @ 0x004d6210: unset
+  for the first object drawn in 14 of the 20 frames, set for every other
+  one); the port draws with the mesh's UV set alone, and the 20 frames
+  are the original's. **Not ported**: the clipping of a face
   crossing the near or far plane (none of the web's does; such a face is
   skipped and logged), the C variant's own rasteriser (the C variant draws
   the creatures with the Pentium II's routines). Not checked against the

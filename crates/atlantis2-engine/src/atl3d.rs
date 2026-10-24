@@ -2,7 +2,7 @@
 //! a `.db` scene loaded into a model slot by `Atl3D_LoadDatabase`
 //! (@ 0x0042a920) and drawn over the panorama by `Atl3D_draw_DataBase`
 //! (@ 0x0042a320) with the warp's camera (@ 0x00660f48), the Pentium II
-//! routines (CPU type 8, the reference: decision 0004) and the Atl3D
+//! routines (CPU type 8, the reference's) and the Atl3D
 //! Z buffer (@ 0x006596a0, cleared to 0 by the puzzle's draw).
 //!
 //! A model is a node of its own (the slot, a child of the scene root:

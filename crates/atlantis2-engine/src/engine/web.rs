@@ -1941,7 +1941,8 @@ impl Engine {
         let view = View::of(&self.camera, w, h);
         let mut zbuf = std::mem::take(&mut self.web_z);
         zbuf.resize(w * h, 0);
-        let drawn_any = match out {
+        let mut out = out;
+        let drawn_any = match out.as_deref_mut() {
             Some(px) => {
                 let mut t = Target {
                     pixels: px,
@@ -1960,8 +1961,8 @@ impl Engine {
         self.web_z = zbuf;
         self.web.drawn.clear();
         self.web.placed.clear();
-        if drawn_any {
-            self.hd_web(&view);
+        if let (true, Some(frame)) = (drawn_any, out) {
+            self.hd_web(&view, frame);
         }
     }
 }

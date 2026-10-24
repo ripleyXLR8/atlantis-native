@@ -4,7 +4,9 @@
 //! every recorded operation of sections C (the entries, the load hook), D
 //! (the clicks), E (warp passes) and G (the drawing), each from the state
 //! the row gives (or the one the rows before left) to the state, commands
-//! and results the row records.
+//! and results the row records; in G also each frame's samples (G+) and
+//! every object drawn (G*: the pipeline's clip codes, eye, codes, faces and
+//! projections).
 //!
 //! They need the game: `ATLANTIS2_DATA` = the installed folder,
 //! `ATLANTIS2_DISCS` = a folder holding the four CD images (or copies of
@@ -25,7 +27,7 @@ use atlantis2_engine::Fpu;
 use md5::{Digest, Md5};
 
 const GOLDEN: &str = include_str!("golden/web.txt");
-/// The control word of the reference (the warp's, decision 0004).
+/// The control word of the reference (0x0e7f, the warp's).
 const K: Fpu = Fpu::Chop;
 const OBJECTS: [&str; 5] = ["CHENILLE", "SAUTERELLE", "CRANE_ARAIG2", "EPEE", "PLUME"];
 const MARK: u16 = 0xf81f;
@@ -521,27 +523,55 @@ fn frame_rows(pixels: &[u16], zbuf: &[u32]) -> (String, String) {
     )
 }
 
+/// A G* row of the golden in [`stage_row`]'s form. Its `f=` (the flags
+/// FUN_0042c8d0 receives) is the pipeline's 0x6300000 with, in bits 0-1,
+/// FUN_004d6210's texture-coordinate channels that have a source: checked
+/// to be so (channel 0, the mesh's UV set, always) and left out, the port
+/// drawing with the mesh's UV set alone (the frames' md5s pin the pixels).
+/// The whole buffers' `cam=` (camera-space vertices @ pipeline + 0x04) and
+/// `proj=` (+ 0x14) are left out: the projection of an object inside every
+/// plane (@ 0x0057eac0) writes no camera-space vertex, the transform
+/// @ 0x0057eec0 writes 12 of each vertex's 16 bytes, and both projections
+/// skip the vertices no face uses, so these hold what the objects drawn
+/// before left; `uproj=`, the used vertices' entries, is compared.
+fn stage_of_golden(rest: &str) -> String {
+    let mut out = Vec::new();
+    for kv in rest.split(' ') {
+        let (key, value) = kv.split_once('=').unwrap();
+        match key {
+            "f" => {
+                let f = u32::from_str_radix(value, 16).unwrap();
+                assert!(f & !3 == 0x630_0000 && f & 1 == 1, "flags {f:x}");
+            }
+            "cam" | "proj" => {}
+            _ => out.push(kv),
+        }
+    }
+    out.join(" ")
+}
+
 /// A G* row's comparable part (`or`, `and`, the vertex and face counts,
-/// the eye, the projection, codes and faces) of an object drawn.
+/// the eye, codes, faces and the used vertices' projections) of an object
+/// drawn.
 fn stage_row(st: &ObjectStage) -> String {
     let eye: Vec<u8> = st.eye.iter().flat_map(|v| v.to_le_bytes()).collect();
-    let proj: Vec<u8> = st
+    let uproj: Vec<u8> = st
         .projected
         .iter()
-        .flatten()
-        .flat_map(|v| v.to_le_bytes())
+        .zip(&st.codes)
+        .filter(|(_, &c)| c & 0x80 != 0)
+        .flat_map(|(p, _)| p.iter().flat_map(|v| v.to_le_bytes()))
         .collect();
-    let codes: Vec<u8> = st.codes.clone();
     format!(
-        "or={:x} and={:x} nv={} nf={} eye={} proj={} codes={} faces={}",
+        "or={:x} and={:x} nv={} nf={} eye={} codes={} faces={} uproj={}",
         st.or,
         st.and,
         st.codes.len(),
         st.faces.len(),
         eye.iter().map(|b| format!("{b:02x}")).collect::<String>(),
-        md5(&proj),
-        md5(&codes),
-        md5(&st.faces)
+        md5(&st.codes),
+        md5(&st.faces),
+        md5(&uproj)
     )
 }
 
@@ -784,20 +814,38 @@ fn replay(g: &Game, tag: &str) -> (usize, Vec<String>) {
             ));
         }
         if let Some(samples) = done.samples {
+            // The frame's samples (G+) and every object drawn (G*), each
+            // compared.
             let want = lines[i + 1];
             let got = format!("G+|{} | {}", row.label, samples);
-            if want != got && text != row.rest {
-                bad.push(format!("  samples want {want}\n  samples got  {got}"));
+            n += 1;
+            if want != got {
+                bad.push(format!("G+|{}:\n  want {want}\n  got  {got}", row.label));
             }
-            if text != row.rest {
-                for (k, st) in done.stages.iter().enumerate() {
-                    let want = lines
-                        .iter()
-                        .find(|l| l.starts_with(&format!("G*|{} object {k} |", row.label)))
-                        .map_or("-", |l| l);
+            // The objects the box tests let through (FUN_0042c8d0).
+            let drawn: Vec<&ObjectStage> = done.stages.iter().filter(|s| !s.rejected).collect();
+            let objects: Vec<&str> = lines[i + 2..]
+                .iter()
+                .take_while(|l| l.starts_with("G*|"))
+                .copied()
+                .collect();
+            if objects.len() != drawn.len() {
+                bad.push(format!(
+                    "G*|{}: {} objects drawn, {} in the golden",
+                    row.label,
+                    drawn.len(),
+                    objects.len()
+                ));
+            }
+            for (k, (want, st)) in objects.iter().zip(drawn).enumerate() {
+                let (head, rest) = want.split_once(" | ").unwrap();
+                assert_eq!(head, format!("G*|{} object {k}", row.label));
+                n += 1;
+                let got = stage_row(st);
+                if stage_of_golden(rest) != got {
                     bad.push(format!(
-                        "  object {k}: want {want}\n             got {}",
-                        stage_row(st)
+                        "G*|{} object {k}:\n  want {rest}\n  got  {got}",
+                        row.label
                     ));
                 }
             }
@@ -811,7 +859,14 @@ fn replay(g: &Game, tag: &str) -> (usize, Vec<String>) {
 fn check(tag: &str) {
     let Some(g) = Game::open() else { return };
     let (n, bad) = replay(&g, tag);
-    assert!(n > 0, "no {tag} rows");
+    // Every row of the section, G's samples (G+) and objects (G*) too.
+    let rows = GOLDEN
+        .lines()
+        .filter(|l| {
+            l.starts_with(tag) && matches!(l.as_bytes().get(tag.len()), Some(b'|' | b'+' | b'*'))
+        })
+        .count();
+    assert_eq!(n, rows, "{tag} rows replayed");
     if !bad.is_empty() {
         for b in bad.iter().take(12) {
             eprintln!("{b}");
@@ -1259,7 +1314,7 @@ fn search(g: &Game, stage: i32, bag: &[&str], won: impl Fn(&Web, &Mock) -> bool)
 }
 
 #[test]
-#[ignore = "finds the routes of `rounds_won`"]
+#[ignore = "finds the routes of the rounds the flow plays"]
 fn find_routes() {
     let Some(g) = Game::open() else { return };
     let r1 = search(&g, 1, &[], |_, m| m.var("finaraign1") == 1);
@@ -1272,22 +1327,4 @@ fn find_routes() {
         m.bag.iter().any(|b| b == "SAUTERELLE") && !w.loaded && (m.view == 199 || m.view == 200)
     });
     eprintln!("stage 4: {r4:?}");
-}
-
-#[test]
-#[ignore = "scratch"]
-fn scratch_stage3() {
-    let Some(g) = Game::open() else { return };
-    let mut best = Vec::new();
-    for want in [
-        |w: &Web, _: &Mock| w.sword >= 1,
-        |w: &Web, _: &Mock| w.skull >= 1,
-        |w: &Web, _: &Mock| w.sword >= 2,
-    ] {
-        let r = search(&g, 3, &["PLUME"], want);
-        eprintln!("{r:?}");
-        best.push(r);
-    }
-    let (w, m, steps) = play(&g, 3, &[], &[199, 213]);
-    eprintln!("{} {:?}", state(&w, &m), steps);
 }
