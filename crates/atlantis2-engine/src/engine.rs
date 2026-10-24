@@ -69,8 +69,9 @@ pub use turtle::RING_MODE;
 mod ui;
 mod wheels;
 pub use wheels::{DISC_WHEEL, WHEELS_FIRST, WHEELS_SECOND, WHEEL_DISC};
+mod stars;
+pub use stars::{STARS_CLICK, STARS_ENTRY, STARS_WIN, STAR_HOLES, STAR_HOLE_COUNT};
 mod xibalba;
-pub use xibalba::STAR_HOLES;
 mod yucatan;
 pub use yucatan::{
     yucatan_click_hooks, yucatan_entry_hooks, MAYA_GRID_VIEWS, STATUE_BRANCH, STATUE_VIEW, WEB_MODE,
@@ -156,7 +157,7 @@ pub enum Event {
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
     /// A testing aid wrote what a puzzle the port does not have writes
-    /// (Xibalba's, [`Engine::win_star_map`], [`Engine::win_canoe`],
+    /// (Xibalba's, [`Engine::win_canoe`],
     /// [`Engine::win_web_round`]): the original's function whose writes
     /// follow.
     PuzzleAid { function: u32 },
@@ -171,6 +172,11 @@ pub enum Event {
     CrossLaid { value: i32 },
     /// Brigid's cross taken back from the zone of value `value`.
     CrossTaken { value: i32 },
+    /// A star (`star`, its object index) laid on hole `hole` of the star
+    /// map (FUN_00494e80).
+    StarLaid { hole: i32, star: i32 },
+    /// A star taken back from hole `hole` of the star map.
+    StarTaken { hole: i32, star: i32 },
     /// A move to another place (a type-2 zone, @ 0x0040fc60): its file,
     /// the view, and whether it waits for the turn (deferred) or is made
     /// at once.
@@ -515,6 +521,9 @@ pub struct Engine {
     /// Brigid's cross slot's id (@ 0x006d26b8), kept by the view 2
     /// entry hook (`DefName_GetIdName(1, "CROIXBRIGIT_SPRITE")`).
     cross_sprite: i32,
+    /// The star map's object id (@ 0x006d26ec), kept by the view 121
+    /// entry hook (`DefName_GetIdName(1, "Etoiles_Puz")`; 0 before any).
+    pub stars_sprite: i32,
     /// The blackbird songs of Ireland (`engine/blackbird.rs`), never reset
     /// nor saved.
     pub blackbird: Blackbird,
@@ -902,6 +911,7 @@ impl Engine {
             // then, as `FUN_004770c0` is refused while stopped.
             music: MusicVolume::new(fpu, crate::sound::DEFAULT_MUSIC_VOLUME, 0, 0),
             cross_sprite: 0,
+            stars_sprite: 0,
             blackbird: Blackbird::default(),
             figurine_slots: [0; 6],
             lent_vars: None,

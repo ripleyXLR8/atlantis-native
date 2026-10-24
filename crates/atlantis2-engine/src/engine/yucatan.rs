@@ -33,10 +33,11 @@
 //!   that frame does not run (the menu is open, FUN_0045a870).
 //!
 //! The Maya counting grids (views 55, 64, 75 of `pyratez.wam`, chapters
-//! 31, 32, 34) run (`grids.rs`), each hook noted [`Event::PuzzleRan`].
-//! The star map (view 121), the canoe (view 402) and the spider web
-//! (views 198-265, the mode 1) are Xibalba's (`MONDE` 6), whose puzzles
-//! the port does not have: they are listed and noted
+//! 31, 32, 34) and Xibalba's star map (view 121 of `xibalba.wam`,
+//! chapter 39) run (`grids.rs`, `stars.rs`), each hook noted
+//! [`Event::PuzzleRan`]. The canoe (view 402) and the spider web (views
+//! 198-265, the mode 1), Xibalba's (`MONDE` 6) other puzzles, the port
+//! does not have: they are listed and noted
 //! ([`Event::PuzzleNotPorted`]); testing aids write their wins
 //! (`xibalba.rs`).
 
@@ -44,6 +45,7 @@ use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 
 use super::grids::{GRID_CLICKS, GRID_ENTRIES, GRID_LEAVES, GRID_VIEWS};
+use super::stars::{STARS_CLICK, STARS_ENTRY};
 use super::{CursorBank, Engine, Event};
 
 /// The prefix of Yucatán's views (@ 0x005db004).
@@ -52,10 +54,8 @@ const YUCATAN_PREFIX: &[u8] = b"YU";
 /// The counting grids' views (@ 0x0049b9bd, 0x0049b9ce, 0x0049b9df).
 pub const MAYA_GRID_VIEWS: [u32; 3] = GRID_VIEWS;
 
-/// The star map's view (@ 0x0049bb1f), click and entry.
+/// The star map's view (@ 0x0049bb1f).
 const STARS_VIEW: u32 = 121;
-const STARS_CLICK: u32 = 0x0049_4e80;
-const STARS_ENTRY: u32 = 0x0049_4e00;
 
 /// The canoe's view (@ 0x0049bb34), its switch (@ 0x005e2e94) and start
 /// (FUN_0049c010(1), loop type 9).
@@ -162,12 +162,26 @@ pub fn yucatan_entry_hooks(view_name: &[u8], view: u32, mode: i32) -> Vec<u32> {
 
 impl Engine {
     /// The `YU` part of FUN_0049b910 for a click on `zone` of view
-    /// `view` (warp name `view_name`): the grids' leaves and clicks and the
-    /// statue's branch run, Xibalba's hooks are noted; true when the click
+    /// `view` (warp name `view_name`): the grids' leaves and clicks, the
+    /// star map's click and the statue's branch run, the canoe's and the
+    /// web's hooks are noted; true when the click
     /// is consumed (the canoe's view while the canoe is not enabled).
     /// Public for tests and tools: the dispatcher on any warp name and
     /// number.
     pub fn yucatan_click(&mut self, view_name: &[u8], view: u32, zone: &Zone) -> bool {
+        self.yucatan_click_on(None, view_name, view, zone)
+    }
+
+    /// [`Engine::yucatan_click`] on the zone of index `zi` of the view,
+    /// when the click handler gives it (noted [`Event::PuzzleHook`] at the
+    /// star map's click).
+    pub(super) fn yucatan_click_on(
+        &mut self,
+        zi: Option<usize>,
+        view_name: &[u8],
+        view: u32,
+        zone: &Zone,
+    ) -> bool {
         let canoe = self
             .con
             .as_deref()
@@ -182,6 +196,13 @@ impl Engine {
             } else if let Some(g) = GRID_CLICKS.iter().position(|&f| f == function) {
                 self.event(Event::PuzzleRan { function });
                 self.grid_click(g, zone.value);
+            } else if function == STARS_CLICK {
+                if let Some(zi) = zi {
+                    let cliczone = self.hand_scan_cliczone();
+                    self.event(Event::PuzzleHook { zone: zi, cliczone });
+                }
+                self.event(Event::PuzzleRan { function });
+                self.stars_click(zone.kind, zone.value);
             } else if function == STATUE_BRANCH {
                 self.statue_click(zone);
             } else {
@@ -191,8 +212,8 @@ impl Engine {
         consumed
     }
 
-    /// The Yucatán part of FUN_0049bd50: the grids' entries run,
-    /// Xibalba's hooks are noted.
+    /// The Yucatán part of FUN_0049bd50: the grids' and the star map's
+    /// entries run, the web's are noted.
     pub(super) fn yucatan_entry(&mut self) {
         let hooks = self
             .current_view()
@@ -202,6 +223,9 @@ impl Engine {
             if let Some(g) = GRID_ENTRIES.iter().position(|&f| f == function) {
                 self.event(Event::PuzzleRan { function });
                 self.grid_entry(g);
+            } else if function == STARS_ENTRY {
+                self.event(Event::PuzzleRan { function });
+                self.stars_entry();
             } else {
                 self.puzzle_not_ported(function);
             }

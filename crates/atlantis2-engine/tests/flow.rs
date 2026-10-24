@@ -42,7 +42,7 @@ use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
 use atlantis2_engine::bag::{UiBank, UiDraw, FORM_FRAMES};
-use atlantis2_engine::engine::MANDALAS;
+use atlantis2_engine::engine::{MANDALAS, STAR_HOLES};
 use atlantis2_engine::menu::{state, PageKind};
 use atlantis2_engine::sound::VOICE_EFFECTS;
 use atlantis2_engine::subjects::cell;
@@ -4376,10 +4376,9 @@ fn yucatan_stages_from_saves() {
 // ---------------------------------------------------------------------------
 // Xibalba, with the mouse.
 
-/// The hooks of Xibalba's puzzles, not ported: noted where a player
-/// reaches them (the canoe's start, the star map's entry and click, the
-/// web's entry of view 198).
-const XIBALBA_NOTED: [u32; 4] = [0x0049_c010, 0x0049_4e00, 0x0049_4e80, 0x0048_f530];
+/// The hooks of Xibalba's puzzles not ported: noted where a player
+/// reaches them (the canoe's start, the web's entry of view 198).
+const XIBALBA_NOTED: [u32; 2] = [0x0049_c010, 0x0048_f530];
 
 impl Run {
     /// A click on zone `zone` (a `#ZONES_CLIC#` name) that opens the
@@ -4724,9 +4723,10 @@ const STARS: [(&str, u32); 7] = [
 ];
 
 /// The seven stars taken in the clearing's views (by the river's view
-/// 301 and its link to view 124: chapter 39), view 121: a star laid on a
-/// hole of the map (its click noted), the map's win written by the
-/// testing aid (the seven stars laid, chapter 39's section: film 49, the
+/// 301 and its link to view 124: chapter 39), then the star map of view
+/// 121 played with the mouse: a star laid on a wrong hole (sound 115) and
+/// taken back with the empty hand (sound 114), then each star laid on a
+/// right hole; the seventh wins (chapter 39's section: film 49, the
 /// statue of Tezcatlipoca shown, its zones enabled).
 fn the_star_map(r: &mut Run) {
     r.river_to(301, 124);
@@ -4737,29 +4737,36 @@ fn the_star_map(r: &mut Run) {
     }
     r.shot_as("xibalba-04-star.png");
     let evs = r.go(121, &[]);
-    assert!(evs.contains(&Event::PuzzleNotPorted {
+    assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_4e00
     }));
     assert_eq!(r.var("LIMITEANGLEWARPY"), 86);
-    let view = r.e.place().1;
-    let hole =
+    let hole = |r: &Run, h: i32| {
+        let view = r.e.place().1;
         r.e.wam()
             .view(view)
             .unwrap()
             .zones
             .iter()
-            .position(|z| z.kind == 50 && z.value == 0)
-            .unwrap();
-    let evs = r.use_on(Some("ETOILE102"), hole);
-    assert!(evs.contains(&Event::PuzzleNotPorted {
+            .position(|z| z.kind == 50 && z.value == h)
+            .unwrap()
+    };
+    let z = hole(r, 5);
+    let evs = r.use_on(Some("ETOILE102"), z);
+    assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_4e80
     }));
-    r.stow();
-    assert!(r.e.win_star_map());
-    let mut evs = r.events();
-    evs.extend(r.settle());
-    assert!(films(&evs).contains(&49));
     assert!(sounds(&evs).contains(&"sound115.apc".to_string()));
+    assert_eq!(r.var("etat_etoile5"), r.obj("ETOILE102"));
+    let evs = r.use_on(None, z);
+    assert!(sounds(&evs).contains(&"sound114.apc".to_string()));
+    assert_eq!(r.var("etat_etoile5"), 0);
+    let mut evs = Vec::new();
+    for ((star, _), h) in STARS.iter().zip(STAR_HOLES) {
+        let z = hole(r, h);
+        evs = r.use_on(Some(star), z);
+    }
+    assert!(films(&evs).contains(&49));
     assert_eq!(
         (
             r.var("etoiles_fini"),

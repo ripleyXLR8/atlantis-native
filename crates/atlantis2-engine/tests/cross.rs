@@ -1,6 +1,6 @@
 //! Brigid's cross (Ireland, view 2) against the original
 //! (`tests/golden/cross.txt`, its header there): the frame-table functions
-//! on synthetic slots (rows A), the view entry hook (B), the click hook
+//! on synthetic slots, the clear included (rows A), the view entry hook (B), the click hook
 //! alone (C, through [`Engine::cross_click`]), the dispatcher's choice of
 //! the hooks (D), the zone click and the click scan of the same frame on
 //! chapter 16, with the section the win starts resumed by the film's and
@@ -196,12 +196,14 @@ fn the_frame_table_functions_as_the_original() {
             warns()
         ));
     }
-    // FUN_0047ca10 (the clear) is not the cross's (the star map uses it):
-    // its row is the original's only.
-    let golden: Vec<&str> = golden
-        .into_iter()
-        .filter(|r| !r.starts_with("A clear"))
-        .collect();
+    // FUN_0047ca10, the clear (the star map's entry uses it): every
+    // slot of the id, whatever its kind.
+    let mut a = setup();
+    for k in [3, 1, 2] {
+        a.add_frame(27, k);
+    }
+    a.clear_frames(27);
+    got.push(format!("A clear 27 after adds 3 1 2 | {}", tabs(&a)));
     assert_eq!(got, golden);
 }
 
