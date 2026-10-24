@@ -382,8 +382,8 @@ fn at(files: A2Files, commands: &[&[u8]], hd: bool) -> Engine {
 
 /// The places of the worlds the port plays (Yucatán's open view and the
 /// king's hall with its characters; Xibalba's four places, the bat and
-/// Chac in their views).
-const PLACES: [(&str, &[&[u8]]); 10] = [
+/// Chac in their views, the star map with the stars its entry draws).
+const PLACES: [(&str, &[&[u8]]); 11] = [
     ("Tibet", &[]),
     (
         "Ireland",
@@ -425,6 +425,21 @@ const PLACES: [(&str, &[&[u8]]); 10] = [
     (
         "the spider's web",
         &[b"(monde=6)", b"(changewam=toile.wam)", b"(vue=198)"],
+    ),
+    (
+        "the star map with its seven stars",
+        &[
+            b"(monde=6)",
+            b"(etat_etoile0=67)",
+            b"(etat_etoile2=68)",
+            b"(etat_etoile6=69)",
+            b"(etat_etoile8=70)",
+            b"(etat_etoile11=71)",
+            b"(etat_etoile13=72)",
+            b"(etat_etoile16=73)",
+            b"(changewam=xibalba.wam)",
+            b"(vue=121)",
+        ],
     ),
 ];
 

@@ -505,6 +505,15 @@ impl Anim {
         true
     }
 
+    /// FUN_0047ca10: the frame list of every slot of `id`, whatever its
+    /// kind, emptied (its 128 bytes set to [`LIST_END`],
+    /// @ 0x0047ca2c..0x0047ca38).
+    pub fn clear_frames(&mut self, id: i32) {
+        for s in self.slots.iter_mut().filter(|s| s.id == id) {
+            s.frames = [LIST_END; FRAME_TAB];
+        }
+    }
+
     /// FUN_0047c9c0: whether a slot of `id` has `frame` (a signed byte)
     /// anywhere in its 128 bytes, past the end included.
     pub fn has_frame(&self, id: i32, frame: i32) -> bool {

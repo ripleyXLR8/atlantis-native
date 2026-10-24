@@ -324,7 +324,7 @@ impl Engine {
             .unwrap_or_default();
         // Yucatán's (the `YU` branches, before Ireland's in both cases of
         // the switch): the canoe's view may consume the click.
-        if self.yucatan_click(&name, self.view, zone) {
+        if self.yucatan_click_on(Some(zi), &name, self.view, zone) {
             return true;
         }
         let applies = self
@@ -497,7 +497,7 @@ impl Engine {
     }
 
     /// `CLICZONE` as a hook finds it.
-    fn hand_scan_cliczone(&self) -> i32 {
+    pub(super) fn hand_scan_cliczone(&self) -> i32 {
         self.con
             .as_deref()
             .map_or(self.vars.cliczone, |s| s.vars[s.keys.cliczone])

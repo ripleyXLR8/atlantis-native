@@ -1,9 +1,9 @@
 //! Xibalba (world 6, disc 4): every Xibalba chapter's `/INIT` run; every
 //! view of the four places entered with the puzzles' entry hooks; the
 //! click hooks (the canoe's view taking the click until it is enabled,
-//! the star map's and the canoe's noted); the moves between the places
-//! (WAM links); the testing aids that write the three puzzles' wins and
-//! what the scripts do after them; every dialog the chapters and the web
+//! the canoe's noted, the star map's run); the moves between the places
+//! (WAM links); the testing aids that write the canoe's and the web's
+//! wins and what the scripts do after them; every dialog the chapters and the web
 //! start; the subjects, objects, musics and films on disc 4; the place
 //! sounds; a save in Xibalba loaded, and one in the web loaded in view
 //! 198. The way in from the priestess and the way back to the king's
@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 use atlantis2_data::{A2Files, Folder};
-use atlantis2_engine::engine::{yucatan_click_hooks, yucatan_entry_hooks, STAR_HOLES};
+use atlantis2_engine::engine::{yucatan_click_hooks, yucatan_entry_hooks};
 use atlantis2_engine::{Engine, EngineError, Event, Fpu, LoopType, Variant};
 
 fn game() -> Option<A2Files> {
@@ -246,6 +246,12 @@ fn every_xibalba_view_is_entered_with_its_hooks() {
                 yucatan_entry_hooks(name.as_bytes(), id, 0),
                 "{place} {id}"
             );
+            // Only the star map's entry runs.
+            assert!(e.events.iter().all(|x| match x {
+                Event::PuzzleRan { function } => *function == 0x0049_4e00,
+                Event::PuzzleNotPorted { function } => *function != 0x0049_4e00,
+                _ => true,
+            }));
             hooks.extend(h.into_iter().map(|f| (place, id, f)));
             assert_eq!(e.puzzle_mode(), 0, "{place} {id}");
         }
@@ -265,8 +271,9 @@ fn every_xibalba_view_is_entered_with_its_hooks() {
     );
     assert!(missing_warp.is_empty(), "{missing_warp:?}");
     assert!(missing_spw.is_empty(), "{missing_spw:?}");
-    // The hooks, all noted: the star map's entry (view 121) and the web's
-    // (view 198, also `riviere.wam`'s record of it, a `YU` view 198).
+    // The hooks: the star map's entry (view 121), run, and the web's
+    // (view 198, also `riviere.wam`'s record of it, a `YU` view 198),
+    // noted.
     assert_eq!(
         hooks,
         [
@@ -275,10 +282,6 @@ fn every_xibalba_view_is_entered_with_its_hooks() {
             ("toile.wam", 198, 0x0048_f530),
         ]
     );
-    assert!(e
-        .events
-        .iter()
-        .all(|x| !matches!(x, Event::PuzzleRan { .. })));
 }
 
 /// The values of `/set(key=...)` lines of Xibalba's chapters (comments
@@ -313,7 +316,8 @@ fn set_values(files: &A2Files, key: &str) -> Vec<String> {
 /// zone of view 402 takes the click (`CLICZONE` left at 0) until
 /// `enable_pz_pirog` is 1; then the canoe's start is noted and the click
 /// goes on (FUN_0049c010's branch returns 0); a star map's hole (view
-/// 121, type 50) notes the map's click, and the click scan follows.
+/// 121, type 50) runs the map's click (the star laid), and the click
+/// scan follows.
 #[test]
 fn the_xibalba_click_hooks() {
     // The dispatcher's lists, for Xibalba's views.
@@ -375,11 +379,16 @@ fn the_xibalba_click_hooks() {
     e.events.clear();
     e.click(30.0);
     e.pass(None);
-    assert_eq!(noted(&e.events), [0x0049_4e80]);
+    // The click, then its win test (the map not won).
+    assert_eq!(noted(&e.events), [0x0049_4e80, 0x0049_4f60]);
     assert!(e.events.iter().any(|x| matches!(x, Event::ClickScan(_))));
-    // Nothing laid: the star stays in hand and in the bag.
-    assert!(in_bag(&e, "ETOILE102"));
-    assert_eq!(var(&e, "etat_etoile0"), 0);
+    // Laid: the star out of the hand and the bag, on hole 0.
+    assert!(!in_bag(&e, "ETOILE102"));
+    assert_eq!(
+        var(&e, "etat_etoile0"),
+        id(&e, defnames::OBJETS, "ETOILE102")
+    );
+    assert_eq!(var(&e, "OBJETENMAIN"), 0);
 }
 
 /// Moves along each link between Xibalba's places, without the scripts
@@ -501,79 +510,6 @@ fn the_canoe_aid_writes_its_win() {
     assert_eq!(var(&e, "Pirogue_JustFinished"), 0);
     let lines = set_lines(&e.events);
     assert!(lines.contains(&(35, 116)) && lines.contains(&(35, 117)));
-}
-
-/// The star map's testing aid in view 121 (chapter 39): nothing with
-/// fewer than seven stars; with them, the seven lays' writes (the stars
-/// out of the bag onto the seven right holes, `pz_etoile_started`, sound
-/// 115) and the win's (`Etoiles_JustFinished` and the scan: chapter 39's
-/// section, film 49, the statue shown, its zones enabled); then nothing,
-/// the map being done.
-#[test]
-fn the_star_map_aid_writes_its_win() {
-    let Some(files) = game() else { return };
-    let mut e = in_xibalba(files);
-    goto(&mut e, "xibalba.wam", 121, 39);
-    assert!(!e.win_star_map());
-    let stars = [
-        "ETOILE102",
-        "ETOILE103",
-        "ETOILE105",
-        "ETOILE108",
-        "ETOILE111",
-        "ETOILE113",
-        "ETOILE115",
-    ];
-    for s in &stars[..6] {
-        e.run_command(format!("(sacados={s})").as_bytes());
-    }
-    assert!(!e.win_star_map());
-    assert_eq!(var(&e, "pz_etoile_started"), 0);
-    e.run_command(b"(sacados=ETOILE115)");
-    e.run_command(b"(objetenmain=ETOILE115)");
-    e.events.clear();
-    assert!(e.win_star_map());
-    let ids: Vec<i32> = stars.iter().map(|s| id(&e, defnames::OBJETS, s)).collect();
-    for (k, hole) in STAR_HOLES.iter().enumerate() {
-        assert_eq!(
-            var(&e, &format!("etat_etoile{hole}")),
-            ids[k],
-            "hole {hole}"
-        );
-    }
-    for hole in (0..17).filter(|h| !STAR_HOLES.contains(h)) {
-        assert_eq!(var(&e, &format!("etat_etoile{hole}")), 0);
-    }
-    assert!(stars.iter().all(|s| !in_bag(&e, s)));
-    assert_eq!(var(&e, "OBJETENMAIN"), 0);
-    assert!(e.events.contains(&Event::Sound("sound115.apc".into())));
-    settle(&mut e);
-    assert_eq!(
-        (
-            var(&e, "etoiles_fini"),
-            var(&e, "Etoiles_JustFinished"),
-            var(&e, "pz_etoile_started"),
-            flag(&e, 85)
-        ),
-        (1, 0, 1, 1)
-    );
-    assert!(e.events.iter().any(
-        |x| matches!(x, Event::VideoStart { name, frames: Some(_) } if name.eq_ignore_ascii_case("cine049.hnm"))
-    ));
-    let statue = id(&e, defnames::PERSONNAGES, "TEZ_STATUE");
-    assert!(e.anim.table.get(statue, 1) >= 1, "the statue shown");
-    let lines = set_lines(&e.events);
-    assert!((27..=33).all(|l| lines.contains(&(39, l))), "{lines:?}");
-    lines_as_the_original(&lines);
-    // The statue's zones of view 122 enabled.
-    goto(&mut e, "xibalba.wam", 122, 39);
-    for name in ["CLICTEZSTATUE", "CLICPIED122"] {
-        let z = zone(&e, |z| z.name.as_deref() == Some(name));
-        assert!(e.wam().view(122).unwrap().zones[z].kind < 88888, "{name}");
-    }
-    // Done: nothing more.
-    e.run_command(b"(sacados=ETOILE102)");
-    assert!(!e.win_star_map());
 }
 
 /// The web's testing aid (`toile.wam` view 198, chapter 38): each round

@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba without its three puzzles, the star map, the canoe and the spider's web, whose hooks are noted and whose wins testing aids write) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with its star map, without its canoe and its spider's web, whose hooks are noted and whose wins testing aids write) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -641,12 +641,12 @@ dragon, the turtle ring and the labyrinth's souls, below) and sends the
 game back to Tibet with China's mandala (the lantern), or at once by its
 gong. Yucatán's boat leaves for Yucatán (world 2, below), which plays
 with its counting grids and sends the game back to Tibet by its brazier;
-the priestess's yes leads into Xibalba (world 6, below), whose three
-puzzles are not ported yet (their hooks noted; testing aids write their
-wins, so a test plays on), and the soul it gives ends Yucatán with its
-mandala. A trip to a world not ported plays its film and stays where it
-is (the crystal, the space travel). Not yet: Xibalba's three puzzles and
-Shamballa.
+the priestess's yes leads into Xibalba (world 6, below), whose star map
+is played and whose two other puzzles are not ported yet (their hooks
+noted; testing aids write their wins, so a test plays on), and the soul
+it gives ends Yucatán with its mandala. A trip to a world not ported
+plays its film and stays where it is (the crystal, the space travel).
+Not yet: Xibalba's canoe and spider's web, and Shamballa.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -1343,9 +1343,9 @@ back) into `yucatan-*.png`.
   55, 64 and 75 (their entries, their clicks on zones of type 50, their
   leaves on move zones) run (below); none takes the click, as in the
   original, so every click reaches `CLICZONE`, the scans and the moves.
-  Xibalba's hooks under the same prefix are listed and noted
-  (`Event::PuzzleNotPorted`): the star map
-  (view 121), the spider web (view 198, and every view in its puzzle mode
+  Xibalba's star map (view 121) runs (below); its other hooks under the
+  same prefix are listed and noted
+  (`Event::PuzzleNotPorted`): the spider web (view 198, and every view in its puzzle mode
   1) and the canoe (view 402), whose view takes the click while
   `enable_pz_pirog` is not 1, as in the original (the dispatcher's own
   return of 1; the web's branch, in the puzzle mode 1, returns the web's
@@ -1395,10 +1395,40 @@ back) into `yucatan-*.png`.
   original); a save made in the web (views 198-265) loads in view 198, as
   the original's load sets it (@ 0x0048f450..0x0048f494), the rest of
   that code (the web's stage variables from the prey in the bag, then
-  the web's entry) being the web's, noted. **Xibalba's puzzles are not
-  ported**: their hooks are listed and noted (`Event::PuzzleNotPorted`)
-  where the original calls them: the star map (`xibalba.wam` view 121,
-  its entry and its clicks on zones of type 50), the canoe (`bat.wam`
+  the web's entry) being the web's, noted. **The star map** (`engine/stars.rs`, `xibalba.wam`
+  view 121, chapter 39) is ported: the seven stars `ETOILE102..115`,
+  taken in the clearing's views 102-115, are laid on the 17 holes of a
+  stone, the view's zones of type 50 (values 0..16); each hole is a
+  frame of `Etoiles_Puz`'s frame list and a variable `etat_etoile<hole>`
+  (the star there, 0 when empty: the save holds nothing else). The
+  entry (@ 0x00494e00) keeps the object's id, holds its first slot at
+  frame 0, shown (+0xbc = 0, +0x10 = 0, +0x30 = 1), empties the id's
+  frame lists (FUN_0047ca10, `Anim::clear_frames`) and adds frame h for
+  each hole h whose variable is not 0. A click on a hole (@ 0x00494e80;
+  nothing once `etoiles_fini` is 1) lays a star in hand on an empty hole
+  (any object between `ETOILE102` and `ETOILE115` by index: frame h
+  added, `etat_etoile<h>` = the star, the star out of the hand and the
+  bag, `(pz_etoile_started=1)`, `(NewSound=115)`) or takes back the star
+  of a full hole with the empty hand (frame taken out, 0, the star into
+  the bag and the hand pair, not the cursor pair: `(NewSound=114)`),
+  then always runs the win test (@ 0x00494f60): the holes 0, 2, 6, 8,
+  11, 13, 16 all not 0 (any star in any right hole) set
+  `Etoiles_JustFinished` and run a scan, whose film 49 drops the click
+  scan of that frame; chapter 39 shows the statue and enables its zones.
+  `pz_etoile_started` is read by chapter 35's `/INIT`: the bat offers its
+  subject about the stars (dialog 177 / 178) once a star was laid even
+  with none left in the bag. `tests/stars.rs` compares the original's
+  entry, click, win test, dispatchers, the clicks with chapter 39's
+  scans and the drawing of the map's 17 frames (`tests/golden/stars.txt`;
+  after a fatal error the original's game quits, so its rows past one
+  are compared up to it), and plays the map with the mouse from chapter
+  39: the stars taken, a wrong lay taken back, all seven on wrong holes,
+  a save loaded, the bat's subject in chapter 35 (dialog 177), the stars
+  moved to the right holes (the win: lines 27-33, film 49), the HD view,
+  the statue asked through its zone. Which constellation the right holes
+  draw, and where the game hints at it, was not looked for. **Xibalba's
+  two other puzzles are not ported**: their hooks are listed and noted
+  (`Event::PuzzleNotPorted`) where the original calls them: the canoe (`bat.wam`
   view 402: its click taken while `enable_pz_pirog` is not 1, then
   FUN_0049c010(1), the 3D canoe's own loop type 9, noted, and the click
   goes on) and the spider's web (`toile.wam` views 198-265: the entry of
@@ -1407,12 +1437,7 @@ back) into `yucatan-*.png`.
   the web is not loaded). **Testing aids** (`engine/xibalba.rs`, for
   tests and tools only) write what each puzzle's win writes, read in the
   original's code, so the story after it can be played:
-  `Engine::win_star_map` (the seven winning lays, each a star of the bag
-  on one of the right holes 0, 2, 6, 8, 11, 13, 16: `etat_etoile<hole>`,
-  the star out of the hand and the bag, `(pz_etoile_started=1)`,
-  `(NewSound=115)`; then the win: `Etoiles_JustFinished` = 1 and the
-  scan, which plays chapter 39's film 49 and shows the statue; nothing
-  drawn), `Engine::win_canoe` (the start's `(flag103=1)`, the end's
+  `Engine::win_canoe` (the start's `(flag103=1)`, the end's
   `finpirogue` = 1 and, when `Pirogue_JustFinished` is 0, it = 1 and the
   scan: chapter 35 sends the first win to `xibalba.wam` view 124, a
   later one to view 404; the cursor pair cleared as the quit does) and
@@ -1448,7 +1473,8 @@ back) into `yucatan-*.png`.
   everything, the canoe's zone clicked and its win by the aid, the web's
   first round by the aid, the caterpillar given to Chac (event 7), the
   priestess visited by `BackToS27` and the way back by the bat of her
-  view, the seven stars taken and the star map's win by the aid, the
+  view, the seven stars taken and laid on the star map with the mouse
+  (one on a wrong hole first and taken back), the
   statue asked before and after the obsidian is laid on the small
   statue, the crocodile's foot laid on its own (films 50, 51: the
   serpent), the serpent asked (the feather), the web's second round and
@@ -1464,20 +1490,19 @@ back) into `yucatan-*.png`.
   to the priestess's and the bat's answers at other stages; 144 does not
   exist). Every chapter it goes through is left by one of its own
   `chapter=` lines, no world is refused, the only hooks noted are the
-  three puzzles' (FUN_0049c010, FUN_00494e00, FUN_00494e80,
-  FUN_0048f530), and every `/set` line of chapters 25-41 it reports is
+  two puzzles' not ported (FUN_0049c010, FUN_0048f530), and every `/set` line of chapters 25-41 it reports is
   one the original runs. With `ATLANTIS2_PNG_DIR` set it writes its
   screens (`yucatan-*.png`, `xibalba-*.png`). `tests/xibalba.rs` also
   runs every Xibalba chapter's `/INIT`, enters every view of the four
   places with its hooks, plays the click hooks (the canoe's view taking
-  the click, then its start noted; a star laid on the map noted), moves
+  the click, then its start noted; a star laid on the map), moves
   along every link (the web's only with a transition video), checks each
   aid against the scripts' sections it triggers, plays all 34 dialogs the
   chapters and the web start (171-202, 204, 208), checks the subjects,
   objects, musics and films on disc 4 and the place sounds, and loads a
   game saved in the statues' clearing and one saved in the web.
-  `tests/hd.rs` checks Xibalba's four places with the HD mode as the
-  others (the 640x480 frames identical pass by pass, the HD view's
+  `tests/hd.rs` checks Xibalba's four places, and the star map with its
+  seven stars drawn, with the HD mode as the others (the 640x480 frames identical pass by pass, the HD view's
   colours the panorama's). Not checked against the original running
   Xibalba (Wine / Win98): the pictures, the place sounds' mix, Chac's
   events' timing on screen.
