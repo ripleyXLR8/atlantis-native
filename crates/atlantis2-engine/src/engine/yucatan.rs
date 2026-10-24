@@ -33,12 +33,12 @@
 //!   that frame does not run (the menu is open, FUN_0045a870).
 //!
 //! The Maya counting grids (views 55, 64, 75 of `pyratez.wam`, chapters
-//! 31, 32, 34) and Xibalba's star map (view 121 of `xibalba.wam`,
-//! chapter 39) run (`grids.rs`, `stars.rs`), each hook noted
-//! [`Event::PuzzleRan`]. The canoe (view 402) and the spider web (views
-//! 198-265, the mode 1), Xibalba's (`MONDE` 6) other puzzles, the port
-//! does not have: they are listed and noted
-//! ([`Event::PuzzleNotPorted`]); testing aids write their wins
+//! 31, 32, 34), Xibalba's star map (view 121 of `xibalba.wam`, chapter
+//! 39) and its canoe (`MONDE` 6, view 402) run (`grids.rs`, `stars.rs`,
+//! `canoe.rs`), each hook noted [`Event::PuzzleRan`]. The spider web
+//! (views 198-265, the mode 1), Xibalba's other puzzle, is not in the
+//! port: it is listed and noted ([`Event::PuzzleNotPorted`]); a testing
+//! aid writes its wins
 //! (`xibalba.rs`).
 
 use atlantis2_data::defnames;
@@ -205,6 +205,8 @@ impl Engine {
                 self.stars_click(zone.kind, zone.value);
             } else if function == STATUE_BRANCH {
                 self.statue_click(zone);
+            } else if function == CANOE_START {
+                self.start_canoe();
             } else {
                 self.puzzle_not_ported(function);
             }

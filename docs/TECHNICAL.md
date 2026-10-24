@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with its star map, without its canoe and its spider's web, whose hooks are noted and whose wins testing aids write) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with its star map and its 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d.rs`, `canoe.rs`); the spider's web, whose hooks are noted and whose wins a testing aid writes) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -1343,14 +1343,14 @@ back) into `yucatan-*.png`.
   55, 64 and 75 (their entries, their clicks on zones of type 50, their
   leaves on move zones) run (below); none takes the click, as in the
   original, so every click reaches `CLICZONE`, the scans and the moves.
-  Xibalba's star map (view 121) runs (below); its other hooks under the
-  same prefix are listed and noted
-  (`Event::PuzzleNotPorted`): the spider web (view 198, and every view in its puzzle mode
-  1) and the canoe (view 402), whose view takes the click while
-  `enable_pz_pirog` is not 1, as in the original (the dispatcher's own
-  return of 1; the web's branch, in the puzzle mode 1, returns the web's
-  click's value, which can be 1 too, and is counted as not consuming
-  since the port does not have the web). Yucatán's end (chapter 28's
+  Of Xibalba's hooks under the same prefix the star map's (view 121)
+  and the canoe's (view 402) run (below), the canoe's view taking the
+  click while `enable_pz_pirog` is not 1, as in the original (the
+  dispatcher's own return of 1); the spider web's (view 198, and every
+  view in its puzzle mode 1) are listed and noted
+  (`Event::PuzzleNotPorted`; the web's branch, in the puzzle mode 1,
+  returns the web's click's value, which can be 1 too, and is counted as
+  not consuming since the port does not have the web). Yucatán's end (chapter 28's
   arrival in the king's view 86 with the soul `CHULEL`: film 55 with
   dialog 168 over it, Yucatán's mandala, Tibet's view 7) needs the soul,
   which only Xibalba's chapter 39 gives (below). **The way back to Tibet
@@ -1430,21 +1430,17 @@ back) into `yucatan-*.png`.
   its zone; `tests/hd.rs` aims at each right hole of the map entered with
   and without the seven stars: the map's frame list is the seven holes,
   and where the frames differ the HD view shows the star. Which constellation the right holes
-  draw, and where the game hints at it, was not looked for. **Xibalba's
-  two other puzzles are not ported**: their hooks are listed and noted
-  (`Event::PuzzleNotPorted`) where the original calls them: the canoe (`bat.wam`
+  draw, and where the game hints at it, was not looked for. **The canoe runs** (`bat.wam`
   view 402: its click taken while `enable_pz_pirog` is not 1, then
-  FUN_0049c010(1), the 3D canoe's own loop type 9, noted, and the click
-  goes on) and the spider's web (`toile.wam` views 198-265: the entry of
+  FUN_0049c010(1), the 3D canoe's own loop type 9, below, and the click
+  goes on). **Xibalba's last puzzle is not ported**: its hooks are
+  listed and noted (`Event::PuzzleNotPorted`) where the original calls
+  them: the spider's web (`toile.wam` views 198-265: the entry of
   view 198, which would set the puzzle mode 1, so the web's mode-1 entry
   and move clicks never run; its zone-click call returns at once while
-  the web is not loaded). **Testing aids** (`engine/xibalba.rs`, for
-  tests and tools only) write what each puzzle's win writes, read in the
+  the web is not loaded). **A testing aid** (`engine/xibalba.rs`, for
+  tests and tools only) writes what its win writes, read in the
   original's code, so the story after it can be played:
-  `Engine::win_canoe` (the start's `(flag103=1)`, the end's
-  `finpirogue` = 1 and, when `Pirogue_JustFinished` is 0, it = 1 and the
-  scan: chapter 35 sends the first win to `xibalba.wam` view 124, a
-  later one to view 404; the cursor pair cleared as the quit does) and
   `Engine::win_web_round` (one round won, by the web's stage
   `Engine::web_stage`, 1 + the leading `finaraignN` set, 4 when all
   three: the caterpillar (`CHENILLE`, sound 104, `finaraign1`), the
@@ -1453,7 +1449,7 @@ back) into `yucatan-*.png`.
   runs too; again at stage 4 only while it is not in the bag),
   the big spider (`flag92` and the spider goddess a subject of the bat
   and the priestess, the sword, film 48, the skull `CRANE_ARAIG2`, the
-  sword taken back, `finaraign3`); each aid notes `Event::PuzzleAid`.
+  sword taken back, `finaraign3`); the aid notes `Event::PuzzleAid`.
   **A headless game plays Yucatán and Xibalba with the mouse only**
   (`tests/flow.rs` `yucatan_with_the_mouse`, about 75 s in release):
   from a new game, Yucatán's boat taken in view 5 and laid in the hut,
@@ -1474,7 +1470,9 @@ back) into `yucatan-*.png`.
   view 28, the foot and the obsidian taken back), a save and a load
   through the menus, the way back to Tibet by the brazier and the second
   trip; then the priestess's yes and Xibalba (the bat asked about
-  everything, the canoe's zone clicked and its win by the aid, the web's
+  everything, the canoe's zone clicked and the canoe played with the
+  mouse to its win (each tile taken to its square and turned upright,
+  the stage clicked, the river paddled), the web's
   first round by the aid, the caterpillar given to Chac (event 7), the
   priestess visited by `BackToS27` and the way back by the bat of her
   view, the seven stars taken and laid on the star map with the mouse
@@ -1494,14 +1492,17 @@ back) into `yucatan-*.png`.
   to the priestess's and the bat's answers at other stages; 144 does not
   exist). Every chapter it goes through is left by one of its own
   `chapter=` lines, no world is refused, the only hooks noted are the
-  two puzzles' not ported (FUN_0049c010, FUN_0048f530), and every `/set` line of chapters 25-41 it reports is
+  web's (FUN_0048f530), and
+  every `/set` line of chapters 25-41 it reports is
   one the original runs. With `ATLANTIS2_PNG_DIR` set it writes its
   screens (`yucatan-*.png`, `xibalba-*.png`). `tests/xibalba.rs` also
   runs every Xibalba chapter's `/INIT`, enters every view of the four
   places with its hooks, plays the click hooks (the canoe's view taking
-  the click, then its start noted; a star laid on the map), moves
-  along every link (the web's only with a transition video), checks each
-  aid against the scripts' sections it triggers, plays all 34 dialogs the
+  the click, then the canoe started; a star laid on the map), moves
+  along every link (the web's only with a transition video), plays the
+  canoe with the mouse to its first and second wins and quits one with
+  Escape, checks it at 800 x 600, checks the aid against the scripts'
+  sections it triggers, plays all 34 dialogs the
   chapters and the web start (171-202, 204, 208), checks the subjects,
   objects, musics and films on disc 4 and the place sounds, and loads a
   game saved in the statues' clearing and one saved in the web.
@@ -1510,6 +1511,77 @@ back) into `yucatan-*.png`.
   colours the panorama's). Not checked against the original running
   Xibalba (Wine / Win98): the pictures, the place sounds' mix, Chac's
   events' timing on screen.
+- **The canoe** (`canoe.rs`, `atl3d.rs`, `engine/canoe.rs`; the files
+  in `atlantis2-data`'s `canoe.rs`; `bat.wam` view 402, chapter 35):
+  loop type 9, the only puzzle with a loop of its own. The click branch
+  of view 402 (`enable_pz_pirog` = 1) starts it (FUN_0049c010(1) →
+  `pz_pirogue_init` FUN_00496a60): `(flag103=1)`, then the loading (the
+  six hero databases `C1`, `g1`, `h1`, `a1`, `b1`, `e1`, the camera
+  made with the first, the 33 depth tiles, the squares, the waypoints of
+  `traj_pirog.txt`, the orthographic camera placed and turned, the depth
+  factors, the seven stones, the river, `fdpuzzle.tga`, the shuffle, the
+  board's depth), the pointer at the 640 x 480 surface's centre and the
+  cursor pair `interfac.spr` frame 0x28; the loop type left is kept. Each
+  pass is one frame of FUN_00498ca0 with the pointer, the left and right
+  click flags (cleared by their handlers) and Escape (the key code 1):
+  the square under the pointer, the clicks (take, lay back, swap, turn),
+  the picture (the background, the board's depth into the 3D Z buffer,
+  the tiles with the pointed one at 50 %, the stone counter, the stones
+  and the hero in 3D, the held tile at the pointer with its stones, the
+  pointer), Escape, the canoe's step (1.5 units a frame along the
+  river; at each waypoint the hero's animation by its letter, a stone
+  taken with `(NewSound=…)`, a break or the end without the seven stones
+  in order stopping it), and the win (`finpirogue` = 1, and the first
+  time `Pirogue_JustFinished` = 1 with the scan: chapter 35 sends the
+  game to `xibalba.wam` view 124, chapter 39, a later win to view 404);
+  then the quit (the cursor pair cleared) and the loop type kept. The
+  river (`recalc_trajet` FUN_004988a0) chains the tiles' segments from
+  `X9E1` by the nearest free end, a join of 20 units or more breaking
+  it. Its errors (a segment starting on neither end, no direction, no
+  free end left, the first waypoint moved) and a stone's waypoint not
+  found are the original's fatal error (FUN_00480cd0: an emergency save,
+  then the game quits): here the rebuild stops, the puzzle quits and the
+  scripts stop with the original's message, as for their own fatal
+  errors; the game's data never reach them. Two deviations there, on
+  data the game never has: the original's copy of a segment has no bound
+  (a segment without its end goes on past the table), the port stops
+  with a fatal message of its own; the table the original logs twice
+  before the "no free end" error (FUN_00498b40) is not logged. The loop
+  has no clock: one step a frame (the original's frames are
+  unpaced; here one a pass of the 60 Hz loop). The 3D is the original's
+  Atl3D path for these databases (`atl3d.rs`): the node tree with its
+  matrix round trips, the database slots and their track keys (the
+  heads' `eval_track`), the **library of textures, materials and meshes
+  by name** that every load adds to and that the canoe empties at its
+  start (so every hero animation draws `C1.db`'s meshes, as the
+  original), the orthographic camera of mode 2, the bounding sphere and
+  clip codes, the back faces against the computed planes, the
+  projection, the generic face drawer (which writes only x, y and w of
+  the three vertex records: the texture coordinates are what the last
+  polygon left) and the rasteriser of the CPU type (the heads'), the x87
+  control word as the frame leaves it. `tests/canoe.rs` replays the
+  original's emulated frames (`tests/golden/canoe_0e7f.txt`, the Pentium
+  II's routines under 0x0e7f, and `canoe_027f.txt`, the C ones under
+  0x027f): the loading's values (the init's command, cursor and control
+  word, the camera's fields the port keeps; the waypoints by the MD5 of
+  their table, the stones' and the slots' nodes by an MD5 each, so that
+  the files hold no game data), then for each of 1797 frames the state,
+  the script events, the picture's, the Z buffer's and the held tile's Z
+  buffer's MD5 (and whole rows with pixel samples for chosen frames), a
+  run quit by Escape, the win's frame count and variables and the cursor
+  after the quit; all bit for bit; and the fatal errors on changed
+  waypoints. At 800 x 600 the canoe draws on the
+  640 x 480 surface, enlarged; with the HD mode on its frames are the
+  original's and no HD layer is made (the front end enlarges the frame).
+  Not known: whether the original's `spr_p6.dll`, which a Pentium Pro /
+  II loads, draws the pointed tile's 50 % as `spr_p5.dll` does (an
+  emulation with it gives darker pixels there; the port draws P5's); the
+  held tile's depth written outside the 640 x 480 buffer (the original
+  writes past its allocation near the screen's edges; the port drops
+  those writes); the stale texture coordinates after other 3D drawing
+  (a dialog's head) in the same run (the canoe's own drawing is checked
+  from its start); the near and far clipping of faces (the canoe's
+  objects never cross the planes: not ported, logged).
 - **Maya counting grids** (`engine/grids.rs`, `pyratez.wam` views 55, 64
   and 75; chapters 31, 32, 34): each grid is 16 cells in four groups of
   four (cells 4k..4k + 3: the tests read only i mod 4; where a group lies
@@ -2533,7 +2605,7 @@ copies); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
 `chest.rs`, `wheels.rs`, `dragon.rs`, `turtle.rs`, `labyrinth.rs`:
 `pz-cross-*.png`, `pz-figurines-*.png`, `pz-chest-*.png`,
 `pz-wheels-*.png`, `pz-dragon-*.png`, `pz-turtle-*.png`,
-`pz-labyrinth-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
+`pz-labyrinth-*.png`) and `tests/xibalba.rs`'s canoe (`pz-canoe-*.png`); the expected frames, matrices, zone picks, heads, lip-sync
 weights, dialog lines, dialog frames, subtitle layouts, music fades,
 script results and save files come from the original `atlantis2.exe` run under emulation
 (Tibet's moves pass by pass, the place animations tick by tick, the
@@ -2553,7 +2625,8 @@ drawing, the pearl and dragon's hooks, steps, frames at five tick rates,
 clicks with chapter 58 and drawing, the turtle ring's hooks, tick,
 dispatchers, clicks and arrivals with chapter 46 and drawing, the
 labyrinth souls' cells, visibility tests, random drops, entry, delay,
-tick, warp frames with chapter 60, dispatchers and drawing;
+tick, warp frames with chapter 60, dispatchers and drawing, the canoe's
+loading and every frame of a played canoe, under both CPU routines;
 names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):

@@ -71,6 +71,9 @@ impl Engine {
             LoopType::Dialog => self.end_dialog(),
             LoopType::Video => {}
             LoopType::Menu => self.with_menu(|m, e| m.escape(e)),
+            // The key callback writes the key's code (@ 0x004762f9), which
+            // the canoe's frame reads: Escape (1) quits it.
+            LoopType::Canoe => self.canoe_escape = true,
         }
     }
 

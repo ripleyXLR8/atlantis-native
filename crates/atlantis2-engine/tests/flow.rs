@@ -1259,6 +1259,49 @@ impl Run {
         panic!("the game never settles");
     }
 
+    /// The canoe (loop type 9) played with the mouse, a frame a pass:
+    /// each tile taken to its own square (a click on it, one on its
+    /// square: the two swap) and turned upright (right clicks), the stage
+    /// clicked, then the canoe left to paddle to the river's end. Its
+    /// events.
+    fn play_canoe(&mut self) -> Vec<Event> {
+        let mut evs = Vec::new();
+        let centre = |r: &Run, k: usize| {
+            let s = r.e.canoe().unwrap().board[k];
+            (s.x + 0x10, s.y + 0x36)
+        };
+        let mut frame = |r: &mut Run, k: usize, left: bool, right: bool| {
+            let (x, y) = centre(r, k);
+            r.point(x, y);
+            if left {
+                r.tap();
+            }
+            if right {
+                r.e.right_click();
+            }
+            evs.extend(r.events());
+        };
+        for k in 0..8 {
+            let board = self.e.canoe().unwrap().board;
+            let s = (0..8).find(|&s| board[s].tile / 4 == k as i32).unwrap();
+            if s != k {
+                frame(self, s, true, false);
+                frame(self, k, true, false);
+            }
+            while self.e.canoe().unwrap().board[k].tile % 4 != 0 {
+                frame(self, k, false, true);
+            }
+        }
+        frame(self, 8, true, false);
+        for _ in 0..5000 {
+            if self.e.loop_type != LoopType::Canoe {
+                return evs;
+            }
+            frame(self, 8, false, false);
+        }
+        panic!("the canoe never arrives");
+    }
+
     /// The object in hand put back in the bag (the bar opened and closed).
     fn stow(&mut self) {
         if self.var("OBJETENMAIN") != 0 {
@@ -4264,10 +4307,11 @@ fn yucatan_dialogs_played() -> Vec<u32> {
 /// foot, the mirrors and the secret door), a save and a load through the
 /// menus, the way back to Tibet by the brazier and the second trip; then
 /// the priestess's yes and Xibalba as chapters 35-39 make it
-/// ([`XIBALBA`]: the bat, the canoe, the web's three rounds and Chac,
-/// the priestess visited on the way, the star map, the statues and the
-/// serpent, the soul), its three puzzles' hooks noted where a player
-/// reaches them and their wins written by the testing aids, a save and a
+/// ([`XIBALBA`]: the bat, the canoe played with the mouse, the web's
+/// three rounds and Chac, the priestess visited on the way, the star map,
+/// the statues and the serpent, the soul), its two other puzzles' hooks
+/// noted where a player reaches them and their wins written by the
+/// testing aids, a save and a
 /// load in Xibalba; the way back with the soul to the king (the end of
 /// Yucatán) and Yucatán's mandala laid in Tibet. Every chapter it goes
 /// through is left by one of its own `chapter=` lines, no world is
@@ -4377,8 +4421,8 @@ fn yucatan_stages_from_saves() {
 // Xibalba, with the mouse.
 
 /// The hooks of Xibalba's puzzles not ported: noted where a player
-/// reaches them (the canoe's start, the web's entry of view 198).
-const XIBALBA_NOTED: [u32; 2] = [0x0049_c010, 0x0048_f530];
+/// reaches them (the web's entry of view 198).
+const XIBALBA_NOTED: [u32; 1] = [0x0048_f530];
 
 impl Run {
     /// A click on zone `zone` (a `#ZONES_CLIC#` name) that opens the
@@ -4580,19 +4624,23 @@ fn the_bat(r: &mut Run) {
     r.shot_as("xibalba-01-the-bat.png");
 }
 
-/// View 402: the canoe's zone clicked (FUN_0049c010(1), the 3D canoe,
-/// noted), then its win written by the testing aid: chapter 35's first
-/// win sends the game to `xibalba.wam` view 124, chapter 39.
+/// View 402: the canoe's zone clicked (FUN_0049c010(1): the 3D canoe,
+/// loop type 9), the canoe played with the mouse to its win: chapter 35's
+/// first win sends the game to `xibalba.wam` view 124, chapter 39.
 fn the_canoe(r: &mut Run) {
     r.walk(402);
     let z = r.zone_valued(469);
     let evs = r.use_on(None, z);
-    assert!(evs.contains(&Event::PuzzleNotPorted {
-        function: 0x0049_c010
+    assert!(evs.contains(&Event::PuzzleRan {
+        function: 0x0049_6a60
     }));
-    r.shot_as("xibalba-02-canoe-view.png");
-    r.e.win_canoe();
-    let evs = r.settle();
+    assert_eq!((r.e.loop_type, r.flag(103)), (LoopType::Canoe, 1));
+    r.shot_as("xibalba-02-canoe.png");
+    let mut evs = r.play_canoe();
+    assert!(evs.contains(&Event::PuzzleRan {
+        function: 0x0049_a570
+    }));
+    evs.extend(r.settle());
     assert!(evs.contains(&Event::Wam("xibalba.wam".into())));
     assert_eq!((r.e.place(), r.chapter()), (("xibalba.wam", 124), 39));
     assert_eq!(
