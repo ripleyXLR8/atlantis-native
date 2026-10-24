@@ -775,3 +775,87 @@ fn the_view_is_drawn_through_its_rays() {
         }
     }
 }
+
+/// The web's creatures with the HD mode on: drawn into the 640x480 frame
+/// as with it off, and again over the HD view by the same pipeline, the
+/// layer standing for the frame with them (its base), so that what the
+/// front end composes shows the HD creatures: at tile 16 the HD view's
+/// creature pixels are the frame's; at tile 40 with sides, every pixel of
+/// the HD creatures (the centre's cursor and marker aside) comes from the
+/// layer in `atlantis_engine::hd::compose`.
+#[test]
+fn hd_draws_the_web_s_creatures() {
+    if game().is_none() {
+        return;
+    }
+    let web = [&b"(monde=6)"[..], b"(changewam=toile.wam)", b"(vue=198)"];
+    for (tile, side) in [(16, 0), (40, 4)] {
+        let mut on = at(game().unwrap(), &web, true);
+        let mut off = at(game().unwrap(), &web, false);
+        on.set_hd_output(Some(tile), side);
+        let (mut a, mut b) = (vec![0u16; 640 * 480], vec![0u16; 640 * 480]);
+        for e in [&mut on, &mut off] {
+            // Onto the web: the caterpillar's round, the spider in sight
+            // off the screen's centre (its cursor and marker).
+            e.enter_at(199, 0.0, 0.0).unwrap();
+            e.enter_at(213, 0.0, 0.0).unwrap();
+            assert!(e.web.loaded);
+            let fpu = e.camera.fpu;
+            let p = e.web.creature_pos(fpu, 213, 0);
+            let d = [p[0] as f32, (p[1] - 20.0) as f32, p[2] as f32];
+            let (yaw, pitch) = atlantis2_engine::camera::direction_angles(fpu, d);
+            e.camera.enter(yaw + 0.15, pitch);
+        }
+        let centre =
+            |x: usize, y: usize| (x as i32 - 320).abs() < 40 && (y as i32 - 240).abs() < 40;
+        let (mut seen, mut seen_hd) = (0, 0);
+        for i in 0..30 {
+            for e in [&mut off, &mut on] {
+                e.set_clock(i as f64 / 60.0);
+            }
+            off.pass(Some(&mut a));
+            on.pass(Some(&mut b));
+            assert!(a == b, "tile {tile}: frame {i} differs with the HD mode");
+            let (z, hz) = on.hd_web_capture();
+            let mask: Vec<bool> = z.iter().map(|&v| v != 0).collect();
+            let hmask: Vec<bool> = hz.iter().map(|&v| v != 0).collect();
+            let l = on.hd_layer().expect("a layer");
+            let lut = atlantis2_engine::hd::rgb565_to_888();
+            for k in (0..640 * 480).filter(|&k| mask[k] && !centre(k % 640, k / 640)) {
+                let (x, y) = (k % 640, k / 640);
+                seen += 1;
+                assert_eq!(
+                    l.base[k], b[k],
+                    "tile {tile}: frame {i} ({x}, {y}) not in the base"
+                );
+                if tile == 16 {
+                    assert_eq!(l.pixels[k], lut[usize::from(b[k])], "frame {i} ({x}, {y})");
+                }
+            }
+            if tile == 40 {
+                let (w, h, cw) = (l.width, l.height, l.centre_width());
+                assert_eq!(hmask.len(), w * h);
+                let mut out = vec![0u32; cw * h];
+                atlantis_engine::hd::compose(&b, l, &mut out, cw, 0, 0, cw, h);
+                for y in 0..h {
+                    for x in 0..cw {
+                        if !hmask[y * w + l.side + x] || centre(x * 640 / cw, y * 480 / h) {
+                            continue;
+                        }
+                        seen_hd += 1;
+                        assert_eq!(
+                            out[y * cw + x],
+                            l.pixels[y * w + l.side + x],
+                            "frame {i} HD ({x}, {y}) not from the layer"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(seen > 1000, "tile {tile}: {seen} creature pixels");
+        assert!(
+            tile == 16 || seen_hd > 4000,
+            "tile {tile}: {seen_hd} HD creature pixels"
+        );
+    }
+}

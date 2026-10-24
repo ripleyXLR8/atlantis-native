@@ -31,7 +31,7 @@
 //!   = 1 and a scan the first time; the loop then quits (FUN_0049a570).
 //! - The frame (FUN_00498ca0): the background, the board's depth copied
 //!   into the 3D Z buffer, the tiles (the pointed one at 50 %), the stone
-//!   counter, the stones and the hero in 3D ([`crate::atl3d`]), the held
+//!   counter, the stones and the hero in 3D ([`crate::atl3d::ortho`]), the held
 //!   tile at the pointer with its stones, the cursor.
 //!
 //! The loop has no clock of its own: everything counts frames (the
@@ -42,7 +42,7 @@ use atlantis2_data::db::Scene;
 use atlantis2_data::spr::{Mode, SprBank, Target as SprTarget};
 use atlantis2_data::tga::Tga;
 
-use crate::atl3d::{
+use crate::atl3d::ortho::{
     axis_angle, axis_angle_matrix, draw_database, len2, look_rotation, mat_vec, normalize, vscale,
     Camera3, Database, DrawContext, DrawTarget, Library, Nodes, Records, ROOT,
 };

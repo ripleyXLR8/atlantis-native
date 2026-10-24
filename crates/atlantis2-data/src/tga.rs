@@ -69,7 +69,7 @@ impl Decoded {
         let height = u16::from_le_bytes([h[14], h[15]]) as usize;
         let bits = h[16];
         let top_down = h[17] & 0x20 != 0;
-        if !(bits == 16 || bits == 24) || !(image_type == 2 || image_type == 10) {
+        if !(bits == 16 || bits == 24 || bits == 32) || !(image_type == 2 || image_type == 10) {
             return Err(TgaError::Unsupported { image_type, bits });
         }
         let mut at = 18 + id_len;

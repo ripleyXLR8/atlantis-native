@@ -2,9 +2,9 @@
 //! view of the four places entered with the puzzles' entry hooks; the
 //! click hooks (the canoe's view taking the click until it is enabled,
 //! then starting it; the star map's run); the moves between the places
-//! (WAM links); the canoe played with the mouse to its win, the testing
-//! aid that writes the web's wins, and what the scripts do after them;
-//! every dialog the chapters and the web
+//! (WAM links); the canoe played with the mouse to its win, the web's
+//! rounds played, and what the scripts do after them; every dialog the
+//! chapters and the web
 //! start; the subjects, objects, musics and films on disc 4; the place
 //! sounds; a save in Xibalba loaded, and one in the web loaded in view
 //! 198. The way in from the priestess and the way back to the king's
@@ -249,20 +249,25 @@ fn every_xibalba_view_is_entered_with_its_hooks() {
                 Event::SpwLoad { name, found: false } => Some(name.clone()),
                 _ => None,
             }));
+            // Every puzzle function the entry ran or noted (`PuzzleRan`
+            // included): the view's hooks, and all of them listed below.
             let h = noted(&e.events);
             assert_eq!(
                 h,
                 yucatan_entry_hooks(name.as_bytes(), id, 0),
                 "{place} {id}"
             );
-            // Only the star map's entry runs.
-            assert!(e.events.iter().all(|x| match x {
-                Event::PuzzleRan { function } => *function == 0x0049_4e00,
-                Event::PuzzleNotPorted { function } => *function != 0x0049_4e00,
-                _ => true,
-            }));
+            // The star map's entry and the web's run; nothing is noted.
+            assert!(!e
+                .events
+                .iter()
+                .any(|x| matches!(x, Event::PuzzleNotPorted { .. })));
+            // The web's entry of view 198 (FUN_0048f530) sets the puzzle
+            // mode 1; set back for the next view.
+            let web = h.contains(&0x0048_f530);
             hooks.extend(h.into_iter().map(|f| (place, id, f)));
-            assert_eq!(e.puzzle_mode(), 0, "{place} {id}");
+            assert_eq!(e.puzzle_mode(), i32::from(web), "{place} {id}");
+            e.set_puzzle_mode(0);
         }
         views.push((place, n));
     }
@@ -280,9 +285,8 @@ fn every_xibalba_view_is_entered_with_its_hooks() {
     );
     assert!(missing_warp.is_empty(), "{missing_warp:?}");
     assert!(missing_spw.is_empty(), "{missing_spw:?}");
-    // The hooks: the star map's entry (view 121), run, and the web's
-    // (view 198, also `riviere.wam`'s record of it, a `YU` view 198),
-    // noted.
+    // The hooks, all run: the star map's entry (view 121) and the web's
+    // (view 198, also `riviere.wam`'s record of it, a `YU` view 198).
     assert_eq!(
         hooks,
         [
@@ -664,63 +668,85 @@ fn the_canoe_at_800_by_600() {
     }
 }
 
-/// The web's testing aid (`toile.wam` view 198, chapter 38): each round
-/// by its stage, what the original writes along a won round: the
-/// caterpillar (sound 104, `finaraign1`), the grasshopper (sound 105,
-/// `finaraign2`), the big spider (`flag92`, the spider goddess a subject
-/// of the bat and the priestess, film 48, the skull, the sword given and
-/// taken back, `finaraign3`), then the grasshopper again (stage 4, no
-/// variable) while it is not in the bag, and nothing when it is.
+/// A move zone of the web to view `to` clicked once the spiders stand
+/// (the web takes the click while one moves), the screen's centre off
+/// them; the passes until the move's end (its video ended).
+fn web_move(e: &mut Engine, to: u32) {
+    for _ in 0..2000 {
+        let still = e.web.creatures.iter().all(|c| {
+            !matches!(c.kind, 1 | 2) || (c.t == 0.0 && c.target == c.heading && c.from == c.to)
+        });
+        if still {
+            break;
+        }
+        e.pass(None);
+    }
+    let from = e.place().1;
+    let z = zone(e, |z| z.kind == 1 && z.value == to as i32);
+    let (yaw, pitch) = e.zone_aim(from, z).unwrap();
+    let off = 0.01;
+    let aims = [
+        (yaw, pitch),
+        (yaw + off, pitch),
+        (yaw - off, pitch),
+        (yaw, pitch + off),
+    ];
+    let mut ok = false;
+    for (y, p) in aims {
+        e.camera.enter(y, p);
+        e.pass(None);
+        if e.centre_zone().map(|(i, _)| i) == Some(z) && !e.web.hit(e.camera.fpu, &e.camera) {
+            ok = true;
+            break;
+        }
+    }
+    assert!(ok, "view {from}: the zone to {to} is behind a spider");
+    let t = e.clock() + 10.0;
+    e.click(t);
+    for _ in 0..600 {
+        if e.loop_type == LoopType::Video {
+            e.end_video();
+        }
+        e.pass(None);
+        if e.place().1 == to && e.loop_type == LoopType::Warp && !e.turning() {
+            return;
+        }
+    }
+    panic!("no arrival in view {to}");
+}
+
+/// The web played with the engine's clicks from view 198 (chapter 38):
+/// stage 1's round as the original plays it (`tests/golden/web.txt`
+/// section F): the caterpillar taken on the centre (sound 104), the web
+/// left by view 199 (`finaraign1`, chapter 38's film 47); stage 2's round
+/// starts with the grasshopper's stage.
 #[test]
-fn the_web_aid_writes_each_round() {
+fn the_web_is_played() {
     let Some(files) = game() else { return };
     let mut e = in_xibalba(files);
     goto(&mut e, "toile.wam", 198, 38);
-    assert_eq!(e.puzzle_mode(), 0);
-    assert_eq!(e.web_stage(), 1);
+    // The entry of view 198 by a `vue=` line: FUN_0048f530.
+    assert_eq!((e.puzzle_mode(), e.web.stage, e.web.loaded), (1, 1, false));
     e.events.clear();
-    assert_eq!(e.win_web_round(), 1);
-    assert!(in_bag(&e, "CHENILLE"));
-    assert_eq!(var(&e, "finaraign1"), 1);
-    assert!(e.events.contains(&Event::Sound("sound104.apc".into())));
-    assert_eq!(e.web_stage(), 2);
-    e.events.clear();
-    assert_eq!(e.win_web_round(), 2);
-    assert!(in_bag(&e, "SAUTERELLE"));
-    assert_eq!(var(&e, "finaraign2"), 1);
-    assert!(e.events.contains(&Event::Sound("sound105.apc".into())));
-    assert_eq!(e.web_stage(), 3);
-    e.run_command(b"(sacados=NOT_SAUTERELLE)");
-    e.events.clear();
-    assert_eq!(e.win_web_round(), 3);
-    assert!(e.events.iter().any(
-        |x| matches!(x, Event::VideoStart { name, frames: Some(_) } if name.eq_ignore_ascii_case("cine048.hnm"))
-    ));
-    settle(&mut e);
-    assert!(in_bag(&e, "CRANE_ARAIG2"));
-    assert!(!in_bag(&e, "EPEE"));
-    assert_eq!((var(&e, "finaraign3"), flag(&e, 92)), (1, 1));
-    let s = e.script_state().unwrap();
-    let goddess = s.names.param(defnames::SUJETS, b"DEESSE_ARAIGNEE");
-    for who in ["CHAUVE_SOURIS", "PRETRESSE"] {
-        let c = id(&e, defnames::PERSONNAGES, who);
-        assert!(
-            s.subjects.list(c).iter().any(|x| x.value == goddess),
-            "{who}"
-        );
+    for v in [
+        199, 213, 230, 213, 214, 231, 248, 249, 265, 252, 235, 218, 201, 199,
+    ] {
+        web_move(&mut e, v);
+        if v == 265 {
+            assert!(in_bag(&e, "CHENILLE"));
+        }
     }
-    assert_eq!(e.web_stage(), 4);
-    e.events.clear();
-    assert_eq!(e.win_web_round(), 4);
-    assert!(in_bag(&e, "SAUTERELLE"));
-    assert!(e.events.contains(&Event::Sound("sound105.apc".into())));
-    let bag = e.bag_entries().len();
-    e.events.clear();
-    assert_eq!(e.win_web_round(), 4);
-    assert_eq!(e.bag_entries().len(), bag);
-    assert!(!e.events.contains(&Event::Sound("sound105.apc".into())));
-    assert_eq!(e.web_stage(), 4);
-    assert_eq!(e.puzzle_mode(), 0);
+    settle(&mut e);
+    assert!(e.events.contains(&Event::Sound("sound104.apc".into())));
+    assert!(e.events.iter().any(
+        |x| matches!(x, Event::VideoStart { name, .. } if name.eq_ignore_ascii_case("cine047.hnm"))
+    ));
+    assert_eq!(var(&e, "finaraign1"), 1);
+    assert_eq!(
+        (e.place(), e.web.loaded, e.web.stage),
+        (("toile.wam", 199), false, 2)
+    );
+    assert_eq!(e.puzzle_mode(), 1);
 }
 
 /// Every dialog Xibalba's chapters start (`dial=N`) and the web's code
@@ -972,8 +998,8 @@ fn a_save_in_xibalba_loads() {
 }
 
 /// A game saved in the web (view 230) loads in view 198, as the
-/// original's load does (FUN_0048f450, the rest of it the web's, noted),
-/// whose entry is noted too.
+/// original's load does (FUN_0048f450: the stage's `finaraignN` from the
+/// prey in the bag, the web's entry FUN_0048f530: the puzzle mode 1).
 #[test]
 fn a_save_in_the_web_loads_in_view_198() {
     let Some(files) = game() else { return };
@@ -984,6 +1010,7 @@ fn a_save_in_the_web_loads_in_view_198() {
     assert_eq!(f.place(), ("toile.wam", 198));
     assert_eq!(f.script_state().unwrap().chapter, 38);
     assert_eq!(f.files().current_disc(), 4);
-    assert_eq!(noted(&f.events), [0x0048_f450, 0x0048_f530]);
-    assert_eq!(f.puzzle_mode(), 0);
+    // Then the view's entry in the mode 1: FUN_0048f9a0 (198: nothing).
+    assert_eq!(noted(&f.events), [0x0048_f450, 0x0048_f530, 0x0048_f9a0]);
+    assert_eq!((f.puzzle_mode(), f.web.stage, f.web.loaded), (1, 1, false));
 }

@@ -37,7 +37,8 @@
 //! pages) are its 640x480 pixels, upscaled by the front end
 //! (`atlantis_engine::hd::HdCompositor`): the layer is shown where the
 //! 640x480 frame still shows the cube it was drawn with
-//! (`HdLayer::base`).
+//! (`HdLayer::base`; on the spider's web, the cube and the creatures
+//! drawn again over the HD view).
 
 pub use atlantis_engine::hd::{
     rgb565_to_888, tile_for_output, HdLayer, HdOptions, HdText, PanoFilter, MAX_SIDE_TILES,

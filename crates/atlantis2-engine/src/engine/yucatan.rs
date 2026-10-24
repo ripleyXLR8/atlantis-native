@@ -33,13 +33,10 @@
 //!   that frame does not run (the menu is open, FUN_0045a870).
 //!
 //! The Maya counting grids (views 55, 64, 75 of `pyratez.wam`, chapters
-//! 31, 32, 34), Xibalba's star map (view 121 of `xibalba.wam`, chapter
-//! 39) and its canoe (`MONDE` 6, view 402) run (`grids.rs`, `stars.rs`,
-//! `canoe.rs`), each hook noted [`Event::PuzzleRan`]. The spider web
-//! (views 198-265, the mode 1), Xibalba's other puzzle, is not in the
-//! port: it is listed and noted ([`Event::PuzzleNotPorted`]); a testing
-//! aid writes its wins
-//! (`xibalba.rs`).
+//! 31, 32, 34) and Xibalba's (`MONDE` 6) three puzzles, the star map
+//! (view 121 of `xibalba.wam`, chapter 39), the canoe (view 402) and the
+//! spider web (views 198-265, the mode 1), run (`grids.rs`, `stars.rs`,
+//! `canoe.rs`, `web.rs`), each hook noted [`Event::PuzzleRan`].
 
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
@@ -75,7 +72,7 @@ const STATUE_NAME: &str = "TEZ_STATUE";
 /// The spider web's puzzle mode, its entry views and functions: the
 /// click in the mode (FUN_0048fdd0), the entry in the mode (FUN_0048f9a0)
 /// and the entry of view 198 outside it (FUN_0048f530).
-pub const WEB_MODE: i32 = 1;
+pub const WEB_MODE: i32 = super::web::WEB_MODE;
 const WEB_VIEW: u32 = 198;
 const WEB_CLICK: u32 = 0x0048_fdd0;
 const WEB_MODE_ENTRY: u32 = 0x0048_f9a0;
@@ -187,10 +184,14 @@ impl Engine {
             .as_deref()
             .and_then(|s| s.var(CANOE_SWITCH))
             .is_some_and(|v| v == 1);
-        let (hooks, consumed) =
+        let (hooks, mut consumed) =
             yucatan_click_hooks(view_name, view, zone.kind, self.puzzle_mode(), canoe);
         for function in hooks {
-            if let Some(g) = GRID_LEAVES.iter().position(|&f| f == function) {
+            if function == WEB_CLICK {
+                // The dispatcher returns the web's value (@ 0x0049b9f3).
+                self.event(Event::PuzzleRan { function });
+                consumed = self.web_move_click(zone.value);
+            } else if let Some(g) = GRID_LEAVES.iter().position(|&f| f == function) {
                 self.event(Event::PuzzleRan { function });
                 self.grid_leave(g);
             } else if let Some(g) = GRID_CLICKS.iter().position(|&f| f == function) {
@@ -228,6 +229,12 @@ impl Engine {
             } else if function == STARS_ENTRY {
                 self.event(Event::PuzzleRan { function });
                 self.stars_entry();
+            } else if function == WEB_MODE_ENTRY {
+                self.event(Event::PuzzleRan { function });
+                self.web_entry();
+            } else if function == WEB_ENTRY {
+                self.event(Event::PuzzleRan { function });
+                self.web_entry198();
             } else {
                 self.puzzle_not_ported(function);
             }

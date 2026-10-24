@@ -314,6 +314,9 @@ impl Engine {
         // store are the save's; the others not ported are kept for the
         // next save.
         self.grids_reset();
+        // The web's quit (FUN_00491260: in the mode 1, its models freed,
+        // the mode 0, the web not loaded).
+        self.web_quit();
         for k in KEPT {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }
@@ -397,15 +400,13 @@ impl Engine {
         // FUN_004785a0: the saved angles are the next view entry's.
         self.arrival = (d.f32(entry::YAW), d.f32(entry::PITCH));
         let mut view = header.view;
-        let monde = self.con.as_ref().map_or(0, |s| s.vars[s.keys.monde]);
-        if monde == 6 && 0xc5 < view && view < 0x10a {
-            // In the spider web (FUN_0048f450 @ 0x0048f450..0x0048f494):
-            // back to view 198, the current view record cleared (the view
-            // entry below makes it again). The rest is the web's, not
-            // ported (noted): its stage's `finaraignN` from the prey in
-            // the bag, then its entry FUN_0048f530.
-            view = 198;
-            self.puzzle_not_ported(0x0048_f450);
+        // In the spider web (FUN_0048f450 @ 0x0048f450..0x0048f494, MONDE
+        // 6, views 198-265): back to view 198, the current view record
+        // cleared (the view entry below makes it again), the stage's
+        // `finaraignN` from the prey in the bag, then the web's entry
+        // FUN_0048f530 (`engine/web.rs`).
+        if let Some(v) = self.web_load_hook(view) {
+            view = v;
         }
         // FUN_0040fc60(WAM, view): the place loaded, the view made current
         // (`LASTVUE`, `VUE`) and entered at those angles.

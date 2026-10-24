@@ -51,7 +51,7 @@ fn d(x: f32) -> f64 {
 }
 
 /// FUN_004c6d10: the rotation matrix (row-major) of an axis and an angle.
-fn axis_angle(fpu: Fpu, axis: [f32; 3], angle: f32) -> [f64; 9] {
+pub(crate) fn axis_angle(fpu: Fpu, axis: [f32; 3], angle: f32) -> [f64; 9] {
     let (add, sub, mul) = (
         |a, b| fpu.add(a, b),
         |a, b| fpu.sub(a, b),

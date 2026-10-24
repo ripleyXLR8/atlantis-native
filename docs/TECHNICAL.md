@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with its star map and its 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d.rs`, `canoe.rs`); the spider's web, whose hooks are noted and whose wins a testing aid writes) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -641,12 +641,11 @@ dragon, the turtle ring and the labyrinth's souls, below) and sends the
 game back to Tibet with China's mandala (the lantern), or at once by its
 gong. Yucatán's boat leaves for Yucatán (world 2, below), which plays
 with its counting grids and sends the game back to Tibet by its brazier;
-the priestess's yes leads into Xibalba (world 6, below), whose star map
-is played and whose two other puzzles are not ported yet (their hooks
-noted; testing aids write their wins, so a test plays on), and the soul
-it gives ends Yucatán with its mandala. A trip to a world not ported
-plays its film and stays where it is (the crystal, the space travel).
-Not yet: Xibalba's canoe and spider's web, and Shamballa.
+the priestess's yes leads into Xibalba (world 6, below), whose three
+puzzles (the star map, the canoe, the spider's web) are played, and the
+soul it gives ends Yucatán with its mandala. A trip to a world not
+ported plays its film and stays where it is (the crystal, the space
+travel). Not yet: Shamballa.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -1343,14 +1342,12 @@ back) into `yucatan-*.png`.
   55, 64 and 75 (their entries, their clicks on zones of type 50, their
   leaves on move zones) run (below); none takes the click, as in the
   original, so every click reaches `CLICZONE`, the scans and the moves.
-  Of Xibalba's hooks under the same prefix the star map's (view 121)
-  and the canoe's (view 402) run (below), the canoe's view taking the
+  Xibalba's hooks under the same prefix all run (below): the star
+  map's (view 121), the canoe's (view 402), the canoe's view taking the
   click while `enable_pz_pirog` is not 1, as in the original (the
-  dispatcher's own return of 1); the spider web's (view 198, and every
-  view in its puzzle mode 1) are listed and noted
-  (`Event::PuzzleNotPorted`; the web's branch, in the puzzle mode 1,
-  returns the web's click's value, which can be 1 too, and is counted as
-  not consuming since the port does not have the web). Yucatán's end (chapter 28's
+  dispatcher's own return of 1), and the spider web's (view 198, and
+  every view in its puzzle mode 1), the dispatcher returning the web's
+  move click's value (1 takes the click). Yucatán's end (chapter 28's
   arrival in the king's view 86 with the soul `CHULEL`: film 55 with
   dialog 168 over it, Yucatán's mandala, Tibet's view 7) needs the soul,
   which only Xibalba's chapter 39 gives (below). **The way back to Tibet
@@ -1393,9 +1390,9 @@ back) into `yucatan-*.png`.
   `riviere.wam` play (`bat.wam` and `toile.wam` have none). A save in
   Xibalba loads (chapter 39 runs its `/INIT` again at a load, as in the
   original); a save made in the web (views 198-265) loads in view 198, as
-  the original's load sets it (@ 0x0048f450..0x0048f494), the rest of
-  that code (the web's stage variables from the prey in the bag, then
-  the web's entry) being the web's, noted. **The star map** (`engine/stars.rs`, `xibalba.wam`
+  the original's load sets it (@ 0x0048f450..0x0048f494), with the
+  stage's variables from the prey in the bag (the web's load hook,
+  below). **The star map** (`engine/stars.rs`, `xibalba.wam`
   view 121, chapter 39) is ported: the seven stars `ETOILE102..115`,
   taken in the clearing's views 102-115, are laid on the 17 holes of a
   stone, the view's zones of type 50 (values 0..16); each hole is a
@@ -1433,23 +1430,8 @@ back) into `yucatan-*.png`.
   draw, and where the game hints at it, was not looked for. **The canoe runs** (`bat.wam`
   view 402: its click taken while `enable_pz_pirog` is not 1, then
   FUN_0049c010(1), the 3D canoe's own loop type 9, below, and the click
-  goes on). **Xibalba's last puzzle is not ported**: its hooks are
-  listed and noted (`Event::PuzzleNotPorted`) where the original calls
-  them: the spider's web (`toile.wam` views 198-265: the entry of
-  view 198, which would set the puzzle mode 1, so the web's mode-1 entry
-  and move clicks never run; its zone-click call returns at once while
-  the web is not loaded). **A testing aid** (`engine/xibalba.rs`, for
-  tests and tools only) writes what its win writes, read in the
-  original's code, so the story after it can be played:
-  `Engine::win_web_round` (one round won, by the web's stage
-  `Engine::web_stage`, 1 + the leading `finaraignN` set, 4 when all
-  three: the caterpillar (`CHENILLE`, sound 104, `finaraign1`), the
-  grasshopper (`SAUTERELLE`, sound 105, `finaraign2`, then the sword's
-  removal of the next stage's exit, which the exit's chain of tests
-  runs too; again at stage 4 only while it is not in the bag),
-  the big spider (`flag92` and the spider goddess a subject of the bat
-  and the priestess, the sword, film 48, the skull `CRANE_ARAIG2`, the
-  sword taken back, `finaraign3`); the aid notes `Event::PuzzleAid`.
+  goes on). **The spider's web runs** (below). No testing aid is
+  left: every win is played.
   **A headless game plays Yucatán and Xibalba with the mouse only**
   (`tests/flow.rs` `yucatan_with_the_mouse`, about 75 s in release):
   from a new game, Yucatán's boat taken in view 5 and laid in the hut,
@@ -1472,15 +1454,17 @@ back) into `yucatan-*.png`.
   trip; then the priestess's yes and Xibalba (the bat asked about
   everything, the canoe's zone clicked and the canoe played with the
   mouse to its win (each tile taken to its square and turned upright,
-  the stage clicked, the river paddled), the web's
-  first round by the aid, the caterpillar given to Chac (event 7), the
+  the stage clicked, the river paddled), the web's first round played
+  (the caterpillar), the caterpillar given to Chac (event 7), the
   priestess visited by `BackToS27` and the way back by the bat of her
   view, the seven stars taken and laid on the star map with the mouse
   (one on a wrong hole first and taken back), the
   statue asked before and after the obsidian is laid on the small
   statue, the crocodile's foot laid on its own (films 50, 51: the
-  serpent), the serpent asked (the feather), the web's second round and
-  the grasshopper given to Chac (event 8), the third round (the skull),
+  serpent), the serpent asked (the feather), the web's second round (the
+  grasshopper, the second spider) and the grasshopper given to Chac
+  (event 8), the third round (the feather laid, the sword, its blow on
+  the big spider: film 48, the skull),
   the skull given to the serpent (film 52: the soul)), a save and a load
   in Xibalba through the menus, the way back with the soul (the bat,
   `BackToS27`, the priestess, the king: film 55, Yucatán's mandala,
@@ -1488,21 +1472,24 @@ back) into `yucatan-*.png`.
   character is asked about everything he offers at each step; the
   dialogs of chapters 25-41 it plays are 101-123, 125, 129, 132, 134-136,
   138-143, 145-167, 169-176, 184-186, 190-202, 204 and 210 (168 over film
-  55; the others belong to the stages the aids skip, 187-189 and 208, or
-  to the priestess's and the bat's answers at other stages; 144 does not
-  exist). Every chapter it goes through is left by one of its own
-  `chapter=` lines, no world is refused, the only hooks noted are the
-  web's (FUN_0048f530), and
-  every `/set` line of chapters 25-41 it reports is
-  one the original runs. With `ATLANTIS2_PNG_DIR` set it writes its
-  screens (`yucatan-*.png`, `xibalba-*.png`). `tests/xibalba.rs` also
+  55; the others belong to a click on a spider, which the rounds avoid,
+  187-189, to the canoe started and not won, 208, or to the priestess's
+  and the bat's answers at other stages; 144 does not exist). The web's
+  rounds are those its golden plays (`tests/golden/web.txt` section F),
+  each move clicked once the spiders stand, the screen's centre off them.
+  Every chapter it goes through is left by one of its own `chapter=`
+  lines, no world is refused, no puzzle hook is noted (each
+  runs: `Event::PuzzleRan`), and every `/set` line of
+  chapters 25-41 it reports is one the original runs. With
+  `ATLANTIS2_PNG_DIR` set it writes its screens (`yucatan-*.png`,
+  `xibalba-*.png`, `pz-web-*.png`). `tests/xibalba.rs` also
   runs every Xibalba chapter's `/INIT`, enters every view of the four
   places with its hooks, plays the click hooks (the canoe's view taking
   the click, then the canoe started; a star laid on the map), moves
   along every link (the web's only with a transition video), plays the
   canoe with the mouse to its first and second wins and quits one with
-  Escape, checks it at 800 x 600, checks the aid against the scripts'
-  sections it triggers, plays all 34 dialogs the
+  Escape, checks it at 800 x 600, plays the web's first round with the
+  engine's clicks, plays all 34 dialogs the
   chapters and the web start (171-202, 204, 208), checks the subjects,
   objects, musics and films on disc 4 and the place sounds, and loads a
   game saved in the statues' clearing and one saved in the web.
@@ -1511,7 +1498,7 @@ back) into `yucatan-*.png`.
   colours the panorama's). Not checked against the original running
   Xibalba (Wine / Win98): the pictures, the place sounds' mix, Chac's
   events' timing on screen.
-- **The canoe** (`canoe.rs`, `atl3d.rs`, `engine/canoe.rs`; the files
+- **The canoe** (`canoe.rs`, `atl3d/ortho.rs`, `engine/canoe.rs`; the files
   in `atlantis2-data`'s `canoe.rs`; `bat.wam` view 402, chapter 35):
   loop type 9, the only puzzle with a loop of its own. The click branch
   of view 402 (`enable_pz_pirog` = 1) starts it (FUN_0049c010(1) →
@@ -1549,7 +1536,7 @@ back) into `yucatan-*.png`.
   before the "no free end" error (FUN_00498b40) is not logged. The loop
   has no clock: one step a frame (the original's frames are
   unpaced; here one a pass of the 60 Hz loop). The 3D is the original's
-  Atl3D path for these databases (`atl3d.rs`): the node tree with its
+  Atl3D path for these databases (`atl3d/ortho.rs`): the node tree with its
   matrix round trips, the database slots and their track keys (the
   heads' `eval_track`), the **library of textures, materials and meshes
   by name** that every load adds to and that the canoe empties at its
@@ -1582,6 +1569,60 @@ back) into `yucatan-*.png`.
   (a dialog's head) in the same run (the canoe's own drawing is checked
   from its start); the near and far clipping of faces (the canoe's
   objects never cross the planes: not ported, logged).
+- **The spider's web** (`engine/web.rs`, `toile.wam` views 198-265,
+  chapters 35 and 38; the module `pz_araig`): 65 nodes, views 201-265,
+  four rings of sixteen and the centre, their positions read from
+  `toile.vue` and their graph the views' destinations. The entry of view
+  198 (@ 0x0048f530) loads the stage's 3D models (`atl3d/warp.rs`) and sets
+  the puzzle mode 1; in it every entry runs the web's (@ 0x0048f9a0): a
+  node loads the round (the creatures placed), the prey's node takes it
+  (into the bag, into the hand the frame after), 199 or 200 leave it
+  (the stage's `finaraignN` with the prey). At each arrival the spiders
+  take a step (@ 0x004905c0, the chase @ 0x004908d0: the nearest node to
+  the player or to the centre, or the next node of their ring towards
+  the player's sector, by rings and sectors) and walk it frame by frame
+  (@ 0x00491670, the puzzle tick: 0.02 of the edge and 0.07 rad of turn
+  a warp frame); a spider ending on the player's node, or walked into,
+  attacks, and at its attack's end the round is lost (the warp's draw,
+  @ 0x00491b30: film 46, the prey taken back, the player put on 199 or
+  200). A move click is taken while a spider walks or turns
+  (@ 0x0048fdd0); with the feather in hand it lays it (the big spider
+  turned back once), from 247 to 248 with the sword in hand it is the
+  blow (film 48, four steps held); a click on a spider (its quads around
+  it, @ 0x00491e40, picked at the screen's centre @ 0x00458fe0, before
+  the zone's own click @ 0x0049caf2) asks about it (dialogs 187-189) or,
+  with the sword, strikes it. No randomness. The creatures are drawn over
+  the cube, under the cursor and the marker, by `atl3d/warp.rs`: the scene's
+  objects posed by their tracks at the model's frame, the pipeline with
+  the warp camera (76°, near 1.5) and the Pentium II's rasteriser, the
+  prey and objects through its `Opacity` twin (black texels not drawn).
+  The face planes come from the scenes' per-face normals (version 5),
+  32-bit maps are read as 24-bit ones. A save made in the web loads in
+  view 198 with the stage's variables from the prey in the bag
+  (@ 0x0048f450); the reset quits the web. A `vue=` line lends the
+  interpreter to the view's entry, so that the web's commands run inside
+  it as the original's re-entrant `RunOneCommand` runs them (the exit by
+  chapter 38's `vue=199`). With the HD mode on, the creatures are drawn
+  again over the HD view by the same pipeline with the camera scaled,
+  and the HD picture stands for the 640x480 frame with them (its base),
+  so that the front end shows them at the HD size (`tests/hd.rs` checks
+  what it composes).
+  **Checked** against the original's code run under emulation
+  (`tests/golden/web.txt`, `tests/web.rs`): the data and models as
+  loaded, the step for every node pair, the entries, exits and load,
+  the clicks, 2677 frames of passes, four rounds won from view 198 and
+  20 frames drawn, bit for bit, and in them every object drawn (its clip
+  codes, eye, vertex codes, face bytes and the used vertices'
+  projections). **Not read**: what gives the web's objects a second
+  texture-coordinate channel (bit 1 of the flags, from @ 0x004d6210: unset
+  for the first object drawn in 14 of the 20 frames, set for every other
+  one); the port draws with the mesh's UV set alone, and the 20 frames
+  are the original's. **Not ported**: the clipping of a face
+  crossing the near or far plane (none of the web's does; such a face is
+  skipped and logged), the C variant's own rasteriser (the C variant draws
+  the creatures with the Pentium II's routines). Not checked against the
+  original running the web (Wine / Win98): the pictures on screen, the
+  pace (the original's frames are not paced).
 - **Maya counting grids** (`engine/grids.rs`, `pyratez.wam` views 55, 64
   and 75; chapters 31, 32, 34): each grid is 16 cells in four groups of
   four (cells 4k..4k + 3: the tests read only i mod 4; where a group lies

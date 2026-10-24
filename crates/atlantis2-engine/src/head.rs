@@ -188,24 +188,24 @@ fn slerp(c: Fpu, a: &Quat, b: &Quat, t: f64) -> Quat {
 /// rotation, position and uniform scale; the world values are computed
 /// on demand (@ 0x004a33c0).
 #[derive(Clone, Debug)]
-struct Node {
-    name: String,
-    parent: Option<usize>,
-    lq: Quat,
-    lp: Vec3,
-    ls: f64,
-    wq: Quat,
-    wp: Vec3,
-    ws: f64,
-    valid: bool,
+pub(crate) struct Node {
+    pub(crate) name: String,
+    pub(crate) parent: Option<usize>,
+    pub(crate) lq: Quat,
+    pub(crate) lp: Vec3,
+    pub(crate) ls: f64,
+    pub(crate) wq: Quat,
+    pub(crate) wp: Vec3,
+    pub(crate) ws: f64,
+    pub(crate) valid: bool,
 }
 
 /// A node's key-frame track (@ 0x004c7250): (time, value) per channel.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Track {
-    rotations: Vec<(f64, Quat)>,
-    positions: Vec<(f64, Vec3)>,
-    scales: Vec<(f64, f64)>,
+    pub(crate) rotations: Vec<(f64, Quat)>,
+    pub(crate) positions: Vec<(f64, Vec3)>,
+    pub(crate) scales: Vec<(f64, f64)>,
 }
 
 /// The first key whose time is not below `t` (@ 0x004c87d0).
@@ -302,9 +302,9 @@ impl Camera {
 }
 
 /// Clip codes of a vertex (pipeline + 0x24).
-const CLIP_NEAR: u8 = 0x10;
-const CLIP_FAR: u8 = 0x20;
-const USED: u8 = 0x80;
+pub(crate) const CLIP_NEAR: u8 = 0x10;
+pub(crate) const CLIP_FAR: u8 = 0x20;
+pub(crate) const USED: u8 = 0x80;
 
 /// The head mesh as the pipeline reads it.
 #[derive(Clone, Debug)]
@@ -591,27 +591,12 @@ impl Head {
     /// Poses the scene at the body video's frame `frame` (@ 0x00463140):
     /// every node's tracks at time `(float)frame`.
     pub fn pose(&mut self, frame: i32) {
-        let t = f64::from(frame as f32);
-        for i in 0..self.nodes.len() {
-            let Some(tr) = &self.tracks[i] else { continue };
-            let (q, p, s) = eval_track(self.fpu, tr, t);
-            // Each value is set relative to the node's own parent: a copy
-            // (@ 0x004a2860, @ 0x004a2000, @ 0x004a2f40), which marks the
-            // node and its descendants stale.
-            let n = &mut self.nodes[i];
-            if let Some(q) = q {
-                n.lq = q;
-            }
-            if let Some(p) = p {
-                n.lp = p;
-            }
-            if let Some(s) = s {
-                n.ls = s;
-            }
-        }
-        for n in &mut self.nodes {
-            n.valid = false;
-        }
+        pose_nodes(
+            self.fpu,
+            &mut self.nodes,
+            &self.tracks,
+            f64::from(frame as f32),
+        );
     }
 
     /// The world values of node `i` (@ 0x004a33c0).
@@ -660,51 +645,7 @@ impl Head {
     /// the parent's world values (updated first), no float store in
     /// between and no rule for a zero scale.
     fn update_asm(&mut self, i: usize) {
-        if self.nodes[i].valid {
-            return;
-        }
-        let c = self.fpu;
-        let m = |x, y| c.mul(x, y);
-        let Some(pi) = self.nodes[i].parent else {
-            let n = &mut self.nodes[i];
-            (n.wq, n.wp, n.ws, n.valid) = (n.lq, n.lp, n.ls, true);
-            return;
-        };
-        self.update_asm(pi);
-        let (pq, pp, ps) = {
-            let p = &self.nodes[pi];
-            (p.wq, p.wp, p.ws)
-        };
-        let n = &mut self.nodes[i];
-        let [px, py, pz, pw] = pq;
-        n.ws = c.f(m(ps, n.ls));
-        let (a, b, cc) = (m(n.lp[0], ps), m(n.lp[1], ps), m(n.lp[2], ps));
-        let x0 = c.add(c.sub(m(a, pw), m(pz, b)), m(py, cc));
-        let y0 = c.add(c.sub(m(b, pw), m(px, cc)), m(pz, a));
-        let z0 = c.add(c.sub(m(cc, pw), m(py, a)), m(px, b));
-        let w0 = c.add(m(a, px), c.add(m(b, py), m(cc, pz)));
-        n.wp = [
-            c.f(c.add(
-                c.add(m(x0, pw), c.sub(c.add(m(px, w0), m(py, z0)), m(pz, y0))),
-                pp[0],
-            )),
-            c.f(c.add(
-                c.add(m(y0, pw), c.sub(c.add(m(py, w0), m(pz, x0)), m(px, z0))),
-                pp[1],
-            )),
-            c.f(c.add(
-                c.add(m(z0, pw), c.sub(c.add(m(w0, pz), m(px, y0)), m(py, x0))),
-                pp[2],
-            )),
-        ];
-        let [lx, ly, lz, lw] = n.lq;
-        n.wq = [
-            c.f(c.sub(c.add(c.add(m(lx, pw), m(px, lw)), m(py, lz)), m(ly, pz))),
-            c.f(c.sub(c.add(c.add(m(ly, pw), m(py, lw)), m(lx, pz)), m(px, lz))),
-            c.f(c.sub(c.add(c.add(m(lz, pw), m(lw, pz)), m(ly, px)), m(py, lx))),
-            c.f(c.sub(c.sub(c.sub(m(pw, lw), m(px, lx)), m(py, ly)), m(pz, lz))),
-        ];
-        n.valid = true;
+        update_asm_node(self.fpu, &mut self.nodes, i);
     }
 
     /// The lip-sync mouth (`dlg_Anim::LipSync` @ 0x004631a0 with an
@@ -1206,7 +1147,7 @@ fn back_faces_pii(k: Fpu, corners: &[[u16; 3]], cv: &[[f64; 3]], codes: &mut [u8
 
 /// A face's byte (0 drawn, 0x40 back face); a drawn face's three vertices
 /// get the code 0x80.
-fn mark_front(front: bool, tri: &[u16; 3], codes: &mut [u8]) -> u8 {
+pub(crate) fn mark_front(front: bool, tri: &[u16; 3], codes: &mut [u8]) -> u8 {
     if !front {
         return 0x40;
     }
@@ -1351,6 +1292,82 @@ pub(crate) fn eval_track(c: Fpu, tr: &Track, t: f64) -> (Option<Quat>, Option<Ve
         })
     };
     (q, p, s)
+}
+
+/// Poses the nodes at time `t` (@ 0x004c7810 for every node with a
+/// track, flags 0x1f, [`eval_track`]): each value set relative to the
+/// node's parent; every node's world values stale afterwards.
+pub(crate) fn pose_nodes(fpu: Fpu, nodes: &mut [Node], tracks: &[Option<Track>], t: f64) {
+    for i in 0..nodes.len() {
+        let Some(tr) = &tracks[i] else { continue };
+        let (q, p, s) = eval_track(fpu, tr, t);
+        // Each value is set relative to the node's own parent: a copy
+        // (@ 0x004a2860, @ 0x004a2000, @ 0x004a2f40), which marks the
+        // node and its descendants stale.
+        let n = &mut nodes[i];
+        if let Some(q) = q {
+            n.lq = q;
+        }
+        if let Some(p) = p {
+            n.lp = p;
+        }
+        if let Some(s) = s {
+            n.ls = s;
+        }
+    }
+    for n in nodes.iter_mut() {
+        n.valid = false;
+    }
+}
+
+/// The world values of node `i` as the x87 assembly computes them
+/// (@ 0x00584340); see [`Head::update_asm`].
+pub(crate) fn update_asm_node(fpu: Fpu, nodes: &mut [Node], i: usize) {
+    if nodes[i].valid {
+        return;
+    }
+    let c = fpu;
+    let m = |x, y| c.mul(x, y);
+    let Some(pi) = nodes[i].parent else {
+        let n = &mut nodes[i];
+        (n.wq, n.wp, n.ws, n.valid) = (n.lq, n.lp, n.ls, true);
+        return;
+    };
+    update_asm_node(fpu, nodes, pi);
+    let (pq, pp, ps) = {
+        let p = &nodes[pi];
+        (p.wq, p.wp, p.ws)
+    };
+    let n = &mut nodes[i];
+    let [px, py, pz, pw] = pq;
+    n.ws = c.f(m(ps, n.ls));
+    let (a, b, cc) = (m(n.lp[0], ps), m(n.lp[1], ps), m(n.lp[2], ps));
+    let x0 = c.add(c.sub(m(a, pw), m(pz, b)), m(py, cc));
+    let y0 = c.add(c.sub(m(b, pw), m(px, cc)), m(pz, a));
+    let z0 = c.add(c.sub(m(cc, pw), m(py, a)), m(px, b));
+    let w0 = c.add(m(a, px), c.add(m(b, py), m(cc, pz)));
+    n.wp = [
+        c.f(c.add(
+            c.add(m(x0, pw), c.sub(c.add(m(px, w0), m(py, z0)), m(pz, y0))),
+            pp[0],
+        )),
+        c.f(c.add(
+            c.add(m(y0, pw), c.sub(c.add(m(py, w0), m(pz, x0)), m(px, z0))),
+            pp[1],
+        )),
+        c.f(c.add(
+            c.add(m(z0, pw), c.sub(c.add(m(w0, pz), m(px, y0)), m(py, x0))),
+            pp[2],
+        )),
+    ];
+    let [lx, ly, lz, lw] = n.lq;
+    n.wq = [
+        c.f(c.sub(c.add(c.add(m(lx, pw), m(px, lw)), m(py, lz)), m(ly, pz))),
+        c.f(c.sub(c.add(c.add(m(ly, pw), m(py, lw)), m(lx, pz)), m(px, lz))),
+        c.f(c.sub(c.add(c.add(m(lz, pw), m(lw, pz)), m(ly, px)), m(py, lx))),
+        c.f(c.sub(c.sub(c.sub(m(pw, lw), m(px, lx)), m(py, ly)), m(pz, lz))),
+    ];
+    n.valid = true;
 }
 
 /// Linear interpolation of two position keys (@ 0x004c7b10).

@@ -5,7 +5,9 @@
 //! (`HdLayer::base`). In a dialog line the layer is the first game's
 //! dialog picture (`atlantis_engine::hd::compose_dialog`): the view, the
 //! body video upscaled over it, and the head drawn again at the HD size by
-//! the same pipeline ([`crate::head::Head::draw_scaled`]). The texts of a
+//! the same pipeline ([`crate::head::Head::draw_scaled`]). On the spider's
+//! web the creatures are drawn again over the HD view, and the layer stands
+//! for the 640x480 frame with them. The texts of a
 //! frame (the subtitles, the tooltips, the bag's names, the credits) are
 //! recorded for the front end to draw again at its size
 //! ([`crate::hd::HdTexts`]). The engine does nothing of this with the HD
@@ -54,6 +56,9 @@ pub(crate) struct HdState {
     /// same view and unchanged faces is not drawn again.
     view_key: Option<ViewKey>,
     view_in_layer: bool,
+    /// The web's creatures at the HD size and their Z buffer.
+    web_pixels: Vec<u16>,
+    web_z: Vec<u32>,
 }
 
 /// What an HD view shows, besides the faces.
@@ -127,6 +132,13 @@ impl Engine {
     #[doc(hidden)]
     pub fn hd_dialog_capture(&self) -> &DialogHd {
         &self.hd.dialog
+    }
+
+    /// The web's last Z buffers, the 640x480 frame's and the HD view's
+    /// (non-zero where the creatures were drawn; for tests and tools).
+    #[doc(hidden)]
+    pub fn hd_web_capture(&self) -> (&[u32], &[u32]) {
+        (&self.web_z, &self.hd.web_z)
     }
 
     /// The texts of the frame on screen, to draw at the HD size (their
@@ -250,6 +262,61 @@ impl Engine {
         hd.drew_video = false;
         if let Some(t0) = t0 {
             hd.view_ms = t0.elapsed().as_secs_f64() * 1e3;
+        }
+    }
+
+    /// The web's creatures were just drawn over the cube with `view`
+    /// (`engine/web.rs`) into `frame`: drawn again over the HD view, at
+    /// its size, by the same pipeline with the camera scaled (as the
+    /// dialog heads). The layer then stands for `frame` (its base), so
+    /// that the front end shows it where the screen still shows the cube
+    /// and the creatures.
+    pub(super) fn hd_web(&mut self, view: &crate::atl3d::View, frame: &[u16]) {
+        if !self.hd_active() || !self.hd.drew_scene {
+            return;
+        }
+        let Some(tile) = self.hd.tile else { return };
+        let t0 = now();
+        let k = self.camera.fpu;
+        let (w, h, side) = (
+            self.hd.layer.width,
+            self.hd.layer.height,
+            self.hd.layer.side,
+        );
+        let v = view.scaled(k, tile, side, w, h);
+        let mut pixels = std::mem::take(&mut self.hd.web_pixels);
+        let mut zbuf = std::mem::take(&mut self.hd.web_z);
+        pixels.clear();
+        pixels.resize(w * h, 0);
+        zbuf.clear();
+        zbuf.resize(w * h, 0);
+        {
+            let mut t = crate::raster3d::Target {
+                pixels: &mut pixels,
+                zbuf: &mut zbuf,
+                width: w,
+                height: h,
+            };
+            let player = self.view as i32;
+            self.web.redraw(k, player, &v, &mut t);
+        }
+        let lut = crate::hd::rgb565_to_888();
+        let hd = &mut self.hd;
+        for (i, &z) in zbuf.iter().enumerate() {
+            if z != 0 {
+                hd.layer.pixels[i] = lut[usize::from(pixels[i])];
+            }
+        }
+        hd.layer
+            .base
+            .copy_from_slice(&frame[..crate::hd::SCREEN_W * crate::hd::SCREEN_H]);
+        // The layer no longer shows the view alone: the next frame draws
+        // it again.
+        hd.view_key = None;
+        hd.web_pixels = pixels;
+        hd.web_z = zbuf;
+        if let Some(t0) = t0 {
+            hd.view_ms += t0.elapsed().as_secs_f64() * 1e3;
         }
     }
 

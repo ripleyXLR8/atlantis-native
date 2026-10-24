@@ -61,6 +61,10 @@ pub struct Mesh {
     pub vertex_normals: Vec<[f32; 3]>,
     /// Per-face planes (unit normal, d), version 6 and later.
     pub face_planes: Vec<[f32; 4]>,
+    /// Per-face unit normals of the files before version 6, from which
+    /// the loader makes the face planes (@ 0x004a7395..0x004a740b: d = the
+    /// normal · the face's first vertex).
+    pub face_normals: Vec<[f32; 3]>,
     /// Per-corner planes, version 6 and later.
     pub corner_planes: Vec<[f32; 4]>,
 }
@@ -332,7 +336,7 @@ fn read_mesh(r: &mut Reader) -> Result<Mesh, DbError> {
     }
     m.face_materials = r.vec_u8()?;
     if v < 6 {
-        r.vec_f::<3>()?; // per-vertex normals of the old files
+        m.face_normals = r.vec_f::<3>()?;
     }
     r.vec_u32()?;
     m.corners = r.vec_u16()?;

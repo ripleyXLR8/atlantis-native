@@ -27,8 +27,8 @@
 //! and a shorter trip back by chapter 42's gong. Yucatán and Xibalba the
 //! same way, from a new game ([`whole_yucatan`]): Yucatán's chapters
 //! 25-34 with the counting grids, the brazier back and the second trip,
-//! the priestess's yes and Xibalba's chapters 35-39 (its three puzzles'
-//! hooks noted, their wins written by the engine's testing aids), a save
+//! the priestess's yes and Xibalba's chapters 35-39 (its three puzzles
+//! played with the mouse: the canoe, the web's rounds, the star map), a save
 //! and a load in each, the soul brought back to the king and Yucatán's
 //! mandala laid in Tibet.
 //!
@@ -4309,10 +4309,9 @@ fn yucatan_dialogs_played() -> Vec<u32> {
 /// the priestess's yes and Xibalba as chapters 35-39 make it
 /// ([`XIBALBA`]: the bat, the canoe played with the mouse, the web's
 /// three rounds and Chac, the priestess visited on the way, the star map,
-/// the statues and the serpent, the soul), its two other puzzles' hooks
-/// noted where a player reaches them and their wins written by the
-/// testing aids, a save and a
-/// load in Xibalba; the way back with the soul to the king (the end of
+/// the statues and the serpent, the soul), the web played (its rounds won
+/// as the original wins them), every puzzle hook run and none noted, a
+/// save and a load in Xibalba; the way back with the soul to the king (the end of
 /// Yucatán) and Yucatán's mandala laid in Tibet. Every chapter it goes
 /// through is left by one of its own `chapter=` lines, no world is
 /// refused, and every `/set` line of chapters 25-41 reported is one the
@@ -4346,18 +4345,22 @@ fn yucatan_with_the_mouse() {
     yucatan_lines_as_the_original(&journal);
     chapters_ended(&r.e, &journal, &YUCATAN_CHAPTERS);
     chapters_ended(&r.e, &journal, &XIBALBA_CHAPTERS);
-    let mut noted: Vec<u32> = journal
+    // Every puzzle hook ran as the original's, none is left noted.
+    assert!(!journal
+        .iter()
+        .any(|e| matches!(e, Event::PuzzleNotPorted { .. })));
+    let mut ran: Vec<u32> = journal
         .iter()
         .filter_map(|e| match e {
-            Event::PuzzleNotPorted { function } => Some(*function),
+            Event::PuzzleRan { function } => Some(*function),
             _ => None,
         })
         .collect();
-    noted.sort_unstable();
-    noted.dedup();
-    let mut want = XIBALBA_NOTED.to_vec();
-    want.sort_unstable();
-    assert_eq!(noted, want);
+    ran.sort_unstable();
+    ran.dedup();
+    for function in XIBALBA_RAN {
+        assert!(ran.contains(&function), "{function:#010x} not run");
+    }
     assert!(!journal
         .iter()
         .any(|e| matches!(e, Event::WorldNotPorted(_))));
@@ -4421,8 +4424,20 @@ fn yucatan_stages_from_saves() {
 // Xibalba, with the mouse.
 
 /// The hooks of Xibalba's puzzles not ported: noted where a player
-/// reaches them (the web's entry of view 198).
-const XIBALBA_NOTED: [u32; 1] = [0x0048_f530];
+/// The puzzle functions of Xibalba a player's game runs, each noted
+/// [`Event::PuzzleRan`]: the web's entry of view 198, its mode-1 entry
+/// and its move click; the star map's entry, click and win test; the
+/// canoe's start (`pz_pirogue_init`) and its quit after the win.
+const XIBALBA_RAN: [u32; 8] = [
+    0x0048_f530,
+    0x0048_f9a0,
+    0x0048_fdd0,
+    0x0049_4e00,
+    0x0049_4e80,
+    0x0049_4f60,
+    0x0049_6a60,
+    0x0049_a570,
+];
 
 impl Run {
     /// A click on zone `zone` (a `#ZONES_CLIC#` name) that opens the
@@ -4655,23 +4670,225 @@ fn the_canoe(r: &mut Run) {
     r.shot_as("xibalba-03-clearing.png");
 }
 
-/// To the web by the river (`toile.wam` view 198, chapter 38; its entry
-/// noted), a step on it and back, a round's win written by the testing
-/// aid (stage `stage`), and back to the river (chapter 36).
+/// The rounds of the web from view 198, as the original plays them
+/// (`tests/golden/web.txt` section F): each a view (its move zone
+/// clicked), or −3 (the feather taken from the bag, then laid by the click
+/// on the next move zone).
+const WEB_ROUNDS: [&[i32]; 4] = [
+    &[
+        199, 213, 230, 213, 214, 231, 248, 249, 265, 252, 235, 218, 201, 199,
+    ],
+    &[
+        199, 213, 230, 213, 214, 215, 216, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211,
+        212, 213, 230, 213, 214, 215, 216, 217, 234, 251, 234, 217, 216, 199,
+    ],
+    &[
+        199, 213, -3, 214, 214, 213, 230, 247, 248, 264, 265, 252, 235, 218, 201, 199,
+    ],
+    &[
+        199, 213, 230, 213, 214, 215, 216, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211,
+        212, 213, 230, 213, 214, 215, 216, 217, 234, 251, 234, 217, 216, 199,
+    ],
+];
+
+impl Run {
+    /// Whether the web's spiders all stand (none walks or turns): the web
+    /// takes a move click while one moves.
+    fn web_still(&self) -> bool {
+        self.e.web.creatures.iter().all(|c| {
+            !matches!(c.kind, 1 | 2) || (c.t == 0.0 && c.target == c.heading && c.from == c.to)
+        })
+    }
+
+    /// Passes until the web's spiders stand.
+    fn web_wait(&mut self) {
+        for _ in 0..2000 {
+            if self.web_still() {
+                return;
+            }
+            self.step();
+        }
+        panic!("the spiders never stop");
+    }
+
+    /// The move zone to view `to` aimed with the mouse, the screen's
+    /// centre off the spiders (a click on one is the web's: a dialog, or
+    /// the sword's blow), once they stand.
+    fn web_aim(&mut self, to: u32) {
+        self.web_wait();
+        self.wait(15);
+        let view = self.e.place().1;
+        let zones: Vec<usize> = self
+            .e
+            .wam()
+            .view(view)
+            .unwrap()
+            .zones
+            .iter()
+            .enumerate()
+            .filter(|(_, z)| z.kind == 1 && z.value == to as i32)
+            .map(|(i, _)| i)
+            .collect();
+        for z in zones {
+            let (yaw, pitch) = self.e.zone_aim(view, z).unwrap();
+            let on = move |e: &Engine| {
+                e.centre_zone().map(|(i, _)| i) == Some(z)
+                    && !e.web.hit(e.camera.fpu, &e.camera)
+                    && e.sprite_under_centre().1 == 0
+            };
+            let off = 0.6f32.to_radians();
+            let mut targets = vec![
+                (yaw + off, pitch),
+                (yaw - off, pitch),
+                (yaw, pitch + off),
+                (yaw, pitch - off),
+            ];
+            // Then towards each corner of the zone (the spider may stand
+            // in front of its middle).
+            let fpu = self.e.fpu();
+            for p in &self.e.wam().view(view).unwrap().zones[z].points {
+                let (y, q) = atlantis2_engine::camera::direction_angles(fpu, *p);
+                let dy = (y - yaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                    - std::f32::consts::PI;
+                for f in [0.5, 0.75, 0.9] {
+                    targets.push((yaw + dy * f, pitch + (q - pitch) * f));
+                }
+            }
+            for (y, p) in targets {
+                if self.steer(y, p, &on) {
+                    return;
+                }
+            }
+        }
+        panic!("no move zone to view {to} off the spiders in view {view}");
+    }
+
+    /// A move on the web: the spiders let stand, the zone aimed off them
+    /// and clicked, the move's video clicked away; the events, in order.
+    fn web_walk(&mut self, to: u32) -> Vec<Event> {
+        self.web_aim(to);
+        self.tap();
+        let mut all = Vec::new();
+        for _ in 0..600 {
+            let evs = self.events();
+            let video = evs.iter().any(|e| {
+                matches!(
+                    e,
+                    Event::VideoStart {
+                        frames: Some(_),
+                        ..
+                    }
+                )
+            });
+            let arrived = evs.iter().any(|e| matches!(e, Event::ArrivalScan(_)));
+            all.extend(evs);
+            if video {
+                self.wait(15);
+                self.tap();
+            }
+            if arrived {
+                assert_eq!(self.e.place().1, to);
+                self.wait(4);
+                all.extend(self.take_events());
+                all.extend(self.settle());
+                return all;
+            }
+        }
+        panic!("no arrival in view {to}");
+    }
+
+    /// A click on the move zone to view `to` that the web takes (the
+    /// feather laid, the sword's blow): no move; what follows played out.
+    fn web_click(&mut self, to: u32) -> Vec<Event> {
+        let view = self.e.place().1;
+        self.web_aim(to);
+        self.tap();
+        let mut all = self.events();
+        all.extend(self.settle());
+        assert_eq!(self.e.place().1, view, "the click on {to} moved");
+        all
+    }
+
+    /// The view turned with the mouse onto the web's creature `i` (the
+    /// screen's centre on its click quad's direction).
+    fn web_look(&mut self, i: usize) {
+        let fpu = self.e.camera.fpu;
+        let p = self.e.web.creature_pos(fpu, self.e.place().1 as i32, i);
+        let d = [p[0] as f32, (p[1] - 20.0) as f32, p[2] as f32];
+        let (yaw, pitch) = atlantis2_engine::camera::direction_angles(fpu, d);
+        let on = move |e: &Engine| {
+            let (y, p) = e.camera.angles();
+            let dy = (y - yaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                - std::f32::consts::PI;
+            dy.abs() < 0.03 && (p - pitch).abs() < 0.03
+        };
+        self.steer(yaw, pitch, &on);
+        self.wait(2);
+    }
+
+    /// A round of the web played with the mouse from view 198: `route`
+    /// ([`WEB_ROUNDS`]); a picture of the spider after the round's second
+    /// move (`pz-web-<stage>-spider.png`) and of the big spider before the
+    /// sword's blow (`pz-web-3-blow.png`).
+    fn web_play(&mut self, stage: i32, route: &[i32]) -> Vec<Event> {
+        let mut all = Vec::new();
+        let mut feather = false;
+        let mut sword = false;
+        for (k, &v) in route.iter().enumerate() {
+            if k == 2 {
+                self.web_wait();
+                self.web_look(0);
+                self.shot_as(&format!("pz-web-{stage}-spider.png"));
+            }
+            if v == -3 {
+                let id = self.obj("PLUME");
+                self.pick(id);
+                feather = true;
+                continue;
+            }
+            let v = v as u32;
+            let from = self.e.place().1;
+            if feather {
+                all.extend(self.web_click(v));
+                assert_eq!(self.e.web.feather, v as i32, "the feather not laid");
+                feather = false;
+            } else if from == 247 && v == 248 && !sword {
+                // The sword's blow on the spider standing on 248: film 48.
+                assert_eq!(self.var("OBJETENMAIN"), self.obj("EPEE"));
+                self.web_wait();
+                self.web_look(0);
+                self.shot_as("pz-web-3-blow.png");
+                let evs = self.web_click(v);
+                assert!(films(&evs).contains(&48), "no blow");
+                all.extend(evs);
+                sword = true;
+            } else {
+                all.extend(self.web_walk(v));
+            }
+        }
+        all
+    }
+}
+
+/// To the web by the river (`toile.wam` view 198, chapter 38: its entry,
+/// the puzzle mode 1), a round of stage `stage` played with the mouse
+/// ([`WEB_ROUNDS`]), left by view 199 (chapter 38's film 47, the web's
+/// flight), and back to the river (chapter 36).
 fn web_round(r: &mut Run, stage: i32) -> Vec<Event> {
     let mut evs = r.river_to(314, 198);
     assert_eq!((r.e.place(), r.chapter()), (("toile.wam", 198), 38));
-    assert!(evs.contains(&Event::PuzzleNotPorted {
+    assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0048_f530
     }));
+    assert_eq!((r.e.puzzle_mode(), r.e.web.stage), (1, stage));
+    evs.extend(r.web_play(stage, WEB_ROUNDS[stage as usize - 1]));
+    assert!(films(&evs).contains(&47), "no flight");
+    assert_eq!(r.e.place(), ("toile.wam", 199));
+    assert!(!r.e.web.loaded);
     if stage == 1 {
         r.shot_as("xibalba-05-web.png");
     }
-    evs.extend(r.walk(199));
     evs.extend(r.walk(198));
-    assert_eq!(r.e.web_stage(), stage);
-    assert_eq!(r.e.win_web_round(), stage);
-    evs.extend(r.settle());
     evs.extend(r.walk_link_to(314));
     assert_eq!((r.e.place(), r.chapter()), (("riviere.wam", 314), 36));
     evs
@@ -4896,7 +5113,7 @@ fn the_spiders_skull(r: &mut Run) {
     assert!(r.in_bag("CRANE_ARAIG2"));
     assert!(!r.in_bag("EPEE"));
     assert_eq!((r.var("finaraign3"), r.flag(92)), (1, 1));
-    assert_eq!(r.e.web_stage(), 4);
+    assert_eq!(r.e.web.stage, 4);
 }
 
 /// The spider's skull given to the serpent (view 122, chapter 39: film
