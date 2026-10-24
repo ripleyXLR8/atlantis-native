@@ -206,6 +206,7 @@ fn state(e: &Engine) -> String {
         match e.cursor.bank {
             CursorBank::Objects => format!("OBJ#{}", s.hand_x),
             CursorBank::Interface => format!("0x11110000#{}", s.hand_x),
+            CursorBank::Puzzle => format!("puzzle#{}", s.hand_x),
         }
     };
     let pair = format!(

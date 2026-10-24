@@ -240,6 +240,8 @@ pub struct Overlays {
     pub saved_cursor_frame: i32,
     pub saved_hand_frame: i32,
     pub saved_hand_objects: bool,
+    /// Whether that bank was the counting grids' marbles.
+    pub saved_hand_puzzle: bool,
 }
 
 impl Overlays {

@@ -33,28 +33,23 @@
 //!   that frame does not run (the menu is open, FUN_0045a870).
 //!
 //! The Maya counting grids (views 55, 64, 75 of `pyratez.wam`, chapters
-//! 31, 32, 34) are not ported: their hooks are listed and noted
-//! ([`Event::PuzzleNotPorted`]), and [`Engine::solve_maya_grid`] writes
-//! what a grid's win writes, for tests. The star map (view 121), the canoe
-//! (view 402) and the spider web (views 198-265, the mode 1) are
-//! Xibalba's (`MONDE` 6), whose places the port refuses: they are listed
-//! and noted too.
+//! 31, 32, 34) run (`grids.rs`), each hook noted [`Event::PuzzleRan`].
+//! The star map (view 121), the canoe (view 402) and the spider web
+//! (views 198-265, the mode 1) are Xibalba's (`MONDE` 6), whose places
+//! the port refuses: they are listed and noted
+//! ([`Event::PuzzleNotPorted`]).
 
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 
+use super::grids::{GRID_CLICKS, GRID_ENTRIES, GRID_LEAVES, GRID_VIEWS};
 use super::{CursorBank, Engine, Event};
 
 /// The prefix of Yucatán's views (@ 0x005db004).
 const YUCATAN_PREFIX: &[u8] = b"YU";
 
 /// The counting grids' views (@ 0x0049b9bd, 0x0049b9ce, 0x0049b9df).
-pub const MAYA_GRID_VIEWS: [u32; 3] = [55, 64, 75];
-
-/// Their leaves (move zones), clicks (type 0x32) and entries, by grid.
-const GRID_LEAVES: [u32; 3] = [0x0049_2d60, 0x0049_2e80, 0x0049_2ef0];
-const GRID_CLICKS: [u32; 3] = [0x0049_31a0, 0x0049_3490, 0x0049_3510];
-const GRID_ENTRIES: [u32; 3] = [0x0049_2f60, 0x0049_3070, 0x0049_3100];
+pub const MAYA_GRID_VIEWS: [u32; 3] = GRID_VIEWS;
 
 /// The star map's view (@ 0x0049bb1f), click and entry.
 const STARS_VIEW: u32 = 121;
@@ -87,9 +82,6 @@ const WEB_ENTRY: u32 = 0x0048_f530;
 
 /// The pointer frame of `interfac.spr` (@ 0x0049bbb1).
 const POINTER_FRAME: i32 = 0x28;
-
-/// The grid's win sound (@ 0x005e1970, FUN_00493470).
-const GRID_WIN_SOUND: &str = "sound101.apc";
 
 fn prefixed(view_name: &[u8]) -> bool {
     view_name.len() >= 2 && view_name[..2].eq_ignore_ascii_case(YUCATAN_PREFIX)
@@ -169,10 +161,11 @@ pub fn yucatan_entry_hooks(view_name: &[u8], view: u32, mode: i32) -> Vec<u32> {
 
 impl Engine {
     /// The `YU` part of FUN_0049b910 for a click on `zone` of view
-    /// `view` (warp name `view_name`): the statue's branch runs, the other
-    /// hooks are noted; true when the click is consumed (the canoe's view
-    /// while the canoe is not enabled). Public for tests and tools: the
-    /// dispatcher on any warp name and number.
+    /// `view` (warp name `view_name`): the grids' leaves and clicks and the
+    /// statue's branch run, Xibalba's hooks are noted; true when the click
+    /// is consumed (the canoe's view while the canoe is not enabled).
+    /// Public for tests and tools: the dispatcher on any warp name and
+    /// number.
     pub fn yucatan_click(&mut self, view_name: &[u8], view: u32, zone: &Zone) -> bool {
         let canoe = self
             .con
@@ -182,22 +175,35 @@ impl Engine {
         let (hooks, consumed) =
             yucatan_click_hooks(view_name, view, zone.kind, self.puzzle_mode(), canoe);
         for function in hooks {
-            match function {
-                STATUE_BRANCH => self.statue_click(zone),
-                _ => self.puzzle_not_ported(function),
+            if let Some(g) = GRID_LEAVES.iter().position(|&f| f == function) {
+                self.event(Event::PuzzleRan { function });
+                self.grid_leave(g);
+            } else if let Some(g) = GRID_CLICKS.iter().position(|&f| f == function) {
+                self.event(Event::PuzzleRan { function });
+                self.grid_click(g, zone.value);
+            } else if function == STATUE_BRANCH {
+                self.statue_click(zone);
+            } else {
+                self.puzzle_not_ported(function);
             }
         }
         consumed
     }
 
-    /// The Yucatán part of FUN_0049bd50: every hook noted (none is ported).
+    /// The Yucatán part of FUN_0049bd50: the grids' entries run,
+    /// Xibalba's hooks are noted.
     pub(super) fn yucatan_entry(&mut self) {
         let hooks = self
             .current_view()
             .map(|v| yucatan_entry_hooks(v.name.as_bytes(), self.view, self.puzzle_mode()))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            if let Some(g) = GRID_ENTRIES.iter().position(|&f| f == function) {
+                self.event(Event::PuzzleRan { function });
+                self.grid_entry(g);
+            } else {
+                self.puzzle_not_ported(function);
+            }
         }
     }
 
@@ -252,27 +258,5 @@ impl Engine {
                 None
             }
         }
-    }
-
-    /// A testing aid, for tests and tools only: what the win of counting
-    /// grid `n` (1..3: views 55, 64, 75) writes, the grids being not
-    /// ported (FUN_004931a0 / FUN_00493490 / FUN_00493510 when the grid's
-    /// 16 digits equal its solution, `0000000000000045`,
-    /// `0000000000040001`, `0000155500350001` @ 0x005e187c, 0x005e1890,
-    /// 0x005e18a4): the module's state 2 (@ 0x006d2684 + 4 (n − 1)),
-    /// `finmayaN` = 1 (Interp_WriteVar), the win sound `sound101.apc` on
-    /// voice 2 (FUN_00493470). No scan: in the original the click scan of
-    /// the same frame follows (the dispatcher returns 0), here the next
-    /// click's. The module's state and the digits are not kept (no port
-    /// code reads them), so the grid's leave, which in the original sets
-    /// `finmayaN` back to 0 when the digits differ from the solution, is
-    /// not needed to keep the win.
-    pub fn solve_maya_grid(&mut self, n: usize) {
-        assert!((1..=3).contains(&n), "grid {n}");
-        let var = format!("finmaya{n}");
-        self.with_script(|s, _| {
-            s.set_var(&var, 1);
-        });
-        crate::script::Host::new_sound(self, GRID_WIN_SOUND);
     }
 }

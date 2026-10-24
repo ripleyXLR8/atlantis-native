@@ -3694,11 +3694,29 @@ fn the_obsidian(r: &mut Run) {
     r.walk(34);
 }
 
+/// A counting grid played with the mouse: a click on its zone of type 50
+/// of each value in turn (0x11 one more marble, 0x12 five or none, 1..16
+/// a cell); the events.
+fn play_grid(r: &mut Run, values: &[i32]) -> Vec<Event> {
+    let view = r.e.place().1;
+    let mut all = Vec::new();
+    for &v in values {
+        let z = (0..r.e.wam().view(view).unwrap().zones.len())
+            .find(|&i| {
+                let z = &r.e.wam().view(view).unwrap().zones[i];
+                z.kind == 50 && z.value == v
+            })
+            .unwrap();
+        all.extend(r.press_zone(z));
+    }
+    all
+}
+
 /// The link into the pyramid (chapter 30's departure: chapter 31), views
 /// 51-54: the first guard (dialog 169), the first counting grid in view 55
-/// (its hooks noted; its win written by the testing aid), the guard again:
-/// he lets the hero pass after five seconds; view 63 (chapter 32, whose
-/// arrival section turns the view).
+/// played (five marbles on the first cell, four on the second), the guard
+/// again: he lets the hero pass after five seconds; view 63 (chapter 32,
+/// whose arrival section turns the view).
 fn the_first_guard(r: &mut Run) {
     r.walk_link_to(50);
     assert_eq!((r.e.place(), r.chapter()), (("pyratez.wam", 50), 31));
@@ -3711,19 +3729,19 @@ fn the_first_guard(r: &mut Run) {
     r.walk(55);
     assert_eq!(r.flag(94), 1);
     r.shot_as("yucatan-8-grid.png");
-    let z = (0..r.e.wam().view(55).unwrap().zones.len())
-        .find(|&i| r.e.wam().view(55).unwrap().zones[i].kind == 50)
-        .unwrap();
-    let evs = r.press_zone(z);
-    assert!(evs.contains(&Event::PuzzleNotPorted {
+    let evs = play_grid(r, &[18, 1, 17, 17, 17, 17, 2]);
+    assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_31a0
     }));
-    r.e.solve_maya_grid(1);
+    assert!(evs.contains(&Event::Sound("sound101.apc".into())));
+    assert_eq!(&r.e.grid_digits(0)[..16], b"0000000000000045");
     assert_eq!(r.var("finmaya1"), 1);
+    r.shot_as("yucatan-8b-grid-won.png");
     let evs = r.walk(54);
-    assert!(evs.contains(&Event::PuzzleNotPorted {
+    assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_2d60
     }));
+    assert_eq!(r.var("finmaya1"), 1);
     r.click_on(true, guard);
     assert_eq!(r.var("gardien1Gentil"), 1);
     r.wait(6 * 60);
@@ -3740,11 +3758,12 @@ fn the_first_guard(r: &mut Run) {
     assert!(pitch.abs() < 1e-6);
 }
 
-/// The second grid (view 64, by the aid), the second guard (view 58),
-/// view 67 (chapter 33).
+/// The second grid (view 64: one marble on the first cell, four on the
+/// fifth), the second guard (view 58), view 67 (chapter 33).
 fn the_second_guard(r: &mut Run) {
     r.walk(64);
-    r.e.solve_maya_grid(2);
+    play_grid(r, &[17, 1, 17, 17, 17, 17, 5]);
+    assert_eq!(r.var("finmaya2"), 1);
     r.go(58, &[54, 63]);
     let guard = r.who("GARDIEN2");
     r.click_on(true, guard);
@@ -3768,16 +3787,20 @@ fn the_entrance_door(r: &mut Run) {
     assert_eq!(r.chapter(), 34);
 }
 
-/// The third grid (view 75, by the aid): the next click opens the
-/// crocodile's jaw (chapter 34), whose foot is taken.
+/// The third grid (view 75: the number 1, 8, 16 in three rows): its win
+/// opens the crocodile's jaw in the same frame (chapter 34), whose foot
+/// is taken.
 fn the_crocodiles_foot(r: &mut Run) {
     r.go(75, &[]);
-    r.e.solve_maya_grid(3);
-    let z = (0..r.e.wam().view(75).unwrap().zones.len())
-        .find(|&i| r.e.wam().view(75).unwrap().zones[i].kind == 50)
-        .unwrap();
-    r.press_zone(z);
+    let evs = play_grid(r, &[17, 1, 18, 5, 17, 17, 17, 6, 18, 9, 18, 10, 18, 11]);
+    assert_eq!(r.var("croco_ouvert"), 0);
+    assert!(evs
+        .iter()
+        .all(|x| !matches!(x, Event::Sound(s) if s == "sound112.apc")));
+    let evs = play_grid(r, &[17, 12]);
+    assert_eq!(r.var("finmaya3"), 1);
     assert_eq!(r.var("croco_ouvert"), 1);
+    assert!(evs.contains(&Event::Sound("sound112.apc".into())));
     let z = r.zone_named("GUEULE_CROCO");
     r.use_on(None, z);
     assert_eq!(r.var("pied_pris"), 1);
@@ -3845,12 +3868,12 @@ fn yucatan_lines_as_the_original(evs: &[Event]) {
 /// chapters 25-34 make it ([`YUCATAN`]: the prince and the high priest,
 /// the priestess, the king and the bands, the priestess's question and
 /// the way into Xibalba refused, the obsidian, the pyramid's guards and
-/// counting grids (the grids' wins written by the testing aid), the
-/// entrance door, the crocodile's foot, the mirrors and the secret door),
-/// a save and a load through the menus, and the way back to Tibet by the
-/// brazier. Every chapter it goes through is left by one of its own
-/// `chapter=` lines, the only puzzle hooks noted are the grids', and
-/// every Yucatán `/set` line reported is one the original runs.
+/// counting grids (played with the mouse), the entrance door, the
+/// crocodile's foot, the mirrors and the secret door), a save and a load
+/// through the menus, and the way back to Tibet by the brazier. Every
+/// chapter it goes through is left by one of its own `chapter=` lines, no
+/// puzzle hook is left unported, and every Yucatán `/set` line reported
+/// is one the original runs.
 #[test]
 fn yucatan_with_the_mouse() {
     if game().is_none() {
@@ -3876,28 +3899,9 @@ fn yucatan_with_the_mouse() {
     let journal = std::mem::take(&mut r.journal);
     yucatan_lines_as_the_original(&journal);
     chapters_ended(&r.e, &journal, &YUCATAN_CHAPTERS);
-    let mut noted: Vec<u32> = journal
+    assert!(!journal
         .iter()
-        .filter_map(|e| match e {
-            Event::PuzzleNotPorted { function } => Some(*function),
-            _ => None,
-        })
-        .collect();
-    noted.sort_unstable();
-    noted.dedup();
-    assert_eq!(
-        noted,
-        [
-            0x0049_2d60,
-            0x0049_2e80,
-            0x0049_2ef0,
-            0x0049_2f60,
-            0x0049_3070,
-            0x0049_3100,
-            0x0049_31a0,
-            0x0049_3510
-        ]
-    );
+        .any(|e| matches!(e, Event::PuzzleNotPorted { .. })));
     assert_eq!(
         journal
             .iter()

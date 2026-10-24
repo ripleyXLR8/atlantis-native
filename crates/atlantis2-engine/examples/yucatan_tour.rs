@@ -2,7 +2,7 @@
 //! the departure film, the arrival in `yucatan.wam` view 10, the link to
 //! the king's hall (its arrival turned by `AngleWarpXNow`, dialog 101),
 //! a character's subject menu and answer, the priestess, the pyramid's first
-//! counting grid (not ported: its hooks noted), the Tezcatlipoca statue's
+//! counting grid (empty, then five marbles laid with four in hand), the Tezcatlipoca statue's
 //! menu (in Xibalba's `xibalba.wam`, loaded for the picture though the
 //! scripts cannot reach it), and the brazier's way back to Tibet. Some
 //! steps put the game where they need it (a place, a view, a chapter, an
@@ -245,9 +245,17 @@ fn main() {
     t.settle();
     t.save("yucatan-08-priestess.png");
 
-    // The pyramid's first counting grid (view 55, chapter 31).
+    // The pyramid's first counting grid (view 55, chapter 31): empty,
+    // then five marbles laid on the first cell and four taken in hand
+    // (the hand of marbles drawn at the centre).
     t.goto("pyratez.wam", 55, 31);
     t.save("yucatan-09-grid.png");
+    for v in [18, 1, 17, 17, 17, 17] {
+        t.aim(|z| z.kind == 50 && z.value == v);
+        t.click();
+        t.step();
+    }
+    t.save("yucatan-09b-grid-marbles.png");
 
     // The Tezcatlipoca statue (Xibalba's view 122, chapter 39 once the
     // star map is done): a click on its zone opens its subject menu.

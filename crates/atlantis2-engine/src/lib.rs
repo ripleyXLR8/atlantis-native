@@ -51,7 +51,9 @@ pub mod turn;
 pub mod warp;
 
 pub use camera::Camera;
-pub use engine::{CentreDraw, CursorBank, Engine, EngineError, Event, LoopType, ScanVars};
+pub use engine::{
+    CentreDraw, CursorBank, Engine, EngineError, Event, HandBank, LoopType, ScanVars,
+};
 pub use enhancements::Enhancements;
 pub use fpu::Fpu;
 pub use script::Script;

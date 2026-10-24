@@ -144,6 +144,16 @@ keys! {
     testspecialevent = b"TestSpecialEvent", nearw77 = b"NEARW77", gameover = b"GAMEOVER",
 }
 
+/// The bank of the hand pair (@ 0x00673f68): none, the world's objects
+/// (@ 0x00671ef4) or the counting grids' marbles (@ 0x006d2694).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum HandBank {
+    #[default]
+    None,
+    Objects,
+    Puzzle,
+}
+
 /// The interpreter and the script state it keeps.
 #[derive(Clone, Debug)]
 pub struct Script {
@@ -188,6 +198,9 @@ pub struct Script {
     /// bank (@ 0x00673f68, the bank @ 0x00671ef4 or none).
     pub cursor_sprite: i32,
     pub cursor_objects: bool,
+    /// Whether the bank is the counting grids' marbles (@ 0x006d2694,
+    /// set by the engine's puzzle only; `cursor_objects` is false then).
+    pub cursor_puzzle: bool,
     /// The hand drawn at the cursor (@ 0x00673fa0) and its x (@ 0x005def58,
     /// −1 at start).
     pub hand_drawn: bool,
@@ -288,6 +301,7 @@ impl Script {
             shown: Vec::new(),
             cursor_sprite: 0,
             cursor_objects: false,
+            cursor_puzzle: false,
             hand_drawn: false,
             hand_x: -1,
             angle_x: 0.0,
@@ -485,6 +499,25 @@ impl Script {
     pub(crate) fn set_cursor(&mut self, sprite: i32, objects: bool) {
         self.cursor_sprite = sprite;
         self.cursor_objects = objects;
+        self.cursor_puzzle = false;
+    }
+
+    /// Sets the cursor (`FUN_0047c0c0`) with the bank given.
+    pub(crate) fn set_cursor_bank(&mut self, sprite: i32, bank: HandBank) {
+        self.cursor_sprite = sprite;
+        self.cursor_objects = bank == HandBank::Objects;
+        self.cursor_puzzle = bank == HandBank::Puzzle;
+    }
+
+    /// The bank of the hand pair.
+    pub fn cursor_bank(&self) -> HandBank {
+        if self.cursor_objects {
+            HandBank::Objects
+        } else if self.cursor_puzzle {
+            HandBank::Puzzle
+        } else {
+            HandBank::None
+        }
     }
 }
 

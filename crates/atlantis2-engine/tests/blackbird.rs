@@ -731,6 +731,7 @@ fn cursor(e: &Engine) -> String {
             match e.cursor.bank {
                 CursorBank::Interface => "interface",
                 CursorBank::Objects => "objects",
+                CursorBank::Puzzle => "puzzle",
             }
         ),
     }
