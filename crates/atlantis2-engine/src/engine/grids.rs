@@ -1,12 +1,15 @@
 //! The Maya counting grids of Yucatán's pyramid (`YU` views 55, 64 and 75
 //! of `pyratez.wam`, chapters 31, 32 and 34).
 //!
-//! Each grid is 16 cells in four rows of four, a 16-digit string (cell
-//! i = digit 15 − i; the save's entries 21, 23 and 25, `0000000000000000`
-//! at start-up, @ 0x005e1840, 0x005e1854, 0x005e1868) whose digit is the
-//! number of marbles in the cell, 0..5. A row is a Maya number: its first
-//! cell takes 1..5 marbles, each next cell only when the one before holds
-//! five (a bar), the last one at most four. The grid is the slot of
+//! Each grid is 16 cells in four groups of four (cells 4k..4k + 3: the
+//! tests read only i mod 4; where a group lies on the screen is not read),
+//! a 16-digit string (cell i = digit 15 − i; the save's entries 21, 23 and
+//! 25, `0000000000000000` at start-up, @ 0x005e1840, 0x005e1854,
+//! 0x005e1868) whose digit is the number of marbles in the cell, 0..5. In
+//! a group the first cell takes 1..5 marbles, each next cell only when
+//! the one before holds five (a bar), the last one at most four
+//! (FUN_004935c0, FUN_00493590) [inferred from that rule: a group is a
+//! Maya digit, bars and dots]. The grid is the slot of
 //! `SPW_BASE5A` / `B` / `C` (80 frames: cell i with n marbles is frame
 //! 5 i + n − 1, one frame per non-empty cell in its frame list); the
 //! marbles in hand (@ 0x006d2690, 0..5, not saved) are the hand pair's
@@ -152,9 +155,10 @@ impl Grids {
 }
 
 /// FUN_004935c0(i, hand, s): whether marbles may be laid on cell i: its
-/// row's first cell, or the cell before it holds '5' (digit 16 − i); and
-/// the row's last cell, or the cell after it holds '0' (digit 14 − i);
-/// five marbles are refused on a row's last cell.
+/// group's first cell (i mod 4 = 0), or the cell before it holds '5'
+/// (digit 16 − i); and the group's last cell (i mod 4 = 3), or the cell
+/// after it holds '0' (digit 14 − i); five marbles are refused on a
+/// group's last cell.
 pub fn may_lay(i: usize, hand: i32, s: &[u8]) -> bool {
     let c = i & 3;
     let before = |s: &[u8]| s[16 - i] == b'5';
@@ -173,7 +177,7 @@ pub fn may_lay(i: usize, hand: i32, s: &[u8]) -> bool {
 }
 
 /// FUN_00493590(i, s): whether the marbles of cell i may be taken: the
-/// row's last cell, or the cell after it holds '0'.
+/// group's last cell, or the cell after it holds '0'.
 pub fn may_take(i: usize, s: &[u8]) -> bool {
     i & 3 == 3 || s[14 - i] == b'0'
 }

@@ -668,16 +668,15 @@ fn the_leaves_as_the_original() {
                     let hand = e.grids.hand;
                     e.grid_leave(g);
                     let (want, _) = row_state(r);
-                    // The hand: the golden's carried count where the leave
-                    // does not drop it (each row clicked 0x11 once more).
-                    let got = state(&e).replace(
-                        &format!("hand {hand} "),
-                        &format!("hand {} ", field(want, "hand ")),
-                    );
-                    assert_eq!(got, want, "{r}");
-                    if wher != "its view" {
-                        e.grids.hand = field(want, "hand ").parse().unwrap();
+                    // The hand as it is: dropped to 0 in the grid's own
+                    // view, kept elsewhere (the rows carry one count, one
+                    // more 0x11 click each, as this loop does).
+                    if wher == "its view" {
+                        assert_eq!(e.grids.hand, 0, "{r}");
+                    } else {
+                        assert_eq!(e.grids.hand, hand, "{r}");
                     }
+                    assert_eq!(state(&e), want, "{r}");
                     n += 1;
                 }
             }
@@ -1394,8 +1393,11 @@ fn the_grids_played_with_the_mouse() {
 }
 
 /// A save made in a grid's view with marbles laid keeps the digits (save
-/// entries 20-25); its load in another view finds them, and the view's
-/// entry draws them.
+/// entries 20-25), and the saved view's entry draws them, whichever view
+/// the load is made in. The reset's leaves drop the hand only when the
+/// load is made in the grid's view (FUN_00492dd0); from another view the
+/// marbles in hand, not saved, are kept (0x006d2690 is written only by the
+/// drop and the step).
 #[test]
 fn a_save_keeps_the_grids() {
     let Some(files) = game() else { return };
@@ -1408,18 +1410,41 @@ fn a_save_keeps_the_grids() {
     e.grid_click(0, 1);
     assert_eq!(&e.grid_digits(0)[..16], b"0000000000000005");
     e.save_slot(1);
-    e.grid_click(0, 17);
-    e.grid_click(0, 2);
-    assert_eq!(&e.grid_digits(0)[..16], b"0000000000000015");
+    let laid_more = |e: &mut Engine| {
+        e.grid_click(0, 17);
+        e.grid_click(0, 2);
+        assert_eq!(&e.grid_digits(0)[..16], b"0000000000000015");
+        // One marble in hand at the load.
+        e.grid_click(0, 17);
+        assert_eq!(e.grids.hand, 1);
+    };
+    let drawn = |e: &Engine| {
+        assert_eq!(e.place().1, 55);
+        assert_eq!(&e.grid_digits(0)[..16], b"0000000000000005");
+        assert_eq!(e.grid_state(0), 1);
+        assert_eq!(e.puzzle_mode(), 7);
+        let n = e
+            .anim
+            .slots
+            .iter()
+            .position(|s| s.id == SPRITE_IDS[0])
+            .unwrap();
+        assert_eq!(e.anim.frame_list(n), [4]);
+    };
+    // The load in the grid's view: the hand dropped.
+    laid_more(&mut e);
     e.load_slot(1).unwrap();
-    assert_eq!(&e.grid_digits(0)[..16], b"0000000000000005");
-    assert_eq!(e.grid_state(0), 1);
-    let n = e
-        .anim
-        .slots
-        .iter()
-        .position(|s| s.id == SPRITE_IDS[0])
-        .unwrap();
-    assert_eq!(e.anim.frame_list(n), [4]);
+    drawn(&e);
+    assert_eq!(e.grids.hand, 0);
+    // The load in another view (left by a script's `vue=`, no leave): the
+    // reset's leaves skip the drop, the hand stays.
+    laid_more(&mut e);
+    e.enter_at(54, 0.0, 0.0).unwrap();
+    assert_eq!(e.place().1, 54);
+    assert_eq!(e.puzzle_mode(), 7);
+    e.load_slot(1).unwrap();
+    drawn(&e);
+    assert_eq!(e.grids.hand, 1);
+    assert!(e.grids.bank_loaded);
     let _ = std::fs::remove_dir_all(&dir);
 }

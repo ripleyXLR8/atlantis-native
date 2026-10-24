@@ -1384,32 +1384,34 @@ back) into `yucatan-*.png`.
   subjects, objects and musics on disc 2, the place sounds, and loads a
   game saved in the pyramid.
 - **Maya counting grids** (`engine/grids.rs`, `pyratez.wam` views 55, 64
-  and 75; chapters 31, 32, 34): each grid is 16 cells in four rows of
-  four, a 16-digit string (cell i is digit 15 − i; save entries 21, 23,
-  25, `0000000000000000` at start-up, kept in the save's bytes the engine
-  reads in place, as the module's states of entries 20, 22, 24), each
-  digit the marbles in the cell. A row is a Maya number: its first cell
-  takes 1..5 marbles, each next cell only when the one before holds five,
-  the last at most four (@ 0x004935c0, @ 0x00493590). The grid is the
+  and 75; chapters 31, 32, 34): each grid is 16 cells in four groups of
+  four (cells 4k..4k + 3: the tests read only i mod 4; where a group lies
+  on the screen is not read), a 16-digit string (cell i is digit 15 − i;
+  save entries 21, 23, 25, `0000000000000000` at start-up, kept in the
+  save's bytes the engine reads in place, as the module's states of
+  entries 20, 22, 24), each digit the marbles in the cell. In a group the
+  first cell takes 1..5 marbles, each next cell only when the one before
+  holds five, the last at most four (@ 0x004935c0, @ 0x00493590) [inferred
+  from that rule: a group is a Maya digit, bars and dots]. The grid is the
   frame list of `SPW_BASE5A` / `B` / `C`'s slot (80 frames, 5 i + n − 1
   for n marbles in cell i); the marbles in hand (0..5, not saved) are the
   hand pair's frame n − 1 of `spr\sprboul.spr`, a third bank of the hand
   pair (`HandBank::Puzzle`) drawn at the centre like an object. The entry
   (@ 0x00492f60, 0x00493070, 0x00493100) keeps the slot's id, resets the
   digits when `resetmayaN` is 1 (and sets it back to 0; `resetmaya3`
-  resets grid 2's, a slip no chapter reaches), draws the grid
-  (@ 0x00492ff0: the bank loaded, frames 0..79 out of the list, one frame
-  per non-empty cell in, the puzzle mode 7) and sets the module's state 1
+  resets grid 2's, a slip no chapter reaches), draws the grid (@
+  0x00492ff0: the bank loaded, frames 0..79 out of the list, one frame per
+  non-empty cell in, the puzzle mode 7) and sets the module's state 1
   unless 2. A click on a zone of type 50 (@ 0x004931a0 / 0x00493490 /
   0x00493510 through the step @ 0x00493220, nothing with an object in
   hand): 0x11 one more marble (four wrap to none) and 0x12 five or none,
   both with `sound100.apc`; 0x13 and 0x14 one less (none from five); a
-  cell with marbles in hand lays them when allowed and takes back what
-  the cell held (a swap, `sound100.apc` replayed by its handle, which is
-  −1, with a warning and no sound, before any 0x11 / 0x12 of the visit),
-  else `sound102.apc`; a cell with an empty hand gives its marbles to the
-  hand (no sound) when allowed. When the click changed the grid and the
-  digits equal the solution (`0000000000000045`, `0000000000040001`,
+  cell with marbles in hand lays them when allowed and takes back what the
+  cell held (a swap, `sound100.apc` replayed by its handle, which is −1,
+  with a warning and no sound, before any 0x11 / 0x12 of the visit), else
+  `sound102.apc`; a cell with an empty hand gives its marbles to the hand
+  (no sound) when allowed. When the click changed the grid and the digits
+  equal the solution (`0000000000000045`, `0000000000040001`,
   `0000155500350001`: 9; 4·20 + 1; 16·400 + 8·20 + 1): the state 2,
   `finmayaN` = 1 and `sound101.apc` on voice 2; the click scan of the same
   frame follows (chapter 34's crocodile opens there, its sound 112
@@ -1418,30 +1420,33 @@ back) into `yucatan-*.png`.
   the grid's view runs its leave (@ 0x00492d60..): the state 0 unless 2,
   `finmayaN` = 0 when the digits are not the solution, and in that view
   the hand pair emptied, the bank freed, no marble, the three sounds freed
-  on voice 2, the mode 0; a load runs the three leaves first (the reset
-  @ 0x0049bf70). Kept from the original: the mode 7 outlives a view left
-  by a script's `vue=` (the marbles stay in hand), a leave with an object
-  in hand empties its picture, the solved grid stays solved whatever is
-  laid after. Against the original's emulated run (`tests/grids.rs`,
-  `tests/golden/grids.txt`): the data; the entries per view, state and
-  reset (twice: the bank already loaded); the step on every cell for each
-  hand 0..5 and each digit of the cell, the one before and the one after
-  (18576 clicks: the digits, the hand, the changed byte, the sounds, the
-  slot's list); the other zones for each hand −1..6 and object, a
-  sequence with the sound table kept, the two tests on six strings; the
-  shortest wins of the three grids and a played way to the first (a
-  refusal, swaps, a take back, the hand put back), clicks after the win,
-  the leave, the entry again; the leaves in and out of their views; the
-  cursor for each count, object and bank; the dispatchers and the reset;
-  the clicks through the engine's pass with chapters 31, 32 and 34 (the
-  hooks, `CLICZONE`, the lines of the scan, the sounds, the state: the
-  crocodile's section in the win's frame); the hand of marbles at the
+  on voice 2, the mode 0; a load runs the three leaves first (the reset @
+  0x0049bf70), so a load made in another view keeps the marbles in hand
+  (not saved; only the drop and the step write them, @ 0x00492e0a,
+  0x00493249..0x0049345c). Kept from the original: the mode 7 outlives a
+  view left by a script's `vue=` (the marbles stay in hand), a leave with
+  an object in hand empties its picture, the solved grid stays solved
+  whatever is laid after. Against the original's emulated run
+  (`tests/grids.rs`, `tests/golden/grids.txt`): the data; the entries per
+  view, state and reset (twice: the bank already loaded); the step on
+  every cell for each hand 0..5 and each digit of the cell, the one before
+  and the one after (18576 clicks: the digits, the hand, the changed byte,
+  the sounds, the slot's list); the other zones for each hand −1..6 and
+  object, a sequence with the sound table kept, the two tests on six
+  strings; the shortest wins of the three grids and a played way to the
+  first (a refusal, swaps, a take back, the hand put back), clicks after
+  the win, the leave, the entry again; the leaves in and out of their
+  views; the cursor for each count, object and bank; the dispatchers and
+  the reset; the clicks through the engine's pass with chapters 31, 32 and
+  34 (the hooks, `CLICZONE`, the lines of the scan, the sounds, the state:
+  the crocodile's section in the win's frame); the hand of marbles at the
   centre and its five sprites drawn; the three grids' slots drawn for
   seven digit strings and all 80 frames alone (md5 of each face, pixels).
   `the_grids_played_with_the_mouse` plays the three with the mouse (the
   centre steered onto each zone, a click), the first with a refusal, a
   swap and a take back, to their wins, the crocodile opening in the third
-  win's frame (chapter 34's lines 25-33); a save keeps the digits.
+  win's frame (chapter 34's lines 25-33); a save keeps the digits, loaded
+  in the grid's view (the hand dropped) or in another (the hand kept).
 - **The figurines on the floor** (`engine/figurines.rs`, China's
   `miniature.wam`, `SS` views 1-7; chapters 55, 47 and 48): six
   figurines lie in the grass of view 13 (the objects `OB_FIG1HERBE` ..
