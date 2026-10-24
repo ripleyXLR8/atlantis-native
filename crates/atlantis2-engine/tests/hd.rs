@@ -379,8 +379,9 @@ fn at(files: A2Files, commands: &[&[u8]], hd: bool) -> Engine {
     e
 }
 
-/// The places of the three worlds the port plays.
-const PLACES: [(&str, &[&[u8]]); 3] = [
+/// The places of the four worlds the port plays (Yucatán's open view
+/// and the king's hall with its characters).
+const PLACES: [(&str, &[&[u8]]); 5] = [
     ("Tibet", &[]),
     (
         "Ireland",
@@ -394,6 +395,14 @@ const PLACES: [(&str, &[&[u8]]); 3] = [
     (
         "China",
         &[b"(monde=3)", b"(changewam=chine.wam)", b"(vue=10)"],
+    ),
+    (
+        "Yucatán",
+        &[b"(monde=2)", b"(changewam=yucatan.wam)", b"(vue=10)"],
+    ),
+    (
+        "the king's hall",
+        &[b"(monde=2)", b"(changewam=salleroi.wam)", b"(vue=86)"],
     ),
 ];
 

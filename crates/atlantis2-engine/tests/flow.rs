@@ -3358,3 +3358,551 @@ fn china_stages_from_saves() {
     let journal = std::mem::take(&mut r.journal);
     china_lines_as_the_original(&journal);
 }
+
+// ---------------------------------------------------------------------------
+// Yucatán, with the mouse.
+
+/// The game from the start-up intro to Yucatán, with the mouse: Yucatán's
+/// boat taken in view 5, the walk to the hut (the shaman's greeting on
+/// the way), the boat picked from the bar and laid on its zone (the hook,
+/// chapter 75's section, film 40), the trip (`MONDE` 2 on disc 2,
+/// `yucatan.wam` view 10, chapter 25 and its music).
+fn to_yucatan(r: &mut Run) {
+    tibet_start(r);
+    for to in 3..=5 {
+        r.walk(to);
+    }
+    let boat = r.obj("MANDALA_BATEAU_YU");
+    let evs = r.click_sprite(|e| matches!(e, Event::Take { .. }));
+    assert!(evs.contains(&Event::Take { id: boat }));
+    for to in 6..=10 {
+        r.walk(to);
+    }
+    r.pick(boat);
+    let zi =
+        r.e.wam()
+            .view(10)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.name.as_deref() == Some("ZONE_YUB"))
+            .unwrap();
+    r.aim(zi);
+    r.tap();
+    let mut evs = r.events();
+    assert!(evs.contains(&Event::Sound("sound400.apc".into())));
+    assert_eq!(r.e.loop_type, LoopType::Video);
+    r.wait(60);
+    r.shot_as("yucatan-1-departure-film.png");
+    evs.extend(r.settle());
+    assert!(!evs.iter().any(|e| matches!(e, Event::WorldNotPorted(_))));
+    assert!(evs.contains(&Event::Monde(2)));
+    assert!(evs.contains(&Event::Wam("yucatan.wam".into())));
+    assert!(evs.iter().any(
+        |e| matches!(e, Event::VideoStart { name, frames: Some(_) } if name == "cine040.hnm")
+    ));
+    assert_eq!(r.e.place(), ("yucatan.wam", 10));
+    assert_eq!(r.e.files().current_disc(), 2);
+    assert_eq!(
+        (
+            r.chapter(),
+            r.var("MONDE"),
+            r.var("NbMandalaPosed"),
+            r.var("OrdreMandala3"),
+            r.var("poseyub"),
+            r.var("VignetteSave"),
+            r.var("YucatanVisited"),
+        ),
+        (25, 2, 1, 1, 1, 10, 1)
+    );
+    assert!(!r.in_bag("MANDALA_BATEAU_YU"));
+    r.wait(30);
+    assert!(r
+        .e
+        .music_playing()
+        .is_some_and(|m| [11, 12, 15].contains(&m)));
+    r.shot_as("yucatan-2-arrival.png");
+}
+
+/// The play of Yucatán: what a player does there, besides the others'.
+impl Run {
+    /// A click on the view's link to view `to` of another place (a
+    /// type-2 zone), played out until the arrival.
+    fn walk_link_to(&mut self, to: u32) -> Vec<Event> {
+        self.wait(15);
+        let view = self.e.place().1;
+        let zone = self
+            .e
+            .wam()
+            .view(view)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.kind == 2 && z.value == to as i32)
+            .unwrap_or_else(|| panic!("no link from view {view} to {to}"));
+        let wam = self.e.place().0.to_string();
+        self.aim(zone);
+        self.tap();
+        let mut all = Vec::new();
+        for _ in 0..3000 {
+            all.extend(self.events());
+            if self.e.loop_type == LoopType::Video {
+                all.extend(self.watch());
+            }
+            if self.e.place().0 != wam && self.e.loop_type == LoopType::Warp {
+                all.extend(self.settle());
+                assert_eq!(self.e.place().1, to);
+                return all;
+            }
+        }
+        panic!("the link of view {view} to {to} leads nowhere");
+    }
+
+    /// A click on the move zone to view `to` whose departure section plays
+    /// a dialog or a film first: played out until the panorama is still.
+    fn depart(&mut self, to: u32) -> Vec<Event> {
+        self.walk_redirected(to)
+    }
+
+    /// Character `who` asked about `subject` through his menu: what
+    /// follows, played out (an answer that is not a dialog).
+    fn ask_events(&mut self, who: &str, subject: &str) -> Vec<Event> {
+        let character = self.who(who);
+        let value = self.subject(subject);
+        self.stow();
+        let evs = self.click_on(true, character);
+        assert!(
+            evs.iter()
+                .any(|e| matches!(e, Event::SubjectMenu { character: c, .. } if *c == character)),
+            "{who}: no subject menu"
+        );
+        let list = self.e.script_state().unwrap().subjects.list(character);
+        let i = list
+            .iter()
+            .position(|e| e.value == value)
+            .unwrap_or_else(|| panic!("{who} offers no {subject}"));
+        let (x, y) = cell(list.len() as i32, i as i32);
+        self.point(x + 31, y + 31);
+        self.step();
+        self.tap();
+        let mut evs = self.events();
+        assert!(evs.contains(&Event::Subject {
+            character,
+            value: Some(value)
+        }));
+        evs.extend(self.settle());
+        evs
+    }
+
+    /// Character `who` (one of several in the view) asked once about each
+    /// subject his menu offers, each through the menu opened by a click on
+    /// him: the subjects and their dialogs, in order.
+    fn ask_each(&mut self, who: &str) -> Vec<(i32, u32)> {
+        let character = self.who(who);
+        let mut asked: Vec<(i32, u32)> = Vec::new();
+        loop {
+            let list = self.e.script_state().unwrap().subjects.list(character);
+            let Some(entry) = list.iter().find(|e| asked.iter().all(|a| a.0 != e.value)) else {
+                return asked;
+            };
+            let value = entry.value;
+            self.stow();
+            let evs = self.click_on(true, character);
+            assert!(evs.contains(&Event::SubjectMenu {
+                character,
+                count: list.len() as i32
+            }));
+            let i = list.iter().position(|e| e.value == value).unwrap();
+            let (x, y) = cell(list.len() as i32, i as i32);
+            self.point(x + 31, y + 31);
+            self.step();
+            self.tap();
+            let mut evs = self.events();
+            evs.extend(self.settle());
+            let d = dialogs(&evs)
+                .first()
+                .copied()
+                .unwrap_or_else(|| panic!("{who} {value}: no dialog"));
+            asked.push((value, d));
+            assert!(asked.len() < 16, "the subjects never run out");
+        }
+    }
+
+    /// The subjects character `who` offers now, by name.
+    fn offers(&self, who: &str) -> Vec<i32> {
+        let s = self.e.script_state().unwrap();
+        s.subjects
+            .list(self.who(who))
+            .iter()
+            .map(|e| e.value)
+            .collect()
+    }
+}
+
+/// Yucatán's story without Xibalba, stage by stage, as chapters 25-34
+/// make it: each stage starts and ends in the panorama.
+const YUCATAN: &[Stage] = &[
+    (
+        "the prince and the high priest",
+        the_prince_and_the_high_priest,
+    ),
+    ("the priestess", the_priestess),
+    ("the king", the_king),
+    ("the bloody bands", the_bloody_bands),
+    ("the way to Xibalba", the_way_to_xibalba),
+    ("the obsidian", the_obsidian),
+    ("the first guard", the_first_guard),
+    ("the second guard", the_second_guard),
+    ("the entrance door", the_entrance_door),
+    ("the crocodile's foot", the_crocodiles_foot),
+    ("the mirrors", the_mirrors),
+];
+
+/// Views 17, 19, 22, 39 and the link to the king's hall's view 81
+/// (chapter 25's departure: chapter 26, whose arrival section turns the
+/// view, `AngleWarpXNow=270`, and plays dialog 101); in view 82 the prince
+/// and the high priest asked about everything they offer.
+fn the_prince_and_the_high_priest(r: &mut Run) {
+    r.route(&[17, 19, 22, 39]);
+    let evs = r.walk_link_to(81);
+    assert!(dialogs(&evs).contains(&101));
+    assert_eq!((r.e.place(), r.chapter()), (("salleroi.wam", 81), 26));
+    assert_eq!(r.flag(76), 1);
+    r.shot_as("yucatan-3-kings-hall.png");
+    r.walk(82);
+    r.head_passes = 0;
+    let mut asked = r.ask_each("PRINCE");
+    asked.sort_unstable();
+    let mut want: Vec<(i32, u32)> = [("PRINCE", 104), ("MAIS", 102), ("ROI", 103)]
+        .iter()
+        .map(|&(n, d)| (r.subject(n), d))
+        .collect();
+    want.sort_unstable();
+    assert_eq!(asked, want);
+    assert!(r.head_passes > 0, "no head drawn for the prince");
+    r.shot_as("yucatan-4-prince.png");
+    let mut asked = r.ask_each("GRAND_PRETRE");
+    asked.sort_unstable();
+    let mut want: Vec<(i32, u32)> = [("GRAND_PRETRE", 106), ("SUPERNOVA_YU", 105)]
+        .iter()
+        .map(|&(n, d)| (r.subject(n), d))
+        .collect();
+    want.sort_unstable();
+    assert_eq!(asked, want);
+}
+
+/// Views 81, 80, 83 (chapter 26's arrival: chapter 27, whose `/INIT`
+/// plays dialog 107 and gives the clean bands); the priestess of view 84
+/// asked about everything she offers.
+fn the_priestess(r: &mut Run) {
+    r.walk(81);
+    r.walk(80);
+    let evs = r.walk(83);
+    assert!(dialogs(&evs).contains(&107));
+    assert_eq!(r.chapter(), 27);
+    assert!(r.in_bag("BANDES_PROPRES"));
+    r.stow();
+    r.walk(84);
+    let asked = r.ask_each("PRETRESSE");
+    let mut got: Vec<u32> = asked.iter().map(|a| a.1).collect();
+    got.sort_unstable();
+    assert_eq!(got, [108, 109, 110, 111, 112, 113]);
+    r.shot_as("yucatan-5-priestess.png");
+}
+
+/// Views 85, 86 (chapter 27's departure: chapter 28, the king's greeting,
+/// dialog 138), 88: the clean bands given to the king (dialog 142, film
+/// 41); back to view 86, then the move to 85 (chapter 28's departure:
+/// dialog 143, the bloody bands, chapter 27).
+fn the_king(r: &mut Run) {
+    r.walk(85);
+    let evs = r.walk(86);
+    assert!(dialogs(&evs).contains(&138));
+    assert_eq!(r.chapter(), 28);
+    r.walk(88);
+    let evs = r.give("BANDES_PROPRES", "ROI");
+    assert!(dialogs(&evs).contains(&142));
+    assert!(films(&evs).contains(&41));
+    assert_eq!(r.flag(77), 1);
+    assert!(!r.in_bag("BANDES_PROPRES"));
+    r.stow();
+    r.shot_as("yucatan-6-king.png");
+    r.walk(86);
+    let evs = r.depart(85);
+    assert!(dialogs(&evs).contains(&143));
+    assert_eq!((r.e.place().1, r.chapter()), (85, 27));
+    assert!(r.in_bag("BANDES_SANG"));
+    assert_eq!(r.flag(78), 1);
+    r.stow();
+}
+
+/// View 84: the bloody bands given to the priestess (dialog 115, film 42,
+/// dialog 116): her subjects now name Tezcatlipoca.
+fn the_bloody_bands(r: &mut Run) {
+    r.walk(84);
+    let evs = r.give("BANDES_SANG", "PRETRESSE");
+    let d = dialogs(&evs);
+    assert!(d.contains(&115) && d.contains(&116), "{d:?}");
+    assert!(films(&evs).contains(&42));
+    assert_eq!(r.flag(80), 1);
+    assert!(!r.in_bag("BANDES_SANG"));
+    assert!(r.offers("PRETRESSE").contains(&r.subject("TEZ")));
+}
+
+/// The priestess asked about Tezcatlipoca (dialog 122, a yes or no
+/// question): yes is chapter 27's way into Xibalba (the prince and the
+/// high priest hidden, `MONDE` 6 on disc 4, film 43, `bat.wam`), refused
+/// by the port: the world back to Yucatán's (disc 2), the game in view 84
+/// of chapter 27, the priestess asking again; then no.
+fn the_way_to_xibalba(r: &mut Run) {
+    assert_eq!(r.ask("PRETRESSE", "TEZ"), 122);
+    assert_eq!(r.var("Pretresse_AskOuiNon"), 1);
+    let evs = r.ask_events("PRETRESSE", "OUI");
+    assert!(evs.contains(&Event::Monde(6)));
+    assert!(films(&evs).contains(&43));
+    assert!(evs.contains(&Event::WorldNotPorted("bat.wam".into())));
+    let refused = evs
+        .iter()
+        .position(|e| matches!(e, Event::WorldNotPorted(_)))
+        .unwrap();
+    assert!(evs[refused..].contains(&Event::Monde(2)));
+    assert_eq!(r.e.files().current_disc(), 2);
+    assert_eq!((r.e.place(), r.chapter()), (("salleroi.wam", 84), 27));
+    assert_eq!((r.var("MONDE"), r.var("Pretresse_AskOuiNon")), (2, 0));
+    let s = r.e.script_state().unwrap();
+    assert!(s.fatal.is_none() && !s.travel_refused);
+    r.shot_as("yucatan-7-xibalba-refused.png");
+    // Asked again: the same question; no this time.
+    assert_eq!(r.ask("PRETRESSE", "TEZ"), 122);
+    r.ask_events("PRETRESSE", "NON");
+    assert_eq!((r.flag(82), r.var("Pretresse_AskOuiNon")), (1, 0));
+}
+
+/// Out of the king's hall (views 83, 80: chapter 26; the link to
+/// `yucatan.wam` view 39: chapter 25), to the pyramid's top (view 34:
+/// chapter 30) and view 40, where the obsidian is taken.
+fn the_obsidian(r: &mut Run) {
+    r.walk(83);
+    r.walk(80);
+    assert_eq!(r.chapter(), 26);
+    r.walk_link_to(39);
+    assert_eq!((r.e.place(), r.chapter()), (("yucatan.wam", 39), 25));
+    r.go(34, &[]);
+    assert_eq!(r.chapter(), 30);
+    r.walk(40);
+    r.take("OBSIDIENNE1");
+    r.walk(34);
+}
+
+/// The link into the pyramid (chapter 30's departure: chapter 31), views
+/// 51-54: the first guard (dialog 169), the first counting grid in view 55
+/// (its hooks noted; its win written by the testing aid), the guard again:
+/// he lets the hero pass after five seconds; view 63 (chapter 32, whose
+/// arrival section turns the view).
+fn the_first_guard(r: &mut Run) {
+    r.walk_link_to(50);
+    assert_eq!((r.e.place(), r.chapter()), (("pyratez.wam", 50), 31));
+    r.go(54, &[]);
+    let guard = r.who("GARDIEN1");
+    let evs = r.click_on(true, guard);
+    let mut evs2 = evs.clone();
+    evs2.extend(r.settle());
+    assert!(dialogs(&evs2).contains(&169));
+    r.walk(55);
+    assert_eq!(r.flag(94), 1);
+    r.shot_as("yucatan-8-grid.png");
+    let z = (0..r.e.wam().view(55).unwrap().zones.len())
+        .find(|&i| r.e.wam().view(55).unwrap().zones[i].kind == 50)
+        .unwrap();
+    let evs = r.press_zone(z);
+    assert!(evs.contains(&Event::PuzzleNotPorted {
+        function: 0x0049_31a0
+    }));
+    r.e.solve_maya_grid(1);
+    assert_eq!(r.var("finmaya1"), 1);
+    let evs = r.walk(54);
+    assert!(evs.contains(&Event::PuzzleNotPorted {
+        function: 0x0049_2d60
+    }));
+    r.click_on(true, guard);
+    assert_eq!(r.var("gardien1Gentil"), 1);
+    r.wait(6 * 60);
+    assert_eq!(r.var("gardien1Gentil"), 2);
+    let evs = r.walk(63);
+    assert!(evs.contains(&Event::Set {
+        chapter: 31,
+        line: 17
+    }));
+    assert_eq!(r.chapter(), 32);
+    // `AngleWarpXNow=360`: the read-back yaw 90 - 360 = -270 (90).
+    let (yaw, pitch) = r.e.camera.angles();
+    assert!((f64::from(yaw).to_degrees() - 90.0).abs() < 1e-3, "{yaw}");
+    assert!(pitch.abs() < 1e-6);
+}
+
+/// The second grid (view 64, by the aid), the second guard (view 58),
+/// view 67 (chapter 33).
+fn the_second_guard(r: &mut Run) {
+    r.walk(64);
+    r.e.solve_maya_grid(2);
+    r.go(58, &[54, 63]);
+    let guard = r.who("GARDIEN2");
+    r.click_on(true, guard);
+    assert_eq!(r.var("gardien2Gentil"), 1);
+    r.wait(6 * 60);
+    assert_eq!(r.var("gardien2Gentil"), 2);
+    r.walk(67);
+    assert_eq!(r.chapter(), 33);
+}
+
+/// View 68: the button opens the entrance door (`ClicObjet=BOUTON_S`,
+/// sound 112), view 69 (chapter 34).
+fn the_entrance_door(r: &mut Run) {
+    r.walk(68);
+    let button = r.obj("BOUTON_S");
+    let mut evs = r.click_on(false, button);
+    evs.extend(r.settle());
+    assert!(sounds(&evs).contains(&"sound112.apc".to_string()));
+    assert_eq!(r.flag(101), 1);
+    r.walk(69);
+    assert_eq!(r.chapter(), 34);
+}
+
+/// The third grid (view 75, by the aid): the next click opens the
+/// crocodile's jaw (chapter 34), whose foot is taken.
+fn the_crocodiles_foot(r: &mut Run) {
+    r.go(75, &[]);
+    r.e.solve_maya_grid(3);
+    let z = (0..r.e.wam().view(75).unwrap().zones.len())
+        .find(|&i| r.e.wam().view(75).unwrap().zones[i].kind == 50)
+        .unwrap();
+    r.press_zone(z);
+    assert_eq!(r.var("croco_ouvert"), 1);
+    let z = r.zone_named("GUEULE_CROCO");
+    r.use_on(None, z);
+    assert_eq!(r.var("pied_pris"), 1);
+    assert!(r.in_bag("PIED2_CROCO"));
+    r.stow();
+    r.shot_as("yucatan-9-crocodile.png");
+}
+
+/// View 71: the foot and the obsidian laid in the two mirror holes; the
+/// secret door opens (sound 110); its link back to `yucatan.wam` view 28
+/// (chapter 34's departure: sound 111, chapter 25).
+fn the_mirrors(r: &mut Run) {
+    r.go(71, &[]);
+    let z1 = r.zone_named("TROU_MIROIR1");
+    r.use_on(Some("PIED2_CROCO"), z1);
+    assert_eq!(r.var("trou1_remplis"), 1);
+    let z2 = r.zone_named("TROU_MIROIR2");
+    let evs = r.use_on(Some("OBSIDIENNE1"), z2);
+    assert!(sounds(&evs).contains(&"sound110.apc".to_string()));
+    assert_eq!(r.var("porte_secrete_ouverte"), 1);
+    let evs = r.walk_link_to(28);
+    assert!(sounds(&evs).contains(&"sound111.apc".to_string()));
+    assert_eq!((r.e.place(), r.chapter()), (("yucatan.wam", 28), 25));
+}
+
+/// The way back: to the brazier of view 35 (chapter 30), clicked with an
+/// empty hand: Tibet's view 7, chapter 75.
+fn yucatan_way_back(r: &mut Run) -> Vec<Event> {
+    r.go(35, &[]);
+    assert_eq!(r.chapter(), 30);
+    let z = r.zone_named("BRAZERO_ZONE");
+    let evs = r.use_on(None, z);
+    assert!(evs.contains(&Event::Monde(5)));
+    assert!(evs.contains(&Event::Wam("tibet.wam".into())));
+    evs
+}
+
+/// The Yucatán chapters a game without Xibalba goes through (29 is
+/// empty and named by no `chapter=` line).
+const YUCATAN_CHAPTERS: [i32; 9] = [25, 26, 27, 28, 30, 31, 32, 33, 34];
+
+/// Every `/set` line of a Yucatán chapter that ran (the events' chapter
+/// and line) is one of the lines the original's handler ran
+/// (`scripts_worlds_china.txt`, which holds chapters 25-60).
+fn yucatan_lines_as_the_original(evs: &[Event]) {
+    let golden = include_str!("golden/scripts_worlds_china.txt");
+    let mut n = 0;
+    for e in evs {
+        if let Event::Set { chapter, line } = e {
+            if (25..=41).contains(chapter) {
+                let head = format!("chapi{chapter:03}.con:{line} ");
+                assert!(
+                    golden.lines().any(|l| l.starts_with(&head)),
+                    "chapter {chapter} line {line}: not a line the original runs"
+                );
+                n += 1;
+            }
+        }
+    }
+    assert!(n > 10, "{n}");
+}
+
+/// A game from the start-up intro through Yucatán and back, with the
+/// mouse only, Xibalba aside: [`to_yucatan`], then Yucatán's story as its
+/// chapters 25-34 make it ([`YUCATAN`]: the prince and the high priest,
+/// the priestess, the king and the bands, the priestess's question and
+/// the way into Xibalba refused, the obsidian, the pyramid's guards and
+/// counting grids (the grids' wins written by the testing aid), the
+/// entrance door, the crocodile's foot, the mirrors and the secret door),
+/// a save and a load through the menus, and the way back to Tibet by the
+/// brazier. Every chapter it goes through is left by one of its own
+/// `chapter=` lines, the only puzzle hooks noted are the grids', and
+/// every Yucatán `/set` line reported is one the original runs.
+#[test]
+fn yucatan_with_the_mouse() {
+    if game().is_none() {
+        return;
+    }
+    let dir = scratch("a2-flow-yucatan");
+    let mut r = Run::new(&dir);
+    to_yucatan(&mut r);
+    for (name, stage) in YUCATAN {
+        stage(&mut r);
+        assert_eq!(r.e.loop_type, LoopType::Warp, "after {name}");
+        if *name == "the way to Xibalba" {
+            r = saved_and_continued(r, &dir);
+        }
+    }
+    yucatan_way_back(&mut r);
+    r.wait(10);
+    r.shot_as("yucatan-10-back-in-tibet.png");
+    assert_eq!(r.e.place(), ("tibet.wam", 7));
+    assert_eq!((r.chapter(), r.var("MONDE")), (75, 5));
+    assert_eq!(r.e.files().current_disc(), 1);
+    assert!(!r.in_bag("MANDALA_YUCATAN"));
+    let journal = std::mem::take(&mut r.journal);
+    yucatan_lines_as_the_original(&journal);
+    chapters_ended(&r.e, &journal, &YUCATAN_CHAPTERS);
+    let mut noted: Vec<u32> = journal
+        .iter()
+        .filter_map(|e| match e {
+            Event::PuzzleNotPorted { function } => Some(*function),
+            _ => None,
+        })
+        .collect();
+    noted.sort_unstable();
+    noted.dedup();
+    assert_eq!(
+        noted,
+        [
+            0x0049_2d60,
+            0x0049_2e80,
+            0x0049_2ef0,
+            0x0049_2f60,
+            0x0049_3070,
+            0x0049_3100,
+            0x0049_31a0,
+            0x0049_3510
+        ]
+    );
+    assert_eq!(
+        journal
+            .iter()
+            .filter(|e| matches!(e, Event::WorldNotPorted(_)))
+            .count(),
+        1
+    );
+}

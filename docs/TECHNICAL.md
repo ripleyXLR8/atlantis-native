@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán without its counting grids (the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -639,9 +639,12 @@ game back to Tibet with Ireland's mandala. China's boat leaves for China
 figurines, the chest, the incense, the five wheels, the pearl and the
 dragon, the turtle ring and the labyrinth's souls, below) and sends the
 game back to Tibet with China's mandala (the lantern), or at once by its
-gong; a trip to another world (Yucatán's boat, the crystal, the
-space travel) plays its film and stays where it is. Not yet: Yucatán and
-Shamballa.
+gong. Yucatán's boat leaves for Yucatán (world 2, below), which plays
+without its counting grids (written by a testing aid in the tests) as far
+as the original goes without Xibalba, and sends the game back to Tibet by
+its brazier; the way into Xibalba (world 6), which the mandala needs,
+plays its film and stays where it is, as a trip to another world does
+(the crystal, the space travel). Not yet: Xibalba and Shamballa.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -657,7 +660,8 @@ objects in the bag and `--hold <object>` one in the hand (by their
 --talk --pointer 475,329`: the shaman's menu, the pointer on a subject);
 `--command <commands>` runs script commands before the view entry (e.g.
 `--command "(monde=1)(changewam=bigile1.wam)(vue=1)(chapter=3)"`: Ireland,
-`--command "(monde=3)(changewam=chine.wam)(vue=10)"`: China); `--hd`,
+`--command "(monde=3)(changewam=chine.wam)(vue=10)"`: China,
+`--command "(monde=2)(changewam=yucatan.wam)(vue=10)"`: Yucatán); `--hd`,
 `--widescreen` and `--size <w>x<h>` give the HD mode at that window size,
 and a headless run's screenshot is then the window's picture at that size
 (and its HD timings are printed). `Engine::new_game` keeps the
@@ -675,7 +679,12 @@ china_tour <install> <discs> <out>` lays China's boat and draws the trip
 (the departure film, the arrival, the gardener master's menu and answer,
 the turtle room and its picture, the miniature garden and its map, a
 move's zoom, chapter 59's door, the labyrinth and a demon's special
-event, the gong's way back to Tibet) into `china-*.png`.
+event, the gong's way back to Tibet) into `china-*.png`; `--example
+yucatan_tour <install> <discs> <out>` lays Yucatán's boat and draws the
+trip (the departure film, the arrival, the king's hall turned by
+`AngleWarpXNow`, a character's menu, the priestess, the pyramid's first
+grid, the Tezcatlipoca statue's menu, the brazier's way back) into
+`yucatan-*.png`.
 
 - **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
   timestamp 0x38030926), recognised by its size and timestamp and
@@ -1294,6 +1303,92 @@ event, the gong's way back to Tibet) into `china-*.png`.
   section from the move, its `/set` lines all the original's), plays
   all 115 dialogs the chapters start, checks the subjects, objects and
   musics on disc 3, and loads a game saved in the turtle room.
+- **Yucatán** (world 2, disc 2; `yucatan.wam` loaded by chapter 75's
+  trips, `salleroi.wam` (the king's hall) and `pyratez.wam` (the
+  pyramid) reached by the links of `yucatan.wam` views 39 and 34;
+  chapters 25-34): laying Yucatán's boat in the shaman's hut runs
+  chapter 75's section (the world on disc 2, `objyuc.spr`, `sujyuc.spr`,
+  the Yucatán texts and heads, film 40, `yucatan.wam` view 10, chapter 25
+  and its music); laying it again later (chapter 75's second-trip
+  section) goes back. Every key of chapters 25-34 is handled (their `/set`
+  lines match the original's handler, `tests/script.rs`). New for
+  Yucatán: **`AngleWarpXNow` and `AngleWarpYNow`** as the original turns
+  the view, read and emulated (`tests/golden/turn_now.txt`, both control
+  words, the camera's quaternion and the angles read back bit for bit):
+  `AngleWarpXNow` (FUN_0045ad40) **sets** the camera's rotation about the
+  vertical axis relative to the scene root, dropping the pitch (the
+  angles read back are 90° − the angle and 0), `AngleWarpYNow`
+  (FUN_0045ada0) pitches the camera from its current orientation (both
+  data uses are 0). The port's earlier guess (the yaw set, the pitch kept)
+  is replaced; chapter 26's arrival in the king's hall (270), chapter
+  32's in view 63 (360) and chapter 33's in view 67 (180) use them. **The
+  Tezcatlipoca statue** (FUN_0049b910's `YU` view 122 branch,
+  @ 0x0049bb62..0x0049bbbc, `engine/yucatan.rs`): a click on the zone
+  `ClicTezStatue` while `TEZ_STATUE` is not hidden (FUN_00484d90, the show
+  / hide table, as for the transition sprites) makes the statue the
+  clicked character (`CLICPERSO`), sets the cursor pair to
+  `interfac.spr` frame 40 and opens its subject menu, whatever is in hand
+  and whatever its subject count; `CLICZONE` is set as for any action
+  zone and no click scan follows (the menu is open); the menu then works
+  as a character's. The statue stands in Xibalba's `xibalba.wam` (chapter
+  39), which the scripts cannot reach in the port: `tests/yucatan.rs`
+  loads the place to play it (the click, the menu, a subject's answer,
+  dialog 193; hidden, nothing). **Yucatán's other hooks** (the `YU`
+  branches of both dispatchers, `yucatan_click_hooks`,
+  `yucatan_entry_hooks`): the Maya counting grids of `pyratez.wam` views
+  55, 64 and 75 (their entries, their clicks on zones of type 50, their
+  leaves on move zones) are not ported: their hooks are noted
+  (`Event::PuzzleNotPorted`) and take no click, as in the original, so
+  every click reaches `CLICZONE`, the scans and the moves; without them
+  `finmaya1..3` stay 0 and the guards and the crocodile keep the pyramid
+  closed. `Engine::solve_maya_grid(n)`, a testing aid, writes what a
+  grid's win writes (`finmayaN` = 1, the win sound `sound101.apc` on voice
+  2); the grids' own state (the 16 digits, the module's state byte) is
+  not kept, so their leave, which in the original clears `finmayaN` when
+  the digits are not the solution and, in its view, empties the hand pair
+  and sets the puzzle mode to 0, is not needed to keep the win. Xibalba's
+  hooks under the same prefix are listed and noted too: the star map
+  (view 121), the spider web (view 198, and every view in its puzzle mode
+  1) and the canoe (view 402), whose view takes the click while
+  `enable_pz_pirog` is not 1 (the dispatcher's only consuming branch, as
+  the original). **Xibalba** (world 6, disc 4: `bat.wam`, `xibalba.wam`,
+  `riviere.wam`, `toile.wam`, chapters 35-41) is not ported: the
+  priestess's yes (chapter 27, once she has the bloody bands and is asked
+  about Tezcatlipoca: the prince and the high priest hidden, world 6 on
+  disc 4, film 43, `bat.wam` view 403, chapter 35) plays its film and is
+  refused at the `changewam` (above: the world back to Yucatán's on disc
+  2, the game in the priestess's view, her question asked again by her
+  next subject). Yucatán **cannot be finished without Xibalba**: its end
+  (chapter 28's arrival in the king's view 86 with the soul `CHULEL`:
+  film 55 with dialog 168 over it, Yucatán's mandala, Tibet's view 7) needs
+  the soul, which only Xibalba's chapter 39 gives; `tests/yucatan.rs`
+  plays that end with the soul put in the bag. **The way back to Tibet
+  without Xibalba** is chapter 30's brazier (`yucatan.wam` view 35, a click
+  with an empty hand: Tibet's view 7, chapter 75); the space travel of
+  view 22 (chapter 25) is refused like China's and Ireland's. Every
+  panorama of the three places is on disc 2; one place animation
+  (`w3A1078078.SPW`, the closed jaw of view 78) is on no disc and is
+  skipped with the original's message; the place sounds of `yucatan.wam`
+  play. A headless game plays Yucatán with the mouse only
+  (`tests/flow.rs` `yucatan_with_the_mouse`): from a new game, Yucatán's
+  boat taken in view 5 and laid in the hut, then chapters 25-34 stage by
+  stage (the prince and the high priest asked in the king's hall, the
+  priestess and her clean bands, the king given them (film 41), the
+  bloody bands back to the priestess (film 42), her question and the way
+  into Xibalba refused, then no; the obsidian of view 40; the pyramid's
+  first guard, grid (by the aid) and pass, the second, the entrance
+  door's button, the third grid and the crocodile's foot, the two
+  mirrors and the secret door back to view 28), a save and a load through
+  the menus, and the way back to Tibet by the brazier. Every chapter it
+  goes through is left by one of its own `chapter=` lines, the only hooks
+  noted are the grids', and every Yucatán `/set` line it reports is one
+  the original runs. With `ATLANTIS2_PNG_DIR` set it writes its screens
+  (`yucatan-*.png`). `tests/yucatan.rs` also runs every Yucatán chapter's
+  `/INIT`, enters every view of the three places with its hooks, moves
+  along every link, plays chapter 26's turned arrival, the brazier, the
+  end with the soul, all 70 dialogs the chapters start, checks the
+  subjects, objects and musics on disc 2, the place sounds, and loads a
+  game saved in the pyramid.
 - **The figurines on the floor** (`engine/figurines.rs`, China's
   `miniature.wam`, `SS` views 1-7; chapters 55, 47 and 48): six
   figurines lie in the grass of view 13 (the objects `OB_FIG1HERBE` ..
@@ -1668,10 +1763,11 @@ event, the gong's way back to Tibet) into `china-*.png`.
   `NEWSOUND`, film and `TrajSound` tracks the original also keeps there
   while they play, so a handle can differ when one of those is still
   loaded at the view's entry or a round's start.
-- **Worlds:** Tibet (`tibet.wam`, world 5), Ireland and China (above)
-  are ported. A `changewam` of the scripts to any other place (Yucatán's
-  boat, Shamballa's `voiles.wam` after the crystal, `Planetes.wam` of the
-  space travel, Ireland's `demo.wam`) is
+- **Worlds:** Tibet (`tibet.wam`, world 5), Ireland, China and Yucatán
+  (above) are ported. A `changewam` of the scripts to any other place
+  (Xibalba's `bat.wam` from the priestess's yes, Shamballa's `voiles.wam`
+  after the crystal, `Planetes.wam` of the space travel, Ireland's
+  `demo.wam`) is
   refused: where the original loads it (a place it cannot load is fatal
   there), the port notes it (`Event::WorldNotPorted`), ends the section
   at that line, sets the world back to the current place's (`Interp_SetMonde`: the
@@ -1998,8 +2094,9 @@ event, the gong's way back to Tibet) into `china-*.png`.
   next view entry and the click flags are one state shared with the
   navigation; the object in hand is the script's. The hooks wired:
   `changewam` (any place file), `vue`, `nextvue`, `anglewarpx/y`,
-  `anglewarpxnow/ynow` (the camera set to the angle [inferred: the
-  original sets the scene node's rotation]), the four zone keys (the type
+  `anglewarpxnow/ynow` (the camera's rotation set about the vertical
+  axis, the pitch dropped / a pitch from the current orientation, as
+  emulated: Yucatán, below), the four zone keys (the type
   of the zones of that value in the first such view of the current place
   ± 88888), `ABORTDEPART`, the show / hide table and the animation keys on
   the view's slots (`hideperso`, `showperso`, `hideobjet`, `showobjet`,

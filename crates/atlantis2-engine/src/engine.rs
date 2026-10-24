@@ -63,6 +63,10 @@ pub use turtle::RING_MODE;
 mod ui;
 mod wheels;
 pub use wheels::{DISC_WHEEL, WHEELS_FIRST, WHEELS_SECOND, WHEEL_DISC};
+mod yucatan;
+pub use yucatan::{
+    yucatan_click_hooks, yucatan_entry_hooks, MAYA_GRID_VIEWS, STATUE_BRANCH, STATUE_VIEW, WEB_MODE,
+};
 
 pub use blackbird::Blackbird;
 pub use dragon::Dragon;
@@ -140,8 +144,9 @@ pub enum Event {
     /// `CLICZONE` as it leaves it (the click scan may not follow: a film a
     /// hook's scan started drops the click).
     ZoneClick { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (China's puzzles): the
-    /// original's function, which would have run here.
+    /// A puzzle hook the port does not have (Yucatán's counting grids,
+    /// Xibalba's puzzles): the original's function, which would have run
+    /// here.
     PuzzleNotPorted { function: u32 },
     /// A puzzle function the port has, run: the original's function (a
     /// hook, or the wheels' check FUN_0048d310).
@@ -2025,7 +2030,7 @@ impl Engine {
             .map(|d| d.sprites.clone())
             .unwrap_or_default();
         for name in names {
-            if self.spf_hidden(&name) {
+            if self.perso_hidden(&name) {
                 continue;
             }
             let prefix = self
@@ -2059,8 +2064,9 @@ impl Engine {
 
     /// `Interp_is_perso_hidden` (FUN_00484d90): the name as an object (or
     /// else as a character) hidden by the show / hide table (a state
-    /// below 1; no row gives 2).
-    fn spf_hidden(&self, name: &str) -> bool {
+    /// below 1; no row gives 2). The transition sprites' test
+    /// (FUN_0047c100) and the Tezcatlipoca statue's (FUN_0049b910).
+    pub(crate) fn perso_hidden(&self, name: &str) -> bool {
         let perso = self
             .names
             .id(defnames::PERSONNAGES, name.as_bytes())
