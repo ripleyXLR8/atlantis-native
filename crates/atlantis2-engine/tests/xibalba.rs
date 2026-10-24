@@ -1,9 +1,10 @@
 //! Xibalba (world 6, disc 4): every Xibalba chapter's `/INIT` run; every
 //! view of the four places entered with the puzzles' entry hooks; the
 //! click hooks (the canoe's view taking the click until it is enabled,
-//! the star map's and the canoe's noted); the moves between the places
-//! (WAM links); the testing aids that write the three puzzles' wins and
-//! what the scripts do after them; every dialog the chapters and the web
+//! then starting it; the star map's noted); the moves between the places
+//! (WAM links); the canoe played with the mouse to its win, the testing
+//! aids that write the two other puzzles' wins, and what the scripts do
+//! after them; every dialog the chapters and the web
 //! start; the subjects, objects, musics and films on disc 4; the place
 //! sounds; a save in Xibalba loaded, and one in the web loaded in view
 //! 198. The way in from the priestess and the way back to the king's
@@ -17,7 +18,9 @@ use std::path::PathBuf;
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 use atlantis2_data::{A2Files, Folder};
+use atlantis2_engine::display::blit_640_to_800;
 use atlantis2_engine::engine::{yucatan_click_hooks, yucatan_entry_hooks, STAR_HOLES};
+use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, EngineError, Event, Fpu, LoopType, Variant};
 
 fn game() -> Option<A2Files> {
@@ -44,7 +47,13 @@ const PLACES: [&str; 4] = ["bat.wam", "xibalba.wam", "riviere.wam", "toile.wam"]
 /// loads them, then the section's commands (the world, the place, view
 /// 403, chapter 35).
 fn in_xibalba(files: A2Files) -> Engine {
+    in_xibalba_at(files, false)
+}
+
+/// [`in_xibalba`] with the screen option at 800 x 600 when `large`.
+fn in_xibalba_at(files: A2Files, large: bool) -> Engine {
     let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.set_screen_800(large);
     e.trace = true;
     e.start_new_game().unwrap();
     e.end_video();
@@ -311,8 +320,8 @@ fn set_values(files: &A2Files, key: &str) -> Vec<String> {
 
 /// The click hooks on Xibalba's zones, with the scripts: the canoe's
 /// zone of view 402 takes the click (`CLICZONE` left at 0) until
-/// `enable_pz_pirog` is 1; then the canoe's start is noted and the click
-/// goes on (FUN_0049c010's branch returns 0); a star map's hole (view
+/// `enable_pz_pirog` is 1; then the canoe starts (loop type 9) and the
+/// click goes on (FUN_0049c010's branch returns 0); a star map's hole (view
 /// 121, type 50) notes the map's click, and the click scan follows.
 #[test]
 fn the_xibalba_click_hooks() {
@@ -358,13 +367,16 @@ fn the_xibalba_click_hooks() {
     e.events.clear();
     e.click(20.0);
     e.pass(None);
-    assert_eq!(noted(&e.events), [0x0049_c010]);
+    // The start (FUN_0049c010(1) → `pz_pirogue_init`).
+    assert_eq!(noted(&e.events), [0x0049_6a60]);
     assert!(e
         .events
         .iter()
         .any(|x| matches!(x, Event::ZoneClick { cliczone: 469, .. })));
     assert!(e.events.iter().any(|x| matches!(x, Event::ClickScan(_))));
-    assert_eq!((e.loop_type, flag(&e, 103)), (LoopType::Warp, 0));
+    assert_eq!((e.loop_type, flag(&e, 103)), (LoopType::Canoe, 1));
+    e.escape();
+    e.pass(None);
     settle(&mut e);
 
     goto(&mut e, "xibalba.wam", 121, 39);
@@ -455,27 +467,112 @@ fn the_places_of_xibalba_are_linked() {
     }
 }
 
-/// The canoe's testing aid in view 402 (chapter 35): what its start and
-/// its end write (`flag103`, `finpirogue`, `Pirogue_JustFinished` and
-/// the scan): the first win's section sends the game to `xibalba.wam`
+/// The canoe played with the mouse in loop type 9, one pass a frame
+/// (`pass`, with the screen written as `pz-canoe-<name>.png` in
+/// `ATLANTIS2_SHOTS` when set): each tile taken to its own square (a left
+/// click on it, one on its square: the two swap) and turned upright (right
+/// clicks), the stage clicked, then the canoe left to paddle along the
+/// river to its end. The passes it took.
+fn play_canoe(
+    e: &mut Engine,
+    t: &mut f64,
+    pass: &mut dyn FnMut(&mut Engine, Option<&str>),
+) -> usize {
+    let centre = |e: &Engine, k: usize| {
+        let s = e.canoe().unwrap().board[k];
+        (s.x + 0x10, s.y + 0x36)
+    };
+    let mut passes = 0;
+    let mut frame = |e: &mut Engine, k: usize, left: bool, right: bool, shot: Option<&str>| {
+        let (x, y) = centre(e, k);
+        e.pointer(x, y);
+        if left {
+            *t += 1.0;
+            e.click(*t);
+        }
+        if right {
+            e.right_click();
+        }
+        pass(e, shot);
+        passes += 1;
+    };
+    assert_eq!(e.loop_type, LoopType::Canoe);
+    frame(e, 4, false, false, Some("1-shuffled"));
+    for k in 0..8 {
+        let board = e.canoe().unwrap().board;
+        let s = (0..8).find(|&s| board[s].tile / 4 == k as i32).unwrap();
+        if s != k {
+            frame(e, s, true, false, None);
+            assert_ne!(e.canoe().unwrap().held, -1);
+            frame(e, k, true, false, None);
+            assert_eq!(e.canoe().unwrap().held, -1);
+        }
+        while e.canoe().unwrap().board[k].tile % 4 != 0 {
+            frame(e, k, false, true, None);
+        }
+    }
+    frame(e, 8, false, false, Some("2-solved"));
+    frame(e, 8, true, false, None);
+    assert!(e.canoe().unwrap().moving);
+    let mut n = 0;
+    while e.loop_type == LoopType::Canoe {
+        n += 1;
+        assert!(n < 5000, "the canoe never arrives");
+        let shot = (n == 600).then_some("3-paddling");
+        frame(e, 8, false, false, shot);
+    }
+    passes
+}
+
+/// The canoe in view 402 (chapter 35), started by its zone and played
+/// with the mouse: the start (`(flag103=1)`, the loop type 9, the pointer
+/// pair), the play, the win's writes (`finpirogue`,
+/// `Pirogue_JustFinished` and the scan) and the quit back to the
+/// panorama: the first win's section sends the game to `xibalba.wam`
 /// view 124, chapter 39 (`flag117`); a second win, from the bat's island
-/// again, to view 404.
+/// again, to view 404. Escape quits a canoe started again, nothing
+/// written.
 #[test]
-fn the_canoe_aid_writes_its_win() {
+fn the_canoe_is_played_to_its_win() {
     let Some(files) = game() else { return };
+    let shots = std::env::var_os("ATLANTIS2_SHOTS").map(PathBuf::from);
+    if let Some(d) = &shots {
+        std::fs::create_dir_all(d).unwrap();
+    }
+    let mut screen = vec![0u16; 640 * 480];
+    let mut pass = |e: &mut Engine, shot: Option<&str>| {
+        e.pass(Some(&mut screen));
+        if let (Some(d), Some(name)) = (&shots, shot) {
+            let png = encode_rgb565(&screen, 640, 480);
+            std::fs::write(d.join(format!("pz-canoe-{name}.png")), png).unwrap();
+        }
+    };
     let mut e = in_xibalba(files);
     goto(&mut e, "bat.wam", 402, 35);
-    e.events.clear();
-    e.win_canoe();
-    let aids: Vec<u32> = e
-        .events
-        .iter()
-        .filter_map(|x| match x {
-            Event::PuzzleAid { function } => Some(*function),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(aids, [0x0049_6a60, 0x0049_a040]);
+    e.run_command(b"(enable_pz_pirog=1)");
+    let z = zone(&e, |z| z.kind == 4 && z.value == 469);
+    let mut t = 10.0;
+    let start = |e: &mut Engine, t: &mut f64| {
+        aim(e, z);
+        e.events.clear();
+        *t += 1.0;
+        e.click(*t);
+        e.pass(None);
+        assert!(e.events.contains(&Event::PuzzleRan {
+            function: 0x0049_6a60
+        }));
+        assert_eq!(e.loop_type, LoopType::Canoe);
+        assert_eq!(flag(e, 103), 1);
+        assert_eq!(e.pointer, (320, 240));
+    };
+    start(&mut e, &mut t);
+    let passes = play_canoe(&mut e, &mut t, &mut pass);
+    assert!(passes > 1000, "{passes}");
+    assert!(e.events.contains(&Event::PuzzleRan {
+        function: 0x0049_a570
+    }));
+    assert!(e.canoe().is_none());
+    pass(&mut e, Some("4-won"));
     settle(&mut e);
     assert_eq!(e.place(), ("xibalba.wam", 124));
     assert_eq!(e.script_state().unwrap().chapter, 39);
@@ -494,13 +591,68 @@ fn the_canoe_aid_writes_its_win() {
     lines_as_the_original(&lines);
     // Again: chapter 35's second-win section, view 404.
     goto(&mut e, "bat.wam", 402, 35);
+    start(&mut e, &mut t);
     e.events.clear();
-    e.win_canoe();
+    play_canoe(&mut e, &mut t, &mut |e, _| e.pass(None));
     settle(&mut e);
     assert_eq!(e.place(), ("bat.wam", 404));
     assert_eq!(var(&e, "Pirogue_JustFinished"), 0);
     let lines = set_lines(&e.events);
     assert!(lines.contains(&(35, 116)) && lines.contains(&(35, 117)));
+    // Escape: the quit at once, nothing written, back to the panorama.
+    goto(&mut e, "bat.wam", 402, 35);
+    start(&mut e, &mut t);
+    e.events.clear();
+    e.escape();
+    e.pass(None);
+    assert_eq!(e.loop_type, LoopType::Warp);
+    assert!(e.canoe().is_none());
+    assert!(e.events.contains(&Event::PuzzleRan {
+        function: 0x0049_a570
+    }));
+    assert!(set_lines(&e.events).is_empty());
+    assert_eq!(e.place(), ("bat.wam", 402));
+}
+
+/// At 800 x 600 the canoe is drawn on the 640 x 480 surface, enlarged
+/// (its init's FUN_00402960(0)), the pointer at that surface's centre:
+/// the frames are those of a 640 x 480 game enlarged.
+#[test]
+fn the_canoe_at_800_by_600() {
+    let Some(files) = game() else { return };
+    let mut small = in_xibalba(files);
+    let mut big = in_xibalba_at(game().unwrap(), true);
+    let (mut a, mut b, mut want) = (
+        vec![0u16; 640 * 480],
+        vec![0u16; 800 * 600],
+        vec![0u16; 800 * 600],
+    );
+    assert_eq!(big.screen_size(), (800, 600));
+    for e in [&mut small, &mut big] {
+        goto(e, "bat.wam", 402, 35);
+        e.run_command(b"(enable_pz_pirog=1)");
+        e.start_canoe();
+        assert_eq!((e.loop_type, e.pointer), (LoopType::Canoe, (320, 240)));
+    }
+    for i in 0..60 {
+        for e in [&mut small, &mut big] {
+            e.pointer(150 + 5 * i, 100 + 3 * i);
+            if i % 15 == 7 {
+                e.right_click();
+            }
+        }
+        small.pass(Some(&mut a));
+        big.pass(Some(&mut b));
+        blit_640_to_800(&a, &mut want, 800);
+        let d: Vec<usize> = (0..800 * 600).filter(|&k| b[k] != want[k]).collect();
+        assert!(
+            d.is_empty(),
+            "frame {i}: {} pixels, first {:?}, last {:?}",
+            d.len(),
+            d.first().map(|k| (k % 800, k / 800)),
+            d.last().map(|k| (k % 800, k / 800))
+        );
+    }
 }
 
 /// The star map's testing aid in view 121 (chapter 39): nothing with

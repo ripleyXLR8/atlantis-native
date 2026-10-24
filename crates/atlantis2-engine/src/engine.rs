@@ -36,6 +36,8 @@ use crate::turn::{Turn, Zoom};
 use crate::warp::{faces_from_hnm, Renderer, Variant};
 
 mod blackbird;
+mod canoe;
+pub use canoe::{CANOE_INIT, CANOE_QUIT};
 mod chest;
 mod cross;
 mod figurines;
@@ -156,8 +158,8 @@ pub enum Event {
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
     /// A testing aid wrote what a puzzle the port does not have writes
-    /// (Xibalba's, [`Engine::win_star_map`], [`Engine::win_canoe`],
-    /// [`Engine::win_web_round`]): the original's function whose writes
+    /// (Xibalba's, [`Engine::win_star_map`], [`Engine::win_web_round`]):
+    /// the original's function whose writes
     /// follow.
     PuzzleAid { function: u32 },
     /// A puzzle function the port has, run: the original's function (a
@@ -270,6 +272,8 @@ pub enum LoopType {
     /// 11: a full-screen picture (`ViewBigSpr`, @ 0x0048ca50) until a
     /// click.
     Picture,
+    /// 9: the canoe puzzle (@ 0x0049c060, `crate::canoe`).
+    Canoe,
 }
 
 /// The script variables the navigation sets (`defnames.con` names).
@@ -575,6 +579,12 @@ pub struct Engine {
     player: Player,
     /// The picture of `ViewBigSpr` (@ 0x006d1874).
     picture: Option<SprBank>,
+    /// The canoe puzzle in loop type 9, the loop type it left
+    /// (@ 0x006d84c4) and Escape pressed in it (the key code 1,
+    /// @ 0x00672014).
+    canoe: Option<Box<crate::canoe::Canoe>>,
+    canoe_prev_loop: LoopType,
+    canoe_escape: bool,
     /// A sound loaded for the next video (`cine%03d.apc` @ 0x0047a320, or
     /// the `TrajSound` of a move), played on voice 2 when it starts.
     pending_sound: Option<(String, Pcm)>,
@@ -926,6 +936,9 @@ impl Engine {
             con: None,
             player: Player::default(),
             picture: None,
+            canoe: None,
+            canoe_prev_loop: LoopType::Warp,
+            canoe_escape: false,
             pending_sound: None,
             traj_sound: None,
             spf: Vec::new(),
@@ -1368,6 +1381,7 @@ impl Engine {
             }
             LoopType::Menu => self.menu_pass(out.as_deref_mut()),
             LoopType::Picture => self.picture_pass(out.as_deref_mut()),
+            LoopType::Canoe => self.canoe_pass(out.as_deref_mut()),
         }
         self.hd_pass_end(out.as_deref());
         // Every case of the dispatcher ends with the 15 Hz flag cleared

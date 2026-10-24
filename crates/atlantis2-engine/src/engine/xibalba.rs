@@ -5,14 +5,16 @@
 //! for the king's hall by chapter 35. Their views share Yucatán's `YU`
 //! prefix, so their puzzle hooks are the `YU` branches of `yucatan.rs`.
 //!
-//! Its three puzzles are not ported; their hooks stay listed and noted
-//! ([`Event::PuzzleNotPorted`]):
+//! The canoe (view 402 of `bat.wam`) runs: FUN_0049c010(1), the 3D
+//! puzzle's own loop (type 9), started by a click there once
+//! `enable_pz_pirog` is 1 (before, the click is consumed); see
+//! `canoe.rs` and [`crate::canoe`].
+//!
+//! Its two other puzzles are not ported; their hooks stay listed and
+//! noted ([`Event::PuzzleNotPorted`]):
 //!
 //! - the star map (view 121 of `xibalba.wam`): the entry FUN_00494e00
 //!   and the click FUN_00494e80 (zones of type 0x32);
-//! - the canoe (view 402 of `bat.wam`): FUN_0049c010(1), the 3D puzzle's
-//!   own loop (type 9), started by a click there once `enable_pz_pirog`
-//!   is 1 (before, the click is consumed);
 //! - the spider's web (`toile.wam`, views 198-265): the entry of view 198
 //!   FUN_0048f530 (the puzzle mode 1, which the port never sets), and in
 //!   that mode the entry FUN_0048f9a0 and the move click FUN_0048fdd0. The
@@ -23,10 +25,9 @@
 //!   FUN_0048f450 (the stage's variables from the bag, then FUN_0048f530)
 //!   is the web's, noted.
 //!
-//! What each puzzle's win writes is available as a testing aid, for
-//! tests and tools only, so that the story after it can be played:
-//! [`Engine::win_star_map`], [`Engine::win_canoe`] and
-//! [`Engine::win_web_round`]. They write the variables, the bag, the hand
+//! What each of the two puzzles' wins writes is available as a testing
+//! aid, for tests and tools only, so that the story after it can be
+//! played: [`Engine::win_star_map`] and [`Engine::win_web_round`]. They write the variables, the bag, the hand
 //! and the sounds the original's code writes along a won game of the
 //! puzzle, in its order, and nothing it draws.
 
@@ -50,13 +51,6 @@ const STAR_STARTED: &[u8] = b"(pz_etoile_started=1)";
 const STAR_LAID_SOUND: &[u8] = b"(NewSound=115)";
 const STARS_DONE: &str = "etoiles_fini";
 const STARS_JUST_FINISHED: &str = "Etoiles_JustFinished";
-
-/// The canoe's start command (FUN_00496a60 @ 0x00496a7f, the string
-/// @ 0x005e24fc) and its end's variables (FUN_0049a040, @ 0x005e2cd4,
-/// 0x005e2cbc).
-const CANOE_STARTED: &[u8] = b"(flag103=1)";
-const CANOE_DONE: &str = "finpirogue";
-const CANOE_JUST_FINISHED: &str = "Pirogue_JustFinished";
 
 /// The web's stage variables (FUN_0048f930, @ 0x005e14ec, 0x005e14e0,
 /// 0x005e14d4).
@@ -115,33 +109,6 @@ impl Engine {
             s.ctrl_scenar_in(h);
         });
         true
-    }
-
-    /// A testing aid, for tests and tools only (the canoe is not ported):
-    /// what a canoe started and won writes. The start (FUN_00496a60, from
-    /// FUN_0049c010(1)): `(flag103=1)` (RunOneCommand @ 0x00496a7f). The
-    /// end (FUN_0049a040 @ 0x0049a040..0x0049a06c): `finpirogue` = 1
-    /// (Interp_WriteVar), then when `Pirogue_JustFinished` is 0, it = 1
-    /// and `CtrlScenarIN` (chapter 35 then sends the game on). The quit
-    /// that follows the won frame (FUN_0049a570 from FUN_00498ca0) clears
-    /// the cursor pair (FUN_0047bef0(0, 0)); the loop type 9 and its
-    /// return to the loop type it left are not entered.
-    pub fn win_canoe(&mut self) {
-        self.event(Event::PuzzleAid {
-            function: 0x0049_6a60,
-        });
-        self.with_script(|s, h| s.run_command(h, CANOE_STARTED));
-        self.event(Event::PuzzleAid {
-            function: 0x0049_a040,
-        });
-        self.with_script(|s, h| {
-            s.set_var(CANOE_DONE, 1);
-            if s.var(CANOE_JUST_FINISHED) == Some(0) {
-                s.set_var(CANOE_JUST_FINISHED, 1);
-                s.ctrl_scenar_in(h);
-            }
-        });
-        self.clear_cursor_pair();
     }
 
     /// The web's stage (FUN_0048f930, @ 0x0048f930..0x0048f99a): 1 + the

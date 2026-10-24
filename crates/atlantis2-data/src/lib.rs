@@ -21,10 +21,12 @@
 //!   container) and `atlant2.cfg`;
 //! - [`dialog`]: the dialog scripts' speakers and lines, their texts, the
 //!   worlds' file sets and heroes, and `Font.txt`;
-//! - [`messages`]: the object names the bag bar shows.
+//! - [`messages`]: the object names the bag bar shows;
+//! - [`canoe`]: the canoe puzzle's waypoints and depth tiles.
 
 #![forbid(unsafe_code)]
 
+pub mod canoe;
 pub mod con;
 pub mod db;
 pub mod defnames;

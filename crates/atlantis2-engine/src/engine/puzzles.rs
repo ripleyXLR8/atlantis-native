@@ -51,13 +51,12 @@
 //!   still noted ([`Event::PuzzleNotPorted`]) is another world's (a mode
 //!   of another world's puzzle from a save, for instance).
 //! - Yucatán's hooks (prefix `YU`, `yucatan.rs`): the Maya counting
-//!   grids (`grids.rs`: entries, clicks, leaves and the mode 7's tick)
-//!   and the Tezcatlipoca statue's branch run; Xibalba's (the star map,
-//!   the canoe, the spider web), whose puzzles are not ported, are listed
-//!   and noted (`xibalba.rs` has testing aids that write their wins). The
-//!   canoe's view
-//!   consumes the click while the canoe is not enabled, as in the
-//!   original.
+//!   grids (`grids.rs`: entries, clicks, leaves and the mode 7's tick),
+//!   the Tezcatlipoca statue's branch and Xibalba's canoe (`canoe.rs`,
+//!   loop type 9) run; the canoe's view consumes the click while the
+//!   canoe is not enabled, as in the original. Xibalba's two other
+//!   puzzles (the star map, the spider web), not ported, are listed and
+//!   noted (`xibalba.rs` has testing aids that write their wins).
 //! - The places the port has: Tibet, Ireland, China, Yucatán and
 //!   Xibalba. A `changewam` to any other place (Shamballa, the space
 //!   travel) is refused: the section stops there, the world goes back to

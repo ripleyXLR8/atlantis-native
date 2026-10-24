@@ -480,6 +480,61 @@ fn hd_keeps_the_original_frames() {
     }
 }
 
+/// The canoe (loop type 9) with the HD mode on: its frames are those of
+/// the HD mode off (the puzzle's own drawing, at 640 x 480), with no HD
+/// layer (the front end enlarges the frame, as it does a menu page); the
+/// panorama's layer is back once the canoe is quit.
+#[test]
+fn hd_canoe_is_the_original_frame() {
+    if game().is_none() {
+        return;
+    }
+    let commands: &[&[u8]] = &[
+        b"(monde=6)",
+        b"(changewam=bat.wam)",
+        b"(vue=402)",
+        b"(chapter=35)",
+        b"(enable_pz_pirog=1)",
+    ];
+    let mut off = at(game().unwrap(), commands, false);
+    let mut on = at(game().unwrap(), commands, true);
+    on.set_hd_output(Some(20), 4);
+    off.set_hd_output(Some(20), 4);
+    let (mut a, mut b) = (vec![0u16; 640 * 480], vec![0u16; 640 * 480]);
+    for e in [&mut off, &mut on] {
+        e.start_canoe();
+        assert_eq!(e.loop_type, LoopType::Canoe);
+    }
+    for i in 0..120 {
+        for e in [&mut off, &mut on] {
+            e.set_clock(i as f64 / 60.0);
+            e.pointer(100 + 4 * i, 120 + 2 * i);
+            if i % 20 == 10 {
+                e.right_click();
+            }
+            if i % 40 == 30 {
+                e.click(i as f64);
+            }
+        }
+        off.pass(Some(&mut a));
+        on.pass(Some(&mut b));
+        assert!(a == b, "frame {i} differs with the HD mode");
+        assert!(on.hd_layer().is_none() && !on.hd_photo(), "frame {i}");
+    }
+    for e in [&mut off, &mut on] {
+        e.escape();
+    }
+    off.pass(Some(&mut a));
+    on.pass(Some(&mut b));
+    assert_eq!(on.loop_type, LoopType::Warp);
+    for i in 0..5 {
+        off.pass(Some(&mut a));
+        on.pass(Some(&mut b));
+        assert!(a == b, "frame {i} after the canoe differs with the HD mode");
+    }
+    assert!(on.hd_layer().is_some());
+}
+
 /// The HD view of a place: the cube's colours where the 640x480 frame
 /// shows them, at the HD size: each original pixel centre's HD pixel is
 /// within the colours of the texels around the original's.

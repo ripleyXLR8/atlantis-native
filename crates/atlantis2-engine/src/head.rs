@@ -45,19 +45,19 @@ pub const VISEMES: &[u8; 7] = b"diaobsv";
 
 /// A quaternion (x, y, z, w) and a vector, as the f32 values the original
 /// stores, held in f64.
-type Quat = [f64; 4];
-type Vec3 = [f64; 3];
+pub(crate) type Quat = [f64; 4];
+pub(crate) type Vec3 = [f64; 3];
 
-fn q64(q: [f32; 4]) -> Quat {
+pub(crate) fn q64(q: [f32; 4]) -> Quat {
     q.map(f64::from)
 }
 
-fn v64(v: [f32; 3]) -> Vec3 {
+pub(crate) fn v64(v: [f32; 3]) -> Vec3 {
     v.map(f64::from)
 }
 
 /// a ⊗ b (@ 0x004a29c0).
-fn qmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
+pub(crate) fn qmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
     let m = |x, y| c.mul(x, y);
     let [ax, ay, az, aw] = *a;
     let [bx, by, bz, bw] = *b;
@@ -70,7 +70,7 @@ fn qmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
 }
 
 /// conj(a) ⊗ b (@ 0x004a2c50).
-fn qcmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
+pub(crate) fn qcmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
     let m = |x, y| c.mul(x, y);
     let [ax, ay, az, aw] = *a;
     let [bx, by, bz, bw] = *b;
@@ -83,7 +83,7 @@ fn qcmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
 }
 
 /// The rotation matrix of a quaternion, rows (@ 0x004c6e40).
-fn qmat(c: Fpu, q: &Quat) -> [f64; 9] {
+pub(crate) fn qmat(c: Fpu, q: &Quat) -> [f64; 9] {
     let [x, y, z, w] = *q;
     let x2 = c.add(x, x);
     let y2 = c.f(c.add(y, y));
@@ -112,7 +112,7 @@ fn qmat(c: Fpu, q: &Quat) -> [f64; 9] {
 }
 
 /// The quaternion of a rotation matrix (@ 0x004c8a10).
-fn matq(c: Fpu, m: &[f64; 9]) -> Quat {
+pub(crate) fn matq(c: Fpu, m: &[f64; 9]) -> Quat {
     let trace = c.add(c.add(m[4], m[0]), m[8]);
     let mut q = [0.0; 4];
     if trace > 0.0 {
@@ -202,7 +202,7 @@ struct Node {
 
 /// A node's key-frame track (@ 0x004c7250): (time, value) per channel.
 #[derive(Clone, Debug, Default)]
-struct Track {
+pub(crate) struct Track {
     rotations: Vec<(f64, Quat)>,
     positions: Vec<(f64, Vec3)>,
     scales: Vec<(f64, f64)>,
@@ -594,60 +594,7 @@ impl Head {
         let t = f64::from(frame as f32);
         for i in 0..self.nodes.len() {
             let Some(tr) = &self.tracks[i] else { continue };
-            let c = self.fpu;
-            // Rotation (@ 0x004c7810, flag 1).
-            let q = if tr.rotations.is_empty() {
-                None
-            } else {
-                let k = lower_bound(&tr.rotations, t);
-                Some(if k == tr.rotations.len() {
-                    tr.rotations[k - 1].1
-                } else if tr.rotations[k].0 == t || k == 0 {
-                    tr.rotations[k].1
-                } else {
-                    let (t0, a) = tr.rotations[k - 1];
-                    let (t1, b) = tr.rotations[k];
-                    // @ 0x004c7bc0.
-                    let u = c.f(c.div(c.sub(t, t0), c.sub(t1, t0)));
-                    slerp(c, &a, &b, u)
-                })
-            };
-            // Position (flag 2).
-            let p = if tr.positions.is_empty() {
-                None
-            } else {
-                let k = lower_bound(&tr.positions, t);
-                Some(if k == tr.positions.len() {
-                    tr.positions[k - 1].1
-                } else if tr.positions[k].0 == t || k == 0 {
-                    tr.positions[k].1
-                } else {
-                    let (t0, a) = tr.positions[k - 1];
-                    let (t1, b) = tr.positions[k];
-                    lerp_position(c, t0, &a, t1, &b, t)
-                })
-            };
-            // Scale (flag 4).
-            let s = if tr.scales.is_empty() {
-                None
-            } else {
-                let k = lower_bound(&tr.scales, t);
-                Some(if k == tr.scales.len() {
-                    tr.scales[k - 1].1
-                } else if tr.scales[k].0 == t || k == 0 {
-                    tr.scales[k].1
-                } else {
-                    let (t0, a) = tr.scales[k - 1];
-                    let (t1, b) = tr.scales[k];
-                    // @ 0x004c7c20.
-                    let v = c.add(c.div(c.mul(c.sub(b, a), c.sub(t, t0)), c.sub(t1, t0)), a);
-                    if v == 0.0 {
-                        1.0
-                    } else {
-                        c.f(v)
-                    }
-                })
-            };
+            let (q, p, s) = eval_track(self.fpu, tr, t);
             // Each value is set relative to the node's own parent: a copy
             // (@ 0x004a2860, @ 0x004a2000, @ 0x004a2f40), which marks the
             // node and its descendants stale.
@@ -1300,7 +1247,7 @@ fn head_object(scene: &Scene) -> Option<(String, &atlantis2_data::db::Mesh)> {
 
 /// A node's track from its `.db` record (@ 0x004c7250): the TCB keys'
 /// values, or the version-11 linear keys when there is no TCB key.
-fn track(d: &atlantis2_data::db::Node) -> Option<Track> {
+pub(crate) fn track(d: &atlantis2_data::db::Node) -> Option<Track> {
     let tcb =
         !(d.rotation_keys.is_empty() && d.position_keys.is_empty() && d.scale_keys.is_empty());
     let scale = |s: f32| if s == 0.0 { 1.0 } else { f64::from(s) };
@@ -1343,6 +1290,67 @@ fn track(d: &atlantis2_data::db::Node) -> Option<Track> {
     };
     let empty = t.rotations.is_empty() && t.positions.is_empty() && t.scales.is_empty();
     (!empty).then_some(t)
+}
+
+/// A node's tracks at time `t` (@ 0x004c7810 with the channel flags
+/// 0x1f): the rotation, position and scale keys found, each the key at
+/// or after `t` (the last one past the end, the first one before the
+/// start) or the interpolation between its neighbours.
+pub(crate) fn eval_track(c: Fpu, tr: &Track, t: f64) -> (Option<Quat>, Option<Vec3>, Option<f64>) {
+    // Rotation (@ 0x004c7810, flag 1).
+    let q = if tr.rotations.is_empty() {
+        None
+    } else {
+        let k = lower_bound(&tr.rotations, t);
+        Some(if k == tr.rotations.len() {
+            tr.rotations[k - 1].1
+        } else if tr.rotations[k].0 == t || k == 0 {
+            tr.rotations[k].1
+        } else {
+            let (t0, a) = tr.rotations[k - 1];
+            let (t1, b) = tr.rotations[k];
+            // @ 0x004c7bc0.
+            let u = c.f(c.div(c.sub(t, t0), c.sub(t1, t0)));
+            slerp(c, &a, &b, u)
+        })
+    };
+    // Position (flag 2).
+    let p = if tr.positions.is_empty() {
+        None
+    } else {
+        let k = lower_bound(&tr.positions, t);
+        Some(if k == tr.positions.len() {
+            tr.positions[k - 1].1
+        } else if tr.positions[k].0 == t || k == 0 {
+            tr.positions[k].1
+        } else {
+            let (t0, a) = tr.positions[k - 1];
+            let (t1, b) = tr.positions[k];
+            lerp_position(c, t0, &a, t1, &b, t)
+        })
+    };
+    // Scale (flag 4).
+    let s = if tr.scales.is_empty() {
+        None
+    } else {
+        let k = lower_bound(&tr.scales, t);
+        Some(if k == tr.scales.len() {
+            tr.scales[k - 1].1
+        } else if tr.scales[k].0 == t || k == 0 {
+            tr.scales[k].1
+        } else {
+            let (t0, a) = tr.scales[k - 1];
+            let (t1, b) = tr.scales[k];
+            // @ 0x004c7c20.
+            let v = c.add(c.div(c.mul(c.sub(b, a), c.sub(t, t0)), c.sub(t1, t0)), a);
+            if v == 0.0 {
+                1.0
+            } else {
+                c.f(v)
+            }
+        })
+    };
+    (q, p, s)
 }
 
 /// Linear interpolation of two position keys (@ 0x004c7b10).
