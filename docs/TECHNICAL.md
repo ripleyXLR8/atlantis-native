@@ -10,7 +10,7 @@
 | `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
-| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán without its counting grids (the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view) |
+| `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán as far as it goes without Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -640,9 +640,8 @@ figurines, the chest, the incense, the five wheels, the pearl and the
 dragon, the turtle ring and the labyrinth's souls, below) and sends the
 game back to Tibet with China's mandala (the lantern), or at once by its
 gong. Yucatán's boat leaves for Yucatán (world 2, below), which plays
-without its counting grids (written by a testing aid in the tests) as far
-as the original goes without Xibalba, and sends the game back to Tibet by
-its brazier; the way into Xibalba (world 6), which the mandala needs,
+with its counting grids as far as the original goes without Xibalba,
+and sends the game back to Tibet by its brazier; the way into Xibalba (world 6), which the mandala needs,
 plays its film and stays where it is, as a trip to another world does
 (the crystal, the space travel). Not yet: Xibalba and Shamballa.
 `--headless <folder> [frames] --screenshot
@@ -683,8 +682,8 @@ event, the gong's way back to Tibet) into `china-*.png`; `--example
 yucatan_tour <install> <discs> <out>` lays Yucatán's boat and draws the
 trip (the departure film, the arrival, the king's hall turned by
 `AngleWarpXNow`, a character's menu, the priestess, the pyramid's first
-grid, the Tezcatlipoca statue's menu, the brazier's way back) into
-`yucatan-*.png`.
+grid with marbles laid, the Tezcatlipoca statue's menu, the brazier's way
+back) into `yucatan-*.png`.
 
 - **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
   timestamp 0x38030926), recognised by its size and timestamp and
@@ -1337,17 +1336,10 @@ grid, the Tezcatlipoca statue's menu, the brazier's way back) into
   branches of both dispatchers, `yucatan_click_hooks`,
   `yucatan_entry_hooks`): the Maya counting grids of `pyratez.wam` views
   55, 64 and 75 (their entries, their clicks on zones of type 50, their
-  leaves on move zones) are not ported: their hooks are noted
-  (`Event::PuzzleNotPorted`) and take no click, as in the original, so
-  every click reaches `CLICZONE`, the scans and the moves; without them
-  `finmaya1..3` stay 0 and the guards and the crocodile keep the pyramid
-  closed. `Engine::solve_maya_grid(n)`, a testing aid, writes what a
-  grid's win writes (`finmayaN` = 1, the win sound `sound101.apc` on voice
-  2); the grids' own state (the 16 digits, the module's state byte) is
-  not kept, so their leave, which in the original clears `finmayaN` when
-  the digits are not the solution and, in its view, empties the hand pair
-  and sets the puzzle mode to 0, is not needed to keep the win. Xibalba's
-  hooks under the same prefix are listed and noted too: the star map
+  leaves on move zones) run (below); none takes the click, as in the
+  original, so every click reaches `CLICZONE`, the scans and the moves.
+  Xibalba's hooks under the same prefix are listed and noted
+  (`Event::PuzzleNotPorted`): the star map
   (view 121), the spider web (view 198, and every view in its puzzle mode
   1) and the canoe (view 402), whose view takes the click while
   `enable_pz_pirog` is not 1, as in the original (the dispatcher's own
@@ -1378,19 +1370,83 @@ grid, the Tezcatlipoca statue's menu, the brazier's way back) into
   priestess and her clean bands, the king given them (film 41), the
   bloody bands back to the priestess (film 42), her question and the way
   into Xibalba refused, then no; the obsidian of view 40; the pyramid's
-  first guard, grid (by the aid) and pass, the second, the entrance
-  door's button, the third grid and the crocodile's foot, the two
-  mirrors and the secret door back to view 28), a save and a load through
-  the menus, and the way back to Tibet by the brazier. Every chapter it
-  goes through is left by one of its own `chapter=` lines, the only hooks
-  noted are the grids', and every Yucatán `/set` line it reports is one
-  the original runs. With `ATLANTIS2_PNG_DIR` set it writes its screens
+  first guard, grid (played: five marbles, then four) and pass, the
+  second, the entrance door's button, the third grid, whose win opens the
+  crocodile's jaw, and the crocodile's foot, the two mirrors and the
+  secret door back to view 28), a save and a load through the menus, and
+  the way back to Tibet by the brazier. Every chapter it goes through is
+  left by one of its own `chapter=` lines, no hook is left unported, and
+  every Yucatán `/set` line it reports is one the original runs. With `ATLANTIS2_PNG_DIR` set it writes its screens
   (`yucatan-*.png`). `tests/yucatan.rs` also runs every Yucatán chapter's
   `/INIT`, enters every view of the three places with its hooks, moves
   along every link, plays chapter 26's turned arrival, the brazier, the
   end with the soul, all 70 dialogs the chapters start, checks the
   subjects, objects and musics on disc 2, the place sounds, and loads a
   game saved in the pyramid.
+- **Maya counting grids** (`engine/grids.rs`, `pyratez.wam` views 55, 64
+  and 75; chapters 31, 32, 34): each grid is 16 cells in four groups of
+  four (cells 4k..4k + 3: the tests read only i mod 4; where a group lies
+  on the screen is not read), a 16-digit string (cell i is digit 15 − i;
+  save entries 21, 23, 25, `0000000000000000` at start-up, kept in the
+  save's bytes the engine reads in place, as the module's states of
+  entries 20, 22, 24), each digit the marbles in the cell. In a group the
+  first cell takes 1..5 marbles, each next cell only when the one before
+  holds five, the last at most four (@ 0x004935c0, @ 0x00493590) [inferred
+  from that rule: a group is a Maya digit, bars and dots]. The grid is the
+  frame list of `SPW_BASE5A` / `B` / `C`'s slot (80 frames, 5 i + n − 1
+  for n marbles in cell i); the marbles in hand (0..5, not saved) are the
+  hand pair's frame n − 1 of `spr\sprboul.spr`, a third bank of the hand
+  pair (`HandBank::Puzzle`) drawn at the centre like an object. The entry
+  (@ 0x00492f60, 0x00493070, 0x00493100) keeps the slot's id, resets the
+  digits when `resetmayaN` is 1 (and sets it back to 0; `resetmaya3`
+  resets grid 2's, a slip no chapter reaches), draws the grid (@
+  0x00492ff0: the bank loaded, frames 0..79 out of the list, one frame per
+  non-empty cell in, the puzzle mode 7) and sets the module's state 1
+  unless 2. A click on a zone of type 50 (@ 0x004931a0 / 0x00493490 /
+  0x00493510 through the step @ 0x00493220, nothing with an object in
+  hand): 0x11 one more marble (four wrap to none) and 0x12 five or none,
+  both with `sound100.apc`; 0x13 and 0x14 one less (none from five); a
+  cell with marbles in hand lays them when allowed and takes back what the
+  cell held (a swap, `sound100.apc` replayed by its handle, which is −1,
+  with a warning and no sound, before any 0x11 / 0x12 of the visit), else
+  `sound102.apc`; a cell with an empty hand gives its marbles to the hand
+  (no sound) when allowed. When the click changed the grid and the digits
+  equal the solution (`0000000000000045`, `0000000000040001`,
+  `0000155500350001`: 9; 4·20 + 1; 16·400 + 8·20 + 1): the state 2,
+  `finmayaN` = 1 and `sound101.apc` on voice 2; the click scan of the same
+  frame follows (chapter 34's crocodile opens there, its sound 112
+  replacing 101). The mode 7's tick (@ 0x00493660, every warp frame) sets
+  the hand pair from the marbles while `OBJETENMAIN` is 0. A move zone of
+  the grid's view runs its leave (@ 0x00492d60..): the state 0 unless 2,
+  `finmayaN` = 0 when the digits are not the solution, and in that view
+  the hand pair emptied, the bank freed, no marble, the three sounds freed
+  on voice 2, the mode 0; a load runs the three leaves first (the reset @
+  0x0049bf70), so a load made in another view keeps the marbles in hand
+  (not saved; only the drop and the step write them, @ 0x00492e0a,
+  0x00493249..0x0049345c). Kept from the original: the mode 7 outlives a
+  view left by a script's `vue=` (the marbles stay in hand), a leave with
+  an object in hand empties its picture, the solved grid stays solved
+  whatever is laid after. Against the original's emulated run
+  (`tests/grids.rs`, `tests/golden/grids.txt`): the data; the entries per
+  view, state and reset (twice: the bank already loaded); the step on
+  every cell for each hand 0..5 and each digit of the cell, the one before
+  and the one after (18576 clicks: the digits, the hand, the changed byte,
+  the sounds, the slot's list); the other zones for each hand −1..6 and
+  object, a sequence with the sound table kept, the two tests on six
+  strings; the shortest wins of the three grids and a played way to the
+  first (a refusal, swaps, a take back, the hand put back), clicks after
+  the win, the leave, the entry again; the leaves in and out of their
+  views; the cursor for each count, object and bank; the dispatchers and
+  the reset; the clicks through the engine's pass with chapters 31, 32 and
+  34 (the hooks, `CLICZONE`, the lines of the scan, the sounds, the state:
+  the crocodile's section in the win's frame); the hand of marbles at the
+  centre and its five sprites drawn; the three grids' slots drawn for
+  seven digit strings and all 80 frames alone (md5 of each face, pixels).
+  `the_grids_played_with_the_mouse` plays the three with the mouse (the
+  centre steered onto each zone, a click), the first with a refusal, a
+  swap and a take back, to their wins, the crocodile opening in the third
+  win's frame (chapter 34's lines 25-33); a save keeps the digits, loaded
+  in the grid's view (the hand dropped) or in another (the hand kept).
 - **The figurines on the floor** (`engine/figurines.rs`, China's
   `miniature.wam`, `SS` views 1-7; chapters 55, 47 and 48): six
   figurines lie in the grass of view 13 (the objects `OB_FIG1HERBE` ..

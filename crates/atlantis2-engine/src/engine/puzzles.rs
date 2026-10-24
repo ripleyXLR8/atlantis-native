@@ -50,11 +50,11 @@
 //!   `labyrinth.rs`) run too: every Chinese puzzle is ported. A hook
 //!   still noted ([`Event::PuzzleNotPorted`]) is another world's (a mode
 //!   of another world's puzzle from a save, for instance).
-//! - Yucatán's hooks (prefix `YU`, `yucatan.rs`): the Tezcatlipoca
-//!   statue's branch runs; the Maya counting grids' hooks are listed and
-//!   noted (the grids are not ported, [`Engine::solve_maya_grid`] writes
-//!   their wins for tests), and so are Xibalba's (the star map, the canoe,
-//!   the spider web), whose places are not ported. The canoe's view
+//! - Yucatán's hooks (prefix `YU`, `yucatan.rs`): the Maya counting
+//!   grids (`grids.rs`: entries, clicks, leaves and the mode 7's tick)
+//!   and the Tezcatlipoca statue's branch run; Xibalba's (the star map,
+//!   the canoe, the spider web), whose places are not ported, are listed
+//!   and noted. The canoe's view
 //!   consumes the click while the canoe is not enabled, as in the
 //!   original.
 //! - The places the port has: Tibet, Ireland, China and Yucatán. A
@@ -69,6 +69,7 @@ use atlantis2_data::wam::Zone;
 
 use super::chest::CHEST_MODE;
 use super::dragon::DRAGON_MODE;
+use super::grids::MARBLES_MODE;
 use super::labyrinth::SOULS_MODE;
 use super::turtle::RING_MODE;
 use super::{Engine, Event};
@@ -439,8 +440,9 @@ impl Engine {
     /// it outside their views, the click dispatcher clears a 5 outside `SS`
     /// 1-7 (@ 0x0049b977); a load copies the save's entry. The reset
     /// FUN_0049bf70 (start-up, load) clears only its own modules' modes
-    /// (1, 2, 3, 6), and also sets 0 in views 55, 64 and 75 (FUN_00492dd0
-    /// @ 0x00492e69); a new game does not run it, so it keeps the mode.
+    /// (1, 2, 3, 6), and also sets 0 in views 55, 64 and 75 (the grids'
+    /// leaves, FUN_00492dd0 @ 0x00492e69); a new game does not run it, so
+    /// it keeps the mode.
     pub fn puzzle_mode(&self) -> i32 {
         i32::from_le_bytes(self.save_extra.entry(MODE_ENTRY).try_into().unwrap())
     }
@@ -456,9 +458,9 @@ impl Engine {
     /// puzzle mode is not 0 (`AtlWarp_continue` @ 0x0045a5e8, after the
     /// move's completion, turning or not): each mode's step in the
     /// original's order ([`PUZZLE_TICKS`], @ 0x0049bfbb..0x0049c007), the
-    /// mode read again before each. The turtle ring's (noted
-    /// [`Event::PuzzleRan`]), the labyrinth souls' and the pearl and
-    /// dragon's run; the others
+    /// mode read again before each. The turtle ring's and the Maya
+    /// marbles' (noted [`Event::PuzzleRan`]), the labyrinth souls' and the
+    /// pearl and dragon's run; the others
     /// (no ported place sets their modes: a save made in their rooms) are
     /// noted [`Event::PuzzleNotPorted`]; 5 (the chest) and any other mode
     /// have none. The pause byte (@ 0x006d85f0) that stops it is not in
@@ -478,6 +480,10 @@ impl Engine {
                 }
                 SOULS_MODE => self.souls_tick(self.view),
                 DRAGON_MODE => self.dragon_tick(),
+                MARBLES_MODE => {
+                    self.event(Event::PuzzleRan { function });
+                    self.grids_cursor();
+                }
                 _ => self.puzzle_not_ported(function),
             }
         }

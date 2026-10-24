@@ -131,6 +131,7 @@ impl Walk {
         match b {
             CursorBank::Interface => "interfac".into(),
             CursorBank::Objects => self.objects_bank(),
+            CursorBank::Puzzle => "puzzle".into(),
         }
     }
 

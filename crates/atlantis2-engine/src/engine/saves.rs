@@ -17,10 +17,12 @@ use super::Engine;
 use crate::script::{BagEntry, Shown, SubjectTable};
 
 /// The entries Native keeps as the save's bytes: the dowsing rod's 15
-/// (@ 0x006d84f4, its role not read), the puzzles not ported (20..25,
-/// 27), and the puzzle mode (26) with the turtle ring's count and frame
-/// store (28, 29) and Brigid's cross (32), which the engine reads in
-/// place ([`Engine::puzzle_mode`], [`Engine::ring_count`],
+/// (@ 0x006d84f4, its role not read), the spider web's stage (27, not
+/// ported), and the Maya grids' states and digits (20..25), the puzzle
+/// mode (26) with the turtle ring's count and frame store (28, 29) and
+/// Brigid's cross (32), which the engine reads in place
+/// ([`Engine::grid_state`], [`Engine::grid_digits`],
+/// [`Engine::puzzle_mode`], [`Engine::ring_count`],
 /// [`Engine::ring_store`], [`Engine::cross_state`]). The dialog flag (33) is written from the running
 /// dialog and not read back: a save made from the menus has no dialog
 /// running, Escape ends it before the main menu opens (@ 0x004762f0).
@@ -305,9 +307,13 @@ impl Engine {
             return Err(SaveError::NotPorted(wam));
         }
         // FUN_0049bf70 resets the puzzles (its quit functions clear the
-        // modes 1, 2, 3 and 6), then the entries are copied: the mode, the
-        // ring's count and store are the save's; the others not ported
-        // are kept for the next save.
+        // modes 1, 2, 3 and 6; the grids' leaves, FUN_00492d60..: in the
+        // view of a grid the hand of marbles, their bank and sounds are
+        // dropped; their variables are the save's below), then the
+        // entries are copied: the mode, the grids, the ring's count and
+        // store are the save's; the others not ported are kept for the
+        // next save.
+        self.grids_reset();
         for k in KEPT {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }

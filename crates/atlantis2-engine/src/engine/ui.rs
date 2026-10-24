@@ -19,7 +19,7 @@ use atlantis2_data::Folder;
 use super::{CursorBank, Engine, Event, LoopType};
 use crate::bag::{next_shown, param_word, visible_count, UiBank, UiDraw, FORM_FRAMES};
 use crate::hd::TextFont;
-use crate::script::BagEntry;
+use crate::script::{BagEntry, HandBank};
 use crate::subtitle::TextOut;
 
 /// The frame of `interfac.spr` shown as the pointer while the bar or an
@@ -62,21 +62,42 @@ impl Engine {
         }
     }
 
-    /// The hand's frame and whether its bank is the objects bank.
-    fn hand_pair(&self) -> (i32, bool) {
+    /// The hand's frame and its bank.
+    fn hand_pair(&self) -> (i32, HandBank) {
         match &self.con {
-            Some(s) => (s.cursor_sprite, s.cursor_objects),
-            None => self.hand.map_or((0, false), |(_, f)| (f, true)),
+            Some(s) => (s.cursor_sprite, s.cursor_bank()),
+            None => match (self.hand, self.hand_puzzle) {
+                (Some((_, f)), _) => (f, HandBank::Objects),
+                (None, Some(f)) => (f, HandBank::Puzzle),
+                (None, None) => (0, HandBank::None),
+            },
         }
+    }
+
+    /// The hand pair's bank.
+    pub(crate) fn hand_bank(&self) -> HandBank {
+        self.hand_pair().1
     }
 
     /// FUN_0047c0c0(frame, bank): the hand pair, the objects bank or none.
     pub(crate) fn set_hand_pair(&mut self, frame: i32, objects: bool) {
+        let bank = if objects {
+            HandBank::Objects
+        } else {
+            HandBank::None
+        };
+        self.set_hand_pair_bank(frame, bank);
+    }
+
+    /// FUN_0047c0c0(frame, bank) with any bank: the objects', the counting
+    /// grids' marbles (`engine/grids.rs`) or none.
+    pub(crate) fn set_hand_pair_bank(&mut self, frame: i32, bank: HandBank) {
         if let Some(s) = self.con.as_mut() {
-            s.set_cursor(frame, objects);
+            s.set_cursor_bank(frame, bank);
         }
         let id = self.objetenmain();
-        self.hand = objects.then_some((id, frame));
+        self.hand = (bank == HandBank::Objects).then_some((id, frame));
+        self.hand_puzzle = (bank == HandBank::Puzzle).then_some(frame);
     }
 
     /// FUN_0047bef0(bank, frame): the cursor pair.
@@ -107,6 +128,7 @@ impl Engine {
             s.empty_hand();
         }
         self.hand = None;
+        self.hand_puzzle = None;
     }
 
     /// FUN_0047bf20: the cursor's frame (0 with a warning when there is no
@@ -266,6 +288,9 @@ impl Engine {
             let bank = match self.cursor.bank {
                 CursorBank::Interface => UiBank::Interface,
                 CursorBank::Objects => UiBank::Objects,
+                // The cursor pair is never the grids' marbles (only the
+                // hand pair is, FUN_00493660).
+                CursorBank::Puzzle => return,
             };
             self.ui_draws.push(UiDraw::Sprite {
                 bank,
@@ -417,9 +442,10 @@ impl Engine {
         self.overlays.saved_objetenmain = self.objetenmain();
         self.overlays.saved_cursor_frame = self.cursor_frame();
         self.set_objetenmain(0);
-        let (frame, objects) = self.hand_pair();
+        let (frame, bank) = self.hand_pair();
         self.overlays.saved_hand_frame = frame;
-        self.overlays.saved_hand_objects = objects;
+        self.overlays.saved_hand_objects = bank == HandBank::Objects;
+        self.overlays.saved_hand_puzzle = bank == HandBank::Puzzle;
         self.set_hand_pair(0, false);
         self.set_cursor_pair(CursorBank::Interface, POINTER_FRAME);
     }
@@ -456,14 +482,20 @@ impl Engine {
         }
         if self.overlays.any() && (self.click || self.click_aux == 1) {
             let o = &self.overlays;
-            let (id, hand, objects, cursor) = (
+            let (id, hand, objects, puzzle, cursor) = (
                 o.saved_objetenmain,
                 o.saved_hand_frame,
                 o.saved_hand_objects,
+                o.saved_hand_puzzle,
                 o.saved_cursor_frame,
             );
             self.set_objetenmain(id);
-            self.set_hand_pair(hand, objects);
+            let bank = match (objects, puzzle) {
+                (true, _) => HandBank::Objects,
+                (false, true) => HandBank::Puzzle,
+                (false, false) => HandBank::None,
+            };
+            self.set_hand_pair_bank(hand, bank);
             self.set_cursor_pair(CursorBank::Objects, cursor);
             self.close_overlays();
         }

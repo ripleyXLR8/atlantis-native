@@ -1,12 +1,12 @@
-//! Yucatán (world 2) without its counting grids: every Yucatán chapter's
-//! `/INIT` run; every view of the three places entered with the puzzles'
-//! entry hooks; the click hooks (the grids' noted, the statue's run, the
-//! canoe's view taking the click); the moves between the places (WAM
-//! links); `AngleWarpXNow` on the arrival in the king's hall; the
-//! priestess's yes, the way into Xibalba, refused; the brazier's and the
-//! king's ways back to Tibet; the grids' testing aid; every dialog the
-//! chapters start; the subjects, objects and musics on disc 2; the place
-//! sounds; a save in Yucatán loaded.
+//! Yucatán (world 2): every Yucatán chapter's `/INIT` run; every view of
+//! the three places entered with the puzzles' entry hooks; the click
+//! hooks (the counting grids' and the statue's run, the canoe's view
+//! taking the click); the moves between the places (WAM links);
+//! `AngleWarpXNow` on the arrival in the king's hall; the priestess's yes,
+//! the way into Xibalba, refused; the brazier's and the king's ways back
+//! to Tibet; every dialog the chapters start; the subjects, objects and
+//! musics on disc 2; the place sounds; a save in Yucatán loaded. The
+//! grids themselves are `tests/grids.rs`'s.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the tests are skipped.
@@ -246,7 +246,7 @@ fn every_yucatan_view_is_entered_with_its_hooks() {
     // One place animation is on no disc: the closed jaw of view 78
     // (`GUEULE_F`), which the original logs too.
     assert_eq!(missing_spw, ["w3A1078078.SPW"]);
-    // The hooks: the counting grids' entries, noted.
+    // The hooks: the counting grids' entries, run.
     assert_eq!(
         hooks,
         [
@@ -258,7 +258,7 @@ fn every_yucatan_view_is_entered_with_its_hooks() {
     assert!(e
         .events
         .iter()
-        .all(|x| !matches!(x, Event::PuzzleRan { .. })));
+        .all(|x| !matches!(x, Event::PuzzleNotPorted { .. })));
 }
 
 #[test]
@@ -323,8 +323,10 @@ fn the_yucatan_click_hooks() {
     );
 
     let Some(files) = game() else { return };
-    // Each case: a zone of a grid's view clicked, its hook noted, then
-    // `CLICZONE` and the click scan (type 50) or the move (types 1).
+    // Each case: a zone of a grid's view clicked, its hook run, then
+    // `CLICZONE` and the click scan (type 50) or the move (types 1). The
+    // grid's entry left the puzzle mode 7, whose step (the hand's cursor,
+    // @ 0x00493190) runs in every pass until the leave.
     let mut e = bare(files, "pyratez.wam", 55);
     let mut t = 10.0;
     for (view, click, leave) in [
@@ -339,7 +341,7 @@ fn the_yucatan_click_hooks() {
         t += 10.0;
         e.click(t);
         e.pass(None);
-        assert_eq!(noted(&e.events), [click], "view {view}");
+        assert_eq!(noted(&e.events), [click, 0x0049_3190], "view {view}");
         assert!(e
             .events
             .iter()
@@ -646,21 +648,6 @@ fn the_soul_brought_to_the_king_ends_yucatan() {
     for (c, l) in lines {
         let head = format!("chapi{c:03}.con:{l} ");
         assert!(golden.lines().any(|g| g.starts_with(&head)), "{head}");
-    }
-}
-
-/// The counting grids' testing aid: `finmayaN` = 1 and the win sound.
-#[test]
-fn the_grids_aid_writes_their_wins() {
-    let Some(files) = game() else { return };
-    let mut e = in_yucatan(files);
-    goto(&mut e, "pyratez.wam", 55, 31);
-    assert_eq!(var(&e, "finmaya1"), 0);
-    for n in 1..=3 {
-        e.events.clear();
-        e.solve_maya_grid(n);
-        assert_eq!(var(&e, &format!("finmaya{n}")), 1);
-        assert!(e.events.contains(&Event::Sound("sound101.apc".into())));
     }
 }
 

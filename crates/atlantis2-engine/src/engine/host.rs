@@ -61,6 +61,7 @@ impl Engine {
         self.hand = s
             .cursor_objects
             .then(|| (s.vars[k.objetenmain], s.cursor_sprite));
+        self.hand_puzzle = s.cursor_puzzle.then_some(s.cursor_sprite);
         self.vars.objet_en_main = s.vars[k.objetenmain];
         self.vars.cliczone = s.vars[k.cliczone];
         self.vars.clicperso = s.vars[k.clicperso];

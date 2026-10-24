@@ -169,7 +169,7 @@ as the original's F5 / F6 and F7 / F8 do.
 ## Atlantis II
 
 Atlantis II is in progress (Tibet, Ireland and China play to their end;
-Yucatán plays without its Maya counting grids and cannot be finished
+Yucatán plays with its Maya counting grids but cannot be finished
 without Xibalba, which is not there yet;
 see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)). For now only the
 command line opens it: give the folder of the installed game (the one

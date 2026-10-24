@@ -46,6 +46,7 @@ fn bank(b: CursorBank) -> &'static str {
     match b {
         CursorBank::Interface => "interface",
         CursorBank::Objects => "objects",
+        CursorBank::Puzzle => "puzzle",
     }
 }
 

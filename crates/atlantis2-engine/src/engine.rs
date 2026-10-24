@@ -27,6 +27,7 @@ use crate::enhancements::Enhancements;
 use crate::fpu::Fpu;
 use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
 use crate::menu::Menu;
+pub use crate::script::HandBank;
 use crate::script::{BagEntry, Script};
 use crate::sound::{MusicVolume, Pcm, Voices};
 use crate::subjects::SubjectMenu;
@@ -38,6 +39,11 @@ mod blackbird;
 mod chest;
 mod cross;
 mod figurines;
+mod grids;
+pub use grids::{
+    grid_cursor_frame, grid_list_draw, grid_step, may_lay, may_take, GridList, GridOp, Grids,
+    GRID_CLICKS, GRID_ENTRIES, GRID_LEAVES, GRID_SOLUTIONS, GRID_START, GRID_VIEWS, MARBLES_MODE,
+};
 mod hd;
 pub use figurines::FIGURINE_TARGETS;
 mod display;
@@ -280,6 +286,9 @@ pub enum CursorBank {
     /// The world's objects bank (@ 0x00671ef4): set by a take
     /// (@ 0x0045a650) until the next cursor choice.
     Objects,
+    /// The counting grids' marbles (`spr\sprboul.spr` @ 0x006d2694): the
+    /// hand pair's only (FUN_00493660).
+    Puzzle,
 }
 
 /// The cursor (@ 0x00474500): a range of `interfac.spr` frames played on
@@ -484,6 +493,9 @@ pub struct Engine {
     /// The object in hand: its id and sprite in the world's objects bank
     /// (the pair @ 0x00673f68 / 0x00673f94, drawn under the cursor).
     pub hand: Option<(i32, i32)>,
+    /// The hand pair's frame when its bank is the counting grids' marbles
+    /// (`engine/grids.rs`).
+    pub hand_puzzle: Option<i32>,
     /// Record [`Event`]s into [`Engine::events`].
     pub trace: bool,
     pub events: Vec<Event>,
@@ -527,6 +539,9 @@ pub struct Engine {
     /// The pearl and dragon puzzle's state (`engine/dragon.rs`), never
     /// reset nor saved.
     pub dragon: Dragon,
+    /// The Maya counting grids' state besides the save's entries 20-25
+    /// (`engine/grids.rs`): the marbles in hand, their bank, the sounds.
+    pub grids: Grids,
     /// Where the port may differ from the original (default: the minor
     /// bug fixes on).
     pub enhancements: Enhancements,
@@ -871,6 +886,7 @@ impl Engine {
             object_names,
             popup_font: None,
             hand: None,
+            hand_puzzle: None,
             trace: false,
             events: Vec::new(),
             dial_script: None,
@@ -889,6 +905,7 @@ impl Engine {
             ogham: OGHAM_START,
             ogham_sprite: 0,
             dragon: Dragon::default(),
+            grids: Grids::default(),
             enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),
@@ -919,7 +936,7 @@ impl Engine {
             player_number: 0,
             data_dir: None,
             wall_clock: atlantis2_data::save::SystemTime::default,
-            save_extra: atlantis2_data::save::SaveData::default(),
+            save_extra: grids::save_extra_at_start(),
             cfg_extra: atlantis2_data::save::Cfg::default(),
             quit_requested: false,
         }
@@ -940,6 +957,7 @@ impl Engine {
         self.look.limit_x = NO_LIMIT;
         self.vars.objet_en_main = 0;
         self.hand = None;
+        self.hand_puzzle = None;
         self.click = false;
     }
 
@@ -1656,6 +1674,18 @@ impl Engine {
                 });
             }
         }
+        // The marbles of the counting grids (their bank is not 0 while
+        // the hand pair holds it: FUN_00493660 sets it only when loaded).
+        if let Some(frame) = self.hand_puzzle.filter(|_| !self.subject_menu.open) {
+            if frame >= 0 {
+                plan.push(CentreDraw::Sprite {
+                    bank: CursorBank::Puzzle,
+                    frame,
+                    x: cx,
+                    y: cy,
+                });
+            }
+        }
         if let Some(frame) = self.cursor.shown.filter(|_| !self.subject_menu.open) {
             plan.push(CentreDraw::Sprite {
                 bank: self.cursor.bank,
@@ -1694,8 +1724,9 @@ impl Engine {
             match *d {
                 CentreDraw::Sprite { bank, frame, x, y } => {
                     let bank = match bank {
-                        CursorBank::Interface => &self.cursor_bank,
-                        CursorBank::Objects => &self.objects_bank,
+                        CursorBank::Interface => self.cursor_bank.as_ref(),
+                        CursorBank::Objects => self.objects_bank.as_ref(),
+                        CursorBank::Puzzle => self.grids.bank(),
                     };
                     if let (Some(bank), Ok(frame)) = (bank, usize::try_from(frame)) {
                         bank.draw(&mut Target::screen(out, w, h), Some(x), y, frame);
@@ -1769,6 +1800,7 @@ impl Engine {
                 self.set_cursor_pair(CursorBank::Objects, sprite);
                 self.vars.objet_en_main = id;
                 self.hand = Some((id, sprite));
+                self.hand_puzzle = None;
                 self.event(Event::Take { id });
                 log::info!("Objet pris en spw : {}", self.name_of(1, id));
                 // The script's side: `CLICOBJET`, the show / hide table,
