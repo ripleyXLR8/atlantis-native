@@ -582,7 +582,7 @@ fn the_star_map_aid_writes_its_win() {
 /// `finaraign2`), the big spider (`flag92`, the spider goddess a subject
 /// of the bat and the priestess, film 48, the skull, the sword given and
 /// taken back, `finaraign3`), then the grasshopper again (stage 4, no
-/// variable).
+/// variable) while it is not in the bag, and nothing when it is.
 #[test]
 fn the_web_aid_writes_each_round() {
     let Some(files) = game() else { return };
@@ -622,8 +622,15 @@ fn the_web_aid_writes_each_round() {
         );
     }
     assert_eq!(e.web_stage(), 4);
+    e.events.clear();
     assert_eq!(e.win_web_round(), 4);
     assert!(in_bag(&e, "SAUTERELLE"));
+    assert!(e.events.contains(&Event::Sound("sound105.apc".into())));
+    let bag = e.bag_entries().len();
+    e.events.clear();
+    assert_eq!(e.win_web_round(), 4);
+    assert_eq!(e.bag_entries().len(), bag);
+    assert!(!e.events.contains(&Event::Sound("sound105.apc".into())));
     assert_eq!(e.web_stage(), 4);
     assert_eq!(e.puzzle_mode(), 0);
 }

@@ -171,15 +171,28 @@ impl Engine {
     /// the prey reached (FUN_0048f9a0: stage 1 in view 265
     /// `(sacados=CHENILLE)`, `(NewSound=104)` @ 0x0048fb07, 0x0048fb1b;
     /// stages 2 and 4 in view 251 `(sacados=SAUTERELLE)`,
-    /// `(NewSound=105)` @ 0x0048fbc6, 0x0048fbda; stage 3 the sword in
-    /// view 247 `(sacados=EPEE)` @ 0x0048fc3b, the spider struck with it
-    /// from view 247 towards 248 (FUN_0048fdd0, `(cinema=48)`
-    /// @ 0x0048fed8), the skull in view 265 `(sacados=CRANE_ARAIG2)`
-    /// @ 0x0048fb60), then the web left by view 199 or 200 (FUN_0048f9a0:
-    /// stage 1 `(finaraign1=1)` @ 0x0048fc8b, stage 2 `(finaraign2=1)`
-    /// @ 0x0048fcbc, stage 3 `(sacados=NOT_EPEE)` and `(finaraign3=1)`
-    /// @ 0x0048fcfc, 0x0048fd12, stage 4 nothing). All by RunOneCommand,
-    /// no scan. The stage it played is returned.
+    /// `(NewSound=105)` @ 0x0048fbc6, 0x0048fbda while the word
+    /// @ 0x006d2614 is 0, which the web's load (FUN_00490260 from
+    /// FUN_0048fd60) sets to 0 at stage 2 and at stage 4 only while
+    /// `SAUTERELLE` is not in the bag (FUN_004753d0 @ 0x004904c9; in the
+    /// bag it is set to 1 @ 0x00490511, and stage 4 gives nothing); stage
+    /// 3 the sword in view 247 `(sacados=EPEE)` @ 0x0048fc3b, the spider
+    /// struck with it from view 247 towards 248 (FUN_0048fdd0,
+    /// `(cinema=48)` @ 0x0048fed8), the skull in view 265
+    /// `(sacados=CRANE_ARAIG2)` @ 0x0048fb60), then the web left by view
+    /// 199 or 200 (FUN_0048f9a0 @ 0x0048fc71..0x0048fd4f, a chain of
+    /// tests on the stage, each exit recomputing it by FUN_0048f930 for
+    /// the tests after: stage 1 `(finaraign1=1)` @ 0x0048fc8b, then the
+    /// stage-2 test stops on the word @ 0x006d2614, 0; stage 2
+    /// `(finaraign2=1)` @ 0x0048fcbc, then the stage-3 test runs:
+    /// `(sacados=NOT_EPEE)` @ 0x0048fcfc, the word @ 0x006d2618 (the
+    /// skull taken) 0 and @ 0x006d2624 (the feather laid) 0, so nothing
+    /// more; stage 3 `(sacados=NOT_EPEE)` and `(finaraign3=1)`
+    /// @ 0x0048fcfc, 0x0048fd12; stage 4 nothing). The three words are
+    /// zero data written only by the web's code, by a later stage than
+    /// the one they are 0 for here; a game loaded back to an earlier
+    /// stage in the same run is not modelled. All by RunOneCommand, no
+    /// scan. The stage it played is returned.
     pub fn win_web_round(&mut self) -> i32 {
         let stage = self.web_stage();
         self.event(Event::PuzzleAid {
@@ -196,6 +209,7 @@ impl Engine {
                 &b"(sacados=SAUTERELLE)"[..],
                 b"(NewSound=105)",
                 b"(finaraign2=1)",
+                b"(sacados=NOT_EPEE)",
             ]),
             3 => commands.extend([
                 &b"(flag92=1)"[..],
@@ -207,7 +221,14 @@ impl Engine {
                 b"(sacados=NOT_EPEE)",
                 b"(finaraign3=1)",
             ]),
-            _ => commands.extend([&b"(sacados=SAUTERELLE)"[..], b"(NewSound=105)"]),
+            _ => {
+                let Some(hopper) = self.object_index(b"SAUTERELLE") else {
+                    return stage;
+                };
+                if !self.bag_entries().iter().any(|b| b.id == hopper) {
+                    commands.extend([&b"(sacados=SAUTERELLE)"[..], b"(NewSound=105)"]);
+                }
+            }
         }
         for c in commands {
             self.with_script(|s, h| s.run_command(h, c));

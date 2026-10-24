@@ -1419,7 +1419,9 @@ back) into `yucatan-*.png`.
   `Engine::win_web_round` (one round won, by the web's stage
   `Engine::web_stage`, 1 + the leading `finaraignN` set, 4 when all
   three: the caterpillar (`CHENILLE`, sound 104, `finaraign1`), the
-  grasshopper (`SAUTERELLE`, sound 105, `finaraign2`; again at stage 4),
+  grasshopper (`SAUTERELLE`, sound 105, `finaraign2`, then the sword's
+  removal of the next stage's exit, which the exit's chain of tests
+  runs too; again at stage 4 only while it is not in the bag),
   the big spider (`flag92` and the spider goddess a subject of the bat
   and the priestess, the sword, film 48, the skull `CRANE_ARAIG2`, the
   sword taken back, `finaraign3`); each aid notes `Event::PuzzleAid`.
