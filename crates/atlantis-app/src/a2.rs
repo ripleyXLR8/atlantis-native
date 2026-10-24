@@ -1446,4 +1446,215 @@ mod tests {
         assert!(changed > 0);
         eprintln!("{changed} window pixels clicked one pixel off before");
     }
+
+    /// With the game (`ATLANTIS2_DATA`, `ATLANTIS2_DISCS`; skipped
+    /// without): a short stretch played as the window plays it, at once in
+    /// the HD mode with the widescreen sides in a 1920 x 1080 window and
+    /// with the original graphics: Tibet's first view and the shaman's
+    /// dialog (360) clicked through, with the options menu (F10) over one
+    /// of its lines; Ireland's and China's first views turned around; the
+    /// game's main menu with a button's tooltip. Every pass gives the same
+    /// 640 x 480 frame and the game the same script events either way;
+    /// the HD picture is composed (its view drawn, the sides filled by the
+    /// panorama) where the original graphics leave black bars.
+    #[test]
+    fn hd_widescreen_plays_as_the_original() {
+        use atlantis2_engine::Event;
+        use atlantis_engine::hd::HdOptions;
+        let (Some(dir), Some(discs)) = (
+            std::env::var_os("ATLANTIS2_DATA"),
+            std::env::var_os("ATLANTIS2_DISCS"),
+        ) else {
+            eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+            return;
+        };
+        let (dir, discs) = (PathBuf::from(dir), [PathBuf::from(discs)]);
+        let (ww, wh) = (1920, 1080);
+        let (ox, _, _, _) = picture_rect(ww, wh);
+        let open = |hd: bool| {
+            let x = Enhancements {
+                hd,
+                hd_options: HdOptions {
+                    widescreen: true,
+                    ..HdOptions::default()
+                },
+                ..Enhancements::default()
+            };
+            let (mut e, _) = boot(&dir, &discs, x).expect("game");
+            e.anim.rand = atlantis2_engine::anim::MsvcRand(1);
+            e.trace = true;
+            e
+        };
+        struct Side {
+            engine: Engine,
+            picture: Picture,
+            screen: Vec<u16>,
+            window: Vec<u32>,
+        }
+        let mut sides = [false, true].map(|hd| Side {
+            engine: open(hd),
+            picture: Picture::new(),
+            screen: vec![0u16; (WIDTH * HEIGHT) as usize],
+            window: vec![0u32; ww * wh],
+        });
+        let mut frame = 0usize;
+        let (mut composed, mut layers, mut filled) = (0, 0, 0);
+        // `n` frames of 1/60 s as the window runs them, `input` given to
+        // both engines before each; every 8th frame (and the last)
+        // composed in the window, with the options menu over it when
+        // `options` is given.
+        let mut play = |sides: &mut [Side; 2],
+                        n: usize,
+                        input: &mut dyn FnMut(&mut Engine, usize, f64),
+                        options: Option<&OptionsMenu>| {
+            for k in 0..n {
+                for s in sides.iter_mut() {
+                    let t = frame as f64 / 60.0;
+                    input(&mut s.engine, k, t);
+                    s.engine.set_clock(t);
+                    s.picture.prepare(&mut s.engine, ww, wh);
+                    s.engine.pass(Some(&mut s.screen));
+                }
+                let [off, on] = &mut *sides;
+                assert!(
+                    off.screen == on.screen,
+                    "frame {frame}: the HD mode's frame differs"
+                );
+                assert_eq!(
+                    off.engine.events.len(),
+                    on.engine.events.len(),
+                    "frame {frame}"
+                );
+                assert!(off.engine.hd_layer().is_none());
+                if on.engine.loop_type == LoopType::Warp && !on.engine.turning() {
+                    layers += usize::from(on.engine.hd_layer().is_some());
+                }
+                if k % 8 == 7 || k + 1 == n {
+                    for (hd, s) in sides.iter_mut().enumerate() {
+                        let mut text = HdText::default();
+                        let mut shown = s.screen.clone();
+                        if let Some(menu) = options {
+                            let values = menu_values(&s.engine);
+                            let font = SubtitleFont::new();
+                            menu.draw_recording(
+                                &mut shown,
+                                WIDTH as usize,
+                                HEIGHT as usize,
+                                &font,
+                                values,
+                                Some(&mut text),
+                            );
+                        }
+                        s.picture.compose_with_text(
+                            &s.engine,
+                            &shown,
+                            &text,
+                            &mut s.window,
+                            ww,
+                            wh,
+                        );
+                        // The left bar: the panorama in widescreen HD,
+                        // black with the original graphics.
+                        let bar = (0..wh).any(|y| s.window[y * ww..][..ox].iter().any(|&p| p != 0));
+                        if hd == 0 {
+                            assert!(!bar, "frame {frame}: the original graphics' bar");
+                        } else {
+                            composed += 1;
+                            filled += usize::from(bar);
+                        }
+                    }
+                }
+                frame += 1;
+            }
+            let [off, on] = &*sides;
+            assert!(
+                off.engine.events == on.engine.events,
+                "frame {frame}: the events differ"
+            );
+        };
+        let none = &mut |_: &mut Engine, _: usize, _: f64| {};
+        // A new game: its opening film ended, Tibet's first view.
+        for s in sides.iter_mut() {
+            s.engine.start_new_game().unwrap();
+            s.engine.end_video();
+        }
+        play(&mut sides, 60, none, None);
+        assert_eq!(sides[1].engine.loop_type, LoopType::Warp);
+        let tibet = sides[1].engine.place().0.to_string();
+        // The shaman's dialog, a line clicked every two seconds; the
+        // options menu over it for a while.
+        for s in sides.iter_mut() {
+            s.engine.start_dialog(360).unwrap();
+        }
+        let click = &mut |e: &mut Engine, k: usize, t: f64| {
+            if k % 120 == 119 {
+                e.click(t);
+            }
+        };
+        play(&mut sides, 240, click, None);
+        let mut options = OptionsMenu::new();
+        options.set_info(menu_info("Game"));
+        options.open();
+        play(&mut sides, 16, none, Some(&options));
+        // (A subtitle under the menu: the game's texts drawn again before
+        // the menu's.)
+        let on = &sides[1].engine;
+        assert_eq!(on.loop_type, LoopType::Dialog);
+        assert!(on.hd_texts().is_some_and(|t| !t.runs.is_empty()));
+        play(&mut sides, 300, click, None);
+        for s in sides.iter_mut() {
+            if s.engine.loop_type == LoopType::Dialog {
+                s.engine.end_dialog();
+            }
+        }
+        // Ireland's and China's first views, turned around.
+        let turn = &mut |e: &mut Engine, _: usize, _: f64| e.mouse_motion(12, 1);
+        for (commands, place) in [
+            (
+                ["(monde=1)", "(changewam=bigile1.wam)", "(vue=5)"],
+                ("bigile1.wam", 5),
+            ),
+            (
+                ["(monde=3)", "(changewam=chine.wam)", "(vue=10)"],
+                ("chine.wam", 10),
+            ),
+        ] {
+            for s in sides.iter_mut() {
+                for c in commands {
+                    s.engine.run_command(c.as_bytes());
+                }
+            }
+            play(&mut sides, 30, none, None);
+            for s in sides.iter_mut() {
+                assert_eq!(s.engine.place(), place);
+            }
+            play(&mut sides, 90, turn, None);
+        }
+        // The game's main menu, the pointer on a button (its tooltip).
+        for s in sides.iter_mut() {
+            s.engine.open_menu_page(PageKind::Main);
+            s.engine.pointer(375, 238);
+        }
+        play(&mut sides, 60, none, None);
+        assert_eq!(sides[1].engine.loop_type, LoopType::Menu);
+        let events = &sides[1].engine.events;
+        let entered: Vec<u32> = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Enter { view } => Some(*view),
+                _ => None,
+            })
+            .collect();
+        eprintln!(
+            "{frame} frames from {tibet}, {} events, views entered {entered:?}; \
+             {composed} HD pictures, {filled} with the sides, {layers} frames with the HD view",
+            events.len()
+        );
+        assert!(entered.contains(&5) && entered.contains(&10), "{entered:?}");
+        assert!(layers > 150, "{layers} frames with the HD view");
+        assert!(
+            filled * 2 > composed,
+            "{filled} of {composed} with the sides filled"
+        );
+    }
 }

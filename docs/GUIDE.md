@@ -212,7 +212,8 @@ it. Its entries:
   screen, F11), the finer it is.
 - With HD on: **Panorama filter** (Bicubic, sharper, or Bilinear),
   **Panorama sharpening**, **Interface** (Smooth or Pixels),
-  **Widescreen** (in a window wider than 4:3 the panorama fills the
+  **Sharp subtitles** (the subtitles and the menus' texts drawn at the
+  window's resolution; on by default), **Widescreen** (in a window wider than 4:3 the panorama fills the
   sides too) and **Video sides** (black or blurred bars beside the
   videos in widescreen).
 - **Screen**: the original's two screen sizes, 640 x 480 and 800 x 600

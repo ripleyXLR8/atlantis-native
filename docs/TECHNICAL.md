@@ -833,52 +833,60 @@ event, the gong's way back to Tibet) into `china-*.png`.
   scale from an offset that could fall on half a pixel, and some clicks
   named the pixel next to the one drawn under them (one pixel away at
   most; a test in `a2.rs` compares the two).
+  With the options menu (F10) open over a subtitle, the game's texts are
+  drawn again before the menu's, so the menu stays on top. The test
+  `hd_widescreen_plays_as_the_original` (`a2.rs`, with the game) plays a
+  new game's first view, the shaman's dialog clicked through (the options
+  menu over one of its lines), Ireland's and China's first views turned
+  around and the main menu with a tooltip at once with HD widescreen in a
+  1920x1080 window and with the original graphics: every pass gives the
+  same 640x480 frame and the same script events, the HD picture fills the
+  sides where the original graphics leave black bars.
   Timings (release, Intel i7-9700K, 8 cores, nothing else running; the
-  headless run `--hd` or `--widescreen`, `--size <w>x<h> --command
-  "(monde=3)(changewam=chine.wam)(vue=10)" --headless <game> 300`, China's
-  view 10, the middle of three runs; a frame is the pass, which draws the
-  view, and the window's composition):
+  middle of three headless runs of 300 frames, `--hd` or `--widescreen`,
+  `--size <w>x<h> --headless <game> 300` with `--command
+  "(monde=3)(changewam=chine.wam)(vue=10)"` (China's view 10), `--view
+  7,70,5` (Tibet's view 7) or `--dialog 360` (the shaman's first line),
+  which print the pass, the HD view's part of it and the window's
+  composition; measured on `a2/m0` with the three HD branches merged):
 
   | | 1920x1080 | 1920x1080 widescreen | 2560x1440 | 2560x1440 widescreen |
   |---|---|---|---|---|
-  | HD view (in the pass) | 6.0 ms (1440x1080) | 7.6 ms (1944x1080) | 9.6 ms (1920x1440) | 12.5 ms (2592x1440) |
-  | engine pass with the view | 7.1 ms | 8.6 ms | 10.7 ms | 13.6 ms |
-  | composition | 1.9 ms | 2.1 ms | 3.6 ms | 3.9 ms |
-  | frame | 8.9 ms | 10.7 ms | 14.3 ms | 17.5 ms |
-  | slowest frame (the view's first) | 30 ms | 33 ms | 40 ms | 45 ms |
+  | China's view 10: pass (HD view) | 3.7 ms (2.5 ms) | 4.0 ms (2.9 ms) | 4.4 ms (3.2 ms) | 5.1 ms (3.9 ms) |
+  | composition | 2.1 ms | 2.2 ms | 3.4 ms | 3.8 ms |
+  | frame | 5.7 ms | 6.3 ms | 7.8 ms | 8.9 ms |
+  | slowest frame (the view's first) | 32 ms | 33 ms | 41 ms | 46 ms |
+  | Tibet's view 7: frame | 6.4 ms | 7.0 ms | | |
+  | dialog 360: pass (HD view and dialog composition) | 11.1 ms (4.2 ms) | 11.3 ms (4.4 ms) | 13.7 ms (5.5 ms) | 13.9 ms (5.6 ms) |
+  | composition (the sharp subtitles included) | 2.2 ms | 2.4 ms | 3.1 ms | 3.4 ms |
+  | frame | 13.3 ms | 13.7 ms | 16.8 ms | 17.3 ms |
+  | slowest frame (the line's first) | 45 ms | 51 ms | 58 ms | 63 ms |
 
-  Without the HD mode the same run takes 1.0 ms a pass and 1.1 ms to
-  scale the picture to a 1920x1080 window. The ignored test `cargo test
-  --release -p atlantis2-engine --test hd -- --ignored --nocapture
-  hd_timings` times the view alone on synthetic faces, and the faces'
-  preparation: 13 ms for a new view (bicubic; 4.9 ms bilinear), hence
-  the first frame of a view's 30 to 45 ms; then 0.4 ms when nothing
-  changed, 1.6 ms for a sprite's frame. The view is
+  A still view redraws only what its animations change; a turn redraws
+  the whole HD view, which `cargo test --release -p atlantis2-engine
+  --test hd -- --ignored --nocapture hd_timings` times alone on synthetic
+  faces: 4.6 ms at 1440x1080, 6.1 ms at 1944x1080, 7.5 ms at 1920x1440,
+  10.1 ms at 2592x1440 (bicubic or bilinear alike), so a turning frame
+  takes about 8 ms at 1920x1080 (9.5 ms widescreen). The faces'
+  preparation for a new view takes 13 ms (bicubic; 4.8 ms bilinear),
+  hence the first frame of a view's 30 to 45 ms; then 0.6 ms when nothing
+  changed, 1.8 ms for a sprite's frame. Every case stays under the 16.7
+  ms of 60 frames a second at 1920x1080; a dialog at 2560x1440 is just
+  over it (about 58 frames a second). Without the HD mode the same runs
+  take 1.0 ms a pass in the panorama (3.2 ms in the dialog) and 1.1 ms to
+  scale the picture to a 1920x1080 window; the main menu in HD widescreen
+  0.7 ms a pass and 3.6 ms to compose. The view is
   computed in blocks of 64 columns by 32 rows, shared out among the cores
   (one on the web); the projection and the face choice take about a third
   of it, the bilinear sampling the rest. A frame's HD pass is printed by
-  a headless run with `--size`.
-  A dialog's frames (the same machine and method, `--dialog 360 --hd
-  --size 1920x1080 --headless <game> 300`: the shaman's first line):
-
-  | | 1920x1080 | 1920x1080 widescreen | 2560x1440 | 2560x1440 widescreen |
-  |---|---|---|---|---|
-  | HD view (kept) and the dialog's composition, in the pass | 5.4 ms | 5.6 ms | 7.6 ms | 7.5 ms |
-  | engine pass (the HD head included) | 12.4 ms | 12.6 ms | 15.9 ms | 15.8 ms |
-  | composition (the sharp subtitles included) | 2.6 ms | 2.9 ms | 3.8 ms | 4.1 ms |
-  | frame (pass and composition) | 15 ms | 15.4 ms | 19.7 ms | 19.9 ms |
-
-  So about 65 frames a second at 1920x1080 and 50 at 2560x1440 (the body
-  video and the head's pose change 15 times a second, the mouth at every
-  frame). The HD head alone (`cargo test --release -p atlantis2-engine
-  --test hd_heads -- --ignored --nocapture hd_head_timings`, `Ais1.db`,
-  the Pentium II's routines, its pose included) takes 5.7 ms at 1440x1080
-  and 8.1 ms at 1920x1440, against 2.6 ms for the original's draw: the
-  rasteriser is the original's, transcribed with its x87 rounding, on one
-  core (its faces are drawn in order, the later winning a Z tie). A line's
-  first frame takes 60 to 90 ms (the faces prepared, the view drawn, the
-  line's video and voice opened). The menu pages and the credits compose
-  in 4.1 to 4.5 ms at 1920x1080.
+  a headless run with `--size`. The body video and the head's pose of a
+  dialog change 15 times a second, the mouth at every frame. The HD head
+  alone (`cargo test --release -p atlantis2-engine --test hd_heads --
+  --ignored --nocapture hd_head_timings`, `Ais1.db`, the Pentium II's
+  routines, its pose included) takes 5.7 ms at 1440x1080 and 8.1 ms at
+  1920x1440, against 2.6 ms for the original's draw: the rasteriser is
+  the original's, transcribed with its x87 rounding, on one core (its
+  faces are drawn in order, the later winning a Z tie).
 - **Camera:** the orientation is a float quaternion turned by axis-angle
   rotations built through 3x3 matrices, transcribed operation by
   operation under the x87 control word (`fpu.rs`, `camera.rs`): the matrix
@@ -2149,7 +2157,7 @@ event, the gong's way back to Tibet) into `china-*.png`.
   colours, keys and mouse are the same code
   (`atlantis_engine::options_menu::MenuBox`, which the first game's menu
   is drawn with too), Atlantis II giving its own rows: Graphics (Original or HD), the HD options
-  (panorama filter, sharpening, interface, widescreen, the bars beside the
+  (panorama filter, sharpening, interface, sharp subtitles, widescreen, the bars beside the
   videos: black or blurred; greyed in the original graphics), Screen (640
   x 480 or 800 x 600, the original's option above; greyed in HD), Fix
   original bugs, Close. The game is paused while it is open (its clock
@@ -2157,8 +2165,8 @@ event, the gong's way back to Tibet) into `china-*.png`.
   game's. The choices are written at once to Atlantis II's own
   `settings.ini`, beside its saves and `atlant2.cfg`, with the first
   game's keys (`minor_bug_fixes`, `graphics = original|hd`,
-  `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_widescreen`,
-  `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
+  `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_sharp_subtitles`,
+  `hd_widescreen`, `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
   written then too (the original writes it at exit). A window reads
   `settings.ini` at start (written with the defaults when there is none);
   `--hd`, `--widescreen` and `--original` (which turns the bug fixes off)

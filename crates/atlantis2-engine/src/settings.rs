@@ -80,6 +80,10 @@ impl Settings {
                     }
                     _ => false,
                 },
+                ("hd_sharp_subtitles", Some(b)) => {
+                    x.hd_options.sharp_subtitles = b;
+                    true
+                }
                 ("hd_widescreen", Some(b)) => {
                     x.hd_options.widescreen = b;
                     true
@@ -107,12 +111,14 @@ impl Settings {
              # The port's graphics (options menu, F10): original or hd\n\
              graphics = {}\n\
              # HD mode: panorama filter (bicubic or bilinear), its sharpening,\n\
-             # the interface art (smooth: xBR, or pixels), widescreen (the\n\
-             # panorama fills the sides of a wide window) and the bars beside\n\
-             # the videos (black or blur)\n\
+             # the interface art (smooth: xBR, or pixels), the texts drawn at\n\
+             # the window's resolution, widescreen (the panorama fills the\n\
+             # sides of a wide window) and the bars beside the videos (black\n\
+             # or blur)\n\
              hd_panorama = {}\n\
              hd_sharpen = {}\n\
              hd_interface = {}\n\
+             hd_sharp_subtitles = {}\n\
              hd_widescreen = {}\n\
              hd_video_sides = {}\n\
              # The original's options (subtitles, volumes, the 800 x 600\n\
@@ -126,6 +132,7 @@ impl Settings {
             } else {
                 "pixels"
             },
+            b(o.sharp_subtitles),
             b(o.widescreen),
             video_sides(o.video_sides).name(),
         )
@@ -150,9 +157,9 @@ mod tests {
                     panorama: PanoFilter::Bilinear,
                     sharpen: false,
                     smooth_interface: false,
+                    sharp_subtitles: false,
                     widescreen: true,
                     video_sides: VideoSides::Blur,
-                    ..HdOptions::default()
                 },
             },
         };
@@ -160,7 +167,7 @@ mod tests {
         // The first game's keys and values.
         let p = Settings::parse(
             "graphics = HD\nhd_panorama = Bilinear\nhd_sharpen = 0\nhd_interface = pixels\n\
-             hd_widescreen = yes\nhd_video_sides = blur\nminor_bug_fixes = off",
+             hd_sharp_subtitles = 0\nhd_widescreen = yes\nhd_video_sides = blur\nminor_bug_fixes = off",
         );
         assert_eq!(p, s);
         // Bad values keep the defaults; the sides Atlantis II lacks are black.

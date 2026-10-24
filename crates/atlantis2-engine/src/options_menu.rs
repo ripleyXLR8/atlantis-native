@@ -25,6 +25,7 @@ pub enum Entry {
     PanoramaFilter,
     Sharpen,
     Interface,
+    SharpSubtitles,
     Widescreen,
     VideoSides,
     Screen,
@@ -32,11 +33,12 @@ pub enum Entry {
     Close,
 }
 
-const ENTRIES: [Entry; 9] = [
+const ENTRIES: [Entry; 10] = [
     Entry::Graphics,
     Entry::PanoramaFilter,
     Entry::Sharpen,
     Entry::Interface,
+    Entry::SharpSubtitles,
     Entry::Widescreen,
     Entry::VideoSides,
     Entry::Screen,
@@ -53,6 +55,7 @@ impl Entry {
             Entry::PanoramaFilter
                 | Entry::Sharpen
                 | Entry::Interface
+                | Entry::SharpSubtitles
                 | Entry::Widescreen
                 | Entry::VideoSides
         )
@@ -157,6 +160,7 @@ impl OptionsMenu {
             }
             Entry::Sharpen => o.sharpen = !o.sharpen,
             Entry::Interface => o.smooth_interface = !o.smooth_interface,
+            Entry::SharpSubtitles => o.sharp_subtitles = !o.sharp_subtitles,
             Entry::Widescreen => o.widescreen = !o.widescreen,
             Entry::VideoSides => {
                 o.video_sides = match o.video_sides {
@@ -188,6 +192,7 @@ impl OptionsMenu {
             Entry::PanoramaFilter => "The panorama's sampling: Bicubic is sharper",
             Entry::Sharpen => "A mild sharpening of the panorama, without halos",
             Entry::Interface => "Menus, bars and videos: Smooth (xBR) or Pixels",
+            Entry::SharpSubtitles => "Subtitles drawn at the window's resolution",
             Entry::Widescreen => "The panorama fills the sides of a wide window",
             Entry::VideoSides => "Widescreen: the bars beside the videos",
             Entry::Screen => "The original's screen sizes (its options page)",
@@ -221,6 +226,9 @@ impl OptionsMenu {
                             "Pixels"
                         }),
                     ),
+                    Entry::SharpSubtitles => {
+                        ("Sharp subtitles", Some(on(x.hd_options.sharp_subtitles)))
+                    }
                     Entry::Widescreen => ("Widescreen", Some(on(x.hd_options.widescreen))),
                     Entry::VideoSides => (
                         "Video sides",
@@ -369,7 +377,7 @@ mod tests {
         m.open();
         let v = hd();
         let mut seen = Vec::new();
-        for _ in 0..5 {
+        for _ in 0..6 {
             m.key(Key::Down, v);
             seen.push(m.selected());
             let MenuAction::SetEnhancements(x) = m.key(Key::Enter, v) else {
@@ -382,7 +390,7 @@ mod tests {
         assert_eq!(m.selected(), Entry::BugFixes, "the screen is skipped in HD");
         // A click on a greyed row selects it but changes nothing.
         let (bx, by) = OptionsMenu::origin(640, 480);
-        let y = by + TITLE_H + 6 * ROW_H + 5;
+        let y = by + TITLE_H + 7 * ROW_H + 5;
         assert_eq!(m.click(bx + 50, y, 640, 480, v), MenuAction::None);
         assert_eq!(m.selected(), Entry::Screen);
         assert_eq!(
@@ -396,7 +404,7 @@ mod tests {
         // The video sides: black and blurred.
         let mut m = OptionsMenu::new();
         m.open();
-        for _ in 0..5 {
+        for _ in 0..6 {
             m.key(Key::Down, v);
         }
         assert_eq!(m.selected(), Entry::VideoSides);
@@ -418,9 +426,9 @@ mod tests {
         m.draw(&mut plain, 640, 480, &font, hd());
         assert!(s == plain, "same pixels with or without recording");
         assert!(t.after == s);
-        // The title, 8 rows of a label and a value, Close, the
+        // The title, 9 rows of a label and a value, Close, the
         // description and the keys.
-        assert_eq!(t.items.len(), 1 + 8 * 2 + 1 + 2);
+        assert_eq!(t.items.len(), 1 + 9 * 2 + 1 + 2);
         assert!(t.items.iter().any(|i| i.text == b"< HD >"));
         let mut u = s.clone();
         t.uncover(&mut u);
@@ -450,7 +458,7 @@ mod tests {
                 }
             }
             // The pointer and the clicks find the rows on that screen.
-            m.pointer(bx + 30, by + TITLE_H + 7 * ROW_H + 3, w, h);
+            m.pointer(bx + 30, by + TITLE_H + 8 * ROW_H + 3, w, h);
             assert_eq!(m.selected(), Entry::BugFixes);
             assert_eq!(m.click(2, 2, w, h, ORIG), MenuAction::Close);
         }
