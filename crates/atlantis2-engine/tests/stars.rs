@@ -855,6 +855,26 @@ impl Run {
         self.e.mouse_motion(x - px, y - py);
     }
 
+    /// The HD view at 1920x1440 (no sharpening, the panorama bilinear)
+    /// of the frame a pass draws: the layer's 640x480 base, and its pixels
+    /// with the width and height; the HD mode off again after.
+    #[allow(clippy::type_complexity)]
+    fn hd_view(&mut self) -> (Vec<u16>, (Vec<u32>, usize, usize)) {
+        self.e.enhancements = Enhancements {
+            hd: true,
+            ..Enhancements::default()
+        };
+        self.e.enhancements.hd_options.sharpen = false;
+        self.e.enhancements.hd_options.panorama = atlantis2_engine::hd::PanoFilter::Bilinear;
+        self.e.set_hd_output(Some(48), 0);
+        self.step();
+        let l = self.e.hd_layer().expect("the HD layer");
+        let v = (l.base.clone(), (l.pixels.clone(), l.width, l.height));
+        self.e.enhancements = Enhancements::default();
+        self.e.set_hd_output(None, 0);
+        v
+    }
+
     fn shot(&self, name: &str) {
         if let Some(dir) = &self.shots {
             std::fs::write(
@@ -1431,10 +1451,15 @@ fn the_star_map_played_with_the_mouse_from_chapter_39() {
     r.wait(20);
     assert_eq!(r.map(), wrong);
     let mut evs = Vec::new();
+    let mut before = None;
     for (k, (&w, h)) in wrong.iter().zip(STAR_HOLES).enumerate() {
         let star = r.take_back(w);
         if k == 6 {
             r.shot("4-the-last-star");
+            // The last hole aimed at, still empty: its HD view kept.
+            let z = r.hole(h);
+            r.aim(z);
+            before = Some((r.e.camera.clone(), r.hd_view()));
         }
         evs = r.click_hole(h);
         assert!(evs.contains(&Event::StarLaid { hole: h, star }));
@@ -1468,23 +1493,56 @@ fn the_star_map_played_with_the_mouse_from_chapter_39() {
     assert!(!evs.iter().any(|x| matches!(x, Event::StarTaken { .. })));
     assert_eq!(r.var("OBJETENMAIN"), 0);
 
-    // The HD view of the won map.
-    if let Some(dir) = r.shots.clone() {
-        r.e.enhancements = Enhancements {
-            hd: true,
-            ..Enhancements::default()
-        };
-        r.e.set_hd_output(Some(48), 4);
-        r.step();
-        let l = r.e.hd_layer().expect("the HD layer");
+    // The HD view of the won map, the last hole aimed at as before its
+    // star: the 640x480 frame changed around the centre (the star laid),
+    // and there the HD view shows the frame's pixels, not those it showed
+    // before.
+    let (cam, (base0, hd0)) = before.unwrap();
+    r.e.camera = cam;
+    let (base1, hd1) = r.hd_view();
+    if let Some(dir) = &r.shots {
         std::fs::write(
             dir.join("pz-stars-6-won-hd.png"),
-            encode_xrgb8888(&l.pixels, l.width, l.height),
+            encode_xrgb8888(&hd1.0, hd1.1, hd1.2),
         )
         .unwrap();
-        r.e.enhancements = Enhancements::default();
-        r.e.set_hd_output(None, 0);
     }
+    let lut = atlantis2_engine::hd::rgb565_to_888();
+    let close = |a: u32, b: u32| {
+        (0..3)
+            .map(|k| ((a >> (8 * k)) & 0xff).abs_diff((b >> (8 * k)) & 0xff))
+            .max()
+            .unwrap()
+            <= 48
+    };
+    let at = |l: &(Vec<u32>, usize, usize), x: usize, y: usize| l.0[(3 * y + 1) * l.1 + 3 * x + 1];
+    let star: Vec<(usize, usize)> = (140..340)
+        .flat_map(|y| (220..420).map(move |x| (x, y)))
+        .filter(|&(x, y)| base0[y * 640 + x] != base1[y * 640 + x])
+        .collect();
+    let shown = star
+        .iter()
+        .filter(|&&(x, y)| close(at(&hd1, x, y), lut[usize::from(base1[y * 640 + x])]))
+        .count();
+    let changed = star
+        .iter()
+        .filter(|&&(x, y)| at(&hd1, x, y) != at(&hd0, x, y))
+        .count();
+    eprintln!(
+        "the last star: {} pixels, {shown} shown, {changed} changed in HD",
+        star.len()
+    );
+    assert!(star.len() >= 20, "{} pixels of the last star", star.len());
+    assert!(
+        shown * 10 >= star.len() * 9,
+        "{shown} of {} shown",
+        star.len()
+    );
+    assert!(
+        changed * 10 >= star.len() * 9,
+        "{changed} of {} changed",
+        star.len()
+    );
 
     // View 122: the statue of Tezcatlipoca, shown by the win, asked
     // through its zone.

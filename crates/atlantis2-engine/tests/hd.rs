@@ -13,14 +13,16 @@
 //!   a click lands where it would in the original;
 //! - with the game (`ATLANTIS2_DATA`, `ATLANTIS2_DISCS`; skipped
 //!   without): the 640x480 frames are the same with the HD mode on or off,
-//!   in Tibet, Ireland, China and Yucatán (two of its places), the layer's
-//!   base is the cube the frame shows, and the zone under the centre is the
-//!   same.
+//!   in Tibet, Ireland, China, Yucatán (two of its places) and Xibalba
+//!   (its places and the star map), the layer's base is the cube the frame
+//!   shows, and the zone under the centre is the same; the star map's
+//!   stars, each aimed at, are in the HD view where the frame shows them.
 
 use std::path::PathBuf;
 
-use atlantis2_data::A2Files;
+use atlantis2_data::{defnames, A2Files};
 use atlantis2_engine::camera::deg_to_rad;
+use atlantis2_engine::engine::STAR_HOLES;
 use atlantis2_engine::hd::{
     cube_point, picture_rect, render_view, side_tiles, tile_for_output, window_to_screen,
     HdProjection, SCREEN_H, SCREEN_W,
@@ -527,6 +529,98 @@ fn hd_view_shows_the_panorama() {
         }
         eprintln!("{name}: {close} of {n} sample pixels close to the original's");
         assert!(close * 10 >= n * 9, "{name}: {close} of {n}");
+    }
+}
+
+/// The star map's stars in the HD view: the clearing entered with the
+/// seven stars on their holes (the last place of [`PLACES`]) and without
+/// any; the entry gives the map a frame per held hole; each hole aimed at,
+/// the 640x480 frames of the two differ around the centre (the star), and
+/// there the HD view shows the star: its pixel close to the frame's, and
+/// not the one of the view without the stars.
+#[test]
+fn hd_view_shows_the_star_map_s_stars() {
+    if game().is_none() {
+        return;
+    }
+    let with = PLACES.last().unwrap().1;
+    let bare: &[&[u8]] = &[b"(monde=6)", b"(changewam=xibalba.wam)", b"(vue=121)"];
+    let [mut full, mut empty] = [with, bare].map(|c| {
+        let mut e = at(game().unwrap(), c, true);
+        e.enhancements.hd_options.sharpen = false;
+        e.enhancements.hd_options.panorama = atlantis2_engine::hd::PanoFilter::Bilinear;
+        e.set_hd_output(Some(48), 0);
+        e
+    });
+    assert_eq!(full.place(), ("xibalba.wam", 121));
+    let map = |e: &Engine| {
+        let id = e
+            .script_state()
+            .unwrap()
+            .names
+            .id(defnames::OBJETS, b"Etoiles_Puz")
+            .unwrap() as i32;
+        let n = e.anim.slots.iter().position(|s| s.id == id).unwrap();
+        let mut l = e.anim.frame_list(n);
+        l.sort_unstable();
+        l
+    };
+    assert_eq!(map(&full), STAR_HOLES);
+    assert!(map(&empty).is_empty());
+    let lut = atlantis2_engine::hd::rgb565_to_888();
+    let close = |a: u32, b: u32| {
+        (0..3)
+            .map(|k| ((a >> (8 * k)) & 0xff).abs_diff((b >> (8 * k)) & 0xff))
+            .max()
+            .unwrap()
+            <= 48
+    };
+    for h in STAR_HOLES {
+        let zone = full
+            .wam()
+            .view(121)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.kind == 50 && z.value == h)
+            .unwrap();
+        let (yaw, pitch) = full.zone_aim(121, zone).unwrap();
+        let mut out = vec![0u16; 640 * 480];
+        for e in [&mut full, &mut empty] {
+            e.camera.enter(yaw, pitch);
+            e.pass(Some(&mut out));
+            assert_eq!(
+                e.centre_zone().map(|z| z.0),
+                Some(zone),
+                "hole {h} aimed at"
+            );
+        }
+        let (f, b) = (full.hd_layer().unwrap(), empty.hd_layer().unwrap());
+        let star: Vec<(usize, usize)> = (140..340)
+            .flat_map(|y| (220..420).map(move |x| (x, y)))
+            .filter(|&(x, y)| f.base[y * 640 + x] != b.base[y * 640 + x])
+            .collect();
+        let hd = |l: &atlantis_engine::hd::HdLayer, x: usize, y: usize| {
+            l.pixels[(3 * y + 1) * l.width + 3 * x + 1]
+        };
+        let shown = star
+            .iter()
+            .filter(|&&(x, y)| close(hd(f, x, y), lut[usize::from(f.base[y * 640 + x])]))
+            .count();
+        let changed = star
+            .iter()
+            .filter(|&&(x, y)| hd(f, x, y) != hd(b, x, y))
+            .count();
+        eprintln!(
+            "hole {h}: {} star pixels, {shown} shown, {changed} changed in HD",
+            star.len()
+        );
+        assert!(star.len() >= 20, "hole {h}: {} star pixels", star.len());
+        assert!(shown * 10 >= star.len() * 9, "hole {h}: {shown} shown");
+        assert!(
+            changed * 10 >= star.len() * 9,
+            "hole {h}: {changed} changed"
+        );
     }
 }
 

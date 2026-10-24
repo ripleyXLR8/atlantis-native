@@ -1424,8 +1424,12 @@ back) into `yucatan-*.png`.
   are compared up to it), and plays the map with the mouse from chapter
   39: the stars taken, a wrong lay taken back, all seven on wrong holes,
   a save loaded, the bat's subject in chapter 35 (dialog 177), the stars
-  moved to the right holes (the win: lines 27-33, film 49), the HD view,
-  the statue asked through its zone. Which constellation the right holes
+  moved to the right holes (the win: lines 27-33, film 49), the HD view
+  of the last hole before and after its star (where the 640x480 frame
+  changed, the HD view shows the new pixels), the statue asked through
+  its zone; `tests/hd.rs` aims at each right hole of the map entered with
+  and without the seven stars: the map's frame list is the seven holes,
+  and where the frames differ the HD view shows the star. Which constellation the right holes
   draw, and where the game hints at it, was not looked for. **Xibalba's
   two other puzzles are not ported**: their hooks are listed and noted
   (`Event::PuzzleNotPorted`) where the original calls them: the canoe (`bat.wam`
