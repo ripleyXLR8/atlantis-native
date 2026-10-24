@@ -50,11 +50,18 @@
 //!   `labyrinth.rs`) run too: every Chinese puzzle is ported. A hook
 //!   still noted ([`Event::PuzzleNotPorted`]) is another world's (a mode
 //!   of another world's puzzle from a save, for instance).
-//! - The places the port has: Tibet, Ireland and China. A `changewam` to
-//!   any other place (Yucatán's boat, Shamballa, the space travel) is
-//!   refused: the section stops there, the world goes back to the
-//!   current place's, the view's per-view reset runs (as the section's
-//!   `vue=` would) and the game stays in the view it was in
+//! - Yucatán's hooks (prefix `YU`, `yucatan.rs`): the Tezcatlipoca
+//!   statue's branch runs; the Maya counting grids' hooks are listed and
+//!   noted (the grids are not ported, [`Engine::solve_maya_grid`] writes
+//!   their wins for tests), and so are Xibalba's (the star map, the canoe,
+//!   the spider web), whose places are not ported. The canoe's view
+//!   consumes the click while the canoe is not enabled, as in the
+//!   original.
+//! - The places the port has: Tibet, Ireland, China and Yucatán. A
+//!   `changewam` to any other place (Xibalba, Shamballa, the space
+//!   travel) is refused: the section stops there, the world goes back to
+//!   the current place's, the view's per-view reset runs (as the
+//!   section's `vue=` would) and the game stays in the view it was in
 //!   ([`Event::WorldNotPorted`]).
 
 use atlantis2_data::defnames;
@@ -106,13 +113,18 @@ const LAID_SOUND: &[u8] = b"(NewSound=400)";
 const IRELAND_PREFIX: &[u8] = b"IR";
 
 /// The places the port has, with the world (`MONDE`) the scripts set
-/// before entering them: Tibet's, Ireland's five places (chapters 2-24)
-/// and China's five (chapters 42-60: `chine.wam` and `miniature.wam`
+/// before entering them: Tibet's, Ireland's five places (chapters 2-24),
+/// China's five (chapters 42-60: `chine.wam` and `miniature.wam`
 /// loaded by the scripts, `salletortue.wam`, `labysol.wam` and
-/// `labyplaf.wam` reached by their links). Not `demo.wam`, which only
-/// chapter 1 loads: no script jumps to chapter 1, and none of its nine
-/// panoramas (`de0001.hnm` .. `de0009.hnm`) is on a disc.
-const PORTED_PLACES: [(&str, i32); 11] = [
+/// `labyplaf.wam` reached by their links) and Yucatán's three (chapters
+/// 25-34: `yucatan.wam` loaded by chapter 75's trips, `salleroi.wam` and
+/// `pyratez.wam` reached by the links of `yucatan.wam` views 39 and 34;
+/// chapter 35, Xibalba's, loads `salleroi.wam` too). Not `demo.wam`,
+/// which only chapter 1 loads: no script jumps to chapter 1, and none of
+/// its nine panoramas (`de0001.hnm` .. `de0009.hnm`) is on a disc. Not
+/// Xibalba's places (`MONDE` 6: `bat.wam`, `xibalba.wam`, `riviere.wam`,
+/// `toile.wam`).
+const PORTED_PLACES: [(&str, i32); 14] = [
     ("tibet.wam", 5),
     ("bigile1.wam", 1),
     ("livre.wam", 1),
@@ -124,6 +136,9 @@ const PORTED_PLACES: [(&str, i32); 11] = [
     ("salletortue.wam", 3),
     ("labysol.wam", 3),
     ("labyplaf.wam", 3),
+    ("yucatan.wam", 2),
+    ("salleroi.wam", 2),
+    ("pyratez.wam", 2),
 ];
 
 /// China's warp prefixes (@ 0x005db000 `CH`, 0x005e2ea4 `SS` for
@@ -296,6 +311,15 @@ impl Engine {
     /// prefix and view; true when it consumes the click. Tibet's mandala
     /// hook returns 0 (@ 0x0049bcf9).
     pub(super) fn puzzle_hooks(&mut self, zi: usize, zone: &Zone) -> bool {
+        let name = self
+            .current_view()
+            .map(|v| v.name.as_bytes().to_vec())
+            .unwrap_or_default();
+        // Yucatán's (the `YU` branches, before Ireland's in both cases of
+        // the switch): the canoe's view may consume the click.
+        if self.yucatan_click(&name, self.view, zone) {
+            return true;
+        }
         let applies = self
             .current_view()
             .is_some_and(|v| mandala_hook_applies(v.name.as_bytes(), self.view, zone.kind));
@@ -351,10 +375,6 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
-        let name = self
-            .current_view()
-            .map(|v| v.name.as_bytes().to_vec())
-            .unwrap_or_default();
         self.chinese_click(zi, &name, self.view, zone)
     }
 
@@ -501,8 +521,10 @@ impl Engine {
     /// stones (view 6) and blackbird songs (view 73) run, and China's
     /// figurines and chest (`SS` views 1-7), wheels (`SS` 12-13), pearl
     /// and dragon (`SS` 31), turtle ring (`CH` views 40-64) and labyrinth
-    /// souls (`LA` views 1-60); Tibet has none.
+    /// souls (`LA` views 1-60); Yucatán's hooks, first (the web's entry in
+    /// the mode 1, then the `YU` views'), are noted; Tibet has none.
     pub(super) fn entry_hooks(&mut self) {
+        self.yucatan_entry();
         let hook = self
             .current_view()
             .and_then(|v| irish_entry_hook(v.name.as_bytes(), self.view));

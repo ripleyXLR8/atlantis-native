@@ -406,6 +406,14 @@ fn e_row(e: &mut Engine, n: &DefNames, want: &str, t: &mut f64) {
         assert_eq!((s.chapter, s.var("MONDE")), (2, Some(1)));
         assert!(s.fatal.is_none());
     }
+    // Yucatán's boat (first and second trips): its view 10, chapter 25.
+    if ev.contains(&Event::Wam("yucatan.wam".into())) {
+        assert!(refused.is_none());
+        assert_eq!(e.place(), ("yucatan.wam", 10));
+        let s = e.script_state().unwrap();
+        assert_eq!((s.chapter, s.var("MONDE")), (25, Some(2)));
+        assert!(s.fatal.is_none());
+    }
 }
 
 #[test]
@@ -550,7 +558,7 @@ fn the_hook_only_in_view_10() {
 
     let Some(files) = game() else { return };
     let mut e = chapter_75(files);
-    // Yucatán's boat (its trip refused: the game stays in view 10).
+    // Yucatán's boat (laid: the trip waits for the film).
     let boat = names(&e)
         .id(defnames::OBJETS, b"MANDALA_BATEAU_YU")
         .unwrap() as i32;
@@ -566,7 +574,25 @@ fn the_hook_only_in_view_10() {
         .any(|x| matches!(x, Event::PuzzleHook { cliczone: 0, .. })));
     assert_eq!(var(&e, "OrdreMandala3"), 1);
     e.end_video();
+    for _ in 0..50 {
+        if e.loop_type == LoopType::Video {
+            e.end_video();
+        }
+        e.tick();
+        e.pass(None);
+    }
+    // The trip made; back to Tibet's view 10 by the scripts' commands.
+    assert_eq!(e.place(), ("yucatan.wam", 10));
+    for c in [
+        &b"(monde=5)"[..],
+        b"(changewam=tibet.wam)",
+        b"(vue=10)",
+        b"(chapter=75)",
+    ] {
+        e.run_command(c);
+    }
     e.pass(None);
+    assert_eq!(e.place(), ("tibet.wam", 10));
     // View 10's move zone (type 1, to view 9): the departure, no hook.
     set(&mut e, "ObjetEnMain", 0);
     let zones = e.wam().view(10).unwrap().zones.clone();
@@ -596,9 +622,9 @@ fn the_hook_only_in_view_10() {
 }
 
 /// A boat taken in its view, put in hand from the bag and laid on its
-/// zone: chapter 75's section, the film, the refused trip; the puzzle's
-/// state survives a save and a load; a second click on the laid boat
-/// asks for the trip again (refused again).
+/// zone: chapter 75's section, the film, the trip to Yucatán; the
+/// puzzle's state survives a save there and a load; back in Tibet, the
+/// laid boat is shown and a second click on it makes the trip again.
 #[test]
 fn a_boat_laid_saved_and_loaded() {
     let Some(files) = game() else { return };
@@ -607,7 +633,7 @@ fn a_boat_laid_saved_and_loaded() {
     let boat = n.id(defnames::OBJETS, b"MANDALA_BATEAU_YU").unwrap() as i32;
     let laid = n.id(defnames::OBJETS, b"MANDALA_YU1").unwrap() as i32;
     // The take in view 5 (the boats of views 5, 8, 9: Yucatán, Ireland,
-    // China; Yucatán's trip is still refused).
+    // China).
     enter(&mut e, 5);
     let slot = e
         .anim
@@ -630,15 +656,26 @@ fn a_boat_laid_saved_and_loaded() {
     assert!(e.events.contains(&Event::Sound("sound400.apc".into())));
     assert_eq!(e.loop_type, LoopType::Video);
     assert!(e.events.contains(&Event::Monde(2)));
-    // The bag bar shows Tibet's objects again after the refusal; the boat
-    // has left the bag, the laid mandala is shown.
-    e.end_video();
-    e.pass(None);
-    assert!(e
+    // The trip: Yucatán's view 10 and chapter 25 on disc 2; the boat has
+    // left the bag, the laid mandala's row of the show / hide table is
+    // set.
+    for _ in 0..50 {
+        if e.loop_type == LoopType::Video {
+            e.end_video();
+        }
+        e.tick();
+        e.pass(None);
+    }
+    assert!(!e
         .events
         .iter()
-        .any(|x| matches!(x, Event::WorldNotPorted(w) if w.eq_ignore_ascii_case("yucatan.wam"))));
-    assert_eq!(var(&e, "MONDE"), 5);
+        .any(|x| matches!(x, Event::WorldNotPorted(_))));
+    assert_eq!(e.place(), ("yucatan.wam", 10));
+    assert_eq!(e.files().current_disc(), 2);
+    assert_eq!(
+        (var(&e, "MONDE"), e.script_state().unwrap().chapter),
+        (2, 25)
+    );
     assert_eq!(
         (
             var(&e, "poseyub"),
@@ -656,8 +693,6 @@ fn a_boat_laid_saved_and_loaded() {
             .any(|r| r.id == laid && r.shown)
     };
     assert!(shown(&e));
-    assert!(e.anim.slots.iter().any(|s| s.id == laid && s.active));
-    assert_eq!(e.place(), ("tibet.wam", 10));
 
     // Saved and loaded in a new game.
     let saved = e.save_data();
@@ -667,33 +702,48 @@ fn a_boat_laid_saved_and_loaded() {
         assert_eq!(var(&f, k), var(&e, k), "{k}");
     }
     assert!(shown(&f));
-    assert_eq!(f.place(), ("tibet.wam", 10));
+    assert_eq!(f.place(), ("yucatan.wam", 10));
 
-    // The laid boat clicked again with an empty hand: the trip again
-    // (chapter 75's second-trip section), refused again; the hook counts
+    // Back in Tibet's view 10 (as the brazier's way back makes it, with
+    // view 10 for view 7): the laid boat shown; clicked with an empty hand,
+    // the trip again (chapter 75's second-trip section); the hook counts
     // nothing.
+    for c in [
+        &b"(monde=5)"[..],
+        b"(changewam=tibet.wam)",
+        b"(vue=10)",
+        b"(chapter=75)",
+    ] {
+        f.run_command(c);
+    }
+    f.pass(None);
+    assert_eq!(f.place(), ("tibet.wam", 10));
+    assert!(f.anim.slots.iter().any(|s| s.id == laid && s.active));
     f.trace = true;
     aim(&mut f, "ZONE_YUB");
     f.events.clear();
     f.click(30.0);
-    f.pass(None);
-    if f.loop_type == LoopType::Video {
-        f.end_video();
+    for _ in 0..50 {
+        if f.loop_type == LoopType::Video {
+            f.end_video();
+        }
+        f.tick();
         f.pass(None);
     }
-    assert!(f
+    assert!(!f
         .events
         .iter()
-        .any(|x| matches!(x, Event::WorldNotPorted(w) if w.eq_ignore_ascii_case("yucatan.wam"))));
+        .any(|x| matches!(x, Event::WorldNotPorted(_))));
     assert_eq!(var(&f, "NbMandalaPosed"), 1);
-    assert_eq!(f.place(), ("tibet.wam", 10));
-    assert_eq!(var(&f, "MONDE"), 5);
+    assert_eq!(f.place(), ("yucatan.wam", 10));
+    assert_eq!(var(&f, "MONDE"), 2);
 
-    // A save in another world's place is refused before anything changes.
+    // A save in another world's place (Xibalba's) is refused before
+    // anything changes.
     let mut other = saved.clone();
-    other.set_wam(b"yucatan.wam");
+    other.set_wam(b"bat.wam");
     let before = f.save_data();
-    assert!(matches!(f.load_data(&other), Err(SaveError::NotPorted(w)) if w == "yucatan.wam"));
+    assert!(matches!(f.load_data(&other), Err(SaveError::NotPorted(w)) if w == "bat.wam"));
     assert_eq!(f.save_data().entry(6), before.entry(6));
-    assert_eq!(f.place(), ("tibet.wam", 10));
+    assert_eq!(f.place(), ("yucatan.wam", 10));
 }

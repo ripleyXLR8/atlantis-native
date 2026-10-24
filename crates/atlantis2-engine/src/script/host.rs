@@ -111,8 +111,9 @@ pub trait Host {
     }
 
     /// `anglewarpxnow` / `anglewarpynow` (@ 0x0045ad40 / 0x0045ada0):
-    /// turn the current view at once; `yaw` true for the yaw, the angle in
-    /// radians.
+    /// turn the current view at once, the angle in radians: `yaw` true,
+    /// the camera's rotation set about the root's Y axis (the pitch
+    /// dropped); false, a pitch from the current orientation.
     fn turn_now(&mut self, yaw: bool, angle: f32) {}
 
     /// `ZoomStart` (@ 0x0045b350): the zoom and the field of view in

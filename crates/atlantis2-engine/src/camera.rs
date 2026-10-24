@@ -270,6 +270,58 @@ impl Camera {
         self.q = quat_mul(self.fpu, self.q, rot);
     }
 
+    /// FUN_0045ad40 (`AngleWarpXNow`): the node's rotation **set** to
+    /// `angle` (radians) about (0, 1, 0), relative to the scene root
+    /// (FUN_004a2860 with the root, the node's parent, as the frame copies
+    /// the quaternion, @ 0x004a287c..0x004a289a): the pitch is dropped and
+    /// the read-back is (90° − angle, 0).
+    pub fn set_yaw(&mut self, angle: f32) {
+        let m = axis_angle(self.fpu, [0.0, 1.0, 0.0], angle);
+        self.q = matrix_to_quat(self.fpu, &m);
+    }
+
+    /// FUN_0045ada0 (`AngleWarpYNow`): the node's rotation set relative to
+    /// itself, to `angle` (radians) about (1, 0, 0): FUN_004a2860 with
+    /// the node as the frame multiplies the node's world rotation (its
+    /// own, the parent being the root, FUN_004a33c0) by the rotation
+    /// (FUN_004a29c0, @ 0x004a28c8), then expresses the product relative
+    /// to the parent, the root, whose world rotation is (0, 0, 0, 1)
+    /// (@ 0x004a28d6..0x004a2990, each component stored): a pitch by
+    /// `angle` from the current orientation, as [`Camera::pitch`].
+    pub fn pitch_from_here(&mut self, angle: f32) {
+        let m = axis_angle(self.fpu, [1.0, 0.0, 0.0], angle);
+        let rot = matrix_to_quat(self.fpu, &m);
+        let r = quat_mul(self.fpu, self.q, rot).map(d);
+        let fpu = self.fpu;
+        let (add, sub, mul) = (
+            |a, b| fpu.add(a, b),
+            |a, b| fpu.sub(a, b),
+            |a, b| fpu.mul(a, b),
+        );
+        // The root's world rotation (x, y, z, w) = (0, 0, 0, 1)
+        // (FUN_004a1cf0).
+        let (px, py, pz, pw) = (0.0, 0.0, 0.0, 1.0);
+        let [x, y, z, w] = r;
+        self.q = [
+            fpu.f32(add(
+                mul(y, pz),
+                sub(sub(mul(x, pw), mul(w, px)), mul(z, py)),
+            )),
+            fpu.f32(add(
+                mul(z, px),
+                sub(sub(mul(y, pw), mul(w, py)), mul(x, pz)),
+            )),
+            fpu.f32(add(
+                mul(x, py),
+                sub(sub(mul(z, pw), mul(w, pz)), mul(y, px)),
+            )),
+            fpu.f32(add(
+                add(add(mul(w, pw), mul(y, py)), mul(z, pz)),
+                mul(x, px),
+            )),
+        ];
+    }
+
     /// The matrix the cube's corners are multiplied by (FUN_0045c030:
     /// FUN_004a2a70 relative to the root, then FUN_004c6e40).
     pub fn matrix(&self) -> [f32; 9] {

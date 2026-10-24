@@ -442,13 +442,13 @@ impl Host for Engine {
     }
 
     fn turn_now(&mut self, yaw: bool, angle: f32) {
-        // FUN_0045ad40 / FUN_0045ada0 set the rotation of the scene's root
-        // or camera node [INFERRED: absolute, from "set rotation"].
-        let (y, p) = self.camera.angles();
+        // FUN_0045ad40: the camera node's rotation set about the root's Y
+        // (the pitch dropped); FUN_0045ada0: a pitch from the current
+        // orientation.
         if yaw {
-            self.camera.enter(angle, p);
+            self.camera.set_yaw(angle);
         } else {
-            self.camera.enter(y, angle);
+            self.camera.pitch_from_here(angle);
         }
     }
 
