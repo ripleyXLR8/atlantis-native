@@ -62,9 +62,9 @@
 //!   too (its mode is never set); the end of a firefly's move in
 //!   `voiles.wam` (FUN_0045a630 → FUN_004952d0) runs.
 //! - The places the port has: every place a script or a link names but
-//!   `demo.wam` (chapter 1's, whose panoramas are on no disc) and
-//!   `sans_nom.wam` (named by nothing). A `changewam` to a place it does not
-//!   have is refused: the section stops there, the world goes back to
+//!   `demo.wam` (chapter 1's, whose panoramas are on no disc); the one
+//!   place file nothing names, `sans_nom.wam`, is not ported either. A
+//!   `changewam` to a place it does not have is refused: the section stops there, the world goes back to
 //!   the current place's, the view's per-view reset runs (as the
 //!   section's `vue=` would) and the game stays in the view it was in
 //!   ([`Event::WorldNotPorted`]).
@@ -136,7 +136,7 @@ const IRELAND_PREFIX: &[u8] = b"IR";
 /// links of `rhea.wam` view 3 and `annulair.wam` view 5 lead to the same).
 /// Not `demo.wam`, which only chapter 1 loads: no script jumps to chapter
 /// 1, and none of its nine panoramas (`de0001.hnm` .. `de0009.hnm`) is on
-/// a disc.
+/// a disc. Not `sans_nom.wam` either, which no script and no link names.
 const PORTED_PLACES: [(&str, i32); 23] = [
     ("tibet.wam", 5),
     ("bigile1.wam", 1),

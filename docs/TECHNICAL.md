@@ -2186,7 +2186,8 @@ back) into `yucatan-*.png`.
   Xibalba, the space-travel hub, Shamballa and Atlantis (above) are
   ported. A `changewam` of the scripts to any other place (Ireland's
   `demo.wam`, chapter 1's, whose panoramas are on no disc and which no
-  chapter reaches) is
+  chapter reaches, or `sans_nom.wam`, the one place file no script and
+  no link names) is
   refused: where the original loads it (a place it cannot load is fatal
   there), the port notes it (`Event::WorldNotPorted`), ends the section
   at that line, sets the world back to the current place's (`Interp_SetMonde`: the

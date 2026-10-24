@@ -426,8 +426,9 @@ fn every_endgame_view_is_entered_with_its_hooks() {
         }
     }
     // 46 views entered. Five records have no panorama on any disc: the
-    // hub's 10 and 11 (the ends of its way back and of its last move, left
-    // by a section's place change before any entry), Atlantis's 802 and
+    // hub's 10 (the way back's destination, left by the departure
+    // section's place change before the move) and 11 (a record no zone or
+    // destination leads to), Atlantis's 802 and
     // 810 (the holders of the octopuses' and the plankton's animations,
     // which the octopus's entry loads in the views it fights in) and 19
     // (a destination of view 18 that no zone leads to).
