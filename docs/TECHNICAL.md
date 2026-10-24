@@ -1367,16 +1367,27 @@ back) into `yucatan-*.png`.
   (`tests/flow.rs` `yucatan_with_the_mouse`): from a new game, Yucatán's
   boat taken in view 5 and laid in the hut, then chapters 25-34 stage by
   stage (the prince and the high priest asked in the king's hall, the
-  priestess and her clean bands, the king given them (film 41), the
+  priestess and her clean bands, the king, his daughter and the
+  counsellor asked, the priestess again, the king given the bands (film
+  41), the hall asked again, the bloody bands, the hall in mourning, the
   bloody bands back to the priestess (film 42), her question and the way
-  into Xibalba refused, then no; the obsidian of view 40; the pyramid's
-  first guard, grid (played: five marbles, then four) and pass, the
-  second, the entrance door's button, the third grid, whose win opens the
-  crocodile's jaw, and the crocodile's foot, the two mirrors and the
+  into Xibalba refused, then no, twice, and her other subjects; the
+  obsidian of view 40; the pyramid's first guard and his riddle, the way
+  on barred, the walk back to the king's hall for the Maya numbers'
+  subject, the first grid played with a wrong try (three dots) before
+  its answer (a bar and four dots), the guard's pass; the second guard's
+  riddle, the second grid laid with 81 and the third with 6561 (the
+  riddles' numbers written in Maya digits from the units' group up), the
+  entrance door barred, opened, closed and opened by its buttons, the
+  crocodile's foot, which closes the door behind, the two mirrors and the
   secret door back to view 28), a save and a load through the menus, and
-  the way back to Tibet by the brazier. Every chapter it goes through is
-  left by one of its own `chapter=` lines, no hook is left unported, and
-  every Yucatán `/set` line it reports is one the original runs. With `ATLANTIS2_PNG_DIR` set it writes its screens
+  the way back to Tibet by the brazier. Every character is asked about
+  everything he offers at each step, so every dialog of chapters 25-34
+  that does not need Xibalba is played (101-123, 138-143, 145-167, 169,
+  170, 210; 124-137 and 168 need Xibalba, 144 does not exist). Every
+  chapter it goes through is left by one of its own `chapter=` lines, no
+  hook is left unported, and every Yucatán `/set` line it reports is one
+  the original runs (about 46 s in release). With `ATLANTIS2_PNG_DIR` set it writes its screens
   (`yucatan-*.png`). `tests/yucatan.rs` also runs every Yucatán chapter's
   `/INIT`, enters every view of the three places with its hooks, moves
   along every link, plays chapter 26's turned arrival, the brazier, the

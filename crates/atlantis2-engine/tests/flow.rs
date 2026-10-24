@@ -3548,15 +3548,82 @@ const YUCATAN: &[Stage] = &[
     ),
     ("the priestess", the_priestess),
     ("the king", the_king),
+    ("the king's hall with the bloody bands", the_halls_mourning),
     ("the bloody bands", the_bloody_bands),
     ("the way to Xibalba", the_way_to_xibalba),
     ("the obsidian", the_obsidian),
     ("the first guard", the_first_guard),
+    ("the Maya numbers", the_maya_numbers),
+    ("the first grid", the_first_grid),
     ("the second guard", the_second_guard),
     ("the entrance door", the_entrance_door),
     ("the crocodile's foot", the_crocodiles_foot),
     ("the mirrors", the_mirrors),
 ];
+
+/// The views of the king's hall (`salleroi.wam` 86-88), where the king,
+/// his daughter and the counsellor stand.
+const HALL: [u32; 3] = [86, 87, 88];
+
+impl Run {
+    /// Character `who` of the king's hall found (the views of [`HALL`]
+    /// walked until his sprite can be clicked) and asked about each
+    /// subject he offers: the subjects' names and their dialogs, sorted.
+    fn ask_in_hall(&mut self, who: &str) -> Vec<(String, u32)> {
+        let id = self.who(who);
+        let here = |r: &Run| {
+            r.e.anim
+                .slots
+                .iter()
+                .any(|s| s.id == id && s.active && s.click != 0 && matches!(s.kind, 1 | 3))
+        };
+        for v in HALL {
+            if here(self) {
+                break;
+            }
+            self.go(v, &[]);
+        }
+        assert!(here(self), "{who} is in none of the hall's views");
+        let mut asked: Vec<(String, u32)> = self
+            .ask_each(who)
+            .into_iter()
+            .map(|(value, d)| (self.subject_name(value), d))
+            .collect();
+        asked.sort();
+        asked
+    }
+
+    /// The `defnames.con` name of subject value `value`.
+    fn subject_name(&self, value: i32) -> String {
+        let s = self.e.script_state().unwrap();
+        [
+            "PRINCE",
+            "GRAND_PRETRE",
+            "PRETRESSE",
+            "ROI",
+            "FILLE_ROI",
+            "CONSEILLER",
+            "MAIS",
+            "ENNEMI",
+            "SUPERNOVA_YU",
+            "BANDELETTES",
+            "BANDELETTES_SANG",
+            "CHIFFRE_MAYA",
+            "TEZ",
+        ]
+        .into_iter()
+        .find(|n| s.names.param(defnames::SUJETS, n.as_bytes()) == value)
+        .unwrap_or_else(|| panic!("subject {value} not one of the hall's"))
+        .to_string()
+    }
+}
+
+/// `(subject, dialog)` pairs, sorted.
+fn answers(pairs: &[(&str, u32)]) -> Vec<(String, u32)> {
+    let mut v: Vec<(String, u32)> = pairs.iter().map(|&(s, d)| (s.to_string(), d)).collect();
+    v.sort();
+    v
+}
 
 /// Views 17, 19, 22, 39 and the link to the king's hall's view 81
 /// (chapter 25's departure: chapter 26, whose arrival section turns the
@@ -3611,15 +3678,51 @@ fn the_priestess(r: &mut Run) {
 }
 
 /// Views 85, 86 (chapter 27's departure: chapter 28, the king's greeting,
-/// dialog 138), 88: the clean bands given to the king (dialog 142, film
-/// 41); back to view 86, then the move to 85 (chapter 28's departure:
-/// dialog 143, the bloody bands, chapter 27).
+/// dialog 138); the king, his daughter and the counsellor asked about
+/// everything (chapter 28's sections 3-5: dialogs 139, 141, 140 whatever
+/// the subject); the priestess clicked again (view 84: dialog 114); view
+/// 88 (chapter 28 again): the clean bands given to the king (dialog 142,
+/// film 41); the three asked again (sections 7-9: dialogs 145-153); back
+/// to view 86, then the move to 85 (chapter 28's departure: dialog 143,
+/// the bloody bands, chapter 27).
 fn the_king(r: &mut Run) {
     r.walk(85);
     let evs = r.walk(86);
     assert!(dialogs(&evs).contains(&138));
     assert_eq!(r.chapter(), 28);
-    r.walk(88);
+    r.stow();
+    assert_eq!(
+        r.ask_in_hall("ROI"),
+        answers(&[
+            ("ENNEMI", 139),
+            ("FILLE_ROI", 139),
+            ("MAIS", 139),
+            ("PRINCE", 139)
+        ])
+    );
+    assert_eq!(
+        r.ask_in_hall("FILLE_ROI"),
+        answers(&[("FILLE_ROI", 141), ("ROI", 141)])
+    );
+    assert_eq!(
+        r.ask_in_hall("CONSEILLER"),
+        answers(&[
+            ("GRAND_PRETRE", 140),
+            ("MAIS", 140),
+            ("ROI", 140),
+            ("SUPERNOVA_YU", 140)
+        ])
+    );
+    // Back to the priestess with the bands still in the bag: she asks
+    // whether they were given (chapter 27's section 5: dialog 114).
+    r.go(84, &[]);
+    assert_eq!(r.chapter(), 27);
+    let priestess = r.who("PRETRESSE");
+    let mut evs = r.click_on(true, priestess);
+    evs.extend(r.settle());
+    assert_eq!(dialogs(&evs), [114]);
+    r.go(88, &[]);
+    assert_eq!(r.chapter(), 28);
     let evs = r.give("BANDES_PROPRES", "ROI");
     assert!(dialogs(&evs).contains(&142));
     assert!(films(&evs).contains(&41));
@@ -3627,7 +3730,24 @@ fn the_king(r: &mut Run) {
     assert!(!r.in_bag("BANDES_PROPRES"));
     r.stow();
     r.shot_as("yucatan-6-king.png");
-    r.walk(86);
+    assert_eq!(
+        r.ask_in_hall("ROI"),
+        answers(&[
+            ("ENNEMI", 146),
+            ("FILLE_ROI", 147),
+            ("MAIS", 145),
+            ("PRINCE", 148)
+        ])
+    );
+    assert_eq!(
+        r.ask_in_hall("FILLE_ROI"),
+        answers(&[("FILLE_ROI", 152), ("ROI", 153)])
+    );
+    assert_eq!(
+        r.ask_in_hall("CONSEILLER"),
+        answers(&[("GRAND_PRETRE", 150), ("ROI", 151), ("SUPERNOVA_YU", 149)])
+    );
+    r.go(86, &[]);
     let evs = r.depart(85);
     assert!(dialogs(&evs).contains(&143));
     assert_eq!((r.e.place().1, r.chapter()), (85, 27));
@@ -3636,10 +3756,41 @@ fn the_king(r: &mut Run) {
     r.stow();
 }
 
-/// View 84: the bloody bands given to the priestess (dialog 115, film 42,
-/// dialog 116): her subjects now name Tezcatlipoca.
+/// Back to view 86 with the bloody bands (chapter 27's departure: chapter
+/// 28): the king, his daughter and the counsellor in mourning (sections
+/// 11-13: dialogs 154, 156, 155 whatever the subject); view 85 again
+/// (section 10: chapter 27).
+fn the_halls_mourning(r: &mut Run) {
+    r.walk(86);
+    assert_eq!(r.chapter(), 28);
+    assert_eq!(
+        r.ask_in_hall("ROI"),
+        answers(&[("BANDELETTES_SANG", 154), ("FILLE_ROI", 154), ("ROI", 154)])
+    );
+    assert_eq!(
+        r.ask_in_hall("FILLE_ROI"),
+        answers(&[("GRAND_PRETRE", 156), ("PRETRESSE", 156), ("PRINCE", 156)])
+    );
+    assert_eq!(
+        r.ask_in_hall("CONSEILLER"),
+        answers(&[("GRAND_PRETRE", 155), ("PRETRESSE", 155), ("PRINCE", 155)])
+    );
+    r.go(86, &[]);
+    r.walk(85);
+    assert_eq!(r.chapter(), 27);
+}
+
+/// View 84: the priestess clicked with an empty hand asks for the bands
+/// (chapter 27's section 5: dialog 210); the bloody bands given to her
+/// (dialog 115, film 42, dialog 116): her subjects now name Tezcatlipoca.
 fn the_bloody_bands(r: &mut Run) {
     r.walk(84);
+    r.stow();
+    let priestess = r.who("PRETRESSE");
+    let mut evs = r.click_on(true, priestess);
+    evs.extend(r.settle());
+    assert_eq!(dialogs(&evs), [210]);
+    assert_eq!(r.flag(80), 0);
     let evs = r.give("BANDES_SANG", "PRETRESSE");
     let d = dialogs(&evs);
     assert!(d.contains(&115) && d.contains(&116), "{d:?}");
@@ -3676,6 +3827,32 @@ fn the_way_to_xibalba(r: &mut Run) {
     assert_eq!(r.ask("PRETRESSE", "TEZ"), 122);
     r.ask_events("PRETRESSE", "NON");
     assert_eq!((r.flag(82), r.var("Pretresse_AskOuiNon")), (1, 0));
+    // After a no, Tezcatlipoca is the shorter question (dialog 123), no
+    // again; then everything else she offers (section 7: dialogs
+    // 117-121).
+    assert_eq!(r.ask("PRETRESSE", "TEZ"), 123);
+    assert_eq!(r.var("Pretresse_AskOuiNon"), 1);
+    r.ask_events("PRETRESSE", "NON");
+    assert_eq!(r.var("Pretresse_AskOuiNon"), 0);
+    for (subject, dialog) in [
+        ("PRINCE", 117),
+        ("GRAND_PRETRE", 118),
+        ("ROI", 119),
+        ("FILLE_ROI", 120),
+        ("SUPERNOVA_YU", 121),
+    ] {
+        assert_eq!(r.ask("PRETRESSE", subject), dialog, "{subject}");
+    }
+    // Each answered subject greyed (`DisableSuj`): only Tezcatlipoca left.
+    let s = r.e.script_state().unwrap();
+    let left: Vec<i32> = s
+        .subjects
+        .list(r.who("PRETRESSE"))
+        .iter()
+        .filter(|e| e.enabled())
+        .map(|e| e.value)
+        .collect();
+    assert_eq!(left, [r.subject("TEZ")]);
 }
 
 /// Out of the king's hall (views 83, 80: chapter 26; the link to
@@ -3712,11 +3889,45 @@ fn play_grid(r: &mut Run, values: &[i32]) -> Vec<Event> {
     all
 }
 
+/// The clicks that lay number `n` on an empty counting grid as a Maya
+/// number is written: its base-20 digits from the units up, digit k on
+/// the group of cells 4k + 1..4k + 4 (the units' group is the panel's
+/// lowest, its cell 1 the lowest row), each group from its first cell: a
+/// bar per five (zone 0x12, five marbles in hand, then the cell), then the
+/// dots left (zone 0x11 once a marble, then the cell). Each lay is on an
+/// empty cell, so the hand is empty after it.
+fn maya_clicks(mut n: u32) -> Vec<i32> {
+    let mut clicks = Vec::new();
+    let mut first = 1;
+    while n > 0 {
+        let (digit, mut cell) = (n % 20, first);
+        for _ in 0..digit / 5 {
+            clicks.extend([0x12, cell]);
+            cell += 1;
+        }
+        if digit % 5 > 0 {
+            clicks.extend(std::iter::repeat_n(0x11, (digit % 5) as usize));
+            clicks.push(cell);
+        }
+        n /= 20;
+        first += 4;
+    }
+    clicks
+}
+
+/// The numbers the guards' riddles name: the bat's is 3 (dialog 169: the
+/// jaguar's is the bat's times itself; dialog 170: the jaguar's times
+/// itself is the serpent's), and the third grid the serpent's times
+/// itself. They are the grids' solutions (@ 0x005e187c..: 9, 81, 6561).
+const BAT: u32 = 3;
+const JAGUAR: u32 = BAT * BAT;
+const SERPENT: u32 = JAGUAR * JAGUAR;
+const THIRD_GRID: u32 = SERPENT * SERPENT;
+
 /// The link into the pyramid (chapter 30's departure: chapter 31), views
-/// 51-54: the first guard (dialog 169), the first counting grid in view 55
-/// played (five marbles on the first cell, four on the second), the guard
-/// again: he lets the hero pass after five seconds; view 63 (chapter 32,
-/// whose arrival section turns the view).
+/// 51-54: the first guard (dialog 169, his riddle); view 55, the first
+/// counting grid, seen (`flag94`); back in view 54 the way on to view 63
+/// is barred (chapter 31's section 2: `abortdepart`).
 fn the_first_guard(r: &mut Run) {
     r.walk_link_to(50);
     assert_eq!((r.e.place(), r.chapter()), (("pyratez.wam", 50), 31));
@@ -3729,14 +3940,102 @@ fn the_first_guard(r: &mut Run) {
     r.walk(55);
     assert_eq!(r.flag(94), 1);
     r.shot_as("yucatan-8-grid.png");
-    let evs = play_grid(r, &[18, 1, 17, 17, 17, 17, 2]);
+    r.walk(54);
+    r.walk_redirected(63);
+    assert_eq!((r.e.place().1, r.chapter()), (54, 31));
+}
+
+/// Out of the pyramid (view 50's link to `yucatan.wam` view 41: chapter
+/// 30) to the king's hall (view 39's link to 81: chapter 26; 83: 27; 86:
+/// 28, whose `/INIT` gives the king and the counsellor the Maya numbers'
+/// subject once the grid was seen); the king, his daughter and the
+/// counsellor asked about everything (sections 15-17: dialogs 157-167,
+/// the counsellor's 162 on the numbers); back to the pyramid (chapter 31
+/// again, its `/INIT` resetting the first grid).
+fn the_maya_numbers(r: &mut Run) {
+    r.go(50, &[]);
+    r.walk_link_to(41);
+    assert_eq!((r.e.place(), r.chapter()), (("yucatan.wam", 41), 30));
+    r.go(39, &[]);
+    assert_eq!(r.chapter(), 25);
+    r.walk_link_to(81);
+    assert_eq!(r.chapter(), 26);
+    r.go(83, &[]);
+    assert_eq!(r.chapter(), 27);
+    r.go(86, &[84]);
+    assert_eq!(r.chapter(), 28);
+    assert!(r.offers("CONSEILLER").contains(&r.subject("CHIFFRE_MAYA")));
+    assert_eq!(
+        r.ask_in_hall("ROI"),
+        answers(&[
+            ("CHIFFRE_MAYA", 157),
+            ("MAIS", 157),
+            ("PRETRESSE", 157),
+            ("SUPERNOVA_YU", 157)
+        ])
+    );
+    assert_eq!(
+        r.ask_in_hall("CONSEILLER"),
+        answers(&[
+            ("CHIFFRE_MAYA", 162),
+            ("MAIS", 160),
+            ("PRETRESSE", 159),
+            ("ROI", 161),
+            ("SUPERNOVA_YU", 158)
+        ])
+    );
+    assert_eq!(
+        r.ask_in_hall("FILLE_ROI"),
+        answers(&[
+            ("FILLE_ROI", 166),
+            ("PRETRESSE", 167),
+            ("PRINCE", 164),
+            ("ROI", 165),
+            ("SUPERNOVA_YU", 163)
+        ])
+    );
+    r.go(86, &[]);
+    r.walk(85);
+    assert_eq!(r.chapter(), 27);
+    r.go(80, &[84]);
+    assert_eq!(r.chapter(), 26);
+    r.walk_link_to(39);
+    r.go(34, &[]);
+    assert_eq!(r.chapter(), 30);
+    r.walk_link_to(50);
+    assert_eq!(r.chapter(), 31);
+    r.go(54, &[]);
+}
+
+/// The first grid in view 55 (the jaguar's number, 9: a bar and four dots
+/// in the lowest group), played as a player does: first three dots (the
+/// bat's number) in the lowest row, which wins nothing; then a bar on that
+/// row (the three dots come back in hand), the three laid on the row above,
+/// four dots on it (three come back: the grid won, sound 101), and the
+/// three put back one by one (zone 0x13). The guard again: he lets the hero
+/// pass after five seconds; view 63 (chapter 32, whose arrival section
+/// turns the view).
+fn the_first_grid(r: &mut Run) {
+    let guard = r.who("GARDIEN1");
+    r.walk(55);
+    let evs = play_grid(r, &[0x11, 0x11, 0x11, 1]);
     assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_31a0
     }));
+    assert_eq!(&r.e.grid_digits(0)[..16], b"0000000000000003");
+    assert_eq!(r.var("finmaya1"), 0);
+    play_grid(r, &[0x12, 1]);
+    assert_eq!(r.e.grids.hand, 3);
+    play_grid(r, &[2]);
+    assert_eq!(r.e.grids.hand, 0);
+    let evs = play_grid(r, &[0x11, 0x11, 0x11, 0x11, 2]);
     assert!(evs.contains(&Event::Sound("sound101.apc".into())));
     assert_eq!(&r.e.grid_digits(0)[..16], b"0000000000000045");
     assert_eq!(r.var("finmaya1"), 1);
+    assert_eq!(r.e.grids.hand, 3);
     r.shot_as("yucatan-8b-grid-won.png");
+    play_grid(r, &[0x13, 0x13, 0x13]);
+    assert_eq!(r.e.grids.hand, 0);
     let evs = r.walk(54);
     assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_2d60
@@ -3758,14 +4057,26 @@ fn the_first_guard(r: &mut Run) {
     assert!(pitch.abs() < 1e-6);
 }
 
-/// The second grid (view 64: one marble on the first cell, four on the
-/// fifth), the second guard (view 58), view 67 (chapter 33).
+/// The second guard (view 58, by 62, 60, 61): his riddle (dialog 170),
+/// the way on to view 67 barred (chapter 32's section 3); the second grid
+/// (view 64) laid with the serpent's number, 81 (a dot in the lowest
+/// group, four in the one above); the guard again, view 67 (chapter 33).
 fn the_second_guard(r: &mut Run) {
-    r.walk(64);
-    play_grid(r, &[17, 1, 17, 17, 17, 17, 5]);
+    r.go(58, &[54, 64]);
+    let guard = r.who("GARDIEN2");
+    let mut evs = r.click_on(true, guard);
+    evs.extend(r.settle());
+    assert_eq!(dialogs(&evs), [170]);
+    r.walk_redirected(67);
+    assert_eq!((r.e.place().1, r.chapter()), (58, 32));
+    r.go(64, &[54, 63]);
+    let clicks = maya_clicks(SERPENT);
+    assert_eq!(clicks, [0x11, 1, 0x11, 0x11, 0x11, 0x11, 5]);
+    let evs = play_grid(r, &clicks);
+    assert!(evs.contains(&Event::Sound("sound101.apc".into())));
+    assert_eq!(&r.e.grid_digits(1)[..16], b"0000000000040001");
     assert_eq!(r.var("finmaya2"), 1);
     r.go(58, &[54, 63]);
-    let guard = r.who("GARDIEN2");
     r.click_on(true, guard);
     assert_eq!(r.var("gardien2Gentil"), 1);
     r.wait(6 * 60);
@@ -3774,39 +4085,66 @@ fn the_second_guard(r: &mut Run) {
     assert_eq!(r.chapter(), 33);
 }
 
-/// View 68: the button opens the entrance door (`ClicObjet=BOUTON_S`,
-/// sound 112), view 69 (chapter 34).
+/// View 68: the closed entrance door bars the way to view 69 (chapter 33's
+/// section 2); its button opens it (`ClicObjet=BOUTON_S`, sound 112), the
+/// other button shown closes it (`BOUTON_R`, sound 113), the first opens
+/// it again; view 69 (chapter 34).
 fn the_entrance_door(r: &mut Run) {
     r.walk(68);
-    let button = r.obj("BOUTON_S");
-    let mut evs = r.click_on(false, button);
-    evs.extend(r.settle());
-    assert!(sounds(&evs).contains(&"sound112.apc".to_string()));
-    assert_eq!(r.flag(101), 1);
+    r.walk_redirected(69);
+    assert_eq!((r.e.place().1, r.chapter()), (68, 33));
+    for (button, sound, open) in [
+        ("BOUTON_S", "sound112.apc", 1),
+        ("BOUTON_R", "sound113.apc", 0),
+        ("BOUTON_S", "sound112.apc", 1),
+    ] {
+        let id = r.obj(button);
+        let mut evs = r.click_on(false, id);
+        evs.extend(r.settle());
+        assert!(sounds(&evs).contains(&sound.to_string()), "{button}");
+        assert_eq!(r.flag(101), open, "{button}");
+    }
     r.walk(69);
     assert_eq!(r.chapter(), 34);
 }
 
-/// The third grid (view 75: the number 1, 8, 16 in three rows): its win
-/// opens the crocodile's jaw in the same frame (chapter 34), whose foot
-/// is taken.
+/// The third grid (view 75, by 72 and 78) laid with the serpent's number
+/// times itself, 6561 (one dot; a bar and three dots; three bars and a
+/// dot, in the three lowest groups): its last click wins and opens the
+/// crocodile's jaw in the same frame (chapter 34's section 2, sound 112,
+/// the entrance door open too), whose foot is taken; that closes the
+/// entrance door (sound 113): from view 69 the way out to 68 is barred
+/// (chapter 34's section 1).
 fn the_crocodiles_foot(r: &mut Run) {
     r.go(75, &[]);
-    let evs = play_grid(r, &[17, 1, 18, 5, 17, 17, 17, 6, 18, 9, 18, 10, 18, 11]);
+    let clicks = maya_clicks(THIRD_GRID);
+    assert_eq!(
+        clicks,
+        [17, 1, 18, 5, 17, 17, 17, 6, 18, 9, 18, 10, 18, 11, 17, 12]
+    );
+    let (last, before) = clicks.split_last().unwrap();
+    let evs = play_grid(r, before);
     assert_eq!(r.var("croco_ouvert"), 0);
     assert!(evs
         .iter()
         .all(|x| !matches!(x, Event::Sound(s) if s == "sound112.apc")));
-    let evs = play_grid(r, &[17, 12]);
+    let evs = play_grid(r, &[*last]);
+    assert_eq!(&r.e.grid_digits(2)[..16], b"0000155500350001");
     assert_eq!(r.var("finmaya3"), 1);
     assert_eq!(r.var("croco_ouvert"), 1);
     assert!(evs.contains(&Event::Sound("sound112.apc".into())));
+    assert_eq!(r.flag(101), 1);
     let z = r.zone_named("GUEULE_CROCO");
-    r.use_on(None, z);
+    let evs = r.use_on(None, z);
+    assert!(sounds(&evs).contains(&"sound113.apc".to_string()));
     assert_eq!(r.var("pied_pris"), 1);
+    assert_eq!(r.flag(101), 0);
     assert!(r.in_bag("PIED2_CROCO"));
     r.stow();
     r.shot_as("yucatan-9-crocodile.png");
+    r.go(69, &[]);
+    r.walk_redirected(68);
+    assert_eq!((r.e.place().1, r.chapter()), (69, 34));
 }
 
 /// View 71: the foot and the obsidian laid in the two mirror holes; the
@@ -3863,17 +4201,31 @@ fn yucatan_lines_as_the_original(evs: &[Event]) {
     assert!(n > 10, "{n}");
 }
 
+/// The dialogs of chapters 25-34 a game without Xibalba can play: all
+/// but 124-137 and 168, which need the priestess's yes (`flag81`, set by
+/// Xibalba's chapter 35) or the chulel brought back from Xibalba (144 is
+/// none: no script names it and `DialYU.txt` has no line of it).
+fn yucatan_dialogs_without_xibalba() -> Vec<u32> {
+    let mut v: Vec<u32> = (101..=123).chain(138..=143).chain(145..=167).collect();
+    v.extend([169, 170, 210]);
+    v
+}
+
 /// A game from the start-up intro through Yucatán and back, with the
-/// mouse only, Xibalba aside: [`to_yucatan`], then Yucatán's story as its
-/// chapters 25-34 make it ([`YUCATAN`]: the prince and the high priest,
-/// the priestess, the king and the bands, the priestess's question and
-/// the way into Xibalba refused, the obsidian, the pyramid's guards and
-/// counting grids (played with the mouse), the entrance door, the
-/// crocodile's foot, the mirrors and the secret door), a save and a load
-/// through the menus, and the way back to Tibet by the brazier. Every
-/// chapter it goes through is left by one of its own `chapter=` lines, no
-/// puzzle hook is left unported, and every Yucatán `/set` line reported
-/// is one the original runs.
+/// mouse only, as far as it goes without Xibalba: [`to_yucatan`], then
+/// Yucatán's story as its chapters 25-34 make it ([`YUCATAN`]: the prince
+/// and the high priest, the priestess, the king's hall and the bands, the
+/// priestess's question and the way into Xibalba refused, the obsidian,
+/// the pyramid's guards and their riddles, the king's hall again for the
+/// Maya numbers, the counting grids played as a player does (a wrong try
+/// on the first; the others laid from the riddles' numbers), the entrance
+/// door and its buttons, the crocodile's foot, the mirrors and the secret
+/// door), a save and a load through the menus, and the way back to Tibet
+/// by the brazier. Every character is asked about everything he offers
+/// at each step, so every dialog of chapters 25-34 that does not need
+/// Xibalba is played; every chapter it goes through is left by one of its
+/// own `chapter=` lines, no puzzle hook is left unported, and every
+/// Yucatán `/set` line reported is one the original runs.
 #[test]
 fn yucatan_with_the_mouse() {
     if game().is_none() {
@@ -3897,6 +4249,11 @@ fn yucatan_with_the_mouse() {
     assert_eq!(r.e.files().current_disc(), 1);
     assert!(!r.in_bag("MANDALA_YUCATAN"));
     let journal = std::mem::take(&mut r.journal);
+    let mut played = dialogs(&journal);
+    played.retain(|d| (101..=210).contains(d));
+    played.sort_unstable();
+    played.dedup();
+    assert_eq!(played, yucatan_dialogs_without_xibalba());
     yucatan_lines_as_the_original(&journal);
     chapters_ended(&r.e, &journal, &YUCATAN_CHAPTERS);
     assert!(!journal
