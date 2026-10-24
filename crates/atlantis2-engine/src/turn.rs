@@ -7,8 +7,10 @@
 //! operations and float stores of the original, under the control word the
 //! game runs with ([`Fpu`]). The zoom of `ZoomStart` rides on the same
 //! step ([`Zoom`], @ 0x0045babe..0x0045bb40): the field of view narrows
-//! by its step every frame and the move waits for it. The roll of
-//! `ZoomPsychoStart` (Shamballa only) is not ported.
+//! by its step every frame and the move waits for it; `ZoomPsychoStart`
+//! (Shamballa's ring, `annulair.wam`) adds a roll of the camera about its
+//! own Z axis (@ 0x0045bb45..0x0045bbae), during which the turn's yaw and
+//! pitch are not applied.
 
 use crate::camera::Camera;
 use crate::fpu::Fpu;
@@ -43,14 +45,22 @@ fn below_zero(x: f64) -> bool {
     x < 0.0 || x.is_nan()
 }
 
+/// The roll step a frame of `ZoomPsychoStart`, −0.16 rad (the float
+/// 0xbe23d70a stored @ 0x0045b3f2).
+pub const ROLL_STEP: f32 = f32::from_bits(0xbe23_d70a);
+
 /// The zoom of a move (`ZoomStart`): the field of view in degrees
 /// (@ 0x005db850), its target (@ 0x005db854) and the step a frame
-/// (@ 0x005db858), 76, 76 and 1 at start-up.
+/// (@ 0x005db858), 76, 76 and 1 at start-up; with `ZoomPsychoStart` the
+/// roll summed so far (@ 0x006617b4) and its step a frame (@ 0x006617b8),
+/// 0 and 0 when no roll runs.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Zoom {
     pub current: f32,
     pub target: f32,
     pub step: f32,
+    pub roll: f32,
+    pub roll_step: f32,
 }
 
 impl Default for Zoom {
@@ -59,6 +69,8 @@ impl Default for Zoom {
             current: ZOOM_FOV,
             target: ZOOM_FOV,
             step: 1.0,
+            roll: 0.0,
+            roll_step: 0.0,
         }
     }
 }
@@ -72,6 +84,18 @@ impl Zoom {
         if self.target == self.current {
             self.current = ZOOM_FOV;
             self.target = fov;
+        }
+    }
+
+    /// FUN_0045b3b0(value, fov) (`ZoomPsychoStart=a,b`): only when no roll
+    /// runs (the sum and the step both 0): the zoom of [`Zoom::start`],
+    /// then the sum 0 and the step −0.16 rad a frame; else nothing (a
+    /// second call during a roll is ignored, the zoom's step too).
+    pub fn psycho_start(&mut self, fpu: Fpu, value: f32, fov: f32) {
+        if self.roll == 0.0 && self.roll_step == 0.0 {
+            self.start(fpu, value, fov);
+            self.roll = 0.0;
+            self.roll_step = ROLL_STEP;
         }
     }
 
@@ -156,8 +180,12 @@ impl Turn {
     }
 
     /// FUN_0045b910: one step; turns the camera (yaw about the world's Y
-    /// axis, pitch about its own X axis, as the mouse does), then runs the
-    /// zoom ([`Turn::zoom_step`]); whether the turn goes on.
+    /// axis, pitch about its own X axis, as the mouse does) unless a roll
+    /// runs (@ 0x0045ba0a..0x0045ba1b: the roll's step compared with 0.0),
+    /// then runs the zoom
+    /// ([`Turn::zoom_step`]), then the roll (@ 0x0045bb45: the camera
+    /// turned about its own Z axis by the step, the step added to the
+    /// sum); whether the turn goes on.
     pub fn step(&mut self, cam: &mut Camera, zoom: &mut Zoom, screen: (u32, u32)) -> Step {
         let fpu: Fpu = cam.fpu;
         let prev = self.done;
@@ -188,9 +216,15 @@ impl Turn {
         let f = fpu.div(fpu.sub(d(self.done), d(prev)), d(self.dist));
         let yaw = fpu.f32(fpu.mul(f, d(self.d_yaw)));
         let pitch = fpu.f32(fpu.mul(f, d(self.d_pitch)));
-        cam.yaw(-yaw);
-        cam.pitch(-pitch);
+        if zoom.roll_step == 0.0 {
+            cam.yaw(-yaw);
+            cam.pitch(-pitch);
+        }
         let skip_draw = self.zoom_step(cam, zoom, screen);
+        if zoom.roll_step != 0.0 {
+            cam.roll(zoom.roll_step);
+            zoom.roll = fpu.f32(fpu.add(d(zoom.roll), d(zoom.roll_step)));
+        }
         Step {
             going: !(self.done == self.dist && zoom.target == zoom.current),
             skip_draw,
@@ -201,8 +235,9 @@ impl Turn {
     /// target is below the field of view: the field of view less the step,
     /// when still above the target, is stored (a float); else it stays
     /// and, once the turn is at its end, FUN_0045b390 (both back to 76°),
-    /// FUN_0045b400 (the roll undone: none here) and FUN_0045b680 (the
-    /// next warp frame skips its draw once) run. Then the camera's field
+    /// FUN_0045b400 (the roll undone: the camera turned about its Z axis
+    /// by minus the sum, then the sum and the step 0) and FUN_0045b680
+    /// (the next warp frame skips its draw once) run. Then the camera's field
     /// of view (FUN_004a4950). True when the draw is to be skipped.
     fn zoom_step(&self, cam: &mut Camera, zoom: &mut Zoom, (w, h): (u32, u32)) -> bool {
         if d(zoom.current) <= d(zoom.target) {
@@ -214,11 +249,11 @@ impl Turn {
         if x > d(zoom.target) {
             zoom.current = fpu.f32(x);
         } else if self.done == self.dist {
-            *zoom = Zoom {
-                current: ZOOM_FOV,
-                target: ZOOM_FOV,
-                step: zoom.step,
-            };
+            zoom.current = ZOOM_FOV;
+            zoom.target = ZOOM_FOV;
+            cam.roll(-zoom.roll);
+            zoom.roll = 0.0;
+            zoom.roll_step = 0.0;
             skip = true;
         }
         cam.set_fov(zoom.radians(fpu), w, h);

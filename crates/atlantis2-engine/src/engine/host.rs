@@ -476,9 +476,9 @@ impl Host for Engine {
     }
 
     fn zoom_psycho_start(&mut self, a: f32, b: f32) {
-        // FUN_0045b3b0 (Shamballa's `voiles.wam`): the zoom with a roll of
-        // the camera, which the port's turn does not have yet.
-        log::info!("ZoomPsychoStart({a}, {b}): the roll is not ported");
+        // FUN_0045b3b0 (chapter 81's moves in `annulair.wam`): the zoom of
+        // the next move with a roll of the camera, when no roll runs.
+        self.zoom.psycho_start(self.camera.fpu, a, b);
     }
 
     fn enable_zone(&mut self, view: i32, zone: i32, on: bool) {

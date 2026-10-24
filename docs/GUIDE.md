@@ -169,7 +169,10 @@ as the original's F5 / F6 and F7 / F8 do.
 ## Atlantis II
 
 Atlantis II is in progress (Tibet, Ireland, China, and Yucatán with
-Xibalba play to their end; Shamballa is not there yet;
+Xibalba play to their end, and so does the end of the game: the space
+travel, Shamballa and Atlantis, the credits; but two of its puzzles are
+not there yet, Shamballa's fireflies and the octopus fight of Atlantis,
+which stop the game there;
 see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)). For now only the
 command line opens it: give the folder of the installed game (the one
 holding `atlantis2.exe`, `wam`, `scenar`...), and the folder of the CD

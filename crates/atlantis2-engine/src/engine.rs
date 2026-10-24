@@ -65,6 +65,11 @@ pub use puzzles::{
     irish_entry_hook, mandala_hook_applies, ported_place, MANDALAS, SKULL_OBJECTS, SKULL_START,
 };
 mod saves;
+mod shamballa;
+pub use shamballa::{
+    atlantis_entry_hooks, shamballa_click_hooks, FIREFLIES_CLICK, FIREFLIES_MOVE_END,
+    OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
+};
 mod subjects;
 mod turtle;
 pub use turtle::RING_MODE;
@@ -156,9 +161,14 @@ pub enum Event {
     /// `CLICZONE` as it leaves it (the click scan may not follow: a film a
     /// hook's scan started drops the click).
     ZoneClick { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (Xibalba's puzzles): the
-    /// original's function, which would have run here.
+    /// A puzzle hook the port does not have (Shamballa's fireflies, the
+    /// octopus of Atlantis): the original's function, which would have
+    /// run here.
     PuzzleNotPorted { function: u32 },
+    /// A testing aid wrote what a puzzle the port does not have would
+    /// (`Engine::win_fireflies`, `Engine::end_octopus_fight`): the
+    /// original's function whose writes it copies.
+    PuzzleAid { function: u32 },
     /// A puzzle function the port has, run: the original's function (a
     /// hook, or the wheels' check FUN_0048d310).
     PuzzleRan { function: u32 },
@@ -2290,9 +2300,10 @@ impl Engine {
             }
         }
         let Some(next) = self.next_view.take() else {
-            // FUN_0045a630: only `voiles.wam` (Shamballa's fireflies, not
-            // ported) does something there.
+            // FUN_0045a630: only `voiles.wam` (Shamballa's fireflies) does
+            // something there.
             log::debug!("move without a next view");
+            self.move_end_without_view();
             return;
         };
         let old = if old_record {
