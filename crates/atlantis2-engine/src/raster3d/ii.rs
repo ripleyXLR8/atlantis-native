@@ -7,6 +7,13 @@
 //! of a 32-pixel block from the shifted end points, the last block's steps
 //! from a float difference.
 //!
+//! Its `Opacity` twin, `Zi32Texture16FastPerspectiveOpacity1516II` (record
+//! @ 0x005e6600: the same set-up and scan, span @ 0x004fee40), draws
+//! nothing, neither colour nor Z, where the texel equals the key colour
+//! (@ 0x006e141c), and keeps the Z of the next pixel one step behind when
+//! the first pixel of a pair fails the Z test and the second is drawn
+//! ([`Scan::span`]).
+//!
 //! The set-up loads the x87 control word 0x0e7f (@ 0x0051ca01: 53-bit
 //! precision, rounding toward zero) at each polygon and never restores it,
 //! so every operation here is [`Fpu::Chop`], whatever the caller ran under.
@@ -93,6 +100,12 @@ fn below(a: f64, b: f64) -> bool {
 /// does: each vertex record gets +0.5 on x and y, its integer row
 /// (`fistp` toward zero) and u, v scaled and multiplied by w, once.
 pub fn draw_polygon(poly: &mut [Vertex], tex: &Texture, out: &mut Target) {
+    draw_polygon_keyed(poly, tex, None, out);
+}
+
+/// [`draw_polygon`] with the `Opacity` routine (@ 0x005e6600) when `key`
+/// is given: texels of that value are not drawn.
+pub fn draw_polygon_keyed(poly: &mut [Vertex], tex: &Texture, key: Option<u16>, out: &mut Target) {
     if poly.len() < 3 {
         return;
     }
@@ -112,18 +125,27 @@ pub fn draw_polygon(poly: &mut [Vertex], tex: &Texture, out: &mut Target) {
             [&poly[0], &poly[k - 1], &poly[k]],
             [rows[0], rows[k - 1], rows[k]],
             tex,
+            key,
             out,
         );
     }
 }
 
 /// The case tree @ 0x0051cadf on the integer rows of v0, v1, v2.
-fn triangle(b: &Binding, v: [&Vertex; 3], i: [i32; 3], tex: &Texture, out: &mut Target) {
+fn triangle(
+    b: &Binding,
+    v: [&Vertex; 3],
+    i: [i32; 3],
+    tex: &Texture,
+    key: Option<u16>,
+    out: &mut Target,
+) {
     let [v0, v1, v2] = v;
     let [i0, i1, i2] = i;
     let mut e = Scan {
         b,
         tex,
+        key,
         edges: [Edge::default(); 3],
     };
     if i0 < i1 {
@@ -195,6 +217,8 @@ fn triangle(b: &Binding, v: [&Vertex; 3], i: [i32; 3], tex: &Texture, out: &mut 
 struct Scan<'a> {
     b: &'a Binding,
     tex: &'a Texture<'a>,
+    /// The `Opacity` routine's key colour, `None` for the plain one.
+    key: Option<u16>,
     edges: [Edge; 3],
 }
 
@@ -451,13 +475,14 @@ impl Scan<'_> {
         let mut x = xl as usize;
         let b = self.b;
         let tex = self.tex;
-        let mut plot = |x: usize, z: u32, uu: u32, vv: u32| {
-            if z >= out.zbuf[row + x] {
-                out.zbuf[row + x] = z;
-                let i = ((uu & b.mask_u) | (vv & b.mask_v)) >> b.shift;
-                out.pixels[row + x] = tex.pixels[i as usize];
-            }
+        let texel = |uu: u32, vv: u32| {
+            let i = ((uu & b.mask_u) | (vv & b.mask_v)) >> b.shift;
+            tex.pixels[i as usize]
         };
+        // The texel coordinates of every pixel, block by block (two MMX
+        // lanes stepping the same way: the pairs only matter to the
+        // `Opacity` span's Z, below).
+        let mut coords = Vec::with_capacity(n as usize);
         for k in 0..blocks {
             let (u0, v0) = table[k];
             let (u1, v1) = table[k + 1];
@@ -466,9 +491,7 @@ impl Scan<'_> {
             let dv = ((v1 as u32 >> 5).wrapping_sub(v0 as u32 >> 5)) << 6;
             let (mut uu, mut vv) = ((u0 as u32) << 6, (v0 as u32) << 6);
             for _ in 0..32 {
-                plot(x, z, uu, vv);
-                x += 1;
-                z = z.wrapping_add(dz);
+                coords.push((uu, vv));
                 uu = uu.wrapping_add(du);
                 vv = vv.wrapping_add(dv);
             }
@@ -477,11 +500,71 @@ impl Scan<'_> {
         let (mut uu, mut vv) = ((u0 as u32) << 6, (v0 as u32) << 6);
         let (du, dv) = ((du_last as u32) << 6, (dv_last as u32) << 6);
         for _ in 0..rem {
-            plot(x, z, uu, vv);
-            x += 1;
-            z = z.wrapping_add(dz);
+            coords.push((uu, vv));
             uu = uu.wrapping_add(du);
             vv = vv.wrapping_add(dv);
+        }
+        match self.key {
+            None => {
+                for &(uu, vv) in &coords {
+                    if z >= out.zbuf[row + x] {
+                        out.zbuf[row + x] = z;
+                        out.pixels[row + x] = texel(uu, vv);
+                    }
+                    x += 1;
+                    z = z.wrapping_add(dz);
+                }
+            }
+            Some(key) => {
+                // @ 0x004fee40: pixel pairs from the span's first pixel in
+                // each 32-pixel block (16 pairs) and in the last block
+                // (rem / 2 pairs, then the odd pixel). A drawn pixel
+                // whose texel is the key writes neither colour nor Z.
+                // When the pair's first pixel fails the Z test and the
+                // second passes, the step after the second is added to
+                // another register (`add ebx, eax` @ 0x004ff185,
+                // 0x004ff2e5) and Z stays one step behind for the rest of
+                // the span.
+                let plot = |out: &mut Target, x: usize, z: u32, (uu, vv): (u32, u32)| {
+                    let c = texel(uu, vv);
+                    if c != key {
+                        out.zbuf[row + x] = z;
+                        out.pixels[row + x] = c;
+                    }
+                };
+                let pairs_of = |len: usize| (len / 2, len % 2 == 1);
+                let mut i = 0usize;
+                let mut runs = vec![32usize; blocks];
+                runs.push(rem as usize);
+                for len in runs {
+                    let (pairs, odd) = pairs_of(len);
+                    for _ in 0..pairs {
+                        let a = z >= out.zbuf[row + x];
+                        if a {
+                            plot(out, x, z, coords[i]);
+                        }
+                        z = z.wrapping_add(dz);
+                        if z >= out.zbuf[row + x + 1] {
+                            plot(out, x + 1, z, coords[i + 1]);
+                            if a {
+                                z = z.wrapping_add(dz);
+                            }
+                        } else {
+                            z = z.wrapping_add(dz);
+                        }
+                        x += 2;
+                        i += 2;
+                    }
+                    if odd {
+                        // The last pixel of the span (@ 0x004ff2f9).
+                        if z >= out.zbuf[row + x] {
+                            plot(out, x, z, coords[i]);
+                        }
+                        x += 1;
+                        i += 1;
+                    }
+                }
+            }
         }
     }
 }

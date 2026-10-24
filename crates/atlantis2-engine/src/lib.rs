@@ -21,6 +21,7 @@
 #![forbid(unsafe_code)]
 
 pub mod anim;
+pub mod atl3d;
 pub mod bag;
 pub mod blackbird;
 pub mod camera;

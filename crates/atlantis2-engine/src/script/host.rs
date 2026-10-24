@@ -30,6 +30,8 @@
 //! request) are the host's to report: [`super::Script::video_ended`],
 //! [`super::Script::dialog_ended`], [`super::Script::disc_inserted`].
 
+use super::Script;
+
 /// What the animation keys ask of the place's animation records
 /// (@ 0x0067bfb0, 200 bytes each: the SPW slots of the view). `kind` is 1
 /// for a character (`#PERSONNAGES#`), 2 for an object (`#OBJETS#`), 0 when
@@ -108,6 +110,15 @@ pub trait Host {
     fn enter_view_with_vars(&mut self, view: i32, yaw: f32, pitch: f32, vars: &mut [i32]) {
         let _ = vars;
         self.enter_view(view, yaw, pitch);
+    }
+
+    /// The same with the interpreter itself at hand, for the hooks that
+    /// run commands (`RunOneCommand`, which the original's interpreter
+    /// runs re-entrantly in the middle of the `VUE` line, as the spider
+    /// web's exit does). By default [`Host::enter_view_with_vars`] with
+    /// its variables.
+    fn enter_view_with_script(&mut self, view: i32, yaw: f32, pitch: f32, script: &mut Script) {
+        self.enter_view_with_vars(view, yaw, pitch, &mut script.vars);
     }
 
     /// `anglewarpxnow` / `anglewarpynow` (@ 0x0045ad40 / 0x0045ada0):

@@ -433,6 +433,23 @@ impl Host for Engine {
         }
     }
 
+    fn enter_view_with_script(&mut self, view: i32, yaw: f32, pitch: f32, script: &mut Script) {
+        // The interpreter is out of the engine while it runs this line: a
+        // copy of it is put back for the entry, so that the puzzles' set-up
+        // reads and writes its variables and runs its commands as the
+        // original's does; the copy, as the entry leaves it, is the
+        // interpreter after.
+        if self.con.is_some() {
+            self.enter_view_with_vars(view, yaw, pitch, &mut script.vars);
+            return;
+        }
+        self.con = Some(Box::new(script.clone()));
+        Host::enter_view(self, view, yaw, pitch);
+        if let Some(s) = self.con.take() {
+            *script = *s;
+        }
+    }
+
     fn enter_view(&mut self, view: i32, yaw: f32, pitch: f32) {
         self.vars.last_vue = self.view;
         if let Err(e) = Engine::enter_view(self, view as u32, yaw, pitch) {

@@ -484,6 +484,7 @@ impl Engine {
                     self.event(Event::PuzzleRan { function });
                     self.turtle_tick(self.view);
                 }
+                super::web::WEB_MODE => self.web_tick(),
                 SOULS_MODE => self.souls_tick(self.view),
                 DRAGON_MODE => self.dragon_tick(),
                 MARBLES_MODE => {

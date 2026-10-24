@@ -67,6 +67,7 @@ mod subjects;
 mod turtle;
 pub use turtle::RING_MODE;
 mod ui;
+pub mod web;
 mod wheels;
 pub use wheels::{DISC_WHEEL, WHEELS_FIRST, WHEELS_SECOND, WHEEL_DISC};
 mod xibalba;
@@ -156,9 +157,8 @@ pub enum Event {
     /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
     /// A testing aid wrote what a puzzle the port does not have writes
-    /// (Xibalba's, [`Engine::win_star_map`], [`Engine::win_canoe`],
-    /// [`Engine::win_web_round`]): the original's function whose writes
-    /// follow.
+    /// (Xibalba's, [`Engine::win_star_map`], [`Engine::win_canoe`]): the
+    /// original's function whose writes follow.
     PuzzleAid { function: u32 },
     /// A puzzle function the port has, run: the original's function (a
     /// hook, or the wheels' check FUN_0048d310).
@@ -548,6 +548,12 @@ pub struct Engine {
     /// The Maya counting grids' state besides the save's entries 20-25
     /// (`engine/grids.rs`): the marbles in hand, their bank, the sounds.
     pub grids: Grids,
+    /// The spider's web of Xibalba (`engine/web.rs`): the module's
+    /// words, never saved; its models as loaded (the original reads the
+    /// files again at each load) and its Z buffer.
+    pub web: web::Web,
+    web_models: std::collections::HashMap<web::Slot, std::sync::Arc<crate::atl3d::Model>>,
+    web_z: Vec<u32>,
     /// Where the port may differ from the original (default: the minor
     /// bug fixes on).
     pub enhancements: Enhancements,
@@ -912,6 +918,9 @@ impl Engine {
             ogham_sprite: 0,
             dragon: Dragon::default(),
             grids: Grids::default(),
+            web: web::Web::default(),
+            web_models: std::collections::HashMap::new(),
+            web_z: Vec::new(),
             enhancements: Enhancements::default(),
             voices: Voices::new(),
             rand: Rand::new(0),
@@ -1610,11 +1619,18 @@ impl Engine {
             self.renderer.render(&self.work, &m, p, out);
             self.camera.fpu = self.renderer.fpu;
             self.hd_scene(out, &m, p);
+            // FUN_0045a930's end in the puzzle mode 1: the web's draw
+            // (FUN_00491b30), under the cursor and the marker.
+            self.web_draw(Some(out));
             self.draw_centre(out, w, h);
-        } else if self.renderer.variant == Variant::PII {
-            // warpPII leaves 0x0e7f whether or not the pixels are wanted.
-            self.camera.fpu = Fpu::Chop;
-            self.renderer.fpu = Fpu::Chop;
+        } else {
+            if self.renderer.variant == Variant::PII {
+                // warpPII leaves 0x0e7f whether or not the pixels are
+                // wanted.
+                self.camera.fpu = Fpu::Chop;
+                self.renderer.fpu = Fpu::Chop;
+            }
+            self.web_draw(None);
         }
         restore(&mut self.work, &self.faces, &dirty);
         self.anim_tick();
@@ -1901,6 +1917,12 @@ impl Engine {
         // Not while the subject menu or the bag bar is open or a dialog
         // runs (@ 0x006617b0, 0x00671ef0, 0x006cfb54).
         if !self.click || self.subject_menu.open || self.bar.open || self.dialog.is_some() {
+            return None;
+        }
+        // The web's click on a spider (@ 0x0049caf2, FUN_00491290), with or
+        // without a zone under the centre: when it takes the click, the
+        // zone's is not run.
+        if self.web_zone_click() {
             return None;
         }
         let (zi, zone) = self.centre().map(|(i, z)| (i, z.clone()))?;

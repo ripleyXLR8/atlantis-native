@@ -611,3 +611,58 @@ fn the_view_is_drawn_through_its_rays() {
         }
     }
 }
+
+/// The web's creatures with the HD mode on: drawn into the 640x480 frame
+/// as with it off, and again over the HD view by the same pipeline; at
+/// tile 16 the HD view's creature pixels are the frame's; at tile 40 with
+/// sides, the frames those of the HD mode off.
+#[test]
+fn hd_draws_the_web_s_creatures() {
+    if game().is_none() {
+        return;
+    }
+    let web = [&b"(monde=6)"[..], b"(changewam=toile.wam)", b"(vue=198)"];
+    for (tile, side) in [(16, 0), (40, 4)] {
+        let mut on = at(game().unwrap(), &web, true);
+        let mut off = at(game().unwrap(), &web, false);
+        on.set_hd_output(Some(tile), side);
+        let (mut a, mut b) = (vec![0u16; 640 * 480], vec![0u16; 640 * 480]);
+        for e in [&mut on, &mut off] {
+            // Onto the web: the caterpillar's round, the spider in sight
+            // off the screen's centre (its cursor and marker).
+            e.enter_at(199, 0.0, 0.0).unwrap();
+            e.enter_at(213, 0.0, 0.0).unwrap();
+            assert!(e.web.loaded);
+            let fpu = e.camera.fpu;
+            let p = e.web.creature_pos(fpu, 213, 0);
+            let d = [p[0] as f32, (p[1] - 20.0) as f32, p[2] as f32];
+            let (yaw, pitch) = atlantis2_engine::camera::direction_angles(fpu, d);
+            e.camera.enter(yaw + 0.15, pitch);
+        }
+        let mut seen = 0;
+        for i in 0..30 {
+            for e in [&mut off, &mut on] {
+                e.set_clock(i as f64 / 60.0);
+            }
+            off.pass(Some(&mut a));
+            on.pass(Some(&mut b));
+            assert!(a == b, "tile {tile}: frame {i} differs with the HD mode");
+            let l = on.hd_layer().expect("a layer");
+            let lut = atlantis2_engine::hd::rgb565_to_888();
+            // The creatures: where the frame is not the cube (the
+            // centre's cursor and marker aside).
+            for k in 0..640 * 480 {
+                let (x, y) = (k % 640, k / 640);
+                if b[k] == l.base[k] || ((x as i32 - 320).abs() < 40 && (y as i32 - 240).abs() < 40)
+                {
+                    continue;
+                }
+                seen += 1;
+                if tile == 16 {
+                    assert_eq!(l.pixels[k], lut[usize::from(b[k])], "frame {i} ({x}, {y})");
+                }
+            }
+        }
+        assert!(seen > 1000, "tile {tile}: {seen} creature pixels");
+    }
+}
