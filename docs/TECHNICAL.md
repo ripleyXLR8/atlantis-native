@@ -1507,7 +1507,17 @@ back) into `yucatan-*.png`.
   then the quit (the cursor pair cleared) and the loop type kept. The
   river (`recalc_trajet` FUN_004988a0) chains the tiles' segments from
   `X9E1` by the nearest free end, a join of 20 units or more breaking
-  it. The loop has no clock: one step a frame (the original's frames are
+  it. Its errors (a segment starting on neither end, no direction, no
+  free end left, the first waypoint moved) and a stone's waypoint not
+  found are the original's fatal error (FUN_00480cd0: an emergency save,
+  then the game quits): here the rebuild stops, the puzzle quits and the
+  scripts stop with the original's message, as for their own fatal
+  errors; the game's data never reach them. Two deviations there, on
+  data the game never has: the original's copy of a segment has no bound
+  (a segment without its end goes on past the table), the port stops
+  with a fatal message of its own; the table the original logs twice
+  before the "no free end" error (FUN_00498b40) is not logged. The loop
+  has no clock: one step a frame (the original's frames are
   unpaced; here one a pass of the 60 Hz loop). The 3D is the original's
   Atl3D path for these databases (`atl3d.rs`): the node tree with its
   matrix round trips, the database slots and their track keys (the
@@ -1522,10 +1532,15 @@ back) into `yucatan-*.png`.
   control word as the frame leaves it. `tests/canoe.rs` replays the
   original's emulated frames (`tests/golden/canoe_0e7f.txt`, the Pentium
   II's routines under 0x0e7f, and `canoe_027f.txt`, the C ones under
-  0x027f): the loading's values, then for each of 1797 frames the state,
+  0x027f): the loading's values (the init's command, cursor and control
+  word, the camera's fields the port keeps; the waypoints by the MD5 of
+  their table, the stones' and the slots' nodes by an MD5 each, so that
+  the files hold no game data), then for each of 1797 frames the state,
   the script events, the picture's, the Z buffer's and the held tile's Z
   buffer's MD5 (and whole rows with pixel samples for chosen frames), a
-  run quit by Escape; all bit for bit. At 800 x 600 the canoe draws on the
+  run quit by Escape, the win's frame count and variables and the cursor
+  after the quit; all bit for bit; and the fatal errors on changed
+  waypoints. At 800 x 600 the canoe draws on the
   640 x 480 surface, enlarged; with the HD mode on its frames are the
   original's and no HD layer is made (the front end enlarges the frame).
   Not known: whether the original's `spr_p6.dll`, which a Pentium Pro /

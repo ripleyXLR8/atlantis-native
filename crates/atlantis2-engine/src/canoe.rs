@@ -107,7 +107,7 @@ const SQUARES: [(i32, i32); 9] = [
 
 /// The tiles' sprite offsets (@ 0x005e2168, minus (0x10f, 0x6b),
 /// FUN_00498080).
-const TILE_OFFSETS: [(i32, i32); 33] = [
+pub const TILE_OFFSETS: [(i32, i32); 33] = [
     (182, 84),
     (182, 87),
     (182, 104),
@@ -145,7 +145,7 @@ const TILE_OFFSETS: [(i32, i32); 33] = [
 
 /// The squares' centres in the scene (FUN_00497910, @ 0x0049792d ..
 /// 0x00497a45), floats.
-const CENTRES: [[u32; 3]; 9] = [
+pub const CENTRES: [[u32; 3]; 9] = [
     [0x424d62f8, 0xc25b46ed, 0xc1d346a2],
     [0x4316836f, 0xc25b46ed, 0xc1d346a2],
     [0x4379ae20, 0xc25b46ed, 0xc1d346a2],
@@ -159,7 +159,7 @@ const CENTRES: [[u32; 3]; 9] = [
 
 /// The squares' spacing in the scene, x and y (@ 0x006d8270,
 /// 0x006d2794).
-const SPACING: [u32; 2] = [0x42c65562, 0xc2c65531];
+pub const SPACING: [u32; 2] = [0x42c65562, 0xc2c65531];
 
 /// The depth factors FUN_00497910 writes over its table of distance
 /// ratios (@ 0x00497cb2 ..): (index, the double's bits).
@@ -270,11 +270,19 @@ pub trait CanoeHost {
     fn music_step(&mut self);
 }
 
-/// Why the puzzle could not start (the original quits it, FUN_0049a570).
+/// Why the puzzle could not start: a file missing (the original quits
+/// the puzzle, FUN_0049a570) or the original's fatal error (see
+/// [`Canoe::fatal`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CanoeError {
     Missing(String),
+    Fatal(String),
 }
+
+/// The command `pz_pirogue_init` runs first (@ 0x005e24fc, RunOneCommand
+/// @ 0x00496add), before any load; the caller runs it (the scripts are
+/// its).
+pub const START_COMMAND: &str = "(flag103=1)";
 
 /// The files the puzzle reads.
 pub trait CanoeFiles {
@@ -339,6 +347,14 @@ pub struct Canoe {
     pub records: Records,
     /// The routines of the CPU type.
     pub variant: Variant,
+    /// The first of the original's fatal errors (the reporter
+    /// FUN_00480cd0: an emergency save when a view is current, then the
+    /// game quits, FUN_0049d960 @ 0x00480de9) the river's rebuild or the
+    /// stones' search ran into: the message as the original formats it,
+    /// or the port's own for its guards. The work stops there and the
+    /// next frame returns 0; the caller stops the scripts. The game's data
+    /// never reach it.
+    pub fatal: Option<String>,
 }
 
 /// One quarter turn, as the float the calls pass (0x3fc90fdb).
@@ -437,6 +453,7 @@ impl Canoe {
             cursor: CursorPair::Pointer,
             records: Records::default(),
             variant,
+            fatal: None,
         };
         // The depth tiles (`load_zbuffers_sol` FUN_004970f0).
         for id in 0..33 {
@@ -507,6 +524,9 @@ impl Canoe {
         }
         canoe.reset_stones();
         canoe.rebuild();
+        if let Some(m) = canoe.fatal.take() {
+            return Err(CanoeError::Fatal(m));
+        }
         // The background (@ 0x00497005 .. 0x004970bf), the shuffle, the
         // board's depth.
         let bg = files
@@ -519,6 +539,9 @@ impl Canoe {
                 .copy_from_slice(&bg.pixels[y * bg.width..y * bg.width + n]);
         }
         canoe.shuffle();
+        if let Some(m) = canoe.fatal.take() {
+            return Err(CanoeError::Fatal(m));
+        }
         host.music_step();
         canoe.make_board_depth();
         Ok(canoe)
@@ -613,7 +636,18 @@ impl Canoe {
         self.rebuild();
     }
 
-    /// `recalc_trajet` (FUN_004988a0).
+    /// The original's fatal error (FUN_00480cd0, see [`Canoe::fatal`]):
+    /// logged, the first one kept.
+    fn fail(&mut self, msg: String) {
+        log::error!("{msg}");
+        if self.fatal.is_none() {
+            self.fatal = Some(msg);
+        }
+    }
+
+    /// `recalc_trajet` (FUN_004988a0). Its errors are fatal in the
+    /// original (FUN_00480cd0 @ 0x0049891b, 0x00498958, 0x00498a8c,
+    /// 0x00498b24, which never return): the rebuild stops there.
     pub fn rebuild(&mut self) {
         let c = self.nodes.fpu;
         let n = self.waypoints.len();
@@ -623,16 +657,18 @@ impl Canoe {
         }
         if n > 0 {
             let mut cur = 0usize;
-            // The direction (@ [esp+0x14]): kept from the previous segment
-            // when neither rule applies (the error case).
-            let mut dir: isize = 1;
+            // The direction (@ [esp+0x14]).
+            let mut dir: isize;
             loop {
-                let letter = self.waypoints[cur].name[2];
+                let w = self.waypoints[cur];
+                let letter = w.name[2];
                 if letter != b'E' && letter != b'S' {
-                    log::warn!(
-                        "recalc_trajet() : err Debut de sequence {}",
-                        self.waypoints[cur].name_str()
-                    );
+                    // @ 0x00498916: the string @ 0x005e2a98.
+                    self.fail(format!(
+                        "recalc_trajet() err Debut de sequence {}",
+                        w.name_str()
+                    ));
+                    return;
                 }
                 if cur == 0 {
                     dir = 1;
@@ -643,7 +679,14 @@ impl Canoe {
                     } else if matches!(self.waypoints[cur - 1].name[2], b'E' | b'S') {
                         dir = 1;
                     } else {
-                        log::warn!("recalc_trajet() : err Direction");
+                        // @ 0x00498953: the string @ 0x005e2a5c, the
+                        // name and its second byte.
+                        self.fail(format!(
+                            "recalc_trajet() err Direction Debut de sequence {} case {}",
+                            w.name_str(),
+                            char::from(w.name[1])
+                        ));
+                        return;
                     }
                 }
                 let end = if letter == b'E' { b'S' } else { b'E' };
@@ -651,9 +694,20 @@ impl Canoe {
                     let w = self.waypoints[cur];
                     out.push(w);
                     self.waypoints[cur].name[0] = b'_';
-                    let i = cur as isize + dir;
-                    if w.name[2] == end || out.len() > n || i < 0 || i as usize >= n {
+                    if w.name[2] == end {
                         break;
+                    }
+                    // The original's copy (@ 0x00498985 .. 0x004989b3) has
+                    // no bound: a segment without its end runs on through
+                    // the memory after the table. The port stops there
+                    // (its own message).
+                    let i = cur as isize + dir;
+                    if out.len() >= n || i < 0 || i as usize >= n {
+                        self.fail(format!(
+                            "recalc_trajet(): segment de {} sans fin (port)",
+                            w.name_str()
+                        ));
+                        return;
                     }
                     cur = i as usize;
                 }
@@ -677,8 +731,21 @@ impl Canoe {
                     break;
                 }
                 let Some(k) = found else {
-                    log::warn!("recalc_trajet() : p_trajet = NULL");
-                    break;
+                    // @ 0x00498a59 .. 0x00498a8c: the warning
+                    // "----err-----" (FUN_00480c20), the table logged
+                    // (FUN_00498b40, not reproduced), the new table over
+                    // the old (the rest of it zeros, @ 0x004988a7), the
+                    // table logged again, then the fatal error with the
+                    // last record copied and the count (@ 0x005e2a10).
+                    log::warn!("----err-----");
+                    let len = out.len();
+                    let name = last.name_str();
+                    out.resize(n, Waypoint::default());
+                    self.waypoints = out;
+                    self.fail(format!(
+                        "recalc_trajet(): p_trajet = NULL pour last_trajet={name} n={len} "
+                    ));
+                    return;
                 };
                 self.waypoints[k].flag = i32::from(best >= f64::from(GAP));
                 cur = k;
@@ -687,22 +754,26 @@ impl Canoe {
         out.resize(n, Waypoint::default());
         self.waypoints = out;
         if self.waypoints.first().map(|w| &w.name[..4]) != Some(FIRST_WAYPOINT) {
-            log::warn!("recalc_trajet() : premier point déplacé!!");
+            // @ 0x00498b1f: the string @ 0x005e29dc; the stones are not
+            // placed.
+            self.fail("recalc_trajet() : premier point déplacé!!".into());
+            return;
         }
         self.place_stones();
     }
 
-    /// The waypoint named `name` (FUN_00499b30).
-    fn find(&self, name: &[u8]) -> Option<usize> {
+    /// The waypoint named `name` (FUN_00499b30): among the first 400;
+    /// none is fatal (@ 0x00499b96, the string @ 0x005e2c9c).
+    fn find(&mut self, name: &[u8]) -> Option<usize> {
         let r = self.waypoints.iter().take(400).position(|w| {
             let end = w.name.iter().position(|&c| c == 0).unwrap_or(8);
             &w.name[..end] == name
         });
         if r.is_none() {
-            log::warn!(
+            self.fail(format!(
                 "find_mesh_name(): {} non trouvé",
                 String::from_utf8_lossy(name)
-            );
+            ));
         }
         r
     }
@@ -710,11 +781,12 @@ impl Canoe {
     /// FUN_00499aa0: each stone at its waypoint, then FUN_0049a290.
     fn place_stones(&mut self) {
         for (i, (_, name)) in STONES.iter().enumerate() {
-            if let Some(k) = self.find(name.as_bytes()) {
-                let p = self.waypoints[k].pos.map(f64::from);
-                if let Some(db) = self.stones.get(i) {
-                    self.nodes.set_position(db.node, p);
-                }
+            let Some(k) = self.find(name.as_bytes()) else {
+                return;
+            };
+            let p = self.waypoints[k].pos.map(f64::from);
+            if let Some(db) = self.stones.get(i) {
+                self.nodes.set_position(db.node, p);
             }
         }
         self.reset_stones();
@@ -1002,12 +1074,19 @@ impl Canoe {
         escape: bool,
         out: &mut [u16],
     ) -> bool {
+        if self.fatal.is_some() {
+            return false;
+        }
         self.hovered = Self::square_at(x, y);
         if left {
             self.left_click();
         }
         if right {
             self.right_click();
+        }
+        if self.fatal.is_some() {
+            // The original has quit in the click's rebuild.
+            return false;
         }
         self.draw(x, y, out);
         if escape {

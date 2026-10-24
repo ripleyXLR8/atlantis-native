@@ -18,9 +18,13 @@
 //! - **Quit** FUN_0049a570 when the frame returns 0 (Escape, the win):
 //!   the cursor pair cleared (FUN_0047bef0(0, 0)), everything freed, the
 //!   loop type kept set again (FUN_0049da90).
+//! - **Fatal errors** of the river's rebuild and the stones' search
+//!   (FUN_00480cd0, [`Canoe::fatal`]): the original saves and quits; here
+//!   the scripts stop with the message, as for their own fatal errors, and
+//!   the puzzle quits.
 
 use super::{CursorBank, Engine, Event, LoopType};
-use crate::canoe::{Canoe, CanoeFiles, CanoeHost, POINTER_FRAME};
+use crate::canoe::{Canoe, CanoeError, CanoeFiles, CanoeHost, POINTER_FRAME, START_COMMAND};
 use atlantis2_data::spr::SprBank;
 use atlantis2_data::Folder;
 
@@ -28,9 +32,6 @@ use atlantis2_data::Folder;
 /// for the events.
 pub const CANOE_INIT: u32 = 0x0049_6a60;
 pub const CANOE_QUIT: u32 = 0x0049_a570;
-
-/// The command the init runs first (@ 0x005e24fc).
-const CANOE_STARTED: &str = "(flag103=1)";
 
 /// The game's files as the puzzle reads them: `datas_a2\3d\` of the
 /// current disc (disc 4 in Xibalba), `spr\` of the install.
@@ -97,7 +98,7 @@ impl Engine {
         self.event(Event::PuzzleRan {
             function: CANOE_INIT,
         });
-        self.with_script(|s, h| s.run_command(h, CANOE_STARTED.as_bytes()));
+        self.with_script(|s, h| s.run_command(h, START_COMMAND.as_bytes()));
         let fpu = self.camera.fpu;
         let variant = self.renderer.variant;
         // The loading's only effect on the game around it is the music's
@@ -121,6 +122,10 @@ impl Engine {
                 self.pointer = (w as i32 / 2, h as i32 / 2);
                 self.set_cursor_pair(CursorBank::Interface, POINTER_FRAME as i32);
                 self.canoe_escape = false;
+            }
+            Err(CanoeError::Fatal(m)) => {
+                self.with_script(|s, _| s.fail(m));
+                self.canoe_quit();
             }
             Err(e) => {
                 log::warn!("pz_pirogue_init: {e:?}");
@@ -176,7 +181,11 @@ impl Engine {
             c.frame(&mut host, pointer, left, right, escape, screen)
         };
         self.camera.fpu = c.nodes.fpu;
+        let fatal = c.fatal.clone();
         self.canoe = Some(c);
+        if let Some(m) = fatal {
+            self.with_script(|s, _| s.fail(m));
+        }
         if !going {
             self.canoe_quit();
         }
