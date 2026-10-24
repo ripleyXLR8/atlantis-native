@@ -1,8 +1,8 @@
 //! Yucatán's puzzle hooks: the dispatchers' branches for the views whose
 //! warp names start with `YU` (@ 0x005db004, `_strnicmp` over two
 //! characters, any case). Yucatán's three places (`yucatan.wam`,
-//! `salleroi.wam`, `pyratez.wam`, `MONDE` 2) and Xibalba's (`MONDE` 6, not
-//! ported) share the prefix.
+//! `salleroi.wam`, `pyratez.wam`, `MONDE` 2) and Xibalba's four (`MONDE`
+//! 6, `xibalba.rs`) share the prefix.
 //!
 //! - **Click** (FUN_0049b910): move zones (types 1, 2,
 //!   @ 0x0049b9a4..0x0049b9fd): views 55, 64, 75, the counting grids'
@@ -35,9 +35,10 @@
 //! The Maya counting grids (views 55, 64, 75 of `pyratez.wam`, chapters
 //! 31, 32, 34) run (`grids.rs`), each hook noted [`Event::PuzzleRan`].
 //! The star map (view 121), the canoe (view 402) and the spider web
-//! (views 198-265, the mode 1) are Xibalba's (`MONDE` 6), whose places
-//! the port refuses: they are listed and noted
-//! ([`Event::PuzzleNotPorted`]).
+//! (views 198-265, the mode 1) are Xibalba's (`MONDE` 6), whose puzzles
+//! the port does not have: they are listed and noted
+//! ([`Event::PuzzleNotPorted`]); testing aids write their wins
+//! (`xibalba.rs`).
 
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;

@@ -2,8 +2,8 @@
 //!
 //! Comments cite addresses in the original `atlantis2.exe` (the French CD
 //! build of 1999, 2199552 bytes) so that each behaviour stays traceable to
-//! the original code. It plays Tibet, Ireland, China and Yucatán
-//! (without its Maya counting grids, and without Xibalba): the cube drawn as the original draws it with its place
+//! the original code. It plays Tibet, Ireland, China, Yucatán and
+//! Xibalba (without Xibalba's three puzzles): the cube drawn as the original draws it with its place
 //! animations, turned with the mouse within the original's limits, the
 //! cursor at the centre, and the moves between views and places (turn,
 //! zoom, transition video, arrival). A dialog ([`dialog`])

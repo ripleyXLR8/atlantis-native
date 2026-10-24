@@ -2,9 +2,9 @@
 //! the three places entered with the puzzles' entry hooks; the click
 //! hooks (the counting grids' and the statue's run, the canoe's view
 //! taking the click); the moves between the places (WAM links);
-//! `AngleWarpXNow` on the arrival in the king's hall; the priestess's yes,
-//! the way into Xibalba, refused; the brazier's and the king's ways back
-//! to Tibet; every dialog the chapters start; the subjects, objects and
+//! `AngleWarpXNow` on the arrival in the king's hall; the brazier's and
+//! the king's ways back to Tibet (Xibalba, the priestess's yes, is
+//! `tests/xibalba.rs`'s); every dialog the chapters start; the subjects, objects and
 //! musics on disc 2; the place sounds; a save in Yucatán loaded. The
 //! grids themselves are `tests/grids.rs`'s.
 //!
@@ -372,7 +372,7 @@ fn the_yucatan_click_hooks() {
 }
 
 /// The Tezcatlipoca statue (`xibalba.wam` view 122, chapter 39, loaded
-/// here though the port refuses Xibalba to the scripts): a click on its
+/// here directly; `tests/flow.rs` reaches it as a player does): a click on its
 /// zone makes it the clicked character and opens its subject menu, with
 /// no click scan; a subject asked starts its answer. Hidden, or another
 /// zone: nothing.

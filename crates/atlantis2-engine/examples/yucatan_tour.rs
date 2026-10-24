@@ -3,8 +3,9 @@
 //! the king's hall (its arrival turned by `AngleWarpXNow`, dialog 101),
 //! a character's subject menu and answer, the priestess, the pyramid's first
 //! counting grid (empty, then five marbles laid with four in hand), the Tezcatlipoca statue's
-//! menu (in Xibalba's `xibalba.wam`, loaded for the picture though the
-//! scripts cannot reach it), and the brazier's way back to Tibet. Some
+//! menu (in Xibalba's `xibalba.wam`, loaded directly for the picture;
+//! `tests/flow.rs` reaches it as a player does), and the brazier's way
+//! back to Tibet. Some
 //! steps put the game where they need it (a place, a view, a chapter, an
 //! object in hand) instead of walking there.
 //!
