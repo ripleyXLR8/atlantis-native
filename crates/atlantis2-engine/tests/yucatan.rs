@@ -423,7 +423,22 @@ fn the_tezcatlipoca_statue_talks() {
         started: true
     }));
     settle(&mut e);
-    // Hidden: no menu; a click of type 3 on another zone: no menu.
+    // Another zone of type 3 (`CLICPIED122`), the statue shown: its value
+    // is not the statue's (@ 0x0049bb80), no menu.
+    let other = zone(&e, named("CLICPIED122"));
+    let zones = &e.wam().view(122).unwrap().zones;
+    assert_eq!(zones[other].kind, 3);
+    assert_ne!(zones[other].value, value);
+    assert!(e.anim.table.get(statue, 1) >= 1, "the statue shown");
+    aim(&mut e, other);
+    e.events.clear();
+    e.click(25.0);
+    e.pass(None);
+    assert!(!e.subject_menu.open);
+    assert!(noted(&e.events).is_empty());
+    assert!(e.events.iter().any(|x| matches!(x, Event::ClickScan(_))));
+    settle(&mut e);
+    // Hidden: no menu.
     e.run_command(b"(hideperso=TEZ_STATUE)");
     aim(&mut e, z);
     e.events.clear();

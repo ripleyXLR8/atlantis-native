@@ -729,7 +729,7 @@ grid, the Tezcatlipoca statue's menu, the brazier's way back) into
   keeps it in Atlantis II's `settings.ini`. With
   it off the engine does none of this. With it on, the engine's 640x480
   frame is still the original's, pixel for pixel (the scripts, the picks
-  and the goldens see the same frames; a test plays the three worlds' views
+  and the goldens see the same frames; a test plays the four worlds' views
   both ways); after the cube is drawn, the same view is drawn again at the
   window's resolution from the same faces (the place animations in them)
   and the same camera floats, with the 640x480 cube it stands for (the
@@ -1350,8 +1350,10 @@ grid, the Tezcatlipoca statue's menu, the brazier's way back) into
   hooks under the same prefix are listed and noted too: the star map
   (view 121), the spider web (view 198, and every view in its puzzle mode
   1) and the canoe (view 402), whose view takes the click while
-  `enable_pz_pirog` is not 1 (the dispatcher's only consuming branch, as
-  the original). **Xibalba** (world 6, disc 4: `bat.wam`, `xibalba.wam`,
+  `enable_pz_pirog` is not 1, as in the original (the dispatcher's own
+  return of 1; the web's branch, in the puzzle mode 1, returns the web's
+  click's value, which can be 1 too, and is counted as not consuming
+  since the port does not have the web). **Xibalba** (world 6, disc 4: `bat.wam`, `xibalba.wam`,
   `riviere.wam`, `toile.wam`, chapters 35-41) is not ported: the
   priestess's yes (chapter 27, once she has the bloody bands and is asked
   about Tezcatlipoca: the prince and the high priest hidden, world 6 on

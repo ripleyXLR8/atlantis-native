@@ -13,8 +13,9 @@
 //!   a click lands where it would in the original;
 //! - with the game (`ATLANTIS2_DATA`, `ATLANTIS2_DISCS`; skipped
 //!   without): the 640x480 frames are the same with the HD mode on or off,
-//!   in Tibet, Ireland and China, the layer's base is the cube the frame
-//!   shows, and the zone under the centre is the same.
+//!   in Tibet, Ireland, China and Yucatán (two of its places), the layer's
+//!   base is the cube the frame shows, and the zone under the centre is the
+//!   same.
 
 use std::path::PathBuf;
 

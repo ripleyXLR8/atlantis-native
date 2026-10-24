@@ -12,8 +12,9 @@
 //!   type 0x32 only, views 55, 64, 75 the grids' click FUN_004931a0 /
 //!   FUN_00493490 / FUN_00493510 and view 121 the star map FUN_00494e80;
 //!   view 402 the canoe: while `enable_pz_pirog` is not 1 the click is
-//!   **consumed** (the dispatcher's only return of 1, @ 0x0049bb53 →
-//!   0x0049bcfd), else FUN_0049c010(1) starts it; view 122 the
+//!   **consumed** (the dispatcher's own return of 1, @ 0x0049bb53 →
+//!   0x0049bcfd; the web's branch, @ 0x0049b9f3..0x0049b9fd, returns
+//!   FUN_0048fdd0's value, which can be 1 too), else FUN_0049c010(1) starts it; view 122 the
 //!   Tezcatlipoca statue (below). Every other `YU` path returns 0: the
 //!   click goes on to `CLICZONE` and the move.
 //! - **Entry** (FUN_0049bd50, @ 0x0049bd50..0x0049bdd2): in the puzzle mode
@@ -205,19 +206,18 @@ impl Engine {
     /// `TEZ_STATUE` is not hidden, the statue made the clicked character
     /// and its subject menu opened. Public for tests and tools.
     pub fn statue_click(&mut self, zone: &Zone) {
-        // `DefName_GetIdName(4, ..)` (@ 0x0049bb75): an unknown name is the
-        // original's fatal error; the game's data have it.
-        let Ok(z) = self.names.id(defnames::ZONES_CLIC, STATUE_ZONE) else {
-            log::error!("DefName_GetIdName: Nom de #ZONES_CLIC# inconnu:ClicTezStatue");
+        // `DefName_GetIdName(4, ..)` (@ 0x0049bb75), the zone's value
+        // compared (@ 0x0049bb80), FUN_00484d90 (@ 0x0049bb89), then
+        // `DefName_GetIdName(0, ..)` (@ 0x0049bb9c).
+        let Some(z) = self.statue_name_id(defnames::ZONES_CLIC, "#ZONES_CLIC#", STATUE_ZONE) else {
             return;
         };
-        if zone.value != z as i32 || self.perso_hidden(STATUE_NAME) {
+        if zone.value != z || self.perso_hidden(STATUE_NAME) {
             return;
         }
-        let Ok(id) = self.names.id(defnames::PERSONNAGES, STATUE) else {
+        let Some(id) = self.statue_name_id(defnames::PERSONNAGES, "#PERSONNAGES#", STATUE) else {
             return;
         };
-        let id = id as i32;
         self.event(Event::PuzzleRan {
             function: STATUE_BRANCH,
         });
@@ -232,6 +232,26 @@ impl Engine {
             character: id,
             count: self.subject_count(id),
         });
+    }
+
+    /// `DefName_GetIdName(section, name)` (FUN_004105a0). An unknown name
+    /// is the original's fatal error (FUN_00480cd0 with "DefName_GetIdName:
+    /// Nom de %s inconnu:%s", @ 0x004106a3: an emergency save, then the
+    /// game quits): here the scripts stop and so does the hook (`None`).
+    /// The game's data never reach it.
+    fn statue_name_id(&mut self, section: usize, label: &str, name: &[u8]) -> Option<i32> {
+        match self.names.id(section, name) {
+            Ok(id) => Some(id as i32),
+            Err(_) => {
+                let msg = format!(
+                    "DefName_GetIdName: Nom de {label} inconnu:{}",
+                    String::from_utf8_lossy(name)
+                );
+                log::error!("{msg}");
+                self.with_script(|s, _| s.fail(msg));
+                None
+            }
+        }
     }
 
     /// A testing aid, for tests and tools only: what the win of counting
