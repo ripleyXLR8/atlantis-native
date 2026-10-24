@@ -53,12 +53,13 @@
 //! - Yucatán's hooks (prefix `YU`, `yucatan.rs`): the Maya counting
 //!   grids (`grids.rs`: entries, clicks, leaves and the mode 7's tick)
 //!   and the Tezcatlipoca statue's branch run; Xibalba's (the star map,
-//!   the canoe, the spider web), whose places are not ported, are listed
-//!   and noted. The canoe's view
+//!   the canoe, the spider web), whose puzzles are not ported, are listed
+//!   and noted (`xibalba.rs` has testing aids that write their wins). The
+//!   canoe's view
 //!   consumes the click while the canoe is not enabled, as in the
 //!   original.
-//! - The places the port has: Tibet, Ireland, China and Yucatán. A
-//!   `changewam` to any other place (Xibalba, Shamballa, the space
+//! - The places the port has: Tibet, Ireland, China, Yucatán and
+//!   Xibalba. A `changewam` to any other place (Shamballa, the space
 //!   travel) is refused: the section stops there, the world goes back to
 //!   the current place's, the view's per-view reset runs (as the
 //!   section's `vue=` would) and the game stays in the view it was in
@@ -120,12 +121,13 @@ const IRELAND_PREFIX: &[u8] = b"IR";
 /// `labyplaf.wam` reached by their links) and Yucatán's three (chapters
 /// 25-34: `yucatan.wam` loaded by chapter 75's trips, `salleroi.wam` and
 /// `pyratez.wam` reached by the links of `yucatan.wam` views 39 and 34;
-/// chapter 35, Xibalba's, loads `salleroi.wam` too). Not `demo.wam`,
-/// which only chapter 1 loads: no script jumps to chapter 1, and none of
-/// its nine panoramas (`de0001.hnm` .. `de0009.hnm`) is on a disc. Not
-/// Xibalba's places (`MONDE` 6: `bat.wam`, `xibalba.wam`, `riviere.wam`,
-/// `toile.wam`).
-const PORTED_PLACES: [(&str, i32); 14] = [
+/// chapter 35, Xibalba's, loads `salleroi.wam` too) and Xibalba's four
+/// (`MONDE` 6, chapters 35-41: `bat.wam` loaded by chapter 27's ways in,
+/// `xibalba.wam` by chapters 35 and 36, `riviere.wam` and `toile.wam`
+/// reached by their links). Not `demo.wam`, which only chapter 1 loads:
+/// no script jumps to chapter 1, and none of its nine panoramas
+/// (`de0001.hnm` .. `de0009.hnm`) is on a disc.
+const PORTED_PLACES: [(&str, i32); 18] = [
     ("tibet.wam", 5),
     ("bigile1.wam", 1),
     ("livre.wam", 1),
@@ -140,6 +142,10 @@ const PORTED_PLACES: [(&str, i32); 14] = [
     ("yucatan.wam", 2),
     ("salleroi.wam", 2),
     ("pyratez.wam", 2),
+    ("bat.wam", 6),
+    ("xibalba.wam", 6),
+    ("riviere.wam", 6),
+    ("toile.wam", 6),
 ];
 
 /// China's warp prefixes (@ 0x005db000 `CH`, 0x005e2ea4 `SS` for

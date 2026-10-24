@@ -69,6 +69,8 @@ pub use turtle::RING_MODE;
 mod ui;
 mod wheels;
 pub use wheels::{DISC_WHEEL, WHEELS_FIRST, WHEELS_SECOND, WHEEL_DISC};
+mod xibalba;
+pub use xibalba::STAR_HOLES;
 mod yucatan;
 pub use yucatan::{
     yucatan_click_hooks, yucatan_entry_hooks, MAYA_GRID_VIEWS, STATUE_BRANCH, STATUE_VIEW, WEB_MODE,
@@ -150,10 +152,14 @@ pub enum Event {
     /// `CLICZONE` as it leaves it (the click scan may not follow: a film a
     /// hook's scan started drops the click).
     ZoneClick { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (Yucatán's counting grids,
-    /// Xibalba's puzzles): the original's function, which would have run
-    /// here.
+    /// A puzzle hook the port does not have (Xibalba's puzzles): the
+    /// original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
+    /// A testing aid wrote what a puzzle the port does not have writes
+    /// (Xibalba's, [`Engine::win_star_map`], [`Engine::win_canoe`],
+    /// [`Engine::win_web_round`]): the original's function whose writes
+    /// follow.
+    PuzzleAid { function: u32 },
     /// A puzzle function the port has, run: the original's function (a
     /// hook, or the wheels' check FUN_0048d310).
     PuzzleRan { function: u32 },

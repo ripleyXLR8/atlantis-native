@@ -380,9 +380,10 @@ fn at(files: A2Files, commands: &[&[u8]], hd: bool) -> Engine {
     e
 }
 
-/// The places of the four worlds the port plays (Yucatán's open view
-/// and the king's hall with its characters).
-const PLACES: [(&str, &[&[u8]]); 5] = [
+/// The places of the worlds the port plays (Yucatán's open view and the
+/// king's hall with its characters; Xibalba's four places, the bat and
+/// Chac in their views).
+const PLACES: [(&str, &[&[u8]]); 10] = [
     ("Tibet", &[]),
     (
         "Ireland",
@@ -404,6 +405,26 @@ const PLACES: [(&str, &[&[u8]]); 5] = [
     (
         "the king's hall",
         &[b"(monde=2)", b"(changewam=salleroi.wam)", b"(vue=86)"],
+    ),
+    (
+        "Xibalba's bat",
+        &[b"(monde=6)", b"(changewam=bat.wam)", b"(vue=403)"],
+    ),
+    (
+        "Xibalba's river",
+        &[b"(monde=6)", b"(changewam=riviere.wam)", b"(vue=300)"],
+    ),
+    (
+        "Chac's pond",
+        &[b"(monde=6)", b"(changewam=xibalba.wam)", b"(vue=123)"],
+    ),
+    (
+        "the statues' clearing",
+        &[b"(monde=6)", b"(changewam=xibalba.wam)", b"(vue=121)"],
+    ),
+    (
+        "the spider's web",
+        &[b"(monde=6)", b"(changewam=toile.wam)", b"(vue=198)"],
     ),
 ];
 

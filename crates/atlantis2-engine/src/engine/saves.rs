@@ -399,9 +399,13 @@ impl Engine {
         let mut view = header.view;
         let monde = self.con.as_ref().map_or(0, |s| s.vars[s.keys.monde]);
         if monde == 6 && 0xc5 < view && view < 0x10a {
-            // In the spider web (@ 0x0048f450): back to view 198; the bag
-            // reconciliation of the puzzle is not ported.
+            // In the spider web (FUN_0048f450 @ 0x0048f450..0x0048f494):
+            // back to view 198, the current view record cleared (the view
+            // entry below makes it again). The rest is the web's, not
+            // ported (noted): its stage's `finaraignN` from the prey in
+            // the bag, then its entry FUN_0048f530.
             view = 198;
+            self.puzzle_not_ported(0x0048_f450);
         }
         // FUN_0040fc60(WAM, view): the place loaded, the view made current
         // (`LASTVUE`, `VUE`) and entered at those angles.

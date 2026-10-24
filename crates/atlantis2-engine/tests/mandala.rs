@@ -738,12 +738,12 @@ fn a_boat_laid_saved_and_loaded() {
     assert_eq!(f.place(), ("yucatan.wam", 10));
     assert_eq!(var(&f, "MONDE"), 2);
 
-    // A save in another world's place (Xibalba's) is refused before
+    // A save in another world's place (Shamballa's) is refused before
     // anything changes.
     let mut other = saved.clone();
-    other.set_wam(b"bat.wam");
+    other.set_wam(b"voiles.wam");
     let before = f.save_data();
-    assert!(matches!(f.load_data(&other), Err(SaveError::NotPorted(w)) if w == "bat.wam"));
+    assert!(matches!(f.load_data(&other), Err(SaveError::NotPorted(w)) if w == "voiles.wam"));
     assert_eq!(f.save_data().entry(6), before.entry(6));
     assert_eq!(f.place(), ("yucatan.wam", 10));
 }
