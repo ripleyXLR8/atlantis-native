@@ -1433,7 +1433,7 @@ back) into `yucatan-*.png`.
   goes on). **The spider's web runs** (below). No testing aid is
   left: every win is played.
   **A headless game plays Yucatán and Xibalba with the mouse only**
-  (`tests/flow.rs` `yucatan_with_the_mouse`, about 75 s in release):
+  (`tests/flow.rs` `yucatan_with_the_mouse`, about 90 s in release):
   from a new game, Yucatán's boat taken in view 5 and laid in the hut,
   then chapters 25-34 stage by stage (the prince and the high priest
   asked in the king's hall, the priestess and her clean bands, the king,
@@ -1468,7 +1468,9 @@ back) into `yucatan-*.png`.
   the skull given to the serpent (film 52: the soul)), a save and a load
   in Xibalba through the menus, the way back with the soul (the bat,
   `BackToS27`, the priestess, the king: film 55, Yucatán's mandala,
-  Tibet's view 7) and Yucatán's mandala laid on its zone. Every
+  Tibet's view 7) and Yucatán's mandala laid on its zone, the game
+  left in Tibet with the three puzzles' end variables set and every
+  puzzle function of Xibalba a player reaches seen to run. Every
   character is asked about everything he offers at each step; the
   dialogs of chapters 25-41 it plays are 101-123, 125, 129, 132, 134-136,
   138-143, 145-167, 169-176, 184-186, 190-202, 204 and 210 (168 over film

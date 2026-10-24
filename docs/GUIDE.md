@@ -168,10 +168,8 @@ as the original's F5 / F6 and F7 / F8 do.
 
 ## Atlantis II
 
-Atlantis II is in progress (Tibet, Ireland and China play to their end;
-Yucatán plays with its Maya counting grids but cannot be finished
-without Xibalba, whose canoe plays but whose star map and spider's web
-are not there yet;
+Atlantis II is in progress (Tibet, Ireland, China, and Yucatán with
+Xibalba play to their end; Shamballa is not there yet;
 see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)). For now only the
 command line opens it: give the folder of the installed game (the one
 holding `atlantis2.exe`, `wam`, `scenar`...), and the folder of the CD
@@ -189,6 +187,15 @@ images or copies of the CDs if they are not inside it:
 | Escape | the game's menu (options, volumes, load and save, quit), and closes it; ends a dialog |
 | F10 or O | the port's options menu (below); the game waits while it is open |
 | F11 | full screen on and off |
+
+Xibalba's canoe puzzle has a screen of its own, with a pointer: a left
+click takes a river tile, lays it back or swaps it with the clicked
+square's, and on the landing stage starts the canoe; a right click turns
+the held or pointed tile a quarter; Escape leaves the puzzle. On the
+spider's web the view turns as usual and a left click on a way moves
+along it once the spiders stand still; with the feather in hand the click
+lays it there, and a click on a spider asks about it (or strikes it with
+the sword).
 
 In the game's menus the mouse moves the game's own pointer. As in the
 original there are no named saves: the menu's disc saves in the next free

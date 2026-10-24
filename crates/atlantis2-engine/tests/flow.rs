@@ -5207,6 +5207,21 @@ fn yucatans_mandala_laid(r: &mut Run) {
     assert_eq!(r.var("OrdreMandala6"), 2);
     assert!(!r.in_bag("MANDALA_YUCATAN"));
     assert!(r.shown(false, "MANDALA_YU2"));
+    // The game goes on in Tibet: the soul given, Xibalba's puzzles all
+    // won.
+    assert_eq!((r.e.place(), r.chapter()), (("tibet.wam", 10), 75));
+    assert!(!r.in_bag("CHULEL"));
+    assert_eq!(
+        (
+            r.var("finpirogue"),
+            r.var("etoiles_fini"),
+            r.var("finaraign1"),
+            r.var("finaraign2"),
+            r.var("finaraign3")
+        ),
+        (1, 1, 1, 1, 1)
+    );
+    r.shot_as("xibalba-11-mandala-in-tibet.png");
 }
 
 /// The Xibalba chapters a game goes through (40 and 41 hold only an
