@@ -1571,6 +1571,15 @@ back) into `yucatan-*.png`.
   (a dialog's head) in the same run (the canoe's own drawing is checked
   from its start); the near and far clipping of faces (the canoe's
   objects never cross the planes: not ported, logged).
+- **Two Atl3D paths.** The canoe's and the web's 3D were read and ported
+  each for its own puzzle and checked on its own frames: `atl3d/ortho.rs`
+  (databases, the orthographic camera, the generic face drawer) and
+  `atl3d/warp.rs` (models over the panorama with the warp camera, the
+  Pentium II routines, the Atl3D Z buffer), side by side under `atl3d`,
+  both on the heads' helpers (`head.rs`: quaternions, tracks, node
+  updates). What both go through in the original (the `.db` loader's
+  face planes and bounding values, the node updates) is written twice;
+  joining the two is a clean-up not done yet.
 - **The spider's web** (`engine/web.rs`, `toile.wam` views 198-265,
   chapters 35 and 38; the module `pz_araig`): 65 nodes, views 201-265,
   four rings of sixteen and the centre, their positions read from
