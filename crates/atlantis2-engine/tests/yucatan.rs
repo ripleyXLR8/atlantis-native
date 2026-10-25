@@ -585,7 +585,11 @@ fn the_brazier_sends_the_game_back_to_tibet() {
     assert_eq!(e.place(), ("tibet.wam", 7));
     assert_eq!(e.script_state().unwrap().chapter, 75);
     assert_eq!(var(&e, "MONDE"), 5);
-    assert_eq!(e.files().current_disc(), 1);
+    assert_eq!(
+        e.files().current_disc(),
+        2,
+        "Tibet keeps the disc in the drive"
+    );
     assert!(e.events.contains(&Event::Monde(5)));
     assert!(!e
         .events
@@ -623,7 +627,11 @@ fn the_soul_brought_to_the_king_ends_yucatan() {
     assert_eq!(e.place(), ("tibet.wam", 7));
     assert_eq!(e.script_state().unwrap().chapter, 75);
     assert_eq!((var(&e, "MONDE"), var(&e, "dial168_done")), (5, 1));
-    assert_eq!(e.files().current_disc(), 1);
+    assert_eq!(
+        e.files().current_disc(),
+        2,
+        "Tibet keeps the disc in the drive"
+    );
     assert!(in_bag(&e, "MANDALA_YUCATAN"));
     assert!(!in_bag(&e, "CHULEL"));
     let film = e
@@ -829,7 +837,12 @@ fn yucatan_subjects_objects_and_music_are_on_disc_2() {
 #[test]
 fn yucatan_place_sounds_play() {
     let Some(files) = game() else { return };
-    let mut e = bare(files, "yucatan.wam", 2);
+    // In Yucatán, disc 2 in the drive: the sounds are read from the
+    // current disc only, as the original reads them.
+    let mut e = in_yucatan(files);
+    e.load_place("yucatan.wam");
+    e.enter_at(2, 0.0, 0.0).unwrap();
+    e.events.clear();
     assert!(!e.place.sources.is_empty());
     let mut started = false;
     for _ in 0..3000 {

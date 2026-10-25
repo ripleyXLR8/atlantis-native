@@ -1062,7 +1062,12 @@ fn xibalba_subjects_objects_musics_and_films() {
 fn xibalba_place_sounds_play() {
     let Some(files) = game() else { return };
     for (place, view) in [("xibalba.wam", 101), ("riviere.wam", 300)] {
-        let mut e = bare(game().unwrap(), place, view);
+        // In Xibalba, disc 4 in the drive: the sounds are read from the
+        // current disc only, as the original reads them.
+        let mut e = in_xibalba(game().unwrap());
+        e.load_place(place);
+        e.enter_at(view, 0.0, 0.0).unwrap();
+        e.events.clear();
         assert!(!e.place.sources.is_empty(), "{place}");
         let mut started = false;
         for _ in 0..3000 {

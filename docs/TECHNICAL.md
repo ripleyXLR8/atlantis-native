@@ -711,9 +711,17 @@ back) into `yucatan-*.png`.
   folders directly inside it and in each `--discs <folder>`, and told apart
   by the original's marker files (`datas_a2\spf\sphex.spr`, `cerceris`,
   `bousier`, `mante`). The current disc follows the `MONDE` rule (worlds
-  1..4 on discs 1..4, Tibet on whichever disc is in, 6 on disc 4); six
-  files differ between the discs, so a file is read from the current disc
-  first (`crates/atlantis2-data/src/files.rs`). The discs' long names are
+  1..4 on discs 1..4, 6 on disc 4, Tibet on the disc of the first drive
+  holding one); Native plays as one drive whose disc is changed when the
+  game asks, so Tibet keeps the disc already in. Six files differ between
+  the discs, so a file is read from the current disc first
+  (`crates/atlantis2-data/src/files.rs`). Other files missing from the
+  current disc come from another one, except the sounds of
+  `datas_a2\apc\`, read from the current disc only as the original
+  reads them: film 44 (chapter 27, disc 4) has its track on disc 2 only
+  and plays silent, as in the original; film 62 on the way back from
+  Shamballa (chapter 78, `monde=5` with disc 4 in) plays its track from
+  disc 4. The discs' long names are
   in their Joliet trees, which the disc-image reader now reads.
 - **Places:** `WAM V2.8` is a stream of tagged chunks (views, moves, 3D
   click zones with their corners, sounds, links, entities and their
@@ -2455,7 +2463,16 @@ back) into `yucatan-*.png`.
   only Irish place with sources (8 sources, 33 views); Tibet's two
   transition videos have no sound track. A film's track (`cineNNN.apc`) plays on voice 2 at the
   effects volume from the film's first frame and stops with it; after a
-  film the next panorama frame asks for the music at 100 %.
+  film the next panorama frame asks for the music at 100 %, unless a new
+  music starts first (a `startmusik` right after the film: the old music
+  fades out without swelling back first). Voice 2 is the video's only
+  when its track loaded, or for a move's `TrajSound` (even one that does
+  not load): only then does the video's end stop voice 2, so a
+  `NEWSOUND` still playing goes on through a film without a track (18,
+  33, 60, 67) or a move without a `TrajSound`. A video that does not
+  open keeps the loaded track for the next one. Compared with the
+  original's own functions under emulation
+  (`tests/golden/sound_glue.txt`, `tests/sound_glue.rs`).
 - **Music** (`music.rs`, the player's states in `engine/host.rs`):
   `startmusik` draws a track from its list as the original does (one
   entry; two, the other one in 85 % of the draws when the current music

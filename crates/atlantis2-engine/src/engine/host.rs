@@ -166,6 +166,9 @@ impl Engine {
         if n == self.player.current {
             return false;
         }
+        // FUN_0040bb80 (@ 0x0047a221): a new music cancels the "music back
+        // to 100 %" a video's end asked of the next warp draw.
+        self.music_after_video = false;
         self.player.current = n;
         let copies = self.copy_music(&n.to_string());
         self.player.mark = mark;
@@ -298,9 +301,12 @@ impl Engine {
         }
     }
 
-    /// A sound of `datas_a2\apc\` decoded whole (FUN_0047a530).
+    /// A sound of `datas_a2\apc\` decoded whole (FUN_0047a530), read
+    /// from the disc in the drive only (FUN_004037d0 builds the path on
+    /// the current CD's root): film 44's track, on disc 2 while the film
+    /// plays from disc 4, does not load.
     pub(super) fn load_sound(&self, name: &str) -> Option<(String, Pcm)> {
-        let data = self.files.read(Folder::Apc, name)?;
+        let data = self.files.read_current(Folder::Apc, name)?;
         let apc = decode_apc(&data)
             .map_err(|e| log::warn!("{name}: {e}"))
             .ok()?;
@@ -664,10 +670,7 @@ impl Host for Engine {
     }
 
     fn cinema_sound(&mut self, apc: &str) {
-        self.pending_sound = self.load_sound(apc);
-        if self.pending_sound.is_none() {
-            log::info!("{apc}: no sound track");
-        }
+        self.video_track(apc);
     }
 
     fn play_video(&mut self, hnm: &str, dialog: Option<i32>) -> bool {

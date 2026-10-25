@@ -74,7 +74,10 @@ fn discs_and_the_monde_rule() {
     files.set_monde(6);
     assert_eq!(files.current_disc(), 4);
     assert_eq!(files.size(Folder::Spw, "sna1013013.spw"), Some(1_323));
-    // Tibet: whichever disc is in, here the first.
+    // Tibet: the disc in the drive, here disc 4 still.
+    files.set_monde(5);
+    assert_eq!(files.current_disc(), 4);
+    files.set_monde(1);
     files.set_monde(5);
     assert_eq!(files.current_disc(), 1);
     // The first view's panorama is the same on every disc.

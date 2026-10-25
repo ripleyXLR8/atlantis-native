@@ -635,11 +635,22 @@ pub struct Engine {
     canoe: Option<Box<crate::canoe::Canoe>>,
     canoe_prev_loop: LoopType,
     canoe_escape: bool,
-    /// A sound loaded for the next video (`cine%03d.apc` @ 0x0047a320, or
-    /// the `TrajSound` of a move), played on voice 2 when it starts.
-    pending_sound: Option<(String, Pcm)>,
-    /// `TrajSound`'s file name (@ 0x00673198), until the next move with a
-    /// video.
+    /// The sound loaded for a video (the entry @ 0x00673f34: a film's or an
+    /// intro's track, FUN_0047a320; a move's `TrajSound`, FUN_0047a350),
+    /// `None` for a file that could not be read (entry −1). It is played
+    /// on voice 2 when a video starts while `video_owns_voice2` is set,
+    /// and freed at the video's end; a video that does not open
+    /// keeps both for the next one (FUN_0040bf60 touches neither).
+    video_sound: Option<(String, Pcm)>,
+    /// Voice 2 belongs to the video (@ 0x006d168d): set by a film's or an
+    /// intro's track that loaded (FUN_0047a320) and by any `TrajSound`
+    /// taken by a move, even one that did not load (FUN_0047a350). Only
+    /// then does a video start play `video_sound` and its end stop voice 2
+    /// (FUN_0040bae0): a `NEWSOUND` still playing on voice 2 goes on
+    /// through a video without a sound of its own.
+    video_owns_voice2: bool,
+    /// `TrajSound`'s file name (@ 0x00673198), until the end of a video
+    /// that owned voice 2 (FUN_0047a380 from FUN_0040bae0).
     traj_sound: Option<String>,
     /// The transition sprites (@ 0x00673f40, count @ 0x00673fa4), drawn
     /// over the video's frames.
@@ -656,7 +667,8 @@ pub struct Engine {
     /// ([`Engine::refuse_place`]), handled once they are back.
     refused_place: Option<String>,
     /// The video end asks the next warp draw for the music at 100 %
-    /// (@ 0x00656999, FUN_0040bb90).
+    /// (@ 0x00656999, FUN_0040bb90); a new music before it cancels the
+    /// request (FUN_0040bb80 from FUN_0047a200).
     music_after_video: bool,
     /// The place animation hidden while its character speaks
     /// (@ 0x006c2e78): the slot and the names it was found for.
@@ -1004,7 +1016,8 @@ impl Engine {
             canoe: None,
             canoe_prev_loop: LoopType::Warp,
             canoe_escape: false,
-            pending_sound: None,
+            video_sound: None,
+            video_owns_voice2: false,
             traj_sound: None,
             spf: Vec::new(),
             deferred_wam: None,
@@ -2563,10 +2576,13 @@ impl Engine {
         let udada = self.con.as_ref().and_then(|s| s.var("UDADA")).unwrap_or(0);
         if let (Some(d), false, 0) = (&dest, self.double, udada) {
             // FUN_0047a350: a `TrajSound` set before the move plays with
-            // the video, the music at 20 %.
-            if let Some(name) = self.traj_sound.take() {
+            // the video, the music at 20 %; voice 2 is the video's even
+            // when the file does not load. The name stays until the
+            // video's end.
+            if let Some(name) = self.traj_sound.clone() {
                 self.music.set_percent(20);
-                self.pending_sound = self.load_sound(&name);
+                self.video_owns_voice2 = true;
+                self.video_sound = self.load_sound(&name);
             }
             // The name is used as a printf format by the original; when
             // the video cannot start, FUN_0047b280 (@ 0x0045a5b2).
@@ -2598,12 +2614,11 @@ impl Engine {
                 frames: None,
             });
             log::info!("{name}: no video, a cut");
-            // The music back to 100 % (outside a dialog), the sound loaded
-            // for the video dropped.
+            // The music back to 100 % (outside a dialog). The sound loaded
+            // for the video and the flag stay: the next video plays it.
             if self.dialog.is_none() {
                 self.music.set_percent(100);
             }
-            self.pending_sound = None;
             return false;
         };
         let frames = hnm.frame_count();
@@ -2613,13 +2628,17 @@ impl Engine {
         });
         // FUN_0047b030: the place sounds' listener steps.
         self.place_sounds_video_start(frames);
-        // The sound loaded for it (a film's track, a `TrajSound`) starts
-        // on voice 2 (FUN_0047a650(id, 2)) at the effects volume.
-        if let Some((sound, pcm)) = self.pending_sound.take() {
-            let att = self.fx_attenuation();
-            self.voices
-                .play(crate::sound::VOICE_EFFECTS, pcm, false, att, 0);
-            self.event(Event::Sound(sound));
+        // When voice 2 is the video's (@ 0x0040c002), the sound loaded for
+        // it (a film's track, a `TrajSound`) starts on voice 2
+        // (FUN_0047a650(id, 2): what voice 2 played stopped, the effects
+        // volume); entry −1 plays nothing.
+        if self.video_owns_voice2 {
+            if let Some((sound, pcm)) = self.video_sound.clone() {
+                let att = self.fx_attenuation();
+                self.voices
+                    .play(crate::sound::VOICE_EFFECTS, pcm, false, att, 0);
+                self.event(Event::Sound(sound));
+            }
         }
         let end = !matches!(hnm.next_frame(), Some(Ok(_))) || hnm.frames_decoded() >= frames;
         self.event(Event::VideoFrame(0));
@@ -2699,7 +2718,7 @@ impl Engine {
         // One pass of the music player (the thunk @ 0x0047a280), the
         // sound loaded (FUN_0047a320), `AtlHnm_start`.
         self.music_frame();
-        self.pending_sound = self.load_sound(&format!("intro{n:02}.apc"));
+        self.video_track(&format!("intro{n:02}.apc"));
         if self.start_video(&format!("intro{n:02}.hnm")) {
             self.intro_next += 1;
         } else {
@@ -2737,15 +2756,17 @@ impl Engine {
         let prev = self.video.take().map_or(LoopType::Warp, |v| v.prev);
         self.set_loop_type(prev);
         self.event(Event::VideoEnd);
-        // FUN_0040bae0: the video's sound stops; the next warp draw asks
-        // for the music at 100 % unless a dialog runs; a dialog played
-        // over the film ends with it (FUN_00480a40).
-        self.voices.stop(crate::sound::VOICE_EFFECTS);
-        if self.dialog.is_none() {
-            self.music_after_video = true;
-        }
+        // FUN_0040bae0: when voice 2 is the video's (@ 0x006d168d), voice
+        // 2 stopped and the sound freed (FUN_0047a3d0: entry −1 stops
+        // nothing) and the `TrajSound` name cleared (FUN_0047a380);
+        // otherwise what voice 2 plays (a `NEWSOUND`) goes on. The next
+        // warp draw asks for the music at 100 % (the loop type is still
+        // the video's here, so never the dialog's 2); a dialog played over
+        // the film ends with it (FUN_00480a40).
+        self.video_sound_end();
+        self.music_after_video = true;
         // The intro's next file (@ 0x0040c0ee), in place of the place
-        // sounds after a film (FUN_0047b280, not ported).
+        // sounds after a film (FUN_0047b280).
         if self.intro_playing {
             self.start_intro();
         } else {
@@ -2757,6 +2778,29 @@ impl Engine {
         }
         // The section the film interrupted goes on.
         self.with_script(|s, h| s.video_ended(h));
+    }
+
+    /// FUN_0047a320: a film's or an intro's track loaded for the next
+    /// video; voice 2 is the video's only when it loaded.
+    pub(super) fn video_track(&mut self, apc: &str) {
+        self.video_sound = self.load_sound(apc);
+        self.video_owns_voice2 = self.video_sound.is_some();
+        if self.video_sound.is_none() {
+            log::info!("{apc}: no sound track");
+        }
+    }
+
+    /// FUN_0040bae0's sound part: voice 2 stopped, the video's sound
+    /// freed, the flag and the `TrajSound` name cleared, only when voice 2
+    /// is the video's.
+    fn video_sound_end(&mut self) {
+        if !std::mem::take(&mut self.video_owns_voice2) {
+            return;
+        }
+        if self.video_sound.take().is_some() {
+            self.voices.stop(crate::sound::VOICE_EFFECTS);
+        }
+        self.traj_sound = None;
     }
 
     /// [`Engine::render`] on the surface the frame is drawn on (the

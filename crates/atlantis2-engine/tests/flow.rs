@@ -4394,7 +4394,11 @@ fn whole_yucatan() -> Vec<Stage> {
         r.shot_as("yucatan-10-back-in-tibet.png");
         assert_eq!(r.e.place(), ("tibet.wam", 7));
         assert_eq!((r.chapter(), r.var("MONDE")), (75, 5));
-        assert_eq!(r.e.files().current_disc(), 1);
+        assert_eq!(
+            r.e.files().current_disc(),
+            2,
+            "Tibet keeps the disc in the drive"
+        );
         assert!(!r.in_bag("MANDALA_YUCATAN"));
     }));
     v.push(("the second trip", the_second_trip));
@@ -4406,7 +4410,7 @@ fn whole_yucatan() -> Vec<Stage> {
         r.shot_as("xibalba-10-back-in-tibet.png");
         assert_eq!(r.e.place(), ("tibet.wam", 7));
         assert_eq!((r.chapter(), r.var("MONDE")), (75, 5));
-        assert_eq!(r.e.files().current_disc(), 1);
+        assert_eq!(r.e.files().current_disc(), 2, "back through Yucatán");
         assert_eq!(r.var("dial168_done"), 1);
         assert!(r.in_bag("MANDALA_YUCATAN") && !r.in_bag("CHULEL"));
     }));
