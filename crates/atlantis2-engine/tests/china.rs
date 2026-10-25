@@ -680,7 +680,11 @@ fn the_lantern_sends_the_game_back_to_tibet() {
     assert_eq!(e.place(), ("tibet.wam", 7));
     assert_eq!(e.script_state().unwrap().chapter, 75);
     assert_eq!((var(&e, "MONDE"), var(&e, "isChineFinished")), (5, 1));
-    assert_eq!(e.files().current_disc(), 1);
+    assert_eq!(
+        e.files().current_disc(),
+        3,
+        "Tibet keeps the disc in the drive"
+    );
     let at = |p: &dyn Fn(&Event) -> bool| {
         e.events
             .iter()

@@ -618,8 +618,14 @@ fn the_vortex_leads_back_or_on() {
     run_until(&mut e, |e| e.place().0 == "tibet.wam");
     assert_eq!(e.place(), ("tibet.wam", 10));
     assert_eq!(e.script_state().unwrap().chapter, 75);
-    assert_eq!((var(&e, "MONDE"), e.files().current_disc()), (5, 1));
+    // Tibet keeps the disc in the drive (FUN_0040e0e0): film 62's track
+    // is read from disc 4, where it is.
+    assert_eq!((var(&e, "MONDE"), e.files().current_disc()), (5, 4));
     assert_eq!(films(&e.events), [62]);
+    assert!(e
+        .events
+        .iter()
+        .any(|ev| matches!(ev, Event::Sound(s) if s.eq_ignore_ascii_case("cine062.apc"))));
     let lines = set_lines(&e.events);
     assert!((19..=32).all(|l| lines.contains(&(78, l))), "{lines:?}");
     lines_as_the_original(&lines);
@@ -929,7 +935,7 @@ fn the_octopus_s_two_ends() {
     run_until(&mut e, |e| e.place().0 == "tibet.wam");
     assert_eq!(e.place(), ("tibet.wam", 7));
     assert_eq!(e.script_state().unwrap().chapter, 75);
-    assert_eq!((var(&e, "MONDE"), e.files().current_disc()), (5, 1));
+    assert_eq!((var(&e, "MONDE"), e.files().current_disc()), (5, 4));
     assert_eq!(films(&e.events), [65]);
     assert_eq!(dialogs(&e.events), [372]);
     assert_eq!((flag(&e, 260), flag(&e, 261)), (1, 1));

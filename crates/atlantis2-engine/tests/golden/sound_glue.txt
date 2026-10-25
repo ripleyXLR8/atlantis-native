@@ -16,6 +16,12 @@
 # `warp_draw` FUN_0040bb90); the state is @ 0x006d168d (`owns`), @ 0x00673f34 (`entry`), the
 # TrajSound name @ 0x00673198, @ 0x00656999 and voice 2. `glue.<scenario>.end` sums up what
 # tests/sound_glue.rs compares.
+# The `tibet_after_shamballa` scenarios also run the disc choice of `monde=4` (FUN_0040dff0(4, 1))
+# and `monde=5` (FUN_0040e0e0) on a simulated drive table (0x14-byte records @ 0x00656a94, the
+# disc number at +0x10, the marker files `datas_a2\spf\*.spr` answered by the file stub): one
+# drive holding disc 4, then four drives holding discs 1..4; the CD root stub answers the root
+# of the current record @ 0x00656ae8. `glue.<scenario>.disc` gives that drive and the current
+# disc @ 0x00656a88 at the end.
 glue.film_then_draw.00 video_end | - | owns=0 entry=0 traj=- music_after_video=1 voice2=silent
 glue.film_then_draw.01 warp_draw | music_percent 100 | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
 glue.film_then_draw.end start_play2=0 end_stop2=0 voice2_after=silent draw_percent=100
@@ -84,3 +90,19 @@ glue.film_track_not_on_the_current_disc.02 hnm_start cine044.hnm | - | owns=0 en
 glue.film_track_not_on_the_current_disc.03 video_end | - | owns=0 entry=-1 traj=- music_after_video=1 voice2=playing
 glue.film_track_not_on_the_current_disc.end start_play2=0 end_stop2=0 voice2_after=playing draw_percent=-
 glue.film_track_not_on_the_current_disc.fatal 0
+glue.tibet_after_shamballa_one_drive.00 monde 4 4 1 | open D:\datas_a2\spf\sphex.spr missing; open D:\datas_a2\spf\cerceris.spr missing; open D:\datas_a2\spf\bousier.spr missing; open D:\datas_a2\spf\mante.spr ok | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.tibet_after_shamballa_one_drive.01 monde 5 | open D:\datas_a2\spf\sphex.spr missing; open D:\datas_a2\spf\cerceris.spr missing; open D:\datas_a2\spf\bousier.spr missing; open D:\datas_a2\spf\mante.spr ok | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.tibet_after_shamballa_one_drive.02 film_track cine062.apc | open D:\datas_a2\apc\cine062.apc ok | owns=1 entry=0 traj=- music_after_video=0 voice2=silent
+glue.tibet_after_shamballa_one_drive.03 hnm_start cine062.hnm | stop voice2; play voice2 entry0 cine062.apc | owns=1 entry=0 traj=- music_after_video=0 voice2=playing
+glue.tibet_after_shamballa_one_drive.04 video_end | stop voice2 | owns=0 entry=0 traj=- music_after_video=1 voice2=silent
+glue.tibet_after_shamballa_one_drive.end start_play2=1 end_stop2=1 voice2_after=silent draw_percent=-
+glue.tibet_after_shamballa_one_drive.disc drive=D:\ disc=4
+glue.tibet_after_shamballa_one_drive.fatal 0
+glue.tibet_after_shamballa_four_drives.00 monde 4 4 1 | open D:\datas_a2\spf\sphex.spr ok; open D:\datas_a2\spf\cerceris.spr missing; open D:\datas_a2\spf\bousier.spr missing; open D:\datas_a2\spf\mante.spr missing; open E:\datas_a2\spf\sphex.spr missing; open E:\datas_a2\spf\cerceris.spr ok; open E:\datas_a2\spf\bousier.spr missing; open E:\datas_a2\spf\mante.spr missing; open F:\datas_a2\spf\sphex.spr missing; open F:\datas_a2\spf\cerceris.spr missing; open F:\datas_a2\spf\bousier.spr ok; open F:\datas_a2\spf\mante.spr missing; open G:\datas_a2\spf\sphex.spr missing; open G:\datas_a2\spf\cerceris.spr missing; open G:\datas_a2\spf\bousier.spr missing; open G:\datas_a2\spf\mante.spr ok | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.tibet_after_shamballa_four_drives.01 monde 5 | open D:\datas_a2\spf\sphex.spr ok; open D:\datas_a2\spf\cerceris.spr missing; open D:\datas_a2\spf\bousier.spr missing; open D:\datas_a2\spf\mante.spr missing | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.tibet_after_shamballa_four_drives.02 film_track cine062.apc | open D:\datas_a2\apc\cine062.apc missing | owns=0 entry=-1 traj=- music_after_video=0 voice2=silent
+glue.tibet_after_shamballa_four_drives.03 hnm_start cine062.hnm | - | owns=0 entry=-1 traj=- music_after_video=0 voice2=silent
+glue.tibet_after_shamballa_four_drives.04 video_end | - | owns=0 entry=-1 traj=- music_after_video=1 voice2=silent
+glue.tibet_after_shamballa_four_drives.end start_play2=0 end_stop2=0 voice2_after=silent draw_percent=-
+glue.tibet_after_shamballa_four_drives.disc drive=D:\ disc=1
+glue.tibet_after_shamballa_four_drives.fatal 0

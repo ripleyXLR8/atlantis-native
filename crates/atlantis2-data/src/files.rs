@@ -16,7 +16,8 @@
 //! The four discs share 260 paths, 254 of them byte for byte; six differ
 //! between discs, so a file under `datas_a2\` is read from the disc the
 //! original would read: the current one, chosen by the `MONDE` rule
-//! ([`A2Files::set_monde`]). A port with every disc at hand needs no disc
+//! ([`A2Files::set_monde`]) as on a single drive, the disc asked for
+//! inserted when asked. A port with every disc at hand needs no disc
 //! prompt; a file missing from the current disc is read from another disc
 //! that has it (the original would fail to open it), and logged.
 //! [`A2Files::read_current`] reads as the original does, for the files
@@ -255,16 +256,16 @@ impl A2Files {
 
     /// `/set(monde=N)` (@ 0x00484df0): the disc of world N becomes the
     /// current one. 1..4 (Ireland, Yucatán, China, Shamballa) are discs
-    /// 1..4; 5 (Tibet) is whichever disc is in the drive, here the
-    /// lowest-numbered one found (the first drive holding a disc,
-    /// @ 0x0040e0e0); 6 (the Yucatán texts of the last disc) is disc 4;
-    /// any other value leaves the disc unchanged. Returns the disc wanted,
-    /// which stays the current one even when it was not found (its files
-    /// then come from the others).
+    /// 1..4; 6 (the Yucatán texts of the last disc) is disc 4; any other
+    /// value leaves the disc unchanged. 5 (Tibet) takes the disc of the
+    /// first drive holding one (@ 0x0040e0e0), whatever its number: with
+    /// one drive, the disc already in it, so the current disc stays (after
+    /// Shamballa, film 62's track is read from disc 4). Returns the disc
+    /// wanted, which stays the current one even when it was not found (its
+    /// files then come from the others).
     pub fn set_monde(&mut self, monde: i32) -> u8 {
         let wanted = match monde {
             1..=4 => monde as u8,
-            5 => self.discs.first().map_or(self.current, |d| d.number),
             6 => 4,
             _ => self.current,
         };
@@ -452,9 +453,10 @@ mod tests {
             files.read_with_disc(Folder::Warp, "b.hnm"),
             Some((b"four".to_vec(), 4))
         );
-        // Tibet: the first disc; 6: disc 4; others: unchanged.
-        assert_eq!(files.set_monde(5), 2);
+        // Tibet: the disc in the drive; 6: disc 4; others: unchanged.
+        assert_eq!(files.set_monde(5), 3);
         assert_eq!(files.set_monde(6), 4);
+        assert_eq!(files.set_monde(5), 4);
         assert_eq!(files.set_monde(0), 4);
         assert_eq!(files.set_monde(7), 4);
         // A disc that is not there stays wanted; files come from the others.

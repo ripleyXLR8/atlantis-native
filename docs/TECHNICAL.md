@@ -710,13 +710,17 @@ back) into `yucatan-*.png`.
   folders directly inside it and in each `--discs <folder>`, and told apart
   by the original's marker files (`datas_a2\spf\sphex.spr`, `cerceris`,
   `bousier`, `mante`). The current disc follows the `MONDE` rule (worlds
-  1..4 on discs 1..4, Tibet on whichever disc is in, 6 on disc 4); six
-  files differ between the discs, so a file is read from the current disc
-  first (`crates/atlantis2-data/src/files.rs`). Other files missing from
-  the current disc come from another one, except the sounds of
+  1..4 on discs 1..4, 6 on disc 4, Tibet on the disc of the first drive
+  holding one); Native plays as one drive whose disc is changed when the
+  game asks, so Tibet keeps the disc already in. Six files differ between
+  the discs, so a file is read from the current disc first
+  (`crates/atlantis2-data/src/files.rs`). Other files missing from the
+  current disc come from another one, except the sounds of
   `datas_a2\apc\`, read from the current disc only as the original
   reads them: film 44 (chapter 27, disc 4) has its track on disc 2 only
-  and plays silent, as in the original. The discs' long names are
+  and plays silent, as in the original; film 62 on the way back from
+  Shamballa (chapter 78, `monde=5` with disc 4 in) plays its track from
+  disc 4. The discs' long names are
   in their Joliet trees, which the disc-image reader now reads.
 - **Places:** `WAM V2.8` is a stream of tagged chunks (views, moves, 3D
   click zones with their corners, sounds, links, entities and their

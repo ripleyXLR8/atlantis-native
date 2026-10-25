@@ -5,7 +5,8 @@
 //! loaded or by a move's `TrajSound`), the "music back to 100 %" request
 //! of a video's end that a new music cancels (FUN_0040bb90,
 //! FUN_0040bb80), and a film's track read from the disc in the drive only
-//! (film 44).
+//! (film 44 silent; film 62 with its track, Tibet keeping the disc in the
+//! drive).
 //!
 //! Each scenario of the golden that the shipped game can reach is played
 //! here with the scripts' own commands; its `.end` row is what is
@@ -320,4 +321,41 @@ fn film_44_plays_without_its_track_from_another_disc() {
         .iter()
         .any(|ev| matches!(ev, Event::Sound(s) if s.eq_ignore_ascii_case("cine044.apc"))));
     assert_eq!(got, golden("film_track_not_on_the_current_disc"));
+}
+
+/// The disc of the golden's `.disc` row: the current disc @ 0x00656a88
+/// when the scenario ends.
+fn golden_disc(scenario: &str) -> u8 {
+    let key = format!("glue.{scenario}.disc ");
+    let row = GOLDEN
+        .lines()
+        .find_map(|l| l.strip_prefix(key.as_str()))
+        .unwrap_or_else(|| panic!("{scenario}.disc not in the golden"));
+    row.split(' ')
+        .find_map(|f| f.strip_prefix("disc="))
+        .and_then(|d| d.parse().ok())
+        .unwrap_or_else(|| panic!("disc in {row}"))
+}
+
+/// `monde=5` keeps the disc in the drive: chapter 78 leaves Shamballa
+/// (`monde=4`, disc 4) with `monde=5` then `cinema=62` (lines 26-27), and
+/// `cine062.apc` is on disc 4 only. On one drive the original's
+/// FUN_0040e0e0 finds disc 4 there and plays the film with its track
+/// (golden `tibet_after_shamballa_one_drive`).
+#[test]
+fn film_62_after_shamballa_plays_its_track_from_the_disc_in_the_drive() {
+    let Some(files) = game() else { return };
+    let scenario = "tibet_after_shamballa_one_drive";
+    let mut e = in_tibet(files);
+    e.run_command(b"(monde=4)");
+    assert_eq!(e.files().current_disc(), 4);
+    e.run_command(b"(monde=5)");
+    assert_eq!(e.files().current_disc(), golden_disc(scenario));
+    let mut got = around_video(&mut e, cinema(62), &[]);
+    got.draw_percent = None;
+    assert!(e
+        .events
+        .iter()
+        .any(|ev| matches!(ev, Event::Sound(s) if s.eq_ignore_ascii_case("cine062.apc"))));
+    assert_eq!(got, golden(scenario));
 }
