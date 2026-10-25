@@ -36,6 +36,9 @@ use atlantis2_engine::subtitle::{layout, SubtitleFont};
 use atlantis2_engine::{Engine, Fpu, Variant};
 use md5::{Digest, Md5};
 
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
+
 const SCRIPT: &str = include_str!("golden/dialog_script_ti.txt");
 const FRAMES: &str = include_str!("golden/dialog_frames.txt");
 const SUBTITLES: &str = include_str!("golden/subtitles.txt");
@@ -474,6 +477,21 @@ fn music_fades_and_volumes_match_the_original() {
     }
 }
 
+/// The dialog loop as the original's (`dialog_loop.txt`) on Tibet's first
+/// dialog (360, head lines) in view 7: the panorama drawn under the
+/// frame and its place animations stepped on the 15 Hz ticks, no turn;
+/// the panorama back at 76° after the end.
+#[test]
+fn the_dialog_loop_in_tibet_matches_the_original() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::new_game(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    let (kinds, stepped) = dialog_loop::check_dialog_loop(&mut e, 360);
+    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0]);
+    assert!(stepped);
+}
+
 /// Tibet's first dialog (360) played by the engine at 60 frames a second
 /// from the arrival in view 7: the three lines follow their voices, the
 /// first voice is the one the lip-sync golden analysed, the video loops
@@ -559,6 +577,9 @@ fn dialog_360_plays_end_to_end() {
     );
     assert_eq!(min_music, 16);
     assert!(e.dialog().is_none());
+    // The last line is the shaman's (50°): the end puts the panorama back
+    // at 76° with the screen's centre (FUN_00402960).
+    dialog_loop::assert_camera_after_dialog(&e, "dialog 360");
     // Back up to 100 % in 84 / 127 s.
     for k in 0..60 {
         e.set_clock((frame + k) as f64 / 60.0);

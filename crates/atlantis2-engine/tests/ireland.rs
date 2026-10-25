@@ -19,6 +19,9 @@ use atlantis2_engine::engine::{irish_click_hook, irish_entry_hook};
 use atlantis2_engine::sound::{Pcm, VOICE_EFFECTS};
 use atlantis2_engine::{Engine, Enhancements, Event, Fpu, LoopType, Variant};
 
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
+
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
         std::env::var_os("ATLANTIS2_DATA"),
@@ -574,6 +577,28 @@ fn set_values(files: &A2Files, key: &str) -> Vec<String> {
     out
 }
 
+/// The dialog loop as the original's (`dialog_loop.txt`) on Ireland's
+/// three kinds of lines: a head dialog, dialog 56 (`voixoff`: the view
+/// turns with the mouse) and dialog 44 (`voixoff0`: the panorama drawn
+/// under Liam's subtitle, not the last head); in each, the place
+/// animations step on the 15 Hz ticks and the panorama is back at 76°
+/// after the end.
+#[test]
+fn the_dialog_loop_in_ireland_matches_the_original() {
+    let Some(files) = game() else { return };
+    let mut e = in_ireland(files);
+    let mut kinds = std::collections::BTreeSet::new();
+    let mut stepped = false;
+    for n in [1, 56, 44] {
+        let (k, s) = dialog_loop::check_dialog_loop(&mut e, n);
+        kinds.extend(k);
+        stepped |= s;
+        settle(&mut e);
+    }
+    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0, 1, 2]);
+    assert!(stepped);
+}
+
 #[test]
 fn every_irish_dialog_plays() {
     let Some(files) = game() else { return };
@@ -607,6 +632,8 @@ fn every_irish_dialog_plays() {
             }
         }
         assert!(ended, "dialog {n} does not end");
+        // The panorama back at 76° (FUN_00402960 at the end).
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
         lines += e
             .events
             .iter()

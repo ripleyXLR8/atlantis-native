@@ -1,8 +1,7 @@
 //! The engine's part of the 800 x 600 mode ([`crate::display`]): the
 //! screen size from `atlant2.cfg`, the mode of each loop type, the frame
-//! drawn on the 640 x 480 surface and enlarged. At 640 x 480 nothing of
-//! this changes what the engine does (not even the camera reset the
-//! original does at each loop type change: see `apply_mode`).
+//! drawn on the 640 x 480 surface and enlarged. At 640 x 480 only the
+//! camera reset of each loop type change remains (see `apply_mode`).
 
 use super::{Engine, LoopType};
 use crate::camera::WARP_FOV;
@@ -65,18 +64,15 @@ impl Engine {
     /// FUN_00402960: the frame drawn on the screen itself (`native`) or on
     /// the 640 x 480 surface; the warp camera set for the logical size:
     /// centre (W / 2, H / 2) (FUN_004a48f0), 76° across (FUN_004a4950 with
-    /// the float π times the double 76 / 180, the constant `WARP_FOV`).
-    /// The original sets the camera at every loop type change, at 640 x
-    /// 480 too; the port does it only at 800 x 600 or when the size
-    /// changes, so that the 640 x 480 game stays as it was (a possible
-    /// difference after a dialog ending on another speaker's line with a
-    /// `[Focale]` field of view, not checked yet).
+    /// the float π times the double 76 / 180, the constant `WARP_FOV`,
+    /// whatever the control word). Every path of FUN_00402960 does it
+    /// (atlantis2-cd-fr-2199552 @ 0x00402a3f, 0x00402b59), so every loop
+    /// type change resets the camera, at 640 x 480 too: a dialog that ends
+    /// on a line with its own `[Focale]` field of view leaves the panorama
+    /// at 76° (FUN_004808a0 → FUN_0049da90 @ 0x004809d9).
     fn apply_mode(&mut self, native: bool) {
         self.display.native = native;
         let logical = self.display.logical_size();
-        if !self.display.large() && self.display.logical == logical {
-            return;
-        }
         self.display.logical = logical;
         let (w, h) = (logical.0 as u32, logical.1 as u32);
         self.camera.cx = (w / 2) as f32;

@@ -24,6 +24,9 @@ use atlantis2_engine::engine::{yucatan_click_hooks, yucatan_entry_hooks};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, EngineError, Event, Fpu, LoopType, Variant};
 
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
+
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
         std::env::var_os("ATLANTIS2_DATA"),
@@ -869,6 +872,22 @@ fn the_web_is_played() {
     assert_eq!(e.puzzle_mode(), 1);
 }
 
+/// The dialog loop as the original's (`dialog_loop.txt`) on dialog 190
+/// (Tezcat's `voixoff0` lines between the hero's head lines) in view 123:
+/// under Tezcat's subtitles the panorama, not the hero's last head; Chac
+/// and the place animations step through the dialog; the panorama back at
+/// 76° after the end.
+#[test]
+fn the_dialog_loop_in_xibalba_matches_the_original() {
+    let Some(files) = game() else { return };
+    let mut e = in_xibalba(files);
+    e.load_place("xibalba.wam");
+    e.enter_at(123, 0.0, 0.0).unwrap();
+    let (kinds, stepped) = dialog_loop::check_dialog_loop(&mut e, 190);
+    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0, 2]);
+    assert!(stepped);
+}
+
 /// Every dialog Xibalba's chapters start (`dial=N`) and the web's code
 /// (187-189, by RunOneCommand) plays to its end with its heads and bodies
 /// drawn.
@@ -905,6 +924,8 @@ fn every_xibalba_dialog_plays() {
             }
         }
         assert!(ended, "dialog {n} does not end");
+        // The panorama back at 76° (FUN_00402960 at the end).
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
         let n_lines = e
             .events
             .iter()
