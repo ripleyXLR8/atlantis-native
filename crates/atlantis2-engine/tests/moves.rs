@@ -435,7 +435,10 @@ fn g9(v: f32) -> String {
 /// turn, the move held until the zoom ends; under 0x0e7f it lands on 35
 /// and stays there, under 0x027f it is reset to 76. One row per pass that
 /// changed the field of view, the target, the turn, the loop or the view.
-/// (`ZoomPsychoStart`'s roll is not ported: its sections are not run.)
+/// `ZoomPsychoStart=180,3` the same way: the field of view 1.8° less per
+/// frame towards 3°, the camera rolled by −0.16 rad a frame instead of
+/// turning, the roll undone and the field of view back to 76 at the end,
+/// under both control words.
 #[test]
 fn the_zoom_of_a_move_matches_the_original() {
     if game().is_none() {
@@ -450,7 +453,9 @@ fn the_zoom_of_a_move_matches_the_original() {
         }
     }
     let mut checked = 0;
-    for (head, want) in sections.iter().filter(|(h, _)| h.contains("ZoomStart=100")) {
+    for (head, want) in &sections {
+        let psycho = head.contains("ZoomPsychoStart=180,3");
+        assert!(psycho || head.contains("ZoomStart=100"), "{head}");
         let (variant, fpu) = if head.starts_with("cw 0x0e7f") {
             (Variant::PII, Fpu::Chop)
         } else {
@@ -462,10 +467,14 @@ fn the_zoom_of_a_move_matches_the_original() {
         e.anim.rand = MsvcRand(1000);
         e.enter_at(2, radians(-75.0), radians(15.0)).unwrap();
         let f = e.fpu();
-        e.zoom.start(f, 100.0, 35.0);
+        if psycho {
+            e.zoom.psycho_start(f, 180.0, 3.0);
+        } else {
+            e.zoom.start(f, 100.0, 35.0);
+        }
         let mut got = vec![format!(
-            "set: fov {:.4} target {:.4} step {:.4} roll 0.0000/0.0000",
-            e.zoom.current, e.zoom.target, e.zoom.step
+            "set: fov {:.4} target {:.4} step {:.4} roll {:.4}/{:.4}",
+            e.zoom.current, e.zoom.target, e.zoom.step, e.zoom.roll, e.zoom.roll_step
         )];
         let mut prev = None;
         let mut clock = 100.0;
@@ -481,6 +490,7 @@ fn the_zoom_of_a_move_matches_the_original() {
             let cur = (
                 e.zoom.current,
                 e.zoom.target,
+                e.zoom.roll,
                 e.turning(),
                 i32::from(e.loop_type == LoopType::Video),
                 e.place().1,
@@ -488,12 +498,13 @@ fn the_zoom_of_a_move_matches_the_original() {
             if Some(cur) != prev {
                 let (yaw, pitch) = e.camera.angles();
                 got.push(format!(
-                    "p{n} fov {} target {} roll 0.0000 turn {} loop {} view {} yaw {} pitch {}",
+                    "p{n} fov {} target {} roll {:.4} turn {} loop {} view {} yaw {} pitch {}",
                     g9(cur.0),
                     g9(cur.1),
-                    i32::from(cur.2),
-                    cur.3,
+                    cur.2,
+                    i32::from(cur.3),
                     cur.4,
+                    cur.5,
                     fmt3(degrees(yaw)),
                     fmt3(degrees(pitch))
                 ));
@@ -503,5 +514,5 @@ fn the_zoom_of_a_move_matches_the_original() {
         compare(head, &got, want);
         checked += 1;
     }
-    assert_eq!(checked, 2);
+    assert_eq!(checked, 4);
 }

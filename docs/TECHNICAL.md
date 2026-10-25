@@ -643,9 +643,14 @@ gong. Yucatán's boat leaves for Yucatán (world 2, below), which plays
 with its counting grids and sends the game back to Tibet by its brazier;
 the priestess's yes leads into Xibalba (world 6, below), whose three
 puzzles (the star map, the canoe, the spider's web) are played, and the
-soul it gives ends Yucatán with its mandala. A trip to a world not
-ported plays its film and stays where it is (the crystal, the space
-travel). Not yet: Shamballa.
+soul it gives ends Yucatán with its mandala. Each world's ball (the
+shaman's) leads to the space-travel hub and back (below). The six
+mandalas laid, the crystal laid in the hut leads to Shamballa and
+Atlantis (world 4, below), which play to the octopus without their two
+puzzles (the fireflies and the octopus fight, whose wins testing aids
+write); the octopus's death sends the game back to Tibet, and the
+crystal laid again to the hub's last view, the films, the credits and the
+end of the game.
 `--headless <folder> [frames] --screenshot
 <file.png>` plays a new game for that many frames of 1/60 s and saves the
 screen;
@@ -1050,8 +1055,19 @@ back) into `yucatan-*.png`.
   the original under both words (`tests/moves.rs`,
   `scripts_worlds_zoom.txt`). The turn step's comparisons are the x87's:
   a NaN counts as below (`test ah, 1`), which keeps a turn at its end
-  while a zoom holds it (the braking divides by 0 there). The roll of
-  `ZoomPsychoStart` (Shamballa only) is not ported.
+  while a zoom holds it (the braking divides by 0 there).
+  `ZoomPsychoStart=a,b` (chapter 81, every move of the ring) is the same
+  zoom (towards b°, a / 100° a frame) with a roll, when none runs (the
+  roll's sum and step both 0, FUN_0045b3b0): the step −0.16 rad (the
+  float 0xbe23d70a), and while it is not 0 the turn's yaw and pitch are
+  not applied (@ 0x0045ba0a..0x0045ba1b; the turn still counts its way
+  and ends), the camera turns about its own Z axis by the step after the
+  zoom's part, the step summed (@ 0x0045bb45..0x0045bbae); the zoom's end
+  undoes the sum and clears both (FUN_0045b400). The view's direction is
+  kept, so the move's video and arrival come from where the click aimed.
+  Checked frame by frame against the original under both words
+  (`scripts_worlds_zoom.txt`'s `ZoomPsychoStart` sections: the field of
+  view, the summed roll, the read-back angles).
 - **Mandalas** (`engine/puzzles.rs`): the puzzles' click hook
   dispatcher of the original (@ 0x0049b910) sends a click on a zone of
   type 3, 4 or 50 of a view whose warp name starts with `TI` (any case)
@@ -1080,7 +1096,7 @@ back) into `yucatan-*.png`.
   place change; the dispatcher's choice of the hook for 47 warp names,
   view numbers and zone types. Not ported: the solution log the original prints at exit
   (@ 0x00495650, a fixed list that is not the fireflies' answer) and the
-  fireflies themselves (Shamballa).
+  fireflies themselves (Shamballa, below).
 - **Skull** (`engine/puzzles.rs`, Ireland's views 40-42 of
   `bigile1.wam`): the view entry of the three views (@ 0x00493cb0, from
   the entry dispatcher @ 0x0049bd50) keeps `CRANE_SPRITE`'s object index,
@@ -1276,9 +1292,9 @@ back) into `yucatan-*.png`.
   one place animation (`1mA1024025.SPW`, renamed `.err.SPW` on disc 3)
   is skipped with the original's message; music 21, which chapter 75's
   trip copies, is on no disc and no list plays it. The place sounds of
-  `chine.wam` and `miniature.wam` play. Not ported: the space travel
-  from China (chapter 56, `Planetes.wam`: refused, the hub is another
-  world's work). A headless game plays the whole of China with the
+  `chine.wam` and `miniature.wam` play. The space travel from China
+  (chapter 56, `miniature.wam` view 16) leads to the hub and back
+  (below). A headless game plays the whole of China with the
   mouse only (`tests/flow.rs` `the_whole_of_china_with_the_mouse`, about
   50 s): from a new game, China's boat laid in the hut, then chapters
   42-60 stage by stage (the shadow, the abbot and the gardener master's
@@ -1353,7 +1369,7 @@ back) into `yucatan-*.png`.
   which only Xibalba's chapter 39 gives (below). **The way back to Tibet
   without it** is chapter 30's brazier (`yucatan.wam` view 35, a click
   with an empty hand: Tibet's view 7, chapter 75); the space travel of
-  view 22 (chapter 25) is refused like China's and Ireland's. Every
+  view 22 (chapter 25) leads to the hub and back (below). Every
   panorama of the three places is on disc 2; one place animation
   (`w3A1078078.SPW`, the closed jaw of view 78) is on no disc and is
   skipped with the original's message; the place sounds of `yucatan.wam`
@@ -1500,6 +1516,100 @@ back) into `yucatan-*.png`.
   colours the panorama's). Not checked against the original running
   Xibalba (Wine / Win98): the pictures, the place sounds' mix, Chac's
   events' timing on screen.
+- **The space-travel hub** (`planetes.wam`, chapter 83, prefix `PL`;
+  its panoramas, videos, music 39 and films 200 and 201 are on every
+  disc): the world is kept (no `monde` line; the objects bank and the
+  texts stay the traveller's). The shaman's balls (chapter 75's subject
+  `SHAMAN`: `BOULE_SHAMAN` and one per world, moved to worlds 1-3) open
+  the ball overlay; a click on the zone the ball names (Tibet's view 4,
+  `ilepoete.wam` / `ilepoete2.wam` view 70 / 170, `yucatan.wam` view 22,
+  `miniature.wam` view 16) sets `SpaceTravel`, whose sections in chapters
+  20, 25, 56 and 75 play film 200, load the hub (view 1) and its
+  chapter, with `SourceWorld_SpaceTravel` and, the first time from that
+  world, `TravelXXDone` and one more `SpaceDeep`. Chapter 83's `/INIT`
+  disables the move from view `SpaceDeep` to the next (1..4) and enables
+  those before it; 0 is the scripts' trap (a fatal error, as the
+  original's). Each move's departure section names its sound
+  (`TrajSound`), played with the video. In view 4 the four balls become
+  the four crystals, once. View 1's zone 10 is the way back: film 201,
+  the source world's place, view and chapter (Ireland's second island
+  once `flag70` is set). View 5's last zone (value 77450, no view) is the
+  end: `monde=4`, the music stopped, films 68 and 66, the credits
+  (`credits=1`: the menu loop's credits page, a resume point left), then
+  film 99 and `exit=1` (the game quits). A click or Escape in the credits
+  quits at once (the menu's key action), without film 99, as the
+  original. Two view records have no panorama on any disc: 10 (the way
+  back's destination, which the departure section leaves before the
+  move) and 11 (a record no zone leads to).
+- **Shamballa and Atlantis** (world 4, disc 4; chapters 78, 80-82 and
+  201; `voiles.wam` loaded by chapter 75's crystal (its section needs the
+  six `pose*` flags and `flag261` = 0; with `flag261` = 1 the crystal is
+  the hub's last trip), `rhea.wam`, `annulair.wam`, `atlantis.wam` loaded
+  by chapters 78, 80 and 81, and reached by the links of `rhea.wam` view 3
+  and `annulair.wam` view 5): `voiles.wam`'s six move zones of view 1 are
+  the fireflies (each departure shows its firefly and starts the zoom;
+  the zones lead to views 1..6, of which only view 1 is in the place: a
+  move's end without a view runs FUN_0045a630, which in `voiles.wam` sets
+  the field of view back to 76° and, the puzzle won, sets
+  `Puzzle_Lucioles_AutoWin` and scans: film 62, `rhea.wam`). The vortex
+  (`TOURBILLON`, click kind 3) leads back to Tibet's view 10 before the
+  win, to Rhea after. Rhea (view 6) answers seven subjects; the shadow's
+  (`OMBRE_SHAMB`) opens the link of view 3 (film 67, the ring). The ring
+  (`annulair.wam`, 16 views round, `ZoomPsychoStart` on every move): its
+  sixteen objects (`*_LA`) are taken by a click, nine characters answer
+  a click with a dialog (399-407); `ETOILE_LA` in hand on view 5's stone
+  (`ZONEPOSEETOILEPIERRE`, a link of type 2) is the way to Atlantis (film
+  63; the sixteen objects leave the bag); without it the departure is
+  aborted. Atlantis (chapter 82, `EnergieJoueur` = 10): views 1-18, the
+  sunken crystal (`CRISTAL_ENGLOUTI`) in view 18. Its ends are the octopus
+  fight's: the hero's death (chapter 201: film 64, view 8 and chapter 82
+  again) and the octopus's (chapter 200: film 65, Tibet's view 7, chapter
+  75, `flag260`, whose section plays dialog 372, counts a trip and sets
+  `flag261`). Three of Atlantis's view records have no panorama on any
+  disc: 802 and 810 (they hold the octopuses' and the plankton's
+  animations, which the fight loads) and 19 (a destination of view 18
+  that no zone leads to). Of the transition videos of the four places
+  only `rh001002.hnm` is on a disc: the other moves are cuts, as in the
+  original (whose video start fails the same way).
+  **The two puzzles are not ported** (`engine/shamballa.rs`): the
+  dispatchers' `SH` and `AT` branches are listed as the original's
+  (`shamballa_click_hooks`: `SH` view 1, zone types 1 and 2, the
+  fireflies' click FUN_00495210; `atlantis_entry_hooks`: `AT` views 1-19,
+  the octopus's entry FUN_0049a8c0) and noted (`Event::PuzzleNotPorted`);
+  none takes the click; the octopus's mode 6 is never set, so its tick
+  (FUN_0049aaa0) and its cursor (FUN_0049a9a0) never run. What the port
+  then does not do: the fireflies' count and their sound 300, the stop of
+  the turn speeds on a firefly's click; the octopus's entry's camera
+  reset (FUN_0045b4b0: the hit shake cleared, the view set about Y from
+  its read-back yaw, the field of view 76°), its crosshair cursor, its
+  tentacles' animations (views 802), the hits, the shots, the
+  `PoulpeWarp%d` / `BigTenta%dDied` variables. Testing aids, not the
+  original's, write the wins (`Event::PuzzleAid`):
+  `Engine::win_fireflies` (`NbLucioleAllumed` = 6,
+  `Puzzle_Lucioles_Fini` = 1, as the sixth right firefly does) and
+  `Engine::end_octopus_fight(octopus_dead)` (the fight's quit, then
+  `(chapter=200)` or `(chapter=201)` and a scan, as its two ends).
+  `tests/endgame.rs` runs every chapter's `/INIT` (and the trap), enters
+  every view of the five places with their hooks, plays a firefly's
+  move and its end, the aid and the automatic way on, the vortex both
+  ways, Rhea's subjects and the refused and opened link, the ring's
+  rolling move (the direction kept, the roll undone, 76° after), a
+  character's dialog, the star taken and laid (refused without it), the
+  octopus's two ends, the hub from each world twice (the first trip
+  counted once) and back, the hub's moves with their sounds and the
+  crystals, the end (films, credits, film 99, the quit; a click in the
+  credits), every dialog the chapters start (391-407, and Tibet's 372),
+  the subjects, objects, musics and films on their discs, and saves in
+  the four places and the hub; `tests/script.rs` compares every `/set`
+  line of chapters 78-201 with the original's
+  (`tests/golden/scripts_worlds_endgame.txt`, 209 rows, the trap's key
+  written `{trap}`, compared up to its fatal error: the harness goes on
+  where the game quits); `tests/flow.rs` `the_end_of_the_game_with_the_mouse`
+  plays it with the mouse from Tibet (the three worlds' ends written as
+  their scripts leave them); `tests/hd.rs` checks the hub, the fireflies'
+  view, Rhea, the ring and Atlantis with the HD mode as the other places,
+  and the HD view following the ring's roll. Not checked against the
+  original running (Wine / Win98): the pictures, the roll on screen.
 - **The canoe** (`canoe.rs`, `atl3d/ortho.rs`, `engine/canoe.rs`; the files
   in `atlantis2-data`'s `canoe.rs`; `bat.wam` view 402, chapter 35):
   loop type 9, the only puzzle with a loop of its own. The click branch
@@ -2072,11 +2182,12 @@ back) into `yucatan-*.png`.
   `NEWSOUND`, film and `TrajSound` tracks the original also keeps there
   while they play, so a handle can differ when one of those is still
   loaded at the view's entry or a round's start.
-- **Worlds:** Tibet (`tibet.wam`, world 5), Ireland, China, Yucatán and
-  Xibalba (above) are ported. A `changewam` of the scripts to any other
-  place (Shamballa's `voiles.wam`
-  after the crystal, `Planetes.wam` of the space travel, Ireland's
-  `demo.wam`) is
+- **Worlds:** Tibet (`tibet.wam`, world 5), Ireland, China, Yucatán,
+  Xibalba, the space-travel hub, Shamballa and Atlantis (above) are
+  ported. A `changewam` of the scripts to any other place (Ireland's
+  `demo.wam`, chapter 1's, whose panoramas are on no disc and which no
+  chapter reaches, or `sans_nom.wam`, the one place file no script and
+  no link names) is
   refused: where the original loads it (a place it cannot load is fatal
   there), the port notes it (`Event::WorldNotPorted`), ends the section
   at that line, sets the world back to the current place's (`Interp_SetMonde`: the
@@ -2424,7 +2535,7 @@ back) into `yucatan-*.png`.
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
-  credits). No-ops, logged: `ZoomPsychoStart` (its roll), `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
+  credits), `ZoomPsychoStart` (the zoom with its roll). No-ops, logged: `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
   read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. `ANIM_THE_FRAME`
   sets the playing byte of the first record of its id, of any kind
@@ -2713,5 +2824,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), China's seven puzzles (done), Yucatán with its grids (done), Xibalba without its puzzles (done), then Xibalba's three puzzles, Shamballa and its puzzles |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), China's seven puzzles (done), Yucatán with its grids (done), Xibalba and its three puzzles (done), the space-travel hub, Shamballa and Atlantis without their two puzzles, the end of the game (done), then the fireflies and the octopus fight |
 

@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use atlantis2_data::defnames::DefNames;
+use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_engine::script::{AnimOp, DialStart, Host, Keys, Script, SubjectTable};
 use md5::{Digest, Md5};
 
@@ -25,6 +25,7 @@ const TIBET_SCAN: &str = include_str!("golden/scripts_con_tibet_scan.txt");
 const NAMES: &str = include_str!("golden/scripts_con_names.txt");
 const IRELAND: &str = include_str!("golden/scripts_worlds_ireland.txt");
 const CHINA: &str = include_str!("golden/scripts_worlds_china.txt");
+const ENDGAME: &str = include_str!("golden/scripts_worlds_endgame.txt");
 const EVENTS: &str = include_str!("golden/scripts_worlds_events.txt");
 const COMMENT: &str = include_str!("golden/scripts_con_comment.txt");
 
@@ -63,7 +64,8 @@ fn synthetic_defnames() -> Vec<u8> {
     t
 }
 
-/// The golden's `{S:I}` / `{S:I:l}` tokens replaced by the names.
+/// The golden's `{S:I}` / `{S:I:l}` tokens replaced by the names (a
+/// `{word}` is kept).
 fn fill(names: &DefNames, s: &str) -> String {
     let mut out = String::new();
     let mut rest = s;
@@ -71,6 +73,12 @@ fn fill(names: &DefNames, s: &str) -> String {
         out.push_str(&rest[..i]);
         let j = rest[i..].find('}').unwrap() + i;
         let f: Vec<&str> = rest[i + 1..j].split(':').collect();
+        if f.len() < 2 {
+            // `{trap}`: a name of no section, left as written.
+            out.push_str(&rest[i..=j]);
+            rest = &rest[j + 1..];
+            continue;
+        }
         let name = names
             .name(f[0].parse().unwrap(), f[1].parse().unwrap())
             .unwrap();
@@ -784,6 +792,58 @@ fn every_china_set_line_matches_the_original() {
     }
     assert!(golden.next().is_none());
     assert_eq!((n, china), (1855, 1035));
+}
+
+/// Every `/set` line of chapters 78 to 201 (Shamballa and Atlantis, the
+/// space-travel hub, the octopus's two endings), each in place in its
+/// chapter's text, the state carried from line to line from chapter 1 on,
+/// against the original's (`scripts_worlds_endgame.txt`). The key of the
+/// line that is in no `defnames.con` section (chapter 83's trap, a fatal
+/// error in both) is written `{trap}` there; of its row only the fatal is
+/// compared (the harness goes on after it, the game quits).
+#[test]
+fn every_endgame_set_line_matches_the_original() {
+    let Some(mut s) = game_script() else { return };
+    let names = s.names.clone();
+    let mut h = Rec::default();
+    s.current_view = Some(2);
+    for chapter in chapters(1, 60) {
+        world_rows(&mut s, &mut h, chapter);
+    }
+    let mut golden = rows(ENDGAME).map(|r| fill(&names, r));
+    let (mut n, mut traps) = (0, 0);
+    for chapter in chapters(61, 299).into_iter().filter(|&c| c != 75) {
+        for (got, changes) in world_rows(&mut s, &mut h, chapter) {
+            let key = got
+                .split(" key=")
+                .nth(1)
+                .unwrap()
+                .split(' ')
+                .next()
+                .unwrap();
+            let want = golden.next().unwrap_or_default();
+            if key != "flag#" && names.id(defnames::VARIABLES, key.as_bytes()).is_err() {
+                // The trap: the lookup's fatal error in both. The game
+                // quits there; the harness's fatal stub returns index 0
+                // and its line goes on into the `CHAPTER` branch, which
+                // the port, stopping at the fatal, does not run.
+                traps += 1;
+                let head = got.split(" key=").next().unwrap();
+                assert!(want.starts_with(&format!("{head} key={{trap}} ")), "{want}");
+                assert!(want.ends_with(" fatal") && got.ends_with(" fatal"), "{got}");
+                n += 1;
+                continue;
+            }
+            assert_eq!(
+                got.to_ascii_lowercase(),
+                want.to_ascii_lowercase(),
+                "{changes:?}"
+            );
+            n += 1;
+        }
+    }
+    assert!(golden.next().is_none());
+    assert_eq!((n, traps), (209, 1));
 }
 
 #[test]

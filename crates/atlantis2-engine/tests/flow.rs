@@ -30,7 +30,13 @@
 //! the priestess's yes and Xibalba's chapters 35-39 (its three puzzles
 //! played with the mouse: the canoe, the web's rounds, the star map), a save
 //! and a load in each, the soul brought back to the king and Yucatán's
-//! mandala laid in Tibet.
+//! mandala laid in Tibet. Then the end of the game, from Tibet as the three
+//! worlds leave it: the space-travel hub by Tibet's ball and back, the
+//! crystal laid in the hut, Shamballa (the fireflies' win written by the
+//! testing aid, the puzzle not being ported; the vortex), Rhea, the
+//! ring's rolling moves and its star, Atlantis (the octopus's two ends by
+//! the aid), Tibet again, the hub's last trip, the films, the credits and
+//! the quit.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the test is skipped. The saves go to a
@@ -5227,3 +5233,264 @@ fn yucatans_mandala_laid(r: &mut Run) {
 /// The Xibalba chapters a game goes through (40 and 41 hold only an
 /// empty `/INIT`, named by no `chapter=` line).
 const XIBALBA_CHAPTERS: [i32; 5] = [35, 36, 37, 38, 39];
+
+/// The end of the game with the mouse, from Tibet as the three worlds
+/// leave it (played above; here their ends are written as the scripts
+/// leave them: the six mandalas laid, the shaman's four balls in the bag,
+/// the three worlds' first space trips made): the ball of Tibet's view 4
+/// (the hub's first trip from Tibet, the balls made crystals in view 4,
+/// the way back), the crystal laid in the hut (Shamballa), the fireflies
+/// (the testing aid writes their win: the puzzle is not ported) and the
+/// vortex, Rhea asked about all she offers, the ring walked round with
+/// its rolling moves, the star taken and laid, Atlantis walked to the
+/// sunken crystal, the octopus's two ends (the aid again: the hero's death,
+/// then the octopus's), Tibet's dialog 372, the crystal laid again, the
+/// hub's last trip to view 5, its last zone, the films and the credits to
+/// their end, the last film and the quit. Pictures with
+/// `ATLANTIS2_PNG_DIR` (`endgame-*.png`).
+#[test]
+fn the_end_of_the_game_with_the_mouse() {
+    if game().is_none() {
+        return;
+    }
+    let dir = scratch("a2-flow-endgame");
+    let mut r = Run::new(&dir);
+    tibet_start(&mut r);
+    for (k, (object, _, order)) in MANDALAS.iter().enumerate() {
+        let pose = match k {
+            0 => "poseirb",
+            1 => "posechb",
+            2 => "poseyub",
+            3 => "poseira",
+            4 => "posecha",
+            _ => "poseyua",
+        };
+        for c in [
+            format!("({pose}=1)"),
+            format!("({order}={})", k + 1),
+            format!("(sacados=NOT_{object})"),
+        ] {
+            r.e.run_command(c.as_bytes());
+        }
+    }
+    for c in [
+        "(NbMandalaPosed=6)",
+        "(sacados=BOULE_SHAMAN_IR)",
+        "(sacados=BOULE_SHAMAN_YU)",
+        "(sacados=BOULE_SHAMAN_CH)",
+        "(ChangeObjectWorld=BOULE_SHAMAN_IR,1)",
+        "(ChangeObjectWorld=BOULE_SHAMAN_YU,2)",
+        "(ChangeObjectWorld=BOULE_SHAMAN_CH,3)",
+        "(sacados=BOULE_SHAMAN)",
+        "(TravelIRDone=1)",
+        "(TravelYUDone=1)",
+        "(TravelCHDone=1)",
+        "(SpaceDeep=3)",
+    ] {
+        r.e.run_command(c.as_bytes());
+    }
+
+    // Tibet's ball in view 4: the hub.
+    r.go(4, &[]);
+    let ball = r.obj("BOULE_SHAMAN");
+    r.choose(ball);
+    assert!(r.e.overlays.ball);
+    let zone =
+        r.e.wam()
+            .view(4)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.kind == 1000)
+            .unwrap();
+    let evs = r.press_zone(zone);
+    assert_eq!(films(&evs), [200]);
+    assert!(r.e.place().0.eq_ignore_ascii_case("planetes.wam"));
+    assert_eq!((r.e.place().1, r.chapter()), (1, 83));
+    assert_eq!((r.var("SpaceDeep"), r.var("MONDE")), (4, 5));
+    r.shot_as("endgame-01-hub.png");
+    r.route(&[2, 3, 4]);
+    assert!(r.in_bag("CRISTAL_SHAMAN") && !r.in_bag("BOULE_SHAMAN"));
+    r.shot_as("endgame-02-hub-view-4.png");
+    r.route(&[3, 2, 1]);
+    let evs = r.walk_redirected(10);
+    assert_eq!(films(&evs), [201]);
+    assert_eq!((r.e.place(), r.chapter()), (("tibet.wam", 4), 75));
+
+    // The crystal laid in the hut: Shamballa.
+    r.go(10, &[]);
+    let crystal = r.obj("CRISTAL_SHAMAN");
+    r.pick(crystal);
+    let zone = r.zone_named("ZonePoseCristal");
+    r.aim(zone);
+    r.tap();
+    let mut evs = r.events();
+    evs.extend(r.settle());
+    assert_eq!(films(&evs), [61]);
+    assert_eq!((r.e.place(), r.chapter()), (("voiles.wam", 1), 78));
+    assert_eq!((r.var("MONDE"), r.e.files().current_disc()), (4, 4));
+    r.shot_as("endgame-03-fireflies.png");
+    // A firefly lit (its hook noted), the aid's win, the vortex.
+    let firefly = r.zone_to(3);
+    let evs = r.press_zone(firefly);
+    assert!(evs.contains(&Event::PuzzleNotPorted {
+        function: 0x0049_5210
+    }));
+    assert!(r.shown(false, "LUCIOLLE3"));
+    r.e.win_fireflies();
+    let vortex = r.obj("TOURBILLON");
+    let mut evs = r.click_on(false, vortex);
+    evs.extend(r.settle());
+    assert_eq!(films(&evs), [62]);
+    assert_eq!((r.e.place(), r.chapter()), (("rhea.wam", 1), 80));
+
+    // Rhea.
+    r.route(&[2, 3, 4, 5, 6]);
+    r.shot_as("endgame-04-rhea.png");
+    let asked = r.ask_each("RHEA");
+    let mut heard: Vec<u32> = asked.iter().map(|a| a.1).collect();
+    heard.sort_unstable();
+    heard.dedup();
+    assert_eq!(heard, [391, 392, 393, 394, 395, 396, 397], "{asked:?}");
+    assert_eq!(r.flag(232), 1);
+    r.route(&[5, 4, 3]);
+    let evs = r.walk_link();
+    assert_eq!(films(&evs), [67]);
+    assert_eq!((r.e.place(), r.chapter()), (("annulair.wam", 1), 81));
+
+    // The ring: round to the star, then to the stone.
+    let mut rolled = false;
+    for v in [16, 15, 14, 13, 12] {
+        r.wait(15);
+        let z = r.zone_to(v);
+        assert!(r.try_aim(z, true));
+        r.tap();
+        let mut shot = false;
+        for _ in 0..600 {
+            r.step();
+            rolled |= r.e.zoom.roll != 0.0;
+            if v == 14 && !shot && r.e.zoom.roll < -3.0 {
+                r.shot_as("endgame-05-ring-rolling.png");
+                shot = true;
+            }
+            if r.e.loop_type == LoopType::Video {
+                r.watch();
+            }
+            if r.e.place().1 == v && !r.e.turning() && r.e.loop_type == LoopType::Warp {
+                break;
+            }
+        }
+        assert_eq!(r.e.place().1, v);
+        if v == 12 {
+            // The arrival's frame is not drawn (the zoom's end skips one
+            // draw): the next ones are.
+            r.wait(5);
+            r.shot_as("endgame-06-ring-star.png");
+        }
+    }
+    assert!(rolled);
+    r.take("ETOILE_LA");
+    r.route(&[11, 10, 9, 8, 7, 6, 5]);
+    let star = r.obj("ETOILE_LA");
+    r.pick(star);
+    let stone =
+        r.e.wam()
+            .view(5)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.kind == 2)
+            .unwrap();
+    r.aim(stone);
+    r.tap();
+    let mut evs = r.events();
+    for _ in 0..3000 {
+        if r.e.place().0 == "atlantis.wam" && r.e.loop_type == LoopType::Warp {
+            break;
+        }
+        if r.e.loop_type == LoopType::Video {
+            evs.extend(r.watch());
+        }
+        evs.extend(r.events());
+    }
+    evs.extend(r.settle());
+    assert_eq!(films(&evs), [63]);
+    assert_eq!((r.e.place(), r.chapter()), (("atlantis.wam", 8), 82));
+    r.shot_as("endgame-07-atlantis.png");
+
+    // Atlantis: to the sunken crystal, every view's octopus noted.
+    let evs = r.go(18, &[]);
+    assert!(evs.contains(&Event::PuzzleNotPorted {
+        function: 0x0049_a8c0
+    }));
+    r.take("CRISTAL_ENGLOUTI");
+    r.shot_as("endgame-08-sunken-crystal.png");
+    // The octopus fight's two ends, by the aid: the hero's death (film 64,
+    // view 8 again), then the octopus's (film 65, Tibet, dialog 372).
+    r.e.end_octopus_fight(false);
+    let evs = r.settle();
+    assert_eq!(films(&evs), [64]);
+    assert_eq!((r.e.place(), r.chapter()), (("atlantis.wam", 8), 82));
+    r.e.end_octopus_fight(true);
+    let evs = r.settle();
+    assert_eq!(films(&evs), [65]);
+    assert_eq!(dialogs(&evs), [372]);
+    assert_eq!((r.e.place(), r.chapter()), (("tibet.wam", 7), 75));
+    assert_eq!((r.flag(260), r.flag(261), r.var("SpaceDeep")), (1, 1, 5));
+
+    // The crystal again: the hub's last trip.
+    r.go(10, &[]);
+    r.pick(crystal);
+    let zone = r.zone_named("ZonePoseCristal");
+    r.aim(zone);
+    r.tap();
+    let mut evs = r.events();
+    evs.extend(r.settle());
+    assert_eq!(films(&evs), [200]);
+    assert_eq!((r.e.place().1, r.chapter()), (1, 83));
+    r.route(&[2, 3, 4, 5]);
+    r.shot_as("endgame-09-hub-view-5.png");
+    // The last zone: the end.
+    r.wait(15);
+    let z = r.zone_to(77450);
+    assert!(r.try_aim(z, true));
+    r.tap();
+    let mut films_seen = Vec::new();
+    let mut credits_shot = false;
+    for n in 0..30_000 {
+        let evs = r.events();
+        films_seen.extend(films(&evs));
+        if r.e.loop_type == LoopType::Video && films_seen.last() != Some(&99) {
+            r.wait(30);
+            // A click on the film (one in the credits would quit at once).
+            if r.e.loop_type == LoopType::Video {
+                r.tap();
+            }
+        }
+        if r.e.loop_type == LoopType::Menu && !credits_shot && n % 600 == 599 {
+            r.shot_as("endgame-10-credits.png");
+            credits_shot = true;
+        }
+        if r.e.quit() {
+            break;
+        }
+    }
+    assert!(r.e.quit());
+    assert!(credits_shot);
+    assert_eq!(films_seen, [68, 66, 99]);
+    let journal = std::mem::take(&mut r.journal);
+    assert!(!journal
+        .iter()
+        .any(|e| matches!(e, Event::WorldNotPorted(_))));
+    // Only the two puzzles' hooks are noted.
+    let mut noted: Vec<u32> = journal
+        .iter()
+        .filter_map(|e| match e {
+            Event::PuzzleNotPorted { function } => Some(*function),
+            _ => None,
+        })
+        .collect();
+    noted.sort_unstable();
+    noted.dedup();
+    assert_eq!(noted, [0x0049_5210, 0x0049_a8c0]);
+}

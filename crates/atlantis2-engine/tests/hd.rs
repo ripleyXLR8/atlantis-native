@@ -384,8 +384,10 @@ fn at(files: A2Files, commands: &[&[u8]], hd: bool) -> Engine {
 
 /// The places of the worlds the port plays (Yucatán's open view and the
 /// king's hall with its characters; Xibalba's four places, the bat and
-/// Chac in their views, the star map with the stars its entry draws).
-const PLACES: [(&str, &[&[u8]]); 11] = [
+/// Chac in their views; the space-travel hub; Shamballa's fireflies,
+/// Rhea, the ring's star, Atlantis's crystal; last, the star map with the
+/// stars its entry draws).
+const PLACES: [(&str, &[&[u8]]); 16] = [
     ("Tibet", &[]),
     (
         "Ireland",
@@ -427,6 +429,23 @@ const PLACES: [(&str, &[&[u8]]); 11] = [
     (
         "the spider's web",
         &[b"(monde=6)", b"(changewam=toile.wam)", b"(vue=198)"],
+    ),
+    (
+        "the space-travel hub",
+        &[b"(changewam=Planetes.wam)", b"(vue=1)"],
+    ),
+    (
+        "Shamballa's fireflies",
+        &[b"(monde=4)", b"(changewam=voiles.wam)", b"(vue=1)"],
+    ),
+    ("Rhea", &[b"(monde=4)", b"(changewam=rhea.wam)", b"(vue=6)"]),
+    (
+        "the ring's star",
+        &[b"(monde=4)", b"(changewam=annulair.wam)", b"(vue=12)"],
+    ),
+    (
+        "Atlantis's crystal",
+        &[b"(monde=4)", b"(changewam=atlantis.wam)", b"(vue=18)"],
     ),
     (
         "the star map with its seven stars",
@@ -495,6 +514,78 @@ fn hd_keeps_the_original_frames() {
         }
         assert!(layers >= 80, "{name}: {layers} frames with the layer");
     }
+}
+
+/// A move of the ring (`annulair.wam`, chapter 81's `ZoomPsychoStart`):
+/// the view rolls and narrows; with the HD mode on the 640x480 frames are
+/// those of the HD mode off pass by pass, and the HD view follows the
+/// rolled camera (its pixels the panorama's colours where the frame shows
+/// them) while it rolls.
+#[test]
+fn hd_follows_the_ring_s_roll() {
+    if game().is_none() {
+        return;
+    }
+    let commands: &[&[u8]] = &[
+        b"(monde=4)",
+        b"(changewam=annulair.wam)",
+        b"(vue=1)",
+        b"(chapter=81)",
+    ];
+    let mut off = at(game().unwrap(), commands, false);
+    let mut on = at(game().unwrap(), commands, true);
+    on.enhancements.hd_options.sharpen = false;
+    on.enhancements.hd_options.panorama = atlantis2_engine::hd::PanoFilter::Bilinear;
+    on.set_hd_output(Some(48), 0);
+    off.set_hd_output(Some(48), 0);
+    let zone = on
+        .wam()
+        .view(1)
+        .unwrap()
+        .zones
+        .iter()
+        .position(|z| z.kind == 1 && z.value == 16)
+        .unwrap();
+    let (yaw, pitch) = on.zone_aim(1, zone).unwrap();
+    let (mut a, mut b) = (vec![0u16; 640 * 480], vec![0u16; 640 * 480]);
+    for e in [&mut off, &mut on] {
+        e.camera.enter(yaw + 0.01, pitch);
+        e.pass(None);
+        e.click(10.0);
+    }
+    let lut = atlantis2_engine::hd::rgb565_to_888();
+    let mut checked = 0;
+    for i in 0..60 {
+        for e in [&mut off, &mut on] {
+            e.set_clock(i as f64 / 60.0);
+            if i % 4 == 0 {
+                e.tick();
+            }
+        }
+        off.pass(Some(&mut a));
+        on.pass(Some(&mut b));
+        assert!(a == b, "pass {i} differs with the HD mode");
+        if on.zoom.roll == 0.0 || i % 8 != 4 {
+            continue;
+        }
+        let l = on.hd_layer().expect("a layer");
+        let (mut close, mut n) = (0, 0);
+        for y in (0..480).step_by(7) {
+            for x in (0..640).step_by(7) {
+                let o = lut[usize::from(l.base[y * 640 + x])];
+                let h = l.pixels[(3 * y + 1) * l.width + 3 * x + 1];
+                let d = (0..3)
+                    .map(|k| ((o >> (8 * k)) & 0xff).abs_diff((h >> (8 * k)) & 0xff))
+                    .max()
+                    .unwrap();
+                close += usize::from(d <= 48);
+                n += 1;
+            }
+        }
+        assert!(close * 10 >= n * 9, "pass {i}: {close} of {n}");
+        checked += 1;
+    }
+    assert!(checked >= 4, "{checked}");
 }
 
 /// The canoe (loop type 9) with the HD mode on: its frames are those of

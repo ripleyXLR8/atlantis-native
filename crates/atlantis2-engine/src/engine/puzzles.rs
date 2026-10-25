@@ -56,9 +56,15 @@
 //!   star map, `stars.rs`; the canoe, `canoe.rs`, loop type 9; the
 //!   spider web, `web.rs`) run; the canoe's view consumes the click while
 //!   the canoe is not enabled, as in the original.
-//! - The places the port has: Tibet, Ireland, China, Yucatán and
-//!   Xibalba. A `changewam` to any other place (Shamballa, the space
-//!   travel) is refused: the section stops there, the world goes back to
+//! - Shamballa's and Atlantis's hooks (prefixes `SH` and `AT`,
+//!   `shamballa.rs`): the fireflies' click and the octopus's entry are
+//!   listed and noted ([`Event::PuzzleNotPorted`]), the octopus's tick
+//!   too (its mode is never set); the end of a firefly's move in
+//!   `voiles.wam` (FUN_0045a630 → FUN_004952d0) runs.
+//! - The places the port has: every place a script or a link names but
+//!   `demo.wam` (chapter 1's, whose panoramas are on no disc); the one
+//!   place file nothing names, `sans_nom.wam`, is not ported either. A
+//!   `changewam` to a place it does not have is refused: the section stops there, the world goes back to
 //!   the current place's, the view's per-view reset runs (as the
 //!   section's `vue=` would) and the game stays in the view it was in
 //!   ([`Event::WorldNotPorted`]).
@@ -122,10 +128,16 @@ const IRELAND_PREFIX: &[u8] = b"IR";
 /// chapter 35, Xibalba's, loads `salleroi.wam` too) and Xibalba's four
 /// (`MONDE` 6, chapters 35-41: `bat.wam` loaded by chapter 27's ways in,
 /// `xibalba.wam` by chapters 35 and 36, `riviere.wam` and `toile.wam`
-/// reached by their links). Not `demo.wam`, which only chapter 1 loads:
-/// no script jumps to chapter 1, and none of its nine panoramas
-/// (`de0001.hnm` .. `de0009.hnm`) is on a disc.
-const PORTED_PLACES: [(&str, i32); 18] = [
+/// reached by their links), the space-travel hub (`planetes.wam`, chapter
+/// 83, loaded by chapters 20, 25, 56 and 75 with the world kept: 0 here),
+/// and Shamballa's and Atlantis's four (`MONDE` 4, chapters 78, 80-82 and
+/// 201: `voiles.wam` loaded by chapter 75's crystal, `rhea.wam` by chapter
+/// 78, `annulair.wam` by chapter 80, `atlantis.wam` by chapter 81; the
+/// links of `rhea.wam` view 3 and `annulair.wam` view 5 lead to the same).
+/// Not `demo.wam`, which only chapter 1 loads: no script jumps to chapter
+/// 1, and none of its nine panoramas (`de0001.hnm` .. `de0009.hnm`) is on
+/// a disc. Not `sans_nom.wam` either, which no script and no link names.
+const PORTED_PLACES: [(&str, i32); 23] = [
     ("tibet.wam", 5),
     ("bigile1.wam", 1),
     ("livre.wam", 1),
@@ -144,7 +156,17 @@ const PORTED_PLACES: [(&str, i32); 18] = [
     ("xibalba.wam", 6),
     ("riviere.wam", 6),
     ("toile.wam", 6),
+    ("planetes.wam", WORLD_KEPT),
+    ("voiles.wam", 4),
+    ("rhea.wam", 4),
+    ("annulair.wam", 4),
+    ("atlantis.wam", 4),
 ];
+
+/// The world of [`PORTED_PLACES`]' hub: the scripts keep the world of the
+/// place they leave (chapter 83 sets none, its panoramas are on every
+/// disc).
+pub const WORLD_KEPT: i32 = 0;
 
 /// China's warp prefixes (@ 0x005db000 `CH`, 0x005e2ea4 `SS` for
 /// `miniature.wam`, 0x005e2eac `LA` for the labyrinth).
@@ -231,7 +253,8 @@ pub fn chinese_entry_hooks(view_name: &[u8], view: u32) -> Vec<u32> {
 }
 
 /// Whether the port has a place (`changewam`, a save's place), by its
-/// file name in any case; with the world its scripts set.
+/// file name in any case; with the world its scripts set
+/// ([`WORLD_KEPT`] for the space-travel hub).
 pub fn ported_place(wam: &str) -> Option<i32> {
     PORTED_PLACES
         .iter()
@@ -380,6 +403,8 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
+        // Shamballa's (@ 0x0049ba5a): the fireflies' click, noted.
+        self.shamballa_click(&name, self.view, zone);
         self.chinese_click(zi, &name, self.view, zone)
     }
 
@@ -594,6 +619,9 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
+        // Atlantis's (@ 0x0049bec6, between `LA`'s and `SS`'s, whose
+        // prefixes exclude it): the octopus's entry, noted.
+        self.atlantis_entry();
     }
 
     /// FUN_00493cb0 (the entry of views 40, 41 and 42; its argument, the
@@ -720,7 +748,7 @@ impl Engine {
         let monde = ported_place(&self.wam_name);
         self.with_script(|s, h| {
             s.travel_refused = false;
-            if let Some(m) = monde {
+            if let Some(m) = monde.filter(|&m| m != WORLD_KEPT) {
                 if s.vars[s.keys.monde] != m {
                     let k = s.keys.monde;
                     s.vars[k] = m;

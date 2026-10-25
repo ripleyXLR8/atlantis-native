@@ -270,6 +270,15 @@ impl Camera {
         self.q = quat_mul(self.fpu, self.q, rot);
     }
 
+    /// The roll of `ZoomPsychoStart` (FUN_0045b910 @ 0x0045bb58..0x0045bb9d,
+    /// FUN_0045b400): a rotation by `angle` (radians) about (0, 0, 1) with
+    /// the node itself as the frame (FUN_004a2d00), q · rot, as the pitch.
+    pub fn roll(&mut self, angle: f32) {
+        let m = axis_angle(self.fpu, [0.0, 0.0, 1.0], angle);
+        let rot = matrix_to_quat(self.fpu, &m);
+        self.q = quat_mul(self.fpu, self.q, rot);
+    }
+
     /// FUN_0045ad40 (`AngleWarpXNow`): the node's rotation **set** to
     /// `angle` (radians) about (0, 1, 0), relative to the scene root
     /// (FUN_004a2860 with the root, the node's parent, as the frame copies
