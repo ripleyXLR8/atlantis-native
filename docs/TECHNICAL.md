@@ -2808,8 +2808,10 @@ back) into `yucatan-*.png`.
   `baton.spr` loaded again when shown), chapters 39, 46 and 83 run their
   `/INIT` again. The skull's state (entry 30), the ogham stones' bytes
   (entry 31) and Brigid's cross (entry 32, which the engine reads and
-  writes in place) are the engine's; the other worlds' puzzles (entries
-  20..29) and the rod's entry 15 (@ 0x006d84f4, role not read) are kept
+  writes in place) are the engine's, and so is the spider web's stage
+  (entry 27, @ 0x005e1340, initial 3: saved from the web's state and set
+  back before the web's load hook tests it); the other worlds' puzzles
+  (entries 20..26, 28, 29) and the rod's entry 15 (@ 0x006d84f4, role not read) are kept
   as the bytes of the last load until their studies are ported (the
   blackbird songs have no entry: their mode is not saved); the dialog flag is written from the
   running dialog and not read back (a save made from the menus has no

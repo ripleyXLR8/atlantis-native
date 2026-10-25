@@ -17,8 +17,7 @@ use super::Engine;
 use crate::script::{BagEntry, Shown, SubjectTable};
 
 /// The entries Native keeps as the save's bytes: the dowsing rod's 15
-/// (@ 0x006d84f4, its role not read), the spider web's stage (27, not
-/// ported), and the Maya grids' states and digits (20..25), the puzzle
+/// (@ 0x006d84f4, its role not read), and the Maya grids' states and digits (20..25), the puzzle
 /// mode (26) with the turtle ring's count and frame store (28, 29) and
 /// Brigid's cross (32), which the engine reads in place
 /// ([`Engine::grid_state`], [`Engine::grid_digits`],
@@ -26,7 +25,11 @@ use crate::script::{BagEntry, Shown, SubjectTable};
 /// [`Engine::ring_store`], [`Engine::cross_state`]). The dialog flag (33) is written from the running
 /// dialog and not read back: a save made from the menus has no dialog
 /// running, Escape ends it before the main menu opens (@ 0x004762f0).
-const KEPT: [usize; 12] = [15, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 32];
+const KEPT: [usize; 11] = [15, 20, 21, 22, 23, 24, 25, 26, 28, 29, 32];
+
+/// The spider web's stage (@ 0x005e1340, initial 3), the web's
+/// [`Web::stage`](super::web::Web::stage).
+const WEB_STAGE: usize = 27;
 
 /// The skull's state (@ 0x005e1a4c, 8 bytes).
 const SKULL: usize = 30;
@@ -167,6 +170,8 @@ impl Engine {
         let mut d = self.save_extra.clone();
         // 31: the Ogham stones (@ 0x005e20dc).
         d.entry_mut(OGHAM).copy_from_slice(&self.ogham);
+        // 27: the web's stage.
+        d.set_i32(WEB_STAGE, self.web.stage);
         let Some(s) = self.con.as_deref() else {
             return d;
         };
@@ -329,6 +334,9 @@ impl Engine {
         for k in KEPT {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }
+        // 27: the web's stage, which the web's load hook below tests
+        // (FUN_0048f450 @ 0x0048f4aa..0x0048f4f8).
+        self.web.stage = d.i32(WEB_STAGE);
         // 30: the skull's state, which FUN_0049bf70 does not reset; the
         // view entry below shows it. 31: the Ogham stones.
         self.skull.copy_from_slice(d.entry(SKULL));

@@ -1014,3 +1014,27 @@ fn a_save_in_the_web_loads_in_view_198() {
     assert_eq!(noted(&f.events), [0x0048_f450, 0x0048_f530, 0x0048_f9a0]);
     assert_eq!((f.puzzle_mode(), f.web.stage, f.web.loaded), (1, 1, false));
 }
+
+/// The web's stage is the save's entry 27 (@ 0x005e1340, initial 3): a
+/// save made in the web in stage 2 with the grasshopper in the bag, loaded
+/// in a new game (whose stage is 3), ends the round as the original's load
+/// hook does (FUN_0048f450 @ 0x0048f4d1: `finaraign2`).
+#[test]
+fn the_web_stage_is_saved_and_loaded() {
+    let Some(files) = game() else { return };
+    let mut e = in_xibalba(files);
+    // A new game's save carries the stage's initial value.
+    assert_eq!(e.save_data().i32(27), 3);
+    e.run_command(b"(finaraign1=1)");
+    goto(&mut e, "toile.wam", 198, 38);
+    goto(&mut e, "toile.wam", 230, 38);
+    assert_eq!(e.web.stage, 2);
+    e.run_command(b"(sacados=SAUTERELLE)");
+    let saved = e.save_data();
+    assert_eq!(saved.i32(27), 2);
+    let f = loaded(&saved);
+    assert_eq!(f.place(), ("toile.wam", 198));
+    assert_eq!(var(&f, "finaraign2"), 1);
+    // The entry FUN_0048f530 computes the stage again from the variables.
+    assert_eq!(f.web.stage, 3);
+}
