@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 use atlantis2_data::{A2Files, Folder};
+use atlantis2_engine::anim::MsvcRand;
 use atlantis2_engine::display::blit_640_to_800;
 use atlantis2_engine::engine::{yucatan_click_hooks, yucatan_entry_hooks};
 use atlantis2_engine::png::encode_rgb565;
@@ -190,6 +191,125 @@ fn lines_as_the_original(lines: &[(i32, usize)]) {
             assert!(golden.lines().any(|g| g.starts_with(&head)), "{head}");
         }
     }
+}
+
+const CHAINS: &str = include_str!("golden/spw_chains.txt");
+
+/// The place animation state chains against the original
+/// (`spw_chains.txt`): every state record of the 25 WAMs with a next state
+/// (only Chac's animations 1 and 2 in view 123, both to `A1`); the slots
+/// of each such view as its entry leaves them (+0x28 set, +0x2c the next
+/// state's slot); then the 15 Hz steps with chapi037's commands on Chac
+/// (`GOTOFRAMEPERSO=CHAC,30`, `playanimp=CHAC,2`, then
+/// `ChangeAnimGotoPerso=CHAC,1,1` after animation 2 or during it, or
+/// never): animation 2 hands back to animation 1, which loops on itself,
+/// or plays animation 2 again while `playanimp`'s chain stands.
+#[test]
+fn place_animation_chains_match_the_original() {
+    let Some(files) = game() else { return };
+    let dir = PathBuf::from(std::env::var_os("ATLANTIS2_DATA").unwrap()).join("wam");
+    let mut wams: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|d| d.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("wam")))
+        .collect();
+    wams.sort_by_key(|p| p.to_string_lossy().to_lowercase());
+    assert_eq!(wams.len(), 25);
+    let mut chained = Vec::new();
+    for p in &wams {
+        let wam = atlantis2_data::wam::Wam::parse(&std::fs::read(p).unwrap()).unwrap();
+        for e in &wam.entities {
+            for s in e.state_records().filter(|s| s.next != 0) {
+                let next: String = s
+                    .next
+                    .to_le_bytes()
+                    .iter()
+                    .take_while(|&&b| b != 0)
+                    .map(|&b| char::from(b))
+                    .collect();
+                chained.push(format!(
+                    "chained {} view {} {} anim {} next {next}",
+                    p.file_name().unwrap().to_string_lossy(),
+                    s.view,
+                    e.con_name,
+                    s.anim
+                ));
+            }
+        }
+    }
+    let rows: Vec<&str> = CHAINS.lines().filter(|l| !l.starts_with('#')).collect();
+    let want: Vec<&str> = rows
+        .iter()
+        .copied()
+        .filter(|l| l.starts_with("chained "))
+        .collect();
+    assert_eq!(chained, want);
+
+    // The scripts' state of a game in Xibalba, with the show / hide table
+    // empty as in the harness (which ran no chapter's `/INIT`).
+    let mut e = in_xibalba(files);
+    e.anim.table = Default::default();
+    let mut got: Vec<String> = Vec::new();
+    let mut want: Vec<String> = Vec::new();
+    let mut tick = 0;
+    for row in rows.iter().filter(|l| !l.starts_with("chained ")) {
+        want.push(row.to_string());
+        if let Some(head) = row.strip_prefix("== view ") {
+            let (view, rest) = head.split_once(" of ").unwrap();
+            let wam = rest.split_once(':').unwrap().0;
+            e.anim.rand = MsvcRand(1000);
+            e.load_place(wam);
+            e.enter_at(view.parse().unwrap(), 0.0, 0.0).unwrap();
+            got.push(row.to_string());
+            for (n, s) in e.anim.slots.iter().enumerate() {
+                got.push(format!(
+                    "slot {n} id {} kind {} anim {} weight {} click {} active {} frames {} \
+                     start {} end {} chain {} handing {}",
+                    s.id,
+                    s.kind,
+                    s.state.anim,
+                    s.state.weight,
+                    s.click,
+                    i32::from(s.active),
+                    s.count,
+                    s.start,
+                    s.end,
+                    s.chain,
+                    i32::from(s.handing)
+                ));
+            }
+            tick = 0;
+        } else if let Some(line) = row.strip_prefix("cmd /set") {
+            e.run_command(line.as_bytes());
+            got.push(row.to_string());
+        } else if row.starts_with("tick ") {
+            e.anim.step();
+            let active: Vec<String> = e
+                .anim
+                .slots
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.active)
+                .map(|(n, s)| {
+                    let h = if s.handing {
+                        format!("h{}", s.chain)
+                    } else {
+                        String::new()
+                    };
+                    format!("{n}:{}/{}{h}", s.frame, s.end)
+                })
+                .collect();
+            got.push(format!("tick {tick} {}", active.join(" ")));
+            tick += 1;
+        }
+    }
+    let first = got.iter().zip(&want).position(|(g, w)| g != w);
+    assert!(
+        first.is_none() && got.len() == want.len(),
+        "first difference at row {first:?}: got {:?}, want {:?}",
+        first.map(|i| &got[i]),
+        first.map(|i| &want[i])
+    );
 }
 
 #[test]

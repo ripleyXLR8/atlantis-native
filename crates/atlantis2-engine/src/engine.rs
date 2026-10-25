@@ -1138,6 +1138,8 @@ impl Engine {
                     if let Some(slot) = self.anim.slots.get_mut(n) {
                         slot.record = Some(record);
                     }
+                    let next = self.next_state_record(record);
+                    self.anim.set_next(n, next);
                     // The horse's frame kept across views (@ 0x0047c764):
                     // a slot whose id is `CHEVAL`'s object index, whatever
                     // its kind, starts at `FRAMECHEVAL`.
@@ -1155,6 +1157,17 @@ impl Engine {
                 None => log::warn!("Can't load SPW {name}"),
             }
         }
+        // FUN_0047c820 (@ 0x0045a267): the chains to the next states'
+        // slots.
+        self.anim.link_chains();
+    }
+
+    /// FUN_004123b0 at a slot's load: the record (entity, state) of the
+    /// next state of WAM record `(entity, state)`, if it has one.
+    pub(crate) fn next_state_record(&self, (ei, si): (usize, usize)) -> Option<(usize, usize)> {
+        let e = self.wam.entities.get(ei)?;
+        let states: Vec<_> = e.state_records().collect();
+        crate::anim::next_state(&states, states.get(si)?).map(|k| (ei, k))
     }
 
     /// A mouse move, in mickeys (relative pointer motion): the pointer

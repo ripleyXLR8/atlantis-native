@@ -978,8 +978,19 @@ back) into `yucatan-*.png`.
   from a full list of an earlier slot of the id, or frame −2 matching
   that end byte): the byte below the list into the matched entry and the
   end into that byte, @ 0x0047c979..0x0047c988 (no data reaches them).
-  State chains and the odd-tick flag are not ported (no Tibet or Irish
-  state uses them).
+  State chains are ported: a state whose WAM record names a next state
+  (+0x1c, `A1`) keeps that state's record when its slot is loaded
+  (FUN_004123b0: the entity's first state with that letter and number),
+  so the slot hands over when it ends, and after the view's loads each
+  such slot chains to the slot loaded from that record (FUN_0047c820 /
+  FUN_0047c850). The only chained states are Chac's animations 1 and 2 in
+  Xibalba's view 123 (both to animation 1): animation 1 loops on itself,
+  and after `playanimp=CHAC,2` animation 2 hands back to animation 1
+  instead of leaving the pond empty. Checked against the original's loads
+  and steps run under emulation, with chapter 37's commands on Chac
+  (`tests/xibalba.rs`, `golden/spw_chains.txt`). The odd-tick flag
+  (+0xc0) is ported with the pearl and dragon puzzle, its only writer
+  (the transparent cloud, @ 0x00494bed).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
   `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
