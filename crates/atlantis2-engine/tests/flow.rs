@@ -2149,7 +2149,9 @@ fn brigids_cross(r: &mut Run) {
     r.route(&[8, 7, 1, 2]);
     assert_eq!(r.chapter(), 16);
     // A place clicked with an empty hand: the hook (FUN_00494190) plays
-    // sound 9, the click goes on (`CLICZONE`, the click scan).
+    // sound 9, the click goes on (the click scan; `CLICZONE` = the
+    // place's value in the original, kept at 0 by the minor bug fixes:
+    // `tests/plain_values.rs`).
     let zone = r.zone_valued(3);
     let evs = r.use_on(None, zone);
     assert!(evs.iter().any(|e| matches!(e, Event::PuzzleHook { .. })));
@@ -2157,9 +2159,14 @@ fn brigids_cross(r: &mut Run) {
         function: 0x0049_4190
     }));
     assert!(evs.contains(&Event::Sound("sound009.apc".into())));
+    let cliczone = if r.e.enhancements.minor_bug_fixes {
+        0
+    } else {
+        3
+    };
     assert!(evs
         .iter()
-        .any(|e| matches!(e, Event::ClickScan(v) if v.cliczone == 3)));
+        .any(|e| matches!(e, Event::ClickScan(v) if v.cliczone == cliczone)));
     assert_eq!(r.e.cross_state(), 0);
     // Laid on place 5, another place clicked, taken back.
     let zone = r.zone_valued(5);

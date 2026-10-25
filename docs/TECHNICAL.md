@@ -86,7 +86,14 @@ its last sample (the original drops the last ~5.8 s of a track followed
 by another), and a track that ends with an empty list, or with loops
 left, plays again from its start (the original loops the last 5.9 s of
 its ring until another music command); see the Music item of
-[Atlantis II](#atlantis-ii-in-progress). `--original` turns it off there
+[Atlantis II](#atlantis-ii-in-progress). With it too, in Ireland's two
+puzzle views (Brigid's cross, view 2; the ogham stones, view 6) a click
+on a puzzle zone runs its puzzle and nothing else: the original also
+reads the zone's plain value as the index of a named zone, so that in
+chapter 12 the fourth stone sends the player back to Tibet as the
+weeping head does, and in chapter 14 the ninth, with the horse in hand,
+plays the water's film (see the Ireland item of
+[Atlantis II](#atlantis-ii-in-progress)). `--original` turns it off there
 too. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
 `hd_options`, the first game's `HdOptions`), which `--hd` and
 `--widescreen` turn on; see the HD mode item of
@@ -1179,7 +1186,23 @@ back) into `yucatan-*.png`.
   too (below); each hook that runs is noted (`Event::PuzzleRan`, the
   original's function). The original's dispatcher never takes an Irish
   click (@ 0x0049baba, @ 0x0049bcf8): the click goes on to `CLICZONE`,
-  the click scan and the move as in the original. The move-zone hooks of
+  the click scan and the move as in the original. The zones of views 2
+  and 6 are of type 4, whose values (1..25 for the cross, 1..18 and 99
+  for the stones) `CLICZONE` takes as they are (@ 0x0049cb9b; the load
+  fix-up FUN_00410020 turns only type-3 values into indices of the named
+  click zones), and no Irish section names a view: so in the original a
+  zone of value N there answers for the named zone of index N, in both
+  views: 1 `CRANE_ZONE` (chapter 7, a skull in hand: laid), 4
+  `TETE_PLEURANTE` (chapter 12: empty-handed, back to Tibet; the jug:
+  filled), 5 `MENHIR` (chapter 8, the ogham staff: film 5), 6 `NUADA`
+  and 7 `FILLE_LIVRE` (chapter 5, the pencil, with their flags), 8
+  `HAUT_CROIX` (chapter 9, the fork), 9 `EAU` (chapter 14, the horse:
+  film 6), 10 `PUIT_ZONE` (chapter 20, while dowsing). With the minor
+  bug fixes ([Enhancements](#enhancements)) a click on those zones
+  leaves `CLICZONE` as it was, so it runs its puzzle hook and nothing
+  else (`irish_plain_value_zone`; `tests/plain_values.rs`: every type-4
+  zone of both views in every Irish chapter, with an empty hand and each
+  object an Irish `cliczone` condition names, both ways). The move-zone hooks of
   views 2, 6 and 42 clear the cursor pair (FUN_0047bef0(0, 0), whatever
   is in hand) until the next cursor choice; view 73's is the blackbird
   game's leave (below). A headless game plays the whole of Ireland with

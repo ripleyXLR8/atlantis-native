@@ -62,7 +62,8 @@ mod places;
 mod puzzles;
 pub use puzzles::{
     chest_mode_cleared, chinese_click_hooks, chinese_entry_hooks, irish_click_hook,
-    irish_entry_hook, mandala_hook_applies, ported_place, MANDALAS, SKULL_OBJECTS, SKULL_START,
+    irish_entry_hook, irish_plain_value_zone, mandala_hook_applies, ported_place, MANDALAS,
+    SKULL_OBJECTS, SKULL_START,
 };
 mod octopus;
 pub use octopus::{
@@ -1997,10 +1998,18 @@ impl Engine {
             return None;
         }
         let (zi, zone) = self.centre().map(|(i, z)| (i, z.clone()))?;
+        let keep_cliczone = self.plain_value_fixed(&zone);
         if self.sprite_hit.is_some() {
+            let before = (self.vars.cliczone, self.script_cliczone());
             self.vars.cliczone = zone.value;
             self.set_script_var(|k| k.cliczone, zone.value);
             self.puzzle_hooks(zi, &zone);
+            if keep_cliczone {
+                self.vars.cliczone = before.0;
+                if let Some(v) = before.1 {
+                    self.set_script_var(|k| k.cliczone, v);
+                }
+            }
             return Some(zi);
         }
         let target = if zone.kind == 1 || zone.kind == 2 {
@@ -2020,7 +2029,7 @@ impl Engine {
         if self.puzzle_hooks(zi, &zone) {
             return Some(zi);
         }
-        if zone.kind > 2 && zone.kind < 88888 {
+        if zone.kind > 2 && zone.kind < 88888 && !keep_cliczone {
             self.vars.cliczone = zone.value;
             self.set_script_var(|k| k.cliczone, zone.value);
         }
@@ -2030,6 +2039,20 @@ impl Engine {
             _ => {}
         }
         Some(zi)
+    }
+
+    /// Whether the minor bug fixes keep a click on `zone` from setting
+    /// `CLICZONE` to its plain value ([`irish_plain_value_zone`]).
+    fn plain_value_fixed(&self, zone: &Zone) -> bool {
+        self.enhancements.minor_bug_fixes
+            && self
+                .current_view()
+                .is_some_and(|v| irish_plain_value_zone(v.name.as_bytes(), self.view, zone.kind))
+    }
+
+    /// The interpreter's `CLICZONE`, when the scripts run the game.
+    fn script_cliczone(&self) -> Option<i32> {
+        self.con.as_deref().map(|s| s.vars[s.keys.cliczone])
     }
 
     /// FUN_0049cbf0: a type-2 zone: the first link of the current place

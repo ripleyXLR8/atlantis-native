@@ -30,7 +30,7 @@ use atlantis2_engine::anim::Anim;
 use atlantis2_engine::engine::irish_click_hook;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::subjects::cell;
-use atlantis2_engine::{CursorBank, Engine, Event, Fpu, LoopType, Variant};
+use atlantis2_engine::{CursorBank, Engine, Enhancements, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
 const GOLDEN: &str = include_str!("golden/cross.txt");
@@ -340,6 +340,9 @@ fn the_entry_and_click_hooks_as_the_original() {
     let Some(files) = game() else { return };
     capture();
     let mut e = in_view_2(files);
+    // The golden's `CLICZONE` is the original's: the zone's plain value
+    // (the minor bug fixes leave it as it was, `tests/plain_values.rs`).
+    e.enhancements = Enhancements::original();
     let names = e.script_state().unwrap().names.clone();
     let id = |n: &str| names.id(defnames::OBJETS, n.as_bytes()).unwrap() as i32;
     assert_eq!(

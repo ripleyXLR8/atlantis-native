@@ -233,7 +233,11 @@ it. Its entries:
 - **Screen**: the original's two screen sizes, 640 x 480 and 800 x 600
   (below); with the original graphics only.
 - **Fix original bugs**: on by default (for now: every music track is
-  heard to its end).
+  heard to its end; in Ireland, a click on Brigid's cross or on an ogham
+  stone works the puzzle and nothing else, where the original may take
+  it for a click on another place's object: back to Tibet from the
+  fourth stone in one chapter, the water's film from the ninth with the
+  horse in another).
 
 The choices are kept at once in `settings.ini`, in the `atlantis2`
 folder of the per-user data folder (`~/.local/share/atlantis-native/atlantis2`
