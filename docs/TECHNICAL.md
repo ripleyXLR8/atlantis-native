@@ -959,7 +959,10 @@ back) into `yucatan-*.png`.
   the original does: each tick writes its slot's new frame into the
   script variable `FRAMECHEVAL` (@ 0x0047d84d) and a view entry starts a
   new slot of that id at it (@ 0x0047c764); neither tests the slot's
-  kind. A state that is not one animated frame (record +0x2c ≠ 1: only
+  kind. `ADDFRAMEOBJET=CHEVAL` past the slot's end zeroes the range
+  (record +0x20, +0x24) on the loaded WAM's state record itself
+  (@ 0x00483565..0x00483574), so it lasts until the next `changewam`:
+  view 27's horse plays its whole file at its next entries. A state that is not one animated frame (record +0x2c ≠ 1: only
   Ireland's puzzle pictures in the ported places) draws, instead of its
   current frame, the frames of its 128-byte list (signed bytes, in list
   order up to 0xfe, 0xff skipped; empty at load), which the puzzles' code

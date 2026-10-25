@@ -543,6 +543,43 @@ fn the_horse_keeps_its_frame_across_views() {
     assert_eq!(e.anim.slots[slot].frame, 0);
 }
 
+/// `ADDFRAMEOBJET=CHEVAL` past the range of view 27's horse zeroes the
+/// range on the WAM's state record (@ 0x00483565..0x00483574), so the
+/// next entry of view 27 plays the horse's whole file instead of its
+/// 585-609 waiting loop.
+#[test]
+fn the_horse_range_zeroed_lasts_until_the_next_place() {
+    let Some(files) = game() else { return };
+    let mut e = in_ireland(files);
+    e.run_command(b"(showobjet=CHEVAL)");
+    let horse = e
+        .script_state()
+        .unwrap()
+        .names
+        .id(defnames::OBJETS, b"CHEVAL")
+        .unwrap() as i32;
+    let slot_of = |e: &Engine| e.anim.slots.iter().position(|s| s.id == horse).unwrap();
+    e.run_command(b"(framecheval=0)");
+    e.enter_at(27, 0.0, 0.0).unwrap();
+    let s = &e.anim.slots[slot_of(&e)];
+    assert_eq!((s.state.first, s.state.end), (585, 610));
+    for _ in 0..12 {
+        e.run_command(b"(addframeobjet=CHEVAL,60)");
+    }
+    let s = &e.anim.slots[slot_of(&e)];
+    assert_eq!((s.state.first, s.state.end, s.end), (0, 0, s.count));
+    // Back in view 27 from view 26: the record keeps the zeroed range.
+    e.enter_at(26, 0.0, 0.0).unwrap();
+    e.enter_at(27, 0.0, 0.0).unwrap();
+    let s = &e.anim.slots[slot_of(&e)];
+    assert_eq!((s.state.first, s.state.end, s.end), (0, 0, s.count));
+    // A new `changewam` reads the file again.
+    e.run_command(b"(changewam=bigile1.wam)");
+    e.enter_at(27, 0.0, 0.0).unwrap();
+    let s = &e.anim.slots[slot_of(&e)];
+    assert_eq!((s.state.first, s.state.end), (585, 610));
+}
+
 /// The values a key takes in the Irish chapters' `/set` lines (not the
 /// `#` ones), by the text after `KEY=` up to `)`.
 fn set_values(files: &A2Files, key: &str) -> Vec<String> {
