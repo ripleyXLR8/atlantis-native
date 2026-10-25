@@ -12,7 +12,7 @@ use atlantis2_data::con::NewGame;
 use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::dialog::{FontTxt, World};
 use atlantis2_data::messages::ObjectNames;
-use atlantis2_data::spr::{SprBank, Target};
+use atlantis2_data::spr::{SprBank, SprDll, Target};
 use atlantis2_data::spw::{FaceBox, Spw};
 use atlantis2_data::wam::{self, View, WamError, Zone};
 use atlantis2_data::{A2Files, Folder, Wam};
@@ -440,6 +440,11 @@ pub struct Engine {
     hd: hd::HdState,
     pub camera: Camera,
     pub look: Look,
+    /// The sprite library the 50 % sprites are drawn with (the bag bar's,
+    /// the canoe's pointed tile): `spr_p6.dll`, the one the original loads
+    /// on a Pentium II (@ 0x0059cb93), by default; `spr_p5.dll` the one of
+    /// a Pentium or an AMD K6.
+    pub spr_dll: SprDll,
     /// The place animations.
     pub anim: Anim,
     pub loop_type: LoopType,
@@ -902,6 +907,7 @@ impl Engine {
             hd: Default::default(),
             camera,
             look: Look::default(),
+            spr_dll: SprDll::default(),
             // GetTickCount() in the original: a port seeds with its clock
             // (`anim.rand`).
             anim,

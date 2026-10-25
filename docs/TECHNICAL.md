@@ -985,11 +985,17 @@ back) into `yucatan-*.png`.
   state uses them).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
-  `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
-  subjects already asked) and their tables for RGB565, the last row and
+  the sprite library's `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
+  subjects already asked, the bag bar's and the canoe's pointed tile) and
+  their tables for RGB565, the last row and
   column of the screen never drawn; the one bank with a 0x400-byte
   (B, G, R, x) colour table, `Ponpirog.SPR`, converted as the DLL does
-  for RGB565) at the screen centre: 1..12 over a move zone, 25..39 over
+  for RGB565; the library is the one the original loads on a Pentium II,
+  `spr_p6.dll` (@ 0x0059cb93: CPUID family 6), whose 50 % shade runs are
+  `shade(dst, f)` and `half(dst)` where `spr_p5.dll`'s, a Pentium's or
+  an AMD K6's, are `shade(dst, f >> 1)` and `half(dst) +
+  half(half(dst))`; `Engine::spr_dll` chooses `spr_p5.dll`'s) at the
+  screen centre: 1..12 over a move zone, 25..39 over
   another zone (none from type 1000 on), 13..24 or 25..39 over a
   clickable object or character, one frame on per tick, chosen after the
   frame is drawn so it shows on the next one. The object in hand (its
@@ -1754,9 +1760,10 @@ back) into `yucatan-*.png`.
   the three vertex records: the texture coordinates are what the last
   polygon left) and the rasteriser of the CPU type (the heads'), the x87
   control word as the frame leaves it. `tests/canoe.rs` replays the
-  original's emulated frames (`tests/golden/canoe_0e7f.txt`, the Pentium
-  II's routines under 0x0e7f, and `canoe_027f.txt`, the C ones under
-  0x027f): the loading's values (the init's command, cursor and control
+  original's emulated frames (`tests/golden/canoe_0e7f_p6.txt`, the
+  Pentium II's routines under 0x0e7f with `spr_p6.dll`, `canoe_0e7f.txt`
+  the same with `spr_p5.dll`, and `canoe_027f.txt`, the C ones under
+  0x027f with `spr_p5.dll`): the loading's values (the init's command, cursor and control
   word, the camera's fields the port keeps; the waypoints by the MD5 of
   their table, the stones' and the slots' nodes by an MD5 each, so that
   the files hold no game data), then for each of 1797 frames the state,
@@ -1767,9 +1774,9 @@ back) into `yucatan-*.png`.
   waypoints. At 800 x 600 the canoe draws on the
   640 x 480 surface, enlarged; with the HD mode on its frames are the
   original's and no HD layer is made (the front end enlarges the frame).
-  Not known: whether the original's `spr_p6.dll`, which a Pentium Pro /
-  II loads, draws the pointed tile's 50 % as `spr_p5.dll` does (an
-  emulation with it gives darker pixels there; the port draws P5's); the
+  The pointed tile at 50 % is drawn as `spr_p6.dll` draws it, the
+  library a Pentium II loads (the reference run), or as `spr_p5.dll`
+  does (its own run, both bit for bit). Not known: the
   held tile's depth written outside the 640 x 480 buffer (the original
   writes past its allocation near the screen's edges; the port drops
   those writes); the stale texture coordinates after other 3D drawing
@@ -2871,7 +2878,8 @@ script results and save files come from the original `atlantis2.exe` run under e
 (Tibet's moves pass by pass, the place animations tick by tick, the
 screen centre and the clicks on sprites pass by pass with the texel under
 the centre given, every SPW frame of Tibet and the first of every other
-file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks, the
+file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks with
+`spr_p5.dll` and `spr_p6.dll`, the
 subject menu's cells and click grid, the shaman's subjects along chapter
 75, every `/set` line of Ireland's, Yucatán's and China's chapters
 through the handler, the special events, the zoom of a move,

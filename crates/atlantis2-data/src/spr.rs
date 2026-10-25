@@ -119,16 +119,35 @@ fn half(c: u16) -> u16 {
     (c & 0xf7de) >> 1
 }
 
+/// The sprite library the game loads (@ 0x0059cb93): `spr_p6.dll` for the
+/// CPU classes from 4 of FUN_0059f670 (CPUID family 6: a Pentium Pro, a
+/// Pentium II and the later family-6 CPUs), `spr_p5.dll` for the others
+/// (family 4 or 5, and families above 6, whose class is −1). The two draw
+/// alike but in `AFF_SPRTRS50`'s shade runs (and in `AFF_SPRALPHA`, which
+/// the game never calls). The default is the Pentium II's, the port's
+/// reference machine.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SprDll {
+    /// `spr_p5.dll`: shade runs at 50 % `shade(dst, f >> 1)` (0x74 family,
+    /// @ 0x10005b58) or `half(dst) + half(half(dst))` (0x274 family,
+    /// @ 0x10006773).
+    P5,
+    /// `spr_p6.dll`: shade runs at 50 % `shade(dst, f)` (0x74 family,
+    /// @ 0x10005deb; 0x78 @ 0x1000586b) or `half(dst)` (0x274 family,
+    /// @ 0x100068c7).
+    #[default]
+    P6,
+}
+
 /// How `AtlSpr_Aff` (@ 0x0047bc40) blends a sprite: its fifth argument.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     /// 0, `AFF_SPR` (spr_p5.dll @ 0x100028e5).
     Opaque,
-    /// 1, `AFF_SPRTRS50` (spr_p5.dll @ 0x100029e8): the sprite at 50 % over
-    /// the screen. Palette runs `half(c) + half(dst)`, pair runs `half(c) +
-    /// shade(dst, f >> 1)`, shade runs `shade(dst, f >> 1)` (0x74 family,
-    /// blitter @ 0x10005b58) or, with no factor byte, `half(dst) +
-    /// half(half(dst))` (0x274 family, @ 0x100065f5..0x1000678f).
+    /// 1, `AFF_SPRTRS50` (spr_p5.dll @ 0x100029e8, spr_p6.dll
+    /// @ 0x10002a63): the sprite at 50 % over the screen. Palette runs
+    /// `half(c) + half(dst)`, pair runs `half(c) + shade(dst, f >> 1)`,
+    /// shade runs as the library draws them ([`SprDll`]).
     Half,
 }
 
@@ -300,9 +319,8 @@ impl SprBank {
         self.draw_mode(t, x, y, index, Mode::Opaque)
     }
 
-    /// `AFF_SPR` or `AFF_SPRTRS50` of sprite `index`, as [`SprBank::draw`].
-    /// The original's `AFF_SPRTRS50` also has a blitter for the 0x278
-    /// family (@ 0x100060b8), which no shipped bank uses: not here.
+    /// `AFF_SPR` or `AFF_SPRTRS50` of sprite `index`, as [`SprBank::draw`],
+    /// with the default library ([`SprDll::P6`]).
     pub fn draw_mode(
         &self,
         t: &mut Target,
@@ -310,6 +328,21 @@ impl SprBank {
         y: i32,
         index: usize,
         mode: Mode,
+    ) -> bool {
+        self.draw_with(t, x, y, index, mode, SprDll::default())
+    }
+
+    /// [`SprBank::draw_mode`] with the library `dll`. The original's
+    /// `AFF_SPRTRS50` also has a blitter for the 0x278 family
+    /// (spr_p5.dll @ 0x100060b8), which no shipped bank uses: not here.
+    pub fn draw_with(
+        &self,
+        t: &mut Target,
+        x: Option<i32>,
+        y: i32,
+        index: usize,
+        mode: Mode,
+        dll: SprDll,
     ) -> bool {
         // The two families of the shipped banks: 0x74 / 0x874 / 0x878 (a
         // factor byte in shade runs, @ 0x100039d5 and, for 0x878, its own
@@ -406,12 +439,17 @@ impl SprBank {
                         for _ in 0..n {
                             if inside(sx) {
                                 let px = &mut t.pixels[line + sx as usize];
-                                *px = match (f, half_mode) {
-                                    (Some(f), false) => shade(*px, f),
-                                    (Some(f), true) => shade(*px, f >> 1),
-                                    (None, false) => half(*px),
-                                    // @ 0x10006773: half(dst) + half(half(dst)).
-                                    (None, true) => half(*px).wrapping_add(half(half(*px))),
+                                *px = match (f, half_mode, dll) {
+                                    (Some(f), false, _) | (Some(f), true, SprDll::P6) => {
+                                        shade(*px, f)
+                                    }
+                                    (Some(f), true, SprDll::P5) => shade(*px, f >> 1),
+                                    (None, false, _) | (None, true, SprDll::P6) => half(*px),
+                                    // spr_p5.dll @ 0x10006773: half(dst) +
+                                    // half(half(dst)).
+                                    (None, true, SprDll::P5) => {
+                                        half(*px).wrapping_add(half(half(*px)))
+                                    }
                                 };
                             }
                             sx += 1;

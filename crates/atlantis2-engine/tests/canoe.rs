@@ -1,5 +1,6 @@
 //! The canoe puzzle of Xibalba against the original's
-//! (`tests/golden/canoe_0e7f.txt`, `canoe_027f.txt`: the original's code
+//! (`tests/golden/canoe_0e7f_p6.txt`, `canoe_0e7f.txt`, `canoe_027f.txt`:
+//! the original's code
 //! run under emulation from the start of the puzzle, its header there):
 //! the loading (the init's command, cursor and control word; the depth
 //! tiles and the tiles' offsets, the camera's distances, the squares'
@@ -15,8 +16,8 @@
 //! buffer's and the held tile's Z buffer's MD5 and pixel samples; a run
 //! quit by Escape; the end rows (the win's frame count and the variables
 //! written, the cursor after the quit). Under the Pentium II's routines
-//! and control word 0x0e7f (the reference) and the C routines under
-//! 0x027f. The original's fatal errors of the river's rebuild and the
+//! and control word 0x0e7f with `spr_p6.dll` (the reference) or
+//! `spr_p5.dll`, and the C routines under 0x027f with `spr_p5.dll`. The original's fatal errors of the river's rebuild and the
 //! stones' search on changed waypoints.
 //!
 //! The game-data tests need `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
@@ -25,7 +26,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use atlantis2_data::spr::SprBank;
+use atlantis2_data::spr::{SprBank, SprDll};
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::canoe::{
     Canoe, CanoeError, CanoeFiles, CanoeHost, CursorPair, CENTRES, H, SPACING, START_COMMAND,
@@ -35,6 +36,7 @@ use atlantis2_engine::{Fpu, Variant};
 use md5::{Digest, Md5};
 
 const GOLDEN_0E7F: &str = include_str!("golden/canoe_0e7f.txt");
+const GOLDEN_0E7F_P6: &str = include_str!("golden/canoe_0e7f_p6.txt");
 const GOLDEN_027F: &str = include_str!("golden/canoe_027f.txt");
 
 fn game() -> Option<A2Files> {
@@ -362,11 +364,23 @@ fn replay(golden: &str) {
         assert!(head.contains("0x027f"));
         (Fpu::Double, Variant::C)
     };
+    // The sprite library the golden was made with.
+    let spr_dll = if head.contains("spr_p6.dll") {
+        SprDll::P6
+    } else {
+        assert!(head.contains("spr_p5.dll"));
+        SprDll::P5
+    };
     let files = Files(files);
     // `pz_pirogue_init` runs `(flag103=1)` before any load; that is the
     // caller's (the engine's `start_canoe`), with the port's constant.
     let load = |host: &mut Host| {
-        let c = Canoe::load(fpu, variant, &files, host).expect("the canoe's files");
+        let mut c = Canoe::load(fpu, variant, &files, host).expect("the canoe's files");
+        // `spr_p6.dll` is the default; `spr_p5.dll` is chosen.
+        if spr_dll == SprDll::P5 {
+            c.spr_dll = spr_dll;
+        }
+        assert_eq!(c.spr_dll, spr_dll);
         assert!(
             host.events.is_empty(),
             "the loading's events: {:?}",
@@ -469,13 +483,20 @@ fn replay(golden: &str) {
     assert_eq!(end(golden, "Q "), format!("Q cur {} loaded 0", cursor(&c)));
 }
 
-/// The reference: the Pentium II's routines under 0x0e7f.
+/// The reference: the Pentium II's routines under 0x0e7f, the sprites of
+/// `spr_p6.dll` (the pointed tile at 50 %).
 #[test]
 fn the_canoe_as_the_original_pentium_ii() {
+    replay(GOLDEN_0E7F_P6);
+}
+
+/// The same with `spr_p5.dll`'s sprites.
+#[test]
+fn the_canoe_as_the_original_pentium_ii_with_spr_p5() {
     replay(GOLDEN_0E7F);
 }
 
-/// The C routines under 0x027f.
+/// The C routines under 0x027f (`spr_p5.dll`'s sprites).
 #[test]
 fn the_canoe_as_the_original_c_routines() {
     replay(GOLDEN_027F);
