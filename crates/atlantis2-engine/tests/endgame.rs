@@ -4,8 +4,10 @@
 //! `atlantis.wam`), the octopus's death (chapter 200, back to Tibet) and the
 //! end (chapter 83's last section: films, the credits, the last film, the
 //! quit). Every chapter's `/INIT`; every view entered with its hooks (the
-//! fireflies' click and the octopus's entry noted, not ported, with their
-//! testing aids); the fireflies' move end; the vortex both ways; Rhea and
+//! fireflies' click run, the octopus's entry noted, not ported, with its
+//! testing aid); the fireflies lit, their move end and their win (the
+//! puzzle itself against the original in `tests/fireflies.rs`); the
+//! vortex both ways; Rhea and
 //! the way to the ring; the ring's rolling zoom, its characters and the
 //! star; the octopus's two ends; the hub's travels from each world and
 //! back, the balls made crystals; the end; every dialog; the subjects,
@@ -523,10 +525,10 @@ fn the_shamballa_and_atlantis_hooks() {
 
     let Some(files) = game() else { return };
     let mut e = in_shamballa(files);
-    // A firefly's zone (to view 3, not in the place): the hook noted, the
-    // departure section shows the firefly and starts the zoom; the move
-    // goes on; at its end, without a view, FUN_004952d0 sets the field of
-    // view back to 76°.
+    // A firefly's zone (to view 3, not in the place): the hook run (the
+    // count, sound 300), the departure section shows the firefly and starts
+    // the zoom; the move goes on; at its end, without a view, FUN_004952d0
+    // sets the field of view back to 76°.
     let firefly = id(&e, defnames::OBJETS, "LUCIOLLE3");
     assert!(e.anim.table.get(firefly, 2) < 1);
     let z = zone(&e, |z| z.kind == 1 && z.value == 3);
@@ -535,6 +537,7 @@ fn the_shamballa_and_atlantis_hooks() {
     e.click(10.0);
     e.pass(None);
     assert_eq!(noted(&e.events), [FIREFLIES_CLICK]);
+    assert!(e.events.contains(&Event::FireflySound));
     assert!(e.zoom.pending());
     assert!(e.turning());
     assert!(e.anim.table.get(firefly, 2) >= 1);
@@ -546,7 +549,7 @@ fn the_shamballa_and_atlantis_hooks() {
     assert!(!e.events.iter().any(|x| matches!(x, Event::Enter { .. })));
     assert_eq!(
         (var(&e, "NbLucioleAllumed"), var(&e, "Puzzle_Lucioles_Fini")),
-        (0, 0)
+        (1, 0)
     );
     assert_eq!(var(&e, "Puzzle_Lucioles_AutoWin"), 0);
     assert_eq!(e.script_state().unwrap().chapter, 78);
@@ -558,21 +561,31 @@ fn the_shamballa_and_atlantis_hooks() {
     run_until(&mut e, |e| !e.turning());
     assert_eq!(noted(&e.events), [FIREFLIES_CLICK]);
     assert!(e.events.contains(&Event::Enter { view: 1 }));
-    // The aid writes the win; the next firefly's move end then runs
-    // chapter 78's automatic way on: film 62, Rhea's place.
+    assert_eq!(var(&e, "NbLucioleAllumed"), 2);
+    // The six mandalas laid in Tibet in their hook's order: the sixth
+    // firefly must be the one of the sixth mandala (`MANDALA_YUCATAN`,
+    // `OrdreMandala6`: value 6); three more, then it. Its move end then
+    // runs chapter 78's automatic way on: film 62, Rhea's place.
+    for k in 1..=6 {
+        e.run_command(format!("(OrdreMandala{k}={k})").as_bytes());
+    }
+    let mut t = 20.0;
+    for v in [2, 4, 5] {
+        t += 10.0;
+        light(&mut e, v, t);
+        assert_eq!(var(&e, "Puzzle_Lucioles_Fini"), 0);
+    }
+    let z = zone(&e, |z| z.kind == 1 && z.value == 6);
+    aim(&mut e, z);
     e.events.clear();
-    e.win_fireflies();
-    assert_eq!(noted(&e.events), [FIREFLIES_CLICK]);
-    assert!(matches!(e.events[0], Event::PuzzleAid { .. }));
+    e.click(t + 10.0);
+    e.pass(None);
     assert_eq!(
         (var(&e, "NbLucioleAllumed"), var(&e, "Puzzle_Lucioles_Fini")),
         (6, 1)
     );
-    let z = zone(&e, |z| z.kind == 1 && z.value == 5);
-    aim(&mut e, z);
-    e.events.clear();
-    e.click(30.0);
     run_until(&mut e, |e| e.place().0 == "rhea.wam");
+    assert_eq!(noted(&e.events), [FIREFLIES_CLICK, FIREFLIES_MOVE_END]);
     assert_eq!(e.place(), ("rhea.wam", 1));
     assert_eq!(e.script_state().unwrap().chapter, 80);
     assert_eq!(var(&e, "Puzzle_Lucioles_AutoWin"), 1);
@@ -581,6 +594,16 @@ fn the_shamballa_and_atlantis_hooks() {
     assert!((41..=45).all(|l| lines.contains(&(78, l))), "{lines:?}");
     lines_as_the_original(&lines);
     assert!(music_reaches(&mut e, 35));
+}
+
+/// Firefly `v` of `voiles.wam`'s view 1 clicked, its move played out.
+fn light(e: &mut Engine, v: i32, t: f64) {
+    let z = zone(e, |z| z.kind == 1 && z.value == v);
+    aim(e, z);
+    e.events.clear();
+    e.click(t);
+    run_until(e, |e| !e.turning());
+    assert_eq!(noted(&e.events)[0], FIREFLIES_CLICK);
 }
 
 /// The vortex (`TOURBILLON`, click kind 3) of `voiles.wam`: before the
@@ -603,8 +626,24 @@ fn the_vortex_leads_back_or_on() {
     assert!((19..=32).all(|l| lines.contains(&(78, l))), "{lines:?}");
     lines_as_the_original(&lines);
 
+    // The fireflies won with the last one in view 1 (the mandala of
+    // Ireland, `OrdreMandala4`, laid last: value 1): the view entered
+    // again, no automatic way on; the vortex then leads to Rhea.
     let mut e = in_shamballa(game().unwrap());
-    e.win_fireflies();
+    for (k, rank) in [1, 2, 3, 6, 4, 5].into_iter().enumerate() {
+        e.run_command(format!("(OrdreMandala{}={rank})", k + 1).as_bytes());
+    }
+    for (n, v) in [2, 3, 5, 4, 6, 1].into_iter().enumerate() {
+        light(&mut e, v, 20.0 + 10.0 * n as f64);
+    }
+    assert_eq!(e.place(), ("voiles.wam", 1));
+    assert_eq!(
+        (
+            var(&e, "Puzzle_Lucioles_Fini"),
+            var(&e, "Puzzle_Lucioles_AutoWin")
+        ),
+        (1, 0)
+    );
     aim_sprite(&mut e, false, vortex);
     e.events.clear();
     e.click(10.0);

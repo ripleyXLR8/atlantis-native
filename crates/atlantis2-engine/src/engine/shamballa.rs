@@ -6,10 +6,10 @@
 //!
 //! - **Click** (FUN_0049b910, move zones, types 1 and 2,
 //!   @ 0x0049ba5a..0x0049ba84, after Ireland's and before `SS` 31's):
-//!   `SH` view 1, the fireflies' click FUN_00495210 (catalogue row 17),
-//!   which acts on type 1 only (@ 0x0049521e). The dispatcher returns 0:
-//!   the move goes on (the zones of view 1 lead to views 1..6, of which
-//!   only view 1 is in the file).
+//!   `SH` view 1, the fireflies' click FUN_00495210 (catalogue row 17,
+//!   `pz_lucioles`), ported: see [`Engine::fireflies_click`]. The
+//!   dispatcher returns 0: the move goes on (the zones of view 1 lead to
+//!   views 1..6, of which only view 1 is in the file).
 //! - **Entry** (FUN_0049bd50, @ 0x0049bec6..0x0049bef2, after `LA`'s and
 //!   before `SS`'s): `AT` views 1..19, the octopus's FUN_0049a8c0
 //!   (catalogue row 18), which sets the puzzle mode 6; its tick
@@ -24,10 +24,9 @@
 //!   1, `Puzzle_Lucioles_AutoWin` = 1 and a scan (FUN_00483c90): chapter
 //!   78's way to `rhea.wam`.
 //!
-//! The fireflies' click and the octopus's entry are not ported: noted
-//! ([`Event::PuzzleNotPorted`]), none takes the click, the mode 6 is never
-//! set. What they would write is the testing aids'
-//! ([`Engine::win_fireflies`], [`Engine::end_octopus_fight`]).
+//! The octopus's entry is not ported: noted ([`Event::PuzzleNotPorted`]),
+//! the mode 6 is never set. What it would write is the testing aid's
+//! ([`Engine::end_octopus_fight`]).
 
 use atlantis2_data::wam::Zone;
 
@@ -62,12 +61,42 @@ const LIT: &str = "NbLucioleAllumed";
 const DONE: &str = "Puzzle_Lucioles_Fini";
 const AUTO_WIN: &str = "Puzzle_Lucioles_AutoWin";
 
+/// The byte table @ 0x005e1d38 the click indexes by the zone's value
+/// (`movsx`, no bound check, @ 0x0049525f): bytes 0..7, of which 1..6
+/// are the `OrdreMandala<k>` each firefly reads. Byte 0 and byte 7 (the
+/// table's padding) are 0; beyond, the bytes of the next string
+/// (`(NewSound=300)` @ 0x005e1d40) and, before, the tail of the previous
+/// one (`etat_etoile%d`).
+pub const FIREFLY_MANDALA: [u8; 8] = [0, 4, 1, 2, 5, 3, 6, 0];
+
+/// The variable whose rank the sixth firefly is compared with
+/// (`OrdreMandala%d` @ 0x005e1d68).
+const ORDER: &str = "OrdreMandala";
+
+/// The click's sound (@ 0x005e1d40), run for every zone of type 1:
+/// `sound300.apc`, on none of the four discs, so that it plays nothing
+/// (FUN_0047a290 does nothing when the file does not open).
+const LIT_SOUND: &[u8] = b"(NewSound=300)";
+
+/// The warning of a value outside 1..6 (@ 0x005e1d78).
+const BAD_VALUE: &str = "pz_lucioles_gere_clic(): zone_clicked->numero=%d";
+
+/// The firefly count that wins (@ 0x0049529c).
+const FIREFLIES: i32 = 6;
+
 /// The octopus's ends (@ 0x005e2d5c, 0x005e2d4c): its death, the hero's.
 const OCTOPUS_DEAD: &[u8] = b"(chapter=200)";
 const HERO_DEAD: &[u8] = b"(chapter=201)";
 
 fn prefixed(view_name: &[u8], prefix: &[u8]) -> bool {
     view_name.len() >= 2 && view_name[..2].eq_ignore_ascii_case(prefix)
+}
+
+/// FUN_0045a630's test (@ 0x0045a630..0x0045a645): the current place's
+/// name (@ 0x00659168) against `voiles.wam` (@ 0x005db944) by `_stricmp`
+/// (FUN_005b91d0), the whole name in any case.
+pub fn fireflies_place(name: &str) -> bool {
+    name.eq_ignore_ascii_case(FIREFLIES_PLACE)
 }
 
 /// The `SH` part of FUN_0049b910 for a click on a zone of type `kind` in
@@ -93,10 +122,68 @@ pub fn atlantis_entry_hooks(view_name: &[u8], view: u32) -> Vec<u32> {
 }
 
 impl Engine {
-    /// The `SH` hooks of a zone click (noted, the click not consumed).
+    /// The `SH` hooks of a zone click (the click not consumed): the
+    /// fireflies' click.
     pub(super) fn shamballa_click(&mut self, view_name: &[u8], view: u32, zone: &Zone) {
         for function in shamballa_click_hooks(view_name, view, zone.kind) {
-            self.puzzle_not_ported(function);
+            self.event(Event::PuzzleRan { function });
+            self.fireflies_click(zone);
+        }
+    }
+
+    /// FUN_00495210 (`pz_lucioles_gere_clic`, @ 0x00495210..0x004952c4)
+    /// on a zone of `voiles.wam`'s view 1; public for tests and tools (the
+    /// hook alone, without the dispatcher and the scans).
+    ///
+    /// Nothing unless the zone's type is 1 (@ 0x0049521e: a type 2 reaches
+    /// the hook and returns). For a value v in 1..6, `NbLucioleAllumed` + 1
+    /// (`Interp_AddVar` @ 0x0049523b) and the turn's speeds stopped
+    /// (FUN_0040c680 @ 0x00495243); any other value, the warning
+    /// (FUN_00480c20 @ 0x00495250), the count kept. Then, whatever v,
+    /// `OrdreMandala<t[v]>` (t = [`FIREFLY_MANDALA`] @ 0x005e1d38) compared
+    /// with the count (@ 0x0049528b, the count read first): equal and the
+    /// count 6 (@ 0x0049529c), `Puzzle_Lucioles_Fini` = 1 (@ 0x004952a8);
+    /// then `(NewSound=300)` (@ 0x004952b5). Only the sixth firefly is
+    /// tested: the one whose mandala was laid last in Tibet's view 10 wins
+    /// at the count 6, whatever the five before; the count is never reset
+    /// here (the scripts set it to 0), so a seventh click does not test
+    /// again. No zone of the data has a value outside 1..6: there the name
+    /// looked up (`OrdreMandala0`, or the bytes around the table) is not a
+    /// variable, `DefName_GetIdName`'s fatal error (@ 0x004106a3).
+    pub fn fireflies_click(&mut self, zone: &Zone) {
+        if zone.kind != 1 {
+            return;
+        }
+        let v = zone.value;
+        if (1..=6).contains(&v) {
+            self.with_script(|s, _| s.add_var(LIT, 1));
+            self.look.stop();
+        } else {
+            self.with_script(|s, _| s.warn(BAD_VALUE, &v.to_string()));
+        }
+        // The byte @ 0x005e1d38 + v, sign-extended: the table's for 0..7;
+        // outside, the bytes around it, none of which names a variable.
+        let order = usize::try_from(v)
+            .ok()
+            .and_then(|i| FIREFLY_MANDALA.get(i))
+            .map(|&k| format!("{ORDER}{}", k as i8));
+        let sounded = self.with_script(|s, h| {
+            let lit = s.var(LIT);
+            let Some(rank) = order.as_deref().and_then(|name| s.var(name)) else {
+                let name = order.unwrap_or_else(|| format!("{ORDER}<byte 0x005e1d38{v:+}>"));
+                let msg = format!("DefName_GetIdName: Nom de #VARIABLES# inconnu:{name}");
+                log::error!("{msg}");
+                s.fail(msg);
+                return false;
+            };
+            if lit == Some(rank) && s.var(LIT) == Some(FIREFLIES) {
+                s.set_var(DONE, 1);
+            }
+            s.run_command(h, LIT_SOUND);
+            true
+        });
+        if sounded == Some(true) {
+            self.event(Event::FireflySound);
         }
     }
 
@@ -112,9 +199,10 @@ impl Engine {
     }
 
     /// FUN_0045a630, at the end of a move whose view is not in the
-    /// place: in `voiles.wam`, FUN_004952d0 (noted [`Event::PuzzleRan`]).
-    pub(super) fn move_end_without_view(&mut self) {
-        if !self.wam_name.eq_ignore_ascii_case(FIREFLIES_PLACE) {
+    /// place: in `voiles.wam` ([`fireflies_place`]), FUN_004952d0 (noted
+    /// [`Event::PuzzleRan`]); public for tests and tools.
+    pub fn move_end_without_view(&mut self) {
+        if !fireflies_place(&self.wam_name) {
             return;
         }
         self.event(Event::PuzzleRan {
@@ -127,21 +215,6 @@ impl Engine {
                 s.set_var(AUTO_WIN, 1);
                 s.ctrl_scenar_in(h);
             }
-        });
-    }
-
-    /// A testing aid, not the original's: what the fireflies' winning
-    /// click writes (FUN_00495210 @ 0x00495234..0x004952a8: the sixth
-    /// firefly lit, `NbLucioleAllumed` = 6 and `Puzzle_Lucioles_Fini` = 1),
-    /// without its sound (`(NewSound=300)`). The scripts then go on as
-    /// after the win: the vortex clicked, or the next firefly's move end.
-    pub fn win_fireflies(&mut self) {
-        self.event(Event::PuzzleAid {
-            function: FIREFLIES_CLICK,
-        });
-        self.with_script(|s, _| {
-            s.set_var(LIT, 6);
-            s.set_var(DONE, 1);
         });
     }
 

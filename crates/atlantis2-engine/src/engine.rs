@@ -67,8 +67,8 @@ pub use puzzles::{
 mod saves;
 mod shamballa;
 pub use shamballa::{
-    atlantis_entry_hooks, shamballa_click_hooks, FIREFLIES_CLICK, FIREFLIES_MOVE_END,
-    OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
+    atlantis_entry_hooks, fireflies_place, shamballa_click_hooks, FIREFLIES_CLICK,
+    FIREFLIES_MOVE_END, FIREFLY_MANDALA, OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
 };
 mod subjects;
 mod turtle;
@@ -161,17 +161,20 @@ pub enum Event {
     /// `CLICZONE` as it leaves it (the click scan may not follow: a film a
     /// hook's scan started drops the click).
     ZoneClick { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (Shamballa's fireflies, the
-    /// octopus of Atlantis): the original's function, which would have
-    /// run here.
+    /// A puzzle hook the port does not have (the octopus of Atlantis):
+    /// the original's function, which would have run here.
     PuzzleNotPorted { function: u32 },
     /// A testing aid wrote what a puzzle the port does not have would
-    /// (`Engine::win_fireflies`, `Engine::end_octopus_fight`): the
+    /// (`Engine::end_octopus_fight`): the
     /// original's function whose writes it copies.
     PuzzleAid { function: u32 },
     /// A puzzle function the port has, run: the original's function (a
     /// hook, or the wheels' check FUN_0048d310).
     PuzzleRan { function: u32 },
+    /// The fireflies' click ran its `(NewSound=300)` (FUN_00495210
+    /// @ 0x004952b5): `sound300.apc` is on no disc, the command plays
+    /// nothing; noted so that the click can be followed.
+    FireflySound,
     /// A labyrinth soul's passage started (`(NewSound=220)`) or ended
     /// (`(NewSound=221)`, a sound on no disc) in slot `slot`
     /// (FUN_0048eb30).
