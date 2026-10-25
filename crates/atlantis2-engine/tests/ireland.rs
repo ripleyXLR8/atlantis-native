@@ -17,7 +17,7 @@ use atlantis2_data::wam::Destination;
 use atlantis2_data::A2Files;
 use atlantis2_engine::engine::{irish_click_hook, irish_entry_hook};
 use atlantis2_engine::sound::{Pcm, VOICE_EFFECTS};
-use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
+use atlantis2_engine::{Engine, Enhancements, Event, Fpu, LoopType, Variant};
 
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
@@ -246,6 +246,9 @@ fn the_irish_click_hooks_take_no_click() {
 
     let Some(files) = game() else { return };
     let mut e = bare(files, "bigile1.wam", 2);
+    // As the original (the minor bug fixes keep `CLICZONE` there:
+    // `tests/plain_values.rs`).
+    e.enhancements = Enhancements::original();
     // A zone of the cross: its hook (FUN_00494190; with an empty hand
     // only its sound, which needs the scripts: `tests/cross.rs`), then
     // `CLICZONE` and the click scan as for any zone.

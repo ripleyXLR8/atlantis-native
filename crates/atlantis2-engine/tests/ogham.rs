@@ -23,7 +23,7 @@ use atlantis2_engine::engine::{
     irish_click_hook, ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET,
 };
 use atlantis2_engine::png::encode_rgb565;
-use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
+use atlantis2_engine::{Engine, Enhancements, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
 const GOLDEN: &str = include_str!("golden/ogham.txt");
@@ -738,6 +738,10 @@ fn quiet_g_row(r: &mut Run, value: i32, label: &str) {
 fn the_ogham_stones_played_with_the_mouse() {
     let Some(files) = game() else { return };
     let mut r = Run::new(files);
+    // The golden's rows are the original's: `CLICZONE` = the stone's
+    // value (the minor bug fixes leave it as it was,
+    // `tests/plain_values.rs`).
+    r.e.enhancements = Enhancements::original();
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("ogham");
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();

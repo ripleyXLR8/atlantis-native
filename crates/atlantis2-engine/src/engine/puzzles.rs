@@ -285,6 +285,27 @@ pub fn irish_click_hook(view_name: &[u8], view: u32, kind: i32, knife: bool) -> 
     }
 }
 
+/// Whether a click on a zone of type `kind` in view `view` of a place
+/// whose warp names start as `view_name` sets `CLICZONE` to a number that
+/// may stand for another zone: Ireland's two puzzle views, Brigid's
+/// cross (view 2) and the ogham stones (view 6), whose zones are of type
+/// 4 with values 1..25 and 99. FUN_0049ca80 sets `CLICZONE` to a zone's
+/// value for any type above 2 (@ 0x0049cb9b, @ 0x0049cbd0), but the load
+/// fix-up FUN_00410020 turns only type-3 values into indices of the
+/// named click zones (@ 0x00410035); the chapters compare `CLICZONE`
+/// with those indices and no section of Ireland's names a view, so a
+/// stone or a cross zone of value N answers for the named zone of index
+/// N (4 `TETE_PLEURANTE`, 9 `EAU`, 1 `CRANE_ZONE` ...). With the minor
+/// bug fixes on, such a click leaves `CLICZONE` as it was (the puzzle
+/// hook still runs and sees what it sees in the original).
+pub fn irish_plain_value_zone(view_name: &[u8], view: u32, kind: i32) -> bool {
+    view_name.len() >= 2
+        && view_name[..2].eq_ignore_ascii_case(IRELAND_PREFIX)
+        && matches!(view, 2 | 6)
+        && kind > 3
+        && kind < 88888
+}
+
 /// The Irish entry hook FUN_0049bd50 calls when view `view` of an `IR`
 /// place is entered (@ 0x0049bdf0..0x0049be5e): the original's function.
 pub fn irish_entry_hook(view_name: &[u8], view: u32) -> Option<u32> {

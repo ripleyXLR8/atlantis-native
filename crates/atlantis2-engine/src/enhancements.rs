@@ -19,7 +19,16 @@ pub struct Enhancements {
     ///   left (`*n`), plays again from its start; off, as the original, the
     ///   rewind's file check compares the PCM size with the file's
     ///   (@ 0x00477b00), fails and closes the file, and the ring loops its
-    ///   last 5.9 s until another music command.
+    ///   last 5.9 s until another music command;
+    /// - in Ireland's two puzzle views (Brigid's cross, view 2; the ogham
+    ///   stones, view 6) a click on a puzzle zone runs its puzzle and
+    ///   nothing else; off, as the original (FUN_0049ca80 @ 0x0049cb9b),
+    ///   it also sets `CLICZONE` to the zone's plain value, which the
+    ///   scripts read as the index of a named zone: in chapter 12 the
+    ///   value-4 zone answers for the weeping head (with an empty hand,
+    ///   back to Tibet), in chapter 14 the value-9 zone with the horse
+    ///   plays the water's film, and so on
+    ///   ([`crate::engine::irish_plain_value_zone`]).
     pub minor_bug_fixes: bool,
     /// The HD mode (default off; the first game's `graphics = hd`,
     /// `--hd`): the panorama drawn at the window's resolution with the
