@@ -97,9 +97,11 @@ pub use dragon::Dragon;
 pub use saves::SaveError;
 pub use subjects::subjects_bank_name;
 
-/// The scheduler's tick: 15 a second (the dialogs' sequencer, the music
-/// fades, the animations, the videos).
-pub const TICK: f64 = 1.0 / 15.0;
+/// The 15 Hz task's period (the dialogs' sequencer, the music fades, the
+/// animations, the videos): `1.0 / 15.0` stored as a float
+/// (@ 0x0040cb78..0x0040cba1, then widened into the task's double
+/// @ 0x0040cbf6..0x0040cc04), 0.0666666701436…, a little over 1/15 s.
+pub const TICK: f64 = (1.0f32 / 15.0f32) as f64;
 
 /// Why the engine cannot show a view.
 #[derive(Debug)]
@@ -1270,18 +1272,29 @@ impl Engine {
         self.clock
     }
 
-    /// Moves the clock to `now` (seconds), running the 15 Hz ticks due
-    /// (a stall of more than a second skips the ticks missed).
-    pub fn set_clock(&mut self, now: f64) {
-        if now - self.next_tick > 1.0 {
-            self.next_tick = now;
-        }
-        while self.next_tick <= now {
-            self.clock = self.next_tick;
-            self.tick();
-            self.next_tick += TICK;
-        }
+    /// Moves the clock to `now` without the scheduler: for the harnesses
+    /// that run the 15 Hz task themselves ([`Engine::tick`]), as the
+    /// original's emulated runs the goldens come from do.
+    pub fn set_time(&mut self, now: f64) {
         self.clock = now;
+    }
+
+    /// Moves the clock to `now` (seconds: the scheduler's time of a pass,
+    /// @ 0x00584a0a..0x00584a1a) and runs the 15 Hz task when it is due,
+    /// as the scheduler FUN_00584a00 runs it: due when `now` is past its
+    /// next time (strictly, @ 0x00584a2e..0x00584a41), run at most once a
+    /// pass, its next time then `now` + its period (the smaller of that and
+    /// its end, DBL_MAX, @ 0x00584ad0..0x00584af0; the sum under the x87
+    /// control word in force). No catch-up: a late pass delays every later
+    /// tick, so the tick runs below 15 Hz, the more so the fewer passes a
+    /// second (at 60 a second, every 4 or 5 passes). Its first run is the
+    /// first pass after the start (FUN_00584960: next time = the start).
+    pub fn set_clock(&mut self, now: f64) {
+        self.clock = now;
+        if now > self.next_tick {
+            self.tick();
+            self.next_tick = self.camera.fpu.add(now, TICK);
+        }
     }
 
     /// The world's dialog texts (`MONDE`'s world change, @ 0x0047fe50) and

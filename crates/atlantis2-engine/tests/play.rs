@@ -18,6 +18,7 @@ use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
 use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::engine::TICK;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
 const TIBET_SCAN: &str = include_str!("golden/scripts_con_tibet_scan.txt");
@@ -223,9 +224,10 @@ fn a_new_game_plays_to_the_first_dialog() {
         "{yaw} {pitch}"
     );
 
-    // The film plays at 15 frames a second; a click ends it, and the
-    // rest of the /INIT starts music 30 from its beginning.
-    let evs = r.until(10, |e| matches!(e, Event::VideoFrame(3)));
+    // The film moves a frame a 15 Hz tick (every 5th pass of 1/60 s:
+    // passes 1, 6, 11); a click ends it, and the rest of the /INIT starts
+    // music 30 from its beginning.
+    let evs = r.until(12, |e| matches!(e, Event::VideoFrame(3)));
     assert!(evs.iter().any(|e| matches!(e, Event::VideoFrame(1))));
     r.click();
     let evs = r.until(10, |e| *e == Event::VideoEnd);
@@ -328,4 +330,34 @@ fn a_new_game_plays_to_the_first_dialog() {
     assert_eq!(r.e.script_state().unwrap().flags[202], 1);
     assert!(r.e.script_state().unwrap().fatal.is_none());
     eprintln!("{}", r.log.join("\n"));
+}
+
+/// The 15 Hz task as the scheduler FUN_00584a00 runs it: due when the
+/// pass's time is past its next time, at most once a pass, its next time
+/// then the pass's time + its period (a float, a little over 1/15 s). At
+/// 60 passes a second it runs every 5th pass; after a stall, once.
+#[test]
+fn the_15_hz_task_as_the_scheduler_runs_it() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    assert!(TICK > 1.0 / 15.0 && TICK as f32 == 1.0f32 / 15.0f32);
+    let mut runs = Vec::new();
+    for k in 0..=60u32 {
+        let before = e.ticks;
+        e.set_clock(f64::from(k) / 60.0);
+        if e.ticks != before {
+            assert_eq!(e.ticks, before + 1);
+            runs.push(k);
+        }
+    }
+    assert_eq!(runs, (1..=56).step_by(5).collect::<Vec<_>>());
+    // A stall of 1.5 s: one run, no catch-up; the next a period after the
+    // late pass, not before.
+    let before = e.ticks;
+    e.set_clock(2.5);
+    assert_eq!(e.ticks, before + 1);
+    e.set_clock(2.5 + TICK);
+    assert_eq!(e.ticks, before + 1);
+    e.set_clock(2.5 + TICK + 1e-6);
+    assert_eq!(e.ticks, before + 2);
 }

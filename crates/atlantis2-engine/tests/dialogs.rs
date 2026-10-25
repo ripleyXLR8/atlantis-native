@@ -508,8 +508,10 @@ fn dialog_360_plays_end_to_end() {
     let mut yaws = Vec::new();
     let mut min_music = 100;
     let mut frame = 0u64;
+    // The passes from 1/60 s on: the 15 Hz task's first run is the first
+    // pass after the start (the scheduler's strict test).
     while e.dialog().is_some() && frame < 60 * 30 {
-        let t = frame as f64 / 60.0;
+        let t = (frame + 1) as f64 / 60.0;
         e.set_clock(t);
         e.frame();
         e.render(&mut screen);
@@ -536,9 +538,7 @@ fn dialog_360_plays_end_to_end() {
                         .collect();
                     assert_eq!(hex(&pcm), k("pcm_md5"), "{} voice", l.id);
                 }
-                if l.id == "360_01" {
-                    numbers.push(d.stream().unwrap().number());
-                }
+                numbers.push((l.id.clone(), d.stream().unwrap().number()));
             }
         }
         frame += 1;
@@ -549,8 +549,15 @@ fn dialog_360_plays_end_to_end() {
     // 60193 samples (2.730 s).
     let first = seen[1].1 - seen[0].1;
     assert!((2.73..2.73 + 3.0 / 15.0).contains(&first), "{first}");
-    assert!(numbers.contains(&40) && numbers.windows(2).any(|w| w == [40, 1]));
-    assert!(!numbers.contains(&0));
+    // Each line's video starts at its frame 1 and moves one frame a tick
+    // (the loop past frame 40 is checked by the dialog frame's test: at a
+    // tick every 5th pass no line of dialog 360 is that long).
+    assert!(numbers.windows(2).all(|w| if w[0].0 == w[1].0 {
+        w[1].1 == w[0].1 || w[1].1 == w[0].1 % 40 + 1
+    } else {
+        w[1].1 == 1
+    }));
+    assert_eq!(numbers[0].1, 1);
     // The hero's line turns the view around; the shaman's turns it back.
     let turn = |a: f32, b: f32| ((a - b).rem_euclid(360.0) - 180.0).abs() < 0.01;
     assert!(
@@ -560,7 +567,7 @@ fn dialog_360_plays_end_to_end() {
     assert_eq!(min_music, 16);
     assert!(e.dialog().is_none());
     // Back up to 100 % in 84 / 127 s.
-    for k in 0..60 {
+    for k in 1..=60 {
         e.set_clock((frame + k) as f64 / 60.0);
     }
     assert_eq!(e.music.volume, 100);

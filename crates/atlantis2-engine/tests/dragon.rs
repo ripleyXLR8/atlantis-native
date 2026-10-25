@@ -1406,15 +1406,20 @@ fn the_pearl_played_with_the_mouse_to_the_mechanism_and_chapter_59() {
     // The clouds before the dragon is woken: nothing.
     r.click_zone("CLIC_NUAGE_GAUCHE");
     assert_eq!(r.var("Time_nuage_transparent"), 0);
-    // The dragon: the first round, 'A' hidden.
+    // The dragon: the first round, 'A' hidden, clicked on the pass after
+    // a 15 Hz step.
+    let ticks = r.e.ticks;
+    while r.e.ticks == ticks {
+        r.wait(1);
+    }
     let evs = r.click_zone("CLIC_DRAGON");
     assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_4600
     }));
     assert_eq!(r.var("Perle_cachee"), 0x41);
-    // At 60 passes a second no 15 Hz step fell in the two passes after
-    // this click: the dragon is stopped on frame 50 at once, without its
-    // flight (the original's race, `engine/dragon.rs`).
+    // No 15 Hz step falls in the two passes after this click (the next is
+    // 4 or 5 passes after the last): the dragon is stopped on frame 50 at
+    // once, without its flight (the original's race, `engine/dragon.rs`).
     let (_, flew) = r.until_still();
     assert!(!flew);
     // The rounds: 'A' left, 'B' right, after the sequence ABBAB; the

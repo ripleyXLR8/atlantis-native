@@ -856,7 +856,7 @@ fn the_warp_frame_as_the_original() {
             if k.is_multiple_of(4) {
                 e.tick();
             }
-            e.set_clock(k as f64 / 60.0);
+            e.set_time(k as f64 / 60.0);
             let mut i = 0;
             while i < acts.len() {
                 match acts[i] {
@@ -980,7 +980,7 @@ impl Run {
         if self.pass.is_multiple_of(4) {
             self.e.tick();
         }
-        self.e.set_clock(self.now());
+        self.e.set_time(self.now());
         self.e.pass(Some(&mut self.screen));
         self.e.voices().fill(&mut self.audio, 22050, 2);
         self.pass += 1;

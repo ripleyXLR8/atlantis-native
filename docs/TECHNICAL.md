@@ -934,10 +934,25 @@ back) into `yucatan-*.png`.
   of the moment: panorama, video or dialog) and a 15 Hz task
   (`Engine::tick`, @ 0x0040caa0) paces the videos, the place animations,
   the cursor, the music fades, the dialog's lines and the script clocks;
-  `Engine::set_clock` runs the ticks due at the scheduler's clock (a
-  stall of over a second drops the ticks missed). The window draws at 60
-  frames a second, the headless mode runs frames of 1/60 s. A move's turn is counted in frames, as in
-  the original (`engine.rs`).
+  `Engine::set_clock` runs it as the original's scheduler does
+  (@ 0x00584a00): due when the pass's time is past its next time
+  (strictly), at most once a pass, its next time then the pass's time +
+  its period, `1.0 / 15.0` kept as a float (0.0666666701…, a little over
+  1/15 s; the sum under the x87 control word of the moment). There is no
+  catch-up: a late pass delays every later tick, so the task runs below
+  15 Hz by the passes' lateness. At the port's 60 frames a second it is
+  due every 4 or 5 frames (every 5th with frames exactly 1/60 s apart, as
+  the headless mode runs them): 12 to 15 Hz, which paces the videos and
+  the place animations alike. The original's own frame rate, which sets
+  this rate and every per-frame quantity (the turns, the zooms, the blinks,
+  the puzzles' steps), is not known: its frame task has no period (an
+  open question, to settle by a measure on period hardware). In a pass
+  the port runs the task before the frame; in the
+  original the frame task, whose next time is the previous pass's, comes
+  first and the tick after it, so a tick's effects are drawn one pass
+  later there (the rates are the same). The window draws at 60 frames a
+  second, the headless mode runs frames of 1/60 s. A move's turn is
+  counted in frames, as in the original (`engine.rs`).
 - **Place animations:** the SPW files of `datas_a2\spw\` are banks of
   frames with up to six sprites each, one per cube face, in the first
   game's sprite rows and blend (`c + dst × (32 − f) / 32`), drawn into the
@@ -2051,8 +2066,8 @@ back) into `yucatan-*.png`.
   port: 60 a second, half a second of transparency); the dragon's frames
   move with the 15 Hz step of the place animations. So a dragon woken by
   a click whose next two warp frames see no 15 Hz step is stopped on
-  frame 50 at once, without its flight (at 60 frames a second, one click
-  in two; the rounds that start by themselves have three frames), as the
+  frame 50 at once, without its flight (at 60 frames a second, about one
+  click in two; the rounds that start by themselves have three frames), as the
   original at any frame rate above 30 [CONFIRMED-EMULATED]; the flight
   gives no hint of the side anyway (one animation for both). Unknown:
   the original's warp frame rate on the machines of its time, so how
