@@ -747,6 +747,10 @@ fn the_ogham_stones_played_with_the_mouse() {
     std::fs::create_dir_all(&dir).unwrap();
     r.e.set_data_dir(Some(dir));
     r.e.start_new_game().unwrap();
+    // The music copy's please-wait page of a first new game.
+    while r.e.copying() {
+        r.step();
+    }
     r.e.end_video();
     r.wait(5);
     // Chapter 15's state: Ireland's hub chapter (3) with Ailill's knife

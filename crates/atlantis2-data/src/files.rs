@@ -138,6 +138,9 @@ pub struct A2Files {
     discs: Vec<Disc>,
     /// The current disc (@ 0x00656a88), 0 when there is none.
     current: u8,
+    /// The folders the discs were looked for in ([`A2Files::open_dir`]),
+    /// looked in again by [`A2Files::refresh_discs`].
+    roots: Vec<PathBuf>,
 }
 
 /// Why a game folder does not open.
@@ -201,6 +204,7 @@ impl A2Files {
             install,
             discs,
             current,
+            roots: Vec::new(),
         }
     }
 
@@ -216,15 +220,41 @@ impl A2Files {
             .read("atlantis2.exe")
             .ok_or(OpenError::NoExecutable)?;
         let build = identify(&exe).map_err(OpenError::Exe)?;
-        let mut candidates = disc_candidates(dir);
-        for d in disc_dirs {
-            candidates.extend(disc_candidates(d));
-        }
-        let files = A2Files::new(install, candidates);
+        let roots: Vec<PathBuf> = std::iter::once(dir.to_path_buf())
+            .chain(disc_dirs.iter().cloned())
+            .collect();
+        let candidates = roots.iter().flat_map(|d| disc_candidates(d));
+        let mut files = A2Files::new(install, candidates);
         if files.discs.is_empty() {
             return Err(OpenError::NoDisc);
         }
+        files.roots = roots;
         Ok((files, build))
+    }
+
+    /// The folders of [`A2Files::open_dir`] looked in again for discs
+    /// that were not there (a disc image added while the game asks for
+    /// it, the CD page's poll FUN_0040e090). The discs already found are
+    /// kept. True when a disc was added.
+    pub fn refresh_discs(&mut self) -> bool {
+        let mut added = false;
+        for root in self.roots.clone() {
+            for (origin, source) in disc_candidates(&root) {
+                let number = disc_number(source.as_ref());
+                if number == 0 || self.discs.iter().any(|d| d.number == number) {
+                    continue;
+                }
+                log::info!("disc {number}: {origin}");
+                self.discs.push(Disc {
+                    number,
+                    source,
+                    origin,
+                });
+                added = true;
+            }
+        }
+        self.discs.sort_by_key(|d| d.number);
+        added
     }
 
     /// The install folder.
@@ -315,6 +345,12 @@ impl A2Files {
     pub fn read_with_disc(&self, folder: Folder, name: &str) -> Option<(Vec<u8>, u8)> {
         let (src, path, disc) = self.locate(folder, name)?;
         src.read(&path).map(|d| (d, disc))
+    }
+
+    /// The size of a CD file on disc `n` only.
+    pub fn size_on_disc(&self, n: u8, folder: Folder, name: &str) -> Option<u64> {
+        let disc = self.discs.iter().find(|d| d.number == n)?;
+        disc.source.size(&folder.path(name))
     }
 
     /// A CD file from disc `n` only.

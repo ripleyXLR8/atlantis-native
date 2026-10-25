@@ -213,14 +213,16 @@ impl Host for Rec {
     fn traj_sound(&mut self, apc: &str) {
         self.traj = Some(apc.to_string());
     }
-    fn load_music(&mut self, list: &str) {
+    fn load_music(&mut self, list: &str) -> bool {
         self.push(format!("AtlMuzik_Load('{list}')"));
+        false
     }
     fn delete_music(&mut self, list: &str) {
         self.push(format!("AtlMuzik_Del('{list}')"));
     }
-    fn start_music(&mut self, _: &str) {
+    fn start_music(&mut self, _: &str) -> bool {
         self.push("AtlMuzik_Start(0x006d0444)()".into());
+        false
     }
     fn view_id(&mut self) -> i32 {
         self.view
@@ -1137,8 +1139,9 @@ fn a_new_game_runs_chapter_0s_init() {
         fn play_video(&mut self, hnm: &str, dialog: Option<i32>) -> bool {
             self.rec.play_video(hnm, dialog)
         }
-        fn start_music(&mut self, list: &str) {
+        fn start_music(&mut self, list: &str) -> bool {
             self.rec.push(format!("music {list}"));
+            false
         }
         fn set_monde(&mut self, monde: i32) -> bool {
             self.rec.set_monde(monde)

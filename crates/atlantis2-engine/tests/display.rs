@@ -157,6 +157,11 @@ impl Run {
 
     fn new_game(&mut self) {
         self.e.start_new_game().unwrap();
+        // With a data folder of its own the first new game copies chapter
+        // 0's music under the please-wait page (`engine/media.rs`).
+        while self.e.copying() {
+            self.step();
+        }
         self.e.end_video();
         self.wait(30);
         assert_eq!(self.e.loop_type, LoopType::Warp);

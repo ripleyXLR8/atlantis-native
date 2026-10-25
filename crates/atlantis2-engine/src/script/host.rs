@@ -4,10 +4,12 @@
 //! itself (variables, flags, subjects, the bag, the show/hide table, the
 //! hand) and calls out for everything else. Each method of [`Host`] is one
 //! callee of the original, named after it, with its address; its default
-//! does what the game shows when that subsystem is not there yet (nothing,
-//! or "not started"), so a host implements only what it has.
+//! does what the game shows when that subsystem is not there (nothing, or
+//! "not started"), so a host implements only what it has: the engine
+//! (`crate::engine`, `engine/host.rs`) implements them for the game, the
+//! tests' hosts what they check.
 //!
-//! Subsystems not ported yet, and the methods they will fill in:
+//! The subsystems and their methods:
 //!
 //! - **navigation** (places, views, moves, the place's animations):
 //!   [`Host::load_wam`], [`Host::has_view`], [`Host::enter_view`],
@@ -22,13 +24,15 @@
 //! - **sound and music**: [`Host::music_step`], [`Host::music_volume`],
 //!   [`Host::new_sound`], [`Host::traj_sound`], [`Host::load_music`],
 //!   [`Host::delete_music`], [`Host::start_music`], [`Host::stop_music`];
+//! - **the bag bar**: [`Host::close_bar`];
 //! - **worlds and discs**: [`Host::set_monde`], [`Host::change_cd`];
 //! - **menus and screens**: [`Host::bag_layout`], [`Host::message_clic`],
 //!   [`Host::view_big_sprite`], [`Host::credits`].
 //!
 //! The ends of the loops a command starts (a video, a dialog, a disc
-//! request) are the host's to report: [`super::Script::video_ended`],
-//! [`super::Script::dialog_ended`], [`super::Script::disc_inserted`].
+//! request, a music copy's page) are the host's to report:
+//! [`super::Script::video_ended`], [`super::Script::dialog_ended`],
+//! [`super::Script::disc_inserted`], [`super::Script::copy_ended`].
 
 use super::Script;
 
@@ -198,6 +202,11 @@ pub trait Host {
         false
     }
 
+    /// The bag bar closed (its flag @ 0x00671ef0 = 0, nothing else: the
+    /// hand and the cursor are left as they are), as the `cinema` key
+    /// does after the film's start (@ 0x00481d4e).
+    fn close_bar(&mut self) {}
+
     /// Whether a dialog is running (@ 0x006cfb54).
     fn dialog_running(&self) -> bool {
         false
@@ -228,8 +237,13 @@ pub trait Host {
     fn traj_sound(&mut self, apc: &str) {}
 
     /// `LOADMUSIK` (@ 0x00479480): copy music files from the CD; the text
-    /// is the value up to the end of the line (`1,2,3)`).
-    fn load_music(&mut self, list: &str) {}
+    /// is the value up to the end of the line (`1,2,3)`). True when the
+    /// copy shows the please-wait page: the original copies before the
+    /// next line runs, so the section waits for the page's end
+    /// ([`super::Script::copy_ended`]).
+    fn load_music(&mut self, list: &str) -> bool {
+        false
+    }
 
     /// `delmusik` (@ 0x00479d70): delete those copies.
     fn delete_music(&mut self, list: &str) {}
@@ -237,7 +251,11 @@ pub trait Host {
     /// `startmusik` (@ 0x00485140 → `Interp_SelectMusic` @ 0x004851f0,
     /// @ 0x0047a200): choose and start a music from the list (the value
     /// up to the end of the line, also kept in [`super::Script::music`]).
-    fn start_music(&mut self, list: &str) {}
+    /// True when the music's copy shows the please-wait page, as
+    /// [`Host::load_music`].
+    fn start_music(&mut self, list: &str) -> bool {
+        false
+    }
 
     /// `stopmusik` (@ 0x00477090): fade the music out.
     fn stop_music(&mut self) {}

@@ -139,6 +139,16 @@ impl Run {
     }
 
     fn step(&mut self) {
+        self.one_pass();
+        // The music copies' please-wait pages (`engine/media.rs`: a new
+        // game, the departures from Tibet) hold the game: gone through
+        // within the step.
+        while self.e.copying() {
+            self.one_pass();
+        }
+    }
+
+    fn one_pass(&mut self) {
         self.e.set_clock(self.now());
         self.e.pass(Some(&mut self.screen));
         self.e.voices().fill(&mut self.audio, 22050, 2);
@@ -365,12 +375,30 @@ fn player_menu_new_game_bag_save_and_load() {
     assert_eq!(*sprites.last().unwrap(), (UiBank::Interface, 40, 320, 240));
     assert_eq!(r.e.bar.shown.len(), 1);
 
-    // Escape over the open bar: the main menu, the save.
-    let before = r.state();
+    // Escape over the open bar: the main menu, the save. (The state the
+    // load gives back is the save's, taken at the press of YES: the 15 Hz
+    // clocks go on in the menu.)
     let want = r.e.save_data();
     r.disc_panel();
     r.press_widget("a_save.spr");
-    r.press_widget("b_oui.spr");
+    let w =
+        r.e.menu()
+            .unwrap()
+            .page
+            .as_ref()
+            .unwrap()
+            .widget("b_oui.spr")
+            .unwrap();
+    let (x, y) = (
+        (w.hit.left + w.hit.right) / 2,
+        (w.hit.top + w.hit.bottom) / 2,
+    );
+    r.e.pointer(x, y);
+    r.e.click(r.now());
+    r.step();
+    let before = r.state();
+    r.e.release();
+    r.step();
     assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
     assert!(r.e.bar.open, "the menus leave the bar as it was");
     let file = std::fs::read(dir.join("save").join("ATL04_00.SAV")).unwrap();
@@ -901,7 +929,9 @@ fn tibet_start(r: &mut Run) {
     assert!(!r.e.intro_playing());
     assert_eq!(r.page(), Some(PageKind::Player));
 
-    // A new game, its film clicked away, the first click (chapter 75).
+    // A new game (the music copy's please-wait page gone through by the
+    // steps, its data folder being new), its film clicked away, the first
+    // click (chapter 75).
     r.press_widget("b_ter.spr");
     assert_eq!(r.e.loop_type, LoopType::Video);
     r.wait(30);

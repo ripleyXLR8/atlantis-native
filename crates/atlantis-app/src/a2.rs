@@ -21,8 +21,11 @@
 //! in it, in the folders directly inside it, and in the folders given with
 //! `--discs`.
 //!
-//! `--original` turns the enhancements off (the minor bug fixes: the
-//! music tracks heard to their end), as for the first game.
+//! `--original` turns the enhancements off, as for the first game: the
+//! minor bug fixes (`atlantis2_engine::Enhancements::minor_bug_fixes`:
+//! every music track heard to its end, a track that ends with nothing
+//! after it played again, Ireland's puzzle zones answering for no named
+//! zone) and the HD mode.
 //!
 //! `--hd` draws the panorama at the window's resolution (the first game's
 //! HD mode, `atlantis2_engine::hd`), `--widescreen` too with the panorama
@@ -213,6 +216,16 @@ impl A2Start {
             return Ok(());
         }
         engine.start_new_game().map_err(|e| e.to_string())?;
+        if at_once || self.menu.is_some() {
+            // The new game's music copy (`LOADMUSIK` in chapter 0's /INIT,
+            // when the data folder holds no copy yet) holds the rest of
+            // /INIT under the please-wait page: gone through first, so the
+            // opening film and its music have started before the aids end
+            // the film and apply theirs (`engine/media.rs`).
+            while engine.copying() {
+                engine.pass(None);
+            }
+        }
         self.apply(engine)?;
         match self.menu {
             Some(PageKind::Credits) => engine.open_credits(),
@@ -611,6 +624,7 @@ pub fn run_window(
         paused,
         paused_at: None,
         menu_pointer: None,
+        game_pointer: None,
         motion: (0.0, 0.0),
         keys: [false; 4],
         locked: false,
@@ -648,6 +662,9 @@ struct A2App {
     paused_at: Option<Instant>,
     /// The window's pointer on the screen (the options menu's clicks).
     menu_pointer: Option<(i32, i32)>,
+    /// The window's pointer as the game's menus last had it (its moves
+    /// turn the view: [`system_pointer`]); none outside the menus.
+    game_pointer: Option<(i32, i32)>,
     /// Raw mouse motion not yet given to the engine (fractions kept).
     motion: (f64, f64),
     /// Left, right, up, down held.
@@ -680,6 +697,9 @@ impl A2App {
         // In the menus the pointer is the game's own, moved by the mouse
         // over the window; in the game the mouse turns the view.
         let in_menu = self.engine.loop_type == LoopType::Menu;
+        if !in_menu {
+            self.game_pointer = None;
+        }
         if in_menu && self.locked {
             self.grab(false);
             if let Some(w) = &self.window {
@@ -971,45 +991,23 @@ impl ApplicationHandler for A2App {
             // bag bar's pointer).
             WindowEvent::CursorMoved { position, .. } if in_menu || !self.locked => {
                 self.menu_pointer = self.to_screen(position, screen_dims(&self.screen));
-                if let Some((x, y)) = self.to_screen(position, self.logical()) {
-                    self.engine.pointer(x, y);
+                if let Some(p) = self.to_screen(position, self.logical()) {
+                    let last = if in_menu {
+                        Some(&mut self.game_pointer)
+                    } else {
+                        None
+                    };
+                    system_pointer(&mut self.engine, last, p);
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.menu_pointer = self.to_screen(position, screen_dims(&self.screen));
             }
-            WindowEvent::MouseInput {
-                state,
-                button: MouseButton::Left,
-                ..
-            } if in_menu => {
-                // The click flag (@ 0x006569c9) and the held flag
-                // (@ 0x006569ca).
-                if state == ElementState::Pressed {
-                    let now = self.started.elapsed().as_secs_f64();
-                    self.engine.click(now);
-                } else {
-                    self.engine.release();
-                }
-            }
-            WindowEvent::MouseInput {
-                state: ElementState::Pressed,
-                button,
-                ..
-            } => {
-                // A click ends a video (the intro's too) whether or not
-                // the pointer is held.
-                let in_video = self.engine.loop_type == LoopType::Video;
-                if !self.locked && !in_menu && !(in_video && button == MouseButton::Left) {
+            WindowEvent::MouseInput { state, button, .. } => {
+                let now = self.started.elapsed().as_secs_f64();
+                let pressed = state == ElementState::Pressed;
+                if mouse_button(&mut self.engine, self.locked, button, pressed, now) {
                     self.grab(true);
-                } else if button == MouseButton::Left {
-                    // The click flag (@ 0x006569c9) is the left button's
-                    // (input callback FUN_0040c510); the right one opens
-                    // the bag.
-                    let now = self.started.elapsed().as_secs_f64();
-                    self.engine.click(now);
-                } else if button == MouseButton::Right {
-                    self.engine.right_click();
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
@@ -1063,6 +1061,55 @@ impl ApplicationHandler for A2App {
             _ => {}
         }
     }
+}
+
+/// A mouse button for the engine (the input callbacks FUN_0040c510 and
+/// FUN_0040c660): every release of the left button clears the held flag
+/// (@ 0x006569ca), whatever the loop type; a press clicks (the left
+/// button: the click flag @ 0x006569c9, a video ended) or opens the bag
+/// (the right one). True when the press only grabs the pointer (outside
+/// the menus, with the pointer free; a left click still ends a video).
+fn mouse_button(
+    engine: &mut Engine,
+    locked: bool,
+    button: MouseButton,
+    pressed: bool,
+    now: f64,
+) -> bool {
+    if !pressed {
+        if button == MouseButton::Left {
+            engine.release();
+        }
+        return false;
+    }
+    let in_menu = engine.loop_type == LoopType::Menu;
+    let in_video = engine.loop_type == LoopType::Video;
+    if !locked && !in_menu && !(in_video && button == MouseButton::Left) {
+        return true;
+    }
+    match button {
+        MouseButton::Left => engine.click(now),
+        MouseButton::Right => engine.right_click(),
+        _ => {}
+    }
+    false
+}
+
+/// The window's pointer at `p` on the screen where the pointer is the
+/// system's: the game's pointer there; in the menus (`last` given, the
+/// position it had) its moves also add to the turn speeds, as the
+/// original's motion callback (@ 0x0040c420) adds the mouse's moves to
+/// them in every loop type (the port adds the pointer's moves in screen
+/// pixels, the original the mouse's counts, which moved its pointer one
+/// pixel each).
+fn system_pointer(engine: &mut Engine, last: Option<&mut Option<(i32, i32)>>, p: (i32, i32)) {
+    if let Some(last) = last {
+        if let Some((x, y)) = *last {
+            engine.pointer_moved(p.0 - x, p.1 - y);
+        }
+        *last = Some(p);
+    }
+    engine.pointer(p.0, p.1);
 }
 
 /// A window position on the 640x480 screen, in a `width` x `height`
@@ -1279,6 +1326,123 @@ impl Timings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The game's files, or `None` (the test skipped) without
+    /// `ATLANTIS2_DATA` / `ATLANTIS2_DISCS`.
+    fn a2_files() -> Option<atlantis2_data::A2Files> {
+        let (Some(dir), Some(discs)) = (
+            std::env::var_os("ATLANTIS2_DATA"),
+            std::env::var_os("ATLANTIS2_DISCS"),
+        ) else {
+            eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+            return None;
+        };
+        let (files, _) = atlantis2_data::A2Files::open_dir(
+            std::path::Path::new(&dir),
+            &[std::path::PathBuf::from(discs)],
+        )
+        .ok()?;
+        Some(files)
+    }
+
+    /// The testing aids' start on a data folder with no music copy yet:
+    /// the please-wait page of chapter 0's `LOADMUSIK` goes first, then
+    /// the rest of /INIT (the opening film and music 30), then the aids.
+    /// The view asked for is shown with the music, no film over it.
+    #[test]
+    fn the_aids_start_after_the_music_copy() {
+        let Some(files) = a2_files() else { return };
+        let dir = std::env::temp_dir().join(format!("a2-aids-copy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+        e.set_data_dir(Some(dir.clone()));
+        let start = A2Start {
+            view: Some((10, 0.0, 0.0)),
+            ..A2Start::default()
+        };
+        start.begin(&mut e, true).unwrap();
+        assert!(!e.copying());
+        for i in 0..120 {
+            e.set_clock(f64::from(i) / 60.0);
+            e.pass(None);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(e.loop_type, LoopType::Warp);
+        assert!(e.video_playing().is_none());
+        assert_eq!(e.place().1, 10);
+        assert_eq!(e.music_playing(), Some(30));
+    }
+
+    /// Every release of the left button reaches the engine, also outside
+    /// the menus (FUN_0040c660 clears the held flag in every loop type):
+    /// a press on a player symbol closes the player menu, and its release
+    /// comes in the game.
+    #[test]
+    fn every_left_release_reaches_the_engine() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+        e.open_player_menu();
+        let mut clock = 0.0;
+        let mut pass = |e: &mut Engine| {
+            clock += 1.0 / 60.0;
+            e.set_clock(clock);
+            e.pass(None);
+        };
+        pass(&mut e);
+        let w = e
+            .menu()
+            .unwrap()
+            .page
+            .as_ref()
+            .unwrap()
+            .widget("b_gala.spr")
+            .unwrap();
+        e.pointer(
+            (w.hit.left + w.hit.right) / 2,
+            (w.hit.top + w.hit.bottom) / 2,
+        );
+        // In the menus a press clicks, whether the pointer is held or not.
+        assert!(!mouse_button(&mut e, false, MouseButton::Left, true, 1.0));
+        assert!(e.button_held());
+        pass(&mut e);
+        pass(&mut e);
+        while e.copying() {
+            pass(&mut e);
+        }
+        assert_ne!(e.loop_type, LoopType::Menu);
+        assert!(!mouse_button(&mut e, true, MouseButton::Left, false, 1.1));
+        assert!(!e.button_held());
+        // Outside the menus, with the pointer free, a press grabs it.
+        assert_eq!(e.loop_type, LoopType::Video);
+        e.end_video();
+        pass(&mut e);
+        assert!(mouse_button(&mut e, false, MouseButton::Left, true, 2.0));
+        assert!(!e.button_held());
+    }
+
+    /// In the menus the system pointer's moves add to the turn speeds
+    /// (the motion callback @ 0x0040c420 runs in every loop type); outside
+    /// them, with the pointer free, it only places the game's pointer.
+    #[test]
+    fn the_menus_pointer_turns_the_view() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+        let mut last = None;
+        system_pointer(&mut e, None, (100, 100));
+        assert_eq!((e.look.yaw_speed, e.look.pitch_speed), (0.0, 0.0));
+        e.escape();
+        assert_eq!(e.loop_type, LoopType::Menu);
+        system_pointer(&mut e, Some(&mut last), (100, 100));
+        assert_eq!((e.look.yaw_speed, e.look.pitch_speed), (0.0, 0.0));
+        system_pointer(&mut e, Some(&mut last), (140, 90));
+        let mut want = atlantis2_engine::look::Look::default();
+        want.mouse(e.fpu(), 40, -10);
+        assert_eq!(
+            (e.look.yaw_speed, e.look.pitch_speed),
+            (want.yaw_speed, want.pitch_speed)
+        );
+        assert_eq!(last, Some((140, 90)));
+    }
 
     #[test]
     fn sizes() {
@@ -1573,9 +1737,16 @@ mod tests {
             );
         };
         let none = &mut |_: &mut Engine, _: usize, _: f64| {};
-        // A new game: its opening film ended, Tibet's first view.
+        // A new game: the music copy's please-wait page (the data folder
+        // may be new), its opening film ended, Tibet's first view.
         for s in sides.iter_mut() {
             s.engine.start_new_game().unwrap();
+        }
+        if sides[0].engine.copying() {
+            play(&mut sides, 60, none, None);
+        }
+        for s in sides.iter_mut() {
+            assert!(!s.engine.copying());
             s.engine.end_video();
         }
         play(&mut sides, 60, none, None);

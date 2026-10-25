@@ -55,6 +55,7 @@ mod labyrinth;
 pub use labyrinth::{
     soul_cell, soul_drops, soul_open, soul_random, soul_visible, Hood, SOULS_MODE,
 };
+mod media;
 mod menus;
 mod ogham;
 pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
@@ -683,6 +684,12 @@ pub struct Engine {
     pub cfg_extra: atlantis2_data::save::Cfg,
     /// The menus asked the program to end.
     quit_requested: bool,
+    /// The music copies and the media pages (`engine/media.rs`).
+    pub media: media::Media,
+    /// The left button held (@ 0x006569ca): set by every press, cleared
+    /// by every release (FUN_0040c510, FUN_0040c660), whatever the loop
+    /// type; the menus' buttons animate only while it is clear.
+    button_held: bool,
 }
 
 /// The music player's own state (@ 0x00673f30, 0x006725a0..0x006725c4):
@@ -889,7 +896,10 @@ impl Engine {
         );
         let mut anim = Anim::new(0);
         anim.cheval = names.id(defnames::OBJETS, b"CHEVAL").ok().map(|i| i as i32);
+        let media = media::Media::all_made();
         Engine {
+            media,
+            button_held: false,
             files,
             wam: Wam::default(),
             wam_name: String::new(),
@@ -1170,11 +1180,40 @@ impl Engine {
         crate::anim::next_state(&states, states.get(si)?).map(|k| (ei, k))
     }
 
-    /// A mouse move, in mickeys (relative pointer motion): the pointer
-    /// and the turn speeds.
+    /// A mouse move, in mickeys (relative pointer motion): the pointer,
+    /// the turn speeds and the zone under the centre (the motion callback
+    /// @ 0x0040c420).
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
+        if self.hold_input(media::Input::Motion(dx, dy)) {
+            return;
+        }
         self.move_pointer(dx, dy);
         self.look.mouse(self.camera.fpu, dx, dy);
+        self.motion_pick();
+    }
+
+    /// The end of the motion callback (@ 0x0040c4df..0x0040c500): the
+    /// zone under the screen centre picked again from the camera as it
+    /// is, in every loop type and whatever is open (the warp frame's pick
+    /// is skipped under the bag bar, the subject menu, a dialog or an
+    /// overlay; this one is not).
+    fn motion_pick(&mut self) {
+        self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+    }
+
+    /// A move of the system pointer by (dx, dy) screen pixels where the
+    /// pointer is the system's (the menus: [`Engine::pointer`] places
+    /// it): the turn speeds gain it and the zone under the centre is
+    /// picked again, as the motion callback (@ 0x0040c420) does on every
+    /// move whatever the loop type. The menu frame
+    /// runs no decay, so the speeds are kept across a menu and the view
+    /// swings on when it closes.
+    pub fn pointer_moved(&mut self, dx: i32, dy: i32) {
+        if self.hold_input(media::Input::PointerMoved(dx, dy)) {
+            return;
+        }
+        self.look.mouse(self.camera.fpu, dx, dy);
+        self.motion_pick();
     }
 
     /// A left button press at `now` seconds (the input callback
@@ -1184,14 +1223,17 @@ impl Engine {
     /// During a dialog the click goes to it: the next line (the dialog's
     /// tick reads and clears the flag, @ 0x004801d0).
     pub fn click(&mut self, now: f64) {
+        if self.hold_input(media::Input::Click(now)) {
+            return;
+        }
         self.double = self.last_click.is_some_and(|t| now - t < 0.2);
         self.last_click = Some(now);
         let double = self.double;
         self.event(Event::Click { double });
+        self.button_held = true;
         if self.loop_type == LoopType::Menu {
             if let Some(m) = self.menu.as_mut() {
                 m.input.click = true;
-                m.input.held = true;
             }
             return;
         }
@@ -1280,6 +1322,13 @@ impl Engine {
     /// Moves the clock to `now` (seconds), running the 15 Hz ticks due
     /// (a stall of more than a second skips the ticks missed).
     pub fn set_clock(&mut self, now: f64) {
+        // No task runs during a music copy (its loop draws the page and
+        // nothing else): the first pass after it runs one tick.
+        if self.copying() {
+            self.next_tick = now;
+            self.clock = now;
+            return;
+        }
         if now - self.next_tick > 1.0 {
             self.next_tick = now;
         }
@@ -1436,6 +1485,16 @@ impl Engine {
         self.centre_draws.clear();
         self.ui_draws.clear();
         self.hd_pass_start();
+        // A music copy holds the game under the please-wait page
+        // (`engine/media.rs`).
+        if self.copying() {
+            self.copy_pass(out.as_deref_mut());
+            self.hd_pass_end(out.as_deref());
+            self.frame_flag = false;
+            return;
+        }
+        // A disc asked for and not found: the CD page.
+        self.open_cd_page();
         // The music state machine (@ 0x00476fc0, called @ 0x0049ce32).
         self.music_frame();
         match self.loop_type {
@@ -1618,32 +1677,22 @@ impl Engine {
 
     /// `AtlWarp_continue` (@ 0x0045a3b0).
     fn warp_pass(&mut self, mut out: Option<&mut [u16]>) {
-        // 1. The turn step, or the mouse inertia and the limits
-        // (@ 0x0040c6a0); then the zone under the centre.
-        if let Some(turn) = &mut self.turn {
-            let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
-            let step = turn.step(&mut self.camera, &mut self.zoom, screen);
-            if step.skip_draw {
-                self.draw_skip = true;
-            }
-            if !step.going {
-                self.turn = None;
-                self.move_pending = true;
-            }
-        } else {
-            // The limits are the script's `LIMITEANGLEWARPX` / `Y`, read
-            // every frame. Not while the bag bar, the subject menu or a
-            // full-screen overlay is open (nor a dialog, the parchment or
-            // the pause, which the port does not have here).
-            if let Some(s) = &self.con {
-                self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
-                self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
-            }
-            if !self.bar.open && !self.subject_menu.open && !self.overlays.cover {
-                self.look.frame(&mut self.camera);
-            }
+        // 1. FUN_0040c6a0: the turn step, or the mouse inertia and the
+        // limits; then the zone under the centre. Not at all while the bag
+        // bar, the subject menu, a dialog or a full-screen overlay is open
+        // (@ 0x0045a3b0..0x0045a3ea; the parchment and the pause, the two
+        // other flags tested, are never set in the port): a move's turn
+        // waits under the open bar. The zone under the centre is then the
+        // one the last mouse move picked (the motion callback picks it in
+        // every case, [`Engine::mouse_motion`]).
+        if !self.bar.open
+            && !self.subject_menu.open
+            && self.dialog.is_none()
+            && !self.overlays.cover
+        {
+            self.turn_or_look();
+            self.centre_zone = self.pick_centre().map(|i| (self.view, i));
         }
-        self.centre_zone = self.pick_centre().map(|i| (self.view, i));
         // The overlays' clicks (@ 0x0047efd0).
         if self.overlays.any() {
             self.overlay_clicks();
@@ -1711,6 +1760,29 @@ impl Engine {
         }
     }
 
+    /// FUN_0040c6a0's first part: a move's turn step, or else the mouse
+    /// inertia within the script's `LIMITEANGLEWARPX` / `Y` (read every
+    /// frame).
+    fn turn_or_look(&mut self) {
+        if let Some(turn) = &mut self.turn {
+            let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
+            let step = turn.step(&mut self.camera, &mut self.zoom, screen);
+            if step.skip_draw {
+                self.draw_skip = true;
+            }
+            if !step.going {
+                self.turn = None;
+                self.move_pending = true;
+            }
+            return;
+        }
+        if let Some(s) = &self.con {
+            self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
+            self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
+        }
+        self.look.frame(&mut self.camera);
+    }
+
     /// The zone under the screen centre (@ 0x00458fe0).
     fn pick_centre(&self) -> Option<usize> {
         let view = self.wam.view(self.view)?;
@@ -1729,7 +1801,11 @@ impl Engine {
         let centre = self
             .forced_centre
             .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
-        let (dirty, mut hit) = self.anim.draw(&mut self.work, centre, self.click);
+        // The slot under the centre is recorded on a click only while the
+        // bag bar is closed (FUN_0045b040 @ 0x0045b0cd).
+        let (dirty, mut hit) = self
+            .anim
+            .draw(&mut self.work, centre, self.click && !self.bar.open);
         if !self.sprite_picks {
             hit = Default::default();
         }
