@@ -216,6 +216,16 @@ impl A2Start {
             return Ok(());
         }
         engine.start_new_game().map_err(|e| e.to_string())?;
+        if at_once || self.menu.is_some() {
+            // The new game's music copy (`LOADMUSIK` in chapter 0's /INIT,
+            // when the data folder holds no copy yet) holds the rest of
+            // /INIT under the please-wait page: gone through first, so the
+            // opening film and its music have started before the aids end
+            // the film and apply theirs (`engine/media.rs`).
+            while engine.copying() {
+                engine.pass(None);
+            }
+        }
         self.apply(engine)?;
         match self.menu {
             Some(PageKind::Credits) => engine.open_credits(),
@@ -1333,6 +1343,34 @@ mod tests {
         )
         .ok()?;
         Some(files)
+    }
+
+    /// The testing aids' start on a data folder with no music copy yet:
+    /// the please-wait page of chapter 0's `LOADMUSIK` goes first, then
+    /// the rest of /INIT (the opening film and music 30), then the aids.
+    /// The view asked for is shown with the music, no film over it.
+    #[test]
+    fn the_aids_start_after_the_music_copy() {
+        let Some(files) = a2_files() else { return };
+        let dir = std::env::temp_dir().join(format!("a2-aids-copy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+        e.set_data_dir(Some(dir.clone()));
+        let start = A2Start {
+            view: Some((10, 0.0, 0.0)),
+            ..A2Start::default()
+        };
+        start.begin(&mut e, true).unwrap();
+        assert!(!e.copying());
+        for i in 0..120 {
+            e.set_clock(f64::from(i) / 60.0);
+            e.pass(None);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(e.loop_type, LoopType::Warp);
+        assert!(e.video_playing().is_none());
+        assert_eq!(e.place().1, 10);
+        assert_eq!(e.music_playing(), Some(30));
     }
 
     /// Every release of the left button reaches the engine, also outside

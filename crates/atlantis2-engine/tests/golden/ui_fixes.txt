@@ -31,6 +31,16 @@ p162 t41 yaw -89.921 pitch 0.079
 p163 t41 yaw -90.000 pitch 0.000 loop=1 view=3 turn=0 zone=-1 ARRIVEEVUE=3 VUE=3 | video 79; frame 0
 p164 t42 | frame 1
 end view 3 yaw -90.000 pitch 0.000 loop 1 centre zone -1 bar 0
+== M1b view 2 at (-75, 15), right button at p2 (bar open)
+start view 2 yaw -75.000 pitch 15.000 centre zone -1
+p0 t1 zone=0
+p2 t1 bar=1 | right
+end view 2 yaw -75.000 pitch 15.000 loop 0 centre zone 0 bar 1
+== M1c then view 2 entered at (0, 0) under the open bar: motion 1,0 at p3, right button at p6
+start view 2 yaw 0.000 pitch -0.000 centre zone 0
+p3 t2 zone=-1 | motion 1,0
+p6 t3 bar=0 | right
+end view 2 yaw 0.000 pitch -0.000 loop 0 centre zone -1 bar 0
 == M3 /set(cinema=12) with the bar open
 bar after the line 0
 bar closed before: after the line 0

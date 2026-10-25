@@ -1167,20 +1167,32 @@ impl Engine {
         }
     }
 
-    /// A mouse move, in mickeys (relative pointer motion): the pointer
-    /// and the turn speeds.
+    /// A mouse move, in mickeys (relative pointer motion): the pointer,
+    /// the turn speeds and the zone under the centre (the motion callback
+    /// @ 0x0040c420).
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
         if self.hold_input(media::Input::Motion(dx, dy)) {
             return;
         }
         self.move_pointer(dx, dy);
         self.look.mouse(self.camera.fpu, dx, dy);
+        self.motion_pick();
+    }
+
+    /// The end of the motion callback (@ 0x0040c4df..0x0040c500): the
+    /// zone under the screen centre picked again from the camera as it
+    /// is, in every loop type and whatever is open (the warp frame's pick
+    /// is skipped under the bag bar, the subject menu, a dialog or an
+    /// overlay; this one is not).
+    fn motion_pick(&mut self) {
+        self.centre_zone = self.pick_centre().map(|i| (self.view, i));
     }
 
     /// A move of the system pointer by (dx, dy) screen pixels where the
     /// pointer is the system's (the menus: [`Engine::pointer`] places
-    /// it): the turn speeds gain it, as the motion callback (@ 0x0040c420)
-    /// adds every move to them whatever the loop type. The menu frame
+    /// it): the turn speeds gain it and the zone under the centre is
+    /// picked again, as the motion callback (@ 0x0040c420) does on every
+    /// move whatever the loop type. The menu frame
     /// runs no decay, so the speeds are kept across a menu and the view
     /// swings on when it closes.
     pub fn pointer_moved(&mut self, dx: i32, dy: i32) {
@@ -1188,6 +1200,7 @@ impl Engine {
             return;
         }
         self.look.mouse(self.camera.fpu, dx, dy);
+        self.motion_pick();
     }
 
     /// A left button press at `now` seconds (the input callback
@@ -1592,8 +1605,9 @@ impl Engine {
         // bar, the subject menu, a dialog or a full-screen overlay is open
         // (@ 0x0045a3b0..0x0045a3ea; the parchment and the pause, the two
         // other flags tested, are never set in the port): a move's turn
-        // waits under the open bar, and the zone under the centre is the
-        // last one picked.
+        // waits under the open bar. The zone under the centre is then the
+        // one the last mouse move picked (the motion callback picks it in
+        // every case, [`Engine::mouse_motion`]).
         if !self.bar.open
             && !self.subject_menu.open
             && self.dialog.is_none()

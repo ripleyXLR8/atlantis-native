@@ -1,7 +1,8 @@
 //! The bag bar, the menus' input and the media pages against the original
 //! (`tests/golden/ui_fixes.txt`, atlantis2-cd-fr-2199552 run under
 //! Unicorn): a move's turn held under the open bag bar, `cinema=` closing
-//! the bar, the button-held flag cleared by every release, the turn speeds
+//! the bar, the zone under the centre picked by a mouse move under the bar,
+//! the button-held flag cleared by every release, the turn speeds
 //! kept across the Escape menu, the menu's sliders, the music copy's
 //! please-wait page, the CD page, no sprite hit recorded under the bar.
 //!
@@ -301,6 +302,32 @@ fn the_turn_waits_under_the_open_bar() {
         &mut rows,
     );
     compare("M1", &rows, &section("M1"));
+}
+
+/// The zone under the centre while the bag bar is open: the warp frame
+/// does not pick it, but the motion callback (@ 0x0040c420) does on every
+/// mouse move, whatever the gate; after a view entry turned the camera
+/// under the bar, the zone follows at the next move.
+#[test]
+fn a_move_of_the_mouse_picks_the_zone_under_the_bar() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+    e.trace = true;
+    e.sprite_picks = false;
+    e.anim.rand = MsvcRand(1000);
+    let mut d = Driver {
+        e,
+        pass_no: 0,
+        clock: 0.0,
+    };
+    d.enter_at(2, -75.0, 15.0);
+    let mut rows = Vec::new();
+    d.run(&[(2, Act::Right)], 3, &mut rows);
+    compare("M1b", &rows, &section("M1b"));
+    d.enter_at(2, 0.0, 0.0);
+    let mut rows = Vec::new();
+    d.run(&[(3, Act::Motion(1, 0)), (6, Act::Right)], 12, &mut rows);
+    compare("M1c", &rows, &section("M1c"));
 }
 
 /// M10: the turn speeds are kept across the Escape menu and the menu's

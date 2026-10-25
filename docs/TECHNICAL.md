@@ -663,8 +663,9 @@ end of the game.
 screen;
 `--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
 plays a dialog at once and `--menu <page>` shows a menu page (`player`,
-`main`, `options`, `sound`, `load`, `credits`; testing aids, which end the
-opening film first),
+`main`, `options`, `sound`, `load`, `credits`; testing aids, which go
+through the new game's music copy page when the data folder holds no copy
+yet, then end the opening film first),
 e.g. `--view 7,-164.394,14.96 --dialog 360`; `--take <object>[,...]` puts
 objects in the bag and `--hold <object>` one in the hand (by their
 `defnames.con` names, through the scripts' `sacados` and `objetenmain`),
@@ -2321,7 +2322,11 @@ back) into `yucatan-*.png`.
   under the centre (`AtlWarp_continue` @ 0x0045a3b0..0x0045a3ea, also
   while the subject menu, a dialog or a full-screen overlay is open): a
   move's turn waits under the open bar and goes on when it closes
-  (`tests/ui_fixes.rs`, against the original run under emulation).
+  (`tests/ui_fixes.rs`, against the original run under emulation). The
+  zone under the centre is still picked on every mouse move: the motion
+  callback (@ 0x0040c420, its end @ 0x0040c4df) picks it in every loop
+  type whatever is open, so after a view entry under the bar it follows
+  the camera at the next move.
   `cinema=` closes the bar (its flag only, @ 0x00481d4e). The object in hand is drawn at the screen centre under the
   cursor (hand bank set and frame ≥ 0, frame 0 included), and right after
   a take or a pick the cursor shows the object too until the next cursor
