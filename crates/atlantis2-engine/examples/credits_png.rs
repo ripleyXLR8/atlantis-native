@@ -1,4 +1,4 @@
-//! Plays the credits of Atlantis II headless at 60 frames a second and
+//! Plays the credits of Atlantis II headless at 59.94 frames a second and
 //! writes some of their frames to PNG files: `<prefix>page00.png` (2 s),
 //! `<prefix>fade.png` (6 s, page 0 half faded into page 1),
 //! `<prefix>page01.png` (9 s), `<prefix>page16.png` (page 16, the first
@@ -13,6 +13,7 @@
 use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, Fpu, Variant};
 
@@ -33,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     e.set_clock(0.0);
     e.open_credits();
     for frame in 0..200 * 60 {
-        e.set_clock(frame as f64 / 60.0);
+        e.set_clock(frame as f64 * PASS);
         e.pass(Some(&mut screen));
         if let Some((_, name)) = shots.iter().find(|s| s.0 == frame) {
             let path = format!("{prefix}{name}.png");
@@ -41,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{path}");
         }
         if e.quit() {
-            println!("the credits ended at {:.3} s", frame as f64 / 60.0);
+            println!("the credits ended at {:.3} s", frame as f64 * PASS);
             break;
         }
     }

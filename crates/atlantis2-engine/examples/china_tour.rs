@@ -8,12 +8,13 @@
 //! in hand) instead of walking there.
 //!
 //! Usage: `china_tour <install dir> <discs dir> <out dir>`; writes
-//! `china-*.png`. 60 passes a second, a 15 Hz tick every fourth.
+//! `china-*.png`. 59.94 passes a second, a 15 Hz tick every fourth.
 
 use std::path::{Path, PathBuf};
 
 use atlantis2_data::defnames;
 use atlantis2_data::A2Files;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::subjects::cell;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -30,7 +31,7 @@ struct Tour {
 
 impl Tour {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

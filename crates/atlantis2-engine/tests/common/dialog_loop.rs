@@ -81,8 +81,11 @@ pub fn check_dialog_loop(e: &mut Engine, number: u32) -> (BTreeSet<i32>, bool) {
     let mut buf = vec![0u16; w * h];
     let mut seen = BTreeSet::new();
     let mut stepped_any = false;
+    // The harness runs the 15 Hz task itself (a tick every four passes,
+    // as the golden's emulated loop): the clock moves without the
+    // scheduler.
     let mut clock = 0.0;
-    e.set_clock(clock);
+    e.set_time(clock);
     e.start_dialog(number)
         .unwrap_or_else(|err| panic!("dialog {number}: {err}"));
     let mut checked: Option<usize> = None;
@@ -90,7 +93,7 @@ pub fn check_dialog_loop(e: &mut Engine, number: u32) -> (BTreeSet<i32>, bool) {
     for pass in 0..40_000 {
         if pass % 4 == 0 {
             clock += 1.0 / 15.0;
-            e.set_clock(clock);
+            e.set_time(clock);
             e.tick();
         }
         e.pass(Some(&mut buf));

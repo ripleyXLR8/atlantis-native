@@ -48,11 +48,12 @@
 //!
 //! **Timing.** The dragon's frames move with the 15 Hz step of the place
 //! animations; the puzzle's step and its 30-frame transparency count warp
-//! frames, which the original does not pace. The dragon is stopped at the
+//! frames, which only the screen's refresh paces in the original (in full
+//! screen, one a refresh). The dragon is stopped at the
 //! first warp frame of state 3 that finds it on frame 50: when no 15 Hz
 //! step ran in the two warp frames after the click, it has not left frame
-//! 50 and the round starts without its flight (at 60 frames a second, a
-//! click in two of four frames; the rounds that start by themselves have
+//! 50 and the round starts without its flight (at the port's 59.94 frames
+//! a second, a tick every 4th, a click in two of four frames; the rounds that start by themselves have
 //! three frames). The transparent cloud is drawn only when the 15 Hz
 //! counter is odd (FUN_0047cf00 @ 0x0047d181..0x0047d1aa: slot +0xc0 ≠ 0).
 

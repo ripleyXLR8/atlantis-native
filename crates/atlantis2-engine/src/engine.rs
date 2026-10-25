@@ -12,7 +12,7 @@ use atlantis2_data::con::NewGame;
 use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::dialog::{FontTxt, World};
 use atlantis2_data::messages::ObjectNames;
-use atlantis2_data::spr::{SprBank, Target};
+use atlantis2_data::spr::{SprBank, SprDll, Target};
 use atlantis2_data::spw::{FaceBox, Spw};
 use atlantis2_data::wam::{self, View, WamError, Zone};
 use atlantis2_data::{A2Files, Folder, Wam};
@@ -98,9 +98,22 @@ pub use dragon::Dragon;
 pub use saves::SaveError;
 pub use subjects::subjects_bank_name;
 
-/// The scheduler's tick: 15 a second (the dialogs' sequencer, the music
-/// fades, the animations, the videos).
-pub const TICK: f64 = 1.0 / 15.0;
+/// The 15 Hz task's period (the dialogs' sequencer, the music fades, the
+/// animations, the videos): `1.0 / 15.0` stored as a float
+/// (@ 0x0040cb78..0x0040cba1, then widened into the task's double
+/// @ 0x0040cbf6..0x0040cc04), 0.0666666701436…, a little over 1/15 s.
+pub const TICK: f64 = (1.0f32 / 15.0f32) as f64;
+
+/// The time between two of the port's passes, seconds: a frame of the VGA
+/// 640 x 480 mode at 60 Hz (800 x 525 pixels at 25.175 MHz, 59.94 frames a
+/// second). In full screen, its default, the original shows its frames
+/// with a flip that waits for the vertical blank (`Flip(NULL, DDFLIP_WAIT)`
+/// on a chain of one back buffer, @ 0x0058fdec..0x0058fdf1, the chain made
+/// @ 0x0058f86c..0x0058f8b2, the mode set with the display's default rate
+/// @ 0x0058f81b..0x0058f82a): one pass a refresh of the screen. The port
+/// runs its passes as on a 60 Hz screen, at this standard timing; the
+/// 15 Hz task is then due every 4th pass (the scheduler's golden).
+pub const PASS: f64 = 800.0 * 525.0 / 25_175_000.0;
 
 /// Why the engine cannot show a view.
 #[derive(Debug)]
@@ -441,6 +454,11 @@ pub struct Engine {
     hd: hd::HdState,
     pub camera: Camera,
     pub look: Look,
+    /// The sprite library the 50 % sprites are drawn with (the bag bar's,
+    /// the canoe's pointed tile): `spr_p6.dll`, the one the original loads
+    /// on a Pentium II (@ 0x0059cb93), by default; `spr_p5.dll` the one of
+    /// a Pentium or an AMD K6.
+    pub spr_dll: SprDll,
     /// The place animations.
     pub anim: Anim,
     pub loop_type: LoopType,
@@ -619,6 +637,12 @@ pub struct Engine {
     /// last one (the 15 Hz task's previous run, @ 0x00656a10).
     clock: f64,
     next_tick: f64,
+    /// The 15 Hz task is due in this pass: it runs after the frame
+    /// ([`Engine::set_clock`]).
+    tick_due: bool,
+    /// The time of the scheduler's pass (the `now` its due task's next
+    /// time is counted from); it stands during a music copy.
+    pass_time: f64,
     last_tick: f64,
     zbuf: Vec<u32>,
     /// The CON interpreter when the scripts run the game
@@ -924,6 +948,7 @@ impl Engine {
             hd: Default::default(),
             camera,
             look: Look::default(),
+            spr_dll: SprDll::default(),
             // GetTickCount() in the original: a port seeds with its clock
             // (`anim.rand`).
             anim,
@@ -1008,6 +1033,8 @@ impl Engine {
             fx_volume: crate::sound::DEFAULT_FX_VOLUME,
             clock: 0.0,
             next_tick: 0.0,
+            tick_due: false,
+            pass_time: 0.0,
             last_tick: 0.0,
             zbuf: vec![0; (width * height) as usize],
             con: None,
@@ -1332,25 +1359,57 @@ impl Engine {
         self.clock
     }
 
-    /// Moves the clock to `now` (seconds), running the 15 Hz ticks due
-    /// (a stall of more than a second skips the ticks missed).
+    /// Moves the clock to `now` without the scheduler: for the harnesses
+    /// that run the 15 Hz task themselves ([`Engine::tick`]), as the
+    /// original's emulated runs the goldens come from do.
+    pub fn set_time(&mut self, now: f64) {
+        self.clock = now;
+    }
+
+    /// Moves the clock to `now` (seconds: the scheduler's time of a pass,
+    /// @ 0x00584a0a..0x00584a1a) and finds whether the 15 Hz task is due in
+    /// this pass, as the scheduler FUN_00584a00 does: due when `now` is past
+    /// its next time (strictly, @ 0x00584a2e..0x00584a41), run at most once
+    /// a pass, its next time then `now` + its period (the smaller of that
+    /// and its end, DBL_MAX, @ 0x00584ad0..0x00584af0; the sum under the
+    /// x87 control word in force after the run). No catch-up: a late pass
+    /// delays every later tick. Its first run is the first pass after the
+    /// start (FUN_00584960: next time = the start).
+    ///
+    /// The due task runs after the pass's frame ([`Engine::pass`]), as in
+    /// the original: the frame task's next time is the previous pass's
+    /// time, earlier in the time-ordered queue than a due 15 Hz task's, so
+    /// the frame dispatcher runs first (the scheduler's golden: `F` before
+    /// `T` in every pass). A tick still pending when the clock moves on (a
+    /// pass without a frame) runs first, at its own pass's time.
+    ///
+    /// A music copy is a loop inside the task that started it
+    /// (`CopyMusikToDrive` @ 0x00479480: the please-wait page's frame and
+    /// the flip per half block, no scheduler call; `engine/media.rs`):
+    /// its passes do not reach the scheduler. The pass that started it
+    /// goes on after its last frame (a 15 Hz task due in that pass runs
+    /// then), its next time counted from that pass's time.
     pub fn set_clock(&mut self, now: f64) {
-        // No task runs during a music copy (its loop draws the page and
-        // nothing else): the first pass after it runs one tick.
         if self.copying() {
-            self.next_tick = now;
             self.clock = now;
             return;
         }
-        if now - self.next_tick > 1.0 {
-            self.next_tick = now;
-        }
-        while self.next_tick <= now {
-            self.clock = self.next_tick;
-            self.tick();
-            self.next_tick += TICK;
-        }
+        self.run_due_tick();
         self.clock = now;
+        self.pass_time = now;
+        self.tick_due = now > self.next_tick;
+    }
+
+    /// The 15 Hz task when it is due in this pass, then its next time;
+    /// held during a music copy.
+    pub(crate) fn run_due_tick(&mut self) {
+        if self.copying() {
+            return;
+        }
+        if std::mem::take(&mut self.tick_due) {
+            self.tick();
+            self.next_tick = self.camera.fpu.add(self.pass_time, TICK);
+        }
     }
 
     /// The world's dialog texts (`MONDE`'s world change, @ 0x0047fe50) and

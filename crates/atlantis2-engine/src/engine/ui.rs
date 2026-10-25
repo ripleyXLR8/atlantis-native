@@ -675,7 +675,7 @@ impl Engine {
                     };
                     if let (Some(bank), Ok(frame)) = (bank, usize::try_from(*frame)) {
                         let t = &mut Target::screen(out, w, h);
-                        bank.draw_mode(t, Some(*x), *y, frame, mode);
+                        bank.draw_with(t, Some(*x), *y, frame, mode, self.spr_dll);
                     }
                 }
                 UiDraw::Text {

@@ -23,6 +23,7 @@ use atlantis2_data::wam::{EntityState, Zone};
 use atlantis2_data::{A2Files, Folder};
 
 use atlantis2_engine::anim::Anim;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{DISC_WHEEL, WHEEL_DISC};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{CursorBank, Engine, Event, Fpu, LoopType, Variant};
@@ -875,7 +876,7 @@ fn st_without_slots(e: &Engine) -> String {
     )
 }
 
-/// The engine at 60 passes a second, a 15 Hz tick every fourth, every
+/// The engine at 59.94 passes a second ([`PASS`]), a 15 Hz tick every fourth, every
 /// pass drawn; the mouse as a player moves it.
 struct Run {
     e: Engine,
@@ -901,7 +902,7 @@ impl Run {
     }
 
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

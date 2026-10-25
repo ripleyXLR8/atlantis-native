@@ -21,6 +21,7 @@ use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
 use atlantis2_engine::crt::Rand;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{soul_cell, soul_drops, soul_open, soul_random, soul_visible};
 use atlantis2_engine::{Engine, Fpu, Variant};
 
@@ -638,8 +639,8 @@ fn centre_slot(e: &Engine) -> Option<usize> {
     })
 }
 
-/// The engine at 60 passes a second, the 15 Hz ticks from its clock,
-/// every pass drawn and 1/60 s of sound mixed (the voices end as the
+/// The engine at 59.94 passes a second ([`PASS`]), the 15 Hz ticks from its clock,
+/// every pass drawn and a pass of sound mixed (the voices end as the
 /// sound output plays them, so voice 2 is free again after a sound); the
 /// mouse as a player moves it.
 struct Run {
@@ -661,7 +662,7 @@ struct Run {
 
 impl Run {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

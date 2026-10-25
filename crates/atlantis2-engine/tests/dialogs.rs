@@ -26,6 +26,7 @@ use atlantis2_data::dialog::{parse_dial, FontTxt, World};
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::dialog::{compose, load_head, Dialog, DialogScript};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::hnm_stream::HnmStream;
 use atlantis2_engine::raster3d::{HEIGHT, WIDTH};
 use atlantis2_engine::sound::{
@@ -492,7 +493,7 @@ fn the_dialog_loop_in_tibet_matches_the_original() {
     assert!(stepped);
 }
 
-/// Tibet's first dialog (360) played by the engine at 60 frames a second
+/// Tibet's first dialog (360) played by the engine at 59.94 frames a second
 /// from the arrival in view 7: the three lines follow their voices, the
 /// first voice is the one the lip-sync golden analysed, the video loops
 /// frames 1..40, the hero's line is a reverse shot with its own field of
@@ -526,18 +527,22 @@ fn dialog_360_plays_end_to_end() {
     let mut yaws = Vec::new();
     let mut min_music = 100;
     let mut frame = 0u64;
+    // The passes from `PASS` on: the 15 Hz task's first run is the first
+    // pass after the start (the scheduler's strict test).
     while e.dialog().is_some() && frame < 60 * 30 {
-        let t = frame as f64 / 60.0;
+        let t = (frame + 1) as f64 * PASS;
         e.set_clock(t);
         e.frame();
         e.render(&mut screen);
         min_music = min_music.min(e.music.volume);
         if let Some(d) = e.dialog() {
             // The heads follow the panorama's CPU: the Pentium II's
-            // routines, under the 0x0e7f warpPII and the II set-up leave.
+            // routines, under the 0x0e7f warpPII and the II set-up leave
+            // (from the first line on: the dialog's first frame comes
+            // before its first tick, under the process's word).
             assert_eq!(d.variant(), Variant::PII);
-            assert_eq!((d.fpu(), e.fpu()), (Fpu::Chop, Fpu::Chop));
             if let Some(l) = d.current_line() {
+                assert_eq!((d.fpu(), e.fpu()), (Fpu::Chop, Fpu::Chop));
                 if seen.last().is_none_or(|(id, _)| *id != l.id) {
                     seen.push((l.id.clone(), t));
                     yaws.push((e.angles_deg().0, e.camera.fx));
@@ -554,9 +559,7 @@ fn dialog_360_plays_end_to_end() {
                         .collect();
                     assert_eq!(hex(&pcm), k("pcm_md5"), "{} voice", l.id);
                 }
-                if l.id == "360_01" {
-                    numbers.push(d.stream().unwrap().number());
-                }
+                numbers.push((l.id.clone(), d.stream().unwrap().number()));
             }
         }
         frame += 1;
@@ -567,8 +570,17 @@ fn dialog_360_plays_end_to_end() {
     // 60193 samples (2.730 s).
     let first = seen[1].1 - seen[0].1;
     assert!((2.73..2.73 + 3.0 / 15.0).contains(&first), "{first}");
-    assert!(numbers.contains(&40) && numbers.windows(2).any(|w| w == [40, 1]));
-    assert!(!numbers.contains(&0));
+    // Each line's video starts at its frame 1 and moves one frame a tick,
+    // looping frames 1..40 (360_01 lasts 41 ticks).
+    assert!(numbers
+        .windows(2)
+        .any(|w| w[0].0 == "360_01" && w[0].1 == 40 && w[1] == (w[0].0.clone(), 1)));
+    assert!(numbers.windows(2).all(|w| if w[0].0 == w[1].0 {
+        w[1].1 == w[0].1 || w[1].1 == w[0].1 % 40 + 1
+    } else {
+        w[1].1 == 1
+    }));
+    assert_eq!(numbers[0].1, 1);
     // The hero's line turns the view around; the shaman's turns it back.
     let turn = |a: f32, b: f32| ((a - b).rem_euclid(360.0) - 180.0).abs() < 0.01;
     assert!(
@@ -581,8 +593,8 @@ fn dialog_360_plays_end_to_end() {
     // at 76° with the screen's centre (FUN_00402960).
     dialog_loop::assert_camera_after_dialog(&e, "dialog 360");
     // Back up to 100 % in 84 / 127 s.
-    for k in 0..60 {
-        e.set_clock((frame + k) as f64 / 60.0);
+    for k in 1..=60 {
+        e.set_clock((frame + k) as f64 * PASS);
     }
     assert_eq!(e.music.volume, 100);
 }

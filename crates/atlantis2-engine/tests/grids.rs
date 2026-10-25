@@ -20,6 +20,7 @@ use atlantis2_data::spw::{Spw, FACE};
 use atlantis2_data::wam::EntityState;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::anim::Anim;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{
     grid_cursor_frame, grid_list_draw, grid_step, may_lay, may_take, yucatan_click_hooks,
     yucatan_entry_hooks, GridList, GridOp, GRID_SOLUTIONS, GRID_START, GRID_VIEWS,
@@ -1101,7 +1102,7 @@ fn the_grids_are_drawn_as_the_original() {
 // ---------------------------------------------------------------------------
 // Played with the mouse.
 
-/// The engine at 60 passes a second, every pass drawn.
+/// The engine at 59.94 passes a second ([`PASS`]), every pass drawn.
 struct Run {
     e: Engine,
     pass: u64,
@@ -1124,7 +1125,7 @@ impl Run {
     }
 
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

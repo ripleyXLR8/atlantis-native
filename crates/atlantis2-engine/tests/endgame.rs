@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 use atlantis2_data::A2Files;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{
     atlantis_entry_hooks, shamballa_click_hooks, FIREFLIES_CLICK, FIREFLIES_MOVE_END,
     OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
@@ -237,7 +238,7 @@ fn music_reaches(e: &mut Engine, music: i32) -> bool {
         if e.music_playing() == Some(music) {
             return true;
         }
-        t += 1.0 / 60.0;
+        t += PASS;
         e.set_clock(t);
         e.pass(None);
     }
@@ -1176,7 +1177,7 @@ fn the_end_of_the_game() {
         // The credits page, then its end.
         let c0 = e.clock();
         for n in 0..20_000 {
-            e.set_clock(c0 + f64::from(n) / 60.0);
+            e.set_clock(c0 + f64::from(n) * PASS);
             if click_in_the_credits && n == 600 {
                 e.click(c0 + 1000.0);
             }

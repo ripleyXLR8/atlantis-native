@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 
 use atlantis2_data::A2Files;
 use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::{slider_values, PageKind, Settings, WidgetKind};
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
@@ -265,13 +266,13 @@ fn scripted(files: A2Files, data: Option<PathBuf>) -> Engine {
         if !e.copying() {
             break;
         }
-        clock += 1.0 / 60.0;
+        clock += PASS;
         e.set_clock(clock);
         e.pass(None);
     }
     e.end_video();
     for _ in 0..30 {
-        clock += 1.0 / 60.0;
+        clock += PASS;
         e.set_clock(clock);
         e.pass(None);
     }
@@ -408,7 +409,7 @@ fn every_release_clears_the_held_flag() {
     };
     let mut wait = |e: &mut Engine, n: u32| {
         for _ in 0..n {
-            clock += 1.0 / 60.0;
+            clock += PASS;
             e.set_clock(clock);
             e.pass(None);
         }
@@ -543,7 +544,7 @@ fn page_frames(e: &mut Engine, clock: &mut f64) -> u32 {
     let (lt, ticks) = (e.loop_type, e.ticks);
     let mut n = 0;
     while e.copying() {
-        *clock += 1.0 / 60.0;
+        *clock += PASS;
         e.set_clock(*clock);
         e.pass(None);
         n += 1;
@@ -580,7 +581,7 @@ fn the_music_copy_shows_the_please_wait_page() {
     assert_eq!(e.menu().and_then(|m| m.kind()), None);
     e.end_video();
     for _ in 0..30 {
-        clock += 1.0 / 60.0;
+        clock += PASS;
         e.set_clock(clock);
         e.pass(None);
     }
@@ -632,6 +633,61 @@ fn the_music_copy_shows_the_please_wait_page() {
     assert_eq!(e.loop_type, LoopType::Video);
 }
 
+/// M13 with M16: the copy is a loop inside the task that started it
+/// (`CopyMusikToDrive` @ 0x00479480 draws the page and flips, and calls
+/// no scheduler; FUN_00584a00 is called only by the main loop, through
+/// FUN_00584b40). A copy started in a pass whose 15 Hz task is due: no
+/// tick during the page; the pass goes on after its last frame, so the
+/// due task runs then; its next time is that pass's time + the period
+/// (the time read @ 0x00584a0a, added @ 0x00584ad2..0x00584ad8 after the
+/// task's callback), long past after the page: due in the next pass.
+#[test]
+fn a_music_copy_holds_the_scheduler_until_its_end() {
+    let Some(files) = game() else { return };
+    let mut clock = 0.0;
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.set_data_dir(Some(scratch("copy-scheduler")));
+    e.start_new_game().unwrap();
+    page_frames(&mut e, &mut clock);
+    e.end_video();
+    let pass = |e: &mut Engine, clock: &mut f64| {
+        *clock += PASS;
+        e.set_clock(*clock);
+        e.pass(None);
+    };
+    for _ in 0..30 {
+        pass(&mut e, &mut clock);
+    }
+    // A pass that ran the task: the next one is due 4 passes later.
+    let t = e.ticks;
+    while e.ticks == t {
+        pass(&mut e, &mut clock);
+    }
+    for _ in 0..3 {
+        pass(&mut e, &mut clock);
+    }
+    let t0 = e.ticks;
+    clock += PASS;
+    e.set_clock(clock);
+    // The copy started in this pass's frame (a script's `LOADMUSIK`).
+    e.run_command(b"(delmusik=1)");
+    e.run_command(b"(LOADMUSIK=1)");
+    assert!(e.copying());
+    e.pass(None);
+    let mut n = 1;
+    while e.copying() {
+        assert_eq!(e.ticks, t0, "page frame {n}");
+        pass(&mut e, &mut clock);
+        n += 1;
+    }
+    assert!(f64::from(n) * PASS > atlantis2_engine::engine::TICK, "{n}");
+    assert_eq!(e.ticks, t0 + 1, "the due task after the page");
+    pass(&mut e, &mut clock);
+    assert_eq!(e.ticks, t0 + 2, "due again in the first pass after it");
+    pass(&mut e, &mut clock);
+    assert_eq!(e.ticks, t0 + 2);
+}
+
 /// The disk-full and disk-error pages only come from a copy the port does
 /// not write: the golden's cases show them only after a short read or
 /// write, or too little free space.
@@ -677,7 +733,7 @@ fn a_missing_disc_opens_the_cd_page() {
     let mut e = scripted(files, None);
     let mut clock = 1000.0;
     let mut pass = |e: &mut Engine| {
-        clock += 1.0 / 60.0;
+        clock += PASS;
         e.set_clock(clock);
         e.pass(None);
     };
@@ -729,7 +785,7 @@ fn no_sprite_hit_under_the_open_bar() {
     let mut e = scripted(files, None);
     let mut clock = 1000.0;
     let mut pass = |e: &mut Engine| {
-        clock += 1.0 / 60.0;
+        clock += PASS;
         e.set_clock(clock);
         e.pass(None);
     };
@@ -796,7 +852,7 @@ fn the_disc_icons_show_at_the_slides_start() {
     let mut e = scripted(files, None);
     let mut clock = 1000.0;
     let mut pass = |e: &mut Engine| {
-        clock += 1.0 / 60.0;
+        clock += PASS;
         e.set_clock(clock);
         e.pass(None);
     };

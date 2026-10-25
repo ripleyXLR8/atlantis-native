@@ -20,6 +20,7 @@
 use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::sound::VOICE_EFFECTS;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
@@ -222,7 +223,7 @@ fn no_swell_between_a_film_and_the_next_music() {
     let mut e = in_tibet(files);
     let mut t = e.clock();
     let mut step = |e: &mut Engine| {
-        t += 1.0 / 60.0;
+        t += PASS;
         e.set_clock(t);
         e.pass(None);
     };

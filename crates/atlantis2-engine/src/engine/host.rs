@@ -604,9 +604,28 @@ impl Host for Engine {
                     s.frame += frames;
                     if s.frame >= s.end {
                         if horse {
+                            // The range is zeroed on the loaded WAM's state
+                            // record (slot +0x24, @ 0x00483565..0x00483574),
+                            // not on a copy: it lasts until the next
+                            // `changewam`, so the next entry of the view
+                            // plays the whole file.
                             s.state.first = 0;
                             s.state.end = 0;
                             s.end = s.count;
+                            if let Some((ei, si)) = s.record {
+                                if let Some(w) = self
+                                    .wam
+                                    .entities
+                                    .get_mut(ei)
+                                    .and_then(|e| e.states.get_mut(si))
+                                {
+                                    for i in [8, 9] {
+                                        if let Some(v) = w.get_mut(i) {
+                                            *v = 0;
+                                        }
+                                    }
+                                }
+                            }
                         } else {
                             s.frame = s.end;
                         }
