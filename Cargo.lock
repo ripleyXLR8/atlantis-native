@@ -219,7 +219,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis2-data"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "atlantis-data",
  "log",
@@ -228,7 +228,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis2-engine"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "ab_glyph",
  "atlantis-codecs",
