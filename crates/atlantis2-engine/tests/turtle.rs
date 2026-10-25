@@ -624,6 +624,13 @@ fn the_dispatchers_as_the_original() {
         if let Some(f) = first.map(hook_name).filter(|f| !names.contains(f)) {
             names.insert(0, f);
         }
+        // The golden's other puzzles' ticks are stubs that leave the mode;
+        // the octopus fight's runs here (`a2/pz-octopus`) and, in a view
+        // numbered above 19, quits: the mode 0.
+        if mode == 6 {
+            assert_eq!(e.puzzle_mode(), 0);
+            e.set_puzzle_mode(6);
+        }
         got.push(format!(
             "E tick mode {mode} pause 0 -> {} | {}",
             if names.is_empty() {

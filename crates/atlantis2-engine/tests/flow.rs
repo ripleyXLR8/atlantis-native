@@ -34,9 +34,9 @@
 //! worlds leave it: the space-travel hub by Tibet's ball and back, the
 //! crystal laid in the hut, Shamballa (the fireflies' win written by the
 //! testing aid, the puzzle not being ported; the vortex), Rhea, the
-//! ring's rolling moves and its star, Atlantis (the octopus's two ends by
-//! the aid), Tibet again, the hub's last trip, the films, the credits and
-//! the quit.
+//! ring's rolling moves and its star, Atlantis (the octopus fought with the
+//! mouse: lost without the crystal, then won with it), Tibet again, the
+//! hub's last trip, the films, the credits and the quit.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the test is skipped. The saves go to a
@@ -48,7 +48,7 @@ use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
 use atlantis2_engine::bag::{UiBank, UiDraw, FORM_FRAMES};
-use atlantis2_engine::engine::{MANDALAS, STAR_HOLES};
+use atlantis2_engine::engine::{MANDALAS, OCTOPUS_ENTRY, OCTOPUS_MODE, STAR_HOLES};
 use atlantis2_engine::menu::{state, PageKind};
 use atlantis2_engine::sound::VOICE_EFFECTS;
 use atlantis2_engine::subjects::cell;
@@ -1263,6 +1263,80 @@ impl Run {
             }
         }
         panic!("the game never settles");
+    }
+
+    /// The octopus fight of Atlantis's view 16 played with the mouse, a
+    /// frame a pass, until one of its two `chapter=` commands: the player
+    /// faces the octopus (yaw −90°, its sector) and waits; with `shoot`,
+    /// when a tentacle attacks, the view is turned onto it (a mouse move a
+    /// few frames, aimed at the middle of its frame on the cube) and,
+    /// while it is under the centre, clicked each frame. The fight's
+    /// events and what its end starts, played out.
+    fn octopus_fight(&mut self, shoot: bool) -> Vec<Event> {
+        let wrap = |a: f32| {
+            let t = std::f32::consts::TAU;
+            (a + std::f32::consts::PI).rem_euclid(t) - std::f32::consts::PI
+        };
+        let face_octopus = -std::f32::consts::FRAC_PI_2;
+        let mut all = Vec::new();
+        let mut shots = 0;
+        let mut shook = false;
+        let mut idle = 0;
+        for n in 0..20_000 {
+            let (sx, sy) = self.mouse_signs;
+            let attacker = self.e.octopus.records[..self.e.octopus.live()]
+                .iter()
+                .find(|r| r.state == 2 || r.state == 4)
+                .and_then(|r| r.tentacles[r.attacking as usize]);
+            let target = match attacker {
+                Some(a) if shoot => self.slot_aims(a).first().copied(),
+                _ => Some((face_octopus, 0.0)),
+            };
+            let on = attacker.is_some_and(|a| {
+                self.e.sprite_under_centre().1 != 0 && centre_slot(&self.e) == Some(a)
+            });
+            if shoot && on {
+                self.tap();
+                shots += 1;
+            } else if let Some((yaw, pitch)) = target {
+                // A new mouse move once the last one's turn is spent.
+                idle += 1;
+                let (y0, p0) = self.e.camera.angles();
+                let (dy, dp) = (wrap(yaw - y0), pitch - p0);
+                let far = dy.abs() > 0.02 || dp.abs() > 0.02;
+                if far && idle > 6 && self.e.look.yaw_speed.abs() < 1e-3 {
+                    idle = 0;
+                    let mx = (sx * dy * 500.0).round() as i32;
+                    let my = (sy * dp * 500.0).round() as i32;
+                    self.e.mouse_motion(mx, my);
+                }
+            }
+            let evs = self.events();
+            shook |= self.e.shake.counter != 0;
+            if n % 400 == 200 || (shook && self.e.shake.counter == 3) {
+                let k = if shoot { "won" } else { "lost" };
+                if self.e.shake.counter == 3 {
+                    self.shot_as(&format!("pz-octopus-{k}-blow.png"));
+                } else if shots > 0 {
+                    self.shot_as(&format!("pz-octopus-{k}-shooting.png"));
+                } else {
+                    self.shot_as(&format!("pz-octopus-{k}-waiting.png"));
+                }
+            }
+            let end = evs
+                .iter()
+                .any(|e| matches!(e, Event::OctopusCommand(c) if c.starts_with("(chapter=")));
+            all.extend(evs);
+            if end {
+                self.shot_as(&format!(
+                    "pz-octopus-{}-end.png",
+                    if shoot { "won" } else { "lost" }
+                ));
+                all.extend(self.settle());
+                return all;
+            }
+        }
+        panic!("the octopus fight does not end ({shots} shots)");
     }
 
     /// The canoe (loop type 9) played with the mouse, a frame a pass:
@@ -5242,12 +5316,13 @@ const XIBALBA_CHAPTERS: [i32; 5] = [35, 36, 37, 38, 39];
 /// the way back), the crystal laid in the hut (Shamballa), the fireflies
 /// (the testing aid writes their win: the puzzle is not ported) and the
 /// vortex, Rhea asked about all she offers, the ring walked round with
-/// its rolling moves, the star taken and laid, Atlantis walked to the
-/// sunken crystal, the octopus's two ends (the aid again: the hero's death,
-/// then the octopus's), Tibet's dialog 372, the crystal laid again, the
+/// its rolling moves, the star taken and laid, Atlantis: the octopus of
+/// view 16 faced without the crystal until the hero dies (film 64, view 8
+/// again), the sunken crystal taken in view 18, the octopus shot down in
+/// view 16 (film 65), Tibet's dialog 372, the crystal laid again, the
 /// hub's last trip to view 5, its last zone, the films and the credits to
 /// their end, the last film and the quit. Pictures with
-/// `ATLANTIS2_PNG_DIR` (`endgame-*.png`).
+/// `ATLANTIS2_PNG_DIR` (`endgame-*.png`, `pz-octopus-*.png`).
 #[test]
 fn the_end_of_the_game_with_the_mouse() {
     if game().is_none() {
@@ -5418,21 +5493,52 @@ fn the_end_of_the_game_with_the_mouse() {
     assert_eq!((r.e.place(), r.chapter()), (("atlantis.wam", 8), 82));
     r.shot_as("endgame-07-atlantis.png");
 
-    // Atlantis: to the sunken crystal, every view's octopus noted.
-    let evs = r.go(18, &[]);
-    assert!(evs.contains(&Event::PuzzleNotPorted {
-        function: 0x0049_a8c0
+    // Atlantis: the octopus of view 16 faced without the crystal: its
+    // tentacles strike (`EnergieJoueur` 10 to 0, the eleventh blow kills)
+    // until the hero dies: film 64, view 8 again, chapter 82.
+    let evs = r.go(16, &[]);
+    assert!(evs.contains(&Event::PuzzleRan {
+        function: OCTOPUS_ENTRY
     }));
-    r.take("CRISTAL_ENGLOUTI");
-    r.shot_as("endgame-08-sunken-crystal.png");
-    // The octopus fight's two ends, by the aid: the hero's death (film 64,
-    // view 8 again), then the octopus's (film 65, Tibet, dialog 372).
-    r.e.end_octopus_fight(false);
-    let evs = r.settle();
+    assert_eq!(r.e.puzzle_mode(), OCTOPUS_MODE);
+    let evs = r.octopus_fight(false);
+    let blows = evs
+        .iter()
+        .filter(|e| matches!(e, Event::OctopusCommand(c) if *c == "(NewSound=303)"))
+        .count();
+    assert_eq!(blows, 11);
+    assert!(evs.contains(&Event::OctopusCommand("(chapter=201)")));
     assert_eq!(films(&evs), [64]);
     assert_eq!((r.e.place(), r.chapter()), (("atlantis.wam", 8), 82));
-    r.e.end_octopus_fight(true);
-    let evs = r.settle();
+    assert_eq!(r.var("EnergieJoueur"), 10);
+    // The sunken crystal of view 18 (gone from the bar in Atlantis: the
+    // fight's tick puts its bag entry in world 123), then the octopus
+    // shot down: 36 shots, six per tentacle, the octopus's death, film 65,
+    // Tibet, dialog 372.
+    r.go(18, &[]);
+    r.take("CRISTAL_ENGLOUTI");
+    r.shot_as("endgame-08-sunken-crystal.png");
+    r.step();
+    let sunken = r.obj("CRISTAL_ENGLOUTI");
+    assert!(r
+        .e
+        .bag_entries()
+        .iter()
+        .any(|b| b.id == sunken && b.world == 123));
+    r.go(16, &[]);
+    let evs = r.octopus_fight(true);
+    let shots = evs
+        .iter()
+        .filter(|e| matches!(e, Event::OctopusCommand(c) if *c == "(NewSound=301)"))
+        .count();
+    assert_eq!(shots, 36);
+    let deaths = evs
+        .iter()
+        .filter(|e| matches!(e, Event::OctopusCommand(c) if *c == "(NewSound=304)"))
+        .count();
+    assert_eq!(deaths, 5);
+    assert!(evs.contains(&Event::OctopusCommand("(chapter=200)")));
+    assert!((1..=6).all(|k| r.var(&format!("BigTenta{k}Died")) == 1));
     assert_eq!(films(&evs), [65]);
     assert_eq!(dialogs(&evs), [372]);
     assert_eq!((r.e.place(), r.chapter()), (("tibet.wam", 7), 75));
@@ -5492,5 +5598,5 @@ fn the_end_of_the_game_with_the_mouse() {
         .collect();
     noted.sort_unstable();
     noted.dedup();
-    assert_eq!(noted, [0x0049_5210, 0x0049_a8c0]);
+    assert_eq!(noted, [0x0049_5210]);
 }

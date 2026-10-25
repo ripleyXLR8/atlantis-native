@@ -57,10 +57,10 @@
 //!   spider web, `web.rs`) run; the canoe's view consumes the click while
 //!   the canoe is not enabled, as in the original.
 //! - Shamballa's and Atlantis's hooks (prefixes `SH` and `AT`,
-//!   `shamballa.rs`): the fireflies' click and the octopus's entry are
-//!   listed and noted ([`Event::PuzzleNotPorted`]), the octopus's tick
-//!   too (its mode is never set); the end of a firefly's move in
-//!   `voiles.wam` (FUN_0045a630 → FUN_004952d0) runs.
+//!   `shamballa.rs`): the fireflies' click is listed and noted
+//!   ([`Event::PuzzleNotPorted`]); the end of a firefly's move in
+//!   `voiles.wam` (FUN_0045a630 → FUN_004952d0) runs; the octopus fight's
+//!   entry, its mode 6's tick and its cursor run (`octopus.rs`).
 //! - The places the port has: every place a script or a link names but
 //!   `demo.wam` (chapter 1's, whose panoramas are on no disc); the one
 //!   place file nothing names, `sans_nom.wam`, is not ported either. A
@@ -509,6 +509,7 @@ impl Engine {
                 }
                 super::web::WEB_MODE => self.web_tick(),
                 SOULS_MODE => self.souls_tick(self.view),
+                super::octopus::OCTOPUS_MODE => self.octopus_tick(),
                 DRAGON_MODE => self.dragon_tick(),
                 MARBLES_MODE => {
                     self.event(Event::PuzzleRan { function });
@@ -620,7 +621,7 @@ impl Engine {
             }
         }
         // Atlantis's (@ 0x0049bec6, between `LA`'s and `SS`'s, whose
-        // prefixes exclude it): the octopus's entry, noted.
+        // prefixes exclude it): the octopus fight's entry.
         self.atlantis_entry();
     }
 

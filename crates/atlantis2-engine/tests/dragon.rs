@@ -958,10 +958,11 @@ fn the_dispatchers_as_the_original() {
         let f = e.puzzle_tick();
         // The turtle ring's step runs (`a2/pz-turtle`) and the Maya
         // marbles' (`a2/pz-grids`), noted as run; the souls'
-        // (`a2/pz-labyrinth`) and the spider web's (`a2/pz-web`) with no
-        // event, as this one; the steps not ported are noted.
+        // (`a2/pz-labyrinth`), the spider web's (`a2/pz-web`) and the
+        // octopus fight's (`a2/pz-octopus`) with no event, as this one;
+        // the steps not ported are noted.
         match f {
-            None | Some(0x0049_47b0 | 0x0048_eb30 | 0x0049_1610) => {}
+            None | Some(0x0049_47b0 | 0x0048_eb30 | 0x0049_1610 | 0x0049_aaa0) => {}
             Some(function @ (0x0049_c400 | 0x0049_3190)) => {
                 assert_eq!(e.events.first(), Some(&Event::PuzzleRan { function }));
             }

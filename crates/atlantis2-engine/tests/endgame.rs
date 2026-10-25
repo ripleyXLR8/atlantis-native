@@ -4,10 +4,10 @@
 //! `atlantis.wam`), the octopus's death (chapter 200, back to Tibet) and the
 //! end (chapter 83's last section: films, the credits, the last film, the
 //! quit). Every chapter's `/INIT`; every view entered with its hooks (the
-//! fireflies' click and the octopus's entry noted, not ported, with their
-//! testing aids); the fireflies' move end; the vortex both ways; Rhea and
-//! the way to the ring; the ring's rolling zoom, its characters and the
-//! star; the octopus's two ends; the hub's travels from each world and
+//! fireflies' click noted, not ported, with its testing aid; the octopus
+//! fight's entry run); the fireflies' move end; the vortex both ways; Rhea
+//! and the way to the ring; the ring's rolling zoom, its characters and the
+//! star; the octopus fight's two ends; the hub's travels from each world and
 //! back, the balls made crystals; the end; every dialog; the subjects,
 //! objects, musics and films; saves in Shamballa, Atlantis and the hub.
 //!
@@ -21,7 +21,7 @@ use atlantis2_data::wam::Zone;
 use atlantis2_data::A2Files;
 use atlantis2_engine::engine::{
     atlantis_entry_hooks, shamballa_click_hooks, FIREFLIES_CLICK, FIREFLIES_MOVE_END,
-    OCTOPUS_ENTRY, OCTOPUS_TICK,
+    OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
 };
 use atlantis2_engine::{Engine, EngineError, Event, Fpu, LoopType, Variant};
 
@@ -444,7 +444,7 @@ fn every_endgame_view_is_entered_with_its_hooks() {
         ]
     );
     assert!(missing_spw.is_empty(), "{missing_spw:?}");
-    // The hooks: the octopus's entry in Atlantis's views 1-18, noted.
+    // The hooks: the octopus fight's entry in Atlantis's views 1-18, run.
     let want: Vec<(&str, u32, u32)> = (1..=18)
         .map(|v| ("atlantis.wam", v, OCTOPUS_ENTRY))
         .collect();
@@ -791,10 +791,63 @@ fn the_ring_rolls_and_its_star_opens_atlantis() {
     lines_as_the_original(&set_lines(&e.events));
 }
 
-/// Atlantis (chapter 82): every view's entry is the octopus's (noted, its
-/// mode never set, so no tick); the aid's two ends: the hero's death
-/// (chapter 201: film 64, back to view 8 and chapter 82), the octopus's
-/// (chapter 200: film 65, Tibet's view 7, chapter 75, `flag260`; chapter
+/// The octopus fight in view 16 until one of its `chapter=` commands: the
+/// view turned to the octopus (yaw −90°); with `shoot`, whenever a
+/// tentacle strikes, the texel under the centre put on its frame's middle
+/// and a click. The fight's events.
+fn fight(e: &mut Engine, shoot: bool) -> Vec<Event> {
+    e.camera.set_yaw(std::f32::consts::PI);
+    let mut all = Vec::new();
+    let mut clock = 1000.0;
+    for n in 0..8000 {
+        if n % 4 == 0 {
+            e.tick();
+        }
+        e.forced_centre = None;
+        let live = e.octopus.live();
+        let striking = e.octopus.records[..live]
+            .iter()
+            .find(|r| r.state == 2 || r.state == 4)
+            .and_then(|r| r.tentacles[r.attacking as usize]);
+        if let Some(b) = striking
+            .filter(|_| shoot)
+            .and_then(|a| e.anim.slots[a].frame_box(1))
+        {
+            let (x, y, w, h) = (
+                i32::from(b.x),
+                i32::from(b.y),
+                i32::from(b.w),
+                i32::from(b.h),
+            );
+            e.forced_centre = Some((1, x + w / 2, y + h / 2));
+            clock += 10.0;
+            e.click(clock);
+        }
+        e.pass(None);
+        let evs = std::mem::take(&mut e.events);
+        let end = evs
+            .iter()
+            .any(|x| matches!(x, Event::OctopusCommand(c) if c.starts_with("(chapter=")));
+        all.extend(evs);
+        if end {
+            e.forced_centre = None;
+            return all;
+        }
+    }
+    panic!("the fight does not end");
+}
+
+fn commands(evs: &[Event], c: &str) -> usize {
+    evs.iter()
+        .filter(|x| matches!(x, Event::OctopusCommand(k) if *k == c))
+        .count()
+}
+
+/// Atlantis (chapter 82): every view's entry is the octopus fight's (the
+/// mode 6; no octopus but in view 16); its two ends played in view 16: the
+/// hero's death (energy 3: the fourth blow; chapter 201: film 64, back to
+/// view 8 and chapter 82), the octopus's (36 shots with the crystal;
+/// chapter 200: film 65, Tibet's view 7, chapter 75, `flag260`; chapter
 /// 75's section then plays dialog 372, counts a trip and sets `flag261`).
 #[test]
 fn the_octopus_s_two_ends() {
@@ -806,22 +859,36 @@ fn the_octopus_s_two_ends() {
         t += 10.0;
         walk(&mut e, t, v);
         assert_eq!(noted(&e.events), [OCTOPUS_ENTRY], "view {v}");
-        assert_eq!(e.puzzle_mode(), 0);
-        assert_eq!(e.puzzle_tick(), None);
+        assert_eq!(e.puzzle_mode(), OCTOPUS_MODE);
+        assert_eq!(e.octopus.live(), 0);
+        assert_eq!(e.puzzle_tick(), Some(OCTOPUS_TICK));
     }
+    goto(&mut e, "atlantis.wam", 16, 82);
+    assert_eq!(e.octopus.live(), 1);
     e.run_command(b"(EnergieJoueur=3)");
     e.events.clear();
-    e.end_octopus_fight(false);
+    let evs = fight(&mut e, false);
+    assert_eq!(commands(&evs, "(NewSound=303)"), 4);
+    assert_eq!(commands(&evs, "(chapter=201)"), 1);
+    assert!(evs.contains(&Event::OctopusScan));
+    e.events = evs;
     run_until(&mut e, |e| e.place().1 == 8);
     assert_eq!(e.place(), ("atlantis.wam", 8));
     assert_eq!(e.script_state().unwrap().chapter, 82);
     assert_eq!(films(&e.events), [64]);
     assert_eq!(var(&e, "EnergieJoueur"), 10);
-    assert_eq!(noted(&e.events), [OCTOPUS_TICK, OCTOPUS_ENTRY]);
+    assert_eq!(noted(&e.events), [OCTOPUS_ENTRY]);
     lines_as_the_original(&set_lines(&e.events));
     let deep = var(&e, "SpaceDeep");
+    goto(&mut e, "atlantis.wam", 16, 82);
+    e.run_command(b"(sacados=CRISTAL_ENGLOUTI)");
     e.events.clear();
-    e.end_octopus_fight(true);
+    let evs = fight(&mut e, true);
+    assert_eq!(commands(&evs, "(NewSound=301)"), 36);
+    assert_eq!(commands(&evs, "(NewSound=304)"), 5);
+    assert_eq!(commands(&evs, "(chapter=200)"), 1);
+    assert!((1..=6).all(|k| var(&e, &format!("BigTenta{k}Died")) == 1));
+    e.events = evs;
     run_until(&mut e, |e| e.place().0 == "tibet.wam");
     assert_eq!(e.place(), ("tibet.wam", 7));
     assert_eq!(e.script_state().unwrap().chapter, 75);

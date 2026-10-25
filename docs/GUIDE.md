@@ -170,9 +170,9 @@ as the original's F5 / F6 and F7 / F8 do.
 
 Atlantis II is in progress (Tibet, Ireland, China, and Yucatán with
 Xibalba play to their end, and so does the end of the game: the space
-travel, Shamballa and Atlantis, the credits; but two of its puzzles are
-not there yet, Shamballa's fireflies and the octopus fight of Atlantis,
-which stop the game there;
+travel, Shamballa and Atlantis with the octopus fight, the credits; but
+one of its puzzles is not there yet, Shamballa's fireflies, which stops
+the game there;
 see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)). For now only the
 command line opens it: give the folder of the installed game (the one
 holding `atlantis2.exe`, `wam`, `scenar`...), and the folder of the CD
@@ -198,7 +198,10 @@ the held or pointed tile a quarter; Escape leaves the puzzle. On the
 spider's web the view turns as usual and a left click on a way moves
 along it once the spiders stand still; with the feather in hand the click
 lays it there, and a click on a spider asks about it (or strikes it with
-the sword).
+the sword). In Atlantis the centre shows a crosshair; in the octopus's
+view, a tentacle that strikes is shot by a click on it, the sunken
+crystal in the bag (six shots a tentacle); without it the tentacles'
+blows wear the hero down.
 
 In the game's menus the mouse moves the game's own pointer. As in the
 original there are no named saves: the menu's disc saves in the next free

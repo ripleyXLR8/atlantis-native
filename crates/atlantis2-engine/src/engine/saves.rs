@@ -315,8 +315,11 @@ impl Engine {
         // next save.
         self.grids_reset();
         // The web's quit (FUN_00491260: in the mode 1, its models freed,
-        // the mode 0, the web not loaded).
+        // the mode 0, the web not loaded), then the octopus fight's
+        // (FUN_0049aef0, the reset's last: in the mode 6, the mode 0, the
+        // crosshair freed, the camera's reset).
         self.web_quit();
+        self.octopus_quit();
         for k in KEPT {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }
