@@ -38,6 +38,11 @@
 //! the game is paused while it is open. Its choices are kept in
 //! `settings.ini` beside the saves (the first game's keys); `--hd`,
 //! `--widescreen` and `--original` hold for the run without changing it.
+//!
+//! The game is held while the window does not have the focus, as the
+//! original holds it: no frame runs, its clock stands still and its sound
+//! is silent until the focus comes back.
+//!
 //! The screen size is the original's own option, kept in `atlant2.cfg` as
 //! its options page's button keeps it; `--resolution 800x600` chooses it
 //! from the command line. A frame at 800 x 600 is shown scaled to the
@@ -596,7 +601,7 @@ pub fn run_window(
     menu.set_info(menu_info(&label));
     let mut app = A2App {
         _audio: audio,
-        started: Instant::now(),
+        clock: GameClock::new(Instant::now()),
         engine,
         fullscreen,
         size,
@@ -609,7 +614,6 @@ pub fn run_window(
         menu,
         font: SubtitleFont::new(),
         paused,
-        paused_at: None,
         menu_pointer: None,
         motion: (0.0, 0.0),
         keys: [false; 4],
@@ -621,12 +625,67 @@ pub fn run_window(
         .map_err(|e| format!("The window failed: {e}"))
 }
 
+/// Whether the game is held: while the port's options menu is open, and
+/// while the window does not have the focus, as the original, whose 15 Hz
+/// task (@ 0x0040caa5) and frame dispatcher (@ 0x0049ce25) return at once
+/// unless its window is active (FUN_0058ff10: the window's active byte and
+/// DirectDraw's `TestCooperativeLevel`): timers, scripts, videos, dialogs
+/// and animations stop, and its DirectSound buffers, made without the
+/// global focus flag, are not heard. The time away does not count: the
+/// scheduler moves the task's last run on while it returns (the seconds
+/// accumulator gains none of it).
+fn must_hold(menu_open: bool, focused: bool) -> bool {
+    menu_open || !focused
+}
+
+/// The game's clock: the time since it started, less the time it was
+/// held.
+#[derive(Clone, Copy, Debug)]
+struct GameClock {
+    started: Instant,
+    held_since: Option<Instant>,
+}
+
+impl GameClock {
+    fn new(now: Instant) -> GameClock {
+        GameClock {
+            started: now,
+            held_since: None,
+        }
+    }
+
+    fn held(&self) -> bool {
+        self.held_since.is_some()
+    }
+
+    /// Stops the clock (it stays stopped from the first hold on).
+    fn hold(&mut self, now: Instant) {
+        self.held_since.get_or_insert(now);
+    }
+
+    /// Starts it again where it stopped.
+    fn release(&mut self, now: Instant) {
+        if let Some(t) = self.held_since.take() {
+            self.started += now.saturating_duration_since(t);
+        }
+    }
+
+    /// Its time at `now`, seconds.
+    fn secs(&self, now: Instant) -> f64 {
+        self.held_since
+            .unwrap_or(now)
+            .saturating_duration_since(self.started)
+            .as_secs_f64()
+    }
+}
+
 struct A2App {
     /// The sound output (kept alive while the window is open).
     _audio: Option<cpal::Stream>,
-    /// The game's clock starts with the window (moved on by the time the
-    /// options menu was open).
-    started: Instant,
+    /// The game's clock: it starts with the window and stands still while
+    /// the game is held (the options menu open, the window without the
+    /// focus).
+    clock: GameClock,
     engine: Engine,
     fullscreen: bool,
     /// The window's first size (`--size`), else twice 640 x 480.
@@ -643,9 +702,8 @@ struct A2App {
     /// The port's options menu (F10, O), its font (the first game's).
     menu: OptionsMenu,
     font: SubtitleFont,
-    /// The sound silenced, since when the game is paused (the menu open).
+    /// The sound silenced while the game is held.
     paused: Arc<AtomicBool>,
-    paused_at: Option<Instant>,
     /// The window's pointer on the screen (the options menu's clicks).
     menu_pointer: Option<(i32, i32)>,
     /// Raw mouse motion not yet given to the engine (fractions kept).
@@ -697,7 +755,7 @@ impl A2App {
         if (dx != 0 || dy != 0) && !in_menu {
             self.engine.mouse_motion(dx, dy);
         }
-        self.engine.set_clock(self.started.elapsed().as_secs_f64());
+        self.engine.set_clock(self.clock.secs(Instant::now()));
         if let Some(size) = self.window.as_ref().map(|w| w.inner_size()) {
             self.picture
                 .prepare(&mut self.engine, size.width as usize, size.height as usize);
@@ -745,8 +803,7 @@ impl A2App {
             return;
         }
         self.menu.open();
-        self.paused_at = Some(Instant::now());
-        self.paused.store(true, Ordering::Relaxed);
+        self.hold();
         self.grab(false);
         self.keys = [false; 4];
         if let Some(w) = &self.window {
@@ -757,12 +814,7 @@ impl A2App {
     /// The menu closed: the game goes on where it was.
     fn close_menu(&mut self) {
         self.menu.close();
-        if let Some(t) = self.paused_at.take() {
-            let now = Instant::now();
-            self.started += now.duration_since(t);
-            self.next_frame = now;
-        }
-        self.paused.store(false, Ordering::Relaxed);
+        self.hold();
         self.motion = (0.0, 0.0);
         if self.engine.loop_type == LoopType::Menu {
             // The game's pointer is drawn by its menus.
@@ -771,6 +823,21 @@ impl A2App {
             }
         } else if self.focused {
             self.grab(true);
+        }
+    }
+
+    /// Holds the game, or lets it go on, as [`must_hold`] says: held, its
+    /// clock stands still and its sound is silent (the voices kept where
+    /// they are), and no frame runs.
+    fn hold(&mut self) {
+        let now = Instant::now();
+        if must_hold(self.menu.is_open(), self.focused) {
+            self.clock.hold(now);
+            self.paused.store(true, Ordering::Relaxed);
+        } else if self.clock.held() {
+            self.clock.release(now);
+            self.paused.store(false, Ordering::Relaxed);
+            self.next_frame = now;
         }
     }
 
@@ -964,7 +1031,10 @@ impl ApplicationHandler for A2App {
                 if !on {
                     self.grab(false);
                     self.keys = [false; 4];
+                } else {
+                    self.motion = (0.0, 0.0);
                 }
+                self.hold();
             }
             // The window's pointer is the game's in the menus (and while
             // the mouse is not held); held, the raw motion moves it (the
@@ -986,7 +1056,7 @@ impl ApplicationHandler for A2App {
                 // The click flag (@ 0x006569c9) and the held flag
                 // (@ 0x006569ca).
                 if state == ElementState::Pressed {
-                    let now = self.started.elapsed().as_secs_f64();
+                    let now = self.clock.secs(Instant::now());
                     self.engine.click(now);
                 } else {
                     self.engine.release();
@@ -1006,7 +1076,7 @@ impl ApplicationHandler for A2App {
                     // The click flag (@ 0x006569c9) is the left button's
                     // (input callback FUN_0040c510); the right one opens
                     // the bag.
-                    let now = self.started.elapsed().as_secs_f64();
+                    let now = self.clock.secs(Instant::now());
                     self.engine.click(now);
                 } else if button == MouseButton::Right {
                     self.engine.right_click();
@@ -1046,7 +1116,7 @@ impl ApplicationHandler for A2App {
             }
             WindowEvent::RedrawRequested => {
                 let now = Instant::now();
-                if now >= self.next_frame && !self.menu.is_open() {
+                if now >= self.next_frame && !self.clock.held() {
                     self.step();
                     // `EXIT` in a script, or the menus, quit the game.
                     if self.engine.quit() {
@@ -1279,6 +1349,30 @@ impl Timings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The window losing the focus holds the game as the options menu
+    /// does: no frame runs and the clock stands still until it comes back.
+    #[test]
+    fn the_game_is_held_without_the_focus() {
+        assert!(must_hold(false, false));
+        assert!(must_hold(true, true));
+        assert!(!must_hold(false, true));
+        let t0 = Instant::now();
+        let at = |s: f64| t0 + Duration::from_secs_f64(s);
+        let mut c = GameClock::new(t0);
+        assert_eq!(c.secs(at(2.0)), 2.0);
+        // Away from 2 s to 7 s, then the menu opened at 8 s while the
+        // clock already stands (a second hold changes nothing), closed at
+        // 9 s with the window still away, back at 10 s.
+        c.hold(at(2.0));
+        assert_eq!(c.secs(at(7.0)), 2.0);
+        c.hold(at(8.0));
+        assert_eq!(c.secs(at(9.0)), 2.0);
+        c.release(at(10.0));
+        assert!(!c.held());
+        assert_eq!(c.secs(at(10.0)), 2.0);
+        assert_eq!(c.secs(at(11.5)), 3.5);
+    }
 
     #[test]
     fn sizes() {

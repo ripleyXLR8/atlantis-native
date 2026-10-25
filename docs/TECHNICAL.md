@@ -952,7 +952,15 @@ back) into `yucatan-*.png`.
   first and the tick after it, so a tick's effects are drawn one pass
   later there (the rates are the same). The window draws at 60 frames a
   second, the headless mode runs frames of 1/60 s. A move's turn is
-  counted in frames, as in the original (`engine.rs`).
+  counted in frames, as in the original (`engine.rs`). While the window
+  does not have the focus the game is held, as the original's 15 Hz task
+  (@ 0x0040caa5) and frame dispatcher (@ 0x0049ce25) return at once
+  unless its window is active (FUN_0058ff10): no frame runs, the clock
+  stands still (the time away does not count, as the scheduler moves the
+  task's last run on while it returns) and the sound is silent (the
+  original's DirectSound buffers have no global focus); the game goes on
+  where it was when the focus comes back (`atlantis-app/src/a2.rs`, as
+  for the options menu).
 - **Place animations:** the SPW files of `datas_a2\spw\` are banks of
   frames with up to six sprites each, one per cube face, in the first
   game's sprite rows and blend (`c + dst × (32 − f) / 32`), drawn into the
