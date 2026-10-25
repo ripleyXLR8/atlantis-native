@@ -36,7 +36,7 @@ use super::{Engine, Event};
 /// The prefix of `voiles.wam`'s views (@ 0x005daffc) and of
 /// `atlantis.wam`'s (@ 0x005e2ea8).
 const SHAMBALLA_PREFIX: &[u8] = b"SH";
-const ATLANTIS_PREFIX: &[u8] = b"AT";
+pub(super) const ATLANTIS_PREFIX: &[u8] = b"AT";
 
 /// The fireflies' view (@ 0x0049ba79, EBX = 1).
 const FIREFLIES_VIEW: u32 = 1;

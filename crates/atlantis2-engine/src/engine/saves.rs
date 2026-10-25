@@ -291,6 +291,22 @@ impl Engine {
         Ok(())
     }
 
+    /// The puzzle reset FUN_0049bf70 as a load runs it (its quit functions
+    /// clear the modes 1, 2, 3 and 6): the grids' leaves (FUN_00492d60..:
+    /// in the view of a grid the hand of marbles, their bank and sounds are
+    /// dropped; their variables are the save's after), the web's quit
+    /// (FUN_00491260: in the mode 1, its models freed, the mode 0, the web
+    /// not loaded), then the octopus fight's (FUN_0049aef0, the reset's
+    /// last: in the mode 6, the mode 0, the crosshair freed, the camera's
+    /// reset). The turtle ring's, the canoe's and the souls' quits
+    /// (FUN_0049c270, FUN_0049a570, FUN_0048eb10), between the grids' and
+    /// the octopus's, are not called here. Public for tests.
+    pub fn puzzles_reset(&mut self) {
+        self.grids_reset();
+        self.web_quit();
+        self.octopus_quit();
+    }
+
     /// The load of a save's globals (FUN_00478f30 from step 2): the
     /// puzzles reset, the 35 entries copied back, then the world restore
     /// (FUN_00479130) and "init after load" (FUN_004785a0). The view comes
@@ -306,20 +322,10 @@ impl Engine {
             log::warn!("load: {wam} is in a world not ported yet");
             return Err(SaveError::NotPorted(wam));
         }
-        // FUN_0049bf70 resets the puzzles (its quit functions clear the
-        // modes 1, 2, 3 and 6; the grids' leaves, FUN_00492d60..: in the
-        // view of a grid the hand of marbles, their bank and sounds are
-        // dropped; their variables are the save's below), then the
-        // entries are copied: the mode, the grids, the ring's count and
-        // store are the save's; the others not ported are kept for the
-        // next save.
-        self.grids_reset();
-        // The web's quit (FUN_00491260: in the mode 1, its models freed,
-        // the mode 0, the web not loaded), then the octopus fight's
-        // (FUN_0049aef0, the reset's last: in the mode 6, the mode 0, the
-        // crosshair freed, the camera's reset).
-        self.web_quit();
-        self.octopus_quit();
+        // FUN_0049bf70 resets the puzzles, then the entries are copied:
+        // the mode, the grids, the ring's count and store are the save's;
+        // the others not ported are kept for the next save.
+        self.puzzles_reset();
         for k in KEPT {
             self.save_extra.entry_mut(k).copy_from_slice(d.entry(k));
         }

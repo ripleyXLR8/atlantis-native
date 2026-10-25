@@ -3,10 +3,10 @@
 //! header there): the module's data (rows A), `random(n)` (B), the
 //! sectors of the view's yaw (S), the entry per view, seed and dead
 //! tentacles (C), the hit shake and the camera's reset (K), the tick alone
-//! on a hundred states (T), the cursor (U), the dispatchers and the quit
-//! (H), the warp frame pass by pass with a player who shoots and one who
-//! does not (E), and the files drawn: the octopus's on the faces, the
-//! crosshair at the centre (G).
+//! on 76 states (T), the cursor (U), the dispatchers, the quit and the
+//! puzzle reset (H), the warp frame pass by pass with players who shoot
+//! and who do not (E), and the files drawn: the octopus's on the faces,
+//! the crosshair at the centre (G).
 //!
 //! The T, K and U rows start from the same state (`fresh`): the camera's
 //! node the identity, no shake, the mode 0, the crosshair's frame 0, no
@@ -24,20 +24,19 @@
 //! `shake` (counter, rounds, the field of view's bits), `zone7af=Z` (view
 //! 16's zone Z made type 0x7af).
 //!
-//! Then the fight played with the mouse, as a player plays it: Atlantis
-//! walked to view 16 without the crystal (the tentacles strike until the
-//! hero dies: film 64, view 8, chapter 82 again), then to the sunken
-//! crystal of view 18 and back, each attacking tentacle aimed at and shot
-//! (36 shots: the octopus dies, film 65, Tibet). With `ATLANTIS2_PNG_DIR`
-//! set to a folder, `pz-octopus-*.png` are written there.
+//! The fight played with the mouse is `tests/flow.rs`'s
+//! (`the_end_of_the_game_with_the_mouse`), its two ends
+//! `tests/endgame.rs`'s.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
-//! `tests/warp.rs`); without them the tests are skipped (rows B and S
-//! run always).
+//! `tests/warp.rs`); without them the tests are skipped (B and S's
+//! control word, tenths and bounds run always; S's yaw rows need the
+//! game).
 
 use std::cell::RefCell;
 use std::path::PathBuf;
 
+use atlantis2_data::defnames;
 use atlantis2_data::spr::{SprBank, Target};
 use atlantis2_data::spw::Spw;
 use atlantis2_data::wam::EntityState;
@@ -45,8 +44,7 @@ use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::anim::Anim;
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::{
-    atlantis_entry_hooks, chinese_entry_hooks, octopus_random, octopus_sector, Shake,
-    OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
+    octopus_data, octopus_random, octopus_sector, Shake, OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
 };
 use atlantis2_engine::{CentreDraw, CursorBank, Engine, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
@@ -162,7 +160,9 @@ fn random_as_the_original() {
 
 #[test]
 fn the_sectors_as_the_original() {
+    // The golden's control word, the one the rows S are run under.
     let fpu = Fpu::Chop;
+    assert_eq!(format!("S cw {:04x}", fpu.control_word()), rows("S cw ")[0]);
     let tenths = rows("S tenths ")[0];
     let mut runs = Vec::new();
     let (mut prev, mut start) = (None, 0);
@@ -612,7 +612,65 @@ fn the_data_as_the_original() {
             row
         );
     }
-    assert_eq!(rows("A shake table ")[0], "A shake table [0,10,-10,-10,10]");
+    // The module's constants, as the port holds them.
+    let data = octopus_data();
+    assert_eq!(
+        format!("A strings {}", data.strings.join(" | ")),
+        rows("A strings ")[0]
+    );
+    let floats: Vec<String> = data
+        .floats
+        .iter()
+        .map(|(a, b)| format!("{a:08x}={b:08x}"))
+        .collect();
+    assert_eq!(
+        format!("A floats {}", floats.join(" ")),
+        rows("A floats ")[0]
+    );
+    let doubles: Vec<String> = data
+        .doubles
+        .iter()
+        .map(|(a, b)| format!("{a:08x}={b:016x}"))
+        .collect();
+    assert_eq!(
+        format!("A doubles {}", doubles.join(" ")),
+        rows("A doubles ")[0]
+    );
+    assert_eq!(
+        format!("A shake table {}", lst(data.rolls)),
+        rows("A shake table ")[0]
+    );
+    // The ids, in the sections the port reads them from: the crystal an
+    // object, the bodies characters.
+    let names = &e.script_state().unwrap().names;
+    let mut ids = vec![format!(
+        "CRISTAL_ENGLOUTI={}",
+        names.id(defnames::OBJETS, b"CRISTAL_ENGLOUTI").unwrap()
+    )];
+    for n in [
+        "GDP_CORPS_V1",
+        "GDP_CORPS_V2",
+        "PTP_CORPS_V1",
+        "PTP_CORPS_V4",
+    ] {
+        ids.push(format!(
+            "{n}={}",
+            names.id(defnames::PERSONNAGES, n.as_bytes()).unwrap()
+        ));
+    }
+    assert_eq!(format!("A ids {}", ids.join(" ")), rows("A ids ")[0]);
+    // Every row of A is one of the above.
+    let checked = [
+        "A entity ",
+        "A strings ",
+        "A floats ",
+        "A doubles ",
+        "A shake table ",
+        "A ids ",
+    ];
+    for row in rows("A ") {
+        assert!(checked.iter().any(|p| row.starts_with(p)), "{row}");
+    }
 }
 
 #[test]
@@ -932,44 +990,82 @@ fn the_cursor_as_the_original() {
     }
 }
 
+/// The functions of the golden's H rows the engine's events show entered,
+/// in order.
+fn entered(e: &Engine) -> String {
+    let v: Vec<&str> = e
+        .events
+        .iter()
+        .filter_map(|x| match x {
+            Event::PuzzleRan { function } => match *function {
+                OCTOPUS_ENTRY => Some("octopus-entry"),
+                OCTOPUS_TICK => Some("octopus-tick"),
+                0x0048_df10 => Some("souls-entry"),
+                0x0049_c340 => Some("ring-entry"),
+                _ => None,
+            },
+            Event::OctopusQuit => Some("octopus-quit"),
+            Event::CameraReset => Some("camera-reset"),
+            _ => None,
+        })
+        .collect();
+    if v.is_empty() {
+        "-".into()
+    } else {
+        v.join(",")
+    }
+}
+
+/// `f` run with the current view the golden's fake record: view 16's
+/// record named `name` and numbered `number` (a record already numbered
+/// so set aside), the current view's number `number`; then all put back.
+fn with_fake_view(e: &mut Engine, name: &str, number: u32, f: impl FnOnce(&mut Engine)) {
+    let mut saved = Vec::new();
+    for (pi, p) in e.wam_mut().places.iter_mut().enumerate() {
+        for (vi, v) in p.views.iter_mut().enumerate() {
+            if v.id == 16 {
+                saved.push((pi, vi, v.id, v.name.clone()));
+                v.name = name.into();
+                v.id = number;
+            } else if v.id == number {
+                saved.push((pi, vi, v.id, v.name.clone()));
+                v.id = u32::MAX;
+            }
+        }
+    }
+    e.set_view_number(number);
+    f(e);
+    for (pi, vi, id, name) in saved {
+        let v = &mut e.wam_mut().places[pi].views[vi];
+        v.id = id;
+        v.name = name;
+    }
+    e.set_view_number(16);
+}
+
 #[test]
 fn the_dispatchers_as_the_original() {
     let Some(files) = game() else { return };
     let mut e = in_atlantis(files);
+    // The entry dispatcher (FUN_0049bd50) itself, on a fake view record
+    // as the golden's.
     for row in rows("H entry ") {
         let w: Vec<&str> = row.split_whitespace().collect();
         let (name, number): (&str, u32) = (w[2], w[3].parse().unwrap());
-        let mut entered = Vec::new();
         fresh(&mut e, 1);
         e.octopus_quit();
-        let hooks = atlantis_entry_hooks(name.as_bytes(), number);
-        let souls = chinese_entry_hooks(name.as_bytes(), number);
-        if hooks.contains(&OCTOPUS_ENTRY) {
-            e.set_view_number(number);
-            e.octopus_entry();
-            entered.push("octopus-entry,camera-reset");
-            e.set_view_number(16);
-        }
-        if souls.contains(&0x0048_df10) {
-            entered.push("souls-entry");
-        }
-        let entered = if entered.is_empty() {
-            "-".to_string()
-        } else {
-            entered.join(",")
-        };
-        let mode = if souls.contains(&0x0048_df10) {
-            3
-        } else {
-            e.puzzle_mode()
-        };
-        assert_eq!(
-            format!(
-                "H entry {name} {number} -> {entered} | mode {mode} | {}",
-                recs_row(&e)
-            ),
-            row
-        );
+        let mut got = String::new();
+        with_fake_view(&mut e, name, number, |e| {
+            e.events.clear();
+            e.entry_hooks();
+            got = format!(
+                "H entry {name} {number} -> {} | mode {} | {}",
+                entered(e),
+                e.puzzle_mode(),
+                recs_row(e)
+            );
+        });
+        assert_eq!(got, row);
     }
     for row in rows("H tick mode ") {
         let w: Vec<&str> = row.split_whitespace().collect();
@@ -994,24 +1090,45 @@ fn the_dispatchers_as_the_original() {
             row
         );
     }
+    // The quit, and the port's puzzle reset of a load. The golden's
+    // reset rows start with the other modules' functions, which its
+    // harness stubs (their own goldens cover them): the port's reset is
+    // compared from the octopus's quit on.
     for row in rows("H quit mode ")
         .into_iter()
         .chain(rows("H reset mode "))
     {
         let w: Vec<&str> = row.split_whitespace().collect();
-        let mode: i32 = w[3].parse().unwrap();
+        let (label, mode): (&str, i32) = (w[1], w[3].parse().unwrap());
         fresh(&mut e, 1);
         e.camera.set_yaw(bits("40490fdb"));
         e.set_puzzle_mode(mode);
         let before = e.octopus.bank.is_some();
-        e.octopus_quit();
-        let tail = format!(
-            "| mode {} | banks {} | {}",
-            e.puzzle_mode(),
-            banks(before, e.octopus.bank.is_some()),
-            camera_row(&e)
+        e.events.clear();
+        let others = if label == "quit" {
+            e.octopus_quit();
+            ""
+        } else {
+            e.puzzles_reset();
+            "grid1-leave,grid2-leave,grid3-leave,ring-quit,canoe-quit,web-quit,souls-quit,"
+        };
+        // In the mode 1 the web's quit, which the golden's harness stubs,
+        // clears its mode (FUN_00491260), in the port as in the original.
+        let want = if label == "reset" && mode == 1 {
+            row.replacen("| mode 1 |", "| mode 0 |", 1)
+        } else {
+            row.to_string()
+        };
+        assert_eq!(
+            format!(
+                "H {label} mode {mode} -> {others}{} | mode {} | banks {} | {}",
+                entered(&e),
+                e.puzzle_mode(),
+                banks(before, e.octopus.bank.is_some()),
+                camera_row(&e)
+            ),
+            want
         );
-        assert!(row.ends_with(&tail), "{row}\n{tail}");
     }
 }
 

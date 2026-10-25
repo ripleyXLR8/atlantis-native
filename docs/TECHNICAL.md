@@ -1602,11 +1602,25 @@ back) into `yucatan-*.png`.
   port: 60 a second). The port's only difference: a tentacle's file
   missing from every disc gets no slot (the original writes its frame and
   slot pointer one slot before the table; the game's data have every
-  file). `tests/octopus.rs` checks every row of the original's golden
-  (`tests/golden/octopus.txt`: the data, `random`, the sectors, the entry
-  per view, the shake, the tick on 76 states, the cursor, the
-  dispatchers, four fights pass by pass, the files and the crosshair
-  drawn) and `tests/flow.rs` plays the fight with the mouse, lost then
+  file). `tests/octopus.rs` checks the original's golden row by row
+  (`tests/golden/octopus.txt`: the module's strings, floats, doubles,
+  roll table and entities against the port's constants, `random`, the
+  sectors, the entry per view, the shake, the tick on 76 states, the
+  cursor, the dispatcher run on the golden's view names, the quit and the
+  port's puzzle reset with the functions they enter, four fights pass by
+  pass, the files and the crosshair drawn). Not compared: view 19's entry
+  (no panorama on any disc), the puzzle tick with the pause byte (not in
+  the port), and in the reset's rows the other modules' functions, which
+  the golden's harness stubs (the port's reset runs the grids' leaves, the
+  web's quit and the octopus's, not the turtle ring's, the canoe's nor the
+  souls' quits: the ring's and the souls' only clear modes the save's
+  then replaces, but the canoe's FUN_0049a570 has no test and runs whole
+  at every reset: the cursor pair emptied, FUN_0047bef0(0, 0)
+  @ 0x0049a575, its frees, FUN_00402960(1, …) @ 0x0049a66c, at 800 x 600
+  FUN_0042a720(800, 600) @ 0x0049a686, FUN_00403920(0) @ 0x0049a694,
+  none of which the port's load does; what that changes after a load is
+  not checked).
+  `tests/flow.rs` plays the fight with the mouse, lost then
   won.
   `tests/endgame.rs` runs every chapter's `/INIT` (and the trap), enters
   every view of the five places with their hooks, plays a firefly's

@@ -559,8 +559,10 @@ impl Engine {
     /// figurines and chest (`SS` views 1-7), wheels (`SS` 12-13), pearl
     /// and dragon (`SS` 31), turtle ring (`CH` views 40-64) and labyrinth
     /// souls (`LA` views 1-60); Yucatán's hooks, first (the web's entry in
-    /// the mode 1, then the `YU` views'), are noted; Tibet has none.
-    pub(super) fn entry_hooks(&mut self) {
+    /// the mode 1, then the `YU` views'), are noted; Tibet has none; then
+    /// Atlantis's octopus fight runs. Public for tests (the dispatcher
+    /// alone, on the current view's name and number).
+    pub fn entry_hooks(&mut self) {
         self.yucatan_entry();
         let hook = self
             .current_view()

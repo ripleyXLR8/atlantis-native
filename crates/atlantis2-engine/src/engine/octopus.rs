@@ -129,11 +129,30 @@ const ATTACK_CLICK: i32 = 5;
 /// The zone type FUN_0049b370 makes a move (1).
 const CLOSED_ZONE: i32 = 0x7af;
 
+/// The names the module prints (`sprintf`, @ 0x005e2dd0, 0x005e2de0,
+/// 0x005e2e44): a tentacle's `BigTenta<k>Died`, a view's
+/// `PoulpeWarp<view>`, a record's body `<body><sector>`.
+const TENTACLE_DIED: &str = "BigTenta%dDied";
+const VIEW_DONE: &str = "PoulpeWarp%d";
+const BODY_NAME: &str = "%s%d";
+
 /// π as the float @ 0x005c678c, 180.0f (@ 0x005c6304), 360.0f
-/// (@ 0x005c6714).
+/// (@ 0x005c6714), −180.0f (@ 0x005c6718, the wrap's lower bound) and
+/// 0.0f (@ 0x005c62f8, the between test's signs).
 const PI: f32 = f32::from_bits(0x4049_0fdb);
-const DEG_180: f64 = 180.0;
-const DEG_360: f64 = 360.0;
+const DEG_180: f32 = 180.0;
+const DEG_360: f32 = 360.0;
+const DEG_MINUS_180: f32 = -180.0;
+const ZERO: f32 = 0.0;
+/// The shake's fields of view in degrees: the rest 76.0f (@ 0x005c6340,
+/// read by the step's two tests; the hit, the reset and the step store
+/// the same bits as an immediate, @ 0x0045b497, 0x0045b4c7, 0x0045b635), the
+/// step back 4.0f (@ 0x005c633c), the widening 8.0f (@ 0x005c6348) and its
+/// bound 90.0f (@ 0x005c6344, stored as an immediate @ 0x0045b5e6).
+const FOV_REST: f32 = 76.0;
+const FOV_BACK: f32 = 4.0;
+const FOV_WIDEN: f32 = 8.0;
+const FOV_MAX: f32 = 90.0;
 /// The shake's roll table (@ 0x005db85c, degrees), its angle factor (the
 /// float 1/180 @ 0x005c62b8), the field of view's (the double 1/180
 /// @ 0x005c6328) and the reset's 76° (π · the double 76/180
@@ -225,6 +244,68 @@ fn d(x: f32) -> f64 {
     f64::from(x)
 }
 
+/// `sprintf(fmt, ...)` of the module's three names: `%s` the string, `%d`
+/// the number, each once.
+fn c_format(fmt: &str, s: &str, n: i32) -> String {
+    fmt.replacen("%s", s, 1).replacen("%d", &n.to_string(), 1)
+}
+
+/// The module's data as the original holds it (the golden's rows A): its
+/// strings in the order of their addresses (@ 0x005e2d18 .. 0x005e2ea8),
+/// its floats' and doubles' bits by address, the shake's roll table.
+/// Public for tests.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OctopusData {
+    pub strings: Vec<&'static str>,
+    pub floats: Vec<(u32, u32)>,
+    pub doubles: Vec<(u32, u64)>,
+    pub rolls: [i32; 5],
+}
+
+/// The port's constants as [`OctopusData`].
+pub fn octopus_data() -> OctopusData {
+    let crystal = std::str::from_utf8(CRYSTAL).expect("ASCII");
+    let atlantis = std::str::from_utf8(super::shamballa::ATLANTIS_PREFIX).expect("ASCII");
+    OctopusData {
+        strings: vec![
+            SMALL_BODY,
+            SMALL_PREFIX,
+            BIG_BODY,
+            BIG_PREFIX,
+            CROSSHAIR,
+            HERO_DEAD,
+            OCTOPUS_DEAD,
+            ENERGY,
+            BLOW,
+            BODY_DEATH,
+            TENTACLE_DEATH,
+            SHOT,
+            crystal,
+            TENTACLE_DIED,
+            VIEW_DONE,
+            BODY_NAME,
+            atlantis,
+        ],
+        floats: vec![
+            (0x005c_6304, DEG_180.to_bits()),
+            (0x005c_678c, PI.to_bits()),
+            (0x005c_62b8, ROLL_PER_180.to_bits()),
+            (0x005c_6348, FOV_WIDEN.to_bits()),
+            (0x005c_6344, FOV_MAX.to_bits()),
+            (0x005c_6340, FOV_REST.to_bits()),
+            (0x005c_633c, FOV_BACK.to_bits()),
+            (0x005c_62f8, ZERO.to_bits()),
+            (0x005c_6714, DEG_360.to_bits()),
+            (0x005c_6718, DEG_MINUS_180.to_bits()),
+        ],
+        doubles: vec![
+            (0x005c_6298, FOV_76_PER_180.to_bits()),
+            (0x005c_6328, FOV_PER_180.to_bits()),
+        ],
+        rolls: ROLLS,
+    }
+}
+
 /// `random(n)` (@ 0x0049afe0): `rand() · (n + 1) / 32767`, C division.
 pub fn octopus_random(rand: &mut crate::crt::Rand, n: i32) -> i32 {
     rand.rand().wrapping_mul(n.wrapping_add(1)) / 0x7fff
@@ -233,24 +314,24 @@ pub fn octopus_random(rand: &mut crate::crt::Rand, n: i32) -> i32 {
 /// The tick's yaw in degrees (@ 0x0049aad3..0x0049aaf3): the read-back
 /// radians times 180.0f over π (floats), stored as a float.
 pub fn octopus_degrees(fpu: Fpu, yaw: f32) -> f32 {
-    fpu.f32(fpu.div(fpu.mul(d(yaw), DEG_180), d(PI)))
+    fpu.f32(fpu.div(fpu.mul(d(yaw), d(DEG_180)), d(PI)))
 }
 
 /// FUN_0049b4f0: `x` brought into [−180, 180] by steps of 360, in the
 /// x87 register (the loops' sums are not stored).
 fn wrap180(fpu: Fpu, mut x: f64) -> f64 {
-    if x > DEG_180 {
+    if x > d(DEG_180) {
         loop {
-            x = fpu.sub(x, DEG_360);
-            if x <= DEG_180 {
+            x = fpu.sub(x, d(DEG_360));
+            if x <= d(DEG_180) {
                 break;
             }
         }
     }
-    if x < -DEG_180 {
+    if x < d(DEG_MINUS_180) {
         loop {
-            x = fpu.add(x, DEG_360);
-            if x >= -DEG_180 {
+            x = fpu.add(x, d(DEG_360));
+            if x >= d(DEG_MINUS_180) {
                 break;
             }
         }
@@ -266,10 +347,11 @@ pub fn octopus_between(fpu: Fpu, yaw: f32, hi: f32, lo: f32) -> bool {
     let y = d(fpu.f32(wrap180(fpu, d(yaw))));
     let mut hi = d(fpu.f32(wrap180(fpu, d(hi))));
     let mut lo = wrap180(fpu, d(lo));
-    if y > 0.0 && lo > 0.0 && hi < 0.0 {
-        hi = d(fpu.f32(fpu.add(hi, DEG_360)));
-    } else if y < 0.0 && hi < 0.0 && lo > 0.0 {
-        lo = fpu.sub(lo, DEG_360);
+    let zero = d(ZERO);
+    if y > zero && lo > zero && hi < zero {
+        hi = d(fpu.f32(fpu.add(hi, d(DEG_360))));
+    } else if y < zero && hi < zero && lo > zero {
+        lo = fpu.sub(lo, d(DEG_360));
     }
     y < hi && y > lo
 }
@@ -330,8 +412,9 @@ impl Engine {
     /// with the radians: the view turns to 90° − yaw, its pitch dropped),
     /// the field of view 76° (π · 76/180 as a float).
     pub fn camera_reset(&mut self) {
+        self.event(Event::CameraReset);
         self.shake.counter = 0;
-        self.shake.fov = 76.0;
+        self.shake.fov = FOV_REST;
         let (yaw, _) = self.camera.angles();
         self.camera.set_yaw(yaw);
         let fpu = self.camera.fpu;
@@ -346,7 +429,7 @@ impl Engine {
         if self.shake.counter == 0 {
             self.shake.counter = 1;
             self.shake.repeats = if n == 0 { 1 } else { n };
-            self.shake.fov = 76.0;
+            self.shake.fov = FOV_REST;
         }
     }
 
@@ -356,11 +439,11 @@ impl Engine {
         let (w, h) = (self.renderer.width() as u32, self.renderer.height() as u32);
         if self.shake.counter == 0 {
             // The field of view back by 4° a frame down to 76.
-            if d(self.shake.fov) > 76.0 {
-                let f = fpu.sub(d(self.shake.fov), 4.0);
+            if d(self.shake.fov) > d(FOV_REST) {
+                let f = fpu.sub(d(self.shake.fov), d(FOV_BACK));
                 self.shake.fov = fpu.f32(f);
-                if f < 76.0 {
-                    self.shake.fov = 76.0;
+                if f < d(FOV_REST) {
+                    self.shake.fov = FOV_REST;
                 }
                 let fov = fpu.f32(fpu.mul(fpu.mul(d(self.shake.fov), d(PI)), FOV_PER_180));
                 self.camera.set_fov(fov, w, h);
@@ -376,10 +459,10 @@ impl Engine {
         self.camera.roll(angle);
         let fov = fpu.f32(fpu.mul(fpu.mul(d(self.shake.fov), d(PI)), FOV_PER_180));
         self.camera.set_fov(fov, w, h);
-        let f = fpu.add(d(self.shake.fov), 8.0);
+        let f = fpu.add(d(self.shake.fov), d(FOV_WIDEN));
         self.shake.fov = fpu.f32(f);
-        if f > 90.0 {
-            self.shake.fov = 90.0;
+        if f > d(FOV_MAX) {
+            self.shake.fov = FOV_MAX;
         }
         if self.shake.counter != 0 {
             self.shake.counter += 1;
@@ -537,7 +620,7 @@ impl Engine {
                 }
                 if !is_body {
                     let dead = self.octopus.big
-                        && self.octopus_var(&format!("BigTenta{}Died", k + 1)) == 1;
+                        && self.octopus_var(&c_format(TENTACLE_DIED, "", k as i32 + 1)) == 1;
                     let r = &mut self.octopus.records[rec.min(RECORDS - 1)];
                     if dead {
                         if let Some(s) = slot.and_then(|n| self.anim.slots.get_mut(n)) {
@@ -592,7 +675,7 @@ impl Engine {
     /// animation `anim` (FUN_0047dea0: the first slot of that id and
     /// animation; none is the original's fatal error and slot 0).
     fn octopus_body_slot(&mut self, sector: i32, anim: u32) -> Option<usize> {
-        let name = format!("{}{}", self.octopus.body, sector);
+        let name = c_format(BODY_NAME, self.octopus.body, sector);
         let id = match self.names.id(defnames::PERSONNAGES, name.as_bytes()) {
             Ok(id) => id as i32,
             Err(_) => {
@@ -619,6 +702,7 @@ impl Engine {
 
     /// FUN_0049aef0: the quit (in the mode 6 only).
     pub fn octopus_quit(&mut self) {
+        self.event(Event::OctopusQuit);
         if self.puzzle_mode() == OCTOPUS_MODE {
             self.set_puzzle_mode(0);
             self.octopus.bank = None;
@@ -722,7 +806,7 @@ impl Engine {
                     .is_some_and(|s| s.frame == DEATH_FRAME)
                 {
                     // FUN_0049af60.
-                    let name = format!("PoulpeWarp{}", self.view);
+                    let name = c_format(VIEW_DONE, "", self.view as i32);
                     self.octopus_write(&name, 1, false);
                     self.slot_active(Some(n), false);
                     self.octopus.count = self.octopus.count.wrapping_sub(1);
@@ -848,7 +932,7 @@ impl Engine {
             return Step::On;
         }
         // FUN_0049af20.
-        self.octopus_write(&format!("BigTenta{}Died", at + 1), 1, false);
+        self.octopus_write(&c_format(TENTACLE_DIED, "", at + 1), 1, false);
         let t = self.octopus.records[k].tentacles[i];
         if let Some(s) = t.and_then(|n| self.anim.slots.get_mut(n)) {
             s.active = false;

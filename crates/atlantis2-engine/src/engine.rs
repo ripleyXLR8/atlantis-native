@@ -66,9 +66,9 @@ pub use puzzles::{
 };
 mod octopus;
 pub use octopus::{
-    octopus_between, octopus_degrees, octopus_random, octopus_sector, Octopus, Record, Shake, BLOW,
-    BODY_DEATH, HERO_DEAD, OCTOPUS_CURSOR, OCTOPUS_DEAD, OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_QUIT,
-    OCTOPUS_TICK, RECORDS, SHOT, TENTACLE_DEATH,
+    octopus_between, octopus_data, octopus_degrees, octopus_random, octopus_sector, Octopus,
+    OctopusData, Record, Shake, BLOW, BODY_DEATH, HERO_DEAD, OCTOPUS_CURSOR, OCTOPUS_DEAD,
+    OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_QUIT, OCTOPUS_TICK, RECORDS, SHOT, TENTACLE_DEATH,
 };
 mod saves;
 mod shamballa;
@@ -179,6 +179,12 @@ pub enum Event {
     /// The scan (`CtrlScenarIN`, FUN_00483c90) after the fight's
     /// `chapter=` commands.
     OctopusScan,
+    /// The octopus fight's quit FUN_0049aef0 entered (it acts in the mode 6
+    /// only): from the fight's tick and the puzzle reset of a load.
+    OctopusQuit,
+    /// The warp module's camera reset FUN_0045b4b0 (from the octopus
+    /// fight's entry and quit).
+    CameraReset,
     /// A puzzle function the port has, run: the original's function (a
     /// hook, or the wheels' check FUN_0048d310).
     PuzzleRan { function: u32 },
