@@ -1,0 +1,238 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# SetVariables (0x004818f0) on every /set line of chapi078.con to chapi201.con
+# (Shamballa and Atlantis, the space-travel hub, the two endings of the octopus), in
+# file order, each in place in its chapter text (the bytes after the line are the
+# file's), the state carried from line to line whatever the conditions, from
+# chapi001.con on (the rows of chapters 1-24 are scripts_worlds_ireland.txt, of 25-60
+# scripts_worlds_china.txt; chapi000.con and chapi075.con are not run): file:line, key,
+# offset returned from the line's /set (-1: none), number and names of the calls,
+# number of changes (the variables, flags, subjects, bag, show/hide table and globals),
+# fatal / warning.
+# Names of defnames.con entries that are not strings of the executable are written
+# {S:I} (section, index; :l in lower case); the test fills them in from the game's file.
+# {trap} is the key of chapi083.con's line under its "never the case" comment, a name
+# that is in no defnames.con section: the lookup's fatal error (which returns in the
+# harness, and the line goes on into the CHAPTER branch).
+# Stubbed, recorded: logging, the warning 0x00480c20 and the fatal 0x00480cd0 (which
+# returns), and every callee with an effect outside the script tables: WAM load and view
+# lookup / entry, video start, sound and music, dialog start / stop, CD and world change,
+# camera turn and zoom, zone enabling, bag layout, the music step, LoadCurrentChap,
+# RunInit and the credits.
+# chapi078.con md5 c6ea5dbe5b606e05a1abdabe39fb3ef2 world SH
+chapi078.con:2 key=vignettesave ret=24 calls=0: changes=1
+chapi078.con:3 key=hideobjet ret=26 calls=0: changes=1
+chapi078.con:4 key=hideobjet ret=26 calls=0: changes=1
+chapi078.con:5 key=hideobjet ret=26 calls=0: changes=1
+chapi078.con:6 key=hideobjet ret=26 calls=0: changes=1
+chapi078.con:7 key=hideobjet ret=26 calls=0: changes=1
+chapi078.con:8 key=hideobjet ret=26 calls=0: changes=1
+chapi078.con:9 key=nblucioleallumed ret=25 calls=0: changes=0
+chapi078.con:10 key=startmusik ret=20 calls=1:AtlMuzik_Start changes=1
+chapi078.con:11 key=killsuj ret=29 calls=0: changes=0
+chapi078.con:15 key=limiteanglewarpy ret=26 calls=0: changes=1
+chapi078.con:19 key=hideobjet ret=26 calls=0: changes=0
+chapi078.con:20 key=hideobjet ret=26 calls=0: changes=0
+chapi078.con:21 key=hideobjet ret=26 calls=0: changes=0
+chapi078.con:22 key=hideobjet ret=26 calls=0: changes=0
+chapi078.con:23 key=hideobjet ret=26 calls=0: changes=0
+chapi078.con:24 key=hideobjet ret=26 calls=0: changes=0
+chapi078.con:25 key=nblucioleallumed ret=25 calls=0: changes=0
+chapi078.con:26 key=monde ret=14 calls=1:Interp_SetMonde changes=0
+chapi078.con:27 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi078.con:28 key=changewam ret=26 calls=1:AtlWam_Load changes=1
+chapi078.con:29 key=anglewarpx ret=19 calls=0: changes=2
+chapi078.con:30 key=anglewarpy ret=19 calls=0: changes=0
+chapi078.con:31 key=vue ret=13 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=5
+chapi078.con:32 key=chapter ret=-419 calls=2:LoadCurrentChap,RunInit changes=2
+chapi078.con:34 key=limiteanglewarpy ret=26 calls=0: changes=0
+chapi078.con:35 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi078.con:36 key=changewam ret=25 calls=1:AtlWam_Load changes=1
+chapi078.con:37 key=vue ret=12 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=4
+chapi078.con:38 key=chapter ret=-550 calls=2:LoadCurrentChap,RunInit changes=2
+chapi078.con:41 key=limiteanglewarpy ret=26 calls=0: changes=0
+chapi078.con:42 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi078.con:43 key=changewam ret=25 calls=1:AtlWam_Load changes=0
+chapi078.con:44 key=vue ret=12 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=2
+chapi078.con:45 key=chapter ret=-715 calls=2:LoadCurrentChap,RunInit changes=0
+chapi078.con:48 key=showobjet ret=26 calls=0: changes=1
+chapi078.con:49 key=zoomstart ret=20 calls=1:AtlWarp_ZoomStart changes=0
+chapi078.con:52 key=showobjet ret=26 calls=0: changes=1
+chapi078.con:53 key=zoomstart ret=20 calls=1:AtlWarp_ZoomStart changes=0
+chapi078.con:56 key=showobjet ret=26 calls=0: changes=1
+chapi078.con:57 key=zoomstart ret=20 calls=1:AtlWarp_ZoomStart changes=0
+chapi078.con:60 key=showobjet ret=26 calls=0: changes=1
+chapi078.con:61 key=zoomstart ret=20 calls=1:AtlWarp_ZoomStart changes=0
+chapi078.con:64 key=showobjet ret=26 calls=0: changes=1
+chapi078.con:65 key=zoomstart ret=20 calls=1:AtlWarp_ZoomStart changes=0
+chapi078.con:68 key=showobjet ret=26 calls=0: changes=1
+chapi078.con:69 key=zoomstart ret=20 calls=1:AtlWarp_ZoomStart changes=0
+# chapi080.con md5 f96d092d0de2a31a0455af4846d60a6c world SH
+chapi080.con:2 key=vignettesave ret=22 calls=0: changes=1
+chapi080.con:3 key=enablesuj ret=30 calls=0: changes=1
+chapi080.con:4 key=delmusik ret=24 calls=1:AtlMuzik_Del changes=0
+chapi080.con:5 key=delmusik ret=36 calls=1:AtlMuzik_Del changes=0
+chapi080.con:6 key=loadmusik ret=25 calls=1:AtlMuzik_Load changes=0
+chapi080.con:7 key=startmusik ret=20 calls=1:AtlMuzik_Start changes=1
+chapi080.con:11 key=abortdepart ret=20 calls=0: changes=1
+chapi080.con:14 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi080.con:15 key=changewam ret=29 calls=1:AtlWam_Load changes=1
+chapi080.con:16 key=vue ret=12 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=1
+chapi080.con:17 key=startmusik ret=20 calls=1:AtlMuzik_Start changes=1
+chapi080.con:18 key=chapter ret=-177 calls=2:LoadCurrentChap,RunInit changes=2
+chapi080.con:22 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:23 key=flag# ret=16 calls=0: changes=1
+chapi080.con:24 key=enablesuj ret=30 calls=0: changes=1
+chapi080.con:25 key=disablesuj ret=31 calls=0: changes=1
+chapi080.con:27 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:28 key=disablesuj ret=31 calls=0: changes=0
+chapi080.con:30 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:31 key=flag# ret=16 calls=0: changes=1
+chapi080.con:32 key=disablesuj ret=31 calls=0: changes=1
+chapi080.con:33 key=enablesuj ret=74 calls=0: changes=1
+chapi080.con:35 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:36 key=disablesuj ret=31 calls=0: changes=0
+chapi080.con:38 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:39 key=disablesuj ret=27 calls=0: changes=1
+chapi080.con:41 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:42 key=disablesuj ret=29 calls=0: changes=1
+chapi080.con:44 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:45 key=disablesuj ret=35 calls=0: changes=1
+chapi080.con:47 key=flag# ret=16 calls=0: changes=1
+chapi080.con:48 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:49 key=disablesuj ret=34 calls=0: changes=1
+chapi080.con:51 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi080.con:52 key=disablesuj ret=38 calls=0: changes=1
+# chapi081.con md5 9dd8cce76fbcf68cc77cd35776e2ecb1 world SH
+chapi081.con:4 key=vignettesave ret=24 calls=0: changes=1
+chapi081.con:5 key=clearsuj ret=25 calls=0: changes=1
+chapi081.con:6 key=clearsuj ret=22 calls=0: changes=1
+chapi081.con:7 key=clearsuj ret=27 calls=0: changes=0
+chapi081.con:8 key=clearsuj ret=24 calls=0: changes=1
+chapi081.con:9 key=clearsuj ret=26 calls=0: changes=1
+chapi081.con:16 key=sacados ret=28 calls=0: changes=0
+chapi081.con:17 key=objetenmain ret=20 calls=0: changes=0
+chapi081.con:18 key=flag# ret=16 calls=0: changes=1
+chapi081.con:19 key=sacados ret=27 calls=0: changes=0
+chapi081.con:20 key=sacados ret=28 calls=0: changes=0
+chapi081.con:21 key=sacados ret=26 calls=0: changes=0
+chapi081.con:22 key=sacados ret=28 calls=0: changes=0
+chapi081.con:23 key=sacados ret=29 calls=0: changes=0
+chapi081.con:24 key=sacados ret=28 calls=0: changes=0
+chapi081.con:25 key=sacados ret=27 calls=0: changes=0
+chapi081.con:26 key=sacados ret=28 calls=0: changes=0
+chapi081.con:27 key=sacados ret=32 calls=0: changes=0
+chapi081.con:28 key=sacados ret=30 calls=0: changes=0
+chapi081.con:29 key=sacados ret=30 calls=0: changes=0
+chapi081.con:30 key=sacados ret=28 calls=0: changes=0
+chapi081.con:31 key=sacados ret=26 calls=0: changes=0
+chapi081.con:32 key=sacados ret=27 calls=0: changes=0
+chapi081.con:33 key=sacados ret=28 calls=0: changes=0
+chapi081.con:34 key=sacados ret=29 calls=0: changes=0
+chapi081.con:35 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi081.con:36 key=changewam ret=29 calls=1:AtlWam_Load changes=1
+chapi081.con:37 key=vue ret=12 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=2
+chapi081.con:38 key=chapter ret=-644 calls=2:LoadCurrentChap,RunInit changes=2
+chapi081.con:43 key=abortdepart ret=20 calls=0: changes=1
+chapi081.con:48 key=zoompsychostart ret=28 calls=1:AtlWarp_ZoomPsychoStart changes=0
+chapi081.con:56 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi081.con:60 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi081.con:64 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi081.con:68 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi081.con:72 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi081.con:76 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi081.con:80 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi081.con:84 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+chapi081.con:88 key=dial ret=15 calls=2:AtlDial_start,AtlMuzik_Volume changes=1
+# chapi082.con md5 73531e21a5c96c8ee84aa6b715c2d42c world SH
+chapi082.con:5 key=vignettesave ret=22 calls=0: changes=1
+chapi082.con:6 key=energiejoueur ret=23 calls=0: changes=1
+chapi082.con:7 key=startmusik ret=20 calls=1:AtlMuzik_Start changes=1
+# chapi083.con md5 c0f615d12342b8bb1e91867e701a084c world space
+chapi083.con:8 key={trap} ret=-26 calls=2:LoadCurrentChap,RunInit changes=2 fatal
+chapi083.con:13 key=disablezoneclicnwnz ret=30 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:14 key=flag# ret=16 calls=0: changes=0
+chapi083.con:18 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:19 key=disablezoneclicnwnz ret=30 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:23 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=0
+chapi083.con:24 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:25 key=disablezoneclicnwnz ret=30 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:29 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:30 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:31 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:32 key=disablezoneclicnwnz ret=30 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:36 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:37 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:38 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:39 key=enablezoneclicnwnz ret=29 calls=1:AtlWam_EnableZone changes=1
+chapi083.con:42 key=startmusik ret=20 calls=1:AtlMuzik_Start changes=1
+chapi083.con:49 key=sacados ret=34 calls=0: changes=0
+chapi083.con:50 key=sacados ret=34 calls=0: changes=0
+chapi083.con:51 key=sacados ret=34 calls=0: changes=0
+chapi083.con:52 key=sacados ret=31 calls=0: changes=0
+chapi083.con:53 key=sacados ret=29 calls=2:Inventaire_Layout,Inventaire_Step changes=1
+chapi083.con:54 key=sacados ret=32 calls=2:Inventaire_Layout,Inventaire_Step changes=1
+chapi083.con:55 key=sacados ret=32 calls=2:Inventaire_Layout,Inventaire_Step changes=1
+chapi083.con:56 key=sacados ret=32 calls=2:Inventaire_Layout,Inventaire_Step changes=1
+chapi083.con:57 key=changeobjectworld ret=44 calls=0: changes=1
+chapi083.con:58 key=changeobjectworld ret=44 calls=0: changes=1
+chapi083.con:59 key=changeobjectworld ret=44 calls=0: changes=1
+chapi083.con:60 key=changeobjectworld ret=41 calls=0: changes=0
+chapi083.con:61 key=flag# ret=16 calls=0: changes=1
+chapi083.con:66 key=trajsound ret=25 calls=0: changes=1
+chapi083.con:69 key=trajsound ret=25 calls=0: changes=1
+chapi083.con:72 key=trajsound ret=25 calls=0: changes=1
+chapi083.con:75 key=trajsound ret=25 calls=0: changes=1
+chapi083.con:78 key=trajsound ret=25 calls=0: changes=1
+chapi083.con:81 key=trajsound ret=25 calls=0: changes=1
+chapi083.con:84 key=trajsound ret=25 calls=0: changes=1
+chapi083.con:87 key=trajsound ret=25 calls=0: changes=1
+chapi083.con:99 key=monde ret=14 calls=1:Interp_SetMonde changes=1
+chapi083.con:100 key=cinema ret=17 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi083.con:101 key=changewam ret=29 calls=1:AtlWam_Load changes=1
+chapi083.con:102 key=vue ret=13 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=5
+chapi083.con:103 key=chapter ret=-1937 calls=2:LoadCurrentChap,RunInit changes=2
+chapi083.con:107 key=monde ret=14 calls=1:Interp_SetMonde changes=0
+chapi083.con:108 key=cinema ret=17 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi083.con:109 key=changewam ret=30 calls=1:AtlWam_Load changes=1
+chapi083.con:110 key=vue ret=14 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=4
+chapi083.con:111 key=chapter ret=-2101 calls=2:LoadCurrentChap,RunInit changes=0
+chapi083.con:115 key=monde ret=14 calls=1:Interp_SetMonde changes=1
+chapi083.con:116 key=cinema ret=17 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi083.con:117 key=changewam ret=28 calls=1:AtlWam_Load changes=1
+chapi083.con:118 key=vue ret=13 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=4
+chapi083.con:119 key=chapter ret=-2251 calls=2:LoadCurrentChap,RunInit changes=2
+chapi083.con:123 key=monde ret=14 calls=1:Interp_SetMonde changes=1
+chapi083.con:124 key=cinema ret=17 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi083.con:125 key=changewam ret=30 calls=1:AtlWam_Load changes=1
+chapi083.con:126 key=vue ret=13 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=4
+chapi083.con:127 key=startmusik ret=20 calls=1:AtlMuzik_Start changes=1
+chapi083.con:128 key=chapter ret=-2424 calls=2:LoadCurrentChap,RunInit changes=2
+chapi083.con:132 key=monde ret=14 calls=1:Interp_SetMonde changes=1
+chapi083.con:133 key=cinema ret=17 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi083.con:134 key=changewam ret=26 calls=1:AtlWam_Load changes=1
+chapi083.con:135 key=anglewarpx ret=21 calls=0: changes=2
+chapi083.con:136 key=anglewarpy ret=19 calls=0: changes=0
+chapi083.con:137 key=vue ret=12 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=4
+chapi083.con:138 key=chapter ret=-2613 calls=2:LoadCurrentChap,RunInit changes=2
+chapi083.con:142 key=monde ret=14 calls=1:Interp_SetMonde changes=1
+chapi083.con:143 key=stopmusik ret=18 calls=1:AtlMuzik_Stop changes=0
+chapi083.con:144 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi083.con:145 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi083.con:146 key=credits ret=16 calls=1:Credits_Start changes=1
+chapi083.con:147 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi083.con:148 key=exit ret=13 calls=0: changes=2
+# chapi200.con md5 5ae07887d15637a53e0c49268782f63c world TI
+chapi200.con:6 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi200.con:7 key=monde ret=14 calls=1:Interp_SetMonde changes=1
+chapi200.con:8 key=changewam ret=26 calls=1:AtlWam_Load changes=0
+chapi200.con:9 key=anglewarpx ret=21 calls=0: changes=2
+chapi200.con:10 key=anglewarpy ret=19 calls=0: changes=0
+chapi200.con:11 key=vue ret=12 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=4
+chapi200.con:12 key=flag# ret=16 calls=0: changes=1
+chapi200.con:13 key=chapter ret=-155 calls=2:LoadCurrentChap,RunInit changes=0
+# chapi201.con md5 59823e06bbcca69b437b9d09b73a60dc world SH
+chapi201.con:6 key=cinema ret=16 calls=5:AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start changes=1
+chapi201.con:7 key=vue ret=12 calls=2:AtlWam_FindView,AtlWarp_EnterView changes=4
+chapi201.con:8 key=chapter ret=-52 calls=2:LoadCurrentChap,RunInit changes=2

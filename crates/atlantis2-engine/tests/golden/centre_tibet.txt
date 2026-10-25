@@ -1,0 +1,147 @@
+# The screen centre and the clicks on sprites in tibet.wam, run by the original atlantis2.exe
+# (French CD build of 1999, 2199552 bytes) under emulation, x87 control word 0x0e7f, 4 dispatcher
+# passes per 15 Hz tick, rand seeded with 1000: the frames of moves_tibet.txt with the warp draw
+# (0x0045a9f0) run: the cursor choice (0x00474500), the draws at the centre (0x0045af10,
+# 0x0047bfd0), the sprite pick (0x0045b040, 0x0047cf00) and the SPW step; the take (0x0045a650),
+# the subject menu test (0x0045a7c0), the click scan (0x0045a870). Not run: the cube draw, the
+# sprite drawing, the per-face projection of the centre (0x0047db60): the texel under the centre
+# (face, column, row; column against the SPW face box's x / w, row against its y / h) is given
+# by the case, (0, -100, -100) (on no sprite) when it gives none; T: the texel from p0, none from
+# p4; P, M: the texel from p0; R, Z1..Z4: none. Case P sets the shaman's subject count to 0
+# (no subject menu); case M keeps the 1 of the new-game state and ends in the subject menu.
+# Pass rows: pN tTICKS view zone loop turn | click; the frame's draws (spr BANK#SPRITE@X,Y; line
+#   X1,Y1-X2,Y2 ARGB) and the scans with the variables they see | after the pass: the cursor's
+#   (bank, frame) pair ("none" for a null bank) and range start, the hand's pair, OBJETENMAIN,
+#   CLICOBJET, CLICPERSO, the sprite hit, the cursor state, the bag count
+# case T: object id 61 slot 0 click 1
+# texel 0,379,339
+== T view 5 at zone 1 aim, the boat under the centre, click; then off it, click
+start view 5 yaw -107.033 pitch 13.120 centre zone -1
+p0 t1 view 5 zone 1 loop 0 turn 0 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#13 range 13 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 1 bag 0
+p1 t1 view 5 zone 1 loop 0 turn 0 | spr interface#13@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#14 range 13 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 1 bag 0
+p2 t1 view 5 zone 1 loop 0 turn 0 | click; spr interface#14@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=6,CLICPERSO=0,CLICOBJET=61) | cursor objects#1 range 13 hand objects#1 OBJETENMAIN 61 CLICOBJET 0 CLICPERSO 0 hit 0 state 1 bag 1
+p3 t1 view 5 zone 1 loop 0 turn 0 | spr objects#1@320,240; spr objects#1@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#1 range 1 hand objects#1 OBJETENMAIN 61 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p4 t2 view 5 zone 1 loop 0 turn 0 | spr objects#1@320,240; spr interface#1@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#1 range 1 hand objects#1 OBJETENMAIN 61 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p5 t2 view 5 zone 1 loop 0 turn 0 | spr objects#1@320,240; spr interface#1@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#2 range 1 hand objects#1 OBJETENMAIN 61 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p6 t2 view 5 zone 1 loop 0 turn 0 | spr objects#1@320,240; spr interface#2@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#2 range 1 hand objects#1 OBJETENMAIN 61 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p7 t2 view 5 zone 1 loop 0 turn 0 | spr objects#1@320,240; spr interface#2@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#2 range 1 hand objects#1 OBJETENMAIN 61 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p8 t3 view 6 zone -1 loop 0 turn 0 | click; spr objects#1@320,240; spr interface#2@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff; scan(DEPARTVUE=6,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0) | cursor none range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p9 t3 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff; scan(DEPARTVUE=0,ARRIVEEVUE=6,CLICZONE=0,CLICPERSO=0,CLICOBJET=0) | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p10 t3 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p11 t3 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p12 t4 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p13 t4 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p14 t4 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p15 t4 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p16 t5 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p17 t5 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p18 t5 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p19 t5 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p20 t6 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p21 t6 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p22 t6 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p23 t6 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p24 t7 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p25 t7 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p26 t7 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p27 t7 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p28 t8 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p29 t8 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p30 t8 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p31 t8 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p32 t9 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p33 t9 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p34 t9 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p35 t9 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p36 t10 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p37 t10 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p38 t10 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p39 t10 view 6 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+end view 6
+# case P: character id 1 slot 4 click 2, subjects 1 set to 0
+# texel 0,179,359
+== P view 7 at (0, 0), the shaman under the centre (no subjects), click, click
+start view 7 yaw 0.000 pitch -0.000 centre zone -1
+p0 t11 view 7 zone 0 loop 0 turn 0 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#25 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 2 bag 1
+p1 t11 view 7 zone 0 loop 0 turn 0 | spr interface#25@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#26 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 2 bag 1
+p2 t11 view 7 zone 0 loop 0 turn 0 | click; spr interface#26@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=6,CLICPERSO=1,CLICOBJET=0) | cursor interface#26 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit 4 state 2 bag 1
+p3 t11 view 7 zone 0 loop 0 turn 0 | spr interface#26@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#26 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 2 bag 1
+p4 t12 view 7 zone 0 loop 0 turn 0 | spr interface#26@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#26 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 2 bag 1
+p5 t12 view 7 zone 0 loop 0 turn 0 | click; spr interface#26@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=6,CLICPERSO=1,CLICOBJET=0) | cursor interface#27 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit 4 state 2 bag 1
+p6 t12 view 7 zone 0 loop 0 turn 0 | spr interface#27@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#27 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 2 bag 1
+p7 t12 view 7 zone 0 loop 0 turn 0 | spr interface#27@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#27 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 2 bag 1
+end view 7
+== R view 6 at zone 0 aim, click; click in the arrival frame; click
+start view 6 yaw -164.394 pitch 14.960 centre zone -1
+p0 t13 view 6 zone 0 loop 0 turn 0 | spr interface#27@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#1 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p1 t13 view 6 zone 0 loop 0 turn 0 | spr interface#1@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#2 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p2 t13 view 7 zone -1 loop 0 turn 0 | click; spr interface#2@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff; scan(DEPARTVUE=7,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0); scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0) | cursor none range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p3 t13 view 7 zone -1 loop 0 turn 0 | click; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff; scan(DEPARTVUE=0,ARRIVEEVUE=7,CLICZONE=0,CLICPERSO=0,CLICOBJET=0) | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p4 t14 view 7 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p5 t14 view 7 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p6 t14 view 7 zone -1 loop 0 turn 0 | click; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff; scan(DEPARTVUE=0,ARRIVEEVUE=0,CLICZONE=0,CLICPERSO=0,CLICOBJET=0) | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p7 t14 view 7 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+end view 7
+== Z1 view 2 zone 0 (move)
+start view 2 yaw -89.703 pitch 14.676 centre zone -1
+p0 t15 view 2 zone 0 loop 0 turn 0 | line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#1 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p1 t15 view 2 zone 0 loop 0 turn 0 | spr interface#1@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#2 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p2 t15 view 2 zone 0 loop 0 turn 0 | spr interface#2@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#2 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p3 t15 view 2 zone 0 loop 0 turn 0 | spr interface#2@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#2 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p4 t16 view 2 zone 0 loop 0 turn 0 | spr interface#2@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#2 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p5 t16 view 2 zone 0 loop 0 turn 0 | spr interface#2@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#3 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p6 t16 view 2 zone 0 loop 0 turn 0 | spr interface#3@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#3 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p7 t16 view 2 zone 0 loop 0 turn 0 | spr interface#3@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#3 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p8 t17 view 2 zone 0 loop 0 turn 0 | spr interface#3@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#3 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p9 t17 view 2 zone 0 loop 0 turn 0 | spr interface#3@320,240; line 320,238-320,242 ff0000ff; line 318,240-322,240 ff0000ff | cursor interface#4 range 1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+end view 2
+== Z2 view 4 zone 2 (type 1000)
+start view 4 yaw -179.760 pitch -11.397 centre zone -1
+p0 t17 view 4 zone 2 loop 0 turn 0 | spr interface#4@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p1 t17 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p2 t18 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p3 t18 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p4 t18 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p5 t18 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p6 t19 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p7 t19 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p8 t19 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p9 t19 view 4 zone 2 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+end view 4
+== Z3 view 10 zone 1 (type 3)
+start view 10 yaw 179.751 pitch 10.725 centre zone -1
+p0 t20 view 10 zone 1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#27 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p1 t20 view 10 zone 1 loop 0 turn 0 | spr interface#27@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#28 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p2 t20 view 10 zone 1 loop 0 turn 0 | spr interface#28@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#28 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p3 t20 view 10 zone 1 loop 0 turn 0 | spr interface#28@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#28 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p4 t21 view 10 zone 1 loop 0 turn 0 | spr interface#28@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#28 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p5 t21 view 10 zone 1 loop 0 turn 0 | spr interface#28@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#29 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p6 t21 view 10 zone 1 loop 0 turn 0 | spr interface#29@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#29 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p7 t21 view 10 zone 1 loop 0 turn 0 | spr interface#29@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#29 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p8 t22 view 10 zone 1 loop 0 turn 0 | spr interface#29@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#29 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p9 t22 view 10 zone 1 loop 0 turn 0 | spr interface#29@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor interface#30 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+end view 10
+== Z4 view 10 at (0, -60), no zone
+start view 10 yaw 0.001 pitch -60.000 centre zone 1
+p0 t22 view 10 zone -1 loop 0 turn 0 | spr interface#30@320,240; line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p1 t22 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p2 t23 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p3 t23 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p4 t23 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p5 t23 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p6 t24 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p7 t24 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p8 t24 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+p9 t24 view 10 zone -1 loop 0 turn 0 | line 320,238-320,242 ffffffff; line 318,240-322,240 ffffffff | cursor none range -1 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 0 bag 1
+end view 10
+# case M: character id 1 slot 4 subjects 1
+# texel 0,179,359
+== M view 7 at (0, 0), the shaman under the centre (with subjects), click
+start view 7 yaw -0.000 pitch -0.000 centre zone -1
+p0 t25 view 7 zone 0 loop 0 turn 0 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#25 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 2 bag 1
+p1 t25 view 7 zone 0 loop 0 turn 0 | spr interface#25@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#26 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 0 hit -1 state 2 bag 1
+p2 t25 view 7 zone 0 loop 0 turn 0 | click; spr interface#26@320,240; line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00 | cursor interface#40 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 1 hit 4 state 2 bag 1
+p3 t25 view 7 zone 0 loop 0 turn 0 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr interface#40@0,0 | cursor interface#40 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 1 hit -1 state 2 bag 1
+p4 t26 view 7 zone 0 loop 0 turn 0 | line 320,238-320,242 ff00ff00; line 318,240-322,240 ff00ff00; spr interface#40@0,0 | cursor interface#40 range 25 hand none OBJETENMAIN 0 CLICOBJET 0 CLICPERSO 1 hit -1 state 2 bag 1
+end view 7
+errors: 4 warnings (case M: the subject menu draws with no bank loaded)

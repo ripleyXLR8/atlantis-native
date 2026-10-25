@@ -1,0 +1,179 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) and scenar\chapi055.con (MD5 2181189ab5c342c39fd42c7bfacf9c58):
+# the five wheels and the bridge (SS views 12-13). The ids line gives the defnames.con
+# indices of the objects RoueK1..5, DISQUE1..5, Pont_Leve, Pont_Moitie, Pont_Baisse,
+# PIECE1; params their sprites (DISQUE1..5, PIECE1); the variables line pos_roue1..5,
+# findisque1, findisque2, OBJETENMAIN, MONDE, DEPARTVUE, ABORTDEPART, VUE, CLICZONE;
+# the zones line the #ZONES_CLIC# indices of AXE_5ROUES1..5 (the values of those zones).
+# `lines` are chapter 55's line numbers. Each section's own header (## lines) says
+# what its rows hold.
+ids objects 132 133 134 135 136 90 91 92 93 94 126 127 128 137
+params 2 3 4 0 1 17
+ids variables 122 123 124 125 126 103 104 28 91 5 6 12 76
+ids zones 37 38 39 40 41
+tables 0x005e0f7c [3,4,0,1,2] 0x005e0f68 [2,3,4,0,1]
+## state: pos = pos_roue1..5; fin = findisque1/findisque2; wheels = the records of ROUEK1..5 (slots 12-16 of view 13), bridge = PONT_LEVE, PONT_MOITIE, PONT_BAISSE (slots 6-8), each active(+0x30)/frame(+0x10)/playing(+0xbc); hand = OBJETENMAIN; pair = the hand pair (frame 0x00673f94, bank 0x00673f68); cursor = the cursor pair (bank 0x00673fa0, frame 0x005def58); bag = id/sprite/world; table = the show / hide table id/shown/kind; OBJ = the world's objects bank
+## B: entry hook FUN_0048d080 on view 13's slots, pos_roue1..5 given; ids = the records' indexes it keeps (0x006d189c..0x006d18ac)
+B pos [0,0,0,0,0] times 1 -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | ids [12,13,14,15,16] | warn []
+B pos [1,2,3,4,5] times 1 -> pos [1,2,3,4,5] fin 0/0 wheels [1/3/0,1/4/0,1/0/0,1/1/0,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | ids [12,13,14,15,16] | warn []
+B pos [5,3,1,4,2] times 1 -> pos [5,3,1,4,2] fin 0/0 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | ids [12,13,14,15,16] | warn []
+B pos [0,2,0,4,0] times 1 -> pos [0,2,0,4,0] fin 0/0 wheels [1/3/0,0/0/1,0/0/1,1/1/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | ids [12,13,14,15,16] | warn []
+B pos [3,3,3,3,3] times 1 -> pos [3,3,3,3,3] fin 0/0 wheels [1/2/0,1/2/0,1/2/0,1/2/0,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | ids [12,13,14,15,16] | warn []
+B pos [6,9,-1,0,1] times 1 -> pos [6,9,-1,0,1] fin 0/0 wheels [0/0/1,1/0/0,1/5/0,1/8/0,1/-2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | ids [12,13,14,15,16] | warn []
+B pos [2,4,1,5,3] times 2 -> pos [2,4,1,5,3] fin 0/0 wheels [1/4/0,1/2/0,1/1/0,1/3/0,1/0/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | ids [12,13,14,15,16] | warn []
+B pos [1,2,3,4,5] frames 3 before -> pos [1,2,3,4,5] fin 0/0 wheels [1/3/0,1/4/0,1/0/0,1/1/0,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | ids [12,13,14,15,16] | warn []
+B no ROUEK3 slot, pos [1,2,3,4,5] -> ids [12,13,0,14,15] slot0 1/0/0 | warn [fatal:AtlSpw_find_index():_vue_%d_!_AtlSpw_find_index(%d)_introuvable]
+## C: click hook FUN_0048d170(zone) after the entry hook, a zone of type 3 named N (value 1; the type and the value are not read); MONDE 3; objects given to the bag by FUN_004754f0 and held by FUN_00475340 (empty: FUN_0047bf40); check = FUN_0048d310 entered; calls = the stubs reached
+C empty AXE_5ROUES3 -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 0 | calls - | warn []
+C given -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 90 pair (2,OBJ) cursor (0,-1) bag [90/2/3,91/3/3,92/4/3,93/0/3,94/1/3] table []
+C DISQUE1 AXE_5ROUES1 -> pos [1,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,1/0/0,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [91/3/3,92/4/3,93/0/3,94/1/3] table [] | check 1 | calls - | warn []
+C DISQUE2 AXE_5ROUES1 -> pos [0,1,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/0,1/0/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 90 pair (2,OBJ) cursor (0,-1) bag [92/4/3,93/0/3,94/1/3,90/2/3] table [] | check 1 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C DISQUE1 back in hand AXE_5ROUES2 -> pos [2,1,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,1/1/0,1/0/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [92/4/3,93/0/3,94/1/3] table [] | check 1 | calls - | warn []
+C empty AXE_5ROUES2 -> pos [0,1,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/1/0,1/0/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 90 pair (2,OBJ) cursor (0,-1) bag [92/4/3,93/0/3,94/1/3,90/2/3] table [] | check 0 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C PIECE1 AXE_5ROUES1 -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/1/0,0/0/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 91 pair (3,OBJ) cursor (0,-1) bag [92/4/3,93/0/3,94/1/3,90/2/3,137/17/3,91/3/3] table [] | check 0 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C PIECE1 AXE_5ROUES4 -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/1/0,0/0/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 137 pair (17,OBJ) cursor (0,-1) bag [92/4/3,93/0/3,94/1/3,90/2/3,137/17/3,91/3/3] table [] | check 0 | calls - | warn []
+C DISQUE2 AXE_5ROUES2 -> pos [0,2,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/1/0,1/1/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [92/4/3,93/0/3,94/1/3,90/2/3,137/17/3] table [] | check 1 | calls - | warn []
+C DISQUE1 AXE_5ROUES1 -> pos [1,2,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,1/0/0,1/1/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [92/4/3,93/0/3,94/1/3,137/17/3] table [] | check 1 | calls - | warn []
+C DISQUE3 AXE_5ROUES3 -> pos [1,2,3,0,0] fin 0/0 wheels [0/0/1,0/0/1,1/0/0,1/1/0,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [93/0/3,94/1/3,137/17/3] table [] | check 1 | calls - | warn []
+C DISQUE4 AXE_5ROUES4 -> pos [1,2,3,4,0] fin 0/0 wheels [1/3/0,0/0/1,1/0/0,1/1/0,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [94/1/3,137/17/3] table [] | check 1 | calls - | warn []
+C DISQUE5 AXE_5ROUES5 -> pos [1,2,3,4,5] fin 1/0 wheels [1/3/0,1/4/0,1/0/0,1/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [137/17/3] table [126/0/2,127/1/2] | check 1 | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine024.apc'),Input_Refresh(),AtlHnm_start('cine024.hnm')] | warn []
+C empty AXE_5ROUES1 -> pos [0,2,3,4,5] fin 1/0 wheels [1/3/0,1/4/0,0/0/0,1/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 90 pair (2,OBJ) cursor (0,-1) bag [137/17/3,90/2/3] table [126/0/2,127/1/2] | check 0 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C DISQUE1 in hand AXE_5ROUES5 -> pos [5,2,3,4,0] fin 1/0 wheels [1/3/0,0/4/0,1/4/0,1/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 94 pair (1,OBJ) cursor (0,-1) bag [137/17/3,94/1/3] table [126/0/2,127/1/2] | check 1 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C DISQUE5 in hand AXE_5ROUES2 -> pos [5,0,3,4,2] fin 1/0 wheels [1/3/0,1/1/0,1/4/0,0/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 91 pair (3,OBJ) cursor (0,-1) bag [137/17/3,91/3/3] table [126/0/2,127/1/2] | check 1 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C DISQUE2 in hand AXE_5ROUES3 -> pos [5,3,0,4,2] fin 1/0 wheels [1/3/0,1/1/0,1/4/0,1/2/0,0/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 92 pair (4,OBJ) cursor (0,-1) bag [137/17/3,92/4/3] table [126/0/2,127/1/2] | check 1 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C DISQUE3 in hand AXE_5ROUES1 -> pos [5,3,1,4,2] fin 1/1 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [0/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [137/17/3] table [126/0/2,127/0/2,128/1/2] | check 1 | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine025.apc'),Input_Refresh(),AtlHnm_start('cine025.hnm')] | warn []
+C after the win, empty AXE_5ROUES1 -> pos [5,3,1,4,2] fin 1/1 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [0/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [137/17/3] table [126/0/2,127/0/2,128/1/2] | check 0 | calls - | warn []
+C after the win, PIECE1 AXE_5ROUES1 -> pos [5,3,1,4,2] fin 1/1 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [0/0/1,0/0/1,1/0/1] hand 137 pair (17,OBJ) cursor (0,-1) bag [137/17/3] table [126/0/2,127/0/2,128/1/2] | check 0 | calls - | warn []
+C names DISQUE4 'axe_5roues3' -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 93 pair (0,OBJ) cursor (0,-1) bag [93/0/3] table [] | check 0 | calls - | warn []
+C names DISQUE4 'Axe_5Roues3' -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 93 pair (0,OBJ) cursor (0,-1) bag [93/0/3] table [] | check 0 | calls - | warn []
+C names DISQUE4 'AXE_5ROUES' -> pos [0,0,0,-48,0] fin 0/0 wheels [1/-49/0,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C names DISQUE4 'AXE_5ROUES9' -> pos [0,0,0,9,0] fin 0/0 wheels [1/8/0,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C names DISQUE4 'AXE_5ROUESX' -> pos [0,0,0,40,0] fin 0/0 wheels [1/39/0,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C names DISQUE4 'AXE_5ROUES12' -> pos [0,0,0,1,0] fin 0/0 wheels [1/0/0,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C names DISQUE4 'AXE_5ROUE3' -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 93 pair (0,OBJ) cursor (0,-1) bag [93/0/3] table [] | check 0 | calls - | warn []
+C names DISQUE4 '' -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 93 pair (0,OBJ) cursor (0,-1) bag [93/0/3] table [] | check 0 | calls - | warn []
+C names DISQUE4 none -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 93 pair (0,OBJ) cursor (0,-1) bag [93/0/3] table [] | check 0 | calls - | warn []
+C names DISQUE4 'XAXE_5ROUES3' -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 93 pair (0,OBJ) cursor (0,-1) bag [93/0/3] table [] | check 0 | calls - | warn []
+C type 4 DISQUE4 AXE_5ROUES2 -> pos [0,0,0,2,0] fin 0/0 wheels [1/1/0,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C type 50 DISQUE4 AXE_5ROUES2 -> pos [0,0,0,2,0] fin 0/0 wheels [1/1/0,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C type 1 DISQUE4 AXE_5ROUES2 -> pos [0,0,0,2,0] fin 0/0 wheels [1/1/0,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C type 0 DISQUE4 AXE_5ROUES2 -> pos [0,0,0,2,0] fin 0/0 wheels [1/1/0,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C no first: DISQUE1 AXE_5ROUES5 -> pos [5,3,1,4,2] fin 0/0 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C findisque1=1: DISQUE5 AXE_5ROUES5 -> pos [1,2,3,4,5] fin 1/0 wheels [1/3/0,1/4/0,1/0/0,1/1/0,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C findisque2=1: DISQUE5 AXE_5ROUES2 -> pos [5,3,1,4,0] fin 1/1 wheels [1/3/0,0/0/1,1/4/0,1/2/0,1/0/0] bridge [1/0/1,0/0/1,0/0/1] hand 94 pair (1,OBJ) cursor (0,-1) bag [94/1/3] table [] | check 0 | calls - | warn []
+C findisque2=2: DISQUE5 AXE_5ROUES5 -> pos [1,2,3,4,5] fin 1/2 wheels [1/3/0,1/4/0,1/0/0,1/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [126/0/2,127/1/2] | check 1 | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine024.apc'),Input_Refresh(),AtlHnm_start('cine024.hnm')] | warn []
+C two on 3, empty AXE_5ROUES3 -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/2/0,0/2/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 91 pair (3,OBJ) cursor (0,-1) bag [91/3/3] table [] | check 0 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C DISQUE1 laid on 2 and held AXE_5ROUES4 -> pos [4,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,1/3/0,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C again empty AXE_5ROUES4 -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/3/0,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 90 pair (2,OBJ) cursor (0,-1) bag [90/2/3] table [] | check 0 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C MONDE 1 DISQUE3 not in the bag AXE_5ROUES3 -> pos [0,0,3,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | check 1 | calls - | warn []
+C MONDE 1 DISQUE3 in hand AXE_5ROUES3 -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 92 pair (4,OBJ) cursor (0,-1) bag [92/4/1] table [] | check 0 | calls [Inventaire_Layout(),Inventaire_Step()] | warn []
+C MONDE 1 empty AXE_5ROUES3 -> pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [92/4/1] table [] | check 0 | calls - | warn []
+## C check: FUN_0048d310 alone on pos_roue1..5 and findisque1 / 2
+C check pos [1,2,3,4,5] fin 0/0 -> pos [1,2,3,4,5] fin 1/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [0/0/1,1/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [126/0/2,127/1/2] | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine024.apc'),Input_Refresh(),AtlHnm_start('cine024.hnm')] | warn []
+C check pos [1,2,3,5,4] fin 0/0 -> pos [1,2,3,5,4] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | calls - | warn []
+C check pos [5,3,1,4,2] fin 0/0 -> pos [5,3,1,4,2] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | calls - | warn []
+C check pos [5,3,1,4,2] fin 1/0 -> pos [5,3,1,4,2] fin 1/1 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [1/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [127/0/2,128/1/2] | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine025.apc'),Input_Refresh(),AtlHnm_start('cine025.hnm')] | warn []
+C check pos [1,2,3,4,5] fin 1/0 -> pos [1,2,3,4,5] fin 1/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | calls - | warn []
+C check pos [5,3,1,4,2] fin 1/1 -> pos [5,3,1,4,2] fin 1/1 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | calls - | warn []
+C check pos [1,2,3,4,5] fin 2/0 -> pos [1,2,3,4,5] fin 2/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [] | calls - | warn []
+C check pos [5,3,1,4,2] fin 2/0 -> pos [5,3,1,4,2] fin 2/1 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [1/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [127/0/2,128/1/2] | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine025.apc'),Input_Refresh(),AtlHnm_start('cine025.hnm')] | warn []
+C check pos [5,3,1,4,2] fin -1/0 -> pos [5,3,1,4,2] fin -1/1 wheels [0/0/1,0/0/1,0/0/1,0/0/1,1/0/1] bridge [1/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [127/0/2,128/1/2] | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine025.apc'),Input_Refresh(),AtlHnm_start('cine025.hnm')] | warn []
+## D: the hook dispatcher FUN_0049b910(zone) alone: the view's warp name (+0x00), number (+0x10), the zone's type (named AXE_5ROUES2), DISQUE4 held, the puzzle mode m -> the hooks entered (0048d170 the wheels, 0048d310 their check, 00493960 the chest, 0048da20 the figurines), AL, the mode after, pos_roue4
+D ss0013.hnm 13 1 mode 0 -> - AL 0 mode 0 pos4 0
+D ss0013.hnm 13 2 mode 0 -> - AL 0 mode 0 pos4 0
+D ss0013.hnm 13 3 mode 0 -> 0048d170,0048d310 AL 0 mode 0 pos4 2
+D ss0013.hnm 13 4 mode 0 -> 0048d170,0048d310 AL 0 mode 0 pos4 2
+D ss0013.hnm 13 10 mode 0 -> - AL 0 mode 0 pos4 0
+D ss0013.hnm 13 50 mode 0 -> 0048d170,0048d310 AL 0 mode 0 pos4 2
+D ss0013.hnm 13 1000 mode 0 -> - AL 0 mode 0 pos4 0
+D SS0013.HNM 13 3 mode 0 -> 0048d170,0048d310 AL 0 mode 0 pos4 2
+D Ss13 13 3 mode 0 -> 0048d170,0048d310 AL 0 mode 0 pos4 2
+D CH0013 13 3 mode 0 -> - AL 0 mode 0 pos4 0
+D S 13 3 mode 0 -> - AL 0 mode 0 pos4 0
+D ss0013.hnm 12 3 mode 0 -> - AL 0 mode 0 pos4 0
+D ss0013.hnm 14 3 mode 0 -> - AL 0 mode 0 pos4 0
+D ss0013.hnm 3 3 mode 0 -> 00493960 AL 0 mode 0 pos4 0
+D ss0013.hnm 113 3 mode 0 -> - AL 0 mode 0 pos4 0
+D ss0013.hnm 13 3 mode 5 -> - AL 0 mode 0 pos4 0
+D ss0013.hnm 13 3 mode 4 -> 0048d170,0048d310 AL 0 mode 4 pos4 2
+D ss0013.hnm 13 3 mode 2 -> 0048d170,0048d310 AL 0 mode 2 pos4 2
+## E: the zone click FUN_0049ca80 (DEPARTVUE, CtrlScenarOUT, ABORTDEPART, the dispatcher, CLICZONE), Interp_GereFrame FUN_00484b70 (its ABORTDEPART step clears the click), then the click scan FUN_0045a870 (CtrlScenarIN) on chapi055, no sprite under the centre, RunInit stubbed, VUE = the view, an axle's zone valued as the WAM load leaves it (its name's #ZONES_CLIC# index): out = the departure scan's lines, hook = the lines the hook runs, abort = ABORTDEPART after the click, cliczone, gere = the lines Interp_GereFrame runs, click scan = 1 when FUN_0045a870 ran CtrlScenarIN (a film started by the hook clears the click flag), in = its lines, calls
+E move to 14 view 12 zone 1 14 - -> out [14] | hook [] | abort 1 | cliczone 0 | gere [] | click scan 0 | in [] - | calls - | pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [90/2/3,91/3/3,92/4/3,93/0/3,94/1/3] table []
+E move to 13 view 12 zone 1 13 - -> out [] | hook [] | abort 0 | cliczone 0 | gere [] | click scan 1 | in [] - | calls [Move_Start(13)] | pos [0,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,0/0/1,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [90/2/3,91/3/3,92/4/3,93/0/3,94/1/3] table []
+E DISQUE1 view 13 zone 3 37 AXE_5ROUES1 -> out [] | hook [] | abort 0 | cliczone 37 | gere [] | click scan 1 | in [] - | calls - | pos [1,0,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,1/0/0,0/0/1,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [91/3/3,92/4/3,93/0/3,94/1/3] table []
+E DISQUE2 view 13 zone 3 38 AXE_5ROUES2 -> out [] | hook [] | abort 0 | cliczone 38 | gere [] | click scan 1 | in [] - | calls - | pos [1,2,0,0,0] fin 0/0 wheels [0/0/1,0/0/1,1/0/0,1/1/0,0/0/1] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [92/4/3,93/0/3,94/1/3] table []
+E DISQUE3 view 13 zone 3 39 AXE_5ROUES3 -> out [] | hook [] | abort 0 | cliczone 39 | gere [] | click scan 1 | in [] - | calls - | pos [1,2,3,0,0] fin 0/0 wheels [0/0/1,0/0/1,1/0/0,1/1/0,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [93/0/3,94/1/3] table []
+E DISQUE4 view 13 zone 3 40 AXE_5ROUES4 -> out [] | hook [] | abort 0 | cliczone 40 | gere [] | click scan 1 | in [] - | calls - | pos [1,2,3,4,0] fin 0/0 wheels [1/3/0,0/0/1,1/0/0,1/1/0,1/2/0] bridge [1/0/1,0/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [94/1/3] table []
+E DISQUE5 view 13 zone 3 41 AXE_5ROUES5 -> out [] | hook [] | abort 0 | cliczone 41 | gere [] | click scan 0 | in [] - | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine024.apc'),Input_Refresh(),AtlHnm_start('cine024.hnm')] | pos [1,2,3,4,5] fin 1/0 wheels [1/3/0,1/4/0,1/0/0,1/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [126/0/2,127/1/2]
+E empty view 13 zone 3 37 AXE_5ROUES1 -> out [] | hook [] | abort 0 | cliczone 37 | gere [] | click scan 1 | in [] - | calls [Inventaire_Layout(),Inventaire_Step()] | pos [0,2,3,4,5] fin 1/0 wheels [1/3/0,1/4/0,0/0/0,1/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 90 pair (2,OBJ) cursor (0,-1) bag [90/2/3] table [126/0/2,127/1/2]
+E DISQUE1 in hand view 13 zone 3 41 AXE_5ROUES5 -> out [] | hook [] | abort 0 | cliczone 41 | gere [] | click scan 1 | in [] - | calls [Inventaire_Layout(),Inventaire_Step()] | pos [5,2,3,4,0] fin 1/0 wheels [1/3/0,0/4/0,1/4/0,1/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 94 pair (1,OBJ) cursor (0,-1) bag [94/1/3] table [126/0/2,127/1/2]
+E DISQUE5 in hand view 13 zone 3 38 AXE_5ROUES2 -> out [] | hook [] | abort 0 | cliczone 38 | gere [] | click scan 1 | in [] - | calls [Inventaire_Layout(),Inventaire_Step()] | pos [5,0,3,4,2] fin 1/0 wheels [1/3/0,1/1/0,1/4/0,0/1/0,1/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 91 pair (3,OBJ) cursor (0,-1) bag [91/3/3] table [126/0/2,127/1/2]
+E DISQUE2 in hand view 13 zone 3 39 AXE_5ROUES3 -> out [] | hook [] | abort 0 | cliczone 39 | gere [] | click scan 1 | in [] - | calls [Inventaire_Layout(),Inventaire_Step()] | pos [5,3,0,4,2] fin 1/0 wheels [1/3/0,1/1/0,1/4/0,1/2/0,0/2/0] bridge [0/0/1,1/0/1,0/0/1] hand 92 pair (4,OBJ) cursor (0,-1) bag [92/4/3] table [126/0/2,127/1/2]
+E DISQUE3 in hand view 13 zone 3 37 AXE_5ROUES1 -> out [] | hook [] | abort 0 | cliczone 37 | gere [] | click scan 0 | in [] - | calls [AtlMuzik_Volume(20),Input_Refresh(),AtlSound_CinemaApc('cine025.apc'),Input_Refresh(),AtlHnm_start('cine025.hnm')] | pos [5,3,1,4,2] fin 1/1 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [0/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [126/0/2,127/0/2,128/1/2]
+E move to 12 view 13 zone 1 12 - -> out [] | hook [] | abort 0 | cliczone 0 | gere [] | click scan 1 | in [] - | calls [Move_Start(12)] | pos [5,3,1,4,2] fin 1/1 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [0/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [126/0/2,127/0/2,128/1/2]
+E move to 14 view 12 zone 1 14 - -> out [18] | hook [] | abort 0 | cliczone 0 | gere [] | click scan 1 | in [] - | calls [LoadCurrentChap(56),RunInit(),Move_Start(14)] | pos [5,3,1,4,2] fin 1/1 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [0/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [126/0/2,127/0/2,128/1/2]
+E move to 11 view 12 zone 1 11 - -> out [] | hook [] | abort 0 | cliczone 0 | gere [] | click scan 1 | in [] - | calls [Move_Start(11)] | pos [5,3,1,4,2] fin 1/1 wheels [1/3/0,1/1/0,1/4/0,1/2/0,1/0/0] bridge [0/0/1,0/0/1,1/0/1] hand 0 pair (0,0) cursor (0,-1) bag [] table [126/0/2,127/0/2,128/1/2]
+errors []
+## F: FUN_0047ce60(slot 0, faces, rects) on a wheel's slot (+0x34 = 1, active, the frame f in +0x10) holding CD 3's datas_a2/spw/k<k>a101<v>012.SPW, faces 512 x 512 RGB565 over the background (the SPW goldens' one: pixel i = (i * 2654435761 mod 2^32) >> 16, md5 4f168fc9c0f17cd896b5ea7f8248e8b6), visible rectangles the whole faces, nothing under the centre; per face: bg (untouched) or the md5 of its 512 x 512 u16 pixels (little-endian), the changed-pixel count and the pixels at the frame's box's centre, first and last corner (x,y=rgb565 hex); AL = the byte returned
+F file k1a1013012.SPW md5 f8b382840dd41106508aec8d9036c617 frames 5
+F k1a1013012.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 30f753f7f252e42e90152146a23f97d0 n1835 361,348=62c6 337,323=441b 384,372=8ce0 | f5 bg
+F k1a1013012.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 cb7cd77eaf31c3e7579268bac31ed66a n2727 414,361=7347 383,333=0795 445,389=9e42 | f5 bg
+F k1a1013012.SPW frame 2 AL 0 | f0 059f5290c56f0f687fe689673c2e9559 n677 9,386=39c3 0,359=8f0d 17,413=8054 | f1 bg | f2 bg | f3 bg | f4 36916861a352662fe5011b882bfb7d43 n3722 478,380=3183 444,346=5d29 511,413=cf61 | f5 bg
+F k1a1013012.SPW frame 3 AL 0 | f0 3b06f114a044f0c757f660a559fcd85f n3590 55,372=4a86 18,340=7b24 92,403=8513 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k1a1013012.SPW frame 4 AL 0 | f0 c41f91923dc22a53eae7297168c3d611 n2334 119,356=6b49 91,329=d481 147,382=6907 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k2a1013012.SPW md5 e18ca86a7b9b6da459bace28f104731f frames 5
+F k2a1013012.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 b06dcbb9e3b512cf0aef11dca8c8925d n1848 361,348=0000 337,324=b30f 385,372=2b18 | f5 bg
+F k2a1013012.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 2d9fce6e5d2bcb10fb34438ee22e78c5 n2730 414,362=0000 383,333=0795 444,390=6efe | f5 bg
+F k2a1013012.SPW frame 2 AL 0 | f0 83dea9a18f46267e676567b56d6f25cd n703 9,387=0840 0,359=4203 17,414=ef47 | f1 bg | f2 bg | f3 bg | f4 106a08ed978b6be7cae4036f94c5bf07 n3718 478,381=2183 444,347=cc1c 511,414=3e54 | f5 bg
+F k2a1013012.SPW frame 3 AL 0 | f0 fb5c76f90306a92e90a82b88ed80f415 n3614 55,373=1081 18,341=ea18 92,404=f406 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k2a1013012.SPW frame 4 AL 0 | f0 8a170d95d0e303680fcd85e861c8b948 n2347 118,356=2102 90,329=3649 146,383=39c3 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k3a1013012.SPW md5 c3d2745cde2f2c9554e91b393deedbab frames 5
+F k3a1013012.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 f4f85307e777b0875824a8581225392b n1843 361,348=4a46 337,323=441b 384,372=8ce0 | f5 bg
+F k3a1013012.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 727fe40e0000dc4c2c08b3db1887e5a2 n2730 414,361=4245 383,333=0795 444,389=000a | f5 bg
+F k3a1013012.SPW frame 2 AL 0 | f0 b085fbed17be4c8687d866c3592843c2 n681 9,387=1881 0,360=3ae5 17,414=ef47 | f1 bg | f2 bg | f3 bg | f4 21fe51b1920f90f8ae967b1c7ccfab86 n3735 478,380=3943 444,346=5d29 511,413=cf61 | f5 bg
+F k3a1013012.SPW frame 3 AL 0 | f0 8b3ebcf9f2b9bce4a54911206839f872 n3605 56,372=3983 19,340=195c 93,403=234a | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k3a1013012.SPW frame 4 AL 0 | f0 d45336b1dcf715ee270aa44320570b94 n2353 118,356=3143 90,329=3649 146,382=cacf | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k4a1013012.SPW md5 79a6cd340dd97de71400e886b4003647 frames 5
+F k4a1013012.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 1492dda03afb8c117ffad8fe216e6e39 n1836 361,348=2941 337,324=b30f 384,372=8ce0 | f5 bg
+F k4a1013012.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 45cd8f168c27789313fe92b507f63d64 n2727 414,362=2901 383,333=0795 445,390=0d35 | f5 bg
+F k4a1013012.SPW frame 2 AL 0 | f0 d564931792a75546324f61c48f3fcd4a n709 9,387=2901 0,359=4a03 17,414=ef47 | f1 bg | f2 bg | f3 bg | f4 58f2c2ad7d63e924f266074227ab3834 n3696 478,381=3142 444,347=cc1c 511,414=3e54 | f5 bg
+F k4a1013012.SPW frame 3 AL 0 | f0 10635500b727ddcf6b600f5330622771 n3584 56,372=1901 19,341=884f 93,403=234a | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k4a1013012.SPW frame 4 AL 0 | f0 589dda0f908e1f2fa14dea9cf5010a87 n2335 119,356=1901 91,329=d481 146,383=39c3 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k5a1013012.SPW md5 6c9da9cca70c685a1b60a2097833ff92 frames 5
+F k5a1013012.SPW frame 0 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 e266a5bc14325ede608672dff0091046 n1845 361,348=5b07 337,323=441b 384,372=8ce0 | f5 bg
+F k5a1013012.SPW frame 1 AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 0656692143adcbd2676422100351ba06 n2726 414,361=52c7 383,333=0795 444,389=000a | f5 bg
+F k5a1013012.SPW frame 2 AL 0 | f0 0a4aa29c0e1f8474fd564c10411f7a6f n698 9,387=2901 0,360=3b44 17,414=ef47 | f1 bg | f2 bg | f3 bg | f4 3cc4598f3b24727218dc544c630bb218 n3734 478,380=39c4 444,346=5d29 511,414=3e54 | f5 bg
+F k5a1013012.SPW frame 3 AL 0 | f0 48d490c3354c001932223cb78c51457c n3606 55,372=4205 18,341=ea18 92,403=8513 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k5a1013012.SPW frame 4 AL 0 | f0 774d29460ac9ecf8f9b75578466aee5a n2346 119,356=2943 91,329=d481 146,383=39c3 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k1a1012012.SPW md5 c5ed88344d5cfe12286e2ca5bc57438c frames 5
+F k1a1012012.SPW frame 0 AL 0 | f0 f3a0b76d7caae8f7b694fd42bfc8ce9d n554 23,302=7389 8,291=1064 37,313=8597 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k1a1012012.SPW frame 1 AL 0 | f0 38f7a12a0547fe7d5e5e485523cbbdc1 n472 51,300=6b48 38,289=bcfd 64,310=e897 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k1a1012012.SPW frame 2 AL 0 | f0 60a0768f290ee06059cc1c1a79e03bfa n404 76,297=6b48 64,287=f0b9 87,307=d2b8 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k1a1012012.SPW frame 3 AL 0 | f0 e3db5aa9f94a90d5e5b44f579c6610ae n347 99,295=6b07 88,285=e805 109,304=1ea3 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k1a1012012.SPW frame 4 AL 0 | f0 28574c2a4b9133e63c431b84633416b5 n306 118,293=6b49 108,284=d568 128,302=feda | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k2a1012012.SPW md5 4c6b18f1cb938b0fab52b9598f7af7cf frames 5
+F k2a1012012.SPW frame 0 AL 0 | f0 3a9c7fb7e221f623ddd5e14bb7568794 n563 23,302=39c5 8,291=1064 38,313=23ce | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k2a1012012.SPW frame 1 AL 0 | f0 1cb676327a2b7f4f2b9315efd0458092 n480 51,300=3184 37,289=1ec6 64,310=e897 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k2a1012012.SPW frame 2 AL 0 | f0 5cb376ffd8efff1e415c25c02ee405dd n406 76,297=4205 64,287=f0b9 87,307=d2b8 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k2a1012012.SPW frame 3 AL 0 | f0 c6c4e8015e52f2e495d4b948baaef5ff n348 98,295=2943 87,286=b8c1 109,304=1ea3 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k2a1012012.SPW frame 4 AL 0 | f0 5f41b189518c69b9c110244a20debd15 n310 118,293=2983 108,284=d568 128,302=feda | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k3a1012012.SPW md5 8d80be9739aacb12edef2b15d91f3cf2 frames 5
+F k3a1012012.SPW frame 0 AL 0 | f0 e9cba8d707375e1ff5840e0842d0c13a n559 23,302=4a46 8,291=1064 37,313=8597 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k3a1012012.SPW frame 1 AL 0 | f0 aa622cd1c5d1d2c5f8a8c18972f15a65 n475 51,300=4205 37,289=1ec6 64,310=e897 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k3a1012012.SPW frame 2 AL 0 | f0 2db14375184fceccae24abcfed5a7047 n405 76,297=4a05 64,287=f0b9 87,307=d2b8 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k3a1012012.SPW frame 3 AL 0 | f0 84c95c5dbf9ffd5fd823b77e8a6c0ef1 n352 99,295=4205 88,285=e805 109,304=1ea3 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k3a1012012.SPW frame 4 AL 0 | f0 7f0ac8b6e064aa40d0c4ed02c3db2906 n310 118,293=41c4 108,284=d568 128,302=feda | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k4a1012012.SPW md5 ba455e81d83f87a24e32a2dd44260c8b frames 5
+F k4a1012012.SPW frame 0 AL 0 | f0 e1f5af34f5ee2091ff266846fdb89519 n558 23,302=3183 8,291=1064 38,313=23ce | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k4a1012012.SPW frame 1 AL 0 | f0 2be83932373e22fd713ddc4f455b2774 n478 51,300=3183 37,289=1ec6 64,310=e897 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k4a1012012.SPW frame 2 AL 0 | f0 4c819d8a02e5290251e77cd917ddb640 n406 76,297=3183 64,287=f0b9 87,307=d2b8 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k4a1012012.SPW frame 3 AL 0 | f0 c4faf575d3abbb3e75dc6deaabc3a61a n348 99,295=3182 88,286=56f9 109,304=1ea3 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k4a1012012.SPW frame 4 AL 0 | f0 2522da1b8033b86093e4e599e784aefd n311 118,293=2942 108,284=d568 128,302=feda | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F file k5a1012012.SPW md5 c3a774abd07e14284ba3366ad19a2532 frames 5
+F k5a1012012.SPW frame 0 AL 0 | f0 373433d47cafeb25ed0dc020f52343dd n565 23,302=4205 8,291=1064 38,313=23ce | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k5a1012012.SPW frame 1 AL 0 | f0 cfd59cbf43d448dd2169cd917ff29c19 n480 51,300=4a46 37,289=1ec6 64,310=e897 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k5a1012012.SPW frame 2 AL 0 | f0 64448a4cec3a39c1942d94f923e10924 n406 76,297=4205 64,287=f0b9 87,307=d2b8 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k5a1012012.SPW frame 3 AL 0 | f0 9dbb37041be8bf2b710f34e6ea5a0bb3 n349 98,295=4205 87,286=b8c1 109,304=1ea3 | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F k5a1012012.SPW frame 4 AL 0 | f0 bb6b61890fd3fa2e6d39b31872667314 n311 118,293=4205 108,284=d568 128,302=feda | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+F errors []

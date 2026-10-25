@@ -1,0 +1,272 @@
+# The music choices and decoding of the original atlantis2.exe (French CD build of 1999, 2199552
+# bytes, MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation, x87 control word 0x027f. Producer:
+# an emulation harness running the original code; stubs: the logs. Derived values only.
+# rand.seedS: the C runtime's rand() after srand(S).
+# randmark.nN.seedS: AtlMuzik_GetRandomMark (0x00478090) for N marks, srand(S) first, the current
+#   mark following each draw.
+# select.'LIST'.CUR.seedS: Interp_SelectMusic (0x004851f0) on a startmusik list (the text up to the
+#   line end), the current music 0 (cur0) or the first one drawn (curfirst), srand(S) first;
+#   music/mark/loops/entries per draw.
+# stream.FILE: the music file decoded from its header by the stream decoder (0x00593e60, then
+#   0x00593f60 per 0x1000 file bytes): frames, stereo flag, md5 of the 16-bit PCM.
+# spp.FILE.markK: 0x4000 file bytes decoded from .spp record K - 1 (as AtlMuzik_GotoMark
+#   0x00477e80 sets the decoder): the record's offset and md5 of the PCM.
+rand.seed0 38,7719,21238,2437,8855,11797,8365,32285,10450,30612,5853,28100
+rand.seed1 41,18467,6334,26500,19169,15724,11478,29358,26962,24464,5705,28145
+rand.seed15 87,5105,27056,2938,32501,5162,22284,21144,28748,3927,3635,28761
+rand.seed12345 7584,19164,25795,22125,5828,23405,27477,5413,29072,23404,14959,14800
+rand.seed2147483647 35,29739,3374,11141,31308,7870,5253,2445,26706,3992,6001,28056
+randmark.n0.seed1 0,0,0,0,0,0,0,0,0,0
+randmark.n0.seed7 0,0,0,0,0,0,0,0,0,0
+randmark.n0.seed12345 0,0,0,0,0,0,0,0,0,0
+randmark.n2.seed1 1,0,2,1,2,0,2,1,0,1
+randmark.n2.seed7 1,0,1,0,2,1,2,1,0,2
+randmark.n2.seed12345 1,2,0,2,0,2,1,0,1,2
+randmark.n5.seed1 3,1,4,3,2,5,4,1,5,4
+randmark.n5.seed7 3,2,1,2,1,5,2,5,3,0
+randmark.n5.seed12345 1,3,4,1,4,5,0,5,4,2
+randmark.n10.seed1 6,2,8,6,5,3,9,8,1,9
+randmark.n10.seed7 5,2,5,2,10,3,9,6,1,9
+randmark.n10.seed12345 2,6,8,7,1,7,9,1,9,7
+select.'30)'.cur0.seed1 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1
+select.'30)'.cur0.seed99 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1
+select.'30)'.cur0.seed4242 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1
+select.'30)'.curfirst.seed1 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1
+select.'30)'.curfirst.seed99 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1
+select.'30)'.curfirst.seed4242 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1
+select.'1)'.cur0.seed1 1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1
+select.'1)'.cur0.seed99 1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1
+select.'1)'.cur0.seed4242 1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1
+select.'1)'.curfirst.seed1 1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1
+select.'1)'.curfirst.seed99 1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1
+select.'1)'.curfirst.seed4242 1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1;1/-1/0/1
+select.'20-3)'.cur0.seed1 20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1
+select.'20-3)'.cur0.seed99 20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1
+select.'20-3)'.cur0.seed4242 20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1
+select.'20-3)'.curfirst.seed1 20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1
+select.'20-3)'.curfirst.seed99 20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1
+select.'20-3)'.curfirst.seed4242 20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1;20/3/0/1
+select.'1,3)'.cur0.seed1 1/-1/0/2;3/-1/0/2;1/-1/0/2;3/-1/0/2;3/-1/0/2;1/-1/0/2
+select.'1,3)'.cur0.seed99 1/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2;1/-1/0/2;1/-1/0/2
+select.'1,3)'.cur0.seed4242 1/-1/0/2;3/-1/0/2;1/-1/0/2;1/-1/0/2;3/-1/0/2;3/-1/0/2
+select.'1,3)'.curfirst.seed1 1/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2
+select.'1,3)'.curfirst.seed99 1/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2
+select.'1,3)'.curfirst.seed4242 1/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2;3/-1/0/2
+select.'2)'.cur0.seed1 2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1
+select.'2)'.cur0.seed99 2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1
+select.'2)'.cur0.seed4242 2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1
+select.'2)'.curfirst.seed1 2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1
+select.'2)'.curfirst.seed99 2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1
+select.'2)'.curfirst.seed4242 2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1;2/-1/0/1
+select.'4)'.cur0.seed1 4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1
+select.'4)'.cur0.seed99 4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1
+select.'4)'.cur0.seed4242 4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1
+select.'4)'.curfirst.seed1 4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1
+select.'4)'.curfirst.seed99 4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1
+select.'4)'.curfirst.seed4242 4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1;4/-1/0/1
+select.'5)'.cur0.seed1 5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1
+select.'5)'.cur0.seed99 5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1
+select.'5)'.cur0.seed4242 5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1
+select.'5)'.curfirst.seed1 5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1
+select.'5)'.curfirst.seed99 5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1
+select.'5)'.curfirst.seed4242 5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1;5/-1/0/1
+select.'11,12,15)'.cur0.seed1 12/-1/0/3;15/-1/0/3;12/-1/0/3;15/-1/0/3;15/-1/0/3;15/-1/0/3
+select.'11,12,15)'.cur0.seed99 15/-1/0/3;15/-1/0/3;12/-1/0/3;12/-1/0/3;15/-1/0/3;15/-1/0/3
+select.'11,12,15)'.cur0.seed4242 15/-1/0/3;12/-1/0/3;15/-1/0/3;12/-1/0/3;12/-1/0/3;15/-1/0/3
+select.'11,12,15)'.curfirst.seed1 12/-1/0/3;15/-1/0/3;12/-1/0/3;15/-1/0/3;15/-1/0/3;15/-1/0/3
+select.'11,12,15)'.curfirst.seed99 15/-1/0/3;15/-1/0/3;11/-1/0/3;11/-1/0/3;12/-1/0/3;15/-1/0/3
+select.'11,12,15)'.curfirst.seed4242 15/-1/0/3;11/-1/0/3;15/-1/0/3;11/-1/0/3;11/-1/0/3;12/-1/0/3
+select.'11)'.cur0.seed1 11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1
+select.'11)'.cur0.seed99 11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1
+select.'11)'.cur0.seed4242 11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1
+select.'11)'.curfirst.seed1 11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1
+select.'11)'.curfirst.seed99 11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1
+select.'11)'.curfirst.seed4242 11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1;11/-1/0/1
+select.'16)'.cur0.seed1 16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1
+select.'16)'.cur0.seed99 16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1
+select.'16)'.cur0.seed4242 16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1
+select.'16)'.curfirst.seed1 16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1
+select.'16)'.curfirst.seed99 16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1
+select.'16)'.curfirst.seed4242 16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1;16/-1/0/1
+select.'16,14)'.cur0.seed1 16/-1/0/2;14/-1/0/2;16/-1/0/2;14/-1/0/2;14/-1/0/2;16/-1/0/2
+select.'16,14)'.cur0.seed99 16/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2;16/-1/0/2;16/-1/0/2
+select.'16,14)'.cur0.seed4242 16/-1/0/2;14/-1/0/2;16/-1/0/2;16/-1/0/2;14/-1/0/2;14/-1/0/2
+select.'16,14)'.curfirst.seed1 16/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2
+select.'16,14)'.curfirst.seed99 16/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2
+select.'16,14)'.curfirst.seed4242 16/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2;14/-1/0/2
+select.'14,16)'.cur0.seed1 14/-1/0/2;16/-1/0/2;14/-1/0/2;16/-1/0/2;16/-1/0/2;14/-1/0/2
+select.'14,16)'.cur0.seed99 14/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2;14/-1/0/2;14/-1/0/2
+select.'14,16)'.cur0.seed4242 14/-1/0/2;16/-1/0/2;14/-1/0/2;14/-1/0/2;16/-1/0/2;16/-1/0/2
+select.'14,16)'.curfirst.seed1 14/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2
+select.'14,16)'.curfirst.seed99 14/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2
+select.'14,16)'.curfirst.seed4242 14/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2;16/-1/0/2
+select.'13)'.cur0.seed1 13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1
+select.'13)'.cur0.seed99 13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1
+select.'13)'.cur0.seed4242 13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1
+select.'13)'.curfirst.seed1 13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1
+select.'13)'.curfirst.seed99 13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1
+select.'13)'.curfirst.seed4242 13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1;13/-1/0/1
+select.'23)'.cur0.seed1 23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1
+select.'23)'.cur0.seed99 23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1
+select.'23)'.cur0.seed4242 23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1
+select.'23)'.curfirst.seed1 23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1
+select.'23)'.curfirst.seed99 23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1
+select.'23)'.curfirst.seed4242 23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1;23/-1/0/1
+select.'22)'.cur0.seed1 22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1
+select.'22)'.cur0.seed99 22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1
+select.'22)'.cur0.seed4242 22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1
+select.'22)'.curfirst.seed1 22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1
+select.'22)'.curfirst.seed99 22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1
+select.'22)'.curfirst.seed4242 22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1;22/-1/0/1
+select.'20)'.cur0.seed1 20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1
+select.'20)'.cur0.seed99 20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1
+select.'20)'.cur0.seed4242 20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1
+select.'20)'.curfirst.seed1 20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1
+select.'20)'.curfirst.seed99 20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1
+select.'20)'.curfirst.seed4242 20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1;20/-1/0/1
+select.'38)'.cur0.seed1 38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1
+select.'38)'.cur0.seed99 38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1
+select.'38)'.cur0.seed4242 38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1
+select.'38)'.curfirst.seed1 38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1
+select.'38)'.curfirst.seed99 38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1
+select.'38)'.curfirst.seed4242 38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1;38/-1/0/1
+select.'35)'.cur0.seed1 35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1
+select.'35)'.cur0.seed99 35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1
+select.'35)'.cur0.seed4242 35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1
+select.'35)'.curfirst.seed1 35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1
+select.'35)'.curfirst.seed99 35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1
+select.'35)'.curfirst.seed4242 35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1;35/-1/0/1
+select.'37)'.cur0.seed1 37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1
+select.'37)'.cur0.seed99 37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1
+select.'37)'.cur0.seed4242 37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1
+select.'37)'.curfirst.seed1 37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1
+select.'37)'.curfirst.seed99 37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1
+select.'37)'.curfirst.seed4242 37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1;37/-1/0/1
+select.'36)'.cur0.seed1 36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1
+select.'36)'.cur0.seed99 36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1
+select.'36)'.cur0.seed4242 36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1
+select.'36)'.curfirst.seed1 36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1
+select.'36)'.curfirst.seed99 36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1
+select.'36)'.curfirst.seed4242 36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1;36/-1/0/1
+select.'39)'.cur0.seed1 39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1
+select.'39)'.cur0.seed99 39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1
+select.'39)'.cur0.seed4242 39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1
+select.'39)'.curfirst.seed1 39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1
+select.'39)'.curfirst.seed99 39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1
+select.'39)'.curfirst.seed4242 39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1;39/-1/0/1
+select.'1-2*3,4'.cur0.seed1 1/2/3/2;4/-1/0/2;1/2/3/2;4/-1/0/2;4/-1/0/2;1/2/3/2
+select.'1-2*3,4'.cur0.seed99 1/2/3/2;4/-1/0/2;4/-1/0/2;4/-1/0/2;1/2/3/2;1/2/3/2
+select.'1-2*3,4'.cur0.seed4242 1/2/3/2;4/-1/0/2;1/2/3/2;1/2/3/2;4/-1/0/2;4/-1/0/2
+select.'1-2*3,4'.curfirst.seed1 1/2/3/2;4/-1/0/2;4/-1/0/2;4/-1/0/2;4/-1/0/2;4/-1/0/2
+select.'1-2*3,4'.curfirst.seed99 1/2/3/2;4/-1/0/2;4/-1/0/2;4/-1/0/2;4/-1/0/2;4/-1/0/2
+select.'1-2*3,4'.curfirst.seed4242 1/2/3/2;4/-1/0/2;4/-1/0/2;4/-1/0/2;4/-1/0/2;4/-1/0/2
+select.'7*2'.cur0.seed1 7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1
+select.'7*2'.cur0.seed99 7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1
+select.'7*2'.cur0.seed4242 7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1
+select.'7*2'.curfirst.seed1 7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1
+select.'7*2'.curfirst.seed99 7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1
+select.'7*2'.curfirst.seed4242 7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1;7/-1/2/1
+stream.cd1/apc/music/muzik01.APC frames=10465855 stereo=1 md5=c45222d5e07af729be0157ea8fc7472d
+stream.cd1/apc/music/muzik02.APC frames=9505062 stereo=1 md5=6fdb4687c2f4d8eae10df7d5718ac30b
+stream.cd1/apc/music/muzik03.APc frames=7989055 stereo=1 md5=a56edb7d088815c4e3cea8847d08dfa9
+stream.cd1/apc/music/muzik04.APC frames=6655871 stereo=1 md5=6d1240d32f296891355160af1f638e09
+stream.cd1/apc/music/muzik05.APC frames=8049408 stereo=1 md5=f3e50beb39e874661df22dfbbe20f34c
+stream.cd2/apc/music/muzik10.APC frames=6345983 stereo=1 md5=0edfa1f1c8cb654db630b527c37ae128
+stream.cd2/apc/music/muzik11.APC frames=7982326 stereo=1 md5=9919d4ef375bc9979944ddee8bd48728
+stream.cd2/apc/music/muzik12.APC frames=6122111 stereo=1 md5=37a23abbabf690996772d837403c32d2
+stream.cd2/apc/music/muzik13.APC frames=4315775 stereo=1 md5=c6d62bf6e4572514498c6c419f57b348
+stream.cd2/apc/music/muzik14.APC frames=2119615 stereo=1 md5=d393b158396a1484eb84467076a6a3c1
+stream.cd2/apc/music/muzik15.APC frames=2731327 stereo=1 md5=f4748e963a562e9b8d77a425635265c6
+stream.cd2/apc/music/muzik16.APC frames=5373183 stereo=1 md5=a2d73c90361083cc8bdc4e11e2268659
+stream.cd3/apc/music/muzik20.APC frames=9489599 stereo=1 md5=f7704fb49e897bbf66fee22ecef625e8
+stream.cd3/apc/music/muzik22.APC frames=5558591 stereo=1 md5=28e536db9b46996dda7e427e048ee9bc
+stream.cd3/apc/music/muzik23.APC frames=5578623 stereo=1 md5=678a89ad9f0dbef089b4b091737d2989
+stream.cd1/apc/music/muzik30.APC frames=5872624 stereo=1 md5=a21119d2cffed43676f7e2bc81100f1e
+stream.cd4/apc/music/muzik35.APC frames=5267199 stereo=1 md5=e67460d10652efdf6bcca2f2eb9a61e0
+stream.cd4/apc/music/muzik36.APC frames=10676543 stereo=1 md5=7ababc172b2c7f0de100cd3599f55aab
+stream.cd4/apc/music/muzik37.APC frames=9250880 stereo=1 md5=e52f5d9799d3b6f55a2f0945cc2d8600
+stream.cd4/apc/music/muzik38.APC frames=6091967 stereo=1 md5=b5b0efc94f0bfff3fed7214fbfedb50d
+stream.cd1/apc/music/muzik39.APC frames=6809919 stereo=1 md5=c774469a05b3d8f45aefe6387c7f3bad
+spp.cd1/apc/music/muzik01.APC.mark1 offset=1670976 md5=a7a58d209e51b902bb5d8458adaa3d3d
+spp.cd1/apc/music/muzik01.APC.mark2 offset=3349568 md5=d336375ab7cd4f162ff8ffe3f08a8cc1
+spp.cd1/apc/music/muzik01.APC.mark3 offset=4385408 md5=744fec6f7ca2d131915e5e2e0108ab7d
+spp.cd1/apc/music/muzik01.APC.mark4 offset=6142912 md5=2c8c308cf7bf88f060eacb4e4297918a
+spp.cd1/apc/music/muzik01.APC.mark5 offset=6699776 md5=fbda21d53779c3479c56fe9b055b643b
+spp.cd1/apc/music/muzik01.APC.mark6 offset=8144896 md5=73823ffdd53b5b301328a71fdf2f5a9b
+spp.cd1/apc/music/muzik02.APC.mark1 offset=3680448 md5=b5b44aa0696e3925a9ba43fe02df7dde
+spp.cd1/apc/music/muzik02.APC.mark2 offset=6405167 md5=4c41e7b5cc04d4533a6b4a6453fa4889
+spp.cd1/apc/music/muzik03.APc.mark1 offset=1620416 md5=17bdf04c26254ceb9f520e95383c4a06
+spp.cd1/apc/music/muzik03.APc.mark2 offset=3366784 md5=d39f6f30372ea19cb3d64816de36236e
+spp.cd1/apc/music/muzik03.APc.mark3 offset=4541824 md5=ecd5013e8735b88f5024162f130b134a
+spp.cd1/apc/music/muzik03.APc.mark4 offset=5809664 md5=8562b1659a5fe75a029c26620cd9032b
+spp.cd1/apc/music/muzik04.APC.mark1 offset=484207 md5=bacad1fa75538d165b58227d52cacf98
+spp.cd1/apc/music/muzik04.APC.mark2 offset=524160 md5=79216280d950369cd5772f9e57f61aff
+spp.cd1/apc/music/muzik04.APC.mark3 offset=951844 md5=e73ecbbc1ffab0190d2229571b4b4a95
+spp.cd1/apc/music/muzik04.APC.mark4 offset=1858016 md5=44386f5da576c58933d038aa834eb233
+spp.cd1/apc/music/muzik04.APC.mark5 offset=2668815 md5=9a8749dce36359cf1f2667dbbc3cbbb1
+spp.cd1/apc/music/muzik04.APC.mark6 offset=3271342 md5=4725d8b85803c102b3e1c86ec836deb8
+spp.cd1/apc/music/muzik04.APC.mark7 offset=4249877 md5=fb3ae371bc8bbbd4d8c2646bf21073d5
+spp.cd1/apc/music/muzik04.APC.mark8 offset=5112132 md5=cd7d8cec1697c13141207a07dc6cf2dd
+spp.cd1/apc/music/muzik05.APC.mark1 offset=1337664 md5=4038e2d6863559c7e03fa4df5871e24c
+spp.cd1/apc/music/muzik05.APC.mark2 offset=2447232 md5=92969839a178007c52a422841d6bbc69
+spp.cd1/apc/music/muzik05.APC.mark3 offset=3705408 md5=c00c848a4e9c0d00522d44a7bbb2f4ac
+spp.cd1/apc/music/muzik05.APC.mark4 offset=4249600 md5=03a6c4e2a7ca54899104e5e1ec670dd6
+spp.cd1/apc/music/muzik05.APC.mark5 offset=4309103 md5=3e36891914c09e184dce4a3211834c93
+spp.cd1/apc/music/muzik05.APC.mark6 offset=5467520 md5=72f96fa6211468976bf9b97a8409bd4e
+spp.cd1/apc/music/muzik05.APC.mark7 offset=5520478 md5=48e5d444e1556a322106dd2fcfac9575
+spp.cd1/apc/music/muzik05.APC.mark8 offset=6178607 md5=f9e963006a00d92f58389de44eaf024e
+spp.cd2/apc/music/muzik11.APC.mark1 offset=1634176 md5=31655745193efa601295adddcabff6fc
+spp.cd2/apc/music/muzik11.APC.mark2 offset=2621120 md5=936db93ccab03af15c9fd13745383633
+spp.cd2/apc/music/muzik11.APC.mark3 offset=3707392 md5=1cdb3eafb4cd167ee62fa4c7a9521481
+spp.cd2/apc/music/muzik11.APC.mark4 offset=4549760 md5=64e2123f914c21bfc33b9b301ecc227e
+spp.cd2/apc/music/muzik11.APC.mark5 offset=5636836 md5=8dee9673c3411e1b126fc5a392b1ccae
+spp.cd2/apc/music/muzik12.APC.mark1 offset=1372544 md5=8da01caca3d79f57e7eb58ab3b733f9b
+spp.cd2/apc/music/muzik12.APC.mark2 offset=2393952 md5=cc7d640dee2b44acb3731a89481bdb59
+spp.cd2/apc/music/muzik12.APC.mark3 offset=2868655 md5=0b0e4524045eedb428cb2d2dd36013b6
+spp.cd2/apc/music/muzik12.APC.mark4 offset=3912542 md5=0d236990b039f320961e5fb7689726ba
+spp.cd2/apc/music/muzik13.APC.mark1 offset=252638 md5=45df5a5943b18585c959ddb4f509a0c1
+spp.cd2/apc/music/muzik13.APC.mark2 offset=505058 md5=1d9e72ffb832a6954cb7193ee14f05cf
+spp.cd2/apc/music/muzik13.APC.mark3 offset=1008576 md5=513dd125337fa8ffd45d51f4c222d906
+spp.cd2/apc/music/muzik13.APC.mark4 offset=2008064 md5=c871b9df50e7f2cdfc92780ed65a4d93
+spp.cd2/apc/music/muzik13.APC.mark5 offset=2511680 md5=ec6a6fd2e3920e7ed989556d157e8ff6
+spp.cd2/apc/music/muzik13.APC.mark6 offset=3269504 md5=4860fb7eced171edb02b352f32b466b9
+spp.cd2/apc/music/muzik15.APC.mark1 offset=642445 md5=82e35361164660489bc22554623b511c
+spp.cd2/apc/music/muzik15.APC.mark2 offset=1284132 md5=e78b344a30c85654b516dfc363809766
+spp.cd2/apc/music/muzik15.APC.mark3 offset=1925492 md5=54ca65cb7b61d907a9803429ee92bde0
+spp.cd2/apc/music/muzik15.APC.mark4 offset=2246152 md5=08c403eaaafc601b776b18f14267770b
+spp.cd2/apc/music/muzik16.APC.mark1 offset=827968 md5=103dd40c857aae2d0fc0b91a1f2d8a9e
+spp.cd2/apc/music/muzik16.APC.mark2 offset=1258368 md5=bcfb01bef142bc12758a026d18fe2564
+spp.cd2/apc/music/muzik16.APC.mark3 offset=1830208 md5=bc2acae0267be1988d06e6d7a285a72e
+spp.cd2/apc/music/muzik16.APC.mark4 offset=2115584 md5=d26f1244a1a190fad4397e9e9f9795d1
+spp.cd2/apc/music/muzik16.APC.mark5 offset=2402792 md5=84e596a3018016a23c394031c53200e8
+spp.cd2/apc/music/muzik16.APC.mark6 offset=2974612 md5=448ef143e3316987566d5ad09d7b7a9f
+spp.cd2/apc/music/muzik16.APC.mark7 offset=3546695 md5=cd9127b98cad15dfd223b4dc7b908a8b
+spp.cd2/apc/music/muzik16.APC.mark8 offset=3832552 md5=cc1896628fd60f59fe627d0799985d3d
+spp.cd2/apc/music/muzik16.APC.mark9 offset=4112128 md5=7500627138d169623bc8f6d4f8386103
+spp.cd2/apc/music/muzik16.APC.mark10 offset=4690880 md5=686adf0821df97690f90e6f72d36e4da
+spp.cd3/apc/music/muzik20.APC.mark1 offset=2352382 md5=c48d586ac7b309aa25833f32df435b15
+spp.cd3/apc/music/muzik20.APC.mark2 offset=4648127 md5=95510c8da00e7a81648ade23bbe47531
+spp.cd3/apc/music/muzik20.APC.mark3 offset=5336256 md5=3b161e8e6718f83368cdd8407863bff8
+spp.cd3/apc/music/muzik20.APC.mark4 offset=6742114 md5=b2cb90b5b047006bf3eda52f18ba21c3
+spp.cd3/apc/music/muzik20.APC.mark5 offset=7746111 md5=449da2eb70b0d4e7ae44a6eb7c4ef6af
+spp.cd3/apc/music/muzik22.APC.mark1 offset=587443 md5=3aeed44770fbdc892b8d07d0084000ae
+spp.cd3/apc/music/muzik22.APC.mark2 offset=1176149 md5=6f3e8ab3455c82abc0da9d1830d40277
+spp.cd3/apc/music/muzik22.APC.mark3 offset=1764464 md5=17f9bcd467a563dd07da2601c8a6cf66
+spp.cd3/apc/music/muzik22.APC.mark4 offset=2352208 md5=26b8e6c1687cdc6de8c73da73db9d273
+spp.cd3/apc/music/muzik22.APC.mark5 offset=2958912 md5=abd1292eab2f7de125b6485e9cbe45f3
+spp.cd3/apc/music/muzik22.APC.mark6 offset=3711104 md5=e67d61a11c44f063d439e095c78b81d4
+spp.cd3/apc/music/muzik22.APC.mark7 offset=4207168 md5=9b14a36dfb8f7484a322058166511987
+spp.cd3/apc/music/muzik23.APC.mark1 offset=826944 md5=ec6f6c8a425d97437b7e10c914a336b8
+spp.cd3/apc/music/muzik23.APC.mark2 offset=1242380 md5=8aee4132de66a977bf02fd01fef1ed7c
+spp.cd3/apc/music/muzik23.APC.mark3 offset=2329595 md5=2fb12ce9f9c417682fc3e543c20cb980
+spp.cd3/apc/music/muzik23.APC.mark4 offset=4495936 md5=b8c1d2542e8c2b9bf8306db4d3c2892a
+spp.cd4/apc/music/muzik35.APC.mark1 offset=1393248 md5=0d85db64ce433781bafd55739faab25a
+spp.cd4/apc/music/muzik35.APC.mark2 offset=2507618 md5=6a38840081306e1e8b4bb7061e27471d
+spp.cd4/apc/music/muzik35.APC.mark3 offset=2785702 md5=f3c70c3d94eaf9301340ac1a7be9c0c9
+spp.cd4/apc/music/muzik35.APC.mark4 offset=3482032 md5=6f4df22d305e1cfb500dc634df99a6f9
+spp.cd4/apc/music/muzik35.APC.mark5 offset=3900032 md5=7bfb6bb6c5b67b6a6f3569674af14bd7
+spp.cd4/apc/music/muzik36.APC.mark1 offset=2021708 md5=f1dfebcdd4fae93a19a01a07c4c26a45
+spp.cd4/apc/music/muzik36.APC.mark2 offset=3064640 md5=9f9059e5b5022dc76da69257054016ad
+spp.cd4/apc/music/muzik36.APC.mark3 offset=4650792 md5=175af04394d1b637cbf807d2fc3c7670
+spp.cd4/apc/music/muzik36.APC.mark4 offset=5760969 md5=f1e8574ea348001397de092b6d610b9c
+spp.cd4/apc/music/muzik36.APC.mark5 offset=8250612 md5=d3ec7df7e1ba4389a8600df527676095

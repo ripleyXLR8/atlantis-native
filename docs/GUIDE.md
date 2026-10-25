@@ -166,6 +166,103 @@ page also has a **Full screen** button at its top right.
 In the panoramic view, the arrow keys turn (← →) and tilt (↑ ↓) the view,
 as the original's F5 / F6 and F7 / F8 do.
 
+## Atlantis II
+
+Atlantis II plays from its start to its end (Tibet, Ireland, China,
+Yucatán with Xibalba, the space travel, Shamballa with its fireflies,
+Atlantis with the octopus fight, the credits;
+see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)). For now only the
+command line opens it: give the folder of the installed game (the one
+holding `atlantis2.exe`, `wam`, `scenar`...), and the folder of the CD
+images or copies of the CDs if they are not inside it:
+
+    atlantis-native --discs /path/to/cd-images /path/to/Atlantis_2_Files
+
+### Controls
+
+| Input | In the game |
+|---|---|
+| Mouse (or the arrow keys) | turns the view; the cursor at the centre of the screen tells what is there |
+| Left click | walks on (a move cursor), takes an object, uses the object in hand, opens a character's subjects; in a dialog, the next line; ends a film (a double click ends them all at start-up) |
+| Right click | opens or closes the bag bar at the bottom (the mouse then moves a pointer over it; a click puts an object in the hand) |
+| Escape | the game's menu (options, volumes, load and save, quit), and closes it; ends a dialog |
+| F10 or O | the port's options menu (below); the game waits while it is open |
+| F11 | full screen on and off |
+
+Xibalba's canoe puzzle has a screen of its own, with a pointer: a left
+click takes a river tile, lays it back or swaps it with the clicked
+square's, and on the landing stage starts the canoe; a right click turns
+the held or pointed tile a quarter; Escape leaves the puzzle. On the
+spider's web the view turns as usual and a left click on a way moves
+along it once the spiders stand still; with the feather in hand the click
+lays it there, and a click on a spider asks about it (or strikes it with
+the sword). In Atlantis the centre shows a crosshair; in the octopus's
+view, a tentacle that strikes is shot by a click on it, but only with
+the sunken crystal in the bag (six shots a tentacle); a strike not shot
+in time lands, crystal or not, and the blows wear the hero down.
+
+In the game's menus the mouse moves the game's own pointer. As in the
+original there are no named saves: the menu's disc saves in the next free
+slot of the current player (99 each) and loads any of them.
+
+### Options and the HD mode
+
+F10 (or O) opens the port's options menu, the same as the first game's:
+arrows and Enter (or the mouse) change an entry, Escape, F10 or O close
+it. Its entries:
+
+- **Graphics**: *Original* (the original's picture, scaled to the
+  window) or *HD*: the panorama and the dialogs' 3D heads drawn at the
+  window's resolution with the original's own projection (see
+  [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress), item HD mode);
+  the subtitles, the menus' tooltips, the bag's names and the credits'
+  texts drawn sharp from the game's font at that size, with the
+  original's line breaks; the cursor, the bag bar, the menu pictures, the
+  dialogs' filmed bodies and the videos are the original's 640x480
+  pictures, smoothly enlarged (they cannot be made sharper). Off
+  by default. The panorama is drawn finer as soon as the window's picture
+  is wider than 640 pixels (in the window's default size, 1280x960, at
+  twice the original's resolution), and the larger the window (or full
+  screen, F11), the finer it is.
+- With HD on: **Panorama filter** (Bicubic, sharper, or Bilinear),
+  **Panorama sharpening**, **Interface** (Smooth or Pixels),
+  **Sharp subtitles** (the subtitles and the menus' texts drawn at the
+  window's resolution; on by default), **Widescreen** (in a window wider than 4:3 the panorama fills the
+  sides too) and **Video sides** (black or blurred bars beside the
+  videos in widescreen).
+- **Screen**: the original's two screen sizes, 640 x 480 and 800 x 600
+  (below); with the original graphics only.
+- **Fix original bugs**: on by default (for now: every music track is
+  heard to its end; in Ireland, a click on Brigid's cross or on an ogham
+  stone works the puzzle and nothing else, where the original may take
+  it for a click on another place's object: back to Tibet from the
+  fourth stone in one chapter, the water's film from the ninth with the
+  horse in another).
+
+The choices are kept at once in `settings.ini`, in the `atlantis2`
+folder of the per-user data folder (`~/.local/share/atlantis-native/atlantis2`
+on Linux, `%APPDATA%\atlantis-native\atlantis2` on Windows,
+`~/Library/Application Support/atlantis-native/atlantis2` on macOS),
+beside the saves (`save\ATL<player>_<slot>.SAV`, the original's files)
+and the original's options file `atlant2.cfg`. From the command line, `--hd` turns HD on and
+`--widescreen` HD with widescreen, and `--original` turns the bug fixes
+off, for that run only; `--size 1920x1080` opens the window at that size,
+for example `atlantis-native --widescreen --size 1920x1080
+/path/to/Atlantis_2_Files`.
+
+### The 800 x 600 screen
+
+The original offers 640 x 480 and 800 x 600 on its options page (the
+button beside the subtitles), and so does the port, as the original
+does it: in the panorama the view is drawn with 800 x 600 pixels (the
+same field of view, a finer picture; the bag bar shows 10 objects
+instead of 8), while the films, the dialogs, the menus and the credits,
+made for 640 x 480, are enlarged to 800 x 600 by the original's own
+filter. Choose it with the options page's button, the port's options
+menu (Screen) or `--resolution 800x600`; it is kept in `atlant2.cfg`. In
+the HD mode the screen stays 640 x 480 (the HD picture is drawn from it):
+the choice applies when HD is off.
+
 ## Command line
 
 The game folder can be left out of each of these: the game library
@@ -184,13 +281,19 @@ say.
 the player screen.
 
 `atlantis-native --original /path/to/game` plays the original game, bug for
-bug (see [Enhancements](TECHNICAL.md#enhancements)).
+bug (see [Enhancements](TECHNICAL.md#enhancements)); with Atlantis II too
+(its music tracks then lose their last ~5.8 s when another follows, as
+in the original).
 
 `atlantis-native --hd /path/to/game` starts in the [HD mode](TECHNICAL.md#hd-mode),
 whatever `settings.ini` says.
 
 `atlantis-native --widescreen /path/to/game` starts in the HD mode with
 the widescreen option on, for this run (`settings.ini` is not changed).
+
+With Atlantis II, `--hd` and `--widescreen` turn on its HD mode for the
+run, `--size 1920x1080` sizes its window and `--resolution 800x600`
+chooses the original's 800 x 600 screen (see [Atlantis II](#atlantis-ii)).
 
 `atlantis-native --fullscreen /path/to/game` opens the window in full
 screen (F, F11 or Alt+Enter switches it back): for a launcher such as the

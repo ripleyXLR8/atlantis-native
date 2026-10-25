@@ -1,0 +1,25 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# CtrlScenarIN (0x00483c90) and the timer scans (0x00483de0) on the synthetic chapter below
+# (| = CRLF): the flags 10..29 set, and the offset CtrlScenarIN returns (0 for the text's start).
+# chapter: /INIT|/set(flag1=1)|/FININIT|/001|/con(flag2=1)|/set(flag10=1)|/001|/con(flag3=1)|/set(flag11=1)|/set(flag12=1)|/002|/con(flag4=1)|/con(flag5=1)|/set(flag13=1)|/con(flag6=1)|/set(flag14=1)|/set(flag15=1)|/con(flag7=1)|/set(flag16=1)|/003|#/con(flag8=1)|/con(flag9=1)|#/set(flag17=1)||  /set(flag18=1)|x/set(flag19=1)|/set(flag20=1)|/004|/tim1(time1>3)|/set(flag21=1)|/005|/tim2(time2>5)|/set(flag22=1)|/000|
+scanIN none: set flags - ret=0
+scanIN f2: set flags 10 ret=68
+scanIN f3: set flags 11,12 ret=121
+scanIN f2+f3: set flags 10 ret=68
+scanIN f4: set flags - ret=0
+scanIN f4+f5: set flags 13 ret=0
+scanIN f4+f6: set flags 14,15 ret=0
+scanIN f4+f7: set flags 16 ret=251
+scanIN f4+f5+f6: set flags 13 ret=0
+scanIN f5: set flags - ret=0
+scanIN f8: set flags - ret=0
+scanIN f9: set flags - ret=0
+scanIN f8+f9: set flags 17,18,19,20 ret=358
+timers time1=4 testtime1=1 time2=0 testtime2=0: set flags 21
+timers time1=3 testtime1=1 time2=0 testtime2=0: set flags -
+timers time1=4 testtime1=0 time2=0 testtime2=0: set flags -
+timers time1=0 testtime1=0 time2=6 testtime2=1: set flags 22
+timers time1=9 testtime1=1 time2=9 testtime2=1: set flags 21,22
+errors -

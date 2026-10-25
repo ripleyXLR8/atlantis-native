@@ -613,6 +613,31 @@ impl HdCompositor {
         true
     }
 
+    /// The text items of `f.texts` drawn at the output's resolution into
+    /// `out` (XRGB8888, `stride` pixels per row, the 640x480 frame being
+    /// its `area`), whatever `opts.sharp_subtitles`: for a front end that
+    /// draws texts of its own between the picture
+    /// ([`HdCompositor::compose_with`] without its texts) and these.
+    pub fn draw_texts(
+        &mut self,
+        f: &HdFrame<'_>,
+        out: &mut [u32],
+        stride: usize,
+        area: (usize, usize, usize, usize),
+    ) {
+        self.draw_text_items(f, out, stride, area, rgb565_to_888(), 0);
+    }
+
+    /// Whether [`HdCompositor::compose`] puts back what was under the
+    /// 640x480 glyphs of `f.texts` (the picture at `ox` in the window):
+    /// with sharp subtitles, and on a video zoomed to the window's sides
+    /// (whose texts are always drawn again at the window's size). A front
+    /// end that draws its texts itself (rather than through
+    /// [`HdText::items`]) draws them again exactly then.
+    pub fn uncovers_texts(f: &HdFrame<'_>, opts: HdOptions, ox: usize) -> bool {
+        opts.sharp_subtitles || video_bars(f, opts, ox) == Some(VideoSides::Zoom)
+    }
+
     /// The frame and the maps of a composition: the frame with its text
     /// uncovered, the video's sides, how the pixels are scaled, the axes,
     /// the upscaled art brought up to date.
@@ -629,11 +654,8 @@ impl HdCompositor {
         let (w, h) = (SCREEN_W, SCREEN_H);
         self.frame.clear();
         self.frame.extend_from_slice(f.screen);
-        // Widescreen sides of a video (a frame without an HD layer).
-        let video_bars = (f.photo && f.layer.is_none() && opts.widescreen && ox > 0)
-            .then_some(opts.video_sides)
-            .filter(|&v| v != VideoSides::Black);
-        if opts.sharp_subtitles || video_bars == Some(VideoSides::Zoom) {
+        let video_bars = video_bars(f, opts, ox);
+        if Self::uncovers_texts(f, opts, ox) {
             for t in f.texts {
                 t.uncover(&mut self.frame);
             }
@@ -1086,6 +1108,14 @@ impl HdCompositor {
     }
 }
 
+/// Widescreen: what fills the sides of a video's frame (a frame without
+/// an HD layer), none when they stay black.
+fn video_bars(f: &HdFrame<'_>, opts: HdOptions, ox: usize) -> Option<VideoSides> {
+    (f.photo && f.layer.is_none() && opts.widescreen && ox > 0)
+        .then_some(opts.video_sides)
+        .filter(|&v| v != VideoSides::Black)
+}
+
 /// The HD picture of a frame.
 #[derive(Clone, Debug, Default)]
 pub struct HdLayer {
@@ -1263,52 +1293,57 @@ pub fn compose_dialog(
         let rgb: Vec<u32> = over.iter().map(|&p| lut[usize::from(p)]).collect();
         (rgb, Axis::new(SCREEN_W, w), Axis::new(SCREEN_H, h))
     });
-    for (hy, sy) in low_res_map(h, tile).into_iter().enumerate() {
-        let c = &composite[sy * SCREEN_W..][..SCREEN_W];
-        let line = &mut layer.pixels[hy * lw..][..lw];
-        // The view, then the character (the body and the head) over it,
-        // `shift` columns aside (see `dialog_shift`).
-        line.copy_from_slice(&view[hy * lw..][..lw]);
-        let at = |x: usize| (side + x).checked_add_signed(shift).filter(|&c| c < lw);
-        for (x, &sx) in cols.iter().enumerate() {
-            if !is_char(sy * SCREEN_W + sx) {
-                continue;
+    // The rows in bands over the processor's cores (the same pixels).
+    let rows = low_res_map(h, tile);
+    crate::upscale::for_each_band(&mut layer.pixels[..lw * h], lw, |first, band| {
+        for (i, line) in band.chunks_mut(lw).enumerate() {
+            let hy = first + i;
+            let sy = rows[hy];
+            let c = &composite[sy * SCREEN_W..][..SCREEN_W];
+            // The view, then the character (the body and the head) over it,
+            // `shift` columns aside (see `dialog_shift`).
+            line.copy_from_slice(&view[hy * lw..][..lw]);
+            let at = |x: usize| (side + x).checked_add_signed(shift).filter(|&c| c < lw);
+            for (x, &sx) in cols.iter().enumerate() {
+                if !is_char(sy * SCREEN_W + sx) {
+                    continue;
+                }
+                if let Some(d) = at(x) {
+                    line[d] = if let Some((rgb, ax, ay)) = &smooth {
+                        sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
+                    } else {
+                        lut[usize::from(c[sx])]
+                    };
+                }
             }
-            if let Some(d) = at(x) {
-                line[d] = if let Some((rgb, ax, ay)) = &smooth {
-                    sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
-                } else {
-                    lut[usize::from(c[sx])]
-                };
-            }
-        }
-        if let (Some((hp, hm)), Some(f)) = (head, &footprint) {
-            let hp = &hp[hy * w..][..w];
-            let hm = &hm[hy * w..][..w];
-            let f = &f[sy * SCREEN_W..][..SCREEN_W];
-            for x in 0..w {
-                if hm[x] != 0 && f[cols[x]] != 0 {
-                    if let Some(d) = at(x) {
-                        line[d] = lut[usize::from(hp[x])];
+            if let (Some((hp, hm)), Some(f)) = (head, &footprint) {
+                let hp = &hp[hy * w..][..w];
+                let hm = &hm[hy * w..][..w];
+                let f = &f[sy * SCREEN_W..][..SCREEN_W];
+                for x in 0..w {
+                    if hm[x] != 0 && f[cols[x]] != 0 {
+                        if let Some(d) = at(x) {
+                            line[d] = lut[usize::from(hp[x])];
+                        }
                     }
                 }
             }
-        }
-        // The overlay over the head, with the character.
-        let o = &over[sy * SCREEN_W..][..SCREEN_W];
-        for (x, &sx) in cols.iter().enumerate() {
-            if o[sx] == c[sx] {
-                continue;
+            // The overlay over the head, with the character.
+            let o = &over[sy * SCREEN_W..][..SCREEN_W];
+            for (x, &sx) in cols.iter().enumerate() {
+                if o[sx] == c[sx] {
+                    continue;
+                }
+                if let Some(d) = at(x) {
+                    line[d] = if let Some((rgb, ax, ay)) = &smooth {
+                        sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
+                    } else {
+                        lut[usize::from(o[sx])]
+                    };
+                }
             }
-            if let Some(d) = at(x) {
-                line[d] = if let Some((rgb, ax, ay)) = &smooth {
-                    sample_bilinear(rgb, SCREEN_W, ax.lin[x], ay.lin[hy])
-                } else {
-                    lut[usize::from(o[sx])]
-                };
-            }
         }
-    }
+    });
 }
 
 /// The 640x480 pixels where the head was drawn (`before` and `after`

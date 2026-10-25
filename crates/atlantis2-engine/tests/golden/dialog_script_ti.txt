@@ -1,0 +1,168 @@
+# Every Tibet dialog initialised by the original atlantis2.exe (French CD build of 1999, 2199552
+# bytes, MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation: dlg_Dialog::LoadScript 0x0045dd60
+# on dialTI.txt / comTI.txt / infoTI.txt, then Initialise 0x0045ebc0 for each dialog in order from
+# one srand(0) (the dialog object's construction), the heads loaded by the original, Remove
+# 0x00460290 after each. Producer: an emulation harness running the original code; stubs: Win32
+# file and memory calls (host files, a bump heap), the log and error reporters.
+# rep N K | speaker stand camera mood kind from to | video voice (paths start with the CD root,
+# null here) | text length (with its NUL) md5 last byte; perso N K | stand:cameras. Derived values
+# and file names only.
+dialog 360 | ok 1 lines 3 persos 2
+rep 360 0 | 0 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\360_01.apc | 43 8c1c577d16780ecc5d93f599b819508f 0
+rep 360 1 | 1 0 0 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\360_02.apc | 30 acec270f94521b801b097d01c0806223 0
+rep 360 2 | 0 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\360_03.apc | 32 9f27a3b7b4c9a17219c0b82d4512cc4f 0
+perso 360 0 | 0:3
+perso 360 1 | 0:3
+dialog 361 | ok 1 lines 2 persos 2
+rep 361 0 | 0 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\361_01.apc | 42 20a55d55a43ddf092df297a3e6dc34be 0
+rep 361 1 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\361_02.apc | 208 f9d001413750eddfec664d916f0bd3fd 0
+perso 361 0 | 0:3
+perso 361 1 | 0:3
+dialog 362 | ok 1 lines 12 persos 2
+rep 362 0 | 0 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\362_01.apc | 80 a575198f888e1cb794b07a6c690e627a 0
+rep 362 1 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\362_02.apc | 118 16067d6d492282b96e1e3f88f8b208aa 0
+rep 362 2 | 0 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\362_03.apc | 27 adbe46608ff5f00c13d3310b19a5fa72 0
+rep 362 3 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\362_04.apc | 42 b6d8c88d5f01a291098ca558a218f842 0
+rep 362 4 | 0 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\362_05.apc | 22 2d3e5fc99d15ce4224ecf031537225ff 0
+rep 362 5 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\362_06.apc | 142 62233697ec80e9c78613de64375215a6 0
+rep 362 6 | 0 0 2 4 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\362_07.apc | 72 ea50abb1aeee769ed4c7d63ae3b45dc8 0
+rep 362 7 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\362_08.apc | 56 8b6bec3670829b47e834fe8233f15152 0
+rep 362 8 | 0 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\362_09.apc | 10 b4346c68813970cd83f872cba4039abe 0
+rep 362 9 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\362_10.apc | 224 7842da2d756c31666786b478a4831912 0
+rep 362 10 | 0 0 1 4 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\362_11.apc | 32 c8daa80445d79d8b8f3b116824b2bcc4 0
+rep 362 11 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\362_12.apc | 41 35f5315f75898a67a8b6825140b2f161 0
+perso 362 0 | 0:3
+perso 362 1 | 0:3
+dialog 363 | ok 1 lines 8 persos 2
+rep 363 0 | 0 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\363_01.apc | 22 bd27b41d281977adbbf6ec83e92b2966 0
+rep 363 1 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\363_02.apc | 30 9baa744aaca3a5e5bb37c2fbe9002f72 0
+rep 363 2 | 0 0 1 4 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\363_03.apc | 49 268df085e534c3948c92d20bb0031542 0
+rep 363 3 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\363_04.apc | 251 11485f315b4b64b363a14df17df3cf5b 0
+rep 363 4 | 0 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\363_05.apc | 55 68eb37128108128b7d879bee816fea4b 0
+rep 363 5 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\363_06.apc | 105 c560c7c490d46a1382f8272d9cb58948 0
+rep 363 6 | 0 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\363_07.apc | 63 134e4f7fa1c538ecafea4e55361bca3b 0
+rep 363 7 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\363_08.apc | 96 2b881b5c5ba1355fdf30718835820fd9 0
+perso 363 0 | 0:3
+perso 363 1 | 0:3
+dialog 364 | ok 1 lines 6 persos 2
+rep 364 0 | 0 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\364_01.apc | 25 9b3b86c804e2399540909974d467b8a8 0
+rep 364 1 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\364_02.apc | 146 f301c0160e87ab3e1b50e91f53bb14b7 0
+rep 364 2 | 0 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\364_03.apc | 24 2bc3376a2dc2e960f153ce28216ad3c1 0
+rep 364 3 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\364_04.apc | 66 aac474bd093b2965d0d72de211ac3805 0
+rep 364 4 | 0 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\364_05.apc | 113 207776594e59ff929fcc550fcd52dc99 0
+rep 364 5 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\364_06.apc | 171 e8b24daefce69bbc9d1b6f4b0c0a9558 0
+perso 364 0 | 0:3
+perso 364 1 | 0:3
+dialog 365 | ok 1 lines 2 persos 2
+rep 365 0 | 0 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\365_01.apc | 38 445766fc40c60098001975f0a2d7f5a1 0
+rep 365 1 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\365_02.apc | 143 a1b1c1082fe0ca28ace1437531cf2e35 0
+perso 365 0 | 0:3
+perso 365 1 | 0:3
+dialog 366 | ok 1 lines 2 persos 2
+rep 366 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\366_01.apc | 43 3c64cc047c071f8731bbfb6f536392e4 0
+rep 366 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\366_02.apc | 214 de01bee027d31f37abac00f1ec834932 0
+perso 366 0 | 0:3
+perso 366 1 | 0:3
+dialog 367 | ok 1 lines 2 persos 2
+rep 367 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\367_01.apc | 36 c3ebf0102cdfa8c9b121889acb217c12 0
+rep 367 1 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\367_02.apc | 238 f55ec1609d5546f54bb2d126a7ba9f7a 0
+perso 367 0 | 0:3
+perso 367 1 | 0:3
+dialog 368 | ok 1 lines 2 persos 2
+rep 368 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\368_01.apc | 71 e6de33654eafb0552251069f94980708 0
+rep 368 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\368_02.apc | 76 ab9cfefd0cafc94c07b12dc20f97143c 0
+perso 368 0 | 0:3
+perso 368 1 | 0:3
+dialog 369 | ok 1 lines 4 persos 2
+rep 369 0 | 0 0 0 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\369_01.apc | 78 de21d1519e043c6e1d3b2cb4ae76f42f 0
+rep 369 1 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\369_02.apc | 145 a7faad8adda9b9bdaecb584740adeb2e 0
+rep 369 2 | 0 0 0 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\369_03.apc | 47 f61fe07f8bd3666c8abeeffb30697bb3 0
+rep 369 3 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\369_04.apc | 118 ed1788208419fae582d11e754489dbcb 0
+perso 369 0 | 0:3
+perso 369 1 | 0:3
+dialog 370 | ok 1 lines 4 persos 2
+rep 370 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\370_01.apc | 39 a04007064ecb68fdb7cb10b992966751 0
+rep 370 1 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\370_02.apc | 119 7184730bfe1229e5d354558d2a0595c7 0
+rep 370 2 | 0 0 1 4 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\370_03.apc | 45 1f584eff5a42d66e89b0e0d320fb77a3 0
+rep 370 3 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\370_04.apc | 201 8b1b3ca5e45513fcb3f38998a9f6cbe5 0
+perso 370 0 | 0:3
+perso 370 1 | 0:3
+dialog 371 | ok 1 lines 2 persos 2
+rep 371 0 | 0 0 2 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\371_01.apc | 52 a49f8916f72e61edf900906407c9ed2e 0
+rep 371 1 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\371_02.apc | 93 d425d0ba88ea73031dfc78a74e339c13 0
+perso 371 0 | 0:3
+perso 371 1 | 0:3
+dialog 372 | ok 1 lines 1 persos 1
+rep 372 0 | 0 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\372_01.apc | 120 5322a62892ed3bbcac0cfdbc1ca82d0b 0
+perso 372 0 | 0:3
+dialog 373 | ok 1 lines 2 persos 2
+rep 373 0 | 0 0 0 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\373_01.apc | 32 c294fe90610348f88e2b9fb29a87e758 0
+rep 373 1 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\373_02.apc | 74 7a5604ad7733d8c3309a2cdb6a3c1b6b 0
+perso 373 0 | 0:3
+perso 373 1 | 0:3
+dialog 374 | ok 1 lines 2 persos 2
+rep 374 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\374_01.apc | 42 9725334f5b1fb6791ff228629699891d 0
+rep 374 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\374_02.apc | 78 cd21feb0eee98a5b0db2e901ee6cb863 0
+perso 374 0 | 0:3
+perso 374 1 | 0:3
+dialog 375 | ok 1 lines 2 persos 2
+rep 375 0 | 0 0 2 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\375_01.apc | 62 0d92147e01d876d6b0143d8bdb91c941 0
+rep 375 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\375_02.apc | 97 8979af22d0f64c669d0331279e836ef3 0
+perso 375 0 | 0:3
+perso 375 1 | 0:3
+dialog 376 | ok 1 lines 2 persos 2
+rep 376 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\376_01.apc | 44 7a28507360475635516cc9e12597d172 0
+rep 376 1 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\376_02.apc | 172 8c0065fbe7eb82b4355cc42425bc1b1f 0
+perso 376 0 | 0:3
+perso 376 1 | 0:3
+dialog 377 | ok 1 lines 2 persos 2
+rep 377 0 | 0 0 0 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\377_01.apc | 31 f53ed24f4b14841538f02059a7405c9f 0
+rep 377 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\377_02.apc | 76 1e0f4f726b9e30428c5fda287a821b77 0
+perso 377 0 | 0:3
+perso 377 1 | 0:3
+dialog 378 | ok 1 lines 2 persos 2
+rep 378 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\378_01.apc | 39 87bf15e975eaa00ae5d5246d8f1f6ea1 0
+rep 378 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\378_02.apc | 222 fca5ac084036de20464556998f2a2a88 0
+perso 378 0 | 0:3
+perso 378 1 | 0:3
+dialog 379 | ok 1 lines 4 persos 2
+rep 379 0 | 0 0 2 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\379_01.apc | 45 2fca6d7d45abdc7c40e84f8f077dcb37 0
+rep 379 1 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\379_02.apc | 70 adeb7a63fc5b62b9320096ce91902645 0
+rep 379 2 | 0 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\379_03.apc | 57 13da71d5bc5bd98a01c201226c6ffb56 0
+rep 379 3 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\379_04.apc | 28 35d8a8725d303de91679d35b77b677d8 0
+perso 379 0 | 0:3
+perso 379 1 | 0:3
+dialog 380 | ok 1 lines 4 persos 2
+rep 380 0 | 0 0 2 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\380_01.apc | 63 b231ebb53e0b89e6978c3d7eb00ff55a 0
+rep 380 1 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\380_02.apc | 34 17e0fdd4d955816f6a22b6a1ad61556b 0
+rep 380 2 | 0 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\380_03.apc | 27 7d7caa1bda25eccaf6d9b9325ca454b6 0
+rep 380 3 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\380_04.apc | 151 8af0715d3a8b5600a02fc28ca45996e1 0
+perso 380 0 | 0:3
+perso 380 1 | 0:3
+dialog 381 | ok 1 lines 4 persos 2
+rep 381 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\381_01.apc | 63 0e2beca28d04d67d8c32e506ca2e1fac 0
+rep 381 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\381_02.apc | 34 17e0fdd4d955816f6a22b6a1ad61556b 0
+rep 381 2 | 0 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\381_03.apc | 27 7d7caa1bda25eccaf6d9b9325ca454b6 0
+rep 381 3 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\381_04.apc | 255 aca490638218a3e87de18e7eb1beb4a0 0
+perso 381 0 | 0:3
+perso 381 1 | 0:3
+dialog 382 | ok 1 lines 2 persos 2
+rep 382 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\382_01.apc | 69 2d53ee5be100c6f140dc63748a20176b 0
+rep 382 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\382_02.apc | 76 808a661ea6ded62538e6751287dcb02f 0
+perso 382 0 | 0:3
+perso 382 1 | 0:3
+dialog 383 | ok 1 lines 2 persos 2
+rep 383 0 | 0 0 0 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c1.hnm (null)datas_a2\apc\dial\383_01.apc | 69 2d53ee5be100c6f140dc63748a20176b 0
+rep 383 1 | 1 0 2 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c3.hnm (null)datas_a2\apc\dial\383_02.apc | 255 aca490638218a3e87de18e7eb1beb4a0 0
+perso 383 0 | 0:3
+perso 383 1 | 0:3
+dialog 384 | ok 1 lines 2 persos 2
+rep 384 0 | 0 0 2 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c3.hnm (null)datas_a2\apc\dial\384_01.apc | 71 594bacd63e9c9edd5827b57cac05fa69 0
+rep 384 1 | 1 0 1 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c2.hnm (null)datas_a2\apc\dial\384_02.apc | 111 0341a8a4de2d7c841867e8658e387165 0
+perso 384 0 | 0:3
+perso 384 1 | 0:3
+dialog 385 | ok 1 lines 2 persos 2
+rep 385 0 | 0 0 1 2 0 0 0 | (null)datas_a2\hnm\dial/H5s1c2.hnm (null)datas_a2\apc\dial\385_01.apc | 71 594bacd63e9c9edd5827b57cac05fa69 0
+rep 385 1 | 1 0 0 1 0 0 0 | (null)datas_a2\hnm\dial/shs1c1.hnm (null)datas_a2\apc\dial\385_02.apc | 255 bbd7960d6bcd19abbc11cbe72e6e46a0 0
+perso 385 0 | 0:3
+perso 385 1 | 0:3

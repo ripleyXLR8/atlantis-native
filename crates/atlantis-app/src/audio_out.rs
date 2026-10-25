@@ -6,6 +6,15 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 /// Opens the default output device; `None` (logged) when there is none.
 /// The stream plays while it is kept alive.
 pub fn start(mixer: Mixer) -> Option<cpal::Stream> {
+    start_with(move |out, rate, channels| mixer.fill(out, rate, channels))
+}
+
+/// The same for any mixer: `fill(out, rate, channels)` writes interleaved
+/// samples.
+pub fn start_with<F>(mut fill: F) -> Option<cpal::Stream>
+where
+    F: FnMut(&mut [f32], u32, usize) + Send + 'static,
+{
     let host = cpal::default_host();
     let device = host.default_output_device().or_else(|| {
         log::warn!("no audio output device");
@@ -23,7 +32,7 @@ pub fn start(mixer: Mixer) -> Option<cpal::Stream> {
             move |out: &mut [f32], _| {
                 #[cfg(not(target_arch = "wasm32"))]
                 crate::watchdog::audio_beat();
-                mixer.fill(out, rate, channels)
+                fill(out, rate, channels)
             },
             |e| log::warn!("audio stream: {e}"),
             None,
@@ -36,7 +45,7 @@ pub fn start(mixer: Mixer) -> Option<cpal::Stream> {
                     #[cfg(not(target_arch = "wasm32"))]
                     crate::watchdog::audio_beat();
                     buf.resize(out.len(), 0.0);
-                    mixer.fill(&mut buf, rate, channels);
+                    fill(&mut buf, rate, channels);
                     for (o, s) in out.iter_mut().zip(&buf) {
                         *o = (s * 32767.0) as i16;
                     }

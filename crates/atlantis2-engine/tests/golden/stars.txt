@@ -1,0 +1,137 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) and scenar\chapi039.con (MD5 201d1b3afd58105b0b562ccf78a0394b):
+# the star map (YU view 121). The ids line gives the defnames.con indices of the objects
+# Etoiles_Puz, the seven ETOILE stars and OBSIDIENNE1; params the stars' parameters; the
+# variables line etat_etoile0..16, etoiles_fini, pz_etoile_started, Etoiles_JustFinished,
+# OBJETENMAIN, MONDE, CLICZONE; range the objects around the stars' range. `lines` are
+# chapter 39's line numbers. Each section's own header (## lines) says what its rows hold.
+ids objects 150 67 68 69 70 71 72 73 154
+params 6 6 6 6 6 6 6
+ids variables 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 192 242 28 91 76
+range 66:LEZARD 67:ETOILE102 68:ETOILE103 69:ETOILE105 70:ETOILE108 71:ETOILE111 72:ETOILE113 73:ETOILE115 74:BOUTON_S
+## state: etat = the non-zero etat_etoile<h> (h:value); tab = the Etoiles_Puz slot's frame table (slot 0); slot0 = its active(+0x30)/frame(+0x10)/playing(+0xbc); hand = OBJETENMAIN; pair = the hand pair (frame 0x00673f94, bank 0x00673f68); cursor = the cursor pair (bank 0x00673fa0, frame 0x005def58); bag = id/sprite/world; started = pz_etoile_started, just = Etoiles_JustFinished, fini = etoiles_fini; OBJ = the world's objects bank
+## B: entry hook FUN_00494e00 on view 121's slots (MONDE 6): etat_etoile<h> given (h:value), the table before (pre), the slot's active/frame/playing before (pre slot), the hook run once or twice; kept = the id (0x006d26ec) and the slot index (0x006d26f0) it keeps
+B etat [] pre [] pre slot - times 1 -> etat [] tab [] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [0:67] pre [] pre slot - times 1 -> etat [0:67] tab [0] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [0:67,5:68,16:73] pre [] pre slot - times 1 -> etat [0:67,5:68,16:73] tab [0,5,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [0:67,1:68,2:69,3:70,4:71,5:72,6:73,7:67,8:68,9:69,10:70,11:71,12:72,13:73,14:67,15:68,16:69] pre [] pre slot - times 1 -> etat [0:67,1:68,2:69,3:70,4:71,5:72,6:73,7:67,8:68,9:69,10:70,11:71,12:72,13:73,14:67,15:68,16:69] tab [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [0:67,2:67,6:67,8:67,11:67,13:67,16:67] pre [] pre slot - times 1 -> etat [0:67,2:67,6:67,8:67,11:67,13:67,16:67] tab [0,2,6,8,11,13,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [3:-1,9:7,12:99999] pre [] pre slot - times 1 -> etat [3:-1,9:7,12:99999] tab [3,9,12] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [] pre [3,3,9] pre slot - times 1 -> etat [] tab [] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [4:67] pre [4,1] pre slot - times 1 -> etat [4:67] tab [4] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [1:67,2:67] pre [] pre slot - times 2 -> etat [1:67,2:67] tab [1,2] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B etat [7:67] pre [] pre slot 0/9/1 times 1 -> etat [7:67] tab [7] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn []
+B two slots of the id, etat [2:67] pre [5] -> etat [2:67] tab [2] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | kept 150 0 | warn [] | slot7 0/0/1 tab [2]
+B no slot of the id, etat [2:67] -> kept 150 0 slot0 1/0/0 tab0 [] | warn [fatal:AtlSpw_find_index():_vue_%d_!_AtlSpw_find_index(%d)_introuvable,warning:AddSpwToFrameTab_impossible_for_-_non_trouvé_-_:%d]
+## C: click hook FUN_00494e80(zone) after the entry hook, a zone of type t (0x32 unless given) and value v (the hole); MONDE 6; objects given to the bag by FUN_004754f0 and held by FUN_00475340 (empty: FUN_0047bf40); win test = FUN_00494f60 entered; lines = chapi039's /set lines run; sounds = what voice 2 starts, in order (film:NAME = the film's video, its track after it); warn = the warnings and fatals logged
+C empty zone 50 3 -> etat [] tab [] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn []
+C given -> etat [] tab [] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [67/6/2,68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 0 just 0 fini 0
+C ETOILE102 type 4 zone 4 3 -> etat [] tab [] slot0 1/0/0 hand 67 pair (6,OBJ) cursor (0,-1) bag [67/6/2,68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 0 just 0 fini 0 | win test 0 | lines [] | sounds [] | warn []
+C ETOILE102 type 3 zone 3 3 -> etat [] tab [] slot0 1/0/0 hand 67 pair (6,OBJ) cursor (0,-1) bag [67/6/2,68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 0 just 0 fini 0 | win test 0 | lines [] | sounds [] | warn []
+C ETOILE102 type 1 zone 1 3 -> etat [] tab [] slot0 1/0/0 hand 67 pair (6,OBJ) cursor (0,-1) bag [67/6/2,68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 0 just 0 fini 0 | win test 0 | lines [] | sounds [] | warn []
+C ETOILE102 zone 50 3 -> etat [3:67] tab [3] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE103 on the full hole zone 50 3 -> etat [3:67] tab [3] slot0 1/0/0 hand 68 pair (6,OBJ) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn []
+C empty on the full hole zone 50 3 -> etat [] tab [] slot0 1/0/0 hand 67 pair (6,OBJ) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2,67/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound114.apc] | warn []
+C ETOILE102 back in hand zone 50 4 -> etat [4:67] tab [4] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C OBSIDIENNE1 zone 50 5 -> etat [4:67] tab [4] slot0 1/0/0 hand 154 pair (10,OBJ) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn []
+C empty zone 50 5 -> etat [4:67] tab [4] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn []
+C ETOILE115 zone 50 16 -> etat [4:67,16:73] tab [4,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE103 zone 50 0 -> etat [0:68,4:67,16:73] tab [4,16,0] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [69/6/2,70/6/2,71/6/2,72/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE105 zone 50 2 -> etat [0:68,2:69,4:67,16:73] tab [4,16,0,2] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [70/6/2,71/6/2,72/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE108 zone 50 6 -> etat [0:68,2:69,4:67,6:70,16:73] tab [4,16,0,2,6] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [71/6/2,72/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE111 zone 50 8 -> etat [0:68,2:69,4:67,6:70,8:71,16:73] tab [4,16,0,2,6,8] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [72/6/2,154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE113 zone 50 11 -> etat [0:68,2:69,4:67,6:70,8:71,11:72,16:73] tab [4,16,0,2,6,8,11] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [154/10/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE102 the seventh zone 50 13 -> etat [0:68,2:69,4:67,6:70,8:71,11:72,13:67,16:73] tab [4,16,0,2,6,8,11,13] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [154/10/2] started 1 just 0 fini 1 | win test 1 | lines [27,28,29,30] | sounds [sound115.apc,film:cine049.hnm,cine049.apc] | warn []
+C after the win, empty zone 50 13 -> etat [0:68,2:69,4:67,6:70,8:71,11:72,13:67,16:73] tab [4,16,0,2,6,8,11,13] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [154/10/2] started 1 just 0 fini 1 | win test 0 | lines [] | sounds [] | warn []
+C after the win, OBSIDIENNE1 zone 50 1 -> etat [0:68,2:69,4:67,6:70,8:71,11:72,13:67,16:73] tab [4,16,0,2,6,8,11,13] slot0 1/0/0 hand 154 pair (10,OBJ) cursor (0,-1) bag [154/10/2] started 1 just 0 fini 1 | win test 0 | lines [] | sounds [] | warn []
+C ETOILE102 zone 50 0 -> etat [0:67,1:67,3:67,4:67,5:67,7:67,9:67,10:67,12:67,14:67,15:67] tab [1,3,4,5,7,9,10,12,14,15,0] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE103 zone 50 2 -> etat [0:67,1:67,2:68,3:67,4:67,5:67,7:67,9:67,10:67,12:67,14:67,15:67] tab [1,3,4,5,7,9,10,12,14,15,0,2] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [69/6/2,70/6/2,71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE105 zone 50 6 -> etat [0:67,1:67,2:68,3:67,4:67,5:67,6:69,7:67,9:67,10:67,12:67,14:67,15:67] tab [1,3,4,5,7,9,10,12,14,15,0,2,6] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [70/6/2,71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE108 zone 50 8 -> etat [0:67,1:67,2:68,3:67,4:67,5:67,6:69,7:67,8:70,9:67,10:67,12:67,14:67,15:67] tab [1,3,4,5,7,9,10,12,14,15,0,2,6,8] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE111 zone 50 11 -> etat [0:67,1:67,2:68,3:67,4:67,5:67,6:69,7:67,8:70,9:67,10:67,11:71,12:67,14:67,15:67] tab [1,3,4,5,7,9,10,12,14,15,0,2,6,8,11] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [72/6/2,73/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE113 zone 50 13 -> etat [0:67,1:67,2:68,3:67,4:67,5:67,6:69,7:67,8:70,9:67,10:67,11:71,12:67,13:72,14:67,15:67] tab [1,3,4,5,7,9,10,12,14,15,0,2,6,8,11,13] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [73/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C empty, a right hole zone 50 13 -> etat [0:67,1:67,2:68,3:67,4:67,5:67,6:69,7:67,8:70,9:67,10:67,11:71,12:67,14:67,15:67] tab [1,3,4,5,7,9,10,12,14,15,0,2,6,8,11] slot0 1/0/0 hand 72 pair (6,OBJ) cursor (0,-1) bag [73/6/2,72/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound114.apc] | warn []
+C ETOILE113 back in hand zone 50 16 -> etat [0:67,1:67,2:68,3:67,4:67,5:67,6:69,7:67,8:70,9:67,10:67,11:71,12:67,14:67,15:67,16:72] tab [1,3,4,5,7,9,10,12,14,15,0,2,6,8,11,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [73/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C ETOILE113 back in hand zone 50 13 -> etat [0:67,1:67,2:68,3:67,4:67,5:67,6:69,7:67,8:70,9:67,10:67,11:71,12:67,14:67,15:67,16:72] tab [1,3,4,5,7,9,10,12,14,15,0,2,6,8,11,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [73/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn []
+C seven held, empty zone 50 5 -> etat [0:67,2:67,6:67,8:67,11:67,13:67,16:67] tab [0,2,6,8,11,13,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 1 | win test 1 | lines [27,28,29,30] | sounds [film:cine049.hnm,cine049.apc] | warn []
+C seven held, etoiles_fini 2, empty zone 50 5 -> etat [0:67,2:67,6:67,8:67,11:67,13:67,16:67] tab [0,2,6,8,11,13,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 1 | win test 1 | lines [27,28,29,30] | sounds [film:cine049.hnm,cine049.apc] | warn []
+C etoiles_fini 1, ETOILE115 zone 50 16 -> etat [0:67,2:67,6:67,8:67,11:67,13:67] tab [0,2,6,8,11,13] slot0 1/0/0 hand 73 pair (6,OBJ) cursor (0,-1) bag [73/6/2] started 0 just 0 fini 1 | win test 0 | lines [] | sounds [] | warn []
+C empty on a hole holding 7 zone 50 4 -> etat [] tab [] slot0 1/0/0 hand 7 pair (16,OBJ) cursor (0,-1) bag [7/16/2] started 0 just 0 fini 0 | win test 1 | lines [] | sounds [sound114.apc] | warn []
+C OBSIDIENNE1 on the emptied hole zone 50 4 -> etat [] tab [] slot0 1/0/0 hand 154 pair (10,OBJ) cursor (0,-1) bag [7/16/2,154/10/2] started 0 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn []
+C ObjetEnMain 66 (no bag) zone 50 7 -> etat [] tab [] slot0 1/0/0 hand 66 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn []
+C ObjetEnMain 74 (no bag) zone 50 7 -> etat [] tab [] slot0 1/0/0 hand 74 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn []
+C ObjetEnMain 68 (no bag) zone 50 7 -> etat [7:68] tab [7] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C MONDE 2 ETOILE108 zone 50 9 -> etat [9:70] tab [9] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound115.apc] | warn []
+C MONDE 2 empty zone 50 9 -> etat [] tab [] slot0 1/0/0 hand 70 pair (6,OBJ) cursor (0,-1) bag [70/6/2] started 1 just 0 fini 0 | win test 1 | lines [] | sounds [sound114.apc] | warn []
+C empty zone 50 17 -> etat [] tab [] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn [fatal:DefName_GetIdName:_Nom_de_%s_inconnu:%s]
+C empty zone 50 -1 -> etat [] tab [] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 0 just 0 fini 0 | win test 1 | lines [] | sounds [] | warn [fatal:DefName_GetIdName:_Nom_de_%s_inconnu:%s]
+## C win: FUN_00494f60 alone on etat_etoile<h> given; scan = CtrlScenarIN entered
+C win [0,2,6,8,11,13,16] -> just 0 scan 1 lines [27,28,29,30]
+C win [0,2,6,8,11,13] -> just 0 scan 0 lines []
+C win [2,6,8,11,13,16] -> just 0 scan 0 lines []
+C win [0,2,6,8,11,16] -> just 0 scan 0 lines []
+C win [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16] -> just 0 scan 1 lines [27,28,29,30]
+C win [1,3,4,5,7,9,10,12,14,15] -> just 0 scan 0 lines []
+C win [] -> just 0 scan 0 lines []
+## D: the hook dispatcher FUN_0049b910(zone) alone: the view's warp name (+0x00), number (+0x10), the zone's type (value 3), ETOILE102 held, the puzzle mode 0 -> the hooks entered (00494e80 the click, 00494f60 the win test), AL, etat_etoile3; then FUN_0049bd50 -> entered (00494e00 the entry)
+D yu0121.hnm 121 1 -> - AL 0 etat3 0
+D yu0121.hnm 121 2 -> - AL 0 etat3 0
+D yu0121.hnm 121 3 -> - AL 0 etat3 0
+D yu0121.hnm 121 4 -> - AL 0 etat3 0
+D yu0121.hnm 121 10 -> - AL 0 etat3 0
+D yu0121.hnm 121 50 -> 00494e80,00494f60 AL 0 etat3 67
+D yu0121.hnm 121 1000 -> - AL 0 etat3 0
+D YU0121.HNM 121 50 -> 00494e80,00494f60 AL 0 etat3 67
+D Yu121 121 50 -> 00494e80,00494f60 AL 0 etat3 67
+D ir0121.hnm 121 50 -> - AL 0 etat3 0
+D Y 121 50 -> - AL 0 etat3 0
+D yu0121.hnm 120 50 -> - AL 0 etat3 0
+D yu0121.hnm 122 50 -> - AL 0 etat3 0
+D yu0121.hnm 21 50 -> - AL 0 etat3 0
+D yu0121.hnm 1121 50 -> - AL 0 etat3 0
+D entry yu0121.hnm 121 -> 00494e00 kept 150
+D entry YU0121.HNM 121 -> 00494e00 kept 150
+D entry ir0121.hnm 121 -> - kept 0
+D entry yu0120.hnm 120 -> - kept 0
+## E: the zone click FUN_0049ca80 (CtrlScenarOUT, the dispatcher, CLICZONE) then the click scan FUN_0045a870 (CtrlScenarIN) on chapi039, view YU 121, a zone of type 0x32 under the centre, no sprite, RunInit stubbed; then the suspended section resumed (FUN_00483f90) as the film's end does, then CLICZONE = 0 as the warp frame's last step does: out = the departure scan's lines; hook = CLICZONE when the hook starts, the lines it runs, the sounds of the click; click scan = 1 when FUN_0045a870 ran CtrlScenarIN (a film started by the hook's scan clears the click flag 0x006569c9); in = the click scan's and the resumed lines
+E ETOILE102 zone 50 5 -> out [] | hook cliczone 0 lines [] sounds [sound115.apc] | cliczone 5 | click scan 1 | in [] resumes 0 | etat [5:67] tab [5] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0
+E empty zone 50 5 -> out [] | hook cliczone 0 lines [] sounds [sound114.apc] | cliczone 5 | click scan 1 | in [] resumes 0 | etat [] tab [] slot0 1/0/0 hand 67 pair (6,OBJ) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2,67/6/2] started 1 just 0 fini 0
+E ETOILE102 zone 50 0 -> out [] | hook cliczone 0 lines [] sounds [sound115.apc] | cliczone 0 | click scan 1 | in [] resumes 0 | etat [0:67] tab [0] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [68/6/2,69/6/2,70/6/2,71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0
+E ETOILE103 zone 50 2 -> out [] | hook cliczone 0 lines [] sounds [sound115.apc] | cliczone 2 | click scan 1 | in [] resumes 0 | etat [0:67,2:68] tab [0,2] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [69/6/2,70/6/2,71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0
+E ETOILE105 zone 50 6 -> out [] | hook cliczone 0 lines [] sounds [sound115.apc] | cliczone 6 | click scan 1 | in [] resumes 0 | etat [0:67,2:68,6:69] tab [0,2,6] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [70/6/2,71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0
+E ETOILE108 zone 50 8 -> out [] | hook cliczone 0 lines [] sounds [sound115.apc] | cliczone 8 | click scan 1 | in [] resumes 0 | etat [0:67,2:68,6:69,8:70] tab [0,2,6,8] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [71/6/2,72/6/2,73/6/2] started 1 just 0 fini 0
+E ETOILE111 zone 50 11 -> out [] | hook cliczone 0 lines [] sounds [sound115.apc] | cliczone 11 | click scan 1 | in [] resumes 0 | etat [0:67,2:68,6:69,8:70,11:71] tab [0,2,6,8,11] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [72/6/2,73/6/2] started 1 just 0 fini 0
+E ETOILE113 zone 50 13 -> out [] | hook cliczone 0 lines [] sounds [sound115.apc] | cliczone 13 | click scan 1 | in [] resumes 0 | etat [0:67,2:68,6:69,8:70,11:71,13:72] tab [0,2,6,8,11,13] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [73/6/2] started 1 just 0 fini 0
+E ETOILE115 zone 50 16 -> out [] | hook cliczone 0 lines [27,28,29,30] sounds [sound115.apc,film:cine049.hnm,cine049.apc] | cliczone 16 | click scan 0 | in [31,32,33] resumes 1 | etat [0:67,2:68,6:69,8:70,11:71,13:72,16:73] tab [0,2,6,8,11,13,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 1 just 0 fini 1
+E after the win, empty zone 50 16 -> out [] | hook cliczone 0 lines [] sounds [] | cliczone 16 | click scan 1 | in [] resumes 0 | etat [0:67,2:68,6:69,8:70,11:71,13:72,16:73] tab [0,2,6,8,11,13,16] slot0 1/0/0 hand 0 pair (0,0) cursor (0,-1) bag [] started 1 just 0 fini 1
+F save entries at 0x006d26e0..0x006d2700: []
+errors []
+## G: FUN_0047ce60(slot 0, faces, rects) on an Etoiles_Puz slot (+0x34 = 0, click kind 0) holding epa1121121.SPW (md5 a1b01e5a7f5edada60c475e4b74fcc07, 17 frames), faces 512 x 512 RGB565 over the background of spw_golden.py (pixel i = (i * 2654435761 mod 2^32) >> 16, md5 4f168fc9c0f17cd896b5ea7f8248e8b6), visible rectangles the whole faces; per face: bg (untouched) or the md5 of its 512 x 512 u16 pixels (little-endian), the changed-pixel count and, for each frame of the table with a box on that face, the pixels at the box's centre, first and last corner (x,y=rgb565 hex); AL = the byte returned
+G tab [] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [0,2,6,8,11,13,16] AL 0 | f0 bg | f1 6388ca319938a8440349706d513c626d n1291 204,448=4185 195,441=a585 212,455=3883 178,464=51c5 168,456=75ee 187,471=b44f 250,455=51c4 241,447=ad31 258,463=1e16 277,469=5206 267,460=6130 286,478=ec6a 289,497=3945 278,486=724a 299,508=f5c1 339,500=6a46 328,489=a5fa 350,511=5304 342,475=7285 332,465=b806 351,484=b235 | f2 bg | f3 2616e902b6e568f9c874bf3bbc2f7988 n26 168,510=dd45 161,508=abda 175,511=9fbc | f4 bg | f5 bg
+G tab [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16] AL 0 | f0 bg | f1 911beb89ea3be71843ac9234e5cf88b2 n2953 204,448=4185 195,441=a585 212,455=3883 226,443=5205 218,436=b1c0 234,450=a687 178,464=51c5 168,456=75ee 187,471=b44f 212,464=5a05 203,456=1784 221,472=26a0 191,484=49c5 180,474=ada5 201,494=5335 235,471=5a04 225,462=49fc 244,479=6644 250,455=51c4 241,447=ad31 258,463=5cef 256,470=6246 247,461=2965 265,478=f1dd 277,469=5206 267,460=6130 286,478=ec6a 239,496=51c4 228,485=1c81 249,506=3105 264,487=72c6 254,476=4794 274,497=bde1 289,497=3945 278,486=724a 299,508=f5c1 315,510=7b8a 313,508=9ca9 317,511=5241 339,500=6a46 328,489=a5fa 350,511=5304 312,479=4985 302,469=e954 321,489=5275 304,455=82c6 296,447=ab1c 312,463=7dca 342,475=7285 332,465=b806 351,484=b235 | f2 bg | f3 f0ec1bab0b35beb4dd6e4041bf5d22c2 n289 194,500=7286 183,488=999a 204,511=8c05 168,510=dd45 161,508=abda 175,511=9fbc | f4 bg | f5 bg
+G tab [16,13,11,8,6,2,0] AL 0 | f0 bg | f1 6388ca319938a8440349706d513c626d n1291 342,475=7285 332,465=b806 351,484=b235 339,500=6a46 328,489=a5fa 350,511=5304 289,497=3945 278,486=724a 299,508=f5c1 277,469=5206 267,460=6130 286,478=ec6a 250,455=51c4 241,447=ad31 258,463=1e16 178,464=51c5 168,456=75ee 187,471=b44f 204,448=4185 195,441=a585 212,455=3883 | f2 bg | f3 2616e902b6e568f9c874bf3bbc2f7988 n26 168,510=dd45 161,508=abda 175,511=9fbc | f4 bg | f5 bg
+G tab [12,13] AL 0 | f0 bg | f1 76e936e5d31b2db137b7bbfca347bcc3 n260 315,510=7b8a 313,508=9ca9 317,511=5241 339,500=6a46 328,489=a5fa 350,511=5304 | f2 bg | f3 f0ec1bab0b35beb4dd6e4041bf5d22c2 n289 194,500=7286 183,488=999a 204,511=8c05 168,510=dd45 161,508=abda 175,511=9fbc | f4 bg | f5 bg
+G tab [13,12] AL 0 | f0 bg | f1 76e936e5d31b2db137b7bbfca347bcc3 n260 339,500=6a46 328,489=a5fa 350,511=5304 315,510=7b8a 313,508=9ca9 317,511=5241 | f2 bg | f3 f0ec1bab0b35beb4dd6e4041bf5d22c2 n289 168,510=dd45 161,508=abda 175,511=9fbc 194,500=7286 183,488=999a 204,511=8c05 | f4 bg | f5 bg
+G tab [3,-1,5] AL 0 | f0 bg | f1 20c1a44087aac9499c977ffddbaad2b6 n338 212,464=5a05 203,456=1784 221,472=26a0 235,471=5a04 225,462=49fc 244,479=6644 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [5,5] AL 0 | f0 bg | f1 10fde7d6d0b92e38e280a9741488c066 n178 235,471=5a04 225,462=49fc 244,479=6644 235,471=5a04 225,462=49fc 244,479=6644 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [-1] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [0] AL 0 | f0 bg | f1 638d4adbc7042825bf3dcc22fba40843 n132 204,448=4185 195,441=a585 212,455=3883 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [1] AL 0 | f0 bg | f1 ee65605ee502e3caa40820399fe987ec n127 226,443=5205 218,436=b1c0 234,450=a687 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [2] AL 0 | f0 bg | f1 624207fdf6ed880dedf70f053bebc0ea n162 178,464=51c5 168,456=75ee 187,471=b44f | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [3] AL 0 | f0 bg | f1 a38ae2756eccc9bbbfb132ce634bb8d4 n160 212,464=5a05 203,456=1784 221,472=26a0 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [4] AL 0 | f0 bg | f1 7176bc0156bb88a75633d889231fd2c6 n204 191,484=49c5 180,474=ada5 201,494=5335 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [5] AL 0 | f0 bg | f1 702ca278b9c519cc028f6dbc613bf73d n178 235,471=5a04 225,462=49fc 244,479=6644 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [6] AL 0 | f0 bg | f1 4cb725a53ce88d63e67279c56b89dccb n155 250,455=51c4 241,447=ad31 258,463=1e16 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [7] AL 0 | f0 bg | f1 1deb1b5278235b5e1752c156d1bd5eca n166 256,470=6246 247,461=73cd 265,478=f1dd | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [8] AL 0 | f0 bg | f1 7f79a75397f55bcdaa2e7bb44bb0b6b8 n172 277,469=5206 267,460=6130 286,478=ec6a | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [9] AL 0 | f0 bg | f1 be4a434fde50d0181ffca3d42bec7ffa n242 239,496=51c4 228,485=1c81 249,506=3105 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [10] AL 0 | f0 bg | f1 f59f7d5ac2a620a340b50e4c2c28b586 n215 264,487=72c6 254,476=4794 274,497=bde1 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [11] AL 0 | f0 bg | f1 d4b922c6680918b865ebbae329baa001 n229 289,497=3945 278,486=724a 299,508=f5c1 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [12] AL 0 | f0 bg | f1 7aa3a2e3154cf2bdc23e45e5efd26dde n13 315,510=7b8a 313,508=9ca9 317,511=5241 | f2 bg | f3 f72438b0869b333c55d84a404f24b9f2 n263 194,500=7286 183,488=999a 204,511=8c05 | f4 bg | f5 bg
+G tab [13] AL 0 | f0 bg | f1 03b30e92a598fc971b04723bd80b63f8 n247 339,500=6a46 328,489=a5fa 350,511=5304 | f2 bg | f3 2616e902b6e568f9c874bf3bbc2f7988 n26 168,510=dd45 161,508=abda 175,511=9fbc | f4 bg | f5 bg
+G tab [14] AL 0 | f0 bg | f1 85d2081eed9de2de80e834e57e85e7c4 n206 312,479=4985 302,469=e954 321,489=5275 | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [15] AL 0 | f0 bg | f1 d32780ad9633625ac5b0d585616e3756 n153 304,455=82c6 296,447=ab1c 312,463=7dca | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [16] AL 0 | f0 bg | f1 4621b2995990e715a2baf9e151d1a1f8 n194 342,475=7285 332,465=b806 351,484=b235 | f2 bg | f3 bg | f4 bg | f5 bg
+G errors []

@@ -1,0 +1,76 @@
+# Dialog frames drawn by the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation: the dialog's video stream HnmStream (open
+# 0x0046b4e0 with its two frames, next frame 0x0046b750, frame number 0x0046b840) on a body video,
+# the head's pose 0x00463140 at the frame number, the mouth 0x004631a0 on key `a`, then the draw of
+# the dialog frame 0x00461430 (Z clear, body video 0x0046b790 through its AL mask, DisplayFace
+# 0x00463460 with the C rasteriser) over a synthetic background, x87 control word 0x027f,
+# srand(0) at the dialog object's construction.
+# Producer: an emulation harness running the original code. Stubs and harness inputs: the file and
+# memory calls of Win32 (host files, a bump heap whose GlobalAlloc blocks start with a non-zero
+# dword: the video end test 0x0040bd90 also reads the first dword of a read buffer this build never
+# writes), the screen's pixel format (RGB565), the background (below), the log and error reporters.
+# Background: pixel (x, y) = (x * 31 / 639) << 11 | (y * 63 / 479) << 5 | ((x + y) & 31).
+# Derived values only (MD5s and frame numbers).
+open shs1.db shs1c1.hnm | 1 1
+tick shs1.db shs1c1.hnm 0 0 | 1 | a30bedd85f730dbc21d539ff969a35b2 1477fb58f1c85e4c8f891825265b4c88 | 3386c41c0599983ce49036c558c13954
+tick shs1.db shs1c1.hnm 0 1 | 2 | ac53368c2afbe76d0700233862816190 547943ada4958ad809304b6bcf7450f4 | 19aa04b104eab46cef6c74a23265e379
+tick shs1.db shs1c1.hnm 0 2 | 3 | b7c4b2e61e8b75168a48e8bd2b3016b5 8ec7457c0626d2e4a87ab43f869f903b | 6002d2bf8f2ba4dfc7ea1c9e91c2e5a2
+tick shs1.db shs1c1.hnm 0 3 | 4 | 4c44c306b7cf77dee017fdb8dfa6d3d9 86f5c0f6f20400a4af6ad2e493b1ea3b | f189dc0aec751df45bb1af7a58b3d220
+tick shs1.db shs1c1.hnm 0 4 | 5 | 20a5e04ebf254f6600f7c2f440342cf8 2419bcd0b1a1526f4e23670f1e386720 | aa2a19062b34e90b5d3f7e5158305dcd
+tick shs1.db shs1c1.hnm 0 5 | 6 | 4a356fdb58a6bfb97a6f711b4bc35932 55616018473e035dbcd0c9b65f43c07b | d712ac1d07b64d6cfd485ba5e4a6f19c
+tick shs1.db shs1c1.hnm 0 6 | 7 | ad96ac127e8d067ab79e566fc14bc886 6b7e598b48be7a6b2308e13a0f988bf6 | 8f02bb9e064a49ecb363464f646cdf1a
+tick shs1.db shs1c1.hnm 0 7 | 8 | 16a53b9485b5946ba0c298d353de7762 f2c49d0007b40cc61070ccafa584e2f7 | c855bd4b94a7f1068746a6be288c0dc7
+tick shs1.db shs1c1.hnm 0 8 | 9 | 31f314567ecf8ab1154e4a7782296cf0 4ae9d18647748d49ca57f8dfaf115d2f | 7083252d6ae048fd344e98495aefeec1
+tick shs1.db shs1c1.hnm 0 9 | 10 | 2e16b1d778d15ea739b2cc80a75d02dd 142fe57d5b59ad23b4511e4ab546fc4d | e119fef3e27a1b2337e16a5d9fd6b7cd
+tick shs1.db shs1c1.hnm 0 10 | 11 | 29ebd7f5264b6f53024b42a5c5863b12 19007a982c8ddae9534ace0572b1b4ef | cac64aecfeb01b704a199855a5959eed
+tick shs1.db shs1c1.hnm 0 11 | 12 | dae675fcb448c6abf9719e0f38373f5c 866f8664a3cc8c2047139f74fba290be | deabeda657964067342eb0941d97157b
+tick shs1.db shs1c1.hnm 0 12 | 13 | f1897543063b0347697325eb2245a649 c9e570e60e1fff460336ce2b354d04f2 | 4cad9b0c149f2e21ff8fdea5fe3e184e
+tick shs1.db shs1c1.hnm 0 13 | 14 | 89cf7c925b79e3d68981d5789585bfd0 8b01452a788d4b9b216e122c337c5441 | d7bdc6c56dfbc3e3123095f600af7eed
+tick shs1.db shs1c1.hnm 0 14 | 15 | 2f678ab3b733cc7deb49f26e31bf81c3 d878f2afef3cd5e0ca4f4d41cd32aef0 | e058bc5ed15e4f0e109c80633589220d
+tick shs1.db shs1c1.hnm 0 15 | 16 | 2d575a22eae99e64700f5b10cf053a5e 58a57b57b02e44926e0ca138de25eca4 | 5530f366e20fe7ec81119e17a5d94045
+tick shs1.db shs1c1.hnm 0 16 | 17 | 3b8bed6d1ab0ed225c394cb594e37a9a bef18cad26f083e747c8a38033982179 | 7aaf61c7011d9aacf1e3bba5204d160a
+tick shs1.db shs1c1.hnm 0 17 | 18 | e27baf78febec5e8e7e7bf95cee5dc5c 4caf221a797ec71b0c57243ca1f19ae5 | abf85ab4582843d0fe62950287304d8b
+tick shs1.db shs1c1.hnm 0 18 | 19 | 0bf286e8d41637a668b16facd08f37bd d441a763e9839af335551320b7425b64 | ae8c925d1e6679054db5c90d6b5dda50
+tick shs1.db shs1c1.hnm 0 19 | 20 | 08d01f8d63621d3df3b6e3297735380e 5e4b9470d35c7353d36e95fb7822ee55 | ed830b0f03531d619a040be6ab881cb3
+tick shs1.db shs1c1.hnm 0 20 | 21 | 7cbbb3cf3192a0d28a82112728270bd6 fa8db30d79fc30430d1a392ebd17046a | 09e0bce15980dce180027495fb4d9377
+tick shs1.db shs1c1.hnm 0 21 | 22 | aafc77acdf95d3a2630f4ffdbb777940 2192ff9763981081ea6e9c749a7fef53 | bb9e045a678bd5f74abd9a4b5e5761e7
+tick shs1.db shs1c1.hnm 0 22 | 23 | 43e0cf6793e02ac840845a8c70d85219 6838114b625c469a04bd809460f8e6c0 | fd2dea5b5880d54d02e5b558e8890a45
+tick shs1.db shs1c1.hnm 0 23 | 24 | 0158aefa5c728201096fd6bedf4e9697 6a6fed6eee791c09d8b9c7c133fa21e3 | b2235cfacbae1b9a6f48a97c6691b451
+tick shs1.db shs1c1.hnm 0 24 | 25 | 5480931252b386959a43bc6f9313cbaa cadd8b24ff9b4956bb14bc5f3a162766 | 0d1ef71fbe1bf2f8899bb7a370578d4f
+tick shs1.db shs1c1.hnm 0 25 | 26 | 54fe85d42213fd12ed9f66519cf867ba 4e23a89374396e37a96b8c483e9e940a | 70aec5c3ea434bc825cdb095c751a61b
+tick shs1.db shs1c1.hnm 0 26 | 27 | 107e07e50eb5413a208ae78389678d60 2dfa602137944580bd77d75eed40591d | 8bb519a8aedeeb6b2bbc9e227f8ef9ce
+tick shs1.db shs1c1.hnm 0 27 | 28 | f38c50b32d241e10ac84d551e96c99c9 0400336951f883738bae07297de51afd | 519ebdadafb2c0d67f83be7757793fed
+tick shs1.db shs1c1.hnm 0 28 | 29 | 9181d30ac7e5d1145f56b236cc52f7ec 74a35821c2116147b93ff3f347188642 | aba50ac9614a546760bfe9e67054c36b
+tick shs1.db shs1c1.hnm 0 29 | 30 | ab4ba28d7da96f3bcccffacc8e9fda57 786b183d6b8ff5ba24686e9fc9fbecf3 | 66e0bbd9393fdb6848103c42a1a7c9df
+tick shs1.db shs1c1.hnm 0 30 | 31 | b0bcd4d6a44a8f36cdf3578688282360 d55398160500a3d60a112932dcfdc921 | 5167acc47c13bc681a3fb038e0ce88d1
+tick shs1.db shs1c1.hnm 0 31 | 32 | c59ab14f1725e33c6070303dadc6a377 c79197cbbbcf406155aea5f146d12f2d | 167f5b2c33e616aae5a6d2d009492bdb
+tick shs1.db shs1c1.hnm 0 32 | 33 | 6378c74a47f63c3ad84e95437b9fccc2 e27d0dfcb87760295a40f2844b7816aa | 8880ab1ed0cf4bc4382246ab0b124cbc
+tick shs1.db shs1c1.hnm 0 33 | 34 | 376c0790603fb9c1cbb24edd5ffb1034 a05ecca5e46f9bdbf66247b5cd497f93 | 72aa1a10748a6c79586f39bcb8699319
+tick shs1.db shs1c1.hnm 0 34 | 35 | bb69357f31ee0a78cea3ce0755e0e05c fca6b6a02cfc2f9d34950dd70e347afc | 2b85f479323925ba0b8b6e723bed2d3a
+tick shs1.db shs1c1.hnm 0 35 | 36 | 4501410462483234f1b7dbe039508966 a66c65c27bdffcad3ef7c953a55d20f2 | d2defcc42c0ba483f8f0180a4423dfce
+tick shs1.db shs1c1.hnm 0 36 | 37 | c3a1bf29bee761dcde0e9a9d07dc8680 3b542227a0d2ed18f265619af11f967e | a71c8808defe39f08b831840e1264acc
+tick shs1.db shs1c1.hnm 0 37 | 38 | fe8efde01ac6d930f2d591df643b7a9c 5f7f3799b0088a6042fe471c6d6faecf | eea1307bd5d95e27bd39425fb4680e52
+tick shs1.db shs1c1.hnm 0 38 | 39 | c2d160f9a8e76dbd17e84befb1060024 f80f433ce9605b0e9c0333f63eac66f0 | 01fb59606be4150a0b729f5d1efc14bf
+tick shs1.db shs1c1.hnm 0 39 | 40 | c9ca1bc4d73bd935e75e01e577105032 d05eb0621ef3d4d76c6c8b2069fd32c4 | 75209f0a491deb94294eba8cd8ad9cde
+tick shs1.db shs1c1.hnm 0 40 | 1 | a30bedd85f730dbc21d539ff969a35b2 1477fb58f1c85e4c8f891825265b4c88 | 3386c41c0599983ce49036c558c13954
+tick shs1.db shs1c1.hnm 0 41 | 2 | ac53368c2afbe76d0700233862816190 547943ada4958ad809304b6bcf7450f4 | 19aa04b104eab46cef6c74a23265e379
+tick shs1.db shs1c1.hnm 0 42 | 3 | b7c4b2e61e8b75168a48e8bd2b3016b5 8ec7457c0626d2e4a87ab43f869f903b | 6002d2bf8f2ba4dfc7ea1c9e91c2e5a2
+tick shs1.db shs1c1.hnm 0 43 | 4 | 4c44c306b7cf77dee017fdb8dfa6d3d9 86f5c0f6f20400a4af6ad2e493b1ea3b | f189dc0aec751df45bb1af7a58b3d220
+open shs1.db shs1c2.hnm | 1 1
+tick shs1.db shs1c2.hnm 1 0 | 1 | fea543e3774443b0b9b4977adaf31330 db0a09fa25b677435b276f1edc776d00 | adc6d7796c20c50decc87ecf82651dca
+tick shs1.db shs1c2.hnm 1 1 | 2 | a473555597e0e4edbd13a7b0f2d94c2f df621aeeca32faac9885d4e95e66a89e | 1eaa44e0835f1291c79794e4c288d80b
+tick shs1.db shs1c2.hnm 1 2 | 3 | 6d70c8fd9e0b003f155ea192f4f14edc b640b87f25505374a65e89e2c4e993c6 | c8c499fa07ce6cd52bb6edb2ab3e4a5f
+open shs1.db shs1c3.hnm | 1 1
+tick shs1.db shs1c3.hnm 2 0 | 1 | d7030af58c9ca7003388e57c05c6119c 6f0a1549a331576098739e0d3464050e | 2ce29df156f6c1f7246ddd876651027a
+tick shs1.db shs1c3.hnm 2 1 | 2 | 640ab17afa28c19401ca08f71dd8a6b2 45a68a3d90612b85123462a1f30cb289 | baf384897e268abb7859d94240b96846
+tick shs1.db shs1c3.hnm 2 2 | 3 | ef7da534c6dd671402e02dec14030396 5433b45cebc74ce6f04980486c5c452b | 7bc21087089b9f110c60a6119e8b2f67
+open H5s1.db H5s1C1.hnm | 1 1
+tick H5s1.db H5s1C1.hnm 0 0 | 1 | 6e313687fec9c97fab146458cde02387 7bb9c1f04e4bda2f09057a1107478285 | e29ce6291df33b80acb5050dd023063f
+tick H5s1.db H5s1C1.hnm 0 1 | 2 | 3fe1cc8ce7ae6308e26be843fc69759c d6f761b7f44e18c080feec891172acae | a3d44c4ad16824a0895a7d3259f71440
+tick H5s1.db H5s1C1.hnm 0 2 | 3 | c8f3911482c6de32702e9acb4c5fdf75 1f79cc04d9a6ca65d128d38b8b2779de | f5b758c271feb6d8c800bd9fd6d75aee
+# background (above), md5 of its 640 x 480 pixels 609b5d3f6f41579aa664772c651b88d1
+# tick line: db video camera tick | frame number | md5(frame) md5(Z) | md5(frame without the head)
+# files: shs1.db md5 f35eb0555ab0b95f35319901ad136b6d; shs1c1.hnm: md5 3d58bbbc75a8550f1cc3329b3b687184
+# files: shs1.db md5 f35eb0555ab0b95f35319901ad136b6d; shs1c2.hnm: md5 d8860f5c39df56e99a9e92f2d4d146d7
+# files: shs1.db md5 f35eb0555ab0b95f35319901ad136b6d; shs1c3.hnm: md5 27d3693f1c96a2d51f1ee6775aaae7ef
+# files: H5s1.db md5 7e3ebda99ac7dd1b596d015d41630ae9; H5s1C1.hnm: md5 1a2f0770c1f66ffc9d7d486721ad8eba

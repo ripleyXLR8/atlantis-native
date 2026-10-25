@@ -1,0 +1,175 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) and scenar\chapi078.con (MD5 c6ea5dbe5b606e05a1abdabe39fb3ef2):
+# Shamballa's fireflies (voiles.wam view 1): the click (@ 0x00495210) alone (A-C), the
+# move end (@ 0x004952d0) under both x87 control words (D), the engine's test of the place
+# name (@ 0x0045a630, E), the hook dispatcher (@ 0x0049b910, F), and the zone click
+# (@ 0x0049ca80), the click scan (@ 0x0045a870) and the move end of the same click on
+# chapter 78 (G). The six mandalas are laid by the original's Tibet hook (@ 0x004954f0).
+# `lines` are chapter 78's line numbers; speeds = the turn's yaw / pitch speeds after;
+# SetFov = the camera's field of view set (float bits, then width, height twice).
+# Each section's own header (## lines) says what its rows hold.
+# variables (DefName section 3): NbLucioleAllumed=189 Puzzle_Lucioles_Fini=190 Puzzle_Lucioles_AutoWin=232 OrdreMandala1=182 OrdreMandala2=183 OrdreMandala3=184 OrdreMandala4=185 OrdreMandala5=186 OrdreMandala6=187
+# objects (DefName section 1): LUCIOLLE1=188 LUCIOLLE2=189 LUCIOLLE3=190 LUCIOLLE4=191 LUCIOLLE5=192 LUCIOLLE6=193 TOURBILLON=187
+# table @ 0x005e1d38, bytes 0..7: 0 4 1 2 5 3 6 0
+## A: FUN_00495210 alone; the mandalas laid in hook order (OrdreMandalaK = K); turn speeds 1.5/-2 before; count n before; state after, calls, speeds after
+A type=0 n=0 v=1: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=0 v=2: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=0 v=3: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=0 v=4: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=0 v=5: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=0 v=6: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=5 v=1: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=5 v=2: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=5 v=3: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=5 v=4: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=5 v=5: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=0 n=5 v=6: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=1 n=0 v=1: NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=0 v=2: NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=0 v=3: NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=0 v=4: NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=0 v=5: NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=0 v=6: NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=5 v=1: NbLucioleAllumed=6 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=5 v=2: NbLucioleAllumed=6 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=5 v=3: NbLucioleAllumed=6 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=5 v=4: NbLucioleAllumed=6 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=5 v=5: NbLucioleAllumed=6 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=1 n=5 v=6: NbLucioleAllumed=6 Puzzle_Lucioles_Fini=1 Puzzle_Lucioles_AutoWin=0 speeds=0/0 calls=RunOneCommand('(NewSound=300)') errors=-
+A type=2 n=0 v=1: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=0 v=2: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=0 v=3: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=0 v=4: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=0 v=5: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=0 v=6: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=5 v=1: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=5 v=2: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=5 v=3: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=5 v=4: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=5 v=5: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=2 n=5 v=6: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=0 v=1: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=0 v=2: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=0 v=3: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=0 v=4: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=0 v=5: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=0 v=6: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=5 v=1: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=5 v=2: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=5 v=3: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=5 v=4: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=5 v=5: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=3 n=5 v=6: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=0 v=1: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=0 v=2: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=0 v=3: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=0 v=4: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=0 v=5: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=0 v=6: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=5 v=1: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=5 v=2: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=5 v=3: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=5 v=4: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=5 v=5: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=4 n=5 v=6: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=0 v=1: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=0 v=2: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=0 v=3: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=0 v=4: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=0 v=5: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=0 v=6: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=5 v=1: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=5 v=2: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=5 v=3: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=5 v=4: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=5 v=5: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+A type=-1 n=5 v=6: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/-2 calls=- errors=-
+## B: values outside 1..6, type 1, n=5 before: the warning, then the table byte @ 0x005e1d38 + v read anyway; the looked-up name is not a variable: fatal
+B v=0 byte=0: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/1.5 calls=RunOneCommand('(NewSound=300)') errors=warning:pz_lucioles_gere_clic(): zone_clicked->numero=%d,fatal:DefName_GetIdName: Nom de %s inconnu:%s
+B v=7 byte=0: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/1.5 calls=RunOneCommand('(NewSound=300)') errors=warning:pz_lucioles_gere_clic(): zone_clicked->numero=%d,fatal:DefName_GetIdName: Nom de %s inconnu:%s
+B v=8 byte=40: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/1.5 calls=RunOneCommand('(NewSound=300)') errors=warning:pz_lucioles_gere_clic(): zone_clicked->numero=%d,fatal:DefName_GetIdName: Nom de %s inconnu:%s
+B v=-1 byte=0: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/1.5 calls=RunOneCommand('(NewSound=300)') errors=warning:pz_lucioles_gere_clic(): zone_clicked->numero=%d,fatal:DefName_GetIdName: Nom de %s inconnu:%s
+B v=9 byte=78: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/1.5 calls=RunOneCommand('(NewSound=300)') errors=warning:pz_lucioles_gere_clic(): zone_clicked->numero=%d,fatal:DefName_GetIdName: Nom de %s inconnu:%s
+B v=100 byte=100: NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 speeds=1.5/1.5 calls=RunOneCommand('(NewSound=300)') errors=warning:pz_lucioles_gere_clic(): zone_clicked->numero=%d,fatal:DefName_GetIdName: Nom de %s inconnu:%s
+## C: for a placement order (ZONES indices, OrdreMandala1..6 after), the 720 orders of six distinct firefly values: how many win (Fini=1 after the sixth), the set of their last values, and whether the last value alone decides (every order with it wins, every other loses); then the intended order (k-th lit = the firefly whose mandala was laid k-th) click by click
+C order ZONE_YUA,ZONE_CHA,ZONE_IRA,ZONE_YUB,ZONE_CHB,ZONE_IRB OrdreMandala1..6=6,5,4,3,2,1: wins 120/720 last values [2] decided by the last value alone: 1
+  intended: 6->n1/f0 4->n2/f0 1->n3/f0 5->n4/f0 3->n5/f0 2->n6/f1
+  same six, then 1, then it again: 2->n1/f0 2->n2/f0 2->n3/f0 2->n4/f0 2->n5/f0 2->n6/f1 1->n7/f1 2->n8/f1
+C order ZONE_YUA,ZONE_CHA,ZONE_IRA,ZONE_YUB,ZONE_IRB,ZONE_CHB OrdreMandala1..6=5,6,4,3,2,1: wins 120/720 last values [3] decided by the last value alone: 1
+  intended: 6->n1/f0 4->n2/f0 1->n3/f0 5->n4/f0 2->n5/f0 3->n6/f1
+  same six, then 1, then it again: 3->n1/f0 3->n2/f0 3->n3/f0 3->n4/f0 3->n5/f0 3->n6/f1 1->n7/f1 3->n8/f1
+C order ZONE_YUA,ZONE_CHA,ZONE_IRA,ZONE_CHB,ZONE_IRB,ZONE_YUB OrdreMandala1..6=5,4,6,3,2,1: wins 120/720 last values [5] decided by the last value alone: 1
+  intended: 6->n1/f0 4->n2/f0 1->n3/f0 3->n4/f0 2->n5/f0 5->n6/f1
+  same six, then 1, then it again: 5->n1/f0 5->n2/f0 5->n3/f0 5->n4/f0 5->n5/f0 5->n6/f1 1->n7/f1 5->n8/f1
+C order ZONE_YUA,ZONE_CHA,ZONE_YUB,ZONE_CHB,ZONE_IRB,ZONE_IRA OrdreMandala1..6=5,4,3,6,2,1: wins 120/720 last values [1] decided by the last value alone: 1
+  intended: 6->n1/f0 4->n2/f0 5->n3/f0 3->n4/f0 2->n5/f0 1->n6/f1
+  same six, then 1, then it again: 1->n1/f0 1->n2/f0 1->n3/f0 1->n4/f0 1->n5/f0 1->n6/f1 1->n7/f1 1->n8/f1
+C order ZONE_YUA,ZONE_IRA,ZONE_YUB,ZONE_CHB,ZONE_IRB,ZONE_CHA OrdreMandala1..6=5,4,3,2,6,1: wins 120/720 last values [4] decided by the last value alone: 1
+  intended: 6->n1/f0 1->n2/f0 5->n3/f0 3->n4/f0 2->n5/f0 4->n6/f1
+  same six, then 1, then it again: 4->n1/f0 4->n2/f0 4->n3/f0 4->n4/f0 4->n5/f0 4->n6/f1 1->n7/f1 4->n8/f1
+C order ZONE_CHA,ZONE_IRA,ZONE_YUB,ZONE_CHB,ZONE_IRB,ZONE_YUA OrdreMandala1..6=5,4,3,2,1,6: wins 120/720 last values [6] decided by the last value alone: 1
+  intended: 4->n1/f0 1->n2/f0 5->n3/f0 3->n4/f0 2->n5/f0 6->n6/f1
+  same six, then 1, then it again: 6->n1/f0 6->n2/f0 6->n3/f0 6->n4/f0 6->n5/f0 6->n6/f1 1->n7/f1 6->n8/f1
+## D: FUN_004952d0 with Fini before (AutoWin 0 before), screen 640x480; chapi078 installed with the variables as after /INIT; lines = chapi078 /set lines run by the scan
+D cw=0x027f Fini=0: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 lines - resumes=0 chapter_cur=78 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480)
+D cw=0x027f Fini=1: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=1 Puzzle_Lucioles_AutoWin=1 lines 41,42,43,44,45 resumes=1 chapter_cur=80 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480),AtlMuzik_Volume(20),AtlSound_CinemaApc('cine062.apc'),AtlHnm_start('cine062.hnm'),AtlWam_Load('rhea.wam'),AtlWam_FindView(1),AtlWarp_EnterView(view#1),LoadCurrentChap(80),RunInit()
+D cw=0x027f Fini=2: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=2 Puzzle_Lucioles_AutoWin=0 lines - resumes=0 chapter_cur=78 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480)
+D cw=0x0e7f Fini=0: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 lines - resumes=0 chapter_cur=78 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480)
+D cw=0x0e7f Fini=1: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=1 Puzzle_Lucioles_AutoWin=1 lines 41,42,43,44,45 resumes=1 chapter_cur=80 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480),AtlMuzik_Volume(20),AtlSound_CinemaApc('cine062.apc'),AtlHnm_start('cine062.hnm'),AtlWam_Load('rhea.wam'),AtlWam_FindView(1),AtlWarp_EnterView(view#1),LoadCurrentChap(80),RunInit()
+D cw=0x0e7f Fini=2: NbLucioleAllumed=0 Puzzle_Lucioles_Fini=2 Puzzle_Lucioles_AutoWin=0 lines - resumes=0 chapter_cur=78 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480)
+## E: FUN_0045a630 (a move's end without a next view) by the current place's name; Fini=0: ran = FUN_004952d0 entered (its SetFov)
+E name='voiles.wam': ran=1 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480)
+E name='VOILES.WAM': ran=1 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480)
+E name='Voiles.Wam': ran=1 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480)
+E name='voiles.wa': ran=0 calls=-
+E name='voiles.wam ': ran=0 calls=-
+E name='rhea.wam': ran=0 calls=-
+E name='atlantis.wam': ran=0 calls=-
+E name='tibet.wam': ran=0 calls=-
+E name='': ran=0 calls=-
+## F: the hook dispatcher FUN_0049b910(zone) alone: the view's warp name (+0x00) and number (+0x10), a zone {type, value 3}; hook = FUN_00495210 entered; return AL
+F name=SH0001 view=1 type=0: hook=0 return AL=0
+F name=SH0001 view=1 type=1: hook=1 return AL=0
+F name=SH0001 view=1 type=2: hook=1 return AL=0
+F name=SH0001 view=1 type=3: hook=0 return AL=0
+F name=SH0001 view=1 type=4: hook=0 return AL=0
+F name=SH0001 view=1 type=50: hook=0 return AL=0
+F name=sh0001 view=1 type=1: hook=1 return AL=0
+F name=Sh0001 view=1 type=1: hook=1 return AL=0
+F name=sH0001 view=1 type=1: hook=1 return AL=0
+F name=SX0001 view=1 type=1: hook=0 return AL=0
+F name=XH0001 view=1 type=1: hook=0 return AL=0
+F name=HS0001 view=1 type=1: hook=0 return AL=0
+F name=S view=1 type=1: hook=0 return AL=0
+F name=SH0001 view=0 type=1: hook=0 return AL=0
+F name=SH0001 view=2 type=1: hook=0 return AL=0
+F name=SH0001 view=3 type=1: hook=0 return AL=0
+F name=SH0001 view=6 type=1: hook=0 return AL=0
+F name=SH0001 view=7 type=1: hook=0 return AL=0
+F name=SH0001 view=257 type=1: hook=0 return AL=0
+## G: FUN_0049ca80 on chapi078, SH view 1, a type-1 zone of value v (DEPARTVUE, CtrlScenarOUT, ABORTDEPART, the dispatcher, the move set-up), then FUN_0045a870 (CtrlScenarIN), then for v != 1 FUN_0045a630 (the move's end without a view; for v = 1 the view is entered again, not run here); OUT / IN / END = chapi078 /set lines run
+G won: placement ZONE_IRA,ZONE_IRB,ZONE_YUA,ZONE_CHB,ZONE_CHA,ZONE_YUB OrdreMandala1..6=2,4,6,1,5,3 clicks 1,2,6,3,4,5
+  v=1: OUT+hook 48,49 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(1) | IN - | END - | NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=2: OUT+hook 52,53 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(2) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=2 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=6: OUT+hook 68,69 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(6) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=3 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=3: OUT+hook 56,57 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(3) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=4 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=4: OUT+hook 60,61 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(4) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=5: OUT+hook 64,65 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(5) | IN - | END 41,42,43,44,45 calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480),AtlMuzik_Volume(20),AtlSound_CinemaApc('cine062.apc'),AtlHnm_start('cine062.hnm'),AtlWam_Load('rhea.wam'),AtlWam_FindView(1),AtlWarp_EnterView(view#1),LoadCurrentChap(80),RunInit() | NbLucioleAllumed=6 Puzzle_Lucioles_Fini=1 Puzzle_Lucioles_AutoWin=1 chapter_cur=80 speeds=0/0
+G won on view 1: placement ZONE_IRB,ZONE_CHB,ZONE_YUB,ZONE_CHA,ZONE_YUA,ZONE_IRA OrdreMandala1..6=1,2,3,6,4,5 clicks 2,3,5,4,6,1
+  v=2: OUT+hook 52,53 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(2) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=3: OUT+hook 56,57 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(3) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=2 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=5: OUT+hook 64,65 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(5) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=3 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=4: OUT+hook 60,61 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(4) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=4 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=6: OUT+hook 68,69 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(6) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=1: OUT+hook 48,49 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(1) | IN - | END - | NbLucioleAllumed=6 Puzzle_Lucioles_Fini=1 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+G lost: placement ZONE_IRB,ZONE_CHB,ZONE_YUB,ZONE_IRA,ZONE_CHA,ZONE_YUA OrdreMandala1..6=1,2,3,4,5,6 clicks 6,4,1,5,3,2
+  v=6: OUT+hook 68,69 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(6) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=1 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=4: OUT+hook 60,61 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(4) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=2 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=1: OUT+hook 48,49 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(1) | IN - | END - | NbLucioleAllumed=3 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=5: OUT+hook 64,65 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(5) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=4 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=3: OUT+hook 56,57 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(3) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=5 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+  v=2: OUT+hook 52,53 calls=AtlWarp_ZoomStart(100, 35),RunOneCommand('(NewSound=300)'),MoveSetup(2) | IN - | END - calls=SetFov(ecx=0x660f48, 0x3fa9c91f, 640, 480, 640, 480) | NbLucioleAllumed=6 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 chapter_cur=78 speeds=0/0
+G aborted: placement ZONE_IRB,ZONE_CHB,ZONE_YUB,ZONE_IRA,ZONE_CHA,ZONE_YUA OrdreMandala1..6=1,2,3,4,5,6 clicks 2,3,5,1,4,6
+  v=2: ABORTDEPART=1 hook=0 NbLucioleAllumed=0 Puzzle_Lucioles_Fini=0 Puzzle_Lucioles_AutoWin=0 calls=-
+errors -

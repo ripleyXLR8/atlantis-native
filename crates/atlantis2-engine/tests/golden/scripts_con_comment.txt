@@ -1,0 +1,18 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# CtrlScenarIN (0x00483c90) on `#/set` lines (| = CRLF): Ireland's chapter 19
+# (chapi019.con, MD5 143132c78d1f8e1f35b8343d2582b2b5) with CLICOBJET = object {1:N}
+# (and the object {1:41} in hand for {1:36}): the script lines whose /set ran and
+# character {0:5}'s subjects (count, then value, index, flag); then a section of
+# `/INIT|/FININIT|/001|/con(flag1=1)|` + the body shown, flag 1 set: the lines
+# and the flags 2..29 set.
+chapi019 ClicObjet={1:36}: lines 58,59,60 {0:5} subjects 0 -
+chapi019 ClicObjet={1:37}: lines 63,64,65,66 {0:5} subjects 0 -
+chapi019 ClicObjet={1:39}: lines 69,70,71,72,73,74 {0:5} subjects 1 19 17 1
+section next /set (/set(flag2=1)|#/set(flag9=1)|/set(flag3=1)|/000|): lines 5,7 flags 2,3
+section next header (/set(flag2=1)|#/set(flag9=1)|/000|): lines 5,6 flags 2,9
+section next /con (/set(flag2=1)|#/set(flag9=1)|/con(flag5=1)|/set(flag4=1)|/000|): lines 5,6 flags 2,9
+section next empty (/set(flag2=1)|#/set(flag9=1)||/set(flag3=1)|/000|): lines 5,6,8 flags 2,3,9
+section first line (#/set(flag9=1)|/set(flag3=1)|/000|): lines - flags -
+errors -

@@ -1,0 +1,411 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83), scenar\chapi007.con and CD 1's three
+# skull sprite files (their MD5s in the F rows): the skull puzzle of the Irish
+# views 40-42. Names of defnames.con entries are written {S:I} (section, index).
+# A: the SPW frame lists (@ 0x0047c880 add, @ 0x0047c910 sub, @ 0x0047c9c0 has,
+# @ 0x0047ca10 clear, @ 0x0047ca50 index) on slots s0 = the skull's sprite
+# (SPRITE), s1 = another object (OTHER), s2 = the skull's sprite again; lists up to
+# their end, signed bytes; ret = the value returned.
+# B: the view entry (@ 0x00493cb0) on one slot of the skull's sprite, its list and
+# the seven-character state (@ 0x005e1a4c) given; id = the sprite id it keeps.
+# C: the click (@ 0x00493d40) after the entry (state 0199999): the list, the state,
+# the cursor pair (preset to (77, 5); (0, 0) = cleared), the hand, the commands.
+# D: the click dispatcher (@ 0x0049b910) and the entry dispatcher (@ 0x0049bd50)
+# alone by warp name, view and zone type: the skull function entered.
+# E: the zone click (@ 0x0049ca80) then the click scan (@ 0x0045a870) on chapter 7,
+# view IR 42, the five objects in the bag, CLICZONE 0 before each click: chapter 7's
+# /set lines run (OUT the departure scan, IN the click scan; resumes = sections
+# resumed after a film), the hook's commands, the variables, the bag's ids, the
+# list, the state, the active flags of the skull's slot and of a hidden character's.
+# F: one slot of the skull's sprite drawn (@ 0x0045b040) with the list given into
+# six 512 x 512 RGB565 faces whose pixel i of face k is ((i + k) * 2654435761 mod
+# 2^32) >> 16, every face visible; the texel under the centre as given: md5 of the
+# six faces, the cursor state and the slot hit, the frames' boxes on face 5 (x, y,
+# w, h) and 24 pixels of face 5 (x,y=RGB565 hex) over the union of those boxes.
+A add(SPRITE,3): ret=1 | s0[3] s1[] s2[3] | -
+A add(SPRITE,5): ret=1 | s0[3,5] s1[] s2[3,5] | -
+A add(SPRITE,3) again: ret=1 | s0[3,5,3] s1[] s2[3,5,3] | -
+A add(SPRITE,7): ret=1 | s0[3,5,3,7] s1[] s2[3,5,3,7] | -
+A add(OTHER,0): ret=1 | s0[3,5,3,7] s1[0] s2[3,5,3,7] | -
+A has(SPRITE,5): ret=1 | s0[3,5,3,7] s1[0] s2[3,5,3,7] | -
+A has(SPRITE,4): ret=0 | s0[3,5,3,7] s1[0] s2[3,5,3,7] | -
+A has(OTHER,3): ret=0 | s0[3,5,3,7] s1[0] s2[3,5,3,7] | -
+A index(SPRITE,7): ret=7 | s0[3,5,3,7] s1[0] s2[3,5,3,7] | -
+A index(SPRITE,4): ret=4294967295 | s0[3,5,3,7] s1[0] s2[3,5,3,7] | -
+A sub(SPRITE,3): ret=1 | s0[3,5,7] s1[0] s2[3,5,3,7] | -
+A sub(SPRITE,3) again: ret=1 | s0[7,5] s1[0] s2[3,5,3,7] | -
+A sub(SPRITE,3) third: ret=0 | s0[7,5] s1[0] s2[3,5,3,7] | warning:SubSpwToFrameTab impossible !! for :%d %d
+A sub(SPRITE,9) absent: ret=0 | s0[7,5] s1[0] s2[3,5,3,7] | warning:SubSpwToFrameTab impossible !! for :%d %d
+A sub(99999,1) no slot: ret=1 | s0[7,5] s1[0] s2[3,5,3,7] | -
+A add(99999,1) no slot: ret=0 | s0[7,5] s1[0] s2[3,5,3,7] | warning:AddSpwToFrameTab impossible for - non trouvé - :%d
+A add(SPRITE,-1): ret=1 | s0[7,5,-1] s1[0] s2[3,5,3,7,-1] | -
+A has(SPRITE,-1): ret=1 | s0[7,5,-1] s1[0] s2[3,5,3,7,-1] | -
+A add(SPRITE,0x105): ret=1 | s0[7,5,-1,5] s1[0] s2[3,5,3,7,-1,5] | -
+A sub(SPRITE,5) first of s0: ret=1 | s0[7,5,-1] s1[0] s2[3,5,3,7,-1,5] | -
+A clear(SPRITE): ret=0 | s0[] s1[0] s2[] | -
+A has(SPRITE,7) after clear: ret=0 | s0[] s1[0] s2[] | -
+A add(SPRITE,1) on a full list (128 entries): ret=0 | s0[0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1] | warning:AddSpwToFrameTab impossible - Trop d'entrée - for :%d
+A sub(SPRITE,6) on a full list: ret=1 | s0[0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1,2,3,4,5,6,0,1] | -
+A has(SPRITE,0) without a {1:13} slot: ret=0 | s0[] | -
+B view 40 state '0199999' list []: s0[0,1] id=13 state='0199999' | -
+B view 40 state '0123456' list []: s0[0,1,2,3,4,5,6] id=13 state='0123456' | -
+B view 40 state '0129996' list []: s0[0,1,2,6] id=13 state='0129996' | -
+B view 40 state '9999999' list []: s0[] id=13 state='9999999' | -
+B view 40 state '0000000' list []: s0[0,0,0,0,0,0,0] id=13 state='0000000' | -
+B view 40 state '7890123' list []: s0[7,8,0,1,2,3] id=13 state='7890123' | -
+B view 40 state '0a1b2c/' list []: s0[0,1,2] id=13 state='0a1b2c/' | -
+B view 40 state '0199999' list [0, 1, 2, 2, 5]: s0[2,0,1] id=13 state='0199999' | -
+B view 40 state '0123456' list [0, 1, 2, 3, 4, 5, 6]: s0[0,1,2,3,4,5,6] id=13 state='0123456' | -
+B view 40 state '0199999' list [6, 0, 1, -1, 0]: s0[-1,0,0,1] id=13 state='0199999' | -
+B view 40 state '0199' list []: s0[0,1] id=13 state='0199' | -
+B view 41 state '0199999' list []: s0[0,1] id=13 state='0199999' | -
+B view 41 state '0123456' list []: s0[0,1,2,3,4,5,6] id=13 state='0123456' | -
+B view 41 state '0129996' list []: s0[0,1,2,6] id=13 state='0129996' | -
+B view 41 state '9999999' list []: s0[] id=13 state='9999999' | -
+B view 41 state '0000000' list []: s0[0,0,0,0,0,0,0] id=13 state='0000000' | -
+B view 41 state '7890123' list []: s0[7,8,0,1,2,3] id=13 state='7890123' | -
+B view 41 state '0a1b2c/' list []: s0[0,1,2] id=13 state='0a1b2c/' | -
+B view 41 state '0199999' list [0, 1, 2, 2, 5]: s0[2,0,1] id=13 state='0199999' | -
+B view 41 state '0123456' list [0, 1, 2, 3, 4, 5, 6]: s0[0,1,2,3,4,5,6] id=13 state='0123456' | -
+B view 41 state '0199999' list [6, 0, 1, -1, 0]: s0[-1,0,0,1] id=13 state='0199999' | -
+B view 41 state '0199' list []: s0[0,1] id=13 state='0199' | -
+B view 42 state '0199999' list []: s0[0,1] id=13 state='0199999' | -
+B view 42 state '0123456' list []: s0[0,1,2,3,4,5,6] id=13 state='0123456' | -
+B view 42 state '0129996' list []: s0[0,1,2,6] id=13 state='0129996' | -
+B view 42 state '9999999' list []: s0[] id=13 state='9999999' | -
+B view 42 state '0000000' list []: s0[0,0,0,0,0,0,0] id=13 state='0000000' | -
+B view 42 state '7890123' list []: s0[7,8,0,1,2,3] id=13 state='7890123' | -
+B view 42 state '0a1b2c/' list []: s0[0,1,2] id=13 state='0a1b2c/' | -
+B view 42 state '0199999' list [0, 1, 2, 2, 5]: s0[2,0,1] id=13 state='0199999' | -
+B view 42 state '0123456' list [0, 1, 2, 3, 4, 5, 6]: s0[0,1,2,3,4,5,6] id=13 state='0123456' | -
+B view 42 state '0199999' list [6, 0, 1, -1, 0]: s0[-1,0,0,1] id=13 state='0199999' | -
+B view 42 state '0199' list []: s0[0,1] id=13 state='0199' | -
+B view 42 without a {1:13} slot: s0[] id=13 | warning:AddSpwToFrameTab impossible for - non trouvé - :%d,warning:AddSpwToFrameTab impossible for - non trouvé - :%d
+B view 42 two {1:13} slots: s0[0,1] s1[0,1] | -
+C {4:1} hand={1:17}: s0[0,1,2] state='0129999' cursor=(0,0) hand=17 | RunOneCommand('(NewSound=7)')
+C {4:1} hand={1:18}: s0[0,1,3] state='0193999' cursor=(0,0) hand=18 | RunOneCommand('(NewSound=7)')
+C {4:1} hand={1:20}: s0[0,1,4] state='0199499' cursor=(0,0) hand=20 | RunOneCommand('(NewSound=7)')
+C {4:1} hand={1:21}: s0[0,1,5] state='0199959' cursor=(0,0) hand=21 | RunOneCommand('(NewSound=7)')
+C {4:1} hand={1:15}: s0[0,1,6] state='0199996' cursor=(0,0) hand=15 | RunOneCommand('(NewSound=7)')
+C {4:1} hand={1:14}: s0[0,1] state='0199999' cursor=(77,5) hand=14 | -
+C {4:1} hand={1:16}: s0[0,1] state='0199999' cursor=(77,5) hand=16 | -
+C {4:1} hand={1:19}: s0[0,1] state='0199999' cursor=(77,5) hand=19 | -
+C {4:1} hand={1:13}: s0[0,1] state='0199999' cursor=(77,5) hand=13 | -
+C {4:1} hand=0: s0[0,1] state='0199999' cursor=(77,5) hand=0 | -
+C zone {4:52} (its own value) hand={1:17}: s0[0,1] state='0199999' cursor=(77,5) hand=17 | -
+C zone named {4:1}, value 0, hand={1:17}: s0[0,1] state='0199999' cursor=(77,5) hand=17 | -
+C zone named XX, value of {4:1}, hand={1:17}: s0[0,1,2] state='0129999' cursor=(0,0) hand=17 | RunOneCommand('(NewSound=7)')
+C {4:1} type 1 hand={1:20}: s0[0,1,4] state='0199499' cursor=(0,0) hand=20 | RunOneCommand('(NewSound=7)')
+C {1:18} twice: s0[0,1,3,3] state='0193999' cursor=(0,0) hand=18 | RunOneCommand('(NewSound=7)')
+C all five, W18 first: {1:15}: s0[0,1,6] state='0199996' cursor=(0,0) hand=15 | RunOneCommand('(NewSound=7)') || {1:21}: s0[0,1,6,5] state='0199956' cursor=(0,0) hand=21 | RunOneCommand('(NewSound=7)') || {1:20}: s0[0,1,6,5,4] state='0199456' cursor=(0,0) hand=20 | RunOneCommand('(NewSound=7)') || {1:18}: s0[0,1,6,5,4,3] state='0193456' cursor=(0,0) hand=18 | RunOneCommand('(NewSound=7)') || {1:17}: s0[0,1,6,5,4,3,2] state='0123456' cursor=(0,0) hand=17 | RunOneCommand('(NewSound=7)')
+C then the entry hook of view 41 (same slot): s0[0,1,2,3,4,5,6] state='0123456'
+C without an entry hook (0x006d26a8 = 0): s0[] state='0129999' cursor=(0,0) hand=17 | RunOneCommand('(NewSound=7)'),warning:AddSpwToFrameTab impossible for - non trouvé - :%d
+D click IR42 view 39 type 1: - AL=0
+D click IR42 view 39 type 2: - AL=0
+D click IR42 view 39 type 3: - AL=0
+D click IR42 view 39 type 4: - AL=0
+D click IR42 view 39 type 50: - AL=0
+D click IR42 view 39 type 10: - AL=0
+D entry IR42 view 39: - list=[]
+D click IR42 view 40 type 1: - AL=0
+D click IR42 view 40 type 2: - AL=0
+D click IR42 view 40 type 3: - AL=0
+D click IR42 view 40 type 4: - AL=0
+D click IR42 view 40 type 50: - AL=0
+D click IR42 view 40 type 10: - AL=0
+D entry IR42 view 40: 00493cb0(40) list=[0,1]
+D click IR42 view 41 type 1: - AL=0
+D click IR42 view 41 type 2: - AL=0
+D click IR42 view 41 type 3: - AL=0
+D click IR42 view 41 type 4: - AL=0
+D click IR42 view 41 type 50: - AL=0
+D click IR42 view 41 type 10: - AL=0
+D entry IR42 view 41: 00493cb0(41) list=[0,1]
+D click IR42 view 42 type 1: 00493d20() AL=0
+D click IR42 view 42 type 2: 00493d20() AL=0
+D click IR42 view 42 type 3: 00493d40(zone) AL=0
+D click IR42 view 42 type 4: 00493d40(zone) AL=0
+D click IR42 view 42 type 50: 00493d40(zone) AL=0
+D click IR42 view 42 type 10: - AL=0
+D entry IR42 view 42: 00493cb0(42) list=[0,1]
+D click IR42 view 43 type 1: - AL=0
+D click IR42 view 43 type 2: - AL=0
+D click IR42 view 43 type 3: - AL=0
+D click IR42 view 43 type 4: - AL=0
+D click IR42 view 43 type 50: - AL=0
+D click IR42 view 43 type 10: - AL=0
+D entry IR42 view 43: - list=[]
+D click ir42 view 39 type 1: - AL=0
+D click ir42 view 39 type 2: - AL=0
+D click ir42 view 39 type 3: - AL=0
+D click ir42 view 39 type 4: - AL=0
+D click ir42 view 39 type 50: - AL=0
+D click ir42 view 39 type 10: - AL=0
+D entry ir42 view 39: - list=[]
+D click ir42 view 40 type 1: - AL=0
+D click ir42 view 40 type 2: - AL=0
+D click ir42 view 40 type 3: - AL=0
+D click ir42 view 40 type 4: - AL=0
+D click ir42 view 40 type 50: - AL=0
+D click ir42 view 40 type 10: - AL=0
+D entry ir42 view 40: 00493cb0(40) list=[0,1]
+D click ir42 view 41 type 1: - AL=0
+D click ir42 view 41 type 2: - AL=0
+D click ir42 view 41 type 3: - AL=0
+D click ir42 view 41 type 4: - AL=0
+D click ir42 view 41 type 50: - AL=0
+D click ir42 view 41 type 10: - AL=0
+D entry ir42 view 41: 00493cb0(41) list=[0,1]
+D click ir42 view 42 type 1: 00493d20() AL=0
+D click ir42 view 42 type 2: 00493d20() AL=0
+D click ir42 view 42 type 3: 00493d40(zone) AL=0
+D click ir42 view 42 type 4: 00493d40(zone) AL=0
+D click ir42 view 42 type 50: 00493d40(zone) AL=0
+D click ir42 view 42 type 10: - AL=0
+D entry ir42 view 42: 00493cb0(42) list=[0,1]
+D click ir42 view 43 type 1: - AL=0
+D click ir42 view 43 type 2: - AL=0
+D click ir42 view 43 type 3: - AL=0
+D click ir42 view 43 type 4: - AL=0
+D click ir42 view 43 type 50: - AL=0
+D click ir42 view 43 type 10: - AL=0
+D entry ir42 view 43: - list=[]
+D click Ir42 view 39 type 1: - AL=0
+D click Ir42 view 39 type 2: - AL=0
+D click Ir42 view 39 type 3: - AL=0
+D click Ir42 view 39 type 4: - AL=0
+D click Ir42 view 39 type 50: - AL=0
+D click Ir42 view 39 type 10: - AL=0
+D entry Ir42 view 39: - list=[]
+D click Ir42 view 40 type 1: - AL=0
+D click Ir42 view 40 type 2: - AL=0
+D click Ir42 view 40 type 3: - AL=0
+D click Ir42 view 40 type 4: - AL=0
+D click Ir42 view 40 type 50: - AL=0
+D click Ir42 view 40 type 10: - AL=0
+D entry Ir42 view 40: 00493cb0(40) list=[0,1]
+D click Ir42 view 41 type 1: - AL=0
+D click Ir42 view 41 type 2: - AL=0
+D click Ir42 view 41 type 3: - AL=0
+D click Ir42 view 41 type 4: - AL=0
+D click Ir42 view 41 type 50: - AL=0
+D click Ir42 view 41 type 10: - AL=0
+D entry Ir42 view 41: 00493cb0(41) list=[0,1]
+D click Ir42 view 42 type 1: 00493d20() AL=0
+D click Ir42 view 42 type 2: 00493d20() AL=0
+D click Ir42 view 42 type 3: 00493d40(zone) AL=0
+D click Ir42 view 42 type 4: 00493d40(zone) AL=0
+D click Ir42 view 42 type 50: 00493d40(zone) AL=0
+D click Ir42 view 42 type 10: - AL=0
+D entry Ir42 view 42: 00493cb0(42) list=[0,1]
+D click Ir42 view 43 type 1: - AL=0
+D click Ir42 view 43 type 2: - AL=0
+D click Ir42 view 43 type 3: - AL=0
+D click Ir42 view 43 type 4: - AL=0
+D click Ir42 view 43 type 50: - AL=0
+D click Ir42 view 43 type 10: - AL=0
+D entry Ir42 view 43: - list=[]
+D click TI42 view 39 type 1: - AL=0
+D click TI42 view 39 type 2: - AL=0
+D click TI42 view 39 type 3: - AL=0
+D click TI42 view 39 type 4: - AL=0
+D click TI42 view 39 type 50: - AL=0
+D click TI42 view 39 type 10: - AL=0
+D entry TI42 view 39: - list=[]
+D click TI42 view 40 type 1: - AL=0
+D click TI42 view 40 type 2: - AL=0
+D click TI42 view 40 type 3: - AL=0
+D click TI42 view 40 type 4: - AL=0
+D click TI42 view 40 type 50: - AL=0
+D click TI42 view 40 type 10: - AL=0
+D entry TI42 view 40: - list=[]
+D click TI42 view 41 type 1: - AL=0
+D click TI42 view 41 type 2: - AL=0
+D click TI42 view 41 type 3: - AL=0
+D click TI42 view 41 type 4: - AL=0
+D click TI42 view 41 type 50: - AL=0
+D click TI42 view 41 type 10: - AL=0
+D entry TI42 view 41: - list=[]
+D click TI42 view 42 type 1: - AL=0
+D click TI42 view 42 type 2: - AL=0
+D click TI42 view 42 type 3: - AL=0
+D click TI42 view 42 type 4: - AL=0
+D click TI42 view 42 type 50: - AL=0
+D click TI42 view 42 type 10: - AL=0
+D entry TI42 view 42: - list=[]
+D click TI42 view 43 type 1: - AL=0
+D click TI42 view 43 type 2: - AL=0
+D click TI42 view 43 type 3: - AL=0
+D click TI42 view 43 type 4: - AL=0
+D click TI42 view 43 type 50: - AL=0
+D click TI42 view 43 type 10: - AL=0
+D entry TI42 view 43: - list=[]
+D click XR42 view 39 type 1: - AL=0
+D click XR42 view 39 type 2: - AL=0
+D click XR42 view 39 type 3: - AL=0
+D click XR42 view 39 type 4: - AL=0
+D click XR42 view 39 type 50: - AL=0
+D click XR42 view 39 type 10: - AL=0
+D entry XR42 view 39: - list=[]
+D click XR42 view 40 type 1: - AL=0
+D click XR42 view 40 type 2: - AL=0
+D click XR42 view 40 type 3: - AL=0
+D click XR42 view 40 type 4: - AL=0
+D click XR42 view 40 type 50: - AL=0
+D click XR42 view 40 type 10: - AL=0
+D entry XR42 view 40: - list=[]
+D click XR42 view 41 type 1: - AL=0
+D click XR42 view 41 type 2: - AL=0
+D click XR42 view 41 type 3: - AL=0
+D click XR42 view 41 type 4: - AL=0
+D click XR42 view 41 type 50: - AL=0
+D click XR42 view 41 type 10: - AL=0
+D entry XR42 view 41: - list=[]
+D click XR42 view 42 type 1: - AL=0
+D click XR42 view 42 type 2: - AL=0
+D click XR42 view 42 type 3: - AL=0
+D click XR42 view 42 type 4: - AL=0
+D click XR42 view 42 type 50: - AL=0
+D click XR42 view 42 type 10: - AL=0
+D entry XR42 view 42: - list=[]
+D click XR42 view 43 type 1: - AL=0
+D click XR42 view 43 type 2: - AL=0
+D click XR42 view 43 type 3: - AL=0
+D click XR42 view 43 type 4: - AL=0
+D click XR42 view 43 type 50: - AL=0
+D click XR42 view 43 type 10: - AL=0
+D entry XR42 view 43: - list=[]
+D click I view 39 type 1: - AL=0
+D click I view 39 type 2: - AL=0
+D click I view 39 type 3: - AL=0
+D click I view 39 type 4: - AL=0
+D click I view 39 type 50: - AL=0
+D click I view 39 type 10: - AL=0
+D entry I view 39: - list=[]
+D click I view 40 type 1: - AL=0
+D click I view 40 type 2: - AL=0
+D click I view 40 type 3: - AL=0
+D click I view 40 type 4: - AL=0
+D click I view 40 type 50: - AL=0
+D click I view 40 type 10: - AL=0
+D entry I view 40: - list=[]
+D click I view 41 type 1: - AL=0
+D click I view 41 type 2: - AL=0
+D click I view 41 type 3: - AL=0
+D click I view 41 type 4: - AL=0
+D click I view 41 type 50: - AL=0
+D click I view 41 type 10: - AL=0
+D entry I view 41: - list=[]
+D click I view 42 type 1: - AL=0
+D click I view 42 type 2: - AL=0
+D click I view 42 type 3: - AL=0
+D click I view 42 type 4: - AL=0
+D click I view 42 type 50: - AL=0
+D click I view 42 type 10: - AL=0
+D entry I view 42: - list=[]
+D click I view 43 type 1: - AL=0
+D click I view 43 type 2: - AL=0
+D click I view 43 type 3: - AL=0
+D click I view 43 type 4: - AL=0
+D click I view 43 type 50: - AL=0
+D click I view 43 type 10: - AL=0
+D entry I view 43: - list=[]
+E order {1:17},{1:18},{1:20},{1:21},{1:15}: bag at start [17,18,20,21,15]
+E 1 hand={1:17}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 65,66,67,68 resumes=0 | {3:97}=1 {3:28}=0 bag=[18,20,21,15] | [0,1,2] state='0129999' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 2 hand={1:18}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 79,80,81,82 resumes=0 | {3:97}=2 {3:28}=0 bag=[20,21,15] | [0,1,2,3] state='0123999' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 3 hand={1:20}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 93,94,95,96 resumes=0 | {3:97}=3 {3:28}=0 bag=[21,15] | [0,1,2,3,4] state='0123499' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 4 hand={1:21}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 107,108,109,110 resumes=0 | {3:97}=4 {3:28}=0 bag=[15] | [0,1,2,3,4,5] state='0123459' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 5 hand={1:15}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 114,115,116,117,118,119 resumes=1 | {3:97}=6 {3:28}=0 bag=[] | [0,1,2,3,4,5,6] state='0123456' active=0,1 | calls=AtlMuzik_Volume(20);AtlSound_CinemaApc('cine002.apc');AtlHnm_start('cine002.hnm') | -
+E order {1:15},{1:21},{1:20},{1:18},{1:17}: bag at start [17,18,20,21,15]
+E 1 hand={1:15}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 121,122,123,124 resumes=0 | {3:97}=1 {3:28}=0 bag=[17,18,20,21] | [0,1,6] state='0199996' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 2 hand={1:21}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 107,108,109,110 resumes=0 | {3:97}=2 {3:28}=0 bag=[17,18,20] | [0,1,6,5] state='0199956' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 3 hand={1:20}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 93,94,95,96 resumes=0 | {3:97}=3 {3:28}=0 bag=[17,18] | [0,1,6,5,4] state='0199456' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 4 hand={1:18}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 79,80,81,82 resumes=0 | {3:97}=4 {3:28}=0 bag=[17] | [0,1,6,5,4,3] state='0193456' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 5 hand={1:17}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 58,59,60,61,62,63 resumes=1 | {3:97}=6 {3:28}=0 bag=[] | [0,1,6,5,4,3,2] state='0123456' active=0,1 | calls=AtlMuzik_Volume(20);AtlSound_CinemaApc('cine002.apc');AtlHnm_start('cine002.hnm') | -
+E order {1:20},{1:15},{1:17},{1:21},{1:18}: bag at start [17,18,20,21,15]
+E 1 hand={1:20}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 93,94,95,96 resumes=0 | {3:97}=1 {3:28}=0 bag=[17,18,21,15] | [0,1,4] state='0199499' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 2 hand={1:15}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 121,122,123,124 resumes=0 | {3:97}=2 {3:28}=0 bag=[17,18,21] | [0,1,4,6] state='0199496' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 3 hand={1:17}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 65,66,67,68 resumes=0 | {3:97}=3 {3:28}=0 bag=[18,21] | [0,1,4,6,2] state='0129496' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 4 hand={1:21}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 107,108,109,110 resumes=0 | {3:97}=4 {3:28}=0 bag=[18] | [0,1,4,6,2,5] state='0129456' active=1,0 | calls=AtlSound_NewSound('sound003.apc') | -
+E 5 hand={1:18}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 72,73,74,75,76,77 resumes=1 | {3:97}=6 {3:28}=0 bag=[] | [0,1,4,6,2,5,3] state='0123456' active=0,1 | calls=AtlMuzik_Volume(20);AtlSound_CinemaApc('cine002.apc');AtlHnm_start('cine002.hnm') | -
+E empty hand on {4:1}: OUT lines - | hook - | {3:76}=1 | IN lines - resumes=0 | {3:97}=0 {3:28}=0 bag=[17,18,20,21,15] | [0,1] state='0199999' active=1,0 | calls=- | -
+E {1:14} in hand on {4:1}: OUT lines - | hook - | {3:76}=1 | IN lines - resumes=0 | {3:97}=0 {3:28}=14 bag=[17,18,20,21,15] | [0,1] state='0199999' active=1,0 | calls=- | -
+E {3:97}=4 before, hand={1:15}: OUT lines - | hook RunOneCommand('(NewSound=7)') | {3:76}=1 | IN lines 114,115,116,117,118,119 resumes=1 | {3:97}=6 {3:28}=0 bag=[17,18,20,21] | [0,1,6] state='0199996' active=0,1 | calls=AtlMuzik_Volume(20);AtlSound_CinemaApc('cine002.apc');AtlHnm_start('cine002.hnm') | -
+F background md5s 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621
+F file cra1040042.SPW md5 c6cb7cf0946d7be5386a3269cb9e2271 size 2867
+F cra1040042.SPW list [0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c b1361a50972ceb5787259de9d46406b6 | cursor=0 hit=-1 | boxes 311,301,14,26 | samples 311,301=c0a4 313,301=fd13 316,301=d7b9 318,301=1428 321,301=eecf 324,301=c975 311,309=383f 313,309=3163 316,309=7b27 318,309=7b07 321,309=8b88 324,309=4110 311,317=7d91 313,317=6ac6 316,317=41a4 318,317=6286 321,317=2941 324,317=b8ab 311,326=9669 313,326=d2d7 316,326=9d1c 318,326=b30b 321,326=ac4e 324,326=9f3a
+F cra1040042.SPW list [1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 8f1d80c1a998f39885a91c431b55b656 | cursor=0 hit=-1 | boxes 322,304,9,16 | samples 322,304=d9e0 323,304=7818 325,304=ac46 326,304=52be 328,304=8f2d 330,304=cb9c 322,309=04a1 323,309=8ab3 325,309=6ae6 326,309=5a87 328,309=3923 330,309=f65d 322,314=2f62 323,314=b4f5 325,314=4a45 326,314=5183 328,314=49c4 330,314=211a 322,319=5a23 323,319=e839 325,319=2386 326,319=9a60 328,319=166e 330,319=4bdf
+F cra1040042.SPW list [2]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c d0f9940fc78c0ba5f12c517e88db967f | cursor=0 hit=-1 | boxes 319,301,12,13 | samples 319,301=a220 321,301=b54b 323,301=231d 325,301=67ad 327,301=a41c 330,301=7ec2 319,305=6e2d 321,305=9a78 323,305=7326 325,305=5267 327,305=39e3 330,305=3a90 319,309=29fb 321,309=666a 323,309=9ab6 325,309=8366 327,309=5266 330,309=7b4c 319,313=e5c8 321,313=2237 323,313=5ea6 325,313=9b15 327,313=d784 330,313=b22b
+F cra1040042.SPW list [3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 7b4b3ee61fe8b98fba5c69161f72236f | cursor=0 hit=-1 | boxes 322,311,9,11 | samples 322,311=e288 323,311=80bf 325,311=bd2e 326,311=5b66 328,311=97d5 330,311=c3e3 322,314=2f62 323,314=cd9a 325,314=62e7 326,314=6205 328,314=49c4 330,314=20ec 322,317=7c3c 323,317=1253 325,317=3b03 326,317=5225 328,317=3963 330,317=5cd3 322,321=380a 323,321=d641 325,321=11a9 326,321=7125 328,321=9b6d 330,321=29c6
+F cra1040042.SPW list [4]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c bbf784afc26646e86cde0eef6b034096 | cursor=0 hit=-1 | boxes 320,309,9,17 | samples 320,309=c832 321,309=666a 323,309=8a34 324,309=38ef 326,309=7d7f 328,309=b9ee 320,314=f2f3 321,314=7168 323,314=7b2a 324,314=62e9 326,314=a840 328,314=e4af 320,319=1c70 321,319=6286 323,319=5a45 324,319=49e4 326,319=51a2 328,319=0f70 320,325=b768 321,325=55a0 323,325=920f 324,325=3046 326,325=6cb5 328,325=a924
+F cra1040042.SPW list [5]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 5c6165bcc359f3025c570c82a8a97f66 | cursor=0 hit=-1 | boxes 324,319,5,9 | samples 324,319=9692 324,319=9692 325,319=34c9 326,319=d301 327,319=7138 328,319=072f 324,321=7479 324,321=7479 325,321=12b0 326,321=b0e8 327,321=4f1f 328,321=ed57 324,324=6108 324,324=6108 325,324=41a4 326,324=41e4 327,324=62af 328,324=3a31 324,327=0e2d 324,327=0e2d 325,327=a3e4 326,327=3a14 327,327=e8d3 328,327=870b
+F cra1040042.SPW list [6]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c e197aeb1819becd16c13b53ad6a86f1d | cursor=0 hit=-1 | boxes 313,321,14,11 | samples 313,321=9814 315,321=dc44 318,321=bf2c 320,321=fb9b 323,321=d641 326,321=b0e8 313,324=f4f1 315,324=49e5 318,324=0c06 320,324=4875 323,324=2296 326,324=fdc2 313,327=41cb 315,327=20e2 318,327=5a46 320,327=7b49 323,327=41c4 326,327=3a16 313,331=fd98 315,331=3a07 318,331=1369 320,331=4950 323,331=2bc3 326,331=066a
+F cra1040042.SPW list []: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1040042.SPW list [0, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 0034bd5953d79551e978622cb57f5803 | cursor=0 hit=-1 | boxes 311,301,14,26;322,304,9,16 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=8d06 326,301=05e4 330,301=7ec2 311,309=383f 314,309=5a45 318,309=7b07 322,309=7306 326,309=5a87 330,309=f65d 311,317=7d91 314,317=6286 318,317=6286 322,317=2988 326,317=5a27 330,317=6df8 311,326=9669 314,326=710f 318,326=b30b 322,326=628a 326,326=dba9 330,326=5487
+F cra1040042.SPW list [0, 1, 2]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c f1be0bc900737ed4e5d136acff37b224 | cursor=0 hit=-1 | boxes 311,301,14,26;322,304,9,16;319,301,12,13 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=7404 326,301=05e4 330,301=7ec2 311,309=383f 314,309=5a45 318,309=7b07 322,309=7306 326,309=6266 330,309=7b4c 311,317=7d91 314,317=6286 318,317=6286 322,317=2988 326,317=5a27 330,317=6df8 311,326=9669 314,326=710f 318,326=b30b 322,326=628a 326,326=dba9 330,326=5487
+F cra1040042.SPW list [0, 1, 2, 3, 4, 5, 6]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c f32768ba8ffc5e9b4e37fb292f47d048 | cursor=0 hit=-1 | boxes 311,301,14,26;322,304,9,16;319,301,12,13;322,311,9,11;320,309,9,17;324,319,5,9;313,321,14,11 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=7404 326,301=05e4 330,301=7ec2 311,311=1626 314,311=5a86 318,311=7b08 322,311=7a66 326,311=6265 330,311=49a1 311,321=6ba8 314,321=2224 318,321=b6eb 322,321=5a45 326,321=5205 330,321=29c6 311,331=c129 314,331=9bd0 318,331=1369 322,331=7caa 326,331=066a 330,331=7f47
+F cra1040042.SPW list [6, 5, 4, 3, 2, 1, 0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 49d7300b3506d70a23702311fb4ad2b9 | cursor=0 hit=-1 | boxes 313,321,14,11;324,319,5,9;320,309,9,17;322,311,9,11;319,301,12,13;322,304,9,16;311,301,14,26 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=7404 326,301=05e4 330,301=7ec2 311,311=1626 314,311=5a86 318,311=7b08 322,311=8ae7 326,311=49c4 330,311=59a2 311,321=6ba8 314,321=2224 318,321=b6eb 322,321=49e4 326,321=41c3 330,321=29c6 311,331=c129 314,331=9bd0 318,331=1369 322,331=7caa 326,331=066a 330,331=7f47
+F cra1040042.SPW list [0, -1, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 0034bd5953d79551e978622cb57f5803 | cursor=0 hit=-1 | boxes 311,301,14,26;322,304,9,16 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=8d06 326,301=05e4 330,301=7ec2 311,309=383f 314,309=5a45 318,309=7b07 322,309=7306 326,309=5a87 330,309=f65d 311,317=7d91 314,317=6286 318,317=6286 322,317=2988 326,317=5a27 330,317=6df8 311,326=9669 314,326=710f 318,326=b30b 322,326=628a 326,326=dba9 330,326=5487
+F cra1040042.SPW list [0, 1, 6, 3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c e3a094c504f69ad8e6daf9137f10b5d5 | cursor=0 hit=-1 | boxes 311,301,14,26;322,304,9,16;313,321,14,11;322,311,9,11 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=8d06 326,301=05e4 330,301=7ec2 311,311=1626 314,311=5a86 318,311=7b08 322,311=82a7 326,311=49e4 330,311=9b23 311,321=6ba8 314,321=2224 318,321=b6eb 322,321=3008 326,321=7125 330,321=29c6 311,331=c129 314,331=9bd0 318,331=1369 322,331=7caa 326,331=066a 330,331=7f47
+F cra1040042.SPW list [1, 0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 36a5a37665014780f093c32c43652e98 | cursor=0 hit=-1 | boxes 322,304,9,16;311,301,14,26 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=8d06 326,301=05e4 330,301=7ec2 311,309=383f 314,309=5a45 318,309=7b07 322,309=7306 326,309=5a87 330,309=f65d 311,317=7d91 314,317=6286 318,317=6286 322,317=2988 326,317=5a27 330,317=6df8 311,326=9669 314,326=710f 318,326=b30b 322,326=628a 326,326=dba9 330,326=5487
+F cra1040042.SPW list [3, 3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c bed6fd2b374636f9e95fe8e216a915ec | cursor=0 hit=-1 | boxes 322,311,9,11;322,311,9,11 | samples 322,311=e288 323,311=80bf 325,311=bd2e 326,311=5b66 328,311=97d5 330,311=b3a2 322,314=2f62 323,314=cd9a 325,314=7327 326,314=5a45 328,314=3963 330,314=20c5 322,317=7c3c 323,317=0a32 325,317=31c3 326,317=5205 328,317=3963 330,317=4bcf 322,321=380a 323,321=d641 325,321=1125 326,321=5143 328,321=6a68 330,321=29c6
+F cra1040042.SPW list [0, 1] inactive (+0x30 = 0): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes 311,301,14,26;322,304,9,16 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=8d06 326,301=05e4 330,301=7ec2 311,309=383f 314,309=12e5 318,309=8bc3 322,309=04a1 326,309=7d7f 330,309=f65d 311,317=afda 314,317=8a80 318,317=035e 322,317=7c3c 326,317=f51a 330,317=6df8 311,326=9669 314,326=710f 318,326=e9ed 322,326=62cb 326,326=dba9 330,326=5487
+F cra1040042.SPW single (+0x34 = 1) frame 4, list [0, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c bbf784afc26646e86cde0eef6b034096 | cursor=0 hit=-1 | boxes 311,301,14,26;322,304,9,16 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=8d06 326,301=05e4 330,301=7ec2 311,309=383f 314,309=12e5 318,309=8bc3 322,309=04a1 326,309=7d7f 330,309=f65d 311,317=afda 314,317=8a80 318,317=035e 322,317=4a70 326,317=f51a 330,317=6df8 311,326=9669 314,326=710f 318,326=e9ed 322,326=62cb 326,326=dba9 330,326=5487
+F cra1040042.SPW list [0, 1, 2] click kind 2, texel (5, 325, 307) (frame 2's box): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c f1be0bc900737ed4e5d136acff37b224 | cursor=1 hit=0 | boxes 311,301,14,26;322,304,9,16;319,301,12,13 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=7404 326,301=05e4 330,301=7ec2 311,309=383f 314,309=5a45 318,309=7b07 322,309=7306 326,309=6266 330,309=7b4c 311,317=7d91 314,317=6286 318,317=6286 322,317=2988 326,317=5a27 330,317=6df8 311,326=9669 314,326=710f 318,326=b30b 322,326=628a 326,326=dba9 330,326=5487
+F cra1040042.SPW list [0, 1, 2] click kind 1, texel (5, 325, 307): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c f1be0bc900737ed4e5d136acff37b224 | cursor=1 hit=0 | boxes 311,301,14,26;322,304,9,16;319,301,12,13 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=7404 326,301=05e4 330,301=7ec2 311,309=383f 314,309=5a45 318,309=7b07 322,309=7306 326,309=6266 330,309=7b4c 311,317=7d91 314,317=6286 318,317=6286 322,317=2988 326,317=5a27 330,317=6df8 311,326=9669 314,326=710f 318,326=b30b 322,326=628a 326,326=dba9 330,326=5487
+F cra1040042.SPW list [] click kind 2, texel (5, 325, 307): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1040042.SPW list [2, -1] click kind 2, texel (5, 325, 307): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c d0f9940fc78c0ba5f12c517e88db967f | cursor=1 hit=0 | boxes 319,301,12,13 | samples 319,301=a220 321,301=b54b 323,301=231d 325,301=67ad 327,301=a41c 330,301=7ec2 319,305=6e2d 321,305=9a78 323,305=7326 325,305=5267 327,305=39e3 330,305=3a90 319,309=29fb 321,309=666a 323,309=9ab6 325,309=8366 327,309=5266 330,309=7b4c 319,313=e5c8 321,313=2237 323,313=5ea6 325,313=9b15 327,313=d784 330,313=b22b
+F cra1040042.SPW list [-1] click kind 2, texel (5, 325, 307): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1040042.SPW list [0, 1, 2] click kind 0, texel (5, 325, 307): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c f1be0bc900737ed4e5d136acff37b224 | cursor=0 hit=-1 | boxes 311,301,14,26;322,304,9,16;319,301,12,13 | samples 311,301=c0a4 314,301=9b4a 318,301=1428 322,301=7404 326,301=05e4 330,301=7ec2 311,309=383f 314,309=5a45 318,309=7b07 322,309=7306 326,309=6266 330,309=7b4c 311,317=7d91 314,317=6286 318,317=6286 322,317=2988 326,317=5a27 330,317=6df8 311,326=9669 314,326=710f 318,326=b30b 322,326=628a 326,326=dba9 330,326=5487
+F file cra1041042.SPW md5 84dfa14c6953644f47586c2fd0615ae1 size 15828
+F cra1041042.SPW list [0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c c53d22b2dff454ed79a61f872e199f53 | cursor=0 hit=-1 | boxes 346,362,47,97 | samples 346,362=d238 355,362=622b 364,362=f21e 373,362=8212 382,362=1205 392,362=4030 346,394=b0a4 355,394=3143 364,394=72c7 373,394=7b07 382,394=9309 392,394=1e9c 346,426=8f10 355,426=41e4 364,426=41a4 373,426=4245 382,426=be5c 392,426=fd08 346,458=6d7d 355,458=fd70 364,458=8d63 373,458=1d57 382,458=9c89 392,458=db75
+F cra1041042.SPW list [1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 0d7050b4666b81ad3dfa13a3ea7d7cc9 | cursor=0 hit=-1 | boxes 372,368,30,49 | samples 372,368=7d8f 377,368=8404 383,368=49f1 389,368=ff3e 395,368=b48b 401,368=69d7 372,384=6cc5 377,384=83da 383,384=3926 389,384=5245 395,384=3122 401,384=590d 372,400=5bfb 377,400=7310 383,400=285d 389,400=ddaa 395,400=3944 401,400=4944 372,416=4b31 377,416=6246 383,416=1793 389,416=cce0 395,416=822d 401,416=377a
+F cra1041042.SPW list [2]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c ad2a081d912621de901e3977dc73aee2 | cursor=0 hit=-1 | boxes 367,361,40,53 | samples 367,361=5dd2 374,361=b156 382,361=a312 390,361=94cd 398,361=8689 406,361=7845 367,378=bbfb 374,378=0f7f 382,378=5a68 390,378=6246 398,378=3163 406,378=d66f 367,395=1a25 374,395=6da9 382,395=5f65 390,395=7aa6 398,395=6269 406,395=3aab 367,413=e741 374,413=3ac6 382,413=2c82 390,413=1e3d 398,413=0ff9 406,413=01b5
+F cra1041042.SPW list [3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 4a6e0fead8cee25909f94ca3b0d3e4f0 | cursor=0 hit=-1 | boxes 381,402,28,41 | samples 381,402=c9d5 386,402=e0ea 391,402=f800 397,402=ad4c 402,402=c462 408,402=79af 381,415=6c31 386,415=6aa4 391,415=2905 397,415=7b07 402,415=39a4 408,415=1c0b 381,428=0e8d 386,428=23a2 391,428=4207 397,428=71c4 402,428=944c 408,428=ad86 381,442=16d8 386,442=36f2 391,442=4e07 397,442=0354 402,442=1a69 408,442=cfb6
+F cra1041042.SPW list [4]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 1b5f0ea990ec9e09681ffa693e4f24e8 | cursor=0 hit=-1 | boxes 377,399,29,55 | samples 377,399=041d 382,399=1b32 388,399=d07f 393,399=e794 399,399=9ce1 405,399=522e 377,417=d13a 382,417=e84f 388,417=4a46 393,417=7b27 399,417=69fe 405,417=1f4b 377,435=8dd5 382,435=20e2 388,435=6ac6 393,435=7307 399,435=8ba9 405,435=ec68 377,453=6b74 382,453=8289 388,453=37d6 393,453=4eeb 399,453=0438 405,453=b985
+F cra1041042.SPW list [5]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 4e1179f531b4f9fe5a67f4c077d7b70e | cursor=0 hit=-1 | boxes 391,441,8,12 | samples 391,441=df14 392,441=750a 393,441=12e2 395,441=466d 396,441=d567 398,441=3298 391,444=2985 392,444=18c2 393,444=3143 395,444=4a24 396,444=5a45 398,444=4307 391,448=e7bb 392,448=7551 393,448=3a65 395,448=41c5 396,448=4a25 398,448=3241 391,452=a389 392,452=41c0 393,452=dff8 395,452=1c67 396,452=79b4 398,452=f70d
+F cra1041042.SPW list [6]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 378cfd4703ffbbffb5bffda64a3677b4 | cursor=0 hit=-1 | boxes 354,430,44,43 | samples 354,430=2b94 362,430=2e56 371,430=be49 379,430=b005 388,430=3ff8 397,430=cfeb 354,444=4de9 362,444=3144 371,444=cf98 379,444=c154 388,444=5147 397,444=e13b 354,458=5f38 362,458=40b0 371,458=7b07 379,458=b3c9 388,458=6ac7 397,458=f28a 354,472=7088 362,472=6244 371,472=f237 379,472=e3f3 388,472=73e6 397,472=03d9
+F cra1041042.SPW list []: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1041042.SPW list [0, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 0f1fd4652a68c1637e0e04b72a4f3bc2 | cursor=0 hit=-1 | boxes 346,362,47,97;372,368,30,49 | samples 346,362=d238 357,362=9e9a 368,362=5233 379,362=375f 390,362=03c1 401,362=d023 346,394=b0a4 357,394=49e4 368,394=72c8 379,394=7b67 390,394=51c4 401,394=950c 346,426=8f10 357,426=5205 368,426=42a6 379,426=93ca 390,426=c099 401,426=8cfc 346,458=6d7d 357,458=39df 368,458=0641 379,458=aa64 390,458=9f06 401,458=6b68
+F cra1041042.SPW list [0, 1, 2]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c e708d8756a73f2ac070a7d29ffe9559e | cursor=0 hit=-1 | boxes 346,362,47,97;372,368,30,49;367,361,40,53 | samples 346,361=6345 358,361=cdde 370,361=3055 382,361=a312 394,361=0dab 406,361=7845 346,393=41b1 358,393=5224 370,393=8beb 382,393=82e9 394,393=62a8 406,393=450c 346,425=201d 358,425=7307 370,425=49e5 382,425=5fea 394,425=ca84 406,425=351e 346,458=6d7d 358,458=d816 370,458=42b0 382,458=9c89 394,458=17e3 406,458=827d
+F cra1041042.SPW list [0, 1, 2, 3, 4, 5, 6]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c f9dcef1aa01226af5422d7add35e1527 | cursor=0 hit=-1 | boxes 346,362,47,97;372,368,30,49;367,361,40,53;381,402,28,41;377,399,29,55;391,441,8,12;354,430,44,43 | samples 346,361=6345 358,361=cdde 370,361=3055 383,361=4149 395,361=abe3 408,361=b4b4 346,398=6c72 358,398=4a25 370,398=72c6 383,398=8b8b 395,398=72c6 408,398=bde1 346,435=759f 358,435=5205 370,435=5ac9 383,435=5a45 395,435=72e6 408,435=c70e 346,472=7ecc 358,472=e966 370,472=53ff 383,472=4c4f 395,472=c76a 408,472=d03c
+F cra1041042.SPW list [6, 5, 4, 3, 2, 1, 0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c a30a68fe018570355245aff6181ea063 | cursor=0 hit=-1 | boxes 354,430,44,43;391,441,8,12;377,399,29,55;381,402,28,41;367,361,40,53;372,368,30,49;346,362,47,97 | samples 346,361=6345 358,361=cdde 370,361=3055 383,361=4149 395,361=abe3 408,361=b4b4 346,398=6c72 358,398=4a25 370,398=72c6 383,398=8b8b 395,398=3964 408,398=bde1 346,435=759f 358,435=5205 370,435=5ac9 383,435=5a45 395,435=6285 408,435=c70e 346,472=7ecc 358,472=e966 370,472=53ff 383,472=4c4f 395,472=c76a 408,472=d03c
+F cra1041042.SPW list [0, -1, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 0f1fd4652a68c1637e0e04b72a4f3bc2 | cursor=0 hit=-1 | boxes 346,362,47,97;372,368,30,49 | samples 346,362=d238 357,362=9e9a 368,362=5233 379,362=375f 390,362=03c1 401,362=d023 346,394=b0a4 357,394=49e4 368,394=72c8 379,394=7b67 390,394=51c4 401,394=950c 346,426=8f10 357,426=5205 368,426=42a6 379,426=93ca 390,426=c099 401,426=8cfc 346,458=6d7d 357,458=39df 368,458=0641 379,458=aa64 390,458=9f06 401,458=6b68
+F cra1041042.SPW list [0, 1, 6, 3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c acee1852464a12f744ad9ebc4be97120 | cursor=0 hit=-1 | boxes 346,362,47,97;372,368,30,49;354,430,44,43;381,402,28,41 | samples 346,362=d238 358,362=3cd2 370,362=a76b 383,362=b03d 395,362=1ad6 408,362=23a7 346,398=6c72 358,398=4a25 370,398=72c6 383,398=8b8b 395,398=39a5 408,398=bde1 346,435=759f 358,435=5205 370,435=5ac9 383,435=53a3 395,435=a559 408,435=c70e 346,472=7ecc 358,472=e966 370,472=53ff 383,472=4c4f 395,472=c76a 408,472=d03c
+F cra1041042.SPW list [1, 0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 9696630eccb06729205a926b9b846ac2 | cursor=0 hit=-1 | boxes 372,368,30,49;346,362,47,97 | samples 346,362=d238 357,362=9e9a 368,362=5233 379,362=375f 390,362=03c1 401,362=d023 346,394=b0a4 357,394=49e4 368,394=72c8 379,394=7b67 390,394=51c4 401,394=950c 346,426=8f10 357,426=5205 368,426=42a6 379,426=93ca 390,426=c099 401,426=8cfc 346,458=6d7d 357,458=39df 368,458=0641 379,458=aa64 390,458=9f06 401,458=6b68
+F cra1041042.SPW list [3, 3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c bec5f6fba07cc0b863e435de525de9e2 | cursor=0 hit=-1 | boxes 381,402,28,41;381,402,28,41 | samples 381,402=c9d5 386,402=e0ea 391,402=f800 397,402=ad4c 402,402=c462 408,402=79af 381,415=6c31 386,415=5223 391,415=18e2 397,415=7b07 402,415=3984 408,415=1c0b 381,428=0e8d 386,428=2282 391,428=49c4 397,428=61c4 402,428=946c 408,428=9cc5 381,442=0df5 386,442=36f2 391,442=4e07 397,442=0354 402,442=1a69 408,442=cfb6
+F cra1041042.SPW list [0, 1] inactive (+0x30 = 0): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes 346,362,47,97;372,368,30,49 | samples 346,362=d238 357,362=9e9a 368,362=6afc 379,362=375f 390,362=03c1 401,362=d023 346,394=b0a4 357,394=7d06 368,394=4969 379,394=15cb 390,394=e22d 401,394=ae8f 346,426=8f10 357,426=5b73 368,426=27d5 379,426=f437 390,426=c099 401,426=8cfc 346,458=6d7d 357,458=39df 368,458=0641 379,458=d2a3 390,458=9f06 401,458=6b68
+F cra1041042.SPW single (+0x34 = 1) frame 4, list [0, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 1b5f0ea990ec9e09681ffa693e4f24e8 | cursor=0 hit=-1 | boxes 346,362,47,97;372,368,30,49 | samples 346,362=d238 357,362=9e9a 368,362=6afc 379,362=375f 390,362=03c1 401,362=d023 346,394=b0a4 357,394=7d06 368,394=4969 379,394=15cb 390,394=e22d 401,394=ae8f 346,426=8f10 357,426=5b73 368,426=27d5 379,426=f437 390,426=c099 401,426=8cfc 346,458=6d7d 357,458=39df 368,458=0641 379,458=d2a3 390,458=9f06 401,458=6b68
+F cra1041042.SPW list [0, 1, 2] click kind 2, texel (5, 387, 387) (frame 2's box): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c e708d8756a73f2ac070a7d29ffe9559e | cursor=1 hit=0 | boxes 346,362,47,97;372,368,30,49;367,361,40,53 | samples 346,361=6345 358,361=cdde 370,361=3055 382,361=a312 394,361=0dab 406,361=7845 346,393=41b1 358,393=5224 370,393=8beb 382,393=82e9 394,393=62a8 406,393=450c 346,425=201d 358,425=7307 370,425=49e5 382,425=5fea 394,425=ca84 406,425=351e 346,458=6d7d 358,458=d816 370,458=42b0 382,458=9c89 394,458=17e3 406,458=827d
+F cra1041042.SPW list [0, 1, 2] click kind 1, texel (5, 387, 387): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c e708d8756a73f2ac070a7d29ffe9559e | cursor=1 hit=0 | boxes 346,362,47,97;372,368,30,49;367,361,40,53 | samples 346,361=6345 358,361=cdde 370,361=3055 382,361=a312 394,361=0dab 406,361=7845 346,393=41b1 358,393=5224 370,393=8beb 382,393=82e9 394,393=62a8 406,393=450c 346,425=201d 358,425=7307 370,425=49e5 382,425=5fea 394,425=ca84 406,425=351e 346,458=6d7d 358,458=d816 370,458=42b0 382,458=9c89 394,458=17e3 406,458=827d
+F cra1041042.SPW list [] click kind 2, texel (5, 387, 387): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1041042.SPW list [2, -1] click kind 2, texel (5, 387, 387): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c ad2a081d912621de901e3977dc73aee2 | cursor=1 hit=0 | boxes 367,361,40,53 | samples 367,361=5dd2 374,361=b156 382,361=a312 390,361=94cd 398,361=8689 406,361=7845 367,378=bbfb 374,378=0f7f 382,378=5a68 390,378=6246 398,378=3163 406,378=d66f 367,395=1a25 374,395=6da9 382,395=5f65 390,395=7aa6 398,395=6269 406,395=3aab 367,413=e741 374,413=3ac6 382,413=2c82 390,413=1e3d 398,413=0ff9 406,413=01b5
+F cra1041042.SPW list [-1] click kind 2, texel (5, 387, 387): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1041042.SPW list [0, 1, 2] click kind 0, texel (5, 387, 387): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c e708d8756a73f2ac070a7d29ffe9559e | cursor=0 hit=-1 | boxes 346,362,47,97;372,368,30,49;367,361,40,53 | samples 346,361=6345 358,361=cdde 370,361=3055 382,361=a312 394,361=0dab 406,361=7845 346,393=41b1 358,393=5224 370,393=8beb 382,393=82e9 394,393=62a8 406,393=450c 346,425=201d 358,425=7307 370,425=49e5 382,425=5fea 394,425=ca84 406,425=351e 346,458=6d7d 358,458=d816 370,458=42b0 382,458=9c89 394,458=17e3 406,458=827d
+F file cra1042042.SPW md5 1835c7c2c630846b446b78b29a663292 size 40576
+F cra1042042.SPW list [0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c a424ced3e60c7d447a2b80a11dfeb8fe | cursor=0 hit=-1 | boxes 293,185,84,141 | samples 293,185=5a75 309,185=3ded 326,185=bf9c 342,185=a313 359,185=24c2 376,185=a671 293,231=4a31 309,231=5a65 326,231=93a8 342,231=8b49 359,231=840d 376,231=962d 293,278=a8e0 309,278=3143 326,278=49c4 342,278=28a4 359,278=732d 376,278=f4dc 293,325=078f 309,325=eb06 326,325=6cb5 342,325=502d 359,325=d1dc 376,325=538b
+F cra1042042.SPW list [1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c a09e8c54297cae7eff631f0466828fc0 | cursor=0 hit=-1 | boxes 354,219,44,69 | samples 354,219=ca00 362,219=bbbc 371,219=428a 379,219=3d6b 388,219=cd5e 397,219=5d51 354,241=52ea 362,241=5ae7 371,241=6a88 379,241=41c3 388,241=31c3 397,241=e63c 354,264=4287 362,264=5ac5 371,264=5a46 379,264=5a46 388,264=31c2 397,264=de1a 354,287=42a6 362,287=3462 371,287=abd3 379,287=b611 388,287=4604 397,287=d5f7
+F cra1042042.SPW list [2]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 77d3fe1c4c480fda3b10e3d00fb05971 | cursor=0 hit=-1 | boxes 350,185,57,65 | samples 350,185=846d 361,185=592e 372,185=2d94 383,185=f9f6 394,185=c658 406,185=30f2 350,206=aec6 361,206=7b28 372,206=478b 383,206=72c6 394,206=7309 406,206=4ae9 350,227=c8bd 361,227=951f 372,227=6182 383,227=7366 394,227=6245 406,227=4242 350,249=51a8 361,249=1e0a 372,249=ea6c 383,249=b6ce 394,249=8330 406,249=edca
+F cra1042042.SPW list [3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 68f5ec9de271f05a9fe235f0c2536c14 | cursor=0 hit=-1 | boxes 353,227,58,71 | samples 353,227=a364 364,227=6fc6 375,227=3c28 387,227=a6c2 398,227=7324 410,227=ddbe 353,250=9b41 364,250=67a4 375,250=3406 387,250=9ea0 398,250=49c4 410,250=d59b 353,273=931f 364,273=39a3 375,273=6245 387,273=59c5 398,273=6a86 410,273=cd79 353,297=f9f0 364,297=c653 375,297=92b5 387,297=fd4f 398,297=c9b1 410,297=344a
+F cra1042042.SPW list [4]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c a08833dea098c5023bd9d7e55808c4ff | cursor=0 hit=-1 | boxes 346,204,59,111 | samples 346,204=5801 357,204=2464 369,204=8efd 380,204=5b60 392,204=c5f9 404,204=3093 346,240=f23b 357,240=be9d 369,240=3184 380,240=8369 392,240=6033 404,240=cacd 346,277=fb68 357,277=62a5 369,277=7b08 380,277=7367 392,277=8b89 404,277=d3fa 346,314=0496 357,314=d0f8 369,314=332f 380,314=07f4 392,314=728d 404,314=dd27
+F cra1042042.SPW list [5]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 993754cacb39ef3c9f49294568e98043 | cursor=0 hit=-1 | boxes 373,295,20,36 | samples 373,295=785f 376,295=5306 380,295=cbe3 384,295=44c1 388,295=8bf4 392,295=2bf0 373,306=3cd4 376,306=177b 380,306=0800 384,306=3983 388,306=4183 392,306=c26e 373,318=703d 376,318=2922 380,318=51e3 384,318=3184 388,318=3163 392,318=2e5b 373,330=a3a6 376,330=7e4c 380,330=f72a 384,330=6807 388,330=e8e6 392,330=61c4
+F cra1042042.SPW list [6]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 175c141c5e6ad54dbc24defd03ee8e18 | cursor=0 hit=-1 | boxes 308,291,81,68 | samples 308,291=7858 324,291=73f3 340,291=576b 356,291=3ae3 372,291=1e5a 388,291=01d2 308,313=1966 324,313=fcde 340,313=e055 356,313=c3cd 372,313=9684 388,313=8abc 308,335=a251 324,335=3162 340,335=4183 356,335=5225 372,335=6286 388,335=13a7 308,358=9a2e 324,358=7da6 340,358=611e 356,358=336f 372,358=280d 388,358=0b84
+F cra1042042.SPW list []: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1042042.SPW list [0, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 0fab522dd436bfdcf32717edf5da3915 | cursor=0 hit=-1 | boxes 293,185,84,141;354,219,44,69 | samples 293,185=5a75 313,185=b6ca 334,185=b157 355,185=abe4 376,185=a671 397,185=a0fe 293,231=4a31 313,231=5a65 334,231=7b48 355,231=8367 376,231=4204 397,231=90ba 293,278=a8e0 313,278=2902 334,278=39a2 355,278=3103 376,278=6227 397,278=ef69 293,325=078f 313,325=63e4 334,325=5e71 355,325=50dd 376,325=538b 397,325=4e18
+F cra1042042.SPW list [0, 1, 2]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 6876f706e257c325e6e61e2a5c060d0b | cursor=0 hit=-1 | boxes 293,185,84,141;354,219,44,69;350,185,57,65 | samples 293,185=5a75 315,185=f339 338,185=2a35 360,185=a2d4 383,185=f9f6 406,185=30f2 293,231=4a31 315,231=72c7 338,231=6267 360,231=8b8a 383,231=4124 406,231=3126 293,278=a8e0 315,278=2902 338,278=2081 360,278=10a1 383,278=4143 406,278=7f5c 293,325=078f 315,325=a053 338,325=d74f 360,325=7013 383,325=a70f 406,325=de0b
+F cra1042042.SPW list [0, 1, 2, 3, 4, 5, 6]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 22aa1c75127f69f34748d1bcaa54b1b0 | cursor=0 hit=-1 | boxes 293,185,84,141;354,219,44,69;350,185,57,65;353,227,58,71;346,204,59,111;373,295,20,36;308,291,81,68 | samples 293,185=5a75 316,185=9171 339,185=c86d 363,185=9da0 386,185=d49c 410,185=a9d0 293,242=0ea6 316,242=1941 339,242=5a67 363,242=2943 386,242=6ac6 410,242=5e00 293,300=31ca 316,300=18c1 339,300=4a04 363,300=6aa6 386,300=49c4 410,300=8125 293,358=54ee 316,358=8bea 339,358=c2e6 363,358=9819 386,358=cf15 410,358=a449
+F cra1042042.SPW list [6, 5, 4, 3, 2, 1, 0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 76e668a9935acfc933234587278fa79b | cursor=0 hit=-1 | boxes 308,291,81,68;373,295,20,36;346,204,59,111;353,227,58,71;350,185,57,65;354,219,44,69;293,185,84,141 | samples 293,185=5a75 316,185=9171 339,185=c86d 363,185=9da0 386,185=d49c 410,185=a9d0 293,242=0ea6 316,242=1941 339,242=5a67 363,242=5a46 386,242=3142 410,242=5e00 293,300=31ca 316,300=18c1 339,300=4a04 363,300=2944 386,300=49c4 410,300=8125 293,358=54ee 316,358=8bea 339,358=c2e6 363,358=9819 386,358=cf15 410,358=a449
+F cra1042042.SPW list [0, -1, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 0fab522dd436bfdcf32717edf5da3915 | cursor=0 hit=-1 | boxes 293,185,84,141;354,219,44,69 | samples 293,185=5a75 313,185=b6ca 334,185=b157 355,185=abe4 376,185=a671 397,185=a0fe 293,231=4a31 313,231=5a65 334,231=7b48 355,231=8367 376,231=4204 397,231=90ba 293,278=a8e0 313,278=2902 334,278=39a2 355,278=3103 376,278=6227 397,278=ef69 293,325=078f 313,325=63e4 334,325=5e71 355,325=50dd 376,325=538b 397,325=4e18
+F cra1042042.SPW list [0, 1, 6, 3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 972dac70d4bf3cec0dafc72b796a95dd | cursor=0 hit=-1 | boxes 293,185,84,141;354,219,44,69;308,291,81,68;353,227,58,71 | samples 293,185=5a75 316,185=9171 339,185=c86d 363,185=9da0 386,185=d49c 410,185=a9d0 293,242=0ea6 316,242=1941 339,242=5a67 363,242=5a67 386,242=3903 410,242=5e00 293,300=31ca 316,300=18c1 339,300=4a04 363,300=2944 386,300=abf1 410,300=8125 293,358=54ee 316,358=8bea 339,358=c2e6 363,358=9819 386,358=cf15 410,358=a449
+F cra1042042.SPW list [1, 0]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c d3ece2ca91f123c31f029cd85dc05d52 | cursor=0 hit=-1 | boxes 354,219,44,69;293,185,84,141 | samples 293,185=5a75 313,185=b6ca 334,185=b157 355,185=abe4 376,185=a671 397,185=a0fe 293,231=4a31 313,231=5a65 334,231=7b48 355,231=8367 376,231=4204 397,231=90ba 293,278=a8e0 313,278=2902 334,278=39a2 355,278=28e2 376,278=6227 397,278=ef69 293,325=078f 313,325=63e4 334,325=5e71 355,325=50dd 376,325=538b 397,325=4e18
+F cra1042042.SPW list [3, 3]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 7b33180663171c733c39efe1b0063cb4 | cursor=0 hit=-1 | boxes 353,227,58,71;353,227,58,71 | samples 353,227=a364 364,227=6fc6 375,227=3c28 387,227=a6c2 398,227=7324 410,227=ddbe 353,250=9b41 364,250=67a4 375,250=3406 387,250=9ea0 398,250=49c4 410,250=d59b 353,273=931f 364,273=3123 375,273=6245 387,273=59c5 398,273=6a86 410,273=cd79 353,297=f9f0 364,297=c653 375,297=92b5 387,297=fd4f 398,297=c9b1 410,297=344a
+F cra1042042.SPW list [0, 1] inactive (+0x30 = 0): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes 293,185,84,141;354,219,44,69 | samples 293,185=5a75 313,185=b6ca 334,185=b157 355,185=abe4 376,185=a671 397,185=a0fe 293,231=4a31 313,231=a686 334,231=a113 355,231=9ba0 376,231=962d 397,231=90ba 293,278=a8e0 313,278=0535 334,278=ffc2 355,278=fa4f 376,278=f4dc 397,278=ef69 293,325=078f 313,325=63e4 334,325=5e71 355,325=58fe 376,325=538b 397,325=4e18
+F cra1042042.SPW single (+0x34 = 1) frame 4, list [0, 1]: faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c a08833dea098c5023bd9d7e55808c4ff | cursor=0 hit=-1 | boxes 293,185,84,141;354,219,44,69 | samples 293,185=5a75 313,185=b6ca 334,185=b157 355,185=abe4 376,185=a671 397,185=a0fe 293,231=4a31 313,231=a686 334,231=a113 355,231=9ba0 376,231=7b67 397,231=90ba 293,278=a8e0 313,278=0535 334,278=ffc2 355,278=4924 376,278=7328 397,278=62a5 293,325=078f 313,325=63e4 334,325=5e71 355,325=58fe 376,325=538b 397,325=4e18
+F cra1042042.SPW list [0, 1, 2] click kind 2, texel (5, 378, 217) (frame 2's box): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 6876f706e257c325e6e61e2a5c060d0b | cursor=1 hit=0 | boxes 293,185,84,141;354,219,44,69;350,185,57,65 | samples 293,185=5a75 315,185=f339 338,185=2a35 360,185=a2d4 383,185=f9f6 406,185=30f2 293,231=4a31 315,231=72c7 338,231=6267 360,231=8b8a 383,231=4124 406,231=3126 293,278=a8e0 315,278=2902 338,278=2081 360,278=10a1 383,278=4143 406,278=7f5c 293,325=078f 315,325=a053 338,325=d74f 360,325=7013 383,325=a70f 406,325=de0b
+F cra1042042.SPW list [0, 1, 2] click kind 1, texel (5, 378, 217): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 6876f706e257c325e6e61e2a5c060d0b | cursor=1 hit=0 | boxes 293,185,84,141;354,219,44,69;350,185,57,65 | samples 293,185=5a75 315,185=f339 338,185=2a35 360,185=a2d4 383,185=f9f6 406,185=30f2 293,231=4a31 315,231=72c7 338,231=6267 360,231=8b8a 383,231=4124 406,231=3126 293,278=a8e0 315,278=2902 338,278=2081 360,278=10a1 383,278=4143 406,278=7f5c 293,325=078f 315,325=a053 338,325=d74f 360,325=7013 383,325=a70f 406,325=de0b
+F cra1042042.SPW list [] click kind 2, texel (5, 378, 217): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1042042.SPW list [2, -1] click kind 2, texel (5, 378, 217): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 77d3fe1c4c480fda3b10e3d00fb05971 | cursor=1 hit=0 | boxes 350,185,57,65 | samples 350,185=846d 361,185=592e 372,185=2d94 383,185=f9f6 394,185=c658 406,185=30f2 350,206=aec6 361,206=7b28 372,206=478b 383,206=72c6 394,206=7309 406,206=4ae9 350,227=c8bd 361,227=951f 372,227=6182 383,227=7366 394,227=6245 406,227=4242 350,249=51a8 361,249=1e0a 372,249=ea6c 383,249=b6ce 394,249=8330 406,249=edca
+F cra1042042.SPW list [-1] click kind 2, texel (5, 378, 217): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 54818acfd0fe0ea30e765f7584590621 | cursor=0 hit=-1 | boxes - | samples -
+F cra1042042.SPW list [0, 1, 2] click kind 0, texel (5, 378, 217): faces 4f168fc9c0f17cd896b5ea7f8248e8b6 d696c6ce005599a42bf72d054a26ff8d a9c0a89fa16c0375b506ae4cf105c0a1 5814433c0c8e1c6c581bc71507ec8fde 4d492d44f7d9f3895f02172a628d7c8c 6876f706e257c325e6e61e2a5c060d0b | cursor=0 hit=-1 | boxes 293,185,84,141;354,219,44,69;350,185,57,65 | samples 293,185=5a75 315,185=f339 338,185=2a35 360,185=a2d4 383,185=f9f6 406,185=30f2 293,231=4a31 315,231=72c7 338,231=6267 360,231=8b8a 383,231=4124 406,231=3126 293,278=a8e0 315,278=2902 338,278=2081 360,278=10a1 383,278=4143 406,278=7f5c 293,325=078f 315,325=a053 338,325=d74f 360,325=7013 383,325=a70f 406,325=de0b
+errors -

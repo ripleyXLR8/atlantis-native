@@ -1,0 +1,45 @@
+# Produced by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) run under emulation, with defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) parsed by its own DefName_Init (0x00410b70).
+# The 15 Hz tick (0x0040caa0) for chosen scheduler times (now - last = dt): tick count,
+# seconds accumulator, RANDOM, TIME1, TIME2, the four tick flags. Stubbed: the window test,
+# the music fade step, 0x004801d0. x87 control word 0x027f.
+tick 0 dt=0.066667 ticks=1 acc=0.066667 random=0 time1=0 time2=0 flags=1111
+tick 1 dt=0.066667 ticks=2 acc=0.133333 random=0 time1=0 time2=0 flags=1111
+tick 2 dt=0.066667 ticks=3 acc=0.200000 random=0 time1=0 time2=0 flags=1111
+tick 3 dt=0.066667 ticks=4 acc=0.266667 random=0 time1=0 time2=0 flags=1111
+tick 4 dt=0.066667 ticks=5 acc=0.333333 random=0 time1=0 time2=0 flags=1111
+tick 5 dt=0.066667 ticks=6 acc=0.400000 random=0 time1=0 time2=0 flags=1111
+tick 6 dt=0.066667 ticks=7 acc=0.466667 random=0 time1=0 time2=0 flags=1111
+tick 7 dt=0.066667 ticks=8 acc=0.533333 random=0 time1=0 time2=0 flags=1111
+tick 8 dt=0.066667 ticks=9 acc=0.600000 random=0 time1=0 time2=0 flags=1111
+tick 9 dt=0.066667 ticks=10 acc=0.666667 random=0 time1=0 time2=0 flags=1111
+tick 10 dt=0.066667 ticks=11 acc=0.733333 random=0 time1=0 time2=0 flags=1111
+tick 11 dt=0.066667 ticks=12 acc=0.800000 random=0 time1=0 time2=0 flags=1111
+tick 12 dt=0.066667 ticks=13 acc=0.866667 random=0 time1=0 time2=0 flags=1111
+tick 13 dt=0.066667 ticks=14 acc=0.933333 random=0 time1=0 time2=0 flags=1111
+tick 14 dt=0.066667 ticks=15 acc=0.000000 random=15 time1=1 time2=1 flags=1111
+tick 15 dt=0.066667 ticks=16 acc=0.066667 random=15 time1=1 time2=1 flags=1111
+tick 16 dt=0.066667 ticks=17 acc=0.133333 random=15 time1=1 time2=1 flags=1111
+tick 17 dt=0.066667 ticks=18 acc=0.200000 random=15 time1=1 time2=1 flags=1111
+tick 18 dt=0.066667 ticks=19 acc=0.266667 random=15 time1=1 time2=1 flags=1111
+tick 19 dt=0.066667 ticks=20 acc=0.333333 random=15 time1=1 time2=1 flags=1111
+tick 20 dt=0.066667 ticks=21 acc=0.400000 random=15 time1=1 time2=1 flags=1111
+tick 21 dt=0.066667 ticks=22 acc=0.466667 random=15 time1=1 time2=1 flags=1111
+tick 22 dt=0.066667 ticks=23 acc=0.533333 random=15 time1=1 time2=1 flags=1111
+tick 23 dt=0.066667 ticks=24 acc=0.600000 random=15 time1=1 time2=1 flags=1111
+tick 24 dt=0.066667 ticks=25 acc=0.666667 random=15 time1=1 time2=1 flags=1111
+tick 25 dt=0.066667 ticks=26 acc=0.733333 random=15 time1=1 time2=1 flags=1111
+tick 26 dt=0.066667 ticks=27 acc=0.800000 random=15 time1=1 time2=1 flags=1111
+tick 27 dt=0.066667 ticks=28 acc=0.866667 random=15 time1=1 time2=1 flags=1111
+tick 28 dt=0.066667 ticks=29 acc=0.933333 random=15 time1=1 time2=1 flags=1111
+tick 29 dt=0.066667 ticks=30 acc=0.000000 random=30 time1=2 time2=2 flags=1111
+tick 30 dt=0.066667 ticks=31 acc=0.066667 random=30 time1=2 time2=2 flags=1111
+tick 31 dt=0.066667 ticks=32 acc=0.133333 random=30 time1=2 time2=2 flags=1111
+tick 32 dt=0.500000 ticks=33 acc=0.633333 random=30 time1=2 time2=2 flags=1111
+tick 33 dt=0.500000 ticks=34 acc=0.133333 random=34 time1=3 time2=3 flags=1111
+tick 34 dt=0.250000 ticks=35 acc=0.383333 random=34 time1=3 time2=3 flags=1111
+tick 35 dt=12.000000 ticks=36 acc=0.000000 random=34 time1=3 time2=3 flags=1111
+tick 36 dt=0.066667 ticks=37 acc=0.066667 random=34 time1=3 time2=3 flags=1111
+tick 37 dt=1.000000 ticks=38 acc=0.066667 random=38 time1=4 time2=4 flags=1111
+tick 38 dt=3.000000 ticks=39 acc=2.066667 random=39 time1=5 time2=5 flags=1111

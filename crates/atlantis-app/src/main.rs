@@ -27,8 +27,32 @@
 //! `--fullscreen` opens the window in full screen (F, F11 or Alt+Enter
 //! switches it back).
 //!
-//! `--original` (before the game directory) turns every enhancement off:
-//! the original game, bug for bug. `--new-game` skips the start-up videos
+//! A folder holding Atlantis II (`atlantis2.exe`) opens Atlantis II's own
+//! mode (`atlantis_app::a2`): the player menu, then Tibet, to look around
+//! and walk from view to view with a left click; Escape opens the menus
+//! (options, volumes, saves). Its discs (CD images or copies) are looked
+//! for in the folder, in the folders directly inside it and in each
+//! `--discs <folder>`; `--headless <folder> [frames] [--screenshot
+//! <file.png>]` plays a new game, prints where it is and saves the screen;
+//! `--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
+//! plays a dialog at once, `--menu <page>` (`player`, `main`, `options`,
+//! `sound`, `load`, `credits`) shows a menu page (testing aids). The intro
+//! videos play before the player menu, as in the original: `--no-intro`
+//! skips them, `--intro` plays them in a headless run. `--hd` and
+//! `--widescreen` draw its panorama at the window's resolution, as the
+//! first game's HD mode does, `--size <w>x<h>` sizes its window (and a
+//! headless run's screenshot); F10 (or O) opens its options menu, whose
+//! choices are kept in its own `settings.ini`; `--resolution 800x600`
+//! chooses the original's 800 x 600 screen (its options page's button,
+//! kept in `atlant2.cfg`), `--options-menu` shows the options menu in a
+//! headless run's screenshot. Only the
+//! command line opens Atlantis II for now:
+//! the launcher, the game library and the web build know the first game
+//! alone. The first game's options but `--original` are refused in this
+//! mode, and `--discs` and `--screenshot` with the first game.
+//!
+//! `--original` (before the game directory) turns every enhancement off,
+//! in both games: the original game, bug for bug. `--new-game` skips the start-up videos
 //! and the player screen.
 //!
 //! `--puzzle <n> [--object <id>]` (a testing aid) plays StartPuzzle `n` at
@@ -96,6 +120,26 @@ fn main() {
     let launcher = flag("--launcher");
     let force_support = flag("--support-screen");
     let fullscreen = flag("--fullscreen");
+    // Atlantis II: the folders of its discs, and a screenshot of a
+    // headless run.
+    let mut discs = Vec::new();
+    let mut screenshot = None;
+    while let Some(i) = args
+        .iter()
+        .position(|a| a == "--discs" || a == "--screenshot")
+    {
+        let name = args.remove(i);
+        if i >= args.len() {
+            eprintln!("{name} needs a folder or a file");
+            std::process::exit(2);
+        }
+        let path = std::path::PathBuf::from(args.remove(i));
+        if name == "--discs" {
+            discs.push(path);
+        } else {
+            screenshot = Some(path);
+        }
+    }
     let mut value = |name: &str| -> Option<i32> {
         let i = args.iter().position(|a| a == name)?;
         args.remove(i);
@@ -110,13 +154,215 @@ fn main() {
         }))
     };
     let puzzle = value("--puzzle");
-    let object = value("--object").unwrap_or(0);
+    let object = value("--object");
+    let dialog = value("--dialog");
+    // Atlantis II: `--view <id>[,<yaw>,<pitch>]`.
+    let view = match args.iter().position(|a| a == "--view") {
+        Some(i) if i + 1 < args.len() => {
+            args.remove(i);
+            let v = args.remove(i);
+            Some(
+                atlantis_app::a2::A2Start::parse_view(&v).unwrap_or_else(|| {
+                    eprintln!("--view {v}: not <id>[,<yaw>,<pitch>]");
+                    std::process::exit(2);
+                }),
+            )
+        }
+        Some(_) => {
+            eprintln!("--view needs a view");
+            std::process::exit(2);
+        }
+        None => None,
+    };
+    // Atlantis II: `--menu <page>`.
+    let menu = match args.iter().position(|a| a == "--menu") {
+        Some(i) if i + 1 < args.len() => {
+            args.remove(i);
+            let v = args.remove(i);
+            Some(
+                atlantis_app::a2::A2Start::parse_menu(&v).unwrap_or_else(|| {
+                    eprintln!("--menu {v}: not player, main, options, sound, load or credits");
+                    std::process::exit(2);
+                }),
+            )
+        }
+        Some(_) => {
+            eprintln!("--menu needs a page");
+            std::process::exit(2);
+        }
+        None => None,
+    };
+    // Atlantis II's bag aids: `--take <names>`, `--hold <name>`, `--bag`,
+    // `--pointer <x>,<y>`.
+    let mut text_value = |name: &str| -> Option<String> {
+        let i = args.iter().position(|a| a == name)?;
+        args.remove(i);
+        if i >= args.len() {
+            eprintln!("{name} needs a value");
+            std::process::exit(2);
+        }
+        Some(args.remove(i))
+    };
+    let take = text_value("--take");
+    let command = text_value("--command");
+    let hold = text_value("--hold");
+    let size = text_value("--size").map(|v| {
+        atlantis_app::a2::A2Start::parse_size(&v).unwrap_or_else(|| {
+            eprintln!("--size {v}: not <width>x<height>");
+            std::process::exit(2);
+        })
+    });
+    // Atlantis II: the original's screen option (its options page,
+    // atlant2.cfg).
+    let resolution = text_value("--resolution").map(|v| {
+        atlantis_app::a2::A2Start::parse_resolution(&v).unwrap_or_else(|| {
+            eprintln!("--resolution {v}: not 640x480 or 800x600");
+            std::process::exit(2);
+        })
+    });
+    let pointer = text_value("--pointer").map(|v| {
+        atlantis_app::a2::A2Start::parse_pointer(&v).unwrap_or_else(|| {
+            eprintln!("--pointer {v}: not <x>,<y>");
+            std::process::exit(2);
+        })
+    });
+    let bag = match args.iter().position(|a| a == "--bag") {
+        Some(i) => {
+            args.remove(i);
+            true
+        }
+        None => false,
+    };
+    // `--talk` (a click on the character under the centre: its subject
+    // menu) and Atlantis II's start-up intro: `--intro`, `--no-intro`.
+    let mut flag = |name: &str| match args.iter().position(|a| a == name) {
+        Some(i) => {
+            args.remove(i);
+            true
+        }
+        None => false,
+    };
+    let talk = flag("--talk");
+    let options_menu = flag("--options-menu");
+    let intro = match (flag("--intro"), flag("--no-intro")) {
+        (true, true) => {
+            eprintln!("--intro and --no-intro together");
+            std::process::exit(2);
+        }
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        (false, false) => None,
+    };
+    let a2_start = atlantis_app::a2::A2Start {
+        view,
+        dialog: dialog.map(|d| d.max(0) as u32),
+        menu,
+        take: take
+            .iter()
+            .flat_map(|t| t.split(','))
+            .map(str::to_string)
+            .collect(),
+        hold,
+        bag,
+        pointer,
+        talk,
+        intro,
+        size,
+        commands: command.into_iter().collect(),
+        resolution,
+        options_menu,
+    };
+    // `--original`, `--hd` and `--widescreen` hold for both games (for
+    // this run: `settings.ini` is not changed). A headless run starts
+    // from the defaults, a window from Atlantis II's `settings.ini`.
+    let a2_flags_applied = |mut x: atlantis2_engine::Enhancements| {
+        if original {
+            x.minor_bug_fixes = false;
+        }
+        x.hd |= force_hd;
+        x.hd_options.widescreen |= force_wide;
+        x
+    };
+    let a2_enhancements = a2_flags_applied(if original {
+        atlantis2_engine::Enhancements::original()
+    } else {
+        atlantis2_engine::Enhancements::default()
+    });
+    // The options of one game only, refused for the other rather than
+    // ignored.
+    let first_game_flags: Vec<&str> = [
+        ("--new-game", new_game),
+        ("--launcher", launcher),
+        ("--support-screen", force_support),
+        ("--puzzle", puzzle.is_some()),
+        ("--object", object.is_some()),
+    ]
+    .into_iter()
+    .filter_map(|(name, on)| on.then_some(name))
+    .collect();
+    let a2_flags: Vec<&str> = [
+        ("--discs", !discs.is_empty()),
+        ("--screenshot", screenshot.is_some()),
+        ("--dialog", dialog.is_some()),
+        ("--view", view.is_some()),
+        ("--menu", menu.is_some()),
+        ("--take", !a2_start.take.is_empty()),
+        ("--hold", a2_start.hold.is_some()),
+        ("--bag", a2_start.bag),
+        ("--pointer", a2_start.pointer.is_some()),
+        ("--talk", a2_start.talk),
+        ("--intro", intro == Some(true)),
+        ("--no-intro", intro == Some(false)),
+        ("--size", size.is_some()),
+        ("--resolution", resolution.is_some()),
+        ("--options-menu", options_menu),
+        ("--command", !a2_start.commands.is_empty()),
+    ]
+    .into_iter()
+    .filter_map(|(name, on)| on.then_some(name))
+    .collect();
+    let object = object.unwrap_or(0);
+    let refuse = |flags: &[&str], game: &str| {
+        if !flags.is_empty() {
+            let text = format!("{}: not an option of {game}", flags.join(", "));
+            if headless {
+                eprintln!("{text}");
+            } else {
+                error_box(&text);
+            }
+            std::process::exit(2);
+        }
+    };
     let start = match puzzle {
         Some(id) => Start::Puzzle { id, object },
         None if new_game => Start::NewGame,
         None => Start::Boot,
     };
 
+    if args.first().map(String::as_str) == Some("--headless")
+        && args
+            .get(1)
+            .is_some_and(|d| atlantis_app::a2::holds_atlantis2(Path::new(d)))
+    {
+        refuse(&first_game_flags, "Atlantis II's mode");
+        let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
+        if let Err(e) = atlantis_app::a2::headless(
+            Path::new(&args[1]),
+            &discs,
+            frames,
+            screenshot.as_deref(),
+            &a2_start,
+            a2_enhancements,
+        ) {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    let is_a2 = args.len() == 1 && atlantis_app::a2::holds_atlantis2(Path::new(&args[0]));
+    if !is_a2 {
+        refuse(&a2_flags, "the first game (Atlantis II only)");
+    }
     if args.first().map(String::as_str) == Some("--headless") {
         let Some(dir) = args.get(1) else {
             eprintln!(
@@ -177,7 +423,22 @@ fn main() {
         return;
     }
 
-    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--fullscreen] [--launcher] [--support-screen] [--new-game | --puzzle <n> [--object <id>]] [<game dir>]";
+    // A folder of Atlantis II: its own mode.
+    if is_a2 {
+        refuse(&first_game_flags, "Atlantis II's mode");
+        let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
+        let run = atlantis_app::a2::open(Path::new(&args[0]), &discs, &a2_start, enhancements)
+            .and_then(|(engine, label)| {
+                atlantis_app::a2::run_window(engine, label, fullscreen, size)
+            });
+        if let Err(e) = run {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    const USAGE: &str = "usage: atlantis-native [--original] [--hd] [--widescreen] [--fullscreen] [--launcher] [--support-screen] [--new-game | --puzzle <n> [--object <id>]] [--discs <dir>] [<game dir>]";
     if args.len() > 1 || args.first().is_some_and(|a| a.starts_with('-')) {
         error_box(&format!("{USAGE}\n\n'{}' not understood", args.join(" ")));
         std::process::exit(2);

@@ -1,0 +1,22 @@
+[package]
+name = "atlantis2-engine"
+description = "Atlantis II engine: the cube panoramas and, in time, the game"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ab_glyph = "0.2"
+atlantis2-data = { path = "../atlantis2-data" }
+atlantis-codecs = { path = "../atlantis-codecs" }
+atlantis-data = { path = "../atlantis-data" }
+# The HD mode shares the first game's: its layer, options and panorama
+# filters (`atlantis_engine::hd`, `atlantis_engine::upscale`).
+atlantis-engine = { path = "../atlantis-engine" }
+# The same results on every platform: the trigonometry of the camera is not
+# left to each system's mathematics library.
+libm = "=0.2.16"
+log = "0.4"
+
+[dev-dependencies]
+md-5 = "0.10"

@@ -97,27 +97,246 @@ impl MenuValues {
     }
 }
 
-const BOX_W: i32 = 400;
-const ROW_H: i32 = 24;
-const TITLE_H: i32 = 34;
-/// The footer: two lines on the game and the port, the selected entry's
-/// description, the keys.
-const FOOTER_H: i32 = 86;
+/// The box's width; a row's height; the title's; the footer's: two lines
+/// on the game and the port, the selected entry's description, the keys.
+pub const BOX_W: i32 = 400;
+pub const ROW_H: i32 = 24;
+pub const TITLE_H: i32 = 34;
+pub const FOOTER_H: i32 = 86;
+#[cfg(test)]
 const BOX_X: i32 = (SCREEN_W as i32 - BOX_W) / 2;
 
-const BG: u16 = 0x18e3;
-const BORDER: u16 = 0xbdf7;
-const HIGHLIGHT: u16 = 0x3a0c;
-const TEXT: u16 = 0xffff;
-const DIM: u16 = 0x9cf3;
-const GREYED: u16 = 0x632c;
-const SELECTED: u16 = 0xffe0;
+/// The box's colours (RGB565).
+pub const BG: u16 = 0x18e3;
+pub const BORDER: u16 = 0xbdf7;
+pub const HIGHLIGHT: u16 = 0x3a0c;
+pub const TEXT: u16 = 0xffff;
+pub const DIM: u16 = 0x9cf3;
+pub const GREYED: u16 = 0x632c;
+pub const SELECTED: u16 = 0xffe0;
+
+/// A row of an options box ([`MenuBox`]): a setting, its label at the
+/// left and `< value >` at the right, or a button (no value), its label
+/// centred; greyed (skipped by the keys, fixed under a click) when not
+/// enabled.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Row<'a> {
+    pub label: &'a str,
+    pub value: Option<&'a str>,
+    pub enabled: bool,
+}
+
+/// What an input did to an options box.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BoxInput {
+    None,
+    /// Row `i` is to change (a click on it, Enter or Space, Left or
+    /// Right on a setting): the game's menu checks that it is enabled.
+    Activate(usize),
+    /// The box closed (Escape, F10, O, a click outside).
+    Close,
+}
+
+/// The options box of the port's menus, both games': its layout (centred
+/// on the screen, whatever its size), colours, font, keys and mouse. The
+/// game's menu gives the rows and acts on [`BoxInput::Activate`].
+#[derive(Clone, Debug, Default)]
+pub struct MenuBox {
+    open: bool,
+    selected: usize,
+}
+
+impl MenuBox {
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    /// Opens the box, its first row selected.
+    pub fn open(&mut self) {
+        self.open = true;
+        self.selected = 0;
+    }
+
+    pub fn close(&mut self) {
+        self.open = false;
+    }
+
+    /// The selected row.
+    pub fn selected(&self) -> usize {
+        self.selected
+    }
+
+    /// Keeps the selection among `n` rows.
+    pub fn clamp(&mut self, n: usize) {
+        self.selected = self.selected.min(n.saturating_sub(1));
+    }
+
+    /// The height of a box of `n` rows.
+    pub fn box_h(n: usize) -> i32 {
+        TITLE_H + n as i32 * ROW_H + FOOTER_H
+    }
+
+    /// The top left corner of a box of `n` rows on a `w` x `h` screen
+    /// (centred).
+    pub fn origin(n: usize, w: usize, h: usize) -> (i32, i32) {
+        ((w as i32 - BOX_W) / 2, (h as i32 - Self::box_h(n)) / 2)
+    }
+
+    /// The next row from the selected one that can be changed.
+    fn step(&mut self, forward: bool, rows: &[Row]) {
+        let n = rows.len();
+        let dir = if forward { 1 } else { n - 1 };
+        for _ in 0..n {
+            self.selected = (self.selected + dir) % n;
+            if rows[self.selected].enabled {
+                break;
+            }
+        }
+    }
+
+    /// A key pressed while the box is open: Up / Down choose a row
+    /// (skipping the greyed ones), Enter / Space (and Left / Right on a
+    /// setting) change it, Escape, F10 and O close the box.
+    pub fn key(&mut self, key: Key, rows: &[Row]) -> BoxInput {
+        match key {
+            Key::Escape | Key::F(10) | Key::Char('o' | 'O') => {
+                self.close();
+                BoxInput::Close
+            }
+            Key::Up => {
+                self.step(false, rows);
+                BoxInput::None
+            }
+            Key::Down => {
+                self.step(true, rows);
+                BoxInput::None
+            }
+            Key::Enter | Key::Space => BoxInput::Activate(self.selected),
+            Key::Left | Key::Right if rows[self.selected].value.is_some() => {
+                BoxInput::Activate(self.selected)
+            }
+            _ => BoxInput::None,
+        }
+    }
+
+    /// The row under a point of a `w` x `h` screen, for `n` rows.
+    fn row_at(n: usize, x: i32, y: i32, w: usize, h: usize) -> Option<usize> {
+        let (bx, by) = Self::origin(n, w, h);
+        if !(bx..bx + BOX_W).contains(&x) {
+            return None;
+        }
+        let r = y - (by + TITLE_H);
+        (r >= 0 && r < n as i32 * ROW_H).then_some((r / ROW_H) as usize)
+    }
+
+    /// The pointer moved to a point of a `w` x `h` screen: the row under
+    /// it (of `n`) is selected.
+    pub fn pointer(&mut self, n: usize, x: i32, y: i32, w: usize, h: usize) {
+        if let Some(i) = Self::row_at(n, x, y, w, h) {
+            self.selected = i;
+        }
+    }
+
+    /// A click at a point of a `w` x `h` screen: the row under it (of
+    /// `n`) is selected and changes; outside the box the box closes.
+    pub fn click(&mut self, n: usize, x: i32, y: i32, w: usize, h: usize) -> BoxInput {
+        if let Some(i) = Self::row_at(n, x, y, w, h) {
+            self.selected = i;
+            return BoxInput::Activate(i);
+        }
+        let (bx, by) = Self::origin(n, w, h);
+        let inside = (bx..bx + BOX_W).contains(&x) && (by..by + Self::box_h(n)).contains(&y);
+        if inside {
+            BoxInput::None
+        } else {
+            self.close();
+            BoxInput::Close
+        }
+    }
+
+    /// Draws the box over a `w` x `h` RGB565 frame: the title, `rows`,
+    /// the `info` lines (at most two), the selected row's `description`
+    /// and the keys; the text recorded in `record` for the HD mode to
+    /// draw sharp (see [`HdText`]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_recording(
+        &self,
+        screen: &mut [u16],
+        w: usize,
+        h: usize,
+        font: &SubtitleFont,
+        rows: &[Row],
+        info: &[String],
+        description: &str,
+        record: Option<&mut HdText>,
+    ) {
+        let n = rows.len();
+        let (bx, by) = Self::origin(n, w, h);
+        let bh = Self::box_h(n);
+        let mut fill = |x: i32, y: i32, fw: i32, fh: i32, c: u16| {
+            for yy in y.max(0)..(y + fh).min(h as i32) {
+                for xx in x.max(0)..(x + fw).min(w as i32) {
+                    screen[yy as usize * w + xx as usize] = c;
+                }
+            }
+        };
+        fill(bx - 1, by - 1, BOX_W + 2, bh + 2, BORDER);
+        fill(bx, by, BOX_W, bh, BG);
+        let sel_y = by + TITLE_H + self.selected as i32 * ROW_H;
+        fill(bx + 6, sel_y, BOX_W - 12, ROW_H - 2, HIGHLIGHT);
+        let mut items = Vec::new();
+        let mut text = |t: &str, x: i32, y: i32, c: u16| {
+            items.push(TextItem {
+                x,
+                y,
+                max_w: BOX_W - 20,
+                color: c,
+                text: t.as_bytes().to_vec(),
+                bitmap: None,
+                code_page: atlantis_data::TextCodePage::Windows1252,
+                face: None,
+            });
+        };
+        let centre = |t: &str| bx + (BOX_W - font.width(t.as_bytes())) / 2;
+        let right = |t: &str| bx + BOX_W - 16 - font.width(t.as_bytes());
+        let t = "Atlantis Native options";
+        text(t, centre(t), by + 10, TEXT);
+        for (i, row) in rows.iter().enumerate() {
+            let y = by + TITLE_H + i as i32 * ROW_H;
+            let c = match (row.enabled, i == self.selected) {
+                (false, _) => GREYED,
+                (true, true) => SELECTED,
+                (true, false) => TEXT,
+            };
+            match row.value {
+                Some(value) => {
+                    text(row.label, bx + 16, y + 4, c);
+                    let t = format!("< {value} >");
+                    text(&t, right(&t), y + 4, c);
+                }
+                None => text(row.label, centre(row.label), y + 4, c),
+            }
+        }
+        for (i, line) in info.iter().take(2).enumerate() {
+            text(line, centre(line), by + bh - 82 + i as i32 * 18, DIM);
+        }
+        text(description, centre(description), by + bh - 44, TEXT);
+        let k = "Arrows, Enter or click; Escape, F10 or O closes";
+        text(k, centre(k), by + bh - 22, DIM);
+        let under = record.as_ref().map(|_| screen.to_vec());
+        for it in &items {
+            font.draw(screen, w, h, &it.text, it.x, it.y, it.max_w, it.color);
+        }
+        if let (Some(t), Some(under)) = (record, under) {
+            t.set(items, &under, screen);
+        }
+    }
+}
 
 /// The menu's state.
 #[derive(Debug, Default)]
 pub struct OptionsMenu {
-    open: bool,
-    selected: usize,
+    menu: MenuBox,
     /// Shown at the foot of the menu: the game's release, the port's
     /// version (set by the front end).
     info: Vec<String>,
@@ -138,7 +357,7 @@ impl OptionsMenu {
     /// Whether the menu has the "Game library..." entry (the desktop).
     pub fn set_library(&mut self, on: bool) {
         self.library = on;
-        self.selected = self.selected.min(self.entries().len() - 1);
+        self.menu.clamp(self.entries().len());
     }
 
     /// The entries shown.
@@ -150,30 +369,31 @@ impl OptionsMenu {
         }
     }
 
+    #[cfg(test)]
     fn box_h(&self) -> i32 {
-        TITLE_H + self.entries().len() as i32 * ROW_H + FOOTER_H
+        MenuBox::box_h(self.entries().len())
     }
 
+    #[cfg(test)]
     fn box_y(&self) -> i32 {
-        (SCREEN_H as i32 - self.box_h()) / 2
+        MenuBox::origin(self.entries().len(), SCREEN_W, SCREEN_H).1
     }
 
     pub fn is_open(&self) -> bool {
-        self.open
+        self.menu.is_open()
     }
 
     pub fn open(&mut self) {
-        self.open = true;
-        self.selected = 0;
+        self.menu.open();
     }
 
     pub fn close(&mut self) {
-        self.open = false;
+        self.menu.close();
     }
 
     /// The selected entry.
     pub fn selected(&self) -> Entry {
-        self.entries()[self.selected]
+        self.entries()[self.menu.selected()]
     }
 
     fn activate(&mut self, entry: Entry, v: MenuValues) -> MenuAction {
@@ -242,17 +462,75 @@ impl OptionsMenu {
         }
     }
 
-    /// The next entry from the selected one in `dir` (+1 / -1) that can be
-    /// changed.
-    fn step(&mut self, forward: bool, v: MenuValues) {
-        let entries = self.entries();
-        let n = entries.len();
-        let dir = if forward { 1 } else { n - 1 };
-        for _ in 0..n {
-            self.selected = (self.selected + dir) % n;
-            if v.enabled(entries[self.selected]) {
-                break;
-            }
+    /// The rows the box shows for the values `v`.
+    fn rows(&self, v: MenuValues) -> Vec<Row<'static>> {
+        let on = |b: bool| if b { "On" } else { "Off" };
+        self.entries()
+            .iter()
+            .map(|&e| {
+                let (label, value) = match e {
+                    Entry::Graphics => (
+                        "Graphics",
+                        Some(match v.graphics {
+                            Graphics::Original => "Original",
+                            Graphics::Hd => "HD",
+                        }),
+                    ),
+                    Entry::PanoramaFilter => (
+                        "Panorama filter",
+                        Some(match v.hd.panorama {
+                            PanoFilter::Bilinear => "Bilinear",
+                            PanoFilter::Bicubic => "Bicubic",
+                        }),
+                    ),
+                    Entry::Sharpen => ("Panorama sharpening", Some(on(v.hd.sharpen))),
+                    Entry::Interface => (
+                        "Interface",
+                        Some(if v.hd.smooth_interface {
+                            "Smooth"
+                        } else {
+                            "Pixels"
+                        }),
+                    ),
+                    Entry::SharpSubtitles => ("Sharp subtitles", Some(on(v.hd.sharp_subtitles))),
+                    Entry::Widescreen => ("Widescreen", Some(on(v.hd.widescreen))),
+                    Entry::VideoSides => (
+                        "Video sides",
+                        Some(match v.hd.video_sides {
+                            VideoSides::Black => "Black",
+                            VideoSides::Blur => "Blurred",
+                            VideoSides::Zoom => "Zoomed",
+                            VideoSides::Panorama => "Panorama",
+                        }),
+                    ),
+                    Entry::BugFixes => (
+                        "Fix original bugs",
+                        Some(on(v.enhancements.minor_bug_fixes)),
+                    ),
+                    Entry::RestoredContent => (
+                        "Restored content",
+                        Some(on(v.enhancements.restored_content)),
+                    ),
+                    Entry::UiUx => ("Modern UI/UX", Some(on(v.enhancements.ui_ux))),
+                    Entry::Close => ("Close", None),
+                    Entry::Library => ("Game library...", None),
+                    Entry::Support => ("Buy me a coffee...", None),
+                };
+                Row {
+                    label,
+                    value,
+                    enabled: v.enabled(e),
+                }
+            })
+            .collect()
+    }
+
+    /// What the box's input `input` does.
+    fn act(&mut self, input: BoxInput, v: MenuValues) -> MenuAction {
+        match input {
+            BoxInput::None => MenuAction::None,
+            BoxInput::Close => MenuAction::Close,
+            BoxInput::Activate(i) => self.activate(self.entries()[i], v),
         }
     }
 
@@ -260,173 +538,23 @@ impl OptionsMenu {
     /// (skipping the greyed ones), Enter / Space (and Left / Right on a
     /// setting) change it, Escape, F10 and O close the menu.
     pub fn key(&mut self, key: Key, v: MenuValues) -> MenuAction {
-        match key {
-            Key::Escape | Key::F(10) | Key::Char('o' | 'O') => {
-                self.close();
-                MenuAction::Close
-            }
-            Key::Up => {
-                self.step(false, v);
-                MenuAction::None
-            }
-            Key::Down => {
-                self.step(true, v);
-                MenuAction::None
-            }
-            Key::Enter | Key::Space => self.activate(self.selected(), v),
-            Key::Left | Key::Right
-                if !matches!(
-                    self.selected(),
-                    Entry::Close | Entry::Library | Entry::Support
-                ) =>
-            {
-                self.activate(self.selected(), v)
-            }
-            _ => MenuAction::None,
-        }
-    }
-
-    /// The entry under a 640x480 screen point.
-    fn entry_at(&self, x: i32, y: i32) -> Option<usize> {
-        if !(BOX_X..BOX_X + BOX_W).contains(&x) {
-            return None;
-        }
-        let r = y - (self.box_y() + TITLE_H);
-        (r >= 0 && r < self.entries().len() as i32 * ROW_H).then_some((r / ROW_H) as usize)
+        let input = self.menu.key(key, &self.rows(v));
+        self.act(input, v)
     }
 
     /// The pointer moved to a 640x480 screen point: the entry under it is
     /// selected.
     pub fn pointer(&mut self, x: i32, y: i32) {
-        if let Some(i) = self.entry_at(x, y) {
-            self.selected = i;
-        }
+        let n = self.entries().len();
+        self.menu.pointer(n, x, y, SCREEN_W, SCREEN_H);
     }
 
     /// A click at a 640x480 screen point: the entry under it changes;
     /// outside the box the menu closes.
     pub fn click(&mut self, x: i32, y: i32, v: MenuValues) -> MenuAction {
-        if let Some(i) = self.entry_at(x, y) {
-            self.selected = i;
-            return self.activate(self.entries()[i], v);
-        }
-        let (box_y, box_h) = (self.box_y(), self.box_h());
-        let inside = (BOX_X..BOX_X + BOX_W).contains(&x) && (box_y..box_y + box_h).contains(&y);
-        if inside {
-            MenuAction::None
-        } else {
-            self.close();
-            MenuAction::Close
-        }
-    }
-
-    /// The menu's boxes (x, y, w, h, colour) and text.
-    fn layout(&self, font: &SubtitleFont, v: MenuValues) -> (Vec<[i32; 5]>, Vec<TextItem>) {
-        let (box_y, box_h) = (self.box_y(), self.box_h());
-        let mut fills = vec![
-            [
-                BOX_X - 1,
-                box_y - 1,
-                BOX_W + 2,
-                box_h + 2,
-                i32::from(BORDER),
-            ],
-            [BOX_X, box_y, BOX_W, box_h, i32::from(BG)],
-        ];
-        let mut texts = Vec::new();
-        let mut text = |t: &str, x: i32, y: i32, c: u16| {
-            texts.push(TextItem {
-                x,
-                y,
-                max_w: BOX_W - 20,
-                color: c,
-                text: t.as_bytes().to_vec(),
-                bitmap: None,
-                code_page: atlantis_data::TextCodePage::Windows1252,
-                face: None,
-            });
-        };
-        let centre = |t: &str| BOX_X + (BOX_W - font.width(t.as_bytes())) / 2;
-        let right = |t: &str| BOX_X + BOX_W - 16 - font.width(t.as_bytes());
-        let on = |b: bool| if b { "On" } else { "Off" };
-        let t = "Atlantis Native options";
-        text(t, centre(t), box_y + 10, TEXT);
-        for (i, &e) in self.entries().iter().enumerate() {
-            let y = box_y + TITLE_H + i as i32 * ROW_H;
-            let sel = i == self.selected;
-            if sel {
-                fills.push([BOX_X + 6, y, BOX_W - 12, ROW_H - 2, i32::from(HIGHLIGHT)]);
-            }
-            let c = match (v.enabled(e), sel) {
-                (false, _) => GREYED,
-                (true, true) => SELECTED,
-                (true, false) => TEXT,
-            };
-            let (label, value) = match e {
-                Entry::Graphics => (
-                    "Graphics",
-                    match v.graphics {
-                        Graphics::Original => "Original",
-                        Graphics::Hd => "HD",
-                    },
-                ),
-                Entry::PanoramaFilter => (
-                    "Panorama filter",
-                    match v.hd.panorama {
-                        PanoFilter::Bilinear => "Bilinear",
-                        PanoFilter::Bicubic => "Bicubic",
-                    },
-                ),
-                Entry::Sharpen => ("Panorama sharpening", on(v.hd.sharpen)),
-                Entry::Interface => (
-                    "Interface",
-                    if v.hd.smooth_interface {
-                        "Smooth"
-                    } else {
-                        "Pixels"
-                    },
-                ),
-                Entry::SharpSubtitles => ("Sharp subtitles", on(v.hd.sharp_subtitles)),
-                Entry::Widescreen => ("Widescreen", on(v.hd.widescreen)),
-                Entry::VideoSides => (
-                    "Video sides",
-                    match v.hd.video_sides {
-                        VideoSides::Black => "Black",
-                        VideoSides::Blur => "Blurred",
-                        VideoSides::Zoom => "Zoomed",
-                        VideoSides::Panorama => "Panorama",
-                    },
-                ),
-                Entry::BugFixes => ("Fix original bugs", on(v.enhancements.minor_bug_fixes)),
-                Entry::RestoredContent => ("Restored content", on(v.enhancements.restored_content)),
-                Entry::UiUx => ("Modern UI/UX", on(v.enhancements.ui_ux)),
-                Entry::Close => {
-                    text("Close", centre("Close"), y + 4, c);
-                    continue;
-                }
-                Entry::Library => {
-                    let t = "Game library...";
-                    text(t, centre(t), y + 4, c);
-                    continue;
-                }
-                Entry::Support => {
-                    let t = "Buy me a coffee...";
-                    text(t, centre(t), y + 4, c);
-                    continue;
-                }
-            };
-            text(label, BOX_X + 16, y + 4, c);
-            let t = format!("< {value} >");
-            text(&t, right(&t), y + 4, c);
-        }
-        for (i, line) in self.info.iter().take(2).enumerate() {
-            text(line, centre(line), box_y + box_h - 82 + i as i32 * 18, DIM);
-        }
-        let d = Self::description(self.selected(), v);
-        text(d, centre(d), box_y + box_h - 44, TEXT);
-        let k = "Arrows, Enter or click; Escape, F10 or O closes";
-        text(k, centre(k), box_y + box_h - 22, DIM);
-        (fills, texts)
+        let n = self.entries().len();
+        let input = self.menu.click(n, x, y, SCREEN_W, SCREEN_H);
+        self.act(input, v)
     }
 
     /// Draws the menu over a 640x480 RGB565 frame.
@@ -443,23 +571,17 @@ impl OptionsMenu {
         v: MenuValues,
         text: Option<&mut HdText>,
     ) {
-        let (fills, items) = self.layout(font, v);
-        for [x, y, w, h, c] in fills {
-            for yy in y.max(0)..(y + h).min(SCREEN_H as i32) {
-                for xx in x.max(0)..(x + w).min(SCREEN_W as i32) {
-                    screen[yy as usize * SCREEN_W + xx as usize] = c as u16;
-                }
-            }
-        }
-        let under = text.as_ref().map(|_| screen.to_vec());
-        for it in &items {
-            font.draw(
-                screen, SCREEN_W, SCREEN_H, &it.text, it.x, it.y, it.max_w, it.color,
-            );
-        }
-        if let (Some(t), Some(under)) = (text, under) {
-            t.set(items, &under, screen);
-        }
+        let d = Self::description(self.selected(), v);
+        self.menu.draw_recording(
+            screen,
+            SCREEN_W,
+            SCREEN_H,
+            font,
+            &self.rows(v),
+            &self.info,
+            d,
+            text,
+        );
     }
 }
 

@@ -1,0 +1,152 @@
+# Produced by the original atlantis2.exe (French CD build, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) run under emulation with its defnames.con
+# (MD5 b80c3351c39c1e4678f13388c2dc0c83) and scenar\chapi016.con (MD5 07ae454ee7a2b5c8de9ee98c6c615ea9):
+# Brigid's cross (IR view 2). The ids line gives the defnames.con indices of the objects
+# CROIXBRIGIT_SPRITE, CROIX_BRIGID, CRANE_CROIX, BOUGIE, CRANE_CHAPELLE, the character
+# DEESSE and CROIX_BRIGID's parameter; the variables line FINCROIX, OBJETENMAIN,
+# flagdeesse, MONDE, CLICZONE. `lines` are chapter 16's line numbers. Each section's
+# own header (## lines) says what its rows hold.
+ids objects 27 31 17 1 21 character 9 param 1
+ids variables 99 28 202 91 76
+## state: the cross's state (0x006d26b4), the CROIXBRIGIT_SPRITE slot's frame table, OBJETENMAIN, the cursor pair (bank 0x00673fa0, frame 0x005def58), the hand pair (frame 0x00673f94, bank 0x00673f68), the bag (id/sprite/world), FINCROIX, flagdeesse; OBJ = the world's objects bank
+## A: the frame-table functions on synthetic slots (0: object id 27, 1: object id 5, 2: character id 27, all frame tables 0xfe-filled): add = AddSpwToFrameTab FUN_0047c880(id, f), sub = SubSpwToFrameTab FUN_0047c910(id, f), has = FUN_0047c9c0(id, f); -> EAX | the three tables | warn = the warnings logged (add-none, add-full, sub)
+A add 27 4 -> 1 | [4] [] [4] | warn []
+A add 27 0 -> 1 | [4,0] [] [4,0] | warn []
+A add 27 4 -> 1 | [4,0,4] [] [4,0,4] | warn []
+A add 5 9 -> 1 | [4,0,4] [9] [4,0,4] | warn []
+A has 27 4 -> 1 | [4,0,4] [9] [4,0,4] | warn []
+A has 27 7 -> 0 | [4,0,4] [9] [4,0,4] | warn []
+A has 5 9 -> 1 | [4,0,4] [9] [4,0,4] | warn []
+A has 27 9 -> 0 | [4,0,4] [9] [4,0,4] | warn []
+A has 27 -2 -> 1 | [4,0,4] [9] [4,0,4] | warn []
+A has 6 -2 -> 0 | [4,0,4] [9] [4,0,4] | warn []
+A sub 27 4 -> 1 | [4,0] [9] [4,0,4] | warn []
+A sub 27 4 -> 1 | [0] [9] [4,0,4] | warn []
+A sub 27 4 -> 0 | [0] [9] [4,0,4] | warn [sub]
+A sub 27 0 -> 1 | [] [9] [4,0,4] | warn []
+A sub 27 0 -> 0 | [] [9] [4,0,4] | warn [sub]
+A sub 5 9 -> 1 | [] [] [4,0,4] | warn []
+A sub 6 1 -> 1 | [] [] [4,0,4] | warn []
+A add 6 1 -> 0 | [] [] [4,0,4] | warn [add-none]
+A add 27 -1 -> 1 | [-1] [] [4,0,4,-1] | warn []
+A has 27 -1 -> 1 | [-1] [] [4,0,4,-1] | warn []
+A sub 27 -1 -> 1 | [] [] [4,0,4,-1] | warn []
+A add 27 1 -> 1 | [1] [] [4,0,4,-1,1] | warn []
+A add 27 2 -> 1 | [1,2] [] [4,0,4,-1,1,2] | warn []
+A add 27 3 -> 1 | [1,2,3] [] [4,0,4,-1,1,2,3] | warn []
+A sub 27 1 -> 1 | [3,2] [] [4,0,4,-1,1,2,3] | warn []
+A add 27 1 -> 1 | [3,2,1] [] [4,0,4,-1,1,2,3,1] | warn []
+A sub 27 2 -> 1 | [3,1] [] [4,0,4,-1,1,2,3,1] | warn []
+A full: 129 adds of k mod 100 on id 5 -> [1,1,1]..[1,1,0] | bytes 0-3 [0,1,2,3] 126-127 [26,27] | warn [add-full]
+A full: has 5 27 -> 1, sub 5 27 -> 1 | bytes 25-28 [25,26,27,28] 98-100 [98,99,0] 126-127 [254,26] | warn []
+A full: has 5 99 -> 1, sub 5 99 -> 1 | bytes 25-28 [25,26,27,28] 98-100 [98,25,0] 126-127 [254,26] | warn []
+A full: has 5 26 -> 1, sub 5 26 -> 1 | bytes 25-28 [25,24,27,28] 98-100 [98,25,0] 126-127 [254,26] | warn []
+A clear 27 after adds 3 1 2 | [] [] []
+## B: entry hook FUN_00494120 on view 2's slots (bougie, croix: frame table, crane02, deesse): the state, the table before (pre), the hook run once or twice
+B state 0 pre [] times 1 -> state 0 tab [] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B state 1 pre [] times 1 -> state 1 tab [0] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B state 7 pre [] times 1 -> state 7 tab [6] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B state 25 pre [] times 1 -> state 25 tab [24] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B state -3 pre [] times 1 -> state -3 tab [] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B state 5 pre [0,9] times 1 -> state 5 tab [9,4] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B state 5 pre [] times 2 -> state 5 tab [4,4] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B state 0 pre [0] times 1 -> state 0 tab [] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B state 3 pre [0,0] times 1 -> state 3 tab [0,2] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | warn []
+B no slot of the cross, state 4 -> warn [add-none]
+## C: click hook FUN_00494190(zone) after the entry hook: a zone of type t, value v; MONDE 1 unless given; objects given to the bag by FUN_004754f0 and held by FUN_00475340 (empty: FUN_0047bf40); lines = chapi016's /set lines run; sounds = what voice 2 starts, in order (film:NAME = the film's video, its track after it)
+C empty zone 4 5 -> state 0 tab [] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound009.apc] | warn []
+C held -> state 0 tab [] hand 31 cursor (0,-1) pair (1,OBJ) bag [31/1/1] FINCROIX 0 flagdeesse 0
+C cross zone 4 5 -> state 5 tab [4] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound008.apc,sound009.apc] | warn []
+C empty zone 4 7 -> state 5 tab [4] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound009.apc] | warn []
+C empty zone 4 5 -> state 0 tab [] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [31/1/1] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound009.apc] | warn []
+C cross zone 4 25 -> state 25 tab [24] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound008.apc,sound009.apc] | warn []
+C CRANE_CROIX zone 4 3 -> state 25 tab [24] hand 17 cursor (0,-1) pair (9,OBJ) bag [17/9/1] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound009.apc] | warn []
+C CRANE_CROIX zone 4 25 -> state 0 tab [] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [17/9/1,31/1/1] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound009.apc] | warn []
+C cross zone 3 12 -> state 12 tab [11] hand 0 cursor (0,-1) pair (0,0) bag [17/9/1] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound008.apc,sound009.apc] | warn []
+C empty zone 50 12 -> state 0 tab [] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [17/9/1,31/1/1] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound009.apc] | warn []
+C cross zone 4 1 -> state 1 tab [0] hand 0 cursor (0,-1) pair (0,0) bag [17/9/1] FINCROIX 1 flagdeesse 0 | lines [5] | sounds [film:cine015.hnm,cine015.apc,sound008.apc,sound009.apc] | warn []
+C after the win -> state 1 tab [0] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 1 flagdeesse 1
+C empty zone 4 1 -> state 0 tab [] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [31/1/1] FINCROIX 1 flagdeesse 1 | lines [] | sounds [sound009.apc] | warn []
+C cross zone 4 1 -> state 1 tab [0] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 1 flagdeesse 1 | lines [] | sounds [sound008.apc,sound009.apc] | warn []
+C empty zone 4 1 -> state 0 tab [] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [31/1/1] FINCROIX 1 flagdeesse 1 | lines [] | sounds [sound009.apc] | warn []
+C cross zone 4 6 -> state 6 tab [5] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 1 flagdeesse 1 | lines [] | sounds [sound008.apc,sound009.apc] | warn []
+C cross zone 4 9 -> state 9 tab [5,8] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 1 flagdeesse 1 | lines [] | sounds [sound008.apc,sound009.apc] | warn []
+C empty zone 4 6 -> state 9 tab [5,8] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 1 flagdeesse 1 | lines [] | sounds [sound009.apc] | warn []
+C empty zone 4 9 -> state 0 tab [5] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [31/1/1] FINCROIX 1 flagdeesse 1 | lines [] | sounds [sound009.apc] | warn []
+C empty zone 4 0 -> state 0 tab [] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [31/1/1] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound009.apc] | warn [sub]
+C MONDE 5 cross zone 4 2 -> state 2 tab [1] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound008.apc,sound009.apc] | warn []
+C MONDE 5 empty zone 4 2 -> state 0 tab [] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [31/1/5] FINCROIX 0 flagdeesse 0 | lines [] | sounds [sound009.apc] | warn []
+## D: the hook dispatcher FUN_0049b910(zone) alone: the view's warp name (+0x00), number (+0x10), the zone's type (value 5), the hand empty -> the IR hook entered (FUN_00494170 move zones, FUN_00494190 the cross), AL
+D ir0002.hnm 2 1 -> 00494170 AL 0
+D ir0002.hnm 2 2 -> 00494170 AL 0
+D ir0002.hnm 2 3 -> 00494190 AL 0
+D ir0002.hnm 2 4 -> 00494190 AL 0
+D ir0002.hnm 2 10 -> - AL 0
+D ir0002.hnm 2 50 -> 00494190 AL 0
+D ir0002.hnm 2 1000 -> - AL 0
+D IR0002.hnm 2 4 -> 00494190 AL 0
+D Ir2 2 4 -> 00494190 AL 0
+D XR0002 2 4 -> - AL 0
+D I 2 4 -> - AL 0
+D ir0002.hnm 1 4 -> - AL 0
+D ir0002.hnm 3 4 -> - AL 0
+D ir0002.hnm 12 4 -> - AL 0
+D ir0002.hnm 102 4 -> - AL 0
+## E: the zone click FUN_0049ca80 (CtrlScenarOUT, the dispatcher, CLICZONE) then the click scan FUN_0045a870 (CtrlScenarIN) on chapi016, view IR 2, a zone of type 4 under the centre, no sprite, RunInit stubbed; then the suspended section resumed (FUN_00483f90) as the film's and the dialog's ends do, then CLICZONE = 0 as the warp frame's last step does: out = the departure scan's lines; hook = CLICZONE when the hook starts, the lines it runs, the sounds of the click; click scan = 1 when FUN_0045a870 ran CtrlScenarIN (the click flag 0x006569c9 still set: a film started by the hook's scan clears it); in = the click scan's and the resumed lines
+E cross zone 4 8 -> out [] | hook cliczone 0 lines [] sounds [sound008.apc,sound009.apc] | cliczone 8 | click scan 1 | in [] resumes 0 [] | state 8 tab [7] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 0 flagdeesse 0
+E empty zone 4 8 -> out [] | hook cliczone 0 lines [] sounds [sound009.apc] | cliczone 8 | click scan 1 | in [] resumes 0 [] | state 0 tab [] hand 31 cursor (OBJ,1) pair (1,OBJ) bag [31/1/1] FINCROIX 0 flagdeesse 0
+E cross zone 4 1 -> out [] | hook cliczone 0 lines [5] sounds [film:cine015.hnm,cine015.apc,sound008.apc,sound009.apc] | cliczone 1 | click scan 0 | in [6,7,8,9] resumes 2 [56] | state 1 tab [0] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 1 flagdeesse 1
+E empty zone 4 14 -> out [] | hook cliczone 0 lines [] sounds [sound009.apc] | cliczone 14 | click scan 1 | in [] resumes 0 [] | state 1 tab [0] hand 0 cursor (0,-1) pair (0,0) bag [] FINCROIX 1 flagdeesse 1
+F save entry 32 = 0x006d26b4 4
+errors []
+## G: FUN_0047ce60(slot 0, faces, rects) on a CROIXBRIGIT_SPRITE slot (+0x34 = 0) holding cba1002002.SPW (md5 e828747df78c4d106979cffe74004d65, 25 frames), faces 512 x 512 RGB565 over the background of spw_golden.py (pixel i = (i * 2654435761 mod 2^32) >> 16, md5 4f168fc9c0f17cd896b5ea7f8248e8b6), visible rectangles the whole faces; per face: bg (untouched) or the md5 of its 512 x 512 u16 pixels (little-endian), the changed-pixel count and, for each frame of the table with a box on that face, the pixels at the box's centre, first and last corner (x,y=rgb565 hex); AL = the byte returned
+G tab [] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 bg
+G tab [0] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 e3916bc18a8e52b14cfbe382b4e76567 n403 391,228=3902 363,203=53a8 418,253=fd1c
+G tab [4] AL 0 | f0 bg | f1 5f3bc864fc9cc82fe4c95f197e355763 n403 18,186=bcbb 0,159=e929 35,213=f216 | f2 bg | f3 bg | f4 bg | f5 5fcd34b4b25e0e7cb8bd68b25b272548 n108 498,186=64bf 485,179=5347 511,193=6df7
+G tab [24] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 9e7e88a0c7adc7c887372e3040ea2799 n321 274,194=4182 251,171=3cf6 297,217=9aaa
+G tab [0,24] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 14bf32e16ad0169ea438013bc534c80b n724 391,228=3902 363,203=53a8 418,253=fd1c 274,194=4182 251,171=3cf6 297,217=9aaa
+G tab [24,0] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 14bf32e16ad0169ea438013bc534c80b n724 274,194=4182 251,171=3cf6 297,217=9aaa 391,228=3902 363,203=53a8 418,253=fd1c
+G tab [-1,3] AL 0 | f0 bg | f1 933037bbde3a51c2d5e992a19e3c4e9e n425 20,393=8631 0,365=3102 39,421=90b3 | f2 bg | f3 bg | f4 bg | f5 4218fcd2f442f19d14867101673e37d7 n62 501,395=3123 490,393=21af 511,397=8005
+G tab [3,-1] AL 0 | f0 bg | f1 933037bbde3a51c2d5e992a19e3c4e9e n425 20,393=8631 0,365=3102 39,421=90b3 | f2 bg | f3 bg | f4 bg | f5 4218fcd2f442f19d14867101673e37d7 n62 501,395=3123 490,393=21af 511,397=8005
+G tab [12,5,20] AL 0 | f0 bg | f1 4b238611ca139320dbd65c3e1e3aa359 n391 17,227=e37e 0,200=ae24 34,254=18d9 | f2 bg | f3 bg | f4 bg | f5 5fe98d9329250022c8801db5f5e3db28 n909 498,238=ee2f 484,221=e8fd 511,254=d5b5 242,203=3101 220,180=facd 264,225=ad1e 451,190=28c1 421,163=d632 481,216=e396
+G tab [5,5] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 7de5fab35f57b9c7e7328f55ea8fd2c1 n309 242,203=3101 220,180=facd 264,225=ad1e 242,203=3101 220,180=facd 264,225=ad1e
+G tab [1] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 b1809a3213d22d7cef5889c214f54e46 n275 192,201=3101 172,180=5066 212,222=3cff
+G tab [2] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 b06cd3c176bf498be3983f75aa3bda2a n273 195,362=1080 175,341=f21d 215,383=deb6
+G tab [3] AL 0 | f0 bg | f1 933037bbde3a51c2d5e992a19e3c4e9e n425 20,393=8631 0,365=3102 39,421=90b3 | f2 bg | f3 bg | f4 bg | f5 4218fcd2f442f19d14867101673e37d7 n62 501,395=3123 490,393=21af 511,397=8005
+G tab [5] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 f7db5eff9b7038bafc4e4fdba2a8e28f n309 242,203=3101 220,180=facd 264,225=ad1e
+G tab [6] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 e2009bd394fda687c76f30c24a2b6200 n290 230,328=20c1 209,306=ca35 251,350=d124
+G tab [7] AL 0 | f0 bg | f1 67428b862ba0242ceb89c3b6e8d28f89 n5 1,362=7220 0,361=6472 1,363=f153 | f2 bg | f3 bg | f4 bg | f5 c867c7bb3f24977b73231801d11e0416 n487 480,358=3101 449,331=f3fc 511,384=3dce
+G tab [8] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 4837ad1efb46d3319af54cad1cd523d6 n469 471,215=3101 440,188=6a15 501,242=84a3
+G tab [9] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 43aed35f0e659fc3f53af00ac500b49d n325 279,234=3942 256,211=aa13 302,257=07c6
+G tab [10] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 1b57b591875b3c4e8635620263955110 n269 195,289=3942 175,267=dfc3 215,310=3b4f
+G tab [11] AL 0 | f0 bg | f1 77e3bd0358669f96ed839e63a9dcd6c5 n48 9,304=38b0 0,301=742a 18,306=bed1 | f2 bg | f3 bg | f4 bg | f5 592b2e749fe5a735bbde91800afdd058 n454 489,302=1989 466,275=306d 511,329=6784
+G tab [12] AL 0 | f0 bg | f1 4b238611ca139320dbd65c3e1e3aa359 n391 17,227=e37e 0,200=ae24 34,254=18d9 | f2 bg | f3 bg | f4 bg | f5 f4c4aa84daaa6fe76a05053cb15928cf n141 498,238=ee2f 484,221=e8fd 511,254=d5b5
+G tab [13] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 57b1d484fd021a890e6c5ad91fb0bcca n415 400,191=3942 372,165=6b7a 427,216=83e2
+G tab [14] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 6463fa1d7389149b094014ef4c0c02f7 n370 345,308=2901 319,284=3d21 370,332=8fd0
+G tab [15] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 a9b9bc9cb9e16c4c385b9ed4f743e1a2 n322 272,271=3942 249,248=5fbc 294,294=1f38
+G tab [16] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 282d2cc999b084bb50bf2b1b4433dc04 n464 459,270=3942 429,243=73fc 489,296=8160
+G tab [17] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 97367876ba63b67af8fa9311cd7ab24c n359 323,195=3102 298,171=4926 347,219=5f66
+G tab [18] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 c13e8fdb2bfe883468ac74032be55642 n295 216,233=3942 195,211=f6db 237,254=8ed6
+G tab [19] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 eac7af2f0e55e8b4023e91a60c3733e8 n358 338,379=1881 313,355=4d54 363,403=01cc
+G tab [20] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 9079a1198ace4c0193f261d4e1e306ab n459 451,190=28c1 421,163=d632 481,216=e396
+G tab [21] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 1572c2c1446085bd5a4eb9511edc336f n340 329,224=2901 304,200=9005 354,248=447d
+G tab [22] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 b300ae149087cd4f59684f351af62382 n266 191,231=2901 171,209=43c1 211,252=9f4d
+G tab [23] AL 0 | f0 bg | f1 bg | f2 bg | f3 bg | f4 bg | f5 cf4d76e46274e0556161a3298e1ce5bf n447 436,238=3942 407,212=6bbf 465,264=cdc1
+## G centre: the slot with click kind c (+0x20), kind 2; the texel (face, column, row) the projection FUN_0047db60 returns; the cursor state 0x006c2df4 and AL after FUN_0047ce60
+G centre 1 18 186 tab [4] click 1 -> cursor 1 AL 1
+G centre 1 18 186 tab [0] click 1 -> cursor 0 AL 0
+G centre 1 18 186 tab [0,4] click 1 -> cursor 1 AL 1
+G centre 1 18 186 tab [4,0] click 1 -> cursor 1 AL 1
+G centre 1 18 186 tab [] click 1 -> cursor 0 AL 0
+G centre 1 18 186 tab [-1] click 1 -> cursor 0 AL 0
+G centre 1 18 186 tab [4,-1] click 1 -> cursor 1 AL 1
+G centre 1 18 186 tab [-1,4] click 1 -> cursor 1 AL 1
+G centre 1 0 160 tab [4] click 1 -> cursor 0 AL 0
+G centre 1 1 160 tab [4] click 1 -> cursor 1 AL 1
+G centre 1 36 214 tab [4] click 1 -> cursor 1 AL 1
+G centre 1 37 214 tab [4] click 1 -> cursor 0 AL 0
+G centre 1 1 159 tab [4] click 1 -> cursor 0 AL 0
+G centre 1 1 215 tab [4] click 1 -> cursor 0 AL 0
+G centre 1 18 186 tab [4] click 0 -> cursor 0 AL 0
+G centre 0 -100 -100 tab [4] click 1 -> cursor 0 AL 0
+G errors []

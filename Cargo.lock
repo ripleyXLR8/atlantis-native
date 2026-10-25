@@ -162,12 +162,15 @@ dependencies = [
  "atlantis-codecs",
  "atlantis-data",
  "atlantis-engine",
+ "atlantis2-data",
+ "atlantis2-engine",
  "console_error_panic_hook",
  "console_log",
  "cpal",
  "embed-resource",
  "env_logger",
  "js-sys",
+ "libc",
  "log",
  "md-5",
  "objc2 0.6.5",
@@ -179,6 +182,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "windows-sys 0.59.0",
  "winit",
 ]
 
@@ -187,6 +191,7 @@ name = "atlantis-codecs"
 version = "0.4.0"
 dependencies = [
  "atlantis-data",
+ "atlantis2-data",
  "md-5",
 ]
 
@@ -210,6 +215,29 @@ dependencies = [
  "log",
  "md-5",
  "ttf-parser",
+]
+
+[[package]]
+name = "atlantis2-data"
+version = "0.3.2"
+dependencies = [
+ "atlantis-data",
+ "log",
+ "md-5",
+]
+
+[[package]]
+name = "atlantis2-engine"
+version = "0.3.2"
+dependencies = [
+ "ab_glyph",
+ "atlantis-codecs",
+ "atlantis-data",
+ "atlantis-engine",
+ "atlantis2-data",
+ "libm",
+ "log",
+ "md-5",
 ]
 
 [[package]]

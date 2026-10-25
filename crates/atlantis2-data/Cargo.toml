@@ -1,0 +1,11 @@
+[package]
+name = "atlantis2-data"
+description = "Atlantis II data files: game detection, the install and disc file layer, WAM places"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+atlantis-data = { path = "../atlantis-data" }
+log = "0.4"
+md-5 = "0.10"

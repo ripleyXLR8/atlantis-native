@@ -1,0 +1,71 @@
+# The music player of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation, x87 control word 0x027f. Producer: an
+# emulation harness running the original code (the opens FUN_00477160 / FUN_00477410 /
+# FUN_00477470, AtlMuzik_GotoMark FUN_00477e80, check_buffer_music FUN_00477590 with the
+# end-of-track callback @ 0x00485080); stubs: the logs, the file calls (the disc files), the
+# allocator, LOADMUSIK (recorded), the DirectSound calls (the ring kept in emulated memory, a
+# simulated play cursor). Derived values only.
+# TAG.init: what the start did; TAG.stepK EVENT: an event of check_buffer_music at step K (open,
+#   setpos(to, from), remove and loadmusik of the rewind's failed check), with the bytes heard
+#   before, the md5 and size of what was heard since the last open or cursor move, the cursor;
+# TAG.end: after the last step (300 steps past the second switch or the file closed).
+# The simulated cursor advances 0x1000 bytes per step (the .s1468 scenarios: 1468 bytes, 367
+# stereo frames, about one 60 Hz frame); check_buffer_music runs once per step before the cursor
+# moves; 'heard' hashes the bytes the cursor passes over (16-bit stereo PCM).
+# srand(1) before the start (and srand(0) by a start from the beginning, the tick count being 0).
+m30.start.init ('open', 'muzik30.apc')
+m30.start.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
+m30.start.init ('setvol', -3)
+m30.start.step5610 ('open', 'muzik30.apc') heard_before=22974464 segment_md5=af454ca0655770c9e0dbbf1b7b93ccc3 segment_bytes=22974464 cursor=6c000
+m30.start.step5610 ('setpos', 442368, 430080) heard_before=22974464 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m30.start.step11219 ('open', 'muzik30.apc') heard_before=45948928 segment_md5=af454ca0655770c9e0dbbf1b7b93ccc3 segment_bytes=22974464 cursor=6c000
+m30.start.step11219 ('setpos', 442368, 348160) heard_before=45948928 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m30.start.end steps=11518 heard=47177728 md5=13998073edd6c3735e29ddd3d338e4de segment_md5=08008e645bc0877c2a5d437879b88113 segment_bytes=1228800 pos=1736704 write=14000 state=4 loopsleft=0 mark=0
+m20.mark3.init ('open', 'muzik20.apc')
+m20.mark3.init ('create', 0, 524288, 22050, 16, 2)
+m20.mark3.init ('setpos', 442368, 0)
+m20.mark3.init ('play', 0, 1, -3, 0)
+m20.mark3.step3930 ('open', 'muzik20.apc') heard_before=16093184 segment_md5=f893870bfa20cd042b69e0e35a939c4e segment_bytes=16093184 cursor=6c000
+m20.mark3.step3930 ('setpos', 442368, 282624) heard_before=16093184 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m20.mark3.step13071 ('open', 'muzik20.apc') heard_before=53534720 segment_md5=53b0d3460104e6c523bd4ad562b61d0e segment_bytes=37441536 cursor=6c000
+m20.mark3.step13071 ('setpos', 442368, 135168) heard_before=53534720 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m20.mark3.end steps=13370 heard=54763520 md5=264456b3c82d9f7b8daaecd69966666e segment_md5=57ae7334030a72febaec9ea4815959f0 segment_bytes=1228800 pos=1736704 write=14000 state=4 loopsleft=0 mark=0
+m14.loop3.init ('open', 'muzik14.apc')
+m14.loop3.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
+m14.loop3.init ('setvol', -3)
+m14.loop3.step1946 ('remove', 'muzik14.apc') heard_before=7966720 segment_md5=f1f8c38e119c2be540c9ffbc1120dcf2 segment_bytes=7966720 cursor=19000
+m14.loop3.step1946 ('loadmusik', '14)') heard_before=7966720 segment_md5=f1f8c38e119c2be540c9ffbc1120dcf2 segment_bytes=7966720 cursor=19000
+m14.loop3.end steps=2245 heard=9195520 md5=ec666d546a6407253091b3bebabd7442 segment_md5=ec666d546a6407253091b3bebabd7442 segment_bytes=9195520 pos=0 write=14000 state=4 loopsleft=2 mark=0
+m16.list.init ('open', 'muzik16.apc')
+m16.list.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
+m16.list.init ('setvol', -3)
+m16.list.step5121 ('open', 'muzik14.apc') heard_before=20971520 segment_md5=13533a0396c6e5f2c8d985881fef657b segment_bytes=20971520 cursor=6c000
+m16.list.step5121 ('setpos', 442368, 0) heard_before=20971520 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m16.list.step7066 ('open', 'muzik16.apc') heard_before=28938240 segment_md5=f1f8c38e119c2be540c9ffbc1120dcf2 segment_bytes=7966720 cursor=6c000
+m16.list.step7066 ('setpos', 442368, 20480) heard_before=28938240 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m16.list.end steps=7365 heard=30167040 md5=80ca4cd07fe3b873a181f3131d25c022 segment_md5=a113a20e5b07806b7e6c769f9e857e38 segment_bytes=1228800 pos=13635152 write=14000 state=4 loopsleft=0 mark=6
+m01.random.init ('open', 'muzik01.apc')
+m01.random.init ('create', 0, 524288, 22050, 16, 2)
+m01.random.init ('setpos', 442368, 0)
+m01.random.init ('play', 0, 1, -3, 0)
+m01.random.end steps=3000 heard=12288000 md5=2433d68e2b711c8dec95d8ed89270b81 segment_md5=2433d68e2b711c8dec95d8ed89270b81 segment_bytes=12288000 pos=30337536 write=20000 state=4 loopsleft=0 mark=3
+m30.nolist.init ('open', 'muzik30.apc')
+m30.nolist.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
+m30.nolist.init ('setvol', -3)
+m30.nolist.step5610 ('remove', 'muzik30.apc') heard_before=22974464 segment_md5=af454ca0655770c9e0dbbf1b7b93ccc3 segment_bytes=22974464 cursor=69000
+m30.nolist.step5610 ('loadmusik', '30)') heard_before=22974464 segment_md5=af454ca0655770c9e0dbbf1b7b93ccc3 segment_bytes=22974464 cursor=69000
+m30.nolist.end steps=5909 heard=24203264 md5=6889cad534515b7bccf329101909fa89 segment_md5=6889cad534515b7bccf329101909fa89 segment_bytes=24203264 pos=0 write=64000 state=4 loopsleft=0 mark=0
+m16.list.s1468.init ('open', 'muzik16.apc')
+m16.list.s1468.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
+m16.list.s1468.init ('setvol', -3)
+m16.list.s1468.step14287 ('open', 'muzik14.apc') heard_before=20971848 segment_md5=e601f764adb6624daf07f26ccbb27da5 segment_bytes=20971848 cursor=6c000
+m16.list.s1468.step14287 ('setpos', 442368, 328) heard_before=20971848 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m16.list.s1468.step19712 ('open', 'muzik16.apc') heard_before=28935748 segment_md5=c6a3051503a9d888a1fe25d96d45986a segment_bytes=7963900 cursor=6c000
+m16.list.s1468.step19712 ('setpos', 442368, 17660) heard_before=28935748 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m16.list.s1468.end steps=20011 heard=29376148 md5=48e0bc67e1d4c03bbed7e9f6a3c4b33a segment_md5=e80f106a823b97a52c5534e2a1288279 segment_bytes=440400 pos=12848720 write=54000 state=4 loopsleft=0 mark=6
+m30.nolist.s1468.init ('open', 'muzik30.apc')
+m30.nolist.s1468.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
+m30.nolist.s1468.init ('setvol', -3)
+m30.nolist.s1468.step15649 ('remove', 'muzik30.apc') heard_before=22971264 segment_md5=06ff8292b015a298711cb8d1ed51d0a3 segment_bytes=22971264 cursor=68380
+m30.nolist.s1468.step15649 ('loadmusik', '30)') heard_before=22971264 segment_md5=06ff8292b015a298711cb8d1ed51d0a3 segment_bytes=22971264 cursor=68380
+m30.nolist.s1468.end steps=15948 heard=23411664 md5=4a5e717a4154723e71d54bfceca8161b segment_md5=4a5e717a4154723e71d54bfceca8161b segment_bytes=23411664 pos=0 write=64000 state=4 loopsleft=0 mark=0

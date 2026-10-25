@@ -27,6 +27,9 @@ const CHUNK_IX: u16 = tag16(b"IX");
 const CHUNK_SD: u16 = tag16(b"SD");
 const CHUNK_AA: u16 = tag16(b"AA");
 const CHUNK_BB: u16 = tag16(b"BB");
+/// Atlantis II's dialog videos: the alpha mask of the frame (run pairs),
+/// drawn by the dialog video stream, not by the frame decoder.
+const CHUNK_AL: u16 = tag16(b"AL");
 
 fn le16(d: &[u8], pos: usize) -> u16 {
     u16::from_le_bytes([d[pos], d[pos + 1]])
@@ -105,6 +108,9 @@ pub struct HnmVideo<D: AsRef<[u8]> = Vec<u8>> {
     frame_samples: u64,
     /// The delay of a frame without sound.
     regular_delay_ms: u64,
+    /// The last `AL` payload of the last superchunk read (start, end in
+    /// `data`), `None` when that superchunk has none.
+    alpha: Option<(usize, usize)>,
 }
 
 impl<D: AsRef<[u8]>> HnmVideo<D> {
@@ -175,6 +181,7 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
             next_start: 0,
             frame_samples: 0,
             regular_delay_ms: REGULAR_FRAME_DELAY_MS,
+            alpha: None,
             data,
         })
     }
@@ -229,6 +236,15 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
             .as_mut()
             .map(|a| std::mem::take(&mut a.pcm))
             .unwrap_or_default()
+    }
+
+    /// The alpha mask of the last frame read: the payload of the last `AL`
+    /// chunk of its superchunk (Atlantis II's dialog videos), as the chunk
+    /// scan atlantis2.exe @ 0x0040be20 keeps it; `None` when the superchunk
+    /// has none. Draw it with [`crate::AlphaTables::blend`].
+    pub fn alpha(&self) -> Option<&[u8]> {
+        let (start, end) = self.alpha?;
+        self.data.as_ref().get(start..end)
     }
 
     /// The last decoded frame (before the first one: the initial buffer
@@ -301,6 +317,7 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
         let mut got_video = false;
         // Sound sample frames of the superchunk's last sound chunk.
         let mut frame_delay = None;
+        self.alpha = None;
         for chunk in chunks(superchunk) {
             let Chunk { kind, data } = chunk?;
             match kind {
@@ -312,6 +329,12 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
                 CHUNK_IW | CHUNK_IX => {
                     self.decoder.decode_frame(data, kind == CHUNK_IW)?;
                     got_video = true;
+                }
+                // Not part of the picture: kept for the caller (the first
+                // game's files have none).
+                CHUNK_AL => {
+                    let start = data.as_ptr() as usize - hnm.as_ptr() as usize;
+                    self.alpha = Some((start, start + data.len()));
                 }
                 other => return Err(DecodeError::UnexpectedChunk(other)),
             }
