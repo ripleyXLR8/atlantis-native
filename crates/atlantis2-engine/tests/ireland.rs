@@ -578,24 +578,26 @@ fn set_values(files: &A2Files, key: &str) -> Vec<String> {
 }
 
 /// The dialog loop as the original's (`dialog_loop.txt`) on Ireland's
-/// three kinds of lines: a head dialog, dialog 56 (`voixoff`: the view
-/// turns with the mouse) and dialog 44 (`voixoff0`: the panorama drawn
-/// under Liam's subtitle, not the last head); in each, the place
-/// animations step on the 15 Hz ticks and the panorama is back at 76°
-/// after the end.
+/// four kinds of lines: a head dialog, dialog 56 (`voixoff`: the view
+/// turns with the mouse), dialog 44 (`voixoff0`: the panorama drawn
+/// under Liam's subtitle, not the last head, the dowsing rod and the
+/// overlays over it) and dialog 71 (`cinema` lines, here started in the
+/// dialog loop: the subtitle alone, no panorama, no rod, no turn); the
+/// place animations step on the 15 Hz ticks under the panorama lines,
+/// and the panorama is back at 76° after each end.
 #[test]
 fn the_dialog_loop_in_ireland_matches_the_original() {
     let Some(files) = game() else { return };
     let mut e = in_ireland(files);
     let mut kinds = std::collections::BTreeSet::new();
     let mut stepped = false;
-    for n in [1, 56, 44] {
+    for n in [1, 56, 44, 71] {
         let (k, s) = dialog_loop::check_dialog_loop(&mut e, n);
         kinds.extend(k);
         stepped |= s;
         settle(&mut e);
     }
-    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0, 1, 2]);
+    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0, 1, 2, 3]);
     assert!(stepped);
 }
 

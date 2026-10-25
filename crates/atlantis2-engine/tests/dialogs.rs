@@ -586,3 +586,42 @@ fn dialog_360_plays_end_to_end() {
     }
     assert_eq!(e.music.volume, 100);
 }
+
+/// Every Tibet dialog (the 26 of `dialog_script_ti.txt`) started in view
+/// 7 and played to its end with its heads and bodies drawn, a click every
+/// 20 passes: the panorama back at 76° with the screen's centre after
+/// each, whatever field of view its last line had (FUN_004808a0 →
+/// FUN_0049da90 → FUN_00402960), as the original's camera after the end
+/// (`dialog_loop.txt`).
+#[test]
+fn every_tibet_dialog_ends_at_76_degrees() {
+    let Some(files) = game() else { return };
+    let numbers: Vec<u32> = SCRIPT
+        .lines()
+        .filter_map(|l| l.strip_prefix("dialog "))
+        .map(|l| l.split(' ').next().unwrap().parse().unwrap())
+        .collect();
+    assert_eq!(numbers.len(), 26);
+    let mut e = Engine::new_game(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    let mut screen = vec![0u16; 640 * 480];
+    for n in numbers {
+        e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+            .unwrap();
+        e.start_dialog(n)
+            .unwrap_or_else(|err| panic!("dialog {n}: {err}"));
+        let mut ended = false;
+        for pass in 0..20_000 {
+            if pass % 20 == 19 {
+                e.click(f64::from(pass) * 10.0 + f64::from(n) * 1e6);
+            }
+            e.tick();
+            e.pass(Some(&mut screen));
+            if e.dialog().is_none() {
+                ended = true;
+                break;
+            }
+        }
+        assert!(ended, "dialog {n} does not end");
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
+    }
+}

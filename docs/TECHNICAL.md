@@ -2595,12 +2595,16 @@ back) into `yucatan-*.png`.
   a `cinema` line (only in the dialogs over films) draws its subtitle
   alone; no line, nothing. Checked against the dispatcher run under
   emulation with the line kind given (`golden/dialog_loop.txt`,
-  `tests/common/dialog_loop.rs`). The dialog's end sets the previous loop
-  type back, and that resets the warp camera (FUN_00402960: the screen's
-  centre and 76°), whatever field of view the last line had: the
-  panorama is not left zoomed in after a dialog (asserted after every
-  dialog of every world's tests, against the camera the original's code
-  leaves under emulation). The lines, the
+  `tests/common/dialog_loop.rs`, on lines of the four kinds: Tibet's
+  dialog 360, Ireland's 1, 56, 44 and 71, Xibalba's 190): the panorama,
+  its step and the turn, and the dowsing rod and the ring drawn (the rod
+  stepped) under the dialog frame for a `voixoff0` line only. The
+  dialog's end sets the previous loop type back, and that resets the warp
+  camera (FUN_00402960: the screen's centre and 76°), whatever field of
+  view the last line had: the panorama is not left zoomed in after a
+  dialog (asserted after every dialog of the Tibet, Irish, Chinese,
+  Yucatán, Xibalba and endgame tests, against the camera the original's
+  code leaves under emulation). The lines, the
   video frames and their numbers, the composed frames, every subtitle's
   layout and the fades are the original's (tests/dialogs.rs).
 - **Scripts:** the chapter scripts `scenar\chapiNNN.con` keep the first

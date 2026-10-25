@@ -6,6 +6,9 @@
 
 use std::collections::BTreeSet;
 
+use atlantis2_data::spr::SprBank;
+use atlantis2_data::Folder;
+use atlantis2_engine::bag::{Overlays, UiBank, UiDraw};
 use atlantis2_engine::{Engine, Fpu};
 
 const GOLDEN: &str = include_str!("../golden/dialog_loop.txt");
@@ -64,6 +67,11 @@ pub fn assert_camera_after_dialog(e: &Engine, what: &str) {
 ///   buffer held (drawn twice over two fillings, on passes without a
 ///   tick), and a tick's pass steps the place animations (a playing slot
 ///   moves) while a pass without one does not;
+/// - the dowsing rod and the overlays (0x00475320, FUN_0049c6e0 and
+///   FUN_0047f0b0): with the rod shown and the ring open, both drawn and
+///   the rod stepped in the pass, and the frame not the one without them
+///   (they are painted under the dialog frame, not left out); for the
+///   other kinds neither is drawn nor stepped and the frame is the same;
 /// - the turn (0x0040c6a0): a mouse motion turns the view in that pass.
 ///
 /// Returns the kinds seen (and checked) and whether a playing slot was
@@ -113,6 +121,9 @@ pub fn check_dialog_loop(e: &mut Engine, number: u32) -> (BTreeSet<i32>, bool) {
             panorama,
             "dialog {number} line {line} (kind {kind}): the panorama under the frame"
         );
+        // The rod and the ring, on passes without a tick.
+        let rod_overlays = want.contains(&"rod_overlays(0x00475320)");
+        check_rod_overlays(e, &mut buf, rod_overlays, number, line, kind);
         // The step: only on a tick's pass, when a slot plays.
         let frames = |e: &Engine| -> Vec<(bool, i32)> {
             e.anim.slots.iter().map(|s| (s.active, s.frame)).collect()
@@ -156,4 +167,87 @@ pub fn check_dialog_loop(e: &mut Engine, number: u32) -> (BTreeSet<i32>, bool) {
         assert_camera_after_dialog(e, &format!("dialog {number}"));
     }
     (seen, stepped_any)
+}
+
+/// The sprites of `bank` the last pass drew.
+fn sprites_of(e: &Engine, bank: UiBank) -> Vec<(i32, i32, i32)> {
+    e.ui_draws
+        .iter()
+        .filter_map(|d| match d {
+            UiDraw::Sprite {
+                bank: b,
+                frame,
+                x,
+                y,
+            } if *b == bank => Some((*frame, *x, *y)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// One pass of a line of kind `kind` with the dowsing rod shown
+/// (`NEARW77` = 3, frame 0, step 1; only when a script with the variable
+/// runs, as the rod reads 0 and goes away otherwise) and the ring open
+/// at the screen centre, then one without them (no rod, no overlay), both
+/// into a zeroed `buf`: whether the pass draws the rod (at (W / 2,
+/// H − 240), frame 0, stepped to 1) and the ring, and whether the frame
+/// differs, is `rod_overlays`. The state is put back after.
+fn check_rod_overlays(
+    e: &mut Engine,
+    buf: &mut [u16],
+    rod_overlays: bool,
+    number: u32,
+    line: usize,
+    kind: i32,
+) {
+    let what = format!("dialog {number} line {line} (kind {kind})");
+    let (w, h) = (e.width() as i32, e.height() as i32);
+    let bank = |e: &Engine, name: &str| {
+        let data = e.files().read(Folder::Spr, name).unwrap();
+        Some(SprBank::parse(&data).unwrap())
+    };
+    let near = e.script_state().and_then(|s| s.var("NEARW77"));
+    let shown = near.is_some();
+    if shown {
+        assert!(e.script_state_mut().unwrap().set_var("NEARW77", 3));
+    }
+    let rod = std::mem::take(&mut e.rod);
+    let overlays = std::mem::replace(&mut e.overlays, Overlays::new());
+    if shown {
+        e.rod.bank = bank(e, "baton.spr");
+        (e.rod.active, e.rod.frame, e.rod.step) = (true, 0, 1);
+    }
+    e.overlays.ring_bank = bank(e, "anneau.spr");
+    (e.overlays.ring, e.overlays.centre) = (true, (w / 2, h / 2));
+    buf.fill(0);
+    e.pass(Some(buf));
+    let with = buf.to_vec();
+    let (rods, rings) = (sprites_of(e, UiBank::Rod), sprites_of(e, UiBank::Ring));
+    let stepped = e.rod.frame;
+    e.rod = Default::default();
+    e.overlays = Overlays::new();
+    buf.fill(0);
+    e.pass(Some(buf));
+    (e.rod, e.overlays) = (rod, overlays);
+    if let Some(near) = near {
+        assert!(e.script_state_mut().unwrap().set_var("NEARW77", near));
+    }
+    if rod_overlays {
+        if shown {
+            assert_eq!(rods, [(0, w / 2, h - 240)], "{what}: the rod");
+            assert_eq!(stepped, 1, "{what}: the rod's step");
+        }
+        assert_eq!(rings, [(0, w / 2, h / 2)], "{what}: the ring");
+    } else {
+        assert!(
+            rods.is_empty() && rings.is_empty(),
+            "{what}: the rod and the ring"
+        );
+        assert_eq!(stepped, 0, "{what}: the rod's step");
+    }
+    assert_eq!(
+        with != buf,
+        rod_overlays,
+        "{what}: the rod and the ring on the frame"
+    );
 }
