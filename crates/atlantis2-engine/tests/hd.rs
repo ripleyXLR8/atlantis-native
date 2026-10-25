@@ -22,6 +22,7 @@ use std::path::PathBuf;
 
 use atlantis2_data::{defnames, A2Files};
 use atlantis2_engine::camera::deg_to_rad;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::STAR_HOLES;
 use atlantis2_engine::hd::{
     cube_point, picture_rect, render_view, side_tiles, tile_for_output, window_to_screen,
@@ -482,7 +483,7 @@ fn hd_keeps_the_original_frames() {
         let mut layers = 0;
         for i in 0..90 {
             for e in [&mut off, &mut on] {
-                e.set_clock(i as f64 / 60.0);
+                e.set_clock(i as f64 * PASS);
                 e.mouse_motion(
                     if i < 45 { 23 } else { -11 },
                     if i % 30 < 15 { 9 } else { -9 },
@@ -557,7 +558,7 @@ fn hd_follows_the_ring_s_roll() {
     let mut checked = 0;
     for i in 0..60 {
         for e in [&mut off, &mut on] {
-            e.set_clock(i as f64 / 60.0);
+            e.set_clock(i as f64 * PASS);
             if i % 4 == 0 {
                 e.tick();
             }
@@ -625,7 +626,7 @@ fn hd_follows_the_octopus_s_shake() {
     let (mut checked, mut shaken) = (0, 0);
     for i in 0..40 {
         for e in [&mut off, &mut on] {
-            e.set_clock(i as f64 / 60.0);
+            e.set_clock(i as f64 * PASS);
             if i % 4 == 1 {
                 e.tick();
             }
@@ -688,7 +689,7 @@ fn hd_canoe_is_the_original_frame() {
     }
     for i in 0..120 {
         for e in [&mut off, &mut on] {
-            e.set_clock(i as f64 / 60.0);
+            e.set_clock(i as f64 * PASS);
             e.pointer(100 + 4 * i, 120 + 2 * i);
             if i % 20 == 10 {
                 e.right_click();
@@ -975,7 +976,7 @@ fn hd_draws_the_web_s_creatures() {
         let (mut seen, mut seen_hd) = (0, 0);
         for i in 0..30 {
             for e in [&mut off, &mut on] {
-                e.set_clock(i as f64 / 60.0);
+                e.set_clock(i as f64 * PASS);
             }
             off.pass(Some(&mut a));
             on.pass(Some(&mut b));

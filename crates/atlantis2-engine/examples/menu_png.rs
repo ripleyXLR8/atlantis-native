@@ -17,6 +17,7 @@ use std::path::PathBuf;
 
 use atlantis2_data::save::SystemTime;
 use atlantis2_data::A2Files;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::PageKind;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, Fpu, Variant};
@@ -34,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut screen = vec![0u16; 640 * 480];
     let mut run = |e: &mut Engine, frames: u32, screen: &mut Vec<u16>| {
         for _ in 0..frames {
-            clock += 1.0 / 60.0;
+            clock += PASS;
             e.set_clock(clock);
             e.pass(Some(screen));
         }

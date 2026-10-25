@@ -12,7 +12,7 @@ use atlantis2_data::con::NewGame;
 use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::dialog::{FontTxt, World};
 use atlantis2_data::messages::ObjectNames;
-use atlantis2_data::spr::{SprBank, Target};
+use atlantis2_data::spr::{SprBank, SprDll, Target};
 use atlantis2_data::spw::{FaceBox, Spw};
 use atlantis2_data::wam::{self, View, WamError, Zone};
 use atlantis2_data::{A2Files, Folder, Wam};
@@ -55,6 +55,7 @@ mod labyrinth;
 pub use labyrinth::{
     soul_cell, soul_drops, soul_open, soul_random, soul_visible, Hood, SOULS_MODE,
 };
+mod media;
 mod menus;
 mod ogham;
 pub use ogham::{ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET};
@@ -97,9 +98,22 @@ pub use dragon::Dragon;
 pub use saves::SaveError;
 pub use subjects::subjects_bank_name;
 
-/// The scheduler's tick: 15 a second (the dialogs' sequencer, the music
-/// fades, the animations, the videos).
-pub const TICK: f64 = 1.0 / 15.0;
+/// The 15 Hz task's period (the dialogs' sequencer, the music fades, the
+/// animations, the videos): `1.0 / 15.0` stored as a float
+/// (@ 0x0040cb78..0x0040cba1, then widened into the task's double
+/// @ 0x0040cbf6..0x0040cc04), 0.0666666701436…, a little over 1/15 s.
+pub const TICK: f64 = (1.0f32 / 15.0f32) as f64;
+
+/// The time between two of the port's passes, seconds: a frame of the VGA
+/// 640 x 480 mode at 60 Hz (800 x 525 pixels at 25.175 MHz, 59.94 frames a
+/// second). In full screen, its default, the original shows its frames
+/// with a flip that waits for the vertical blank (`Flip(NULL, DDFLIP_WAIT)`
+/// on a chain of one back buffer, @ 0x0058fdec..0x0058fdf1, the chain made
+/// @ 0x0058f86c..0x0058f8b2, the mode set with the display's default rate
+/// @ 0x0058f81b..0x0058f82a): one pass a refresh of the screen. The port
+/// runs its passes as on a 60 Hz screen, at this standard timing; the
+/// 15 Hz task is then due every 4th pass (the scheduler's golden).
+pub const PASS: f64 = 800.0 * 525.0 / 25_175_000.0;
 
 /// Why the engine cannot show a view.
 #[derive(Debug)]
@@ -440,6 +454,11 @@ pub struct Engine {
     hd: hd::HdState,
     pub camera: Camera,
     pub look: Look,
+    /// The sprite library the 50 % sprites are drawn with (the bag bar's,
+    /// the canoe's pointed tile): `spr_p6.dll`, the one the original loads
+    /// on a Pentium II (@ 0x0059cb93), by default; `spr_p5.dll` the one of
+    /// a Pentium or an AMD K6.
+    pub spr_dll: SprDll,
     /// The place animations.
     pub anim: Anim,
     pub loop_type: LoopType,
@@ -618,6 +637,12 @@ pub struct Engine {
     /// last one (the 15 Hz task's previous run, @ 0x00656a10).
     clock: f64,
     next_tick: f64,
+    /// The 15 Hz task is due in this pass: it runs after the frame
+    /// ([`Engine::set_clock`]).
+    tick_due: bool,
+    /// The time of the scheduler's pass (the `now` its due task's next
+    /// time is counted from); it stands during a music copy.
+    pass_time: f64,
     last_tick: f64,
     zbuf: Vec<u32>,
     /// The CON interpreter when the scripts run the game
@@ -634,11 +659,22 @@ pub struct Engine {
     canoe: Option<Box<crate::canoe::Canoe>>,
     canoe_prev_loop: LoopType,
     canoe_escape: bool,
-    /// A sound loaded for the next video (`cine%03d.apc` @ 0x0047a320, or
-    /// the `TrajSound` of a move), played on voice 2 when it starts.
-    pending_sound: Option<(String, Pcm)>,
-    /// `TrajSound`'s file name (@ 0x00673198), until the next move with a
-    /// video.
+    /// The sound loaded for a video (the entry @ 0x00673f34: a film's or an
+    /// intro's track, FUN_0047a320; a move's `TrajSound`, FUN_0047a350),
+    /// `None` for a file that could not be read (entry −1). It is played
+    /// on voice 2 when a video starts while `video_owns_voice2` is set,
+    /// and freed at the video's end; a video that does not open
+    /// keeps both for the next one (FUN_0040bf60 touches neither).
+    video_sound: Option<(String, Pcm)>,
+    /// Voice 2 belongs to the video (@ 0x006d168d): set by a film's or an
+    /// intro's track that loaded (FUN_0047a320) and by any `TrajSound`
+    /// taken by a move, even one that did not load (FUN_0047a350). Only
+    /// then does a video start play `video_sound` and its end stop voice 2
+    /// (FUN_0040bae0): a `NEWSOUND` still playing on voice 2 goes on
+    /// through a video without a sound of its own.
+    video_owns_voice2: bool,
+    /// `TrajSound`'s file name (@ 0x00673198), until the end of a video
+    /// that owned voice 2 (FUN_0047a380 from FUN_0040bae0).
     traj_sound: Option<String>,
     /// The transition sprites (@ 0x00673f40, count @ 0x00673fa4), drawn
     /// over the video's frames.
@@ -655,7 +691,8 @@ pub struct Engine {
     /// ([`Engine::refuse_place`]), handled once they are back.
     refused_place: Option<String>,
     /// The video end asks the next warp draw for the music at 100 %
-    /// (@ 0x00656999, FUN_0040bb90).
+    /// (@ 0x00656999, FUN_0040bb90); a new music before it cancels the
+    /// request (FUN_0040bb80 from FUN_0047a200).
     music_after_video: bool,
     /// The place animation hidden while its character speaks
     /// (@ 0x006c2e78): the slot and the names it was found for.
@@ -683,6 +720,12 @@ pub struct Engine {
     pub cfg_extra: atlantis2_data::save::Cfg,
     /// The menus asked the program to end.
     quit_requested: bool,
+    /// The music copies and the media pages (`engine/media.rs`).
+    pub media: media::Media,
+    /// The left button held (@ 0x006569ca): set by every press, cleared
+    /// by every release (FUN_0040c510, FUN_0040c660), whatever the loop
+    /// type; the menus' buttons animate only while it is clear.
+    button_held: bool,
 }
 
 /// The music player's own state (@ 0x00673f30, 0x006725a0..0x006725c4):
@@ -889,7 +932,10 @@ impl Engine {
         );
         let mut anim = Anim::new(0);
         anim.cheval = names.id(defnames::OBJETS, b"CHEVAL").ok().map(|i| i as i32);
+        let media = media::Media::all_made();
         Engine {
+            media,
+            button_held: false,
             files,
             wam: Wam::default(),
             wam_name: String::new(),
@@ -902,6 +948,7 @@ impl Engine {
             hd: Default::default(),
             camera,
             look: Look::default(),
+            spr_dll: SprDll::default(),
             // GetTickCount() in the original: a port seeds with its clock
             // (`anim.rand`).
             anim,
@@ -986,6 +1033,8 @@ impl Engine {
             fx_volume: crate::sound::DEFAULT_FX_VOLUME,
             clock: 0.0,
             next_tick: 0.0,
+            tick_due: false,
+            pass_time: 0.0,
             last_tick: 0.0,
             zbuf: vec![0; (width * height) as usize],
             con: None,
@@ -994,7 +1043,8 @@ impl Engine {
             canoe: None,
             canoe_prev_loop: LoopType::Warp,
             canoe_escape: false,
-            pending_sound: None,
+            video_sound: None,
+            video_owns_voice2: false,
             traj_sound: None,
             spf: Vec::new(),
             deferred_wam: None,
@@ -1138,6 +1188,8 @@ impl Engine {
                     if let Some(slot) = self.anim.slots.get_mut(n) {
                         slot.record = Some(record);
                     }
+                    let next = self.next_state_record(record);
+                    self.anim.set_next(n, next);
                     // The horse's frame kept across views (@ 0x0047c764):
                     // a slot whose id is `CHEVAL`'s object index, whatever
                     // its kind, starts at `FRAMECHEVAL`.
@@ -1155,13 +1207,53 @@ impl Engine {
                 None => log::warn!("Can't load SPW {name}"),
             }
         }
+        // FUN_0047c820 (@ 0x0045a267): the chains to the next states'
+        // slots.
+        self.anim.link_chains();
     }
 
-    /// A mouse move, in mickeys (relative pointer motion): the pointer
-    /// and the turn speeds.
+    /// FUN_004123b0 at a slot's load: the record (entity, state) of the
+    /// next state of WAM record `(entity, state)`, if it has one.
+    pub(crate) fn next_state_record(&self, (ei, si): (usize, usize)) -> Option<(usize, usize)> {
+        let e = self.wam.entities.get(ei)?;
+        let states: Vec<_> = e.state_records().collect();
+        crate::anim::next_state(&states, states.get(si)?).map(|k| (ei, k))
+    }
+
+    /// A mouse move, in mickeys (relative pointer motion): the pointer,
+    /// the turn speeds and the zone under the centre (the motion callback
+    /// @ 0x0040c420).
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
+        if self.hold_input(media::Input::Motion(dx, dy)) {
+            return;
+        }
         self.move_pointer(dx, dy);
         self.look.mouse(self.camera.fpu, dx, dy);
+        self.motion_pick();
+    }
+
+    /// The end of the motion callback (@ 0x0040c4df..0x0040c500): the
+    /// zone under the screen centre picked again from the camera as it
+    /// is, in every loop type and whatever is open (the warp frame's pick
+    /// is skipped under the bag bar, the subject menu, a dialog or an
+    /// overlay; this one is not).
+    fn motion_pick(&mut self) {
+        self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+    }
+
+    /// A move of the system pointer by (dx, dy) screen pixels where the
+    /// pointer is the system's (the menus: [`Engine::pointer`] places
+    /// it): the turn speeds gain it and the zone under the centre is
+    /// picked again, as the motion callback (@ 0x0040c420) does on every
+    /// move whatever the loop type. The menu frame
+    /// runs no decay, so the speeds are kept across a menu and the view
+    /// swings on when it closes.
+    pub fn pointer_moved(&mut self, dx: i32, dy: i32) {
+        if self.hold_input(media::Input::PointerMoved(dx, dy)) {
+            return;
+        }
+        self.look.mouse(self.camera.fpu, dx, dy);
+        self.motion_pick();
     }
 
     /// A left button press at `now` seconds (the input callback
@@ -1171,14 +1263,17 @@ impl Engine {
     /// During a dialog the click goes to it: the next line (the dialog's
     /// tick reads and clears the flag, @ 0x004801d0).
     pub fn click(&mut self, now: f64) {
+        if self.hold_input(media::Input::Click(now)) {
+            return;
+        }
         self.double = self.last_click.is_some_and(|t| now - t < 0.2);
         self.last_click = Some(now);
         let double = self.double;
         self.event(Event::Click { double });
+        self.button_held = true;
         if self.loop_type == LoopType::Menu {
             if let Some(m) = self.menu.as_mut() {
                 m.input.click = true;
-                m.input.held = true;
             }
             return;
         }
@@ -1264,18 +1359,57 @@ impl Engine {
         self.clock
     }
 
-    /// Moves the clock to `now` (seconds), running the 15 Hz ticks due
-    /// (a stall of more than a second skips the ticks missed).
-    pub fn set_clock(&mut self, now: f64) {
-        if now - self.next_tick > 1.0 {
-            self.next_tick = now;
-        }
-        while self.next_tick <= now {
-            self.clock = self.next_tick;
-            self.tick();
-            self.next_tick += TICK;
-        }
+    /// Moves the clock to `now` without the scheduler: for the harnesses
+    /// that run the 15 Hz task themselves ([`Engine::tick`]), as the
+    /// original's emulated runs the goldens come from do.
+    pub fn set_time(&mut self, now: f64) {
         self.clock = now;
+    }
+
+    /// Moves the clock to `now` (seconds: the scheduler's time of a pass,
+    /// @ 0x00584a0a..0x00584a1a) and finds whether the 15 Hz task is due in
+    /// this pass, as the scheduler FUN_00584a00 does: due when `now` is past
+    /// its next time (strictly, @ 0x00584a2e..0x00584a41), run at most once
+    /// a pass, its next time then `now` + its period (the smaller of that
+    /// and its end, DBL_MAX, @ 0x00584ad0..0x00584af0; the sum under the
+    /// x87 control word in force after the run). No catch-up: a late pass
+    /// delays every later tick. Its first run is the first pass after the
+    /// start (FUN_00584960: next time = the start).
+    ///
+    /// The due task runs after the pass's frame ([`Engine::pass`]), as in
+    /// the original: the frame task's next time is the previous pass's
+    /// time, earlier in the time-ordered queue than a due 15 Hz task's, so
+    /// the frame dispatcher runs first (the scheduler's golden: `F` before
+    /// `T` in every pass). A tick still pending when the clock moves on (a
+    /// pass without a frame) runs first, at its own pass's time.
+    ///
+    /// A music copy is a loop inside the task that started it
+    /// (`CopyMusikToDrive` @ 0x00479480: the please-wait page's frame and
+    /// the flip per half block, no scheduler call; `engine/media.rs`):
+    /// its passes do not reach the scheduler. The pass that started it
+    /// goes on after its last frame (a 15 Hz task due in that pass runs
+    /// then), its next time counted from that pass's time.
+    pub fn set_clock(&mut self, now: f64) {
+        if self.copying() {
+            self.clock = now;
+            return;
+        }
+        self.run_due_tick();
+        self.clock = now;
+        self.pass_time = now;
+        self.tick_due = now > self.next_tick;
+    }
+
+    /// The 15 Hz task when it is due in this pass, then its next time;
+    /// held during a music copy.
+    pub(crate) fn run_due_tick(&mut self) {
+        if self.copying() {
+            return;
+        }
+        if std::mem::take(&mut self.tick_due) {
+            self.tick();
+            self.next_tick = self.camera.fpu.add(self.pass_time, TICK);
+        }
     }
 
     /// The world's dialog texts (`MONDE`'s world change, @ 0x0047fe50) and
@@ -1355,7 +1489,7 @@ impl Engine {
                 self.music.set_percent(100);
                 // AtlDial_start set the loop type 2, then the previous one
                 // back (@ 0x0047ff7a, 0x0047ffd6): the camera set again
-                // for it (nothing changes at 640 x 480).
+                // for it (centre and 76°, FUN_00402960).
                 self.set_loop_type(self.loop_type);
                 Err(e)
             }
@@ -1423,17 +1557,22 @@ impl Engine {
         self.centre_draws.clear();
         self.ui_draws.clear();
         self.hd_pass_start();
+        // A music copy holds the game under the please-wait page
+        // (`engine/media.rs`).
+        if self.copying() {
+            self.copy_pass(out.as_deref_mut());
+            self.hd_pass_end(out.as_deref());
+            self.frame_flag = false;
+            return;
+        }
+        // A disc asked for and not found: the CD page.
+        self.open_cd_page();
         // The music state machine (@ 0x00476fc0, called @ 0x0049ce32).
         self.music_frame();
         match self.loop_type {
             LoopType::Warp => self.warp_pass(out.as_deref_mut()),
             LoopType::Video => self.video_pass(out.as_deref_mut()),
-            LoopType::Dialog => {
-                self.frame();
-                if let Some(out) = out.as_deref_mut() {
-                    self.render_surface(out);
-                }
-            }
+            LoopType::Dialog => self.dialog_pass(out.as_deref_mut()),
             LoopType::Menu => self.menu_pass(out.as_deref_mut()),
             LoopType::Picture => self.picture_pass(out.as_deref_mut()),
             LoopType::Canoe => self.canoe_pass(out.as_deref_mut()),
@@ -1518,6 +1657,75 @@ impl Engine {
         restore(&mut self.work, &self.faces, &dirty);
     }
 
+    /// The dialog loop (the dispatcher's loop type 2, @ 0x0049ce71, and
+    /// FUN_00480840) by the kind of the current line (@ 0x004616f0): no
+    /// line (−1), nothing; a head line (0) and a `voixoff` line (1, which
+    /// turns first, FUN_0040c6a0), the panorama as FUN_0045a930 draws it
+    /// (the place animations drawn and stepped, the web in its mode) then
+    /// the dialog frame over it; a `voixoff0` line (2), the same panorama,
+    /// then FUN_00475320's dowsing rod and overlays (@ 0x0049ce80..
+    /// 0x0049ce8a), then the dialog frame (its subtitles: FUN_00461430
+    /// draws a head only for kind 0); a `cinema` line (3), the dialog
+    /// frame alone. No cursor and no centre marker.
+    fn dialog_pass(&mut self, mut out: Option<&mut [u16]>) {
+        self.frame();
+        let kind = self.dialog.as_ref().map_or(-1, Dialog::kind);
+        if kind < 0 {
+            return;
+        }
+        if kind != 3 {
+            self.dialog_scene(out.as_deref_mut());
+        }
+        if kind == 2 {
+            self.rod_frame();
+            if self.overlays.any() {
+                self.overlay_draw();
+            }
+        }
+        if let Some(out) = out {
+            let (w, h) = (self.renderer.width(), self.renderer.height());
+            if kind == 2 {
+                self.paint_ui(out, w, h);
+            }
+            self.draw_dialog_frame(out);
+        }
+    }
+
+    /// FUN_0045a930 in the dialog loop: the place animations drawn into
+    /// the faces with the sprite under the centre recorded (FUN_0045b040:
+    /// the cursor state and, on a click, the slot), the cube rendered into
+    /// `out` (`None`: no pixels, but the control word warpPII leaves), the
+    /// web drawn in its mode (FUN_00491b30), then the animations' 15 Hz
+    /// step (FUN_0047d7f0 @ 0x0045a9c7).
+    fn dialog_scene(&mut self, out: Option<&mut [u16]>) {
+        if self.faces[0].is_empty() {
+            if let Some(out) = out {
+                out.fill(0);
+            }
+        } else {
+            let dirty = self.draw_slots();
+            match out {
+                Some(out) => {
+                    let (m, p) = (self.camera.matrix(), self.camera.projection());
+                    self.renderer.fpu = self.camera.fpu;
+                    self.renderer.render(&self.work, &m, p, out);
+                    self.camera.fpu = self.renderer.fpu;
+                    self.hd_scene(out, &m, p);
+                    self.web_draw(Some(out));
+                }
+                None => {
+                    if self.renderer.variant == Variant::PII {
+                        self.camera.fpu = Fpu::Chop;
+                        self.renderer.fpu = Fpu::Chop;
+                    }
+                    self.web_draw(None);
+                }
+            }
+            restore(&mut self.work, &self.faces, &dirty);
+        }
+        self.anim_tick();
+    }
+
     /// The place animations' 15 Hz step (FUN_0047d7f0, on its flag), the
     /// horse's frame kept in `FRAMECHEVAL`.
     fn anim_tick(&mut self) {
@@ -1541,32 +1749,22 @@ impl Engine {
 
     /// `AtlWarp_continue` (@ 0x0045a3b0).
     fn warp_pass(&mut self, mut out: Option<&mut [u16]>) {
-        // 1. The turn step, or the mouse inertia and the limits
-        // (@ 0x0040c6a0); then the zone under the centre.
-        if let Some(turn) = &mut self.turn {
-            let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
-            let step = turn.step(&mut self.camera, &mut self.zoom, screen);
-            if step.skip_draw {
-                self.draw_skip = true;
-            }
-            if !step.going {
-                self.turn = None;
-                self.move_pending = true;
-            }
-        } else {
-            // The limits are the script's `LIMITEANGLEWARPX` / `Y`, read
-            // every frame. Not while the bag bar, the subject menu or a
-            // full-screen overlay is open (nor a dialog, the parchment or
-            // the pause, which the port does not have here).
-            if let Some(s) = &self.con {
-                self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
-                self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
-            }
-            if !self.bar.open && !self.subject_menu.open && !self.overlays.cover {
-                self.look.frame(&mut self.camera);
-            }
+        // 1. FUN_0040c6a0: the turn step, or the mouse inertia and the
+        // limits; then the zone under the centre. Not at all while the bag
+        // bar, the subject menu, a dialog or a full-screen overlay is open
+        // (@ 0x0045a3b0..0x0045a3ea; the parchment and the pause, the two
+        // other flags tested, are never set in the port): a move's turn
+        // waits under the open bar. The zone under the centre is then the
+        // one the last mouse move picked (the motion callback picks it in
+        // every case, [`Engine::mouse_motion`]).
+        if !self.bar.open
+            && !self.subject_menu.open
+            && self.dialog.is_none()
+            && !self.overlays.cover
+        {
+            self.turn_or_look();
+            self.centre_zone = self.pick_centre().map(|i| (self.view, i));
         }
-        self.centre_zone = self.pick_centre().map(|i| (self.view, i));
         // The overlays' clicks (@ 0x0047efd0).
         if self.overlays.any() {
             self.overlay_clicks();
@@ -1634,6 +1832,29 @@ impl Engine {
         }
     }
 
+    /// FUN_0040c6a0's first part: a move's turn step, or else the mouse
+    /// inertia within the script's `LIMITEANGLEWARPX` / `Y` (read every
+    /// frame).
+    fn turn_or_look(&mut self) {
+        if let Some(turn) = &mut self.turn {
+            let screen = (self.renderer.width() as u32, self.renderer.height() as u32);
+            let step = turn.step(&mut self.camera, &mut self.zoom, screen);
+            if step.skip_draw {
+                self.draw_skip = true;
+            }
+            if !step.going {
+                self.turn = None;
+                self.move_pending = true;
+            }
+            return;
+        }
+        if let Some(s) = &self.con {
+            self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
+            self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
+        }
+        self.look.frame(&mut self.camera);
+    }
+
     /// The zone under the screen centre (@ 0x00458fe0).
     fn pick_centre(&self) -> Option<usize> {
         let view = self.wam.view(self.view)?;
@@ -1642,6 +1863,27 @@ impl Engine {
             .ray(self.camera.cx, self.camera.cy)
             .map(f64::from);
         wam::pick(&view.zones, d)
+    }
+
+    /// FUN_0045b040 (from FUN_0045a930, in the warp and the dialog loop):
+    /// the place animations drawn into the faces, the cursor state of
+    /// what is under the screen centre and, on a click, its slot. Returns
+    /// the boxes drawn, to restore.
+    fn draw_slots(&mut self) -> Vec<(usize, FaceBox)> {
+        let centre = self
+            .forced_centre
+            .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
+        // The slot under the centre is recorded on a click only while the
+        // bag bar is closed (FUN_0045b040 @ 0x0045b0cd).
+        let (dirty, mut hit) = self
+            .anim
+            .draw(&mut self.work, centre, self.click && !self.bar.open);
+        if !self.sprite_picks {
+            hit = Default::default();
+        }
+        self.sprite_state = hit.cursor;
+        self.sprite_hit = hit.slot;
+        dirty
     }
 
     /// The warp draw (@ 0x0045a9f0): sprites into the faces, the cube, the
@@ -1655,16 +1897,7 @@ impl Engine {
             }
             return;
         }
-        let centre = self
-            .forced_centre
-            .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
-        let (dirty, mut hit): (Vec<(usize, FaceBox)>, _) =
-            self.anim.draw(&mut self.work, centre, self.click);
-        if !self.sprite_picks {
-            hit = Default::default();
-        }
-        self.sprite_state = hit.cursor;
-        self.sprite_hit = hit.slot;
+        let dirty = self.draw_slots();
         let (w, h) = (self.renderer.width(), self.renderer.height());
         // FUN_0049a9a0 (@ 0x0045aa15): in the octopus fight's mode 6 its
         // own centre draws, instead of FUN_0045af10 and of the cursor's
@@ -2402,10 +2635,13 @@ impl Engine {
         let udada = self.con.as_ref().and_then(|s| s.var("UDADA")).unwrap_or(0);
         if let (Some(d), false, 0) = (&dest, self.double, udada) {
             // FUN_0047a350: a `TrajSound` set before the move plays with
-            // the video, the music at 20 %.
-            if let Some(name) = self.traj_sound.take() {
+            // the video, the music at 20 %; voice 2 is the video's even
+            // when the file does not load. The name stays until the
+            // video's end.
+            if let Some(name) = self.traj_sound.clone() {
                 self.music.set_percent(20);
-                self.pending_sound = self.load_sound(&name);
+                self.video_owns_voice2 = true;
+                self.video_sound = self.load_sound(&name);
             }
             // The name is used as a printf format by the original; when
             // the video cannot start, FUN_0047b280 (@ 0x0045a5b2).
@@ -2437,12 +2673,11 @@ impl Engine {
                 frames: None,
             });
             log::info!("{name}: no video, a cut");
-            // The music back to 100 % (outside a dialog), the sound loaded
-            // for the video dropped.
+            // The music back to 100 % (outside a dialog). The sound loaded
+            // for the video and the flag stay: the next video plays it.
             if self.dialog.is_none() {
                 self.music.set_percent(100);
             }
-            self.pending_sound = None;
             return false;
         };
         let frames = hnm.frame_count();
@@ -2452,13 +2687,17 @@ impl Engine {
         });
         // FUN_0047b030: the place sounds' listener steps.
         self.place_sounds_video_start(frames);
-        // The sound loaded for it (a film's track, a `TrajSound`) starts
-        // on voice 2 (FUN_0047a650(id, 2)) at the effects volume.
-        if let Some((sound, pcm)) = self.pending_sound.take() {
-            let att = self.fx_attenuation();
-            self.voices
-                .play(crate::sound::VOICE_EFFECTS, pcm, false, att, 0);
-            self.event(Event::Sound(sound));
+        // When voice 2 is the video's (@ 0x0040c002), the sound loaded for
+        // it (a film's track, a `TrajSound`) starts on voice 2
+        // (FUN_0047a650(id, 2): what voice 2 played stopped, the effects
+        // volume); entry −1 plays nothing.
+        if self.video_owns_voice2 {
+            if let Some((sound, pcm)) = self.video_sound.clone() {
+                let att = self.fx_attenuation();
+                self.voices
+                    .play(crate::sound::VOICE_EFFECTS, pcm, false, att, 0);
+                self.event(Event::Sound(sound));
+            }
         }
         let end = !matches!(hnm.next_frame(), Some(Ok(_))) || hnm.frames_decoded() >= frames;
         self.event(Event::VideoFrame(0));
@@ -2538,7 +2777,7 @@ impl Engine {
         // One pass of the music player (the thunk @ 0x0047a280), the
         // sound loaded (FUN_0047a320), `AtlHnm_start`.
         self.music_frame();
-        self.pending_sound = self.load_sound(&format!("intro{n:02}.apc"));
+        self.video_track(&format!("intro{n:02}.apc"));
         if self.start_video(&format!("intro{n:02}.hnm")) {
             self.intro_next += 1;
         } else {
@@ -2576,15 +2815,17 @@ impl Engine {
         let prev = self.video.take().map_or(LoopType::Warp, |v| v.prev);
         self.set_loop_type(prev);
         self.event(Event::VideoEnd);
-        // FUN_0040bae0: the video's sound stops; the next warp draw asks
-        // for the music at 100 % unless a dialog runs; a dialog played
-        // over the film ends with it (FUN_00480a40).
-        self.voices.stop(crate::sound::VOICE_EFFECTS);
-        if self.dialog.is_none() {
-            self.music_after_video = true;
-        }
+        // FUN_0040bae0: when voice 2 is the video's (@ 0x006d168d), voice
+        // 2 stopped and the sound freed (FUN_0047a3d0: entry −1 stops
+        // nothing) and the `TrajSound` name cleared (FUN_0047a380);
+        // otherwise what voice 2 plays (a `NEWSOUND`) goes on. The next
+        // warp draw asks for the music at 100 % (the loop type is still
+        // the video's here, so never the dialog's 2); a dialog played over
+        // the film ends with it (FUN_00480a40).
+        self.video_sound_end();
+        self.music_after_video = true;
         // The intro's next file (@ 0x0040c0ee), in place of the place
-        // sounds after a film (FUN_0047b280, not ported).
+        // sounds after a film (FUN_0047b280).
         if self.intro_playing {
             self.start_intro();
         } else {
@@ -2598,13 +2839,38 @@ impl Engine {
         self.with_script(|s, h| s.video_ended(h));
     }
 
+    /// FUN_0047a320: a film's or an intro's track loaded for the next
+    /// video; voice 2 is the video's only when it loaded.
+    pub(super) fn video_track(&mut self, apc: &str) {
+        self.video_sound = self.load_sound(apc);
+        self.video_owns_voice2 = self.video_sound.is_some();
+        if self.video_sound.is_none() {
+            log::info!("{apc}: no sound track");
+        }
+    }
+
+    /// FUN_0040bae0's sound part: voice 2 stopped, the video's sound
+    /// freed, the flag and the `TrajSound` name cleared, only when voice 2
+    /// is the video's.
+    fn video_sound_end(&mut self) {
+        if !std::mem::take(&mut self.video_owns_voice2) {
+            return;
+        }
+        if self.video_sound.take().is_some() {
+            self.voices.stop(crate::sound::VOICE_EFFECTS);
+        }
+        self.traj_sound = None;
+    }
+
     /// [`Engine::render`] on the surface the frame is drawn on (the
     /// logical size, [`Engine::width`] x [`Engine::height`]): the
     /// cube with the place animations as FUN_0045a930 draws it (no cursor,
-    /// no centre marker), or the video's frame. In a dialog
-    /// (@ 0x00480840): nothing before its first line; the panorama for a
-    /// head or `voixoff` line, then the dialog frame over it; for
-    /// `voixoff0` and `cinema` lines the subtitles over what `out` holds.
+    /// no centre marker, no step), or the video's frame. In a dialog (the
+    /// loop type 2, @ 0x0049ce71, and @ 0x00480840): nothing before its
+    /// first line; the panorama for a head, `voixoff` or `voixoff0` line
+    /// (with the overlays of the last pass for `voixoff0`), then the
+    /// dialog frame over it; for a `cinema` line the subtitles over what
+    /// `out` holds.
     pub fn render_surface(&mut self, out: &mut [u16]) {
         self.hd_pass_start();
         self.render_frame(out);
@@ -2625,9 +2891,19 @@ impl Engine {
         }
         if self.faces[0].is_empty() {
             out.fill(0);
-        } else if matches!(kind, None | Some(0) | Some(1)) {
+        } else if matches!(kind, None | Some(0..=2)) {
             self.draw_scene(out);
         }
+        if kind == Some(2) {
+            self.paint_ui(out, w, h);
+        }
+        self.draw_dialog_frame(out);
+    }
+
+    /// The dialog frame (@ 0x00461430) over `out`: the head of a head
+    /// line, the subtitles.
+    fn draw_dialog_frame(&mut self, out: &mut [u16]) {
+        let (w, h) = (self.renderer.width(), self.renderer.height());
         let active = self.hd_active();
         if let Some(d) = self.dialog.as_mut() {
             let (hd, texts) = self.hd.frame_parts(active);

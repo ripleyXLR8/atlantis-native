@@ -109,8 +109,9 @@ impl Engine {
             self.music_frame();
         }
         match r {
-            Ok(c) => {
+            Ok(mut c) => {
                 self.camera.fpu = c.nodes.fpu;
+                c.spr_dll = self.spr_dll;
                 self.canoe = Some(Box::new(c));
                 self.canoe_prev_loop = self.loop_type;
                 self.set_loop_type(LoopType::Canoe);

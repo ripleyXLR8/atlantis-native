@@ -17,6 +17,7 @@ use atlantis2_data::save::{
 };
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::{action, state, Menu, PageKind, Rect, WidgetKind};
 use atlantis2_engine::{Engine, Fpu, LoopType, Variant};
 
@@ -70,7 +71,7 @@ fn time(minute: u16) -> SystemTime {
     }
 }
 
-/// The engine at 60 passes a second.
+/// The engine at 59.94 passes a second ([`PASS`]).
 struct Run {
     e: Engine,
     pass: u64,
@@ -85,7 +86,7 @@ impl Run {
     }
 
     fn step(&mut self) {
-        self.e.set_clock(self.pass as f64 / 60.0);
+        self.e.set_clock(self.pass as f64 * PASS);
         self.e.pass(None);
         self.pass += 1;
     }
@@ -99,7 +100,7 @@ impl Run {
     /// A click at (x, y) of the menu, the button released after a pass.
     fn press(&mut self, x: i32, y: i32) {
         self.e.pointer(x, y);
-        self.e.click(self.pass as f64 / 60.0);
+        self.e.click(self.pass as f64 * PASS);
         self.step();
         self.e.release();
         self.step();
@@ -108,6 +109,11 @@ impl Run {
     /// A new game, its film ended.
     fn new_game(&mut self) {
         self.e.start_new_game().unwrap();
+        // With a data folder of its own the first new game copies chapter
+        // 0's music under the please-wait page (`engine/media.rs`).
+        while self.e.copying() {
+            self.step();
+        }
         self.e.end_video();
         self.wait(30);
         assert_eq!(self.e.loop_type, LoopType::Warp);
@@ -358,15 +364,21 @@ fn the_volumes() {
     assert_eq!(r.page(), Some(PageKind::Sound));
     // The sliders start at general / 256, music / 127 / general, dialogs
     // and effects / 127.
+    // The original's floats (× 0.007874016, under the panorama's control
+    // word 0x0e7f, which truncates: 127 gives the float below 1;
+    // `tests/ui_fixes.rs` checks the whole table).
     let v = r.menu().values;
     assert_eq!(v[0], 1.0);
-    assert_eq!(v[1], (100.0f64 / 127.0) as f32);
-    assert_eq!((v[2], v[3]), (1.0, 1.0));
+    assert_eq!(v[1], f32::from_bits(0x3f49_9326));
+    assert_eq!(
+        (v[2], v[3]),
+        (f32::from_bits(0x3f7f_ffff), f32::from_bits(0x3f7f_ffff))
+    );
     // The general volume grabbed at 57 pixels from the track's origin
     // (425 − 65): 57 / 115, × 256 truncated; the music then follows:
     // ftol(music × general × 127 + 0.5).
     r.e.pointer(360 + 57, 139);
-    r.e.click(r.pass as f64 / 60.0);
+    r.e.click(r.pass as f64 * PASS);
     r.step();
     let g = (57.0f64 / 115.0) as f32;
     assert_eq!(r.menu().values[0], g);
@@ -387,7 +399,7 @@ fn the_volumes() {
     );
     // The effects at 0.
     r.e.pointer(350 - 65 - 5, 364);
-    r.e.click(r.pass as f64 / 60.0);
+    r.e.click(r.pass as f64 * PASS);
     r.step();
     r.e.release();
     r.step();
@@ -427,7 +439,7 @@ fn saving_and_loading_through_the_menus() {
     r.new_game();
     // Play a little: the first click sends the game to chapter 75; look
     // elsewhere.
-    r.e.click(r.pass as f64 / 60.0);
+    r.e.click(r.pass as f64 * PASS);
     r.wait(20);
     r.e.mouse_motion(400, -100);
     r.wait(30);
@@ -477,7 +489,7 @@ fn saving_and_loading_through_the_menus() {
     let (yaw, pitch) = r.e.zone_aim(2, 0).unwrap();
     r.e.camera.enter(yaw, pitch);
     r.wait(15);
-    r.e.click(r.pass as f64 / 60.0);
+    r.e.click(r.pass as f64 * PASS);
     for _ in 0..600 {
         r.step();
         if r.e.place().1 == 3 && r.e.loop_type == LoopType::Warp {
@@ -643,7 +655,7 @@ fn the_animated_buttons() {
     // The button pressed outside the box and held, then the mouse in the
     // box: the button is not pressed, frame 0 (FUN_0046db00).
     r.e.pointer(5, 470);
-    r.e.click(r.pass as f64 / 60.0);
+    r.e.click(r.pass as f64 * PASS);
     r.step();
     assert_eq!(frame(&r), 0);
     r.e.pointer(x, y);

@@ -659,12 +659,13 @@ the octopus's death sends the game back to Tibet, and the
 crystal laid again to the hub's last view, the films, the credits and the
 end of the game.
 `--headless <folder> [frames] --screenshot
-<file.png>` plays a new game for that many frames of 1/60 s and saves the
+<file.png>` plays a new game for that many passes (59.94 a second) and saves the
 screen;
 `--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
 plays a dialog at once and `--menu <page>` shows a menu page (`player`,
-`main`, `options`, `sound`, `load`, `credits`; testing aids, which end the
-opening film first),
+`main`, `options`, `sound`, `load`, `credits`; testing aids, which go
+through the new game's music copy page when the data folder holds no copy
+yet, then end the opening film first),
 e.g. `--view 7,-164.394,14.96 --dialog 360`; `--take <object>[,...]` puts
 objects in the bag and `--hold <object>` one in the hand (by their
 `defnames.con` names, through the scripts' `sacados` and `objetenmain`),
@@ -710,9 +711,17 @@ back) into `yucatan-*.png`.
   folders directly inside it and in each `--discs <folder>`, and told apart
   by the original's marker files (`datas_a2\spf\sphex.spr`, `cerceris`,
   `bousier`, `mante`). The current disc follows the `MONDE` rule (worlds
-  1..4 on discs 1..4, Tibet on whichever disc is in, 6 on disc 4); six
-  files differ between the discs, so a file is read from the current disc
-  first (`crates/atlantis2-data/src/files.rs`). The discs' long names are
+  1..4 on discs 1..4, 6 on disc 4, Tibet on the disc of the first drive
+  holding one); Native plays as one drive whose disc is changed when the
+  game asks, so Tibet keeps the disc already in. Six files differ between
+  the discs, so a file is read from the current disc first
+  (`crates/atlantis2-data/src/files.rs`). Other files missing from the
+  current disc come from another one, except the sounds of
+  `datas_a2\apc\`, read from the current disc only as the original
+  reads them: film 44 (chapter 27, disc 4) has its track on disc 2 only
+  and plays silent, as in the original; film 62 on the way back from
+  Shamballa (chapter 78, `monde=5` with disc 4 in) plays its track from
+  disc 4. The discs' long names are
   in their Joliet trees, which the disc-image reader now reads.
 - **Places:** `WAM V2.8` is a stream of tagged chunks (views, moves, 3D
   click zones with their corners, sounds, links, entities and their
@@ -926,18 +935,58 @@ back) into `yucatan-*.png`.
   original when no assembly frame was drawn before it (also not known).
 - **Turning:** the mouse adds dx / 2000 and −dy / 2000 radians to two
   speeds, which decay × 0.8 a frame; the limits stop the turn (`look.rs`).
-  The original's warp loop is unpaced; the port turns once per frame at
-  60 frames a second. The arrow keys stand for 8 mickeys a frame each (a
-  port convenience).
+  The port turns once per frame, at its 59.94 frames a second (below).
+  The arrow keys stand for 8 mickeys a frame each (a port convenience).
+- **Frame rate:** the original's frame task has no period, but in full
+  screen (its default) it shows each frame with `Flip(NULL, DDFLIP_WAIT)`
+  on a chain of one back buffer (@ 0x0058fdec, the chain made
+  @ 0x0058f86c..0x0058f8b2), a flip that waits for the vertical blank:
+  one pass per refresh of the screen, at the rate the display mode was
+  set to (`SetDisplayMode` with rate 0, the display's default,
+  @ 0x0058f81b..0x0058f82a). In a window it copies the frame with an
+  asynchronous blit and is not paced. The port runs its passes as on a
+  60 Hz screen at the VGA 640 x 480 timing: 800 x 525 pixels at
+  25.175 MHz, 16.683 ms a pass, 59.94 a second (`engine::PASS`; the
+  window's `FRAME`, the headless mode and the tests). The original on
+  another screen ran its per-frame quantities (the turns, the zooms, the
+  blinks, the puzzles' steps) at that screen's rate.
 - **Time:** as in the original, the frame dispatcher runs once per
   drawn frame (`Engine::pass`: the music's state machine, then the loop
   of the moment: panorama, video or dialog) and a 15 Hz task
   (`Engine::tick`, @ 0x0040caa0) paces the videos, the place animations,
-  the cursor, the music fades, the dialog's lines and the script clocks;
-  `Engine::set_clock` runs the ticks due at the scheduler's clock (a
-  stall of over a second drops the ticks missed). The window draws at 60
-  frames a second, the headless mode runs frames of 1/60 s. A move's turn is counted in frames, as in
-  the original (`engine.rs`).
+  the cursor, the music fades, the dialog's lines and the script clocks.
+  It runs as the original's scheduler runs it (@ 0x00584a00): due when
+  the pass's time is past its next time (strictly), at most once a pass,
+  its next time then the pass's time + its period, `1.0 / 15.0` kept as
+  a float (0.0666666701…, a little over 1/15 s; the sum under the x87
+  control word of the moment). There is no catch-up: a late pass delays
+  every later tick. So the task's rate depends on the passes': on the
+  port's 59.94 passes a second it is due every 4th pass (14.985 Hz); on
+  the original the scheduler's golden (`tests/golden/scheduler.txt`,
+  the game's own scheduler under emulation) gives every 4th or 5th pass
+  on a screen of exactly 60 Hz (the counter's rounding decides), every
+  5th at 72.8 Hz, every 5th or 6th at 75 Hz, every 6th at 85 Hz and
+  every 34th at 500 passes a second, 12.5 to 15 Hz. In a pass the frame
+  runs first and the 15 Hz task after it (the frame task's next time is
+  the previous pass's, earlier in the time-ordered queue; the golden's
+  frame task runs before the 15 Hz task in every pass):
+  `Engine::set_clock` finds whether the task is due and `Engine::pass`
+  runs it after the frame, so a click, a film's start or a dialog's
+  start handled in a frame sees the ticks of the passes before it, and a
+  tick's effects are drawn in the next pass. The window runs a pass at
+  the time it was due (as the original's passes keep the screen's pace),
+  not at the time its event came. A move's turn is counted in frames, as
+  in the original (`engine.rs`). While the window does not have the
+  focus the game is held, as the original's 15 Hz task (@ 0x0040caa5)
+  and frame dispatcher (@ 0x0049ce25) return at once unless its window
+  is active (FUN_0058ff10): no frame runs and the clock stands still (the
+  time away does not count, as the scheduler moves the task's last run
+  on while it returns). The sound differs, a port choice: the original
+  only stops hearing its DirectSound buffers (made without the global
+  focus flag), which play on unheard, so a voice, a film's track or the
+  music has moved on by the time away when the focus comes back; the
+  port's voices stand still while silent and play on from where they
+  were (`atlantis-app/src/a2.rs`, as for the options menu).
 - **Place animations:** the SPW files of `datas_a2\spw\` are banks of
   frames with up to six sprites each, one per cube face, in the first
   game's sprite rows and blend (`c + dst × (32 − f) / 32`), drawn into the
@@ -959,7 +1008,10 @@ back) into `yucatan-*.png`.
   the original does: each tick writes its slot's new frame into the
   script variable `FRAMECHEVAL` (@ 0x0047d84d) and a view entry starts a
   new slot of that id at it (@ 0x0047c764); neither tests the slot's
-  kind. A state that is not one animated frame (record +0x2c ≠ 1: only
+  kind. `ADDFRAMEOBJET=CHEVAL` past the slot's end zeroes the range
+  (record +0x20, +0x24) on the loaded WAM's state record itself
+  (@ 0x00483565..0x00483574), so it lasts until the next `changewam`:
+  view 27's horse plays its whole file at its next entries. A state that is not one animated frame (record +0x2c ≠ 1: only
   Ireland's puzzle pictures in the ported places) draws, instead of its
   current frame, the frames of its 128-byte list (signed bytes, in list
   order up to 0xfe, 0xff skipped; empty at load), which the puzzles' code
@@ -978,15 +1030,32 @@ back) into `yucatan-*.png`.
   from a full list of an earlier slot of the id, or frame −2 matching
   that end byte): the byte below the list into the matched entry and the
   end into that byte, @ 0x0047c979..0x0047c988 (no data reaches them).
-  State chains and the odd-tick flag are not ported (no Tibet or Irish
-  state uses them).
+  State chains are ported: a state whose WAM record names a next state
+  (+0x1c, `A1`) keeps that state's record when its slot is loaded
+  (FUN_004123b0: the entity's first state with that letter and number),
+  so the slot hands over when it ends, and after the view's loads each
+  such slot chains to the slot loaded from that record (FUN_0047c820 /
+  FUN_0047c850). The only chained states are Chac's animations 1 and 2 in
+  Xibalba's view 123 (both to animation 1): animation 1 loops on itself,
+  and after `playanimp=CHAC,2` animation 2 hands back to animation 1
+  instead of leaving the pond empty. Checked against the original's loads
+  and steps run under emulation, with chapter 37's commands on Chac
+  (`tests/xibalba.rs`, `golden/spw_chains.txt`). The odd-tick flag
+  (+0xc0) is ported with the pearl and dragon puzzle, its only writer
+  (the transparent cloud, @ 0x00494bed).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
-  `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
-  subjects already asked) and their tables for RGB565, the last row and
+  the sprite library's `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
+  subjects already asked, the bag bar's and the canoe's pointed tile) and
+  their tables for RGB565, the last row and
   column of the screen never drawn; the one bank with a 0x400-byte
   (B, G, R, x) colour table, `Ponpirog.SPR`, converted as the DLL does
-  for RGB565) at the screen centre: 1..12 over a move zone, 25..39 over
+  for RGB565; the library is the one the original loads on a Pentium II,
+  `spr_p6.dll` (@ 0x0059cb93: CPUID family 6), whose 50 % shade runs are
+  `shade(dst, f)` and `half(dst)` where `spr_p5.dll`'s, a Pentium's or
+  an AMD K6's, are `shade(dst, f >> 1)` and `half(dst) +
+  half(half(dst))`; `Engine::spr_dll` chooses `spr_p5.dll`'s) at the
+  screen centre: 1..12 over a move zone, 25..39 over
   another zone (none from type 1000 on), 13..24 or 25..39 over a
   clickable object or character, one frame on per tick, chosen after the
   frame is drawn so it shows on the next one. The object in hand (its
@@ -1694,7 +1763,7 @@ back) into `yucatan-*.png`.
   ball, China with its ball on the way back, Yucatán with its ball, the
   fourth first trip making the crystals, Xibalba, the six mandalas laid,
   Shamballa, Rhea, the ring, Atlantis, the hub's last trip; about 4
-  minutes in release, 161 717 passes of 1/60 s): every chapter the game
+  minutes in release, 160 027 passes of 16.68 ms): every chapter the game
   goes through is left by one of its own `chapter=` lines (Atlantis's 82
   by the octopus fight's two ends), every puzzle function a player
   reaches runs, no hook is noted as not ported and no world refused, and
@@ -1751,9 +1820,10 @@ back) into `yucatan-*.png`.
   the three vertex records: the texture coordinates are what the last
   polygon left) and the rasteriser of the CPU type (the heads'), the x87
   control word as the frame leaves it. `tests/canoe.rs` replays the
-  original's emulated frames (`tests/golden/canoe_0e7f.txt`, the Pentium
-  II's routines under 0x0e7f, and `canoe_027f.txt`, the C ones under
-  0x027f): the loading's values (the init's command, cursor and control
+  original's emulated frames (`tests/golden/canoe_0e7f_p6.txt`, the
+  Pentium II's routines under 0x0e7f with `spr_p6.dll`, `canoe_0e7f.txt`
+  the same with `spr_p5.dll`, and `canoe_027f.txt`, the C ones under
+  0x027f with `spr_p5.dll`): the loading's values (the init's command, cursor and control
   word, the camera's fields the port keeps; the waypoints by the MD5 of
   their table, the stones' and the slots' nodes by an MD5 each, so that
   the files hold no game data), then for each of 1797 frames the state,
@@ -1764,9 +1834,9 @@ back) into `yucatan-*.png`.
   waypoints. At 800 x 600 the canoe draws on the
   640 x 480 surface, enlarged; with the HD mode on its frames are the
   original's and no HD layer is made (the front end enlarges the frame).
-  Not known: whether the original's `spr_p6.dll`, which a Pentium Pro /
-  II loads, draws the pointed tile's 50 % as `spr_p5.dll` does (an
-  emulation with it gives darker pixels there; the port draws P5's); the
+  The pointed tile at 50 % is drawn as `spr_p6.dll` draws it, the
+  library a Pentium II loads (the reference run), or as `spr_p5.dll`
+  does (its own run, both bit for bit). Not known: the
   held tile's depth written outside the 640 x 480 buffer (the original
   writes past its allocation near the screen's edges; the port drops
   those writes); the stale texture coordinates after other 3D drawing
@@ -2037,17 +2107,18 @@ back) into `yucatan-*.png`.
   one (above 0) with `(NewSound=%03d)` of 205 + the new count, and at
   five `FINPERLE` = 1 and `PERLE_TROU` shown; while fewer than five are
   raised the next round starts. **Timing**: the step and the 30-frame
-  transparency count warp frames, which the original does not pace (the
-  port: 60 a second, half a second of transparency); the dragon's frames
-  move with the 15 Hz step of the place animations. So a dragon woken by
-  a click whose next two warp frames see no 15 Hz step is stopped on
-  frame 50 at once, without its flight (at 60 frames a second, one click
-  in two; the rounds that start by themselves have three frames), as the
-  original at any frame rate above 30 [CONFIRMED-EMULATED]; the flight
-  gives no hint of the side anyway (one animation for both). Unknown:
-  the original's warp frame rate on the machines of its time, so how
-  often its players saw the flight skipped (to settle: time
-  `AtlWarp_continue` in the Win98 VM). The slots
+  transparency count warp frames, which only the screen's refresh paces
+  in the original (one a refresh in full screen; the port: 59.94 a
+  second, half a second of transparency); the dragon's frames move with
+  the 15 Hz step of the place animations. So a dragon woken by a click
+  whose next two warp frames see no 15 Hz step is stopped on frame 50 at
+  once, without its flight (at the port's rate, a tick every 4th pass,
+  one click in two; the rounds that start by themselves have three
+  frames), as the original at any frame rate above 30
+  [CONFIRMED-EMULATED]; the flight gives no hint of the side anyway (one
+  animation for both). Unknown: whether the machines of its time drew
+  view 31 within a refresh, so how often its players saw the flight
+  skipped (to settle: time `AtlWarp_continue` in the Win98 VM). The slots
   now have the original's playing byte (+0xbc, 1 at load: the 15 Hz step
   moves only the active slots that play) and the blink word (+0xc0, 0 at
   load). Not ported: an index kept from view 31 that names no slot of
@@ -2314,9 +2385,19 @@ back) into `yucatan-*.png`.
   the bottom 80 rows on cell x / 80 puts its object in the hand and the
   cursor, sets `OBJETENMAIN`, stops the turn, uses the click and closes
   the bar. While the bar is open the centre draws nothing, the cursor is
-  not chosen, a click takes no object, moves nowhere and runs no click
-  scan (a sprite of click kind 3 or 4 still sets `CLICOBJET` /
-  `CLICPERSO`). The object in hand is drawn at the screen centre under the
+  not chosen, no sprite under the centre is recorded (FUN_0045b040 @
+  0x0045b0cd), so a click takes no object, sets neither `CLICOBJET` nor
+  `CLICPERSO`, moves nowhere and runs no click scan; and the warp frame
+  runs neither the mouse look nor a move's turn step nor the zone pick
+  under the centre (`AtlWarp_continue` @ 0x0045a3b0..0x0045a3ea, also
+  while the subject menu, a dialog or a full-screen overlay is open): a
+  move's turn waits under the open bar and goes on when it closes
+  (`tests/ui_fixes.rs`, against the original run under emulation). The
+  zone under the centre is still picked on every mouse move: the motion
+  callback (@ 0x0040c420, its end @ 0x0040c4df) picks it in every loop
+  type whatever is open, so after a view entry under the bar it follows
+  the camera at the next move.
+  `cinema=` closes the bar (its flag only, @ 0x00481d4e). The object in hand is drawn at the screen centre under the
   cursor (hand bank set and frame ≥ 0, frame 0 included), and right after
   a take or a pick the cursor shows the object too until the next cursor
   choice. The world change empties the hand pair but keeps `OBJETENMAIN`;
@@ -2433,7 +2514,16 @@ back) into `yucatan-*.png`.
   only Irish place with sources (8 sources, 33 views); Tibet's two
   transition videos have no sound track. A film's track (`cineNNN.apc`) plays on voice 2 at the
   effects volume from the film's first frame and stops with it; after a
-  film the next panorama frame asks for the music at 100 %.
+  film the next panorama frame asks for the music at 100 %, unless a new
+  music starts first (a `startmusik` right after the film: the old music
+  fades out without swelling back first). Voice 2 is the video's only
+  when its track loaded, or for a move's `TrajSound` (even one that does
+  not load): only then does the video's end stop voice 2, so a
+  `NEWSOUND` still playing goes on through a film without a track (18,
+  33, 60, 67) or a move without a `TrajSound`. A video that does not
+  open keeps the loaded track for the next one. Compared with the
+  original's own functions under emulation
+  (`tests/golden/sound_glue.txt`, `tests/sound_glue.rs`).
 - **Music** (`music.rs`, the player's states in `engine/host.rs`):
   `startmusik` draws a track from its list as the original does (one
   entry; two, the other one in 85 % of the draws when the current music
@@ -2470,9 +2560,12 @@ back) into `yucatan-*.png`.
   first fades out; a new one starts at the music volume (14 in a dialog);
   `stopmusik` fades out and stops; the films (20 %) and the dialogs
   (16 %) duck it with the fade machine of the dialogs (127 units a
-  second). The files are read from the discs (the install's `music\`
-  copies are empty until `LOADMUSIK`, which, like `delmusik`, does
-  nothing here). Every track decoded from its start and from each of the
+  second). The files are read from the discs: the original plays
+  hard-disk copies (the install's `music\` files are empty) that
+  `LOADMUSIK`, or a music started whose copy is empty, makes from the
+  disc in the drive under the "please wait" page; the port copies
+  nothing but keeps which copies the original would hold and shows the
+  page where it copies (Menus, below). Every track decoded from its start and from each of the
   83 marks, the random marks and the list choices are the original's
   (tests/music.rs). Known differences: the music player shares the C
   runtime's `rand` with the dialogs and the blackbird songs, which the
@@ -2571,8 +2664,29 @@ back) into `yucatan-*.png`.
   sequencer alone (no click, no camera change; its end is ignored), then
   its draw over the frame, the dialog removed when the film ends (FUN_0040c030;
   what the dialog step draws there is the dialog frame's own rule, no
-  Tibet film has one). Not there yet: the `voixoff0` and `cinema` lines'
-  pictures. The lines, the
+  Tibet film has one). Each frame of the dialog loop (the dispatcher's
+  loop type 2 and FUN_00480840) does what the current line's kind asks:
+  a head line and a `voixoff` line (which first turns with the mouse,
+  FUN_0040c6a0) draw the panorama as the warp does (FUN_0045a930: the
+  place animations drawn and stepped on the 15 Hz ticks, so the place's
+  characters, water and fire go on moving, and the web in its mode), then
+  the dialog frame; a `voixoff0` line (Liam's off-screen lines in Ireland,
+  the spider's and Tezcat's in Yucatán and Xibalba) draws the same
+  panorama, then the dowsing rod and the overlays (FUN_00475320), then its
+  subtitle, so the hero's head of a previous line does not stay on screen;
+  a `cinema` line (only in the dialogs over films) draws its subtitle
+  alone; no line, nothing. Checked against the dispatcher run under
+  emulation with the line kind given (`golden/dialog_loop.txt`,
+  `tests/common/dialog_loop.rs`, on lines of the four kinds: Tibet's
+  dialog 360, Ireland's 1, 56, 44 and 71, Xibalba's 190): the panorama,
+  its step and the turn, and the dowsing rod and the ring drawn (the rod
+  stepped) under the dialog frame for a `voixoff0` line only. The
+  dialog's end sets the previous loop type back, and that resets the warp
+  camera (FUN_00402960: the screen's centre and 76°), whatever field of
+  view the last line had: the panorama is not left zoomed in after a
+  dialog (asserted after every dialog of the Tibet, Irish, Chinese,
+  Yucatán, Xibalba and endgame tests, against the camera the original's
+  code leaves under emulation). The lines, the
   video frames and their numbers, the composed frames, every subtitle's
   layout and the fades are the original's (tests/dialogs.rs).
 - **Scripts:** the chapter scripts `scenar\chapiNNN.con` keep the first
@@ -2627,8 +2741,11 @@ back) into `yucatan-*.png`.
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
-  credits), `ZoomPsychoStart` (the zoom with its roll). No-ops, logged: `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
-  read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
+  credits), `ZoomPsychoStart` (the zoom with its roll). `LOADMUSIK` and `delmusik` keep which music copies the original would
+  hold and show the "please wait" page for a copy, the section waiting
+  for its end (Menus, below); `monde` asks for the world's disc (the CD
+  page when it was not found). No-ops, logged: `CHANGECD` (it answers
+  that the disc is there; no shipped script uses it), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. `ANIM_THE_FRAME`
   sets the playing byte of the first record of its id, of any kind
   (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
@@ -2664,12 +2781,25 @@ back) into `yucatan-*.png`.
   ticks in a box, centred on it in white over black. Each frame the
   widgets are asked in order and the first action wins; the state machine
   then slides the main page's panels (1 + 2 + ... pixels a frame: 30
-  frames for the options and the disc, 40 for the sound), asks its
+  frames for the options and the disc, 40 for the sound; the disc
+  panel's load and save icons are shown, disabled, from the slide's first
+  frame and enabled at its end), asks its
   questions in the yes / no box (save, erase, quit), opens the pages, and
   sets the options (subtitles, centre marker, inverted mouse, the screen
   size: 640 x 480 or 800 x 600, kept in `atlant2.cfg`, below) and the volumes (general = slider × 256, music = music slider
-  × general slider × 127 + 0.5, effects and dialogs × 127, truncated).
+  × general slider × 127 + 0.5, effects and dialogs × 127, truncated);
+  at each opening the sliders start at general × 1/256, music ×
+  0.007874016 / general (0 when general is 0), effects and dialogs ×
+  0.007874016 (floats, under the control word; the whole table checked
+  against the original's, `tests/ui_fixes.rs`).
   Escape closes the main menu opened from the game (not the player menu).
+  A menu keeps the panorama's turn speeds: only the panorama frame
+  decays them, and the original's motion callback adds every mouse move
+  to them in every loop type, so a move of the pointer in the menu
+  swings the view when it closes (the port adds the system pointer's
+  moves in screen pixels, the original the mouse's counts). The
+  button-held flag that keeps the animated buttons still is set by every
+  press and cleared by every release, in every loop type.
   The cursor is `curseur.spr` at the mouse; the window then lets the
   pointer go and draws the game's own. Quitting shows the credits, as
   does the scripts' `CREDITS` (`crates/atlantis2-engine/src/credits.rs`,
@@ -2698,10 +2828,35 @@ back) into `yucatan-*.png`.
   original). A 24-bit picture would be copied unchanged (checked on
   synthetic files; the shipped ones are 16-bit). Their texts are drawn
   with the game's TrueType font as the subtitles are (the original's are GDI's: a few pixels of each glyph
-  differ). Built but not opened by the
-  game: the disc request (every disc is read where it is), "please wait",
-  "disk full" and "write error" (the original opens them only while
-  `LOADMUSIK` copies music, which the port does not do). Not known, and
+  differ). The media pages (`engine/media.rs`): "please wait" is the
+  original's music copy (`CopyMusikToDrive` @ 0x00479480: each music of
+  the list whose hard-disk copy is empty is copied from the current disc,
+  0x40000 bytes at a time with a frame of the page after each read and
+  each write; one not on the disc is not copied). The port copies
+  nothing; it keeps which copies the original would hold
+  (`music_copies.txt` beside the saves, from session to session, as the
+  original's files, the first session starting from the install's empty
+  ones; `delmusik` deletes them; without a data folder, in the tests and
+  tools, every copy is taken as made until a `delmusik`) and shows the page for the
+  frames the original draws, two per block of the `.apc` (46 for
+  `muzik30` at a new game): the time a real drive takes over each block
+  is not modelled. The game is held meanwhile, as the original's copy
+  loop runs nothing else: the section that ran `LOADMUSIK` or the
+  `startmusik` (or the load) waits for the page's end, no 15 Hz tick
+  runs (the copy loop calls no scheduler: the scheduler's pass that
+  started it goes on after its last frame, a tick due in that pass runs
+  then and the next one is counted from that pass's time, so it is due
+  in the first pass after the page), the music machine runs once a frame (the menu frame's call), and
+  the mouse's and the keys' events wait until the end (DirectInput's
+  buffer). Checked against the original's copy under emulation
+  (`tests/ui_fixes.rs`). The CD page (FUN_0040dff0) asks for a world's
+  disc no drive holds; the port reads every disc it found as if each
+  were in a drive of its own, so it asks only for a disc that was not
+  found, polls the folders the discs were looked for in every 101 ticks
+  (state 9: `100 < ticks − start`) and goes on when the disc is there.
+  "Disk full" and "write error" (FUN_00486c60, FUN_00486d10) are opened
+  only by the copy, when the free space is short or a block's read or
+  write is short; the port writes no copy, so they never open. Not known, and
   chosen here: whether the page title (line 0 of each section) is drawn
   (it is not). At 800 x 600 the pages are drawn at 640 x 480 and
   enlarged, as in the original (below). The list's date and
@@ -2738,17 +2893,13 @@ back) into `yucatan-*.png`.
   800 x 600 the panorama, drawn on the 640 x 480 surface, is 1.25 times
   narrower than at 640 x 480: the original's way (the head, in its own
   640 x 480 viewport, is the same). At 800 wide the menus' dimmed backdrop
-  is black (`FUN_00470430`). Each mode change sets the camera again
+  is black (`FUN_00470430`). Each loop type change sets the camera again
   (centre, 76° for the size drawn, under the x87 control word of the
-  moment). The original does this at 640 x 480 too, at every loop type
-  change (`FUN_00402960`); the port does it only at 800 x 600 (and when
-  the size changes), so that the 640 x 480 game stays as it was. The two
-  differ only if a loop type change finds the camera with another centre
-  or field of view: after a dialog that ends on another speaker's line
-  with a `[Focale]` field of view (the end, @ 0x004808a0, sets 76° again
-  only after a hero's line), when the panorama follows in the same view
-  (a new view sets 76°). Not checked yet against the original: a
-  possible difference. The surface changes between passes (a change in the
+  moment), at 640 x 480 too, as the original does on every path of
+  `FUN_00402960`: after a dialog that ends on a line with a `[Focale]`
+  field of view, the panorama is back at 76° (checked against the
+  camera the original leaves under emulation, `golden/dialog_loop.txt`).
+  The surface changes between passes (a change in the
   middle of a pass takes effect at the next one; a film started by a
   panorama frame has its first frame enlarged at once). The window
   scales the 800 x 600 picture as it scales the 640 x 480 one, and a
@@ -2805,8 +2956,10 @@ back) into `yucatan-*.png`.
   `baton.spr` loaded again when shown), chapters 39, 46 and 83 run their
   `/INIT` again. The skull's state (entry 30), the ogham stones' bytes
   (entry 31) and Brigid's cross (entry 32, which the engine reads and
-  writes in place) are the engine's; the other worlds' puzzles (entries
-  20..29) and the rod's entry 15 (@ 0x006d84f4, role not read) are kept
+  writes in place) are the engine's, and so is the spider web's stage
+  (entry 27, @ 0x005e1340, initial 3: saved from the web's state and set
+  back before the web's load hook tests it); the other worlds' puzzles
+  (entries 20..26, 28, 29) and the rod's entry 15 (@ 0x006d84f4, role not read) are kept
   as the bytes of the last load until their studies are ported (the
   blackbird songs have no entry: their mode is not saved); the dialog flag is written from the
   running dialog and not read back (a save made from the menus has no
@@ -2866,7 +3019,8 @@ script results and save files come from the original `atlantis2.exe` run under e
 (Tibet's moves pass by pass, the place animations tick by tick, the
 screen centre and the clicks on sprites pass by pass with the texel under
 the centre given, every SPW frame of Tibet and the first of every other
-file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks, the
+file, every `AFF_SPR` and `AFF_SPRTRS50` of the installed banks with
+`spr_p5.dll` and `spr_p6.dll`, the
 subject menu's cells and click grid, the shaman's subjects along chapter
 75, every `/set` line of Ireland's, Yucatán's and China's chapters
 through the handler, the special events, the zoom of a move,

@@ -3,7 +3,7 @@
 //! the move's turn, the transition video, the arrival, a second move).
 //!
 //! Usage: `tibet_tour <install dir> <discs dir> <out dir>`; writes
-//! `tibet-*.png` and `tibet-sequence.txt` into the out dir. 60 passes a
+//! `tibet-*.png` and `tibet-sequence.txt` into the out dir. 59.94 passes a
 //! second, a 15 Hz tick every fourth pass, `rand` seeded with 1000.
 
 use std::fmt::Write as _;
@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 use atlantis2_data::A2Files;
 use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
@@ -102,7 +103,7 @@ fn step(e: &mut Engine, screen: &mut [u16], log: &mut String, pass: &mut u64, wh
         let _ = writeln!(
             log,
             "{:7.3} s pass {:4} tick {:3} view {:2} {} yaw {y:8.3} pitch {p:7.3} zone {:2}{}{}",
-            *pass as f64 / 60.0,
+            *pass as f64 * PASS,
             *pass,
             e.ticks,
             e.place().1,
@@ -146,7 +147,7 @@ fn main() {
     let mut shots = 0;
     let _ = writeln!(
         log,
-        "new game: tibet.wam view 2 at (-90, 0); 60 passes a second"
+        "new game: tibet.wam view 2 at (-90, 0); 59.94 passes a second"
     );
     for _ in 0..30 {
         step(&mut e, &mut screen, &mut log, &mut pass, "");
@@ -166,7 +167,7 @@ fn main() {
         );
     }
     assert_eq!(e.centre_index(), 0, "zone 0 (to view 3) under the centre");
-    e.click(pass as f64 / 60.0);
+    e.click(pass as f64 * PASS);
     let mut turned = false;
     for _ in 0..600 {
         if e.place().1 != 2 {
@@ -196,7 +197,7 @@ fn main() {
     // Zone 1 of view 3 (to view 4) is under the centre: a click, a short
     // turn to its aim, no video on the discs, a cut.
     assert_eq!(e.centre_index(), 1, "zone 1 (to view 4) under the centre");
-    e.click(pass as f64 / 60.0);
+    e.click(pass as f64 * PASS);
     for _ in 0..600 {
         if e.place().1 != 3 {
             break;

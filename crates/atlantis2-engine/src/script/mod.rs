@@ -182,6 +182,9 @@ pub struct Script {
     /// [`Script::resume_at`] (@ 0x006d0574).
     pub resume_pending: bool,
     pub resume_at: usize,
+    /// The section waits for a music copy's please-wait page
+    /// ([`Script::copy_ended`]).
+    pub copy_waiting: bool,
     /// A `RunOneCommand` is running (@ 0x006d169a): no resume point then.
     in_command: bool,
     /// `RunOneCommand_AfterDisplay` (@ 0x00481790): a command for the next
@@ -230,12 +233,12 @@ pub struct Script {
     pub wam: Vec<u8>,
     pub music: Vec<u8>,
     /// A click to handle (@ 0x006569c9), its companion (@ 0x006569a0), a
-    /// double click (@ 0x006569cb), the space-travel overlay (@ 0x00671ef0)
-    /// and the cinematic being started (@ 0x006d168c).
+    /// double click (@ 0x006569cb) and the cinematic being started
+    /// (@ 0x006d168c). The bag bar's flag (@ 0x00671ef0), which `cinema=`
+    /// also clears, is the host's ([`Host::close_bar`]).
     pub click: bool,
     pub click_aux: i32,
     pub double_click: bool,
-    pub overlay: bool,
     pub cinema_starting: bool,
     /// The x87 control word the script's float code runs under.
     pub fpu: Fpu,
@@ -293,6 +296,7 @@ impl Script {
             init_skip: false,
             resume_pending: false,
             resume_at: 0,
+            copy_waiting: false,
             in_command: false,
             queued: None,
             section_number: 0,
@@ -321,7 +325,6 @@ impl Script {
             click: false,
             click_aux: 0,
             double_click: false,
-            overlay: false,
             cinema_starting: false,
             fpu: Fpu::Double,
             ticks: 0,

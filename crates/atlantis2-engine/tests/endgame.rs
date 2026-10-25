@@ -20,11 +20,15 @@ use std::path::PathBuf;
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 use atlantis2_data::A2Files;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{
     atlantis_entry_hooks, shamballa_click_hooks, FIREFLIES_CLICK, FIREFLIES_MOVE_END,
     OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
 };
 use atlantis2_engine::{Engine, EngineError, Event, Fpu, LoopType, Variant};
+
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
 
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
@@ -225,16 +229,17 @@ fn warp_fov(e: &Engine) -> [f32; 4] {
     atlantis2_engine::Camera::new(e.fpu(), 640, 480).projection()
 }
 
-/// Passes run (a 15 Hz tick every fourth) until the music streamed is
-/// `music`: the switch fades the music before.
+/// Passes run at 60 a second on the clock (its 15 Hz ticks with them)
+/// until the music streamed is `music`: the switch fades the music out
+/// first, at 127 volume units a second.
 fn music_reaches(e: &mut Engine, music: i32) -> bool {
-    for n in 0..1200 {
+    let mut t = e.clock();
+    for _ in 0..1200 {
         if e.music_playing() == Some(music) {
             return true;
         }
-        if n % 4 == 0 {
-            e.tick();
-        }
+        t += PASS;
+        e.set_clock(t);
         e.pass(None);
     }
     false
@@ -617,8 +622,14 @@ fn the_vortex_leads_back_or_on() {
     run_until(&mut e, |e| e.place().0 == "tibet.wam");
     assert_eq!(e.place(), ("tibet.wam", 10));
     assert_eq!(e.script_state().unwrap().chapter, 75);
-    assert_eq!((var(&e, "MONDE"), e.files().current_disc()), (5, 1));
+    // Tibet keeps the disc in the drive (FUN_0040e0e0): film 62's track
+    // is read from disc 4, where it is.
+    assert_eq!((var(&e, "MONDE"), e.files().current_disc()), (5, 4));
     assert_eq!(films(&e.events), [62]);
+    assert!(e
+        .events
+        .iter()
+        .any(|ev| matches!(ev, Event::Sound(s) if s.eq_ignore_ascii_case("cine062.apc"))));
     let lines = set_lines(&e.events);
     assert!((19..=32).all(|l| lines.contains(&(78, l))), "{lines:?}");
     lines_as_the_original(&lines);
@@ -928,7 +939,7 @@ fn the_octopus_s_two_ends() {
     run_until(&mut e, |e| e.place().0 == "tibet.wam");
     assert_eq!(e.place(), ("tibet.wam", 7));
     assert_eq!(e.script_state().unwrap().chapter, 75);
-    assert_eq!((var(&e, "MONDE"), e.files().current_disc()), (5, 1));
+    assert_eq!((var(&e, "MONDE"), e.files().current_disc()), (5, 4));
     assert_eq!(films(&e.events), [65]);
     assert_eq!(dialogs(&e.events), [372]);
     assert_eq!((flag(&e, 260), flag(&e, 261)), (1, 1));
@@ -1166,7 +1177,7 @@ fn the_end_of_the_game() {
         // The credits page, then its end.
         let c0 = e.clock();
         for n in 0..20_000 {
-            e.set_clock(c0 + f64::from(n) / 60.0);
+            e.set_clock(c0 + f64::from(n) * PASS);
             if click_in_the_credits && n == 600 {
                 e.click(c0 + 1000.0);
             }
@@ -1272,6 +1283,8 @@ fn every_endgame_dialog_plays() {
             }
         }
         assert!(ended, "dialog {n} does not end");
+        // The panorama back at 76° (FUN_00402960 at the end).
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
         lines += e
             .events
             .iter()

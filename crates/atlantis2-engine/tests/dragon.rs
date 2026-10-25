@@ -29,6 +29,7 @@ use atlantis2_data::wam::{EntityState, Zone};
 use atlantis2_data::{A2Files, Folder};
 
 use atlantis2_engine::anim::Anim;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{chinese_entry_hooks, Dragon};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -1177,7 +1178,7 @@ fn view_31_is_drawn_as_the_original_with_the_blink() {
     same(&got, &golden);
 }
 
-/// The engine at 60 passes a second, the 15 Hz ticks run by its clock,
+/// The engine at 59.94 passes a second ([`PASS`]), the 15 Hz ticks run by its clock,
 /// every pass drawn; the mouse as a player moves it.
 struct Run {
     e: Engine,
@@ -1190,7 +1191,7 @@ struct Run {
 
 impl Run {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {
@@ -1406,15 +1407,21 @@ fn the_pearl_played_with_the_mouse_to_the_mechanism_and_chapter_59() {
     // The clouds before the dragon is woken: nothing.
     r.click_zone("CLIC_NUAGE_GAUCHE");
     assert_eq!(r.var("Time_nuage_transparent"), 0);
-    // The dragon: the first round, 'A' hidden.
+    // The dragon: the first round, 'A' hidden, clicked on the pass after
+    // a 15 Hz step.
+    let ticks = r.e.ticks;
+    while r.e.ticks == ticks {
+        r.wait(1);
+    }
     let evs = r.click_zone("CLIC_DRAGON");
     assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_4600
     }));
     assert_eq!(r.var("Perle_cachee"), 0x41);
-    // At 60 passes a second no 15 Hz step fell in the two passes after
-    // this click: the dragon is stopped on frame 50 at once, without its
-    // flight (the original's race, `engine/dragon.rs`).
+    // No 15 Hz step falls in the two passes after this click (the click's
+    // frame takes the last tick's step, the next tick runs 4 passes after
+    // it, after the frame): the dragon is stopped on frame 50 at
+    // once, without its flight (the original's race, `engine/dragon.rs`).
     let (_, flew) = r.until_still();
     assert!(!flew);
     // The rounds: 'A' left, 'B' right, after the sequence ABBAB; the

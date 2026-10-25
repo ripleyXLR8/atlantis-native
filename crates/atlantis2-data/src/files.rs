@@ -16,9 +16,13 @@
 //! The four discs share 260 paths, 254 of them byte for byte; six differ
 //! between discs, so a file under `datas_a2\` is read from the disc the
 //! original would read: the current one, chosen by the `MONDE` rule
-//! ([`A2Files::set_monde`]). A port with every disc at hand needs no disc
+//! ([`A2Files::set_monde`]) as on a single drive, the disc asked for
+//! inserted when asked. A port with every disc at hand needs no disc
 //! prompt; a file missing from the current disc is read from another disc
 //! that has it (the original would fail to open it), and logged.
+//! [`A2Files::read_current`] reads as the original does, for the files
+//! whose absence the game shows: the sounds (film 44's track is on disc 2,
+//! the film on disc 4, so the original plays it silent).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -138,6 +142,9 @@ pub struct A2Files {
     discs: Vec<Disc>,
     /// The current disc (@ 0x00656a88), 0 when there is none.
     current: u8,
+    /// The folders the discs were looked for in ([`A2Files::open_dir`]),
+    /// looked in again by [`A2Files::refresh_discs`].
+    roots: Vec<PathBuf>,
 }
 
 /// Why a game folder does not open.
@@ -201,6 +208,7 @@ impl A2Files {
             install,
             discs,
             current,
+            roots: Vec::new(),
         }
     }
 
@@ -216,15 +224,41 @@ impl A2Files {
             .read("atlantis2.exe")
             .ok_or(OpenError::NoExecutable)?;
         let build = identify(&exe).map_err(OpenError::Exe)?;
-        let mut candidates = disc_candidates(dir);
-        for d in disc_dirs {
-            candidates.extend(disc_candidates(d));
-        }
-        let files = A2Files::new(install, candidates);
+        let roots: Vec<PathBuf> = std::iter::once(dir.to_path_buf())
+            .chain(disc_dirs.iter().cloned())
+            .collect();
+        let candidates = roots.iter().flat_map(|d| disc_candidates(d));
+        let mut files = A2Files::new(install, candidates);
         if files.discs.is_empty() {
             return Err(OpenError::NoDisc);
         }
+        files.roots = roots;
         Ok((files, build))
+    }
+
+    /// The folders of [`A2Files::open_dir`] looked in again for discs
+    /// that were not there (a disc image added while the game asks for
+    /// it, the CD page's poll FUN_0040e090). The discs already found are
+    /// kept. True when a disc was added.
+    pub fn refresh_discs(&mut self) -> bool {
+        let mut added = false;
+        for root in self.roots.clone() {
+            for (origin, source) in disc_candidates(&root) {
+                let number = disc_number(source.as_ref());
+                if number == 0 || self.discs.iter().any(|d| d.number == number) {
+                    continue;
+                }
+                log::info!("disc {number}: {origin}");
+                self.discs.push(Disc {
+                    number,
+                    source,
+                    origin,
+                });
+                added = true;
+            }
+        }
+        self.discs.sort_by_key(|d| d.number);
+        added
     }
 
     /// The install folder.
@@ -252,16 +286,16 @@ impl A2Files {
 
     /// `/set(monde=N)` (@ 0x00484df0): the disc of world N becomes the
     /// current one. 1..4 (Ireland, Yucatán, China, Shamballa) are discs
-    /// 1..4; 5 (Tibet) is whichever disc is in the drive, here the
-    /// lowest-numbered one found (the first drive holding a disc,
-    /// @ 0x0040e0e0); 6 (the Yucatán texts of the last disc) is disc 4;
-    /// any other value leaves the disc unchanged. Returns the disc wanted,
-    /// which stays the current one even when it was not found (its files
-    /// then come from the others).
+    /// 1..4; 6 (the Yucatán texts of the last disc) is disc 4; any other
+    /// value leaves the disc unchanged. 5 (Tibet) takes the disc of the
+    /// first drive holding one (@ 0x0040e0e0), whatever its number: with
+    /// one drive, the disc already in it, so the current disc stays (after
+    /// Shamballa, film 62's track is read from disc 4). Returns the disc
+    /// wanted, which stays the current one even when it was not found (its
+    /// files then come from the others).
     pub fn set_monde(&mut self, monde: i32) -> u8 {
         let wanted = match monde {
             1..=4 => monde as u8,
-            5 => self.discs.first().map_or(self.current, |d| d.number),
             6 => 4,
             _ => self.current,
         };
@@ -315,6 +349,26 @@ impl A2Files {
     pub fn read_with_disc(&self, folder: Folder, name: &str) -> Option<(Vec<u8>, u8)> {
         let (src, path, disc) = self.locate(folder, name)?;
         src.read(&path).map(|d| (d, disc))
+    }
+
+    /// The size of a CD file on disc `n` only.
+    pub fn size_on_disc(&self, n: u8, folder: Folder, name: &str) -> Option<u64> {
+        let disc = self.discs.iter().find(|d| d.number == n)?;
+        disc.source.size(&folder.path(name))
+    }
+
+    /// A file as the original opens it: a CD file from the current disc
+    /// only, `None` when that disc does not have it even if another one
+    /// does (the original builds the path on the root of the CD in the
+    /// drive). When the current disc was not found the others are read,
+    /// as [`A2Files::read`] does (the original would ask for the disc).
+    pub fn read_current(&self, folder: Folder, name: &str) -> Option<Vec<u8>> {
+        if folder.location().0 == Root::Cd {
+            if let Some(d) = self.discs.iter().find(|d| d.number == self.current) {
+                return d.source.read(&folder.path(name));
+            }
+        }
+        self.read(folder, name)
     }
 
     /// A CD file from disc `n` only.
@@ -435,9 +489,10 @@ mod tests {
             files.read_with_disc(Folder::Warp, "b.hnm"),
             Some((b"four".to_vec(), 4))
         );
-        // Tibet: the first disc; 6: disc 4; others: unchanged.
-        assert_eq!(files.set_monde(5), 2);
+        // Tibet: the disc in the drive; 6: disc 4; others: unchanged.
+        assert_eq!(files.set_monde(5), 3);
         assert_eq!(files.set_monde(6), 4);
+        assert_eq!(files.set_monde(5), 4);
         assert_eq!(files.set_monde(0), 4);
         assert_eq!(files.set_monde(7), 4);
         // A disc that is not there stays wanted; files come from the others.

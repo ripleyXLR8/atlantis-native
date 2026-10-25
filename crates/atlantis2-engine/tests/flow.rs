@@ -52,6 +52,7 @@ use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
 use atlantis2_engine::bag::{UiBank, UiDraw, FORM_FRAMES};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{
     FIREFLY_MANDALA, MANDALAS, OCTOPUS_ENTRY, OCTOPUS_MODE, STAR_HOLES,
 };
@@ -86,7 +87,7 @@ fn time() -> SystemTime {
     }
 }
 
-/// The engine at 60 passes a second, every pass drawn.
+/// The engine at 59.94 passes a second ([`PASS`]), every pass drawn.
 struct Run {
     e: Engine,
     pass: u64,
@@ -135,10 +136,20 @@ impl Run {
     }
 
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {
+        self.one_pass();
+        // The music copies' please-wait pages (`engine/media.rs`: a new
+        // game, the departures from Tibet) hold the game: gone through
+        // within the step.
+        while self.e.copying() {
+            self.one_pass();
+        }
+    }
+
+    fn one_pass(&mut self) {
         self.e.set_clock(self.now());
         self.e.pass(Some(&mut self.screen));
         self.e.voices().fill(&mut self.audio, 22050, 2);
@@ -365,12 +376,30 @@ fn player_menu_new_game_bag_save_and_load() {
     assert_eq!(*sprites.last().unwrap(), (UiBank::Interface, 40, 320, 240));
     assert_eq!(r.e.bar.shown.len(), 1);
 
-    // Escape over the open bar: the main menu, the save.
-    let before = r.state();
+    // Escape over the open bar: the main menu, the save. (The state the
+    // load gives back is the save's, taken at the press of YES: the 15 Hz
+    // clocks go on in the menu.)
     let want = r.e.save_data();
     r.disc_panel();
     r.press_widget("a_save.spr");
-    r.press_widget("b_oui.spr");
+    let w =
+        r.e.menu()
+            .unwrap()
+            .page
+            .as_ref()
+            .unwrap()
+            .widget("b_oui.spr")
+            .unwrap();
+    let (x, y) = (
+        (w.hit.left + w.hit.right) / 2,
+        (w.hit.top + w.hit.bottom) / 2,
+    );
+    r.e.pointer(x, y);
+    r.e.click(r.now());
+    r.step();
+    let before = r.state();
+    r.e.release();
+    r.step();
     assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
     assert!(r.e.bar.open, "the menus leave the bar as it was");
     let file = std::fs::read(dir.join("save").join("ATL04_00.SAV")).unwrap();
@@ -901,7 +930,9 @@ fn tibet_start(r: &mut Run) {
     assert!(!r.e.intro_playing());
     assert_eq!(r.page(), Some(PageKind::Player));
 
-    // A new game, its film clicked away, the first click (chapter 75).
+    // A new game (the music copy's please-wait page gone through by the
+    // steps, its data folder being new), its film clicked away, the first
+    // click (chapter 75).
     r.press_widget("b_ter.spr");
     assert_eq!(r.e.loop_type, LoopType::Video);
     r.wait(30);
@@ -4364,7 +4395,11 @@ fn whole_yucatan() -> Vec<Stage> {
         r.shot_as("yucatan-10-back-in-tibet.png");
         assert_eq!(r.e.place(), ("tibet.wam", 7));
         assert_eq!((r.chapter(), r.var("MONDE")), (75, 5));
-        assert_eq!(r.e.files().current_disc(), 1);
+        assert_eq!(
+            r.e.files().current_disc(),
+            2,
+            "Tibet keeps the disc in the drive"
+        );
         assert!(!r.in_bag("MANDALA_YUCATAN"));
     }));
     v.push(("the second trip", the_second_trip));
@@ -4376,7 +4411,7 @@ fn whole_yucatan() -> Vec<Stage> {
         r.shot_as("xibalba-10-back-in-tibet.png");
         assert_eq!(r.e.place(), ("tibet.wam", 7));
         assert_eq!((r.chapter(), r.var("MONDE")), (75, 5));
-        assert_eq!(r.e.files().current_disc(), 1);
+        assert_eq!(r.e.files().current_disc(), 2, "back through Yucatán");
         assert_eq!(r.var("dial168_done"), 1);
         assert!(r.in_bag("MANDALA_YUCATAN") && !r.in_bag("CHULEL"));
     }));

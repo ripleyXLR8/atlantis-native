@@ -192,6 +192,9 @@ impl Engine {
     /// which is not the game's pointer). The parchment, which also takes
     /// the button, never opens (below).
     pub fn right_click(&mut self) {
+        if self.hold_input(super::media::Input::Right) {
+            return;
+        }
         if self.loop_type != LoopType::Warp {
             self.click_aux = 1;
             return;
@@ -672,7 +675,7 @@ impl Engine {
                     };
                     if let (Some(bank), Ok(frame)) = (bank, usize::try_from(*frame)) {
                         let t = &mut Target::screen(out, w, h);
-                        bank.draw_mode(t, Some(*x), *y, frame, mode);
+                        bank.draw_with(t, Some(*x), *y, frame, mode, self.spr_dll);
                     }
                 }
                 UiDraw::Text {

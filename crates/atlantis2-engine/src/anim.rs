@@ -81,9 +81,14 @@ pub struct Slot {
     pub click: i32,
     /// +0x24: the state record.
     pub state: EntityState,
-    /// +0x28: hands over to `chain` when it ends.
+    /// +0x28: hands over to `chain` when it ends. At load it holds the
+    /// next state's record ([`Slot::next`]), so it is set when the state
+    /// has a next state that FUN_004123b0 finds (@ 0x0047c691..0x0047c6a8);
+    /// `PLAYANIMP` sets it on the playing slot and clears it on the
+    /// target.
     pub handing: bool,
-    /// +0x2c: the slot it hands over to, −1 none.
+    /// +0x2c: the slot it hands over to, −1 none. After the view's loads
+    /// it is the slot of the next state ([`Anim::link_chains`]).
     pub chain: i32,
     /// +0x30: drawn and stepped.
     pub active: bool,
@@ -118,6 +123,10 @@ pub struct Slot {
     /// the place's order): the record pointer +0x24 that FUN_0048eae0
     /// looks a slot up by.
     pub record: Option<(usize, usize)>,
+    /// The record of the state's next state (WAM record +0x1c), as
+    /// FUN_004123b0 finds it among the entity's states: what the load
+    /// keeps in +0x28 until [`Anim::link_chains`] turns it into `chain`.
+    pub next: Option<(usize, usize)>,
 }
 
 impl Slot {
@@ -196,11 +205,6 @@ impl Anim {
         }
         let count = spw.frame_count();
         let end = if state.end == 0 { count } else { state.end - 1 };
-        if state.next != 0 {
-            // FUN_004123b0 (state chains) is not ported: no Tibet state has
-            // a next state.
-            log::warn!("{name}: state chains are not supported");
-        }
         let mut active = state.shown != 0;
         let shown = self.table.get(id, kind);
         if shown != 2 {
@@ -239,7 +243,37 @@ impl Anim {
             delay: state.delay.wrapping_abs(),
             blink: 0,
             record: None,
+            next: None,
         });
+    }
+
+    /// The end of `AtlSpw_load` for slot `n` (@ 0x0047c691..0x0047c6a8):
+    /// the record of its state's next state, `None` when the state has
+    /// none or FUN_004123b0 finds none; the slot then hands over when it
+    /// ends (+0x28 ≠ 0).
+    pub fn set_next(&mut self, n: usize, next: Option<(usize, usize)>) {
+        if let Some(s) = self.slots.get_mut(n) {
+            s.next = next;
+            s.handing = next.is_some();
+        }
+    }
+
+    /// FUN_0047c820, after a view's loads (@ 0x0045a267): every slot whose
+    /// +0x28 holds a next state's record chains to the first slot loaded
+    /// from that record (FUN_0047c850), −1 when the view loaded none. The
+    /// original searches the whole table of 0x22 slots; the slots past the
+    /// loaded ones were zeroed when they were freed (FUN_0047c480), so
+    /// none matches there.
+    pub fn link_chains(&mut self) {
+        let records: Vec<_> = self.slots.iter().map(|s| s.record).collect();
+        for s in self.slots.iter_mut() {
+            if let Some(next) = s.next.filter(|_| s.handing) {
+                s.chain = records
+                    .iter()
+                    .position(|r| *r == Some(next))
+                    .map_or(-1, |k| k as i32);
+            }
+        }
     }
 
     /// FUN_0047d7f0 on a 15 Hz tick: every active slot that plays
@@ -548,6 +582,59 @@ impl Anim {
     }
 }
 
+/// FUN_004123b0(entity, record): the index, among the entity's `states`
+/// (its list, in file order), of the first state whose letter (+0x00) is
+/// the byte +0x1c of `record` and whose animation number (+0x04) is
+/// `atoi(record + 0x1d)`, or 1 when nothing follows the letter; `None`
+/// when `record` has no next state (+0x1c = 0, @ 0x0047c69a) or none
+/// matches. `atoi` reads on past +0x1f into +0x20 (the first frame) as
+/// the original does.
+pub fn next_state(states: &[EntityState], record: &EntityState) -> Option<usize> {
+    let mut bytes = [0u8; 16];
+    for (k, w) in [
+        record.next,
+        record.first as u32,
+        record.end as u32,
+        record.shown as u32,
+    ]
+    .iter()
+    .enumerate()
+    {
+        bytes[4 * k..4 * k + 4].copy_from_slice(&w.to_le_bytes());
+    }
+    let letter = bytes[0];
+    if letter == 0 {
+        return None;
+    }
+    let number = if bytes[1] == 0 { 1 } else { atoi(&bytes[1..]) };
+    states
+        .iter()
+        .position(|s| s.letter as u8 == letter && s.anim as i32 == number)
+}
+
+/// MSVC's `atoi` on a byte string (@ 0x005adbe4): blanks skipped, a sign,
+/// the digits up to the first other byte, wrapping.
+fn atoi(b: &[u8]) -> i32 {
+    let mut i = 0;
+    while i < b.len() && matches!(b[i], b' ' | b'\t'..=b'\r') {
+        i += 1;
+    }
+    let neg = i < b.len() && b[i] == b'-';
+    if i < b.len() && matches!(b[i], b'+' | b'-') {
+        i += 1;
+    }
+    let mut n = 0i32;
+    while i < b.len() && b[i].is_ascii_digit() {
+        n = n.wrapping_mul(10).wrapping_add(i32::from(b[i] - b'0'));
+        i += 1;
+    }
+    if neg {
+        n.wrapping_neg()
+    } else {
+        n
+    }
+}
+
 /// Puts back the face texels under the boxes drawn (the faces' clean copy
 /// `clean`), as the save / restore around the warp does (@ 0x0045b120,
 /// @ 0x004d9ec0).
@@ -572,6 +659,28 @@ mod tests {
         // srand(1): 41, 18467, 6334, ...
         let mut r = MsvcRand(1);
         assert_eq!([r.rand(), r.rand(), r.rand()], [41, 18467, 6334]);
+    }
+
+    #[test]
+    fn next_state_as_fun_004123b0() {
+        let st = |anim: u32, next: &[u8]| {
+            let mut w = [0u8; 4];
+            w[..next.len()].copy_from_slice(next);
+            EntityState {
+                letter: u32::from(b'A'),
+                anim,
+                next: u32::from_le_bytes(w),
+                ..Default::default()
+            }
+        };
+        let states = [st(2, b""), st(1, b"A1"), st(3, b"A"), st(12, b"A12")];
+        assert_eq!(next_state(&states, &states[0]), None);
+        assert_eq!(next_state(&states, &states[1]), Some(1));
+        // The letter alone: animation 1.
+        assert_eq!(next_state(&states, &states[2]), Some(1));
+        assert_eq!(next_state(&states, &states[3]), Some(3));
+        assert_eq!(next_state(&states, &st(1, b"B1")), None);
+        assert_eq!(next_state(&states, &st(1, b"A9")), None);
     }
 
     #[test]

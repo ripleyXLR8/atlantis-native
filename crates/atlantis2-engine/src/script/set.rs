@@ -252,8 +252,8 @@ impl Script {
             return done(self);
         }
         if key == k.loadmusik {
-            host.load_music(&self.line_text(src, p + 1));
-            return done(self);
+            let copies = host.load_music(&self.line_text(src, p + 1));
+            return Some(self.copy_wait(src, p, copies));
         }
         if key == k.delmusik {
             host.delete_music(&self.line_text(src, p + 1));
@@ -264,9 +264,9 @@ impl Script {
             let t = self.line_text(src, p + 1);
             self.music = t.bytes().take(0xff).collect();
             let click = self.click;
-            host.start_music(&t);
+            let copies = host.start_music(&t);
             self.click = click;
-            return done(self);
+            return Some(self.copy_wait(src, p, copies));
         }
         if key == k.stopmusik {
             host.stop_music();
@@ -474,10 +474,12 @@ impl Script {
         host.cinema_sound(&format!("cine{value:03}.apc"));
         host.music_step();
         let started = host.play_video(&format!("cine{value:03}.hnm"), dialog);
+        // After `AtlHnm_start` the click flags, the bag bar and the
+        // cinematic flag are cleared (@ 0x00481d39..0x00481d55).
         self.double_click = false;
         self.click = false;
         self.click_aux = 0;
-        self.overlay = false;
+        host.close_bar();
         self.cinema_starting = false;
         let next = self.after_cr(src, p);
         if !self.in_command && started {
@@ -781,6 +783,20 @@ impl Script {
         if monde != 5 {
             self.disc_answer(host, present, ask);
         }
+    }
+
+    /// After a music copy (FUN_00479480): when it shows the please-wait
+    /// page the section waits for the page's end, as the original's copy
+    /// runs before the next line (unless in a `RunOneCommand`, which the
+    /// port cannot hold: the command goes on under the page).
+    fn copy_wait(&mut self, src: Src, p: usize, copies: bool) -> usize {
+        let next = self.after_cr(src, p);
+        if copies && !self.in_command {
+            self.resume_pending = true;
+            self.resume_at = next;
+            self.copy_waiting = true;
+        }
+        next
     }
 
     /// FUN_0040dff0's answer: with the disc there, a waiting section goes

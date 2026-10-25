@@ -26,6 +26,7 @@ use atlantis2_data::dialog::{parse_dial, FontTxt, World};
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::dialog::{compose, load_head, Dialog, DialogScript};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::hnm_stream::HnmStream;
 use atlantis2_engine::raster3d::{HEIGHT, WIDTH};
 use atlantis2_engine::sound::{
@@ -35,6 +36,9 @@ use atlantis2_engine::sound::{
 use atlantis2_engine::subtitle::{layout, SubtitleFont};
 use atlantis2_engine::{Engine, Fpu, Variant};
 use md5::{Digest, Md5};
+
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
 
 const SCRIPT: &str = include_str!("golden/dialog_script_ti.txt");
 const FRAMES: &str = include_str!("golden/dialog_frames.txt");
@@ -474,7 +478,22 @@ fn music_fades_and_volumes_match_the_original() {
     }
 }
 
-/// Tibet's first dialog (360) played by the engine at 60 frames a second
+/// The dialog loop as the original's (`dialog_loop.txt`) on Tibet's first
+/// dialog (360, head lines) in view 7: the panorama drawn under the
+/// frame and its place animations stepped on the 15 Hz ticks, no turn;
+/// the panorama back at 76° after the end.
+#[test]
+fn the_dialog_loop_in_tibet_matches_the_original() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::new_game(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    let (kinds, stepped) = dialog_loop::check_dialog_loop(&mut e, 360);
+    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0]);
+    assert!(stepped);
+}
+
+/// Tibet's first dialog (360) played by the engine at 59.94 frames a second
 /// from the arrival in view 7: the three lines follow their voices, the
 /// first voice is the one the lip-sync golden analysed, the video loops
 /// frames 1..40, the hero's line is a reverse shot with its own field of
@@ -508,18 +527,22 @@ fn dialog_360_plays_end_to_end() {
     let mut yaws = Vec::new();
     let mut min_music = 100;
     let mut frame = 0u64;
+    // The passes from `PASS` on: the 15 Hz task's first run is the first
+    // pass after the start (the scheduler's strict test).
     while e.dialog().is_some() && frame < 60 * 30 {
-        let t = frame as f64 / 60.0;
+        let t = (frame + 1) as f64 * PASS;
         e.set_clock(t);
         e.frame();
         e.render(&mut screen);
         min_music = min_music.min(e.music.volume);
         if let Some(d) = e.dialog() {
             // The heads follow the panorama's CPU: the Pentium II's
-            // routines, under the 0x0e7f warpPII and the II set-up leave.
+            // routines, under the 0x0e7f warpPII and the II set-up leave
+            // (from the first line on: the dialog's first frame comes
+            // before its first tick, under the process's word).
             assert_eq!(d.variant(), Variant::PII);
-            assert_eq!((d.fpu(), e.fpu()), (Fpu::Chop, Fpu::Chop));
             if let Some(l) = d.current_line() {
+                assert_eq!((d.fpu(), e.fpu()), (Fpu::Chop, Fpu::Chop));
                 if seen.last().is_none_or(|(id, _)| *id != l.id) {
                     seen.push((l.id.clone(), t));
                     yaws.push((e.angles_deg().0, e.camera.fx));
@@ -536,9 +559,7 @@ fn dialog_360_plays_end_to_end() {
                         .collect();
                     assert_eq!(hex(&pcm), k("pcm_md5"), "{} voice", l.id);
                 }
-                if l.id == "360_01" {
-                    numbers.push(d.stream().unwrap().number());
-                }
+                numbers.push((l.id.clone(), d.stream().unwrap().number()));
             }
         }
         frame += 1;
@@ -549,8 +570,17 @@ fn dialog_360_plays_end_to_end() {
     // 60193 samples (2.730 s).
     let first = seen[1].1 - seen[0].1;
     assert!((2.73..2.73 + 3.0 / 15.0).contains(&first), "{first}");
-    assert!(numbers.contains(&40) && numbers.windows(2).any(|w| w == [40, 1]));
-    assert!(!numbers.contains(&0));
+    // Each line's video starts at its frame 1 and moves one frame a tick,
+    // looping frames 1..40 (360_01 lasts 41 ticks).
+    assert!(numbers
+        .windows(2)
+        .any(|w| w[0].0 == "360_01" && w[0].1 == 40 && w[1] == (w[0].0.clone(), 1)));
+    assert!(numbers.windows(2).all(|w| if w[0].0 == w[1].0 {
+        w[1].1 == w[0].1 || w[1].1 == w[0].1 % 40 + 1
+    } else {
+        w[1].1 == 1
+    }));
+    assert_eq!(numbers[0].1, 1);
     // The hero's line turns the view around; the shaman's turns it back.
     let turn = |a: f32, b: f32| ((a - b).rem_euclid(360.0) - 180.0).abs() < 0.01;
     assert!(
@@ -559,9 +589,51 @@ fn dialog_360_plays_end_to_end() {
     );
     assert_eq!(min_music, 16);
     assert!(e.dialog().is_none());
+    // The last line is the shaman's (50°): the end puts the panorama back
+    // at 76° with the screen's centre (FUN_00402960).
+    dialog_loop::assert_camera_after_dialog(&e, "dialog 360");
     // Back up to 100 % in 84 / 127 s.
-    for k in 0..60 {
-        e.set_clock((frame + k) as f64 / 60.0);
+    for k in 1..=60 {
+        e.set_clock((frame + k) as f64 * PASS);
     }
     assert_eq!(e.music.volume, 100);
+}
+
+/// Every Tibet dialog (the 26 of `dialog_script_ti.txt`) started in view
+/// 7 and played to its end with its heads and bodies drawn, a click every
+/// 20 passes: the panorama back at 76° with the screen's centre after
+/// each, whatever field of view its last line had (FUN_004808a0 →
+/// FUN_0049da90 → FUN_00402960), as the original's camera after the end
+/// (`dialog_loop.txt`).
+#[test]
+fn every_tibet_dialog_ends_at_76_degrees() {
+    let Some(files) = game() else { return };
+    let numbers: Vec<u32> = SCRIPT
+        .lines()
+        .filter_map(|l| l.strip_prefix("dialog "))
+        .map(|l| l.split(' ').next().unwrap().parse().unwrap())
+        .collect();
+    assert_eq!(numbers.len(), 26);
+    let mut e = Engine::new_game(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    let mut screen = vec![0u16; 640 * 480];
+    for n in numbers {
+        e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+            .unwrap();
+        e.start_dialog(n)
+            .unwrap_or_else(|err| panic!("dialog {n}: {err}"));
+        let mut ended = false;
+        for pass in 0..20_000 {
+            if pass % 20 == 19 {
+                e.click(f64::from(pass) * 10.0 + f64::from(n) * 1e6);
+            }
+            e.tick();
+            e.pass(Some(&mut screen));
+            if e.dialog().is_none() {
+                ended = true;
+                break;
+            }
+        }
+        assert!(ended, "dialog {n} does not end");
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
+    }
 }

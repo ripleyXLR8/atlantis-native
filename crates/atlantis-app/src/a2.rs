@@ -21,8 +21,11 @@
 //! in it, in the folders directly inside it, and in the folders given with
 //! `--discs`.
 //!
-//! `--original` turns the enhancements off (the minor bug fixes: the
-//! music tracks heard to their end), as for the first game.
+//! `--original` turns the enhancements off, as for the first game: the
+//! minor bug fixes (`atlantis2_engine::Enhancements::minor_bug_fixes`:
+//! every music track heard to its end, a track that ends with nothing
+//! after it played again, Ireland's puzzle zones answering for no named
+//! zone) and the HD mode.
 //!
 //! `--hd` draws the panorama at the window's resolution (the first game's
 //! HD mode, `atlantis2_engine::hd`), `--widescreen` too with the panorama
@@ -38,6 +41,11 @@
 //! the game is paused while it is open. Its choices are kept in
 //! `settings.ini` beside the saves (the first game's keys); `--hd`,
 //! `--widescreen` and `--original` hold for the run without changing it.
+//!
+//! The game is held while the window does not have the focus, as the
+//! original holds it: no frame runs, its clock stands still and its sound
+//! is silent until the focus comes back.
+//!
 //! The screen size is the original's own option, kept in `atlant2.cfg` as
 //! its options page's button keeps it; `--resolution 800x600` chooses it
 //! from the command line. A frame at 800 x 600 is shown scaled to the
@@ -69,6 +77,7 @@ use std::sync::Arc;
 use atlantis2_data::files::OpenError;
 use atlantis2_data::save::SystemTime;
 use atlantis2_data::A2Files;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::hd::{picture_rect, side_tiles, tile_for_output, window_to_screen};
 use atlantis2_engine::menu::PageKind;
 use atlantis2_engine::options_menu::{MenuAction, MenuValues, OptionsMenu};
@@ -97,9 +106,10 @@ pub const HEIGHT: u32 = 480;
 /// original's decay this turns about 55° a second at 60 frames a second.
 const KEY_TURN: i32 = 8;
 
-/// The frame period: the original's warp loop is unpaced, the port shows
-/// one frame per 1/60 s.
-const FRAME: Duration = Duration::from_micros(16_667);
+/// The frame period: the original shows a frame per refresh of the screen
+/// (its flip waits for the vertical blank), the port one per refresh of a
+/// 60 Hz VGA screen ([`PASS`], 16.683 ms).
+const FRAME: Duration = Duration::from_nanos(16_683_217);
 
 /// Where a run starts besides the new game's first view (testing aids).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -213,6 +223,16 @@ impl A2Start {
             return Ok(());
         }
         engine.start_new_game().map_err(|e| e.to_string())?;
+        if at_once || self.menu.is_some() {
+            // The new game's music copy (`LOADMUSIK` in chapter 0's /INIT,
+            // when the data folder holds no copy yet) holds the rest of
+            // /INIT under the please-wait page: gone through first, so the
+            // opening film and its music have started before the aids end
+            // the film and apply theirs (`engine/media.rs`).
+            while engine.copying() {
+                engine.pass(None);
+            }
+        }
         self.apply(engine)?;
         match self.menu {
             Some(PageKind::Credits) => engine.open_credits(),
@@ -408,7 +428,7 @@ fn boot(
     Ok((engine, format!("Game: {}", build.label)))
 }
 
-/// `--headless`: runs `frames` frames of 1/60 s without input (the 15 Hz
+/// `--headless`: runs `frames` frames of [`PASS`] without input (the 15 Hz
 /// ticks run on the scheduler's clock), prints where the game is, and writes the
 /// screen to `screenshot` (PNG) when given.
 pub fn headless(
@@ -442,7 +462,7 @@ pub fn headless(
     let compose = start.size.is_some();
     let mut times = Timings::default();
     for i in 0..frames {
-        engine.set_clock(i as f64 / 60.0);
+        engine.set_clock(i as f64 * PASS);
         picture.prepare(&mut engine, sw, sh);
         let (w, h) = engine.screen_size();
         screen.resize(w * h, 0);
@@ -580,8 +600,8 @@ pub fn run_window(
 ) -> Result<(), String> {
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let voices = engine.voices().clone();
-    // The sound stops while the options menu is open (the game paused):
-    // silence, the voices kept where they are.
+    // The sound stops while the game is held (the options menu open, the
+    // window without the focus): silence, the voices kept where they are.
     let paused = Arc::new(AtomicBool::new(false));
     let silent = paused.clone();
     let audio = crate::audio_out::start_with(move |out, rate, channels| {
@@ -591,42 +611,121 @@ pub fn run_window(
             voices.fill(out, rate, channels);
         }
     });
-    let (w, h) = engine.screen_size();
-    let mut menu = OptionsMenu::new();
-    menu.set_info(menu_info(&label));
-    let mut app = A2App {
-        _audio: audio,
-        started: Instant::now(),
+    let mut app = A2App::new(
         engine,
+        &label,
         fullscreen,
         size,
-        window: None,
-        surface: None,
-        picture: Picture::new(),
-        screen: vec![0u16; w * h],
-        shown: Vec::new(),
-        menu_text: HdText::default(),
-        menu,
-        font: SubtitleFont::new(),
+        audio,
         paused,
-        paused_at: None,
-        menu_pointer: None,
-        motion: (0.0, 0.0),
-        keys: [false; 4],
-        locked: false,
-        focused: true,
-        next_frame: Instant::now(),
-    };
+        Instant::now(),
+    );
     el.run_app(&mut app)
         .map_err(|e| format!("The window failed: {e}"))
+}
+
+/// Whether the game is held: while the port's options menu is open, and
+/// while the window does not have the focus, as the original, whose 15 Hz
+/// task (@ 0x0040caa5) and frame dispatcher (@ 0x0049ce25) return at once
+/// unless its window is active (FUN_0058ff10: the window's active byte and
+/// DirectDraw's `TestCooperativeLevel`): timers, scripts, videos, dialogs
+/// and animations stop, and its DirectSound buffers, made without the
+/// global focus flag, are not heard. The time away does not count: the
+/// scheduler moves the task's last run on while it returns (the seconds
+/// accumulator gains none of it).
+fn must_hold(menu_open: bool, focused: bool) -> bool {
+    menu_open || !focused
+}
+
+/// The game's clock: the time since it started, less the time it was
+/// held.
+#[derive(Clone, Copy, Debug)]
+struct GameClock {
+    started: Instant,
+    held_since: Option<Instant>,
+}
+
+impl GameClock {
+    fn new(now: Instant) -> GameClock {
+        GameClock {
+            started: now,
+            held_since: None,
+        }
+    }
+
+    fn held(&self) -> bool {
+        self.held_since.is_some()
+    }
+
+    /// Stops the clock (it stays stopped from the first hold on).
+    fn hold(&mut self, now: Instant) {
+        self.held_since.get_or_insert(now);
+    }
+
+    /// Starts it again where it stopped.
+    fn release(&mut self, now: Instant) {
+        if let Some(t) = self.held_since.take() {
+            self.started += now.saturating_duration_since(t);
+        }
+    }
+
+    /// Its time at `now`, seconds.
+    fn secs(&self, now: Instant) -> f64 {
+        self.held_since
+            .unwrap_or(now)
+            .saturating_duration_since(self.started)
+            .as_secs_f64()
+    }
+}
+
+impl A2App {
+    /// The window's game before its window opens, its clock started at
+    /// `now`.
+    fn new(
+        engine: Engine,
+        label: &str,
+        fullscreen: bool,
+        size: Option<(u32, u32)>,
+        audio: Option<cpal::Stream>,
+        paused: Arc<AtomicBool>,
+        now: Instant,
+    ) -> A2App {
+        let (w, h) = engine.screen_size();
+        let mut menu = OptionsMenu::new();
+        menu.set_info(menu_info(label));
+        A2App {
+            _audio: audio,
+            clock: GameClock::new(now),
+            engine,
+            fullscreen,
+            size,
+            window: None,
+            surface: None,
+            picture: Picture::new(),
+            screen: vec![0u16; w * h],
+            shown: Vec::new(),
+            menu_text: HdText::default(),
+            menu,
+            font: SubtitleFont::new(),
+            paused,
+            menu_pointer: None,
+            game_pointer: None,
+            motion: (0.0, 0.0),
+            keys: [false; 4],
+            locked: false,
+            focused: true,
+            next_frame: now,
+        }
+    }
 }
 
 struct A2App {
     /// The sound output (kept alive while the window is open).
     _audio: Option<cpal::Stream>,
-    /// The game's clock starts with the window (moved on by the time the
-    /// options menu was open).
-    started: Instant,
+    /// The game's clock: it starts with the window and stands still while
+    /// the game is held (the options menu open, the window without the
+    /// focus).
+    clock: GameClock,
     engine: Engine,
     fullscreen: bool,
     /// The window's first size (`--size`), else twice 640 x 480.
@@ -643,11 +742,13 @@ struct A2App {
     /// The port's options menu (F10, O), its font (the first game's).
     menu: OptionsMenu,
     font: SubtitleFont,
-    /// The sound silenced, since when the game is paused (the menu open).
+    /// The sound silenced while the game is held.
     paused: Arc<AtomicBool>,
-    paused_at: Option<Instant>,
     /// The window's pointer on the screen (the options menu's clicks).
     menu_pointer: Option<(i32, i32)>,
+    /// The window's pointer as the game's menus last had it (its moves
+    /// turn the view: [`system_pointer`]); none outside the menus.
+    game_pointer: Option<(i32, i32)>,
     /// Raw mouse motion not yet given to the engine (fractions kept).
     motion: (f64, f64),
     /// Left, right, up, down held.
@@ -680,6 +781,9 @@ impl A2App {
         // In the menus the pointer is the game's own, moved by the mouse
         // over the window; in the game the mouse turns the view.
         let in_menu = self.engine.loop_type == LoopType::Menu;
+        if !in_menu {
+            self.game_pointer = None;
+        }
         if in_menu && self.locked {
             self.grab(false);
             if let Some(w) = &self.window {
@@ -697,7 +801,9 @@ impl A2App {
         if (dx != 0 || dy != 0) && !in_menu {
             self.engine.mouse_motion(dx, dy);
         }
-        self.engine.set_clock(self.started.elapsed().as_secs_f64());
+        // The pass's time is the one it was due at, as the original's
+        // passes keep the pace of the screen's refresh.
+        self.engine.set_clock(self.clock.secs(self.next_frame));
         if let Some(size) = self.window.as_ref().map(|w| w.inner_size()) {
             self.picture
                 .prepare(&mut self.engine, size.width as usize, size.height as usize);
@@ -745,8 +851,7 @@ impl A2App {
             return;
         }
         self.menu.open();
-        self.paused_at = Some(Instant::now());
-        self.paused.store(true, Ordering::Relaxed);
+        self.hold();
         self.grab(false);
         self.keys = [false; 4];
         if let Some(w) = &self.window {
@@ -757,12 +862,7 @@ impl A2App {
     /// The menu closed: the game goes on where it was.
     fn close_menu(&mut self) {
         self.menu.close();
-        if let Some(t) = self.paused_at.take() {
-            let now = Instant::now();
-            self.started += now.duration_since(t);
-            self.next_frame = now;
-        }
-        self.paused.store(false, Ordering::Relaxed);
+        self.hold();
         self.motion = (0.0, 0.0);
         if self.engine.loop_type == LoopType::Menu {
             // The game's pointer is drawn by its menus.
@@ -772,6 +872,51 @@ impl A2App {
         } else if self.focused {
             self.grab(true);
         }
+    }
+
+    /// Holds the game, or lets it go on, as [`must_hold`] says: held, its
+    /// clock stands still and its sound is silent (the voices kept where
+    /// they are), and no frame runs.
+    fn hold(&mut self) {
+        self.hold_at(Instant::now());
+    }
+
+    fn hold_at(&mut self, now: Instant) {
+        if must_hold(self.menu.is_open(), self.focused) {
+            self.clock.hold(now);
+            self.paused.store(true, Ordering::Relaxed);
+        } else if self.clock.held() {
+            self.clock.release(now);
+            self.paused.store(false, Ordering::Relaxed);
+            self.next_frame = now;
+        }
+    }
+
+    /// The window gains or loses the focus at `now`: without it the game
+    /// is held ([`must_hold`]).
+    fn set_focus(&mut self, on: bool, now: Instant) {
+        self.focused = on;
+        if !on {
+            self.grab(false);
+            self.keys = [false; 4];
+        } else {
+            self.motion = (0.0, 0.0);
+        }
+        self.hold_at(now);
+    }
+
+    /// A redraw at `now`: the game's pass when one is due and the game is
+    /// not held; whether it ran.
+    fn redraw(&mut self, now: Instant) -> bool {
+        if now < self.next_frame || self.clock.held() {
+            return false;
+        }
+        self.step();
+        self.next_frame += FRAME;
+        if self.next_frame < now {
+            self.next_frame = now + FRAME;
+        }
+        true
     }
 
     fn menu_action(&mut self, action: MenuAction) {
@@ -959,57 +1104,29 @@ impl ApplicationHandler for A2App {
                 self.engine.write_cfg();
                 el.exit();
             }
-            WindowEvent::Focused(on) => {
-                self.focused = on;
-                if !on {
-                    self.grab(false);
-                    self.keys = [false; 4];
-                }
-            }
+            WindowEvent::Focused(on) => self.set_focus(on, Instant::now()),
             // The window's pointer is the game's in the menus (and while
             // the mouse is not held); held, the raw motion moves it (the
             // bag bar's pointer).
             WindowEvent::CursorMoved { position, .. } if in_menu || !self.locked => {
                 self.menu_pointer = self.to_screen(position, screen_dims(&self.screen));
-                if let Some((x, y)) = self.to_screen(position, self.logical()) {
-                    self.engine.pointer(x, y);
+                if let Some(p) = self.to_screen(position, self.logical()) {
+                    let last = if in_menu {
+                        Some(&mut self.game_pointer)
+                    } else {
+                        None
+                    };
+                    system_pointer(&mut self.engine, last, p);
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.menu_pointer = self.to_screen(position, screen_dims(&self.screen));
             }
-            WindowEvent::MouseInput {
-                state,
-                button: MouseButton::Left,
-                ..
-            } if in_menu => {
-                // The click flag (@ 0x006569c9) and the held flag
-                // (@ 0x006569ca).
-                if state == ElementState::Pressed {
-                    let now = self.started.elapsed().as_secs_f64();
-                    self.engine.click(now);
-                } else {
-                    self.engine.release();
-                }
-            }
-            WindowEvent::MouseInput {
-                state: ElementState::Pressed,
-                button,
-                ..
-            } => {
-                // A click ends a video (the intro's too) whether or not
-                // the pointer is held.
-                let in_video = self.engine.loop_type == LoopType::Video;
-                if !self.locked && !in_menu && !(in_video && button == MouseButton::Left) {
+            WindowEvent::MouseInput { state, button, .. } => {
+                let now = self.clock.secs(Instant::now());
+                let pressed = state == ElementState::Pressed;
+                if mouse_button(&mut self.engine, self.locked, button, pressed, now) {
                     self.grab(true);
-                } else if button == MouseButton::Left {
-                    // The click flag (@ 0x006569c9) is the left button's
-                    // (input callback FUN_0040c510); the right one opens
-                    // the bag.
-                    let now = self.started.elapsed().as_secs_f64();
-                    self.engine.click(now);
-                } else if button == MouseButton::Right {
-                    self.engine.right_click();
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
@@ -1045,24 +1162,65 @@ impl ApplicationHandler for A2App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                let now = Instant::now();
-                if now >= self.next_frame && !self.menu.is_open() {
-                    self.step();
-                    // `EXIT` in a script, or the menus, quit the game.
-                    if self.engine.quit() {
-                        self.engine.write_cfg();
-                        el.exit();
-                    }
-                    self.next_frame += FRAME;
-                    if self.next_frame < now {
-                        self.next_frame = now + FRAME;
-                    }
+                // `EXIT` in a script, or the menus, quit the game.
+                if self.redraw(Instant::now()) && self.engine.quit() {
+                    self.engine.write_cfg();
+                    el.exit();
                 }
                 self.present();
             }
             _ => {}
         }
     }
+}
+
+/// A mouse button for the engine (the input callbacks FUN_0040c510 and
+/// FUN_0040c660): every release of the left button clears the held flag
+/// (@ 0x006569ca), whatever the loop type; a press clicks (the left
+/// button: the click flag @ 0x006569c9, a video ended) or opens the bag
+/// (the right one). True when the press only grabs the pointer (outside
+/// the menus, with the pointer free; a left click still ends a video).
+fn mouse_button(
+    engine: &mut Engine,
+    locked: bool,
+    button: MouseButton,
+    pressed: bool,
+    now: f64,
+) -> bool {
+    if !pressed {
+        if button == MouseButton::Left {
+            engine.release();
+        }
+        return false;
+    }
+    let in_menu = engine.loop_type == LoopType::Menu;
+    let in_video = engine.loop_type == LoopType::Video;
+    if !locked && !in_menu && !(in_video && button == MouseButton::Left) {
+        return true;
+    }
+    match button {
+        MouseButton::Left => engine.click(now),
+        MouseButton::Right => engine.right_click(),
+        _ => {}
+    }
+    false
+}
+
+/// The window's pointer at `p` on the screen where the pointer is the
+/// system's: the game's pointer there; in the menus (`last` given, the
+/// position it had) its moves also add to the turn speeds, as the
+/// original's motion callback (@ 0x0040c420) adds the mouse's moves to
+/// them in every loop type (the port adds the pointer's moves in screen
+/// pixels, the original the mouse's counts, which moved its pointer one
+/// pixel each).
+fn system_pointer(engine: &mut Engine, last: Option<&mut Option<(i32, i32)>>, p: (i32, i32)) {
+    if let Some(last) = last {
+        if let Some((x, y)) = *last {
+            engine.pointer_moved(p.0 - x, p.1 - y);
+        }
+        *last = Some(p);
+    }
+    engine.pointer(p.0, p.1);
 }
 
 /// A window position on the 640x480 screen, in a `width` x `height`
@@ -1279,6 +1437,202 @@ impl Timings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The window losing the focus holds the game as the options menu
+    /// does: no frame runs and the clock stands still until it comes back.
+    #[test]
+    fn the_game_clock_stands_while_held() {
+        assert!(must_hold(false, false));
+        assert!(must_hold(true, true));
+        assert!(!must_hold(false, true));
+        let t0 = Instant::now();
+        let at = |s: f64| t0 + Duration::from_secs_f64(s);
+        let mut c = GameClock::new(t0);
+        assert_eq!(c.secs(at(2.0)), 2.0);
+        // Away from 2 s to 7 s, then the menu opened at 8 s while the
+        // clock already stands (a second hold changes nothing), closed at
+        // 9 s with the window still away, back at 10 s.
+        c.hold(at(2.0));
+        assert_eq!(c.secs(at(7.0)), 2.0);
+        c.hold(at(8.0));
+        assert_eq!(c.secs(at(9.0)), 2.0);
+        c.release(at(10.0));
+        assert!(!c.held());
+        assert_eq!(c.secs(at(10.0)), 2.0);
+        assert_eq!(c.secs(at(11.5)), 3.5);
+    }
+
+    /// With the game (`ATLANTIS2_DATA`, `ATLANTIS2_DISCS`; skipped
+    /// without): the window's game as its events drive it. A pass a
+    /// [`FRAME`] at the time it was due ([`PASS`] apart); the focus lost,
+    /// no pass runs, the 15 Hz task and the clock stand still and the
+    /// sound is silent, as in the original, whose frame dispatcher
+    /// (@ 0x0049ce25) and 15 Hz task (@ 0x0040caa5) return at once while
+    /// its window is not active (FUN_0058ff10); the focus back, the game
+    /// goes on a pass later, the time away not counted.
+    #[test]
+    fn the_game_is_held_without_the_focus() {
+        let (Some(dir), Some(discs)) = (
+            std::env::var_os("ATLANTIS2_DATA"),
+            std::env::var_os("ATLANTIS2_DISCS"),
+        ) else {
+            eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+            return;
+        };
+        let (engine, label) = boot(
+            &PathBuf::from(dir),
+            &[PathBuf::from(discs)],
+            Enhancements::default(),
+        )
+        .expect("game");
+        assert!((FRAME.as_secs_f64() - PASS).abs() < 1e-9);
+        let t0 = Instant::now();
+        let paused = Arc::new(AtomicBool::new(false));
+        let mut app = A2App::new(engine, &label, false, None, None, paused.clone(), t0);
+        let at = |k: u32| t0 + FRAME * k;
+        let mut ticks = Vec::new();
+        for k in 0..60 {
+            // Due once a frame, not before.
+            assert!(!app.redraw(at(k) - Duration::from_micros(1)));
+            assert!(app.redraw(at(k)), "frame {k}");
+            assert!((app.engine.clock() - f64::from(k) * PASS).abs() < 1e-6);
+            ticks.push(app.engine.ticks);
+        }
+        // The 15 Hz task every 4th pass (from the first after the start).
+        assert!(ticks.windows(5).all(|w| w[4] == w[0] + 1));
+        let (clock, tick) = (app.engine.clock(), app.engine.ticks);
+        app.set_focus(false, at(60));
+        assert!(paused.load(Ordering::Relaxed));
+        for k in 60..600 {
+            assert!(!app.redraw(at(k)), "frame {k} away");
+        }
+        assert_eq!((app.engine.clock(), app.engine.ticks), (clock, tick));
+        app.set_focus(true, at(600));
+        assert!(!paused.load(Ordering::Relaxed));
+        assert!(app.redraw(at(600)));
+        assert!((app.engine.clock() - (clock + PASS)).abs() < 1e-6);
+        // The options menu over the focused window holds it the same way.
+        app.open_menu();
+        assert!(app.clock.held() && paused.load(Ordering::Relaxed));
+        assert!(!app.redraw(at(700)));
+    }
+
+    /// The game's files, or `None` (the test skipped) without
+    /// `ATLANTIS2_DATA` / `ATLANTIS2_DISCS`.
+    fn a2_files() -> Option<atlantis2_data::A2Files> {
+        let (Some(dir), Some(discs)) = (
+            std::env::var_os("ATLANTIS2_DATA"),
+            std::env::var_os("ATLANTIS2_DISCS"),
+        ) else {
+            eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+            return None;
+        };
+        let (files, _) = atlantis2_data::A2Files::open_dir(
+            std::path::Path::new(&dir),
+            &[std::path::PathBuf::from(discs)],
+        )
+        .ok()?;
+        Some(files)
+    }
+
+    /// The testing aids' start on a data folder with no music copy yet:
+    /// the please-wait page of chapter 0's `LOADMUSIK` goes first, then
+    /// the rest of /INIT (the opening film and music 30), then the aids.
+    /// The view asked for is shown with the music, no film over it.
+    #[test]
+    fn the_aids_start_after_the_music_copy() {
+        let Some(files) = a2_files() else { return };
+        let dir = std::env::temp_dir().join(format!("a2-aids-copy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+        e.set_data_dir(Some(dir.clone()));
+        let start = A2Start {
+            view: Some((10, 0.0, 0.0)),
+            ..A2Start::default()
+        };
+        start.begin(&mut e, true).unwrap();
+        assert!(!e.copying());
+        for i in 0..120 {
+            e.set_clock(f64::from(i) * PASS);
+            e.pass(None);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(e.loop_type, LoopType::Warp);
+        assert!(e.video_playing().is_none());
+        assert_eq!(e.place().1, 10);
+        assert_eq!(e.music_playing(), Some(30));
+    }
+
+    /// Every release of the left button reaches the engine, also outside
+    /// the menus (FUN_0040c660 clears the held flag in every loop type):
+    /// a press on a player symbol closes the player menu, and its release
+    /// comes in the game.
+    #[test]
+    fn every_left_release_reaches_the_engine() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+        e.open_player_menu();
+        let mut clock = 0.0;
+        let mut pass = |e: &mut Engine| {
+            clock += PASS;
+            e.set_clock(clock);
+            e.pass(None);
+        };
+        pass(&mut e);
+        let w = e
+            .menu()
+            .unwrap()
+            .page
+            .as_ref()
+            .unwrap()
+            .widget("b_gala.spr")
+            .unwrap();
+        e.pointer(
+            (w.hit.left + w.hit.right) / 2,
+            (w.hit.top + w.hit.bottom) / 2,
+        );
+        // In the menus a press clicks, whether the pointer is held or not.
+        assert!(!mouse_button(&mut e, false, MouseButton::Left, true, 1.0));
+        assert!(e.button_held());
+        pass(&mut e);
+        pass(&mut e);
+        while e.copying() {
+            pass(&mut e);
+        }
+        assert_ne!(e.loop_type, LoopType::Menu);
+        assert!(!mouse_button(&mut e, true, MouseButton::Left, false, 1.1));
+        assert!(!e.button_held());
+        // Outside the menus, with the pointer free, a press grabs it.
+        assert_eq!(e.loop_type, LoopType::Video);
+        e.end_video();
+        pass(&mut e);
+        assert!(mouse_button(&mut e, false, MouseButton::Left, true, 2.0));
+        assert!(!e.button_held());
+    }
+
+    /// In the menus the system pointer's moves add to the turn speeds
+    /// (the motion callback @ 0x0040c420 runs in every loop type); outside
+    /// them, with the pointer free, it only places the game's pointer.
+    #[test]
+    fn the_menus_pointer_turns_the_view() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+        let mut last = None;
+        system_pointer(&mut e, None, (100, 100));
+        assert_eq!((e.look.yaw_speed, e.look.pitch_speed), (0.0, 0.0));
+        e.escape();
+        assert_eq!(e.loop_type, LoopType::Menu);
+        system_pointer(&mut e, Some(&mut last), (100, 100));
+        assert_eq!((e.look.yaw_speed, e.look.pitch_speed), (0.0, 0.0));
+        system_pointer(&mut e, Some(&mut last), (140, 90));
+        let mut want = atlantis2_engine::look::Look::default();
+        want.mouse(e.fpu(), 40, -10);
+        assert_eq!(
+            (e.look.yaw_speed, e.look.pitch_speed),
+            (want.yaw_speed, want.pitch_speed)
+        );
+        assert_eq!(last, Some((140, 90)));
+    }
 
     #[test]
     fn sizes() {
@@ -1499,7 +1853,7 @@ mod tests {
         });
         let mut frame = 0usize;
         let (mut composed, mut layers, mut filled) = (0, 0, 0);
-        // `n` frames of 1/60 s as the window runs them, `input` given to
+        // `n` frames of `PASS` as the window runs them, `input` given to
         // both engines before each; every 8th frame (and the last)
         // composed in the window, with the options menu over it when
         // `options` is given.
@@ -1509,7 +1863,7 @@ mod tests {
                         options: Option<&OptionsMenu>| {
             for k in 0..n {
                 for s in sides.iter_mut() {
-                    let t = frame as f64 / 60.0;
+                    let t = frame as f64 * PASS;
                     input(&mut s.engine, k, t);
                     s.engine.set_clock(t);
                     s.picture.prepare(&mut s.engine, ww, wh);
@@ -1573,9 +1927,16 @@ mod tests {
             );
         };
         let none = &mut |_: &mut Engine, _: usize, _: f64| {};
-        // A new game: its opening film ended, Tibet's first view.
+        // A new game: the music copy's please-wait page (the data folder
+        // may be new), its opening film ended, Tibet's first view.
         for s in sides.iter_mut() {
             s.engine.start_new_game().unwrap();
+        }
+        if sides[0].engine.copying() {
+            play(&mut sides, 60, none, None);
+        }
+        for s in sides.iter_mut() {
+            assert!(!s.engine.copying());
             s.engine.end_video();
         }
         play(&mut sides, 60, none, None);

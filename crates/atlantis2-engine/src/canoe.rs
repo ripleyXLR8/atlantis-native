@@ -39,7 +39,7 @@
 
 use atlantis2_data::canoe::{depth_tile, depth_tile_name, parse_trajectory, Waypoint};
 use atlantis2_data::db::Scene;
-use atlantis2_data::spr::{Mode, SprBank, Target as SprTarget};
+use atlantis2_data::spr::{Mode, SprBank, SprDll, Target as SprTarget};
 use atlantis2_data::tga::Tga;
 
 use crate::atl3d::ortho::{
@@ -323,6 +323,9 @@ pub struct Canoe {
     pub pointer_bank: SprBank,
     /// @ 0x005e2150: the square under the pointer, −1 none.
     pub hovered: i32,
+    /// The sprite library the tiles are drawn with (the pointed one at
+    /// 50 %): `spr_p6.dll` by default, the engine's choice.
+    pub spr_dll: SprDll,
     /// @ 0x005e2154: the tile in hand, −1 none; @ 0x006d7fe0 the square it
     /// came from; @ 0x005e2348, 0x005e234c the point it was taken at.
     pub held: i32,
@@ -439,6 +442,7 @@ impl Canoe {
             counter,
             pointer_bank,
             hovered: -1,
+            spr_dll: SprDll::default(),
             held: -1,
             from: -1,
             hold_at: (-1, -1),
@@ -1137,6 +1141,7 @@ impl Canoe {
                 Some(ox - 0x10f + sq.x),
                 oy - 0x6b + sq.y,
                 mode,
+                self.spr_dll,
             );
         }
         if self.in_order != 0 {
@@ -1147,6 +1152,7 @@ impl Canoe {
                 None,
                 i32::MIN,
                 Mode::Opaque,
+                self.spr_dll,
             );
         }
         // FUN_004999e0(from or 999, 1): the stones not on the held tile.
@@ -1191,6 +1197,7 @@ impl Canoe {
                 Some(ox - 0x10f - 0x10 + mx),
                 oy - 0x6b - 0x36 + my,
                 Mode::Opaque,
+                self.spr_dll,
             );
         }
         if self.held != -1 {
@@ -1223,6 +1230,7 @@ impl Canoe {
             Some(w / 2 + mx),
             h / 2 + my,
             Mode::Opaque,
+            self.spr_dll,
         );
     }
 
@@ -1448,7 +1456,15 @@ fn next_turn(t: i32) -> i32 {
 
 /// `AtlSpr_Aff` (FUN_0047bc40) on the 640 x 480 screen: the size and
 /// position checks, then the sprite (`None` x: its default position).
-fn aff(bank: &SprBank, out: &mut [u16], index: usize, x: Option<i32>, y: i32, mode: Mode) {
+fn aff(
+    bank: &SprBank,
+    out: &mut [u16],
+    index: usize,
+    x: Option<i32>,
+    y: i32,
+    mode: Mode,
+    dll: SprDll,
+) {
     let Some(info) = bank.info(index) else {
         log::warn!("AtlSpr_Aff num spr incorrect {index}");
         return;
@@ -1463,5 +1479,5 @@ fn aff(bank: &SprBank, out: &mut [u16], index: usize, x: Option<i32>, y: i32, mo
         }
     }
     let mut t = SprTarget::screen(out, W, H);
-    bank.draw_mode(&mut t, x, y, index, mode);
+    bank.draw_with(&mut t, x, y, index, mode, dll);
 }

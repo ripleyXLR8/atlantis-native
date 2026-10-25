@@ -18,10 +18,14 @@ use std::path::PathBuf;
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 use atlantis2_data::{A2Files, Folder};
+use atlantis2_engine::anim::MsvcRand;
 use atlantis2_engine::display::blit_640_to_800;
 use atlantis2_engine::engine::{yucatan_click_hooks, yucatan_entry_hooks};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, EngineError, Event, Fpu, LoopType, Variant};
+
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
 
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
@@ -190,6 +194,125 @@ fn lines_as_the_original(lines: &[(i32, usize)]) {
             assert!(golden.lines().any(|g| g.starts_with(&head)), "{head}");
         }
     }
+}
+
+const CHAINS: &str = include_str!("golden/spw_chains.txt");
+
+/// The place animation state chains against the original
+/// (`spw_chains.txt`): every state record of the 25 WAMs with a next state
+/// (only Chac's animations 1 and 2 in view 123, both to `A1`); the slots
+/// of each such view as its entry leaves them (+0x28 set, +0x2c the next
+/// state's slot); then the 15 Hz steps with chapi037's commands on Chac
+/// (`GOTOFRAMEPERSO=CHAC,30`, `playanimp=CHAC,2`, then
+/// `ChangeAnimGotoPerso=CHAC,1,1` after animation 2 or during it, or
+/// never): animation 2 hands back to animation 1, which loops on itself,
+/// or plays animation 2 again while `playanimp`'s chain stands.
+#[test]
+fn place_animation_chains_match_the_original() {
+    let Some(files) = game() else { return };
+    let dir = PathBuf::from(std::env::var_os("ATLANTIS2_DATA").unwrap()).join("wam");
+    let mut wams: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|d| d.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("wam")))
+        .collect();
+    wams.sort_by_key(|p| p.to_string_lossy().to_lowercase());
+    assert_eq!(wams.len(), 25);
+    let mut chained = Vec::new();
+    for p in &wams {
+        let wam = atlantis2_data::wam::Wam::parse(&std::fs::read(p).unwrap()).unwrap();
+        for e in &wam.entities {
+            for s in e.state_records().filter(|s| s.next != 0) {
+                let next: String = s
+                    .next
+                    .to_le_bytes()
+                    .iter()
+                    .take_while(|&&b| b != 0)
+                    .map(|&b| char::from(b))
+                    .collect();
+                chained.push(format!(
+                    "chained {} view {} {} anim {} next {next}",
+                    p.file_name().unwrap().to_string_lossy(),
+                    s.view,
+                    e.con_name,
+                    s.anim
+                ));
+            }
+        }
+    }
+    let rows: Vec<&str> = CHAINS.lines().filter(|l| !l.starts_with('#')).collect();
+    let want: Vec<&str> = rows
+        .iter()
+        .copied()
+        .filter(|l| l.starts_with("chained "))
+        .collect();
+    assert_eq!(chained, want);
+
+    // The scripts' state of a game in Xibalba, with the show / hide table
+    // empty as in the harness (which ran no chapter's `/INIT`).
+    let mut e = in_xibalba(files);
+    e.anim.table = Default::default();
+    let mut got: Vec<String> = Vec::new();
+    let mut want: Vec<String> = Vec::new();
+    let mut tick = 0;
+    for row in rows.iter().filter(|l| !l.starts_with("chained ")) {
+        want.push(row.to_string());
+        if let Some(head) = row.strip_prefix("== view ") {
+            let (view, rest) = head.split_once(" of ").unwrap();
+            let wam = rest.split_once(':').unwrap().0;
+            e.anim.rand = MsvcRand(1000);
+            e.load_place(wam);
+            e.enter_at(view.parse().unwrap(), 0.0, 0.0).unwrap();
+            got.push(row.to_string());
+            for (n, s) in e.anim.slots.iter().enumerate() {
+                got.push(format!(
+                    "slot {n} id {} kind {} anim {} weight {} click {} active {} frames {} \
+                     start {} end {} chain {} handing {}",
+                    s.id,
+                    s.kind,
+                    s.state.anim,
+                    s.state.weight,
+                    s.click,
+                    i32::from(s.active),
+                    s.count,
+                    s.start,
+                    s.end,
+                    s.chain,
+                    i32::from(s.handing)
+                ));
+            }
+            tick = 0;
+        } else if let Some(line) = row.strip_prefix("cmd /set") {
+            e.run_command(line.as_bytes());
+            got.push(row.to_string());
+        } else if row.starts_with("tick ") {
+            e.anim.step();
+            let active: Vec<String> = e
+                .anim
+                .slots
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.active)
+                .map(|(n, s)| {
+                    let h = if s.handing {
+                        format!("h{}", s.chain)
+                    } else {
+                        String::new()
+                    };
+                    format!("{n}:{}/{}{h}", s.frame, s.end)
+                })
+                .collect();
+            got.push(format!("tick {tick} {}", active.join(" ")));
+            tick += 1;
+        }
+    }
+    let first = got.iter().zip(&want).position(|(g, w)| g != w);
+    assert!(
+        first.is_none() && got.len() == want.len(),
+        "first difference at row {first:?}: got {:?}, want {:?}",
+        first.map(|i| &got[i]),
+        first.map(|i| &want[i])
+    );
 }
 
 #[test]
@@ -749,6 +872,22 @@ fn the_web_is_played() {
     assert_eq!(e.puzzle_mode(), 1);
 }
 
+/// The dialog loop as the original's (`dialog_loop.txt`) on dialog 190
+/// (Tezcat's `voixoff0` lines between the hero's head lines) in view 123:
+/// under Tezcat's subtitles the panorama, not the hero's last head; Chac
+/// and the place animations step through the dialog; the panorama back at
+/// 76° after the end.
+#[test]
+fn the_dialog_loop_in_xibalba_matches_the_original() {
+    let Some(files) = game() else { return };
+    let mut e = in_xibalba(files);
+    e.load_place("xibalba.wam");
+    e.enter_at(123, 0.0, 0.0).unwrap();
+    let (kinds, stepped) = dialog_loop::check_dialog_loop(&mut e, 190);
+    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0, 2]);
+    assert!(stepped);
+}
+
 /// Every dialog Xibalba's chapters start (`dial=N`) and the web's code
 /// (187-189, by RunOneCommand) plays to its end with its heads and bodies
 /// drawn.
@@ -785,6 +924,8 @@ fn every_xibalba_dialog_plays() {
             }
         }
         assert!(ended, "dialog {n} does not end");
+        // The panorama back at 76° (FUN_00402960 at the end).
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
         let n_lines = e
             .events
             .iter()
@@ -921,7 +1062,12 @@ fn xibalba_subjects_objects_musics_and_films() {
 fn xibalba_place_sounds_play() {
     let Some(files) = game() else { return };
     for (place, view) in [("xibalba.wam", 101), ("riviere.wam", 300)] {
-        let mut e = bare(game().unwrap(), place, view);
+        // In Xibalba, disc 4 in the drive: the sounds are read from the
+        // current disc only, as the original reads them.
+        let mut e = in_xibalba(game().unwrap());
+        e.load_place(place);
+        e.enter_at(view, 0.0, 0.0).unwrap();
+        e.events.clear();
         assert!(!e.place.sources.is_empty(), "{place}");
         let mut started = false;
         for _ in 0..3000 {
@@ -1013,4 +1159,28 @@ fn a_save_in_the_web_loads_in_view_198() {
     // Then the view's entry in the mode 1: FUN_0048f9a0 (198: nothing).
     assert_eq!(noted(&f.events), [0x0048_f450, 0x0048_f530, 0x0048_f9a0]);
     assert_eq!((f.puzzle_mode(), f.web.stage, f.web.loaded), (1, 1, false));
+}
+
+/// The web's stage is the save's entry 27 (@ 0x005e1340, initial 3): a
+/// save made in the web in stage 2 with the grasshopper in the bag, loaded
+/// in a new game (whose stage is 3), ends the round as the original's load
+/// hook does (FUN_0048f450 @ 0x0048f4d1: `finaraign2`).
+#[test]
+fn the_web_stage_is_saved_and_loaded() {
+    let Some(files) = game() else { return };
+    let mut e = in_xibalba(files);
+    // A new game's save carries the stage's initial value.
+    assert_eq!(e.save_data().i32(27), 3);
+    e.run_command(b"(finaraign1=1)");
+    goto(&mut e, "toile.wam", 198, 38);
+    goto(&mut e, "toile.wam", 230, 38);
+    assert_eq!(e.web.stage, 2);
+    e.run_command(b"(sacados=SAUTERELLE)");
+    let saved = e.save_data();
+    assert_eq!(saved.i32(27), 2);
+    let f = loaded(&saved);
+    assert_eq!(f.place(), ("toile.wam", 198));
+    assert_eq!(var(&f, "finaraign2"), 1);
+    // The entry FUN_0048f530 computes the stage again from the variables.
+    assert_eq!(f.web.stage, 3);
 }

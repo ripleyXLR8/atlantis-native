@@ -20,6 +20,7 @@ use atlantis2_data::spw::{Spw, FACE};
 use atlantis2_data::wam::{EntityState, Zone};
 use atlantis2_data::A2Files;
 use atlantis2_engine::anim::{Anim, LIST_END};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{irish_click_hook, irish_entry_hook, SKULL_OBJECTS, SKULL_START};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -977,7 +978,7 @@ fn the_state_is_saved_and_loaded() {
 
 // ---- The puzzle played ------------------------------------------------------
 
-/// The engine at 60 passes a second (a 15 Hz tick every fourth), every
+/// The engine at 59.94 passes a second ([`PASS`]) (a 15 Hz tick every fourth), every
 /// pass drawn.
 struct Run {
     e: Engine,
@@ -989,7 +990,7 @@ struct Run {
 
 impl Run {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

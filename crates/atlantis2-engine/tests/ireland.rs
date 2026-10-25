@@ -19,6 +19,9 @@ use atlantis2_engine::engine::{irish_click_hook, irish_entry_hook};
 use atlantis2_engine::sound::{Pcm, VOICE_EFFECTS};
 use atlantis2_engine::{Engine, Enhancements, Event, Fpu, LoopType, Variant};
 
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
+
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
         std::env::var_os("ATLANTIS2_DATA"),
@@ -543,6 +546,43 @@ fn the_horse_keeps_its_frame_across_views() {
     assert_eq!(e.anim.slots[slot].frame, 0);
 }
 
+/// `ADDFRAMEOBJET=CHEVAL` past the range of view 27's horse zeroes the
+/// range on the WAM's state record (@ 0x00483565..0x00483574), so the
+/// next entry of view 27 plays the horse's whole file instead of its
+/// 585-609 waiting loop.
+#[test]
+fn the_horse_range_zeroed_lasts_until_the_next_place() {
+    let Some(files) = game() else { return };
+    let mut e = in_ireland(files);
+    e.run_command(b"(showobjet=CHEVAL)");
+    let horse = e
+        .script_state()
+        .unwrap()
+        .names
+        .id(defnames::OBJETS, b"CHEVAL")
+        .unwrap() as i32;
+    let slot_of = |e: &Engine| e.anim.slots.iter().position(|s| s.id == horse).unwrap();
+    e.run_command(b"(framecheval=0)");
+    e.enter_at(27, 0.0, 0.0).unwrap();
+    let s = &e.anim.slots[slot_of(&e)];
+    assert_eq!((s.state.first, s.state.end), (585, 610));
+    for _ in 0..12 {
+        e.run_command(b"(addframeobjet=CHEVAL,60)");
+    }
+    let s = &e.anim.slots[slot_of(&e)];
+    assert_eq!((s.state.first, s.state.end, s.end), (0, 0, s.count));
+    // Back in view 27 from view 26: the record keeps the zeroed range.
+    e.enter_at(26, 0.0, 0.0).unwrap();
+    e.enter_at(27, 0.0, 0.0).unwrap();
+    let s = &e.anim.slots[slot_of(&e)];
+    assert_eq!((s.state.first, s.state.end, s.end), (0, 0, s.count));
+    // A new `changewam` reads the file again.
+    e.run_command(b"(changewam=bigile1.wam)");
+    e.enter_at(27, 0.0, 0.0).unwrap();
+    let s = &e.anim.slots[slot_of(&e)];
+    assert_eq!((s.state.first, s.state.end), (585, 610));
+}
+
 /// The values a key takes in the Irish chapters' `/set` lines (not the
 /// `#` ones), by the text after `KEY=` up to `)`.
 fn set_values(files: &A2Files, key: &str) -> Vec<String> {
@@ -572,6 +612,30 @@ fn set_values(files: &A2Files, key: &str) -> Vec<String> {
         }
     }
     out
+}
+
+/// The dialog loop as the original's (`dialog_loop.txt`) on Ireland's
+/// four kinds of lines: a head dialog, dialog 56 (`voixoff`: the view
+/// turns with the mouse), dialog 44 (`voixoff0`: the panorama drawn
+/// under Liam's subtitle, not the last head, the dowsing rod and the
+/// overlays over it) and dialog 71 (`cinema` lines, here started in the
+/// dialog loop: the subtitle alone, no panorama, no rod, no turn); the
+/// place animations step on the 15 Hz ticks under the panorama lines,
+/// and the panorama is back at 76° after each end.
+#[test]
+fn the_dialog_loop_in_ireland_matches_the_original() {
+    let Some(files) = game() else { return };
+    let mut e = in_ireland(files);
+    let mut kinds = std::collections::BTreeSet::new();
+    let mut stepped = false;
+    for n in [1, 56, 44, 71] {
+        let (k, s) = dialog_loop::check_dialog_loop(&mut e, n);
+        kinds.extend(k);
+        stepped |= s;
+        settle(&mut e);
+    }
+    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0, 1, 2, 3]);
+    assert!(stepped);
 }
 
 #[test]
@@ -607,6 +671,8 @@ fn every_irish_dialog_plays() {
             }
         }
         assert!(ended, "dialog {n} does not end");
+        // The panorama back at 76° (FUN_00402960 at the end).
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
         lines += e
             .events
             .iter()

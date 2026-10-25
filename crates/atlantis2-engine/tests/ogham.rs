@@ -19,6 +19,7 @@ use atlantis2_data::spw::{Spw, FACE};
 use atlantis2_data::wam::EntityState;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::anim::{Anim, FRAME_TAB as LIST, LIST_END};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{
     irish_click_hook, ogham_click, OghamClick, OGHAM_START, OGHAM_TARGET,
 };
@@ -455,7 +456,7 @@ fn the_stones_are_drawn_as_the_original() {
 const W: usize = 640;
 const H: usize = 480;
 
-/// The engine at 60 passes a second, every pass drawn.
+/// The engine at 59.94 passes a second ([`PASS`]), every pass drawn.
 struct Run {
     e: Engine,
     pass: u64,
@@ -485,7 +486,7 @@ impl Run {
     }
 
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {
@@ -747,6 +748,10 @@ fn the_ogham_stones_played_with_the_mouse() {
     std::fs::create_dir_all(&dir).unwrap();
     r.e.set_data_dir(Some(dir));
     r.e.start_new_game().unwrap();
+    // The music copy's please-wait page of a first new game.
+    while r.e.copying() {
+        r.step();
+    }
     r.e.end_video();
     r.wait(5);
     // Chapter 15's state: Ireland's hub chapter (3) with Ailill's knife
