@@ -909,12 +909,16 @@ fn chinese_subjects_objects_and_music_are_on_disc_3() {
 
 /// `chine.wam`'s and `miniature.wam`'s place sounds (the places of the
 /// executable's listener table that have sources) start in a view that
-/// hears them.
+/// hears them, in a game in China (disc 3 in the drive: the sounds are
+/// read from the current disc only, as the original reads them).
 #[test]
 fn chinese_place_sounds_play() {
     let Some(files) = game() else { return };
     for (place, view) in [("chine.wam", 1), ("miniature.wam", 21)] {
-        let mut e = bare(game().unwrap(), place, view);
+        let mut e = in_china(game().unwrap());
+        e.load_place(place);
+        e.enter_at(view, 0.0, 0.0).unwrap();
+        e.events.clear();
         assert!(!e.place.sources.is_empty(), "{place}");
         let mut started = false;
         for _ in 0..3000 {

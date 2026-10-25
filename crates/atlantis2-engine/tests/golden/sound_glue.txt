@@ -1,0 +1,86 @@
+# The sound glue around videos and music of the original atlantis2.exe (French CD build of 1999,
+# 2199552 bytes, MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation, x87 control word 0x027f.
+# Producer: an emulation harness running the original code unmodified: the video end
+# FUN_0040bae0 (FUN_0047a3d0, FUN_0047aa30, FUN_0047a380), FUN_0040bb80 / FUN_0040bb90 (the
+# "music back to 100 %" flag @ 0x00656999), play music FUN_0047a200, NEWSOUND FUN_0047a290, the
+# film / intro track FUN_0047a320, TrajSound= FUN_0047a390 and a move's FUN_0047a350, the sound
+# table (FUN_0047a530, FUN_0047a610, FUN_0047aad0 with the APC decoder on a synthetic 64-sample
+# file), FUN_0047a650, and AtlHnm_start FUN_0040bf60. Stubs: the logs, the current CD's root
+# ("D:"), the file layer (a scenario's set of files that open), the allocator, the voices (stop,
+# play and state, recorded), the music percent and start (recorded), LOADMUSIK, the music
+# passes, the video file's open (the scenario's answer) and close, the loop type's setter.
+# Rows `glue.<scenario>.<nn> <step> | <calls the step made> | <state after>`: the steps are the
+# original's functions (`newsound` FUN_0047a290, `film_track` FUN_0047a320, `trajsound=`
+# FUN_0047a390, `move` FUN_0047a350, `hnm_start` FUN_0040bf60, `video_end` FUN_0040bae0 as the
+# video loop calls it (loop type 1; 2 as a dialog's stream close), `play_music` FUN_0047a200,
+# `warp_draw` FUN_0040bb90); the state is @ 0x006d168d (`owns`), @ 0x00673f34 (`entry`), the
+# TrajSound name @ 0x00673198, @ 0x00656999 and voice 2. `glue.<scenario>.end` sums up what
+# tests/sound_glue.rs compares.
+glue.film_then_draw.00 video_end | - | owns=0 entry=0 traj=- music_after_video=1 voice2=silent
+glue.film_then_draw.01 warp_draw | music_percent 100 | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.film_then_draw.end start_play2=0 end_stop2=0 voice2_after=silent draw_percent=100
+glue.film_then_draw.fatal 0
+glue.film_then_startmusik.00 video_end | - | owns=0 entry=0 traj=- music_after_video=1 voice2=silent
+glue.film_then_startmusik.01 play_music 1 -1 0 | music_start muzik01.apc mark-1 loops0 | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.film_then_startmusik.02 warp_draw | - | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.film_then_startmusik.end start_play2=0 end_stop2=0 voice2_after=silent draw_percent=-
+glue.film_then_startmusik.fatal 0
+glue.film_then_same_music.00 video_end | - | owns=0 entry=0 traj=- music_after_video=1 voice2=silent
+glue.film_then_same_music.01 play_music 5 -1 0 | - | owns=0 entry=0 traj=- music_after_video=1 voice2=silent
+glue.film_then_same_music.02 warp_draw | music_percent 100 | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.film_then_same_music.end start_play2=0 end_stop2=0 voice2_after=silent draw_percent=100
+glue.film_then_same_music.fatal 0
+glue.dialog_stream_close.00 video_end | - | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.dialog_stream_close.01 warp_draw | - | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.dialog_stream_close.end start_play2=0 end_stop2=0 voice2_after=silent draw_percent=-
+glue.dialog_stream_close.fatal 0
+glue.newsound_then_film_without_track.00 newsound sound001.apc | open D:\datas_a2\apc\sound001.apc ok; open D:\datas_a2\apc\sound001.apc ok; stop voice2; play voice2 entry0 sound001.apc | owns=0 entry=0 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_film_without_track.01 film_track cine018.apc | open D:\datas_a2\apc\cine018.apc missing | owns=0 entry=-1 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_film_without_track.02 hnm_start cine018.hnm | - | owns=0 entry=-1 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_film_without_track.03 video_end | - | owns=0 entry=-1 traj=- music_after_video=1 voice2=playing
+glue.newsound_then_film_without_track.04 warp_draw | music_percent 100 | owns=0 entry=-1 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_film_without_track.end start_play2=0 end_stop2=0 voice2_after=playing draw_percent=100
+glue.newsound_then_film_without_track.fatal 0
+glue.newsound_then_film_with_track.00 newsound sound001.apc | open D:\datas_a2\apc\sound001.apc ok; open D:\datas_a2\apc\sound001.apc ok; stop voice2; play voice2 entry0 sound001.apc | owns=0 entry=0 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_film_with_track.01 film_track cine008.apc | open D:\datas_a2\apc\cine008.apc ok | owns=1 entry=1 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_film_with_track.02 hnm_start cine008.hnm | stop voice2; play voice2 entry1 cine008.apc | owns=1 entry=1 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_film_with_track.03 video_end | stop voice2 | owns=0 entry=1 traj=- music_after_video=1 voice2=silent
+glue.newsound_then_film_with_track.04 warp_draw | music_percent 100 | owns=0 entry=1 traj=- music_after_video=0 voice2=silent
+glue.newsound_then_film_with_track.end start_play2=1 end_stop2=1 voice2_after=silent draw_percent=100
+glue.newsound_then_film_with_track.fatal 0
+glue.newsound_then_move_with_trajsound.00 newsound sound001.apc | open D:\datas_a2\apc\sound001.apc ok; open D:\datas_a2\apc\sound001.apc ok; stop voice2; play voice2 entry0 sound001.apc | owns=0 entry=0 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_move_with_trajsound.01 trajsound= sound512.apc | - | owns=0 entry=0 traj=sound512.apc music_after_video=0 voice2=playing
+glue.newsound_then_move_with_trajsound.02 move | music_percent 20; open D:\datas_a2\apc\sound512.apc ok | owns=1 entry=1 traj=sound512.apc music_after_video=0 voice2=playing
+glue.newsound_then_move_with_trajsound.03 hnm_start m.hnm | stop voice2; play voice2 entry1 sound512.apc | owns=1 entry=1 traj=sound512.apc music_after_video=0 voice2=playing
+glue.newsound_then_move_with_trajsound.04 video_end | stop voice2 | owns=0 entry=1 traj=- music_after_video=1 voice2=silent
+glue.newsound_then_move_with_trajsound.end start_play2=1 end_stop2=1 voice2_after=silent draw_percent=-
+glue.newsound_then_move_with_trajsound.fatal 0
+glue.newsound_then_move_with_missing_trajsound.00 newsound sound001.apc | open D:\datas_a2\apc\sound001.apc ok; open D:\datas_a2\apc\sound001.apc ok; stop voice2; play voice2 entry0 sound001.apc | owns=0 entry=0 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_move_with_missing_trajsound.01 trajsound= nosuch.apc | - | owns=0 entry=0 traj=nosuch.apc music_after_video=0 voice2=playing
+glue.newsound_then_move_with_missing_trajsound.02 move | music_percent 20; open D:\datas_a2\apc\nosuch.apc missing | owns=1 entry=-1 traj=nosuch.apc music_after_video=0 voice2=playing
+glue.newsound_then_move_with_missing_trajsound.03 hnm_start m.hnm | - | owns=1 entry=-1 traj=nosuch.apc music_after_video=0 voice2=playing
+glue.newsound_then_move_with_missing_trajsound.04 video_end | - | owns=0 entry=-1 traj=- music_after_video=1 voice2=playing
+glue.newsound_then_move_with_missing_trajsound.end start_play2=0 end_stop2=0 voice2_after=playing draw_percent=-
+glue.newsound_then_move_with_missing_trajsound.fatal 0
+glue.newsound_then_move_without_trajsound.00 newsound sound001.apc | open D:\datas_a2\apc\sound001.apc ok; open D:\datas_a2\apc\sound001.apc ok; stop voice2; play voice2 entry0 sound001.apc | owns=0 entry=0 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_move_without_trajsound.01 move | - | owns=0 entry=0 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_move_without_trajsound.02 hnm_start m.hnm | - | owns=0 entry=0 traj=- music_after_video=0 voice2=playing
+glue.newsound_then_move_without_trajsound.03 video_end | - | owns=0 entry=0 traj=- music_after_video=1 voice2=playing
+glue.newsound_then_move_without_trajsound.end start_play2=0 end_stop2=0 voice2_after=playing draw_percent=-
+glue.newsound_then_move_without_trajsound.fatal 0
+glue.newsound_missing.00 newsound sound002.apc | open D:\datas_a2\apc\sound002.apc missing | owns=0 entry=0 traj=- music_after_video=0 voice2=silent
+glue.newsound_missing.end start_play2=0 end_stop2=0 voice2_after=silent draw_percent=-
+glue.newsound_missing.fatal 0
+glue.film_does_not_open.00 film_track cine008.apc | open D:\datas_a2\apc\cine008.apc ok | owns=1 entry=0 traj=- music_after_video=0 voice2=silent
+glue.film_does_not_open.01 hnm_start cine008.hnm | music_percent 100 | owns=1 entry=0 traj=- music_after_video=0 voice2=silent
+glue.film_does_not_open.02 move | - | owns=1 entry=0 traj=- music_after_video=0 voice2=silent
+glue.film_does_not_open.03 hnm_start m.hnm | stop voice2; play voice2 entry0 cine008.apc | owns=1 entry=0 traj=- music_after_video=0 voice2=playing
+glue.film_does_not_open.04 video_end | stop voice2 | owns=0 entry=0 traj=- music_after_video=1 voice2=silent
+glue.film_does_not_open.end start_play2=1 end_stop2=1 voice2_after=silent draw_percent=-
+glue.film_does_not_open.fatal 0
+glue.film_track_not_on_the_current_disc.00 newsound sound001.apc | open D:\datas_a2\apc\sound001.apc ok; open D:\datas_a2\apc\sound001.apc ok; stop voice2; play voice2 entry0 sound001.apc | owns=0 entry=0 traj=- music_after_video=0 voice2=playing
+glue.film_track_not_on_the_current_disc.01 film_track cine044.apc | open D:\datas_a2\apc\cine044.apc missing | owns=0 entry=-1 traj=- music_after_video=0 voice2=playing
+glue.film_track_not_on_the_current_disc.02 hnm_start cine044.hnm | - | owns=0 entry=-1 traj=- music_after_video=0 voice2=playing
+glue.film_track_not_on_the_current_disc.03 video_end | - | owns=0 entry=-1 traj=- music_after_video=1 voice2=playing
+glue.film_track_not_on_the_current_disc.end start_play2=0 end_stop2=0 voice2_after=playing draw_percent=-
+glue.film_track_not_on_the_current_disc.fatal 0

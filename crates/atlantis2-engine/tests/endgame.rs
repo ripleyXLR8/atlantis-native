@@ -225,16 +225,17 @@ fn warp_fov(e: &Engine) -> [f32; 4] {
     atlantis2_engine::Camera::new(e.fpu(), 640, 480).projection()
 }
 
-/// Passes run (a 15 Hz tick every fourth) until the music streamed is
-/// `music`: the switch fades the music before.
+/// Passes run at 60 a second on the clock (its 15 Hz ticks with them)
+/// until the music streamed is `music`: the switch fades the music out
+/// first, at 127 volume units a second.
 fn music_reaches(e: &mut Engine, music: i32) -> bool {
-    for n in 0..1200 {
+    let mut t = e.clock();
+    for _ in 0..1200 {
         if e.music_playing() == Some(music) {
             return true;
         }
-        if n % 4 == 0 {
-            e.tick();
-        }
+        t += 1.0 / 60.0;
+        e.set_clock(t);
         e.pass(None);
     }
     false

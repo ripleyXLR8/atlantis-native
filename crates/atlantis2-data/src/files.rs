@@ -19,6 +19,9 @@
 //! ([`A2Files::set_monde`]). A port with every disc at hand needs no disc
 //! prompt; a file missing from the current disc is read from another disc
 //! that has it (the original would fail to open it), and logged.
+//! [`A2Files::read_current`] reads as the original does, for the files
+//! whose absence the game shows: the sounds (film 44's track is on disc 2,
+//! the film on disc 4, so the original plays it silent).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -315,6 +318,20 @@ impl A2Files {
     pub fn read_with_disc(&self, folder: Folder, name: &str) -> Option<(Vec<u8>, u8)> {
         let (src, path, disc) = self.locate(folder, name)?;
         src.read(&path).map(|d| (d, disc))
+    }
+
+    /// A file as the original opens it: a CD file from the current disc
+    /// only, `None` when that disc does not have it even if another one
+    /// does (the original builds the path on the root of the CD in the
+    /// drive). When the current disc was not found the others are read,
+    /// as [`A2Files::read`] does (the original would ask for the disc).
+    pub fn read_current(&self, folder: Folder, name: &str) -> Option<Vec<u8>> {
+        if folder.location().0 == Root::Cd {
+            if let Some(d) = self.discs.iter().find(|d| d.number == self.current) {
+                return d.source.read(&folder.path(name));
+            }
+        }
+        self.read(folder, name)
     }
 
     /// A CD file from disc `n` only.
