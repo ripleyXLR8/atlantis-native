@@ -69,6 +69,33 @@ const AUTO_WIN: &str = "Puzzle_Lucioles_AutoWin";
 /// one (`etat_etoile%d`).
 pub const FIREFLY_MANDALA: [u8; 8] = [0, 4, 1, 2, 5, 3, 6, 0];
 
+/// The executable's bytes 0x005e1d28..0x005e1dd8 around the table (its
+/// `.data`, read from atlantis2-cd-fr-2199552): `etat_etoile%d`, the
+/// table, `(NewSound=300)`, `Puzzle_Lucioles_Fini`, `OrdreMandala%d`, the
+/// warning, `NbLucioleAllumed` and `Puzzle_Lucioles_AutoWin`, each padded
+/// to 4 bytes. A value v in -16..160 reads its byte here; outside, the
+/// original reads another byte of its image (other strings, or the
+/// zero-filled `.data` the game writes at run time, or an unmapped
+/// address), which the port does not have.
+const AROUND_TABLE: &[u8; 0xb0] = b"etat_etoile%d\0\0\0\
+    \0\x04\x01\x02\x05\x03\x06\0(NewSound=300)\0\0\
+    Puzzle_Lucioles_Fini\0\0\0\0OrdreMandala%d\0\0\
+    pz_lucioles_gere_clic(): zone_clicked->numero=%d\0\0\0\0\
+    NbLucioleAllumed\0\0\0\0Puzzle_Lucioles_AutoWin\0";
+
+/// The address of [`AROUND_TABLE`]'s first byte.
+const AROUND_TABLE_AT: i64 = 0x005e_1d28;
+
+/// The address of [`FIREFLY_MANDALA`].
+const TABLE_AT: i64 = 0x005e_1d38;
+
+/// The byte @ 0x005e1d38 + `v` (`movsx` @ 0x0049525f), when the port has
+/// it ([`AROUND_TABLE`]).
+pub fn firefly_order_byte(v: i32) -> Option<i8> {
+    let i = usize::try_from(TABLE_AT + i64::from(v) - AROUND_TABLE_AT).ok()?;
+    AROUND_TABLE.get(i).map(|&b| b as i8)
+}
+
 /// The variable whose rank the sixth firefly is compared with
 /// (`OrdreMandala%d` @ 0x005e1d68).
 const ORDER: &str = "OrdreMandala";
@@ -148,8 +175,11 @@ impl Engine {
     /// at the count 6, whatever the five before; the count is never reset
     /// here (the scripts set it to 0), so a seventh click does not test
     /// again. No zone of the data has a value outside 1..6: there the name
-    /// looked up (`OrdreMandala0`, or the bytes around the table) is not a
-    /// variable, `DefName_GetIdName`'s fatal error (@ 0x004106a3).
+    /// looked up (`OrdreMandala0`, or the bytes around the table:
+    /// `OrdreMandala40` for 8, the `(`) is not a variable,
+    /// `DefName_GetIdName`'s fatal error (@ 0x004106a3); for a v whose
+    /// byte the port does not have ([`firefly_order_byte`]), the message
+    /// names the byte instead.
     pub fn fireflies_click(&mut self, zone: &Zone) {
         if zone.kind != 1 {
             return;
@@ -161,15 +191,16 @@ impl Engine {
         } else {
             self.with_script(|s, _| s.warn(BAD_VALUE, &v.to_string()));
         }
-        // The byte @ 0x005e1d38 + v, sign-extended: the table's for 0..7;
-        // outside, the bytes around it, none of which names a variable.
-        let order = usize::try_from(v)
-            .ok()
-            .and_then(|i| FIREFLY_MANDALA.get(i))
-            .map(|&k| format!("{ORDER}{}", k as i8));
+        // The byte @ 0x005e1d38 + v, sign-extended, and
+        // `sprintf("OrdreMandala%d")` (@ 0x0049526d): the table's for
+        // 0..7; outside, the bytes around it, none of which names a
+        // variable.
+        let order = firefly_order_byte(v).map(|k| format!("{ORDER}{k}"));
         let sounded = self.with_script(|s, h| {
             let lit = s.var(LIT);
             let Some(rank) = order.as_deref().and_then(|name| s.var(name)) else {
+                // Beyond the bytes the port has, the name is unknown: the
+                // message says which byte the original reads instead.
                 let name = order.unwrap_or_else(|| format!("{ORDER}<byte 0x005e1d38{v:+}>"));
                 let msg = format!("DefName_GetIdName: Nom de #VARIABLES# inconnu:{name}");
                 log::error!("{msg}");

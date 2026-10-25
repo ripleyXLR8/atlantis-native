@@ -20,7 +20,8 @@ use std::path::PathBuf;
 use atlantis2_data::wam::Zone;
 use atlantis2_data::A2Files;
 use atlantis2_engine::engine::{
-    fireflies_place, shamballa_click_hooks, FIREFLIES_CLICK, FIREFLIES_MOVE_END, FIREFLY_MANDALA,
+    fireflies_place, firefly_order_byte, shamballa_click_hooks, FIREFLIES_CLICK,
+    FIREFLIES_MOVE_END, FIREFLY_MANDALA,
 };
 use atlantis2_engine::{Camera, Engine, Event, Fpu, LoopType, Variant};
 
@@ -218,8 +219,20 @@ fn the_click_alone_against_the_original() {
         set(&mut e, "NbLucioleAllumed", 5);
         set(&mut e, "Puzzle_Lucioles_Fini", 0);
         (e.look.yaw_speed, e.look.pitch_speed) = (1.5, 1.5);
+        // The byte the original reads @ 0x005e1d38 + v, and the name it
+        // builds from it (`OrdreMandala%d`).
+        let byte: i8 = head.rsplit("byte=").next().unwrap().parse().unwrap();
+        assert_eq!(firefly_order_byte(v), Some(byte), "{head}");
         let (calls, errors) = click(&mut e, 1, v);
         assert_eq!(calls, "-", "the fatal ends the click");
+        assert_eq!(
+            e.script_state().unwrap().fatal.as_deref(),
+            Some(
+                format!("DefName_GetIdName: Nom de #VARIABLES# inconnu:OrdreMandala{byte}")
+                    .as_str()
+            ),
+            "{head}"
+        );
         let got = format!(
             "{head}: {} speeds={} calls=RunOneCommand('(NewSound=300)') errors={errors}",
             state(&e),

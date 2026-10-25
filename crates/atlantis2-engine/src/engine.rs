@@ -67,8 +67,9 @@ pub use puzzles::{
 mod saves;
 mod shamballa;
 pub use shamballa::{
-    atlantis_entry_hooks, fireflies_place, shamballa_click_hooks, FIREFLIES_CLICK,
-    FIREFLIES_MOVE_END, FIREFLY_MANDALA, OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_TICK,
+    atlantis_entry_hooks, fireflies_place, firefly_order_byte, shamballa_click_hooks,
+    FIREFLIES_CLICK, FIREFLIES_MOVE_END, FIREFLY_MANDALA, OCTOPUS_ENTRY, OCTOPUS_MODE,
+    OCTOPUS_TICK,
 };
 mod subjects;
 mod turtle;

@@ -1589,7 +1589,12 @@ back) into `yucatan-*.png`.
   wrong ones the vortex back to Tibet and the crystal laid again are the
   way to try again. A value outside 1..6 (no zone has one) warns and
   ends on `DefName_GetIdName`'s fatal error, the name read around the
-  table not being a variable. The click is not consumed: the move goes
+  table not being a variable (`OrdreMandala%d` of the signed byte @
+  0x005e1d38 + v: `OrdreMandala0` for 0 and 7, `OrdreMandala40` for 8).
+  The port has the executable's bytes 0x005e1d28..0x005e1dd8 (v in
+  -16..160); for a v beyond them, the byte the original reads (another
+  string, the `.data` it writes at run time, or an unmapped address) is
+  unknown to the port, whose message names the byte's address instead. The click is not consumed: the move goes
   on; the win's move end (a firefly other than view 1's) runs the
   automatic way on (film 62, Rhea), a win on view 1's own firefly waits
   for the vortex. The puzzle draws nothing of its own (each lit firefly
