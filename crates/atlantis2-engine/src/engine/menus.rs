@@ -11,7 +11,7 @@ use crate::menu::{Menu, MenuHost, PageKind, Settings, HEIGHT, WIDTH};
 impl Engine {
     /// Runs `f` on the menus with the engine as their host (the menus are
     /// loaded at the first use, as `AtlMenu_MainInit` at start-up).
-    fn with_menu<R>(&mut self, f: impl FnOnce(&mut Menu, &mut Engine) -> R) -> R {
+    pub(super) fn with_menu<R>(&mut self, f: impl FnOnce(&mut Menu, &mut Engine) -> R) -> R {
         let mut m = self
             .menu
             .take()
@@ -20,6 +20,7 @@ impl Engine {
         // 0x006569bc), the one the bag bar reads too.
         m.input.x = self.pointer.0.clamp(0, WIDTH as i32 - 1);
         m.input.y = self.pointer.1.clamp(0, HEIGHT as i32 - 1);
+        m.input.held = self.button_held;
         let r = f(&mut m, self);
         self.menu = Some(m);
         r
@@ -66,6 +67,9 @@ impl Engine {
     /// panorama opens the main menu, a dialog ends, a video goes on, the
     /// menu closes when it is the main menu opened from the game.
     pub fn escape(&mut self) {
+        if self.hold_input(super::media::Input::Escape) {
+            return;
+        }
         match self.loop_type {
             LoopType::Warp | LoopType::Picture => self.open_main_menu(),
             LoopType::Dialog => self.end_dialog(),
@@ -87,6 +91,9 @@ impl Engine {
     /// screen): the game's one pointer (@ 0x006569c0, 0x006569bc), which
     /// the menus and the bag bar both read.
     pub fn pointer(&mut self, x: i32, y: i32) {
+        if self.hold_input(super::media::Input::Pointer(x, y)) {
+            return;
+        }
         let (w, h) = (self.width() as i32, self.height() as i32);
         self.pointer = (x.clamp(0, w - 1), y.clamp(0, h - 1));
         if let Some(m) = self.menu.as_mut() {
@@ -95,11 +102,22 @@ impl Engine {
         }
     }
 
-    /// The left button released (the held flag @ 0x006569ca).
+    /// The left button released: the held flag (@ 0x006569ca) cleared
+    /// in every loop type (FUN_0040c660 @ 0x0040c669), so a press that
+    /// closed a menu does not leave the next menu's buttons still.
     pub fn release(&mut self) {
+        if self.hold_input(super::media::Input::Release) {
+            return;
+        }
+        self.button_held = false;
         if let Some(m) = self.menu.as_mut() {
             m.input.held = false;
         }
+    }
+
+    /// Whether the left button is held (@ 0x006569ca).
+    pub fn button_held(&self) -> bool {
+        self.button_held
     }
 
     /// Whether the menus want the program to end.
@@ -162,9 +180,10 @@ impl MenuHost for Engine {
         if self.loop_type != LoopType::Menu {
             self.menu_prev_loop = self.loop_type;
         }
+        // The turn speeds are kept (only FUN_0040c680 zeroes them, and no
+        // menu code calls it): the menu frame runs no decay, and the
+        // pointer's moves add to them ([`Engine::pointer_moved`]).
         self.set_loop_type(LoopType::Menu);
-        // The turn stops while a menu is open.
-        self.look.stop();
     }
 
     fn leave_menu_loop(&mut self) {
@@ -265,6 +284,9 @@ impl MenuHost for Engine {
     }
 
     fn disc_present(&mut self, n: u8) -> bool {
+        // FUN_0040e090: the drives looked at again; here the folders the
+        // discs were found in.
+        self.files.refresh_discs();
         self.files.disc_numbers().contains(&n)
     }
 

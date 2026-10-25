@@ -124,6 +124,27 @@ pub struct Settings {
     pub dialogs: i32,
 }
 
+/// The sliders' values from the volumes, as every `AtlMenu_start*` sets
+/// them (`AtlMenu_start` @ 0x00486954..0x004869cf): general × (float)
+/// 1/256; music × (float) 0.007874016 / general, or 0 when general is 0
+/// (the test @ 0x00486970); dialogs and effects × (float) 0.007874016.
+pub fn slider_values(fpu: Fpu, s: &Settings) -> [f32; 4] {
+    // The float constants @ 0x005c65a8 and 0x005c66a8.
+    let k = f64::from(f32::from_bits(0x3c01_0204));
+    let general = fpu.f32(fpu.mul(f64::from(s.general), 1.0 / 256.0));
+    let music = if general == 0.0 {
+        0.0
+    } else {
+        fpu.f32(fpu.div(fpu.mul(f64::from(s.music), k), f64::from(general)))
+    };
+    [
+        general,
+        music,
+        fpu.f32(fpu.mul(f64::from(s.dialogs), k)),
+        fpu.f32(fpu.mul(f64::from(s.effects), k)),
+    ]
+}
+
 /// What the menus do outside themselves.
 pub trait MenuHost {
     fn files(&self) -> &A2Files;
@@ -459,14 +480,7 @@ impl Menu {
 
     /// The slider values from the volumes (at every opening).
     fn values_from(&mut self, fpu: Fpu, s: &Settings) {
-        let general = fpu.f32(fpu.div(f64::from(s.general), 256.0));
-        let music = fpu.f32(fpu.div(fpu.div(f64::from(s.music), 127.0), f64::from(general)));
-        self.values = [
-            general,
-            music,
-            fpu.f32(fpu.div(f64::from(s.dialogs), 127.0)),
-            fpu.f32(fpu.div(f64::from(s.effects), 127.0)),
-        ];
+        self.values = slider_values(fpu, s);
     }
 
     fn start(&mut self, host: &mut dyn MenuHost, page: PageKind, enter_loop: bool) {
@@ -1315,9 +1329,10 @@ impl Menu {
                 if let Some(p) = self.page.as_mut() {
                     p.move_by("c_load.spr", -c, 0);
                     p.move_by("a_disc.spr", -c, 0);
+                    // Shown since the slide's start (below), enabled at
+                    // its end (FUN_00472680, state 3 @ the 30th move).
                     if c >= 30 {
                         for n in ["a_load.spr", "a_save.spr"] {
-                            p.show(n);
                             p.enable(n);
                         }
                     }
@@ -1402,9 +1417,10 @@ impl Menu {
                 _ => {}
             },
             state::CD => {
-                // Every 100 ticks (6.7 s) the disc is looked for.
+                // Every 100 ticks (6.7 s) the disc is looked for (state 9:
+                // `100 < ticks - start`).
                 let now = host.ticks();
-                if now.wrapping_sub(self.cd_check) >= 100 {
+                if now.wrapping_sub(self.cd_check) > 100 {
                     self.cd_check = now;
                     if host.disc_present(self.cd_disc) {
                         log::info!("Changement de CD => insertion CD N°{}", self.cd_disc);
@@ -1451,6 +1467,12 @@ impl Menu {
             action::OPTIONS | action::SOUND | action::LOAD_SAVE => {
                 if let Some(p) = self.page.as_mut() {
                     p.disable_all();
+                    // The load and save icons are shown at once, still
+                    // disabled (FUN_00472710 on both, state 0 action 4).
+                    if act == action::LOAD_SAVE {
+                        p.show("a_load.spr");
+                        p.show("a_save.spr");
+                    }
                 }
                 self.counter = 0;
                 self.state = match act {

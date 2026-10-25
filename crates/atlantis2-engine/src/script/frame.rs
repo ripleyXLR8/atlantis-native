@@ -70,8 +70,9 @@ impl Script {
     }
 
     /// A new game for a player without a save (menu @ 0x00488f12): the
-    /// `/INIT` of the chapter loaded at start-up. How the menu resets the
-    /// variables before (FUN_00489040) is not read.
+    /// `/INIT` of the chapter loaded at start-up. The menu calls
+    /// `AtlMenu_stop` (FUN_00489040) first, which deletes the page and
+    /// sets the loop type back, and resets no variable.
     pub fn new_game(&mut self, host: &mut dyn Host) -> bool {
         self.run_init(host)
     }
@@ -249,12 +250,12 @@ impl Script {
     }
 
     /// The click scan (@ 0x0045a870), on a click when neither the subject
-    /// menu (the caller's to check, @ 0x006617b0) nor the overlay is open:
-    /// `CLICPERSO` = the character hit (a kind 2 record) if any, the scan,
-    /// the timer scans, then the click forgotten (`CLICPERSO` = `CLICOBJET`
-    /// = 0, `SUJET` = −2).
+    /// menu (@ 0x006617b0) nor the bag bar (@ 0x00671ef0) is open, which
+    /// the caller checks: `CLICPERSO` = the character hit (a kind 2
+    /// record) if any, the scan, the timer scans, then the click forgotten
+    /// (`CLICPERSO` = `CLICOBJET` = 0, `SUJET` = −2).
     pub fn click_scan(&mut self, host: &mut dyn Host, character: Option<i32>) {
-        if !self.click || self.overlay {
+        if !self.click {
             return;
         }
         let k = self.keys.clone();
@@ -340,6 +341,14 @@ impl Script {
     pub fn dialog_ended(&mut self, host: &mut dyn Host) {
         self.dialog_reset();
         self.resume_if_pending(host);
+    }
+
+    /// The end of a music copy's please-wait page (FUN_00479480 returns):
+    /// the section that waited for it goes on.
+    pub fn copy_ended(&mut self, host: &mut dyn Host) {
+        if std::mem::take(&mut self.copy_waiting) {
+            self.resume_if_pending(host);
+        }
     }
 
     /// The disc asked for is in (@ 0x0040dff0, the CD menu @ 0x00486eb0).

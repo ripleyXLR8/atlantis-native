@@ -86,6 +86,8 @@ impl Engine {
                 self.apply_cfg(&Cfg::parse(&b));
             }
         }
+        // The music copies the original would hold (`engine/media.rs`).
+        self.load_copies();
     }
 
     pub fn data_dir(&self) -> Option<&Path> {
@@ -376,6 +378,7 @@ impl Engine {
         // queued command are dropped [port choice: the original's flag
         // @ 0x006d1699 is not in the table].
         s.resume_pending = false;
+        s.copy_waiting = false;
         s.queued = None;
         let shown = s.shown.clone();
         let bag: Vec<i32> = s.bag.iter().map(|b| b.id).collect();

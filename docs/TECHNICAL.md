@@ -2314,9 +2314,15 @@ back) into `yucatan-*.png`.
   the bottom 80 rows on cell x / 80 puts its object in the hand and the
   cursor, sets `OBJETENMAIN`, stops the turn, uses the click and closes
   the bar. While the bar is open the centre draws nothing, the cursor is
-  not chosen, a click takes no object, moves nowhere and runs no click
-  scan (a sprite of click kind 3 or 4 still sets `CLICOBJET` /
-  `CLICPERSO`). The object in hand is drawn at the screen centre under the
+  not chosen, no sprite under the centre is recorded (FUN_0045b040 @
+  0x0045b0cd), so a click takes no object, sets neither `CLICOBJET` nor
+  `CLICPERSO`, moves nowhere and runs no click scan; and the warp frame
+  runs neither the mouse look nor a move's turn step nor the zone pick
+  under the centre (`AtlWarp_continue` @ 0x0045a3b0..0x0045a3ea, also
+  while the subject menu, a dialog or a full-screen overlay is open): a
+  move's turn waits under the open bar and goes on when it closes
+  (`tests/ui_fixes.rs`, against the original run under emulation).
+  `cinema=` closes the bar (its flag only, @ 0x00481d4e). The object in hand is drawn at the screen centre under the
   cursor (hand bank set and frame ≥ 0, frame 0 included), and right after
   a take or a pick the cursor shows the object too until the next cursor
   choice. The world change empties the hand pair but keeps `OBJETENMAIN`;
@@ -2470,9 +2476,12 @@ back) into `yucatan-*.png`.
   first fades out; a new one starts at the music volume (14 in a dialog);
   `stopmusik` fades out and stops; the films (20 %) and the dialogs
   (16 %) duck it with the fade machine of the dialogs (127 units a
-  second). The files are read from the discs (the install's `music\`
-  copies are empty until `LOADMUSIK`, which, like `delmusik`, does
-  nothing here). Every track decoded from its start and from each of the
+  second). The files are read from the discs: the original plays
+  hard-disk copies (the install's `music\` files are empty) that
+  `LOADMUSIK`, or a music started whose copy is empty, makes from the
+  disc in the drive under the "please wait" page; the port copies
+  nothing but keeps which copies the original would hold and shows the
+  page where it copies (Menus, below). Every track decoded from its start and from each of the
   83 marks, the random marks and the list choices are the original's
   (tests/music.rs). Known differences: the music player shares the C
   runtime's `rand` with the dialogs and the blackbird songs, which the
@@ -2627,8 +2636,11 @@ back) into `yucatan-*.png`.
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
   picture viewer), `NextWarpInvalide` (the view entry skipped) and the
   special events (`TestSpecialEvent`; China above), `CREDITS` (the
-  credits), `ZoomPsychoStart` (the zoom with its roll). No-ops, logged: `LOADMUSIK`, `delmusik`, `CHANGECD` (every disc is
-  read where it is), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
+  credits), `ZoomPsychoStart` (the zoom with its roll). `LOADMUSIK` and `delmusik` keep which music copies the original would
+  hold and show the "please wait" page for a copy, the section waiting
+  for its end (Menus, below); `monde` asks for the world's disc (the CD
+  page when it was not found). No-ops, logged: `CHANGECD` (it answers
+  that the disc is there; no shipped script uses it), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. `ANIM_THE_FRAME`
   sets the playing byte of the first record of its id, of any kind
   (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
@@ -2664,12 +2676,25 @@ back) into `yucatan-*.png`.
   ticks in a box, centred on it in white over black. Each frame the
   widgets are asked in order and the first action wins; the state machine
   then slides the main page's panels (1 + 2 + ... pixels a frame: 30
-  frames for the options and the disc, 40 for the sound), asks its
+  frames for the options and the disc, 40 for the sound; the disc
+  panel's load and save icons are shown, disabled, from the slide's first
+  frame and enabled at its end), asks its
   questions in the yes / no box (save, erase, quit), opens the pages, and
   sets the options (subtitles, centre marker, inverted mouse, the screen
   size: 640 x 480 or 800 x 600, kept in `atlant2.cfg`, below) and the volumes (general = slider × 256, music = music slider
-  × general slider × 127 + 0.5, effects and dialogs × 127, truncated).
+  × general slider × 127 + 0.5, effects and dialogs × 127, truncated);
+  at each opening the sliders start at general × 1/256, music ×
+  0.007874016 / general (0 when general is 0), effects and dialogs ×
+  0.007874016 (floats, under the control word; the whole table checked
+  against the original's, `tests/ui_fixes.rs`).
   Escape closes the main menu opened from the game (not the player menu).
+  A menu keeps the panorama's turn speeds: only the panorama frame
+  decays them, and the original's motion callback adds every mouse move
+  to them in every loop type, so a move of the pointer in the menu
+  swings the view when it closes (the port adds the system pointer's
+  moves in screen pixels, the original the mouse's counts). The
+  button-held flag that keeps the animated buttons still is set by every
+  press and cleared by every release, in every loop type.
   The cursor is `curseur.spr` at the mouse; the window then lets the
   pointer go and draws the game's own. Quitting shows the credits, as
   does the scripts' `CREDITS` (`crates/atlantis2-engine/src/credits.rs`,
@@ -2698,10 +2723,32 @@ back) into `yucatan-*.png`.
   original). A 24-bit picture would be copied unchanged (checked on
   synthetic files; the shipped ones are 16-bit). Their texts are drawn
   with the game's TrueType font as the subtitles are (the original's are GDI's: a few pixels of each glyph
-  differ). Built but not opened by the
-  game: the disc request (every disc is read where it is), "please wait",
-  "disk full" and "write error" (the original opens them only while
-  `LOADMUSIK` copies music, which the port does not do). Not known, and
+  differ). The media pages (`engine/media.rs`): "please wait" is the
+  original's music copy (`CopyMusikToDrive` @ 0x00479480: each music of
+  the list whose hard-disk copy is empty is copied from the current disc,
+  0x40000 bytes at a time with a frame of the page after each read and
+  each write; one not on the disc is not copied). The port copies
+  nothing; it keeps which copies the original would hold
+  (`music_copies.txt` beside the saves, from session to session, as the
+  original's files, the first session starting from the install's empty
+  ones; `delmusik` deletes them; without a data folder, in the tests and
+  tools, every copy is taken as made until a `delmusik`) and shows the page for the
+  frames the original draws, two per block of the `.apc` (46 for
+  `muzik30` at a new game): the time a real drive takes over each block
+  is not modelled. The game is held meanwhile, as the original's copy
+  loop runs nothing else: the section that ran `LOADMUSIK` or the
+  `startmusik` (or the load) waits for the page's end, no 15 Hz tick
+  runs, the music machine runs once a frame (the menu frame's call), and
+  the mouse's and the keys' events wait until the end (DirectInput's
+  buffer). Checked against the original's copy under emulation
+  (`tests/ui_fixes.rs`). The CD page (FUN_0040dff0) asks for a world's
+  disc no drive holds; the port reads every disc it found as if each
+  were in a drive of its own, so it asks only for a disc that was not
+  found, polls the folders the discs were looked for in every 101 ticks
+  (state 9: `100 < ticks − start`) and goes on when the disc is there.
+  "Disk full" and "write error" (FUN_00486c60, FUN_00486d10) are opened
+  only by the copy, when the free space is short or a block's read or
+  write is short; the port writes no copy, so they never open. Not known, and
   chosen here: whether the page title (line 0 of each section) is drawn
   (it is not). At 800 x 600 the pages are drawn at 640 x 480 and
   enlarged, as in the original (below). The list's date and

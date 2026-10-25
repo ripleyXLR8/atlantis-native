@@ -192,6 +192,9 @@ impl Engine {
     /// which is not the game's pointer). The parchment, which also takes
     /// the button, never opens (below).
     pub fn right_click(&mut self) {
+        if self.hold_input(super::media::Input::Right) {
+            return;
+        }
         if self.loop_type != LoopType::Warp {
             self.click_aux = 1;
             return;

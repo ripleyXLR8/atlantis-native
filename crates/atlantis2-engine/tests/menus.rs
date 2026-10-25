@@ -108,6 +108,11 @@ impl Run {
     /// A new game, its film ended.
     fn new_game(&mut self) {
         self.e.start_new_game().unwrap();
+        // With a data folder of its own the first new game copies chapter
+        // 0's music under the please-wait page (`engine/media.rs`).
+        while self.e.copying() {
+            self.step();
+        }
         self.e.end_video();
         self.wait(30);
         assert_eq!(self.e.loop_type, LoopType::Warp);
@@ -358,10 +363,16 @@ fn the_volumes() {
     assert_eq!(r.page(), Some(PageKind::Sound));
     // The sliders start at general / 256, music / 127 / general, dialogs
     // and effects / 127.
+    // The original's floats (× 0.007874016, under the panorama's control
+    // word 0x0e7f, which truncates: 127 gives the float below 1;
+    // `tests/ui_fixes.rs` checks the whole table).
     let v = r.menu().values;
     assert_eq!(v[0], 1.0);
-    assert_eq!(v[1], (100.0f64 / 127.0) as f32);
-    assert_eq!((v[2], v[3]), (1.0, 1.0));
+    assert_eq!(v[1], f32::from_bits(0x3f49_9326));
+    assert_eq!(
+        (v[2], v[3]),
+        (f32::from_bits(0x3f7f_ffff), f32::from_bits(0x3f7f_ffff))
+    );
     // The general volume grabbed at 57 pixels from the track's origin
     // (425 − 65): 57 / 115, × 256 truncated; the music then follows:
     // ftol(music × general × 127 + 0.5).

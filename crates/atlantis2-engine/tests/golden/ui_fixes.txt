@@ -1,0 +1,298 @@
+# UI rules run by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation: the bag bar, the menus' input, the media pages
+# M1 / M10 rows as moves_tibet.txt's (4 passes per 15 Hz tick, x87 0x0e7f), plus bar=<0x00671ef0>;
+#   events: click, right (button callback), motion dx,dy, menu (AtlMenu_start), menu closed
+#   (AtlMenu_stop), turn (the move's set-up 0x0045b690), video N (frames), frame k
+== M1 view 2 at (-75, 15), click at p2, right button at p10 (bar open) and p150 (bar closed)
+start view 2 yaw -75.000 pitch 15.000 centre zone -1
+p0 t1 zone=0
+p2 t1 turn=1 | click; turn 270.000,-0.000
+p3 t1 yaw -75.141 pitch 14.859
+p4 t2 yaw -75.424 pitch 14.576
+p5 t2 yaw -75.848 pitch 14.151
+p6 t2 yaw -76.414 pitch 13.586
+p7 t2 yaw -77.121 pitch 12.879
+p8 t3 yaw -77.970 pitch 12.030
+p9 t3 yaw -78.960 pitch 11.040
+p10 t3 bar=1 | right
+p150 t38 yaw -80.091 pitch 9.909 bar=0 | right
+p151 t38 yaw -81.364 pitch 8.636
+p152 t39 yaw -82.778 pitch 7.222
+p153 t39 yaw -84.334 pitch 5.666
+p154 t39 yaw -85.676 pitch 4.324
+p155 t39 yaw -86.810 pitch 3.190
+p156 t40 yaw -87.742 pitch 2.258
+p157 t40 yaw -88.482 pitch 1.518
+p158 t40 yaw -89.041 pitch 0.959
+p159 t40 yaw -89.438 pitch 0.562
+p160 t41 yaw -89.694 pitch 0.306
+p161 t41 yaw -89.843 pitch 0.157
+p162 t41 yaw -89.921 pitch 0.079
+p163 t41 yaw -90.000 pitch 0.000 loop=1 view=3 turn=0 zone=-1 ARRIVEEVUE=3 VUE=3 | video 79; frame 0
+p164 t42 | frame 1
+end view 3 yaw -90.000 pitch 0.000 loop 1 centre zone -1 bar 0
+== M3 /set(cinema=12) with the bar open
+bar after the line 0
+bar closed before: after the line 0
+== M9 button-up callback 0x0040c660, held flag 0x006569ca before -> after
+loop 0: left up 1 -> 0; right up 1 -> 1
+loop 1: left up 1 -> 0; right up 1 -> 1
+loop 2: left up 1 -> 0; right up 1 -> 1
+loop 3: left up 1 -> 0; right up 1 -> 1
+loop 4: left up 1 -> 0; right up 1 -> 1
+loop 5: left up 1 -> 0; right up 1 -> 1
+loop 6: left up 1 -> 0; right up 1 -> 1
+loop 7: left up 1 -> 0; right up 1 -> 1
+loop 8: left up 1 -> 0; right up 1 -> 1
+loop 9: left up 1 -> 0; right up 1 -> 1
+loop 10: left up 1 -> 0; right up 1 -> 1
+loop 11: left up 1 -> 0; right up 1 -> 1
+== M10 view 2 at (0, 0): motion 40,0 at p2, Escape menu at p3, motion -10,6 and 25,-3 at p5 and p8 in the menu, menu closed at p12
+start view 2 yaw 0.000 pitch 0.000 centre zone -1
+p2 t1 yaw -0.917 pitch 0.000 | motion 40,0
+p3 t1 loop=5 | menu
+p5 t2 | motion -10,6
+p8 t3 | motion 25,-3
+p12 t4 yaw -1.994 pitch 0.069 loop=0 | menu closed
+p13 t4 yaw -2.856 pitch 0.124
+p14 t4 yaw -3.545 pitch 0.168
+p15 t4 yaw -4.096 pitch 0.203
+p16 t5 yaw -4.538 pitch 0.231
+p17 t5 yaw -4.891 pitch 0.254
+p18 t5 yaw -5.173 pitch 0.272
+p19 t5 yaw -5.399 pitch 0.286
+p20 t6 yaw -5.579 pitch 0.298
+p21 t6 yaw -5.724 pitch 0.307
+p22 t6 yaw -5.840 pitch 0.314
+p23 t6 yaw -5.932 pitch 0.320
+p24 t7 yaw -6.006 pitch 0.325
+p25 t7 yaw -6.065 pitch 0.329
+p26 t7 yaw -6.113 pitch 0.332
+p27 t7 yaw -6.151 pitch 0.334
+p28 t8 yaw -6.181 pitch 0.336
+p29 t8 yaw -6.205 pitch 0.338
+p30 t8 yaw -6.225 pitch 0.339
+p31 t8 yaw -6.240 pitch 0.340
+p32 t9 yaw -6.252 pitch 0.341
+p33 t9 yaw -6.262 pitch 0.341
+p34 t9 yaw -6.270 pitch 0.342
+p35 t9 yaw -6.277 pitch 0.342
+p36 t10 yaw -6.282 pitch 0.342
+p37 t10 yaw -6.286 pitch 0.343
+p38 t10 yaw -6.289 pitch 0.343
+p39 t10 yaw -6.292 pitch 0.343
+p40 t11 yaw -6.294 pitch 0.343
+p41 t11 yaw -6.295 pitch 0.343
+p42 t11 yaw -6.297 pitch 0.343
+p43 t11 yaw -6.298 pitch 0.344
+p44 t12 yaw -6.298 pitch 0.344
+p45 t12 yaw -6.299 pitch 0.344
+p46 t12 yaw -6.300 pitch 0.344
+p47 t12 yaw -6.300 pitch 0.344
+p48 t13 yaw -6.300 pitch 0.344
+p49 t13 yaw -6.301 pitch 0.344
+p50 t13 yaw -6.301 pitch 0.344
+p51 t13 yaw -6.301 pitch 0.344
+p52 t14 yaw -6.301 pitch 0.344
+end view 2 yaw -6.301 pitch 0.344 loop 0 centre zone -1 bar 0
+== M10b view 2 at (0, 0): motion 40,0 at p2, then panorama passes (no menu)
+start view 2 yaw 0.000 pitch -0.000 centre zone -1
+p2 t16 yaw -0.917 pitch -0.000 | motion 40,0
+p3 t16 yaw -1.650 pitch -0.000
+p4 t17 yaw -2.237 pitch -0.000
+p5 t17 yaw -2.706 pitch -0.000
+p6 t17 yaw -3.082 pitch -0.000
+p7 t17 yaw -3.382 pitch -0.000
+p8 t18 yaw -3.622 pitch -0.000
+p9 t18 yaw -3.815 pitch -0.000
+p10 t18 yaw -3.968 pitch -0.000
+p11 t18 yaw -4.091 pitch -0.000
+p12 t19 yaw -4.190 pitch -0.000
+p13 t19 yaw -4.269 pitch -0.000
+p14 t19 yaw -4.332 pitch -0.000
+p15 t19 yaw -4.382 pitch -0.000
+p16 t20 yaw -4.422 pitch -0.000
+p17 t20 yaw -4.454 pitch -0.000
+p18 t20 yaw -4.480 pitch -0.000
+p19 t20 yaw -4.501 pitch -0.000
+p20 t21 yaw -4.517 pitch -0.000
+p21 t21 yaw -4.531 pitch -0.000
+p22 t21 yaw -4.541 pitch -0.000
+p23 t21 yaw -4.550 pitch -0.000
+p24 t22 yaw -4.556 pitch -0.000
+p25 t22 yaw -4.562 pitch -0.000
+p26 t22 yaw -4.566 pitch -0.000
+p27 t22 yaw -4.570 pitch -0.000
+p28 t23 yaw -4.572 pitch -0.000
+p29 t23 yaw -4.575 pitch -0.000
+end view 2 yaw -4.575 pitch -0.000 loop 0 centre zone -1 bar 0
+== M12 AtlMenu_start slider values: general/256, music, dialogs, effects (float bits)
+cw 0x0e7f table md5 a2259aabda22bd8a231aa00230057a94 (32896 rows: 'g<general> m<v> <general> <music> <dialogs> <effects>', v = music = dialogs = effects)
+cw 0x0e7f g0 m0 00000000 00000000 00000000 00000000
+cw 0x0e7f g0 m9 00000000 00000000 3d912244 3d912244
+cw 0x0e7f g0 m18 00000000 00000000 3e112244 3e112244
+cw 0x0e7f g0 m27 00000000 00000000 3e59b366 3e59b366
+cw 0x0e7f g0 m36 00000000 00000000 3e912244 3e912244
+cw 0x0e7f g0 m45 00000000 00000000 3eb56ad5 3eb56ad5
+cw 0x0e7f g0 m54 00000000 00000000 3ed9b366 3ed9b366
+cw 0x0e7f g0 m63 00000000 00000000 3efdfbf7 3efdfbf7
+cw 0x0e7f g0 m72 00000000 00000000 3f112244 3f112244
+cw 0x0e7f g0 m81 00000000 00000000 3f23468d 3f23468d
+cw 0x0e7f g0 m90 00000000 00000000 3f356ad5 3f356ad5
+cw 0x0e7f g0 m99 00000000 00000000 3f478f1e 3f478f1e
+cw 0x0e7f g0 m108 00000000 00000000 3f59b366 3f59b366
+cw 0x0e7f g0 m117 00000000 00000000 3f6bd7af 3f6bd7af
+cw 0x0e7f g0 m126 00000000 00000000 3f7dfbf7 3f7dfbf7
+cw 0x0e7f g1 m0 3b800000 00000000 00000000 00000000
+cw 0x0e7f g1 m9 3b800000 41912244 3d912244 3d912244
+cw 0x0e7f g1 m18 3b800000 42112244 3e112244 3e112244
+cw 0x0e7f g1 m27 3b800000 4259b366 3e59b366 3e59b366
+cw 0x0e7f g1 m36 3b800000 42912244 3e912244 3e912244
+cw 0x0e7f g1 m45 3b800000 42b56ad5 3eb56ad5 3eb56ad5
+cw 0x0e7f g1 m54 3b800000 42d9b366 3ed9b366 3ed9b366
+cw 0x0e7f g1 m63 3b800000 42fdfbf7 3efdfbf7 3efdfbf7
+cw 0x0e7f g1 m72 3b800000 43112244 3f112244 3f112244
+cw 0x0e7f g1 m81 3b800000 4323468d 3f23468d 3f23468d
+cw 0x0e7f g1 m90 3b800000 43356ad5 3f356ad5 3f356ad5
+cw 0x0e7f g1 m99 3b800000 43478f1e 3f478f1e 3f478f1e
+cw 0x0e7f g1 m108 3b800000 4359b366 3f59b366 3f59b366
+cw 0x0e7f g1 m117 3b800000 436bd7af 3f6bd7af 3f6bd7af
+cw 0x0e7f g1 m126 3b800000 437dfbf7 3f7dfbf7 3f7dfbf7
+cw 0x0e7f g135 m0 3f070000 00000000 00000000 00000000
+cw 0x0e7f g135 m9 3f070000 3e099bc0 3d912244 3d912244
+cw 0x0e7f g135 m18 3f070000 3e899bc0 3e112244 3e112244
+cw 0x0e7f g135 m27 3f070000 3ece69a0 3e59b366 3e59b366
+cw 0x0e7f g135 m36 3f070000 3f099bc0 3e912244 3e912244
+cw 0x0e7f g135 m45 3f070000 3f2c02b0 3eb56ad5 3eb56ad5
+cw 0x0e7f g135 m54 3f070000 3f4e69a0 3ed9b366 3ed9b366
+cw 0x0e7f g135 m63 3f070000 3f70d090 3efdfbf7 3efdfbf7
+cw 0x0e7f g135 m72 3f070000 3f899bc0 3f112244 3f112244
+cw 0x0e7f g135 m81 3f070000 3f9acf38 3f23468d 3f23468d
+cw 0x0e7f g135 m90 3f070000 3fac02b0 3f356ad5 3f356ad5
+cw 0x0e7f g135 m99 3f070000 3fbd3628 3f478f1e 3f478f1e
+cw 0x0e7f g135 m108 3f070000 3fce69a0 3f59b366 3f59b366
+cw 0x0e7f g135 m117 3f070000 3fdf9d18 3f6bd7af 3f6bd7af
+cw 0x0e7f g135 m126 3f070000 3ff0d090 3f7dfbf7 3f7dfbf7
+cw 0x0e7f g256 m0 3f800000 00000000 00000000 00000000
+cw 0x0e7f g256 m9 3f800000 3d912244 3d912244 3d912244
+cw 0x0e7f g256 m18 3f800000 3e112244 3e112244 3e112244
+cw 0x0e7f g256 m27 3f800000 3e59b366 3e59b366 3e59b366
+cw 0x0e7f g256 m36 3f800000 3e912244 3e912244 3e912244
+cw 0x0e7f g256 m45 3f800000 3eb56ad5 3eb56ad5 3eb56ad5
+cw 0x0e7f g256 m54 3f800000 3ed9b366 3ed9b366 3ed9b366
+cw 0x0e7f g256 m63 3f800000 3efdfbf7 3efdfbf7 3efdfbf7
+cw 0x0e7f g256 m72 3f800000 3f112244 3f112244 3f112244
+cw 0x0e7f g256 m81 3f800000 3f23468d 3f23468d 3f23468d
+cw 0x0e7f g256 m90 3f800000 3f356ad5 3f356ad5 3f356ad5
+cw 0x0e7f g256 m99 3f800000 3f478f1e 3f478f1e 3f478f1e
+cw 0x0e7f g256 m108 3f800000 3f59b366 3f59b366 3f59b366
+cw 0x0e7f g256 m117 3f800000 3f6bd7af 3f6bd7af 3f6bd7af
+cw 0x0e7f g256 m126 3f800000 3f7dfbf7 3f7dfbf7 3f7dfbf7
+cw 0x027f table md5 db9cdee4979aff304b35b8146e4d15a4 (32896 rows: 'g<general> m<v> <general> <music> <dialogs> <effects>', v = music = dialogs = effects)
+cw 0x027f g0 m0 00000000 00000000 00000000 00000000
+cw 0x027f g0 m9 00000000 00000000 3d912244 3d912244
+cw 0x027f g0 m18 00000000 00000000 3e112244 3e112244
+cw 0x027f g0 m27 00000000 00000000 3e59b367 3e59b367
+cw 0x027f g0 m36 00000000 00000000 3e912244 3e912244
+cw 0x027f g0 m45 00000000 00000000 3eb56ad6 3eb56ad6
+cw 0x027f g0 m54 00000000 00000000 3ed9b367 3ed9b367
+cw 0x027f g0 m63 00000000 00000000 3efdfbf8 3efdfbf8
+cw 0x027f g0 m72 00000000 00000000 3f112244 3f112244
+cw 0x027f g0 m81 00000000 00000000 3f23468d 3f23468d
+cw 0x027f g0 m90 00000000 00000000 3f356ad6 3f356ad6
+cw 0x027f g0 m99 00000000 00000000 3f478f1e 3f478f1e
+cw 0x027f g0 m108 00000000 00000000 3f59b367 3f59b367
+cw 0x027f g0 m117 00000000 00000000 3f6bd7af 3f6bd7af
+cw 0x027f g0 m126 00000000 00000000 3f7dfbf8 3f7dfbf8
+cw 0x027f g1 m0 3b800000 00000000 00000000 00000000
+cw 0x027f g1 m9 3b800000 41912244 3d912244 3d912244
+cw 0x027f g1 m18 3b800000 42112244 3e112244 3e112244
+cw 0x027f g1 m27 3b800000 4259b367 3e59b367 3e59b367
+cw 0x027f g1 m36 3b800000 42912244 3e912244 3e912244
+cw 0x027f g1 m45 3b800000 42b56ad6 3eb56ad6 3eb56ad6
+cw 0x027f g1 m54 3b800000 42d9b367 3ed9b367 3ed9b367
+cw 0x027f g1 m63 3b800000 42fdfbf8 3efdfbf8 3efdfbf8
+cw 0x027f g1 m72 3b800000 43112244 3f112244 3f112244
+cw 0x027f g1 m81 3b800000 4323468d 3f23468d 3f23468d
+cw 0x027f g1 m90 3b800000 43356ad6 3f356ad6 3f356ad6
+cw 0x027f g1 m99 3b800000 43478f1e 3f478f1e 3f478f1e
+cw 0x027f g1 m108 3b800000 4359b367 3f59b367 3f59b367
+cw 0x027f g1 m117 3b800000 436bd7af 3f6bd7af 3f6bd7af
+cw 0x027f g1 m126 3b800000 437dfbf8 3f7dfbf8 3f7dfbf8
+cw 0x027f g135 m0 3f070000 00000000 00000000 00000000
+cw 0x027f g135 m9 3f070000 3e099bc0 3d912244 3d912244
+cw 0x027f g135 m18 3f070000 3e899bc0 3e112244 3e112244
+cw 0x027f g135 m27 3f070000 3ece69a0 3e59b367 3e59b367
+cw 0x027f g135 m36 3f070000 3f099bc0 3e912244 3e912244
+cw 0x027f g135 m45 3f070000 3f2c02b0 3eb56ad6 3eb56ad6
+cw 0x027f g135 m54 3f070000 3f4e69a0 3ed9b367 3ed9b367
+cw 0x027f g135 m63 3f070000 3f70d090 3efdfbf8 3efdfbf8
+cw 0x027f g135 m72 3f070000 3f899bc0 3f112244 3f112244
+cw 0x027f g135 m81 3f070000 3f9acf38 3f23468d 3f23468d
+cw 0x027f g135 m90 3f070000 3fac02b0 3f356ad6 3f356ad6
+cw 0x027f g135 m99 3f070000 3fbd3628 3f478f1e 3f478f1e
+cw 0x027f g135 m108 3f070000 3fce69a0 3f59b367 3f59b367
+cw 0x027f g135 m117 3f070000 3fdf9d18 3f6bd7af 3f6bd7af
+cw 0x027f g135 m126 3f070000 3ff0d090 3f7dfbf8 3f7dfbf8
+cw 0x027f g256 m0 3f800000 00000000 00000000 00000000
+cw 0x027f g256 m9 3f800000 3d912244 3d912244 3d912244
+cw 0x027f g256 m18 3f800000 3e112244 3e112244 3e112244
+cw 0x027f g256 m27 3f800000 3e59b367 3e59b367 3e59b367
+cw 0x027f g256 m36 3f800000 3e912244 3e912244 3e912244
+cw 0x027f g256 m45 3f800000 3eb56ad6 3eb56ad6 3eb56ad6
+cw 0x027f g256 m54 3f800000 3ed9b367 3ed9b367 3ed9b367
+cw 0x027f g256 m63 3f800000 3efdfbf8 3efdfbf8 3efdfbf8
+cw 0x027f g256 m72 3f800000 3f112244 3f112244 3f112244
+cw 0x027f g256 m81 3f800000 3f23468d 3f23468d 3f23468d
+cw 0x027f g256 m90 3f800000 3f356ad6 3f356ad6 3f356ad6
+cw 0x027f g256 m99 3f800000 3f478f1e 3f478f1e 3f478f1e
+cw 0x027f g256 m108 3f800000 3f59b367 3f59b367 3f59b367
+cw 0x027f g256 m117 3f800000 3f6bd7af 3f6bd7af 3f6bd7af
+cw 0x027f g256 m126 3f800000 3f7dfbf8 3f7dfbf8 3f7dfbf8
+== M13 CopyMusikToDrive (LOADMUSIK) on stubbed files; CD sizes from cd-fr-1
+LOADMUSIK=30, empty copies: frames 46 | page please-wait; create hd\muzik30.apc; open cd\muzik30.apc; block x23; create hd\muzik30.spp; open-fail cd\muzik30.spp; warning impossible d'ouvrir le fichi; delete hd\muzik30.spp; page stop
+LOADMUSIK=30, muzik30.apc copied: frames 0 | page please-wait; page stop
+LOADMUSIK=1,2,3, empty copies: frames 216 | page please-wait; create hd\muzik01.apc; open cd\muzik01.apc; block x40; create hd\muzik01.spp; open cd\muzik01.spp; read 0x150; write 0x150; create hd\muzik02.apc; open cd\muzik02.apc; block x37; create hd\muzik02.spp; open cd\muzik02.spp; read 0x70; write 0x70; create hd\muzik03.apc; open cd\muzik03.apc; block x31; create hd\muzik03.spp; open cd\muzik03.spp; read 0xe0; write 0xe0; page stop
+LOADMUSIK=1,2,3, muzik02.apc copied: frames 142 | page please-wait; create hd\muzik01.apc; open cd\muzik01.apc; block x40; create hd\muzik01.spp; open cd\muzik01.spp; read 0x150; write 0x150; create hd\muzik03.apc; open cd\muzik03.apc; block x31; create hd\muzik03.spp; open cd\muzik03.spp; read 0xe0; write 0xe0; page stop
+LOADMUSIK=20, not on the disc: frames 0 | page please-wait; create hd\muzik20.apc; open-fail cd\muzik20.apc; warning impossible d'ouvrir le fichi; delete hd\muzik20.apc; page stop
+LOADMUSIK=30, disk full: frames 0 | page please-wait; create hd\muzik30.apc; open cd\muzik30.apc; warning espace disk insufisant pour; delete hd\muzik30.apc; page stop; page disk-full
+LOADMUSIK=30, read error: frames 0 | page please-wait; create hd\muzik30.apc; open cd\muzik30.apc; read 0x40000; warning erreure de lecture du fichie; delete hd\muzik30.apc; page stop; page disk-error
+startmusik 5: FUN_0047a200 copies '5': frames 62 | page please-wait; create hd\muzik05.apc; open cd\muzik05.apc; block x31; create hd\muzik05.spp; open cd\muzik05.spp; read 0x1c0; write 0x1c0; page stop
+blocks: muzik01.apc 10465888 bytes 40 blocks, muzik02.apc 9505095 bytes 37 blocks, muzik03.apc 7989088 bytes 31 blocks, muzik04.apc 6655904 bytes 26 blocks, muzik05.apc 8049441 bytes 31 blocks, muzik30.apc 5872657 bytes 23 blocks, muzik39.apc 6809952 bytes 26 blocks
+== M15 FUN_0045b040(1): slot recorded at 0x00661640 (-1 none)
+click 0 bar 0 kind 0 cursor 0 -> -1
+click 0 bar 0 kind 0 cursor 1 -> -1
+click 0 bar 0 kind 0 cursor 2 -> -1
+click 0 bar 0 kind 3 cursor 0 -> -1
+click 0 bar 0 kind 3 cursor 1 -> -1
+click 0 bar 0 kind 3 cursor 2 -> -1
+click 0 bar 0 kind 4 cursor 0 -> -1
+click 0 bar 0 kind 4 cursor 1 -> -1
+click 0 bar 0 kind 4 cursor 2 -> -1
+click 0 bar 1 kind 0 cursor 0 -> -1
+click 0 bar 1 kind 0 cursor 1 -> -1
+click 0 bar 1 kind 0 cursor 2 -> -1
+click 0 bar 1 kind 3 cursor 0 -> -1
+click 0 bar 1 kind 3 cursor 1 -> -1
+click 0 bar 1 kind 3 cursor 2 -> -1
+click 0 bar 1 kind 4 cursor 0 -> -1
+click 0 bar 1 kind 4 cursor 1 -> -1
+click 0 bar 1 kind 4 cursor 2 -> -1
+click 1 bar 0 kind 0 cursor 0 -> -1
+click 1 bar 0 kind 0 cursor 1 -> -1
+click 1 bar 0 kind 0 cursor 2 -> -1
+click 1 bar 0 kind 3 cursor 0 -> -1
+click 1 bar 0 kind 3 cursor 1 -> 0
+click 1 bar 0 kind 3 cursor 2 -> 0
+click 1 bar 0 kind 4 cursor 0 -> -1
+click 1 bar 0 kind 4 cursor 1 -> 0
+click 1 bar 0 kind 4 cursor 2 -> 0
+click 1 bar 1 kind 0 cursor 0 -> -1
+click 1 bar 1 kind 0 cursor 1 -> -1
+click 1 bar 1 kind 0 cursor 2 -> -1
+click 1 bar 1 kind 3 cursor 0 -> -1
+click 1 bar 1 kind 3 cursor 1 -> -1
+click 1 bar 1 kind 3 cursor 2 -> -1
+click 1 bar 1 kind 4 cursor 0 -> -1
+click 1 bar 1 kind 4 cursor 1 -> -1
+click 1 bar 1 kind 4 cursor 2 -> -1

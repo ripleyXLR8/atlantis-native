@@ -157,13 +157,17 @@ impl Engine {
     }
 
     /// Play music `n` (`FUN_0047a200(n, mark, loops)`): nothing when it is
-    /// the current one; else it becomes current and opens at once, or
-    /// after the playing one has faded out (FUN_00477dc0).
-    pub(super) fn play_music(&mut self, n: i32, mark: i32, loops: i32) {
+    /// the current one; else it becomes current, its hard-disk copy is
+    /// made when empty (`CopyMusikToDrive` of `n`, @ 0x0047a24e: the
+    /// please-wait page, `engine/media.rs`), and it opens at once, or
+    /// after the playing one has faded out (FUN_00477dc0). True when the
+    /// copy shows the page.
+    pub(super) fn play_music(&mut self, n: i32, mark: i32, loops: i32) -> bool {
         if n == self.player.current {
-            return;
+            return false;
         }
         self.player.current = n;
+        let copies = self.copy_music(&n.to_string());
         self.player.mark = mark;
         self.player.stream.loops = loops;
         let next = if mark == 0 { 1 } else { 2 };
@@ -172,6 +176,7 @@ impl Engine {
         } else {
             self.music.state = next;
         }
+        copies
     }
 
     /// States 1 and 2: the current music opened (two tries), from its
@@ -247,8 +252,9 @@ impl Engine {
     }
 
     /// Music `n`'s file and marks, read from the discs (the install's
-    /// `music\` copies are empty until `LOADMUSIK`, which, like `delmusik`,
-    /// does nothing here).
+    /// `music\` copies are empty until `LOADMUSIK`: the port copies
+    /// nothing and only keeps which copies the original would hold, for
+    /// its please-wait page, `engine/media.rs`).
     fn music_data(&self, n: i32) -> Option<music::MusicData> {
         load_music(&self.files, n)
     }
@@ -281,7 +287,11 @@ impl Engine {
                     mark: self.player.stream.current_mark,
                 }),
                 music::StreamEvent::Recopy(n) => {
-                    log::info!("{}: rewind refused, the ring loops", music::music_name(n))
+                    // The copy deleted (@ 0x00477bc6) and made again
+                    // (`LOADMUSIK n`): the please-wait page.
+                    log::info!("{}: rewind refused, the ring loops", music::music_name(n));
+                    self.delete_copies(&n.to_string());
+                    self.copy_music(&n.to_string());
                 }
                 music::StreamEvent::Cursor(..) => {}
             }
@@ -721,7 +731,7 @@ impl Host for Engine {
         self.traj_sound = Some(apc.to_string());
     }
 
-    fn start_music(&mut self, list: &str) {
+    fn start_music(&mut self, list: &str) -> bool {
         self.player.list = list.bytes().take(0xff).collect();
         let list = self.player.list.clone();
         if let Some((e, _)) = music::select(
@@ -730,23 +740,38 @@ impl Host for Engine {
             self.player.current,
             self.player.stream.current_mark,
         ) {
-            self.play_music(e.music, e.mark, e.loops);
+            return self.play_music(e.music, e.mark, e.loops);
         }
+        false
     }
 
     fn stop_music(&mut self) {
         self.music.stop();
     }
 
+    fn load_music(&mut self, list: &str) -> bool {
+        self.copy_music(list)
+    }
+
+    fn delete_music(&mut self, list: &str) {
+        self.delete_copies(list);
+    }
+
     fn set_monde(&mut self, monde: i32) -> bool {
         self.event(Event::Monde(monde));
         self.monde = monde;
-        self.files.set_monde(monde);
+        let disc = self.files.set_monde(monde);
         self.objects_bank = load_objects_bank(&self.files, monde);
         self.load_subjects_bank(monde);
         self.load_world_texts(monde);
-        // Every disc is read where it is: the disc asked for is there.
-        true
+        // Every disc found is read where it is, as if each were in a drive
+        // of its own: the CD page asks only for a disc not found
+        // (FUN_0040dff0; Tibet's world, 5, asks for none).
+        monde == 5 || self.ask_disc(disc)
+    }
+
+    fn close_bar(&mut self) {
+        self.bar.open = false;
     }
 
     fn bag_layout(&mut self, visible: i32) {
