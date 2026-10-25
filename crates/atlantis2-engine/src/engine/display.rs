@@ -123,8 +123,14 @@ impl Engine {
     /// types other than the panorama draw on the 640 x 480 surface, which
     /// `AtlDisplay_AutoBlit` (FUN_00402c30, FUN_00402bd0) then enlarges
     /// onto the screen if the frame is still not native (a menu closed in
-    /// the pass leaves the screen as it was).
+    /// the pass leaves the screen as it was). Then the 15 Hz task when it
+    /// is due in this pass ([`Engine::set_clock`]).
     pub fn pass(&mut self, out: Option<&mut [u16]>) {
+        self.frame_pass(out);
+        self.run_due_tick();
+    }
+
+    fn frame_pass(&mut self, out: Option<&mut [u16]>) {
         self.sync_surface();
         let (w, h) = (self.display.width, self.display.height);
         let out = match out {

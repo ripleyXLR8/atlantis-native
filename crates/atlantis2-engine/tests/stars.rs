@@ -29,6 +29,7 @@ use atlantis2_data::wam::{EntityState, Zone};
 use atlantis2_data::{A2Files, Folder};
 
 use atlantis2_engine::anim::Anim;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{yucatan_entry_hooks, STAR_HOLES};
 use atlantis2_engine::png::{encode_rgb565, encode_xrgb8888};
 use atlantis2_engine::subjects::cell;
@@ -788,7 +789,7 @@ fn the_map_is_drawn_from_its_frame_table_as_the_original() {
 // ---------------------------------------------------------------------------
 // The puzzle played with the mouse.
 
-/// The engine at 60 passes a second, a 15 Hz tick every fourth, every
+/// The engine at 59.94 passes a second ([`PASS`]), a 15 Hz tick every fourth, every
 /// pass drawn; the mouse as a player moves it.
 struct Run {
     e: Engine,
@@ -819,7 +820,7 @@ fn texel_angles(face: usize, col: f64, row: f64) -> (f32, f32) {
 
 impl Run {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

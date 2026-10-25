@@ -26,6 +26,7 @@ use atlantis2_data::{A2Files, Folder};
 
 use atlantis2_engine::anim::{Anim, MsvcRand};
 use atlantis2_engine::camera::direction_angles;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{chinese_click_hooks, FIGURINE_TARGETS};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{CursorBank, Engine, Event, Fpu, LoopType, Variant};
@@ -860,7 +861,7 @@ fn a_figurine_is_drawn_as_the_original() {
     assert_eq!(got, want);
 }
 
-/// The engine at 60 passes a second, a 15 Hz tick every fourth, every
+/// The engine at 59.94 passes a second ([`PASS`]), a 15 Hz tick every fourth, every
 /// pass drawn; the mouse as a player moves it.
 struct Run {
     e: Engine,
@@ -872,7 +873,7 @@ struct Run {
 
 impl Run {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

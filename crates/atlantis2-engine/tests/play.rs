@@ -18,6 +18,7 @@ use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
 use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::TICK;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
@@ -64,7 +65,7 @@ fn dialog_lines(n: u32) -> Vec<String> {
         .collect()
 }
 
-/// The engine at 60 passes a second, the clock running with them.
+/// The engine at 59.94 passes a second ([`PASS`]), the clock running with them.
 struct Run {
     e: Engine,
     pass: u64,
@@ -73,7 +74,7 @@ struct Run {
 
 impl Run {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     /// One pass; the events it produced.
@@ -224,9 +225,9 @@ fn a_new_game_plays_to_the_first_dialog() {
         "{yaw} {pitch}"
     );
 
-    // The film moves a frame a 15 Hz tick (every 5th pass of 1/60 s:
-    // passes 1, 6, 11); a click ends it, and the rest of the /INIT starts
-    // music 30 from its beginning.
+    // The film moves a frame a 15 Hz tick (every 4th pass: ticks after
+    // passes 1, 5, 9, each frame shown by the next pass); a click ends it,
+    // and the rest of the /INIT starts music 30 from its beginning.
     let evs = r.until(12, |e| matches!(e, Event::VideoFrame(3)));
     assert!(evs.iter().any(|e| matches!(e, Event::VideoFrame(1))));
     r.click();
@@ -332,32 +333,78 @@ fn a_new_game_plays_to_the_first_dialog() {
     eprintln!("{}", r.log.join("\n"));
 }
 
-/// The 15 Hz task as the scheduler FUN_00584a00 runs it: due when the
-/// pass's time is past its next time, at most once a pass, its next time
-/// then the pass's time + its period (a float, a little over 1/15 s). At
-/// 60 passes a second it runs every 5th pass; after a stall, once.
+/// The 15 Hz task as the scheduler FUN_00584a00 runs it, against the
+/// original's scheduler under emulation (`tests/golden/scheduler.txt`: the
+/// game's queue, frame task and 15 Hz timer, one FUN_00584a00 call a pass
+/// at the times of a 60 Hz, 72, 75 and 85 Hz screen, of an unpaced loop at
+/// 500 passes a second and of a stall, under 0x0e7f and 0x027f): the task
+/// runs in the same passes, after the pass's frame (the golden's `F`
+/// before `T`), and the port's own pass period, a 60 Hz VGA frame, is the
+/// golden's `vga60`: every 4th pass.
 #[test]
 fn the_15_hz_task_as_the_scheduler_runs_it() {
-    let Some(files) = game() else { return };
-    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
-    assert!(TICK > 1.0 / 15.0 && TICK as f32 == 1.0f32 / 15.0f32);
-    let mut runs = Vec::new();
-    for k in 0..=60u32 {
-        let before = e.ticks;
-        e.set_clock(f64::from(k) / 60.0);
-        if e.ticks != before {
-            assert_eq!(e.ticks, before + 1);
-            runs.push(k);
-        }
+    const GOLDEN: &str = include_str!("golden/scheduler.txt");
+    if game().is_none() {
+        return;
     }
-    assert_eq!(runs, (1..=56).step_by(5).collect::<Vec<_>>());
-    // A stall of 1.5 s: one run, no catch-up; the next a period after the
-    // late pass, not before.
-    let before = e.ticks;
-    e.set_clock(2.5);
-    assert_eq!(e.ticks, before + 1);
-    e.set_clock(2.5 + TICK);
-    assert_eq!(e.ticks, before + 1);
-    e.set_clock(2.5 + TICK + 1e-6);
-    assert_eq!(e.ticks, before + 2);
+    assert!(TICK > 1.0 / 15.0 && TICK as f32 == 1.0f32 / 15.0f32);
+    let mut scenarios = 0;
+    let mut lines = GOLDEN.lines().filter(|l| !l.starts_with('#')).peekable();
+    while let Some(head) = lines.next() {
+        let rest = head.strip_prefix("scenario ").expect(head);
+        let (name, cw) = rest.split_once(" cw ").unwrap();
+        let fpu = match cw {
+            "0x0e7f" => Fpu::Chop,
+            "0x027f" => Fpu::Double,
+            _ => panic!("{cw}"),
+        };
+        // A new game: the tasks started at time 0.
+        let mut e = Engine::boot(game().unwrap(), Variant::default(), fpu, 640, 480).unwrap();
+        let mut runs = Vec::new();
+        while let Some(row) = lines.next_if(|l| !l.starts_with("summary ")) {
+            let (pass, rest) = row.split_once(' ').unwrap();
+            let (_, rest) = rest.split_once(' ').unwrap();
+            let (now, tasks) = rest.split_once(": ").unwrap();
+            let now = f64::from_bits(u64::from_str_radix(now, 16).unwrap());
+            e.camera.fpu = fpu;
+            let before = e.ticks;
+            e.set_clock(now);
+            // The frame runs first: no tick yet.
+            assert_eq!(e.ticks, before, "{name} {cw} pass {pass}");
+            e.pass(None);
+            e.camera.fpu = fpu;
+            let ran = e.ticks.wrapping_sub(before);
+            assert_eq!(
+                ran,
+                u32::from(tasks == "FT"),
+                "{name} {cw} pass {pass}: {tasks}"
+            );
+            assert!(tasks == "F" || tasks == "FT", "{tasks}");
+            if ran == 1 {
+                runs.push(pass.parse::<u32>().unwrap());
+            }
+        }
+        let summary = lines.next().unwrap();
+        let want: Vec<u32> = summary
+            .split_once(": ")
+            .unwrap()
+            .1
+            .split_whitespace()
+            .map(|n| n.parse().unwrap())
+            .collect();
+        assert_eq!(runs, want, "{summary}");
+        if name == "vga60" {
+            // The port's passes: a tick every 4th pass.
+            assert!(want.windows(2).all(|w| w[1] - w[0] == 4));
+            let row = GOLDEN
+                .lines()
+                .find(|l| l.starts_with("scenario vga60"))
+                .unwrap();
+            let first = GOLDEN.lines().skip_while(|l| *l != row).nth(1).unwrap();
+            let count: f64 = first.split(' ').nth(1).unwrap().parse().unwrap();
+            assert!((count / 1_193_182.0 - PASS).abs() < 1e-6);
+        }
+        scenarios += 1;
+    }
+    assert_eq!(scenarios, 14);
 }

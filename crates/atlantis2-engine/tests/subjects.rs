@@ -22,6 +22,7 @@ use atlantis2_data::spr::SprBank;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::anim::{MsvcRand, Texel};
 use atlantis2_engine::bag::{UiBank, UiDraw};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::script::{DialStart, Host, Script, SubjectTable};
 use atlantis2_engine::subjects::{cell, first_row, hit};
 use atlantis2_engine::{CentreDraw, CursorBank, Engine, Event, Fpu, LoopType, Variant};
@@ -123,7 +124,7 @@ fn last_column(count: i32) -> i32 {
     }
 }
 
-/// The engine at 60 passes a second; ticks with the clock.
+/// The engine at 59.94 passes a second ([`PASS`]); ticks with the clock.
 struct Run {
     e: Engine,
     pass: u64,
@@ -132,7 +133,7 @@ struct Run {
 
 impl Run {
     fn step(&mut self) -> Vec<Event> {
-        self.e.set_clock(self.pass as f64 / 60.0);
+        self.e.set_clock(self.pass as f64 * PASS);
         self.e.pass(None);
         self.pass += 1;
         std::mem::take(&mut self.e.events)
@@ -141,7 +142,7 @@ impl Run {
     fn click(&mut self) {
         // Clicks far apart: never a double click.
         self.clicks += 10.0;
-        self.e.click(self.pass as f64 / 60.0 + self.clicks);
+        self.e.click(self.pass as f64 * PASS + self.clicks);
     }
 
     fn until(&mut self, max: u32, f: impl Fn(&Event) -> bool) -> Vec<Event> {

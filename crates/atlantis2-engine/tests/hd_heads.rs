@@ -22,6 +22,7 @@ use atlantis2_data::db::Scene;
 use atlantis2_data::tga::Tga;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::hd::{HdTexts, TextFont, SCREEN_H, SCREEN_W};
 use atlantis2_engine::head::Head;
 use atlantis2_engine::raster3d::{HEIGHT, WIDTH};
@@ -381,12 +382,12 @@ fn dialog_both_ways(variant: (Variant, Fpu)) {
     let (mut layers, mut texts, mut heads) = (0, 0, 0);
     for i in 0..900 {
         for e in [&mut off, &mut on] {
-            e.set_clock(i as f64 / 60.0);
+            e.set_clock(i as f64 * PASS);
             e.tick();
         }
         if i % 120 == 119 {
-            off.click(i as f64 / 60.0);
-            on.click(i as f64 / 60.0);
+            off.click(i as f64 * PASS);
+            on.click(i as f64 * PASS);
         }
         off.pass(Some(&mut a));
         on.pass(Some(&mut b));
@@ -488,7 +489,7 @@ fn both_ways(
     let (mut a, mut b) = (vec![0u16; 640 * 480], vec![0u16; 640 * 480]);
     for i in at..at + frames {
         for e in [&mut *off, &mut *on] {
-            e.set_clock(i as f64 / 60.0);
+            e.set_clock(i as f64 * PASS);
             e.tick();
         }
         off.pass(Some(&mut a));

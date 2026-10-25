@@ -29,6 +29,7 @@ use atlantis2_data::wam::EntityState;
 use atlantis2_data::{A2Files, Folder};
 
 use atlantis2_engine::anim::Anim;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{chinese_click_hooks, chinese_entry_hooks, RING_MODE};
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::subjects::cell;
@@ -1016,7 +1017,7 @@ fn the_ring_is_drawn_as_the_original() {
     same(&got, &golden);
 }
 
-/// The engine at 60 passes a second (the 15 Hz ticks from the clock),
+/// The engine at 59.94 passes a second ([`PASS`]) (the 15 Hz ticks from the clock),
 /// every pass drawn; the mouse as a player moves it.
 struct Run {
     e: Engine,
@@ -1029,7 +1030,7 @@ struct Run {
 
 impl Run {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {
@@ -1276,6 +1277,19 @@ impl Run {
 
     /// A click on the zone named `name` of the current view, turned to
     /// with the mouse: the events of that pass.
+    /// [`Run::click_zone`] a pass after the aim, and whether the 15 Hz
+    /// task ran in that pass: its flag is then up in the click's frame
+    /// (the task runs after the frame, its flags read by the next).
+    fn click_zone_ticks(&mut self, name: &str) -> (Vec<Event>, i32) {
+        let zone = self.zone(name);
+        assert!(self.try_aim(zone), "zone {name} out of reach");
+        let t = self.e.ticks;
+        self.step();
+        let n = self.e.ticks.wrapping_sub(t) as i32;
+        self.tap();
+        (self.events(), n)
+    }
+
     fn click_zone(&mut self, name: &str) -> Vec<Event> {
         let zone = self.zone(name);
         assert!(self.try_aim(zone), "zone {name} out of reach");
@@ -1568,13 +1582,14 @@ fn the_turtle_room_played_with_the_mouse_to_chapter_47() {
     assert_eq!(r.e.place(), ("salletortue.wam", 56));
     r.wait(10);
     r.shot("2-view-56");
-    // A quarter to the left: sound 218, nine frames one a tick.
-    let evs = r.click_zone("TORTUE_GAUCHE");
+    // A quarter to the left: sound 218, nine frames one a tick (from the
+    // tick of the click's pass, when one falls in it).
+    let (evs, n) = r.click_zone_ticks("TORTUE_GAUCHE");
     assert!(evs.contains(&Event::PuzzleRan {
         function: 0x0049_c290
     }));
     assert_eq!(sounds(&evs), "[sound218.apc]");
-    assert_eq!(r.e.ring_count(), 9);
+    assert_eq!(r.e.ring_count(), 9 - n);
     // A click during the turn (the centre still on the zone) is lost.
     r.tap();
     let evs = r.events();
@@ -1589,9 +1604,9 @@ fn the_turtle_room_played_with_the_mouse_to_chapter_47() {
         ((9, false), 0, 9)
     );
     r.shot("3-ring-left-1");
-    let evs = r.click_zone("TORTUE_GAUCHE");
+    let (evs, n) = r.click_zone_ticks("TORTUE_GAUCHE");
     assert_eq!(sounds(&evs), "[sound218.apc]");
-    assert_eq!(r.e.ring_count(), 10);
+    assert_eq!(r.e.ring_count(), 10 - n);
     // Half way: one frame per tick.
     r.wait(20);
     let (mid, _) = r.ring();
@@ -1601,9 +1616,9 @@ fn the_turtle_room_played_with_the_mouse_to_chapter_47() {
     assert_eq!(r.ring(), (19, false));
     r.shot("5-ring-left-2");
     // A quarter to the right: back to 9 (−10 from 19).
-    let evs = r.click_zone("TORTUE_DROITE");
+    let (evs, n) = r.click_zone_ticks("TORTUE_DROITE");
     assert_eq!(sounds(&evs), "[sound218.apc]");
-    assert_eq!(r.e.ring_count(), -10);
+    assert_eq!(r.e.ring_count(), -10 + n);
     r.wait(60);
     assert_eq!(r.ring(), (9, false));
     // The frame kept in the next view.

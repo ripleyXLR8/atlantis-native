@@ -10,6 +10,7 @@
 use std::path::PathBuf;
 
 use atlantis2_data::{A2Files, Folder};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::PageKind;
 use atlantis2_engine::sound::VOICE_EFFECTS;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -31,7 +32,7 @@ fn discs() -> Option<PathBuf> {
     Some(PathBuf::from(discs))
 }
 
-/// The engine at 60 passes a second, every pass drawn.
+/// The engine at 59.94 passes a second ([`PASS`]), every pass drawn.
 struct Run {
     e: Engine,
     pass: u64,
@@ -65,7 +66,7 @@ impl Run {
     }
 
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

@@ -52,6 +52,7 @@ use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
 use atlantis2_engine::bag::{UiBank, UiDraw, FORM_FRAMES};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{
     FIREFLY_MANDALA, MANDALAS, OCTOPUS_ENTRY, OCTOPUS_MODE, STAR_HOLES,
 };
@@ -86,7 +87,7 @@ fn time() -> SystemTime {
     }
 }
 
-/// The engine at 60 passes a second, every pass drawn.
+/// The engine at 59.94 passes a second ([`PASS`]), every pass drawn.
 struct Run {
     e: Engine,
     pass: u64,
@@ -135,7 +136,7 @@ impl Run {
     }
 
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

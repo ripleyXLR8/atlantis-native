@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use atlantis2_data::A2Files;
 use atlantis2_engine::anim::MsvcRand;
 use atlantis2_engine::display::{blit_640_to_800, NATIVE_DIALOGS};
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::{MenuHost, PageKind};
 use atlantis2_engine::{Camera, Engine, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
@@ -121,7 +122,7 @@ fn scratch(name: &str, width: i32, height: i32) -> PathBuf {
     d
 }
 
-/// A new game at 60 passes a second, its film ended, the screen kept.
+/// A new game at 59.94 passes a second, its film ended, the screen kept.
 struct Run {
     e: Engine,
     pass: u64,
@@ -142,7 +143,7 @@ impl Run {
     }
 
     fn step(&mut self) {
-        self.e.set_clock(self.pass as f64 / 60.0);
+        self.e.set_clock(self.pass as f64 * PASS);
         let (w, h) = self.e.screen_size();
         self.screen.resize(w * h, 0);
         self.e.pass(Some(&mut self.screen));

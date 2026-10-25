@@ -28,6 +28,7 @@ use std::cell::RefCell;
 
 use atlantis2_engine::anim::Anim;
 use atlantis2_engine::engine::irish_click_hook;
+use atlantis2_engine::engine::PASS;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::subjects::cell;
 use atlantis2_engine::{CursorBank, Engine, Enhancements, Event, Fpu, LoopType, Variant};
@@ -686,7 +687,7 @@ fn the_cross_is_drawn_from_its_frame_table_as_the_original() {
     assert_eq!(got, golden);
 }
 
-/// The engine at 60 passes a second, a 15 Hz tick every fourth, every
+/// The engine at 59.94 passes a second ([`PASS`]), a 15 Hz tick every fourth, every
 /// pass drawn; the mouse as a player moves it.
 struct Run {
     e: Engine,
@@ -698,7 +699,7 @@ struct Run {
 
 impl Run {
     fn now(&self) -> f64 {
-        self.pass as f64 / 60.0
+        self.pass as f64 * PASS
     }
 
     fn step(&mut self) {

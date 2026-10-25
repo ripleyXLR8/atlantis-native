@@ -103,6 +103,17 @@ pub use subjects::subjects_bank_name;
 /// @ 0x0040cbf6..0x0040cc04), 0.0666666701436…, a little over 1/15 s.
 pub const TICK: f64 = (1.0f32 / 15.0f32) as f64;
 
+/// The time between two of the port's passes, seconds: a frame of the VGA
+/// 640 x 480 mode at 60 Hz (800 x 525 pixels at 25.175 MHz, 59.94 frames a
+/// second). In full screen, its default, the original shows its frames
+/// with a flip that waits for the vertical blank (`Flip(NULL, DDFLIP_WAIT)`
+/// on a chain of one back buffer, @ 0x0058fdec..0x0058fdf1, the chain made
+/// @ 0x0058f86c..0x0058f8b2, the mode set with the display's default rate
+/// @ 0x0058f81b..0x0058f82a): one pass a refresh of the screen. The port
+/// runs its passes as on a 60 Hz screen, at this standard timing; the
+/// 15 Hz task is then due every 4th pass (the scheduler's golden).
+pub const PASS: f64 = 800.0 * 525.0 / 25_175_000.0;
+
 /// Why the engine cannot show a view.
 #[derive(Debug)]
 pub enum EngineError {
@@ -625,6 +636,9 @@ pub struct Engine {
     /// last one (the 15 Hz task's previous run, @ 0x00656a10).
     clock: f64,
     next_tick: f64,
+    /// The 15 Hz task is due in this pass: it runs after the frame
+    /// ([`Engine::set_clock`]).
+    tick_due: bool,
     last_tick: f64,
     zbuf: Vec<u32>,
     /// The CON interpreter when the scripts run the game
@@ -994,6 +1008,7 @@ impl Engine {
             fx_volume: crate::sound::DEFAULT_FX_VOLUME,
             clock: 0.0,
             next_tick: 0.0,
+            tick_due: false,
             last_tick: 0.0,
             zbuf: vec![0; (width * height) as usize],
             con: None,
@@ -1280,20 +1295,32 @@ impl Engine {
     }
 
     /// Moves the clock to `now` (seconds: the scheduler's time of a pass,
-    /// @ 0x00584a0a..0x00584a1a) and runs the 15 Hz task when it is due,
-    /// as the scheduler FUN_00584a00 runs it: due when `now` is past its
-    /// next time (strictly, @ 0x00584a2e..0x00584a41), run at most once a
-    /// pass, its next time then `now` + its period (the smaller of that and
-    /// its end, DBL_MAX, @ 0x00584ad0..0x00584af0; the sum under the x87
-    /// control word in force). No catch-up: a late pass delays every later
-    /// tick, so the tick runs below 15 Hz, the more so the fewer passes a
-    /// second (at 60 a second, every 4 or 5 passes). Its first run is the
-    /// first pass after the start (FUN_00584960: next time = the start).
+    /// @ 0x00584a0a..0x00584a1a) and finds whether the 15 Hz task is due in
+    /// this pass, as the scheduler FUN_00584a00 does: due when `now` is past
+    /// its next time (strictly, @ 0x00584a2e..0x00584a41), run at most once
+    /// a pass, its next time then `now` + its period (the smaller of that
+    /// and its end, DBL_MAX, @ 0x00584ad0..0x00584af0; the sum under the
+    /// x87 control word in force after the run). No catch-up: a late pass
+    /// delays every later tick. Its first run is the first pass after the
+    /// start (FUN_00584960: next time = the start).
+    ///
+    /// The due task runs after the pass's frame ([`Engine::pass`]), as in
+    /// the original: the frame task's next time is the previous pass's
+    /// time, earlier in the time-ordered queue than a due 15 Hz task's, so
+    /// the frame dispatcher runs first (the scheduler's golden: `F` before
+    /// `T` in every pass). A tick still pending when the clock moves on (a
+    /// pass without a frame) runs first, at its own pass's time.
     pub fn set_clock(&mut self, now: f64) {
+        self.run_due_tick();
         self.clock = now;
-        if now > self.next_tick {
+        self.tick_due = now > self.next_tick;
+    }
+
+    /// The 15 Hz task when it is due in this pass, then its next time.
+    pub(crate) fn run_due_tick(&mut self) {
+        if std::mem::take(&mut self.tick_due) {
             self.tick();
-            self.next_tick = self.camera.fpu.add(now, TICK);
+            self.next_tick = self.camera.fpu.add(self.clock, TICK);
         }
     }
 
