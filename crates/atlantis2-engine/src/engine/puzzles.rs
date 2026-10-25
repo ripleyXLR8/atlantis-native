@@ -57,10 +57,10 @@
 //!   spider web, `web.rs`) run; the canoe's view consumes the click while
 //!   the canoe is not enabled, as in the original.
 //! - Shamballa's and Atlantis's hooks (prefixes `SH` and `AT`,
-//!   `shamballa.rs`): the fireflies' click and the octopus's entry are
-//!   listed and noted ([`Event::PuzzleNotPorted`]), the octopus's tick
-//!   too (its mode is never set); the end of a firefly's move in
-//!   `voiles.wam` (FUN_0045a630 → FUN_004952d0) runs.
+//!   `shamballa.rs`): the fireflies' click (FUN_00495210) and the end of
+//!   a firefly's move in `voiles.wam` (FUN_0045a630 → FUN_004952d0) run;
+//!   the octopus's entry is listed and noted
+//!   ([`Event::PuzzleNotPorted`]), its tick too (its mode is never set).
 //! - The places the port has: every place a script or a link names but
 //!   `demo.wam` (chapter 1's, whose panoramas are on no disc); the one
 //!   place file nothing names, `sans_nom.wam`, is not ported either. A
@@ -403,7 +403,7 @@ impl Engine {
                 _ => self.puzzle_not_ported(function),
             }
         }
-        // Shamballa's (@ 0x0049ba5a): the fireflies' click, noted.
+        // Shamballa's (@ 0x0049ba5a): the fireflies' click, run.
         self.shamballa_click(&name, self.view, zone);
         self.chinese_click(zi, &name, self.view, zone)
     }

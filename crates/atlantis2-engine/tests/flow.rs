@@ -32,8 +32,8 @@
 //! and a load in each, the soul brought back to the king and Yucatán's
 //! mandala laid in Tibet. Then the end of the game, from Tibet as the three
 //! worlds leave it: the space-travel hub by Tibet's ball and back, the
-//! crystal laid in the hut, Shamballa (the fireflies' win written by the
-//! testing aid, the puzzle not being ported; the vortex), Rhea, the
+//! crystal laid in the hut, Shamballa (the six fireflies lit in the
+//! mandalas' order, the last one's move end the way on), Rhea, the
 //! ring's rolling moves and its star, Atlantis (the octopus's two ends by
 //! the aid), Tibet again, the hub's last trip, the films, the credits and
 //! the quit.
@@ -5240,8 +5240,8 @@ const XIBALBA_CHAPTERS: [i32; 5] = [35, 36, 37, 38, 39];
 /// the three worlds' first space trips made): the ball of Tibet's view 4
 /// (the hub's first trip from Tibet, the balls made crystals in view 4,
 /// the way back), the crystal laid in the hut (Shamballa), the fireflies
-/// (the testing aid writes their win: the puzzle is not ported) and the
-/// vortex, Rhea asked about all she offers, the ring walked round with
+/// lit in the order the mandalas were laid (the sixth one's move end the
+/// way on to Rhea), Rhea asked about all she offers, the ring walked round with
 /// its rolling moves, the star taken and laid, Atlantis walked to the
 /// sunken crystal, the octopus's two ends (the aid again: the hero's death,
 /// then the octopus's), Tibet's dialog 372, the crystal laid again, the
@@ -5330,19 +5330,35 @@ fn the_end_of_the_game_with_the_mouse() {
     assert_eq!((r.e.place(), r.chapter()), (("voiles.wam", 1), 78));
     assert_eq!((r.var("MONDE"), r.e.files().current_disc()), (4, 4));
     r.shot_as("endgame-03-fireflies.png");
-    // A firefly lit (its hook noted), the aid's win, the vortex.
-    let firefly = r.zone_to(3);
-    let evs = r.press_zone(firefly);
-    assert!(evs.contains(&Event::PuzzleNotPorted {
-        function: 0x0049_5210
-    }));
-    assert!(r.shown(false, "LUCIOLLE3"));
-    r.e.win_fireflies();
-    let vortex = r.obj("TOURBILLON");
-    let mut evs = r.click_on(false, vortex);
+    // The fireflies, each aimed at and clicked: the mandalas were laid in
+    // their hook's order (`OrdreMandalaK` = K), so the k-th firefly is the
+    // one whose mandala was laid k-th (values 2, 3, 5, 1, 4, 6); the
+    // sixth's move ends without a view, the win's automatic way on.
+    let mut evs = Vec::new();
+    for (n, v) in [2, 3, 5, 1, 4, 6].into_iter().enumerate() {
+        let firefly = r.zone_to(v);
+        let lit = r.press_zone(firefly);
+        assert!(lit.contains(&Event::PuzzleRan {
+            function: 0x0049_5210
+        }));
+        if n < 5 {
+            assert!(r.shown(false, &format!("LUCIOLLE{v}")));
+            assert_eq!(r.var("NbLucioleAllumed"), n as i32 + 1);
+        }
+        evs.extend(lit);
+    }
+    // The sixth's move ends in the pass that settled it: its film is
+    // played out here.
     evs.extend(r.settle());
     assert_eq!(films(&evs), [62]);
     assert_eq!((r.e.place(), r.chapter()), (("rhea.wam", 1), 80));
+    assert_eq!(
+        (
+            r.var("Puzzle_Lucioles_Fini"),
+            r.var("Puzzle_Lucioles_AutoWin")
+        ),
+        (1, 1)
+    );
 
     // Rhea.
     r.route(&[2, 3, 4, 5, 6]);
@@ -5482,7 +5498,7 @@ fn the_end_of_the_game_with_the_mouse() {
     assert!(!journal
         .iter()
         .any(|e| matches!(e, Event::WorldNotPorted(_))));
-    // Only the two puzzles' hooks are noted.
+    // Only the octopus's hook is noted.
     let mut noted: Vec<u32> = journal
         .iter()
         .filter_map(|e| match e {
@@ -5492,5 +5508,149 @@ fn the_end_of_the_game_with_the_mouse() {
         .collect();
     noted.sort_unstable();
     noted.dedup();
-    assert_eq!(noted, [0x0049_5210, 0x0049_a8c0]);
+    assert_eq!(noted, [0x0049_a8c0]);
+}
+
+/// The set lines of chapter `chapter` in `evs`.
+fn chapter_lines(evs: &[Event], chapter: i32) -> Vec<usize> {
+    evs.iter()
+        .filter_map(|e| match e {
+            Event::Set { chapter: c, line } if *c == chapter => Some(*line),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Shamballa's fireflies played with the mouse as a player plays them.
+/// Tibet as the three worlds leave it, the six mandalas laid in another
+/// order than their hook's (China's boat first, then China's mandala,
+/// Ireland's boat, Yucatán's mandala, Yucatán's boat, Ireland's mandala
+/// last: `OrdreMandala1..6` = 3, 1, 5, 6, 2, 4), the shaman's crystal in
+/// the bag. The crystal laid in the hut with the mouse: Shamballa. The six
+/// fireflies lit in a wrong order (each aimed at and clicked: its move,
+/// its sprite shown, the count), a seventh, the right last one, too late:
+/// no win; the vortex then sends the game back to Tibet (film 62, chapter
+/// 78's lines 19-32). The crystal laid again: the fireflies dark again,
+/// the count 0. Then the six in the mandalas' order (the k-th lit the one
+/// whose mandala was laid k-th: 3, 4, 2, 6, 5, 1): the sixth is view 1's
+/// own firefly, the view entered again, the win written; the vortex now
+/// leads to Rhea (film 62, lines 34-38, chapter 80). Pictures with
+/// `ATLANTIS2_PNG_DIR` (`pz-fireflies-*.png`).
+#[test]
+fn shamballa_s_fireflies_with_the_mouse() {
+    if game().is_none() {
+        return;
+    }
+    let dir = scratch("a2-flow-fireflies");
+    let mut r = Run::new(&dir);
+    tibet_start(&mut r);
+    let ranks = [3, 1, 5, 6, 2, 4];
+    for (k, (object, _, order)) in MANDALAS.iter().enumerate() {
+        let pose = [
+            "poseirb", "posechb", "poseyub", "poseira", "posecha", "poseyua",
+        ][k];
+        for c in [
+            format!("({pose}=1)"),
+            format!("({order}={})", ranks[k]),
+            format!("(sacados=NOT_{object})"),
+        ] {
+            r.e.run_command(c.as_bytes());
+        }
+    }
+    r.e.run_command(b"(NbMandalaPosed=6)");
+    r.e.run_command(b"(sacados=CRISTAL_SHAMAN)");
+
+    // The crystal laid in the hut: Shamballa.
+    let to_shamballa = |r: &mut Run| {
+        r.go(10, &[]);
+        let crystal = r.obj("CRISTAL_SHAMAN");
+        r.pick(crystal);
+        let zone = r.zone_named("ZonePoseCristal");
+        r.aim(zone);
+        r.tap();
+        let mut evs = r.events();
+        evs.extend(r.settle());
+        assert_eq!(films(&evs), [61]);
+        assert_eq!((r.e.place(), r.chapter()), (("voiles.wam", 1), 78));
+        for v in 1..=6 {
+            assert!(!r.shown(false, &format!("LUCIOLLE{v}")));
+        }
+        assert_eq!(r.var("NbLucioleAllumed"), 0);
+    };
+    to_shamballa(&mut r);
+    r.shot_as("pz-fireflies-1-shamballa.png");
+
+    // A firefly clicked: the hook's count and the turn's stop, the
+    // departure section's sprite and zoom, the move to a view the place
+    // does not have, its end (76° again).
+    let light = |r: &mut Run, v: i32| -> Vec<Event> {
+        let firefly = r.zone_to(v as u32);
+        let evs = r.press_zone(firefly);
+        assert!(evs.contains(&Event::PuzzleRan {
+            function: 0x0049_5210
+        }));
+        assert!(evs.contains(&Event::FireflySound));
+        let ends = evs.contains(&Event::PuzzleRan {
+            function: 0x0049_52d0,
+        });
+        assert_eq!(ends, v != 1, "firefly {v}");
+        evs
+    };
+
+    // A wrong order: no win, and a seventh firefly does not test again.
+    for (n, v) in [1, 5, 6, 2, 4, 3].into_iter().enumerate() {
+        light(&mut r, v);
+        assert!(r.shown(false, &format!("LUCIOLLE{v}")));
+        assert_eq!(r.var("NbLucioleAllumed"), n as i32 + 1);
+        if n == 2 {
+            r.shot_as("pz-fireflies-2-three-lit.png");
+        }
+    }
+    assert_eq!(r.var("Puzzle_Lucioles_Fini"), 0);
+    r.shot_as("pz-fireflies-3-six-lit-wrong.png");
+    light(&mut r, 1);
+    assert_eq!(
+        (r.var("NbLucioleAllumed"), r.var("Puzzle_Lucioles_Fini")),
+        (7, 0)
+    );
+    assert_eq!(r.e.place(), ("voiles.wam", 1));
+
+    // The vortex: back to Tibet.
+    let vortex = r.obj("TOURBILLON");
+    let mut evs = r.click_on(false, vortex);
+    evs.extend(r.settle());
+    assert_eq!(films(&evs), [62]);
+    assert_eq!((r.e.place(), r.chapter()), (("tibet.wam", 10), 75));
+    let lines = chapter_lines(&evs, 78);
+    assert!((19..=32).all(|l| lines.contains(&l)), "{lines:?}");
+    assert!(!lines.iter().any(|l| (34..=45).contains(l)), "{lines:?}");
+    assert_eq!(r.var("NbLucioleAllumed"), 0);
+    r.shot_as("pz-fireflies-4-back-in-tibet.png");
+    assert!(r.in_bag("CRISTAL_SHAMAN"));
+
+    // Again, in the mandalas' order.
+    to_shamballa(&mut r);
+    for (n, v) in [3, 4, 2, 6, 5, 1].into_iter().enumerate() {
+        light(&mut r, v);
+        assert!(r.shown(false, &format!("LUCIOLLE{v}")));
+        assert_eq!(
+            (r.var("NbLucioleAllumed"), r.var("Puzzle_Lucioles_Fini")),
+            (n as i32 + 1, i32::from(n == 5))
+        );
+    }
+    assert_eq!(r.e.place(), ("voiles.wam", 1));
+    assert_eq!(r.var("Puzzle_Lucioles_AutoWin"), 0);
+    r.shot_as("pz-fireflies-5-won.png");
+    let mut evs = r.click_on(false, vortex);
+    evs.extend(r.settle());
+    assert_eq!(films(&evs), [62]);
+    assert_eq!((r.e.place(), r.chapter()), (("rhea.wam", 1), 80));
+    let lines = chapter_lines(&evs, 78);
+    assert!((34..=38).all(|l| lines.contains(&l)), "{lines:?}");
+    assert!(!lines.iter().any(|l| (19..=32).contains(l)), "{lines:?}");
+    r.shot_as("pz-fireflies-6-rhea.png");
+    let journal = std::mem::take(&mut r.journal);
+    assert!(!journal
+        .iter()
+        .any(|e| matches!(e, Event::PuzzleNotPorted { .. } | Event::PuzzleAid { .. })));
 }

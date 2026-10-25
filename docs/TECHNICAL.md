@@ -646,9 +646,10 @@ puzzles (the star map, the canoe, the spider's web) are played, and the
 soul it gives ends Yucatán with its mandala. Each world's ball (the
 shaman's) leads to the space-travel hub and back (below). The six
 mandalas laid, the crystal laid in the hut leads to Shamballa and
-Atlantis (world 4, below), which play to the octopus without their two
-puzzles (the fireflies and the octopus fight, whose wins testing aids
-write); the octopus's death sends the game back to Tibet, and the
+Atlantis (world 4, below), which play to the octopus with the fireflies
+(the six lit in the order the mandalas were laid) but without the octopus
+fight (whose ends a testing aid writes); the octopus's death sends the
+game back to Tibet, and the
 crystal laid again to the hub's last view, the films, the credits and the
 end of the game.
 `--headless <folder> [frames] --screenshot
@@ -1095,8 +1096,9 @@ back) into `yucatan-*.png`.
   crystal (with and without the six flags), line by line up to the
   place change; the dispatcher's choice of the hook for 47 warp names,
   view numbers and zone types. Not ported: the solution log the original prints at exit
-  (@ 0x00495650, a fixed list that is not the fireflies' answer) and the
-  fireflies themselves (Shamballa, below).
+  (@ 0x00495650, a fixed list that is not the fireflies' answer; what its
+  "Mandala k" numbers is unknown). The fireflies that read these ranks
+  are Shamballa's (below).
 - **Skull** (`engine/puzzles.rs`, Ireland's views 40-42 of
   `bigile1.wam`): the view entry of the three views (@ 0x00493cb0, from
   the entry dispatcher @ 0x0049bd50) keeps `CRANE_SPRITE`'s object index,
@@ -1571,28 +1573,57 @@ back) into `yucatan-*.png`.
   that no zone leads to). Of the transition videos of the four places
   only `rh001002.hnm` is on a disc: the other moves are cuts, as in the
   original (whose video start fails the same way).
-  **The two puzzles are not ported** (`engine/shamballa.rs`): the
-  dispatchers' `SH` and `AT` branches are listed as the original's
-  (`shamballa_click_hooks`: `SH` view 1, zone types 1 and 2, the
-  fireflies' click FUN_00495210; `atlantis_entry_hooks`: `AT` views 1-19,
-  the octopus's entry FUN_0049a8c0) and noted (`Event::PuzzleNotPorted`);
-  none takes the click; the octopus's mode 6 is never set, so its tick
-  (FUN_0049aaa0) and its cursor (FUN_0049a9a0) never run. What the port
-  then does not do: the fireflies' count and their sound 300, the stop of
-  the turn speeds on a firefly's click; the octopus's entry's camera
-  reset (FUN_0045b4b0: the hit shake cleared, the view set about Y from
-  its read-back yaw, the field of view 76°), its crosshair cursor, its
-  tentacles' animations (views 802), the hits, the shots, the
-  `PoulpeWarp%d` / `BigTenta%dDied` variables. Testing aids, not the
-  original's, write the wins (`Event::PuzzleAid`):
-  `Engine::win_fireflies` (`NbLucioleAllumed` = 6,
-  `Puzzle_Lucioles_Fini` = 1, as the sixth right firefly does) and
+  **The fireflies** (`engine/shamballa.rs`, `Engine::fireflies_click`,
+  catalogue row 17): the dispatcher's `SH` branch (`shamballa_click_hooks`:
+  `SH` view 1, any case, zone types 1 and 2) runs FUN_00495210, which
+  does nothing for a type 2 and, for a type 1 of value v in 1..6, adds 1
+  to `NbLucioleAllumed` and stops the turn's speeds; then, whatever v, it
+  compares the count with `OrdreMandala<t[v]>` (t the byte table
+  `FIREFLY_MANDALA` @ 0x005e1d38: 1:4, 2:1, 3:2, 4:5, 5:3, 6:6, read
+  first the count, then the rank) and, equal at the count 6, sets
+  `Puzzle_Lucioles_Fini`; then it runs `(NewSound=300)`, whose
+  `sound300.apc` is on no disc (it plays nothing; `Event::FireflySound`
+  notes it). Only the sixth click is tested: the firefly of the mandala
+  laid last in Tibet wins, whatever the five before; the count is reset
+  by chapter 78 only (its `/INIT` and the vortex's section), so after six
+  wrong ones the vortex back to Tibet and the crystal laid again are the
+  way to try again. A value outside 1..6 (no zone has one) warns and
+  ends on `DefName_GetIdName`'s fatal error, the name read around the
+  table not being a variable (`OrdreMandala%d` of the signed byte @
+  0x005e1d38 + v: `OrdreMandala0` for 0 and 7, `OrdreMandala40` for 8).
+  The port has the executable's bytes 0x005e1d28..0x005e1dd8 (v in
+  -16..160); for a v beyond them, the byte the original reads (another
+  string, the `.data` it writes at run time, or an unmapped address) is
+  unknown to the port, whose message names the byte's address instead. The click is not consumed: the move goes
+  on; the win's move end (a firefly other than view 1's) runs the
+  automatic way on (film 62, Rhea), a win on view 1's own firefly waits
+  for the vortex. The puzzle draws nothing of its own (each lit firefly
+  is chapter 78's `showObjet`). `tests/fireflies.rs` compares the click
+  alone (every type, value, count, the turn's speeds), whole games (the
+  720 orders for six placements), the move end under both control words,
+  the place test, the dispatcher, and the clicks played in the place
+  with chapter 78's lines, with the original's
+  (`tests/golden/fireflies.txt`); `tests/flow.rs`
+  `shamballa_s_fireflies_with_the_mouse` plays a wrong order, the vortex
+  back to Tibet, the crystal again and the win with the mouse. Not
+  checked against the original running (Wine / Win98): the pictures of
+  the lit fireflies.
+  **The octopus fight is not ported**: the dispatcher's `AT` branch is
+  listed as the original's (`atlantis_entry_hooks`: `AT` views 1-19, the
+  octopus's entry FUN_0049a8c0) and noted (`Event::PuzzleNotPorted`);
+  the octopus's mode 6 is never set, so its tick (FUN_0049aaa0) and its
+  cursor (FUN_0049a9a0) never run. What the port then does not do: the
+  octopus's entry's camera reset (FUN_0045b4b0: the hit shake cleared,
+  the view set about Y from its read-back yaw, the field of view 76°),
+  its crosshair cursor, its tentacles' animations (views 802), the hits,
+  the shots, the `PoulpeWarp%d` / `BigTenta%dDied` variables. A testing
+  aid, not the original's, writes its ends (`Event::PuzzleAid`):
   `Engine::end_octopus_fight(octopus_dead)` (the fight's quit, then
   `(chapter=200)` or `(chapter=201)` and a scan, as its two ends).
   `tests/endgame.rs` runs every chapter's `/INIT` (and the trap), enters
   every view of the five places with their hooks, plays a firefly's
-  move and its end, the aid and the automatic way on, the vortex both
-  ways, Rhea's subjects and the refused and opened link, the ring's
+  move and its end, the fireflies won and the automatic way on, the
+  vortex both ways (the second after a win on view 1's firefly), Rhea's subjects and the refused and opened link, the ring's
   rolling move (the direction kept, the roll undone, 76° after), a
   character's dialog, the star taken and laid (refused without it), the
   octopus's two ends, the hub from each world twice (the first trip
@@ -1606,7 +1637,7 @@ back) into `yucatan-*.png`.
   written `{trap}`, compared up to its fatal error: the harness goes on
   where the game quits); `tests/flow.rs` `the_end_of_the_game_with_the_mouse`
   plays it with the mouse from Tibet (the three worlds' ends written as
-  their scripts leave them); `tests/hd.rs` checks the hub, the fireflies'
+  their scripts leave them; the fireflies lit in the mandalas' order); `tests/hd.rs` checks the hub, the fireflies'
   view, Rhea, the ring and Atlantis with the HD mode as the other places,
   and the HD view following the ring's roll. Not checked against the
   original running (Wine / Win98): the pictures, the roll on screen.
@@ -2824,5 +2855,5 @@ Atlantis II, on the `a2/m0` branch:
 |---|---|
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
-| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), China's seven puzzles (done), Yucatán with its grids (done), Xibalba and its three puzzles (done), the space-travel hub, Shamballa and Atlantis without their two puzzles, the end of the game (done), then the fireflies and the octopus fight |
+| next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), China's seven puzzles (done), Yucatán with its grids (done), Xibalba and its three puzzles (done), the space-travel hub, Shamballa and Atlantis without their two puzzles, the end of the game (done), the fireflies (done), then the octopus fight |
 
