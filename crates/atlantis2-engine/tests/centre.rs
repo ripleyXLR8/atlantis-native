@@ -143,6 +143,9 @@ impl Driver {
                     CentreDraw::Line { from, to, argb } => {
                         format!("line {},{}-{},{} {argb:08x}", from.0, from.1, to.0, to.1)
                     }
+                    CentreDraw::Crosshair { frame, x, y } => {
+                        format!("spr viseur#{frame}@{x},{y}")
+                    }
                 });
             }
             for e in &self.e.events {

@@ -11,10 +11,10 @@
 //!   dispatcher returns 0: the move goes on (the zones of view 1 lead to
 //!   views 1..6, of which only view 1 is in the file).
 //! - **Entry** (FUN_0049bd50, @ 0x0049bec6..0x0049bef2, after `LA`'s and
-//!   before `SS`'s): `AT` views 1..19, the octopus's FUN_0049a8c0
-//!   (catalogue row 18), which sets the puzzle mode 6; its tick
-//!   FUN_0049aaa0 runs in that mode only (FUN_0049bfb0), its cursor
-//!   FUN_0049a9a0 returns 0 outside it.
+//!   before `SS`'s): `AT` views 1..19, the octopus fight's FUN_0049a8c0
+//!   (catalogue row 18, `engine/octopus.rs`), which sets the puzzle mode
+//!   6; its tick FUN_0049aaa0 runs in that mode only (FUN_0049bfb0), its
+//!   cursor FUN_0049a9a0 returns 0 outside it.
 //! - **A move's end without a next view** (FUN_0045a3b0 @ 0x0045a5d0 →
 //!   FUN_0045a630): when the current place is `voiles.wam` (`_stricmp`
 //!   with the name @ 0x00659168), FUN_004952d0, ported: the camera's field
@@ -24,18 +24,18 @@
 //!   1, `Puzzle_Lucioles_AutoWin` = 1 and a scan (FUN_00483c90): chapter
 //!   78's way to `rhea.wam`.
 //!
-//! The octopus's entry is not ported: noted ([`Event::PuzzleNotPorted`]),
-//! the mode 6 is never set. What it would write is the testing aid's
-//! ([`Engine::end_octopus_fight`]).
+//! Both puzzles run: the fireflies' click here, the octopus fight in
+//! `octopus.rs`.
 
 use atlantis2_data::wam::Zone;
 
+use super::octopus::OCTOPUS_ENTRY;
 use super::{Engine, Event};
 
 /// The prefix of `voiles.wam`'s views (@ 0x005daffc) and of
 /// `atlantis.wam`'s (@ 0x005e2ea8).
 const SHAMBALLA_PREFIX: &[u8] = b"SH";
-const ATLANTIS_PREFIX: &[u8] = b"AT";
+pub(super) const ATLANTIS_PREFIX: &[u8] = b"AT";
 
 /// The fireflies' view (@ 0x0049ba79, EBX = 1).
 const FIREFLIES_VIEW: u32 = 1;
@@ -43,12 +43,6 @@ const FIREFLIES_VIEW: u32 = 1;
 /// The fireflies' click (FUN_00495210) and their move end (FUN_004952d0).
 pub const FIREFLIES_CLICK: u32 = 0x0049_5210;
 pub const FIREFLIES_MOVE_END: u32 = 0x0049_52d0;
-
-/// The octopus's entry (FUN_0049a8c0), tick (FUN_0049aaa0) and puzzle
-/// mode (@ 0x0049a8cf).
-pub const OCTOPUS_ENTRY: u32 = 0x0049_a8c0;
-pub const OCTOPUS_TICK: u32 = 0x0049_aaa0;
-pub const OCTOPUS_MODE: i32 = 6;
 
 /// The place FUN_0045a630 compares with (@ 0x005db944).
 const FIREFLIES_PLACE: &str = "voiles.wam";
@@ -110,10 +104,6 @@ const BAD_VALUE: &str = "pz_lucioles_gere_clic(): zone_clicked->numero=%d";
 
 /// The firefly count that wins (@ 0x0049529c).
 const FIREFLIES: i32 = 6;
-
-/// The octopus's ends (@ 0x005e2d5c, 0x005e2d4c): its death, the hero's.
-const OCTOPUS_DEAD: &[u8] = b"(chapter=200)";
-const HERO_DEAD: &[u8] = b"(chapter=201)";
 
 fn prefixed(view_name: &[u8], prefix: &[u8]) -> bool {
     view_name.len() >= 2 && view_name[..2].eq_ignore_ascii_case(prefix)
@@ -218,14 +208,17 @@ impl Engine {
         }
     }
 
-    /// The `AT` hooks of a view entry (noted).
+    /// The `AT` hooks of a view entry: the octopus fight's entry.
     pub(super) fn atlantis_entry(&mut self) {
         let hooks = self
             .current_view()
             .map(|v| atlantis_entry_hooks(v.name.as_bytes(), self.view))
             .unwrap_or_default();
         for function in hooks {
-            self.puzzle_not_ported(function);
+            match function {
+                OCTOPUS_ENTRY => self.octopus_entry(),
+                _ => self.puzzle_not_ported(function),
+            }
         }
     }
 
@@ -246,31 +239,6 @@ impl Engine {
                 s.set_var(AUTO_WIN, 1);
                 s.ctrl_scenar_in(h);
             }
-        });
-    }
-
-    /// A testing aid, not the original's: one of the octopus fight's two
-    /// ends (FUN_0049aaa0): `octopus_dead`, the last big tentacle's death
-    /// (@ 0x0049ae84..0x0049ae9b: the tentacle's record FUN_0049af90, the
-    /// quit FUN_0049aef0, `(chapter=200)` and a scan), else the hero's
-    /// (@ 0x0049aea8..0x0049aeba: the quit,
-    /// `(chapter=201)` and a scan). The quit clears the mode 6, which the
-    /// port never sets.
-    pub fn end_octopus_fight(&mut self, octopus_dead: bool) {
-        self.event(Event::PuzzleAid {
-            function: OCTOPUS_TICK,
-        });
-        if self.puzzle_mode() == OCTOPUS_MODE {
-            self.set_puzzle_mode(0);
-        }
-        let command = if octopus_dead {
-            OCTOPUS_DEAD
-        } else {
-            HERO_DEAD
-        };
-        self.with_script(|s, h| {
-            s.run_command(h, command);
-            s.ctrl_scenar_in(h);
         });
     }
 }

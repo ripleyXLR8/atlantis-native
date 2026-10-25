@@ -42,6 +42,8 @@ pub struct Camera {
     pub inv_fy: f32,
     /// The node's orientation (x, y, z, w).
     pub q: [f32; 4],
+    /// The field of view last set (radians, the camera object's +0xc0).
+    pub fov: f32,
 }
 
 /// A float of the original as an `f64` operand.
@@ -227,6 +229,7 @@ impl Camera {
             inv_fx: 0.0,
             inv_fy: 0.0,
             q: [0.0, 0.0, 0.0, 1.0],
+            fov: 0.0,
         };
         c.set_fov(WARP_FOV, width, height);
         c
@@ -236,6 +239,7 @@ impl Camera {
     /// fx = W / (2 tan(fov / 2)) (`fptan`), fy = fx · (W/H) / (W/H); then
     /// FUN_004a4a30: 1 / fx, 1 / fy.
     pub fn set_fov(&mut self, fov: f32, width: u32, height: u32) {
+        self.fov = fov;
         let fpu = self.fpu;
         let (w, h) = (f64::from(width), f64::from(height));
         let t = libm::tan(fpu.mul(d(fov), 0.5));

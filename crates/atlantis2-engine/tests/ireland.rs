@@ -1,7 +1,7 @@
-//! Ireland (world 1) without three of its four puzzles (Brigid's cross is
-//! ported, `tests/cross.rs`): every Irish chapter's `/INIT` run, every view
-//! of the six places entered, the other puzzles' hooks noted and the
-//! variables their wins write set by the testing aid, the
+//! Ireland (world 1), its four puzzles apart (each has its own test:
+//! `tests/cross.rs`, `skull.rs`, `ogham.rs`, `blackbird.rs`): every Irish
+//! chapter's `/INIT` run, every view of the six places entered with the
+//! puzzles' entries run, the
 //! moves to another place (a type-2 zone, at once or deferred), the
 //! transition sprites over a transition video, and the horse's frame kept
 //! across views (`FRAMECHEVAL`).

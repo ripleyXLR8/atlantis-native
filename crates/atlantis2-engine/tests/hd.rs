@@ -588,6 +588,79 @@ fn hd_follows_the_ring_s_roll() {
     assert!(checked >= 4, "{checked}");
 }
 
+/// The octopus fight (`atlantis.wam` view 16, chapter 82): a tentacle's
+/// blow (its strike set at frame 61, the blow at 62) shakes the view (a roll of ±10° and a
+/// field of view widened to 90°, then back to 76°); with the HD mode on
+/// the 640x480 frames, the crosshair at their centre, are those of the HD
+/// mode off pass by pass, and the HD view follows the shaken camera.
+#[test]
+fn hd_follows_the_octopus_s_shake() {
+    if game().is_none() {
+        return;
+    }
+    let commands: &[&[u8]] = &[
+        b"(monde=4)",
+        b"(changewam=atlantis.wam)",
+        b"(vue=16)",
+        b"(chapter=82)",
+    ];
+    let mut off = at(game().unwrap(), commands, false);
+    let mut on = at(game().unwrap(), commands, true);
+    on.enhancements.hd_options.sharpen = false;
+    on.enhancements.hd_options.panorama = atlantis2_engine::hd::PanoFilter::Bilinear;
+    on.set_hd_output(Some(48), 0);
+    off.set_hd_output(Some(48), 0);
+    for e in [&mut off, &mut on] {
+        assert_eq!(e.place(), ("atlantis.wam", 16));
+        e.camera.set_yaw(std::f32::consts::PI);
+        let r = &mut e.octopus.records[0];
+        r.state = 2;
+        r.attacking = 0;
+        let n = r.tentacles[0].unwrap();
+        e.anim.slots[n].frame = 61;
+        e.anim.slots[n].click = 5;
+    }
+    let (mut a, mut b) = (vec![0u16; 640 * 480], vec![0u16; 640 * 480]);
+    let lut = atlantis2_engine::hd::rgb565_to_888();
+    let (mut checked, mut shaken) = (0, 0);
+    for i in 0..40 {
+        for e in [&mut off, &mut on] {
+            e.set_clock(i as f64 / 60.0);
+            if i % 4 == 1 {
+                e.tick();
+            }
+        }
+        off.pass(Some(&mut a));
+        on.pass(Some(&mut b));
+        assert!(a == b, "pass {i} differs with the HD mode");
+        assert!(on
+            .centre_draws
+            .iter()
+            .any(|d| matches!(d, atlantis2_engine::CentreDraw::Crosshair { .. })));
+        if on.shake.counter == 0 {
+            continue;
+        }
+        shaken += 1;
+        let l = on.hd_layer().expect("a layer");
+        let (mut close, mut n) = (0, 0);
+        for y in (0..480).step_by(7) {
+            for x in (0..640).step_by(7) {
+                let o = lut[usize::from(l.base[y * 640 + x])];
+                let h = l.pixels[(3 * y + 1) * l.width + 3 * x + 1];
+                let d = (0..3)
+                    .map(|k| ((o >> (8 * k)) & 0xff).abs_diff((h >> (8 * k)) & 0xff))
+                    .max()
+                    .unwrap();
+                close += usize::from(d <= 48);
+                n += 1;
+            }
+        }
+        assert!(close * 10 >= n * 9, "pass {i}: {close} of {n}");
+        checked += 1;
+    }
+    assert!(shaken >= 8 && checked >= 8, "{shaken} {checked}");
+}
+
 /// The canoe (loop type 9) with the HD mode on: its frames are those of
 /// the HD mode off (the puzzle's own drawing, at 640 x 480), with no HD
 /// layer (the front end enlarges the frame, as it does a menu page); the

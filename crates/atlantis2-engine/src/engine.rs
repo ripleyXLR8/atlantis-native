@@ -64,12 +64,17 @@ pub use puzzles::{
     chest_mode_cleared, chinese_click_hooks, chinese_entry_hooks, irish_click_hook,
     irish_entry_hook, mandala_hook_applies, ported_place, MANDALAS, SKULL_OBJECTS, SKULL_START,
 };
+mod octopus;
+pub use octopus::{
+    octopus_between, octopus_data, octopus_degrees, octopus_random, octopus_sector, Octopus,
+    OctopusData, Record, Shake, BLOW, BODY_DEATH, HERO_DEAD, OCTOPUS_CURSOR, OCTOPUS_DEAD,
+    OCTOPUS_ENTRY, OCTOPUS_MODE, OCTOPUS_QUIT, OCTOPUS_TICK, RECORDS, SHOT, TENTACLE_DEATH,
+};
 mod saves;
 mod shamballa;
 pub use shamballa::{
     atlantis_entry_hooks, fireflies_place, firefly_order_byte, shamballa_click_hooks,
-    FIREFLIES_CLICK, FIREFLIES_MOVE_END, FIREFLY_MANDALA, OCTOPUS_ENTRY, OCTOPUS_MODE,
-    OCTOPUS_TICK,
+    FIREFLIES_CLICK, FIREFLIES_MOVE_END, FIREFLY_MANDALA,
 };
 mod subjects;
 mod turtle;
@@ -162,13 +167,22 @@ pub enum Event {
     /// `CLICZONE` as it leaves it (the click scan may not follow: a film a
     /// hook's scan started drops the click).
     ZoneClick { zone: usize, cliczone: i32 },
-    /// A puzzle hook the port does not have (the octopus of Atlantis):
-    /// the original's function, which would have run here.
+    /// A puzzle hook the port does not have: the original's function,
+    /// which would have run here. Every hook a player reaches is ported;
+    /// this is the dispatchers' fallback.
     PuzzleNotPorted { function: u32 },
-    /// A testing aid wrote what a puzzle the port does not have would
-    /// (`Engine::end_octopus_fight`): the
-    /// original's function whose writes it copies.
-    PuzzleAid { function: u32 },
+    /// A command the octopus fight runs (`RunOneCommand`, FUN_00481800,
+    /// from its tick FUN_0049aaa0).
+    OctopusCommand(&'static str),
+    /// The scan (`CtrlScenarIN`, FUN_00483c90) after the fight's
+    /// `chapter=` commands.
+    OctopusScan,
+    /// The octopus fight's quit FUN_0049aef0 entered (it acts in the mode 6
+    /// only): from the fight's tick and the puzzle reset of a load.
+    OctopusQuit,
+    /// The warp module's camera reset FUN_0045b4b0 (from the octopus
+    /// fight's entry and quit).
+    CameraReset,
     /// A puzzle function the port has, run: the original's function (a
     /// hook, or the wheels' check FUN_0048d310).
     PuzzleRan { function: u32 },
@@ -272,6 +286,9 @@ pub enum CentreDraw {
         to: (i32, i32),
         argb: u32,
     },
+    /// The octopus fight's crosshair (FUN_0049a9a0): `AtlSpr_Aff` of
+    /// `viseur.spr`'s frame `frame` with its hot spot at (x, y).
+    Crosshair { frame: i32, x: i32, y: i32 },
 }
 
 /// The loop types of the dispatcher (@ 0x006d8520) the engine has.
@@ -575,6 +592,12 @@ pub struct Engine {
     /// words, never saved; its models as loaded (the original reads the
     /// files again at each load) and its Z buffer.
     pub web: web::Web,
+    /// The octopus fight of Atlantis (`engine/octopus.rs`): the module's
+    /// words, never saved.
+    pub octopus: Octopus,
+    /// The warp module's hit shake (@ 0x006617bc, 0x006617c0,
+    /// 0x006611c8), run by the octopus fight.
+    pub shake: Shake,
     web_models: std::collections::HashMap<web::Slot, std::sync::Arc<crate::atl3d::Model>>,
     web_z: Vec<u32>,
     /// Where the port may differ from the original (default: the minor
@@ -949,6 +972,8 @@ impl Engine {
             dragon: Dragon::default(),
             grids: Grids::default(),
             web: web::Web::default(),
+            octopus: Octopus::default(),
+            shake: Shake::default(),
             web_models: std::collections::HashMap::new(),
             web_z: Vec::new(),
             enhancements: Enhancements::default(),
@@ -1640,12 +1665,16 @@ impl Engine {
         self.sprite_state = hit.cursor;
         self.sprite_hit = hit.slot;
         let (w, h) = (self.renderer.width(), self.renderer.height());
-        // FUN_0045af10 draws nothing while the bar is open, only the
-        // marker while the subject menu is.
-        self.centre_draws = if self.bar.open {
-            Vec::new()
-        } else {
-            self.centre_plan(w, h)
+        // FUN_0049a9a0 (@ 0x0045aa15): in the octopus fight's mode 6 its
+        // own centre draws, instead of FUN_0045af10 and of the cursor's
+        // choice; FUN_0045af10 draws nothing while the bar is open, only
+        // the marker while the subject menu is.
+        let octopus = self.octopus_cursor(w, h);
+        let octopus_cursor = octopus.is_some();
+        self.centre_draws = match octopus {
+            Some(plan) => plan,
+            None if self.bar.open => Vec::new(),
+            None => self.centre_plan(w, h),
         };
         if let Some(out) = out.as_deref_mut() {
             let (m, p) = (self.camera.matrix(), self.camera.projection());
@@ -1671,7 +1700,8 @@ impl Engine {
         // The cursor for the next frame (after FUN_0045af10 drew this one),
         // unless the bar, the subject menu (or a dialog) is open.
         let zone_kind = self.centre().map(|(_, z)| z.kind);
-        if !self.bar.open
+        if !octopus_cursor
+            && !self.bar.open
             && !self.subject_menu.open
             && self.dialog.is_none()
             && !self.blackbird.flag
@@ -1785,6 +1815,13 @@ impl Engine {
                         CursorBank::Puzzle => self.grids.bank(),
                     };
                     if let (Some(bank), Ok(frame)) = (bank, usize::try_from(frame)) {
+                        bank.draw(&mut Target::screen(out, w, h), Some(x), y, frame);
+                    }
+                }
+                CentreDraw::Crosshair { frame, x, y } => {
+                    // FUN_0047bc40 refuses a null bank and a frame out of
+                    // the bank (warnings).
+                    if let (Some(bank), Ok(frame)) = (&self.octopus.bank, usize::try_from(frame)) {
                         bank.draw(&mut Target::screen(out, w, h), Some(x), y, frame);
                     }
                 }
@@ -2655,6 +2692,12 @@ impl Engine {
 
     pub fn wam(&self) -> &Wam {
         &self.wam
+    }
+
+    /// The current view's number (@ 0x006d85d4 +0x10) made `view` without
+    /// an entry: for tests and tools (a hook run with another number).
+    pub fn set_view_number(&mut self, view: u32) {
+        self.view = view;
     }
 
     pub fn files(&self) -> &A2Files {

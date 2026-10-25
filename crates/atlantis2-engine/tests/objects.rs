@@ -546,7 +546,7 @@ fn objects_against_the_original() {
                         "AtlSpr_Aff({},{frame},{x},{y},0)",
                         w.cursor_bank(*bank)
                     )),
-                    CentreDraw::Line { .. } => None,
+                    CentreDraw::Line { .. } | CentreDraw::Crosshair { .. } => None,
                 })
                 .collect();
         let draws = if draws.is_empty() {

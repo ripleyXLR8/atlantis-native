@@ -508,8 +508,9 @@ impl Engine {
     }
 
     /// FUN_0047c4e0 for state `si` of entity `ei`: the slot loaded after
-    /// the others, or `None` (the file on no disc, the slots full).
-    fn load_soul(&mut self, ei: usize, si: usize) -> Option<usize> {
+    /// the others, or `None` (the file on no disc, the slots full). The
+    /// octopus fight loads its states with it too.
+    pub(super) fn load_soul(&mut self, ei: usize, si: usize) -> Option<usize> {
         let e = &self.wam.entities[ei];
         let s = e.state_records().nth(si)?;
         let name = e.spw_name(&s);

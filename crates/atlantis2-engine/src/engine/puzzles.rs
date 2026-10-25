@@ -59,8 +59,8 @@
 //! - Shamballa's and Atlantis's hooks (prefixes `SH` and `AT`,
 //!   `shamballa.rs`): the fireflies' click (FUN_00495210) and the end of
 //!   a firefly's move in `voiles.wam` (FUN_0045a630 → FUN_004952d0) run;
-//!   the octopus's entry is listed and noted
-//!   ([`Event::PuzzleNotPorted`]), its tick too (its mode is never set).
+//!   the octopus fight's entry, its mode 6's tick and its cursor run
+//!   (`octopus.rs`).
 //! - The places the port has: every place a script or a link names but
 //!   `demo.wam` (chapter 1's, whose panoramas are on no disc); the one
 //!   place file nothing names, `sans_nom.wam`, is not ported either. A
@@ -509,6 +509,7 @@ impl Engine {
                 }
                 super::web::WEB_MODE => self.web_tick(),
                 SOULS_MODE => self.souls_tick(self.view),
+                super::octopus::OCTOPUS_MODE => self.octopus_tick(),
                 DRAGON_MODE => self.dragon_tick(),
                 MARBLES_MODE => {
                     self.event(Event::PuzzleRan { function });
@@ -558,8 +559,10 @@ impl Engine {
     /// figurines and chest (`SS` views 1-7), wheels (`SS` 12-13), pearl
     /// and dragon (`SS` 31), turtle ring (`CH` views 40-64) and labyrinth
     /// souls (`LA` views 1-60); Yucatán's hooks, first (the web's entry in
-    /// the mode 1, then the `YU` views'), are noted; Tibet has none.
-    pub(super) fn entry_hooks(&mut self) {
+    /// the mode 1, then the `YU` views'), are noted; Tibet has none; then
+    /// Atlantis's octopus fight runs. Public for tests (the dispatcher
+    /// alone, on the current view's name and number).
+    pub fn entry_hooks(&mut self) {
         self.yucatan_entry();
         let hook = self
             .current_view()
@@ -620,7 +623,7 @@ impl Engine {
             }
         }
         // Atlantis's (@ 0x0049bec6, between `LA`'s and `SS`'s, whose
-        // prefixes exclude it): the octopus's entry, noted.
+        // prefixes exclude it): the octopus fight's entry.
         self.atlantis_entry();
     }
 
