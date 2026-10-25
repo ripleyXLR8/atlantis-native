@@ -1664,7 +1664,18 @@ back) into `yucatan-*.png`.
   written `{trap}`, compared up to its fatal error: the harness goes on
   where the game quits); `tests/flow.rs` `the_end_of_the_game_with_the_mouse`
   plays it with the mouse from Tibet (the three worlds' ends written as
-  their scripts leave them; the fireflies lit in the mandalas' order); `tests/hd.rs` checks the hub, the fireflies'
+  their scripts leave them; the fireflies lit in the mandalas' order),
+  and `the_whole_game_with_the_mouse` plays **the whole game** with the
+  mouse only, from the start-up intro and a new game to the end credits
+  and the quit (Tibet, Ireland with its ball on the poet's island, Tibet's
+  ball, China with its ball on the way back, Yucatán with its ball, the
+  fourth first trip making the crystals, Xibalba, the six mandalas laid,
+  Shamballa, Rhea, the ring, Atlantis, the hub's last trip; about 4
+  minutes in release, 161 717 passes of 1/60 s): every chapter the game
+  goes through is left by one of its own `chapter=` lines (Atlantis's 82
+  by the octopus fight's two ends), every puzzle function a player
+  reaches runs, no hook is noted as not ported and no world refused, and
+  every `/set` line reported is one the original runs; `tests/hd.rs` checks the hub, the fireflies'
   view, Rhea, the ring and Atlantis with the HD mode as the other places,
   and the HD view following the ring's roll. Not checked against the
   original running (Wine / Win98): the pictures, the roll on screen.

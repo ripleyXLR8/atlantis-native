@@ -36,7 +36,11 @@
 //! mandalas' order, the last one's move end the way on), Rhea, the
 //! ring's rolling moves and its star, Atlantis (the octopus fought with the
 //! mouse: lost without the crystal, then won with it), Tibet again, the
-//! hub's last trip, the films, the credits and the quit.
+//! hub's last trip, the films, the credits and the quit. And the whole
+//! game in one run, from the start-up intro and a new game to the end
+//! credits ([`the_whole_game_with_the_mouse`]): the three worlds one after
+//! the other with each world's ball and Tibet's (the four first trips to
+//! the hub), the six mandalas laid as a player lays them, the end.
 //!
 //! Needs the game: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the test is skipped. The saves go to a
@@ -48,7 +52,9 @@ use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::save::{entry, read_save, SystemTime};
 use atlantis2_data::A2Files;
 use atlantis2_engine::bag::{UiBank, UiDraw, FORM_FRAMES};
-use atlantis2_engine::engine::{MANDALAS, OCTOPUS_ENTRY, OCTOPUS_MODE, STAR_HOLES};
+use atlantis2_engine::engine::{
+    FIREFLY_MANDALA, MANDALAS, OCTOPUS_ENTRY, OCTOPUS_MODE, STAR_HOLES,
+};
 use atlantis2_engine::menu::{state, PageKind};
 use atlantis2_engine::sound::VOICE_EFFECTS;
 use atlantis2_engine::subjects::cell;
@@ -703,15 +709,21 @@ impl Run {
     /// A click on the shown sprite of character (`character`) or object
     /// `id`, turned to with the mouse: the click's events.
     fn click_on(&mut self, character: bool, id: i32) -> Vec<Event> {
-        let n = self.e.anim.slots.len();
-        for k in 0..n {
-            let s = &self.e.anim.slots[k];
-            if s.id != id || matches!(s.kind, 1 | 3) != character {
-                continue;
+        // A character's animation may hand over to another of its slots
+        // while the view turns onto the first (a missed click): looked at
+        // again a moment later, as a player clicks again.
+        for _ in 0..4 {
+            let n = self.e.anim.slots.len();
+            for k in 0..n {
+                let s = &self.e.anim.slots[k];
+                if s.id != id || matches!(s.kind, 1 | 3) != character {
+                    continue;
+                }
+                if let Some(evs) = self.click_slot(k) {
+                    return evs;
+                }
             }
-            if let Some(evs) = self.click_slot(k) {
-                return evs;
-            }
+            self.wait(15);
         }
         panic!(
             "{} {id} not clickable in view {}",
@@ -1005,7 +1017,7 @@ fn to_ireland_from_view_2(r: &mut Run) -> (&'static str, String) {
     if r.e.loop_type == LoopType::Dialog {
         evs.extend(r.listen());
     }
-    evs.extend(std::mem::take(&mut r.e.events));
+    evs.extend(r.take_events());
     assert!(!evs.iter().any(|e| matches!(e, Event::WorldNotPorted(_))));
     assert!(evs.contains(&Event::Monde(1)));
     assert!(evs.contains(&Event::Wam("bigile1.wam".into())));
@@ -1118,6 +1130,13 @@ fn a_game_from_tibet_to_ireland_and_back() {
     assert_eq!(kept(&r), before);
     r.wait(30);
 
+    ireland_way_back(&mut r);
+}
+
+/// The way back as chapter 16 makes it, once the story has set its flag
+/// (`flag71` = 1): from the book's view 60 to Tibet's view 7, chapter 75,
+/// Ireland's mandala in the bag. The events.
+fn ireland_way_back(r: &mut Run) -> Vec<Event> {
     // The way back as chapter 16 makes it, now that the story has set its
     // flag (`flag71` = 1, Nuada's sword given back): out of the book by
     // view 55's link, views 4, 3 (chapter 16), 2; leaving view 2 for view
@@ -1157,7 +1176,7 @@ fn a_game_from_tibet_to_ireland_and_back() {
     // The next panorama frame's `Interp_GereFrame` sees that `ARRIVEEVUE`:
     // the per-view reset empties the hand, as the original's does.
     r.wait(4);
-    evs.extend(std::mem::take(&mut r.e.events));
+    evs.extend(r.take_events());
     assert_eq!((r.var("OBJETENMAIN"), r.var("ARRIVEEVUE")), (0, 0));
     ireland_lines_as_the_original(&evs);
     assert!(evs.contains(&Event::Monde(5)));
@@ -1173,6 +1192,7 @@ fn a_game_from_tibet_to_ireland_and_back() {
         (75, 5, 2)
     );
     assert!(r.e.bag_entries().iter().any(|b| b.id == mandala));
+    evs
 }
 
 /// The play of Ireland, with the mouse: what a player does, step by step.
@@ -2405,6 +2425,13 @@ fn to_china(r: &mut Run) {
     for to in 3..=9 {
         r.walk(to);
     }
+    china_from_view_9(r);
+}
+
+/// [`to_china`] from Tibet's view 9: the boat taken, laid in the hut, the
+/// trip (the boat the `n`-th object laid).
+fn china_from_view_9(r: &mut Run) {
+    let laid = r.var("NbMandalaPosed") + 1;
     let boat = r.obj("MANDALA_BATEAU_CH");
     let evs = r.click_sprite(|e| matches!(e, Event::Take { .. }));
     assert!(evs.contains(&Event::Take { id: boat }));
@@ -2445,7 +2472,7 @@ fn to_china(r: &mut Run) {
             r.var("VignetteSave"),
             r.var("ChineVisited"),
         ),
-        (42, 3, 1, 1, 1, 5, 1)
+        (42, 3, laid, laid, 1, 5, 1)
     );
     assert!(!r.in_bag("MANDALA_BATEAU_CH"));
     r.wait(30);
@@ -3304,8 +3331,9 @@ fn chapters_ended(e: &Engine, evs: &[Event], chapters: &[i32]) {
 /// (film 34, 47), 3, 1 and its link to the turtle room (chapter 46), the
 /// walk to view 40 and its link to `chine.wam` view 32: chapter 46's end
 /// of China (films 32 and 33, dialogs 346 and 347), Tibet's view 7,
-/// chapter 75, China's mandala in the bag.
-fn china_way_back(r: &mut Run) -> Vec<Event> {
+/// chapter 75, China's mandala in the bag. With `ball`, China's ball
+/// used in view 16 on the way ([`space_trip`]).
+fn china_way_back(r: &mut Run, ball: bool) -> Vec<Event> {
     r.route(&[21, 20, 19, 130, 31]);
     assert_eq!(r.chapter(), 58);
     r.walk(32);
@@ -3315,7 +3343,13 @@ fn china_way_back(r: &mut Run) -> Vec<Event> {
     let evs = r.press_zone(z);
     assert!(films(&evs).contains(&27));
     assert_eq!((r.e.place(), r.chapter()), (("miniature.wam", 18), 56));
-    r.route(&[17, 16, 15, 14, 12]);
+    r.route(&[17, 16]);
+    if ball {
+        // China's ball on its zone of view 16 (chapter 56): the hub and
+        // back.
+        space_trip(r, "BOULE_SHAMAN_CH", false);
+    }
+    r.route(&[15, 14, 12]);
     assert_eq!(r.chapter(), 55);
     r.route(&[11, 10, 7]);
     assert_eq!(r.chapter(), 48);
@@ -3358,7 +3392,7 @@ fn the_whole_of_china_with_the_mouse() {
             r = saved_and_continued(r, &dir);
         }
     }
-    china_way_back(&mut r);
+    china_way_back(&mut r, false);
     r.wait(10);
     r.shot_as("china-13-back-in-tibet.png");
     assert_eq!(r.e.place(), ("tibet.wam", 7));
@@ -3474,7 +3508,7 @@ fn china_stages_from_saves() {
                 assert!(r.e.save_slot((i + 1) as u8));
             }
             None => {
-                china_way_back(&mut r);
+                china_way_back(&mut r, false);
             }
         }
     }
@@ -3501,12 +3535,21 @@ fn to_yucatan(r: &mut Run) {
     for to in 3..=5 {
         r.walk(to);
     }
+    yucatan_from_view_5(r, |r| {
+        for to in 6..=10 {
+            r.walk(to);
+        }
+    });
+}
+
+/// [`to_yucatan`] from Tibet's view 5: the boat taken, the walk to the
+/// hut (`to_hut`), the boat laid, the trip.
+fn yucatan_from_view_5(r: &mut Run, to_hut: fn(&mut Run)) {
+    let laid = r.var("NbMandalaPosed") + 1;
     let boat = r.obj("MANDALA_BATEAU_YU");
     let evs = r.click_sprite(|e| matches!(e, Event::Take { .. }));
     assert!(evs.contains(&Event::Take { id: boat }));
-    for to in 6..=10 {
-        r.walk(to);
-    }
+    to_hut(r);
     r.pick(boat);
     let zi =
         r.e.wam()
@@ -3542,7 +3585,7 @@ fn to_yucatan(r: &mut Run) {
             r.var("VignetteSave"),
             r.var("YucatanVisited"),
         ),
-        (25, 2, 1, 1, 1, 10, 1)
+        (25, 2, laid, laid, 1, 10, 1)
     );
     assert!(!r.in_bag("MANDALA_BATEAU_YU"));
     r.wait(30);
@@ -5267,6 +5310,7 @@ fn xibalba_way_back(r: &mut Run) -> Vec<Event> {
 /// zone (the hook: sound 400, `OrdreMandala6`; chapter 75's section:
 /// `poseyua`, the mandala shown, out of the bag).
 fn yucatans_mandala_laid(r: &mut Run) {
+    let laid = r.var("NbMandalaPosed") + 1;
     r.go(10, &[]);
     let id = r.obj("MANDALA_YUCATAN");
     r.pick(id);
@@ -5283,8 +5327,8 @@ fn yucatans_mandala_laid(r: &mut Run) {
     let mut evs = r.events();
     evs.extend(r.settle());
     assert!(evs.contains(&Event::Sound("sound400.apc".into())));
-    assert_eq!((r.var("poseyua"), r.var("NbMandalaPosed")), (1, 2));
-    assert_eq!(r.var("OrdreMandala6"), 2);
+    assert_eq!((r.var("poseyua"), r.var("NbMandalaPosed")), (1, laid));
+    assert_eq!(r.var("OrdreMandala6"), laid);
     assert!(!r.in_bag("MANDALA_YUCATAN"));
     assert!(r.shown(false, "MANDALA_YU2"));
     // The game goes on in Tibet: the soul given, Xibalba's puzzles all
@@ -5392,6 +5436,52 @@ fn the_end_of_the_game_with_the_mouse() {
     assert_eq!(films(&evs), [201]);
     assert_eq!((r.e.place(), r.chapter()), (("tibet.wam", 4), 75));
 
+    // The mandalas were laid in their hook's order (`OrdreMandalaK` = K).
+    assert_eq!(fireflies_order(&r), [2, 3, 5, 1, 4, 6]);
+    the_end_from_the_hut(&mut r);
+    let journal = std::mem::take(&mut r.journal);
+    assert!(!journal
+        .iter()
+        .any(|e| matches!(e, Event::WorldNotPorted(_))));
+    // No hook is noted as not ported.
+    let mut noted: Vec<u32> = journal
+        .iter()
+        .filter_map(|e| match e {
+            Event::PuzzleNotPorted { function } => Some(*function),
+            _ => None,
+        })
+        .collect();
+    noted.sort_unstable();
+    noted.dedup();
+    assert!(noted.is_empty(), "{noted:x?}");
+}
+
+/// The fireflies' values (the zones' values in `voiles.wam` view 1) in
+/// the order that wins: the n-th is the one whose `OrdreMandala<t[v]>`
+/// (t = [`FIREFLY_MANDALA`]) is n, the firefly of the mandala laid n-th.
+fn fireflies_order(r: &Run) -> [u32; 6] {
+    let mut order = [0; 6];
+    for (n, o) in order.iter_mut().enumerate() {
+        *o = (1..=6u32)
+            .find(|&v| {
+                r.var(&format!("OrdreMandala{}", FIREFLY_MANDALA[v as usize])) == n as i32 + 1
+            })
+            .expect("a firefly for each rank");
+    }
+    order
+}
+
+/// The end of the game from Tibet's hut, the six mandalas laid and the
+/// shaman's crystal in the bag (`SpaceDeep` 4: the four first trips
+/// made): the crystal laid (Shamballa), the fireflies lit in the order
+/// the mandalas were laid, Rhea asked about all she offers, the ring
+/// walked round with its rolling moves, the star taken and laid,
+/// Atlantis: the octopus of view 16 faced without the crystal until the
+/// hero dies (film 64, view 8 again), the sunken crystal taken in view
+/// 18, the octopus shot down in view 16 (film 65), Tibet's dialog 372,
+/// the crystal laid again, the hub's last trip to view 5, its last zone,
+/// the films and the credits to their end, the last film and the quit.
+fn the_end_from_the_hut(r: &mut Run) {
     // The crystal laid in the hut: Shamballa.
     r.go(10, &[]);
     let crystal = r.obj("CRISTAL_SHAMAN");
@@ -5405,12 +5495,13 @@ fn the_end_of_the_game_with_the_mouse() {
     assert_eq!((r.e.place(), r.chapter()), (("voiles.wam", 1), 78));
     assert_eq!((r.var("MONDE"), r.e.files().current_disc()), (4, 4));
     r.shot_as("endgame-03-fireflies.png");
-    // The fireflies, each aimed at and clicked: the mandalas were laid in
-    // their hook's order (`OrdreMandalaK` = K), so the k-th firefly is the
-    // one whose mandala was laid k-th (values 2, 3, 5, 1, 4, 6); the
-    // sixth's move ends without a view, the win's automatic way on.
+    // The fireflies, each aimed at and clicked in the order the mandalas
+    // were laid ([`fireflies_order`]): the k-th firefly is the one whose
+    // mandala was laid k-th; the sixth's move ends without a view, the
+    // win's automatic way on (view 1's own firefly, the vortex then).
+    let order = fireflies_order(r);
     let mut evs = Vec::new();
-    for (n, v) in [2, 3, 5, 1, 4, 6].into_iter().enumerate() {
+    for (n, v) in order.into_iter().enumerate() {
         let firefly = r.zone_to(v);
         let lit = r.press_zone(firefly);
         assert!(lit.contains(&Event::PuzzleRan {
@@ -5425,15 +5516,17 @@ fn the_end_of_the_game_with_the_mouse() {
     // The sixth's move ends in the pass that settled it: its film is
     // played out here.
     evs.extend(r.settle());
+    assert_eq!(r.var("Puzzle_Lucioles_Fini"), 1);
+    if order[5] == 1 {
+        assert_eq!(r.e.place(), ("voiles.wam", 1));
+        let vortex = r.obj("TOURBILLON");
+        evs.extend(r.click_on(false, vortex));
+        evs.extend(r.settle());
+    } else {
+        assert_eq!(r.var("Puzzle_Lucioles_AutoWin"), 1);
+    }
     assert_eq!(films(&evs), [62]);
     assert_eq!((r.e.place(), r.chapter()), (("rhea.wam", 1), 80));
-    assert_eq!(
-        (
-            r.var("Puzzle_Lucioles_Fini"),
-            r.var("Puzzle_Lucioles_AutoWin")
-        ),
-        (1, 1)
-    );
 
     // Rhea.
     r.route(&[2, 3, 4, 5, 6]);
@@ -5600,21 +5693,6 @@ fn the_end_of_the_game_with_the_mouse() {
     assert!(r.e.quit());
     assert!(credits_shot);
     assert_eq!(films_seen, [68, 66, 99]);
-    let journal = std::mem::take(&mut r.journal);
-    assert!(!journal
-        .iter()
-        .any(|e| matches!(e, Event::WorldNotPorted(_))));
-    // No hook is noted as not ported.
-    let mut noted: Vec<u32> = journal
-        .iter()
-        .filter_map(|e| match e {
-            Event::PuzzleNotPorted { function } => Some(*function),
-            _ => None,
-        })
-        .collect();
-    noted.sort_unstable();
-    noted.dedup();
-    assert!(noted.is_empty(), "{noted:x?}");
 }
 
 /// The set lines of chapter `chapter` in `evs`.
@@ -5759,4 +5837,318 @@ fn shamballa_s_fireflies_with_the_mouse() {
     assert!(!journal
         .iter()
         .any(|e| matches!(e, Event::PuzzleNotPorted { .. })));
+}
+
+// ---------------------------------------------------------------------------
+// The whole game, with the mouse.
+
+/// A first space trip by the shaman's ball `ball`, from the current view
+/// (its type-1000 zone, `ZoneBoule_*`): the ball picked from the bag (its
+/// overlay), a click on the zone: the world's chapter plays film 200 and
+/// sends the game to the hub (`planetes.wam` view 1, chapter 83), the
+/// world, its disc and the place's chapter kept for the way back,
+/// `SpaceDeep` one more. With `crystals`, views 2, 3, 4 (the balls made
+/// crystals, `SpaceDeep` 4 opening the way) and back; then view 1's way
+/// back (zone 10): film 201, the view and chapter the trip left.
+fn space_trip(r: &mut Run, ball: &str, crystals: bool) -> Vec<Event> {
+    let (place, view) = (r.e.place().0.to_string(), r.e.place().1);
+    let chapter = r.chapter();
+    let (monde, disc, deep) = (
+        r.var("MONDE"),
+        r.e.files().current_disc(),
+        r.var("SpaceDeep"),
+    );
+    r.stow();
+    let id = r.obj(ball);
+    r.choose(id);
+    assert!(r.e.overlays.ball, "{ball}");
+    let zone =
+        r.e.wam()
+            .view(view)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.kind == 1000)
+            .unwrap_or_else(|| panic!("no ball zone in {place} view {view}"));
+    let mut evs = r.press_zone(zone);
+    assert_eq!(films(&evs), [200], "{ball}");
+    assert!(r.e.place().0.eq_ignore_ascii_case("planetes.wam"));
+    assert_eq!((r.e.place().1, r.chapter()), (1, 83));
+    assert_eq!(
+        (
+            r.var("SpaceDeep"),
+            r.var("MONDE"),
+            r.e.files().current_disc()
+        ),
+        (deep + 1, monde, disc)
+    );
+    if crystals {
+        r.route(&[2, 3, 4]);
+        for b in [
+            "BOULE_SHAMAN",
+            "BOULE_SHAMAN_IR",
+            "BOULE_SHAMAN_YU",
+            "BOULE_SHAMAN_CH",
+        ] {
+            let id = r.obj(b);
+            assert!(!r.e.bag_entries().iter().any(|e| e.id == id), "{b}");
+        }
+        let id = r.obj("CRISTAL_SHAMAN");
+        assert!(r.e.bag_entries().iter().any(|e| e.id == id && e.world == 5));
+        r.route(&[3, 2, 1]);
+    }
+    let back = r.walk_redirected(10);
+    assert_eq!(films(&back), [201], "{ball}");
+    assert_eq!(
+        (r.e.place(), r.chapter()),
+        ((place.as_str(), view), chapter)
+    );
+    evs.extend(back);
+    evs
+}
+
+/// Mandala `object` laid on its zone `zone` of the hut (Tibet's view
+/// 10): the hook (sound 400, its `OrdreMandala<k>` the count of laid
+/// ones), chapter 75's section (`pose`, the mandala out of the bag).
+fn lay_mandala(r: &mut Run, object: &str, zone: &str, pose: &str) {
+    let laid = r.var("NbMandalaPosed") + 1;
+    let order = MANDALAS.iter().find(|m| m.0 == object).unwrap().2;
+    r.go(10, &[]);
+    let id = r.obj(object);
+    r.pick(id);
+    let zi =
+        r.e.wam()
+            .view(10)
+            .unwrap()
+            .zones
+            .iter()
+            .position(|z| z.name.as_deref() == Some(zone))
+            .unwrap();
+    r.aim(zi);
+    r.tap();
+    let mut evs = r.events();
+    evs.extend(r.settle());
+    assert!(evs.contains(&Event::Sound("sound400.apc".into())));
+    assert_eq!((r.var(pose), r.var("NbMandalaPosed")), (1, laid));
+    assert_eq!(r.var(order), laid);
+    assert!(!r.in_bag(object));
+    assert_eq!((r.e.place(), r.chapter()), (("tibet.wam", 10), 75));
+}
+
+/// Every `/set` line of chapters 78-201 that ran is one of the lines the
+/// original's handler ran (`scripts_worlds_endgame.txt`).
+fn endgame_lines_as_the_original(evs: &[Event]) {
+    let golden = include_str!("golden/scripts_worlds_endgame.txt");
+    let mut n = 0;
+    for e in evs {
+        if let Event::Set { chapter, line } = e {
+            if (78..=201).contains(chapter) {
+                let head = format!("chapi{chapter:03}.con:{line} ");
+                assert!(
+                    golden.lines().any(|l| l.starts_with(&head)),
+                    "chapter {chapter} line {line}: not a line the original runs"
+                );
+                n += 1;
+            }
+        }
+    }
+    assert!(n > 10, "{n}");
+}
+
+/// The chapters of the end of the game a game goes through: Tibet's 0
+/// and 75, Shamballa's 78, Rhea's 80, the ring's 81, the hub's 83, the
+/// octopus's death 200 and the hero's 201 (82, Atlantis's, has no
+/// `chapter=` line: the octopus fight's two ends leave it).
+const ENDGAME_CHAPTERS: [i32; 8] = [0, 75, 78, 80, 81, 83, 200, 201];
+
+/// The whole game, played with the mouse only from the start-up intro
+/// and a new game to the end credits, as a player plays it: the intro
+/// ended by a double click, a new game from the player menu; Tibet
+/// ([`to_ireland`]: the shaman asked, Ireland's boat laid); Ireland's
+/// story ([`IRELAND`]) with Ireland's ball used on the poet's island
+/// (view 70, chapter 20: the hub's first trip, [`space_trip`]) and the
+/// way back with Ireland's mandala, laid in the hut; Tibet's ball in view
+/// 4; China's boat, China's story ([`CHINA`]) and its ball in
+/// `miniature.wam` view 16 on the way back with the lantern, China's
+/// mandala laid; Yucatán's boat, its ball in view 22 at the arrival (the
+/// fourth first trip: the hub's view 4, the balls made crystals), then
+/// Yucatán and Xibalba ([`whole_yucatan`]: their grids, the canoe, the
+/// web, the star map) and Yucatán's mandala; then
+/// [`the_end_from_the_hut`]: Shamballa's fireflies lit in the order the
+/// mandalas were laid, Rhea, the ring, Atlantis's octopus fight lost then
+/// won, Tibet again, the hub's last trip, the films, the credits and the
+/// quit. Every puzzle a player meets is played; every chapter the game
+/// goes through is left by one of its own `chapter=` lines (Atlantis's
+/// 82 by the octopus fight's two ends); no hook is noted as not ported
+/// and no world refused; every `/set` line reported is one the original
+/// runs.
+#[test]
+fn the_whole_game_with_the_mouse() {
+    if game().is_none() {
+        return;
+    }
+    let started = std::time::Instant::now();
+    let dir = scratch("a2-flow-whole-game");
+    let mut r = Run::new(&dir);
+    // The worlds' own tests write the pictures.
+    r.shots = None;
+
+    // Tibet, then Ireland with its ball.
+    to_ireland(&mut r);
+    for (name, stage) in IRELAND {
+        stage(&mut r);
+        assert_eq!(r.e.loop_type, LoopType::Warp, "after {name}");
+        if *name == "the big horse" {
+            assert_eq!((r.e.place(), r.chapter()), (("ilepoete.wam", 71), 20));
+            r.go(70, &[]);
+            space_trip(&mut r, "BOULE_SHAMAN_IR", false);
+            r.go(71, &[]);
+        }
+    }
+    ireland_way_back(&mut r);
+    lay_mandala(&mut r, "MANDALA_IRLANDE", "ZONE_IRA", "poseira");
+    eprintln!("Ireland done: pass {} ({:.0?})", r.pass, started.elapsed());
+
+    // Tibet's ball.
+    r.go(4, &[]);
+    space_trip(&mut r, "BOULE_SHAMAN", false);
+
+    // China, its ball on the way back.
+    r.go(9, &[]);
+    china_from_view_9(&mut r);
+    for (name, stage) in CHINA {
+        stage(&mut r);
+        assert_eq!(r.e.loop_type, LoopType::Warp, "after {name}");
+    }
+    china_way_back(&mut r, true);
+    r.wait(10);
+    assert_eq!((r.e.place(), r.chapter()), (("tibet.wam", 7), 75));
+    assert!(r.in_bag("MANDALA_CHINE"));
+    lay_mandala(&mut r, "MANDALA_CHINE", "ZONE_CHA", "posecha");
+    eprintln!("China done: pass {} ({:.0?})", r.pass, started.elapsed());
+
+    // Yucatán: its ball at once (the fourth first trip, the crystals),
+    // then Yucatán and Xibalba.
+    r.go(5, &[]);
+    yucatan_from_view_5(&mut r, |r| {
+        r.go(10, &[]);
+    });
+    r.route(&[17, 19, 22]);
+    space_trip(&mut r, "BOULE_SHAMAN_YU", true);
+    r.go(10, &[]);
+    for (name, stage) in whole_yucatan() {
+        stage(&mut r);
+        assert_eq!(r.e.loop_type, LoopType::Warp, "after {name}");
+    }
+    assert_eq!(
+        (
+            r.var("NbMandalaPosed"),
+            r.var("SpaceDeep"),
+            r.var("TravelTIDone"),
+            r.var("TravelIRDone"),
+            r.var("TravelCHDone"),
+            r.var("TravelYUDone")
+        ),
+        (6, 4, 1, 1, 1, 1)
+    );
+    assert!(r.in_bag("CRISTAL_SHAMAN"));
+    eprintln!("Yucatán done: pass {} ({:.0?})", r.pass, started.elapsed());
+
+    // The end.
+    the_end_from_the_hut(&mut r);
+    assert!(r.e.quit());
+
+    let journal = std::mem::take(&mut r.journal);
+    assert!(!journal
+        .iter()
+        .any(|e| matches!(e, Event::WorldNotPorted(_))));
+    let noted: Vec<u32> = journal
+        .iter()
+        .filter_map(|e| match e {
+            Event::PuzzleNotPorted { function } => Some(*function),
+            _ => None,
+        })
+        .collect();
+    assert!(noted.is_empty(), "noted as not ported: {noted:x?}");
+    // Every chapter the game went through, left by its own script.
+    let mut seen: Vec<i32> = journal
+        .iter()
+        .filter_map(|e| match e {
+            Event::Set { chapter, .. } => Some(*chapter),
+            _ => None,
+        })
+        .collect();
+    seen.sort_unstable();
+    seen.dedup();
+    let mut all: Vec<i32> = IRISH_CHAPTERS
+        .iter()
+        .chain(&CHINESE_CHAPTERS)
+        .chain(&YUCATAN_CHAPTERS)
+        .chain(&XIBALBA_CHAPTERS)
+        .chain(&ENDGAME_CHAPTERS)
+        .copied()
+        .collect();
+    all.push(82);
+    all.sort_unstable();
+    let unexpected: Vec<i32> = seen.iter().filter(|c| !all.contains(c)).copied().collect();
+    assert!(unexpected.is_empty(), "chapters {unexpected:?}");
+    let left: Vec<i32> = all.iter().filter(|&&c| c != 82).copied().collect();
+    chapters_ended(&r.e, &journal, &left);
+    assert!(seen.contains(&82));
+    for end in ["(chapter=200)", "(chapter=201)"] {
+        assert!(journal.contains(&Event::OctopusCommand(end)), "{end}");
+    }
+    ireland_lines_as_the_original(&journal);
+    china_lines_as_the_original(&journal);
+    yucatan_lines_as_the_original(&journal);
+    endgame_lines_as_the_original(&journal);
+    // Every puzzle's functions ran.
+    let mut ran: Vec<u32> = journal
+        .iter()
+        .filter_map(|e| match e {
+            Event::PuzzleRan { function } => Some(*function),
+            _ => None,
+        })
+        .collect();
+    ran.sort_unstable();
+    ran.dedup();
+    let want = [
+        // Ireland's.
+        0x0049_4120u32,
+        0x0049_4190,
+        0x0049_3cb0,
+        0x0049_3d40,
+        0x0049_6020,
+        0x0049_60a0,
+        0x0049_58f0,
+        // China's.
+        0x0048_d680,
+        0x0048_da20,
+        0x0049_38f0,
+        0x0049_3960,
+        0x0048_d080,
+        0x0048_d170,
+        0x0049_44a0,
+        0x0049_4600,
+        0x0049_45f0,
+        0x0049_c340,
+        0x0049_c290,
+        0x0049_c400,
+        0x0048_df10,
+        // Shamballa's fireflies (the click, the move end) and the octopus.
+        0x0049_5210,
+        0x0049_52d0,
+        OCTOPUS_ENTRY,
+    ];
+    for function in want.into_iter().chain(XIBALBA_RAN) {
+        assert!(ran.contains(&function), "FUN_{function:08x} never ran");
+    }
+    let dialogs_played = dialogs(&journal).len();
+    eprintln!(
+        "the whole game: {} passes ({:.0} min of play), {} dialogs, {:.0?}",
+        r.pass,
+        r.pass as f64 / 3600.0,
+        dialogs_played,
+        started.elapsed()
+    );
 }
