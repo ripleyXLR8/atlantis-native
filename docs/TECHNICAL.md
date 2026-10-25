@@ -978,8 +978,19 @@ back) into `yucatan-*.png`.
   from a full list of an earlier slot of the id, or frame −2 matching
   that end byte): the byte below the list into the matched entry and the
   end into that byte, @ 0x0047c979..0x0047c988 (no data reaches them).
-  State chains and the odd-tick flag are not ported (no Tibet or Irish
-  state uses them).
+  State chains are ported: a state whose WAM record names a next state
+  (+0x1c, `A1`) keeps that state's record when its slot is loaded
+  (FUN_004123b0: the entity's first state with that letter and number),
+  so the slot hands over when it ends, and after the view's loads each
+  such slot chains to the slot loaded from that record (FUN_0047c820 /
+  FUN_0047c850). The only chained states are Chac's animations 1 and 2 in
+  Xibalba's view 123 (both to animation 1): animation 1 loops on itself,
+  and after `playanimp=CHAC,2` animation 2 hands back to animation 1
+  instead of leaving the pond empty. Checked against the original's loads
+  and steps run under emulation, with chapter 37's commands on Chac
+  (`tests/xibalba.rs`, `golden/spw_chains.txt`). The odd-tick flag
+  (+0xc0) is ported with the pearl and dragon puzzle, its only writer
+  (the transparent cloud, @ 0x00494bed).
 - **Cursor:** the frames of `spr\interfac.spr` (a `SPRCRYO` bank,
   `crates/atlantis2-data/src/spr.rs`: the shade-run state machine of
   `spr_p5.dll`'s `AFF_SPR` and `AFF_SPRTRS50` (the 50 % mode of the
@@ -2571,8 +2582,29 @@ back) into `yucatan-*.png`.
   sequencer alone (no click, no camera change; its end is ignored), then
   its draw over the frame, the dialog removed when the film ends (FUN_0040c030;
   what the dialog step draws there is the dialog frame's own rule, no
-  Tibet film has one). Not there yet: the `voixoff0` and `cinema` lines'
-  pictures. The lines, the
+  Tibet film has one). Each frame of the dialog loop (the dispatcher's
+  loop type 2 and FUN_00480840) does what the current line's kind asks:
+  a head line and a `voixoff` line (which first turns with the mouse,
+  FUN_0040c6a0) draw the panorama as the warp does (FUN_0045a930: the
+  place animations drawn and stepped on the 15 Hz ticks, so the place's
+  characters, water and fire go on moving, and the web in its mode), then
+  the dialog frame; a `voixoff0` line (Liam's off-screen lines in Ireland,
+  the spider's and Tezcat's in Yucatán and Xibalba) draws the same
+  panorama, then the dowsing rod and the overlays (FUN_00475320), then its
+  subtitle, so the hero's head of a previous line does not stay on screen;
+  a `cinema` line (only in the dialogs over films) draws its subtitle
+  alone; no line, nothing. Checked against the dispatcher run under
+  emulation with the line kind given (`golden/dialog_loop.txt`,
+  `tests/common/dialog_loop.rs`, on lines of the four kinds: Tibet's
+  dialog 360, Ireland's 1, 56, 44 and 71, Xibalba's 190): the panorama,
+  its step and the turn, and the dowsing rod and the ring drawn (the rod
+  stepped) under the dialog frame for a `voixoff0` line only. The
+  dialog's end sets the previous loop type back, and that resets the warp
+  camera (FUN_00402960: the screen's centre and 76°), whatever field of
+  view the last line had: the panorama is not left zoomed in after a
+  dialog (asserted after every dialog of the Tibet, Irish, Chinese,
+  Yucatán, Xibalba and endgame tests, against the camera the original's
+  code leaves under emulation). The lines, the
   video frames and their numbers, the composed frames, every subtitle's
   layout and the fades are the original's (tests/dialogs.rs).
 - **Scripts:** the chapter scripts `scenar\chapiNNN.con` keep the first
@@ -2738,17 +2770,13 @@ back) into `yucatan-*.png`.
   800 x 600 the panorama, drawn on the 640 x 480 surface, is 1.25 times
   narrower than at 640 x 480: the original's way (the head, in its own
   640 x 480 viewport, is the same). At 800 wide the menus' dimmed backdrop
-  is black (`FUN_00470430`). Each mode change sets the camera again
+  is black (`FUN_00470430`). Each loop type change sets the camera again
   (centre, 76° for the size drawn, under the x87 control word of the
-  moment). The original does this at 640 x 480 too, at every loop type
-  change (`FUN_00402960`); the port does it only at 800 x 600 (and when
-  the size changes), so that the 640 x 480 game stays as it was. The two
-  differ only if a loop type change finds the camera with another centre
-  or field of view: after a dialog that ends on another speaker's line
-  with a `[Focale]` field of view (the end, @ 0x004808a0, sets 76° again
-  only after a hero's line), when the panorama follows in the same view
-  (a new view sets 76°). Not checked yet against the original: a
-  possible difference. The surface changes between passes (a change in the
+  moment), at 640 x 480 too, as the original does on every path of
+  `FUN_00402960`: after a dialog that ends on a line with a `[Focale]`
+  field of view, the panorama is back at 76° (checked against the
+  camera the original leaves under emulation, `golden/dialog_loop.txt`).
+  The surface changes between passes (a change in the
   middle of a pass takes effect at the next one; a film started by a
   panorama frame has its first frame enlarged at once). The window
   scales the 800 x 600 picture as it scales the 640 x 480 one, and a

@@ -22,6 +22,9 @@ use atlantis2_data::A2Files;
 use atlantis2_engine::engine::{chinese_click_hooks, chinese_entry_hooks};
 use atlantis2_engine::{Engine, EngineError, Event, Fpu, LoopType, Variant};
 
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
+
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
         std::env::var_os("ATLANTIS2_DATA"),
@@ -803,6 +806,8 @@ fn every_chinese_dialog_plays() {
             }
         }
         assert!(ended, "dialog {n} does not end");
+        // The panorama back at 76° (FUN_00402960 at the end).
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
         lines += e
             .events
             .iter()

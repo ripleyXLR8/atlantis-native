@@ -36,6 +36,9 @@ use atlantis2_engine::subtitle::{layout, SubtitleFont};
 use atlantis2_engine::{Engine, Fpu, Variant};
 use md5::{Digest, Md5};
 
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
+
 const SCRIPT: &str = include_str!("golden/dialog_script_ti.txt");
 const FRAMES: &str = include_str!("golden/dialog_frames.txt");
 const SUBTITLES: &str = include_str!("golden/subtitles.txt");
@@ -474,6 +477,21 @@ fn music_fades_and_volumes_match_the_original() {
     }
 }
 
+/// The dialog loop as the original's (`dialog_loop.txt`) on Tibet's first
+/// dialog (360, head lines) in view 7: the panorama drawn under the
+/// frame and its place animations stepped on the 15 Hz ticks, no turn;
+/// the panorama back at 76° after the end.
+#[test]
+fn the_dialog_loop_in_tibet_matches_the_original() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::new_game(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    let (kinds, stepped) = dialog_loop::check_dialog_loop(&mut e, 360);
+    assert_eq!(kinds.into_iter().collect::<Vec<_>>(), [0]);
+    assert!(stepped);
+}
+
 /// Tibet's first dialog (360) played by the engine at 60 frames a second
 /// from the arrival in view 7: the three lines follow their voices, the
 /// first voice is the one the lip-sync golden analysed, the video loops
@@ -559,9 +577,51 @@ fn dialog_360_plays_end_to_end() {
     );
     assert_eq!(min_music, 16);
     assert!(e.dialog().is_none());
+    // The last line is the shaman's (50°): the end puts the panorama back
+    // at 76° with the screen's centre (FUN_00402960).
+    dialog_loop::assert_camera_after_dialog(&e, "dialog 360");
     // Back up to 100 % in 84 / 127 s.
     for k in 0..60 {
         e.set_clock((frame + k) as f64 / 60.0);
     }
     assert_eq!(e.music.volume, 100);
+}
+
+/// Every Tibet dialog (the 26 of `dialog_script_ti.txt`) started in view
+/// 7 and played to its end with its heads and bodies drawn, a click every
+/// 20 passes: the panorama back at 76° with the screen's centre after
+/// each, whatever field of view its last line had (FUN_004808a0 →
+/// FUN_0049da90 → FUN_00402960), as the original's camera after the end
+/// (`dialog_loop.txt`).
+#[test]
+fn every_tibet_dialog_ends_at_76_degrees() {
+    let Some(files) = game() else { return };
+    let numbers: Vec<u32> = SCRIPT
+        .lines()
+        .filter_map(|l| l.strip_prefix("dialog "))
+        .map(|l| l.split(' ').next().unwrap().parse().unwrap())
+        .collect();
+    assert_eq!(numbers.len(), 26);
+    let mut e = Engine::new_game(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    let mut screen = vec![0u16; 640 * 480];
+    for n in numbers {
+        e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+            .unwrap();
+        e.start_dialog(n)
+            .unwrap_or_else(|err| panic!("dialog {n}: {err}"));
+        let mut ended = false;
+        for pass in 0..20_000 {
+            if pass % 20 == 19 {
+                e.click(f64::from(pass) * 10.0 + f64::from(n) * 1e6);
+            }
+            e.tick();
+            e.pass(Some(&mut screen));
+            if e.dialog().is_none() {
+                ended = true;
+                break;
+            }
+        }
+        assert!(ended, "dialog {n} does not end");
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
+    }
 }

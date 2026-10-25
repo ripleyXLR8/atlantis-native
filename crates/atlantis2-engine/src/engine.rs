@@ -1138,6 +1138,8 @@ impl Engine {
                     if let Some(slot) = self.anim.slots.get_mut(n) {
                         slot.record = Some(record);
                     }
+                    let next = self.next_state_record(record);
+                    self.anim.set_next(n, next);
                     // The horse's frame kept across views (@ 0x0047c764):
                     // a slot whose id is `CHEVAL`'s object index, whatever
                     // its kind, starts at `FRAMECHEVAL`.
@@ -1155,6 +1157,17 @@ impl Engine {
                 None => log::warn!("Can't load SPW {name}"),
             }
         }
+        // FUN_0047c820 (@ 0x0045a267): the chains to the next states'
+        // slots.
+        self.anim.link_chains();
+    }
+
+    /// FUN_004123b0 at a slot's load: the record (entity, state) of the
+    /// next state of WAM record `(entity, state)`, if it has one.
+    pub(crate) fn next_state_record(&self, (ei, si): (usize, usize)) -> Option<(usize, usize)> {
+        let e = self.wam.entities.get(ei)?;
+        let states: Vec<_> = e.state_records().collect();
+        crate::anim::next_state(&states, states.get(si)?).map(|k| (ei, k))
     }
 
     /// A mouse move, in mickeys (relative pointer motion): the pointer
@@ -1355,7 +1368,7 @@ impl Engine {
                 self.music.set_percent(100);
                 // AtlDial_start set the loop type 2, then the previous one
                 // back (@ 0x0047ff7a, 0x0047ffd6): the camera set again
-                // for it (nothing changes at 640 x 480).
+                // for it (centre and 76°, FUN_00402960).
                 self.set_loop_type(self.loop_type);
                 Err(e)
             }
@@ -1428,12 +1441,7 @@ impl Engine {
         match self.loop_type {
             LoopType::Warp => self.warp_pass(out.as_deref_mut()),
             LoopType::Video => self.video_pass(out.as_deref_mut()),
-            LoopType::Dialog => {
-                self.frame();
-                if let Some(out) = out.as_deref_mut() {
-                    self.render_surface(out);
-                }
-            }
+            LoopType::Dialog => self.dialog_pass(out.as_deref_mut()),
             LoopType::Menu => self.menu_pass(out.as_deref_mut()),
             LoopType::Picture => self.picture_pass(out.as_deref_mut()),
             LoopType::Canoe => self.canoe_pass(out.as_deref_mut()),
@@ -1516,6 +1524,75 @@ impl Engine {
         self.camera.fpu = self.renderer.fpu;
         self.hd_scene(out, &m, p);
         restore(&mut self.work, &self.faces, &dirty);
+    }
+
+    /// The dialog loop (the dispatcher's loop type 2, @ 0x0049ce71, and
+    /// FUN_00480840) by the kind of the current line (@ 0x004616f0): no
+    /// line (−1), nothing; a head line (0) and a `voixoff` line (1, which
+    /// turns first, FUN_0040c6a0), the panorama as FUN_0045a930 draws it
+    /// (the place animations drawn and stepped, the web in its mode) then
+    /// the dialog frame over it; a `voixoff0` line (2), the same panorama,
+    /// then FUN_00475320's dowsing rod and overlays (@ 0x0049ce80..
+    /// 0x0049ce8a), then the dialog frame (its subtitles: FUN_00461430
+    /// draws a head only for kind 0); a `cinema` line (3), the dialog
+    /// frame alone. No cursor and no centre marker.
+    fn dialog_pass(&mut self, mut out: Option<&mut [u16]>) {
+        self.frame();
+        let kind = self.dialog.as_ref().map_or(-1, Dialog::kind);
+        if kind < 0 {
+            return;
+        }
+        if kind != 3 {
+            self.dialog_scene(out.as_deref_mut());
+        }
+        if kind == 2 {
+            self.rod_frame();
+            if self.overlays.any() {
+                self.overlay_draw();
+            }
+        }
+        if let Some(out) = out {
+            let (w, h) = (self.renderer.width(), self.renderer.height());
+            if kind == 2 {
+                self.paint_ui(out, w, h);
+            }
+            self.draw_dialog_frame(out);
+        }
+    }
+
+    /// FUN_0045a930 in the dialog loop: the place animations drawn into
+    /// the faces with the sprite under the centre recorded (FUN_0045b040:
+    /// the cursor state and, on a click, the slot), the cube rendered into
+    /// `out` (`None`: no pixels, but the control word warpPII leaves), the
+    /// web drawn in its mode (FUN_00491b30), then the animations' 15 Hz
+    /// step (FUN_0047d7f0 @ 0x0045a9c7).
+    fn dialog_scene(&mut self, out: Option<&mut [u16]>) {
+        if self.faces[0].is_empty() {
+            if let Some(out) = out {
+                out.fill(0);
+            }
+        } else {
+            let dirty = self.draw_slots();
+            match out {
+                Some(out) => {
+                    let (m, p) = (self.camera.matrix(), self.camera.projection());
+                    self.renderer.fpu = self.camera.fpu;
+                    self.renderer.render(&self.work, &m, p, out);
+                    self.camera.fpu = self.renderer.fpu;
+                    self.hd_scene(out, &m, p);
+                    self.web_draw(Some(out));
+                }
+                None => {
+                    if self.renderer.variant == Variant::PII {
+                        self.camera.fpu = Fpu::Chop;
+                        self.renderer.fpu = Fpu::Chop;
+                    }
+                    self.web_draw(None);
+                }
+            }
+            restore(&mut self.work, &self.faces, &dirty);
+        }
+        self.anim_tick();
     }
 
     /// The place animations' 15 Hz step (FUN_0047d7f0, on its flag), the
@@ -1644,6 +1721,23 @@ impl Engine {
         wam::pick(&view.zones, d)
     }
 
+    /// FUN_0045b040 (from FUN_0045a930, in the warp and the dialog loop):
+    /// the place animations drawn into the faces, the cursor state of
+    /// what is under the screen centre and, on a click, its slot. Returns
+    /// the boxes drawn, to restore.
+    fn draw_slots(&mut self) -> Vec<(usize, FaceBox)> {
+        let centre = self
+            .forced_centre
+            .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
+        let (dirty, mut hit) = self.anim.draw(&mut self.work, centre, self.click);
+        if !self.sprite_picks {
+            hit = Default::default();
+        }
+        self.sprite_state = hit.cursor;
+        self.sprite_hit = hit.slot;
+        dirty
+    }
+
     /// The warp draw (@ 0x0045a9f0): sprites into the faces, the cube, the
     /// faces restored, the animation step; the cursor and the centre
     /// marker; the cursor chosen for the next frame.
@@ -1655,16 +1749,7 @@ impl Engine {
             }
             return;
         }
-        let centre = self
-            .forced_centre
-            .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
-        let (dirty, mut hit): (Vec<(usize, FaceBox)>, _) =
-            self.anim.draw(&mut self.work, centre, self.click);
-        if !self.sprite_picks {
-            hit = Default::default();
-        }
-        self.sprite_state = hit.cursor;
-        self.sprite_hit = hit.slot;
+        let dirty = self.draw_slots();
         let (w, h) = (self.renderer.width(), self.renderer.height());
         // FUN_0049a9a0 (@ 0x0045aa15): in the octopus fight's mode 6 its
         // own centre draws, instead of FUN_0045af10 and of the cursor's
@@ -2601,10 +2686,12 @@ impl Engine {
     /// [`Engine::render`] on the surface the frame is drawn on (the
     /// logical size, [`Engine::width`] x [`Engine::height`]): the
     /// cube with the place animations as FUN_0045a930 draws it (no cursor,
-    /// no centre marker), or the video's frame. In a dialog
-    /// (@ 0x00480840): nothing before its first line; the panorama for a
-    /// head or `voixoff` line, then the dialog frame over it; for
-    /// `voixoff0` and `cinema` lines the subtitles over what `out` holds.
+    /// no centre marker, no step), or the video's frame. In a dialog (the
+    /// loop type 2, @ 0x0049ce71, and @ 0x00480840): nothing before its
+    /// first line; the panorama for a head, `voixoff` or `voixoff0` line
+    /// (with the overlays of the last pass for `voixoff0`), then the
+    /// dialog frame over it; for a `cinema` line the subtitles over what
+    /// `out` holds.
     pub fn render_surface(&mut self, out: &mut [u16]) {
         self.hd_pass_start();
         self.render_frame(out);
@@ -2625,9 +2712,19 @@ impl Engine {
         }
         if self.faces[0].is_empty() {
             out.fill(0);
-        } else if matches!(kind, None | Some(0) | Some(1)) {
+        } else if matches!(kind, None | Some(0..=2)) {
             self.draw_scene(out);
         }
+        if kind == Some(2) {
+            self.paint_ui(out, w, h);
+        }
+        self.draw_dialog_frame(out);
+    }
+
+    /// The dialog frame (@ 0x00461430) over `out`: the head of a head
+    /// line, the subtitles.
+    fn draw_dialog_frame(&mut self, out: &mut [u16]) {
+        let (w, h) = (self.renderer.width(), self.renderer.height());
         let active = self.hd_active();
         if let Some(d) = self.dialog.as_mut() {
             let (hd, texts) = self.hd.frame_parts(active);

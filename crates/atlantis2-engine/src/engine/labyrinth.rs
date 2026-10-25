@@ -534,6 +534,10 @@ impl Engine {
         self.anim.load(&name, spw, kind, id, sprite, s);
         let slot = self.anim.slots.get_mut(n)?;
         slot.record = Some((ei, si));
+        // AtlSpw_load's next state (+0x28); no chain is linked here
+        // (FUN_0047c820 runs only at a view's entry).
+        let next = self.next_state_record((ei, si));
+        self.anim.set_next(n, next);
         Some(n)
     }
 

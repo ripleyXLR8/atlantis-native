@@ -19,6 +19,9 @@ use atlantis2_data::A2Files;
 use atlantis2_engine::engine::{yucatan_click_hooks, yucatan_entry_hooks, STATUE_BRANCH, WEB_MODE};
 use atlantis2_engine::{CursorBank, Engine, EngineError, Event, Fpu, LoopType, Variant};
 
+#[path = "common/dialog_loop.rs"]
+mod dialog_loop;
+
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
         std::env::var_os("ATLANTIS2_DATA"),
@@ -720,6 +723,8 @@ fn every_yucatan_dialog_plays() {
             }
         }
         assert!(ended, "dialog {n} does not end");
+        // The panorama back at 76° (FUN_00402960 at the end).
+        dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
         lines += e
             .events
             .iter()
