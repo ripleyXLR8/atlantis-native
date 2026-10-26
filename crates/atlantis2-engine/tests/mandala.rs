@@ -489,6 +489,16 @@ fn mandalas_against_the_original() {
                 }
                 assert_eq!(&format!("{head}: {}", state(&e, &n)), want);
             }
+            "D" if f[1] == "log" => {
+                // `D log n1 .. n6`: the solution log the exit hook writes
+                // (FUN_00495650) after the order above.
+                let mut want_log = vec!["--- Solution Mandalas ---".to_string()];
+                for (k, v) in f[2..].iter().enumerate() {
+                    want_log.push(format!("Mandala {} : numero {v}", k + 1));
+                }
+                want_log.push(String::new());
+                assert_eq!(e.mandala_solution_log(), want_log, "{want}");
+            }
             "D" => {
                 // `D last {4:Z} ({3:V}=6)`: the others in the hook's
                 // order, then Z.

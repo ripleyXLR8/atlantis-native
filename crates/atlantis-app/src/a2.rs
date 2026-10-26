@@ -1120,8 +1120,9 @@ impl ApplicationHandler for A2App {
         }
         match event {
             WindowEvent::CloseRequested => {
-                // `atlant2.cfg` is written at exit (FUN_0047f530).
-                self.engine.write_cfg();
+                // The exit hook: the mandala solution log, `atlant2.cfg`
+                // (FUN_00495650, FUN_0047f530).
+                self.engine.at_exit();
                 el.exit();
             }
             WindowEvent::Focused(on) => self.set_focus(on, Instant::now()),
@@ -1202,7 +1203,7 @@ impl ApplicationHandler for A2App {
             WindowEvent::RedrawRequested => {
                 // `EXIT` in a script, or the menus, quit the game.
                 if self.redraw(Instant::now()) && self.engine.quit() {
-                    self.engine.write_cfg();
+                    self.engine.at_exit();
                     el.exit();
                 }
                 self.present();
