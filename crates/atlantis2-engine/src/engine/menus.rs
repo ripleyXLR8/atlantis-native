@@ -127,6 +127,12 @@ impl Engine {
 
     /// The menu loop's frame (@ 0x00486eb0).
     pub(super) fn menu_pass(&mut self, out: Option<&mut [u16]>) {
+        // The menu frame's first call (@ 0x00486ecf): the music state
+        // machine, through the thunk @ 0x0047a280. In the dispatcher's
+        // loop type 5 it so runs twice a pass, after the dispatcher's own
+        // call (@ 0x0049ce32): a fade's end moves the state on in the
+        // same pass, the ring is refilled twice.
+        self.music_frame();
         if let Some(m) = self.menu.as_mut() {
             m.input.escape = self.escape_down;
         }

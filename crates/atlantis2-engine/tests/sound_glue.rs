@@ -360,3 +360,57 @@ fn film_62_after_shamballa_plays_its_track_from_the_disc_in_the_drive() {
         .any(|ev| matches!(ev, Event::Sound(s) if s.eq_ignore_ascii_case("cine062.apc"))));
     assert_eq!(got, golden(scenario));
 }
+
+/// Review N1: the music state machine (FUN_00476fc0) runs on every
+/// dispatcher pass (@ 0x0049ce32) and once more in the menu frame
+/// (@ 0x00486ecf, through the thunk @ 0x0047a280): in a menu, a fade's
+/// end (the volume at its target) moves the machine on in the same pass,
+/// so `stopmusik`'s stop (state 5, FUN_004778f0) always comes in the pass
+/// after the one that reached the target. In the panorama, with one call
+/// a pass, it comes a pass later unless the 15 Hz task's fade step
+/// (@ 0x0040caa0, after the frame) takes the state on in between: the
+/// fade is started at the four phases of the task.
+#[test]
+fn the_music_machine_runs_twice_a_pass_in_the_menus() {
+    if game().is_none() {
+        return;
+    }
+    let mut gaps = [Vec::new(), Vec::new()];
+    for in_menu in [false, true] {
+        for phase in 0..4 {
+            let mut e = in_tibet(game().unwrap());
+            if in_menu {
+                e.open_main_menu();
+                assert_eq!(e.loop_type, LoopType::Menu);
+            }
+            let mut t = e.clock();
+            let mut step = |e: &mut Engine| {
+                t += PASS;
+                e.set_clock(t);
+                e.pass(None);
+            };
+            for _ in 0..phase {
+                step(&mut e);
+            }
+            e.run_command(b"(stopmusik=1)");
+            assert_eq!(e.music.state, 3, "stopmusik fades");
+            let mut silent = None;
+            let mut stop = None;
+            for n in 0..2000 {
+                step(&mut e);
+                if silent.is_none() && e.music.volume == 0 {
+                    silent = Some(n);
+                }
+                // The stop (FUN_004778f0) leaves the state 0.
+                if e.music.state == 0 {
+                    stop = Some(n);
+                    break;
+                }
+            }
+            let (silent, stop) = (silent.expect("fades to 0"), stop.expect("stops"));
+            gaps[usize::from(in_menu)].push(stop - silent);
+        }
+    }
+    assert!(gaps[0].contains(&2), "the panorama: {:?}", gaps[0]);
+    assert_eq!(gaps[1], [1; 4], "a menu");
+}
