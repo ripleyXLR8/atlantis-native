@@ -326,6 +326,9 @@ impl Script {
             let a = self.parse_int(src, &mut i);
             let b = self.parse_int(src, &mut i);
             host.anim(AnimOp::ChangeAnimGotoPerso { id, a, b });
+            if let Some(msg) = host.take_fatal() {
+                self.fail(msg);
+            }
         }
         let anim_key = [
             k.playanimp,
@@ -496,7 +499,12 @@ impl Script {
     fn dial(&mut self, host: &mut dyn Host, src: Src, p: usize) -> usize {
         if host.dialog_running() {
             self.warn("SetVariables() : AtlDial_start() : dialogue en cours", "");
+            // The whole end, FUN_004808a0 (@ 0x00482694): the host's part,
+            // then `CLICPERSO` = 0, `SUJET` = −2 and the waiting section
+            // run from where it waits (@ 0x00480a07..0x00480a22), before
+            // the new dialog starts.
             host.dial_stop();
+            self.dialog_ended(host);
         }
         let mut n = self.atoi_at(src, p + 1);
         if n == 0 {
@@ -767,6 +775,9 @@ impl Script {
             }
         };
         host.anim(op);
+        if let Some(msg) = host.take_fatal() {
+            self.fail(msg);
+        }
         self.after_cr(src, i)
     }
 

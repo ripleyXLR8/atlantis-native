@@ -41,7 +41,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -135,7 +135,7 @@ fn state(single: i32, kind: i32) -> EntityState {
 fn the_frame_table_functions_as_the_original() {
     let empty = || Spw::parse(vec![0; 4]).unwrap();
     let setup = || {
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         a.load("a", empty(), 2, 27, 0, state(0, 0));
         a.load("b", empty(), 2, 5, 0, state(0, 0));
         a.load("c", empty(), 1, 27, 0, state(0, 0));
@@ -591,7 +591,7 @@ fn the_cross_is_drawn_from_its_frame_table_as_the_original() {
     let golden_md5 = format!("{:x}", Md5::digest(&data));
     assert!(GOLDEN.contains(&format!("cba1002002.SPW (md5 {golden_md5}, 25 frames)")));
     let slot = |table: &[i32], click: i32| {
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         a.load(
             "cb",
             Spw::parse(data.clone()).unwrap(),

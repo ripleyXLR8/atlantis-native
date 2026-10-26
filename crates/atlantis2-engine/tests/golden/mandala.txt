@@ -9,6 +9,8 @@
 # line numbers. F: the hook dispatcher (@ 0x0049b910) alone, by the view's warp name
 # (+0x00), its number (+0x10) and the zone's type, the hand empty: hook = the mandala
 # hook entered, AL = the byte returned (1 consumes the click), calls = the stubs called.
+# D log: the solution log FUN_00495650 (the exit hook's) after the order above: the six
+# `Mandala k : numero N` values N, k = 1..6, between its title line and an empty line.
 ids objects 53 57 61 52 56 60 167
 ids zones 52 53 54 49 50 51 57
 ids variables 188 182 183 184 185 186 187 132 133 134 129 130 131
@@ -30,9 +32,13 @@ B cut7:{4:52} hand={1:53}: {3:188}=0 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:
 C {4:50} hand={1:56}: {3:188}=1 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=1 {3:187}=0
 C {4:50} hand={1:56}: {3:188}=2 {3:182}=0 {3:183}=0 {3:184}=0 {3:185}=0 {3:186}=2 {3:187}=0
 D order {4:52},{4:53},{4:54},{4:49},{4:50},{4:51}: {3:188}=6 {3:182}=1 {3:183}=2 {3:184}=3 {3:185}=4 {3:186}=5 {3:187}=6
+D log 4 6 5 1 3 2
 D order {4:49},{4:50},{4:51},{4:52},{4:53},{4:54}: {3:188}=6 {3:182}=4 {3:183}=5 {3:184}=6 {3:185}=1 {3:186}=2 {3:187}=3
+D log 1 3 2 4 6 5
 D order {4:54},{4:52},{4:50},{4:53},{4:51},{4:49}: {3:188}=6 {3:182}=2 {3:183}=4 {3:184}=1 {3:185}=6 {3:186}=3 {3:187}=5
+D log 6 5 3 2 1 4
 D order {4:51},{4:50},{4:49},{4:54},{4:53},{4:52}: {3:188}=6 {3:182}=6 {3:183}=5 {3:184}=4 {3:185}=3 {3:186}=2 {3:187}=1
+D log 3 1 2 6 4 5
 D last {4:52} ({3:182}=6)
 D last {4:53} ({3:183}=6)
 D last {4:54} ({3:184}=6)

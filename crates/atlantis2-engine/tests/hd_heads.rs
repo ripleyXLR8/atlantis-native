@@ -33,7 +33,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -354,7 +354,7 @@ fn dialog(files: A2Files, number: u32, hd: bool, (variant, fpu): (Variant, Fpu))
     e
 }
 
-/// Dialog 360 (Tibet's shaman, its four lines), with the Pentium II's
+/// Dialog 360 (Tibet's shaman, its three lines), with the Pentium II's
 /// routines and the C ones: the HD mode on gives the original's frames
 /// (the HD head's draw leaves nothing behind for the next original draw);
 /// each frame's layer stands for the frame before the subtitles (the

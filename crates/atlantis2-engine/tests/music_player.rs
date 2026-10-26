@@ -15,6 +15,8 @@ use std::sync::Arc;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::music::{self, MusicData, Ring, Stream, StreamEvent, RING_BYTES};
+use atlantis2_engine::sound::VOICE_MUSIC;
+use atlantis2_engine::{Engine, Fpu, Variant};
 use md5::{Digest, Md5};
 
 const GOLDEN: &str = include_str!("golden/music_player.txt");
@@ -24,7 +26,7 @@ fn files() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -223,6 +225,7 @@ fn run(files: &A2Files, s: &Scenario, fixes: bool) -> Vec<String> {
                     format!("('remove', '{}')", music::music_name(n)),
                     format!("('loadmusik', '{n})')"),
                 ],
+                StreamEvent::Fatal(m) => panic!("{}: fatal {m}", s.tag),
             };
             for ev in evs {
                 rows.push(format!(
@@ -362,5 +365,145 @@ fn fixed_tracks_play_to_their_end() {
             heard[i * track.len()..(i + 1) * track.len()] == track[..],
             "loop {i}"
         );
+    }
+}
+
+/// A golden `.init` row's call: its name and numbers.
+fn init_call(row: &str) -> (String, Vec<i64>) {
+    let inner = row.trim_start_matches('(').trim_end_matches(')');
+    let mut parts = inner.split(", ");
+    let name = parts.next().unwrap().trim_matches('\'').to_string();
+    (name, parts.filter_map(|p| p.parse().ok()).collect())
+}
+
+/// L47: the start of each scenario by the engine (FUN_0047a200, then the
+/// music state machine's open in the next pass) against the golden's
+/// `.init` rows: the file opened; from the start (FUN_00477410 /
+/// FUN_00477470) voice 0 created and played from the 0x80000-byte buffer,
+/// looping, at −10000, then the start volume; at a mark (FUN_004774f0,
+/// `GotoMark`, FUN_00477540) voice 0 created, the cursor set where the
+/// mark's chunks start, then played at the start volume.
+#[test]
+fn the_engine_starts_each_music_as_the_original() {
+    if files().is_none() {
+        return;
+    }
+    let mut e = Engine::boot(
+        files().unwrap(),
+        Variant::default(),
+        Fpu::default(),
+        640,
+        480,
+    )
+    .unwrap();
+    let mut n = 0;
+    for s in &SCENARIOS {
+        let rows: Vec<(String, Vec<i64>)> = GOLDEN
+            .lines()
+            .filter_map(|l| l.strip_prefix(&format!("{}.init ", s.tag)))
+            .map(init_call)
+            .collect();
+        assert!(!rows.is_empty(), "{}", s.tag);
+        e.music_reset();
+        e.media.copies.insert(s.music.to_string());
+        e.trace = true;
+        e.events.clear();
+        e.music_start(s.music, s.mark, s.loops);
+        // srand(1) before the start, as the harness (a random mark draws
+        // from it; a start from the beginning seeds with the tick count).
+        e.rand = Rand::new(1);
+        e.pass(None);
+        let (rate, channels, frames, looping) =
+            e.voices().format(VOICE_MUSIC).expect("voice 0 created");
+        let (att, pan) = e.voices().levels(VOICE_MUSIC).unwrap();
+        let cursor = e.voices().music_ring().cursor().unwrap();
+        let mut want_cursor = 0;
+        for (name, a) in &rows {
+            match name.as_str() {
+                "open" => {
+                    let opened = e.events.iter().find_map(|ev| match ev {
+                        atlantis2_engine::Event::Music { music, .. } => Some(*music),
+                        _ => None,
+                    });
+                    assert_eq!(opened, Some(s.music), "{}", s.tag);
+                }
+                "createplay" | "create" => {
+                    let k = usize::from(name == "createplay");
+                    assert_eq!(a[0], 0, "{}: voice", s.tag);
+                    let bytes = a[1] as usize;
+                    if name == "createplay" {
+                        assert_eq!(a[2], 1, "{}: looping", s.tag);
+                    }
+                    let (r, bits, ch) = (a[2 + k], a[3 + k], a[4 + k]);
+                    assert_eq!(bits, 16);
+                    assert_eq!(
+                        (rate, i64::from(channels), frames * 2 * channels as usize),
+                        (r as u32, ch, bytes),
+                        "{}: buffer",
+                        s.tag
+                    );
+                    assert!(looping, "{}", s.tag);
+                }
+                "setpos" => want_cursor = a[0] as i32,
+                "setvol" => assert_eq!((att, pan), (a[0] as i32, 0), "{}", s.tag),
+                "play" => {
+                    assert_eq!((a[0], a[1]), (0, 1), "{}: voice 0, looping", s.tag);
+                    assert_eq!((att, pan), (a[2] as i32, a[3] as i32), "{}", s.tag);
+                }
+                other => panic!("{}: {other}", s.tag),
+            }
+            n += 1;
+        }
+        assert_eq!(cursor, want_cursor, "{}: cursor", s.tag);
+    }
+    assert_eq!(n, 26);
+}
+
+/// L18: the golden's `m01.edge`: a random mark drawn at the `rand()` =
+/// 0x7fff edge is one past the file's marks, and `GotoMark` reports it as
+/// a fatal error (`fatal=1`, the mark played left as it was); with the
+/// minor bug fixes the file plays from its last mark.
+#[test]
+fn a_random_mark_at_the_rand_edge_is_fatal() {
+    let Some(files) = files() else { return };
+    let row = GOLDEN
+        .lines()
+        .find_map(|l| l.strip_prefix("m01.edge.init mark="))
+        .expect("m01.edge");
+    let field = |name: &str| -> i32 {
+        row.split(' ')
+            .find_map(|f| f.strip_prefix(name))
+            .map(|v| v.parse().unwrap())
+            .unwrap_or_else(|| panic!("{name} in {row}"))
+    };
+    let (mark, marks, fatals) = (
+        row.split(' ').next().unwrap().parse::<i32>().unwrap(),
+        field("marks="),
+        field("fatal="),
+    );
+    assert_eq!(fatals, 1);
+    for fixes in [false, true] {
+        let mut st = Stream::default();
+        st.fixes = fixes;
+        assert!(st.open(load(&files, 1).unwrap()));
+        st.events.clear();
+        let mut ring = SimRing {
+            buf: st.buffer.clone(),
+            cursor: 0,
+        };
+        let mut rand = Rand::new(0xf01b_f641);
+        let ok = st.goto_mark(-1, &mut rand, &mut ring);
+        let fatal = st
+            .events
+            .iter()
+            .filter(|e| matches!(e, StreamEvent::Fatal(_)))
+            .count();
+        if fixes {
+            assert!(ok);
+            assert_eq!((fatal, st.current_mark), (0, marks));
+        } else {
+            assert!(!ok);
+            assert_eq!((fatal as i32, st.current_mark), (fatals, mark));
+        }
     }
 }

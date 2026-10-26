@@ -291,6 +291,7 @@ impl Engine {
             let bank = match self.cursor.bank {
                 CursorBank::Interface => UiBank::Interface,
                 CursorBank::Objects => UiBank::Objects,
+                CursorBank::Menu => UiBank::Menu,
                 // The cursor pair is never the grids' marbles (only the
                 // hand pair is, FUN_00493660).
                 CursorBank::Puzzle => return,
@@ -621,6 +622,10 @@ impl Engine {
     /// (W / 2, H − 240) and moves one step, the step reversed (and the
     /// frame stepped back) when it reaches `NEARW77` or −1.
     pub(super) fn rod_frame(&mut self) {
+        // The rod's anchor (W / 2, H): written at every call, the rod shown
+        // or not (@ 0x0049c6e0..0x0049c6f4); its y is save entry 15
+        // (@ 0x006d84f4), which nothing else reads.
+        self.set_rod_anchor_y(self.height() as i32);
         if !self.rod.active {
             return;
         }
@@ -665,13 +670,14 @@ impl Engine {
                         Mode::Opaque
                     };
                     let bank = match bank {
-                        UiBank::Interface => &self.cursor_bank,
-                        UiBank::Objects => &self.objects_bank,
-                        UiBank::Rod => &self.rod.bank,
-                        UiBank::Form => &self.overlays.form_bank,
-                        UiBank::Ring => &self.overlays.ring_bank,
-                        UiBank::Ball => &self.overlays.ball_bank,
-                        UiBank::Subjects => &self.subjects_bank,
+                        UiBank::Menu => self.menu.as_deref().and_then(|m| m.cursor_bank()),
+                        UiBank::Interface => self.cursor_bank.as_ref(),
+                        UiBank::Objects => self.objects_bank.as_ref(),
+                        UiBank::Rod => self.rod.bank.as_ref(),
+                        UiBank::Form => self.overlays.form_bank.as_ref(),
+                        UiBank::Ring => self.overlays.ring_bank.as_ref(),
+                        UiBank::Ball => self.overlays.ball_bank.as_ref(),
+                        UiBank::Subjects => self.subjects_bank.as_ref(),
                     };
                     if let (Some(bank), Ok(frame)) = (bank, usize::try_from(*frame)) {
                         let t = &mut Target::screen(out, w, h);

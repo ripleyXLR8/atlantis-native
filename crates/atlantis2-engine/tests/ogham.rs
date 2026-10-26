@@ -34,7 +34,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -422,7 +422,7 @@ fn the_stones_are_drawn_as_the_original() {
     let mut n = 0;
     for row in rows("H ") {
         let st = unhex(field(row, "list=").trim_end_matches(':'));
-        let mut anim = Anim::new(0);
+        let mut anim = Anim::new();
         anim.load("ogA1006006.SPW", spw.clone(), 2, 1, 0, state);
         anim.slots[0].frames = list(&st);
         let bg = background(FACE * FACE);

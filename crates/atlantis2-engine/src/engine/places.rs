@@ -79,32 +79,55 @@ impl Engine {
         }
     }
 
-    /// FUN_0047a530 for a place sound: the entry of that name if one is
-    /// loaded (its position stays the first loader's), else a free entry
-    /// with the file decoded; −1 when none is free or the file fails.
+    /// FUN_0047a530 for a place sound: the sound table's load
+    /// ([`Engine::table_load`]) with the source's position.
     fn place_load(&mut self, name: &str, owner: usize) -> i32 {
-        if let Some(i) = self
-            .place
-            .table
-            .iter()
-            .position(|e| e.as_ref().is_some_and(|e| e.name == name))
-        {
-            return i as i32;
+        self.table_load(name, Some(owner))
+    }
+
+    /// FUN_0047a530(name, position), the one sound table of 50 entries
+    /// every sound but the music and the dialog voices goes through (the
+    /// place sounds, `NEWSOUND`, the films' and moves' tracks, the
+    /// puzzles'): the entry of that name if one is loaded (exact bytes;
+    /// its position stays the first loader's), else the first free entry
+    /// (@ 0x0047a610; none: `find_free_sound: Sound overflow`, a fatal
+    /// error, and entry 0) with the file decoded into it (@ 0x0047aad0,
+    /// which first empties the entry); −1 when the file cannot be read.
+    pub(crate) fn table_load(&mut self, name: &str, owner: Option<usize>) -> i32 {
+        if let Some(i) = self.table_find(name) {
+            return i;
         }
-        let Some(free) = self.place.table.iter().position(Option::is_none) else {
-            log::warn!("{name}: the sound table is full");
-            return -1;
+        let free = match self.place.table.iter().position(Option::is_none) {
+            Some(i) => i,
+            None => {
+                self.original_fatal("find_free_sound: Sound overflow");
+                0
+            }
         };
+        self.place.table[free] = None;
+        self.place_pcm.remove(&free);
         let Some((_, pcm)) = self.load_sound(name) else {
+            if owner.is_none() {
+                log::warn!("### ERREUR lecture impossible fichier : {name}");
+            }
             return -1;
         };
         self.place.table[free] = Some(Entry {
             name: name.to_string(),
-            owner: Some(owner),
+            owner,
             looping: false,
         });
         self.place_pcm.insert(free, pcm);
         free as i32
+    }
+
+    /// The sound table's loaded entry of that name (exact bytes), if any.
+    pub(crate) fn table_find(&self, name: &str) -> Option<i32> {
+        self.place
+            .table
+            .iter()
+            .position(|e| e.as_ref().is_some_and(|e| e.name == name))
+            .map(|i| i as i32)
     }
 
     /// FUN_0047aa30 on a place sound.

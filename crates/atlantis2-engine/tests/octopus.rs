@@ -56,7 +56,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -950,6 +950,7 @@ fn the_cursor_as_the_original() {
                         CursorBank::Interface => "interface",
                         CursorBank::Objects => "objects",
                         CursorBank::Puzzle => "puzzle",
+                        CursorBank::Menu => "menu",
                     };
                     format!("spr {b}#{frame}@{x},{y}")
                 }
@@ -1112,10 +1113,12 @@ fn the_dispatchers_as_the_original() {
             e.puzzles_reset();
             "grid1-leave,grid2-leave,grid3-leave,ring-quit,canoe-quit,web-quit,souls-quit,"
         };
-        // In the mode 1 the web's quit, which the golden's harness stubs,
-        // clears its mode (FUN_00491260), in the port as in the original.
-        let want = if label == "reset" && mode == 1 {
-            row.replacen("| mode 1 |", "| mode 0 |", 1)
+        // In the modes 1, 2 and 3 the web's, the turtle ring's and the
+        // souls' quits, which the golden's harness stubs, clear their mode
+        // (FUN_00491260, FUN_0049c270, FUN_0048eb10), in the port as in
+        // the original.
+        let want = if label == "reset" && (1..=3).contains(&mode) {
+            row.replacen(&format!("| mode {mode} |"), "| mode 0 |", 1)
         } else {
             row.to_string()
         };
@@ -1172,6 +1175,7 @@ fn draws(e: &Engine) -> Vec<String> {
                     CursorBank::Interface => "interface",
                     CursorBank::Objects => "objects",
                     CursorBank::Puzzle => "puzzle",
+                    CursorBank::Menu => "menu",
                 };
                 format!("{b}#{frame}@{x},{y}")
             }
@@ -1346,7 +1350,7 @@ fn the_octopus_s_files_are_drawn_as_the_original() {
         let w: Vec<&str> = row.split(' ').collect();
         let (name, frame): (&str, i32) = (w[1], w[3].parse().unwrap());
         let spw = Spw::parse(data.clone()).unwrap();
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         a.load(
             name,
             Spw::parse(data.clone()).unwrap(),
@@ -1416,5 +1420,39 @@ fn the_octopus_s_files_are_drawn_as_the_original() {
             format!("G AFF_SPR viseur#{f}@320,240 {:x}", Md5::digest(&bytes)),
             *row
         );
+    }
+}
+
+/// The shots of `the_warp_frames_as_the_original` force the texel under
+/// the centre to the middle of the attacker's box on face 1, as the
+/// original's harness does (it replaces FUN_0047db60). That texel is where
+/// the camera aims: turned to a texel of face 1, the port's FUN_0047db60
+/// (compared with the original's in `tests/centre.rs`) gives that texel,
+/// or one beside it at a face's edge.
+#[test]
+fn a_forced_texel_is_one_the_camera_aims_at() {
+    use atlantis2_engine::Camera;
+    for y in (3..509).step_by(23) {
+        for x in (3..509).step_by(23) {
+            // The face's camera (focal 254.99998, centre 256) sees the
+            // texel's middle in this direction; face 1 is turned half a
+            // turn about the vertical axis (its quaternion (0, 1, 0, 0)).
+            let f = f64::from(f32::from_bits(0x437e_ffff));
+            let (px, py) = (
+                (f64::from(x) + 0.5 - 256.0) / f,
+                (f64::from(y) + 0.5 - 256.0) / f,
+            );
+            let d = [-px, py, -1.0];
+            let yaw = d[2].atan2(d[0]);
+            let pitch = d[1].atan2((d[2] * d[2] + d[0] * d[0]).sqrt());
+            let mut cam = Camera::new(Fpu::Chop, 640, 480);
+            cam.enter(yaw as f32, pitch as f32);
+            let (face, tx, ty) = cam.texel(cam.cx, cam.cy).unwrap();
+            assert_eq!(face, 1, "texel {x},{y}");
+            assert!(
+                (tx - x).abs() <= 1 && (ty - y).abs() <= 1,
+                "texel {x},{y}: the camera sees {tx},{ty}"
+            );
+        }
     }
 }

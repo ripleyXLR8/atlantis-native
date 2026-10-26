@@ -13,6 +13,8 @@
 //! - `tests/golden/music_fade_*.txt`, `sound_volume.txt`: the music fades
 //!   (the dialogs duck the music to 16 %), the volume and pan tables and
 //!   the default levels;
+//! - `tests/golden/lipsync_survey.txt`: the lip-sync weights of every
+//!   dialog line of the five worlds, every 1/15 s;
 //! - a whole Tibet dialog played by the engine: lines, voices, video,
 //!   panorama shots, music.
 //!
@@ -24,20 +26,22 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use atlantis2_data::dialog::{parse_dial, FontTxt, World};
+use atlantis2_data::defnames;
+use atlantis2_data::dialog::{parse_dial, FontTxt, LineKind, World};
 use atlantis2_data::exe::Release;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::dialog::{compose, load_head, Dialog, DialogScript};
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::hnm_stream::HnmStream;
+use atlantis2_engine::lipsync::LipSync;
 use atlantis2_engine::raster3d::{HEIGHT, WIDTH};
 use atlantis2_engine::sound::{
     attenuation_table, pan_table, volume_to_attenuation, MusicVolume, DEFAULT_FX_VOLUME,
     DEFAULT_MASTER, DEFAULT_MUSIC_VOLUME, DEFAULT_VOICE_VOLUME,
 };
 use atlantis2_engine::subtitle::{layout, SubtitleFont};
-use atlantis2_engine::{Engine, Fpu, Variant};
+use atlantis2_engine::{Engine, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
 #[path = "common/dialog_loop.rs"]
@@ -49,6 +53,7 @@ const SUBTITLES: &str = include_str!("golden/subtitles.txt");
 const SUBTITLES_101_CD: &str = include_str!("golden/subtitles_101_cd.txt");
 const SUBTITLES_101_GOG: &str = include_str!("golden/subtitles_101_gog.txt");
 const LIPSYNC: &str = include_str!("golden/lipsync_tibet.txt");
+const LIPSYNC_SURVEY: &str = include_str!("golden/lipsync_survey.txt");
 const VOLUME: &str = include_str!("golden/sound_volume.txt");
 const FADES: [(&str, Fpu); 3] = [
     (include_str!("golden/music_fade_027f.txt"), Fpu::Double),
@@ -72,7 +77,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA or ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA or ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -83,7 +88,7 @@ fn game() -> Option<A2Files> {
 /// GOG's installation (`ATLANTIS2_GOG`), opened as a game folder.
 fn gog() -> Option<A2Files> {
     let Some(dir) = std::env::var_os("ATLANTIS2_GOG") else {
-        eprintln!("ATLANTIS2_GOG not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_GOG not set");
         return None;
     };
     let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[]).expect("GOG folder");
@@ -93,6 +98,116 @@ fn gog() -> Option<A2Files> {
 /// The fields of a golden line after its first word.
 fn fields(line: &str) -> Vec<&str> {
     line.split_whitespace().filter(|&f| f != "|").collect()
+}
+
+/// Review L46: every dialog line of the five worlds (`com*.txt`), its
+/// voice decoded and analysed and its lip-sync weights evaluated every
+/// 1/15 s from the speaker's `Offset`, under 0x027f, against the
+/// original's analyser and evaluator (`lipsync_survey.txt`: 1214 lines,
+/// 82807 frames, 996 of them NaN, as the original's are; the voices no
+/// disc has and the speakers without a `[Matrice]` the same).
+#[test]
+fn every_line_s_lip_sync_matches_the_original() {
+    let Some(files) = game() else { return };
+    let want: BTreeMap<&str, &str> = LIPSYNC_SURVEY
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+        .filter_map(|l| l.split_once(' '))
+        .collect();
+    let mut got: BTreeMap<String, String> = BTreeMap::new();
+    let mut total: BTreeMap<&str, usize> = [
+        "lines",
+        "nan_lines",
+        "nan_frames",
+        "frames",
+        "noapc",
+        "noperso",
+        "nomatrix",
+    ]
+    .into_iter()
+    .map(|k| (k, 0))
+    .collect();
+    for (code, monde) in [("CH", 3), ("IR", 1), ("SH", 4), ("TI", 5), ("YU", 2)] {
+        let world = World::of_monde(monde).unwrap();
+        assert_eq!(world.code, code);
+        let script = DialogScript::load(&files, world, Fpu::Double).unwrap();
+        for l in &script.com {
+            let k = format!("{code}.{}", l.id);
+            *total.entry("lines").or_default() += 1;
+            let Some(apc) = files.read(Folder::ApcDial, &format!("{}.apc", l.id)) else {
+                got.insert(format!("{k}.apc"), "missing".into());
+                *total.entry("noapc").or_default() += 1;
+                continue;
+            };
+            let Some(p) = script.persos.iter().find(|p| p.name == l.speaker) else {
+                got.insert(format!("{k}.perso"), "missing".into());
+                *total.entry("noperso").or_default() += 1;
+                continue;
+            };
+            got.insert(format!("{k}.speaker"), l.speaker.clone());
+            let Some(matrix) = p.matrix else {
+                got.insert(format!("{k}.matrix"), "none".into());
+                *total.entry("nomatrix").or_default() += 1;
+                continue;
+            };
+            let voice = atlantis_codecs::decode_apc(&apc).expect(&k);
+            let n = voice.samples.len() as u32;
+            let mut ls = LipSync::new(Fpu::Double, &matrix, &voice.samples, n, p.smooth);
+            let frames = (f64::from(n) / 22050.0 * 15.0) as usize + 2;
+            let mut md5 = Md5::new();
+            let mut nan = Vec::new();
+            for f in 0..frames {
+                let t = (f as f64 * (1.0 / 15.0) + f64::from(p.offset)) as f32;
+                let w = ls.eval(t);
+                if w[0].to_bits() == 0xffc0_0000 {
+                    nan.push(f);
+                }
+                for x in w {
+                    md5.update(x.to_bits().to_le_bytes());
+                }
+            }
+            let kind = match l.kind {
+                LineKind::Head => "head",
+                LineKind::VoiceOver => "voixoff",
+                LineKind::VoiceOver0 => "voixoff0",
+                LineKind::Cinema => "cinema",
+            };
+            let md5: String = md5.finalize().iter().map(|b| format!("{b:02x}")).collect();
+            let first = nan.first().map_or(-1, |&f| f as i64);
+            for (field, v) in [
+                ("kind", kind.to_string()),
+                ("samples", n.to_string()),
+                ("frames", frames.to_string()),
+                ("nan_frames", nan.len().to_string()),
+                ("first_nan", first.to_string()),
+                ("weights_md5", md5),
+            ] {
+                got.insert(format!("{k}.{field}"), v);
+            }
+            *total.entry("frames").or_default() += frames;
+            *total.entry("nan_frames").or_default() += nan.len();
+            *total.entry("nan_lines").or_default() += usize::from(!nan.is_empty());
+        }
+    }
+    for (key, v) in total {
+        got.insert(format!("total.{key}"), v.to_string());
+    }
+    let mut bad = Vec::new();
+    for (key, v) in &want {
+        match got.get(*key) {
+            Some(g) if g == v => {}
+            g => bad.push(format!("{key}: {g:?}, the original {v}")),
+        }
+    }
+    for key in got.keys().filter(|k| !want.contains_key(k.as_str())) {
+        bad.push(format!("{key}: not in the original's"));
+    }
+    assert!(
+        bad.is_empty(),
+        "{} differences, first {:?}",
+        bad.len(),
+        &bad[..bad.len().min(10)]
+    );
 }
 
 /// Every Tibet dialog, in order, from one `srand(0)`: as the original
@@ -760,6 +875,57 @@ fn dialog_360_plays_end_to_end() {
     assert_eq!(e.music.volume, 100);
 }
 
+/// L20: a voiced line ends when DirectSound reports its voice played
+/// out (FUN_0047a9c0(1) @ 0x0046101b), not when the clock has run the
+/// voice's length: with a sound output that starts mixing 0.4 s late (a
+/// device that stalls), line 360_01 lasts its 2.730 s voice plus the
+/// stall, and none of its voice is cut. Without an output (the other
+/// tests) the clock decides, as `dialog_360_plays_end_to_end` checks.
+#[test]
+fn a_voiced_line_ends_when_the_output_has_played_its_voice() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::new_game(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    e.voices().attach_output();
+    e.start_dialog(360).unwrap();
+    let stall = 0.4;
+    let mut first: Option<f64> = None;
+    let mut mixed = 0.0f64;
+    let mut out = Vec::new();
+    let mut lines: Vec<(String, f64)> = Vec::new();
+    let mut frame = 0u64;
+    while e.dialog().is_some() && frame < 60 * 30 {
+        let t = (frame + 1) as f64 * PASS;
+        e.set_clock(t);
+        e.frame();
+        if let Some(l) = e.dialog().and_then(|d| d.current_line()) {
+            if lines.last().is_none_or(|(id, _)| *id != l.id) {
+                lines.push((l.id.clone(), t));
+            }
+            first.get_or_insert(t);
+        }
+        // The output mixes in step with the clock once the stall is over.
+        if let Some(t0) = first {
+            let want = ((t - t0 - stall).max(0.0) * 22050.0).floor();
+            let n = (want - mixed) as usize;
+            if n > 0 {
+                out.resize(2 * n, 0.0);
+                e.voices().fill(&mut out, 22050, 2);
+                mixed += n as f64;
+            }
+        }
+        frame += 1;
+    }
+    let ids: Vec<&str> = lines.iter().map(|(i, _)| i.as_str()).collect();
+    assert_eq!(ids, ["360_01", "360_02", "360_03"]);
+    let len = lines[1].1 - lines[0].1;
+    assert!(
+        (2.73 + stall..2.73 + stall + 3.0 / 15.0 + PASS).contains(&len),
+        "{len}"
+    );
+}
+
 /// Every Tibet dialog (the 26 of `dialog_script_ti.txt`) started in view
 /// 7 and played to its end with its heads and bodies drawn, a click every
 /// 20 passes: the panorama back at 76° with the screen's centre after
@@ -797,4 +963,162 @@ fn every_tibet_dialog_ends_at_76_degrees() {
         assert!(ended, "dialog {n} does not end");
         dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
     }
+}
+
+/// The speaker's place animation hidden while it speaks (FUN_00461870,
+/// atlantis2-cd-fr-2199552 @ 0x0046191d..0x0046195e): its `[IdText]`
+/// names in order (the shaman's `SHAMAN`, then `SHAMANW10`), and for the
+/// first name with an active slot, the lowest such slot; not the lowest
+/// slot of any of the names.
+#[test]
+fn the_hidden_speaker_slot_follows_the_idtext_order() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.start_new_game().unwrap();
+    e.end_video();
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    let id = |e: &Engine, n: &[u8]| {
+        e.script_state()
+            .unwrap()
+            .names
+            .id(defnames::PERSONNAGES, n)
+            .unwrap() as i32
+    };
+    let (shaman, w10) = (id(&e, b"SHAMAN"), id(&e, b"SHAMANW10"));
+    assert!(!e.anim.slots.is_empty());
+    while e.anim.slots.len() < 2 {
+        let s = e.anim.slots[0].clone();
+        e.anim.slots.push(s);
+    }
+    for s in e.anim.slots.iter_mut() {
+        s.id = -99;
+    }
+    e.anim.slots[0].id = w10;
+    e.anim.slots[1].id = shaman;
+    e.anim.slots[0].active = true;
+    e.anim.slots[1].active = true;
+    e.start_dialog(360).unwrap();
+    for _ in 0..200 {
+        e.tick();
+        e.pass(None);
+        if e.dialog()
+            .and_then(|d| d.current_line())
+            .is_some_and(|l| l.speaker == "Chamane")
+        {
+            break;
+        }
+    }
+    assert!(e
+        .dialog()
+        .and_then(|d| d.current_line())
+        .is_some_and(|l| l.speaker == "Chamane"));
+    assert!(e.anim.slots[0].active, "the SHAMANW10 slot is hidden");
+    assert!(!e.anim.slots[1].active, "the SHAMAN slot is shown");
+}
+
+/// A new game in Tibet's view 7 (the shaman's), the scripts running, the
+/// opening film over.
+fn in_view_7(files: A2Files) -> Engine {
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.start_new_game().unwrap();
+    e.end_video();
+    for _ in 0..30 {
+        e.tick();
+        e.pass(None);
+    }
+    assert_eq!(e.loop_type, LoopType::Warp);
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    e.trace = true;
+    e
+}
+
+/// The place animations' frames.
+fn slot_frames(e: &Engine) -> Vec<i32> {
+    e.anim.slots.iter().map(|s| s.frame).collect()
+}
+
+/// L14, L49: a dialog over its film (`cinema=N,M`) as the video loop runs
+/// it (FUN_0040c060 → FUN_00480830, FUN_00480840:
+/// `tests/golden/dialog_loop.txt`, `film kind` rows). Its head lines (kind 0) draw the
+/// panorama over the film's frame, whose place animations step; its
+/// lines play, and the film's end ends it. The shipped film dialogs (71,
+/// 168) have `cinema` lines only: dialog 360's head lines stand for a
+/// head line over a film.
+#[test]
+fn a_film_dialog_s_head_lines_draw_the_panorama_over_the_film() {
+    const GOLDEN: &str = include_str!("golden/dialog_loop.txt");
+    let row = |k: i32| {
+        GOLDEN
+            .lines()
+            .find_map(|l| l.strip_prefix(&format!("film kind {k}: ")))
+            .unwrap()
+            .to_string()
+    };
+    assert!(row(0).contains("panorama(0x0045a930)"));
+    assert!(row(1).contains("turn(0x0040c6a0) panorama(0x0045a930)"));
+    assert!(!row(2).contains("panorama") && !row(3).contains("panorama"));
+    assert!(row(3).contains("dialog_frame(0x00461430)"));
+    let Some(files) = game() else { return };
+    let mut screen = vec![0u16; 640 * 480];
+    // Without a dialog, the film does not step the place animations.
+    let mut e = in_view_7(files);
+    let before = slot_frames(&e);
+    assert!(!before.is_empty());
+    e.run_command(b"(cinema=8)");
+    assert_eq!(e.loop_type, LoopType::Video);
+    for _ in 0..40 {
+        e.tick();
+        e.pass(Some(&mut screen));
+    }
+    assert_eq!(slot_frames(&e), before);
+    // With dialog 360 over it: its head lines step them (the panorama's
+    // draw), and its lines play over the film.
+    let mut e = in_view_7(game().unwrap());
+    let before = slot_frames(&e);
+    e.events.clear();
+    e.run_command(b"(cinema=8,360)");
+    assert_eq!(e.loop_type, LoopType::Video);
+    let mut head_ticks = 0;
+    for _ in 0..40 {
+        e.tick();
+        e.pass(Some(&mut screen));
+        if e.film_dialog().is_some_and(|d| d.kind() == 0) {
+            head_ticks += 1;
+        }
+    }
+    assert!(head_ticks > 0);
+    assert_ne!(slot_frames(&e), before);
+    e.end_video();
+    assert!(e.film_dialog().is_none());
+}
+
+/// L14: the film dialog is set up whatever the film's start answered
+/// (FUN_0040c030 @ 0x0040c030..0x0040c054, `dialog_loop.txt`'s `film start
+/// 0` row): a film that does not start leaves it to the next video, which
+/// plays it and ends it.
+#[test]
+fn a_film_that_does_not_start_leaves_its_dialog_to_the_next_video() {
+    const GOLDEN: &str = include_str!("golden/dialog_loop.txt");
+    assert!(GOLDEN
+        .lines()
+        .any(|l| l == "film start 0: hnm_start(0x0040bf60) film_dialog_setup(0x004801a0) flag 1"));
+    let Some(files) = game() else { return };
+    let mut e = in_view_7(files);
+    e.run_command(b"(cinema=250,360)");
+    assert_eq!(e.loop_type, LoopType::Warp);
+    assert_eq!(e.film_dialog().map(|d| d.number()), Some(360));
+    e.run_command(b"(cinema=8)");
+    assert_eq!(e.loop_type, LoopType::Video);
+    let mut screen = vec![0u16; 640 * 480];
+    let mut played = false;
+    for _ in 0..40 {
+        e.tick();
+        e.pass(Some(&mut screen));
+        played |= e.film_dialog().is_some_and(|d| d.current().is_some());
+    }
+    assert!(played, "dialog 360 does not play over film 8");
+    e.end_video();
+    assert!(e.film_dialog().is_none());
 }

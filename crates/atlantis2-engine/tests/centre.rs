@@ -12,7 +12,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::{MsvcRand, Texel};
+use atlantis2_engine::anim::Texel;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::{CentreDraw, CursorBank, Engine, Event, Fpu, LoopType, ScanVars, Variant};
 
 const GOLDEN: &str = include_str!("golden/centre_tibet.txt");
@@ -26,7 +27,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -47,6 +48,7 @@ fn bank(b: CursorBank) -> &'static str {
         CursorBank::Interface => "interface",
         CursorBank::Objects => "objects",
         CursorBank::Puzzle => "puzzle",
+        CursorBank::Menu => "menu",
     }
 }
 
@@ -177,7 +179,7 @@ fn centre_and_sprite_clicks_match_the_original() {
     let Some(files) = game() else { return };
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
     e.trace = true;
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     let mut d = Driver {
         e,
         pass_no: 0,
@@ -246,5 +248,111 @@ fn centre_and_sprite_clicks_match_the_original() {
             assert_eq!(g, w, "case {name}, row {i}");
         }
         assert_eq!(rows.len(), want.len(), "case {name}: row count");
+    }
+}
+
+/// The texel under the screen centre (FUN_0047db60, run by the original
+/// under emulation: `tests/golden/centre_texel.txt`) against the port's
+/// cube mapping, on view
+/// 2 entered at every 5° of yaw and pitch, under 0x0e7f.
+#[test]
+fn the_texel_under_the_centre_matches_the_original() {
+    use atlantis2_engine::camera::Camera;
+    let golden = include_str!("golden/centre_texel.txt");
+    let (mut n, mut bad) = (0, Vec::new());
+    for row in golden.lines().filter(|l| l.starts_with("yaw ")) {
+        let f: Vec<&str> = row.split(' ').collect();
+        let (yaw, pitch): (f64, f64) = (f[1].parse().unwrap(), f[3].parse().unwrap());
+        let want: Vec<i32> = f[5].split(',').map(|v| v.parse().unwrap()).collect();
+        let mut cam = Camera::new(Fpu::Chop, 640, 480);
+        cam.enter(yaw.to_radians() as f32, pitch.to_radians() as f32);
+        let got = cam
+            .texel(cam.cx, cam.cy)
+            .map_or((-1, 320, 240), |(face, x, y)| (face as i32, x, y));
+        if got != (want[0], want[1], want[2]) {
+            bad.push(format!("{row}: got {got:?}"));
+        }
+        n += 1;
+    }
+    assert_eq!(n, 72 * 35);
+    assert!(
+        bad.is_empty(),
+        "{} of {n} differ: {:?}",
+        bad.len(),
+        &bad[..bad.len().min(8)]
+    );
+}
+
+/// The original draws the place animations into a face clipped to the
+/// face's visible rectangle (FUN_0045b120 → FUN_004daad0, then
+/// FUN_0047cf00's blit clip); Native draws them on the whole face box. The
+/// pixels are the same: over the golden's directions (640 x 480 and
+/// 800 x 600 at 76°, and zoomed to 35° and 120°), neither renderer samples
+/// a texel outside the original's rectangles (faces filled with a marker
+/// outside them leave no marker on the screen), and the faces are put
+/// back after the cube.
+#[test]
+fn the_cube_samples_no_texel_outside_the_visible_rectangles() {
+    use atlantis2_engine::{Camera, Renderer};
+    for (golden, w, h, fov) in [
+        (
+            include_str!("golden/centre_texel.txt"),
+            640u32,
+            480u32,
+            None,
+        ),
+        (
+            include_str!("golden/centre_texel_800x600.txt"),
+            800,
+            600,
+            None,
+        ),
+        (
+            include_str!("golden/centre_texel_fov35.txt"),
+            640,
+            480,
+            Some(35.0f64),
+        ),
+        (
+            include_str!("golden/centre_texel_fov120.txt"),
+            640,
+            480,
+            Some(120.0),
+        ),
+    ] {
+        for (variant, fpu) in [(Variant::PII, Fpu::Chop), (Variant::C, Fpu::Double)] {
+            let mut n = 0;
+            for row in golden.lines().filter(|l| l.starts_with("yaw ")) {
+                let f: Vec<&str> = row.split(' ').collect();
+                let (yaw, pitch): (f64, f64) = (f[1].parse().unwrap(), f[3].parse().unwrap());
+                let faces: [Vec<u16>; 6] = std::array::from_fn(|k| {
+                    let mut t = vec![0xffffu16; 512 * 512];
+                    if f[7 + k] != "-" {
+                        let r: Vec<i32> = f[7 + k].split(',').map(|x| x.parse().unwrap()).collect();
+                        let (top, bottom, right, left) = (r[0], r[1], r[2], r[3]);
+                        for y in top.max(0)..=bottom.min(511) {
+                            for x in left.max(0)..=right.min(511) {
+                                t[y as usize * 512 + x as usize] = k as u16 + 1;
+                            }
+                        }
+                    }
+                    t
+                });
+                let mut cam = Camera::new(fpu, w, h);
+                cam.enter(yaw.to_radians() as f32, pitch.to_radians() as f32);
+                if let Some(fov) = fov {
+                    cam.set_fov(fov.to_radians() as f32, w, h);
+                }
+                let mut r = Renderer::new(variant, fpu, w as usize, h as usize);
+                let mut out = vec![0u16; (w * h) as usize];
+                r.render(&faces, &cam.matrix(), cam.projection(), &mut out);
+                assert!(
+                    !out.contains(&0xffff),
+                    "{variant:?} {w}x{h} {fov:?} {row}: a texel outside"
+                );
+                n += 1;
+            }
+            assert_eq!(n, 72 * 35);
+        }
     }
 }

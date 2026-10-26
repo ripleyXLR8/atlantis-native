@@ -16,8 +16,11 @@ use atlantis2_data::save::{
 use super::Engine;
 use crate::script::{BagEntry, Shown, SubjectTable};
 
-/// The entries Native keeps as the save's bytes: the dowsing rod's 15
-/// (@ 0x006d84f4, its role not read), and the Maya grids' states and digits (20..25), the puzzle
+/// The entries Native keeps as the save's bytes: the dowsing rod's anchor
+/// y 15 (@ 0x006d84f4: the logical height, 480 from the start-up's static
+/// initialiser @ 0x0049c6d0, written again by every call of the rod's
+/// draw FUN_0049c6e0 and read only by it, @ 0x0049c7aa, right after; see
+/// [`Engine::set_rod_anchor_y`]), and the Maya grids' states and digits (20..25), the puzzle
 /// mode (26) with the turtle ring's count and frame store (28, 29) and
 /// Brigid's cross (32), which the engine reads in place
 /// ([`Engine::grid_state`], [`Engine::grid_digits`],
@@ -41,7 +44,12 @@ const OGHAM: usize = 31;
 /// (@ 0x006d8500) and its step (@ 0x005e2efc).
 const ROD_ACTIVE: usize = 13;
 const ROD_FRAME: usize = 14;
+const ROD_ANCHOR_Y: usize = 15;
 const ROD_STEP: usize = 16;
+
+/// The rod's anchor y before any draw (the logical height's initial
+/// value @ 0x005d9ba0, copied by the static initialiser @ 0x0049c6d0).
+pub(super) const ROD_ANCHOR_START: i32 = 480;
 
 /// Why a save could not be loaded.
 #[derive(Debug)]
@@ -112,6 +120,27 @@ impl Engine {
             width: self.cfg_extra.width,
             height: self.cfg_extra.height,
         }
+    }
+
+    /// The dowsing rod's anchor y (save entry 15, @ 0x006d84f4), set to
+    /// the logical height by every call of the rod's draw.
+    pub(super) fn set_rod_anchor_y(&mut self, y: i32) {
+        self.save_extra.set_i32(ROD_ANCHOR_Y, y);
+    }
+
+    /// Whether the game runs in full screen: `atlant2.cfg`'s byte 8
+    /// (@ 0x005e2f2c, 1 by default), which the start-up's display set-up
+    /// reads (atlantis2-cd-fr-2199552 @ 0x0049d0af: mode 3, full screen,
+    /// or 2, a window; the 1.01 executable the same,
+    /// atlantis2-gog-fr-2183168 @ 0x0049d13f).
+    pub fn fullscreen(&self) -> bool {
+        self.cfg_extra.fullscreen != 0
+    }
+
+    /// The window mode switched (1.00's Alt+Enter flips the byte,
+    /// @ 0x00476321..0x0047632b): kept in `atlant2.cfg` at exit.
+    pub fn set_fullscreen(&mut self, on: bool) {
+        self.cfg_extra.fullscreen = u8::from(on);
     }
 
     /// The options of `cfg` in force.
@@ -298,19 +327,34 @@ impl Engine {
         Ok(())
     }
 
-    /// The puzzle reset FUN_0049bf70 as a load runs it (its quit functions
-    /// clear the modes 1, 2, 3 and 6): the grids' leaves (FUN_00492d60..:
-    /// in the view of a grid the hand of marbles, their bank and sounds are
-    /// dropped; their variables are the save's after), the web's quit
-    /// (FUN_00491260: in the mode 1, its models freed, the mode 0, the web
-    /// not loaded), then the octopus fight's (FUN_0049aef0, the reset's
-    /// last: in the mode 6, the mode 0, the crosshair freed, the camera's
-    /// reset). The turtle ring's, the canoe's and the souls' quits
-    /// (FUN_0049c270, FUN_0049a570, FUN_0048eb10), between the grids' and
-    /// the octopus's, are not called here. Public for tests.
+    /// The puzzle reset FUN_0049bf70 as a load runs it, its eight calls in
+    /// order: the grids' leaves (FUN_00492d60..: in the view of a grid the
+    /// hand of marbles, their bank and sounds are dropped; their variables
+    /// are the save's after); the turtle ring's quit (FUN_0049c270: the
+    /// mode 2 back to 0); the canoe's (FUN_0049a570), which has no test of
+    /// its own and runs whole at every reset: the cursor pair emptied
+    /// (FUN_0047bef0(0, 0) @ 0x0049a575), so the load's restore of the
+    /// cursor frame (FUN_0047bfa0) finds no bank and only warns; the web's
+    /// quit (FUN_00491260: in the mode 1, its models freed, the mode 0,
+    /// the web not loaded); the souls' (FUN_0048eb10: the mode 3 back to
+    /// 0); the octopus fight's (FUN_0049aef0, in the mode 6: the mode 0,
+    /// the crosshair freed, the camera's reset). The modes are then the
+    /// save's (entry 26). Not ported of the canoe's quit, which frees what
+    /// the canoe holds only while it runs (loop type 9, where Escape opens
+    /// no menu): its `FUN_00402960(1)` (@ 0x0049a66c), the panorama's
+    /// display mode. At 640 x 480 it repeats the camera reset of the
+    /// menu's stop (centre and 76°); at 800 x 600 it puts the screen in
+    /// the native mode, so after a menu opened over a loop type drawn on
+    /// the 640 x 480 surface (a picture, `ViewBigSpr`) and a load, the
+    /// original draws that loop's 640 x 480 frames at the top left of the
+    /// 800 x 600 screen until the next loop type change; Native keeps
+    /// enlarging them. Public for tests.
     pub fn puzzles_reset(&mut self) {
         self.grids_reset();
+        self.ring_quit();
+        self.clear_cursor_pair();
         self.web_quit();
+        self.souls_quit();
         self.octopus_quit();
     }
 
@@ -455,15 +499,25 @@ impl Engine {
             self.vars.clicperso = s.vars[k.clicperso];
             self.vars.clicobjet = s.vars[k.clicobjet];
         }
-        // The saved music again (FUN_0047a200(music, −1, 0)) when not 0.
+        // Entry 12 is the music player's own list (`Interp_MusikScript`
+        // @ 0x006d0444, which the port keeps twice): the list the next end
+        // of track draws from is the save's, whatever plays.
+        self.player.list = self.con.as_ref().map_or(Vec::new(), |s| s.music.clone());
+        // The saved music again (FUN_0047a200(music, −1, 0)) when not 0
+        // (FUN_004785a0 @ 0x004785df); with 0 the music playing goes on.
         let music = d.i32(entry::MUSIC);
         if music != 0 {
-            self.player.list = self.con.as_ref().map_or(Vec::new(), |s| s.music.clone());
             self.play_music(music, -1, 0);
         }
-        // The cursor's frame (FUN_0047bfa0, only with a bank).
+        // The cursor's frame (FUN_0047bfa0, only with a bank; the reset's
+        // canoe quit has emptied the pair, so it warns).
         if self.cursor.shown.is_some() {
             self.cursor.shown = Some(d.i32(entry::CURSOR));
+        } else {
+            log::warn!(
+                "AtlSpr_set_curseur_num({}), mais mouse_SprBank=NULL!",
+                d.i32(entry::CURSOR)
+            );
         }
         // The dowsing rod: its state copied back with the globals,
         // `baton.spr` loaded again when it was shown.

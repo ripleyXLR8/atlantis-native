@@ -1,10 +1,13 @@
-# The dialog loop of the original atlantis2.exe (French CD build of 1999, 2199552 bytes) under
-# emulation, its callees stubbed and recorded:
+# The dialog loop of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation, its callees stubbed and recorded:
 #   kind K: CALLS  one frame dispatcher pass in loop type 2 (0x0049ce20, 0x00480840) with the
 #     current line's kind K (0x004616f0: -1 none, 0 head, 1 voixoff, 2 voixoff0, 3 cinema)
 #   scene pause P mode M: CALLS  the panorama's draw 0x0045a930 with the byte 0x006d85f0 = P
 #     and the puzzle mode 0x006d84d0 = M (0x0047d7f0 the place animations' step, 0x00491b30
 #     the web)
+#   film start F: CALLS  a dialog over a film (cinema=N,M) started with its flag argument F
+#   film kind K: CALLS  one pass of the video loop (FUN_0040c060) on a new tick with the film
+#     dialog's current line of kind K
 #   camera cw C STEP: fx fy cx cy 1/fx 1/fy fov (+0xc0) of the warp camera, value/bits: at
 #     start-up, after a dialog line's 50-degree field of view (0x004a4950) and after the loop
 #     type set back to the panorama at 640 x 480 (0x0049da90 -> 0x00402960), as a dialog's
@@ -18,6 +21,13 @@ scene pause 0 mode 0: spw_count(0x0047cc30) 0x00402790 spw_restore(0x0045b120) 0
 scene pause 0 mode 1: spw_count(0x0047cc30) 0x00402790 spw_restore(0x0045b120) 0x004028f0 0x0047c290 spw_draw_pick(0x0045b040) 0x00402930 0x004d8bd0 0x00402b80 0x004d8b30 0x004d8d10 0x004d8ad0 cube(0x0045c030) 0x004d8b20 0x0045b290 spw_step(0x0047d7f0) web(0x00491b30) 0x0048c600
 scene pause 1 mode 0: spw_count(0x0047cc30) 0x00402790 spw_restore(0x0045b120) 0x004028f0 0x0047c290 spw_draw_pick(0x0045b040) 0x00402930 0x004d8bd0 0x00402b80 0x004d8b30 0x004d8d10 0x004d8ad0 cube(0x0045c030) 0x004d8b20 0x0045b290 0x0048c600
 scene pause 1 mode 1: spw_count(0x0047cc30) 0x00402790 spw_restore(0x0045b120) 0x004028f0 0x0047c290 spw_draw_pick(0x0045b040) 0x00402930 0x004d8bd0 0x00402b80 0x004d8b30 0x004d8d10 0x004d8ad0 cube(0x0045c030) 0x004d8b20 0x0045b290 web(0x00491b30) 0x0048c600
+film start 1: hnm_start(0x0040bf60) film_dialog_setup(0x004801a0) flag 1
+film start 0: hnm_start(0x0040bf60) film_dialog_setup(0x004801a0) flag 1
+film kind -1: video_frame(0x0040bbb0) film_step(0x00480830) flip(0x0058fdb0) place_sounds(0x0047b090)
+film kind 0: video_frame(0x0040bbb0) film_step(0x00480830) panorama(0x0045a930) surface(0x004028a0) dialog_frame(0x00461430) flip(0x0058fdb0) place_sounds(0x0047b090)
+film kind 1: video_frame(0x0040bbb0) film_step(0x00480830) turn(0x0040c6a0) panorama(0x0045a930) surface(0x004028a0) dialog_frame(0x00461430) flip(0x0058fdb0) place_sounds(0x0047b090)
+film kind 2: video_frame(0x0040bbb0) film_step(0x00480830) dialog_frame(0x00461430) flip(0x0058fdb0) place_sounds(0x0047b090)
+film kind 3: video_frame(0x0040bbb0) film_step(0x00480830) dialog_frame(0x00461430) flip(0x0058fdb0) place_sounds(0x0047b090)
 camera cw 0x0e7f start: 409.581299/43ccca68 409.581299/43ccca68 320/43a00000 240/43700000 0.00244151754/3b2001de 0.00244151754/3b2001de 1.32645023/3fa9c91f
 camera cw 0x0e7f line fov 50: 686.242188/442b8f80 686.242188/442b8f80 320/43a00000 240/43700000 0.00145721145/3abeffe7 0.00145721145/3abeffe7 0.87266463/3f5f66f3
 camera cw 0x0e7f loop type 0 (0x0049da90): 409.581299/43ccca68 409.581299/43ccca68 320/43a00000 240/43700000 0.00244151754/3b2001de 0.00244151754/3b2001de 1.32645023/3fa9c91f

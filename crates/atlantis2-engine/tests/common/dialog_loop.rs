@@ -113,11 +113,14 @@ pub fn check_dialog_loop(e: &mut Engine, number: u32) -> (BTreeSet<i32>, bool) {
         let want = calls(kind);
         let panorama = want.contains(&"panorama(0x0045a930)");
         let turn = want.contains(&"turn(0x0040c6a0)");
-        // Drawn over two fillings, without a tick in between.
+        // Drawn over two fillings, without a tick in between, from the
+        // same `rand` state (a head's blinks draw from it each frame).
+        let rand = e.rand;
         buf.fill(0);
         e.pass(Some(&mut buf));
         let a = buf.clone();
         buf.fill(0xffff);
+        e.rand = rand;
         e.pass(Some(&mut buf));
         assert_eq!(
             a == buf,

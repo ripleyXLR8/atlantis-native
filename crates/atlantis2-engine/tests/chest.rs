@@ -40,7 +40,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -520,7 +520,7 @@ fn the_entry_and_click_hooks_as_the_original() {
         }
         let seq: Vec<String> = (0..7)
             .map(|_| {
-                e.anim.step();
+                e.anim.step(&mut e.rand);
                 slot(&e, "COFFRE_CHINE")
             })
             .collect();
@@ -711,7 +711,7 @@ fn the_chest_and_the_chopstick_are_drawn_as_the_original() {
             Md5::digest(&data)
         ));
         for f in 0..n {
-            let mut a = Anim::new(0);
+            let mut a = Anim::new();
             let state = EntityState {
                 letter: 65,
                 anim: 1,

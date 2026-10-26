@@ -1,0 +1,81 @@
+# SetVariables of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation, the place animations' /set keys
+# defnames.con md5 b80c3351c39c1e4678f13388c2dc0c83
+# slots: s<n>:f<frame>/e<end>/c<count> a<active +0x30> h<hand-over +0x28> ch<chain +0x2c> p<playing byte +0xbc> r20 / r24 = the WAM state record's +0x20 / +0x24
+# slot 0: kind 1 CHAC = id 54 anim 1
+# slot 1: kind 1 CHAC = id 54 anim 2
+# slot 2: kind 1 GARDIEN1 = id 52 anim 7
+# slot 3: kind 2 CHEVAL = id 3 anim 1
+# slot 4: kind 2 CROCO = id 76 anim 1
+# slot 5: kind 2 CROCO = id 76 anim 2
+# slot 6: kind 1 DEMON_CHEVAL = id 69 anim 1
+# slot 7: kind 2 FUMEE_ENCENS2 = id 123 anim 1
+# slot 8: kind 1 OGRE = id 16 anim 3
+start s0:f5/e20/c20 a1 h0 ch-1 p1 r20=0 r24=0 s1:f0/e0/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f3/e39/c40 a1 h0 ch-1 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h0 ch-1 p1 r20=0 r24=0 s5:f0/e0/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e70/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f7/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f2/e9/c9 a1 h0 ch-1 p1 r20=0 r24=0
+/set(PLAYANIMP=CHAC,2) | ret=23 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f3/e39/c40 a1 h0 ch-1 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h0 ch-1 p1 r20=0 r24=0 s5:f0/e0/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e70/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f7/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f2/e9/c9 a1 h0 ch-1 p1 r20=0 r24=0
+/set(PLAYANIMP=CHAC,9) | ret=23 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f3/e39/c40 a1 h0 ch-1 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h0 ch-1 p1 r20=0 r24=0 s5:f0/e0/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e70/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f7/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f2/e9/c9 a1 h0 ch-1 p1 r20=0 r24=0
+/set(PLAYANIMP=GARDIEN1,7) | ret=27 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f0/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h0 ch-1 p1 r20=0 r24=0 s5:f0/e0/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e70/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f7/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f2/e9/c9 a1 h0 ch-1 p1 r20=0 r24=0
+/set(PLAYANIMO=CROCO,2) | ret=24 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f0/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e70/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f7/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f2/e9/c9 a1 h0 ch-1 p1 r20=0 r24=0
+/set(CONTINUEANIM=DEMON_CHEVAL) | ret=32 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f0/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f7/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f2/e9/c9 a1 h0 ch-1 p1 r20=0 r24=0
+/set(STOPANIM=OGRE,3) | ret=22 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f0/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f7/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(GOTOFRAMEPERSO=GARDIEN1,39) | ret=33 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f39/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f7/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(GOTOFRAMEOBJET=FUMEE_ENCENS2,0) | ret=37 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f39/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f0/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(GOTOFRAMEOBJET=FUMEE_ENCENS2,99) | ret=38 | calls=- | changes=- | errors=fatal:SetVariables(): GOTOFRAMEOBJET! %d>%d
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f39/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ANIM_THE_FRAME=CHAC,1) | ret=28 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f39/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ANIM_THE_FRAME=CHAC,0) | ret=28 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p0 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f39/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ANIM_THE_FRAME=CHAC,2) | ret=28 | calls=- | changes=- | errors=fatal:SetVariables(): ANIM_THE_FRAME != 0 ou 1
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f39/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ADDFRAMEPERSO=GARDIEN1,5) | ret=31 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ADDFRAMEPERSO=GARDIEN1,100) | ret=33 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f40/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ADDFRAMEOBJET=CHEVAL,10) | ret=30 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f50/e60/c80 a1 h0 ch-1 p1 r20=10 r24=61 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ADDFRAMEOBJET=CHEVAL,60) | ret=30 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f0/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ADDFRAMEOBJET=CROCO,3) | ret=28 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f3/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ADDFRAMEOBJET=CROCO,30) | ret=29 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ChangeAnimGotoPerso=CHAC,1,2) | ret=35 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch1 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ChangeAnimGotoPerso=CHAC,1,1) | ret=35 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch0 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch-1 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(ChangeAnimGotoPerso=CHAC, 2 ,1) | ret=37 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch0 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch0 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(numframeobjet=0) | ret=22 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch0 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch0 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(framecheval=0) | ret=20 | calls=- | changes=-
+  s0:f5/e20/c20 a1 h1 ch0 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch0 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(showperso=PRINCE,GRAND_PRETRE) | ret=36 | calls=- | changes=vis[1]=39/1/1
+  s0:f5/e20/c20 a1 h1 ch0 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch0 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(showperso=GARDIEN1,7) | ret=27 | calls=- | changes=vis[2]=52/1/1
+  s0:f5/e20/c20 a1 h1 ch0 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch0 p1 r20=0 r24=31 s2:f40/e40/c40 a1 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+/set(hideperso=GARDIEN1) | ret=25 | calls=- | changes=vis[2]=52/0/1
+  s0:f5/e20/c20 a1 h1 ch0 p1 r20=0 r24=0 s1:f0/e30/c40 a0 h0 ch0 p1 r20=0 r24=31 s2:f0/e40/c40 a0 h0 ch2 p1 r20=0 r24=0 s3:f110/e80/c80 a1 h0 ch-1 p1 r20=0 r24=0 s4:f10/e10/c10 a1 h1 ch5 p1 r20=0 r24=0 s5:f0/e25/c25 a0 h0 ch-1 p1 r20=0 r24=0 s6:f50/e71/c71 a1 h0 ch-1 p0 r20=0 r24=0 s7:f99/e12/c12 a1 h0 ch-1 p1 r20=0 r24=0 s8:f0/e9/c9 a0 h0 ch-1 p1 r20=0 r24=0
+# id clash: slot 0 is an object of id 54 (= CHAC's character index), slot 1 the character
+/set(GOTOFRAMEPERSO=CHAC,4) | ret=28 | calls=- | changes=-
+  s0:f4/e5/c5 a1 h0 ch-1 p1 r20=0 r24=0 s1:f2/e5/c5 a1 h0 ch-1 p1 r20=0 r24=0
+/set(ADDFRAMEPERSO=CHAC,1) | ret=27 | calls=- | changes=-
+  s0:f5/e5/c5 a1 h0 ch-1 p1 r20=0 r24=0 s1:f2/e5/c5 a1 h0 ch-1 p1 r20=0 r24=0
+cond '(numframeobjet=CHEVAL,40)' -> 1 numframeobjet_var=40 numframeperso_var=0
+cond '(numframeobjet=CHEVAL,41)' -> 0 numframeobjet_var=40 numframeperso_var=0
+cond '(numframeobjet>CHEVAL,30)' -> 1 numframeobjet_var=40 numframeperso_var=0
+cond '(numframeobjet=CROCO,0)' -> 1 numframeobjet_var=0 numframeperso_var=0
+cond '(numframeobjet=CRAYON,0)' -> 1 numframeobjet_var=0 numframeperso_var=0
+cond '(numframeperso=GARDIEN1,3)' -> 1 numframeobjet_var=0 numframeperso_var=3
+cond '(numframeperso=FINBAR,0)' -> 0 numframeobjet_var=0 numframeperso_var=-1
+cond '(numframeperso=FINBAR,-1)' -> 1 numframeobjet_var=0 numframeperso_var=-1
+# PRINCE = 39, GRAND_PRETRE = 37, GARDIEN1 = 52
+errors -

@@ -339,12 +339,14 @@ fn take_cell(i: usize, base: i32, digits: &mut [u8; 17], list: &mut impl GridLis
 }
 
 /// The save's entries as the start-up leaves them: zeros but the grids'
-/// digits (the `.data` strings @ 0x005e1840, 0x005e1854, 0x005e1868).
+/// digits (the `.data` strings @ 0x005e1840, 0x005e1854, 0x005e1868) and
+/// the dowsing rod's anchor y (480, entry 15).
 pub(super) fn save_extra_at_start() -> SaveData {
     let mut d = SaveData::default();
     for k in DIGIT_ENTRIES {
         d.entry_mut(k).copy_from_slice(&GRID_START);
     }
+    d.set_i32(15, super::saves::ROD_ANCHOR_START);
     d
 }
 

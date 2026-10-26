@@ -1,0 +1,9 @@
+# GetTextExtentPoint32A of every single byte 0x20..0xff in the French CD's loc\Atl_Font.ttf
+# ("Gill Alt One MT") at the credits' height, as Windows' GDI gives them: a program called
+# AddFontResourceA, then CreateFontA(-13, 0, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0,
+# VARIABLE_PITCH, face) (the game's arguments at 96 DPI), selected in a memory DC, and measured each
+# byte; run on Windows 98 SE (4.10.2222 A) and on Windows 11, 96 DPI. A text's extent is the sum of
+# its bytes' widths (GDI applies no kerning there). Derived values only.
+# SYSTEM -13 ppem=PPEM W(0x20) .. W(0xff)
+win98 -13 ppem=13 4 4 5 8 7 9 8 2 4 4 5 8 3 4 3 4 7 7 7 7 7 7 7 7 7 7 3 3 8 8 8 4 13 9 7 9 10 7 6 10 9 3 3 9 6 10 10 11 7 11 8 6 8 9 8 14 9 8 8 4 4 4 6 7 4 6 7 6 7 6 3 6 7 3 3 6 3 10 7 7 7 7 5 5 4 7 6 9 7 6 5 4 3 4 8 13 13 13 3 7 6 13 6 6 4 13 6 4 12 13 13 13 13 3 3 6 6 5 7 13 4 13 5 4 11 13 13 8 4 4 6 7 7 7 3 5 4 10 4 6 8 4 10 7 5 8 4 4 4 7 7 3 4 4 5 6 11 11 11 4 9 9 9 9 9 9 12 9 7 7 7 7 3 3 3 3 10 10 11 11 11 11 11 8 11 9 9 9 9 8 7 7 6 6 6 6 6 6 9 6 6 6 6 6 3 3 3 3 7 7 7 7 7 7 7 8 7 7 7 7 7 6 7 6
+win11 -13 ppem=13 4 4 5 8 7 9 8 2 4 4 5 8 3 4 3 4 7 7 7 7 7 7 7 7 7 7 3 3 8 8 8 4 13 9 7 9 10 7 6 10 9 3 3 9 6 10 10 11 7 11 8 6 8 9 8 14 9 8 8 4 4 4 6 7 4 6 7 6 7 6 3 6 7 3 3 6 3 10 7 7 7 7 5 5 4 7 6 9 7 6 5 4 3 4 8 13 13 0 3 7 6 13 6 6 4 13 6 4 12 0 8 0 0 3 3 6 6 5 7 13 4 13 5 4 11 0 5 8 4 4 6 7 7 7 3 5 4 10 4 6 8 4 10 7 5 8 4 4 4 7 7 4 4 4 5 6 11 11 11 4 9 9 9 9 9 9 12 9 7 7 7 7 3 3 3 3 10 10 11 11 11 11 11 8 11 9 9 9 9 8 7 7 6 6 6 6 6 6 9 6 6 6 6 6 3 3 3 3 7 7 7 7 7 7 7 8 7 7 7 7 7 6 7 6

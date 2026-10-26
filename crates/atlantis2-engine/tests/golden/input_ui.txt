@@ -1,0 +1,457 @@
+# producer: tools/emu/input_ui.py (atlantis2-cd-fr-2199552, md5 5e218f7fa9754532ae1d7a4275443fef)
+# sections: slides (FUN_00486eb0), tooltip (FUN_0046d720 / FUN_0046d750), names (FUN_00474810); see the docstring for what runs and what is stubbed
+== slides: options (action 2)
+f0 action 2: state 1 counter 0 | disable_all
+f1 action 0: state 1 counter 1 | move(c_opt.spr,1,0); move(a_toolbx.spr,1,0)
+f2 action 0: state 1 counter 2 | move(c_opt.spr,2,0); move(a_toolbx.spr,2,0)
+f3 action 0: state 1 counter 3 | move(c_opt.spr,3,0); move(a_toolbx.spr,3,0)
+f4 action 0: state 1 counter 4 | move(c_opt.spr,4,0); move(a_toolbx.spr,4,0)
+f5 action 0: state 1 counter 5 | move(c_opt.spr,5,0); move(a_toolbx.spr,5,0)
+f6 action 0: state 1 counter 6 | move(c_opt.spr,6,0); move(a_toolbx.spr,6,0)
+f7 action 0: state 1 counter 7 | move(c_opt.spr,7,0); move(a_toolbx.spr,7,0)
+f8 action 0: state 1 counter 8 | move(c_opt.spr,8,0); move(a_toolbx.spr,8,0)
+f9 action 0: state 1 counter 9 | move(c_opt.spr,9,0); move(a_toolbx.spr,9,0)
+f10 action 0: state 1 counter 10 | move(c_opt.spr,10,0); move(a_toolbx.spr,10,0)
+f11 action 0: state 1 counter 11 | move(c_opt.spr,11,0); move(a_toolbx.spr,11,0)
+f12 action 0: state 1 counter 12 | move(c_opt.spr,12,0); move(a_toolbx.spr,12,0)
+f13 action 0: state 1 counter 13 | move(c_opt.spr,13,0); move(a_toolbx.spr,13,0)
+f14 action 0: state 1 counter 14 | move(c_opt.spr,14,0); move(a_toolbx.spr,14,0)
+f15 action 0: state 1 counter 15 | move(c_opt.spr,15,0); move(a_toolbx.spr,15,0)
+f16 action 0: state 1 counter 16 | move(c_opt.spr,16,0); move(a_toolbx.spr,16,0)
+f17 action 0: state 1 counter 17 | move(c_opt.spr,17,0); move(a_toolbx.spr,17,0)
+f18 action 0: state 1 counter 18 | move(c_opt.spr,18,0); move(a_toolbx.spr,18,0)
+f19 action 0: state 1 counter 19 | move(c_opt.spr,19,0); move(a_toolbx.spr,19,0)
+f20 action 0: state 1 counter 20 | move(c_opt.spr,20,0); move(a_toolbx.spr,20,0)
+f21 action 0: state 1 counter 21 | move(c_opt.spr,21,0); move(a_toolbx.spr,21,0)
+f22 action 0: state 1 counter 22 | move(c_opt.spr,22,0); move(a_toolbx.spr,22,0)
+f23 action 0: state 1 counter 23 | move(c_opt.spr,23,0); move(a_toolbx.spr,23,0)
+f24 action 0: state 1 counter 24 | move(c_opt.spr,24,0); move(a_toolbx.spr,24,0)
+f25 action 0: state 1 counter 25 | move(c_opt.spr,25,0); move(a_toolbx.spr,25,0)
+f26 action 0: state 1 counter 26 | move(c_opt.spr,26,0); move(a_toolbx.spr,26,0)
+f27 action 0: state 1 counter 27 | move(c_opt.spr,27,0); move(a_toolbx.spr,27,0)
+f28 action 0: state 1 counter 28 | move(c_opt.spr,28,0); move(a_toolbx.spr,28,0)
+f29 action 0: state 1 counter 29 | move(c_opt.spr,29,0); move(a_toolbx.spr,29,0)
+f30 action 0: state 1 counter 30 | move(c_opt.spr,30,0); move(a_toolbx.spr,30,0)
+f31 action 0: state 0 counter 0 | build_options
+f32 action 0: state 0 counter 0
+f33 action 0: state 0 counter 0
+== slides: sound (action 3)
+f0 action 3: state 2 counter 0 | disable_all
+f1 action 0: state 2 counter 1 | move(c_son.spr,1,0); move(a_baffle.spr,1,0)
+f2 action 0: state 2 counter 2 | move(c_son.spr,2,0); move(a_baffle.spr,2,0)
+f3 action 0: state 2 counter 3 | move(c_son.spr,3,0); move(a_baffle.spr,3,0)
+f4 action 0: state 2 counter 4 | move(c_son.spr,4,0); move(a_baffle.spr,4,0)
+f5 action 0: state 2 counter 5 | move(c_son.spr,5,0); move(a_baffle.spr,5,0)
+f6 action 0: state 2 counter 6 | move(c_son.spr,6,0); move(a_baffle.spr,6,0)
+f7 action 0: state 2 counter 7 | move(c_son.spr,7,0); move(a_baffle.spr,7,0)
+f8 action 0: state 2 counter 8 | move(c_son.spr,8,0); move(a_baffle.spr,8,0)
+f9 action 0: state 2 counter 9 | move(c_son.spr,9,0); move(a_baffle.spr,9,0)
+f10 action 0: state 2 counter 10 | move(c_son.spr,10,0); move(a_baffle.spr,10,0)
+f11 action 0: state 2 counter 11 | move(c_son.spr,11,0); move(a_baffle.spr,11,0)
+f12 action 0: state 2 counter 12 | move(c_son.spr,12,0); move(a_baffle.spr,12,0)
+f13 action 0: state 2 counter 13 | move(c_son.spr,13,0); move(a_baffle.spr,13,0)
+f14 action 0: state 2 counter 14 | move(c_son.spr,14,0); move(a_baffle.spr,14,0)
+f15 action 0: state 2 counter 15 | move(c_son.spr,15,0); move(a_baffle.spr,15,0)
+f16 action 0: state 2 counter 16 | move(c_son.spr,16,0); move(a_baffle.spr,16,0)
+f17 action 0: state 2 counter 17 | move(c_son.spr,17,0); move(a_baffle.spr,17,0)
+f18 action 0: state 2 counter 18 | move(c_son.spr,18,0); move(a_baffle.spr,18,0)
+f19 action 0: state 2 counter 19 | move(c_son.spr,19,0); move(a_baffle.spr,19,0)
+f20 action 0: state 2 counter 20 | move(c_son.spr,20,0); move(a_baffle.spr,20,0)
+f21 action 0: state 2 counter 21 | move(c_son.spr,21,0); move(a_baffle.spr,21,0)
+f22 action 0: state 2 counter 22 | move(c_son.spr,22,0); move(a_baffle.spr,22,0)
+f23 action 0: state 2 counter 23 | move(c_son.spr,23,0); move(a_baffle.spr,23,0)
+f24 action 0: state 2 counter 24 | move(c_son.spr,24,0); move(a_baffle.spr,24,0)
+f25 action 0: state 2 counter 25 | move(c_son.spr,25,0); move(a_baffle.spr,25,0)
+f26 action 0: state 2 counter 26 | move(c_son.spr,26,0); move(a_baffle.spr,26,0)
+f27 action 0: state 2 counter 27 | move(c_son.spr,27,0); move(a_baffle.spr,27,0)
+f28 action 0: state 2 counter 28 | move(c_son.spr,28,0); move(a_baffle.spr,28,0)
+f29 action 0: state 2 counter 29 | move(c_son.spr,29,0); move(a_baffle.spr,29,0)
+f30 action 0: state 2 counter 30 | move(c_son.spr,30,0); move(a_baffle.spr,30,0)
+f31 action 0: state 2 counter 31 | move(c_son.spr,31,0); move(a_baffle.spr,31,0)
+f32 action 0: state 2 counter 32 | move(c_son.spr,32,0); move(a_baffle.spr,32,0)
+f33 action 0: state 2 counter 33 | move(c_son.spr,33,0); move(a_baffle.spr,33,0)
+f34 action 0: state 2 counter 34 | move(c_son.spr,34,0); move(a_baffle.spr,34,0)
+f35 action 0: state 2 counter 35 | move(c_son.spr,35,0); move(a_baffle.spr,35,0)
+f36 action 0: state 2 counter 36 | move(c_son.spr,36,0); move(a_baffle.spr,36,0)
+f37 action 0: state 2 counter 37 | move(c_son.spr,37,0); move(a_baffle.spr,37,0)
+f38 action 0: state 2 counter 38 | move(c_son.spr,38,0); move(a_baffle.spr,38,0)
+f39 action 0: state 2 counter 39 | move(c_son.spr,39,0); move(a_baffle.spr,39,0)
+f40 action 0: state 2 counter 40 | move(c_son.spr,40,0); move(a_baffle.spr,40,0)
+f41 action 0: state 0 counter 0 | build_sound
+f42 action 0: state 0 counter 0
+f43 action 0: state 0 counter 0
+== slides: disc (action 4), then SAVE (0x15) answered NO (0x18)
+f0 action 4: state 3 counter 0 | disable_all; show(a_load.spr); show(a_save.spr)
+f1 action 0: state 3 counter 1 | move(c_load.spr,-1,0); move(a_disc.spr,-1,0)
+f2 action 0: state 3 counter 2 | move(c_load.spr,-2,0); move(a_disc.spr,-2,0)
+f3 action 0: state 3 counter 3 | move(c_load.spr,-3,0); move(a_disc.spr,-3,0)
+f4 action 0: state 3 counter 4 | move(c_load.spr,-4,0); move(a_disc.spr,-4,0)
+f5 action 0: state 3 counter 5 | move(c_load.spr,-5,0); move(a_disc.spr,-5,0)
+f6 action 0: state 3 counter 6 | move(c_load.spr,-6,0); move(a_disc.spr,-6,0)
+f7 action 0: state 3 counter 7 | move(c_load.spr,-7,0); move(a_disc.spr,-7,0)
+f8 action 0: state 3 counter 8 | move(c_load.spr,-8,0); move(a_disc.spr,-8,0)
+f9 action 0: state 3 counter 9 | move(c_load.spr,-9,0); move(a_disc.spr,-9,0)
+f10 action 0: state 3 counter 10 | move(c_load.spr,-10,0); move(a_disc.spr,-10,0)
+f11 action 0: state 3 counter 11 | move(c_load.spr,-11,0); move(a_disc.spr,-11,0)
+f12 action 0: state 3 counter 12 | move(c_load.spr,-12,0); move(a_disc.spr,-12,0)
+f13 action 0: state 3 counter 13 | move(c_load.spr,-13,0); move(a_disc.spr,-13,0)
+f14 action 0: state 3 counter 14 | move(c_load.spr,-14,0); move(a_disc.spr,-14,0)
+f15 action 0: state 3 counter 15 | move(c_load.spr,-15,0); move(a_disc.spr,-15,0)
+f16 action 0: state 3 counter 16 | move(c_load.spr,-16,0); move(a_disc.spr,-16,0)
+f17 action 0: state 3 counter 17 | move(c_load.spr,-17,0); move(a_disc.spr,-17,0)
+f18 action 0: state 3 counter 18 | move(c_load.spr,-18,0); move(a_disc.spr,-18,0)
+f19 action 0: state 3 counter 19 | move(c_load.spr,-19,0); move(a_disc.spr,-19,0)
+f20 action 0: state 3 counter 20 | move(c_load.spr,-20,0); move(a_disc.spr,-20,0)
+f21 action 0: state 3 counter 21 | move(c_load.spr,-21,0); move(a_disc.spr,-21,0)
+f22 action 0: state 3 counter 22 | move(c_load.spr,-22,0); move(a_disc.spr,-22,0)
+f23 action 0: state 3 counter 23 | move(c_load.spr,-23,0); move(a_disc.spr,-23,0)
+f24 action 0: state 3 counter 24 | move(c_load.spr,-24,0); move(a_disc.spr,-24,0)
+f25 action 0: state 3 counter 25 | move(c_load.spr,-25,0); move(a_disc.spr,-25,0)
+f26 action 0: state 3 counter 26 | move(c_load.spr,-26,0); move(a_disc.spr,-26,0)
+f27 action 0: state 3 counter 27 | move(c_load.spr,-27,0); move(a_disc.spr,-27,0)
+f28 action 0: state 3 counter 28 | move(c_load.spr,-28,0); move(a_disc.spr,-28,0)
+f29 action 0: state 3 counter 29 | move(c_load.spr,-29,0); move(a_disc.spr,-29,0)
+f30 action 0: state 3 counter 30 | move(c_load.spr,-30,0); move(a_disc.spr,-30,0)
+f31 action 0: state 8 counter 30 | enable(a_load.spr); enable(a_save.spr)
+f32 action 0: state 8 counter 30
+f33 action 21: state 5 counter 30 | disable_all; enable(c_yn.spr); enable(b_oui.spr); enable(b_non.spr); show(c_yn.spr); show(b_oui.spr); show(b_non.spr); text(b_oui.spr); text(b_non.spr)
+f34 action 24: state 4 counter 30 | enable_all; hide(c_yn.spr); hide(b_oui.spr); hide(b_non.spr)
+f35 action 0: state 4 counter 29 | move(c_load.spr,30,0); move(a_disc.spr,30,0)
+f36 action 0: state 4 counter 28 | move(c_load.spr,29,0); move(a_disc.spr,29,0)
+f37 action 0: state 4 counter 27 | move(c_load.spr,28,0); move(a_disc.spr,28,0)
+f38 action 0: state 4 counter 26 | move(c_load.spr,27,0); move(a_disc.spr,27,0)
+f39 action 0: state 4 counter 25 | move(c_load.spr,26,0); move(a_disc.spr,26,0)
+f40 action 0: state 4 counter 24 | move(c_load.spr,25,0); move(a_disc.spr,25,0)
+f41 action 0: state 4 counter 23 | move(c_load.spr,24,0); move(a_disc.spr,24,0)
+f42 action 0: state 4 counter 22 | move(c_load.spr,23,0); move(a_disc.spr,23,0)
+f43 action 0: state 4 counter 21 | move(c_load.spr,22,0); move(a_disc.spr,22,0)
+f44 action 0: state 4 counter 20 | move(c_load.spr,21,0); move(a_disc.spr,21,0)
+f45 action 0: state 4 counter 19 | move(c_load.spr,20,0); move(a_disc.spr,20,0)
+f46 action 0: state 4 counter 18 | move(c_load.spr,19,0); move(a_disc.spr,19,0)
+f47 action 0: state 4 counter 17 | move(c_load.spr,18,0); move(a_disc.spr,18,0)
+f48 action 0: state 4 counter 16 | move(c_load.spr,17,0); move(a_disc.spr,17,0)
+f49 action 0: state 4 counter 15 | move(c_load.spr,16,0); move(a_disc.spr,16,0)
+f50 action 0: state 4 counter 14 | move(c_load.spr,15,0); move(a_disc.spr,15,0)
+f51 action 0: state 4 counter 13 | move(c_load.spr,14,0); move(a_disc.spr,14,0)
+f52 action 0: state 4 counter 12 | move(c_load.spr,13,0); move(a_disc.spr,13,0)
+f53 action 0: state 4 counter 11 | move(c_load.spr,12,0); move(a_disc.spr,12,0)
+f54 action 0: state 4 counter 10 | move(c_load.spr,11,0); move(a_disc.spr,11,0)
+f55 action 0: state 4 counter 9 | move(c_load.spr,10,0); move(a_disc.spr,10,0)
+f56 action 0: state 4 counter 8 | move(c_load.spr,9,0); move(a_disc.spr,9,0)
+f57 action 0: state 4 counter 7 | move(c_load.spr,8,0); move(a_disc.spr,8,0)
+f58 action 0: state 4 counter 6 | move(c_load.spr,7,0); move(a_disc.spr,7,0)
+f59 action 0: state 4 counter 5 | move(c_load.spr,6,0); move(a_disc.spr,6,0)
+f60 action 0: state 4 counter 4 | move(c_load.spr,5,0); move(a_disc.spr,5,0)
+f61 action 0: state 4 counter 3 | move(c_load.spr,4,0); move(a_disc.spr,4,0)
+f62 action 0: state 4 counter 2 | move(c_load.spr,3,0); move(a_disc.spr,3,0)
+f63 action 0: state 4 counter 1 | move(c_load.spr,2,0); move(a_disc.spr,2,0)
+f64 action 0: state 4 counter 0 | move(c_load.spr,1,0); move(a_disc.spr,1,0)
+f65 action 0: state 0 counter 0 | enable_all; hide(a_load.spr); hide(a_save.spr)
+f66 action 0: state 0 counter 0
+f67 action 0: state 0 counter 0
+== slides: disc (action 4), then a click elsewhere (0x13)
+f0 action 4: state 3 counter 0 | disable_all; show(a_load.spr); show(a_save.spr)
+f1 action 0: state 3 counter 1 | move(c_load.spr,-1,0); move(a_disc.spr,-1,0)
+f2 action 0: state 3 counter 2 | move(c_load.spr,-2,0); move(a_disc.spr,-2,0)
+f3 action 0: state 3 counter 3 | move(c_load.spr,-3,0); move(a_disc.spr,-3,0)
+f4 action 0: state 3 counter 4 | move(c_load.spr,-4,0); move(a_disc.spr,-4,0)
+f5 action 0: state 3 counter 5 | move(c_load.spr,-5,0); move(a_disc.spr,-5,0)
+f6 action 0: state 3 counter 6 | move(c_load.spr,-6,0); move(a_disc.spr,-6,0)
+f7 action 0: state 3 counter 7 | move(c_load.spr,-7,0); move(a_disc.spr,-7,0)
+f8 action 0: state 3 counter 8 | move(c_load.spr,-8,0); move(a_disc.spr,-8,0)
+f9 action 0: state 3 counter 9 | move(c_load.spr,-9,0); move(a_disc.spr,-9,0)
+f10 action 0: state 3 counter 10 | move(c_load.spr,-10,0); move(a_disc.spr,-10,0)
+f11 action 0: state 3 counter 11 | move(c_load.spr,-11,0); move(a_disc.spr,-11,0)
+f12 action 0: state 3 counter 12 | move(c_load.spr,-12,0); move(a_disc.spr,-12,0)
+f13 action 0: state 3 counter 13 | move(c_load.spr,-13,0); move(a_disc.spr,-13,0)
+f14 action 0: state 3 counter 14 | move(c_load.spr,-14,0); move(a_disc.spr,-14,0)
+f15 action 0: state 3 counter 15 | move(c_load.spr,-15,0); move(a_disc.spr,-15,0)
+f16 action 0: state 3 counter 16 | move(c_load.spr,-16,0); move(a_disc.spr,-16,0)
+f17 action 0: state 3 counter 17 | move(c_load.spr,-17,0); move(a_disc.spr,-17,0)
+f18 action 0: state 3 counter 18 | move(c_load.spr,-18,0); move(a_disc.spr,-18,0)
+f19 action 0: state 3 counter 19 | move(c_load.spr,-19,0); move(a_disc.spr,-19,0)
+f20 action 0: state 3 counter 20 | move(c_load.spr,-20,0); move(a_disc.spr,-20,0)
+f21 action 0: state 3 counter 21 | move(c_load.spr,-21,0); move(a_disc.spr,-21,0)
+f22 action 0: state 3 counter 22 | move(c_load.spr,-22,0); move(a_disc.spr,-22,0)
+f23 action 0: state 3 counter 23 | move(c_load.spr,-23,0); move(a_disc.spr,-23,0)
+f24 action 0: state 3 counter 24 | move(c_load.spr,-24,0); move(a_disc.spr,-24,0)
+f25 action 0: state 3 counter 25 | move(c_load.spr,-25,0); move(a_disc.spr,-25,0)
+f26 action 0: state 3 counter 26 | move(c_load.spr,-26,0); move(a_disc.spr,-26,0)
+f27 action 0: state 3 counter 27 | move(c_load.spr,-27,0); move(a_disc.spr,-27,0)
+f28 action 0: state 3 counter 28 | move(c_load.spr,-28,0); move(a_disc.spr,-28,0)
+f29 action 0: state 3 counter 29 | move(c_load.spr,-29,0); move(a_disc.spr,-29,0)
+f30 action 0: state 3 counter 30 | move(c_load.spr,-30,0); move(a_disc.spr,-30,0)
+f31 action 0: state 8 counter 30 | enable(a_load.spr); enable(a_save.spr)
+f32 action 0: state 8 counter 30
+f33 action 19: state 4 counter 30
+f34 action 0: state 4 counter 29 | move(c_load.spr,30,0); move(a_disc.spr,30,0)
+f35 action 0: state 4 counter 28 | move(c_load.spr,29,0); move(a_disc.spr,29,0)
+f36 action 0: state 4 counter 27 | move(c_load.spr,28,0); move(a_disc.spr,28,0)
+f37 action 0: state 4 counter 26 | move(c_load.spr,27,0); move(a_disc.spr,27,0)
+f38 action 0: state 4 counter 25 | move(c_load.spr,26,0); move(a_disc.spr,26,0)
+f39 action 0: state 4 counter 24 | move(c_load.spr,25,0); move(a_disc.spr,25,0)
+f40 action 0: state 4 counter 23 | move(c_load.spr,24,0); move(a_disc.spr,24,0)
+f41 action 0: state 4 counter 22 | move(c_load.spr,23,0); move(a_disc.spr,23,0)
+f42 action 0: state 4 counter 21 | move(c_load.spr,22,0); move(a_disc.spr,22,0)
+f43 action 0: state 4 counter 20 | move(c_load.spr,21,0); move(a_disc.spr,21,0)
+f44 action 0: state 4 counter 19 | move(c_load.spr,20,0); move(a_disc.spr,20,0)
+f45 action 0: state 4 counter 18 | move(c_load.spr,19,0); move(a_disc.spr,19,0)
+f46 action 0: state 4 counter 17 | move(c_load.spr,18,0); move(a_disc.spr,18,0)
+f47 action 0: state 4 counter 16 | move(c_load.spr,17,0); move(a_disc.spr,17,0)
+f48 action 0: state 4 counter 15 | move(c_load.spr,16,0); move(a_disc.spr,16,0)
+f49 action 0: state 4 counter 14 | move(c_load.spr,15,0); move(a_disc.spr,15,0)
+f50 action 0: state 4 counter 13 | move(c_load.spr,14,0); move(a_disc.spr,14,0)
+f51 action 0: state 4 counter 12 | move(c_load.spr,13,0); move(a_disc.spr,13,0)
+f52 action 0: state 4 counter 11 | move(c_load.spr,12,0); move(a_disc.spr,12,0)
+f53 action 0: state 4 counter 10 | move(c_load.spr,11,0); move(a_disc.spr,11,0)
+f54 action 0: state 4 counter 9 | move(c_load.spr,10,0); move(a_disc.spr,10,0)
+f55 action 0: state 4 counter 8 | move(c_load.spr,9,0); move(a_disc.spr,9,0)
+f56 action 0: state 4 counter 7 | move(c_load.spr,8,0); move(a_disc.spr,8,0)
+f57 action 0: state 4 counter 6 | move(c_load.spr,7,0); move(a_disc.spr,7,0)
+f58 action 0: state 4 counter 5 | move(c_load.spr,6,0); move(a_disc.spr,6,0)
+f59 action 0: state 4 counter 4 | move(c_load.spr,5,0); move(a_disc.spr,5,0)
+f60 action 0: state 4 counter 3 | move(c_load.spr,4,0); move(a_disc.spr,4,0)
+f61 action 0: state 4 counter 2 | move(c_load.spr,3,0); move(a_disc.spr,3,0)
+f62 action 0: state 4 counter 1 | move(c_load.spr,2,0); move(a_disc.spr,2,0)
+f63 action 0: state 4 counter 0 | move(c_load.spr,1,0); move(a_disc.spr,1,0)
+f64 action 0: state 0 counter 0 | enable_all; hide(a_load.spr); hide(a_save.spr)
+f65 action 0: state 0 counter 0
+== tooltip: enabled: enter at 5, stay
+t5 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t6 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t7 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t8 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t9 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t10 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t11 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t12 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t13 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t14 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t15 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t16 ptr (150,120) enabled 1 visible 1: drawn 2 start 5 inside 1
+t17 ptr (150,120) enabled 1 visible 1: drawn 2 start 5 inside 1
+t18 ptr (150,120) enabled 1 visible 1: drawn 2 start 5 inside 1
+t19 ptr (150,120) enabled 1 visible 1: drawn 2 start 5 inside 1
+== tooltip: disabled while the mouse enters at 5, enabled at 20
+t0 ptr (50,50) enabled 1 visible 1: drawn 0 start 0 inside 0
+t5 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t6 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t7 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t8 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t9 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t10 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t11 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t12 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t13 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t14 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t15 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t16 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t17 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t18 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t19 ptr (150,120) enabled 0 visible 1: drawn 0 start 0 inside 1
+t20 ptr (150,120) enabled 1 visible 1: drawn 2 start 0 inside 1
+t21 ptr (150,120) enabled 1 visible 1: drawn 2 start 0 inside 1
+t22 ptr (150,120) enabled 1 visible 1: drawn 2 start 0 inside 1
+t23 ptr (150,120) enabled 1 visible 1: drawn 2 start 0 inside 1
+== tooltip: enabled: enter at 5, disabled at 10..30, enabled again
+t5 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t6 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t7 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t8 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t9 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t10 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t11 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t12 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t13 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t14 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t15 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t16 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t17 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t18 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t19 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t20 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t21 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t22 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t23 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t24 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t25 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t26 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t27 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t28 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t29 ptr (150,120) enabled 0 visible 1: drawn 0 start 5 inside 1
+t30 ptr (150,120) enabled 1 visible 1: drawn 2 start 5 inside 1
+t31 ptr (150,120) enabled 1 visible 1: drawn 2 start 5 inside 1
+t32 ptr (150,120) enabled 1 visible 1: drawn 2 start 5 inside 1
+t33 ptr (150,120) enabled 1 visible 1: drawn 2 start 5 inside 1
+== tooltip: invisible while the mouse enters at 5, shown at 20
+t5 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t6 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t7 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t8 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t9 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t10 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t11 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t12 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t13 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t14 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t15 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t16 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t17 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t18 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t19 ptr (150,120) enabled 1 visible 0: drawn 0 start 0 inside 0
+t20 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t21 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t22 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t23 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t24 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t25 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t26 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t27 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t28 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t29 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t30 ptr (150,120) enabled 1 visible 1: drawn 0 start 20 inside 1
+t31 ptr (150,120) enabled 1 visible 1: drawn 2 start 20 inside 1
+t32 ptr (150,120) enabled 1 visible 1: drawn 2 start 20 inside 1
+== tooltip: enabled: in at 5, out at 9, in at 12
+t5 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t6 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t7 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t8 ptr (150,120) enabled 1 visible 1: drawn 0 start 5 inside 1
+t9 ptr (50,50) enabled 1 visible 1: drawn 0 start 5 inside 0
+t10 ptr (50,50) enabled 1 visible 1: drawn 0 start 5 inside 0
+t11 ptr (50,50) enabled 1 visible 1: drawn 0 start 5 inside 0
+t12 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t13 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t14 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t15 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t16 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t17 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t18 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t19 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t20 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t21 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t22 ptr (150,120) enabled 1 visible 1: drawn 0 start 12 inside 1
+t23 ptr (150,120) enabled 1 visible 1: drawn 2 start 12 inside 1
+t24 ptr (150,120) enabled 1 visible 1: drawn 2 start 12 inside 1
+== names: loc\Messages.txt md5 c01cd8c783f23896fdd43931b034e1c6, 108 keys, defname checks 112, fatal []
+key 0 len 12 md5 df0c50764425 | name len 15 lead 0 trail 0 cr 0 md5 019195e6442f
+key 1 len 8 md5 33dcb8654bde | name len 8 lead 0 trail 0 cr 0 md5 998eca6fd4ce
+key 2 len 14 md5 46990c66f1b8 | name len 11 lead 0 trail 0 cr 0 md5 2b737203a1d9
+key 3 len 11 md5 d19c74591cb7 | name len 25 lead 0 trail 0 cr 0 md5 9e8f1cc81cf3
+key 4 len 8 md5 d01f508243ee | name len 5 lead 0 trail 0 cr 0 md5 d56595e66a47
+key 5 len 11 md5 6cd08a258d14 | name len 5 lead 0 trail 0 cr 0 md5 d56595e66a47
+key 6 len 12 md5 b18a77da4e1c | name len 17 lead 0 trail 0 cr 0 md5 33966ca771a6
+key 7 len 12 md5 3006670a31a1 | name len 5 lead 0 trail 0 cr 0 md5 978c49591865
+key 8 len 10 md5 94ff7f45df0b | name len 10 lead 0 trail 0 cr 0 md5 105e13e85800
+key 9 len 13 md5 0b1cb5e3f4e7 | name len 10 lead 0 trail 0 cr 0 md5 105e13e85800
+key 10 len 8 md5 dc8e75a5fc9c | name len 8 lead 0 trail 0 cr 0 md5 e598827fefc7
+key 11 len 6 md5 4b7f18ea5fd7 | name len 6 lead 0 trail 0 cr 0 md5 4d0ebc47a4e6
+key 12 len 13 md5 c9324d31e946 | name len 6 lead 0 trail 0 cr 0 md5 4d0ebc47a4e6
+key 13 len 6 md5 16eb32eea430 | name len 6 lead 0 trail 0 cr 0 md5 08ab9471d4c5
+key 14 len 9 md5 8d3499e85349 | name len 6 lead 0 trail 0 cr 0 md5 08ab9471d4c5
+key 15 len 9 md5 55bd11bb6385 | name len 12 lead 0 trail 0 cr 0 md5 744d932d0061
+key 16 len 10 md5 322b6395253c | name len 13 lead 0 trail 0 cr 0 md5 d494722797ac
+key 17 len 14 md5 8840d5b58166 | name len 16 lead 0 trail 0 cr 0 md5 4dbff3d24fb3
+key 18 len 12 md5 e10f4b2b1373 | name len 15 lead 0 trail 0 cr 0 md5 2028c70f6435
+key 19 len 12 md5 56799f8eb2f5 | name len 6 lead 0 trail 1 cr 0 md5 db6b8c6dd170
+key 20 len 14 md5 caf46f6afa3b | name len 16 lead 0 trail 0 cr 0 md5 cd47369c8325
+key 21 len 11 md5 71a7c98473f6 | name len 16 lead 0 trail 0 cr 0 md5 cd47369c8325
+key 22 len 10 md5 97d05a576014 | name len 16 lead 0 trail 0 cr 0 md5 cd47369c8325
+key 23 len 12 md5 2148cc84bd86 | name len 16 lead 0 trail 0 cr 0 md5 cd47369c8325
+key 24 len 11 md5 cba78f6990ef | name len 16 lead 0 trail 0 cr 0 md5 cd47369c8325
+key 25 len 12 md5 b892698b3016 | name len 5 lead 0 trail 0 cr 0 md5 e4b86b73352c
+key 26 len 9 md5 13d958851b67 | name len 16 lead 0 trail 0 cr 0 md5 cd47369c8325
+key 27 len 9 md5 4aa96b2b57d0 | name len 16 lead 0 trail 0 cr 0 md5 cd47369c8325
+key 28 len 6 md5 026c4c765f02 | name len 7 lead 0 trail 0 cr 0 md5 5f14b1519f5a
+key 29 len 16 md5 47f5d9a16018 | name len 7 lead 0 trail 0 cr 0 md5 2d92a68ec95f
+key 30 len 14 md5 14c00af4b432 | name len 7 lead 0 trail 0 cr 0 md5 2d92a68ec95f
+key 31 len 12 md5 a5fda4254ee9 | name len 15 lead 0 trail 0 cr 0 md5 1eaf293d5608
+key 32 len 6 md5 0e889cd8b8a4 | name len 6 lead 0 trail 0 cr 0 md5 57fb14ecfa8d
+key 33 len 10 md5 62c3cf1e9b7b | name len 6 lead 0 trail 0 cr 0 md5 57fb14ecfa8d
+key 34 len 7 md5 2494e5067a4d | name len 6 lead 0 trail 0 cr 0 md5 e4b0247d7997
+key 35 len 7 md5 bb5a5ff7bb6b | name len 6 lead 0 trail 0 cr 0 md5 e4b0247d7997
+key 36 len 7 md5 8d58257f8a26 | name len 6 lead 0 trail 0 cr 0 md5 e4b0247d7997
+key 37 len 7 md5 b396f8598069 | name len 6 lead 0 trail 0 cr 0 md5 e4b0247d7997
+key 38 len 7 md5 497bdece18e5 | name len 6 lead 0 trail 0 cr 0 md5 e4b0247d7997
+key 39 len 9 md5 5d598342d2c6 | name len 6 lead 0 trail 0 cr 0 md5 e4b0247d7997
+key 40 len 4 md5 550c2e8d4a3c | name len 4 lead 0 trail 0 cr 0 md5 8201cb38ebb3
+key 41 len 7 md5 0d80a778e6c6 | name len 4 lead 0 trail 0 cr 0 md5 8201cb38ebb3
+key 42 len 10 md5 842525c39117 | name len 13 lead 0 trail 0 cr 0 md5 98c782f32a4a
+key 43 len 10 md5 8d245424a3e8 | name len 13 lead 0 trail 0 cr 0 md5 609f0d0f38c4
+key 44 len 9 md5 bb7958eb64f0 | name len 6 lead 0 trail 0 cr 0 md5 fadab27b84f5
+key 45 len 9 md5 8d354a1a00fe | name len 6 lead 0 trail 0 cr 0 md5 fadab27b84f5
+key 46 len 9 md5 911be0bbd5ff | name len 6 lead 0 trail 0 cr 0 md5 fadab27b84f5
+key 47 len 9 md5 edb1c45adf5c | name len 6 lead 0 trail 0 cr 0 md5 fadab27b84f5
+key 48 len 9 md5 e6ca8542cc1f | name len 6 lead 0 trail 0 cr 0 md5 fadab27b84f5
+key 49 len 9 md5 648316a0a7a4 | name len 6 lead 0 trail 0 cr 0 md5 fadab27b84f5
+key 50 len 9 md5 85a04b9a02f0 | name len 6 lead 0 trail 0 cr 0 md5 fadab27b84f5
+key 51 len 11 md5 d7246088b856 | name len 7 lead 0 trail 0 cr 0 md5 8ba7f4ce980c
+key 52 len 9 md5 a30a6440770b | name len 6 lead 0 trail 0 cr 0 md5 fadab27b84f5
+key 53 len 8 md5 ec57d31799be | name len 8 lead 0 trail 0 cr 0 md5 8093d56d20d5
+key 54 len 11 md5 19d874a082b1 | name len 8 lead 0 trail 0 cr 0 md5 8093d56d20d5
+key 55 len 12 md5 ab8edcd13dd1 | name len 10 lead 0 trail 0 cr 0 md5 7874f489c1b3
+key 56 len 12 md5 e2dfb53a84d4 | name len 10 lead 0 trail 0 cr 0 md5 7874f489c1b3
+key 57 len 12 md5 820577c1c822 | name len 10 lead 0 trail 0 cr 0 md5 7874f489c1b3
+key 58 len 15 md5 b8d0eb865bc4 | name len 17 lead 0 trail 0 cr 0 md5 ae50ae1637cf
+key 59 len 7 md5 d90d405f0bbd | name len 7 lead 0 trail 0 cr 0 md5 fe0c65577255
+key 60 len 9 md5 7ee2ff158121 | name len 6 lead 0 trail 0 cr 0 md5 76318c62166f
+key 61 len 10 md5 53310f6789c0 | name len 7 lead 0 trail 0 cr 0 md5 186b32b81e0b
+key 62 len 8 md5 a810a5f603ab | name len 8 lead 0 trail 0 cr 0 md5 72ba1cfb7e4b
+key 63 len 11 md5 968423f33c8a | name len 8 lead 0 trail 0 cr 0 md5 72ba1cfb7e4b
+key 64 len 4 md5 186495f7da29 | name len 4 lead 0 trail 0 cr 0 md5 a02c83a7dbd9
+key 65 len 7 md5 9c520d6e6fde | name len 4 lead 0 trail 0 cr 0 md5 a02c83a7dbd9
+key 66 len 17 md5 27660c7b0ed0 | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 67 len 17 md5 2e93d50c0be2 | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 68 len 17 md5 3e6a958209e2 | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 69 len 11 md5 6b261c54544b | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 70 len 11 md5 27faf5b9b64b | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 71 len 13 md5 8482781f29fb | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 72 len 11 md5 d0bee4fd66ad | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 73 len 11 md5 8eaff0cf9891 | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 74 len 15 md5 4a20c1d83406 | name len 20 lead 0 trail 1 cr 0 md5 20e4f8dab98f
+key 75 len 11 md5 5898a0c1423b | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 76 len 11 md5 85ae71e07ac7 | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 77 len 15 md5 5a08934cba95 | name len 19 lead 0 trail 0 cr 0 md5 fc0b24b6776d
+key 78 len 11 md5 ac03fe25caf2 | name len 18 lead 0 trail 0 cr 0 md5 a3609b74bb14
+key 79 len 17 md5 a503816d829a | name len 18 lead 0 trail 0 cr 0 md5 a3609b74bb14
+key 80 len 9 md5 8f68341f93ca | name len 9 lead 0 trail 0 cr 0 md5 c6ec6038dc56
+key 81 len 16 md5 20264732cbd0 | name len 5 lead 0 trail 0 cr 0 md5 fbda6b0c0c46
+key 82 len 8 md5 8207075da818 | name len 15 lead 0 trail 0 cr 0 md5 0ca2a1b2a84b
+key 83 len 15 md5 08fefc02d10a | name len 15 lead 0 trail 0 cr 0 md5 0ca2a1b2a84b
+key 84 len 10 md5 74631211ec1a | name len 5 lead 0 trail 0 cr 0 md5 fbda6b0c0c46
+key 85 len 6 md5 6e2469547615 | name len 5 lead 0 trail 0 cr 0 md5 b9872c4e6bbd
+key 86 len 6 md5 666f38420b97 | name len 5 lead 0 trail 0 cr 0 md5 b9872c4e6bbd
+key 87 len 6 md5 eb5d4cd4688d | name len 5 lead 0 trail 0 cr 0 md5 b9872c4e6bbd
+key 88 len 6 md5 181412d8cc1f | name len 5 lead 0 trail 0 cr 0 md5 b9872c4e6bbd
+key 89 len 6 md5 493394de0f4d | name len 5 lead 0 trail 0 cr 0 md5 b9872c4e6bbd
+key 90 len 11 md5 06b87950ab24 | name len 18 lead 0 trail 0 cr 0 md5 a3609b74bb14
+key 91 len 10 md5 2389193475fc | name len 7 lead 0 trail 0 cr 0 md5 5f14b1519f5a
+key 92 len 5 md5 2dfbcd557d79 | name len 5 lead 0 trail 0 cr 0 md5 f557aa64b626
+key 93 len 8 md5 d17baa5de185 | name len 5 lead 0 trail 0 cr 0 md5 f557aa64b626
+key 94 len 6 md5 5e84a8afd9f2 | name len 4 lead 0 trail 0 cr 0 md5 49a6916d3796
+key 95 len 6 md5 6ccc099a9b67 | name len 4 lead 0 trail 0 cr 0 md5 49a6916d3796
+key 96 len 6 md5 ed6d6634a048 | name len 4 lead 0 trail 0 cr 0 md5 49a6916d3796
+key 97 len 6 md5 b597c9379549 | name len 4 lead 0 trail 0 cr 0 md5 49a6916d3796
+key 98 len 6 md5 7a7a90fc204d | name len 4 lead 0 trail 0 cr 0 md5 49a6916d3796
+key 99 len 6 md5 5d53da972784 | name len 6 lead 0 trail 0 cr 0 md5 6a090c6a5afe
+key 100 len 9 md5 1ff523e5a07a | name len 6 lead 0 trail 0 cr 0 md5 6a090c6a5afe
+key 101 len 12 md5 44ff07d18614 | name len 15 lead 0 trail 0 cr 0 md5 019e62ca62c5
+key 102 len 10 md5 dd0491d4f24c | name len 10 lead 0 trail 0 cr 0 md5 8ad444342839
+key 103 len 9 md5 261fa4b21d7c | name len 6 lead 0 trail 0 cr 0 md5 0ee4761e7295
+key 104 len 12 md5 4941ac9aac71 | name len 12 lead 0 trail 0 cr 0 md5 a73e6387f915
+key 105 len 10 md5 96549f58668d | name len 13 lead 0 trail 0 cr 0 md5 6dc4ead0978d
+key 106 len 15 md5 8a966e486dde | name len 20 lead 0 trail 0 cr 0 md5 c5a5154c972e
+key 107 len 14 md5 de82bfb4b6cf | name len 13 lead 0 trail 0 cr 0 md5 6dc4ead0978d
+== names, synthetic file (hex 4b45593d780d0a3b20636f6d6d656e740d0a205b4f626a6563744e616d654c6973745d0d0a5b4f626a6563744e616d654c6973745d200d0a5b4f626a6563744e616d654c6973745d0d0a53544f4e45090909412073746f6e650d0a3b20616761696e0d0a20203b2073706163656420636f6d6d656e740d0a53544f4e4509095468652073746f6e650d0a73746f6e65096c6f7765720d0a524f44202020526f6420200d0a50495045202c3b2c207069706564203b206e616d65090d0a4352096f6e650d74776f0d0a454d5054590d0a41465445520961667465720d0a094c454144096c65640d0a54414209090d0a5b456e644f626a6563744e616d654c6973745d200d0a4c415445096c6174650d0a5b456e644f626a6563744e616d654c6973745d0d0a4f5554096e6f0d0a): 12 keys, defname checks 14
+key 4146544552 b'AFTER' | name 6166746572 b'after'
+key 414741494e b'AGAIN' | name  b''
+key 4352 b'CR' | name 6f6e6574776f b'onetwo'
+key 454d505459 b'EMPTY' | name  b''
+key 4c415445 b'LATE' | name 6c617465 b'late'
+key 4c454144 b'LEAD' | name 6c6564 b'led'
+key 50495045 b'PIPE' | name 7069706564203b206e616d6509 b'piped ; name\t'
+key 524f44 b'ROD' | name 526f642020 b'Rod  '
+key 535041434544 b'SPACED' | name 636f6d6d656e74 b'comment'
+key 53544f4e45 b'STONE' | name 6c6f776572 b'lower'
+key 544142 b'TAB' | name  b''
+key 5b454e444f424a4543544e414d454c4953545d b'[ENDOBJECTNAMELIST]' | name  b''

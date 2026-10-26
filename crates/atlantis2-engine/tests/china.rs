@@ -30,7 +30,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -825,7 +825,7 @@ fn every_chinese_dialog_plays() {
 #[test]
 fn chinese_subjects_objects_and_music_are_on_disc_3() {
     let Some(files) = game() else { return };
-    let e = in_china(files);
+    let mut e = in_china(files);
     let s = e.script_state().unwrap();
     let names = s.names.clone();
     let bank = |name: &str| {
@@ -912,7 +912,16 @@ fn chinese_subjects_objects_and_music_are_on_disc_3() {
         .files()
         .read(atlantis2_data::Folder::ApcMusic, &name)
         .is_none());
-    // Chapter 42's music plays.
+    // Chapter 42's music plays, once the music the view's entry opened
+    // (the music state machine runs during the panorama's load, as
+    // FUN_00476e10 does) has faded out.
+    for _ in 0..600 {
+        if e.music_playing().is_some_and(|m| (20..=23).contains(&m)) {
+            break;
+        }
+        e.set_clock(e.clock() + atlantis2_engine::engine::PASS);
+        e.pass(None);
+    }
     assert!(e.music_playing().is_some_and(|m| (20..=23).contains(&m)));
 }
 

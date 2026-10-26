@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
 const GOLDEN: &str = include_str!("golden/moves_tibet.txt");
@@ -21,7 +21,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -68,7 +68,7 @@ impl Driver {
         let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
         e.trace = true;
         e.sprite_picks = false;
-        e.anim.rand = MsvcRand(1000);
+        e.rand = Rand::new(1000);
         Driver {
             e,
             pass_no: 0,
@@ -389,7 +389,7 @@ fn animations_match_the_original() {
         }
         let ticks = want.iter().filter(|r| r.starts_with("tick")).count();
         for t in 0..ticks {
-            d.e.anim.step();
+            d.e.anim.step(&mut d.e.rand);
             let active: Vec<String> =
                 d.e.anim
                     .slots
@@ -464,7 +464,7 @@ fn the_zoom_of_a_move_matches_the_original() {
         };
         let mut e = Engine::new_game(game().unwrap(), variant, fpu, 640, 480).unwrap();
         e.sprite_picks = false;
-        e.anim.rand = MsvcRand(1000);
+        e.rand = Rand::new(1000);
         e.enter_at(2, radians(-75.0), radians(15.0)).unwrap();
         let f = e.fpu();
         if psycho {
@@ -515,4 +515,131 @@ fn the_zoom_of_a_move_matches_the_original() {
         checked += 1;
     }
     assert_eq!(checked, 4);
+}
+
+const RING: &str = include_str!("golden/moves_ring.txt");
+
+/// The ring's moves against the original (`moves_ring.txt`): in
+/// `annulair.wam` view 1, chapter 81, a click on the move to view 16 at its
+/// aim and 8° off it runs chapter 81's departure section
+/// (`ZoomPsychoStart=180,3`): the field of view 1.8° less a frame towards
+/// 3°, the camera rolled by −0.16 rad a frame with its direction kept (no
+/// turn to the zone), then view 16 at 76° with no roll, under both control
+/// words; one row per pass that changed the field of view, its target, the
+/// roll, the turn, the loop or the view.
+#[test]
+fn the_rings_rolling_moves_match_the_original() {
+    if game().is_none() {
+        return;
+    }
+    let mut sections: Vec<(String, Vec<String>)> = Vec::new();
+    for line in RING.lines().filter(|l| !l.starts_with('#')) {
+        if let Some(h) = line.strip_prefix("== ") {
+            sections.push((h.to_string(), Vec::new()));
+        } else if !line.starts_with("chapi081 ") {
+            sections.last_mut().unwrap().1.push(line.to_string());
+        }
+    }
+    assert_eq!(sections.len(), 4);
+    for (head, want) in &sections {
+        let (variant, fpu) = if head.starts_with("cw 0x0e7f") {
+            (Variant::PII, Fpu::Chop)
+        } else {
+            assert!(head.starts_with("cw 0x027f"), "{head}");
+            (Variant::C, Fpu::Double)
+        };
+        let words: Vec<&str> = head.split_whitespace().collect();
+        let zi: usize = words[6].parse().unwrap();
+        let mut e = Engine::boot(game().unwrap(), variant, fpu, 640, 480).unwrap();
+        e.start_new_game().unwrap();
+        e.end_video();
+        for c in [
+            "(monde=4)",
+            "(changewam=annulair.wam)",
+            "(vue=1)",
+            "(chapter=81)",
+        ] {
+            e.run_command(c.as_bytes());
+        }
+        for _ in 0..400 {
+            if e.loop_type == LoopType::Video {
+                e.end_video();
+            }
+            e.tick();
+            e.pass(None);
+            if e.loop_type == LoopType::Warp && !e.turning() {
+                break;
+            }
+        }
+        assert_eq!(e.place(), ("annulair.wam", 1));
+        let z = &e.wam().view(1).unwrap().zones[zi];
+        assert_eq!((z.kind, z.value), (1, 16), "{head}");
+        let (ay, ap) = e.zone_aim(1, zi).unwrap();
+        let aim = format!("aim {},{}", fmt3(degrees(ay)), fmt3(degrees(ap)));
+        assert!(head.contains(&aim), "{head}: {aim}");
+        // The view entered at the original's own arrival angles (its
+        // f32 bits), so that the rows follow the roll alone.
+        let bits: Vec<u32> = want[0]
+            .split(|c: char| !c.is_ascii_hexdigit())
+            .filter(|t| t.len() == 8)
+            .map(|t| u32::from_str_radix(t, 16).unwrap())
+            .collect();
+        e.sprite_picks = false;
+        e.seed_rand(1000);
+        // As the harness: the start-up camera, the view entered by
+        // `(vue=1)` at (0, 0) (`ANGLEWARPX` / `ANGLEWARPY` = 0), then at
+        // the arrival angles (the camera's residues follow its history).
+        e.camera = atlantis2_engine::Camera::new(fpu, 640, 480);
+        e.enter_at(1, 0.0, 0.0).unwrap();
+        e.enter_at(1, f32::from_bits(bits[2]), f32::from_bits(bits[3]))
+            .unwrap();
+        let mut got = vec![format!(
+            "aim bits {:08x} {:08x}; entered at bits {:08x} {:08x}",
+            ay.to_bits(),
+            ap.to_bits(),
+            bits[2],
+            bits[3]
+        )];
+        got.push(format!(
+            "set: fov {:.4} target {:.4} step {:.4} roll {:.4}/{:.4}",
+            e.zoom.current, e.zoom.target, e.zoom.step, e.zoom.roll, e.zoom.roll_step
+        ));
+        let mut prev = None;
+        let mut clock = 100.0;
+        for n in 0..240u64 {
+            if n % 4 == 0 {
+                e.tick();
+            }
+            if n == 2 {
+                clock += 10.0;
+                e.click(clock);
+            }
+            e.pass(None);
+            let cur = (
+                format!("{:.4}", e.zoom.current),
+                format!("{:.4}", e.zoom.target),
+                format!("{:.4}", e.zoom.roll),
+                e.turning(),
+                i32::from(e.loop_type == LoopType::Video),
+                e.place().1,
+            );
+            if Some(&cur) != prev.as_ref() {
+                let (yaw, pitch) = e.camera.angles();
+                got.push(format!(
+                    "p{n} fov {} target {} roll {} step {:.4} turn {} loop {} view {} yaw {} pitch {}",
+                    g9(e.zoom.current),
+                    g9(e.zoom.target),
+                    cur.2,
+                    e.zoom.roll_step,
+                    i32::from(cur.3),
+                    cur.4,
+                    cur.5,
+                    fmt3(degrees(yaw)),
+                    fmt3(degrees(pitch))
+                ));
+            }
+            prev = Some(cur);
+        }
+        compare(head, &got, want);
+    }
 }

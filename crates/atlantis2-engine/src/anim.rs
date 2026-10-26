@@ -9,6 +9,8 @@
 use atlantis2_data::spw::{Blend, Clip, FaceBox, Spw, FACE};
 use atlantis2_data::wam::EntityState;
 
+use crate::crt::Rand;
+
 /// `AtlSpw_load : n>MAX_SPW_VISIBLE`.
 pub const MAX_SLOTS: usize = 0x22;
 
@@ -19,19 +21,6 @@ pub const FRAME_TAB: usize = 0x80;
 pub const LIST_END: u8 = 0xfe;
 /// An entry the draw skips (0xff, −1).
 pub const LIST_SKIP: u8 = 0xff;
-
-/// MSVC's `rand` (@ 0x005ae42b): `seed = seed × 214013 + 2531011`, bits
-/// 16..30. The game seeds it with `GetTickCount()` at the SPW set-up
-/// (@ 0x0047d740).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MsvcRand(pub u32);
-
-impl MsvcRand {
-    pub fn rand(&mut self) -> i32 {
-        self.0 = self.0.wrapping_mul(214_013).wrapping_add(2_531_011);
-        ((self.0 >> 16) & 0x7fff) as i32
-    }
-}
 
 /// The show / hide table (@ 0x006afdd0, count @ 0x006c2dfc): entries
 /// (id, state, kind) set by taking an object and by the scripts'
@@ -151,7 +140,6 @@ pub struct CentreHit {
 pub struct Anim {
     pub slots: Vec<Slot>,
     pub table: ShowTable,
-    pub rand: MsvcRand,
     blend: Blend,
     /// `CHEVAL`'s `#OBJETS#` index (`DefName_GetIdName(1, "CHEVAL")`): the
     /// slots of that id carry the horse's frame across views in
@@ -165,17 +153,23 @@ pub struct Anim {
     pub counter: u32,
 }
 
+impl Default for Anim {
+    fn default() -> Anim {
+        Anim::new()
+    }
+}
+
 /// The texel under the screen centre: (face, column, row).
 pub type Texel = (usize, i32, i32);
 
 impl Anim {
-    /// The SPW set-up (@ 0x0047d740): blend tables, no slot, `rand`
-    /// seeded.
-    pub fn new(seed: u32) -> Anim {
+    /// The SPW set-up (@ 0x0047d740): blend tables, no slot. Its
+    /// `srand(GetTickCount())` is the engine's ([`crate::crt::Rand`]: one
+    /// state for the whole game).
+    pub fn new() -> Anim {
         Anim {
             slots: Vec::new(),
             table: ShowTable::default(),
-            rand: MsvcRand(seed),
             blend: Blend::rgb565(),
             cheval: None,
             warnings: Vec::new(),
@@ -283,7 +277,7 @@ impl Anim {
     /// the frame the first loop left in the last slot of `CHEVAL`'s id,
     /// whatever its kind (the value it writes into `FRAMECHEVAL`,
     /// @ 0x0047d84d..0x0047d872).
-    pub fn step(&mut self) -> Option<i32> {
+    pub fn step(&mut self, rand: &mut Rand) -> Option<i32> {
         let mut horse = None;
         for s in self.slots.iter_mut().filter(|s| s.active && s.playing) {
             s.frame = if s.frame < 0 || s.frame >= s.end - 1 {
@@ -305,10 +299,10 @@ impl Anim {
                     self.slots[i].delay -= 1;
                     continue;
                 }
-                let r = self.rand.rand();
+                let r = rand.rand();
                 self.slots[i].delay = r.wrapping_mul(delay.wrapping_abs()) / 0x7fff + 10;
             }
-            if self.hand_over(i) {
+            if self.hand_over(i, rand) {
                 continue;
             }
             let s = &mut self.slots[i];
@@ -337,7 +331,7 @@ impl Anim {
     /// weight draws among the weighted slots of the same id. Returns true
     /// when it picked another one and first plays on to its file's last
     /// frame.
-    fn hand_over(&mut self, i: usize) -> bool {
+    fn hand_over(&mut self, i: usize, rand: &mut Rand) -> bool {
         let me = &self.slots[i];
         if me.chain != -1 || me.state.weight <= 0 {
             return false;
@@ -355,7 +349,7 @@ impl Anim {
         if weights.is_empty() {
             return false;
         }
-        let r = ((self.rand.rand() as u32 & 0x3ff) / 10).min(100) as i32;
+        let r = ((rand.rand() as u32 & 0x3ff) / 10).min(100) as i32;
         let mut sum = 0;
         let mut pick = None;
         for &(w, k) in &weights {
@@ -653,13 +647,6 @@ pub fn restore(faces: &mut [Vec<u16>; 6], clean: &[Vec<u16>; 6], dirty: &[(usize
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn msvc_rand() {
-        // srand(1): 41, 18467, 6334, ...
-        let mut r = MsvcRand(1);
-        assert_eq!([r.rand(), r.rand(), r.rand()], [41, 18467, 6334]);
-    }
 
     #[test]
     fn next_state_as_fun_004123b0() {

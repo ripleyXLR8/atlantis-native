@@ -95,6 +95,10 @@ const PUZZLE_TICKS: [(i32, u32); 6] = [
     (7, 0x0049_3190),
 ];
 
+/// The `OrdreMandala` numbers the solution log reads, in its order
+/// (FUN_00495650 @ 0x0049565d..0x00495685).
+const MANDALA_LOG_ORDER: [u8; 6] = [4, 6, 5, 1, 3, 2];
+
 /// The warp prefix of Tibet's views (@ 0x005daff8).
 const TIBET_PREFIX: &[u8] = b"TI";
 
@@ -491,8 +495,9 @@ impl Engine {
     /// 1-7 (@ 0x0049b977); a load copies the save's entry. The reset
     /// FUN_0049bf70 (start-up, load) clears only its own modules' modes
     /// (1, 2, 3, 6), and also sets 0 in views 55, 64 and 75 (the grids'
-    /// leaves, FUN_00492dd0 @ 0x00492e69); a new game does not run it, so
-    /// it keeps the mode.
+    /// leaves, FUN_00492dd0 @ 0x00492e69); a new game does not run it, but
+    /// the original starts one only from the start-up's player menu, so it
+    /// finds the start-up's 0.
     pub fn puzzle_mode(&self) -> i32 {
         i32::from_le_bytes(self.save_extra.entry(MODE_ENTRY).try_into().unwrap())
     }
@@ -508,12 +513,11 @@ impl Engine {
     /// puzzle mode is not 0 (`AtlWarp_continue` @ 0x0045a5e8, after the
     /// move's completion, turning or not): each mode's step in the
     /// original's order ([`PUZZLE_TICKS`], @ 0x0049bfbb..0x0049c007), the
-    /// mode read again before each. The turtle ring's and the Maya
-    /// marbles' (noted [`Event::PuzzleRan`]), the labyrinth souls' and the
-    /// pearl and dragon's run; the others
-    /// (no ported place sets their modes: a save made in their rooms) are
-    /// noted [`Event::PuzzleNotPorted`]; 5 (the chest) and any other mode
-    /// have none. The pause byte (@ 0x006d85f0) that stops it is not in
+    /// mode read again before each. Every step runs: the web's, the
+    /// turtle ring's and the Maya marbles' cursor (these two also noted
+    /// [`Event::PuzzleRan`]), the labyrinth souls', the octopus fight's and
+    /// the pearl and dragon's; 5 (the chest) and any other mode have
+    /// none. The pause byte (@ 0x006d85f0) that stops it is not in
     /// the port. Returns the first step reached. Public for tests and
     /// tools.
     pub fn puzzle_tick(&mut self) -> Option<u32> {
@@ -580,7 +584,8 @@ impl Engine {
     /// figurines and chest (`SS` views 1-7), wheels (`SS` 12-13), pearl
     /// and dragon (`SS` 31), turtle ring (`CH` views 40-64) and labyrinth
     /// souls (`LA` views 1-60); Yucatán's hooks, first (the web's entry in
-    /// the mode 1, then the `YU` views'), are noted; Tibet has none; then
+    /// the mode 1, then the `YU` views': the grids, the statue, the star
+    /// map, the canoe's view and the web), run too; Tibet has none; then
     /// Atlantis's octopus fight runs. Public for tests (the dispatcher
     /// alone, on the current view's name and number).
     pub fn entry_hooks(&mut self) {
@@ -750,6 +755,37 @@ impl Engine {
                 }
             });
         }
+    }
+
+    /// The mandala solution log (FUN_00495650), which the original's exit
+    /// hook writes to `atlantis2.log` (LAB_0049d820 @ 0x0049d820..0x0049d829,
+    /// once `defnames.con` is loaded, before `atlant2.cfg` is written): a
+    /// title, then for k = 1..6 `Mandala k : numero` the value of
+    /// `OrdreMandala` s_k for the fixed list s = (4, 6, 5, 1, 3, 2) (the
+    /// immediates @ 0x0049565d..0x00495685; not the fireflies' order),
+    /// then an empty line. A name missing from `#VARIABLES#` reads 0.
+    pub fn mandala_solution_log(&self) -> Vec<String> {
+        let mut lines = vec!["--- Solution Mandalas ---".to_string()];
+        for (k, s) in MANDALA_LOG_ORDER.iter().enumerate() {
+            let v = self
+                .con
+                .as_deref()
+                .and_then(|c| c.var(&format!("OrdreMandala{s}")))
+                .unwrap_or(0);
+            lines.push(format!("Mandala {} : numero {v}", k + 1));
+        }
+        lines.push(String::new());
+        lines
+    }
+
+    /// The original's exit hook (LAB_0049d820): the mandala solution log
+    /// ([`Engine::mandala_solution_log`], to the log at the info level),
+    /// then `atlant2.cfg` written ([`Engine::write_cfg`], FUN_0047f530).
+    pub fn at_exit(&self) {
+        for line in self.mandala_solution_log() {
+            log::info!("{line}");
+        }
+        self.write_cfg();
     }
 
     /// The scripts asked for a place the port does not have: noted, and

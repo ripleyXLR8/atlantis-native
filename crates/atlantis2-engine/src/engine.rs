@@ -29,7 +29,7 @@ use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
 use crate::menu::Menu;
 pub use crate::script::HandBank;
 use crate::script::{BagEntry, Script};
-use crate::sound::{MusicVolume, Pcm, Voices};
+use crate::sound::{MusicVolume, Voices};
 use crate::subjects::SubjectMenu;
 use crate::subtitle::SubtitleFont;
 use crate::turn::{Turn, Zoom};
@@ -226,6 +226,10 @@ pub enum Event {
         view: u32,
         deferred: bool,
     },
+    /// Frame `frame` of transition sprite bank `bank` drawn over the
+    /// video's frame of that number (FUN_0047c200; an empty sprite draws
+    /// nothing and is left out).
+    SpfDraw { bank: usize, frame: u32 },
     /// A transition sprite bank loaded (`datas_a2\spf\`, @ 0x0047c100), or
     /// not found.
     SpfLoad { name: String, found: bool },
@@ -264,6 +268,14 @@ pub enum Event {
     Picture { name: String, found: bool },
     /// A click closed the picture viewer (@ 0x0048ca50).
     PictureEnd,
+    /// `MESSAGE_CLIC` (@ 0x00476790): the message viewer opened on that
+    /// id, found in `Messages.txt` or not.
+    Message { id: String, found: bool },
+    /// A click or the time closed the message viewer (@ 0x00476860).
+    MessageEnd,
+    /// The fatal error reporter ran (FUN_00480cd0): the emergency save,
+    /// then the program asked to end ([`Engine::quit`]).
+    Fatal(String),
     /// The right button opened or closed the bag bar.
     Bag { open: bool },
     /// An object picked from the bag bar.
@@ -317,6 +329,9 @@ pub enum LoopType {
     Dialog,
     /// 5: the menus (@ 0x00486eb0).
     Menu,
+    /// 10: a message over the frozen panorama (`MESSAGE_CLIC`,
+    /// @ 0x00476860, [`crate::message`]) until a click or two seconds.
+    Message,
     /// 11: a full-screen picture (`ViewBigSpr`, @ 0x0048ca50) until a
     /// click.
     Picture,
@@ -347,6 +362,13 @@ pub enum CursorBank {
     /// The counting grids' marbles (`spr\sprboul.spr` @ 0x006d2694): the
     /// hand pair's only (FUN_00493660).
     Puzzle,
+    /// The menus' pointer (`spr\Menu\curseur.spr` @ 0x006d1744): the
+    /// main, CD and player menus' start sets the pair to (it, 0)
+    /// (FUN_0047bef0 @ 0x004869d5, 0x00486aa8, 0x00486b95) and their stop
+    /// does not put the game's back (FUN_00489040): the pair stays until
+    /// the game sets it again (the next cursor choice, the bag bar's
+    /// opening...), and a save from the menus records its frame 0.
+    Menu,
 }
 
 /// The cursor (@ 0x00474500): a range of `interfac.spr` frames played on
@@ -624,7 +646,10 @@ pub struct Engine {
     /// bug fixes on).
     pub enhancements: Enhancements,
     voices: Voices,
-    /// The C runtime's `rand` (seeded by the dialog object's `srand`).
+    /// The C runtime's `rand`: one state for the whole game (the dialogs,
+    /// the place animations and sounds, the music, the puzzles), as the
+    /// original's single thread has ([`Engine::seed_rand`]). A new engine
+    /// starts from `srand(0)`, the tests' fixed seed.
     pub rand: Rand,
     font: Option<SubtitleFont>,
     /// The subtitles option (@ 0x005df970, on by default).
@@ -653,23 +678,39 @@ pub struct Engine {
     player: Player,
     /// The picture of `ViewBigSpr` (@ 0x006d1874).
     picture: Option<SprBank>,
+    /// `loc\Messages.txt` as `AtlMessage_MainInit` reads it (@ 0x00476590)
+    /// and the shown message: its id (@ 0x0067202c) and its end tick
+    /// (@ 0x00672020, 0 for none).
+    messages: Vec<u8>,
+    message: Option<(Vec<u8>, i32)>,
+    /// `AtlFT_Big_Default`, the message's font.
+    big_font: Option<SubtitleFont>,
     /// The canoe puzzle in loop type 9, the loop type it left
     /// (@ 0x006d84c4) and Escape pressed in it (the key code 1,
     /// @ 0x00672014).
     canoe: Option<Box<crate::canoe::Canoe>>,
     canoe_prev_loop: LoopType,
     canoe_escape: bool,
-    /// The sound loaded for a video (the entry @ 0x00673f34: a film's or an
-    /// intro's track, FUN_0047a320; a move's `TrajSound`, FUN_0047a350),
-    /// `None` for a file that could not be read (entry −1). It is played
-    /// on voice 2 when a video starts while `video_owns_voice2` is set,
-    /// and freed at the video's end; a video that does not open
-    /// keeps both for the next one (FUN_0040bf60 touches neither).
-    video_sound: Option<(String, Pcm)>,
+    /// The sound table's handle of voice 2's sounds (@ 0x00673f34, 0 at
+    /// start): the last `NEWSOUND` (FUN_0047a290), film's or intro's track
+    /// (FUN_0047a320) or move's `TrajSound` (FUN_0047a350) loaded, −1 for
+    /// a file that could not be read. One handle for all three, in the
+    /// table the place sounds and the puzzles share: a track loaded over a
+    /// `NEWSOUND` that still plays leaves the `NEWSOUND`'s entry loaded
+    /// for good, and a `NEWSOUND` while voice 2 plays frees the entry the
+    /// handle names, whoever loaded it (`sound_glue.txt`'s `.table` rows).
+    /// A video plays it on voice 2 when it starts while
+    /// `video_owns_voice2` is set, and frees it at its end; a video that
+    /// does not open keeps both for the next one (FUN_0040bf60 touches
+    /// neither).
+    sound_handle: i32,
+    /// A `NEWSOUND` plays (@ 0x00673f38): the dispatcher frees the
+    /// handle's entry once voice 2 is silent (FUN_0047a2f0 @ 0x0049ce37).
+    newsound_on: bool,
     /// Voice 2 belongs to the video (@ 0x006d168d): set by a film's or an
     /// intro's track that loaded (FUN_0047a320) and by any `TrajSound`
     /// taken by a move, even one that did not load (FUN_0047a350). Only
-    /// then does a video start play `video_sound` and its end stop voice 2
+    /// then does a video start play `sound_handle` and its end stop voice 2
     /// (FUN_0040bae0): a `NEWSOUND` still playing on voice 2 goes on
     /// through a video without a sound of its own.
     video_owns_voice2: bool,
@@ -711,6 +752,12 @@ pub struct Engine {
     data_dir: Option<std::path::PathBuf>,
     /// The time a save is stamped with (`GetLocalTime`).
     pub wall_clock: fn() -> atlantis2_data::save::SystemTime,
+    /// The load page's text of a save's time: the user's locale's short
+    /// date and time (`GetDateFormatA(LOCALE_USER_DEFAULT,
+    /// DATE_SHORTDATE)`, `GetTimeFormatA(LOCALE_USER_DEFAULT, 0)`,
+    /// FUN_0046f830 @ 0x0046f928, 0x0046f94c); by default
+    /// [`crate::menu::date_time`], a French system's.
+    pub date_text: fn(&atlantis2_data::save::SystemTime) -> Vec<u8>,
     /// The saved entries Native keeps as bytes (the dowsing rod, the
     /// puzzles, the dialog flag): those of the last load, written back by
     /// the next save.
@@ -720,6 +767,13 @@ pub struct Engine {
     pub cfg_extra: atlantis2_data::save::Cfg,
     /// The menus asked the program to end.
     quit_requested: bool,
+    /// The fatal error reporter (FUN_00480cd0) has run: the emergency
+    /// save is written and the program asked to end
+    /// ([`Engine::check_fatal`]); and a fatal error found by the host
+    /// while a script line runs, for the script to stop on
+    /// ([`crate::script::Host::take_fatal`]).
+    fatal_reported: bool,
+    pending_fatal: Option<String>,
     /// The music copies and the media pages (`engine/media.rs`).
     pub media: media::Media,
     /// The left button held (@ 0x006569ca): set by every press, cleared
@@ -741,15 +795,6 @@ struct Player {
     stream: crate::music::Stream,
     /// The `startmusik` list (`Interp_MusikScript` @ 0x006d0444).
     list: Vec<u8>,
-}
-
-/// The texel of the cube under a direction: the face (cube order) and the
-/// texel (column, row) the warp samples there, a + (b − a)·t of the face's
-/// texture coordinates with a = 1/512, b = 511/512 (the cube's corners,
-/// @ 0x0045c790).
-fn texel_of(dir: [f32; 3]) -> Option<Texel> {
-    crate::hd::cube_point(dir.map(f64::from))
-        .map(|(face, u, v)| (face, u.floor() as i32, v.floor() as i32))
 }
 
 /// The world's objects bank `/set(monde=N)` loads (@ 0x00484df0).
@@ -793,8 +838,11 @@ impl Engine {
     /// `variant` is the CPU's cube renderer, `fpu` the x87 control word the
     /// process starts with. With `warpPII` the first frame changes it to
     /// 0x0e7f for good: the first view is entered under `fpu` and every
-    /// later turn, entry and frame runs under 0x0e7f, as in the original if
-    /// no assembly renderer drew before the first view (not known).
+    /// later turn, entry and frame runs under 0x0e7f, as in the original:
+    /// no assembly routine runs before the first view, and its Direct3D
+    /// start-up leaves 0x027f's arithmetic, `Fpu::default()` (measured on
+    /// Windows 11 and 98 SE with Direct3D's RGB software device; a
+    /// hardware device was not tried, see [`Fpu`]).
     pub fn new_game(
         mut files: A2Files,
         variant: Variant,
@@ -914,12 +962,12 @@ impl Engine {
         let objects_bank = load_objects_bank(&files, monde);
         // The bag's start-up (@ 0x00474810) reads the object names (a
         // missing file is fatal there).
-        let object_names = match files.read(Folder::Loc, "Messages.txt") {
-            Some(d) => ObjectNames::parse(&d),
-            None => {
-                log::warn!("loc\\Messages.txt not found: no object names");
-                ObjectNames::default()
-            }
+        let messages = files.read(Folder::Loc, "Messages.txt").unwrap_or_default();
+        let object_names = if messages.is_empty() {
+            log::warn!("loc\\Messages.txt not found: no object names");
+            ObjectNames::default()
+        } else {
+            ObjectNames::parse(&messages)
         };
         let camera = Camera::new(fpu, width, height);
         // The listener table of the place sounds, in the executable, at
@@ -931,7 +979,7 @@ impl Engine {
                 .map(|exe| crate::place_sound::Listeners::from_exe(&exe, &build.place_sounds))
                 .unwrap_or_default(),
         );
-        let mut anim = Anim::new(0);
+        let mut anim = Anim::new();
         anim.cheval = names.id(defnames::OBJETS, b"CHEVAL").ok().map(|i| i as i32);
         let media = media::Media::all_made();
         Engine {
@@ -950,8 +998,6 @@ impl Engine {
             camera,
             look: Look::default(),
             spr_dll: SprDll::default(),
-            // GetTickCount() in the original: a port seeds with its clock
-            // (`anim.rand`).
             anim,
             loop_type: LoopType::Warp,
             turn: None,
@@ -1041,10 +1087,14 @@ impl Engine {
             con: None,
             player: Player::default(),
             picture: None,
+            messages,
+            message: None,
+            big_font: None,
             canoe: None,
             canoe_prev_loop: LoopType::Warp,
             canoe_escape: false,
-            video_sound: None,
+            sound_handle: 0,
+            newsound_on: false,
             video_owns_voice2: false,
             traj_sound: None,
             spf: Vec::new(),
@@ -1061,9 +1111,12 @@ impl Engine {
             player_number: 0,
             data_dir: None,
             wall_clock: atlantis2_data::save::SystemTime::default,
+            date_text: crate::menu::date_time,
             save_extra: grids::save_extra_at_start(),
             cfg_extra: atlantis2_data::save::Cfg::default(),
             quit_requested: false,
+            fatal_reported: false,
+            pending_fatal: None,
         }
     }
 
@@ -1119,10 +1172,17 @@ impl Engine {
             self.event(Event::EnterSkipped { view: id });
             return Ok(());
         }
+        // FUN_0045a290: FUN_00476e10 at its start (@ 0x0045a297), then
+        // FUN_0040cf20 after the header (@ 0x0040cfeb) and after each of
+        // the six faces (@ 0x0040d000 .. 0x0040d04f).
+        self.music_pump();
         let (hnm, disc) = self
             .files
             .read_with_disc(Folder::Warp, &name)
             .ok_or_else(|| EngineError::NoWarp(name.clone()))?;
+        for _ in 0..7 {
+            self.music_pump();
+        }
         self.faces = faces_from_hnm(&hnm).map_err(|e| EngineError::BadWarp(name.clone(), e))?;
         self.work = self.faces.clone();
         log::info!("view {id}: warp {name} (disc {disc})");
@@ -1173,6 +1233,8 @@ impl Engine {
             }
         }
         for (name, kind, id, sprite, s, record) in loads {
+            // FUN_00476e10 (@ 0x0045a242), before each load.
+            self.music_pump();
             let spw = self
                 .files
                 .read(Folder::Spw, &name)
@@ -1184,8 +1246,9 @@ impl Engine {
             match spw {
                 Some(spw) => {
                     self.spw_loaded = true;
-                    let n = self.anim.slots.len();
-                    self.anim.load(&name, spw, kind, id, sprite, s);
+                    let Some(n) = self.spw_load(&name, spw, kind, id, sprite, s) else {
+                        continue;
+                    };
                     if let Some(slot) = self.anim.slots.get_mut(n) {
                         slot.record = Some(record);
                     }
@@ -1317,6 +1380,9 @@ impl Engine {
         if self.loop_type != LoopType::Dialog {
             return;
         }
+        // The tick's first call: the music state machine (the thunk
+        // @ 0x0047a280, called @ 0x004801e8).
+        self.music_frame();
         // The field of view takes the screen's size, not the logical one
         // (@ 0x004803e5): see `crate::display`.
         let screen = self.fov_screen();
@@ -1347,10 +1413,30 @@ impl Engine {
         }
     }
 
+    /// The start-up's seed, for a game played: the original calls
+    /// `srand(time(0))` in the dialog object's static constructor
+    /// (atlantis2-cd-fr-2199552 @ 0x0045daf6), then, before any `rand`
+    /// call, `srand(GetTickCount())` in the SPW set-up of the start-up
+    /// FUN_0049d680 (FUN_0047d740, @ 0x0047d7aa), which is the seed that
+    /// counts; the front end gives its clock as `tick_count` (a run that
+    /// wants its draws again gives the same). Each music start seeds it
+    /// again with the 15 Hz count (@ 0x00477459, `music_open`).
+    pub fn seed_rand(&mut self, tick_count: u32) {
+        self.rand = Rand::new(tick_count);
+    }
+
+    /// The music's volume and fade, its arithmetic under the process's
+    /// current x87 control word (the camera's).
+    pub(crate) fn music_mut(&mut self) -> &mut crate::sound::MusicVolume {
+        self.music.set_fpu(self.camera.fpu);
+        &mut self.music
+    }
+
     /// The music fade step (@ 0x00476e80) at the clock, its volume given to
     /// the music voice.
     fn fade_step(&mut self) {
-        if let Some(att) = self.music.step(self.clock) {
+        let clock = self.clock;
+        if let Some(att) = self.music_mut().step(clock) {
             self.voices.set_attenuation(crate::sound::VOICE_MUSIC, att);
         }
     }
@@ -1429,6 +1515,7 @@ impl Engine {
             let load = |id: &str| SubtitleFont::load(&self.files, font_txt.as_ref()?, id);
             self.font = load("AtlFT_Dialog");
             self.popup_font = load("AtlFT_POPUP");
+            self.big_font = load("AtlFT_Big_Default");
             if self.font.is_none() {
                 log::warn!("loc\\Font.txt or its font missing: no subtitles");
             }
@@ -1447,7 +1534,7 @@ impl Engine {
             self.stop_dialog();
         }
         let out = self.dial_open(number);
-        self.music.set_percent(16);
+        self.music_mut().set_percent(16);
         out
     }
 
@@ -1483,7 +1570,7 @@ impl Engine {
             }
             Err(e) => {
                 self.music.in_dialog = false;
-                self.music.set_percent(100);
+                self.music_mut().set_percent(100);
                 // AtlDial_start set the loop type 2, then the previous one
                 // back (@ 0x0047ff7a, 0x0047ffd6): the camera set again
                 // for it (centre and 76°, FUN_00402960).
@@ -1509,8 +1596,9 @@ impl Engine {
         }
     }
 
-    /// The end of the dialog without the script's part (a dialog stopped
-    /// by another `dial`, whose section is the one running).
+    /// The end of the dialog without the script's part (the host's part
+    /// of a dialog stopped by another `dial`, whose script part the
+    /// script runs itself).
     pub(crate) fn stop_dialog(&mut self) {
         // The screen's size (@ 0x0048096e).
         let screen = self.fov_screen();
@@ -1521,7 +1609,7 @@ impl Engine {
         }
         self.sync_hidden();
         self.music.in_dialog = false;
-        self.music.set_percent(100);
+        self.music_mut().set_percent(100);
     }
 
     /// The running dialog.
@@ -1548,6 +1636,12 @@ impl Engine {
         self.font.as_ref()
     }
 
+    /// The `startmusik` list the music player draws the next track from
+    /// at the end of one (`Interp_MusikScript` @ 0x006d0444).
+    pub fn music_list(&self) -> &[u8] {
+        &self.player.list
+    }
+
     /// The sound voices, for the sound output to mix.
     pub fn voices(&self) -> &Voices {
         &self.voices
@@ -1569,13 +1663,16 @@ impl Engine {
         }
         // A disc asked for and not found: the CD page.
         self.open_cd_page();
-        // The music state machine (@ 0x00476fc0, called @ 0x0049ce32).
+        // The music state machine (@ 0x00476fc0, called @ 0x0049ce32),
+        // then the end of a `NEWSOUND` (@ 0x0049ce37).
         self.music_frame();
+        self.new_sound_end();
         match self.loop_type {
             LoopType::Warp => self.warp_pass(out.as_deref_mut()),
             LoopType::Video => self.video_pass(out.as_deref_mut()),
             LoopType::Dialog => self.dialog_pass(out.as_deref_mut()),
             LoopType::Menu => self.menu_pass(out.as_deref_mut()),
+            LoopType::Message => self.message_pass(out.as_deref_mut()),
             LoopType::Picture => self.picture_pass(out.as_deref_mut()),
             LoopType::Canoe => self.canoe_pass(out.as_deref_mut()),
         }
@@ -1583,6 +1680,76 @@ impl Engine {
         // Every case of the dispatcher ends with the 15 Hz flag cleared
         // (@ 0x0049ce56 .. 0x0049cf29).
         self.frame_flag = false;
+        self.check_fatal();
+    }
+
+    /// `AtlSpw_load` (FUN_0047c4e0): a slot for an entity state of the
+    /// view (the place animations' and the souls' loads), its index
+    /// returned. A full table (0x22 slots) is the original's fatal error
+    /// (@ 0x0047c566..0x0047c575, `AtlSpw_load(): n>MAX_SPW_VISIBLES for
+    /// :%s`): the reporter's emergency save and quit, and no slot (the
+    /// load returns @ 0x0047c583). The shipped views never fill it.
+    pub fn spw_load(
+        &mut self,
+        name: &str,
+        spw: atlantis2_data::spw::Spw,
+        kind: i32,
+        id: i32,
+        object_sprite: i32,
+        state: atlantis2_data::wam::EntityState,
+    ) -> Option<usize> {
+        if self.anim.slots.len() >= crate::anim::MAX_SLOTS {
+            self.engine_fatal(format!("AtlSpw_load(): n>MAX_SPW_VISIBLES for :{name}"));
+            return None;
+        }
+        let n = self.anim.slots.len();
+        self.anim.load(name, spw, kind, id, object_sprite, state);
+        Some(n)
+    }
+
+    /// A fatal error found by the engine (a caller of FUN_00480cd0
+    /// outside the interpreter): recorded on the scripts, which stop on
+    /// it, for [`Engine::check_fatal`]; while a script line runs (the
+    /// interpreter is out), kept for that line to stop on
+    /// ([`crate::script::Host::take_fatal`]).
+    pub(crate) fn engine_fatal(&mut self, msg: String) {
+        match self.con.as_mut() {
+            Some(s) => {
+                s.fail(msg);
+                self.check_fatal();
+            }
+            None => {
+                log::error!("{msg}");
+                self.pending_fatal.get_or_insert(msg);
+            }
+        }
+    }
+
+    /// The fatal error reporter FUN_00480cd0 (atlantis2-cd-fr-2199552
+    /// @ 0x00480cd0) once the scripts recorded a fatal error (theirs, or a
+    /// puzzle's, which they stop on): the message logged; when a view is
+    /// current (@ 0x006d85d4 ≠ 0, @ 0x00480dc8..0x00480dd1: the scripts'
+    /// current view, which a place load forgets, so a deferred place
+    /// change to a view the new file lacks only quits) the emergency
+    /// save, player 9 slot 8
+    /// (`save\ATL09_08.SAV`, @ 0x00480dd3..0x00480ddc, a player the menu
+    /// never lists); then the game quits (FUN_0049d960 → FUN_005853e0(0),
+    /// whose exit hook writes `atlant2.cfg`: the front end's quit). Once.
+    pub(crate) fn check_fatal(&mut self) {
+        if self.fatal_reported {
+            return;
+        }
+        let Some(msg) = self.con.as_ref().and_then(|s| s.fatal.clone()) else {
+            return;
+        };
+        self.fatal_reported = true;
+        log::error!("fatal error: {msg}: emergency save and quit");
+        if self.con.as_ref().is_some_and(|s| s.current_view.is_some()) {
+            self.player_number = 9;
+            self.save_slot(8);
+        }
+        self.quit_requested = true;
+        self.event(Event::Fatal(msg));
     }
 
     /// `ViewBigSpr` (FUN_0048c9d0): loop type 11 (the previous one is not
@@ -1637,6 +1804,68 @@ impl Engine {
         }
     }
 
+    /// `MESSAGE_CLIC` (FUN_00476790 with 0, from SetVariables
+    /// @ 0x004839f2): only from the panorama, which becomes loop type 10
+    /// (its camera set again, FUN_00402960(1)); the id kept, the end at
+    /// tick + 30 (`ftol(2.0 × 15.0 + tick)`). In loop type 10 the click is
+    /// dropped instead; other loop types ignore it. The section goes on
+    /// at once.
+    pub(crate) fn open_message(&mut self, value: &[u8]) {
+        match self.loop_type {
+            LoopType::Warp => {}
+            LoopType::Message => {
+                self.click = false;
+                return;
+            }
+            _ => return,
+        }
+        self.set_loop_type(LoopType::Message);
+        let id = crate::message::id_of(value);
+        let end = (f64::from(2.0f32 * 15.0f32) + f64::from(self.ticks as i32)) as i32;
+        let (found, _) = crate::message::lookup(&self.messages, &id);
+        self.event(Event::Message {
+            id: String::from_utf8_lossy(&id).into_owned(),
+            found,
+        });
+        self.message = Some((id, end));
+    }
+
+    /// The message loop (FUN_00476860): the panorama as FUN_0045a930
+    /// draws it (the place animations drawn and stepped, the web in its
+    /// mode; no turn), the text over it ([`crate::message`]), the flip;
+    /// then a click, or a tick past the end, goes back to the panorama
+    /// (loop type 0): the click cleared, the turn speeds stopped
+    /// (FUN_0040c680).
+    fn message_pass(&mut self, mut out: Option<&mut [u16]>) {
+        self.dialog_scene(out.as_deref_mut());
+        if let (Some(out), Some((id, _)), Some(font)) =
+            (out, self.message.as_ref(), self.big_font.as_ref())
+        {
+            let (w, h) = (self.renderer.width(), self.renderer.height());
+            let (found, text) = crate::message::lookup(&self.messages, id);
+            let calls =
+                crate::message::layout(&text, found, |b| font.extent(b), w as i32, h as i32);
+            self.hd
+                .texts_mut()
+                .draw(crate::hd::TextFont::Big, font, out, w, h, &calls);
+        }
+        let end = self.message.as_ref().map_or(0, |m| m.1);
+        if self.click || (end != 0 && end < self.ticks as i32) {
+            self.set_loop_type(LoopType::Warp);
+            self.message = None;
+            self.click = false;
+            self.look.stop();
+            self.event(Event::MessageEnd);
+        }
+    }
+
+    /// The message shown (`MESSAGE_CLIC`): its text and whether
+    /// `Messages.txt` holds its id.
+    pub fn message(&self) -> Option<(bool, Vec<u8>)> {
+        let (id, _) = self.message.as_ref()?;
+        Some(crate::message::lookup(&self.messages, id))
+    }
+
     /// The picture of `ViewBigSpr` shown, if any.
     pub fn picture(&self) -> Option<&SprBank> {
         self.picture.as_ref()
@@ -1649,7 +1878,7 @@ impl Engine {
             out.fill(0);
             return;
         }
-        let centre = texel_of(self.camera.ray(self.camera.cx, self.camera.cy));
+        let centre = self.camera.texel(self.camera.cx, self.camera.cy);
         let (dirty, _) = self.anim.draw(&mut self.work, centre, false);
         let (m, p) = (self.camera.matrix(), self.camera.projection());
         self.renderer.fpu = self.camera.fpu;
@@ -1733,7 +1962,7 @@ impl Engine {
     fn anim_tick(&mut self) {
         if self.spw_flag && self.spw_loaded {
             self.spw_flag = false;
-            if let Some(frame) = self.anim.step() {
+            if let Some(frame) = self.anim.step(&mut self.rand) {
                 if let Some(s) = self.con.as_mut() {
                     s.set_var("FRAMECHEVAL", frame);
                 }
@@ -1741,11 +1970,19 @@ impl Engine {
         }
     }
 
-    /// The dialog loop's turn (@ 0x00480840): only a `voixoff` line turns;
-    /// outside a dialog, the mouse look.
+    /// The dialog loop's turn (@ 0x00480840): only a `voixoff` line turns,
+    /// with the warp's own FUN_0040c6a0 (@ 0x0048085e): a move's pending
+    /// turn steps (its end leaves the move to the next warp pass), else
+    /// the mouse inertia and the view's limits; then the zone under the
+    /// centre is picked again. Outside a dialog, the mouse look.
     pub fn frame(&mut self) {
-        if self.dialog.as_ref().is_none_or(|d| d.kind() == 1) {
-            self.look.frame(&mut self.camera);
+        match self.dialog.as_ref().map(Dialog::kind) {
+            None => self.look.frame(&mut self.camera),
+            Some(1) => {
+                self.turn_or_look();
+                self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+            }
+            Some(_) => {}
         }
     }
 
@@ -1771,20 +2008,20 @@ impl Engine {
         if self.overlays.any() {
             self.overlay_clicks();
         }
-        // 2. The draw (@ 0x0045a9f0); after a video, the music back to
-        // 100 % first (FUN_0040bb90).
-        if std::mem::take(&mut self.music_after_video) {
-            self.music.set_percent(100);
-        }
-        // Not while `NextWarpInvalide` is 2 (the screen frozen) nor in the
-        // frame after a zoom's end (@ 0x0045a3fd..0x0045a41a); the flag is
-        // set back either way.
+        // 2. The draw (@ 0x0045a9f0). Not while `NextWarpInvalide` is 2
+        // (the screen frozen) nor in the frame after a zoom's end
+        // (@ 0x0045a3fd..0x0045a41a); the flag is set back either way.
+        // After a video, the music back to 100 % (FUN_0040bb90, called by
+        // the draw only, @ 0x0045aa10): a skipped draw keeps the request.
         let frozen = self
             .con
             .as_ref()
             .is_some_and(|s| s.vars[s.keys.next_warp_invalide] == 2);
         if !frozen && !self.draw_skip {
             self.draw(out.as_deref_mut());
+            if std::mem::take(&mut self.music_after_video) {
+                self.music_mut().set_percent(100);
+            }
         }
         self.draw_skip = false;
         // 3. The clicks and the scans, unless turning.
@@ -1874,7 +2111,7 @@ impl Engine {
     fn draw_slots(&mut self) -> Vec<(usize, FaceBox)> {
         let centre = self
             .forced_centre
-            .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
+            .or_else(|| self.camera.texel(self.camera.cx, self.camera.cy));
         // The slot under the centre is recorded on a click only while the
         // bag bar is closed (FUN_0045b040 @ 0x0045b0cd).
         let (dirty, mut hit) = self
@@ -2049,6 +2286,7 @@ impl Engine {
                         CursorBank::Interface => self.cursor_bank.as_ref(),
                         CursorBank::Objects => self.objects_bank.as_ref(),
                         CursorBank::Puzzle => self.grids.bank(),
+                        CursorBank::Menu => self.menu.as_deref().and_then(|m| m.cursor_bank()),
                     };
                     if let (Some(bank), Ok(frame)) = (bank, usize::try_from(frame)) {
                         bank.draw(&mut Target::screen(out, w, h), Some(x), y, frame);
@@ -2377,9 +2615,10 @@ impl Engine {
     }
 
     /// `AtlWam_Load` (@ 0x0040fee0): the place file read, the entities'
-    /// and zones' names resolved; the zone under the centre and the move's
-    /// next view forgotten. No view is entered (the scripts' `vue=` or a
-    /// move does it; tests use [`Engine::enter_at`]).
+    /// and zones' names resolved; the current view (@ 0x006d85d4, cleared
+    /// @ 0x0040ff98), the zone under the centre and the move's next view
+    /// forgotten. No view is entered (the scripts' `vue=` or a move does
+    /// it; tests use [`Engine::enter_at`]).
     pub fn load_place(&mut self, name: &str) {
         self.event(Event::Wam(name.to_string()));
         match load_wam(&self.files, name) {
@@ -2390,6 +2629,9 @@ impl Engine {
             }
             // Fatal in the original (`Can't load WAM`).
             Err(e) => log::error!("{e}"),
+        }
+        if let Some(s) = self.con.as_mut() {
+            s.current_view = None;
         }
         self.centre_zone = None;
         self.next_view = None;
@@ -2430,6 +2672,8 @@ impl Engine {
                 .map(|e| e.prefix.clone())
                 .unwrap_or_default();
             let file = format!("{prefix}{old:03}{new:03}.spr");
+            // FUN_00476e10 (@ 0x0047c1a3), before each bank.
+            self.music_pump();
             let bank = self
                 .files
                 .read(Folder::Spf, &file)
@@ -2443,8 +2687,10 @@ impl Engine {
                 continue;
             };
             if self.spf.len() >= 10 {
-                // Fatal in the original (`nb_spf>=MAX_SPF`).
-                log::error!("AtlSpr_init_spf() : nb_spf>=MAX_SPF!!");
+                // The fatal error reporter (@ 0x0047c1da, `nb_spf>=MAX_SPF`):
+                // the emergency save and the quit ([`Engine::check_fatal`]).
+                let msg = "AtlSpr_init_spf() : nb_spf>=MAX_SPF!!".to_string();
+                self.with_script(|s, _| s.fail(msg));
                 return;
             }
             self.spf.push(bank);
@@ -2484,17 +2730,34 @@ impl Engine {
         blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
         let k = v.shown as usize;
         let mut t = Target::screen(out, w, h);
-        for bank in &self.spf {
-            if k >= bank.len() {
-                continue;
-            }
-            match bank.info(k) {
-                Some(i) if i.w <= 640 && i.h <= 480 => {
-                    bank.draw(&mut t, None, 0, k);
-                }
-                _ => {}
+        for i in self.transition_sprites_drawn(k) {
+            self.spf[i].draw(&mut t, None, 0, k);
+        }
+    }
+
+    /// A video frame shown, and the transition sprites drawn over it
+    /// (FUN_0047c200), for the trace.
+    fn video_frame_event(&mut self, k: u32) {
+        self.event(Event::VideoFrame(k));
+        if self.trace {
+            for bank in self.transition_sprites_drawn(k as usize) {
+                self.event(Event::SpfDraw { bank, frame: k });
             }
         }
+    }
+
+    /// The transition sprite banks whose frame `k` FUN_0047c200 draws
+    /// (FUN_0047bc40's checks: a bank shorter than k, or a sprite larger
+    /// than 640 x 480, is refused with a warning), in their order.
+    pub fn transition_sprites_drawn(&self, k: usize) -> Vec<usize> {
+        self.spf
+            .iter()
+            .enumerate()
+            .filter(|(_, bank)| {
+                k < bank.len() && bank.info(k).is_some_and(|i| i.w <= 640 && i.h <= 480)
+            })
+            .map(|(i, _)| i)
+            .collect()
     }
 
     /// FUN_0049cc40: the move set-up of a type-1 zone.
@@ -2590,13 +2853,12 @@ impl Engine {
             self.load_place(&name);
             self.next_view = self.wam.view(n).map(|v| v.id);
             if self.next_view.is_none() {
-                // Fatal in the original.
-                log::error!("AtlWarp_continue(): load wam {name} : vue {n} introuvable!");
+                // The fatal error reporter (@ 0x0045a4cb): the quit, no
+                // emergency save (the load forgot the current view).
+                let msg = format!("AtlWarp_continue(): load wam {name} : vue {n} introuvable!");
+                self.with_script(|s, _| s.fail(msg));
             }
             self.set_script_var(|k| k.next_warp_invalide, 0);
-            if let Some(s) = self.con.as_mut() {
-                s.current_view = None;
-            }
         }
         let Some(next) = self.next_view.take() else {
             // FUN_0045a630: only `voiles.wam` (Shamballa's fireflies) does
@@ -2641,9 +2903,9 @@ impl Engine {
             // when the file does not load. The name stays until the
             // video's end.
             if let Some(name) = self.traj_sound.clone() {
-                self.music.set_percent(20);
+                self.music_mut().set_percent(20);
                 self.video_owns_voice2 = true;
-                self.video_sound = self.load_sound(&name);
+                self.sound_handle = self.table_load(&name, None);
             }
             // The name is used as a printf format by the original; when
             // the video cannot start, FUN_0047b280 (@ 0x0045a5b2).
@@ -2665,6 +2927,8 @@ impl Engine {
             log::warn!("AtlHnm_start({name}) : deja en AtlMain_loop_HNM");
             return false;
         }
+        // FUN_00476e10 (@ 0x0040bfa7), before the open.
+        self.music_pump();
         let opened = self
             .files
             .read(Folder::Hnm, name)
@@ -2678,7 +2942,7 @@ impl Engine {
             // The music back to 100 % (outside a dialog). The sound loaded
             // for the video and the flag stay: the next video plays it.
             if self.dialog.is_none() {
-                self.music.set_percent(100);
+                self.music_mut().set_percent(100);
             }
             return false;
         };
@@ -2694,15 +2958,10 @@ impl Engine {
         // (FUN_0047a650(id, 2): what voice 2 played stopped, the effects
         // volume); entry −1 plays nothing.
         if self.video_owns_voice2 {
-            if let Some((sound, pcm)) = self.video_sound.clone() {
-                let att = self.fx_attenuation();
-                self.voices
-                    .play(crate::sound::VOICE_EFFECTS, pcm, false, att, 0);
-                self.event(Event::Sound(sound));
-            }
+            self.sound_play(self.sound_handle, crate::sound::VOICE_EFFECTS);
         }
         let end = !matches!(hnm.next_frame(), Some(Ok(_))) || hnm.frames_decoded() >= frames;
-        self.event(Event::VideoFrame(0));
+        self.video_frame_event(0);
         self.video = Some(Video {
             hnm,
             name: name.to_string(),
@@ -2712,17 +2971,28 @@ impl Engine {
             shown: 0,
         });
         self.set_loop_type(LoopType::Video);
+        // FUN_00476e10 (@ 0x0040c01e), the start's last call.
+        self.music_pump();
         true
     }
 
     /// `AtlMain_loop_HNM` (@ 0x0040c060): a new frame at each 15 Hz tick;
     /// the end, a click or a double click ends it.
     fn video_pass(&mut self, mut out: Option<&mut [u16]>) {
-        let Some(v) = &mut self.video else {
+        let Some(v) = &self.video else {
             self.set_loop_type(LoopType::Warp);
             return;
         };
         let new_tick = v.tick != self.ticks;
+        if new_tick {
+            // The loop's own pass of the music state machine (the thunk
+            // @ 0x0047a280, called @ 0x0040c071 on a new tick), after the
+            // dispatcher's of the same pass.
+            self.music_frame();
+        }
+        let Some(v) = &mut self.video else {
+            return;
+        };
         let mut shown = None;
         if new_tick {
             v.tick = self.ticks;
@@ -2750,7 +3020,7 @@ impl Engine {
             }
         }
         if let Some(k) = shown {
-            self.event(Event::VideoFrame(k));
+            self.video_frame_event(k);
         }
         // `cinema=N,M`: the dialog's step after each frame (FUN_00480830,
         // FUN_00480840): its lines and subtitles over the film.
@@ -2837,6 +3107,8 @@ impl Engine {
         if let Some(mut d) = self.film_dialog.take() {
             d.remove(&self.voices);
         }
+        // FUN_00476e10 (@ 0x0040c108).
+        self.music_pump();
         // The section the film interrupted goes on.
         self.with_script(|s, h| s.video_ended(h));
     }
@@ -2844,9 +3116,9 @@ impl Engine {
     /// FUN_0047a320: a film's or an intro's track loaded for the next
     /// video; voice 2 is the video's only when it loaded.
     pub(super) fn video_track(&mut self, apc: &str) {
-        self.video_sound = self.load_sound(apc);
-        self.video_owns_voice2 = self.video_sound.is_some();
-        if self.video_sound.is_none() {
+        self.sound_handle = self.table_load(apc, None);
+        self.video_owns_voice2 = self.sound_handle != -1;
+        if self.sound_handle == -1 {
             log::info!("{apc}: no sound track");
         }
     }
@@ -2858,10 +3130,36 @@ impl Engine {
         if !std::mem::take(&mut self.video_owns_voice2) {
             return;
         }
-        if self.video_sound.take().is_some() {
-            self.voices.stop(crate::sound::VOICE_EFFECTS);
-        }
+        // FUN_0047a3d0: FUN_0047aa30(handle, 2), which stops voice 2 only
+        // when the entry is loaded.
+        self.sound_free(self.sound_handle, crate::sound::VOICE_EFFECTS);
         self.traj_sound = None;
+    }
+
+    /// `NEWSOUND` (FUN_0047a290): only when the file is there; while voice
+    /// 2 plays, the entry the handle names is freed first (and voice 2
+    /// stopped); the file loaded into the table (its entry the new
+    /// handle), played on voice 2, the flag set.
+    pub(super) fn new_sound(&mut self, apc: &str) {
+        if self.files.read_current(Folder::Apc, apc).is_none() {
+            return;
+        }
+        if self.voices.is_playing(crate::sound::VOICE_EFFECTS) {
+            self.sound_free(self.sound_handle, crate::sound::VOICE_EFFECTS);
+        }
+        self.sound_handle = self.table_load(apc, None);
+        self.sound_play(self.sound_handle, crate::sound::VOICE_EFFECTS);
+        self.newsound_on = true;
+    }
+
+    /// FUN_0047a2f0, on every dispatcher pass after the music state
+    /// machine (@ 0x0049ce37): a `NEWSOUND`'s entry freed once voice 2 is
+    /// silent (the handle's, whoever loaded it last).
+    fn new_sound_end(&mut self) {
+        if self.newsound_on && !self.voices.is_playing(crate::sound::VOICE_EFFECTS) {
+            self.sound_free(self.sound_handle, crate::sound::VOICE_EFFECTS);
+            self.newsound_on = false;
+        }
     }
 
     /// [`Engine::render`] on the surface the frame is drawn on (the
@@ -3050,6 +3348,22 @@ impl Engine {
         self.with_script(|s, h| s.run_command(h, command));
     }
 
+    /// A `/con` condition (`EvalCondition` @ 0x00480fd0) on the game's
+    /// state, as a scan evaluates it: for tests and tools. `None` without
+    /// the scripts.
+    #[doc(hidden)]
+    pub fn eval_condition(&mut self, cond: &[u8]) -> Option<bool> {
+        self.with_script(|s, h| {
+            let kept = s.chapter_text().to_vec();
+            let mut t = cond.to_vec();
+            t.extend_from_slice(b"\r\n");
+            s.set_chapter_text(&t);
+            let r = s.eval_condition(h, 0).is_some();
+            s.set_chapter_text(&kept);
+            r
+        })
+    }
+
     /// A click on the sprite of slot `n` of the view, as the warp frame
     /// handles it (@ 0x0045a650): for tests and tools.
     pub fn take_slot(&mut self, n: usize) {
@@ -3135,15 +3449,7 @@ mod tests {
     }
 
     #[test]
-    fn texels_under_the_centre() {
-        assert_eq!(texel_of([0.0, 0.0, 1.0]), Some((0, 256, 256)));
-        assert_eq!(texel_of([1.0, 0.0, 0.0]), Some((5, 256, 256)));
-        assert_eq!(texel_of([0.0, -1.0, 0.0]), Some((2, 256, 256)));
-        // Top-left corner of ft: texel 1.
-        assert_eq!(
-            texel_of([-1.0, -1.0, 1.0]).map(|t| (t.1, t.2)),
-            Some((1, 1))
-        );
+    fn rgb565_of_argb() {
         assert_eq!(rgb565(0xff00_00ff), 0x001f);
     }
 }

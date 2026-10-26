@@ -43,7 +43,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -502,12 +502,12 @@ fn the_click_and_the_tick_as_the_original() {
     e.turtle_entry(56);
     let mut steps = Vec::new();
     for _ in 0..4 {
-        e.anim.step();
+        e.anim.step(&mut e.rand);
         steps.push(rings(&e));
     }
     e.anim.slots[k].playing = true;
     for _ in 0..3 {
-        e.anim.step();
+        e.anim.step(&mut e.rand);
         steps.push(rings(&e));
     }
     got.push(format!(
@@ -972,7 +972,7 @@ fn the_ring_is_drawn_as_the_original() {
         assert_eq!(w[1], name);
         let f: i32 = w[3].parse().unwrap();
         let spw = Spw::parse(data.clone()).unwrap();
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         let state = EntityState {
             letter: 65,
             anim: 1,

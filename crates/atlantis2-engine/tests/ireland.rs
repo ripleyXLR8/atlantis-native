@@ -27,7 +27,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -811,4 +811,76 @@ fn nextvue_and_udada_as_the_chapters_use_them() {
     move_7_to_8(&mut e, 300.0);
     assert_eq!(e.place(), ("bigile1.wam", 106));
     assert_eq!(var(&e, "NEXTVUE"), 0);
+}
+
+/// A `voixoff` line (kind 1, here dialog 56's `DS` line) runs the warp's
+/// FUN_0040c6a0 (atlantis2-cd-fr-2199552 @ 0x0048085e): a move's pending
+/// turn steps on and its end is kept for the warp, which then plays the
+/// move; the zone under the centre is picked again. Other kinds do not
+/// turn.
+#[test]
+fn a_voixoff_line_steps_a_pending_turn() {
+    let Some(files) = game() else { return };
+    let mut e = in_ireland(files);
+    e.enter_at(7, 0.0, 0.0).unwrap();
+    e.script_state_mut().unwrap().set_current_view(7);
+    e.reset_view();
+    e.pass(None);
+    let zones = e.wam().view(7).unwrap().zones.clone();
+    let z = zones
+        .iter()
+        .position(|z| z.kind == 1 && z.value == 8)
+        .unwrap();
+    // On the zone but off its aim, as far as it goes, so that the turn
+    // has a way to go.
+    let (yaw, pitch) = e.zone_aim(7, z).unwrap();
+    let mut off = 0.0;
+    for k in 1..100 {
+        e.camera.enter(yaw + 0.01 * k as f32, pitch);
+        e.pass(None);
+        if e.centre_zone().map(|(i, _)| i) != Some(z) {
+            break;
+        }
+        off = 0.01 * k as f32;
+    }
+    e.camera.enter(yaw + off, pitch);
+    e.pass(None);
+    assert_eq!(e.centre_zone().map(|(i, _)| i), Some(z));
+    e.click(100.0);
+    e.pass(None);
+    assert!(e.turning(), "the move does not turn");
+    e.start_dialog(56).unwrap();
+    let mut voixoff_passes = 0;
+    for _ in 0..600 {
+        e.tick();
+        e.pass(None);
+        let Some(d) = e.dialog() else { break };
+        if d.kind() == 1 {
+            voixoff_passes += 1;
+            if !e.turning() {
+                break;
+            }
+        } else {
+            assert!(e.turning());
+        }
+    }
+    assert!(voixoff_passes > 0, "no voixoff line");
+    assert!(!e.turning(), "the turn did not step under the voixoff line");
+    // Picked again where the turn ended (off the zone): not the zone
+    // the click saw.
+    assert_eq!(e.centre_zone(), None);
+    // The move itself waits for the warp.
+    assert_eq!(e.place(), ("bigile1.wam", 7));
+    e.end_dialog();
+    for _ in 0..400 {
+        e.tick();
+        e.pass(None);
+        if e.loop_type == LoopType::Video {
+            e.end_video();
+        }
+        if e.place().1 == 8 {
+            break;
+        }
+    }
+    assert_eq!(e.place(), ("bigile1.wam", 8));
 }

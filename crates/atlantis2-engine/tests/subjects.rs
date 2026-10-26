@@ -20,8 +20,9 @@ use std::path::PathBuf;
 use atlantis2_data::defnames::{self, DefNames};
 use atlantis2_data::spr::SprBank;
 use atlantis2_data::{A2Files, Folder};
-use atlantis2_engine::anim::{MsvcRand, Texel};
+use atlantis2_engine::anim::Texel;
 use atlantis2_engine::bag::{UiBank, UiDraw};
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::script::{DialStart, Host, Script, SubjectTable};
 use atlantis2_engine::subjects::{cell, first_row, hit};
@@ -43,7 +44,7 @@ fn install() -> Option<PathBuf> {
 
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (install(), std::env::var_os("ATLANTIS2_DISCS")) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) = A2Files::open_dir(&dir, &[PathBuf::from(discs)]).expect("game folder");
@@ -163,7 +164,7 @@ impl Run {
 /// then the first click (the departure scan of chapter 0 loads it).
 fn chapter_75(files: A2Files) -> Run {
     let mut e = Engine::boot(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     e.trace = true;
     e.start_new_game().unwrap();
     let mut r = Run {
@@ -376,7 +377,7 @@ impl Host for Rec {
 #[test]
 fn the_shaman_subjects_along_chapter_75_match_the_original() {
     if install().is_none() {
-        eprintln!("ATLANTIS2_DATA not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA not set");
         return;
     }
     let chapter = scenar("chapi075.con");

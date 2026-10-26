@@ -1,13 +1,14 @@
 //! Atlantis II, as far as it goes: the player menu opens first (a symbol
 //! continues that player's newest save or starts a new game, on Tibet's
 //! first view, `tibet.wam` view 2); the player looks around with the mouse
-//! or the arrow keys and walks from view to view with a left click on a move
-//! zone (the turn, the transition video, the arrival), the place animations
-//! playing. The chapter scripts run the game as the original's: the opening
-//! film, the music, the dialogs they call (a left click goes to the next
-//! line, Escape ends a dialog). The right button opens the bag bar at the
-//! bottom of the screen (the mouse then moves a pointer over it; a click
-//! puts an object in the hand, drawn at the screen centre). Escape opens
+//! (or the arrow keys, a port convenience) and walks from view to view
+//! with a left click on a move zone (the turn, the transition video, the
+//! arrival), the place animations playing. The chapter scripts run the
+//! game as the original's: the opening film, the music, the dialogs they
+//! call (a left click goes to the next line, Escape ends a dialog). The
+//! right button opens the bag bar at the bottom of the screen (the mouse
+//! then moves a pointer over it; a click puts an object in the hand, drawn
+//! at the screen centre). Escape opens
 //! the main menu (options, volumes, load and save, quit) and closes it
 //! again; in the menus the pointer is the game's own. A mode of its own,
 //! beside the first game's front end: a window, the screen scaled to it,
@@ -27,11 +28,19 @@
 //! font sizes, and no Alt+Enter (1.00's switch between full screen and
 //! window; F11 is the port's own and works with both).
 //!
+//! The window opens in full screen when `atlant2.cfg`'s full-screen byte
+//! says so, as the original's start-up does (1, its default; both
+//! releases read it), or with `--fullscreen`; Alt+Enter (1.00) and F11
+//! switch it and keep the choice there, written at exit as the original
+//! writes it.
+//!
 //! `--original` turns the enhancements off, as for the first game: the
 //! minor bug fixes (`atlantis2_engine::Enhancements::minor_bug_fixes`:
 //! every music track heard to its end, a track that ends with nothing
 //! after it played again, Ireland's puzzle zones answering for no named
-//! zone) and the HD mode.
+//! zone), the interface conveniences
+//! (`atlantis2_engine::Enhancements::ui_ux`: the arrow keys' turn) and the
+//! HD mode.
 //!
 //! `--hd` draws the panorama at the window's resolution (the first game's
 //! HD mode, `atlantis2_engine::hd`), `--widescreen` too with the panorama
@@ -67,7 +76,10 @@
 //! `--pointer <x>,<y>` puts the mouse pointer there and `--talk` clicks
 //! the character under the screen centre (its subject menu opens);
 //! `--command <commands>` runs script commands at the start, before the
-//! view entry (`(monde=1)(changewam=bigile1.wam)(vue=5)`: Ireland).
+//! view entry (`(monde=1)(changewam=bigile1.wam)(vue=5)`: Ireland);
+//! `--seed <n>` gives `rand` the seed `n` instead of the clock (the
+//! original seeds it with `GetTickCount()` at start-up), so that a run
+//! draws the same animations, cameras and choices again.
 //!
 //! At start-up the intro videos play before the player menu, as in the
 //! original (a click skips one, a double click all of them); `--no-intro`
@@ -109,8 +121,9 @@ pub const WIDTH: u32 = 640;
 pub const HEIGHT: u32 = 480;
 
 /// A turn key held: the mouse move it stands for each frame, in mickeys
-/// (a port convenience; the original turns with the mouse only). With the
-/// original's decay this turns about 55° a second at 60 frames a second.
+/// (a port convenience, [`Enhancements::ui_ux`]; the original turns with
+/// the mouse only). With the original's decay this turns about 55° a
+/// second at 60 frames a second.
 const KEY_TURN: i32 = 8;
 
 /// The frame period: the original shows a frame per refresh of the screen
@@ -154,6 +167,9 @@ pub struct A2Start {
     /// A headless run's screenshot shows the options menu (F10) over the
     /// last frame (`--options-menu`).
     pub options_menu: bool,
+    /// The `rand` seed of the start-up (`--seed`), instead of the clock
+    /// ([`Engine::seed_rand`]): the same draws on every run.
+    pub seed: Option<u32>,
 }
 
 impl A2Start {
@@ -205,6 +221,9 @@ impl A2Start {
     /// the testing aids), then the view, the dialog and the menu page asked
     /// for.
     pub fn begin(&self, engine: &mut Engine, headless: bool) -> Result<(), String> {
+        if let Some(seed) = self.seed {
+            engine.seed_rand(seed);
+        }
         if let Some((w, _)) = self.resolution {
             engine.set_screen_800(w == 800);
         }
@@ -314,6 +333,58 @@ fn local_now() -> SystemTime {
         second: t.wSecond,
         milliseconds: t.wMilliseconds,
     }
+}
+
+/// The load page's text of a save's time, as the original's
+/// (FUN_0046f830 @ 0x0046f928, 0x0046f94c): the user's locale's short date
+/// and time, a space between.
+#[cfg(windows)]
+fn local_date_text(t: &SystemTime) -> Vec<u8> {
+    use windows_sys::Win32::Foundation::SYSTEMTIME;
+    use windows_sys::Win32::Globalization::{
+        GetDateFormatA, GetTimeFormatA, DATE_SHORTDATE, LOCALE_USER_DEFAULT,
+    };
+    let st = SYSTEMTIME {
+        wYear: t.year,
+        wMonth: t.month,
+        wDayOfWeek: t.day_of_week,
+        wDay: t.day,
+        wHour: t.hour,
+        wMinute: t.minute,
+        wSecond: t.second,
+        wMilliseconds: t.milliseconds,
+    };
+    let mut date = [0u8; 256];
+    let mut time = [0u8; 256];
+    // SAFETY: both calls read `st` and write at most 256 bytes (their
+    // count, the terminating zero included) into their buffers.
+    let (nd, nt) = unsafe {
+        (
+            GetDateFormatA(
+                LOCALE_USER_DEFAULT,
+                DATE_SHORTDATE,
+                &st,
+                std::ptr::null(),
+                date.as_mut_ptr(),
+                256,
+            ),
+            GetTimeFormatA(
+                LOCALE_USER_DEFAULT,
+                0,
+                &st,
+                std::ptr::null(),
+                time.as_mut_ptr(),
+                256,
+            ),
+        )
+    };
+    if nd <= 0 || nt <= 0 {
+        return atlantis2_engine::menu::date_time(t);
+    }
+    let mut out = date[..nd as usize - 1].to_vec();
+    out.push(b' ');
+    out.extend_from_slice(&time[..nt as usize - 1]);
+    out
 }
 
 /// The time of a save: the local time, as the original stamps it
@@ -427,11 +498,16 @@ fn boot(
     engine.enhancements = enhancements;
     engine.set_data_dir(Some(data_dir()));
     engine.wall_clock = local_now;
-    // The original seeds `rand` with GetTickCount() (@ 0x0047d740).
+    #[cfg(windows)]
+    {
+        engine.date_text = local_date_text;
+    }
+    // The original seeds `rand` with GetTickCount() at start-up
+    // (@ 0x0047d740): a clock in milliseconds (`--seed` fixes it).
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u32);
-    engine.anim.rand = atlantis2_engine::anim::MsvcRand(seed);
+    engine.seed_rand(seed);
     Ok((engine, format!("Game: {}", build.label)))
 }
 
@@ -700,8 +776,19 @@ impl A2App {
         let (w, h) = engine.screen_size();
         let mut menu = OptionsMenu::new();
         menu.set_info(menu_info(label));
+        // Full screen as `atlant2.cfg` says (the start-up's mode 3 or 2,
+        // @ 0x0049d0af), or as `--fullscreen` asks.
+        let fullscreen = fullscreen || engine.fullscreen();
+        // The voices' status is the output's from now on: a voice ends
+        // when it has been played out, as DirectSound's buffers do (a
+        // dialog line, voice 2's `NEWSOUND`, FUN_0047a9c0). Without a
+        // sound device the mix is played into nothing at the game's pace
+        // ([`A2App::play_silent`]), so the voices still end.
+        engine.voices().attach_output();
+        let silent = audio.is_none().then_some(0);
         A2App {
             _audio: audio,
+            silent,
             clock: GameClock::new(now),
             engine,
             fullscreen,
@@ -722,6 +809,7 @@ impl A2App {
             locked: false,
             focused: true,
             alt_left: false,
+            refocused: false,
             next_frame: now,
         }
     }
@@ -730,6 +818,9 @@ impl A2App {
 struct A2App {
     /// The sound output (kept alive while the window is open).
     _audio: Option<cpal::Stream>,
+    /// Without a sound output: the primary frames the mix has been played
+    /// to so far, on the game's clock.
+    silent: Option<u64>,
     /// The game's clock: it starts with the window and stands still while
     /// the game is held (the options menu open, the window without the
     /// focus).
@@ -765,15 +856,20 @@ struct A2App {
     focused: bool,
     /// The left Alt key held (Alt+Enter, 1.00 only).
     alt_left: bool,
+    /// The focus came back with the pointer free: the next press may be
+    /// the one that gave it ([`mouse_button`]'s `focus_click`).
+    refocused: bool,
     next_frame: Instant,
 }
 
 impl A2App {
-    /// Full screen or window (F11; Alt+Enter with 1.00).
+    /// Full screen or window (F11; Alt+Enter with 1.00), the choice kept
+    /// in `atlant2.cfg`'s byte 8 as the original's Alt+Enter keeps it.
     fn toggle_fullscreen(&mut self) {
         if let Some(w) = &self.window {
-            let full = w.fullscreen().is_some();
-            w.set_fullscreen((!full).then_some(Fullscreen::Borderless(None)));
+            let full = w.fullscreen().is_none();
+            w.set_fullscreen(full.then_some(Fullscreen::Borderless(None)));
+            self.engine.set_fullscreen(full);
         }
     }
 
@@ -809,11 +905,22 @@ impl A2App {
             }
         } else if !in_menu && !self.locked && self.focused {
             self.grab(true);
+            // A press after this pass is not the one that gave the focus:
+            // grabbed, it reaches the game anyway; not grabbed (both grab
+            // modes refused), the pointer stays free and every press is a
+            // click, so the flag must not swallow a later one.
+            self.refocused = false;
         }
         let (mx, my) = (self.motion.0.trunc(), self.motion.1.trunc());
         self.motion.0 -= mx;
         self.motion.1 -= my;
-        let [left, right, up, down] = self.keys.map(i32::from);
+        // The arrow keys turn only with the interface conveniences.
+        let keys = if self.engine.enhancements.ui_ux {
+            self.keys
+        } else {
+            [false; 4]
+        };
+        let [left, right, up, down] = keys.map(i32::from);
         let dx = mx as i32 + (right - left) * KEY_TURN;
         let dy = my as i32 + (down - up) * KEY_TURN;
         if (dx != 0 || dy != 0) && !in_menu {
@@ -822,6 +929,7 @@ impl A2App {
         // The pass's time is the one it was due at, as the original's
         // passes keep the pace of the screen's refresh.
         self.engine.set_clock(self.clock.secs(self.next_frame));
+        self.play_silent();
         if let Some(size) = self.window.as_ref().map(|w| w.inner_size()) {
             self.picture
                 .prepare(&mut self.engine, size.width as usize, size.height as usize);
@@ -830,6 +938,24 @@ impl A2App {
         let (w, h) = self.engine.screen_size();
         self.screen.resize(w * h, 0);
         self.engine.pass(Some(&mut self.screen));
+    }
+
+    /// Without a sound device, the mix played up to the game's clock and
+    /// dropped: the voices advance and end as with a device (DirectSound
+    /// plays a buffer out whatever the card), the clock standing still
+    /// while the game is held.
+    fn play_silent(&mut self) {
+        let Some(done) = self.silent else { return };
+        let rate = atlantis2_engine::sound::PRIMARY_RATE;
+        let due = (self.engine.clock() * f64::from(rate)) as u64;
+        let mut buf = vec![0.0f32; 2 * 1024];
+        let mut at = done;
+        while at < due {
+            let n = (due - at).min(1024) as usize;
+            self.engine.voices().fill(&mut buf[..2 * n], rate, 2);
+            at += n as u64;
+        }
+        self.silent = Some(at);
     }
 
     /// A window position on the screen the frame is laid out for (the
@@ -921,8 +1047,17 @@ impl A2App {
             self.alt_left = false;
         } else {
             self.motion = (0.0, 0.0);
+            self.refocused = !self.locked;
         }
         self.hold_at(now);
+    }
+
+    /// Whether a press (`pressed`) is the one that gave the window the
+    /// focus, with the interface conveniences on ([`mouse_button`]'s
+    /// `focus_click`): only the first press after a focus gain, before the
+    /// next pass ([`A2App::step`]).
+    fn focus_click(&mut self, pressed: bool) -> bool {
+        pressed && std::mem::take(&mut self.refocused) && self.engine.enhancements.ui_ux
     }
 
     /// A redraw at `now`: the game's pass when one is due and the game is
@@ -1120,8 +1255,9 @@ impl ApplicationHandler for A2App {
         }
         match event {
             WindowEvent::CloseRequested => {
-                // `atlant2.cfg` is written at exit (FUN_0047f530).
-                self.engine.write_cfg();
+                // The exit hook: the mandala solution log, `atlant2.cfg`
+                // (FUN_00495650, FUN_0047f530).
+                self.engine.at_exit();
                 el.exit();
             }
             WindowEvent::Focused(on) => self.set_focus(on, Instant::now()),
@@ -1145,7 +1281,15 @@ impl ApplicationHandler for A2App {
             WindowEvent::MouseInput { state, button, .. } => {
                 let now = self.clock.secs(Instant::now());
                 let pressed = state == ElementState::Pressed;
-                if mouse_button(&mut self.engine, self.locked, button, pressed, now) {
+                let focus_click = self.focus_click(pressed);
+                if mouse_button(
+                    &mut self.engine,
+                    self.locked,
+                    focus_click,
+                    button,
+                    pressed,
+                    now,
+                ) {
                     self.grab(true);
                 }
             }
@@ -1202,7 +1346,7 @@ impl ApplicationHandler for A2App {
             WindowEvent::RedrawRequested => {
                 // `EXIT` in a script, or the menus, quit the game.
                 if self.redraw(Instant::now()) && self.engine.quit() {
-                    self.engine.write_cfg();
+                    self.engine.at_exit();
                     el.exit();
                 }
                 self.present();
@@ -1216,11 +1360,20 @@ impl ApplicationHandler for A2App {
 /// FUN_0040c660): every release of the left button clears the held flag
 /// (@ 0x006569ca), whatever the loop type; a press clicks (the left
 /// button: the click flag @ 0x006569c9, a video ended) or opens the bag
-/// (the right one). True when the press only grabs the pointer (outside
-/// the menus, with the pointer free; a left click still ends a video).
+/// (the right one), also while the pointer is free, as the original's: it
+/// reads DirectInput's mouse state once a pass (FUN_0058e9f0,
+/// `GetDeviceState` @ 0x0058eaf5) and calls the press callback for a
+/// button down that was up at the pass before (@ 0x0058ec28..0x0058ec55),
+/// so the press that gives its window the focus is a click once the device
+/// is acquired again. `focus_click`: the press is the one that gave the
+/// window the focus and the interface conveniences
+/// ([`Enhancements::ui_ux`]) are on: it only grabs the pointer (outside
+/// the menus; a left click still ends a video). True when the pointer is
+/// to be grabbed (a press outside the menus with the pointer free).
 fn mouse_button(
     engine: &mut Engine,
     locked: bool,
+    focus_click: bool,
     button: MouseButton,
     pressed: bool,
     now: f64,
@@ -1233,7 +1386,8 @@ fn mouse_button(
     }
     let in_menu = engine.loop_type == LoopType::Menu;
     let in_video = engine.loop_type == LoopType::Video;
-    if !locked && !in_menu && !(in_video && button == MouseButton::Left) {
+    let grab = !locked && !in_menu;
+    if grab && focus_click && !(in_video && button == MouseButton::Left) {
         return true;
     }
     match button {
@@ -1241,7 +1395,7 @@ fn mouse_button(
         MouseButton::Right => engine.right_click(),
         _ => {}
     }
-    false
+    grab
 }
 
 /// The window's pointer at `p` on the screen where the pointer is the
@@ -1514,7 +1668,7 @@ mod tests {
             std::env::var_os("ATLANTIS2_DATA"),
             std::env::var_os("ATLANTIS2_DISCS"),
         ) else {
-            eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+            atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
             return;
         };
         let (engine, label) = boot(
@@ -1555,6 +1709,55 @@ mod tests {
         assert!(!app.redraw(at(700)));
     }
 
+    /// Review L19/L20: a window without a sound device still plays the
+    /// voices out on the game's clock, as DirectSound plays a buffer out
+    /// whatever the card, so the dispatcher's FUN_0047a2f0 frees a
+    /// `NEWSOUND`'s entry once its sound has been played (it stayed in the
+    /// shared table for good, voice 2 never ending without a device).
+    #[test]
+    fn a_window_without_sound_device_plays_the_voices_out() {
+        let Some(files) = a2_files() else { return };
+        let mut engine = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+        engine.start_new_game().unwrap();
+        engine.end_video();
+        for c in ["(changewam=tibet.wam)", "(vue=2)", "(chapter=75)"] {
+            engine.run_command(c.as_bytes());
+        }
+        for _ in 0..400 {
+            match engine.loop_type {
+                LoopType::Video => engine.end_video(),
+                LoopType::Dialog => engine.end_dialog(),
+                LoopType::Warp if !engine.turning() => break,
+                _ => {}
+            }
+            engine.tick();
+            engine.pass(None);
+        }
+        assert_eq!(engine.loop_type, LoopType::Warp);
+        engine.sound_table_clear();
+        engine.run_command(b"(NewSound=1)");
+        let (rate, _, frames, _) = engine
+            .voices()
+            .format(atlantis2_engine::sound::VOICE_EFFECTS)
+            .expect("sound001 on voice 2");
+        let named = |e: &Engine| e.sound_table().iter().any(|(_, n)| n.contains("001"));
+        assert!(named(&engine));
+        let t0 = Instant::now();
+        let paused = Arc::new(AtomicBool::new(false));
+        let mut app = A2App::new(engine, "test", false, None, None, paused, t0);
+        let length = frames as f64 / f64::from(rate);
+        let passes = ((length + 0.5) / PASS) as u32;
+        for k in 0..passes {
+            app.redraw(t0 + FRAME * k);
+        }
+        let voice2 = app
+            .engine
+            .voices()
+            .is_playing(atlantis2_engine::sound::VOICE_EFFECTS);
+        assert!(!voice2, "voice 2 still plays {length:.2} s on");
+        assert!(!named(&app.engine), "{:?}", app.engine.sound_table());
+    }
+
     /// The game's files, or `None` (the test skipped) without
     /// `ATLANTIS2_DATA` / `ATLANTIS2_DISCS`.
     fn a2_files() -> Option<atlantis2_data::A2Files> {
@@ -1562,14 +1765,14 @@ mod tests {
             std::env::var_os("ATLANTIS2_DATA"),
             std::env::var_os("ATLANTIS2_DISCS"),
         ) else {
-            eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+            atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
             return None;
         };
         let (files, _) = atlantis2_data::A2Files::open_dir(
             std::path::Path::new(&dir),
             &[std::path::PathBuf::from(discs)],
         )
-        .ok()?;
+        .expect("game folder");
         Some(files)
     }
 
@@ -1630,7 +1833,14 @@ mod tests {
             (w.hit.top + w.hit.bottom) / 2,
         );
         // In the menus a press clicks, whether the pointer is held or not.
-        assert!(!mouse_button(&mut e, false, MouseButton::Left, true, 1.0));
+        assert!(!mouse_button(
+            &mut e,
+            false,
+            false,
+            MouseButton::Left,
+            true,
+            1.0
+        ));
         assert!(e.button_held());
         pass(&mut e);
         pass(&mut e);
@@ -1638,14 +1848,146 @@ mod tests {
             pass(&mut e);
         }
         assert_ne!(e.loop_type, LoopType::Menu);
-        assert!(!mouse_button(&mut e, true, MouseButton::Left, false, 1.1));
+        assert!(!mouse_button(
+            &mut e,
+            true,
+            false,
+            MouseButton::Left,
+            false,
+            1.1
+        ));
         assert!(!e.button_held());
-        // Outside the menus, with the pointer free, a press grabs it.
+        // Outside the menus, with the pointer free, the press that gave
+        // the window the focus only grabs it (the interface conveniences).
         assert_eq!(e.loop_type, LoopType::Video);
         e.end_video();
         pass(&mut e);
-        assert!(mouse_button(&mut e, false, MouseButton::Left, true, 2.0));
+        assert!(mouse_button(
+            &mut e,
+            false,
+            true,
+            MouseButton::Left,
+            true,
+            2.0
+        ));
         assert!(!e.button_held());
+    }
+
+    /// The original reads the mouse's buttons once a pass and clicks for a
+    /// button newly down (FUN_0058e9f0 @ 0x0058ec28..0x0058ec55), the press
+    /// that activates its window included: a press with the pointer free
+    /// clicks and grabs it, unless it is the focusing press and the
+    /// interface conveniences are on.
+    #[test]
+    fn a_press_with_the_pointer_free_clicks() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+        e.end_video();
+        assert_eq!(e.loop_type, LoopType::Warp);
+        // Not the focusing press (or `--original`): a click.
+        assert!(mouse_button(
+            &mut e,
+            false,
+            false,
+            MouseButton::Left,
+            true,
+            3.0
+        ));
+        assert!(e.button_held());
+        assert!(!mouse_button(
+            &mut e,
+            false,
+            false,
+            MouseButton::Left,
+            false,
+            3.1
+        ));
+        // The right button opens the bag bar, and grabs.
+        assert!(mouse_button(
+            &mut e,
+            false,
+            false,
+            MouseButton::Right,
+            true,
+            4.0
+        ));
+        assert!(e.bar.open);
+    }
+
+    /// The arrow keys turn the view only with the interface conveniences
+    /// (`--original` turns them off: the original's key-down callback
+    /// @ 0x004762f0 has no turn key); the window opens in full screen when
+    /// `atlant2.cfg`'s byte 8 says so (1 by default, the start-up's mode 3
+    /// @ 0x0049d0af).
+    #[test]
+    fn arrow_keys_are_a_convenience_and_the_cfg_chooses_the_screen() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+        e.end_video();
+        assert!(e.fullscreen(), "atlant2.cfg's default");
+        let paused = Arc::new(AtomicBool::new(false));
+        let t0 = Instant::now();
+        let mut app = A2App::new(e, "", false, None, None, paused, t0);
+        assert!(app.fullscreen);
+        for (ui_ux, turns) in [(false, false), (true, true)] {
+            app.engine.enhancements.ui_ux = ui_ux;
+            app.engine.look.yaw_speed = 0.0;
+            app.keys = [false, true, false, false];
+            app.step();
+            assert_eq!(app.engine.look.yaw_speed != 0.0, turns, "ui_ux {ui_ux}");
+        }
+        app.engine.set_fullscreen(false);
+        assert!(!app.engine.fullscreen());
+        assert_eq!(app.engine.cfg().fullscreen, 0);
+        let e = app.engine;
+        let app = A2App::new(
+            e,
+            "",
+            false,
+            None,
+            None,
+            Arc::new(AtomicBool::new(false)),
+            t0,
+        );
+        assert!(!app.fullscreen);
+    }
+
+    /// The press that gave the window the focus only grabs the pointer
+    /// (the interface conveniences); a press after the next pass is a
+    /// click even when the pointer could not be grabbed (here: no window,
+    /// as where both grab modes are refused), so a focus gained from the
+    /// keyboard does not swallow a press long after.
+    #[test]
+    fn only_the_focusing_press_is_swallowed() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+        e.end_video();
+        let t0 = Instant::now();
+        let mut app = A2App::new(
+            e,
+            "",
+            false,
+            None,
+            None,
+            Arc::new(AtomicBool::new(false)),
+            t0,
+        );
+        app.set_focus(false, t0);
+        app.set_focus(true, t0);
+        assert!(!app.locked);
+        assert!(app.focus_click(true), "the press that gave the focus");
+        assert!(!app.focus_click(true));
+        // The focus gained from the keyboard: a pass runs, the grab fails.
+        app.set_focus(false, t0);
+        app.set_focus(true, t0);
+        app.step();
+        assert!(!app.locked);
+        assert!(!app.focus_click(true), "a press after a pass is a click");
+        // `--original`: never swallowed.
+        app.set_focus(false, t0);
+        app.set_focus(true, t0);
+        app.engine.enhancements.ui_ux = false;
+        assert!(!app.focus_click(true));
     }
 
     /// In the menus the system pointer's moves add to the turn speeds
@@ -1857,7 +2199,7 @@ mod tests {
             std::env::var_os("ATLANTIS2_DATA"),
             std::env::var_os("ATLANTIS2_DISCS"),
         ) else {
-            eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+            atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
             return;
         };
         let (dir, discs) = (PathBuf::from(dir), [PathBuf::from(discs)]);
@@ -1873,7 +2215,7 @@ mod tests {
                 ..Enhancements::default()
             };
             let (mut e, _) = boot(&dir, &discs, x).expect("game");
-            e.anim.rand = atlantis2_engine::anim::MsvcRand(1);
+            e.seed_rand(1);
             e.trace = true;
             e
         };

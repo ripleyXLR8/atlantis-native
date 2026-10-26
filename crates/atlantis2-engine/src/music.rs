@@ -109,8 +109,9 @@ pub fn decode_music(data: &[u8], mark: Option<&Mark>) -> Option<Pcm> {
 
 /// `AtlMuzik_GetRandomMark` (@ 0x00478090): up to 10 draws of
 /// `rand() · (count + 1) / 0x7fff` while the draw equals the current mark.
-/// 0 is the file's start; `count + 1` (from `rand()` = 0x7fff) is the
-/// invalid mark the original reports as fatal.
+/// 0 is the file's start; `count + 1` (from `rand()` = 0x7fff, the golden's
+/// `randmark.edge` rows) is the invalid mark `GotoMark` reports as fatal
+/// ([`Stream::fixes`]).
 pub fn random_mark(rand: &mut Rand, count: i32, current: i32) -> i32 {
     let mut m = current;
     for _ in 0..10 {
@@ -263,6 +264,10 @@ pub enum StreamEvent {
     /// The rewind's file check failed: the copy deleted and copied again
     /// (`remove`, `LOADMUSIK`), the file closed.
     Recopy(i32),
+    /// A fatal error of the original's player (FUN_00480cd0: an
+    /// emergency save, then the game quits), its message: `GotoMark` on a
+    /// mark the file does not have.
+    Fatal(String),
 }
 
 /// The open file (@ 0x00672174) and where it is read.
@@ -298,6 +303,10 @@ pub struct Stream {
     /// The loops left (@ 0x006725c4).
     pub loops: i32,
     pub events: Vec<StreamEvent>,
+    /// The minor bug fixes: a random mark drawn at the `rand()` = 0x7fff
+    /// edge, one past the file's marks, is its last mark; off, as the
+    /// original, it is `GotoMark`'s fatal error.
+    pub fixes: bool,
 }
 
 impl Default for Stream {
@@ -314,6 +323,7 @@ impl Default for Stream {
             current_mark: 0,
             loops: 0,
             events: Vec::new(),
+            fixes: false,
         }
     }
 }
@@ -488,6 +498,9 @@ impl Stream {
         let mut k = k;
         if k == -1 {
             k = random_mark(rand, marks.len() as i32, self.current_mark);
+            if self.fixes {
+                k = k.min(marks.len() as i32);
+            }
         }
         let mut offset = 0;
         if k == 0 {
@@ -503,8 +516,10 @@ impl Stream {
                     self.dec = Some(ApcDecoder::resume(m.stereo, m.predictors, m.step_indexes));
                 }
                 None => {
-                    // A fatal error in the original.
-                    log::error!("AtlMuzik_GotoMark({k}): {} marks", marks.len());
+                    // A fatal error in the original (@ 0x00477f2a).
+                    let msg = format!("AtlMuzik_GotoMark({k}) invalide ({} marks)", marks.len());
+                    log::error!("{msg}");
+                    self.events.push(StreamEvent::Fatal(msg));
                     return None;
                 }
             }
@@ -541,6 +556,7 @@ impl Stream {
         load: &mut dyn FnMut(i32) -> Option<MusicData>,
         fixes: bool,
     ) -> bool {
+        self.fixes = fixes;
         if self.file.is_none() {
             return false;
         }

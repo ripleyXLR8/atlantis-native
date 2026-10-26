@@ -26,6 +26,8 @@ use md5::{Digest, Md5};
 
 const HEADS: &str = include_str!("golden/heads.txt");
 const HEADS_PII: &str = include_str!("golden/heads_pii.txt");
+const HEADS_PII_MORE: &str = include_str!("golden/heads_pii_more.txt");
+const HEADS_MORE: &str = include_str!("golden/heads_more.txt");
 const LIPSYNC: &str = include_str!("golden/lipsync_tibet.txt");
 
 fn hex(bytes: &[u8]) -> String {
@@ -40,7 +42,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA or ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA or ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -158,6 +160,23 @@ fn heads_match_the_original() {
 fn pii_heads_match_the_original() {
     let Some(files) = game() else { return };
     check_frames(&files, HEADS_PII, Variant::PII, Fpu::Chop);
+}
+
+/// The 25 other heads of the game (every `.db` of the four discs'
+/// `datas_a2\3d\Dial`) against the original's Pentium II path
+/// (`heads_pii_more.txt`, a shorter frame sequence): the drawer the three
+/// heads above settle is the same for all 28.
+#[test]
+fn every_other_head_matches_the_original() {
+    let Some(files) = game() else { return };
+    check_frames(&files, HEADS_PII_MORE, Variant::PII, Fpu::Chop);
+}
+
+/// The same 25 heads with the C routines under 0x027f (`heads_more.txt`).
+#[test]
+fn every_other_head_matches_the_original_c_path() {
+    let Some(files) = game() else { return };
+    check_frames(&files, HEADS_MORE, Variant::C, Fpu::Double);
 }
 
 fn check_frames(files: &A2Files, golden: &str, variant: Variant, fpu: Fpu) {

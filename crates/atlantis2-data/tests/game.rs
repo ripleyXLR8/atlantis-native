@@ -19,7 +19,7 @@ use md5::{Digest, Md5};
 fn install() -> Option<PathBuf> {
     let dir = std::env::var_os("ATLANTIS2_DATA");
     if dir.is_none() {
-        eprintln!("ATLANTIS2_DATA not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA not set");
     }
     dir.map(PathBuf::from)
 }
@@ -27,7 +27,7 @@ fn install() -> Option<PathBuf> {
 fn game() -> Option<A2Files> {
     let dir = install()?;
     let Some(discs) = std::env::var_os("ATLANTIS2_DISCS") else {
-        eprintln!("ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, build) = A2Files::open_dir(&dir, &[PathBuf::from(discs)]).expect("game folder");

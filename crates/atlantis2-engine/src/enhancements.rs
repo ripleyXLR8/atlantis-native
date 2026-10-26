@@ -20,6 +20,12 @@ pub struct Enhancements {
     ///   rewind's file check compares the PCM size with the file's
     ///   (@ 0x00477b00), fails and closes the file, and the ring loops its
     ///   last 5.9 s until another music command;
+    /// - a random music mark drawn at the `rand()` = 0x7fff edge (one draw
+    ///   in 32768) is the file's last mark; off, as the original
+    ///   (`AtlMuzik_GetRandomMark` @ 0x00478090 gives one past the marks),
+    ///   `AtlMuzik_GotoMark` reports a fatal error (the original saves in
+    ///   slot 8 of player 9 and quits; here the music and the scripts
+    ///   stop);
     /// - in Ireland's two puzzle views (Brigid's cross, view 2; the ogham
     ///   stones, view 6) a click on a puzzle zone runs its puzzle and
     ///   nothing else; off, as the original (FUN_0049ca80 @ 0x0049cb9b),
@@ -30,6 +36,13 @@ pub struct Enhancements {
     ///   plays the water's film, and so on
     ///   ([`crate::engine::irish_plain_value_zone`]).
     pub minor_bug_fixes: bool,
+    /// Interface conveniences the original lacks (default on; the first
+    /// game's `ui_ux` group):
+    /// - the arrow keys turn the view (each held key stands for a mouse
+    ///   move of 8 counts a frame); off, as the original, whose key-down
+    ///   callback (atlantis2-cd-fr-2199552 @ 0x004762f0) knows Escape,
+    ///   Space and Alt+Enter only, the view turns with the mouse alone.
+    pub ui_ux: bool,
     /// The HD mode (default off; the first game's `graphics = hd`,
     /// `--hd`): the panorama drawn at the window's resolution with the
     /// original's projection (see [`crate::hd`]); the engine's 640x480
@@ -46,6 +59,7 @@ impl Default for Enhancements {
     fn default() -> Self {
         Enhancements {
             minor_bug_fixes: true,
+            ui_ux: true,
             hd: false,
             hd_options: HdOptions::default(),
         }
@@ -58,6 +72,7 @@ impl Enhancements {
     pub fn original() -> Self {
         Enhancements {
             minor_bug_fixes: false,
+            ui_ux: false,
             hd: false,
             hd_options: HdOptions::default(),
         }

@@ -15,12 +15,21 @@
 //!   GDI takes for the text metrics (top of a 23-pixel cell; the baseline 18
 //!   pixels below the y `TextOutA` is given).
 //!
-//! The glyph shapes are the outlines scaled to 16 pixels per em and filled
-//! where a pixel is at least half covered (monochrome, as GDI draws on a
-//! 16-bit surface without smoothing). GDI also runs the font's hinting
-//! program, which moves the outlines to the pixel grid; that is not done
-//! here, so a few pixels of each glyph differ from the original's: the
-//! one known limit of the subtitles (the first game's port has the same one).
+//! The glyph shapes are drawn as GDI draws them in monochrome (a 16-bit
+//! surface without font smoothing, Windows 9x's default; GOG's quality
+//! `NONANTIALIASED_QUALITY` everywhere): the font's hinting program run
+//! at the size (the TrueType interpreter, for a monochrome target), then
+//! the pixels whose centre is inside the hinted outline, and a pixel for
+//! each dropout (a run of a row or a column between two crossings that
+//! holds no pixel centre: the one nearest its middle). Measured against
+//! GDI (`tests/gdi_glyphs.rs`: every byte at every size the game asks, on
+//! Windows 98 SE and on Windows 11), 70 to 80 % of the glyphs are GDI's
+//! pixel for pixel and the others differ by a pixel or two at a diagonal's
+//! step: GDI's own dropout and stub rules are not all known, and Windows
+//! 98 and 11 differ from each other on about one glyph in twenty. A font
+//! with no hinting program is filled where a pixel is at least half
+//! covered. On a Windows with font smoothing on, 1.00 and 1.01
+//! (`DEFAULT_QUALITY`) draw smoothed glyphs; the port does not.
 //!
 //! The breaking rules (`FUN_004611e0`, checked against the original under
 //! emulation: `subtitles.txt`):
@@ -384,6 +393,10 @@ fn table(ttf: &[u8], tag: &[u8; 4]) -> Option<(usize, usize)> {
 /// file, at the size GDI makes of its height.
 pub struct SubtitleFont {
     font: FontVec,
+    /// Each byte's glyph as GDI draws it in monochrome ([`gdi_glyph`]);
+    /// `None` for the whole table when the font cannot be hinted (its
+    /// unhinted outline is then filled where a pixel is half covered).
+    glyphs: Option<Vec<Option<GlyphBits>>>,
     /// Pixels per em: MulDiv(points, 96, 72).
     ppem: u16,
     widths: Option<Vec<u8>>,
@@ -457,8 +470,10 @@ impl SubtitleFont {
             }
         };
         let widths = hdmx_widths(&ttf, ppem as u8);
+        let glyphs = gdi_glyphs(&ttf, ppem, &font);
         Some(SubtitleFont {
             font,
+            glyphs,
             ppem,
             widths,
             ascent,
@@ -546,6 +561,22 @@ impl SubtitleFont {
             let mut pen = call.x;
             let base = (call.y + self.ascent) as f32;
             for &b in &call.bytes {
+                if let Some(table) = &self.glyphs {
+                    if let Some(g) = &table[usize::from(b)] {
+                        for (k, &on) in g.bits.iter().enumerate() {
+                            if on {
+                                let (x, y) = ((k % g.w) as i32, (k / g.w) as i32);
+                                put(
+                                    pen + g.x0 + x,
+                                    call.y + self.ascent - g.top + y,
+                                    call.colour,
+                                );
+                            }
+                        }
+                    }
+                    pen += self.advance(b);
+                    continue;
+                }
                 let g = Glyph {
                     id: self.glyph(b),
                     scale,
@@ -691,5 +722,231 @@ mod tests {
     fn colours() {
         assert_eq!(rgb565(0xffffff), 0xffff);
         assert_eq!(rgb565(0), 0);
+    }
+}
+
+/// A glyph's pixels as GDI lights them: `w` x `h` from the column `x0`
+/// right of the pen and the row `top` above the baseline.
+#[derive(Clone, Debug)]
+struct GlyphBits {
+    x0: i32,
+    top: i32,
+    w: usize,
+    bits: Vec<bool>,
+}
+
+/// Every byte's glyph ([`gdi_glyph`]) at `ppem`, or `None` when the font
+/// has no hinting program to run.
+fn gdi_glyphs(ttf: &[u8], ppem: u16, font: &FontVec) -> Option<Vec<Option<GlyphBits>>> {
+    use skrifa::instance::{LocationRef, Size};
+    use skrifa::outline::{Engine, HintingInstance, HintingOptions, Target};
+    use skrifa::{FontRef, MetadataProvider};
+    let f = FontRef::new(ttf).ok()?;
+    let outlines = f.outline_glyphs();
+    let options = HintingOptions {
+        engine: Engine::Interpreter,
+        target: Target::Mono,
+    };
+    let hinting = HintingInstance::new(
+        &outlines,
+        Size::new(f32::from(ppem)),
+        LocationRef::default(),
+        options,
+    )
+    .ok()?;
+    Some(
+        (0..=255u8)
+            .map(|b| {
+                let id = font.glyph_id(TextCodePage::Windows1252.char_of(b));
+                let g = outlines.get(skrifa::GlyphId::new(u32::from(id.0)))?;
+                gdi_glyph(&g, &hinting)
+            })
+            .collect(),
+    )
+}
+
+/// The outline as the font's hinting program leaves it at that size
+/// (the TrueType interpreter for a monochrome target) and GDI's scan
+/// conversion of it: a pixel lit when its centre is inside (non-zero
+/// winding), then the dropouts: a run between two crossings of a row's
+/// or a column's centre line that holds no pixel centre lights the pixel
+/// nearest its middle. GDI's own rules for the dropouts (and the stubs it
+/// leaves out) are not all known: measured against Windows 98 SE and 11
+/// (`tests/gdi_glyphs.rs`).
+fn gdi_glyph(
+    g: &skrifa::outline::OutlineGlyph,
+    hinting: &skrifa::outline::HintingInstance,
+) -> Option<GlyphBits> {
+    let mut pen = Flatten::default();
+    g.draw(
+        skrifa::outline::DrawSettings::hinted(hinting, false),
+        &mut pen,
+    )
+    .ok()?;
+    pen.end();
+    let cs = &pen.contours;
+    let pts = cs.iter().flatten();
+    let (mut xmin, mut xmax, mut ymin, mut ymax) = (f64::MAX, f64::MIN, f64::MAX, f64::MIN);
+    for &(x, y) in pts {
+        xmin = xmin.min(x);
+        xmax = xmax.max(x);
+        ymin = ymin.min(y);
+        ymax = ymax.max(y);
+    }
+    if xmin > xmax {
+        return None;
+    }
+    // The pixels (columns x0.., rows from `top` above the baseline down)
+    // that may hold a centre or a dropout, with a margin of one.
+    let x0 = xmin.floor() as i32 - 1;
+    let top = ymax.ceil() as i32 + 1;
+    let w = (xmax.ceil() as i32 + 1 - x0) as usize;
+    let h = (top - (ymin.floor() as i32 - 1)) as usize;
+    let mut bits = vec![false; w * h];
+    // Pixel (i, j) has its centre at x = x0 + i + 0.5, y = top − j − 0.5.
+    for j in 0..h {
+        let cy = f64::from(top) - j as f64 - 0.5;
+        for i in 0..w {
+            let cx = f64::from(x0) + i as f64 + 0.5;
+            bits[j * w + i] = winding(cs, cx, cy) != 0;
+        }
+    }
+    // Dropouts along the rows, then the columns.
+    for j in 0..h {
+        let cy = f64::from(top) - j as f64 - 0.5;
+        for (l, r) in runs(cs, cy, false) {
+            let (l, r) = (l - f64::from(x0), r - f64::from(x0));
+            if (l - 0.5).ceil() > (r - 0.5).floor() {
+                let m = ((l + r) / 2.0).floor();
+                if m >= 0.0 && (m as usize) < w {
+                    bits[j * w + m as usize] = true;
+                }
+            }
+        }
+    }
+    for i in 0..w {
+        let cx = f64::from(x0) + i as f64 + 0.5;
+        for (lo, hi) in runs(cs, cx, true) {
+            // Rows down from `top`.
+            let (a, b) = (f64::from(top) - hi, f64::from(top) - lo);
+            if (a - 0.5).ceil() > (b - 0.5).floor() {
+                let m = ((a + b) / 2.0).floor();
+                if m >= 0.0 && (m as usize) < h {
+                    bits[m as usize * w + i] = true;
+                }
+            }
+        }
+    }
+    Some(GlyphBits { x0, top, w, bits })
+}
+
+/// Non-zero winding number of the polygons `cs` at (x, y).
+fn winding(cs: &[Vec<(f64, f64)>], x: f64, y: f64) -> i32 {
+    let mut n = 0;
+    for c in cs {
+        for k in 0..c.len() {
+            let (x0, y0) = c[k];
+            let (x1, y1) = c[(k + 1) % c.len()];
+            let side = (x1 - x0) * (y - y0) - (x - x0) * (y1 - y0);
+            if y0 <= y {
+                if y1 > y && side > 0.0 {
+                    n += 1;
+                }
+            } else if y1 <= y && side < 0.0 {
+                n -= 1;
+            }
+        }
+    }
+    n
+}
+
+/// The inside runs (from, to) of the line y = `at` (`vertical`: x = `at`,
+/// the runs along y), from the crossings and their windings.
+fn runs(cs: &[Vec<(f64, f64)>], at: f64, vertical: bool) -> Vec<(f64, f64)> {
+    let mut xs: Vec<(f64, i32)> = Vec::new();
+    for c in cs {
+        for k in 0..c.len() {
+            let (mut a, mut b) = (c[k], c[(k + 1) % c.len()]);
+            if vertical {
+                a = (a.1, a.0);
+                b = (b.1, b.0);
+            }
+            if (a.1 <= at && b.1 > at) || (b.1 <= at && a.1 > at) {
+                let t = (at - a.1) / (b.1 - a.1);
+                xs.push((a.0 + t * (b.0 - a.0), if b.1 > a.1 { 1 } else { -1 }));
+            }
+        }
+    }
+    xs.sort_by(|p, q| p.0.total_cmp(&q.0));
+    let mut out = Vec::new();
+    let mut n = 0;
+    let mut from = 0.0;
+    for (x, d) in xs {
+        let before = n;
+        n += d;
+        if before == 0 && n != 0 {
+            from = x;
+        } else if before != 0 && n == 0 {
+            out.push((from, x));
+        }
+    }
+    out
+}
+
+/// The hinted outline as polygons (each quadratic curve in 64 steps).
+#[derive(Default)]
+struct Flatten {
+    contours: Vec<Vec<(f64, f64)>>,
+    cur: Vec<(f64, f64)>,
+}
+
+impl Flatten {
+    fn end(&mut self) {
+        if !self.cur.is_empty() {
+            self.contours.push(std::mem::take(&mut self.cur));
+        }
+    }
+}
+
+impl skrifa::outline::OutlinePen for Flatten {
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.end();
+        self.cur.push((f64::from(x), f64::from(y)));
+    }
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.cur.push((f64::from(x), f64::from(y)));
+    }
+    fn quad_to(&mut self, cx: f32, cy: f32, x: f32, y: f32) {
+        let (x0, y0) = self.cur.last().copied().unwrap_or_default();
+        let (cx, cy, x, y) = (f64::from(cx), f64::from(cy), f64::from(x), f64::from(y));
+        for k in 1..=64 {
+            let t = f64::from(k) / 64.0;
+            let u = 1.0 - t;
+            self.cur.push((
+                u * u * x0 + 2.0 * u * t * cx + t * t * x,
+                u * u * y0 + 2.0 * u * t * cy + t * t * y,
+            ));
+        }
+    }
+    fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32) {
+        let (x0, y0) = self.cur.last().copied().unwrap_or_default();
+        let p = [
+            (x0, y0),
+            (f64::from(cx0), f64::from(cy0)),
+            (f64::from(cx1), f64::from(cy1)),
+            (f64::from(x), f64::from(y)),
+        ];
+        for k in 1..=64 {
+            let t = f64::from(k) / 64.0;
+            let u = 1.0 - t;
+            let (a, b, c, d) = (u * u * u, 3.0 * u * u * t, 3.0 * u * t * t, t * t * t);
+            self.cur.push((
+                a * p[0].0 + b * p[1].0 + c * p[2].0 + d * p[3].0,
+                a * p[0].1 + b * p[1].1 + c * p[2].1 + d * p[3].1,
+            ));
+        }
+    }
+    fn close(&mut self) {
+        self.end();
     }
 }

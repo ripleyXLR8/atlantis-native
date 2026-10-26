@@ -47,8 +47,7 @@
 //! - The generator: `random(n)` = `rand() · n / 32767` (@ 0x0048e130), the
 //!   C runtime's one `rand`, which the music's start seeds with the 15 Hz
 //!   count and the dialogs, the music and the place sounds draw from too
-//!   ([`Engine::rand`]); the place animations draw from it as well in the
-//!   original, from their own generator here.
+//!   ([`Engine::rand`]); the place animations draw from it as well.
 
 use atlantis2_data::defnames;
 
@@ -432,7 +431,7 @@ impl Engine {
     }
 
     /// FUN_0048eb10: the mode 3 back to 0.
-    fn souls_quit(&mut self) {
+    pub(super) fn souls_quit(&mut self) {
         if self.puzzle_mode() == SOULS_MODE {
             self.set_puzzle_mode(0);
         }
@@ -471,8 +470,7 @@ impl Engine {
             .collect();
         if candidates.len() >= 0x22 {
             // The fatal error (@ 0x0048df86); the data never reach it.
-            log::error!("{OVERFLOW}");
-            self.with_script(|s, _| s.fail(OVERFLOW.to_string()));
+            self.engine_fatal(OVERFLOW.to_string());
         }
         self.souls_candidates = candidates.len() as i32;
         self.souls_loaded = 0;
@@ -530,8 +528,7 @@ impl Engine {
         });
         let spw = spw?;
         self.spw_loaded = true;
-        let n = self.anim.slots.len();
-        self.anim.load(&name, spw, kind, id, sprite, s);
+        let n = self.spw_load(&name, spw, kind, id, sprite, s)?;
         let slot = self.anim.slots.get_mut(n)?;
         slot.record = Some((ei, si));
         // AtlSpw_load's next state (+0x28); no chain is linked here

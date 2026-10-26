@@ -43,7 +43,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -729,7 +729,7 @@ fn the_map_is_drawn_from_its_frame_table_as_the_original() {
     let golden: Vec<&str> = rows("G tab");
     for row in &golden {
         let table = parse(row.split(' ').nth(2).unwrap());
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         a.load(
             "ep",
             Spw::parse(data.clone()).unwrap(),

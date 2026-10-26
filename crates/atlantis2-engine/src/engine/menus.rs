@@ -21,6 +21,7 @@ impl Engine {
         m.input.x = self.pointer.0.clamp(0, WIDTH as i32 - 1);
         m.input.y = self.pointer.1.clamp(0, HEIGHT as i32 - 1);
         m.input.held = self.button_held;
+        m.date_text = self.date_text;
         let r = f(&mut m, self);
         self.menu = Some(m);
         r
@@ -47,6 +48,12 @@ impl Engine {
         self.with_menu(|m, e| m.start_main(e));
     }
 
+    /// A menu frame whose action is `act` (a test hook, see
+    /// [`Menu::step_action`]).
+    pub fn menu_step_action(&mut self, act: i32) {
+        self.with_menu(|m, e| m.step_action(e, act));
+    }
+
     /// The credits (`AtlMenu_start_Credits` @ 0x00486e00).
     pub fn open_credits(&mut self) {
         self.with_menu(|m, e| m.start_credits(e));
@@ -71,7 +78,7 @@ impl Engine {
             return;
         }
         match self.loop_type {
-            LoopType::Warp | LoopType::Picture => self.open_main_menu(),
+            LoopType::Warp | LoopType::Message | LoopType::Picture => self.open_main_menu(),
             LoopType::Dialog => self.end_dialog(),
             LoopType::Video => {}
             LoopType::Menu => self.with_menu(|m, e| m.escape(e)),
@@ -127,6 +134,12 @@ impl Engine {
 
     /// The menu loop's frame (@ 0x00486eb0).
     pub(super) fn menu_pass(&mut self, out: Option<&mut [u16]>) {
+        // The menu frame's first call (@ 0x00486ecf): the music state
+        // machine, through the thunk @ 0x0047a280. In the dispatcher's
+        // loop type 5 it so runs twice a pass, after the dispatcher's own
+        // call (@ 0x0049ce32): a fade's end moves the state on in the
+        // same pass, the ring is refilled twice.
+        self.music_frame();
         if let Some(m) = self.menu.as_mut() {
             m.input.escape = self.escape_down;
         }
@@ -292,6 +305,10 @@ impl MenuHost for Engine {
 
     fn disc_inserted(&mut self) {
         self.with_script(|s, h| s.disc_inserted(h));
+    }
+
+    fn menu_cursor(&mut self) {
+        self.set_cursor_pair(super::CursorBank::Menu, 0);
     }
 
     fn resume_section(&mut self) -> bool {

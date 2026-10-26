@@ -36,7 +36,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -1291,7 +1291,7 @@ fn the_wheels_are_drawn_as_the_original() {
         let spw = Spw::parse(data.clone()).unwrap();
         let count: i32 = w[6].parse().unwrap();
         for f in 0..count {
-            let mut a = Anim::new(0);
+            let mut a = Anim::new();
             a.load(
                 name,
                 Spw::parse(data.clone()).unwrap(),

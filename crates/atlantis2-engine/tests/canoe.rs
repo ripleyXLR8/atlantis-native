@@ -26,12 +26,14 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use atlantis2_data::db::Scene;
 use atlantis2_data::spr::{SprBank, SprDll};
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::canoe::{
-    Canoe, CanoeError, CanoeFiles, CanoeHost, CursorPair, CENTRES, H, SPACING, START_COMMAND,
-    STONES, TILE_OFFSETS, W,
+    Canoe, CanoeError, CanoeFiles, CanoeHost, CursorPair, CENTRES, H, HERO_FILES, SPACING,
+    START_COMMAND, STONES, TILE_OFFSETS, W,
 };
+use atlantis2_engine::engine::web::SLOTS;
 use atlantis2_engine::{Fpu, Variant};
 use md5::{Digest, Md5};
 
@@ -44,7 +46,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -471,6 +473,9 @@ fn replay(golden: &str) {
             md5_32(&c.zbuf),
             md5_32(&c.zheld)
         );
+        // Review L40: no face the port leaves out (transparent, across the
+        // near or far plane, without a map) in any frame.
+        assert_eq!(c.nodes.skipped, 0, "frame {}: faces left out", i.n);
         if let Some(w) = whole.get(&i.n) {
             assert_eq!(format!("{body} | {}", samples(&out)), *w, "frame {}", i.n);
         }
@@ -590,4 +595,90 @@ fn the_canoes_fatal_errors() {
         Some(format!("find_mesh_name(): {} non trouvé", STONES[0].1).as_str())
     );
     assert!(!c.frame(&mut host, (10, 10), true, false, false, &mut out));
+}
+
+/// Review L39-L41: the 3D puzzles' files (the canoe's databases, the
+/// web's eleven models) reach none of the paths the two Atl3D ports
+/// leave out: every material is opaque (a transparent one's faces go to
+/// the deferred list, @ 0x004380b0 via FUN_00429700's 2, and are drawn
+/// with both texture channels) and has its map (slot 1), and no mesh has
+/// a second or third texture-coordinate set (the face drawer's unclipped
+/// path writes the first alone: `DAT_006e152c` / `DAT_006e1530`).
+#[test]
+fn the_3d_puzzles_files_take_only_the_ported_paths() {
+    let Some(game) = game() else { return };
+    let files = Files(game);
+    let mut names: Vec<String> = HERO_FILES.iter().map(|s| s.to_string()).collect();
+    names.extend(STONES.iter().map(|(f, _)| format!("pz_pirog\\{f}")));
+    names.extend(SLOTS.iter().map(|s| format!("pz_araig\\{}", s.file())));
+    let mut materials = 0;
+    for name in &names {
+        let data = files.three_d(name).unwrap_or_else(|| panic!("{name}"));
+        let scene = Scene::parse(&data).unwrap();
+        for m in &scene.materials {
+            assert_eq!(m.transparency, 0.0, "{name}: {} is transparent", m.name);
+            assert!(m.texture().is_some(), "{name}: {} has no map", m.name);
+            materials += 1;
+        }
+        for mesh in &scene.meshes {
+            assert_eq!(mesh.uvs[0].len(), 3 * mesh.face_count as usize, "{name}");
+            assert!(
+                mesh.uvs[1].is_empty() && mesh.uvs[2].is_empty(),
+                "{name}: {} has more texture-coordinate sets",
+                mesh.name
+            );
+        }
+    }
+    assert_eq!(names.len(), 24);
+    assert!(materials > 100, "{materials}");
+}
+
+/// Review L38: the generic face drawer (@ 0x0042d020) never writes the
+/// texture coordinates of the rasteriser's vertex records (@ 0x006e1520),
+/// so the canoe's first polygon reads what the last polygon drawn before
+/// it left there (a dialog's head, in the game); the port starts from
+/// zeros. `tests/golden/canoe_records.txt`, the original run with four
+/// sets preset: the first three frames are the same pictures whatever the
+/// records hold, under both routine sets, and the port's are those.
+#[test]
+fn the_canoe_s_first_frames_whatever_the_records_hold() {
+    let Some(game) = game() else { return };
+    let files = Files(game);
+    let rows: Vec<&str> = include_str!("golden/canoe_records.txt")
+        .lines()
+        .filter(|l| l.starts_with("R "))
+        .collect();
+    assert_eq!(rows.len(), 8);
+    let centre4 = (
+        (270.0 + 121.0 * 1.5 - 89.0 * 1.5) as i32,
+        (86.0 + 46.0 * 1.5 + 63.0 * 1.5) as i32,
+    );
+    for row in rows {
+        let (head, rest) = row.split_once(" [").unwrap();
+        let (fpu, variant) = if head.contains("cpu 8 cw 0e7f") {
+            (Fpu::Chop, Variant::PII)
+        } else {
+            assert!(head.contains("cpu 1 cw 027f"));
+            (Fpu::Double, Variant::C)
+        };
+        let (uv, rest) = rest.split_once("] | frames ").unwrap();
+        let nums: Vec<f64> = uv
+            .split(|c: char| !(c.is_ascii_digit() || c == '.'))
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse().unwrap())
+            .collect();
+        assert_eq!(nums.len(), 6, "{row}");
+        let want: Vec<&str> = rest.split(" | ").next().unwrap().split(' ').collect();
+        let mut host = Host::default();
+        let mut c = Canoe::load(fpu, variant, &files, &mut host).unwrap();
+        c.spr_dll = SprDll::P5;
+        for k in 0..3 {
+            c.records.uv[k] = [nums[2 * k], nums[2 * k + 1]];
+        }
+        let mut out = vec![0u16; W * H];
+        for (f, w) in want.iter().enumerate() {
+            c.frame(&mut host, centre4, false, false, false, &mut out);
+            assert_eq!(md5_16(&out), *w, "{head}: frame {f}");
+        }
+    }
 }

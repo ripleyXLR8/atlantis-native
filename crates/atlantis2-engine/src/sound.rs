@@ -119,6 +119,13 @@ impl MusicVolume {
         }
     }
 
+    /// The x87 control word the fade's arithmetic runs under: the
+    /// process's at the call (the fade runs from the 15 Hz task and the
+    /// music state machine, under whatever word the frame left).
+    pub fn set_fpu(&mut self, fpu: Fpu) {
+        self.fpu = fpu;
+    }
+
     /// The attenuation of the current volume.
     pub fn attenuation(&self) -> i32 {
         volume_to_attenuation(&self.att, self.master, self.volume)
@@ -239,92 +246,57 @@ struct Voice {
     pan: i32,
 }
 
-/// The 12 voices, shared between the engine and the sound output.
-#[derive(Clone, Debug, Default)]
-pub struct Voices(Arc<Mutex<Vec<Option<Voice>>>>);
+/// The rate of DirectSound's primary buffer, the mix the player hears:
+/// `SysSnd_InitSoundCard` (FUN_0040f480(0, 0x5622, 0x10, 2)) gives it the
+/// format PCM 22050 Hz, 16 bits, stereo, and every voice is converted to
+/// it.
+pub const PRIMARY_RATE: u32 = 22050;
 
-/// The original's voice numbers.
-pub const VOICE_MUSIC: usize = 0;
-pub const VOICE_DIALOG: usize = 1;
-pub const VOICE_EFFECTS: usize = 2;
+/// The voices and the mix: DirectSound's mixer as the port stands for it.
+#[derive(Clone, Debug)]
+struct Mixer {
+    voices: Vec<Option<Voice>>,
+    /// The output's place between the primary frames `prev` (0) and
+    /// `next` (1), when the device's rate is not the primary rate.
+    t: f64,
+    prev: [f32; 2],
+    next: [f32; 2],
+    primed: bool,
+    /// A sound output plays the mix (DirectSound's status then tells when
+    /// a voice has been played out; see [`Voices::output_attached`]).
+    attached: bool,
+}
 
-impl Voices {
-    pub fn new() -> Voices {
-        Voices(Arc::new(Mutex::new(vec![None; 12])))
-    }
-
-    fn lock(&self) -> std::sync::MutexGuard<'_, Vec<Option<Voice>>> {
-        self.0.lock().unwrap_or_else(|e| e.into_inner())
-    }
-
-    /// Plays `pcm` on `voice` (stopping what it played), at `attenuation`
-    /// and `pan` (hundredths of dB).
-    pub fn play(&self, voice: usize, pcm: Pcm, looping: bool, attenuation: i32, pan: i32) {
-        if let Some(v) = self.lock().get_mut(voice) {
-            *v = Some(Voice {
-                pcm,
-                pos: 0.0,
-                looping,
-                attenuation,
-                pan,
-            });
+impl Default for Mixer {
+    fn default() -> Self {
+        Mixer {
+            voices: vec![None; 12],
+            t: 0.0,
+            prev: [0.0; 2],
+            next: [0.0; 2],
+            primed: false,
+            attached: false,
         }
     }
+}
 
-    pub fn stop(&self, voice: usize) {
-        if let Some(v) = self.lock().get_mut(voice) {
-            *v = None;
-        }
-    }
-
-    pub fn set_attenuation(&self, voice: usize, attenuation: i32) {
-        if let Some(Some(v)) = self.lock().get_mut(voice) {
-            v.attenuation = attenuation;
-        }
-    }
-
-    /// DirectSound's `SetPan` (hundredths of dB, > 0 attenuates the left
-    /// channel).
-    pub fn set_pan(&self, voice: usize, pan: i32) {
-        if let Some(Some(v)) = self.lock().get_mut(voice) {
-            v.pan = pan;
-        }
-    }
-
-    /// The attenuation and pan of a voice that plays.
-    pub fn levels(&self, voice: usize) -> Option<(i32, i32)> {
-        self.lock()
-            .get(voice)
-            .and_then(|v| v.as_ref().map(|v| (v.attenuation, v.pan)))
-    }
-
-    pub fn is_playing(&self, voice: usize) -> bool {
-        matches!(self.lock().get(voice), Some(Some(_)))
-    }
-
-    /// Voice 0 as the music player's ring ([`crate::music::Ring`]).
-    pub fn music_ring(&self) -> MusicRing<'_> {
-        MusicRing(self)
-    }
-
-    /// Mixes every voice into `out` (interleaved f32, `channels` per
-    /// frame, at `rate`), replacing its content.
-    pub fn fill(&self, out: &mut [f32], rate: u32, channels: usize) {
-        out.fill(0.0);
-        if channels == 0 || rate == 0 {
-            return;
-        }
-        let mut voices = self.lock();
-        for slot in voices.iter_mut() {
+impl Mixer {
+    /// `n` frames of the primary buffer: every voice converted to 22050 Hz
+    /// (linear interpolation), at its attenuation and pan, summed, the sum
+    /// held to the 16-bit range. A voice played out is dropped (its
+    /// status: stopped).
+    fn mix(&mut self, n: usize) -> Vec<[f32; 2]> {
+        let mut out = vec![[0.0f32; 2]; n];
+        for slot in self.voices.iter_mut() {
             let Some(v) = slot else { continue };
             let g = gain(v.attenuation);
             // pan > 0 attenuates the left channel, < 0 the right one.
             let (gl, gr) = (g * gain(-v.pan.max(0)), g * gain(v.pan.min(0)));
             let ch = usize::from(v.pcm.channels.max(1));
             let frames = v.pcm.samples.len() / ch;
-            let step = f64::from(v.pcm.rate) / f64::from(rate);
+            let step = f64::from(v.pcm.rate) / f64::from(PRIMARY_RATE);
             let mut ended = false;
-            for frame in out.chunks_exact_mut(channels) {
+            for frame in out.iter_mut() {
                 if v.pos >= frames as f64 {
                     if v.looping && frames > 0 {
                         v.pos -= frames as f64;
@@ -345,21 +317,177 @@ impl Voices {
                 let s = |k: usize, c: usize| f32::from(v.pcm.samples[k * ch + c.min(ch - 1)]);
                 let l = (s(i, 0) * (1.0 - t) + s(j, 0) * t) / 32768.0;
                 let r = (s(i, 1) * (1.0 - t) + s(j, 1) * t) / 32768.0;
-                if channels == 1 {
-                    frame[0] += 0.5 * (l * gl + r * gr);
-                } else {
-                    frame[0] += l * gl;
-                    frame[1] += r * gr;
-                }
+                frame[0] += l * gl;
+                frame[1] += r * gr;
                 v.pos += step;
             }
-            if ended {
+            if ended || (!v.looping && v.pos >= frames as f64) {
                 *slot = None;
             }
         }
-        for s in out.iter_mut() {
-            *s = s.clamp(-1.0, 1.0);
+        for f in out.iter_mut() {
+            f[0] = f[0].clamp(-1.0, 1.0);
+            f[1] = f[1].clamp(-1.0, 1.0);
         }
+        out
+    }
+}
+
+/// The 12 voices, shared between the engine and the sound output.
+#[derive(Clone, Debug, Default)]
+pub struct Voices(Arc<Mutex<Mixer>>);
+
+/// The original's voice numbers.
+pub const VOICE_MUSIC: usize = 0;
+pub const VOICE_DIALOG: usize = 1;
+pub const VOICE_EFFECTS: usize = 2;
+
+impl Voices {
+    pub fn new() -> Voices {
+        Voices(Arc::new(Mutex::new(Mixer::default())))
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, Mixer> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Plays `pcm` on `voice` (stopping what it played), at `attenuation`
+    /// and `pan` (hundredths of dB).
+    pub fn play(&self, voice: usize, pcm: Pcm, looping: bool, attenuation: i32, pan: i32) {
+        if let Some(v) = self.lock().voices.get_mut(voice) {
+            *v = Some(Voice {
+                pcm,
+                pos: 0.0,
+                looping,
+                attenuation,
+                pan,
+            });
+        }
+    }
+
+    pub fn stop(&self, voice: usize) {
+        if let Some(v) = self.lock().voices.get_mut(voice) {
+            *v = None;
+        }
+    }
+
+    pub fn set_attenuation(&self, voice: usize, attenuation: i32) {
+        if let Some(Some(v)) = self.lock().voices.get_mut(voice) {
+            v.attenuation = attenuation;
+        }
+    }
+
+    /// DirectSound's `SetPan` (hundredths of dB, > 0 attenuates the left
+    /// channel).
+    pub fn set_pan(&self, voice: usize, pan: i32) {
+        if let Some(Some(v)) = self.lock().voices.get_mut(voice) {
+            v.pan = pan;
+        }
+    }
+
+    /// The attenuation and pan of a voice that plays.
+    pub fn levels(&self, voice: usize) -> Option<(i32, i32)> {
+        self.lock()
+            .voices
+            .get(voice)
+            .and_then(|v| v.as_ref().map(|v| (v.attenuation, v.pan)))
+    }
+
+    /// What a voice plays: its sample rate, channels, frames and looping
+    /// flag (DirectSound's buffer format, size and play flags).
+    pub fn format(&self, voice: usize) -> Option<(u32, u16, usize, bool)> {
+        self.lock().voices.get(voice).and_then(|v| {
+            v.as_ref().map(|v| {
+                let ch = usize::from(v.pcm.channels.max(1));
+                (
+                    v.pcm.rate,
+                    v.pcm.channels,
+                    v.pcm.samples.len() / ch,
+                    v.looping,
+                )
+            })
+        })
+    }
+
+    pub fn is_playing(&self, voice: usize) -> bool {
+        matches!(self.lock().voices.get(voice), Some(Some(_)))
+    }
+
+    /// A sound output plays the mix from now on ([`Voices::fill`] is
+    /// called as the device asks): a voice's status is then the one the
+    /// player hears, as DirectSound's is.
+    pub fn attach_output(&self) {
+        self.lock().attached = true;
+    }
+
+    /// Whether a sound output plays the mix.
+    pub fn output_attached(&self) -> bool {
+        self.lock().attached
+    }
+
+    /// Voice 0 as the music player's ring ([`crate::music::Ring`]).
+    pub fn music_ring(&self) -> MusicRing<'_> {
+        MusicRing(self)
+    }
+
+    /// The mix into `out` (interleaved f32, `channels` per frame, at
+    /// `rate`), replacing its content: DirectSound's primary buffer (every
+    /// voice converted to [`PRIMARY_RATE`] by linear interpolation and
+    /// summed: a 44100 Hz file keeps one sample in two, unfiltered, so
+    /// what it holds above 11025 Hz folds back below; how the players'
+    /// DirectSound converts is not known), then that buffer converted to
+    /// the device's rate (linear interpolation).
+    pub fn fill(&self, out: &mut [f32], rate: u32, channels: usize) {
+        out.fill(0.0);
+        if channels == 0 || rate == 0 {
+            return;
+        }
+        let frames = out.len() / channels;
+        let mut m = self.lock();
+        let put = |frame: &mut [f32], s: [f32; 2]| {
+            if channels == 1 {
+                frame[0] = 0.5 * (s[0] + s[1]);
+            } else {
+                frame[0] = s[0];
+                frame[1] = s[1];
+            }
+        };
+        if rate == PRIMARY_RATE {
+            let block = m.mix(frames);
+            for (frame, s) in out.chunks_exact_mut(channels).zip(block) {
+                put(frame, s);
+            }
+            return;
+        }
+        if !m.primed {
+            let b = m.mix(2);
+            m.prev = b[0];
+            m.next = b[1];
+            m.primed = true;
+        }
+        let step = f64::from(PRIMARY_RATE) / f64::from(rate);
+        // Primary frames 0 (`prev`), 1 (`next`), then the new ones, up to
+        // the one after the place the next call starts from.
+        let end = m.t + frames as f64 * step;
+        let last = end.floor() as usize + 1;
+        let block = m.mix(last.saturating_sub(1));
+        let (prev, next) = (m.prev, m.next);
+        let at = |i: usize| match i {
+            0 => prev,
+            1 => next,
+            _ => block[i - 2],
+        };
+        for (k, frame) in out.chunks_exact_mut(channels).enumerate() {
+            let pos = m.t + k as f64 * step;
+            let i = pos as usize;
+            let f = (pos - i as f64) as f32;
+            let (a, b) = (at(i), at(i + 1));
+            put(frame, [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+        }
+        let n = end as usize;
+        m.prev = at(n);
+        m.next = at(n + 1);
+        m.t = end - n as f64;
     }
 }
 
@@ -369,21 +497,21 @@ pub struct MusicRing<'a>(&'a Voices);
 
 impl crate::music::Ring for MusicRing<'_> {
     fn cursor(&self) -> Option<i32> {
-        let voices = self.0.lock();
-        let v = voices.get(VOICE_MUSIC)?.as_ref()?;
+        let mixer = self.0.lock();
+        let v = mixer.voices.get(VOICE_MUSIC)?.as_ref()?;
         let ch = i32::from(v.pcm.channels.max(1));
         Some(v.pos as i32 * ch * 2)
     }
 
     fn set_cursor(&mut self, at: i32) {
-        if let Some(Some(v)) = self.0.lock().get_mut(VOICE_MUSIC) {
+        if let Some(Some(v)) = self.0.lock().voices.get_mut(VOICE_MUSIC) {
             let ch = i32::from(v.pcm.channels.max(1));
             v.pos = f64::from(at / (ch * 2));
         }
     }
 
     fn write(&mut self, at: i32, samples: &[i16]) {
-        if let Some(Some(v)) = self.0.lock().get_mut(VOICE_MUSIC) {
+        if let Some(Some(v)) = self.0.lock().voices.get_mut(VOICE_MUSIC) {
             let buf = Arc::make_mut(&mut v.pcm.samples);
             let start = (at.max(0) / 2) as usize;
             let end = (start + samples.len()).min(buf.len());
@@ -429,6 +557,54 @@ mod tests {
             t += 1.0 / 15.0;
         }
         assert_eq!((m.volume, m.state), (16, 4));
+    }
+
+    /// The four 44100 Hz files reach the output through the 22050 Hz
+    /// primary buffer (FUN_0040f480's format) whatever the device's rate:
+    /// the conversion keeps one sample in two, unfiltered, so a 22050 Hz
+    /// component (samples alternating) comes out as a constant (aliased
+    /// to 0 Hz), not removed. (The players' DirectSound converter is not
+    /// known; this pins Native's.)
+    #[test]
+    fn the_mix_is_the_22050_hz_primary_buffer() {
+        let v = Voices::new();
+        let samples: Vec<i16> = (0..4000)
+            .map(|i| if i % 2 == 0 { 16384 } else { -16384 })
+            .collect();
+        let pcm = Pcm {
+            rate: 44100,
+            channels: 1,
+            samples: Arc::new(samples),
+        };
+        for rate in [48000, 44100, 22050] {
+            v.play(VOICE_EFFECTS, pcm.clone(), false, 0, 0);
+            let mut out = vec![0.0; 2 * 1000];
+            v.fill(&mut out, rate, 2);
+            assert!(out.iter().all(|&s| s == 0.5), "{rate} Hz: {:?}", &out[..8]);
+        }
+    }
+
+    /// The conversion to the device's rate goes on from call to call:
+    /// one call or many give the same samples.
+    #[test]
+    fn the_device_rate_conversion_streams() {
+        let pcm = Pcm {
+            rate: 22050,
+            channels: 2,
+            samples: Arc::new((0..20000).map(|i| ((i * 37) % 30000) as i16).collect()),
+        };
+        let (a, b) = (Voices::new(), Voices::new());
+        a.play(VOICE_MUSIC, pcm.clone(), true, 0, 0);
+        b.play(VOICE_MUSIC, pcm, true, 0, 0);
+        let mut whole = vec![0.0; 2 * 4800];
+        a.fill(&mut whole, 48000, 2);
+        let mut parts = Vec::new();
+        for n in [7, 480, 1, 1000, 3312] {
+            let mut out = vec![0.0; 2 * n];
+            b.fill(&mut out, 48000, 2);
+            parts.extend(out);
+        }
+        assert_eq!(parts, whole);
     }
 
     #[test]

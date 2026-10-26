@@ -205,6 +205,12 @@ fn main() {
     };
     let take = text_value("--take");
     let command = text_value("--command");
+    let seed = text_value("--seed").map(|v| {
+        v.parse::<u32>().unwrap_or_else(|_| {
+            eprintln!("--seed {v}: not a number from 0 to 4294967295");
+            std::process::exit(2);
+        })
+    });
     let hold = text_value("--hold");
     let size = text_value("--size").map(|v| {
         atlantis_app::a2::A2Start::parse_size(&v).unwrap_or_else(|| {
@@ -271,6 +277,7 @@ fn main() {
         commands: command.into_iter().collect(),
         resolution,
         options_menu,
+        seed,
     };
     // `--original`, `--hd` and `--widescreen` hold for both games (for
     // this run: `settings.ini` is not changed). A headless run starts
@@ -278,6 +285,7 @@ fn main() {
     let a2_flags_applied = |mut x: atlantis2_engine::Enhancements| {
         if original {
             x.minor_bug_fixes = false;
+            x.ui_ux = false;
         }
         x.hd |= force_hd;
         x.hd_options.widescreen |= force_wide;
@@ -317,6 +325,7 @@ fn main() {
         ("--resolution", resolution.is_some()),
         ("--options-menu", options_menu),
         ("--command", !a2_start.commands.is_empty()),
+        ("--seed", seed.is_some()),
     ]
     .into_iter()
     .filter_map(|(name, on)| on.then_some(name))

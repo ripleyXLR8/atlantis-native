@@ -96,6 +96,9 @@ pub enum UiBank {
     /// The world's subjects bank (`spr\suj*.spr`, @ 0x006cfb5c): frame 0
     /// the ring of a cell, the others the subjects.
     Subjects,
+    /// The menus' pointer (`spr\Menu\curseur.spr` @ 0x006d1744), when the
+    /// cursor pair still holds it after a menu.
+    Menu,
 }
 
 /// The bar's layout and scroll (@ 0x00671ee0..0x00671ef0).

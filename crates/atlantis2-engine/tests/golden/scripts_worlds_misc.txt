@@ -1,0 +1,97 @@
+# SetVariables of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation, the other worlds' script keys
+# defnames.con md5 b80c3351c39c1e4678f13388c2dc0c83
+# zones: ClicPied122 = 64, ClicTezStatue = 65 (#ZONES_CLIC# indices)
+zones start v122:3/64/on,3/65/on,3/64/on v47:1/1/on,2/1/on,1/3/on v1:1/2/on,1/5/on,3/9/on
+/set(DisableZoneClicNWNZ=1,2) | ret=30 | calls=- | changes=var[219]=1
+  zones v122:3/64/on,3/65/on,3/64/on v47:1/1/on,2/1/on,1/3/on v1:88889/2/off,1/5/on,3/9/on
+/set(DisableZoneClicNWNZ=1,2) | ret=30 | calls=- | changes=-
+  zones v122:3/64/on,3/65/on,3/64/on v47:1/1/on,2/1/on,1/3/on v1:88889/2/off,1/5/on,3/9/on
+/set(DisableZoneClicNWNZ=47,1) | ret=31 | calls=- | changes=var[219]=47
+  zones v122:3/64/on,3/65/on,3/64/on v47:88889/1/off,88890/1/off,1/3/on v1:88889/2/off,1/5/on,3/9/on
+/set(EnableZoneClicNWNZ=1,2) | ret=29 | calls=- | changes=var[220]=1
+  zones v122:3/64/on,3/65/on,3/64/on v47:88889/1/off,88890/1/off,1/3/on v1:1/2/on,1/5/on,3/9/on
+/set(EnableZoneClicNWNZ=1,2) | ret=29 | calls=- | changes=-
+  zones v122:3/64/on,3/65/on,3/64/on v47:88889/1/off,88890/1/off,1/3/on v1:1/2/on,1/5/on,3/9/on
+/set(DisableZoneClicNWNZ=1,9) | ret=30 | calls=- | changes=var[219]=1
+  zones v122:3/64/on,3/65/on,3/64/on v47:88889/1/off,88890/1/off,1/3/on v1:1/2/on,1/5/on,88891/9/off
+/set(DisableZoneClicNWNameZ=122,ClicPied122) | ret=45 | calls=- | changes=var[239]=122
+  zones v122:88891/64/off,3/65/on,88891/64/off v47:88889/1/off,88890/1/off,1/3/on v1:1/2/on,1/5/on,88891/9/off
+/set(EnableZoneClicNWNameZ=122,ClicPied122) | ret=44 | calls=- | changes=var[240]=122
+  zones v122:3/64/on,3/65/on,3/64/on v47:88889/1/off,88890/1/off,1/3/on v1:1/2/on,1/5/on,88891/9/off
+/set(DisableZoneClicNWNZ=5,2) | ret=30 | calls=- | changes=var[219]=5
+  zones v122:3/64/on,3/65/on,3/64/on v47:88889/1/off,88890/1/off,1/3/on v1:1/2/on,1/5/on,88891/9/off
+zoom start fov=76 fov_target=76 fov_step=1 roll_sum=0 roll_step=0
+/set(ZoomStart=100) | ret=20 | calls=- | changes=-
+  fov=76 fov_target=35 fov_step=1 roll_sum=0 roll_step=0
+/set(ZoomStart=50) | ret=19 | calls=- | changes=-
+  fov=76 fov_target=35 fov_step=0.5 roll_sum=0 roll_step=0
+  (harness: fov and target back to 76)
+/set(ZoomPsychoStart=180,3) | ret=28 | calls=- | changes=-
+  fov=76 fov_target=3 fov_step=1.8 roll_sum=0 roll_step=-0.16
+/set(ZoomPsychoStart=90,10) | ret=28 | calls=- | changes=-
+  fov=76 fov_target=3 fov_step=1.8 roll_sum=0 roll_step=-0.16
+/set(NextVue=130) | ret=18 | calls=AtlWam_FindView(130) | changes=var[13]=130 next_view_ptr=view#130
+/set(TrajSound=sound512) | ret=25 | calls=- | changes=traj='sound512.apc'
+/set(LIMITEANGLEWARPX=50) | ret=26 | calls=- | changes=var[45]=50
+/set(LIMITEANGLEWARPX=999) | ret=27 | calls=- | changes=var[45]=-1
+/set(AngleWarpYNow=0) | ret=22 | calls=AtlWarp_SetAngleYNow(0) | changes=-
+/set(credits=1) | ret=16 | calls=Credits_Start() | changes=resume_pending=1
+/set(exit=1) | ret=13 | calls=- | changes=var[77]=1 quit=1
+/set(newsound=203) | ret=19 | calls=AtlSound_NewSound('sound203.apc') | changes=-
+/set(viewbigspr=CarteChi.spr) | ret=30 | calls=ViewBigSpr_Start('CarteChi.spr)') | changes=-
+/set(showbarque=3) | ret=19 | calls=- | changes=var[201]=3
+/set(enablesuj,ABBE,MAITRE,SALLE_TORTUE) | ret=41 | calls=- | changes=subj[55]=2/36/1;13/39/1
+/set(MemoNumDial=327) | ret=22 | calls=- | changes=var[229]=327
+/set(dial=MemoNumDial) | ret=23 | calls=AtlDial_start(327) AtlMuzik_Volume(16) | changes=resume_pending=1
+/set(EnergieJoueur=10) | ret=23 | calls=- | changes=var[223]=10
+/set(SpaceDeep++) | ret=18 | calls=- | changes=var[218]=1
+/set(nbpassageporte++) | ret=23 | calls=- | changes=var[109]=1
+# rod: step 0x005e2efc = 1 at start; SprCount returns 7
+rod NEARW77=6: frames 0 1 2 3 4 5 5 4 3 2 1 0 0 1 2 3 | overlay=1 SOURCIER=1 OBJETENMAIN=5
+rod NEARW77=4: frames 0 1 2 3 3 2 1 0 0 1 2 3 3 2 1 0 | overlay=1 SOURCIER=1 OBJETENMAIN=5
+rod NEARW77=2: frames 0 1 1 0 0 1 1 0 0 1 1 0 0 1 1 0 | overlay=1 SOURCIER=1 OBJETENMAIN=5
+rod NEARW77=0: frames - | overlay=0 SOURCIER=0 OBJETENMAIN=0
+form FORMULAIRE 0 (essai 1,4,6): SprDraw(119, 0, 320, 240, 0)
+form FORMULAIRE 1 (essai 1,4,6): SprDraw(119, 0, 320, 240, 0) SprDraw(119, 4, 320, 120, 0)
+form FORMULAIRE 2 (essai 1,4,6): SprDraw(119, 0, 320, 240, 0) SprDraw(119, 4, 320, 120, 0) SprDraw(119, 1, 320, 240, 0)
+form FORMULAIRE 3 (essai 1,4,6): SprDraw(119, 0, 320, 240, 0) SprDraw(119, 4, 320, 120, 0) SprDraw(119, 1, 320, 240, 0) SprDraw(119, 5, 320, 360, 0)
+fan soluce_laby=0: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 4, 190, 190, 0) SprDraw(119, 1, 320, 140, 0) SprDraw(119, 5, 450, 190, 0) -> soluce_laby=1 warn
+fan soluce_laby=1: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 4, 190, 190, 0) SprDraw(119, 1, 320, 140, 0) SprDraw(119, 5, 450, 190, 0) -> soluce_laby=1
+fan soluce_laby=2: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 3, 190, 190, 0) SprDraw(119, 6, 320, 140, 0) SprDraw(119, 2, 450, 190, 0) -> soluce_laby=2
+fan soluce_laby=3: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 2, 190, 190, 0) SprDraw(119, 4, 320, 140, 0) SprDraw(119, 1, 450, 190, 0) -> soluce_laby=3
+fan soluce_laby=4: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 1, 190, 190, 0) SprDraw(119, 3, 320, 140, 0) SprDraw(119, 4, 450, 190, 0) -> soluce_laby=4
+fan soluce_laby=5: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 6, 190, 190, 0) SprDraw(119, 4, 320, 140, 0) SprDraw(119, 5, 450, 190, 0) -> soluce_laby=5
+fan soluce_laby=6: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 5, 190, 190, 0) SprDraw(119, 2, 320, 140, 0) SprDraw(119, 1, 450, 190, 0) -> soluce_laby=6
+fan soluce_laby=7: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 4, 190, 190, 0) SprDraw(119, 2, 320, 140, 0) SprDraw(119, 6, 450, 190, 0) -> soluce_laby=7
+fan soluce_laby=8: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 3, 190, 190, 0) SprDraw(119, 5, 320, 140, 0) SprDraw(119, 3, 450, 190, 0) -> soluce_laby=8
+fan soluce_laby=9: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 2, 190, 190, 0) SprDraw(119, 5, 320, 140, 0) SprDraw(119, 4, 450, 190, 0) -> soluce_laby=9
+fan soluce_laby=10: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 1, 190, 190, 0) SprDraw(119, 4, 320, 140, 0) SprDraw(119, 6, 450, 190, 0) -> soluce_laby=10
+fan soluce_laby=11: SprDraw(119, 7, 320, 240, 0) SprDraw(119, 4, 190, 190, 0) SprDraw(119, 1, 320, 140, 0) SprDraw(119, 5, 450, 190, 0) -> soluce_laby=1 warn
+maya solutions 0000000000000045 0000000000040001 0000155500350001
+maya1 leave, state 0000000000000000: finmaya1=0
+maya1 click, state = solution: finmaya1=1 0x006d2684=2 calls=Maya_ClickStep(0, 0),Maya_WinSound()
+maya1 leave solved: finmaya1=1
+maya enter view of grid 1 with resetmaya1=1: states 0000000000000000 1111111111111111 1111111111111111 resetmaya1=0 calls=Maya_Draw(24, '0000000000000000')
+maya enter view of grid 2 with resetmaya2=1: states 1111111111111111 0000000000000000 1111111111111111 resetmaya2=0 calls=Maya_Draw(25, '0000000000000000')
+maya enter view of grid 3 with resetmaya3=1: states 1111111111111111 0000000000000000 1111111111111111 resetmaya3=0 calls=Maya_Draw(26, '1111111111111111')
+wheels first (1, 2, 3, 4, 5): findisque1=1 findisque2=0 calls=AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start('cine024.hnm')
+wheels first wrong (1, 2, 3, 5, 4): findisque1=0 findisque2=0 calls=-
+wheels second (5, 3, 1, 4, 2): findisque1=1 findisque2=1 calls=AtlMuzik_Volume,Input_Refresh,AtlSound_CinemaApc,Input_Refresh,AtlHnm_start('cine025.hnm')
+wheels second wrong (1, 2, 3, 4, 5): findisque1=1 findisque2=0 calls=-
+fireflies zone value -> OrdreMandala index: 1:4 2:1 3:2 4:5 5:3 6:6
+fireflies OrdreMandala1..6 = 3,1,4,2,5,6
+fireflies a: 2->n1/f0 3->n2/f0 1->n3/f0 5->n4/f0 4->n5/f0 6->n6/f1
+fireflies b: 1->n1/f0 2->n2/f0 3->n3/f0 4->n4/f0 5->n5/f0 6->n6/f1
+fireflies c: 2->n1/f0 3->n2/f0 1->n3/f0 5->n4/f0 6->n5/f0 4->n6/f0
+fireflies d: 2->n1/f0 3->n2/f0 1->n3/f0 5->n4/f0 4->n5/f0 6->n6/f1 6->n7/f1
+fireflies e: 7->n0/f0!warning!fatal
+fireflies view entry with Fini=0: AutoWin=0 calls=SetFov(1.32645)
+fireflies view entry with Fini=1: AutoWin=1 calls=SetFov(1.32645)
+spider finaraign 000: stage 0x005e1340=1
+spider finaraign 100: stage 0x005e1340=2
+spider finaraign 110: stage 0x005e1340=3
+spider finaraign 111: stage 0x005e1340=4
+spider finaraign 011: stage 0x005e1340=1
+canoe end: finpirogue=1 Pirogue_JustFinished=1 calls=Pirogue_Exit()
+errors warning:pz_lucioles_gere_clic(): zone_clicked->numero=%d fatal:DefName_GetIdName: Nom de %s inconnu:%s

@@ -32,7 +32,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -1674,7 +1674,7 @@ fn a_soul_is_drawn_as_the_original() {
         let w: Vec<&str> = row.split(' ').collect();
         let (name, frame): (&str, i32) = (w[1], w[3].parse().unwrap());
         let spw = Spw::parse(data.clone()).unwrap();
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         a.load(
             name,
             Spw::parse(data.clone()).unwrap(),

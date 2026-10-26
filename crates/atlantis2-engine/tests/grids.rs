@@ -39,7 +39,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -251,9 +251,13 @@ fn engine_sounds(evs: &[Event]) -> Vec<String> {
         .collect()
 }
 
-/// The sound table empty and the three handles −1.
+/// The sound table empty and the three handles −1. The golden's
+/// harness stubs `NEWSOUND` (its calls are only recorded), so the
+/// scripts' `NEWSOUND`s here must not free the grids' entries through the
+/// shared handle: the handle is set to −1.
 fn clear_sounds(e: &mut Engine) {
     e.sound_table_clear();
+    e.set_sound_handle(-1);
     e.grids.handles = [-1; 3];
 }
 
@@ -1066,7 +1070,7 @@ fn the_grids_are_drawn_as_the_original() {
                     .map(|i| u8::from_str_radix(&l[i..i + 2], 16).unwrap())
                     .collect()
             };
-            let mut anim = Anim::new(0);
+            let mut anim = Anim::new();
             anim.load(name, spw.clone(), 2, 1, 0, state);
             let mut fl = [atlantis2_engine::anim::LIST_END; atlantis2_engine::anim::FRAME_TAB];
             fl[..list.len()].copy_from_slice(&list);
