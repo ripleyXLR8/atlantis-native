@@ -39,7 +39,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -208,6 +208,7 @@ fn state(e: &Engine) -> String {
             CursorBank::Objects => format!("OBJ#{}", s.hand_x),
             CursorBank::Interface => format!("0x11110000#{}", s.hand_x),
             CursorBank::Puzzle => format!("puzzle#{}", s.hand_x),
+            CursorBank::Menu => format!("menu#{}", s.hand_x),
         }
     };
     let pair = format!(

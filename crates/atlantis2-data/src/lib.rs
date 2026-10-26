@@ -22,7 +22,8 @@
 //! - [`dialog`]: the dialog scripts' speakers and lines, their texts, the
 //!   worlds' file sets and heroes, and `Font.txt`;
 //! - [`messages`]: the object names the bag bar shows;
-//! - [`canoe`]: the canoe puzzle's waypoints and depth tiles.
+//! - [`canoe`]: the canoe puzzle's waypoints and depth tiles;
+//! - [`testing`]: what a game-data test does when its data is missing.
 
 #![forbid(unsafe_code)]
 
@@ -38,6 +39,7 @@ pub mod messages;
 pub mod save;
 pub mod spr;
 pub mod spw;
+pub mod testing;
 pub mod tga;
 pub mod wam;
 

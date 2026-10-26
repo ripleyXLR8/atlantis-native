@@ -6,7 +6,7 @@
 //! options menu (F10, [`crate::options_menu`]) writes it at each change.
 //!
 //! It holds the port's options only ([`Enhancements`]: the minor bug
-//! fixes, the graphics and the HD mode's options). The options of the
+//! fixes, the interface conveniences, the graphics and the HD mode's options). The options of the
 //! original's own menus, the 800 x 600 screen among them, stay in
 //! `atlant2.cfg` as the original keeps them.
 
@@ -59,6 +59,10 @@ impl Settings {
                     x.minor_bug_fixes = b;
                     true
                 }
+                ("ui_ux", Some(b)) => {
+                    x.ui_ux = b;
+                    true
+                }
                 ("graphics", _) => Graphics::from_name(v)
                     .map(|g| x.hd = g == Graphics::Hd)
                     .is_some(),
@@ -108,6 +112,8 @@ impl Settings {
             "# Atlantis Native settings (Atlantis II)\n\
              # Enhancements: where the port may differ from the original game\n\
              minor_bug_fixes = {}\n\
+             # Interface conveniences the original lacks (the arrow keys turn)\n\
+             ui_ux = {}\n\
              # The port's graphics (options menu, F10): original or hd\n\
              graphics = {}\n\
              # HD mode: panorama filter (bicubic or bilinear), its sharpening,\n\
@@ -124,6 +130,7 @@ impl Settings {
              # The original's options (subtitles, volumes, the 800 x 600\n\
              # screen) are in atlant2.cfg, as the original keeps them\n",
             b(x.minor_bug_fixes),
+            b(x.ui_ux),
             if x.hd { "hd" } else { "original" },
             o.panorama.name(),
             b(o.sharpen),
@@ -152,6 +159,7 @@ mod tests {
         let s = Settings {
             enhancements: Enhancements {
                 minor_bug_fixes: false,
+                ui_ux: false,
                 hd: true,
                 hd_options: HdOptions {
                     panorama: PanoFilter::Bilinear,
@@ -167,7 +175,8 @@ mod tests {
         // The first game's keys and values.
         let p = Settings::parse(
             "graphics = HD\nhd_panorama = Bilinear\nhd_sharpen = 0\nhd_interface = pixels\n\
-             hd_sharp_subtitles = 0\nhd_widescreen = yes\nhd_video_sides = blur\nminor_bug_fixes = off",
+             hd_sharp_subtitles = 0\nhd_widescreen = yes\nhd_video_sides = blur\nminor_bug_fixes = off\n\
+             ui_ux = no",
         );
         assert_eq!(p, s);
         // Bad values keep the defaults; the sides Atlantis II lacks are black.

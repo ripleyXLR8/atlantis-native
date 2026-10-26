@@ -30,6 +30,13 @@ pub struct Enhancements {
     ///   plays the water's film, and so on
     ///   ([`crate::engine::irish_plain_value_zone`]).
     pub minor_bug_fixes: bool,
+    /// Interface conveniences the original lacks (default on; the first
+    /// game's `ui_ux` group):
+    /// - the arrow keys turn the view (each held key stands for a mouse
+    ///   move of 8 counts a frame); off, as the original, whose key-down
+    ///   callback (atlantis2-cd-fr-2199552 @ 0x004762f0) knows Escape,
+    ///   Space and Alt+Enter only, the view turns with the mouse alone.
+    pub ui_ux: bool,
     /// The HD mode (default off; the first game's `graphics = hd`,
     /// `--hd`): the panorama drawn at the window's resolution with the
     /// original's projection (see [`crate::hd`]); the engine's 640x480
@@ -46,6 +53,7 @@ impl Default for Enhancements {
     fn default() -> Self {
         Enhancements {
             minor_bug_fixes: true,
+            ui_ux: true,
             hd: false,
             hd_options: HdOptions::default(),
         }
@@ -58,6 +66,7 @@ impl Enhancements {
     pub fn original() -> Self {
         Enhancements {
             minor_bug_fixes: false,
+            ui_ux: false,
             hd: false,
             hd_options: HdOptions::default(),
         }

@@ -72,7 +72,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA or ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA or ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -83,7 +83,7 @@ fn game() -> Option<A2Files> {
 /// GOG's installation (`ATLANTIS2_GOG`), opened as a game folder.
 fn gog() -> Option<A2Files> {
     let Some(dir) = std::env::var_os("ATLANTIS2_GOG") else {
-        eprintln!("ATLANTIS2_GOG not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_GOG not set");
         return None;
     };
     let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[]).expect("GOG folder");

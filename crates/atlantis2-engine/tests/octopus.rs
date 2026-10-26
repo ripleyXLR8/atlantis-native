@@ -56,7 +56,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -950,6 +950,7 @@ fn the_cursor_as_the_original() {
                         CursorBank::Interface => "interface",
                         CursorBank::Objects => "objects",
                         CursorBank::Puzzle => "puzzle",
+                        CursorBank::Menu => "menu",
                     };
                     format!("spr {b}#{frame}@{x},{y}")
                 }
@@ -1112,10 +1113,12 @@ fn the_dispatchers_as_the_original() {
             e.puzzles_reset();
             "grid1-leave,grid2-leave,grid3-leave,ring-quit,canoe-quit,web-quit,souls-quit,"
         };
-        // In the mode 1 the web's quit, which the golden's harness stubs,
-        // clears its mode (FUN_00491260), in the port as in the original.
-        let want = if label == "reset" && mode == 1 {
-            row.replacen("| mode 1 |", "| mode 0 |", 1)
+        // In the modes 1, 2 and 3 the web's, the turtle ring's and the
+        // souls' quits, which the golden's harness stubs, clear their mode
+        // (FUN_00491260, FUN_0049c270, FUN_0048eb10), in the port as in
+        // the original.
+        let want = if label == "reset" && (1..=3).contains(&mode) {
+            row.replacen(&format!("| mode {mode} |"), "| mode 0 |", 1)
         } else {
             row.to_string()
         };
@@ -1172,6 +1175,7 @@ fn draws(e: &Engine) -> Vec<String> {
                     CursorBank::Interface => "interface",
                     CursorBank::Objects => "objects",
                     CursorBank::Puzzle => "puzzle",
+                    CursorBank::Menu => "menu",
                 };
                 format!("{b}#{frame}@{x},{y}")
             }

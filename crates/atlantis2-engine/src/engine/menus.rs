@@ -21,6 +21,7 @@ impl Engine {
         m.input.x = self.pointer.0.clamp(0, WIDTH as i32 - 1);
         m.input.y = self.pointer.1.clamp(0, HEIGHT as i32 - 1);
         m.input.held = self.button_held;
+        m.date_text = self.date_text;
         let r = f(&mut m, self);
         self.menu = Some(m);
         r
@@ -45,6 +46,12 @@ impl Engine {
     /// The main menu (`AtlMenu_start` @ 0x00486930).
     pub fn open_main_menu(&mut self) {
         self.with_menu(|m, e| m.start_main(e));
+    }
+
+    /// A menu frame whose action is `act` (a test hook, see
+    /// [`Menu::step_action`]).
+    pub fn menu_step_action(&mut self, act: i32) {
+        self.with_menu(|m, e| m.step_action(e, act));
     }
 
     /// The credits (`AtlMenu_start_Credits` @ 0x00486e00).
@@ -292,6 +299,10 @@ impl MenuHost for Engine {
 
     fn disc_inserted(&mut self) {
         self.with_script(|s, h| s.disc_inserted(h));
+    }
+
+    fn menu_cursor(&mut self) {
+        self.set_cursor_pair(super::CursorBank::Menu, 0);
     }
 
     fn resume_section(&mut self) -> bool {

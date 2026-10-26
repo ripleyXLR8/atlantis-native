@@ -26,7 +26,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -146,7 +146,7 @@ impl Run {
         self.e.escape();
         assert_eq!(self.page(), Some(PageKind::Main));
         self.press_widget("a_disc.spr");
-        self.wait(30);
+        self.wait(31);
         assert_eq!(self.menu().state, state::LOAD_OR_SAVE);
     }
 }
@@ -302,7 +302,8 @@ fn the_main_menu_its_slides_and_the_options() {
     r.press(5, 470);
     assert_eq!((r.page(), r.menu().state), (Some(PageKind::Main), 0));
     // The tool box: every widget disabled, the panel slides 30 frames
-    // (1 + 2 + ... + 30 = 465 pixels), then the options page.
+    // (1 + 2 + ... + 30 = 465 pixels), drawn once at its end, then the
+    // options page.
     let x0 = r
         .menu()
         .page
@@ -318,8 +319,10 @@ fn the_main_menu_its_slides_and_the_options() {
     let c = r.menu().counter;
     let moved = p.widget("c_opt.spr").unwrap().x - x0;
     assert_eq!(moved, c * (c + 1) / 2);
-    r.wait(30 - c as u64 - 1);
+    r.wait(30 - c as u64);
     assert_eq!(r.page(), Some(PageKind::Main));
+    let p = r.menu().page.as_ref().unwrap();
+    assert_eq!(p.widget("c_opt.spr").unwrap().x - x0, 465);
     r.step();
     assert_eq!(r.page(), Some(PageKind::Options));
     // The options: the toggles flip the engine's options.
@@ -360,7 +363,7 @@ fn the_volumes() {
     r.new_game();
     r.e.escape();
     r.press_widget("a_baffle.spr");
-    r.wait(40);
+    r.wait(41);
     assert_eq!(r.page(), Some(PageKind::Sound));
     // The sliders start at general / 256, music / 127 / general, dialogs
     // and effects / 127.

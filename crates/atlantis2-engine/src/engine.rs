@@ -347,6 +347,13 @@ pub enum CursorBank {
     /// The counting grids' marbles (`spr\sprboul.spr` @ 0x006d2694): the
     /// hand pair's only (FUN_00493660).
     Puzzle,
+    /// The menus' pointer (`spr\Menu\curseur.spr` @ 0x006d1744): the
+    /// main, CD and player menus' start sets the pair to (it, 0)
+    /// (FUN_0047bef0 @ 0x004869d5, 0x00486aa8, 0x00486b95) and their stop
+    /// does not put the game's back (FUN_00489040): the pair stays until
+    /// the game sets it again (the next cursor choice, the bag bar's
+    /// opening...), and a save from the menus records its frame 0.
+    Menu,
 }
 
 /// The cursor (@ 0x00474500): a range of `interfac.spr` frames played on
@@ -711,6 +718,12 @@ pub struct Engine {
     data_dir: Option<std::path::PathBuf>,
     /// The time a save is stamped with (`GetLocalTime`).
     pub wall_clock: fn() -> atlantis2_data::save::SystemTime,
+    /// The load page's text of a save's time: the user's locale's short
+    /// date and time (`GetDateFormatA(LOCALE_USER_DEFAULT,
+    /// DATE_SHORTDATE)`, `GetTimeFormatA(LOCALE_USER_DEFAULT, 0)`,
+    /// FUN_0046f830 @ 0x0046f928, 0x0046f94c); by default
+    /// [`crate::menu::date_time`], a French system's.
+    pub date_text: fn(&atlantis2_data::save::SystemTime) -> Vec<u8>,
     /// The saved entries Native keeps as bytes (the dowsing rod, the
     /// puzzles, the dialog flag): those of the last load, written back by
     /// the next save.
@@ -1061,6 +1074,7 @@ impl Engine {
             player_number: 0,
             data_dir: None,
             wall_clock: atlantis2_data::save::SystemTime::default,
+            date_text: crate::menu::date_time,
             save_extra: grids::save_extra_at_start(),
             cfg_extra: atlantis2_data::save::Cfg::default(),
             quit_requested: false,
@@ -2049,6 +2063,7 @@ impl Engine {
                         CursorBank::Interface => self.cursor_bank.as_ref(),
                         CursorBank::Objects => self.objects_bank.as_ref(),
                         CursorBank::Puzzle => self.grids.bank(),
+                        CursorBank::Menu => self.menu.as_deref().and_then(|m| m.cursor_bank()),
                     };
                     if let (Some(bank), Ok(frame)) = (bank, usize::try_from(frame)) {
                         bank.draw(&mut Target::screen(out, w, h), Some(x), y, frame);

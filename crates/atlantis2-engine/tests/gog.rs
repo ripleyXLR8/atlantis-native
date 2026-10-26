@@ -36,7 +36,7 @@ const SUBTITLES_101_CD: &str = include_str!("golden/subtitles_101_cd.txt");
 fn gog_dir() -> Option<PathBuf> {
     let d = std::env::var_os("ATLANTIS2_GOG").map(PathBuf::from);
     if d.is_none() {
-        eprintln!("ATLANTIS2_GOG not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_GOG not set");
     }
     d
 }
@@ -47,10 +47,13 @@ fn gog() -> Option<A2Files> {
 }
 
 fn cd() -> Option<A2Files> {
-    let (dir, discs) = (
-        std::env::var_os("ATLANTIS2_DATA")?,
-        std::env::var_os("ATLANTIS2_DISCS")?,
-    );
+    let (Some(dir), Some(discs)) = (
+        std::env::var_os("ATLANTIS2_DATA"),
+        std::env::var_os("ATLANTIS2_DISCS"),
+    ) else {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
+        return None;
+    };
     let (files, _) =
         A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("game folder");
     Some(files)
@@ -449,7 +452,9 @@ fn a_cd_installation_patched_to_1_01() {
         std::env::var_os("ATLANTIS2_DISCS"),
         std::env::var_os("ATLANTIS2_PATCH101"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS / ATLANTIS2_PATCH101 not set: test skipped");
+        atlantis2_data::testing::missing(
+            "ATLANTIS2_DATA / ATLANTIS2_DISCS / ATLANTIS2_PATCH101 not set",
+        );
         return;
     };
     let install = scratch("a2-patched-101");

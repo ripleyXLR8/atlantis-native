@@ -77,7 +77,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -213,7 +213,7 @@ impl Run {
         self.e.escape();
         assert_eq!(self.page(), Some(PageKind::Main));
         self.press_widget("a_disc.spr");
-        self.wait(30);
+        self.wait(31);
         assert_eq!(self.e.menu().unwrap().state, state::LOAD_OR_SAVE);
     }
 
@@ -6051,7 +6051,7 @@ fn the_whole_game_with_the_mouse() {
 #[test]
 fn the_whole_game_with_the_mouse_on_gog() {
     if std::env::var_os("ATLANTIS2_GOG").is_none() {
-        eprintln!("ATLANTIS2_GOG not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_GOG not set");
         return;
     }
     ON_GOG.with(|g| g.set(true));

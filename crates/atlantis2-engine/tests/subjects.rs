@@ -43,7 +43,7 @@ fn install() -> Option<PathBuf> {
 
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (install(), std::env::var_os("ATLANTIS2_DISCS")) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) = A2Files::open_dir(&dir, &[PathBuf::from(discs)]).expect("game folder");
@@ -376,7 +376,7 @@ impl Host for Rec {
 #[test]
 fn the_shaman_subjects_along_chapter_75_match_the_original() {
     if install().is_none() {
-        eprintln!("ATLANTIS2_DATA not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA not set");
         return;
     }
     let chapter = scenar("chapi075.con");

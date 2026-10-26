@@ -432,7 +432,7 @@ impl Engine {
     }
 
     /// FUN_0048eb10: the mode 3 back to 0.
-    fn souls_quit(&mut self) {
+    pub(super) fn souls_quit(&mut self) {
         if self.puzzle_mode() == SOULS_MODE {
             self.set_puzzle_mode(0);
         }

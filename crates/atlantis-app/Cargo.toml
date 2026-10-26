@@ -38,7 +38,7 @@ rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation", "Win32_Foundation"] }
+windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation", "Win32_Foundation", "Win32_Globalization"] }
 
 # The Dock icon (macOS takes it from the application, not the window).
 [target.'cfg(target_os = "macos")'.dependencies]

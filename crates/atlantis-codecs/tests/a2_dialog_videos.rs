@@ -32,7 +32,7 @@ fn frame_md5(frame: &[u16]) -> String {
 
 fn discs() -> Option<A2Files> {
     let Some(dir) = std::env::var_os("ATLANTIS2_DISCS") else {
-        eprintln!("ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DISCS not set");
         return None;
     };
     let files = A2Files::new(

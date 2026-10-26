@@ -163,7 +163,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA or ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA or ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -249,6 +249,7 @@ fn new_game_shows_the_first_view() {
 #[test]
 fn picks_through_the_camera() {
     let Some(dir) = std::env::var_os("ATLANTIS2_DATA") else {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA not set");
         return;
     };
     let dir = PathBuf::from(dir);

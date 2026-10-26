@@ -9,7 +9,8 @@
 //! options (greyed in the original graphics), the screen (640 x 480 or
 //! 800 x 600, [`crate::display`]; greyed in HD, whose picture is drawn
 //! from the 640 x 480 screen), the minor bug fixes
-//! ([`Enhancements::minor_bug_fixes`]), Close.
+//! ([`Enhancements::minor_bug_fixes`]), the arrow keys' turn
+//! ([`Enhancements::ui_ux`]), Close.
 
 use atlantis_engine::hd::{HdText, PanoFilter, VideoSides};
 use atlantis_engine::options_menu::{BoxInput, MenuBox, Row};
@@ -30,10 +31,11 @@ pub enum Entry {
     VideoSides,
     Screen,
     BugFixes,
+    ArrowKeys,
     Close,
 }
 
-const ENTRIES: [Entry; 10] = [
+const ENTRIES: [Entry; 11] = [
     Entry::Graphics,
     Entry::PanoramaFilter,
     Entry::Sharpen,
@@ -43,6 +45,7 @@ const ENTRIES: [Entry; 10] = [
     Entry::VideoSides,
     Entry::Screen,
     Entry::BugFixes,
+    Entry::ArrowKeys,
     Entry::Close,
 ];
 
@@ -169,6 +172,7 @@ impl OptionsMenu {
                 };
             }
             Entry::BugFixes => x.minor_bug_fixes = !x.minor_bug_fixes,
+            Entry::ArrowKeys => x.ui_ux = !x.ui_ux,
             Entry::Screen => return MenuAction::SetScreen800(!v.screen_800),
             Entry::Close => {
                 self.close();
@@ -197,6 +201,7 @@ impl OptionsMenu {
             Entry::VideoSides => "Widescreen: the bars beside the videos",
             Entry::Screen => "The original's screen sizes (its options page)",
             Entry::BugFixes => "Fixes bugs of the original release (on by default)",
+            Entry::ArrowKeys => "The arrow keys turn the view (the original: the mouse only)",
             Entry::Close => "Back to the game",
         }
     }
@@ -246,6 +251,7 @@ impl OptionsMenu {
                         }),
                     ),
                     Entry::BugFixes => ("Fix original bugs", Some(on(x.minor_bug_fixes))),
+                    Entry::ArrowKeys => ("Arrow keys turn", Some(on(x.ui_ux))),
                     Entry::Close => ("Close", None),
                 };
                 Row {
@@ -316,6 +322,7 @@ mod tests {
     const ORIG: MenuValues = MenuValues {
         enhancements: Enhancements {
             minor_bug_fixes: true,
+            ui_ux: true,
             hd: false,
             hd_options: atlantis_engine::hd::HdOptions {
                 panorama: PanoFilter::Bicubic,
@@ -359,6 +366,13 @@ mod tests {
             panic!("no change");
         };
         assert!(!x.minor_bug_fixes && !x.hd);
+        // The arrow keys' turn, a port convenience (`--original` off).
+        m.key(Key::Down, ORIG);
+        assert_eq!(m.selected(), Entry::ArrowKeys);
+        let MenuAction::SetEnhancements(x) = m.key(Key::Enter, ORIG) else {
+            panic!("no change");
+        };
+        assert!(!x.ui_ux && x.minor_bug_fixes);
         m.key(Key::Down, ORIG);
         assert_eq!(m.selected(), Entry::Close);
         assert_eq!(m.key(Key::Left, ORIG), MenuAction::None);
@@ -426,9 +440,9 @@ mod tests {
         m.draw(&mut plain, 640, 480, &font, hd());
         assert!(s == plain, "same pixels with or without recording");
         assert!(t.after == s);
-        // The title, 9 rows of a label and a value, Close, the
+        // The title, 10 rows of a label and a value, Close, the
         // description and the keys.
-        assert_eq!(t.items.len(), 1 + 9 * 2 + 1 + 2);
+        assert_eq!(t.items.len(), 1 + 10 * 2 + 1 + 2);
         assert!(t.items.iter().any(|i| i.text == b"< HD >"));
         let mut u = s.clone();
         t.uncover(&mut u);

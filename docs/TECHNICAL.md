@@ -79,8 +79,10 @@ Where the port may differ from the original by choice, `Options` holds an
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
-Atlantis II has its own `Enhancements` (`crates/atlantis2-engine/src/enhancements.rs`),
-for now `minor_bug_fixes` alone, on by default: every music track is heard
+Atlantis II has its own `Enhancements` (`crates/atlantis2-engine/src/enhancements.rs`):
+`ui_ux`, on by default, holds the conveniences the original lacks (the
+arrow keys turn the view; the click that gives the window the focus only
+takes the pointer back), and `minor_bug_fixes`, on by default: every music track is heard
 to its end, the next one of the `startmusik` list starting right after
 its last sample (the original drops the last ~5.8 s of a track followed
 by another), and a track that ends with an empty list, or with loops
@@ -1007,7 +1009,15 @@ back) into `yucatan-*.png`.
 - **Turning:** the mouse adds dx / 2000 and −dy / 2000 radians to two
   speeds, which decay × 0.8 a frame; the limits stop the turn (`look.rs`).
   The port turns once per frame, at its 59.94 frames a second (below).
-  The arrow keys stand for 8 mickeys a frame each (a port convenience).
+  The arrow keys stand for 8 mickeys a frame each (a port convenience,
+  the `ui_ux` enhancements: the original's key callback has no turn key).
+  The original reads the mouse once a pass (DirectInput's state, a button
+  newly down is a press), so the press that activates its window is a
+  click: so is every press here, the pointer free or held, but with
+  `ui_ux` the one that gives the window the focus only takes the pointer.
+  The window opens in full screen when `atlant2.cfg`'s byte 8 says so (1,
+  the original's default: its start-up's mode, both releases), or with
+  `--fullscreen`; F11 and 1.00's Alt+Enter switch it and write the byte.
 - **Frame rate:** the original's frame task has no period, but in full
   screen (its default) it shows each frame with `Flip(NULL, DDFLIP_WAIT)`
   on a chain of one back buffer (@ 0x0058fdec, the chain made
@@ -2449,8 +2459,12 @@ back) into `yucatan-*.png`.
   which a take moves to the end; the pointer within 10 pixels of the
   right edge (5 of the left) and in the bottom 80 rows scrolls one entry
   per 0.1 s; over a cell the object's name of `Messages.txt`
-  (`[ObjectNameList]`, keys compared case included, a repeated key
-  keeping its last name, a missing one an empty text) is drawn in
+  (`[ObjectNameList]`, the keys upper-cased, a repeated key keeping its
+  last name, a missing one an empty text; the original's tokenizer: every
+  line of the block is an entry, the name the rest of the line after the
+  blanks, its trailing blanks kept; `atlantis2_data::messages`, against
+  the original's loader run on the installed file and on a synthetic one,
+  `tests/input_ui.rs`) is drawn in
   `AtlFT_POPUP` (10 points) centred on the cell, kept on the screen, its
   top at H − 70, black one pixel down and right then white; a click in
   the bottom 80 rows on cell x / 80 puts its object in the hand and the
@@ -2495,9 +2509,7 @@ back) into `yucatan-*.png`.
   original's (`tests/objects.rs` against its emulated run); the bar's
   frame, scroll, names, pick, the overlays and the dowsing rod follow its
   code as read (no emulated golden of them yet) and are run with the
-  game's files in the same test file. Not known: how `Messages.txt`'s
-  reader splits a line (the port takes the rest of the line after the
-  blanks as the name, as the shipped names hold spaces); the text's two
+  game's files in the same test file. Not known: the text's two
   colours (the calls pass 0 and −1, taken as black and white as for the
   subtitles); the frame of a stamp or symbol whose value is outside the
   executable's table (the original reads past it; the port draws
@@ -2505,7 +2517,11 @@ back) into `yucatan-*.png`.
   (0.10000000149 s) has passed since its last scroll.
   The first frame after the bar closes shows its pointer frame at the
   screen centre, as the original's cursor pair still holds it until the
-  next cursor choice.
+  next cursor choice. The main, CD and player menus set the cursor pair
+  to their own pointer (`curseur.spr`, frame 0) and leave it so when they
+  close: with the bar open across a menu, the bar's pointer is the menus'
+  until the bar closes, and a save made from the menus records the cursor
+  frame 0 (`tests/input_ui.rs`).
 - **Subject menu** (`subjects.rs`, `engine/subjects.rs`,
   `script/subjects.rs`): the subjects of each character are the scripts'
   table kept as the original's memory (256 records of a count and 16
@@ -2849,14 +2865,24 @@ back) into `yucatan-*.png`.
   knob, x0 = x − 65, 115 pixels, the action every frame while held) and
   the load page's list (60-pixel rows, the thumbnail of `save.spr` and the
   date and time in `AtlFT_POPUP`, newest first) with its scroll bar (at
-  the list's right edge, a 200-pixel track). A tooltip shows after 10
-  ticks in a box, centred on it in white over black. Each frame the
+  the list's right edge, a 200-pixel track); the date and time are the
+  front end's (`Engine::date_text`): on Windows the user's locale's short
+  date and time, as the original's `GetDateFormatA` / `GetTimeFormatA`,
+  elsewhere a French system's dd/mm/yyyy hh:mm:ss. A tooltip shows after
+  10 ticks in a box, centred on it in white over black; its count restarts
+  when the mouse enters the box of an enabled widget, and a disabled
+  widget still notes whether the mouse is in its box, so once enabled it
+  keeps its count (FUN_0046d750, against the original run under
+  emulation, `tests/input_ui.rs`). Each frame the
   widgets are asked in order and the first action wins; the state machine
   then slides the main page's panels (1 + 2 + ... pixels a frame: 30
-  frames for the options and the disc, 40 for the sound; the disc
+  moves for the options and the disc, 40 for the sound, the state
+  changing at the frame after the last move, as the original's; the disc
   panel's load and save icons are shown, disabled, from the slide's first
-  frame and enabled at its end), asks its
-  questions in the yes / no box (save, erase, quit), opens the pages, and
+  frame and enabled then; NO to the save question enables every widget
+  again before the slide back), asks its
+  questions in the yes / no box (save, erase, quit; the box and its two
+  buttons enabled), opens the pages, and
   sets the options (subtitles, centre marker, inverted mouse, the screen
   size: 640 x 480 or 800 x 600, kept in `atlant2.cfg`, below) and the volumes (general = slider × 256, music = music slider
   × general slider × 127 + 0.5, effects and dialogs × 127, truncated);
@@ -2992,16 +3018,17 @@ back) into `yucatan-*.png`.
   (panorama filter, sharpening, interface, sharp subtitles, widescreen, the bars beside the
   videos: black or blurred; greyed in the original graphics), Screen (640
   x 480 or 800 x 600, the original's option above; greyed in HD), Fix
-  original bugs, Close. The game is paused while it is open (its clock
+  original bugs, Arrow keys turn (`ui_ux`), Close. The game is paused while it is open (its clock
   and its sound); its text is drawn sharp in the HD mode, as the first
   game's. The choices are written at once to Atlantis II's own
   `settings.ini`, beside its saves and `atlant2.cfg`, with the first
-  game's keys (`minor_bug_fixes`, `graphics = original|hd`,
+  game's keys (`minor_bug_fixes`, `ui_ux`, `graphics = original|hd`,
   `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_sharp_subtitles`,
   `hd_widescreen`, `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
   written then too (the original writes it at exit). A window reads
   `settings.ini` at start (written with the defaults when there is none);
-  `--hd`, `--widescreen` and `--original` (which turns the bug fixes off)
+  `--hd`, `--widescreen` and `--original` (which turns the bug fixes and
+  `ui_ux` off)
   hold for the run without changing it; a headless run starts from the
   defaults. `--options-menu` draws the menu over a headless run's last
   frame. The web build does not run Atlantis II yet, so it has no such
@@ -3031,11 +3058,20 @@ back) into `yucatan-*.png`.
   writes in place) are the engine's, and so is the spider web's stage
   (entry 27, @ 0x005e1340, initial 3: saved from the web's state and set
   back before the web's load hook tests it); the other worlds' puzzles
-  (entries 20..26, 28, 29) and the rod's entry 15 (@ 0x006d84f4, role not read) are kept
-  as the bytes of the last load until their studies are ported (the
+  (entries 20..26, 28, 29) are kept
+  as the bytes of the last load until their studies are ported; the rod's
+  entry 15 (@ 0x006d84f4) is its anchor's y, the logical height, which
+  the rod's draw writes at every panorama frame and reads right after (480
+  from the start-up, 600 in the panorama at 800 x 600) (the
   blackbird songs have no entry: their mode is not saved); the dialog flag is written from the
   running dialog and not read back (a save made from the menus has no
-  dialog running: Escape ends it before the main menu opens). Chosen here: a section
+  dialog running: Escape ends it before the main menu opens). A load's
+  puzzle reset runs the original's eight quits (the turtle ring's and the
+  souls' modes back to 0; the canoe's, which has no test of its own,
+  empties the cursor pair, so the saved cursor frame is not restored;
+  its change of the display mode is not ported: at 800 x 600, after a
+  menu opened over a picture and a load, the original draws the picture
+  at the top left of the screen until the next loop type change). Chosen here: a section
   waiting to go on and a queued command are dropped at a load (the
   original's flags are not saved: what it does with them is not known);
   a save is stamped with the local time, as the original's; the subject
@@ -3086,7 +3122,12 @@ the 1.01 subtitles in `tests/dialogs.rs`, the listener table in
 played again on it, its pictures written as `gog-*.png` with
 `ATLANTIS2_PNG_DIR`), `ATLANTIS2_PATCH101` the 1.01 patch's
 `atlantis2.exe` (`tests/gog.rs` puts it beside links to
-`ATLANTIS2_DATA`'s folders: a CD installation patched to 1.01); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
+`ATLANTIS2_DATA`'s folders: a CD installation patched to 1.01). An
+Atlantis II test whose data is missing fails, saying which variable it
+needs, unless `ATLANTIS2_SKIP_DATA_TESTS=1` asks for the game-data tests
+to be skipped (the CI's builds set it); a skipped test writes a
+`SKIPPED <test>: <what is missing>` line that `cargo test` shows
+(`atlantis2_data::testing`). With `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
 `tests/ogham.rs`'s played games write their screens there
 (`pz-skull-*.png`, `pz-ogham-*.png`), and with `ATLANTIS2_SHOTS` set
 `tests/cross.rs`'s and the Chinese puzzles' (`tests/figurines.rs`,

@@ -131,7 +131,7 @@ impl Engine {
     }
 
     /// FUN_0049c270: the mode 2 back to 0 (@ 0x0049c270..0x0049c279).
-    fn ring_quit(&mut self) {
+    pub(super) fn ring_quit(&mut self) {
         if self.puzzle_mode() == RING_MODE {
             self.set_puzzle_mode(0);
         }

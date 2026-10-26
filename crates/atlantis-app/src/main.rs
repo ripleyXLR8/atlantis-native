@@ -278,6 +278,7 @@ fn main() {
     let a2_flags_applied = |mut x: atlantis2_engine::Enhancements| {
         if original {
             x.minor_bug_fixes = false;
+            x.ui_ux = false;
         }
         x.hd |= force_hd;
         x.hd_options.widescreen |= force_wide;
