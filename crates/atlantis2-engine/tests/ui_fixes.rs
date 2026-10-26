@@ -12,7 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::{slider_values, PageKind, Settings, WidgetKind};
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -258,7 +258,7 @@ fn compare(name: &str, got: &[String], want: &[&str]) {
 /// (the music copy's page shown first when `data` has no copies).
 fn scripted(files: A2Files, data: Option<PathBuf>) -> Engine {
     let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     e.set_data_dir(data);
     e.start_new_game().unwrap();
     let mut clock = 0.0;
@@ -289,7 +289,7 @@ fn the_turn_waits_under_the_open_bar() {
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
     e.trace = true;
     e.sprite_picks = false;
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     let mut d = Driver {
         e,
         pass_no: 0,
@@ -315,7 +315,7 @@ fn a_move_of_the_mouse_picks_the_zone_under_the_bar() {
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
     e.trace = true;
     e.sprite_picks = false;
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     let mut d = Driver {
         e,
         pass_no: 0,
@@ -340,7 +340,7 @@ fn the_turn_speeds_go_across_the_menu() {
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
     e.trace = true;
     e.sprite_picks = false;
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     let mut d = Driver {
         e,
         pass_no: 0,

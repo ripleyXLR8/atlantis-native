@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use atlantis2_data::defnames;
 use atlantis2_data::wam::Zone;
 use atlantis2_data::{A2Files, Folder};
-use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::display::blit_640_to_800;
 use atlantis2_engine::engine::{yucatan_click_hooks, yucatan_entry_hooks};
 use atlantis2_engine::png::encode_rgb565;
@@ -260,7 +260,7 @@ fn place_animation_chains_match_the_original() {
         if let Some(head) = row.strip_prefix("== view ") {
             let (view, rest) = head.split_once(" of ").unwrap();
             let wam = rest.split_once(':').unwrap().0;
-            e.anim.rand = MsvcRand(1000);
+            e.rand = Rand::new(1000);
             e.load_place(wam);
             e.enter_at(view.parse().unwrap(), 0.0, 0.0).unwrap();
             got.push(row.to_string());
@@ -286,7 +286,7 @@ fn place_animation_chains_match_the_original() {
             e.run_command(line.as_bytes());
             got.push(row.to_string());
         } else if row.starts_with("tick ") {
-            e.anim.step();
+            e.anim.step(&mut e.rand);
             let active: Vec<String> = e
                 .anim
                 .slots

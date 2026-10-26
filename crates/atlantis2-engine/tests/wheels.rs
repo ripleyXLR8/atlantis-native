@@ -1291,7 +1291,7 @@ fn the_wheels_are_drawn_as_the_original() {
         let spw = Spw::parse(data.clone()).unwrap();
         let count: i32 = w[6].parse().unwrap();
         for f in 0..count {
-            let mut a = Anim::new(0);
+            let mut a = Anim::new();
             a.load(
                 name,
                 Spw::parse(data.clone()).unwrap(),

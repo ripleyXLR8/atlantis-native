@@ -729,7 +729,7 @@ fn the_map_is_drawn_from_its_frame_table_as_the_original() {
     let golden: Vec<&str> = rows("G tab");
     for row in &golden {
         let table = parse(row.split(' ').nth(2).unwrap());
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         a.load(
             "ep",
             Spw::parse(data.clone()).unwrap(),

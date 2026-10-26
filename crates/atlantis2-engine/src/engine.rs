@@ -632,7 +632,10 @@ pub struct Engine {
     /// bug fixes on).
     pub enhancements: Enhancements,
     voices: Voices,
-    /// The C runtime's `rand` (seeded by the dialog object's `srand`).
+    /// The C runtime's `rand`: one state for the whole game (the dialogs,
+    /// the place animations and sounds, the music, the puzzles), as the
+    /// original's single thread has ([`Engine::seed_rand`]). A new engine
+    /// starts from `srand(0)`, the tests' fixed seed.
     pub rand: Rand,
     font: Option<SubtitleFont>,
     /// The subtitles option (@ 0x005df970, on by default).
@@ -946,7 +949,7 @@ impl Engine {
                 .map(|exe| crate::place_sound::Listeners::from_exe(&exe, &build.place_sounds))
                 .unwrap_or_default(),
         );
-        let mut anim = Anim::new(0);
+        let mut anim = Anim::new();
         anim.cheval = names.id(defnames::OBJETS, b"CHEVAL").ok().map(|i| i as i32);
         let media = media::Media::all_made();
         Engine {
@@ -965,8 +968,6 @@ impl Engine {
             camera,
             look: Look::default(),
             spr_dll: SprDll::default(),
-            // GetTickCount() in the original: a port seeds with its clock
-            // (`anim.rand`).
             anim,
             loop_type: LoopType::Warp,
             turn: None,
@@ -1363,6 +1364,18 @@ impl Engine {
         } else {
             self.end_dialog();
         }
+    }
+
+    /// The start-up's seed, for a game played: the original calls
+    /// `srand(time(0))` in the dialog object's static constructor
+    /// (atlantis2-cd-fr-2199552 @ 0x0045daf6), then, before any `rand`
+    /// call, `srand(GetTickCount())` in the SPW set-up of the start-up
+    /// FUN_0049d680 (FUN_0047d740, @ 0x0047d7aa), which is the seed that
+    /// counts; the front end gives its clock as `tick_count` (a run that
+    /// wants its draws again gives the same). Each music start seeds it
+    /// again with the 15 Hz count (@ 0x00477459, `music_open`).
+    pub fn seed_rand(&mut self, tick_count: u32) {
+        self.rand = Rand::new(tick_count);
     }
 
     /// The music fade step (@ 0x00476e80) at the clock, its volume given to
@@ -1816,7 +1829,7 @@ impl Engine {
     fn anim_tick(&mut self) {
         if self.spw_flag && self.spw_loaded {
             self.spw_flag = false;
-            if let Some(frame) = self.anim.step() {
+            if let Some(frame) = self.anim.step(&mut self.rand) {
                 if let Some(s) = self.con.as_mut() {
                     s.set_var("FRAMECHEVAL", frame);
                 }

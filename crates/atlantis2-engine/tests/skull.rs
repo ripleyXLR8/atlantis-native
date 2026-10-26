@@ -150,7 +150,7 @@ fn frame_lists_as_the_original() {
     let other = n.id(defnames::OBJETS, b"CRANE_LIVRE").unwrap() as i32;
     let (_, data) = skull_spw(e.files(), 42);
     let golden = rows('A');
-    let mut a = Anim::new(0);
+    let mut a = Anim::new();
     let set = |a: &mut Anim, ids: &[i32]| {
         a.clear();
         for &i in ids {
@@ -866,7 +866,7 @@ fn the_frame_lists_drawn_as_the_original() {
                     .collect();
                 (v[0] as usize, v[1], v[2])
             });
-            let mut a = Anim::new(0);
+            let mut a = Anim::new();
             let mut st = state(click);
             if single {
                 st.single = 1;

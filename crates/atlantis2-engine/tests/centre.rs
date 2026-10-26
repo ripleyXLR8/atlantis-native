@@ -12,7 +12,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::{MsvcRand, Texel};
+use atlantis2_engine::anim::Texel;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::{CentreDraw, CursorBank, Engine, Event, Fpu, LoopType, ScanVars, Variant};
 
 const GOLDEN: &str = include_str!("golden/centre_tibet.txt");
@@ -177,7 +178,7 @@ fn centre_and_sprite_clicks_match_the_original() {
     let Some(files) = game() else { return };
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
     e.trace = true;
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     let mut d = Driver {
         e,
         pass_no: 0,

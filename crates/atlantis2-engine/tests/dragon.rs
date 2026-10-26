@@ -734,7 +734,7 @@ fn the_entry_click_and_step_as_the_original() {
     e.dragon_click(&dragon);
     let mut seq = Vec::new();
     for _ in 0..84 {
-        e.anim.step();
+        e.anim.step(&mut e.rand);
         seq.push(e.anim.slots[0].frame.to_string());
     }
     assert_eq!(
@@ -1125,7 +1125,7 @@ fn view_31_is_drawn_as_the_original_with_the_blink() {
             ]);
         }
         for (f, blink, counter) in cases {
-            let mut a = Anim::new(0);
+            let mut a = Anim::new();
             let state = EntityState {
                 letter: 65,
                 anim: 1,

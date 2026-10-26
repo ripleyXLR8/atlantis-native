@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
 const GOLDEN: &str = include_str!("golden/moves_tibet.txt");
@@ -68,7 +68,7 @@ impl Driver {
         let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
         e.trace = true;
         e.sprite_picks = false;
-        e.anim.rand = MsvcRand(1000);
+        e.rand = Rand::new(1000);
         Driver {
             e,
             pass_no: 0,
@@ -389,7 +389,7 @@ fn animations_match_the_original() {
         }
         let ticks = want.iter().filter(|r| r.starts_with("tick")).count();
         for t in 0..ticks {
-            d.e.anim.step();
+            d.e.anim.step(&mut d.e.rand);
             let active: Vec<String> =
                 d.e.anim
                     .slots
@@ -464,7 +464,7 @@ fn the_zoom_of_a_move_matches_the_original() {
         };
         let mut e = Engine::new_game(game().unwrap(), variant, fpu, 640, 480).unwrap();
         e.sprite_picks = false;
-        e.anim.rand = MsvcRand(1000);
+        e.rand = Rand::new(1000);
         e.enter_at(2, radians(-75.0), radians(15.0)).unwrap();
         let f = e.fpu();
         if psycho {
