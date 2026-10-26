@@ -35,10 +35,10 @@
 //! writes it.
 //!
 //! `--original` turns the enhancements off, as for the first game: the
-//! minor bug fixes (`atlantis2_engine::Enhancements::minor_bug_fixes`:
-//! every music track heard to its end, a track that ends with nothing
-//! after it played again, Ireland's puzzle zones answering for no named
-//! zone), the interface conveniences
+//! bug fixes, every one of them (`atlantis2_engine::BugFixes`: every
+//! music track heard to its end, a track that ends with nothing after it
+//! played again, the random music mark past the last, Ireland's puzzle
+//! zones answering for no named zone), the interface conveniences
 //! (`atlantis2_engine::Enhancements::ui_ux`: the arrow keys' turn) and the
 //! HD mode.
 //!
@@ -52,9 +52,10 @@
 //! F10 (or O) opens the port's options menu
 //! (`atlantis2_engine::options_menu`, the first game's): the graphics
 //! (original or HD) and the HD options, the screen (the original's 640 x
-//! 480 or 800 x 600, `atlantis2_engine::display`), the minor bug fixes;
-//! the game is paused while it is open. Its choices are kept in
-//! `settings.ini` beside the saves (the first game's keys); `--hd`,
+//! 480 or 800 x 600, `atlantis2_engine::display`), the bug fixes (all
+//! at once, or one by one in "Choose the bug fixes..."); the game is
+//! paused while it is open. Its choices are kept in `settings.ini` beside
+//! the saves (the first game's keys, and one per bug fix); `--hd`,
 //! `--widescreen` and `--original` hold for the run without changing it.
 //!
 //! The game is held while the window does not have the focus, as the
@@ -167,6 +168,9 @@ pub struct A2Start {
     /// A headless run's screenshot shows the options menu (F10) over the
     /// last frame (`--options-menu`).
     pub options_menu: bool,
+    /// Keys pressed in that menu before the screenshot (`--options-keys`:
+    /// `down,down,enter`); its changes hold for the run only.
+    pub options_keys: Vec<MenuKey>,
     /// The `rand` seed of the start-up (`--seed`), instead of the clock
     /// ([`Engine::seed_rand`]): the same draws on every run.
     pub seed: Option<u32>,
@@ -193,6 +197,24 @@ impl A2Start {
         let (w, h) = v.split_once(['x', 'X'])?;
         let (w, h) = (w.trim().parse().ok()?, h.trim().parse().ok()?);
         (w > 0 && h > 0).then_some((w, h))
+    }
+
+    /// Parses `--options-keys`' value: key names (`up`, `down`, `left`,
+    /// `right`, `enter`, `escape`) separated by commas.
+    pub fn parse_options_keys(v: &str) -> Option<Vec<MenuKey>> {
+        v.split(',')
+            .map(|k| {
+                Some(match k.trim().to_ascii_lowercase().as_str() {
+                    "up" => MenuKey::Up,
+                    "down" => MenuKey::Down,
+                    "left" => MenuKey::Left,
+                    "right" => MenuKey::Right,
+                    "enter" => MenuKey::Enter,
+                    "escape" => MenuKey::Escape,
+                    _ => return None,
+                })
+            })
+            .collect()
     }
 
     /// Parses `--resolution`'s value: `640x480` or `800x600`.
@@ -575,6 +597,11 @@ pub fn headless(
         let mut menu = OptionsMenu::new();
         menu.set_info(menu_info(&label));
         menu.open();
+        for &k in &start.options_keys {
+            if let MenuAction::SetEnhancements(x) = menu.key(k, menu_values(&engine)) {
+                engine.enhancements = x;
+            }
+        }
         let values = menu_values(&engine);
         let font = SubtitleFont::new();
         menu.draw_recording(

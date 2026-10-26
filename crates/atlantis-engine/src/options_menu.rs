@@ -137,9 +137,73 @@ pub enum BoxInput {
     Close,
 }
 
+/// A gap between two groups of rows of a box ([`BoxLayout::gaps`]).
+pub const GAP_H: i32 = 8;
+
+/// The layout of an options box: its title, its width, the gaps between
+/// groups of rows and the height of its foot. [`BoxLayout::OPTIONS`] is the
+/// options menu's (both games').
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BoxLayout<'a> {
+    pub title: &'a str,
+    pub width: i32,
+    /// The rows that start a group: a [`GAP_H`]-pixel gap above each.
+    pub gaps: &'a [usize],
+    pub footer_h: i32,
+}
+
+impl BoxLayout<'_> {
+    /// The options menu's box.
+    pub const OPTIONS: BoxLayout<'static> = BoxLayout {
+        title: "Atlantis Native options",
+        width: BOX_W,
+        gaps: &[],
+        footer_h: FOOTER_H,
+    };
+
+    /// The height of a box of `n` rows.
+    pub fn box_h(&self, n: usize) -> i32 {
+        let gaps = self.gaps.iter().filter(|&&g| g < n).count() as i32;
+        TITLE_H + n as i32 * ROW_H + gaps * GAP_H + self.footer_h
+    }
+
+    /// The top left corner of a box of `n` rows on a `w` x `h` screen
+    /// (centred).
+    pub fn origin(&self, n: usize, w: usize, h: usize) -> (i32, i32) {
+        ((w as i32 - self.width) / 2, (h as i32 - self.box_h(n)) / 2)
+    }
+
+    /// The top of row `i`, from the box's top.
+    pub fn row_y(&self, i: usize) -> i32 {
+        let gaps = self.gaps.iter().filter(|&&g| g <= i).count() as i32;
+        TITLE_H + i as i32 * ROW_H + gaps * GAP_H
+    }
+
+    /// The row under a point of a `w` x `h` screen, for `n` rows.
+    fn row_at(&self, n: usize, x: i32, y: i32, w: usize, h: usize) -> Option<usize> {
+        let (bx, by) = self.origin(n, w, h);
+        if !(bx..bx + self.width).contains(&x) {
+            return None;
+        }
+        (0..n).find(|&i| (0..ROW_H).contains(&(y - by - self.row_y(i))))
+    }
+}
+
+/// A line of a box's foot: its text, its top (from the box's bottom) and
+/// its colour.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FootLine<'a> {
+    pub text: &'a str,
+    pub from_bottom: i32,
+    pub color: u16,
+}
+
 /// The options box of the port's menus, both games': its layout (centred
 /// on the screen, whatever its size), colours, font, keys and mouse. The
-/// game's menu gives the rows and acts on [`BoxInput::Activate`].
+/// game's menu gives the rows and acts on [`BoxInput::Activate`]. The
+/// methods without a layout are the options menu's
+/// ([`BoxLayout::OPTIONS`]); the `_in` ones take another box's (Atlantis
+/// II's bug fixes).
 #[derive(Clone, Debug, Default)]
 pub struct MenuBox {
     open: bool,
@@ -166,6 +230,11 @@ impl MenuBox {
         self.selected
     }
 
+    /// Selects row `i`.
+    pub fn select(&mut self, i: usize) {
+        self.selected = i;
+    }
+
     /// Keeps the selection among `n` rows.
     pub fn clamp(&mut self, n: usize) {
         self.selected = self.selected.min(n.saturating_sub(1));
@@ -173,13 +242,13 @@ impl MenuBox {
 
     /// The height of a box of `n` rows.
     pub fn box_h(n: usize) -> i32 {
-        TITLE_H + n as i32 * ROW_H + FOOTER_H
+        BoxLayout::OPTIONS.box_h(n)
     }
 
     /// The top left corner of a box of `n` rows on a `w` x `h` screen
     /// (centred).
     pub fn origin(n: usize, w: usize, h: usize) -> (i32, i32) {
-        ((w as i32 - BOX_W) / 2, (h as i32 - Self::box_h(n)) / 2)
+        BoxLayout::OPTIONS.origin(n, w, h)
     }
 
     /// The next row from the selected one that can be changed.
@@ -219,20 +288,15 @@ impl MenuBox {
         }
     }
 
-    /// The row under a point of a `w` x `h` screen, for `n` rows.
-    fn row_at(n: usize, x: i32, y: i32, w: usize, h: usize) -> Option<usize> {
-        let (bx, by) = Self::origin(n, w, h);
-        if !(bx..bx + BOX_W).contains(&x) {
-            return None;
-        }
-        let r = y - (by + TITLE_H);
-        (r >= 0 && r < n as i32 * ROW_H).then_some((r / ROW_H) as usize)
-    }
-
     /// The pointer moved to a point of a `w` x `h` screen: the row under
     /// it (of `n`) is selected.
     pub fn pointer(&mut self, n: usize, x: i32, y: i32, w: usize, h: usize) {
-        if let Some(i) = Self::row_at(n, x, y, w, h) {
+        self.pointer_in(&BoxLayout::OPTIONS, n, x, y, w, h);
+    }
+
+    /// [`MenuBox::pointer`] on a box laid out as `layout`.
+    pub fn pointer_in(&mut self, layout: &BoxLayout, n: usize, x: i32, y: i32, w: usize, h: usize) {
+        if let Some(i) = layout.row_at(n, x, y, w, h) {
             self.selected = i;
         }
     }
@@ -240,12 +304,26 @@ impl MenuBox {
     /// A click at a point of a `w` x `h` screen: the row under it (of
     /// `n`) is selected and changes; outside the box the box closes.
     pub fn click(&mut self, n: usize, x: i32, y: i32, w: usize, h: usize) -> BoxInput {
-        if let Some(i) = Self::row_at(n, x, y, w, h) {
+        self.click_in(&BoxLayout::OPTIONS, n, x, y, w, h)
+    }
+
+    /// [`MenuBox::click`] on a box laid out as `layout`.
+    pub fn click_in(
+        &mut self,
+        layout: &BoxLayout,
+        n: usize,
+        x: i32,
+        y: i32,
+        w: usize,
+        h: usize,
+    ) -> BoxInput {
+        if let Some(i) = layout.row_at(n, x, y, w, h) {
             self.selected = i;
             return BoxInput::Activate(i);
         }
-        let (bx, by) = Self::origin(n, w, h);
-        let inside = (bx..bx + BOX_W).contains(&x) && (by..by + Self::box_h(n)).contains(&y);
+        let (bx, by) = layout.origin(n, w, h);
+        let inside =
+            (bx..bx + layout.width).contains(&x) && (by..by + layout.box_h(n)).contains(&y);
         if inside {
             BoxInput::None
         } else {
@@ -270,9 +348,48 @@ impl MenuBox {
         description: &str,
         record: Option<&mut HdText>,
     ) {
+        let mut foot: Vec<FootLine> = info
+            .iter()
+            .take(2)
+            .enumerate()
+            .map(|(i, line)| FootLine {
+                text: line,
+                from_bottom: 82 - i as i32 * 18,
+                color: DIM,
+            })
+            .collect();
+        foot.push(FootLine {
+            text: description,
+            from_bottom: 44,
+            color: TEXT,
+        });
+        foot.push(FootLine {
+            text: KEYS,
+            from_bottom: 22,
+            color: DIM,
+        });
+        self.draw_in(&BoxLayout::OPTIONS, screen, w, h, font, rows, &foot, record);
+    }
+
+    /// Draws a box laid out as `layout` over a `w` x `h` RGB565 frame: the
+    /// title, `rows` and the `foot` lines, each centred; the text recorded
+    /// in `record` for the HD mode to draw sharp (see [`HdText`]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_in(
+        &self,
+        layout: &BoxLayout,
+        screen: &mut [u16],
+        w: usize,
+        h: usize,
+        font: &SubtitleFont,
+        rows: &[Row],
+        foot: &[FootLine],
+        record: Option<&mut HdText>,
+    ) {
         let n = rows.len();
-        let (bx, by) = Self::origin(n, w, h);
-        let bh = Self::box_h(n);
+        let bw = layout.width;
+        let (bx, by) = layout.origin(n, w, h);
+        let bh = layout.box_h(n);
         let mut fill = |x: i32, y: i32, fw: i32, fh: i32, c: u16| {
             for yy in y.max(0)..(y + fh).min(h as i32) {
                 for xx in x.max(0)..(x + fw).min(w as i32) {
@@ -280,16 +397,16 @@ impl MenuBox {
                 }
             }
         };
-        fill(bx - 1, by - 1, BOX_W + 2, bh + 2, BORDER);
-        fill(bx, by, BOX_W, bh, BG);
-        let sel_y = by + TITLE_H + self.selected as i32 * ROW_H;
-        fill(bx + 6, sel_y, BOX_W - 12, ROW_H - 2, HIGHLIGHT);
+        fill(bx - 1, by - 1, bw + 2, bh + 2, BORDER);
+        fill(bx, by, bw, bh, BG);
+        let sel_y = by + layout.row_y(self.selected);
+        fill(bx + 6, sel_y, bw - 12, ROW_H - 2, HIGHLIGHT);
         let mut items = Vec::new();
         let mut text = |t: &str, x: i32, y: i32, c: u16| {
             items.push(TextItem {
                 x,
                 y,
-                max_w: BOX_W - 20,
+                max_w: bw - 20,
                 color: c,
                 text: t.as_bytes().to_vec(),
                 bitmap: None,
@@ -297,12 +414,11 @@ impl MenuBox {
                 face: None,
             });
         };
-        let centre = |t: &str| bx + (BOX_W - font.width(t.as_bytes())) / 2;
-        let right = |t: &str| bx + BOX_W - 16 - font.width(t.as_bytes());
-        let t = "Atlantis Native options";
-        text(t, centre(t), by + 10, TEXT);
+        let centre = |t: &str| bx + (bw - font.width(t.as_bytes())) / 2;
+        let right = |t: &str| bx + bw - 16 - font.width(t.as_bytes());
+        text(layout.title, centre(layout.title), by + 10, TEXT);
         for (i, row) in rows.iter().enumerate() {
-            let y = by + TITLE_H + i as i32 * ROW_H;
+            let y = by + layout.row_y(i);
             let c = match (row.enabled, i == self.selected) {
                 (false, _) => GREYED,
                 (true, true) => SELECTED,
@@ -317,12 +433,14 @@ impl MenuBox {
                 None => text(row.label, centre(row.label), y + 4, c),
             }
         }
-        for (i, line) in info.iter().take(2).enumerate() {
-            text(line, centre(line), by + bh - 82 + i as i32 * 18, DIM);
+        for line in foot {
+            text(
+                line.text,
+                centre(line.text),
+                by + bh - line.from_bottom,
+                line.color,
+            );
         }
-        text(description, centre(description), by + bh - 44, TEXT);
-        let k = "Arrows, Enter or click; Escape, F10 or O closes";
-        text(k, centre(k), by + bh - 22, DIM);
         let under = record.as_ref().map(|_| screen.to_vec());
         for it in &items {
             font.draw(screen, w, h, &it.text, it.x, it.y, it.max_w, it.color);
@@ -332,6 +450,9 @@ impl MenuBox {
         }
     }
 }
+
+/// The keys' line at the foot of the options menu.
+pub const KEYS: &str = "Arrows, Enter or click; Escape, F10 or O closes";
 
 /// The menu's state.
 #[derive(Debug, Default)]

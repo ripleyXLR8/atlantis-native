@@ -3,8 +3,11 @@
 //! ran under emulation, step for step: the start, the refills, the end of
 //! each track (the next one written behind the cursor, the last ~5.8 s of
 //! the old one never heard), the failed rewind of an empty list or of
-//! loops (the ring looping), what is heard (md5) and where. Then the minor
-//! bug fixes: every track heard to its end.
+//! loops (the ring looping), what is heard (md5) and where. Then the bug
+//! fixes, each alone and all together: every track heard to its end
+//! (`MusicFixes::end`), an ended track again from its start
+//! (`MusicFixes::restart`), the random mark's edge (`MusicFixes::mark`);
+//! each alone leaves what it does not fix as the original.
 //!
 //! Needs the game's discs: `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them the tests are skipped.
@@ -14,7 +17,7 @@ use std::sync::Arc;
 
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
-use atlantis2_engine::music::{self, MusicData, Ring, Stream, StreamEvent, RING_BYTES};
+use atlantis2_engine::music::{self, MusicData, MusicFixes, Ring, Stream, StreamEvent, RING_BYTES};
 use atlantis2_engine::sound::VOICE_MUSIC;
 use atlantis2_engine::{Engine, Fpu, Variant};
 use md5::{Digest, Md5};
@@ -198,7 +201,7 @@ fn start(files: &A2Files, s: &Scenario) -> (Stream, SimRing, Rand) {
 
 /// The scenario's rows, as the harness writes them (the `init` rows left
 /// out).
-fn run(files: &A2Files, s: &Scenario, fixes: bool) -> Vec<String> {
+fn run(files: &A2Files, s: &Scenario, fixes: MusicFixes) -> Vec<String> {
     let (mut st, mut ring, mut rand) = start(files, s);
     let mut rows = Vec::new();
     let mut all = Md5::new();
@@ -268,20 +271,76 @@ fn run(files: &A2Files, s: &Scenario, fixes: bool) -> Vec<String> {
     rows
 }
 
+/// The golden's rows of scenario `s`.
+fn golden_rows(s: &Scenario) -> Vec<&'static str> {
+    let want: Vec<&str> = GOLDEN
+        .lines()
+        .filter(|l| {
+            l.strip_prefix(s.tag)
+                .is_some_and(|r| r.starts_with(".step") || r.starts_with(".end"))
+        })
+        .collect();
+    assert!(!want.is_empty(), "{}", s.tag);
+    want
+}
+
 #[test]
 fn ring_matches_the_original() {
     let Some(files) = files() else { return };
     for s in &SCENARIOS {
-        let want: Vec<&str> = GOLDEN
-            .lines()
-            .filter(|l| {
-                l.strip_prefix(s.tag)
-                    .is_some_and(|r| r.starts_with(".step") || r.starts_with(".end"))
-            })
-            .collect();
-        assert!(!want.is_empty(), "{}", s.tag);
-        let got = run(&files, s, false);
-        assert_eq!(got, want, "{}", s.tag);
+        let got = run(&files, s, MusicFixes::default());
+        assert_eq!(got, golden_rows(s), "{}", s.tag);
+    }
+}
+
+/// The scenarios that end a track with another one (the list has an
+/// entry: the end fix's), and those that rewind one (an empty list, or
+/// loops left: the restart fix's).
+const NEXT_TRACK: [&str; 5] = [
+    "m30.start",
+    "m20.mark3",
+    "m16.list",
+    "m01.random",
+    "m16.list.s1468",
+];
+const REWIND: [&str; 3] = ["m14.loop3", "m30.nolist", "m30.nolist.s1468"];
+
+/// Each fix alone changes nothing in the scenarios it does not fix: the
+/// end fix leaves the rewinds as the original (the loops' first rewind
+/// fails as the original's), the restart fix the next tracks, and the
+/// mark fix every scenario (no draw at the `rand()` edge in them).
+#[test]
+fn each_fix_alone_leaves_the_rest_as_the_original() {
+    let Some(files) = files() else { return };
+    assert_eq!(NEXT_TRACK.len() + REWIND.len(), SCENARIOS.len());
+    let alone = [
+        (
+            MusicFixes {
+                end: true,
+                ..MusicFixes::default()
+            },
+            &REWIND[..],
+        ),
+        (
+            MusicFixes {
+                restart: true,
+                ..MusicFixes::default()
+            },
+            &NEXT_TRACK[..],
+        ),
+        (
+            MusicFixes {
+                mark: true,
+                ..MusicFixes::default()
+            },
+            &[&NEXT_TRACK[..], &REWIND[..]].concat()[..],
+        ),
+    ];
+    for (fixes, tags) in alone {
+        for s in SCENARIOS.iter().filter(|s| tags.contains(&s.tag)) {
+            let got = run(&files, s, fixes);
+            assert_eq!(got, golden_rows(s), "{} with {fixes:?}", s.tag);
+        }
     }
 }
 
@@ -293,9 +352,14 @@ fn pcm_bytes(files: &A2Files, n: i32, k: i32) -> Vec<u8> {
     pcm.samples.iter().flat_map(|s| s.to_le_bytes()).collect()
 }
 
-/// Runs `s` with the fixes until `bytes` have been heard, returning them,
-/// with the opens (music, mark played) in order.
-fn hear_fixed(files: &A2Files, s: &Scenario, bytes: usize) -> (Vec<u8>, Vec<(i32, i32)>) {
+/// Runs `s` with the fixes `fixes` until `bytes` have been heard,
+/// returning them, with the opens (music, mark played) in order.
+fn hear_fixed(
+    files: &A2Files,
+    s: &Scenario,
+    bytes: usize,
+    fixes: MusicFixes,
+) -> (Vec<u8>, Vec<(i32, i32)>) {
     let (mut st, mut ring, mut rand) = start(files, s);
     let mut heard = Vec::with_capacity(bytes + s.step as usize);
     let mut opens = Vec::new();
@@ -307,7 +371,7 @@ fn hear_fixed(files: &A2Files, s: &Scenario, bytes: usize) -> (Vec<u8>, Vec<(i32
             s.music,
             &mut rand,
             &mut ld,
-            true,
+            fixes,
         );
         for e in std::mem::take(&mut st.events) {
             assert!(
@@ -327,44 +391,66 @@ fn hear_fixed(files: &A2Files, s: &Scenario, bytes: usize) -> (Vec<u8>, Vec<(i32
 #[test]
 fn fixed_tracks_play_to_their_end() {
     let Some(files) = files() else { return };
+    let all = MusicFixes::all(true);
+    let end = MusicFixes {
+        end: true,
+        ..MusicFixes::default()
+    };
+    let restart = MusicFixes {
+        restart: true,
+        ..MusicFixes::default()
+    };
     // A track followed by another: the whole of muzik16, then muzik14
-    // from the mark drawn, with no sample lost or repeated.
-    let s = &SCENARIOS[6];
-    let first = pcm_bytes(&files, 16, 0);
-    let (heard, opens) = hear_fixed(&files, s, first.len() + 0x100000);
-    assert_eq!(opens.len(), 1, "{opens:?}");
-    let (next, mark) = opens[0];
-    assert_eq!(next, 14);
-    let second = pcm_bytes(&files, next, mark);
-    assert!(heard[..first.len()] == first[..], "muzik16 heard whole");
-    assert!(
-        heard[first.len()..] == second[..0x100000],
-        "muzik14 from mark {mark} right after"
-    );
-
-    // An empty list: the track again from its start, after its last
-    // sample (the original loops the ring's last 5.9 s instead).
-    for s in [&SCENARIOS[5], &SCENARIOS[7]] {
-        let track = pcm_bytes(&files, 30, 0);
-        let (heard, opens) = hear_fixed(&files, s, track.len() + 0x100000);
-        assert!(opens.is_empty(), "{opens:?}");
-        assert!(heard[..track.len()] == track[..], "{}: heard whole", s.tag);
+    // from the mark drawn, with no sample lost or repeated; the end fix
+    // alone does it.
+    for fixes in [end, all] {
+        let s = &SCENARIOS[6];
+        let first = pcm_bytes(&files, 16, 0);
+        let (heard, opens) = hear_fixed(&files, s, first.len() + 0x100000, fixes);
+        assert_eq!(opens.len(), 1, "{opens:?}");
+        let (next, mark) = opens[0];
+        assert_eq!(next, 14);
+        let second = pcm_bytes(&files, next, mark);
         assert!(
-            heard[track.len()..] == track[..0x100000],
-            "{}: again from its start",
-            s.tag
+            heard[..first.len()] == first[..],
+            "muzik16 heard whole, {fixes:?}"
+        );
+        assert!(
+            heard[first.len()..] == second[..0x100000],
+            "muzik14 from mark {mark} right after, {fixes:?}"
         );
     }
 
-    // Loops (`*3`): played whole three times.
+    // An empty list: the track again from its start, after its last
+    // sample (the original loops the ring's last 5.9 s instead); the
+    // restart fix alone does it.
+    for fixes in [restart, all] {
+        for s in [&SCENARIOS[5], &SCENARIOS[7]] {
+            let track = pcm_bytes(&files, 30, 0);
+            let (heard, opens) = hear_fixed(&files, s, track.len() + 0x100000, fixes);
+            assert!(opens.is_empty(), "{opens:?}");
+            assert!(heard[..track.len()] == track[..], "{}: heard whole", s.tag);
+            assert!(
+                heard[track.len()..] == track[..0x100000],
+                "{}: again from its start, {fixes:?}",
+                s.tag
+            );
+        }
+    }
+
+    // Loops (`*3`): played whole three times; with the restart fix alone
+    // the two rewinds are whole (the end of the third play, which draws
+    // from the list, is the original's).
     let s = &SCENARIOS[2];
     let track = pcm_bytes(&files, 14, 0);
-    let (heard, _) = hear_fixed(&files, s, 3 * track.len());
-    for i in 0..3 {
-        assert!(
-            heard[i * track.len()..(i + 1) * track.len()] == track[..],
-            "loop {i}"
-        );
+    for (fixes, plays) in [(all, 3), (restart, 2)] {
+        let (heard, _) = hear_fixed(&files, s, plays * track.len(), fixes);
+        for i in 0..plays {
+            assert!(
+                heard[i * track.len()..(i + 1) * track.len()] == track[..],
+                "loop {i}, {fixes:?}"
+            );
+        }
     }
 }
 
@@ -462,7 +548,8 @@ fn the_engine_starts_each_music_as_the_original() {
 /// L18: the golden's `m01.edge`: a random mark drawn at the `rand()` =
 /// 0x7fff edge is one past the file's marks, and `GotoMark` reports it as
 /// a fatal error (`fatal=1`, the mark played left as it was); with the
-/// minor bug fixes the file plays from its last mark.
+/// mark fix (alone or with the others) the file plays from its last mark,
+/// and the other fixes without it leave the error.
 #[test]
 fn a_random_mark_at_the_rand_edge_is_fatal() {
     let Some(files) = files() else { return };
@@ -482,9 +569,21 @@ fn a_random_mark_at_the_rand_edge_is_fatal() {
         field("fatal="),
     );
     assert_eq!(fatals, 1);
-    for fixes in [false, true] {
+    let mut others = MusicFixes::all(true);
+    others.mark = false;
+    let mark_alone = MusicFixes {
+        mark: true,
+        ..MusicFixes::default()
+    };
+    for set in [
+        MusicFixes::default(),
+        others,
+        mark_alone,
+        MusicFixes::all(true),
+    ] {
+        let fixes = set.mark;
         let mut st = Stream::default();
-        st.fixes = fixes;
+        st.fixes = set;
         assert!(st.open(load(&files, 1).unwrap()));
         st.events.clear();
         let mut ring = SimRing {

@@ -45,7 +45,8 @@
 //! choices are kept in its own `settings.ini`; `--resolution 800x600`
 //! chooses the original's 800 x 600 screen (its options page's button,
 //! kept in `atlant2.cfg`), `--options-menu` shows the options menu in a
-//! headless run's screenshot. Only the
+//! headless run's screenshot (`--options-keys down,enter` presses keys in
+//! it first, for that run only). Only the
 //! command line opens Atlantis II for now:
 //! the launcher, the game library and the web build know the first game
 //! alone. The first game's options but `--original` are refused in this
@@ -226,6 +227,12 @@ fn main() {
             std::process::exit(2);
         })
     });
+    let options_keys = text_value("--options-keys").map(|v| {
+        atlantis_app::a2::A2Start::parse_options_keys(&v).unwrap_or_else(|| {
+            eprintln!("--options-keys {v}: not up, down, left, right, enter or escape, separated by commas");
+            std::process::exit(2);
+        })
+    });
     let pointer = text_value("--pointer").map(|v| {
         atlantis_app::a2::A2Start::parse_pointer(&v).unwrap_or_else(|| {
             eprintln!("--pointer {v}: not <x>,<y>");
@@ -249,7 +256,7 @@ fn main() {
         None => false,
     };
     let talk = flag("--talk");
-    let options_menu = flag("--options-menu");
+    let options_menu = flag("--options-menu") || options_keys.is_some();
     let intro = match (flag("--intro"), flag("--no-intro")) {
         (true, true) => {
             eprintln!("--intro and --no-intro together");
@@ -277,6 +284,7 @@ fn main() {
         commands: command.into_iter().collect(),
         resolution,
         options_menu,
+        options_keys: options_keys.clone().unwrap_or_default(),
         seed,
     };
     // `--original`, `--hd` and `--widescreen` hold for both games (for
@@ -284,7 +292,7 @@ fn main() {
     // from the defaults, a window from Atlantis II's `settings.ini`.
     let a2_flags_applied = |mut x: atlantis2_engine::Enhancements| {
         if original {
-            x.minor_bug_fixes = false;
+            x.fixes = atlantis2_engine::BugFixes::NONE;
             x.ui_ux = false;
         }
         x.hd |= force_hd;
@@ -324,6 +332,7 @@ fn main() {
         ("--size", size.is_some()),
         ("--resolution", resolution.is_some()),
         ("--options-menu", options_menu),
+        ("--options-keys", options_keys.is_some()),
         ("--command", !a2_start.commands.is_empty()),
         ("--seed", seed.is_some()),
     ]

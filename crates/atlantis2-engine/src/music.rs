@@ -11,8 +11,9 @@
 //! next one is written behind the cursor and the cursor moved there: the
 //! last ~5.8 s of a track followed by another are never heard. With no
 //! next track (an empty `startmusik` list) or loops left, the rewind fails
-//! and the ring keeps looping its last 5.9 s. The minor bug fixes play
-//! every track to its end instead (see `docs/TECHNICAL.md`).
+//! and the ring keeps looping its last 5.9 s. The bug fixes play every
+//! track to its end and an ended track again from its start instead,
+//! each its own switch ([`MusicFixes`], see `docs/TECHNICAL.md`).
 
 use std::sync::Arc;
 
@@ -111,7 +112,7 @@ pub fn decode_music(data: &[u8], mark: Option<&Mark>) -> Option<Pcm> {
 /// `rand() · (count + 1) / 0x7fff` while the draw equals the current mark.
 /// 0 is the file's start; `count + 1` (from `rand()` = 0x7fff, the golden's
 /// `randmark.edge` rows) is the invalid mark `GotoMark` reports as fatal
-/// ([`Stream::fixes`]).
+/// ([`MusicFixes::mark`]).
 pub fn random_mark(rand: &mut Rand, count: i32, current: i32) -> i32 {
     let mut m = current;
     for _ in 0..10 {
@@ -277,6 +278,36 @@ struct OpenFile {
     read: usize,
 }
 
+/// The music player's bug fixes, each its own switch
+/// ([`crate::BugFix`]); all off is the original.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MusicFixes {
+    /// The next music of the list is written right after the old track's
+    /// end, which is heard to its last sample (the original writes it
+    /// behind the play cursor, `GotoMark`).
+    pub end: bool,
+    /// The rewind of a track that ends with an empty list or with loops
+    /// left checks the file's size, as the code means, and the track
+    /// plays again from its start right after its end (the original's
+    /// check compares the PCM size, fails and closes the file).
+    pub restart: bool,
+    /// A random mark drawn at the `rand()` = 0x7fff edge, one past the
+    /// file's marks, is its last mark (the original's `GotoMark` reports
+    /// it as a fatal error).
+    pub mark: bool,
+}
+
+impl MusicFixes {
+    /// Every fix `on`.
+    pub fn all(on: bool) -> MusicFixes {
+        MusicFixes {
+            end: on,
+            restart: on,
+            mark: on,
+        }
+    }
+}
+
 /// The music streamer (`AtlMuzik`, @ 0x00672138..0x006725c4): the file,
 /// the decoder state, the PCM position and size, the ring's write offset,
 /// the music buffer, the mark played and the loops left.
@@ -303,10 +334,9 @@ pub struct Stream {
     /// The loops left (@ 0x006725c4).
     pub loops: i32,
     pub events: Vec<StreamEvent>,
-    /// The minor bug fixes: a random mark drawn at the `rand()` = 0x7fff
-    /// edge, one past the file's marks, is its last mark; off, as the
-    /// original, it is `GotoMark`'s fatal error.
-    pub fixes: bool,
+    /// The bug fixes; `GotoMark` reads [`MusicFixes::mark`], the refill
+    /// ([`Stream::refill`]) sets them.
+    pub fixes: MusicFixes,
 }
 
 impl Default for Stream {
@@ -323,7 +353,7 @@ impl Default for Stream {
             current_mark: 0,
             loops: 0,
             events: Vec::new(),
-            fixes: false,
+            fixes: MusicFixes::default(),
         }
     }
 }
@@ -498,7 +528,7 @@ impl Stream {
         let mut k = k;
         if k == -1 {
             k = random_mark(rand, marks.len() as i32, self.current_mark);
-            if self.fixes {
+            if self.fixes.mark {
                 k = k.min(marks.len() as i32);
             }
         }
@@ -542,10 +572,11 @@ impl Stream {
     /// its mark (`GotoMark`: behind the cursor, what the ring still held of
     /// the old track dropped); with none, or loops left, the file is
     /// rewound, and the rewind's check closes it: the ring loops on.
-    /// `load` reads a music file. `fixes` (the minor bug fixes): the next
-    /// music, or the rewound one, is written right after the old track's
-    /// end, which is heard to its last sample. True when the ring was
-    /// written.
+    /// `load` reads a music file. `fixes`: with [`MusicFixes::end`] the
+    /// next music is written right after the old track's end, which is
+    /// heard to its last sample; with [`MusicFixes::restart`] the rewind
+    /// succeeds and the track goes on from its start there. True when the
+    /// ring was written.
     #[allow(clippy::too_many_arguments)]
     pub fn refill(
         &mut self,
@@ -554,7 +585,7 @@ impl Stream {
         current_music: i32,
         rand: &mut Rand,
         load: &mut dyn FnMut(i32) -> Option<MusicData>,
-        fixes: bool,
+        fixes: MusicFixes,
     ) -> bool {
         self.fixes = fixes;
         if self.file.is_none() {
@@ -601,7 +632,7 @@ impl Stream {
                     log::warn!("{}: not found, no music", music_name(e.music));
                     return false;
                 };
-                if fixes {
+                if fixes.end {
                     if !self.continue_with(file, mark, len, rest, rand, ring) {
                         return false;
                     }
@@ -619,12 +650,12 @@ impl Stream {
             self.loops -= 1;
         }
         self.file_seek(0);
-        if !self.init_read(fixes) {
+        if !self.init_read(fixes.restart) {
             self.file = None;
             return false;
         }
-        // Reached only with the fixes: the rewound file goes on in the
-        // chunk.
+        // Reached only with the restart fix: the rewound file goes on in
+        // the chunk.
         self.write_rest(len, rest, ring);
         true
     }

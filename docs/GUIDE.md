@@ -251,12 +251,31 @@ it. Its entries:
   videos in widescreen).
 - **Screen**: the original's two screen sizes, 640 x 480 and 800 x 600
   (below); with the original graphics only.
-- **Fix original bugs**: on by default (for now: every music track is
-  heard to its end; in Ireland, a click on Brigid's cross or on an ogham
-  stone works the puzzle and nothing else, where the original may take
-  it for a click on another place's object: back to Tibet from the
-  fourth stone in one chapter, the water's film from the ninth with the
-  horse in another).
+- **Fix original bugs**: *On* (every fix, the default), *Off* (none:
+  as the original), or *Custom (n/4)* when some are on and some off;
+  Enter turns them all on, then all off.
+- **Choose the bug fixes...**: opens a box of its own, in the same
+  style, with *All on*, *All off (as the original)*, one switch per fix
+  and *Back*; the foot of the box tells what the original does without
+  the fix selected and where a player notices it. Arrows, Enter or a
+  click change a fix; Escape (or a click outside the box) goes back to
+  the options, F10 or O closes everything. The fixes:
+  - **Music: every track heard to its end**: the original starts the
+    next track about 6 seconds before the old one ends, so the last
+    seconds of each piece of music are never heard.
+  - **Music: an ended track starts again**: when a track ends with
+    nothing to follow it, the original repeats its last 6 seconds over
+    and over until another music starts; with the fix the track plays
+    again from its start.
+  - **Music: the rare missing mark (1 in 32768)**: once in 32768 random
+    starts of a music, the original picks a place past the track's last
+    and stops with a fatal error (it saves and quits); with the fix the
+    track plays from its last place.
+  - **Ireland: cross and ogham clicks**: a click on Brigid's cross or on
+    an ogham stone works the puzzle and nothing else, where the original
+    may take it for a click on another place's object: back to Tibet
+    from the fourth stone in one chapter, the water's film from the
+    ninth with the horse in another.
 - **Arrow keys turn**: on by default, the arrow keys turn the view as
   the mouse does; off, as in the original, only the mouse turns it. On,
   the click that brings the window back to the front only takes the
@@ -267,8 +286,12 @@ folder of the per-user data folder (`~/.local/share/atlantis-native/atlantis2`
 on Linux, `%APPDATA%\atlantis-native\atlantis2` on Windows,
 `~/Library/Application Support/atlantis-native/atlantis2` on macOS),
 beside the saves (`save\ATL<player>_<slot>.SAV`, the original's files)
-and the original's options file `atlant2.cfg`. From the command line, `--hd` turns HD on and
-`--widescreen` HD with widescreen, and `--original` turns the bug fixes
+and the original's options file `atlant2.cfg`, one line per fix
+(`fix_music_end`, `fix_music_restart`, `fix_music_mark`,
+`fix_ireland_clicks`, each `on` or `off`); a `settings.ini` written by
+an earlier version, with its single `minor_bug_fixes` line, is still
+read: that line sets every fix. From the command line, `--hd` turns HD on and
+`--widescreen` HD with widescreen, and `--original` turns every bug fix
 and the arrow keys' turn off, for that run only; `--size 1920x1080` opens the window at that size,
 for example `atlantis-native --widescreen --size 1920x1080
 /path/to/Atlantis_2_Files`.
