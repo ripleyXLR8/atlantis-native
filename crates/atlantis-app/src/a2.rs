@@ -99,7 +99,7 @@ use winit::dpi::PhysicalPosition;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::{Key, NamedKey};
+use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
 pub use atlantis2_data::files::holds_atlantis2;
@@ -721,7 +721,7 @@ impl A2App {
             keys: [false; 4],
             locked: false,
             focused: true,
-            alt: false,
+            alt_left: false,
             next_frame: now,
         }
     }
@@ -763,8 +763,8 @@ struct A2App {
     keys: [bool; 4],
     locked: bool,
     focused: bool,
-    /// Alt held (Alt+Enter, 1.00 only).
-    alt: bool,
+    /// The left Alt key held (Alt+Enter, 1.00 only).
+    alt_left: bool,
     next_frame: Instant,
 }
 
@@ -917,6 +917,8 @@ impl A2App {
         if !on {
             self.grab(false);
             self.keys = [false; 4];
+            // Its release is not seen once the window is left (Alt+Tab).
+            self.alt_left = false;
         } else {
             self.motion = (0.0, 0.0);
         }
@@ -1123,7 +1125,6 @@ impl ApplicationHandler for A2App {
                 el.exit();
             }
             WindowEvent::Focused(on) => self.set_focus(on, Instant::now()),
-            WindowEvent::ModifiersChanged(m) => self.alt = m.state().alt_key(),
             // The window's pointer is the game's in the menus (and while
             // the mouse is not held); held, the raw motion moves it (the
             // bag bar's pointer).
@@ -1150,6 +1151,13 @@ impl ApplicationHandler for A2App {
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
+                let code = match event.physical_key {
+                    PhysicalKey::Code(c) => Some(c),
+                    PhysicalKey::Unidentified(_) => None,
+                };
+                if code == Some(KeyCode::AltLeft) {
+                    self.alt_left = down;
+                }
                 match event.logical_key {
                     // Escape (@ 0x004762f0): the main menu from the game,
                     // the end of a dialog, the main menu closed.
@@ -1165,13 +1173,17 @@ impl ApplicationHandler for A2App {
                     Key::Named(NamedKey::ArrowDown) => self.keys[3] = down,
                     Key::Named(NamedKey::F11) if down => self.toggle_fullscreen(),
                     // Alt+Enter: full screen or window, as 1.00's key-down
-                    // callback (@ 0x004762f0, Enter with the modifier)
-                    // switches; the 1.01 patch removed it
+                    // callback switches (@ 0x004762f0: the main Enter,
+                    // `DIK_RETURN`, while the key state @ 0x006e2b6c of the
+                    // modifier slot 0x7a of the key table is down; with
+                    // DirectInput that slot is `DIK_LMENU`, the left Alt,
+                    // @ 0x00586133); the 1.01 patch removed it
                     // (`atlantis2-gog-fr-2183168` @ 0x004763c0).
                     Key::Named(NamedKey::Enter)
                         if down
                             && !event.repeat
-                            && self.alt
+                            && code == Some(KeyCode::Enter)
+                            && self.alt_left
                             && self.engine.files().build().release == Release::V100 =>
                     {
                         self.toggle_fullscreen()

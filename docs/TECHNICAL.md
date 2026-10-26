@@ -727,16 +727,23 @@ back) into `yucatan-*.png`.
     −MulDiv(Height, 96, 72)): GDI takes the largest size whose `VDMX`
     height fits (GOG's `Font.txt` asks 22 for the dialogs: 15 pixels per
     em, a 21-pixel cell; 16 for the popups: 11 pixels per em; the CD's 12
-    and 10 give 10 and 9 pixels per em, from the font's win metrics as no
-    `VDMX` record fits);
+    and 10, below the font's smallest `VDMX` cell, give 7 pixels per em
+    in a cell of the height asked: subtitle lines 13 pixels apart). These
+    sizes are Windows' own, measured on Windows 11 and Windows 98 SE
+    with `GetTextMetricsA` at every height from 2 to 40; Windows 98
+    differs only below the smallest `VDMX` cell (a 9-pixel cell whatever
+    the height), and the port follows Windows 11, where the GOG edition
+    runs;
   - the subtitles' and the credits' lines are `GetTextMetricsA`'s
     `tmHeight` + 1 apart (22 pixels with GOG's files), no longer
     `Height`;
   - a font file that is missing is replaced by a system font (1.01 logs
     it; 1.00's `AddFontResourceA` fails and GDI substitutes a face the
     same way): here the port's Liberation Sans;
-  - Alt+Enter, which switches 1.00 between full screen and window, does
-    nothing (F11 is the port's own key, with both).
+  - Alt+Enter, which switches 1.00 between full screen and window (the
+    main Enter while the left Alt is down: the key table's modifier slot
+    is `DIK_LMENU` once DirectInput runs), does nothing (F11 is the
+    port's own key, with both).
 
   GOG's own patches change how the program talks to Windows (its install
   folder taken for the CD, no free-space check before the music copy, no
@@ -750,8 +757,8 @@ back) into `yucatan-*.png`.
   with GOG's executable. The subtitles of 1.01 are checked against its
   own subtitle function run under emulation on the CD's and on GOG's
   files (`golden/subtitles_101_cd.txt`, `golden/subtitles_101_gog.txt`,
-  `tests/dialogs.rs`); the font size GDI makes of a cell height is the
-  harness's (Wine's algorithm), not measured on Windows.
+  `tests/dialogs.rs`), with the font sizes and widths measured on
+  Windows 11 as the harness's GDI.
 - **Files:** the install folder holds the places, scripts, texts and
   sprite banks; everything under `datas_a2\` comes from the current CD.
   The discs (images or copies) are found in the game folder, in the

@@ -397,9 +397,76 @@ fn golden_font(golden: &str, height: i32) -> (u16, i32, i32) {
     )
 }
 
+/// What Windows 11's GDI makes of `CreateFontA(+height)` on `Atl_Font.ttf`
+/// (the French CD's and GOG's files give the same), with the arguments of
+/// 1.01 (`atlantis2-gog-fr-2183168` @ 0x0046f140): height, pixels per em
+/// (tmHeight − tmInternalLeading), tmAscent, tmHeight. Measured on Windows
+/// with `GetTextMetricsA`, every height from 2 to 40.
+const WINDOWS_CELL_HEIGHTS: [(i32, u16, i32, i32); 39] = [
+    (2, 2, 2, 2),
+    (3, 3, 2, 3),
+    (4, 3, 3, 4),
+    (5, 4, 4, 5),
+    (6, 5, 5, 6),
+    (7, 6, 6, 7),
+    (8, 7, 6, 8),
+    (9, 7, 7, 9),
+    (10, 7, 8, 10),
+    (11, 7, 9, 11),
+    (12, 7, 10, 12),
+    (13, 7, 10, 13),
+    (14, 8, 10, 14),
+    (15, 10, 11, 15),
+    (16, 11, 12, 16),
+    (17, 11, 12, 16),
+    (18, 12, 14, 18),
+    (19, 13, 14, 18),
+    (20, 13, 14, 18),
+    (21, 14, 16, 21),
+    (22, 15, 16, 21),
+    (23, 16, 18, 23),
+    (24, 16, 18, 23),
+    (25, 17, 19, 25),
+    (26, 17, 19, 25),
+    (27, 18, 20, 27),
+    (28, 19, 20, 27),
+    (29, 20, 22, 29),
+    (30, 21, 23, 30),
+    (31, 22, 23, 31),
+    (32, 22, 23, 31),
+    (33, 23, 25, 33),
+    (34, 24, 26, 34),
+    (35, 26, 27, 35),
+    (36, 26, 27, 35),
+    (37, 26, 27, 35),
+    (38, 27, 29, 38),
+    (39, 28, 30, 39),
+    (40, 29, 31, 40),
+];
+
+/// 1.01's font of every cell height is the one Windows makes.
+#[test]
+fn fonts_of_1_01_have_the_sizes_windows_gives() {
+    let Some(files) = game() else { return };
+    let mut font_txt = FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
+    let ttf = files.read(Folder::Loc, "Atl_Font.ttf").unwrap();
+    for &(height, ppem, ascent, cell) in &WINDOWS_CELL_HEIGHTS {
+        let entry = font_txt
+            .fonts
+            .iter_mut()
+            .find(|f| f.id == "AtlFT_Dialog")
+            .unwrap();
+        entry.height = height;
+        let font =
+            SubtitleFont::named_for(ttf.clone(), &font_txt, "AtlFT_Dialog", Release::V101).unwrap();
+        assert_eq!(font.metrics(), (ppem, ascent, cell), "height {height}");
+        assert_eq!(font.line_step(), cell + 1, "height {height}");
+    }
+}
+
 /// The 1.01 executable's subtitles on the French CD's files (a CD
-/// installation patched to 1.01): `Height` 12 as a cell height (10 pixels
-/// per em, an 11-pixel cell, lines 12 apart) and every byte a character
+/// installation patched to 1.01): `Height` 12 as a cell height (7 pixels
+/// per em, a 12-pixel cell, lines 13 apart) and every byte a character
 /// of its own.
 #[test]
 fn subtitles_of_1_01_on_the_cd_files_match_the_original() {
@@ -409,7 +476,7 @@ fn subtitles_of_1_01_on_the_cd_files_match_the_original() {
     let font =
         SubtitleFont::named_for(ttf.clone(), &font_txt, "AtlFT_Dialog", Release::V101).unwrap();
     assert_eq!(font.metrics(), golden_font(SUBTITLES_101_CD, 12));
-    assert_eq!(font.line_step(), 12);
+    assert_eq!(font.line_step(), 13);
     let popup = SubtitleFont::named_for(ttf, &font_txt, "AtlFT_POPUP", Release::V101).unwrap();
     assert_eq!(popup.metrics(), golden_font(SUBTITLES_101_CD, 10));
     assert!(SUBTITLES_101_CD.contains("\nmbcs 0\n"));

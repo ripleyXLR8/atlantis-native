@@ -56,7 +56,13 @@
 //!   the identity of `MM_TEXT`), so GDI takes the largest size whose
 //!   `VDMX` height (yMax − yMin) fits; GOG's `Font.txt` asks 22 for the
 //!   dialogs (15 pixels per em, a 21-pixel cell) and 16 for the popups
-//!   (11 pixels per em);
+//!   (11 pixels per em). A height below the font's smallest `VDMX` cell
+//!   (the CD's `Font.txt`, 12 and 10) gets the size under that record, 7
+//!   pixels per em, in a cell of the height asked. These sizes are what
+//!   GDI gives on Windows (measured on Windows 11 and Windows 98 SE for
+//!   both `Atl_Font.ttf` files, every height from 2 to 40; Windows 98
+//!   differs only below the smallest `VDMX` cell, where its cell is the
+//!   size's own: the port follows Windows 11, where the GOG edition runs);
 //! - the lines are `tmHeight` + 1 apart (`GetTextMetricsA`, through
 //!   `LPtoDP`): 22 pixels with GOG's files, no longer overlapping.
 //!
@@ -243,11 +249,21 @@ fn vdmx(ttf: &[u8], ppem: u16) -> Option<(i32, i32)> {
 }
 
 /// GDI's size for a cell height `height` (`CreateFontA` with a positive
-/// height, 1.01): in the `VDMX` group of the font's ratio, the record whose
-/// yMax − yMin equals `height`, else the one before the first that is
-/// taller; `None` when the first is already taller or none is (the
-/// algorithm of Wine's GDI, which follows Windows' use of `VDMX`
-/// [INFERRED: not measured on Windows]). Returns ppem, yMax, yMin.
+/// height, 1.01) in a font with a `VDMX` table: in the group of the font's
+/// ratio, the first record whose yMax − yMin equals `height`, else the one
+/// before the first that is taller. When even the first record is taller,
+/// the size is the smaller of MulDiv(unitsPerEm, height, winAscent +
+/// winDescent) and the first record's size − 1, the cell is `height` and
+/// the ascent MulDiv(height, winAscent, winAscent + winDescent). `None`
+/// without a `VDMX` group for the ratio, or past its last record. Returns
+/// ppem, ascent, −descent.
+///
+/// Measured on Windows 11 for both `Atl_Font.ttf` files at every height
+/// from 2 to 40 (`CreateFontA` with the arguments of 1.01's
+/// `atlantis2-gog-fr-2183168` @ 0x0046f140, `GetTextMetricsA`): the rule
+/// gives Windows' tmHeight, tmAscent and size at each of them. Windows 98
+/// SE agrees down to the first record; below it, its cell is the size's
+/// own (9 pixels at 7 per em), not `height`.
 fn vdmx_for_height(ttf: &[u8], height: i32) -> Option<(u16, i32, i32)> {
     let (off, len) = table(ttf, b"VDMX")?;
     let t = ttf.get(off..off + len)?;
@@ -276,12 +292,44 @@ fn vdmx_for_height(ttf: &[u8], height: i32) -> Option<(u16, i32, i32)> {
                 return Some((ppem, ymax, ymin));
             }
             if ymax - ymin > height {
-                return if e == 0 { None } else { rec(e - 1) };
+                if e > 0 {
+                    return rec(e - 1);
+                }
+                return below_vdmx(ttf, height, ppem);
             }
         }
         return None;
     }
     None
+}
+
+/// GDI's font of a cell height below the first `VDMX` record (whose size
+/// is `first_ppem`), see [`vdmx_for_height`].
+fn below_vdmx(ttf: &[u8], height: i32, first_ppem: u16) -> Option<(u16, i32, i32)> {
+    let (wa, wd) = (i64::from(os2_u16(ttf, 74)?), i64::from(os2_u16(ttf, 76)?));
+    let upem = i64::from(head_upem(ttf)?);
+    if wa + wd == 0 || height < 1 {
+        return None;
+    }
+    let muldiv = |a: i64, b: i64, c: i64| (a * b + c / 2) / c;
+    let h = i64::from(height);
+    let ppem = muldiv(upem, h, wa + wd)
+        .min(i64::from(first_ppem) - 1)
+        .max(1);
+    let ascent = muldiv(h, wa, wa + wd) as i32;
+    Some((ppem as u16, ascent, ascent - height))
+}
+
+/// The font's units per em (`head`).
+fn head_upem(ttf: &[u8]) -> Option<u16> {
+    let (off, len) = table(ttf, b"head")?;
+    if len < 20 {
+        return None;
+    }
+    Some(u16::from_be_bytes([
+        *ttf.get(off + 18)?,
+        *ttf.get(off + 19)?,
+    ]))
 }
 
 /// A `u16` of the font's `OS/2` table at `offset`.
@@ -297,10 +345,11 @@ fn os2_u16(ttf: &[u8], offset: usize) -> Option<u16> {
 }
 
 /// The size and the ascent and descent GDI gives a cell height of a font
-/// without a fitting `VDMX` record: ppem = MulDiv(unitsPerEm, height,
-/// usWinAscent + usWinDescent), the ascent and descent the `OS/2` win
-/// values at that size, rounded as 26.6 fixed-point values (Wine's GDI
-/// [INFERRED]).
+/// without a `VDMX` table (the port's system font): ppem =
+/// MulDiv(unitsPerEm, height, usWinAscent + usWinDescent), the ascent and
+/// descent the `OS/2` win values at that size, rounded as 26.6 fixed-point
+/// values. Windows 11 gives these for Liberation Sans within a pixel; its
+/// hinted widths, which the port does not compute, differ more.
 fn cell_from_win_metrics(font: &FontVec, ttf: &[u8], height: i32) -> (u16, i32, i32) {
     let upem = font.units_per_em().unwrap_or(2048.0) as i64;
     let (wa, wd) = match (os2_u16(ttf, 74), os2_u16(ttf, 76)) {

@@ -7,15 +7,15 @@
 # Producer: an emulation harness running the original code. Stubs and harness inputs: the font
 # file calls (AddFontResourceA, GetFileAttributesA, the CreateFontA wrapper 0x0046f140, the
 # surface's GetDC), the GDI text calls (TextOutA and SetTextColor recorded), LPtoDP (the identity),
-# and GetTextExtentPoint32A / GetTextMetricsA, whose results are the harness's: the font GDI
-# makes of a cell height (the VDMX record of loc\Atl_Font.ttf whose yMax - yMin is the height,
-# else the one before the first taller one; without one, MulDiv(unitsPerEm, height, winAscent +
-# winDescent) pixels per em and the win metrics at that size), the hdmx advance widths at that
-# size over the bytes (Windows-1252), the cell height for cy and tmHeight.
+# and GetTextExtentPoint32A / GetTextMetricsA, whose results were measured on Windows 11: a
+# program calling CreateFontA with the arguments of 0x0046f140 on loc\Atl_Font.ttf at each
+# height, then GetTextMetricsA (tmHeight, tmAscent, ppem = tmHeight - tmInternalLeading) and
+# GetTextExtentPoint32A of every single byte; the extent of a text is the sum of its bytes'
+# widths (measured strings add up), cy and tmHeight the measured tmHeight.
 # font HANDLE FACE HEIGHT | PPEM ASCENT CELL; text WORLD.ID BYTES MD5 | CALLS; call WORLD.ID K X Y
 # COLOUR LENGTH MD5 OFFSET (the offset of the drawn bytes in the text, -1 when they are not a
 # part of it). Derived values only.
-font f1 Gill_Alt_One_MT 12 | 10 9 11
+font f1 Gill_Alt_One_MT 12 | 7 10 12
 font f2 Gill_Alt_One_MT 22 | 15 16 21
 font f3 Gill_Alt_One_MT 20 | 13 14 18
 font f4 Gill_Alt_One_MT 16 | 11 12 16

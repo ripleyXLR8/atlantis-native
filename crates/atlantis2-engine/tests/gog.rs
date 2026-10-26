@@ -476,13 +476,96 @@ fn a_cd_installation_patched_to_1_01() {
     let dialog =
         atlantis2_engine::subtitle::SubtitleFont::load(&files, &font_txt, "AtlFT_Dialog").unwrap();
     assert_eq!(dialog.metrics(), golden_font(SUBTITLES_101_CD, 12));
-    assert_eq!(dialog.line_step(), 12);
+    assert_eq!(dialog.line_step(), 13);
     let popup =
         atlantis2_engine::subtitle::SubtitleFont::load(&files, &font_txt, "AtlFT_POPUP").unwrap();
     assert_eq!(popup.metrics(), golden_font(SUBTITLES_101_CD, 10));
     // The engine boots on it.
     let e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
     assert_eq!(e.files().build().id, "atlantis2-patch101-2183168");
+    drop(e);
+    let _ = std::fs::remove_dir_all(&install);
+}
+
+/// GOG's CD page (`atlantis2-gog-fr-2183168` @ 0x00488e57..0x00488ec2,
+/// state 9 patched): the start is set again every frame and the page
+/// closes when the low byte of the ticks since the last frame is 1, without
+/// looking for the disc, the current disc left as it was. GOG's folder
+/// holds every disc, so the page is opened here on a scratch copy of it
+/// (links) without disc 4's marker: the folder is then disc 3 alone.
+#[cfg(unix)]
+#[test]
+fn gogs_cd_page_closes_at_the_first_tick() {
+    use std::os::unix::fs::symlink;
+    use std::path::Path;
+    let Some(dir) = gog_dir() else { return };
+    let link_all = |from: &Path, to: &Path, skip: &str| {
+        for entry in std::fs::read_dir(from).unwrap().flatten() {
+            let name = entry.file_name();
+            if !name.to_string_lossy().eq_ignore_ascii_case(skip) {
+                symlink(entry.path(), to.join(&name)).unwrap();
+            }
+        }
+    };
+    let install = scratch("a2-gog-without-disc-4");
+    link_all(&dir, &install, "DATAS_A2");
+    let datas = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .find(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .eq_ignore_ascii_case("datas_a2")
+        })
+        .unwrap()
+        .path();
+    let spf = std::fs::read_dir(&datas)
+        .unwrap()
+        .flatten()
+        .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case("spf"))
+        .unwrap()
+        .path();
+    let to_datas = install.join(datas.file_name().unwrap());
+    std::fs::create_dir(&to_datas).unwrap();
+    link_all(&datas, &to_datas, "SPF");
+    let to_spf = to_datas.join(spf.file_name().unwrap());
+    std::fs::create_dir(&to_spf).unwrap();
+    link_all(&spf, &to_spf, "MANTE.SPR");
+    let (files, build) = A2Files::open_dir(&install, &[]).unwrap();
+    assert!(build.gog);
+    assert_eq!(files.disc_numbers(), vec![3]);
+
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    let mut clock = 1000.0;
+    let mut pass = |e: &mut Engine| {
+        clock += PASS;
+        e.set_clock(clock);
+        e.pass(None);
+    };
+    e.run_command(b"(monde=3)");
+    pass(&mut e);
+    assert_ne!(e.loop_type, LoopType::Menu);
+    // Disc 4's world: the page opens.
+    e.run_command(b"(monde=4)");
+    pass(&mut e);
+    assert_eq!(e.loop_type, LoopType::Menu);
+    assert_eq!(
+        e.menu().and_then(|m| m.kind()),
+        Some(atlantis2_engine::menu::PageKind::Cd(4))
+    );
+    // It closes at the pass of the next tick, the disc still missing.
+    let opened = e.ticks;
+    while e.loop_type == LoopType::Menu {
+        pass(&mut e);
+        assert!(
+            e.ticks.wrapping_sub(opened) <= 1,
+            "{}",
+            e.ticks.wrapping_sub(opened)
+        );
+    }
+    assert_eq!(e.ticks.wrapping_sub(opened), 1);
+    assert_eq!(e.files().disc_numbers(), vec![3]);
+    assert_eq!(e.files().current_disc(), 4);
     drop(e);
     let _ = std::fs::remove_dir_all(&install);
 }
