@@ -816,8 +816,10 @@ impl Engine {
     /// `variant` is the CPU's cube renderer, `fpu` the x87 control word the
     /// process starts with. With `warpPII` the first frame changes it to
     /// 0x0e7f for good: the first view is entered under `fpu` and every
-    /// later turn, entry and frame runs under 0x0e7f, as in the original if
-    /// no assembly renderer drew before the first view (not known).
+    /// later turn, entry and frame runs under 0x0e7f, as in the original:
+    /// no assembly routine runs before the first view, and its Direct3D
+    /// start-up leaves 0x027f's arithmetic (measured on Windows 11 and 98
+    /// SE, atlantis2-re experiment 2026-10-26-04), `Fpu::default()`.
     pub fn new_game(
         mut files: A2Files,
         variant: Variant,
