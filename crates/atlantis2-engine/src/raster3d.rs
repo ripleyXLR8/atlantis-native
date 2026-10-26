@@ -167,8 +167,60 @@ pub fn draw_polygon(fpu: Fpu, poly: &mut [Vertex], tex: &Texture, out: &mut Targ
     }
 }
 
+/// Draws one polygon flat, `colour` with no Z test or write: the routine
+/// `FlatC` (record @ 0x005e4ce0, flags 1), whose polygon set-up and scan
+/// are the textured C routine's (@ 0x00570710, 0x00570190: x and y moved
+/// to the pixel centres, the same edges and rows) and whose span
+/// (@ 0x0056fee0) fills pixels xs..xe of the row. A head's material group
+/// without a texture (`head.rs`).
+pub fn draw_polygon_flat(fpu: Fpu, poly: &mut [Vertex], colour: u16, out: &mut Target) {
+    if poly.len() < 3 {
+        return;
+    }
+    let c = fpu;
+    for p in poly.iter_mut() {
+        p.x = c.f(c.add(p.x, 0.5));
+        p.y = c.f(c.add(p.y, 0.5));
+    }
+    let no_texture = [0u16; 1];
+    let tex = Texture {
+        pixels: &no_texture,
+        width: 1,
+        height: 1,
+    };
+    let b = Binding::new(&tex);
+    for k in 2..poly.len() {
+        triangle_with(
+            fpu,
+            &b,
+            [poly[0], poly[k - 1], poly[k]],
+            &tex,
+            Fill::Flat(colour),
+            out,
+        );
+    }
+}
+
+/// What the span does: the textured C span or `FlatC`'s fill.
+#[derive(Clone, Copy)]
+enum Fill {
+    Texture,
+    Flat(u16),
+}
+
 /// One triangle (a, p = previous, c = current), @ 0x00570b93..0x00570dcb.
 fn triangle(fpu: Fpu, b: &Binding, tri: [Vertex; 3], tex: &Texture, out: &mut Target) {
+    triangle_with(fpu, b, tri, tex, Fill::Texture, out);
+}
+
+fn triangle_with(
+    fpu: Fpu,
+    b: &Binding,
+    tri: [Vertex; 3],
+    tex: &Texture,
+    fill: Fill,
+    out: &mut Target,
+) {
     let [a, p, c] = tri;
     // Sort by y: top, middle, bottom (the compare tree @ 0x00570b93).
     let (mut top, mut mid, mut bot);
@@ -243,7 +295,7 @@ fn triangle(fpu: Fpu, b: &Binding, tri: [Vertex; 3], tex: &Texture, out: &mut Ta
             });
         }
     }
-    scan(fpu, b, &mut edges, (left, right), lower, tex, out);
+    scan(fpu, b, &mut edges, (left, right), lower, tex, fill, out);
 }
 
 /// The edge set-up @ 0x00570520; `None` for an empty edge (the original
@@ -290,6 +342,7 @@ fn edge(fpu: Fpu, a: &Vertex, b: &Vertex, attrs: bool, vp_bottom1: i32) -> Optio
 
 /// The scan @ 0x00570190: the x gradients from the two edges' slopes,
 /// then the rows of the upper pair and of the lower pair.
+#[allow(clippy::too_many_arguments)]
 fn scan(
     fpu: Fpu,
     b: &Binding,
@@ -297,6 +350,7 @@ fn scan(
     upper: (usize, usize),
     lower: Option<(usize, usize)>,
     tex: &Texture,
+    fill: Fill,
     out: &mut Target,
 ) {
     let c = fpu;
@@ -324,7 +378,14 @@ fn scan(
                 let xs = ftol(VP_LEFT).max(ftol(edges[li].x));
                 let xe = ftol(edges[ri].x).min(out.width as i32);
                 if xs < xe {
-                    span(fpu, b, &g, &edges[li], *y, xs, xe, tex, out);
+                    match fill {
+                        Fill::Texture => span(fpu, b, &g, &edges[li], *y, xs, xe, tex, out),
+                        Fill::Flat(colour) => {
+                            // @ 0x0056fee0: the row from xs to xe.
+                            let row = *y as usize * out.width;
+                            out.pixels[row + xs as usize..row + xe as usize].fill(colour);
+                        }
+                    }
                 }
                 *y += 1;
                 let rr = &mut edges[ri];
