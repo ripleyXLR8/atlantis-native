@@ -2173,8 +2173,9 @@ back) into `yucatan-*.png`.
   tick, and the click dispatcher, on the first zone click in an `SS` view
   outside 1-7 with the mode 5, clears it and runs no hook on that click
   (the wheels' first click in view 13 is lost, as in the original);
-  a new game keeps a 5, as the original's (it does not run the puzzle
-  reset). Three other entries overwrite the mode, as in the original:
+  a new game finds the start-up's 0 (the original runs no puzzle reset
+  at a new game, but starts one only from the start-up's player menu).
+  Three other entries overwrite the mode, as in the original:
   the turtle ring's for views 40-64 (2), the clouds' in `SS` 31 (4,
   unless `FINPERLE` is 1) and the souls' in `LA` (3); so a save made in
   the turtle room after the chest writes entry 26 = 2, and the first
@@ -2361,7 +2362,10 @@ back) into `yucatan-*.png`.
   from their own generator here (the fox woman's weighted states in
   views 20, 21 and 30 share the souls' generator in the original); a
   drop draw of `rand()` = 32767 (one draw in 32768; a view entry with
-  three candidates or more makes one to three) reads, in the original,
+  three candidates or more drops one to three of them, drawing until
+  they are dropped or 100 draws have missed: a draw on a candidate
+  already dropped, or this one, is a miss and draws again) reads, in the
+  original,
   the candidates' flags past their count: a word of the entry's own
   stack frame (@ 0x0048dff2, [ESP + 4 · n + 0x2c]) that neither the
   entry nor the view entry around it writes (an emulated write watch,

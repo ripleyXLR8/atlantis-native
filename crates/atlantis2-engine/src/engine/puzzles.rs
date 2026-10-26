@@ -495,8 +495,9 @@ impl Engine {
     /// 1-7 (@ 0x0049b977); a load copies the save's entry. The reset
     /// FUN_0049bf70 (start-up, load) clears only its own modules' modes
     /// (1, 2, 3, 6), and also sets 0 in views 55, 64 and 75 (the grids'
-    /// leaves, FUN_00492dd0 @ 0x00492e69); a new game does not run it, so
-    /// it keeps the mode.
+    /// leaves, FUN_00492dd0 @ 0x00492e69); a new game does not run it, but
+    /// the original starts one only from the start-up's player menu, so it
+    /// finds the start-up's 0.
     pub fn puzzle_mode(&self) -> i32 {
         i32::from_le_bytes(self.save_extra.entry(MODE_ENTRY).try_into().unwrap())
     }

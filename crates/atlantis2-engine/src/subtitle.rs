@@ -772,7 +772,7 @@ fn gdi_glyphs(ttf: &[u8], ppem: u16, font: &FontVec) -> Option<Vec<Option<GlyphB
 /// or a column's centre line that holds no pixel centre lights the pixel
 /// nearest its middle. GDI's own rules for the dropouts (and the stubs it
 /// leaves out) are not all known: measured against Windows 98 SE and 11
-/// (`tests/subtitles.rs`).
+/// (`tests/gdi_glyphs.rs`).
 fn gdi_glyph(
     g: &skrifa::outline::OutlineGlyph,
     hinting: &skrifa::outline::HintingInstance,

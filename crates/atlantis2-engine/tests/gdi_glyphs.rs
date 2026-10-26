@@ -51,7 +51,7 @@ fn md5(s: &str) -> String {
         })
 }
 
-/// Byte `b` drawn alone at (32, 32) in gdi_glyphs.c's text form.
+/// Byte `b` drawn alone at (32, 32) in the golden file's text form.
 fn glyph_text(f: &SubtitleFont, b: u8) -> String {
     const SZ: i32 = 96;
     let mut px = vec![false; (SZ * SZ) as usize];

@@ -1,4 +1,4 @@
-# GDI's glyph pixels for the game's TrueType files, as md5s (atlantis2-re tools/gdi/gdi_glyphs.c;
+# GDI's glyph pixels for the game's TrueType files, as md5s (measured on Windows:
 # each byte 0x21..0xff drawn alone by TextOutA in white on a black 16-bit DIB section, the font
 # made by CreateFontA(height, ..., quality, VARIABLE_PITCH, "Gill Alt One MT")): the md5 of
 # 'x0 y0 w h ROWS' (the lit pixels' box from the TextOutA point, then h rows of w bits in hex

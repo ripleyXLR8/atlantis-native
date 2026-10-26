@@ -12,9 +12,10 @@
 //! - The state: the puzzle mode 2 (@ 0x006d84d0, save entry 26), the
 //!   pending turn count (@ 0x006d84e0, entry 28) and the ring's frame
 //!   store (@ 0x006d84e4, entry 29), kept in the save's bytes. Nothing
-//!   resets them but the hooks below: a new game keeps them (the puzzle
-//!   reset FUN_0049bf70 runs at start-up and at a load only, and a load
-//!   copies the save's entries after it).
+//!   resets them but the hooks below and a load (the puzzle reset
+//!   FUN_0049bf70 runs at start-up and at a load only, and a load copies
+//!   the save's entries after it); a new game, which the original starts
+//!   only from the start-up's player menu, finds the start-up's zeros.
 //! - find_num_spw_anneau FUN_0049c3b0: the **last** loaded slot whose id
 //!   is `ANNEAU_GRAVE`'s, whatever its kind; none is the original's fatal
 //!   error `find_num_spw_anneau() !!` (an emergency save, then the game
