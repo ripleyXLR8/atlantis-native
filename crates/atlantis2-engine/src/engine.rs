@@ -3182,6 +3182,22 @@ impl Engine {
         self.with_script(|s, h| s.run_command(h, command));
     }
 
+    /// A `/con` condition (`EvalCondition` @ 0x00480fd0) on the game's
+    /// state, as a scan evaluates it: for tests and tools. `None` without
+    /// the scripts.
+    #[doc(hidden)]
+    pub fn eval_condition(&mut self, cond: &[u8]) -> Option<bool> {
+        self.with_script(|s, h| {
+            let kept = s.chapter_text().to_vec();
+            let mut t = cond.to_vec();
+            t.extend_from_slice(b"\r\n");
+            s.set_chapter_text(&t);
+            let r = s.eval_condition(h, 0).is_some();
+            s.set_chapter_text(&kept);
+            r
+        })
+    }
+
     /// A click on the sprite of slot `n` of the view, as the warp frame
     /// handles it (@ 0x0045a650): for tests and tools.
     pub fn take_slot(&mut self, n: usize) {
