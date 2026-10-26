@@ -2396,9 +2396,9 @@ back) into `yucatan-*.png`.
   `miniature.wam`, a soul's passage, the buffalo's empty form, the fox
   woman's fan read, the three demons' stamps in the fan's order across
   both places, the buffalo's answer: dialog 322, the mushroom,
-  `flag173`). Known differences: the place animations' hand-over draws
-  from their own generator here (the fox woman's weighted states in
-  views 20, 21 and 30 share the souls' generator in the original); a
+  `flag173`). The place animations' hand-over (the fox woman's weighted
+  states in views 20, 21 and 30) draws from the souls' generator, the
+  game's one `rand`, as in the original. Known difference: a
   drop draw of `rand()` = 32767 (one draw in 32768; a view entry with
   three candidates or more drops one to three of them, drawing until
   they are dropped or 100 draws have missed: a draw on a candidate
@@ -2412,9 +2412,9 @@ back) into `yucatan-*.png`.
   reads), not known for the running game; a 1 there drops nothing more.
   The port takes it as a miss (review L35: documented; settling it needs
   a debugger's breakpoint on the running game, which Atlantis II does
-  not have yet); the original's fatal errors, which the data never reach,
-  stop the scripts here (34 candidates) or are logged (AtlSpw_load's
-  full slot table, as for every place animation).
+  not have yet). The original's fatal errors, which the data never
+  reach (34 candidates, `AtlSpw_load`'s full slot table), run the
+  reporter here too (Scripts, below).
 - **Ogham stones** (`engine/ogham.rs`, Ireland's view 6 of
   `bigile1.wam`): fifteen places in three rows of five on a standing
   stone, the frame list of `OGHAM_SPRITE`'s slot (frame 4 k + e: place k,
@@ -3019,7 +3019,8 @@ back) into `yucatan-*.png`.
   (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
   the scripts or of a puzzle (an unknown name, a missing chapter, a slot
   or an animation the data lack, the view a deferred place change names
-  missing in the new file) runs the original's reporter (FUN_00480cd0): with a view
+  missing in the new file, a view's 35th place animation: `AtlSpw_load`'s
+  full table of 0x22 slots, @ 0x0047c575, no slot loaded) runs the original's reporter (FUN_00480cd0): with a view
   entered, the emergency save of player 9, slot 8 (`save\ATL09_08.SAV`,
   which the menu never lists), then the game quits; the shipped data
   never reach one. A dialog number with no line plays, in the original,

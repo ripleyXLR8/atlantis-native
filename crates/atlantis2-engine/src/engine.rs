@@ -1246,8 +1246,9 @@ impl Engine {
             match spw {
                 Some(spw) => {
                     self.spw_loaded = true;
-                    let n = self.anim.slots.len();
-                    self.anim.load(&name, spw, kind, id, sprite, s);
+                    let Some(n) = self.spw_load(&name, spw, kind, id, sprite, s) else {
+                        continue;
+                    };
                     if let Some(slot) = self.anim.slots.get_mut(n) {
                         slot.record = Some(record);
                     }
@@ -1680,6 +1681,48 @@ impl Engine {
         // (@ 0x0049ce56 .. 0x0049cf29).
         self.frame_flag = false;
         self.check_fatal();
+    }
+
+    /// `AtlSpw_load` (FUN_0047c4e0): a slot for an entity state of the
+    /// view (the place animations' and the souls' loads), its index
+    /// returned. A full table (0x22 slots) is the original's fatal error
+    /// (@ 0x0047c566..0x0047c575, `AtlSpw_load(): n>MAX_SPW_VISIBLES for
+    /// :%s`): the reporter's emergency save and quit, and no slot (the
+    /// load returns @ 0x0047c583). The shipped views never fill it.
+    pub fn spw_load(
+        &mut self,
+        name: &str,
+        spw: atlantis2_data::spw::Spw,
+        kind: i32,
+        id: i32,
+        object_sprite: i32,
+        state: atlantis2_data::wam::EntityState,
+    ) -> Option<usize> {
+        if self.anim.slots.len() >= crate::anim::MAX_SLOTS {
+            self.engine_fatal(format!("AtlSpw_load(): n>MAX_SPW_VISIBLES for :{name}"));
+            return None;
+        }
+        let n = self.anim.slots.len();
+        self.anim.load(name, spw, kind, id, object_sprite, state);
+        Some(n)
+    }
+
+    /// A fatal error found by the engine (a caller of FUN_00480cd0
+    /// outside the interpreter): recorded on the scripts, which stop on
+    /// it, for [`Engine::check_fatal`]; while a script line runs (the
+    /// interpreter is out), kept for that line to stop on
+    /// ([`crate::script::Host::take_fatal`]).
+    pub(crate) fn engine_fatal(&mut self, msg: String) {
+        match self.con.as_mut() {
+            Some(s) => {
+                s.fail(msg);
+                self.check_fatal();
+            }
+            None => {
+                log::error!("{msg}");
+                self.pending_fatal.get_or_insert(msg);
+            }
+        }
     }
 
     /// The fatal error reporter FUN_00480cd0 (atlantis2-cd-fr-2199552

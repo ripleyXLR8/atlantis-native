@@ -389,6 +389,43 @@ fn a_missing_animation_is_fatal() {
     assert!(e.quit());
 }
 
+/// `AtlSpw_load` on a full slot table (0x22): the original's fatal error
+/// (@ 0x0047c566..0x0047c575), the reporter's emergency save and quit,
+/// and no slot (@ 0x0047c583). No shipped view fills the table.
+#[test]
+fn a_full_place_animation_table_is_fatal() {
+    let Some(files) = game() else { return };
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("a2-fatal-spw");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("save")).unwrap();
+    let mut e = started(files);
+    e.set_data_dir(Some(dir.clone()));
+    let t = e.anim.slots[0].clone();
+    let spw = e
+        .files()
+        .read(atlantis2_data::Folder::Spw, &t.name)
+        .and_then(|d| atlantis2_data::spw::Spw::parse(d).ok())
+        .expect("the slot's file");
+    let load =
+        |e: &mut Engine| e.spw_load(&t.name, spw.clone(), t.kind, t.id, t.object_sprite, t.state);
+    while e.anim.slots.len() < atlantis2_engine::anim::MAX_SLOTS {
+        let n = e.anim.slots.len();
+        assert_eq!(load(&mut e), Some(n));
+    }
+    assert!(!e.quit());
+    assert!(e.script_state().unwrap().fatal.is_none());
+    assert_eq!(load(&mut e), None);
+    assert_eq!(e.anim.slots.len(), atlantis2_engine::anim::MAX_SLOTS);
+    let fatal = e.script_state().unwrap().fatal.clone().unwrap_or_default();
+    assert!(
+        fatal.starts_with("AtlSpw_load(): n>MAX_SPW_VISIBLES"),
+        "{fatal}"
+    );
+    assert!(e.quit());
+    assert!(dir.join("save").join("ATL09_08.SAV").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// A deferred place change naming a view the new file lacks
 /// (FUN_0045a3b0 @ 0x0045a487..0x0045a4cb): the reporter quits without the
 /// emergency save, the place load (FUN_0040fee0) having cleared the current
