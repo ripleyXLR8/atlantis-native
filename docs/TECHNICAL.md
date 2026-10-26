@@ -2563,9 +2563,16 @@ back) into `yucatan-*.png`.
 - **Sound:** the voices of the original (0 the music, 1 the dialog
   voice, 2 the films' tracks and the effects) mixed as DirectSound does
   (`sound.rs`): each voice converted to the primary buffer's format,
-  22050 Hz stereo (FUN_0040f480), and summed there, so the four 44100 Hz
-  files lose what lies above 11025 Hz as in the original; that mix is
-  then converted to the device's rate. Every sound but the music and the
+  22050 Hz stereo (FUN_0040f480), and summed there; that mix is then
+  converted to the device's rate. Both conversions interpolate linearly,
+  so the four 44100 Hz files keep one sample in two, unfiltered (what
+  they hold above 11025 Hz folds back below it). How the players'
+  DirectSound converts (a Windows 9x software mixer, a card's mixer, a
+  later Windows' mixer) is not known, so this part is the port's choice.
+  Without a sound device the window still plays the mix, into nothing,
+  at the game's pace, so every voice ends at its length as DirectSound's
+  buffers do (a `NEWSOUND`'s entry is then freed as with a device; the
+  original without a sound card plays nothing at all). Every sound but the music and the
   dialog voices goes through one table of 50 entries (FUN_0047a530: a
   name already loaded is reused, else the first free entry; a full table
   is the original's fatal error) shared by the place sounds, the puzzles,
@@ -2767,8 +2774,9 @@ back) into `yucatan-*.png`.
   line ends once its voice has been played out, DirectSound's status
   (FUN_0047a9c0(1) @ 0x0046101b): with a sound output, the mixer's (a
   voice the output has not played out a second after its length, a
-  stalled device, ends by the clock); without one (a run with no sound
-  device, the tests), the voice's length on the clock. With
+  stalled device, ends by the clock; a window without a sound device
+  plays the mix into nothing at the game's pace); without one (the
+  tests), the voice's length on the clock. With
   `cinema=N,M` dialog M plays over film N: at each video tick its line
   sequencer alone (no click, no camera change; its end is ignored), then
   its draw over the frame, the dialog removed when the film ends (FUN_0040c030;
@@ -3154,9 +3162,10 @@ labyrinth souls' cells, visibility tests, random drops, entry, delay,
 tick, warp frames with chapter 60, dispatchers and drawing, the canoe's
 loading and every frame of a played canoe, under both CPU routines,
 every frame of the 1086 `.hnm` files of the four discs (the videos
-decoded over surfaces holding another video's leftovers, as the
-original never clears them; each video ends on its frame count, which
-the size-0 dword after its last superchunk matches), the dialog videos'
+decoded over surfaces filled with 0xa5a5 rather than zeroed, as the
+original never clears them, with the same frames; each video ends on
+its frame count, a size-0 dword right after its last counted
+superchunk), the dialog videos'
 blend with the RGB565 and RGB555 tables at 640 and 800 pixels a row,
 the 161 sound files decoded whole, each music's start;
 the credits' text widths are checked against GDI's widths of the font

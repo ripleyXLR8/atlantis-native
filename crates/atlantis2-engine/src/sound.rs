@@ -432,10 +432,11 @@ impl Voices {
 
     /// The mix into `out` (interleaved f32, `channels` per frame, at
     /// `rate`), replacing its content: DirectSound's primary buffer (every
-    /// voice converted to [`PRIMARY_RATE`] and summed, so a 44100 Hz file
-    /// loses what lies above 11025 Hz, as the original's does), then
-    /// that buffer converted to the device's rate (linear
-    /// interpolation).
+    /// voice converted to [`PRIMARY_RATE`] by linear interpolation and
+    /// summed: a 44100 Hz file keeps one sample in two, unfiltered, so
+    /// what it holds above 11025 Hz folds back below; how the players'
+    /// DirectSound converts is not known), then that buffer converted to
+    /// the device's rate (linear interpolation).
     pub fn fill(&self, out: &mut [f32], rate: u32, channels: usize) {
         out.fill(0.0);
         if channels == 0 || rate == 0 {
@@ -558,9 +559,12 @@ mod tests {
         assert_eq!((m.volume, m.state), (16, 4));
     }
 
-    /// The four 44100 Hz files reach the player through DirectSound's
-    /// 22050 Hz primary buffer (FUN_0040f480): a component at 22050 Hz
-    /// (samples alternating) is gone, whatever the device's rate.
+    /// The four 44100 Hz files reach the output through the 22050 Hz
+    /// primary buffer (FUN_0040f480's format) whatever the device's rate:
+    /// the conversion keeps one sample in two, unfiltered, so a 22050 Hz
+    /// component (samples alternating) comes out as a constant (aliased
+    /// to 0 Hz), not removed. (The players' DirectSound converter is not
+    /// known; this pins Native's.)
     #[test]
     fn the_mix_is_the_22050_hz_primary_buffer() {
         let v = Voices::new();

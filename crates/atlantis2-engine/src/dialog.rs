@@ -474,7 +474,8 @@ impl Dialog {
     /// Whether the voice still plays at `clock`: DirectSound's status of
     /// voice 1 (FUN_0047a9c0(1) @ 0x0046101b), so a line ends once the
     /// mixer has played its voice out. When no sound output plays the mix
-    /// (a run without a sound device, the tests), the voice lasts its
+    /// (the tests and headless runs; a window without a sound device plays
+    /// the mix into nothing), the voice lasts its
     /// samples from its start on the clock; with one, the port's guard: a
     /// voice the output has not played out a second after its length
     /// (a stalled device) ends by the clock too.

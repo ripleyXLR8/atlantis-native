@@ -57,19 +57,38 @@ fn read(files: &A2Files, n: u8, path: &str) -> Vec<u8> {
         .unwrap_or_else(|| panic!("disc {n}: {path}"))
 }
 
-/// The superchunks of an HNM6 file before the first size dword of 0 (or
-/// the file's end).
-fn superchunks(data: &[u8]) -> u32 {
+/// The superchunks of an HNM6 file before the first size dword of 0, or
+/// `None` when the file ends (or a size runs past it) before such a dword:
+/// the player's other end test (@ 0x0040bdda) reads that dword after the
+/// last superchunk.
+fn superchunks(data: &[u8]) -> Option<u32> {
     let (mut pos, mut n) = (0x40usize, 0);
     while pos + 4 <= data.len() {
         let size = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) & 0xff_ffff;
         if size == 0 {
-            break;
+            return Some(n);
         }
         n += 1;
         pos += size as usize;
     }
-    n
+    None
+}
+
+/// Review L24: a file whose last superchunk ends at the file's end, with
+/// no size-0 dword after it, does not count as ending on its count.
+#[test]
+fn superchunks_need_the_size_0_dword() {
+    let mut data = vec![0u8; 0x40];
+    data.extend_from_slice(&8u32.to_le_bytes());
+    data.extend_from_slice(&[1, 2, 3, 4]);
+    assert_eq!(superchunks(&data), None);
+    data.extend_from_slice(&0u32.to_le_bytes());
+    assert_eq!(superchunks(&data), Some(1));
+    // A size running past the file's end.
+    data.truncate(0x40);
+    data.extend_from_slice(&16u32.to_le_bytes());
+    data.extend_from_slice(&[0; 8]);
+    assert_eq!(superchunks(&data), None);
 }
 
 /// One file of the golden's `F` rows decoded: its frames' md5s, the
@@ -91,8 +110,13 @@ fn decode_file(files: &A2Files, disc: u8, path: &str) -> (Vec<String>, usize) {
     };
     if video {
         // The player's other end test (@ 0x0040bdda, the next superchunk's
-        // size 0) ends every video on the frame its count does.
-        assert_eq!(superchunks(&data), v.frame_count(), "disc {disc} {path}");
+        // size 0) ends every video on the frame its count does: a size-0
+        // dword right after the counted superchunks.
+        assert_eq!(
+            superchunks(&data),
+            Some(v.frame_count()),
+            "disc {disc} {path}"
+        );
     }
     let mut md5s = Vec::new();
     let mut alpha = 0;

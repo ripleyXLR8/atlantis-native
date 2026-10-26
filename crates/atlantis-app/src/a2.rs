@@ -618,11 +618,6 @@ pub fn run_window(
             voices.fill(out, rate, channels);
         }
     });
-    // The voices' status is the output's from now on: a dialog line ends
-    // when its voice has been played out, as with DirectSound.
-    if audio.is_some() {
-        engine.voices().attach_output();
-    }
     let mut app = A2App::new(
         engine,
         &label,
@@ -705,8 +700,16 @@ impl A2App {
         let (w, h) = engine.screen_size();
         let mut menu = OptionsMenu::new();
         menu.set_info(menu_info(label));
+        // The voices' status is the output's from now on: a voice ends
+        // when it has been played out, as DirectSound's buffers do (a
+        // dialog line, voice 2's `NEWSOUND`, FUN_0047a9c0). Without a
+        // sound device the mix is played into nothing at the game's pace
+        // ([`A2App::play_silent`]), so the voices still end.
+        engine.voices().attach_output();
+        let silent = audio.is_none().then_some(0);
         A2App {
             _audio: audio,
+            silent,
             clock: GameClock::new(now),
             engine,
             fullscreen,
@@ -735,6 +738,9 @@ impl A2App {
 struct A2App {
     /// The sound output (kept alive while the window is open).
     _audio: Option<cpal::Stream>,
+    /// Without a sound output: the primary frames the mix has been played
+    /// to so far, on the game's clock.
+    silent: Option<u64>,
     /// The game's clock: it starts with the window and stands still while
     /// the game is held (the options menu open, the window without the
     /// focus).
@@ -827,6 +833,7 @@ impl A2App {
         // The pass's time is the one it was due at, as the original's
         // passes keep the pace of the screen's refresh.
         self.engine.set_clock(self.clock.secs(self.next_frame));
+        self.play_silent();
         if let Some(size) = self.window.as_ref().map(|w| w.inner_size()) {
             self.picture
                 .prepare(&mut self.engine, size.width as usize, size.height as usize);
@@ -835,6 +842,24 @@ impl A2App {
         let (w, h) = self.engine.screen_size();
         self.screen.resize(w * h, 0);
         self.engine.pass(Some(&mut self.screen));
+    }
+
+    /// Without a sound device, the mix played up to the game's clock and
+    /// dropped: the voices advance and end as with a device (DirectSound
+    /// plays a buffer out whatever the card), the clock standing still
+    /// while the game is held.
+    fn play_silent(&mut self) {
+        let Some(done) = self.silent else { return };
+        let rate = atlantis2_engine::sound::PRIMARY_RATE;
+        let due = (self.engine.clock() * f64::from(rate)) as u64;
+        let mut buf = vec![0.0f32; 2 * 1024];
+        let mut at = done;
+        while at < due {
+            let n = (due - at).min(1024) as usize;
+            self.engine.voices().fill(&mut buf[..2 * n], rate, 2);
+            at += n as u64;
+        }
+        self.silent = Some(at);
     }
 
     /// A window position on the screen the frame is laid out for (the
@@ -1558,6 +1583,55 @@ mod tests {
         app.open_menu();
         assert!(app.clock.held() && paused.load(Ordering::Relaxed));
         assert!(!app.redraw(at(700)));
+    }
+
+    /// Review L19/L20: a window without a sound device still plays the
+    /// voices out on the game's clock, as DirectSound plays a buffer out
+    /// whatever the card, so the dispatcher's FUN_0047a2f0 frees a
+    /// `NEWSOUND`'s entry once its sound has been played (it stayed in the
+    /// shared table for good, voice 2 never ending without a device).
+    #[test]
+    fn a_window_without_sound_device_plays_the_voices_out() {
+        let Some(files) = a2_files() else { return };
+        let mut engine = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+        engine.start_new_game().unwrap();
+        engine.end_video();
+        for c in ["(changewam=tibet.wam)", "(vue=2)", "(chapter=75)"] {
+            engine.run_command(c.as_bytes());
+        }
+        for _ in 0..400 {
+            match engine.loop_type {
+                LoopType::Video => engine.end_video(),
+                LoopType::Dialog => engine.end_dialog(),
+                LoopType::Warp if !engine.turning() => break,
+                _ => {}
+            }
+            engine.tick();
+            engine.pass(None);
+        }
+        assert_eq!(engine.loop_type, LoopType::Warp);
+        engine.sound_table_clear();
+        engine.run_command(b"(NewSound=1)");
+        let (rate, _, frames, _) = engine
+            .voices()
+            .format(atlantis2_engine::sound::VOICE_EFFECTS)
+            .expect("sound001 on voice 2");
+        let named = |e: &Engine| e.sound_table().iter().any(|(_, n)| n.contains("001"));
+        assert!(named(&engine));
+        let t0 = Instant::now();
+        let paused = Arc::new(AtomicBool::new(false));
+        let mut app = A2App::new(engine, "test", false, None, None, paused, t0);
+        let length = frames as f64 / f64::from(rate);
+        let passes = ((length + 0.5) / PASS) as u32;
+        for k in 0..passes {
+            app.redraw(t0 + FRAME * k);
+        }
+        let voice2 = app
+            .engine
+            .voices()
+            .is_playing(atlantis2_engine::sound::VOICE_EFFECTS);
+        assert!(!voice2, "voice 2 still plays {length:.2} s on");
+        assert!(!named(&app.engine), "{:?}", app.engine.sound_table());
     }
 
     /// The game's files, or `None` (the test skipped) without
