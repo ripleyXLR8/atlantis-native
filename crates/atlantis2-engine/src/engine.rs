@@ -642,8 +642,8 @@ pub struct Engine {
     pub shake: Shake,
     web_models: std::collections::HashMap<web::Slot, std::sync::Arc<crate::atl3d::Model>>,
     web_z: Vec<u32>,
-    /// Where the port may differ from the original (default: the minor
-    /// bug fixes on).
+    /// Where the port may differ from the original (default: the bug
+    /// fixes on).
     pub enhancements: Enhancements,
     voices: Voices,
     /// The C runtime's `rand`: one state for the whole game (the dialogs,
@@ -2514,10 +2514,11 @@ impl Engine {
         Some(zi)
     }
 
-    /// Whether the minor bug fixes keep a click on `zone` from setting
-    /// `CLICZONE` to its plain value ([`irish_plain_value_zone`]).
+    /// Whether the Ireland fix ([`crate::BugFix::IrelandClicks`]) keeps a
+    /// click on `zone` from setting `CLICZONE` to its plain value
+    /// ([`irish_plain_value_zone`]).
     fn plain_value_fixed(&self, zone: &Zone) -> bool {
-        self.enhancements.minor_bug_fixes
+        self.enhancements.fixes.ireland_clicks
             && self
                 .current_view()
                 .is_some_and(|v| irish_plain_value_zone(v.name.as_bytes(), self.view, zone.kind))

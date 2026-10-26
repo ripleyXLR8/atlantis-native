@@ -24,7 +24,7 @@ use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::music;
 use atlantis2_engine::sound::{VOICE_EFFECTS, VOICE_MUSIC};
-use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
+use atlantis2_engine::{BugFix, BugFixes, Engine, Event, Fpu, LoopType, Variant};
 
 const GOLDEN: &str = include_str!("golden/sound_glue.txt");
 const FADE_027F: &str = include_str!("golden/music_fade_027f.txt");
@@ -579,8 +579,9 @@ fn the_music_fade_runs_under_the_current_control_word() {
 /// at the `rand()` = 0x7fff edge is one past the file's marks
 /// (`music.txt`'s `randedge` rows), which `AtlMuzik_GotoMark` reports as
 /// a fatal error (the original saves and quits; Native stops the music
-/// and the scripts). With the minor bug fixes the music plays from its
-/// last mark.
+/// and the scripts). With the music mark fix (`BugFix::MusicMark`, alone
+/// or with the others) the music plays from its last mark; the other
+/// fixes without it leave the error.
 #[test]
 fn a_random_mark_at_the_rand_edge() {
     if game().is_none() {
@@ -603,9 +604,17 @@ fn a_random_mark_at_the_rand_edge() {
     if let Some(edge) = edge {
         assert_eq!(draw, edge);
     }
-    for fixes in [false, true] {
+    let mut others = BugFixes::ALL;
+    others.music_mark = false;
+    for set in [
+        BugFixes::NONE,
+        others,
+        BugFixes::only(BugFix::MusicMark),
+        BugFixes::ALL,
+    ] {
+        let fixes = set.music_mark;
         let mut e = in_tibet(game().unwrap());
-        e.enhancements.minor_bug_fixes = fixes;
+        e.enhancements.fixes = set;
         music_stopped(&mut e);
         e.media.copies.insert("20".into());
         e.run_command(b"(startmusik=20)");

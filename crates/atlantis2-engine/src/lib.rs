@@ -57,7 +57,7 @@ pub use camera::Camera;
 pub use engine::{
     CentreDraw, CursorBank, Engine, EngineError, Event, HandBank, LoopType, ScanVars,
 };
-pub use enhancements::Enhancements;
+pub use enhancements::{BugFix, BugFixes, Enhancements};
 pub use fpu::Fpu;
 pub use script::Script;
 pub use warp::{Renderer, Variant};

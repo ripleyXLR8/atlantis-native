@@ -2193,7 +2193,7 @@ fn brigids_cross(r: &mut Run) {
     assert_eq!(r.chapter(), 16);
     // A place clicked with an empty hand: the hook (FUN_00494190) plays
     // sound 9, the click goes on (the click scan; `CLICZONE` = the
-    // place's value in the original, kept at 0 by the minor bug fixes:
+    // place's value in the original, kept at 0 by the Ireland fix:
     // `tests/plain_values.rs`).
     let zone = r.zone_valued(3);
     let evs = r.use_on(None, zone);
@@ -2202,7 +2202,7 @@ fn brigids_cross(r: &mut Run) {
         function: 0x0049_4190
     }));
     assert!(evs.contains(&Event::Sound("sound009.apc".into())));
-    let cliczone = if r.e.enhancements.minor_bug_fixes {
+    let cliczone = if r.e.enhancements.fixes.ireland_clicks {
         0
     } else {
         3

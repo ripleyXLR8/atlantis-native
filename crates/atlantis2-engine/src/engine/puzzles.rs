@@ -299,9 +299,10 @@ pub fn irish_click_hook(view_name: &[u8], view: u32, kind: i32, knife: bool) -> 
 /// named click zones (@ 0x00410035); the chapters compare `CLICZONE`
 /// with those indices and no section of Ireland's names a view, so a
 /// stone or a cross zone of value N answers for the named zone of index
-/// N (4 `TETE_PLEURANTE`, 9 `EAU`, 1 `CRANE_ZONE` ...). With the minor
-/// bug fixes on, such a click leaves `CLICZONE` as it was (the puzzle
-/// hook still runs and sees what it sees in the original).
+/// N (4 `TETE_PLEURANTE`, 9 `EAU`, 1 `CRANE_ZONE` ...). With the Ireland
+/// fix on ([`crate::BugFix::IrelandClicks`]), such a click leaves
+/// `CLICZONE` as it was (the puzzle hook still runs and sees what it sees
+/// in the original).
 pub fn irish_plain_value_zone(view_name: &[u8], view: u32, kind: i32) -> bool {
     view_name.len() >= 2
         && view_name[..2].eq_ignore_ascii_case(IRELAND_PREFIX)

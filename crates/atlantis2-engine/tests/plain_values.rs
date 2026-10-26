@@ -5,9 +5,10 @@
 //! indices of the named click zones and name no view. So, with the
 //! original's rules (`--original`), the zone of value 4 answers for the
 //! weeping head (index 4) in chapter 12, the one of value 9 for the
-//! water (index 9) in chapter 14, and so on; with the minor bug fixes on
-//! (the default), a click there runs its puzzle hook and nothing meant
-//! for a named zone.
+//! water (index 9) in chapter 14, and so on; with the Ireland fix on
+//! (`BugFix::IrelandClicks`, the default), a click there runs its puzzle
+//! hook and nothing meant for a named zone; the other fixes change none
+//! of it.
 //!
 //! The game-data tests need `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` (see
 //! `tests/warp.rs`); without them they are skipped.
@@ -17,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use atlantis2_data::A2Files;
 use atlantis2_engine::engine::irish_plain_value_zone;
-use atlantis2_engine::{Engine, Enhancements, Event, Fpu, LoopType, Variant};
+use atlantis2_engine::{BugFix, BugFixes, Engine, Enhancements, Event, Fpu, LoopType, Variant};
 
 fn game() -> Option<(A2Files, PathBuf)> {
     let (Some(dir), Some(discs)) = (
@@ -69,15 +70,19 @@ fn settle(e: &mut Engine) {
 }
 
 /// A new game in Ireland at view `view` of `bigile1.wam`, chapter
-/// `chapter` loaded, with the fixes on or off; the `setup` commands run.
-fn at(dir: &Path, fixes: bool, chapter: i32, view: u32, setup: &[&str]) -> Engine {
+/// `chapter` loaded, with the bug fixes `fixes` (the other enhancements
+/// on with any fix, else off); the `setup` commands run.
+fn at(dir: &Path, fixes: BugFixes, chapter: i32, view: u32, setup: &[&str]) -> Engine {
     let discs = PathBuf::from(std::env::var_os("ATLANTIS2_DISCS").unwrap());
     let (files, _) = A2Files::open_dir(dir, &[discs]).unwrap();
     let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
-    e.enhancements = if fixes {
-        Enhancements::default()
-    } else {
-        Enhancements::original()
+    e.enhancements = Enhancements {
+        fixes,
+        ..if fixes == BugFixes::NONE {
+            Enhancements::original()
+        } else {
+            Enhancements::default()
+        }
     };
     e.start_new_game().unwrap();
     e.end_video();
@@ -375,15 +380,30 @@ fn every_collision_answers_as_the_original_off_and_only_the_puzzle_on() {
     for (label, chapter, value, hand, setup, original) in CASES.iter().chain([&FILLE_LIVRE]) {
         for view in [2, 6] {
             let what = format!("{label}, view {view}");
-            // The original: a section meant for the named zone runs.
-            let mut e = at(&dir, false, *chapter, view, setup);
+            // The original: a section meant for the named zone runs; the
+            // same with every other fix on.
+            let mut e = at(&dir, BugFixes::NONE, *chapter, view, setup);
             let zi = zone_of_value(&e, *value);
             let off = click(&mut e, zi, *hand, &mut t);
             assert!(!chapters.cliczone_sets(&off).is_empty(), "{what}: off");
             original(&e, &off);
-            // The fix: none runs, the place and chapter stay, the hand is
-            // kept; the puzzle hooks run as with the fix off.
-            let mut e = at(&dir, true, *chapter, view, setup);
+            let mut others = at(&dir, all_but_ireland(), *chapter, view, setup);
+            let o = click(&mut others, zi, *hand, &mut t);
+            assert_eq!(
+                (chapters.cliczone_sets(&o), hooks(&o), films(&o)),
+                (chapters.cliczone_sets(&off), hooks(&off), films(&off)),
+                "{what}: the other fixes"
+            );
+            original(&others, &o);
+            // The fix (alone): none runs, the place and chapter stay, the
+            // hand is kept; the puzzle hooks run as with the fix off.
+            let mut e = at(
+                &dir,
+                BugFixes::only(BugFix::IrelandClicks),
+                *chapter,
+                view,
+                setup,
+            );
             let held = hand_id(&e);
             let on = click(&mut e, zi, *hand, &mut t);
             assert_eq!(chapters.cliczone_sets(&on), [], "{what}: on");
@@ -400,20 +420,33 @@ fn every_collision_answers_as_the_original_off_and_only_the_puzzle_on() {
     }
 }
 
+/// Every bug fix but Ireland's.
+fn all_but_ireland() -> BugFixes {
+    let mut f = BugFixes::ALL;
+    f.ireland_clicks = false;
+    f
+}
+
 /// Every type-4 zone of both views clicked in every Irish chapter, with
 /// an empty hand and each object an Irish `cliczone` condition names:
-/// with the fixes off the entries meant for named zones that answer are
-/// exactly the census's (the start state of each chapter); on, none.
+/// with the Ireland fix off (every other fix on) the entries meant for
+/// named zones that answer are exactly the census's (the start state of
+/// each chapter); with the Ireland fix alone, none.
 #[test]
 fn every_zone_every_chapter_every_hand() {
     let Some((_, dir)) = game() else { return };
     let chapters = Chapters::read(&dir);
     let mut t = 100.0;
     for fixes in [false, true] {
+        let set = if fixes {
+            BugFixes::only(BugFix::IrelandClicks)
+        } else {
+            all_but_ireland()
+        };
         let mut answered = BTreeSet::new();
         for chapter in CHAPTERS {
             for view in [2, 6] {
-                let mut e = at(&dir, fixes, chapter, view, &[]);
+                let mut e = at(&dir, set, chapter, view, &[]);
                 let zones = plain_zones(&e);
                 for hand in std::iter::once(None).chain(HANDS.iter().copied().map(Some)) {
                     for &(zi, value) in &zones {
@@ -425,7 +458,7 @@ fn every_zone_every_chapter_every_hand() {
                         let quiet = e.place() == ("bigile1.wam", view)
                             && !evs.iter().any(|x| matches!(x, Event::Set { .. }));
                         if !quiet {
-                            e = at(&dir, fixes, chapter, view, &[]);
+                            e = at(&dir, set, chapter, view, &[]);
                         }
                     }
                 }
