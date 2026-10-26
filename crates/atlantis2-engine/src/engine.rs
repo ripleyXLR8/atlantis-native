@@ -1771,20 +1771,20 @@ impl Engine {
         if self.overlays.any() {
             self.overlay_clicks();
         }
-        // 2. The draw (@ 0x0045a9f0); after a video, the music back to
-        // 100 % first (FUN_0040bb90).
-        if std::mem::take(&mut self.music_after_video) {
-            self.music.set_percent(100);
-        }
-        // Not while `NextWarpInvalide` is 2 (the screen frozen) nor in the
-        // frame after a zoom's end (@ 0x0045a3fd..0x0045a41a); the flag is
-        // set back either way.
+        // 2. The draw (@ 0x0045a9f0). Not while `NextWarpInvalide` is 2
+        // (the screen frozen) nor in the frame after a zoom's end
+        // (@ 0x0045a3fd..0x0045a41a); the flag is set back either way.
+        // After a video, the music back to 100 % (FUN_0040bb90, called by
+        // the draw only, @ 0x0045aa10): a skipped draw keeps the request.
         let frozen = self
             .con
             .as_ref()
             .is_some_and(|s| s.vars[s.keys.next_warp_invalide] == 2);
         if !frozen && !self.draw_skip {
             self.draw(out.as_deref_mut());
+            if std::mem::take(&mut self.music_after_video) {
+                self.music.set_percent(100);
+            }
         }
         self.draw_skip = false;
         // 3. The clicks and the scans, unless turning.

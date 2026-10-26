@@ -212,6 +212,30 @@ fn a_new_music_cancels_the_music_back_to_full_after_a_film() {
     }
 }
 
+/// The video end's request is taken by the warp draw (FUN_0040bb90 is
+/// called by FUN_0045a9f0 only, atlantis2-cd-fr-2199552 @ 0x0045aa10), so
+/// a pass whose draw is skipped (`NextWarpInvalide` = 2,
+/// @ 0x0045a3fd..0x0045a41a) keeps it for the next drawn pass.
+#[test]
+fn a_skipped_draw_keeps_the_music_back_to_full_request() {
+    let Some(files) = game() else { return };
+    let mut e = in_tibet(files);
+    e.run_command(b"(cinema=8)");
+    assert_eq!(e.loop_type, LoopType::Video);
+    e.end_video();
+    e.run_command(b"(NextWarpInvalide=2)");
+    let target = e.music.target;
+    e.pass(None);
+    e.pass(None);
+    assert_eq!(e.music.target, target, "taken while the screen is frozen");
+    e.run_command(b"(NextWarpInvalide=0)");
+    e.pass(None);
+    assert_eq!(
+        Some(e.music.target * 100 / e.music.max),
+        golden("film_then_draw").draw_percent
+    );
+}
+
 /// M5, the whole fade (60 passes a second on the clock): after film 8
 /// (the music faded to 20 %) and `startmusik=20`, the old music only fades
 /// out, then music 20 starts. The original's FUN_0040bb80 cancels the
