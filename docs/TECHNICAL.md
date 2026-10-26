@@ -1002,9 +1002,14 @@ back) into `yucatan-*.png`.
   (the exact error of each sum, product, quotient and square root tells
   which way the double was rounded). Before it, the process's word
   applies: 53 bits to nearest (0x027f, Win32's default, the port's
-  choice) or 24 bits (0x007f, which Direct3D may have set; not known). A
-  new game's first view is entered under the process's word, as in the
-  original when no assembly frame was drawn before it (also not known).
+  choice). The game's own Direct3D start-up was measured with the RGB
+  software device on Windows 11 (0x027f kept) and Windows 98 SE with
+  DirectX 6.1 (0x023f, the same arithmetic): it does not load the single
+  precision (0x007f) the DirectX documentation describes. A hardware (HAL)
+  device, the one a 3D-accelerated machine of the time would have used,
+  was not tried; under it 0x007f may apply (the engine's `Fpu::Single`
+  models it). No assembly routine runs before the first view, so a new
+  game's first view is entered under the process's word.
 - **Turning:** the mouse adds dx / 2000 and −dy / 2000 radians to two
   speeds, which decay × 0.8 a frame; the limits stop the turn (`look.rs`).
   The port turns once per frame, at its 59.94 frames a second (below).
@@ -2894,7 +2899,9 @@ back) into `yucatan-*.png`.
   each channel keeps its top bits, as the heads' maps) or the game screen
   at half brightness, and widgets of `spr\menu\*.spr` at fixed positions
   with the tooltips of `loc\Menu.txt` (sections padded with their last
-  line when short). The widget classes are the original's: sprites,
+  line when short; a missing file is fatal in the original's
+  `AtlMenu_MainInit`, @ 0x00486298, while the port logs a warning and
+  shows the menus without texts: no shipped release lacks it). The widget classes are the original's: sprites,
   buttons (the box frame 0's size centred on the position, strict
   inequalities), hover buttons (frame 1 under the mouse), animated
   buttons (20 frames, one per 15 Hz tick while the mouse is in the box
@@ -2931,7 +2938,8 @@ back) into `yucatan-*.png`.
   does the scripts' `CREDITS` (`crates/atlantis2-engine/src/credits.rs`,
   checked frame by frame against the original under emulation,
   `tests/credits.rs`): the pages of `loc\Credits.txt` (21 in the French
-  release) over the 16 pictures `f_cred01.tga` .. `f_cred16.tga` in turn,
+  release; a missing file is fatal in the original, @ 0x00470c63, while
+  the port logs a warning and the credits end at once) over the 16 pictures `f_cred01.tga` .. `f_cred16.tga` in turn,
   each line one step (the popup font's height in points) below the last,
   a `#` line centred on x = 522 (at 640 wide) and any other at x = 405,
   white over a black copy one pixel down-right, written on the picture so

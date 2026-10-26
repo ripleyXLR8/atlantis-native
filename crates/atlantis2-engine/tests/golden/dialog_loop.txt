@@ -1,7 +1,17 @@
-# The dialog loop's calls per line kind, run by atlantis2.exe (md5 5e218f7fa9754532ae1d7a4275443fef) under Unicorn: tools/emu/dialog_loop.py
-# kind K: the calls of one frame dispatcher pass in loop type 2 (0x0049ce20, 0x00480840), the
-#   line kind returned by 0x004616f0; scene pause P mode M: the calls of 0x0045a930 with the
-#   byte 0x006d85f0 = P and the puzzle mode 0x006d84d0 = M
+# The dialog loop of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation, its callees stubbed and recorded:
+#   kind K: CALLS  one frame dispatcher pass in loop type 2 (0x0049ce20, 0x00480840) with the
+#     current line's kind K (0x004616f0: -1 none, 0 head, 1 voixoff, 2 voixoff0, 3 cinema)
+#   scene pause P mode M: CALLS  the panorama's draw 0x0045a930 with the byte 0x006d85f0 = P
+#     and the puzzle mode 0x006d84d0 = M (0x0047d7f0 the place animations' step, 0x00491b30
+#     the web)
+#   film start F: CALLS  a dialog over a film (cinema=N,M) started with its flag argument F
+#   film kind K: CALLS  one pass of the video loop (FUN_0040c060) on a new tick with the film
+#     dialog's current line of kind K
+#   camera cw C STEP: fx fy cx cy 1/fx 1/fy fov (+0xc0) of the warp camera, value/bits: at
+#     start-up, after a dialog line's 50-degree field of view (0x004a4950) and after the loop
+#     type set back to the panorama at 640 x 480 (0x0049da90 -> 0x00402960), as a dialog's
+#     end does (0x004809d9)
 kind -1: -
 kind 0: panorama(0x0045a930) surface(0x004028a0) dialog_frame(0x00461430) blit(0x00402bd0) flip(0x0058fdb0)
 kind 1: turn(0x0040c6a0) panorama(0x0045a930) surface(0x004028a0) dialog_frame(0x00461430) blit(0x00402bd0) flip(0x0058fdb0)

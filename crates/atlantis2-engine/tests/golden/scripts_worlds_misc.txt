@@ -1,4 +1,5 @@
-# producer: tools/emu/scripts_worlds.py misc (atlantis2-cd-fr-2199552, md5 5e218f7fa9754532ae1d7a4275443fef)
+# SetVariables of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation, the other worlds' script keys
 # defnames.con md5 b80c3351c39c1e4678f13388c2dc0c83
 # zones: ClicPied122 = 64, ClicTezStatue = 65 (#ZONES_CLIC# indices)
 zones start v122:3/64/on,3/65/on,3/64/on v47:1/1/on,2/1/on,1/3/on v1:1/2/on,1/5/on,3/9/on

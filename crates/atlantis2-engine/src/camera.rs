@@ -47,8 +47,8 @@ pub struct Camera {
 }
 
 /// The cube's six faces as its static constructor leaves them
-/// (FUN_004598d0 → FUN_004d94b0, read under emulation:
-/// atlantis2-re `evidence/golden/centre_texel.txt`): the quaternions
+/// (FUN_004598d0 → FUN_004d94b0, read under emulation, the header of
+/// `tests/golden/centre_texel.txt`): the quaternions
 /// (x, y, z, w) of the face cameras, as float bits.
 const FACE_QUATS: [[u32; 4]; 6] = [
     [0x0000_0000, 0x0000_0000, 0x0000_0000, 0x3f80_0000],

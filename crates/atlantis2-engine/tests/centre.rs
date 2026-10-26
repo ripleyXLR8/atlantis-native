@@ -251,8 +251,8 @@ fn centre_and_sprite_clicks_match_the_original() {
 }
 
 /// The texel under the screen centre (FUN_0047db60, run by the original
-/// under emulation: `tests/golden/centre_texel.txt`, atlantis2-re
-/// `tools/emu/centre_texel.py`) against the port's cube mapping, on view
+/// under emulation: `tests/golden/centre_texel.txt`) against the port's
+/// cube mapping, on view
 /// 2 entered at every 5° of yaw and pitch, under 0x0e7f.
 #[test]
 fn the_texel_under_the_centre_matches_the_original() {

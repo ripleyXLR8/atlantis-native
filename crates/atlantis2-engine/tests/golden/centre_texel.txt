@@ -1,5 +1,6 @@
-# The texel under the screen centre (FUN_0047db60) and the faces' visible rectangles (FUN_004d97c0 + FUN_004daad0) of atlantis2.exe (md5 5e218f7fa9754532ae1d7a4275443fef) under Unicorn:
-# tools/emu/centre_texel.py on wam_pick_tibet.py's cube and camera (tibet.wam, view 2, 640x480);
+# The texel under the screen centre (FUN_0047db60) and the faces' visible rectangles (FUN_004d97c0 + FUN_004daad0) of the original atlantis2.exe
+# (French CD build of 1999, 2199552 bytes, MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation,
+# on the cube and camera of the picks' golden wam_pick_tibet.txt (tibet.wam, view 2, 640x480);
 # x87 control word 0x0e7f; rows differing under 0x027f: 132, 0x007f: 162
 # yaw Y pitch P centre FACE,COLUMN,ROW rects top,bottom,right,left per face 0..5 (- not visible)
 yaw 0 pitch -85 centre 2,278,256 rects - - 44,467,437,134 0,0,0,0 - -

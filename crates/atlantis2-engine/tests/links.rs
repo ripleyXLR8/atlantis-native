@@ -1,6 +1,5 @@
 //! Moves to another place and the transition sprites against the original
-//! (`tests/golden/links.txt`, atlantis2-re `tools/emu/links.py`: the
-//! original's frame code under emulation, as `moves_tibet.txt`'s): a move
+//! (`tests/golden/links.txt`: the original's frame code under emulation, as `moves_tibet.txt`'s): a move
 //! with two transition sprite banks drawn over its video (`bigile1.wam`
 //! 7 → 8), the same with one character hidden by the show / hide table,
 //! a type-2 zone that changes place at once (`livre.wam` 55 →
@@ -70,7 +69,7 @@ fn state(e: &Engine) -> State {
     }
 }
 
-/// The events of a pass in the golden's form (`links.py --native`).
+/// The events of a pass in the golden's form.
 fn events(e: &mut Engine) -> Vec<String> {
     let mut out = Vec::new();
     let mut spw = None;
@@ -117,7 +116,7 @@ fn events(e: &mut Engine) -> Vec<String> {
     out
 }
 
-/// One case of the harness (`links.py`'s `case`).
+/// One case of the golden.
 struct Case {
     name: &'static str,
     wam: &'static str,

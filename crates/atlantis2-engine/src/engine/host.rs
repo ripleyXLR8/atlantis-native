@@ -366,7 +366,7 @@ impl Engine {
     /// A dialog over a film (`cinema=N,M`), on the video loop's new ticks
     /// only (@ 0x0040c068): its step (@ 0x00480830, the line sequencer
     /// alone, its result ignored), then FUN_00480840 as the dialog loop
-    /// runs it, over the film's frame (atlantis2-re `dialog_loop.txt`,
+    /// runs it, over the film's frame (`tests/golden/dialog_loop.txt`,
     /// `film kind` rows): no line (−1), nothing; a `voixoff` line (1)
     /// turns first (FUN_0040c6a0: a move's turn steps, else the inertia;
     /// the centre picked again); a head line (0) and a `voixoff` line,

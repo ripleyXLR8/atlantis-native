@@ -1,5 +1,6 @@
-# Place animation state chains run by atlantis2.exe (md5 5e218f7fa9754532ae1d7a4275443fef) under Unicorn: tools/emu/spw_chains.py
-# functions run and stubs: the harness docstring; notes: formats/spw.md
+# Place animation state chains run by the original atlantis2.exe (French CD build of 1999,
+# 2199552 bytes, MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation: AtlWam_Load, the view
+# entry (0x00459fe0) with AtlSpw_load (0x0047c4e0) and the place animations' step (0x0047d7f0)
 # xibalba.wam md5 c416d06a00763b7d73d18ff92bc60d7e; x87 control word 0x0e7f; rand seeded with 1000
 # chained WAM view ENTITY anim N next XY: every state record with a next state (+0x1c)
 # paused WAM view ENTITY anim N delay D: every state record with a random pause (+0x14)

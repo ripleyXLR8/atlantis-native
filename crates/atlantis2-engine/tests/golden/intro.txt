@@ -1,4 +1,5 @@
-# The start-up intro run by atlantis2.exe (md5 5e218f7fa9754532ae1d7a4275443fef) under Unicorn: tools/emu/intro.py
+# The start-up intro run by the original atlantis2.exe (French CD build of 1999, 2199552 bytes,
+# MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation:
 # FUN_0049d9c0 then the frame dispatcher in loop type 1 (FUN_0040c060), a tick every fourth pass;
 # the current disc's inventory; rows: pN tT loop L counter C (0x006d85f4) flag F (0x006d85f1) | events
 == disc 1 no input

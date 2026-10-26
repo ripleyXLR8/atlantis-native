@@ -1,8 +1,8 @@
 # Recorded from the original's head renderer under emulation for the 25 heads heads_pii.txt
 # leaves out (derived values only: MD5s, counts, boxes), one line per frame, the variant the
 # game draws on a Pentium II (CPU type 8, x87 control word 0x0e7f), as heads_pii.txt; the
-# frame sequence of atlantis2-re head_render.py golden --frames 10 (idle frames 0..10, a
-# blink, each viseme and two mixes per mood set, each camera). Binary atlantis2-cd-fr-2199552
+# frame sequence: idle frames 0..10, a blink, each viseme and two mixes per mood set, each
+# camera. Binary atlantis2-cd-fr-2199552
 # (MD5 5e218f7fa9754532ae1d7a4275443fef); the warnings the original logged (a material's
 # texture the folder lacks) are kept as comments.
 file ABS1.DB 073dbf77ca0899e3c3fb76e633a71d29 2 377 65cf1a5d566628e23e47b4ef81aa9a02

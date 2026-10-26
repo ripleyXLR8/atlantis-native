@@ -3,12 +3,15 @@
 //! The warp's C code (the camera and the `warpC` rasteriser) changes
 //! nothing in the x87 control word, so it runs under whatever the process
 //! has: 0x027f (53-bit precision, rounding to nearest: the Win32 default
-//! the MSVC 6 start-up keeps). The game's Direct3D start-up does not set
-//! single precision (0x007f) as the DirectX documentation and Wine have it:
-//! measured with the game's own calls in its order, Windows 11 leaves
-//! 0x027f and Windows 98 SE's DirectX 6.1 loads 0x023f (the same arithmetic,
-//! a reserved bit clear) when the `IDirect3D3` interface is obtained
-//! (atlantis2-re experiment 2026-10-26-04). `Fpu::Single` stays a choice.
+//! the MSVC 6 start-up keeps). With Direct3D's RGB software device, the
+//! game's Direct3D start-up does not set single precision (0x007f) as the
+//! DirectX documentation and Wine have it: measured with the game's own
+//! calls in its order, Windows 11 leaves 0x027f and Windows 98 SE's
+//! DirectX 6.1 loads 0x023f (the same arithmetic, a reserved bit clear)
+//! when the `IDirect3D3` interface is obtained. A hardware (HAL) device,
+//! which a 3D-accelerated machine of the time would have used, was not
+//! tried (neither system had one): under it the documented single
+//! precision may apply. `Fpu::Single` models that case.
 //!
 //! The assembly renderers (`warpP5`, `warpMMX`, `warpPII`) load 0x0e7f
 //! (`fldcw` of the word @ 0x005edc78) at their entry and never restore it:

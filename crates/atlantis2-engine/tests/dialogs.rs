@@ -875,8 +875,8 @@ fn slot_frames(e: &Engine) -> Vec<i32> {
 }
 
 /// L14, L49: a dialog over its film (`cinema=N,M`) as the video loop runs
-/// it (FUN_0040c060 → FUN_00480830, FUN_00480840: atlantis2-re
-/// `dialog_loop.txt`, `film kind` rows). Its head lines (kind 0) draw the
+/// it (FUN_0040c060 → FUN_00480830, FUN_00480840:
+/// `tests/golden/dialog_loop.txt`, `film kind` rows). Its head lines (kind 0) draw the
 /// panorama over the film's frame, whose place animations step; its
 /// lines play, and the film's end ends it. The shipped film dialogs (71,
 /// 168) have `cinema` lines only: dialog 360's head lines stand for a

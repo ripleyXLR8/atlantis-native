@@ -1,5 +1,6 @@
-# Native's copy of atlantis2-re evidence/golden/links.txt (tools/emu/links.py --native): the
-# same rows, the events in the form of Native's test (tests/links.rs)
+# Moves to another place run by the original atlantis2.exe (French CD build of 1999, 2199552
+# bytes, MD5 5e218f7fa9754532ae1d7a4275443fef) under emulation, the events in the form of
+# Native's test (tests/links.rs)
 == T bigile1.wam view 7, the move to view 8: two transition sprite banks
 start view 7 yaw -28.891 pitch 3.503 centre zone -1
 p0 t1 zone=3

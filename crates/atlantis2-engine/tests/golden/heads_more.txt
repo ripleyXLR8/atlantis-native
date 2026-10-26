@@ -1,7 +1,7 @@
 # Recorded from the original's head renderer under emulation for the 25 heads heads.txt
 # leaves out (derived values only: MD5s, counts, boxes), one line per frame, the C routines
-# (CPU type 1) under the x87 control word 0x027f, as heads.txt; the frame sequence of
-# atlantis2-re head_render.py golden --frames 10 --cpu 1 --cw 027f. Binary
+# (CPU type 1) under the x87 control word 0x027f, as heads.txt; the frame sequence: idle
+# frames 0..10, a blink, each viseme and two mixes per mood set, each camera. Binary
 # atlantis2-cd-fr-2199552 (MD5 5e218f7fa9754532ae1d7a4275443fef); the warnings the original
 # logged (a material's texture the folder lacks) are kept as comments.
 file ABS1.DB 073dbf77ca0899e3c3fb76e633a71d29 2 377 65cf1a5d566628e23e47b4ef81aa9a02

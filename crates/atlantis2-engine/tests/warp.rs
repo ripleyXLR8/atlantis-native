@@ -248,9 +248,8 @@ fn new_game_shows_the_first_view() {
 /// from the start-up camera, the unprojection and the matrix), under the
 /// three control words: the golden's 0x007f, the process's 0x027f and
 /// warpPII's 0x0e7f (`Fpu::Chop`, the game's after its first frame); the
-/// original gives the same 11508 picks under each (atlantis2-re
-/// `wam_pick_tibet.py --cw`, its header's count for 0x027f and
-/// `evidence/golden/wam_pick_tibet_0e7f.txt`).
+/// original gives the same 11508 picks under each (the
+/// original's picks run again under emulation under 0x027f and 0x0e7f).
 #[test]
 fn picks_through_the_camera() {
     let Some(dir) = std::env::var_os("ATLANTIS2_DATA") else {

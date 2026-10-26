@@ -1,4 +1,5 @@
-# producer: tools/emu/scripts_worlds.py anim (atlantis2-cd-fr-2199552, md5 5e218f7fa9754532ae1d7a4275443fef)
+# SetVariables of the original atlantis2.exe (French CD build of 1999, 2199552 bytes, MD5
+# 5e218f7fa9754532ae1d7a4275443fef) under emulation, the place animations' /set keys
 # defnames.con md5 b80c3351c39c1e4678f13388c2dc0c83
 # slots: s<n>:f<frame>/e<end>/c<count> a<active +0x30> h<hand-over +0x28> ch<chain +0x2c> p<playing byte +0xbc> r20 / r24 = the WAM state record's +0x20 / +0x24
 # slot 0: kind 1 CHAC = id 54 anim 1

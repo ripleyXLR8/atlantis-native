@@ -1,7 +1,6 @@
 //! The `/set` keys of the place animations and the script keys the other
 //! worlds use, against the original's `SetVariables` under emulation
-//! (`tests/golden/scripts_worlds_anim.txt`, `scripts_worlds_misc.txt`,
-//! atlantis2-re `tools/emu/scripts_worlds.py anim` / `misc`).
+//! (`tests/golden/scripts_worlds_anim.txt`, `scripts_worlds_misc.txt`).
 //!
 //! - anim: nine synthetic slots as the harness lays them, then each line
 //!   run alone: the slots' frame, end, count, active, hand-over, chain,
