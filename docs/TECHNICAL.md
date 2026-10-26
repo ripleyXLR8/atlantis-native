@@ -1014,7 +1014,9 @@ back) into `yucatan-*.png`.
   The original reads the mouse once a pass (DirectInput's state, a button
   newly down is a press), so the press that activates its window is a
   click: so is every press here, the pointer free or held, but with
-  `ui_ux` the one that gives the window the focus only takes the pointer.
+  `ui_ux` the one that gives the window the focus only takes the pointer
+  (a press before the next frame: after it the pointer is taken by the
+  frame, or cannot be, and a press is a click).
   The window opens in full screen when `atlant2.cfg`'s byte 8 says so (1,
   the original's default: its start-up's mode, both releases), or with
   `--fullscreen`; F11 and 1.00's Alt+Enter switch it and write the byte.
@@ -1809,15 +1811,12 @@ back) into `yucatan-*.png`.
   pass, the files and the crosshair drawn). Not compared: view 19's entry
   (no panorama on any disc), the puzzle tick with the pause byte (not in
   the port), and in the reset's rows the other modules' functions, which
-  the golden's harness stubs (the port's reset runs the grids' leaves, the
-  web's quit and the octopus's, not the turtle ring's, the canoe's nor the
-  souls' quits: the ring's and the souls' only clear modes the save's
-  then replaces, but the canoe's FUN_0049a570 has no test and runs whole
-  at every reset: the cursor pair emptied, FUN_0047bef0(0, 0)
-  @ 0x0049a575, its frees, FUN_00402960(1, …) @ 0x0049a66c, at 800 x 600
-  FUN_0042a720(800, 600) @ 0x0049a686, FUN_00403920(0) @ 0x0049a694,
-  none of which the port's load does; what that changes after a load is
-  not checked).
+  the golden's harness stubs (the test checks that the port's reset
+  enters them in the original's order, the grids' leaves and the turtle
+  ring's, the canoe's, the web's and the souls' quits, and that the
+  web's, the ring's and the souls' clear their modes 1, 2 and 3; what
+  the load's reset ports of the canoe's quit is told in the Saves item
+  below).
   `tests/flow.rs` plays the fight with the mouse, lost then
   won.
   `tests/endgame.rs` runs every chapter's `/INIT` (and the trap), enters
@@ -3071,7 +3070,22 @@ back) into `yucatan-*.png`.
   empties the cursor pair, so the saved cursor frame is not restored;
   its change of the display mode is not ported: at 800 x 600, after a
   menu opened over a picture and a load, the original draws the picture
-  at the top left of the screen until the next loop type change). Chosen here: a section
+  at the top left of the screen until the next loop type change; the
+  rest of it changes nothing at a load, which never happens during the
+  canoe (Escape does nothing in its loop type, so no menu opens) and the
+  canoe always ends through that quit: its banks, 3D slots and depth
+  tiles are already freed, its board flag @ 0x006d8278 already 0, the
+  3D library already emptied (by the canoe's last quit or the web's free
+  @ 0x00491241, which the web's quit in the same reset runs), the
+  secondary data folder already none (set and reset within the web's and
+  the canoe's loads), the 3D draw's Z surface pointer @ 0x00659bd8 is set
+  by each drawing caller before it draws (@ 0x00491b60, 0x004978dc,
+  0x00499a40, 0x00499a69), and FUN_0042a720(800, 600) makes the 3D Z
+  surfaces again at the size they have outside the canoe, the configured
+  one (made so by the start-up's FUN_0042a6e0 @ 0x0049d71e, the flag
+  @ 0x005d9ba4 still its initial 1, by the screen size option, and by
+  every canoe quit); the 1.01 executable's quit is the same,
+  @ 0x0049a5d0). Chosen here: a section
   waiting to go on and a queued command are dropped at a load (the
   original's flags are not saved: what it does with them is not known);
   a save is stamped with the local time, as the original's; the subject

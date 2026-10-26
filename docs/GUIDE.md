@@ -192,16 +192,21 @@ longer overlap) and broken after accented letters too, and no Alt+Enter
 to 1.01 (the patch's `atlantis2.exe` copied over the CD's) is played the
 same way.
 
+The game opens in full screen, as the original does: its options file
+`atlant2.cfg` says full screen until the choice is changed. F11 switches
+between full screen and a window, and the choice is kept there for the
+next start (`--fullscreen` opens in full screen whatever it says).
+
 ### Controls
 
 | Input | In the game |
 |---|---|
-| Mouse (or the arrow keys) | turns the view; the cursor at the centre of the screen tells what is there |
+| Mouse (and the arrow keys, an option of the port) | turns the view; the cursor at the centre of the screen tells what is there |
 | Left click | walks on (a move cursor), takes an object, uses the object in hand, opens a character's subjects; in a dialog, the next line; ends a film (a double click ends them all at start-up) |
 | Right click | opens or closes the bag bar at the bottom (the mouse then moves a pointer over it; a click puts an object in the hand) |
 | Escape | the game's menu (options, volumes, load and save, quit), and closes it; ends a dialog |
 | F10 or O | the port's options menu (below); the game waits while it is open |
-| F11 | full screen on and off (the left Alt with Enter too with the CD's version 1.00, as in the original; version 1.01 removed it) |
+| F11 | full screen on and off, kept for the next start (the left Alt with Enter too with the CD's version 1.00, as in the original; version 1.01 removed it) |
 
 Xibalba's canoe puzzle has a screen of its own, with a pointer: a left
 click takes a river tile, lays it back or swaps it with the clicked
@@ -252,6 +257,10 @@ it. Its entries:
   it for a click on another place's object: back to Tibet from the
   fourth stone in one chapter, the water's film from the ninth with the
   horse in another).
+- **Arrow keys turn**: on by default, the arrow keys turn the view as
+  the mouse does; off, as in the original, only the mouse turns it. On,
+  the click that brings the window back to the front only takes the
+  mouse back and does not act in the game.
 
 The choices are kept at once in `settings.ini`, in the `atlantis2`
 folder of the per-user data folder (`~/.local/share/atlantis-native/atlantis2`
@@ -260,7 +269,7 @@ on Linux, `%APPDATA%\atlantis-native\atlantis2` on Windows,
 beside the saves (`save\ATL<player>_<slot>.SAV`, the original's files)
 and the original's options file `atlant2.cfg`. From the command line, `--hd` turns HD on and
 `--widescreen` HD with widescreen, and `--original` turns the bug fixes
-off, for that run only; `--size 1920x1080` opens the window at that size,
+and the arrow keys' turn off, for that run only; `--size 1920x1080` opens the window at that size,
 for example `atlantis-native --widescreen --size 1920x1080
 /path/to/Atlantis_2_Files`.
 

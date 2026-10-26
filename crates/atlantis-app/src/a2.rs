@@ -884,6 +884,11 @@ impl A2App {
             }
         } else if !in_menu && !self.locked && self.focused {
             self.grab(true);
+            // A press after this pass is not the one that gave the focus:
+            // grabbed, it reaches the game anyway; not grabbed (both grab
+            // modes refused), the pointer stays free and every press is a
+            // click, so the flag must not swallow a later one.
+            self.refocused = false;
         }
         let (mx, my) = (self.motion.0.trunc(), self.motion.1.trunc());
         self.motion.0 -= mx;
@@ -1005,6 +1010,14 @@ impl A2App {
             self.refocused = !self.locked;
         }
         self.hold_at(now);
+    }
+
+    /// Whether a press (`pressed`) is the one that gave the window the
+    /// focus, with the interface conveniences on ([`mouse_button`]'s
+    /// `focus_click`): only the first press after a focus gain, before the
+    /// next pass ([`A2App::step`]).
+    fn focus_click(&mut self, pressed: bool) -> bool {
+        pressed && std::mem::take(&mut self.refocused) && self.engine.enhancements.ui_ux
     }
 
     /// A redraw at `now`: the game's pass when one is due and the game is
@@ -1227,9 +1240,7 @@ impl ApplicationHandler for A2App {
             WindowEvent::MouseInput { state, button, .. } => {
                 let now = self.clock.secs(Instant::now());
                 let pressed = state == ElementState::Pressed;
-                let focus_click = pressed
-                    && std::mem::take(&mut self.refocused)
-                    && self.engine.enhancements.ui_ux;
+                let focus_click = self.focus_click(pressed);
                 if mouse_button(
                     &mut self.engine,
                     self.locked,
@@ -1849,6 +1860,44 @@ mod tests {
             t0,
         );
         assert!(!app.fullscreen);
+    }
+
+    /// The press that gave the window the focus only grabs the pointer
+    /// (the interface conveniences); a press after the next pass is a
+    /// click even when the pointer could not be grabbed (here: no window,
+    /// as where both grab modes are refused), so a focus gained from the
+    /// keyboard does not swallow a press long after.
+    #[test]
+    fn only_the_focusing_press_is_swallowed() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+        e.end_video();
+        let t0 = Instant::now();
+        let mut app = A2App::new(
+            e,
+            "",
+            false,
+            None,
+            None,
+            Arc::new(AtomicBool::new(false)),
+            t0,
+        );
+        app.set_focus(false, t0);
+        app.set_focus(true, t0);
+        assert!(!app.locked);
+        assert!(app.focus_click(true), "the press that gave the focus");
+        assert!(!app.focus_click(true));
+        // The focus gained from the keyboard: a pass runs, the grab fails.
+        app.set_focus(false, t0);
+        app.set_focus(true, t0);
+        app.step();
+        assert!(!app.locked);
+        assert!(!app.focus_click(true), "a press after a pass is a click");
+        // `--original`: never swallowed.
+        app.set_focus(false, t0);
+        app.set_focus(true, t0);
+        app.engine.enhancements.ui_ux = false;
+        assert!(!app.focus_click(true));
     }
 
     /// In the menus the system pointer's moves add to the turn speeds
