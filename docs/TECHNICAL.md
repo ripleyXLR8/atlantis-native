@@ -3243,7 +3243,9 @@ back) into `yucatan-*.png`.
   an earlier version's `minor_bug_fixes` sets every fix without its own
   key; `--hd`, `--widescreen` and `--original` (which turns every bug fix and
   `ui_ux` off)
-  hold for the run without changing it; a headless run starts from the
+  hold for the run without changing it (a change in the menu writes
+  only the switches it changed, `Enhancements::with_changes`, the
+  others kept as stored); a headless run starts from the
   defaults. `--options-menu` draws the menu over a headless run's last
   frame, and `--options-keys down,enter,...` presses keys in it first
   (its changes hold for that run only). The web build does not run Atlantis II yet, so it has no such

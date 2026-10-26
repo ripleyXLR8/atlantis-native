@@ -249,7 +249,7 @@ fn the_irish_click_hooks_take_no_click() {
 
     let Some(files) = game() else { return };
     let mut e = bare(files, "bigile1.wam", 2);
-    // As the original (the minor bug fixes keep `CLICZONE` there:
+    // As the original (the Ireland fix, `BugFix::IrelandClicks`, keeps `CLICZONE` there:
     // `tests/plain_values.rs`).
     e.enhancements = Enhancements::original();
     // A zone of the cross: its hook (FUN_00494190; with an empty hand

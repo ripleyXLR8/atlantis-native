@@ -184,3 +184,76 @@ impl Enhancements {
         }
     }
 }
+
+impl Enhancements {
+    /// `self` (the stored choices, `settings.ini`'s) with what a change
+    /// from `before` to `after` (the options menu's) changed, every other
+    /// switch kept as stored: a run's `--original`, `--hd` or
+    /// `--widescreen`, which hold for that run only, are not written with
+    /// an unrelated change.
+    pub fn with_changes(&self, before: &Enhancements, after: &Enhancements) -> Enhancements {
+        fn pick<T: PartialEq + Copy>(stored: T, before: T, after: T) -> T {
+            if before != after {
+                after
+            } else {
+                stored
+            }
+        }
+        let mut x = *self;
+        for f in BugFix::ALL {
+            let on = pick(self.fixes.get(f), before.fixes.get(f), after.fixes.get(f));
+            x.fixes.set(f, on);
+        }
+        x.ui_ux = pick(self.ui_ux, before.ui_ux, after.ui_ux);
+        x.hd = pick(self.hd, before.hd, after.hd);
+        let (s, b, a) = (&self.hd_options, &before.hd_options, &after.hd_options);
+        x.hd_options = HdOptions {
+            panorama: pick(s.panorama, b.panorama, a.panorama),
+            sharpen: pick(s.sharpen, b.sharpen, a.sharpen),
+            smooth_interface: pick(s.smooth_interface, b.smooth_interface, a.smooth_interface),
+            sharp_subtitles: pick(s.sharp_subtitles, b.sharp_subtitles, a.sharp_subtitles),
+            widescreen: pick(s.widescreen, b.widescreen, a.widescreen),
+            video_sides: pick(s.video_sides, b.video_sides, a.video_sides),
+        };
+        x
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A run's `--original` (every fix off, `ui_ux` off) and `--hd` with
+    /// `--widescreen`: a change of one fix, then of the HD mode, in the
+    /// menu writes that change only, the stored choices kept.
+    #[test]
+    fn a_change_keeps_the_stored_choices() {
+        let mut stored = Enhancements::default();
+        stored.fixes.set(BugFix::MusicMark, false);
+        stored.hd_options.sharpen = false;
+        let mut run = Enhancements::original();
+        run.hd = true;
+        run.hd_options.widescreen = true;
+        // One fix turned on in the menu.
+        let mut after = run;
+        after.fixes.set(BugFix::IrelandClicks, true);
+        let s = stored.with_changes(&run, &after);
+        let mut want = stored;
+        want.fixes.set(BugFix::IrelandClicks, true);
+        assert_eq!(s, want);
+        // The HD mode turned off (the run's widescreen not written).
+        let mut off = after;
+        off.hd = false;
+        let s2 = s.with_changes(&after, &off);
+        assert_eq!(s2, want);
+        // Every fix off ("All off"): written, the rest kept.
+        let mut none = stored;
+        none.fixes = BugFixes::NONE;
+        let mut all = run;
+        all.fixes = BugFixes::ALL;
+        assert_eq!(none.with_changes(&run, &all).fixes, BugFixes::ALL);
+        assert_eq!(stored.with_changes(&all, &run).fixes, BugFixes::NONE);
+        // No change: nothing written.
+        assert_eq!(stored.with_changes(&run, &run), stored);
+    }
+}

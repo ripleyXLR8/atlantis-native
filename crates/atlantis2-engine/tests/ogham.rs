@@ -740,7 +740,7 @@ fn the_ogham_stones_played_with_the_mouse() {
     let Some(files) = game() else { return };
     let mut r = Run::new(files);
     // The golden's rows are the original's: `CLICZONE` = the stone's
-    // value (the minor bug fixes leave it as it was,
+    // value (the Ireland fix, `BugFix::IrelandClicks`, leaves it as it was,
     // `tests/plain_values.rs`).
     r.e.enhancements = Enhancements::original();
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("ogham");

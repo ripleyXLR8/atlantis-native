@@ -597,9 +597,14 @@ pub fn headless(
         let mut menu = OptionsMenu::new();
         menu.set_info(menu_info(&label));
         menu.open();
+        // Their changes for this run only: the screen's row as the
+        // window's at the key (its new size from the next pass), no file
+        // written.
         for &k in &start.options_keys {
-            if let MenuAction::SetEnhancements(x) = menu.key(k, menu_values(&engine)) {
-                engine.enhancements = x;
+            match menu.key(k, menu_values(&engine)) {
+                MenuAction::SetEnhancements(x) => engine.enhancements = x,
+                MenuAction::SetScreen800(on) => engine.set_screen_800(on),
+                MenuAction::None | MenuAction::Close => {}
             }
         }
         let values = menu_values(&engine);
@@ -1107,11 +1112,13 @@ impl A2App {
             MenuAction::Close => self.close_menu(),
             MenuAction::SetEnhancements(x) => {
                 // In force at once: the HD mode at the next frame, the
-                // music's from the next track.
-                self.engine.enhancements = x;
+                // music's from the next track. Only what changed is
+                // written: `--original`, `--hd` and `--widescreen` hold for
+                // the run without changing `settings.ini`.
+                let before = std::mem::replace(&mut self.engine.enhancements, x);
                 log::info!("enhancements: {x:?}");
                 let mut s = stored_settings();
-                s.enhancements = x;
+                s.enhancements = s.enhancements.with_changes(&before, &x);
                 save_settings(&s);
             }
             MenuAction::SetScreen800(on) => {
