@@ -1741,11 +1741,19 @@ impl Engine {
         }
     }
 
-    /// The dialog loop's turn (@ 0x00480840): only a `voixoff` line turns;
-    /// outside a dialog, the mouse look.
+    /// The dialog loop's turn (@ 0x00480840): only a `voixoff` line turns,
+    /// with the warp's own FUN_0040c6a0 (@ 0x0048085e): a move's pending
+    /// turn steps (its end leaves the move to the next warp pass), else
+    /// the mouse inertia and the view's limits; then the zone under the
+    /// centre is picked again. Outside a dialog, the mouse look.
     pub fn frame(&mut self) {
-        if self.dialog.as_ref().is_none_or(|d| d.kind() == 1) {
-            self.look.frame(&mut self.camera);
+        match self.dialog.as_ref().map(Dialog::kind) {
+            None => self.look.frame(&mut self.camera),
+            Some(1) => {
+                self.turn_or_look();
+                self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+            }
+            Some(_) => {}
         }
     }
 
