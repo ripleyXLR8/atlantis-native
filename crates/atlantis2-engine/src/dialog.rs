@@ -413,6 +413,11 @@ impl Dialog {
         &self.lines
     }
 
+    /// The dialog's number.
+    pub fn number(&self) -> u32 {
+        self.number
+    }
+
     /// The current line's index.
     pub fn current(&self) -> Option<usize> {
         self.current

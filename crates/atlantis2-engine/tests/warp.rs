@@ -245,7 +245,11 @@ fn new_game_shows_the_first_view() {
 }
 
 /// The original's picks again, through the port's camera (the view entry
-/// from the start-up camera, the unprojection and the matrix).
+/// from the start-up camera, the unprojection and the matrix), under the
+/// three control words: the golden's 0x007f, the process's 0x027f and
+/// warpPII's 0x0e7f (`Fpu::Chop`, the game's after its first frame); the
+/// original gives the same 11508 picks under each (the
+/// original's picks run again under emulation under 0x027f and 0x0e7f).
 #[test]
 fn picks_through_the_camera() {
     let Some(dir) = std::env::var_os("ATLANTIS2_DATA") else {
@@ -260,7 +264,7 @@ fn picks_through_the_camera() {
     assert_eq!((start.view, start.yaw_deg, start.pitch_deg), (2, -90, 0));
     let golden = include_str!("../../atlantis2-data/tests/golden/wam_pick_tibet.txt");
     let (mut n, mut bad) = (0, Vec::new());
-    for fpu in [Fpu::Single, Fpu::Double] {
+    for fpu in [Fpu::Single, Fpu::Double, Fpu::Chop] {
         for line in golden
             .lines()
             .filter(|l| !l.starts_with('#') && !l.starts_with("aim"))
@@ -279,7 +283,7 @@ fn picks_through_the_camera() {
             n += 1;
         }
     }
-    assert_eq!(n, 2 * 10908);
+    assert_eq!(n, 3 * 10908);
     assert!(
         bad.is_empty(),
         "{} picks differ: {:?}",

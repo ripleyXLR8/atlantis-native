@@ -72,6 +72,7 @@ impl Engine {
             self.event(Event::Set { chapter, line });
         }
         self.after_refused_place();
+        self.check_fatal();
         Some(r)
     }
 
@@ -330,9 +331,10 @@ impl Engine {
     }
 
     /// The speaker's place animation hidden while it speaks
-    /// (FUN_00461870: the first active slot whose id is one of its
-    /// `[IdText]` names, inactive; shown again when the speaker changes and
-    /// at the end).
+    /// (FUN_00461870, atlantis2-cd-fr-2199552 @ 0x0046191d..0x0046195e:
+    /// its `[IdText]` names in order, and for the first name that has one,
+    /// the lowest active slot of that id, made inactive; shown again when
+    /// the speaker changes and at the end).
     pub(super) fn sync_hidden(&mut self) {
         let want = self.dialog.as_ref().and_then(|d| d.hidden.clone());
         let have = self.hidden.as_ref().map(|(_, n)| n.clone());
@@ -345,16 +347,15 @@ impl Engine {
             }
         }
         if let Some(names) = want {
-            let ids: Vec<i32> = names
+            let slot = names
                 .iter()
                 .filter_map(|n| self.names.id(defnames::PERSONNAGES, n.as_bytes()).ok())
-                .map(|i| i as i32)
-                .collect();
-            let slot = self
-                .anim
-                .slots
-                .iter()
-                .position(|s| s.active && ids.contains(&s.id));
+                .find_map(|id| {
+                    self.anim
+                        .slots
+                        .iter()
+                        .position(|s| s.active && s.id == id as i32)
+                });
             if let Some(i) = slot {
                 self.anim.slots[i].active = false;
             }
@@ -364,17 +365,22 @@ impl Engine {
 
     /// A dialog over a film (`cinema=N,M`), on the video loop's new ticks
     /// only (@ 0x0040c068): its step (@ 0x00480830, the line sequencer
-    /// alone, its result ignored), then its draw over the frame
-    /// (@ 0x00480840). The film's end ends it.
-    pub(super) fn film_dialog_step(&mut self, new_tick: bool, out: Option<&mut [u16]>) {
-        let (w, h) = (self.renderer.width(), self.renderer.height());
-        let fov_screen = self.fov_screen();
-        let Some(d) = self.film_dialog.as_mut() else {
-            return;
-        };
-        if !new_tick {
+    /// alone, its result ignored), then FUN_00480840 as the dialog loop
+    /// runs it, over the film's frame (`tests/golden/dialog_loop.txt`,
+    /// `film kind` rows): no line (−1), nothing; a `voixoff` line (1)
+    /// turns first (FUN_0040c6a0: a move's turn steps, else the inertia;
+    /// the centre picked again); a head line (0) and a `voixoff` line,
+    /// the panorama (FUN_0045a930) over the film's frame; then the dialog
+    /// frame, for every kind (unlike the dialog loop, no panorama for a
+    /// `voixoff0` line, 2). The shipped film dialogs (71, 168) have
+    /// `cinema` lines (3) only. The film's end ends it.
+    pub(super) fn film_dialog_step(&mut self, new_tick: bool, mut out: Option<&mut [u16]>) {
+        if !new_tick || self.film_dialog.is_none() {
             return;
         }
+        let (w, h) = (self.renderer.width(), self.renderer.height());
+        let fov_screen = self.fov_screen();
+        let mut d = self.film_dialog.take().unwrap();
         let mut ctx = TickContext {
             files: &self.files,
             camera: &mut self.camera,
@@ -386,7 +392,15 @@ impl Engine {
             screen: fov_screen,
         };
         d.film_step(&mut ctx);
-        if let Some(out) = out {
+        let kind = d.kind();
+        if kind == 1 {
+            self.turn_or_look();
+            self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+        }
+        if kind == 0 || kind == 1 {
+            self.dialog_scene(out.as_deref_mut());
+        }
+        if let (true, Some(out)) = (kind >= 0, out) {
             let mut frame = FrameContext {
                 clock: self.clock,
                 rand: &mut self.rand,
@@ -401,6 +415,7 @@ impl Engine {
             self.camera.fpu = d.fpu();
             self.renderer.fpu = d.fpu();
         }
+        self.film_dialog = Some(d);
     }
 
     /// The slots an animation key acts on: those of `id` (none of the
@@ -586,11 +601,19 @@ impl Host for Engine {
                     s.frame = 0;
                 }
             }
-            AnimOp::GotoFrame { id, frame, .. } => {
+            AnimOp::GotoFrame { kind, id, frame } => {
+                // The first slot of the id, whatever its kind; for
+                // `GOTOFRAMEOBJET` (the key, not the slot's kind) a frame
+                // past the file's count is fatal before the frame is set
+                // (atlantis2-cd-fr-2199552 @ 0x004831fd..0x0048320e).
                 if let Some(s) = slots.iter_mut().find(|s| s.id == id) {
-                    s.frame = frame;
-                    if s.kind == 2 && frame > s.count {
-                        log::error!("SetVariables(): GOTOFRAMEOBJET! {frame}>{}", s.count);
+                    if kind == 2 && frame > s.count {
+                        self.pending_fatal = Some(format!(
+                            "SetVariables(): GOTOFRAMEOBJET! {frame}>{}",
+                            s.count
+                        ));
+                    } else {
+                        s.frame = frame;
                     }
                 }
             }
@@ -639,7 +662,10 @@ impl Host for Engine {
                 };
                 match (find(a), find(b)) {
                     (Some(sa), Some(sb)) => self.anim.slots[sa].chain = sb as i32,
-                    _ => log::error!("AtlSpw_find_index_anum({id}, {a}, {b})"),
+                    // FUN_0047dea0's fatal error (the reporter, @ 0x0047dee3).
+                    _ => {
+                        self.pending_fatal = Some(format!("AtlSpw_find_index_anum({id}, {a}, {b})"))
+                    }
                 }
             }
             // The first record of the id, whatever its kind (the loop
@@ -694,9 +720,11 @@ impl Host for Engine {
 
     fn play_video(&mut self, hnm: &str, dialog: Option<i32>) -> bool {
         let started = self.start_video(hnm);
-        // FUN_0040c030: the film, then dialog M set up over it
-        // (FUN_004801a0 → FUN_0045ebc0; a failure removes it).
-        if let (true, Some(m)) = (started, dialog) {
+        // FUN_0040c030 (@ 0x0040c030..0x0040c054): the film, then dialog
+        // M set up over it (FUN_004801a0 → FUN_0045ebc0; a failure removes
+        // it), whatever the film's start answered: a film that does not
+        // start leaves the dialog to the next video loop, which ends it.
+        if let Some(m) = dialog {
             let d = match self.dial_script.as_ref() {
                 Some(script) => Dialog::initialise(
                     m as u32,
@@ -792,6 +820,19 @@ impl Host for Engine {
         monde == 5 || self.ask_disc(disc)
     }
 
+    fn change_cd(&mut self, disc: i32) -> bool {
+        // FUN_0040dff0(value − 1, 1) (@ 0x0048275c): the disc wanted
+        // becomes the current one; a disc not found opens the CD page,
+        // which waits for it (a number no disc has, 0 or above 4, waits
+        // for ever; no shipped script uses `CHANGECD`).
+        let n = u8::try_from(disc).unwrap_or(0);
+        if !(1..=4).contains(&disc) {
+            log::warn!("CHANGECD: no disc {disc}");
+        }
+        self.files.set_disc(n);
+        self.ask_disc(n)
+    }
+
     fn close_bar(&mut self) {
         self.bar.open = false;
     }
@@ -800,8 +841,12 @@ impl Host for Engine {
         self.bar.taken(visible);
     }
 
+    fn take_fatal(&mut self) -> Option<String> {
+        self.pending_fatal.take()
+    }
+
     fn message_clic(&mut self, text: &str) {
-        log::info!("MESSAGE_CLIC={text}: the message viewer is not ported");
+        self.open_message(text.as_bytes());
     }
 
     fn view_big_sprite(&mut self, bank: &str) {

@@ -680,7 +680,8 @@ objects in the bag and `--hold <object>` one in the hand (by their
 `--command "(monde=3)(changewam=chine.wam)(vue=10)"`: China,
 `--command "(monde=2)(changewam=yucatan.wam)(vue=10)"`: Yucatán,
 `--command "(monde=6)(changewam=xibalba.wam)(vue=122)(chapter=39)"`:
-Xibalba's statues); `--hd`,
+Xibalba's statues); `--seed <n>` gives the C runtime's `rand` the
+start-up seed n instead of the clock (the same draws on every run); `--hd`,
 `--widescreen` and `--size <w>x<h>` give the HD mode at that window size,
 and a headless run's screenshot is then the window's picture at that size
 (and its HD timings are printed). `Engine::new_game` keeps the
@@ -1003,9 +1004,14 @@ back) into `yucatan-*.png`.
   (the exact error of each sum, product, quotient and square root tells
   which way the double was rounded). Before it, the process's word
   applies: 53 bits to nearest (0x027f, Win32's default, the port's
-  choice) or 24 bits (0x007f, which Direct3D may have set; not known). A
-  new game's first view is entered under the process's word, as in the
-  original when no assembly frame was drawn before it (also not known).
+  choice). The game's own Direct3D start-up was measured with the RGB
+  software device on Windows 11 (0x027f kept) and Windows 98 SE with
+  DirectX 6.1 (0x023f, the same arithmetic): it does not load the single
+  precision (0x007f) the DirectX documentation describes. A hardware (HAL)
+  device, the one a 3D-accelerated machine of the time would have used,
+  was not tried; under it 0x007f may apply (the engine's `Fpu::Single`
+  models it). No assembly routine runs before the first view, so a new
+  game's first view is entered under the process's word.
 - **Turning:** the mouse adds dx / 2000 and −dy / 2000 radians to two
   speeds, which decay × 0.8 a frame; the limits stop the turn (`look.rs`).
   The port turns once per frame, at its 59.94 frames a second (below).
@@ -1079,14 +1085,25 @@ back) into `yucatan-*.png`.
   show / hide table (a taken object) overrides "shown". Each tick moves
   every shown slot one frame on; at its end a slot restarts (its first
   play one frame shorter, as in the original), stops, or, for a state
-  with a weight, draws among the weighted states of its entity with the
-  original's `rand` (MSVC's, seeded from the clock as the original seeds
-  it with `GetTickCount`) and hands over after playing to the end of its
-  file (`anim.rs`). The faces are drawn on and put back after every
-  frame. While a character speaks in a dialog, its first shown slot
-  whose id is one of the speaker's `[IdText]` names is hidden, and shown
-  again when the speaker changes or the dialog ends (@ 0x00461870; which
-  slot when several match is not known [inferred: the first shown one]).
+  with a weight, draws among the weighted states of its entity, and
+  hands over after playing to the end of its file (`anim.rs`); a state
+  with a random pause (only `yucatan.wam` view 39's lizard) waits a
+  number of ticks drawn at each end. The draws use the game's one `rand`
+  (MSVC's; the original's single thread has one state, shared with the
+  dialogs, the music, the place sounds and the puzzles): seeded at
+  start-up with the clock as the original seeds it with `GetTickCount()`
+  (its earlier `srand(time(0))` counts for nothing), again with the 15 Hz
+  count at each music start; `--seed N` gives the start-up seed, and the
+  tests keep `srand(0)` or their own (`Engine::seed_rand`). The pause and
+  the hand-overs are compared with the original's step under emulation
+  (`spw_chains.txt`). The faces are drawn on and put back after every
+  frame (the original clips each blit to the face's visible rectangle,
+  FUN_004daad0; the renderers sample no texel outside those rectangles,
+  `tests/centre.rs`, so the pictures are the same). While a character
+  speaks in a dialog, the place animation of one of the speaker's
+  `[IdText]` names is hidden, and shown again when the speaker changes
+  or the dialog ends: the names in their order, and for the first one
+  with a shown slot, its lowest (@ 0x0046191d..0x0046195e).
   The horse (`CHEVAL`'s object index) keeps its frame across views as
   the original does: each tick writes its slot's new frame into the
   script variable `FRAMECHEVAL` (@ 0x0047d84d) and a view entry starts a
@@ -1148,10 +1165,16 @@ back) into `yucatan-*.png`.
   option (on by default) in the colour of what is under the centre
   (zone type or sprite); its two lines are drawn end points included
   [inferred]. The texel under the centre that the sprite test uses is
-  taken from the cube's texture mapping (the original projects through
-  per-face cameras, @ 0x0047db60, not read) [inferred]; everything after
-  it (the box test, the cursor, the hand, the marker, the take) is
-  checked against the original frame by frame.
+  the original's (FUN_0047db60, `Camera::texel`): the centre unprojected,
+  turned into the world by the camera's quaternion, turned back by each
+  face's quaternion in turn and projected by the face's camera (focal
+  254.99998, centre 256), truncated, the first face whose 0..511
+  rectangle holds it; every operation in the control word's precision and
+  rounding (2520 directions against the original's function under
+  emulation, `centre_texel.txt`; the cube mapping it replaced differed by
+  a texel in 102 of them). Everything after it (the box test, the cursor,
+  the hand, the marker, the take) is checked against the original frame
+  by frame.
 - **Moves:** a click runs the zone click of the original (@ 0x0049ca80):
   a sprite under the centre takes it (an object of click kind 1 is taken:
   hidden for good, in the bag list and the hand); otherwise a move zone
@@ -1195,7 +1218,10 @@ back) into `yucatan-*.png`.
   and drawn over the video: frame k of each bank at its default position
   over the video's frame k, until the bank runs out; the video's end
   frees them, and a move without a video leaves them for the next film,
-  as in the original (@ 0x0047c100, 0x0047c200, 0x0040bc58). The video
+  as in the original (@ 0x0047c100, 0x0047c200, 0x0040bc58); an empty
+  sprite draws nothing. The transition sprites, the type-2 zone at once
+  and two deferred place changes are compared pass by pass with the
+  original's frame code under emulation (`links.txt`, `tests/links.rs`). The video
   of a move to another place is the destination old → new looked up in
   the new place's file (@ 0x0045a518): between `chine.wam`,
   `salletortue.wam` and `miniature.wam` there is none (the old view's
@@ -1881,8 +1907,8 @@ back) into `yucatan-*.png`.
   free end left, the first waypoint moved) and a stone's waypoint not
   found are the original's fatal error (FUN_00480cd0: an emergency save,
   then the game quits): here the rebuild stops, the puzzle quits and the
-  scripts stop with the original's message, as for their own fatal
-  errors; the game's data never reach them. Two deviations there, on
+  scripts stop with the original's message, which runs the same
+  reporter (Scripts, below); the game's data never reach them. Two deviations there, on
   data the game never has: the original's copy of a segment has no bound
   (a segment without its end goes on past the table), the port stops
   with a fatal message of its own; the table the original logs twice
@@ -2653,9 +2679,8 @@ back) into `yucatan-*.png`.
   nothing but keeps which copies the original would hold and shows the
   page where it copies (Menus, below). Every track decoded from its start and from each of the
   83 marks, the random marks and the list choices are the original's
-  (tests/music.rs). Known differences: the music player shares the C
-  runtime's `rand` with the dialogs and the blackbird songs, which the
-  original also shares with the place animations (two generators here).
+  (tests/music.rs). The music player draws from the game's one `rand`
+  (Place animations, above).
 - **Alpha masks:** the dialog videos carry an `AL` chunk per frame (runs of
   (n, a) pairs, a = 0..31), which the decoder keeps for the caller
   (`HnmVideo::alpha`) and `AlphaTables::blend` draws as the original's
@@ -2681,7 +2706,12 @@ back) into `yucatan-*.png`.
   With `warpC` it is the C pipeline (`Zi32Texture1516FastPerspective1516C`:
   perspective every 32 pixels from truncated ends) under the process's
   word, which AMD CPUs drew. A fan of triangles, nearest texel, a 32-bit
-  Z buffer, every float store and x87 rounding as the original's. The eyes
+  Z buffer, every float store and x87 rounding as the original's. A
+  material group of the head mesh whose texture is not loaded is drawn
+  flat black, with no Z test or write, by the routine `FlatC` (the C
+  set-up and scan, a filling span; FUN_00429700 gives a material without
+  texture black): only `Als1.db` (Ailill) has one, its `moustache` group
+  naming `sonoir.tga`, which no disc has. The eyes
   blink at random (2 % a frame, then three frames closed, half closed,
   open), with the C runtime's own `rand`. The lip-sync analyses the voice
   by blocks of 256 samples (energy and a histogram of zero-crossing
@@ -2691,6 +2721,7 @@ back) into `yucatan-*.png`.
   the scripts). Frames, Z buffers, intermediate buffers and the weights
   of every Tibet line are the original's, bit for bit: the heads with
   both variants (the Pentium II's under 0x0e7f, the C one under 0x027f;
+  all 28 heads of the discs with the Pentium II's, `heads_pii_more.txt`;
   for each, three frames also step by step: the head's world pose, the
   camera, the camera-space and projected vertices, the clip codes and the
   face bytes), the lip-sync under 0x027f, 0x007f and 0x0e7f. One
@@ -2747,14 +2778,21 @@ back) into `yucatan-*.png`.
   font's hinting, which this does not, so a few pixels of a glyph differ
   from the original's (the one known difference). The voices are mixed as
   DirectSound mixes its buffers (gain 10^(attenuation / 2000)). With
-  `cinema=N,M` dialog M plays over film N: at each video tick its line
-  sequencer alone (no click, no camera change; its end is ignored), then
-  its draw over the frame, the dialog removed when the film ends (FUN_0040c030;
-  what the dialog step draws there is the dialog frame's own rule, no
-  Tibet film has one). Each frame of the dialog loop (the dispatcher's
-  loop type 2 and FUN_00480840) does what the current line's kind asks:
-  a head line and a `voixoff` line (which first turns with the mouse,
-  FUN_0040c6a0) draw the panorama as the warp does (FUN_0045a930: the
+  `cinema=N,M` dialog M plays over film N: it is set up whatever the
+  film's start answered (FUN_0040c030: a film that does not start leaves
+  it to the next video), then at each video tick its line sequencer alone
+  (no click, no camera change; its end is ignored) and FUN_00480840 over
+  the film's frame: a `voixoff` line turns first, head and `voixoff`
+  lines draw the panorama with its place animations' step over the film,
+  every kind its dialog frame (no panorama for a `voixoff0` line there);
+  the dialog removed when the film ends. The shipped film dialogs (71,
+  168) have `cinema` lines only (`dialog_loop.txt`'s `film` rows, run by
+  the original under emulation). Each frame of the dialog loop (the
+  dispatcher's loop type 2 and FUN_00480840) does what the current line's
+  kind asks: a head line and a `voixoff` line (which first runs the
+  warp's FUN_0040c6a0: a move's pending turn steps on, its end left to
+  the warp, else the mouse inertia within the view's limits; then the
+  zone under the centre is picked again) draw the panorama as the warp does (FUN_0045a930: the
   place animations drawn and stepped on the 15 Hz ticks, so the place's
   characters, water and fire go on moving, and the web in its mode), then
   the dialog frame; a `voixoff0` line (Liam's off-screen lines in Ireland,
@@ -2817,12 +2855,16 @@ back) into `yucatan-*.png`.
   `PLAYANIMP` / `O`, `CONTINUEANIM`, `STOPANIM`, `GOTOFRAME*`,
   `ADDFRAME*`, `ChangeAnimGotoPerso`, and the `NUMFRAME*` conditions;
   only the first four occur in Tibet; Ireland adds `PLAYANIMP` / `O`,
-  `CONTINUEANIM`, `ADDFRAMEOBJET` and `NUMFRAMEOBJET`, whose lines are
-  checked against the original's handler but whose effect on the slots
-  no Native test compares with the original's yet), `cinema` (the film at 15
+  `CONTINUEANIM`, `ADDFRAMEOBJET` and `NUMFRAMEOBJET`; their effect on the
+  slots, the id clash where the kind is not checked and the `NUMFRAME*`
+  conditions are compared with the original's handler on synthetic slots,
+  `scripts_worlds_anim.txt`, `tests/scripts_worlds.rs`; `GOTOFRAMEOBJET`
+  past the file's count is fatal by its key), `cinema` (the film at 15
   frames a second with its sound track, the music at 20 %, dialog `M` over
   it), `dial` (the dialog loop; a failed start leaves the section waiting,
-  as in the original), `startmusik`, `stopmusik`, `NEWSOUND`, `TrajSound`,
+  as in the original; a `dial` while a dialog runs ends that one in full
+  first, FUN_004808a0: `CLICPERSO` = 0, `SUJET` = −2 and the section that
+  waited for it runs on from its wait before the new one starts), `startmusik`, `stopmusik`, `NEWSOUND`, `TrajSound`,
   `monde` (the disc rule, the objects bank, the dialog texts), the bag and
   the hand (`sacados` scrolls the bar to its end, `objetenmain=0` also
   hides the cursor), `ZoomStart` (the zoom of a move), `ViewBigSpr` (the
@@ -2831,13 +2873,33 @@ back) into `yucatan-*.png`.
   credits), `ZoomPsychoStart` (the zoom with its roll). `LOADMUSIK` and `delmusik` keep which music copies the original would
   hold and show the "please wait" page for a copy, the section waiting
   for its end (Menus, below); `monde` asks for the world's disc (the CD
-  page when it was not found). No-ops, logged: `CHANGECD` (it answers
-  that the disc is there; no shipped script uses it), `MESSAGE_CLIC`; `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
+  page when it was not found); `CHANGECD=n` asks for disc n − 1 as `monde`
+  does (FUN_0040dff0(n − 1, 1)); `MESSAGE_CLIC=<id>` shows `loc\Messages.txt`'s
+  line for the id over the panorama, which stops turning (loop type 10,
+  `message.rs`: in `AtlFT_Big_Default` at the centre, a text wider than
+  640 pixels cut at half its bytes and only its second half shown, an
+  unknown id as `Unknown message ID :` and the id; a click or two seconds
+  end it; the text's colour is 0x0fffffff, as the warp's `PAUSED`
+  overlay's, which Windows 98 SE's GDI draws white and Windows 11's black
+  (measured on 16-bit DIB and DirectDraw surface DCs): the port draws it
+  white, as on the Windows 9x of the game's release); no shipped script
+  uses either.
+  `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. `ANIM_THE_FRAME`
   sets the playing byte of the first record of its id, of any kind
   (@ 0x00483371..0x0048339e; `tests/anim_the_frame.rs`). A fatal error of
-  the scripts (an unknown name, a missing chapter) stops them and is
-  logged; the game itself goes on. The original's own unknowns stay open:
+  the scripts or of a puzzle (an unknown name, a missing chapter, a slot
+  or an animation the data lack, the view a deferred place change names
+  missing in the new file) runs the original's reporter (FUN_00480cd0): with a view
+  entered, the emergency save of player 9, slot 8 (`save\ATL09_08.SAV`,
+  which the menu never lists), then the game quits; the shipped data
+  never reach one. A dialog number with no line plays, in the original,
+  one `voixoff` line of a speaker `Dummy` whose id is the error message
+  (@ 0x0045ebc0, FUN_00460830 with stand and camera −1, mood 1, kind 1
+  [the arguments' roles inferred from the line parser's own call]);
+  here the dialog is refused (no voice, head or text could be found for
+  it, and every number the shipped scripts and films start has lines,
+  `tests/*` "every dialog plays"). The original's own unknowns stay open:
   how the menu resets the variables of a new game (the
   port starts from the start-up's tables), and whether its first scan is
   a click (the port follows the code: `vue=2` sets `ARRIVEEVUE` to 0, so
@@ -2855,7 +2917,9 @@ back) into `yucatan-*.png`.
   each channel keeps its top bits, as the heads' maps) or the game screen
   at half brightness, and widgets of `spr\menu\*.spr` at fixed positions
   with the tooltips of `loc\Menu.txt` (sections padded with their last
-  line when short). The widget classes are the original's: sprites,
+  line when short; a missing file is fatal in the original's
+  `AtlMenu_MainInit`, @ 0x00486298, while the port logs a warning and
+  shows the menus without texts: no shipped release lacks it). The widget classes are the original's: sprites,
   buttons (the box frame 0's size centred on the position, strict
   inequalities), hover buttons (frame 1 under the mouse), animated
   buttons (20 frames, one per 15 Hz tick while the mouse is in the box
@@ -2902,7 +2966,8 @@ back) into `yucatan-*.png`.
   does the scripts' `CREDITS` (`crates/atlantis2-engine/src/credits.rs`,
   checked frame by frame against the original under emulation,
   `tests/credits.rs`): the pages of `loc\Credits.txt` (21 in the French
-  release) over the 16 pictures `f_cred01.tga` .. `f_cred16.tga` in turn,
+  release; a missing file is fatal in the original, @ 0x00470c63, while
+  the port logs a warning and the credits end at once) over the 16 pictures `f_cred01.tga` .. `f_cred16.tga` in turn,
   each line one step (the popup font's height in points) below the last,
   a `#` line centred on x = 522 (at 640 wide) and any other at x = 405,
   white over a black copy one pixel down-right, written on the picture so
@@ -2968,7 +3033,7 @@ back) into `yucatan-*.png`.
   (`FUN_00402720`), and each loop type change (`FUN_0049da90` →
   `FUN_00402960`) chooses where the frame is drawn and the size the code
   lays things out for (@ 0x005d9b9c, 0x005d9ba0). The panorama (and the
-  `MESSAGE_CLIC` box, not ported) is drawn on the screen itself: the cube
+  `MESSAGE_CLIC` text) is drawn on the screen itself: the cube
   at 800 x 600 with the same 76° across (fx = 800 / (2 tan 38°) = 511.98,
   centre (400, 300); 60.7° high, as at 640 x 480), the cursor and the
   object in hand at its centre, the bag bar with 10 cells and its art

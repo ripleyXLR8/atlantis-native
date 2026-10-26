@@ -12,7 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::{slider_values, PageKind, Settings, WidgetKind};
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -258,7 +258,7 @@ fn compare(name: &str, got: &[String], want: &[&str]) {
 /// (the music copy's page shown first when `data` has no copies).
 fn scripted(files: A2Files, data: Option<PathBuf>) -> Engine {
     let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     e.set_data_dir(data);
     e.start_new_game().unwrap();
     let mut clock = 0.0;
@@ -289,7 +289,7 @@ fn the_turn_waits_under_the_open_bar() {
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
     e.trace = true;
     e.sprite_picks = false;
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     let mut d = Driver {
         e,
         pass_no: 0,
@@ -315,7 +315,7 @@ fn a_move_of_the_mouse_picks_the_zone_under_the_bar() {
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
     e.trace = true;
     e.sprite_picks = false;
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     let mut d = Driver {
         e,
         pass_no: 0,
@@ -340,7 +340,7 @@ fn the_turn_speeds_go_across_the_menu() {
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
     e.trace = true;
     e.sprite_picks = false;
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     let mut d = Driver {
         e,
         pass_no: 0,
@@ -904,4 +904,98 @@ fn the_disc_icons_show_at_the_slides_start() {
         e.menu().unwrap().state,
         atlantis2_engine::menu::state::LOAD_OR_SAVE
     );
+}
+
+/// `CHANGECD=n` (no shipped script uses it) asks for disc n − 1
+/// (FUN_0040dff0(value − 1, 1), atlantis2-cd-fr-2199552 @ 0x0048275c): that
+/// disc becomes the current one, and the CD page asks for it when it was
+/// not found.
+#[test]
+fn changecd_asks_for_the_disc_below_its_value() {
+    let Some((dir, discs)) = dirs() else { return };
+    if !discs.join("CD4.iso").exists() {
+        eprintln!("CD4.iso not in ATLANTIS2_DISCS: test skipped");
+        return;
+    }
+    let only = scratch("changecd");
+    link_discs(&discs, &only, &[1, 2, 3]);
+    let (files, _) = A2Files::open_dir(&dir, std::slice::from_ref(&only)).unwrap();
+    let mut e = scripted(files, None);
+    let mut clock = 1000.0;
+    let mut pass = |e: &mut Engine| {
+        clock += PASS;
+        e.set_clock(clock);
+        e.pass(None);
+    };
+    e.run_command(b"(CHANGECD=3)");
+    pass(&mut e);
+    assert_eq!(e.loop_type, LoopType::Warp);
+    assert_eq!(e.files().current_disc(), 2);
+    e.run_command(b"(CHANGECD=5)");
+    pass(&mut e);
+    assert_eq!(e.files().current_disc(), 4);
+    assert_eq!(e.loop_type, LoopType::Menu);
+    assert_eq!(e.menu().and_then(|m| m.kind()), Some(PageKind::Cd(4)));
+}
+
+/// L3: `MESSAGE_CLIC=<id>` (no shipped script uses it) opens the message
+/// viewer (loop type 10, FUN_00476790 / FUN_00476860): `Messages.txt`'s
+/// line drawn over the panorama, which no longer turns, until a click or
+/// the tick past `tick + 30`; an unknown id shows `Unknown message ID :`
+/// and the id; a second `MESSAGE_CLIC` in it drops the click; Escape
+/// opens the main menu (the key callback's default case, @ 0x004762f0).
+#[test]
+fn message_clic_shows_a_message_until_a_click_or_two_seconds() {
+    let Some(files) = game() else { return };
+    let mut e = scripted(files, None);
+    let mut clock = 1000.0;
+    let mut screen = vec![0u16; 640 * 480];
+    let mut bare = vec![0u16; 640 * 480];
+    let mut pass = |e: &mut Engine, out: &mut [u16]| {
+        clock += PASS;
+        e.set_clock(clock);
+        e.pass(Some(out));
+    };
+    pass(&mut e, &mut bare);
+    pass(&mut e, &mut bare);
+    e.run_command(b"(MESSAGE_CLIC=PAUSED)");
+    assert_eq!(e.loop_type, LoopType::Message);
+    assert_eq!(e.message(), Some((true, b"PAUSED".to_vec())));
+    let start = e.ticks;
+    pass(&mut e, &mut screen);
+    // The text at the centre, over the panorama.
+    let differ: Vec<usize> = (0..screen.len())
+        .filter(|&i| screen[i] != bare[i])
+        .collect();
+    assert!(!differ.is_empty(), "no text drawn");
+    assert!(differ.iter().all(|&i| {
+        let (x, y) = (i % 640, i / 640);
+        (200..440).contains(&x) && (200..280).contains(&y)
+    }));
+    // `SetTextColor(0x0fffffff)`: white, as Windows 98 SE's GDI draws it
+    // (Windows 11's black is not the release's), over the panorama.
+    assert!(differ.iter().any(|&i| screen[i] == 0xffff), "no white text");
+    assert!(differ.iter().all(|&i| screen[i] != 0), "black text");
+    while e.loop_type == LoopType::Message {
+        pass(&mut e, &mut screen);
+        assert!(e.ticks.wrapping_sub(start) <= 32);
+    }
+    assert_eq!(e.ticks.wrapping_sub(start), 31);
+    assert_eq!(e.loop_type, LoopType::Warp);
+    // An unknown id (the value up to the line's end, `)` included); a
+    // click ends it.
+    e.run_command(b"(MESSAGE_CLIC=NOSUCH)");
+    assert_eq!(
+        e.message(),
+        Some((false, b"Unknown message ID :NOSUCH)".to_vec()))
+    );
+    pass(&mut e, &mut screen);
+    assert_eq!(e.loop_type, LoopType::Message);
+    e.click(e.clock() + 1.0);
+    pass(&mut e, &mut screen);
+    assert_eq!(e.loop_type, LoopType::Warp);
+    // Escape opens the main menu.
+    e.run_command(b"(MESSAGE_CLIC=PAUSED)");
+    e.escape();
+    assert_eq!(e.loop_type, LoopType::Menu);
 }

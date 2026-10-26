@@ -76,7 +76,10 @@
 //! `--pointer <x>,<y>` puts the mouse pointer there and `--talk` clicks
 //! the character under the screen centre (its subject menu opens);
 //! `--command <commands>` runs script commands at the start, before the
-//! view entry (`(monde=1)(changewam=bigile1.wam)(vue=5)`: Ireland).
+//! view entry (`(monde=1)(changewam=bigile1.wam)(vue=5)`: Ireland);
+//! `--seed <n>` gives `rand` the seed `n` instead of the clock (the
+//! original seeds it with `GetTickCount()` at start-up), so that a run
+//! draws the same animations, cameras and choices again.
 //!
 //! At start-up the intro videos play before the player menu, as in the
 //! original (a click skips one, a double click all of them); `--no-intro`
@@ -164,6 +167,9 @@ pub struct A2Start {
     /// A headless run's screenshot shows the options menu (F10) over the
     /// last frame (`--options-menu`).
     pub options_menu: bool,
+    /// The `rand` seed of the start-up (`--seed`), instead of the clock
+    /// ([`Engine::seed_rand`]): the same draws on every run.
+    pub seed: Option<u32>,
 }
 
 impl A2Start {
@@ -215,6 +221,9 @@ impl A2Start {
     /// the testing aids), then the view, the dialog and the menu page asked
     /// for.
     pub fn begin(&self, engine: &mut Engine, headless: bool) -> Result<(), String> {
+        if let Some(seed) = self.seed {
+            engine.seed_rand(seed);
+        }
         if let Some((w, _)) = self.resolution {
             engine.set_screen_800(w == 800);
         }
@@ -493,11 +502,12 @@ fn boot(
     {
         engine.date_text = local_date_text;
     }
-    // The original seeds `rand` with GetTickCount() (@ 0x0047d740).
+    // The original seeds `rand` with GetTickCount() at start-up
+    // (@ 0x0047d740): a clock in milliseconds (`--seed` fixes it).
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u32);
-    engine.anim.rand = atlantis2_engine::anim::MsvcRand(seed);
+    engine.seed_rand(seed);
     Ok((engine, format!("Game: {}", build.label)))
 }
 
@@ -2125,7 +2135,7 @@ mod tests {
                 ..Enhancements::default()
             };
             let (mut e, _) = boot(&dir, &discs, x).expect("game");
-            e.anim.rand = atlantis2_engine::anim::MsvcRand(1);
+            e.seed_rand(1);
             e.trace = true;
             e
         };

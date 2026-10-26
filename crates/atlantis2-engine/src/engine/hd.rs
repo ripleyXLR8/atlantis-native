@@ -166,6 +166,7 @@ impl Engine {
             let font = match r.font {
                 TextFont::Dialog => self.font.as_ref(),
                 TextFont::Popup => popup,
+                TextFont::Big => self.big_font.as_ref(),
             };
             if let Some(f) = font {
                 f.draw_hd(out, stride, area, &r.call, r.alpha);

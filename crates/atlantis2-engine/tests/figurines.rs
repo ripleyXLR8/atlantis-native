@@ -24,8 +24,9 @@ use atlantis2_data::spw::Spw;
 use atlantis2_data::wam::EntityState;
 use atlantis2_data::{A2Files, Folder};
 
-use atlantis2_engine::anim::{Anim, MsvcRand};
+use atlantis2_engine::anim::Anim;
 use atlantis2_engine::camera::direction_angles;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::{chinese_click_hooks, FIGURINE_TARGETS};
 use atlantis2_engine::png::encode_rgb565;
@@ -744,7 +745,7 @@ fn the_step_in_view_7_as_the_original() {
             .collect();
         let label = head.split(" pos [").next().unwrap();
         fresh(&mut e, &pos, 0, 7);
-        e.anim.rand = MsvcRand(1);
+        e.rand = Rand::new(1);
         let mine: Vec<usize> = (0..e.anim.slots.len())
             .filter(|&n| FIGURINE_IDS.contains(&e.anim.slots[n].id))
             .collect();
@@ -754,7 +755,7 @@ fn the_step_in_view_7_as_the_original() {
         );
         i += 1;
         for t in 1..=70 {
-            e.anim.step();
+            e.anim.step(&mut e.rand);
             let row: Vec<String> = mine
                 .iter()
                 .map(|&n| {
@@ -803,7 +804,7 @@ fn a_figurine_is_drawn_as_the_original() {
         let w: Vec<&str> = row.split(' ').collect();
         let (name, frame): (&str, i32) = (w[1], w[3].parse().unwrap());
         let spw = Spw::parse(data.clone()).unwrap();
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         a.load(
             name,
             Spw::parse(data.clone()).unwrap(),

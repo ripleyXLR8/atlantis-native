@@ -22,8 +22,8 @@ use atlantis2_data::dialog::parse_dial;
 use atlantis2_data::exe::Release;
 use atlantis2_data::files::holds_atlantis2;
 use atlantis2_data::{A2Files, Folder};
-use atlantis2_engine::anim::MsvcRand;
 use atlantis2_engine::canoe::{HERO_FILES, STONES};
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::web::{load_model, SLOTS};
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::subtitle::{layout, TextOut};
@@ -267,7 +267,7 @@ fn a_new_game_the_shamans_dialog_in_1_01_and_a_save() {
     let Some(files) = gog() else { return };
     let data = scratch("a2-gog-new-game");
     let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     e.trace = true;
     e.set_data_dir(Some(data.clone()));
     e.start_new_game().unwrap();

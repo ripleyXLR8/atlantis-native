@@ -422,7 +422,7 @@ fn the_stones_are_drawn_as_the_original() {
     let mut n = 0;
     for row in rows("H ") {
         let st = unhex(field(row, "list=").trim_end_matches(':'));
-        let mut anim = Anim::new(0);
+        let mut anim = Anim::new();
         anim.load("ogA1006006.SPW", spw.clone(), 2, 1, 0, state);
         anim.slots[0].frames = list(&st);
         let bg = background(FACE * FACE);

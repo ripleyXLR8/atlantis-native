@@ -441,6 +441,17 @@ impl A2Files {
         wanted
     }
 
+    /// `CHANGECD` (FUN_0040dff0 with the value − 1, atlantis2-cd-fr-2199552
+    /// @ 0x0048275c): disc `n` becomes the wanted, current one, found or
+    /// not (its files then come from the others), as [`A2Files::set_monde`]
+    /// does for a world.
+    pub fn set_disc(&mut self, n: u8) {
+        if n != self.current {
+            log::info!("CHANGECD: disc {n}");
+        }
+        self.current = n;
+    }
+
     /// The path under which `src` (the install folder, 0, or disc `key`)
     /// holds `path`: itself, or the name [`alias_of`] finds in its folder
     /// (looked for once per path); `None` when it holds neither.

@@ -1674,7 +1674,7 @@ fn a_soul_is_drawn_as_the_original() {
         let w: Vec<&str> = row.split(' ').collect();
         let (name, frame): (&str, i32) = (w[1], w[3].parse().unwrap());
         let spw = Spw::parse(data.clone()).unwrap();
-        let mut a = Anim::new(0);
+        let mut a = Anim::new();
         a.load(
             name,
             Spw::parse(data.clone()).unwrap(),

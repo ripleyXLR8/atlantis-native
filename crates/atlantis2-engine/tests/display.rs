@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::display::{blit_640_to_800, NATIVE_DIALOGS};
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::{MenuHost, PageKind};
@@ -132,7 +132,7 @@ struct Run {
 impl Run {
     fn new(files: A2Files, data: PathBuf) -> Run {
         let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
-        e.anim.rand = MsvcRand(1000);
+        e.rand = Rand::new(1000);
         e.set_data_dir(Some(data));
         let (w, h) = e.screen_size();
         Run {

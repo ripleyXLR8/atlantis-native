@@ -212,7 +212,9 @@ pub trait Host {
         false
     }
 
-    /// `AtlDial_stop` (@ 0x004808a0) of a running dialog before another.
+    /// `AtlDial_stop` (@ 0x004808a0) of a running dialog before another:
+    /// the host's part (the script's, [`super::Script::dialog_ended`],
+    /// follows).
     fn dial_stop(&mut self) {}
 
     /// `AtlDial_start` (@ 0x0047ff60): dialog `n` of `loc\Dial*.txt`.
@@ -279,6 +281,12 @@ pub trait Host {
     /// the current world's entries (@ 0x00475870, kept @ 0x00671ee8), then
     /// @ 0x004757b0 until it returns 0: the bar scrolls to its end.
     fn bag_layout(&mut self, visible: i32) {}
+
+    /// A fatal error the host met while it ran the line's command
+    /// (FUN_00480cd0 called from inside it), for the script to stop on.
+    fn take_fatal(&mut self) -> Option<String> {
+        None
+    }
 
     /// `MESSAGE_CLIC` (@ 0x00476790): the message viewer (loop type 10).
     fn message_clic(&mut self, text: &str) {}

@@ -17,7 +17,7 @@
 use std::path::PathBuf;
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::engine::TICK;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -169,7 +169,7 @@ fn set_lines(evs: &[Event], chapter: i32) -> Vec<usize> {
 fn a_new_game_plays_to_the_first_dialog() {
     let Some(files) = game() else { return };
     let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     e.trace = true;
     // Start-up, then the menu's new game: chapter 0's /INIT, up to the
     // film it starts (its sound track on voice 2).

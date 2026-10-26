@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use atlantis2_data::A2Files;
-use atlantis2_engine::anim::MsvcRand;
+use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::png::encode_rgb565;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
@@ -37,7 +37,7 @@ fn texel_angles(face: usize, col: f64, row: f64) -> (f32, f32) {
 fn open(install: &Path, discs: &Path) -> Engine {
     let (files, _) = A2Files::open_dir(install, &[discs.to_path_buf()]).expect("game folder");
     let mut e = Engine::new_game(files, Variant::PII, Fpu::Double, W as u32, H as u32).unwrap();
-    e.anim.rand = MsvcRand(1000);
+    e.rand = Rand::new(1000);
     e.trace = true;
     e
 }

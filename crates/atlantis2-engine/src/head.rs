@@ -313,6 +313,9 @@ struct Mesh {
     corners: Vec<[u16; 3]>,
     /// Texture coordinates of set 1, three per face.
     uvs: Vec<[[f64; 2]; 3]>,
+    /// Per face, whether its material group is drawn flat (see
+    /// [`Head::new`]).
+    flat: Vec<bool>,
 }
 
 /// What a frame of the pipeline produced, for checks against the
@@ -491,6 +494,40 @@ impl Head {
                 })
             })
             .collect();
+        // The material groups (record +0x124: faces per group, in face
+        // order; their materials by name). A group whose material has no
+        // texture once loaded is drawn flat black with no Z test or write
+        // (FUN_00429700: its texture +0x60 null gives FUN_00429be0(0, 0,
+        // 0, 0xff) and the flags 1, the routine `FlatC` @ 0x005e4ce0: the
+        // C set-up and scan, the span @ 0x0056fee0). The heads load the
+        // map of their first material only; the only shipped head with a
+        // second group, `Als1.db`, names `sonoir.tga` there, which no disc
+        // has (the original's `head_pii_more.txt`). A group with another
+        // texture that exists would be drawn with that texture by the
+        // original: not ported, no shipped head has one.
+        let main = mesh
+            .materials
+            .first()
+            .and_then(|m| scene.materials.iter().find(|x| &x.name == m))
+            .and_then(|m| m.texture())
+            .map(str::to_ascii_lowercase);
+        let mut flat = Vec::with_capacity(n);
+        let groups: Vec<u16> = if mesh.groups.is_empty() {
+            vec![n as u16]
+        } else {
+            mesh.groups.clone()
+        };
+        for (g, &count) in groups.iter().enumerate() {
+            let tex = mesh
+                .materials
+                .get(g)
+                .and_then(|m| scene.materials.iter().find(|x| &x.name == m))
+                .and_then(|m| m.texture())
+                .map(str::to_ascii_lowercase);
+            let is_flat = tex.is_none() || tex != main;
+            flat.extend(std::iter::repeat_n(is_flat, usize::from(count)));
+        }
+        flat.resize(n, false);
         // The cameras in name order (the map walk of @ 0x004626b0).
         let mut cams: Vec<&atlantis2_data::db::Camera> = scene.cameras.iter().collect();
         cams.sort_by(|a, b| a.name.as_bytes().cmp(b.name.as_bytes()));
@@ -503,7 +540,7 @@ impl Head {
             nodes,
             tracks,
             head,
-            mesh: Mesh { corners, uvs },
+            mesh: Mesh { corners, uvs, flat },
             name: mesh.name.as_bytes().to_vec(),
             vertices: mesh.vertices.iter().map(|v| v64(*v)).collect(),
             morphs,
@@ -905,6 +942,17 @@ impl Head {
                     v: uv[1],
                 }
             });
+            if self.mesh.flat[fi] {
+                // `FlatC`, whatever the CPU (no II flat routine has the
+                // flags 1), under the word the draw runs under.
+                let k = if drawn && self.variant == Variant::PII {
+                    Fpu::Chop
+                } else {
+                    k
+                };
+                crate::raster3d::draw_polygon_flat(k, &mut poly, 0x0000, target);
+                continue;
+            }
             match self.variant {
                 Variant::C => draw_polygon(k, &mut poly, &tex, target),
                 Variant::PII => ii::draw_polygon(&mut poly, &tex, target),

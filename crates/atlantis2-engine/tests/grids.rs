@@ -1066,7 +1066,7 @@ fn the_grids_are_drawn_as_the_original() {
                     .map(|i| u8::from_str_radix(&l[i..i + 2], 16).unwrap())
                     .collect()
             };
-            let mut anim = Anim::new(0);
+            let mut anim = Anim::new();
             anim.load(name, spw.clone(), 2, 1, 0, state);
             let mut fl = [atlantis2_engine::anim::LIST_END; atlantis2_engine::anim::FRAME_TAB];
             fl[..list.len()].copy_from_slice(&list);

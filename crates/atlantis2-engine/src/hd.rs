@@ -369,6 +369,8 @@ pub fn side_tiles(ox: usize, dw: usize) -> usize {
 pub enum TextFont {
     Dialog,
     Popup,
+    /// `AtlFT_Big_Default` (the `MESSAGE_CLIC` viewer).
+    Big,
 }
 
 /// A `TextOutA` call of a frame, for the HD mode to draw again at the

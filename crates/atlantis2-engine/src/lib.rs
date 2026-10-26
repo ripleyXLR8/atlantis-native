@@ -39,6 +39,7 @@ pub mod hnm_stream;
 pub mod lipsync;
 pub mod look;
 pub mod menu;
+pub mod message;
 pub mod music;
 pub mod options_menu;
 pub mod place_sound;

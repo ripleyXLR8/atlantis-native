@@ -292,3 +292,122 @@ fn every_start_plays_it_again() {
     assert_eq!(names(&r), whole);
     let _ = std::fs::remove_dir_all(&data);
 }
+
+/// One case of `tests/golden/intro.txt` (the original's FUN_0049d9c0 and
+/// video loop under emulation, a tick every fourth pass): the videos
+/// started (pass, name, the last frame the one before showed) and the pass
+/// the menu is back.
+type Starts = (Vec<(i64, String, Option<u32>)>, i64);
+
+fn golden_case(golden: &str, head: &str) -> Starts {
+    let mut rows = golden
+        .lines()
+        .skip_while(|l| *l != head)
+        .skip(1)
+        .take_while(|l| !l.starts_with("=="));
+    let mut starts = Vec::new();
+    let mut end = -1;
+    for l in rows.by_ref() {
+        let pass = if l.starts_with("start ") {
+            -1
+        } else if let Some(p) = l.strip_prefix('p') {
+            p.split(' ').next().unwrap().parse().unwrap()
+        } else {
+            continue;
+        };
+        if l.contains("loop 5 ") {
+            end = pass;
+        }
+        let Some(i) = l.find("AtlHnm_start(") else {
+            continue;
+        };
+        let name = l[i + 13..].split(')').next().unwrap().to_string();
+        let last = l[..i]
+            .rsplit("hnm_frame ")
+            .next()
+            .filter(|_| l[..i].contains("hnm_frame "))
+            .and_then(|s| s.split(';').next())
+            .map(|s| s.trim().parse().unwrap());
+        starts.push((pass, name, last));
+    }
+    (starts, end)
+}
+
+/// The same run by the engine: `clicks` maps a pass to a double click.
+fn native_case(files: A2Files, clicks: &[(i64, bool)]) -> Starts {
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.trace = true;
+    e.open_player_menu();
+    e.events.clear();
+    e.start_intro();
+    let mut starts = Vec::new();
+    let mut last = None;
+    let mut record = |e: &mut Engine, pass: i64, last: &mut Option<u32>| {
+        for ev in std::mem::take(&mut e.events) {
+            match ev {
+                Event::VideoStart { name, .. } => {
+                    starts.push((pass, name, last.take()));
+                }
+                Event::VideoFrame(k) => *last = Some(k),
+                _ => {}
+            }
+        }
+    };
+    record(&mut e, -1, &mut last);
+    let mut t = 100.0;
+    for n in 0..4000i64 {
+        if n % 4 == 0 {
+            e.tick();
+        }
+        if let Some(&(_, double)) = clicks.iter().find(|c| c.0 == n) {
+            t += 10.0;
+            e.click(t);
+            if double {
+                e.click(t + 0.1);
+            }
+        }
+        e.pass(None);
+        record(&mut e, n, &mut last);
+        if e.loop_type == LoopType::Menu {
+            return (starts, n);
+        }
+    }
+    panic!("the intro still plays");
+}
+
+/// L49: the intro's chain and its skip rules against the original's
+/// (`intro.txt`): discs 1 and 2, no input, a click, a double click, two
+/// clicks; the passes each video starts and the menu comes back, and the
+/// last frame each video showed.
+#[cfg(unix)]
+#[test]
+fn the_intro_and_its_skips_match_the_original() {
+    let Some(discs) = discs() else { return };
+    let golden = include_str!("golden/intro.txt");
+    let mut n = 0;
+    for disc in [1, 2] {
+        for (label, clicks) in [
+            ("no input", vec![]),
+            ("click at pass 20", vec![(20, false)]),
+            ("double click at pass 20", vec![(20, true)]),
+            (
+                "click at pass 20 and at pass 200",
+                vec![(20, false), (200, false)],
+            ),
+        ] {
+            let head = format!("== disc {disc} {label}");
+            if !golden.lines().any(|l| l == head) {
+                continue;
+            }
+            let Some(one) = one_disc(&discs, disc) else {
+                eprintln!("CD{disc}.iso not found: case skipped");
+                continue;
+            };
+            let want = golden_case(golden, &head);
+            let got = native_case(game_with(one).unwrap(), &clicks);
+            assert_eq!(got, want, "{head}");
+            n += 1;
+        }
+    }
+    assert_eq!(n, 7);
+}
