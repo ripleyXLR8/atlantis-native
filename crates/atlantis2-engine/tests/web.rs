@@ -575,6 +575,94 @@ fn stage_row(st: &ObjectStage) -> String {
     )
 }
 
+thread_local! {
+    /// For [`no_face_crosses_the_near_or_far_plane`]: when set, each pass
+    /// of sections E and F first looks for faces crossing the near or far
+    /// plane ([`near_far_sweep`]): the passes where a wide view finds one,
+    /// the views of the game's own field that do, the objects looked at.
+    static SWEEP: RefCell<Option<[usize; 3]>> = const { RefCell::new(None) };
+}
+
+/// The creatures' faces as the pass is about to draw them, against the
+/// near (1.5) and far (100000) planes of the warp camera at the player's
+/// node (`ObjectStage::clipped`, from the clip codes of the objects not
+/// inside every plane). First twelve wide views (yaw every 90°, pitch
+/// −60°, 0°, 60°, a quarter of the focal lengths: about 145° across):
+/// a vertex nearer to the eye than the near plane shows there. Only when
+/// one does, the game's own view (76°) every 10° of yaw and of pitch
+/// within the ±70° the views allow (the per-view reset's limits; a 5°
+/// grid finds none either). Nothing is rasterised (a 1 x 1 target); the
+/// state is put back after.
+fn near_far_sweep(w: &mut Web, m: &mut Mock) {
+    if !w.loaded || SWEEP.with(|s| s.borrow().is_none()) {
+        return;
+    }
+    let saved = (
+        w.poses.clone(),
+        w.drawn.len(),
+        w.lost,
+        w.placed.len(),
+        w.quads,
+    );
+    let cmds = m.cmds.len();
+    let errors = m.errors.len();
+    let (mut px, mut zb) = ([0u16; 1], [0u32; 1]);
+    let mut views = |w: &mut Web, m: &mut Mock, angles: &[(f32, f32)], wide: bool| {
+        let (mut clipped, mut objects) = (0, 0);
+        for &(yaw, pitch) in angles {
+            let mut cam = Camera::new(K, WIDTH as u32, HEIGHT as u32);
+            cam.enter(yaw.to_radians(), pitch.to_radians());
+            let mut view = View::of(&cam, WIDTH, HEIGHT);
+            if wide {
+                view = view.scaled(K, 4, 0, WIDTH, HEIGHT);
+            }
+            // The round lost is the pass's own draw's.
+            let lost = std::mem::take(&mut w.lost);
+            let stages = {
+                let mut t = Target {
+                    pixels: &mut px,
+                    zbuf: &mut zb,
+                    width: 1,
+                    height: 1,
+                };
+                w.draw(m, Some(&view), Some(&mut t))
+            };
+            w.lost = lost;
+            let hit: usize = stages.iter().flatten().map(|o| o.clipped).sum();
+            clipped += usize::from(hit > 0);
+            objects += stages.iter().flatten().filter(|o| !o.rejected).count();
+        }
+        (clipped, objects)
+    };
+    let wide: Vec<(f32, f32)> = (0..4)
+        .flat_map(|y| [-60.0, 0.0, 60.0].map(|p| (y as f32 * 90.0, p)))
+        .collect();
+    let (near_eye, mut objects) = views(w, m, &wide, true);
+    let mut crossing = 0;
+    if near_eye > 0 {
+        let game: Vec<(f32, f32)> = (0..36)
+            .flat_map(|y| (-7..=7).map(move |p| (y as f32 * 10.0, p as f32 * 10.0)))
+            .collect();
+        let (c, o) = views(w, m, &game, false);
+        crossing = c;
+        objects += o;
+    }
+    w.poses = saved.0;
+    w.drawn.truncate(saved.1);
+    w.lost = saved.2;
+    w.placed.truncate(saved.3);
+    w.quads = saved.4;
+    m.cmds.truncate(cmds);
+    m.errors.truncate(errors);
+    SWEEP.with(|s| {
+        if let Some(t) = s.borrow_mut().as_mut() {
+            t[0] += usize::from(near_eye > 0);
+            t[1] += crossing;
+            t[2] += objects;
+        }
+    });
+}
+
 /// What an operation printed after the state.
 struct Done {
     extra: String,
@@ -610,6 +698,8 @@ fn run_op(w: &mut Web, m: &mut Mock, op: &str) -> Done {
             let r = w.move_click(m, parts[1].parse().unwrap());
             done.extra = format!(" ret={}", u8::from(r));
         }
+        // The web's quit (FUN_00491260), as a load's puzzle reset runs it.
+        "quit" => w.quit(m),
         "load" => {
             let v: i32 = parts[1].parse().unwrap();
             let saved = match w.load_hook(m, v) {
@@ -641,6 +731,7 @@ fn run_op(w: &mut Web, m: &mut Mock, op: &str) -> Done {
             );
         }
         "pass" => {
+            near_far_sweep(w, m);
             if w.loaded {
                 w.draw(m, None, None);
             }
@@ -659,6 +750,7 @@ fn run_op(w: &mut Web, m: &mut Mock, op: &str) -> Done {
             for _ in 0..n {
                 m.cmds.clear();
                 m.errors.clear();
+                near_far_sweep(w, m);
                 if w.loaded {
                     w.draw(m, None, None);
                 }
@@ -1099,6 +1191,34 @@ fn g_drawing() {
 #[test]
 fn f_rounds_won() {
     check("F");
+}
+
+/// Review L40: the web's faces never cross the near or the far plane, so
+/// the clipping the port leaves out (@ 0x004380b0, its interpolation of
+/// both texture channels) is never needed: every pass of sections E and F
+/// (each stage's rounds, the attacks to the round lost, the strikes, the
+/// prey, four rounds won) with the creatures looked at in every direction
+/// of the game's own field of view ([`near_far_sweep`]).
+#[test]
+fn no_face_crosses_the_near_or_far_plane() {
+    if Game::open().is_none() {
+        return;
+    }
+    SWEEP.with(|s| *s.borrow_mut() = Some([0; 3]));
+    check("E");
+    check("F");
+    let [near_eye, crossing, objects] = SWEEP.with(|s| s.borrow_mut().take()).unwrap();
+    // Creatures come within the near plane's distance of the eye (beside
+    // or behind it: the wide views), but never into the game's own field.
+    assert!(
+        near_eye > 400,
+        "passes with a creature at the eye: {near_eye}"
+    );
+    assert!(objects > 1_000_000, "objects looked at: {objects}");
+    assert_eq!(
+        crossing, 0,
+        "views with a face crossing the near or far plane"
+    );
 }
 
 // ---------------------------------------------------------------------------

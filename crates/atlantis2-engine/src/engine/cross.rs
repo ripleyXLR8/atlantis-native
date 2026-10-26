@@ -10,9 +10,10 @@
 //! - The state (@ 0x006d26b4, save entry 32): the value of the zone that
 //!   holds the cross, 0 when it is not laid. No instruction writes it
 //!   but the hook's, and a load copies the save's bytes: the port resets
-//!   it nowhere, not at a new game either. Whether the original's new
-//!   game clears it through some block clear is not settled (no direct
-//!   reference does; see `docs/TECHNICAL.md`).
+//!   it nowhere. A new game finds it at its start-up 0: the original
+//!   starts a new game only from the player menu (menu state 10), which
+//!   it builds once, at start-up (`AtlMenu_start_Player` FUN_00486af0,
+//!   whose one caller is the start-up's FUN_0049d680).
 //! - The view entry FUN_00494120 (from FUN_0049bd50, after the slots are
 //!   loaded): the slot's id kept (@ 0x006d26b8, `DefName_GetIdName(1,
 //!   "CROIXBRIGIT_SPRITE")`); frame 0 taken out of its table when there

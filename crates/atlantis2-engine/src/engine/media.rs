@@ -196,7 +196,8 @@ impl Engine {
             self.media.copy_page = true;
             self.with_menu(|m, e| m.start_please_wait(e));
         }
-        self.music_frame();
+        // The menu frame runs the music state machine first
+        // ([`Engine::menu_pass`]).
         if let Some(m) = self.menu.as_mut() {
             m.tick_flag = true;
         }

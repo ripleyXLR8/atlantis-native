@@ -42,7 +42,8 @@
 //! the right sound's handle.
 //!
 //! None of this is saved (no entry of the save table), and nothing resets
-//! the mode: a new game or a load keeps it.
+//! the mode: a load keeps it, and a new game, which the original starts
+//! only from the start-up's player menu, finds the start-up's 0.
 
 use atlantis2_data::defnames;
 

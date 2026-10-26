@@ -1379,6 +1379,9 @@ impl Engine {
         if self.loop_type != LoopType::Dialog {
             return;
         }
+        // The tick's first call: the music state machine (the thunk
+        // @ 0x0047a280, called @ 0x004801e8).
+        self.music_frame();
         // The field of view takes the screen's size, not the logical one
         // (@ 0x004803e5): see `crate::display`.
         let screen = self.fov_screen();
@@ -2933,11 +2936,20 @@ impl Engine {
     /// `AtlMain_loop_HNM` (@ 0x0040c060): a new frame at each 15 Hz tick;
     /// the end, a click or a double click ends it.
     fn video_pass(&mut self, mut out: Option<&mut [u16]>) {
-        let Some(v) = &mut self.video else {
+        let Some(v) = &self.video else {
             self.set_loop_type(LoopType::Warp);
             return;
         };
         let new_tick = v.tick != self.ticks;
+        if new_tick {
+            // The loop's own pass of the music state machine (the thunk
+            // @ 0x0047a280, called @ 0x0040c071 on a new tick), after the
+            // dispatcher's of the same pass.
+            self.music_frame();
+        }
+        let Some(v) = &mut self.video else {
+            return;
+        };
         let mut shown = None;
         if new_tick {
             v.tick = self.ticks;
