@@ -46,6 +46,82 @@ pub struct Camera {
     pub fov: f32,
 }
 
+/// The cube's six faces as its static constructor leaves them
+/// (FUN_004598d0 → FUN_004d94b0, read under emulation:
+/// atlantis2-re `evidence/golden/centre_texel.txt`): the quaternions
+/// (x, y, z, w) of the face cameras, as float bits.
+const FACE_QUATS: [[u32; 4]; 6] = [
+    [0x0000_0000, 0x0000_0000, 0x0000_0000, 0x3f80_0000],
+    [0x8000_0000, 0x3f80_0000, 0x0000_0000, 0x0000_0000],
+    [0x3f35_04f3, 0x0000_0000, 0x0000_0000, 0x3f35_04f3],
+    [0xbf35_04f3, 0x0000_0000, 0x0000_0000, 0x3f35_04f3],
+    [0x8000_0000, 0xbf35_04f3, 0x0000_0000, 0x3f35_04f3],
+    [0x0000_0000, 0x3f35_04f3, 0x0000_0000, 0x3f35_04f3],
+];
+/// The face cameras' focal lengths, centre and near plane (+0x00, +0x08,
+/// +0x18 of the cube's camera @ 0x00661058 + 0x60).
+const FACE_FOCAL: f32 = f32::from_bits(0x437e_ffff);
+const FACE_CENTRE: f32 = 256.0;
+const FACE_NEAR: f32 = 1.0;
+
+/// FUN_0047e140: `v` turned by the quaternion `q` (x, y, z, w): q v q*,
+/// the four products of q v kept on the x87 stack, the three results
+/// stored as floats.
+fn quat_rotate(fpu: Fpu, q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let (q, v) = (q.map(d), v.map(d));
+    let x = add(sub(mul(v[0], q[3]), mul(v[1], q[2])), mul(v[2], q[1]));
+    let y = add(sub(mul(v[1], q[3]), mul(v[2], q[0])), mul(v[0], q[2]));
+    let z = add(sub(mul(v[2], q[3]), mul(v[0], q[1])), mul(v[1], q[0]));
+    let w = add(add(mul(v[1], q[1]), mul(v[0], q[0])), mul(v[2], q[2]));
+    [
+        fpu.f32(sub(
+            add(add(mul(w, q[0]), mul(x, q[3])), mul(z, q[1])),
+            mul(y, q[2]),
+        )),
+        fpu.f32(sub(
+            add(add(mul(x, q[2]), mul(y, q[3])), mul(w, q[1])),
+            mul(z, q[0]),
+        )),
+        fpu.f32(sub(
+            add(add(mul(w, q[2]), mul(y, q[0])), mul(z, q[3])),
+            mul(x, q[1]),
+        )),
+    ]
+}
+
+/// FUN_0047e210: `v` turned back by the quaternion `q`: q* v q.
+fn quat_rotate_back(fpu: Fpu, q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let (q, v) = (q.map(d), v.map(d));
+    let x = sub(add(mul(v[0], q[3]), mul(v[1], q[2])), mul(v[2], q[1]));
+    let y = sub(add(mul(v[2], q[0]), mul(v[1], q[3])), mul(v[0], q[2]));
+    let z = sub(add(mul(v[0], q[1]), mul(v[2], q[3])), mul(v[1], q[0]));
+    let w = sub(sub(-mul(v[0], q[0]), mul(v[1], q[1])), mul(v[2], q[2]));
+    [
+        fpu.f32(add(
+            sub(sub(mul(x, q[3]), mul(w, q[0])), mul(z, q[1])),
+            mul(y, q[2]),
+        )),
+        fpu.f32(add(
+            sub(sub(mul(y, q[3]), mul(w, q[1])), mul(x, q[2])),
+            mul(z, q[0]),
+        )),
+        fpu.f32(add(
+            sub(sub(mul(z, q[3]), mul(w, q[2])), mul(y, q[0])),
+            mul(x, q[1]),
+        )),
+    ]
+}
+
 /// A float of the original as an `f64` operand.
 #[inline(always)]
 fn d(x: f32) -> f64 {
@@ -363,6 +439,46 @@ impl Camera {
             ))
         };
         [row(0), row(3), row(6)]
+    }
+
+    /// The texel of the cube under the screen point (sx, sy), as the
+    /// sprite test asks it (FUN_0047db60, called by FUN_0047cf00 with the
+    /// screen centre): the point unprojected at depth 0.0001 (FUN_004a6380),
+    /// turned into the world by the camera node's quaternion
+    /// (FUN_0047e140; its scale 1, its position and the scene root's are
+    /// 0 and the root's quaternion the identity, which change nothing),
+    /// then for each face 0..5 in turn turned back by the face's
+    /// quaternion (FUN_0047e210) and, when in front of its near plane
+    /// (depth above 1.0), projected by the face's camera (FUN_004a6210:
+    /// focal 254.99998, centre 256) and truncated (`_ftol`): the first
+    /// face whose rectangle 0..511 holds the point. Every operation in the
+    /// control word's precision and rounding, the stores as floats.
+    /// `None` when no face holds it (the original then returns face −1).
+    pub fn texel(&self, sx: f32, sy: f32) -> Option<(usize, i32, i32)> {
+        let fpu = self.fpu;
+        let z = fpu.div(1.0, d(0.0001f32));
+        let v = [
+            fpu.f32(fpu.mul(fpu.mul(fpu.sub(d(sx), d(self.cx)), d(self.inv_fx)), z)),
+            fpu.f32(fpu.mul(fpu.mul(fpu.sub(d(sy), d(self.cy)), d(self.inv_fy)), z)),
+            fpu.f32(z),
+        ];
+        let w = quat_rotate(fpu, self.q, v);
+        for (k, q) in FACE_QUATS.iter().enumerate() {
+            let p = quat_rotate_back(fpu, q.map(f32::from_bits), w);
+            // `fcomp`: on, only when the depth is above the near plane
+            // (C0 and C3 clear; a NaN sets them).
+            if p[2].partial_cmp(&FACE_NEAR) != Some(std::cmp::Ordering::Greater) {
+                continue;
+            }
+            let r = fpu.div(1.0, d(p[2]));
+            let px = fpu.f32(fpu.add(fpu.mul(fpu.mul(d(p[0]), d(FACE_FOCAL)), r), d(FACE_CENTRE)));
+            let py = fpu.f32(fpu.add(fpu.mul(fpu.mul(d(p[1]), d(FACE_FOCAL)), r), d(FACE_CENTRE)));
+            let (x, y) = (crate::fpu::ftol(d(px)), crate::fpu::ftol(d(py)));
+            if (0..=511).contains(&x) && (0..=511).contains(&y) {
+                return Some((k, x, y));
+            }
+        }
+        None
     }
 
     /// FUN_0045adf0 → FUN_004581d0: the yaw and pitch (radians, floats) of

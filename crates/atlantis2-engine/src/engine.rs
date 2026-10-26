@@ -761,15 +761,6 @@ struct Player {
     list: Vec<u8>,
 }
 
-/// The texel of the cube under a direction: the face (cube order) and the
-/// texel (column, row) the warp samples there, a + (b − a)·t of the face's
-/// texture coordinates with a = 1/512, b = 511/512 (the cube's corners,
-/// @ 0x0045c790).
-fn texel_of(dir: [f32; 3]) -> Option<Texel> {
-    crate::hd::cube_point(dir.map(f64::from))
-        .map(|(face, u, v)| (face, u.floor() as i32, v.floor() as i32))
-}
-
 /// The world's objects bank `/set(monde=N)` loads (@ 0x00484df0).
 pub fn objects_bank_name(monde: i32) -> Option<&'static str> {
     Some(match monde {
@@ -1745,7 +1736,7 @@ impl Engine {
             out.fill(0);
             return;
         }
-        let centre = texel_of(self.camera.ray(self.camera.cx, self.camera.cy));
+        let centre = self.camera.texel(self.camera.cx, self.camera.cy);
         let (dirty, _) = self.anim.draw(&mut self.work, centre, false);
         let (m, p) = (self.camera.matrix(), self.camera.projection());
         self.renderer.fpu = self.camera.fpu;
@@ -1978,7 +1969,7 @@ impl Engine {
     fn draw_slots(&mut self) -> Vec<(usize, FaceBox)> {
         let centre = self
             .forced_centre
-            .or_else(|| texel_of(self.camera.ray(self.camera.cx, self.camera.cy)));
+            .or_else(|| self.camera.texel(self.camera.cx, self.camera.cy));
         // The slot under the centre is recorded on a click only while the
         // bag bar is closed (FUN_0045b040 @ 0x0045b0cd).
         let (dirty, mut hit) = self
@@ -3239,15 +3230,7 @@ mod tests {
     }
 
     #[test]
-    fn texels_under_the_centre() {
-        assert_eq!(texel_of([0.0, 0.0, 1.0]), Some((0, 256, 256)));
-        assert_eq!(texel_of([1.0, 0.0, 0.0]), Some((5, 256, 256)));
-        assert_eq!(texel_of([0.0, -1.0, 0.0]), Some((2, 256, 256)));
-        // Top-left corner of ft: texel 1.
-        assert_eq!(
-            texel_of([-1.0, -1.0, 1.0]).map(|t| (t.1, t.2)),
-            Some((1, 1))
-        );
+    fn rgb565_of_argb() {
         assert_eq!(rgb565(0xff00_00ff), 0x001f);
     }
 }

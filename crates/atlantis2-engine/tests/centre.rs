@@ -249,3 +249,35 @@ fn centre_and_sprite_clicks_match_the_original() {
         assert_eq!(rows.len(), want.len(), "case {name}: row count");
     }
 }
+
+/// The texel under the screen centre (FUN_0047db60, run by the original
+/// under emulation: `tests/golden/centre_texel.txt`, atlantis2-re
+/// `tools/emu/centre_texel.py`) against the port's cube mapping, on view
+/// 2 entered at every 5° of yaw and pitch, under 0x0e7f.
+#[test]
+fn the_texel_under_the_centre_matches_the_original() {
+    use atlantis2_engine::camera::Camera;
+    let golden = include_str!("golden/centre_texel.txt");
+    let (mut n, mut bad) = (0, Vec::new());
+    for row in golden.lines().filter(|l| l.starts_with("yaw ")) {
+        let f: Vec<&str> = row.split(' ').collect();
+        let (yaw, pitch): (f64, f64) = (f[1].parse().unwrap(), f[3].parse().unwrap());
+        let want: Vec<i32> = f[5].split(',').map(|v| v.parse().unwrap()).collect();
+        let mut cam = Camera::new(Fpu::Chop, 640, 480);
+        cam.enter(yaw.to_radians() as f32, pitch.to_radians() as f32);
+        let got = cam
+            .texel(cam.cx, cam.cy)
+            .map_or((-1, 320, 240), |(face, x, y)| (face as i32, x, y));
+        if got != (want[0], want[1], want[2]) {
+            bad.push(format!("{row}: got {got:?}"));
+        }
+        n += 1;
+    }
+    assert_eq!(n, 72 * 35);
+    assert!(
+        bad.is_empty(),
+        "{} of {n} differ: {:?}",
+        bad.len(),
+        &bad[..bad.len().min(8)]
+    );
+}
