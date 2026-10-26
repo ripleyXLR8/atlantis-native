@@ -25,7 +25,7 @@ fn dirs() -> Option<(PathBuf, PathBuf)> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     Some((PathBuf::from(dir), PathBuf::from(discs)))
@@ -723,7 +723,7 @@ fn link_discs(from: &Path, to: &Path, wanted: &[u8]) {
 fn a_missing_disc_opens_the_cd_page() {
     let Some((dir, discs)) = dirs() else { return };
     if !discs.join("CD4.iso").exists() {
-        eprintln!("CD4.iso not in ATLANTIS2_DISCS: test skipped");
+        atlantis2_data::testing::missing("CD4.iso not in ATLANTIS2_DISCS");
         return;
     }
     let only = scratch("discs");
@@ -892,7 +892,9 @@ fn the_disc_icons_show_at_the_slides_start() {
         atlantis2_engine::menu::state::DISC_SLIDE
     );
     assert_eq!(icons(&e), ((true, false), (true, false)));
-    for _ in 0..29 {
+    // Thirty moves, then the frame after the last one enables them
+    // (`input_ui.txt`'s slides).
+    for _ in 0..30 {
         pass(&mut e);
         assert_eq!(icons(&e), ((true, false), (true, false)));
     }

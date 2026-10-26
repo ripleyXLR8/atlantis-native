@@ -14,6 +14,9 @@ permissions:
 # docs/releases/<tag>.md).
 env:
   RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'nightly' }}
+  # No game data here: the Atlantis II game-data tests skip, visibly
+  # (atlantis2_data::testing), instead of failing.
+  ATLANTIS2_SKIP_DATA_TESTS: "1"
 
 # The nightly release's assets keep the same names from one build to the
 # next (installers download them by name):

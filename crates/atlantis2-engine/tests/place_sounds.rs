@@ -246,7 +246,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -263,7 +263,7 @@ fn the_listener_table_of_each_build() {
     assert!(cd.place("tibet.wam").is_none());
     // GOG's Game.exe (1.01): the same table at its own addresses.
     let Some(gog) = std::env::var_os("ATLANTIS2_GOG") else {
-        eprintln!("ATLANTIS2_GOG not set: GOG part skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_GOG not set");
         return;
     };
     let (g, build) = A2Files::open_dir(&PathBuf::from(gog), &[]).expect("GOG folder");

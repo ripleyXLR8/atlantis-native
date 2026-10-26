@@ -26,7 +26,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -47,6 +47,7 @@ fn bank(b: CursorBank) -> &'static str {
         CursorBank::Interface => "interface",
         CursorBank::Objects => "objects",
         CursorBank::Puzzle => "puzzle",
+        CursorBank::Menu => "menu",
     }
 }
 

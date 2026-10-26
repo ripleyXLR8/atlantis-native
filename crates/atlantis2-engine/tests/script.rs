@@ -42,7 +42,7 @@ fn hex(d: &[u8]) -> String {
 fn install() -> Option<PathBuf> {
     let dir = std::env::var_os("ATLANTIS2_DATA");
     if dir.is_none() {
-        eprintln!("ATLANTIS2_DATA not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA not set");
     }
     dir.map(PathBuf::from)
 }

@@ -1,0 +1,191 @@
+# producer: tools/emu/moves_ring.py (atlantis2-cd-fr-2199552, md5 5e218f7fa9754532ae1d7a4275443fef)
+# runs moves_tibet.py's Moves harness (its stubs) on annulair.wam and chapi081.con with ZoomStart / ZoomPsychoStart unstubbed;
+# a row is printed when fov / target / roll / turn / loop / view change
+== cw 0x0e7f view 1 at zone 1 (type 1 value 16) aim 179.690,0.616 + 0 deg yaw, click: the move to view 16
+aim bits 4048b717 3c300cb6; entered at bits 4048b717 3c300cb6
+set: fov 76.0000 target 76.0000 step 1.0000 roll 0.0000/0.0000
+p0 fov 76 target 76 roll 0.0000 step 0.0000 turn 0 loop 0 view 1 yaw 179.690 pitch 0.616
+p2 fov 76 target 3 roll 0.0000 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p3 fov 74.1999969 target 3 roll -0.1600 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p4 fov 72.3999939 target 3 roll -0.3200 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p5 fov 70.5999908 target 3 roll -0.4800 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p6 fov 68.7999878 target 3 roll -0.6400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p7 fov 66.9999847 target 3 roll -0.8000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p8 fov 65.1999817 target 3 roll -0.9600 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p9 fov 63.3999786 target 3 roll -1.1200 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p10 fov 61.5999756 target 3 roll -1.2800 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p11 fov 59.7999725 target 3 roll -1.4400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p12 fov 57.9999695 target 3 roll -1.6000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p13 fov 56.1999664 target 3 roll -1.7600 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p14 fov 54.3999634 target 3 roll -1.9200 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p15 fov 52.5999603 target 3 roll -2.0800 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p16 fov 50.7999573 target 3 roll -2.2400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p17 fov 48.9999542 target 3 roll -2.4000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p18 fov 47.1999512 target 3 roll -2.5600 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p19 fov 45.3999481 target 3 roll -2.7200 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p20 fov 43.5999451 target 3 roll -2.8800 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p21 fov 41.799942 target 3 roll -3.0400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p22 fov 39.999939 target 3 roll -3.2000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p23 fov 38.1999359 target 3 roll -3.3600 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p24 fov 36.3999329 target 3 roll -3.5200 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p25 fov 34.5999298 target 3 roll -3.6800 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p26 fov 32.7999268 target 3 roll -3.8400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p27 fov 30.9999256 target 3 roll -4.0000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p28 fov 29.1999245 target 3 roll -4.1600 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p29 fov 27.3999233 target 3 roll -4.3200 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p30 fov 25.5999222 target 3 roll -4.4800 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p31 fov 23.799921 target 3 roll -4.6400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p32 fov 21.9999199 target 3 roll -4.8000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p33 fov 20.1999187 target 3 roll -4.9600 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p34 fov 18.3999176 target 3 roll -5.1200 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p35 fov 16.5999165 target 3 roll -5.2800 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p36 fov 14.7999163 target 3 roll -5.4400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p37 fov 12.9999161 target 3 roll -5.6000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p38 fov 11.1999159 target 3 roll -5.7600 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p39 fov 9.3999157 target 3 roll -5.9200 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p40 fov 7.5999155 target 3 roll -6.0800 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p41 fov 5.79991531 target 3 roll -6.2400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p42 fov 3.99991536 target 3 roll -6.4000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p43 fov 76 target 76 roll 0.0000 step 0.0000 turn 0 loop 0 view 16 yaw 179.690 pitch 0.616
+chapi081 lines run: 48; errors -
+== cw 0x0e7f view 1 at zone 1 (type 1 value 16) aim 179.690,0.616 + 8 deg yaw, click: the move to view 16
+aim bits 4048b717 3c300cb6; entered at bits 4051a6ba 3c300cb6
+set: fov 76.0000 target 76.0000 step 1.0000 roll 0.0000/0.0000
+p0 fov 76 target 76 roll 0.0000 step 0.0000 turn 0 loop 0 view 1 yaw -172.310 pitch 0.616
+p2 fov 76 target 3 roll 0.0000 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p3 fov 74.1999969 target 3 roll -0.1600 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p4 fov 72.3999939 target 3 roll -0.3200 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p5 fov 70.5999908 target 3 roll -0.4800 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p6 fov 68.7999878 target 3 roll -0.6400 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p7 fov 66.9999847 target 3 roll -0.8000 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p8 fov 65.1999817 target 3 roll -0.9600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p9 fov 63.3999786 target 3 roll -1.1200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p10 fov 61.5999756 target 3 roll -1.2800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p11 fov 59.7999725 target 3 roll -1.4400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p12 fov 57.9999695 target 3 roll -1.6000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p13 fov 56.1999664 target 3 roll -1.7600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p14 fov 54.3999634 target 3 roll -1.9200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p15 fov 52.5999603 target 3 roll -2.0800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p16 fov 50.7999573 target 3 roll -2.2400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p17 fov 48.9999542 target 3 roll -2.4000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p18 fov 47.1999512 target 3 roll -2.5600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p19 fov 45.3999481 target 3 roll -2.7200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p20 fov 43.5999451 target 3 roll -2.8800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p21 fov 41.799942 target 3 roll -3.0400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p22 fov 39.999939 target 3 roll -3.2000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p23 fov 38.1999359 target 3 roll -3.3600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p24 fov 36.3999329 target 3 roll -3.5200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p25 fov 34.5999298 target 3 roll -3.6800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p26 fov 32.7999268 target 3 roll -3.8400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p27 fov 30.9999256 target 3 roll -4.0000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p28 fov 29.1999245 target 3 roll -4.1600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p29 fov 27.3999233 target 3 roll -4.3200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p30 fov 25.5999222 target 3 roll -4.4800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p31 fov 23.799921 target 3 roll -4.6400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p32 fov 21.9999199 target 3 roll -4.8000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p33 fov 20.1999187 target 3 roll -4.9600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p34 fov 18.3999176 target 3 roll -5.1200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p35 fov 16.5999165 target 3 roll -5.2800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p36 fov 14.7999163 target 3 roll -5.4400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p37 fov 12.9999161 target 3 roll -5.6000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p38 fov 11.1999159 target 3 roll -5.7600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p39 fov 9.3999157 target 3 roll -5.9200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p40 fov 7.5999155 target 3 roll -6.0800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p41 fov 5.79991531 target 3 roll -6.2400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p42 fov 3.99991536 target 3 roll -6.4000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p43 fov 76 target 76 roll 0.0000 step 0.0000 turn 0 loop 0 view 16 yaw 179.690 pitch 0.616
+chapi081 lines run: 48; errors -
+== cw 0x027f view 1 at zone 1 (type 1 value 16) aim 179.690,0.616 + 0 deg yaw, click: the move to view 16
+aim bits 4048b718 3c300cb6; entered at bits 4048b718 3c300cb6
+set: fov 76.0000 target 76.0000 step 1.0000 roll 0.0000/0.0000
+p0 fov 76 target 76 roll 0.0000 step 0.0000 turn 0 loop 0 view 1 yaw 179.690 pitch 0.616
+p2 fov 76 target 3 roll 0.0000 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p3 fov 74.1999969 target 3 roll -0.1600 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p4 fov 72.3999939 target 3 roll -0.3200 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p5 fov 70.5999908 target 3 roll -0.4800 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p6 fov 68.7999878 target 3 roll -0.6400 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p7 fov 66.9999847 target 3 roll -0.8000 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p8 fov 65.1999817 target 3 roll -0.9600 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p9 fov 63.3999825 target 3 roll -1.1200 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p10 fov 61.5999832 target 3 roll -1.2800 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p11 fov 59.799984 target 3 roll -1.4400 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p12 fov 57.9999847 target 3 roll -1.6000 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p13 fov 56.1999855 target 3 roll -1.7600 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p14 fov 54.3999863 target 3 roll -1.9200 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p15 fov 52.599987 target 3 roll -2.0800 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p16 fov 50.7999878 target 3 roll -2.2400 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p17 fov 48.9999886 target 3 roll -2.4000 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p18 fov 47.1999893 target 3 roll -2.5600 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p19 fov 45.3999901 target 3 roll -2.7200 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p20 fov 43.5999908 target 3 roll -2.8800 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p21 fov 41.7999916 target 3 roll -3.0400 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p22 fov 39.9999924 target 3 roll -3.2000 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p23 fov 38.1999931 target 3 roll -3.3600 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p24 fov 36.3999939 target 3 roll -3.5200 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p25 fov 34.5999947 target 3 roll -3.6800 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p26 fov 32.7999954 target 3 roll -3.8400 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p27 fov 30.9999962 target 3 roll -4.0000 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p28 fov 29.1999969 target 3 roll -4.1600 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p29 fov 27.3999977 target 3 roll -4.3200 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p30 fov 25.5999985 target 3 roll -4.4800 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p31 fov 23.7999992 target 3 roll -4.6400 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p32 fov 22 target 3 roll -4.8000 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p33 fov 20.2000008 target 3 roll -4.9600 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p34 fov 18.4000015 target 3 roll -5.1200 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p35 fov 16.6000023 target 3 roll -5.2800 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p36 fov 14.8000021 target 3 roll -5.4400 step -0.1600 turn 1 loop 0 view 1 yaw 179.690 pitch 0.616
+p37 fov 13.0000019 target 3 roll -5.6000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p38 fov 11.2000017 target 3 roll -5.7600 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p39 fov 9.40000153 target 3 roll -5.9200 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p40 fov 7.60000134 target 3 roll -6.0800 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p41 fov 5.80000114 target 3 roll -6.2400 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p42 fov 4.00000095 target 3 roll -6.4000 step -0.1600 turn 1 loop 0 view 1 yaw 179.689 pitch 0.616
+p43 fov 76 target 76 roll 0.0000 step 0.0000 turn 0 loop 0 view 16 yaw 179.690 pitch 0.616
+chapi081 lines run: 48; errors -
+== cw 0x027f view 1 at zone 1 (type 1 value 16) aim 179.690,0.616 + 8 deg yaw, click: the move to view 16
+aim bits 4048b718 3c300cb6; entered at bits 4051a6bb 3c300cb6
+set: fov 76.0000 target 76.0000 step 1.0000 roll 0.0000/0.0000
+p0 fov 76 target 76 roll 0.0000 step 0.0000 turn 0 loop 0 view 1 yaw -172.310 pitch 0.616
+p2 fov 76 target 3 roll 0.0000 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p3 fov 74.1999969 target 3 roll -0.1600 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p4 fov 72.3999939 target 3 roll -0.3200 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p5 fov 70.5999908 target 3 roll -0.4800 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p6 fov 68.7999878 target 3 roll -0.6400 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p7 fov 66.9999847 target 3 roll -0.8000 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p8 fov 65.1999817 target 3 roll -0.9600 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p9 fov 63.3999825 target 3 roll -1.1200 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p10 fov 61.5999832 target 3 roll -1.2800 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p11 fov 59.799984 target 3 roll -1.4400 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p12 fov 57.9999847 target 3 roll -1.6000 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p13 fov 56.1999855 target 3 roll -1.7600 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p14 fov 54.3999863 target 3 roll -1.9200 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p15 fov 52.599987 target 3 roll -2.0800 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p16 fov 50.7999878 target 3 roll -2.2400 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p17 fov 48.9999886 target 3 roll -2.4000 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p18 fov 47.1999893 target 3 roll -2.5600 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p19 fov 45.3999901 target 3 roll -2.7200 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p20 fov 43.5999908 target 3 roll -2.8800 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p21 fov 41.7999916 target 3 roll -3.0400 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p22 fov 39.9999924 target 3 roll -3.2000 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p23 fov 38.1999931 target 3 roll -3.3600 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p24 fov 36.3999939 target 3 roll -3.5200 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p25 fov 34.5999947 target 3 roll -3.6800 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p26 fov 32.7999954 target 3 roll -3.8400 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p27 fov 30.9999962 target 3 roll -4.0000 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p28 fov 29.1999969 target 3 roll -4.1600 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p29 fov 27.3999977 target 3 roll -4.3200 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p30 fov 25.5999985 target 3 roll -4.4800 step -0.1600 turn 1 loop 0 view 1 yaw -172.310 pitch 0.616
+p31 fov 23.7999992 target 3 roll -4.6400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p32 fov 22 target 3 roll -4.8000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p33 fov 20.2000008 target 3 roll -4.9600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p34 fov 18.4000015 target 3 roll -5.1200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p35 fov 16.6000023 target 3 roll -5.2800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p36 fov 14.8000021 target 3 roll -5.4400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p37 fov 13.0000019 target 3 roll -5.6000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p38 fov 11.2000017 target 3 roll -5.7600 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p39 fov 9.40000153 target 3 roll -5.9200 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p40 fov 7.60000134 target 3 roll -6.0800 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p41 fov 5.80000114 target 3 roll -6.2400 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p42 fov 4.00000095 target 3 roll -6.4000 step -0.1600 turn 1 loop 0 view 1 yaw -172.311 pitch 0.616
+p43 fov 76 target 76 roll 0.0000 step 0.0000 turn 0 loop 0 view 16 yaw 179.690 pitch 0.616
+chapi081 lines run: 48; errors -

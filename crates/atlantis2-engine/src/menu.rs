@@ -188,6 +188,10 @@ pub trait MenuHost {
     /// The disc asked for is in: a load waiting for it finishes
     /// (FUN_00478580), else an interrupted section resumes.
     fn disc_inserted(&mut self) {}
+    /// The game's cursor pair set to the menus' pointer, frame 0
+    /// (FUN_0047bef0(curseur, 0) in the main, CD and player menus'
+    /// start).
+    fn menu_cursor(&mut self) {}
     /// An interrupted script section resumes (@ 0x006d1699,
     /// FUN_00483f90); false when there is none.
     fn resume_section(&mut self) -> bool {
@@ -317,8 +321,11 @@ pub struct Widget {
     pub action: i32,
     pub hit: Rect,
     bank: Option<Arc<SprBank>>,
-    /// The tick the mouse entered the box (the tooltip's count).
-    hover_since: Option<u32>,
+    /// The tooltip's count (FUN_0046d750): the tick the mouse entered the
+    /// box of the enabled widget (+0x48), and whether it was in the box at
+    /// the widget's last draw (+0x4c).
+    tip_start: u32,
+    tip_inside: bool,
 }
 
 /// A page (`CMnMenu`, 0x1e8 bytes).
@@ -367,6 +374,9 @@ pub struct Menu {
     /// The 15 Hz flag the animated buttons step on (@ 0x00656a50).
     pub tick_flag: bool,
     pub input: Input,
+    /// The load page's text of a save's time ([`date_time`] by default;
+    /// the engine's `date_text`).
+    pub date_text: fn(&SystemTime) -> Vec<u8>,
 }
 
 impl std::fmt::Debug for Menu {
@@ -448,7 +458,13 @@ impl Menu {
             gog_cd: files.build().gog,
             tick_flag: false,
             input: Input::default(),
+            date_text: date_time,
         }
+    }
+
+    /// The menus' pointer (`curseur.spr`), when loaded.
+    pub fn cursor_bank(&self) -> Option<&SprBank> {
+        self.cursor.as_ref()
     }
 
     /// Whether a page is shown.
@@ -500,11 +516,13 @@ impl Menu {
     pub fn start_main(&mut self, host: &mut dyn MenuHost) {
         self.start(host, PageKind::Main, true);
         self.from_game = true;
+        host.menu_cursor();
     }
 
     /// `AtlMenu_start_Player` (@ 0x00486af0), at start-up.
     pub fn start_player(&mut self, host: &mut dyn MenuHost) {
         self.start(host, PageKind::Player, true);
+        host.menu_cursor();
     }
 
     /// `AtlMenu_start_CD` (@ 0x004869f0): disc `n` is asked for.
@@ -513,6 +531,7 @@ impl Menu {
         self.cd_check = host.ticks();
         self.start(host, PageKind::Cd(n), true);
         self.state = state::CD;
+        host.menu_cursor();
     }
 
     /// `AtlMenu_start_PleaseWait` (@ 0x00486bb0): the loop type is not
@@ -991,7 +1010,8 @@ impl Menu {
                 bottom: y + h / 2,
             },
             bank,
-            hover_since: None,
+            tip_start: 0,
+            tip_inside: false,
         }
     }
 
@@ -1196,15 +1216,18 @@ impl Menu {
         }
     }
 
-    /// A question: every widget disabled, the box shown with its texts.
+    /// A question: every widget disabled, the box and its buttons enabled
+    /// and shown (the box too, a sprite no click reaches: FUN_00472680 on
+    /// `c_yn.spr` @ 0x00488c5e, golden `input_ui.txt`), with its texts.
     fn ask(&mut self, yes: Vec<u8>, no: Vec<u8>) {
         let Some(p) = self.page.as_mut() else { return };
         p.disable_all();
+        for n in ["c_yn.spr", "b_oui.spr", "b_non.spr"] {
+            p.enable(n);
+        }
         p.show("c_yn.spr");
         p.show("b_oui.spr");
         p.show("b_non.spr");
-        p.enable("b_oui.spr");
-        p.enable("b_non.spr");
         p.set_text("b_oui.spr", yes);
         p.set_text("b_non.spr", no);
     }
@@ -1247,6 +1270,15 @@ impl Menu {
         self.run(host, act);
     }
 
+    /// A frame of the state machine whose action is `act`, as if the
+    /// widgets had answered it (a test hook: the original's FUN_00472320
+    /// replaced, as the emulated golden `input_ui.txt` does); no draw.
+    pub fn step_action(&mut self, host: &mut dyn MenuHost, act: i32) {
+        if self.page.is_some() {
+            self.run(host, act);
+        }
+    }
+
     /// Draws the page and the cursor (no state change).
     pub fn draw(&self, out: &mut [u16], ticks: u32) {
         self.draw_with(out, ticks, None);
@@ -1267,6 +1299,7 @@ impl Menu {
             self.font.as_ref(),
             &self.input,
             texts,
+            self.date_text,
         );
         if self.cursor_shown {
             if let Some(c) = &self.cursor {
@@ -1306,55 +1339,64 @@ impl Menu {
     fn run(&mut self, host: &mut dyn MenuHost, act: i32) {
         match self.state {
             state::IDLE => self.idle(host, act),
+            // The slides (FUN_00486eb0 states 1-4): a frame moves the
+            // panels while the counter is below its end; the frame after
+            // the last move, which has drawn them at their end, changes the
+            // state (states 1, 2 @ 0x00487a8a, 0x00487c6a; 3 @ 0x00487e4a;
+            // 4 @ 0x00488122: one frame more than the moves).
             state::OPTIONS_SLIDE | state::SOUND_SLIDE => {
-                self.counter += 1;
-                let c = self.counter;
                 let (panel, icon, frames, next) = if self.state == state::OPTIONS_SLIDE {
                     ("c_opt.spr", "a_toolbx.spr", 30, PageKind::Options)
                 } else {
                     ("c_son.spr", "a_baffle.spr", 40, PageKind::Sound)
                 };
-                if let Some(p) = self.page.as_mut() {
-                    p.move_by(panel, c, 0);
-                    p.move_by(icon, c, 0);
-                }
-                if c >= frames {
+                if self.counter < frames {
+                    self.counter += 1;
+                    let c = self.counter;
+                    if let Some(p) = self.page.as_mut() {
+                        p.move_by(panel, c, 0);
+                        p.move_by(icon, c, 0);
+                    }
+                } else {
                     self.state = state::IDLE;
+                    self.counter = 0;
                     self.build(host, next);
                 }
             }
             state::DISC_SLIDE => {
-                self.counter += 1;
-                let c = self.counter;
-                if let Some(p) = self.page.as_mut() {
-                    p.move_by("c_load.spr", -c, 0);
-                    p.move_by("a_disc.spr", -c, 0);
-                    // Shown since the slide's start (below), enabled at
-                    // its end (FUN_00472680, state 3 @ the 30th move).
-                    if c >= 30 {
+                if self.counter < 30 {
+                    self.counter += 1;
+                    let c = self.counter;
+                    if let Some(p) = self.page.as_mut() {
+                        p.move_by("c_load.spr", -c, 0);
+                        p.move_by("a_disc.spr", -c, 0);
+                    }
+                } else {
+                    // The load and save icons, shown since the slide's
+                    // start, enabled (FUN_00472680).
+                    self.state = state::LOAD_OR_SAVE;
+                    if let Some(p) = self.page.as_mut() {
                         for n in ["a_load.spr", "a_save.spr"] {
                             p.enable(n);
                         }
                     }
                 }
-                if c >= 30 {
-                    self.state = state::LOAD_OR_SAVE;
-                }
             }
             state::DISC_BACK => {
-                let c = self.counter;
-                if let Some(p) = self.page.as_mut() {
-                    p.move_by("c_load.spr", c, 0);
-                    p.move_by("a_disc.spr", c, 0);
-                }
-                self.counter -= 1;
-                if self.counter <= 0 {
+                if self.counter < 1 {
                     self.state = state::IDLE;
                     if let Some(p) = self.page.as_mut() {
                         p.enable_all();
                         p.hide("a_load.spr");
                         p.hide("a_save.spr");
                     }
+                } else {
+                    let c = self.counter;
+                    if let Some(p) = self.page.as_mut() {
+                        p.move_by("c_load.spr", c, 0);
+                        p.move_by("a_disc.spr", c, 0);
+                    }
+                    self.counter -= 1;
                 }
             }
             state::ASK_SAVE => match act {
@@ -1372,6 +1414,12 @@ impl Menu {
                     }
                 }
                 action::NO => {
+                    // Every widget enabled again (FUN_00472650), the
+                    // question hidden, then the slide back (state 5
+                    // @ 0x00488bb4..0x00488d7e).
+                    if let Some(p) = self.page.as_mut() {
+                        p.enable_all();
+                    }
                     self.hide_question();
                     self.state = state::DISC_BACK;
                 }
@@ -1654,12 +1702,7 @@ impl Page {
     /// animated buttons' frames, the credits' clock.
     fn update(&mut self, input: &Input, ticks: u32, flag: bool, fpu: Fpu, clock: f64) {
         for w in &mut self.widgets {
-            let inside = w.visible && w.enabled && w.hit.holds(input.x, input.y);
-            w.hover_since = match (inside, w.hover_since) {
-                (true, None) => Some(ticks),
-                (true, s) => s,
-                (false, _) => None,
-            };
+            w.tooltip_step(input.x, input.y, ticks);
             if let WidgetKind::Blink { state: true, cycle } = &mut w.kind {
                 // FUN_0046de20: the cycle restarts after 10 ticks.
                 if ticks.wrapping_sub(*cycle) > 10 {
@@ -1708,6 +1751,7 @@ impl Page {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw(
         &self,
         out: &mut [u16],
@@ -1716,6 +1760,7 @@ impl Page {
         font: Option<&SubtitleFont>,
         input: &Input,
         mut rec: Option<&mut HdTexts>,
+        date_text: fn(&SystemTime) -> Vec<u8>,
     ) {
         if let Some(c) = &self.credits {
             match rec {
@@ -1737,7 +1782,7 @@ impl Page {
                         x: w.x + 100,
                         y: w.y + 30 + 60 * i as i32,
                         colour: 0xff_ffff,
-                        bytes: date_time(&e.time),
+                        bytes: date_text(&e.time),
                     });
                 }
             }
@@ -1748,25 +1793,23 @@ impl Page {
                 w.kind,
                 WidgetKind::Sprite | WidgetKind::Slider { .. } | WidgetKind::List(_)
             );
-            if let Some(since) = w.hover_since.filter(|_| button && !w.text.is_empty()) {
-                if ticks.wrapping_sub(since) > 10 {
-                    let (tw, _) = f.extent(&w.text);
-                    let cx = (w.hit.left + w.hit.right) / 2;
-                    let x = (cx - tw / 2).clamp(0, (WIDTH as i32 - tw).max(0));
-                    let y = w.hit.top;
-                    texts.push(TextOut {
-                        x: x + 1,
-                        y: y + 1,
-                        colour: 0,
-                        bytes: w.text.clone(),
-                    });
-                    texts.push(TextOut {
-                        x,
-                        y,
-                        colour: 0xff_ffff,
-                        bytes: w.text.clone(),
-                    });
-                }
+            if button && !w.text.is_empty() && w.tip_shown(ticks) {
+                let (tw, _) = f.extent(&w.text);
+                let cx = (w.hit.left + w.hit.right) / 2;
+                let x = (cx - tw / 2).clamp(0, (WIDTH as i32 - tw).max(0));
+                let y = w.hit.top;
+                texts.push(TextOut {
+                    x: x + 1,
+                    y: y + 1,
+                    colour: 0,
+                    bytes: w.text.clone(),
+                });
+                texts.push(TextOut {
+                    x,
+                    y,
+                    colour: 0xff_ffff,
+                    bytes: w.text.clone(),
+                });
             }
             match rec.as_deref_mut() {
                 Some(t) => t.draw(TextFont::Popup, f, out, WIDTH, HEIGHT, &texts),
@@ -1776,8 +1819,11 @@ impl Page {
     }
 }
 
-/// The list's text: `GetDateFormatA(DATE_SHORTDATE)`, a space,
-/// `GetTimeFormatA(0)`, in the French system's formats.
+/// The list's text: `GetDateFormatA(LOCALE_USER_DEFAULT,
+/// DATE_SHORTDATE)`, a space, `GetTimeFormatA(LOCALE_USER_DEFAULT, 0)`
+/// (FUN_0046f830 @ 0x0046f928, 0x0046f94c): the user's locale's formats;
+/// here a French system's, the default where the front end has no
+/// locale's formats (the engine's `date_text`).
 pub fn date_time(t: &SystemTime) -> Vec<u8> {
     format!(
         "{:02}/{:02}/{:04} {:02}:{:02}:{:02}",
@@ -1819,6 +1865,34 @@ impl ListBox {
 }
 
 impl Widget {
+    /// The tooltip's count at the widget's draw, the mouse at (`x`, `y`)
+    /// (FUN_0046d750, which the draw of a visible widget runs): restarted
+    /// when the mouse enters the box of an enabled widget; whether it is
+    /// in the box is noted at every draw, enabled or not (@ 0x0046d8a0),
+    /// so a widget enabled with the mouse already in its box keeps the
+    /// count it had (@ 0x0046d784..0x0046d791). Nothing while hidden.
+    pub fn tooltip_step(&mut self, x: i32, y: i32, ticks: u32) {
+        if self.visible {
+            let inside = self.hit.holds(x, y);
+            if self.enabled && inside && !self.tip_inside {
+                self.tip_start = ticks;
+            }
+            self.tip_inside = inside;
+        }
+    }
+
+    /// Whether its tooltip is drawn at tick `ticks` (FUN_0046d750: the
+    /// widget enabled, the mouse in its box, more than 10 ticks since the
+    /// count's start).
+    pub fn tip_shown(&self, ticks: u32) -> bool {
+        self.enabled && self.tip_inside && (ticks.wrapping_sub(self.tip_start) as i32) > 10
+    }
+
+    /// The tooltip's count start (+0x48) and in-the-box flag (+0x4c).
+    pub fn tip_state(&self) -> (u32, bool) {
+        (self.tip_start, self.tip_inside)
+    }
+
     /// The frame of the widget's bank drawn now.
     fn frame(&self, ticks: u32, input: &Input) -> Option<usize> {
         match &self.kind {

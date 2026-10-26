@@ -34,7 +34,7 @@ fn game() -> Option<A2Files> {
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
     ) else {
-        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS not set: test skipped");
+        atlantis2_data::testing::missing("ATLANTIS2_DATA / ATLANTIS2_DISCS not set");
         return None;
     };
     let (files, _) =
@@ -132,6 +132,7 @@ impl Walk {
             CursorBank::Interface => "interfac".into(),
             CursorBank::Objects => self.objects_bank(),
             CursorBank::Puzzle => "puzzle".into(),
+            CursorBank::Menu => "menu".into(),
         }
     }
 
