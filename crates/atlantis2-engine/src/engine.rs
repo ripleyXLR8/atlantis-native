@@ -1633,7 +1633,10 @@ impl Engine {
     /// The fatal error reporter FUN_00480cd0 (atlantis2-cd-fr-2199552
     /// @ 0x00480cd0) once the scripts recorded a fatal error (theirs, or a
     /// puzzle's, which they stop on): the message logged; when a view is
-    /// current (@ 0x006d85d4 ≠ 0) the emergency save, player 9 slot 8
+    /// current (@ 0x006d85d4 ≠ 0, @ 0x00480dc8..0x00480dd1: the scripts'
+    /// current view, which a place load forgets, so a deferred place
+    /// change to a view the new file lacks only quits) the emergency
+    /// save, player 9 slot 8
     /// (`save\ATL09_08.SAV`, @ 0x00480dd3..0x00480ddc, a player the menu
     /// never lists); then the game quits (FUN_0049d960 → FUN_005853e0(0),
     /// whose exit hook writes `atlant2.cfg`: the front end's quit). Once.
@@ -1646,7 +1649,7 @@ impl Engine {
         };
         self.fatal_reported = true;
         log::error!("fatal error: {msg}: emergency save and quit");
-        if !self.faces[0].is_empty() {
+        if self.con.as_ref().is_some_and(|s| s.current_view.is_some()) {
             self.player_number = 9;
             self.save_slot(8);
         }
@@ -2516,9 +2519,10 @@ impl Engine {
     }
 
     /// `AtlWam_Load` (@ 0x0040fee0): the place file read, the entities'
-    /// and zones' names resolved; the zone under the centre and the move's
-    /// next view forgotten. No view is entered (the scripts' `vue=` or a
-    /// move does it; tests use [`Engine::enter_at`]).
+    /// and zones' names resolved; the current view (@ 0x006d85d4, cleared
+    /// @ 0x0040ff98), the zone under the centre and the move's next view
+    /// forgotten. No view is entered (the scripts' `vue=` or a move does
+    /// it; tests use [`Engine::enter_at`]).
     pub fn load_place(&mut self, name: &str) {
         self.event(Event::Wam(name.to_string()));
         match load_wam(&self.files, name) {
@@ -2529,6 +2533,9 @@ impl Engine {
             }
             // Fatal in the original (`Can't load WAM`).
             Err(e) => log::error!("{e}"),
+        }
+        if let Some(s) = self.con.as_mut() {
+            s.current_view = None;
         }
         self.centre_zone = None;
         self.next_view = None;
@@ -2748,15 +2755,12 @@ impl Engine {
             self.load_place(&name);
             self.next_view = self.wam.view(n).map(|v| v.id);
             if self.next_view.is_none() {
-                // The fatal error reporter (@ 0x0045a4cb): the emergency
-                // save and the quit.
+                // The fatal error reporter (@ 0x0045a4cb): the quit, no
+                // emergency save (the load forgot the current view).
                 let msg = format!("AtlWarp_continue(): load wam {name} : vue {n} introuvable!");
                 self.with_script(|s, _| s.fail(msg));
             }
             self.set_script_var(|k| k.next_warp_invalide, 0);
-            if let Some(s) = self.con.as_mut() {
-                s.current_view = None;
-            }
         }
         let Some(next) = self.next_view.take() else {
             // FUN_0045a630: only `voiles.wam` (Shamballa's fireflies) does

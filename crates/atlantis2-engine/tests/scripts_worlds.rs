@@ -388,3 +388,62 @@ fn a_missing_animation_is_fatal() {
     assert!(e.script_state().unwrap().fatal.is_some());
     assert!(e.quit());
 }
+
+/// A deferred place change naming a view the new file lacks
+/// (FUN_0045a3b0 @ 0x0045a487..0x0045a4cb): the reporter quits without the
+/// emergency save, the place load (FUN_0040fee0) having cleared the current
+/// view (@ 0x0040ff98) that the reporter tests (@ 0x00480dc8..0x00480dd1).
+/// The shipped places have no such link: `chine.wam`'s 32 → 40 change,
+/// aimed at a view `salletortue.wam` lacks.
+#[test]
+fn a_deferred_change_to_a_missing_view_quits_without_saving() {
+    const MISSING: u32 = 999;
+    let Some(files) = game() else { return };
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("a2-fatal-no-save");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("save")).unwrap();
+    let mut e = started(files);
+    e.set_data_dir(Some(dir.clone()));
+    e.load_place("chine.wam");
+    e.enter_at(32, 0.0, 0.0).unwrap();
+    e.script_state_mut().unwrap().set_current_view(32);
+    let mut zone = None;
+    for p in &mut e.wam_mut().places {
+        for l in &mut p.links {
+            if l.from_view == 32 && l.to_view == 40 {
+                l.to_view = MISSING;
+            }
+        }
+        for v in p.views.iter_mut().filter(|v| v.id == 32) {
+            for d in v.destinations.iter_mut().filter(|d| d.target == 40) {
+                d.target = MISSING;
+            }
+            for (i, z) in v.zones.iter_mut().enumerate() {
+                if z.kind == 2 && z.value == 40 {
+                    z.value = MISSING as i32;
+                    zone = Some(i);
+                }
+            }
+        }
+    }
+    let (yaw, pitch) = e.zone_aim(32, zone.unwrap()).unwrap();
+    e.enter_at(32, yaw + 0.2f32.to_radians(), pitch).unwrap();
+    assert!(e.script_state().unwrap().current_view.is_some());
+    for n in 0..400 {
+        if n % 4 == 0 {
+            e.tick();
+        }
+        if n == 2 {
+            e.click(100.0);
+        }
+        e.pass(None);
+        if e.quit() {
+            break;
+        }
+    }
+    let fatal = e.script_state().unwrap().fatal.clone().expect("fatal");
+    assert!(fatal.contains("introuvable"), "{fatal}");
+    assert!(e.quit());
+    assert!(!dir.join("save").join("ATL09_08.SAV").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
