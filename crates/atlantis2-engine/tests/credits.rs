@@ -187,6 +187,61 @@ fn the_texts_are_laid_out_as_the_original() {
     assert_eq!(n, calls.iter().map(Vec::len).sum::<usize>());
 }
 
+/// L51: the widths the credits are laid out with, against Windows' own
+/// (`tests/golden/gdi_widths.txt`: GDI's widths of every byte of the
+/// font at the credits' height, measured on Windows 98 SE and Windows 11),
+/// not against the font's `hdmx` model the emulated run answered
+/// `GetTextExtentPoint32A` with: every measured line of the credits.
+#[test]
+fn the_text_widths_are_windows_own() {
+    let Some(files) = game() else { return };
+    let font = popup(&files);
+    let measured: Vec<Vec<u8>> = pages(&files)
+        .iter()
+        .flatten()
+        .filter(|l| l.first() == Some(&b'#'))
+        .map(|l| {
+            let mut l = l.clone();
+            l[0] = b' ';
+            l
+        })
+        .collect();
+    let golden: Vec<_> = rows("extent").collect();
+    assert_eq!(measured.len(), golden.len());
+    let gdi = include_str!("golden/gdi_widths.txt");
+    let mut systems = 0;
+    for row in gdi.lines().filter(|l| !l.starts_with('#')) {
+        let f: Vec<&str> = row.split(' ').collect();
+        assert_eq!((f[1], f[2]), ("-13", "ppem=13"), "{row}");
+        let widths: Vec<i32> = f[3..].iter().map(|w| w.parse().unwrap()).collect();
+        assert_eq!(widths.len(), 224);
+        let gdi_extent = |b: &[u8]| -> i32 {
+            b.iter()
+                .map(|&c| {
+                    if c >= 0x20 {
+                        widths[usize::from(c - 0x20)]
+                    } else {
+                        0
+                    }
+                })
+                .sum()
+        };
+        for (b, r) in measured.iter().zip(&golden) {
+            let want = gdi_extent(b);
+            assert_eq!(
+                font.extent(b).0,
+                want,
+                "{}: {:?}",
+                f[0],
+                String::from_utf8_lossy(b)
+            );
+            assert_eq!(r[3].parse::<i32>().unwrap(), want, "{}", f[0]);
+        }
+        systems += 1;
+    }
+    assert_eq!(systems, 2);
+}
+
 #[test]
 fn the_pictures_load_as_the_original() {
     let Some(files) = game() else { return };
