@@ -1,0 +1,140 @@
+# The start-up intro run by atlantis2.exe (md5 5e218f7fa9754532ae1d7a4275443fef) under Unicorn: tools/emu/intro.py
+# FUN_0049d9c0 then the frame dispatcher in loop type 1 (FUN_0040c060), a tick every fourth pass;
+# the current disc's inventory; rows: pN tT loop L counter C (0x006d85f4) flag F (0x006d85f1) | events
+== disc 1 no input
+start loop 1 counter 1 flag 1 | AtlHnm_start(intro00.hnm); hnm_open(hnm\intro00.hnm)=ok frames=327; hnm_frame 0
+p0 t1 loop 1 counter 1 flag 1 | hnm_frame 1
+p40 t11 | hnm_frame 11
+p80 t21 | hnm_frame 21
+p120 t31 | hnm_frame 31
+p160 t41 | hnm_frame 41
+p200 t51 | hnm_frame 51
+p240 t61 | hnm_frame 61
+p280 t71 | hnm_frame 71
+p320 t81 | hnm_frame 81
+p360 t91 | hnm_frame 91
+p400 t101 | hnm_frame 101
+p440 t111 | hnm_frame 111
+p480 t121 | hnm_frame 121
+p520 t131 | hnm_frame 131
+p560 t141 | hnm_frame 141
+p600 t151 | hnm_frame 151
+p640 t161 | hnm_frame 161
+p680 t171 | hnm_frame 171
+p720 t181 | hnm_frame 181
+p760 t191 | hnm_frame 191
+p800 t201 | hnm_frame 201
+p840 t211 | hnm_frame 211
+p880 t221 | hnm_frame 221
+p920 t231 | hnm_frame 231
+p960 t241 | hnm_frame 241
+p1000 t251 | hnm_frame 251
+p1040 t261 | hnm_frame 261
+p1080 t271 | hnm_frame 271
+p1120 t281 | hnm_frame 281
+p1160 t291 | hnm_frame 291
+p1200 t301 | hnm_frame 301
+p1240 t311 | hnm_frame 311
+p1280 t321 | hnm_frame 321
+p1300 t326 loop 1 counter 2 flag 1 | hnm_frame 326; hnm_close(); AtlHnm_start(intro01.hnm); hnm_open(hnm\intro01.hnm)=ok frames=211; hnm_frame 0
+p1320 t331 | hnm_frame 5
+p1360 t341 | hnm_frame 15
+p1400 t351 | hnm_frame 25
+p1440 t361 | hnm_frame 35
+p1480 t371 | hnm_frame 45
+p1520 t381 | hnm_frame 55
+p1560 t391 | hnm_frame 65
+p1600 t401 | hnm_frame 75
+p1640 t411 | hnm_frame 85
+p1680 t421 | hnm_frame 95
+p1720 t431 | hnm_frame 105
+p1760 t441 | hnm_frame 115
+p1800 t451 | hnm_frame 125
+p1840 t461 | hnm_frame 135
+p1880 t471 | hnm_frame 145
+p1920 t481 | hnm_frame 155
+p1960 t491 | hnm_frame 165
+p2000 t501 | hnm_frame 175
+p2040 t511 | hnm_frame 185
+p2080 t521 | hnm_frame 195
+p2120 t531 | hnm_frame 205
+p2140 t536 loop 5 counter 1 flag 0 | hnm_frame 210; hnm_close(); AtlHnm_start(intro02.hnm); hnm_open(hnm\intro02.hnm)=missing
+end p2141 loop 5 counter 1 flag 0 click 0 double 0
+== disc 1 click at pass 20
+start loop 1 counter 1 flag 1 | AtlHnm_start(intro00.hnm); hnm_open(hnm\intro00.hnm)=ok frames=327; hnm_frame 0
+p0 t1 loop 1 counter 1 flag 1 | hnm_frame 1
+p20 t6 loop 1 counter 2 flag 1 | click; hnm_frame 6; hnm_close(); AtlHnm_start(intro01.hnm); hnm_open(hnm\intro01.hnm)=ok frames=211; hnm_frame 0
+p40 t11 | hnm_frame 5
+p80 t21 | hnm_frame 15
+p120 t31 | hnm_frame 25
+p160 t41 | hnm_frame 35
+p200 t51 | hnm_frame 45
+p240 t61 | hnm_frame 55
+p280 t71 | hnm_frame 65
+p320 t81 | hnm_frame 75
+p360 t91 | hnm_frame 85
+p400 t101 | hnm_frame 95
+p440 t111 | hnm_frame 105
+p480 t121 | hnm_frame 115
+p520 t131 | hnm_frame 125
+p560 t141 | hnm_frame 135
+p600 t151 | hnm_frame 145
+p640 t161 | hnm_frame 155
+p680 t171 | hnm_frame 165
+p720 t181 | hnm_frame 175
+p760 t191 | hnm_frame 185
+p800 t201 | hnm_frame 195
+p840 t211 | hnm_frame 205
+p860 t216 loop 5 counter 1 flag 0 | hnm_frame 210; hnm_close(); AtlHnm_start(intro02.hnm); hnm_open(hnm\intro02.hnm)=missing
+end p861 loop 5 counter 1 flag 0 click 0 double 0
+== disc 1 double click at pass 20
+start loop 1 counter 1 flag 1 | AtlHnm_start(intro00.hnm); hnm_open(hnm\intro00.hnm)=ok frames=327; hnm_frame 0
+p0 t1 loop 1 counter 1 flag 1 | hnm_frame 1
+p20 t6 loop 1 counter 2 flag 1 | double click; hnm_frame 6; hnm_close(); AtlHnm_start(intro01.hnm); hnm_open(hnm\intro01.hnm)=ok frames=211; hnm_frame 0
+p24 t7 loop 5 counter 1 flag 0 | hnm_frame 1; hnm_close(); AtlHnm_start(intro02.hnm); hnm_open(hnm\intro02.hnm)=missing
+end p25 loop 5 counter 1 flag 0 click 0 double 1
+== disc 2 no input
+start loop 1 counter 1 flag 1 | AtlHnm_start(intro00.hnm); hnm_open(hnm\intro00.hnm)=ok frames=211; hnm_frame 0
+p0 t1 loop 1 counter 1 flag 1 | hnm_frame 1
+p40 t11 | hnm_frame 11
+p80 t21 | hnm_frame 21
+p120 t31 | hnm_frame 31
+p160 t41 | hnm_frame 41
+p200 t51 | hnm_frame 51
+p240 t61 | hnm_frame 61
+p280 t71 | hnm_frame 71
+p320 t81 | hnm_frame 81
+p360 t91 | hnm_frame 91
+p400 t101 | hnm_frame 101
+p440 t111 | hnm_frame 111
+p480 t121 | hnm_frame 121
+p520 t131 | hnm_frame 131
+p560 t141 | hnm_frame 141
+p600 t151 | hnm_frame 151
+p640 t161 | hnm_frame 161
+p680 t171 | hnm_frame 171
+p720 t181 | hnm_frame 181
+p760 t191 | hnm_frame 191
+p800 t201 | hnm_frame 201
+p836 t210 loop 5 counter 1 flag 0 | hnm_frame 210; hnm_close(); AtlHnm_start(intro01.hnm); hnm_open(hnm\intro01.hnm)=missing
+end p837 loop 5 counter 1 flag 0 click 0 double 0
+== disc 2 click at pass 20
+start loop 1 counter 1 flag 1 | AtlHnm_start(intro00.hnm); hnm_open(hnm\intro00.hnm)=ok frames=211; hnm_frame 0
+p0 t1 loop 1 counter 1 flag 1 | hnm_frame 1
+p20 t6 loop 5 counter 1 flag 0 | click; hnm_frame 6; hnm_close(); AtlHnm_start(intro01.hnm); hnm_open(hnm\intro01.hnm)=missing
+end p21 loop 5 counter 1 flag 0 click 0 double 0
+== disc 2 double click at pass 20
+start loop 1 counter 1 flag 1 | AtlHnm_start(intro00.hnm); hnm_open(hnm\intro00.hnm)=ok frames=211; hnm_frame 0
+p0 t1 loop 1 counter 1 flag 1 | hnm_frame 1
+p20 t6 loop 5 counter 1 flag 0 | double click; hnm_frame 6; hnm_close(); AtlHnm_start(intro01.hnm); hnm_open(hnm\intro01.hnm)=missing
+end p21 loop 5 counter 1 flag 0 click 0 double 1
+== disc 1 click at pass 20 and at pass 200
+start loop 1 counter 1 flag 1 | AtlHnm_start(intro00.hnm); hnm_open(hnm\intro00.hnm)=ok frames=327; hnm_frame 0
+p0 t1 loop 1 counter 1 flag 1 | hnm_frame 1
+p20 t6 loop 1 counter 2 flag 1 | click; hnm_frame 6; hnm_close(); AtlHnm_start(intro01.hnm); hnm_open(hnm\intro01.hnm)=ok frames=211; hnm_frame 0
+p40 t11 | hnm_frame 5
+p80 t21 | hnm_frame 15
+p120 t31 | hnm_frame 25
+p160 t41 | hnm_frame 35
+p200 t51 loop 5 counter 1 flag 0 | click; hnm_frame 45; hnm_close(); AtlHnm_start(intro02.hnm); hnm_open(hnm\intro02.hnm)=missing
+end p201 loop 5 counter 1 flag 0 click 0 double 0
