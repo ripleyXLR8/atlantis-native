@@ -58,6 +58,10 @@ pub struct Nodes {
     nodes: Vec<Node>,
     /// The x87 control word the code runs under.
     pub fpu: Fpu,
+    /// Faces the generic drawer's port leaves out: a transparent
+    /// material's, one across the near or far plane, one without a map
+    /// (each logged; the canoe's data and frames give none, `tests/canoe.rs`).
+    pub skipped: usize,
 }
 
 const IDENTITY: Quat = [0.0, 0.0, 0.0, 1.0];
@@ -77,6 +81,7 @@ impl Nodes {
                 valid: true,
             }],
             fpu,
+            skipped: 0,
         }
     }
 
@@ -1090,6 +1095,7 @@ fn draw_object(
             if f & 0x40 != 0 || deferred {
                 if deferred && f & 0x40 == 0 {
                     log::warn!("Atl3D: a transparent material's faces are not drawn");
+                    nodes.skipped += 1;
                 }
                 continue;
             }
@@ -1098,10 +1104,12 @@ fn draw_object(
                 // A face across the near or far plane (@ 0x0042d276): the
                 // canoe's objects stay hundreds of units away from both.
                 log::warn!("Atl3D: a face across the near or far plane is not drawn");
+                nodes.skipped += 1;
                 continue;
             }
             let Some(tex) = texture else {
                 log::warn!("Atl3D: a face without texture is not drawn");
+                nodes.skipped += 1;
                 continue;
             };
             let mut poly: [Vertex; 3] = std::array::from_fn(|k| {
