@@ -24,6 +24,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use atlantis2_data::defnames;
 use atlantis2_data::dialog::{parse_dial, FontTxt, World};
 use atlantis2_data::exe::Release;
 use atlantis2_data::{A2Files, Folder};
@@ -797,4 +798,57 @@ fn every_tibet_dialog_ends_at_76_degrees() {
         assert!(ended, "dialog {n} does not end");
         dialog_loop::assert_camera_after_dialog(&e, &format!("dialog {n}"));
     }
+}
+
+/// The speaker's place animation hidden while it speaks (FUN_00461870,
+/// atlantis2-cd-fr-2199552 @ 0x0046191d..0x0046195e): its `[IdText]`
+/// names in order (the shaman's `SHAMAN`, then `SHAMANW10`), and for the
+/// first name with an active slot, the lowest such slot; not the lowest
+/// slot of any of the names.
+#[test]
+fn the_hidden_speaker_slot_follows_the_idtext_order() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.start_new_game().unwrap();
+    e.end_video();
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    let id = |e: &Engine, n: &[u8]| {
+        e.script_state()
+            .unwrap()
+            .names
+            .id(defnames::PERSONNAGES, n)
+            .unwrap() as i32
+    };
+    let (shaman, w10) = (id(&e, b"SHAMAN"), id(&e, b"SHAMANW10"));
+    assert!(!e.anim.slots.is_empty());
+    while e.anim.slots.len() < 2 {
+        let s = e.anim.slots[0].clone();
+        e.anim.slots.push(s);
+    }
+    for s in e.anim.slots.iter_mut() {
+        s.id = -99;
+    }
+    e.anim.slots[0].id = w10;
+    e.anim.slots[1].id = shaman;
+    e.anim.slots[0].active = true;
+    e.anim.slots[1].active = true;
+    e.start_dialog(360).unwrap();
+    for _ in 0..200 {
+        e.tick();
+        e.pass(None);
+        if e
+            .dialog()
+            .and_then(|d| d.current_line())
+            .is_some_and(|l| l.speaker == "Chamane")
+        {
+            break;
+        }
+    }
+    assert!(e
+        .dialog()
+        .and_then(|d| d.current_line())
+        .is_some_and(|l| l.speaker == "Chamane"));
+    assert!(e.anim.slots[0].active, "the SHAMANW10 slot is hidden");
+    assert!(!e.anim.slots[1].active, "the SHAMAN slot is shown");
 }

@@ -330,9 +330,10 @@ impl Engine {
     }
 
     /// The speaker's place animation hidden while it speaks
-    /// (FUN_00461870: the first active slot whose id is one of its
-    /// `[IdText]` names, inactive; shown again when the speaker changes and
-    /// at the end).
+    /// (FUN_00461870, atlantis2-cd-fr-2199552 @ 0x0046191d..0x0046195e:
+    /// its `[IdText]` names in order, and for the first name that has one,
+    /// the lowest active slot of that id, made inactive; shown again when
+    /// the speaker changes and at the end).
     pub(super) fn sync_hidden(&mut self) {
         let want = self.dialog.as_ref().and_then(|d| d.hidden.clone());
         let have = self.hidden.as_ref().map(|(_, n)| n.clone());
@@ -345,16 +346,15 @@ impl Engine {
             }
         }
         if let Some(names) = want {
-            let ids: Vec<i32> = names
+            let slot = names
                 .iter()
                 .filter_map(|n| self.names.id(defnames::PERSONNAGES, n.as_bytes()).ok())
-                .map(|i| i as i32)
-                .collect();
-            let slot = self
-                .anim
-                .slots
-                .iter()
-                .position(|s| s.active && ids.contains(&s.id));
+                .find_map(|id| {
+                    self.anim
+                        .slots
+                        .iter()
+                        .position(|s| s.active && s.id == id as i32)
+                });
             if let Some(i) = slot {
                 self.anim.slots[i].active = false;
             }
