@@ -2836,7 +2836,10 @@ back) into `yucatan-*.png`.
   all 28 heads of the discs with the Pentium II's, `heads_pii_more.txt`;
   for each, three frames also step by step: the head's world pose, the
   camera, the camera-space and projected vertices, the clip codes and the
-  face bytes), the lip-sync under 0x027f, 0x007f and 0x0e7f. One
+  face bytes), the lip-sync under 0x027f, 0x007f and 0x0e7f; and the
+  lip-sync weights of every line of the five worlds under 0x027f (1214
+  lines, 82807 frames every 1/15 s, the 996 NaN frames included,
+  `lipsync_survey.txt`, `tests/dialogs.rs`). One
   departure, on purpose: when a row's left edge is a NaN or beyond the
   32-bit range and its right edge is not, the original's II scan calls
   its span from x = −2³¹ (`fistp` gives the integer indefinite, and the
