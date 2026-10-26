@@ -362,6 +362,8 @@ pub struct Menu {
     /// The disc the CD page asks for, and the tick of the last check.
     cd_disc: u8,
     cd_check: u32,
+    /// GOG's `Game.exe`: the CD page leaves at once (see `state::CD`).
+    gog_cd: bool,
     /// The 15 Hz flag the animated buttons step on (@ 0x00656a50).
     pub tick_flag: bool,
     pub input: Input,
@@ -422,10 +424,7 @@ impl Menu {
         let font = files
             .read(Folder::Loc, "Font.txt")
             .map(|d| FontTxt::parse(&d))
-            .and_then(|f| {
-                let file = f.font("AtlFT_POPUP")?.file.clone();
-                SubtitleFont::named(files.read(Folder::Loc, &file)?, &f, "AtlFT_POPUP")
-            });
+            .and_then(|f| SubtitleFont::load(files, &f, "AtlFT_POPUP"));
         if font.is_none() {
             log::warn!("AtlFT_POPUP not found: the menus draw no text");
         }
@@ -446,6 +445,7 @@ impl Menu {
             player: 0,
             cd_disc: 1,
             cd_check: 0,
+            gog_cd: files.build().gog,
             tick_flag: false,
             input: Input::default(),
         }
@@ -1416,6 +1416,21 @@ impl Menu {
                 action::ELSEWHERE => self.state = state::DISC_BACK,
                 _ => {}
             },
+            state::CD if self.gog_cd => {
+                // GOG's patch (`atlantis2-gog-fr-2183168` @ 0x00488e67)
+                // drops the wait and the disc check: the low byte of the
+                // ticks since the last frame (the start is set again every
+                // frame) is compared with 1, so the page closes at the first
+                // tick, the current disc left as it was.
+                let now = host.ticks();
+                let elapsed = now.wrapping_sub(self.cd_check);
+                self.cd_check = now;
+                if elapsed as u8 == 1 {
+                    log::info!("Changement de CD => insertion CD N°{}", self.cd_disc);
+                    self.stop(host);
+                    host.disc_inserted();
+                }
+            }
             state::CD => {
                 // Every 100 ticks (6.7 s) the disc is looked for (state 9:
                 // `100 < ticks - start`).

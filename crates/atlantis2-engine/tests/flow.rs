@@ -61,7 +61,18 @@ use atlantis2_engine::sound::VOICE_EFFECTS;
 use atlantis2_engine::subjects::cell;
 use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
+thread_local! {
+    /// The test plays GOG's installation (`ATLANTIS2_GOG`) instead of the
+    /// CD's files.
+    static ON_GOG: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 fn game() -> Option<A2Files> {
+    if ON_GOG.with(|g| g.get()) {
+        let dir = std::env::var_os("ATLANTIS2_GOG")?;
+        let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[]).expect("GOG folder");
+        return Some(files);
+    }
     let (Some(dir), Some(discs)) = (
         std::env::var_os("ATLANTIS2_DATA"),
         std::env::var_os("ATLANTIS2_DISCS"),
@@ -465,7 +476,8 @@ impl Run {
         if let Some(dir) = &self.shots {
             std::fs::create_dir_all(dir).unwrap();
             let png = atlantis2_engine::png::encode_rgb565(&self.screen, 640, 480);
-            std::fs::write(dir.join(file), png).unwrap();
+            let gog = if ON_GOG.with(|g| g.get()) { "gog-" } else { "" };
+            std::fs::write(dir.join(format!("{gog}{file}")), png).unwrap();
         }
     }
 
@@ -6029,11 +6041,32 @@ fn the_whole_game_with_the_mouse() {
     if game().is_none() {
         return;
     }
+    whole_game("a2-flow-whole-game");
+}
+
+/// The whole game on GOG's installation (`ATLANTIS2_GOG`, its `Game.exe`
+/// 1.01 and every disc in one folder): the same play, the same chapters
+/// and lines. With `ATLANTIS2_PNG_DIR` its pictures are written there
+/// (`gog-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_gog() {
+    if std::env::var_os("ATLANTIS2_GOG").is_none() {
+        eprintln!("ATLANTIS2_GOG not set: test skipped");
+        return;
+    }
+    ON_GOG.with(|g| g.set(true));
+    whole_game("a2-flow-whole-game-gog");
+}
+
+fn whole_game(scratch_name: &str) {
+    let gog = ON_GOG.with(|g| g.get());
     let started = std::time::Instant::now();
-    let dir = scratch("a2-flow-whole-game");
+    let dir = scratch(scratch_name);
     let mut r = Run::new(&dir);
-    // The worlds' own tests write the pictures.
-    r.shots = None;
+    // The worlds' own tests write the pictures (GOG's run writes its own).
+    if !gog {
+        r.shots = None;
+    }
 
     // Tibet, then Ireland with its ball.
     to_ireland(&mut r);

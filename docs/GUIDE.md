@@ -178,6 +178,20 @@ images or copies of the CDs if they are not inside it:
 
     atlantis-native --discs /path/to/cd-images /path/to/Atlantis_2_Files
 
+The GOG.com edition needs nothing more: give its installation folder (the
+one holding `Game.exe`, for example `C:\Program Files\GOG
+Galaxy\Games\Atlantis 2` or `C:\GOG Games\Atlantis 2`). It holds every
+disc, so no disc is asked for.
+
+    atlantis-native "C:\Program Files\GOG Galaxy\Games\Atlantis 2"
+
+GOG's edition is the game patched to version 1.01, and Atlantis Native
+plays it as 1.01 does: the subtitles' lines further apart (they no
+longer overlap) and broken after accented letters too, and no Alt+Enter
+(F11 switches full screen with every version). A CD installation patched
+to 1.01 (the patch's `atlantis2.exe` copied over the CD's) is played the
+same way.
+
 ### Controls
 
 | Input | In the game |
@@ -187,7 +201,7 @@ images or copies of the CDs if they are not inside it:
 | Right click | opens or closes the bag bar at the bottom (the mouse then moves a pointer over it; a click puts an object in the hand) |
 | Escape | the game's menu (options, volumes, load and save, quit), and closes it; ends a dialog |
 | F10 or O | the port's options menu (below); the game waits while it is open |
-| F11 | full screen on and off |
+| F11 | full screen on and off (the left Alt with Enter too with the CD's version 1.00, as in the original; version 1.01 removed it) |
 
 Xibalba's canoe puzzle has a screen of its own, with a pointer: a left
 click takes a river tile, lays it back or swaps it with the clicked

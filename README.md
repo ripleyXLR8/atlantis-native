@@ -175,6 +175,12 @@ From a terminal you can also pass the folder:
 `atlantis-native /path/to/game`. More options (`--original`, `--hd`,
 `--new-game`, …) are in the [player's guide](docs/GUIDE.md#command-line).
 
+*Atlantis II* (1999) opens from the terminal too, for now: give the folder
+of its installation (with the CD images beside it, or `--discs <folder>`),
+or the GOG.com installation folder, which holds everything (GOG's edition
+is version 1.01, and plays as 1.01 does). See
+[Atlantis II](docs/GUIDE.md#atlantis-ii).
+
 ## Controls
 
 | Action | Control |

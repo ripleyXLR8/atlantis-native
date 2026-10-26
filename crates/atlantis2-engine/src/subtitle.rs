@@ -41,11 +41,44 @@
 //! - line j of n (from 1) is drawn at x = 10, y = H − 12 (n − j + 1) − 10
 //!   in white, after a black copy at (+1, +1): the lines are 12 pixels
 //!   apart, `Font.txt`'s height in points (@ 0x00404c50), so they overlap.
+//!
+//! The 1.01 patch (and GOG's `Game.exe`, built on it) changes three things
+//! (`atlantis2-gog-fr-2183168` @ 0x0045a2f0, 0x0046ec70, 0x0046f140,
+//! 0x0046f0c0; checked under emulation of the 1.01 executable:
+//! `subtitles_101_*.txt`):
+//!
+//! - a byte with the high bit set is a lead byte only when `Font.txt`'s
+//!   `[CharacterSet]` is `MBCS`; with `SBCS` or no such section (the
+//!   French files) every byte is a character of its own, and a break
+//!   character is any table entry whose low byte is that byte: French
+//!   lines break at the space after an accented letter;
+//! - `Height` is a cell height: `CreateFontA(+Height)` (through `DPtoLP`,
+//!   the identity of `MM_TEXT`), so GDI takes the largest size whose
+//!   `VDMX` height (yMax − yMin) fits; GOG's `Font.txt` asks 22 for the
+//!   dialogs (15 pixels per em, a 21-pixel cell) and 16 for the popups
+//!   (11 pixels per em). A height below the font's smallest `VDMX` cell
+//!   (the CD's `Font.txt`, 12 and 10) gets the size under that record, 7
+//!   pixels per em, in a cell of the height asked. These sizes are what
+//!   GDI gives on Windows (measured on Windows 11 and Windows 98 SE for
+//!   both `Atl_Font.ttf` files, every height from 2 to 40; Windows 98
+//!   differs only below the smallest `VDMX` cell, where its cell is the
+//!   size's own: the port follows Windows 11, where the GOG edition runs);
+//! - the lines are `tmHeight` + 1 apart (`GetTextMetricsA`, through
+//!   `LPtoDP`): 22 pixels with GOG's files, no longer overlapping.
+//!
+//! GOG's own patch draws the fonts without antialiasing
+//! (`NONANTIALIASED_QUALITY`), as the glyphs are drawn here in both
+//! releases. A font file that is missing is replaced by a system font
+//! (1.01 logs `Font %s not found, using system font`; 1.00's
+//! `AddFontResourceA` fails and GDI substitutes a face the same way): here
+//! the port's Liberation Sans, which has Arial's metrics.
 
 use ab_glyph::{point, Font, FontVec, Glyph, PxScale};
 use atlantis_data::TextCodePage;
 
 use atlantis2_data::dialog::FontTxt;
+use atlantis2_data::exe::Release;
+use atlantis2_data::{A2Files, Folder};
 
 /// One `TextOutA` call: position, colour (0xRRGGBB) and bytes.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -57,9 +90,15 @@ pub struct TextOut {
 }
 
 /// Whether the character at `s` (one byte, or a lead byte and the next)
-/// is a break character (@ 0x00404840).
-fn is_break(breaks: &[u16], s: &[u8]) -> bool {
+/// is a break character (@ 0x00404840). `mbcs`: a byte with the high bit
+/// set is a lead byte (always in 1.00; in 1.01 with `[CharacterSet] MBCS`
+/// only, else every byte is compared with the entries' low bytes,
+/// `atlantis2-gog-fr-2183168` @ 0x0046ec70).
+fn is_break(breaks: &[u16], s: &[u8], mbcs: bool) -> bool {
     let b0 = s.first().copied().unwrap_or(0);
+    if !mbcs {
+        return breaks.iter().any(|&c| b0 == c as u8);
+    }
     if b0 & 0x80 == 0 {
         breaks.iter().any(|&c| c & 0x8000 == 0 && b0 == c as u8)
     } else {
@@ -72,13 +111,16 @@ fn is_break(breaks: &[u16], s: &[u8]) -> bool {
 
 /// The subtitle layout of `text` (@ 0x004611e0) on a `screen_w` x
 /// `screen_h` screen: `measure` gives the width and height of a run of
-/// bytes (`GetTextExtentPoint32A`), `line_step` is the font's height in
-/// points. Returns the `TextOutA` calls in order.
+/// bytes (`GetTextExtentPoint32A`), `line_step` is the step between the
+/// lines (1.00: the font's height in points; 1.01: `tmHeight` + 1),
+/// `mbcs` whether a byte with the high bit set takes the next byte with it
+/// (always in 1.00). Returns the `TextOutA` calls in order.
 pub fn layout(
     text: &[u8],
     measure: impl Fn(&[u8]) -> (i32, i32),
     line_step: i32,
     breaks: &[u16],
+    mbcs: bool,
     screen_w: i32,
     screen_h: i32,
 ) -> Vec<TextOut> {
@@ -104,9 +146,9 @@ pub fn layout(
             out[start + j] = 0;
             break;
         }
-        let brk = is_break(breaks, &src[i..]);
+        let brk = is_break(breaks, &src[i..], mbcs);
         out[start + j] = c;
-        if c & 0x80 != 0 {
+        if mbcs && c & 0x80 != 0 {
             // A lead byte: the next byte goes with it.
             out[start + j + 1] = src[i + 1];
             j += 2;
@@ -206,6 +248,124 @@ fn vdmx(ttf: &[u8], ppem: u16) -> Option<(i32, i32)> {
     None
 }
 
+/// GDI's size for a cell height `height` (`CreateFontA` with a positive
+/// height, 1.01) in a font with a `VDMX` table: in the group of the font's
+/// ratio, the first record whose yMax − yMin equals `height`, else the one
+/// before the first that is taller. When even the first record is taller,
+/// the size is the smaller of MulDiv(unitsPerEm, height, winAscent +
+/// winDescent) and the first record's size − 1, the cell is `height` and
+/// the ascent MulDiv(height, winAscent, winAscent + winDescent). `None`
+/// without a `VDMX` group for the ratio, or past its last record. Returns
+/// ppem, ascent, −descent.
+///
+/// Measured on Windows 11 for both `Atl_Font.ttf` files at every height
+/// from 2 to 40 (`CreateFontA` with the arguments of 1.01's
+/// `atlantis2-gog-fr-2183168` @ 0x0046f140, `GetTextMetricsA`): the rule
+/// gives Windows' tmHeight, tmAscent and size at each of them. Windows 98
+/// SE agrees down to the first record; below it, its cell is the size's
+/// own (9 pixels at 7 per em), not `height`.
+fn vdmx_for_height(ttf: &[u8], height: i32) -> Option<(u16, i32, i32)> {
+    let (off, len) = table(ttf, b"VDMX")?;
+    let t = ttf.get(off..off + len)?;
+    let be16 = |p: usize| t.get(p..p + 2).map(|b| u16::from_be_bytes([b[0], b[1]]));
+    let nratios = usize::from(be16(4)?);
+    for k in 0..nratios {
+        let r = t.get(6 + 4 * k..10 + 4 * k)?;
+        let any = r[1] == 0 && r[2] == 0 && r[3] == 0;
+        let square = r[1] == 1 && r[2] <= 1 && r[3] >= 1;
+        if !(any || square) {
+            continue;
+        }
+        let g = usize::from(be16(6 + 4 * nratios + 2 * k)?);
+        let recs = usize::from(be16(g)?);
+        let rec = |e: usize| -> Option<(u16, i32, i32)> {
+            let p = g + 4 + 6 * e;
+            Some((
+                be16(p)?,
+                be16(p + 2)? as i16 as i32,
+                be16(p + 4)? as i16 as i32,
+            ))
+        };
+        for e in 0..recs {
+            let (ppem, ymax, ymin) = rec(e)?;
+            if ymax - ymin == height {
+                return Some((ppem, ymax, ymin));
+            }
+            if ymax - ymin > height {
+                if e > 0 {
+                    return rec(e - 1);
+                }
+                return below_vdmx(ttf, height, ppem);
+            }
+        }
+        return None;
+    }
+    None
+}
+
+/// GDI's font of a cell height below the first `VDMX` record (whose size
+/// is `first_ppem`), see [`vdmx_for_height`].
+fn below_vdmx(ttf: &[u8], height: i32, first_ppem: u16) -> Option<(u16, i32, i32)> {
+    let (wa, wd) = (i64::from(os2_u16(ttf, 74)?), i64::from(os2_u16(ttf, 76)?));
+    let upem = i64::from(head_upem(ttf)?);
+    if wa + wd == 0 || height < 1 {
+        return None;
+    }
+    let muldiv = |a: i64, b: i64, c: i64| (a * b + c / 2) / c;
+    let h = i64::from(height);
+    let ppem = muldiv(upem, h, wa + wd)
+        .min(i64::from(first_ppem) - 1)
+        .max(1);
+    let ascent = muldiv(h, wa, wa + wd) as i32;
+    Some((ppem as u16, ascent, ascent - height))
+}
+
+/// The font's units per em (`head`).
+fn head_upem(ttf: &[u8]) -> Option<u16> {
+    let (off, len) = table(ttf, b"head")?;
+    if len < 20 {
+        return None;
+    }
+    Some(u16::from_be_bytes([
+        *ttf.get(off + 18)?,
+        *ttf.get(off + 19)?,
+    ]))
+}
+
+/// A `u16` of the font's `OS/2` table at `offset`.
+fn os2_u16(ttf: &[u8], offset: usize) -> Option<u16> {
+    let (off, len) = table(ttf, b"OS/2")?;
+    if offset + 2 > len {
+        return None;
+    }
+    Some(u16::from_be_bytes([
+        *ttf.get(off + offset)?,
+        *ttf.get(off + offset + 1)?,
+    ]))
+}
+
+/// The size and the ascent and descent GDI gives a cell height of a font
+/// without a `VDMX` table (the port's system font): ppem =
+/// MulDiv(unitsPerEm, height, usWinAscent + usWinDescent), the ascent and
+/// descent the `OS/2` win values at that size, rounded as 26.6 fixed-point
+/// values. Windows 11 gives these for Liberation Sans within a pixel; its
+/// hinted widths, which the port does not compute, differ more.
+fn cell_from_win_metrics(font: &FontVec, ttf: &[u8], height: i32) -> (u16, i32, i32) {
+    let upem = font.units_per_em().unwrap_or(2048.0) as i64;
+    let (wa, wd) = match (os2_u16(ttf, 74), os2_u16(ttf, 76)) {
+        (Some(a), Some(d)) if a as i64 + d as i64 > 0 => (a as i64, d as i64),
+        _ => (
+            font.ascent_unscaled().round() as i64,
+            (-font.descent_unscaled()).round() as i64,
+        ),
+    };
+    let ppem = ((upem * i64::from(height) + (wa + wd) / 2) / (wa + wd)).max(1);
+    let px26 = |v: i64| (v * ppem * 64 + upem / 2) / upem;
+    let ascent = ((px26(wa) + 32) >> 6) as i32;
+    let descent = ((px26(wd) + 32) >> 6) as i32;
+    (ppem as u16, ascent, -descent)
+}
+
 /// The offset and length of a table of a TrueType file.
 fn table(ttf: &[u8], tag: &[u8; 4]) -> Option<(usize, usize)> {
     let n = usize::from(u16::from_be_bytes([*ttf.get(4)?, *ttf.get(5)?]));
@@ -230,9 +390,13 @@ pub struct SubtitleFont {
     ascent: i32,
     /// The extent's height (`tmHeight`).
     cell: i32,
-    /// `Font.txt`'s height in points: the step between lines.
+    /// The step between lines: `Font.txt`'s height in points (1.00), or
+    /// `tmHeight` + 1 (1.01).
     line_step: i32,
     breaks: Vec<u16>,
+    /// A byte with the high bit set is a lead byte (1.00; 1.01 with
+    /// `[CharacterSet] MBCS`).
+    mbcs: bool,
 }
 
 impl SubtitleFont {
@@ -242,33 +406,86 @@ impl SubtitleFont {
     }
 
     /// Font `id` of `font_txt` (`AtlFT_POPUP` for the menus' texts and the
-    /// bag's names, 10 points: 13 pixels per em) from `ttf`.
+    /// bag's names, 10 points: 13 pixels per em) from `ttf`, as 1.00 makes
+    /// it.
     pub fn named(ttf: Vec<u8>, font_txt: &FontTxt, id: &str) -> Option<SubtitleFont> {
+        SubtitleFont::named_for(ttf, font_txt, id, Release::V100)
+    }
+
+    /// Font `id` of `font_txt` from `ttf` as `release` makes it (see the
+    /// module's notes).
+    pub fn named_for(
+        ttf: Vec<u8>,
+        font_txt: &FontTxt,
+        id: &str,
+        release: Release,
+    ) -> Option<SubtitleFont> {
         let entry = font_txt.font(id)?;
-        // CreateFontA(−MulDiv(height, LOGPIXELSY, 72)) at 96 DPI.
-        let ppem = ((i64::from(entry.height) * 96 + 36) / 72) as u16;
-        let widths = hdmx_widths(&ttf, ppem as u8);
         let font = FontVec::try_from_vec(ttf.clone()).ok()?;
         let upem = font.units_per_em()?;
-        let (ascent, descent) = match vdmx(&ttf, ppem) {
-            Some(a) => a,
-            None => {
-                let s = f32::from(ppem) / upem;
+        let (ppem, ascent, descent, line_step, mbcs) = match release {
+            Release::V100 => {
+                // CreateFontA(−MulDiv(height, LOGPIXELSY, 72)) at 96 DPI.
+                let ppem = ((i64::from(entry.height) * 96 + 36) / 72) as u16;
+                let (ascent, descent) = match vdmx(&ttf, ppem) {
+                    Some(a) => a,
+                    None => {
+                        let s = f32::from(ppem) / upem;
+                        (
+                            (font.ascent_unscaled() * s).round() as i32,
+                            (font.descent_unscaled() * s).round() as i32,
+                        )
+                    }
+                };
+                (ppem, ascent, descent, entry.height, true)
+            }
+            Release::V101 => {
+                // CreateFontA(+height): a cell height.
+                let (ppem, ascent, descent) = match vdmx_for_height(&ttf, entry.height) {
+                    Some(r) => r,
+                    None => cell_from_win_metrics(&font, &ttf, entry.height),
+                };
+                // GetTextMetricsA: tmHeight + 1.
+                let line_step = ascent - descent + 1;
                 (
-                    (font.ascent_unscaled() * s).round() as i32,
-                    (font.descent_unscaled() * s).round() as i32,
+                    ppem,
+                    ascent,
+                    descent,
+                    line_step,
+                    font_txt.mbcs == Some(true),
                 )
             }
         };
+        let widths = hdmx_widths(&ttf, ppem as u8);
         Some(SubtitleFont {
             font,
             ppem,
             widths,
             ascent,
             cell: ascent - descent,
-            line_step: entry.height,
+            line_step,
             breaks: font_txt.breaks.clone(),
+            mbcs,
         })
+    }
+
+    /// Font `id` of `font_txt` for the game in `files`: its file in
+    /// `loc\`, made as the executable's release makes it; a system font
+    /// (the port's Liberation Sans) when the file is missing.
+    pub fn load(files: &A2Files, font_txt: &FontTxt, id: &str) -> Option<SubtitleFont> {
+        let release = files.build().release;
+        let file = &font_txt.font(id)?.file;
+        let ttf = match files.read(Folder::Loc, file) {
+            Some(t) if !file.is_empty() => t,
+            _ => {
+                match release {
+                    Release::V100 => log::warn!("add_font() ERREUR: {file} ({id}): system font"),
+                    Release::V101 => log::warn!("Font {file} not found, using system font"),
+                }
+                atlantis_engine::subtitles::system_font_data().to_vec()
+            }
+        };
+        SubtitleFont::named_for(ttf, font_txt, id, release)
     }
 
     fn glyph(&self, b: u8) -> ab_glyph::GlyphId {
@@ -294,7 +511,20 @@ impl SubtitleFont {
 
     /// The layout of `text` on a `w` x `h` screen.
     pub fn layout(&self, text: &[u8], w: i32, h: i32) -> Vec<TextOut> {
-        layout(text, |b| self.extent(b), self.line_step, &self.breaks, w, h)
+        layout(
+            text,
+            |b| self.extent(b),
+            self.line_step,
+            &self.breaks,
+            self.mbcs,
+            w,
+            h,
+        )
+    }
+
+    /// Pixels per em, the ascent and the cell height (`tmHeight`).
+    pub fn metrics(&self) -> (u16, i32, i32) {
+        (self.ppem, self.ascent, self.cell)
     }
 
     /// Draws `calls` into `out` (`w` x `h` RGB565).
@@ -390,8 +620,10 @@ impl SubtitleFont {
         }
     }
 
+    /// The step between the lines of the subtitles and the credits:
     /// `Font.txt`'s height in points (@ 0x00404c50: the font record's
-    /// +0x44), the step between the lines of the subtitles and the credits.
+    /// +0x44) in 1.00, `tmHeight` + 1 in 1.01
+    /// (`atlantis2-gog-fr-2183168` @ 0x0046f0c0).
     pub fn line_step(&self) -> i32 {
         self.line_step
     }
@@ -414,7 +646,7 @@ mod tests {
 
     #[test]
     fn short_text_one_line() {
-        let c = layout(b"Hello", widths, 12, &[0x20], 640, 480);
+        let c = layout(b"Hello", widths, 12, &[0x20], true, 640, 480);
         assert_eq!(c.len(), 2);
         assert_eq!((c[0].x, c[0].y, c[0].colour), (11, 459, 0));
         assert_eq!((c[1].x, c[1].y, c[1].colour), (10, 458, 0xffffff));
@@ -426,7 +658,7 @@ mod tests {
         // 10 pixels a byte, 620 available: 62 bytes fit.
         let mut t = b"word ".repeat(13);
         t.extend_from_slice(b"end");
-        let c = layout(&t, widths, 12, &[0x20], 640, 480);
+        let c = layout(&t, widths, 12, &[0x20], true, 640, 480);
         assert_eq!(c.len(), 4);
         assert_eq!(c[1].bytes.len(), 60);
         assert!(c[1].bytes.ends_with(b" "));
@@ -435,9 +667,24 @@ mod tests {
         // `\xe9 ` is one character: no break there.
         let mut t = b"x".repeat(55);
         t.extend_from_slice(b"\xe9 yyyyyyyyyyyy");
-        let c = layout(&t, widths, 12, &[0x20], 640, 480);
+        let c = layout(&t, widths, 12, &[0x20], true, 640, 480);
         assert_eq!(c.len(), 2);
         assert_eq!(c[1].bytes.len(), 61);
+    }
+
+    #[test]
+    fn single_byte_characters_in_1_01() {
+        // `\xe9 ` breaks: the space after the accent is a break.
+        let mut t = b"x".repeat(55);
+        t.extend_from_slice(b"\xe9 yyyyyyyyyyyy");
+        let c = layout(&t, widths, 22, &[0x20], false, 640, 480);
+        assert_eq!(c.len(), 4);
+        assert_eq!(c[1].bytes.len(), 57);
+        assert_eq!(c[3].bytes, b"yyyyyyyyyyyy");
+        assert_eq!((c[1].y, c[3].y), (480 - 44 - 10, 480 - 22 - 10));
+        // A table entry with the lead flag matches its low byte alone.
+        assert!(is_break(&[0x8120], b" ", false));
+        assert!(!is_break(&[0x8120], b" ", true));
     }
 
     #[test]
