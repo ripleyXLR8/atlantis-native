@@ -604,7 +604,8 @@ Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 
 ## Atlantis II (in progress)
 
-A folder holding `atlantis2.exe` opens Atlantis II (`crates/atlantis-app/src/a2.rs`):
+A folder holding `atlantis2.exe` (or GOG.com's installation, with its
+`Game.exe`) opens Atlantis II (`crates/atlantis-app/src/a2.rs`):
 the player menu comes first, as in the original (five symbols: a symbol
 continues that player's newest save, or starts a new game). As the
 original's start-up (@ 0x0049d680, last two calls), the player page is
@@ -702,9 +703,55 @@ trip (the departure film, the arrival, the king's hall turned by
 grid with marbles laid, the Tezcatlipoca statue's menu, the brazier's way
 back) into `yucatan-*.png`.
 
-- **Build:** `atlantis2.exe` of the French CD (1999, 2199552 bytes, PE
-  timestamp 0x38030926), recognised by its size and timestamp and
-  confirmed by its MD5 (`crates/atlantis2-data/src/exe.rs`).
+- **Builds:** `atlantis2.exe` of the French CD (1.00, version 3.15, 1999,
+  2199552 bytes, PE timestamp 0x38030926), the official 1.01 patch's
+  `atlantis2.exe` (version 3.18, 2183168 bytes, PE timestamp 0x38328ed1,
+  one file for the French and the English releases) and GOG.com's
+  `Game.exe` (the 1.01 executable with 18 byte patches of GOG's),
+  recognised by size and timestamp and confirmed by MD5
+  (`crates/atlantis2-data/src/exe.rs`). GOG's folder holds an
+  `atlantis2.exe` too, a 20,992-byte splash-screen launcher: the
+  executable is the first of `atlantis2.exe` and `Game.exe` that is a
+  known build. 1.01 moved most of the code and data; the one table the
+  port reads from the executable, the place sounds' listener table
+  (@ 0x005dd2c0 in 1.00), is read at each build's own address (0xf60
+  lower in 1.01, the same 5780 bytes). What 1.01 changes that a player
+  sees, reproduced when a 1.01 executable is found (GOG's or a CD
+  installation patched to 1.01), the CD's 1.00 keeping its own behaviour:
+  - `loc\Font.txt`'s new `[CharacterSet]` section (`SBCS` / `MBCS`):
+    only with `MBCS` is a byte with the high bit set a lead byte, so with
+    the French files (no such section) an accented letter is a character
+    of its own and the space after it a break; 1.00 always glues it to
+    the next character;
+  - a font's `Height` is a cell height (`CreateFontA(+Height)`, no longer
+    −MulDiv(Height, 96, 72)): GDI takes the largest size whose `VDMX`
+    height fits (GOG's `Font.txt` asks 22 for the dialogs: 15 pixels per
+    em, a 21-pixel cell; 16 for the popups: 11 pixels per em; the CD's 12
+    and 10 give 10 and 9 pixels per em, from the font's win metrics as no
+    `VDMX` record fits);
+  - the subtitles' and the credits' lines are `GetTextMetricsA`'s
+    `tmHeight` + 1 apart (22 pixels with GOG's files), no longer
+    `Height`;
+  - a font file that is missing is replaced by a system font (1.01 logs
+    it; 1.00's `AddFontResourceA` fails and GDI substitutes a face the
+    same way): here the port's Liberation Sans;
+  - Alt+Enter, which switches 1.00 between full screen and window, does
+    nothing (F11 is the port's own key, with both).
+
+  GOG's own patches change how the program talks to Windows (its install
+  folder taken for the CD, no free-space check before the music copy, no
+  `WM_FONTCHANGE` broadcast, DirectInput re-acquired on any error,
+  `WM_ACTIVATE` for the window's activation), which the port has no use
+  for, and three things a player could see: the fonts are drawn without
+  antialiasing (`NONANTIALIASED_QUALITY`), as the port draws them with
+  every build; a video ends at its frame count only, as the port's do;
+  and the CD page, should it open, closes at the first 15 Hz tick without
+  looking for the disc, the current disc unchanged, which the port does
+  with GOG's executable. The subtitles of 1.01 are checked against its
+  own subtitle function run under emulation on the CD's and on GOG's
+  files (`golden/subtitles_101_cd.txt`, `golden/subtitles_101_gog.txt`,
+  `tests/dialogs.rs`); the font size GDI makes of a cell height is the
+  harness's (Wine's algorithm), not measured on Windows.
 - **Files:** the install folder holds the places, scripts, texts and
   sprite banks; everything under `datas_a2\` comes from the current CD.
   The discs (images or copies) are found in the game folder, in the
@@ -722,7 +769,24 @@ back) into `yucatan-*.png`.
   and plays silent, as in the original; film 62 on the way back from
   Shamballa (chapter 78, `monde=5` with disc 4 in) plays its track from
   disc 4. The discs' long names are
-  in their Joliet trees, which the disc-image reader now reads.
+  in their Joliet trees, which the disc-image reader now reads. GOG's
+  installation holds every disc in one `DATAS_A2` folder of its install
+  folder, with the four discs' markers: a folder (or image) holding all
+  four counts as each of the discs 1 to 4, so no disc is ever asked for
+  and the music is copied from it as from the disc of the world (the
+  original would take it for disc 4 alone; GOG's executable is patched to
+  use it for every disc). Its data is the European DVD's: upper-case
+  folder names (no matter, the lookup ignores case), one copy of each of
+  the six files that differ between the discs, 8.3 copies beside the long
+  names, and the ten file names with accents of the discs only without
+  their accents (`TR-D-tete araignee.tga`) or as 8.3 names
+  (`TR_B_TET.TGA`), while the spider's and the canoe's `.db` files name
+  them with their accents: a name not found is looked for with its
+  accents folded, then as its ISO 9660 level-1 name. Film 44 has its
+  track there, so it is not silent as on the CD. GOG's texts are a
+  corrected edition (spelling and typography), and its chapter 83 plays
+  dialog 398 over film 66 (`/set(cinema=66,398)`, a line the CD's texts
+  hold but its script never shows); both come from the data.
 - **Places:** `WAM V2.8` is a stream of tagged chunks (views, moves, 3D
   click zones with their corners, sounds, links, entities and their
   states), read in file order; the zone under the screen centre is the
@@ -2650,10 +2714,11 @@ back) into `yucatan-*.png`.
   click goes to the next line. Each frame
   draws the panorama, the body video through its mask, the head with the
   lip-sync of the voice's current time, and the subtitle. The subtitles
-  break and place their lines as the original's code does (a byte with the
-  high bit set is taken with the next one, so an accented letter before a
-  space is no break; lines 12 pixels apart, in white over a black copy
-  shifted by one pixel), with the widths of the game's own font,
+  break and place their lines as the original's code does (with 1.00, a
+  byte with the high bit set is taken with the next one, so an accented
+  letter before a space is no break; lines 12 pixels apart, in white over
+  a black copy shifted by one pixel; 1.01 differs, see **Builds** above),
+  with the widths of the game's own font,
   `loc\Atl_Font.ttf`, from its `hdmx` table at 16 pixels per em and its
   ascent from its `VDMX` table, as GDI uses them. The glyphs are the
   font's outlines filled where at least half covered: GDI also runs the
@@ -3006,7 +3071,15 @@ trees (`en-US`, `fr-FR`, ...) and `ATLANTIS_GOG_FR` the French GOG.com
 installation, for the tests of those builds. For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
-copies); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
+copies), `ATLANTIS2_GOG` GOG.com's installation (only read; `tests/gog.rs`:
+the folder, the web's and the canoe's textures, a new game to the shaman's
+dialogs with 1.01's subtitles, a save and a load, dialog 398 over film 66;
+the 1.01 subtitles in `tests/dialogs.rs`, the listener table in
+`tests/place_sounds.rs`, and `tests/flow.rs`'s whole game with the mouse
+played again on it, its pictures written as `gog-*.png` with
+`ATLANTIS2_PNG_DIR`), `ATLANTIS2_PATCH101` the 1.01 patch's
+`atlantis2.exe` (`tests/gog.rs` puts it beside links to
+`ATLANTIS2_DATA`'s folders: a CD installation patched to 1.01); with `ATLANTIS2_PNG_DIR` set, `tests/skull.rs`'s and
 `tests/ogham.rs`'s played games write their screens there
 (`pz-skull-*.png`, `pz-ogham-*.png`), and with `ATLANTIS2_SHOTS` set
 `tests/cross.rs`'s and the Chinese puzzles' (`tests/figurines.rs`,

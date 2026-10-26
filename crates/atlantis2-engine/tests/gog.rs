@@ -10,7 +10,10 @@
 //!
 //! Needs `ATLANTIS2_GOG`, the folder of GOG's installation (only read);
 //! without it the tests are skipped. The textures are compared with the
-//! CD's when `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` are set too.
+//! CD's when `ATLANTIS2_DATA` and `ATLANTIS2_DISCS` are set too. With
+//! those two and `ATLANTIS2_PATCH101`, the 1.01 patch's `atlantis2.exe`,
+//! a CD installation patched to 1.01 is put together in a scratch folder
+//! (the patch's executable beside links to the installation's folders).
 
 use std::path::PathBuf;
 
@@ -28,6 +31,7 @@ use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
 const SUBTITLES_101_GOG: &str = include_str!("golden/subtitles_101_gog.txt");
+const SUBTITLES_101_CD: &str = include_str!("golden/subtitles_101_cd.txt");
 
 fn gog_dir() -> Option<PathBuf> {
     let d = std::env::var_os("ATLANTIS2_GOG").map(PathBuf::from);
@@ -416,4 +420,69 @@ fn a_new_game_the_shamans_dialog_in_1_01_and_a_save() {
     assert_eq!(d.lines()[0].id, "398_01");
     assert!(!d.lines()[0].text.is_empty());
     let _ = std::fs::remove_dir_all(&data);
+}
+
+/// The font line of a 1.01 golden for `height`: ppem, ascent, cell.
+fn golden_font(golden: &str, height: i32) -> (u16, i32, i32) {
+    let l = golden
+        .lines()
+        .find(|l| {
+            l.starts_with("font ") && l.split_whitespace().nth(3) == Some(&height.to_string())
+        })
+        .unwrap();
+    let f: Vec<&str> = l.split_whitespace().filter(|&f| f != "|").collect();
+    (
+        f[4].parse().unwrap(),
+        f[5].parse().unwrap(),
+        f[6].parse().unwrap(),
+    )
+}
+
+/// The French CD's installation with the 1.01 patch's `atlantis2.exe`:
+/// the patch's build, its listener table, and 1.01's fonts on the CD's
+/// `Font.txt`.
+#[cfg(unix)]
+#[test]
+fn a_cd_installation_patched_to_1_01() {
+    let (Some(dir), Some(discs), Some(patch)) = (
+        std::env::var_os("ATLANTIS2_DATA"),
+        std::env::var_os("ATLANTIS2_DISCS"),
+        std::env::var_os("ATLANTIS2_PATCH101"),
+    ) else {
+        eprintln!("ATLANTIS2_DATA / ATLANTIS2_DISCS / ATLANTIS2_PATCH101 not set: test skipped");
+        return;
+    };
+    let install = scratch("a2-patched-101");
+    for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+        let name = entry.file_name();
+        if !name.to_string_lossy().eq_ignore_ascii_case("atlantis2.exe") {
+            std::os::unix::fs::symlink(entry.path(), install.join(&name)).unwrap();
+        }
+    }
+    std::fs::copy(&patch, install.join("atlantis2.exe")).unwrap();
+    let (files, build) = A2Files::open_dir(&install, &[PathBuf::from(&discs)]).unwrap();
+    assert_eq!(
+        (build.id, build.release, build.gog),
+        ("atlantis2-patch101-2183168", Release::V101, false)
+    );
+    let (cd, _) = A2Files::open_dir(&PathBuf::from(&dir), &[PathBuf::from(&discs)]).unwrap();
+    use atlantis2_engine::place_sound::Listeners;
+    assert_eq!(
+        Listeners::from_exe(&files.read_exe().unwrap(), &build.place_sounds),
+        Listeners::from_exe(&cd.read_exe().unwrap(), &cd.build().place_sounds)
+    );
+    let font_txt =
+        atlantis2_data::dialog::FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
+    let dialog =
+        atlantis2_engine::subtitle::SubtitleFont::load(&files, &font_txt, "AtlFT_Dialog").unwrap();
+    assert_eq!(dialog.metrics(), golden_font(SUBTITLES_101_CD, 12));
+    assert_eq!(dialog.line_step(), 12);
+    let popup =
+        atlantis2_engine::subtitle::SubtitleFont::load(&files, &font_txt, "AtlFT_POPUP").unwrap();
+    assert_eq!(popup.metrics(), golden_font(SUBTITLES_101_CD, 10));
+    // The engine boots on it.
+    let e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    assert_eq!(e.files().build().id, "atlantis2-patch101-2183168");
+    drop(e);
+    let _ = std::fs::remove_dir_all(&install);
 }
