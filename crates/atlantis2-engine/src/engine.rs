@@ -922,12 +922,13 @@ impl Engine {
             }
         };
         let camera = Camera::new(fpu, width, height);
-        // The listener table of the place sounds, in the executable.
+        // The listener table of the place sounds, in the executable, at
+        // its build's addresses.
+        let build = files.build();
         let place = crate::place_sound::PlaceSounds::new(
             files
-                .install()
-                .read("atlantis2.exe")
-                .map(|exe| crate::place_sound::Listeners::from_exe(&exe))
+                .read_exe()
+                .map(|exe| crate::place_sound::Listeners::from_exe(&exe, &build.place_sounds))
                 .unwrap_or_default(),
         );
         let mut anim = Anim::new(0);
@@ -1425,11 +1426,7 @@ impl Engine {
                 .files
                 .read(Folder::Loc, "Font.txt")
                 .map(|d| FontTxt::parse(&d));
-            let load = |id: &str| {
-                let f = font_txt.as_ref()?;
-                let file = f.font(id)?.file.clone();
-                SubtitleFont::named(self.files.read(Folder::Loc, &file)?, f, id)
-            };
+            let load = |id: &str| SubtitleFont::load(&self.files, font_txt.as_ref()?, id);
             self.font = load("AtlFT_Dialog");
             self.popup_font = load("AtlFT_POPUP");
             if self.font.is_none() {
@@ -1530,6 +1527,11 @@ impl Engine {
     /// The running dialog.
     pub fn dialog(&self) -> Option<&Dialog> {
         self.dialog.as_ref()
+    }
+
+    /// The dialog played over a film (`cinema=N,M`), while it plays.
+    pub fn film_dialog(&self) -> Option<&Dialog> {
+        self.film_dialog.as_ref()
     }
 
     pub fn dialog_mut(&mut self) -> Option<&mut Dialog> {

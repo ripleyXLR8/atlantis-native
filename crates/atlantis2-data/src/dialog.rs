@@ -294,9 +294,11 @@ pub struct FontEntry {
     pub file: String,
     /// `Type`: the face name.
     pub face: String,
-    /// `Height`, in points: `CreateFontA` gets −MulDiv(height, DPI, 72)
-    /// (@ 0x00404c70), and the subtitles step their lines by this value in
-    /// pixels (@ 0x00404c50 returns it).
+    /// `Height`, in points for 1.00: `CreateFontA` gets −MulDiv(height,
+    /// DPI, 72) (@ 0x00404c70), and the subtitles step their lines by this
+    /// value in pixels (@ 0x00404c50 returns it). 1.01 takes it for a cell
+    /// height in pixels (`CreateFontA(+height)`, `atlantis2-gog-fr-2183168`
+    /// @ 0x0046f140).
     pub height: i32,
     pub width: i32,
 }
@@ -310,6 +312,12 @@ pub struct FontTxt {
     /// 0x006167bc.
     pub breaks: Vec<u16>,
     pub fonts: Vec<FontEntry>,
+    /// `[CharacterSet]`, read by 1.01 only (`atlantis2-gog-fr-2183168`
+    /// @ 0x0046e996): `SBCS` (false) or `MBCS` (true), `None` when the
+    /// file has no such line (1.01 then runs single-byte: its flag
+    /// @ 0x0066ea34 starts at 0). 1.00 takes every byte with the high bit
+    /// set for a lead byte.
+    pub mbcs: Option<bool>,
 }
 
 impl FontTxt {
@@ -333,6 +341,11 @@ impl FontTxt {
                         }
                     }
                 }
+                "[CharacterSet]" => match rest.first().copied() {
+                    Some("SBCS") => out.mbcs = Some(false),
+                    Some("MBCS") => out.mbcs = Some(true),
+                    _ => {}
+                },
                 "[Font]" => cur = Some(FontEntry::default()),
                 "[EndFont]" => out.fonts.extend(cur.take()),
                 _ => {
@@ -383,6 +396,10 @@ mod tests {
             b"; c\r\n[PartitionCode]\t0x20\r\n[Font]\r\nNameID\tAtlFT_Dialog\r\nName\tA.ttf\r\nType\tGill Alt One MT\r\nHeight\t12\r\nWidth\t0\r\n[EndFont]\r\n",
         );
         assert_eq!(f.breaks, [0x20]);
+        assert_eq!(f.mbcs, None);
+        let m = FontTxt::parse(b"[CharacterSet]\tMBCS\r\n[PartitionCode]\t0x20 0xA1A1\r\n");
+        assert_eq!((m.mbcs, m.breaks), (Some(true), vec![0x20, 0xa1a1]));
+        assert_eq!(FontTxt::parse(b"[CharacterSet] SBCS\n").mbcs, Some(false));
         let d = f.font("AtlFT_Dialog").unwrap();
         assert_eq!((d.face.as_str(), d.height), ("Gill Alt One MT", 12));
         assert!(f.font("AtlFT_Popup").is_none());

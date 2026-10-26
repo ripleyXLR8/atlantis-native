@@ -29,6 +29,14 @@ pub trait FileSource: Send + Sync {
     fn read_beside(&self, name: &str) -> Option<Vec<u8>> {
         self.read(name)
     }
+
+    /// The names of the entries of folder `dir` (`""`: the top), for the
+    /// lookups that need more than a case-insensitive match (Atlantis II's
+    /// names with accents); empty when the source cannot list them.
+    fn list(&self, dir: &str) -> Vec<String> {
+        let _ = dir;
+        Vec::new()
+    }
 }
 
 /// Files of a directory on disk. Names are matched without regard to case
@@ -97,6 +105,21 @@ impl FileSource for StdDir {
     fn has_dir(&self, name: &str) -> bool {
         self.resolve(name).is_some_and(|p| Path::new(&p).is_dir())
     }
+
+    fn list(&self, dir: &str) -> Vec<String> {
+        let path = if Self::key(dir).is_empty() {
+            Some(self.root.clone())
+        } else {
+            self.resolve(dir)
+        };
+        path.and_then(|p| std::fs::read_dir(p).ok())
+            .map(|rd| {
+                rd.flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
 }
 
 /// Files held in memory (the web build, tests).
@@ -129,5 +152,19 @@ impl FileSource for MemFiles {
     fn has_dir(&self, name: &str) -> bool {
         let prefix = StdDir::key(name) + "/";
         self.files.keys().any(|k| k.starts_with(&prefix))
+    }
+
+    fn list(&self, dir: &str) -> Vec<String> {
+        let key = StdDir::key(dir);
+        let prefix = if key.is_empty() { key } else { key + "/" };
+        let mut out: Vec<String> = self
+            .files
+            .keys()
+            .filter_map(|k| k.strip_prefix(&prefix))
+            .map(|rest| rest.split('/').next().unwrap_or(rest).to_string())
+            .collect();
+        out.sort();
+        out.dedup();
+        out
     }
 }

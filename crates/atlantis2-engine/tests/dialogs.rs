@@ -7,7 +7,9 @@
 //!   numbers and loop), and the dialog frame composed of the video through
 //!   its mask and the head, frame by frame;
 //! - `tests/golden/subtitles.txt`: the line breaks and positions of every
-//!   subtitle of the five worlds;
+//!   subtitle of the five worlds; `subtitles_101_cd.txt` and
+//!   `subtitles_101_gog.txt` the same for the 1.01 executable on the CD's
+//!   files and on GOG's (`ATLANTIS2_GOG`, the GOG installation's folder);
 //! - `tests/golden/music_fade_*.txt`, `sound_volume.txt`: the music fades
 //!   (the dialogs duck the music to 16 %), the volume and pan tables and
 //!   the default levels;
@@ -23,6 +25,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use atlantis2_data::dialog::{parse_dial, FontTxt, World};
+use atlantis2_data::exe::Release;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::dialog::{compose, load_head, Dialog, DialogScript};
@@ -43,6 +46,8 @@ mod dialog_loop;
 const SCRIPT: &str = include_str!("golden/dialog_script_ti.txt");
 const FRAMES: &str = include_str!("golden/dialog_frames.txt");
 const SUBTITLES: &str = include_str!("golden/subtitles.txt");
+const SUBTITLES_101_CD: &str = include_str!("golden/subtitles_101_cd.txt");
+const SUBTITLES_101_GOG: &str = include_str!("golden/subtitles_101_gog.txt");
 const LIPSYNC: &str = include_str!("golden/lipsync_tibet.txt");
 const VOLUME: &str = include_str!("golden/sound_volume.txt");
 const FADES: [(&str, Fpu); 3] = [
@@ -72,6 +77,16 @@ fn game() -> Option<A2Files> {
     };
     let (files, _) =
         A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("game folder");
+    Some(files)
+}
+
+/// GOG's installation (`ATLANTIS2_GOG`), opened as a game folder.
+fn gog() -> Option<A2Files> {
+    let Some(dir) = std::env::var_os("ATLANTIS2_GOG") else {
+        eprintln!("ATLANTIS2_GOG not set: test skipped");
+        return None;
+    };
+    let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[]).expect("GOG folder");
     Some(files)
 }
 
@@ -265,20 +280,9 @@ fn synthetic() -> Vec<Vec<u8>> {
     t
 }
 
-/// Every subtitle of the five worlds (and synthetic texts): the breaks,
-/// the lines, their positions and colours, with the font's own widths.
-#[test]
-fn subtitles_match_the_original() {
-    let Some(files) = game() else { return };
-    let font_txt = FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
-    let ttf = files.read(Folder::Loc, "Atl_Font.ttf").unwrap();
-    let font = SubtitleFont::new(ttf, &font_txt).unwrap();
-    let breaks: Vec<String> = font_txt.breaks.iter().map(|b| format!("{b:04x}")).collect();
-    let want_breaks = SUBTITLES
-        .lines()
-        .find(|l| l.starts_with("breaks "))
-        .unwrap();
-    assert_eq!(fields(want_breaks)[1..].join(" "), breaks.join(" "));
+/// The texts of a golden: every line of the five worlds' `Dial*.txt` of
+/// `files`, and the synthetic ones.
+fn subtitle_texts(files: &A2Files) -> BTreeMap<String, Vec<u8>> {
     let mut texts: BTreeMap<String, Vec<u8>> = BTreeMap::new();
     for w in ["CH", "IR", "SH", "TI", "YU"] {
         let data = files.read(Folder::Loc, &format!("Dial{w}.txt")).unwrap();
@@ -289,9 +293,23 @@ fn subtitles_match_the_original() {
     for (k, t) in synthetic().into_iter().enumerate() {
         texts.insert(format!("synthetic.{k}"), t);
     }
+    texts
+}
+
+/// Every text of `golden` laid out by `layout` as the golden's calls say:
+/// `count` texts, the breaks of `font_txt`.
+fn check_subtitles(
+    golden: &str,
+    texts: &BTreeMap<String, Vec<u8>>,
+    font_txt: &FontTxt,
+    layout: impl Fn(&[u8]) -> Vec<atlantis2_engine::subtitle::TextOut>,
+) {
+    let breaks: Vec<String> = font_txt.breaks.iter().map(|b| format!("{b:04x}")).collect();
+    let want_breaks = golden.lines().find(|l| l.starts_with("breaks ")).unwrap();
+    assert_eq!(fields(want_breaks)[1..].join(" "), breaks.join(" "));
     let mut calls: BTreeMap<&str, Vec<Vec<&str>>> = BTreeMap::new();
     let mut count = 0;
-    for line in SUBTITLES.lines() {
+    for line in golden.lines() {
         let f = fields(line);
         match f.first() {
             Some(&"text") => {
@@ -309,12 +327,11 @@ fn subtitles_match_the_original() {
             _ => {}
         }
     }
-    assert_eq!(count, 1221);
+    assert_eq!(count, texts.len());
     let mut bad = Vec::new();
     for (key, want) in &calls {
         let text = &texts[*key];
-        let got = layout(text, |b| font.extent(b), 12, &font_txt.breaks, 640, 480);
-        let got: Vec<String> = got
+        let got: Vec<String> = layout(text)
             .iter()
             .map(|c| {
                 let off = if c.bytes.is_empty() {
@@ -345,6 +362,150 @@ fn subtitles_match_the_original() {
         bad.len(),
         &bad[..bad.len().min(3)]
     );
+}
+
+/// Every subtitle of the five worlds (and synthetic texts): the breaks,
+/// the lines, their positions and colours, with the font's own widths.
+#[test]
+fn subtitles_match_the_original() {
+    let Some(files) = game() else { return };
+    let font_txt = FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
+    let ttf = files.read(Folder::Loc, "Atl_Font.ttf").unwrap();
+    let font = SubtitleFont::new(ttf, &font_txt).unwrap();
+    let texts = subtitle_texts(&files);
+    assert_eq!(texts.len(), 1221);
+    check_subtitles(SUBTITLES, &texts, &font_txt, |t| {
+        layout(t, |b| font.extent(b), 12, &font_txt.breaks, true, 640, 480)
+    });
+    // The font as the engine loads it for this build (1.00).
+    let loaded = SubtitleFont::load(&files, &font_txt, "AtlFT_Dialog").unwrap();
+    assert_eq!((loaded.metrics(), loaded.line_step()), ((16, 18, 23), 12));
+}
+
+/// The font line of a 1.01 golden for `height` (CreateFontA's): ppem,
+/// ascent, cell.
+fn golden_font(golden: &str, height: i32) -> (u16, i32, i32) {
+    let l = golden
+        .lines()
+        .find(|l| l.starts_with("font ") && fields(l)[3] == height.to_string())
+        .unwrap();
+    let f = fields(l);
+    (
+        f[4].parse().unwrap(),
+        f[5].parse().unwrap(),
+        f[6].parse().unwrap(),
+    )
+}
+
+/// What Windows 11's GDI makes of `CreateFontA(+height)` on `Atl_Font.ttf`
+/// (the French CD's and GOG's files give the same), with the arguments of
+/// 1.01 (`atlantis2-gog-fr-2183168` @ 0x0046f140): height, pixels per em
+/// (tmHeight − tmInternalLeading), tmAscent, tmHeight. Measured on Windows
+/// with `GetTextMetricsA`, every height from 2 to 40.
+const WINDOWS_CELL_HEIGHTS: [(i32, u16, i32, i32); 39] = [
+    (2, 2, 2, 2),
+    (3, 3, 2, 3),
+    (4, 3, 3, 4),
+    (5, 4, 4, 5),
+    (6, 5, 5, 6),
+    (7, 6, 6, 7),
+    (8, 7, 6, 8),
+    (9, 7, 7, 9),
+    (10, 7, 8, 10),
+    (11, 7, 9, 11),
+    (12, 7, 10, 12),
+    (13, 7, 10, 13),
+    (14, 8, 10, 14),
+    (15, 10, 11, 15),
+    (16, 11, 12, 16),
+    (17, 11, 12, 16),
+    (18, 12, 14, 18),
+    (19, 13, 14, 18),
+    (20, 13, 14, 18),
+    (21, 14, 16, 21),
+    (22, 15, 16, 21),
+    (23, 16, 18, 23),
+    (24, 16, 18, 23),
+    (25, 17, 19, 25),
+    (26, 17, 19, 25),
+    (27, 18, 20, 27),
+    (28, 19, 20, 27),
+    (29, 20, 22, 29),
+    (30, 21, 23, 30),
+    (31, 22, 23, 31),
+    (32, 22, 23, 31),
+    (33, 23, 25, 33),
+    (34, 24, 26, 34),
+    (35, 26, 27, 35),
+    (36, 26, 27, 35),
+    (37, 26, 27, 35),
+    (38, 27, 29, 38),
+    (39, 28, 30, 39),
+    (40, 29, 31, 40),
+];
+
+/// 1.01's font of every cell height is the one Windows makes.
+#[test]
+fn fonts_of_1_01_have_the_sizes_windows_gives() {
+    let Some(files) = game() else { return };
+    let mut font_txt = FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
+    let ttf = files.read(Folder::Loc, "Atl_Font.ttf").unwrap();
+    for &(height, ppem, ascent, cell) in &WINDOWS_CELL_HEIGHTS {
+        let entry = font_txt
+            .fonts
+            .iter_mut()
+            .find(|f| f.id == "AtlFT_Dialog")
+            .unwrap();
+        entry.height = height;
+        let font =
+            SubtitleFont::named_for(ttf.clone(), &font_txt, "AtlFT_Dialog", Release::V101).unwrap();
+        assert_eq!(font.metrics(), (ppem, ascent, cell), "height {height}");
+        assert_eq!(font.line_step(), cell + 1, "height {height}");
+    }
+}
+
+/// The 1.01 executable's subtitles on the French CD's files (a CD
+/// installation patched to 1.01): `Height` 12 as a cell height (7 pixels
+/// per em, a 12-pixel cell, lines 13 apart) and every byte a character
+/// of its own.
+#[test]
+fn subtitles_of_1_01_on_the_cd_files_match_the_original() {
+    let Some(files) = game() else { return };
+    let font_txt = FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
+    let ttf = files.read(Folder::Loc, "Atl_Font.ttf").unwrap();
+    let font =
+        SubtitleFont::named_for(ttf.clone(), &font_txt, "AtlFT_Dialog", Release::V101).unwrap();
+    assert_eq!(font.metrics(), golden_font(SUBTITLES_101_CD, 12));
+    assert_eq!(font.line_step(), 13);
+    let popup = SubtitleFont::named_for(ttf, &font_txt, "AtlFT_POPUP", Release::V101).unwrap();
+    assert_eq!(popup.metrics(), golden_font(SUBTITLES_101_CD, 10));
+    assert!(SUBTITLES_101_CD.contains("\nmbcs 0\n"));
+    let texts = subtitle_texts(&files);
+    check_subtitles(SUBTITLES_101_CD, &texts, &font_txt, |t| {
+        font.layout(t, 640, 480)
+    });
+}
+
+/// GOG's installation (`ATLANTIS2_GOG`), its `Game.exe` (1.01): the
+/// corrected texts, `Font.txt`'s heights 22 and 16 as cell heights (lines
+/// 22 apart), accented letters single characters; the font as the engine
+/// loads it.
+#[test]
+fn subtitles_of_gog_match_the_original() {
+    let Some(files) = gog() else { return };
+    assert_eq!(files.build().release, Release::V101);
+    let font_txt = FontTxt::parse(&files.read(Folder::Loc, "Font.txt").unwrap());
+    assert_eq!(font_txt.mbcs, None);
+    let font = SubtitleFont::load(&files, &font_txt, "AtlFT_Dialog").unwrap();
+    assert_eq!(font.metrics(), golden_font(SUBTITLES_101_GOG, 22));
+    assert_eq!(font.line_step(), 22);
+    let popup = SubtitleFont::load(&files, &font_txt, "AtlFT_POPUP").unwrap();
+    assert_eq!(popup.metrics(), golden_font(SUBTITLES_101_GOG, 16));
+    let texts = subtitle_texts(&files);
+    assert_eq!(texts.len(), 1221);
+    check_subtitles(SUBTITLES_101_GOG, &texts, &font_txt, |t| {
+        font.layout(t, 640, 480)
+    });
 }
 
 /// The volume and pan tables, the default levels and the music fades,

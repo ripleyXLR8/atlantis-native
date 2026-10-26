@@ -255,10 +255,34 @@ fn game() -> Option<A2Files> {
 }
 
 #[test]
+fn the_listener_table_of_each_build() {
+    let Some(files) = game() else { return };
+    let cd = Listeners::from_exe(&files.read_exe().unwrap(), &files.build().place_sounds);
+    // Ten places have a listener; Tibet is not one of them.
+    assert!(cd.place("xibalba.wam").is_some());
+    assert!(cd.place("tibet.wam").is_none());
+    // GOG's Game.exe (1.01): the same table at its own addresses.
+    let Some(gog) = std::env::var_os("ATLANTIS2_GOG") else {
+        eprintln!("ATLANTIS2_GOG not set: GOG part skipped");
+        return;
+    };
+    let (g, build) = A2Files::open_dir(&PathBuf::from(gog), &[]).expect("GOG folder");
+    assert_eq!(build.id, "atlantis2-gog-fr-2183168");
+    let gl = Listeners::from_exe(&g.read_exe().unwrap(), &build.place_sounds);
+    assert_eq!(gl, cd);
+    // Read at the reference's addresses, 1.01's bytes are something else.
+    let wrong = Listeners::from_exe(
+        &g.read_exe().unwrap(),
+        &atlantis2_data::exe::KNOWN_BUILDS[0].place_sounds,
+    );
+    assert_ne!(wrong, cd);
+}
+
+#[test]
 fn every_bruitage_of_the_places_matches_the_original() {
     let Some(files) = game() else { return };
-    let exe = files.install().read("atlantis2.exe").unwrap();
-    let listeners = Listeners::from_exe(&exe);
+    let exe = files.read_exe().unwrap();
+    let listeners = Listeners::from_exe(&exe, &files.build().place_sounds);
     let att = attenuation_table();
     for cw in ["0e7f", "027f", "007f"] {
         let f = fpu(cw);

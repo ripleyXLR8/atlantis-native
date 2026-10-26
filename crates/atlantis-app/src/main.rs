@@ -27,12 +27,12 @@
 //! `--fullscreen` opens the window in full screen (F, F11 or Alt+Enter
 //! switches it back).
 //!
-//! A folder holding Atlantis II (`atlantis2.exe`) opens Atlantis II's own
-//! mode (`atlantis_app::a2`): the player menu, then Tibet, to look around
-//! and walk from view to view with a left click; Escape opens the menus
-//! (options, volumes, saves). Its discs (CD images or copies) are looked
-//! for in the folder, in the folders directly inside it and in each
-//! `--discs <folder>`; `--headless <folder> [frames] [--screenshot
+//! A folder holding Atlantis II (`atlantis2.exe`, or GOG.com's `Game.exe`)
+//! opens Atlantis II's own mode (`atlantis_app::a2`): the player menu, then
+//! Tibet, to look around and walk from view to view with a left click;
+//! Escape opens the menus (options, volumes, saves). Its discs (CD images
+//! or copies) are looked for in the folder, in the folders directly inside
+//! it and in each `--discs <folder>` (GOG's folder holds them all); `--headless <folder> [frames] [--screenshot
 //! <file.png>]` plays a new game, prints where it is and saves the screen;
 //! `--view <id>[,<yaw>,<pitch>]` starts in another view, `--dialog <n>`
 //! plays a dialog at once, `--menu <page>` (`player`, `main`, `options`,

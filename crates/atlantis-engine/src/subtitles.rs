@@ -39,6 +39,12 @@ pub use cjk::{cjk_subtitle_rows, split_subtitle_cjk, CjkSplit};
 /// The subtitle font, Liberation Sans Regular.
 static FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/LiberationSans-Regular.ttf");
 
+/// The port's Liberation Sans Regular (metrics of Arial), the stand-in for
+/// a system font when a game's own font file is missing.
+pub fn system_font_data() -> &'static [u8] {
+    FONT_DATA
+}
+
 /// The CJK subtitle fonts of the port, Noto Serif TC and SC Regular, cut
 /// to the characters of the Chinese releases' chapter scripts with ASCII
 /// and the punctuation (`assets/fonts/make_cjk_subset.py`). Built into the
