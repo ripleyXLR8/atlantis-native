@@ -51,7 +51,7 @@ use crate::blackbird::{
     bird_cell, draw_songs, question, random, song_file, BAD_SOUND, BIRDS, CELL, FIRST_BIRD_FRAME,
     GOOD_SOUND, MENU_X, MENU_Y, POET, VIEW, WIN_COUNT, WIN_VAR,
 };
-use crate::place_sound::{Entry, TABLE};
+use crate::place_sound::TABLE;
 use crate::sound::VOICE_EFFECTS;
 
 /// The cursor pair's frame of `interfac.spr` the entry sets.
@@ -115,12 +115,12 @@ impl Engine {
         let bad = self.sound_load(BAD_SOUND);
         self.blackbird.bad = bad;
         if bad == -1 {
-            self.fatal("### ERREUR ### ID son non accepté.. : ID_son_merlem");
+            self.original_fatal("### ERREUR ### ID son non accepté.. : ID_son_merlem");
         }
         let good = self.sound_load(GOOD_SOUND);
         self.blackbird.good = good;
         if good == -1 {
-            self.fatal("### ERREUR ### ID son non accepté.. : ID_son_merleb");
+            self.original_fatal("### ERREUR ### ID son non accepté.. : ID_son_merleb");
         }
         self.blackbird.count = 0;
         self.blackbird.handles = [-1; 5];
@@ -185,7 +185,7 @@ impl Engine {
             let h = self.sound_load(&name);
             self.blackbird.handles[i] = h;
             if h == -1 {
-                self.fatal("### ERREUR ### ID son non accepté.. : ID_son_merle[n]");
+                self.original_fatal("### ERREUR ### ID son non accepté.. : ID_son_merle[n]");
             }
         }
         let song = self.blackbird.song_at(self.blackbird.right);
@@ -193,7 +193,7 @@ impl Engine {
             Some(c) => {
                 self.with_script(|s, h| s.run_command(h, c.as_bytes()));
             }
-            None => self.fatal(&format!(
+            None => self.original_fatal(&format!(
                 "### ERREUR ### Appeler Eric en urgence    soluce[bonne] incorrect... : {song}"
             )),
         }
@@ -246,7 +246,7 @@ impl Engine {
             }
             self.blackbird.handles[i] = -1;
         }
-        self.music.set_percent(100);
+        self.music_mut().set_percent(100);
         self.blackbird.flag = false;
     }
 
@@ -261,65 +261,45 @@ impl Engine {
             .collect()
     }
 
-    /// Every entry of the sound table freed (nothing stopped), for tests
-    /// and tools.
+    /// Every entry of the sound table freed (nothing stopped), and the
+    /// `NEWSOUND` handle and flag as at start-up (0, clear), for tests and
+    /// tools.
     pub fn sound_table_clear(&mut self) {
         for e in self.place.table.iter_mut() {
             *e = None;
         }
         self.place_pcm.clear();
+        self.sound_handle = 0;
+        self.newsound_on = false;
     }
 
     /// A fatal error of the original (FUN_00480cd0: an emergency save,
     /// then the game quits): here the scripts stop.
-    fn fatal(&mut self, msg: &str) {
+    pub(crate) fn original_fatal(&mut self, msg: &str) {
         log::error!("{msg}");
         self.with_script(|s, _| s.fail(msg.to_string()));
     }
 
-    /// FUN_0047a530(name, 0): the sound table's entry of that name if one
-    /// is loaded (exact bytes), else the first free entry (@ 0x0047a610;
-    /// none: a fatal error and entry 0) with the file decoded into it
-    /// (@ 0x0047aad0, which first marks the entry empty); −1 when the
-    /// file cannot be read. The entry has no position (+0x14 = 0): it
-    /// plays at the effects volume, centred.
+    /// Sets the `NEWSOUND` / track handle (@ 0x00673f34), for tests and
+    /// tools: −1 makes the next `NEWSOUND` free nothing, as a harness that
+    /// stubs `NEWSOUND` sees it.
+    pub fn set_sound_handle(&mut self, handle: i32) {
+        self.sound_handle = handle;
+    }
+
+    /// FUN_0047a530(name, 0) for a puzzle's sound: the sound table's load
+    /// ([`Engine::table_load`]) of a sound with no position (it plays at
+    /// the effects volume, centred), a new load reported as an event.
     pub fn sound_load(&mut self, name: &str) -> i32 {
-        if let Some(i) = self
-            .place
-            .table
-            .iter()
-            .position(|e| e.as_ref().is_some_and(|e| e.name == name))
-        {
-            return i as i32;
+        if let Some(i) = self.table_find(name) {
+            return i;
         }
-        let free = match self.place.table.iter().position(Option::is_none) {
-            Some(i) => i,
-            None => {
-                self.fatal("find_free_sound: Sound overflow");
-                0
-            }
-        };
-        self.place.table[free] = None;
-        self.place_pcm.remove(&free);
-        let Some((_, pcm)) = self.load_sound(name) else {
-            log::warn!("### ERREUR lecture impossible fichier : {name}");
-            self.event(Event::SoundLoaded {
-                name: name.to_string(),
-                entry: -1,
-            });
-            return -1;
-        };
+        let entry = self.table_load(name, None);
         self.event(Event::SoundLoaded {
             name: name.to_string(),
-            entry: free as i32,
+            entry,
         });
-        self.place.table[free] = Some(Entry {
-            name: name.to_string(),
-            owner: None,
-            looping: false,
-        });
-        self.place_pcm.insert(free, pcm);
-        free as i32
+        entry
     }
 
     /// FUN_0047aa30(handle, voice): a loaded entry's voice stopped
@@ -338,10 +318,11 @@ impl Engine {
         self.place_pcm.remove(&i);
     }
 
-    /// FUN_0047a650(handle, voice) for an entry with no position: the
-    /// voice stopped, then the sound played once on it at the effects
-    /// volume, centred; a handle outside 0..49 is reported, an empty entry
-    /// plays nothing.
+    /// FUN_0047a650(handle, voice): the voice stopped, then the sound
+    /// played on it with the entry's looping flag: an entry with no
+    /// position at the effects volume, centred; a place sound's entry (a
+    /// `NEWSOUND` of a file a place loaded) at its source's current gains;
+    /// a handle outside 0..49 is reported, an empty entry plays nothing.
     pub fn sound_play(&mut self, handle: i32, voice: usize) {
         let Some(i) = usize::try_from(handle).ok().filter(|&i| i < TABLE) else {
             log::warn!("AtlSound_play:ID_son invalide:{handle}");
@@ -353,8 +334,23 @@ impl Engine {
             return;
         };
         self.voices.stop(voice);
-        let att = self.fx_attenuation();
-        self.voices.play(voice, pcm, entry.looping, att, 0);
+        let (att, pan) = match entry.owner {
+            Some(owner) => {
+                let (g0, g1) = self.place.gains.get(owner).copied().unwrap_or((0, 0));
+                crate::place_sound::pan_volume(
+                    self.camera.fpu,
+                    &crate::sound::attenuation_table(),
+                    self.music.master,
+                    self.fx_volume,
+                    g0,
+                    g1,
+                    None,
+                    false,
+                )
+            }
+            None => (self.fx_attenuation(), 0),
+        };
+        self.voices.play(voice, pcm, entry.looping, att, pan);
         self.event(Event::Sound(entry.name));
     }
 }

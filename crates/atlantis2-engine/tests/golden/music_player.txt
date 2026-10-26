@@ -13,6 +13,9 @@
 # stereo frames, about one 60 Hz frame); check_buffer_music runs once per step before the cursor
 # moves; 'heard' hashes the bytes the cursor passes over (16-bit stereo PCM).
 # srand(1) before the start (and srand(0) by a start from the beginning, the tick count being 0).
+# m01.edge: a random mark at the rand() = 0x7fff edge (srand(0xf01bf641) before the start): its
+# init rows, then `mark= marks= fatal=` (the mark played @ 0x006725a4, the file's marks, the fatal
+# reports and the first one's format string); GotoMark's fatal ends the start there.
 m30.start.init ('open', 'muzik30.apc')
 m30.start.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
 m30.start.init ('setvol', -3)
@@ -49,6 +52,9 @@ m01.random.init ('create', 0, 524288, 22050, 16, 2)
 m01.random.init ('setpos', 442368, 0)
 m01.random.init ('play', 0, 1, -3, 0)
 m01.random.end steps=3000 heard=12288000 md5=2433d68e2b711c8dec95d8ed89270b81 segment_md5=2433d68e2b711c8dec95d8ed89270b81 segment_bytes=12288000 pos=30337536 write=20000 state=4 loopsleft=0 mark=3
+m01.edge.init ('open', 'muzik01.apc')
+m01.edge.init ('create', 0, 524288, 22050, 16, 2)
+m01.edge.init mark=0 marks=6 fatal=1 AtlMuzik_GotoMark(%d) invalide  tbl_mark=%X
 m30.nolist.init ('open', 'muzik30.apc')
 m30.nolist.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
 m30.nolist.init ('setvol', -3)

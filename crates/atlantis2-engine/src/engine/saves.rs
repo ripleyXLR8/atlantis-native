@@ -499,10 +499,14 @@ impl Engine {
             self.vars.clicperso = s.vars[k.clicperso];
             self.vars.clicobjet = s.vars[k.clicobjet];
         }
-        // The saved music again (FUN_0047a200(music, −1, 0)) when not 0.
+        // Entry 12 is the music player's own list (`Interp_MusikScript`
+        // @ 0x006d0444, which the port keeps twice): the list the next end
+        // of track draws from is the save's, whatever plays.
+        self.player.list = self.con.as_ref().map_or(Vec::new(), |s| s.music.clone());
+        // The saved music again (FUN_0047a200(music, −1, 0)) when not 0
+        // (FUN_004785a0 @ 0x004785df); with 0 the music playing goes on.
         let music = d.i32(entry::MUSIC);
         if music != 0 {
-            self.player.list = self.con.as_ref().map_or(Vec::new(), |s| s.music.clone());
             self.play_music(music, -1, 0);
         }
         // The cursor's frame (FUN_0047bfa0, only with a bank; the reset's

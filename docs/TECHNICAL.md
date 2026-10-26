@@ -87,7 +87,10 @@ to its end, the next one of the `startmusik` list starting right after
 its last sample (the original drops the last ~5.8 s of a track followed
 by another), and a track that ends with an empty list, or with loops
 left, plays again from its start (the original loops the last 5.9 s of
-its ring until another music command); see the Music item of
+its ring until another music command), and a random mark drawn at the
+`rand()` = 0x7fff edge (one draw in 32768 of a `startmusik` entry
+without a mark) plays the track's last mark (the original's draw is one
+past the marks, a fatal error: it saves and quits); see the Music item of
 [Atlantis II](#atlantis-ii-in-progress). With it too, in Ireland's two
 puzzle views (Brigid's cross, view 2; the ogham stones, view 6) a click
 on a puzzle zone runs its puzzle and nothing else: the original also
@@ -2446,11 +2449,10 @@ back) into `yucatan-*.png`.
   the edge column, the win with its film and dialog) pass by pass, with
   their sprite draws, scans, sounds, the click flag and the cursor; and
   a game played with the mouse by ear from chapter 20's arrival on the
-  island to the standing poet's first subject (dialog 64). Known
-  difference: the sound table holds the place sounds and these, not the
-  `NEWSOUND`, film and `TrajSound` tracks the original also keeps there
-  while they play, so a handle can differ when one of those is still
-  loaded at the view's entry or a round's start.
+  island to the standing poet's first subject (dialog 64). The handles
+  are those of the one sound table the place sounds, `NEWSOUND`, the
+  films' and moves' tracks and the puzzles share (Sound, below), so a
+  `NEWSOUND` entry the original leaves loaded shifts them as it does.
 - **Worlds:** Tibet (`tibet.wam`, world 5), Ireland, China, Yucatán,
   Xibalba, the space-travel hub, Shamballa and Atlantis (above) are
   ported. A `changewam` of the scripts to any other place (Ireland's
@@ -2601,7 +2603,27 @@ back) into `yucatan-*.png`.
   keeps them.
 - **Sound:** the voices of the original (0 the music, 1 the dialog
   voice, 2 the films' tracks and the effects) mixed as DirectSound does
-  (`sound.rs`). The place sounds (`place_sound.rs`, `engine/places.rs`)
+  (`sound.rs`): each voice converted to the primary buffer's format,
+  22050 Hz stereo (FUN_0040f480), and summed there; that mix is then
+  converted to the device's rate. Both conversions interpolate linearly,
+  so the four 44100 Hz files keep one sample in two, unfiltered (what
+  they hold above 11025 Hz folds back below it). How the players'
+  DirectSound converts (a Windows 9x software mixer, a card's mixer, a
+  later Windows' mixer) is not known, so this part is the port's choice.
+  Without a sound device the window still plays the mix, into nothing,
+  at the game's pace, so every voice ends at its length as DirectSound's
+  buffers do (a `NEWSOUND`'s entry is then freed as with a device; the
+  original without a sound card plays nothing at all). Every sound but the music and the
+  dialog voices goes through one table of 50 entries (FUN_0047a530: a
+  name already loaded is reused, else the first free entry; a full table
+  is the original's fatal error) shared by the place sounds, the puzzles,
+  `NEWSOUND` and the tracks, with one handle (@ 0x00673f34) for the
+  last `NEWSOUND`, film's or move's track: a `NEWSOUND` while voice 2
+  plays frees the handle's entry first, a track loaded over a
+  `NEWSOUND` that still plays leaves the `NEWSOUND`'s entry loaded for
+  good, and each pass frees the handle's entry once a `NEWSOUND` has
+  been played out (FUN_0047a2f0), as `tests/sound_glue.rs` checks against
+  the table of the original's runs. The place sounds (`place_sound.rs`, `engine/places.rs`)
   are the original's: the sources of the place file (a position, a
   level, four files with a probability each) heard on voices 3 to 10
   from the listener position that a table in the executable gives each
@@ -2633,9 +2655,17 @@ back) into `yucatan-*.png`.
   not load): only then does the video's end stop voice 2, so a
   `NEWSOUND` still playing goes on through a film without a track (18,
   33, 60, 67) or a move without a `TrajSound`. A video that does not
-  open keeps the loaded track for the next one. Compared with the
+  open keeps the loaded track for the next one (film 4: its track is on
+  disc 1, its video on no disc). Compared with the
   original's own functions under emulation
-  (`tests/golden/sound_glue.txt`, `tests/sound_glue.rs`).
+  (`tests/golden/sound_glue.txt`, `tests/sound_glue.rs`). The music state
+  machine also runs inside the original's long loads (FUN_00476e10, again
+  while it writes the ring): twice in a video's start, at a video's end,
+  before each transition sprite bank, eight times in a panorama's load
+  and before each place animation of a view; so a music asked for before
+  a view's entry or a video opens there, in that pass. The fades' float
+  arithmetic runs under the process's x87 control word of the moment
+  (0x0e7f once the Pentium II warp has drawn), not the start-up one.
 - **Music** (`music.rs`, the player's states in `engine/host.rs`):
   `startmusik` draws a track from its list as the original does (one
   entry; two, the other one in 85 % of the draws when the current music
@@ -2679,8 +2709,16 @@ back) into `yucatan-*.png`.
   nothing but keeps which copies the original would hold and shows the
   page where it copies (Menus, below). Every track decoded from its start and from each of the
   83 marks, the random marks and the list choices are the original's
-  (tests/music.rs). The music player draws from the game's one `rand`
-  (Place animations, above).
+  (tests/music.rs), and so is each start's voice: created from the music
+  buffer, looping, its cursor and volume (`tests/music_player.rs` against
+  the runs' `init` rows). A random mark is drawn as `rand() · (marks + 1)
+  / 0x7fff`, so `rand()` = 0x7fff gives one past the marks, which
+  `AtlMuzik_GotoMark` reports as a fatal error (the original saves and
+  quits; Native stops the music and the scripts); with the minor bug
+  fixes the track plays from its last mark instead. A load puts the
+  save's `startmusik` list back (it is the player's own list) even when
+  the save's music is 0 and the music playing goes on. The music player
+  draws from the game's one `rand` (Place animations, above).
 - **Alpha masks:** the dialog videos carry an `AL` chunk per frame (runs of
   (n, a) pairs, a = 0..31), which the decoder keeps for the caller
   (`HnmVideo::alpha`) and `AlphaTables::blend` draws as the original's
@@ -2777,7 +2815,13 @@ back) into `yucatan-*.png`.
   font's outlines filled where at least half covered: GDI also runs the
   font's hinting, which this does not, so a few pixels of a glyph differ
   from the original's (the one known difference). The voices are mixed as
-  DirectSound mixes its buffers (gain 10^(attenuation / 2000)). With
+  DirectSound mixes its buffers (gain 10^(attenuation / 2000)). A voiced
+  line ends once its voice has been played out, DirectSound's status
+  (FUN_0047a9c0(1) @ 0x0046101b): with a sound output, the mixer's (a
+  voice the output has not played out a second after its length, a
+  stalled device, ends by the clock; a window without a sound device
+  plays the mix into nothing at the game's pace); without one (the
+  tests), the voice's length on the clock. With
   `cinema=N,M` dialog M plays over film N: it is set up whatever the
   film's start answered (FUN_0040c030: a film that does not start leaves
   it to the next video), then at each video tick its line sequencer alone
@@ -3235,7 +3279,16 @@ clicks with chapter 58 and drawing, the turtle ring's hooks, tick,
 dispatchers, clicks and arrivals with chapter 46 and drawing, the
 labyrinth souls' cells, visibility tests, random drops, entry, delay,
 tick, warp frames with chapter 60, dispatchers and drawing, the canoe's
-loading and every frame of a played canoe, under both CPU routines;
+loading and every frame of a played canoe, under both CPU routines,
+every frame of the 1086 `.hnm` files of the four discs (the videos
+decoded over surfaces filled with 0xa5a5 rather than zeroed, as the
+original never clears them, with the same frames; each video ends on
+its frame count, a size-0 dword right after its last counted
+superchunk), the dialog videos'
+blend with the RGB565 and RGB555 tables at 640 and 800 pixels a row,
+the 161 sound files decoded whole, each music's start;
+the credits' text widths are checked against GDI's widths of the font
+measured on Windows 98 SE and Windows 11;
 names of `defnames.con`
 entries are written by section and index in the script files and filled
 in from the game's file by the tests):

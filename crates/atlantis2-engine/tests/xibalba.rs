@@ -1147,7 +1147,7 @@ fn a_save_in_xibalba_loads() {
         e.run_command(c);
     }
     let saved = e.save_data();
-    let f = loaded(&saved);
+    let mut f = loaded(&saved);
     assert_eq!(f.place(), ("xibalba.wam", 122));
     assert_eq!(f.script_state().unwrap().chapter, 39);
     assert_eq!(f.files().current_disc(), 4);
@@ -1163,6 +1163,15 @@ fn a_save_in_xibalba_loads() {
         .position(|z| z.name.as_deref() == Some("CLICTEZSTATUE"))
         .unwrap();
     assert!(f.wam().view(122).unwrap().zones[z].kind < 88888);
+    // The saved music, once the one the load's view entry opened (the
+    // music state machine runs during the panorama's load) has faded out.
+    for _ in 0..600 {
+        if f.music_playing().is_some_and(|m| [14, 16].contains(&m)) {
+            break;
+        }
+        f.set_clock(f.clock() + atlantis2_engine::engine::PASS);
+        f.pass(None);
+    }
     assert!(f.music_playing().is_some_and(|m| [14, 16].contains(&m)));
 }
 

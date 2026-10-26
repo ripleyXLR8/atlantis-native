@@ -19,7 +19,7 @@ use crate::crt::Rand;
 use crate::dialog::{Dialog, FrameContext, TickContext};
 use crate::music;
 use crate::script::{AnimOp, DialStart, Host, Keys, Script};
-use crate::sound::{volume_to_attenuation, Pcm, VOICE_EFFECTS, VOICE_MUSIC};
+use crate::sound::{volume_to_attenuation, Pcm, VOICE_MUSIC};
 
 /// The music's start volume during a dialog (@ 0x00477470 with the flag
 /// @ 0x006725c8).
@@ -157,6 +157,33 @@ impl Engine {
         false
     }
 
+    /// The music player as at start-up: no music, none current, the
+    /// voice stopped and the file closed (for tests and tools).
+    pub fn music_reset(&mut self) {
+        self.voices.stop(VOICE_MUSIC);
+        self.player.stream.close();
+        self.player.current = 0;
+        self.music.state = 0;
+    }
+
+    /// `FUN_0047a200(n, mark, loops)` (play music `n`, see `play_music`),
+    /// for tests and tools.
+    pub fn music_start(&mut self, n: i32, mark: i32, loops: i32) -> bool {
+        self.play_music(n, mark, loops)
+    }
+
+    /// FUN_00476e10: the music state machine run, again while its pass
+    /// wrote the ring. The original calls it around its long loads: twice
+    /// in `AtlHnm_start` (before the open and at the end), at the end of
+    /// the video loop, before each transition sprite bank, at the start
+    /// of the panorama load and after its header and each of its six
+    /// faces, and before each place animation of a view; so a music
+    /// opened, stopped or faded there takes effect in that pass, not the
+    /// next.
+    pub(super) fn music_pump(&mut self) {
+        while self.music_frame() {}
+    }
+
     /// Play music `n` (`FUN_0047a200(n, mark, loops)`): nothing when it is
     /// the current one; else it becomes current, its hard-disk copy is
     /// made when empty (`CopyMusikToDrive` of `n`, @ 0x0047a24e: the
@@ -176,7 +203,7 @@ impl Engine {
         self.player.stream.loops = loops;
         let next = if mark == 0 { 1 } else { 2 };
         if self.music.state != 0 {
-            self.music.switch(next);
+            self.music_mut().switch(next);
         } else {
             self.music.state = next;
         }
@@ -218,9 +245,15 @@ impl Engine {
         self.voices.play(VOICE_MUSIC, pcm, true, att, 0);
         if at_mark {
             let mut ring = self.voices.music_ring();
-            self.player
+            self.player.stream.fixes = self.enhancements.minor_bug_fixes;
+            let ok = self
+                .player
                 .stream
                 .goto_mark(self.player.mark, &mut self.rand, &mut ring);
+            if !ok {
+                self.stream_events();
+                return;
+            }
         }
         self.music.volume = self.start_volume();
         self.voices
@@ -235,6 +268,18 @@ impl Engine {
         };
         self.player.stream.events.clear();
         self.event(Event::Music { music: n, mark });
+    }
+
+    /// A fatal error of the music player (FUN_00480cd0: the original saves
+    /// in slot 8 of player 9 and quits): here the music stops (no stale
+    /// buffer goes on looping) and the scripts stop, Native's way with the
+    /// original's fatal errors.
+    fn music_fatal(&mut self, msg: &str) {
+        self.voices.stop(VOICE_MUSIC);
+        self.player.stream.close();
+        self.music.state = 0;
+        self.event(Event::MusicStop);
+        self.with_script(|s, _| s.fail(msg.to_string()));
     }
 
     /// The music's start volume: 14 in a dialog, else the music volume.
@@ -298,6 +343,7 @@ impl Engine {
                     self.copy_music(&n.to_string());
                 }
                 music::StreamEvent::Cursor(..) => {}
+                music::StreamEvent::Fatal(msg) => self.music_fatal(&msg),
             }
         }
     }
@@ -764,17 +810,11 @@ impl Host for Engine {
     }
 
     fn music_volume(&mut self, percent: i32) {
-        self.music.set_percent(percent);
+        self.music_mut().set_percent(percent);
     }
 
     fn new_sound(&mut self, apc: &str) {
-        // FUN_0047a290: only when the file opens; what voice 2 played is
-        // stopped.
-        if let Some((name, pcm)) = self.load_sound(apc) {
-            let att = self.fx_attenuation();
-            self.voices.play(VOICE_EFFECTS, pcm, false, att, 0);
-            self.event(Event::Sound(name));
-        }
+        Engine::new_sound(self, apc);
     }
 
     fn traj_sound(&mut self, apc: &str) {
@@ -796,7 +836,7 @@ impl Host for Engine {
     }
 
     fn stop_music(&mut self) {
-        self.music.stop();
+        self.music_mut().stop();
     }
 
     fn load_music(&mut self, list: &str) -> bool {

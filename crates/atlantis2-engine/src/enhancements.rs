@@ -20,6 +20,12 @@ pub struct Enhancements {
     ///   rewind's file check compares the PCM size with the file's
     ///   (@ 0x00477b00), fails and closes the file, and the ring loops its
     ///   last 5.9 s until another music command;
+    /// - a random music mark drawn at the `rand()` = 0x7fff edge (one draw
+    ///   in 32768) is the file's last mark; off, as the original
+    ///   (`AtlMuzik_GetRandomMark` @ 0x00478090 gives one past the marks),
+    ///   `AtlMuzik_GotoMark` reports a fatal error (the original saves in
+    ///   slot 8 of player 9 and quits; here the music and the scripts
+    ///   stop);
     /// - in Ireland's two puzzle views (Brigid's cross, view 2; the ogham
     ///   stones, view 6) a click on a puzzle zone runs its puzzle and
     ///   nothing else; off, as the original (FUN_0049ca80 @ 0x0049cb9b),

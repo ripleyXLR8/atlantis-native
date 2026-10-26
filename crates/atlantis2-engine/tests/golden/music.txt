@@ -4,6 +4,8 @@
 # rand.seedS: the C runtime's rand() after srand(S).
 # randmark.nN.seedS: AtlMuzik_GetRandomMark (0x00478090) for N marks, srand(S) first, the current
 #   mark following each draw.
+# randedge.nN: AtlMuzik_GetRandomMark for N marks, the current mark 0, at the rand() = 0x7fff edge
+#   (srand(0xf01bf641) first): the draw, N + 1, one past the marks.
 # select.'LIST'.CUR.seedS: Interp_SelectMusic (0x004851f0) on a startmusik list (the text up to the
 #   line end), the current music 0 (cur0) or the first one drawn (curfirst), srand(S) first;
 #   music/mark/loops/entries per draw.
@@ -28,6 +30,10 @@ randmark.n5.seed12345 1,3,4,1,4,5,0,5,4,2
 randmark.n10.seed1 6,2,8,6,5,3,9,8,1,9
 randmark.n10.seed7 5,2,5,2,10,3,9,6,1,9
 randmark.n10.seed12345 2,6,8,7,1,7,9,1,9,7
+randedge.n0 1
+randedge.n2 3
+randedge.n5 6
+randedge.n10 11
 select.'30)'.cur0.seed1 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1
 select.'30)'.cur0.seed99 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1
 select.'30)'.cur0.seed4242 30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1;30/-1/0/1

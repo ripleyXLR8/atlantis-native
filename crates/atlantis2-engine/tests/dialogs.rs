@@ -761,6 +761,57 @@ fn dialog_360_plays_end_to_end() {
     assert_eq!(e.music.volume, 100);
 }
 
+/// L20: a voiced line ends when DirectSound reports its voice played
+/// out (FUN_0047a9c0(1) @ 0x0046101b), not when the clock has run the
+/// voice's length: with a sound output that starts mixing 0.4 s late (a
+/// device that stalls), line 360_01 lasts its 2.730 s voice plus the
+/// stall, and none of its voice is cut. Without an output (the other
+/// tests) the clock decides, as `dialog_360_plays_end_to_end` checks.
+#[test]
+fn a_voiced_line_ends_when_the_output_has_played_its_voice() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::new_game(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    e.voices().attach_output();
+    e.start_dialog(360).unwrap();
+    let stall = 0.4;
+    let mut first: Option<f64> = None;
+    let mut mixed = 0.0f64;
+    let mut out = Vec::new();
+    let mut lines: Vec<(String, f64)> = Vec::new();
+    let mut frame = 0u64;
+    while e.dialog().is_some() && frame < 60 * 30 {
+        let t = (frame + 1) as f64 * PASS;
+        e.set_clock(t);
+        e.frame();
+        if let Some(l) = e.dialog().and_then(|d| d.current_line()) {
+            if lines.last().is_none_or(|(id, _)| *id != l.id) {
+                lines.push((l.id.clone(), t));
+            }
+            first.get_or_insert(t);
+        }
+        // The output mixes in step with the clock once the stall is over.
+        if let Some(t0) = first {
+            let want = ((t - t0 - stall).max(0.0) * 22050.0).floor();
+            let n = (want - mixed) as usize;
+            if n > 0 {
+                out.resize(2 * n, 0.0);
+                e.voices().fill(&mut out, 22050, 2);
+                mixed += n as f64;
+            }
+        }
+        frame += 1;
+    }
+    let ids: Vec<&str> = lines.iter().map(|(i, _)| i.as_str()).collect();
+    assert_eq!(ids, ["360_01", "360_02", "360_03"]);
+    let len = lines[1].1 - lines[0].1;
+    assert!(
+        (2.73 + stall..2.73 + stall + 3.0 / 15.0 + PASS).contains(&len),
+        "{len}"
+    );
+}
+
 /// Every Tibet dialog (the 26 of `dialog_script_ti.txt`) started in view
 /// 7 and played to its end with its heads and bodies drawn, a click every
 /// 20 passes: the panorama back at 76° with the screen's centre after
