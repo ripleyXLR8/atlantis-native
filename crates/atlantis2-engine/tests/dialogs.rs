@@ -13,6 +13,8 @@
 //! - `tests/golden/music_fade_*.txt`, `sound_volume.txt`: the music fades
 //!   (the dialogs duck the music to 16 %), the volume and pan tables and
 //!   the default levels;
+//! - `tests/golden/lipsync_survey.txt`: the lip-sync weights of every
+//!   dialog line of the five worlds, every 1/15 s;
 //! - a whole Tibet dialog played by the engine: lines, voices, video,
 //!   panorama shots, music.
 //!
@@ -25,13 +27,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use atlantis2_data::defnames;
-use atlantis2_data::dialog::{parse_dial, FontTxt, World};
+use atlantis2_data::dialog::{parse_dial, FontTxt, LineKind, World};
 use atlantis2_data::exe::Release;
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::dialog::{compose, load_head, Dialog, DialogScript};
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::hnm_stream::HnmStream;
+use atlantis2_engine::lipsync::LipSync;
 use atlantis2_engine::raster3d::{HEIGHT, WIDTH};
 use atlantis2_engine::sound::{
     attenuation_table, pan_table, volume_to_attenuation, MusicVolume, DEFAULT_FX_VOLUME,
@@ -50,6 +53,7 @@ const SUBTITLES: &str = include_str!("golden/subtitles.txt");
 const SUBTITLES_101_CD: &str = include_str!("golden/subtitles_101_cd.txt");
 const SUBTITLES_101_GOG: &str = include_str!("golden/subtitles_101_gog.txt");
 const LIPSYNC: &str = include_str!("golden/lipsync_tibet.txt");
+const LIPSYNC_SURVEY: &str = include_str!("golden/lipsync_survey.txt");
 const VOLUME: &str = include_str!("golden/sound_volume.txt");
 const FADES: [(&str, Fpu); 3] = [
     (include_str!("golden/music_fade_027f.txt"), Fpu::Double),
@@ -94,6 +98,116 @@ fn gog() -> Option<A2Files> {
 /// The fields of a golden line after its first word.
 fn fields(line: &str) -> Vec<&str> {
     line.split_whitespace().filter(|&f| f != "|").collect()
+}
+
+/// Review L46: every dialog line of the five worlds (`com*.txt`), its
+/// voice decoded and analysed and its lip-sync weights evaluated every
+/// 1/15 s from the speaker's `Offset`, under 0x027f, against the
+/// original's analyser and evaluator (`lipsync_survey.txt`: 1214 lines,
+/// 82807 frames, 996 of them NaN, as the original's are; the voices no
+/// disc has and the speakers without a `[Matrice]` the same).
+#[test]
+fn every_line_s_lip_sync_matches_the_original() {
+    let Some(files) = game() else { return };
+    let want: BTreeMap<&str, &str> = LIPSYNC_SURVEY
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+        .filter_map(|l| l.split_once(' '))
+        .collect();
+    let mut got: BTreeMap<String, String> = BTreeMap::new();
+    let mut total: BTreeMap<&str, usize> = [
+        "lines",
+        "nan_lines",
+        "nan_frames",
+        "frames",
+        "noapc",
+        "noperso",
+        "nomatrix",
+    ]
+    .into_iter()
+    .map(|k| (k, 0))
+    .collect();
+    for (code, monde) in [("CH", 3), ("IR", 1), ("SH", 4), ("TI", 5), ("YU", 2)] {
+        let world = World::of_monde(monde).unwrap();
+        assert_eq!(world.code, code);
+        let script = DialogScript::load(&files, world, Fpu::Double).unwrap();
+        for l in &script.com {
+            let k = format!("{code}.{}", l.id);
+            *total.entry("lines").or_default() += 1;
+            let Some(apc) = files.read(Folder::ApcDial, &format!("{}.apc", l.id)) else {
+                got.insert(format!("{k}.apc"), "missing".into());
+                *total.entry("noapc").or_default() += 1;
+                continue;
+            };
+            let Some(p) = script.persos.iter().find(|p| p.name == l.speaker) else {
+                got.insert(format!("{k}.perso"), "missing".into());
+                *total.entry("noperso").or_default() += 1;
+                continue;
+            };
+            got.insert(format!("{k}.speaker"), l.speaker.clone());
+            let Some(matrix) = p.matrix else {
+                got.insert(format!("{k}.matrix"), "none".into());
+                *total.entry("nomatrix").or_default() += 1;
+                continue;
+            };
+            let voice = atlantis_codecs::decode_apc(&apc).expect(&k);
+            let n = voice.samples.len() as u32;
+            let mut ls = LipSync::new(Fpu::Double, &matrix, &voice.samples, n, p.smooth);
+            let frames = (f64::from(n) / 22050.0 * 15.0) as usize + 2;
+            let mut md5 = Md5::new();
+            let mut nan = Vec::new();
+            for f in 0..frames {
+                let t = (f as f64 * (1.0 / 15.0) + f64::from(p.offset)) as f32;
+                let w = ls.eval(t);
+                if w[0].to_bits() == 0xffc0_0000 {
+                    nan.push(f);
+                }
+                for x in w {
+                    md5.update(x.to_bits().to_le_bytes());
+                }
+            }
+            let kind = match l.kind {
+                LineKind::Head => "head",
+                LineKind::VoiceOver => "voixoff",
+                LineKind::VoiceOver0 => "voixoff0",
+                LineKind::Cinema => "cinema",
+            };
+            let md5: String = md5.finalize().iter().map(|b| format!("{b:02x}")).collect();
+            let first = nan.first().map_or(-1, |&f| f as i64);
+            for (field, v) in [
+                ("kind", kind.to_string()),
+                ("samples", n.to_string()),
+                ("frames", frames.to_string()),
+                ("nan_frames", nan.len().to_string()),
+                ("first_nan", first.to_string()),
+                ("weights_md5", md5),
+            ] {
+                got.insert(format!("{k}.{field}"), v);
+            }
+            *total.entry("frames").or_default() += frames;
+            *total.entry("nan_frames").or_default() += nan.len();
+            *total.entry("nan_lines").or_default() += usize::from(!nan.is_empty());
+        }
+    }
+    for (key, v) in total {
+        got.insert(format!("total.{key}"), v.to_string());
+    }
+    let mut bad = Vec::new();
+    for (key, v) in &want {
+        match got.get(*key) {
+            Some(g) if g == v => {}
+            g => bad.push(format!("{key}: {g:?}, the original {v}")),
+        }
+    }
+    for key in got.keys().filter(|k| !want.contains_key(k.as_str())) {
+        bad.push(format!("{key}: not in the original's"));
+    }
+    assert!(
+        bad.is_empty(),
+        "{} differences, first {:?}",
+        bad.len(),
+        &bad[..bad.len().min(10)]
+    );
 }
 
 /// Every Tibet dialog, in order, from one `srand(0)`: as the original
