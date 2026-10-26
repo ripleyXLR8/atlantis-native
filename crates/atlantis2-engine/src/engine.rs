@@ -2747,8 +2747,10 @@ impl Engine {
             self.load_place(&name);
             self.next_view = self.wam.view(n).map(|v| v.id);
             if self.next_view.is_none() {
-                // Fatal in the original.
-                log::error!("AtlWarp_continue(): load wam {name} : vue {n} introuvable!");
+                // The fatal error reporter (@ 0x0045a4cb): the emergency
+                // save and the quit.
+                let msg = format!("AtlWarp_continue(): load wam {name} : vue {n} introuvable!");
+                self.with_script(|s, _| s.fail(msg));
             }
             self.set_script_var(|k| k.next_warp_invalide, 0);
             if let Some(s) = self.con.as_mut() {

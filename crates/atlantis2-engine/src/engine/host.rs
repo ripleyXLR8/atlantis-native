@@ -662,7 +662,10 @@ impl Host for Engine {
                 };
                 match (find(a), find(b)) {
                     (Some(sa), Some(sb)) => self.anim.slots[sa].chain = sb as i32,
-                    _ => log::error!("AtlSpw_find_index_anum({id}, {a}, {b})"),
+                    // FUN_0047dea0's fatal error (the reporter, @ 0x0047dee3).
+                    _ => {
+                        self.pending_fatal = Some(format!("AtlSpw_find_index_anum({id}, {a}, {b})"))
+                    }
                 }
             }
             // The first record of the id, whatever its kind (the loop

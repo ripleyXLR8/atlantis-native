@@ -373,3 +373,19 @@ fn a_fatal_error_saves_and_quits() {
     assert!(dir.join("save").join("ATL09_08.SAV").exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// `ChangeAnimGotoPerso` naming an animation the view's slots lack: the
+/// look-up FUN_0047dea0's fatal error (@ 0x0047dee3), the reporter's
+/// emergency save and quit.
+#[test]
+fn a_missing_animation_is_fatal() {
+    let Some(files) = game() else { return };
+    let mut e = started(files);
+    let rows: Vec<(Row, Option<i32>)> = anim_slots().into_iter().map(|r| (r, None)).collect();
+    set_slots(&mut e, &rows);
+    e.run_command(b"(ChangeAnimGotoPerso=CHAC,1,1)");
+    assert!(!e.quit());
+    e.run_command(b"(ChangeAnimGotoPerso=CHAC,1,9)");
+    assert!(e.script_state().unwrap().fatal.is_some());
+    assert!(e.quit());
+}

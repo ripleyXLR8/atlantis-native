@@ -326,6 +326,9 @@ impl Script {
             let a = self.parse_int(src, &mut i);
             let b = self.parse_int(src, &mut i);
             host.anim(AnimOp::ChangeAnimGotoPerso { id, a, b });
+            if let Some(msg) = host.take_fatal() {
+                self.fail(msg);
+            }
         }
         let anim_key = [
             k.playanimp,
