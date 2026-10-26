@@ -17,6 +17,9 @@ atlantis-engine = { path = "../atlantis-engine" }
 # left to each system's mathematics library.
 libm = "=0.2.16"
 log = "0.4"
+# The fonts' hinting programs (the TrueType interpreter), as GDI runs them
+# for the subtitles and menus' glyphs.
+skrifa = "0.37"
 
 [dev-dependencies]
 md-5 = "0.10"
