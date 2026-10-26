@@ -970,6 +970,10 @@ fn message_clic_shows_a_message_until_a_click_or_two_seconds() {
         let (x, y) = (i % 640, i / 640);
         (200..440).contains(&x) && (200..280).contains(&y)
     }));
+    // `SetTextColor(0x0fffffff)`: white, as Windows 98 SE's GDI draws it
+    // (Windows 11's black is not the release's), over the panorama.
+    assert!(differ.iter().any(|&i| screen[i] == 0xffff), "no white text");
+    assert!(differ.iter().all(|&i| screen[i] != 0), "black text");
     while e.loop_type == LoopType::Message {
         pass(&mut e, &mut screen);
         assert!(e.ticks.wrapping_sub(start) <= 32);

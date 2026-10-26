@@ -28,17 +28,20 @@
 //!   every end). Each line's position is (W / 2 − w / 2, H / 2 − h / 2)
 //!   in C's integer division, W x H the logical screen, w x h the line's
 //!   `GetTextExtentPoint32A`.
-//! - The colour: `SetTextColor(0x0fffffff)` (@ 0x0047688e), not
-//!   `0x00ffffff` as every other text of the game: the high byte's bit 0
-//!   makes it a `PALETTEINDEX(0xffff)`, which a DC without a palette
-//!   takes from the default palette, whose first entry is black when the
-//!   index is out of range [INFERRED: Wine's GDI (`get_pixel_color`); a
-//!   run on Windows would settle it].
+//! - The colour: `SetTextColor(0x0fffffff)` (@ 0x0047688e), as the warp
+//!   frame's `PAUSED` overlay (@ 0x0045aafc), where the other texts have
+//!   `0x00ffffff`. What GDI draws for it depends on the Windows: measured
+//!   on a 16-bit RGB565 DIB section and on a 16-bit DirectDraw surface's
+//!   DC, the text begun as the game begins it, Windows 98 SE draws it
+//!   white (as `0x00ffffff`; only a high byte of 1 is a palette index
+//!   there, black), Windows 11 black (the high byte's bit 0 makes it a
+//!   palette index out of the default palette's range).
+//!   The port draws white, as on the Windows 9x of the game's release.
 
 use crate::subtitle::TextOut;
 
 /// The colour of the message's text (see the module's notes).
-pub const COLOUR: u32 = 0x000000;
+pub const COLOUR: u32 = 0xffffff;
 
 /// The prefix of an unknown id's text (@ 0x005dc9a0).
 const UNKNOWN: &[u8] = b"Unknown message ID :";
@@ -139,26 +142,27 @@ pub fn layout(
 mod tests {
     use super::*;
 
-    const TABLE: &[u8] = b"; comment\r\nobNOT_IN_DEMO=Non accessible\r\nPAUSED=PAUSED\r\n\
-                           TEST3=test message 3\r\nKEY  = spaced\r\nLONG=abcdefghij";
+    /// A synthetic table in the file's form.
+    const TABLE: &[u8] = b"; comment\r\nobFIRST=first line\r\nHOLD=held\r\n\
+                           NOTE7=note seven\r\nKEY  = spaced\r\nLONG=abcdefghij";
 
     #[test]
     fn lookup_as_the_original() {
-        assert_eq!(lookup(TABLE, b"PAUSED"), (true, b"PAUSED".to_vec()));
-        assert_eq!(lookup(TABLE, b"TEST3)"), (true, b"test message 3".to_vec()));
+        assert_eq!(lookup(TABLE, b"HOLD"), (true, b"held".to_vec()));
+        assert_eq!(lookup(TABLE, b"NOTE7)"), (true, b"note seven".to_vec()));
         // What follows the first `=`, its blanks kept.
         assert_eq!(lookup(TABLE, b"KEY"), (true, b" spaced".to_vec()));
         // A prefix is not a key.
         assert_eq!(
-            lookup(TABLE, b"TEST"),
-            (false, b"Unknown message ID :TEST".to_vec())
+            lookup(TABLE, b"NOTE"),
+            (false, b"Unknown message ID :NOTE".to_vec())
         );
         // An empty key matches the first line without one (the comment),
         // which has no `=`.
         assert_eq!(lookup(TABLE, b")"), (true, Vec::new()));
         // The last line, without an end.
         assert_eq!(lookup(TABLE, b"LONG"), (true, b"abcdefghij".to_vec()));
-        assert_eq!(id_of(b"PAUSED\r\n/set"), b"PAUSED");
+        assert_eq!(id_of(b"HOLD\r\n/set"), b"HOLD");
     }
 
     #[test]

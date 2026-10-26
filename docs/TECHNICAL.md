@@ -2864,8 +2864,11 @@ back) into `yucatan-*.png`.
   `message.rs`: in `AtlFT_Big_Default` at the centre, a text wider than
   640 pixels cut at half its bytes and only its second half shown, an
   unknown id as `Unknown message ID :` and the id; a click or two seconds
-  end it; the text's colour 0x0fffffff is a palette index, black
-  [inferred from Wine's GDI]); no shipped script uses either.
+  end it; the text's colour is 0x0fffffff, as the warp's `PAUSED`
+  overlay's, which Windows 98 SE's GDI draws white and Windows 11's black
+  (measured on 16-bit DIB and DirectDraw surface DCs): the port draws it
+  white, as on the Windows 9x of the game's release); no shipped script
+  uses either.
   `SHOWGUEST`, `INCPERSO`, `ADDGUEST`, `SUBGUEST` and the plain
   variables are script state only, as in the original. `ANIM_THE_FRAME`
   sets the playing byte of the first record of its id, of any kind
@@ -3005,7 +3008,7 @@ back) into `yucatan-*.png`.
   (`FUN_00402720`), and each loop type change (`FUN_0049da90` →
   `FUN_00402960`) chooses where the frame is drawn and the size the code
   lays things out for (@ 0x005d9b9c, 0x005d9ba0). The panorama (and the
-  `MESSAGE_CLIC` box, not ported) is drawn on the screen itself: the cube
+  `MESSAGE_CLIC` text) is drawn on the screen itself: the cube
   at 800 x 600 with the same 76° across (fx = 800 / (2 tan 38°) = 511.98,
   centre (400, 300); 60.7° high, as at 640 x 480), the cursor and the
   object in hand at its centre, the bag bar with 10 cells and its art
