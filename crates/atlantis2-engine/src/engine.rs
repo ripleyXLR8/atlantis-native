@@ -226,6 +226,10 @@ pub enum Event {
         view: u32,
         deferred: bool,
     },
+    /// Frame `frame` of transition sprite bank `bank` drawn over the
+    /// video's frame of that number (FUN_0047c200; an empty sprite draws
+    /// nothing and is left out).
+    SpfDraw { bank: usize, frame: u32 },
     /// A transition sprite bank loaded (`datas_a2\spf\`, @ 0x0047c100), or
     /// not found.
     SpfLoad { name: String, found: bool },
@@ -2575,8 +2579,10 @@ impl Engine {
                 continue;
             };
             if self.spf.len() >= 10 {
-                // Fatal in the original (`nb_spf>=MAX_SPF`).
-                log::error!("AtlSpr_init_spf() : nb_spf>=MAX_SPF!!");
+                // The fatal error reporter (@ 0x0047c1da, `nb_spf>=MAX_SPF`):
+                // the emergency save and the quit ([`Engine::check_fatal`]).
+                let msg = "AtlSpr_init_spf() : nb_spf>=MAX_SPF!!".to_string();
+                self.with_script(|s, _| s.fail(msg));
                 return;
             }
             self.spf.push(bank);
@@ -2616,17 +2622,34 @@ impl Engine {
         blit_centred(v.hnm.frame(), v.hnm.width(), v.hnm.height(), out, w, h);
         let k = v.shown as usize;
         let mut t = Target::screen(out, w, h);
-        for bank in &self.spf {
-            if k >= bank.len() {
-                continue;
-            }
-            match bank.info(k) {
-                Some(i) if i.w <= 640 && i.h <= 480 => {
-                    bank.draw(&mut t, None, 0, k);
-                }
-                _ => {}
+        for i in self.transition_sprites_drawn(k) {
+            self.spf[i].draw(&mut t, None, 0, k);
+        }
+    }
+
+    /// A video frame shown, and the transition sprites drawn over it
+    /// (FUN_0047c200), for the trace.
+    fn video_frame_event(&mut self, k: u32) {
+        self.event(Event::VideoFrame(k));
+        if self.trace {
+            for bank in self.transition_sprites_drawn(k as usize) {
+                self.event(Event::SpfDraw { bank, frame: k });
             }
         }
+    }
+
+    /// The transition sprite banks whose frame `k` FUN_0047c200 draws
+    /// (FUN_0047bc40's checks: a bank shorter than k, or a sprite larger
+    /// than 640 x 480, is refused with a warning), in their order.
+    pub fn transition_sprites_drawn(&self, k: usize) -> Vec<usize> {
+        self.spf
+            .iter()
+            .enumerate()
+            .filter(|(_, bank)| {
+                k < bank.len() && bank.info(k).is_some_and(|i| i.w <= 640 && i.h <= 480)
+            })
+            .map(|(i, _)| i)
+            .collect()
     }
 
     /// FUN_0049cc40: the move set-up of a type-1 zone.
@@ -2834,7 +2857,7 @@ impl Engine {
             }
         }
         let end = !matches!(hnm.next_frame(), Some(Ok(_))) || hnm.frames_decoded() >= frames;
-        self.event(Event::VideoFrame(0));
+        self.video_frame_event(0);
         self.video = Some(Video {
             hnm,
             name: name.to_string(),
@@ -2882,7 +2905,7 @@ impl Engine {
             }
         }
         if let Some(k) = shown {
-            self.event(Event::VideoFrame(k));
+            self.video_frame_event(k);
         }
         // `cinema=N,M`: the dialog's step after each frame (FUN_00480830,
         // FUN_00480840): its lines and subtitles over the film.

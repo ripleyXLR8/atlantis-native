@@ -1,0 +1,220 @@
+# Native's copy of atlantis2-re evidence/golden/links.txt (tools/emu/links.py --native): the
+# same rows, the events in the form of Native's test (tests/links.rs)
+== T bigile1.wam view 7, the move to view 8: two transition sprite banks
+start view 7 yaw -28.891 pitch 3.503 centre zone -1
+p0 t1 zone=3
+p2 t1 turn=1 | click; depart 8; turn 359.719,-0.000; clickscan 0
+p3 t1 yaw -28.692 pitch 3.479
+p4 t2 yaw -28.295 pitch 3.430
+p5 t2 yaw -27.700 pitch 3.358
+p6 t2 yaw -26.905 pitch 3.260
+p7 t2 yaw -25.913 pitch 3.139
+p8 t3 yaw -24.722 pitch 2.993
+p9 t3 yaw -23.332 pitch 2.823
+p10 t3 yaw -21.744 pitch 2.628
+p11 t3 yaw -19.957 pitch 2.409
+p12 t4 yaw -17.972 pitch 2.166 zone=-1
+p13 t4 yaw -15.788 pitch 1.899
+p14 t4 yaw -13.605 pitch 1.632
+p15 t4 yaw -11.600 pitch 1.386
+p16 t5 yaw -9.773 pitch 1.162
+p17 t5 yaw -8.121 pitch 0.960
+p18 t5 yaw -6.644 pitch 0.779
+p19 t5 yaw -5.338 pitch 0.619
+p20 t6 yaw -4.201 pitch 0.480
+p21 t6 yaw -3.228 pitch 0.361
+p22 t6 yaw -2.416 pitch 0.261
+p23 t6 yaw -1.759 pitch 0.181
+p24 t7 yaw -1.248 pitch 0.118
+p25 t7 yaw -0.872 pitch 0.072
+p26 t7 yaw -0.615 pitch 0.041
+p27 t7 yaw -0.457 pitch 0.022
+p28 t8 yaw -69.282 pitch -0.001 loop=1 view=8 turn=0 ARRIVEEVUE=8 VUE=8 | enter spw=7; spf li007008.spr; spf p0007008.spr; video 39; frame 0; spfdraw 0 0; spfdraw 1 0
+p32 t9  | frame 1; spfdraw 0 1; spfdraw 1 1
+p36 t10  | frame 2; spfdraw 0 2; spfdraw 1 2
+p40 t11  | frame 3; spfdraw 0 3; spfdraw 1 3
+p44 t12  | frame 4; spfdraw 0 4; spfdraw 1 4
+p48 t13  | frame 5; spfdraw 0 5; spfdraw 1 5
+p52 t14  | frame 6; spfdraw 0 6; spfdraw 1 6
+p56 t15  | frame 7; spfdraw 0 7; spfdraw 1 7
+p60 t16  | frame 8; spfdraw 0 8; spfdraw 1 8
+p64 t17  | frame 9; spfdraw 0 9; spfdraw 1 9
+p68 t18  | frame 10; spfdraw 0 10; spfdraw 1 10
+p72 t19  | frame 11; spfdraw 0 11; spfdraw 1 11
+p76 t20  | frame 12; spfdraw 0 12; spfdraw 1 12
+p80 t21  | frame 13; spfdraw 0 13; spfdraw 1 13
+p84 t22  | frame 14; spfdraw 0 14; spfdraw 1 14
+p88 t23  | frame 15; spfdraw 0 15; spfdraw 1 15
+p92 t24  | frame 16; spfdraw 0 16; spfdraw 1 16
+p96 t25  | frame 17; spfdraw 0 17; spfdraw 1 17
+p100 t26  | frame 18; spfdraw 0 18; spfdraw 1 18
+p104 t27  | frame 19; spfdraw 0 19; spfdraw 1 19
+p108 t28  | frame 20; spfdraw 0 20; spfdraw 1 20
+p112 t29  | frame 21; spfdraw 0 21; spfdraw 1 21
+p116 t30  | frame 22; spfdraw 0 22; spfdraw 1 22
+p120 t31  | frame 23; spfdraw 0 23; spfdraw 1 23
+p124 t32  | frame 24; spfdraw 0 24; spfdraw 1 24
+p128 t33  | frame 25; spfdraw 0 25; spfdraw 1 25
+p132 t34  | frame 26; spfdraw 0 26; spfdraw 1 26
+p136 t35  | frame 27; spfdraw 0 27; spfdraw 1 27
+p140 t36  | frame 28; spfdraw 0 28; spfdraw 1 28
+p144 t37  | frame 29; spfdraw 0 29; spfdraw 1 29
+p148 t38  | frame 30; spfdraw 0 30; spfdraw 1 30
+p152 t39  | frame 31; spfdraw 0 31; spfdraw 1 31
+p156 t40  | frame 32; spfdraw 1 32
+p160 t41  | frame 33; spfdraw 1 33
+p164 t42  | frame 34; spfdraw 1 34
+p168 t43  | frame 35; spfdraw 1 35
+p172 t44  | frame 36; spfdraw 1 36
+p176 t45  | frame 37; spfdraw 1 37
+p180 t46 loop=0 | frame 38; spfdraw 1 38; close
+p181 t46 zone=1 ARRIVEEVUE=0 | arrive 8
+end view 8 yaw -69.282 pitch -0.001 loop 0 centre zone 1
+== U the same, LIAM_CELLULE hidden by the show / hide table
+start view 7 yaw -28.891 pitch 3.503 centre zone -1
+p0 t1 zone=3
+p2 t1 turn=1 | click; depart 8; turn 359.719,-0.000; clickscan 0
+p3 t1 yaw -28.692 pitch 3.479
+p4 t2 yaw -28.295 pitch 3.430
+p5 t2 yaw -27.700 pitch 3.358
+p6 t2 yaw -26.905 pitch 3.260
+p7 t2 yaw -25.913 pitch 3.139
+p8 t3 yaw -24.722 pitch 2.993
+p9 t3 yaw -23.332 pitch 2.823
+p10 t3 yaw -21.744 pitch 2.628
+p11 t3 yaw -19.957 pitch 2.409
+p12 t4 yaw -17.972 pitch 2.166 zone=-1
+p13 t4 yaw -15.788 pitch 1.899
+p14 t4 yaw -13.605 pitch 1.632
+p15 t4 yaw -11.600 pitch 1.386
+p16 t5 yaw -9.773 pitch 1.162
+p17 t5 yaw -8.121 pitch 0.960
+p18 t5 yaw -6.644 pitch 0.779
+p19 t5 yaw -5.338 pitch 0.619
+p20 t6 yaw -4.201 pitch 0.480
+p21 t6 yaw -3.228 pitch 0.361
+p22 t6 yaw -2.416 pitch 0.261
+p23 t6 yaw -1.759 pitch 0.181
+p24 t7 yaw -1.248 pitch 0.118
+p25 t7 yaw -0.872 pitch 0.072
+p26 t7 yaw -0.615 pitch 0.041
+p27 t7 yaw -0.457 pitch 0.022
+p28 t8 yaw -69.282 pitch -0.001 loop=1 view=8 turn=0 ARRIVEEVUE=8 VUE=8 | enter spw=7; spf p0007008.spr; video 39; frame 0; spfdraw 0 0
+p32 t9  | frame 1; spfdraw 0 1
+p36 t10  | frame 2; spfdraw 0 2
+p40 t11  | frame 3; spfdraw 0 3
+p44 t12  | frame 4; spfdraw 0 4
+p48 t13  | frame 5; spfdraw 0 5
+p52 t14  | frame 6; spfdraw 0 6
+p56 t15  | frame 7; spfdraw 0 7
+p60 t16  | frame 8; spfdraw 0 8
+p64 t17  | frame 9; spfdraw 0 9
+p68 t18  | frame 10; spfdraw 0 10
+p72 t19  | frame 11; spfdraw 0 11
+p76 t20  | frame 12; spfdraw 0 12
+p80 t21  | frame 13; spfdraw 0 13
+p84 t22  | frame 14; spfdraw 0 14
+p88 t23  | frame 15; spfdraw 0 15
+p92 t24  | frame 16; spfdraw 0 16
+p96 t25  | frame 17; spfdraw 0 17
+p100 t26  | frame 18; spfdraw 0 18
+p104 t27  | frame 19; spfdraw 0 19
+p108 t28  | frame 20; spfdraw 0 20
+p112 t29  | frame 21; spfdraw 0 21
+p116 t30  | frame 22; spfdraw 0 22
+p120 t31  | frame 23; spfdraw 0 23
+p124 t32  | frame 24; spfdraw 0 24
+p128 t33  | frame 25; spfdraw 0 25
+p132 t34  | frame 26; spfdraw 0 26
+p136 t35  | frame 27; spfdraw 0 27
+p140 t36  | frame 28; spfdraw 0 28
+p144 t37  | frame 29; spfdraw 0 29
+p148 t38  | frame 30; spfdraw 0 30
+p152 t39  | frame 31; spfdraw 0 31
+p156 t40  | frame 32; spfdraw 0 32
+p160 t41  | frame 33; spfdraw 0 33
+p164 t42  | frame 34; spfdraw 0 34
+p168 t43  | frame 35; spfdraw 0 35
+p172 t44  | frame 36; spfdraw 0 36
+p176 t45  | frame 37; spfdraw 0 37
+p180 t46 loop=0 | frame 38; spfdraw 0 38; close
+p181 t46 zone=1 ARRIVEEVUE=0 | arrive 8
+end view 8 yaw -69.282 pitch -0.001 loop 0 centre zone 1
+== L livre.wam view 55, its type-2 zone to Bigile1.wam view 5: at once
+start view 55 yaw 13.025 pitch 0.065 centre zone -1
+p0 t1 zone=1
+p2 t1 yaw 13.025 pitch 0.065 view=5 zone=-1 LASTVUE=0 VUE=5 | click; depart 5; link Bigile1.wam 5; wam Bigile1.wam; enter spw=5; clickscan 0
+end view 5 yaw 13.025 pitch 0.065 loop 0 centre zone -1
+== M chine.wam view 32, its type-2 zone to salletortue.wam view 40: deferred
+start view 32 yaw -153.094 pitch 11.195 centre zone -1
+p0 t1 zone=2
+p2 t1 turn=1 | click; depart 40; link salletortue.wam 40; turn -153.294,11.195; clickscan 0
+p3 t1 yaw -153.294 pitch 11.195 view=40 turn=0 zone=-1 ARRIVEEVUE=40 LASTVUE=0 VUE=40 | wam salletortue.wam; enter spw=3
+p4 t2 ARRIVEEVUE=0 | arrive 40
+end view 40 yaw -153.294 pitch 11.195 loop 0 centre zone -1
+== N miniature.wam view 123, its type-2 zone to labysol.wam view 3: deferred, a video
+start view 123 yaw 149.908 pitch 14.475 centre zone -1
+p0 t1 zone=1
+p2 t1 turn=1 | click; depart 3; link labysol.wam 3; turn 149.551,0.000; clickscan 0
+p3 t1 yaw 149.903 pitch 14.275
+p4 t2 yaw 149.893 pitch 13.875
+p5 t2 yaw 149.878 pitch 13.275
+p6 t2 yaw 149.858 pitch 12.475
+p7 t2 yaw 149.834 pitch 11.476
+p8 t3 yaw 149.804 pitch 10.276
+p9 t3 yaw 149.770 pitch 8.877
+p10 t3 yaw 149.730 pitch 7.277
+p11 t3 yaw 149.686 pitch 5.478
+p12 t4 yaw 149.649 pitch 3.974
+p13 t4 yaw 149.619 pitch 2.754
+p14 t4 yaw 149.596 pitch 1.805
+p15 t4 yaw 149.578 pitch 1.105
+p16 t5 yaw 149.567 pitch 0.627
+p17 t5 yaw 149.559 pitch 0.331
+p18 t5 yaw 149.555 pitch 0.167
+p19 t5 yaw -90.000 pitch 0.000 loop=1 view=3 turn=0 zone=-1 ARRIVEEVUE=3 LASTVUE=0 VUE=3 | wam labysol.wam; enter spw=4; video 44; frame 0
+p20 t6  | frame 1
+p24 t7  | frame 2
+p28 t8  | frame 3
+p32 t9  | frame 4
+p36 t10  | frame 5
+p40 t11  | frame 6
+p44 t12  | frame 7
+p48 t13  | frame 8
+p52 t14  | frame 9
+p56 t15  | frame 10
+p60 t16  | frame 11
+p64 t17  | frame 12
+p68 t18  | frame 13
+p72 t19  | frame 14
+p76 t20  | frame 15
+p80 t21  | frame 16
+p84 t22  | frame 17
+p88 t23  | frame 18
+p92 t24  | frame 19
+p96 t25  | frame 20
+p100 t26  | frame 21
+p104 t27  | frame 22
+p108 t28  | frame 23
+p112 t29  | frame 24
+p116 t30  | frame 25
+p120 t31  | frame 26
+p124 t32  | frame 27
+p128 t33  | frame 28
+p132 t34  | frame 29
+p136 t35  | frame 30
+p140 t36  | frame 31
+p144 t37  | frame 32
+p148 t38  | frame 33
+p152 t39  | frame 34
+p156 t40  | frame 35
+p160 t41  | frame 36
+p164 t42  | frame 37
+p168 t43  | frame 38
+p172 t44  | frame 39
+p176 t45  | frame 40
+p180 t46  | frame 41
+p184 t47  | frame 42
+p188 t48 loop=0 | frame 43; close
+p189 t48 zone=0 ARRIVEEVUE=0 | arrive 3
+end view 3 yaw -90.000 pitch 0.000 loop 0 centre zone 0
