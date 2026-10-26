@@ -2945,7 +2945,11 @@ back) into `yucatan-*.png`.
   Yucatán, Xibalba and endgame tests, against the camera the original's
   code leaves under emulation). The lines, the
   video frames and their numbers, the composed frames, every subtitle's
-  layout and the fades are the original's (tests/dialogs.rs).
+  layout and the fades are the original's (tests/dialogs.rs); so is every
+  dialog of the five worlds as `Initialise` sets it up from one
+  `srand(0)` a world (358 dialogs, 1214 lines: speaker, stand, camera,
+  mood, kind, video and voice files, text, and the heads loaded;
+  `dialog_script_*.txt`).
 - **Scripts:** the chapter scripts `scenar\chapiNNN.con` keep the first
   game's text language but not its interpreter: names come from
   `scenar\defnames.con` (five sections, looked up per key:
