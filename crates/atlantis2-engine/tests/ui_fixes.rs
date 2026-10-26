@@ -903,3 +903,35 @@ fn the_disc_icons_show_at_the_slides_start() {
         atlantis2_engine::menu::state::LOAD_OR_SAVE
     );
 }
+
+/// `CHANGECD=n` (no shipped script uses it) asks for disc n − 1
+/// (FUN_0040dff0(value − 1, 1), atlantis2-cd-fr-2199552 @ 0x0048275c): that
+/// disc becomes the current one, and the CD page asks for it when it was
+/// not found.
+#[test]
+fn changecd_asks_for_the_disc_below_its_value() {
+    let Some((dir, discs)) = dirs() else { return };
+    if !discs.join("CD4.iso").exists() {
+        eprintln!("CD4.iso not in ATLANTIS2_DISCS: test skipped");
+        return;
+    }
+    let only = scratch("changecd");
+    link_discs(&discs, &only, &[1, 2, 3]);
+    let (files, _) = A2Files::open_dir(&dir, std::slice::from_ref(&only)).unwrap();
+    let mut e = scripted(files, None);
+    let mut clock = 1000.0;
+    let mut pass = |e: &mut Engine| {
+        clock += PASS;
+        e.set_clock(clock);
+        e.pass(None);
+    };
+    e.run_command(b"(CHANGECD=3)");
+    pass(&mut e);
+    assert_eq!(e.loop_type, LoopType::Warp);
+    assert_eq!(e.files().current_disc(), 2);
+    e.run_command(b"(CHANGECD=5)");
+    pass(&mut e);
+    assert_eq!(e.files().current_disc(), 4);
+    assert_eq!(e.loop_type, LoopType::Menu);
+    assert_eq!(e.menu().and_then(|m| m.kind()), Some(PageKind::Cd(4)));
+}

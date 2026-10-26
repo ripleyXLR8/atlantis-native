@@ -792,6 +792,19 @@ impl Host for Engine {
         monde == 5 || self.ask_disc(disc)
     }
 
+    fn change_cd(&mut self, disc: i32) -> bool {
+        // FUN_0040dff0(value − 1, 1) (@ 0x0048275c): the disc wanted
+        // becomes the current one; a disc not found opens the CD page,
+        // which waits for it (a number no disc has, 0 or above 4, waits
+        // for ever; no shipped script uses `CHANGECD`).
+        let n = u8::try_from(disc).unwrap_or(0);
+        if !(1..=4).contains(&disc) {
+            log::warn!("CHANGECD: no disc {disc}");
+        }
+        self.files.set_disc(n);
+        self.ask_disc(n)
+    }
+
     fn close_bar(&mut self) {
         self.bar.open = false;
     }
