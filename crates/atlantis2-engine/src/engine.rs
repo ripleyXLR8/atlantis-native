@@ -269,6 +269,9 @@ pub enum Event {
     Message { id: String, found: bool },
     /// A click or the time closed the message viewer (@ 0x00476860).
     MessageEnd,
+    /// The fatal error reporter ran (FUN_00480cd0): the emergency save,
+    /// then the program asked to end ([`Engine::quit`]).
+    Fatal(String),
     /// The right button opened or closed the bag bar.
     Bag { open: bool },
     /// An object picked from the bag bar.
@@ -738,6 +741,13 @@ pub struct Engine {
     pub cfg_extra: atlantis2_data::save::Cfg,
     /// The menus asked the program to end.
     quit_requested: bool,
+    /// The fatal error reporter (FUN_00480cd0) has run: the emergency
+    /// save is written and the program asked to end
+    /// ([`Engine::check_fatal`]); and a fatal error found by the host
+    /// while a script line runs, for the script to stop on
+    /// ([`crate::script::Host::take_fatal`]).
+    fatal_reported: bool,
+    pending_fatal: Option<String>,
     /// The music copies and the media pages (`engine/media.rs`).
     pub media: media::Media,
     /// The left button held (@ 0x006569ca): set by every press, cleared
@@ -1074,6 +1084,8 @@ impl Engine {
             save_extra: grids::save_extra_at_start(),
             cfg_extra: atlantis2_data::save::Cfg::default(),
             quit_requested: false,
+            fatal_reported: false,
+            pending_fatal: None,
         }
     }
 
@@ -1608,6 +1620,31 @@ impl Engine {
         // Every case of the dispatcher ends with the 15 Hz flag cleared
         // (@ 0x0049ce56 .. 0x0049cf29).
         self.frame_flag = false;
+        self.check_fatal();
+    }
+
+    /// The fatal error reporter FUN_00480cd0 (atlantis2-cd-fr-2199552
+    /// @ 0x00480cd0) once the scripts recorded a fatal error (theirs, or a
+    /// puzzle's, which they stop on): the message logged; when a view is
+    /// current (@ 0x006d85d4 ≠ 0) the emergency save, player 9 slot 8
+    /// (`save\ATL09_08.SAV`, @ 0x00480dd3..0x00480ddc, a player the menu
+    /// never lists); then the game quits (FUN_0049d960 → FUN_005853e0(0),
+    /// whose exit hook writes `atlant2.cfg`: the front end's quit). Once.
+    pub(crate) fn check_fatal(&mut self) {
+        if self.fatal_reported {
+            return;
+        }
+        let Some(msg) = self.con.as_ref().and_then(|s| s.fatal.clone()) else {
+            return;
+        };
+        self.fatal_reported = true;
+        log::error!("fatal error: {msg}: emergency save and quit");
+        if !self.faces[0].is_empty() {
+            self.player_number = 9;
+            self.save_slot(8);
+        }
+        self.quit_requested = true;
+        self.event(Event::Fatal(msg));
     }
 
     /// `ViewBigSpr` (FUN_0048c9d0): loop type 11 (the previous one is not

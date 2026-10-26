@@ -772,6 +772,9 @@ impl Script {
             }
         };
         host.anim(op);
+        if let Some(msg) = host.take_fatal() {
+            self.fail(msg);
+        }
         self.after_cr(src, i)
     }
 

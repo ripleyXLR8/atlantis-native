@@ -72,6 +72,7 @@ impl Engine {
             self.event(Event::Set { chapter, line });
         }
         self.after_refused_place();
+        self.check_fatal();
         Some(r)
     }
 
@@ -586,11 +587,19 @@ impl Host for Engine {
                     s.frame = 0;
                 }
             }
-            AnimOp::GotoFrame { id, frame, .. } => {
+            AnimOp::GotoFrame { kind, id, frame } => {
+                // The first slot of the id, whatever its kind; for
+                // `GOTOFRAMEOBJET` (the key, not the slot's kind) a frame
+                // past the file's count is fatal before the frame is set
+                // (atlantis2-cd-fr-2199552 @ 0x004831fd..0x0048320e).
                 if let Some(s) = slots.iter_mut().find(|s| s.id == id) {
-                    s.frame = frame;
-                    if s.kind == 2 && frame > s.count {
-                        log::error!("SetVariables(): GOTOFRAMEOBJET! {frame}>{}", s.count);
+                    if kind == 2 && frame > s.count {
+                        self.pending_fatal = Some(format!(
+                            "SetVariables(): GOTOFRAMEOBJET! {frame}>{}",
+                            s.count
+                        ));
+                    } else {
+                        s.frame = frame;
                     }
                 }
             }
@@ -811,6 +820,10 @@ impl Host for Engine {
 
     fn bag_layout(&mut self, visible: i32) {
         self.bar.taken(visible);
+    }
+
+    fn take_fatal(&mut self) -> Option<String> {
+        self.pending_fatal.take()
     }
 
     fn message_clic(&mut self, text: &str) {

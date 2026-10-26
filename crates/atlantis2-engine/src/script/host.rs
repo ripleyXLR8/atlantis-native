@@ -282,6 +282,12 @@ pub trait Host {
     /// @ 0x004757b0 until it returns 0: the bar scrolls to its end.
     fn bag_layout(&mut self, visible: i32) {}
 
+    /// A fatal error the host met while it ran the line's command
+    /// (FUN_00480cd0 called from inside it), for the script to stop on.
+    fn take_fatal(&mut self) -> Option<String> {
+        None
+    }
+
     /// `MESSAGE_CLIC` (@ 0x00476790): the message viewer (loop type 10).
     fn message_clic(&mut self, text: &str) {}
 
