@@ -1418,3 +1418,37 @@ fn the_octopus_s_files_are_drawn_as_the_original() {
         );
     }
 }
+
+/// The shots of `the_warp_frames_as_the_original` force the texel under
+/// the centre to the middle of the attacker's box on face 1, as the
+/// original's harness does (it replaces FUN_0047db60). That texel is where
+/// the camera aims: turned to a texel of face 1, the port's FUN_0047db60
+/// (compared with the original's in `tests/centre.rs`) gives that texel,
+/// or one beside it at a face's edge.
+#[test]
+fn a_forced_texel_is_one_the_camera_aims_at() {
+    use atlantis2_engine::Camera;
+    for y in (3..509).step_by(23) {
+        for x in (3..509).step_by(23) {
+            // The face's camera (focal 254.99998, centre 256) sees the
+            // texel's middle in this direction; face 1 is turned half a
+            // turn about the vertical axis (its quaternion (0, 1, 0, 0)).
+            let f = f64::from(f32::from_bits(0x437e_ffff));
+            let (px, py) = (
+                (f64::from(x) + 0.5 - 256.0) / f,
+                (f64::from(y) + 0.5 - 256.0) / f,
+            );
+            let d = [-px, py, -1.0];
+            let yaw = d[2].atan2(d[0]);
+            let pitch = d[1].atan2((d[2] * d[2] + d[0] * d[0]).sqrt());
+            let mut cam = Camera::new(Fpu::Chop, 640, 480);
+            cam.enter(yaw as f32, pitch as f32);
+            let (face, tx, ty) = cam.texel(cam.cx, cam.cy).unwrap();
+            assert_eq!(face, 1, "texel {x},{y}");
+            assert!(
+                (tx - x).abs() <= 1 && (ty - y).abs() <= 1,
+                "texel {x},{y}: the camera sees {tx},{ty}"
+            );
+        }
+    }
+}
