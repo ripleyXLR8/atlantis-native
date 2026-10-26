@@ -585,7 +585,7 @@ fn the_rings_rolling_moves_match_the_original() {
             .map(|t| u32::from_str_radix(t, 16).unwrap())
             .collect();
         e.sprite_picks = false;
-        e.anim.rand = MsvcRand(1000);
+        e.seed_rand(1000);
         // As the harness: the start-up camera, the view entered by
         // `(vue=1)` at (0, 0) (`ANGLEWARPX` / `ANGLEWARPY` = 0), then at
         // the arrival angles (the camera's residues follow its history).
