@@ -258,7 +258,9 @@ fn game() -> Option<A2Files> {
 fn the_listener_table_of_each_build() {
     let Some(files) = game() else { return };
     let cd = Listeners::from_exe(&files.read_exe().unwrap(), &files.build().place_sounds);
-    assert!(cd.place("tibet.wam").is_some());
+    // Ten places have a listener; Tibet is not one of them.
+    assert!(cd.place("xibalba.wam").is_some());
+    assert!(cd.place("tibet.wam").is_none());
     // GOG's Game.exe (1.01): the same table at its own addresses.
     let Some(gog) = std::env::var_os("ATLANTIS2_GOG") else {
         eprintln!("ATLANTIS2_GOG not set: GOG part skipped");
