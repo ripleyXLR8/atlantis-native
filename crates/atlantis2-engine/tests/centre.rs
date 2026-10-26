@@ -281,3 +281,77 @@ fn the_texel_under_the_centre_matches_the_original() {
         &bad[..bad.len().min(8)]
     );
 }
+
+/// The original draws the place animations into a face clipped to the
+/// face's visible rectangle (FUN_0045b120 → FUN_004daad0, then
+/// FUN_0047cf00's blit clip); Native draws them on the whole face box. The
+/// pixels are the same: over the golden's directions (640 x 480 and
+/// 800 x 600 at 76°, and zoomed to 35° and 120°), neither renderer samples
+/// a texel outside the original's rectangles (faces filled with a marker
+/// outside them leave no marker on the screen), and the faces are put
+/// back after the cube.
+#[test]
+fn the_cube_samples_no_texel_outside_the_visible_rectangles() {
+    use atlantis2_engine::{Camera, Renderer};
+    for (golden, w, h, fov) in [
+        (
+            include_str!("golden/centre_texel.txt"),
+            640u32,
+            480u32,
+            None,
+        ),
+        (
+            include_str!("golden/centre_texel_800x600.txt"),
+            800,
+            600,
+            None,
+        ),
+        (
+            include_str!("golden/centre_texel_fov35.txt"),
+            640,
+            480,
+            Some(35.0f64),
+        ),
+        (
+            include_str!("golden/centre_texel_fov120.txt"),
+            640,
+            480,
+            Some(120.0),
+        ),
+    ] {
+        for (variant, fpu) in [(Variant::PII, Fpu::Chop), (Variant::C, Fpu::Double)] {
+            let mut n = 0;
+            for row in golden.lines().filter(|l| l.starts_with("yaw ")) {
+                let f: Vec<&str> = row.split(' ').collect();
+                let (yaw, pitch): (f64, f64) = (f[1].parse().unwrap(), f[3].parse().unwrap());
+                let faces: [Vec<u16>; 6] = std::array::from_fn(|k| {
+                    let mut t = vec![0xffffu16; 512 * 512];
+                    if f[7 + k] != "-" {
+                        let r: Vec<i32> = f[7 + k].split(',').map(|x| x.parse().unwrap()).collect();
+                        let (top, bottom, right, left) = (r[0], r[1], r[2], r[3]);
+                        for y in top.max(0)..=bottom.min(511) {
+                            for x in left.max(0)..=right.min(511) {
+                                t[y as usize * 512 + x as usize] = k as u16 + 1;
+                            }
+                        }
+                    }
+                    t
+                });
+                let mut cam = Camera::new(fpu, w, h);
+                cam.enter(yaw.to_radians() as f32, pitch.to_radians() as f32);
+                if let Some(fov) = fov {
+                    cam.set_fov(fov.to_radians() as f32, w, h);
+                }
+                let mut r = Renderer::new(variant, fpu, w as usize, h as usize);
+                let mut out = vec![0u16; (w * h) as usize];
+                r.render(&faces, &cam.matrix(), cam.projection(), &mut out);
+                assert!(
+                    !out.contains(&0xffff),
+                    "{variant:?} {w}x{h} {fov:?} {row}: a texel outside"
+                );
+                n += 1;
+            }
+            assert_eq!(n, 72 * 35);
+        }
+    }
+}
