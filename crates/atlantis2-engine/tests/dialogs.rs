@@ -837,8 +837,7 @@ fn the_hidden_speaker_slot_follows_the_idtext_order() {
     for _ in 0..200 {
         e.tick();
         e.pass(None);
-        if e
-            .dialog()
+        if e.dialog()
             .and_then(|d| d.current_line())
             .is_some_and(|l| l.speaker == "Chamane")
         {

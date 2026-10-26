@@ -962,7 +962,9 @@ fn message_clic_shows_a_message_until_a_click_or_two_seconds() {
     let start = e.ticks;
     pass(&mut e, &mut screen);
     // The text at the centre, over the panorama.
-    let differ: Vec<usize> = (0..screen.len()).filter(|&i| screen[i] != bare[i]).collect();
+    let differ: Vec<usize> = (0..screen.len())
+        .filter(|&i| screen[i] != bare[i])
+        .collect();
     assert!(!differ.is_empty(), "no text drawn");
     assert!(differ.iter().all(|&i| {
         let (x, y) = (i % 640, i / 640);

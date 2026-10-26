@@ -125,11 +125,7 @@ pub fn layout(
     if extent(text).0 <= 640 {
         return vec![call(text, 0)];
     }
-    let cut = if found {
-        text.len() / 2
-    } else {
-        UNKNOWN.len()
-    };
+    let cut = if found { text.len() / 2 } else { UNKNOWN.len() };
     let (first, second) = text.split_at(cut.min(text.len()));
     let mut calls = Vec::new();
     if !found {

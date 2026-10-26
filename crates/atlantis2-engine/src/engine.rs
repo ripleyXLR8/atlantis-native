@@ -1697,7 +1697,8 @@ impl Engine {
         {
             let (w, h) = (self.renderer.width(), self.renderer.height());
             let (found, text) = crate::message::lookup(&self.messages, id);
-            let calls = crate::message::layout(&text, found, |b| font.extent(b), w as i32, h as i32);
+            let calls =
+                crate::message::layout(&text, found, |b| font.extent(b), w as i32, h as i32);
             self.hd
                 .texts_mut()
                 .draw(crate::hd::TextFont::Big, font, out, w, h, &calls);
