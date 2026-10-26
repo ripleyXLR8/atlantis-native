@@ -212,7 +212,9 @@ pub trait Host {
         false
     }
 
-    /// `AtlDial_stop` (@ 0x004808a0) of a running dialog before another.
+    /// `AtlDial_stop` (@ 0x004808a0) of a running dialog before another:
+    /// the host's part (the script's, [`super::Script::dialog_ended`],
+    /// follows).
     fn dial_stop(&mut self) {}
 
     /// `AtlDial_start` (@ 0x0047ff60): dialog `n` of `loc\Dial*.txt`.

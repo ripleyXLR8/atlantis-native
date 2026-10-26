@@ -1410,3 +1410,56 @@ fn special_events_match_the_original() {
     assert_eq!(rows(EVENTS).count(), 42);
     assert!(EVENTS.contains(&format!("# objet FORMULAIRE_1 = {obj}")));
 }
+
+/// `dial=` while a dialog runs ends it in full (FUN_004808a0, called by
+/// SetVariables @ 0x00482694): `CLICPERSO` = 0, `SUJET` = −2, and the
+/// section that waited for the first dialog runs on from its wait
+/// (@ 0x00480a07..0x00480a22) before the second dialog starts.
+#[test]
+fn a_dial_during_a_dialog_ends_it_in_full() {
+    #[derive(Default)]
+    struct Dials {
+        running: bool,
+        calls: Vec<String>,
+    }
+    impl Host for Dials {
+        fn read_chapter(&mut self, _: i32) -> Option<Vec<u8>> {
+            None
+        }
+        fn dialog_running(&self) -> bool {
+            self.running
+        }
+        fn dial_stop(&mut self) {
+            self.running = false;
+            self.calls.push("stop".into());
+        }
+        fn dial_start(&mut self, n: i32) -> DialStart {
+            self.running = true;
+            self.calls.push(format!("start {n}"));
+            DialStart::Started
+        }
+    }
+    let text = "/INIT|/FININIT|/001|/con(flag1=1)|/set(dial=5)|/set(flag2=1)|\
+                /002|/con(flag3=1)|/set(dial=6)|/set(flag4=1)|"
+        .replace('|', "\r\n");
+    let mut s = Script::new(&synthetic_defnames()).unwrap();
+    let mut h = Dials::default();
+    s.set_chapter_text(text.as_bytes());
+    s.flags.iter_mut().for_each(|v| *v = 0);
+    s.flags[1] = 1;
+    s.ctrl_scenar_in(&mut h);
+    assert!(s.resume_pending);
+    assert_eq!(s.flags[2], 0);
+    // A second `dial` while dialog 5 runs.
+    assert!(s.set_var("CLICPERSO", 7));
+    assert!(s.set_var("SUJET", 3));
+    s.flags[1] = 0;
+    s.flags[3] = 1;
+    s.ctrl_scenar_in(&mut h);
+    assert_eq!(h.calls, ["start 5", "stop", "start 6"]);
+    assert_eq!((s.var("CLICPERSO"), s.var("SUJET")), (Some(0), Some(-2)));
+    assert_eq!(s.flags[2], 1, "the first section did not run on");
+    assert_eq!(s.flags[4], 0);
+    assert!(s.resume_pending);
+    assert!(s.fatal.is_none(), "{:?}", s.fatal);
+}

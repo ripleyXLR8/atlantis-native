@@ -1509,8 +1509,9 @@ impl Engine {
         }
     }
 
-    /// The end of the dialog without the script's part (a dialog stopped
-    /// by another `dial`, whose section is the one running).
+    /// The end of the dialog without the script's part (the host's part
+    /// of a dialog stopped by another `dial`, whose script part the
+    /// script runs itself).
     pub(crate) fn stop_dialog(&mut self) {
         // The screen's size (@ 0x0048096e).
         let screen = self.fov_screen();
