@@ -3,6 +3,7 @@
 //! - `tests/golden/dialog_script_ti.txt`: every Tibet dialog initialised
 //!   (the lines, their speakers, stands, cameras drawn with `rand`, video
 //!   and voice files, texts) as `dlg_Dialog::Initialise` does it;
+//!   `dialog_script_{ir,yu,ch,sh}.txt` the same for the four other worlds;
 //! - `tests/golden/dialog_frames.txt`: the body video stream (its frame
 //!   numbers and loop), and the dialog frame composed of the video through
 //!   its mask and the head, frame by frame;
@@ -48,6 +49,10 @@ use md5::{Digest, Md5};
 mod dialog_loop;
 
 const SCRIPT: &str = include_str!("golden/dialog_script_ti.txt");
+const SCRIPT_IR: &str = include_str!("golden/dialog_script_ir.txt");
+const SCRIPT_YU: &str = include_str!("golden/dialog_script_yu.txt");
+const SCRIPT_CH: &str = include_str!("golden/dialog_script_ch.txt");
+const SCRIPT_SH: &str = include_str!("golden/dialog_script_sh.txt");
 const FRAMES: &str = include_str!("golden/dialog_frames.txt");
 const SUBTITLES: &str = include_str!("golden/subtitles.txt");
 const SUBTITLES_101_CD: &str = include_str!("golden/subtitles_101_cd.txt");
@@ -215,18 +220,44 @@ fn every_line_s_lip_sync_matches_the_original() {
 #[test]
 fn tibet_dialogs_initialise_as_the_original() {
     let Some(files) = game() else { return };
-    let script = DialogScript::load(&files, World::of_monde(5).unwrap(), Fpu::Double).unwrap();
+    assert_eq!(
+        dialogs_initialise_as_the_original(&files, 5, SCRIPT),
+        (26, 82)
+    );
+}
+
+/// Review L46: every dialog of the four other worlds, in order, from one
+/// `srand(0)` per world, against the original's `Initialise` run the same
+/// way (`dialog_script_{ir,yu,ch,sh}.txt`).
+#[test]
+fn every_world_s_dialogs_initialise_as_the_original() {
+    let Some(files) = game() else { return };
+    for (monde, golden, want) in [
+        (1, SCRIPT_IR, (94, 383)),
+        (2, SCRIPT_YU, (104, 339)),
+        (3, SCRIPT_CH, (116, 325)),
+        (4, SCRIPT_SH, (18, 85)),
+    ] {
+        let got = dialogs_initialise_as_the_original(&files, monde, golden);
+        assert_eq!(got, want, "monde {monde}");
+    }
+}
+
+/// Every dialog of world `monde` initialised in the golden's order from
+/// one `srand(0)` and compared with the golden: (dialogs, lines) checked.
+fn dialogs_initialise_as_the_original(files: &A2Files, monde: i32, golden: &str) -> (usize, usize) {
+    let script = DialogScript::load(files, World::of_monde(monde).unwrap(), Fpu::Double).unwrap();
     let mut rand = Rand::new(0);
     let mut dialogs = 0;
     let mut lines_checked = 0;
     let mut current: Option<Dialog> = None;
-    for line in SCRIPT.lines().filter(|l| !l.starts_with('#')) {
+    for line in golden.lines().filter(|l| !l.starts_with('#')) {
         let f = fields(line);
         match f[0] {
             "dialog" => {
                 let n: u32 = f[1].parse().unwrap();
                 // The golden's word: 0x027f (and the C heads).
-                let d = Dialog::initialise(n, &script, &files, &mut rand, Variant::C, Fpu::Double)
+                let d = Dialog::initialise(n, &script, files, &mut rand, Variant::C, Fpu::Double)
                     .unwrap();
                 assert_eq!(f[3], "1", "{n} ok");
                 assert_eq!(d.lines().len().to_string(), f[5], "{n} lines");
@@ -284,8 +315,7 @@ fn tibet_dialogs_initialise_as_the_original() {
             _ => {}
         }
     }
-    assert_eq!(dialogs, 26);
-    assert_eq!(lines_checked, 82);
+    (dialogs, lines_checked)
 }
 
 /// The harness's background under the dialog frames.
