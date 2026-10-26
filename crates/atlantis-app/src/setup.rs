@@ -10,7 +10,10 @@ use atlantis_data::GameError;
 
 pub use crate::guide::HELP_URL;
 
-/// The GOG.com product id of the game (its registry key on Windows).
+/// The GOG.com product id of the game (its registry key on Windows): the
+/// first game's. Atlantis II's is 1207658951; it is not looked for here,
+/// as the launcher opens the first game only (Atlantis II opens from the
+/// command line, GOG's folder included).
 const GOG_ID: &str = "1207658944";
 
 /// The first-start explanation.

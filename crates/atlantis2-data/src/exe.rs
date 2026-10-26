@@ -1,13 +1,59 @@
-//! Which build of `atlantis2.exe` a folder holds.
+//! Which build of the game's executable a folder holds.
 //!
 //! A build is recognised by its size and PE timestamp, and confirmed by the
 //! MD5 of the whole file. Only the builds checked against their own code
 //! are listed: another build is reported with its identifiers, so that it
 //! can be added once compared.
+//!
+//! Three builds are known:
+//!
+//! - the French CD's `atlantis2.exe` (1.00, version string 3.15), the
+//!   reference every address in the comments belongs to;
+//! - the official 1.01 patch's `atlantis2.exe` (version 3.18, built
+//!   1999-11-17, one executable for the French and the English releases),
+//!   which a CD installation may hold;
+//! - GOG.com's `Game.exe`: the 1.01 executable with 18 byte patches of
+//!   GOG's (the install folder used as the CD, no free-space or CD
+//!   check, no `WM_FONTCHANGE` broadcast, fonts without antialiasing,
+//!   videos ended by their frame count only, input and window fixes for
+//!   current Windows). GOG's folder also holds an `atlantis2.exe`, a
+//!   splash-screen launcher that starts `Game.exe` ([`LAUNCHER_SIZE`]).
+//!
+//! 1.01 moved most of the code and data (the linker order changed), so
+//! what the port reads from the executable is read at each build's own
+//! addresses ([`Build::place_sounds`]). What 1.01 changes in the game's
+//! behaviour is in [`Release`].
 
 use md5::{Digest, Md5};
 
-/// A known build of `atlantis2.exe`.
+/// The release of the game's code a build is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Release {
+    /// 1.00, the CD's (version string 3.15).
+    V100,
+    /// 1.01, the official patch's (version string 3.18). Compared with
+    /// 1.00: `Font.txt`'s `[CharacterSet]` section (`SBCS`, the default,
+    /// or `MBCS`), which decides whether a byte with the high bit set is
+    /// a lead byte (in 1.00 it always is: an accented letter is glued to
+    /// the next character in the subtitles); a `[Font]` block's `Height`
+    /// is a cell height (`CreateFontA(+Height)`), no longer points; the
+    /// line step is `GetTextMetricsA`'s `tmHeight` + 1, no longer
+    /// `Height`; a missing font file falls back to a system font; Alt+Enter
+    /// no longer switches between full screen and window.
+    V101,
+}
+
+/// Where the place sounds' listener table lies in a build (virtual
+/// addresses): the place names (16 bytes each, up to an empty one), the
+/// rows (20 bytes: place, view, x, y, z) and the rows' end.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlaceSoundTable {
+    pub names: u32,
+    pub rows: u32,
+    pub end: u32,
+}
+
+/// A known build of the game's executable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Build {
     /// `atlantis2-<medium>-<language>-<size>`.
@@ -22,21 +68,81 @@ pub struct Build {
     /// The version string the game writes to its log at start-up
     /// (@ 0x005e3128, used by @ 0x0049d350).
     pub version: &'static str,
+    /// The release of its code.
+    pub release: Release,
+    /// GOG.com's patches of the 1.01 executable (`Game.exe`).
+    pub gog: bool,
+    /// The place sounds' listener table (@ 0x005dd2c0 in the reference).
+    pub place_sounds: PlaceSoundTable,
 }
 
+/// The listener table of 1.01 (and GOG): the same 5780 bytes as the
+/// reference's, 0xf60 lower.
+const PLACE_SOUNDS_101: PlaceSoundTable = PlaceSoundTable {
+    names: 0x005d_c360,
+    rows: 0x005d_c410,
+    end: 0x005d_d9f4,
+};
+
 /// The builds this port knows.
-pub const KNOWN_BUILDS: [Build; 1] = [Build {
-    id: "atlantis2-cd-fr-2199552",
-    label: "Atlantis II, French CD (1999)",
-    size: 2_199_552,
-    // 1999-10-12 10:10:46 UTC.
-    pe_timestamp: 0x3803_0926,
-    md5: [
-        0x5e, 0x21, 0x8f, 0x7f, 0xa9, 0x75, 0x45, 0x32, 0xae, 0x1d, 0x7a, 0x42, 0x75, 0x44, 0x3f,
-        0xef,
-    ],
-    version: "Atlantis 2 - Version 3.15 - 8/10/1999",
-}];
+pub const KNOWN_BUILDS: [Build; 3] = [
+    Build {
+        id: "atlantis2-cd-fr-2199552",
+        label: "Atlantis II, French CD (1999)",
+        size: 2_199_552,
+        // 1999-10-12 10:10:46 UTC.
+        pe_timestamp: 0x3803_0926,
+        md5: [
+            0x5e, 0x21, 0x8f, 0x7f, 0xa9, 0x75, 0x45, 0x32, 0xae, 0x1d, 0x7a, 0x42, 0x75, 0x44,
+            0x3f, 0xef,
+        ],
+        version: "Atlantis 2 - Version 3.15 - 8/10/1999",
+        release: Release::V100,
+        gog: false,
+        place_sounds: PlaceSoundTable {
+            names: 0x005d_d2c0,
+            rows: 0x005d_d370,
+            end: 0x005d_e954,
+        },
+    },
+    Build {
+        id: "atlantis2-patch101-2183168",
+        label: "Atlantis II, patch 1.01 (1999)",
+        size: 2_183_168,
+        // 1999-11-17 11:17:37 UTC.
+        pe_timestamp: 0x3832_8ed1,
+        md5: [
+            0x25, 0x53, 0x10, 0xe7, 0xd6, 0xbd, 0x7f, 0x82, 0x3f, 0x68, 0x0e, 0x2b, 0xd3, 0xbe,
+            0x8b, 0x7f,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: false,
+        place_sounds: PLACE_SOUNDS_101,
+    },
+    Build {
+        id: "atlantis2-gog-fr-2183168",
+        label: "Atlantis II, GOG.com (patch 1.01)",
+        size: 2_183_168,
+        pe_timestamp: 0x3832_8ed1,
+        md5: [
+            0x25, 0x4e, 0xcd, 0x84, 0x04, 0x6d, 0x75, 0xc2, 0x0a, 0x68, 0x5e, 0x7d, 0x7f, 0x91,
+            0xd1, 0xd8,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: true,
+        place_sounds: PLACE_SOUNDS_101,
+    },
+];
+
+/// The size of GOG's `atlantis2.exe`, the DotEmu splash-screen launcher
+/// that starts `Game.exe` (20,992 bytes, PE timestamp 0x4c19e4d8).
+pub const LAUNCHER_SIZE: u64 = 20_992;
+
+/// The file names the game's executable goes by: the CD's and the
+/// patch's `atlantis2.exe`, GOG's `Game.exe`.
+pub const EXE_NAMES: [&str; 2] = ["atlantis2.exe", "Game.exe"];
 
 /// Why an executable is not a known build.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,14 +160,14 @@ pub enum ExeError {
 impl std::fmt::Display for ExeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ExeError::NotPe => write!(f, "atlantis2.exe is not a Windows executable"),
+            ExeError::NotPe => write!(f, "the game's executable is not a Windows executable"),
             ExeError::Unknown {
                 size,
                 pe_timestamp,
                 md5,
             } => write!(
                 f,
-                "atlantis2.exe is not a known build ({size} bytes, PE timestamp {pe_timestamp:#010x}, MD5 {md5})"
+                "the game's executable is not a known build of Atlantis II ({size} bytes, PE timestamp {pe_timestamp:#010x}, MD5 {md5})"
             ),
         }
     }
@@ -143,6 +249,31 @@ mod tests {
         d[0x80..0x84].copy_from_slice(b"PE\0\0");
         d[0x88..0x8c].copy_from_slice(&stamp.to_le_bytes());
         d
+    }
+
+    #[test]
+    fn known_builds() {
+        let md5s: Vec<String> = KNOWN_BUILDS.iter().map(|b| hex(&b.md5)).collect();
+        assert_eq!(
+            md5s,
+            [
+                "5e218f7fa9754532ae1d7a4275443fef",
+                "255310e7d6bd7f823f680e2bd3be8b7f",
+                "254ecd84046d75c20a685e7d7f91d1d8",
+            ]
+        );
+        // The listener table is 5780 bytes in every build.
+        for b in &KNOWN_BUILDS {
+            assert_eq!(b.place_sounds.end - b.place_sounds.names, 5780, "{}", b.id);
+            assert_eq!(b.place_sounds.rows - b.place_sounds.names, 0xb0, "{}", b.id);
+        }
+        assert_eq!(
+            KNOWN_BUILDS
+                .iter()
+                .filter(|b| b.release == Release::V101)
+                .count(),
+            2
+        );
     }
 
     #[test]

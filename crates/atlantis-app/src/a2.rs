@@ -19,7 +19,13 @@
 //! The game folder is the installed one (`atlantis2.exe`, `wam\`,
 //! `scenar\`...); the discs (CD images or copies of the CDs) are looked for
 //! in it, in the folders directly inside it, and in the folders given with
-//! `--discs`.
+//! `--discs`. GOG.com's installation is a game folder too: its program is
+//! `Game.exe` (the 1.01 patch's, with GOG's fixes; its `atlantis2.exe` is a
+//! launcher) and its `DATAS_A2` folder holds every disc, so no disc is
+//! asked for. With a 1.01 executable (GOG's, or a CD installation patched
+//! to 1.01) the game behaves as 1.01 does: the subtitles' line breaks and
+//! font sizes, and no Alt+Enter (1.00's switch between full screen and
+//! window; F11 is the port's own and works with both).
 //!
 //! `--original` turns the enhancements off, as for the first game: the
 //! minor bug fixes (`atlantis2_engine::Enhancements::minor_bug_fixes`:
@@ -74,6 +80,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use atlantis2_data::exe::Release;
 use atlantis2_data::files::OpenError;
 use atlantis2_data::save::SystemTime;
 use atlantis2_data::A2Files;
@@ -714,6 +721,7 @@ impl A2App {
             keys: [false; 4],
             locked: false,
             focused: true,
+            alt: false,
             next_frame: now,
         }
     }
@@ -755,10 +763,20 @@ struct A2App {
     keys: [bool; 4],
     locked: bool,
     focused: bool,
+    /// Alt held (Alt+Enter, 1.00 only).
+    alt: bool,
     next_frame: Instant,
 }
 
 impl A2App {
+    /// Full screen or window (F11; Alt+Enter with 1.00).
+    fn toggle_fullscreen(&mut self) {
+        if let Some(w) = &self.window {
+            let full = w.fullscreen().is_some();
+            w.set_fullscreen((!full).then_some(Fullscreen::Borderless(None)));
+        }
+    }
+
     /// Hides and holds the pointer: the mouse turns the view, as in the
     /// original (which reads DirectInput's relative motion).
     fn grab(&mut self, on: bool) {
@@ -1105,6 +1123,7 @@ impl ApplicationHandler for A2App {
                 el.exit();
             }
             WindowEvent::Focused(on) => self.set_focus(on, Instant::now()),
+            WindowEvent::ModifiersChanged(m) => self.alt = m.state().alt_key(),
             // The window's pointer is the game's in the menus (and while
             // the mouse is not held); held, the raw motion moves it (the
             // bag bar's pointer).
@@ -1144,11 +1163,18 @@ impl ApplicationHandler for A2App {
                     Key::Named(NamedKey::ArrowRight) => self.keys[1] = down,
                     Key::Named(NamedKey::ArrowUp) => self.keys[2] = down,
                     Key::Named(NamedKey::ArrowDown) => self.keys[3] = down,
-                    Key::Named(NamedKey::F11) if down => {
-                        if let Some(w) = &self.window {
-                            let full = w.fullscreen().is_some();
-                            w.set_fullscreen((!full).then_some(Fullscreen::Borderless(None)));
-                        }
+                    Key::Named(NamedKey::F11) if down => self.toggle_fullscreen(),
+                    // Alt+Enter: full screen or window, as 1.00's key-down
+                    // callback (@ 0x004762f0, Enter with the modifier)
+                    // switches; the 1.01 patch removed it
+                    // (`atlantis2-gog-fr-2183168` @ 0x004763c0).
+                    Key::Named(NamedKey::Enter)
+                        if down
+                            && !event.repeat
+                            && self.alt
+                            && self.engine.files().build().release == Release::V100 =>
+                    {
+                        self.toggle_fullscreen()
                     }
                     // The port's options menu (F10, or O for keyboards
                     // without function keys): not the game's keys.

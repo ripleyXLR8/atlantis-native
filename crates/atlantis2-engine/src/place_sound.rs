@@ -57,12 +57,6 @@ const TENTH: f64 = 0.1f32 as f64;
 /// float 0.66 (@ 0x005c66c8): the fade's share of a video.
 const FADE_OUT: f64 = 0.66f32 as f64;
 
-/// The listener table's place names (@ 0x005dd2c0, 16 bytes each) and
-/// rows (@ 0x005dd370..0x005de954: place index, view, x, y, z).
-const NAMES_VA: u32 = 0x005d_d2c0;
-const ROWS_VA: u32 = 0x005d_d370;
-const ROWS_END: u32 = 0x005d_e954;
-
 /// An ambient object of the place file (tag 0x0b, 0x88 bytes).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Source {
@@ -244,18 +238,21 @@ pub fn draw(rand: &mut Rand, probs: [i8; 4], loaded: [bool; 4], tick: i32) -> (O
 }
 
 /// The executable's listener table.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Listeners {
     names: Vec<String>,
     rows: Vec<(i32, i32, [f32; 3])>,
 }
 
 impl Listeners {
-    /// Read from `atlantis2.exe` (the French CD build's addresses).
-    pub fn from_exe(exe: &[u8]) -> Listeners {
+    /// Read from the executable at its build's addresses (`table`): the
+    /// place names (@ 0x005dd2c0 in the reference, 16 bytes each) and the
+    /// rows (@ 0x005dd370..0x005de954: place index, view, x, y, z); 1.01
+    /// has the same bytes 0xf60 lower.
+    pub fn from_exe(exe: &[u8], table: &atlantis2_data::exe::PlaceSoundTable) -> Listeners {
         use atlantis2_data::exe::bytes_at;
         let mut names = Vec::new();
-        let mut va = NAMES_VA;
+        let mut va = table.names;
         while let Some(n) = bytes_at(exe, va, 16) {
             if n[0] == 0 {
                 break;
@@ -269,8 +266,8 @@ impl Listeners {
             va += 16;
         }
         let mut rows = Vec::new();
-        let mut va = ROWS_VA;
-        while va + 4 < ROWS_END {
+        let mut va = table.rows;
+        while va + 4 < table.end {
             let Some(r) = bytes_at(exe, va, 20) else {
                 break;
             };
