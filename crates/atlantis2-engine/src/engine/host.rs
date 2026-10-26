@@ -245,7 +245,7 @@ impl Engine {
         self.voices.play(VOICE_MUSIC, pcm, true, att, 0);
         if at_mark {
             let mut ring = self.voices.music_ring();
-            self.player.stream.fixes = self.enhancements.minor_bug_fixes;
+            self.player.stream.fixes = self.enhancements.fixes.music();
             let ok = self
                 .player
                 .stream
@@ -309,8 +309,9 @@ impl Engine {
     }
 
     /// The ring's refill (`check_buffer_music` @ 0x00477590), the end of a
-    /// track drawing the next one from the `startmusik` list; the minor
-    /// bug fixes play every track to its end.
+    /// track drawing the next one from the `startmusik` list; the music's
+    /// bug fixes ([`crate::BugFix`]) play every track to its end and an
+    /// ended track again from its start.
     fn music_refill(&mut self) -> bool {
         let files = &self.files;
         let mut load = |n: i32| load_music(files, n);
@@ -321,7 +322,7 @@ impl Engine {
             self.player.current,
             &mut self.rand,
             &mut load,
-            self.enhancements.minor_bug_fixes,
+            self.enhancements.fixes.music(),
         );
         self.stream_events();
         wrote

@@ -82,24 +82,24 @@ Where the port may differ from the original by choice, `Options` holds an
 Atlantis II has its own `Enhancements` (`crates/atlantis2-engine/src/enhancements.rs`):
 `ui_ux`, on by default, holds the conveniences the original lacks (the
 arrow keys turn the view; the click that gives the window the focus only
-takes the pointer back), and `minor_bug_fixes`, on by default: every music track is heard
-to its end, the next one of the `startmusik` list starting right after
-its last sample (the original drops the last ~5.8 s of a track followed
-by another), and a track that ends with an empty list, or with loops
-left, plays again from its start (the original loops the last 5.9 s of
-its ring until another music command), and a random mark drawn at the
-`rand()` = 0x7fff edge (one draw in 32768 of a `startmusik` entry
-without a mark) plays the track's last mark (the original's draw is one
-past the marks, a fatal error: it saves and quits); see the Music item of
-[Atlantis II](#atlantis-ii-in-progress). With it too, in Ireland's two
-puzzle views (Brigid's cross, view 2; the ogham stones, view 6) a click
-on a puzzle zone runs its puzzle and nothing else: the original also
-reads the zone's plain value as the index of a named zone, so that in
-chapter 12 the fourth stone sends the player back to Tibet as the
-weeping head does, and in chapter 14 the ninth, with the horse in hand,
-plays the water's film (see the Ireland item of
-[Atlantis II](#atlantis-ii-in-progress)). `--original` turns it off there
-too. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
+takes the pointer back), and `fixes` (`BugFixes`), the bug fixes, each
+its own switch (`BugFix`), all on by default:
+
+| Fix (`settings.ini` key) | Where in the code | What it changes |
+|---|---|---|
+| `fix_music_end` | `music::Stream::refill`, `MusicFixes::end` | every music track is heard to its end, the next one of the `startmusik` list starting right after its last sample (the original writes it behind the play cursor and drops the last ~5.8 s of a track followed by another) |
+| `fix_music_restart` | `music::Stream::refill`, `MusicFixes::restart` | a track that ends with an empty list, or with loops left, plays again from its start (the original's rewind check fails and its ring loops the last 5.9 s until another music command) |
+| `fix_music_mark` | `music::Stream::seek_mark` (`goto_mark` and the refill), `MusicFixes::mark` | a random mark drawn at the `rand()` = 0x7fff edge (one draw in 32768 of a `startmusik` entry without a mark) plays the track's last mark (the original's draw is one past the marks, a fatal error: it saves and quits) |
+| `fix_ireland_clicks` | `Engine::plain_value_fixed` | in Ireland's two puzzle views (Brigid's cross, view 2; the ogham stones, view 6) a click on a puzzle zone runs its puzzle and nothing else: the original also reads the zone's plain value as the index of a named zone, so that in chapter 12 the fourth stone sends the player back to Tibet as the weeping head does, and in chapter 14 the ninth, with the horse in hand, plays the water's film |
+
+These four are every use of the switch the port had before (one
+`minor_bug_fixes` for all, still read from `settings.ini`: it sets every
+fix whose own key is absent); each gates its own behaviour only, and
+with each off that behaviour is the original's, the others on or off
+(`tests/music_player.rs`, `tests/sound_glue.rs` and
+`tests/plain_values.rs` run each alone; see the Music and Ireland items
+of [Atlantis II](#atlantis-ii-in-progress)). `--original` turns them all
+off there too. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
 `hd_options`, the first game's `HdOptions`), which `--hd` and
 `--widescreen` turn on; see the HD mode item of
 [Atlantis II](#atlantis-ii-in-progress).
@@ -1395,12 +1395,13 @@ back) into `yucatan-*.png`.
   filled), 5 `MENHIR` (chapter 8, the ogham staff: film 5), 6 `NUADA`
   and 7 `FILLE_LIVRE` (chapter 5, the pencil, with their flags), 8
   `HAUT_CROIX` (chapter 9, the fork), 9 `EAU` (chapter 14, the horse:
-  film 6), 10 `PUIT_ZONE` (chapter 20, while dowsing). With the minor
-  bug fixes ([Enhancements](#enhancements)) a click on those zones
+  film 6), 10 `PUIT_ZONE` (chapter 20, while dowsing). With the Ireland
+  fix (`fix_ireland_clicks`, [Enhancements](#enhancements)) a click on those zones
   leaves `CLICZONE` as it was, so it runs its puzzle hook and nothing
   else (`irish_plain_value_zone`; `tests/plain_values.rs`: every type-4
   zone of both views in every Irish chapter, with an empty hand and each
-  object an Irish `cliczone` condition names, both ways). The move-zone hooks of
+  object an Irish `cliczone` condition names, both ways, the fix alone
+  and every other fix without it). The move-zone hooks of
   views 2, 6 and 42 clear the cursor pair (FUN_0047bef0(0, 0), whatever
   is in hand) until the next cursor choice; view 73's is the blackbird
   game's leave (below). A headless game plays the whole of Ireland with
@@ -2769,10 +2770,13 @@ back) into `yucatan-*.png`.
   before, until another music command. Native does both as the original
   (`tests/music_player.rs` replays the original's runs under emulation,
   with a play cursor moving 0x1000 or 1468 bytes per pass: every event,
-  position and md5 of what is heard), unless the minor bug fixes are on
-  (the default, see [Enhancements](#enhancements)): then the next track,
-  or the rewound one, is decoded right after the old one's last sample in
-  the same chunk, and every track is heard to its end. A music playing
+  position and md5 of what is heard), unless the music's bug fixes are
+  on (the default, see [Enhancements](#enhancements)): with
+  `fix_music_end` the next track, and with `fix_music_restart` the
+  rewound one, is decoded right after the old one's last sample in the
+  same chunk, and every track is heard to its end. Each alone leaves the
+  other case as the original (the golden's runs replayed with one fix
+  on: the scenarios it does not fix match row for row). A music playing
   first fades out; a new one starts at the music volume (14 in a dialog);
   `stopmusik` fades out and stops; the films (20 %) and the dialogs
   (16 %) duck it with the fade machine of the dialogs (127 units a
@@ -2788,8 +2792,8 @@ back) into `yucatan-*.png`.
   the runs' `init` rows). A random mark is drawn as `rand() · (marks + 1)
   / 0x7fff`, so `rand()` = 0x7fff gives one past the marks, which
   `AtlMuzik_GotoMark` reports as a fatal error (the original saves and
-  quits; Native stops the music and the scripts); with the minor bug
-  fixes the track plays from its last mark instead. A load puts the
+  quits; Native stops the music and the scripts); with `fix_music_mark`
+  the track plays from its last mark instead. A load puts the
   save's `startmusik` list back (it is the player's own list) even when
   the save's music is 0 and the music playing goes on. The music player
   draws from the game's one `rand` (Place animations, above).
@@ -3219,20 +3223,30 @@ back) into `yucatan-*.png`.
   (panorama filter, sharpening, interface, sharp subtitles, widescreen, the bars beside the
   videos: black or blurred; greyed in the original graphics), Screen (640
   x 480 or 800 x 600, the original's option above; greyed in HD), Fix
-  original bugs, Arrow keys turn (`ui_ux`), Close. The game is paused while it is open (its clock
+  original bugs (On, Off, or Custom (n/4) when mixed; Enter turns them
+  all on, then all off), Choose the bug fixes... (a second box drawn by
+  the same `MenuBox` with its own `BoxLayout`: wider, a gap above the
+  fixes and above Back, and a foot of four lines: All on, All off (as
+  the original), one On/Off row per fix, Back, and below them what the
+  original does without the selected fix; Escape or a click outside goes
+  back to the options, F10 or O closes the menu), Arrow keys turn
+  (`ui_ux`), Close. The game is paused while it is open (its clock
   and its sound); its text is drawn sharp in the HD mode, as the first
   game's. The choices are written at once to Atlantis II's own
   `settings.ini`, beside its saves and `atlant2.cfg`, with the first
-  game's keys (`minor_bug_fixes`, `ui_ux`, `graphics = original|hd`,
+  game's keys and one per bug fix (`fix_music_end`, `fix_music_restart`,
+  `fix_music_mark`, `fix_ireland_clicks`, `ui_ux`, `graphics = original|hd`,
   `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_sharp_subtitles`,
   `hd_widescreen`, `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
   written then too (the original writes it at exit). A window reads
   `settings.ini` at start (written with the defaults when there is none);
-  `--hd`, `--widescreen` and `--original` (which turns the bug fixes and
+  an earlier version's `minor_bug_fixes` sets every fix without its own
+  key; `--hd`, `--widescreen` and `--original` (which turns every bug fix and
   `ui_ux` off)
   hold for the run without changing it; a headless run starts from the
   defaults. `--options-menu` draws the menu over a headless run's last
-  frame. The web build does not run Atlantis II yet, so it has no such
+  frame, and `--options-keys down,enter,...` presses keys in it first
+  (its changes hold for that run only). The web build does not run Atlantis II yet, so it has no such
   menu for it.
 - **Saves** (`crates/atlantis2-data/src/save.rs`, the engine's side in
   `engine/saves.rs`): the original's format, so its saves and the port's
