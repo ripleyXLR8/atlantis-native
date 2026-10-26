@@ -71,7 +71,7 @@ impl Engine {
             return;
         }
         match self.loop_type {
-            LoopType::Warp | LoopType::Picture => self.open_main_menu(),
+            LoopType::Warp | LoopType::Message | LoopType::Picture => self.open_main_menu(),
             LoopType::Dialog => self.end_dialog(),
             LoopType::Video => {}
             LoopType::Menu => self.with_menu(|m, e| m.escape(e)),

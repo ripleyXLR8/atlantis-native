@@ -814,7 +814,7 @@ impl Host for Engine {
     }
 
     fn message_clic(&mut self, text: &str) {
-        log::info!("MESSAGE_CLIC={text}: the message viewer is not ported");
+        self.open_message(text.as_bytes());
     }
 
     fn view_big_sprite(&mut self, bank: &str) {

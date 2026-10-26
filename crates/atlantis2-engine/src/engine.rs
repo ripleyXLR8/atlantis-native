@@ -264,6 +264,11 @@ pub enum Event {
     Picture { name: String, found: bool },
     /// A click closed the picture viewer (@ 0x0048ca50).
     PictureEnd,
+    /// `MESSAGE_CLIC` (@ 0x00476790): the message viewer opened on that
+    /// id, found in `Messages.txt` or not.
+    Message { id: String, found: bool },
+    /// A click or the time closed the message viewer (@ 0x00476860).
+    MessageEnd,
     /// The right button opened or closed the bag bar.
     Bag { open: bool },
     /// An object picked from the bag bar.
@@ -317,6 +322,9 @@ pub enum LoopType {
     Dialog,
     /// 5: the menus (@ 0x00486eb0).
     Menu,
+    /// 10: a message over the frozen panorama (`MESSAGE_CLIC`,
+    /// @ 0x00476860, [`crate::message`]) until a click or two seconds.
+    Message,
     /// 11: a full-screen picture (`ViewBigSpr`, @ 0x0048ca50) until a
     /// click.
     Picture,
@@ -653,6 +661,13 @@ pub struct Engine {
     player: Player,
     /// The picture of `ViewBigSpr` (@ 0x006d1874).
     picture: Option<SprBank>,
+    /// `loc\Messages.txt` as `AtlMessage_MainInit` reads it (@ 0x00476590)
+    /// and the shown message: its id (@ 0x0067202c) and its end tick
+    /// (@ 0x00672020, 0 for none).
+    messages: Vec<u8>,
+    message: Option<(Vec<u8>, i32)>,
+    /// `AtlFT_Big_Default`, the message's font.
+    big_font: Option<SubtitleFont>,
     /// The canoe puzzle in loop type 9, the loop type it left
     /// (@ 0x006d84c4) and Escape pressed in it (the key code 1,
     /// @ 0x00672014).
@@ -914,12 +929,12 @@ impl Engine {
         let objects_bank = load_objects_bank(&files, monde);
         // The bag's start-up (@ 0x00474810) reads the object names (a
         // missing file is fatal there).
-        let object_names = match files.read(Folder::Loc, "Messages.txt") {
-            Some(d) => ObjectNames::parse(&d),
-            None => {
-                log::warn!("loc\\Messages.txt not found: no object names");
-                ObjectNames::default()
-            }
+        let messages = files.read(Folder::Loc, "Messages.txt").unwrap_or_default();
+        let object_names = if messages.is_empty() {
+            log::warn!("loc\\Messages.txt not found: no object names");
+            ObjectNames::default()
+        } else {
+            ObjectNames::parse(&messages)
         };
         let camera = Camera::new(fpu, width, height);
         // The listener table of the place sounds, in the executable, at
@@ -1041,6 +1056,9 @@ impl Engine {
             con: None,
             player: Player::default(),
             picture: None,
+            messages,
+            message: None,
+            big_font: None,
             canoe: None,
             canoe_prev_loop: LoopType::Warp,
             canoe_escape: false,
@@ -1429,6 +1447,7 @@ impl Engine {
             let load = |id: &str| SubtitleFont::load(&self.files, font_txt.as_ref()?, id);
             self.font = load("AtlFT_Dialog");
             self.popup_font = load("AtlFT_POPUP");
+            self.big_font = load("AtlFT_Big_Default");
             if self.font.is_none() {
                 log::warn!("loc\\Font.txt or its font missing: no subtitles");
             }
@@ -1577,6 +1596,7 @@ impl Engine {
             LoopType::Video => self.video_pass(out.as_deref_mut()),
             LoopType::Dialog => self.dialog_pass(out.as_deref_mut()),
             LoopType::Menu => self.menu_pass(out.as_deref_mut()),
+            LoopType::Message => self.message_pass(out.as_deref_mut()),
             LoopType::Picture => self.picture_pass(out.as_deref_mut()),
             LoopType::Canoe => self.canoe_pass(out.as_deref_mut()),
         }
@@ -1636,6 +1656,67 @@ impl Engine {
             self.look.stop();
             self.event(Event::PictureEnd);
         }
+    }
+
+    /// `MESSAGE_CLIC` (FUN_00476790 with 0, from SetVariables
+    /// @ 0x004839f2): only from the panorama, which becomes loop type 10
+    /// (its camera set again, FUN_00402960(1)); the id kept, the end at
+    /// tick + 30 (`ftol(2.0 × 15.0 + tick)`). In loop type 10 the click is
+    /// dropped instead; other loop types ignore it. The section goes on
+    /// at once.
+    pub(crate) fn open_message(&mut self, value: &[u8]) {
+        match self.loop_type {
+            LoopType::Warp => {}
+            LoopType::Message => {
+                self.click = false;
+                return;
+            }
+            _ => return,
+        }
+        self.set_loop_type(LoopType::Message);
+        let id = crate::message::id_of(value);
+        let end = (f64::from(2.0f32 * 15.0f32) + f64::from(self.ticks as i32)) as i32;
+        let (found, _) = crate::message::lookup(&self.messages, &id);
+        self.event(Event::Message {
+            id: String::from_utf8_lossy(&id).into_owned(),
+            found,
+        });
+        self.message = Some((id, end));
+    }
+
+    /// The message loop (FUN_00476860): the panorama as FUN_0045a930
+    /// draws it (the place animations drawn and stepped, the web in its
+    /// mode; no turn), the text over it ([`crate::message`]), the flip;
+    /// then a click, or a tick past the end, goes back to the panorama
+    /// (loop type 0): the click cleared, the turn speeds stopped
+    /// (FUN_0040c680).
+    fn message_pass(&mut self, mut out: Option<&mut [u16]>) {
+        self.dialog_scene(out.as_deref_mut());
+        if let (Some(out), Some((id, _)), Some(font)) =
+            (out, self.message.as_ref(), self.big_font.as_ref())
+        {
+            let (w, h) = (self.renderer.width(), self.renderer.height());
+            let (found, text) = crate::message::lookup(&self.messages, id);
+            let calls = crate::message::layout(&text, found, |b| font.extent(b), w as i32, h as i32);
+            self.hd
+                .texts_mut()
+                .draw(crate::hd::TextFont::Big, font, out, w, h, &calls);
+        }
+        let end = self.message.as_ref().map_or(0, |m| m.1);
+        if self.click || (end != 0 && end < self.ticks as i32) {
+            self.set_loop_type(LoopType::Warp);
+            self.message = None;
+            self.click = false;
+            self.look.stop();
+            self.event(Event::MessageEnd);
+        }
+    }
+
+    /// The message shown (`MESSAGE_CLIC`): its text and whether
+    /// `Messages.txt` holds its id.
+    pub fn message(&self) -> Option<(bool, Vec<u8>)> {
+        let (id, _) = self.message.as_ref()?;
+        Some(crate::message::lookup(&self.messages, id))
     }
 
     /// The picture of `ViewBigSpr` shown, if any.

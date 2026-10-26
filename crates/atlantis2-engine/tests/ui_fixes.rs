@@ -935,3 +935,59 @@ fn changecd_asks_for_the_disc_below_its_value() {
     assert_eq!(e.loop_type, LoopType::Menu);
     assert_eq!(e.menu().and_then(|m| m.kind()), Some(PageKind::Cd(4)));
 }
+
+/// L3: `MESSAGE_CLIC=<id>` (no shipped script uses it) opens the message
+/// viewer (loop type 10, FUN_00476790 / FUN_00476860): `Messages.txt`'s
+/// line drawn over the panorama, which no longer turns, until a click or
+/// the tick past `tick + 30`; an unknown id shows `Unknown message ID :`
+/// and the id; a second `MESSAGE_CLIC` in it drops the click; Escape
+/// opens the main menu (the key callback's default case, @ 0x004762f0).
+#[test]
+fn message_clic_shows_a_message_until_a_click_or_two_seconds() {
+    let Some(files) = game() else { return };
+    let mut e = scripted(files, None);
+    let mut clock = 1000.0;
+    let mut screen = vec![0u16; 640 * 480];
+    let mut bare = vec![0u16; 640 * 480];
+    let mut pass = |e: &mut Engine, out: &mut [u16]| {
+        clock += PASS;
+        e.set_clock(clock);
+        e.pass(Some(out));
+    };
+    pass(&mut e, &mut bare);
+    pass(&mut e, &mut bare);
+    e.run_command(b"(MESSAGE_CLIC=PAUSED)");
+    assert_eq!(e.loop_type, LoopType::Message);
+    assert_eq!(e.message(), Some((true, b"PAUSED".to_vec())));
+    let start = e.ticks;
+    pass(&mut e, &mut screen);
+    // The text at the centre, over the panorama.
+    let differ: Vec<usize> = (0..screen.len()).filter(|&i| screen[i] != bare[i]).collect();
+    assert!(!differ.is_empty(), "no text drawn");
+    assert!(differ.iter().all(|&i| {
+        let (x, y) = (i % 640, i / 640);
+        (200..440).contains(&x) && (200..280).contains(&y)
+    }));
+    while e.loop_type == LoopType::Message {
+        pass(&mut e, &mut screen);
+        assert!(e.ticks.wrapping_sub(start) <= 32);
+    }
+    assert_eq!(e.ticks.wrapping_sub(start), 31);
+    assert_eq!(e.loop_type, LoopType::Warp);
+    // An unknown id (the value up to the line's end, `)` included); a
+    // click ends it.
+    e.run_command(b"(MESSAGE_CLIC=NOSUCH)");
+    assert_eq!(
+        e.message(),
+        Some((false, b"Unknown message ID :NOSUCH)".to_vec()))
+    );
+    pass(&mut e, &mut screen);
+    assert_eq!(e.loop_type, LoopType::Message);
+    e.click(e.clock() + 1.0);
+    pass(&mut e, &mut screen);
+    assert_eq!(e.loop_type, LoopType::Warp);
+    // Escape opens the main menu.
+    e.run_command(b"(MESSAGE_CLIC=PAUSED)");
+    e.escape();
+    assert_eq!(e.loop_type, LoopType::Menu);
+}
