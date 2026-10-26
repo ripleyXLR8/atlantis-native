@@ -251,9 +251,13 @@ fn engine_sounds(evs: &[Event]) -> Vec<String> {
         .collect()
 }
 
-/// The sound table empty and the three handles −1.
+/// The sound table empty and the three handles −1. The golden's
+/// harness stubs `NEWSOUND` (its calls are only recorded), so the
+/// scripts' `NEWSOUND`s here must not free the grids' entries through the
+/// shared handle: the handle is set to −1.
 fn clear_sounds(e: &mut Engine) {
     e.sound_table_clear();
+    e.set_sound_handle(-1);
     e.grids.handles = [-1; 3];
 }
 

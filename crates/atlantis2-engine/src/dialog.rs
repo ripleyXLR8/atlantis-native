@@ -471,12 +471,23 @@ impl Dialog {
         self.voice.as_ref().map(|v| (&v.samples[..], v.start))
     }
 
-    /// Whether the voice still plays at `clock` (DirectSound's status, @
-    /// 0x0047a9c0): until its last sample.
-    fn voice_playing(&self, clock: f64) -> bool {
-        self.voice
-            .as_ref()
-            .is_some_and(|v| clock < v.start + v.samples.len() as f64 / f64::from(VOICE_RATE))
+    /// Whether the voice still plays at `clock`: DirectSound's status of
+    /// voice 1 (FUN_0047a9c0(1) @ 0x0046101b), so a line ends once the
+    /// mixer has played its voice out. When no sound output plays the mix
+    /// (a run without a sound device, the tests), the voice lasts its
+    /// samples from its start on the clock; with one, the port's guard: a
+    /// voice the output has not played out a second after its length
+    /// (a stalled device) ends by the clock too.
+    fn voice_playing(&self, clock: f64, voices: &Voices) -> bool {
+        let Some(v) = self.voice.as_ref() else {
+            return false;
+        };
+        let end = v.start + v.samples.len() as f64 / f64::from(VOICE_RATE);
+        if voices.output_attached() {
+            voices.is_playing(VOICE_DIALOG) && clock < end + 1.0
+        } else {
+            clock < end
+        }
     }
 
     /// The line sequencer (@ 0x00460ba0). `false` past the last line.
@@ -497,7 +508,7 @@ impl Dialog {
             };
             let stand = line.stand;
             let voiced = self.voice.is_some();
-            if voiced && !self.voice_playing(ctx.clock) {
+            if voiced && !self.voice_playing(ctx.clock, ctx.voices) {
                 self.next = true;
             }
             if let Some(s) = stand {

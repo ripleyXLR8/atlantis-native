@@ -618,6 +618,11 @@ pub fn run_window(
             voices.fill(out, rate, channels);
         }
     });
+    // The voices' status is the output's from now on: a dialog line ends
+    // when its voice has been played out, as with DirectSound.
+    if audio.is_some() {
+        engine.voices().attach_output();
+    }
     let mut app = A2App::new(
         engine,
         &label,

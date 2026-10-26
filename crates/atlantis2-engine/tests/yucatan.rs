@@ -746,7 +746,7 @@ fn every_yucatan_dialog_plays() {
 #[test]
 fn yucatan_subjects_objects_and_music_are_on_disc_2() {
     let Some(files) = game() else { return };
-    let e = in_yucatan(files);
+    let mut e = in_yucatan(files);
     let s = e.script_state().unwrap();
     let names = s.names.clone();
     let bank = |name: &str| {
@@ -827,7 +827,16 @@ fn yucatan_subjects_objects_and_music_are_on_disc_2() {
             "{name}"
         );
     }
-    // Chapter 25's music plays.
+    // Chapter 25's music plays, once the music the view's entry opened
+    // (the music state machine runs during the panorama's load, as
+    // FUN_00476e10 does) has faded out.
+    for _ in 0..600 {
+        if e.music_playing().is_some_and(|m| [11, 12, 15].contains(&m)) {
+            break;
+        }
+        e.set_clock(e.clock() + atlantis2_engine::engine::PASS);
+        e.pass(None);
+    }
     assert!(e.music_playing().is_some_and(|m| [11, 12, 15].contains(&m)));
 }
 

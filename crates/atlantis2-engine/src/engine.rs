@@ -29,7 +29,7 @@ use crate::look::{Look, DEFAULT_LIMIT_Y, NO_LIMIT};
 use crate::menu::Menu;
 pub use crate::script::HandBank;
 use crate::script::{BagEntry, Script};
-use crate::sound::{MusicVolume, Pcm, Voices};
+use crate::sound::{MusicVolume, Voices};
 use crate::subjects::SubjectMenu;
 use crate::subtitle::SubtitleFont;
 use crate::turn::{Turn, Zoom};
@@ -659,17 +659,26 @@ pub struct Engine {
     canoe: Option<Box<crate::canoe::Canoe>>,
     canoe_prev_loop: LoopType,
     canoe_escape: bool,
-    /// The sound loaded for a video (the entry @ 0x00673f34: a film's or an
-    /// intro's track, FUN_0047a320; a move's `TrajSound`, FUN_0047a350),
-    /// `None` for a file that could not be read (entry −1). It is played
-    /// on voice 2 when a video starts while `video_owns_voice2` is set,
-    /// and freed at the video's end; a video that does not open
-    /// keeps both for the next one (FUN_0040bf60 touches neither).
-    video_sound: Option<(String, Pcm)>,
+    /// The sound table's handle of voice 2's sounds (@ 0x00673f34, 0 at
+    /// start): the last `NEWSOUND` (FUN_0047a290), film's or intro's track
+    /// (FUN_0047a320) or move's `TrajSound` (FUN_0047a350) loaded, −1 for
+    /// a file that could not be read. One handle for all three, in the
+    /// table the place sounds and the puzzles share: a track loaded over a
+    /// `NEWSOUND` that still plays leaves the `NEWSOUND`'s entry loaded
+    /// for good, and a `NEWSOUND` while voice 2 plays frees the entry the
+    /// handle names, whoever loaded it (`sound_glue.txt`'s `.table` rows).
+    /// A video plays it on voice 2 when it starts while
+    /// `video_owns_voice2` is set, and frees it at its end; a video that
+    /// does not open keeps both for the next one (FUN_0040bf60 touches
+    /// neither).
+    sound_handle: i32,
+    /// A `NEWSOUND` plays (@ 0x00673f38): the dispatcher frees the
+    /// handle's entry once voice 2 is silent (FUN_0047a2f0 @ 0x0049ce37).
+    newsound_on: bool,
     /// Voice 2 belongs to the video (@ 0x006d168d): set by a film's or an
     /// intro's track that loaded (FUN_0047a320) and by any `TrajSound`
     /// taken by a move, even one that did not load (FUN_0047a350). Only
-    /// then does a video start play `video_sound` and its end stop voice 2
+    /// then does a video start play `sound_handle` and its end stop voice 2
     /// (FUN_0040bae0): a `NEWSOUND` still playing on voice 2 goes on
     /// through a video without a sound of its own.
     video_owns_voice2: bool,
@@ -1044,7 +1053,8 @@ impl Engine {
             canoe: None,
             canoe_prev_loop: LoopType::Warp,
             canoe_escape: false,
-            video_sound: None,
+            sound_handle: 0,
+            newsound_on: false,
             video_owns_voice2: false,
             traj_sound: None,
             spf: Vec::new(),
@@ -1119,10 +1129,17 @@ impl Engine {
             self.event(Event::EnterSkipped { view: id });
             return Ok(());
         }
+        // FUN_0045a290: FUN_00476e10 at its start (@ 0x0045a297), then
+        // FUN_0040cf20 after the header (@ 0x0040cfeb) and after each of
+        // the six faces (@ 0x0040d000 .. 0x0040d04f).
+        self.music_pump();
         let (hnm, disc) = self
             .files
             .read_with_disc(Folder::Warp, &name)
             .ok_or_else(|| EngineError::NoWarp(name.clone()))?;
+        for _ in 0..7 {
+            self.music_pump();
+        }
         self.faces = faces_from_hnm(&hnm).map_err(|e| EngineError::BadWarp(name.clone(), e))?;
         self.work = self.faces.clone();
         log::info!("view {id}: warp {name} (disc {disc})");
@@ -1173,6 +1190,8 @@ impl Engine {
             }
         }
         for (name, kind, id, sprite, s, record) in loads {
+            // FUN_00476e10 (@ 0x0045a242), before each load.
+            self.music_pump();
             let spw = self
                 .files
                 .read(Folder::Spw, &name)
@@ -1349,8 +1368,16 @@ impl Engine {
 
     /// The music fade step (@ 0x00476e80) at the clock, its volume given to
     /// the music voice.
+    /// The music's volume and fade, its arithmetic under the process's
+    /// current x87 control word (the camera's).
+    pub(crate) fn music_mut(&mut self) -> &mut crate::sound::MusicVolume {
+        self.music.set_fpu(self.camera.fpu);
+        &mut self.music
+    }
+
     fn fade_step(&mut self) {
-        if let Some(att) = self.music.step(self.clock) {
+        let clock = self.clock;
+        if let Some(att) = self.music_mut().step(clock) {
             self.voices.set_attenuation(crate::sound::VOICE_MUSIC, att);
         }
     }
@@ -1447,7 +1474,7 @@ impl Engine {
             self.stop_dialog();
         }
         let out = self.dial_open(number);
-        self.music.set_percent(16);
+        self.music_mut().set_percent(16);
         out
     }
 
@@ -1483,7 +1510,7 @@ impl Engine {
             }
             Err(e) => {
                 self.music.in_dialog = false;
-                self.music.set_percent(100);
+                self.music_mut().set_percent(100);
                 // AtlDial_start set the loop type 2, then the previous one
                 // back (@ 0x0047ff7a, 0x0047ffd6): the camera set again
                 // for it (centre and 76°, FUN_00402960).
@@ -1521,7 +1548,7 @@ impl Engine {
         }
         self.sync_hidden();
         self.music.in_dialog = false;
-        self.music.set_percent(100);
+        self.music_mut().set_percent(100);
     }
 
     /// The running dialog.
@@ -1548,6 +1575,12 @@ impl Engine {
         self.font.as_ref()
     }
 
+    /// The `startmusik` list the music player draws the next track from
+    /// at the end of one (`Interp_MusikScript` @ 0x006d0444).
+    pub fn music_list(&self) -> &[u8] {
+        &self.player.list
+    }
+
     /// The sound voices, for the sound output to mix.
     pub fn voices(&self) -> &Voices {
         &self.voices
@@ -1569,8 +1602,10 @@ impl Engine {
         }
         // A disc asked for and not found: the CD page.
         self.open_cd_page();
-        // The music state machine (@ 0x00476fc0, called @ 0x0049ce32).
+        // The music state machine (@ 0x00476fc0, called @ 0x0049ce32),
+        // then the end of a `NEWSOUND` (@ 0x0049ce37).
         self.music_frame();
+        self.new_sound_end();
         match self.loop_type {
             LoopType::Warp => self.warp_pass(out.as_deref_mut()),
             LoopType::Video => self.video_pass(out.as_deref_mut()),
@@ -1774,7 +1809,7 @@ impl Engine {
         // 2. The draw (@ 0x0045a9f0); after a video, the music back to
         // 100 % first (FUN_0040bb90).
         if std::mem::take(&mut self.music_after_video) {
-            self.music.set_percent(100);
+            self.music_mut().set_percent(100);
         }
         // Not while `NextWarpInvalide` is 2 (the screen frozen) nor in the
         // frame after a zoom's end (@ 0x0045a3fd..0x0045a41a); the flag is
@@ -2430,6 +2465,8 @@ impl Engine {
                 .map(|e| e.prefix.clone())
                 .unwrap_or_default();
             let file = format!("{prefix}{old:03}{new:03}.spr");
+            // FUN_00476e10 (@ 0x0047c1a3), before each bank.
+            self.music_pump();
             let bank = self
                 .files
                 .read(Folder::Spf, &file)
@@ -2641,9 +2678,9 @@ impl Engine {
             // when the file does not load. The name stays until the
             // video's end.
             if let Some(name) = self.traj_sound.clone() {
-                self.music.set_percent(20);
+                self.music_mut().set_percent(20);
                 self.video_owns_voice2 = true;
-                self.video_sound = self.load_sound(&name);
+                self.sound_handle = self.table_load(&name, None);
             }
             // The name is used as a printf format by the original; when
             // the video cannot start, FUN_0047b280 (@ 0x0045a5b2).
@@ -2665,6 +2702,8 @@ impl Engine {
             log::warn!("AtlHnm_start({name}) : deja en AtlMain_loop_HNM");
             return false;
         }
+        // FUN_00476e10 (@ 0x0040bfa7), before the open.
+        self.music_pump();
         let opened = self
             .files
             .read(Folder::Hnm, name)
@@ -2678,7 +2717,7 @@ impl Engine {
             // The music back to 100 % (outside a dialog). The sound loaded
             // for the video and the flag stay: the next video plays it.
             if self.dialog.is_none() {
-                self.music.set_percent(100);
+                self.music_mut().set_percent(100);
             }
             return false;
         };
@@ -2694,12 +2733,7 @@ impl Engine {
         // (FUN_0047a650(id, 2): what voice 2 played stopped, the effects
         // volume); entry −1 plays nothing.
         if self.video_owns_voice2 {
-            if let Some((sound, pcm)) = self.video_sound.clone() {
-                let att = self.fx_attenuation();
-                self.voices
-                    .play(crate::sound::VOICE_EFFECTS, pcm, false, att, 0);
-                self.event(Event::Sound(sound));
-            }
+            self.sound_play(self.sound_handle, crate::sound::VOICE_EFFECTS);
         }
         let end = !matches!(hnm.next_frame(), Some(Ok(_))) || hnm.frames_decoded() >= frames;
         self.event(Event::VideoFrame(0));
@@ -2712,6 +2746,8 @@ impl Engine {
             shown: 0,
         });
         self.set_loop_type(LoopType::Video);
+        // FUN_00476e10 (@ 0x0040c01e), the start's last call.
+        self.music_pump();
         true
     }
 
@@ -2837,6 +2873,8 @@ impl Engine {
         if let Some(mut d) = self.film_dialog.take() {
             d.remove(&self.voices);
         }
+        // FUN_00476e10 (@ 0x0040c108).
+        self.music_pump();
         // The section the film interrupted goes on.
         self.with_script(|s, h| s.video_ended(h));
     }
@@ -2844,9 +2882,9 @@ impl Engine {
     /// FUN_0047a320: a film's or an intro's track loaded for the next
     /// video; voice 2 is the video's only when it loaded.
     pub(super) fn video_track(&mut self, apc: &str) {
-        self.video_sound = self.load_sound(apc);
-        self.video_owns_voice2 = self.video_sound.is_some();
-        if self.video_sound.is_none() {
+        self.sound_handle = self.table_load(apc, None);
+        self.video_owns_voice2 = self.sound_handle != -1;
+        if self.sound_handle == -1 {
             log::info!("{apc}: no sound track");
         }
     }
@@ -2858,10 +2896,36 @@ impl Engine {
         if !std::mem::take(&mut self.video_owns_voice2) {
             return;
         }
-        if self.video_sound.take().is_some() {
-            self.voices.stop(crate::sound::VOICE_EFFECTS);
-        }
+        // FUN_0047a3d0: FUN_0047aa30(handle, 2), which stops voice 2 only
+        // when the entry is loaded.
+        self.sound_free(self.sound_handle, crate::sound::VOICE_EFFECTS);
         self.traj_sound = None;
+    }
+
+    /// `NEWSOUND` (FUN_0047a290): only when the file is there; while voice
+    /// 2 plays, the entry the handle names is freed first (and voice 2
+    /// stopped); the file loaded into the table (its entry the new
+    /// handle), played on voice 2, the flag set.
+    pub(super) fn new_sound(&mut self, apc: &str) {
+        if self.files.read_current(Folder::Apc, apc).is_none() {
+            return;
+        }
+        if self.voices.is_playing(crate::sound::VOICE_EFFECTS) {
+            self.sound_free(self.sound_handle, crate::sound::VOICE_EFFECTS);
+        }
+        self.sound_handle = self.table_load(apc, None);
+        self.sound_play(self.sound_handle, crate::sound::VOICE_EFFECTS);
+        self.newsound_on = true;
+    }
+
+    /// FUN_0047a2f0, on every dispatcher pass after the music state
+    /// machine (@ 0x0049ce37): a `NEWSOUND`'s entry freed once voice 2 is
+    /// silent (the handle's, whoever loaded it last).
+    fn new_sound_end(&mut self) {
+        if self.newsound_on && !self.voices.is_playing(crate::sound::VOICE_EFFECTS) {
+            self.sound_free(self.sound_handle, crate::sound::VOICE_EFFECTS);
+            self.newsound_on = false;
+        }
     }
 
     /// [`Engine::render`] on the surface the frame is drawn on (the
