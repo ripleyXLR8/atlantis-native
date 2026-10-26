@@ -365,17 +365,22 @@ impl Engine {
 
     /// A dialog over a film (`cinema=N,M`), on the video loop's new ticks
     /// only (@ 0x0040c068): its step (@ 0x00480830, the line sequencer
-    /// alone, its result ignored), then its draw over the frame
-    /// (@ 0x00480840). The film's end ends it.
-    pub(super) fn film_dialog_step(&mut self, new_tick: bool, out: Option<&mut [u16]>) {
-        let (w, h) = (self.renderer.width(), self.renderer.height());
-        let fov_screen = self.fov_screen();
-        let Some(d) = self.film_dialog.as_mut() else {
-            return;
-        };
-        if !new_tick {
+    /// alone, its result ignored), then FUN_00480840 as the dialog loop
+    /// runs it, over the film's frame (atlantis2-re `dialog_loop.txt`,
+    /// `film kind` rows): no line (−1), nothing; a `voixoff` line (1)
+    /// turns first (FUN_0040c6a0: a move's turn steps, else the inertia;
+    /// the centre picked again); a head line (0) and a `voixoff` line,
+    /// the panorama (FUN_0045a930) over the film's frame; then the dialog
+    /// frame, for every kind (unlike the dialog loop, no panorama for a
+    /// `voixoff0` line, 2). The shipped film dialogs (71, 168) have
+    /// `cinema` lines (3) only. The film's end ends it.
+    pub(super) fn film_dialog_step(&mut self, new_tick: bool, mut out: Option<&mut [u16]>) {
+        if !new_tick || self.film_dialog.is_none() {
             return;
         }
+        let (w, h) = (self.renderer.width(), self.renderer.height());
+        let fov_screen = self.fov_screen();
+        let mut d = self.film_dialog.take().unwrap();
         let mut ctx = TickContext {
             files: &self.files,
             camera: &mut self.camera,
@@ -387,7 +392,15 @@ impl Engine {
             screen: fov_screen,
         };
         d.film_step(&mut ctx);
-        if let Some(out) = out {
+        let kind = d.kind();
+        if kind == 1 {
+            self.turn_or_look();
+            self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+        }
+        if kind == 0 || kind == 1 {
+            self.dialog_scene(out.as_deref_mut());
+        }
+        if let (true, Some(out)) = (kind >= 0, out) {
             let mut frame = FrameContext {
                 clock: self.clock,
                 rand: &mut self.rand,
@@ -402,6 +415,7 @@ impl Engine {
             self.camera.fpu = d.fpu();
             self.renderer.fpu = d.fpu();
         }
+        self.film_dialog = Some(d);
     }
 
     /// The slots an animation key acts on: those of `id` (none of the
@@ -703,9 +717,11 @@ impl Host for Engine {
 
     fn play_video(&mut self, hnm: &str, dialog: Option<i32>) -> bool {
         let started = self.start_video(hnm);
-        // FUN_0040c030: the film, then dialog M set up over it
-        // (FUN_004801a0 → FUN_0045ebc0; a failure removes it).
-        if let (true, Some(m)) = (started, dialog) {
+        // FUN_0040c030 (@ 0x0040c030..0x0040c054): the film, then dialog
+        // M set up over it (FUN_004801a0 → FUN_0045ebc0; a failure removes
+        // it), whatever the film's start answered: a film that does not
+        // start leaves the dialog to the next video loop, which ends it.
+        if let Some(m) = dialog {
             let d = match self.dial_script.as_ref() {
                 Some(script) => Dialog::initialise(
                     m as u32,

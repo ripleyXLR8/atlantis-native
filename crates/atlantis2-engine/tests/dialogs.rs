@@ -38,7 +38,7 @@ use atlantis2_engine::sound::{
     DEFAULT_MASTER, DEFAULT_MUSIC_VOLUME, DEFAULT_VOICE_VOLUME,
 };
 use atlantis2_engine::subtitle::{layout, SubtitleFont};
-use atlantis2_engine::{Engine, Fpu, Variant};
+use atlantis2_engine::{Engine, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
 #[path = "common/dialog_loop.rs"]
@@ -850,4 +850,110 @@ fn the_hidden_speaker_slot_follows_the_idtext_order() {
         .is_some_and(|l| l.speaker == "Chamane"));
     assert!(e.anim.slots[0].active, "the SHAMANW10 slot is hidden");
     assert!(!e.anim.slots[1].active, "the SHAMAN slot is shown");
+}
+
+/// A new game in Tibet's view 7 (the shaman's), the scripts running, the
+/// opening film over.
+fn in_view_7(files: A2Files) -> Engine {
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.start_new_game().unwrap();
+    e.end_video();
+    for _ in 0..30 {
+        e.tick();
+        e.pass(None);
+    }
+    assert_eq!(e.loop_type, LoopType::Warp);
+    e.enter_view(7, (-164.394f32).to_radians(), 14.96f32.to_radians())
+        .unwrap();
+    e.trace = true;
+    e
+}
+
+/// The place animations' frames.
+fn slot_frames(e: &Engine) -> Vec<i32> {
+    e.anim.slots.iter().map(|s| s.frame).collect()
+}
+
+/// L14, L49: a dialog over its film (`cinema=N,M`) as the video loop runs
+/// it (FUN_0040c060 → FUN_00480830, FUN_00480840: atlantis2-re
+/// `dialog_loop.txt`, `film kind` rows). Its head lines (kind 0) draw the
+/// panorama over the film's frame, whose place animations step; its
+/// lines play, and the film's end ends it. The shipped film dialogs (71,
+/// 168) have `cinema` lines only: dialog 360's head lines stand for a
+/// head line over a film.
+#[test]
+fn a_film_dialog_s_head_lines_draw_the_panorama_over_the_film() {
+    const GOLDEN: &str = include_str!("golden/dialog_loop.txt");
+    let row = |k: i32| {
+        GOLDEN
+            .lines()
+            .find_map(|l| l.strip_prefix(&format!("film kind {k}: ")))
+            .unwrap()
+            .to_string()
+    };
+    assert!(row(0).contains("panorama(0x0045a930)"));
+    assert!(row(1).contains("turn(0x0040c6a0) panorama(0x0045a930)"));
+    assert!(!row(2).contains("panorama") && !row(3).contains("panorama"));
+    assert!(row(3).contains("dialog_frame(0x00461430)"));
+    let Some(files) = game() else { return };
+    let mut screen = vec![0u16; 640 * 480];
+    // Without a dialog, the film does not step the place animations.
+    let mut e = in_view_7(files);
+    let before = slot_frames(&e);
+    assert!(!before.is_empty());
+    e.run_command(b"(cinema=8)");
+    assert_eq!(e.loop_type, LoopType::Video);
+    for _ in 0..40 {
+        e.tick();
+        e.pass(Some(&mut screen));
+    }
+    assert_eq!(slot_frames(&e), before);
+    // With dialog 360 over it: its head lines step them (the panorama's
+    // draw), and its lines play over the film.
+    let mut e = in_view_7(game().unwrap());
+    let before = slot_frames(&e);
+    e.events.clear();
+    e.run_command(b"(cinema=8,360)");
+    assert_eq!(e.loop_type, LoopType::Video);
+    let mut head_ticks = 0;
+    for _ in 0..40 {
+        e.tick();
+        e.pass(Some(&mut screen));
+        if e.film_dialog().is_some_and(|d| d.kind() == 0) {
+            head_ticks += 1;
+        }
+    }
+    assert!(head_ticks > 0);
+    assert_ne!(slot_frames(&e), before);
+    e.end_video();
+    assert!(e.film_dialog().is_none());
+}
+
+/// L14: the film dialog is set up whatever the film's start answered
+/// (FUN_0040c030 @ 0x0040c030..0x0040c054, `dialog_loop.txt`'s `film start
+/// 0` row): a film that does not start leaves it to the next video, which
+/// plays it and ends it.
+#[test]
+fn a_film_that_does_not_start_leaves_its_dialog_to_the_next_video() {
+    const GOLDEN: &str = include_str!("golden/dialog_loop.txt");
+    assert!(GOLDEN
+        .lines()
+        .any(|l| l == "film start 0: hnm_start(0x0040bf60) film_dialog_setup(0x004801a0) flag 1"));
+    let Some(files) = game() else { return };
+    let mut e = in_view_7(files);
+    e.run_command(b"(cinema=250,360)");
+    assert_eq!(e.loop_type, LoopType::Warp);
+    assert_eq!(e.film_dialog().map(|d| d.number()), Some(360));
+    e.run_command(b"(cinema=8)");
+    assert_eq!(e.loop_type, LoopType::Video);
+    let mut screen = vec![0u16; 640 * 480];
+    let mut played = false;
+    for _ in 0..40 {
+        e.tick();
+        e.pass(Some(&mut screen));
+        played |= e.film_dialog().is_some_and(|d| d.current().is_some());
+    }
+    assert!(played, "dialog 360 does not play over film 8");
+    e.end_video();
+    assert!(e.film_dialog().is_none());
 }
