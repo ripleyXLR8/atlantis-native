@@ -149,12 +149,18 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
 | CD, Traditional Chinese release (1998 build, 4 CDs) | Traditional Chinese subtitles and menus, English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
 | CD, Simplified Chinese release (1999 build, 4 CDs) | Simplified Chinese subtitles (Traditional Chinese menus, as shipped), English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
+| Cryo's DVD-ROM (1998 build, one double-sided DVD) | English, French, German, Dutch (side A); Spanish, Italian, Swedish (side B); each language its own edition. The Japanese version (side B) is not supported yet | the DVD drive, a copy of a side (the folder holding `FACE_A` or `FACE_B`), or the images of the sides (`.iso`) in one folder |
+| Perfect Edition (Tgames' 2018 package of the DVD's English version) | English | the installation folder |
 
 Each build plays as it shipped: the 1997 English CD, the May 1997
 French CD and the Dutch and Swedish CDs, for one, draw their subtitles in their own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
 The Chinese CDs' subtitles are drawn with your own Windows `mingliu.ttc`
 (Traditional) or `simsun.ttc` (Simplified) when you put it in the game
 folder, else with the bundled Noto Serif TC or SC.
+The DVD's Dutch and Swedish subtitles show, as on the DVD, punctuation
+signs in place of their accented letters (their texts are the CDs', which
+the DVD's program reads as Windows text); a bug fix of the options menu
+shows the letters.
 
 How to get the files from your CD or GOG.com: see
 [Getting the game files](docs/GUIDE.md#getting-the-game-files).

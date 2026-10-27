@@ -52,6 +52,25 @@ matter). It reads `.iso` images, raw `.bin` images (with or without
 their `.cue`, as Redump's), `.img`, `.mdf` and Nero `.nrg` images.
 Compressed images (`.zip`, `.7z`, `.chd`) must be extracted first.
 
+### From the DVD
+
+Cryo's DVD-ROM of 1998 holds the game in eight languages on one
+double-sided disc: German, English, French and Dutch on side A, Spanish,
+Italian, Swedish and Japanese on side B. Give Atlantis Native the DVD
+drive, a copy of a side (the folder holding its `FACE_A` or `FACE_B`
+folder), or the images of the sides (`.iso` files; both in one folder
+for all eight languages). Each language found is its own edition in the
+[game library](#several-editions-the-game-library), *Atlantis: The Lost
+Tales, DVD, Swedish (1998 build)*: choose the one to play there. A
+language of the side that is not in the drive says so (*on the other
+side of the DVD*): turn the disc over. The web version takes the drive
+or a copy of a side, then asks for the language (it reads no disc
+image). The Japanese version is not supported yet; the DVD-Video
+"making of" on each side is not part of the game.
+
+The *Perfect Edition* (Tgames' 2018 package of the DVD's English
+version): choose its installation folder.
+
 ### Supported editions
 
 The English CD (1997 and 2001 builds), the French CD (May and August
@@ -59,9 +78,11 @@ The English CD (1997 and 2001 builds), the French CD (May and August
 1997), the Spanish CD (August 1997), the Italian CD (July 1997), the CD
 with Cryo's patch 1.01 (over the English, French, German, Dutch,
 Swedish, Spanish or Italian CD), the GOG.com release in
-English, French, German, Spanish and Italian, and the Traditional
+English, French, German, Spanish and Italian, the Traditional
 Chinese CD (1998) and the Simplified Chinese CD (1999), copied or as
-images. Another edition is
+images, Cryo's DVD (1998: English, French, German, Dutch, Spanish,
+Italian and Swedish; the drive, a copy of a side or the images of the
+sides) and the Perfect Edition. Another edition is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
 project's page in your browser, filled in with the identifiers of the
@@ -87,6 +108,9 @@ The message says what is wrong and what to do:
 | does not hold Atlantis: The Lost Tales | choose the folder that holds `atlantis.exe` |
 | holds Atlantis II but none of its discs | put the images of its four CDs (or copies of the CDs) in the folder or a folder inside it |
 | holds Atlantis II's discs, not the installed game | choose the folder where Atlantis II is installed (with `atlantis2.exe`), the discs put in it |
+| holds Cryo's DVD | choose the language in the game library (each language found is listed), or the folder holding `FACE_A` or `FACE_B`, the drive, or the folder of the sides' images |
+| this version is on the other side of the DVD | turn the disc over (the side it names), or put the images of both sides in one folder |
+| holds a language of Cryo's DVD without the folders its side shares | copy the whole side (the folder holding `FACE_A` or `FACE_B`) |
 
 Choosing the folder above the game's works too: Atlantis Native looks a
 few levels down for `atlantis.exe` (or Atlantis II's `atlantis2.exe` or
@@ -126,7 +150,11 @@ both games found are offered to the library, whose screen then shows
 them. **Add a game folder...** takes the folder of either game, or a
 folder above it (a few levels up); when that folder holds both games,
 it asks which one to add (choose the folder again for the other, or use
-**Find installations**). A folder of CD images is the first game's when
+**Find installations**). Cryo's DVD adds each of its languages found,
+each its own edition (*Atlantis: The Lost Tales, DVD, German (1998
+build)*, with *from disc images* for the images of its sides); a
+language whose side is not in the drive is shown *not found*, with the
+side to turn the disc to. A folder of CD images is the first game's when
 one of its images is (images of both games' discs side by side
 included). A folder that no longer holds the game (moved, renamed,
 on a drive not plugged in) is shown in red as *not found*: **Locate...**
@@ -240,21 +268,23 @@ change an entry; Escape, F10 or O close it. Its entries:
 
   Those of some editions:
   - **Hexagon puzzle: its pieces always there** (the 1997 and Chinese
-    CDs): those builds place the hexagon puzzle's pieces only when the
+    CDs, the DVD and the Perfect Edition): those builds place the hexagon puzzle's pieces only when the
     player comes holding the right object; the later builds always place
     them.
   - **Music: tracks copied one by one** (the May 1997 French CD): that
     build copies a music list to the disk all or nothing, on its first
     track, where the others copy each missing track.
   - **German: the sharp s in the LOAD list** (the games whose texts
-    hold `ß`: the German CD, also with the patch 1.01 over it): no
+    hold `ß`: the German CD, also with the patch 1.01 over it, and the
+    DVD's German version): no
     sprite font of the game has `ß`; the original leaves a gap in the
     LOAD list's chapter names, the fix draws it as "ss".
   - **Dutch: the credits and fonts of disc 1** (the games whose discs
     hold different copies of them: the Dutch CD, also with the patch
     1.01 over it): the original reads the credits and the name fonts
     from the disc in the drive, and disc 2 holds an older revision.
-  - **Italian: the whole of OK and Annulla** (Italian CD): the original's
+  - **Italian: the whole of OK and Annulla** (Italian CD and the DVD's
+    Italian version): the original's
     click areas of the menu lines at a fixed place stop short of the
     drawn word, and the right ends of `OK` and `Annulla` do not answer.
   - **Chinese: the subtitle rows** (Simplified Chinese CD): the original
@@ -264,6 +294,11 @@ change an entry; Escape, F10 or O close it. Its entries:
   - **Chinese: the SUBTITLES button** (Chinese CDs): with SUBTITLES off
     the original reads that button's record one byte out of step, and its
     click area takes a wrong width and height.
+  - **DVD: the subtitles' accented letters** (the DVD's Dutch and
+    Swedish versions): their subtitles are the CDs' texts, written for
+    the CDs' own font, but the DVD's program draws them through Windows:
+    `„`, `†`, `”` and other signs stand in place of `ä`, `å`, `ö`, `é`...
+    The fix shows the letters.
 - **Restored content** (off by default) and **Modern UI/UX** (off by
   default): see [Enhancements](TECHNICAL.md#enhancements).
 - **Buy me a coffee...**, **Close** and, on the desktop, **Game
@@ -452,6 +487,11 @@ release build, redirect it to a file:
 `atlantis-native --support-screen` shows the
 [support screen](#the-support-screen) at start-up, whatever its counts
 say.
+
+A language of Cryo's DVD is given as its folder below the disc's root,
+`/path/to/side/FACE_B/ITA` (with the images of the sides, that path below
+their folder, `/path/to/images/FACE_B/ITA`, though no such folder exists);
+the DVD's root alone lists its languages' paths.
 
 `atlantis-native --new-game /path/to/game` skips the start-up videos and
 the player screen.
