@@ -353,18 +353,16 @@ pub enum FirstStart {
 }
 
 /// The first start (the game library is empty): the installation found
-/// on the computer, if the player takes it (two games or more found: the
-/// game library's screen with them, to choose from); else the copy from a
-/// disc in a drive; else the folder the player chooses in the system's
-/// folder picker, after an explanation of why the game's files are
-/// needed. `None` when the player quits.
+/// on the computer, if the player takes it (both games found: the game
+/// library's screen with them, to choose from); else the copy from a disc
+/// in a drive; else the folder the player chooses in the system's folder
+/// picker, after an explanation of why the game's files are needed.
+/// `None` when the player quits.
 pub fn first_start() -> Option<FirstStart> {
-    // The installations on this computer (GOG.com's, copies in usual
-    // places), of either game.
-    let found: Vec<(PathBuf, Opened)> = installed_games()
-        .into_iter()
-        .filter_map(|d| open_any(&d).ok().map(|o| (d, o)))
-        .collect();
+    // The installations in the usual places (GOG.com's, copies in usual
+    // folders; not the drives, which Find installations looks at): the
+    // first of each game that opens.
+    let found = first_of_each_game(&setup::candidate_folders());
     let offered = !found.is_empty();
     if found.len() >= 2 {
         let list: Vec<String> = found
@@ -438,8 +436,8 @@ fn report_edition(dir: &Path) {
 }
 
 /// The game folder the player chooses in the system's folder picker (of
-/// either game: the folder itself or one below it, [`setup::find_any_root`]),
-/// with a message saying what to do when the folder is not right (its
+/// either game: the folder itself or one below it, [`setup::find_roots`];
+/// a folder holding both games asks which one), with a message saying what to do when the folder is not right (its
 /// third button labelled `give_up`), and the offer to copy the discs when
 /// the folder is a CD drive of the first game. The game and its folder;
 /// `None` when the player cancels.
@@ -460,9 +458,31 @@ pub fn pick_game_folder(give_up: &str) -> Option<(Opened, PathBuf)> {
             }
         }
         // The folder above the game's, or a macOS app bundle, holds it
-        // further down.
-        let (root, kind) =
-            setup::find_any_root(&dir, 4).unwrap_or_else(|| (dir.clone(), GameKind::LostTales));
+        // further down; both games there: the player says which.
+        let (root, kind) = match setup::find_roots(&dir, 4).as_slice() {
+            [] => (dir.clone(), GameKind::LostTales),
+            [one] => one.clone(),
+            [first, second, ..] => {
+                let text = format!(
+                    "Both games are in this folder:\n\n\u{2022} {}\n   {}\n\u{2022} {}\n   {}\n\n\
+                     Which one? (Choose the folder again for the other one.)",
+                    first.1.name(),
+                    first.0.display(),
+                    second.1.name(),
+                    second.0.display()
+                );
+                match ask(
+                    &text,
+                    first.1.name(),
+                    second.1.name(),
+                    "Choose another folder",
+                ) {
+                    Choice::First => first.clone(),
+                    Choice::Second => second.clone(),
+                    Choice::Third => continue,
+                }
+            }
+        };
         if kind == GameKind::Atlantis2 {
             match open_atlantis2(&root) {
                 Ok(build) => {
@@ -511,6 +531,32 @@ pub fn pick_game_folder(give_up: &str) -> Option<(Opened, PathBuf)> {
             }
         }
     }
+}
+
+/// The first folder that opens of each game below `candidates`, in their
+/// order (up to 4 levels down, [`setup::find_roots`]), the first game's
+/// first: what the first start offers, as it offered the first folder of
+/// the first game that opened (a second copy of the same game is not
+/// offered, nor opened). The folders are opened until one of each game
+/// is found.
+pub fn first_of_each_game(candidates: &[PathBuf]) -> Vec<(PathBuf, Opened)> {
+    let mut found: [Option<(PathBuf, Opened)>; 2] = [None, None];
+    'candidates: for c in candidates {
+        for (root, kind) in setup::find_roots(c, 4) {
+            let slot = &mut found[usize::from(kind == GameKind::Atlantis2)];
+            if slot.is_some() {
+                continue;
+            }
+            match open_any(&root) {
+                Ok(opened) => *slot = Some((root, opened)),
+                Err(e) => log::info!("{}: {e}", root.display()),
+            }
+            if found.iter().all(Option::is_some) {
+                break 'candidates;
+            }
+        }
+    }
+    found.into_iter().flatten().collect()
 }
 
 /// The game folders, of both games, below each of `candidates` (up to 4
@@ -644,6 +690,78 @@ mod tests {
         } else {
             std::os::windows::fs::symlink_file(target, link).unwrap();
         }
+    }
+
+    /// The first start's offer: the first folder of each game that opens
+    /// (a second copy of the first game is not offered; a folder that
+    /// does not open is passed over), the first game's first; a folder of
+    /// both games' CD images is the first game's.
+    #[test]
+    fn first_start_offers_one_folder_of_each_game() {
+        let (Some(first), Some(gog)) = (
+            std::env::var_os("ATLANTIS_DATA").map(PathBuf::from),
+            std::env::var_os("ATLANTIS2_GOG").map(PathBuf::from),
+        ) else {
+            atlantis2_data::testing::missing("ATLANTIS_DATA / ATLANTIS2_GOG not set");
+            return;
+        };
+        let d = tmp("first-start");
+        let (games, cryo) = (d.join("GOG Games"), d.join("Cryo"));
+        // Met first in the GOG folder, but not the game.
+        touch(&games.join("Atlantis Broken/atlantis.exe"));
+        link(&first, &games.join("Atlantis The Lost Tales"));
+        link(&first, &cryo.join("Atlantis"));
+        let candidates = [games.clone(), cryo.clone()];
+        let kinds = |found: &[(PathBuf, Opened)]| -> Vec<(PathBuf, GameKind)> {
+            found.iter().map(|(p, o)| (p.clone(), o.kind())).collect()
+        };
+        // Two copies of the first game: one offered, as before.
+        assert_eq!(
+            kinds(&first_of_each_game(&candidates)),
+            vec![(cryo.join("Atlantis"), GameKind::LostTales)]
+        );
+        // Atlantis II beside them: one of each.
+        link(&gog, &cryo.join("Atlantis 2"));
+        assert_eq!(
+            kinds(&first_of_each_game(&candidates)),
+            vec![
+                (cryo.join("Atlantis"), GameKind::LostTales),
+                (cryo.join("Atlantis 2"), GameKind::Atlantis2)
+            ]
+        );
+        assert!(first_of_each_game(&[d.join("nothing")]).is_empty());
+        // The first game's CD images with one of Atlantis II's discs.
+        if let (Some(isos), Some(discs)) = (
+            std::env::var_os("ATLANTIS_ISO_FR").map(PathBuf::from),
+            std::env::var_os("ATLANTIS2_DISCS").map(PathBuf::from),
+        ) {
+            let mixed = d.join("CD images");
+            for e in std::fs::read_dir(&isos).unwrap().flatten() {
+                if e.file_name()
+                    .to_string_lossy()
+                    .to_ascii_lowercase()
+                    .ends_with(".iso")
+                {
+                    link(&e.path(), &mixed.join(e.file_name()));
+                }
+            }
+            link(&discs.join("CD1.iso"), &mixed.join("Atlantis2-CD1.iso"));
+            assert_eq!(setup::kind_of(&mixed), Some(GameKind::LostTales));
+            assert_eq!(setup::find_game_root(&d, 1), Some(mixed.clone()));
+            let e = describe(&mixed);
+            assert!(
+                e.found && e.label.ends_with("from disc images"),
+                "{}",
+                e.label
+            );
+            // Atlantis II's disc alone: neither game.
+            let alone = d.join("A2 disc");
+            link(&discs.join("CD1.iso"), &alone.join("CD1.iso"));
+            assert_eq!(setup::kind_of(&alone), None);
+        } else {
+            eprintln!("ATLANTIS_ISO_FR / ATLANTIS2_DISCS not set: mixed CD images not checked");
+        }
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     /// Atlantis II's editions as the library shows them: GOG.com's folder,

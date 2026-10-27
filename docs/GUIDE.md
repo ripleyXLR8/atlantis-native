@@ -118,19 +118,29 @@ or *Atlantis II, French CD (1999)*, and its folder.
 **Find installations** looks where the first start looks (GOG.com's
 installations of both games, the usual places, the mounted discs and
 disc images, the copy made from the discs), adds the games not listed
-yet and says how many it found. The first start does the same: one game
-found is offered to play at once; two or more (the first game and
-Atlantis II, say) are offered to the library, whose screen then shows
+yet and says how many it found. The first start looks in the usual
+places only (not the drives) and keeps the first folder of each game
+that opens: one game found is offered to play at once, as before (a
+second copy of the same game is not offered: add it from the library);
+both games found are offered to the library, whose screen then shows
 them. **Add a game folder...** takes the folder of either game, or a
-folder above it (a few levels up). A folder that no longer holds the game (moved, renamed,
+folder above it (a few levels up); when that folder holds both games,
+it asks which one to add (choose the folder again for the other, or use
+**Find installations**). A folder of CD images is the first game's when
+one of its images is (images of both games' discs side by side
+included). A folder that no longer holds the game (moved, renamed,
 on a drive not plugged in) is shown in red as *not found*: **Locate...**
 (in place of Play) asks where it is now, or remove it.
 
 To open the library's screen with one game in it: hold **Shift** while
-the program starts, or start it with `--launcher`. While you play, the
-last entry of the options menu (F10), **Game library...**, stops the
-game and goes back to the screen to play another edition (the progress
-since the last checkpoint is not kept, as when quitting). The settings,
+the program starts (or press it in the first two seconds of the game's
+window, where the system cannot tell before: Linux), or start it with
+`--launcher`; this works with either game. While you play, the last
+entry of the options menu (F10), **Game library...**, stops the game
+and goes back to the screen to play another edition (the progress
+since the last checkpoint is not kept, as when quitting); Atlantis II's
+options menu (F10 or O) has the same entry when it was started from the
+library (not when its folder was given on the command line). The settings,
 players and checkpoints are kept per build of the game (see
 [Players, checkpoints and settings](#players-checkpoints-and-settings)).
 

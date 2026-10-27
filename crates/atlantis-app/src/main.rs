@@ -21,7 +21,10 @@
 //! dropped, so that the voices end as they would.
 //!
 //! The options menu's "Game library..." entry (F10) stops the game and
-//! shows the game library's screen, to play another edition.
+//! shows the game library's screen, to play another edition; Atlantis
+//! II's has it too when it was started from the library (its window
+//! ends, and the library's screen opens in a new one), and Shift in its
+//! first moments does the same as for the first game.
 //!
 //! `--hd` starts in the HD mode (the panoramic view and the talking heads
 //! at the window's resolution), whatever `settings.ini` says; F10 opens the
@@ -496,11 +499,16 @@ fn main() {
     // A run with a game folder or a testing option: it neither counts
     // towards the support screen (launches, play time) nor shows it.
     let scripted = !args.is_empty() || new_game || puzzle.is_some() || force_support;
-    let mut session = Session::new(data_dir(), original, force_hd, force_wide, start);
-    session.counts_play = !scripted;
-    let mut app = App::new(Sys::new(Mixer::new()), None)
-        .with_session(session)
-        .with_fullscreen(fullscreen);
+    // The first game's front end and the game library's screen (made
+    // again when Atlantis II goes back to the library).
+    let new_app = move |start: Start| {
+        let mut session = Session::new(data_dir(), original, force_hd, force_wide, start);
+        session.counts_play = !scripted;
+        App::new(Sys::new(Mixer::new()), None)
+            .with_session(session)
+            .with_fullscreen(fullscreen)
+    };
+    let mut app = new_app(start);
     // The launch counted; the support screen when it is due, or asked for.
     let mut counts = SupportState::load(&data_dir());
     if !scripted {
@@ -515,6 +523,11 @@ fn main() {
     // What the program starts with (after the support screen, if shown);
     // false: nothing to play, the program ends.
     let dir_arg = args.first().cloned();
+    // Atlantis II started as the library's one game, without its screen:
+    // Shift in its first moments goes back to the library (as for the
+    // first game, [`Session::shift_grace`]).
+    let a2_grace = Rc::new(std::cell::Cell::new(false));
+    let grace = a2_grace.clone();
     let begin = move |app: &mut App| -> bool {
         match dir_arg {
             // A game folder on the command line: played as it is.
@@ -558,6 +571,7 @@ fn main() {
                         app.play_opened(opened, &dir);
                         if let Some(s) = app.session_mut() {
                             s.shift_grace();
+                            grace.set(s.wants_atlantis2());
                         }
                     }
                     Startup::Launcher => app.show_launcher(None),
@@ -573,37 +587,58 @@ fn main() {
     } else {
         begin(&mut app)
     };
-    if windowed {
-        // On demand: the event loop runs again for Atlantis II when it is
-        // chosen in the game library (a program has one event loop).
-        use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
-        let run = el.run_app_on_demand(&mut app);
-        app.save_play_time();
-        if let Err(e) = run {
-            error_box(&format!("The window failed: {e}"));
-            std::process::exit(1);
+    // On demand: the event loop runs again for Atlantis II when it is
+    // chosen in the game library (a program has one event loop), and for
+    // the library's screen when Atlantis II goes back to it.
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    let mut windowed = windowed;
+    loop {
+        if windowed {
+            let run = el.run_app_on_demand(&mut app);
+            app.save_play_time();
+            if let Err(e) = run {
+                error_box(&format!("The window failed: {e}"));
+                std::process::exit(1);
+            }
         }
-    }
-    let atlantis2 = app.session_mut().and_then(|s| s.take_atlantis2());
-    // The first game's window and sound end here.
-    drop(app);
-    let Some(dir) = atlantis2 else {
-        return;
-    };
-    atlantis_app::watchdog::leave();
-    let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
-    let run = atlantis_app::a2::open(
-        &dir,
-        &[],
-        &atlantis_app::a2::A2Start::default(),
-        enhancements,
-    )
-    .and_then(|(engine, label)| {
-        atlantis_app::a2::run_window_on(&mut el, engine, label, fullscreen, None)
-    });
-    if let Err(e) = run {
-        error_box(&e);
-        std::process::exit(1);
+        let atlantis2 = app.session_mut().and_then(|s| s.take_atlantis2());
+        // The first game's window and sound end here.
+        drop(app);
+        let Some(dir) = atlantis2 else {
+            return;
+        };
+        atlantis_app::watchdog::leave();
+        let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
+        let run = atlantis_app::a2::open(
+            &dir,
+            &[],
+            &atlantis_app::a2::A2Start::default(),
+            enhancements,
+        )
+        .and_then(|(engine, label)| {
+            atlantis_app::a2::run_window_on(
+                &mut el,
+                engine,
+                label,
+                fullscreen,
+                None,
+                a2_grace.replace(false),
+            )
+        });
+        match run {
+            Ok(atlantis_app::a2::Ended::Quit) => return,
+            // The options menu's "Game library...", or Shift held as it
+            // started: the library's screen in the first game's window.
+            Ok(atlantis_app::a2::Ended::Library) => {
+                app = new_app(Start::Boot);
+                app.show_launcher(None);
+                windowed = true;
+            }
+            Err(e) => {
+                error_box(&e);
+                std::process::exit(1);
+            }
+        }
     }
 }
 

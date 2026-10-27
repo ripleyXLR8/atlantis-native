@@ -552,6 +552,39 @@ mod tests {
         assert_eq!(startup(2, false, never), Startup::Launcher);
     }
 
+    /// `ATLANTIS_NATIVE_DATA` pointed at a test's own folder, for one test
+    /// at a time (the variable is the process's: two such tests at once
+    /// would read and remove each other's folder); on drop the variable
+    /// is set back, then the folder removed.
+    struct OwnDataDir {
+        dir: PathBuf,
+        before: Option<std::ffi::OsString>,
+        _one_at_a_time: std::sync::MutexGuard<'static, ()>,
+    }
+
+    fn own_data_dir(name: &str) -> OwnDataDir {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tmp(name);
+        let before = std::env::var_os("ATLANTIS_NATIVE_DATA");
+        std::env::set_var("ATLANTIS_NATIVE_DATA", &dir);
+        OwnDataDir {
+            dir,
+            before,
+            _one_at_a_time: guard,
+        }
+    }
+
+    impl Drop for OwnDataDir {
+        fn drop(&mut self) {
+            match &self.before {
+                Some(v) => std::env::set_var("ATLANTIS_NATIVE_DATA", v),
+                None => std::env::remove_var("ATLANTIS_NATIVE_DATA"),
+            }
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
     fn app_with_library(d: &Path) -> App {
         let session = Session::new(d.to_path_buf(), false, false, false, Start::Boot);
         App::new(Sys::new(Mixer::new()), None).with_session(session)
@@ -600,8 +633,8 @@ mod tests {
             return;
         };
         let first = std::env::var_os("ATLANTIS_DATA").map(PathBuf::from);
-        let d = tmp("both-games");
-        std::env::set_var("ATLANTIS_NATIVE_DATA", &d);
+        let own = own_data_dir("both-games");
+        let d = own.dir.clone();
         let mut folders: Vec<PathBuf> = first.iter().cloned().collect();
         folders.push(a2.clone());
         let text: String = folders
@@ -662,7 +695,6 @@ mod tests {
         .unwrap();
         assert!(label.contains("GOG.com"), "{label}");
         drop(engine);
-        let _ = std::fs::remove_dir_all(&d);
     }
 
     /// Switching games drops the engine: nothing keeps its system alive.
@@ -673,9 +705,9 @@ mod tests {
             return;
         };
         let dir = PathBuf::from(dir);
-        let d = tmp("switch");
         // The saves of this test in its own folder.
-        std::env::set_var("ATLANTIS_NATIVE_DATA", &d);
+        let own = own_data_dir("switch");
+        let d = own.dir.clone();
         let mut app = app_with_library(&d);
         let game = desktop::try_open(&dir).unwrap();
         app.play_game(game, Some(&dir));
@@ -700,6 +732,8 @@ mod tests {
         app.run_launcher_action(LauncherAction::Play(0));
         assert!(app.has_game());
         assert!(app.session().unwrap().launcher().is_none());
-        let _ = std::fs::remove_dir_all(&d);
+        // The engine before the folder goes.
+        drop(app);
+        drop(own);
     }
 }

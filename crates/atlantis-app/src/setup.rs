@@ -62,15 +62,6 @@ fn has_file(dir: &Path, name: &str) -> bool {
     })
 }
 
-/// Whether `dir` holds CD images (by their extension).
-fn has_disc_images(dir: &Path) -> bool {
-    names_in(dir).iter().any(|n| {
-        atlantis_data::disc_image::IMAGE_EXTENSIONS
-            .iter()
-            .any(|e| n.ends_with(&format!(".{e}")))
-    })
-}
-
 /// The names of the files at the top of `dir` (lower case).
 pub fn names_in(dir: &Path) -> Vec<String> {
     std::fs::read_dir(dir)
@@ -86,13 +77,13 @@ pub fn names_in(dir: &Path) -> Vec<String> {
 /// Which game `dir` itself holds, if any: Atlantis II when
 /// [`atlantis2_data::files::holds_atlantis2`] says so (looked at first:
 /// its CD installation's folder may hold the images of its discs), else
-/// the first game when it holds atlantis.exe, or CD images that are not
-/// Atlantis II's discs.
+/// the first game when it holds atlantis.exe, or a CD image that is not
+/// one of Atlantis II's discs (a folder of both games' images is the
+/// first game's).
 pub fn kind_of(dir: &Path) -> Option<GameKind> {
     if atlantis2_data::files::holds_atlantis2(dir) {
         Some(GameKind::Atlantis2)
-    } else if has_file(dir, "atlantis.exe") || (has_disc_images(dir) && !holds_atlantis2_discs(dir))
-    {
+    } else if has_file(dir, "atlantis.exe") || has_other_disc_images(dir) {
         Some(GameKind::LostTales)
     } else {
         None
@@ -199,20 +190,35 @@ pub fn explain(dir: &Path, err: &GameError) -> String {
     crate::guide::explain(&names_in(dir), &dir.display().to_string(), err)
 }
 
-/// Whether the CD images at the top of `dir` are Atlantis II's discs
-/// (one of them is enough).
-fn holds_atlantis2_discs(dir: &Path) -> bool {
+/// Whether the CD images at the top of `dir` (by their extension) are
+/// taken for the first game's: when none is one of Atlantis II's discs
+/// (as before Atlantis II was known: any image, the first game's message
+/// then says what is wrong), or when one of them opens and is not (a
+/// folder of both games' images is the first game's).
+fn has_other_disc_images(dir: &Path) -> bool {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return false;
     };
-    entries.flatten().any(|e| {
+    let (mut images, mut atlantis2, mut other) = (false, false, false);
+    for e in entries.flatten() {
         let name = e.file_name().to_string_lossy().to_ascii_lowercase();
-        atlantis_data::disc_image::IMAGE_EXTENSIONS
+        if !atlantis_data::disc_image::IMAGE_EXTENSIONS
             .iter()
             .any(|x| name.ends_with(&format!(".{x}")))
-            && atlantis_data::disc_image::DiscImage::open(&e.path())
-                .is_some_and(|img| atlantis2_data::files::disc_number(&img) != 0)
-    })
+        {
+            continue;
+        }
+        images = true;
+        match atlantis_data::disc_image::DiscImage::open(&e.path()) {
+            Some(img) if atlantis2_data::files::disc_number(&img) != 0 => atlantis2 = true,
+            Some(_) => other = true,
+            None => {}
+        }
+        if other {
+            return true;
+        }
+    }
+    images && !atlantis2
 }
 
 /// Whether `dir` holds Atlantis II discs (CD images, or copies of the
