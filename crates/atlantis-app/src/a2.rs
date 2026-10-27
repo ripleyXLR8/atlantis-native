@@ -714,6 +714,28 @@ pub fn run_window(
     size: Option<(u32, u32)>,
 ) -> Result<(), String> {
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
+    let mut app = window_app(engine, &label, fullscreen, size);
+    el.run_app(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))
+}
+
+/// [`run_window`] on an event loop that ran before (the game library's:
+/// a program makes one event loop only), run again for this game.
+pub fn run_window_on(
+    el: &mut EventLoop<()>,
+    engine: Engine,
+    label: String,
+    fullscreen: bool,
+    size: Option<(u32, u32)>,
+) -> Result<(), String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    let mut app = window_app(engine, &label, fullscreen, size);
+    el.run_app_on_demand(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))
+}
+
+/// The window's application: the game, its sound started.
+fn window_app(engine: Engine, label: &str, fullscreen: bool, size: Option<(u32, u32)>) -> A2App {
     let voices = engine.voices().clone();
     // The sound stops while the game is held (the options menu open, the
     // window without the focus): silence, the voices kept where they are.
@@ -726,17 +748,15 @@ pub fn run_window(
             voices.fill(out, rate, channels);
         }
     });
-    let mut app = A2App::new(
+    A2App::new(
         engine,
-        &label,
+        label,
         fullscreen,
         size,
         audio,
         paused,
         Instant::now(),
-    );
-    el.run_app(&mut app)
-        .map_err(|e| format!("The window failed: {e}"))
+    )
 }
 
 /// Whether the game is held: while the port's options menu is open, and

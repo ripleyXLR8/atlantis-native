@@ -85,20 +85,26 @@ The message says what is wrong and what to do:
 | holds the GOG.com installer | run the installer, then choose the installed folder |
 | holds an atlantis.exe that Atlantis Native does not know | an edition not supported yet (see above) |
 | does not hold Atlantis: The Lost Tales | choose the folder that holds `atlantis.exe` |
+| holds Atlantis II but none of its discs | put the images of its four CDs (or copies of the CDs) in the folder or a folder inside it |
+| holds Atlantis II's discs, not the installed game | choose the folder where Atlantis II is installed (with `atlantis2.exe`), the discs put in it |
 
 Choosing the folder above the game's works too: Atlantis Native looks a
-few levels down for `atlantis.exe`.
+few levels down for `atlantis.exe` (or Atlantis II's `atlantis2.exe` or
+`Game.exe`).
 
 ## Several editions: the game library
 
 Atlantis Native keeps a list of the game folders you have played: the
-game library. With one game in it, the game starts at once, as before.
-With two or more (the GOG.com release and the CD, the English and the
-French CD...), the program opens on the library's screen to choose the
-one to play, the last played selected. Each game is shown as its
-edition, *GOG.com, French (1999 build)* or *CD, English (May 1997
-build)* (with *from disc images* when it is read from images of the
-CDs), and its folder.
+game library, for both games, Atlantis: The Lost Tales and
+[Atlantis II](#atlantis-ii). With one game in it, the game starts at
+once, as before. With two or more (the GOG.com release and the CD, the
+English and the French CD, the first game and Atlantis II...), the
+program opens on the library's screen to choose the one to play, the
+last played selected. Each game is shown as its name and edition,
+*Atlantis: The Lost Tales, GOG.com, French (1999 build)*, *Atlantis: The
+Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
+it is read from images of the CDs), *Atlantis II, GOG.com (patch 1.01)*
+or *Atlantis II, French CD (1999)*, and its folder.
 
 | Action | Mouse | Keyboard |
 |---|---|---|
@@ -110,9 +116,13 @@ CDs), and its folder.
 | Quit | **Quit** | Escape |
 
 **Find installations** looks where the first start looks (GOG.com's
-installation, the usual places, the mounted discs and disc images, the
-copy made from the discs), adds the games not listed yet and says how
-many it found. A folder that no longer holds the game (moved, renamed,
+installations of both games, the usual places, the mounted discs and
+disc images, the copy made from the discs), adds the games not listed
+yet and says how many it found. The first start does the same: one game
+found is offered to play at once; two or more (the first game and
+Atlantis II, say) are offered to the library, whose screen then shows
+them. **Add a game folder...** takes the folder of either game, or a
+folder above it (a few levels up). A folder that no longer holds the game (moved, renamed,
 on a drive not plugged in) is shown in red as *not found*: **Locate...**
 (in place of Play) asks where it is now, or remove it.
 
@@ -125,8 +135,9 @@ players and checkpoints are kept per build of the game (see
 [Players, checkpoints and settings](#players-checkpoints-and-settings)).
 
 The list is the file `games.txt` in the per-user folder, one game folder
-per line, the last played first; it can be edited by hand while the
-program is closed. (Earlier versions kept one folder in
+per line (of either game: which one is told from the folder's files),
+the last played first; it can be edited by hand while the program is
+closed. (Earlier versions kept one folder in
 `game-folder.txt`: it is taken over.) A game folder given on the command
 line is played without the library and not added to it.
 
@@ -259,18 +270,32 @@ it changed.
 Atlantis II plays from its start to its end (Tibet, Ireland, China,
 Yucatán with Xibalba, the space travel, Shamballa with its fireflies,
 Atlantis with the octopus fight, the credits;
-see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)). For now only the
-command line opens it: give the folder of the installed game (the one
-holding `atlantis2.exe`, `wam`, `scenar`...), and the folder of the CD
-images or copies of the CDs if they are not inside it:
+see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)). The
+[game library](#several-editions-the-game-library) finds and opens it as
+it does the first game: started without a folder, Atlantis Native looks
+for GOG.com's installation (its entry in the Windows registry, and the
+usual folders: `C:\GOG Games`, `C:\Program Files (x86)\GOG Galaxy\Games`,
+`C:\Program Files\GOG Galaxy\Games`, `C:\Program Files (x86)\GOG.com`,
+`C:\Cryo`; on Linux `~/GOG Games`, `~/Games` and Wine's `GOG Games`; on
+macOS the Applications folders and `~/GOG Games`), in folders whose name
+holds "atlantis" (*Atlantis 2*, *Atlantis II*, *Beyond Atlantis*...).
+**Add a game folder...** takes its folder too:
+
+- GOG.com: the installation folder (the one holding `Game.exe`, for
+  example `C:\Program Files\GOG Galaxy\Games\Atlantis 2` or
+  `C:\GOG Games\Atlantis 2`). It holds every disc, so no disc is asked
+  for.
+- CD: the folder of the installed game (the one holding `atlantis2.exe`,
+  `wam`, `scenar`...), with the images of the four CDs (`.iso`, `.bin`,
+  `.img`, `.mdf`, `.nrg`) or copies of the CDs in it or in a folder inside
+  it (for example `Atlantis 2\CD\CD1.iso` to `CD4.iso`). The library
+  keeps one folder per game: put the discs there. (Without them the
+  library shows the folder as *not found* and says what is missing.)
+
+From the command line, give the game's folder, and with the CD the folder
+of the CD images or copies of the CDs if they are not inside it:
 
     atlantis-native --discs /path/to/cd-images /path/to/Atlantis_2_Files
-
-The GOG.com edition needs nothing more: give its installation folder (the
-one holding `Game.exe`, for example `C:\Program Files\GOG
-Galaxy\Games\Atlantis 2` or `C:\GOG Games\Atlantis 2`). It holds every
-disc, so no disc is asked for.
-
     atlantis-native "C:\Program Files\GOG Galaxy\Games\Atlantis 2"
 
 GOG's edition is the game patched to version 1.01, and Atlantis Native
@@ -407,6 +432,12 @@ decides (except with `--headless`).
 with one game in it (holding Shift at start-up does the same). The Windows
 release build has no console: redirect its output to a file
 (`atlantis-native.exe --headless C:\game > out.txt`) to read it.
+
+`atlantis-native --list-games` prints the games found on this computer,
+of both games (what **Find installations** adds to the library), one per
+line: the game and its edition, then its folder (with the Windows
+release build, redirect it to a file:
+`atlantis-native.exe --list-games > found.txt`).
 
 `atlantis-native --support-screen` shows the
 [support screen](#the-support-screen) at start-up, whatever its counts
