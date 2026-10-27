@@ -136,7 +136,7 @@ impl BugFix {
             ],
             BugFix::MusicMark => &[
                 "Once in 32768 random starts of a music, the",
-                "original picks a place past the track's last",
+                "original picks a place past the track's last mark",
                 "and stops with a fatal error (it saves and quits).",
             ],
             BugFix::IrelandClicks => &[
