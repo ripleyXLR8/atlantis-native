@@ -1082,7 +1082,7 @@ pub const BUILDS: [ExeBuild; 21] = [
 
 /// The Traditional Chinese 4-CD release's build (atlantis-cd-zh-tw-696832,
 /// 1998-07-17). Its code line is atlantis-cd-fr-687104's moved toward the
-/// reference by an unsupported 1998 build (the "Perfect Edition"
+/// reference by the 1998 program ([`DVD_EN`], also the "Perfect Edition"
 /// executable, atlantis-pe-2018-695296), with fourteen changes of its own:
 /// GDI subtitles in the system code page with a Big5 breaker and rows 18
 /// px apart, the menus, the LOAD list and the opening captions drawn as
@@ -1211,7 +1211,8 @@ pub const ZH_CN: ExeBuild = ExeBuild {
 /// DVD-ROM ships it for English (atlantis-dvd-en-695296, `FACE_A\ENG`):
 /// atlantis-cd-fr-687104's code line moved toward the reference, the
 /// parent of [`ZH_TW`], which keeps its rules but those the Chinese builds
-/// changed (binaries/atlantis-cd-zh-tw-696832.md Z1..Z13). The five shared
+/// changed (the GDI text, the sprite menus, the LOAD list and the captions,
+/// SUBTITLES at start-up, players.atl's size). The five shared
 /// folders are read from `\face_a\` at the disc's root (seven DGROUP
 /// strings, 0x004abbfc..0x004ae404), the others from the language's folder
 /// (the port's `dvd::DvdFiles`). Its tables (located by the 32-bit operands
@@ -1289,7 +1290,8 @@ pub const DVD_EN: ExeBuild = ExeBuild {
     menu_toggle_sprites: false,
     load_list: LoadList::EpiText,
     cinema_captions: None,
-    // SUBTITLES keeps the file's 0 (zh-tw's Z9 is not here).
+    // SUBTITLES keeps the file's 0 (the Chinese builds' start-up set is
+    // not here).
     subtitles_on_at_start: false,
     // `push 0x55`: 85 bytes, a 97-byte players.atl.
     players_names_block: 85,

@@ -97,7 +97,14 @@ pub fn store_for(game: &Game) -> Rc<dyn SaveStore> {
 /// Opens the game in `dir`.
 pub fn open_game(dir: &Path) -> Result<Game, String> {
     try_open(dir).map_err(|e| {
-        let languages = dvd_locations(dir);
+        // A DVD language's own folder keeps its error (the other side, the
+        // shared folders, a build not supported): listing it back as the
+        // folder to give would hide it.
+        let languages = if dvd_language_of(dir).is_some() {
+            Vec::new()
+        } else {
+            dvd_locations(dir)
+        };
         if languages.is_empty() {
             format!("{}: {e}", dir.display())
         } else {
@@ -625,20 +632,7 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
         // sides): every language found.
         let languages = dvd_locations(&dir);
         if !languages.is_empty() {
-            let mut first_error = None;
-            let opened: Vec<(Opened, PathBuf)> = languages
-                .iter()
-                .filter_map(|p| match open_with_kind(p) {
-                    Ok((game, images)) => {
-                        Some((Opened::LostTales(Box::new(game), images), p.clone()))
-                    }
-                    Err(e) => {
-                        log::warn!("{}: {e}", p.display());
-                        first_error.get_or_insert((p.clone(), e));
-                        None
-                    }
-                })
-                .collect();
+            let (opened, first_error) = open_dvd_languages(&languages);
             if !opened.is_empty() {
                 log::info!("the DVD in {}: {} languages", dir.display(), opened.len());
                 return Some(opened);
@@ -710,6 +704,12 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
                 }
             }
         }
+        // A language of the DVD further down: every language of its side.
+        let (opened, _) = open_dvd_languages(&dvd_side_of(&root));
+        if !opened.is_empty() {
+            log::info!("the DVD in {}: {} languages", dir.display(), opened.len());
+            return Some(opened);
+        }
         match open_with_kind(&root) {
             Ok((game, images)) => {
                 log::info!("game folder {}", root.display());
@@ -740,6 +740,34 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
             }
         }
     }
+}
+
+/// Every language of the side of the DVD's language `root` (none when
+/// `root` is not one): a pick of a folder above the side's copy.
+fn dvd_side_of(root: &Path) -> Vec<PathBuf> {
+    dvd_language_of(root)
+        .map(|(_, side)| dvd_languages_at(&side))
+        .unwrap_or_default()
+}
+
+/// The DVD's languages at `languages` that open, and the first error.
+#[allow(clippy::type_complexity)]
+fn open_dvd_languages(
+    languages: &[PathBuf],
+) -> (Vec<(Opened, PathBuf)>, Option<(PathBuf, GameError)>) {
+    let mut first_error = None;
+    let opened = languages
+        .iter()
+        .filter_map(|p| match open_with_kind(p) {
+            Ok((game, images)) => Some((Opened::LostTales(Box::new(game), images), p.clone())),
+            Err(e) => {
+                log::warn!("{}: {e}", p.display());
+                first_error.get_or_insert((p.clone(), e));
+                None
+            }
+        })
+        .collect();
+    (opened, first_error)
 }
 
 /// `found` with each of Cryo's DVD's languages met replaced by every
@@ -1068,6 +1096,12 @@ mod tests {
         assert!(matches!(try_open(&esp), Err(GameError::DvdOtherSide('B'))));
         let e = describe(&esp);
         assert!(!e.found && e.label.contains("other side"), "{}", e.label);
+        // The command line keeps a language's own error.
+        let err = open_game(&esp).err().unwrap();
+        assert!(
+            err.contains("other side") && !err.contains("give the folder"),
+            "{err}"
+        );
         // Both sides' copies in one folder.
         let d = tmp("dvd");
         link(&a, &d.join("side A"));
@@ -1076,6 +1110,12 @@ mod tests {
         assert_eq!(both.len(), 8, "{both:?}");
         assert_eq!(both[0], "FACE_A/ALL");
         assert_eq!(both[7], "FACE_B/JAP");
+        // A pick two levels above a side's copy: the side's languages.
+        link(&a, &d.join("deep").join("Atlantis DVD").join("side A"));
+        let roots = setup::find_roots(&d.join("deep"), 4);
+        assert_eq!(roots.len(), 1, "{roots:?}");
+        assert_eq!(names(&dvd_side_of(&roots[0].0)), side_a);
+        assert!(dvd_side_of(&d.join("deep")).is_empty());
         // The search of the installations: a language met gives the side's.
         let found = game_folders_in(&[d.join("side A")], &[], &[]);
         assert_eq!(names(&found), side_a);
@@ -1087,6 +1127,10 @@ mod tests {
             try_open(&d.join("alone").join("FACE_A").join("ENG")),
             Err(GameError::DvdSharedFolders)
         ));
+        let err = open_game(&d.join("alone").join("FACE_A").join("ENG"))
+            .err()
+            .unwrap();
+        assert!(!err.contains("give the folder"), "{err}");
         // The command line's message with the DVD's root.
         let err = open_game(&a).err().unwrap();
         assert!(err.contains("FACE_A") && err.contains("ENG"), "{err}");

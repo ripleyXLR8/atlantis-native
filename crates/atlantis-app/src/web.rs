@@ -264,7 +264,31 @@ pub async fn start(files: FileList, language: Option<String>) -> Result<(), JsVa
         all.insert(key(&rel), f);
     }
     // Cryo's DVD: one of its languages.
-    let dvd = atlantis_data::dvd::languages_in_paths(all.keys().map(String::as_str));
+    let mut dvd = atlantis_data::dvd::languages_in_paths(all.keys().map(String::as_str));
+    // Only the languages whose program the port knows (the desktop library
+    // lists no other): a known build is not reported as an unknown one.
+    let mut known = Vec::with_capacity(dvd.len());
+    let mut unsupported = Vec::new();
+    for (l, root) in dvd {
+        let exe = format!("{root}{}/atlantis.exe", l.path().to_ascii_lowercase());
+        let Some(f) = all.get(&exe) else { continue };
+        let bytes = fetch(f, 0, f.size() as u64).await?;
+        if atlantis_data::exe::build_of(&bytes).is_some() {
+            known.push((l, root));
+        } else {
+            log::info!("the DVD's {}: its program is not supported", l.language);
+            unsupported.push(l.language);
+        }
+    }
+    if known.is_empty() && !unsupported.is_empty() {
+        return Err(format!(
+            "Cryo's DVD: its {} version is not supported yet. Choose the folder \
+             of another of its languages.",
+            unsupported.join(", ")
+        )
+        .into());
+    }
+    dvd = known;
     let mut by_key: HashMap<String, File> = if dvd.is_empty() {
         // Drop the picked folder's name.
         all.into_iter()

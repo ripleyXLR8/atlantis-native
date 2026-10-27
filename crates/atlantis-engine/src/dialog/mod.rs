@@ -1613,3 +1613,103 @@ mod off1_tests {
         release_off1(g, "atlantis-gog-714752", 30, Some((377, 'A')));
     }
 }
+
+#[cfg(test)]
+mod dos_letters_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    use atlantis_data::dvd::{DvdFiles, LANGUAGES};
+    use atlantis_data::{Game, StdDir, TextCodePage};
+
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::hooks::DirectLoader;
+    use crate::sys::{Runner, Sys};
+    use crate::{BugFix, Enhancements};
+
+    /// The rows "äåö ÄÅÖ" as the Dutch and Swedish DVDs' DOS texts hold
+    /// them, drawn by the subtitles of the moment over a black screen: the
+    /// code page the font reads them in and the pixels.
+    async fn drawn(d: &mut Dialogs, e: &Engine) -> (TextCodePage, TextCodePage, Vec<u16>) {
+        let rows = vec![vec![0x84, 0x86, 0x94, b' ', 0x8e, 0x8f, 0x99]];
+        let s = d.subtitler(e).await;
+        let mut screen = vec![0u16; SCREEN_W * SCREEN_H];
+        s.draw_subtitles(&mut screen, SCREEN_W, SCREEN_H, &rows, 0);
+        let Subtitler::Gdi(font, _) = &s else {
+            panic!("the DVD's subtitles are GDI text")
+        };
+        (font.code_page(), d.font(e).await.code_page(), screen)
+    }
+
+    /// The fix switched on and off on one dialog state: the cached font
+    /// and subtitler follow it, the letters drawn change with it and come
+    /// back the same.
+    #[test]
+    fn dos_letters_reach_the_drawn_subtitles() {
+        let mut tested = 0;
+        for (folder, var) in [
+            ("HOL", "ATLANTIS_DVD_A_FILES"),
+            ("SUE", "ATLANTIS_DVD_B_FILES"),
+        ] {
+            let Some(dir) = std::env::var_os(var) else {
+                eprintln!("{var} not set: {folder} skipped");
+                continue;
+            };
+            let l = LANGUAGES.iter().find(|l| l.folder == folder).unwrap();
+            let files = DvdFiles::new(Arc::new(StdDir::new(dir)), l).expect("the side");
+            let g = Game::open(Arc::new(files)).expect("the language");
+            let sys = Sys::new(Mixer::new());
+            let out = Rc::new(RefCell::new(Vec::new()));
+            let o = out.clone();
+            let s2 = sys.clone();
+            let mut r = Runner::new(sys.clone(), async move {
+                let mut e = Engine::new(s2, g, Rc::new(DirectLoader));
+                let mut d = Dialogs::new();
+                e.set_enhancements(Enhancements::original());
+                let a = drawn(&mut d, &e).await;
+                e.set_enhancements(Enhancements::only_fix(BugFix::DosLetters));
+                let b = drawn(&mut d, &e).await;
+                e.set_enhancements(Enhancements::original());
+                let c = drawn(&mut d, &e).await;
+                o.borrow_mut().extend([a, b, c]);
+            });
+            let mut now = 0;
+            while r.step(now) {
+                now += 16;
+                assert!(now < 16 * 1000, "{folder}: not drawn");
+            }
+            let out = out.borrow();
+            let [a, b, c] = &out[..] else {
+                panic!("{folder}: not drawn")
+            };
+            assert_eq!(
+                (a.0, a.1),
+                (TextCodePage::Windows1252, TextCodePage::Windows1252)
+            );
+            assert_eq!((b.0, b.1), (TextCodePage::Dos850, TextCodePage::Dos850));
+            assert_eq!(
+                (c.0, c.1),
+                (TextCodePage::Windows1252, TextCodePage::Windows1252)
+            );
+            assert!(a.2.iter().any(|&p| p != 0), "{folder}: nothing drawn");
+            assert!(
+                b.2.iter().any(|&p| p != 0),
+                "{folder}: nothing drawn with the fix"
+            );
+            assert_ne!(
+                a.2, b.2,
+                "{folder}: the same letters with and without the fix"
+            );
+            assert_eq!(
+                a.2, c.2,
+                "{folder}: the fix switched off draws other letters"
+            );
+            tested += 1;
+        }
+        if tested == 0 {
+            eprintln!("no DVD side: the DOS letters' drawing not checked");
+        }
+    }
+}

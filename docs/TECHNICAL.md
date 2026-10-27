@@ -399,8 +399,8 @@ The port knows twenty-one builds of `atlantis.exe` (`ExeBuild` in
 header's timestamp (the 2001 build and the patch 1.01 build have the same
 size, as have the August 1997 French and German builds and the Spanish
 and Italian ones, the English, Dutch and Swedish 1997 retail
-builds, and the DVD's English, French, German, Spanish and Italian
-builds); the English DVD's and the Perfect Edition's executables share
+builds, the DVD's English, French, German, Spanish and Italian
+builds, and its Dutch and Swedish ones); the English DVD's and the Perfect Edition's executables share
 size and timestamp too, and are told apart by a path string
 (`ExeBuild::path_check`). Their tables are read where each build has
 them, and the code differences that change what a player sees follow the
@@ -561,6 +561,7 @@ PREINTRO.TGA without the R&P and Cryo logos, FONTMIN fonts with other
 while disc 2 is in use, its CREDITS.TXT and FONTMIN show, as in the
 original; with its fix (`fix_disc_revision`), disc 1's, the newest, whatever the
 disc.
+
 Cryo's Windows patch 1.01 (`AT1CDINT.EXE`, December 1999) replaces
 `atlantis.exe` (and `cryo.dll`) in a CD installation, English, French,
 German, Dutch, Swedish, Spanish or Italian, and keeps its `BIGCD1.BIG` … `BIGCD4.BIG`. Its executable is the
