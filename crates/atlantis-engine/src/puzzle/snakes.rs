@@ -155,7 +155,7 @@ pub struct SnakesGame {
     pub carried: i32,
     /// 0x004974c0: 1 left, 255 solved.
     pub result: i32,
-    /// Fix of the original's first-run win (minor bug fixes): see
+    /// Fix of the original's first-run win (`BugFix::SnakesFirstWin`): see
     /// [`SnakesGame::frame`].
     pub fix_first_run_win: bool,
 }
@@ -426,8 +426,9 @@ impl SnakesGame {
     ///
     /// On a first run the snakes not yet released still hold the zeroed
     /// memory (place (0, 0), piece 0), so carrying piece 0 to (0, 0) wins
-    /// (the original's behaviour). With `fix_first_run_win` (the minor bug
-    /// fixes) the win also needs every snake released, as a real win has.
+    /// (the original's behaviour). With `fix_first_run_win`
+    /// (`BugFix::SnakesFirstWin`) the win also needs every snake
+    /// released, as a real win has.
     pub fn frame(&mut self, mx: i32, my: i32) -> bool {
         if self.carried != 0 {
             let p = &mut self.pieces[(self.carried - 1) as usize];
@@ -716,7 +717,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     // carry over from the last run, as in the original's memory.
     let last = e.puzzles.snakes.unwrap_or_default();
     let mut game = SnakesGame::new(map, last);
-    game.fix_first_run_win = e.enhancements().minor_bug_fixes;
+    game.fix_first_run_win = e.snakes_first_run_fix();
     let mut host = Host(PuzzleHost::new(e, hooks));
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;

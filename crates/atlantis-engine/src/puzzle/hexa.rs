@@ -462,9 +462,9 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let sounds = PuzzleSounds::load(e, &["HEXA1", "HEXA2", "HEXA3", "HEXA4", "HEXA5"]).await;
     let mut game = HexaGame::new(map, coverage);
     game.cursor = e.puzzles.cursor;
-    // The 1997 build's entry rule; the minor bug fixes keep the 2001
+    // The 1997 build's entry rule; the hexagon pieces' fix keeps the 2001
     // forcing, so that the pieces are always there.
-    game.force_held_402 = e.game.exe.build.hexa_forces_402 || e.enhancements().minor_bug_fixes;
+    game.force_held_402 = e.hexa_forces_402();
     game.object_in_hand = e.vars.get("objetenmain");
     game.flag_temp6 = e.vars.get("flagtemp6");
     let mut host = Host(PuzzleHost::new(e, hooks));

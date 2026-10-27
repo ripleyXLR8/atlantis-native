@@ -230,8 +230,8 @@ impl Default for FontMinAdvances {
 /// widths' byte 92, 7 in atlantis-cd-de-687104).
 pub const SHARP_S: u8 = 0xe1;
 
-/// A sprite-font text as the port draws and measures it: with the minor
-/// bug fixes ([`crate::enhancements::Enhancements::minor_bug_fixes`]),
+/// A sprite-font text as the port draws and measures it: with the `ß`
+/// fix ([`crate::enhancements::BugFix::SharpS`]),
 /// [`SHARP_S`] is spelled "ss" (the glyph and advance of 's' twice), so
 /// "verläßt" reads "verlässt"; otherwise the bytes as they are.
 pub fn spell_sharp_s(text: &[u8], sharp_s_as_ss: bool) -> std::borrow::Cow<'_, [u8]> {
@@ -382,8 +382,9 @@ pub struct MenuRules {
     /// the two digits of id 10 (@ 0x0042022b), also when the id stays 9, so
     /// with SUBTITLES off the record reads its x at the comma (0) and each
     /// later field from inside the one before (a slot that holds an x / y
-    /// keeps them, a fresh one stores the shifted values); with the minor
-    /// bug fixes the step back is taken only for id 10.
+    /// keeps them, a fresh one stores the shifted values); with the fix
+    /// ([`crate::enhancements::BugFix::SubtitlesToggle`]) the step back is
+    /// taken only for id 10.
     pub toggle_in_step: bool,
 }
 
@@ -401,22 +402,27 @@ impl Default for MenuRules {
 }
 
 impl MenuRules {
-    /// The rules of a build: its own, with the minor bug fixes
-    /// ([`crate::enhancements::Enhancements::minor_bug_fixes`]) the `ß`
-    /// fix and the 22-px positioned zones of every other build (the
+    /// The rules of a build: its own, with the bug fixes `fixes`
+    /// ([`crate::enhancements::BugFix`]): the `ß` fix (`SharpS`), the 22-px
+    /// positioned zones of every other build (`MenuLineWidth`: the
     /// Italian build's 16 px per byte fall short of the drawn word: `OK`
-    /// 11 px, `Annulla` 18 px).
-    pub fn of_build(build: &atlantis_data::exe::ExeBuild, minor_bug_fixes: bool) -> MenuRules {
+    /// 11 px, `Annulla` 18 px) and the SUBTITLES record read in step
+    /// (`SubtitlesToggle`).
+    pub fn of_build(
+        build: &atlantis_data::exe::ExeBuild,
+        fixes: &crate::enhancements::BugFixes,
+    ) -> MenuRules {
+        use crate::enhancements::BugFix;
         MenuRules {
-            sharp_s_as_ss: minor_bug_fixes,
-            positioned_byte_width: if minor_bug_fixes {
+            sharp_s_as_ss: fixes.get(BugFix::SharpS),
+            positioned_byte_width: if fixes.get(BugFix::MenuLineWidth) {
                 22
             } else {
                 i32::from(build.menu_positioned_byte_width)
             },
             high_bytes_as_space: build.menu_high_bytes_as_space,
             toggle_sprites: build.menu_toggle_sprites,
-            toggle_in_step: minor_bug_fixes,
+            toggle_in_step: fixes.get(BugFix::SubtitlesToggle),
         }
     }
 }
@@ -980,6 +986,42 @@ mod tests {
     use super::*;
     use atlantis_data::exe::BUILDS;
 
+    /// The menu walk's rules of every build with each fix alone, then
+    /// every fix but one: the `ß` fix sets `sharp_s_as_ss`, the line
+    /// width's the 22-px zones, the SUBTITLES record's `toggle_in_step`,
+    /// each that field alone; the build's own fields whatever the fixes.
+    #[test]
+    fn menu_rules_follow_their_own_fixes() {
+        use crate::enhancements::{BugFix, BugFixes};
+        for b in BUILDS.iter() {
+            for f in BugFix::ALL {
+                for (fixes, on) in [(BugFixes::only(f), true), (BugFixes::all_but(f), false)] {
+                    let is = |g: BugFix| if g == f { on } else { !on };
+                    let r = MenuRules::of_build(b, &fixes);
+                    let ctx = format!("{} {fixes:?}", b.name);
+                    assert_eq!(r.sharp_s_as_ss, is(BugFix::SharpS), "{ctx}");
+                    let width = if is(BugFix::MenuLineWidth) {
+                        22
+                    } else {
+                        i32::from(b.menu_positioned_byte_width)
+                    };
+                    assert_eq!(r.positioned_byte_width, width, "{ctx}");
+                    assert_eq!(r.toggle_in_step, is(BugFix::SubtitlesToggle), "{ctx}");
+                    assert_eq!(r.high_bytes_as_space, b.menu_high_bytes_as_space);
+                    assert_eq!(r.toggle_sprites, b.menu_toggle_sprites);
+                }
+            }
+        }
+        let it = BUILDS
+            .iter()
+            .find(|b| b.name == "atlantis-cd-it-687104")
+            .unwrap();
+        assert_eq!(
+            MenuRules::of_build(it, &BugFixes::NONE).positioned_byte_width,
+            16
+        );
+    }
+
     /// The three name entry rules: the English 1997 build's, the others',
     /// the Swedish build's letters.
     #[test]
@@ -1209,7 +1251,7 @@ mod tests {
         let mut fresh = MenuWalk::default();
         walk_menu_text(text, 2, -1, 0, 0, rules, &mut fresh);
         assert_eq!(sprites(&fresh)[2], (9, 0, 45, false));
-        // The minor bug fixes read it in step.
+        // The SUBTITLES record fix reads it in step.
         let fixed = MenuRules {
             toggle_in_step: true,
             ..rules
@@ -1251,7 +1293,15 @@ mod tests {
                 }],
                 ops: Vec::new(),
             };
-            walk_menu_text(text, 1, -1, 0, 0, MenuRules::of_build(b, false), &mut walk);
+            walk_menu_text(
+                text,
+                1,
+                -1,
+                0,
+                0,
+                MenuRules::of_build(b, &crate::enhancements::BugFixes::NONE),
+                &mut walk,
+            );
             assert_eq!((walk.ops[0].x, walk.ops[0].y), (600, 0x7b), "{}", b.name);
             assert!(!walk.ops[0].alt_bank);
             assert_eq!(walk.records[0].y, 0x7b);

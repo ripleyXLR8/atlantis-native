@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use atlantis_data::{Game, StdDir};
+use atlantis_engine::enhancements::BugFixes;
 use atlantis_engine::ui::layout::{
     load_picker_knob_record, menu_walk_hit, walk_menu_text_in, LoadPickerScroll, MenuRecord,
     MenuRecordTable, MenuRules, MenuWalk,
@@ -199,7 +200,7 @@ fn check(var: &str, test: &str, build: &str, golden: &str) {
             .iter()
             .map(|m| g.big.read(&format!("SPRLIST\\{m}.TXT")).unwrap())
             .collect(),
-        rules: MenuRules::of_build(b, false),
+        rules: MenuRules::of_build(b, &BugFixes::NONE),
     };
     let want: Vec<&str> = golden
         .lines()
@@ -244,19 +245,16 @@ fn record_table_french_may_1997_build() {
     );
 }
 
-/// Without the table (the minor bug fixes), each menu walks its own
+/// Without the table (the menus' records fix), each menu walks its own
 /// records: SUREMENU after the sound menu keeps its ornament at the text's
 /// place, and the LOAD knob of a second visit with more files is drawn
 /// again at the file's x.
 #[test]
-fn record_table_left_out_with_the_minor_bug_fixes() {
-    let Some(g) = game(
-        "ATLANTIS_DATA_1997",
-        "record_table_left_out_with_the_minor_bug_fixes",
-    ) else {
+fn record_table_left_out_with_the_fix() {
+    let Some(g) = game("ATLANTIS_DATA_1997", "record_table_left_out_with_the_fix") else {
         return;
     };
-    let rules = MenuRules::of_build(g.exe.build, true);
+    let rules = MenuRules::of_build(g.exe.build, &BugFixes::ALL);
     let text = |m: &str| g.big.read(&format!("SPRLIST\\{m}.TXT")).unwrap();
     let mut son = MenuWalk::default();
     walk_menu_text_in(&text("SONMENU"), 5, -1, 0, 0, rules, &mut son, None);

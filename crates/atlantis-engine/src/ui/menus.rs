@@ -58,8 +58,8 @@ pub(crate) struct Menu {
     pub text: Vec<u8>,
     pub number: i32,
     pub walk: MenuWalk,
-    /// The build's walk rules, with the port's fixes from the minor bug
-    /// fixes when the menu was opened ([`MenuRules::of_build`]).
+    /// The build's walk rules, with the port's fixes from the bug fixes
+    /// in force when the menu was opened ([`MenuRules::of_build`]).
     pub rules: MenuRules,
 }
 
@@ -202,7 +202,7 @@ impl Engine {
             text,
             number,
             walk: MenuWalk::default(),
-            rules: MenuRules::of_build(self.game.exe.build, self.enhancements().minor_bug_fixes),
+            rules: self.menu_rules(),
         })
     }
 
@@ -327,7 +327,7 @@ impl Engine {
                 menu.walk(record, 0, 0, self.menu_table());
                 let mut s = bg.clone();
                 self.ui.draw_menu(&mut s, &menu.walk);
-                let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
+                let sharp_s_as_ss = self.sharp_s_as_ss();
                 for j in 0..self.players.count {
                     let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
                     self.ui.draw_font_min(
@@ -350,7 +350,7 @@ impl Engine {
                 }
             }
             // The exit and its commit; players.atl written on record 5.
-            let keep_fifth_name = self.enhancements().minor_bug_fixes;
+            let keep_fifth_name = self.keep_fifth_name();
             let end = player_screen_exit(&mut st, exit, record, &mut self.players, keep_fifth_name);
             if end.write {
                 self.save_players();
@@ -666,7 +666,7 @@ impl Engine {
         let chapters = self.player_checkpoints();
         // The rows, their widths and the title, with the port's `ß` fix
         // (the original draws no glyph for 0xe1 and advances 7).
-        let sharp_s_as_ss = self.enhancements().minor_bug_fixes;
+        let sharp_s_as_ss = self.sharp_s_as_ss();
         let names: Vec<Vec<u8>> = chapters
             .iter()
             .map(|&c| {
@@ -907,7 +907,7 @@ impl Engine {
         }
         .unwrap_or_default();
         // The port's `ß` fix, for consistency (no known CREDITS.TXT holds 0xe1).
-        let text = spell_sharp_s(&text, self.enhancements().minor_bug_fixes);
+        let text = spell_sharp_s(&text, self.sharp_s_as_ss());
         let events = credits_events(&text, &self.game.exe.credit_widths);
         let start = self.sys.millis();
         let mut buffer = vec![0u16; N];
@@ -1025,7 +1025,7 @@ mod record_table_tests {
     use std::rc::Rc;
 
     use crate::test_support::with_engine_in;
-    use crate::Enhancements;
+    use crate::{BugFix, Enhancements};
 
     /// The SPRMENU blits of the golden's line `step <n> SUREMENU`: the
     /// original's walk under emulation, in the May 1997 English build.
@@ -1042,10 +1042,11 @@ mod record_table_tests {
     }
 
     /// The engine's menus walk on the session's record table as the
-    /// original does, and on their own records with the minor bug fixes:
-    /// SUREMENU walked after SONMENU in the 16-record build has its left
-    /// ornament off screen (the original's step 3) without the fixes, at
-    /// the text's place (as a first walk, step 1) with them.
+    /// original does, and on their own records with the menus' records
+    /// fix: SUREMENU walked after SONMENU in the 16-record build has its
+    /// left ornament off screen (the original's step 3) without the fix,
+    /// every other fix on or off, at the text's place (as a first walk,
+    /// step 1) with it alone.
     #[test]
     fn engine_menus_use_the_session_table_only_without_the_fixes() {
         let got = Rc::new(RefCell::new(Vec::new()));
@@ -1054,11 +1055,16 @@ mod record_table_tests {
             "ATLANTIS_DATA_1997",
             "engine_menus_use_the_session_table_only_without_the_fixes",
             move |mut e| async move {
-                for fixes in [false, true] {
-                    e.set_enhancements(Enhancements {
-                        minor_bug_fixes: fixes,
-                        ..Enhancements::default()
-                    });
+                for (fixes, x) in [
+                    (false, Enhancements::original()),
+                    (false, Enhancements::all_but_fix(BugFix::MenuRecords)),
+                    (true, Enhancements::only_fix(BugFix::MenuRecords)),
+                ] {
+                    e.set_enhancements(x);
+                    // A new session's table for each case.
+                    e.menu_records = crate::ui::layout::MenuRecordTable::new(usize::from(
+                        e.game.exe.build.menu_records_per_menu,
+                    ));
                     for name in ["SUREMENU.TXT", "SONMENU.TXT", "SUREMENU.TXT"] {
                         let mut menu = e.load_menu(name).await.unwrap();
                         menu.walk(None, 0, 0, e.menu_table());
@@ -1086,6 +1092,8 @@ mod record_table_tests {
         assert_eq!(
             *got.borrow(),
             [
+                (false, first.clone()),
+                (false, third.clone()),
                 (false, first.clone()),
                 (false, third),
                 (true, first.clone()),

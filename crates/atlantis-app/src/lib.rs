@@ -287,23 +287,34 @@ impl App {
 
     /// The game's release (see [`atlantis_data::Edition`]): in the
     /// window's title and at the foot of the options menu, with the
-    /// port's version.
-    pub fn with_edition(mut self, edition: &atlantis_data::Edition) -> App {
-        self.set_edition(Some(edition));
+    /// port's version; and the bug fixes of its build
+    /// ([`atlantis_engine::BugFix::of_game`]), which the options menu's
+    /// "Choose the bug fixes..." lists.
+    pub fn with_edition(
+        mut self,
+        edition: &atlantis_data::Edition,
+        fixes: Vec<atlantis_engine::BugFix>,
+    ) -> App {
+        self.set_edition(Some((edition, fixes)));
         self
     }
 
     /// [`App::with_edition`] on a running front end; `None` without a game.
-    fn set_edition(&mut self, edition: Option<&atlantis_data::Edition>) {
+    fn set_edition(
+        &mut self,
+        edition: Option<(&atlantis_data::Edition, Vec<atlantis_engine::BugFix>)>,
+    ) {
         match edition {
-            Some(edition) => {
+            Some((edition, fixes)) => {
                 self.title = format!("Atlantis Native - {edition}");
                 self.menu
                     .set_info(vec![format!("Game: {edition}"), version_string()]);
+                self.menu.set_game(Some(&edition.to_string()), Some(fixes));
             }
             None => {
                 self.title = "Atlantis Native".to_string();
                 self.menu.set_info(vec![version_string()]);
+                self.menu.set_game(None, None);
             }
         }
         if let Some(w) = &self.window {
@@ -379,14 +390,14 @@ impl App {
         (sys, runner): (Rc<Sys>, Runner),
         graphics: Graphics,
         saves: Rc<dyn SaveStore>,
-        edition: &atlantis_data::Edition,
+        (edition, fixes): (&atlantis_data::Edition, Vec<atlantis_engine::BugFix>),
         icon: Option<atlantis_data::exe_icon::Icon>,
     ) {
         self.stop_game();
         self.sys = sys;
         self.runner = Some(runner);
         self.set_graphics(graphics, Some(saves));
-        self.set_edition(Some(edition));
+        self.set_edition(Some((edition, fixes)));
         self.set_icon(icon);
         let now = Instant::now();
         self.start = now;
@@ -531,12 +542,15 @@ impl App {
             }
             MenuAction::SetEnhancements(x) => {
                 // The engine reads them where it uses them: in force at once
-                // (the music mode from the next track).
+                // (the music mode from the next track). Only what changed
+                // is written: `--original` holds for the run without
+                // changing `settings.ini`.
+                let before = self.sys.enhancements();
                 self.sys.set_enhancements(x);
                 log::info!("enhancements: {x:?}");
                 if let Some(saves) = &self.saves {
                     let mut s = Settings::load(saves.as_ref()).unwrap_or_default();
-                    s.enhancements = x;
+                    s.enhancements = s.enhancements.with_changes(&before, &x);
                     s.save(saves.as_ref());
                 }
             }

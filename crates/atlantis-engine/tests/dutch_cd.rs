@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use atlantis_data::{Game, StdDir, TextCodePage};
 use atlantis_engine::audio::Mixer;
-use atlantis_engine::enhancements::Enhancements;
+use atlantis_engine::enhancements::{BugFix, Enhancements};
 use atlantis_engine::hooks::DirectLoader;
 use atlantis_engine::subtitles::{split_subtitle_1997, BitmapFont};
 use atlantis_engine::sys::{Input, Runner, Sys};
@@ -260,7 +260,8 @@ fn with_engine(g: Game, f: impl AsyncFnOnce(&mut Engine) + 'static) {
 
 /// While disc 2 is the current disc, CREDITS.TXT and the FONTMIN fonts are
 /// disc 2's older copies (as the original reads them from the disc in the
-/// drive); with the minor bug fixes, disc 1's whatever the disc.
+/// drive), every other fix on or off; with the disc revision's fix alone,
+/// disc 1's whatever the disc.
 #[test]
 fn disc_2_copies_both_ways() {
     let Some(g) = game("disc_2_copies_both_ways") else {
@@ -271,9 +272,15 @@ fn disc_2_copies_both_ways() {
     let o = out.clone();
     with_engine(g, async move |e: &mut Engine| {
         let j = usize::from(b'j' - 0x20);
-        for (fixes, disc) in [(false, 1), (false, 2), (true, 2), (false, 3)] {
-            let mut enh = Enhancements::original();
-            enh.minor_bug_fixes = fixes;
+        let others = Enhancements::all_but_fix(BugFix::DiscRevision);
+        for (enh, disc) in [
+            (Enhancements::original(), 1),
+            (Enhancements::original(), 2),
+            (Enhancements::only_fix(BugFix::DiscRevision), 2),
+            (Enhancements::original(), 3),
+            (others, 2),
+        ] {
+            let fixes = enh.fix(BugFix::DiscRevision);
             e.sys.set_enhancements(enh);
             e.disc = disc;
             let credits = e
@@ -293,6 +300,7 @@ fn disc_2_copies_both_ways() {
     assert!(out[1].starts_with("false 2: 5031 BIGCD2.BIG"), "{out:?}");
     assert!(out[2].starts_with("true 2: 5034 BIGCD1.BIG"), "{out:?}");
     assert!(out[3].starts_with("false 3: 5034 BIGCD3.BIG"), "{out:?}");
+    assert_eq!(out[4], out[1], "every other fix on: as the original");
     // The `j` hotspot: disc 2's font differs from the others'.
     assert_ne!(jy(1), jy(0));
     assert_eq!(jy(2), jy(0));

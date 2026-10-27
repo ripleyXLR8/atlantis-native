@@ -77,8 +77,10 @@ contains none of them.</sub>
   panoramas of the places left and reached (up to a 2.4:1 picture, black
   beyond on wider screens).
 - 🐞 **Bug fixes** (optional): seamless music loops, talking-head overlays
-  drawn correctly, and other fixes of the original's bugs. One switch turns
-  them all off for the game exactly as it shipped.
+  drawn correctly, and other fixes of the original's bugs, each with its
+  own switch (F10, "Choose the bug fixes...", which lists those of the
+  edition played and what each one changes). One switch turns them all off
+  for the game exactly as it shipped.
 - 💾 **Your saves, compatible**: the game saves at every chapter, in the
   original's own file format. An existing installation's players and
   checkpoints are taken over on the first start.

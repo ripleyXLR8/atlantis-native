@@ -85,7 +85,7 @@ fn rows(p: &Players) -> String {
 }
 
 /// The golden run through the port's blocks; `keep_fifth_name` is the
-/// minor bug fixes' rule (the original: false).
+/// fifth player's fix (BugFix::FifthPlayer; the original: false).
 fn run(keep_fifth_name: bool, mut each: impl FnMut(&str, &HashMap<&str, &str>, &Players)) {
     let (mut players, mut st) = (Players::new(MARKER), PlayerScreenState::default());
     let (mut scenarios, mut frames, mut exits) = (0, 0, 0);
@@ -215,7 +215,7 @@ fn player_screen_matches_original() {
     });
 }
 
-/// The minor bug fixes keep the fifth name on OK; the rest is the
+/// The fifth player's fix keeps the fifth name on OK; the rest is the
 /// original's.
 #[test]
 fn player_screen_keeps_the_fifth_name_with_the_fixes() {
