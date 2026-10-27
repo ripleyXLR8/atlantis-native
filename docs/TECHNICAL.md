@@ -3544,7 +3544,7 @@ Japanese scripts in the bundled font, and MS PGothic from a
 library's DVD editions in `atlantis-app`); with `ATLANTIS_DVD_SHOTS` they
 write their screens there (`dvd-<language folder>-first-dialog.png`,
 `dvd-<language folder>-load-list.png`, `dvd-JAP-load-list-rows.png`,
-`library-dvd.png`). For Atlantis II,
+`library-dvd.png`, `library-dvd-end.png`). For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or
 copies), `ATLANTIS2_GOG` GOG.com's installation (only read; `tests/gog.rs`:

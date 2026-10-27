@@ -768,7 +768,7 @@ mod tests {
     /// in the images of both sides its own edition ("from disc images"), and
     /// the Perfect Edition; one played from the screen, first in the
     /// library. With `ATLANTIS_DVD_SHOTS=<folder>` the screen is saved
-    /// there (`library-dvd.png`).
+    /// there (`library-dvd.png`, and its list's end `library-dvd-end.png`).
     #[test]
     fn the_library_lists_the_dvd_languages() {
         let (Some(ia), Some(ib)) = (
@@ -811,7 +811,16 @@ mod tests {
             let mut font = None;
             assert!(draw_launcher(app.session(), &mut frame, &mut font));
             let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
-            std::fs::write(PathBuf::from(dir).join("library-dvd.png"), png).unwrap();
+            std::fs::write(PathBuf::from(&dir).join("library-dvd.png"), png).unwrap();
+            // The end of the list: the Japanese version, the Perfect
+            // Edition.
+            let l = app.session_mut().unwrap().launcher.as_mut().unwrap();
+            l.key(LauncherKey::End);
+            assert!(draw_launcher(app.session(), &mut frame, &mut font));
+            let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
+            std::fs::write(PathBuf::from(dir).join("library-dvd-end.png"), png).unwrap();
+            let l = app.session_mut().unwrap().launcher.as_mut().unwrap();
+            l.key(LauncherKey::Home);
         }
         let l = app.session().unwrap().launcher().unwrap();
         let labels: Vec<&str> = l.entries().iter().map(|e| e.label.as_str()).collect();
