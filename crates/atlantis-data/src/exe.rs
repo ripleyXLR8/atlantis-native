@@ -226,6 +226,21 @@ pub struct ExeBuild {
     /// executables hold no "off1" string nor its player, and their scripts
     /// no such header: the port plays one as an `off` line there.
     pub off1_player: bool,
+    /// The bytes the build's films' folder string holds at this address,
+    /// for the builds whose size and PE timestamp are another build's: the
+    /// English DVD's executable and the Perfect Edition's are one file but
+    /// for seven path strings (atlantis-dvd-en-695296 @ 0x004abc78
+    /// `\face_a\ubb_vue\`, atlantis-pe-2018-695296 `ubb_vue\`).
+    /// `None`: not checked.
+    pub path_check: Option<(u32, &'static str)>,
+    /// The release's CON texts are the 1997 CDs' files, written in the DOS
+    /// code page for those CDs' bitmap font, but this build draws them
+    /// through Windows (GDI TextOutA, atlantis-dvd-nl-695808 FUN_0042f2c0,
+    /// atlantis-dvd-sv-695808 FUN_0042f384) in the Windows code page
+    /// (`text_code_page`): the Dutch and Swedish DVDs. The port reads them
+    /// as the original shows them, or in the DOS code page with the bug fix
+    /// `DosLetters`.
+    pub dos_subtitle_texts: bool,
 }
 
 /// The cut marks of the GDI subtitle breaker ([`ExeBuild::cjk_breaker`]).
@@ -309,8 +324,10 @@ pub struct CinemaCaptions {
 /// the Italian retail CD's build of July 1997 (the French August
 /// build's code with its own menu zones, the credits widths 1 byte further)
 /// and the Traditional and Simplified Chinese CDs' builds of July 1998 and
-/// March 1999 ([`ZH_TW`] and [`ZH_CN`]).
-pub const BUILDS: [ExeBuild; 13] = [
+/// March 1999 ([`ZH_TW`] and [`ZH_CN`]), the seven European builds of
+/// Cryo's 1998 DVD-ROM ([`DVD_EN`]..) and the Perfect Edition's program
+/// ([`PE_2018`]).
+pub const BUILDS: [ExeBuild; 21] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
@@ -363,6 +380,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: true,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // The GOG.com build: its French executable; the five language
     // executables are that one with the player row changed. The name is
@@ -421,6 +440,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: true,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // Cryo's Windows patch AT1CDINT.EXE ("1.01"), installed over the
     // English, French and German CD installs, whose BIGCD1..4.BIG it keeps.
@@ -489,6 +510,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: true,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     ExeBuild {
         name: "atlantis-cd-en-688128",
@@ -543,6 +566,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // A 1997 build sharing most of atlantis-cd-en-688128's code, with the
     // reference's GDI subtitles (FUN_0041a834, FUN_0042e84c, FUN_0042e9cc),
@@ -614,6 +639,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // The German retail CD's build: atlantis-cd-fr-687104's code byte for
     // byte (its BEGTEXT section is the French one's) and its DGROUP layout,
@@ -680,6 +707,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // The Spanish retail CD's build (August 1997): atlantis-cd-fr-687104's
     // code but for one line, the rat puzzle's T0023 search restarting at
@@ -748,6 +777,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // The Italian retail CD's build (July 1997, eleven days before
     // atlantis-cd-fr-687104): the French August build's code but for the
@@ -814,6 +845,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // The first French pressing: atlantis-cd-en-688128's code (every
     // function pairs; most differences are the calling convention of its
@@ -879,6 +912,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // The Dutch retail CD's build: atlantis-cd-en-688128's code (the same
     // size, told apart by the PE stamp) but for the R&P logo at start-up
@@ -956,6 +991,8 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     // The Swedish retail CD's build: atlantis-cd-en-688128's code rebuilt
     // on 1997-06-11 (the same size, told apart by the PE stamp), every
@@ -1028,9 +1065,19 @@ pub const BUILDS: [ExeBuild; 13] = [
         subtitles_on_at_start: false,
         players_names_block: 85,
         off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
     },
     ZH_TW,
     ZH_CN,
+    DVD_EN,
+    DVD_FR,
+    DVD_DE,
+    DVD_NL,
+    DVD_ES,
+    DVD_IT,
+    DVD_SV,
+    PE_2018,
 ];
 
 /// The Traditional Chinese 4-CD release's build (atlantis-cd-zh-tw-696832,
@@ -1137,6 +1184,8 @@ pub const ZH_TW: ExeBuild = ExeBuild {
     players_names_block: 102,
     // FUN_0042fe7c; the scripts' 29 off1 headers.
     off1_player: true,
+    path_check: None,
+    dos_subtitle_texts: false,
 };
 
 /// The Simplified Chinese 4-CD release's build (atlantis-cd-zh-cn-692736,
@@ -1158,6 +1207,188 @@ pub const ZH_CN: ExeBuild = ExeBuild {
     ..ZH_TW
 };
 
+/// The 1998 program (atlantis-pe-2018-695296's, April 1998) as Cryo's
+/// DVD-ROM ships it for English (atlantis-dvd-en-695296, `FACE_A\ENG`):
+/// atlantis-cd-fr-687104's code line moved toward the reference, the
+/// parent of [`ZH_TW`], which keeps its rules but those the Chinese builds
+/// changed (binaries/atlantis-cd-zh-tw-696832.md Z1..Z13). The five shared
+/// folders are read from `\face_a\` at the disc's root (seven DGROUP
+/// strings, 0x004abbfc..0x004ae404), the others from the language's folder
+/// (the port's `dvd::DvdFiles`). Its tables (located by their readers'
+/// operands, atlantis-re `evidence/compare/dvd1998/tables.txt`) hold the
+/// reference's bytes.
+pub const DVD_EN: ExeBuild = ExeBuild {
+    name: "atlantis-dvd-en-695296",
+    size: 695_296,
+    pe_timestamp: 0x3544_84bc,
+    year: 1998,
+    month: None,
+    dgroup_vaddr: 0x8_0000,
+    dgroup_raw: 0x6_d600,
+    // Readers 0x0041ed7a.., 0x00431fbd.
+    music_va: 0x0048_5eec,
+    // Readers 0x004196ef, 0x0042d38c; the names in 0x004ab3bc...
+    sound_names_va: 0x0048_61d8,
+    sound_names_range: (0x004a_0000, 0x004b_0000),
+    // "#New Player", then the label "New Player" (readers 0x004191c0..).
+    new_player_va: 0x0048_6568,
+    // Readers 0x0042a701.., 0x0042a9bc...
+    inventory_va: 0x0048_67a8,
+    guest_va: 0x0048_687c,
+    // Readers 0x0041aab4, 0x0041ac0a, 0x0041ff15: the reference's widths.
+    credit_widths_va: 0x0048_66f4,
+    marker_is_label: false,
+    // FUN_0042270c (fr-687104's FUN_00421f40): no rule for 0x219 / 0x21a.
+    cursor_id_rule: false,
+    // FUN_00427a14: no forced camera.
+    rhea_camera2: false,
+    // FUN_00425bfc: the GOG.com rule (the per-section counter), with the
+    // reference's `0x00486098 < 2` term (@ 0x0042607f).
+    alt_game_over_narration: true,
+    // GDI Arial: font FUN_0041ae5c, breaker FUN_0042f108 (fr-687104's
+    // FUN_0042e84c, the reference's rows), drawer FUN_0042f290 (the
+    // reference's FUN_00430178).
+    bitmap_subtitles: false,
+    // FUN_0041d394: the three-click cycle.
+    subtitle_click_cycle: true,
+    // The '#' rule (FUN_00420520), players.atl 97 bytes.
+    players_1997: false,
+    // FUN_0041dae8: 0x20..0xa7, case kept.
+    upper_case_names: false,
+    // FUN_0043cfb0 (fr-687104's FUN_0043c210): OBJETENMAIN not forced.
+    hexa_forces_402: false,
+    // FUN_0043f8fc (fr-687104's FUN_0043eb5c).
+    queen_reveal: (3, 200),
+    // FUN_00436438 (fr-687104's FUN_004356a0): 5 ticks after each pass;
+    // T0023's search restarted (@ 0x004356c3).
+    rat_deadline_pacing: false,
+    rat_search_restart: true,
+    // FUN_0041bf70 (fr-687104's FUN_0041b938).
+    warp_cursor_steps: 1,
+    // FUN_0041cd40: the knob at 0x7b, with the clamp.
+    load_knob_starts_at_bar: true,
+    load_picker_clamp: true,
+    music_first_value_rule: false,
+    game_over_voice_at_entry: false,
+    music_load_all_or_nothing: false,
+    music_load_min_volume: 0,
+    music_restart_rearms_fade: true,
+    text_code_page: TextCodePage::Windows1252,
+    startup_logo_rp: false,
+    // Once at start-up, with the menus.
+    credits_read_per_run: false,
+    subtitle_cut_back_only: false,
+    name_entry_dos_letters: false,
+    // FUN_0041f30c: `imul ebx,..,0x16`; bytes below 0x20 as spaces.
+    menu_positioned_byte_width: 22,
+    menu_high_bytes_as_space: false,
+    menu_records_per_menu: 20,
+    cjk_breaker: CjkBreaker::None,
+    subtitle_row_step: 14,
+    // The `/sprj=` banks are never loaded: FONTMAX text menus.
+    menu_sprite_banks: None,
+    menu_toggle_sprites: false,
+    load_list: LoadList::EpiText,
+    cinema_captions: None,
+    // SUBTITLES keeps the file's 0 (zh-tw's Z9 is not here).
+    subtitles_on_at_start: false,
+    // `push 0x55`: 85 bytes, a 97-byte players.atl.
+    players_names_block: 85,
+    // FUN_0042f974 (the reference's FUN_00430884, the 1997 copy).
+    off1_player: true,
+    path_check: Some((0x004a_bc78, "\\face_a\\ubb_vue\\")),
+    dos_subtitle_texts: false,
+};
+
+/// The Perfect Edition's program (atlantis-pe-2018-695296, Tgames 2018):
+/// [`DVD_EN`]'s file with its seven `\face_a\` paths made relative, so
+/// the same size and PE timestamp, told apart by the films' folder string.
+pub const PE_2018: ExeBuild = ExeBuild {
+    name: "atlantis-pe-2018-695296",
+    path_check: Some((0x004a_bc78, "ubb_vue\\")),
+    ..DVD_EN
+};
+
+/// The French DVD build (atlantis-dvd-fr-695296, `FACE_A\FRA`): [`DVD_EN`]'s
+/// code (867 functions the same, at the same addresses); its French strings
+/// move the tables after the player row by 4 bytes.
+pub const DVD_FR: ExeBuild = ExeBuild {
+    name: "atlantis-dvd-fr-695296",
+    pe_timestamp: 0x3544_8427,
+    // "#NOUVEAU JOUEUR" (0x00486568).
+    inventory_va: 0x0048_67ac,
+    guest_va: 0x0048_6880,
+    credit_widths_va: 0x0048_66f8,
+    ..DVD_EN
+};
+
+/// The German DVD build (atlantis-dvd-de-695296, `FACE_A\ALL`): [`DVD_EN`]'s
+/// code; the credits widths at the operand of 0x0041aab4 hold its own bytes.
+pub const DVD_DE: ExeBuild = ExeBuild {
+    name: "atlantis-dvd-de-695296",
+    pe_timestamp: 0x3544_8546,
+    credit_widths_va: 0x0048_66f7,
+    ..DVD_EN
+};
+
+/// The Dutch DVD build (atlantis-dvd-nl-695808, `FACE_A\HOL`): [`DVD_EN`]'s
+/// code with 0x30 bytes inserted in WinMain (0x00419787..0x004197b4: the
+/// R&P logo `\face_a\ubb_vue\logorp.hnm` played by 0x004239a4, the
+/// player of PREINTRO, before it), the code from FUN_00419ec0 on 0x30
+/// higher; the Dutch CD's CON texts (DOS code page) drawn by GDI.
+pub const DVD_NL: ExeBuild = ExeBuild {
+    name: "atlantis-dvd-nl-695808",
+    size: 695_808,
+    pe_timestamp: 0x3544_86f7,
+    dgroup_raw: 0x6_d800,
+    // The operand of 0x0041aae4: its own bytes.
+    credit_widths_va: 0x0048_66f7,
+    startup_logo_rp: true,
+    dos_subtitle_texts: true,
+    ..DVD_EN
+};
+
+/// The Spanish DVD build (atlantis-dvd-es-695296, `FACE_B\ESP`):
+/// [`DVD_EN`]'s code, the shared folders at `\face_b\`.
+pub const DVD_ES: ExeBuild = ExeBuild {
+    name: "atlantis-dvd-es-695296",
+    pe_timestamp: 0x3544_88d7,
+    credit_widths_va: 0x0048_66f7,
+    path_check: Some((0x004a_bc78, "\\face_b\\ubb_vue\\")),
+    ..DVD_EN
+};
+
+/// The Italian DVD build (atlantis-dvd-it-695296, `FACE_B\ITA`):
+/// [`DVD_EN`]'s code but the menu record parser FUN_0041f30c, whose
+/// positioned items answer over 16 px per byte (`shl ebx,4`, the Italian
+/// CD's rule), the code after it 4 bytes higher.
+pub const DVD_IT: ExeBuild = ExeBuild {
+    name: "atlantis-dvd-it-695296",
+    pe_timestamp: 0x3544_882d,
+    inventory_va: 0x0048_67ac,
+    guest_va: 0x0048_6880,
+    credit_widths_va: 0x0048_66f9,
+    menu_positioned_byte_width: 16,
+    path_check: Some((0x004a_bc78, "\\face_b\\ubb_vue\\")),
+    ..DVD_EN
+};
+
+/// The Swedish DVD build (atlantis-dvd-sv-695808, `FACE_B\SUE`):
+/// [`DVD_EN`]'s code but the name entry FUN_0041dae8, which stores the
+/// typed `Ä Å Ö ä å ö` as DOS code page bytes (the Swedish CD's rule), the
+/// code after it 0xf4 bytes higher; the Swedish CD's CON texts (DOS code
+/// page) drawn by GDI.
+pub const DVD_SV: ExeBuild = ExeBuild {
+    name: "atlantis-dvd-sv-695808",
+    size: 695_808,
+    pe_timestamp: 0x3544_878c,
+    dgroup_raw: 0x6_d800,
+    name_entry_dos_letters: true,
+    dos_subtitle_texts: true,
+    path_check: Some((0x004a_bc78, "\\face_b\\ubb_vue\\")),
+    ..DVD_EN
+};
+
 /// The TimeDateStamp of a PE file's COFF header (at e_lfanew + 8, after the
 /// "PE\0\0" signature), `None` when the bytes are not a PE file.
 pub fn pe_timestamp(exe: &[u8]) -> Option<u32> {
@@ -1175,19 +1406,34 @@ pub fn pe_timestamp(exe: &[u8]) -> Option<u32> {
     u32_at(pe + 8)
 }
 
-/// The build of an executable, by its size and PE timestamp; `None` when
-/// unknown.
+/// The build of an executable, by its size and PE timestamp (and the
+/// string of [`ExeBuild::path_check`]); `None` when unknown.
 pub fn build_of(exe: &[u8]) -> Option<&'static ExeBuild> {
     let stamp = pe_timestamp(exe)?;
-    BUILDS
-        .iter()
-        .find(|b| b.size as usize == exe.len() && b.pe_timestamp == stamp)
+    BUILDS.iter().find(|b| {
+        b.size as usize == exe.len()
+            && b.pe_timestamp == stamp
+            && b.path_check.is_none_or(|(va, text)| {
+                let at = b.file_offset(va);
+                exe.get(at..at + text.len() + 1)
+                    .is_some_and(|s| &s[..text.len()] == text.as_bytes() && s[text.len()] == 0)
+            })
+    })
 }
 
 // The image base of the known builds.
 const IMAGE_BASE: u32 = 0x40_0000;
 
 impl ExeBuild {
+    /// The side of Cryo's DVD whose root the build reads its shared
+    /// folders from ('A' for `\face_a\`, 'B' for `\face_b\`: its
+    /// [`ExeBuild::path_check`] string); `None` for the other builds.
+    pub fn dvd_side(&self) -> Option<char> {
+        let (_, path) = self.path_check?;
+        let rest = path.strip_prefix("\\face_")?;
+        rest.chars().next().map(|c| c.to_ascii_uppercase())
+    }
+
     /// The file offset of a DGROUP address.
     fn file_offset(&self, va: u32) -> usize {
         (va - IMAGE_BASE - self.dgroup_vaddr + self.dgroup_raw) as usize
@@ -1349,10 +1595,20 @@ mod tests {
         exe
     }
 
+    /// [`fake_exe`] of build `b`, with its [`ExeBuild::path_check`] string.
+    fn fake_exe_of(b: &ExeBuild) -> Vec<u8> {
+        let mut exe = fake_exe(b.size as usize, b.pe_timestamp);
+        if let Some((va, text)) = b.path_check {
+            let at = b.file_offset(va);
+            exe[at..at + text.len()].copy_from_slice(text.as_bytes());
+        }
+        exe
+    }
+
     #[test]
     fn size_and_stamp_tell_every_build() {
         for b in &BUILDS {
-            let exe = fake_exe(b.size as usize, b.pe_timestamp);
+            let exe = fake_exe_of(b);
             assert_eq!(build_of(&exe).map(|f| f.name), Some(b.name));
         }
         // The reference and the patch: one size, two stamps.
@@ -1441,6 +1697,77 @@ mod tests {
         }
         let steps = ZH_TW.cinema_captions.unwrap().steps;
         assert!(steps.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    /// The 1998 DVD's builds and the Perfect Edition's: the English DVD
+    /// and the Perfect Edition share size and stamp, told apart by the
+    /// films' folder string; a 1998 file with neither string is unknown.
+    /// Their fields are the 1998 program's (pe-2018's, the Chinese builds'
+    /// parent) but each language's own rule.
+    #[test]
+    fn dvd_builds() {
+        let en = fake_exe_of(&DVD_EN);
+        assert_eq!(build_of(&en).unwrap().name, "atlantis-dvd-en-695296");
+        let pe = fake_exe_of(&PE_2018);
+        assert_eq!(build_of(&pe).unwrap().name, "atlantis-pe-2018-695296");
+        assert!(build_of(&fake_exe(695_296, 0x3544_84bc)).is_none());
+        // `\face_a\ubb_vue\` then more: not the string.
+        let mut longer = en.clone();
+        let at = DVD_EN.file_offset(0x004a_bc78) + "\\face_a\\ubb_vue\\".len();
+        longer[at] = b'x';
+        assert!(build_of(&longer).is_none());
+        let dvd = [DVD_EN, DVD_FR, DVD_DE, DVD_NL, DVD_ES, DVD_IT, DVD_SV];
+        for b in &dvd {
+            let side = if matches!(
+                b.name,
+                "atlantis-dvd-es-695296" | "atlantis-dvd-it-695296" | "atlantis-dvd-sv-695808"
+            ) {
+                'B'
+            } else {
+                'A'
+            };
+            assert_eq!(b.dvd_side(), Some(side), "{}", b.name);
+            assert_eq!(b.year, 1998);
+            // The 1998 program: zh-tw's rules but those it changed.
+            let mut x = *b;
+            x.name = ZH_TW.name;
+            x.size = ZH_TW.size;
+            x.pe_timestamp = ZH_TW.pe_timestamp;
+            x.dgroup_raw = ZH_TW.dgroup_raw;
+            x.sound_names_va = ZH_TW.sound_names_va;
+            x.new_player_va = ZH_TW.new_player_va;
+            x.inventory_va = ZH_TW.inventory_va;
+            x.guest_va = ZH_TW.guest_va;
+            x.credit_widths_va = ZH_TW.credit_widths_va;
+            x.marker_is_label = ZH_TW.marker_is_label;
+            x.text_code_page = ZH_TW.text_code_page;
+            x.cjk_breaker = ZH_TW.cjk_breaker;
+            x.subtitle_row_step = ZH_TW.subtitle_row_step;
+            x.menu_sprite_banks = ZH_TW.menu_sprite_banks;
+            x.menu_toggle_sprites = ZH_TW.menu_toggle_sprites;
+            x.load_list = ZH_TW.load_list;
+            x.cinema_captions = ZH_TW.cinema_captions;
+            x.subtitles_on_at_start = ZH_TW.subtitles_on_at_start;
+            x.players_names_block = ZH_TW.players_names_block;
+            x.path_check = ZH_TW.path_check;
+            // Each language's own rule.
+            x.startup_logo_rp = false;
+            x.dos_subtitle_texts = false;
+            x.name_entry_dos_letters = false;
+            x.menu_positioned_byte_width = 22;
+            assert_eq!(x, ZH_TW, "{}", b.name);
+        }
+        const { assert!(DVD_NL.startup_logo_rp && DVD_NL.dos_subtitle_texts) };
+        const { assert!(DVD_SV.name_entry_dos_letters && DVD_SV.dos_subtitle_texts) };
+        assert_eq!(DVD_IT.menu_positioned_byte_width, 16);
+        assert_eq!(PE_2018.dvd_side(), None);
+        for b in &BUILDS[..13] {
+            assert!(
+                b.path_check.is_none() && !b.dos_subtitle_texts,
+                "{}",
+                b.name
+            );
+        }
     }
 
     /// The menus' record table: 16 records per menu in the English May

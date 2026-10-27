@@ -521,6 +521,7 @@ impl BugFix {
             BugFix::MenuLineWidth => "Italian: the whole of OK and Annulla",
             BugFix::ChineseRows => "Chinese: the subtitle rows",
             BugFix::SubtitlesToggle => "Chinese: the SUBTITLES button",
+            BugFix::DosLetters => "DVD: the subtitles' accented letters",
         }
     }
 
@@ -602,6 +603,11 @@ impl BugFix {
                 "With SUBTITLES off, the original reads its button's",
                 "record one byte out of step: its click area takes",
                 "the wrong width and height.",
+            ],
+            BugFix::DosLetters => &[
+                "The DVD's Dutch and Swedish subtitles are the CDs'",
+                "texts, but its program reads them as Windows text:",
+                "punctuation signs show in place of ä, å, ö and é.",
             ],
         }
     }

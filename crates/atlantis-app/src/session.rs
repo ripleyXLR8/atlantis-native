@@ -466,12 +466,34 @@ impl App {
                             }
                             l.set_entries(entries, i);
                         }
-                        session.message("This folder no longer opens: locate it or remove it");
+                        let side = matches!(
+                            desktop::try_open(&dir),
+                            Err(atlantis_data::GameError::DvdOtherSide(_))
+                        );
+                        session.message(if side {
+                            "This version is on the other side of the DVD: turn the disc over"
+                        } else {
+                            "This folder no longer opens: locate it or remove it"
+                        });
                     }
                 }
             }
             LauncherAction::Locate(i) => {
-                if let Some((opened, dir)) = desktop::pick_game_folder("Cancel") {
+                if let Some(mut found) = desktop::pick_game_folder("Cancel") {
+                    // The DVD: the same language as the entry's, if found.
+                    let was = session
+                        .library
+                        .folders()
+                        .get(i)
+                        .and_then(|d| desktop::dvd_language_of(d))
+                        .map(|(l, _)| l);
+                    let k = found
+                        .iter()
+                        .position(|(_, d)| {
+                            was.is_some() && desktop::dvd_language_of(d).map(|(l, _)| l) == was
+                        })
+                        .unwrap_or(0);
+                    let (opened, dir) = found.swap_remove(k);
                     let at = session.library.relocate(i, &dir);
                     session.library.save_logged(&session.data_dir);
                     session.refresh(at, &desktop::describe);
@@ -479,15 +501,20 @@ impl App {
                 }
             }
             LauncherAction::Add => {
-                if let Some((opened, dir)) = desktop::pick_game_folder("Cancel") {
-                    let added = session.library.add(&dir);
+                if let Some(found) = desktop::pick_game_folder("Cancel") {
+                    let added: Vec<&(desktop::Opened, PathBuf)> = found
+                        .iter()
+                        .filter(|(_, dir)| session.library.add(dir))
+                        .collect();
                     session.library.save_logged(&session.data_dir);
-                    let at = session.library.position(&dir).unwrap_or(0);
+                    let first = added.first().map_or(&found[0], |a| *a);
+                    let at = session.library.position(&first.1).unwrap_or(0);
                     session.refresh(at, &desktop::describe);
-                    session.message(if added {
-                        format!("Added: {}", opened.label())
-                    } else {
-                        "This game is in the list already".to_string()
+                    session.message(match added.len() {
+                        0 if found.len() > 1 => "These games are in the list already".to_string(),
+                        0 => "This game is in the list already".to_string(),
+                        1 => format!("Added: {}", added[0].0.label()),
+                        n => format!("Added {n} editions of the DVD: choose the language to play"),
                     });
                 }
             }
@@ -733,6 +760,77 @@ mod tests {
         assert!(app.has_game());
         assert!(app.session().unwrap().launcher().is_none());
         // The engine before the folder goes.
+        drop(app);
+        drop(own);
+    }
+
+    /// The game library with Cryo's DVD: each European language found in
+    /// the images of both sides its own edition ("from disc images"), and
+    /// the Perfect Edition; one played from the screen, first in the
+    /// library. With `ATLANTIS_DVD_SHOTS=<folder>` the screen is saved
+    /// there (`library-dvd.png`).
+    #[test]
+    fn the_library_lists_the_dvd_languages() {
+        let (Some(ia), Some(ib)) = (
+            std::env::var_os("ATLANTIS_DVD_A").map(PathBuf::from),
+            std::env::var_os("ATLANTIS_DVD_B").map(PathBuf::from),
+        ) else {
+            eprintln!("ATLANTIS_DVD_A / ATLANTIS_DVD_B not set: skipped");
+            return;
+        };
+        let own = own_data_dir("dvd-library");
+        let d = own.dir.clone();
+        let isos = d.join("Atlantis DVD");
+        std::fs::create_dir_all(&isos).unwrap();
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&ia, isos.join("side_a.iso")).unwrap();
+            std::os::unix::fs::symlink(&ib, isos.join("side_b.iso")).unwrap();
+        }
+        #[cfg(windows)]
+        {
+            std::os::windows::fs::symlink_file(&ia, isos.join("side_a.iso")).unwrap();
+            std::os::windows::fs::symlink_file(&ib, isos.join("side_b.iso")).unwrap();
+        }
+        // What Add a game folder adds: the languages that open.
+        let mut folders: Vec<PathBuf> = desktop::dvd_locations(&isos)
+            .into_iter()
+            .filter(|p| desktop::open_any(p).is_ok())
+            .collect();
+        assert_eq!(folders.len(), 7);
+        folders.extend(std::env::var_os("ATLANTIS_PERFECT_EDITION").map(PathBuf::from));
+        let text: String = folders
+            .iter()
+            .map(|f| format!("{}\n", f.display()))
+            .collect();
+        std::fs::write(d.join("games.txt"), &text).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        if let Some(dir) = std::env::var_os("ATLANTIS_DVD_SHOTS") {
+            let mut frame = Vec::new();
+            let mut font = None;
+            assert!(draw_launcher(app.session(), &mut frame, &mut font));
+            let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
+            std::fs::write(PathBuf::from(dir).join("library-dvd.png"), png).unwrap();
+        }
+        let l = app.session().unwrap().launcher().unwrap();
+        let labels: Vec<&str> = l.entries().iter().map(|e| e.label.as_str()).collect();
+        assert!(l.entries().iter().all(|e| e.found), "{labels:?}");
+        for (i, language) in [
+            "German", "English", "French", "Dutch", "Spanish", "Italian", "Swedish",
+        ]
+        .iter()
+        .enumerate()
+        {
+            assert_eq!(
+                labels[i],
+                format!("Atlantis: The Lost Tales, DVD, {language} (1998 build), from disc images")
+            );
+        }
+        // The Italian played: first in the library.
+        app.run_launcher_action(LauncherAction::Play(5));
+        assert!(app.has_game());
+        assert_eq!(app.session().unwrap().library().folders()[0], folders[5]);
         drop(app);
         drop(own);
     }

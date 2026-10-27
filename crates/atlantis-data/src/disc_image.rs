@@ -223,6 +223,22 @@ impl FileSource for DiscImage {
         let k = Self::key(name);
         self.dirs.contains(&k)
     }
+
+    /// The entries of folder `dir` (lower case).
+    fn list(&self, dir: &str) -> Vec<String> {
+        let k = Self::key(dir);
+        let prefix = if k.is_empty() { k } else { k + "/" };
+        let mut out: Vec<String> = self
+            .files
+            .keys()
+            .chain(self.dirs.iter())
+            .filter_map(|p| p.strip_prefix(&prefix))
+            .filter(|rest| !rest.is_empty() && !rest.contains('/'))
+            .map(str::to_string)
+            .collect();
+        out.sort();
+        out
+    }
 }
 
 /// The images of a game's discs, read as one folder: each file from the
@@ -271,6 +287,13 @@ impl FileSource for DiscSet {
 
     fn has_dir(&self, name: &str) -> bool {
         self.images.iter().any(|i| i.has_dir(name))
+    }
+
+    fn list(&self, dir: &str) -> Vec<String> {
+        let mut out: Vec<String> = self.images.iter().flat_map(|i| i.list(dir)).collect();
+        out.sort();
+        out.dedup();
+        out
     }
 
     /// The file in the images' folder (not in the images).
@@ -339,6 +362,8 @@ mod tests {
         );
         assert!(img.has_dir("GAME"));
         assert_eq!(img.size("nothing"), None);
+        assert_eq!(img.list(""), ["bigcd1.big", "game"]);
+        assert_eq!(img.list("GAME"), ["atlantis.exe"]);
     }
 
     #[test]

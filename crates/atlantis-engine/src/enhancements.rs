@@ -120,12 +120,20 @@ pub enum BugFix {
     /// click area takes the shifted width and height). Those builds only
     /// (`ExeBuild::menu_toggle_sprites`).
     SubtitlesToggle,
+    /// With the Dutch and Swedish DVDs, the subtitles show the letters their
+    /// texts hold (é è ë ï ú, ä å ö Ä Å Ö), read in the DOS code page they
+    /// are written in (the CDs' files, for those CDs' bitmap font). Off, as
+    /// the original: its program draws them through Windows (GDI TextOutA,
+    /// atlantis-dvd-sv-695808 FUN_0042f384) in the Windows code page, so
+    /// `„ † ” Ž ™ ‚ ‰ Š ‹ £` stand in their place (and nothing for `Å`).
+    /// Those builds only (`ExeBuild::dos_subtitle_texts`).
+    DosLetters,
 }
 
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 15] = [
+    pub const ALL: [BugFix; 16] = [
         BugFix::MusicLoop,
         BugFix::HeadOverlay,
         BugFix::HeadFirstFrame,
@@ -141,6 +149,7 @@ impl BugFix {
         BugFix::MenuLineWidth,
         BugFix::ChineseRows,
         BugFix::SubtitlesToggle,
+        BugFix::DosLetters,
     ];
 
     /// Its `settings.ini` key.
@@ -161,6 +170,7 @@ impl BugFix {
             BugFix::MenuLineWidth => "fix_menu_line_width",
             BugFix::ChineseRows => "fix_chinese_rows",
             BugFix::SubtitlesToggle => "fix_subtitles_toggle",
+            BugFix::DosLetters => "fix_dos_letters",
         }
     }
 
@@ -182,6 +192,7 @@ impl BugFix {
             BugFix::MenuLineWidth => build.menu_positioned_byte_width != 22,
             BugFix::ChineseRows => build.cjk_breaker == CjkBreaker::Gb2312,
             BugFix::SubtitlesToggle => build.menu_toggle_sprites,
+            BugFix::DosLetters => build.dos_subtitle_texts,
             _ => true,
         }
     }
@@ -197,6 +208,7 @@ impl BugFix {
                 | BugFix::MenuLineWidth
                 | BugFix::ChineseRows
                 | BugFix::SubtitlesToggle
+                | BugFix::DosLetters
         )
     }
 
@@ -570,6 +582,29 @@ mod tests {
             of("atlantis-cd-zh-cn-692736", plain),
             [HexagonPieces, ChineseRows, SubtitlesToggle]
         );
+        // The 1998 DVD's program (the hexagon not forced, as the 1997 and
+        // the Chinese builds), its Italian menus and the Dutch and Swedish
+        // DOS texts; the Perfect Edition's.
+        for b in [
+            "atlantis-dvd-en-695296",
+            "atlantis-dvd-fr-695296",
+            "atlantis-dvd-de-695296",
+            "atlantis-dvd-es-695296",
+            "atlantis-pe-2018-695296",
+        ] {
+            assert_eq!(of(b, plain), [HexagonPieces], "{b}");
+        }
+        assert_eq!(
+            of("atlantis-dvd-de-695296", german),
+            [HexagonPieces, SharpS]
+        );
+        assert_eq!(
+            of("atlantis-dvd-it-695296", plain),
+            [HexagonPieces, MenuLineWidth]
+        );
+        for b in ["atlantis-dvd-nl-695808", "atlantis-dvd-sv-695808"] {
+            assert_eq!(of(b, plain), [HexagonPieces, DosLetters], "{b}");
+        }
     }
 
     /// A run's `--original` (every switch off): a change of one fix in the

@@ -112,6 +112,8 @@
   #dir { position: absolute; width: 1px; height: 1px; opacity: 0; }
   #status { min-height: 1.6em; text-align: center; color: var(--muted); margin: 0; font-style: italic; }
   #err { color: #ff9a8a; white-space: pre-wrap; margin: 10px 0 0; }
+  #err button.language { font: inherit; color: #1b1206; background: #e8c77a; border: 0;
+    border-radius: 4px; padding: 4px 10px; margin: 6px 4px 0 0; cursor: pointer; }
   .small { color: var(--muted); font-size: 14px; }
   footer {
     position: relative; z-index: 1; width: min(720px, 100% - 32px);
@@ -238,6 +240,9 @@
       <li><em>CD</em>: a folder holding <code>atlantis.exe</code> and
           <code>BIGCD1.BIG</code> to <code>BIGCD4.BIG</code>, copied from the
           four discs.</li>
+      <li><em>DVD</em> (Cryo, 1998): the DVD drive, or a copy of a side
+          (the folder holding <code>FACE_A</code> or <code>FACE_B</code>);
+          then choose the language.</li>
     </ul>
     <div class="choose">
       <label class="menu-item"><svg class="sun" viewBox="0 0 40 40"><use href="#sun"/></svg><span class="gold">Choose your game folder</span>
@@ -270,12 +275,14 @@
   status.textContent = "";
   // The engine's own version and commit (as in the F10 menu).
   document.getElementById("version").textContent = version();
-  document.getElementById("dir").addEventListener("change", async (e) => {
+  // Opens the game of the picked files; for Cryo's DVD, `language` is the
+  // folder of the language the player chose (the engine lists them).
+  const open = async (files, language) => {
     const box = document.getElementById("err");
     box.textContent = "";
     status.textContent = "Opening the game…";
     try {
-      await start(e.target.files);
+      await start(files, language);
       document.body.classList.remove("landing");
       // Full screen: the page's, the canvas filling the screen (the game
       // draws at most 1280x960 pixels and WebGL enlarges them). F11 and
@@ -302,6 +309,19 @@
       window.addEventListener("resize", layout);
     } catch (err) {
       status.textContent = "";
+      // Cryo's DVD: the player chooses the language.
+      if (String(err).startsWith("LANGUAGES:")) {
+        box.append("This is Cryo's DVD. Choose the language to play:");
+        for (const pair of String(err).slice(10).split(";")) {
+          const [folder, name] = pair.split("=");
+          const b = document.createElement("button");
+          b.className = "language";
+          b.textContent = name;
+          b.addEventListener("click", () => open(files, folder));
+          box.append(" ", b);
+        }
+        return;
+      }
       const [text, url] = String(err).split("\n\nREPORT:");
       box.textContent = text;
       if (url) {
@@ -311,7 +331,8 @@
         box.append("\n\n", a);
       }
     }
-  });
+  };
+  document.getElementById("dir").addEventListener("change", (e) => open(e.target.files));
 </script>
 </body>
 </html>

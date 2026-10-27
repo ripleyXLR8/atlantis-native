@@ -223,11 +223,13 @@ impl Dialogs {
     /// files, else the port's ([`FontFace::for_release`]), the rows of the
     /// build's step.
     async fn font(&mut self, e: &Engine) -> Rc<SubtitleFont> {
-        if let Some(f) = &self.font {
+        // The code page of the moment (the Dutch and Swedish DVDs' DOS
+        // texts: [`crate::enhancements::BugFix::DosLetters`]).
+        let code_page = e.subtitle_code_page();
+        if let Some(f) = self.font.as_ref().filter(|f| f.code_page() == code_page) {
             return f.clone();
         }
         let build = &e.game.exe.build;
-        let code_page = build.text_code_page;
         let file = match player_font(code_page) {
             Some((name, _)) => e.read_beside(name).await,
             None => None,
@@ -247,8 +249,12 @@ impl Dialogs {
     /// ([`crate::enhancements::BugFix::ChineseRows`]).
     async fn subtitler(&mut self, e: &Engine) -> Subtitler {
         let fix = e.chinese_row_fix();
+        let code_page = e.subtitle_code_page();
         if let Some(s) = &self.subtitler {
-            return s.clone().with_row_fix(fix);
+            match s {
+                Subtitler::Gdi(font, _) if font.code_page() != code_page => {}
+                _ => return s.clone().with_row_fix(fix),
+            }
         }
         let mut s = None;
         if e.game.exe.build.bitmap_subtitles {

@@ -12,7 +12,9 @@ use std::sync::Arc;
 
 use atlantis2_data::files::OpenError;
 use atlantis2_data::{A2Files, Build};
-use atlantis_data::{Game, GameError, StdDir};
+use atlantis_data::disc_image::DiscSet;
+use atlantis_data::dvd::{self, DvdFiles, DvdLanguage};
+use atlantis_data::{FileSource, Game, GameError, StdDir};
 
 use crate::launcher::LauncherEntry;
 use crate::library::same_folder;
@@ -94,7 +96,155 @@ pub fn store_for(game: &Game) -> Rc<dyn SaveStore> {
 
 /// Opens the game in `dir`.
 pub fn open_game(dir: &Path) -> Result<Game, String> {
-    try_open(dir).map_err(|e| format!("{}: {e}", dir.display()))
+    try_open(dir).map_err(|e| {
+        let languages = dvd_locations(dir);
+        if languages.is_empty() {
+            format!("{}: {e}", dir.display())
+        } else {
+            let list: Vec<String> = languages
+                .iter()
+                .map(|p| format!("  {}", p.display()))
+                .collect();
+            format!(
+                "{} holds Cryo's DVD: give the folder of one of its languages:\n{}",
+                dir.display(),
+                list.join("\n")
+            )
+        }
+    })
+}
+
+/// The DVD's language at `dir`, a folder `<root>/FACE_A/ENG` (any case):
+/// the language and `<root>`, the copy of a side, the drive, or the folder
+/// of the images of the sides (the path then names no folder on disk).
+pub fn dvd_language_of(dir: &Path) -> Option<(&'static DvdLanguage, PathBuf)> {
+    let folder = dir.file_name()?.to_str()?;
+    let face_dir = dir.parent()?;
+    let face = face_dir.file_name()?.to_str()?;
+    let language = DvdLanguage::of(face, folder)?;
+    Some((language, face_dir.parent()?.to_path_buf()))
+}
+
+/// The other side of the DVD.
+fn other_side(side: char) -> char {
+    if side == 'A' {
+        'B'
+    } else {
+        'A'
+    }
+}
+
+/// The game of the DVD's language at `dir` ([`dvd_language_of`]), and
+/// whether it was read from disc images: from the folder of its root (a
+/// copy of a side, the drive), else from the images in it. `None` when
+/// `dir` is not a DVD language's place.
+fn open_dvd(dir: &Path) -> Option<Result<(Game, bool), GameError>> {
+    let (language, root) = dvd_language_of(dir)?;
+    let folder: Arc<dyn FileSource> = Arc::new(StdDir::new(&root));
+    if let Some(files) = DvdFiles::new(folder.clone(), language) {
+        return Some(Game::open(Arc::new(files)).map(|g| (g, false)));
+    }
+    let mut other = dvd::has_side(folder.as_ref(), other_side(language.side));
+    if let Some(set) = DiscSet::open_folder(&root) {
+        let set: Arc<dyn FileSource> = Arc::new(set);
+        if let Some(files) = DvdFiles::new(set.clone(), language) {
+            log::info!("{}: the DVD from its images", dir.display());
+            return Some(Game::open(Arc::new(files)).map(|g| (g, true)));
+        }
+        other |= dvd::has_side(set.as_ref(), other_side(language.side));
+    }
+    if other {
+        return Some(Err(GameError::DvdOtherSide(language.side)));
+    }
+    // A language's folder copied alone: its program says it is the DVD's.
+    dir.is_dir()
+        .then(|| Game::open(Arc::new(StdDir::new(dir))).map(|g| (g, false)))
+}
+
+/// The places of the DVD's languages at the root `root` (a copy of a
+/// side, the drive, or a folder of the sides' images): `root/FACE_x/<language>`
+/// for each language found, in AUTORUN.EXE's order.
+fn dvd_languages_at(root: &Path) -> Vec<PathBuf> {
+    let mut found: Vec<&'static DvdLanguage> = dvd::languages_in(&StdDir::new(root));
+    if setup::names_in(root).iter().any(|n| {
+        atlantis_data::disc_image::IMAGE_EXTENSIONS
+            .iter()
+            .any(|x| n.ends_with(&format!(".{x}")))
+    }) {
+        if let Some(set) = DiscSet::open_folder(root) {
+            for l in dvd::languages_in(&set) {
+                if !found.contains(&l) {
+                    found.push(l);
+                }
+            }
+        }
+    }
+    found.sort_by_key(|l| dvd::LANGUAGES.iter().position(|x| x == *l));
+    found
+        .into_iter()
+        .map(|l| root.join(l.face()).join(l.folder))
+        .collect()
+}
+
+/// The places of the DVD's languages that `dir` gives (each its own
+/// edition, [`dvd_language_of`]): `dir` itself when it is one; the
+/// languages of the root `dir` is (a copy of a side, the drive, the folder
+/// of the sides' images), or whose `FACE_x` folder it is; else those of the
+/// folders directly inside it (copies of both sides side by side). Empty
+/// when `dir` holds no DVD.
+pub fn dvd_locations(dir: &Path) -> Vec<PathBuf> {
+    if dvd_language_of(dir).is_some() {
+        return vec![dir.to_path_buf()];
+    }
+    let is_face = dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.eq_ignore_ascii_case("FACE_A") || n.eq_ignore_ascii_case("FACE_B"));
+    if is_face {
+        if let Some(root) = dir.parent() {
+            let face = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            return dvd_languages_at(root)
+                .into_iter()
+                .filter(|p| {
+                    p.parent()
+                        .and_then(|f| f.file_name())
+                        .and_then(|f| f.to_str())
+                        .is_some_and(|f| f.eq_ignore_ascii_case(face))
+                })
+                .collect();
+        }
+    }
+    let here = dvd_languages_at(dir);
+    if !here.is_empty() {
+        return here;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut subdirs: Vec<PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .take(50)
+        .collect();
+    subdirs.sort();
+    let mut out: Vec<PathBuf> = Vec::new();
+    for d in subdirs {
+        for p in dvd_languages_at(&d) {
+            // Both sides side by side: each language once, the first found.
+            let lang = dvd_language_of(&p).map(|(l, _)| l);
+            if !out
+                .iter()
+                .any(|o| dvd_language_of(o).map(|(l, _)| l) == lang)
+            {
+                out.push(p);
+            }
+        }
+    }
+    out.sort_by_key(|p| {
+        dvd_language_of(p).and_then(|(l, _)| dvd::LANGUAGES.iter().position(|x| x == l))
+    });
+    out
 }
 
 /// The game in `dir`: its files, or the images of its CDs.
@@ -102,11 +252,16 @@ pub fn try_open(dir: &Path) -> Result<Game, GameError> {
     open_with_kind(dir).map(|(game, _)| game)
 }
 
-/// The game in `dir`, and whether it was read from disc images.
+/// The game in `dir`, and whether it was read from disc images: a DVD
+/// language's place ([`dvd_language_of`]), else the folder's files, or
+/// the images of its CDs.
 pub fn open_with_kind(dir: &Path) -> Result<(Game, bool), GameError> {
+    if let Some(r) = open_dvd(dir) {
+        return r;
+    }
     match Game::open(Arc::new(StdDir::new(dir))) {
         Err(e @ (GameError::NoExecutable | GameError::NoArchives)) => {
-            match atlantis_data::disc_image::DiscSet::open_folder(dir) {
+            match DiscSet::open_folder(dir) {
                 Some(set) => {
                     log::info!(
                         "{}: the game from {} disc images",
@@ -203,9 +358,18 @@ pub fn describe(dir: &Path) -> LauncherEntry {
     } else {
         match open_with_kind(dir) {
             Ok((game, images)) => (edition_label(&game, images), true),
+            Err(GameError::DvdOtherSide(side)) => {
+                let language = dvd_language_of(dir).map_or("", |(l, _)| l.language);
+                (
+                    format!(
+                        "Not found: {language} is on the other side of the DVD (turn it over: side {side})"
+                    ),
+                    false,
+                )
+            }
             Err(e) => {
                 log::info!("{}: {e}", dir.display());
-                let why = if dir.exists() {
+                let why = if dir.exists() || dvd_language_of(dir).is_some_and(|(_, r)| r.exists()) {
                     "Not found: this folder no longer holds the game"
                 } else {
                     "Not found: the folder was moved, renamed, or is on a drive not plugged in"
@@ -362,7 +526,7 @@ pub fn first_start() -> Option<FirstStart> {
     // The installations in the usual places (GOG.com's, copies in usual
     // folders; not the drives, which Find installations looks at): the
     // first of each game that opens.
-    let found = first_of_each_game(&setup::candidate_folders());
+    let found = with_every_dvd_language(first_of_each_game(&setup::candidate_folders()));
     let offered = !found.is_empty();
     if found.len() >= 2 {
         let list: Vec<String> = found
@@ -416,7 +580,15 @@ pub fn first_start() -> Option<FirstStart> {
             }
         }
     }
-    pick_game_folder("Quit").map(|(opened, dir)| FirstStart::Play(opened, dir))
+    pick_game_folder("Quit").map(|mut found| {
+        if found.len() == 1 {
+            let (opened, dir) = found.remove(0);
+            FirstStart::Play(opened, dir)
+        } else {
+            // The DVD's languages: the library, to choose one.
+            FirstStart::Library(found.into_iter().map(|(_, d)| d).collect())
+        }
+    })
 }
 
 /// Opens the project's new-issue page in the browser, filled in with the
@@ -440,19 +612,56 @@ fn report_edition(dir: &Path) {
 /// a folder holding both games asks which one), with a message saying what to do when the folder is not right (its
 /// third button labelled `give_up`), and the offer to copy the discs when
 /// the folder is a CD drive of the first game. The game and its folder;
-/// `None` when the player cancels.
-pub fn pick_game_folder(give_up: &str) -> Option<(Opened, PathBuf)> {
+/// for Cryo's DVD, each of its languages found ([`dvd_locations`]), each
+/// its own edition. `None` when the player cancels.
+pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
     loop {
         let dir = rfd::FileDialog::new()
             .set_title(
                 "Choose the folder of your game (the one with atlantis.exe, or atlantis2.exe for Atlantis II)",
             )
             .pick_folder()?;
+        // Cryo's DVD (a copy of a side, the drive, the images of its
+        // sides): every language found.
+        let languages = dvd_locations(&dir);
+        if !languages.is_empty() {
+            let mut first_error = None;
+            let opened: Vec<(Opened, PathBuf)> = languages
+                .iter()
+                .filter_map(|p| match open_with_kind(p) {
+                    Ok((game, images)) => {
+                        Some((Opened::LostTales(Box::new(game), images), p.clone()))
+                    }
+                    Err(e) => {
+                        log::warn!("{}: {e}", p.display());
+                        first_error.get_or_insert((p.clone(), e));
+                        None
+                    }
+                })
+                .collect();
+            if !opened.is_empty() {
+                log::info!("the DVD in {}: {} languages", dir.display(), opened.len());
+                return Some(opened);
+            }
+            if let Some((p, e)) = first_error {
+                match ask(
+                    &setup::explain(&p, &e),
+                    "Choose another folder",
+                    "Help",
+                    give_up,
+                ) {
+                    Choice::First => {}
+                    Choice::Second => setup::open_url(setup::HELP_URL),
+                    Choice::Third => return None,
+                }
+                continue;
+            }
+        }
         // A CD drive: copy the discs.
         if let Some(n) = setup::disc_number(&dir) {
             if try_open(&dir).is_err() {
                 if let Some(found) = offer_disc_copy(&dir, n) {
-                    return Some(found);
+                    return Some(vec![found]);
                 }
                 continue;
             }
@@ -487,7 +696,7 @@ pub fn pick_game_folder(give_up: &str) -> Option<(Opened, PathBuf)> {
             match open_atlantis2(&root) {
                 Ok(build) => {
                     log::info!("game folder {} ({})", root.display(), build.label);
-                    return Some((Opened::Atlantis2(build), root));
+                    return Some(vec![(Opened::Atlantis2(build), root)]);
                 }
                 Err(e) => {
                     log::warn!("{}: {e}", root.display());
@@ -504,7 +713,7 @@ pub fn pick_game_folder(give_up: &str) -> Option<(Opened, PathBuf)> {
         match open_with_kind(&root) {
             Ok((game, images)) => {
                 log::info!("game folder {}", root.display());
-                return Some((Opened::LostTales(Box::new(game), images), root));
+                return Some(vec![(Opened::LostTales(Box::new(game), images), root)]);
             }
             Err(e) => {
                 log::warn!("{}: {e}", root.display());
@@ -531,6 +740,28 @@ pub fn pick_game_folder(give_up: &str) -> Option<(Opened, PathBuf)> {
             }
         }
     }
+}
+
+/// `found` with each of Cryo's DVD's languages met replaced by every
+/// language of its side (or sides) that opens: each its own edition.
+fn with_every_dvd_language(found: Vec<(PathBuf, Opened)>) -> Vec<(PathBuf, Opened)> {
+    let mut out = Vec::new();
+    for (dir, opened) in found {
+        let Some((_, root)) = dvd_language_of(&dir) else {
+            out.push((dir, opened));
+            continue;
+        };
+        let all: Vec<(PathBuf, Opened)> = dvd_languages_at(&root)
+            .into_iter()
+            .filter_map(|p| open_any(&p).ok().map(|o| (p, o)))
+            .collect();
+        if all.is_empty() {
+            out.push((dir, opened));
+        } else {
+            out.extend(all);
+        }
+    }
+    out
 }
 
 /// The first folder that opens of each game below `candidates`, in their
@@ -561,7 +792,8 @@ pub fn first_of_each_game(candidates: &[PathBuf]) -> Vec<(PathBuf, Opened)> {
 
 /// The game folders, of both games, below each of `candidates` (up to 4
 /// levels down) and `discs` (1 level), then `extra`: each once, in that
-/// order (not yet checked to open).
+/// order (not yet checked to open). Cryo's DVD gives each of its
+/// languages found ([`dvd_locations`]).
 pub fn game_folders_in(
     candidates: &[PathBuf],
     discs: &[PathBuf],
@@ -583,6 +815,25 @@ pub fn game_folders_in(
         }))
         .map(|(d, _)| d)
         .collect();
+    // Cryo's DVD: every language of a side met (each its own edition),
+    // and the drives holding a side.
+    roots = roots
+        .into_iter()
+        .flat_map(|r| match dvd_language_of(&r) {
+            Some((_, root)) => {
+                let all = dvd_languages_at(&root);
+                if all.is_empty() {
+                    vec![r]
+                } else {
+                    all
+                }
+            }
+            None => vec![r],
+        })
+        .collect();
+    for d in discs {
+        roots.extend(dvd_languages_at(d));
+    }
     roots.extend(extra.iter().cloned());
     let mut out: Vec<PathBuf> = Vec::new();
     for r in roots {
@@ -760,6 +1011,117 @@ mod tests {
             assert_eq!(setup::kind_of(&alone), None);
         } else {
             eprintln!("ATLANTIS_ISO_FR / ATLANTIS2_DISCS not set: mixed CD images not checked");
+        }
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Cryo's DVD as the library finds and shows it: a copy of each side,
+    /// a language's folder, the side's `FACE_x` folder, copies of both
+    /// sides in one folder, the images of the sides (each language its own
+    /// edition, "from disc images"), one side's image or copy with a
+    /// language of the other side (the other-side message), a language's
+    /// folder copied alone; the drive's place found by the search of the
+    /// installations.
+    #[test]
+    fn dvd_editions() {
+        let (Some(a), Some(b)) = (
+            std::env::var_os("ATLANTIS_DVD_A_FILES").map(PathBuf::from),
+            std::env::var_os("ATLANTIS_DVD_B_FILES").map(PathBuf::from),
+        ) else {
+            atlantis2_data::testing::missing("ATLANTIS_DVD_A_FILES / ATLANTIS_DVD_B_FILES not set");
+            return;
+        };
+        let names = |v: &[PathBuf]| -> Vec<String> {
+            v.iter()
+                .map(|p| {
+                    let (l, _) = dvd_language_of(p).expect("a DVD language's place");
+                    format!("{}/{}", l.face(), l.folder)
+                })
+                .collect()
+        };
+        let side_a = ["FACE_A/ALL", "FACE_A/ENG", "FACE_A/FRA", "FACE_A/HOL"];
+        assert_eq!(names(&dvd_locations(&a)), side_a);
+        assert_eq!(names(&dvd_locations(&a.join("FACE_A"))), side_a);
+        let eng = a.join("FACE_A").join("ENG");
+        assert_eq!(dvd_locations(&eng), std::slice::from_ref(&eng));
+        let e = describe(&eng);
+        assert!(e.found, "{}", e.label);
+        assert_eq!(
+            e.label,
+            "Atlantis: The Lost Tales, DVD, English (1998 build)"
+        );
+        // Every European language opens; the Japanese build is not known.
+        for p in dvd_locations(&b) {
+            let opened = open_with_kind(&p);
+            let japanese = p.ends_with("JAP");
+            assert_eq!(opened.is_ok(), !japanese, "{}", p.display());
+        }
+        // The first start's offer: a language met gives its side's.
+        let met = vec![(eng.clone(), open_any(&eng).unwrap())];
+        let offered: Vec<PathBuf> = with_every_dvd_language(met)
+            .into_iter()
+            .map(|(p, _)| p)
+            .collect();
+        assert_eq!(names(&offered), side_a);
+        // A language of the other side: the side's copy is not it.
+        let esp = a.join("FACE_B").join("ESP");
+        assert!(matches!(try_open(&esp), Err(GameError::DvdOtherSide('B'))));
+        let e = describe(&esp);
+        assert!(!e.found && e.label.contains("other side"), "{}", e.label);
+        // Both sides' copies in one folder.
+        let d = tmp("dvd");
+        link(&a, &d.join("side A"));
+        link(&b, &d.join("side B"));
+        let both = names(&dvd_locations(&d));
+        assert_eq!(both.len(), 8, "{both:?}");
+        assert_eq!(both[0], "FACE_A/ALL");
+        assert_eq!(both[7], "FACE_B/JAP");
+        // The search of the installations: a language met gives the side's.
+        let found = game_folders_in(&[d.join("side A")], &[], &[]);
+        assert_eq!(names(&found), side_a);
+        let found = game_folders_in(&[], &[d.join("side B")], &[]);
+        assert_eq!(names(&found).len(), 4);
+        // Without its side's shared folders.
+        link(&eng, &d.join("alone").join("FACE_A").join("ENG"));
+        assert!(matches!(
+            try_open(&d.join("alone").join("FACE_A").join("ENG")),
+            Err(GameError::DvdSharedFolders)
+        ));
+        // The command line's message with the DVD's root.
+        let err = open_game(&a).err().unwrap();
+        assert!(err.contains("FACE_A") && err.contains("ENG"), "{err}");
+        // The images.
+        if let (Some(ia), Some(ib)) = (
+            std::env::var_os("ATLANTIS_DVD_A").map(PathBuf::from),
+            std::env::var_os("ATLANTIS_DVD_B").map(PathBuf::from),
+        ) {
+            let isos = d.join("images");
+            link(&ia, &isos.join("ATLANTIS_A.iso"));
+            let one = dvd_locations(&isos);
+            assert_eq!(names(&one), side_a);
+            let e = describe(&one[1]);
+            assert_eq!(
+                e.label,
+                "Atlantis: The Lost Tales, DVD, English (1998 build), from disc images"
+            );
+            // Side B's image missing: its languages on the other side.
+            let ita = isos.join("FACE_B").join("ITA");
+            let e = describe(&ita);
+            assert!(!e.found && e.label.contains("Italian"), "{}", e.label);
+            link(&ib, &isos.join("ATLANTIS_B.iso"));
+            assert_eq!(dvd_locations(&isos).len(), 8);
+            let e = describe(&ita);
+            assert!(e.found, "{}", e.label);
+            assert!(e.label.contains("DVD, Italian"), "{}", e.label);
+        } else {
+            eprintln!("ATLANTIS_DVD_A / ATLANTIS_DVD_B not set: the images not checked");
+        }
+        if let Some(pe) = std::env::var_os("ATLANTIS_PERFECT_EDITION") {
+            let e = describe(Path::new(&pe));
+            assert_eq!(
+                e.label,
+                "Atlantis: The Lost Tales, Perfect Edition, English (1998 build)"
+            );
         }
         let _ = std::fs::remove_dir_all(&d);
     }

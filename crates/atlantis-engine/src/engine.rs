@@ -628,6 +628,18 @@ impl Engine {
         self.enhancements().fix(BugFix::ChineseRows)
     }
 
+    /// The code page the subtitles are read in: the build's, or with the
+    /// Dutch and Swedish DVDs' DOS texts and the fix
+    /// [`BugFix::DosLetters`], the DOS code page they are written in.
+    pub fn subtitle_code_page(&self) -> atlantis_data::TextCodePage {
+        let build = self.game.exe.build;
+        if build.dos_subtitle_texts && self.enhancements().fix(BugFix::DosLetters) {
+            atlantis_data::TextCodePage::Dos850
+        } else {
+            build.text_code_page
+        }
+    }
+
     pub fn should_abort(&self) -> bool {
         self.sys.should_quit() || self.abort.is_some()
     }
