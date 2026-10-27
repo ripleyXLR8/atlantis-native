@@ -57,6 +57,9 @@
 //! paused while it is open. Its choices are kept in `settings.ini` beside
 //! the saves (the first game's keys, and one per bug fix); `--hd`,
 //! `--widescreen` and `--original` hold for the run without changing it.
+//! Started from the desktop's game library, the menu ends with "Game
+//! library..." (back to the library's screen, [`Ended::Library`]), and
+//! Shift in the first moments of the library's one game does the same.
 //!
 //! The game is held while the window does not have the focus, as the
 //! original holds it: no frame runs, its clock stands still and its sound
@@ -604,7 +607,7 @@ pub fn headless(
             match menu.key(k, menu_values(&engine)) {
                 MenuAction::SetEnhancements(x) => engine.enhancements = x,
                 MenuAction::SetScreen800(on) => engine.set_screen_800(on),
-                MenuAction::None | MenuAction::Close => {}
+                MenuAction::None | MenuAction::Close | MenuAction::OpenLibrary => {}
             }
         }
         let values = menu_values(&engine);
@@ -714,6 +717,53 @@ pub fn run_window(
     size: Option<(u32, u32)>,
 ) -> Result<(), String> {
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
+    let mut app = window_app(engine, &label, fullscreen, size);
+    el.run_app(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))
+}
+
+/// How a window of the game started from the game library ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ended {
+    /// The game was quit (its menus, the window closed).
+    Quit,
+    /// The options menu's "Game library..." entry, or Shift held as the
+    /// game started: the game library's screen is to be shown.
+    Library,
+}
+
+/// [`run_window`] for the game started from the game library, on its event
+/// loop (a program makes one event loop only), run again for this game:
+/// the options menu has the "Game library..." entry, and with
+/// `shift_grace` (the library's one game, started without its screen)
+/// Shift held in the first moments goes back to the library, as the
+/// first game's start does ([`crate::session::Session::shift_grace`]).
+pub fn run_window_on(
+    el: &mut EventLoop<()>,
+    engine: Engine,
+    label: String,
+    fullscreen: bool,
+    size: Option<(u32, u32)>,
+    shift_grace: bool,
+) -> Result<Ended, String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    let mut app = window_app(engine, &label, fullscreen, size);
+    app.started_from_library(shift_grace.then(|| Instant::now() + SHIFT_GRACE));
+    el.run_app_on_demand(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))?;
+    Ok(if app.to_library {
+        Ended::Library
+    } else {
+        Ended::Quit
+    })
+}
+
+/// How long after an automatic start Shift still goes back to the game
+/// library (the first game's delay).
+const SHIFT_GRACE: Duration = Duration::from_millis(2000);
+
+/// The window's application: the game, its sound started.
+fn window_app(engine: Engine, label: &str, fullscreen: bool, size: Option<(u32, u32)>) -> A2App {
     let voices = engine.voices().clone();
     // The sound stops while the game is held (the options menu open, the
     // window without the focus): silence, the voices kept where they are.
@@ -726,17 +776,15 @@ pub fn run_window(
             voices.fill(out, rate, channels);
         }
     });
-    let mut app = A2App::new(
+    A2App::new(
         engine,
-        &label,
+        label,
         fullscreen,
         size,
         audio,
         paused,
         Instant::now(),
-    );
-    el.run_app(&mut app)
-        .map_err(|e| format!("The window failed: {e}"))
+    )
 }
 
 /// Whether the game is held: while the port's options menu is open, and
@@ -843,7 +891,25 @@ impl A2App {
             alt_left: false,
             refocused: false,
             next_frame: now,
+            shift_until: None,
+            to_library: false,
         }
+    }
+
+    /// Started from the game library: the options menu's "Game
+    /// library..." entry, and Shift until `shift_until` goes back to it.
+    fn started_from_library(&mut self, shift_until: Option<Instant>) {
+        self.menu.set_library(true);
+        self.shift_until = shift_until;
+    }
+
+    /// Ends the game for the game library's screen (the exit hook run, as
+    /// when the game is quit).
+    fn back_to_library(&mut self, el: &ActiveEventLoop) {
+        log::info!("Atlantis II stopped: the game library");
+        self.to_library = true;
+        self.engine.at_exit();
+        el.exit();
     }
 }
 
@@ -892,6 +958,12 @@ struct A2App {
     /// the one that gave it ([`mouse_button`]'s `focus_click`).
     refocused: bool,
     next_frame: Instant,
+    /// Until when Shift goes back to the game library (the library's one
+    /// game started without its screen).
+    shift_until: Option<Instant>,
+    /// The game library's screen asked for: the program shows it once the
+    /// window has closed ([`Ended::Library`]).
+    to_library: bool,
 }
 
 impl A2App {
@@ -1110,6 +1182,8 @@ impl A2App {
         match action {
             MenuAction::None => {}
             MenuAction::Close => self.close_menu(),
+            // The window's event ends the event loop ([`A2App::back_to_library`]).
+            MenuAction::OpenLibrary => self.to_library = true,
             MenuAction::SetEnhancements(x) => {
                 // In force at once: the HD mode at the next frame, the
                 // music's from the next track. Only what changed is
@@ -1243,6 +1317,15 @@ impl ApplicationHandler for A2App {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        if let Some(t) = self.shift_until {
+            if Instant::now() >= t {
+                self.shift_until = None;
+            } else if matches!(&event, WindowEvent::ModifiersChanged(m) if m.state().shift_key()) {
+                log::info!("Shift held at start-up: the game library");
+                self.back_to_library(el);
+                return;
+            }
+        }
         let in_menu = self.engine.loop_type == LoopType::Menu;
         // The options menu open: it takes the keys and the mouse.
         if self.menu.is_open() {
@@ -1267,6 +1350,9 @@ impl ApplicationHandler for A2App {
                         let values = menu_values(&self.engine);
                         let action = self.menu.click(x, y, dims.0, dims.1, values);
                         self.menu_action(action);
+                        if self.to_library {
+                            self.back_to_library(el);
+                        }
                     }
                     return;
                 }
@@ -1279,6 +1365,9 @@ impl ApplicationHandler for A2App {
                                 let values = menu_values(&self.engine);
                                 let action = self.menu.key(key, values);
                                 self.menu_action(action);
+                                if self.to_library {
+                                    self.back_to_library(el);
+                                }
                             }
                         }
                         return;
@@ -1984,6 +2073,37 @@ mod tests {
             t0,
         );
         assert!(!app.fullscreen);
+    }
+
+    /// Started from the game library: the options menu's last entry,
+    /// "Game library...", asks for the library's screen (the program shows
+    /// it once the window has closed); started from the command line, the
+    /// menu has no such entry.
+    #[test]
+    fn the_library_entry_goes_back_to_the_library() {
+        let Some(files) = a2_files() else { return };
+        let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+        e.end_video();
+        let paused = Arc::new(AtomicBool::new(false));
+        let t0 = Instant::now();
+        let mut app = A2App::new(e, "", false, None, None, paused, t0);
+        let up_to_last = |app: &mut A2App| {
+            app.open_menu();
+            let v = menu_values(&app.engine);
+            app.menu.key(MenuKey::Up, v);
+            app.menu.selected()
+        };
+        use atlantis2_engine::options_menu::Entry;
+        assert_eq!(up_to_last(&mut app), Entry::Close);
+        app.menu.close();
+        app.started_from_library(Some(t0 + SHIFT_GRACE));
+        assert_eq!(up_to_last(&mut app), Entry::Library);
+        let action = app.menu.key(MenuKey::Enter, menu_values(&app.engine));
+        assert_eq!(action, MenuAction::OpenLibrary);
+        assert!(!app.to_library);
+        app.menu_action(action);
+        assert!(app.to_library && !app.menu.is_open());
+        assert_eq!(app.shift_until, Some(t0 + SHIFT_GRACE));
     }
 
     /// The press that gave the window the focus only grabs the pointer

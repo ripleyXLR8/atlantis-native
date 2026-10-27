@@ -1,7 +1,10 @@
 //! The desktop's game sessions: the game library ([`crate::library`]),
 //! its screen ([`crate::launcher`]) in the window, and the switch from one
 //! game to another without leaving the program (the options menu's "Game
-//! library..." entry stops the game and shows the screen).
+//! library..." entry stops the game and shows the screen). Atlantis II,
+//! chosen in the library, runs in its own mode ([`crate::a2`]): the
+//! session keeps its folder ([`Session::take_atlantis2`]), the event loop
+//! ends, and the program runs it in its place.
 
 use std::path::{Path, PathBuf};
 
@@ -15,7 +18,7 @@ use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{Key, NamedKey};
 
-use crate::desktop;
+use crate::desktop::{self, Opened};
 use crate::launcher::{Launcher, LauncherAction, LauncherEntry, LauncherKey};
 use crate::library::Library;
 use crate::support::PlayClock;
@@ -107,6 +110,9 @@ pub struct Session {
     /// (not for a run with a game folder or a testing option).
     pub counts_play: bool,
     pub(crate) play_clock: PlayClock,
+    /// Atlantis II's folder, chosen to play: the program runs it once the
+    /// event loop has ended.
+    atlantis2: Option<PathBuf>,
 }
 
 impl Session {
@@ -131,7 +137,26 @@ impl Session {
             shift_until: None,
             play_clock: PlayClock::default(),
             counts_play: true,
+            atlantis2: None,
         }
+    }
+
+    /// The folder of Atlantis II chosen to play, if any (taken).
+    pub fn take_atlantis2(&mut self) -> Option<PathBuf> {
+        self.atlantis2.take()
+    }
+
+    /// Whether Atlantis II was chosen to play: the event loop is to end.
+    pub fn wants_atlantis2(&self) -> bool {
+        self.atlantis2.is_some()
+    }
+
+    /// Adds `dirs` to the library (those not in it yet), saved.
+    pub fn add_games(&mut self, dirs: &[PathBuf]) {
+        for d in dirs {
+            self.library.add(d);
+        }
+        self.library.save_logged(&self.data_dir);
     }
 
     /// The per-user data folder.
@@ -290,6 +315,30 @@ impl App {
         }
     }
 
+    /// Plays what `opened` is: the first game at once, Atlantis II once the
+    /// event loop has ended ([`Session::take_atlantis2`]); `folder` moves to
+    /// the top of the library.
+    pub fn play_opened(&mut self, opened: Opened, folder: &Path) {
+        match opened {
+            Opened::LostTales(game, _) => self.play_game(*game, Some(folder)),
+            Opened::Atlantis2(build) => {
+                log::info!("game folder {} ({})", folder.display(), build.label);
+                self.stop_game();
+                let Some(session) = &mut self.session else {
+                    return;
+                };
+                session.launcher = None;
+                session.played(folder);
+                session.atlantis2 = Some(folder.to_path_buf());
+                // The window of this event loop closes; Atlantis II opens
+                // its own.
+                if let Some(w) = &self.window {
+                    w.set_visible(false);
+                }
+            }
+        }
+    }
+
     /// Stops the game running, if any, and shows the game library's
     /// screen (the last played selected), with `message` under it.
     pub fn show_launcher(&mut self, message: Option<String>) {
@@ -384,6 +433,10 @@ impl App {
         // The dialogs below wait for the player: not a hang.
         crate::watchdog::leave();
         self.run_launcher_action(action);
+        // Atlantis II chosen: the program runs it after this event loop.
+        if self.session.as_ref().is_some_and(Session::wants_atlantis2) {
+            el.exit();
+        }
     }
 
     /// [`App::launcher_action`] but Quit (no event loop needed).
@@ -398,10 +451,10 @@ impl App {
                 let Some(dir) = session.library.folders().get(i).cloned() else {
                     return;
                 };
-                match desktop::try_open(&dir) {
-                    Ok(game) => {
+                match desktop::open_any(&dir) {
+                    Ok(opened) => {
                         log::info!("game folder {}", dir.display());
-                        self.play_game(game, Some(&dir));
+                        self.play_opened(opened, &dir);
                     }
                     Err(e) => {
                         log::warn!("{}: {e}", dir.display());
@@ -418,21 +471,21 @@ impl App {
                 }
             }
             LauncherAction::Locate(i) => {
-                if let Some((game, dir)) = desktop::pick_game_folder("Cancel") {
+                if let Some((opened, dir)) = desktop::pick_game_folder("Cancel") {
                     let at = session.library.relocate(i, &dir);
                     session.library.save_logged(&session.data_dir);
                     session.refresh(at, &desktop::describe);
-                    session.message(format!("Found again: {}", game.edition()));
+                    session.message(format!("Found again: {}", opened.label()));
                 }
             }
             LauncherAction::Add => {
-                if let Some((game, dir)) = desktop::pick_game_folder("Cancel") {
+                if let Some((opened, dir)) = desktop::pick_game_folder("Cancel") {
                     let added = session.library.add(&dir);
                     session.library.save_logged(&session.data_dir);
                     let at = session.library.position(&dir).unwrap_or(0);
                     session.refresh(at, &desktop::describe);
                     session.message(if added {
-                        format!("Added: {}", game.edition())
+                        format!("Added: {}", opened.label())
                     } else {
                         "This game is in the list already".to_string()
                     });
@@ -499,6 +552,39 @@ mod tests {
         assert_eq!(startup(2, false, never), Startup::Launcher);
     }
 
+    /// `ATLANTIS_NATIVE_DATA` pointed at a test's own folder, for one test
+    /// at a time (the variable is the process's: two such tests at once
+    /// would read and remove each other's folder); on drop the variable
+    /// is set back, then the folder removed.
+    struct OwnDataDir {
+        dir: PathBuf,
+        before: Option<std::ffi::OsString>,
+        _one_at_a_time: std::sync::MutexGuard<'static, ()>,
+    }
+
+    fn own_data_dir(name: &str) -> OwnDataDir {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tmp(name);
+        let before = std::env::var_os("ATLANTIS_NATIVE_DATA");
+        std::env::set_var("ATLANTIS_NATIVE_DATA", &dir);
+        OwnDataDir {
+            dir,
+            before,
+            _one_at_a_time: guard,
+        }
+    }
+
+    impl Drop for OwnDataDir {
+        fn drop(&mut self) {
+            match &self.before {
+                Some(v) => std::env::set_var("ATLANTIS_NATIVE_DATA", v),
+                None => std::env::remove_var("ATLANTIS_NATIVE_DATA"),
+            }
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
     fn app_with_library(d: &Path) -> App {
         let session = Session::new(d.to_path_buf(), false, false, false, Start::Boot);
         App::new(Sys::new(Mixer::new()), None).with_session(session)
@@ -534,6 +620,83 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
+    /// The game library with both games: the first game and GOG.com's
+    /// Atlantis II, each shown with its name and edition; Atlantis II
+    /// chosen on the screen is kept for the program to run after the
+    /// event loop, first in the library, and boots. With
+    /// `ATLANTIS_LIBRARY_SHOTS=<folder>` the screen is saved there
+    /// (`library-both.png`, `library-atlantis2-chosen.png`).
+    #[test]
+    fn the_library_plays_atlantis2() {
+        let Some(a2) = std::env::var_os("ATLANTIS2_GOG").map(PathBuf::from) else {
+            atlantis2_data::testing::missing("ATLANTIS2_GOG not set");
+            return;
+        };
+        let first = std::env::var_os("ATLANTIS_DATA").map(PathBuf::from);
+        let own = own_data_dir("both-games");
+        let d = own.dir.clone();
+        let mut folders: Vec<PathBuf> = first.iter().cloned().collect();
+        folders.push(a2.clone());
+        let text: String = folders
+            .iter()
+            .map(|f| format!("{}\n", f.display()))
+            .collect();
+        std::fs::write(d.join("games.txt"), &text).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        let shot = |app: &App, name: &str| {
+            let Some(dir) = std::env::var_os("ATLANTIS_LIBRARY_SHOTS") else {
+                return;
+            };
+            let mut frame = Vec::new();
+            let mut font = None;
+            assert!(draw_launcher(app.session(), &mut frame, &mut font));
+            let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
+            std::fs::write(PathBuf::from(dir).join(name), png).unwrap();
+        };
+        shot(&app, "library-both.png");
+        let l = app.session().unwrap().launcher().unwrap();
+        let labels: Vec<&str> = l.entries().iter().map(|e| e.label.as_str()).collect();
+        assert!(l.entries().iter().all(|e| e.found), "{labels:?}");
+        assert_eq!(labels.last(), Some(&"Atlantis II, GOG.com (patch 1.01)"));
+        if first.is_some() {
+            assert!(labels[0].starts_with("Atlantis: The Lost Tales, "));
+        }
+        // Played from the screen: kept for after the event loop, first
+        // in the library (saved).
+        let i = folders.len() - 1;
+        app.run_launcher_action(LauncherAction::Play(i));
+        assert!(app.session().unwrap().launcher().is_none());
+        assert!(app.session().unwrap().wants_atlantis2());
+        assert_eq!(app.session().unwrap().library().folders()[0], a2);
+        assert_eq!(
+            Library::load(&d).folders().first(),
+            Some(&a2),
+            "games.txt rewritten"
+        );
+        assert_eq!(
+            app.session_mut().unwrap().take_atlantis2(),
+            Some(a2.clone())
+        );
+        assert!(!app.session().unwrap().wants_atlantis2());
+        // The screen again: Atlantis II selected, last played.
+        app.show_launcher(None);
+        shot(&app, "library-atlantis2-chosen.png");
+        // What the program then runs: Atlantis II's mode, from this folder.
+        let (engine, label) = crate::a2::open(
+            &a2,
+            &[],
+            &crate::a2::A2Start {
+                intro: Some(false),
+                ..Default::default()
+            },
+            atlantis2_engine::Enhancements::default(),
+        )
+        .unwrap();
+        assert!(label.contains("GOG.com"), "{label}");
+        drop(engine);
+    }
+
     /// Switching games drops the engine: nothing keeps its system alive.
     #[test]
     fn switching_drops_the_engine() {
@@ -542,9 +705,9 @@ mod tests {
             return;
         };
         let dir = PathBuf::from(dir);
-        let d = tmp("switch");
         // The saves of this test in its own folder.
-        std::env::set_var("ATLANTIS_NATIVE_DATA", &d);
+        let own = own_data_dir("switch");
+        let d = own.dir.clone();
         let mut app = app_with_library(&d);
         let game = desktop::try_open(&dir).unwrap();
         app.play_game(game, Some(&dir));
@@ -562,11 +725,15 @@ mod tests {
         assert!(sys.upgrade().is_none(), "the engine's system is dropped");
         let l = app.session().unwrap().launcher().unwrap();
         assert!(l.entries()[0].found);
-        assert!(l.entries()[0].label.starts_with("CD, English"));
+        assert!(l.entries()[0]
+            .label
+            .starts_with("Atlantis: The Lost Tales, CD, English"));
         // Played again from the screen.
         app.run_launcher_action(LauncherAction::Play(0));
         assert!(app.has_game());
         assert!(app.session().unwrap().launcher().is_none());
-        let _ = std::fs::remove_dir_all(&d);
+        // The engine before the folder goes.
+        drop(app);
+        drop(own);
     }
 }

@@ -12,7 +12,9 @@
 //! all on or all off, "Custom (n/N)" when mixed), "Choose the bug
 //! fixes..." (a box of its own in the same style: all on, all off, one
 //! switch per [`BugFix`] with what the original does, Back), the arrow
-//! keys' turn ([`Enhancements::ui_ux`]), Close.
+//! keys' turn ([`Enhancements::ui_ux`]), Close, and when the game was
+//! started from the desktop's game library "Game library..." (back to the
+//! list of games, as the first game's menu has it).
 
 use atlantis_engine::hd::{HdText, PanoFilter, VideoSides};
 use atlantis_engine::options_menu::{
@@ -38,9 +40,12 @@ pub enum Entry {
     ChooseFixes,
     ArrowKeys,
     Close,
+    /// Stop the game and go back to the game library (shown only when
+    /// the front end has one: [`OptionsMenu::set_library`]).
+    Library,
 }
 
-const ENTRIES: [Entry; 12] = [
+const ENTRIES: [Entry; 13] = [
     Entry::Graphics,
     Entry::PanoramaFilter,
     Entry::Sharpen,
@@ -53,6 +58,7 @@ const ENTRIES: [Entry; 12] = [
     Entry::ChooseFixes,
     Entry::ArrowKeys,
     Entry::Close,
+    Entry::Library,
 ];
 
 impl Entry {
@@ -173,6 +179,8 @@ pub enum MenuAction {
     SetScreen800(bool),
     /// The menu closed.
     Close,
+    /// Stop the game and show the game library (the menu closed).
+    OpenLibrary,
 }
 
 /// The values the menu shows.
@@ -214,6 +222,8 @@ pub struct OptionsMenu {
     /// Shown at the foot of the menu: the game's release, the port's
     /// version (set by the front end).
     info: Vec<String>,
+    /// The front end has a game library: the "Game library..." entry.
+    library: bool,
 }
 
 impl OptionsMenu {
@@ -224,6 +234,22 @@ impl OptionsMenu {
     /// The lines shown at the foot of the menu (at most two).
     pub fn set_info(&mut self, lines: Vec<String>) {
         self.info = lines;
+    }
+
+    /// Whether the menu has the "Game library..." entry (the game was
+    /// started from the desktop's game library).
+    pub fn set_library(&mut self, on: bool) {
+        self.library = on;
+        self.menu.clamp(self.entries().len());
+    }
+
+    /// The entries shown.
+    fn entries(&self) -> &'static [Entry] {
+        if self.library {
+            &ENTRIES
+        } else {
+            &ENTRIES[..ENTRIES.len() - 1]
+        }
     }
 
     pub fn is_open(&self) -> bool {
@@ -242,7 +268,7 @@ impl OptionsMenu {
 
     /// The selected entry.
     pub fn selected(&self) -> Entry {
-        ENTRIES[self.menu.selected()]
+        self.entries()[self.menu.selected()]
     }
 
     /// The bug fixes' box is open.
@@ -255,15 +281,17 @@ impl OptionsMenu {
         FIX_ROWS[self.fixes.selected()]
     }
 
+    /// The box's height without the game library's entry.
     #[cfg(test)]
     fn box_h() -> i32 {
-        MenuBox::box_h(ENTRIES.len())
+        MenuBox::box_h(ENTRIES.len() - 1)
     }
 
-    /// The box's top left corner on a `w` x `h` screen (centred).
+    /// The box's top left corner on a `w` x `h` screen (centred), without
+    /// the game library's entry.
     #[cfg(test)]
     fn origin(w: usize, h: usize) -> (i32, i32) {
-        MenuBox::origin(ENTRIES.len(), w, h)
+        MenuBox::origin(ENTRIES.len() - 1, w, h)
     }
 
     fn activate(&mut self, entry: Entry, v: MenuValues) -> MenuAction {
@@ -301,6 +329,10 @@ impl OptionsMenu {
             Entry::Close => {
                 self.close();
                 return MenuAction::Close;
+            }
+            Entry::Library => {
+                self.close();
+                return MenuAction::OpenLibrary;
             }
         }
         MenuAction::SetEnhancements(x)
@@ -343,6 +375,7 @@ impl OptionsMenu {
             Entry::ChooseFixes => "Enter: one fix at a time",
             Entry::ArrowKeys => "The arrow keys turn the view (the original: the mouse only)",
             Entry::Close => "Back to the game",
+            Entry::Library => "Stop this game and choose another",
         }
     }
 
@@ -395,6 +428,7 @@ impl OptionsMenu {
                     Entry::ChooseFixes => ("Choose the bug fixes...", None),
                     Entry::ArrowKeys => ("Arrow keys turn", Some(on(x.ui_ux))),
                     Entry::Close => ("Close", None),
+                    Entry::Library => ("Game library...", None),
                 };
                 Row {
                     label,
@@ -431,7 +465,7 @@ impl OptionsMenu {
         match input {
             BoxInput::None => MenuAction::None,
             BoxInput::Close => MenuAction::Close,
-            BoxInput::Activate(i) => self.activate(ENTRIES[i], v),
+            BoxInput::Activate(i) => self.activate(self.entries()[i], v),
         }
     }
 
@@ -458,7 +492,8 @@ impl OptionsMenu {
             return self.act_fix(input, v);
         }
         let value = fixes_value(&v.enhancements.fixes);
-        let input = self.menu.key(key, &Self::rows(v, &value));
+        let rows = Self::rows(v, &value);
+        let input = self.menu.key(key, &rows[..self.entries().len()]);
         self.act(input, v)
     }
 
@@ -469,7 +504,7 @@ impl OptionsMenu {
             self.fixes
                 .pointer_in(&FIX_LAYOUT, FIX_ROWS.len(), x, y, w, h);
         } else {
-            self.menu.pointer(ENTRIES.len(), x, y, w, h);
+            self.menu.pointer(self.entries().len(), x, y, w, h);
         }
     }
 
@@ -481,7 +516,7 @@ impl OptionsMenu {
             let input = self.fixes.click_in(&FIX_LAYOUT, FIX_ROWS.len(), x, y, w, h);
             return self.act_fix(input, v);
         }
-        let input = self.menu.click(ENTRIES.len(), x, y, w, h);
+        let input = self.menu.click(self.entries().len(), x, y, w, h);
         self.act(input, v)
     }
 
@@ -532,12 +567,13 @@ impl OptionsMenu {
         }
         let d = Self::description(self.selected(), v);
         let value = fixes_value(&v.enhancements.fixes);
+        let rows = Self::rows(v, &value);
         self.menu.draw_recording(
             screen,
             w,
             h,
             font,
-            &Self::rows(v, &value),
+            &rows[..self.entries().len()],
             &self.info,
             d,
             record,
@@ -716,6 +752,44 @@ mod tests {
             assert_eq!(m.selected(), Entry::BugFixes);
             assert_eq!(m.click(2, 2, w, h, ORIG), MenuAction::Close);
         }
+    }
+
+    /// Started from the game library: "Game library..." after Close, by
+    /// the keys and the mouse, the box still inside both screens.
+    #[test]
+    fn the_library_entry_stops_the_game() {
+        let mut m = OptionsMenu::new();
+        m.open();
+        // Without a game library: Close is the last entry (Up wraps).
+        m.key(Key::Up, ORIG);
+        assert_eq!(m.selected(), Entry::Close);
+        m.set_library(true);
+        m.key(Key::Down, ORIG);
+        assert_eq!(m.selected(), Entry::Library);
+        assert_eq!(m.key(Key::Right, ORIG), MenuAction::None, "a button");
+        assert_eq!(m.key(Key::Enter, ORIG), MenuAction::OpenLibrary);
+        assert!(!m.is_open());
+        let font = SubtitleFont::new();
+        for (w, h) in [(640, 480), (800, 600)] {
+            let n = ENTRIES.len();
+            let (bx, by) = MenuBox::origin(n, w, h);
+            assert!(by >= 1 && by + MenuBox::box_h(n) < h as i32);
+            m.open();
+            let y = by + TITLE_H + (n as i32 - 1) * ROW_H + 5;
+            assert_eq!(m.click(bx + 50, y, w, h, ORIG), MenuAction::OpenLibrary);
+            m.open();
+            let mut s = vec![0u16; w * h];
+            let mut t = HdText::default();
+            m.draw_recording(&mut s, w, h, &font, ORIG, Some(&mut t));
+            assert!(t.items.iter().any(|i| i.text == b"Game library..."));
+            m.close();
+        }
+        // Off again: the selection back inside the shorter menu.
+        m.open();
+        m.key(Key::Up, ORIG);
+        assert_eq!(m.selected(), Entry::Library);
+        m.set_library(false);
+        assert_eq!(m.selected(), Entry::Close);
     }
 
     fn with_fixes(f: BugFixes) -> MenuValues {

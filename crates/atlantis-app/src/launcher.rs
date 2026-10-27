@@ -1,5 +1,6 @@
 //! The game library's screen (desktop): the game folders of the library,
-//! each shown as its edition and its path, to choose the one to play;
+//! each shown as its game and edition (the first game's or Atlantis II's)
+//! and its path, to choose the one to play;
 //! drawn in the window on the 640x480 screen, in the style of the options
 //! menu ([`atlantis_engine::options_menu`]). This module is the screen's
 //! state, input and drawing; the front end carries out its actions.
@@ -13,8 +14,9 @@ use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LauncherEntry {
     pub path: PathBuf,
-    /// The edition ("GOG.com, French (1999 build)"), or why the folder
-    /// does not open.
+    /// The game and its edition ("Atlantis: The Lost Tales, GOG.com,
+    /// French (1999 build)", "Atlantis II, GOG.com (patch 1.01)"), or why
+    /// the folder does not open.
     pub label: String,
     /// The folder opens as the game.
     pub found: bool,
@@ -157,6 +159,21 @@ fn bytes(text: &str) -> Vec<u8> {
             _ => b'?',
         })
         .collect()
+}
+
+/// `text` cut on the right with "..." to fit `max_w` pixels (a label
+/// keeps its start, the game's name).
+fn fit_right(font: &SubtitleFont, text: &str, max_w: i32) -> Vec<u8> {
+    let mut b = bytes(text);
+    if font.width(&b) <= max_w {
+        return b;
+    }
+    let dots = font.width(b"...");
+    while !b.is_empty() && font.width(&b) + dots > max_w {
+        b.pop();
+    }
+    b.extend_from_slice(b"...");
+    b
 }
 
 /// `text` cut on the left with "..." to fit `max_w` pixels (a path keeps
@@ -407,7 +424,7 @@ impl Launcher {
         fill(screen, BOX_X, BOX_Y, BOX_W, BOX_H, BG);
         let t = b"Atlantis Native: game library";
         text(screen, t, centre(t), BOX_Y + 12, BOX_W, TEXT);
-        let t = b"Choose the edition of Atlantis: The Lost Tales to play";
+        let t = b"Choose the game to play (Atlantis: The Lost Tales or Atlantis II)";
         text(screen, t, centre(t), BOX_Y + 34, BOX_W, DIM);
         // The list.
         fill(
@@ -438,12 +455,12 @@ impl Launcher {
                 (true, false) => TEXT,
             };
             let w = LIST_W - 24;
-            let mut label = bytes(&e.label);
+            let mut label = fit_right(font, &e.label, w);
             if i == 0 && e.found {
                 let tag = b"last played";
                 let tw = font.width(tag);
                 text(screen, tag, LIST_X + LIST_W - 12 - tw, y + 5, tw + 2, DIM);
-                label = fit_left(font, &e.label, w - tw - 12);
+                label = fit_right(font, &e.label, w - tw - 12);
             }
             text(screen, &label, LIST_X + 12, y + 5, w, label_c);
             let path = fit_left(font, &e.path.display().to_string(), w);
@@ -682,6 +699,12 @@ mod tests {
         assert!(font.width(&b) <= 300);
         assert!(b.starts_with(b"...") && b.ends_with(b"/Atlantis"));
         assert_eq!(fit_left(&font, "/short", 300), b"/short");
+        // A label keeps its start, the game's name.
+        let label = "Atlantis: The Lost Tales, GOG.com, French (1999 build), from disc images";
+        let b = fit_right(&font, label, 250);
+        assert!(font.width(&b) <= 250);
+        assert!(b.starts_with(b"Atlantis: The") && b.ends_with(b"..."));
+        assert_eq!(fit_right(&font, "Atlantis II", 300), b"Atlantis II");
         assert_eq!(bytes("Jeux\u{e9}\u{4e2d}"), b"Jeux\xe9?");
     }
 

@@ -620,6 +620,40 @@ the new release's title, icon and settings store (one per build) in
 place. A test checks that the old `Sys` is freed. The web build keeps
 its single folder picked in the page.
 
+The library holds Atlantis II's folders beside the first game's
+(`games.txt` stays one folder per line; the game is told from the
+folder's files each time). `setup::kind_of` decides: Atlantis II when
+`atlantis2_data::files::holds_atlantis2` says so (`atlantis2.exe`, or
+`Game.exe` beside `wam` and `scenar`), else the first game when the
+folder holds `atlantis.exe` or CD images that are not all Atlantis
+II's discs (one image that opens and is not one of them is enough, so
+a folder of both games' images is the first game's; images that do not
+open count for the first game unless one of Atlantis II's discs is
+beside them). `setup::find_root` looks a few levels down for either game (or
+one of them), and never looks into the other game's folder, so neither
+detection takes the other game's folder; `setup::candidate_folders`
+reads both GOG.com product ids from the registry (both views; the first
+game's 1207658944, Atlantis II's 1207658951) besides the usual folders.
+`desktop::open_any` opens either: the first game's `Game`, or Atlantis
+II's build (`A2Files::open_dir`, which needs its discs in the folder or
+a folder inside it: the library keeps no `--discs`). Atlantis II has
+its own `ApplicationHandler` (`a2.rs`), and a program makes one winit
+event loop: chosen in the library (or the library's one game), the
+session keeps its folder (`Session::take_atlantis2`), the window is
+hidden and the loop ends; `main.rs` runs the first game's `App` with
+`run_app_on_demand`, drops it (its window, its sound) and runs Atlantis
+II on the same event loop (`a2::run_window_on`). Its options menu then
+has the "Game library..." entry, and Shift in its first two seconds
+(the library's one game, started without the screen) does what it does
+for the first game; either one ends that run with `a2::Ended::Library`,
+and `main.rs` makes a new `App` showing the library's screen and runs
+the loop again. The first start (`desktop::first_of_each_game`) looks
+in `setup::candidate_folders` only, as before, and opens folders until
+it has the first one of each game: one game found is offered as
+before, both are added to the library. A folder picked in the folder
+picker that holds both games (`setup::find_roots`) asks which one. The
+web build is unchanged (the first game only).
+
 ### The web build
 
 `web/build.sh` builds it (`atlantis-native-web.zip` on the nightly

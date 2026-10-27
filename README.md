@@ -166,8 +166,9 @@ options menu, e.g. *GOG.com, French (1999 build)*.
 
 1. Download and unpack the build for your system.
 2. Double-click **atlantis-native** (on macOS, **Atlantis Native**).
-3. The first time, choose your game folder. It is remembered.
-   With more than one edition, the
+3. The first time, choose your game folder (an installation found on
+   the computer is offered first). It is remembered.
+   With more than one edition or both games, the
    [game library](docs/GUIDE.md#several-editions-the-game-library) lets
    you choose the one to play (hold Shift at start-up to open it).
 
@@ -177,10 +178,12 @@ From a terminal you can also pass the folder:
 `atlantis-native /path/to/game`. More options (`--original`, `--hd`,
 `--new-game`, …) are in the [player's guide](docs/GUIDE.md#command-line).
 
-*Atlantis II* (1999) opens from the terminal too, for now: give the folder
-of its installation (with the CD images beside it, or `--discs <folder>`),
-or the GOG.com installation folder, which holds everything (GOG's edition
-is version 1.01, and plays as 1.01 does). See
+*Atlantis II* (1999) is found and opened by the game library too: its
+GOG.com installation (which holds everything; GOG's edition is version
+1.01, and plays as 1.01 does), or the folder of its CD installation with
+the images of its four CDs (or copies of the CDs) in it or in a folder
+inside it. From the terminal, give that folder (the CD images may stay
+elsewhere with `--discs <folder>`). See
 [Atlantis II](docs/GUIDE.md#atlantis-ii).
 
 ## Controls
