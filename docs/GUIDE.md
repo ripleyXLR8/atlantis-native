@@ -65,8 +65,22 @@ Tales, DVD, Swedish (1998 build)*: choose the one to play there. A
 language of the side that is not in the drive says so (*on the other
 side of the DVD*): turn the disc over. The web version takes the drive
 or a copy of a side, then asks for the language (it reads no disc
-image). The Japanese version is not supported yet; the DVD-Video
-"making of" on each side is not part of the game.
+image). The DVD-Video "making of" on each side is not part of the game.
+
+The Japanese version has Japanese subtitles over English voices and
+English menus. Its subtitles are drawn with MS PGothic, the font its
+program asks Windows for, when you have `msgothic.ttc`: put it in the
+game folder (a copy of side B's `FACE_B/JAP`, or beside the images), or
+have it among your system's fonts (every Japanese Windows and Microsoft
+Office have it); otherwise with the bundled Noto Sans JP (the web version
+downloads it for this version only). The options menu's SUBTITLES button
+has three states there, JAPANESE, ENGLISH and NONE: each click moves to the
+next one, the English subtitles being those of the English version. The
+Japanese program starts by playing the logo films of its publishers, Gaga
+and Spike, which the DVD does not hold: as on the DVD, two "Fichier
+introuvable" (file not found) boxes show before the Cryo logo; **OK** (or
+Enter) closes each. The bug fix **Japanese: the two missing logo films**
+skips them.
 
 The *Perfect Edition* (Tgames' 2018 package of the DVD's English
 version): choose its installation folder.
@@ -81,8 +95,8 @@ Swedish, Spanish or Italian CD), the GOG.com release in
 English, French, German, Spanish and Italian, the Traditional
 Chinese CD (1998) and the Simplified Chinese CD (1999), copied or as
 images, Cryo's DVD (1998: English, French, German, Dutch, Spanish,
-Italian and Swedish; the drive, a copy of a side or the images of the
-sides) and the Perfect Edition. Another edition is
+Italian, Swedish and Japanese; the drive, a copy of a side or the images
+of the sides) and the Perfect Edition. Another edition is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
 project's page in your browser, filled in with the identifiers of the
@@ -299,6 +313,10 @@ change an entry; Escape, F10 or O close it. Its entries:
     the CDs' own font, but the DVD's program draws them through Windows:
     `„`, `†`, `”` and other signs stand in place of `ä`, `å`, `ö`, `é`...
     The fix shows the letters.
+  - **Japanese: the two missing logo films** (the DVD's Japanese
+    version): its program first plays the logos of its Japanese
+    publishers, which the DVD does not hold, and shows a "file not
+    found" box for each. The fix skips them silently.
 - **Restored content** (off by default) and **Modern UI/UX** (off by
   default): see [Enhancements](TECHNICAL.md#enhancements).
 - **Buy me a coffee...**, **Close** and, on the desktop, **Game

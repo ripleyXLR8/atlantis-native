@@ -764,8 +764,8 @@ mod tests {
         drop(own);
     }
 
-    /// The game library with Cryo's DVD: each European language found in
-    /// the images of both sides its own edition ("from disc images"), and
+    /// The game library with Cryo's DVD: each of its eight languages found
+    /// in the images of both sides its own edition ("from disc images"), and
     /// the Perfect Edition; one played from the screen, first in the
     /// library. With `ATLANTIS_DVD_SHOTS=<folder>` the screen is saved
     /// there (`library-dvd.png`).
@@ -797,7 +797,7 @@ mod tests {
             .into_iter()
             .filter(|p| desktop::open_any(p).is_ok())
             .collect();
-        assert_eq!(folders.len(), 7);
+        assert_eq!(folders.len(), 8);
         folders.extend(std::env::var_os("ATLANTIS_PERFECT_EDITION").map(PathBuf::from));
         let text: String = folders
             .iter()
@@ -817,7 +817,7 @@ mod tests {
         let labels: Vec<&str> = l.entries().iter().map(|e| e.label.as_str()).collect();
         assert!(l.entries().iter().all(|e| e.found), "{labels:?}");
         for (i, language) in [
-            "German", "English", "French", "Dutch", "Spanish", "Italian", "Swedish",
+            "German", "English", "French", "Dutch", "Spanish", "Italian", "Swedish", "Japanese",
         ]
         .iter()
         .enumerate()

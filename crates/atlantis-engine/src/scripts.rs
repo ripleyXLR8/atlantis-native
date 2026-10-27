@@ -333,8 +333,11 @@ impl Scripts {
                 e.zoom = false;
                 e.music.new_sound_last = 0;
             }
-            let name = format!("SCENAR\\CHAPI{chapter:03}.CON");
+            let name = con_file_name(e, chapter);
             let Some(data) = e.read(&name).await else {
+                // (atlantis-dvd-ja-696832: no CHAPJ010 / CHAPJ086, chapters
+                // no script reaches; FUN_00427070 would show its error box,
+                // code 0xe, and keep the buffer.)
                 log::warn!("no CON file {name}");
                 return;
             };
@@ -346,6 +349,26 @@ impl Scripts {
             e.clocks.time2_offset = 0;
             e.emit(Event::ChapterLoaded(chapter));
         })
+    }
+
+    /// The Japanese DVD build's SUBTITLES click (FUN_0041d768 @ 0x0041d833):
+    /// the chapter's CON read again, `CHAPJ` or `CHAPI` as the language
+    /// counter now stands (FUN_00426df4: the file into the script buffer,
+    /// nothing else; the sections are looked up in the text as they are
+    /// run). A failed read (no chapter's script has one) leaves the text:
+    /// the original shows its error box (code 0xe) and leaves the options.
+    pub async fn reload_con_text(&mut self, e: &mut Engine) {
+        if self.chapter == 0 {
+            return;
+        }
+        let name = con_file_name(e, self.chapter);
+        match e.read(&name).await {
+            Some(data) => {
+                self.script = ConScript::parse(&data);
+                e.emit(Event::ConTextReloaded(name));
+            }
+            None => log::warn!("no CON file {name}: the text kept"),
+        }
     }
 
     /// `FUN_00425eb0`: the /INIT commands, with the loading flag set. Every
@@ -1192,7 +1215,19 @@ fn show_perso(e: &mut Engine, perso: i32) {
     e.recomposite_sprite_layer();
 }
 
+/// The CON file of `chapter`: `SCENAR\CHAPInnn.CON`, or in the Japanese DVD
+/// build while its texts are Japanese `SCENAR\CHAPJnnn.CON`
+/// (atlantis-dvd-ja-696832 FUN_00426df4 @ 0x00426e2d..0x00426e56).
+pub fn con_file_name(e: &Engine, chapter: u32) -> String {
+    let set = if e.japanese_texts() { 'J' } else { 'I' };
+    format!("SCENAR\\CHAP{set}{chapter:03}.CON")
+}
+
 impl ScriptHooks for Scripts {
+    fn reload_con_text<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, ()> {
+        Box::pin(Scripts::reload_con_text(self, e))
+    }
+
     fn chapter_loaded<'a>(
         &'a mut self,
         e: &'a mut Engine,

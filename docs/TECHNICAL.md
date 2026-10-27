@@ -100,12 +100,13 @@ its executable's language:
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
-| `fix_sharp_s` | a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
+| `fix_sharp_s` | a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
 | `fix_disc_revision` | some disc's copy of FONTMIN.SPR, FONTMIN2.SPR, or CREDITS.TXT with the builds that read it at each run, differs from disc 1's (`FixData::disc_revisions`): of the known data, the Dutch CD's | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc` | the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)) |
 | `fix_menu_line_width` | Italian CD and DVD (`menu_positioned_byte_width` 16) | `MenuRules::positioned_byte_width` | a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
 | `fix_chinese_rows` | Simplified Chinese (`CjkBreaker::Gb2312`) | `CjkSplit::row_fix` | the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)) |
 | `fix_subtitles_toggle` | Chinese (`menu_toggle_sprites`) | `MenuRules::toggle_in_step` | the options' SUBTITLES toggle record is read in step while SUBTITLES is off (the original reads it one byte out of step, so its click area takes the wrong width and height, see [Game builds](#game-builds)) |
 | `fix_dos_letters` | the DVD's Dutch and Swedish builds (`dos_subtitle_texts`) | `Engine::subtitle_code_page` | the subtitles are read in the DOS code page their texts are written in (the CDs' files), so `ä å ö é` show; the original's program draws them through Windows in the Windows code page, `„ † ” ‚` in their place (see [Game builds](#game-builds)) |
+| `fix_startup_logos` | the DVD's Japanese build (`startup_logos`) | `Engine::play_startup` | the two logo films its start-up plays first and the DVD does not hold are skipped without a word (the original shows an error box "Fichier introuvable" for each, see [Game builds](#game-builds)); a film that is there plays either way |
 
 These are every use of the single `minor_bug_fixes` switch the port had
 before (still read from `settings.ini`: it sets every fix whose own key
@@ -334,6 +335,23 @@ older) draws right only through its hinting, which the port does not
 run, and is not used. In the HD mode the sharp subtitles use the same
 face at the output's resolution.
 
+The DVD's Japanese build asks Windows for MS PGothic (`ＭＳ Ｐゴシック`,
+the face of `msgothic.ttc` on every Japanese Windows) at the same 16-pixel
+cell and hands it the Shift-JIS bytes of its `SCENAR\CHAPJnnn.CON` texts
+(code page 932). The port draws them with the player's `msgothic.ttc` (its
+face MS PGothic), from beside the game's files or, on the desktop, from
+the system's fonts (`subtitles::system_font`: `%WINDIR%\Fonts`, the macOS
+and Linux font folders), else with Noto Sans JP, bundled as a subset to
+the characters of the Japanese folder's scripts (`make_cjk_subset.py
+--jp ... --ja <side B>/FACE_B/JAP`), by the same rules. Its rows are cut at
+every space (no window, no width: `subtitles::cjk::japanese_rows`), drawn
+18 pixels apart from a bottom row 36 pixels lower than the other builds'
+(base 0x1f2), whole up to the screen's edge (TextOutA on the screen
+surface: a row past the screen is clipped there, not ended before its
+first glyph past 635). Its English subtitles (the SUBTITLES button's
+second state) are cut as the reference's and drawn in the same font, at
+the reference's base.
+
 The 1997 English CD has no Windows text: it draws its subtitles with the
 8x8 pixel font `DIALOG\FONTS.BIN` of the game's archives (one glyph per
 byte, the IBM PC set), white over a black shadow, in rows 10 pixels apart
@@ -394,37 +412,38 @@ the 2001 build's is given the text without them.
 
 ### Game builds
 
-The port knows twenty-one builds of `atlantis.exe` (`ExeBuild` in
+The port knows twenty-two builds of `atlantis.exe` (`ExeBuild` in
 `crates/atlantis-data/src/exe.rs`), found by their size and the PE
 header's timestamp (the 2001 build and the patch 1.01 build have the same
 size, as have the August 1997 French and German builds and the Spanish
 and Italian ones, the English, Dutch and Swedish 1997 retail
 builds, the DVD's English, French, German, Spanish and Italian
-builds, and its Dutch and Swedish ones); the English DVD's and the Perfect Edition's executables share
+builds, and its Dutch and Swedish ones, and the Japanese DVD's and the
+Traditional Chinese CD's); the English DVD's and the Perfect Edition's executables share
 size and timestamp too, and are told apart by a path string
 (`ExeBuild::path_check`). Their tables are read where each build has
 them, and the code differences that change what a player sees follow the
 build:
 
-| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French, German, Spanish and Italian retail CDs (1997) | French retail CD (May 1997) | Traditional and Simplified Chinese CDs (1998, 1999) | DVD (1998) and Perfect Edition |
-|---|---|---|---|---|---|---|---|
-| subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows | Arial | 8x8 font, 10-pixel rows (DOS code page texts) | MingLiU / SimSun, 18-pixel rows (Big5 / GBK texts) | Arial, 14-pixel rows (the Dutch and Swedish DVDs' DOS code page texts read as Windows-1252) |
-| SUBTITLES item | three-click cycle | three-click cycle | plain toggle | plain toggle | plain toggle | three-click cycle, on at start-up | three-click cycle |
-| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor |
-| Rhea always on camera 2 | yes | no | no | no | no | no | no |
-| second death in a section | same narrator line | next line | same line | next line | same line | next line | next line |
-| game-over voice | after the image | after the image | before the image | after the image | before the image | after the image | after the image |
-| players.atl | 97 bytes | 97 bytes | 95 bytes; names in capitals, 0x20..0x7a | 95 bytes | 95 bytes; names in capitals, 0x20..0x7a | 114 bytes | 97 bytes |
-| new-player row | `#` marker, label without it | `#` marker, label without it | the label itself | the label itself | the label itself | the label itself | `#` marker, label without it |
-| hexagon puzzle pieces | always | always | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 |
-| ogre queen reveal | 3 frames of 1 s | 3 frames of 1 s | 5 frames of 0.375 s | 3 frames of 1 s | 5 frames of 0.375 s | 3 frames of 1 s | 3 frames of 1 s |
-| rat puzzle pass | 5 ticks after each | 5 ticks after each | a 5-tick deadline | 5 ticks after each | a 5-tick deadline | 5 ticks after each | 5 ticks after each |
-| warp cursor animation | two steps a frame | two steps a frame | one step a frame | one step a frame | one step a frame | one step a frame | one step a frame |
-| LOAD scrollbar (12+ checkpoints) | knob from the bar's top | knob from the bar's top | knob from y 0, not clamped | knob from y 0, clamped at the bar's top | knob from y 0, not clamped | knob from the bar's top | knob from the bar's top |
-| LOADMUSIK / DELMUSIK | as listed | as listed | nothing when the first track plays | as listed | nothing when the first track plays; LOADMUSIK only at a current music volume of 5 or more, and all or nothing on its first track | as listed | as listed |
-| StartMusik of the playing track | fade-in re-armed | fade-in re-armed | fade-in re-armed | fade-in re-armed | nothing | fade-in re-armed | fade-in re-armed |
-| credits letters E b d g n t | | | | | one pixel narrower | | |
-| `off1` dialog lines | off1 player (none in the scripts) | off1 player (30 lines) | no such player or line | no such player or line | no such player or line | off1 player (29 lines) | off1 player (30 lines) |
+| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French, German, Spanish and Italian retail CDs (1997) | French retail CD (May 1997) | Traditional and Simplified Chinese CDs (1998, 1999) | DVD (1998) and Perfect Edition | Japanese DVD (1998) |
+|---|---|---|---|---|---|---|---|---|
+| subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows | Arial | 8x8 font, 10-pixel rows (DOS code page texts) | MingLiU / SimSun, 18-pixel rows (Big5 / GBK texts) | Arial, 14-pixel rows (the Dutch and Swedish DVDs' DOS code page texts read as Windows-1252) | MS PGothic, 18-pixel rows (Shift-JIS texts), cut at the spaces and 36 pixels lower; English: the reference's rows |
+| SUBTITLES item | three-click cycle | three-click cycle | plain toggle | plain toggle | plain toggle | three-click cycle, on at start-up | three-click cycle | three states: Japanese, English, none (the chapter's script read again) |
+| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor |
+| Rhea always on camera 2 | yes | no | no | no | no | no | no | no |
+| second death in a section | same narrator line | next line | same line | next line | same line | next line | next line | next line |
+| game-over voice | after the image | after the image | before the image | after the image | before the image | after the image | after the image | after the image |
+| players.atl | 97 bytes | 97 bytes | 95 bytes; names in capitals, 0x20..0x7a | 95 bytes | 95 bytes; names in capitals, 0x20..0x7a | 114 bytes | 97 bytes | 97 bytes |
+| new-player row | `#` marker, label without it | `#` marker, label without it | the label itself | the label itself | the label itself | the label itself | `#` marker, label without it | `#` marker, label without it |
+| hexagon puzzle pieces | always | always | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 | with object 402 in hand or FLAGTEMP6 = 2 |
+| ogre queen reveal | 3 frames of 1 s | 3 frames of 1 s | 5 frames of 0.375 s | 3 frames of 1 s | 5 frames of 0.375 s | 3 frames of 1 s | 3 frames of 1 s | 3 frames of 1 s |
+| rat puzzle pass | 5 ticks after each | 5 ticks after each | a 5-tick deadline | 5 ticks after each | a 5-tick deadline | 5 ticks after each | 5 ticks after each | 5 ticks after each |
+| warp cursor animation | two steps a frame | two steps a frame | one step a frame | one step a frame | one step a frame | one step a frame | one step a frame | one step a frame |
+| LOAD scrollbar (12+ checkpoints) | knob from the bar's top | knob from the bar's top | knob from y 0, not clamped | knob from y 0, clamped at the bar's top | knob from y 0, not clamped | knob from the bar's top | knob from the bar's top | knob from the bar's top |
+| LOADMUSIK / DELMUSIK | as listed | as listed | nothing when the first track plays | as listed | nothing when the first track plays; LOADMUSIK only at a current music volume of 5 or more, and all or nothing on its first track | as listed | as listed | as listed |
+| StartMusik of the playing track | fade-in re-armed | fade-in re-armed | fade-in re-armed | fade-in re-armed | nothing | fade-in re-armed | fade-in re-armed | fade-in re-armed |
+| credits letters E b d g n t | | | | | one pixel narrower | | |  |
+| `off1` dialog lines | off1 player (none in the scripts) | off1 player (30 lines) | no such player or line | no such player or line | no such player or line | off1 player (29 lines) | off1 player (30 lines) | off1 player (64 Japanese lines, 61 English) |
 
 Two rules that the port once kept for the Chinese builds alone now follow
 the original in every build: a menu's sprite record is drawn at the y the
@@ -578,9 +597,9 @@ copy, no start-up CD scan, an immediate exit on closing) concern how the
 original runs on a later system, not the game; the port handles the
 window, the disk and the pace in its own way for every build.
 
-Cryo's DVD-ROM of 1998 holds seven builds of the 1998 program the
-Chinese builds descend from (and an eighth, Japanese, not supported yet):
-every flag above is the Chinese builds' but where those changed it (their
+Cryo's DVD-ROM of 1998 holds eight builds of the 1998 program the
+Chinese builds descend from: every flag above is the Chinese builds' but
+where those changed it (their
 text, menus, LOAD list, captions, players.atl and SUBTITLES at start-up),
 plus each language's own rule: the Italian build's 16-pixel menu zones
 (as the Italian CD, `fix_menu_line_width`), the Swedish build's name
@@ -606,6 +625,27 @@ the port takes them as it takes the CDs' (no disc prompt; the copies'
 trace in the video buffer). Every dialog line's subtitle rows of each
 DVD language were checked against that build's breaker run under
 emulation.
+
+The Japanese build is the Chinese builds' parent: the 1998 program with
+the LOAD list's rows and title drawn from sprites (`EPI1.SPR` /
+`EPI2.SPR`, 74 Japanese chapter names, the Chinese builds' chapter table)
+and the opening film's 13 captions (`SUBINTRO.SPR` over `CINEMA=20`),
+both by the code the Chinese builds kept, at their own addresses; its menus
+and voices are English. Its SUBTITLES button has three states
+(`ExeBuild::subtitle_languages`), kept in the three-click counter:
+Japanese (`CHAPJnnn.CON`), English (`CHAPInnn.CON`, the English DVD's
+texts) and none; each click reads the chapter's script again in the
+language of the new state (the port does it when the in-game menu
+closes, `ScriptHooks::reload_con_text`: nothing reads it meanwhile), the
+menu shows the state's word (`//JAPANESE&&ENGLISH&&NONE`), and a subtitle
+is shown while the state is Japanese or English whatever SUBTITLES is
+(the drawer has no test of its own). Its start-up plays two films the DVD
+does not hold, `\face_b\ubb_vue\logogaga.hnm` and `logospik.hnm` (its
+Japanese publishers' logos), before the Cryo logo: the player's open fails
+and shows the error box "Fichier introuvable : " and the path, which the
+port shows as the original (its own box, OK to close), or skips with
+`fix_startup_logos`. The Japanese scripts lack the two chapters no script
+reaches (10, 86).
 
 In every build the player-name font (FONTMIN) has advances for 101
 glyphs, and the original reads those of the glyphs past them from the
@@ -709,14 +749,13 @@ release holds the result); serve the folder over HTTP (for example
 `python3 -m http.server -d web 8000`), the page asks for the game folder. The engine
 reads the player's files through an asynchronous loader that fetches each
 archive member before it is read, so the browser runs the same game as the
-desktop. The Chinese subtitle fonts (about 0.5 MB each) are not built
-into the web program as they are into the desktop one: `web/build.sh`
-copies them into `web/fonts`, and the page fetches the one a Chinese
-release needs once the release is known, before the game starts, unless
-the picked folder holds the player's own `mingliu.ttc` or `simsun.ttc`
-(its first bytes those of a font), which the engine draws with; the
-other releases never load them (the program is 2.7 MB instead of
-3.7 MB). A browser grants
+desktop. The Chinese and Japanese subtitle fonts (about 0.5 MB and
+0.25 MB) are not built into the web program as they are into the desktop
+one: `web/build.sh` copies them into `web/fonts`, and the page fetches the
+one a Chinese release or the Japanese DVD needs once the release is known,
+before the game starts, unless the picked folder holds the player's own
+`mingliu.ttc`, `simsun.ttc` or `msgothic.ttc` (its first bytes those of a
+font), which the engine draws with; the other releases never load them. A browser grants
 the pointer capture only on a click: until then the view turns with the
 pointer's own motion. Sound starts on the first click. For Cryo's DVD
 (the drive or a copy of a side picked), `start` refuses a DVD of several
@@ -3491,14 +3530,20 @@ installation, for the tests of those builds. Cryo's DVD:
 `ATLANTIS_DVD_A_FILES` / `ATLANTIS_DVD_B_FILES` copies of its sides (the
 folders holding `FACE_A` / `FACE_B`), `ATLANTIS_DVD_A` / `ATLANTIS_DVD_B`
 the images of the sides (`.iso` files), `ATLANTIS_PERFECT_EDITION` the
-Perfect Edition's folder (`atlantis-data/tests/dvd.rs`: every European
-language from the copies and from the images, the tables, the Perfect
-Edition; `atlantis-engine/tests/dvd.rs`: every dialog line's rows against
-each build's breaker under emulation, each language's new game to its
-first dialog, a save and its load from the player screen and the LOAD
-list, the bug fixes listed, the DOS letters; the library's DVD editions in
-`atlantis-app`); with `ATLANTIS_DVD_SHOTS` they write their screens there
-(`dvd-<language folder>-first-dialog.png`, `dvd-<language folder>-load-list.png`,
+Perfect Edition's folder (`atlantis-data/tests/dvd.rs`: every language
+from the copies and from the images, the tables, the Japanese folder's
+files, the Perfect Edition; `atlantis-engine/tests/dvd.rs`: every dialog
+line's rows against each build's breaker under emulation (the Japanese
+build's on its Japanese and English lines), each language's new game to
+its first dialog, a save and its load from the player screen and the LOAD
+list, the bug fixes listed, the DOS letters, the Japanese logos' error
+boxes with and without their fix, its SUBTITLES button and script reloads,
+its sprite LOAD list; `atlantis-engine/tests/japanese_font.rs`: the
+Japanese scripts in the bundled font, and MS PGothic from a
+`msgothic.ttc` in `ATLANTIS_FONTS_DIR` or a Windows' font folder; the
+library's DVD editions in `atlantis-app`); with `ATLANTIS_DVD_SHOTS` they
+write their screens there (`dvd-<language folder>-first-dialog.png`,
+`dvd-<language folder>-load-list.png`, `dvd-JAP-load-list-rows.png`,
 `library-dvd.png`). For Atlantis II,
 `ATLANTIS2_DATA` names the installed folder (`atlantis2.exe`, `wam\`,
 `scenar\`...) and `ATLANTIS2_DISCS` a folder of its four CDs' images (or

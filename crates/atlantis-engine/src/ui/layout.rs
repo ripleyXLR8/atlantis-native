@@ -386,6 +386,17 @@ pub struct MenuRules {
     /// ([`crate::enhancements::BugFix::SubtitlesToggle`]) the step back is
     /// taken only for id 10.
     pub toggle_in_step: bool,
+    /// The Japanese DVD build's three-word SUBTITLES line
+    /// (`ExeBuild::subtitle_languages`): the word of the language counter
+    /// [`MenuRules::subtitle_counter`] (`//JAPANESE&&ENGLISH&&NONE`), not
+    /// of SUBTITLES (atlantis-dvd-ja-696832 FUN_0041f738 @ 0x0041fba5..
+    /// 0x0041fbcb: past one `&&` when the counter is 1 or 2, another when
+    /// it is 2; @ 0x0041fc40..0x0041fca4: the rest of the line skipped at
+    /// the next `&&` when SUBTITLES is 1 or the counter below 2).
+    pub subtitle_languages: bool,
+    /// The language counter of the moment (0x00486098), for
+    /// [`MenuRules::subtitle_languages`].
+    pub subtitle_counter: u8,
 }
 
 /// The reference's walk, without the port's fix.
@@ -397,6 +408,8 @@ impl Default for MenuRules {
             high_bytes_as_space: false,
             toggle_sprites: false,
             toggle_in_step: false,
+            subtitle_languages: false,
+            subtitle_counter: 0,
         }
     }
 }
@@ -423,6 +436,8 @@ impl MenuRules {
             high_bytes_as_space: build.menu_high_bytes_as_space,
             toggle_sprites: build.menu_toggle_sprites,
             toggle_in_step: fixes.get(BugFix::SubtitlesToggle),
+            subtitle_languages: build.subtitle_languages,
+            subtitle_counter: 0,
         }
     }
 }
@@ -548,12 +563,16 @@ pub fn walk_menu_text_in(
         if walk_at(t, p, b"//") {
             // 0x0041ffb7
             p += 2;
-            for k in 0..2 {
+            // The Japanese build's words: one more when the counter is 2.
+            let skips = if rules.subtitle_languages { 3 } else { 2 };
+            for k in 0..skips {
+                let lang = rules.subtitle_counter;
                 let on = menu == 2
-                    && if k == 0 {
-                        line == 3 && toggle_a == 0
-                    } else {
-                        line == 5 && toggle_b == 0
+                    && match (k, rules.subtitle_languages) {
+                        (0, false) => line == 3 && toggle_a == 0,
+                        (0, true) => line == 3 && (lang == 1 || lang == 2),
+                        (1, true) => line == 3 && lang == 2,
+                        _ => line == 5 && toggle_b == 0,
                     };
                 if !on {
                     continue;
@@ -565,9 +584,10 @@ pub fn walk_menu_text_in(
                 p = q + 2;
             }
         }
+        let lang_word = rules.subtitle_languages && rules.subtitle_counter < 2;
         if walk_at(t, p, b"&&")
             && menu == 2
-            && ((line == 3 && toggle_a == 1) || (line == 5 && toggle_b == 1))
+            && ((line == 3 && (toggle_a == 1 || lang_word)) || (line == 5 && toggle_b == 1))
         {
             // 0x0042002d
             p = to_cr(p) + 1;
@@ -1196,6 +1216,54 @@ mod tests {
             [(0x53, x0), (0x53, x0 + s16), (0x41, x0 + 2 * s16)]
         );
         assert_eq!(i32::from(walk.records[0].w), a + 2 * s);
+    }
+
+    /// The options' SUBTITLES word: of SUBTITLES (ON / OFF) in every
+    /// build but the Japanese DVD's, whose word is its language counter's
+    /// (JAPANESE / ENGLISH / NONE, atlantis-dvd-ja-696832 FUN_0041f738 @
+    /// 0x0041fba5..0x0041fcd0), whatever SUBTITLES is.
+    #[test]
+    fn subtitle_language_words() {
+        let word = |text: &[u8], subtitles: i32, rules: MenuRules| -> String {
+            let mut walk = MenuWalk::default();
+            walk_menu_text(text, 2, -1, subtitles, 0, rules, &mut walk);
+            walk.ops
+                .iter()
+                .filter(|o| !o.sprite && o.x >= 416 && o.y == walk.ops[0].y + 200)
+                .map(|o| char::from((o.index + 0x20) as u8))
+                .collect()
+        };
+        let menu = |w: &str| {
+            format!(
+                "<>,50>OPTIONS MENU\r\n<>,200>SOUND OPTIONS\r\n<160,250>SUBTITLES:\r\n\
+                 <416,250>//{w}\r\n<160,300>OMNI 3D:\r\n<350,300>//MODE 2&&MODE 1\r\n\
+                 <>,420>OK\r\n/fin\r\n"
+            )
+            .into_bytes()
+        };
+        let ja = menu("JAPANESE&&ENGLISH&&NONE");
+        let en = menu("ON&&OFF");
+        let rules = |languages: bool, counter: u8| MenuRules {
+            subtitle_languages: languages,
+            subtitle_counter: counter,
+            ..MenuRules::default()
+        };
+        assert_eq!(word(&en, 1, rules(false, 0)), "ON");
+        assert_eq!(word(&en, 0, rules(false, 0)), "OFF");
+        for subtitles in [0, 1] {
+            assert_eq!(word(&ja, subtitles, rules(true, 0)), "JAPANESE");
+            assert_eq!(word(&ja, subtitles, rules(true, 1)), "ENGLISH");
+            assert_eq!(word(&ja, subtitles, rules(true, 2)), "NONE");
+        }
+        // The clicks from the start (SUBTITLES 0, counter 0): ENGLISH,
+        // NONE, JAPANESE, ...
+        let (mut on, mut counter) = (false, 0);
+        let mut words = Vec::new();
+        for _ in 0..4 {
+            subtitle_toggle_click(&mut on, &mut counter, true);
+            words.push(word(&ja, i32::from(on), rules(true, counter)));
+        }
+        assert_eq!(words, ["ENGLISH", "NONE", "JAPANESE", "ENGLISH"]);
     }
 
     /// The Chinese builds' options toggles as sprite records: id 9 +

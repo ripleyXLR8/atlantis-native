@@ -1,7 +1,7 @@
-//! Cryo's DVD-ROM of 1998 and the Perfect Edition's program: each European
-//! language of the DVD opened through its side's folders (a copy of each
-//! side, then the images of the sides), its build, edition and tables; the
-//! Perfect Edition's loose folder.
+//! Cryo's DVD-ROM of 1998 and the Perfect Edition's program: each language
+//! of the DVD opened through its side's folders (a copy of each side, then
+//! the images of the sides), its build, edition and tables; the Japanese
+//! folder's own files; the Perfect Edition's loose folder.
 //!
 //! Needs the DVD: `ATLANTIS_DVD_A_FILES` / `ATLANTIS_DVD_B_FILES` (copies
 //! of side A and side B: the folders holding `FACE_A` / `FACE_B`),
@@ -28,7 +28,7 @@ fn var(name: &str) -> Option<PathBuf> {
 }
 
 /// (folder, build, edition, player row marker, label)
-const EUROPEAN: [(&str, &str, &str, &str, &str); 7] = [
+const EVERY: [(&str, &str, &str, &str, &str); 8] = [
     (
         "ALL",
         "atlantis-dvd-de-695296",
@@ -78,6 +78,13 @@ const EUROPEAN: [(&str, &str, &str, &str, &str); 7] = [
         "#Ny spelare",
         "Ny spelare",
     ),
+    (
+        "JAP",
+        "atlantis-dvd-ja-696832",
+        "DVD, Japanese (1998 build)",
+        "#New Player",
+        "New Player",
+    ),
 ];
 
 fn language(folder: &str) -> &'static DvdLanguage {
@@ -86,7 +93,7 @@ fn language(folder: &str) -> &'static DvdLanguage {
 
 /// Each language of `src` (the disc's root) as the game of its build.
 fn check_languages(src: Arc<dyn FileSource>, sides: &[char]) {
-    for (folder, build, edition, marker, label) in EUROPEAN {
+    for (folder, build, edition, marker, label) in EVERY {
         let l = language(folder);
         if !sides.contains(&l.side) {
             continue;
@@ -112,7 +119,7 @@ fn check_languages(src: Arc<dyn FileSource>, sides: &[char]) {
 }
 
 #[test]
-fn every_european_language_from_copies_of_the_sides() {
+fn every_language_from_copies_of_the_sides() {
     let (Some(a), Some(b)) = (var("ATLANTIS_DVD_A_FILES"), var("ATLANTIS_DVD_B_FILES")) else {
         return;
     };
@@ -133,7 +140,7 @@ fn every_european_language_from_copies_of_the_sides() {
 }
 
 #[test]
-fn every_european_language_from_the_images() {
+fn every_language_from_the_images() {
     let (Some(a), Some(b)) = (var("ATLANTIS_DVD_A"), var("ATLANTIS_DVD_B")) else {
         return;
     };
@@ -179,7 +186,7 @@ fn tables_of_the_dvd_builds() {
         return;
     };
     let reference = common::game("tables_of_the_dvd_builds (against the reference)");
-    for (folder, build, ..) in EUROPEAN {
+    for (folder, build, ..) in EVERY {
         let l = language(folder);
         let root = if l.side == 'A' { &a } else { &b };
         let files = DvdFiles::new(Arc::new(StdDir::new(root)), l).unwrap();
@@ -246,15 +253,31 @@ fn perfect_edition() {
     }
 }
 
-/// The Japanese build is the next part's: not known yet.
+/// The Japanese folder: the Japanese scripts beside the English ones (but
+/// for the two chapters no script reaches), the LOAD list's and the
+/// captions' sprites; not the two logo films its program plays first.
 #[test]
-fn japanese_not_yet() {
+fn the_japanese_folder() {
     let Some(b) = var("ATLANTIS_DVD_B_FILES") else {
         return;
     };
     let files = DvdFiles::new(Arc::new(StdDir::new(b)), language("JAP")).unwrap();
-    assert!(matches!(
-        Game::open(Arc::new(files)),
-        Err(GameError::UnknownExecutable(696_832))
-    ));
+    let g = Game::open(Arc::new(files)).expect("the Japanese DVD");
+    assert_eq!(g.exe.build.name, "atlantis-dvd-ja-696832");
+    let has = |n: &str| g.big.contains(n);
+    for c in [1, 2, 85] {
+        assert!(has(&format!("SCENAR\\CHAPJ{c:03}.CON")), "CHAPJ{c:03}");
+        assert!(has(&format!("SCENAR\\CHAPI{c:03}.CON")), "CHAPI{c:03}");
+    }
+    assert!(!has("SCENAR\\CHAPJ010.CON") && has("SCENAR\\CHAPI010.CON"));
+    for s in ["EPI1.SPR", "EPI2.SPR", "SUBINTRO.SPR"] {
+        assert!(has(&format!("SPRITE\\2D\\{s}")), "{s}");
+    }
+    for name in g.exe.build.startup_logos {
+        assert!(!has(&format!("UBB_VUE\\{name}")), "{name}");
+    }
+    assert_eq!(g.exe.build.startup_logos.len(), 2);
+    // The LOAD list's chapters: the Chinese builds' table.
+    assert_eq!(g.exe.load_chapters.len(), 74);
+    assert_eq!(g.exe.load_chapters[..6], [2, 3, 4, 5, 6, 9]);
 }

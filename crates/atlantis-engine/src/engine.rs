@@ -116,6 +116,11 @@ pub enum Event {
         id: i32,
         result: i32,
     },
+    /// The original's error box was shown (its text).
+    ErrorBox(String),
+    /// The chapter's CON text was read again (its file), for the Japanese
+    /// DVD build's subtitle language.
+    ConTextReloaded(String),
 }
 
 /// Why the place loop ends (`_abortCommand`).
@@ -253,8 +258,14 @@ pub struct Engine {
     /// The options of the menus and the enhancements as the settings file
     /// keeps them.
     pub settings: Settings,
-    /// The SUBTITLES toggle's click counter (0x00496098).
+    /// The SUBTITLES toggle's click counter (0x00496098); in the Japanese
+    /// DVD build the subtitles' language (`ExeBuild::subtitle_languages`).
     pub subtitle_clicks: u8,
+    /// The Japanese DVD build's SUBTITLES button was clicked: the chapter's
+    /// CON text is to be read again in the language of the counter
+    /// (FUN_0041d768 @ 0x0041d833), which the scripts do when the menu
+    /// closes ([`crate::hooks::ScriptHooks::reload_con_text`]).
+    pub con_text_reload: bool,
     /// The sound menu's knobs, kept for the session (0 = the file's).
     pub son_knob_x: [i32; 4],
     /// The menus' record table, one for the session as the original's
@@ -422,6 +433,7 @@ impl Engine {
             epi_text: Vec::new(),
             settings: Settings::default(),
             subtitle_clicks: 0,
+            con_text_reload: false,
             son_knob_x: [0; 4],
             menu_records,
             cinema_captions: None,
@@ -626,6 +638,34 @@ impl Engine {
     /// The Chinese subtitle rows' fix ([`BugFix::ChineseRows`]).
     pub fn chinese_row_fix(&self) -> bool {
         self.enhancements().fix(BugFix::ChineseRows)
+    }
+
+    /// The subtitles' texts are the Japanese ones: the Japanese DVD build
+    /// with its language counter at 0 (`ExeBuild::subtitle_languages`).
+    pub fn japanese_texts(&self) -> bool {
+        self.game.exe.build.subtitle_languages && self.subtitle_clicks == 0
+    }
+
+    /// A dialog line's or a game-over narrator's subtitle is drawn:
+    /// SUBTITLES is set, or in the Japanese DVD build the language counter
+    /// is below 2 (atlantis-dvd-ja-696832's callers @ 0x0042ebf2,
+    /// 0x0042fbfe, 0x0042fea0, 0x004301e0, 0x004264ce test `SUBTITLES == 1
+    /// || counter < 2`, and its drawer FUN_0042f86c has no test of its own;
+    /// the other builds' drawers return when SUBTITLES is 0, FUN_00430178
+    /// @ 0x0043019a).
+    pub fn subtitles_shown(&self) -> bool {
+        self.subtitles || (self.game.exe.build.subtitle_languages && self.subtitle_clicks < 2)
+    }
+
+    /// The subtitle breaker of the moment: the Chinese builds' (with their
+    /// rows' fix as it stands), the Japanese DVD build's rows at the spaces
+    /// while its texts are Japanese; `None`: the reference's.
+    pub fn subtitle_split(&self) -> Option<crate::subtitles::CjkSplit> {
+        let build = self.game.exe.build;
+        if build.subtitle_languages && !self.japanese_texts() {
+            return None;
+        }
+        crate::subtitles::CjkSplit::of_build(build, self.chinese_row_fix())
     }
 
     /// The code page the subtitles are read in: the build's, or with the
@@ -965,6 +1005,21 @@ impl Engine {
     }
 }
 
+/// The text of the error box of a missing start-up logo film `name`
+/// (`ExeBuild::startup_logos`): the error code 0xc's "Fichier
+/// introuvable : " (atlantis-dvd-ja-696832 0x004abfe8, its dialog procedure
+/// 0x00419978 @ 0x00419b59) and the path FUN_00423dcc failed to open
+/// (copied to 0x006bd9c8 @ 0x00423e01): the films' folder of the build's
+/// data (0x004abd28, `\face_b\ubb_vue\`) and the name in lower case
+/// (0x00486a08 `logogaga.hnm`, 0x00486a15 `logospik.hnm`).
+pub fn startup_logo_error_text(build: &atlantis_data::exe::ExeBuild, name: &str) -> String {
+    let folder = build.path_check.map_or("ubb_vue\\", |(_, p)| p);
+    format!(
+        "Fichier introuvable : {folder}{}",
+        name.to_ascii_lowercase()
+    )
+}
+
 /// The game: the start-up videos, the player screen, the player's
 /// checkpoint and the place loop, until the game is quit or ends; the task
 /// the front end runs with a [`crate::sys::Runner`].
@@ -1064,6 +1119,30 @@ impl Engine {
     /// plays LOGORP.HNM after the wait.
     pub async fn play_startup(&mut self) {
         use crate::place::CINEMA_FRAME_MS;
+        // The Japanese DVD build: its publishers' logos first, through
+        // LOGO15N's player (WinMain @ 0x00419713..0x00419772). The disc has
+        // neither film: the player's open fails and it shows its error box
+        // (dialog 0x65, code 0xc, the path as WinMain built it: "" +
+        // "\face_b\ubb_vue\" + the name, FUN_00423dcc @ 0x00423df2..
+        // 0x00423e22), then returns, untested. With the bug fix
+        // (`BugFix::StartupLogos`) a missing film is skipped silently.
+        for name in self.game.exe.build.startup_logos {
+            let path = format!("UBB_VUE\\{name}");
+            if self.game.big.contains(&path) {
+                self.play_transition_video(name, None, CINEMA_FRAME_MS)
+                    .await;
+            } else if !self.enhancements().fix(BugFix::StartupLogos) {
+                log::warn!("{path}: missing, the original's error box");
+                let text = startup_logo_error_text(self.game.exe.build, name);
+                let font = crate::subtitles::SubtitleFont::new();
+                crate::dialog::error_box(self, &font, &text).await;
+            } else {
+                log::info!("{path}: missing, skipped (fix_startup_logos)");
+            }
+            if self.sys.should_quit() {
+                return;
+            }
+        }
         self.play_transition_video("LOGO15N.HNM", None, CINEMA_FRAME_MS)
             .await;
         // The busy wait (0x00419662..0x0041967c, no call) reads no input but

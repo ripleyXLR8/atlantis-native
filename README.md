@@ -149,7 +149,7 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
 | CD, Traditional Chinese release (1998 build, 4 CDs) | Traditional Chinese subtitles and menus, English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
 | CD, Simplified Chinese release (1999 build, 4 CDs) | Simplified Chinese subtitles (Traditional Chinese menus, as shipped), English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
-| Cryo's DVD-ROM (1998 build, one double-sided DVD) | English, French, German, Dutch (side A); Spanish, Italian, Swedish (side B); each language its own edition. The Japanese version (side B) is not supported yet | the DVD drive, a copy of a side (the folder holding `FACE_A` or `FACE_B`), or the images of the sides (`.iso`) in one folder |
+| Cryo's DVD-ROM (1998 build, one double-sided DVD) | English, French, German, Dutch (side A); Spanish, Italian, Swedish, Japanese (side B: Japanese or English subtitles, English menus and voices); each language its own edition | the DVD drive, a copy of a side (the folder holding `FACE_A` or `FACE_B`), or the images of the sides (`.iso`) in one folder |
 | Perfect Edition (Tgames' 2018 package of the DVD's English version) | English | the installation folder |
 
 Each build plays as it shipped: the 1997 English CD, the May 1997
@@ -161,6 +161,13 @@ The DVD's Dutch and Swedish subtitles show, as on the DVD, punctuation
 signs in place of their accented letters (their texts are the CDs', which
 the DVD's program reads as Windows text); a bug fix of the options menu
 shows the letters.
+The DVD's Japanese subtitles are drawn with MS PGothic when you have
+`msgothic.ttc` (in the game folder, or among your system's fonts, as on any
+Japanese Windows), else with the bundled Noto Sans JP; its SUBTITLES
+option switches between Japanese, English and none. The Japanese version
+starts by looking for two logo films the DVD does not hold: as on the DVD,
+two "file not found" boxes show (OK closes them), unless the bug fix of the
+options menu skips them.
 
 How to get the files from your CD or GOG.com: see
 [Getting the game files](docs/GUIDE.md#getting-the-game-files).
@@ -287,10 +294,15 @@ Serif SC Regular (`assets/fonts/NotoSerifTC-Subset.otf`,
 `NotoSerifSC-Subset.otf`, from the notofonts/noto-cjk release
 Serif2.003, Copyright (c) 2017-2024 Adobe), are licensed under the SIL
 Open Font License, version 1.1 (see `assets/fonts/LICENSE-NotoSerifCJK`).
+The Japanese subtitle font, a subset of Noto Sans JP Regular
+(`assets/fonts/NotoSansJP-Subset.otf`, from the notofonts/noto-cjk release
+Sans2.004, Copyright (c) 2014-2021 Adobe), is licensed under the SIL Open
+Font License, version 1.1 (see `assets/fonts/LICENSE-NotoSansJP`).
 Noto is a trademark of Google Inc. The fonts are built into the program
-(the web version fetches the Chinese ones from its `fonts` folder, for a
-Chinese release only); every package carries their licence files,
-`LICENSE-LiberationSans` and `LICENSE-NotoSerifCJK`, beside `LICENSE`.
+(the web version fetches the Chinese and Japanese ones from its `fonts`
+folder, for a Chinese or the Japanese release only); every package carries
+their licence files, `LICENSE-LiberationSans`, `LICENSE-NotoSerifCJK` and
+`LICENSE-NotoSansJP`, beside `LICENSE`.
 
 *Atlantis: The Lost Tales* is a trademark of its owners. This project is not
 affiliated with them.

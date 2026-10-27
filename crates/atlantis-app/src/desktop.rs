@@ -1078,12 +1078,16 @@ mod tests {
             e.label,
             "Atlantis: The Lost Tales, DVD, English (1998 build)"
         );
-        // Every European language opens; the Japanese build is not known.
+        // Every language opens, the Japanese one too.
         for p in dvd_locations(&b) {
-            let opened = open_with_kind(&p);
-            let japanese = p.ends_with("JAP");
-            assert_eq!(opened.is_ok(), !japanese, "{}", p.display());
+            assert!(open_with_kind(&p).is_ok(), "{}", p.display());
         }
+        let e = describe(&b.join("FACE_B").join("JAP"));
+        assert!(e.found, "{}", e.label);
+        assert_eq!(
+            e.label,
+            "Atlantis: The Lost Tales, DVD, Japanese (1998 build)"
+        );
         // The first start's offer: a language met gives its side's.
         let met = vec![(eng.clone(), open_any(&eng).unwrap())];
         let offered: Vec<PathBuf> = with_every_dvd_language(met)

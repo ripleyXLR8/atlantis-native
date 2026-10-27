@@ -57,7 +57,7 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
              CD (1997), the Dutch CD (1997), the Swedish CD (1997), the Spanish CD (1997), \
              the Italian CD (1997), the Chinese CDs (1998, 1999), the CD with Cryo's patch \
              1.01, Cryo's DVD (1998: English, French, German, Dutch, Spanish, Italian, \
-             Swedish), the Perfect Edition, and GOG.com (English, French, German, \
+             Swedish, Japanese), the Perfect Edition, and GOG.com (English, French, German, \
              Spanish, Italian).\n\n\
              You can help support your edition: report it to the project. The report \
              opens on the project's GitHub page, filled in with the files' identifiers \

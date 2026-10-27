@@ -522,6 +522,7 @@ impl BugFix {
             BugFix::ChineseRows => "Chinese: the subtitle rows",
             BugFix::SubtitlesToggle => "Chinese: the SUBTITLES button",
             BugFix::DosLetters => "DVD: the subtitles' accented letters",
+            BugFix::StartupLogos => "Japanese: the two missing logo films",
         }
     }
 
@@ -608,6 +609,11 @@ impl BugFix {
                 "The DVD's Dutch and Swedish subtitles are the CDs'",
                 "texts, but its program reads them as Windows text:",
                 "punctuation signs show in place of ä, å, ö and é.",
+            ],
+            BugFix::StartupLogos => &[
+                "The Japanese program starts with two logo films the",
+                "DVD does not hold: the original shows two \"file not",
+                "found\" boxes before the game. Fixed, none.",
             ],
         }
     }

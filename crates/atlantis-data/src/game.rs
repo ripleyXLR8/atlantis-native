@@ -155,6 +155,9 @@ impl Game {
             Some("Traditional Chinese")
         } else if self.exe.build.text_code_page == TextCodePage::Windows936 {
             Some("Simplified Chinese")
+        } else if self.exe.build.text_code_page == TextCodePage::Windows932 {
+            // The Japanese DVD keeps the English row too.
+            Some("Japanese")
         } else if starts(b"NOUVEAU") {
             Some("French")
         } else if starts(b"NEUE") {

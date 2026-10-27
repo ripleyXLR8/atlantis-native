@@ -63,6 +63,12 @@ pub trait ScriptHooks {
         ready(())
     }
 
+    /// The Japanese DVD build's subtitles changed language in the options:
+    /// the chapter's CON text read again (`Scripts::reload_con_text`).
+    fn reload_con_text<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, ()> {
+        ready(())
+    }
+
     /// Once per warp frame, after the view moved: CON clocks
     /// (@ 0x0041c086) and the timer sections (`FUN_0041bfa0` @ 0x0041c369).
     /// True when a section ran (the engine then re-arms the look, as the

@@ -949,6 +949,30 @@ mod caption_tests {
         assert_eq!(c.present(18800), None);
         assert_eq!(c.frame, 10);
     }
+    /// atlantis-dvd-ja-696832's CINEMA 20 captions (FUN_0041b104 @
+    /// 0x0041b269..0x0041b46c): 13 SUBINTRO frames, 12 steps, nothing up to
+    /// tick 1200 and from 18000.
+    #[test]
+    fn japanese_caption_frames_by_tick() {
+        let spec = atlantis_data::exe::DVD_JA.cinema_captions.unwrap();
+        let mut c = CinemaCaptionState {
+            spec,
+            bank: Vec::new(),
+            frame: 0,
+        };
+        assert_eq!(c.present(1200), None);
+        assert_eq!(c.present(2201), Some(0));
+        assert_eq!(c.frame, 1);
+        // 5800 is a step of its own (the Chinese builds' 5000).
+        assert_eq!(c.present(5000), Some(1));
+        assert_eq!(c.frame, 2);
+        assert_eq!(c.present(5801), Some(2));
+        assert_eq!(c.frame, 3);
+        assert_eq!(c.present(16401), Some(3));
+        assert_eq!(c.frame, 12);
+        assert_eq!(c.present(17999), Some(12));
+        assert_eq!(c.present(18000), None);
+    }
 }
 
 #[cfg(test)]

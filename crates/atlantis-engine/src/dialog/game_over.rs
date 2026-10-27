@@ -28,9 +28,10 @@ pub fn game_over_voice_name(section: i32, letter: char) -> String {
 
 /// Step 3: the subtitle is drawn when SUBTITLES is set, whatever the click
 /// counter 0x00496098 (`FUN_00430178` returns at once otherwise,
-/// 0x0043019a).
-pub fn game_over_subtitle_drawn(subtitles: bool) -> bool {
-    subtitles
+/// 0x0043019a); in the Japanese DVD build also while its language counter
+/// is below 2 (`shown` is [`crate::Engine::subtitles_shown`]).
+pub fn game_over_subtitle_drawn(shown: bool) -> bool {
+    shown
 }
 
 /// Step 1.
