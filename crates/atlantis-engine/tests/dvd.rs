@@ -38,8 +38,9 @@ use md5::{Digest, Md5};
 #[path = "../../atlantis2-engine/src/png.rs"]
 mod png;
 
-/// The golden of the emulated breakers (atlantis-re
-/// `tools/emu/video_subtitles_dvd1998.py`).
+/// The golden of the breakers: each build's FUN_0042f108 (its own address
+/// in the Dutch, Italian and Swedish builds) run unmodified under
+/// emulation on its language's dialog lines (md5s of the rows only).
 const GOLDEN: &str = include_str!("golden/video_subtitles_dvd1998.txt");
 
 /// (language folder, build)

@@ -1214,9 +1214,8 @@ pub const ZH_CN: ExeBuild = ExeBuild {
 /// changed (binaries/atlantis-cd-zh-tw-696832.md Z1..Z13). The five shared
 /// folders are read from `\face_a\` at the disc's root (seven DGROUP
 /// strings, 0x004abbfc..0x004ae404), the others from the language's folder
-/// (the port's `dvd::DvdFiles`). Its tables (located by their readers'
-/// operands, atlantis-re `evidence/compare/dvd1998/tables.txt`) hold the
-/// reference's bytes.
+/// (the port's `dvd::DvdFiles`). Its tables (located by the 32-bit operands
+/// of the instructions that read them) hold the reference's bytes.
 pub const DVD_EN: ExeBuild = ExeBuild {
     name: "atlantis-dvd-en-695296",
     size: 695_296,
