@@ -63,7 +63,7 @@ contains none of them.</sub>
 
 ## Features
 
-- 🖥️ **Windows, macOS (Apple Silicon), Linux and the web**: one engine, the
+- 🖥️ **Windows, macOS (Apple Silicon and Intel), Linux and the web**: one engine, the
   same game everywhere, even in a browser tab.
 - 🎯 **Faithful**: the scripts, dialogs, music, 3D heads and puzzles run the
   original's own logic. The heads are drawn with the original's arithmetic,
@@ -102,6 +102,7 @@ those of the latest commit:
 |---|---|
 | Windows 10 and later, 64-bit | `atlantis-native-windows-x64.zip` |
 | macOS 11 and later, Apple Silicon | `atlantis-native-macos-arm64.dmg` |
+| macOS 11 and later, Intel | `atlantis-native-macos-x64.dmg` |
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
 | Linux 64-bit ARM, such as a Raspberry Pi 4 or 5 (glibc 2.35+, ALSA) | `atlantis-native-linux-arm64.tar.gz` |
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
