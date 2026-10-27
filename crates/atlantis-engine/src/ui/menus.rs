@@ -31,7 +31,6 @@ use super::player_screen::{
 };
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
-use crate::enhancements::BugFix;
 use crate::music::apc_pcm;
 use crate::sys::{Input, Key, MouseButton};
 use crate::video_skip::VideoSkipState;
@@ -203,7 +202,7 @@ impl Engine {
             text,
             number,
             walk: MenuWalk::default(),
-            rules: MenuRules::of_build(self.game.exe.build, &self.enhancements().fixes),
+            rules: self.menu_rules(),
         })
     }
 
@@ -328,7 +327,7 @@ impl Engine {
                 menu.walk(record, 0, 0, self.menu_table());
                 let mut s = bg.clone();
                 self.ui.draw_menu(&mut s, &menu.walk);
-                let sharp_s_as_ss = self.enhancements().fix(BugFix::SharpS);
+                let sharp_s_as_ss = self.sharp_s_as_ss();
                 for j in 0..self.players.count {
                     let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
                     self.ui.draw_font_min(
@@ -351,7 +350,7 @@ impl Engine {
                 }
             }
             // The exit and its commit; players.atl written on record 5.
-            let keep_fifth_name = self.enhancements().fix(BugFix::FifthPlayer);
+            let keep_fifth_name = self.keep_fifth_name();
             let end = player_screen_exit(&mut st, exit, record, &mut self.players, keep_fifth_name);
             if end.write {
                 self.save_players();
@@ -667,7 +666,7 @@ impl Engine {
         let chapters = self.player_checkpoints();
         // The rows, their widths and the title, with the port's `ß` fix
         // (the original draws no glyph for 0xe1 and advances 7).
-        let sharp_s_as_ss = self.enhancements().fix(BugFix::SharpS);
+        let sharp_s_as_ss = self.sharp_s_as_ss();
         let names: Vec<Vec<u8>> = chapters
             .iter()
             .map(|&c| {
@@ -908,7 +907,7 @@ impl Engine {
         }
         .unwrap_or_default();
         // The port's `ß` fix, for consistency (no known CREDITS.TXT holds 0xe1).
-        let text = spell_sharp_s(&text, self.enhancements().fix(BugFix::SharpS));
+        let text = spell_sharp_s(&text, self.sharp_s_as_ss());
         let events = credits_events(&text, &self.game.exe.credit_widths);
         let start = self.sys.millis();
         let mut buffer = vec![0u16; N];

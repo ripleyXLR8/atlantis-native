@@ -12,7 +12,6 @@
 
 use super::{load_spr, load_tga, read_puzzle_file, PuzzleHost, PuzzleSounds, SamplePlayer};
 use crate::engine::Engine;
-use crate::enhancements::BugFix;
 use crate::hooks::ScriptHooks;
 
 pub const MAP_W: i32 = 640;
@@ -718,7 +717,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     // carry over from the last run, as in the original's memory.
     let last = e.puzzles.snakes.unwrap_or_default();
     let mut game = SnakesGame::new(map, last);
-    game.fix_first_run_win = e.enhancements().fix(BugFix::SnakesFirstWin);
+    game.fix_first_run_win = e.snakes_first_run_fix();
     let mut host = Host(PuzzleHost::new(e, hooks));
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;

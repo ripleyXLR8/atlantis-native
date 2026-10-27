@@ -986,6 +986,42 @@ mod tests {
     use super::*;
     use atlantis_data::exe::BUILDS;
 
+    /// The menu walk's rules of every build with each fix alone, then
+    /// every fix but one: the `ß` fix sets `sharp_s_as_ss`, the line
+    /// width's the 22-px zones, the SUBTITLES record's `toggle_in_step`,
+    /// each that field alone; the build's own fields whatever the fixes.
+    #[test]
+    fn menu_rules_follow_their_own_fixes() {
+        use crate::enhancements::{BugFix, BugFixes};
+        for b in BUILDS.iter() {
+            for f in BugFix::ALL {
+                for (fixes, on) in [(BugFixes::only(f), true), (BugFixes::all_but(f), false)] {
+                    let is = |g: BugFix| if g == f { on } else { !on };
+                    let r = MenuRules::of_build(b, &fixes);
+                    let ctx = format!("{} {fixes:?}", b.name);
+                    assert_eq!(r.sharp_s_as_ss, is(BugFix::SharpS), "{ctx}");
+                    let width = if is(BugFix::MenuLineWidth) {
+                        22
+                    } else {
+                        i32::from(b.menu_positioned_byte_width)
+                    };
+                    assert_eq!(r.positioned_byte_width, width, "{ctx}");
+                    assert_eq!(r.toggle_in_step, is(BugFix::SubtitlesToggle), "{ctx}");
+                    assert_eq!(r.high_bytes_as_space, b.menu_high_bytes_as_space);
+                    assert_eq!(r.toggle_sprites, b.menu_toggle_sprites);
+                }
+            }
+        }
+        let it = BUILDS
+            .iter()
+            .find(|b| b.name == "atlantis-cd-it-687104")
+            .unwrap();
+        assert_eq!(
+            MenuRules::of_build(it, &BugFixes::NONE).positioned_byte_width,
+            16
+        );
+    }
+
     /// The three name entry rules: the English 1997 build's, the others',
     /// the Swedish build's letters.
     #[test]

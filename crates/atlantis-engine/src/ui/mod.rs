@@ -14,7 +14,6 @@ pub mod player_screen;
 use atlantis_data::sprite::{limits, read_spr_file, SprSprite};
 
 use crate::engine::Engine;
-use crate::enhancements::BugFix;
 use crate::warp::{SCREEN_H, SCREEN_W};
 use layout::{font_min_blits, FontMin, FontMinAdvances, MenuWalk};
 
@@ -373,7 +372,7 @@ impl Engine {
     /// the Dutch CD's disc 2 holds an older revision of CREDITS.TXT and
     /// FONTMIN / FONTMIN2 (the others carry the same bytes on every disc).
     pub async fn read_from_current_disc(&self, name: &str) -> Option<Vec<u8>> {
-        let disc = (!self.enhancements().fix(BugFix::DiscRevision)).then_some(self.disc);
+        let disc = self.current_disc_copy();
         self.game.big.set_disc_copy(disc);
         let data = self.read(name).await;
         self.game.big.set_disc_copy(None);
@@ -390,7 +389,7 @@ impl Engine {
     /// Read again only when that copy is not the one loaded.
     pub async fn load_fontmin_from_current_disc(&mut self) {
         const FONTMIN: &str = "SPRITE\\2D\\FONTMIN.SPR";
-        let disc = (!self.enhancements().fix(BugFix::DiscRevision)).then_some(self.disc);
+        let disc = self.current_disc_copy();
         self.game.big.set_disc_copy(disc);
         let from = self
             .game

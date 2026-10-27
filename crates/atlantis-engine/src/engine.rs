@@ -542,7 +542,7 @@ impl Engine {
     /// LOAD knob hidden by a visit with 11 checkpoints or fewer comes back
     /// on a later visit with more.
     pub(crate) fn menu_table(&mut self) -> Option<&mut crate::ui::layout::MenuRecordTable> {
-        if self.enhancements().fix(BugFix::MenuRecords) {
+        if self.menus_own_records() {
             return None;
         }
         let n = usize::from(self.game.exe.build.menu_records_per_menu);
@@ -554,6 +554,78 @@ impl Engine {
 
     pub fn set_enhancements(&mut self, x: Enhancements) {
         self.sys.set_enhancements(x);
+    }
+
+    // Each place a bug fix changes reads it through one of these, with the
+    // fixes of the moment (tests/fix_menu.rs sets each fix alone, then
+    // every other, and checks every reading).
+
+    /// The music through the original's streaming ring
+    /// ([`BugFix::MusicLoop`] off), read at each track start.
+    pub fn music_through_ring(&self) -> bool {
+        !self.enhancements().fix(BugFix::MusicLoop)
+    }
+
+    /// The talking heads' SPF overlay drawn ([`BugFix::HeadOverlay`]).
+    pub fn head_overlay_drawn(&self) -> bool {
+        self.enhancements().fix(BugFix::HeadOverlay)
+    }
+
+    /// Frame 0 of a talking head's animation drawn with frame 1's pose
+    /// ([`BugFix::HeadFirstFrame`]).
+    pub fn head_rest_key_fix(&self) -> bool {
+        self.enhancements().fix(BugFix::HeadFirstFrame)
+    }
+
+    /// Each menu with its own click records ([`BugFix::MenuRecords`]).
+    pub fn menus_own_records(&self) -> bool {
+        self.enhancements().fix(BugFix::MenuRecords)
+    }
+
+    /// OK on the fifth player keeps its name ([`BugFix::FifthPlayer`]).
+    pub fn keep_fifth_name(&self) -> bool {
+        self.enhancements().fix(BugFix::FifthPlayer)
+    }
+
+    /// The snakes puzzle won only with every snake released
+    /// ([`BugFix::SnakesFirstWin`]).
+    pub fn snakes_first_run_fix(&self) -> bool {
+        self.enhancements().fix(BugFix::SnakesFirstWin)
+    }
+
+    /// The hexagon puzzle forces OBJETENMAIN to 402 before its test: the
+    /// build's rule, or [`BugFix::HexagonPieces`].
+    pub fn hexa_forces_402(&self) -> bool {
+        self.game.exe.build.hexa_forces_402 || self.enhancements().fix(BugFix::HexagonPieces)
+    }
+
+    /// LOADMUSIK copies its tracks one by one where the build's copies all
+    /// or nothing ([`BugFix::LoadMusik`]).
+    pub fn loadmusik_track_by_track(&self) -> bool {
+        self.enhancements().fix(BugFix::LoadMusik)
+    }
+
+    /// `ß` drawn and measured as two 's' ([`BugFix::SharpS`]).
+    pub fn sharp_s_as_ss(&self) -> bool {
+        self.enhancements().fix(BugFix::SharpS)
+    }
+
+    /// The disc whose copy the reads from the disc in the drive take: the
+    /// current disc, or the first copy (`None`) with
+    /// [`BugFix::DiscRevision`].
+    pub fn current_disc_copy(&self) -> Option<u8> {
+        (!self.enhancements().fix(BugFix::DiscRevision)).then_some(self.disc)
+    }
+
+    /// The menu walk's rules: the build's, with [`BugFix::SharpS`],
+    /// [`BugFix::MenuLineWidth`] and [`BugFix::SubtitlesToggle`].
+    pub fn menu_rules(&self) -> crate::ui::layout::MenuRules {
+        crate::ui::layout::MenuRules::of_build(self.game.exe.build, &self.enhancements().fixes)
+    }
+
+    /// The Chinese subtitle rows' fix ([`BugFix::ChineseRows`]).
+    pub fn chinese_row_fix(&self) -> bool {
+        self.enhancements().fix(BugFix::ChineseRows)
     }
 
     pub fn should_abort(&self) -> bool {

@@ -765,6 +765,16 @@ impl OptionsMenu {
         }
     }
 
+    /// The game's fixes all `on` or all off, the others (which change
+    /// nothing in this game) kept: an edition whose build another edition
+    /// shares stores its choices with it (the French and German GOG
+    /// editions), where they may be listed.
+    fn set_game_fixes(&self, x: &mut BugFixes, on: bool) {
+        for &f in &self.game_fixes {
+            x.set(f, on);
+        }
+    }
+
     fn activate(&mut self, entry: Entry, v: MenuValues) -> MenuAction {
         if !v.enabled(entry) {
             return MenuAction::None;
@@ -792,7 +802,7 @@ impl OptionsMenu {
             // All on, then all off (from a mix of the game's: all on).
             Entry::BugFixes => {
                 let all_on = x.fixes.count_of(&self.game_fixes) == self.game_fixes.len();
-                x.fixes = BugFixes::all(!all_on);
+                self.set_game_fixes(&mut x.fixes, !all_on);
             }
             Entry::ChooseFixes => {
                 self.fixes.open();
@@ -821,8 +831,8 @@ impl OptionsMenu {
     fn activate_fix(&mut self, row: FixRow, v: MenuValues) -> MenuAction {
         let mut x = v.enhancements;
         match row {
-            FixRow::AllOn => x.fixes = BugFixes::ALL,
-            FixRow::AllOff => x.fixes = BugFixes::NONE,
+            FixRow::AllOn => self.set_game_fixes(&mut x.fixes, true),
+            FixRow::AllOff => self.set_game_fixes(&mut x.fixes, false),
             FixRow::Fix(f) => x.fixes.set(f, !x.fixes.get(f)),
             FixRow::Back => {
                 self.fixes.close();
@@ -1157,13 +1167,16 @@ mod tests {
         let MenuAction::SetEnhancements(x) = m.key(Key::Enter, ORIG) else {
             panic!("no change");
         };
+        // Without a game, the fixes of every build listed: those off, the
+        // others (which no game here can show) kept.
         assert_eq!(
             x,
             Enhancements {
-                fixes: BugFixes::NONE,
+                fixes: game_fixes_set(&m, BugFixes::ALL, false),
                 ..DEFAULTS
             }
         );
+        assert_eq!(x.fixes.count(), BugFix::ALL.len() - 8);
         // "Choose the bug fixes...": a button, its box.
         m.key(Key::Down, ORIG);
         assert_eq!(m.selected(), Entry::ChooseFixes);
@@ -1354,6 +1367,15 @@ mod tests {
         m
     }
 
+    /// `from` with the fixes `m` lists all `on` or all off.
+    fn game_fixes_set(m: &OptionsMenu, from: BugFixes, on: bool) -> BugFixes {
+        let mut x = from;
+        for &f in m.game_fixes() {
+            x.set(f, on);
+        }
+        x
+    }
+
     fn set(a: MenuAction) -> BugFixes {
         match a {
             MenuAction::SetEnhancements(x) => x.fixes,
@@ -1362,7 +1384,8 @@ mod tests {
     }
 
     /// "Fix original bugs": On, Off or how many of the game's fixes are
-    /// on; pressed, all on, then all off (from a mix: all on).
+    /// on; pressed, all on, then all off (from a mix: all on), the fixes
+    /// of other builds left as they are.
     #[test]
     fn the_bug_fixes_row_shows_all_none_or_how_many() {
         let m = may_1997();
@@ -1384,14 +1407,19 @@ mod tests {
             assert_eq!(m.selected(), Entry::BugFixes);
             set(m.key(Key::Enter, with_fixes(f)))
         };
-        assert_eq!(press(&mut m, BugFixes::ALL), BugFixes::NONE);
-        assert_eq!(press(&mut m, BugFixes::NONE), BugFixes::ALL);
+        let off = game_fixes_set(&m, BugFixes::ALL, false);
+        assert_eq!(press(&mut m, BugFixes::ALL), off);
+        assert!(off.get(BugFix::SharpS) && !off.get(BugFix::LoadMusik));
+        assert_eq!(off.count(), BugFix::ALL.len() - 10);
+        let on = game_fixes_set(&m, BugFixes::NONE, true);
+        assert_eq!(press(&mut m, BugFixes::NONE), on);
+        assert_eq!(on.count(), 10);
+        assert!(!on.get(BugFix::SharpS) && on.get(BugFix::LoadMusik));
         let mix = BugFixes::all_but(BugFix::HexagonPieces);
         assert_eq!(press(&mut m, mix), BugFixes::ALL);
-        assert_eq!(
-            press(&mut m, BugFixes::all_but(BugFix::SharpS)),
-            BugFixes::NONE
-        );
+        let mut want = off;
+        want.set(BugFix::SharpS, false);
+        assert_eq!(press(&mut m, BugFixes::all_but(BugFix::SharpS)), want);
         // Drawn in the row.
         let font = SubtitleFont::new();
         let mut s = vec![0u16; SCREEN_W * SCREEN_H];
@@ -1413,14 +1441,18 @@ mod tests {
         assert_eq!(m.key(Key::Enter, ORIG), MenuAction::None);
         assert!(m.in_fixes() && m.is_open());
         assert_eq!(m.fix_selected(), FixRow::AllOn);
+        // All on, all off: the game's fixes only.
         assert_eq!(
             set(m.key(Key::Enter, with_fixes(BugFixes::NONE))),
-            BugFixes::ALL
+            game_fixes_set(&m, BugFixes::NONE, true)
         );
         m.key(Key::Down, ORIG);
         assert_eq!(m.fix_selected(), FixRow::AllOff);
         assert_eq!(m.key(Key::Left, ORIG), MenuAction::None, "a button");
-        assert_eq!(set(m.key(Key::Space, ORIG)), BugFixes::NONE);
+        assert_eq!(
+            set(m.key(Key::Space, ORIG)),
+            game_fixes_set(&m, BugFixes::ALL, false)
+        );
         let fixes = m.game_fixes().to_vec();
         assert_eq!(fixes.len(), 10);
         for &f in &fixes {
@@ -1506,12 +1538,25 @@ mod tests {
     fn the_fixes_box_fits_for_every_build() {
         use atlantis_data::exe::BUILDS;
         let font = SubtitleFont::new();
-        let languages = [None, Some("German"), Some("Dutch")];
+        // The data's fixes, one or the other (the patch 1.01's data is the
+        // German or the Dutch CD's, not both).
+        let plain = crate::enhancements::FixData::default();
+        let data = [
+            plain,
+            crate::enhancements::FixData {
+                sharp_s: true,
+                ..plain
+            },
+            crate::enhancements::FixData {
+                disc_revisions: true,
+                ..plain
+            },
+        ];
         for b in BUILDS.iter() {
-            for language in languages {
+            for data in &data {
                 let fixes: Vec<BugFix> = BugFix::ALL
                     .into_iter()
-                    .filter(|f| f.applies(b, language))
+                    .filter(|f| f.applies(b, data))
                     .collect();
                 let mut m = OptionsMenu::new();
                 m.set_game(

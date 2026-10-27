@@ -182,7 +182,7 @@ pub fn draw_bar_frame<'a>(
 
 impl Engine {
     /// The inventory as the bar draws it.
-    fn bar_state(&self) -> BarState<'_> {
+    pub fn bar_state(&self) -> BarState<'_> {
         BarState {
             records: &self.inventory,
             first: self.bar_first,

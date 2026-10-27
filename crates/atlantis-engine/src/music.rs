@@ -23,7 +23,6 @@ use atlantis_codecs::decode_apc;
 use crate::audio::{Mixer, Pcm, Source, VoiceId};
 use crate::con_script::{con_music_apply, con_music_list, con_music_load_all_or_nothing};
 use crate::engine::Engine;
-use crate::enhancements::BugFix;
 use crate::persist::Settings;
 use crate::sys::Sys;
 
@@ -732,7 +731,7 @@ impl Engine {
         // The music loop's fix loops the music seamlessly; off, the
         // original's streaming ring (read at each track start, so the
         // options menu applies from the next track).
-        let voice = if !self.enhancements().fix(BugFix::MusicLoop) {
+        let voice = if self.music_through_ring() {
             let mut ring = MusicRing::wine(Arc::new(data.clone()));
             ring.start()
                 .then(|| mixer.play_source(Box::new(MusicRingSource::new(ring)), 0, 0))
@@ -860,7 +859,7 @@ impl Engine {
         let build = self.game.exe.build;
         let rule = build.music_first_value_rule;
         let current = self.music.track_id;
-        let fixes = self.enhancements().fix(BugFix::LoadMusik);
+        let fixes = self.loadmusik_track_by_track();
         // The volume test (FUN_00429184 @ 0x00429c5e), with or without the
         // LOADMUSIK fix; music_load_min_volume is 0 in every other build.
         // The executor's first-value test (0x00429c52) is also LoadMusik's
@@ -1207,8 +1206,9 @@ mod fr688640_tests {
 
     /// atlantis-cd-fr-688640's LOADMUSIK: nothing below a current music
     /// volume of 5 (FUN_00429184 @ 0x00429c5e), all or nothing on its first
-    /// track (FUN_0041e830); with its fix, one by one, the
-    /// volume test kept.
+    /// track (FUN_0041e830), with every fix off (the original) as with
+    /// every other fix on; with its fix, alone or with the others, one by
+    /// one, the volume test kept.
     #[test]
     fn may_1997_music_copies() {
         let got = Rc::new(RefCell::new(Vec::new()));
@@ -1219,32 +1219,43 @@ mod fr688640_tests {
             move |mut e| async move {
                 assert_eq!(e.game.exe.build.name, "atlantis-cd-fr-688640");
                 e.saves = Rc::new(MemStore::new());
-                let load = async |e: &mut Engine, fixes: bool, cur: u8, cmd: &[u8]| {
-                    e.set_enhancements(if fixes {
-                        Enhancements::only_fix(BugFix::LoadMusik)
-                    } else {
-                        Enhancements::all_but_fix(BugFix::LoadMusik)
-                    });
+                let b = |l: &[u32]| l.iter().fold(0u32, |a, &i| a | 1 << i);
+                let load = async |e: &mut Engine, enh: Enhancements, cur: u8, cmd: &[u8]| {
+                    e.set_enhancements(enh);
                     e.music.with_fade(|f| f.cur = cur);
                     e.music_list_command(true, cmd, 15).await;
                     e.music.on_disk
                 };
                 let mut out = Vec::new();
-                // The volume test: 4 copies nothing, 5 copies the list.
-                out.push(load(&mut e, false, 4, b"/set(loadmusik=3,5)\r\n").await);
-                out.push(load(&mut e, false, 5, b"/set(loadmusik=3,5)\r\n").await);
-                // The first track there: the others are not copied.
-                out.push(load(&mut e, false, 127, b"/set(loadmusik=3,7)\r\n").await);
-                // The first track missing: all copied (3 again).
-                out.push(load(&mut e, false, 127, b"/set(loadmusik=9,3)\r\n").await);
-                // The first track the open one: nothing.
-                e.music.track_id = 11;
-                out.push(load(&mut e, false, 127, b"/set(loadmusik=11,2)\r\n").await);
-                e.music.track_id = 0;
-                // The LOADMUSIK fix alone: the volume test kept (4 copies
-                // nothing), then one by one.
-                out.push(load(&mut e, true, 4, b"/set(loadmusik=3,7)\r\n").await);
-                out.push(load(&mut e, true, 5, b"/set(loadmusik=3,7)\r\n").await);
+                // The original (every fix off), then every fix on but
+                // LOADMUSIK's: the same copies.
+                for enh in [
+                    Enhancements::original(),
+                    Enhancements::all_but_fix(BugFix::LoadMusik),
+                ] {
+                    e.music.on_disk = 0;
+                    // The volume test: 4 copies nothing, 5 copies the list.
+                    out.push(load(&mut e, enh, 4, b"/set(loadmusik=3,5)\r\n").await);
+                    out.push(load(&mut e, enh, 5, b"/set(loadmusik=3,5)\r\n").await);
+                    // The first track there: the others are not copied.
+                    out.push(load(&mut e, enh, 127, b"/set(loadmusik=3,7)\r\n").await);
+                    // The first track missing: all copied (3 again).
+                    out.push(load(&mut e, enh, 127, b"/set(loadmusik=9,3)\r\n").await);
+                    // The first track the open one: nothing.
+                    e.music.track_id = 11;
+                    out.push(load(&mut e, enh, 127, b"/set(loadmusik=11,2)\r\n").await);
+                    e.music.track_id = 0;
+                }
+                // The LOADMUSIK fix alone, then with every other: the
+                // volume test kept (4 copies nothing), then one by one.
+                for enh in [
+                    Enhancements::only_fix(BugFix::LoadMusik),
+                    Enhancements::default(),
+                ] {
+                    e.music.on_disk = b(&[2, 4, 8]);
+                    out.push(load(&mut e, enh, 4, b"/set(loadmusik=3,7)\r\n").await);
+                    out.push(load(&mut e, enh, 5, b"/set(loadmusik=3,7)\r\n").await);
+                }
                 *g2.borrow_mut() = out;
             },
             |_, _| {},
@@ -1253,15 +1264,17 @@ mod fr688640_tests {
             let b = |l: &[u32]| l.iter().fold(0u32, |a, &i| a | 1 << i);
             assert_eq!(
                 *got.borrow(),
-                vec![
-                    0,
-                    b(&[2, 4]),
-                    b(&[2, 4]),
-                    b(&[2, 4, 8]),
-                    b(&[2, 4, 8]),
-                    b(&[2, 4, 8]),
-                    b(&[2, 4, 6, 8])
-                ]
+                [0, 1]
+                    .map(|_| [0, b(&[2, 4]), b(&[2, 4]), b(&[2, 4, 8]), b(&[2, 4, 8]),])
+                    .into_iter()
+                    .flatten()
+                    .chain(
+                        [0, 1]
+                            .map(|_| [b(&[2, 4, 8]), b(&[2, 4, 6, 8])])
+                            .into_iter()
+                            .flatten()
+                    )
+                    .collect::<Vec<u32>>()
             );
         }
     }

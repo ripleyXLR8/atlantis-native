@@ -179,7 +179,9 @@ change an entry; Escape, F10 or O close it. Its entries:
   **Video sides**).
 - **Fix original bugs**: *On* (every fix, the default), *Off* (none: as
   the original), or *Custom (n/N)* when some of the game's fixes are on
-  and some off; Enter turns them all on, then all off.
+  and some off; Enter turns them all on, then all off (the game's fixes
+  only: a switch the edition does not list keeps its value, for another
+  edition that shares its settings).
 - **Choose the bug fixes...**: opens a box of its own, in the same
   style, named after the game played, with *All on*, *All off (as the
   original)*, one switch per fix and *Back*; the foot of the box tells
@@ -223,14 +225,14 @@ change an entry; Escape, F10 or O close it. Its entries:
   - **Music: tracks copied one by one** (the May 1997 French CD): that
     build copies a music list to the disk all or nothing, on its first
     track, where the others copy each missing track.
-  - **German: the sharp s in the LOAD list** (German editions, and the
-    patch 1.01, whatever CD it was installed over): no sprite
-    font of the game has `ß`; the original leaves a gap in the LOAD
-    list's chapter names, the fix draws it as "ss".
-  - **Dutch: the credits and fonts of disc 1** (Dutch CD, and the patch
-    1.01): the original
-    reads the credits and the name fonts from the disc in the drive, and
-    disc 2 holds an older revision.
+  - **German: the sharp s in the LOAD list** (the games whose texts
+    hold `ß`: the German CD, also with the patch 1.01 over it): no
+    sprite font of the game has `ß`; the original leaves a gap in the
+    LOAD list's chapter names, the fix draws it as "ss".
+  - **Dutch: the credits and fonts of disc 1** (the games whose discs
+    hold different copies of them: the Dutch CD, also with the patch
+    1.01 over it): the original reads the credits and the name fonts
+    from the disc in the drive, and disc 2 holds an older revision.
   - **Italian: the whole of OK and Annulla** (Italian CD): the original's
     click areas of the menu lines at a fixed place stop short of the
     drawn word, and the right ends of `OK` and `Annulla` do not answer.

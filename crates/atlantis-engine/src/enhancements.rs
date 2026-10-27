@@ -8,7 +8,8 @@
 //! ScummVM port. Fixes of bugs that crash or block the original game are
 //! not optional and are not listed here.
 
-use atlantis_data::exe::{CjkBreaker, ExeBuild};
+use atlantis_data::exe::{CjkBreaker, ExeBuild, LoadList};
+use atlantis_data::Game;
 
 /// A fix of a minor bug of the original, each one its own switch
 /// ([`BugFixes`]; `settings.ini`'s [`BugFix::key`], the options menu's
@@ -83,15 +84,16 @@ pub enum BugFix {
     /// drawn and measured as two 's'. Off, as the original: glyph 193,
     /// past the fonts' 137 sprites, is not drawn and the pen moves by the
     /// advance table's byte (7 in atlantis-cd-de-687104, FUN_00410430;
-    /// [`crate::ui::layout::spell_sharp_s`]). The German editions, and the
-    /// patch 1.01, whose data is the CD's it was installed over.
+    /// [`crate::ui::layout::spell_sharp_s`]). The games whose texts hold
+    /// `ß` ([`FixData::sharp_s`]): of the known data, the German CD's.
     SharpS,
     /// With the Dutch CD, CREDITS.TXT and the FONTMIN fonts are disc 1's
     /// newest revision whatever the disc. Off, the current disc's copy, as
     /// the original reads them from the disc in the drive: disc 2 holds an
     /// older revision (CREDITS.TXT one line shorter, FONTMIN's `j` and `'`
-    /// hotspots). The Dutch CD, also with the patch 1.01 over it (whose data
-    /// is the CD's it was installed over).
+    /// hotspots). The games whose discs hold different copies of those
+    /// files ([`FixData::disc_revisions`]): of the known data, the Dutch
+    /// CD's.
     DiscRevision,
     /// With the Italian CD, a positioned menu line (`<x,y>`) answers over
     /// 22 px per byte as in every other build, so the whole drawn word
@@ -167,17 +169,16 @@ impl BugFix {
     }
 
     /// Whether the fix changes anything in a game of build `build` whose
-    /// language is `language` (`atlantis_data::Edition::language`): the
-    /// bug is that build's (or every build's). The patch 1.01's language
-    /// is its executable's, French, whatever CD it was installed over: the
-    /// fixes of the German and Dutch data are listed with it.
-    pub fn applies(self, build: &ExeBuild, language: Option<&str>) -> bool {
-        let patch = build.name.starts_with("atlantis-patch");
+    /// data is `data` ([`FixData::of`]): the bug is that build's (or every
+    /// build's), or its data's (the `ß`, the discs' revisions: the patch
+    /// 1.01's data is the CD's it was installed over, whatever its
+    /// executable's language).
+    pub fn applies(self, build: &ExeBuild, data: &FixData) -> bool {
         match self {
             BugFix::HexagonPieces => !build.hexa_forces_402,
             BugFix::LoadMusik => build.music_load_all_or_nothing,
-            BugFix::SharpS => language == Some("German") || patch,
-            BugFix::DiscRevision => language == Some("Dutch") || patch,
+            BugFix::SharpS => data.sharp_s,
+            BugFix::DiscRevision => data.disc_revisions,
             BugFix::MenuLineWidth => build.menu_positioned_byte_width != 22,
             BugFix::ChineseRows => build.cjk_breaker == CjkBreaker::Gb2312,
             BugFix::SubtitlesToggle => build.menu_toggle_sprites,
@@ -199,13 +200,112 @@ impl BugFix {
         )
     }
 
-    /// The fixes that change anything in `game`, in the menu's order.
-    pub fn of_game(game: &atlantis_data::Game) -> Vec<BugFix> {
-        let language = game.edition().language;
+    /// The fixes that change anything in `game`, in the menu's order. It
+    /// reads the members [`FixData::members`] names (the web build fetches
+    /// them first).
+    pub fn of_game(game: &Game) -> Vec<BugFix> {
+        let data = FixData::of(game);
         BugFix::ALL
             .into_iter()
-            .filter(|f| f.applies(game.exe.build, language))
+            .filter(|f| f.applies(game.exe.build, &data))
             .collect()
+    }
+}
+
+/// What of a game's data decides whether some fixes change anything in it
+/// ([`BugFix::applies`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FixData {
+    /// A text the sprite fonts draw holds `ß` (0xe1; [`BugFix::SharpS`]):
+    /// the credits, the menus (`SPRLIST\*.TXT`) but with the builds that
+    /// draw their bytes above 0xa8 as spaces (`menu_high_bytes_as_space`),
+    /// EPI.TXT's chapter names but with the builds whose LOAD list is
+    /// sprites (`LoadList::Sprites`: the Chinese EPI.TXT's double-byte
+    /// characters hold 0xe1). The typed player names cannot (0x20..0xa7).
+    pub sharp_s: bool,
+    /// A member read from the disc in the drive (FONTMIN.SPR,
+    /// FONTMIN2.SPR, and CREDITS.TXT with the builds that read it at each
+    /// run) has a copy on some disc that differs from the first disc's
+    /// ([`BugFix::DiscRevision`]).
+    pub disc_revisions: bool,
+}
+
+/// The members read from the disc in the drive; CREDITS.TXT only with the
+/// builds that read it at each run (`ExeBuild::credits_read_per_run`).
+const CURRENT_DISC_MEMBERS: [&str; 3] = [
+    "SPRITE\\2D\\FONTMIN.SPR",
+    "SPRITE\\2D\\FONTMIN2.SPR",
+    "SPRLIST\\CREDITS.TXT",
+];
+
+impl FixData {
+    /// The members [`FixData::of`] reads: each text of `SPRLIST` (in the
+    /// archives, or unpacked beside them), then each disc's copy of the
+    /// members read from the disc in the drive (the disc whose copy, for
+    /// `BigArchive::set_disc_copy`).
+    pub fn members(game: &Game) -> Vec<(String, Option<u8>)> {
+        let big = &game.big;
+        let is_text = |n: &str| n.to_ascii_uppercase().ends_with(".TXT");
+        let mut texts: Vec<String> = big
+            .names()
+            .filter(|n| n.starts_with("SPRLIST\\") && is_text(n))
+            .map(str::to_string)
+            .collect();
+        for n in big.source().list("SPRLIST") {
+            let name = atlantis_data::big::key(&format!("SPRLIST\\{n}"));
+            if is_text(&name) && !texts.contains(&name) && big.contains(&name) {
+                texts.push(name);
+            }
+        }
+        texts.sort();
+        let mut out: Vec<(String, Option<u8>)> = texts.into_iter().map(|n| (n, None)).collect();
+        let per_run = game.exe.build.credits_read_per_run;
+        for name in CURRENT_DISC_MEMBERS {
+            if name.ends_with("CREDITS.TXT") && !per_run {
+                continue;
+            }
+            for disc in big.discs_of(name) {
+                out.push((name.to_string(), Some(disc)));
+            }
+        }
+        out
+    }
+
+    /// The game's data facts, from its [`FixData::members`].
+    pub fn of(game: &Game) -> FixData {
+        let big = &game.big;
+        let read = |name: &str, disc: Option<u8>| {
+            big.set_disc_copy(disc);
+            let data = big.read(name);
+            big.set_disc_copy(None);
+            data
+        };
+        let build = game.exe.build;
+        let epi_drawn = matches!(build.load_list, LoadList::EpiText);
+        let menus_drawn = !build.menu_high_bytes_as_space;
+        let mut data = FixData::default();
+        let mut firsts: std::collections::HashMap<String, Vec<u8>> = Default::default();
+        for (name, disc) in FixData::members(game) {
+            let Some(bytes) = read(&name, disc) else {
+                continue;
+            };
+            if bytes.contains(&crate::ui::layout::SHARP_S) {
+                data.sharp_s |= match name.as_str() {
+                    "SPRLIST\\CREDITS.TXT" => true,
+                    "SPRLIST\\EPI.TXT" => epi_drawn,
+                    n => n.starts_with("SPRLIST\\") && menus_drawn,
+                };
+            }
+            if disc.is_some() {
+                match firsts.get(&name) {
+                    None => {
+                        firsts.insert(name, bytes);
+                    }
+                    Some(first) => data.disc_revisions |= *first != bytes,
+                }
+            }
+        }
+        data
     }
 }
 
@@ -414,56 +514,60 @@ mod tests {
         );
     }
 
-    /// Which builds each build-specific fix is listed for.
+    /// Which builds each build-specific fix is listed for, and the fixes
+    /// of the data (the German CD's `ß`, the Dutch CD's disc revisions)
+    /// with whatever build.
     #[test]
     fn the_fixes_of_each_build() {
-        let of = |name: &str, language: Option<&str>| -> Vec<BugFix> {
+        let of = |name: &str, data: FixData| -> Vec<BugFix> {
             let b = BUILDS.iter().find(|b| b.name == name).unwrap();
             BugFix::ALL
                 .into_iter()
-                .filter(|f| !f.of_every_build() && f.applies(b, language))
+                .filter(|f| !f.of_every_build() && f.applies(b, &data))
                 .collect()
         };
         use BugFix::*;
+        let plain = FixData::default();
+        let german = FixData {
+            sharp_s: true,
+            ..plain
+        };
+        let dutch = FixData {
+            disc_revisions: true,
+            ..plain
+        };
         for b in BUILDS.iter() {
             for f in BugFix::ALL.into_iter().filter(|f| f.of_every_build()) {
-                assert!(f.applies(b, None), "{f:?} {}", b.name);
+                assert!(f.applies(b, &plain), "{f:?} {}", b.name);
             }
         }
-        assert_eq!(of("atlantis-cd-en-714240", Some("English")), []);
-        assert_eq!(of("atlantis-gog-714752", Some("French")), []);
-        assert_eq!(of("atlantis-gog-714752", Some("German")), [SharpS]);
+        assert_eq!(of("atlantis-cd-en-714240", plain), []);
+        assert_eq!(of("atlantis-gog-714752", plain), []);
+        assert_eq!(of("atlantis-gog-714752", german), [SharpS]);
+        assert_eq!(of("atlantis-patch-fr-714240", plain), []);
+        assert_eq!(of("atlantis-patch-fr-714240", german), [SharpS]);
+        assert_eq!(of("atlantis-patch-fr-714240", dutch), [DiscRevision]);
+        assert_eq!(of("atlantis-cd-en-688128", plain), [HexagonPieces]);
+        assert_eq!(of("atlantis-cd-fr-687104", plain), [HexagonPieces]);
         assert_eq!(
-            of("atlantis-patch-fr-714240", Some("French")),
-            [SharpS, DiscRevision]
-        );
-        assert_eq!(
-            of("atlantis-cd-en-688128", Some("English")),
-            [HexagonPieces]
-        );
-        assert_eq!(of("atlantis-cd-fr-687104", Some("French")), [HexagonPieces]);
-        assert_eq!(
-            of("atlantis-cd-fr-688640", Some("French")),
+            of("atlantis-cd-fr-688640", plain),
             [HexagonPieces, LoadMusik]
         );
+        assert_eq!(of("atlantis-cd-de-687104", german), [HexagonPieces, SharpS]);
         assert_eq!(
-            of("atlantis-cd-de-687104", Some("German")),
-            [HexagonPieces, SharpS]
-        );
-        assert_eq!(
-            of("atlantis-cd-nl-688128", Some("Dutch")),
+            of("atlantis-cd-nl-688128", dutch),
             [HexagonPieces, DiscRevision]
         );
         assert_eq!(
-            of("atlantis-cd-it-687104", Some("Italian")),
+            of("atlantis-cd-it-687104", plain),
             [HexagonPieces, MenuLineWidth]
         );
         assert_eq!(
-            of("atlantis-cd-zh-tw-696832", Some("Traditional Chinese")),
+            of("atlantis-cd-zh-tw-696832", plain),
             [HexagonPieces, SubtitlesToggle]
         );
         assert_eq!(
-            of("atlantis-cd-zh-cn-692736", Some("Simplified Chinese")),
+            of("atlantis-cd-zh-cn-692736", plain),
             [HexagonPieces, ChineseRows, SubtitlesToggle]
         );
     }

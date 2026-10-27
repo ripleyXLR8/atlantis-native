@@ -81,9 +81,12 @@ with three groups, those of the ScummVM port:
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
 The bug fixes, each with its `settings.ini` key; the last seven fix a
-bug of some builds only (`BugFix::applies`: the build's tables and the
-edition's language), and the options menu lists only those of the game
-played (`BugFix::of_game`):
+bug of some games only (`BugFix::applies`: the build's tables, and for
+two of them the game's data, `FixData`), and the options menu lists only
+those of the game played (`BugFix::of_game`; the web build fetches the
+few members `FixData::members` names first). The data decides for the
+patch 1.01 too, whose data is the CD's it was installed over whatever
+its executable's language:
 
 | Fix (`settings.ini` key) | Builds | Where in the code | What it changes |
 |---|---|---|---|
@@ -97,8 +100,8 @@ played (`BugFix::of_game`):
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
 | `fix_hexagon_pieces` | the 1997 and Chinese builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
-| `fix_sharp_s` | German; the patch 1.01 (its data is the CD's it was installed over) | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
-| `fix_disc_revision` | Dutch; the patch 1.01 | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc` | the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)) |
+| `fix_sharp_s` | a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
+| `fix_disc_revision` | some disc's copy of FONTMIN.SPR, FONTMIN2.SPR, or CREDITS.TXT with the builds that read it at each run, differs from disc 1's (`FixData::disc_revisions`): of the known data, the Dutch CD's | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc` | the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)) |
 | `fix_menu_line_width` | Italian (`menu_positioned_byte_width` 16) | `MenuRules::positioned_byte_width` | a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
 | `fix_chinese_rows` | Simplified Chinese (`CjkBreaker::Gb2312`) | `CjkSplit::row_fix` | the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)) |
 | `fix_subtitles_toggle` | Chinese (`menu_toggle_sprites`) | `MenuRules::toggle_in_step` | the options' SUBTITLES toggle record is read in step while SUBTITLES is off (the original reads it one byte out of step, so its click area takes the wrong width and height, see [Game builds](#game-builds)) |
@@ -110,7 +113,15 @@ the original's, the other fixes on or off, and every fix off is the
 original game (the tests run each fix alone where the data shows it:
 `ui/bar.rs`, `ui/menus.rs`, `music.rs`, `tests/dutch_cd.rs`,
 `tests/spanish_italian_cd.rs`, `tests/fix_menu.rs`, which also checks
-which fixes each edition lists).
+which fixes each edition lists). Each place a fix changes reads it
+through one `Engine` method (`music_through_ring`, `head_overlay_drawn`,
+`head_rest_key_fix`, `bar_state`, `menus_own_records`,
+`keep_fifth_name`, `snakes_first_run_fix`, `hexa_forces_402`,
+`loadmusik_track_by_track`, `sharp_s_as_ss`, `current_disc_copy`,
+`menu_rules`, `chinese_row_fix`): `tests/fix_menu.rs` sets each fix
+alone, then every fix but one, and checks that every reading follows its
+own fix only, and `ui/layout.rs` does the same for `MenuRules::of_build`
+with every build.
 
 Atlantis II has its own `Enhancements` (`crates/atlantis2-engine/src/enhancements.rs`):
 `ui_ux`, on by default, holds the conveniences the original lacks (the
@@ -142,7 +153,9 @@ only. Otherwise they are read from
 `settings.ini` (see [Players, checkpoints and settings](GUIDE.md#players-checkpoints-and-settings)),
 which the first start writes with the defaults; the options menu (F10)
 turns them on and off: Fix original bugs (On, Off, or Custom (n/N) over
-the game's fixes; Enter turns them all on, then all off), Choose the
+the game's fixes; Enter turns them all on, then all off, the switches
+the game does not list kept: `settings.ini` is per build, and the French
+and German GOG.com editions share one), Choose the
 bug fixes... (a second box drawn by the same `MenuBox` with its own
 `BoxLayout`, the game named in its title: All on, All off (as the
 original), one On/Off row per fix of the game's build, Back, and below

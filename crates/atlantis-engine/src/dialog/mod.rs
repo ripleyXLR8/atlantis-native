@@ -33,7 +33,6 @@ use atlantis_data::SprSprite;
 use crate::audio::VoiceId;
 use crate::con_script::script::latin1_bytes;
 use crate::engine::{Engine, Event};
-use crate::enhancements::BugFix;
 use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;
 use crate::music::apc_pcm;
@@ -247,7 +246,7 @@ impl Dialogs {
     /// with the Chinese rows' fix of the moment
     /// ([`crate::enhancements::BugFix::ChineseRows`]).
     async fn subtitler(&mut self, e: &Engine) -> Subtitler {
-        let fix = e.enhancements().fix(BugFix::ChineseRows);
+        let fix = e.chinese_row_fix();
         if let Some(s) = &self.subtitler {
             return s.clone().with_row_fix(fix);
         }
@@ -496,7 +495,7 @@ impl Dialogs {
                 if let Some(h) = head.as_mut() {
                     // The rest pose of some head animations at frame 0
                     // (an original bug, fixed as an enhancement).
-                    h.set_rest_key_fix(e.enhancements().fix(BugFix::HeadFirstFrame));
+                    h.set_rest_key_fix(e.head_rest_key_fix());
                 }
                 if head.is_none() {
                     // A head file is missing (lines without a .SYC never get
@@ -1201,7 +1200,7 @@ impl LinePlayer {
             // @ 0x0042f57e) then overwrites, so it is never seen; drawn over
             // the head with its fix (BugFix::HeadOverlay). The modulo loops the SPF
             // when the UBB outlives it (every shipped pair has 31 frames).
-            if let (Some(spf), true) = (&self.spf, e.enhancements().fix(BugFix::HeadOverlay)) {
+            if let (Some(spf), true) = (&self.spf, e.head_overlay_drawn()) {
                 let k = if self.spf_count > 0 {
                     self.spf_frame % self.spf_count
                 } else {

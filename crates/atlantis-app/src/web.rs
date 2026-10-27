@@ -74,6 +74,20 @@ impl FileSource for WebFiles {
         let prefix = key(name) + "/";
         self.sizes.keys().any(|k| k.starts_with(&prefix))
     }
+
+    /// The files of folder `dir` (lower case).
+    fn list(&self, dir: &str) -> Vec<String> {
+        let prefix = match key(dir) {
+            d if d.is_empty() => d,
+            d => d + "/",
+        };
+        self.sizes
+            .keys()
+            .filter_map(|k| k.strip_prefix(&prefix))
+            .filter(|n| !n.contains('/'))
+            .map(str::to_string)
+            .collect()
+    }
 }
 
 async fn fetch(file: &File, offset: u64, len: u64) -> Result<Vec<u8>, JsValue> {
@@ -353,6 +367,24 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
             Err(e) => log::warn!("{url}: {e:?}"),
         }
     }
+    // The members that decide which bug fixes the options menu lists
+    // (`FixData`: the texts' `ß`, the discs' revisions), kept.
+    for (name, disc) in atlantis_engine::FixData::members(&game) {
+        game.big.set_disc_copy(disc);
+        let at = game.big.locate(&name);
+        game.big.set_disc_copy(None);
+        let Some((file, offset, size)) = at else {
+            continue;
+        };
+        let Some(f) = by_key.get(&key(&file)) else {
+            continue;
+        };
+        match fetch(f, offset, size as u64).await {
+            Ok(bytes) => add(&file, offset, bytes),
+            Err(e) => log::warn!("{name}: {e:?}"),
+        }
+    }
+    let fixes = atlantis_engine::BugFix::of_game(&game);
     let saves: Rc<dyn SaveStore> = match WebStore::new(game.exe.build.name) {
         Some(store) => Rc::new(store),
         None => {
@@ -369,7 +401,6 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
     };
     let edition = game.edition();
     log::info!("{edition}, {}", crate::version_string());
-    let fixes = atlantis_engine::BugFix::of_game(&game);
     let (sys, runner) = start_game(game, options);
     let el = EventLoop::new().map_err(|e| e.to_string())?;
     el.spawn_app(

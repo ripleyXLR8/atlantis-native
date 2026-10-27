@@ -11,11 +11,14 @@ use atlantis_data::disc_image::DiscSet;
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::hd::{rgb565_to_888, HdCompositor, HdFrame, HdOptions, HdText};
+use atlantis_engine::hooks::DirectLoader;
 use atlantis_engine::options_menu::{MenuValues, OptionsMenu};
 use atlantis_engine::subtitles::SubtitleFont;
 use atlantis_engine::sys::{Key, Runner, Sys};
 use atlantis_engine::warp::{hd_size, SCREEN_H, SCREEN_W};
-use atlantis_engine::{BugFix, Enhancements, Event, Graphics, Options, Start};
+use atlantis_engine::{
+    BugFix, BugFixes, Engine, Enhancements, Event, FixData, Graphics, Options, Start,
+};
 
 use BugFix::*;
 
@@ -36,15 +39,12 @@ fn game(var: &str) -> Option<Game> {
 }
 
 /// Each data set's build-specific fixes (the fixes of every build come
-/// first in every list).
-const SETS: [(&str, &str, &[BugFix]); 11] = [
+/// first in every list). The patch 1.01's data set is installed over the
+/// English CD: neither the German `ß` nor the Dutch discs' revisions.
+const SETS: [(&str, &str, &[BugFix]); 15] = [
     ("ATLANTIS_DATA", "atlantis-cd-en-714240", &[]),
     ("ATLANTIS_GOG_FR", "atlantis-gog-714752", &[]),
-    (
-        "ATLANTIS_DATA_PATCH101",
-        "atlantis-patch-fr-714240",
-        &[SharpS, DiscRevision],
-    ),
+    ("ATLANTIS_DATA_PATCH101", "atlantis-patch-fr-714240", &[]),
     (
         "ATLANTIS_DATA_1997",
         "atlantis-cd-en-688128",
@@ -66,9 +66,29 @@ const SETS: [(&str, &str, &[BugFix]); 11] = [
         &[HexagonPieces, SharpS],
     ),
     (
+        "ATLANTIS_ISO_DE",
+        "atlantis-cd-de-687104",
+        &[HexagonPieces, SharpS],
+    ),
+    (
         "ATLANTIS_DATA_NL1997",
         "atlantis-cd-nl-688128",
         &[HexagonPieces, DiscRevision],
+    ),
+    (
+        "ATLANTIS_BIN_NL",
+        "atlantis-cd-nl-688128",
+        &[HexagonPieces, DiscRevision],
+    ),
+    (
+        "ATLANTIS_DATA_SV1997",
+        "atlantis-cd-sv-688128",
+        &[HexagonPieces],
+    ),
+    (
+        "ATLANTIS_DATA_ES1997",
+        "atlantis-cd-es-687104",
+        &[HexagonPieces],
     ),
     (
         "ATLANTIS_DATA_IT1997",
@@ -100,6 +120,71 @@ fn the_fixes_of_each_game() {
         let mut want = every.clone();
         want.extend_from_slice(own);
         assert_eq!(BugFix::of_game(&g), want, "{var}");
+        // The data's own: the `ß` of the German texts, the revisions of
+        // the Dutch discs.
+        let data = FixData::of(&g);
+        assert_eq!(data.sharp_s, own.contains(&SharpS), "{var}");
+        assert_eq!(data.disc_revisions, own.contains(&DiscRevision), "{var}");
+        let members = FixData::members(&g);
+        assert!(
+            members
+                .iter()
+                .any(|(n, d)| n == "SPRLIST\\EPI.TXT" && d.is_none()),
+            "{var}: {members:?}"
+        );
+    }
+}
+
+/// Each place a fix changes reads that fix and no other: with every fix
+/// alone, then every fix but one, each of the engine's readings follows
+/// its own fix only (the 1997 English build, whose hexagon puzzle has the
+/// fix to read, and the Italian build, whose menu line width has).
+#[test]
+fn each_place_reads_its_own_fix() {
+    for var in ["ATLANTIS_DATA_1997", "ATLANTIS_DATA_IT1997"] {
+        let Some(g) = game(var) else { continue };
+        let build = g.exe.build;
+        let sys = Sys::new(Mixer::new());
+        let mut e = Engine::new(sys, g, Rc::new(DirectLoader));
+        e.disc = 3;
+        let mut cases = vec![BugFixes::NONE, BugFixes::ALL];
+        for f in BugFix::ALL {
+            cases.extend([BugFixes::only(f), BugFixes::all_but(f)]);
+        }
+        for fixes in cases {
+            e.set_enhancements(Enhancements {
+                fixes,
+                ..Enhancements::default()
+            });
+            // Whether fix `g` is on in this case.
+            let is = |g: BugFix| fixes.get(g);
+            let ctx = format!("{var} {fixes:?}");
+            assert_eq!(e.music_through_ring(), !is(MusicLoop), "{ctx}");
+            assert_eq!(e.head_overlay_drawn(), is(HeadOverlay), "{ctx}");
+            assert_eq!(e.head_rest_key_fix(), is(HeadFirstFrame), "{ctx}");
+            let bar = e.bar_state();
+            assert_eq!(bar.slide_out_fix, is(BarSlideOut), "{ctx}");
+            assert_eq!(bar.pickup_fix, is(PickupIcon), "{ctx}");
+            assert_eq!(e.menus_own_records(), is(MenuRecords), "{ctx}");
+            assert_eq!(e.keep_fifth_name(), is(FifthPlayer), "{ctx}");
+            assert_eq!(e.snakes_first_run_fix(), is(SnakesFirstWin), "{ctx}");
+            assert!(!build.hexa_forces_402);
+            assert_eq!(e.hexa_forces_402(), is(HexagonPieces), "{ctx}");
+            assert_eq!(e.loadmusik_track_by_track(), is(LoadMusik), "{ctx}");
+            assert_eq!(e.sharp_s_as_ss(), is(SharpS), "{ctx}");
+            let disc = (!is(DiscRevision)).then_some(3);
+            assert_eq!(e.current_disc_copy(), disc, "{ctx}");
+            let rules = e.menu_rules();
+            assert_eq!(rules.sharp_s_as_ss, is(SharpS), "{ctx}");
+            let width = if is(MenuLineWidth) {
+                22
+            } else {
+                i32::from(build.menu_positioned_byte_width)
+            };
+            assert_eq!(rules.positioned_byte_width, width, "{ctx}");
+            assert_eq!(rules.toggle_in_step, is(SubtitlesToggle), "{ctx}");
+            assert_eq!(e.chinese_row_fix(), is(ChineseRows), "{ctx}");
+        }
     }
 }
 
