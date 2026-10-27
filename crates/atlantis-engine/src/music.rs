@@ -10,7 +10,7 @@
 //! per engine step for every 5 ms elapsed, whatever loop the engine is in.
 //!
 //! The tracks play either looped cleanly (the default, as ScummVM with its
-//! minor bug fixes) or through the original's streaming ring
+//! minor bug fixes; `BugFix::MusicLoop`) or through the original's streaming ring
 //! ([`MusicRing`]), whose stale fragments are heard where the sound
 //! driver's play position runs ahead of the refills.
 
@@ -23,6 +23,7 @@ use atlantis_codecs::decode_apc;
 use crate::audio::{Mixer, Pcm, Source, VoiceId};
 use crate::con_script::{con_music_apply, con_music_list, con_music_load_all_or_nothing};
 use crate::engine::Engine;
+use crate::enhancements::BugFix;
 use crate::persist::Settings;
 use crate::sys::Sys;
 
@@ -728,10 +729,10 @@ impl Engine {
             return;
         };
         let mixer = self.music.mixer();
-        // The minor bug fixes loop the music seamlessly; off, the original's
-        // streaming ring (read at each track start, so the options menu
-        // applies from the next track).
-        let voice = if !self.enhancements().minor_bug_fixes {
+        // The music loop's fix loops the music seamlessly; off, the
+        // original's streaming ring (read at each track start, so the
+        // options menu applies from the next track).
+        let voice = if !self.enhancements().fix(BugFix::MusicLoop) {
             let mut ring = MusicRing::wine(Arc::new(data.clone()));
             ring.start()
                 .then(|| mixer.play_source(Box::new(MusicRingSource::new(ring)), 0, 0))
@@ -839,7 +840,7 @@ impl Engine {
     ///
     /// atlantis-cd-fr-688640 has its own LOADMUSIK (decision of the port:
     /// the build's rules by default, the per-track copy of the other builds
-    /// with the minor bug fixes, so that a list whose first track is there
+    /// with the LOADMUSIK fix (`BugFix::LoadMusik`), so that a list whose first track is there
     /// leaves no other listed track uncopied):
     /// - it runs only when the current music volume 0x00485e71 is 5 or more
     ///   (FUN_00429184 @ 0x00429c5e), so with the music volume option below
@@ -847,7 +848,7 @@ impl Engine {
     /// - its LoadMusik copies all or nothing on the first listed track
     ///   (FUN_0041e830, [`con_music_load_all_or_nothing`]).
     ///
-    /// With the minor bug fixes only the copy changes: the tracks are
+    /// With that fix only the copy changes: the tracks are
     /// copied one by one as atlantis-cd-en-688128 does (the first-value
     /// rule of that build kept), and the volume test stays the build's.
     /// Playback reads the archive in either case (the copies are modelled
@@ -859,9 +860,9 @@ impl Engine {
         let build = self.game.exe.build;
         let rule = build.music_first_value_rule;
         let current = self.music.track_id;
-        let fixes = self.enhancements().minor_bug_fixes;
+        let fixes = self.enhancements().fix(BugFix::LoadMusik);
         // The volume test (FUN_00429184 @ 0x00429c5e), with or without the
-        // minor bug fixes; music_load_min_volume is 0 in every other build.
+        // LOADMUSIK fix; music_load_min_volume is 0 in every other build.
         // The executor's first-value test (0x00429c52) is also LoadMusik's
         // own (0x0041e862..0x0041e891).
         let copies = if load && self.music.fade().cur < build.music_load_min_volume {
@@ -1200,13 +1201,13 @@ mod on_disk_tests {
 #[cfg(test)]
 mod fr688640_tests {
     use super::*;
-    use crate::enhancements::Enhancements;
+    use crate::enhancements::{BugFix, Enhancements};
     use crate::persist::MemStore;
     use crate::test_support::with_engine_in;
 
     /// atlantis-cd-fr-688640's LOADMUSIK: nothing below a current music
     /// volume of 5 (FUN_00429184 @ 0x00429c5e), all or nothing on its first
-    /// track (FUN_0041e830); with the minor bug fixes, one by one, the
+    /// track (FUN_0041e830); with its fix, one by one, the
     /// volume test kept.
     #[test]
     fn may_1997_music_copies() {
@@ -1219,9 +1220,10 @@ mod fr688640_tests {
                 assert_eq!(e.game.exe.build.name, "atlantis-cd-fr-688640");
                 e.saves = Rc::new(MemStore::new());
                 let load = async |e: &mut Engine, fixes: bool, cur: u8, cmd: &[u8]| {
-                    e.set_enhancements(Enhancements {
-                        minor_bug_fixes: fixes,
-                        ..Enhancements::default()
+                    e.set_enhancements(if fixes {
+                        Enhancements::only_fix(BugFix::LoadMusik)
+                    } else {
+                        Enhancements::all_but_fix(BugFix::LoadMusik)
                     });
                     e.music.with_fade(|f| f.cur = cur);
                     e.music_list_command(true, cmd, 15).await;
@@ -1239,7 +1241,7 @@ mod fr688640_tests {
                 e.music.track_id = 11;
                 out.push(load(&mut e, false, 127, b"/set(loadmusik=11,2)\r\n").await);
                 e.music.track_id = 0;
-                // The minor bug fixes: the volume test kept (4 copies
+                // The LOADMUSIK fix alone: the volume test kept (4 copies
                 // nothing), then one by one.
                 out.push(load(&mut e, true, 4, b"/set(loadmusik=3,7)\r\n").await);
                 out.push(load(&mut e, true, 5, b"/set(loadmusik=3,7)\r\n").await);

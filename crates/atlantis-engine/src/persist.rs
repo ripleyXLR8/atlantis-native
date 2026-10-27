@@ -9,7 +9,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
-use crate::enhancements::Enhancements;
+use crate::enhancements::{BugFix, Enhancements};
 use crate::hd::{HdOptions, PanoFilter, VideoSides};
 
 /// A flat folder of named files (names compared without regard to case).
@@ -223,8 +223,14 @@ impl Default for Settings {
 
 impl Settings {
     /// `key = value` lines; unknown keys and bad values keep the default.
+    /// One key per bug fix ([`BugFix::key`]); `minor_bug_fixes`, which
+    /// earlier versions wrote for all of them, sets every fix whose own key
+    /// is absent.
     pub fn parse(text: &str) -> Settings {
         let mut s = Settings::default();
+        // `minor_bug_fixes`, and the fixes whose own key was read.
+        let mut all_fixes = None;
+        let mut read = Vec::new();
         for line in text.lines() {
             let line = line.trim();
             if line.starts_with('#') || line.starts_with(';') {
@@ -239,6 +245,16 @@ impl Settings {
                 "0" | "false" | "off" | "no" => Some(false),
                 _ => None,
             };
+            if let Some(f) = BugFix::ALL.into_iter().find(|f| f.key() == k) {
+                match b {
+                    Some(b) => {
+                        s.enhancements.fixes.set(f, b);
+                        read.push(f);
+                    }
+                    None => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
+                }
+                continue;
+            }
             if k == "graphics" {
                 match Graphics::from_name(v) {
                     Some(g) => s.graphics = g,
@@ -276,7 +292,7 @@ impl Settings {
                 ("volume_music", _, Some(n)) => s.volumes[1] = n,
                 ("volume_effects", _, Some(n)) => s.volumes[2] = n,
                 ("volume_voices", _, Some(n)) => s.volumes[3] = n,
-                ("minor_bug_fixes", Some(b), _) => s.enhancements.minor_bug_fixes = b,
+                ("minor_bug_fixes", Some(b), _) => all_fixes = Some(b),
                 ("restored_content", Some(b), _) => s.enhancements.restored_content = b,
                 ("ui_ux", Some(b), _) => s.enhancements.ui_ux = b,
                 ("hd_sharpen", Some(b), _) => s.hd.sharpen = b,
@@ -286,6 +302,11 @@ impl Settings {
                     s.hd.video_sides = VideoSides::from_name(v).unwrap_or_default();
                 }
                 _ => log::warn!("{SETTINGS_FILE}: '{line}' not understood"),
+            }
+        }
+        if let Some(on) = all_fixes {
+            for f in BugFix::ALL.into_iter().filter(|f| !read.contains(f)) {
+                s.enhancements.fixes.set(f, on);
             }
         }
         s
@@ -303,7 +324,19 @@ impl Settings {
              volume_effects = {}\n\
              volume_voices = {}\n\
              # Enhancements: where the port may differ from the original game\n\
-             minor_bug_fixes = {}\n\
+             # Bug fixes (off: as the original; options menu, F10, \"Choose the\n\
+             # bug fixes...\"): the music loops seamlessly; the talking heads'\n\
+             # overlay (the guards' coif, the pilot's scarf); the lower face's\n\
+             # first frame; no icons left as the inventory bar slides out; a\n\
+             # picked-up object's icon in its slot; each menu its own click\n\
+             # areas; OK on the fifth player; the snakes puzzle's false first\n\
+             # win; and those of some builds: the hexagon puzzle's pieces (1997\n\
+             # and Chinese builds), LOADMUSIK track by track (French May 1997),\n\
+             # the sharp s (German), credits and fonts of disc 1 (Dutch), OK and\n\
+             # Annulla clicks (Italian), the subtitle rows (Simplified Chinese),\n\
+             # the SUBTITLES record (Chinese)\n\
+             {}\n\
+             # Content the original never shows, interface changes\n\
              restored_content = {}\n\
              ui_ux = {}\n\
              # The music tracks LoadMusik copied (hexadecimal bit set)\n\
@@ -326,7 +359,11 @@ impl Settings {
             self.volumes[1],
             self.volumes[2],
             self.volumes[3],
-            b(self.enhancements.minor_bug_fixes),
+            BugFix::ALL
+                .iter()
+                .map(|&f| format!("{} = {}", f.key(), b(self.enhancements.fixes.get(f))))
+                .collect::<Vec<_>>()
+                .join("\n"),
             b(self.enhancements.restored_content),
             b(self.enhancements.ui_ux),
             self.music_on_disk,
@@ -409,5 +446,45 @@ mod tests {
         s.save(&m);
         assert_eq!(Settings::load(&m), Some(s));
         assert_eq!(m.list(), vec![SETTINGS_FILE.to_string()]);
+    }
+
+    /// One key per bug fix, each read and written alone; the earlier
+    /// versions' `minor_bug_fixes` sets every fix without its own key.
+    #[test]
+    fn one_key_per_fix_and_the_old_key_for_the_others() {
+        use crate::enhancements::BugFixes;
+        for f in BugFix::ALL {
+            for on in [false, true] {
+                let mut s = Settings::default();
+                s.enhancements.fixes = BugFixes::all(!on);
+                s.enhancements.fixes.set(f, on);
+                let text = s.to_text();
+                assert!(text.contains(&format!(
+                    "\n{} = {}\n",
+                    f.key(),
+                    if on { "on" } else { "off" }
+                )));
+                assert!(!text.contains("minor_bug_fixes"));
+                assert_eq!(Settings::parse(&text), s);
+            }
+            // That key alone: that fix alone changed.
+            let p = Settings::parse(&format!("{} = off", f.key()));
+            assert_eq!(p.enhancements.fixes, BugFixes::all_but(f));
+            let p = Settings::parse(&format!("minor_bug_fixes = off\n{} = 1", f.key()));
+            assert_eq!(p.enhancements.fixes, BugFixes::only(f));
+            let p = Settings::parse(&format!("{} = no\nminor_bug_fixes = on", f.key()));
+            assert_eq!(p.enhancements.fixes, BugFixes::all_but(f));
+        }
+        // An earlier version's file: its one key for every fix.
+        let p = Settings::parse("minor_bug_fixes = off\nrestored_content = on");
+        assert_eq!(p.enhancements.fixes, BugFixes::NONE);
+        assert!(p.enhancements.restored_content);
+        assert_eq!(
+            Settings::parse("minor_bug_fixes = on").enhancements.fixes,
+            BugFixes::ALL
+        );
+        // A bad value keeps the default.
+        let p = Settings::parse("fix_music_loop = maybe");
+        assert_eq!(p.enhancements.fixes, BugFixes::ALL);
     }
 }

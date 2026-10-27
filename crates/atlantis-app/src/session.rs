@@ -277,7 +277,14 @@ impl App {
         let edition = game.edition();
         log::info!("{edition}, {}", crate::version_string());
         let icon = game.icon.clone();
-        self.install_game(start_game(game, options), graphics, saves, &edition, icon);
+        let fixes = atlantis_engine::BugFix::of_game(&game);
+        self.install_game(
+            start_game(game, options),
+            graphics,
+            saves,
+            (&edition, fixes),
+            icon,
+        );
         if force_wide {
             self.force_widescreen();
         }

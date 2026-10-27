@@ -1272,10 +1272,10 @@ fn engine_leaves_part2b() {
 }
 
 /// The original wins a first run when piece 0 is carried to (0, 0) (the
-/// snakes not yet released hold the zeroed memory); the minor bug fixes
-/// require every snake released.
+/// snakes not yet released hold the zeroed memory); the snakes' fix
+/// (`BugFix::SnakesFirstWin`) requires every snake released.
 #[test]
-fn snakes_first_run_win_fixed_by_minor_bug_fixes() {
+fn snakes_first_run_win_fixed_by_its_fix() {
     let map = vec![0u8; 640 * 480];
     let mut g = SnakesGame::new(map.clone(), Default::default());
     g.place(g.pieces[0].x, g.pieces[0].y);

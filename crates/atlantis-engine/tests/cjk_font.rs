@@ -60,7 +60,7 @@ fn game_with_font(var: &str, name: &str) -> Option<(Game, std::path::PathBuf)> {
 
 /// Every character the scripts' bytes read as (their pairs from the start
 /// of the file, and those of every subtitle row the build's breaker cuts
-/// from a dialog line, with and without the minor bug fixes: a row can
+/// from a dialog line, with and without the Chinese rows' fix: a row can
 /// start on a character's second byte) has a glyph in the bundled font,
 /// but those of the code page's user-defined area (private use), which no
 /// font has.

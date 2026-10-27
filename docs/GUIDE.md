@@ -166,6 +166,92 @@ page also has a **Full screen** button at its top right.
 In the panoramic view, the arrow keys turn (← →) and tilt (↑ ↓) the view,
 as the original's F5 / F6 and F7 / F8 do.
 
+## The options menu
+
+F10 (or O, for a keyboard without function keys; not while a game menu
+takes letters) opens the port's options menu, in the desktop and the web
+builds; the game waits while it is open. Arrows and Enter (or the mouse)
+change an entry; Escape, F10 or O close it. Its entries:
+
+- **Graphics**: *Original* or *HD* (see [HD mode](TECHNICAL.md#hd-mode)),
+  and with HD on its picture options (**Panorama filter**, **Panorama
+  sharpening**, **Interface**, **Sharp subtitles**, **Widescreen**,
+  **Video sides**).
+- **Fix original bugs**: *On* (every fix, the default), *Off* (none: as
+  the original), or *Custom (n/N)* when some of the game's fixes are on
+  and some off; Enter turns them all on, then all off.
+- **Choose the bug fixes...**: opens a box of its own, in the same
+  style, named after the game played, with *All on*, *All off (as the
+  original)*, one switch per fix and *Back*; the foot of the box tells
+  what the original does without the fix selected and where a player
+  notices it. Arrows, Enter or a click change a fix; Escape (or a click
+  outside the box) goes back to the options, F10 or O closes everything.
+  The box lists only the fixes of the edition played. Those of every
+  edition:
+  - **Music: seamless loops**: the original streams the music through a
+    ring its refills do not always keep ahead of, and stale fragments of
+    sound are heard in it.
+  - **Faces: the guards' coif, the pilot's scarf**: the original draws
+    the overlay of these talking heads where the next copy of the
+    picture erases it, so it is never seen.
+  - **Faces: the lower face's first frame**: on the first frame of each
+    loop of some talking heads (Meljanz, Actyon, Servage, the Queen,
+    Gimbas) the original draws the 3D lower face away from the face.
+  - **Inventory: icons left as the bar hides**: with the inventory bar
+    scrolled, the original leaves rows of icons at the bottom of the
+    screen as the bar slides away.
+  - **Inventory: a new object's icon**: after a pick-up the original
+    draws the new object's icon 7 pixels left of its slot until the bar
+    next slides in.
+  - **Menus: each its own click areas**: the original keeps one table of
+    the menus' click areas for the whole session: the LOAD list's
+    scrollbar knob, once hidden by a visit with 11 checkpoints or fewer,
+    stays hidden, and on the May 1997 English and French CDs the ARE YOU
+    SURE ? prompt loses its left ornament after the sound options.
+  - **Players: OK on the fifth player**: with five players, OK on the
+    fifth empties its name in the original, and that player can no
+    longer be chosen.
+  - **Snakes puzzle: the false first win**: on a first visit to the four
+    snakes puzzle, the original takes the first piece carried to the
+    screen's top left corner for the solution.
+
+  Those of some editions:
+  - **Hexagon puzzle: its pieces always there** (the 1997 and Chinese
+    CDs): those builds place the hexagon puzzle's pieces only when the
+    player comes holding the right object; the later builds always place
+    them.
+  - **Music: tracks copied one by one** (the May 1997 French CD): that
+    build copies a music list to the disk all or nothing, on its first
+    track, where the others copy each missing track.
+  - **German: the sharp s in the LOAD list** (German editions, and the
+    patch 1.01, whatever CD it was installed over): no sprite
+    font of the game has `ß`; the original leaves a gap in the LOAD
+    list's chapter names, the fix draws it as "ss".
+  - **Dutch: the credits and fonts of disc 1** (Dutch CD, and the patch
+    1.01): the original
+    reads the credits and the name fonts from the disc in the drive, and
+    disc 2 holds an older revision.
+  - **Italian: the whole of OK and Annulla** (Italian CD): the original's
+    click areas of the menu lines at a fixed place stop short of the
+    drawn word, and the right ends of `OK` and `Annulla` do not answer.
+  - **Chinese: the subtitle rows** (Simplified Chinese CD): the original
+    may start a subtitle row in the middle of a character (after an
+    ideographic space or a mark), and that row's characters come out
+    wrong (72 rows in 50 lines).
+  - **Chinese: the SUBTITLES button** (Chinese CDs): with SUBTITLES off
+    the original reads that button's record one byte out of step, and its
+    click area takes a wrong width and height.
+- **Restored content** (off by default) and **Modern UI/UX** (off by
+  default): see [Enhancements](TECHNICAL.md#enhancements).
+- **Buy me a coffee...**, **Close** and, on the desktop, **Game
+  library...**.
+
+The choices are kept at once in `settings.ini` (see [Players,
+checkpoints and settings](#players-checkpoints-and-settings)), one line
+per fix. `--original` turns every fix and the other enhancements off for
+that run only: a change in the menu during such a run writes only what
+it changed.
+
 ## Atlantis II
 
 Atlantis II plays from its start to its end (Tibet, Ireland, China,
@@ -226,7 +312,8 @@ slot of the current player (99 each) and loads any of them.
 
 ### Options and the HD mode
 
-F10 (or O) opens the port's options menu, the same as the first game's:
+F10 (or O) opens the port's options menu, the same as the
+[first game's](#the-options-menu):
 arrows and Enter (or the mouse) change an entry, Escape, F10 or O close
 it. Its entries:
 
@@ -397,7 +484,14 @@ The same folder holds `settings.ini`: the options of the game's menus
 (subtitles, OMNI 3D mode, the master, music, effects and voices volumes,
 which the original also keeps in each checkpoint and sets again when one
 is loaded) and the [enhancements](TECHNICAL.md#enhancements), one `name = on|off` line
-each. It also keeps `music_on_disk`, the music tracks the original game
+each: one per bug fix (`fix_music_loop`, `fix_head_overlay`,
+`fix_head_first_frame`, `fix_bar_slide_out`, `fix_pickup_icon`,
+`fix_menu_records`, `fix_fifth_player`, `fix_snakes_first_win`,
+`fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
+`fix_disc_revision`, `fix_menu_line_width`, `fix_chinese_rows`,
+`fix_subtitles_toggle`), `restored_content` and `ui_ux`. A
+`settings.ini` written by an earlier version, with its single
+`minor_bug_fixes` line, is still read: that line sets every fix. It also keeps `music_on_disk`, the music tracks the original game
 would have copied to its folder (it reads them from the archives here),
 so that this set outlives the session as the original's copies do,
 `graphics = original|hd`, the graphics mode of the options menu (F10;
@@ -460,8 +554,10 @@ picked folder on its first start.
   ornament, and on every CD the LOAD list's scrollbar knob, hidden while
   11 checkpoints or fewer were listed, stays hidden); with five players,
   OK on the fifth starts it with its name (the original empties that
-  name, and the nameless player can no longer be chosen).
-  `--original` turns them off.
+  name, and the nameless player can no longer be chosen); and the
+  others of [the options menu](#the-options-menu). Each can be turned
+  off alone in the options menu's "Choose the bug fixes...";
+  `--original` turns them all off.
 - On the Traditional Chinese CD, the one subtitle with no punctuation
   mark in its first 75 bytes (a game-over narration) is cut at 75 bytes;
   what the original does with it is not known.
@@ -472,7 +568,7 @@ picked folder on its first start.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).
 - F10 (or O, for a keyboard without function keys; not while a game menu
-  takes letters) opens the port's options menu; the [HD mode](TECHNICAL.md#hd-mode) it offers is
+  takes letters) opens the port's [options menu](#the-options-menu); the [HD mode](TECHNICAL.md#hd-mode) it offers is
   off by default.
 
 ## The icon

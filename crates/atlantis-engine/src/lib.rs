@@ -37,7 +37,7 @@ pub mod warp;
 
 pub use dialog::Dialogs;
 pub use engine::{run, Abort, Engine, Event, Options, Start};
-pub use enhancements::Enhancements;
+pub use enhancements::{BugFix, BugFixes, Enhancements};
 pub use hooks::{Departure, DirectLoader, Loader, NoScripts, ScriptHooks};
 pub use persist::{Graphics, MemStore, SaveStore, Settings};
 pub use scripts::{DialogPresenter, NoDialog, Scripts};

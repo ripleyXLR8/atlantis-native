@@ -19,7 +19,7 @@ use atlantis_data::saves::Players;
 use atlantis_data::{Game, StdDir, TextCodePage};
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::checkpoint::PLAYERS_FILE;
-use atlantis_engine::enhancements::Enhancements;
+use atlantis_engine::enhancements::{BugFix, Enhancements};
 use atlantis_engine::hooks::DirectLoader;
 use atlantis_engine::subtitles::{split_subtitle_1997, split_subtitle_1997_back, BitmapFont};
 use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
@@ -302,8 +302,8 @@ fn with_engine(g: Game, f: impl AsyncFnOnce(&mut Engine) + 'static) {
 }
 
 /// CREDITS.TXT and the FONTMIN fonts are read from the current disc (each
-/// Swedish disc carries a copy), or disc 1's with the minor bug fixes: the
-/// same bytes either way.
+/// Swedish disc carries a copy), or disc 1's with the disc revision's fix
+/// (alone): the same bytes either way.
 #[test]
 fn current_disc_copies_both_ways() {
     let Some(g) = game("current_disc_copies_both_ways") else {
@@ -315,9 +315,11 @@ fn current_disc_copies_both_ways() {
     with_engine(g, async move |e: &mut Engine| {
         let j = usize::from(b'j' - 0x20);
         for (fixes, disc) in [(false, 1), (false, 2), (true, 2), (false, 3), (false, 4)] {
-            let mut enh = Enhancements::original();
-            enh.minor_bug_fixes = fixes;
-            e.sys.set_enhancements(enh);
+            e.sys.set_enhancements(if fixes {
+                Enhancements::only_fix(BugFix::DiscRevision)
+            } else {
+                Enhancements::original()
+            });
             e.disc = disc;
             let credits = e
                 .read_from_current_disc("SPRLIST\\CREDITS.TXT")

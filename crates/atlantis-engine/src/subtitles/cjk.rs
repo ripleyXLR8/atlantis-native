@@ -39,9 +39,10 @@ pub struct CjkSplit {
     pub breaker: CjkBreaker,
     /// The texts' code page, for the character boundaries of the port's
     /// own cut (a window without a mark, see [`cjk_subtitle_rows`]) and of
-    /// the minor bug fixes.
+    /// the rows' fix.
     pub code_page: TextCodePage,
-    /// The minor bug fixes, in the Simplified build: after an ideographic
+    /// The rows' fix ([`crate::enhancements::BugFix::ChineseRows`]), in
+    /// the Simplified build: after an ideographic
     /// space the next row starts two bytes on, past the whole space,
     /// instead of on its second byte (27 of the 72 shipped rows out of
     /// step); and the breaker reads a mark only at a character boundary,
@@ -50,23 +51,23 @@ pub struct CjkSplit {
     /// lead byte of `　`, A3 A1, read as `！`: the other 45). Every row
     /// then decodes. No change in the Traditional build, whose shipped
     /// rows all decode.
-    pub minor_bug_fixes: bool,
+    pub row_fix: bool,
 }
 
 impl CjkSplit {
     /// The breaker of `build`, `None` for the builds that cut at spaces.
-    pub fn of_build(build: &ExeBuild, minor_bug_fixes: bool) -> Option<CjkSplit> {
+    pub fn of_build(build: &ExeBuild, row_fix: bool) -> Option<CjkSplit> {
         (build.cjk_breaker != CjkBreaker::None).then_some(CjkSplit {
             breaker: build.cjk_breaker,
             code_page: build.text_code_page,
-            minor_bug_fixes,
+            row_fix,
         })
     }
 
     /// Whether the breaker reads its marks at character boundaries only
-    /// (the minor bug fixes in the Simplified build).
+    /// (the rows' fix in the Simplified build).
     fn at_boundaries(self) -> bool {
-        self.minor_bug_fixes && self.breaker == CjkBreaker::Gb2312
+        self.row_fix && self.breaker == CjkBreaker::Gb2312
     }
 
     /// Whether the scan stops at the pair (`lead`, `trail`): a punctuation
@@ -107,9 +108,9 @@ impl CjkSplit {
                 // atlantis-cd-zh-cn-692736 @ 0x0042f5da..0x0042f5ef: A1 A1,
                 // the row ends before it (add -1) and the next starts one
                 // byte past its lead byte (skip 1), on its trail byte: that
-                // row reads its pairs one byte out of step. With the minor
-                // bug fixes, two bytes on, as after the other marks.
-                (0xa1, 0xa1) => (-1, if self.minor_bug_fixes { 2 } else { 1 }),
+                // row reads its pairs one byte out of step. With the rows'
+                // fix, two bytes on, as after the other marks.
+                (0xa1, 0xa1) => (-1, if self.row_fix { 2 } else { 1 }),
                 // @ 0x0042f58b..0x0042f5d3: add 1 after A3 AC, A1 A3, A3 BF,
                 // A3 A1; skip 2.
                 (0xa3, 0xac) | (0xa1, 0xa3) | (0xa3, 0xbf) | (0xa3, 0xa1) => (1, 2),
@@ -149,7 +150,7 @@ impl CjkSplit {
 /// ended there; it does the same for any scan that finds no cut within
 /// 75 bytes.
 ///
-/// With the minor bug fixes, in the Simplified build only, a pair is a
+/// With the rows' fix, in the Simplified build only, a pair is a
 /// mark only when its first byte starts a character (counted from the
 /// row's start `s`, the lead bytes taking two bytes): the scan passes over
 /// a pair across two characters (zh-cn @ 0x0042f4ed..0x0042f568: the trail
@@ -189,7 +190,7 @@ pub fn cjk_subtitle_rows(text: &[u8], split: CjkSplit) -> Vec<Range<usize>> {
         s..(s + n.max(0) as usize).min(len)
     };
     // Whether `pos` starts a character, counted from the row's start `s`
-    // (the lead bytes taking two bytes), for the minor bug fixes; any byte
+    // (the lead bytes taking two bytes), for the rows' fix; any byte
     // otherwise.
     let starts = |s: isize, pos: isize| -> bool {
         if !split.at_boundaries() {
@@ -374,13 +375,13 @@ mod tests {
         ];
         for (text, want) in cases {
             assert_eq!(rows(&text, &ZH_TW, false), want, "{text:02x?}");
-            // No change with the minor bug fixes.
+            // No change with the rows' fix.
             assert_eq!(rows(&text, &ZH_TW, true), want);
         }
     }
 
     /// atlantis-cd-zh-cn-692736 FUN_0042f424 under emulation, as above;
-    /// with the minor bug fixes, the same function with the skip after an
+    /// with the rows' fix, the same function with the skip after an
     /// ideographic space patched from 1 to 2 (@ 0x0042f5ef) and the pairs
     /// read by the scan (@ 0x0042f510) and by the checks (@ 0x0042f599)
     /// cleared when their first byte does not start a character, counted
@@ -390,7 +391,7 @@ mod tests {
         use P::*;
         let t = |p: &[P]| text(TEN_GB, p);
         let space = b"\xa1\xa1";
-        // The text, its rows, its rows with the minor bug fixes.
+        // The text, its rows, its rows with the rows' fix.
         type Case = (Vec<u8>, Vec<Range<usize>>, Vec<Range<usize>>);
         let cases: Vec<Case> = vec![
             // 短句。
@@ -479,7 +480,7 @@ mod tests {
         }
     }
 
-    /// With the minor bug fixes, a Simplified later window without a mark:
+    /// With the rows' fix, a Simplified later window without a mark:
     /// the last cut lies before the row's start, so the scan finds none
     /// and the port cuts at the last character boundary within 75 bytes
     /// (the original gives empty rows, as in the Traditional build).
@@ -524,7 +525,7 @@ mod tests {
     }
 
     /// The dialog presenter's subtitler breaks the lines of a Chinese
-    /// build with it, the minor bug fixes as they stand at the line.
+    /// build with it, the rows' fix as it stands at the line.
     #[test]
     fn subtitler_uses_it() {
         use crate::subtitles::{SubtitleFont, Subtitler};
@@ -542,9 +543,9 @@ mod tests {
         let s = Subtitler::Gdi(font.clone(), CjkSplit::of_build(&ZH_CN, false));
         let lens = |s: &Subtitler| s.split(&t).iter().map(Vec::len).collect::<Vec<_>>();
         assert_eq!(lens(&s), [60, 63, 20]);
-        assert_eq!(lens(&s.clone().with_minor_bug_fixes(true)), [60, 62, 20]);
+        assert_eq!(lens(&s.clone().with_row_fix(true)), [60, 62, 20]);
         // The other builds: the 100-byte window cut at a space.
-        let s = Subtitler::Gdi(font.clone(), None).with_minor_bug_fixes(true);
+        let s = Subtitler::Gdi(font.clone(), None).with_row_fix(true);
         assert_eq!(s.split(&t), crate::subtitles::split_subtitle(&t));
 
         // A final blank: 72 bytes, `。`, a space. The Chinese breaker counts

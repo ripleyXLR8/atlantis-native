@@ -334,7 +334,7 @@ pub struct PlayerScreenExitResult {
 /// ([`Players::store_in_last_row`]). With five players and the fifth
 /// selected, the original's OK runs that commit with an empty typed name
 /// and empties the fifth name (the player then stays listed with no name,
-/// unselectable); with `keep_fifth_name` (the minor bug fixes) the name is
+/// unselectable); with `keep_fifth_name` (`BugFix::FifthPlayer`) the name is
 /// kept.
 pub fn player_screen_exit(
     st: &mut PlayerScreenState,

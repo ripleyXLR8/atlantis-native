@@ -71,13 +71,46 @@ replay the original's runs through, pass by pass (`throne.rs`,
 ### Enhancements
 
 Where the port may differ from the original by choice, `Options` holds an
-`Enhancements` setting with three groups, those of the ScummVM port:
+`Enhancements` setting (`crates/atlantis-engine/src/enhancements.rs`)
+with three groups, those of the ScummVM port:
 
 | Group | Default | What it changes |
 |---|---|---|
-| `minor_bug_fixes` | on | the music loops seamlessly (the original's streaming ring has audible seams); the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it); the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose); with the 1997 builds, the hexagon puzzle always shows its pieces, as the later builds do; with the May 1997 French build, LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)); with the German CD, the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts; with the Dutch CD, the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)); with the Italian CD, a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)); with the Simplified Chinese CD, the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)); with the Chinese CDs, the options' SUBTITLES toggle record is read in step while SUBTITLES is off (the original reads it one byte out of step, so its click area takes the wrong width and height, see [Game builds](#game-builds)); each menu keeps its own click records, from zero at every visit (the original keeps one record table for the whole session, with 16 records per menu in the May 1997 English and French builds and 20 in the others: in those two builds the sound menu's last two records spill over the ARE YOU SURE ? menu's and move its left ornament off screen for the session, and in every build the LOAD scrollbar's knob, hidden by a visit with 11 checkpoints or fewer, stays hidden on the later visits); with five players, OK on the fifth starts it with its name (the original runs the commit of a typed name, empty, over the fifth name: that player stays listed with no name and cannot be chosen) |
+| `fixes` (`BugFixes`) | all on | the fixes of minor bugs of the original, each its own switch (`BugFix`, below) |
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
+
+The bug fixes, each with its `settings.ini` key; the last seven fix a
+bug of some builds only (`BugFix::applies`: the build's tables and the
+edition's language), and the options menu lists only those of the game
+played (`BugFix::of_game`):
+
+| Fix (`settings.ini` key) | Builds | Where in the code | What it changes |
+|---|---|---|---|
+| `fix_music_loop` | all | `Engine::music_play_track` | the music loops seamlessly (the original's streaming ring has audible seams; read at each track start) |
+| `fix_head_overlay` | all | `dialog/mod.rs`, the SPF overlay | the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it) |
+| `fix_head_first_frame` | all | `DialogHead::set_rest_key_fix` | the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose) |
+| `fix_bar_slide_out` | all | `ui::bar::slide_out_record_drawn` | the inventory bar's slide-out draws no icon once the slots are at y 506 (the original reads the y of a record from 9 on past its 9-entry slot table, so a scrolled bar leaves 1 to 4 rows of those icons at the bottom of the screen) |
+| `fix_pickup_icon` | all | `ui::bar::slot_x` | after a pick-up the new object's icon is drawn in its slot (the original draws it 7 pixels left, in the hold loop and the slide-out, until the next slide-in) |
+| `fix_menu_records` | all | `Engine::menu_table` | each menu keeps its own click records, from zero at every visit (the original keeps one record table for the whole session, with 16 records per menu in the May 1997 English and French builds and 20 in the others: in those two builds the sound menu's last two records spill over the ARE YOU SURE ? menu's and move its left ornament off screen for the session, and in every build the LOAD scrollbar's knob, hidden by a visit with 11 checkpoints or fewer, stays hidden on the later visits) |
+| `fix_fifth_player` | all | `ui::player_screen::player_screen_exit` | with five players, OK on the fifth starts it with its name (the original runs the commit of a typed name, empty, over the fifth name: that player stays listed with no name and cannot be chosen) |
+| `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
+| `fix_hexagon_pieces` | the 1997 and Chinese builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
+| `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
+| `fix_sharp_s` | German; the patch 1.01 (its data is the CD's it was installed over) | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
+| `fix_disc_revision` | Dutch; the patch 1.01 | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc` | the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)) |
+| `fix_menu_line_width` | Italian (`menu_positioned_byte_width` 16) | `MenuRules::positioned_byte_width` | a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
+| `fix_chinese_rows` | Simplified Chinese (`CjkBreaker::Gb2312`) | `CjkSplit::row_fix` | the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)) |
+| `fix_subtitles_toggle` | Chinese (`menu_toggle_sprites`) | `MenuRules::toggle_in_step` | the options' SUBTITLES toggle record is read in step while SUBTITLES is off (the original reads it one byte out of step, so its click area takes the wrong width and height, see [Game builds](#game-builds)) |
+
+These are every use of the single `minor_bug_fixes` switch the port had
+before (still read from `settings.ini`: it sets every fix whose own key
+is absent). Each gates its own behaviour only: off, that behaviour is
+the original's, the other fixes on or off, and every fix off is the
+original game (the tests run each fix alone where the data shows it:
+`ui/bar.rs`, `ui/menus.rs`, `music.rs`, `tests/dutch_cd.rs`,
+`tests/spanish_italian_cd.rs`, `tests/fix_menu.rs`, which also checks
+which fixes each edition lists).
 
 Atlantis II has its own `Enhancements` (`crates/atlantis2-engine/src/enhancements.rs`):
 `ui_ux`, on by default, holds the conveniences the original lacks (the
@@ -104,10 +137,22 @@ off there too. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
 `--widescreen` turn on; see the HD mode item of
 [Atlantis II](#atlantis-ii-in-progress).
 
-`--original` turns all three off. Otherwise they are read from
+`--original` turns every fix and the two other groups off, for the run
+only. Otherwise they are read from
 `settings.ini` (see [Players, checkpoints and settings](GUIDE.md#players-checkpoints-and-settings)),
 which the first start writes with the defaults; the options menu (F10)
-turns them on and off.
+turns them on and off: Fix original bugs (On, Off, or Custom (n/N) over
+the game's fixes; Enter turns them all on, then all off), Choose the
+bug fixes... (a second box drawn by the same `MenuBox` with its own
+`BoxLayout`, the game named in its title: All on, All off (as the
+original), one On/Off row per fix of the game's build, Back, and below
+them what the original does without the selected fix; its rows are 20
+pixels high instead of 24 when the build has too many fixes for 24 on
+the 640 x 480 screen; Escape or a click outside goes back to the
+options, F10 or O closes the menu), Restored content, Modern UI/UX. A
+change in the menu writes only the switches it changed
+(`Enhancements::with_changes`), so that a run's `--original` does not
+overwrite the stored choices. The web build has the same menu.
 
 ### HD mode
 
@@ -312,16 +357,16 @@ or before an ideographic space `　`, the next row then starting on the
 space's second byte, so that row's characters are read one byte out of
 step (72 rows of the shipped texts). The port does the same, row for row
 (the tests compare every dialog line with the original functions run
-under emulation); with the minor bug fixes, the Simplified build's row
+under emulation); with the rows' fix (`fix_chinese_rows`), the Simplified build's row
 after an ideographic space starts after the whole space (27 of those
 rows), and its marks are only read where a character starts, so that no
 mark is read across two characters (`。　` read as `！`: the other 45
 rows); then every row starts and ends between two characters (the tests
 compare every line with the original function run with those two
 changes). The original's arithmetic is kept as it is: after the first
-row the checks read one byte past the mark (with the minor bug fixes, in
+row the checks read one byte past the mark (with the rows' fix, in
 the Simplified build, only when that byte starts a character), and a
-later window without a mark gives empty rows (with the minor bug fixes,
+later window without a mark gives empty rows (with the rows' fix,
 in the Simplified build, the port's cut below). A first window without a mark sends the
 original's scan back past the start of its buffer (one Traditional
 line, CHAPI084's game-over narration, 80 bytes): what it then does is
@@ -380,7 +425,7 @@ texts hold the umlauts at the DOS code page's places, where the sprite
 fonts have their glyphs. Those fonts have no `ß`: the three LOAD-list
 names that spell it (`verläßt` twice, `Außerhalb`) show a gap of 7
 pixels in its place in the original, and two `s` in the port with the
-minor bug fixes (see [Enhancements](#enhancements)).
+`ß` fix (`fix_sharp_s`, see [Enhancements](#enhancements)).
 
 The Spanish retail CD's build (August 1997) is the August 1997 French
 build's code but for one line, the reference's: the rat puzzle's search
@@ -400,7 +445,7 @@ as a space (no Italian menu has one). The zones fall short of the drawn
 words (the zone of `OK` ends 11 pixels before the end of its `K`, that
 of `Annulla` 18 pixels before its end), so the right end of those
 buttons neither highlights nor takes a click; the port does the
-same, and with the minor bug fixes gives them the 22 pixels of every
+same, and with its fix (`fix_menu_line_width`) gives them the 22 pixels of every
 other build (see [Enhancements](#enhancements)). Its new-player row
 reads `Nuovo Giocatore`, which moves its credits font table one byte up
 from the French build's.
@@ -496,7 +541,7 @@ EPI.TXT's typos, `Musiek`, CREDITS.TXT one line shorter,
 PREINTRO.TGA without the R&P and Cryo logos, FONTMIN fonts with other
 `j` and `'` hotspots). So
 while disc 2 is in use, its CREDITS.TXT and FONTMIN show, as in the
-original; with the minor bug fixes, disc 1's, the newest, whatever the
+original; with its fix (`fix_disc_revision`), disc 1's, the newest, whatever the
 disc.
 
 Cryo's Windows patch 1.01 (`AT1CDINT.EXE`, December 1999) replaces
@@ -523,7 +568,7 @@ in the 2001 build 14).
 
 The May 1997 French build is the English 1997 build's code, compiled five
 days earlier against an older `cryo.dll`, with its own music copy rules.
-By default the port follows them; with the minor bug fixes (on by
+By default the port follows them; with the LOADMUSIK fix (`fix_loadmusik`, on by
 default) LOADMUSIK copies its tracks one by one as the other builds do,
 so that a list whose first track is there leaves no other listed track
 uncopied; it still copies nothing below a current music volume of 5. The

@@ -24,7 +24,7 @@ use atlantis_engine::checkpoint::PLAYERS_FILE;
 use atlantis_engine::hooks::DirectLoader;
 use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::ui::layout::{menu_number, walk_menu_text, MenuRules, MenuWalk};
-use atlantis_engine::{Engine, Enhancements, Event, MemStore, Options, SaveStore, Start};
+use atlantis_engine::{BugFixes, Engine, Enhancements, Event, MemStore, Options, SaveStore, Start};
 
 const W: usize = 640;
 const H: usize = 480;
@@ -120,7 +120,7 @@ fn banks_and_menus(var: &str) {
         let [normal, hovered] = &ui.menu_banks;
         assert!(normal.len() >= 31 && normal.len() == hovered.len());
         assert_eq!(ui.load_banks[0].len(), 74);
-        let rules = MenuRules::of_build(e.game.exe.build, false);
+        let rules = MenuRules::of_build(e.game.exe.build, &BugFixes::NONE);
         let mut walked = 0;
         for name in [
             "MAINMENU", "LOADMENU", "OPTMENU", "SELEMENU", "SONMENU", "SUREMENU", "CD1MENU",
@@ -226,7 +226,7 @@ impl Headless {
 fn record_centre(g: &Game, file: &str, n: usize, toggles: (i32, i32)) -> (i32, i32) {
     let text = g.big.read(&format!("SPRLIST\\{file}")).unwrap();
     let mut walk = MenuWalk::default();
-    let rules = MenuRules::of_build(g.exe.build, false);
+    let rules = MenuRules::of_build(g.exe.build, &BugFixes::NONE);
     let number = menu_number(file).unwrap() as i32;
     walk_menu_text(&text, number, -1, toggles.0, toggles.1, rules, &mut walk);
     let r = walk.records[n];
@@ -240,7 +240,7 @@ fn record_centre(g: &Game, file: &str, n: usize, toggles: (i32, i32)) -> (i32, i
 fn word(g: &Game, file: &str, n: usize, toggles: (i32, i32)) -> (usize, i32, i32) {
     let text = g.big.read(&format!("SPRLIST\\{file}")).unwrap();
     let mut walk = MenuWalk::default();
-    let rules = MenuRules::of_build(g.exe.build, false);
+    let rules = MenuRules::of_build(g.exe.build, &BugFixes::NONE);
     let number = menu_number(file).unwrap() as i32;
     walk_menu_text(&text, number, -1, toggles.0, toggles.1, rules, &mut walk);
     let o = walk.ops.iter().find(|o| o.record == n as i32).unwrap();
@@ -268,7 +268,7 @@ fn play_the_interface(var: &str) {
         saves: store.clone(),
         start: Start::Boot,
         subtitles: false,
-        // The original's rules (the minor bug fixes read the options'
+        // The original's rules (the SUBTITLES record's fix reads the options'
         // id 9 record in step).
         enhancements: Enhancements::original(),
         ..Options::default()

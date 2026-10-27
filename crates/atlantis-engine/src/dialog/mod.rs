@@ -33,6 +33,7 @@ use atlantis_data::SprSprite;
 use crate::audio::VoiceId;
 use crate::con_script::script::latin1_bytes;
 use crate::engine::{Engine, Event};
+use crate::enhancements::BugFix;
 use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;
 use crate::music::apc_pcm;
@@ -243,11 +244,12 @@ impl Dialogs {
     /// The build's subtitles: the GDI Arial layout, or the 1997 build's
     /// `DIALOG\FONTS.BIN` (atlantis-cd-en-688128 0x004191c2..0x004191f9
     /// loads it at start-up; the reference's layout when it is missing);
-    /// with the minor bug fixes of the moment.
+    /// with the Chinese rows' fix of the moment
+    /// ([`crate::enhancements::BugFix::ChineseRows`]).
     async fn subtitler(&mut self, e: &Engine) -> Subtitler {
-        let fixes = e.enhancements().minor_bug_fixes;
+        let fix = e.enhancements().fix(BugFix::ChineseRows);
         if let Some(s) = &self.subtitler {
-            return s.clone().with_minor_bug_fixes(fixes);
+            return s.clone().with_row_fix(fix);
         }
         let mut s = None;
         if e.game.exe.build.bitmap_subtitles {
@@ -269,7 +271,7 @@ impl Dialogs {
             }
         }
         // The Chinese builds' breaker (FUN_0042f424).
-        let cjk = CjkSplit::of_build(e.game.exe.build, fixes);
+        let cjk = CjkSplit::of_build(e.game.exe.build, fix);
         let s = match s {
             Some(s) => s,
             None => Subtitler::Gdi(self.font(e).await, cjk),
@@ -494,7 +496,7 @@ impl Dialogs {
                 if let Some(h) = head.as_mut() {
                     // The rest pose of some head animations at frame 0
                     // (an original bug, fixed as an enhancement).
-                    h.set_rest_key_fix(e.enhancements().minor_bug_fixes);
+                    h.set_rest_key_fix(e.enhancements().fix(BugFix::HeadFirstFrame));
                 }
                 if head.is_none() {
                     // A head file is missing (lines without a .SYC never get
@@ -1197,9 +1199,9 @@ impl LinePlayer {
             // The SPF overlay: the original draws it into the locked
             // surface, which the full copy of the back buffer (FUN_00410f36
             // @ 0x0042f57e) then overwrites, so it is never seen; drawn over
-            // the head with the minor bug fixes. The modulo loops the SPF
+            // the head with its fix (BugFix::HeadOverlay). The modulo loops the SPF
             // when the UBB outlives it (every shipped pair has 31 frames).
-            if let (Some(spf), true) = (&self.spf, e.enhancements().minor_bug_fixes) {
+            if let (Some(spf), true) = (&self.spf, e.enhancements().fix(BugFix::HeadOverlay)) {
                 let k = if self.spf_count > 0 {
                     self.spf_frame % self.spf_count
                 } else {

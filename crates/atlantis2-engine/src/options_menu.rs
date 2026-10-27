@@ -102,6 +102,7 @@ const FIX_TEXT_LINES: usize = 4;
 const FIX_LAYOUT: BoxLayout<'static> = BoxLayout {
     title: "Original bug fixes",
     width: 520,
+    row_h: atlantis_engine::options_menu::ROW_H,
     gaps: &[2, 2 + BugFix::ALL.len()],
     footer_h: 12 + FIX_TEXT_LINES as i32 * 18 + 32,
 };

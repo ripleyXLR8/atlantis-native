@@ -22,7 +22,7 @@ use crate::ambient::{AmbientSounds, MixerAmbientOutput};
 use crate::con_script::{ConClocks, Vars};
 use crate::cursor::WarpCursorState;
 use crate::dialog::Dialogs;
-use crate::enhancements::Enhancements;
+use crate::enhancements::{BugFix, Enhancements};
 use crate::hooks::{Departure, DirectLoader, Loader, ScriptHooks};
 use crate::look::{WarpMomentum, WarpPointer};
 use crate::music::Music;
@@ -534,14 +534,15 @@ impl Engine {
     }
 
     /// The menus' record table of the session, as the original keeps it
-    /// (the build's records per menu); `None` with the minor bug fixes:
+    /// (the build's records per menu); `None` with the menus' own records
+    /// ([`crate::enhancements::BugFix::MenuRecords`]):
     /// each menu then keeps its own records, from zero at every visit, so
     /// that the sound menu's records 16 and 17 no longer move the ARE YOU
     /// SURE ? ornament off screen in the two 16-record builds, and the
     /// LOAD knob hidden by a visit with 11 checkpoints or fewer comes back
     /// on a later visit with more.
     pub(crate) fn menu_table(&mut self) -> Option<&mut crate::ui::layout::MenuRecordTable> {
-        if self.enhancements().minor_bug_fixes {
+        if self.enhancements().fix(BugFix::MenuRecords) {
             return None;
         }
         let n = usize::from(self.game.exe.build.menu_records_per_menu);

@@ -369,12 +369,13 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
     };
     let edition = game.edition();
     log::info!("{edition}, {}", crate::version_string());
+    let fixes = atlantis_engine::BugFix::of_game(&game);
     let (sys, runner) = start_game(game, options);
     let el = EventLoop::new().map_err(|e| e.to_string())?;
     el.spawn_app(
         App::new(sys, Some(runner))
             .with_graphics(graphics, Some(saves))
-            .with_edition(&edition),
+            .with_edition(&edition, fixes),
     );
     Ok(())
 }

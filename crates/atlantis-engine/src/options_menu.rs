@@ -3,11 +3,14 @@
 //! not have. The game is paused while it is open.
 //!
 //! Entries: the graphics mode (see [`crate::hd`]), the three groups of
-//! [`Enhancements`] (the names of the ScummVM port's options), Close, and
-//! on the desktop "Game library..." (back to the list of the player's
-//! game folders, to play another edition).
+//! [`Enhancements`] (the names of the ScummVM port's options): the bug
+//! fixes all on or all off ("Custom (n/N)" when mixed) and "Choose the bug
+//! fixes..." (a box of its own in the same style: all on, all off, one
+//! switch per [`BugFix`] of the game's build with what the original does,
+//! Back), Close, and on the desktop "Game library..." (back to the list of
+//! the player's game folders, to play another edition).
 
-use crate::enhancements::Enhancements;
+use crate::enhancements::{BugFix, BugFixes, Enhancements};
 use crate::hd::{HdOptions, HdText, PanoFilter, TextItem, VideoSides};
 use crate::persist::Graphics;
 use crate::subtitles::SubtitleFont;
@@ -25,6 +28,8 @@ pub enum Entry {
     Widescreen,
     VideoSides,
     BugFixes,
+    /// Open the bug fixes' box.
+    ChooseFixes,
     RestoredContent,
     UiUx,
     /// Open the project's Buy Me a Coffee page in the browser.
@@ -34,7 +39,7 @@ pub enum Entry {
     Library,
 }
 
-const ENTRIES: [Entry; 13] = [
+const ENTRIES: [Entry; 14] = [
     Entry::Graphics,
     Entry::PanoramaFilter,
     Entry::Sharpen,
@@ -43,6 +48,7 @@ const ENTRIES: [Entry; 13] = [
     Entry::Widescreen,
     Entry::VideoSides,
     Entry::BugFixes,
+    Entry::ChooseFixes,
     Entry::RestoredContent,
     Entry::UiUx,
     Entry::Support,
@@ -140,13 +146,15 @@ pub enum BoxInput {
 /// A gap between two groups of rows of a box ([`BoxLayout::gaps`]).
 pub const GAP_H: i32 = 8;
 
-/// The layout of an options box: its title, its width, the gaps between
-/// groups of rows and the height of its foot. [`BoxLayout::OPTIONS`] is the
-/// options menu's (both games').
+/// The layout of an options box: its title, its width, its rows' height,
+/// the gaps between groups of rows and the height of its foot.
+/// [`BoxLayout::OPTIONS`] is the options menu's (both games').
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BoxLayout<'a> {
     pub title: &'a str,
     pub width: i32,
+    /// A row's height ([`ROW_H`] but in a box of many rows).
+    pub row_h: i32,
     /// The rows that start a group: a [`GAP_H`]-pixel gap above each.
     pub gaps: &'a [usize],
     pub footer_h: i32,
@@ -157,6 +165,7 @@ impl BoxLayout<'_> {
     pub const OPTIONS: BoxLayout<'static> = BoxLayout {
         title: "Atlantis Native options",
         width: BOX_W,
+        row_h: ROW_H,
         gaps: &[],
         footer_h: FOOTER_H,
     };
@@ -164,7 +173,7 @@ impl BoxLayout<'_> {
     /// The height of a box of `n` rows.
     pub fn box_h(&self, n: usize) -> i32 {
         let gaps = self.gaps.iter().filter(|&&g| g < n).count() as i32;
-        TITLE_H + n as i32 * ROW_H + gaps * GAP_H + self.footer_h
+        TITLE_H + n as i32 * self.row_h + gaps * GAP_H + self.footer_h
     }
 
     /// The top left corner of a box of `n` rows on a `w` x `h` screen
@@ -176,7 +185,7 @@ impl BoxLayout<'_> {
     /// The top of row `i`, from the box's top.
     pub fn row_y(&self, i: usize) -> i32 {
         let gaps = self.gaps.iter().filter(|&&g| g <= i).count() as i32;
-        TITLE_H + i as i32 * ROW_H + gaps * GAP_H
+        TITLE_H + i as i32 * self.row_h + gaps * GAP_H
     }
 
     /// The row under a point of a `w` x `h` screen, for `n` rows.
@@ -185,7 +194,7 @@ impl BoxLayout<'_> {
         if !(bx..bx + self.width).contains(&x) {
             return None;
         }
-        (0..n).find(|&i| (0..ROW_H).contains(&(y - by - self.row_y(i))))
+        (0..n).find(|&i| (0..self.row_h).contains(&(y - by - self.row_y(i))))
     }
 }
 
@@ -400,7 +409,7 @@ impl MenuBox {
         fill(bx - 1, by - 1, bw + 2, bh + 2, BORDER);
         fill(bx, by, bw, bh, BG);
         let sel_y = by + layout.row_y(self.selected);
-        fill(bx + 6, sel_y, bw - 12, ROW_H - 2, HIGHLIGHT);
+        fill(bx + 6, sel_y, bw - 12, layout.row_h - 2, HIGHLIGHT);
         let mut items = Vec::new();
         let mut text = |t: &str, x: i32, y: i32, c: u16| {
             items.push(TextItem {
@@ -417,8 +426,10 @@ impl MenuBox {
         let centre = |t: &str| bx + (bw - font.width(t.as_bytes())) / 2;
         let right = |t: &str| bx + bw - 16 - font.width(t.as_bytes());
         text(layout.title, centre(layout.title), by + 10, TEXT);
+        // The text's top in its row: 4 pixels down in a 24-pixel row.
+        let pad = (layout.row_h - 16) / 2;
         for (i, row) in rows.iter().enumerate() {
-            let y = by + layout.row_y(i);
+            let y = by + layout.row_y(i) + pad;
             let c = match (row.enabled, i == self.selected) {
                 (false, _) => GREYED,
                 (true, true) => SELECTED,
@@ -426,11 +437,11 @@ impl MenuBox {
             };
             match row.value {
                 Some(value) => {
-                    text(row.label, bx + 16, y + 4, c);
+                    text(row.label, bx + 16, y, c);
                     let t = format!("< {value} >");
-                    text(&t, right(&t), y + 4, c);
+                    text(&t, right(&t), y, c);
                 }
-                None => text(row.label, centre(row.label), y + 4, c),
+                None => text(row.label, centre(row.label), y, c),
             }
         }
         for line in foot {
@@ -454,15 +465,182 @@ impl MenuBox {
 /// The keys' line at the foot of the options menu.
 pub const KEYS: &str = "Arrows, Enter or click; Escape, F10 or O closes";
 
+/// A row of the bug fixes' box.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FixRow {
+    AllOn,
+    AllOff,
+    Fix(BugFix),
+    Back,
+}
+
+impl FixRow {
+    fn explanation(self) -> &'static [&'static str] {
+        match self {
+            FixRow::AllOn => &["Every fix on (the default)"],
+            FixRow::AllOff => &["Every fix off: the original, bug for bug"],
+            FixRow::Fix(f) => f.explanation(),
+            FixRow::Back => &["Back to the options"],
+        }
+    }
+}
+
+/// The lines of a fix's explanation at the foot of its box (at most).
+pub const FIX_TEXT_LINES: usize = 3;
+
+/// The bug fixes' box's width: wider than the options' (the fixes' names
+/// and the game's in its title).
+pub const FIX_BOX_W: i32 = 580;
+
+/// Its foot: the explanation, then the keys.
+const FIX_FOOTER_H: i32 = 12 + FIX_TEXT_LINES as i32 * 18 + 32;
+
+/// The space kept around the bug fixes' box on the 640x480 screen; its
+/// rows are 20 pixels high when 24 would not leave it.
+const FIX_MARGIN: i32 = 8;
+
+/// The keys' line of the bug fixes' box.
+pub const FIX_KEYS: &str = "Arrows, Enter or click; Escape goes back";
+
+impl BugFix {
+    /// Its row's name in the bug fixes' box.
+    pub fn label(self) -> &'static str {
+        match self {
+            BugFix::MusicLoop => "Music: seamless loops",
+            BugFix::HeadOverlay => "Faces: the guards' coif, the pilot's scarf",
+            BugFix::HeadFirstFrame => "Faces: the lower face's first frame",
+            BugFix::BarSlideOut => "Inventory: icons left as the bar hides",
+            BugFix::PickupIcon => "Inventory: a new object's icon",
+            BugFix::MenuRecords => "Menus: each its own click areas",
+            BugFix::FifthPlayer => "Players: OK on the fifth player",
+            BugFix::SnakesFirstWin => "Snakes puzzle: the false first win",
+            BugFix::HexagonPieces => "Hexagon puzzle: its pieces always there",
+            BugFix::LoadMusik => "Music: tracks copied one by one",
+            BugFix::SharpS => "German: the sharp s in the LOAD list",
+            BugFix::DiscRevision => "Dutch: the credits and fonts of disc 1",
+            BugFix::MenuLineWidth => "Italian: the whole of OK and Annulla",
+            BugFix::ChineseRows => "Chinese: the subtitle rows",
+            BugFix::SubtitlesToggle => "Chinese: the SUBTITLES button",
+        }
+    }
+
+    /// What the original does without it, and where a player notices it:
+    /// the lines at the foot of the bug fixes' box.
+    pub fn explanation(self) -> &'static [&'static str] {
+        match self {
+            BugFix::MusicLoop => &[
+                "The original streams the music through a ring that",
+                "its refills do not always keep ahead of: stale",
+                "fragments of sound are heard in the music.",
+            ],
+            BugFix::HeadOverlay => &[
+                "The original draws the overlay of some talking heads",
+                "where the next copy of the picture erases it: the",
+                "guards' coif and the pilot's scarf are never seen.",
+            ],
+            BugFix::HeadFirstFrame => &[
+                "On the first frame of each loop of some talking heads",
+                "(Meljanz, Actyon, Servage, the Queen, Gimbas), the",
+                "original draws the 3D lower face away from the face.",
+            ],
+            BugFix::BarSlideOut => &[
+                "When the inventory bar is scrolled, the original",
+                "leaves rows of icons at the bottom of the screen",
+                "as the bar slides away.",
+            ],
+            BugFix::PickupIcon => &[
+                "After a pick-up, the original draws the new object's",
+                "icon 7 pixels left of its slot until the bar next",
+                "slides in.",
+            ],
+            BugFix::MenuRecords => &[
+                "The original keeps one table of the menus' click",
+                "areas for the session: the LOAD list's knob, once",
+                "hidden, stays hidden (and in May 1997, an ornament).",
+            ],
+            BugFix::FifthPlayer => &[
+                "With five players, OK on the fifth empties its name",
+                "in the original: that player stays listed with no",
+                "name and cannot be chosen.",
+            ],
+            BugFix::SnakesFirstWin => &[
+                "On a first visit to the four snakes puzzle, the",
+                "original takes the first piece carried to the",
+                "screen's top left corner for the solution.",
+            ],
+            BugFix::HexagonPieces => &[
+                "This build places the hexagon puzzle's pieces only",
+                "when the player comes holding the right object:",
+                "the later builds always place them.",
+            ],
+            BugFix::LoadMusik => &[
+                "This build copies a music list to the disk all or",
+                "nothing, on its first track, where the other builds",
+                "copy each missing track.",
+            ],
+            BugFix::SharpS => &[
+                "No sprite font of the game has the sharp s: the",
+                "original leaves a gap in the LOAD list's chapter",
+                "names. Fixed, it is drawn as ss.",
+            ],
+            BugFix::DiscRevision => &[
+                "The original reads the credits and the name fonts",
+                "from the disc in the drive: disc 2 holds an older",
+                "revision (a shorter credits text, two glyphs off).",
+            ],
+            BugFix::MenuLineWidth => &[
+                "This build gives a menu line at a fixed place 16",
+                "pixels per letter, not 22: the right ends of OK and",
+                "Annulla do not highlight or take a click.",
+            ],
+            BugFix::ChineseRows => &[
+                "The original may start a subtitle row in the middle",
+                "of a character (after an ideographic space or a",
+                "mark): that row shows the wrong characters.",
+            ],
+            BugFix::SubtitlesToggle => &[
+                "With SUBTITLES off, the original reads its button's",
+                "record one byte out of step: its click area takes",
+                "the wrong width and height.",
+            ],
+        }
+    }
+}
+
 /// The menu's state.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct OptionsMenu {
     menu: MenuBox,
+    /// The bug fixes' box, over the menu while it is open.
+    fixes: MenuBox,
     /// Shown at the foot of the menu: the game's release, the port's
     /// version (set by the front end).
     info: Vec<String>,
     /// The front end has a game library: the "Game library..." entry.
     library: bool,
+    /// The fixes the bug fixes' box lists: those of the game's build
+    /// ([`BugFix::of_game`]), in the menu's order.
+    game_fixes: Vec<BugFix>,
+    /// The bug fixes' box's title, the game named.
+    fix_title: String,
+    /// The bug fixes' box's gaps: above the fixes and above Back.
+    fix_gaps: [usize; 2],
+}
+
+impl Default for OptionsMenu {
+    fn default() -> Self {
+        let mut m = OptionsMenu {
+            menu: MenuBox::default(),
+            fixes: MenuBox::default(),
+            info: Vec::new(),
+            library: false,
+            game_fixes: Vec::new(),
+            fix_title: String::new(),
+            fix_gaps: [0; 2],
+        };
+        m.set_game(None, None);
+        m
+    }
 }
 
 impl OptionsMenu {
@@ -473,6 +651,29 @@ impl OptionsMenu {
     /// The lines shown at the foot of the menu (at most two).
     pub fn set_info(&mut self, lines: Vec<String>) {
         self.info = lines;
+    }
+
+    /// The game: its release (`edition`, named in the bug fixes' box) and
+    /// the fixes of its build ([`BugFix::of_game`]); without a game, the
+    /// fixes of every build.
+    pub fn set_game(&mut self, edition: Option<&str>, fixes: Option<Vec<BugFix>>) {
+        self.game_fixes = fixes.unwrap_or_else(|| {
+            BugFix::ALL
+                .into_iter()
+                .filter(|f| f.of_every_build())
+                .collect()
+        });
+        self.fix_title = match edition {
+            Some(e) => format!("Bug fixes: {e}"),
+            None => "Original bug fixes".to_string(),
+        };
+        self.fix_gaps = [2, 2 + self.game_fixes.len()];
+        self.fixes.close();
+    }
+
+    /// The fixes the bug fixes' box lists.
+    pub fn game_fixes(&self) -> &[BugFix] {
+        &self.game_fixes
     }
 
     /// Whether the menu has the "Game library..." entry (the desktop).
@@ -506,15 +707,62 @@ impl OptionsMenu {
 
     pub fn open(&mut self) {
         self.menu.open();
+        self.fixes.close();
     }
 
     pub fn close(&mut self) {
         self.menu.close();
+        self.fixes.close();
     }
 
     /// The selected entry.
     pub fn selected(&self) -> Entry {
         self.entries()[self.menu.selected()]
+    }
+
+    /// The bug fixes' box is open.
+    pub fn in_fixes(&self) -> bool {
+        self.menu.is_open() && self.fixes.is_open()
+    }
+
+    /// The bug fixes' box's rows.
+    pub fn fix_rows(&self) -> Vec<FixRow> {
+        let mut rows = vec![FixRow::AllOn, FixRow::AllOff];
+        rows.extend(self.game_fixes.iter().map(|&f| FixRow::Fix(f)));
+        rows.push(FixRow::Back);
+        rows
+    }
+
+    /// The bug fixes' box's selected row.
+    pub fn fix_selected(&self) -> FixRow {
+        self.fix_rows()[self.fixes.selected()]
+    }
+
+    /// The bug fixes' box's layout: rows of 24 pixels, or of 20 when that
+    /// would not leave [`FIX_MARGIN`] around it on the screen.
+    pub fn fix_layout(&self) -> BoxLayout<'_> {
+        let mut l = BoxLayout {
+            title: &self.fix_title,
+            width: FIX_BOX_W,
+            row_h: ROW_H,
+            gaps: &self.fix_gaps,
+            footer_h: FIX_FOOTER_H,
+        };
+        if l.box_h(self.fix_rows().len()) + 2 * FIX_MARGIN > SCREEN_H as i32 {
+            l.row_h = 20;
+        }
+        l
+    }
+
+    /// The "Fix original bugs" row's value: On, Off, or how many of the
+    /// game's fixes are on.
+    fn fixes_value(&self, x: &BugFixes) -> String {
+        let n = self.game_fixes.len();
+        match x.count_of(&self.game_fixes) {
+            0 => "Off".into(),
+            k if k == n => "On".into(),
+            k => format!("Custom ({k}/{n})"),
+        }
     }
 
     fn activate(&mut self, entry: Entry, v: MenuValues) -> MenuAction {
@@ -541,7 +789,15 @@ impl OptionsMenu {
             Entry::SharpSubtitles => hd.sharp_subtitles = !hd.sharp_subtitles,
             Entry::Widescreen => hd.widescreen = !hd.widescreen,
             Entry::VideoSides => hd.video_sides = hd.video_sides.next(),
-            Entry::BugFixes => x.minor_bug_fixes = !x.minor_bug_fixes,
+            // All on, then all off (from a mix of the game's: all on).
+            Entry::BugFixes => {
+                let all_on = x.fixes.count_of(&self.game_fixes) == self.game_fixes.len();
+                x.fixes = BugFixes::all(!all_on);
+            }
+            Entry::ChooseFixes => {
+                self.fixes.open();
+                return MenuAction::None;
+            }
             Entry::RestoredContent => x.restored_content = !x.restored_content,
             Entry::UiUx => x.ui_ux = !x.ui_ux,
             Entry::Close => {
@@ -561,6 +817,21 @@ impl OptionsMenu {
         }
     }
 
+    /// A row of the bug fixes' box activated.
+    fn activate_fix(&mut self, row: FixRow, v: MenuValues) -> MenuAction {
+        let mut x = v.enhancements;
+        match row {
+            FixRow::AllOn => x.fixes = BugFixes::ALL,
+            FixRow::AllOff => x.fixes = BugFixes::NONE,
+            FixRow::Fix(f) => x.fixes.set(f, !x.fixes.get(f)),
+            FixRow::Back => {
+                self.fixes.close();
+                return MenuAction::None;
+            }
+        }
+        MenuAction::SetEnhancements(x)
+    }
+
     /// One line on what the selected entry does.
     fn description(entry: Entry, v: MenuValues) -> &'static str {
         if !v.enabled(entry) {
@@ -574,7 +845,8 @@ impl OptionsMenu {
             Entry::SharpSubtitles => "Subtitles drawn at the window's resolution",
             Entry::Widescreen => "The panorama fills the sides of a wide window",
             Entry::VideoSides => "Widescreen: the bars beside the videos",
-            Entry::BugFixes => "Fixes bugs of the original release (on by default)",
+            Entry::BugFixes => "Every fix of the original's bugs on or off",
+            Entry::ChooseFixes => "Enter: one fix at a time",
             Entry::RestoredContent => "Restores lines the original never plays (off by default)",
             Entry::UiUx => "Modern comforts, e.g. no error box (off by default)",
             Entry::Close => "Back to the game",
@@ -583,8 +855,9 @@ impl OptionsMenu {
         }
     }
 
-    /// The rows the box shows for the values `v`.
-    fn rows(&self, v: MenuValues) -> Vec<Row<'static>> {
+    /// The rows the box shows for the values `v` (`fixes`: the bug fixes'
+    /// value, [`OptionsMenu::fixes_value`]).
+    fn rows<'a>(&self, v: MenuValues, fixes: &'a str) -> Vec<Row<'a>> {
         let on = |b: bool| if b { "On" } else { "Off" };
         self.entries()
             .iter()
@@ -624,10 +897,8 @@ impl OptionsMenu {
                             VideoSides::Panorama => "Panorama",
                         }),
                     ),
-                    Entry::BugFixes => (
-                        "Fix original bugs",
-                        Some(on(v.enhancements.minor_bug_fixes)),
-                    ),
+                    Entry::BugFixes => ("Fix original bugs", Some(fixes)),
+                    Entry::ChooseFixes => ("Choose the bug fixes...", None),
                     Entry::RestoredContent => (
                         "Restored content",
                         Some(on(v.enhancements.restored_content)),
@@ -646,6 +917,27 @@ impl OptionsMenu {
             .collect()
     }
 
+    /// The bug fixes' box's rows for the values `v`.
+    fn fix_box_rows(&self, v: MenuValues) -> Vec<Row<'static>> {
+        let x = v.enhancements.fixes;
+        self.fix_rows()
+            .into_iter()
+            .map(|r| {
+                let (label, value) = match r {
+                    FixRow::AllOn => ("All on", None),
+                    FixRow::AllOff => ("All off (as the original)", None),
+                    FixRow::Fix(f) => (f.label(), Some(if x.get(f) { "On" } else { "Off" })),
+                    FixRow::Back => ("Back", None),
+                };
+                Row {
+                    label,
+                    value,
+                    enabled: true,
+                }
+            })
+            .collect()
+    }
+
     /// What the box's input `input` does.
     fn act(&mut self, input: BoxInput, v: MenuValues) -> MenuAction {
         match input {
@@ -655,24 +947,61 @@ impl OptionsMenu {
         }
     }
 
+    /// What the bug fixes' box's input `input` does: Escape and a click
+    /// outside go back to the menu.
+    fn act_fix(&mut self, input: BoxInput, v: MenuValues) -> MenuAction {
+        match input {
+            BoxInput::None | BoxInput::Close => MenuAction::None,
+            BoxInput::Activate(i) => self.activate_fix(self.fix_rows()[i], v),
+        }
+    }
+
     /// A key pressed while the menu is open: Up / Down choose an entry
     /// (skipping the greyed ones), Enter / Space (and Left / Right on a
-    /// setting) change it, Escape, F10 and O close the menu.
+    /// setting) change it, Escape, F10 and O close the menu. In the bug
+    /// fixes' box the same, but Escape goes back to the menu.
     pub fn key(&mut self, key: Key, v: MenuValues) -> MenuAction {
-        let input = self.menu.key(key, &self.rows(v));
+        if self.fixes.is_open() {
+            if matches!(key, Key::F(10) | Key::Char('o' | 'O')) {
+                self.close();
+                return MenuAction::Close;
+            }
+            let rows = self.fix_box_rows(v);
+            let input = self.fixes.key(key, &rows);
+            return self.act_fix(input, v);
+        }
+        let value = self.fixes_value(&v.enhancements.fixes);
+        let input = self.menu.key(key, &self.rows(v, &value));
         self.act(input, v)
     }
 
     /// The pointer moved to a 640x480 screen point: the entry under it is
     /// selected.
     pub fn pointer(&mut self, x: i32, y: i32) {
+        if self.fixes.is_open() {
+            let n = self.fix_rows().len();
+            let layout = self.fix_layout();
+            let mut b = self.fixes.clone();
+            b.pointer_in(&layout, n, x, y, SCREEN_W, SCREEN_H);
+            self.fixes = b;
+            return;
+        }
         let n = self.entries().len();
         self.menu.pointer(n, x, y, SCREEN_W, SCREEN_H);
     }
 
     /// A click at a 640x480 screen point: the entry under it changes;
-    /// outside the box the menu closes.
+    /// outside the box the menu closes (the bug fixes' box goes back to
+    /// the menu).
     pub fn click(&mut self, x: i32, y: i32, v: MenuValues) -> MenuAction {
+        if self.fixes.is_open() {
+            let n = self.fix_rows().len();
+            let layout = self.fix_layout();
+            let mut b = self.fixes.clone();
+            let input = b.click_in(&layout, n, x, y, SCREEN_W, SCREEN_H);
+            self.fixes = b;
+            return self.act_fix(input, v);
+        }
         let n = self.entries().len();
         let input = self.menu.click(n, x, y, SCREEN_W, SCREEN_H);
         self.act(input, v)
@@ -692,13 +1021,44 @@ impl OptionsMenu {
         v: MenuValues,
         text: Option<&mut HdText>,
     ) {
+        if self.fixes.is_open() {
+            let layout = self.fix_layout();
+            let lines = self.fix_selected().explanation();
+            let mut foot: Vec<FootLine> = lines
+                .iter()
+                .take(FIX_TEXT_LINES)
+                .enumerate()
+                .map(|(i, t)| FootLine {
+                    text: t,
+                    from_bottom: layout.footer_h - 12 - i as i32 * 18,
+                    color: TEXT,
+                })
+                .collect();
+            foot.push(FootLine {
+                text: FIX_KEYS,
+                from_bottom: 22,
+                color: DIM,
+            });
+            self.fixes.draw_in(
+                &layout,
+                screen,
+                SCREEN_W,
+                SCREEN_H,
+                font,
+                &self.fix_box_rows(v),
+                &foot,
+                text,
+            );
+            return;
+        }
         let d = Self::description(self.selected(), v);
+        let value = self.fixes_value(&v.enhancements.fixes);
         self.menu.draw_recording(
             screen,
             SCREEN_W,
             SCREEN_H,
             font,
-            &self.rows(v),
+            &self.rows(v, &value),
             &self.info,
             d,
             text,
@@ -711,11 +1071,11 @@ mod tests {
     use super::*;
 
     /// The menu without the game library's entry (the web build).
-    const BOX_H: i32 = TITLE_H + 12 * ROW_H + FOOTER_H;
+    const BOX_H: i32 = TITLE_H + 13 * ROW_H + FOOTER_H;
     const BOX_Y: i32 = (SCREEN_H as i32 - BOX_H) / 2;
 
     const DEFAULTS: Enhancements = Enhancements {
-        minor_bug_fixes: true,
+        fixes: BugFixes::ALL,
         restored_content: false,
         ui_ux: false,
     };
@@ -751,7 +1111,7 @@ mod tests {
             m.key(Key::Right, HD),
             MenuAction::SetGraphics(Graphics::Original)
         );
-        for _ in 0..5 {
+        for _ in 0..6 {
             assert_eq!(m.key(Key::Down, ORIG), MenuAction::None);
         }
         assert_eq!(m.selected(), Entry::Close);
@@ -778,9 +1138,9 @@ mod tests {
             m.click(320, gy, ORIG),
             MenuAction::SetGraphics(Graphics::Hd)
         );
-        m.pointer(320, gy + 10 * ROW_H);
-        assert_eq!(m.selected(), Entry::Support);
         m.pointer(320, gy + 11 * ROW_H);
+        assert_eq!(m.selected(), Entry::Support);
+        m.pointer(320, gy + 12 * ROW_H);
         assert_eq!(m.selected(), Entry::Close);
         assert_eq!(m.click(320, BOX_Y + 2, ORIG), MenuAction::None);
         assert!(m.is_open());
@@ -800,10 +1160,15 @@ mod tests {
         assert_eq!(
             x,
             Enhancements {
-                minor_bug_fixes: false,
+                fixes: BugFixes::NONE,
                 ..DEFAULTS
             }
         );
+        // "Choose the bug fixes...": a button, its box.
+        m.key(Key::Down, ORIG);
+        assert_eq!(m.selected(), Entry::ChooseFixes);
+        assert_eq!(m.key(Key::Right, ORIG), MenuAction::None);
+        assert!(!m.in_fixes());
         m.key(Key::Down, ORIG);
         assert_eq!(
             m.key(Key::Right, ORIG),
@@ -890,7 +1255,9 @@ mod tests {
         m.draw(&mut plain, &font, ORIG);
         assert!(s == plain, "same pixels with or without recording");
         assert!(t.after == s);
-        assert_eq!(t.items.len(), 1 + 10 * 2 + 2 + 2);
+        // The title, 10 rows of a label and a value, three buttons, the
+        // description and the keys.
+        assert_eq!(t.items.len(), 1 + 10 * 2 + 3 + 2);
         assert!(t.items.iter().any(|i| i.color == GREYED));
         assert!(t.items.iter().any(|i| i.text == b"< Bicubic >"));
         // Without the text, the menu's boxes.
@@ -954,7 +1321,7 @@ mod tests {
         // The last row, under Close, by the pointer.
         m.open();
         assert!(m.box_y() >= 0 && m.box_y() + m.box_h() <= SCREEN_H as i32);
-        let y = m.box_y() + TITLE_H + 12 * ROW_H + 5;
+        let y = m.box_y() + TITLE_H + 13 * ROW_H + 5;
         assert_eq!(m.click(320, y, HD), MenuAction::OpenLibrary);
         let font = SubtitleFont::new();
         let mut s = vec![0u16; SCREEN_W * SCREEN_H];
@@ -962,6 +1329,270 @@ mod tests {
         m.open();
         m.draw_recording(&mut s, &font, HD, Some(&mut t));
         assert!(t.items.iter().any(|i| i.text == b"Game library..."));
+    }
+
+    fn with_fixes(f: BugFixes) -> MenuValues {
+        MenuValues {
+            enhancements: Enhancements {
+                fixes: f,
+                ..DEFAULTS
+            },
+            ..ORIG
+        }
+    }
+
+    /// The menu of the French May 1997 build: the fixes of every build,
+    /// the hexagon pieces' and LOADMUSIK's.
+    fn may_1997() -> OptionsMenu {
+        let mut m = OptionsMenu::new();
+        let mut fixes: Vec<BugFix> = BugFix::ALL
+            .into_iter()
+            .filter(|f| f.of_every_build())
+            .collect();
+        fixes.extend([BugFix::HexagonPieces, BugFix::LoadMusik]);
+        m.set_game(Some("CD, French (May 1997 build)"), Some(fixes));
+        m
+    }
+
+    fn set(a: MenuAction) -> BugFixes {
+        match a {
+            MenuAction::SetEnhancements(x) => x.fixes,
+            a => panic!("{a:?}"),
+        }
+    }
+
+    /// "Fix original bugs": On, Off or how many of the game's fixes are
+    /// on; pressed, all on, then all off (from a mix: all on).
+    #[test]
+    fn the_bug_fixes_row_shows_all_none_or_how_many() {
+        let m = may_1997();
+        let value = |f: BugFixes| m.fixes_value(&f);
+        assert_eq!(value(BugFixes::ALL), "On");
+        assert_eq!(value(BugFixes::NONE), "Off");
+        assert_eq!(
+            value(BugFixes::all_but(BugFix::SnakesFirstWin)),
+            "Custom (9/10)"
+        );
+        assert_eq!(value(BugFixes::only(BugFix::LoadMusik)), "Custom (1/10)");
+        // The fixes of other builds do not count.
+        assert_eq!(value(BugFixes::all_but(BugFix::SharpS)), "On");
+        assert_eq!(value(BugFixes::only(BugFix::SharpS)), "Off");
+        let mut m = may_1997();
+        m.open();
+        let press = |m: &mut OptionsMenu, f: BugFixes| {
+            m.pointer(320, BOX_Y + TITLE_H + 7 * ROW_H + 3);
+            assert_eq!(m.selected(), Entry::BugFixes);
+            set(m.key(Key::Enter, with_fixes(f)))
+        };
+        assert_eq!(press(&mut m, BugFixes::ALL), BugFixes::NONE);
+        assert_eq!(press(&mut m, BugFixes::NONE), BugFixes::ALL);
+        let mix = BugFixes::all_but(BugFix::HexagonPieces);
+        assert_eq!(press(&mut m, mix), BugFixes::ALL);
+        assert_eq!(
+            press(&mut m, BugFixes::all_but(BugFix::SharpS)),
+            BugFixes::NONE
+        );
+        // Drawn in the row.
+        let font = SubtitleFont::new();
+        let mut s = vec![0u16; SCREEN_W * SCREEN_H];
+        let mut t = HdText::default();
+        m.draw_recording(&mut s, &font, with_fixes(mix), Some(&mut t));
+        assert!(t.items.iter().any(|i| i.text == b"< Custom (9/10) >"));
+    }
+
+    /// The bug fixes' box by the keys: its rows (the game's fixes only),
+    /// each fix alone toggled both ways, all on, all off, Back; Escape
+    /// goes back, F10 and O close everything.
+    #[test]
+    fn the_fixes_box_by_the_keys() {
+        let mut m = may_1997();
+        m.open();
+        m.key(Key::Down, ORIG);
+        m.key(Key::Down, ORIG);
+        assert_eq!(m.selected(), Entry::ChooseFixes);
+        assert_eq!(m.key(Key::Enter, ORIG), MenuAction::None);
+        assert!(m.in_fixes() && m.is_open());
+        assert_eq!(m.fix_selected(), FixRow::AllOn);
+        assert_eq!(
+            set(m.key(Key::Enter, with_fixes(BugFixes::NONE))),
+            BugFixes::ALL
+        );
+        m.key(Key::Down, ORIG);
+        assert_eq!(m.fix_selected(), FixRow::AllOff);
+        assert_eq!(m.key(Key::Left, ORIG), MenuAction::None, "a button");
+        assert_eq!(set(m.key(Key::Space, ORIG)), BugFixes::NONE);
+        let fixes = m.game_fixes().to_vec();
+        assert_eq!(fixes.len(), 10);
+        for &f in &fixes {
+            m.key(Key::Down, ORIG);
+            assert_eq!(m.fix_selected(), FixRow::Fix(f));
+            assert_eq!(set(m.key(Key::Right, ORIG)), BugFixes::all_but(f));
+            assert_eq!(set(m.key(Key::Left, ORIG)), BugFixes::all_but(f));
+            assert_eq!(
+                set(m.key(Key::Enter, with_fixes(BugFixes::NONE))),
+                BugFixes::only(f)
+            );
+        }
+        m.key(Key::Down, ORIG);
+        assert_eq!(m.fix_selected(), FixRow::Back);
+        assert_eq!(m.key(Key::Enter, ORIG), MenuAction::None);
+        assert!(!m.in_fixes() && m.is_open());
+        assert_eq!(m.selected(), Entry::ChooseFixes);
+        // Up from the first row wraps to Back; Escape goes back.
+        m.key(Key::Enter, ORIG);
+        assert_eq!(m.fix_selected(), FixRow::AllOn, "opens on its first row");
+        m.key(Key::Up, ORIG);
+        assert_eq!(m.fix_selected(), FixRow::Back);
+        assert_eq!(m.key(Key::Escape, ORIG), MenuAction::None);
+        assert!(!m.in_fixes() && m.is_open());
+        for k in [Key::F(10), Key::Char('o')] {
+            m.key(Key::Enter, ORIG);
+            assert!(m.in_fixes());
+            assert_eq!(m.key(k, ORIG), MenuAction::Close);
+            assert!(!m.is_open() && !m.in_fixes());
+            m.open();
+            assert!(!m.in_fixes(), "the menu opens on its first box");
+            m.key(Key::Down, ORIG);
+            m.key(Key::Down, ORIG);
+        }
+    }
+
+    /// The bug fixes' box by the mouse: its rows found across the gaps, a
+    /// click outside back to the menu.
+    #[test]
+    fn the_fixes_box_by_the_mouse() {
+        let mut m = may_1997();
+        m.open();
+        let y = BOX_Y + TITLE_H + 8 * ROW_H + 5;
+        assert_eq!(m.click(320, y, ORIG), MenuAction::None);
+        assert!(m.in_fixes());
+        let rows = m.fix_rows();
+        let (fx, fy, row_y) = {
+            let layout = m.fix_layout();
+            assert_eq!(layout.row_h, ROW_H, "ten fixes: rows of 24 pixels");
+            assert_eq!(layout.row_y(2), TITLE_H + 2 * ROW_H + GAP_H);
+            let (fx, fy) = layout.origin(rows.len(), SCREEN_W, SCREEN_H);
+            let row_y: Vec<i32> = (0..rows.len()).map(|i| layout.row_y(i)).collect();
+            (fx, fy, row_y)
+        };
+        for (i, &row) in rows.iter().enumerate() {
+            m.pointer(fx + 30, fy + row_y[i] + 3);
+            assert_eq!(m.fix_selected(), row);
+        }
+        // The gap above the fixes is no row.
+        m.pointer(fx + 30, fy + TITLE_H + 2 * ROW_H + 2);
+        assert_eq!(m.fix_selected(), FixRow::Back);
+        let i = rows
+            .iter()
+            .position(|&r| r == FixRow::Fix(BugFix::LoadMusik))
+            .unwrap();
+        let y = fy + row_y[i] + 5;
+        assert_eq!(
+            set(m.click(fx + 30, y, ORIG)),
+            BugFixes::all_but(BugFix::LoadMusik)
+        );
+        // Inside the box, off the rows: nothing.
+        assert_eq!(m.click(fx + 30, fy + 3, ORIG), MenuAction::None);
+        assert!(m.in_fixes());
+        // Outside: back to the menu, still open.
+        assert_eq!(m.click(2, 2, ORIG), MenuAction::None);
+        assert!(!m.in_fixes() && m.is_open());
+    }
+
+    /// The box of every build's fixes: its title names the game, its rows
+    /// and the selected fix's explanation drawn, everything inside the
+    /// screen with a margin, every text inside the box.
+    #[test]
+    fn the_fixes_box_fits_for_every_build() {
+        use atlantis_data::exe::BUILDS;
+        let font = SubtitleFont::new();
+        let languages = [None, Some("German"), Some("Dutch")];
+        for b in BUILDS.iter() {
+            for language in languages {
+                let fixes: Vec<BugFix> = BugFix::ALL
+                    .into_iter()
+                    .filter(|f| f.applies(b, language))
+                    .collect();
+                let mut m = OptionsMenu::new();
+                m.set_game(
+                    Some("CD, Simplified Chinese (2001 build)"),
+                    Some(fixes.clone()),
+                );
+                m.open();
+                m.key(Key::Down, ORIG);
+                m.key(Key::Down, ORIG);
+                m.key(Key::Enter, ORIG);
+                for _ in 0..fixes.len() {
+                    m.key(Key::Down, ORIG);
+                }
+                m.key(Key::Down, ORIG);
+                assert_eq!(m.fix_selected(), FixRow::Fix(*fixes.last().unwrap()));
+                let layout = m.fix_layout();
+                let n = m.fix_rows().len();
+                let (bx, by) = layout.origin(n, SCREEN_W, SCREEN_H);
+                assert!(bx >= 8 && by >= 8, "{}", b.name);
+                assert!(by + layout.box_h(n) + 8 <= SCREEN_H as i32, "{}", b.name);
+                let mut s = vec![0x1234u16; SCREEN_W * SCREEN_H];
+                let mut t = HdText::default();
+                m.draw_recording(&mut s, &font, ORIG, Some(&mut t));
+                let texts: Vec<String> = t
+                    .items
+                    .iter()
+                    .map(|i| String::from_utf8_lossy(&i.text).into_owned())
+                    .collect();
+                assert_eq!(texts[0], "Bug fixes: CD, Simplified Chinese (2001 build)");
+                for f in &fixes {
+                    assert!(texts.iter().any(|t| t == f.label()));
+                }
+                let last = fixes.last().unwrap().explanation();
+                for line in last {
+                    assert!(texts.iter().any(|t| t == line), "{line}");
+                }
+                assert_eq!(texts.last().unwrap(), FIX_KEYS);
+                // The title, 3 buttons, a label and a value per fix, the
+                // explanation and the keys.
+                assert_eq!(t.items.len(), 1 + 3 + 2 * fixes.len() + last.len() + 1);
+                for y in 0..SCREEN_H as i32 {
+                    for x in 0..SCREEN_W as i32 {
+                        let inside = (bx - 1..bx + layout.width + 1).contains(&x)
+                            && (by - 1..by + layout.box_h(n) + 1).contains(&y);
+                        if !inside {
+                            assert_eq!(s[y as usize * SCREEN_W + x as usize], 0x1234);
+                        }
+                    }
+                }
+            }
+        }
+        // Every text fits its box: the labels with their values, the
+        // explanations, the longest title.
+        for f in BugFix::ALL {
+            let label = font.width(f.label().as_bytes()) + font.width(b"< Off >");
+            assert!(16 + label + 24 + 16 <= FIX_BOX_W, "{f:?}");
+            let e = f.explanation();
+            assert!(!e.is_empty() && e.len() <= FIX_TEXT_LINES, "{f:?}");
+            for line in e {
+                assert!(font.width(line.as_bytes()) <= FIX_BOX_W - 32, "{line}");
+            }
+        }
+        for line in [
+            FIX_KEYS,
+            "Every fix off: the original, bug for bug",
+            "Bug fixes: CD, patch 1.01, Traditional Chinese (May 1997 build)",
+        ] {
+            assert!(font.width(line.as_bytes()) <= FIX_BOX_W - 32, "{line}");
+        }
+        for e in [Entry::BugFixes, Entry::ChooseFixes] {
+            assert!(font.width(OptionsMenu::description(e, ORIG).as_bytes()) <= BOX_W - 20);
+        }
+    }
+
+    /// Without a game, the fixes of every build.
+    #[test]
+    fn without_a_game_the_fixes_of_every_build() {
+        let m = OptionsMenu::new();
+        assert_eq!(m.game_fixes().len(), 8);
+        assert!(m.game_fixes().iter().all(|f| f.of_every_build()));
+        assert_eq!(m.fix_title, "Original bug fixes");
     }
 
     #[test]

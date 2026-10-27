@@ -222,7 +222,7 @@ fn traditional_rows_match_original() {
 
 /// The Simplified CD: every row as the original's, the rows started on an
 /// ideographic space's second byte included (72 rows of 50 lines out of
-/// step). With the minor bug fixes, every row as the original's with the
+/// step). With the rows' fix (BugFix::ChineseRows), every row as the original's with the
 /// skip after an ideographic space patched to 2 (@ 0x0042f5ef) and its
 /// marks read at character boundaries only (the pairs of the scan @
 /// 0x0042f510 and of the checks @ 0x0042f599 cleared there under

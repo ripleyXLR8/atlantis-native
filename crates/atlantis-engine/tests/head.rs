@@ -267,7 +267,7 @@ fn centroid(buf: &[u16]) -> (usize, f64, f64) {
 /// against the original: Meljanz (row 522) at its four cameras and Actyon
 /// (row 523) at cameras 3 and 4. The original draws frame 0 of every loop
 /// away from frames 30 and 1 (up to 12 pixels for Meljanz, 35 for Actyon):
-/// the port does the same without the minor bug fixes.
+/// the port does the same without the first frame's fix (BugFix::HeadFirstFrame).
 #[test]
 fn head_loop_matches_the_original() {
     let Some(g) = game("head_loop_matches_the_original") else {
@@ -302,7 +302,7 @@ fn head_loop_matches_the_original() {
     assert_eq!(checked, 198);
 }
 
-/// The minor bug fix of the head animation's frame 0, on every head of the
+/// The fix of the head animation's frame 0 (BugFix::HeadFirstFrame), on every head of the
 /// INITDIAL table at each of its cameras (neutral mouth, one loop of the
 /// animation): without it, the heads whose first key is a rest pose jump
 /// at frame 0 (by 2 pixels or more, and more than their largest step

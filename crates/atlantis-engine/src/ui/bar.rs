@@ -12,6 +12,7 @@ use atlantis_data::sprite::{limits, read_spr_file, SprSprite};
 
 use super::{draw_sprite, draw_sprite_below, object_icon};
 use crate::engine::Engine;
+use crate::enhancements::BugFix;
 use crate::hooks::ScriptHooks;
 use crate::warp::SCREEN_H;
 
@@ -54,7 +55,7 @@ pub fn scroll_step(x: i32, y: i32, count: usize, first: usize) -> i32 {
 /// for a record from 9 on it lies past the 9-entry slot table, where the
 /// only store is `FUN_004278a0`'s 0x1bb (@ 0x00427af0) and .bss holds 0,
 /// so such a record is drawn on every frame (1..4 rows of its icon at
-/// 506). `fix` (the minor bug fixes) gates every record on the slot y.
+/// 506). `fix` (`BugFix::BarSlideOut`) gates every record on the slot y.
 pub fn slide_out_record_drawn(record: usize, slot_y: i32, fix: bool) -> bool {
     if record < BAR_CELLS || fix {
         slot_y < SLIDE_OUT_GATE_Y
@@ -79,10 +80,10 @@ pub fn pickup_slot(record: usize) -> Option<usize> {
 }
 
 /// The x of visible slot `slot`: 70 s + 42 (`FUN_0042c2c4` @ 0x0042c30f),
-/// or [`pickup_slot_x`] for the pick-up's slot (`fixes`: the minor bug
-/// fixes keep it at 70 s + 42).
-pub fn slot_x(slot: usize, pickup: Option<usize>, fixes: bool) -> i32 {
-    if pickup == Some(slot) && !fixes {
+/// or [`pickup_slot_x`] for the pick-up's slot (`fix`,
+/// `BugFix::PickupIcon`, keeps it at 70 s + 42).
+pub fn slot_x(slot: usize, pickup: Option<usize>, fix: bool) -> i32 {
+    if pickup == Some(slot) && !fix {
         pickup_slot_x(slot)
     } else {
         42 + 70 * slot as i32
@@ -100,9 +101,10 @@ pub struct BarState<'a> {
     pub held: i32,
     /// The slot whose x the last pick-up set ([`pickup_slot_x`]).
     pub pickup_slot: Option<usize>,
-    /// The minor bug fixes: every slide-out record gated on the slot y, the
-    /// pick-up's slot at 70 s + 42.
-    pub fixes: bool,
+    /// `BugFix::BarSlideOut`: every slide-out record gated on the slot y.
+    pub slide_out_fix: bool,
+    /// `BugFix::PickupIcon`: the pick-up's slot at 70 s + 42.
+    pub pickup_fix: bool,
 }
 
 /// An icon of a bar frame: the record, its visible slot and the hotspot.
@@ -130,7 +132,7 @@ pub struct BarFrame {
 /// 0x0042c674). A shown record with no entry, or whose id is OBJETENMAIN,
 /// gets no icon (@ 0x0042c682..0x0042c6b1).
 pub fn bar_frame_layout(st: &BarState, slot_y: i32, slide_out: bool) -> BarFrame {
-    let drawn = |r: usize| !slide_out || slide_out_record_drawn(r, slot_y, st.fixes);
+    let drawn = |r: usize| !slide_out || slide_out_record_drawn(r, slot_y, st.slide_out_fix);
     let mut f = BarFrame {
         background: drawn(st.first),
         icons: Vec::new(),
@@ -149,7 +151,7 @@ pub fn bar_frame_layout(st: &BarState, slot_y: i32, slide_out: bool) -> BarFrame
         f.icons.push(BarIcon {
             record,
             slot,
-            x: slot_x(slot, st.pickup_slot, st.fixes),
+            x: slot_x(slot, st.pickup_slot, st.pickup_fix),
             y: slot_y,
         });
     }
@@ -186,7 +188,8 @@ impl Engine {
             first: self.bar_first,
             held: self.vars.get("objetenmain"),
             pickup_slot: self.bar_pickup_slot,
-            fixes: self.enhancements().minor_bug_fixes,
+            slide_out_fix: self.enhancements().fix(BugFix::BarSlideOut),
+            pickup_fix: self.enhancements().fix(BugFix::PickupIcon),
         }
     }
 
@@ -698,8 +701,9 @@ mod tests {
     /// background flag, the icons (record, slot, sprite, hotspot) and the
     /// md5 of the bar's rows on each of the 165 frames, the slivers of the
     /// records from 9 on at slot y 506 included, and slotX[0..8] against
-    /// [`slot_x`]. With the minor bug fixes the frames from 506 show the
-    /// view alone and a pick-up's slot stays at 70 s + 42.
+    /// [`slot_x`]. With the slide-out's fix the frames from 506 show the
+    /// view alone; with the pick-up's fix a pick-up's slot stays at
+    /// 70 s + 42; each fix alone and both.
     #[test]
     fn slide_out_frames_vs_original() {
         let Some(dir) = std::env::var_os("ATLANTIS_DATA") else {
@@ -719,7 +723,10 @@ mod tests {
         let icon = |id: i32| icons.get((id - 1000) as usize);
         let (mut frames, mut slivers, mut pickups) = (0, 0, 0);
         let mut bad = Vec::new();
-        for fixes in [false, true] {
+        for (slide_out_fix, pickup_fix) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let fixes = slide_out_fix || pickup_fix;
             let mut records = Vec::new();
             let (mut first, mut held, mut pickup) = (0, 0, None);
             for w in golden_lines(include_str!("../../tests/golden/ui_bar_slide_out.txt")) {
@@ -755,7 +762,8 @@ mod tests {
                     first,
                     held,
                     pickup_slot: pickup,
-                    fixes,
+                    slide_out_fix,
+                    pickup_fix,
                 };
                 let f = bar_frame_layout(&st, slot_y, true);
                 let mut screen = view.clone();
@@ -792,20 +800,21 @@ mod tests {
                     if got != want {
                         bad.push(format!("{}: {got:?}", w.join(" ")));
                     }
-                } else if slot_y >= 0x1fa {
+                } else if slide_out_fix && slot_y >= 0x1fa {
                     // The view alone from 506.
                     if got != ("0", "-", view_only.clone()) {
                         bad.push(format!("fixes {}: {got:?}", w.join(" ")));
                     }
                 } else {
-                    // The same frames before 506, but for a pick-up's slot
-                    // at 70 s + 42 (its icon moved: another md5).
+                    // The same frames (before 506 with the slide-out's
+                    // fix), but with the pick-up's fix for a pick-up's
+                    // slot at 70 s + 42 (its icon moved: another md5).
                     let mut moved = false;
                     let want_icons = field(&w, "icons")
                         .split(',')
                         .map(|i| {
                             let p: Vec<&str> = i.split(':').collect();
-                            if p.len() == 5 && pickup == p[1].parse().ok() {
+                            if pickup_fix && p.len() == 5 && pickup == p[1].parse().ok() {
                                 moved = true;
                                 let s: i32 = p[1].parse().unwrap();
                                 format!("{}:{}:{}:{}:{}", p[0], p[1], p[2], 70 * s + 42, p[4])

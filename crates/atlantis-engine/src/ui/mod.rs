@@ -14,6 +14,7 @@ pub mod player_screen;
 use atlantis_data::sprite::{limits, read_spr_file, SprSprite};
 
 use crate::engine::Engine;
+use crate::enhancements::BugFix;
 use crate::warp::{SCREEN_H, SCREEN_W};
 use layout::{font_min_blits, FontMin, FontMinAdvances, MenuWalk};
 
@@ -367,11 +368,12 @@ impl Engine {
 
     /// A member the original reads from the open archive at the time it
     /// uses it, so from the disc in the drive: the current disc's copy
-    /// (0x00772913). With the minor bug fixes, the first copy, disc 1's:
+    /// (0x00772913). With the disc revision's fix
+    /// ([`crate::enhancements::BugFix::DiscRevision`]), the first copy, disc 1's:
     /// the Dutch CD's disc 2 holds an older revision of CREDITS.TXT and
     /// FONTMIN / FONTMIN2 (the others carry the same bytes on every disc).
     pub async fn read_from_current_disc(&self, name: &str) -> Option<Vec<u8>> {
-        let disc = (!self.enhancements().minor_bug_fixes).then_some(self.disc);
+        let disc = (!self.enhancements().fix(BugFix::DiscRevision)).then_some(self.disc);
         self.game.big.set_disc_copy(disc);
         let data = self.read(name).await;
         self.game.big.set_disc_copy(None);
@@ -388,7 +390,7 @@ impl Engine {
     /// Read again only when that copy is not the one loaded.
     pub async fn load_fontmin_from_current_disc(&mut self) {
         const FONTMIN: &str = "SPRITE\\2D\\FONTMIN.SPR";
-        let disc = (!self.enhancements().minor_bug_fixes).then_some(self.disc);
+        let disc = (!self.enhancements().fix(BugFix::DiscRevision)).then_some(self.disc);
         self.game.big.set_disc_copy(disc);
         let from = self
             .game
