@@ -429,20 +429,21 @@ fn all_but_ireland() -> BugFixes {
 
 /// Every type-4 zone of both views clicked in every Irish chapter, with
 /// an empty hand and each object an Irish `cliczone` condition names:
-/// with the Ireland fix off (every other fix on) the entries meant for
-/// named zones that answer are exactly the census's (the start state of
-/// each chapter); with the Ireland fix alone, none.
+/// with the Ireland fix off (every fix off, as the original, and every
+/// other fix on) the entries meant for named zones that answer are
+/// exactly the census's (the start state of each chapter); with the
+/// Ireland fix alone, none.
 #[test]
 fn every_zone_every_chapter_every_hand() {
     let Some((_, dir)) = game() else { return };
     let chapters = Chapters::read(&dir);
     let mut t = 100.0;
-    for fixes in [false, true] {
-        let set = if fixes {
-            BugFixes::only(BugFix::IrelandClicks)
-        } else {
-            all_but_ireland()
-        };
+    for set in [
+        BugFixes::NONE,
+        all_but_ireland(),
+        BugFixes::only(BugFix::IrelandClicks),
+    ] {
+        let fixes = set.ireland_clicks;
         let mut answered = BTreeSet::new();
         for chapter in CHAPTERS {
             for view in [2, 6] {
@@ -486,6 +487,6 @@ fn every_zone_every_chapter_every_hand() {
             }
             w
         };
-        assert_eq!(answered, want, "fixes {fixes}");
+        assert_eq!(answered, want, "fixes {set:?}");
     }
 }

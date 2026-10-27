@@ -269,7 +269,7 @@ it. Its entries:
     again from its start.
   - **Music: the rare missing mark (1 in 32768)**: once in 32768 random
     starts of a music, the original picks a place past the track's last
-    and stops with a fatal error (it saves and quits); with the fix the
+    mark and stops with a fatal error (it saves and quits); with the fix the
     track plays from its last place.
   - **Ireland: cross and ogham clicks**: a click on Brigid's cross or on
     an ogham stone works the puzzle and nothing else, where the original
@@ -286,8 +286,8 @@ folder of the per-user data folder (`~/.local/share/atlantis-native/atlantis2`
 on Linux, `%APPDATA%\atlantis-native\atlantis2` on Windows,
 `~/Library/Application Support/atlantis-native/atlantis2` on macOS),
 beside the saves (`save\ATL<player>_<slot>.SAV`, the original's files)
-and the original's options file `atlant2.cfg`, one line per fix
-(`fix_music_end`, `fix_music_restart`, `fix_music_mark`,
+and the original's options file `atlant2.cfg`. `settings.ini` has one
+line per fix (`fix_music_end`, `fix_music_restart`, `fix_music_mark`,
 `fix_ireland_clicks`, each `on` or `off`); a `settings.ini` written by
 an earlier version, with its single `minor_bug_fixes` line, is still
 read: that line sets every fix. From the command line, `--hd` turns HD on and

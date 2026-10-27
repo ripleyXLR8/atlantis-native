@@ -342,7 +342,7 @@ fn the_entry_and_click_hooks_as_the_original() {
     capture();
     let mut e = in_view_2(files);
     // The golden's `CLICZONE` is the original's: the zone's plain value
-    // (the minor bug fixes leave it as it was, `tests/plain_values.rs`).
+    // (the Ireland fix, `BugFix::IrelandClicks`, leaves it as it was, `tests/plain_values.rs`).
     e.enhancements = Enhancements::original();
     let names = e.script_state().unwrap().names.clone();
     let id = |n: &str| names.id(defnames::OBJETS, n.as_bytes()).unwrap() as i32;
