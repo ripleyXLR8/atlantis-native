@@ -7,6 +7,10 @@ use atlantis_data::GameError;
 pub const HELP_URL: &str =
     "https://github.com/ripleyXLR8/atlantis-native/blob/main/docs/GUIDE.md#getting-the-game-files";
 
+/// The page of the player's guide on Atlantis II (its folders, its discs).
+pub const HELP_URL_A2: &str =
+    "https://github.com/ripleyXLR8/atlantis-native/blob/main/docs/GUIDE.md#atlantis-ii";
+
 /// What to tell the player about the folder `shown` whose files are
 /// `names` (lower case), which `Game::open` refused with `err`.
 pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
