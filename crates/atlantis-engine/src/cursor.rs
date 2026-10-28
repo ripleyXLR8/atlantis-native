@@ -49,8 +49,8 @@ pub struct WarpCursorInput {
     pub hidden: bool,
     /// 0x004960c8 == 1 (edge-scroll look mode).
     pub edge_scroll: bool,
-    /// The 2001 build's rule for ids 0x219 / 0x21a
-    /// (`ExeBuild::cursor_id_rule`).
+    /// The 2001 build's rule for ids 0x219 / 0x21a, also in the US
+    /// retail CD's build (`ExeBuild::cursor_id_rule`).
     pub id_rule: bool,
 }
 

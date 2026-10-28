@@ -157,7 +157,8 @@ impl LineHeader {
 ///   one and its UBB is not "none" (0x004287f6), then draw a second time
 ///   against the first draw (0x00428896; a Seth line after the 0x230 check,
 ///   0x00428979..0x004289e3);
-/// - perso 0x230 is forced to camera 2 in the 2001 build (0x0042892e).
+/// - perso 0x230 is forced to camera 2 in the 2001 build (0x0042892e) and
+///   the US retail CD's (atlantis-cd-en-687104 @ 0x004276da).
 ///
 /// The draws read the millisecond clock (`FUN_00451d0c`, timeGetTime), not
 /// rand, as the original's: its loop spins until the clock gives a usable

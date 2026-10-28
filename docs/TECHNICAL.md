@@ -77,7 +77,7 @@ with three groups, those of the ScummVM port:
 | Group | Default | What it changes |
 |---|---|---|
 | `fixes` (`BugFixes`) | all on | the fixes of minor bugs of the original, each its own switch (`BugFix`, below) |
-| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
+| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and May 1997 English and French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
 The bug fixes, each with its `settings.ini` key; the last seven fix a
@@ -352,7 +352,7 @@ first glyph past 635). Its English subtitles (the SUBTITLES button's
 second state) are cut as the reference's and drawn in the same font, at
 the reference's base.
 
-The 1997 English CD has no Windows text: it draws its subtitles with the
+The May 1997 English CD has no Windows text: it draws its subtitles with the
 8x8 pixel font `DIALOG\FONTS.BIN` of the game's archives (one glyph per
 byte, the IBM PC set), white over a black shadow, in rows 10 pixels apart
 broken in a 75-byte window, and the port does the same (`BitmapFont`,
@@ -695,7 +695,7 @@ credits font's table that follows it; the port does the same with each
 build's table (in the August 1997 French build a typed `£` advances 2 pixels,
 in the 2001 build 14).
 
-The May 1997 French build is the English 1997 build's code, compiled five
+The May 1997 French build is the English May 1997 build's code, compiled five
 days earlier against an older `cryo.dll`, with its own music copy rules.
 By default the port follows them; with the LOADMUSIK fix (`fix_loadmusik`, on by
 default) LOADMUSIK copies its tracks one by one as the other builds do,
@@ -3682,7 +3682,7 @@ back) into `yucatan-*.png`.
 
 Tests that need the game files read the game directory from the
 `ATLANTIS_DATA` environment variable (the 2001 English CD) and are
-skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
+skipped without it; `ATLANTIS_DATA_1997` names a folder of the May 1997
 English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
 retail CD, `ATLANTIS_DATA_FR1997_MAY` one of the May 1997 French retail CD
 (the first pressing), `ATLANTIS_DATA_DE1997` one of the German retail CD,
