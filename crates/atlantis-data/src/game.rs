@@ -15,6 +15,13 @@ pub enum GameError {
     /// The CD release's archives (one per disc) that are not in the
     /// folder: their numbers, 1..4.
     MissingArchives(Vec<u8>),
+    /// A language of the DVD whose side ('A' or 'B') is not the one given
+    /// (the drive holds the other side, or only the other side's image is
+    /// there).
+    DvdOtherSide(char),
+    /// A language of the DVD without its side's shared folders (`CYCLO`,
+    /// `DIALOG`, `PUZZLES`, `UBB_VUE`, `WAM`): its folder copied alone.
+    DvdSharedFolders,
 }
 
 impl std::fmt::Display for GameError {
@@ -29,6 +36,14 @@ impl std::fmt::Display for GameError {
                 let names: Vec<String> = n.iter().map(|n| format!("BIGCD{n}.BIG")).collect();
                 write!(f, "{} not found", names.join(", "))
             }
+            GameError::DvdSharedFolders => write!(
+                f,
+                "a language of the DVD without the side's CYCLO, DIALOG, PUZZLES, UBB_VUE and WAM"
+            ),
+            GameError::DvdOtherSide(side) => write!(
+                f,
+                "this version is on the other side of the DVD (side {side})"
+            ),
         }
     }
 }
@@ -50,7 +65,13 @@ impl Game {
         let icon = crate::exe_icon::exe_icon(&exe_bytes);
         let exe = ExeTables::read(&exe_bytes)
             .ok_or(GameError::UnknownExecutable(exe_bytes.len() as u64))?;
-        // The GOG release has a SCENAR directory beside its stubs.
+        // The DVD's program reads the films and the panoramas from its
+        // side's folder ([`crate::dvd::DvdFiles`]).
+        if exe.build.dvd_side().is_some() && !src.has_dir("UBB_VUE") {
+            return Err(GameError::DvdSharedFolders);
+        }
+        // The GOG release (and the DVD, the Perfect Edition) has a SCENAR
+        // directory beside its stubs.
         let unpacked = src.has_dir("SCENAR");
         let mut big = BigArchive::new(src);
         let mut missing = Vec::new();
@@ -82,7 +103,9 @@ impl Game {
 /// Which release of the game a folder holds, for display.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Edition {
-    /// "CD", "CD, patch 1.01" or "GOG.com".
+    /// "CD", "CD, patch 1.01", "GOG.com", "DVD" (Cryo's DVD-ROM of 1998)
+    /// or "Perfect Edition" (Tgames' 2018 package of that DVD's English
+    /// program).
     pub release: &'static str,
     /// "English", "French", ... (`None` when not recognised).
     pub language: Option<&'static str>,
@@ -115,28 +138,39 @@ impl Game {
     /// The 1.01 patch's executable is French ("#NOUVEAU JOUEUR") over
     /// whichever CD it was installed on: the language is its interface's.
     /// The Chinese builds keep the English row ("New Player", no '#'): their
-    /// language is their texts' code page's.
+    /// language is their texts' code page's. The 1998 DVD builds' rows have
+    /// a '#' and the 1997 case: "#Nieuwe speler", "#Ny spelare",
+    /// "#Jugador nuevo", "#Nuovo Giocatore".
     pub fn edition(&self) -> Edition {
         let name = self.exe.build.name;
         let marker = self.exe.new_player_marker.as_slice();
-        let starts = |p: &[u8]| marker.len() >= p.len() && &marker[..p.len()] == p;
+        // The row without its '#', in capitals ("#Nieuwe speler" of the
+        // Dutch DVD, "NOUVEAU JOUEUR" of the French CD).
+        let row = marker
+            .strip_prefix(b"#")
+            .unwrap_or(marker)
+            .to_ascii_uppercase();
+        let starts = |p: &[u8]| row.starts_with(p);
         let language = if self.exe.build.text_code_page == TextCodePage::Windows950 {
             Some("Traditional Chinese")
         } else if self.exe.build.text_code_page == TextCodePage::Windows936 {
             Some("Simplified Chinese")
-        } else if starts(b"#NOUVEAU") || starts(b"NOUVEAU JOUEUR") {
+        } else if self.exe.build.text_code_page == TextCodePage::Windows932 {
+            // The Japanese DVD keeps the English row too.
+            Some("Japanese")
+        } else if starts(b"NOUVEAU") {
             Some("French")
-        } else if starts(b"#NEUE") || starts(b"NEUER SPIELER") {
+        } else if starts(b"NEUE") {
             Some("German")
-        } else if starts(b"Nieuwe speler") {
+        } else if starts(b"NIEUWE") {
             Some("Dutch")
-        } else if starts(b"Ny spelare") {
+        } else if starts(b"NY SPELARE") {
             Some("Swedish")
-        } else if starts(b"#NUEVO") || starts(b"Jugador nuevo") {
+        } else if starts(b"NUEVO") || starts(b"JUGADOR") {
             Some("Spanish")
-        } else if starts(b"#NUOVO") || starts(b"Nuovo Giocatore") {
+        } else if starts(b"NUOVO") {
             Some("Italian")
-        } else if starts(b"#NEW") || starts(b"#New") || starts(b"New Player") {
+        } else if starts(b"NEW") {
             Some("English")
         } else {
             None
@@ -146,6 +180,10 @@ impl Game {
                 "GOG.com"
             } else if name.starts_with("atlantis-patch") {
                 "CD, patch 1.01"
+            } else if name.starts_with("atlantis-dvd") {
+                "DVD"
+            } else if name.starts_with("atlantis-pe") {
+                "Perfect Edition"
             } else {
                 "CD"
             },

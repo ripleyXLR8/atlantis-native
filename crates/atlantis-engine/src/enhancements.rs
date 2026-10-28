@@ -120,12 +120,29 @@ pub enum BugFix {
     /// click area takes the shifted width and height). Those builds only
     /// (`ExeBuild::menu_toggle_sprites`).
     SubtitlesToggle,
+    /// With the Dutch and Swedish DVDs, the subtitles show the letters their
+    /// texts hold (é è ë ï ú, ä å ö Ä Å Ö), read in the DOS code page they
+    /// are written in (the CDs' files, for those CDs' bitmap font). Off, as
+    /// the original: its program draws them through Windows (GDI TextOutA,
+    /// atlantis-dvd-sv-695808 FUN_0042f384) in the Windows code page, so
+    /// `„ † ” Ž ™ ‚ ‰ Š ‹ £` stand in their place (and nothing for `Å`).
+    /// Those builds only (`ExeBuild::dos_subtitle_texts`).
+    DosLetters,
+    /// With the Japanese DVD, its two publishers' logo films, which the
+    /// disc lacks, are skipped at start-up without a word. Off, as the
+    /// original (atlantis-dvd-ja-696832 WinMain @ 0x00419713..0x00419772,
+    /// FUN_00423dcc @ 0x00423df2..0x00423e22): an error box "Fichier
+    /// introuvable : \face_b\ubb_vue\logogaga.hnm", then another for
+    /// `logospik.hnm`, each waiting for OK, before the Cryo logo. A film
+    /// that is there plays either way. That build only
+    /// (`ExeBuild::startup_logos`).
+    StartupLogos,
 }
 
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 15] = [
+    pub const ALL: [BugFix; 17] = [
         BugFix::MusicLoop,
         BugFix::HeadOverlay,
         BugFix::HeadFirstFrame,
@@ -141,6 +158,8 @@ impl BugFix {
         BugFix::MenuLineWidth,
         BugFix::ChineseRows,
         BugFix::SubtitlesToggle,
+        BugFix::DosLetters,
+        BugFix::StartupLogos,
     ];
 
     /// Its `settings.ini` key.
@@ -161,6 +180,8 @@ impl BugFix {
             BugFix::MenuLineWidth => "fix_menu_line_width",
             BugFix::ChineseRows => "fix_chinese_rows",
             BugFix::SubtitlesToggle => "fix_subtitles_toggle",
+            BugFix::DosLetters => "fix_dos_letters",
+            BugFix::StartupLogos => "fix_startup_logos",
         }
     }
 
@@ -182,6 +203,8 @@ impl BugFix {
             BugFix::MenuLineWidth => build.menu_positioned_byte_width != 22,
             BugFix::ChineseRows => build.cjk_breaker == CjkBreaker::Gb2312,
             BugFix::SubtitlesToggle => build.menu_toggle_sprites,
+            BugFix::DosLetters => build.dos_subtitle_texts,
+            BugFix::StartupLogos => !build.startup_logos.is_empty(),
             _ => true,
         }
     }
@@ -197,6 +220,8 @@ impl BugFix {
                 | BugFix::MenuLineWidth
                 | BugFix::ChineseRows
                 | BugFix::SubtitlesToggle
+                | BugFix::DosLetters
+                | BugFix::StartupLogos
         )
     }
 
@@ -217,7 +242,7 @@ impl BugFix {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FixData {
     /// A text the sprite fonts draw holds `ß` (0xe1; [`BugFix::SharpS`]):
-    /// the credits, the menus (`SPRLIST\*.TXT`) but with the builds that
+    /// the credits, the menus ([`is_menu_text`]) but with the builds that
     /// draw their bytes above 0xa8 as spaces (`menu_high_bytes_as_space`),
     /// EPI.TXT's chapter names but with the builds whose LOAD list is
     /// sprites (`LoadList::Sprites`: the Chinese EPI.TXT's double-byte
@@ -228,6 +253,17 @@ pub struct FixData {
     /// run) has a copy on some disc that differs from the first disc's
     /// ([`BugFix::DiscRevision`]).
     pub disc_revisions: bool,
+}
+
+/// Whether `name` is a menu text the menu walk draws (`SPRLIST\*MENU.TXT`,
+/// `ERRORn.TXT`, `WAIT.TXT`): not a sprite list, nor a leftover of the
+/// developers that no build reads (the Japanese DVD's `ALLSAVE.TXT` and
+/// `CREDTEST.TXT`, which hold `ß`).
+fn is_menu_text(name: &str) -> bool {
+    let Some(n) = name.strip_prefix("SPRLIST\\") else {
+        return false;
+    };
+    n.ends_with("MENU.TXT") || (n.starts_with("ERROR") && n.ends_with(".TXT")) || n == "WAIT.TXT"
 }
 
 /// The members read from the disc in the drive; CREDITS.TXT only with the
@@ -293,7 +329,7 @@ impl FixData {
                 data.sharp_s |= match name.as_str() {
                     "SPRLIST\\CREDITS.TXT" => true,
                     "SPRLIST\\EPI.TXT" => epi_drawn,
-                    n => n.starts_with("SPRLIST\\") && menus_drawn,
+                    n => is_menu_text(n) && menus_drawn,
                 };
             }
             if disc.is_some() {
@@ -570,6 +606,29 @@ mod tests {
             of("atlantis-cd-zh-cn-692736", plain),
             [HexagonPieces, ChineseRows, SubtitlesToggle]
         );
+        // The 1998 DVD's program (the hexagon not forced, as the 1997 and
+        // the Chinese builds), its Italian menus and the Dutch and Swedish
+        // DOS texts; the Perfect Edition's.
+        for b in [
+            "atlantis-dvd-en-695296",
+            "atlantis-dvd-fr-695296",
+            "atlantis-dvd-de-695296",
+            "atlantis-dvd-es-695296",
+            "atlantis-pe-2018-695296",
+        ] {
+            assert_eq!(of(b, plain), [HexagonPieces], "{b}");
+        }
+        assert_eq!(
+            of("atlantis-dvd-de-695296", german),
+            [HexagonPieces, SharpS]
+        );
+        assert_eq!(
+            of("atlantis-dvd-it-695296", plain),
+            [HexagonPieces, MenuLineWidth]
+        );
+        for b in ["atlantis-dvd-nl-695808", "atlantis-dvd-sv-695808"] {
+            assert_eq!(of(b, plain), [HexagonPieces, DosLetters], "{b}");
+        }
     }
 
     /// A run's `--original` (every switch off): a change of one fix in the

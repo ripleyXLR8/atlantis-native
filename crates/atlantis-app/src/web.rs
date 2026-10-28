@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+use atlantis_data::dvd::DvdLanguage;
 use atlantis_data::{BigArchive, FileSource, Game};
 use atlantis_engine::hooks::{HookFuture, Loader};
 use atlantis_engine::{SaveStore, Start};
@@ -226,20 +227,33 @@ fn is_original_save(key: &str) -> bool {
             || (key.starts_with('p') && key.ends_with(".gam")))
 }
 
-/// Called by the page with the picked folder.
 /// The port's version and commit, for the page.
 #[wasm_bindgen]
 pub fn version() -> String {
     crate::version_string()
 }
 
+/// The files of language `l` of the DVD whose root is `root` in `all`, as
+/// its program reads them ([`atlantis_data::dvd::DvdFiles`]): the shared
+/// folders from the side's folder, the rest from the language's.
+fn dvd_files(all: HashMap<String, File>, l: &DvdLanguage, root: &str) -> HashMap<String, File> {
+    all.into_iter()
+        .filter_map(|(k, f)| atlantis_data::dvd::path_for_language(&k, l, root).map(|r| (r, f)))
+        .collect()
+}
+
+/// Called by the page with the picked folder, and for Cryo's DVD the
+/// language's folder (`ENG`, ...) once the player chose it: without it,
+/// a DVD of more than one language is refused with the languages found,
+/// `LANGUAGES:` then `folder=language` pairs separated by `;`, for the
+/// page to ask.
 #[wasm_bindgen]
-pub async fn start(files: FileList) -> Result<(), JsValue> {
+pub async fn start(files: FileList, language: Option<String>) -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
     let _ = console_log::init_with_level(log::Level::Info);
 
-    // Paths are "<picked folder>/<path>"; drop the first component.
-    let mut by_key: HashMap<String, File> = HashMap::new();
+    // Paths are "<picked folder>/<path>".
+    let mut all: HashMap<String, File> = HashMap::new();
     for i in 0..files.length() {
         let Some(f) = files.get(i) else { continue };
         // webkitRelativePath is not in web-sys's stable API.
@@ -247,9 +261,62 @@ pub async fn start(files: FileList) -> Result<(), JsValue> {
             .ok()
             .and_then(|v| v.as_string())
             .unwrap_or_else(|| f.name());
-        let rel = rel.split_once('/').map_or(rel.as_str(), |(_, r)| r);
-        by_key.insert(key(rel), f);
+        all.insert(key(&rel), f);
     }
+    // Cryo's DVD: one of its languages.
+    let mut dvd = atlantis_data::dvd::languages_in_paths(all.keys().map(String::as_str));
+    // Only the languages whose program the port knows (the desktop library
+    // lists no other): a known build is not reported as an unknown one.
+    let mut known = Vec::with_capacity(dvd.len());
+    let mut unsupported = Vec::new();
+    for (l, root) in dvd {
+        let exe = format!("{root}{}/atlantis.exe", l.path().to_ascii_lowercase());
+        let Some(f) = all.get(&exe) else { continue };
+        let bytes = fetch(f, 0, f.size() as u64).await?;
+        if atlantis_data::exe::build_of(&bytes).is_some() {
+            known.push((l, root));
+        } else {
+            log::info!("the DVD's {}: its program is not supported", l.language);
+            unsupported.push(l.language);
+        }
+    }
+    if known.is_empty() && !unsupported.is_empty() {
+        return Err(format!(
+            "Cryo's DVD: its {} version is not supported yet. Choose the folder \
+             of another of its languages.",
+            unsupported.join(", ")
+        )
+        .into());
+    }
+    dvd = known;
+    let mut by_key: HashMap<String, File> = if dvd.is_empty() {
+        // Drop the picked folder's name.
+        all.into_iter()
+            .map(|(k, f)| {
+                (
+                    k.split_once('/').map_or(k.clone(), |(_, r)| r.to_string()),
+                    f,
+                )
+            })
+            .collect()
+    } else {
+        let chosen = match &language {
+            Some(want) => dvd
+                .iter()
+                .find(|(l, _)| l.folder.eq_ignore_ascii_case(want)),
+            None if dvd.len() == 1 => dvd.first(),
+            None => None,
+        };
+        let Some((l, root)) = chosen else {
+            let list: Vec<String> = dvd
+                .iter()
+                .map(|(l, _)| format!("{}={}", l.folder, l.language))
+                .collect();
+            return Err(format!("LANGUAGES:{}", list.join(";")).into());
+        };
+        log::info!("the DVD's {} ({})", l.language, l.path());
+        dvd_files(all, l, root)
+    };
     // The player may pick the folder above the game's: take the shallowest
     // folder that holds atlantis.exe as the game's.
     if !by_key.contains_key("atlantis.exe") {

@@ -2,7 +2,9 @@
 //! atlantis-cd-zh-tw-696832 (Big5) and atlantis-cd-zh-cn-692736 (GB2312):
 //! a 75-byte window cut backwards after a double-byte punctuation mark
 //! (in place of the other GDI builds' 100-byte window cut at a space,
-//! [`super::split_subtitle`]).
+//! [`super::split_subtitle`]); and their parent's, the Japanese DVD build's
+//! `FUN_0042f618` with its Japanese texts: a row per space
+//! ([`japanese_rows`]).
 //!
 //! Both read the subtitle buffer `0x00603cc0` (a space, the byte after
 //! `]`, then the text) and write rows of 0x6e bytes at `0x006041c0`, their
@@ -55,7 +57,8 @@ pub struct CjkSplit {
 }
 
 impl CjkSplit {
-    /// The breaker of `build`, `None` for the builds that cut at spaces.
+    /// The breaker of `build`, `None` for the builds with the reference's
+    /// 100-byte window.
     pub fn of_build(build: &ExeBuild, row_fix: bool) -> Option<CjkSplit> {
         (build.cjk_breaker != CjkBreaker::None).then_some(CjkSplit {
             breaker: build.cjk_breaker,
@@ -90,7 +93,7 @@ impl CjkSplit {
                     (0xa1, 0xa1) | (0xa3, 0xac) | (0xa1, 0xa3) | (0xa3, 0xbf) | (0xa3, 0xa1)
                 ) || lead == b'\r'
             }
-            CjkBreaker::None => false,
+            CjkBreaker::None | CjkBreaker::Spaces => false,
         }
     }
 
@@ -116,9 +119,38 @@ impl CjkSplit {
                 (0xa3, 0xac) | (0xa1, 0xa3) | (0xa3, 0xbf) | (0xa3, 0xa1) => (1, 2),
                 _ => (0, 2),
             },
-            CjkBreaker::None => (0, 2),
+            CjkBreaker::None | CjkBreaker::Spaces => (0, 2),
         }
     }
+}
+
+/// atlantis-dvd-ja-696832 `FUN_0042f618` with the subtitle language
+/// counter (0x00486098) at 0, its Japanese texts: the rows, as ranges of
+/// the buffer (a space, then `text`). The text is copied byte by byte from
+/// after the buffer's leading space; each ASCII space ends a row (its NUL
+/// written in the space's place, the next row started), a CR or the NUL
+/// ends the text, and the row then open is the last, counted even when
+/// empty (@ 0x0042f798..0x0042f84e). No window and no width: a row is
+/// drawn whole (the Shift-JIS trail bytes are never 0x20, so a row never
+/// starts inside a character). The shipped texts end their sentences with
+/// a space: 2477 of the 2542 lines end with one, whose empty last row
+/// lifts the others by a row. (The original writes rows past its eighth
+/// beyond its buffer; no shipped text has more than six.)
+pub fn japanese_rows(text: &[u8]) -> Vec<Range<usize>> {
+    let end = text
+        .iter()
+        .position(|&c| c == b'\r' || c == 0)
+        .unwrap_or(text.len());
+    let mut rows = Vec::new();
+    let mut start = 1;
+    for (i, &c) in text[..end].iter().enumerate() {
+        if c == b' ' {
+            rows.push(start..i + 1);
+            start = i + 2;
+        }
+    }
+    rows.push(start..end + 1);
+    rows
 }
 
 /// `FUN_0042f424` on the subtitle buffer: the rows, as ranges of the
@@ -163,6 +195,9 @@ impl CjkSplit {
 /// to it.) A later window without a mark finds no cut, the last one lying
 /// before `s`, and takes the port's cut.
 pub fn cjk_subtitle_rows(text: &[u8], split: CjkSplit) -> Vec<Range<usize>> {
+    if split.breaker == CjkBreaker::Spaces {
+        return japanese_rows(text);
+    }
     let mut b = Vec::with_capacity(text.len() + 1);
     b.push(b' ');
     b.extend_from_slice(text);
@@ -270,7 +305,7 @@ pub fn split_subtitle_cjk(text: &[u8], split: CjkSplit) -> Vec<Vec<u8>> {
 #[allow(clippy::single_range_in_vec_init)]
 mod tests {
     use super::*;
-    use atlantis_data::exe::{BUILDS, ZH_CN, ZH_TW};
+    use atlantis_data::exe::{BUILDS, DVD_JA, ZH_CN, ZH_TW};
 
     /// 一二三四五六七八九十 in Big5 and in GB2312.
     const TEN_BIG5: &[u8] =
@@ -562,6 +597,53 @@ mod tests {
         let s = Subtitler::Gdi(font, None);
         assert_eq!(s.split(&blank), s.split(&t));
         assert_eq!(s.split(b"a \t"), s.split(b"a"));
+    }
+
+    /// atlantis-dvd-ja-696832 FUN_0042f618 run unmodified under emulation
+    /// with the language counter at 0 (the samples of the golden
+    /// video_subtitles_dvd_ja.txt): a row per space, the last always.
+    #[test]
+    fn japanese_rows_match_original() {
+        let split = CjkSplit::of_build(&DVD_JA, false).unwrap();
+        let rows = |t: &[u8]| split_subtitle_cjk(t, split);
+        let v = |r: &[&[u8]]| r.iter().map(|x| x.to_vec()).collect::<Vec<_>>();
+        assert_eq!(rows(b"a b c"), v(&[b"a", b"b", b"c"]));
+        assert_eq!(rows(b"a b c "), v(&[b"a", b"b", b"c", b""]));
+        assert_eq!(rows(b"a  b"), v(&[b"a", b"", b"b"]));
+        assert_eq!(rows(b" a"), v(&[b"", b"a"]));
+        assert_eq!(rows(b""), v(&[b""]));
+        assert_eq!(rows(&b"word ".repeat(30)).len(), 31);
+        let long = [b"x".repeat(60), b" ".to_vec()].concat().repeat(3);
+        assert_eq!(
+            rows(&long),
+            v(&[&[b'x'; 60], &[b'x'; 60], &[b'x'; 60], b""])
+        );
+        // The ranges are the buffer's (" " + the text).
+        assert_eq!(japanese_rows(b"ab c"), [1..3, 4..5]);
+        // A Shift-JIS pair whose trail byte is 0x40..0x7e: never a cut.
+        let t = b"\x83\x5a\x83\x58\x81\x42 \x82\xa0";
+        assert_eq!(rows(t), v(&[b"\x83\x5a\x83\x58\x81\x42", b"\x82\xa0"]));
+    }
+
+    /// The Japanese build's subtitler: the rows at the spaces and 36 px
+    /// lower while its texts are Japanese, the reference's rows otherwise.
+    #[test]
+    fn japanese_subtitler() {
+        use crate::subtitles::{split_subtitle, SubtitleFont, Subtitler, JAPANESE_ROWS_LOWER};
+        let font = std::rc::Rc::new(SubtitleFont::new().with_row_step(18));
+        let ja = Subtitler::Gdi(font.clone(), CjkSplit::of_build(&DVD_JA, false));
+        let en = Subtitler::Gdi(font, None);
+        let t = b"one two ";
+        assert_eq!(ja.split(t), [b"one".to_vec(), b"two".to_vec(), Vec::new()]);
+        assert_eq!(en.split(t), split_subtitle(b"one two"));
+        assert_eq!((ja.rows_lower(), en.rows_lower()), (JAPANESE_ROWS_LOWER, 0));
+        assert_eq!(JAPANESE_ROWS_LOWER, 36);
+        let items = ja.items(&ja.split(t), 0, 0);
+        // Row i of n at 0x1f2 - (n - i + 1) * 18 (the shadow first, 1 px
+        // lower): row 0 of 3 at 426, the empty last row at 462.
+        assert_eq!(items[1].y, 0x1f2 - 4 * 18);
+        assert_eq!(items[5].y, 462);
+        assert_eq!(en.items(&en.split(t), 0, 0)[1].y, 0x1ce - 2 * 18);
     }
 
     #[test]

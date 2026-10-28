@@ -7,6 +7,7 @@
 
 pub mod big;
 pub mod disc_image;
+pub mod dvd;
 pub mod exe;
 pub mod exe_icon;
 pub mod files;

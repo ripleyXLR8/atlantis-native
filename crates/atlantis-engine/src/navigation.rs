@@ -414,6 +414,12 @@ impl Engine {
                     .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                 self.mark_pointer_mouse();
                 self.run_ingame_menu().await;
+                // The Japanese DVD build's language clicks: the CON text in
+                // the new language (FUN_0041d768 reloads it at each click;
+                // nothing reads it while the menus are open).
+                if std::mem::take(&mut self.con_text_reload) {
+                    hooks.reload_con_text(self).await;
+                }
                 self.sync_pointer_mouse();
                 if self.should_abort() {
                     action = WARP_ABORT;
