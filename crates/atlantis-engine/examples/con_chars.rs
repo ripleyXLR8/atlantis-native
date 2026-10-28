@@ -4,7 +4,8 @@
 //!
 //!     cargo run -p atlantis-engine --example con_chars -- <game folder>
 //!
-//! The folder holds the game's files or the images of its discs. Every
+//! The folder holds the game's files or the images of its discs, or is a
+//! language's folder of Cryo's DVD (`<side>/FACE_B/JAP`). Every
 //! `SCENAR\*.CON` member is decoded in the build's code page; in a
 //! double-byte code page also every subtitle row the build's breaker cuts
 //! from each dialog line, with and without the minor bug fixes
@@ -20,6 +21,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use atlantis_data::disc_image::DiscSet;
+use atlantis_data::dvd::{DvdFiles, DvdLanguage};
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::subtitles::{split_subtitle_cjk, CjkSplit};
 
@@ -41,15 +43,26 @@ fn main() {
         std::process::exit(2);
     };
     let dir = Path::new(&dir);
-    let game = Game::open(Arc::new(StdDir::new(dir)))
-        .or_else(|_| {
-            let set = DiscSet::open_folder(dir).ok_or(atlantis_data::GameError::NoArchives)?;
-            Game::open(Arc::new(set))
-        })
-        .unwrap_or_else(|e| {
-            eprintln!("{}: {e}", dir.display());
-            std::process::exit(1);
-        });
+    // A language's folder of the DVD: its side's root and the language.
+    let dvd = || {
+        let lang = dir.file_name()?.to_str()?;
+        let face = dir.parent()?.file_name()?.to_str()?;
+        let l = DvdLanguage::of(face, lang)?;
+        let root = dir.parent()?.parent()?;
+        DvdFiles::new(Arc::new(StdDir::new(root)), l)
+    };
+    let game = match dvd() {
+        Some(files) => Game::open(Arc::new(files)),
+        None => Game::open(Arc::new(StdDir::new(dir))),
+    }
+    .or_else(|_| {
+        let set = DiscSet::open_folder(dir).ok_or(atlantis_data::GameError::NoArchives)?;
+        Game::open(Arc::new(set))
+    })
+    .unwrap_or_else(|e| {
+        eprintln!("{}: {e}", dir.display());
+        std::process::exit(1);
+    });
     let cp = game.exe.build.text_code_page;
     let splits: Vec<CjkSplit> = [false, true]
         .into_iter()
@@ -61,6 +74,13 @@ fn main() {
         .filter(|n| n.starts_with("SCENAR\\") && n.ends_with(".CON"))
         .map(str::to_string)
         .collect();
+    // The loose files' (the GOG.com release, the DVD).
+    for n in game.big.source().list("SCENAR") {
+        let name = format!("SCENAR\\{}", n.to_ascii_uppercase());
+        if name.ends_with(".CON") && !names.contains(&name) {
+            names.push(name);
+        }
+    }
     names.sort();
     let mut chars = BTreeSet::new();
     for name in &names {

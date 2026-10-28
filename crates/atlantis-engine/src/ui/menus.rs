@@ -469,6 +469,7 @@ impl Engine {
         // sprite records (the Chinese builds), the id 9 record of a walk
         // with SUBTITLES off keeps the x / y the session's table holds from
         // an earlier visit (see MenuRules::toggle_in_step).
+        menu.rules.subtitle_counter = self.subtitle_clicks;
         menu.walk(
             None,
             i32::from(self.subtitles),
@@ -503,6 +504,12 @@ impl Engine {
                         self.subtitles = on;
                         self.settings.subtitles = on;
                         changed = true;
+                        // The Japanese DVD build: the next language's CON
+                        // text (FUN_0041d768 @ 0x0041d82c..0x0041d833).
+                        if self.game.exe.build.subtitle_languages {
+                            self.con_text_reload = true;
+                            menu.rules.subtitle_counter = self.subtitle_clicks;
+                        }
                     }
                     Some(5) => {
                         // 0x0041d764..0x0041d794 (hover record 5):

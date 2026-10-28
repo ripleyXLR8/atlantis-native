@@ -4,8 +4,9 @@
 //! the ANSI code page, its bitmap and sprite fonts take the byte as the
 //! glyph index. A port that shows them through Unicode (an outline font,
 //! logs, tests) must decode them in the code page of the release's
-//! archives. The Chinese releases' texts are double-byte (Big5, GBK):
-//! their characters are decoded by `encoding_rs` (MIT / Apache-2.0).
+//! archives. The Chinese and Japanese releases' texts are double-byte
+//! (Big5, GBK, Shift-JIS): their characters are decoded by `encoding_rs`
+//! (MIT / Apache-2.0).
 
 /// How a release's text bytes read as letters.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -32,6 +33,14 @@ pub enum TextCodePage {
     /// few GBK pairs (`85 85`, `97 97`, `A8 44`). Decoded as the WHATWG GBK
     /// of `encoding_rs` (0x80 alone is `€`, as in code page 936).
     Windows936,
+    /// Code page 932, Shift-JIS: the Japanese DVD's `CHAPJ` texts
+    /// (atlantis-dvd-ja-696832 passes them to TextOutA in the font
+    /// "ＭＳ Ｐゴシック", read in the system's ANSI code page: FUN_0042f86c;
+    /// lead bytes 0x81..0x9f and 0xe0..0xfc, the bytes 0xa1..0xdf
+    /// half-width katakana). Decoded as the WHATWG Shift_JIS of
+    /// `encoding_rs`, which is code page 932 at every pair of the shipped
+    /// texts.
+    Windows932,
 }
 
 /// Windows-1252 for 0x80..0x9f (0 where the code page has no character);
@@ -63,6 +72,7 @@ impl TextCodePage {
         match self {
             TextCodePage::Windows950 => Some(encoding_rs::BIG5),
             TextCodePage::Windows936 => Some(encoding_rs::GBK),
+            TextCodePage::Windows932 => Some(encoding_rs::SHIFT_JIS),
             TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
         }
     }
@@ -74,9 +84,13 @@ impl TextCodePage {
     }
 
     /// Whether `b` starts a two-byte character: 0x81..0xfe in code pages
-    /// 950 and 936; never in the single-byte code pages.
+    /// 950 and 936, 0x81..0x9f and 0xe0..0xfc in 932; never in the
+    /// single-byte code pages.
     pub fn is_lead_byte(self, b: u8) -> bool {
-        self.is_double_byte() && (0x81..=0xfe).contains(&b)
+        match self {
+            TextCodePage::Windows932 => matches!(b, 0x81..=0x9f | 0xe0..=0xfc),
+            _ => self.is_double_byte() && (0x81..=0xfe).contains(&b),
+        }
     }
 
     /// The character of one byte (`'\0'` where the code page has none; a
@@ -87,7 +101,7 @@ impl TextCodePage {
             (TextCodePage::Windows1252, 0x80..=0x9f) => u32::from(CP1252_80[usize::from(b - 0x80)]),
             (TextCodePage::Windows1252, _) => u32::from(b),
             (TextCodePage::Dos850, _) => u32::from(CP850_80[usize::from(b - 0x80)]),
-            (TextCodePage::Windows950 | TextCodePage::Windows936, _) => {
+            (TextCodePage::Windows950 | TextCodePage::Windows936 | TextCodePage::Windows932, _) => {
                 return self.decode(&[b]).chars().next().unwrap_or('\0');
             }
         };
@@ -118,7 +132,7 @@ impl TextCodePage {
 
 #[cfg(test)]
 mod tests {
-    use super::TextCodePage::{Dos850, Windows1252, Windows936, Windows950};
+    use super::TextCodePage::{Dos850, Windows1252, Windows932, Windows936, Windows950};
 
     #[test]
     fn french_letters() {
@@ -178,5 +192,33 @@ mod tests {
         assert!(Windows936.is_double_byte() && !Dos850.is_double_byte());
         // The single-byte code pages are unchanged.
         assert_eq!(Windows1252.decode(&[0xa4, 0xa4]), "¤¤");
+    }
+
+    /// The Japanese DVD's texts: kana and kanji, the ideographic full
+    /// stop, half-width katakana (one byte), its lead bytes.
+    #[test]
+    fn japanese_characters() {
+        // ようこそセス。 (CHAPJ003's first words)
+        assert_eq!(
+            Windows932.decode(b"\x82\xe6\x82\xa4\x82\xb1\x82\xbb\x83\x5a\x83\x58\x81\x42"),
+            "ようこそセス。"
+        );
+        assert_eq!(
+            Windows932.decode(b"[Seth] \x93\xfa\x96\x7b!"),
+            "[Seth] 日本!"
+        );
+        // The face name of FUN_0041aec0 (0x004ac2d8).
+        assert_eq!(
+            Windows932.decode(b"\x82\x6c\x82\x72\x20\x82\x6f\x83\x53\x83\x56\x83\x62\x83\x4e"),
+            "ＭＳ Ｐゴシック"
+        );
+        assert_eq!(Windows932.char_of(0xb1), 'ｱ');
+        assert_eq!(Windows932.char_of(0x82), '\0');
+        assert!(Windows932.is_lead_byte(0x82) && Windows932.is_lead_byte(0xe0));
+        assert!(!Windows932.is_lead_byte(0xb1) && !Windows932.is_lead_byte(0xa0));
+        assert!(!Windows932.is_lead_byte(0xfd) && Windows932.is_double_byte());
+        // A trail byte is never an ASCII space (the Japanese breaker cuts
+        // at each 0x20 without tracking the lead bytes).
+        assert_eq!(Windows932.decode(&[0x81, 0x40]), "\u{3000}");
     }
 }

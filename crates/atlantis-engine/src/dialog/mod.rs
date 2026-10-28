@@ -38,7 +38,7 @@ use crate::hooks::HookFuture;
 use crate::music::apc_pcm;
 use crate::scripts::{DialogPresenter, GameOverRequest, LineOutcome, LineRequest};
 use crate::subtitles::{
-    player_font, BitmapBreaker, BitmapFont, CjkSplit, FontFace, SubtitleFont, Subtitler,
+    player_font, system_font, BitmapBreaker, BitmapFont, FontFace, SubtitleFont, Subtitler,
 };
 use crate::sys::{Input, Key, MouseButton};
 use crate::video_skip::VideoSkipState;
@@ -101,6 +101,78 @@ fn poll_input(e: &Engine) -> FrameInput {
 async fn drain(e: &Engine) {
     e.wait_buttons_up().await;
     while e.sys.poll_event().is_some() {}
+}
+
+/// The original's error box (dialog 0x65 of the executable's resources,
+/// its procedure's text for the error code): a modal Windows dialog with
+/// an OK button; the port draws its own box over the screen in `font` and
+/// waits for OK (a click on it, Enter, or Space on its focused button).
+/// Escape does nothing: the box's procedure ends the dialog on WM_COMMAND
+/// IDOK only (`cmp word [ebp+0x1c],1` then EndDialog, reference build
+/// @ 0x00419843..0x00419850, atlantis-dvd-ja-696832 @ 0x004199b3..
+/// 0x004199c0), and the IDCANCEL that Escape sends falls through. (The
+/// original also switches the display to a window first, FUN_0041a1d4;
+/// not done.)
+pub(crate) async fn error_box(e: &Engine, font: &SubtitleFont, text: &str) {
+    e.emit(Event::ErrorBox(text.to_string()));
+    let bytes = latin1_bytes(text);
+    let base = e.sys.screen.borrow().clone();
+    let w = (font.width(&bytes) + 40).clamp(160, SCREEN_W as i32 - 20);
+    let h = 76;
+    let (bx, by) = ((SCREEN_W as i32 - w) / 2, (SCREEN_H as i32 - h) / 2);
+    let ok = (bx + w / 2 - 36, by + h - 32, 72, 22);
+    let fill = |s: &mut [u16], x: i32, y: i32, w: i32, h: i32, c: u16| {
+        for yy in y.max(0)..(y + h).min(SCREEN_H as i32) {
+            for xx in x.max(0)..(x + w).min(SCREEN_W as i32) {
+                s[yy as usize * SCREEN_W + xx as usize] = c;
+            }
+        }
+    };
+    drain(e).await;
+    loop {
+        if e.sys.should_quit() {
+            break;
+        }
+        {
+            let mut s = e.sys.screen.borrow_mut();
+            s.copy_from_slice(&base);
+            fill(&mut s, bx, by, w, h, 0x0000);
+            fill(&mut s, bx + 1, by + 1, w - 2, h - 2, 0xc618);
+            font.draw(
+                &mut s,
+                SCREEN_W,
+                SCREEN_H,
+                &bytes,
+                bx + 20,
+                by + 14,
+                w - 30,
+                0,
+            );
+            fill(&mut s, ok.0, ok.1, ok.2, ok.3, 0x0000);
+            fill(&mut s, ok.0 + 1, ok.1 + 1, ok.2 - 2, ok.3 - 2, 0xdefb);
+            let tw = font.width(b"OK");
+            font.draw(
+                &mut s,
+                SCREEN_W,
+                SCREEN_H,
+                b"OK",
+                ok.0 + (ok.2 - tw) / 2,
+                ok.1 + 4,
+                ok.2,
+                0,
+            );
+            Dialogs::draw_arrow(e, &mut s);
+        }
+        e.sys.frame().await;
+        let fi = poll_input(e);
+        let (mx, my) = e.sys.mouse();
+        let on_ok = (ok.0..ok.0 + ok.2).contains(&mx) && (ok.1..ok.1 + ok.3).contains(&my);
+        if (fi.left_press && on_ok) || fi.enter {
+            break;
+        }
+    }
+    e.sys.screen.borrow_mut().copy_from_slice(&base);
+    drain(e).await;
 }
 
 /// Copies a `w` x `h` picture onto the 640x480 screen, centred, clipped.
@@ -223,19 +295,28 @@ impl Dialogs {
     /// files, else the port's ([`FontFace::for_release`]), the rows of the
     /// build's step.
     async fn font(&mut self, e: &Engine) -> Rc<SubtitleFont> {
-        if let Some(f) = &self.font {
+        // The code page of the moment (the Dutch and Swedish DVDs' DOS
+        // texts: [`crate::enhancements::BugFix::DosLetters`]).
+        let code_page = e.subtitle_code_page();
+        if let Some(f) = self.font.as_ref().filter(|f| f.code_page() == code_page) {
             return f.clone();
         }
         let build = &e.game.exe.build;
-        let code_page = build.text_code_page;
         let file = match player_font(code_page) {
-            Some((name, _)) => e.read_beside(name).await,
+            // The Japanese release's MS PGothic also from the system's
+            // fonts (`system_font`).
+            Some((name, _)) => match e.read_beside(name).await {
+                Some(f) => Some(f),
+                None => system_font(code_page),
+            },
             None => None,
         };
         let face = FontFace::for_release(code_page, file);
-        let f = Rc::new(
-            SubtitleFont::with_face(code_page, face).with_row_step(build.subtitle_row_step),
-        );
+        let mut f = SubtitleFont::with_face(code_page, face).with_row_step(build.subtitle_row_step);
+        if build.subtitle_languages {
+            f = f.with_rows_to_the_edge();
+        }
+        let f = Rc::new(f);
         self.font = Some(f.clone());
         f
     }
@@ -243,12 +324,18 @@ impl Dialogs {
     /// The build's subtitles: the GDI Arial layout, or the 1997 build's
     /// `DIALOG\FONTS.BIN` (atlantis-cd-en-688128 0x004191c2..0x004191f9
     /// loads it at start-up; the reference's layout when it is missing);
-    /// with the Chinese rows' fix of the moment
-    /// ([`crate::enhancements::BugFix::ChineseRows`]).
+    /// with the breaker of the moment ([`Engine::subtitle_split`]: the
+    /// Chinese rows' fix, [`crate::enhancements::BugFix::ChineseRows`]; the
+    /// Japanese DVD build's language).
     async fn subtitler(&mut self, e: &Engine) -> Subtitler {
-        let fix = e.chinese_row_fix();
+        let split = e.subtitle_split();
+        let code_page = e.subtitle_code_page();
         if let Some(s) = &self.subtitler {
-            return s.clone().with_row_fix(fix);
+            match s {
+                Subtitler::Gdi(font, _) if font.code_page() != code_page => {}
+                Subtitler::Gdi(font, _) => return Subtitler::Gdi(font.clone(), split),
+                _ => return s.clone(),
+            }
         }
         let mut s = None;
         if e.game.exe.build.bitmap_subtitles {
@@ -269,11 +356,11 @@ impl Dialogs {
                 None => log::warn!("DIALOG\\FONTS.BIN missing: the subtitles in Arial"),
             }
         }
-        // The Chinese builds' breaker (FUN_0042f424).
-        let cjk = CjkSplit::of_build(e.game.exe.build, fix);
+        // The Chinese builds' breaker (FUN_0042f424), the Japanese one's
+        // (FUN_0042f618).
         let s = match s {
             Some(s) => s,
-            None => Subtitler::Gdi(self.font(e).await, cjk),
+            None => Subtitler::Gdi(self.font(e).await, split),
         };
         self.subtitler = Some(s.clone());
         s
@@ -469,7 +556,7 @@ impl Dialogs {
             spf = e.read(name).await;
         }
 
-        let sub_lines = if e.subtitles && !l.text.is_empty() {
+        let sub_lines = if e.subtitles_shown() && !l.text.is_empty() {
             font.split_line(&latin1_bytes(&[l.text, l.trail].concat()), &e.subtitle_text)
         } else {
             Vec::new()
@@ -668,70 +755,10 @@ impl Dialogs {
         )
     }
 
-    /// The error box of a head that cannot be opened. The original shows a
-    /// modal Windows dialog with an OK button; the port draws its own box
-    /// over the screen and waits for OK (a click on it, Enter, Space or
-    /// Escape).
+    /// The error box of a head that cannot be opened ([`error_box`]).
     async fn error_box(&mut self, e: &Engine, text: &str) {
         let font = self.font(e).await;
-        let base = e.sys.screen.borrow().clone();
-        let bytes = latin1_bytes(text);
-        let w = (font.width(&bytes) + 40).clamp(160, SCREEN_W as i32 - 20);
-        let h = 76;
-        let (bx, by) = ((SCREEN_W as i32 - w) / 2, (SCREEN_H as i32 - h) / 2);
-        let ok = (bx + w / 2 - 36, by + h - 32, 72, 22);
-        let fill = |s: &mut [u16], x: i32, y: i32, w: i32, h: i32, c: u16| {
-            for yy in y.max(0)..(y + h).min(SCREEN_H as i32) {
-                for xx in x.max(0)..(x + w).min(SCREEN_W as i32) {
-                    s[yy as usize * SCREEN_W + xx as usize] = c;
-                }
-            }
-        };
-        drain(e).await;
-        loop {
-            if e.sys.should_quit() {
-                break;
-            }
-            {
-                let mut s = e.sys.screen.borrow_mut();
-                s.copy_from_slice(&base);
-                fill(&mut s, bx, by, w, h, 0x0000);
-                fill(&mut s, bx + 1, by + 1, w - 2, h - 2, 0xc618);
-                font.draw(
-                    &mut s,
-                    SCREEN_W,
-                    SCREEN_H,
-                    &bytes,
-                    bx + 20,
-                    by + 14,
-                    w - 30,
-                    0,
-                );
-                fill(&mut s, ok.0, ok.1, ok.2, ok.3, 0x0000);
-                fill(&mut s, ok.0 + 1, ok.1 + 1, ok.2 - 2, ok.3 - 2, 0xdefb);
-                let tw = font.width(b"OK");
-                font.draw(
-                    &mut s,
-                    SCREEN_W,
-                    SCREEN_H,
-                    b"OK",
-                    ok.0 + (ok.2 - tw) / 2,
-                    ok.1 + 4,
-                    ok.2,
-                    0,
-                );
-                Self::draw_arrow(e, &mut s);
-            }
-            e.sys.frame().await;
-            let fi = poll_input(e);
-            let (mx, my) = e.sys.mouse();
-            let on_ok = (ok.0..ok.0 + ok.2).contains(&mx) && (ok.1..ok.1 + ok.3).contains(&my);
-            if (fi.left_press && on_ok) || fi.enter || fi.escape {
-                break;
-            }
-        }
-        e.sys.screen.borrow_mut().copy_from_slice(&base);
-        drain(e).await;
+        error_box(e, &font, text).await;
     }
 
     /// The subject menu (`showSubjectMenu`: draw `FUN_004261a0`, hit test
@@ -849,7 +876,7 @@ impl Dialogs {
                 .copy_from_slice(&img.pixels[y * img.width..y * img.width + n]);
         }
         // The narrator's subtitle (FUN_0042ffe8 / FUN_00430178, as a line's).
-        if let (Some((text, _)), true) = (narrator, game_over_subtitle_drawn(e.subtitles)) {
+        if let (Some((text, _)), true) = (narrator, game_over_subtitle_drawn(e.subtitles_shown())) {
             let font = self.subtitler(e).await;
             let lines = font.split_line(&latin1_bytes(text), &e.subtitle_text);
             let under = e.sys.hd_tile().is_some().then(|| frame.clone());
@@ -1605,5 +1632,243 @@ mod off1_tests {
         };
         let g = Game::open(Arc::new(StdDir::new(dir))).expect("the game directory");
         release_off1(g, "atlantis-gog-714752", 30, Some((377, 'A')));
+    }
+}
+
+#[cfg(test)]
+mod dos_letters_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    use atlantis_data::dvd::{DvdFiles, LANGUAGES};
+    use atlantis_data::{Game, StdDir, TextCodePage};
+
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::hooks::DirectLoader;
+    use crate::sys::{Runner, Sys};
+    use crate::{BugFix, Enhancements};
+
+    /// The rows "äåö ÄÅÖ" as the Dutch and Swedish DVDs' DOS texts hold
+    /// them, drawn by the subtitles of the moment over a black screen: the
+    /// code page the font reads them in and the pixels.
+    async fn drawn(d: &mut Dialogs, e: &Engine) -> (TextCodePage, TextCodePage, Vec<u16>) {
+        let rows = vec![vec![0x84, 0x86, 0x94, b' ', 0x8e, 0x8f, 0x99]];
+        let s = d.subtitler(e).await;
+        let mut screen = vec![0u16; SCREEN_W * SCREEN_H];
+        s.draw_subtitles(&mut screen, SCREEN_W, SCREEN_H, &rows, 0);
+        let Subtitler::Gdi(font, _) = &s else {
+            panic!("the DVD's subtitles are GDI text")
+        };
+        (font.code_page(), d.font(e).await.code_page(), screen)
+    }
+
+    /// The fix switched on and off on one dialog state: the cached font
+    /// and subtitler follow it, the letters drawn change with it and come
+    /// back the same.
+    #[test]
+    fn dos_letters_reach_the_drawn_subtitles() {
+        let mut tested = 0;
+        for (folder, var) in [
+            ("HOL", "ATLANTIS_DVD_A_FILES"),
+            ("SUE", "ATLANTIS_DVD_B_FILES"),
+        ] {
+            let Some(dir) = std::env::var_os(var) else {
+                eprintln!("{var} not set: {folder} skipped");
+                continue;
+            };
+            let l = LANGUAGES.iter().find(|l| l.folder == folder).unwrap();
+            let files = DvdFiles::new(Arc::new(StdDir::new(dir)), l).expect("the side");
+            let g = Game::open(Arc::new(files)).expect("the language");
+            let sys = Sys::new(Mixer::new());
+            let out = Rc::new(RefCell::new(Vec::new()));
+            let o = out.clone();
+            let s2 = sys.clone();
+            let mut r = Runner::new(sys.clone(), async move {
+                let mut e = Engine::new(s2, g, Rc::new(DirectLoader));
+                let mut d = Dialogs::new();
+                e.set_enhancements(Enhancements::original());
+                let a = drawn(&mut d, &e).await;
+                e.set_enhancements(Enhancements::only_fix(BugFix::DosLetters));
+                let b = drawn(&mut d, &e).await;
+                e.set_enhancements(Enhancements::original());
+                let c = drawn(&mut d, &e).await;
+                o.borrow_mut().extend([a, b, c]);
+            });
+            let mut now = 0;
+            while r.step(now) {
+                now += 16;
+                assert!(now < 16 * 1000, "{folder}: not drawn");
+            }
+            let out = out.borrow();
+            let [a, b, c] = &out[..] else {
+                panic!("{folder}: not drawn")
+            };
+            assert_eq!(
+                (a.0, a.1),
+                (TextCodePage::Windows1252, TextCodePage::Windows1252)
+            );
+            assert_eq!((b.0, b.1), (TextCodePage::Dos850, TextCodePage::Dos850));
+            assert_eq!(
+                (c.0, c.1),
+                (TextCodePage::Windows1252, TextCodePage::Windows1252)
+            );
+            assert!(a.2.iter().any(|&p| p != 0), "{folder}: nothing drawn");
+            assert!(
+                b.2.iter().any(|&p| p != 0),
+                "{folder}: nothing drawn with the fix"
+            );
+            assert_ne!(
+                a.2, b.2,
+                "{folder}: the same letters with and without the fix"
+            );
+            assert_eq!(
+                a.2, c.2,
+                "{folder}: the fix switched off draws other letters"
+            );
+            tested += 1;
+        }
+        if tested == 0 {
+            eprintln!("no DVD side: the DOS letters' drawing not checked");
+        }
+    }
+}
+
+#[cfg(test)]
+mod japanese_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    use atlantis_data::dvd::{DvdFiles, LANGUAGES};
+    use atlantis_data::{Game, StdDir};
+
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::con_script::{con_track_letter, ConItem, ConLine, ConScript};
+    use crate::hooks::DirectLoader;
+    use crate::subtitles::split_subtitle;
+    use crate::sys::{Runner, Sys};
+    use crate::test_support::button;
+
+    fn japanese() -> Option<Game> {
+        let Some(dir) = std::env::var_os("ATLANTIS_DVD_B_FILES") else {
+            eprintln!("ATLANTIS_DVD_B_FILES not set: skipped");
+            return None;
+        };
+        let l = LANGUAGES.iter().find(|l| l.folder == "JAP").unwrap();
+        let files = DvdFiles::new(Arc::new(StdDir::new(dir)), l).expect("side B");
+        Some(Game::open(Arc::new(files)).expect("the Japanese DVD"))
+    }
+
+    /// The first dialog line of a CON file with a text: its section,
+    /// letter and line.
+    fn first_line(g: &Game, file: &str) -> (i32, char, ConLine) {
+        let con = g.big.read(&format!("SCENAR\\{file}")).unwrap();
+        let script = ConScript::parse(&con);
+        for sec in script.sections() {
+            let lines = sec.items.iter().filter_map(|i| match i {
+                ConItem::Line(l) => Some(l),
+                _ => None,
+            });
+            for (k, l) in lines.enumerate() {
+                if !l.text.trim().is_empty() {
+                    return (sec.id, con_track_letter(k), l.clone());
+                }
+            }
+        }
+        panic!("{file}: no dialog line")
+    }
+
+    /// The white pixels of the 18-px band from y, x 5..635.
+    fn white(s: &[u16], y: i32) -> usize {
+        (y.max(0)..(y + 18).min(SCREEN_H as i32))
+            .flat_map(|y| (5..635).map(move |x| (x, y)))
+            .filter(|&(x, y)| s[y as usize * SCREEN_W + x as usize] == 0xffff)
+            .count()
+    }
+
+    /// The first line of `file` played by the Japanese build with the
+    /// language counter at `clicks` and SUBTITLES `subtitles`: the
+    /// subtitle rows it counted, and the most white pixels each band of
+    /// `ys` held in a frame.
+    fn played(clicks: u8, subtitles: bool, file: &str, ys: &[i32]) -> (usize, Vec<usize>) {
+        let g = japanese().unwrap();
+        let (section, letter, line) = first_line(&g, file);
+        let sys = Sys::new(Mixer::new());
+        let mut e = Engine::new(sys.clone(), g, Rc::new(DirectLoader));
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        e.trace = Some(trace.clone());
+        e.subtitle_clicks = clicks;
+        e.subtitles = subtitles;
+        let req = LineRequest {
+            section,
+            letter,
+            line,
+            perso: 514,
+            interactive: false,
+            inc_perso: 0,
+        };
+        let task = async move {
+            let mut d = Dialogs::new();
+            d.line(&mut e, &req).await;
+        };
+        let mut runner = Runner::new(sys.clone(), task);
+        let mut most = vec![0; ys.len()];
+        let mut frame = 0u64;
+        while runner.step(frame * 16) {
+            frame += 1;
+            assert!(frame < 20_000, "the line did not end");
+            if frame == 200 {
+                button(&sys, MouseButton::Left, true);
+            }
+            if frame == 202 {
+                button(&sys, MouseButton::Left, false);
+            }
+            let s = sys.screen.borrow();
+            for (m, &y) in most.iter_mut().zip(ys) {
+                *m = (*m).max(white(&s, y));
+            }
+        }
+        let rows = trace
+            .borrow()
+            .iter()
+            .find_map(|e| match e {
+                Event::LinePlayed { subtitles, .. } => Some(*subtitles),
+                _ => None,
+            })
+            .expect("the line played");
+        (rows, most)
+    }
+
+    /// CHAPJ001's first line (rows 66, 42 and an empty one: the golden's)
+    /// with the counter at 0 and SUBTITLES off: shown, rows 18 px apart
+    /// from the base 0x1f2 (row 0 at 426, row 1 at 444); CHAPI001's first
+    /// (one row) at 1: at the reference's base, 0x1ce - 2 * 18; at 2,
+    /// SUBTITLES off: nothing.
+    #[test]
+    fn japanese_and_english_rows_on_the_screen() {
+        if japanese().is_none() {
+            return;
+        }
+        let ja = [0x1f2 - 4 * 18, 0x1f2 - 3 * 18, 0x1f2 - 5 * 18];
+        let (n, most) = played(0, false, "CHAPJ001.CON", &ja);
+        assert_eq!(n, 3);
+        assert!(most[0] >= 15 && most[1] >= 15, "{most:?}");
+        assert!(most[2] < 15, "a row above: {most:?}");
+
+        let g = japanese().unwrap();
+        let (_, _, l) = first_line(&g, "CHAPI001.CON");
+        let rows = split_subtitle(latin1_bytes(&l.text).trim_ascii_end());
+        assert_eq!(rows.len(), 1);
+        let en = [0x1ce - 2 * 18, 0x1ce - 3 * 18];
+        let (n, most) = played(1, false, "CHAPI001.CON", &en);
+        assert_eq!(n, 1);
+        assert!(most[0] >= 15 && most[1] < 15, "{most:?}");
+
+        let (n, most) = played(2, false, "CHAPI001.CON", &en);
+        assert_eq!(n, 0);
+        assert!(most[0] < 15, "{most:?}");
     }
 }

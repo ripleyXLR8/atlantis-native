@@ -178,13 +178,19 @@ fn italian_positioned_zones_synthetic() {
     assert_eq!(widths(MenuRules::of_build(it, &others)), [title, 48, 112]);
     let fix = BugFixes::only(BugFix::MenuLineWidth);
     assert_eq!(widths(MenuRules::of_build(it, &fix)), [title, 66, 154]);
+    // The Italian DVD's build has the Italian CD's rule.
     for b in &BUILDS {
-        if b.name != it.name {
-            assert_eq!(
-                widths(MenuRules::of_build(b, &BugFixes::NONE)),
-                [title, 66, 154]
-            );
-        }
+        let want = if b.name == it.name || b.name == "atlantis-dvd-it-695296" {
+            [title, 48, 112]
+        } else {
+            [title, 66, 154]
+        };
+        assert_eq!(
+            widths(MenuRules::of_build(b, &BugFixes::NONE)),
+            want,
+            "{}",
+            b.name
+        );
     }
     assert_eq!(
         walk(text, 6, MenuRules::default()).ops,

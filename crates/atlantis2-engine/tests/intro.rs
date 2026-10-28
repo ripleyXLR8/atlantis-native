@@ -112,9 +112,12 @@ impl Run {
     }
 }
 
-/// A folder holding only disc `n`'s image, as a drive with that disc.
+/// A folder holding only disc `n`'s image, as a drive with that disc;
+/// each call its own folder, so tests running at once do not share one.
 #[cfg(unix)]
 fn one_disc(discs: &std::path::Path, n: u32) -> Option<PathBuf> {
+    static CALLS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let image = std::fs::read_dir(discs)
         .ok()?
         .filter_map(Result::ok)
@@ -124,7 +127,7 @@ fn one_disc(discs: &std::path::Path, n: u32) -> Option<PathBuf> {
                 .and_then(|f| f.to_str())
                 .is_some_and(|f| f.eq_ignore_ascii_case(&format!("CD{n}.iso")))
         })?;
-    let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("a2-intro-disc{n}"));
+    let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("a2-intro-disc{n}-{call}"));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     std::os::unix::fs::symlink(&image, d.join(image.file_name().unwrap())).unwrap();

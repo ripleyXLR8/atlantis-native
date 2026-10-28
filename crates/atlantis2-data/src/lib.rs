@@ -28,6 +28,9 @@
 #![forbid(unsafe_code)]
 
 pub mod canoe;
+// "con" is a reserved device name on Windows: a file called con.rs
+// cannot be checked out there, so the module's file has another name.
+#[path = "con_script.rs"]
 pub mod con;
 pub mod db;
 pub mod defnames;

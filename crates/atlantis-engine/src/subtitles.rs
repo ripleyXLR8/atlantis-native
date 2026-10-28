@@ -26,11 +26,19 @@
 //! read as Big5 / GBK. The web build leaves those two out of its program:
 //! its page fetches the one a Chinese release needs, beside the page, and
 //! hands it over ([`provide_cjk_font`]).
+//!
+//! The Japanese DVD build asks for MS PGothic ("ＭＳ Ｐゴシック") at the
+//! same cell height: the port draws with the player's `msgothic.ttc` (its
+//! face MS PGothic) beside the game's files or among the system's fonts
+//! ([`system_font`]), else with Noto Sans JP (bundled, cut to the
+//! characters of the release's scripts, SIL Open Font Licence 1.1), the
+//! bytes read as Shift-JIS; the web build fetches it for that release only.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
+use atlantis_data::exe::CjkBreaker;
 use atlantis_data::TextCodePage;
 
 pub mod cjk;
@@ -53,11 +61,19 @@ pub fn system_font_data() -> &'static [u8] {
 static NOTO_SERIF_TC: &[u8] = include_bytes!("../../../assets/fonts/NotoSerifTC-Subset.otf");
 #[cfg(not(target_arch = "wasm32"))]
 static NOTO_SERIF_SC: &[u8] = include_bytes!("../../../assets/fonts/NotoSerifSC-Subset.otf");
+/// The Japanese subtitle font of the port, Noto Sans JP Regular, cut to the
+/// characters of the Japanese DVD's scripts (`assets/fonts/make_cjk_subset.py`).
+#[cfg(not(target_arch = "wasm32"))]
+static NOTO_SANS_JP: &[u8] = include_bytes!("../../../assets/fonts/NotoSansJP-Subset.otf");
 
-/// The CJK subtitle fonts the web page fetched, Big5's and GBK's.
+/// The CJK subtitle fonts the web page fetched, Big5's, GBK's and
+/// Shift-JIS's.
 #[cfg(target_arch = "wasm32")]
-static FETCHED_CJK: [std::sync::OnceLock<&'static [u8]>; 2] =
-    [std::sync::OnceLock::new(), std::sync::OnceLock::new()];
+static FETCHED_CJK: [std::sync::OnceLock<&'static [u8]>; 3] = [
+    std::sync::OnceLock::new(),
+    std::sync::OnceLock::new(),
+    std::sync::OnceLock::new(),
+];
 
 /// The file name of the port's CJK subtitle font for texts in
 /// `code_page` (in `assets/fonts`), `None` for the single-byte code pages.
@@ -65,6 +81,7 @@ pub fn cjk_font_file(code_page: TextCodePage) -> Option<&'static str> {
     match code_page {
         TextCodePage::Windows950 => Some("NotoSerifTC-Subset.otf"),
         TextCodePage::Windows936 => Some("NotoSerifSC-Subset.otf"),
+        TextCodePage::Windows932 => Some("NotoSansJP-Subset.otf"),
         TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
     }
 }
@@ -79,6 +96,7 @@ pub fn provide_cjk_font(code_page: TextCodePage, data: Vec<u8>) -> bool {
     let slot = match code_page {
         TextCodePage::Windows950 => &FETCHED_CJK[0],
         TextCodePage::Windows936 => &FETCHED_CJK[1],
+        TextCodePage::Windows932 => &FETCHED_CJK[2],
         TextCodePage::Windows1252 | TextCodePage::Dos850 => return false,
     };
     if slot.get().is_some() || FontRef::try_from_slice(&data).is_err() {
@@ -94,6 +112,7 @@ fn bundled_cjk(code_page: TextCodePage) -> Option<&'static [u8]> {
     match code_page {
         TextCodePage::Windows950 => Some(NOTO_SERIF_TC),
         TextCodePage::Windows936 => Some(NOTO_SERIF_SC),
+        TextCodePage::Windows932 => Some(NOTO_SANS_JP),
         TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
     }
 }
@@ -105,6 +124,7 @@ fn bundled_cjk(code_page: TextCodePage) -> Option<&'static [u8]> {
     match code_page {
         TextCodePage::Windows950 => FETCHED_CJK[0].get().copied(),
         TextCodePage::Windows936 => FETCHED_CJK[1].get().copied(),
+        TextCodePage::Windows932 => FETCHED_CJK[2].get().copied(),
         TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
     }
 }
@@ -122,7 +142,10 @@ pub const SUBTITLE_EM_PX: f32 = 13.0;
 /// one (inferred), whose cell is their em: 16 pixels per em. The size
 /// Windows renders it at and whether it drew those faces' embedded 16-pixel
 /// bitmaps are [UNKNOWN]; the port draws the outlines at 16 pixels per em,
-/// thresholded (monochrome), as it does Arial's.
+/// thresholded (monochrome), as it does Arial's. The Japanese DVD build's
+/// FUN_0041aec0 @ 0x0041aedb makes the same call with the face
+/// "ＭＳ Ｐゴシック" (0x004ac2d8; the height from WinMain @ 0x00418f51),
+/// MS PGothic, whose cell is its em too.
 pub const CJK_SUBTITLE_EM_PX: f32 = 16.0;
 
 /// `FUN_00430178`: the x of every subtitle line.
@@ -137,6 +160,11 @@ pub const SUBTITLE_SHADOW: u16 = 0x0000;
 
 /// `FUN_00430178`'s row step: the lines 14 pixels apart.
 pub const SUBTITLE_ROW_STEP: i32 = 14;
+
+/// How much lower the Japanese DVD build draws its Japanese rows: the
+/// bottom row's base 0x1f2 instead of 0x1ce (FUN_0042f86c @
+/// 0x0042f887..0x0042f897, while the subtitle language counter is 0).
+pub const JAPANESE_ROWS_LOWER: i32 = 0x1f2 - 0x1ce;
 
 /// `FUN_0042ffe8` on the subtitle buffer `FUN_0042844c` fills: a space (the
 /// byte after ']') then the text. Under 101 bytes it is one line; otherwise
@@ -251,8 +279,93 @@ pub fn player_font(code_page: TextCodePage) -> Option<(&'static str, &'static st
     match code_page {
         TextCodePage::Windows950 => Some(("mingliu.ttc", "MingLiU")),
         TextCodePage::Windows936 => Some(("simsun.ttc", "SimSun")),
+        TextCodePage::Windows932 => Some(("msgothic.ttc", "MS PGothic")),
         TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
     }
+}
+
+/// The folders a system keeps its fonts in: `%WINDIR%\Fonts` on Windows,
+/// the font folders of macOS and of the Linux desktops (one level of their
+/// sub-folders is searched too).
+#[cfg(not(target_arch = "wasm32"))]
+fn system_font_dirs() -> Vec<std::path::PathBuf> {
+    use std::path::PathBuf;
+    let mut dirs = Vec::new();
+    if cfg!(windows) {
+        for var in ["WINDIR", "SystemRoot"] {
+            if let Some(w) = std::env::var_os(var) {
+                dirs.push(PathBuf::from(w).join("Fonts"));
+            }
+        }
+    } else {
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        if cfg!(target_os = "macos") {
+            dirs.extend(
+                [
+                    "/Library/Fonts",
+                    "/Library/Fonts/Microsoft",
+                    "/System/Library/Fonts",
+                ]
+                .map(PathBuf::from),
+            );
+            dirs.extend(home.iter().map(|h| h.join("Library/Fonts")));
+        } else {
+            dirs.extend(
+                home.iter()
+                    .flat_map(|h| [h.join(".local/share/fonts"), h.join(".fonts")]),
+            );
+            dirs.extend(["/usr/local/share/fonts", "/usr/share/fonts"].map(PathBuf::from));
+        }
+    }
+    dirs
+}
+
+/// The file `name` (any case) in `dirs` or one level below them, read.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn font_in(dirs: &[std::path::PathBuf], name: &str) -> Option<Vec<u8>> {
+    let find = |dir: &std::path::Path| -> Option<std::path::PathBuf> {
+        std::fs::read_dir(dir)
+            .ok()?
+            .flatten()
+            .map(|e| e.path())
+            .find(|p| {
+                p.is_file()
+                    && p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.eq_ignore_ascii_case(name))
+            })
+    };
+    for dir in dirs {
+        let mut at = find(dir);
+        if at.is_none() {
+            let subs = std::fs::read_dir(dir).into_iter().flatten().flatten();
+            at = subs
+                .map(|e| e.path())
+                .filter(|p| p.is_dir())
+                .find_map(|p| find(&p));
+        }
+        if let Some(p) = at {
+            return std::fs::read(p).ok();
+        }
+    }
+    None
+}
+
+/// The system's copy of the player's font of a release in `code_page`
+/// ([`player_font`]), for the Japanese release only (whose program names
+/// MS PGothic, a font of every Japanese Windows and of Microsoft Office):
+/// `msgothic.ttc` among the system's fonts. The web build has none.
+pub fn system_font(code_page: TextCodePage) -> Option<Vec<u8>> {
+    if code_page != TextCodePage::Windows932 {
+        return None;
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let (name, _) = player_font(code_page)?;
+        font_in(&system_font_dirs(), name)
+    }
+    #[cfg(target_arch = "wasm32")]
+    None
 }
 
 /// Whether `head`, a file's first bytes, starts as a font or a font
@@ -648,6 +761,9 @@ pub struct SubtitleFont {
     em_px: f32,
     /// The rows' step of [`SubtitleFont::draw_subtitles`].
     row_step: i32,
+    /// The width a row of [`SubtitleFont::draw_subtitles`] may take
+    /// ([`SUBTITLE_WIDTH`], or none: [`SubtitleFont::with_rows_to_the_edge`]).
+    max_w: i32,
 }
 
 impl Default for SubtitleFont {
@@ -700,6 +816,16 @@ impl SubtitleFont {
         self
     }
 
+    /// The rows of [`SubtitleFont::draw_subtitles`] drawn whole up to the
+    /// screen's edge, where the pixels are clipped (GDI's TextOutA on the
+    /// screen surface: the Japanese DVD build's rows, whose longest
+    /// Japanese ones and English ones in MS PGothic run past the screen),
+    /// instead of ending before the first glyph past [`SUBTITLE_WIDTH`].
+    pub fn with_rows_to_the_edge(mut self) -> SubtitleFont {
+        self.max_w = i32::MAX / 4;
+        self
+    }
+
     /// The scale of `font` at `em_px` pixels per em: ab_glyph scales by
     /// the line height (ascent - descent).
     fn scale(font: &FontRef<'_>, em_px: f32) -> PxScale {
@@ -727,6 +853,7 @@ impl SubtitleFont {
             ascent,
             em_px,
             row_step: SUBTITLE_ROW_STEP,
+            max_w: SUBTITLE_WIDTH,
         }
     }
 
@@ -926,7 +1053,7 @@ impl SubtitleFont {
                 line,
                 SUBTITLE_X + 1,
                 y + 1,
-                SUBTITLE_WIDTH,
+                self.max_w,
                 SUBTITLE_SHADOW,
             );
             self.draw(
@@ -936,7 +1063,7 @@ impl SubtitleFont {
                 line,
                 SUBTITLE_X,
                 y,
-                SUBTITLE_WIDTH,
+                self.max_w,
                 SUBTITLE_COLOR,
             );
         }
@@ -952,6 +1079,7 @@ impl SubtitleFont {
             self.code_page,
             Some(self.face.clone()),
             self.row_step,
+            self.max_w,
         )
     }
 }
@@ -1348,15 +1476,26 @@ impl Subtitler {
         y_offset: i32,
     ) {
         match self {
-            Subtitler::Gdi(f, _) => f.draw_subtitles(dst, width, height, lines, y_offset),
+            Subtitler::Gdi(f, _) => {
+                f.draw_subtitles(dst, width, height, lines, y_offset + self.rows_lower())
+            }
             Subtitler::Bitmap(f, _) => f.draw_subtitles(dst, width, lines, y_offset),
+        }
+    }
+
+    /// How much lower than the reference's the rows are drawn: the
+    /// Japanese rows of the Japanese DVD build ([`JAPANESE_ROWS_LOWER`]).
+    pub fn rows_lower(&self) -> i32 {
+        match self {
+            Subtitler::Gdi(_, Some(c)) if c.breaker == CjkBreaker::Spaces => JAPANESE_ROWS_LOWER,
+            _ => 0,
         }
     }
 
     /// The text items for the HD mode (see [`subtitle_items`]).
     pub fn items(&self, lines: &[Vec<u8>], dx: i32, dy: i32) -> Vec<crate::hd::TextItem> {
         match self {
-            Subtitler::Gdi(f, _) => f.items(lines, dx, dy),
+            Subtitler::Gdi(f, _) => f.items(lines, dx, dy + self.rows_lower()),
             Subtitler::Bitmap(f, _) => {
                 let mut items = Vec::with_capacity(2 * lines.len());
                 for (i, line) in lines.iter().enumerate() {
@@ -1389,11 +1528,19 @@ pub fn subtitle_items(
     dy: i32,
     code_page: TextCodePage,
 ) -> Vec<crate::hd::TextItem> {
-    gdi_items(lines, dx, dy, code_page, None, SUBTITLE_ROW_STEP)
+    gdi_items(
+        lines,
+        dx,
+        dy,
+        code_page,
+        None,
+        SUBTITLE_ROW_STEP,
+        SUBTITLE_WIDTH,
+    )
 }
 
 /// [`subtitle_items`] in `face` (the code page's bundled font for `None`),
-/// the rows `step` pixels apart.
+/// the rows `step` pixels apart, `max_w` wide at most.
 fn gdi_items(
     lines: &[Vec<u8>],
     dx: i32,
@@ -1401,6 +1548,7 @@ fn gdi_items(
     code_page: TextCodePage,
     face: Option<FontFace>,
     step: i32,
+    max_w: i32,
 ) -> Vec<crate::hd::TextItem> {
     let mut items = Vec::with_capacity(2 * lines.len());
     for (i, line) in lines.iter().enumerate() {
@@ -1409,7 +1557,7 @@ fn gdi_items(
             items.push(crate::hd::TextItem {
                 x: SUBTITLE_X + dx + o,
                 y: y + o,
-                max_w: SUBTITLE_WIDTH,
+                max_w,
                 color,
                 text: line.clone(),
                 bitmap: None,

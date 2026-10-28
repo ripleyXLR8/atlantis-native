@@ -12,8 +12,11 @@ permissions:
 # A push to main updates the rolling "nightly" pre-release; a tag v*
 # publishes the release of that version (notes from
 # docs/releases/<tag>.md).
+# A manual run on another branch only builds and tests: its files stay in
+# the run's artifacts, and no release is touched.
 env:
   RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'nightly' }}
+  PUBLISH: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && 'yes' || 'no' }}
   # No game data here: the Atlantis II game-data tests skip, visibly
   # (atlantis2_data::testing), instead of failing.
   ATLANTIS2_SKIP_DATA_TESTS: "1"
@@ -21,6 +24,7 @@ env:
 # The nightly release's assets keep the same names from one build to the
 # next (installers download them by name):
 #   atlantis-native-macos-arm64.dmg
+#   atlantis-native-macos-x64.dmg
 #   atlantis-native-windows-x64.zip
 #   atlantis-native-linux-x64.tar.gz
 #   atlantis-native-linux-arm64.tar.gz
@@ -32,6 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Create or update the release
+        if: env.PUBLISH == 'yes'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -52,9 +57,18 @@ jobs:
             fi
           fi
 
-  macos-arm64:
+  macos:
     needs: release
-    runs-on: macos-14   # Apple Silicon
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14         # Apple Silicon
+          - arch: x64
+            runner: macos-15-intel   # Intel Macs
+    runs-on: ${{ matrix.runner }}
+    env:
+      DMG: atlantis-native-macos-${{ matrix.arch }}.dmg
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -79,15 +93,16 @@ jobs:
           cp README.md LICENSE assets/fonts/LICENSE-* dist/
           ln -s /Applications dist/Applications
           codesign --force --deep -s - "$app"   # ad-hoc signature
-          hdiutil create -volname "Atlantis Native" -srcfolder dist -ov -format UDZO atlantis-native-macos-arm64.dmg
+          hdiutil create -volname "Atlantis Native" -srcfolder dist -ov -format UDZO "$DMG"
       - uses: actions/upload-artifact@v4
         with:
-          name: atlantis-native-macos-arm64
-          path: atlantis-native-macos-arm64.dmg
+          name: atlantis-native-macos-${{ matrix.arch }}
+          path: ${{ env.DMG }}
       - name: Publish to the release
+        if: env.PUBLISH == 'yes'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$RELEASE" atlantis-native-macos-arm64.dmg --clobber
+        run: gh release upload "$RELEASE" "$DMG" --clobber
 
   windows-x64:
     needs: release
@@ -134,6 +149,7 @@ jobs:
           name: atlantis-native-windows-x64
           path: atlantis-native-windows-x64.zip
       - name: Publish to the release
+        if: env.PUBLISH == 'yes'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -164,6 +180,7 @@ jobs:
           name: atlantis-native-linux-x64
           path: atlantis-native-linux-x64.tar.gz
       - name: Publish to the release
+        if: env.PUBLISH == 'yes'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$RELEASE" atlantis-native-linux-x64.tar.gz --clobber
@@ -193,6 +210,7 @@ jobs:
           name: atlantis-native-linux-arm64
           path: atlantis-native-linux-arm64.tar.gz
       - name: Publish to the release
+        if: env.PUBLISH == 'yes'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$RELEASE" atlantis-native-linux-arm64.tar.gz --clobber
@@ -225,19 +243,19 @@ jobs:
       # unlabelled .zip for a Windows build, so the numbered releases carry
       # the three platform packages alone.
       - name: Publish to the release
-        if: env.RELEASE == 'nightly'
+        if: env.PUBLISH == 'yes' && env.RELEASE == 'nightly'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$RELEASE" atlantis-native-web.zip --clobber
       # The web version on GitHub Pages, from main only.
       - uses: actions/upload-pages-artifact@v3
-        if: env.RELEASE == 'nightly'
+        if: env.PUBLISH == 'yes' && env.RELEASE == 'nightly'
         with:
           path: dist/atlantis-native-web
 
   pages:
     needs: web
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -255,7 +273,7 @@ jobs:
   # in their name tags the downloads; html5 is marked "playable in browser"
   # on the itch.io edit page after its first push.
   itch:
-    needs: [macos-arm64, windows-x64, linux-x64, linux-arm64, web]
+    needs: [macos, windows-x64, linux-x64, linux-arm64, web]
     if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.ITCH_GAME != '' }}
     runs-on: ubuntu-latest
     steps:
@@ -264,11 +282,12 @@ jobs:
           path: artifacts
       - name: Unpack the builds
         run: |
-          mkdir -p itch/windows itch/linux itch/linux-arm64 itch/mac itch/web unpacked
+          mkdir -p itch/windows itch/linux itch/linux-arm64 itch/mac itch/mac-x64 itch/web unpacked
           unzip -q artifacts/atlantis-native-windows-x64/atlantis-native-windows-x64.zip -d itch/windows
           tar -xzf artifacts/atlantis-native-linux-x64/atlantis-native-linux-x64.tar.gz -C itch/linux
           tar -xzf artifacts/atlantis-native-linux-arm64/atlantis-native-linux-arm64.tar.gz -C itch/linux-arm64
           cp artifacts/atlantis-native-macos-arm64/atlantis-native-macos-arm64.dmg itch/mac/
+          cp artifacts/atlantis-native-macos-x64/atlantis-native-macos-x64.dmg itch/mac-x64/
           unzip -q artifacts/atlantis-native-web/atlantis-native-web.zip -d unpacked
           cp -r unpacked/atlantis-native-web/. itch/web/
           ls -R itch | head -40
@@ -285,6 +304,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           butler/butler push itch/windows "$ITCH_GAME:windows-x64" --userversion "$version"
           butler/butler push itch/mac "$ITCH_GAME:macos-arm64" --userversion "$version"
+          butler/butler push itch/mac-x64 "$ITCH_GAME:macos-x64" --userversion "$version"
           butler/butler push itch/linux "$ITCH_GAME:linux-x64" --userversion "$version"
           butler/butler push itch/linux-arm64 "$ITCH_GAME:linux-arm64" --userversion "$version"
           butler/butler push itch/web "$ITCH_GAME:html5" --userversion "$version"

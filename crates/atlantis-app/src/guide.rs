@@ -55,15 +55,35 @@ pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {
              does not know: an edition of the game that is not supported yet.\n\n\
              Supported: the English CD (1997 and 2001), the French CD (1997), the German \
              CD (1997), the Dutch CD (1997), the Swedish CD (1997), the Spanish CD (1997), \
-             the Italian CD (1997), the CD with Cryo's patch 1.01, and GOG.com (English, \
-             French, German, Spanish, Italian).\n\n\
+             the Italian CD (1997), the Chinese CDs (1998, 1999), the CD with Cryo's patch \
+             1.01, Cryo's DVD (1998: English, French, German, Dutch, Spanish, Italian, \
+             Swedish, Japanese), the Perfect Edition, and GOG.com (English, French, German, \
+             Spanish, Italian).\n\n\
              You can help support your edition: report it to the project. The report \
              opens on the project's GitHub page, filled in with the files' identifiers \
              (sizes and checksums, no personal data); nothing is sent until you submit it \
              there."
         ),
+        GameError::DvdSharedFolders => format!(
+            "{shown} holds a language of Cryo's DVD without the folders its side shares \
+             (CYCLO, DIALOG, PUZZLES, UBB_VUE, WAM).\n\n\
+             Choose the whole side (the folder holding FACE_A or FACE_B), the DVD drive, \
+             or the folder of the images of the sides."
+        ),
+        GameError::DvdOtherSide(side) => format!(
+            "This version is on the other side of the DVD.\n\n\
+             Turn the disc over (side {side}) and play it again, or give Atlantis Native \
+             the images (or copies) of both sides in one folder."
+        ),
         GameError::NoExecutable => {
-            if any_ext(&["iso", "bin", "cue", "mdf", "mds", "nrg", "img", "chd"]) {
+            if has("face_a") || has("face_b") || (has("autorun.exe") && has("video_ts")) {
+                format!(
+                    "{shown} holds Cryo's DVD of the game: choose the language to play in \
+                     the game library (each language found is listed), or choose the \
+                     folder that holds the DVD's FACE_A or FACE_B folder, the DVD drive, \
+                     or the folder of the images of its sides."
+                )
+            } else if any_ext(&["iso", "bin", "cue", "mdf", "mds", "nrg", "img", "chd"]) {
                 format!(
                     "The folder {shown} holds disc images that Atlantis Native cannot read \
                      (it reads .iso, .bin, .img, .mdf and .nrg images of the game's CDs, \
