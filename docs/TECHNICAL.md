@@ -77,7 +77,7 @@ with three groups, those of the ScummVM port:
 | Group | Default | What it changes |
 |---|---|---|
 | `fixes` (`BugFixes`) | all on | the fixes of minor bugs of the original, each its own switch (`BugFix`, below) |
-| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
+| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and May 1997 English and French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
 The bug fixes, each with its `settings.ini` key; the last seven fix a
@@ -369,7 +369,7 @@ first glyph past 635). Its English subtitles (the SUBTITLES button's
 second state) are cut as the reference's and drawn in the same font, at
 the reference's base.
 
-The 1997 English CD has no Windows text: it draws its subtitles with the
+The May 1997 English CD has no Windows text: it draws its subtitles with the
 8x8 pixel font `DIALOG\FONTS.BIN` of the game's archives (one glyph per
 byte, the IBM PC set), white over a black shadow, in rows 10 pixels apart
 broken in a 75-byte window, and the port does the same (`BitmapFont`,
@@ -430,10 +430,10 @@ the 2001 build's is given the text without them.
 
 ### Game builds
 
-The port knows twenty-three builds of `atlantis.exe` (`ExeBuild` in
+The port knows twenty-four builds of `atlantis.exe` (`ExeBuild` in
 `crates/atlantis-data/src/exe.rs`), found by their size and the PE
 header's timestamp (the 2001 build and the patch 1.01 build have the same
-size, as have the August 1997 French and German builds and the Spanish
+size, as have the August 1997 French, German and US builds and the Spanish
 and Italian ones, the English, Dutch and Swedish 1997 retail
 builds, the DVD's English, French, German, Spanish and Italian
 builds, and its Dutch and Swedish ones, and the Japanese DVD's and the
@@ -443,12 +443,12 @@ size and timestamp too, and are told apart by a path string
 them, and the code differences that change what a player sees follow the
 build:
 
-| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French and German (August), Spanish and Italian retail CDs (1997) | French retail CD (May 1997) | Traditional and Simplified Chinese CDs (1998, 1999) | DVD (1998) and Perfect Edition | Japanese DVD (1998) |
+| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French, German and US English (August), Spanish and Italian retail CDs (1997) | French retail CD (May 1997) | Traditional and Simplified Chinese CDs (1998, 1999) | DVD (1998) and Perfect Edition | Japanese DVD (1998) |
 |---|---|---|---|---|---|---|---|---|
 | subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows | Arial | 8x8 font, 10-pixel rows (DOS code page texts) | MingLiU / SimSun, 18-pixel rows (Big5 / GBK texts) | Arial, 14-pixel rows (the Dutch and Swedish DVDs' DOS code page texts read as Windows-1252) | MS PGothic, 18-pixel rows (Shift-JIS texts), cut at the spaces and 36 pixels lower; English: the reference's rows |
 | SUBTITLES item | three-click cycle | three-click cycle | plain toggle | plain toggle | plain toggle | three-click cycle, on at start-up | three-click cycle | three states: Japanese, English, none (the chapter's script read again) |
-| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor |
-| Rhea always on camera 2 | yes | no | no | no | no | no | no | no |
+| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor | talk cursor (US: navigate cursor) | talk cursor | talk cursor | talk cursor | talk cursor |
+| Rhea always on camera 2 | yes | no | no | no (US: yes) | no | no | no | no |
 | second death in a section | same narrator line | next line | same line | next line | same line | next line | next line | next line |
 | game-over voice | after the image | after the image | before the image | after the image | before the image | after the image | after the image | after the image |
 | players.atl | 97 bytes | 97 bytes | 95 bytes; names in capitals, 0x20..0x7a | 95 bytes | 95 bytes; names in capitals, 0x20..0x7a | 114 bytes | 97 bytes | 97 bytes |
@@ -509,6 +509,22 @@ Both have Windows-1252 CON texts (the Spanish `¡ ¿ á é í ñ ó ú ü`..., t
 Italian `à è é ì ò ù`), broken into rows as the 2001 build breaks them;
 their menu, LOAD-list and credits texts hold their letters at the DOS
 code page's places, where the sprite fonts have a glyph for each.
+
+The US retail CD's build (Interplay, August 1997, built two days after
+the French one) is the August 1997 French build's code with two of the
+2001 build's rules, its only code changes: the warp cursor shows the
+navigate cursor, not the talk cursor, over the characters 0x219 and
+0x21a, and Rhea (character 0x230) is always on camera 2 in the dialogs.
+Everything else in that column applies to it. Its new-player row reads
+`New Player`, four bytes shorter than the French one, so its credits
+font table, inventory and guest tables are four bytes up from the
+French build's (with its bytes: the typed 0xa1, 0xa3, 0xa4 of the LOAD
+list advance 17, 2, 10). Its data are the August 1997 revision (the
+French August discs' scripts, fonts and menu files) with English texts:
+the May 1997 English CD's dialog texts with 31 lines corrected or in
+American spelling, a few script changes of that revision (chapters 15,
+47 and 70, two sprite offsets), CON texts in ASCII; its discs hold the
+same copy of every member they share.
 
 The Dutch retail CD's build (June 1997) is the English May 1997 build's
 code: everything in that column applies to it, but for the names typed
@@ -696,7 +712,7 @@ credits font's table that follows it; the port does the same with each
 build's table (in the August 1997 French build a typed `£` advances 2 pixels,
 in the 2001 build 14).
 
-The May 1997 French build is the English 1997 build's code, compiled five
+The May 1997 French build is the English May 1997 build's code, compiled five
 days earlier against an older `cryo.dll`, with its own music copy rules.
 By default the port follows them; with the LOADMUSIK fix (`fix_loadmusik`, on by
 default) LOADMUSIK copies its tracks one by one as the other builds do,
@@ -3683,7 +3699,7 @@ back) into `yucatan-*.png`.
 
 Tests that need the game files read the game directory from the
 `ATLANTIS_DATA` environment variable (the 2001 English CD) and are
-skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
+skipped without it; `ATLANTIS_DATA_1997` names a folder of the May 1997
 English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
 retail CD, `ATLANTIS_DATA_FR1997_MAY` one of the May 1997 French retail CD
 (the first pressing), `ATLANTIS_DATA_DE1997` one of the German retail CD,
@@ -3694,6 +3710,11 @@ its DOS code page letters, one subtitle's pixels, the LOAD list's `ß`,
 the credits fonts of the disc in the drive, a new game to its first
 dialog, a save and its load from the player screen and the LOAD list;
 its tables, archives and edition in `atlantis-data`'s tests),
+`ATLANTIS_DATA_EN_US97` a folder of the US retail CD's images (its
+`.iso` files: Interplay's August 1997 build; `tests/us_cd.rs`: every
+dialog line's rows against the build's breaker under emulation, its
+menu font advances and fixes, a new game to its first dialog, a save and
+its load; its tables, archives and edition in `atlantis-data`'s tests),
 `ATLANTIS_DATA_NL1997` one of the Dutch retail CD,
 `ATLANTIS_DATA_SV1997` one of the Swedish retail CD,
 `ATLANTIS_DATA_ES1997` / `ATLANTIS_DATA_IT1997` ones of the Spanish /
@@ -3796,6 +3817,7 @@ ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
 ATLANTIS_DATA_FR1997=/path/to/fr1997 ATLANTIS_DATA_FR1997_MAY=/path/to/fr1997may \
 ATLANTIS_DATA_DE1997=/path/to/de1997 ATLANTIS_DATA_NL1997=/path/to/nl1997 \
 ATLANTIS_DATA_DE_MAY97=/path/to/de-may-1997-images \
+ATLANTIS_DATA_EN_US97=/path/to/us-1997-images \
 ATLANTIS_DATA_SV1997=/path/to/sv1997 ATLANTIS_DATA_ES1997=/path/to/es1997 \
 ATLANTIS_DATA_IT1997=/path/to/it1997 ATLANTIS_DATA_PATCH101=/path/to/patch101 \
 cargo test --release

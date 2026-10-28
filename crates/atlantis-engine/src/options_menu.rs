@@ -1387,6 +1387,10 @@ mod tests {
         ]);
         m.open();
         m.draw(&mut s, &font, HD);
+        // The longest edition line (the US retail CD's market) fits the
+        // box's text width.
+        let longest = "Game: CD, English (US, Interplay, August 1997 build)";
+        assert!(font.width(longest.as_bytes()) <= BOX_W - 20, "{longest}");
         // The text stays inside the box.
         for y in 0..SCREEN_H as i32 {
             for x in 0..SCREEN_W as i32 {
@@ -1718,6 +1722,7 @@ mod tests {
             FIX_KEYS,
             "Every fix off: the original, bug for bug",
             "Bug fixes: CD, patch 1.01, Traditional Chinese (May 1997 build)",
+            "Bug fixes: CD, English (US, Interplay, August 1997 build)",
         ] {
             assert!(font.width(line.as_bytes()) <= FIX_BOX_W - 32, "{line}");
         }

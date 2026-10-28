@@ -590,6 +590,7 @@ mod tests {
         assert_eq!(of("atlantis-patch-fr-714240", dutch), [DiscRevision]);
         assert_eq!(of("atlantis-cd-en-688128", plain), [HexagonPieces]);
         assert_eq!(of("atlantis-cd-fr-687104", plain), [HexagonPieces]);
+        assert_eq!(of("atlantis-cd-en-687104", plain), [HexagonPieces]);
         assert_eq!(
             of("atlantis-cd-fr-688640", plain),
             [HexagonPieces, LoadMusik]

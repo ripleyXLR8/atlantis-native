@@ -87,7 +87,8 @@ version): choose its installation folder.
 
 ### Supported editions
 
-The English CD (1997 and 2001 builds), the French CD (May and August
+The English CD (1997 and 2001 builds), the US English CD (Interplay,
+August 1997), the French CD (May and August
 1997), the German CD (May and August 1997), the Dutch and Swedish CDs (June
 1997), the Spanish CD (August 1997), the Italian CD (July 1997), the CD
 with Cryo's patch 1.01 (over the English, French, German, Dutch,
@@ -663,8 +664,8 @@ leaves the deleted player's files behind.)
 
 The files are those the build you play writes: the 1997 CDs write a
 95-byte `players.atl` (five chapter and letter bytes, where the later
-builds write six), and the English one and the May 1997 French and
-German ones store typed names in capitals.
+builds write six), and the May 1997 English, French and German ones
+store typed names in capitals.
 
 The same folder holds `settings.ini`: the options of the game's menus
 (subtitles, OMNI 3D mode, the master, music, effects and voices volumes,
@@ -713,8 +714,8 @@ not kept, erase saves you no longer need.
   deleting a player deletes its own checkpoints.
 - The subtitles of the 2001 and GOG.com builds are drawn with Liberation
   Sans, which has the metrics of the original's Arial (see
-  [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French
-  and German CDs' and the Spanish and Italian CDs'; the 1997 English CD's, the May 1997 French and
+  [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French,
+  German and US English CDs' and the Spanish and Italian CDs'; the May 1997 English, French and
   German CDs' and the Dutch and Swedish CDs' are drawn with their own
   pixel font, as they did (the accents and umlauts included). The Chinese CDs' are drawn with the
   player's own MingLiU or SimSun when `mingliu.ttc` (Traditional) or

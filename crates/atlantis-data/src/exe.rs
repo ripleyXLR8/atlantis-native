@@ -362,7 +362,7 @@ pub struct CinemaCaptions {
 /// March 1999 ([`ZH_TW`] and [`ZH_CN`]), the seven European builds of
 /// Cryo's 1998 DVD-ROM ([`DVD_EN`]..) and the Perfect Edition's program
 /// ([`PE_2018`]).
-pub const BUILDS: [ExeBuild; 23] = [
+pub const BUILDS: [ExeBuild; 24] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
@@ -735,6 +735,81 @@ pub const BUILDS: [ExeBuild; 23] = [
         music_restart_rearms_fade: true,
         // The CON texts; the SPRLIST texts are glyph indices (their umlauts
         // at the DOS code page's places, 0x81 0x84 0x8e 0x94 0x99 0x9a).
+        text_code_page: TextCodePage::Windows1252,
+        startup_logo_rp: false,
+        credits_read_per_run: false,
+        subtitle_cut_back_only: false,
+        name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
+        menu_records_per_menu: 20,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
+        off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
+        subtitle_languages: false,
+        startup_logos: &[],
+    },
+    // The US retail CD's build (Interplay, August 1997):
+    // atlantis-cd-fr-687104's code (829 of its 832 functions the same) with
+    // two of the reference's rules in: the warp cursor's ids 0x219 / 0x21a
+    // (FUN_00421f40 @ 0x004220b1..0x004220d1, the reference's FUN_00422fcc
+    // @ 0x0042313d) and Rhea's forced camera 2 (FUN_00427260 @
+    // 0x004276da..0x004276f5: perso 0x230, the reference's FUN_0042844c @
+    // 0x0042892e); told apart by the PE stamp. Its DGROUP is the French
+    // one's but for English strings: the player row "New Player" (four
+    // bytes shorter than "NOUVEAU JOUEUR") puts the credits widths at
+    // 0x004866d1 (the French bytes), the inventory at 0x00486784 and the
+    // guests at 0x00486858; music and sound tables at the French build's
+    // addresses. Every other flag is fr-687104's.
+    ExeBuild {
+        name: "atlantis-cd-en-687104",
+        size: 687_104,
+        pe_timestamp: 0x33f1_cca6,
+        year: 1997,
+        month: Some("August"),
+        dgroup_vaddr: 0x8_0000,
+        dgroup_raw: 0x6_ba00,
+        music_va: 0x0048_5eec,
+        // The names in 0x004ab37c..0x004abb90, as fr-687104's.
+        sound_names_va: 0x0048_61cc,
+        sound_names_range: (0x004a_0000, 0x004b_0000),
+        // "New Player", no '#' (read as fr-687104's).
+        new_player_va: 0x0048_6546,
+        inventory_va: 0x0048_6784,
+        guest_va: 0x0048_6858,
+        credit_widths_va: 0x0048_66d1,
+        marker_is_label: true,
+        // FUN_00421f40 @ 0x004220b1: ids 0x219 / 0x21a get the navigate
+        // cursor, as the reference's.
+        cursor_id_rule: true,
+        // FUN_00427260 @ 0x004276da: perso 0x230's camera forced to 2.
+        rhea_camera2: true,
+        alt_game_over_narration: true,
+        bitmap_subtitles: false,
+        subtitle_click_cycle: false,
+        players_1997: true,
+        upper_case_names: false,
+        hexa_forces_402: false,
+        queen_reveal: (3, 200),
+        rat_deadline_pacing: false,
+        rat_search_restart: false,
+        warp_cursor_steps: 1,
+        load_knob_starts_at_bar: false,
+        load_picker_clamp: true,
+        music_first_value_rule: false,
+        game_over_voice_at_entry: false,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        // The CON texts are ASCII (no byte above 0x7f).
         text_code_page: TextCodePage::Windows1252,
         startup_logo_rp: false,
         credits_read_per_run: false,
@@ -1839,11 +1914,13 @@ mod tests {
         assert_eq!(build_of(&reference).unwrap().name, "atlantis-cd-en-714240");
         let patch = fake_exe(714_240, 0x385a_4dc6);
         assert_eq!(build_of(&patch).unwrap().name, "atlantis-patch-fr-714240");
-        // The French, German, Spanish and Italian 1997 builds: one size.
+        // The French, German, US, Spanish and Italian 1997 builds: one size.
         let fr = fake_exe(687_104, 0x33ef_1516);
         assert_eq!(build_of(&fr).unwrap().name, "atlantis-cd-fr-687104");
         let de = fake_exe(687_104, 0x33f8_3e81);
         assert_eq!(build_of(&de).unwrap().name, "atlantis-cd-de-687104");
+        let us = fake_exe(687_104, 0x33f1_cca6);
+        assert_eq!(build_of(&us).unwrap().name, "atlantis-cd-en-687104");
         // The Spanish and Italian builds: the same size, two more stamps.
         let es = fake_exe(687_104, 0x3405_51c4);
         assert_eq!(build_of(&es).unwrap().name, "atlantis-cd-es-687104");

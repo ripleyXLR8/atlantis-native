@@ -85,6 +85,19 @@ fn german_cd_may_1997() {
     assert_eq!(g.edition().to_string(), "CD, German (May 1997 build)");
 }
 
+/// The US retail CD (Interplay), read from its images: the English August
+/// 1997 build, with its market.
+#[test]
+fn us_cd_1997() {
+    let Some(g) = common::game_en_us97("us_cd_1997") else {
+        return;
+    };
+    assert_eq!(
+        g.edition().to_string(),
+        "CD, English (US, Interplay, August 1997 build)"
+    );
+}
+
 #[test]
 fn dutch_cd_1997() {
     let Ok(dir) = std::env::var("ATLANTIS_DATA_NL1997") else {

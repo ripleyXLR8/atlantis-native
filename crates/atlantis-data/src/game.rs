@@ -113,6 +113,11 @@ pub struct Edition {
     pub build_year: u16,
     /// Its month, for the 1997 builds.
     pub build_month: Option<&'static str>,
+    /// The market and distributor of a release that has a build of its
+    /// own: "US, Interplay" for the US retail CD (atlantis-cd-en-687104,
+    /// the English August 1997 build Interplay distributed); `None` for
+    /// the others.
+    pub market: Option<&'static str>,
 }
 
 impl std::fmt::Display for Edition {
@@ -121,9 +126,13 @@ impl std::fmt::Display for Edition {
         if let Some(l) = self.language {
             write!(f, ", {l}")?;
         }
+        write!(f, " (")?;
+        if let Some(m) = self.market {
+            write!(f, "{m}, ")?;
+        }
         match self.build_month {
-            Some(m) => write!(f, " ({m} {} build)", self.build_year),
-            None => write!(f, " ({} build)", self.build_year),
+            Some(m) => write!(f, "{m} {} build)", self.build_year),
+            None => write!(f, "{} build)", self.build_year),
         }
     }
 }
@@ -190,6 +199,7 @@ impl Game {
             language,
             build_year: self.exe.build.year,
             build_month: self.exe.build.month,
+            market: (name == "atlantis-cd-en-687104").then_some("US, Interplay"),
         }
     }
 }
