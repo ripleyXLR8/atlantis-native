@@ -271,6 +271,16 @@ pub struct CubeJob<'a> {
     pub gen: u64,
 }
 
+/// A dialog line's HD picture for a renderer outside the engine: the
+/// first game's composition (`atlantis_engine::hd::compose_dialog_plan`)
+/// of `plan` over the view the renderer drew as `view_gen`, kept as its
+/// drawing `gen`.
+pub struct DialogJob<'a> {
+    pub plan: &'a atlantis_engine::hd::DialogPlan<'a>,
+    pub view_gen: u64,
+    pub gen: u64,
+}
+
 /// A renderer of the HD view outside the engine ([`crate::Engine::cube_renderer`]).
 pub trait CubeRenderer {
     /// Draws the view of `job`, kept for the front end's picture
@@ -278,6 +288,20 @@ pub trait CubeRenderer {
     /// back); false when it cannot (the engine then draws it, and the next
     /// job brings the whole atlas: the renderer forgets its copy).
     fn render(&mut self, job: CubeJob<'_>, out: Option<&mut [u32]>) -> bool;
+
+    /// Whether it composes the dialogs' pictures too
+    /// ([`CubeRenderer::compose_dialog`]).
+    fn composes_dialogs(&self) -> bool {
+        false
+    }
+
+    /// Composes the dialog picture of `job`, kept for the front end's
+    /// picture, and into `out` as well when given (read back); false when
+    /// it cannot (the engine composes it then).
+    fn compose_dialog(&mut self, job: DialogJob<'_>, out: Option<&mut [u32]>) -> bool {
+        let _ = (job, out);
+        false
+    }
 }
 
 /// The panorama the HD view samples: the six faces as drawn (their

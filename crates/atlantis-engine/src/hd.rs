@@ -1259,15 +1259,57 @@ pub fn compose_dialog(
     head: Option<(&[u16], &[u8])>,
     smooth: bool,
 ) {
-    use crate::upscale::{sample_bilinear, Axis};
+    let plan = dialog_plan(
+        layer, tile, side_tiles, pano, pre_head, composite, over, body, head, smooth,
+    );
+    compose_dialog_plan(layer, view, &plan);
+}
+
+/// What [`compose_dialog`] composes a dialog line's HD picture from,
+/// prepared once a frame: a renderer elsewhere (the browser's graphics
+/// card) composes the same picture from it.
+pub struct DialogPlan<'a> {
+    pub tile: usize,
+    /// The 4:3 picture's width, the layer's height, its widescreen
+    /// columns on each side and its width.
+    pub width: usize,
+    pub height: usize,
+    pub side: usize,
+    pub layer_width: usize,
+    /// Per 640x480 pixel, 1 where it is the character's.
+    pub chars: Vec<u8>,
+    /// The head's footprint (with a head).
+    pub footprint: Option<Vec<u8>>,
+    /// The columns the character is moved by (widescreen).
+    pub shift: isize,
+    pub composite: &'a [u16],
+    /// The composite with the overlay over the head, or the composite.
+    pub over: &'a [u16],
+    /// `over` differs from the composite.
+    pub has_over: bool,
+    /// The HD head and its mask (40·tile x 30·tile).
+    pub head: Option<(&'a [u16], &'a [u8])>,
+    /// The body upscaled bilinearly (the smooth interface).
+    pub smooth: bool,
+}
+
+/// The plan of [`compose_dialog`], `layer` sized for `tile` (its content
+/// undefined).
+#[allow(clippy::too_many_arguments)]
+pub fn dialog_plan<'a>(
+    layer: &mut HdLayer,
+    tile: usize,
+    side_tiles: usize,
+    pano: &[u16],
+    pre_head: &[u16],
+    composite: &'a [u16],
+    over: &'a [u16],
+    body: &[u8],
+    head: Option<(&'a [u16], &'a [u8])>,
+    smooth: bool,
+) -> DialogPlan<'a> {
     layer.resize(tile, side_tiles);
     layer.on_card = false;
-    let lut = rgb565_to_888();
-    // The 4:3 picture; the view (and the layer) has `side` more columns
-    // on each side (widescreen), which show the view.
-    let (w, h) = (layer.centre_width(), layer.height);
-    let (side, lw) = (layer.side, layer.width);
-    let cols = low_res_map(w, tile);
     let footprint = head.map(|_| head_footprint(pre_head, composite));
     // The character: whatever differs from the view, and the body video's
     // pixels (some equal the view's), but for those the head's drawing put
@@ -1281,9 +1323,10 @@ pub fn compose_dialog(
         !cleared && body.get(i).is_some_and(|&b| b != 0)
     };
     // (once per 640x480 pixel: the HD picture asks each several times)
-    let chars: Vec<bool> = (0..SCREEN_W * SCREEN_H).map(char_at).collect();
-    let is_char = |i: usize| chars[i];
-    let shift = dialog_shift(&is_char, side);
+    let chars: Vec<u8> = (0..SCREEN_W * SCREEN_H)
+        .map(|i| u8::from(char_at(i)))
+        .collect();
+    let shift = dialog_shift(&|i| chars[i] != 0, layer.side);
     // `over`: the composite with the overlay drawn over the head (the
     // SPF), or `composite` again.
     let over = if over.len() == composite.len() {
@@ -1293,8 +1336,46 @@ pub fn compose_dialog(
     };
     // Without an overlay (`over` is the composite) its pass changes nothing.
     let has_over = !std::ptr::eq(over, composite) && !crate::upscale::same_pixels(over, composite);
+    DialogPlan {
+        tile,
+        width: layer.centre_width(),
+        height: layer.height,
+        side: layer.side,
+        layer_width: layer.width,
+        chars,
+        footprint,
+        shift,
+        composite,
+        over,
+        has_over,
+        head,
+        smooth,
+    }
+}
+
+/// The 640x480 pixel under each HD column (or row) of a dialog's picture
+/// at `tile` ([`DialogPlan`]'s maps).
+pub fn dialog_map(n: usize, tile: usize) -> Vec<usize> {
+    low_res_map(n, tile)
+}
+
+/// [`compose_dialog`]'s picture from its plan, over the HD view `view`,
+/// into `layer`.
+pub fn compose_dialog_plan(layer: &mut HdLayer, view: &[u32], plan: &DialogPlan<'_>) {
+    use crate::upscale::{sample_bilinear, Axis};
+    let lut = rgb565_to_888();
+    // The 4:3 picture; the view (and the layer) has `side` more columns
+    // on each side (widescreen), which show the view.
+    let (w, h, tile) = (plan.width, plan.height, plan.tile);
+    let (side, lw) = (plan.side, plan.layer_width);
+    let cols = low_res_map(w, tile);
+    let (composite, over, has_over, shift) = (plan.composite, plan.over, plan.has_over, plan.shift);
+    let chars = &plan.chars;
+    let is_char = |i: usize| chars[i] != 0;
+    let head = plan.head;
+    let footprint = &plan.footprint;
     // The body (a video) upscaled bilinearly with a smooth interface.
-    let smooth = smooth.then(|| {
+    let smooth = plan.smooth.then(|| {
         let rgb: Vec<u32> = over.iter().map(|&p| lut[usize::from(p)]).collect();
         (rgb, Axis::new(SCREEN_W, w), Axis::new(SCREEN_H, h))
     });
@@ -1321,7 +1402,7 @@ pub fn compose_dialog(
                     };
                 }
             }
-            if let (Some((hp, hm)), Some(f)) = (head, &footprint) {
+            if let (Some((hp, hm)), Some(f)) = (head, footprint) {
                 let hp = &hp[hy * w..][..w];
                 let hm = &hm[hy * w..][..w];
                 let f = &f[sy * SCREEN_W..][..SCREEN_W];

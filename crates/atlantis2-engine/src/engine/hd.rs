@@ -14,7 +14,9 @@
 //! mode off, or without an HD size from the front end.
 
 use super::Engine;
-use crate::hd::{CubeJob, DialogHd, HdLayer, HdPanorama, HdProjection, HdTexts, TextFont};
+use crate::hd::{
+    CubeJob, DialogHd, DialogJob, HdLayer, HdPanorama, HdProjection, HdTexts, TextFont,
+};
 
 /// The engine's HD state.
 #[derive(Default)]
@@ -65,6 +67,12 @@ pub(crate) struct HdState {
     on_card: bool,
     card_gen: u64,
     view_proj: Option<HdProjection>,
+    /// The outside renderer's drawing of the current view, when it has
+    /// one (a dialog's picture is composed over it there), and with the
+    /// check its pixels read back (the engine's dialog picture is composed
+    /// over them for the comparison).
+    view_card_gen: Option<u64>,
+    card_view: Vec<u32>,
 }
 
 /// What an HD view shows, besides the faces.
@@ -238,6 +246,85 @@ impl Engine {
         hd.dialog.ready = false;
         let Some(tile) = hd.tile else { return };
         let t0 = now();
+        let smooth = self.enhancements.hd_options.smooth_interface;
+        // The outside renderer's, over its view.
+        if let (Some(r), Some(view_gen)) = (self.cube_renderer.as_mut(), hd.view_card_gen) {
+            if r.composes_dialogs() {
+                let check = self.view_check;
+                if check {
+                    // (the engine's picture too, over its own view)
+                    hd.view_to_cpu();
+                }
+                let d = &hd.dialog;
+                let head = d.drawn.then_some((&d.head[..], &d.mask[..]));
+                let plan = atlantis_engine::hd::dialog_plan(
+                    &mut hd.layer,
+                    tile,
+                    hd.side_tiles,
+                    &d.pano,
+                    &d.pre_head,
+                    &d.composite,
+                    &d.composite,
+                    &d.body,
+                    head,
+                    smooth,
+                );
+                hd.card_gen = hd.card_gen.wrapping_add(1);
+                let gen = hd.card_gen;
+                let mut back = check.then(|| vec![0u32; plan.layer_width * plan.height]);
+                let job = DialogJob {
+                    plan: &plan,
+                    view_gen,
+                    gen,
+                };
+                if r.compose_dialog(job, back.as_deref_mut()) {
+                    hd.layer.base.copy_from_slice(&d.composite);
+                    if let Some(card) = back {
+                        // The engine's own over the card's view, compared;
+                        // then the engine's own over its view, shown.
+                        let own: Vec<u32> = if hd.view_in_layer {
+                            hd.layer.pixels.clone()
+                        } else {
+                            hd.view.clone()
+                        };
+                        let view = if hd.card_view.len() == own.len() {
+                            &hd.card_view
+                        } else {
+                            &own
+                        };
+                        let mut layer = HdLayer::default();
+                        layer.resize(tile, hd.side_tiles);
+                        atlantis_engine::hd::compose_dialog_plan(&mut layer, view, &plan);
+                        let diff = layer
+                            .pixels
+                            .iter()
+                            .zip(&card)
+                            .filter(|(a, b)| a != b)
+                            .count();
+                        log::info!(
+                            "HD dialog check {}x{}: {diff} pixels differ",
+                            plan.layer_width,
+                            plan.height
+                        );
+                        atlantis_engine::hd::compose_dialog_plan(&mut layer, &own, &plan);
+                        if hd.view_in_layer {
+                            std::mem::swap(&mut hd.view, &mut hd.layer.pixels);
+                            hd.view_in_layer = false;
+                        }
+                        hd.layer.pixels = layer.pixels;
+                        hd.layer.on_card = false;
+                    } else {
+                        hd.layer.on_card = true;
+                        hd.layer.card_gen = gen;
+                    }
+                    if let Some(t0) = t0 {
+                        hd.view_ms += t0.elapsed().as_secs_f64() * 1e3;
+                    }
+                    return;
+                }
+                log::warn!("HD dialog: the outside renderer failed, composed by the engine");
+            }
+        }
         // (the dialog's picture is composed here: the view's pixels)
         hd.view_to_cpu();
         if hd.view_in_layer {
@@ -257,7 +344,7 @@ impl Engine {
             &d.composite,
             &d.body,
             head,
-            self.enhancements.hd_options.smooth_interface,
+            smooth,
         );
         hd.layer.base.copy_from_slice(&d.composite);
         if let Some(t0) = t0 {
@@ -307,7 +394,11 @@ impl Engine {
             // here over the view (`hd_dialog`).
             let mut drawn = false;
             let check = self.view_check;
-            let read_back = self.dialog.as_ref().is_some_and(|d| d.kind() == 0);
+            let read_back = self.dialog.as_ref().is_some_and(|d| d.kind() == 0)
+                && !self
+                    .cube_renderer
+                    .as_ref()
+                    .is_some_and(|r| r.composes_dialogs());
             if let Some(r) = self.cube_renderer.as_mut() {
                 hd.card_gen = hd.card_gen.wrapping_add(1);
                 let changes = hd.pano.take_changes();
@@ -350,15 +441,18 @@ impl Engine {
                 log::info!(
                     "HD view check {w}x{h} tile {tile}: {diff} pixels differ (at most {worst} levels)"
                 );
-                hd.layer.pixels = cpu;
+                hd.card_view = std::mem::replace(&mut hd.layer.pixels, cpu);
             }
             hd.on_card = drawn && !check && !read_back;
+            hd.view_card_gen = drawn.then_some(hd.card_gen);
             if !drawn {
                 hd.pano.render(&p, w, h, &mut hd.layer.pixels);
             }
         }
         hd.layer.on_card = hd.on_card && hd.view_in_layer;
-        hd.layer.card_gen = hd.card_gen;
+        if let Some(g) = hd.view_card_gen {
+            hd.layer.card_gen = g;
+        }
         hd.drew_scene = true;
         hd.drew_video = false;
         if let Some(t0) = t0 {

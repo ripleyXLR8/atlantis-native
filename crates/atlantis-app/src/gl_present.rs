@@ -739,7 +739,8 @@ impl GlCompose {
     /// `last`.
     fn send_u16(&self, unit: u32, t: &WebGlTexture, px: &[u16], last: &mut Vec<u16>) {
         self.bind(unit, t);
-        if last.as_slice() == px {
+        // (compared by words: `==` is a byte loop in WebAssembly)
+        if atlantis_engine::upscale::same_pixels(last, px) {
             return;
         }
         let gl = &self.gl;
