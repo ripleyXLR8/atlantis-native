@@ -11,7 +11,7 @@
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
-| `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit, and presents it) |
+| `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
 
 The engine is one async task: where the original's loops present a frame
 and poll their events, the engine awaits the next frame, and the front end
@@ -752,7 +752,8 @@ in `setup::candidate_folders` only, as before, and opens folders until
 it has the first one of each game: one game found is offered as
 before, both are added to the library. A folder picked in the folder
 picker that holds both games (`setup::find_roots`) asks which one. The
-web build is unchanged (the first game only).
+web build finds either game among the picked files (see
+[Atlantis II in the browser](#atlantis-ii-in-the-browser)).
 
 Cryo's DVD is one disc of eight languages: each is its own edition and
 its own library entry, the language's folder below the disc's root
@@ -812,6 +813,107 @@ for pixel:
 `localStorage["atlantis-native/gpu-view"]`: `off` keeps all of it on the
 processor; `check` reads the card's view and composition back and logs
 how many pixels differ from the processor's (0 in every test so far).
+
+#### Atlantis II in the browser
+
+The page's `start` decides which game the picked files hold from their
+paths alone (`crates/atlantis-app/src/web_layout.rs`, tested natively and
+in WebAssembly): Atlantis II's installed folder is the shallowest one
+holding `atlantis2.exe`, or `Game.exe` beside `wam` and `scenar`; its
+discs are the folders holding a `datas_a2` folder among the installed
+folder, the folders directly inside it, the picked folder and the
+folders directly inside that (the desktop's `disc_candidates`, in its
+order; GOG.com's installation is its own four discs). A folder of both
+games answers `GAMES:` and the page asks, as for the DVD's languages.
+The four discs are required at once: the desktop's CD page looks in its
+folders again for a disc asked for, the browser cannot be given one.
+
+Atlantis II's engine reads a file when it needs it and waits for it, as
+the original does (138 places, the `FileSource` of `A2Files`), where the
+first game's engine is a task that awaits its loader. A page reads a
+picked file only asynchronously, but for one synchronous way: an
+`XMLHttpRequest` of a `blob:` URL of the slice (`File.slice`), with
+`overrideMimeType("text/plain; charset=x-user-defined")` (a synchronous
+request of the page's thread may not ask for an array buffer); an inline
+function copies the text's low bytes straight into the engine's buffer
+(`web.rs`, `PickedDir`, by parts of 8 MB; a read over 50 ms is logged).
+The engine reads only the files and the parts it asks for, as on the
+desktop, which reads its videos and sounds whole when they start: a
+request costs about 1.5 ms, then about 12 ms a MB (Edge; a 4 MB intro
+53 ms, a 39 MB cinematic about half a second). The other ways were
+weighed: `FileReaderSync` exists only in a worker (the engine, WebGL and
+the sound would move there); `SharedArrayBuffer` with `Atomics.wait`
+needs a cross-origin isolated page, which GitHub Pages cannot serve.
+
+The engine keeps its saves, `atlant2.cfg` and its music copies in a store
+(`crates/atlantis2-engine/src/store.rs`: `Engine::set_store`; on the
+desktop `set_data_dir` puts the data folder's `DirFiles` there, the same
+files as before), the browser's `localStorage` under
+`atlantis-native/atlantis2/` (`WebStore`, one key per file as for the
+first game), `settings.ini` too. The window of the desktop (`a2.rs`) runs
+in the browser with its web side in `a2_web.rs`: the canvas fitted to the
+page as the first game's (`web::fit_canvas`), a pass at each of the
+browser's redraws once it is due (4 ms early allowed: the browser paces
+them), a pause of the redraws over 250 ms (a hidden tab) not counted as
+game time, `atlant2.cfg` written when it changed (checked every two
+seconds: a page has no exit), the game's quit back to the page's start.
+The pointer lock is asked for on a click only (a gesture), its loss is
+seen from `document.pointerLockElement` (the next click then only takes it
+back), and a request not granted within 600 ms is a refusal: clicks then
+act at once and the arrow keys turn the view. The sound starts on the
+first click or key; until then the voices are played out at the game's
+pace without a device, as the desktop does without one.
+
+In the HD mode the graphics card draws the view (`gl_cube.rs`, the
+engine's `CubeRenderer`): a shader of `HdPanorama::render` for one pixel
+on the prepared atlas, sent whole or by its changed tiles. The card
+computes the ray in single precision where the engine uses double, so a
+coordinate may fall on the other side of a 64th of a texel: with
+`gpu-view` = `check`, 300 to 1700 pixels of 691200 differ, by 1 to 3
+levels. A head line's picture is composed there too
+(`CubeRenderer::compose_dialog`): `atlantis_engine::hd::compose_dialog`
+is split into its plan (`dialog_plan`: the character's pixels, the head's
+footprint, the widescreen shift, the overlay) and its loop
+(`compose_dialog_plan`), which a shader runs with the engine's integer
+arithmetic over the card's view (0 pixels differ in the check). The
+picture is then composed by the first game's `compose_on_card`, Atlantis
+II's own sharp texts drawn into its overlay; while the options menu is
+open the processor composes it (its texts over the game's). The web
+spider's creatures are drawn by the engine over its own view.
+
+Frame times (headless Edge, i7-9700K and Radeon RX 6700 XT, the page
+1600 x 1200, the frame 960 x 720 in HD; each pass and its presentation,
+in ms, mean (95th percentile)):
+
+| Frame | Original graphics | HD, all on the processor | HD now |
+|---|---|---|---|
+| Tibet's view 2 turning (arrow key) | 1.5 (1.6) | 23.6 (25.6) | 3.8 (4.4) |
+| the shaman's greeting (dialog 360, his 3D head) | 4.4 (5.9) | 18.5 (38.2) | 11.1 (16.3) |
+
+In widescreen (1920 x 1080) the turn takes 3.8 ms and the dialog 11.5.
+The steps: the view on the card (23.6 to 7.4 ms), large buffers compared
+by 64-bit words, `same_pixels` (WebAssembly's `memcmp` is a byte loop,
+7.4 to 5.4), the composition on the card (5.4 to 3.8); in the dialog, the
+character's pixels decided once per 640 x 480 pixel (18.5 to 17.1), then
+the dialog's picture on the card (11.1). What is left in a dialog frame
+is the head's two rasterisations (640 x 480 and HD), the original's cube
+and the faces' preparation. In headless Firefox (which composites the page
+in software) the original graphics take 2.8 ms (view) and 7.0 ms
+(dialog); in HD its presentation is that compositor's (24 ms).
+
+The end-to-end runs drive a headless Edge through the DevTools protocol
+(the folder picked with `DOM.setFileInputFiles`; Firefox through
+WebDriver BiDi, which sets files one by one: `start` then takes their
+paths, `window.atlantisTestOpen`): from the start-up intro (a double
+click) through the player menu, a new game and its film, Tibet's view 2
+and the first click (chapter 75), the walk to view 7 and the shaman's
+greeting, on GOG.com's installation, the French CD's installed folder
+with copies of its four CDs, and the same patched to 1.01; a save through
+the menus, the page loaded again and the save continued; the options
+menu, HD and widescreen. The testing aids are `atlantis2_state` (the
+game's state, the menu page's buttons and the frame times, as JSON) and
+`atlantis2_test` (`aim <view>` turns the view onto the move zone to that
+view; the click is the runner's own).
 
 Comments cite addresses in the original `atlantis.exe` (`FUN_0042844c`,
 `0x00496570`, ...) so that each behaviour can be traced to the original code.
@@ -3457,12 +3559,13 @@ back) into `yucatan-*.png`.
   others kept as stored); a headless run starts from the
   defaults. `--options-menu` draws the menu over a headless run's last
   frame, and `--options-keys down,enter,...` presses keys in it first
-  (its changes hold for that run only). The web build does not run Atlantis II yet, so it has no such
-  menu for it.
+  (its changes hold for that run only). The web build has the same menu
+  (F10 or O), its choices in the browser's `settings.ini`.
 - **Saves** (`crates/atlantis2-data/src/save.rs`, the engine's side in
   `engine/saves.rs`): the original's format, so its saves and the port's
   are the same files: `save\ATL<player>_<slot>.SAV`, 99 slots per player,
-  in the `atlantis2` folder of the port's data folder. A save is the 35
+  in the `atlantis2` folder of the port's data folder (the engine's store,
+  `store.rs`; in the browser, `localStorage`). A save is the 35
   globals of the original's table back to back (69288 bytes: the place,
   chapter, view, time and thumbnail of the header, the 300 variables, the
   1024 flags, the bag with its unused entries in their initial pattern,

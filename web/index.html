@@ -83,7 +83,8 @@
     display: flex; align-items: center; justify-content: center; gap: 14px;
     margin: 14px 0 26px; font-size: clamp(18px, 4.2vw, 30px);
   }
-  .spear { width: clamp(70px, 14vw, 120px); height: auto; flex: none; }
+  .tagline .gold { font-size: clamp(15px, 3.2vw, 24px); }
+  .spear { width: clamp(50px, 11vw, 100px); height: auto; flex: none; }
   .spear.right { transform: scaleX(-1); }
   .tablet {
     position: relative; text-align: left; padding: 22px 30px 18px;
@@ -112,7 +113,11 @@
   #dir { position: absolute; width: 1px; height: 1px; opacity: 0; }
   #status { min-height: 1.6em; text-align: center; color: var(--muted); margin: 0; font-style: italic; }
   #err { color: #ff9a8a; white-space: pre-wrap; margin: 10px 0 0; }
-  .tablet h2 { margin: 14px 0 4px; font-weight: normal; font-size: 17px; }
+  /* The two games' folders side by side (one above the other on a phone). */
+  .games { display: grid; grid-template-columns: 1fr 1fr; gap: 0 26px; font-size: 15px; line-height: 1.5; }
+  .games h2 { margin: 6px 0 4px; font-weight: normal; font-size: 15px; }
+  .games ul { padding-left: 20px; }
+  @media (max-width: 640px) { .games { grid-template-columns: 1fr; } }
   #err button.language { font: inherit; color: #1b1206; background: #e8c77a; border: 0;
     border-radius: 4px; padding: 4px 10px; margin: 6px 4px 0 0; cursor: pointer; }
   .small { color: var(--muted); font-size: 14px; }
@@ -244,7 +249,7 @@
   <h1 class="logo">Atlantis</h1>
   <div class="tagline">
     <svg class="spear" viewBox="0 0 120 40"><use href="#spear"/></svg>
-    <span class="gold">The Lost Tales · II</span>
+    <span class="gold">The Lost Tales · Atlantis II</span>
     <svg class="spear right" viewBox="0 0 120 40"><use href="#spear"/></svg>
   </div>
   <div class="tablet">
@@ -256,6 +261,8 @@
     <p>It does not include the games themselves: their pictures, videos,
        voices and music belong to their publisher, so it plays them from
        <em>your own copy</em>. Choose the folder of your game:</p>
+    <div class="games">
+    <section>
     <h2 class="gold">Atlantis: The Lost Tales</h2>
     <ul>
       <li><em>GOG.com</em>: the folder where the game is installed.</li>
@@ -266,6 +273,8 @@
           (the folder holding <code>FACE_A</code> or <code>FACE_B</code>);
           then choose the language.</li>
     </ul>
+    </section>
+    <section>
     <h2 class="gold">Atlantis II</h2>
     <ul>
       <li><em>GOG.com</em>: the folder where the game is installed (the
@@ -278,6 +287,8 @@
           folder. The browser reads files, not CD images
           (<code>.iso</code>…): copy the discs' files.</li>
     </ul>
+    </section>
+    </div>
     <div class="choose">
       <label class="menu-item"><svg class="sun" viewBox="0 0 40 40"><use href="#sun"/></svg><span class="gold">Choose your game folder</span>
         <input type="file" id="dir" webkitdirectory></label>
@@ -316,14 +327,14 @@
   // Opens the game of the picked files; for Cryo's DVD, `language` is the
   // folder of the language the player chose (the engine lists them); for
   // a folder holding both games, `game` the one chosen.
-  const open = async (files, language, game) => {
+  const open = async (files, language, game, paths) => {
     const box = document.getElementById("err");
     box.textContent = "";
     status.textContent = "Opening the game…";
     // (the browser draws the message before the engine reads the files)
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     try {
-      const started = await start(files, language, game);
+      const started = await start(files, language, game, paths);
       document.body.classList.add(started === "atlantis2" ? "game-a2" : "game-a1");
       document.body.classList.remove("landing");
       // Atlantis II quit from its menu: the page again.
@@ -361,7 +372,7 @@
           const b = document.createElement("button");
           b.className = "language";
           b.textContent = name;
-          b.addEventListener("click", () => open(files, folder, game));
+          b.addEventListener("click", () => open(files, folder, game, paths));
           box.append(" ", b);
         }
         return;
@@ -374,7 +385,7 @@
           const b = document.createElement("button");
           b.className = "language";
           b.textContent = name;
-          b.addEventListener("click", () => open(files, language, id));
+          b.addEventListener("click", () => open(files, language, id, paths));
           box.append(" ", b);
         }
         return;
@@ -390,6 +401,9 @@
     }
   };
   document.getElementById("dir").addEventListener("change", (e) => open(e.target.files));
+  // The end-to-end runs whose driver cannot pick a folder (Firefox's
+  // WebDriver BiDi sets files one by one): the files and their paths.
+  window.atlantisTestOpen = (files, paths) => open(files, undefined, undefined, paths);
 </script>
 </body>
 </html>

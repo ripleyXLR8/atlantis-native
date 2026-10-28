@@ -262,12 +262,16 @@ fn dvd_files(all: HashMap<String, File>, l: &DvdLanguage, root: &str) -> HashMap
 /// page to ask. A folder that holds both games is refused the same way
 /// with `GAMES:` then `id=name` pairs, until the page gives the game
 /// chosen (`game`: `atlantis` or `atlantis2`). Returns the game started
-/// (`atlantis`, `atlantis2`).
+/// (`atlantis`, `atlantis2`). `paths` gives the files' paths below the
+/// picked folder's parent when the browser does not
+/// (`webkitRelativePath`): the end-to-end runs of a browser whose driver
+/// sets files one by one (Firefox's WebDriver BiDi).
 #[wasm_bindgen]
 pub async fn start(
     files: FileList,
     language: Option<String>,
     game: Option<String>,
+    paths: Option<Vec<String>>,
 ) -> Result<JsValue, JsValue> {
     console_error_panic_hook::set_once();
     let _ = console_log::init_with_level(log::Level::Info);
@@ -280,6 +284,8 @@ pub async fn start(
         let rel = js_sys::Reflect::get(&f, &"webkitRelativePath".into())
             .ok()
             .and_then(|v| v.as_string())
+            .filter(|r| !r.is_empty())
+            .or_else(|| paths.as_ref().and_then(|p| p.get(i as usize).cloned()))
             .unwrap_or_else(|| f.name());
         all.insert(key(&rel), f);
     }

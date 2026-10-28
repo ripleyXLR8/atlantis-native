@@ -125,6 +125,7 @@ The message says what is wrong and what to do:
 | does not hold Atlantis: The Lost Tales | choose the folder that holds `atlantis.exe` |
 | holds Atlantis II but none of its discs | put the images of its four CDs (or copies of the CDs) in the folder or a folder inside it |
 | holds Atlantis II's discs, not the installed game | choose the folder where Atlantis II is installed (with `atlantis2.exe`), the discs put in it |
+| (web) Atlantis II needs its four discs, and CD *n* is not among the chosen files | copy that CD into the installed game's folder or a folder inside it, and choose the folder again |
 | holds Cryo's DVD | choose the language in the game library (each language found is listed), or the folder holding `FACE_A` or `FACE_B`, the drive, or the folder of the sides' images |
 | this version is on the other side of the DVD | turn the disc over (the side it names), or put the images of both sides in one folder |
 | holds a language of Cryo's DVD without the folders its side shares | copy the whole side (the folder holding `FACE_A` or `FACE_B`) |
@@ -220,6 +221,56 @@ it, or set `never = on` in `support.ini` in the per-user folder (see
 the file also holds the counts it goes by (`launches`, `played_seconds`,
 `last_shown`). `atlantis-native --support-screen` shows it at once,
 whatever the counts say.
+
+## The web version
+
+The web page, **https://ripleyxlr8.github.io/atlantis-native/** (or the
+`atlantis-native-web.zip` of the nightly release, served over HTTP),
+plays both games in Chrome, Edge, Firefox or Safari on a computer with a
+mouse and a keyboard. **Choose your game folder** and pick the folder of
+your game; the browser asks to confirm that the page may read it. The
+files stay where they are: the page reads them inside the browser, a
+part at a time when the game needs it (Atlantis II's 2.4 GB are never
+loaded whole), and sends nothing anywhere. A browser does not let a page
+keep a folder: choose it again at each visit (there is no game library);
+the players, saves and settings are kept in the browser.
+
+What to pick:
+
+- *Atlantis: The Lost Tales*: as for the desktop, the GOG.com folder, a
+  folder holding `atlantis.exe` and the four `BIGCD` archives, or Cryo's
+  DVD (the drive or a copy of a side, then the language). CD images
+  cannot be read in the browser.
+- *Atlantis II*, GOG.com: the installation folder (the one holding
+  `Game.exe` and `DATAS_A2`).
+- *Atlantis II*, CD (version 1.00, or patched to 1.01): the folder of the
+  installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
+  with a copy of each of the four CDs in it, for example in folders
+  `CD1` to `CD4`, each holding the disc's `DATAS_A2` folder (copy the
+  whole disc, or at least its `DATAS_A2`). The copies may also sit beside
+  the installed folder: then pick the folder holding both (for example
+  `Atlantis 2` and `CD1` to `CD4` side by side). The browser reads files,
+  not CD images, and the four discs are needed at once (no disc can be
+  added while the game runs).
+- A folder holding both games: the page asks which one to play.
+
+The sound starts with the first click or key (browsers allow sound only
+after one). In Atlantis II the mouse turns the view once a click has
+taken it (the browser's pointer lock); Escape lets it go (the browser's
+own key for that; press it again for the game's menu if the browser kept
+the first one), and the next click takes it back without acting in the
+game. Where the lock is refused, clicks act at once
+and the arrow keys turn the view. F or F11 (or the page's **Full screen**
+button) switches full screen; F10 or O opens the options menu, with the
+HD mode, widescreen and the bug fixes, as on the desktop.
+
+In the HD mode the graphics card draws the panorama and composes the
+picture (as for the first game), at most 1280 x 960 pixels, which it
+enlarges to the window; Atlantis II's view is computed there in single
+precision, so that about one pixel in a thousand differs by a level or
+two from the desktop's. `atlantis-native/gpu-view` in the page's local
+storage (the browser's developer tools) set to `off` draws everything on
+the processor, `check` compares the two and logs the differences.
 
 ## Full screen
 
@@ -340,7 +391,8 @@ Atlantis II plays from its start to its end (Tibet, Ireland, China,
 Yucatán with Xibalba, the space travel, Shamballa with its fireflies,
 Atlantis with the octopus fight, the credits;
 see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)), on Windows,
-macOS and Linux (the web version does not run it yet). The
+macOS and Linux, and in the browser (see
+[The web version](#the-web-version)). The
 [game library](#several-editions-the-game-library) finds and opens it as
 it does the first game: started without a folder, Atlantis Native looks
 for GOG.com's installation (its entry in the Windows registry, and the
@@ -613,7 +665,11 @@ so that this set outlives the session as the original's copies do,
 The web build keeps its players, checkpoints and settings in the
 browser's storage (`localStorage`, one entry per file, kept per site and
 per browser). It too takes over the `players.atl` and checkpoints of the
-picked folder on its first start.
+picked folder on its first start. Atlantis II's files there are under
+`atlantis-native/atlantis2/`: the saves (`save/atl<player>_<slot>.sav`,
+the original's files), `atlant2.cfg`, `settings.ini` and
+`music_copies.txt`, shared by its editions as on the desktop (the saves
+of the picked folder are not taken over, as on the desktop).
 
 ## Known differences from the original
 
