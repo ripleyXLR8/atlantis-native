@@ -183,8 +183,14 @@ pub struct App {
     alt: bool,
     /// The window's title: the port and the game's release.
     title: String,
-    /// The window opens in full screen (`--fullscreen`).
+    /// The window opens in full screen (`--fullscreen`), whatever the
+    /// setting.
     start_fullscreen: bool,
+    /// The game's "Start in full screen" (its `settings.ini`): the window
+    /// opens in full screen, and goes to full screen when the game starts
+    /// in a window already open (the game library's, the support
+    /// screen's); F, F11 and Alt+Enter set it as they switch (desktop).
+    fullscreen_setting: bool,
     /// The window's icon: the player's atlantis.exe icon.
     icon: Option<atlantis_data::exe_icon::Icon>,
     /// The lock fell back to confining the pointer (Windows, X11): the
@@ -224,10 +230,33 @@ pub struct App {
 }
 
 impl App {
-    /// Opens the window in full screen (F switches it back).
+    /// Opens the window in full screen (F switches it back), whatever the
+    /// game's "Start in full screen" says (which this does not change).
     pub fn with_fullscreen(mut self, on: bool) -> App {
         self.start_fullscreen = on;
         self
+    }
+
+    /// Whether the window opens in full screen: `--fullscreen`, or the
+    /// game's "Start in full screen" on the desktop (the browser puts the
+    /// page in full screen only on a key or a click: F, F11, Alt+Enter or
+    /// its button).
+    fn opens_fullscreen(&self) -> bool {
+        self.start_fullscreen || (cfg!(not(target_arch = "wasm32")) && self.fullscreen_setting)
+    }
+
+    /// The game's "Start in full screen" set to `on` and saved in its
+    /// `settings.ini` (the options menu, the full screen keys).
+    fn store_fullscreen(&mut self, on: bool) {
+        self.fullscreen_setting = on;
+        log::info!("start in full screen: {on}");
+        if let Some(saves) = &self.saves {
+            let mut s = Settings::load(saves.as_ref()).unwrap_or_default();
+            if s.fullscreen != on {
+                s.fullscreen = on;
+                s.save(saves.as_ref());
+            }
+        }
     }
 
     /// A front end for `runner` (the engine task on `sys`), or a test
@@ -265,6 +294,7 @@ impl App {
             alt: false,
             title: "Atlantis Native".to_string(),
             start_fullscreen: false,
+            fullscreen_setting: false,
             icon: None,
             confined: false,
             focused: true,
@@ -273,7 +303,11 @@ impl App {
             rel_acc: (0.0, 0.0),
             audio: None,
             audio_pending: true,
-            menu: OptionsMenu::new(),
+            menu: {
+                let mut m = OptionsMenu::new();
+                m.set_fullscreen_entry(cfg!(not(target_arch = "wasm32")));
+                m
+            },
             menu_font: None,
             menu_frame: Vec::new(),
             launcher_frame: Vec::new(),
@@ -379,9 +413,11 @@ impl App {
 
     fn set_graphics(&mut self, graphics: Graphics, saves: Option<Rc<dyn SaveStore>>) {
         self.graphics = graphics;
-        if let Some(s) = saves.as_ref().and_then(|s| Settings::load(s.as_ref())) {
+        let stored = saves.as_ref().and_then(|s| Settings::load(s.as_ref()));
+        if let Some(s) = &stored {
             self.sys.set_hd_options(s.hd);
         }
+        self.fullscreen_setting = stored.is_some_and(|s| s.fullscreen);
         self.saves = saves;
     }
 
@@ -403,6 +439,15 @@ impl App {
         self.set_graphics(graphics, Some(saves));
         self.set_edition(Some((edition, fixes)));
         self.set_icon(icon);
+        // "Start in full screen" in a window already open (the game
+        // library's, the support screen's).
+        if self.fullscreen_setting {
+            if let Some(w) = &self.window {
+                if w.fullscreen().is_none() {
+                    w.set_fullscreen(Some(Fullscreen::Borderless(None)));
+                }
+            }
+        }
         let now = Instant::now();
         self.start = now;
         self.next_frame = now;
@@ -436,6 +481,7 @@ impl App {
         self.paused_at = None;
         self.sys = Sys::new(Mixer::new());
         self.saves = None;
+        self.fullscreen_setting = false;
         self.locked = false;
         self.confined = false;
         self.raw_motion = false;
@@ -458,7 +504,9 @@ impl App {
     }
 
     /// Full screen on or off (borderless, on the window's monitor; in
-    /// the browser the canvas fills the screen).
+    /// the browser the canvas fills the screen). On the desktop the game's
+    /// "Start in full screen" follows: the window opens the way the player
+    /// left it.
     fn toggle_fullscreen(&mut self) {
         // In the browser, the page's own full screen: it caps the canvas's
         // size (see web/index.html), which the canvas's own full screen
@@ -476,6 +524,8 @@ impl App {
         let Some(w) = &self.window else { return };
         let full = w.fullscreen().is_some();
         w.set_fullscreen((!full).then_some(Fullscreen::Borderless(None)));
+        #[cfg(not(target_arch = "wasm32"))]
+        self.store_fullscreen(!full);
     }
 
     /// Opens the options menu: the game pauses (its clock and its sound),
@@ -558,6 +608,7 @@ impl App {
                     s.save(saves.as_ref());
                 }
             }
+            MenuAction::SetFullscreen(on) => self.store_fullscreen(on),
             MenuAction::OpenLibrary => {
                 // (the web build has no game library: no such entry)
                 #[cfg(not(target_arch = "wasm32"))]
@@ -575,6 +626,7 @@ impl App {
             graphics: self.graphics,
             hd: self.sys.hd_options(),
             enhancements: self.sys.enhancements(),
+            fullscreen: self.fullscreen_setting,
         }
     }
 
@@ -818,6 +870,7 @@ impl App {
                 graphics: self.graphics,
                 hd: self.sys.hd_options(),
                 enhancements: self.sys.enhancements(),
+                fullscreen: self.fullscreen_setting,
             };
             let font = self.menu_font.get_or_insert_with(SubtitleFont::new);
             let text = hd_mode.then_some(&mut self.menu_text);
@@ -1025,7 +1078,7 @@ impl ApplicationHandler for App {
             .with_window_icon(self.window_icon())
             .with_inner_size(LogicalSize::new(W as f64 * 1.5, H as f64 * 1.5))
             .with_fullscreen(
-                self.start_fullscreen
+                self.opens_fullscreen()
                     .then_some(Fullscreen::Borderless(None)),
             );
         // Windows takes the taskbar and Alt+Tab icon separately.
@@ -1475,4 +1528,91 @@ pub(crate) fn compose_on_card(
         None => gl.present(window, &[], (0, 0), whole, true, Some((tex, whole))),
     }
     true
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod fullscreen_tests {
+    use super::*;
+    use atlantis_engine::options_menu::Entry;
+    use atlantis_engine::MemStore;
+
+    fn app_on(store: &Rc<MemStore>) -> App {
+        let saves: Rc<dyn SaveStore> = store.clone();
+        App::new(Sys::new(Mixer::new()), None).with_graphics(Graphics::Original, Some(saves))
+    }
+
+    fn stored(store: &MemStore) -> bool {
+        Settings::load(store).unwrap().fullscreen
+    }
+
+    /// The window opens in full screen with `--fullscreen` or the game's
+    /// "Start in full screen"; `--fullscreen` does not change the setting.
+    #[test]
+    fn the_window_opens_as_the_setting_says() {
+        // No settings yet: a window.
+        let store = Rc::new(MemStore::new());
+        assert!(!app_on(&store).opens_fullscreen());
+        assert!(app_on(&store).with_fullscreen(true).opens_fullscreen());
+        assert!(Settings::load(store.as_ref()).is_none(), "nothing written");
+        // The setting on.
+        let s = Settings {
+            fullscreen: true,
+            ..Settings::default()
+        };
+        s.save(store.as_ref());
+        let app = app_on(&store);
+        assert!(app.opens_fullscreen());
+        assert!(app.menu_values().fullscreen);
+        assert!(app.with_fullscreen(false).opens_fullscreen());
+        // Off: `--fullscreen` alone.
+        let s = Settings::default();
+        s.save(store.as_ref());
+        assert!(!app_on(&store).opens_fullscreen());
+        let app = app_on(&store).with_fullscreen(true);
+        assert!(app.opens_fullscreen());
+        assert!(!app.menu_values().fullscreen);
+        assert!(!stored(&store));
+        // Without a game (the game library's screen): the window's own.
+        assert!(!App::new(Sys::new(Mixer::new()), None).opens_fullscreen());
+    }
+
+    /// The options menu's row, on the desktop, switches the setting and
+    /// saves it with the others; the full screen keys' switch sets it too.
+    #[test]
+    fn the_menu_and_the_keys_save_the_setting() {
+        let store = Rc::new(MemStore::new());
+        let s = Settings {
+            graphics: Graphics::Hd,
+            ..Settings::default()
+        };
+        s.save(store.as_ref());
+        let mut app = app_on(&store);
+        app.open_menu();
+        // Original graphics: Down from Graphics skips the HD rows.
+        let a = app.menu.key(EngineKey::Down, app.menu_values());
+        assert_eq!(a, MenuAction::None);
+        assert_eq!(app.menu.selected(), Entry::Fullscreen);
+        let a = app.menu.key(EngineKey::Enter, app.menu_values());
+        assert_eq!(a, MenuAction::SetFullscreen(true));
+        app.menu_action(a);
+        assert!(app.menu_values().fullscreen && app.opens_fullscreen());
+        let saved = Settings::load(store.as_ref()).unwrap();
+        assert_eq!(
+            saved,
+            Settings {
+                fullscreen: true,
+                ..s
+            },
+            "the other settings kept"
+        );
+        let a = app.menu.key(EngineKey::Right, app.menu_values());
+        assert_eq!(a, MenuAction::SetFullscreen(false));
+        app.menu_action(a);
+        assert!(!stored(&store) && !app.opens_fullscreen());
+        // What F, F11 and Alt+Enter store as they switch.
+        app.store_fullscreen(true);
+        assert!(stored(&store) && app_on(&store).opens_fullscreen());
+        app.store_fullscreen(false);
+        assert!(!stored(&store) && !app_on(&store).opens_fullscreen());
+    }
 }

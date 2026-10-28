@@ -95,7 +95,9 @@ contains none of them.</sub>
   images...) of both games in one list, to choose the one to play at
   start-up or switch from F10.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
-  proportions, the mouse captured while you look around.
+  proportions, the mouse captured while you look around; full screen at
+  a key, and on the desktop kept for the next start (F10, "Start in full
+  screen").
 
 ## Download
 

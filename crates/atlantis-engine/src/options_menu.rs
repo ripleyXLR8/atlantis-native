@@ -2,7 +2,9 @@
 //! frame the game shows: settings of the port that the original's menus do
 //! not have. The game is paused while it is open.
 //!
-//! Entries: the graphics mode (see [`crate::hd`]), the three groups of
+//! Entries: the graphics mode (see [`crate::hd`]), on the desktop "Start
+//! in full screen" (the window opens in full screen; F, F11 or Alt+Enter
+//! switching it changes the option too), the three groups of
 //! [`Enhancements`] (the names of the ScummVM port's options): the bug
 //! fixes all on or all off ("Custom (n/N)" when mixed) and "Choose the bug
 //! fixes..." (a box of its own in the same style: all on, all off, one
@@ -27,6 +29,8 @@ pub enum Entry {
     SharpSubtitles,
     Widescreen,
     VideoSides,
+    /// The window opens in full screen (the desktop).
+    Fullscreen,
     BugFixes,
     /// Open the bug fixes' box.
     ChooseFixes,
@@ -39,7 +43,7 @@ pub enum Entry {
     Library,
 }
 
-const ENTRIES: [Entry; 14] = [
+const ENTRIES: [Entry; 15] = [
     Entry::Graphics,
     Entry::PanoramaFilter,
     Entry::Sharpen,
@@ -47,6 +51,7 @@ const ENTRIES: [Entry; 14] = [
     Entry::SharpSubtitles,
     Entry::Widescreen,
     Entry::VideoSides,
+    Entry::Fullscreen,
     Entry::BugFixes,
     Entry::ChooseFixes,
     Entry::RestoredContent,
@@ -81,6 +86,8 @@ pub enum MenuAction {
     SetHd(HdOptions),
     /// An enhancement group was switched: apply and save them.
     SetEnhancements(Enhancements),
+    /// "Start in full screen" was switched: save it.
+    SetFullscreen(bool),
     /// The menu closed.
     Close,
     /// Stop the game and show the game library (the menu closed).
@@ -95,6 +102,8 @@ pub struct MenuValues {
     pub graphics: Graphics,
     pub hd: HdOptions,
     pub enhancements: Enhancements,
+    /// "Start in full screen".
+    pub fullscreen: bool,
 }
 
 impl MenuValues {
@@ -357,6 +366,34 @@ impl MenuBox {
         description: &str,
         record: Option<&mut HdText>,
     ) {
+        self.draw_recording_in(
+            &BoxLayout::OPTIONS,
+            screen,
+            w,
+            h,
+            font,
+            rows,
+            info,
+            description,
+            record,
+        );
+    }
+
+    /// [`MenuBox::draw_recording`] on a box laid out as `layout` (its
+    /// foot [`FOOTER_H`] pixels high).
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_recording_in(
+        &self,
+        layout: &BoxLayout,
+        screen: &mut [u16],
+        w: usize,
+        h: usize,
+        font: &SubtitleFont,
+        rows: &[Row],
+        info: &[String],
+        description: &str,
+        record: Option<&mut HdText>,
+    ) {
         let mut foot: Vec<FootLine> = info
             .iter()
             .take(2)
@@ -377,7 +414,7 @@ impl MenuBox {
             from_bottom: 22,
             color: DIM,
         });
-        self.draw_in(&BoxLayout::OPTIONS, screen, w, h, font, rows, &foot, record);
+        self.draw_in(layout, screen, w, h, font, rows, &foot, record);
     }
 
     /// Draws a box laid out as `layout` over a `w` x `h` RGB565 frame: the
@@ -491,6 +528,15 @@ pub const FIX_TEXT_LINES: usize = 3;
 /// The bug fixes' box's width: wider than the options' (the fixes' names
 /// and the game's in its title).
 pub const FIX_BOX_W: i32 = 580;
+
+/// The space kept around the options menu's box on the 640x480 screen;
+/// its rows are [`SMALL_ROW_H`] pixels high when [`ROW_H`] would not
+/// leave it (the desktop's menu, with its game library and full screen
+/// rows).
+const MENU_MARGIN: i32 = 8;
+
+/// The rows' height of a box too high for [`ROW_H`].
+pub const SMALL_ROW_H: i32 = 20;
 
 /// Its foot: the explanation, then the keys.
 const FIX_FOOTER_H: i32 = 12 + FIX_TEXT_LINES as i32 * 18 + 32;
@@ -630,6 +676,9 @@ pub struct OptionsMenu {
     info: Vec<String>,
     /// The front end has a game library: the "Game library..." entry.
     library: bool,
+    /// The front end opens a window it can put in full screen (the
+    /// desktop): the "Start in full screen" entry.
+    fullscreen: bool,
     /// The fixes the bug fixes' box lists: those of the game's build
     /// ([`BugFix::of_game`]), in the menu's order.
     game_fixes: Vec<BugFix>,
@@ -646,6 +695,7 @@ impl Default for OptionsMenu {
             fixes: MenuBox::default(),
             info: Vec::new(),
             library: false,
+            fullscreen: false,
             game_fixes: Vec::new(),
             fix_title: String::new(),
             fix_gaps: [0; 2],
@@ -694,23 +744,47 @@ impl OptionsMenu {
         self.menu.clamp(self.entries().len());
     }
 
+    /// Whether the menu has the "Start in full screen" entry (the
+    /// desktop; the browser puts the page in full screen only on a key or
+    /// a click).
+    pub fn set_fullscreen_entry(&mut self, on: bool) {
+        self.fullscreen = on;
+        self.menu.clamp(self.entries().len());
+    }
+
     /// The entries shown.
-    fn entries(&self) -> &'static [Entry] {
-        if self.library {
-            &ENTRIES
-        } else {
-            &ENTRIES[..ENTRIES.len() - 1]
+    fn entries(&self) -> Vec<Entry> {
+        ENTRIES
+            .into_iter()
+            .filter(|e| match e {
+                Entry::Library => self.library,
+                Entry::Fullscreen => self.fullscreen,
+                _ => true,
+            })
+            .collect()
+    }
+
+    /// The box's layout: [`BoxLayout::OPTIONS`], its rows
+    /// [`SMALL_ROW_H`] pixels high when that would not leave
+    /// [`MENU_MARGIN`] around it on the screen.
+    pub fn layout(&self) -> BoxLayout<'static> {
+        let mut l = BoxLayout::OPTIONS;
+        if l.box_h(self.entries().len()) + 2 * MENU_MARGIN > SCREEN_H as i32 {
+            l.row_h = SMALL_ROW_H;
         }
+        l
     }
 
     #[cfg(test)]
     fn box_h(&self) -> i32 {
-        MenuBox::box_h(self.entries().len())
+        self.layout().box_h(self.entries().len())
     }
 
     #[cfg(test)]
     fn box_y(&self) -> i32 {
-        MenuBox::origin(self.entries().len(), SCREEN_W, SCREEN_H).1
+        self.layout()
+            .origin(self.entries().len(), SCREEN_W, SCREEN_H)
+            .1
     }
 
     pub fn is_open(&self) -> bool {
@@ -761,7 +835,7 @@ impl OptionsMenu {
             footer_h: FIX_FOOTER_H,
         };
         if l.box_h(self.fix_rows().len()) + 2 * FIX_MARGIN > SCREEN_H as i32 {
-            l.row_h = 20;
+            l.row_h = SMALL_ROW_H;
         }
         l
     }
@@ -811,6 +885,7 @@ impl OptionsMenu {
             Entry::SharpSubtitles => hd.sharp_subtitles = !hd.sharp_subtitles,
             Entry::Widescreen => hd.widescreen = !hd.widescreen,
             Entry::VideoSides => hd.video_sides = hd.video_sides.next(),
+            Entry::Fullscreen => return MenuAction::SetFullscreen(!v.fullscreen),
             // All on, then all off (from a mix of the game's: all on).
             Entry::BugFixes => {
                 let all_on = x.fixes.count_of(&self.game_fixes) == self.game_fixes.len();
@@ -867,6 +942,7 @@ impl OptionsMenu {
             Entry::SharpSubtitles => "Subtitles drawn at the window's resolution",
             Entry::Widescreen => "The panorama fills the sides of a wide window",
             Entry::VideoSides => "Widescreen: the bars beside the videos",
+            Entry::Fullscreen => "The window opens in full screen (F switches)",
             Entry::BugFixes => "Every fix of the original's bugs on or off",
             Entry::ChooseFixes => "Enter: one fix at a time",
             Entry::RestoredContent => "Restores lines the original never plays (off by default)",
@@ -919,6 +995,7 @@ impl OptionsMenu {
                             VideoSides::Panorama => "Panorama",
                         }),
                     ),
+                    Entry::Fullscreen => ("Start in full screen", Some(on(v.fullscreen))),
                     Entry::BugFixes => ("Fix original bugs", Some(fixes)),
                     Entry::ChooseFixes => ("Choose the bug fixes...", None),
                     Entry::RestoredContent => (
@@ -1009,7 +1086,8 @@ impl OptionsMenu {
             return;
         }
         let n = self.entries().len();
-        self.menu.pointer(n, x, y, SCREEN_W, SCREEN_H);
+        self.menu
+            .pointer_in(&self.layout(), n, x, y, SCREEN_W, SCREEN_H);
     }
 
     /// A click at a 640x480 screen point: the entry under it changes;
@@ -1025,7 +1103,9 @@ impl OptionsMenu {
             return self.act_fix(input, v);
         }
         let n = self.entries().len();
-        let input = self.menu.click(n, x, y, SCREEN_W, SCREEN_H);
+        let input = self
+            .menu
+            .click_in(&self.layout(), n, x, y, SCREEN_W, SCREEN_H);
         self.act(input, v)
     }
 
@@ -1075,7 +1155,8 @@ impl OptionsMenu {
         }
         let d = Self::description(self.selected(), v);
         let value = self.fixes_value(&v.enhancements.fixes);
-        self.menu.draw_recording(
+        self.menu.draw_recording_in(
+            &self.layout(),
             screen,
             SCREEN_W,
             SCREEN_H,
@@ -1113,11 +1194,13 @@ mod tests {
         graphics: Graphics::Original,
         hd: HD_OPTS,
         enhancements: DEFAULTS,
+        fullscreen: false,
     };
     const HD: MenuValues = MenuValues {
         graphics: Graphics::Hd,
         hd: HD_OPTS,
         enhancements: DEFAULTS,
+        fullscreen: false,
     };
 
     #[test]
@@ -1650,6 +1733,75 @@ mod tests {
         assert_eq!(m.game_fixes().len(), 8);
         assert!(m.game_fixes().iter().all(|f| f.of_every_build()));
         assert_eq!(m.fix_title, "Original bug fixes");
+    }
+
+    /// "Start in full screen", on the desktop only: after the HD rows,
+    /// switched by the keys and the mouse whatever the graphics mode, the
+    /// menu's rows smaller so that the box keeps a margin on the screen.
+    #[test]
+    fn the_fullscreen_entry() {
+        let mut m = OptionsMenu::new();
+        assert!(!m.entries().contains(&Entry::Fullscreen), "the browser");
+        assert_eq!(m.layout(), BoxLayout::OPTIONS);
+        m.set_library(true);
+        assert_eq!(m.layout(), BoxLayout::OPTIONS);
+        m.set_fullscreen_entry(true);
+        let entries = m.entries();
+        assert_eq!(entries.len(), 15);
+        assert_eq!(entries[7], Entry::Fullscreen);
+        assert_eq!(entries[6], Entry::VideoSides);
+        // The desktop's box: rows of 20 pixels, inside the screen with a
+        // margin.
+        let layout = m.layout();
+        assert_eq!(layout.row_h, SMALL_ROW_H);
+        assert!(m.box_y() >= MENU_MARGIN);
+        assert!(m.box_y() + m.box_h() + MENU_MARGIN <= SCREEN_H as i32);
+        m.open();
+        // Original graphics: Down from Graphics skips the HD rows.
+        m.key(Key::Down, ORIG);
+        assert_eq!(m.selected(), Entry::Fullscreen);
+        assert!(!Entry::Fullscreen.hd_only());
+        assert_eq!(m.key(Key::Enter, ORIG), MenuAction::SetFullscreen(true));
+        let on = MenuValues {
+            fullscreen: true,
+            ..HD
+        };
+        assert_eq!(m.key(Key::Left, on), MenuAction::SetFullscreen(false));
+        assert_eq!(m.key(Key::Down, ORIG), MenuAction::None);
+        assert_eq!(m.selected(), Entry::BugFixes);
+        // The mouse, on the rows of 20 pixels.
+        let y = m.box_y() + layout.row_y(7) + 3;
+        assert_eq!(m.click(320, y, on), MenuAction::SetFullscreen(false));
+        assert_eq!(m.selected(), Entry::Fullscreen);
+        m.pointer(320, m.box_y() + layout.row_y(14) + 3);
+        assert_eq!(m.selected(), Entry::Library);
+        m.pointer(320, m.box_y() + layout.row_y(0) + 19);
+        assert_eq!(m.selected(), Entry::Graphics);
+        // Drawn with its value, inside the box.
+        let font = SubtitleFont::new();
+        let mut s = vec![0x1234u16; SCREEN_W * SCREEN_H];
+        let mut t = HdText::default();
+        m.pointer(320, y);
+        m.draw_recording(&mut s, &font, on, Some(&mut t));
+        let texts: Vec<&[u8]> = t.items.iter().map(|i| i.text.as_slice()).collect();
+        let i = texts
+            .iter()
+            .position(|&t| t == b"Start in full screen")
+            .expect("the row");
+        assert_eq!(texts[i + 1], b"< On >");
+        let d = OptionsMenu::description(Entry::Fullscreen, ORIG);
+        assert!(texts.contains(&d.as_bytes()));
+        assert!(font.width(d.as_bytes()) <= BOX_W - 20);
+        let (bx, by) = layout.origin(15, SCREEN_W, SCREEN_H);
+        for it in &t.items {
+            assert!(it.y >= by && it.y + 16 <= by + m.box_h(), "{:?}", it.text);
+            assert!(it.x >= bx);
+        }
+        assert_eq!(s[0], 0x1234);
+        // The web's menu (no library, no full screen) keeps its rows.
+        let mut web = OptionsMenu::new();
+        web.set_fullscreen_entry(false);
+        assert_eq!(web.layout().row_h, ROW_H);
     }
 
     #[test]

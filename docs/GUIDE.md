@@ -286,6 +286,18 @@ F, F11 or Alt+Enter switches full screen on and off (desktop and browser;
 F not while a game menu takes typing, such as a player's name); the web
 page also has a **Full screen** button at its top right.
 
+On the desktop the first game opens the way you left it: the options
+menu's **Start in full screen** (F10) opens its window in full screen
+every time, and switching with F, F11 or Alt+Enter while the game runs
+turns that option on or off too. It is kept in the game's `settings.ini`
+with the other options (so it survives updates); a window already open
+(the game library's screen) goes to full screen as the game starts.
+`--fullscreen` opens in full screen whatever the option says, without
+changing it. The browser lets a page go full screen only on a key or a
+click, so the web build has no such option: press F or use the page's
+button. Atlantis II keeps its own choice, as its original does (see
+[Atlantis II](#atlantis-ii)).
+
 ## Looking around with the keyboard
 
 In the panoramic view, the arrow keys turn (← →) and tilt (↑ ↓) the view,
@@ -302,6 +314,8 @@ change an entry; Escape, F10 or O close it. Its entries:
   and with HD on its picture options (**Panorama filter**, **Panorama
   sharpening**, **Interface**, **Sharp subtitles**, **Widescreen**,
   **Video sides**).
+- **Start in full screen** (on the desktop; *Off* by default): the window
+  opens in full screen (see [Full screen](#full-screen)).
 - **Fix original bugs**: *On* (every fix, the default), *Off* (none: as
   the original), or *Custom (n/N)* when some of the game's fixes are on
   and some off; Enter turns them all on, then all off (the game's fixes
@@ -598,7 +612,8 @@ chooses the original's 800 x 600 screen (see [Atlantis II](#atlantis-ii)).
 
 `atlantis-native --fullscreen /path/to/game` opens the window in full
 screen (F, F11 or Alt+Enter switches it back): for a launcher such as the
-Ports of Batocera on a Raspberry Pi.
+Ports of Batocera on a Raspberry Pi. The options menu's **Start in full
+screen** does the same for every start (see [Full screen](#full-screen)).
 
 The environment variable `ATLANTIS_NATIVE_DATA` names another folder for
 the per-user data (saves, settings, log): trial runs that must not touch
@@ -668,7 +683,9 @@ so that this set outlives the session as the original's copies do,
 `hd_sharpen = on|off`, `hd_interface = smooth|pixels` and
 `hd_sharp_subtitles = on|off`, `hd_widescreen = on|off` and
 `hd_video_sides = black|blur|zoom|panorama` (by default `bicubic`, `on`,
-`smooth`, `on`, `off`, `black`).
+`smooth`, `on`, `off`, `black`), and `fullscreen = on|off`, the options
+menu's **Start in full screen** (`off` by default; F, F11 and Alt+Enter
+set it as they switch).
 
 The web build keeps its players, checkpoints and settings in the
 browser's storage (`localStorage`, one entry per file, kept per site and

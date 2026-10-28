@@ -167,7 +167,17 @@ the 640 x 480 screen; Escape or a click outside goes back to the
 options, F10 or O closes the menu), Restored content, Modern UI/UX. A
 change in the menu writes only the switches it changed
 (`Enhancements::with_changes`), so that a run's `--original` does not
-overwrite the stored choices. The web build has the same menu.
+overwrite the stored choices. The web build has the same menu, but for
+two desktop rows: Game library... and Start in full screen (after the HD
+rows; `fullscreen = on|off` in `settings.ini`, read when the window
+opens and when a game starts in a window already open, and set by F,
+F11 and Alt+Enter as they switch; `--fullscreen` forces full screen for
+the run without writing it; the browser goes full screen only on a user
+gesture). With both, the menu's rows are 20 pixels high instead of 24
+(`OptionsMenu::layout`), to keep a margin on the 640 x 480 screen. The
+engine's own save of `settings.ini` (the game's options page) keeps the
+front end's keys as stored: the graphics mode, the HD options, the
+enhancements and full screen.
 
 ### HD mode
 

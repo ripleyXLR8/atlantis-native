@@ -186,6 +186,7 @@ fn dump_menu(name: &str, sys: &Sys) {
         graphics: Graphics::Hd,
         hd: HdOptions::default(),
         enhancements: Enhancements::default(),
+        fullscreen: false,
     };
     let mut frame = sys.screen.borrow().clone();
     let mut text = HdText::default();

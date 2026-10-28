@@ -255,6 +255,7 @@ fn dump(var: &str, name: &str) {
         graphics: Graphics::Hd,
         hd: HdOptions::default(),
         enhancements: x,
+        fullscreen: false,
     };
     let mut menu = OptionsMenu::new();
     menu.set_info(vec![

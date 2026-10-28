@@ -205,6 +205,9 @@ pub struct Settings {
     pub graphics: Graphics,
     /// The HD mode's picture options.
     pub hd: HdOptions,
+    /// The window opens in full screen (the options menu's "Start in full
+    /// screen"; switching full screen with F, F11 or Alt+Enter sets it).
+    pub fullscreen: bool,
 }
 
 impl Default for Settings {
@@ -217,6 +220,7 @@ impl Default for Settings {
             music_on_disk: 0,
             graphics: Graphics::Original,
             hd: HdOptions::default(),
+            fullscreen: false,
         }
     }
 }
@@ -298,6 +302,7 @@ impl Settings {
                 ("hd_sharpen", Some(b), _) => s.hd.sharpen = b,
                 ("hd_sharp_subtitles", Some(b), _) => s.hd.sharp_subtitles = b,
                 ("hd_widescreen", Some(b), _) => s.hd.widescreen = b,
+                ("fullscreen", Some(b), _) => s.fullscreen = b,
                 ("hd_video_sides", _, _) if VideoSides::from_name(v).is_some() => {
                     s.hd.video_sides = VideoSides::from_name(v).unwrap_or_default();
                 }
@@ -352,7 +357,10 @@ impl Settings {
              hd_interface = {}\n\
              hd_sharp_subtitles = {}\n\
              hd_widescreen = {}\n\
-             hd_video_sides = {}\n",
+             hd_video_sides = {}\n\
+             # The window opens in full screen (options menu, F10; F, F11 or\n\
+             # Alt+Enter switching full screen changes it too)\n\
+             fullscreen = {}\n",
             b(self.subtitles),
             b(self.omni3d_mode2),
             self.volumes[0],
@@ -378,6 +386,7 @@ impl Settings {
             b(self.hd.sharp_subtitles),
             b(self.hd.widescreen),
             self.hd.video_sides.name(),
+            b(self.fullscreen),
         )
     }
 
@@ -412,8 +421,18 @@ mod tests {
                 widescreen: false,
                 video_sides: VideoSides::Black,
             },
+            fullscreen: true,
         };
         assert_eq!(Settings::parse(&s.to_text()), s);
+        assert!(s.to_text().contains("\nfullscreen = on\n"));
+        // Full screen: off by default, its key alone, a bad value ignored.
+        assert!(!Settings::default().fullscreen);
+        assert!(Settings::default()
+            .to_text()
+            .contains("\nfullscreen = off\n"));
+        assert!(Settings::parse("fullscreen = yes").fullscreen);
+        assert!(!Settings::parse("fullscreen = maybe").fullscreen);
+        assert!(!Settings::parse("fullscreen = on\nfullscreen = 0").fullscreen);
         assert_eq!(Settings::parse("music_on_disk = 1F").music_on_disk, 0x1f);
         assert_eq!(Settings::parse("graphics = HD").graphics, Graphics::Hd);
         assert_eq!(

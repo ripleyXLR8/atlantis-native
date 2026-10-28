@@ -31,7 +31,9 @@
 //! port's options menu, where it can be switched.
 //!
 //! `--fullscreen` opens the window in full screen (F, F11 or Alt+Enter
-//! switches it back).
+//! switches it back), whatever the first game's "Start in full screen"
+//! (options menu, F10; kept in `settings.ini`, which F, F11 and
+//! Alt+Enter set as they switch) says, without changing it.
 //!
 //! A folder holding Atlantis II (`atlantis2.exe`, or GOG.com's `Game.exe`)
 //! opens Atlantis II's own mode (`atlantis_app::a2`): the player menu, then

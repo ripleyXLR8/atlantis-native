@@ -112,13 +112,16 @@ impl Engine {
     /// The settings file, from the current options.
     pub(crate) fn save_settings(&mut self) {
         self.settings.subtitles = self.subtitles;
-        // The graphics mode and the enhancements are the front end's (its
-        // options menu writes them): keep the stored values, or this save
-        // would undo a choice made in the menu since start-up (and a
-        // --original run would store its overrides).
+        // The graphics mode, the HD options, the enhancements and full
+        // screen are the front end's (its options menu and its full screen
+        // keys write them): keep the stored values, or this save would undo
+        // a choice made since start-up (and a --original run would store
+        // its overrides).
         if let Some(stored) = Settings::load(self.saves.as_ref()) {
             self.settings.graphics = stored.graphics;
+            self.settings.hd = stored.hd;
             self.settings.enhancements = stored.enhancements;
+            self.settings.fullscreen = stored.fullscreen;
         }
         self.settings.save(self.saves.as_ref());
     }
@@ -299,5 +302,48 @@ impl Engine {
         };
         self.music.on_disk = self.settings.music_on_disk;
         self.apply_volumes();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::persist::MemStore;
+    use crate::test_support::with_engine;
+    use std::rc::Rc;
+
+    /// The game's own save of its settings (its options page) keeps what
+    /// the front end stored since start-up: the graphics mode, the HD
+    /// options, the enhancements and full screen.
+    #[test]
+    fn the_settings_save_keeps_the_front_end_choices() {
+        with_engine(
+            "the_settings_save_keeps_the_front_end_choices",
+            |mut e| async move {
+                let store = Rc::new(MemStore::new());
+                e.saves = store.clone();
+                e.load_settings(Settings::default());
+                let mut front = Settings {
+                    graphics: crate::persist::Graphics::Hd,
+                    fullscreen: true,
+                    ..Settings::default()
+                };
+                front.hd.widescreen = true;
+                front.hd.sharpen = false;
+                front.enhancements.ui_ux = true;
+                front.save(store.as_ref());
+                e.subtitles = false;
+                e.save_settings();
+                let saved = Settings::load(store.as_ref()).unwrap();
+                assert_eq!(
+                    saved,
+                    Settings {
+                        subtitles: false,
+                        ..front
+                    }
+                );
+            },
+            |_, _| {},
+        );
     }
 }
