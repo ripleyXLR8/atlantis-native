@@ -307,8 +307,8 @@ which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
 thresholded to one bit, so every platform draws the same pixels; the text
 bytes are read in the release's code page (`TextCodePage` in
 `crates/atlantis-data/src/text.rs`): Windows-1252, but for the May 1997
-French CD and the Dutch and Swedish CDs, whose texts are in the DOS code
-page 850.
+French and German CDs and the Dutch and Swedish CDs, whose texts are in
+the DOS code page 850.
 The font is bundled
 in `assets/fonts`.
 
@@ -372,7 +372,8 @@ texts are in the DOS code
 page, whose accented letters (`0x82` é, `0x85` à...) are those of the
 font's IBM PC glyphs, so the accents show as they should, byte for byte.
 So does the Dutch CD (`é ë è ï ú`), eight of its rows wider than the
-screen. The Swedish CD (`ä å ö Ä Å Ö é`) breaks its rows another way: always
+screen, and the May 1997 German CD (`ü ä Ä ö Ü ß`), nine of its rows wider
+than the screen. The Swedish CD (`ä å ö Ä Å Ö é`) breaks its rows another way: always
 at the last space before the end of the 75-byte window, never at a space
 after it, so none of its rows is over 75 bytes or wider than the screen
 (`split_subtitle_1997_back`). A run of 75 bytes without a space, which no
@@ -534,8 +535,9 @@ texts, two menus, EPI.TXT and the credits font CREDBLAN.SPR (whose `b`
 is drawn 2 pixels further left on disc 1): the original loads the
 first at start-up, from disc 1, and the credits fonts at each credits
 run, from the disc in the drive, as the port does (below). Its scripts
-are the 2001 build's but for a second DELMUSIK and STARTMUSIK in
-chapters 35 and 36, which the port runs as written.
+are the 2001 build's but for a DELMUSIK at the start of chapter 35 (the
+2001 build's has none) and a second STARTMUSIK in chapter 36, which the
+port runs as written.
 
 The Traditional Chinese 4-CD release's build (July 1998) and the
 Simplified Chinese one's (March 1999) are the French August 1997 build's
@@ -612,10 +614,10 @@ German, Dutch, Swedish, Spanish or Italian, and keeps its `BIGCD1.BIG` … `BIGC
 GOG.com column applies to it, and its tables are at the GOG.com build's
 addresses. Its interface is French whatever the CD (the new-player row
 reads `NOUVEAU JOUEUR`), so the options menu shows *CD, patch 1.01,
-French (1999 build)*. Over the Dutch or Swedish CD, whose texts are in
-the DOS code page, it draws them as Windows-1252, as it passes them to
-Windows: the accented letters show as other signs (the Swedish `ä` as
-`„`), and its name entry has no Swedish letters. GOG.com's own edits of that build (no pause when
+French (1999 build)*. Over the Dutch, Swedish or May 1997 German CD,
+whose texts are in the DOS code page, it draws them as Windows-1252, as
+it passes them to Windows: the accented letters show as other signs (the
+Swedish and German `ä` as `„`), and its name entry has no Swedish letters. GOG.com's own edits of that build (no pause when
 the window is inactive, no free-space checks, a delay before each row
 copy, no start-up CD scan, an immediate exit on closing) concern how the
 original runs on a later system, not the game; the port handles the

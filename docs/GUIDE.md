@@ -293,9 +293,9 @@ change an entry; Escape, F10 or O close it. Its entries:
     DVD's German version): no
     sprite font of the game has `ß`; the original leaves a gap in the
     LOAD list's chapter names, the fix draws it as "ss".
-  - **Dutch, German May: the fonts of disc 1** (the games whose discs
-    hold different copies of them: the Dutch CD, also with the patch
-    1.01 over it, and the May 1997 German CD): the original reads the
+  - **Dutch, German May: the credits and fonts of disc 1** (the games
+    whose discs hold different copies of them: the Dutch CD, also with
+    the patch 1.01 over it, and the May 1997 German CD): the original reads the
     credits, their fonts and the name fonts from the disc in the drive;
     the Dutch disc 2 holds an older revision of the credits text and
     name fonts, the German May discs 2 to 4 another credits font (its

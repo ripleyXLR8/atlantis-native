@@ -414,11 +414,11 @@ impl Engine {
 
     /// CREDBLAN.SPR and CREDBLEU.SPR, the credits' white and blue fonts,
     /// from the current disc: every build's credits function loads them at
-    /// the start of each run from the archive open then (0x53 bytes into
-    /// it: atlantis-cd-en-714240 FUN_0041a72c @ 0x0041a77f / 0x0041a7e5,
-    /// atlantis-cd-en-688128 FUN_0041a5f8 @ 0x0041a64b / 0x0041a6b1,
-    /// atlantis-cd-fr-687104 FUN_0041a1f0 @ 0x0041a243 / 0x0041a2a9,
-    /// atlantis-cd-de-693248 FUN_0041a6a4 @ 0x0041a6f7 / 0x0041a75d...).
+    /// the start of each run from the archive open then (0x52 bytes into
+    /// it: atlantis-cd-en-714240 FUN_0041a72c @ 0x0041a77e / 0x0041a7e4,
+    /// atlantis-cd-en-688128 FUN_0041a5f8 @ 0x0041a64a / 0x0041a6b0,
+    /// atlantis-cd-fr-687104 FUN_0041a1f0 @ 0x0041a242 / 0x0041a2a8,
+    /// atlantis-cd-de-693248 FUN_0041a6a4 @ 0x0041a6f6 / 0x0041a75c...).
     /// The German May 1997 CD's disc 1 holds another CREDBLAN.SPR than its
     /// discs 2..4; every other release, the same on each disc.
     pub async fn load_credits_fonts(&self) -> [Vec<SprSprite>; 2] {

@@ -136,14 +136,14 @@ pub struct ExeBuild {
     /// FUN_00423444).
     pub startup_logo_rp: bool,
     /// `SPRLIST\CREDITS.TXT` is read from the open archive each time the
-    /// credits run (atlantis-cd-en-688128 FUN_0041a5f8 @ 0x0041a717,
-    /// atlantis-cd-fr-688640 FUN_0041a638 @ 0x0041a757,
+    /// credits run (atlantis-cd-en-688128 FUN_0041a5f8 @ 0x0041a716,
+    /// atlantis-cd-fr-688640 FUN_0041a638 @ 0x0041a756,
     /// atlantis-cd-nl-688128 FUN_0041a630 @ 0x0041a74e,
     /// atlantis-cd-sv-688128 FUN_0041a600 @ 0x0041a732), so from the disc
     /// in the drive; the other builds load it once at start-up with the
-    /// menus (FUN_00426f20 @ 0x0042710c; atlantis-patch-fr-714240
-    /// FUN_00426e88 @ 0x00427074; atlantis-cd-fr-687104 and
-    /// atlantis-cd-de-687104 FUN_00425d14 @ 0x00425f00), from the boot disc.
+    /// menus (FUN_00426f20 @ 0x0042710b; atlantis-patch-fr-714240
+    /// FUN_00426e88 @ 0x00427073; atlantis-cd-fr-687104 and
+    /// atlantis-cd-de-687104 FUN_00425d14 @ 0x00425eff), from the boot disc.
     pub credits_read_per_run: bool,
     /// The bitmap subtitles' breaker always cuts a row at the space found
     /// backwards from the end of the 75-byte window, so no row is over 75
@@ -1151,7 +1151,9 @@ pub const BUILDS: [ExeBuild; 23] = [
         dgroup_vaddr: 0x8_0000,
         dgroup_raw: 0x6_d200,
         music_va: 0x0048_5eec,
-        // The names in 0x004ab37c..0x004abb90, as en-688128's.
+        // The table at en-688128's address; the names in
+        // 0x004ab37c..0x004abb90, as the Dutch and Swedish builds' (0x10
+        // above en-688128's).
         sound_names_va: 0x0048_61d0,
         sound_names_range: (0x004a_0000, 0x004b_0000),
         // "NEUER SPIELER", no '#'; the names array follows at 0x00486558.

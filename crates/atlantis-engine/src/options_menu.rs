@@ -517,7 +517,7 @@ impl BugFix {
             BugFix::HexagonPieces => "Hexagon puzzle: its pieces always there",
             BugFix::LoadMusik => "Music: tracks copied one by one",
             BugFix::SharpS => "German: the sharp s in the LOAD list",
-            BugFix::DiscRevision => "Dutch, German May: the fonts of disc 1",
+            BugFix::DiscRevision => "Dutch, German May: the credits and fonts of disc 1",
             BugFix::MenuLineWidth => "Italian: the whole of OK and Annulla",
             BugFix::ChineseRows => "Chinese: the subtitle rows",
             BugFix::SubtitlesToggle => "Chinese: the SUBTITLES button",
