@@ -28,6 +28,11 @@ panoramas, the cinematics, the talking heads with their 3D mouths in time
 with the voices, the seventeen puzzles and the end credits. It plays from
 the first screen to the last.
 
+Its sequel *Atlantis II* (*Beyond Atlantis*, 1999) plays from start to
+end too, on Windows, macOS and Linux: Tibet, Ireland, China, Yucatán
+and Xibalba, Shamballa and Atlantis, with every puzzle (see
+[Atlantis II](docs/GUIDE.md#atlantis-ii)).
+
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
 [ScummVM](https://www.scummvm.org/)'s CryOmni3D engine, itself rebuilt by
@@ -86,8 +91,9 @@ contains none of them.</sub>
   checkpoints are taken over on the first start.
 - ⚙️ **Options menu** (F10, or O): graphics, HD settings and enhancements,
   changed at once while you play.
-- 📚 **Game library**: several editions (GOG.com, CD, disc images...) in
-  one list, to choose the one to play at start-up or switch from F10.
+- 📚 **Game library**: several editions (GOG.com, CD, DVD, disc
+  images...) of both games in one list, to choose the one to play at
+  start-up or switch from F10.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
   proportions, the mouse captured while you look around.
 
@@ -173,6 +179,17 @@ option switches between Japanese, English and none. The Japanese version
 starts by looking for two logo films the DVD does not hold: as on the DVD,
 two "file not found" boxes show (OK closes them), unless the bug fix of the
 options menu skips them.
+
+For *Atlantis II*:
+
+| Release | Languages | What to point it at |
+|---|---|---|
+| CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (or copies of the CDs) in it or in a folder inside it |
+| CD with the official patch 1.01 | French or English (one executable for both; tested with the French CD) | the same, with the patched `atlantis2.exe` |
+| [GOG.com](https://www.gog.com/) (version 1.01) | French (tested) | the installation folder |
+
+Another executable is refused with its identifiers, so that it can be
+added. The web version plays the first game only.
 
 How to get the files from your CD or GOG.com: see
 [Getting the game files](docs/GUIDE.md#getting-the-game-files).

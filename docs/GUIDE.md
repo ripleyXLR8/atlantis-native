@@ -96,7 +96,10 @@ English, French, German, Spanish and Italian, the Traditional
 Chinese CD (1998) and the Simplified Chinese CD (1999), copied or as
 images, Cryo's DVD (1998: English, French, German, Dutch, Spanish,
 Italian, Swedish and Japanese; the drive, a copy of a side or the images
-of the sides) and the Perfect Edition. Another edition is
+of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
+1.00), a CD installation with the official
+patch 1.01 and the GOG.com edition (see [Atlantis II](#atlantis-ii)).
+Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
 project's page in your browser, filled in with the identifiers of the
@@ -336,7 +339,8 @@ it changed.
 Atlantis II plays from its start to its end (Tibet, Ireland, China,
 Yucatán with Xibalba, the space travel, Shamballa with its fireflies,
 Atlantis with the octopus fight, the credits;
-see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)). The
+see [Atlantis II](TECHNICAL.md#atlantis-ii-in-progress)), on Windows,
+macOS and Linux (the web version does not run it yet). The
 [game library](#several-editions-the-game-library) finds and opens it as
 it does the first game: started without a folder, Atlantis Native looks
 for GOG.com's installation (its entry in the Windows registry, and the
