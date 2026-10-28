@@ -289,7 +289,9 @@ impl Headless {
 }
 
 /// From the start-up to the player screen: clicks through the films, Enter
-/// on each error box (the Japanese build's missing logos).
+/// on each error box (the Japanese build's missing logos). Escape first,
+/// which leaves the box open as in the original (its procedure ends the
+/// dialog on IDOK only): neither the next box nor a film follows it.
 fn to_player_screen(h: &mut Headless, trace: &Rc<RefCell<Vec<Event>>>) -> bool {
     let mut closed = 0;
     for _ in 0..100 {
@@ -299,6 +301,15 @@ fn to_player_screen(h: &mut Headless, trace: &Rc<RefCell<Vec<Event>>>) -> bool {
         }
         if error_boxes(trace).len() > closed {
             closed += 1;
+            let seen = trace.borrow().len();
+            h.key(Key::Escape);
+            h.steps(60);
+            assert!(
+                !trace.borrow()[seen..]
+                    .iter()
+                    .any(|e| matches!(e, Event::ErrorBox(_) | Event::Video { .. })),
+                "Escape closed error box {closed}"
+            );
             h.key(Key::Enter);
             continue;
         }
@@ -846,8 +857,9 @@ fn white_in(screen: &[u16], y: i32) -> usize {
 /// logo; the player screen, a new player, the clicks to the first dialog
 /// line with a subtitle: CHAPJ001's first, its rows the original's (the
 /// golden's), drawn 18 px apart from the bottom row's base 0x1f2, the
-/// empty last row of its final space counted; then a save and the LOAD
-/// list's sprite rows (EPI1 frames) and its load.
+/// empty last row of its final space counted, and the line played with
+/// that many subtitles. (The save, the LOAD list's sprite rows and the
+/// load: `save_and_load_japanese`, `japanese_load_list_and_captions`.)
 fn first_dialog_japanese_with(enhancements: Enhancements, suffix: &str) {
     let Some(g) = dvd("JAP") else { return };
     let Some(probe) = dvd("JAP") else { return };

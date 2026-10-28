@@ -106,8 +106,13 @@ async fn drain(e: &Engine) {
 /// The original's error box (dialog 0x65 of the executable's resources,
 /// its procedure's text for the error code): a modal Windows dialog with
 /// an OK button; the port draws its own box over the screen in `font` and
-/// waits for OK (a click on it, Enter, Space or Escape). (The original
-/// also switches the display to a window first, FUN_0041a1d4; not done.)
+/// waits for OK (a click on it, Enter, or Space on its focused button).
+/// Escape does nothing: the box's procedure ends the dialog on WM_COMMAND
+/// IDOK only (`cmp word [ebp+0x1c],1` then EndDialog, reference build
+/// @ 0x00419843..0x00419850, atlantis-dvd-ja-696832 @ 0x004199b3..
+/// 0x004199c0), and the IDCANCEL that Escape sends falls through. (The
+/// original also switches the display to a window first, FUN_0041a1d4;
+/// not done.)
 pub(crate) async fn error_box(e: &Engine, font: &SubtitleFont, text: &str) {
     e.emit(Event::ErrorBox(text.to_string()));
     let bytes = latin1_bytes(text);
@@ -162,7 +167,7 @@ pub(crate) async fn error_box(e: &Engine, font: &SubtitleFont, text: &str) {
         let fi = poll_input(e);
         let (mx, my) = e.sys.mouse();
         let on_ok = (ok.0..ok.0 + ok.2).contains(&mx) && (ok.1..ok.1 + ok.3).contains(&my);
-        if (fi.left_press && on_ok) || fi.enter || fi.escape {
+        if (fi.left_press && on_ok) || fi.enter {
             break;
         }
     }

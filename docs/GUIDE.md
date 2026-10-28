@@ -79,8 +79,8 @@ next one, the English subtitles being those of the English version. The
 Japanese program starts by playing the logo films of its publishers, Gaga
 and Spike, which the DVD does not hold: as on the DVD, two "Fichier
 introuvable" (file not found) boxes show before the Cryo logo; **OK** (or
-Enter) closes each. The bug fix **Japanese: the two missing logo films**
-skips them.
+Enter) closes each, Escape does not (as in the original). The bug fix
+**Japanese: the two missing logo films** skips them.
 
 The *Perfect Edition* (Tgames' 2018 package of the DVD's English
 version): choose its installation folder.
