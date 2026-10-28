@@ -115,9 +115,9 @@ those of the latest commit:
 
 The web version of the latest commit is also online:
 **https://ripleyxlr8.github.io/atlantis-native/** (Chrome, Edge, Firefox
-or Safari), for both games. Pick your game folder there: its files are
-read inside your browser and never sent anywhere; the saves stay in that
-browser.
+or Safari), for both games (Atlantis II not yet tried in Safari). Pick
+your game folder there: its files are read inside your browser and never
+sent anywhere; the saves stay in that browser.
 
 > **Windows:** the program is not code-signed (a certificate costs money
 > each year), so Windows SmartScreen may warn that it "protected your PC"

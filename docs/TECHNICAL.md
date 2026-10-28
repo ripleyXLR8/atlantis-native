@@ -845,24 +845,34 @@ weighed: `FileReaderSync` exists only in a worker (the engine, WebGL and
 the sound would move there); `SharedArrayBuffer` with `Atomics.wait`
 needs a cross-origin isolated page, which GitHub Pages cannot serve.
 
-The engine keeps its saves, `atlant2.cfg` and its music copies in a store
-(`crates/atlantis2-engine/src/store.rs`: `Engine::set_store`; on the
-desktop `set_data_dir` puts the data folder's `DirFiles` there, the same
-files as before), the browser's `localStorage` under
+The engine keeps its saves, `atlant2.cfg` and its music copies in a
+store (`crates/atlantis2-engine/src/store.rs`: `Engine::set_store`; on
+the desktop `set_data_dir` puts the data folder's `DirFiles` there, the
+same files as before), the browser's `localStorage` under
 `atlantis-native/atlantis2/` (`WebStore`, one key per file as for the
-first game), `settings.ini` too. The window of the desktop (`a2.rs`) runs
-in the browser with its web side in `a2_web.rs`: the canvas fitted to the
-page as the first game's (`web::fit_canvas`), a pass at each of the
-browser's redraws once it is due (4 ms early allowed: the browser paces
-them), a pause of the redraws over 250 ms (a hidden tab) not counted as
-game time, `atlant2.cfg` written when it changed (checked every two
-seconds: a page has no exit), the game's quit back to the page's start.
-The pointer lock is asked for on a click only (a gesture), its loss is
-seen from `document.pointerLockElement` (the next click then only takes it
-back), and a request not granted within 600 ms is a refusal: clicks then
-act at once and the arrow keys turn the view. The sound starts on the
-first click or key; until then the voices are played out at the game's
-pace without a device, as the desktop does without one.
+first game, in base64), `settings.ini` too. A save is its `ZapFile` (the
+first one in Tibet 632 bytes, 844 characters in the storage; 1 to 2 KB
+further on), so the 5 MB or so a browser gives a site's `localStorage`
+(5.24 million characters in Edge) hold thousands; a write the browser
+refuses (a full storage) is logged, as the original logs a save it
+cannot write, and shown at the top of the page (`show_notice`). The
+window of the desktop (`a2.rs`) runs in the browser with its web side in
+`a2_web.rs`: the canvas fitted to the page as the first game's
+(`web::fit_canvas`), a pass at each of the browser's redraws once it is
+due (4 ms early allowed: the browser paces them), the game held while
+the page is hidden (another tab, the browser minimised:
+`document.hidden` at winit's `Occluded`) as the desktop holds it without
+the focus, its clock stopped and its sound silent (the browser's sound
+output goes on when the redraws stop), any other pause of the redraws
+over 250 ms not counted as game time, `atlant2.cfg` written when it
+changed (checked every two seconds: a page has no exit), the game's quit
+back to the page's start. The pointer lock is asked for on a click only
+(a gesture), its loss is seen from `document.pointerLockElement` (the
+next click then only takes it back), and a request not granted within
+600 ms is a refusal: clicks then act at once and the arrow keys turn the
+view. The sound starts on the first click or key; until then the voices
+are played out at the game's pace without a device, as the desktop does
+without one.
 
 In the HD mode the graphics card draws the view (`gl_cube.rs`, the
 engine's `CubeRenderer`): a shader of `HdPanorama::render` for one pixel
@@ -893,13 +903,34 @@ in ms, mean (95th percentile)):
 In widescreen (1920 x 1080) the turn takes 3.8 ms and the dialog 11.5.
 The steps: the view on the card (23.6 to 7.4 ms), large buffers compared
 by 64-bit words, `same_pixels` (WebAssembly's `memcmp` is a byte loop,
-7.4 to 5.4), the composition on the card (5.4 to 3.8); in the dialog, the
-character's pixels decided once per 640 x 480 pixel (18.5 to 17.1), then
-the dialog's picture on the card (11.1). What is left in a dialog frame
-is the head's two rasterisations (640 x 480 and HD), the original's cube
-and the faces' preparation. In headless Firefox (which composites the page
-in software) the original graphics take 2.8 ms (view) and 7.0 ms
-(dialog); in HD its presentation is that compositor's (24 ms).
+7.4 to 5.4), the composition on the card (5.4 to 3.8); in the dialog,
+the character's pixels decided once per 640 x 480 pixel (18.5 to 17.1),
+then the dialog's picture on the card (11.1). What is left in a dialog
+frame is the head's two rasterisations (640 x 480 and HD), the
+original's cube and the faces' preparation. In headless Firefox (which
+composites the page in software) the original graphics take 2.8 ms
+(view) and 7.0 ms (dialog); in HD its presentation is that compositor's
+(24 ms), so HD in Firefox with a graphics card has not been measured.
+Safari has not been run.
+
+A pass is due every 16.7 ms (60 a second). Headless Chrome measures the
+same (original graphics 1.5 and 4.5 ms, HD 3.8 and 11.7 ms). With the
+processor slowed down by the DevTools protocol
+(`Emulation.setCPUThrottlingRate`, from the turn's measure on; the
+page's own work slowed too), standing for an ordinary or an old PC:
+
+| Frame | Slowed 2x, original | Slowed 2x, HD | Slowed 4x, original | Slowed 4x, HD |
+|---|---|---|---|---|
+| Tibet's view 2 turning | 4.3 (4.8) | 8.7 (10.6) | 8.8 (13.9) | 19.1 (27.8) |
+| the shaman's greeting | 10.5 (14.6) | 25.6 (36.1) | 24.7 (37.3) | 74.5 (113.2) |
+
+So the original graphics keep the full pace on a processor half as fast
+as the i7-9700K, and the turn in HD too; the HD dialog does not (about
+40 passes a second there: the game, whose 15 Hz task counts the passes,
+then runs slower), nor, on a processor four times slower, the original
+dialog. The HD dialog's frame is spread over the faces' preparation
+(`PanoramaPrep::update`), the original's cube, the head's two
+rasterisations and the presentation; no single part of it dominates.
 
 The end-to-end runs drive a headless Edge through the DevTools protocol
 (the folder picked with `DOM.setFileInputFiles`; Firefox through
@@ -908,10 +939,14 @@ paths, `window.atlantisTestOpen`): from the start-up intro (a double
 click) through the player menu, a new game and its film, Tibet's view 2
 and the first click (chapter 75), the walk to view 7 and the shaman's
 greeting, on GOG.com's installation, the French CD's installed folder
-with copies of its four CDs, and the same patched to 1.01; a save through
-the menus, the page loaded again and the save continued; the options
-menu, HD and widescreen. The testing aids are `atlantis2_state` (the
-game's state, the menu page's buttons and the frame times, as JSON) and
+with copies of its four CDs, and the same patched to 1.01; a save
+through the menus, the page loaded again and the save continued, then
+the storage filled up: the save refused and the page's notice; the page
+hidden for 3 s in the dialog (`document.hidden` and `visibilitychange`
+as a browser sends them: the game's clock and the line stood still, and
+went on once it was shown); the options menu, HD and widescreen. The
+testing aids are `atlantis2_state` (the game's state, the menu page's
+buttons, the game's clock and the frame times, as JSON) and
 `atlantis2_test` (`aim <view>` turns the view onto the move zone to that
 view; the click is the runner's own).
 

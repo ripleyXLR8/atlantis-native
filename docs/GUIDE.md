@@ -227,8 +227,10 @@ whatever the counts say.
 The web page, **https://ripleyxlr8.github.io/atlantis-native/** (or the
 `atlantis-native-web.zip` of the nightly release, served over HTTP),
 plays both games in Chrome, Edge, Firefox or Safari on a computer with a
-mouse and a keyboard. **Choose your game folder** and pick the folder of
-your game; the browser asks to confirm that the page may read it. The
+mouse and a keyboard (Atlantis II has been tried in Chrome, Edge and
+Firefox; not yet in Safari). **Choose your game folder** and pick the
+folder of your game; the browser asks to confirm that the page may read
+it. The
 files stay where they are: the page reads them inside the browser, a
 part at a time when the game needs it (Atlantis II's 2.4 GB are never
 loaded whole), and sends nothing anywhere. A browser does not let a page
@@ -271,6 +273,12 @@ precision, so that about one pixel in a thousand differs by a level or
 two from the desktop's. `atlantis-native/gpu-view` in the page's local
 storage (the browser's developer tools) set to `off` draws everything on
 the processor, `check` compares the two and logs the differences.
+
+Atlantis II's original graphics keep the game's full pace on an ordinary
+computer. Its HD mode asks more of the processor: in a dialog, a
+computer about half as fast as a recent desktop runs the game somewhat
+slower than it should; choose the original graphics in the options menu
+(F10) there.
 
 ## Full screen
 
@@ -669,7 +677,13 @@ picked folder on its first start. Atlantis II's files there are under
 `atlantis-native/atlantis2/`: the saves (`save/atl<player>_<slot>.sav`,
 the original's files), `atlant2.cfg`, `settings.ini` and
 `music_copies.txt`, shared by its editions as on the desktop (the saves
-of the picked folder are not taken over, as on the desktop).
+of the picked folder are not taken over, as on the desktop). A browser
+gives a site about 5 MB of this storage, shared by both games (and, on
+GitHub Pages, by the other pages of the same site): an Atlantis II save
+takes one or two KB there (its file is compressed: the first one in
+Tibet, 632 bytes, is 844 characters), so thousands fit. When the browser
+refuses a file all the same, the page says so at its top: that save was
+not kept, erase saves you no longer need.
 
 ## Known differences from the original
 

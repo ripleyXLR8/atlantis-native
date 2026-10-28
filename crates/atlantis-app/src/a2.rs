@@ -63,7 +63,8 @@
 //!
 //! The game is held while the window does not have the focus, as the
 //! original holds it: no frame runs, its clock stands still and its sound
-//! is silent until the focus comes back.
+//! is silent until the focus comes back. In the browser, while the page
+//! is hidden (another tab, the browser minimised).
 //!
 //! The screen size is the original's own option, kept in `atlant2.cfg` as
 //! its options page's button keeps it; `--resolution 800x600` chooses it
@@ -818,12 +819,18 @@ pub fn run_window_on(
 const SHIFT_GRACE: Duration = Duration::from_millis(2000);
 
 /// The game's sound output: its voices, silent while the game is held
-/// (`paused`).
+/// (`paused`), and in the browser while the page is hidden (its redraws
+/// stop then, its sound output does not: the voices are kept where they
+/// are, even when the page's change was not seen as held).
 fn open_audio(engine: &Engine, paused: &Arc<AtomicBool>) -> Option<cpal::Stream> {
     let voices = engine.voices().clone();
     let silent = paused.clone();
+    #[cfg(target_arch = "wasm32")]
+    let hidden = a2_web::page_hidden;
+    #[cfg(not(target_arch = "wasm32"))]
+    let hidden = || false;
     crate::audio_out::start_with(move |out, rate, channels| {
-        if silent.load(Ordering::Relaxed) {
+        if silent.load(Ordering::Relaxed) || hidden() {
             out.fill(0.0);
         } else {
             voices.fill(out, rate, channels);
@@ -1286,6 +1293,26 @@ impl A2App {
         self.hold_at(now);
     }
 
+    /// The browser's page is hidden or shown again at `now` (another tab,
+    /// the browser minimised): hidden, the game is held as without the
+    /// focus ([`must_hold`]), its sound silent, which the browser's
+    /// output would otherwise go on playing while the redraws stop; the
+    /// keys held are let go.
+    #[cfg(any(target_arch = "wasm32", test))]
+    fn set_page_hidden(&mut self, hidden: bool, now: Instant) {
+        if self.focused != hidden {
+            return;
+        }
+        self.focused = !hidden;
+        if hidden {
+            self.keys = [false; 4];
+            self.alt_left = false;
+        } else {
+            self.motion = (0.0, 0.0);
+        }
+        self.hold_at(now);
+    }
+
     /// Whether a press (`pressed`) is the one that gave the window the
     /// focus, with the interface conveniences on ([`mouse_button`]'s
     /// `focus_click`): only the first press after a focus gain, before the
@@ -1299,7 +1326,8 @@ impl A2App {
     fn redraw(&mut self, now: Instant) -> bool {
         // The browser paces the redraws itself (one a screen refresh): a
         // pass is run when it is due within a few milliseconds, a pause of
-        // the redraws (the tab hidden) not counted as game time.
+        // the redraws (the browser busy) not counted as game time; a
+        // hidden page holds the game ([`A2App::set_page_hidden`]).
         #[cfg(target_arch = "wasm32")]
         let now = {
             if let Some((from, to)) = self.web.gap(now) {
@@ -1722,14 +1750,25 @@ impl ApplicationHandler for A2App {
                 el.exit();
             }
             // In the browser the canvas loses the focus to the page's own
-            // buttons: the game is held only while the tab is hidden (see
-            // [`A2App::redraw`]); the keys held are let go.
+            // buttons: the game is held only while the page is hidden
+            // (winit's `Occluded` comes with `visibilitychange`, and when
+            // the canvas leaves the page's view, which does not hold it);
+            // the keys held are let go.
             #[cfg(target_arch = "wasm32")]
             WindowEvent::Focused(on) => {
                 if !on {
                     self.keys = [false; 4];
                     self.alt_left = false;
                 }
+            }
+            #[cfg(target_arch = "wasm32")]
+            WindowEvent::Occluded(_) => {
+                let hidden = a2_web::page_hidden();
+                if !hidden && !self.focused {
+                    // The time away was held: not a gap of the redraws.
+                    self.web.redraws_resumed();
+                }
+                self.set_page_hidden(hidden, Instant::now());
             }
             #[cfg(not(target_arch = "wasm32"))]
             WindowEvent::Focused(on) => self.set_focus(on, Instant::now()),
@@ -2273,6 +2312,20 @@ mod tests {
         app.set_focus(true, at(600));
         assert!(!paused.load(Ordering::Relaxed));
         assert!(app.redraw(at(600)));
+        assert!((app.engine.clock() - (clock + PASS)).abs() < 1e-6);
+        // The browser's page hidden holds it the same way, its sound
+        // silent (the browser's output goes on while the redraws stop).
+        let (clock, tick) = (app.engine.clock(), app.engine.ticks);
+        app.set_page_hidden(true, at(601));
+        assert!(paused.load(Ordering::Relaxed));
+        app.set_page_hidden(true, at(650));
+        for k in 601..900 {
+            assert!(!app.redraw(at(k)), "frame {k} hidden");
+        }
+        assert_eq!((app.engine.clock(), app.engine.ticks), (clock, tick));
+        app.set_page_hidden(false, at(900));
+        assert!(!paused.load(Ordering::Relaxed));
+        assert!(app.redraw(at(900)));
         assert!((app.engine.clock() - (clock + PASS)).abs() < 1e-6);
         // The options menu over the focused window holds it the same way.
         app.open_menu();

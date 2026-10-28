@@ -27,9 +27,11 @@ use crate::gl_present::{GlCompose, GlPresenter};
 /// (`crate::HD_MAX_TILE`).
 pub const HD_MAX_TILE: usize = 24;
 
-/// A pause longer than this between two redraws (the tab hidden, the
-/// browser busy) is not game time: the game was held, as the desktop
-/// holds it without the focus.
+/// A pause longer than this between two redraws (the browser busy, or a
+/// hidden tab whose change was not seen) is not game time. A hidden tab
+/// holds the game as the desktop holds it without the focus, its sound
+/// silent too ([`page_hidden`], `A2App::set_page_hidden`): the browser
+/// stops the redraws but not the sound output.
 const GAP: Duration = Duration::from_millis(250);
 
 /// How long a pointer lock request may take before the page's state is
@@ -278,6 +280,12 @@ impl WebFront {
         (now.saturating_duration_since(last) > GAP).then_some((last, now))
     }
 
+    /// The redraws start again after a pause already held (a hidden
+    /// tab): no gap to count at the next one.
+    pub fn redraws_resumed(&mut self) {
+        self.last_redraw = None;
+    }
+
     /// `atlant2.cfg` written when it changed (checked every two seconds).
     pub fn keep_cfg(&mut self, engine: &Engine, now: Instant) {
         if self
@@ -366,6 +374,14 @@ fn call_page(name: &str) -> bool {
         Some(f) => f.call0(&JsValue::NULL).is_ok(),
         None => false,
     }
+}
+
+/// Whether the page is hidden (`document.hidden`: another tab, the
+/// browser minimised).
+pub fn page_hidden() -> bool {
+    web_sys::window()
+        .and_then(|w| w.document())
+        .is_some_and(|d| d.hidden())
 }
 
 /// Full screen on or off: the page's (it fits the canvas to the screen).
@@ -477,8 +493,8 @@ pub fn atlantis2_test(command: String) {
 }
 
 /// The game's state after the last pass, for the end-to-end runs (JSON:
-/// the loop, the place, the dialog, the video, the menu page, the frame
-/// times).
+/// the loop, the place, the dialog, the video, the menu page, the game's
+/// clock in seconds, the frame times).
 #[wasm_bindgen]
 pub fn atlantis2_state() -> String {
     STATE.with(|s| s.borrow().clone())
@@ -601,12 +617,14 @@ pub fn record_state(engine: &Engine, times: &FrameTimes, audio: bool) {
     let s = format!(
         "{{\"loop\":{},\"wam\":{},\"view\":{view},\"yaw\":{yaw:.2},\"pitch\":{pitch:.2},\
          \"zone\":{zone},\"chapter\":{chapter},\"dialog\":{dialog},\"video\":{video},\
-         \"intro\":{},\"page\":{page},\"widgets\":[{}],\"hd\":{},\"audio\":{audio},\"times\":{}}}",
+         \"intro\":{},\"page\":{page},\"widgets\":[{}],\"hd\":{},\"audio\":{audio},\
+         \"clock\":{:.3},\"times\":{}}}",
         json(&format!("{:?}", engine.loop_type)),
         json(wam),
         engine.intro_playing(),
         widgets.join(","),
         engine.hd_layer().is_some(),
+        engine.clock(),
         times.report()
     );
     STATE.with(|st| *st.borrow_mut() = s);
@@ -667,6 +685,22 @@ mod tests {
         assert!(!t.report().contains("dialog"));
         t.clear();
         assert_eq!(t.report(), "{}");
+    }
+
+    #[test]
+    fn redraw_gaps() {
+        // A pause of the redraws over [`GAP`] is a gap, not one after a
+        // hidden page (held already: no gap to count).
+        let mut w = WebFront::new();
+        let t = Instant::now();
+        let ms = Duration::from_millis;
+        assert_eq!(w.gap(t), None);
+        assert_eq!(w.gap(t + ms(17)), None);
+        assert_eq!(w.gap(t + ms(250)), None);
+        assert_eq!(w.gap(t + ms(1000)), Some((t + ms(250), t + ms(1000))));
+        w.redraws_resumed();
+        assert_eq!(w.gap(t + ms(5000)), None);
+        assert_eq!(w.gap(t + ms(5017)), None);
     }
 
     #[test]

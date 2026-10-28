@@ -214,7 +214,14 @@ impl SaveStore for WebStore {
         match self.storage.set_item(&self.key(name), &text) {
             Ok(()) => true,
             Err(e) => {
+                // Mostly the storage full (`QuotaExceededError`): the game
+                // only logs a save it could not write, as the original
+                // does, so the page says it.
                 log::warn!("{name}: not saved in the browser: {e:?}");
+                show_notice(&format!(
+                    "The browser refused to keep {name}: it was not saved. Its storage for \
+                     this site is probably full; erase saves you no longer need."
+                ));
                 false
             }
         }
@@ -585,7 +592,7 @@ pub fn fit_canvas(w: &Window, wide: bool) {
     }
 }
 
-#[wasm_bindgen(inline_js = r#"
+#[wasm_bindgen(inline_js = r##"
 export function read_picked(file, start, end, out) {
   // A part of a picked file, read at once: a synchronous request of a
   // blob: URL of the slice (an array buffer is refused to a synchronous
@@ -609,11 +616,34 @@ export function read_picked(file, start, end, out) {
     URL.revokeObjectURL(url);
   }
 }
-"#)]
+
+export function show_notice(text) {
+  // A message at the top of the page over the game, for 15 seconds.
+  let box = document.getElementById("atlantis-notice");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "atlantis-notice";
+    box.setAttribute("role", "alert");
+    Object.assign(box.style, {
+      position: "fixed", top: "8px", left: "50%", transform: "translateX(-50%)",
+      zIndex: "20", maxWidth: "min(640px, calc(100vw - 32px))", padding: "8px 14px",
+      background: "#3a1410", color: "#ffd9d0", border: "1px solid #ff9a8a",
+      borderRadius: "6px", font: "14px/1.4 sans-serif", pointerEvents: "none",
+    });
+    document.body.append(box);
+  }
+  box.textContent = text;
+  box.style.display = "block";
+  clearTimeout(box.hideTimer);
+  box.hideTimer = setTimeout(() => { box.style.display = "none"; }, 15000);
+}
+"##)]
 extern "C" {
     /// Bytes `start..end` of `file` into `out` (as long), at once; false
     /// when the browser could not read them.
     fn read_picked(file: &File, start: f64, end: f64, out: &mut [u8]) -> bool;
+    /// A message shown at the top of the page for a while.
+    fn show_notice(text: &str);
 }
 
 thread_local! {
