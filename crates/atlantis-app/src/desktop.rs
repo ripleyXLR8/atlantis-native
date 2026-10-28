@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use atlantis2_data::files::OpenError;
-use atlantis2_data::{A2Files, Build};
+use atlantis2_data::A2Files;
 use atlantis_data::disc_image::DiscSet;
 use atlantis_data::dvd::{self, DvdFiles, DvdLanguage};
 use atlantis_data::{FileSource, Game, GameError, StdDir};
@@ -284,19 +284,20 @@ pub fn open_with_kind(dir: &Path) -> Result<(Game, bool), GameError> {
     }
 }
 
-/// Atlantis II in `dir`: its executable's build, once its discs are found
-/// (in `dir` or a folder directly inside it; GOG.com's folder holds them).
-/// The game itself is booted when it is played ([`crate::a2::open`]).
-pub fn open_atlantis2(dir: &Path) -> Result<&'static Build, OpenError> {
-    A2Files::open_dir(dir, &[]).map(|(_, build)| build)
+/// Atlantis II in `dir`: its edition's name (the executable's build and
+/// the language of its texts), once its discs are found (in `dir` or a
+/// folder directly inside it; GOG.com's folder holds them). The game
+/// itself is booted when it is played ([`crate::a2::open`]).
+pub fn open_atlantis2(dir: &Path) -> Result<String, OpenError> {
+    A2Files::open_dir(dir, &[]).map(|(files, _)| files.label())
 }
 
 /// A game folder that opens, of either game.
 pub enum Opened {
     /// The first game, opened, and whether from disc images.
     LostTales(Box<Game>, bool),
-    /// Atlantis II: its build.
-    Atlantis2(&'static Build),
+    /// Atlantis II: its edition's name.
+    Atlantis2(String),
 }
 
 impl Opened {
@@ -309,11 +310,11 @@ impl Opened {
 
     /// How the game library shows it: the game's name and its edition
     /// ("Atlantis: The Lost Tales, GOG.com, French (1999 build)",
-    /// "Atlantis II, GOG.com (patch 1.01)").
+    /// "Atlantis II, GOG.com, French (patch 1.01)").
     pub fn label(&self) -> String {
         match self {
             Opened::LostTales(game, images) => edition_label(game, *images),
-            Opened::Atlantis2(build) => build.label.to_string(),
+            Opened::Atlantis2(label) => label.clone(),
         }
     }
 }
@@ -349,7 +350,7 @@ pub fn edition_label(game: &Game, from_images: bool) -> String {
 pub fn describe(dir: &Path) -> LauncherEntry {
     let (label, found) = if setup::kind_of(dir) == Some(GameKind::Atlantis2) {
         match open_atlantis2(dir) {
-            Ok(build) => (build.label.to_string(), true),
+            Ok(label) => (label, true),
             Err(e) => {
                 log::info!("{}: {e}", dir.display());
                 let why = match e {
@@ -688,9 +689,9 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
         };
         if kind == GameKind::Atlantis2 {
             match open_atlantis2(&root) {
-                Ok(build) => {
-                    log::info!("game folder {} ({})", root.display(), build.label);
-                    return Some(vec![(Opened::Atlantis2(build), root)]);
+                Ok(label) => {
+                    log::info!("game folder {} ({label})", root.display());
+                    return Some(vec![(Opened::Atlantis2(label), root)]);
                 }
                 Err(e) => {
                     log::warn!("{}: {e}", root.display());
@@ -1192,7 +1193,7 @@ mod tests {
         };
         let e = describe(&gog);
         assert!(e.found, "{}", e.label);
-        assert_eq!(e.label, "Atlantis II, GOG.com (patch 1.01)");
+        assert_eq!(e.label, "Atlantis II, GOG.com, French (patch 1.01)");
         assert!(matches!(open_any(&gog), Ok(Opened::Atlantis2(_))));
         // The CD layout, made of links: the installed folder, the images
         // of the four CDs in its folder "CD".
@@ -1226,7 +1227,10 @@ mod tests {
         assert_eq!(describe(&installed).label, "Atlantis II, French CD (1999)");
         let patched = make("Atlantis II 1.01", &patch);
         link(&installed.join("CD"), &patched.join("CD"));
-        assert_eq!(describe(&patched).label, "Atlantis II, patch 1.01 (1999)");
+        assert_eq!(
+            describe(&patched).label,
+            "Atlantis II, patch 1.01, French (1999)"
+        );
         // Found below a parent folder, with the first game beside them.
         let mut candidates = vec![d.clone()];
         if let Some(first) = std::env::var_os("ATLANTIS_DATA").map(PathBuf::from) {

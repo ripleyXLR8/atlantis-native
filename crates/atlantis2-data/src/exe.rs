@@ -18,6 +18,10 @@
 //!   videos ended by their frame count only, input and window fixes for
 //!   current Windows). GOG's folder also holds an `atlantis2.exe`, a
 //!   splash-screen launcher that starts `Game.exe` ([`LAUNCHER_SIZE`]).
+//!   GOG ships this one `Game.exe` (build "1.0 w10 hotfix", 2022-07-13)
+//!   for its English, French, German and Spanish installations; its
+//!   older builds' `Game.exe` are told apart ([`OLDER_GOG`]) but not
+//!   played yet.
 //!
 //! 1.01 moved most of the code and data (the linker order changed), so
 //! what the port reads from the executable is read at each build's own
@@ -136,6 +140,31 @@ pub const KNOWN_BUILDS: [Build; 3] = [
     },
 ];
 
+/// GOG.com's `Game.exe` of its builds before "1.0 w10 hotfix"
+/// (2022-07-13), whose `Game.exe` is [`KNOWN_BUILDS`]' last: 2,183,168
+/// bytes each, the same file in every language (GOG's build manifests).
+/// Their code has not been compared yet, so they are not played; the
+/// player is told to update the game. MD5, GOG's name of the build, its
+/// date.
+pub const OLDER_GOG: [([u8; 16], &str, &str); 2] = [
+    (
+        [
+            0xf8, 0x34, 0x0e, 0x5a, 0x01, 0x1f, 0xd2, 0x20, 0x7c, 0x5b, 0xb7, 0x8b, 0x4c, 0x2a,
+            0x96, 0x36,
+        ],
+        "1.0",
+        "2018-05-04",
+    ),
+    (
+        [
+            0x8c, 0x24, 0xad, 0x43, 0x7d, 0x9e, 0x99, 0x4f, 0x65, 0x7a, 0xd7, 0x75, 0x1b, 0x62,
+            0x67, 0x18,
+        ],
+        "1.0 w10",
+        "2022-06-21",
+    ),
+];
+
 /// The size of GOG's `atlantis2.exe`, the DotEmu splash-screen launcher
 /// that starts `Game.exe` (20,992 bytes, PE timestamp 0x4c19e4d8).
 pub const LAUNCHER_SIZE: u64 = 20_992;
@@ -149,6 +178,12 @@ pub const EXE_NAMES: [&str; 2] = ["atlantis2.exe", "Game.exe"];
 pub enum ExeError {
     /// Not a PE executable.
     NotPe,
+    /// GOG.com's `Game.exe` of an older build ([`OLDER_GOG`]): GOG's
+    /// name of the build and its date.
+    OlderGog {
+        version: &'static str,
+        date: &'static str,
+    },
     /// A PE file that is no known build: its size, timestamp and MD5.
     Unknown {
         size: u64,
@@ -161,6 +196,12 @@ impl std::fmt::Display for ExeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ExeError::NotPe => write!(f, "the game's executable is not a Windows executable"),
+            ExeError::OlderGog { version, date } => write!(
+                f,
+                "the game's executable is GOG.com's build \"{version}\" of {date}, not supported \
+                 yet: update the game with GOG Galaxy, or install it again from GOG.com's \
+                 current installer (build \"1.0 w10 hotfix\" of 2022-07-13)"
+            ),
             ExeError::Unknown {
                 size,
                 pe_timestamp,
@@ -227,14 +268,17 @@ pub fn identify(exe: &[u8]) -> Result<&'static Build, ExeError> {
         .filter(|b| b.size == size && b.pe_timestamp == stamp)
         .collect();
     let md5: [u8; 16] = Md5::digest(exe).into();
-    candidates
-        .into_iter()
-        .find(|b| b.md5 == md5)
-        .ok_or(ExeError::Unknown {
-            size,
-            pe_timestamp: stamp,
-            md5: hex(&md5),
-        })
+    if let Some(b) = candidates.into_iter().find(|b| b.md5 == md5) {
+        return Ok(b);
+    }
+    if let Some(&(_, version, date)) = OLDER_GOG.iter().find(|(m, _, _)| *m == md5) {
+        return Err(ExeError::OlderGog { version, date });
+    }
+    Err(ExeError::Unknown {
+        size,
+        pe_timestamp: stamp,
+        md5: hex(&md5),
+    })
 }
 
 #[cfg(test)]
@@ -273,6 +317,14 @@ mod tests {
                 .filter(|b| b.release == Release::V101)
                 .count(),
             2
+        );
+        let older: Vec<String> = OLDER_GOG.iter().map(|(m, _, _)| hex(m)).collect();
+        assert_eq!(
+            older,
+            [
+                "f8340e5a011fd2207c5bb78b4c2a9636",
+                "8c24ad437d9e994f657ad7751b626718",
+            ]
         );
     }
 

@@ -1094,7 +1094,18 @@ back) into `yucatan-*.png`.
   one file for the French and the English releases) and GOG.com's
   `Game.exe` (the 1.01 executable with 18 byte patches of GOG's),
   recognised by size and timestamp and confirmed by MD5
-  (`crates/atlantis2-data/src/exe.rs`). GOG's folder holds an
+  (`crates/atlantis2-data/src/exe.rs`). GOG's build manifests show one
+  `Game.exe` for its English, French, German and Spanish installations
+  (in the language-independent depot of its build "1.0 w10 hotfix",
+  2022-07-13); its two older builds ("1.0", 2018, and "1.0 w10",
+  2022-06) each have another `Game.exe` (MD5s
+  `f8340e5a011fd2207c5bb78b4c2a9636`, `8c24ad437d9e994f657ad7751b626718`),
+  named to the player with the advice to update, not played until their
+  code is compared. The languages differ only in data: `loc\` (texts,
+  `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
+  language shown with the edition ("Atlantis II, GOG.com, German (patch
+  1.01)") is told by the MD5 of `loc\Menu.txt`
+  (`crates/atlantis2-data/src/edition.rs`). GOG's folder holds an
   `atlantis2.exe` too, a 20,992-byte splash-screen launcher: the
   executable is the first of `atlantis2.exe` and `Game.exe` that is a
   known build. 1.01 moved most of the code and data; the one table the
