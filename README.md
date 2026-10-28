@@ -142,6 +142,7 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | CD, retail release (August 1997 build, 4 CDs) | French | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release, first pressing (May 1997 build, 4 CDs) | French | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (August 1997 build, 4 CDs) | German | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
+| CD, retail release, first pressing (May 1997 build, 4 CDs) | German | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
 | CD, retail release (June 1997 build, 4 CDs) | Dutch | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (June 1997 build, 4 CDs) | Swedish | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (August 1997 build, 4 CDs) | Spanish | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
@@ -154,7 +155,10 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | Perfect Edition (Tgames' 2018 package of the DVD's English version) | English | the installation folder |
 
 Each build plays as it shipped: the 1997 English CD, the May 1997
-French CD and the Dutch and Swedish CDs, for one, draw their subtitles in their own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
+French and German CDs and the Dutch and Swedish CDs, for one, draw their subtitles in their own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
+The May 1997 German CD's program also answers four keys its developers
+left in (`T`, `R`, `F1`, `F3`: a panel of the engine's variables, and
+others); Atlantis Native does not reproduce them.
 The Chinese CDs' subtitles are drawn with your own Windows `mingliu.ttc`
 (Traditional) or `simsun.ttc` (Simplified) when you put it in the game
 folder, else with the bundled Noto Serif TC or SC.

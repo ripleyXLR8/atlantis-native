@@ -1,4 +1,7 @@
 //! The release shown to the player.
+
+mod common;
+
 use std::sync::Arc;
 
 use atlantis_data::{Game, StdDir};
@@ -71,6 +74,15 @@ fn german_cd_1997() {
         return;
     };
     assert_eq!(edition(&dir).unwrap(), "CD, German (August 1997 build)");
+}
+
+/// The German CD's first pressing, read from its images.
+#[test]
+fn german_cd_may_1997() {
+    let Some(g) = common::game_de_may97("german_cd_may_1997") else {
+        return;
+    };
+    assert_eq!(g.edition().to_string(), "CD, German (May 1997 build)");
 }
 
 #[test]

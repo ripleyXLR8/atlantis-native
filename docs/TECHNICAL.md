@@ -101,7 +101,7 @@ its executable's language:
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
 | `fix_sharp_s` | a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
-| `fix_disc_revision` | some disc's copy of FONTMIN.SPR, FONTMIN2.SPR, or CREDITS.TXT with the builds that read it at each run, differs from disc 1's (`FixData::disc_revisions`): of the known data, the Dutch CD's | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc` | the credits text and the player-name fonts are disc 1's newest revision whatever the disc (the original reads them from the disc in the drive, and disc 2 holds an older revision, see [Game builds](#game-builds)) |
+| `fix_disc_revision` | some disc's copy of FONTMIN.SPR, FONTMIN2.SPR, CREDBLAN.SPR, CREDBLEU.SPR, or CREDITS.TXT with the builds that read it at each run, differs from disc 1's (`FixData::disc_revisions`): of the known data, the Dutch CD's and the May 1997 German CD's | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc`, `load_credits_fonts` | the credits text, the credits fonts and the player-name fonts are disc 1's whatever the disc (the original reads them from the disc in the drive: the Dutch disc 2 holds an older revision, the German May discs 2 to 4 another credits font, see [Game builds](#game-builds)) |
 | `fix_menu_line_width` | Italian CD and DVD (`menu_positioned_byte_width` 16) | `MenuRules::positioned_byte_width` | a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
 | `fix_chinese_rows` | Simplified Chinese (`CjkBreaker::Gb2312`) | `CjkSplit::row_fix` | the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)) |
 | `fix_subtitles_toggle` | Chinese (`menu_toggle_sprites`) | `MenuRules::toggle_in_step` | the options' SUBTITLES toggle record is read in step while SUBTITLES is off (the original reads it one byte out of step, so its click area takes the wrong width and height, see [Game builds](#game-builds)) |
@@ -307,8 +307,8 @@ which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
 thresholded to one bit, so every platform draws the same pixels; the text
 bytes are read in the release's code page (`TextCodePage` in
 `crates/atlantis-data/src/text.rs`): Windows-1252, but for the May 1997
-French CD and the Dutch and Swedish CDs, whose texts are in the DOS code
-page 850.
+French and German CDs and the Dutch and Swedish CDs, whose texts are in
+the DOS code page 850.
 The font is bundled
 in `assets/fonts`.
 
@@ -372,7 +372,8 @@ texts are in the DOS code
 page, whose accented letters (`0x82` é, `0x85` à...) are those of the
 font's IBM PC glyphs, so the accents show as they should, byte for byte.
 So does the Dutch CD (`é ë è ï ú`), eight of its rows wider than the
-screen. The Swedish CD (`ä å ö Ä Å Ö é`) breaks its rows another way: always
+screen, and the May 1997 German CD (`ü ä Ä ö Ü ß`), nine of its rows wider
+than the screen. The Swedish CD (`ä å ö Ä Å Ö é`) breaks its rows another way: always
 at the last space before the end of the 75-byte window, never at a space
 after it, so none of its rows is over 75 bytes or wider than the screen
 (`split_subtitle_1997_back`). A run of 75 bytes without a space, which no
@@ -412,7 +413,7 @@ the 2001 build's is given the text without them.
 
 ### Game builds
 
-The port knows twenty-two builds of `atlantis.exe` (`ExeBuild` in
+The port knows twenty-three builds of `atlantis.exe` (`ExeBuild` in
 `crates/atlantis-data/src/exe.rs`), found by their size and the PE
 header's timestamp (the 2001 build and the patch 1.01 build have the same
 size, as have the August 1997 French and German builds and the Spanish
@@ -425,7 +426,7 @@ size and timestamp too, and are told apart by a path string
 them, and the code differences that change what a player sees follow the
 build:
 
-| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French, German, Spanish and Italian retail CDs (1997) | French retail CD (May 1997) | Traditional and Simplified Chinese CDs (1998, 1999) | DVD (1998) and Perfect Edition | Japanese DVD (1998) |
+| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French and German (August), Spanish and Italian retail CDs (1997) | French retail CD (May 1997) | Traditional and Simplified Chinese CDs (1998, 1999) | DVD (1998) and Perfect Edition | Japanese DVD (1998) |
 |---|---|---|---|---|---|---|---|---|
 | subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows | Arial | 8x8 font, 10-pixel rows (DOS code page texts) | MingLiU / SimSun, 18-pixel rows (Big5 / GBK texts) | Arial, 14-pixel rows (the Dutch and Swedish DVDs' DOS code page texts read as Windows-1252) | MS PGothic, 18-pixel rows (Shift-JIS texts), cut at the spaces and 36 pixels lower; English: the reference's rows |
 | SUBTITLES item | three-click cycle | three-click cycle | plain toggle | plain toggle | plain toggle | three-click cycle, on at start-up | three-click cycle | three states: Japanese, English, none (the chapter's script read again) |
@@ -514,6 +515,30 @@ starts at y 0 but is clamped at the bar's top, and a row click counts
 the list's offset, as in the later builds. Its texts are in the DOS code
 page.
 
+The German retail CD's first pressing (May 1997) has the English May
+1997 build's code too (825 of its 829 functions, built two days
+earlier): everything in that column applies to it, and its texts are in
+the DOS code page (`ü ä Ä ö Ü ß` at 0x81 0x84 0x8e 0x94 0x9a 0xe1),
+which its 8x8 font (the English `DIALOG\FONTS.BIN`) shows as they are.
+Its new-player row reads `NEUER SPIELER`, which moves its tables as in
+the Dutch build (the credits font table 3 bytes, the inventory and
+guest tables 4 bytes up), and its credits font draws `b` one pixel
+narrower than the English build's. It is the only build whose
+developers' keys were left in: its input poll toggles a debug panel
+(46 rows of engine variables in the 8x8 font, drawn by the frame
+presenters of the menus, the warp view, the puzzles and the videos)
+with `T`, and while `R`, `F1` or `F3` is held flips the ogre game's
+queen flag, the edge-scroll look mode and an unread flag once per
+frame. The port does not model these keys (a choice left open). Its
+disc 1 holds other copies than discs 2 to 4 of the CD, error and wait
+texts, two menus, EPI.TXT and the credits font CREDBLAN.SPR (whose `b`
+is drawn 2 pixels further left on disc 1): the original loads the
+first at start-up, from disc 1, and the credits fonts at each credits
+run, from the disc in the drive, as the port does (below). Its scripts
+are the 2001 build's but for a DELMUSIK at the start of chapter 35 (the
+2001 build's has none) and a second STARTMUSIK in chapter 36, which the
+port runs as written.
+
 The Traditional Chinese 4-CD release's build (July 1998) and the
 Simplified Chinese one's (March 1999) are the French August 1997 build's
 code moved toward the 2001 build by an intermediate 1998 build (the
@@ -567,19 +592,20 @@ font, PREINTRO.TGA, and in the 2001, 1999 and August 1997 builds
 CREDITS.TXT) comes from the disc it starts from, disc 1 in the port;
 what it reads when it uses it comes from the disc in the drive: the
 player-name fonts FONTMIN / FONTMIN2 (on entering the LOAD list and the
-player screen) and, in the 1997 builds of the English May code (English,
-French May, Dutch, Swedish), CREDITS.TXT. The archive keeps the copies of each
-disc (`BigArchive::set_disc_copy`), and the port reads these members
-from the current disc's archive. Only the Dutch CD has copies of these
-that differ (the Swedish discs 2 to 4 hold older CD texts, EPI.TXT and
-SELEMENU.TXT, which the original never shows, and the same CREDITS.TXT
-and FONTMIN fonts as disc 1): its disc 2 holds an older revision (the menus at fixed places,
-EPI.TXT's typos, `Musiek`, CREDITS.TXT one line shorter,
-PREINTRO.TGA without the R&P and Cryo logos, FONTMIN fonts with other
-`j` and `'` hotspots). So
-while disc 2 is in use, its CREDITS.TXT and FONTMIN show, as in the
-original; with its fix (`fix_disc_revision`), disc 1's, the newest, whatever the
-disc.
+player screen), the credits fonts CREDBLAN / CREDBLEU (at each credits
+run, in every build) and, in the 1997 builds of the English May code
+(English, French May, German May, Dutch, Swedish), CREDITS.TXT. The
+archive keeps the copies of each disc (`BigArchive::set_disc_copy`), and
+the port reads these members from the current disc's archive. Only two
+CDs have copies of these that differ (the Swedish discs 2 to 4 hold
+older CD texts, EPI.TXT and SELEMENU.TXT, which the original never
+shows, and the same CREDITS.TXT and fonts as disc 1). The Dutch disc 2
+holds an older revision (the menus at fixed places, EPI.TXT's typos,
+`Musiek`, CREDITS.TXT one line shorter, PREINTRO.TGA without the R&P
+and Cryo logos, FONTMIN fonts with other `j` and `'` hotspots); the
+German May discs 2 to 4 another CREDBLAN.SPR (the hotspot of `b`). So
+while such a disc is in use, its copies show, as in the original; with
+the fix (`fix_disc_revision`), disc 1's, whatever the disc.
 
 Cryo's Windows patch 1.01 (`AT1CDINT.EXE`, December 1999) replaces
 `atlantis.exe` (and `cryo.dll`) in a CD installation, English, French,
@@ -588,10 +614,10 @@ German, Dutch, Swedish, Spanish or Italian, and keeps its `BIGCD1.BIG` … `BIGC
 GOG.com column applies to it, and its tables are at the GOG.com build's
 addresses. Its interface is French whatever the CD (the new-player row
 reads `NOUVEAU JOUEUR`), so the options menu shows *CD, patch 1.01,
-French (1999 build)*. Over the Dutch or Swedish CD, whose texts are in
-the DOS code page, it draws them as Windows-1252, as it passes them to
-Windows: the accented letters show as other signs (the Swedish `ä` as
-`„`), and its name entry has no Swedish letters. GOG.com's own edits of that build (no pause when
+French (1999 build)*. Over the Dutch, Swedish or May 1997 German CD,
+whose texts are in the DOS code page, it draws them as Windows-1252, as
+it passes them to Windows: the accented letters show as other signs (the
+Swedish and German `ä` as `„`), and its name entry has no Swedish letters. GOG.com's own edits of that build (no pause when
 the window is inactive, no free-space checks, a delay before each row
 copy, no start-up CD scan, an immediate exit on closing) concern how the
 original runs on a later system, not the game; the port handles the
@@ -3506,6 +3532,13 @@ skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
 English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
 retail CD, `ATLANTIS_DATA_FR1997_MAY` one of the May 1997 French retail CD
 (the first pressing), `ATLANTIS_DATA_DE1997` one of the German retail CD,
+`ATLANTIS_DATA_DE_MAY97` a folder of the German retail CD's first
+pressing's images (its `.iso` files: the May 1997 build; `tests/german_cd_may.rs`:
+every dialog line's rows against the build's breaker under emulation,
+its DOS code page letters, one subtitle's pixels, the LOAD list's `ß`,
+the credits fonts of the disc in the drive, a new game to its first
+dialog, a save and its load from the player screen and the LOAD list;
+its tables, archives and edition in `atlantis-data`'s tests),
 `ATLANTIS_DATA_NL1997` one of the Dutch retail CD,
 `ATLANTIS_DATA_SV1997` one of the Swedish retail CD,
 `ATLANTIS_DATA_ES1997` / `ATLANTIS_DATA_IT1997` ones of the Spanish /
@@ -3607,6 +3640,7 @@ in from the game's file by the tests):
 ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
 ATLANTIS_DATA_FR1997=/path/to/fr1997 ATLANTIS_DATA_FR1997_MAY=/path/to/fr1997may \
 ATLANTIS_DATA_DE1997=/path/to/de1997 ATLANTIS_DATA_NL1997=/path/to/nl1997 \
+ATLANTIS_DATA_DE_MAY97=/path/to/de-may-1997-images \
 ATLANTIS_DATA_SV1997=/path/to/sv1997 ATLANTIS_DATA_ES1997=/path/to/es1997 \
 ATLANTIS_DATA_IT1997=/path/to/it1997 ATLANTIS_DATA_PATCH101=/path/to/patch101 \
 cargo test --release

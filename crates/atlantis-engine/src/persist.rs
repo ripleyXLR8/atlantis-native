@@ -332,9 +332,9 @@ impl Settings {
              # areas; OK on the fifth player; the snakes puzzle's false first\n\
              # win; and those of some builds: the hexagon puzzle's pieces (1997\n\
              # and Chinese builds), LOADMUSIK track by track (French May 1997),\n\
-             # the sharp s (German), credits and fonts of disc 1 (Dutch), OK and\n\
-             # Annulla clicks (Italian), the subtitle rows (Simplified Chinese),\n\
-             # the SUBTITLES record (Chinese)\n\
+             # the sharp s (German), credits and fonts of disc 1 (Dutch, German\n\
+             # May 1997), OK and Annulla clicks (Italian), the subtitle rows\n\
+             # (Simplified Chinese), the SUBTITLES record (Chinese)\n\
              {}\n\
              # Content the original never shows, interface changes\n\
              restored_content = {}\n\

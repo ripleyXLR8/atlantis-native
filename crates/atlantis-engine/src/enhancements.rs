@@ -88,12 +88,14 @@ pub enum BugFix {
     /// `ß` ([`FixData::sharp_s`]): of the known data, the German CD's.
     SharpS,
     /// With the Dutch CD, CREDITS.TXT and the FONTMIN fonts are disc 1's
-    /// newest revision whatever the disc. Off, the current disc's copy, as
-    /// the original reads them from the disc in the drive: disc 2 holds an
+    /// newest revision whatever the disc; with the German May 1997 CD, the
+    /// credits' CREDBLAN.SPR. Off, the current disc's copy, as the original
+    /// reads them from the disc in the drive: the Dutch disc 2 holds an
     /// older revision (CREDITS.TXT one line shorter, FONTMIN's `j` and `'`
-    /// hotspots). The games whose discs hold different copies of those
-    /// files ([`FixData::disc_revisions`]): of the known data, the Dutch
-    /// CD's.
+    /// hotspots), the German May discs 2..4 another CREDBLAN.SPR. The
+    /// games whose discs hold different copies of those files
+    /// ([`FixData::disc_revisions`]): of the known data, the Dutch CD's
+    /// and the German May CD's.
     DiscRevision,
     /// With the Italian CD, a positioned menu line (`<x,y>`) answers over
     /// 22 px per byte as in every other build, so the whole drawn word
@@ -249,9 +251,9 @@ pub struct FixData {
     /// characters hold 0xe1). The typed player names cannot (0x20..0xa7).
     pub sharp_s: bool,
     /// A member read from the disc in the drive (FONTMIN.SPR,
-    /// FONTMIN2.SPR, and CREDITS.TXT with the builds that read it at each
-    /// run) has a copy on some disc that differs from the first disc's
-    /// ([`BugFix::DiscRevision`]).
+    /// FONTMIN2.SPR, CREDBLAN.SPR, CREDBLEU.SPR, and CREDITS.TXT with the
+    /// builds that read it at each run) has a copy on some disc that
+    /// differs from the first disc's ([`BugFix::DiscRevision`]).
     pub disc_revisions: bool,
 }
 
@@ -266,11 +268,14 @@ fn is_menu_text(name: &str) -> bool {
     n.ends_with("MENU.TXT") || (n.starts_with("ERROR") && n.ends_with(".TXT")) || n == "WAIT.TXT"
 }
 
-/// The members read from the disc in the drive; CREDITS.TXT only with the
+/// The members read from the disc in the drive (the credits fonts at each
+/// credits run, `Engine::load_credits_fonts`); CREDITS.TXT only with the
 /// builds that read it at each run (`ExeBuild::credits_read_per_run`).
-const CURRENT_DISC_MEMBERS: [&str; 3] = [
+const CURRENT_DISC_MEMBERS: [&str; 5] = [
     "SPRITE\\2D\\FONTMIN.SPR",
     "SPRITE\\2D\\FONTMIN2.SPR",
+    "SPRITE\\2D\\CREDBLAN.SPR",
+    "SPRITE\\2D\\CREDBLEU.SPR",
     "SPRLIST\\CREDITS.TXT",
 ];
 
@@ -590,6 +595,15 @@ mod tests {
             [HexagonPieces, LoadMusik]
         );
         assert_eq!(of("atlantis-cd-de-687104", german), [HexagonPieces, SharpS]);
+        assert_eq!(of("atlantis-cd-de-693248", german), [HexagonPieces, SharpS]);
+        let german_may = FixData {
+            disc_revisions: true,
+            ..german
+        };
+        assert_eq!(
+            of("atlantis-cd-de-693248", german_may),
+            [HexagonPieces, SharpS, DiscRevision]
+        );
         assert_eq!(
             of("atlantis-cd-nl-688128", dutch),
             [HexagonPieces, DiscRevision]

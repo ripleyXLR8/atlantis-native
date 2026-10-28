@@ -7,6 +7,8 @@
 //! build, `ATLANTIS_DATA_DE1997` for the German retail CD's build,
 //! `ATLANTIS_DATA_NL1997` for the Dutch retail CD's build,
 //! `ATLANTIS_DATA_SV1997` for the Swedish retail CD's build,
+//! `ATLANTIS_DATA_DE_MAY97` for the folder of the German retail CD's first
+//! pressing's images (its May 1997 build),
 //! `ATLANTIS_DATA_ES1997` / `ATLANTIS_DATA_IT1997` for the Spanish and
 //! Italian retail CDs' builds and `ATLANTIS_DATA_PATCH101` for a CD install with Cryo's patch 1.01);
 //! skipped without it.
@@ -14,8 +16,8 @@
 mod common;
 
 use common::{
-    game, game_1997, game_de1997, game_es1997, game_fr1997, game_fr1997_may, game_it1997,
-    game_nl1997, game_patch101, game_sv1997, golden_map, md5_hex,
+    game, game_1997, game_de1997, game_de_may97, game_es1997, game_fr1997, game_fr1997_may,
+    game_it1997, game_nl1997, game_patch101, game_sv1997, golden_map, md5_hex,
 };
 
 fn joined(names: &[String]) -> String {
@@ -390,6 +392,122 @@ fn dutch_archives_disc_copies() {
     };
     assert!(son(2).windows(6).any(|w| w == b"Musiek"));
     assert!(son(1).windows(6).any(|w| w == b"Muziek"));
+}
+
+/// The German May 1997 build (atlantis-cd-de-693248, the first German
+/// pressing): the English May build's code and DGROUP at 0x00480000, its
+/// raw pointer 0x6d200; the player row "NEUER SPIELER" (no '#', also the
+/// label, at 0x0048654a), then the tables as in the Dutch build: the
+/// credits widths 3 bytes further (0x004866d8), the inventory and guest
+/// tables 4 bytes further (0x0048678c, 0x00486860), with the English
+/// build's bytes but the credits advance of `b` (0x62), 8 instead of 9.
+/// Every flag is en-688128's but its texts' DOS code page.
+#[test]
+fn tables_of_the_german_may_1997_build() {
+    let Some(de) = game_de_may97("tables_of_the_german_may_1997_build") else {
+        return;
+    };
+    let exe = &de.exe;
+    assert_eq!(exe.build.name, "atlantis-cd-de-693248");
+    check_sound_tables(&de);
+    assert_eq!(exe.new_player_marker, b"NEUER SPIELER");
+    assert_eq!(exe.new_player_label, b"NEUER SPIELER");
+    assert_eq!(exe.inventory_object_ids.len(), 51);
+    assert_eq!(exe.inventory_object_ids[39], 0);
+    assert_eq!(exe.guest_sprite_ids.len(), 9);
+    assert_eq!(exe.credit_widths[0x62], 8);
+    // The padding byte before the inventory table, as the August builds.
+    assert_eq!(exe.credit_widths[0xb3], 0);
+    let en_build = atlantis_data::exe::BUILDS
+        .iter()
+        .find(|b| b.name == "atlantis-cd-en-688128")
+        .unwrap();
+    let mut b = *exe.build;
+    assert!(b.upper_case_names && b.players_1997 && b.bitmap_subtitles);
+    assert!(!b.startup_logo_rp && !b.load_picker_clamp);
+    assert_eq!((b.year, b.month), (1997, Some("May")));
+    assert_eq!(b.text_code_page, atlantis_data::TextCodePage::Dos850);
+    b.name = en_build.name;
+    b.size = en_build.size;
+    b.pe_timestamp = en_build.pe_timestamp;
+    b.dgroup_raw = en_build.dgroup_raw;
+    b.inventory_va = en_build.inventory_va;
+    b.guest_va = en_build.guest_va;
+    b.credit_widths_va = en_build.credit_widths_va;
+    b.text_code_page = en_build.text_code_page;
+    assert_eq!(&b, en_build);
+    if let Some(en) = game_1997("tables_of_the_german_may_1997_build (English 1997)") {
+        let e = &en.exe;
+        assert_eq!(exe.inventory_object_ids, e.inventory_object_ids);
+        assert_eq!(exe.guest_sprite_ids, e.guest_sprite_ids);
+        // Up to the padding before the inventory table, but `b`.
+        let differ: Vec<usize> = (0..0xb3)
+            .filter(|&i| exe.credit_widths[i] != e.credit_widths[i])
+            .collect();
+        assert_eq!(differ, [0x62]);
+        assert_eq!(e.credit_widths[0x62], 9);
+        assert_eq!(exe.music_names, e.music_names);
+        assert_eq!(exe.newsound_names, e.newsound_names);
+    }
+}
+
+/// The German May CD's archives: the members several discs carry are the
+/// same bytes on each, but for a later revision on disc 1 (1997-05-23) of
+/// the CD, error and wait texts, the sound and ARE YOU SURE menus, EPI.TXT
+/// and CREDBLAN.SPR than on discs 2..4 (1997-05-22). CREDITS.TXT and the
+/// FONTMIN fonts, which the original reads from the disc in the drive, are
+/// the same on every disc.
+#[test]
+fn german_may_archives_disc_copies() {
+    let Some(de) = game_de_may97("german_may_archives_disc_copies") else {
+        return;
+    };
+    let big = &de.big;
+    let mut names: Vec<String> = big.names().map(str::to_string).collect();
+    names.sort();
+    let mut differ = Vec::new();
+    for n in &names {
+        let discs = big.discs_of(n);
+        if discs.len() < 2 {
+            continue;
+        }
+        let copies: Vec<Vec<u8>> = discs
+            .iter()
+            .map(|&d| {
+                big.set_disc_copy(Some(d));
+                big.read(n).unwrap()
+            })
+            .collect();
+        big.set_disc_copy(None);
+        let odd: Vec<u8> = discs
+            .iter()
+            .zip(&copies)
+            .filter(|(_, c)| *c != &copies[0])
+            .map(|(&d, _)| d)
+            .collect();
+        if !odd.is_empty() {
+            differ.push(format!("{n} {odd:?}"));
+        }
+    }
+    let mut want: Vec<String> = [
+        "SPRITE\\2D\\CREDBLAN.SPR",
+        "SPRLIST\\CD1MENU.TXT",
+        "SPRLIST\\CD2MENU.TXT",
+        "SPRLIST\\CD3MENU.TXT",
+        "SPRLIST\\CD4MENU.TXT",
+        "SPRLIST\\EPI.TXT",
+        "SPRLIST\\ERROR1.TXT",
+        "SPRLIST\\ERROR2.TXT",
+        "SPRLIST\\ERROR3.TXT",
+        "SPRLIST\\SONMENU.TXT",
+        "SPRLIST\\SUREMENU.TXT",
+        "SPRLIST\\WAIT.TXT",
+    ]
+    .iter()
+    .map(|n| format!("{n} [2, 3, 4]"))
+    .collect();
+    want.sort();
+    assert_eq!(differ, want);
 }
 
 /// The Swedish 1997 build (atlantis-cd-sv-688128): the English May build's

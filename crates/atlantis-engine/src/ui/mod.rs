@@ -30,9 +30,6 @@ pub struct UiAssets {
     pub fontmin_from: Option<(String, u64)>,
     /// FONTMIN's advances, past its table the build's credits table's.
     pub fontmin_advance: FontMinAdvances,
-    /// CREDBLAN.SPR / CREDBLEU.SPR, the credits fonts.
-    pub credblan: Vec<SprSprite>,
-    pub credbleu: Vec<SprSprite>,
     /// SPRMENU.SPR, the menus' ornaments.
     pub sprmenu: Vec<SprSprite>,
     /// OBJETS1.SPR, the objects' icons (index = the exe's table index).
@@ -345,8 +342,6 @@ impl Engine {
                 .locate("SPRITE\\2D\\FONTMIN.SPR")
                 .map(|(file, at, _)| (file, at)),
             fontmin_advance: FontMinAdvances::new(&self.game.exe.credit_widths),
-            credblan: bank(self, "CREDBLAN.SPR", d).await,
-            credbleu: bank(self, "CREDBLEU.SPR", d).await,
             sprmenu: bank(self, "SPRMENU.SPR", d).await,
             objects: bank(self, "OBJETS1.SPR", d).await,
             guests: bank(self, "SUIVEUR.SPR", d).await,
@@ -370,7 +365,8 @@ impl Engine {
     /// (0x00772913). With the disc revision's fix
     /// ([`crate::enhancements::BugFix::DiscRevision`]), the first copy, disc 1's:
     /// the Dutch CD's disc 2 holds an older revision of CREDITS.TXT and
-    /// FONTMIN / FONTMIN2 (the others carry the same bytes on every disc).
+    /// FONTMIN / FONTMIN2, the German May CD's discs 2..4 another
+    /// CREDBLAN.SPR (the others carry the same bytes on every disc).
     pub async fn read_from_current_disc(&self, name: &str) -> Option<Vec<u8>> {
         let disc = self.current_disc_copy();
         self.game.big.set_disc_copy(disc);
@@ -414,6 +410,33 @@ impl Engine {
         ui.fontmin = fontmin;
         ui.fontmin2 = fontmin2;
         ui.fontmin_from = from;
+    }
+
+    /// CREDBLAN.SPR and CREDBLEU.SPR, the credits' white and blue fonts,
+    /// from the current disc: every build's credits function loads them at
+    /// the start of each run from the archive open then (0x52 bytes into
+    /// it: atlantis-cd-en-714240 FUN_0041a72c @ 0x0041a77e / 0x0041a7e4,
+    /// atlantis-cd-en-688128 FUN_0041a5f8 @ 0x0041a64a / 0x0041a6b0,
+    /// atlantis-cd-fr-687104 FUN_0041a1f0 @ 0x0041a242 / 0x0041a2a8,
+    /// atlantis-cd-de-693248 FUN_0041a6a4 @ 0x0041a6f6 / 0x0041a75c...).
+    /// The German May 1997 CD's disc 1 holds another CREDBLAN.SPR than its
+    /// discs 2..4; every other release, the same on each disc.
+    pub async fn load_credits_fonts(&self) -> [Vec<SprSprite>; 2] {
+        let d = limits::DEFAULT;
+        let bank = |data: Option<Vec<u8>>| {
+            data.and_then(|b| read_spr_file(&b, d.0, d.1))
+                .unwrap_or_default()
+        };
+        [
+            bank(
+                self.read_from_current_disc("SPRITE\\2D\\CREDBLAN.SPR")
+                    .await,
+            ),
+            bank(
+                self.read_from_current_disc("SPRITE\\2D\\CREDBLEU.SPR")
+                    .await,
+            ),
+        ]
     }
 
     /// The pointer of the bar loops, `FUN_0042d558`: CURSEURS.SPR frame 6

@@ -88,7 +88,7 @@ version): choose its installation folder.
 ### Supported editions
 
 The English CD (1997 and 2001 builds), the French CD (May and August
-1997), the German CD (August 1997), the Dutch and Swedish CDs (June
+1997), the German CD (May and August 1997), the Dutch and Swedish CDs (June
 1997), the Spanish CD (August 1997), the Italian CD (July 1997), the CD
 with Cryo's patch 1.01 (over the English, French, German, Dutch,
 Swedish, Spanish or Italian CD), the GOG.com release in
@@ -293,10 +293,13 @@ change an entry; Escape, F10 or O close it. Its entries:
     DVD's German version): no
     sprite font of the game has `ß`; the original leaves a gap in the
     LOAD list's chapter names, the fix draws it as "ss".
-  - **Dutch: the credits and fonts of disc 1** (the games whose discs
-    hold different copies of them: the Dutch CD, also with the patch
-    1.01 over it): the original reads the credits and the name fonts
-    from the disc in the drive, and disc 2 holds an older revision.
+  - **Dutch, German May: the credits and fonts of disc 1** (the games
+    whose discs hold different copies of them: the Dutch CD, also with
+    the patch 1.01 over it, and the May 1997 German CD): the original reads the
+    credits, their fonts and the name fonts from the disc in the drive;
+    the Dutch disc 2 holds an older revision of the credits text and
+    name fonts, the German May discs 2 to 4 another credits font (its
+    `b` 2 pixels to the right of disc 1's).
   - **Italian: the whole of OK and Annulla** (Italian CD and the DVD's
     Italian version): the original's
     click areas of the menu lines at a fixed place stop short of the
@@ -576,10 +579,10 @@ it move up with their files. (The original deletes the files of the letter
 of the row, which after an earlier deletion can be another player's and
 leaves the deleted player's files behind.)
 
-The files are those the build you play writes: the 1997 English and
-French CDs write a 95-byte `players.atl` (five chapter and letter bytes,
-where the later builds write six), and the English one and the May 1997
-French one store typed names in capitals.
+The files are those the build you play writes: the 1997 CDs write a
+95-byte `players.atl` (five chapter and letter bytes, where the later
+builds write six), and the English one and the May 1997 French and
+German ones store typed names in capitals.
 
 The same folder holds `settings.ini`: the options of the game's menus
 (subtitles, OMNI 3D mode, the master, music, effects and voices volumes,
@@ -617,9 +620,9 @@ picked folder on its first start.
 - The subtitles of the 2001 and GOG.com builds are drawn with Liberation
   Sans, which has the metrics of the original's Arial (see
   [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French
-  and German CDs' and the Spanish and Italian CDs'; the 1997 English CD's, the May 1997 French CD's and
-  the Dutch and Swedish CDs' are drawn with their own pixel font, as they
-  did (the accents included). The Chinese CDs' are drawn with the
+  and German CDs' and the Spanish and Italian CDs'; the 1997 English CD's, the May 1997 French and
+  German CDs' and the Dutch and Swedish CDs' are drawn with their own
+  pixel font, as they did (the accents and umlauts included). The Chinese CDs' are drawn with the
   player's own MingLiU or SimSun when `mingliu.ttc` (Traditional) or
   `simsun.ttc` (Simplified), from a Windows `Fonts` folder, is put in the
   game folder (or beside the disc images), else with the bundled Noto
@@ -636,7 +639,8 @@ picked folder on its first start.
   LOAD list's fonts lack is drawn as "ss" (the original leaves a gap);
   on the Dutch CD, the credits text and the player-name fonts are disc
   1's whatever the disc (the original shows disc 2's older revision while
-  disc 2 is in use); on the Italian CD, the buttons and lines of the
+  disc 2 is in use), and on the May 1997 German CD the credits font
+  (discs 2 to 4 draw its `b` 2 pixels to the right); on the Italian CD, the buttons and lines of the
   menus answer over the whole drawn word (the original's zones stop
   short of it: the right end of `OK` and `Annulla` does not answer); on
   the Simplified Chinese CD, every subtitle row starts and ends between
@@ -668,6 +672,13 @@ picked folder on its first start.
   seconds after the opening began); what that shows is not known.
 - Three paths of the 3D talking heads that no shipped head reaches are
   not ported (see [Layout](TECHNICAL.md#layout)).
+- The May 1997 German CD's program answers four keys its developers left
+  in, which the port ignores: `T` (each press, also typed in a player
+  name) shows or hides a panel of 46 of the engine's variables over the
+  left of the screen; `R` turns the ogre game's queen flag over, `F1` a
+  look mode in which the view turns while the pointer is near the
+  screen's edges, `F3` a flag nothing reads, each once per frame while
+  the key is held.
 - F10 (or O, for a keyboard without function keys; not while a game menu
   takes letters) opens the port's [options menu](#the-options-menu); the [HD mode](TECHNICAL.md#hd-mode) it offers is
   off by default.
