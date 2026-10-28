@@ -351,6 +351,9 @@ pub struct CinemaCaptions {
 /// tables from the credits widths on 3 or 4 bytes further) and the Swedish
 /// retail CD's build of June 1997 (the English May build's code and
 /// tables, with its own subtitle breaker, name entry and LOAD clamp), the
+/// German retail CD's first build, of May 1997 (the English May build's
+/// code with the developers' keys left in, the Dutch build's addresses),
+/// the
 /// Spanish retail CD's build of August 1997 (the French August build's code
 /// with the reference's rat search restart, the German build's addresses)
 /// the Italian retail CD's build of July 1997 (the French August
@@ -359,7 +362,7 @@ pub struct CinemaCaptions {
 /// March 1999 ([`ZH_TW`] and [`ZH_CN`]), the seven European builds of
 /// Cryo's 1998 DVD-ROM ([`DVD_EN`]..) and the Perfect Edition's program
 /// ([`PE_2018`]).
-pub const BUILDS: [ExeBuild; 22] = [
+pub const BUILDS: [ExeBuild; 23] = [
     ExeBuild {
         name: "atlantis-cd-en-714240",
         size: 714_240,
@@ -1122,6 +1125,95 @@ pub const BUILDS: [ExeBuild; 22] = [
         subtitle_languages: false,
         startup_logos: &[],
     },
+    // The German retail CD's first pressing (May 1997): atlantis-cd-en-688128's
+    // code (825 of its 829 functions the same, among them the subtitle
+    // breaker FUN_0042f6fc and drawer FUN_0042f8c8, the game-over screen
+    // FUN_00426430, the player list FUN_00420d80, the name entry FUN_0041e45c,
+    // the LOAD picker FUN_0041d734, the /set executor FUN_00429dd0, LoadMusik
+    // FUN_0041f54c, the menu walk FUN_0041fcc0, the credits FUN_0041a6a4),
+    // with the reference's cryo.dll and the developers' keys left in: the
+    // input poll FUN_0041a148 toggles a debug panel with T, the ogre game's
+    // queen flag (0x00485e52) with R, the edge-scroll look mode
+    // (0x004860b8) with F1 and an unread flag with F3; the panel
+    // (FUN_0041ad30, 46 rows of the engine's variables in the FONTS.BIN
+    // font) is drawn by the frame presenters FUN_0041b9f4 and FUN_0041ba94.
+    // The port does not model these keys. The player row "NEUER SPIELER"
+    // (marker = label) moves the names array to 0x00486558 and the tables
+    // after it as in the Dutch build (FONTMAX 0x004865ea, FONTMIN
+    // 0x00486673, both with the other builds' bytes); its credits widths
+    // are en-688128's but `b` (0x62), one pixel narrower.
+    ExeBuild {
+        name: "atlantis-cd-de-693248",
+        size: 693_248,
+        pe_timestamp: 0x3385_89b0,
+        year: 1997,
+        month: Some("May"),
+        dgroup_vaddr: 0x8_0000,
+        dgroup_raw: 0x6_d200,
+        music_va: 0x0048_5eec,
+        // The names in 0x004ab37c..0x004abb90, as en-688128's.
+        sound_names_va: 0x0048_61d0,
+        sound_names_range: (0x004a_0000, 0x004b_0000),
+        // "NEUER SPIELER", no '#'; the names array follows at 0x00486558.
+        new_player_va: 0x0048_654a,
+        inventory_va: 0x0048_678c,
+        guest_va: 0x0048_6860,
+        credit_widths_va: 0x0048_66d8,
+        marker_is_label: true,
+        cursor_id_rule: false,
+        rhea_camera2: false,
+        // FUN_00426430: no per-section counter, the voice at entry.
+        alt_game_over_narration: false,
+        bitmap_subtitles: true,
+        // FUN_0041dd30: a plain toggle.
+        subtitle_click_cycle: false,
+        players_1997: true,
+        // FUN_0041e45c @ 0x0041e83d: 0x20..0x7a, a..z stored upper case.
+        upper_case_names: true,
+        // FUN_0043d300.
+        hexa_forces_402: false,
+        // FUN_0043fc4c.
+        queen_reveal: (5, 75),
+        // FUN_0043679c; FUN_004359fc.
+        rat_deadline_pacing: true,
+        rat_search_restart: false,
+        // FUN_0041c964.
+        warp_cursor_steps: 1,
+        // FUN_0041d734.
+        load_knob_starts_at_bar: false,
+        load_picker_clamp: false,
+        // FUN_00429dd0 @ 0x0042a89e (LOADMUSIK), 0x0042a911 (DELMUSIK).
+        music_first_value_rule: true,
+        game_over_voice_at_entry: true,
+        music_load_all_or_nothing: false,
+        music_load_min_volume: 0,
+        music_restart_rearms_fade: true,
+        // The CON texts are in the DOS code page (0x81 ü, 0x84 ä, 0x8e Ä,
+        // 0x94 ö, 0x9a Ü, 0xe1 ß), drawn glyph = byte with the English
+        // FONTS.BIN.
+        text_code_page: TextCodePage::Dos850,
+        startup_logo_rp: false,
+        credits_read_per_run: true,
+        subtitle_cut_back_only: false,
+        name_entry_dos_letters: false,
+        menu_positioned_byte_width: 22,
+        menu_high_bytes_as_space: false,
+        // FUN_0041fcc0 @ 0x0041fd10: `imul eax,eax,0x81`.
+        menu_records_per_menu: 16,
+        cjk_breaker: CjkBreaker::None,
+        subtitle_row_step: 14,
+        menu_sprite_banks: None,
+        menu_toggle_sprites: false,
+        load_list: LoadList::EpiText,
+        cinema_captions: None,
+        subtitles_on_at_start: false,
+        players_names_block: 85,
+        off1_player: false,
+        path_check: None,
+        dos_subtitle_texts: false,
+        subtitle_languages: false,
+        startup_logos: &[],
+    },
     ZH_TW,
     ZH_CN,
     DVD_EN,
@@ -1577,7 +1669,8 @@ pub struct ExeTables {
     /// builds' marker is their label, "New Player" (atlantis-cd-en-688128
     /// 0x0048654a), "NOUVEAU JOUEUR" (atlantis-cd-fr-687104 0x00486546,
     /// atlantis-cd-fr-688640 0x0048654a), "NEUER SPIELER"
-    /// (atlantis-cd-de-687104 0x00486546), "Nieuwe speler"
+    /// (atlantis-cd-de-687104 0x00486546, atlantis-cd-de-693248
+    /// 0x0048654a), "Nieuwe speler"
     /// (atlantis-cd-nl-688128 0x0048654a), "Ny spelare"
     /// (atlantis-cd-sv-688128 0x0048654a), "Jugador nuevo"
     /// (atlantis-cd-es-687104 0x00486546), "Nuovo Giocatore"
@@ -1762,6 +1855,10 @@ mod tests {
         assert_eq!(build_of(&nl).unwrap().name, "atlantis-cd-nl-688128");
         let sv = fake_exe(688_128, 0x339e_656f);
         assert_eq!(build_of(&sv).unwrap().name, "atlantis-cd-sv-688128");
+        // The German May 1997 build: a size of its own.
+        let de_may = fake_exe(693_248, 0x3385_89b0);
+        assert_eq!(build_of(&de_may).unwrap().name, "atlantis-cd-de-693248");
+        assert!(build_of(&fake_exe(693_248, 0x3388_6fd1)).is_none());
         // The Chinese builds: sizes of their own.
         let tw = fake_exe(696_832, 0x35af_1f09);
         assert_eq!(build_of(&tw).unwrap().name, "atlantis-cd-zh-tw-696832");
@@ -1778,10 +1875,10 @@ mod tests {
         for b in &BUILDS[..3] {
             assert!(b.off1_player, "{}", b.name);
         }
-        for b in &BUILDS[3..11] {
+        for b in &BUILDS[3..12] {
             assert!(!b.off1_player, "{}", b.name);
         }
-        for b in &BUILDS[..11] {
+        for b in &BUILDS[..12] {
             assert_eq!(b.cjk_breaker, CjkBreaker::None, "{}", b.name);
             assert_eq!(b.subtitle_row_step, 14, "{}", b.name);
             assert_eq!(b.menu_sprite_banks, None, "{}", b.name);
@@ -1889,7 +1986,7 @@ mod tests {
         const { assert!(DVD_SV.name_entry_dos_letters && DVD_SV.dos_subtitle_texts) };
         assert_eq!(DVD_IT.menu_positioned_byte_width, 16);
         assert_eq!(PE_2018.dvd_side(), None);
-        for b in &BUILDS[..13] {
+        for b in &BUILDS[..14] {
             assert!(
                 b.path_check.is_none() && !b.dos_subtitle_texts,
                 "{}",
@@ -1959,13 +2056,16 @@ mod tests {
     }
 
     /// The menus' record table: 16 records per menu in the English May
-    /// 1997 code's English and French builds (`imul eax,eax,0x81`), 20 in
+    /// 1997 code's English, French and German May builds (`imul eax,eax,0x81`), 20 in
     /// the others (`0xa1`, the Dutch and Swedish builds of that code too);
     /// the 1997 players.atl row rule in every 1997 build.
     #[test]
     fn menu_records_and_player_rows() {
         for b in &BUILDS {
-            let short = matches!(b.name, "atlantis-cd-en-688128" | "atlantis-cd-fr-688640");
+            let short = matches!(
+                b.name,
+                "atlantis-cd-en-688128" | "atlantis-cd-fr-688640" | "atlantis-cd-de-693248"
+            );
             assert_eq!(
                 b.menu_records_per_menu,
                 if short { 16 } else { 20 },

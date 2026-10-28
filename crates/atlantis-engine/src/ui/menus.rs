@@ -916,6 +916,7 @@ impl Engine {
         // The port's `ß` fix, for consistency (no known CREDITS.TXT holds 0xe1).
         let text = spell_sharp_s(&text, self.sharp_s_as_ss());
         let events = credits_events(&text, &self.game.exe.credit_widths);
+        let [credblan, credbleu] = self.load_credits_fonts().await;
         let start = self.sys.millis();
         let mut buffer = vec![0u16; N];
         while self.sys.poll_event().is_some() {}
@@ -925,11 +926,7 @@ impl Engine {
                     buffer = self.load_picture(&format!("CREDIT{n:02}.TGA")).await;
                 }
                 CreditsEvent::Glyph { blue, x, y, frame } => {
-                    let bank = if blue {
-                        &self.ui.credbleu
-                    } else {
-                        &self.ui.credblan
-                    };
+                    let bank = if blue { &credbleu } else { &credblan };
                     if let Some(spr) = usize::try_from(frame).ok().and_then(|f| bank.get(f)) {
                         draw_sprite(&mut buffer, spr, x, y);
                     }

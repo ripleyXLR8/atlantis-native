@@ -1,9 +1,11 @@
-//! The game read straight from its CD images: the French, German and
-//! Swedish CDs' ISO images (2048-byte sectors), the English and Dutch CDs'
+//! The game read straight from its CD images: the French, German (both
+//! pressings) and Swedish CDs' ISO images (2048-byte sectors), the English and Dutch CDs'
 //! raw images and the Spanish CD's Alcohol 120% `.mdf` images (2352-byte
 //! sectors), the Italian CD's Nero `.nrg` images (2048-byte sectors after
 //! a 307200-byte lead-in), the Traditional Chinese CD's ISO images and the
 //! Simplified Chinese CD's raw images.
+mod common;
+
 use std::sync::Arc;
 
 use atlantis_data::disc_image::DiscSet;
@@ -46,6 +48,21 @@ fn german_cd_iso_images() {
         assert_eq!(g.edition().to_string(), "CD, German (August 1997 build)");
         assert!(g.big.contains("SPRLIST\\EPI.TXT"));
     }
+}
+
+/// The German CD's first pressing: its four ISO images (only the `.iso`
+/// files of the folder `ATLANTIS_DATA_DE_MAY97` names), its May 1997 build
+/// and its discs' archives.
+#[test]
+fn german_may_cd_iso_images() {
+    let Some(g) = common::game_de_may97("german_may_cd_iso_images") else {
+        return;
+    };
+    assert_eq!(g.exe.build.name, "atlantis-cd-de-693248");
+    assert_eq!(g.edition().to_string(), "CD, German (May 1997 build)");
+    assert!(g.big.contains("WAV\\ATA0897D.APC"));
+    let data = g.big.read("WAV\\ATA0001A.APC").expect("a voice");
+    assert!(data.len() > 1000);
 }
 
 #[test]
