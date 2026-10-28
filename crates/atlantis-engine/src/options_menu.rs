@@ -3,8 +3,8 @@
 //! not have. The game is paused while it is open.
 //!
 //! Entries: the graphics mode (see [`crate::hd`]), on the desktop "Start
-//! in full screen" (the window opens in full screen; F, F11 or Alt+Enter
-//! switching it changes the option too), the three groups of
+//! in full screen" (the window opens in full screen; switching full screen
+//! during a game changes the option too), the three groups of
 //! [`Enhancements`] (the names of the ScummVM port's options): the bug
 //! fixes all on or all off ("Custom (n/N)" when mixed) and "Choose the bug
 //! fixes..." (a box of its own in the same style: all on, all off, one

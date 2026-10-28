@@ -171,7 +171,14 @@ overwrite the stored choices. The web build has the same menu, but for
 two desktop rows: Game library... and Start in full screen (after the HD
 rows; `fullscreen = on|off` in `settings.ini`, read when the window
 opens and when a game starts in a window already open, and set by F,
-F11 and Alt+Enter as they switch; `--fullscreen` forces full screen for
+F11 and Alt+Enter as they switch, and by a change made otherwise while a
+game runs (`App::fullscreen_seen`: the state winit reports, read at the
+window's resize, move, focus, scale and occlusion events and at most
+twice a second at the redraws, compared with the last known one, which
+starts as the state asked for when the window opens, so that Wayland's
+late first report saves nothing; macOS reports its green button's full
+screen as the animation starts; on X11 and Windows winit reports only
+the state it asked for); `--fullscreen` forces full screen for
 the run without writing it; the browser goes full screen only on a user
 gesture). With both, the menu's rows are 20 pixels high instead of 24
 (`OptionsMenu::layout`), to keep a margin on the 640 x 480 screen. The

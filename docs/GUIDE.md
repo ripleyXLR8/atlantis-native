@@ -288,8 +288,11 @@ page also has a **Full screen** button at its top right.
 
 On the desktop the first game opens the way you left it: the options
 menu's **Start in full screen** (F10) opens its window in full screen
-every time, and switching with F, F11 or Alt+Enter while the game runs
-turns that option on or off too. It is kept in the game's `settings.ini`
+every time, and switching full screen while the game runs turns that
+option on or off too: with F, F11 or Alt+Enter, and in other ways the
+system reports to the port (macOS's green button or its View menu, a
+Wayland compositor's own full screen on Linux; Windows and X11 report
+only the port's own switches). It is kept in the game's `settings.ini`
 with the other options (so it survives updates); a window already open
 (the game library's screen) goes to full screen as the game starts.
 `--fullscreen` opens in full screen whatever the option says, without
@@ -684,8 +687,8 @@ so that this set outlives the session as the original's copies do,
 `hd_sharp_subtitles = on|off`, `hd_widescreen = on|off` and
 `hd_video_sides = black|blur|zoom|panorama` (by default `bicubic`, `on`,
 `smooth`, `on`, `off`, `black`), and `fullscreen = on|off`, the options
-menu's **Start in full screen** (`off` by default; F, F11 and Alt+Enter
-set it as they switch).
+menu's **Start in full screen** (`off` by default; switching full screen
+during a game sets it).
 
 The web build keeps its players, checkpoints and settings in the
 browser's storage (`localStorage`, one entry per file, kept per site and

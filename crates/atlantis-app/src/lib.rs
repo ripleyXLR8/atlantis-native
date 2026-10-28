@@ -189,8 +189,16 @@ pub struct App {
     /// The game's "Start in full screen" (its `settings.ini`): the window
     /// opens in full screen, and goes to full screen when the game starts
     /// in a window already open (the game library's, the support
-    /// screen's); F, F11 and Alt+Enter set it as they switch (desktop).
+    /// screen's); switching full screen during a game sets it (desktop).
     fullscreen_setting: bool,
+    /// The window's full screen state as last known (`None` before the
+    /// window opens): a change found by [`App::fullscreen_seen`] that no
+    /// key made (macOS's green button, the window manager) sets the
+    /// setting too while a game runs.
+    known_fullscreen: Option<bool>,
+    /// When the window's full screen state was last read at a redraw.
+    #[cfg(not(target_arch = "wasm32"))]
+    fullscreen_checked: Instant,
     /// The window's icon: the player's atlantis.exe icon.
     icon: Option<atlantis_data::exe_icon::Icon>,
     /// The lock fell back to confining the pointer (Windows, X11): the
@@ -259,6 +267,32 @@ impl App {
         }
     }
 
+    /// The window found in full screen (`actual`) or not: a change from
+    /// the state last known, while a game runs, is the player's choice
+    /// made outside the port's keys (macOS's green button or its own full
+    /// screen, a window manager's): saved as [`App::store_fullscreen`]
+    /// saves the keys'. The first state seen (the window just opened, the
+    /// game library's screen) is only noted. Desktop only: the browser
+    /// leaves full screen on Escape, and the web build has no setting.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn fullscreen_seen(&mut self, actual: bool) {
+        let before = self.known_fullscreen.replace(actual);
+        let changed = before.is_some_and(|b| b != actual);
+        if changed && self.has_game() {
+            self.store_fullscreen(actual);
+        }
+    }
+
+    /// [`App::fullscreen_seen`] with the window's state as winit reports
+    /// it (desktop).
+    #[cfg(not(target_arch = "wasm32"))]
+    fn check_fullscreen(&mut self) {
+        if let Some(full) = self.window.as_ref().map(|w| w.fullscreen().is_some()) {
+            self.fullscreen_checked = Instant::now();
+            self.fullscreen_seen(full);
+        }
+    }
+
     /// A front end for `runner` (the engine task on `sys`), or a test
     /// pattern without one.
     pub fn new(sys: Rc<Sys>, runner: Option<Runner>) -> App {
@@ -295,6 +329,9 @@ impl App {
             title: "Atlantis Native".to_string(),
             start_fullscreen: false,
             fullscreen_setting: false,
+            known_fullscreen: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            fullscreen_checked: now,
             icon: None,
             confined: false,
             focused: true,
@@ -448,6 +485,11 @@ impl App {
                 }
             }
         }
+        // The state the game starts in: a change made before (on the game
+        // library's screen) is not the game's choice.
+        if let Some(w) = &self.window {
+            self.known_fullscreen = Some(self.fullscreen_setting || w.fullscreen().is_some());
+        }
         let now = Instant::now();
         self.start = now;
         self.next_frame = now;
@@ -525,7 +567,10 @@ impl App {
         let full = w.fullscreen().is_some();
         w.set_fullscreen((!full).then_some(Fullscreen::Borderless(None)));
         #[cfg(not(target_arch = "wasm32"))]
-        self.store_fullscreen(!full);
+        {
+            self.known_fullscreen = Some(!full);
+            self.store_fullscreen(!full);
+        }
     }
 
     /// Opens the options menu: the game pauses (its clock and its sound),
@@ -1093,6 +1138,10 @@ impl ApplicationHandler for App {
             attrs.with_append(true)
         };
         let window = Rc::new(el.create_window(attrs).unwrap());
+        // The state asked for, not the one reported yet (Wayland reports
+        // full screen once the compositor has configured the window): the
+        // first events find no change to save.
+        self.known_fullscreen = Some(self.opens_fullscreen());
         // The game draws its own cursors.
         if self.runner.is_some() {
             window.set_cursor_visible(false);
@@ -1208,6 +1257,27 @@ impl ApplicationHandler for App {
         #[cfg(not(target_arch = "wasm32"))]
         if self.support_event(el, &event) || self.launcher_event(el, &event) {
             return;
+        }
+        // Full screen changed outside the port's keys: the events a change
+        // brings (macOS sets the state as its animation starts, and may
+        // report the end of one after its last resize), and at most twice
+        // a second at the redraws for the rest.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let due = matches!(event, WindowEvent::RedrawRequested)
+                && self.fullscreen_checked.elapsed() >= Duration::from_millis(500);
+            if due
+                || matches!(
+                    event,
+                    WindowEvent::Resized(_)
+                        | WindowEvent::Moved(_)
+                        | WindowEvent::Focused(_)
+                        | WindowEvent::ScaleFactorChanged { .. }
+                        | WindowEvent::Occluded(_)
+                )
+            {
+                self.check_fullscreen();
+            }
         }
         match event {
             WindowEvent::CloseRequested => {
@@ -1614,5 +1684,60 @@ mod fullscreen_tests {
         assert!(stored(&store) && app_on(&store).opens_fullscreen());
         app.store_fullscreen(false);
         assert!(!stored(&store) && !app_on(&store).opens_fullscreen());
+    }
+
+    /// A full screen change made outside the port's keys (macOS's green
+    /// button, a window manager) is saved while a game runs, once per real
+    /// change; the first state seen, and any change without a game (the
+    /// game library's screen), only noted.
+    #[test]
+    fn a_change_outside_the_keys_is_saved_in_a_game() {
+        let store = Rc::new(MemStore::new());
+        Settings::default().save(store.as_ref());
+        let saves: Rc<dyn SaveStore> = store.clone();
+        let sys = Sys::new(Mixer::new());
+        let runner = Runner::new(sys.clone(), std::future::pending());
+        let mut app =
+            App::new(sys, Some(runner)).with_graphics(Graphics::Original, Some(saves.clone()));
+        // The window opened as asked (`--fullscreen`, the setting off): the
+        // first report, the same, writes nothing.
+        app = app.with_fullscreen(true);
+        app.known_fullscreen = Some(app.opens_fullscreen());
+        app.fullscreen_seen(true);
+        app.fullscreen_seen(true);
+        assert!(!stored(&store), "--fullscreen is not saved");
+        // The player leaves full screen, then enters it, outside the keys.
+        app.fullscreen_seen(false);
+        assert!(!stored(&store) && !app.menu_values().fullscreen);
+        app.fullscreen_seen(true);
+        assert!(stored(&store) && app.menu_values().fullscreen);
+        // Reports of the same state change nothing (the file not written
+        // again: removed, it stays removed).
+        store.remove(atlantis_engine::persist::SETTINGS_FILE);
+        app.fullscreen_seen(true);
+        assert!(Settings::load(store.as_ref()).is_none());
+        Settings {
+            fullscreen: true,
+            ..Settings::default()
+        }
+        .save(store.as_ref());
+        app.fullscreen_seen(false);
+        assert!(!stored(&store));
+        // Before the window: the first state only noted.
+        let mut fresh = App::new(
+            Sys::new(Mixer::new()),
+            Some(Runner::new(Sys::new(Mixer::new()), std::future::pending())),
+        )
+        .with_graphics(Graphics::Original, Some(saves.clone()));
+        Settings::default().save(store.as_ref());
+        fresh.fullscreen_seen(true);
+        assert!(!stored(&store));
+        // Without a game (the game library's screen): noted, not saved.
+        let mut library =
+            App::new(Sys::new(Mixer::new()), None).with_graphics(Graphics::Original, Some(saves));
+        library.known_fullscreen = Some(false);
+        library.fullscreen_seen(true);
+        assert!(!stored(&store));
+        assert_eq!(library.known_fullscreen, Some(true));
     }
 }

@@ -206,7 +206,7 @@ pub struct Settings {
     /// The HD mode's picture options.
     pub hd: HdOptions,
     /// The window opens in full screen (the options menu's "Start in full
-    /// screen"; switching full screen with F, F11 or Alt+Enter sets it).
+    /// screen"; switching full screen during a game sets it).
     pub fullscreen: bool,
 }
 
@@ -358,8 +358,8 @@ impl Settings {
              hd_sharp_subtitles = {}\n\
              hd_widescreen = {}\n\
              hd_video_sides = {}\n\
-             # The window opens in full screen (options menu, F10; F, F11 or\n\
-             # Alt+Enter switching full screen changes it too)\n\
+             # The window opens in full screen (options menu, F10; switching\n\
+             # full screen during a game changes it too)\n\
              fullscreen = {}\n",
             b(self.subtitles),
             b(self.omni3d_mode2),
