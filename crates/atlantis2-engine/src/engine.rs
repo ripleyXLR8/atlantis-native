@@ -747,9 +747,19 @@ pub struct Engine {
     menu_prev_loop: LoopType,
     /// The player number (@ 0x005dcf70): the saves' file names.
     pub player_number: u8,
-    /// The folder of the saves (`save\` in it) and `atlant2.cfg`; none:
-    /// nothing is read or written.
+    /// The folder of the saves (`save\` in it) and `atlant2.cfg`, when
+    /// they are kept on disk ([`Engine::set_data_dir`]).
     data_dir: Option<std::path::PathBuf>,
+    /// The HD view's renderer outside the engine (the browser's graphics
+    /// card, see [`crate::hd::CubeRenderer`]); with `view_check`, its
+    /// pictures are compared with the engine's (logged) and the engine's
+    /// are shown.
+    pub cube_renderer: Option<Box<dyn crate::hd::CubeRenderer>>,
+    pub view_check: bool,
+    /// Where the saves, `atlant2.cfg` and the music copies are kept (the
+    /// data folder's files, or the browser's storage); none: nothing is
+    /// read or written.
+    store: Option<std::rc::Rc<dyn crate::store::SaveStore>>,
     /// The time a save is stamped with (`GetLocalTime`).
     pub wall_clock: fn() -> atlantis2_data::save::SystemTime,
     /// The load page's text of a save's time: the user's locale's short
@@ -1110,6 +1120,9 @@ impl Engine {
             menu_prev_loop: LoopType::Warp,
             player_number: 0,
             data_dir: None,
+            store: None,
+            cube_renderer: None,
+            view_check: false,
             wall_clock: atlantis2_data::save::SystemTime::default,
             date_text: crate::menu::date_time,
             save_extra: grids::save_extra_at_start(),

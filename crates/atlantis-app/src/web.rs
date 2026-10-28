@@ -15,7 +15,19 @@
 //! `players.atl` and `p<letter><chapter>.gam` of the picked folder, if
 //! any, are read at the start, so that the engine takes them over as the
 //! desktop build does.
+//!
+//! Atlantis II ([`crate::web_layout`] finds it among the picked files):
+//! its engine reads its files when it needs them, as the original does,
+//! and waits for them; the browser reads a picked file only
+//! asynchronously on the page's thread, except through a synchronous
+//! request of a part of it (`XMLHttpRequest` of a `blob:` URL of the
+//! slice, the bytes as `x-user-defined` text), which [`PickedDir`] makes:
+//! each file is read when the engine asks for it, the part it asks for,
+//! never the whole of the 2.4 GB. Its saves, `atlant2.cfg` and
+//! `settings.ini` are kept in `localStorage` under `atlantis-native/atlantis2/`,
+//! one key per file as the first game's.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -30,6 +42,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{File, FileList, Response, Storage};
 use winit::event_loop::EventLoop;
 use winit::platform::web::EventLoopExtWebSys;
+use winit::window::Window;
 
 use crate::{options_with_settings, start_game, App};
 
@@ -246,9 +259,16 @@ fn dvd_files(all: HashMap<String, File>, l: &DvdLanguage, root: &str) -> HashMap
 /// language's folder (`ENG`, ...) once the player chose it: without it,
 /// a DVD of more than one language is refused with the languages found,
 /// `LANGUAGES:` then `folder=language` pairs separated by `;`, for the
-/// page to ask.
+/// page to ask. A folder that holds both games is refused the same way
+/// with `GAMES:` then `id=name` pairs, until the page gives the game
+/// chosen (`game`: `atlantis` or `atlantis2`). Returns the game started
+/// (`atlantis`, `atlantis2`).
 #[wasm_bindgen]
-pub async fn start(files: FileList, language: Option<String>) -> Result<(), JsValue> {
+pub async fn start(
+    files: FileList,
+    language: Option<String>,
+    game: Option<String>,
+) -> Result<JsValue, JsValue> {
     console_error_panic_hook::set_once();
     let _ = console_log::init_with_level(log::Level::Info);
 
@@ -262,6 +282,31 @@ pub async fn start(files: FileList, language: Option<String>) -> Result<(), JsVa
             .and_then(|v| v.as_string())
             .unwrap_or_else(|| f.name());
         all.insert(key(&rel), f);
+    }
+    // Which game: Atlantis II, the first game, or the player's choice.
+    let paths: Vec<&str> = all.keys().map(String::as_str).collect();
+    let a2 = match crate::web_layout::picked(&paths) {
+        crate::web_layout::Picked::Atlantis2(l) => Some(l),
+        crate::web_layout::Picked::Both(l) => match game.as_deref() {
+            Some("atlantis2") => Some(l),
+            Some(_) => None,
+            None => {
+                return Err("GAMES:atlantis=Atlantis: The Lost Tales;atlantis2=Atlantis II".into())
+            }
+        },
+        crate::web_layout::Picked::Atlantis2DiscsOnly => {
+            return Err(format!(
+                "{}\n\nHelp: {}",
+                crate::web_layout::A2_DISCS_ONLY,
+                crate::guide::HELP_URL_A2
+            )
+            .into())
+        }
+        _ => None,
+    };
+    if let Some(layout) = a2 {
+        start_atlantis2(all, layout)?;
+        return Ok("atlantis2".into());
     }
     // Cryo's DVD: one of its languages.
     let mut dvd = atlantis_data::dvd::languages_in_paths(all.keys().map(String::as_str));
@@ -475,5 +520,261 @@ pub async fn start(files: FileList, language: Option<String>) -> Result<(), JsVa
             .with_graphics(graphics, Some(saves))
             .with_edition(&edition, fixes),
     );
+    Ok("atlantis".into())
+}
+
+/// In the browser, outside full screen: the canvas as large as the page
+/// allows (less the frame's margin), 4:3, or wider with the HD mode's
+/// widescreen (`wide`, up to the 2.4:1 its sides reach); the browser then
+/// reports the new size as a resize. Both games' windows.
+pub fn fit_canvas(w: &Window, wide: bool) {
+    use winit::platform::web::WindowExtWebSys;
+    let Some(page) = web_sys::window() else {
+        return;
+    };
+    if page
+        .document()
+        .and_then(|d| d.fullscreen_element())
+        .is_some()
+    {
+        return;
+    }
+    let Some(canvas) = w.canvas() else { return };
+    let size = |v: Result<JsValue, _>| v.ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+    // (16 pixels of margin and the frame's 5 on each side)
+    let page_w = size(page.inner_width());
+    let avail_h = (size(page.inner_height()) - 42.0).max(240.0);
+    // The columns of keys beside the frame (`.keys` in web/index.html):
+    // a 4:3 picture leaves them their room on a page wide enough; a
+    // wide one comes first, the keys showing only in the margins it
+    // leaves.
+    let (avail_w, keys) = if wide {
+        let avail_w = (page_w - 42.0).max(320.0);
+        let w = avail_w.min(avail_h.min(avail_w * 3.0 / 4.0) * 2.4);
+        (avail_w, (page_w - w) / 2.0 >= crate::SIDE_KEYS_WIDTH)
+    } else if page_w >= crate::SIDE_KEYS_MIN_WIDTH {
+        (
+            (page_w - 42.0 - 2.0 * crate::SIDE_KEYS_WIDTH).max(320.0),
+            true,
+        )
+    } else {
+        ((page_w - 42.0).max(320.0), false)
+    };
+    if let Some(body) = page.document().and_then(|d| d.body()) {
+        let _ = body.class_list().toggle_with_force("show-keys", keys);
+    }
+    let h = avail_h.min(avail_w * 3.0 / 4.0);
+    let w = if wide {
+        avail_w.min(h * 2.4)
+    } else {
+        h * 4.0 / 3.0
+    };
+    let (w, h) = (format!("{}px", w.floor()), format!("{}px", h.floor()));
+    let style = canvas.style();
+    if style.get_property_value("width").ok().as_deref() != Some(w.as_str())
+        || style.get_property_value("height").ok().as_deref() != Some(h.as_str())
+    {
+        let _ = style.set_property("width", &w);
+        let _ = style.set_property("height", &h);
+    }
+}
+
+#[wasm_bindgen(inline_js = r#"
+export function read_picked(file, start, end, out) {
+  // A part of a picked file, read at once: a synchronous request of a
+  // blob: URL of the slice (an array buffer is refused to a synchronous
+  // request on the page's thread; the bytes come as x-user-defined text,
+  // each char's low byte).
+  const url = URL.createObjectURL(file.slice(start, end));
+  try {
+    const x = new XMLHttpRequest();
+    x.open("GET", url, false);
+    x.overrideMimeType("text/plain; charset=x-user-defined");
+    x.send();
+    const s = x.responseText;
+    if (x.status !== 200 && x.status !== 0) return false;
+    if (s.length !== out.length) return false;
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return true;
+  } catch (e) {
+    console.warn("read_picked", e);
+    return false;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+"#)]
+extern "C" {
+    /// Bytes `start..end` of `file` into `out` (as long), at once; false
+    /// when the browser could not read them.
+    fn read_picked(file: &File, start: f64, end: f64, out: &mut [u8]) -> bool;
+}
+
+thread_local! {
+    /// The files the player picked (Atlantis II's), by index: a browser's
+    /// `File` stays on the page's thread, the engine's sources hold the
+    /// indices.
+    static PICKED: RefCell<Vec<File>> = const { RefCell::new(Vec::new()) };
+}
+
+/// A read larger than this is made in parts (the text a synchronous
+/// request returns is twice the bytes).
+const READ_PART: u64 = 8 << 20;
+
+/// A read slower than this is logged.
+const SLOW_READ_MS: f64 = 50.0;
+
+/// Reads `len` bytes at `offset` of picked file `index`.
+fn read_picked_part(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
+    PICKED.with(|p| {
+        let files = p.borrow();
+        let f = files.get(index)?;
+        let mut out = vec![0u8; len];
+        let mut at = 0usize;
+        while at < len {
+            let n = (len - at).min(READ_PART as usize);
+            let start = offset + at as u64;
+            if !read_picked(
+                f,
+                start as f64,
+                (start + n as u64) as f64,
+                &mut out[at..at + n],
+            ) {
+                return None;
+            }
+            at += n;
+        }
+        Some(out)
+    })
+}
+
+/// A folder of the picked files (Atlantis II's installed folder, a disc's
+/// copy): its files by their path below it (lower case), read at once
+/// when the engine reads them ([`read_picked`]).
+struct PickedDir {
+    /// Lower-case path below the folder -> (index in [`PICKED`], size).
+    files: HashMap<String, (usize, u64)>,
+}
+
+impl PickedDir {
+    /// The files of `all` (lower-case path -> index) under `prefix`.
+    fn new(all: &HashMap<String, (usize, u64)>, prefix: &str) -> PickedDir {
+        PickedDir {
+            files: all
+                .iter()
+                .filter_map(|(k, v)| k.strip_prefix(prefix).map(|r| (r.to_string(), *v)))
+                .collect(),
+        }
+    }
+}
+
+impl FileSource for PickedDir {
+    fn size(&self, name: &str) -> Option<u64> {
+        self.files.get(&key(name)).map(|&(_, s)| s)
+    }
+
+    fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
+        let &(index, size) = self.files.get(&key(name))?;
+        if offset.checked_add(len as u64)? > size {
+            return None;
+        }
+        let t = web_time::Instant::now();
+        let data = read_picked_part(index, offset, len);
+        let ms = t.elapsed().as_secs_f64() * 1e3;
+        if ms > SLOW_READ_MS {
+            log::info!("{name}: {len} bytes read in {ms:.0} ms");
+        }
+        if data.is_none() {
+            log::warn!("{name}: the browser could not read it");
+        }
+        data
+    }
+
+    fn has_dir(&self, name: &str) -> bool {
+        let prefix = key(name) + "/";
+        self.files.keys().any(|k| k.starts_with(&prefix))
+    }
+
+    /// The files of folder `dir` (lower case).
+    fn list(&self, dir: &str) -> Vec<String> {
+        let prefix = match key(dir) {
+            d if d.is_empty() => d,
+            d => d + "/",
+        };
+        self.files
+            .keys()
+            .filter_map(|k| k.strip_prefix(&prefix))
+            .filter(|n| !n.contains('/'))
+            .map(str::to_string)
+            .collect()
+    }
+}
+
+/// Atlantis II from the picked files: its installed folder and discs
+/// ([`crate::web_layout::A2Layout`]), the saves in the browser's storage,
+/// the player menu under the start-up intro, as the desktop starts it.
+fn start_atlantis2(
+    all: HashMap<String, File>,
+    layout: crate::web_layout::A2Layout,
+) -> Result<(), JsValue> {
+    use atlantis2_data::files::{find_exe, OpenError};
+    let help =
+        |text: &str| -> JsValue { format!("{text}\n\nHelp: {}", crate::guide::HELP_URL_A2).into() };
+    let mut index: HashMap<String, (usize, u64)> = HashMap::new();
+    PICKED.with(|p| {
+        let mut p = p.borrow_mut();
+        p.clear();
+        for (k, f) in all {
+            index.insert(k, (p.len(), f.size() as u64));
+            p.push(f);
+        }
+    });
+    let install = PickedDir::new(&index, &layout.install);
+    let (exe_name, build, _) = find_exe(&install).map_err(|e| match e {
+        OpenError::Exe { name, error } => help(&format!(
+            "This folder holds an Atlantis II program, {name}, that Atlantis Native does not \
+             know ({error}): an edition of the game that is not supported yet.\n\n\
+             Supported: the French CD (1999), the CD with patch 1.01, and GOG.com."
+        )),
+        e => help(&e.to_string()),
+    })?;
+    let discs: Vec<(String, Arc<dyn FileSource>)> = layout
+        .discs
+        .iter()
+        .map(|p| {
+            let name = if p.is_empty() { "/" } else { p.as_str() };
+            (
+                name.to_string(),
+                Arc::new(PickedDir::new(&index, p)) as Arc<dyn FileSource>,
+            )
+        })
+        .collect();
+    let mut files = atlantis2_data::A2Files::new(Arc::new(install), discs);
+    files.set_exe(exe_name, build);
+    let found = files.disc_numbers();
+    if found.is_empty() {
+        return Err(help(crate::web_layout::A2_NO_DISC));
+    }
+    // Every disc at once: the browser cannot be given another one while
+    // the game runs (the desktop's CD page looks in its folders again).
+    let missing: Vec<u8> = (1..=4).filter(|n| !found.contains(n)).collect();
+    if !missing.is_empty() {
+        return Err(help(&crate::web_layout::a2_missing_discs(&missing)));
+    }
+    let store: Rc<dyn SaveStore> = match WebStore::new("atlantis2") {
+        Some(s) => Rc::new(s),
+        None => {
+            log::warn!("no localStorage: the saves last as long as the page");
+            Rc::new(atlantis_engine::MemStore::new())
+        }
+    };
+    let enhancements = crate::a2::load_settings(store.as_ref()).enhancements;
+    let (mut engine, label) =
+        crate::a2::boot_files(files, enhancements, |e| e.set_store(Some(store.clone())))
+            .map_err(|e| help(&e))?;
+    crate::a2::A2Start::default().begin(&mut engine, false)?;
+    log::info!("{label}, {}", crate::version_string());
+    let el = EventLoop::new().map_err(|e| e.to_string())?;
+    el.spawn_app(crate::a2::window_app(engine, &label, false, None));
     Ok(())
 }

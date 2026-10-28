@@ -44,7 +44,8 @@ pub use atlantis_engine::hd::{
     rgb565_to_888, tile_for_output, HdLayer, HdOptions, HdText, PanoFilter, MAX_SIDE_TILES,
     MAX_TILE,
 };
-use atlantis_engine::upscale::PanoramaPrep;
+pub use atlantis_engine::upscale::PanoChanges;
+use atlantis_engine::upscale::{same_pixels, PanoramaPrep};
 
 use crate::subtitle::{SubtitleFont, TextOut};
 
@@ -241,10 +242,43 @@ where
 /// The faces' border in the atlas: each face's edge texels repeated, so
 /// that the filters' taps past a face's edge (the sharpening's 1, the
 /// doubling's 2) read its own edge, never the next face.
-const PAD: usize = 4;
+pub const PAD: usize = 4;
 
 /// A face with its border, in the atlas: the six one under the other.
-const CELL: usize = FACE_SIZE + 2 * PAD;
+pub const CELL: usize = FACE_SIZE + 2 * PAD;
+
+/// What a renderer of the HD view outside the engine needs (the
+/// browser's graphics card: one core draws the view too slowly there):
+/// the view of [`HdPanorama::render`] through the projection of
+/// `matrix`, `proj`, `tile` and `side` ([`HdProjection::new`]), `width`
+/// x `height` pixels, from the prepared atlas `pano` (`pano_size`, the
+/// faces one under the other, [`CELL`] pixels each with their [`PAD`],
+/// twice that when `doubled`), of which the tiles `changes` (squares of
+/// `pano_tile` pixels) changed since the last job.
+pub struct CubeJob<'a> {
+    pub pano: &'a [u32],
+    pub pano_size: (usize, usize),
+    pub pano_tile: usize,
+    pub changes: PanoChanges,
+    pub doubled: bool,
+    pub matrix: [f32; 9],
+    pub proj: [f32; 4],
+    pub tile: usize,
+    pub side: usize,
+    pub width: usize,
+    pub height: usize,
+    /// The drawing's number, which [`HdLayer::card_gen`] names.
+    pub gen: u64,
+}
+
+/// A renderer of the HD view outside the engine ([`crate::Engine::cube_renderer`]).
+pub trait CubeRenderer {
+    /// Draws the view of `job`, kept for the front end's picture
+    /// ([`HdLayer::on_card`]), and into `out` as well when given (read
+    /// back); false when it cannot (the engine then draws it, and the next
+    /// job brings the whole atlas: the renderer forgets its copy).
+    fn render(&mut self, job: CubeJob<'_>, out: Option<&mut [u32]>) -> bool;
+}
 
 /// The panorama the HD view samples: the six faces as drawn (their
 /// sprites in), in XRGB8888, sharpened and doubled as the options say
@@ -266,6 +300,7 @@ impl HdPanorama {
     /// 512 x 512 RGB565 each) and the options; the prepared tiles
     /// computed again.
     pub fn update(&mut self, faces: &[Vec<u16>; 6], opts: &HdOptions) -> usize {
+        let fresh = self.atlas.len() != CELL * 6 * CELL;
         self.atlas.resize(CELL * 6 * CELL, 0);
         for (f, face) in faces.iter().enumerate() {
             assert_eq!(face.len(), FACE_SIZE * FACE_SIZE);
@@ -273,6 +308,11 @@ impl HdPanorama {
                 let sy = r.clamp(PAD, PAD + FACE_SIZE - 1) - PAD;
                 let src = &face[sy * FACE_SIZE..][..FACE_SIZE];
                 let dst = &mut self.atlas[(f * CELL + r) * CELL..][..CELL];
+                // (only the rows that changed: the faces change where a
+                // sprite moves)
+                if !fresh && same_pixels(&dst[PAD..PAD + FACE_SIZE], src) {
+                    continue;
+                }
                 dst[..PAD].fill(src[0]);
                 dst[PAD..PAD + FACE_SIZE].copy_from_slice(src);
                 dst[PAD + FACE_SIZE..].fill(src[FACE_SIZE - 1]);
@@ -281,6 +321,28 @@ impl HdPanorama {
         self.double = opts.panorama == PanoFilter::Bicubic;
         self.prep
             .update(&self.atlas, CELL, opts.sharpen, self.double)
+    }
+
+    /// Keeps the tiles computed again by [`HdPanorama::update`] for an
+    /// outside renderer ([`HdPanorama::take_changes`]).
+    pub fn track_changes(&mut self, on: bool) {
+        self.prep.track = on;
+    }
+
+    /// The prepared atlas (XRGB8888), its size, its tiles' side, whether
+    /// it is doubled.
+    pub fn atlas(&self) -> (&[u32], (usize, usize), usize, bool) {
+        (
+            self.prep.pixels(),
+            self.prep.size(),
+            self.prep.tile_size(),
+            self.double,
+        )
+    }
+
+    /// The atlas's tiles computed again since the last call.
+    pub fn take_changes(&mut self) -> PanoChanges {
+        self.prep.take_changes()
     }
 
     /// The view through `proj`, `width` x `height` pixels, into `out`

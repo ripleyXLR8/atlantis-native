@@ -222,7 +222,7 @@ fn link(gl: &Gl) -> Option<WebGlProgram> {
     link_with(gl, FRAGMENT)
 }
 
-fn link_with(gl: &Gl, fragment: &str) -> Option<WebGlProgram> {
+pub(crate) fn link_with(gl: &Gl, fragment: &str) -> Option<WebGlProgram> {
     let p = gl.create_program()?;
     gl.attach_shader(&p, &shader(gl, Gl::VERTEX_SHADER, VERTEX)?);
     gl.attach_shader(&p, &shader(gl, Gl::FRAGMENT_SHADER, fragment)?);

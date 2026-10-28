@@ -255,11 +255,12 @@ impl Engine {
     /// folder's (the installer's are all empty). Without a data folder
     /// they stay as they are.
     pub(super) fn load_copies(&mut self) {
-        let Some(d) = &self.data_dir else { return };
-        let Ok(text) = std::fs::read_to_string(d.join(COPIES_FILE)) else {
+        let Some(store) = &self.store else { return };
+        let Some(text) = store.read(COPIES_FILE) else {
             self.media.copies = Media::from_install(&self.files).copies;
             return;
         };
+        let text = String::from_utf8_lossy(&text);
         self.media.copies = text
             .lines()
             .map(|l| l.trim().to_ascii_lowercase())
@@ -268,13 +269,10 @@ impl Engine {
     }
 
     fn save_copies(&self) {
-        let Some(d) = &self.data_dir else { return };
+        let Some(store) = &self.store else { return };
         let text: String = self.media.copies.iter().map(|n| format!("{n}\n")).collect();
-        if let Err(e) =
-            std::fs::create_dir_all(d).and_then(|_| std::fs::write(d.join(COPIES_FILE), text))
-        {
-            log::warn!("{COPIES_FILE}: {e}");
-        }
+        // (a failure is logged by the store)
+        store.write(COPIES_FILE, text.as_bytes());
     }
 }
 

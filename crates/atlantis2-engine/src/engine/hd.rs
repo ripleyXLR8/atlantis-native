@@ -14,7 +14,7 @@
 //! mode off, or without an HD size from the front end.
 
 use super::Engine;
-use crate::hd::{DialogHd, HdLayer, HdPanorama, HdProjection, HdTexts, TextFont};
+use crate::hd::{CubeJob, DialogHd, HdLayer, HdPanorama, HdProjection, HdTexts, TextFont};
 
 /// The engine's HD state.
 #[derive(Default)]
@@ -59,6 +59,12 @@ pub(crate) struct HdState {
     /// The web's creatures at the HD size and their Z buffer.
     web_pixels: Vec<u16>,
     web_z: Vec<u32>,
+    /// The last view drawn is on the outside renderer only (its copy here,
+    /// in the layer or `view`, is out of date), as its drawing
+    /// `card_gen`; the projection it was drawn with.
+    on_card: bool,
+    card_gen: u64,
+    view_proj: Option<HdProjection>,
 }
 
 /// What an HD view shows, besides the faces.
@@ -72,6 +78,27 @@ struct ViewKey {
 }
 
 impl HdState {
+    /// The last view drawn copied to the engine's pixels when it is on the
+    /// outside renderer only (a dialog's picture or the web's creatures
+    /// are composed over it here): drawn again by the engine.
+    fn view_to_cpu(&mut self) {
+        if !self.on_card {
+            return;
+        }
+        self.on_card = false;
+        self.layer.on_card = false;
+        let Some(p) = self.view_proj else { return };
+        let (w, h) = (self.layer.width, self.layer.height);
+        let target = if self.view_in_layer {
+            &mut self.layer.pixels
+        } else {
+            &mut self.view
+        };
+        if target.len() >= w * h {
+            self.pano.render(&p, w, h, target);
+        }
+    }
+
     /// The text recorder of the current pass.
     pub(super) fn texts_mut(&mut self) -> &mut HdTexts {
         &mut self.texts
@@ -157,6 +184,19 @@ impl Engine {
         stride: usize,
         area: (usize, usize, usize, usize),
     ) {
+        self.draw_hd_texts_top(out, stride, area, 0);
+    }
+
+    /// [`Engine::draw_hd_texts`] into a premultiplied overlay (`top`
+    /// 0xff: the view on the graphics card under it, see
+    /// [`crate::subtitle::SubtitleFont::draw_hd_top`]).
+    pub fn draw_hd_texts_top(
+        &self,
+        out: &mut [u32],
+        stride: usize,
+        area: (usize, usize, usize, usize),
+        top: u8,
+    ) {
         let Some(t) = self.hd_texts() else { return };
         let popup = self
             .popup_font
@@ -169,7 +209,7 @@ impl Engine {
                 TextFont::Big => self.big_font.as_ref(),
             };
             if let Some(f) = font {
-                f.draw_hd(out, stride, area, &r.call, r.alpha);
+                f.draw_hd_top(out, stride, area, &r.call, r.alpha, top);
             }
         }
     }
@@ -198,6 +238,8 @@ impl Engine {
         hd.dialog.ready = false;
         let Some(tile) = hd.tile else { return };
         let t0 = now();
+        // (the dialog's picture is composed here: the view's pixels)
+        hd.view_to_cpu();
         if hd.view_in_layer {
             std::mem::swap(&mut hd.view, &mut hd.layer.pixels);
             hd.view_in_layer = false;
@@ -238,6 +280,8 @@ impl Engine {
             .base
             .copy_from_slice(&out[..crate::hd::SCREEN_W * crate::hd::SCREEN_H]);
         let options = self.enhancements.hd_options;
+        // (the atlas's changes kept for an outside renderer)
+        hd.pano.track_changes(self.cube_renderer.is_some());
         let changed = hd.pano.update(&self.work, &options);
         let key = ViewKey {
             matrix: matrix.map(f32::to_bits),
@@ -255,10 +299,60 @@ impl Engine {
         } else {
             let p = HdProjection::new(matrix, proj, tile, hd.layer.side);
             let (w, h) = (hd.layer.width, hd.layer.height);
-            hd.pano.render(&p, w, h, &mut hd.layer.pixels);
             hd.view_key = Some(key);
             hd.view_in_layer = true;
+            hd.view_proj = Some(p);
+            // The graphics card's, when the front end lends its renderer.
+            let mut drawn = false;
+            let check = self.view_check;
+            if let Some(r) = self.cube_renderer.as_mut() {
+                hd.card_gen = hd.card_gen.wrapping_add(1);
+                let changes = hd.pano.take_changes();
+                let (pano, pano_size, pano_tile, doubled) = hd.pano.atlas();
+                let job = CubeJob {
+                    pano,
+                    pano_size,
+                    pano_tile,
+                    changes,
+                    doubled,
+                    matrix: *matrix,
+                    proj,
+                    tile,
+                    side: hd.layer.side,
+                    width: w,
+                    height: h,
+                    gen: hd.card_gen,
+                };
+                drawn = r.render(job, check.then_some(&mut hd.layer.pixels[..]));
+                if !drawn {
+                    log::warn!("HD view: the outside renderer failed, drawn by the engine");
+                }
+            }
+            if drawn && check {
+                let mut cpu = vec![0u32; w * h];
+                hd.pano.render(&p, w, h, &mut cpu);
+                let (mut diff, mut worst) = (0usize, 0u32);
+                for (a, b) in cpu.iter().zip(&hd.layer.pixels) {
+                    if a != b {
+                        diff += 1;
+                        for s in [0, 8, 16] {
+                            let d = ((a >> s) & 0xff).abs_diff((b >> s) & 0xff);
+                            worst = worst.max(d);
+                        }
+                    }
+                }
+                log::info!(
+                    "HD view check {w}x{h} tile {tile}: {diff} pixels differ (at most {worst} levels)"
+                );
+                hd.layer.pixels = cpu;
+            }
+            hd.on_card = drawn && !check;
+            if !drawn {
+                hd.pano.render(&p, w, h, &mut hd.layer.pixels);
+            }
         }
+        hd.layer.on_card = hd.on_card && hd.view_in_layer;
+        hd.layer.card_gen = hd.card_gen;
         hd.drew_scene = true;
         hd.drew_video = false;
         if let Some(t0) = t0 {
@@ -278,6 +372,8 @@ impl Engine {
         }
         let Some(tile) = self.hd.tile else { return };
         let t0 = now();
+        // (the creatures are drawn over the view's pixels)
+        self.hd.view_to_cpu();
         let k = self.camera.fpu;
         let (w, h, side) = (
             self.hd.layer.width,
@@ -345,7 +441,7 @@ impl Engine {
         if hd.drew_scene || hd.drew_video {
             hd.shown = hd.drew_scene;
             hd.photo = hd.drew_video;
-        } else if hd.after[..] != out[..] {
+        } else if !atlantis_engine::upscale::same_pixels(&hd.after, out) {
             // Something else was drawn (a menu page).
             hd.shown = false;
             hd.photo = false;

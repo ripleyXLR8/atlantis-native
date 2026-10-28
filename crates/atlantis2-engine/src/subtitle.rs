@@ -613,16 +613,32 @@ impl SubtitleFont {
         &self,
         out: &mut [u32],
         stride: usize,
+        area: (usize, usize, usize, usize),
+        call: &TextOut,
+        alpha: u8,
+    ) {
+        self.draw_hd_top(out, stride, area, call, alpha, 0);
+    }
+
+    /// [`SubtitleFont::draw_hd`] with the colour's top byte `top`: 0xff
+    /// on a premultiplied overlay (the front end's view on the graphics
+    /// card under it, `HdLayer::on_card`), where the glyphs then make
+    /// their own coverage over the transparent pixels; 0 on XRGB pixels.
+    pub fn draw_hd_top(
+        &self,
+        out: &mut [u32],
+        stride: usize,
         (ox, oy, dw, dh): (usize, usize, usize, usize),
         call: &TextOut,
         alpha: u8,
+        top: u8,
     ) {
         let upem = self.font.units_per_em().unwrap_or(2048.0);
         let (sx, sy) = (dw as f32 / 640.0, dh as f32 / 480.0);
         let scale = PxScale::from(f32::from(self.ppem) * sy * self.font.height_unscaled() / upem);
         let base = oy as f32 + (call.y + self.ascent) as f32 * sy;
         let c = call.colour;
-        let colour = (c & 0xff) << 16 | (c & 0xff00) | (c >> 16) & 0xff;
+        let colour = (c & 0xff) << 16 | (c & 0xff00) | (c >> 16) & 0xff | u32::from(top) << 24;
         let (x1, y1) = ((ox + dw) as i32, (oy + dh) as i32);
         let mut pen = call.x;
         for &b in &call.bytes {

@@ -333,6 +333,30 @@ fn double_columns(p: &[u8], w: usize, h: usize) -> Vec<u8> {
     out
 }
 
+/// Whether two runs of 16-bit pixels are equal: `==` does the same, but
+/// in WebAssembly it is `memcmp`'s byte loop, several times slower than
+/// this comparison of 64-bit words (four pixels each) on the large
+/// buffers compared every frame (a panorama, the screen).
+pub fn same_pixels(a: &[u16], b: &[u16]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let word = |c: &[u16]| {
+        u64::from(c[0]) | u64::from(c[1]) << 16 | u64::from(c[2]) << 32 | u64::from(c[3]) << 48
+    };
+    let ((ca, ra), (cb, rb)) = (a.as_chunks::<16>(), b.as_chunks::<16>());
+    for (x, y) in ca.iter().zip(cb) {
+        let d = (word(&x[..4]) ^ word(&y[..4]))
+            | (word(&x[4..8]) ^ word(&y[4..8]))
+            | (word(&x[8..12]) ^ word(&y[8..12]))
+            | (word(&x[12..]) ^ word(&y[12..]));
+        if d != 0 {
+            return false;
+        }
+    }
+    ra == rb
+}
+
 /// The tiles [`PanoramaPrep`] works in, and the source pixels around a
 /// tile its pixels depend on (1 for the sharpening, 2 for the doubling).
 const PT: usize = 64;
@@ -417,18 +441,18 @@ impl PanoramaPrep {
             let s = if double { 2 } else { 1 };
             self.out = vec![0; s * s * w * h];
             (self.w, self.h, self.sharpen, self.double) = (w, h, sharpen, double);
-        } else if surface[..w * h] != self.prev[..] {
+        } else if !same_pixels(&surface[..w * h], &self.prev) {
             // Each changed pixel dirties its tile and the tiles within
             // PM pixels of it (wrapping horizontally).
             for y in 0..h {
                 let (a, b) = (&surface[y * w..][..w], &self.prev[y * w..][..w]);
-                if a == b {
+                if same_pixels(a, b) {
                     continue;
                 }
                 let tys = (y.saturating_sub(PM) / PT)..=((y + PM).min(h - 1) / PT);
                 for tx in 0..tw {
                     let (x0, x1) = (tx * PT, ((tx + 1) * PT).min(w));
-                    if a[x0..x1] == b[x0..x1] {
+                    if same_pixels(&a[x0..x1], &b[x0..x1]) {
                         continue;
                     }
                     let first = (x0..x1).find(|&x| a[x] != b[x]).unwrap_or(x0);
@@ -441,10 +465,17 @@ impl PanoramaPrep {
                         }
                     }
                 }
+                // (the rows that changed only)
+                self.prev[y * w..][..w].copy_from_slice(a);
             }
+        } else {
+            // (unchanged: nothing to compute, nothing to copy)
+            return 0;
         }
-        self.prev.clear();
-        self.prev.extend_from_slice(&surface[..w * h]);
+        if fresh {
+            self.prev.clear();
+            self.prev.extend_from_slice(&surface[..w * h]);
+        }
         let todo: Vec<Vec<usize>> = (0..th)
             .map(|ty| (0..tw).filter(|&tx| dirty[ty * tw + tx]).collect())
             .collect();
@@ -909,19 +940,19 @@ impl InterfaceScaler {
             if self.track {
                 self.changes = PanoChanges::All;
             }
-        } else if screen != self.prev.as_slice() {
+        } else if !same_pixels(screen, &self.prev) {
             // The blocks that changed invalidate themselves and their
             // neighbours (xBR reads 2 source pixels around, 3 at 4x).
             let mut changed = vec![false; BW * BH];
             for by in 0..BH {
                 for y in by * BLOCK..(by + 1) * BLOCK {
                     let r = y * SCREEN_W;
-                    if screen[r..r + SCREEN_W] == self.prev[r..r + SCREEN_W] {
+                    if same_pixels(&screen[r..r + SCREEN_W], &self.prev[r..r + SCREEN_W]) {
                         continue;
                     }
                     for bx in 0..BW {
                         let b = r + bx * BLOCK;
-                        if screen[b..b + BLOCK] != self.prev[b..b + BLOCK] {
+                        if !same_pixels(&screen[b..b + BLOCK], &self.prev[b..b + BLOCK]) {
                             changed[by * BW + bx] = true;
                         }
                     }
@@ -1090,6 +1121,28 @@ pub fn sample_bilinear(
     let top = lerp888(src[r0 + cx.0], src[r0 + cx.1], cx.2);
     let bottom = lerp888(src[r1 + cx.0], src[r1 + cx.1], cx.2);
     lerp888(top, bottom, cy.2)
+}
+
+#[cfg(test)]
+mod same_pixels_tests {
+    use super::same_pixels;
+
+    #[test]
+    fn as_slices_compare() {
+        let a: Vec<u16> = (0..1000u16).map(|i| i.wrapping_mul(7919)).collect();
+        for len in [0, 1, 15, 16, 17, 64, 999, 1000] {
+            let copy = a[..len].to_vec();
+            assert!(same_pixels(&a[..len], &copy));
+            for at in [0, len / 2, len.saturating_sub(1)] {
+                if at < len {
+                    let mut b = a[..len].to_vec();
+                    b[at] ^= 0x8000;
+                    assert!(!same_pixels(&a[..len], &b), "{len} {at}");
+                }
+            }
+        }
+        assert!(!same_pixels(&a[..10], &a[..11]));
+    }
 }
 
 #[cfg(test)]

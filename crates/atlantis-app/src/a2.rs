@@ -89,22 +89,33 @@
 //! original (a click skips one, a double click all of them); `--no-intro`
 //! skips them, `--intro` plays them in a headless run (which otherwise
 //! starts a new game at once) or with `--menu player`.
+//!
+//! The web build runs the same window in the browser (`crate::web` opens
+//! the game from the folder the player picked, `crate::a2_web` holds the
+//! browser's side): the frame presented through WebGL, the saves,
+//! `atlant2.cfg` and `settings.ini` in the browser's storage, the pointer
+//! lock and the sound started on a click (the browser's rule), full screen
+//! through the page.
 
 use std::num::NonZeroU32;
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use atlantis2_data::exe::Release;
+#[cfg(not(target_arch = "wasm32"))]
 use atlantis2_data::files::OpenError;
 use atlantis2_data::save::SystemTime;
 use atlantis2_data::A2Files;
+#[cfg(not(target_arch = "wasm32"))]
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::hd::{picture_rect, side_tiles, tile_for_output, window_to_screen};
 use atlantis2_engine::menu::PageKind;
 use atlantis2_engine::options_menu::{MenuAction, MenuValues, OptionsMenu};
 use atlantis2_engine::settings::{Settings, SETTINGS_FILE};
+use atlantis2_engine::store::SaveStore;
 use atlantis2_engine::{Engine, Enhancements, Fpu, LoopType, Variant};
 use atlantis_engine::hd::{HdCompositor, HdFrame, HdText};
 use atlantis_engine::subtitles::SubtitleFont;
@@ -114,11 +125,16 @@ use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalPosition;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+#[cfg(not(target_arch = "wasm32"))]
+use winit::event_loop::EventLoop;
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
 pub use atlantis2_data::files::holds_atlantis2;
+
+#[cfg(target_arch = "wasm32")]
+use crate::a2_web::{self, WebFront};
 
 /// The original's screen.
 pub const WIDTH: u32 = 640;
@@ -453,6 +469,7 @@ fn local_now() -> SystemTime {
 }
 
 /// The folder of the saves, `atlant2.cfg` and `settings.ini`.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn data_dir() -> PathBuf {
     crate::desktop::data_dir().join("atlantis2")
 }
@@ -460,24 +477,42 @@ pub fn data_dir() -> PathBuf {
 /// Atlantis II's `settings.ini` (the port's options: the enhancements, the
 /// graphics), written with the defaults when there is none, as the first
 /// game's.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn stored_settings() -> Settings {
-    let path = data_dir().join(SETTINGS_FILE);
-    match std::fs::read(&path) {
-        Ok(b) => Settings::parse(&String::from_utf8_lossy(&b)),
-        Err(_) => {
+    load_settings(&atlantis2_engine::store::DirFiles::new(data_dir()))
+}
+
+/// `settings.ini` of `store` (the data folder's, the browser's storage),
+/// written with the defaults when there is none.
+pub fn load_settings(store: &dyn SaveStore) -> Settings {
+    match store.read(SETTINGS_FILE) {
+        Some(b) => Settings::parse(&String::from_utf8_lossy(&b)),
+        None => {
             let s = Settings::default();
-            save_settings(&s);
+            save_settings(store, &s);
             s
         }
     }
 }
 
-/// Writes `settings.ini`.
-fn save_settings(s: &Settings) {
-    let dir = data_dir();
-    let path = dir.join(SETTINGS_FILE);
-    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&path, s.to_text())) {
-        log::warn!("{}: {e}", path.display());
+/// Writes `settings.ini` (a failure is logged by the store).
+fn save_settings(store: &dyn SaveStore, s: &Settings) {
+    store.write(SETTINGS_FILE, s.to_text().as_bytes());
+}
+
+/// Where the window keeps `settings.ini`: beside the engine's saves, or
+/// in the data folder.
+fn settings_store(engine: &Engine) -> Rc<dyn SaveStore> {
+    if let Some(s) = engine.store() {
+        return s.clone();
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        Rc::new(atlantis2_engine::store::DirFiles::new(data_dir()))
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        Rc::new(atlantis_engine::MemStore::new())
     }
 }
 
@@ -485,6 +520,7 @@ fn save_settings(s: &Settings) {
 /// drawn by `warpPII` (the reference renderer) for a process whose x87
 /// control word starts as Win32's default.
 /// Returns the engine and the game's release (for the options menu).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn open(
     dir: &Path,
     discs: &[PathBuf],
@@ -498,18 +534,33 @@ pub fn open(
 
 /// The game folder opened and the game booted, with its saves' folder
 /// and the enhancements asked for; the game's release.
+#[cfg(not(target_arch = "wasm32"))]
 fn boot(
     dir: &Path,
     discs: &[PathBuf],
     enhancements: Enhancements,
 ) -> Result<(Engine, String), String> {
-    let (files, build) = A2Files::open_dir(dir, discs).map_err(|e| match e {
+    let (files, _) = A2Files::open_dir(dir, discs).map_err(|e| match e {
         OpenError::NoDisc => format!(
             "{}: {e}, or give their folder with --discs <folder>",
             dir.display()
         ),
         e => format!("{}: {e}", dir.display()),
     })?;
+    boot_files(files, enhancements, |e| e.set_data_dir(Some(data_dir())))
+        .map_err(|e| format!("{}: {e}", dir.display()))
+}
+
+/// The game booted from its files (their executable set), with the
+/// enhancements asked for, `saves` giving the engine its saves' store
+/// (the data folder, the browser's storage); the engine and the game's
+/// release.
+pub fn boot_files(
+    files: A2Files,
+    enhancements: Enhancements,
+    saves: impl FnOnce(&mut Engine),
+) -> Result<(Engine, String), String> {
+    let build = files.build();
     log::info!(
         "{} ({}), discs {:?}",
         build.label,
@@ -519,9 +570,9 @@ fn boot(
     // Start-up: the script tables and chapter 0; the player menu or a new
     // game follows.
     let mut engine = Engine::boot(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
-        .map_err(|e| format!("{}: {e}", dir.display()))?;
+        .map_err(|e| e.to_string())?;
     engine.enhancements = enhancements;
-    engine.set_data_dir(Some(data_dir()));
+    saves(&mut engine);
     engine.wall_clock = local_now;
     #[cfg(windows)]
     {
@@ -529,8 +580,8 @@ fn boot(
     }
     // The original seeds `rand` with GetTickCount() at start-up
     // (@ 0x0047d740): a clock in milliseconds (`--seed` fixes it).
-    let seed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    let seed = web_time::SystemTime::now()
+        .duration_since(web_time::SystemTime::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u32);
     engine.seed_rand(seed);
     Ok((engine, format!("Game: {}", build.label)))
@@ -539,6 +590,7 @@ fn boot(
 /// `--headless`: runs `frames` frames of [`PASS`] without input (the 15 Hz
 /// ticks run on the scheduler's clock), prints where the game is, and writes the
 /// screen to `screenshot` (PNG) when given.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn headless(
     dir: &Path,
     discs: &[PathBuf],
@@ -710,6 +762,7 @@ fn menu_values(engine: &Engine) -> MenuValues {
 
 /// Opens a window on the game; returns when it is closed. `label` names
 /// the game's release in the options menu.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_window(
     engine: Engine,
     label: String,
@@ -738,6 +791,7 @@ pub enum Ended {
 /// `shift_grace` (the library's one game, started without its screen)
 /// Shift held in the first moments goes back to the library, as the
 /// first game's start does ([`crate::session::Session::shift_grace`]).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_window_on(
     el: &mut EventLoop<()>,
     engine: Engine,
@@ -760,22 +814,38 @@ pub fn run_window_on(
 
 /// How long after an automatic start Shift still goes back to the game
 /// library (the first game's delay).
+#[cfg(not(target_arch = "wasm32"))]
 const SHIFT_GRACE: Duration = Duration::from_millis(2000);
 
-/// The window's application: the game, its sound started.
-fn window_app(engine: Engine, label: &str, fullscreen: bool, size: Option<(u32, u32)>) -> A2App {
+/// The game's sound output: its voices, silent while the game is held
+/// (`paused`).
+fn open_audio(engine: &Engine, paused: &Arc<AtomicBool>) -> Option<cpal::Stream> {
     let voices = engine.voices().clone();
-    // The sound stops while the game is held (the options menu open, the
-    // window without the focus): silence, the voices kept where they are.
-    let paused = Arc::new(AtomicBool::new(false));
     let silent = paused.clone();
-    let audio = crate::audio_out::start_with(move |out, rate, channels| {
+    crate::audio_out::start_with(move |out, rate, channels| {
         if silent.load(Ordering::Relaxed) {
             out.fill(0.0);
         } else {
             voices.fill(out, rate, channels);
         }
-    });
+    })
+}
+
+/// The window's application: the game, its sound started (in the
+/// browser, at the first click or key).
+pub fn window_app(
+    engine: Engine,
+    label: &str,
+    fullscreen: bool,
+    size: Option<(u32, u32)>,
+) -> A2App {
+    // The sound stops while the game is held (the options menu open, the
+    // window without the focus): silence, the voices kept where they are.
+    let paused = Arc::new(AtomicBool::new(false));
+    #[cfg(not(target_arch = "wasm32"))]
+    let audio = open_audio(&engine, &paused);
+    #[cfg(target_arch = "wasm32")]
+    let audio = None;
     A2App::new(
         engine,
         label,
@@ -832,6 +902,16 @@ impl GameClock {
         }
     }
 
+    /// The time from `from` to `to` not counted (a gap of the browser's
+    /// redraws), unless the clock is held already.
+    #[cfg(any(target_arch = "wasm32", test))]
+    fn skip(&mut self, from: Instant, to: Instant) {
+        if !self.held() {
+            self.hold(from);
+            self.release(to);
+        }
+    }
+
     /// Its time at `now`, seconds.
     fn secs(&self, now: Instant) -> f64 {
         self.held_since
@@ -866,8 +946,12 @@ impl A2App {
         // ([`A2App::play_silent`]), so the voices still end.
         engine.voices().attach_output();
         let silent = audio.is_none().then_some(0);
+        let settings = settings_store(&engine);
         A2App {
             _audio: audio,
+            settings,
+            #[cfg(target_arch = "wasm32")]
+            web: WebFront::new(),
             silent,
             clock: GameClock::new(now),
             engine,
@@ -898,6 +982,7 @@ impl A2App {
 
     /// Started from the game library: the options menu's "Game
     /// library..." entry, and Shift until `shift_until` goes back to it.
+    #[cfg(not(target_arch = "wasm32"))]
     fn started_from_library(&mut self, shift_until: Option<Instant>) {
         self.menu.set_library(true);
         self.shift_until = shift_until;
@@ -913,9 +998,14 @@ impl A2App {
     }
 }
 
-struct A2App {
+pub struct A2App {
     /// The sound output (kept alive while the window is open).
     _audio: Option<cpal::Stream>,
+    /// Where `settings.ini` is kept.
+    settings: Rc<dyn SaveStore>,
+    /// The browser's side of the window.
+    #[cfg(target_arch = "wasm32")]
+    web: WebFront,
     /// Without a sound output: the primary frames the mix has been played
     /// to so far, on the game's clock.
     silent: Option<u64>,
@@ -970,6 +1060,14 @@ impl A2App {
     /// Full screen or window (F11; Alt+Enter with 1.00), the choice kept
     /// in `atlant2.cfg`'s byte 8 as the original's Alt+Enter keeps it.
     fn toggle_fullscreen(&mut self) {
+        // In the browser, the page's own full screen (it fits the canvas
+        // to the screen); the choice is not kept.
+        #[cfg(target_arch = "wasm32")]
+        {
+            a2_web::toggle_fullscreen();
+            return;
+        }
+        #[allow(unreachable_code)]
         if let Some(w) = &self.window {
             let full = w.fullscreen().is_none();
             w.set_fullscreen(full.then_some(Fullscreen::Borderless(None)));
@@ -981,6 +1079,21 @@ impl A2App {
     /// original (which reads DirectInput's relative motion).
     fn grab(&mut self, on: bool) {
         let Some(w) = &self.window else { return };
+        // The browser: asked for now, granted or not a moment later (see
+        // [`A2App::sync_lock`]); the lock hides the pointer itself.
+        #[cfg(target_arch = "wasm32")]
+        {
+            if on {
+                self.web.lock_asked = Some(Instant::now());
+                a2_web::request_lock(w);
+            } else {
+                a2_web::exit_lock();
+                w.set_cursor_visible(true);
+            }
+            self.locked = on;
+            return;
+        }
+        #[allow(unreachable_code)]
         if on {
             let ok = w.set_cursor_grab(CursorGrabMode::Locked).is_ok()
                 || w.set_cursor_grab(CursorGrabMode::Confined).is_ok();
@@ -1007,7 +1120,8 @@ impl A2App {
             if let Some(w) = &self.window {
                 w.set_cursor_visible(false);
             }
-        } else if !in_menu && !self.locked && self.focused {
+        } else if !in_menu && !self.locked && self.focused && cfg!(not(target_arch = "wasm32")) {
+            // (in the browser the lock is asked for on a click only)
             self.grab(true);
             // A press after this pass is not the one that gave the focus:
             // grabbed, it reaches the game anyway; not grabbed (both grab
@@ -1030,13 +1144,14 @@ impl A2App {
         if (dx != 0 || dy != 0) && !in_menu {
             self.engine.mouse_motion(dx, dy);
         }
+        #[cfg(target_arch = "wasm32")]
+        a2_web::run_test_commands(&mut self.engine, &mut self.web.times);
         // The pass's time is the one it was due at, as the original's
         // passes keep the pace of the screen's refresh.
         self.engine.set_clock(self.clock.secs(self.next_frame));
         self.play_silent();
-        if let Some(size) = self.window.as_ref().map(|w| w.inner_size()) {
-            self.picture
-                .prepare(&mut self.engine, size.width as usize, size.height as usize);
+        if let Some((w, h)) = self.frame_size() {
+            self.picture.prepare(&mut self.engine, w, h);
         }
         // The screen's size: 800 x 600 after the original's option.
         let (w, h) = self.engine.screen_size();
@@ -1085,6 +1200,20 @@ impl A2App {
             ((v - o as i64) * n as i64).div_euclid(d as i64) as i32
         };
         Some((map(x, ox, dw, lw), map(y, oy, dh, lh)))
+    }
+
+    /// The size the frame is composed at: the window's (in the browser
+    /// with WebGL, at most `crate::WEB_MAX_PIXELS` of it, see
+    /// [`WebFront::frame_size`]).
+    fn frame_size(&self) -> Option<(usize, usize)> {
+        let size = self.window.as_ref()?.inner_size();
+        #[cfg(target_arch = "wasm32")]
+        return Some(
+            self.web
+                .frame_size((size.width, size.height), self.engine.enhancements.hd),
+        );
+        #[cfg(not(target_arch = "wasm32"))]
+        Some((size.width as usize, size.height as usize))
     }
 
     /// The logical size: what the engine's pointer is in.
@@ -1142,6 +1271,7 @@ impl A2App {
 
     /// The window gains or loses the focus at `now`: without it the game
     /// is held ([`must_hold`]).
+    #[cfg(not(target_arch = "wasm32"))]
     fn set_focus(&mut self, on: bool, now: Instant) {
         self.focused = on;
         if !on {
@@ -1167,6 +1297,17 @@ impl A2App {
     /// A redraw at `now`: the game's pass when one is due and the game is
     /// not held; whether it ran.
     fn redraw(&mut self, now: Instant) -> bool {
+        // The browser paces the redraws itself (one a screen refresh): a
+        // pass is run when it is due within a few milliseconds, a pause of
+        // the redraws (the tab hidden) not counted as game time.
+        #[cfg(target_arch = "wasm32")]
+        let now = {
+            if let Some((from, to)) = self.web.gap(now) {
+                self.clock.skip(from + FRAME, to);
+                self.next_frame = to;
+            }
+            now + Duration::from_millis(4)
+        };
         if now < self.next_frame || self.clock.held() {
             return false;
         }
@@ -1191,9 +1332,9 @@ impl A2App {
                 // the run without changing `settings.ini`.
                 let before = std::mem::replace(&mut self.engine.enhancements, x);
                 log::info!("enhancements: {x:?}");
-                let mut s = stored_settings();
+                let mut s = load_settings(self.settings.as_ref());
                 s.enhancements = s.enhancements.with_changes(&before, &x);
-                save_settings(&s);
+                save_settings(self.settings.as_ref(), &s);
             }
             MenuAction::SetScreen800(on) => {
                 // The original's option: the screen changes at the next
@@ -1213,6 +1354,10 @@ impl A2App {
     /// kept in proportion, black bars), or in the HD mode the composition
     /// of the HD view and the upscaled screen; the options menu over it.
     fn present(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        if self.present_web() {
+            return;
+        }
         let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
             return;
         };
@@ -1228,27 +1373,179 @@ impl A2App {
             return;
         };
         let (ww, wh) = (size.width as usize, size.height as usize);
-        let screen = if self.menu.is_open() {
-            let (sw, sh) = screen_dims(&self.screen);
-            self.shown.clone_from(&self.screen);
-            let values = menu_values(&self.engine);
-            // Its text drawn sharp in the HD mode, as the first game's.
-            self.menu.draw_recording(
-                &mut self.shown,
-                sw,
-                sh,
-                &self.font,
-                values,
-                Some(&mut self.menu_text),
-            );
+        let screen = if draw_menu(
+            &self.menu,
+            &self.engine,
+            &self.screen,
+            &mut self.shown,
+            &self.font,
+            &mut self.menu_text,
+        ) {
             &self.shown
         } else {
-            self.menu_text.items.clear();
             &self.screen
         };
         self.picture
             .compose_with_text(&self.engine, screen, &self.menu_text, &mut buf, ww, wh);
         let _ = buf.present();
+    }
+}
+
+/// The options menu drawn over the screen into `shown` when it is open
+/// (true then), its text recorded to be drawn sharp in the HD mode, as the
+/// first game's; its text cleared otherwise.
+fn draw_menu(
+    menu: &OptionsMenu,
+    engine: &Engine,
+    screen: &[u16],
+    shown: &mut Vec<u16>,
+    font: &SubtitleFont,
+    text: &mut HdText,
+) -> bool {
+    if !menu.is_open() {
+        text.items.clear();
+        return false;
+    }
+    let (sw, sh) = screen_dims(screen);
+    shown.clear();
+    shown.extend_from_slice(screen);
+    menu.draw_recording(shown, sw, sh, font, menu_values(engine), Some(text));
+    true
+}
+
+/// The browser's side of the window (see [`crate::a2_web`]).
+#[cfg(target_arch = "wasm32")]
+impl A2App {
+    /// The first click or key (a user gesture): the sound starts, which a
+    /// browser allows only then.
+    fn gesture(&mut self) {
+        if !self.web.audio_pending {
+            return;
+        }
+        self.web.audio_pending = false;
+        self._audio = open_audio(&self.engine, &self.paused);
+        if self._audio.is_some() {
+            // The output plays the voices out from now on.
+            self.silent = None;
+        }
+    }
+
+    /// The pointer lock as the page holds it: lost (Escape, another
+    /// window), the system pointer is shown and the next click only takes
+    /// the lock back; refused (no lock in this browser), clicks act at
+    /// once and the arrow keys turn the view.
+    fn sync_lock(&mut self) {
+        if a2_web::pointer_locked() {
+            self.web.lock_seen = true;
+            return;
+        }
+        if !self.locked {
+            return;
+        }
+        let pending = self
+            .web
+            .lock_asked
+            .is_some_and(|t| t.elapsed() < a2_web::LOCK_GRACE);
+        if pending && !self.web.lock_seen {
+            return;
+        }
+        self.locked = false;
+        if self.web.lock_seen {
+            self.refocused = true;
+        } else if !self.web.lock_refused {
+            log::info!("pointer lock refused: clicks act at once, the arrow keys turn the view");
+            self.web.lock_refused = true;
+        }
+        self.web.lock_seen = false;
+        if self.engine.loop_type != LoopType::Menu {
+            if let Some(w) = &self.window {
+                w.set_cursor_visible(true);
+            }
+        }
+    }
+
+    /// A redraw of the browser's: the canvas fitted to the page, the pass
+    /// when one is due, the frame presented when it changed, the next
+    /// redraw asked for (one per screen refresh).
+    fn redraw_web(&mut self, el: &ActiveEventLoop) {
+        let Some(window) = self.window.clone() else {
+            return;
+        };
+        let wide = self.engine.enhancements.hd && self.engine.enhancements.hd_options.widescreen;
+        crate::web::fit_canvas(&window, wide);
+        self.sync_lock();
+        let now = Instant::now();
+        let ran = self.redraw(now);
+        let pass = now.elapsed();
+        // `EXIT` in a script, or the menus, quit the game: the page goes
+        // back to its start.
+        if ran && self.engine.quit() {
+            self.engine.at_exit();
+            a2_web::quit();
+            el.exit();
+            return;
+        }
+        self.web.keep_cfg(&self.engine, now);
+        let size = window.inner_size();
+        let resized = self.web.resized((size.width, size.height));
+        if ran || resized || self.menu.is_open() {
+            let t = Instant::now();
+            self.present();
+            if ran {
+                let kind = a2_web::frame_kind(&self.engine, self.menu.is_open());
+                self.web.times.add(
+                    kind,
+                    pass.as_secs_f64() * 1e3,
+                    t.elapsed().as_secs_f64() * 1e3,
+                );
+            }
+        }
+        if ran && self.web.state_due() {
+            a2_web::record_state(&self.engine, &self.web.times, self._audio.is_some());
+        }
+        window.request_redraw();
+    }
+
+    /// The frame presented through WebGL (see [`WebFront::present`]); false
+    /// without WebGL (the 2D canvas then, as on the desktop).
+    fn present_web(&mut self) -> bool {
+        let Some(window) = &self.window else {
+            return true;
+        };
+        if self.web.gl.is_none() {
+            return false;
+        }
+        let size = window.inner_size();
+        if size.width == 0 || size.height == 0 {
+            return true;
+        }
+        let menu = draw_menu(
+            &self.menu,
+            &self.engine,
+            &self.screen,
+            &mut self.shown,
+            &self.font,
+            &mut self.menu_text,
+        );
+        let screen: &[u16] = if menu { &self.shown } else { &self.screen };
+        let (sw, sh) = screen_dims(screen);
+        let hd = self.engine.enhancements.hd;
+        // The view on the graphics card: its drawing and its width beside
+        // the picture's (the widescreen sides).
+        let card = self
+            .engine
+            .hd_layer()
+            .filter(|l| hd && l.on_card)
+            .map(|l| (l.card_gen, l.width, l.side));
+        let (picture, engine, text) = (&mut self.picture, &self.engine, &self.menu_text);
+        self.web.present(
+            (size.width, size.height),
+            hd,
+            (screen, sw, sh),
+            card,
+            |out, w, h| picture.compose_with_text(engine, screen, text, out, w, h),
+        );
+        true
     }
 }
 
@@ -1281,6 +1578,12 @@ impl ApplicationHandler for A2App {
         if self.fullscreen {
             attrs = attrs.with_fullscreen(Some(Fullscreen::Borderless(None)));
         }
+        #[cfg(target_arch = "wasm32")]
+        let attrs = {
+            use winit::platform::web::WindowAttributesExtWebSys;
+            // (the page's full screen only, on the player's request)
+            attrs.with_append(true).with_fullscreen(None)
+        };
         let window = match el.create_window(attrs) {
             Ok(w) => Rc::new(w),
             Err(e) => {
@@ -1289,16 +1592,39 @@ impl ApplicationHandler for A2App {
                 return;
             }
         };
-        let context = softbuffer::Context::new(window.clone()).unwrap();
-        self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
+        #[cfg(target_arch = "wasm32")]
+        self.web.attach(&window, &mut self.engine);
+        #[cfg(target_arch = "wasm32")]
+        let soft = self.web.gl.is_none();
+        #[cfg(not(target_arch = "wasm32"))]
+        let soft = true;
+        if soft {
+            let context = softbuffer::Context::new(window.clone()).unwrap();
+            self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
+        }
         self.window = Some(window);
+        // (the browser: on the first click)
+        #[cfg(not(target_arch = "wasm32"))]
         self.grab(true);
+        #[cfg(target_arch = "wasm32")]
+        if let Some(w) = &self.window {
+            w.set_cursor_visible(false);
+            w.request_redraw();
+        }
         let (w, h) = self.engine.screen_size();
         self.screen.resize(w * h, 0);
         self.engine.render(&mut self.screen);
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        // In the browser the redraws keep themselves going (see
+        // RedrawRequested).
+        #[cfg(target_arch = "wasm32")]
+        {
+            el.set_control_flow(ControlFlow::Wait);
+            return;
+        }
+        #[allow(unreachable_code)]
         if Instant::now() >= self.next_frame {
             if let Some(w) = &self.window {
                 w.request_redraw();
@@ -1383,6 +1709,17 @@ impl ApplicationHandler for A2App {
                 self.engine.at_exit();
                 el.exit();
             }
+            // In the browser the canvas loses the focus to the page's own
+            // buttons: the game is held only while the tab is hidden (see
+            // [`A2App::redraw`]); the keys held are let go.
+            #[cfg(target_arch = "wasm32")]
+            WindowEvent::Focused(on) => {
+                if !on {
+                    self.keys = [false; 4];
+                    self.alt_left = false;
+                }
+            }
+            #[cfg(not(target_arch = "wasm32"))]
             WindowEvent::Focused(on) => self.set_focus(on, Instant::now()),
             // The window's pointer is the game's in the menus (and while
             // the mouse is not held); held, the raw motion moves it (the
@@ -1404,6 +1741,10 @@ impl ApplicationHandler for A2App {
             WindowEvent::MouseInput { state, button, .. } => {
                 let now = self.clock.secs(Instant::now());
                 let pressed = state == ElementState::Pressed;
+                #[cfg(target_arch = "wasm32")]
+                if pressed {
+                    self.gesture();
+                }
                 let focus_click = self.focus_click(pressed);
                 if mouse_button(
                     &mut self.engine,
@@ -1418,6 +1759,10 @@ impl ApplicationHandler for A2App {
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let down = event.state == ElementState::Pressed;
+                #[cfg(target_arch = "wasm32")]
+                if down {
+                    self.gesture();
+                }
                 let code = match event.physical_key {
                     PhysicalKey::Code(c) => Some(c),
                     PhysicalKey::Unidentified(_) => None,
@@ -1439,6 +1784,18 @@ impl ApplicationHandler for A2App {
                     Key::Named(NamedKey::ArrowUp) => self.keys[2] = down,
                     Key::Named(NamedKey::ArrowDown) => self.keys[3] = down,
                     Key::Named(NamedKey::F11) if down => self.toggle_fullscreen(),
+                    // F too in the browser, as the first game's page, but
+                    // not in the game's menus (a player's name is typed
+                    // there).
+                    Key::Character(ref c)
+                        if cfg!(target_arch = "wasm32")
+                            && down
+                            && !event.repeat
+                            && !in_menu
+                            && c.eq_ignore_ascii_case("f") =>
+                    {
+                        self.toggle_fullscreen()
+                    }
                     // Alt+Enter: full screen or window, as 1.00's key-down
                     // callback switches (@ 0x004762f0: the main Enter,
                     // `DIK_RETURN`, while the key state @ 0x006e2b6c of the
@@ -1466,6 +1823,7 @@ impl ApplicationHandler for A2App {
                     _ => {}
                 }
             }
+            #[cfg(not(target_arch = "wasm32"))]
             WindowEvent::RedrawRequested => {
                 // `EXIT` in a script, or the menus, quit the game.
                 if self.redraw(Instant::now()) && self.engine.quit() {
@@ -1474,6 +1832,8 @@ impl ApplicationHandler for A2App {
                 }
                 self.present();
             }
+            #[cfg(target_arch = "wasm32")]
+            WindowEvent::RedrawRequested => self.redraw_web(el),
             _ => {}
         }
     }
@@ -1655,11 +2015,19 @@ impl Picture {
             // own texts again then).
             let redraw = HdCompositor::uncovers_texts(&f, opts, ox);
             let rect = (ox, oy, dw, dh);
+            // The view on the graphics card (the browser's): the picture
+            // is an overlay with holes over it, the texts drawn with
+            // their coverage.
+            let top = if f.layer.is_some_and(|l| l.on_card) {
+                0xff
+            } else {
+                0
+            };
             if redraw && menu {
                 // The game's texts under the options menu's.
                 self.compositor
                     .compose_with(f, opts, out, width, rect, false);
-                engine.draw_hd_texts(out, width, rect);
+                engine.draw_hd_texts_top(out, width, rect, top);
                 let menu_only = [text];
                 let f = HdFrame {
                     texts: &menu_only,
@@ -1670,7 +2038,7 @@ impl Picture {
             }
             self.compositor.compose(f, opts, out, width, ox, oy, dw, dh);
             if redraw {
-                engine.draw_hd_texts(out, width, rect);
+                engine.draw_hd_texts_top(out, width, rect, top);
             }
             return;
         }
@@ -1698,6 +2066,7 @@ impl Picture {
 
 /// The frame times of a headless run in the HD mode.
 #[derive(Default)]
+#[cfg(not(target_arch = "wasm32"))]
 struct Timings {
     /// Frames with an HD view: the pass (the view included), the view,
     /// the composition, in seconds; the slowest frame.
@@ -1713,6 +2082,7 @@ struct Timings {
     other_compose: f64,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Timings {
     fn add(&mut self, engine: &Engine, pass: Duration, compose: Duration) {
         let (p, c) = (pass.as_secs_f64(), compose.as_secs_f64());
@@ -1749,7 +2119,7 @@ impl Timings {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
 
@@ -1775,6 +2145,14 @@ mod tests {
         assert!(!c.held());
         assert_eq!(c.secs(at(10.0)), 2.0);
         assert_eq!(c.secs(at(11.5)), 3.5);
+        // The browser's gap (the tab hidden from 12 s to 20 s): not
+        // counted; a gap while held changes nothing.
+        c.skip(at(12.0), at(20.0));
+        assert_eq!(c.secs(at(21.0)), 5.0);
+        c.hold(at(21.0));
+        c.skip(at(22.0), at(30.0));
+        assert!(c.held());
+        assert_eq!(c.secs(at(31.0)), 5.0);
     }
 
     /// With the game (`ATLANTIS2_DATA`, `ATLANTIS2_DISCS`; skipped

@@ -48,6 +48,7 @@ pub mod raster3d;
 pub mod script;
 pub mod settings;
 pub mod sound;
+pub mod store;
 pub mod subjects;
 pub mod subtitle;
 pub mod turn;

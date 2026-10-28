@@ -28,12 +28,15 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
-#[cfg(not(target_arch = "wasm32"))]
 pub mod a2;
+#[cfg(target_arch = "wasm32")]
+mod a2_web;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
 pub mod dock_icon;
+#[cfg(target_arch = "wasm32")]
+mod gl_cube;
 #[cfg(target_arch = "wasm32")]
 mod gl_present;
 pub mod guide;
@@ -51,6 +54,7 @@ pub mod support;
 pub mod watchdog;
 #[cfg(target_arch = "wasm32")]
 mod web;
+pub mod web_layout;
 
 const W: usize = SCREEN_W;
 const H: usize = SCREEN_H;
@@ -686,60 +690,13 @@ impl App {
         }
     }
 
-    /// In the browser, outside full screen: the canvas as large as the
-    /// page allows (less the frame's margin), 4:3, or wider with the HD
-    /// mode's widescreen (up to the 2.4:1 its sides reach); the browser
-    /// then reports the new size as a resize.
+    /// In the browser, outside full screen: the canvas fitted to the page
+    /// ([`web::fit_canvas`]), wider with the HD mode's widescreen.
     #[cfg(target_arch = "wasm32")]
     fn fit_canvas(&self) {
-        use winit::platform::web::WindowExtWebSys;
-        let (Some(w), Some(page)) = (&self.window, web_sys::window()) else {
-            return;
-        };
-        if page
-            .document()
-            .and_then(|d| d.fullscreen_element())
-            .is_some()
-        {
-            return;
-        }
-        let Some(canvas) = w.canvas() else { return };
-        let size =
-            |v: Result<wasm_bindgen::JsValue, _>| v.ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
-        // (16 pixels of margin and the frame's 5 on each side)
-        let page_w = size(page.inner_width());
-        let avail_h = (size(page.inner_height()) - 42.0).max(240.0);
+        let Some(w) = &self.window else { return };
         let wide = self.graphics == Graphics::Hd && self.sys.hd_options().widescreen;
-        // The columns of keys beside the frame (`.keys` in web/index.html):
-        // a 4:3 picture leaves them their room on a page wide enough; a
-        // wide one comes first, the keys showing only in the margins it
-        // leaves.
-        let (avail_w, keys) = if wide {
-            let avail_w = (page_w - 42.0).max(320.0);
-            let w = avail_w.min(avail_h.min(avail_w * 3.0 / 4.0) * 2.4);
-            (avail_w, (page_w - w) / 2.0 >= SIDE_KEYS_WIDTH)
-        } else if page_w >= SIDE_KEYS_MIN_WIDTH {
-            ((page_w - 42.0 - 2.0 * SIDE_KEYS_WIDTH).max(320.0), true)
-        } else {
-            ((page_w - 42.0).max(320.0), false)
-        };
-        if let Some(body) = page.document().and_then(|d| d.body()) {
-            let _ = body.class_list().toggle_with_force("show-keys", keys);
-        }
-        let h = avail_h.min(avail_w * 3.0 / 4.0);
-        let w = if wide {
-            avail_w.min(h * 2.4)
-        } else {
-            h * 4.0 / 3.0
-        };
-        let (w, h) = (format!("{}px", w.floor()), format!("{}px", h.floor()));
-        let style = canvas.style();
-        if style.get_property_value("width").ok().as_deref() != Some(w.as_str())
-            || style.get_property_value("height").ok().as_deref() != Some(h.as_str())
-        {
-            let _ = style.set_property("width", &w);
-            let _ = style.set_property("height", &h);
-        }
+        web::fit_canvas(w, wide);
     }
 
     fn redraw(&mut self) {

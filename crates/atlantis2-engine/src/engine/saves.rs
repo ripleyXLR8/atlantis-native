@@ -6,6 +6,7 @@
 //! options file read at start-up and written at exit.
 
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use atlantis2_data::save::{
     entry, read_save, save_file_name, scan_save, write_save, Cfg, InvalidSave, SaveData,
@@ -15,6 +16,10 @@ use atlantis2_data::save::{
 
 use super::Engine;
 use crate::script::{BagEntry, Shown, SubjectTable};
+use crate::store::{save_path, DirFiles, SaveStore};
+
+/// The original's options file, in the store.
+const CFG_FILE: &str = "atlant2.cfg";
 
 /// The entries Native keeps as the save's bytes: the dowsing rod's anchor
 /// y 15 (@ 0x006d84f4: the logical height, 480 from the start-up's static
@@ -88,21 +93,49 @@ impl Engine {
     /// file leaves the defaults). The save folder is made as the start-up
     /// does (FUN_004791c0, without its empty probe file).
     pub fn set_data_dir(&mut self, dir: Option<PathBuf>) {
-        self.data_dir = dir;
-        if let Some(d) = &self.data_dir {
+        if let Some(d) = &dir {
             if let Err(e) = std::fs::create_dir_all(d.join("save")) {
                 log::warn!("{}: {e}", d.join("save").display());
             }
-            if let Ok(b) = std::fs::read(d.join("atlant2.cfg")) {
-                self.apply_cfg(&Cfg::parse(&b));
-            }
+        }
+        let store = dir
+            .clone()
+            .map(|d| Rc::new(DirFiles::new(d)) as Rc<dyn SaveStore>);
+        self.set_store(store);
+        self.data_dir = dir;
+    }
+
+    /// The store the saves (`save/ATLpp_ss.SAV`), `atlant2.cfg` and the
+    /// music copies are kept in ([`crate::store`]; the browser's storage
+    /// in the web build), and `atlant2.cfg` read from it as
+    /// [`Engine::set_data_dir`] reads it.
+    pub fn set_store(&mut self, store: Option<Rc<dyn SaveStore>>) {
+        self.data_dir = None;
+        self.store = store;
+        if let Some(b) = self.store.as_ref().and_then(|s| s.read(CFG_FILE)) {
+            self.apply_cfg(&Cfg::parse(&b));
         }
         // The music copies the original would hold (`engine/media.rs`).
         self.load_copies();
     }
 
+    /// The folder of [`Engine::set_data_dir`].
     pub fn data_dir(&self) -> Option<&Path> {
         self.data_dir.as_deref()
+    }
+
+    /// The store of the saves, if any.
+    pub fn store(&self) -> Option<&Rc<dyn SaveStore>> {
+        self.store.as_ref()
+    }
+
+    /// A file of the store, for the log: its path on disk with a data
+    /// folder.
+    pub(super) fn stored_name(&self, name: &str) -> String {
+        match &self.data_dir {
+            Some(d) => DirFiles::new(d).path(name).display().to_string(),
+            None => name.to_string(),
+        }
     }
 
     /// The options as `atlant2.cfg` holds them.
@@ -167,29 +200,26 @@ impl Engine {
 
     /// FUN_0047f530 at exit: `atlant2.cfg` written.
     pub fn write_cfg(&self) {
-        if let Some(d) = &self.data_dir {
-            let path = d.join("atlant2.cfg");
-            if let Err(e) = std::fs::write(&path, self.cfg().to_bytes()) {
-                log::warn!("{}: {e}", path.display());
-            }
+        if let Some(s) = &self.store {
+            // (a failure is logged by the store)
+            s.write(CFG_FILE, &self.cfg().to_bytes());
         }
     }
 
-    /// The path of a slot of the current player.
-    fn slot_path(&self, slot: u8) -> Option<PathBuf> {
-        let d = self.data_dir.as_ref()?;
-        Some(
-            d.join("save")
-                .join(save_file_name(self.player_number, slot)),
-        )
+    /// The store's path of a slot of the current player.
+    fn slot_path(&self, slot: u8) -> String {
+        save_path(&save_file_name(self.player_number, slot))
     }
 
     /// The valid saves of the current player (FUN_00479250 on slots
     /// 0..98).
     pub fn saves(&self) -> Vec<(u8, SaveHeader)> {
+        let Some(store) = &self.store else {
+            return Vec::new();
+        };
         (0..SLOTS)
             .filter_map(|s| {
-                let b = std::fs::read(self.slot_path(s)?).ok()?;
+                let b = store.read(&self.slot_path(s))?;
                 Some((s, scan_save(&b)?))
             })
             .collect()
@@ -283,39 +313,35 @@ impl Engine {
     /// Saves slot `slot` of the current player (FUN_00478df0). False when
     /// the file cannot be written (the original only logs it).
     pub fn save_slot(&mut self, slot: u8) -> bool {
-        let Some(path) = self.slot_path(slot) else {
+        let Some(store) = self.store.clone() else {
             log::warn!("no folder for the saves: slot {slot} not saved");
             return false;
         };
+        let path = self.slot_path(slot);
         let file = write_save(&self.save_data());
-        match std::fs::write(&path, file) {
-            Ok(()) => {
-                log::info!("saved {}", path.display());
-                true
-            }
-            Err(e) => {
-                log::warn!("ZapFile::Save({}): {e}", path.display());
-                false
-            }
+        if store.write(&path, &file) {
+            log::info!("saved {}", self.stored_name(&path));
+            true
+        } else {
+            log::warn!("ZapFile::Save({}) failed", self.stored_name(&path));
+            false
         }
     }
 
     /// Deletes slot `slot` of the current player (FUN_00479260).
     pub fn delete_slot(&mut self, slot: u8) {
-        if let Some(p) = self.slot_path(slot) {
-            if p.exists() {
-                if let Err(e) = std::fs::remove_file(&p) {
-                    log::warn!("{}: {e}", p.display());
-                }
-            }
+        if let Some(store) = &self.store {
+            store.remove(&self.slot_path(slot));
         }
     }
 
     /// Loads slot `slot` of the current player (`AtlSaveGame_Load`
     /// @ 0x00478f30); a raw file is saved again at once as a `ZapFile`.
     pub fn load_slot(&mut self, slot: u8) -> Result<(), SaveError> {
-        let path = self.slot_path(slot).ok_or(SaveError::NoFolder)?;
-        let file = std::fs::read(&path).map_err(|_| SaveError::Missing)?;
+        let store = self.store.as_ref().ok_or(SaveError::NoFolder)?;
+        let file = store
+            .read(&self.slot_path(slot))
+            .ok_or(SaveError::Missing)?;
         let (data, format) = read_save(&file).map_err(|e| {
             log::warn!("AtlSaveGame_Load({slot}) {e}");
             SaveError::Invalid(e)
