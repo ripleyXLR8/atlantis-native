@@ -6,6 +6,7 @@ members = [
     "crates/atlantis-engine",
     "crates/atlantis2-data",
     "crates/atlantis2-engine",
+    "crates/atlantis3-data",
     "crates/atlantis-app",
 ]
 

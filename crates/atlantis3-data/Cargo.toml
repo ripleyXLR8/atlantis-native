@@ -1,0 +1,15 @@
+[package]
+name = "atlantis3-data"
+description = "Atlantis III data files: game detection, sprites, 3D scenes and the text formats"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+atlantis-data = { path = "../atlantis-data" }
+atlantis2-data = { path = "../atlantis2-data" }
+log = "0.4"
+md-5 = "0.10"
+
+[dev-dependencies]
+atlantis-codecs = { path = "../atlantis-codecs" }

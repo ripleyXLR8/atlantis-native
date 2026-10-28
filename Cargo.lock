@@ -254,6 +254,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "atlantis3-data"
+version = "0.5.6"
+dependencies = [
+ "atlantis-codecs",
+ "atlantis-data",
+ "atlantis2-data",
+ "log",
+ "md-5",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
