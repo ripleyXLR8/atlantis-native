@@ -1,0 +1,20 @@
+[package]
+name = "atlantis3-engine"
+description = "Atlantis III engine (unfinished, not in the released program): the start-up, the cinematics and the first place"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+atlantis-codecs = { path = "../atlantis-codecs" }
+atlantis-data = { path = "../atlantis-data" }
+atlantis2-data = { path = "../atlantis2-data" }
+# Shared with Atlantis II where the code is the same: the cube renderer,
+# the camera and the mouse look, the CON interpreter, the sound voices.
+atlantis2-engine = { path = "../atlantis2-engine" }
+atlantis3-data = { path = "../atlantis3-data" }
+libm = "=0.2.16"
+log = "0.4"
+
+[dev-dependencies]
+md-5 = "0.10"

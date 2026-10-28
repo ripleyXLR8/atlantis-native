@@ -17,7 +17,7 @@ mod ubb;
 
 pub use alpha::AlphaTables;
 pub use apc::{decode_apc, Apc, ApcDecoder, ApcHeader, APC_HEADER_SIZE};
-pub use hnm::{AudioFormat, HnmVideo};
+pub use hnm::{AudioFormat, HnmVideo, SoundRule};
 pub use ubb::{palette_to_rgb565, UbbFrame, UbbVideo, IA_BUFFER_SIZE};
 
 use std::fmt;

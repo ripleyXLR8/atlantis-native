@@ -75,11 +75,48 @@ fn chunks(mut rest: &[u8]) -> impl Iterator<Item = Result<Chunk<'_>, DecodeError
     })
 }
 
+/// Which header rule turns a file's sound track on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SoundRule {
+    /// The first two games: byte +6 bit 0, the rate from its bits 4..6
+    /// (`(flags >> 4) & 6` x 11025 Hz) and stereo from its bit 7.
+    #[default]
+    Flags,
+    /// *Atlantis III*'s CryoMovie library (`Game.exe` @ 0x006b8929): sound
+    /// whenever byte +6 is not zero, whatever its bits; the track is the
+    /// first `AA` chunk of the first frame (else its first `BB` chunk), its
+    /// rate and channels read from that chunk's APC header
+    /// (@ 0x006b96fb .. 0x006b9766); no such chunk, no sound.
+    ApcHeader,
+}
+
 /// The sound track: APC data in AA (with a header) and BB chunks.
 struct AudioTrack {
     format: AudioFormat,
+    /// *Atlantis III*'s CryoMovie rules ([`SoundRule::ApcHeader`]).
+    movie: Option<MovieSound>,
     decoder: Option<ApcDecoder>,
     pcm: Vec<i16>,
+}
+
+/// How *Atlantis III*'s CryoMovie decodes a film's sound (`Game.exe`
+/// @ 0x006b9ec0, the APC decoder @ 0x006b3160): only the first `AA` chunk
+/// carries the APC header, every later `AA` (or `BB`) chunk is raw data
+/// continuing the stream. Each frame decodes a fixed number of sample
+/// frames F (the first one 32 F), F = ((first payload - 32) >> 5) x 4
+/// bytes of 16-bit samples, whatever the chunks hold; the header's sample
+/// count is a budget: past it, or when the data runs out, the frame's
+/// buffer is filled with silence. Every frame, with or without a sound
+/// chunk, has its F sample frames.
+#[derive(Default)]
+struct MovieSound {
+    /// APC bytes received and not yet decoded.
+    fifo: std::collections::VecDeque<u8>,
+    /// Sample frames the header still allows.
+    remaining: u64,
+    /// F, once the first chunk is read.
+    per_frame: u64,
+    frames_out: u64,
 }
 
 /// An HNM6 file decoded frame by frame: the IX videos (transitions,
@@ -125,6 +162,12 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
     /// never clears them: passing the block of the previous video (see
     /// [`HnmVideo::into_buffers`]) reproduces what its first frames show.
     pub fn with_buffers(data: D, block: Vec<u16>) -> Result<Self, DecodeError> {
+        Self::with_rule(data, block, SoundRule::Flags)
+    }
+
+    /// [`HnmVideo::with_buffers`] with the header rule `rule` for the sound
+    /// track.
+    pub fn with_rule(data: D, block: Vec<u16>, rule: SoundRule) -> Result<Self, DecodeError> {
         let hnm = data.as_ref();
         if hnm.len() < FILE_HEADER_SIZE {
             return Err(DecodeError::Truncated);
@@ -146,11 +189,17 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
             return Err(DecodeError::InvalidFileHeader);
         }
 
-        let audio = (audio_flags & 1 != 0).then(|| AudioTrack {
-            format: AudioFormat {
+        let format = match rule {
+            SoundRule::Flags => (audio_flags & 1 != 0).then(|| AudioFormat {
                 sample_rate: u32::from((audio_flags >> 4) & 6) * 11025,
                 channels: if audio_flags & 0x80 != 0 { 2 } else { 1 },
-            },
+            }),
+            SoundRule::ApcHeader if audio_flags != 0 => first_sound_format(hnm),
+            SoundRule::ApcHeader => None,
+        };
+        let audio = format.map(|format| AudioTrack {
+            format,
+            movie: (rule == SoundRule::ApcHeader).then(MovieSound::default),
             decoder: None,
             pcm: Vec::new(),
         });
@@ -339,6 +388,11 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
                 other => return Err(DecodeError::UnexpectedChunk(other)),
             }
         }
+        if let Some(audio) = &mut self.audio {
+            if audio.movie.is_some() {
+                frame_delay = audio.movie_frame();
+            }
+        }
         self.new_frame(frame_delay);
         Ok(Some(got_video))
     }
@@ -366,6 +420,25 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
 impl AudioTrack {
     /// Decodes one sound chunk; returns its number of sample frames.
     fn decode(&mut self, kind: u16, mut data: &[u8]) -> Result<u64, DecodeError> {
+        if let Some(m) = &mut self.movie {
+            if kind == CHUNK_SD {
+                return Ok(0);
+            }
+            if self.decoder.is_none() {
+                if kind != CHUNK_AA {
+                    return Ok(0);
+                }
+                let header = ApcHeader::parse(data)?;
+                self.decoder = Some(ApcDecoder::new(&header));
+                m.remaining = u64::from(header.frames);
+                // ((payload - 32) >> 5) * 4 bytes of 16-bit samples.
+                let bytes = ((data.len() - APC_HEADER_SIZE) >> 5) as u64 * 4;
+                m.per_frame = bytes / (2 * u64::from(self.format.channels));
+                data = &data[APC_HEADER_SIZE..];
+            }
+            m.fifo.extend(data.iter().copied());
+            return Ok(0);
+        }
         if kind == CHUNK_AA {
             let header = ApcHeader::parse(data)?;
             if header.sample_rate != self.format.sample_rate
@@ -389,6 +462,56 @@ impl AudioTrack {
             2 * bytes
         })
     }
+}
+
+impl AudioTrack {
+    /// A CryoMovie frame's sound: 32 F sample frames for the first frame,
+    /// F for each later one, decoded from the bytes received within the
+    /// header's budget, silence for the rest. `None` before the first
+    /// chunk (no sound yet: the regular delay).
+    fn movie_frame(&mut self) -> Option<u64> {
+        let channels = u64::from(self.format.channels);
+        let m = self.movie.as_mut()?;
+        let decoder = self.decoder.as_mut()?;
+        let want = if m.frames_out == 0 {
+            32 * m.per_frame
+        } else {
+            m.per_frame
+        };
+        m.frames_out += 1;
+        let n = want.min(m.remaining);
+        // Stereo: a byte per sample frame; mono: two.
+        let bytes = if channels == 2 { n } else { n.div_ceil(2) } as usize;
+        let take = bytes.min(m.fifo.len());
+        let chunk: Vec<u8> = m.fifo.drain(..take).collect();
+        let start = self.pcm.len();
+        decoder.decode(&chunk, &mut self.pcm);
+        let got = ((self.pcm.len() - start) as u64 / channels).min(n);
+        self.pcm.truncate(start + (got * channels) as usize);
+        m.remaining -= got;
+        self.pcm.resize(start + (want * channels) as usize, 0);
+        Some(want)
+    }
+}
+
+/// The format of the sound track by the APC header of the first `AA` chunk
+/// of the first superchunk, else of its first `BB` chunk (CryoMovie's
+/// search, `Game.exe` of *Atlantis III* @ 0x006b7f60).
+fn first_sound_format(hnm: &[u8]) -> Option<AudioFormat> {
+    let pos = FILE_HEADER_SIZE;
+    let size = (le32(hnm.get(pos..pos + 4)?, 0) & 0x00ff_ffff) as usize;
+    let end = (pos + size.max(4)).min(hnm.len());
+    let first = |tag| {
+        chunks(hnm.get(pos + 4..end)?)
+            .map_while(Result::ok)
+            .find(|c| c.kind == tag)
+            .map(|c| c.data)
+    };
+    let header = ApcHeader::parse(first(CHUNK_AA).or_else(|| first(CHUNK_BB))?).ok()?;
+    Some(AudioFormat {
+        sample_rate: header.sample_rate,
+        channels: header.channels(),
+    })
 }
 
 /// The type of the first video chunk of the first superchunk, skipping
