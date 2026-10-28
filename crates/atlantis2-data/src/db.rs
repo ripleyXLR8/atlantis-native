@@ -27,6 +27,31 @@ pub struct Scene {
     pub materials: Vec<Material>,
     pub nodes: Vec<Node>,
     pub cameras: Vec<Camera>,
+    /// The last section's records (@ 0x004a7590), none in Atlantis II's
+    /// files; Atlantis III's scenes hold their lights there.
+    pub lights: Vec<Light>,
+}
+
+/// Whose reader reads a `.db` file: the records of the last section are 68
+/// bytes after their strings in Atlantis II (@ 0x004a7590), 64 in Atlantis
+/// III (its `Game.exe` @ 0x0050cdc0).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Dialect {
+    #[default]
+    Atlantis2,
+    Atlantis3,
+}
+
+/// A record of the last section: a key, two strings, a vec4, a vec3 and
+/// 10 dwords (Atlantis II) or 9 (Atlantis III).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Light {
+    pub key: String,
+    pub name: String,
+    pub target: String,
+    pub rotation: [f32; 4],
+    pub position: [f32; 3],
+    pub words: Vec<u32>,
 }
 
 /// A triangle mesh (@ 0x004a6d60).
@@ -250,6 +275,15 @@ impl Scene {
     /// Reads a `.db` file and says how many bytes the reader consumed
     /// (the original ignores what follows).
     pub fn parse_len(data: &[u8]) -> Result<(Scene, usize), DbError> {
+        Scene::parse_len_as(data, Dialect::Atlantis2)
+    }
+
+    /// [`Scene::parse_len`] with the reader of `dialect`.
+    pub fn parse_len_as(data: &[u8], dialect: Dialect) -> Result<(Scene, usize), DbError> {
+        let words = match dialect {
+            Dialect::Atlantis2 => 10,
+            Dialect::Atlantis3 => 9,
+        };
         let mut r = Reader { b: data, at: 0 };
         let _marker = r.u32()?; // 0xff in every file; not tested
         let version = r.u32()?;
@@ -284,11 +318,15 @@ impl Scene {
             })?;
             // @ 0x004a7590: str, str, vec4, vec3, 10 dwords; none in the
             // files.
-            r.vec(8, |r| {
-                r.string()?;
-                r.string()?;
-                r.string()?;
-                r.bytes(16 + 12 + 40).map(|_| ())
+            s.lights = r.vec(8, |r| {
+                Ok(Light {
+                    key: r.string()?,
+                    name: r.string()?,
+                    target: r.string()?,
+                    rotation: r.floats::<4>()?,
+                    position: r.floats::<3>()?,
+                    words: (0..words).map(|_| r.u32()).collect::<Result<_, _>>()?,
+                })
             })?;
         }
         if (3..=8).contains(&version) {
