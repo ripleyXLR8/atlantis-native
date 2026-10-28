@@ -134,7 +134,7 @@ fn italian_con_lines_match_original() {
 
 /// The Spanish build restarts the rat's T0023 search at point 0
 /// (FUN_004348fc @ 0x00434933), the reference's rule; the French August,
-/// German and Italian builds do not.
+/// German, US and Italian builds do not.
 #[test]
 fn rat_search_restart_by_build() {
     assert!(build("atlantis-cd-es-687104").rat_search_restart);
@@ -142,6 +142,7 @@ fn rat_search_restart_by_build() {
     for b in [
         "atlantis-cd-fr-687104",
         "atlantis-cd-de-687104",
+        "atlantis-cd-en-687104",
         "atlantis-cd-it-687104",
     ] {
         assert!(!build(b).rat_search_restart, "{b}");

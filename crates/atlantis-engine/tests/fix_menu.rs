@@ -41,7 +41,7 @@ fn game(var: &str) -> Option<Game> {
 /// Each data set's build-specific fixes (the fixes of every build come
 /// first in every list). The patch 1.01's data set is installed over the
 /// English CD: neither the German `ß` nor the Dutch discs' revisions.
-const SETS: [(&str, &str, &[BugFix]); 16] = [
+const SETS: [(&str, &str, &[BugFix]); 17] = [
     ("ATLANTIS_DATA", "atlantis-cd-en-714240", &[]),
     ("ATLANTIS_GOG_FR", "atlantis-gog-714752", &[]),
     ("ATLANTIS_DATA_PATCH101", "atlantis-patch-fr-714240", &[]),
@@ -74,6 +74,11 @@ const SETS: [(&str, &str, &[BugFix]); 16] = [
         "ATLANTIS_DATA_DE_MAY97",
         "atlantis-cd-de-693248",
         &[HexagonPieces, SharpS, DiscRevision],
+    ),
+    (
+        "ATLANTIS_DATA_EN_US97",
+        "atlantis-cd-en-687104",
+        &[HexagonPieces],
     ),
     (
         "ATLANTIS_DATA_NL1997",
