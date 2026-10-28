@@ -1,23 +1,25 @@
 //! The subtitle text buffer of the bitmap-subtitle builds of 1997
-//! (atlantis-cd-en-688128, fr-688640, nl-688128, sv-688128) against their
-//! own code: the start-up clear `FUN_00422bd0`, the section executor's copy
-//! of every `[` line (`FUN_00427420` @ 0x00427707..0x00427722), the
-//! game-over screen's copy of its narrator line (`FUN_004256a4` @
-//! 0x00425a31..0x00425a50) and the row breaker (`FUN_0042e970` and its
-//! copies, `FUN_0042ea7c` in the Swedish build), run unmodified under
-//! emulation. The breaker's forward scan reads past the text's NUL, into
-//! the zeros of the start-up clear or the tail of an earlier, longer text,
-//! so the rows of a line depend on what was shown before it. The expected
-//! values are numbers and file names only.
+//! (atlantis-cd-en-688128, fr-688640, nl-688128, sv-688128, de-693248)
+//! against their own code: the start-up clear `FUN_00422bd0`, the section
+//! executor's copy of every `[` line (`FUN_00427420` @
+//! 0x00427707..0x00427722), the game-over screen's copy of its narrator
+//! line (`FUN_004256a4` @ 0x00425a31..0x00425a50) and the row breaker
+//! (`FUN_0042e970` and its copies, `FUN_0042ea7c` in the Swedish build),
+//! run unmodified under emulation. The breaker's forward scan reads past
+//! the text's NUL, into the zeros of the start-up clear or the tail of an
+//! earlier, longer text, so the rows of a line depend on what was shown
+//! before it. The expected values are numbers and file names only.
 //!
 //! The tests of the CON files need each build's game folder
 //! (`ATLANTIS_DATA_1997`, `ATLANTIS_DATA_FR1997_MAY`,
-//! `ATLANTIS_DATA_NL1997`, `ATLANTIS_DATA_SV1997`); without it they are
+//! `ATLANTIS_DATA_NL1997`, `ATLANTIS_DATA_SV1997`; `ATLANTIS_DATA_DE_MAY97`,
+//! the folder of the German May CD's images); without it they are
 //! skipped.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use atlantis_data::disc_image::DiscSet;
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::con_script::{
     con_line_buffer_text, con_narrator_buffer_text, ConItem, ConScript,
@@ -30,7 +32,7 @@ struct Build {
     breaker: BitmapBreaker,
 }
 
-const BUILDS: [Build; 4] = [
+const BUILDS: [Build; 5] = [
     Build {
         golden: include_str!("golden/video_subtitle_buffer_en688128.txt"),
         var: "ATLANTIS_DATA_1997",
@@ -50,6 +52,11 @@ const BUILDS: [Build; 4] = [
         golden: include_str!("golden/video_subtitle_buffer_sv688128.txt"),
         var: "ATLANTIS_DATA_SV1997",
         breaker: BitmapBreaker::Back,
+    },
+    Build {
+        golden: include_str!("golden/video_subtitle_buffer_de693248.txt"),
+        var: "ATLANTIS_DATA_DE_MAY97",
+        breaker: BitmapBreaker::Nearest,
     },
 ];
 
@@ -320,7 +327,11 @@ fn con_walk_matches_original() {
             eprintln!("{} not set: skipped", b.var);
             continue;
         };
-        let g = Game::open(Arc::new(StdDir::new(dir))).expect("cannot open the game directory");
+        // A game folder, else a folder of the CD's images.
+        let g = Game::open(Arc::new(StdDir::new(&dir)))
+            .ok()
+            .or_else(|| Game::open(Arc::new(DiscSet::open_folder(dir.as_ref())?)).ok())
+            .expect("cannot open the game directory");
         assert!(g.exe.build.bitmap_subtitles);
         let scan = b
             .golden

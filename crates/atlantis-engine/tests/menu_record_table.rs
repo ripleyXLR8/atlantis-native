@@ -10,11 +10,13 @@
 //!
 //! Needs the game folders: `ATLANTIS_DATA` (the 2001 English build),
 //! `ATLANTIS_DATA_1997` (the May 1997 English build) and
-//! `ATLANTIS_DATA_FR1997_MAY` (the May 1997 French build); without them the
-//! tests are skipped.
+//! `ATLANTIS_DATA_FR1997_MAY` (the May 1997 French build) and
+//! `ATLANTIS_DATA_DE_MAY97` (the folder of the May 1997 German CD's
+//! images); without them the tests are skipped.
 
 use std::sync::Arc;
 
+use atlantis_data::disc_image::DiscSet;
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::enhancements::BugFixes;
 use atlantis_engine::ui::layout::{
@@ -35,7 +37,11 @@ fn game(var: &str, test: &str) -> Option<Game> {
         eprintln!("{var} not set: {test} skipped");
         return None;
     };
-    Some(Game::open(Arc::new(StdDir::new(dir))).expect("cannot open the game directory"))
+    // A game folder, else a folder of the CD's images.
+    let g = Game::open(Arc::new(StdDir::new(&dir)))
+        .ok()
+        .or_else(|| Game::open(Arc::new(DiscSet::open_folder(dir.as_ref())?)).ok());
+    Some(g.expect("cannot open the game directory"))
 }
 
 struct Menus {
@@ -242,6 +248,16 @@ fn record_table_french_may_1997_build() {
         "record_table_french_may_1997_build",
         "atlantis-cd-fr-688640",
         include_str!("golden/ui_menu_record_table_fr688640.txt"),
+    );
+}
+
+#[test]
+fn record_table_german_may_1997_build() {
+    check(
+        "ATLANTIS_DATA_DE_MAY97",
+        "record_table_german_may_1997_build",
+        "atlantis-cd-de-693248",
+        include_str!("golden/ui_menu_record_table_de693248.txt"),
     );
 }
 

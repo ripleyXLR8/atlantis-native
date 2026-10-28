@@ -189,3 +189,28 @@ fn g9_matches_printf() {
     assert_eq!(g9(1e10), "1e+10");
     assert_eq!(g9(1.5e-5), "1.49999996e-05");
 }
+
+/// The German retail CD's first pressing (the May 1997 build) from the
+/// `.iso` images in the folder `ATLANTIS_DATA_DE_MAY97` names (the folder
+/// may hold other copies of the discs), `None` (the test skipped) without
+/// it.
+pub fn game_de_may97(test: &str) -> Option<Game> {
+    let Some(dir) = std::env::var_os("ATLANTIS_DATA_DE_MAY97") else {
+        eprintln!("ATLANTIS_DATA_DE_MAY97 not set: {test} skipped");
+        return None;
+    };
+    let mut paths: Vec<_> = std::fs::read_dir(&dir)
+        .expect("the images' folder")
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("iso")))
+        .collect();
+    paths.sort();
+    let images: Vec<atlantis_data::disc_image::DiscImage> = paths
+        .iter()
+        .filter_map(|p| atlantis_data::disc_image::DiscImage::open(p))
+        .collect();
+    assert_eq!(images.len(), 4, "four disc images");
+    let set = atlantis_data::disc_image::DiscSet { images };
+    Some(Game::open(Arc::new(set)).expect("the game from its images"))
+}

@@ -517,7 +517,7 @@ impl BugFix {
             BugFix::HexagonPieces => "Hexagon puzzle: its pieces always there",
             BugFix::LoadMusik => "Music: tracks copied one by one",
             BugFix::SharpS => "German: the sharp s in the LOAD list",
-            BugFix::DiscRevision => "Dutch: the credits and fonts of disc 1",
+            BugFix::DiscRevision => "Dutch, German May: the credits and fonts of disc 1",
             BugFix::MenuLineWidth => "Italian: the whole of OK and Annulla",
             BugFix::ChineseRows => "Chinese: the subtitle rows",
             BugFix::SubtitlesToggle => "Chinese: the SUBTITLES button",
@@ -587,8 +587,8 @@ impl BugFix {
             ],
             BugFix::DiscRevision => &[
                 "The original reads the credits and the name fonts",
-                "from the disc in the drive: disc 2 holds an older",
-                "revision (a shorter credits text, two glyphs off).",
+                "from the disc in the drive: the Dutch disc 2 and",
+                "the German May discs 2-4 hold other revisions.",
             ],
             BugFix::MenuLineWidth => &[
                 "This build gives a menu line at a fixed place 16",
