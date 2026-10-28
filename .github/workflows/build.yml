@@ -230,6 +230,11 @@ jobs:
           cargo install wasm-bindgen-cli --version "$version" --locked
       - name: Build
         run: sh web/build.sh
+      # The web side's unit tests in WebAssembly (Node.js runs them).
+      - name: WebAssembly tests
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
+        run: cargo test --target wasm32-unknown-unknown -p atlantis-app --lib
       - name: Package (the static site)
         run: |
           mkdir -p dist/atlantis-native-web

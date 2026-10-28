@@ -1532,6 +1532,18 @@ impl A2App {
         let hd = self.engine.enhancements.hd;
         // The view on the graphics card: its drawing and its width beside
         // the picture's (the widescreen sides).
+        // The graphics card composes the HD picture (the first game's
+        // way), the processor while the options menu is open (its texts
+        // over the game's).
+        let window = (size.width, size.height);
+        if hd
+            && !menu
+            && self
+                .web
+                .present_card(window, &mut self.picture, &self.engine, screen)
+        {
+            return true;
+        }
         let card = self
             .engine
             .hd_layer()
@@ -2045,6 +2057,51 @@ impl Picture {
         Self::scale(screen, out, width, height);
     }
 
+    /// The HD frame `screen` composed by the graphics card and shown
+    /// (`crate::compose_on_card`, the first game's): the view the card's
+    /// (`card_view`) or the engine's, the interface art, the texts drawn
+    /// sharp over it as an overlay; false when the card cannot (the
+    /// processor composes then).
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn compose_card(
+        &mut self,
+        engine: &Engine,
+        screen: &[u16],
+        c: CardParts<'_>,
+        window: (u32, u32),
+        (sw, sh): (usize, usize),
+    ) -> bool {
+        if !engine.enhancements.hd || screen.len() != (WIDTH * HEIGHT) as usize || sw == 0 {
+            return false;
+        }
+        let area = picture_rect(sw, sh);
+        let held: Vec<&HdText> = engine.hd_texts().iter().map(|t| &t.text).collect();
+        let f = HdFrame {
+            screen,
+            layer: engine.hd_layer(),
+            texts: &held,
+            photo: engine.hd_photo(),
+            video_pano: None,
+        };
+        let card = crate::CardCompose {
+            gl: Some(c.gl),
+            gc: Some(c.gc),
+            card_view: c.card_view,
+            compositor: &mut self.compositor,
+            text: c.text,
+            text_rows: c.text_rows,
+            opts: engine.enhancements.hd_options,
+            check: c.check,
+        };
+        let k = f64::from(window.0) / sw as f64;
+        // Atlantis II's texts are drawn by its engine (its font).
+        let mut runs = |out: &mut [u32], stride: usize, area| {
+            engine.draw_hd_texts_top(out, stride, area, 0xff);
+            engine.hd_texts().is_some_and(|t| !t.runs.is_empty())
+        };
+        crate::compose_on_card(card, f, window, k, (sw, sh), area, &mut runs)
+    }
+
     /// The original graphics: the screen (640 x 480 or 800 x 600) scaled
     /// to the 4:3 picture of a `width` x `height` window (nearest pixel,
     /// black bars), its colours [`atlantis2_engine::png::rgb565_to_rgb`]'s
@@ -2062,6 +2119,19 @@ impl Picture {
             }
         }
     }
+}
+
+/// What [`Picture::compose_card`] composes with: the browser's WebGL
+/// presenter and compositor, the view's picture on the card (with the
+/// layer there), the text overlay and its rows, the check.
+#[cfg(target_arch = "wasm32")]
+pub(crate) struct CardParts<'a> {
+    pub gl: &'a mut crate::gl_present::GlPresenter,
+    pub gc: &'a mut crate::gl_present::GlCompose,
+    pub card_view: Option<Option<&'a web_sys::WebGlTexture>>,
+    pub text: &'a mut Vec<u32>,
+    pub text_rows: &'a mut Option<(usize, usize)>,
+    pub check: bool,
 }
 
 /// The frame times of a headless run in the HD mode.

@@ -302,9 +302,12 @@ impl Engine {
             hd.view_key = Some(key);
             hd.view_in_layer = true;
             hd.view_proj = Some(p);
-            // The graphics card's, when the front end lends its renderer.
+            // The graphics card's, when the front end lends its renderer;
+            // read back at once for a head line, whose picture is composed
+            // here over the view (`hd_dialog`).
             let mut drawn = false;
             let check = self.view_check;
+            let read_back = self.dialog.as_ref().is_some_and(|d| d.kind() == 0);
             if let Some(r) = self.cube_renderer.as_mut() {
                 hd.card_gen = hd.card_gen.wrapping_add(1);
                 let changes = hd.pano.take_changes();
@@ -323,7 +326,10 @@ impl Engine {
                     height: h,
                     gen: hd.card_gen,
                 };
-                drawn = r.render(job, check.then_some(&mut hd.layer.pixels[..]));
+                drawn = r.render(
+                    job,
+                    (check || read_back).then_some(&mut hd.layer.pixels[..]),
+                );
                 if !drawn {
                     log::warn!("HD view: the outside renderer failed, drawn by the engine");
                 }
@@ -346,7 +352,7 @@ impl Engine {
                 );
                 hd.layer.pixels = cpu;
             }
-            hd.on_card = drawn && !check;
+            hd.on_card = drawn && !check && !read_back;
             if !drawn {
                 hd.pano.render(&p, w, h, &mut hd.layer.pixels);
             }

@@ -55,6 +55,11 @@ web-sys = { version = "0.3", features = ["File", "FileList", "Blob", "Window", "
 console_error_panic_hook = "0.1"
 console_log = "1"
 
+# The unit tests run in WebAssembly too (`wasm-bindgen-test-runner`, in
+# Node.js): the game finder of the web page.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
 [build-dependencies]
 # The Windows program file's icon resource (rc.exe or windres).
 embed-resource = "3"

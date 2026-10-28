@@ -18,8 +18,9 @@ use wasm_bindgen::JsCast;
 use web_time::{Duration, Instant};
 use winit::window::Window;
 
+use crate::a2::{CardParts, Picture};
 use crate::gl_cube::{GlCube, SharedCube};
-use crate::gl_present::GlPresenter;
+use crate::gl_present::{GlCompose, GlPresenter};
 
 /// In the browser the HD view is drawn on one core: its tiles at most
 /// 24 pixels (a view of 960 x 720), as the first game's
@@ -38,8 +39,14 @@ pub const LOCK_GRACE: Duration = Duration::from_millis(600);
 /// The browser's state of the window.
 pub struct WebFront {
     pub gl: Option<GlPresenter>,
-    /// The HD view drawn by the graphics card (shared with the engine).
+    /// The HD view drawn by the graphics card (shared with the engine),
+    /// the HD picture composed there, its sharp text overlay and the rows
+    /// the overlay used, whether the composition is checked.
     cube: Option<Rc<RefCell<GlCube>>>,
+    compose: Option<GlCompose>,
+    text: Vec<u32>,
+    text_rows: Option<(usize, usize)>,
+    check: bool,
     /// The frame drawn for the graphics card.
     frame: Vec<u32>,
     /// The sound is started on the first click or key.
@@ -72,6 +79,10 @@ impl WebFront {
         WebFront {
             gl: None,
             cube: None,
+            compose: None,
+            text: Vec::new(),
+            text_rows: None,
+            check: false,
             frame: Vec::new(),
             audio_pending: true,
             last_redraw: None,
@@ -117,7 +128,9 @@ impl WebFront {
             let c = Rc::new(RefCell::new(c));
             engine.cube_renderer = Some(Box::new(SharedCube(c.clone())));
             engine.view_check = setting == "check";
+            self.check = setting == "check";
             self.cube = Some(c);
+            self.compose = self.gl.as_ref().and_then(|p| GlCompose::new(p.context()));
             log::info!(
                 "HD view: graphics card{}",
                 if setting == "check" { " (checked)" } else { "" }
@@ -129,20 +142,11 @@ impl WebFront {
     /// WebGL: at most [`crate::WEB_MAX_PIXELS`], and in the HD mode a
     /// picture no taller than the HD view of [`HD_MAX_TILE`] (the graphics
     /// card enlarges it). The canvas's own size without WebGL.
-    pub fn frame_size(&self, (ww, wh): (u32, u32), hd: bool) -> (usize, usize) {
-        if self.gl.is_none() || ww == 0 || wh == 0 {
-            return (ww as usize, wh as usize);
+    pub fn frame_size(&self, window: (u32, u32), hd: bool) -> (usize, usize) {
+        if self.gl.is_none() {
+            return (window.0 as usize, window.1 as usize);
         }
-        let (fw, fh) = (f64::from(ww), f64::from(wh));
-        let mut k = (crate::WEB_MAX_PIXELS as f64 / (fw * fh)).sqrt().min(1.0);
-        if hd {
-            let picture_h = fh.min(fw * 3.0 / 4.0);
-            k = k.min((HD_MAX_TILE * 480 / 16) as f64 / picture_h);
-        }
-        (
-            ((fw * k).round() as usize).max(1),
-            ((fh * k).round() as usize).max(1),
-        )
+        card_frame_size(window, hd)
     }
 
     /// Presents through WebGL: in the HD mode `compose` draws the picture
@@ -238,6 +242,35 @@ impl WebFront {
         }
     }
 
+    /// The HD picture composed by the graphics card and shown (see
+    /// [`Picture::compose_card`]); false when it cannot.
+    pub fn present_card(
+        &mut self,
+        window: (u32, u32),
+        picture: &mut Picture,
+        engine: &Engine,
+        screen: &[u16],
+    ) -> bool {
+        let size = self.frame_size(window, true);
+        let (Some(gl), Some(gc)) = (self.gl.as_mut(), self.compose.as_mut()) else {
+            return false;
+        };
+        let cube = self.cube.as_ref().map(|c| c.borrow());
+        let card_view = engine
+            .hd_layer()
+            .filter(|l| l.on_card)
+            .map(|l| cube.as_ref().and_then(|c| c.picture(l.card_gen)));
+        let parts = CardParts {
+            gl,
+            gc,
+            card_view,
+            text: &mut self.text,
+            text_rows: &mut self.text_rows,
+            check: self.check,
+        };
+        picture.compose_card(engine, screen, parts, window, size)
+    }
+
     /// A redraw at `now`: the time since the last one when it is a gap
     /// the game did not run through (see [`GAP`]).
     pub fn gap(&mut self, now: Instant) -> Option<(Instant, Instant)> {
@@ -262,6 +295,23 @@ impl WebFront {
             self.cfg_written = cfg.to_vec();
         }
     }
+}
+
+/// [`WebFront::frame_size`] with WebGL.
+fn card_frame_size((ww, wh): (u32, u32), hd: bool) -> (usize, usize) {
+    if ww == 0 || wh == 0 {
+        return (ww as usize, wh as usize);
+    }
+    let (fw, fh) = (f64::from(ww), f64::from(wh));
+    let mut k = (crate::WEB_MAX_PIXELS as f64 / (fw * fh)).sqrt().min(1.0);
+    if hd {
+        let picture_h = fh.min(fw * 3.0 / 4.0);
+        k = k.min((HD_MAX_TILE * 480 / 16) as f64 / picture_h);
+    }
+    (
+        ((fw * k).round() as usize).max(1),
+        ((fh * k).round() as usize).max(1),
+    )
 }
 
 /// Whether the page holds the pointer lock.
@@ -575,4 +625,53 @@ fn json(s: &str) -> String {
     }
     out.push('"');
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::wasm_bindgen_test as test;
+
+    #[test]
+    fn frame_sizes() {
+        // A small canvas: its own size; a large one: at most 1280 x 960
+        // pixels, and in HD a picture no taller than the HD view (720).
+        assert_eq!(card_frame_size((800, 600), false), (800, 600));
+        assert_eq!(card_frame_size((2560, 1920), false), (1280, 960));
+        assert_eq!(card_frame_size((1920, 1440), true), (960, 720));
+        assert_eq!(card_frame_size((1280, 960), true), (960, 720));
+        assert_eq!(card_frame_size((640, 480), true), (640, 480));
+        // Widescreen: the picture's height, or the pixels' count.
+        assert_eq!(card_frame_size((1920, 800), true), (1717, 716));
+        assert_eq!(card_frame_size((2400, 1000), true), (1717, 716));
+        assert_eq!(card_frame_size((0, 0), true), (0, 0));
+    }
+
+    #[test]
+    fn frame_times_report() {
+        let mut t = FrameTimes::default();
+        assert_eq!(t.report(), "{}");
+        for i in 0..10 {
+            t.add("view-hd", f64::from(i), 1.0);
+        }
+        t.add("dialog", 4.0, 0.5);
+        let r = t.report();
+        assert!(r.starts_with("{\"dialog\":{\"n\":1,\"mean\":4.50,"), "{r}");
+        assert!(
+            r.contains("\"view-hd\":{\"n\":10,\"mean\":5.50,\"p50\":6.00,\"p95\":10.00,\"max\":10.00,\"pass\":4.50,\"present\":1.00}"),
+            "{r}"
+        );
+        for _ in 0..SAMPLES {
+            t.add("video", 1.0, 1.0);
+        }
+        assert!(!t.report().contains("dialog"));
+        t.clear();
+        assert_eq!(t.report(), "{}");
+    }
+
+    #[test]
+    fn json_strings() {
+        assert_eq!(json("tibet.wam"), "\"tibet.wam\"");
+        assert_eq!(json("a\"b\\c\n"), "\"a\\\"b\\\\c\\u000a\"");
+    }
 }

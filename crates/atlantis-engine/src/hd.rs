@@ -1273,13 +1273,16 @@ pub fn compose_dialog(
     // pixels (some equal the view's), but for those the head's drawing put
     // back to the view (it clears part of the video's face first).
     let pre = (pre_head.len() == composite.len()).then_some(pre_head);
-    let is_char = |i: usize| {
+    let char_at = |i: usize| {
         if composite[i] != pano[i] {
             return true;
         }
         let cleared = pre.is_some_and(|p| p[i] != composite[i]);
         !cleared && body.get(i).is_some_and(|&b| b != 0)
     };
+    // (once per 640x480 pixel: the HD picture asks each several times)
+    let chars: Vec<bool> = (0..SCREEN_W * SCREEN_H).map(char_at).collect();
+    let is_char = |i: usize| chars[i];
     let shift = dialog_shift(&is_char, side);
     // `over`: the composite with the overlay drawn over the head (the
     // SPF), or `composite` again.
@@ -1288,6 +1291,8 @@ pub fn compose_dialog(
     } else {
         composite
     };
+    // Without an overlay (`over` is the composite) its pass changes nothing.
+    let has_over = !std::ptr::eq(over, composite) && !crate::upscale::same_pixels(over, composite);
     // The body (a video) upscaled bilinearly with a smooth interface.
     let smooth = smooth.then(|| {
         let rgb: Vec<u32> = over.iter().map(|&p| lut[usize::from(p)]).collect();
@@ -1329,6 +1334,9 @@ pub fn compose_dialog(
                 }
             }
             // The overlay over the head, with the character.
+            if !has_over {
+                continue;
+            }
             let o = &over[sy * SCREEN_W..][..SCREEN_W];
             for (x, &sx) in cols.iter().enumerate() {
                 if o[sx] == c[sx] {

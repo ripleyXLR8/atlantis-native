@@ -856,16 +856,32 @@ impl App {
             };
             #[cfg(target_arch = "wasm32")]
             if card_compose {
+                let view = self.gl_view.as_ref().map(|v| v.borrow());
+                let card_view = f
+                    .layer
+                    .filter(|l| l.on_card)
+                    .map(|l| view.as_ref().and_then(|v| v.picture(l.card_gen)));
                 let c = CardCompose {
                     gl: self.gl.as_mut(),
                     gc: self.gl_compose.as_mut(),
-                    view: self.gl_view.as_ref(),
+                    card_view,
                     compositor: &mut self.compositor,
                     text: &mut self.gl_text,
                     text_rows: &mut self.gl_text_rows,
-                    sys: &self.sys,
+                    opts: self.sys.hd_options(),
+                    check: self.sys.view_check.get(),
                 };
-                if compose_on_card(c, f, window_size, k, (sw, sh), (ox, oy, dw, dh)) {
+                let done = compose_on_card(
+                    c,
+                    f,
+                    window_size,
+                    k,
+                    (sw, sh),
+                    (ox, oy, dw, dh),
+                    &mut |_, _, _| false,
+                );
+                drop(view);
+                if done {
                     drop((layer, text, video));
                     return;
                 }
@@ -1333,16 +1349,26 @@ pub fn start_game(game: Game, options: atlantis_engine::Options) -> (Rc<Sys>, Ru
     (sys, runner)
 }
 
-/// The parts of the app [`compose_on_card`] uses.
+/// A front end's own sharp texts drawn into the overlay of
+/// [`compose_on_card`] (`out`, its stride, the picture's area).
 #[cfg(target_arch = "wasm32")]
-struct CardCompose<'a> {
-    gl: Option<&'a mut gl_present::GlPresenter>,
-    gc: Option<&'a mut gl_present::GlCompose>,
-    view: Option<&'a Rc<std::cell::RefCell<gl_present::GlView>>>,
-    compositor: &'a mut HdCompositor,
-    text: &'a mut Vec<u32>,
-    text_rows: &'a mut Option<(usize, usize)>,
-    sys: &'a Sys,
+pub(crate) type MoreText<'a> =
+    &'a mut dyn FnMut(&mut [u32], usize, (usize, usize, usize, usize)) -> bool;
+
+/// The parts of a front end [`compose_on_card`] uses (both games').
+#[cfg(target_arch = "wasm32")]
+pub(crate) struct CardCompose<'a> {
+    pub gl: Option<&'a mut gl_present::GlPresenter>,
+    pub gc: Option<&'a mut gl_present::GlCompose>,
+    /// With the frame's layer on the graphics card, its view's picture
+    /// (None when the card no longer holds it).
+    pub card_view: Option<Option<&'a web_sys::WebGlTexture>>,
+    pub compositor: &'a mut HdCompositor,
+    pub text: &'a mut Vec<u32>,
+    pub text_rows: &'a mut Option<(usize, usize)>,
+    pub opts: atlantis_engine::hd::HdOptions,
+    /// The composition compared with the processor's (logged).
+    pub check: bool,
 }
 
 /// The HD frame `f` composed by the graphics card and shown (the
@@ -1350,35 +1376,34 @@ struct CardCompose<'a> {
 /// at `area`); false when it cannot (a video's widescreen sides, the
 /// card's view missing), the processor composing it then. With the
 /// view check on, the card's picture is compared with the processor's.
+/// `more_text` draws a front end's own sharp texts into the overlay after
+/// the frame's (Atlantis II's, which its engine draws), and says whether
+/// it drew any.
 #[cfg(target_arch = "wasm32")]
 #[allow(clippy::too_many_arguments)]
-fn compose_on_card(
+pub(crate) fn compose_on_card(
     c: CardCompose<'_>,
     f: HdFrame<'_>,
     window: (u32, u32),
     k: f64,
     (sw, sh): (usize, usize),
     area: (usize, usize, usize, usize),
+    more_text: MoreText<'_>,
 ) -> bool {
     let CardCompose {
         gl,
         gc,
-        view,
+        card_view,
         compositor,
         text: gl_text,
         text_rows,
-        sys,
+        opts,
+        check,
     } = c;
     let (Some(gl), Some(gc)) = (gl, gc) else {
         return false;
     };
-    let opts = sys.hd_options();
     let (ox, _, dw, dh) = area;
-    let view = view.map(|v| v.borrow());
-    let card_view = f
-        .layer
-        .filter(|l| l.on_card)
-        .map(|l| view.as_ref().and_then(|v| v.picture(l.card_gen)));
     if matches!(card_view, Some(None)) {
         return false;
     }
@@ -1389,7 +1414,9 @@ fn compose_on_card(
             rows.fill(0);
         }
     }
-    let rows = if compositor.draw_texts_overlay(&f, opts, gl_text, sw, area) {
+    let items = compositor.draw_texts_overlay(&f, opts, gl_text, sw, area);
+    let more = opts.sharp_subtitles && more_text(gl_text, sw, area);
+    let rows = if items || more {
         let text = &*gl_text;
         let used = |y: &usize| text[y * sw..][..sw].iter().any(|&p| p != 0);
         let first = (0..sh).find(used);
@@ -1411,8 +1438,7 @@ fn compose_on_card(
     if gc.compose(plan, layer, (sw, sh), area).is_none() {
         return false;
     }
-    drop(view);
-    if sys.view_check.get() {
+    if check {
         let mut card = vec![0u32; sw * sh];
         let mut cpu = vec![0u32; sw * sh];
         if gc.read_back(&mut card) {
