@@ -418,7 +418,7 @@ impl Game {
     pub(super) fn screen_frame(&mut self) {
         if !matches!(
             self.puzzles.screen,
-            Some(Screen::Carte | Screen::CarteTour | Screen::Ecrin)
+            Some(Screen::Carte | Screen::CarteTour | Screen::Ecrin | Screen::Licorne)
         ) {
             self.draw_warp_only();
             self.draw_pointer();

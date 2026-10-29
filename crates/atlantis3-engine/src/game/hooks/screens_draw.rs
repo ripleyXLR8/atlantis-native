@@ -146,6 +146,31 @@ impl Game {
         }
     }
 
+    /// The unicorn board's picture (@ 0x0042f983..0x0042fa2d): the warp
+    /// frame (@ 0x00440690, covered by the board), the board
+    /// (@ 0x004bb3e0), the cursor when nothing runs and nothing is
+    /// carried (`Interface.spr` #40 at the pointer, else the animated
+    /// frame centred on it), the flip.
+    pub(crate) fn licorne_draw(&mut self, board: &mut crate::licorne::Board) {
+        self.draw_warp_only();
+        board.draw(&mut self.screen);
+        if let Some(c) = board.cursor() {
+            if let Some(i) = self.interface.take() {
+                let path = "spr\\Interface.spr";
+                match c {
+                    crate::licorne::Cursor::Plain(x, y) => {
+                        self.draw_spr(path, &i, 40, Some(x), y, 1.0);
+                    }
+                    crate::licorne::Cursor::Centred(k, x, y) => {
+                        self.draw_spr_centre(path, &i, k.max(0) as usize, x, y, 1.0);
+                    }
+                }
+                self.interface = Some(i);
+            }
+        }
+        self.tr_flip();
+    }
+
     /// `AtlEcrin_ReloadSprBank` (@ 0x00413370), run by the `jardin.wam`
     /// load (@ 0x004c367e): `Ecrin%d.spr`, %d the display's depth (the
     /// port draws in 16 bits). `Interface.spr` is the game's.

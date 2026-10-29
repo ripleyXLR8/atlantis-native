@@ -45,14 +45,14 @@ pub const VISEMES: &[u8; 7] = b"diaobsv";
 
 /// A quaternion (x, y, z, w) and a vector, as the f32 values the original
 /// stores, held in f64.
-pub(crate) type Quat = [f64; 4];
-pub(crate) type Vec3 = [f64; 3];
+pub type Quat = [f64; 4];
+pub type Vec3 = [f64; 3];
 
-pub(crate) fn q64(q: [f32; 4]) -> Quat {
+pub fn q64(q: [f32; 4]) -> Quat {
     q.map(f64::from)
 }
 
-pub(crate) fn v64(v: [f32; 3]) -> Vec3 {
+pub fn v64(v: [f32; 3]) -> Vec3 {
     v.map(f64::from)
 }
 
@@ -83,7 +83,7 @@ pub(crate) fn qcmul(c: Fpu, a: &Quat, b: &Quat) -> Quat {
 }
 
 /// The rotation matrix of a quaternion, rows (@ 0x004c6e40).
-pub(crate) fn qmat(c: Fpu, q: &Quat) -> [f64; 9] {
+pub fn qmat(c: Fpu, q: &Quat) -> [f64; 9] {
     let [x, y, z, w] = *q;
     let x2 = c.add(x, x);
     let y2 = c.f(c.add(y, y));
@@ -112,7 +112,7 @@ pub(crate) fn qmat(c: Fpu, q: &Quat) -> [f64; 9] {
 }
 
 /// The quaternion of a rotation matrix (@ 0x004c8a10).
-pub(crate) fn matq(c: Fpu, m: &[f64; 9]) -> Quat {
+pub fn matq(c: Fpu, m: &[f64; 9]) -> Quat {
     let trace = c.add(c.add(m[4], m[0]), m[8]);
     let mut q = [0.0; 4];
     if trace > 0.0 {
@@ -154,7 +154,7 @@ fn acos(fpu: Fpu, x: f64) -> f64 {
 }
 
 /// Spherical interpolation of two rotation keys (@ 0x004c8b60).
-fn slerp(c: Fpu, a: &Quat, b: &Quat, t: f64) -> Quat {
+pub fn slerp(c: Fpu, a: &Quat, b: &Quat, t: f64) -> Quat {
     let m = |x, y| c.mul(x, y);
     let mut dot = c.f(c.add(
         c.add(c.add(m(a[0], b[0]), m(a[2], b[2])), m(a[1], b[1])),
@@ -188,24 +188,24 @@ fn slerp(c: Fpu, a: &Quat, b: &Quat, t: f64) -> Quat {
 /// rotation, position and uniform scale; the world values are computed
 /// on demand (@ 0x004a33c0).
 #[derive(Clone, Debug)]
-pub(crate) struct Node {
-    pub(crate) name: String,
-    pub(crate) parent: Option<usize>,
-    pub(crate) lq: Quat,
-    pub(crate) lp: Vec3,
-    pub(crate) ls: f64,
-    pub(crate) wq: Quat,
-    pub(crate) wp: Vec3,
-    pub(crate) ws: f64,
-    pub(crate) valid: bool,
+pub struct Node {
+    pub name: String,
+    pub parent: Option<usize>,
+    pub lq: Quat,
+    pub lp: Vec3,
+    pub ls: f64,
+    pub wq: Quat,
+    pub wp: Vec3,
+    pub ws: f64,
+    pub valid: bool,
 }
 
 /// A node's key-frame track (@ 0x004c7250): (time, value) per channel.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Track {
-    pub(crate) rotations: Vec<(f64, Quat)>,
-    pub(crate) positions: Vec<(f64, Vec3)>,
-    pub(crate) scales: Vec<(f64, f64)>,
+pub struct Track {
+    pub rotations: Vec<(f64, Quat)>,
+    pub positions: Vec<(f64, Vec3)>,
+    pub scales: Vec<(f64, f64)>,
 }
 
 /// The first key whose time is not below `t` (@ 0x004c87d0).
@@ -217,20 +217,20 @@ fn lower_bound<T>(keys: &[(f64, T)], t: f64) -> usize {
 /// camera by @ 0x004a6470: projection, frustum slopes, depth map and its
 /// world pose (a node whose parent is the scene root).
 #[derive(Clone, Debug)]
-struct Camera {
-    fx: f64,
-    fy: f64,
-    cx: f64,
-    cy: f64,
-    near: f64,
-    far: f64,
+pub struct Camera {
+    pub fx: f64,
+    pub fy: f64,
+    pub cx: f64,
+    pub cy: f64,
+    pub near: f64,
+    pub far: f64,
     /// Frustum slopes left, top, right, bottom (x/z, y/z).
-    slopes: [f64; 4],
+    pub slopes: [f64; 4],
     /// Depth map: depth = a − b·w.
-    a: f64,
-    b: f64,
-    q: Quat,
-    p: Vec3,
+    pub a: f64,
+    pub b: f64,
+    pub q: Quat,
+    pub p: Vec3,
 }
 
 /// The dialog camera's reference frame (the camera constructor's 640 x
@@ -275,7 +275,7 @@ impl Camera {
     /// *Atlantis III*'s dialog camera (@ 0x004fa0b0 then @ 0x004fb8e0): the
     /// reference frame `w` x `h`, aspect w/h, centre (w/2, h/2), viewport
     /// 0..w−1 x 0..h−1.
-    fn sized(fpu: Fpu, c: &atlantis2_data::db::Camera, w: f64, h: f64) -> Camera {
+    pub fn sized(fpu: Fpu, c: &atlantis2_data::db::Camera, w: f64, h: f64) -> Camera {
         let k = fpu;
         let fov = f64::from(c.fov);
         let fx = k.div(w, k.mul(libm::tan(k.mul(fov, 0.5)), 2.0));
@@ -335,9 +335,9 @@ impl Camera {
 }
 
 /// Clip codes of a vertex (pipeline + 0x24).
-pub(crate) const CLIP_NEAR: u8 = 0x10;
-pub(crate) const CLIP_FAR: u8 = 0x20;
-pub(crate) const USED: u8 = 0x80;
+pub const CLIP_NEAR: u8 = 0x10;
+pub const CLIP_FAR: u8 = 0x20;
+pub const USED: u8 = 0x80;
 
 /// The head mesh as the pipeline reads it.
 #[derive(Clone, Debug)]
@@ -1259,20 +1259,8 @@ impl Head {
         // @ 0x00572080 → @ 0x0057fbc0, the same operations in x87
         // assembly).
         let k = self.fpu;
-        let nv = cv.len();
-        let mut proj = vec![[0.0f64; 4]; nv];
-        st.projected = vec![[0.0f32; 4]; nv];
-        for (i, p) in cv.iter().enumerate() {
-            if st.codes[i] & 0x90 != USED {
-                continue;
-            }
-            let w = k.div(1.0, p[2]);
-            let sx = k.f(k.add(k.mul(k.mul(c.fx, p[0]), w), c.cx));
-            let sy = k.f(k.add(k.mul(k.mul(c.fy, p[1]), w), c.cy));
-            let depth = k.f(k.sub(c.a, k.mul(w, c.b)));
-            proj[i] = [sx, sy, depth, k.f(w)];
-            st.projected[i] = proj[i].map(|x| x as f32);
-        }
+        let proj = project(k, &c, &cv, &st.codes);
+        st.projected = proj.iter().map(|p| p.map(|x| x as f32)).collect();
         // The faces (@ 0x004380b0): one group, the texture of its
         // material; three vertex records (sx, sy, w, u, v) per front face.
         let tex = Texture {
@@ -1416,111 +1404,10 @@ impl Head {
 
     /// The type-8 transform (@ 0x00571bd0 → @ 0x0057eec0, x87 assembly):
     /// the head node's world pose by the assembly update (@ 0x00584340),
-    /// the matrix computed inline (@ 0x0057eef0), then each vertex and its
-    /// clip codes, compared before the float stores.
+    /// then [`transform_pii`].
     fn transform_pii(&mut self, c: &Camera) -> (Stages, Vec<[f64; 3]>) {
-        let k = self.fpu;
-        let m = |x, y| k.mul(x, y);
         self.update_asm(self.head);
-        let n = &self.nodes[self.head];
-        // The camera node: its world pose is its local one (a child of the
-        // scene root), scale 1.
-        let [cx, cy, cz, cw] = c.q;
-        let cs = 1.0;
-        let is = k.div(1.0, cs);
-        let dx = k.sub(n.wp[0], c.p[0]);
-        let dy = k.sub(n.wp[1], c.p[1]);
-        let dz = k.sub(n.wp[2], c.p[2]);
-        let a = k.sub(k.add(m(dx, cw), m(cz, dy)), m(cy, dz));
-        let b = k.sub(k.add(m(dy, cw), m(cx, dz)), m(cz, dx));
-        let e = k.sub(k.add(m(dz, cw), m(cy, dx)), m(cx, dy));
-        let d = k.add(m(dx, cx), k.add(m(dy, cy), m(dz, cz)));
-        let t = [
-            k.f(m(
-                k.add(m(a, cw), k.add(k.sub(m(cx, d), m(cy, e)), m(cz, b))),
-                is,
-            )),
-            k.f(m(
-                k.add(m(b, cw), k.add(k.sub(m(cy, d), m(cz, a)), m(cx, e))),
-                is,
-            )),
-            k.f(m(
-                k.add(m(e, cw), k.add(k.sub(m(d, cz), m(cx, b)), m(cy, a))),
-                is,
-            )),
-        ];
-        let scale = k.f(m(is, n.ws));
-        // conj(q_C) ⊗ q_N.
-        let [ox, oy, oz, ow] = n.wq;
-        let x = k.f(k.add(k.sub(k.sub(m(ox, cw), m(cx, ow)), m(cy, oz)), m(oy, cz)));
-        let y = k.f(k.add(k.sub(k.sub(m(oy, cw), m(cy, ow)), m(ox, cz)), m(cx, oz)));
-        let z = k.f(k.add(k.sub(k.sub(m(oz, cw), m(ow, cz)), m(oy, cx)), m(cy, ox)));
-        let w = k.f(k.add(k.add(k.add(m(cw, ow), m(cx, ox)), m(cy, oy)), m(cz, oz)));
-        let (x2, y2, z2) = (k.add(x, x), k.add(y, y), k.add(z, z));
-        let mat = [
-            k.sub(1.0, k.add(m(y, y2), m(z, z2))),
-            k.sub(m(y2, x), m(w, z2)),
-            k.add(m(z2, x), m(w, y2)),
-            k.add(m(w, z2), m(y2, x)),
-            k.sub(1.0, k.add(m(x, x2), m(z, z2))),
-            k.sub(m(y, z2), m(x2, w)),
-            k.sub(m(z2, x), m(w, y2)),
-            k.add(m(x2, w), m(y, z2)),
-            k.sub(1.0, k.add(m(x, x2), m(y, y2))),
-        ]
-        .map(|v| k.f(m(k.f(v), scale)));
-        let nv = self.vertices.len();
-        let mut st = Stages {
-            camera: Vec::with_capacity(nv),
-            codes: Vec::with_capacity(nv),
-            ..Stages::default()
-        };
-        let mut cv = Vec::with_capacity(nv);
-        let mut and = 0xffu8;
-        // `seta` / `setb` after `fcomi`: false / true when unordered.
-        let above = |a: f64, b: f64| a > b;
-        let below = |a: f64, b: f64| a < b || a.is_nan() || b.is_nan();
-        for v in &self.vertices {
-            let [vx, vy, vz] = *v;
-            let px = k.add(
-                k.add(m(mat[2], vz), k.add(m(mat[1], vy), m(mat[0], vx))),
-                t[0],
-            );
-            let py = k.add(
-                k.add(m(mat[5], vz), k.add(m(mat[4], vy), m(mat[3], vx))),
-                t[1],
-            );
-            let pz = k.add(
-                k.add(k.add(m(vy, mat[7]), m(vx, mat[6])), m(vz, mat[8])),
-                t[2],
-            );
-            let mut code = 0;
-            if above(c.near, pz) {
-                code |= CLIP_NEAR;
-            }
-            if below(c.far, pz) {
-                code |= CLIP_FAR;
-            }
-            if above(m(pz, c.slopes[0]), px) {
-                code |= 1;
-            }
-            if below(m(pz, c.slopes[2]), px) {
-                code |= 4;
-            }
-            if above(m(pz, c.slopes[1]), py) {
-                code |= 2;
-            }
-            if below(m(pz, c.slopes[3]), py) {
-                code |= 8;
-            }
-            and &= code;
-            let p = [k.f(px), k.f(py), k.f(pz)];
-            st.camera.push(p.map(|x| x as f32));
-            st.codes.push(code);
-            cv.push(p);
-        }
-        st.rejected = and & 0x3f != 0;
-        (st, cv)
+        transform_pii(self.fpu, c, &self.nodes[self.head], &self.vertices)
     }
 
     /// The type-8 back faces (@ 0x00572030 → @ 0x0057fac0); see
@@ -1530,10 +1417,136 @@ impl Head {
     }
 }
 
+/// The type-8 transform (@ 0x0057eec0, x87 assembly; *Atlantis III*
+/// @ 0x006944c0) of `vertices` by node `n` (its world values already
+/// computed, [`update_asm_node`]) seen by camera `c`: the matrix computed
+/// inline (@ 0x0057eef0), then each vertex and its clip codes, compared
+/// before the float stores.
+pub fn transform_pii(k: Fpu, c: &Camera, n: &Node, vertices: &[[f64; 3]]) -> (Stages, Vec<[f64; 3]>) {
+    let m = |x, y| k.mul(x, y);
+    // The camera node: its world pose is its local one (a child of the
+    // scene root), scale 1.
+    let [cx, cy, cz, cw] = c.q;
+    let cs = 1.0;
+    let is = k.div(1.0, cs);
+    let dx = k.sub(n.wp[0], c.p[0]);
+    let dy = k.sub(n.wp[1], c.p[1]);
+    let dz = k.sub(n.wp[2], c.p[2]);
+    let a = k.sub(k.add(m(dx, cw), m(cz, dy)), m(cy, dz));
+    let b = k.sub(k.add(m(dy, cw), m(cx, dz)), m(cz, dx));
+    let e = k.sub(k.add(m(dz, cw), m(cy, dx)), m(cx, dy));
+    let d = k.add(m(dx, cx), k.add(m(dy, cy), m(dz, cz)));
+    let t = [
+        k.f(m(
+            k.add(m(a, cw), k.add(k.sub(m(cx, d), m(cy, e)), m(cz, b))),
+            is,
+        )),
+        k.f(m(
+            k.add(m(b, cw), k.add(k.sub(m(cy, d), m(cz, a)), m(cx, e))),
+            is,
+        )),
+        k.f(m(
+            k.add(m(e, cw), k.add(k.sub(m(d, cz), m(cx, b)), m(cy, a))),
+            is,
+        )),
+    ];
+    let scale = k.f(m(is, n.ws));
+    // conj(q_C) ⊗ q_N.
+    let [ox, oy, oz, ow] = n.wq;
+    let x = k.f(k.add(k.sub(k.sub(m(ox, cw), m(cx, ow)), m(cy, oz)), m(oy, cz)));
+    let y = k.f(k.add(k.sub(k.sub(m(oy, cw), m(cy, ow)), m(ox, cz)), m(cx, oz)));
+    let z = k.f(k.add(k.sub(k.sub(m(oz, cw), m(ow, cz)), m(oy, cx)), m(cy, ox)));
+    let w = k.f(k.add(k.add(k.add(m(cw, ow), m(cx, ox)), m(cy, oy)), m(cz, oz)));
+    let (x2, y2, z2) = (k.add(x, x), k.add(y, y), k.add(z, z));
+    let mat = [
+        k.sub(1.0, k.add(m(y, y2), m(z, z2))),
+        k.sub(m(y2, x), m(w, z2)),
+        k.add(m(z2, x), m(w, y2)),
+        k.add(m(w, z2), m(y2, x)),
+        k.sub(1.0, k.add(m(x, x2), m(z, z2))),
+        k.sub(m(y, z2), m(x2, w)),
+        k.sub(m(z2, x), m(w, y2)),
+        k.add(m(x2, w), m(y, z2)),
+        k.sub(1.0, k.add(m(x, x2), m(y, y2))),
+    ]
+    .map(|v| k.f(m(k.f(v), scale)));
+    let nv = vertices.len();
+    let mut st = Stages {
+        camera: Vec::with_capacity(nv),
+        codes: Vec::with_capacity(nv),
+        ..Stages::default()
+    };
+    let mut cv = Vec::with_capacity(nv);
+    let mut and = 0xffu8;
+    // `seta` / `setb` after `fcomi`: false / true when unordered.
+    let above = |a: f64, b: f64| a > b;
+    let below = |a: f64, b: f64| a < b || a.is_nan() || b.is_nan();
+    for v in vertices {
+        let [vx, vy, vz] = *v;
+        let px = k.add(
+            k.add(m(mat[2], vz), k.add(m(mat[1], vy), m(mat[0], vx))),
+            t[0],
+        );
+        let py = k.add(
+            k.add(m(mat[5], vz), k.add(m(mat[4], vy), m(mat[3], vx))),
+            t[1],
+        );
+        let pz = k.add(
+            k.add(k.add(m(vy, mat[7]), m(vx, mat[6])), m(vz, mat[8])),
+            t[2],
+        );
+        let mut code = 0;
+        if above(c.near, pz) {
+            code |= CLIP_NEAR;
+        }
+        if below(c.far, pz) {
+            code |= CLIP_FAR;
+        }
+        if above(m(pz, c.slopes[0]), px) {
+            code |= 1;
+        }
+        if below(m(pz, c.slopes[2]), px) {
+            code |= 4;
+        }
+        if above(m(pz, c.slopes[1]), py) {
+            code |= 2;
+        }
+        if below(m(pz, c.slopes[3]), py) {
+            code |= 8;
+        }
+        and &= code;
+        let p = [k.f(px), k.f(py), k.f(pz)];
+        st.camera.push(p.map(|x| x as f32));
+        st.codes.push(code);
+        cv.push(p);
+    }
+    st.rejected = and & 0x3f != 0;
+    (st, cv)
+}
+
+/// The projection of the used vertices (@ 0x004d20c0; type 8
+/// @ 0x00572080 → @ 0x0057fbc0, the same operations in x87 assembly):
+/// sx, sy, depth, w of each vertex whose code is [`USED`] (zeros for the
+/// others).
+pub fn project(k: Fpu, c: &Camera, cv: &[[f64; 3]], codes: &[u8]) -> Vec<[f64; 4]> {
+    let mut proj = vec![[0.0f64; 4]; cv.len()];
+    for (i, p) in cv.iter().enumerate() {
+        if codes[i] & 0x90 != USED {
+            continue;
+        }
+        let w = k.div(1.0, p[2]);
+        let sx = k.f(k.add(k.mul(k.mul(c.fx, p[0]), w), c.cx));
+        let sy = k.f(k.add(k.mul(k.mul(c.fy, p[1]), w), c.cy));
+        let depth = k.f(k.sub(c.a, k.mul(w, c.b)));
+        proj[i] = [sx, sy, depth, k.f(w)];
+    }
+    proj
+}
+
 /// The type-8 back faces (@ 0x00572030 → @ 0x0057fac0): the normal
 /// from unrounded differences, stored as floats, the test on the
 /// unrounded normal; drawn when N · c0 ≤ 0, culled when unordered.
-fn back_faces_pii(k: Fpu, corners: &[[u16; 3]], cv: &[[f64; 3]], codes: &mut [u8]) -> Vec<u8> {
+pub fn back_faces_pii(k: Fpu, corners: &[[u16; 3]], cv: &[[f64; 3]], codes: &mut [u8]) -> Vec<u8> {
     let m = |x, y| k.mul(x, y);
     let mut faces = Vec::with_capacity(corners.len());
     for tri in corners {
@@ -1552,7 +1565,7 @@ fn back_faces_pii(k: Fpu, corners: &[[u16; 3]], cv: &[[f64; 3]], codes: &mut [u8
 
 /// A face's byte (0 drawn, 0x40 back face); a drawn face's three vertices
 /// get the code 0x80.
-pub(crate) fn mark_front(front: bool, tri: &[u16; 3], codes: &mut [u8]) -> u8 {
+pub fn mark_front(front: bool, tri: &[u16; 3], codes: &mut [u8]) -> u8 {
     if !front {
         return 0x40;
     }
@@ -1593,7 +1606,7 @@ fn head_object(scene: &Scene) -> Option<(String, &atlantis2_data::db::Mesh)> {
 
 /// A node's track from its `.db` record (@ 0x004c7250): the TCB keys'
 /// values, or the version-11 linear keys when there is no TCB key.
-pub(crate) fn track(d: &atlantis2_data::db::Node) -> Option<Track> {
+pub fn track(d: &atlantis2_data::db::Node) -> Option<Track> {
     let tcb =
         !(d.rotation_keys.is_empty() && d.position_keys.is_empty() && d.scale_keys.is_empty());
     let scale = |s: f32| if s == 0.0 { 1.0 } else { f64::from(s) };
@@ -1727,7 +1740,7 @@ pub(crate) fn pose_nodes(fpu: Fpu, nodes: &mut [Node], tracks: &[Option<Track>],
 
 /// The world values of node `i` as the x87 assembly computes them
 /// (@ 0x00584340); see [`Head::update_asm`].
-pub(crate) fn update_asm_node(fpu: Fpu, nodes: &mut [Node], i: usize) {
+pub fn update_asm_node(fpu: Fpu, nodes: &mut [Node], i: usize) {
     if nodes[i].valid {
         return;
     }

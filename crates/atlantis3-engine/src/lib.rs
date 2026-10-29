@@ -19,6 +19,7 @@ pub mod cinema;
 pub mod dialog;
 pub mod game;
 pub mod inventory;
+pub mod licorne;
 pub mod lipsync;
 pub mod maps;
 pub mod menu;
