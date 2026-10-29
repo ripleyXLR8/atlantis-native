@@ -111,6 +111,8 @@ struct Playing {
     shown: u32,
     /// The caption (`loc\text\<lang>\CineNNN.txt`) and its fade.
     caption: Option<crate::caption::CaptionFade>,
+    /// The move's transition sprites (`spf\SPF640\<world>\`).
+    spf: Vec<Bank>,
     /// The cue lines (`hnm\cineNNN.txt`): the line, shown, done.
     cues: Vec<(atlantis3_data::cine_txt::Cue, bool, bool)>,
 }
@@ -1067,6 +1069,7 @@ impl Game {
             shown: 0,
             caption: None,
             cues: Vec::new(),
+            spf: Vec::new(),
         });
         self.mode = Mode::Video;
         // The first frame at once.
@@ -1145,14 +1148,31 @@ impl Game {
                 }
             }
             let (w, h) = v.cinema.size();
-            stretch_video(
-                v.cinema.frame(),
-                w,
-                h,
-                &mut self.screen,
-                self.width,
-                self.height,
-            );
+            if v.spf.is_empty() {
+                stretch_video(
+                    v.cinema.frame(),
+                    w,
+                    h,
+                    &mut self.screen,
+                    self.width,
+                    self.height,
+                );
+            } else {
+                // The move's transition sprites over the travel video
+                // (@ 0x00421fe8): each bank's sprite `frame - 1` at its
+                // default position.
+                let mut frame = v.cinema.frame().to_vec();
+                let k = v.shown as usize;
+                for bank in &v.spf {
+                    let mut t = Target::screen(&mut frame, w, h);
+                    t.xmax = w as i32;
+                    t.ymax = h as i32;
+                    if let Some(i) = k.checked_sub(1) {
+                        bank.draw(&mut t, None, 0, i);
+                    }
+                }
+                stretch_video(&frame, w, h, &mut self.screen, self.width, self.height);
+            }
         }
         let ended = v.cinema.ended();
         if advanced {
@@ -1618,12 +1638,55 @@ impl Game {
                 .find_map(|v| v.destinations.iter().find(|d| d.target == next))
                 .cloned()
         });
+        let world = self.script.as_ref().map_or(1, |s| s.a3.world);
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
+        // The transition sprites (@ 0x00435a90): per `id_spf` of the
+        // destination whose entity the show table does not hide, the
+        // entity's prefix and `%s%03d%03d.spr` (from view, to view).
+        let spf: Vec<Bank> = match (&dest, old) {
+            (Some(d), Some(old)) => d
+                .sprites
+                .iter()
+                .filter_map(|name| {
+                    let hidden = self.script.as_ref().is_some_and(|s| {
+                        let id = self
+                            .names
+                            .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
+                            .map(|i| (i as i32, 1))
+                            .or_else(|_| {
+                                self.names
+                                    .id(atlantis2_data::defnames::OBJETS, name.as_bytes())
+                                    .map(|i| (i as i32, 2))
+                            });
+                        id.is_ok_and(|(id, kind)| {
+                            s.shown
+                                .iter()
+                                .any(|r| r.id == id && r.kind == kind && !r.shown)
+                        })
+                    });
+                    if hidden {
+                        return None;
+                    }
+                    let e = self
+                        .place
+                        .wam
+                        .entities
+                        .iter()
+                        .find(|e| e.con_name.eq_ignore_ascii_case(name))?;
+                    let path = format!("spf/SPF640/{folder}/{}{old:03}{next:03}.spr", e.prefix);
+                    self.files
+                        .read(&path)
+                        .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok())
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
         if let (Some(d), false) = (dest, self.double_click) {
-            let world = self.script.as_ref().map_or(1, |s| s.a3.world);
-            let folder = WORLDS.get(world as usize).copied().unwrap_or("");
             let path = format!("hnmtraj/HNM640/{folder}/{}", d.video);
-            if self.files.size(&path).is_some() {
-                self.start_video(&path, 15, true, Mode::Warp);
+            if self.files.size(&path).is_some() && self.start_video(&path, 15, true, Mode::Warp) {
+                if let Some(v) = self.video.as_mut() {
+                    v.spf = spf;
+                }
             }
         }
     }

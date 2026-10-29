@@ -76,7 +76,22 @@ fn main() {
     r.g.new_game();
     r.settle();
     r.go(5);
-    r.go(6);
+    // The travel to view 6, with the transition sprites over it.
+    assert!(r.g.aim_at_zone(|z| z.kind == 1 && z.value == 6));
+    r.g.click();
+    for _ in 0..600 {
+        r.frame();
+        if r.g.video().is_some() {
+            break;
+        }
+    }
+    if r.g.video().is_some() {
+        for _ in 0..110 {
+            r.frame();
+        }
+        r.save("travel");
+    }
+    r.settle();
     r.go(7);
     // The guard: the subject menu, then the dialog.
     let guard =
