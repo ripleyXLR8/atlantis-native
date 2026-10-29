@@ -1,0 +1,1113 @@
+# CDialogue of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation: the load's
+# stand / camera picks (srand(1)), each Hoggar dialog's opening picks and every line's plan.
+LOAD 214 2 rand=-
+LOAD 215 2 rand=-
+LOAD 11 1 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0022
+LOAD 11 3 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0024
+LOAD 11 5 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0026
+LOAD 11 7 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0028
+LOAD 11 9 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0030
+LOAD 11 11 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0032
+LOAD 11 13 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0034
+LOAD 11 15 rand=- speaker=boss stand=1 camera=1 mood=0 rnd=0 voice=BOSS0036
+LOAD 12 1 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0048
+LOAD 12 3 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0050
+LOAD 12 5 rand=- speaker=boss stand=1 camera=1 mood=0 rnd=0 voice=BOSS0052
+LOAD 12 7 rand=- speaker=boss stand=1 camera=1 mood=0 rnd=0 voice=BOSS0054
+LOAD 12 9 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0056
+LOAD 13 1 rand=- speaker=boss stand=1 camera=0 mood=3 rnd=0 voice=BOSS0057
+LOAD 13 3 rand=- speaker=boss stand=1 camera=1 mood=2 rnd=0 voice=BOSS0059
+LOAD 13 5 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0061
+LOAD 13 7 rand=- speaker=boss stand=1 camera=1 mood=0 rnd=0 voice=BOSS0063
+LOAD 14 2 rand=- speaker=boss stand=1 camera=1 mood=2 rnd=0 voice=BOSS0065
+LOAD 15 2 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0067
+LOAD 16 2 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0069
+LOAD 16 4 rand=- speaker=boss stand=1 camera=0 mood=2 rnd=0 voice=BOSS0071
+LOAD 17 2 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0073
+LOAD 19 1 rand=- speaker=boss stand=1 camera=1 mood=0 rnd=0 voice=BOSS0076
+LOAD 20 1 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0077
+LOAD 20 3 rand=- speaker=boss stand=1 camera=1 mood=0 rnd=0 voice=BOSS0079
+LOAD 27 1 rand=- speaker=boss stand=1 camera=0 mood=2 rnd=0 voice=BOSS0080
+LOAD 27 3 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0082
+LOAD 27 5 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0084
+LOAD 27 7 rand=- speaker=boss stand=1 camera=0 mood=1 rnd=0 voice=BOSS0086
+LOAD 39 1 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0107
+LOAD 39 3 rand=- speaker=boss stand=1 camera=0 mood=2 rnd=0 voice=BOSS0109
+LOAD 39 5 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0111
+LOAD 39 7 rand=- speaker=boss stand=1 camera=0 mood=2 rnd=0 voice=BOSS0113
+LOAD 39 9 rand=- speaker=boss stand=1 camera=0 mood=3 rnd=0 voice=BOSS0115
+LOAD 39 11 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0117
+LOAD 39 13 rand=- speaker=boss stand=1 camera=0 mood=1 rnd=0 voice=BOSS0119
+LOAD 40 1 rand=- speaker=boss stand=1 camera=0 mood=1 rnd=0 voice=BOSS0120
+LOAD 40 3 rand=- speaker=boss stand=1 camera=0 mood=1 rnd=0 voice=BOSS0122
+LOAD 41 1 rand=- speaker=boss stand=1 camera=0 mood=2 rnd=0 voice=BOSS0123
+LOAD 42 2 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0125
+LOAD 42 4 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0127
+LOAD 43 2 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0129
+LOAD 44 2 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0131
+LOAD 45 2 rand=- speaker=boss stand=1 camera=0 mood=0 rnd=0 voice=BOSS0133
+LOAD 45 4 rand=- speaker=boss stand=1 camera=0 mood=2 rnd=0 voice=BOSS0135
+LOAD 46 1 rand=- speaker=boss stand=2 camera=4 mood=1 rnd=0 voice=BOSS0136
+LOAD 47 1 rand=- speaker=boss stand=2 camera=4 mood=1 rnd=0 voice=BOSS0137
+LOAD 49 1 rand=-
+LOAD 300 1 rand=-
+LOAD 71 1 rand=-
+LOAD 71 3 rand=-
+LOAD 71 5 rand=-
+LOAD 71 7 rand=-
+LOAD 71 9 rand=-
+LOAD 71 11 rand=-
+LOAD 188 2 rand=-
+LOAD 194 14 rand=-
+LOAD 72 3 rand=-
+LOAD 72 5 rand=-
+LOAD 73 1 rand=-
+LOAD 73 3 rand=-
+LOAD 216 2 rand=-
+LOAD 74 2 rand=-
+LOAD 74 4 rand=-
+LOAD 181 2 rand=-
+LOAD 184 2 rand=-
+LOAD 242 1 rand=41
+LOAD 250 1 rand=18467
+LOAD 253 1 rand=6334
+LOAD 256 1 rand=26500
+LOAD 258 1 rand=19169
+LOAD 261 2 rand=15724
+LOAD 262 1 rand=11478
+LOAD 263 1 rand=29358
+LOAD 265 1 rand=26962
+LOAD 156 1 rand=-
+LOAD 157 1 rand=-
+LOAD 232 1 rand=-
+LOAD 233 1 rand=-
+LOAD 234 1 rand=-
+LOAD 235 1 rand=-
+LOAD 236 1 rand=-
+LOAD 237 1 rand=-
+LOAD 238 1 rand=-
+LOAD 239 1 rand=-
+LOAD 240 1 rand=-
+LOAD 241 1 rand=-
+LOAD 194 1 rand=-
+LOAD 194 3 rand=-
+LOAD 194 4 rand=-
+LOAD 194 6 rand=-
+LOAD 194 9 rand=-
+LOAD 194 11 rand=-
+LOAD 194 13 rand=-
+LOAD 183 1 rand=-
+LOAD 185 1 rand=-
+LOAD 186 1 rand=-
+LOAD 189 1 rand=-
+LOAD 190 1 rand=-
+LOAD 192 1 rand=-
+LOAD 193 1 rand=-
+LOAD 194 5 rand=-
+LOAD 194 7 rand=-
+LOAD 4 1 rand=24464
+LOAD 5 2 rand=5705 speaker=gapo stand=1 camera=1 mood=0 rnd=0 voice=GAPO0007
+LOAD 6 2 rand=28145 speaker=gapo stand=1 camera=1 mood=0 rnd=0 voice=GAPO0009
+LOAD 7 2 rand=23281 speaker=gapo stand=1 camera=1 mood=0 rnd=0 voice=GAPO0011
+LOAD 8 1 rand=16827 speaker=gapo stand=1 camera=1 mood=0 rnd=0 voice=GAPO0012
+LOAD 124 1 rand=-
+LOAD 124 3 rand=-
+LOAD 124 5 rand=-
+LOAD 124 6 rand=-
+LOAD 124 8 rand=-
+LOAD 86 1 rand=-
+LOAD 86 3 rand=-
+LOAD 86 5 rand=-
+LOAD 86 7 rand=-
+LOAD 86 9 rand=-
+LOAD 86 10 rand=-
+LOAD 86 12 rand=-
+LOAD 50 1 rand=9961,491 speaker=gqu stand=1 camera=2 mood=0 rnd=0 voice=GQU0141
+LOAD 51 1 rand=2995,11942 speaker=gqu stand=1 camera=1 mood=0 rnd=0 voice=GQU0142
+LOAD 56 1 rand=4827,5436
+LOAD 110 1 rand=-
+LOAD 130 1 rand=-
+LOAD 132 1 rand=-
+LOAD 133 1 rand=-
+LOAD 134 2 rand=-
+LOAD 135 2 rand=-
+LOAD 136 2 rand=-
+LOAD 137 2 rand=-
+LOAD 138 2 rand=-
+LOAD 139 2 rand=-
+LOAD 140 2 rand=-
+LOAD 142 1 rand=-
+LOAD 143 1 rand=-
+LOAD 144 1 rand=-
+LOAD 145 1 rand=-
+LOAD 146 1 rand=-
+LOAD 163 1 rand=-
+LOAD 164 1 rand=-
+LOAD 21 1 rand=32391,14604
+LOAD 22 2 rand=3902,153 speaker=gtr stand=1 camera=1 mood=0 rnd=0 voice=GTR0039
+LOAD 23 2 rand=292,12382 speaker=gtr stand=1 camera=1 mood=0 rnd=0 voice=GTR0042
+LOAD 24 1 rand=17421,18716 speaker=gtr stand=1 camera=1 mood=0 rnd=0 voice=GTR0044
+LOAD 18 2 rand=19718,19895 speaker=gtr stand=1 camera=1 mood=0 rnd=0 voice=GTR0075
+LOAD 1 1 rand=5447 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0001
+LOAD 2 1 rand=21726
+LOAD 3 1 rand=14771
+LOAD 4 2 rand=11538
+LOAD 5 1 rand=1869 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0006
+LOAD 6 1 rand=19912 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0008
+LOAD 7 1 rand=25667 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0010
+LOAD 10 1 rand=26299 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0014
+LOAD 10 3 rand=17035 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0016
+LOAD 10 5 rand=9894 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0018
+LOAD 10 7 rand=28703 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0020
+LOAD 11 2 rand=23811 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0023
+LOAD 11 4 rand=31322 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0025
+LOAD 11 6 rand=30333 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0027
+LOAD 11 8 rand=17673 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0029
+LOAD 11 10 rand=4664 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0031
+LOAD 11 12 rand=15141 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0033
+LOAD 11 14 rand=7711 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0035
+LOAD 22 1 rand=28253 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0038
+LOAD 22 3 rand=6868 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0040
+LOAD 23 1 rand=25547 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0041
+LOAD 23 3 rand=27644 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0043
+LOAD 25 1 rand=32662 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0045
+LOAD 26 1 rand=32757
+LOAD 30 1 rand=20037
+LOAD 12 2 rand=12859 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0049
+LOAD 12 4 rand=8723 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0051
+LOAD 12 6 rand=9741 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0053
+LOAD 12 8 rand=27529 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0055
+LOAD 13 2 rand=778 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0058
+LOAD 13 4 rand=12316 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0060
+LOAD 13 6 rand=3035 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0062
+LOAD 14 1 rand=22190 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0064
+LOAD 15 1 rand=1842 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0066
+LOAD 16 1 rand=288 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0068
+LOAD 16 3 rand=30106 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0070
+LOAD 17 1 rand=9040 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0072
+LOAD 18 1 rand=8942 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0074
+LOAD 20 2 rand=19264 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0078
+LOAD 27 2 rand=22648 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0081
+LOAD 27 4 rand=27446 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0083
+LOAD 27 6 rand=23805 speaker=hero stand=1 camera=0 mood=4 rnd=0 voice=HERO0085
+LOAD 31 1 rand=15890 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0089
+LOAD 32 1 rand=6729 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0091
+LOAD 33 1 rand=24370 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0093
+LOAD 34 1 rand=15350 speaker=hero stand=1 camera=0 mood=4 rnd=0 voice=HERO0095
+LOAD 35 2 rand=15006 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0098
+LOAD 36 1 rand=31101 speaker=hero stand=1 camera=0 mood=4 rnd=0 voice=HERO0100
+LOAD 37 1 rand=24393 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0102
+LOAD 37 3 rand=3548 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0104
+LOAD 39 2 rand=19629 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0108
+LOAD 39 4 rand=12623 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0110
+LOAD 39 6 rand=24084 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0112
+LOAD 39 8 rand=19954 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0114
+LOAD 39 10 rand=18756 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0116
+LOAD 39 12 rand=11840 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0118
+LOAD 40 2 rand=4966 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0121
+LOAD 42 1 rand=7376 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0124
+LOAD 42 3 rand=13931 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0126
+LOAD 43 1 rand=26308 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0128
+LOAD 44 1 rand=16944 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0130
+LOAD 45 1 rand=32439 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0132
+LOAD 45 3 rand=24626 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0134
+LOAD 48 1 rand=11323 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0138
+LOAD 52 1 rand=5537
+LOAD 53 1 rand=21538 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0144
+LOAD 54 1 rand=16118 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0145
+LOAD 55 1 rand=2082 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0147
+LOAD 58 1 rand=22929 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0151
+LOAD 59 1 rand=16541 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0153
+LOAD 60 1 rand=4833 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0155
+LOAD 60 3 rand=31115 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0157
+LOAD 61 1 rand=4639 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0159
+LOAD 61 3 rand=29658 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0161
+LOAD 62 1 rand=22704
+LOAD 63 1 rand=9930 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0164
+LOAD 64 1 rand=13977 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0166
+LOAD 65 1 rand=2306 speaker=hero stand=1 camera=0 mood=2 rnd=0 voice=HERO0168
+LOAD 67 1 rand=31673 speaker=hero stand=1 camera=0 mood=4 rnd=0 voice=HERO0170
+LOAD 68 1 rand=22386 speaker=hero stand=1 camera=0 mood=4 rnd=0 voice=HERO0172
+LOAD 68 3 rand=5021 speaker=hero stand=1 camera=0 mood=4 rnd=0 voice=HERO0174
+LOAD 69 1 rand=28745 speaker=hero stand=1 camera=0 mood=4 rnd=0 voice=HERO0175
+LOAD 69 3 rand=26924 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0177
+LOAD 70 1 rand=19072 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0178
+LOAD 80 1 rand=6270 speaker=hero stand=1 camera=0 mood=4 rnd=0 voice=HERO0180
+LOAD 80 3 rand=5829 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0182
+LOAD 81 1 rand=26777 speaker=hero stand=1 camera=0 mood=3 rnd=0 voice=HERO0184
+LOAD 82 1 rand=15573 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0186
+LOAD 82 3 rand=5097 speaker=hero stand=1 camera=0 mood=1 rnd=0 voice=HERO0188
+LOAD 83 1 rand=16512 speaker=hero stand=1 camera=0 mood=0 rnd=0 voice=HERO0189
+LOAD 84 2 rand=23986
+LOAD 85 2 rand=13290
+LOAD 89 2 rand=9161
+LOAD 89 4 rand=18636
+LOAD 89 6 rand=22355
+LOAD 89 8 rand=24767
+LOAD 90 1 rand=23655
+LOAD 91 1 rand=15574
+LOAD 91 3 rand=4031
+LOAD 91 5 rand=12052
+LOAD 91 7 rand=27350
+LOAD 91 9 rand=1150
+LOAD 92 1 rand=16941
+LOAD 92 3 rand=21724
+LOAD 93 1 rand=13966
+LOAD 93 3 rand=3430
+LOAD 94 1 rand=31107
+LOAD 147 1 rand=30191
+LOAD 147 3 rand=18007
+LOAD 169 1 rand=11337
+LOAD 96 1 rand=15457
+LOAD 96 3 rand=12287
+LOAD 96 5 rand=27753
+LOAD 96 7 rand=10383
+LOAD 97 1 rand=14945
+LOAD 97 3 rand=8909
+LOAD 76 2 rand=32209
+LOAD 100 1 rand=9758
+LOAD 101 1 rand=24221
+LOAD 103 1 rand=18588
+LOAD 103 3 rand=6422
+LOAD 103 5 rand=24946
+LOAD 103 7 rand=27506
+LOAD 104 1 rand=13030
+LOAD 105 1 rand=16413
+LOAD 105 3 rand=29168
+LOAD 106 1 rand=900
+LOAD 107 1 rand=32591
+LOAD 108 1 rand=18762
+LOAD 108 3 rand=1655
+LOAD 109 1 rand=17410
+LOAD 109 3 rand=6359
+LOAD 109 5 rand=27624
+LOAD 109 7 rand=20537
+LOAD 111 1 rand=21548
+LOAD 111 3 rand=6483
+LOAD 112 1 rand=27595
+LOAD 113 1 rand=4041
+LOAD 113 3 rand=3602
+LOAD 114 1 rand=24350
+LOAD 115 1 rand=10291
+LOAD 115 3 rand=30836
+LOAD 116 1 rand=9374
+LOAD 117 1 rand=11020
+LOAD 117 3 rand=4596
+LOAD 117 5 rand=24021
+LOAD 118 1 rand=27348
+LOAD 119 1 rand=23199
+LOAD 120 1 rand=19668
+LOAD 121 1 rand=24484
+LOAD 122 1 rand=8281
+LOAD 123 1 rand=4734
+LOAD 123 3 rand=53
+LOAD 127 1 rand=1999
+LOAD 128 1 rand=26418
+LOAD 128 3 rand=27938
+LOAD 128 5 rand=6900
+LOAD 129 1 rand=3788
+LOAD 129 3 rand=18127
+LOAD 141 1 rand=467
+LOAD 141 3 rand=3728
+LOAD 141 5 rand=14893
+LOAD 153 1 rand=24648
+LOAD 153 3 rand=22483
+LOAD 160 1 rand=17807
+LOAD 162 1 rand=2421
+LOAD 134 1 rand=14310
+LOAD 135 1 rand=6617
+LOAD 136 1 rand=22813
+LOAD 137 1 rand=9514
+LOAD 138 1 rand=14309
+LOAD 139 1 rand=7616
+LOAD 140 1 rand=18935
+LOAD 131 1 rand=17451
+LOAD 148 1 rand=20600
+LOAD 148 3 rand=5249
+LOAD 149 1 rand=16519
+LOAD 149 3 rand=31556
+LOAD 150 1 rand=22798
+LOAD 151 1 rand=30303
+LOAD 151 3 rand=6224
+LOAD 152 1 rand=11008
+LOAD 152 3 rand=5844
+LOAD 154 2 rand=32609
+LOAD 155 1 rand=14989
+LOAD 155 3 rand=32702
+LOAD 158 1 rand=3195
+LOAD 166 2 rand=20485
+LOAD 166 4 rand=3093
+LOAD 166 6 rand=14343
+LOAD 167 1 rand=30523
+LOAD 171 1 rand=1587
+LOAD 172 1 rand=29314
+LOAD 159 1 rand=9503
+LOAD 174 1 rand=7448
+LOAD 175 1 rand=25200
+LOAD 176 1 rand=13458
+LOAD 178 1 rand=6618
+LOAD 179 1 rand=20580
+LOAD 180 1 rand=19796
+LOAD 243 1 rand=14798
+LOAD 244 1 rand=15281
+LOAD 245 1 rand=19589
+LOAD 246 1 rand=20798
+LOAD 247 1 rand=28009
+LOAD 248 1 rand=27157
+LOAD 301 2 rand=20472
+LOAD 301 4 rand=23622
+LOAD 301 6 rand=18538
+LOAD 301 8 rand=12292
+LOAD 301 10 rand=6038
+LOAD 301 12 rand=24179
+LOAD 301 14 rand=18190
+LOAD 301 16 rand=29657
+LOAD 301 17 rand=7958
+LOAD 302 2 rand=6191
+LOAD 173 1 rand=-
+LOAD 209 2 rand=-
+LOAD 209 4 rand=-
+LOAD 210 2 rand=-
+LOAD 211 1 rand=-
+LOAD 212 1 rand=-
+LOAD 213 2 rand=-
+LOAD 204 2 rand=-
+LOAD 204 4 rand=-
+LOAD 205 2 rand=-
+LOAD 206 1 rand=-
+LOAD 207 1 rand=-
+LOAD 208 2 rand=-
+LOAD 198 2 rand=-
+LOAD 198 4 rand=-
+LOAD 198 6 rand=-
+LOAD 200 1 rand=-
+LOAD 201 1 rand=-
+LOAD 202 2 rand=-
+LOAD 203 2 rand=-
+LOAD 177 1 rand=-
+LOAD 178 2 rand=-
+LOAD 124 2 rand=-
+LOAD 124 4 rand=-
+LOAD 124 7 rand=-
+LOAD 124 9 rand=-
+LOAD 124 10 rand=-
+LOAD 89 1 rand=19815
+LOAD 89 3 rand=22888
+LOAD 89 5 rand=19156
+LOAD 89 7 rand=11511
+LOAD 89 9 rand=16202
+LOAD 91 2 rand=2634
+LOAD 91 4 rand=24272
+LOAD 91 6 rand=20055
+LOAD 91 8 rand=20328
+LOAD 91 10 rand=22646
+LOAD 92 2 rand=26362
+LOAD 92 4 rand=4886
+LOAD 93 2 rand=18875
+LOAD 93 4 rand=28433
+LOAD 94 2 rand=29869
+LOAD 147 2 rand=20142
+LOAD 147 4 rand=23844
+LOAD 161 1 rand=1416
+LOAD 95 1 rand=21881
+LOAD 96 2 rand=31998
+LOAD 96 4 rand=10322
+LOAD 96 6 rand=18651
+LOAD 96 8 rand=10021
+LOAD 97 2 rand=5699
+LOAD 97 4 rand=3557
+LOAD 75 1 rand=28476
+LOAD 76 1 rand=27892
+LOAD 76 3 rand=24389
+LOAD 100 2 rand=5075
+LOAD 101 2 rand=10712
+LOAD 103 2 rand=2600
+LOAD 103 4 rand=2510
+LOAD 103 6 rand=21003
+LOAD 103 8 rand=26869
+LOAD 104 2 rand=17861
+LOAD 105 2 rand=14688
+LOAD 105 4 rand=13401
+LOAD 106 2 rand=9789
+LOAD 107 2 rand=15255
+LOAD 108 2 rand=16423
+LOAD 108 4 rand=5002
+LOAD 109 2 rand=10585
+LOAD 109 4 rand=24182
+LOAD 109 6 rand=10285
+LOAD 109 8 rand=27088
+LOAD 111 2 rand=31426
+LOAD 111 4 rand=28617
+LOAD 112 2 rand=23757
+LOAD 113 2 rand=9832
+LOAD 113 4 rand=30932
+LOAD 114 2 rand=4169
+LOAD 115 2 rand=2154
+LOAD 115 4 rand=25721
+LOAD 116 2 rand=17189
+LOAD 117 2 rand=19976
+LOAD 117 4 rand=31329
+LOAD 117 6 rand=2368
+LOAD 118 2 rand=28692
+LOAD 119 2 rand=21425
+LOAD 120 2 rand=10555
+LOAD 121 2 rand=3434
+LOAD 122 2 rand=16549
+LOAD 123 2 rand=7441
+LOAD 123 4 rand=9512
+LOAD 127 2 rand=30145
+LOAD 128 2 rand=18060
+LOAD 128 4 rand=21718
+LOAD 128 6 rand=3753
+LOAD 129 2 rand=16139
+LOAD 129 4 rand=12423
+LOAD 141 2 rand=16279
+LOAD 141 4 rand=25996
+LOAD 141 6 rand=16687
+LOAD 153 2 rand=12529
+LOAD 153 4 rand=22549
+LOAD 160 2 rand=17437
+LOAD 162 2 rand=19866
+LOAD 170 1 rand=12949
+LOAD 154 1 rand=193
+LOAD 154 3 rand=23195
+LOAD 242 2 rand=3297
+LOAD 249 1 rand=20416
+LOAD 251 1 rand=28286
+LOAD 252 1 rand=16105
+LOAD 254 1 rand=24488
+LOAD 255 1 rand=16282
+LOAD 257 1 rand=12455
+LOAD 259 1 rand=25734
+LOAD 260 1 rand=18114
+LOAD 261 1 rand=11701
+LOAD 262 2 rand=31316
+LOAD 263 2 rand=20671
+LOAD 264 1 rand=5786
+LOAD 179 2 rand=-
+LOAD 155 2 rand=12263
+LOAD 155 4 rand=4313
+LOAD 158 2 rand=24355
+LOAD 166 1 rand=31185
+LOAD 166 3 rand=20053
+LOAD 166 5 rand=912
+LOAD 166 7 rand=10808
+LOAD 28 1 rand=1832
+LOAD 29 1 rand=20945 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0088
+LOAD 31 2 rand=4313 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0090
+LOAD 32 2 rand=27756 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0092
+LOAD 33 2 rand=28321 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0094
+LOAD 34 2 rand=19558 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0096
+LOAD 35 1 rand=23646 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0097
+LOAD 35 3 rand=27982 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0099
+LOAD 36 2 rand=481 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0101
+LOAD 37 2 rand=4144 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0103
+LOAD 37 4 rand=23196 speaker=pp stand=1 camera=0 mood=0 rnd=0 voice=PP0105
+LOAD 38 1 rand=20222
+LOAD 102 1 rand=7129
+LOAD 102 2 rand=2161
+LOAD 102 3 rand=5535
+LOAD 102 4 rand=20450
+LOAD 102 5 rand=11173
+LOAD 131 2 rand=-
+LOAD 148 2 rand=-
+LOAD 149 2 rand=-
+LOAD 150 2 rand=-
+LOAD 151 2 rand=-
+LOAD 151 4 rand=-
+LOAD 152 2 rand=-
+LOAD 165 1 rand=-
+LOAD 217 1 rand=-
+LOAD 218 1 rand=-
+LOAD 219 1 rand=-
+LOAD 220 1 rand=-
+LOAD 221 1 rand=-
+LOAD 222 1 rand=-
+LOAD 223 1 rand=-
+LOAD 224 1 rand=-
+LOAD 225 1 rand=-
+LOAD 226 1 rand=-
+LOAD 227 1 rand=-
+LOAD 228 1 rand=-
+LOAD 71 2 rand=-
+LOAD 71 4 rand=-
+LOAD 71 6 rand=-
+LOAD 71 8 rand=-
+LOAD 71 10 rand=-
+LOAD 71 12 rand=-
+LOAD 188 1 rand=-
+LOAD 188 3 rand=-
+LOAD 72 2 rand=-
+LOAD 72 4 rand=-
+LOAD 72 6 rand=-
+LOAD 199 1 rand=-
+LOAD 73 2 rand=-
+LOAD 73 4 rand=-
+LOAD 216 1 rand=-
+LOAD 216 3 rand=-
+LOAD 74 1 rand=-
+LOAD 74 3 rand=-
+LOAD 74 5 rand=-
+LOAD 197 2 rand=-
+LOAD 9 1 rand=-
+LOAD 10 2 rand=- speaker=targ stand=1 camera=0 mood=0 rnd=0 voice=TARG0015
+LOAD 10 4 rand=- speaker=targ stand=1 camera=0 mood=0 rnd=0 voice=TARG0017
+LOAD 10 6 rand=- speaker=targ stand=1 camera=0 mood=0 rnd=0 voice=TARG0019
+LOAD 10 8 rand=- speaker=targ stand=1 camera=0 mood=0 rnd=0 voice=TARG0021
+LOAD 54 2 rand=- speaker=targ stand=2 camera=2 mood=0 rnd=0 voice=TARG0146
+LOAD 55 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0148
+LOAD 57 1 rand=-
+LOAD 58 2 rand=- speaker=targ stand=2 camera=2 mood=0 rnd=0 voice=TARG0152
+LOAD 59 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0154
+LOAD 60 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0156
+LOAD 60 4 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0158
+LOAD 61 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0160
+LOAD 62 2 rand=-
+LOAD 63 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0165
+LOAD 64 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0167
+LOAD 66 1 rand=-
+LOAD 67 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0171
+LOAD 68 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0173
+LOAD 69 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0176
+LOAD 70 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0179
+LOAD 80 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0181
+LOAD 80 4 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0183
+LOAD 81 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0185
+LOAD 82 2 rand=- speaker=targ stand=2 camera=0 mood=0 rnd=0 voice=TARG0187
+LOAD 84 1 rand=-
+LOAD 85 1 rand=-
+LOAD 85 3 rand=-
+LOAD 301 1 rand=-
+LOAD 301 3 rand=-
+LOAD 301 5 rand=-
+LOAD 301 7 rand=-
+LOAD 301 9 rand=-
+LOAD 301 11 rand=-
+LOAD 301 13 rand=-
+LOAD 301 15 rand=-
+LOAD 302 1 rand=-
+LOAD 174 2 rand=-
+LOAD 181 1 rand=10466
+LOAD 182 1 rand=12044
+LOAD 184 1 rand=21659
+LOAD 187 1 rand=26292
+LOAD 191 1 rand=26439
+LOAD 194 2 rand=17253
+LOAD 194 8 rand=20024
+LOAD 194 10 rand=26154
+LOAD 194 12 rand=29510
+LOAD 197 1 rand=4745
+LOAD 198 1 rand=20649
+LOAD 198 3 rand=13186
+LOAD 198 5 rand=8313
+LOAD 202 1 rand=4474
+LOAD 203 1 rand=28022
+LOAD 204 1 rand=2168
+LOAD 204 3 rand=14018
+LOAD 205 1 rand=18787
+LOAD 208 1 rand=9905
+LOAD 209 1 rand=17958
+LOAD 209 3 rand=7391
+LOAD 210 1 rand=10202
+LOAD 213 1 rand=3625
+LOAD 214 1 rand=26477
+LOAD 214 3 rand=4414
+LOAD 215 1 rand=9314
+LOAD 215 3 rand=25824
+LOAD 86 2 rand=29334
+LOAD 86 4 rand=25874
+LOAD 86 6 rand=24372
+LOAD 86 8 rand=20159
+LOAD 86 11 rand=11833
+OPEN 1 voixoff=1 lines=1
+CAMS 1 1=0/0
+LINE 1 1 speaker=hero player=1 stand=1 camera=0 mood=0 rnd=0 voice=loc\voix\fra\hoggar\HERO0001.apc voice_file=1 video=- video_file=0 video_op=none focale=42980000 idtext=- text=20/98aa79a8  # focale 76
+END 1 line=2
+OPEN 5 voixoff=0 lines=2
+RAND 004639e9 28070 n=3 pick=3
+CAMS 5 1=3/1 2=1/0
+LINE 5 1 speaker=hero player=1 stand=1 camera=3 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0006.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=53/7d0604e7  # focale 70
+LINE 5 2 speaker=gapo player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GAPO0007.apc voice_file=1 video=hnmdial\HNM640\hoggar\g1s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=HOG_GARDIEN01 text=30/e359a073  # focale 76
+END 5 line=3
+OPEN 6 voixoff=0 lines=2
+RAND 004639e9 7487 n=3 pick=3
+CAMS 6 1=3/1 2=1/0
+LINE 6 1 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0008.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=16/a9435a4f  # focale 70
+LINE 6 2 speaker=gapo player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GAPO0009.apc voice_file=1 video=hnmdial\HNM640\hoggar\g1s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=HOG_GARDIEN01 text=11/2fb983a7  # focale 76
+END 6 line=3
+OPEN 7 voixoff=0 lines=2
+RAND 004639e9 28297 n=3 pick=2
+CAMS 7 1=2/1 2=1/0
+LINE 7 1 speaker=hero player=1 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0010.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=31/98446aee  # focale 50
+LINE 7 2 speaker=gapo player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GAPO0011.apc voice_file=1 video=hnmdial\HNM640\hoggar\g1s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=HOG_GARDIEN01 text=33/c13e5a53  # focale 76
+END 7 line=3
+OPEN 8 voixoff=0 lines=1
+CAMS 8 1=1/0
+LINE 8 1 speaker=gapo player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GAPO0012.apc voice_file=1 video=hnmdial\HNM640\hoggar\g1s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=HOG_GARDIEN01 text=23/0c569612  # focale 76
+END 8 line=2
+OPEN 10 voixoff=0 lines=8
+RAND 004639e9 7518 n=3 pick=1
+RAND 004639e9 8177 n=2 pick=2
+RAND 004639e9 17773 n=3 pick=2
+RAND 004639e9 32270 n=2 pick=1
+RAND 004639e9 1763 n=3 pick=3
+RAND 004639e9 2668 n=2 pick=1
+RAND 004639e9 17192 n=3 pick=3
+RAND 004639e9 13985 n=2 pick=2
+CAMS 10 1=1/1 2=2/1 3=2/1 4=1/1 5=3/1 6=1/1 7=3/1 8=2/1
+LINE 10 1 speaker=hero player=1 stand=1 camera=1 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0014.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=35/88392d4a  # focale 70
+LINE 10 2 speaker=targ player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0015.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=137/8f4230da  # focale 50
+LINE 10 3 speaker=hero player=1 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0016.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=34/e850b88b  # focale 50
+LINE 10 4 speaker=targ player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0017.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=88/f4afaeb2  # focale 70
+LINE 10 5 speaker=hero player=1 stand=1 camera=3 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0018.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=36/95c8b2f5  # focale 70
+LINE 10 6 speaker=targ player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0019.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=27/5bb08041  # focale 70
+LINE 10 7 speaker=hero player=1 stand=1 camera=3 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0020.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=45/35621603  # focale 70
+LINE 10 8 speaker=targ player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0021.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=43/e9d9af0a  # focale 50
+END 10 line=9
+OPEN 11 voixoff=0 lines=15
+RAND 004639e9 3102 n=3 pick=1
+RAND 004639e9 8480 n=3 pick=3
+RAND 004639e9 29213 n=3 pick=3
+RAND 004639e9 7627 n=3 pick=2
+RAND 004639e9 4802 n=3 pick=3
+RAND 004639e9 4099 n=3 pick=2
+RAND 004639e9 30527 n=3 pick=3
+RAND 004639e9 2625 n=3 pick=1
+RAND 004639e9 1543 n=3 pick=2
+RAND 004639e9 1924 n=3 pick=2
+RAND 004639e9 11023 n=3 pick=2
+RAND 004639e9 29972 n=3 pick=3
+RAND 004639e9 13061 n=3 pick=3
+RAND 004639e9 14181 n=3 pick=1
+CAMS 11 1=1/1 2=3/1 3=3/1 4=2/1 5=3/1 6=2/1 7=3/1 8=1/1 9=2/1 10=2/1 11=2/1 12=3/1 13=3/1 14=1/1 15=1/0
+LINE 11 1 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0022.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=9/ab557953  # focale 70
+LINE 11 2 speaker=hero player=1 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0023.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=28/ca164b86  # focale 70
+LINE 11 3 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0024.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=91/c0b2fb92  # focale 70
+LINE 11 4 speaker=hero player=1 stand=1 camera=2 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0025.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=24/314134e3  # focale 50
+LINE 11 5 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0026.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=40/382c2a72  # focale 70
+LINE 11 6 speaker=hero player=1 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0027.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=20/2a026e94  # focale 50
+LINE 11 7 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0028.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=51/3bc027ff  # focale 70
+LINE 11 8 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0029.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=79/237e5fb0  # focale 70
+LINE 11 9 speaker=boss player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0030.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=47/1e29b1b2  # focale 50
+LINE 11 10 speaker=hero player=1 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0031.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=206/7c136639  # focale 50
+LINE 11 11 speaker=boss player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0032.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=44/864e9d10  # focale 50
+LINE 11 12 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0033.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=41/2bb4dfae  # focale 70
+LINE 11 13 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0034.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=24/784509b4  # focale 70
+LINE 11 14 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0035.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=91/644cfa7a  # focale 70
+LINE 11 15 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\BOSS0036.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=42/f580f681  # focale 70
+END 11 line=16
+OPEN 12 voixoff=0 lines=9
+RAND 004639e9 31003 n=3 pick=2
+RAND 004639e9 27432 n=3 pick=1
+RAND 004639e9 17505 n=3 pick=1
+RAND 004639e9 27593 n=3 pick=3
+RAND 004639e9 22725 n=3 pick=1
+RAND 004639e9 13031 n=3 pick=3
+RAND 004639e9 8492 n=3 pick=3
+CAMS 12 1=2/1 2=1/1 3=1/1 4=3/1 5=1/0 6=1/1 7=1/0 8=3/1 9=3/1
+LINE 12 1 speaker=boss player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0048.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=80/b93515b3  # focale 50
+LINE 12 2 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0049.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=66/4c29efa1  # focale 70
+LINE 12 3 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0050.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=64/28b7bfc7  # focale 70
+LINE 12 4 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0051.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=56/1fc6445a  # focale 70
+LINE 12 5 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\BOSS0052.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=74/96b6d323  # focale 70
+LINE 12 6 speaker=hero player=1 stand=1 camera=1 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0053.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=40/32f0b156  # focale 70
+LINE 12 7 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\BOSS0054.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=97/6364c9ad  # focale 70
+LINE 12 8 speaker=hero player=1 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0055.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=48/4e6e0052  # focale 70
+LINE 12 9 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0056.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=27/3d442503  # focale 70
+END 12 line=10
+OPEN 13 voixoff=0 lines=7
+RAND 004639e9 142 n=3 pick=2
+RAND 004639e9 17222 n=3 pick=3
+RAND 004639e9 31286 n=3 pick=3
+RAND 004639e9 13064 n=3 pick=3
+RAND 004639e9 7900 n=3 pick=2
+CAMS 13 1=2/1 2=3/1 3=1/0 4=3/1 5=3/1 6=2/1 7=1/0
+LINE 13 1 speaker=boss player=0 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\BOSS0057.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=84/491ab6e6  # focale 50
+LINE 13 2 speaker=hero player=1 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0058.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=29/6b164f3d  # focale 70
+LINE 13 3 speaker=boss player=0 stand=1 camera=1 mood=2 rnd=0 voice=loc\voix\fra\hoggar\BOSS0059.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=100/e0ab42bf  # focale 70
+LINE 13 4 speaker=hero player=1 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0060.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=63/94d6f674  # focale 70
+LINE 13 5 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0061.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=67/e3fbb52c  # focale 70
+LINE 13 6 speaker=hero player=1 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0062.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=33/31cb02ff  # focale 50
+LINE 13 7 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\BOSS0063.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=70/86f30170  # focale 70
+END 13 line=8
+OPEN 14 voixoff=0 lines=2
+RAND 004639e9 19187 n=3 pick=3
+CAMS 14 1=3/1 2=1/0
+LINE 14 1 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0064.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=30/589cefc9  # focale 70
+LINE 14 2 speaker=boss player=0 stand=1 camera=1 mood=2 rnd=0 voice=loc\voix\fra\hoggar\BOSS0065.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=56/a4580e5a  # focale 70
+END 14 line=3
+OPEN 15 voixoff=0 lines=2
+RAND 004639e9 8360 n=3 pick=3
+RAND 004639e9 22413 n=3 pick=1
+CAMS 15 1=3/1 2=1/1
+LINE 15 1 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0066.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=20/a0c84e85  # focale 70
+LINE 15 2 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0067.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=103/07ef0d12  # focale 70
+END 15 line=3
+OPEN 16 voixoff=0 lines=4
+RAND 004639e9 30974 n=3 pick=3
+RAND 004639e9 14270 n=3 pick=3
+RAND 004639e9 29170 n=3 pick=2
+RAND 004639e9 235 n=3 pick=2
+CAMS 16 1=3/1 2=3/1 3=2/1 4=2/1
+LINE 16 1 speaker=hero player=1 stand=1 camera=3 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0068.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=32/18365a1e  # focale 70
+LINE 16 2 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0069.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=165/64d83eca  # focale 70
+LINE 16 3 speaker=hero player=1 stand=1 camera=2 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0070.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=65/59e0fd00  # focale 50
+LINE 16 4 speaker=boss player=0 stand=1 camera=2 mood=2 rnd=1 voice=loc\voix\fra\hoggar\BOSS0071.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=39/173c5763  # focale 50
+END 16 line=5
+OPEN 17 voixoff=0 lines=2
+RAND 004639e9 30833 n=3 pick=3
+RAND 004639e9 19711 n=3 pick=2
+CAMS 17 1=3/1 2=2/1
+LINE 17 1 speaker=hero player=1 stand=1 camera=3 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0072.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=44/112e8bba  # focale 70
+LINE 17 2 speaker=boss player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0073.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=133/6b6563b3  # focale 50
+END 17 line=3
+OPEN 18 voixoff=0 lines=2
+RAND 004639e9 25760 n=3 pick=3
+CAMS 18 1=3/1 2=1/0
+LINE 18 1 speaker=hero player=1 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0074.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=64/56bba6bb  # focale 70
+LINE 18 2 speaker=gtr player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GTR0075.apc voice_file=1 video=hnmdial\HNM640\hoggar\g3s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=CMP_GARDIEN03,GRO_GARDIEN03 text=42/2d3fdfc5  # focale 76
+END 18 line=3
+OPEN 19 voixoff=0 lines=1
+CAMS 19 1=1/0
+LINE 19 1 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\BOSS0076.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=54/315af495  # focale 70
+END 19 line=2
+OPEN 20 voixoff=0 lines=3
+RAND 004639e9 18896 n=3 pick=3
+RAND 004639e9 4667 n=3 pick=3
+CAMS 20 1=3/1 2=3/1 3=1/0
+LINE 20 1 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0077.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=91/9f477308  # focale 70
+LINE 20 2 speaker=hero player=1 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0078.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=27/619fef71  # focale 70
+LINE 20 3 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\BOSS0079.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=61/acd1d08a  # focale 70
+END 20 line=4
+OPEN 22 voixoff=0 lines=3
+RAND 004639e9 7285 n=3 pick=2
+RAND 004639e9 12550 n=3 pick=2
+CAMS 22 1=2/1 2=1/0 3=2/1
+LINE 22 1 speaker=hero player=1 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0038.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=21/a3323d03  # focale 50
+LINE 22 2 speaker=gtr player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GTR0039.apc voice_file=1 video=hnmdial\HNM640\hoggar\g3s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=CMP_GARDIEN03,GRO_GARDIEN03 text=13/e0ab58d5  # focale 76
+LINE 22 3 speaker=hero player=1 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0040.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=25/03496e2e  # focale 50
+END 22 line=4
+OPEN 23 voixoff=0 lines=3
+RAND 004639e9 140 n=3 pick=3
+RAND 004639e9 13694 n=3 pick=3
+CAMS 23 1=3/1 2=1/0 3=3/1
+LINE 23 1 speaker=hero player=1 stand=1 camera=3 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0041.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=25/cdc43c26  # focale 70
+LINE 23 2 speaker=gtr player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GTR0042.apc voice_file=1 video=hnmdial\HNM640\hoggar\g3s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=CMP_GARDIEN03,GRO_GARDIEN03 text=12/cfd93306  # focale 76
+LINE 23 3 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0043.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=4/a66de5f0  # focale 70
+END 23 line=4
+OPEN 24 voixoff=0 lines=1
+CAMS 24 1=1/0
+LINE 24 1 speaker=gtr player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GTR0044.apc voice_file=1 video=hnmdial\HNM640\hoggar\g3s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=CMP_GARDIEN03,GRO_GARDIEN03 text=38/3a1e02ab  # focale 76
+END 24 line=2
+OPEN 25 voixoff=1 lines=1
+CAMS 25 1=0/0
+LINE 25 1 speaker=hero player=1 stand=1 camera=0 mood=0 rnd=0 voice=loc\voix\fra\hoggar\HERO0045.apc voice_file=1 video=- video_file=0 video_op=none focale=42980000 idtext=- text=79/206673e0  # focale 76
+END 25 line=2
+OPEN 27 voixoff=0 lines=7
+RAND 004639e9 2695 n=3 pick=2
+RAND 004639e9 21624 n=3 pick=1
+RAND 004639e9 28019 n=3 pick=3
+RAND 004639e9 2125 n=3 pick=2
+RAND 004639e9 26576 n=3 pick=3
+RAND 004639e9 21694 n=3 pick=2
+RAND 004639e9 22658 n=3 pick=3
+CAMS 27 1=2/1 2=1/1 3=3/1 4=2/1 5=3/1 6=2/1 7=3/1
+LINE 27 1 speaker=boss player=0 stand=1 camera=2 mood=2 rnd=1 voice=loc\voix\fra\hoggar\BOSS0080.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=257/43eb188c  # focale 50
+LINE 27 2 speaker=hero player=1 stand=1 camera=1 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0081.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=5/8eb9ff0d  # focale 70
+LINE 27 3 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0082.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=226/9246e369  # focale 70
+LINE 27 4 speaker=hero player=1 stand=1 camera=2 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0083.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=75/0daca23a  # focale 50
+LINE 27 5 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0084.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=273/9419eabe  # focale 70
+LINE 27 6 speaker=hero player=1 stand=1 camera=2 mood=4 rnd=1 voice=loc\voix\fra\hoggar\HERO0085.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=34/d3b21ee6  # focale 50
+LINE 27 7 speaker=boss player=0 stand=1 camera=3 mood=1 rnd=1 voice=loc\voix\fra\hoggar\BOSS0086.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=91/b1542257  # focale 70
+END 27 line=8
+OPEN 29 voixoff=0 lines=1
+RAND 004639e9 26302 n=2 pick=1
+CAMS 29 1=1/1
+LINE 29 1 speaker=pp player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0088.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=CMP_ATLANTE text=30/4b3d7083  # focale 70
+END 29 line=2
+OPEN 31 voixoff=0 lines=2
+RAND 004639e9 17371 n=3 pick=2
+RAND 004639e9 22466 n=2 pick=1
+CAMS 31 1=2/1 2=1/1
+LINE 31 1 speaker=hero player=1 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0089.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=22/edfb0c3d  # focale 50
+LINE 31 2 speaker=pp player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0090.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=CMP_ATLANTE text=48/3f00daf4  # focale 70
+END 31 line=3
+OPEN 32 voixoff=0 lines=2
+RAND 004639e9 4678 n=3 pick=2
+RAND 004639e9 22593 n=2 pick=2
+CAMS 32 1=2/1 2=2/1
+LINE 32 1 speaker=hero player=1 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0091.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=24/7de1656a  # focale 50
+LINE 32 2 speaker=pp player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0092.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c2.hnm video_file=1 video_op=open focale=42480000 idtext=CMP_ATLANTE text=50/31216ab4  # focale 50
+END 32 line=3
+OPEN 33 voixoff=0 lines=2
+RAND 004639e9 23851 n=3 pick=2
+RAND 004639e9 25484 n=2 pick=1
+CAMS 33 1=2/1 2=1/1
+LINE 33 1 speaker=hero player=1 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0093.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=18/084f4baf  # focale 50
+LINE 33 2 speaker=pp player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0094.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=CMP_ATLANTE text=44/f427a481  # focale 70
+END 33 line=3
+OPEN 34 voixoff=0 lines=2
+RAND 004639e9 1018 n=3 pick=2
+RAND 004639e9 28464 n=2 pick=1
+CAMS 34 1=2/1 2=1/1
+LINE 34 1 speaker=hero player=1 stand=1 camera=2 mood=4 rnd=1 voice=loc\voix\fra\hoggar\HERO0095.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=42/d77b556f  # focale 50
+LINE 34 2 speaker=pp player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0096.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=CMP_ATLANTE text=68/24966676  # focale 70
+END 34 line=3
+OPEN 35 voixoff=0 lines=3
+RAND 004639e9 21119 n=2 pick=2
+RAND 004639e9 23152 n=3 pick=2
+RAND 004639e9 2800 n=2 pick=1
+CAMS 35 1=2/1 2=2/1 3=1/1
+LINE 35 1 speaker=pp player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0097.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c2.hnm video_file=1 video_op=open focale=42480000 idtext=CMP_ATLANTE text=30/f559941b  # focale 50
+LINE 35 2 speaker=hero player=1 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0098.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=17/cde5d2c1  # focale 50
+LINE 35 3 speaker=pp player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0099.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=CMP_ATLANTE text=19/146aff73  # focale 70
+END 35 line=4
+OPEN 36 voixoff=0 lines=2
+RAND 004639e9 18087 n=3 pick=1
+RAND 004639e9 31060 n=2 pick=1
+CAMS 36 1=1/1 2=1/1
+LINE 36 1 speaker=hero player=1 stand=1 camera=1 mood=4 rnd=1 voice=loc\voix\fra\hoggar\HERO0100.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=49/b74f680e  # focale 70
+LINE 36 2 speaker=pp player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0101.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=CMP_ATLANTE text=19/5b089231  # focale 70
+END 36 line=3
+OPEN 37 voixoff=0 lines=4
+RAND 004639e9 1926 n=3 pick=1
+RAND 004639e9 9010 n=2 pick=1
+RAND 004639e9 4757 n=3 pick=3
+RAND 004639e9 32170 n=2 pick=1
+CAMS 37 1=1/1 2=1/1 3=3/1 4=1/1
+LINE 37 1 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0102.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=58/61da3c41  # focale 70
+LINE 37 2 speaker=pp player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0103.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=CMP_ATLANTE text=5/26c92481  # focale 70
+LINE 37 3 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0104.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=28/434e3d82  # focale 70
+LINE 37 4 speaker=pp player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\PP0105.apc voice_file=1 video=hnmdial\HNM640\hoggar\aes1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=CMP_ATLANTE text=4/6e56a8c9  # focale 70
+END 37 line=5
+OPEN 39 voixoff=0 lines=13
+RAND 004639e9 20315 n=3 pick=3
+RAND 004639e9 9576 n=3 pick=1
+RAND 004639e9 30227 n=3 pick=3
+RAND 004639e9 12043 n=3 pick=2
+RAND 004639e9 22758 n=3 pick=1
+RAND 004639e9 7164 n=3 pick=1
+RAND 004639e9 5109 n=3 pick=1
+RAND 004639e9 7882 n=3 pick=2
+RAND 004639e9 17086 n=3 pick=2
+RAND 004639e9 29565 n=3 pick=1
+RAND 004639e9 3487 n=3 pick=2
+RAND 004639e9 29577 n=3 pick=1
+RAND 004639e9 14474 n=3 pick=3
+CAMS 39 1=3/1 2=1/1 3=3/1 4=2/1 5=1/1 6=1/1 7=1/1 8=2/1 9=2/1 10=1/1 11=2/1 12=1/1 13=3/1
+LINE 39 1 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0107.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=14/d3304aa4  # focale 70
+LINE 39 2 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0108.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=82/daaaade6  # focale 70
+LINE 39 3 speaker=boss player=0 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\BOSS0109.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=28/1d3ed3f1  # focale 70
+LINE 39 4 speaker=hero player=1 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0110.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=31/c1f3c233  # focale 50
+LINE 39 5 speaker=boss player=0 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0111.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=107/ee08fab1  # focale 70
+LINE 39 6 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0112.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=22/57d0aa24  # focale 70
+LINE 39 7 speaker=boss player=0 stand=1 camera=1 mood=2 rnd=1 voice=loc\voix\fra\hoggar\BOSS0113.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=56/ea934057  # focale 70
+LINE 39 8 speaker=hero player=1 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0114.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=23/c78c126e  # focale 50
+LINE 39 9 speaker=boss player=0 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\BOSS0115.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=5/26c92481  # focale 50
+LINE 39 10 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0116.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=31/76acf9cf  # focale 70
+LINE 39 11 speaker=boss player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0117.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=23/ff844118  # focale 50
+LINE 39 12 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0118.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=46/f9af4636  # focale 70
+LINE 39 13 speaker=boss player=0 stand=1 camera=3 mood=1 rnd=1 voice=loc\voix\fra\hoggar\BOSS0119.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=173/2cbb8911  # focale 70
+END 39 line=14
+OPEN 40 voixoff=0 lines=3
+RAND 004639e9 2625 n=3 pick=1
+RAND 004639e9 25627 n=3 pick=2
+RAND 004639e9 5629 n=3 pick=2
+CAMS 40 1=1/1 2=2/1 3=2/1
+LINE 40 1 speaker=boss player=0 stand=1 camera=1 mood=1 rnd=1 voice=loc\voix\fra\hoggar\BOSS0120.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=20/9761b717  # focale 70
+LINE 40 2 speaker=hero player=1 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0121.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=27/bb0e88d5  # focale 50
+LINE 40 3 speaker=boss player=0 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\BOSS0122.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=94/a9fb58e8  # focale 50
+END 40 line=4
+OPEN 41 voixoff=0 lines=1
+RAND 004639e9 31928 n=3 pick=3
+CAMS 41 1=3/1
+LINE 41 1 speaker=boss player=0 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\BOSS0123.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=54/7c3ef695  # focale 70
+END 41 line=2
+OPEN 42 voixoff=0 lines=4
+RAND 004639e9 25423 n=3 pick=2
+RAND 004639e9 28520 n=3 pick=3
+RAND 004639e9 6902 n=3 pick=3
+RAND 004639e9 14962 n=3 pick=2
+CAMS 42 1=2/1 2=3/1 3=3/1 4=2/1
+LINE 42 1 speaker=hero player=1 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0124.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=43/8ba0cbd1  # focale 50
+LINE 42 2 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0125.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=56/361fd7b8  # focale 70
+LINE 42 3 speaker=hero player=1 stand=1 camera=3 mood=2 rnd=1 voice=loc\voix\fra\hoggar\HERO0126.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=14/74255da7  # focale 70
+LINE 42 4 speaker=boss player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0127.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=50/e669d326  # focale 50
+END 42 line=5
+OPEN 43 voixoff=0 lines=2
+RAND 004639e9 123 n=3 pick=1
+RAND 004639e9 24596 n=3 pick=3
+CAMS 43 1=1/1 2=3/1
+LINE 43 1 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0128.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=96/85eccb69  # focale 70
+LINE 43 2 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0129.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=58/e3c0d8f0  # focale 70
+END 43 line=3
+OPEN 44 voixoff=0 lines=2
+RAND 004639e9 3737 n=3 pick=3
+RAND 004639e9 13261 n=3 pick=2
+CAMS 44 1=3/1 2=2/1
+LINE 44 1 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0130.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=39/f157e0a1  # focale 70
+LINE 44 2 speaker=boss player=0 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0131.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=21/1d4ccb9c  # focale 50
+END 44 line=3
+OPEN 45 voixoff=0 lines=4
+RAND 004639e9 10195 n=3 pick=2
+RAND 004639e9 32525 n=3 pick=3
+RAND 004639e9 1264 n=3 pick=2
+RAND 004639e9 8260 n=3 pick=2
+CAMS 45 1=2/1 2=3/1 3=2/1 4=2/1
+LINE 45 1 speaker=hero player=1 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0132.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=46/e7498b0f  # focale 50
+LINE 45 2 speaker=boss player=0 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\BOSS0133.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=91/50803f2d  # focale 70
+LINE 45 3 speaker=hero player=1 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0134.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=13/2f62c5fc  # focale 50
+LINE 45 4 speaker=boss player=0 stand=1 camera=2 mood=2 rnd=1 voice=loc\voix\fra\hoggar\BOSS0135.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos1c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=147/f7920d27  # focale 50
+END 45 line=5
+OPEN 46 voixoff=0 lines=1
+CAMS 46 1=4/0
+LINE 46 1 speaker=boss player=0 stand=2 camera=4 mood=1 rnd=0 voice=loc\voix\fra\hoggar\BOSS0136.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos2c4.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=138/72e68bc8  # focale 50
+END 46 line=2
+OPEN 47 voixoff=0 lines=1
+CAMS 47 1=4/0
+LINE 47 1 speaker=boss player=0 stand=2 camera=4 mood=1 rnd=0 voice=loc\voix\fra\hoggar\BOSS0137.apc voice_file=1 video=hnmdial\HNM640\hoggar\bos2c4.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_BOSS,CMP_BOSS,CMP_BOSS2 text=14/3b0e8d7b  # focale 50
+END 47 line=2
+OPEN 48 voixoff=1 lines=1
+CAMS 48 1=0/0
+LINE 48 1 speaker=hero player=1 stand=1 camera=0 mood=2 rnd=0 voice=loc\voix\fra\hoggar\HERO0138.apc voice_file=1 video=- video_file=0 video_op=none focale=42980000 idtext=- text=28/90eb3041  # focale 76
+END 48 line=2
+OPEN 50 voixoff=0 lines=1
+CAMS 50 1=2/0
+LINE 50 1 speaker=gqu player=0 stand=1 camera=2 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GQU0141.apc voice_file=1 video=hnmdial\HNM640\hoggar\g1s1c2.hnm video_file=1 video_op=open focale=42980000 idtext=HOG_GARDIEN04 text=7/9f1068fa  # focale 76
+END 50 line=2
+OPEN 51 voixoff=0 lines=1
+CAMS 51 1=1/0
+LINE 51 1 speaker=gqu player=0 stand=1 camera=1 mood=0 rnd=0 voice=loc\voix\fra\hoggar\GQU0142.apc voice_file=1 video=hnmdial\HNM640\hoggar\g1s1c1.hnm video_file=1 video_op=open focale=42980000 idtext=HOG_GARDIEN04 text=7/ccd81df9  # focale 76
+END 51 line=2
+OPEN 53 voixoff=0 lines=1
+RAND 004639e9 6202 n=3 pick=2
+CAMS 53 1=2/1
+LINE 53 1 speaker=hero player=1 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0144.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=25/cadfd61c  # focale 50
+END 53 line=2
+OPEN 54 voixoff=0 lines=2
+RAND 004639e9 8116 n=3 pick=2
+CAMS 54 1=2/1 2=2/0
+LINE 54 1 speaker=hero player=1 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0145.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=33/6c00004f  # focale 50
+LINE 54 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=0 voice=loc\voix\fra\hoggar\TARG0146.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=65/41692c09  # focale 50
+END 54 line=3
+OPEN 55 voixoff=0 lines=2
+RAND 004639e9 5030 n=3 pick=3
+RAND 004639e9 20326 n=2 pick=1
+CAMS 55 1=3/1 2=1/1
+LINE 55 1 speaker=hero player=1 stand=1 camera=3 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0147.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=33/e439d4a8  # focale 70
+LINE 55 2 speaker=targ player=0 stand=2 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0148.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=59/ab6f9672  # focale 70
+END 55 line=3
+OPEN 58 voixoff=0 lines=2
+RAND 004639e9 29011 n=3 pick=2
+CAMS 58 1=2/1 2=2/0
+LINE 58 1 speaker=hero player=1 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0151.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=22/079abd2a  # focale 50
+LINE 58 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=0 voice=loc\voix\fra\hoggar\TARG0152.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=45/95016e1c  # focale 50
+END 58 line=3
+OPEN 59 voixoff=0 lines=2
+RAND 004639e9 30771 n=3 pick=1
+RAND 004639e9 6411 n=2 pick=2
+CAMS 59 1=1/1 2=2/1
+LINE 59 1 speaker=hero player=1 stand=1 camera=1 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0153.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=26/043ef037  # focale 70
+LINE 59 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0154.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=44/032e19fe  # focale 50
+END 59 line=3
+OPEN 60 voixoff=0 lines=4
+RAND 004639e9 25547 n=3 pick=3
+RAND 004639e9 21153 n=2 pick=2
+RAND 004639e9 21520 n=3 pick=2
+RAND 004639e9 29790 n=2 pick=1
+CAMS 60 1=3/1 2=2/1 3=2/1 4=1/1
+LINE 60 1 speaker=hero player=1 stand=1 camera=3 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0155.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=40/a6a003f7  # focale 70
+LINE 60 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0156.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=16/7d348d3d  # focale 50
+LINE 60 3 speaker=hero player=1 stand=1 camera=2 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0157.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=61/e673431c  # focale 50
+LINE 60 4 speaker=targ player=0 stand=2 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0158.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=52/08933861  # focale 70
+END 60 line=5
+OPEN 61 voixoff=0 lines=3
+RAND 004639e9 14924 n=3 pick=3
+RAND 004639e9 30188 n=2 pick=1
+RAND 004639e9 21763 n=3 pick=2
+CAMS 61 1=3/1 2=1/1 3=2/1
+LINE 61 1 speaker=hero player=1 stand=1 camera=3 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0159.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=54/deabcc45  # focale 70
+LINE 61 2 speaker=targ player=0 stand=2 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0160.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=22/17f54139  # focale 70
+LINE 61 3 speaker=hero player=1 stand=1 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0161.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=75/01aff785  # focale 50
+END 61 line=4
+OPEN 63 voixoff=0 lines=2
+RAND 004639e9 4940 n=3 pick=3
+RAND 004639e9 20851 n=2 pick=2
+CAMS 63 1=3/1 2=2/1
+LINE 63 1 speaker=hero player=1 stand=1 camera=3 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0164.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=38/4e9bb63b  # focale 70
+LINE 63 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0165.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=24/91f63f11  # focale 50
+END 63 line=3
+OPEN 64 voixoff=0 lines=2
+RAND 004639e9 18662 n=3 pick=3
+RAND 004639e9 13829 n=2 pick=2
+CAMS 64 1=3/1 2=2/1
+LINE 64 1 speaker=hero player=1 stand=1 camera=3 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0166.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=33/1dfde8ea  # focale 70
+LINE 64 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0167.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=57/d341a1c3  # focale 50
+END 64 line=3
+OPEN 65 voixoff=1 lines=1
+CAMS 65 1=0/0
+LINE 65 1 speaker=hero player=1 stand=1 camera=0 mood=2 rnd=0 voice=loc\voix\fra\hoggar\HERO0168.apc voice_file=1 video=- video_file=0 video_op=none focale=42980000 idtext=- text=37/aced3f56  # focale 76
+END 65 line=2
+OPEN 67 voixoff=0 lines=2
+RAND 004639e9 30900 n=3 pick=1
+RAND 004639e9 17713 n=2 pick=2
+CAMS 67 1=1/1 2=2/1
+LINE 67 1 speaker=hero player=1 stand=1 camera=1 mood=4 rnd=1 voice=loc\voix\fra\hoggar\HERO0170.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=28/c3c2549d  # focale 70
+LINE 67 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0171.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=35/e7e2b004  # focale 50
+END 67 line=3
+OPEN 68 voixoff=0 lines=3
+RAND 004639e9 18958 n=3 pick=2
+RAND 004639e9 17578 n=2 pick=1
+RAND 004639e9 8365 n=3 pick=2
+CAMS 68 1=2/1 2=1/1 3=2/1
+LINE 68 1 speaker=hero player=1 stand=1 camera=2 mood=4 rnd=1 voice=loc\voix\fra\hoggar\HERO0172.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=33/916add37  # focale 50
+LINE 68 2 speaker=targ player=0 stand=2 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0173.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=21/a17aeef7  # focale 70
+LINE 68 3 speaker=hero player=1 stand=1 camera=2 mood=4 rnd=1 voice=loc\voix\fra\hoggar\HERO0174.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=25/f6b15f9f  # focale 50
+END 68 line=4
+OPEN 69 voixoff=0 lines=3
+RAND 004639e9 13007 n=3 pick=3
+RAND 004639e9 11477 n=2 pick=2
+RAND 004639e9 1200 n=3 pick=1
+CAMS 69 1=3/1 2=2/1 3=1/1
+LINE 69 1 speaker=hero player=1 stand=1 camera=3 mood=4 rnd=1 voice=loc\voix\fra\hoggar\HERO0175.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=36/2c934c65  # focale 70
+LINE 69 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0176.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=38/6a88ced8  # focale 50
+LINE 69 3 speaker=hero player=1 stand=1 camera=1 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0177.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=77/37e8222b  # focale 70
+END 69 line=4
+OPEN 70 voixoff=0 lines=2
+RAND 004639e9 26058 n=3 pick=1
+RAND 004639e9 6439 n=2 pick=2
+CAMS 70 1=1/1 2=2/1
+LINE 70 1 speaker=hero player=1 stand=1 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0178.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=52/7d4cf055  # focale 70
+LINE 70 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0179.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=21/c6afd4e5  # focale 50
+END 70 line=3
+OPEN 80 voixoff=0 lines=4
+RAND 004639e9 2303 n=3 pick=3
+RAND 004639e9 12760 n=2 pick=1
+RAND 004639e9 19357 n=3 pick=2
+RAND 004639e9 2324 n=2 pick=1
+CAMS 80 1=3/1 2=1/1 3=2/1 4=1/1
+LINE 80 1 speaker=hero player=1 stand=1 camera=3 mood=4 rnd=1 voice=loc\voix\fra\hoggar\HERO0180.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=34/e812c967  # focale 70
+LINE 80 2 speaker=targ player=0 stand=2 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0181.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=12/57916596  # focale 70
+LINE 80 3 speaker=hero player=1 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0182.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=20/d3c33347  # focale 50
+LINE 80 4 speaker=targ player=0 stand=2 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0183.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=41/cc9f6965  # focale 70
+END 80 line=5
+OPEN 81 voixoff=0 lines=2
+RAND 004639e9 6477 n=3 pick=1
+RAND 004639e9 5108 n=2 pick=1
+CAMS 81 1=1/1 2=1/1
+LINE 81 1 speaker=hero player=1 stand=1 camera=1 mood=3 rnd=1 voice=loc\voix\fra\hoggar\HERO0184.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c1.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=24/5e8a652e  # focale 70
+LINE 81 2 speaker=targ player=0 stand=2 camera=1 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0185.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c1.hnm video_file=1 video_op=open focale=428c0000 idtext=HOG_TOUAREG text=23/b05063c9  # focale 70
+END 81 line=3
+OPEN 82 voixoff=0 lines=3
+RAND 004639e9 21113 n=3 pick=3
+RAND 004639e9 14887 n=2 pick=2
+RAND 004639e9 19801 n=3 pick=2
+CAMS 82 1=3/1 2=2/1 3=2/1
+LINE 82 1 speaker=hero player=1 stand=1 camera=3 mood=0 rnd=1 voice=loc\voix\fra\hoggar\HERO0186.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c3.hnm video_file=1 video_op=open focale=428c0000 idtext=- text=30/feabac75  # focale 70
+LINE 82 2 speaker=targ player=0 stand=2 camera=2 mood=0 rnd=1 voice=loc\voix\fra\hoggar\TARG0187.apc voice_file=1 video=hnmdial\HNM640\hoggar\tos2c2.hnm video_file=1 video_op=open focale=42480000 idtext=HOG_TOUAREG text=47/725992fc  # focale 50
+LINE 82 3 speaker=hero player=1 stand=1 camera=2 mood=1 rnd=1 voice=loc\voix\fra\hoggar\HERO0188.apc voice_file=1 video=hnmdial\HNM640\hoggar\hhs1c2.hnm video_file=1 video_op=open focale=42480000 idtext=- text=18/5b3a4b61  # focale 50
+END 82 line=4
+OPEN 83 voixoff=1 lines=1
+CAMS 83 1=0/0
+LINE 83 1 speaker=hero player=1 stand=1 camera=0 mood=0 rnd=0 voice=loc\voix\fra\hoggar\HERO0189.apc voice_file=1 video=- video_file=0 video_op=none focale=42980000 idtext=- text=27/af62fd6c  # focale 76
+END 83 line=2

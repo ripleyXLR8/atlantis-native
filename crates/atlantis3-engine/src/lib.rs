@@ -16,6 +16,7 @@
 pub mod audio;
 pub mod caption;
 pub mod cinema;
+pub mod dialog;
 pub mod game;
 pub mod inventory;
 pub mod place_anim;
