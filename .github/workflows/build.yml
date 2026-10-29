@@ -26,6 +26,7 @@ env:
 #   atlantis-native-macos-arm64.dmg
 #   atlantis-native-macos-x64.dmg
 #   atlantis-native-windows-x64.zip
+#   atlantis-native-windows-arm64.zip
 #   atlantis-native-linux-x64.tar.gz
 #   atlantis-native-linux-arm64.tar.gz
 #   atlantis-native-web.zip
@@ -155,6 +156,35 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$RELEASE" atlantis-native-windows-x64.zip --clobber
 
+  windows-arm64:
+    needs: release
+    # Windows on ARM (Snapdragon PCs, Surface): GitHub's ARM64 Windows
+    # runner, so the tests run on the target. Not signed yet.
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test (game data tests skip without ATLANTIS_DATA)
+        run: cargo test --release --workspace
+      - name: Build
+        run: cargo build --release -p atlantis-app
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/release/atlantis-native.exe, README.md, LICENSE, assets/fonts/LICENSE-* dist/
+          Compress-Archive -Path dist/* -DestinationPath atlantis-native-windows-arm64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-windows-arm64
+          path: atlantis-native-windows-arm64.zip
+      - name: Publish to the release
+        if: env.PUBLISH == 'yes'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE" atlantis-native-windows-arm64.zip --clobber
+
   linux-x64:
     needs: release
     # The oldest supported runner: the binary needs the glibc it was built
@@ -278,7 +308,7 @@ jobs:
   # in their name tags the downloads; html5 is marked "playable in browser"
   # on the itch.io edit page after its first push.
   itch:
-    needs: [macos, windows-x64, linux-x64, linux-arm64, web]
+    needs: [macos, windows-x64, windows-arm64, linux-x64, linux-arm64, web]
     if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.ITCH_GAME != '' }}
     runs-on: ubuntu-latest
     steps:
@@ -287,8 +317,9 @@ jobs:
           path: artifacts
       - name: Unpack the builds
         run: |
-          mkdir -p itch/windows itch/linux itch/linux-arm64 itch/mac itch/mac-x64 itch/web unpacked
+          mkdir -p itch/windows itch/windows-arm64 itch/linux itch/linux-arm64 itch/mac itch/mac-x64 itch/web unpacked
           unzip -q artifacts/atlantis-native-windows-x64/atlantis-native-windows-x64.zip -d itch/windows
+          unzip -q artifacts/atlantis-native-windows-arm64/atlantis-native-windows-arm64.zip -d itch/windows-arm64
           tar -xzf artifacts/atlantis-native-linux-x64/atlantis-native-linux-x64.tar.gz -C itch/linux
           tar -xzf artifacts/atlantis-native-linux-arm64/atlantis-native-linux-arm64.tar.gz -C itch/linux-arm64
           cp artifacts/atlantis-native-macos-arm64/atlantis-native-macos-arm64.dmg itch/mac/
@@ -308,6 +339,7 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           butler/butler push itch/windows "$ITCH_GAME:windows-x64" --userversion "$version"
+          butler/butler push itch/windows-arm64 "$ITCH_GAME:windows-arm64" --userversion "$version"
           butler/butler push itch/mac "$ITCH_GAME:macos-arm64" --userversion "$version"
           butler/butler push itch/mac-x64 "$ITCH_GAME:macos-x64" --userversion "$version"
           butler/butler push itch/linux "$ITCH_GAME:linux-x64" --userversion "$version"
