@@ -355,7 +355,6 @@ impl Game {
         if self.mode != Mode::Menu {
             self.prev_mode = self.mode;
         }
-        self.page = None;
         self.mode = Mode::Menu;
         self.credits = Some(c);
         self.click = false;

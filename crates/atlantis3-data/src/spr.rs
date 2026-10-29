@@ -32,10 +32,13 @@
 //! | 0xb0 | @ 0x10008275 | — | direct colour, two streams |
 //! | 0x130 | — | @ 0x100122eb | direct 32-bit colour, two streams |
 //! | 0xa0 | @ 0x100091f8 | — | direct colour, skip and copy runs only |
+//! | 0x28, 0x68 | @ 0x10008f78 | @ 0x1000f797 | palette, skip and copy runs only (the save thumbnails) |
 //!
 //! Any other kind has no blitter (the call draws nothing) or one that no
-//! shipped file uses (0x24, 0x28, 0x280 in 16 bits; 0x28, 0x120, 0x300 in
-//! 32 bits): those are not here.
+//! shipped file uses (0x24, 0x280 in 16 bits; 0x120, 0x300 in 32 bits):
+//! those are not here. The index table (spr_p5 @ 0x10002aa3) sends 0x68
+//! (the banks the save writer's encoder @ 0x0069c390 makes) to the 0x28
+//! blitters: palette indices with the 0xa0 rows' three runs.
 //!
 //! The palette rows use *Atlantis II*'s run grammar
 //! ([`atlantis2_data::spr::next_run`]): K skip, R palette index, P pair
@@ -428,6 +431,9 @@ enum Rows {
     Direct,
     /// Direct colours, skip and copy runs only (0xa0).
     DirectCopy,
+    /// Palette indices, skip and copy runs only (0x28, 0x68: the save
+    /// thumbnails).
+    PaletteCopy,
 }
 
 /// What `AFF_SPR` / `AFF_SPW` do with a family on a display.
@@ -451,9 +457,8 @@ fn blitter(flags: u32, depth: Depth) -> Blitter {
         }
         (Depth::Rgb565, 0xb0) | (Depth::Xrgb8888, 0x130) => Draw(Rows::Direct),
         (Depth::Rgb565, 0xa0) => Draw(Rows::DirectCopy),
-        (Depth::Rgb565, 0x24 | 0x28 | 0x280) | (Depth::Xrgb8888, 0x28 | 0x120 | 0x300) => {
-            Unsupported
-        }
+        (_, 0x28 | 0x68) => Draw(Rows::PaletteCopy),
+        (Depth::Rgb565, 0x24 | 0x280) | (Depth::Xrgb8888, 0x120 | 0x300) => Unsupported,
         _ => Nothing,
     }
 }
@@ -1117,12 +1122,52 @@ impl Bank {
                     let Some(rel) = u32_at(d, p) else { break };
                     copy_row(d, t, line, &inside, p + 4, p + rel as usize, x0, w)
                 }
+                Rows::PaletteCopy => self.palette_copy_row(t, line, &inside, p, x0, w),
             };
             if ok.is_none() {
                 break;
             }
         }
         true
+    }
+
+    /// A row of the 0x28 / 0x68 family (spr_p5 @ 0x10008f78, unclipped
+    /// path @ 0x1000909f..0x100090ab): the 0xa0 rows' runs
+    /// ([`next_simple`]) on one stream, a copy run's bytes being palette
+    /// indices (`mov edx, [ebp + eax*4]; mov [edi - 2], dx` @ 0x10009071).
+    fn palette_copy_row<P: Pixel>(
+        &self,
+        t: &mut Target<P>,
+        line: usize,
+        inside: &dyn Fn(i32) -> bool,
+        mut p: usize,
+        x0: i32,
+        w: i32,
+    ) -> Option<()> {
+        let d = &self.data;
+        let mut sx = x0;
+        let mut prev = Simple::Start;
+        while sx < x0 + w {
+            let b = *d.get(p)?;
+            p += 1;
+            let (run, n) = next_simple(prev, b);
+            prev = run;
+            match run {
+                Simple::End | Simple::Start => break,
+                Simple::Skip => sx += n as i32,
+                Simple::Copy => {
+                    for _ in 0..n {
+                        let i = *d.get(p)?;
+                        p += 1;
+                        if inside(sx) {
+                            t.pixels[line + sx as usize] = P::from_entry(self.pal[usize::from(i)]);
+                        }
+                        sx += 1;
+                    }
+                }
+            }
+        }
+        Some(())
     }
 
     #[allow(clippy::too_many_arguments)]

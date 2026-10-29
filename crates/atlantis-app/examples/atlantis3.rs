@@ -153,10 +153,27 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => self.game.click(),
+            WindowEvent::MouseInput {
+                state: ElementState::Released,
+                button: MouseButton::Left,
+                ..
+            } => self.game.release(),
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Right,
+                ..
+            } => self.game.right_click(),
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
                 match event.logical_key {
-                    Key::Named(NamedKey::Escape) if self.game.mode() == Mode::Warp => el.exit(),
-                    Key::Named(NamedKey::Escape) | Key::Named(NamedKey::Space) => self.game.skip(),
+                    Key::Named(NamedKey::Escape) if self.game.credits().is_some() => {
+                        self.game.credits_escape();
+                    }
+                    Key::Named(NamedKey::Escape) if self.game.mode() == Mode::Video => {
+                        self.game.skip()
+                    }
+                    // The in-game menu and its pages (@ 0x0042ac50).
+                    Key::Named(NamedKey::Escape) => self.game.escape(),
+                    Key::Named(NamedKey::Space) => self.game.skip(),
                     Key::Named(NamedKey::F12) => self.screenshot(),
                     _ => {}
                 }
@@ -166,7 +183,10 @@ impl ApplicationHandler for App {
                 self.game.step(now);
                 if !self.intro_done && self.game.mode() == Mode::Idle {
                     self.intro_done = true;
-                    self.game.new_game();
+                    // The start page after the intro (mode 6, page 0).
+                    if !self.game.show_start_page() {
+                        self.game.new_game();
+                    }
                 }
                 if self.game.quit {
                     el.exit();

@@ -36,6 +36,7 @@ use std::collections::{BTreeMap, HashMap};
 
 mod credits;
 mod hooks;
+mod pages;
 pub use credits::{Credits, Print};
 pub use hooks::Screen;
 
@@ -272,7 +273,8 @@ pub struct Game {
     /// The speakers' heads by (mesh, stand), loaded at their first line.
     heads: HashMap<(String, i32), Option<atlantis2_engine::head::Head>>,
     /// The menu page shown (mode 6).
-    page: Option<crate::menu::Page>,
+    /// The menu pages (loop mode 6, [`crate::menu::Menus`]).
+    menus: crate::menu::Menus,
     /// Tests: the dialog events logged, and the voice model (a voice
     /// plays for n `IsPlaying` calls).
     #[doc(hidden)]
@@ -384,7 +386,7 @@ impl Game {
                 r
             },
             dialog_tick: false,
-            page: None,
+            menus: Default::default(),
             heads: HashMap::new(),
             dialog_events: None,
             voice_model: None,
@@ -487,95 +489,11 @@ impl Game {
         self.moving.pending
     }
 
-    /// Shows the start page (`i_debut`, after the intro); false when it
-    /// cannot.
-    pub fn show_start_page(&mut self) -> bool {
-        self.show_page("i_debut")
-    }
-
-    /// Shows the in-game menu (`i_princ`, whose `BT_SAVE` saves the game);
-    /// false when it cannot.
-    pub fn show_save_page(&mut self) -> bool {
-        self.show_page("i_princ")
-    }
-
-    /// Shows the load page (`i_load`): its static elements (the saves'
-    /// thumbnails are not drawn yet).
-    pub fn show_load_page(&mut self) -> bool {
-        self.show_page("i_load")
-    }
-
-    fn show_page(&mut self, name: &str) -> bool {
-        let Some(page) = crate::menu::Page::load(&self.files, name, self.width, self.height) else {
-            return false;
-        };
-        if self.mode != Mode::Menu {
-            self.prev_mode = self.mode;
-        }
-        self.page = Some(page);
-        self.mode = Mode::Menu;
-        self.click = false;
-        true
-    }
-
-    /// The menu page shown, if any.
-    pub fn page(&self) -> Option<&crate::menu::Page> {
-        self.page.as_ref()
-    }
-
-    /// A menu frame: the page drawn, then a click (on release) on its
-    /// elements: on the start page, player n's new game or newest save;
-    /// in the in-game menu, `BT_SAVE` writes the next save of the player,
-    /// `BT_BACK` goes back to the game.
-    fn menu_frame(&mut self) {
-        if self.credits.is_some() {
-            self.credits_frame();
-            return;
-        }
-        let Some(mut page) = self.page.take() else {
-            self.mode = Mode::Idle;
-            return;
-        };
-        let (w, h) = (self.width, self.height);
-        self.screen.fill(0);
-        page.frame(&mut self.screen, w, h, self.pointer, self.now);
-        let clicked = std::mem::take(&mut self.click)
-            .then(|| page.clicked(self.pointer).map(<[u8]>::to_vec))
-            .flatten();
-        let name = page.name.clone();
-        self.page = Some(page);
-        let Some(el) = clicked else { return };
-        match (name.as_str(), el.as_slice()) {
-            ("i_debut", b"BT_QUIT") => self.quit = true,
-            ("i_debut", n) if n.starts_with(b"BT_LOAD") => {
-                let player = i32::from(n[n.len() - 1].wrapping_sub(b'0'));
-                self.new_game_or_load(player);
-            }
-            ("i_princ", b"BT_SAVE") => {
-                self.save_game();
-                self.leave_menu();
-            }
-            (_, b"BT_BACK") => self.leave_menu(),
-            _ => {}
-        }
-    }
-
-    fn leave_menu(&mut self) {
-        self.page = None;
-        self.mode = if self.prev_mode == Mode::Menu {
-            Mode::Warp
-        } else {
-            self.prev_mode
-        };
-        self.look_last = None;
-    }
-
     /// The start page's player n (@ 0x00452000): `(chapter=600)` when
     /// `game<n>_1.sav` does not exist, else the newest of the run of saves
     /// from 1 loaded.
     pub fn new_game_or_load(&mut self, player: i32) -> bool {
         self.player = player;
-        self.page = None;
         let mut newest = None;
         for k in 1.. {
             let name = atlantis3_data::save::game_save_name(player, k);
@@ -623,7 +541,6 @@ impl Game {
     pub fn load_save_text(&mut self, name: &str, text: Vec<u8>) -> bool {
         self.saves.insert(name.to_string(), text);
         self.video = None;
-        self.page = None;
         self.mode = Mode::Warp;
         let ok = self.load_named(name);
         self.look_last = None;
@@ -770,6 +687,9 @@ impl Game {
         // input (@ 0x00431580, byte 0x00789d56).
         if self.puzzles.freeze {
             return;
+        }
+        if self.mode == Mode::Menu {
+            self.menus.press();
         }
         self.click = true;
         if self.last_press.is_some_and(|t| self.now - t < 0.2) {
