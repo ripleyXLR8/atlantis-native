@@ -100,7 +100,7 @@ its executable's language:
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
-| `fix_sharp_s` | a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
+| `fix_sharp_s` | (not the Czech CD, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
 | `fix_disc_revision` | some disc's copy of FONTMIN.SPR, FONTMIN2.SPR, CREDBLAN.SPR, CREDBLEU.SPR, or CREDITS.TXT with the builds that read it at each run, differs from disc 1's (`FixData::disc_revisions`): of the known data, the Dutch CD's and the May 1997 German CD's | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc`, `load_credits_fonts` | the credits text, the credits fonts and the player-name fonts are disc 1's whatever the disc (the original reads them from the disc in the drive: the Dutch disc 2 holds an older revision, the German May discs 2 to 4 another credits font, see [Game builds](#game-builds)) |
 | `fix_menu_line_width` | Italian CD and DVD (`menu_positioned_byte_width` 16) | `MenuRules::positioned_byte_width` | a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
 | `fix_chinese_rows` | Simplified Chinese (`CjkBreaker::Gb2312`) | `CjkSplit::row_fix` | the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)) |
@@ -325,7 +325,7 @@ thresholded to one bit, so every platform draws the same pixels; the text
 bytes are read in the release's code page (`TextCodePage` in
 `crates/atlantis-data/src/text.rs`): Windows-1252, but for the May 1997
 French and German CDs and the Dutch and Swedish CDs, whose texts are in
-the DOS code page 850.
+the DOS code page 850, and the Czech CD, whose texts are Windows-1250.
 The font is bundled
 in `assets/fonts`.
 
@@ -656,6 +656,33 @@ copy, no start-up CD scan, an immediate exit on closing) concern how the
 original runs on a later system, not the game; the port handles the
 window, the disk and the pace in its own way for every build.
 
+The Czech CD (Bohemia Interactive, 2000; the same discs, disc 1 with a
+PDF manual added, in the magazine re-issue GAME4U Speciál 2, 2001) ships
+that 1.01 program as its `atlantis.exe`, byte for byte, over archives of
+its own: the US August 1997 discs' (the same scripts, films and English
+voices) with Czech dialog texts, menus, chapter names and credits, the
+six sprite fonts (FONTMAX, FONTMAX2, FONTMIN, FONTMIN2, CREDBLAN,
+CREDBLEU) redrawn with a glyph for each byte up to 0xff, and an end
+picture of its own (`IMAGES\END.TGA`). Since the executable cannot tell it from the patch, the port
+recognises the release by its player screen's menu
+(`SPRLIST\SELEMENU.TXT`, `ZVOLTE JMÉNO HRÁČE`) and plays it as its own
+entry, `atlantis-cd-cs-714240` (`exe::CS_CD`: the patch build's every
+field but the name, which keeps its saves apart, and the code page), shown
+*CD, Czech (Bohemia Interactive, 1999 build)*. Its texts are
+Windows-1250: the program passes the subtitles to Windows in Arial asked
+in the default character set, which a Czech Windows reads in code page
+1250 (`č ř ů ě ť ď ň`, where a Western Windows reads `è ø ù ì` and other
+signs), and the port reads them so. The rows are the 2001 build's,
+as its breaker is. The menus and the LOAD list draw the Czech letters
+from the fonts' new glyphs, at the widths the program reads for them: as
+the original's tables have 137 FONTMAX widths and 101 FONTMIN advances,
+the bytes past them read on in the table that follows (FONTMIN's after
+FONTMAX's, the credits font's after FONTMIN's), and the port reads them
+the same way. The program's French new-player row (`NOUVEAU JOUEUR`)
+stays, and its name entry takes the Windows-1250 letters up to 0xa7
+(`Š Ť Ž š ť ž`). Its 0xe1 is `á`, which the Czech fonts draw, so the
+`ß` fix does not apply to it.
+
 Cryo's DVD-ROM of 1998 holds eight builds of the 1998 program the
 Chinese builds descend from: every flag above is the Chinese builds' but
 where those changed it (their
@@ -710,7 +737,9 @@ In every build the player-name font (FONTMIN) has advances for 101
 glyphs, and the original reads those of the glyphs past them from the
 credits font's table that follows it; the port does the same with each
 build's table (in the August 1997 French build a typed `£` advances 2 pixels,
-in the 2001 build 14).
+in the 2001 build 14). Likewise the menu font (FONTMAX) has 137 widths, and
+a byte past them reads the FONTMIN advances that follow; only the Czech
+CD's menus hold such bytes.
 
 The May 1997 French build is the English May 1997 build's code, compiled five
 days earlier against an older `cryo.dll`, with its own music copy rules.
@@ -3715,6 +3744,13 @@ its tables, archives and edition in `atlantis-data`'s tests),
 dialog line's rows against the build's breaker under emulation, its
 menu font advances and fixes, a new game to its first dialog, a save and
 its load; its tables, archives and edition in `atlantis-data`'s tests),
+`ATLANTIS_DATA_CS` a folder of the Czech CD's images (its `.iso`
+files: the 1.01 program over Bohemia Interactive's archives;
+`tests/cs_cd.rs`: every dialog line's rows against the program's breaker
+under emulation, the Windows-1250 letters and the subtitle font's glyphs
+for them, the menu fonts' glyphs and widths, the edition and fixes, a new
+game with a name typed in Czech letters to its first dialog, a save and
+its load),
 `ATLANTIS_DATA_NL1997` one of the Dutch retail CD,
 `ATLANTIS_DATA_SV1997` one of the Swedish retail CD,
 `ATLANTIS_DATA_ES1997` / `ATLANTIS_DATA_IT1997` ones of the Spanish /
@@ -3817,7 +3853,7 @@ ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
 ATLANTIS_DATA_FR1997=/path/to/fr1997 ATLANTIS_DATA_FR1997_MAY=/path/to/fr1997may \
 ATLANTIS_DATA_DE1997=/path/to/de1997 ATLANTIS_DATA_NL1997=/path/to/nl1997 \
 ATLANTIS_DATA_DE_MAY97=/path/to/de-may-1997-images \
-ATLANTIS_DATA_EN_US97=/path/to/us-1997-images \
+ATLANTIS_DATA_EN_US97=/path/to/us-1997-images ATLANTIS_DATA_CS=/path/to/czech-images \
 ATLANTIS_DATA_SV1997=/path/to/sv1997 ATLANTIS_DATA_ES1997=/path/to/es1997 \
 ATLANTIS_DATA_IT1997=/path/to/it1997 ATLANTIS_DATA_PATCH101=/path/to/patch101 \
 cargo test --release

@@ -157,6 +157,7 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | CD, retail release (June 1997 build, 4 CDs) | Swedish | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (August 1997 build, 4 CDs) | Spanish | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (July 1997 build, 4 CDs) | Italian | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
+| CD, Czech release (Bohemia Interactive, 2000; also GAME4U Speciál 2, 2001; 4 CDs; Cryo's 1999 patch 1.01 program) | Czech subtitles and menus, English voices | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
 | CD with Cryo's patch 1.01 (`AT1CDINT.EXE`, 1999 build) | English, French, German, Dutch, Swedish, Spanish or Italian CD (French interface) | the folder with the patched `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
 | CD, Traditional Chinese release (1998 build, 4 CDs) | Traditional Chinese subtitles and menus, English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
@@ -166,6 +167,11 @@ Atlantis Native contains **no game data**. Bring your own copy:
 
 Each build plays as it shipped: the May 1997 English, French and German
 CDs and the Dutch and Swedish CDs, for one, draw their subtitles in their own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
+The Czech CD's subtitles are read in the Central European code page, as
+on the Czech Windows it was sold for (`č`, `ř`, `ů` and the other Czech
+letters, not the Western letters a Western Windows shows there); its
+player screen keeps the French `NOUVEAU JOUEUR` row of the program it
+ships.
 The May 1997 German CD's program also answers four keys its developers
 left in (`T`, `R`, `F1`, `F3`: a panel of the engine's variables, and
 others); Atlantis Native does not reproduce them.
