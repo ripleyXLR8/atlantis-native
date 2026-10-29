@@ -1105,7 +1105,7 @@ back) into `yucatan-*.png`.
   five of GOG's patches only (fixed drives as the CD and its empty root,
   the two free-space tests, the CD page closing at once). The port
   models none of the patches they lack, so all three play alike
-  (`tests/gog.rs` checks the bytes). The languages differ only in data: `loc\` (texts,
+  (`tests/gog_languages.rs` checks the bytes). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
