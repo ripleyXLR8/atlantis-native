@@ -1316,7 +1316,10 @@ impl Game {
             self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
             // The places' frame hook (@ 0x004c27d0).
             self.frame_hook();
-            if self.mode == Mode::Warp {
+            // The click scan (@ 0x004405b0) whenever no menu is open: a
+            // screen the frame hook started, a dialog or a film a scan
+            // started do not prevent it.
+            if !matches!(self.mode, Mode::Inventory | Mode::Subjects) {
                 self.click_scan();
             }
             if matches!(self.mode, Mode::Warp | Mode::Subjects) {
@@ -2613,6 +2616,16 @@ impl Game {
         &self.work
     }
 
+    /// Whether a play that C code started (a slot not played by the clock
+    /// at the view entry) still runs (tests: the player waits for it).
+    #[doc(hidden)]
+    pub fn driven_play_running(&self) -> bool {
+        self.slots
+            .slots
+            .iter()
+            .any(|s| s.driven && s.shown && s.mode == 1 && !s.ended)
+    }
+
     /// Whether the view's cube was found and decoded.
     pub fn cube_loaded(&self) -> bool {
         self.place.faces.iter().all(|f| !f.is_empty())
@@ -3048,7 +3061,14 @@ impl Host for Game {
         match op {
             AnimOp::Show { kind, id, number } => self.slots.show(id, kind, number, self.now),
             AnimOp::Hide { kind, id } => self.slots.hide(id, kind, self.now),
-            _ => self.not_ported("the animation commands (PlayAnim...)"),
+            AnimOp::Play { kind, id, number } => self.slots.play(id, kind, number),
+            AnimOp::GotoFrame { id, frame, .. } => self.slots.goto_frame(id, frame),
+            AnimOp::TheFrame { id, on, .. } => self.slots.set_animated(id, on),
+            AnimOp::Continue { id, .. } => self.slots.continue_anim(id),
+            AnimOp::Stop { id, number } => self.slots.stop_anim(id, number),
+            // The frame lists of the SPW pass (visual).
+            AnimOp::AddFrame { .. } => {}
+            _ => self.not_ported("the animation command ChangeAnimGotoPerso"),
         }
     }
 

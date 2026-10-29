@@ -74,11 +74,9 @@ struct Run {
 }
 
 impl Run {
-    /// One frame. The harness's clock is frozen (no 15 Hz tick, no timer)
-    /// but during `WAIT`; a turn, which the harness ends at the next
-    /// frame, gets the time it needs here.
+    /// One frame, 1/30 s.
     fn frame(&mut self) {
-        let dt = if self.g.turning() { 1.0 / 30.0 } else { 0.0 };
+        let dt = 1.0 / 30.0;
         self.frame_dt(dt);
     }
 
@@ -134,6 +132,17 @@ impl Run {
 
     fn action(&mut self, line: &str) {
         let w: Vec<&str> = line.split_whitespace().collect();
+        // The player waits for a play a puzzle started (a lid opening)
+        // before acting (the harness, without place animations, ends them
+        // at once).
+        if matches!(w[0], "GO" | "PERSO" | "OBJET" | "ZONE" | "HAND") {
+            for _ in 0..600 {
+                if !self.g.driven_play_running() || self.g.mode() != Mode::Warp {
+                    break;
+                }
+                self.frame();
+            }
+        }
         // `EXPECT` and `RAND` are no steps of the golden.
         if !matches!(w[0], "EXPECT" | "RAND") {
             self.step += 1;
@@ -162,7 +171,18 @@ impl Run {
                     (defnames::OBJETS, 2)
                 };
                 let id = self.id(section, w[1]);
-                assert!(self.g.click_sprite(id, kind), "{line}: not shown");
+                // A sprite still playing an animation that cannot be
+                // clicked: the player waits for the next one (the
+                // harness, without place animations, clicks at once).
+                let mut found = self.g.click_sprite(id, kind);
+                for _ in 0..300 {
+                    if found {
+                        break;
+                    }
+                    self.frame_dt(1.0 / 15.0);
+                    found = self.g.click_sprite(id, kind);
+                }
+                assert!(found, "{line}: not shown");
                 self.act_frame();
             }
             "SUBJECT" => {
@@ -448,16 +468,33 @@ fn play(r: &mut Run, name: &str, walk: &str, golden: &str) {
         }
         r.action(line);
         // The lines so far, against the golden's up to this step.
-        let got: Vec<String> = r.g.script().unwrap().set_log.as_ref().unwrap().iter()
-            .map(|l| format!("SET{l}"))
-            .collect();
-        let upto: Vec<&str> = want.iter().filter(|(s, _)| *s <= r.step).map(|(_, l)| *l).collect();
-        if let Some(i) = (0..got.len().max(upto.len())).find(|&i| got.get(i).map(String::as_str) != upto.get(i).copied()) {
-            let from = i.saturating_sub(4);
-            let flags: Vec<String> = r.g.script().unwrap().flags.iter().enumerate()
-                .filter(|(k, v)| **v != 0 && *k < 1000)
-                .map(|(k, v)| format!("{k}={v}"))
+        let got: Vec<String> =
+            r.g.script()
+                .unwrap()
+                .set_log
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|l| format!("SET{l}"))
                 .collect();
+        let upto: Vec<&str> = want
+            .iter()
+            .filter(|(s, _)| *s <= r.step)
+            .map(|(_, l)| *l)
+            .collect();
+        if let Some(i) = (0..got.len().max(upto.len()))
+            .find(|&i| got.get(i).map(String::as_str) != upto.get(i).copied())
+        {
+            let from = i.saturating_sub(4);
+            let flags: Vec<String> =
+                r.g.script()
+                    .unwrap()
+                    .flags
+                    .iter()
+                    .enumerate()
+                    .filter(|(k, v)| **v != 0 && *k < 1000)
+                    .map(|(k, v)| format!("{k}={v}"))
+                    .collect();
             panic!(
                 "{name}: step {} `{line}`: SetVariables line {i} differs\n native flags {}\n golden {:#?}\n native {:#?}",
                 r.step,

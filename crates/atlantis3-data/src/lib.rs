@@ -47,6 +47,7 @@ pub mod objects;
 pub mod save;
 pub mod set;
 pub mod spr;
+pub mod spr_encode;
 pub mod testing;
 pub mod tokens;
 pub mod vue;

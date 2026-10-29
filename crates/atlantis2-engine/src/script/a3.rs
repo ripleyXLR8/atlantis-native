@@ -442,14 +442,23 @@ impl Script {
         if anim_key.contains(&key) {
             return Some(self.anim_command(host, src, p, key));
         }
-        for name in [
-            "PLAYCUTANIMP",
-            "PLAYCUTANIMO",
-            "UNANIMATE",
-            "ANIMATE",
-            "SUPFRAMEPERSO",
-            "SUPFRAMEOBJET",
-        ] {
+        if is(self, "PLAYCUTANIMP") || is(self, "PLAYCUTANIMO") {
+            // @ 0x0045fa90(id, n, kind, 1): hidden (every slot, at frame
+            // 0), then the slot playing animation n shown: a switch now.
+            let perso = is(self, "PLAYCUTANIMP");
+            let (section, kind) = if perso {
+                (defnames::PERSONNAGES, 1)
+            } else {
+                (defnames::OBJETS, 2)
+            };
+            let id = self.id(section, src, p + 1);
+            let i = self.after_comma(src, p);
+            let n = self.atoi_at(src, i);
+            self.hide(host, id, kind, false);
+            self.show(host, id, kind, n);
+            return Some(next);
+        }
+        for name in ["UNANIMATE", "ANIMATE", "SUPFRAMEPERSO", "SUPFRAMEOBJET"] {
             if is(self, name) {
                 // Not on the first chapters' path: not ported yet.
                 self.warn("SetVariables() : %s non porté", name);

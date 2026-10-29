@@ -67,6 +67,9 @@ pub struct Slot {
     pub next: Option<usize>,
     /// +0x46d: the play reached its end.
     pub ended: bool,
+    /// Not played by the clock at the view entry (mode 0): its plays are
+    /// started by C code (a lid, a door...).
+    pub driven: bool,
 }
 
 /// The view's slots.
@@ -142,6 +145,7 @@ impl Slots {
                     state: s,
                     shown: slot_shown,
                     mode: s.single,
+                    driven: s.single == 0,
                     blink: false,
                     pause,
                     waiting: false,
@@ -187,6 +191,76 @@ impl Slots {
             s.shown = false;
             s.frame = 0;
             s.start = now;
+        }
+    }
+
+    /// `PLAYANIMP` / `PLAYANIMO` (@ 0x0045fa90 with 2): the first slot j of
+    /// (id, kind) playing animation `number` queued after the first shown
+    /// slot k of (id, kind), which plays on to its file's end (k = j:
+    /// restart). Nothing without j or k.
+    pub fn play(&mut self, id: i32, kind: i32, number: i32) {
+        let Some(j) = self
+            .slots
+            .iter()
+            .position(|s| s.id == id && s.kind == kind && s.state.anim as i32 == number)
+        else {
+            return;
+        };
+        let Some(k) = self
+            .slots
+            .iter()
+            .position(|s| s.id == id && s.kind == kind && s.shown)
+        else {
+            return;
+        };
+        let sk = &mut self.slots[k];
+        sk.last = sk.count;
+        sk.queued = true;
+        sk.next = Some(j);
+        let sj = &mut self.slots[j];
+        sj.queued = false;
+        sj.frame = 0;
+        sj.last = if sj.state.end < 1 {
+            sj.count
+        } else {
+            sj.state.end - 1
+        };
+    }
+
+    /// `GOTOFRAMEPERSO` / `GOTOFRAMEOBJET` (@ 0x00449704 / 0x00449983):
+    /// the first slot with that id (kind not tested) at frame `frame`.
+    pub fn goto_frame(&mut self, id: i32, frame: i32) {
+        if let Some(s) = self.slots.iter_mut().find(|s| s.id == id) {
+            s.frame = frame;
+        }
+    }
+
+    /// `ANIM_THE_FRAME` (@ 0x00449ab1): the first slot with that id
+    /// animated or frozen.
+    pub fn set_animated(&mut self, id: i32, on: bool) {
+        if let Some(s) = self.slots.iter_mut().find(|s| s.id == id) {
+            s.animated = on;
+        }
+    }
+
+    /// `CONTINUEANIM` (@ 0x004495f1): the first shown slot plays on to its
+    /// file's end.
+    pub fn continue_anim(&mut self, id: i32) {
+        if let Some(s) = self.slots.iter_mut().find(|s| s.id == id && s.shown) {
+            s.last = s.count;
+        }
+    }
+
+    /// `STOPANIM` (@ 0x0044969d): every character slot of id playing
+    /// animation `number` hidden at frame 0.
+    pub fn stop_anim(&mut self, id: i32, number: i32) {
+        for s in self
+            .slots
+            .iter_mut()
+            .filter(|s| s.id == id && s.kind == 1 && s.state.anim as i32 == number)
+        {
+            s.shown = false;
+            s.frame = 0;
         }
     }
 
