@@ -8,6 +8,10 @@
 //! - `AtlCarteTour` (mode 10): the board's squares, then per frame the
 //!   pawns' animation frames, the sprite calls, the md5 and the return.
 //!
+//! Each at 640 × 480, 800 × 600 and 1024 × 768 (`map_carte_640.txt`,
+//! `map_carte_1024.txt`, `map_tour_640.txt`, `map_tour_1024.txt`; the
+//! pointer at the screen's centre).
+//!
 //! Needs the game: `ATLANTIS3_DATA`.
 
 use atlantis2_engine::Fpu;
@@ -20,10 +24,12 @@ use atlantis3_engine::maps::{
 };
 use md5::{Digest, Md5};
 
-const CARTE: &str = include_str!("golden/map_carte.txt");
-const TOUR: &str = include_str!("golden/map_tour.txt");
-const W: usize = 800;
-const H: usize = 600;
+const CARTE_640: &str = include_str!("golden/map_carte_640.txt");
+const CARTE_800: &str = include_str!("golden/map_carte.txt");
+const CARTE_1024: &str = include_str!("golden/map_carte_1024.txt");
+const TOUR_640: &str = include_str!("golden/map_tour_640.txt");
+const TOUR_800: &str = include_str!("golden/map_tour.txt");
+const TOUR_1024: &str = include_str!("golden/map_tour_1024.txt");
 
 fn md5(px: &[u16]) -> String {
     let b: Vec<u8> = px.iter().flat_map(|p| p.to_le_bytes()).collect();
@@ -142,14 +148,14 @@ fn bank(files: &A3Files, p: &str) -> Bank {
     Bank::parse(&files.read(p).unwrap(), Depth::Rgb565).unwrap()
 }
 
-#[test]
-fn the_land_of_the_dead_map_draws_and_picks_as_the_original() {
+/// The Land of the Dead map's golden of the `w` × `h` screen replayed.
+fn carte(golden: &str, w: usize, h: usize) {
     let Some(files) = banks() else {
         return;
     };
     let carte = bank(&files, "spr/Carte.spr");
     let interface = bank(&files, "spr/Interface.spr");
-    let lines: Vec<&str> = CARTE.lines().filter(|l| !l.starts_with('#')).collect();
+    let lines: Vec<&str> = golden.lines().filter(|l| !l.starts_with('#')).collect();
     // The case's flags (the harness's set-up before each frame).
     let flags_of = |case: &str| -> Vec<(i32, i32)> {
         let mut v = vec![(80, 1)];
@@ -175,9 +181,9 @@ fn the_land_of_the_dead_map_draws_and_picks_as_the_original() {
                 let k: usize = f[2].parse().unwrap();
                 let at = (f[3].parse().unwrap(), f[4].parse().unwrap());
                 let port = if f[1] == "hover" {
-                    carte_label(W, H, k)
+                    carte_label(w, h, k)
                 } else {
-                    carte_place(W, H, k)
+                    carte_place(w, h, k)
                 };
                 assert_eq!(port, at, "{l}");
                 counts[0] += 1;
@@ -187,9 +193,9 @@ fn the_land_of_the_dead_map_draws_and_picks_as_the_original() {
                 for (j, want) in f[2..].iter().enumerate() {
                     let ptr = (10 * j as i32, y);
                     let port = if f[0] == "hover" {
-                        carte_hover(&carte, W, H, ptr).map(|k| (k + 5).to_string())
+                        carte_hover(&carte, w, h, ptr).map(|k| (k + 5).to_string())
                     } else {
-                        carte_click(&carte, W, H, ptr).map(|k| CARTE_CHAPTERS[k - 1].to_string())
+                        carte_click(&carte, w, h, ptr).map(|k| CARTE_CHAPTERS[k - 1].to_string())
                     };
                     assert_eq!(port.as_deref().unwrap_or("-"), *want, "{} at {ptr:?}", f[0]);
                     counts[1] += 1;
@@ -226,8 +232,8 @@ fn the_land_of_the_dead_map_draws_and_picks_as_the_original() {
                     want_events.extend(close.clone());
                     counts[5] += 1;
                 } else {
-                    let mut screen = vec![0u16; W * H];
-                    let calls = draw_carte(&mut screen, W, H, &carte, Some(&interface), fr.ptr);
+                    let mut screen = vec![0u16; w * h];
+                    let calls = draw_carte(&mut screen, w, h, &carte, Some(&interface), fr.ptr);
                     let port: Vec<String> = calls.iter().map(port_draw).collect();
                     assert_eq!(port, fr.draws, "{} {}", fr.case, fr.n);
                     counts[2] += port.len();
@@ -236,7 +242,7 @@ fn the_land_of_the_dead_map_draws_and_picks_as_the_original() {
                         counts[3] += 1;
                     }
                     if fr.left {
-                        match carte_click(&carte, W, H, fr.ptr) {
+                        match carte_click(&carte, w, h, fr.ptr) {
                             Some(k) => {
                                 let chapter = CARTE_CHAPTERS[k - 1];
                                 if carte_fishermen(chapter, flag(69), flag(560)) {
@@ -280,10 +286,10 @@ fn the_land_of_the_dead_map_draws_and_picks_as_the_original() {
             _ => {}
         }
     }
-    // 10 hit-test positions, 2 × 60 × 80 grid points, 22 frames (20
-    // drawn, 19 of them without the panorama, 2 refusals).
+    // 10 hit-test positions, 2 × ⌈h / 10⌉ × ⌈w / 10⌉ grid points, 22
+    // frames (20 drawn, 19 of them without the panorama, 2 refusals).
     assert_eq!(counts[0], 10);
-    assert_eq!(counts[1], 2 * 60 * 80);
+    assert_eq!(counts[1], 2 * h.div_ceil(10) * w.div_ceil(10));
     assert_eq!(counts[4], 22);
     assert_eq!(counts[3], 19);
     assert_eq!(counts[5], 2);
@@ -293,17 +299,18 @@ fn the_land_of_the_dead_map_draws_and_picks_as_the_original() {
     );
 }
 
-#[test]
-fn the_tower_board_draws_its_pawns_as_the_original() {
+/// The tower board's golden of the `w` × `h` screen replayed.
+fn tour(golden: &str, w: usize, h: usize) {
     let Some(files) = banks() else {
         return;
     };
-    let board = bank(&files, "spr/CarteTour800.spr");
+    let board = bank(&files, &format!("spr/CarteTour{w}.spr"));
     let pawns = bank(&files, "spr/PionsTour.spr");
-    // The renderer's control word, which the warp leaves (0x0e7f).
+    // The renderer's control word, which the warp leaves (0x0e7f): at
+    // 800 the factor rounds below 1.
     let fpu = Fpu::Chop;
-    assert!(tour_scale(fpu, W) < 1.0);
-    let lines: Vec<&str> = TOUR.lines().filter(|l| !l.starts_with('#')).collect();
+    assert_eq!(tour_scale(fpu, w) < 1.0, w <= 800);
+    let lines: Vec<&str> = golden.lines().filter(|l| !l.starts_with('#')).collect();
     let mut anim = TourAnim::default();
     let (mut a, mut b, mut on) = (0, 0, false);
     let mut last_t = 300.0f64;
@@ -340,11 +347,11 @@ fn the_tower_board_draws_its_pawns_as_the_original() {
                     i += 1;
                 }
                 last_t = fr.t;
-                let mut screen = vec![0u16; W * H];
+                let mut screen = vec![0u16; w * h];
                 let calls = draw_tour(
                     &mut screen,
-                    W,
-                    H,
+                    w,
+                    h,
                     &board,
                     Some(&pawns),
                     &mut anim,
@@ -391,4 +398,34 @@ fn the_tower_board_draws_its_pawns_as_the_original() {
         "tower board: {} frames, {} sprite calls, {} md5s",
         counts[3], counts[1], counts[2]
     );
+}
+
+#[test]
+fn the_land_of_the_dead_map_draws_and_picks_as_the_original_at_640() {
+    carte(CARTE_640, 640, 480);
+}
+
+#[test]
+fn the_land_of_the_dead_map_draws_and_picks_as_the_original_at_800() {
+    carte(CARTE_800, 800, 600);
+}
+
+#[test]
+fn the_land_of_the_dead_map_draws_and_picks_as_the_original_at_1024() {
+    carte(CARTE_1024, 1024, 768);
+}
+
+#[test]
+fn the_tower_board_draws_its_pawns_as_the_original_at_640() {
+    tour(TOUR_640, 640, 480);
+}
+
+#[test]
+fn the_tower_board_draws_its_pawns_as_the_original_at_800() {
+    tour(TOUR_800, 800, 600);
+}
+
+#[test]
+fn the_tower_board_draws_its_pawns_as_the_original_at_1024() {
+    tour(TOUR_1024, 1024, 768);
 }

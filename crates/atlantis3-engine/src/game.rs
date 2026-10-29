@@ -122,7 +122,7 @@ struct Playing {
     shown: u32,
     /// The caption (`loc\text\<lang>\CineNNN.txt`) and its fade.
     caption: Option<crate::caption::CaptionFade>,
-    /// The move's transition sprites (`spf\SPF640\<world>\`).
+    /// The move's transition sprites (`spf\SPF640\<world>\`, `SPF800` with WarpRes 1024).
     spf: Vec<Bank>,
     /// The cue lines (`hnm\cineNNN.txt`): the line, shown, done.
     cues: Vec<(atlantis3_data::cine_txt::Cue, bool, bool)>,
@@ -1875,7 +1875,13 @@ impl Game {
                         .entities
                         .iter()
                         .find(|e| e.con_name.eq_ignore_ascii_case(name))?;
-                    let path = format!("spf/SPF640/{folder}/{}{old:03}{next:03}.spr", e.prefix);
+                    let path = crate::travel::transition_path(
+                        self.startup.config.warp_res,
+                        folder,
+                        &e.prefix,
+                        old,
+                        next,
+                    );
                     self.files
                         .read(&path)
                         .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok())

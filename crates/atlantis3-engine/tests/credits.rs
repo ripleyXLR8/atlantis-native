@@ -8,13 +8,65 @@
 //! (font, the page text's md5 and length, colour, the layout's margins
 //! and alignments); then Escape: the configuration written, the quit.
 //!
+//! The same at 640 × 480 and 1024 × 768 (`credits_640.txt`,
+//! `credits_1024.txt`: the click at the screen's centre, the text box's
+//! margins (trunc(0.4 W), 0, 0, H − trunc(0.8 H))), the install's
+//! `Atlantis3.cfg` given that `Resolution`.
+//!
 //! Needs the game: `ATLANTIS3_DATA`.
+
+use std::sync::Arc;
 
 use atlantis3_data::A3Files;
 use atlantis3_engine::{Game, Mode};
+use atlantis_data::files::{FileSource, StdDir};
 use md5::{Digest, Md5};
 
-const GOLDEN: &str = include_str!("golden/credits.txt");
+const GOLDEN_640: &str = include_str!("golden/credits_640.txt");
+const GOLDEN_800: &str = include_str!("golden/credits.txt");
+const GOLDEN_1024: &str = include_str!("golden/credits_1024.txt");
+
+/// The install with its `Atlantis3.cfg` followed by a `Resolution` line
+/// (the last one read wins).
+struct Resized {
+    dir: StdDir,
+    cfg: Vec<u8>,
+}
+
+impl Resized {
+    fn is_cfg(name: &str) -> bool {
+        name.replace('\\', "/")
+            .eq_ignore_ascii_case("Datas/Atlantis3.cfg")
+    }
+}
+
+impl FileSource for Resized {
+    fn size(&self, name: &str) -> Option<u64> {
+        if Resized::is_cfg(name) {
+            return Some(self.cfg.len() as u64);
+        }
+        self.dir.size(name)
+    }
+
+    fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
+        if Resized::is_cfg(name) {
+            let start = usize::try_from(offset).ok()?;
+            return self
+                .cfg
+                .get(start..start.checked_add(len)?)
+                .map(<[u8]>::to_vec);
+        }
+        self.dir.read_at(name, offset, len)
+    }
+
+    fn has_dir(&self, name: &str) -> bool {
+        self.dir.has_dir(name)
+    }
+
+    fn list(&self, dir: &str) -> Vec<String> {
+        self.dir.list(dir)
+    }
+}
 
 fn md5(b: &[u8]) -> String {
     Md5::digest(b).iter().map(|x| format!("{x:02x}")).collect()
@@ -65,19 +117,22 @@ fn events(g: &Game) -> Vec<String> {
     out
 }
 
-#[test]
-fn the_credits_as_the_original() {
+/// The golden of the `w` × `h` screen replayed.
+fn replay(golden: &str, w: usize, h: usize) {
     let Some(dir) = atlantis3_data::testing::install_dir() else {
         return;
     };
-    let files = A3Files::open_dir(&dir).unwrap().0;
+    let std_dir = StdDir::new(&dir);
+    let mut cfg = std_dir.read("Datas/Atlantis3.cfg").unwrap_or_default();
+    cfg.extend_from_slice(format!("\r\nResolution\t\t= {w} {h}\r\n").as_bytes());
+    let files = A3Files::new(Arc::new(Resized { dir: std_dir, cfg }));
     let mut g = Game::new(files).expect("the game starts");
-    assert_eq!((g.width(), g.height()), (800, 600), "the golden's screen");
-    g.set_pointer(400, 300);
+    assert_eq!((g.width(), g.height()), (w, h), "the golden's screen");
+    g.set_pointer(w as i32 / 2, h as i32 / 2);
     // The start at the golden's clock.
     g.step(500.0);
     g.start_credits();
-    let lines: Vec<&str> = GOLDEN.lines().filter(|l| !l.starts_with('#')).collect();
+    let lines: Vec<&str> = golden.lines().filter(|l| !l.starts_with('#')).collect();
     let (mut elements, mut frames, mut prints, mut clicks) = (0, 0, 0, 0);
     let mut i = 0;
     while i < lines.len() {
@@ -156,4 +211,19 @@ fn the_credits_as_the_original() {
         i += 1;
     }
     assert_eq!((elements, frames, prints, clicks), (41, 254, 508, 12));
+}
+
+#[test]
+fn the_credits_as_the_original_at_640() {
+    replay(GOLDEN_640, 640, 480);
+}
+
+#[test]
+fn the_credits_as_the_original_at_800() {
+    replay(GOLDEN_800, 800, 600);
+}
+
+#[test]
+fn the_credits_as_the_original_at_1024() {
+    replay(GOLDEN_1024, 1024, 768);
 }
