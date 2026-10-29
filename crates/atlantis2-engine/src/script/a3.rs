@@ -70,6 +70,24 @@ pub struct A3State {
     pub wait_anim: Option<(i32, i32, i32)>,
 }
 
+/// What a save gives the script ([`Script::load_a3`]).
+#[derive(Clone, Debug, Default)]
+pub struct LoadData {
+    pub current_cd: i32,
+    pub wam: String,
+    pub monde: i32,
+    pub vue: i32,
+    pub chapter: i32,
+    /// (index, value) of the flag lines.
+    pub flags: Vec<(i32, i32)>,
+    /// The bag's object names.
+    pub objects: Vec<Vec<u8>>,
+    /// Per character its subjects (etat, `#SUJETS#` index, value).
+    pub subjects: Vec<(i32, Vec<(bool, i32, i32)>)>,
+    /// `Quaternion0..3`, when all four were read.
+    pub camera: Option<[f32; 4]>,
+}
+
 impl Script {
     /// Whether this is *Atlantis III*'s interpreter.
     pub fn is_a3(&self) -> bool {
@@ -467,11 +485,11 @@ impl Script {
             return Some(next);
         }
         if is(self, "SAVE") {
-            host.quick_save(value);
+            host.quick_save(value, self);
             return Some(next);
         }
         if is(self, "LOAD") {
-            host.quick_load(value);
+            host.quick_load(value, self);
             return Some(self.len(src));
         }
         if key == k.monde {
@@ -535,6 +553,94 @@ impl Script {
         true
     }
 
+    /// The loader of a save (atlantis3-gog-fr-3473408 @ 0x0045b750), the
+    /// script side, in its order: `(changecd=..)`, the place loaded
+    /// (`AtlWam_Load` @ 0x0043eb00, without its commands), `(monde=..)`,
+    /// the flags cleared and set, the bag rebuilt from the object names,
+    /// the subject table, the place's own commands (@ 0x0045dd43), `(Vue=..)`,
+    /// the camera, then the chapter loaded and its `/INIT` run
+    /// (@ 0x00449fc0) and the world's view / chapter slots.
+    pub fn load_a3(&mut self, host: &mut dyn Host, d: &LoadData) -> bool {
+        log::info!("-- Debut Load --");
+        self.run_command(host, format!("(changecd={})", d.current_cd).as_bytes());
+        if !host.load_wam(&d.wam) {
+            self.fail(format!("Load: {} introuvable", d.wam));
+            return false;
+        }
+        self.wam = d.wam.as_bytes().to_vec();
+        self.current_view = None;
+        self.run_command(host, format!("(monde={})", d.monde).as_bytes());
+        let previous = self.chapter;
+        self.flags.iter_mut().for_each(|f| *f = 0);
+        for &(i, v) in &d.flags {
+            if let Some(f) = usize::try_from(i).ok().and_then(|i| self.flags.get_mut(i)) {
+                *f = v;
+            }
+        }
+        self.bag.clear();
+        for name in &d.objects {
+            // The loader keeps only the name's letters (@ 0x00445d00); the
+            // object whose name has the same letters is found (the
+            // original's run finds `HOG_OBJ_BATON` from `HOGOBJBATON`).
+            let letters = |n: &[u8]| -> Vec<u8> {
+                n.iter().copied().filter(u8::is_ascii_alphabetic).collect()
+            };
+            let want = letters(name);
+            let found = (0..self.names.len(defnames::OBJETS)).find(|&i| {
+                self.names
+                    .name(defnames::OBJETS, i)
+                    .is_some_and(|n| letters(n).eq_ignore_ascii_case(&want))
+            });
+            let Some(id) = found else {
+                log::warn!("Load: objet {} inconnu", String::from_utf8_lossy(name));
+                continue;
+            };
+            let sprite = self.names.param_of(defnames::OBJETS, id);
+            self.bag_add(host, id as i32, sprite as u8);
+        }
+        self.subjects.reset_a3();
+        for (perso, list) in &d.subjects {
+            for (i, &(etat, id, value)) in list.iter().enumerate() {
+                self.subjects.set_entry(
+                    *perso,
+                    i,
+                    super::Subject {
+                        value,
+                        index: id,
+                        flag: u8::from(etat),
+                    },
+                );
+            }
+            self.subjects.set_count(*perso, list.len() as i32);
+        }
+        let cmds = host.wam_commands(&d.wam, &self.flags);
+        for c in cmds {
+            self.run_command(host, c.as_bytes());
+        }
+        self.run_command(host, format!("(Vue={})", d.vue).as_bytes());
+        if let Some(q) = d.camera {
+            host.set_camera_quaternion(q);
+        }
+        self.previous_chapter = previous;
+        self.chapter = d.chapter;
+        self.vars[self.keys.chapter] = d.chapter;
+        if !self.load_chapter(host, d.chapter) {
+            self.fail(format!(
+                "SetVariables(): chapitre introuvable scenar\\chapi{:03}.con",
+                d.chapter
+            ));
+            return false;
+        }
+        self.run_init(host);
+        if let Some(w) = self.world_slot("Load") {
+            let (v, c) = (self.view_number, self.chapter);
+            self.set_flag(FLAG_WORLD_VIEW + w, v);
+            self.set_flag(FLAG_WORLD_CHAPTER + w, c);
+        }
+        log::info!("-- Fin de Load --");
+        self.fatal.is_none()
+    }
+
     /// `LOADVUEMONDE` (@ 0x0044890f): back to the current world's place,
     /// view and chapter, as kept in its flags.
     fn load_vue_monde(&mut self, host: &mut dyn Host) {
@@ -557,7 +663,7 @@ impl Script {
 
     /// The view's slot of its world, written by the view entry
     /// (`AtlWarp_EnterVue` @ 0x0043fc5a).
-    pub(crate) fn note_world_view(&mut self, view: i32) {
+    pub fn note_world_view(&mut self, view: i32) {
         if let Some(w) = self.world_slot("Vue") {
             self.set_flag(FLAG_WORLD_VIEW + w, view);
         }

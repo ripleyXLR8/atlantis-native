@@ -660,11 +660,14 @@ impl Script {
             return;
         }
         let monde = self.vars[self.keys.monde];
-        self.bag.push(BagEntry {
-            sprite,
-            id,
-            world: if monde == 6 { 2 } else { monde },
-        });
+        let world = if monde == 6 { 2 } else { monde };
+        self.bag.push(BagEntry { sprite, id, world });
+        if self.is_a3() {
+            // Atlantis III mirrors the object in the flags: 1100 + id = its
+            // world, 1500 + id = its sprite (atlantis3-gog-fr-3473408
+            // @ 0x00429720).
+            self.set_bag_flags(id, world, i32::from(sprite));
+        }
         if self.bag.len() > 0x59 {
             self.fail(format!("Inventaire: {} objets", self.bag.len()));
         }
@@ -680,6 +683,27 @@ impl Script {
     pub fn bag_remove(&mut self, id: i32) {
         if let Some(i) = self.bag.iter().position(|e| e.id == id) {
             self.bag.remove(i);
+            if self.is_a3() {
+                self.set_bag_flags(id, 0, 0);
+            }
+        } else if self.is_a3() {
+            let name = usize::try_from(id)
+                .ok()
+                .and_then(|i| self.names.name(defnames::OBJETS, i))
+                .map(|n| String::from_utf8_lossy(n).into_owned())
+                .unwrap_or_default();
+            log::warn!("AtlInventaire_RemoveObjet() : l'objet {name} n'est pas dans l'inventaire");
+        }
+    }
+
+    fn set_bag_flags(&mut self, id: i32, world: i32, sprite: i32) {
+        for (base, v) in [(1100, world), (1500, sprite)] {
+            if let Some(f) = usize::try_from(base + id)
+                .ok()
+                .and_then(|i| self.flags.get_mut(i))
+            {
+                *f = v;
+            }
         }
     }
 

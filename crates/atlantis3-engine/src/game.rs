@@ -206,6 +206,16 @@ pub struct Game {
     /// render's hit, @ 0x0077b670): its slot's character or object id and
     /// click kind.
     sprite_hit: Option<(i32, i32)>,
+    /// The disc in the drive (`CurrentCD` of the saves, @ 0x00789d38;
+    /// never set by the GOG build's code paths met so far: 0).
+    current_cd: i32,
+    /// The spinning top's handler armed (@ 0x007899d3).
+    toupie_armed: bool,
+    /// The player number of the save names (1) and the saves written,
+    /// by file name; also kept in `save_dir` when one is given.
+    player: i32,
+    saves: HashMap<String, Vec<u8>>,
+    pub save_dir: Option<std::path::PathBuf>,
     /// The script asked to stop.
     pub quit: bool,
     /// What the scripts did that the port does not play yet (logged once
@@ -290,6 +300,11 @@ impl Game {
             arrows: None,
             banks_world: 0,
             sprite_hit: None,
+            current_cd: 0,
+            toupie_armed: false,
+            player: atlantis3_data::save::DEFAULT_PLAYER,
+            saves: HashMap::new(),
+            save_dir: None,
             quit: false,
             not_ported: Vec::new(),
         };
@@ -372,6 +387,21 @@ impl Game {
             .as_ref()
             .map(|v| (v.cinema.name(), v.cinema.frames_shown()))
     }
+
+    /// Whether a move waits to complete (the turn ended, the new view not
+    /// entered yet).
+    pub fn move_pending(&self) -> bool {
+        self.moving.pending
+    }
+
+    /// Whether a dialog plays.
+    pub fn dialog_running(&self) -> bool {
+        false
+    }
+
+    /// Ends the dialog playing (tests).
+    #[doc(hidden)]
+    pub fn finish_dialog(&mut self) {}
 
     /// Whether a move turns the view.
     pub fn turning(&self) -> bool {
@@ -938,6 +968,8 @@ impl Game {
             }
             let (yaw, pitch) = self.camera.angles();
             self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
+            // The places' frame hook (@ 0x004c27d0).
+            self.frame_hooks();
             if self.mode == Mode::Warp {
                 self.click_scan();
             }
@@ -987,8 +1019,10 @@ impl Game {
                 self.camera.set_fov(warp_fov(self.camera.fpu), w, h);
                 let step = turn.step(&mut self.camera, &mut self.zoom, (w, h));
                 if !step.going {
+                    // @ 0x00431aee: the move pending, a target view or not
+                    // (a re-alignment, a zone aim without one).
                     self.moving.turn = None;
-                    self.moving.pending = self.moving.next.is_some();
+                    self.moving.pending = true;
                     return;
                 }
             } else {
@@ -1302,11 +1336,20 @@ impl Game {
     fn complete_move(&mut self) {
         self.moving.pending = false;
         let Some(next) = self.moving.next.take() else {
+            // No view to go to (@ 0x004400ed): `CtrlScenarIN`.
+            self.with_script(|s, h| {
+                s.ctrl_scenar_in(h);
+            });
             return;
         };
         let old = self.place.view;
         let (yaw, pitch) = self.moving.arrival;
-        self.with_script(|s, _| s.arrive(next as i32));
+        self.with_script(|s, _| {
+            s.arrive(next as i32);
+            // `AtlWarp_EnterVue` keeps the view in the world's slot
+            // (@ 0x0043fc5a).
+            s.note_world_view(next as i32);
+        });
         self.enter_view(next, yaw, pitch);
         if let Some(mut s) = self.script.take() {
             self.place_hooks(&mut s);
@@ -1525,6 +1568,9 @@ impl Game {
     fn place_hooks(&mut self, script: &mut Script) {
         script.run_command(self, b"(LIMITEANGLEWARPY=70)");
         let view = self.place.view.unwrap_or(0);
+        // The spinning top's handler armed in views 1..3 (@ 0x004d3960).
+        self.toupie_armed =
+            self.place.name.eq_ignore_ascii_case("hoggar.wam") && (1..=3).contains(&view);
         let hooked = match self.place.name.to_ascii_lowercase().as_str() {
             "hoggar.wam" => (1..=3).contains(&view),
             "cfuner.wam" => (1..=4).contains(&view),
@@ -1534,6 +1580,127 @@ impl Game {
         };
         if hooked {
             self.not_ported("the places' puzzle hooks at view entry");
+        }
+    }
+
+    /// The text of a save of the script's state (the writer @ 0x00459ee0).
+    fn save_text(&self, s: &Script) -> Vec<u8> {
+        use atlantis3_data::save::{PersoDialogs, SaveGame, Subject};
+        let obj_name = |id: i32| {
+            usize::try_from(id)
+                .ok()
+                .and_then(|i| self.names.name(atlantis2_data::defnames::OBJETS, i))
+                .map(<[u8]>::to_vec)
+                .unwrap_or_default()
+        };
+        let dialogs = s
+            .subjects
+            .characters()
+            .map(|p| PersoDialogs {
+                perso: p,
+                subjects: (0..s.subjects.count(p).max(0) as usize)
+                    .map(|i| {
+                        let e = s.subjects.entry(p, i);
+                        Subject {
+                            etat: e.flag != 0,
+                            id: e.index,
+                            nb_sprite: e.value,
+                        }
+                    })
+                    .collect(),
+            })
+            .collect();
+        let (yaw, pitch) = self.camera.angles();
+        let q = angles_quaternion(yaw, pitch);
+        let mut g = SaveGame {
+            current_cd: self.current_cd,
+            date_and_time: b"01/01/01 00:00:00".to_vec(),
+            wam: s.wam.clone(),
+            monde: s.a3.world,
+            vue: s.current_view.unwrap_or(0),
+            chapitre: s.chapter,
+            flags: Vec::new(),
+            objects: s.bag.iter().map(|e| obj_name(e.id)).collect(),
+            dialogs,
+            quaternion: q.map(Some),
+        };
+        g.set_flags_from_table(&s.flags);
+        g.write()
+    }
+
+    fn store_save(&mut self, name: &str, data: Vec<u8>) {
+        log::info!("-- Debut de la sauvegarde -- {name}");
+        if let Some(dir) = &self.save_dir {
+            let _ = std::fs::create_dir_all(dir);
+            if let Err(e) = std::fs::write(dir.join(name), &data) {
+                log::warn!("{name}: {e}");
+            }
+        }
+        self.saves.insert(name.to_string(), data);
+    }
+
+    fn read_save(&self, name: &str) -> Option<Vec<u8>> {
+        self.saves.get(name).cloned().or_else(|| {
+            self.save_dir
+                .as_ref()
+                .and_then(|d| std::fs::read(d.join(name)).ok())
+        })
+    }
+
+    /// A save's text by file name (tests).
+    pub fn saved(&self, name: &str) -> Option<&[u8]> {
+        self.saves.get(name).map(Vec::as_slice)
+    }
+
+    /// The places' frame hook (@ 0x004c27d0): in `hoggar.wam` views 1 to
+    /// 3, the spinning top's handler (@ 0x004d3980) once armed by the view
+    /// entry (@ 0x004d3960). The throws and the stars' animation are not
+    /// ported (M4); its success check and the top's return are:
+    ///
+    /// - `VUE` = 1: the top in the bag → flag 415 = 1; no throw running and
+    ///   flags 420..424 (the five stars) all 1 → `Flag13` = 1,
+    ///   `(sacados=NOT_HOG_OBJ_TOUPIE)`, then `CtrlScenarIN`
+    ///   (@ 0x004d3adf..0x004d3b35);
+    /// - another view: flag 415 = 1, `Flag13` ≠ 1 and the top not in the
+    ///   bag (a throw left unfinished) → the top back in the bag.
+    fn frame_hooks(&mut self) {
+        if !self.toupie_armed || !self.place.name.eq_ignore_ascii_case("hoggar.wam") {
+            return;
+        }
+        let Some(s) = self.script.as_ref() else {
+            return;
+        };
+        let vue = s.vars[s.keys.vue];
+        if !(1..=3).contains(&vue) {
+            return;
+        }
+        let names = &self.names;
+        let top = names
+            .id(atlantis2_data::defnames::OBJETS, b"HOG_OBJ_TOUPIE")
+            .map_or(-1, |i| i as i32);
+        let in_bag = s.bag.iter().any(|e| e.id == top);
+        if vue != 1 {
+            if s.flags[415] == 1 && s.flags[13] != 1 && !in_bag {
+                self.run_command("(sacados=HOG_OBJ_TOUPIE)");
+            }
+            return;
+        }
+        if in_bag {
+            if let Some(s) = self.script.as_mut() {
+                s.flags[415] = 1;
+            }
+        }
+        let s = self.script.as_ref().unwrap();
+        // No test of `Flag13` (@ 0x004d3adf): in view 1 the success repeats
+        // every frame until the scripts leave.
+        if (420..=424).all(|f| s.flags[f] == 1) {
+            if let Some(s) = self.script.as_mut() {
+                s.flags[13] = 1;
+            }
+            self.run_command("(sacados=NOT_HOG_OBJ_TOUPIE)");
+            self.with_script(|s, h| {
+                s.ctrl_scenar_in(h);
+            });
         }
     }
 
@@ -1681,6 +1848,124 @@ impl Game {
     pub fn names(&self) -> &DefNames {
         &self.names
     }
+
+    /// The script, mutable (tests and the developers' tools).
+    #[doc(hidden)]
+    pub fn script_mut(&mut self) -> Option<&mut Script> {
+        self.script.as_deref_mut()
+    }
+
+    /// Turns the camera to the aim of the first zone of the current view
+    /// that `pred` accepts (as the player turning to it); whether it is
+    /// then under the centre.
+    #[doc(hidden)]
+    pub fn aim_at_zone(&mut self, pred: impl Fn(&wam::Zone) -> bool) -> bool {
+        let Some((i, z)) = self
+            .place
+            .view
+            .and_then(|v| self.place.wam.view(v))
+            .and_then(|v| v.zones.iter().enumerate().find(|(_, z)| pred(z)))
+            .map(|(i, z)| (i, z.clone()))
+        else {
+            return false;
+        };
+        let (yaw, pitch) = zone_aim_a3(self.camera.fpu, &z.points);
+        self.camera.enter(yaw, pitch);
+        self.look.stop();
+        self.centre = self.pick_centre();
+        self.centre == Some(i)
+    }
+
+    /// Clicks the place sprite of entity `id` of kind `kind` (1 a
+    /// character, 2 an object) shown in the view, as the render's hit test
+    /// finds it under the centre (@ 0x00440bf0): false when none is shown.
+    #[doc(hidden)]
+    pub fn click_sprite(&mut self, id: i32, kind: i32) -> bool {
+        let Some(slot) = self
+            .slots
+            .slots
+            .iter()
+            .find(|s| s.id == id && s.kind == kind && s.shown)
+        else {
+            return false;
+        };
+        self.sprite_hit = Some((id, slot.click));
+        self.click();
+        true
+    }
+
+    /// Ends the video playing (a cinematic or a travel video) as its last
+    /// frame would.
+    #[doc(hidden)]
+    pub fn finish_video(&mut self) {
+        self.end_video();
+    }
+
+    /// Shows an object or a character as the scripts do, without a script
+    /// line (tests: a puzzle's result).
+    #[doc(hidden)]
+    pub fn show_entity(&mut self, kind: i32, name: &str) {
+        let section = if kind == 1 {
+            atlantis2_data::defnames::PERSONNAGES
+        } else {
+            atlantis2_data::defnames::OBJETS
+        };
+        let Ok(id) = self.names.id(section, name.as_bytes()) else {
+            return;
+        };
+        let key = if kind == 1 { "SHOWPERSO" } else { "SHOWOBJET" };
+        let log = self.script.as_mut().and_then(|s| s.set_log.take());
+        self.run_command(&format!("({key}={name})"));
+        if let Some(s) = self.script.as_mut() {
+            s.set_log = log;
+        }
+        let _ = id;
+    }
+}
+
+/// The script's view of a parsed save.
+fn load_data(g: &atlantis3_data::save::SaveGame) -> atlantis2_engine::script::a3::LoadData {
+    atlantis2_engine::script::a3::LoadData {
+        current_cd: g.current_cd,
+        wam: String::from_utf8_lossy(&g.wam).into_owned(),
+        monde: g.monde,
+        vue: g.vue,
+        chapter: g.chapitre,
+        flags: g.flags.clone(),
+        objects: g.objects.clone(),
+        subjects: g
+            .dialogs
+            .iter()
+            .map(|p| {
+                (
+                    p.perso,
+                    p.subjects
+                        .iter()
+                        .map(|s| (s.etat, s.id, s.nb_sprite))
+                        .collect(),
+                )
+            })
+            .collect(),
+        camera: g.camera(),
+    }
+}
+
+/// The camera's orientation as the save's `Quaternion0..3` (x, y, z, w):
+/// the yaw about Y, then the pitch about X [INFERRED: the original's
+/// quaternion @ 0x0077b678 is written by camera code not yet read; the
+/// port keeps its own convention, read back by [`quaternion_angles`]].
+pub fn angles_quaternion(yaw: f32, pitch: f32) -> [f32; 4] {
+    let (sy, cy) = (yaw * 0.5).sin_cos();
+    let (sp, cp) = (pitch * 0.5).sin_cos();
+    [cy * sp, sy * cp, -sy * sp, cy * cp]
+}
+
+/// The angles of [`angles_quaternion`].
+pub fn quaternion_angles(q: [f32; 4]) -> (f32, f32) {
+    let [x, y, z, w] = q;
+    let yaw = (2.0 * (w * y + z * x)).atan2(1.0 - 2.0 * (x * x + y * y));
+    let pitch = (2.0 * (w * x - y * z)).clamp(-1.0, 1.0).asin();
+    (yaw, pitch)
 }
 
 /// The six faces of a cube file (Hnm_Framer: `IX` frames in video mode;
@@ -1771,9 +2056,53 @@ impl Host for Game {
         self.place_hooks(script);
     }
 
+    /// `ANGLEWARPXNOW` / `ANGLEWARPYNOW` (*Atlantis II*'s FUN_0045ad40 /
+    /// FUN_0045ada0, the same camera code): the yaw set about the root's
+    /// Y (the pitch dropped), or a pitch from the current orientation.
     fn turn_now(&mut self, yaw: bool, angle: f32) {
-        let _ = (yaw, angle);
-        self.not_ported("AngleWarpXNow / AngleWarpYNow");
+        if yaw {
+            self.camera.set_yaw(angle);
+        } else {
+            self.camera.pitch_from_here(angle);
+        }
+        self.look.stop();
+        self.centre = self.pick_centre();
+    }
+
+    fn quick_save(&mut self, n: i32, script: &Script) {
+        let name = atlantis3_data::save::quick_save_name(self.player, n);
+        let data = self.save_text(script);
+        self.store_save(&name, data);
+    }
+
+    fn quick_load(&mut self, n: i32, script: &mut Script) {
+        let name = atlantis3_data::save::quick_save_name(self.player, n);
+        match self.read_save(&name) {
+            Some(d) => {
+                let save = atlantis3_data::save::SaveGame::parse(&d);
+                let data = load_data(&save);
+                script.load_a3(self, &data);
+            }
+            None => log::warn!("Load: {name} not found"),
+        }
+    }
+
+    /// `INITRECALAGE` (@ 0x0044922d): the move's turn set-up (@ 0x004410b0)
+    /// toward the script's angles, without a view to go to.
+    fn init_recalage(&mut self, yaw: f32, pitch: f32) -> bool {
+        self.moving.next = None;
+        self.start_turn(yaw, pitch)
+    }
+
+    /// The turn of a move or a re-alignment runs (@ 0x00756080).
+    fn recalage_running(&self) -> bool {
+        self.moving.turn.is_some()
+    }
+
+    fn set_camera_quaternion(&mut self, q: [f32; 4]) {
+        let (yaw, pitch) = quaternion_angles(q);
+        self.camera.enter(yaw, pitch);
+        self.look.stop();
     }
 
     fn anim(&mut self, op: AnimOp) {
@@ -1848,5 +2177,22 @@ impl Host for Game {
     fn set_monde(&mut self, monde: i32) -> bool {
         let _ = monde;
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_save_quaternion_gives_the_angles_back() {
+        for (y, p) in [(0.0f32, 0.0f32), (1.9, 0.17), (-2.6, -0.3), (3.0, 1.2)] {
+            let (y2, p2) = quaternion_angles(angles_quaternion(y, p));
+            assert!(
+                (y - y2).abs() < 1e-5 && (p - p2).abs() < 1e-5,
+                "{y} {p} {y2} {p2}"
+            );
+        }
+        assert_eq!(angles_quaternion(0.0, 0.0), [0.0, 0.0, -0.0, 1.0]);
     }
 }

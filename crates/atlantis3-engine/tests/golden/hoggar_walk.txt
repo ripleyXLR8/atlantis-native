@@ -1,0 +1,60 @@
+# Atlantis III - walkthrough of the Hoggar (world 1, hoggar.wam), new game ->
+# arrival in CFuner (world 2) chapter 9.  Read by tools/emu/a3_hoggar_script.py
+# (golden evidence/golden/a3_hoggar_script.txt) and by Atlantis Native's replay
+# test; grammar in the script's docstring and subsystems/hoggar-walkthrough.md.
+# Only actions the game allows: moves along the current view's WAM zones,
+# clicks on characters / zones of the current view, subjects of the open menu,
+# bag objects.  Names are defnames.con ids (#PERSONNAGES#, #SUJETS#, #OBJETS#,
+# #ZONES_CLIC#).
+
+START                       # chapter 600 -> chapter 1, view 4; cinematics 93, 1, 2
+EXPECT CHAPTER=1
+EXPECT VUE=4
+
+# Chapter 1: the plateau
+GO 5                        # departvue=5: quick save 1
+GO 6                        # departvue=6: voice-over dialog 1, flag426
+GO 7                        # departvue=7: chapter 2 (the camp)
+EXPECT CHAPTER=2
+
+# Chapter 2: guard 1, first talk (subjects enabled by chapter 2's /INIT)
+PERSO HOG_GARDIEN01
+SUBJECT HOG_G1_SITE         # dialogs 5 and 8, Flag3
+# second talk: the guard shoots (cinema 27) and the game reloads quick save 1
+PERSO HOG_GARDIEN01
+SUBJECT HOG_G1_PUITS        # dialog 6, cinema 27, Load=1
+EXPECT CHAPTER=1
+EXPECT VUE=4
+EXPECT FLAG3=0
+
+# again, after the reload
+GO 5                        # quick save 1 again
+GO 6                        # dialog 1 again (flag426 was saved as 0)
+GO 7                        # chapter 2
+GO 10                       # departvue=10: Flag2, chapter 3
+EXPECT CHAPTER=3
+
+# Chapter 3: before the cave
+GO 11                       # departvue=11, first time: cinema 3, dialog 10, cinema 23; move aborted
+EXPECT VUE=10
+GO 13
+GO 2                        # departvue=2: chapter 4 (the cave)
+EXPECT CHAPTER=4
+
+# Chapter 4: the spinning top
+GO 1
+HAND HOG_OBJ_DISQUE
+ZONE HOG_TOUPIE_POSE        # the disc is laid down, flag416
+HAND HOG_OBJ_BATON
+ZONE HOG_TOUPIE_POSE        # the stick on the disc: the top (HOG_OBJ_TOUPIE) in hand
+EXPECT HAND=HOG_OBJ_TOUPIE
+# The toupie puzzle (0x004d4160 throws, 0x004d3980 per frame) is C code: its
+# success state is injected: the five stars lit (flags 420..424, objects
+# HOG_ETOILE01..05 shown); the next frame's 0x004d3980 (real) sees them, sets
+# Flag13 and runs the arrival of chapter 4's first section (cinema 4, world 2).
+SKIP puzzle toupie FLAG420=1 FLAG421=1 FLAG422=1 FLAG423=1 FLAG424=1 SHOWOBJET=HOG_ETOILE01 SHOWOBJET=HOG_ETOILE02 SHOWOBJET=HOG_ETOILE03 SHOWOBJET=HOG_ETOILE04 SHOWOBJET=HOG_ETOILE05
+EXPECT FLAG13=1
+EXPECT MONDE=2
+EXPECT WAM=CFuner.wam
+EXPECT CHAPTER=9
+EXPECT VUE=4

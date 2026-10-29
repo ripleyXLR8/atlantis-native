@@ -330,11 +330,15 @@ pub trait Host {
     /// `PLAYVOICE=a,b,c,d` (@ 0x0040da70).
     fn play_voice(&mut self, values: [i32; 4]) {}
 
-    /// `SAVE=n` (@ 0x0044c6d0): the quick save `n`.
-    fn quick_save(&mut self, n: i32) {}
+    /// `SAVE=n` (@ 0x0044c6d0): the quick save `n` of the script's state.
+    fn quick_save(&mut self, n: i32, script: &Script) {}
 
-    /// `LOAD=n` (@ 0x0044c9b0).
-    fn quick_load(&mut self, n: i32) {}
+    /// `LOAD=n` (@ 0x0044c9b0): quick save `n` read back
+    /// ([`Script::load_a3`]).
+    fn quick_load(&mut self, n: i32, script: &mut Script) {}
+
+    /// A loaded save's camera (`Quaternion0..3`, @ 0x00441040).
+    fn set_camera_quaternion(&mut self, q: [f32; 4]) {}
 
     /// `DIAL=n[, voixoff]` (`AtlDial_start` @ 0x0040cfe0).
     fn dial_start_a3(&mut self, n: i32, voixoff: bool) -> DialStart {
