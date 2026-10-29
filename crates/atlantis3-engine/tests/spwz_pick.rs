@@ -75,12 +75,13 @@ fn place_sprites_hit_as_the_original() {
         let s = &slots[&v];
         for yaw in 0..360 {
             for pitch in -40..=40 {
-                let mut cam = Camera::new(Fpu::Double, 800, 600);
+                // The entry and the ray under 0x0e7f, as after a warp frame.
+                let mut cam = Camera::new(Fpu::Chop, 800, 600);
                 cam.enter(
-                    deg_to_rad_a3(Fpu::Double, yaw),
-                    deg_to_rad_a3(Fpu::Double, pitch),
+                    deg_to_rad_a3(Fpu::Chop, yaw),
+                    deg_to_rad_a3(Fpu::Chop, pitch),
                 );
-                let Some((face, u, w)) = cam.texel(cam.cx, cam.cy) else {
+                let Some((face, u, w)) = cam.texel_a3(cam.cx, cam.cy) else {
                     continue;
                 };
                 match rays.get(&(v, yaw, pitch)) {
@@ -98,8 +99,7 @@ fn place_sprites_hit_as_the_original() {
                         };
                         assert_eq!(&got, want, "view {v} at {yaw}, {pitch}");
                         hits += usize::from(hit.is_some());
-                        // The centre ray's pixel: Atlantis II's texel; one
-                        // pixel off on 99 rays (0x0043a1a0 not transcribed).
+                        // The centre ray's pixel (0x0043a1a0).
                         if (face as i32, u, w) != (g[0], g[1], g[2]) {
                             off += 1;
                         }
@@ -113,5 +113,5 @@ fn place_sprites_hit_as_the_original() {
         }
     }
     assert_eq!(hits, 2396);
-    assert!(off <= 99, "{off}");
+    assert_eq!(off, 0);
 }

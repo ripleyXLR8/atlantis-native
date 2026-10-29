@@ -2540,7 +2540,7 @@ impl Game {
     /// The place sprite under the screen centre (the sprite pass's hit
     /// test @ 0x00439920): its entity id and click kind.
     pub fn sprite_under_centre(&self) -> Option<(i32, i32)> {
-        let (face, u, v) = self.camera.texel(self.camera.cx, self.camera.cy)?;
+        let (face, u, v) = self.camera.texel_a3(self.camera.cx, self.camera.cy)?;
         let (k, _) = self.slots.hit(face, u, v)?;
         let s = &self.slots.slots[k];
         Some((s.id, s.click))
@@ -2563,7 +2563,7 @@ impl Game {
                     atlantis2_engine::script::a3::deg_to_rad_a3(fpu, pitch),
                 );
                 let hit = c
-                    .texel(c.cx, c.cy)
+                    .texel_a3(c.cx, c.cy)
                     .and_then(|(f, u, v)| self.slots.hit(f, u, v))
                     .map(|(k, _)| &self.slots.slots[k])
                     .filter(|s| s.id == id && s.kind == kind);
