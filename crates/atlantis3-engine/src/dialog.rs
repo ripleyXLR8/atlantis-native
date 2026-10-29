@@ -287,10 +287,7 @@ impl BodyVideo {
     /// The next frame (rewound after the last), drawn into `dst` (`pitch`
     /// pixels a row, `height` rows), centred vertically; its index.
     pub fn draw_next(&mut self, dst: &mut [u16], pitch: usize, height: usize) -> i32 {
-        let next = match self.video.next_frame() {
-            Some(Ok(_)) => true,
-            _ => false,
-        };
+        let next = matches!(self.video.next_frame(), Some(Ok(_)));
         if !next {
             match atlantis_codecs::HnmVideo::new(self.data.clone()) {
                 Ok(v) => self.video = v,
