@@ -15,6 +15,7 @@
 use crate::fpu::{f, ftol, Fpu};
 
 pub mod ii;
+pub mod linear_ii;
 
 /// The dialog's frame and Z buffer: 640 x 480 whatever the screen mode
 /// (the viewport set by the dialog frame @ 0x00461430).
