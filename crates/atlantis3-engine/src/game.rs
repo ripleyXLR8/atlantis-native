@@ -156,6 +156,9 @@ pub struct Game {
     pub audio: Audio,
     names: DefNames,
     script: Option<Box<Script>>,
+    /// The world (`MONDE`, @ 0x0077bd04): the folders of the cubes, place
+    /// animations, cinematics and music.
+    world: i32,
     mode: Mode,
     /// The game's clock (seconds) at the last step.
     now: f64,
@@ -304,6 +307,7 @@ impl Game {
             audio: Audio::new(),
             names,
             script: Some(Box::new(script)),
+            world: 1,
             mode: Mode::Idle,
             now: 0.0,
             tick_last: 0.0,
@@ -604,7 +608,7 @@ impl Game {
     #[doc(hidden)]
     pub fn reload_dialogs(&mut self, seed: u32) {
         self.rand = Rand::new(seed);
-        let w = self.script.as_ref().map_or(1, |s| s.a3.world);
+        let w = self.world;
         self.load_dialogs(w);
     }
 
@@ -754,7 +758,7 @@ impl Game {
 
     /// The world's sprite banks, opened again when the world changed.
     fn world_banks(&mut self) {
-        let world = self.script.as_ref().map_or(1, |s| s.a3.world);
+        let world = self.world;
         if world == self.banks_world {
             return;
         }
@@ -1638,7 +1642,7 @@ impl Game {
                 .find_map(|v| v.destinations.iter().find(|d| d.target == next))
                 .cloned()
         });
-        let world = self.script.as_ref().map_or(1, |s| s.a3.world);
+        let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         // The transition sprites (@ 0x00435a90): per `id_spf` of the
         // destination whose entity the show table does not hide, the
@@ -1700,7 +1704,7 @@ impl Game {
             return;
         };
         let name = view.name.clone();
-        let world = self.script.as_ref().map_or(1, |s| s.a3.world);
+        let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         let path = format!("warp/Warp512/{folder}/{name}");
         if self.place.cube != path {
@@ -2088,7 +2092,7 @@ impl Game {
             return;
         }
         if self.dialogs.is_none() {
-            let w = self.script.as_ref().map_or(1, |s| s.a3.world);
+            let w = self.world;
             self.load_dialogs(w);
         }
         let mut dialogs = self.dialogs.take().unwrap();
@@ -2596,6 +2600,11 @@ impl Game {
         &self.work
     }
 
+    /// Whether the view's cube was found and decoded.
+    pub fn cube_loaded(&self) -> bool {
+        self.place.faces.iter().all(|f| !f.is_empty())
+    }
+
     /// The place animations of the view.
     pub fn slots(&self) -> &Slots {
         &self.slots
@@ -2618,6 +2627,7 @@ impl Game {
 
     /// The world (`MONDE`) whose folders the views' cubes come from.
     pub fn set_world(&mut self, world: i32) {
+        self.world = world;
         if let Some(s) = self.script.as_mut() {
             s.a3.world = world;
         }
@@ -2994,7 +3004,7 @@ impl Host for Game {
     }
 
     fn play_cinema(&mut self, n: i32, fps: i32) -> bool {
-        let world = self.script.as_ref().map_or(1, |s| s.a3.world);
+        let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         let (video, subtitles) = atlantis3_data::cine_txt::cinema_names(n as u32);
         // The cue file decides the folder (@ 0x00420f3c..0x00421089).
@@ -3037,7 +3047,7 @@ impl Host for Game {
             .split([' ', '\t', ',', ';', '(', ')'])
             .find(|w| !w.is_empty())
             .unwrap_or("");
-        let world = self.script.as_ref().map_or(1, |s| s.a3.world);
+        let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         let path = format!("music/{folder}/Muzik0{n}.apc");
         if self.music.as_deref() == Some(path.as_str()) && self.audio.is_playing(CHANNEL_MUSIC) {
@@ -3071,6 +3081,8 @@ impl Host for Game {
     /// `MONDE=n` (@ 0x0044bb30): the dialogs freed and loaded again for
     /// the world (`Dial_Free`, `Dial_Init`).
     fn set_monde(&mut self, monde: i32) -> bool {
+        // Kept here too: the script is out of `self` while it runs.
+        self.world = monde;
         self.load_dialogs(monde);
         true
     }

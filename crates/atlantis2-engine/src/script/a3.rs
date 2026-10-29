@@ -39,6 +39,8 @@ pub const FLAG_WORLD_VIEW: usize = 1000;
 pub const FLAG_WORLD_WAM: usize = 1010;
 /// ... of the per-world chapters.
 pub const FLAG_WORLD_CHAPTER: usize = 1020;
+/// The interdimension flag (@ 0x0077d2f0), set by `CHANGEWAM`.
+pub const FLAG_INTERDIM: usize = 897;
 
 /// *Atlantis III*'s story flags: 0x800 ints (@ 0x0077c4ec).
 pub const FLAGS_A3: usize = 0x800;
@@ -551,6 +553,10 @@ impl Script {
         }
         self.wam = name.as_bytes().to_vec();
         self.current_view = None;
+        let lower = name.to_ascii_lowercase();
+        // `Interp_SetInterdimFlag` (@ 0x0044b910): flag 897 (0x0077d2f0)
+        // tells the interdimension's first view entry to set its puzzle up.
+        self.set_flag(FLAG_INTERDIM, i32::from(lower == "interdim.wam"));
         let cmds = host.wam_commands(name, &self.flags);
         let (saved, in_command) = (std::mem::take(&mut self.command), self.in_command);
         for c in cmds {
@@ -560,7 +566,6 @@ impl Script {
         let Some(w) = self.world_slot("Changewam") else {
             return false;
         };
-        let lower = name.to_ascii_lowercase();
         let index = WAM_NAMES
             .iter()
             .position(|n| lower.strip_suffix(".wam") == Some(n))
