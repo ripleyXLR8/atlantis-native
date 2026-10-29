@@ -58,9 +58,9 @@ pub struct Dialogs {
     /// The `rand()` values drawn by the load, per `com.txt` line in order
     /// (the lines of unknown speakers: none).
     pub load_draws: Vec<((i32, i32), Vec<Draw>)>,
-    /// Cameras of each head stand (`<mesh>s<stand>.db`), `None` when the
-    /// file does not exist.
-    cameras: HashMap<(String, i32), Option<usize>>,
+    /// The cameras' quaternions of each head stand (`<mesh>s<stand>.db`),
+    /// `None` when the file does not exist.
+    cameras: HashMap<(String, i32), Option<Vec<[f32; 4]>>>,
     /// The world's folder (`hoggar`, ...).
     pub world: String,
 }
@@ -168,7 +168,7 @@ impl Dialogs {
                 files
                     .read(&format!("mesh/{mesh}s{stand}.db"))
                     .and_then(|d| atlantis3_data::db::parse(&d).ok())
-                    .map(|s| s.cameras.len())
+                    .map(|s| s.cameras.iter().map(|c| c.rotation).collect())
             });
         }
         out
@@ -191,7 +191,19 @@ impl Dialogs {
     /// not load (stand 0, no `.db`).
     pub fn camera_count(&self, speaker: &str, stand: i32) -> Option<usize> {
         let mesh = &self.perso(speaker)?.mesh;
-        self.cameras.get(&(mesh.clone(), stand)).copied().flatten()
+        self.cameras
+            .get(&(mesh.clone(), stand))
+            .and_then(|c| c.as_ref())
+            .map(Vec::len)
+    }
+
+    /// The quaternion of camera `camera` (1-based) of a speaker's head
+    /// stand (`<mesh>-c<n>`, the stand's camera records in order).
+    pub fn head_camera(&self, speaker: &str, stand: i32, camera: i32) -> Option<[f32; 4]> {
+        let mesh = &self.perso(speaker)?.mesh;
+        let list = self.cameras.get(&(mesh.clone(), stand))?.as_ref()?;
+        list.get(usize::try_from(camera).ok()?.checked_sub(1)?)
+            .copied()
     }
 
     /// `CDialogue::Open(n)`'s camera picks (@ 0x004639c0), in line order;

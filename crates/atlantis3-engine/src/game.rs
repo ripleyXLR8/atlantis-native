@@ -40,12 +40,10 @@ type Decoded = (u32, u16, Arc<Vec<i16>>);
 /// The world folders (@ 0x004150b0..0x004151f0, index = `MONDE`).
 pub const WORLDS: [&str; 6] = ["", "hoggar", "ldm", "bagdad", "paleo", "inter"];
 
-/// The warp's field of view, 76°, as the 25 Hz ticks set it (@ 0x004409f0:
-/// f32((76 · f32 π) · f32 1/180)).
+/// The warp's field of view, 76°, as the 25 Hz ticks set it (@ 0x004409f0,
+/// [`dialog_fov`]: the 1/180 is a double).
 fn warp_fov(fpu: Fpu) -> f32 {
-    let pi = f64::from(f32::from_bits(0x4049_0fdb));
-    let k = f64::from(f32::from_bits(0x3bb6_0b61));
-    fpu.f32(fpu.mul(fpu.mul(76.0, pi), k))
+    dialog_fov(fpu, 76.0)
 }
 
 /// The zone aim of *Atlantis III* (@ 0x004634a0): the points summed on the
@@ -2097,7 +2095,9 @@ impl Game {
             self.draw_warp_only();
         } else {
             let (sw, sh) = crate::dialog::SURFACE;
+            // Viewport(640, 480) (@ 0x0043f760): centre and projection.
             let fov = self.camera_fov;
+            (self.camera.cx, self.camera.cy) = ((sw / 2) as f32, (sh / 2) as f32);
             self.camera.set_fov(fov, sw as u32, sh as u32);
             let m = self.camera.matrix();
             let proj = self.camera.projection();
@@ -2117,18 +2117,21 @@ impl Game {
     }
 
     /// The camera set-up for the current speaker (@ 0x0040b700): the field
-    /// of view `[Focale<stand>][camera]` and the pitch levelled
-    /// (`Horizontalize` @ 0x004418a0; the head camera's pitch of `Orient`
-    /// @ 0x00441630 is not ported yet), the yaw kept.
+    /// of view `[Focale<stand>][camera]`, then the pitch of the head's
+    /// camera (`Orient` @ 0x00441630, the head `.db`'s camera record), or
+    /// levelled without one (`Horizontalize` @ 0x004418a0); the yaw kept.
     fn dialog_camera(&mut self) {
         let Some(e) = self.dialog_entry() else { return };
         let Some(d) = self.dialogs.as_ref() else {
             return;
         };
         let deg = d.focale(&e);
+        let head = d.head_camera(&e.speaker, e.stand, e.camera);
         self.camera_fov = dialog_fov(self.camera.fpu, deg);
-        let (yaw, _) = self.camera.angles();
-        self.camera.enter(yaw, 0.0);
+        match head {
+            Some(q) => self.camera.orient_to(q),
+            None => self.camera.horizontalize(),
+        }
     }
 
     /// `AtlDial_Continue` (@ 0x0040d3e0), every frame of mode 5.
@@ -2268,6 +2271,7 @@ impl Game {
         }
         self.camera_fov = r.saved_fov;
         let (w, h) = (self.width as u32, self.height as u32);
+        (self.camera.cx, self.camera.cy) = ((w / 2) as f32, (h / 2) as f32);
         self.camera.set_fov(self.camera_fov, w, h);
         self.mode = r.back;
         self.click = false;
@@ -2539,11 +2543,11 @@ pub fn quaternion_angles(q: [f32; 4]) -> (f32, f32) {
     (yaw, pitch)
 }
 
-/// `SetFov(deg)` (@ 0x004409f0): f32((deg · f32 π) · f32 1/180).
+/// `SetFov(deg)` (@ 0x004409f0): f32((f32 π · deg) · 1/180), the 1/180 a
+/// double (`fmul qword [0x007004b0]`).
 fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
     let pi = f64::from(f32::from_bits(0x4049_0fdb));
-    let k = f64::from(f32::from_bits(0x3bb6_0b61));
-    fpu.f32(fpu.mul(fpu.mul(f64::from(deg), pi), k))
+    fpu.f32(fpu.mul(fpu.mul(pi, f64::from(deg)), 1.0 / 180.0))
 }
 
 /// The six faces of a cube file (Hnm_Framer: `IX` frames in video mode;
