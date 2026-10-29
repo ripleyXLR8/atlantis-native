@@ -6,8 +6,9 @@
 //! handler returning 0 makes the main loop call the mode's `Stop`
 //! ([`Game::stop_screen`]).
 //!
-//! The two maps are drawn ([`crate::maps`], `screens_draw`); the other
-//! screens' drawing, their hover animations and the boards played inside
+//! The two maps and the jewel case are drawn ([`crate::maps`],
+//! `screens_draw`); the other screens' drawing, their hover animations
+//! and the boards played inside
 //! two of them (the unicorn's 3D board, the game boy's reflex dice) are
 //! M4; the outcome of those boards is given by [`Game::screen_outcome`].
 
@@ -25,12 +26,17 @@ pub struct State {
     /// `SCARABEE`: the case open (@ 0x00759324; not reset by the start).
     pub scarab_open: bool,
     /// `ECRIN`: the gems taken (@ 0x00755990..0x00755992), their count
-    /// (@ 0x0075599c), the case shown (the fade @ 0x00715860 at 1.0) and
-    /// the 15 Hz clock's last time (@ 0x00755978).
+    /// (@ 0x0075599c), the fade (@ 0x00715860: 0.0, then 1.0 from the
+    /// first tick), the 15 Hz clock's last time (@ 0x00755978), the glow
+    /// cursor (@ 0x00755998: `Interface.spr` 13..24 on a gem, 40 none)
+    /// and the case bank `Ecrin%d.spr` (@ 0x00755960, %d the display's
+    /// depth).
     pub ecrin_taken: [bool; 3],
     pub ecrin_count: i32,
-    pub ecrin_shown: bool,
+    pub ecrin_fade: f32,
     pub ecrin_clock: f64,
+    pub ecrin_cursor: i32,
+    pub ecrin_bank: Option<Arc<Bank>>,
     /// `LICORNE`: the board's "won" byte (@ 0x007586d4, set by the run's
     /// state 7 @ 0x0042d289; the board is M4).
     pub licorne_won: bool,
@@ -72,13 +78,16 @@ pub(super) fn start(h: &mut Hx, screen: Screen) {
     let now = h.now();
     let st = &mut h.g.puzzles.screens;
     match screen {
-        // @ 0x00412e50: nothing taken, the case not shown yet, the clock
-        // restarted.
+        // @ 0x00412e50: nothing taken, the fade at 0, the clock at the
+        // click's time, the pointer centred (@ 0x00431780), the cursor
+        // reset (@ 0x004282e0) and `Interface.spr` #40 (@ 0x00427f80).
         Screen::Ecrin => {
             st.ecrin_taken = [false; 3];
             st.ecrin_count = 0;
-            st.ecrin_shown = false;
+            st.ecrin_fade = 0.0;
             st.ecrin_clock = now;
+            st.ecrin_cursor = ECRIN_NO_GEM;
+            h.g.pointer = maps::centre(h.g.width, h.g.height);
         }
         // @ 0x0041f660: the result cleared (0x00756054, 0x00756058,
         // 0x00756060 := 0); the dice's faces and clocks (visual, M4).
@@ -129,7 +138,10 @@ pub(super) fn frame(
         }
         Screen::Telecommande => telecommande(h, left, right, sprite),
         Screen::CraneBagdad => crane(h, left, right),
-        Screen::Ecrin => ecrin(h, left, sprite),
+        Screen::Ecrin => {
+            let _ = sprite;
+            ecrin(h, left)
+        }
         Screen::GBoy => gboy(h),
         Screen::Licorne => licorne(h),
     }
@@ -318,36 +330,79 @@ fn crane(h: &mut Hx, left: bool, right: bool) -> bool {
     !right
 }
 
-/// `ECRIN`, the jewel case (@ 0x00412fc0). The case fades in at the
-/// first 1/15 s tick; once shown, a left click on an untaken gem (sprites
-/// 1..3) takes it; at the first tick after the third the loop leaves
-/// (the stop puts the three gems in the bag). The right button does
-/// nothing.
-fn ecrin(h: &mut Hx, left: bool, sprite: Option<i32>) -> bool {
+/// `ECRIN`'s cursor when no gem is hovered (`Interface.spr` #40), and
+/// the glow's frames.
+const ECRIN_NO_GEM: i32 = 40;
+const ECRIN_GLOW: (i32, i32) = (13, 24);
+
+/// `SPR_COLLISION` (@ 0x00437080) of gem k (0..2: case bank sprite
+/// k + 1, the table @ 0x00755928) drawn at the screen's centre, at the
+/// pointer.
+pub(in crate::game) fn ecrin_gem_hit(
+    bank: &Bank,
+    k: usize,
+    w: i32,
+    h: i32,
+    ptr: (i32, i32),
+) -> bool {
+    bank.opaque_at(k + 1, Some(w / 2), h / 2, ptr.0, ptr.1)
+}
+
+/// `ECRIN`, the jewel case (@ 0x00412fc0). Until the first 1/15 s tick the
+/// fade is 0 (the case drawn invisible, no cursor); that tick sets it
+/// to 1. Then, while fewer than three gems are taken: the gem under the
+/// pointer (`SPR_COLLISION` of each untaken gem at the screen's centre,
+/// the last hit in order) starts the glow (cursor 13), none puts the
+/// cursor back to 40, and each tick moves the glow on (13..24). The
+/// frame is drawn and flipped, then a left click on the hovered gem
+/// takes it (the right button does nothing). At the first tick with the
+/// three taken the loop returns 0 before drawing (the stop puts the gems
+/// in the bag). No sound.
+fn ecrin(h: &mut Hx, left: bool) -> bool {
     let now = h.now();
+    let ptr = h.g.pointer;
+    let (w, ht) = (h.g.width as i32, h.g.height as i32);
+    let bank = h.g.puzzles.screens.ecrin_bank.clone();
     let st = &mut h.g.puzzles.screens;
+    let tick = now - st.ecrin_clock > TICK;
     let mut hovered = None;
-    if st.ecrin_shown && st.ecrin_count != 3 {
+    if st.ecrin_fade == 1.0 && st.ecrin_count != 3 {
         for k in 0..3 {
-            if !st.ecrin_taken[k] && sprite == Some(k as i32 + 1) {
+            let hit = bank
+                .as_ref()
+                .is_some_and(|b| ecrin_gem_hit(b, k, w, ht, ptr));
+            if !st.ecrin_taken[k] && hit {
                 hovered = Some(k);
             }
         }
-        if now - st.ecrin_clock > TICK {
-            st.ecrin_clock = now;
-            // visual: the hovered gem's glow frames 13..24 (M4).
+        match hovered {
+            Some(_) if st.ecrin_cursor == ECRIN_NO_GEM => st.ecrin_cursor = ECRIN_GLOW.0,
+            None => st.ecrin_cursor = ECRIN_NO_GEM,
+            _ => {}
         }
-    } else if now - st.ecrin_clock > TICK {
+        if tick {
+            st.ecrin_clock = now;
+            if st.ecrin_cursor != ECRIN_NO_GEM {
+                st.ecrin_cursor += 1;
+                if st.ecrin_cursor > ECRIN_GLOW.1 {
+                    st.ecrin_cursor = ECRIN_GLOW.0;
+                }
+            }
+        }
+    } else if tick {
         st.ecrin_clock = now;
         if st.ecrin_count == 0 {
-            st.ecrin_shown = true;
+            st.ecrin_fade = 1.0;
+            log::debug!("Ecrin transp : {}", st.ecrin_fade);
         } else if st.ecrin_count == 3 {
             return false;
         } else {
             log::warn!("AtlEcrin_Continue(): Fade demandé en plein milieu de la gestion");
         }
     }
+    h.g.ecrin_draw();
     if left {
+        let st = &mut h.g.puzzles.screens;
         if let Some(k) = hovered {
             st.ecrin_taken[k] = true;
             st.ecrin_count += 1;
@@ -400,7 +455,7 @@ fn licorne(h: &mut Hx) -> bool {
 impl Game {
     /// One frame of the running screen with the given click bytes; its
     /// stop when the handler returns 0.
-    pub(super) fn screen_step(&mut self, left: bool, right: bool, sprite: Option<i32>) {
+    pub(in crate::game) fn screen_step(&mut self, left: bool, right: bool, sprite: Option<i32>) {
         let Some(screen) = self.puzzles.screen else {
             return;
         };

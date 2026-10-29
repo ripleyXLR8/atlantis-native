@@ -34,9 +34,12 @@ use atlantis2_engine::place_sound::{sources, Source};
 use atlantis3_data::coord::Coord;
 use std::collections::{BTreeMap, HashMap};
 
+mod board;
 mod credits;
 mod hooks;
 mod pages;
+mod sfx;
+pub use board::BoardInput;
 pub use credits::{Credits, Print};
 pub use hooks::Screen;
 
@@ -290,6 +293,25 @@ pub struct Game {
     /// What the scripts did that the port does not play yet (logged once
     /// each).
     pub not_ported: Vec<String>,
+    /// The C code's sound objects and the voice slots ([`sfx`]).
+    csounds: sfx::CSounds,
+    /// Tests: the observation log of the board goldens (commands the C
+    /// code runs, shows / hides, animation calls, sounds, voices, scans,
+    /// `rand` draws, sprite calls, flips); `None` in play, where nothing
+    /// is recorded.
+    #[doc(hidden)]
+    pub trace: Option<Vec<String>>,
+    /// Tests: the digest a traced flip records of the screen.
+    #[doc(hidden)]
+    pub trace_digest: Option<fn(&[u16]) -> String>,
+    /// Tests: the panorama replaced by black (the emulation harnesses'
+    /// `warp=flat`).
+    #[doc(hidden)]
+    pub flat_warp: bool,
+    /// Tests: the whole-story harness's sound model ([`sfx`]): `PLAYVOICE`
+    /// only logged, a sound started by `Play` playing for ever.
+    #[doc(hidden)]
+    pub story_sound_model: bool,
 }
 
 impl Game {
@@ -402,6 +424,11 @@ impl Game {
             save_dir: None,
             quit: false,
             not_ported: Vec::new(),
+            csounds: Default::default(),
+            trace: None,
+            trace_digest: None,
+            flat_warp: false,
+            story_sound_model: false,
         };
         if !game.with_script(|s, h| s.boot_a3(h)) {
             return Err(GameError::Script(game.script_error()));
@@ -516,9 +543,80 @@ impl Game {
     /// The next value of a script-visible `rand()` (@ 0x006d348b): a
     /// queued one (tests), else the CRT's.
     fn script_rand(&mut self) -> i32 {
-        self.rand_queue
+        let v = self
+            .rand_queue
             .pop_front()
-            .unwrap_or_else(|| self.rand.rand())
+            .unwrap_or_else(|| self.rand.rand());
+        self.tr(|| format!("rand {v}"));
+        v
+    }
+
+    /// Tests: a line of the observation log ([`Game::trace`]).
+    fn tr(&mut self, f: impl FnOnce() -> String) {
+        if let Some(t) = self.trace.as_mut() {
+            t.push(f());
+        }
+    }
+
+    /// Tests: a line naming an entity (kind 1 a character, else an
+    /// object).
+    fn tr_entity(&mut self, kind: i32, id: i32, f: impl FnOnce(&str) -> String) {
+        if self.trace.is_none() {
+            return;
+        }
+        let section = if kind == 1 {
+            atlantis2_data::defnames::PERSONNAGES
+        } else {
+            atlantis2_data::defnames::OBJETS
+        };
+        let name = usize::try_from(id)
+            .ok()
+            .and_then(|i| self.names.name(section, i))
+            .map_or_else(
+                || format!("{kind}#{id}"),
+                |n| String::from_utf8_lossy(n).into_owned(),
+            );
+        self.tr(|| f(&name));
+    }
+
+    /// Tests: the flip (@ 0x0040fdf0) of a frame the C code drew itself,
+    /// with the screen's digest.
+    fn tr_flip(&mut self) {
+        if self.trace.is_some() {
+            let d = self
+                .trace_digest
+                .map_or_else(|| "-".to_string(), |f| f(&self.screen));
+            self.tr(|| format!("flip {d}"));
+        }
+    }
+
+    /// @ 0x0045f520: the slot of (id, kind) playing animation `number`
+    /// (or the first) shown.
+    fn slot_show(&mut self, id: i32, kind: i32, number: i32) {
+        self.tr_entity(kind, id, |e| format!("show {e} kind {kind} arg {number}"));
+        self.slots.show(id, kind, number, self.now);
+    }
+
+    /// @ 0x0045f610: every slot of (id, kind) hidden.
+    fn slot_hide(&mut self, id: i32, kind: i32) {
+        self.tr_entity(kind, id, |e| format!("hide {e} kind {kind} arg 0"));
+        self.slots.hide(id, kind, self.now);
+    }
+
+    /// Tests: the `rand()` values drawn since the generator's state was
+    /// `before` (the place animations' step, the slots' builder).
+    fn tr_rand_since(&mut self, before: u32) {
+        if self.trace.is_none() || self.rand.state == before {
+            return;
+        }
+        let mut r = Rand::new(before);
+        for _ in 0..100_000 {
+            let v = r.rand();
+            self.tr(|| format!("rand {v}"));
+            if r.state == self.rand.state {
+                break;
+            }
+        }
     }
 
     /// Tests replaying the original's script harness, whose move set-up
@@ -1102,6 +1200,8 @@ impl Game {
         // The main loop's per-frame place part, after the mode's frame
         // (@ 0x004d5df9 → 0x004c1950).
         self.main_loop_hook();
+        // The flip's voice slots (@ 0x0040de60).
+        self.voices_release();
     }
 
     // ---- videos -------------------------------------------------------
@@ -1414,6 +1514,15 @@ impl Game {
     /// The warp frame without the overlays (@ 0x00440690) and the cursor
     /// (@ 0x00440a30); false when there is no cube.
     fn draw_warp_only(&mut self) -> bool {
+        if self.flat_warp {
+            // Tests: the harnesses' stub of @ 0x00440690.
+            self.screen.fill(0);
+            self.tr(|| "warp=flat".into());
+            if std::mem::take(&mut self.anim_tick) {
+                self.slots.step(self.now, &mut self.rand);
+            }
+            return true;
+        }
         if self.place.faces.iter().any(|f| f.is_empty()) {
             return false;
         }
@@ -2984,9 +3093,13 @@ impl Host for Game {
                     faces: Default::default(),
                     cube: String::new(),
                 };
-                // The Land of the Dead's map banks (@ 0x004c372b).
+                // The Land of the Dead's map banks (@ 0x004c372b), the
+                // jewel case's (@ 0x004c367e).
                 if name.eq_ignore_ascii_case("ldmorts.wam") {
                     self.carte_reload_banks();
+                }
+                if name.eq_ignore_ascii_case("jardin.wam") {
+                    self.ecrin_reload_banks();
                 }
                 true
             }
@@ -3067,9 +3180,12 @@ impl Host for Game {
 
     fn anim(&mut self, op: AnimOp) {
         match op {
-            AnimOp::Show { kind, id, number } => self.slots.show(id, kind, number, self.now),
-            AnimOp::Hide { kind, id } => self.slots.hide(id, kind, self.now),
-            AnimOp::Play { kind, id, number } => self.slots.play(id, kind, number),
+            AnimOp::Show { kind, id, number } => self.slot_show(id, kind, number),
+            AnimOp::Hide { kind, id } => self.slot_hide(id, kind),
+            AnimOp::Play { kind, id, number } => {
+                self.tr_entity(kind, id, |e| format!("anim {e} {number} {kind} 2"));
+                self.slots.play(id, kind, number);
+            }
             AnimOp::GotoFrame { id, frame, .. } => self.slots.goto_frame(id, frame),
             AnimOp::TheFrame { id, on, .. } => self.slots.set_animated(id, on),
             AnimOp::Continue { id, .. } => self.slots.continue_anim(id),
@@ -3078,6 +3194,21 @@ impl Host for Game {
             AnimOp::AddFrame { .. } => {}
             _ => self.not_ported("the animation command ChangeAnimGotoPerso"),
         }
+    }
+
+    fn anim_cut(&mut self, kind: i32, id: i32, number: i32) {
+        self.tr_entity(kind, id, |e| format!("anim {e} {number} {kind} 1"));
+    }
+
+    fn scenar_in_called(&mut self) {
+        self.tr(|| "scan".into());
+    }
+
+    /// `PLAYVOICE=d,l,r,g` (@ 0x0040da70): the port's parse keeps four
+    /// numbers; the fifth (blue) is 0.
+    fn play_voice(&mut self, values: [i32; 4]) {
+        let [d, l, r, g] = values;
+        self.play_voice_c(d, l, r, g, 0);
     }
 
     fn wam_commands(&mut self, wam: &str, flags: &[i32]) -> Vec<String> {

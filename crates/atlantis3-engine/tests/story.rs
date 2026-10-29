@@ -461,6 +461,8 @@ fn new_run() -> Option<Run> {
     let mut g = Game::new(files).expect("the game starts");
     g.seed(1);
     g.set_harness_turns(true);
+    // The harness's sound stubs: no voice plays, a sound plays for ever.
+    g.story_sound_model = true;
     Some(Run {
         g,
         t: 0.0,

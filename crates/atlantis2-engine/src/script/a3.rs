@@ -454,6 +454,7 @@ impl Script {
             let id = self.id(section, src, p + 1);
             let i = self.after_comma(src, p);
             let n = self.atoi_at(src, i);
+            host.anim_cut(kind, id, n);
             self.hide(host, id, kind, false);
             self.show(host, id, kind, n);
             return Some(next);

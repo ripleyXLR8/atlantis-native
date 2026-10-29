@@ -196,6 +196,23 @@ pub fn aff(
     y: i32,
     alpha: f32,
 ) -> Aff {
+    aff_at(screen, w, h, name, bank, index, Some(x), y, alpha)
+}
+
+/// [`aff`] with x = `None` for the default position (0x80000000: the
+/// sprite's own, recorded as `i32::MIN`).
+#[allow(clippy::too_many_arguments)]
+pub fn aff_at(
+    screen: &mut [u16],
+    w: usize,
+    h: usize,
+    name: &'static str,
+    bank: &Bank,
+    index: usize,
+    x: Option<i32>,
+    y: i32,
+    alpha: f32,
+) -> Aff {
     let mut t = Target::screen(screen, w, h);
     t.xmax = w as i32;
     t.ymax = h as i32;
@@ -203,16 +220,16 @@ pub fn aff(
     match drawn {
         None => {}
         Some(None) => {
-            bank.draw(&mut t, Some(x), y, index);
+            bank.draw(&mut t, x, y, index);
         }
         Some(Some(l)) => {
-            bank.draw_trs(&mut t, Some(x), y, index, l);
+            bank.draw_trs(&mut t, x, y, index, l);
         }
     }
     Aff {
         bank: name,
         index,
-        x,
+        x: x.unwrap_or(i32::MIN),
         y,
         alpha,
         drawn,

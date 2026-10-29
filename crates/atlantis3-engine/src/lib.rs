@@ -30,5 +30,5 @@ pub mod travel;
 pub mod wam_setup;
 
 pub use cinema::{Cinema, CinemaError};
-pub use game::{Game, GameError, Mode};
+pub use game::{BoardInput, Game, GameError, Mode};
 pub use startup::Startup;

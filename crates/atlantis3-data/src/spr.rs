@@ -953,7 +953,11 @@ impl Bank {
     /// walked run by run with the distance d = px − run start: the run
     /// with d ≤ its length decides (so a run's end pixel belongs to it):
     /// a colour or pair run hits, a skip or shade run misses. Palette
-    /// families only.
+    /// families (@ 0x100031f2 for 0x278, @ 0x100030e5 for 0x78) and the
+    /// direct 0xb0 family (@ 0x100032f1: the row's control stream, at the
+    /// row's start plus its first dword, without the colours: a colour
+    /// run has no control byte, a pair run one per pixel, a shade run its
+    /// factor).
     pub fn opaque_at(&self, index: usize, x: Option<i32>, y: i32, px: i32, py: i32) -> bool {
         if self.is_spw() {
             return false;
@@ -989,12 +993,11 @@ impl Bank {
     }
 
     fn opaque_in(&self, at: usize, info: SpriteInfo, x: i32, y: i32, px: i32, py: i32) -> bool {
-        if !matches!(
-            blitter(self.flags, self.depth),
-            Blitter::Draw(Rows::Palette { .. })
-        ) {
-            return false;
-        }
+        let direct = match blitter(self.flags, self.depth) {
+            Blitter::Draw(Rows::Palette { .. }) => false,
+            Blitter::Draw(Rows::Direct) => true,
+            _ => return false,
+        };
         let half_shade = self.flags & 0x200 != 0;
         let x0 = i32::from((x as i16).wrapping_sub(info.xoff));
         let y0 = i32::from((y as i16).wrapping_sub(info.yoff));
@@ -1009,6 +1012,12 @@ impl Bank {
             return false;
         };
         let mut p = first + off as usize;
+        if direct {
+            let Some(rel) = u32_at(d, p) else {
+                return false;
+            };
+            p += rel as usize;
+        }
         let mut sx = x0;
         let mut prev = Run::Start;
         loop {
@@ -1025,13 +1034,15 @@ impl Bank {
                     if inside {
                         return true;
                     }
-                    p += n as usize;
+                    if !direct {
+                        p += n as usize;
+                    }
                 }
                 Run::Pair => {
                     if inside {
                         return true;
                     }
-                    p += 2 * n as usize;
+                    p += if direct { n } else { 2 * n } as usize;
                 }
                 Run::Shade => {
                     if !half_shade {

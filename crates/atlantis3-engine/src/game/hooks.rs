@@ -7,7 +7,10 @@
 //! run through `RunOneCommand`, the story flags and variables they write,
 //! the bag and the hand, the loop modes they start and stop, the
 //! `CtrlScenarIN` scans. The puzzles' own play (their drawing, their
-//! animations' frames) is M4; a test walk skips a puzzle by writing its
+//! animations' frames, their sounds) is ported board by board in M4 and
+//! checked against the board goldens (`tests/common/board.rs`): the
+//! merchant's house guard, the garden's banana bunch, monkey and soldiers,
+//! the jewel case so far; a test walk skips a puzzle by writing its
 //! result, after which the code here continues as after a real solution.
 //!
 //! Every function names the original's address; `FLAG[n]` is the story flag
@@ -89,6 +92,9 @@ pub struct Puzzles {
     /// The input freeze (@ 0x00789d56): while set the mouse handler
     /// (@ 0x00431580) ignores the buttons.
     pub freeze: bool,
+    /// Tests: the sprite pass's cursor kind (@ 0x0076e928) as a harness
+    /// wrote it; `None` in play (the hit test under the centre).
+    pub cursor_kind: Option<i32>,
     /// The places' own globals.
     pub ldmorts: ldmorts::State,
     pub paleo: paleo::State,
@@ -138,6 +144,13 @@ impl Puzzles {
     }
 }
 
+pub(in crate::game) use screens::ecrin_gem_hit;
+
+/// Tests: the guard's golden `st` line.
+pub(super) fn mmarchd_st(m: &mmarchd::State, freeze: bool) -> String {
+    mmarchd::st_line(m, freeze, m.flight_frame)
+}
+
 /// The solution of the funeral chamber's ring (@ 0x0071d530): G, D, D, G, D.
 const CFUNER_SOLUTION: [i32; 5] = [1, 2, 2, 1, 2];
 
@@ -170,6 +183,7 @@ impl Hx<'_> {
 
     /// `RunOneCommand(command, 0)` (@ 0x00447840).
     pub fn run(&mut self, command: &str) {
+        self.g.tr(|| format!("cmd {command}"));
         self.s.run_command(self.g, command.as_bytes());
     }
 
@@ -258,12 +272,10 @@ impl Hx<'_> {
         self.g.now
     }
 
-    /// A voice started by the C code (@ 0x0040da70(a, b, c, d, e)): the
-    /// host's `PLAYVOICE` with the first four values (the fifth is kept
-    /// in the voice slot next to the fourth, @ 0x0074f278).
-    pub fn play_voice(&mut self, a: i32, b: i32, c: i32, d: i32, e: i32) {
-        let _ = e;
-        atlantis2_engine::script::Host::play_voice(self.g, [a, b, c, d]);
+    /// A voice started by the C code (@ 0x0040da70(dialog, line, r, g,
+    /// b), [`super::sfx`]).
+    pub fn play_voice(&mut self, d: i32, l: i32, r: i32, g: i32, b: i32) {
+        self.g.play_voice_c(d, l, r, g, b);
     }
 
     /// The slot of the n-th state shown in this view of the entity whose
@@ -398,13 +410,16 @@ impl Game {
         self.script = Some(s);
     }
 
-    /// The running screen's frame ([`screens`]). The two maps draw
-    /// themselves in their handlers (the map's refusals come before its
-    /// drawing) and hit-test the pointer; the other screens' drawing and
-    /// their sprite hit test are M4: a real click finds no sprite under
-    /// the cursor (tests give it through [`Game::screen_click`]).
+    /// The running screen's frame ([`screens`]). The two maps and the
+    /// jewel case draw themselves in their handlers and hit-test the
+    /// pointer; the other screens' drawing and their sprite hit test are
+    /// M4: a real click finds no sprite under the cursor (tests give it
+    /// through [`Game::screen_click`]).
     pub(super) fn screen_frame(&mut self) {
-        if !matches!(self.puzzles.screen, Some(Screen::Carte | Screen::CarteTour)) {
+        if !matches!(
+            self.puzzles.screen,
+            Some(Screen::Carte | Screen::CarteTour | Screen::Ecrin)
+        ) {
             self.draw_warp_only();
             self.draw_pointer();
         }
@@ -422,6 +437,7 @@ impl Game {
         let Some(screen) = self.puzzles.screen.take() else {
             return;
         };
+        self.tr(|| "stop".into());
         let back = self.puzzles.screen_back.take().unwrap_or(Mode::Warp);
         self.click = false;
         self.right_clicked = false;
@@ -518,6 +534,7 @@ impl Game {
             0x00789780 => p.paleo.tiger_count = v,
             0x0071f271 => p.paleo.tiger_hit = b,
             0x00789d56 => p.freeze = b,
+            0x0076e928 => p.cursor_kind = Some(v),
             0x00789ad4 => p.tourmagi.player = v,
             0x00789ae2 => p.tourmagi.won_seen = b,
             _ => return false,

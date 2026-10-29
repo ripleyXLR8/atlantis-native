@@ -19,10 +19,15 @@ pub const CHANNEL_MUSIC: usize = 2;
 /// The first channel of the place sounds; they take the next ones up to
 /// [`CHANNELS`].
 pub const CHANNEL_PLACE: usize = 3;
-/// How many channels the mix has.
-pub const CHANNELS: usize = 16;
 /// The channel of the dialogs' voices (the place sounds stop before it).
-pub const CHANNEL_VOICE: usize = CHANNELS - 1;
+pub const CHANNEL_VOICE: usize = 15;
+/// The first channel of the C code's sound objects (`LoadSfx` / `Play`
+/// @ 0x004329e0 / 0x00433140: the puzzles' sounds and the `PLAYVOICE`
+/// voices), [`OBJECT_CHANNELS`] of them.
+pub const CHANNEL_OBJECTS: usize = 16;
+pub const OBJECT_CHANNELS: usize = 6;
+/// How many channels the mix has.
+pub const CHANNELS: usize = CHANNEL_OBJECTS + OBJECT_CHANNELS;
 
 #[derive(Clone, Debug, Default)]
 struct Channel {

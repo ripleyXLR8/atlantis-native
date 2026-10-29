@@ -7,16 +7,29 @@
 //! `CtrlScenarIN` (the chapters' capture sections). The way out is
 //! scripted (chapi028 `DepartVue=13 & Flag124=1`, chapi029 `DepartVue=14`).
 //!
-//! Sounds: the original asks its sound objects whether they still play
-//! (@ 0x00433780 on 0x007869a8 the guard's voice, 0x007869f8 the cat's,
-//! 0x00786968 the capture voices, 0x00786a18 the ambience). The port has
-//! no per-object sound state yet: [`playing`] answers false (M4), so each
-//! voice or ambience counts as ended at the next test.
+//! Sounds: the original asks the sound library whether a file still plays
+//! (@ 0x00433780) by the names it keeps in four CStrings: 0x007869a8 the
+//! guard's last voice, 0x007869f8 the cat's, 0x00786968 the capture
+//! voices', 0x00786a18 the grumbling's ambience ([`super::super::sfx`]).
+//! The house's own ambience `sfx\AmbMMA.apc` plays out of the jar.
+//!
+//! The stone's flight draws `PierreVoleur<W>.spr` over the place for 40
+//! frames at 15 Hz, the camera locked.
+
+use std::sync::Arc;
+
+use atlantis3_data::spr::Bank;
 
 use super::{Hx, ZoneRec};
 
 /// The guard's character name (the CString @ 0x00786550).
 const GARDE: &str = "MMA_GARDE";
+
+/// The house's ambience (frame step 1).
+const AMB_MMA: &str = "sfx\\AmbMMA.apc";
+
+/// The grumbling's two ambiences (@ 0x004c6d7f: `rand() & 1`).
+const GRUMBLES: [&str; 2] = ["sfx\\Sound800.APC", "sfx\\Sound801.APC"];
 
 #[derive(Debug, Default, Clone)]
 pub struct State {
@@ -71,6 +84,18 @@ pub struct State {
     /// The camera lock (@ 0x0077b8ac, a warp global: 0x00440740 sets it,
     /// 0x00440750 clears it; while set the turn 0x00440760 does nothing).
     pub cam_lock: bool,
+    /// The sound objects' names: the guard's last voice (@ 0x007869a8),
+    /// the cat's (@ 0x007869f8), the capture voices' (@ 0x00786968), the
+    /// grumbling's ambience (@ 0x00786a18).
+    pub guard_voice: String,
+    pub cat_voice_name: String,
+    pub capture_voice: String,
+    pub grumble_name: String,
+    /// `PierreVoleur%d.spr` (%d the screen's width), loaded at the first
+    /// view entry (@ 0x0071d5bd, @ 0x004c7210).
+    pub stone_bank: Option<Arc<Bank>>,
+    pub stone_bank_path: String,
+    pub stone_bank_loaded: bool,
 }
 
 impl State {
@@ -87,10 +112,60 @@ impl State {
     }
 }
 
-/// Whether a sound object still plays (@ 0x00433780): see the module's
-/// doc (M4: no per-object sound state in the port).
-fn playing(_h: &Hx, _object: u32) -> bool {
-    false
+/// The golden line of the guard's globals (tests: `st`).
+pub(crate) fn st_line(m: &State, freeze: bool, flight_frame: i32) -> String {
+    let b = |v: bool| i32::from(v);
+    format!(
+        "G={} stone={} grumble={} been8={} caught={} pending={} restart={} pflag={} flight={} \
+         ffr={} amb={} ambend={} voice={} delay={} pause={} cat={} catseen={} v883={} frz={} \
+         lock={} reload={}",
+        m.guard,
+        b(m.stone),
+        m.grumble,
+        b(m.been_8),
+        b(m.caught),
+        b(m.pending),
+        b(m.pending_restart),
+        m.pending_flag,
+        b(m.flight),
+        flight_frame,
+        m.amb,
+        b(m.amb_ended),
+        b(m.voice_on),
+        m.amb_delay,
+        m.pause,
+        b(m.cat_voice),
+        b(m.cat_seen),
+        m.voices_883,
+        b(freeze),
+        b(m.cam_lock),
+        b(m.reload),
+    )
+}
+
+/// A guard's voice (dialog d, line 1): the last one stopped first
+/// (@ 0x0040dcc0(0x007869a8)), its name kept.
+fn guard_voice(h: &mut Hx, d: i32) {
+    let old = std::mem::take(&mut h.g.puzzles.mmarchd.guard_voice);
+    h.g.voice_stop_named(&old);
+    h.g.puzzles.mmarchd.guard_voice = h.g.dialog_voice_name(d, 1);
+    h.play_voice(d, 1, 255, 100, 100);
+}
+
+/// A cat's voice (dialog d, line 1), its name kept (@ 0x007869f8).
+fn cat_voice(h: &mut Hx, d: i32) {
+    h.g.puzzles.mmarchd.cat_voice_name = h.g.dialog_voice_name(d, 1);
+    h.play_voice(d, 1, 200, 200, 255);
+}
+
+/// A capture voice (dialog 188, line l), its name kept (@ 0x00786968).
+fn capture_voice(h: &mut Hx, l: i32, rgb: [i32; 3]) {
+    h.g.puzzles.mmarchd.capture_voice = h.g.dialog_voice_name(188, l);
+    h.play_voice(188, l, rgb[0], rgb[1], rgb[2]);
+}
+
+fn cat_playing(h: &Hx) -> bool {
+    h.g.sfx_playing(&h.g.puzzles.mmarchd.cat_voice_name)
 }
 
 /// The guard's state written with its flag.
@@ -101,6 +176,7 @@ fn set_guard(h: &mut Hx, g: i32) {
 
 /// The camera turned half a turn (@ 0x00440760(π)), unless locked.
 fn turn(h: &mut Hx) {
+    h.g.tr(|| "turn".into());
     if !h.g.puzzles.mmarchd.cam_lock {
         h.g.camera.yaw(std::f32::consts::PI);
     }
@@ -138,8 +214,14 @@ fn delayed(h: &mut Hx, cmd: &str, n: usize) {
 /// The view entry (@ 0x004c5590).
 pub(super) fn view(h: &mut Hx) {
     let vue = h.vue();
-    // visual: the first time (@ 0x0071d5bd) the `PierreVoleur%d.spr`
-    // bank is loaded (@ 0x004c7210) (M4).
+    // The first time (@ 0x0071d5bd) the `PierreVoleur%d.spr` bank
+    // (@ 0x004c7210).
+    if !h.g.puzzles.mmarchd.stone_bank_loaded {
+        let name = format!("PierreVoleur{}.spr", h.g.width);
+        h.g.puzzles.mmarchd.stone_bank = h.g.screen_bank(&name);
+        h.g.puzzles.mmarchd.stone_bank_path = format!("spr\\{name}");
+        h.g.puzzles.mmarchd.stone_bank_loaded = true;
+    }
     if h.flag(910) == 0 {
         h.set_flag(910, 1);
         let m = &mut h.g.puzzles.mmarchd;
@@ -153,7 +235,12 @@ pub(super) fn view(h: &mut Hx) {
         h.set_flag(885, 1);
         h.set_flag(869, 0);
         h.set_flag(889, 0);
-        // sound: the four sound objects' names cleared (M4).
+        // The four sound objects' names cleared.
+        let m = &mut h.g.puzzles.mmarchd;
+        m.guard_voice.clear();
+        m.cat_voice_name.clear();
+        m.capture_voice.clear();
+        m.grumble_name.clear();
     }
     if h.g.puzzles.mmarchd.reload {
         let (f884, f869, f889, f885) = (h.flag(884), h.flag(869), h.flag(889), h.flag(885));
@@ -209,9 +296,7 @@ pub(super) fn view(h: &mut Hx) {
             if g == 2 {
                 h.run("(playcutanimp=MMA_GARDE,4)");
                 set_guard(h, 3);
-                // sound: the guard's voice object stopped (@ 0x00443c90,
-                // @ 0x0040dcc0) before the new voice (M4).
-                h.play_voice(190, 1, 255, 100, 100);
+                guard_voice(h, 190);
                 h.g.puzzles.mmarchd.voice_on = true;
             } else if g == 1 {
                 h.run("(playcutanimp=MMA_GARDE,1)");
@@ -249,7 +334,7 @@ pub(super) fn view(h: &mut Hx) {
                 h.g.puzzles.mmarchd.been_8 = true;
                 h.set_flag(889, 1);
                 h.g.puzzles.mmarchd.voice_on = true;
-                h.play_voice(192, 1, 255, 100, 100);
+                guard_voice(h, 192);
             }
         }
         11 => {
@@ -295,6 +380,9 @@ fn reset(h: &mut Hx, first: bool) {
 /// The cursor's kind from the sprite pass's hit test (@ 0x0076e928: 2 on
 /// an entity of kind 1 or 3, 1 on 2 or 4, 0 on none), at the centre.
 fn cursor_kind(h: &Hx) -> i32 {
+    if let Some(k) = h.g.puzzles.cursor_kind {
+        return k;
+    }
     let c = &h.g.camera;
     c.texel_a3(c.cx, c.cy)
         .and_then(|(f, u, v)| h.g.slots.hit(f, u, v))
@@ -313,8 +401,15 @@ fn guard_ended(h: &Hx, n: i32) -> bool {
 pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
     let vue = h.vue();
     let now = h.now();
-    // sound: view 12: the ambience `AmbMMA.apc` started when it does not
-    // play; other views: stopped (M4).
+    // 1. The house's ambience: stopped in the jar (view 12), started
+    // again out of it whenever it does not play.
+    if vue == 12 {
+        if h.g.sfx_playing(AMB_MMA) {
+            h.g.sfx_stop(AMB_MMA);
+        }
+    } else if !h.g.sfx_playing(AMB_MMA) && h.g.sfx_load(AMB_MMA, 0, 1) {
+        h.g.sfx_play(AMB_MMA);
+    }
     // 2. Caught: reset, scan, nothing more this frame.
     if h.g.puzzles.mmarchd.caught {
         reset(h, true);
@@ -347,15 +442,22 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
         let f = ((now - h.g.puzzles.mmarchd.flight_start) * 15.0) as i32;
         h.g.puzzles.mmarchd.flight_frame = f;
         if f < 40 {
-            // visual: the `PierreVoleur` sprite of frame f over the place
-            // (@ 0x004362b0, 0x004367b0) (M4).
+            // The warp frame again, then the sprite at its own position,
+            // alpha 1, and the flip (@ 0x004c61f2..0x004c6342).
+            h.g.draw_warp_only();
+            if let Some(bank) = h.g.puzzles.mmarchd.stone_bank.clone() {
+                let path = h.g.puzzles.mmarchd.stone_bank_path.clone();
+                h.g.draw_spr(&path, &bank, f.max(0) as usize, None, 0, 1.0);
+            }
+            h.g.tr_flip();
         } else {
             h.g.puzzles.mmarchd.flight = false;
-            h.play_voice(189, 1, 255, 100, 100);
+            guard_voice(h, 189);
             h.g.puzzles.mmarchd.voice_on = true;
             h.g.puzzles.mmarchd.stone = true;
             h.run("(playcutanimp=MMA_GARDE,3)");
             set_guard(h, 2);
+            h.g.tr(|| "camunlock".into());
             h.g.puzzles.mmarchd.cam_lock = false;
             h.g.puzzles.freeze = false;
         }
@@ -364,23 +466,23 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
     // sprite of an entity of kind 2 or 4, once.
     if h.flag(119) == 0 && vue == 11 {
         if cursor_kind(h) == 1 {
-            if !playing(h, 0x007869f8) && !h.g.puzzles.mmarchd.cat_seen {
+            if !cat_playing(h) && !h.g.puzzles.mmarchd.cat_seen {
                 h.g.puzzles.mmarchd.cat_voice = true;
-                h.play_voice(182, 1, 200, 200, 255);
+                cat_voice(h, 182);
             }
             h.g.puzzles.mmarchd.cat_seen = true;
         } else {
             h.g.puzzles.mmarchd.cat_seen = false;
         }
     }
-    if h.g.puzzles.mmarchd.cat_voice && !playing(h, 0x007869f8) {
+    if h.g.puzzles.mmarchd.cat_voice && !cat_playing(h) {
         h.g.puzzles.mmarchd.cat_voice = false;
     }
     // 7. The cat clicked (chapi028 `Flag879=1`).
     if h.flag(879) != 0 {
         h.set_flag(879, 0);
         h.set_flag(886, 1);
-        if !playing(h, 0x007869f8) {
+        if !cat_playing(h) {
             h.set_flag(879, 0);
             let r = h.rand() % 60;
             let d = if r < 20 {
@@ -390,7 +492,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
             } else {
                 184
             };
-            h.play_voice(d, 1, 200, 200, 255);
+            cat_voice(h, d);
         }
     }
     // 8. The throw: the stone in hand on `MMA_ZONE_PIERRE`.
@@ -400,6 +502,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
         h.g.puzzles.mmarchd.flight = true;
         h.run("(AngleWarpXNow=590)");
         h.run("(AngleWarpYNow=0)");
+        h.g.tr(|| "camlock".into());
         h.g.puzzles.mmarchd.cam_lock = true;
         h.g.puzzles.mmarchd.flight_start = now;
         h.g.puzzles.freeze = true;
@@ -414,7 +517,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
                 h.g.puzzles.mmarchd.caught = true;
                 h.set_flag(880, 1);
             } else {
-                h.play_voice(190, 1, 255, 100, 100);
+                guard_voice(h, 190);
                 h.g.puzzles.mmarchd.voice_on = true;
             }
             set_guard(h, 3);
@@ -444,30 +547,32 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
     if h.flag(883) != 0 {
         h.set_flag(883, 0);
         h.g.puzzles.mmarchd.voices_883 = 1;
-        h.play_voice(188, 1, 200, 255, 255);
+        capture_voice(h, 1, [200, 255, 255]);
     }
     // Each step waits for the voice before (@ 0x004c6a4c: steps 1, 2, 3
     // fall into the next one's test).
     let step = h.g.puzzles.mmarchd.voices_883;
+    let capture_playing = |h: &Hx| h.g.sfx_playing(&h.g.puzzles.mmarchd.capture_voice);
     if (1..=3).contains(&step) {
-        if step == 1 && !playing(h, 0x00786968) {
+        if step == 1 && !capture_playing(h) {
             h.g.puzzles.mmarchd.voices_883 = 2;
-            h.play_voice(188, 2, 255, 255, 200);
+            capture_voice(h, 2, [255, 255, 200]);
         }
-        if step <= 2 && !playing(h, 0x00786968) {
+        if step <= 2 && !capture_playing(h) {
             h.g.puzzles.mmarchd.voices_883 = 3;
-            h.play_voice(188, 3, 200, 255, 255);
+            capture_voice(h, 3, [200, 255, 255]);
         }
-        if !playing(h, 0x00786968) {
+        if !capture_playing(h) {
             h.g.puzzles.mmarchd.voices_883 = 0;
         }
     }
     // 11. The grumbling's ambience ended (or stopped: the cat freed).
     if h.g.puzzles.mmarchd.amb != 0 && h.flag(119) == 1 {
-        // sound: the ambience stopped (@ 0x004335f0) (M4).
+        let name = h.g.puzzles.mmarchd.grumble_name.clone();
+        h.g.sfx_stop(&name);
         h.g.puzzles.mmarchd.amb = 0;
     }
-    if h.g.puzzles.mmarchd.amb != 0 && !playing(h, 0x00786a18) {
+    if h.g.puzzles.mmarchd.amb != 0 && !h.g.sfx_playing(&h.g.puzzles.mmarchd.grumble_name) {
         h.g.puzzles.mmarchd.amb_start = now;
         let d = (h.rand() & 3) + 2;
         let m = &mut h.g.puzzles.mmarchd;
@@ -482,8 +587,11 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
         if m.amb == 0 && now - m.amb_start > f64::from(m.amb_delay) {
             let r = h.rand() & 1;
             h.g.puzzles.mmarchd.amb = r + 1;
-            // sound: `Sound800.APC` (r = 0) or `Sound801.APC` (r = 1)
-            // started (@ 0x004329e0(.., 0, 2), @ 0x00433140) (M4).
+            let name = GRUMBLES[r as usize].to_string();
+            h.g.puzzles.mmarchd.grumble_name = name.clone();
+            if h.g.sfx_load(&name, 0, 2) {
+                h.g.sfx_play(&name);
+            }
         }
         if h.g.puzzles.mmarchd.amb_ended && !h.g.puzzles.mmarchd.voice_on {
             let m = &h.g.puzzles.mmarchd;
@@ -493,7 +601,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
         }
     }
     // The guard's voice ended: the pause before the next grumble.
-    if h.g.puzzles.mmarchd.voice_on && !playing(h, 0x007869a8) {
+    if h.g.puzzles.mmarchd.voice_on && !h.g.sfx_playing(&h.g.puzzles.mmarchd.guard_voice) {
         h.g.puzzles.mmarchd.pause_start = now;
         let p = (h.rand() & 3) + 6;
         h.g.puzzles.mmarchd.voice_on = false;
@@ -520,12 +628,11 @@ fn grumble(h: &mut Hx) {
     }
     h.g.puzzles.mmarchd.grumble = level;
     h.set_flag(869, level);
-    // sound: the guard's voice object stopped (@ 0x00443c90, 0x0040dcc0).
     match level {
-        1 => h.play_voice(183, 1, 255, 100, 100),
-        2 => h.play_voice(190, 1, 255, 100, 100),
+        1 => guard_voice(h, 183),
+        2 => guard_voice(h, 190),
         3 => {
-            h.play_voice(189, 1, 255, 100, 100);
+            guard_voice(h, 189);
             set_guard(h, 5);
             h.run("(playcutanimp=MMA_GARDE,3)");
         }

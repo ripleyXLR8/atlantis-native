@@ -98,6 +98,7 @@ impl Script {
     /// start) when no entry holds.
     pub fn ctrl_scenar_in(&mut self, host: &mut dyn Host) -> Option<usize> {
         log::debug!("# CtrlScenarIN #");
+        host.scenar_in_called();
         if self.fatal.is_some() {
             return None;
         }

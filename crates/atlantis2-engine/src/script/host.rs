@@ -358,4 +358,13 @@ pub trait Host {
     fn anim_ended(&mut self, kind: i32, id: i32, n: i32) -> bool {
         true
     }
+
+    /// `PLAYCUTANIMP` / `PLAYCUTANIMO` entered *Atlantis III*'s C call
+    /// @ 0x0045fa90(id, number, kind, 1) (its hide and show follow as
+    /// [`AnimOp`]s): for observers only.
+    fn anim_cut(&mut self, kind: i32, id: i32, number: i32) {}
+
+    /// `CtrlScenarIN` entered (*Atlantis III* @ 0x0044a2f0): for observers
+    /// only.
+    fn scenar_in_called(&mut self) {}
 }

@@ -48,16 +48,16 @@ impl State {
 /// (`PLAYANIM`): the slot of animation `anim` queued after the shown slot
 /// of (id, kind), which plays on to its file's end first.
 pub(super) fn play_anim_c(h: &mut Hx, id: i32, anim: i32, kind: i32, mode: i32) {
-    let now = h.now();
-    let slots = &mut h.g.slots;
+    h.g.tr_entity(kind, id, |e| format!("anim {e} {anim} {kind} {mode}"));
     if mode == 1 {
-        slots.hide(id, kind, now);
-        slots.show(id, kind, anim, now);
+        h.g.slot_hide(id, kind);
+        h.g.slot_show(id, kind, anim);
         return;
     }
     if mode != 2 {
         return;
     }
+    let slots = &mut h.g.slots;
     let target = slots
         .slots
         .iter()

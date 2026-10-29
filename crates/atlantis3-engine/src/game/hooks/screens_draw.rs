@@ -1,18 +1,22 @@
-//! The map screens' banks and drawing in the game ([`crate::maps`] has the
-//! rules): `AtlCarte` (mode 9, @ 0x00405700) and `AtlCarteTour` (mode 10,
-//! @ 0x00406780), each drawn over the running warp frame (@ 0x00440690).
+//! The screens' banks and drawing in the game ([`crate::maps`] has the
+//! maps' rules): `AtlCarte` (mode 9, @ 0x00405700), `AtlCarteTour` (mode
+//! 10, @ 0x00406780) and `AtlEcrin` (mode 14, @ 0x00412fc0), each drawn
+//! over the running warp frame (@ 0x00440690); the sprite calls the C
+//! code makes itself (`AtlSpr_Aff` @ 0x004367b0, `AtlSpr_AffCentre`
+//! @ 0x00436b80).
 
 use std::sync::Arc;
 
 use atlantis3_data::spr::{Bank, Depth};
 
+use crate::inventory::aff_at;
 use crate::maps;
 
 use super::Game;
 
 impl Game {
     /// A screen bank read from `spr\`.
-    fn screen_bank(&self, name: &str) -> Option<Arc<Bank>> {
+    pub(crate) fn screen_bank(&self, name: &str) -> Option<Arc<Bank>> {
         let path = format!("spr/{name}");
         let b = self
             .files
@@ -91,5 +95,94 @@ impl Game {
             now,
             pos,
         );
+    }
+
+    /// `AtlSpr_Aff` (@ 0x004367b0) of a bank the C code holds (`path` its
+    /// file, `spr\Name.spr`): x = `None` for the sprite's own position.
+    pub(crate) fn draw_spr(
+        &mut self,
+        path: &str,
+        bank: &Bank,
+        index: usize,
+        x: Option<i32>,
+        y: i32,
+        alpha: f32,
+    ) {
+        let (w, h) = (self.width, self.height);
+        let a = aff_at(&mut self.screen, w, h, "", bank, index, x, y, alpha);
+        self.tr(|| {
+            let (xs, ys) = match x {
+                Some(x) => (x.to_string(), a.y.to_string()),
+                None => ("def".to_string(), "def".to_string()),
+            };
+            let hex: String = alpha
+                .to_bits()
+                .to_le_bytes()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect();
+            format!("aff {path}#{index}@{xs},{ys}*{hex}")
+        });
+    }
+
+    /// `AtlSpr_AffCentre` (@ 0x00436b80): `AtlSpr_Aff` at (x, y) minus
+    /// half the sprite's size; nothing at alpha 0 or below.
+    pub(crate) fn draw_spr_centre(
+        &mut self,
+        path: &str,
+        bank: &Bank,
+        index: usize,
+        x: i32,
+        y: i32,
+        alpha: f32,
+    ) {
+        self.tr(|| format!("affc {path}#{index}@{x},{y}"));
+        if alpha <= 0.0 {
+            return;
+        }
+        if let Some(info) = bank.info(index) {
+            let (dx, dy) = (i32::from(info.w) / 2, i32::from(info.h) / 2);
+            self.draw_spr(path, bank, index, Some(x - dx), y - dy, alpha);
+        }
+    }
+
+    /// `AtlEcrin_ReloadSprBank` (@ 0x00413370), run by the `jardin.wam`
+    /// load (@ 0x004c367e): `Ecrin%d.spr`, %d the display's depth (the
+    /// port draws in 16 bits). `Interface.spr` is the game's.
+    pub(crate) fn ecrin_reload_banks(&mut self) {
+        self.puzzles.screens.ecrin_bank = self.screen_bank("Ecrin16.spr");
+    }
+
+    /// `ECRIN`'s drawing (@ 0x00412fc0): the warp, the case (#0) and each
+    /// untaken gem (#1..#3) at the screen's centre with the fade's alpha,
+    /// then with the fade at 1 only the cursor: #40 at the pointer, the
+    /// glow centred on it; the flip.
+    pub(crate) fn ecrin_draw(&mut self) {
+        self.draw_warp_only();
+        let (cx, cy) = (self.width as i32 / 2, self.height as i32 / 2);
+        let st = &self.puzzles.screens;
+        let (fade, taken, cursor) = (st.ecrin_fade, st.ecrin_taken, st.ecrin_cursor);
+        if let Some(bank) = st.ecrin_bank.clone() {
+            let path = "spr\\Ecrin16.spr";
+            self.draw_spr(path, &bank, 0, Some(cx), cy, fade);
+            for (k, t) in taken.iter().enumerate() {
+                if !t {
+                    self.draw_spr(path, &bank, k + 1, Some(cx), cy, fade);
+                }
+            }
+        }
+        if fade == 1.0 {
+            if let Some(i) = self.interface.take() {
+                let path = "spr\\Interface.spr";
+                let (px, py) = self.pointer;
+                if cursor == 40 {
+                    self.draw_spr(path, &i, 40, Some(px), py, 1.0);
+                } else {
+                    self.draw_spr_centre(path, &i, cursor.max(0) as usize, px, py, 1.0);
+                }
+                self.interface = Some(i);
+            }
+        }
+        self.tr_flip();
     }
 }
