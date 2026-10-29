@@ -257,6 +257,15 @@ pub struct FixData {
     pub disc_revisions: bool,
 }
 
+/// Whether a byte 0xe1 of the sprite fonts' texts is the `ß` no font has a
+/// glyph for ([`BugFix::SharpS`]): in every release but the Czech CD, whose
+/// FONTMAX / FONTMIN / credits fonts hold a glyph for each byte up to 0xff
+/// and whose texts are Windows-1250, 0xe1 the `á` they draw (EPI.TXT's
+/// "Za strážemi").
+pub fn sharp_s_without_glyph(build: &ExeBuild) -> bool {
+    build.text_code_page != atlantis_data::TextCodePage::Windows1250
+}
+
 /// Whether `name` is a menu text the menu walk draws (`SPRLIST\*MENU.TXT`,
 /// `ERRORn.TXT`, `WAIT.TXT`): not a sprite list, nor a leftover of the
 /// developers that no build reads (the Japanese DVD's `ALLSAVE.TXT` and
@@ -330,7 +339,7 @@ impl FixData {
             let Some(bytes) = read(&name, disc) else {
                 continue;
             };
-            if bytes.contains(&crate::ui::layout::SHARP_S) {
+            if bytes.contains(&crate::ui::layout::SHARP_S) && sharp_s_without_glyph(build) {
                 data.sharp_s |= match name.as_str() {
                     "SPRLIST\\CREDITS.TXT" => true,
                     "SPRLIST\\EPI.TXT" => epi_drawn,

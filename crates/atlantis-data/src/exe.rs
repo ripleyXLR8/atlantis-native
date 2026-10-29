@@ -1686,6 +1686,29 @@ pub const DVD_SV: ExeBuild = ExeBuild {
     ..DVD_EN
 };
 
+/// The Czech CD (Bohemia Interactive, 2000; re-issued with the magazine
+/// GAME4U Speciál 2, 2001): its `ATLANTIS.EXE` is Cryo's 1.01 patch
+/// program byte for byte (atlantis-patch-fr-714240, BUILDS\[2\]), over the
+/// US August 1997 archives with Czech CON, SPRLIST and font files. The
+/// executable cannot tell it apart: [`crate::Game::open`] takes this entry
+/// for that program when the archives are the Czech ones
+/// ([`is_czech_menu`]). Every field is the patch build's but the name
+/// (which keys the saves) and the texts' code page, Windows-1250: the
+/// program draws the subtitles with TextOutA in Arial asked in
+/// DEFAULT_CHARSET (FUN_0041ae20 @ 0x0041ae38), so a Czech Windows reads
+/// them in its ANSI code page, 1250.
+pub const CS_CD: ExeBuild = ExeBuild {
+    name: "atlantis-cd-cs-714240",
+    text_code_page: TextCodePage::Windows1250,
+    ..BUILDS[2]
+};
+
+/// Whether `selemenu` (`SPRLIST\SELEMENU.TXT`) is the Czech CD's player
+/// screen menu: its first line `<>,140>ZVOLTE JMÉNO HRÁČE` (Windows-1250).
+pub fn is_czech_menu(selemenu: &[u8]) -> bool {
+    selemenu.starts_with(b"<>,140>ZVOLTE JM\xc9NO HR\xc1\xc8E")
+}
+
 /// The TimeDateStamp of a PE file's COFF header (at e_lfanew + 8, after the
 /// "PE\0\0" signature), `None` when the bytes are not a PE file.
 pub fn pe_timestamp(exe: &[u8]) -> Option<u32> {
@@ -1944,6 +1967,25 @@ mod tests {
         let cn = fake_exe(692_736, 0x36f1_1f20);
         assert_eq!(build_of(&cn).unwrap().name, "atlantis-cd-zh-cn-692736");
         assert!(build_of(&fake_exe(696_832, 0x36f1_1f20)).is_none());
+    }
+
+    /// The Czech CD's entry: the patch build's fields but its name and code
+    /// page; the executable alone gives the patch build.
+    #[test]
+    fn czech_cd_is_the_patch_program() {
+        assert_eq!(BUILDS[2].name, "atlantis-patch-fr-714240");
+        let patch = fake_exe(714_240, 0x385a_4dc6);
+        assert_eq!(build_of(&patch).unwrap().name, BUILDS[2].name);
+        let as_patch = ExeBuild {
+            name: BUILDS[2].name,
+            text_code_page: BUILDS[2].text_code_page,
+            ..CS_CD
+        };
+        assert_eq!(as_patch, BUILDS[2]);
+        assert_eq!(CS_CD.text_code_page, TextCodePage::Windows1250);
+        assert!(BUILDS.iter().all(|b| b.name != CS_CD.name));
+        assert!(is_czech_menu(b"<>,140>ZVOLTE JM\xc9NO HR\xc1\xc8E\r\n"));
+        assert!(!is_czech_menu(b"<>,140>CHOISISSEZ"));
     }
 
     /// The Chinese builds' new fields; every other build keeps the

@@ -250,14 +250,21 @@ pub fn spell_sharp_s(text: &[u8], sharp_s_as_ss: bool) -> std::borrow::Cow<'_, [
 }
 
 /// The width of glyph `c` (byte - 0x20). `FUN_004206c8` reads
-/// 0x004965ee[byte] with no bound, so bytes below 0x20 and from 0xa9 read
-/// the strings before the table and the FONTMIN table after it; the port
-/// counts them 0, as for the pen advance (0x004202cc). No shipped menu
-/// holds such a byte.
+/// 0x004965ee[byte] with no bound, and so does the pen advance
+/// (0x004202cc): a byte from 0xa9 reads the FONTMIN advances that follow
+/// the table in every build (0x00496697 = 0x0049660e + 137;
+/// atlantis-patch-fr-714240 0x0049669b = 0x00496612 + 137;
+/// atlantis-cd-fr-687104 0x00486670 = 0x004865e7 + 137), glyph `i` the
+/// FONTMIN byte `i - 137`. Only the Czech CD's menus hold such bytes (its
+/// FONTMAX has glyphs up to 0xff). The bytes below 0x20 are spaces before
+/// this is read; a glyph past FONTMIN (from 0x10e) cannot occur.
 fn fontmax_width(c: i32) -> i32 {
-    usize::try_from(c)
-        .ok()
-        .and_then(|i| FONTMAX_WIDTHS.get(i))
+    let Ok(i) = usize::try_from(c) else {
+        return 0;
+    };
+    FONTMAX_WIDTHS
+        .get(i)
+        .or_else(|| FONTMIN_ADVANCE.get(i.wrapping_sub(FONTMAX_WIDTHS.len())))
         .map_or(0, |&w| i32::from(w))
 }
 
@@ -427,7 +434,8 @@ impl MenuRules {
     ) -> MenuRules {
         use crate::enhancements::BugFix;
         MenuRules {
-            sharp_s_as_ss: fixes.get(BugFix::SharpS),
+            sharp_s_as_ss: fixes.get(BugFix::SharpS)
+                && crate::enhancements::sharp_s_without_glyph(build),
             positioned_byte_width: if fixes.get(BugFix::MenuLineWidth) {
                 22
             } else {
@@ -915,9 +923,20 @@ pub fn subtitle_toggle_click(on: &mut bool, counter: &mut u8, cycle: bool) {
 }
 
 /// The code the original's ANSI window stores from WM_CHAR (0x00419c9a):
-/// the Windows-1252 code of a typed character, 0 when it has none.
-pub fn name_key_code(c: char) -> u8 {
+/// the code of a typed character in the ANSI code page of the Windows the
+/// release was sold for, 0 when it has none: Windows-1252, or Windows-1250
+/// for the Czech CD's Windows-1250 texts (its `Š Ť Ž š ť ž` are then
+/// within the name entry's 0x20..0xa7).
+pub fn name_key_code(c: char, code_page: atlantis_data::TextCodePage) -> u8 {
     let u = u32::from(c);
+    if code_page == atlantis_data::TextCodePage::Windows1250 {
+        if u < 0x80 {
+            return u as u8;
+        }
+        return (0x80..=0xffu8)
+            .find(|&b| code_page.char_of(b) == c)
+            .unwrap_or(0);
+    }
     if u < 0x80 || (0xa0..=0xff).contains(&u) {
         return u as u8;
     }
@@ -971,7 +990,11 @@ pub fn name_key_code(c: char) -> u8 {
 /// 0x0041dafa..0x0041dbe9: 0xc4 -> 0x8e, 0xc5 -> 0x8f, 0xd6 -> 0x99,
 /// 0xe4 -> 0x84, 0xe5 -> 0x86, 0xf6 -> 0x94).
 pub fn name_entry_byte(c: char, upper_case: bool, dos_letters: bool) -> Option<u8> {
-    name_entry_code(name_key_code(c), upper_case, dos_letters)
+    name_entry_code(
+        name_key_code(c, atlantis_data::TextCodePage::Windows1252),
+        upper_case,
+        dos_letters,
+    )
 }
 
 /// [`name_entry_byte`] for the code the window stores
@@ -1072,14 +1095,29 @@ mod tests {
 
     #[test]
     fn name_key_codes() {
-        assert_eq!(name_key_code('A'), 0x41);
-        assert_eq!(name_key_code('\u{a3}'), 0xa3);
-        assert_eq!(name_key_code('\u{2026}'), 0x85);
-        assert_eq!(name_key_code('\u{20ac}'), 0x80);
-        assert_eq!(name_key_code('\u{153}'), 0x9c);
-        assert_eq!(name_key_code('\u{e9}'), 0xe9);
-        assert_eq!(name_key_code('\u{101}'), 0);
-        assert_eq!(name_key_code('\u{81}'), 0x81);
+        use atlantis_data::TextCodePage::{Windows1250, Windows1252};
+        let code = |c| name_key_code(c, Windows1252);
+        assert_eq!(code('A'), 0x41);
+        assert_eq!(code('\u{a3}'), 0xa3);
+        assert_eq!(code('\u{2026}'), 0x85);
+        assert_eq!(code('\u{20ac}'), 0x80);
+        assert_eq!(code('\u{153}'), 0x9c);
+        assert_eq!(code('\u{e9}'), 0xe9);
+        assert_eq!(code('\u{101}'), 0);
+        assert_eq!(code('\u{81}'), 0x81);
+        // A Czech Windows: its code page's bytes; the name entry keeps
+        // those up to 0xa7.
+        let cz = |c| name_key_code(c, Windows1250);
+        assert_eq!(cz('A'), 0x41);
+        assert_eq!(cz('š'), 0x9a);
+        assert_eq!(cz('ť'), 0x9d);
+        assert_eq!(cz('Ž'), 0x8e);
+        assert_eq!(cz('č'), 0xe8);
+        assert_eq!(cz('ř'), 0xf8);
+        assert_eq!(cz('\u{e8}'), 0);
+        assert_eq!(name_entry_code(cz('ť'), false, false), Some(0x9d));
+        assert_eq!(name_entry_code(cz('č'), false, false), None);
+        assert_eq!(code('ť'), 0);
     }
 
     /// The 1997 build: '#' is a glyph of the player list, the SUBTITLES
@@ -1178,9 +1216,10 @@ mod tests {
         ));
     }
 
-    /// The menu walk: 0xe1 one glyph 193 with the FONTMAX advance (0, past
-    /// the table) as in the original; with the fix two 's' glyphs, and the
-    /// centred line measured with them.
+    /// The menu walk: 0xe1 one glyph 193 with the FONTMAX advance read past
+    /// the table's 137 bytes, in the FONTMIN advances that follow it
+    /// (FONTMIN's byte 56), as in the original; with the fix two 's'
+    /// glyphs, and the centred line measured with them.
     #[test]
     fn sharp_s_in_menu_walk() {
         let text = b"<>,100,\xe1a\r\n/fin";
@@ -1193,10 +1232,12 @@ mod tests {
                 .collect()
         };
         let (s, a) = (fontmax_width(0x53), fontmax_width(0x41));
+        let e1 = fontmax_width(193);
+        assert_eq!(e1, i32::from(FONTMIN_ADVANCE[193 - 137]));
         walk_menu_text(text, 1, -1, 0, 0, MenuRules::default(), &mut walk);
-        let x0 = ((640 - a) / 2) as i16;
-        assert_eq!(glyphs(&walk), [(193, x0), (0x41, x0)]);
-        assert_eq!(i32::from(walk.records[0].w), a);
+        let x0 = ((640 - a - e1) / 2) as i16;
+        assert_eq!(glyphs(&walk), [(193, x0), (0x41, x0 + e1 as i16)]);
+        assert_eq!(i32::from(walk.records[0].w), a + e1);
         walk_menu_text(
             text,
             1,
