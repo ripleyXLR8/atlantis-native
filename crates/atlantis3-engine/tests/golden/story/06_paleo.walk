@@ -1,0 +1,167 @@
+# Atlantis III - story segment 06: Paleo (world 4, paleo.wam), chapters 17,
+# 19..27 through the remote control; the skull PAL_CRANE (interdimension);
+# back to the Hoggar.  Read by tools/emu/a3_story_script.py.  Starts at
+# hoggar view 23, chapter 5 (end of 05).
+
+HAND CMP_TELECOMMANDE       # the remote in hand: PuzzleTelecommande (mode 18) from the inventory frame's hook
+EXPECT MODE=18
+CLICK left SPRITE=29        # Paleo: flag 605 = 0 -> flag402, CMP_PALEO shown, sound 50
+CLICK right
+EXPECT FLAG402=1
+GO 25                       # departvue=25, flag402, flag410=0: flag410, chapter 605 -> paleo.wam view 14, chapter 17 (cinema 31, PAL_BATON)
+EXPECT MONDE=4
+EXPECT CHAPTER=17
+GO 15
+GO 5                        # chapter 17 departvue=5: cinema 32, view 5, flag602, chapter 19
+EXPECT CHAPTER=19
+GO 8
+GO 13
+GO 1                        # chapter 19 DepartVue=1 & flag104=0: NextVue=101, chapter 21 -> view 101
+EXPECT CHAPTER=21
+EXPECT VUE=101
+GO 102
+HAND PAL_BATON
+ZONE PAL_FOYER              # chapter 21: the fire, flag104, cinema 51, Vue=2 (the wolves)
+EXPECT FLAG104=1
+EXPECT VUE=2
+# The wolves' fight (frame 0x004caa40, view 2): its success @ 0x004caf12
+# (white wolf never submitted: byte 0x00787559 := 1) -> 0x004cac90:
+# Flag105 := 1, the wolves stopped, CtrlScenarIN
+SKIP puzzle wolves MEM8=0x00787559:1 CALL=0x004cac90
+EXPECT FLAG105=1
+EXPECT VUE=202
+GO 21                       # chapter 21 departvue=21, Flag116=0: cinema 35, view 21, chapter 22
+EXPECT CHAPTER=22
+GO 22
+OBJET PAL_SOUCHE            # the stump: flag101
+GO 23
+GO 24
+HAND PAL_SOUCHE
+ZONE PAL_ZONE_SOUCHE1       # the stump laid: flag107, PAL_SOUCHE2
+GO 25                       # departvue=25 & flag107: cinema 36, view 25, chapter 23
+EXPECT CHAPTER=23
+OBJET PAL_CAILLOU           # the stone: flag109
+GO 26
+HAND PAL_CAILLOU            # 0x004d11c0: the aim starts (0x0078977c)
+ZONE PAL_ZONE_LANCER        # the throw: hand cleared, throw byte 0x0078977d, camera locked, input frozen
+# The throw's end (20 ticks at 20 Hz, then the hit test 0x004d1380 on the
+# aim and the tiger slot's frame, not modelled): the hit branch of
+# 0x004d11c0: camera unlocked (0x00440750), freeze 0, throw byte 0,
+# counter 0, 0x0071f271 := 1, Flag111 := 1, 0x004d15a0 (CtrlScenarIN)
+SKIP puzzle tiger CALL=0x00440750 MEM8=0x00789d56:0 MEM8=0x0078977d:0 MEM32=0x00789780:0 MEM8=0x0071f271:1 FLAG111=1 CALL=0x004d15a0
+EXPECT FLAG612=1
+OBJET PAL_LEVIER            # the lever: flag112
+GO 27
+GO 28
+HAND PAL_LEVIER
+ZONE PAL_ZONE_ROCHER        # chapter 23: cinema 40, view 29, chapter 24
+EXPECT CHAPTER=24
+EXPECT VUE=29
+# chapter 24: the black wolf appears at view 37; moving back toward it
+# kills (Load=4) until the white wolf kills it at view 34
+GO 30
+GO 31
+GO 37                       # flag600: PAL_LOUP_NOIR shown
+EXPECT FLAG600=1
+GO 31
+GO 30
+GO 32
+GO 34                       # flag600 & vue=34: cinema 42, flag114
+EXPECT FLAG114=1
+GO 32
+GO 30
+GO 31
+GO 37
+OBJET PAL_PERCHE            # the pole: flag613
+GO 38
+HAND PAL_PERCHE
+ZONE PAL_ZONE_PERCHE        # chapter 24: cinema 44, view 40, chapter 25
+EXPECT CHAPTER=25
+GO 41
+GO 42
+GO 43
+GO 44
+GO 45                       # chapter 25 DepartVue=45: cinema 45, chapter 26
+EXPECT CHAPTER=26
+GO 46
+GO 47
+GO 48
+GO 49
+GO 50
+GO 51
+GO 60                       # chapter 26 DepartVue=60: cinema 46, chapter 27
+EXPECT CHAPTER=27
+GO 61
+GO 62
+GO 64
+OBJET PAL_PROPULSEUR        # the spear-thrower: flag614
+HAND -
+OBJET PAL_CRANE             # the skull: chapter 27 flag117, Flag900
+EXPECT FLAG900=1
+RAND 0                      # the interdimension's view: 2
+FRAME                       # flag 900 -> 0x00409cc0 (flag890=4, flag894): world 5, chapter 52, cinema 52
+EXPECT CHAPTER=52
+EXPECT VUE=2
+GO 8
+OBJET INT_BULLENETMARAIS    # first click: the dolphin, dialog 239, flag867
+EXPECT FLAG867=1
+OBJET INT_BULLENETMARAIS    # back (frame hook first: flags 159, 866, 867 -> Flag25): monde=4, LoadVueMonde -> paleo view 64, chapter 27
+EXPECT FLAG25=1
+EXPECT MONDE=4
+GO 62
+GO 51                       # chapter 27 DepartVue=51: chapter 26
+GO 50
+GO 49
+GO 48
+GO 47
+GO 46
+GO 202                      # chapter 26 DepartVue=202: cinema 53, view 202, chapter 21
+EXPECT CHAPTER=21
+GO 201
+GO 13                       # chapter 21 departvue=13: chapter 19
+GO 7
+GO 6
+GO 11
+GO 12
+GO 3                        # chapter 19 DepartVue=3: chapter 20
+EXPECT CHAPTER=20
+GO 4
+# The hunt (frame 0x004c9350, view 4, with the spear-thrower flag614): each
+# hit (@ 0x004c99d0) runs (HideObjet=PAL_<animal>), hit byte := 1,
+# (SacADos=PAL_COEUR_<animal>), flag 608 + k := 1; four hits -> 0x004c9860:
+# (sacados=NOT_PAL_LANCE), Flag620 := 0, Flag91 := 1, CtrlScenarIN
+SKIP puzzle hunt RUN=(HideObjet=PAL_CERF) MEM8=0x00786d88:1 RUN=(SacADos=PAL_COEUR_CERF) FLAG608=1 RUN=(HideObjet=PAL_AVROCH) MEM8=0x00786d48:1 RUN=(SacADos=PAL_COEUR_AVROCH) FLAG609=1 RUN=(HideObjet=PAL_CHEVAL) MEM8=0x00786dc8:1 RUN=(SacADos=PAL_COEUR_CHEVAL) FLAG610=1 RUN=(HideObjet=PAL_BOUQUETIN) MEM8=0x00786d68:1 RUN=(SacADos=PAL_COEUR_BOUQUETIN) FLAG611=1 CALL=0x004c9860
+EXPECT FLAG91=1
+GO 3
+GO 12                       # chapter 20 departvue=12: chapter 19
+GO 11
+GO 6
+GO 5
+# The altar (frame 0x004c4470, views 5..8, real): a heart in hand on an
+# element zone (0x004c4600: (PlaySound=200), position, (ObjetEnMain=0),
+# bag remove); flags 616..619 := position + 1; horse on fire, ibex on
+# earth, aurochs on water, stag on air (2, 3, 1, 4) -> Flag70 := 1,
+# CtrlScenarIN -> chapter 19: cinema 33, flag604
+HAND PAL_COEUR_CHEVAL
+ZONE PAL_ZFEU
+GO 6
+HAND PAL_COEUR_BOUQUETIN
+ZONE PAL_ZTERRE
+GO 7
+HAND PAL_COEUR_AVROCH
+ZONE PAL_ZEAU
+GO 8
+HAND PAL_COEUR_CERF
+ZONE PAL_ZAIR
+EXPECT FLAG70=1
+EXPECT FLAG604=1
+GO 5
+GO 9
+GO 10
+GO 15                       # chapter 19 DepartVue=15: cinema 47, view 15, chapter 17 -> flag604: cinema 50, flag605, the Hoggar view 24, chapter 5
+EXPECT MONDE=1
+EXPECT CHAPTER=5
+EXPECT VUE=24
+EXPECT FLAG403=1
+
+CHECKPOINT 106 06_paleo_end

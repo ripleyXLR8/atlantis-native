@@ -1,0 +1,79 @@
+# Atlantis III - story segment 04: back in the Hoggar (world 1), chapter 5
+# after the Land of the Dead: the cave (chapter 4), the boss (chapter 3),
+# the crystal skull -> the interdimension (world 5, chapter 52), the
+# dolphin, the corridor's first two doors (chapter 53, Flag17), back to the
+# Hoggar.  Read by tools/emu/a3_story_script.py.  Starts at hoggar view 21.
+
+GO 1                        # chapter 5 departvue=1: flag14, vue=1, chapter 4
+EXPECT CHAPTER=4
+GO 2                        # chapter 4 departvue=2, flag14: flag15, the boss shown (sound 2)
+EXPECT FLAG15=1
+GO 13                       # chapter 4 departvue=13 -> chapter 3
+EXPECT CHAPTER=3
+PERSO HOG_BOSS              # chapter 3 clicperso=HOG_BOSS: dialog 11, cinema 28, Flag9, view 21, chapter 5 (arrival: dialog 12, cinema 16, the skull, dialog 13, Flag6)
+EXPECT CHAPTER=5
+EXPECT FLAG6=1
+EXPECT VUE=21
+OBJET HOG_OBJ_CRANE         # the skull: chapter 5 flag8, Flag900
+EXPECT FLAG900=1
+# next frame: the frame hook (flag 900) -> 0x00409cc0: the interdimension,
+# view rand() % 6 + 2 (random, 2..7: RAND 0 -> view 2); arrival: cinema 17
+RAND 0
+FRAME
+EXPECT MONDE=5
+EXPECT CHAPTER=52
+EXPECT VUE=2
+GO 8                        # the bubbles
+OBJET INT_BULLENETCOMPLEXE  # first click: the dolphin, dialog 236, Flag159
+EXPECT FLAG159=1
+GO 2
+GO 1
+OBJET INT_BULLENETCOULOIR   # Flag874=0: Couloir.wam view 15, chapter 53
+EXPECT CHAPTER=53
+EXPECT WAM=Couloir.wam
+# The corridor's doors (chapter 53 departvue=30 / 31 -> Flag920, the frame
+# hook 0x004c49c0 opens COU_PORTE<view><G|D>): each door's animation (the
+# record 0x00786508, 20 frames: +8 frames done) is injected as ended; the
+# real code then checks the door against the sequence 0x0070054c (15G, 17D,
+# 18G, 17G, 15D, 20G), counts the doors (flag906; the second one sets
+# Flag17) and runs (AngleWarpX=180), (Vue=15).
+GO 30                       # left door of view 15
+SKIP puzzle couloir_door MEM32=0x00786510:20
+GO 16
+GO 17
+GO 31                       # right door of view 17
+SKIP puzzle couloir_door MEM32=0x00786510:20
+EXPECT FLAG17=1
+EXPECT VUE=15
+GO 1                        # Vue=15 & DepartVue=1: Interdim.wam view 1, chapter 52
+EXPECT CHAPTER=52
+GO 2
+GO 8
+OBJET INT_BULLENETCOMPLEXE  # flag159=1: monde=1, LoadVueMonde -> hoggar.wam view 21, chapter 5
+EXPECT MONDE=1
+EXPECT CHAPTER=5
+EXPECT VUE=21
+# the Atlante and the bell
+PERSO CMP_ATLANTEFIGE       # with the skull in the bag: cinema 14, CMP_ATLANTE shown, flag425
+PERSO CMP_ATLANTE           # Flag17: dialog 35, cinema 94, Flag21, the bell CMP_CLOCHE shown, cinema 15
+EXPECT FLAG21=1
+GO 22
+GO 23
+OBJET CMP_CLOCHE            # Flag22: sound 49, the remote CMP_TELECOMMANDE appears
+OBJET CMP_TELECOMMANDE      # take it: Flag23; in hand -> next frame PuzzleTelecommande (mode 18)
+FRAME
+EXPECT MODE=18
+# The remote (loop 0x004d0550, real; its buttons are sprites of
+# Telecommande.spr: 0 power, 14 Bagdad, 29 Paleo, 44 home)
+CLICK left SPRITE=0         # first click: flag427, the Atlante figure back; power: flag404, sound 51
+CLICK left SPRITE=14        # Bagdad: flag 908 = 0 -> flag400, CMP_BAGDAD shown, sound 50
+CLICK right                 # close: end 0x004cff70, CtrlScenarIN
+EXPECT MODE=3
+EXPECT FLAG400=1
+GO 25                       # departvue=25, flag400, flag411=0: flag411, chapter 606 -> Bagdad (world 3), MMarchd.wam view 12, chapter 28
+EXPECT MONDE=3
+EXPECT WAM=MMarchd.wam
+EXPECT CHAPTER=28
+EXPECT VUE=12
+
+CHECKPOINT 104 04_hoggar5_end

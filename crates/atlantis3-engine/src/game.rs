@@ -239,6 +239,9 @@ pub struct Game {
     puzzles: hooks::Puzzles,
     /// A right click not yet seen by a screen.
     right_clicked: bool,
+    /// Values the next script-visible `rand()` calls return (tests: the
+    /// original seeds `rand` with the clock).
+    rand_queue: std::collections::VecDeque<i32>,
     /// The player number of the save names (1) and the saves written,
     /// by file name; also kept in `save_dir` when one is given.
     player: i32,
@@ -379,6 +382,7 @@ impl Game {
             camera_fov: warp_fov(Fpu::Double),
             puzzles: hooks::Puzzles::new(),
             right_clicked: false,
+            rand_queue: Default::default(),
             player: atlantis3_data::save::DEFAULT_PLAYER,
             saves: HashMap::new(),
             save_dir: None,
@@ -575,6 +579,33 @@ impl Game {
         }
     }
 
+    /// The next value of a script-visible `rand()` (@ 0x006d348b): a
+    /// queued one (tests), else the CRT's.
+    fn script_rand(&mut self) -> i32 {
+        self.rand_queue
+            .pop_front()
+            .unwrap_or_else(|| self.rand.rand())
+    }
+
+    /// Queues the values the next script-visible `rand()` calls return
+    /// (tests replaying the original's run).
+    pub fn queue_rand(&mut self, v: i32) {
+        self.rand_queue.push_back(v);
+    }
+
+    /// Loads a save's text as the loader does (@ 0x0045b750), the save kept
+    /// under `name` (tests: a story segment started from the original's
+    /// save).
+    pub fn load_save_text(&mut self, name: &str, text: Vec<u8>) -> bool {
+        self.saves.insert(name.to_string(), text);
+        self.video = None;
+        self.page = None;
+        self.mode = Mode::Warp;
+        let ok = self.load_named(name);
+        self.look_last = None;
+        ok
+    }
+
     /// Loads save `name` (the loader @ 0x0045b750).
     fn load_named(&mut self, name: &str) -> bool {
         let Some(d) = self.read_save(name) else {
@@ -583,7 +614,9 @@ impl Game {
         let save = atlantis3_data::save::SaveGame::parse(&d);
         let data = load_data(&save);
         self.puzzles.after_load();
-        self.with_script(|s, h| s.load_a3(h, &data))
+        let ok = self.with_script(|s, h| s.load_a3(h, &data));
+        self.after_load_hook();
+        ok
     }
 
     /// The player's next save `game<P>_<N>.sav` (the first N free,
@@ -706,6 +739,11 @@ impl Game {
     /// double-click flag within 0.2 s of the previous press. In a travel
     /// video a click ends it.
     pub fn click(&mut self) {
+        // The mouse handler skips both buttons while a puzzle freezes the
+        // input (@ 0x00431580, byte 0x00789d56).
+        if self.puzzles.freeze {
+            return;
+        }
         self.click = true;
         if self.last_press.is_some_and(|t| self.now - t < 0.2) {
             self.double_click = true;
@@ -736,13 +774,19 @@ impl Game {
     /// inventory opens (unless it is open), in the inventory it closes, in
     /// the subject menu the menu closes.
     pub fn right_click(&mut self) {
+        if self.puzzles.freeze {
+            return;
+        }
+        // The right button's byte (0x007592b9), read by the screens and the
+        // hunt; cleared when the warp opens the inventory.
+        self.right_clicked = true;
         match self.mode {
             Mode::Warp if self.moving.turn.is_none() && !self.moving.pending => {
-                self.open_inventory()
+                self.open_inventory();
+                self.right_clicked = false;
             }
             Mode::Inventory => self.close_inventory(),
             Mode::Subjects => self.close_subjects(),
-            Mode::Screen => self.right_clicked = true,
             _ => {}
         }
     }
@@ -1041,6 +1085,8 @@ impl Game {
             self.anim_tick = true;
             self.dialog_tick = true;
         }
+        // The main loop's per-frame place part (@ 0x004d5df9 → 0x004c1950).
+        self.main_loop_hook();
         match self.mode {
             Mode::Intro | Mode::Video => self.video_step(),
             Mode::Warp => self.warp_frame(),
@@ -1268,6 +1314,7 @@ impl Game {
         }
         // 6. The click flags cleared (and the sprite hit with them).
         self.click = false;
+        self.right_clicked = false;
         self.sprite_hit = None;
         if let Some(s) = self.script.as_mut() {
             s.click = false;
@@ -2686,7 +2733,8 @@ impl Game {
     pub fn click_sprite(&mut self, id: i32, kind: i32) -> bool {
         let fpu = self.camera.fpu;
         let mut found = None;
-        'search: for pitch in (-40..=40).map(|p: i32| if p % 2 == 0 { p / 2 } else { -(p + 1) / 2 })
+        'search: for pitch in
+            (-120..=120).map(|p: i32| if p % 2 == 0 { p / 2 } else { -(p + 1) / 2 })
         {
             for yaw in 0..360 {
                 let mut c = self.camera.clone();
@@ -2724,21 +2772,57 @@ impl Game {
     /// line (tests: a puzzle's result).
     #[doc(hidden)]
     pub fn show_entity(&mut self, kind: i32, name: &str) {
-        let section = if kind == 1 {
-            atlantis2_data::defnames::PERSONNAGES
-        } else {
-            atlantis2_data::defnames::OBJETS
+        self.entity_unlogged(kind, name, true);
+    }
+
+    /// Hides an entity without the script's log (tests' puzzle results).
+    pub fn hide_entity(&mut self, kind: i32, name: &str) {
+        self.entity_unlogged(kind, name, false);
+    }
+
+    fn entity_unlogged(&mut self, kind: i32, name: &str, show: bool) {
+        let key = match (kind == 1, show) {
+            (true, true) => "SHOWPERSO",
+            (true, false) => "HIDEPERSO",
+            (false, true) => "SHOWOBJET",
+            (false, false) => "HIDEOBJET",
         };
-        let Ok(id) = self.names.id(section, name.as_bytes()) else {
-            return;
-        };
-        let key = if kind == 1 { "SHOWPERSO" } else { "SHOWOBJET" };
         let log = self.script.as_mut().and_then(|s| s.set_log.take());
         self.run_command(&format!("({key}={name})"));
         if let Some(s) = self.script.as_mut() {
             s.set_log = log;
         }
-        let _ = id;
+    }
+
+    /// The quick save `n` written now (@ 0x0044c6d0), as `SAVE=n` does
+    /// (tests: a story segment's checkpoint); its name.
+    pub fn quick_save_now(&mut self, n: i32) -> String {
+        let name = atlantis3_data::save::quick_save_name(self.player, n);
+        if let Some(s) = self.script.take() {
+            let data = self.save_text(&s);
+            self.script = Some(s);
+            self.store_save(&name, data);
+        }
+        name
+    }
+
+    /// `CtrlScenarIN` (@ 0x0044a2f0) now (tests' puzzle results).
+    pub fn ctrl_scenar_in(&mut self) {
+        self.with_script(|s, h| {
+            s.ctrl_scenar_in(h);
+        });
+    }
+
+    /// Writes a script variable by name (tests' puzzle results).
+    pub fn set_var(&mut self, name: &str, v: i32) {
+        if let Some(s) = self.script.as_mut() {
+            if let Ok(k) = s
+                .names
+                .id(atlantis2_data::defnames::VARIABLES, name.as_bytes())
+            {
+                s.vars[k] = v;
+            }
+        }
     }
 }
 
@@ -2910,6 +2994,7 @@ impl Host for Game {
                 // The puzzles' one-shot rebuilds (@ 0x00459e70).
                 self.puzzles.after_load();
                 script.load_a3(self, &data);
+                self.after_load_hook_with(script);
             }
             None => log::warn!("Load: {name} not found"),
         }

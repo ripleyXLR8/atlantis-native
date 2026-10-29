@@ -1,0 +1,71 @@
+# Atlantis III - story segment 07: the corridor's six doors (chapter 53)
+# and Rhea's garden (Rhea.wam, chapter 54): the Omega -> the Hoggar.
+# Read by tools/emu/a3_story_script.py.  Starts at hoggar view 24, chapter 5.
+
+HAND HOG_OBJ_CRANE          # the skull again (flag891, flag901 = 0): AtlCraneBagdad (mode 15)
+EXPECT MODE=15
+RAND 4                      # the interdimension's view: rand() % 6 + 2 = 6
+CLICK left                  # 0x00409b40: flag890 = 1, flag901 := 1, the interdimension commands; returns 0 -> stop 0x00409b00
+EXPECT CHAPTER=52
+EXPECT VUE=6
+GO 1
+OBJET INT_BULLENETCOULOIR   # Couloir.wam view 15, chapter 53
+EXPECT CHAPTER=53
+# the doors' sequence goes on from step 2 (15G, 17D done in segment 04):
+# 18G, 17G, 15D, 20G; each door's animation end injected (record
+# 0x00786508 +8 := 20)
+GO 16
+GO 17
+GO 18
+GO 30                       # left door of view 18
+SKIP puzzle couloir_door MEM32=0x00786510:20
+GO 16
+GO 17
+GO 30                       # left door of view 17
+SKIP puzzle couloir_door MEM32=0x00786510:20
+GO 31                       # right door of view 15
+SKIP puzzle couloir_door MEM32=0x00786510:20
+GO 16
+GO 17
+GO 18
+GO 19
+GO 20
+GO 30                       # left door of view 20: step 6 with flags 159, 866, 867, 908, 605 -> 0x00786519
+SKIP puzzle couloir_door MEM32=0x00786510:20
+EXPECT CHAPTER=54
+# Rhea (frame 0x004cd450, real): the subjects in the order of its step
+# table (chapter 54 writes flag 877 after each subject's dialog)
+GO 12
+PERSO INT_VIEILLE
+SUBJECT DIAL_INT_VIEUX      # 877 = 22: flag875 1, dialog 251
+FRAME                       # the next frame: 0x004cd450 reads flag 877
+EXPECT FLAG875=1
+GO 11                       # 875 = 1 and VUE = 11: 875 := 2, dialog 252
+EXPECT FLAG875=2
+PERSO INT_VIEUX
+SUBJECT DIAL_INT_CRANE      # 15: 875 := 3, dialog 259
+FRAME                       # the next frame: 0x004cd450 reads flag 877
+PERSO INT_VIEUX
+SUBJECT DIAL_INT_HEROINE    # 16: 875 := 4, dialog 260
+FRAME                       # the next frame: 0x004cd450 reads flag 877
+PERSO INT_VIEUX
+SUBJECT DIAL_INT_HUMANITE   # 13: 875 := 5, dialog 261
+FRAME                       # the next frame: 0x004cd450 reads flag 877
+EXPECT FLAG875=5
+GO 12                       # chapter 54 DepartVue=12 & Flag875=5: Flag875=6
+EXPECT FLAG875=6
+PERSO INT_VIEILLE
+SUBJECT DIAL_INT_EXPAND     # 24: 875 := 7, dialog 262
+FRAME                       # the next frame: 0x004cd450 reads flag 877
+PERSO INT_VIEILLE
+SUBJECT DIAL_INT_OMEGA      # 21: 875 := 8, dialog 263
+FRAME                       # the next frame: 0x004cd450 reads flag 877
+EXPECT FLAG875=8
+GO 10
+GO 13
+GO 14                       # chapter 54 DepartVue=14 & Flag875=8: cinema 91, Flag26, the Omega, Monde=1, LoadVueMonde -> hoggar view 24, chapter 5
+EXPECT FLAG26=1
+EXPECT MONDE=1
+EXPECT CHAPTER=5
+
+CHECKPOINT 107 07_rhea_end

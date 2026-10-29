@@ -18,6 +18,17 @@ use atlantis2_engine::script::Script;
 
 use super::{Game, Mode};
 
+mod couloir;
+mod interdim;
+mod jardin;
+mod ldmorts;
+mod mmarchd;
+mod paleo;
+mod pmagi;
+mod rhea;
+mod screens;
+mod tourmagi;
+
 /// A full-screen loop mode started by a hook (the mode numbers of the main
 /// loop's table @ 0x004d5e30).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +85,21 @@ pub struct Puzzles {
     /// The screen running and the mode to go back to (`SetMode`'s result).
     pub screen: Option<Screen>,
     pub screen_back: Option<Mode>,
+    /// The input freeze (@ 0x00789d56): while set the mouse handler
+    /// (@ 0x00431580) ignores the buttons.
+    pub freeze: bool,
+    /// The places' own globals.
+    pub ldmorts: ldmorts::State,
+    pub paleo: paleo::State,
+    pub mmarchd: mmarchd::State,
+    pub jardin: jardin::State,
+    pub tourmagi: tourmagi::State,
+    pub pmagi: pmagi::State,
+    pub interdim: interdim::State,
+    pub couloir: couloir::State,
+    pub rhea: rhea::State,
+    /// The screens' globals.
+    pub screens: screens::State,
 }
 
 impl Puzzles {
@@ -81,6 +107,16 @@ impl Puzzles {
         Puzzles {
             cfuner_fresh: true,
             cfuner_ring: [-1; 5],
+            ldmorts: ldmorts::State::new(),
+            paleo: paleo::State::new(),
+            mmarchd: mmarchd::State::new(),
+            jardin: jardin::State::new(),
+            tourmagi: tourmagi::State::new(),
+            pmagi: pmagi::State::new(),
+            interdim: interdim::State::new(),
+            couloir: couloir::State::new(),
+            rhea: rhea::State::new(),
+            screens: screens::State::new(),
             ..Default::default()
         }
     }
@@ -88,6 +124,16 @@ impl Puzzles {
     /// The load's one-shot "rebuild from flags" bytes (@ 0x00459e70).
     pub fn after_load(&mut self) {
         self.cfuner_fresh = true;
+        self.ldmorts.after_load();
+        self.paleo.after_load();
+        self.mmarchd.after_load();
+        self.jardin.after_load();
+        self.tourmagi.after_load();
+        self.pmagi.after_load();
+        self.interdim.after_load();
+        self.couloir.after_load();
+        self.rhea.after_load();
+        self.screens.after_load();
     }
 }
 
@@ -101,6 +147,7 @@ pub(super) struct Hx<'a> {
     pub s: &'a mut Script,
 }
 
+#[allow(dead_code)]
 impl Hx<'_> {
     pub fn flag(&self, n: usize) -> i32 {
         self.s.flags.get(n).copied().unwrap_or(0)
@@ -166,11 +213,13 @@ impl Hx<'_> {
 
     /// `rand()` (the CRT's, @ 0x006d348b).
     pub fn rand(&mut self) -> i32 {
-        self.g.rand.rand()
+        self.g.script_rand()
     }
 
     /// A loop mode's start: the mode set (the old one kept to go back to),
-    /// the hand cleared (all but the unicorn's).
+    /// the hand cleared by the starts that call @ 0x004282e0 (the tower's
+    /// map, the jewel case, the skull, the remote; the frame hook clears
+    /// it after the others but the game boy's and the unicorn's).
     pub fn start_screen(&mut self, screen: Screen) {
         if self.g.puzzles.screen.is_some() {
             log::warn!("{screen:?}_Start(): deja en AtlMain_loop_{screen:?}!!");
@@ -180,18 +229,91 @@ impl Hx<'_> {
         self.g.puzzles.screen = Some(screen);
         self.g.puzzles.screen_back = Some(self.g.mode);
         self.g.mode = Mode::Screen;
-        if screen != Screen::Licorne {
+        if matches!(
+            screen,
+            Screen::CarteTour | Screen::Ecrin | Screen::CraneBagdad | Screen::Telecommande
+        ) {
             self.hand_clear();
         }
         if screen == Screen::Licorne {
             // @ 0x0042e7a0: the unicorn's film first.
             self.run("(Cinema=77,fps=25)");
         }
+        screens::start(self, screen);
+    }
+
+    /// A variable by name (`FUN_00446f90(name)` then a store).
+    pub fn set_var(&mut self, name: &str, v: i32) {
+        let _ = self.s.set_var(name, v);
+    }
+
+    /// The chapter running (@ 0x0077e508).
+    pub fn chapter(&self) -> i32 {
+        self.s.chapter
+    }
+
+    /// The game's clock (seconds).
+    pub fn now(&self) -> f64 {
+        self.g.now
+    }
+
+    /// A voice started by the C code (@ 0x0040da70(a, b, c, d, e)): the
+    /// host's `PLAYVOICE` with the first four values (the fifth is kept
+    /// in the voice slot next to the fourth, @ 0x0074f278).
+    pub fn play_voice(&mut self, a: i32, b: i32, c: i32, d: i32, e: i32) {
+        let _ = e;
+        atlantis2_engine::script::Host::play_voice(self.g, [a, b, c, d]);
+    }
+
+    /// The slot of the n-th state shown in this view of the entity whose
+    /// `defnames.con` index is `id` (@ 0x0043f7f0, the table @ 0x0077b2d0
+    /// built by the view's load: (index, n) per slot, any kind; the first
+    /// match).
+    pub fn slot_of(&self, id: i32, n: i32) -> Option<usize> {
+        let slots = &self.g.slots.slots;
+        (0..slots.len()).find(|&k| {
+            let s = &slots[k];
+            let ord = slots[..k]
+                .iter()
+                .filter(|o| o.id == s.id && o.kind == s.kind)
+                .count() as i32;
+            s.id == id && ord == n
+        })
+    }
+
+    /// The first slot of the object `name` whose slot kind (−8) is `kind`
+    /// (the lookup of @ 0x0045f820 / @ 0x0045f920).
+    pub fn obj_slot(&self, name: &str, kind: i32) -> Option<usize> {
+        let id = self.obj(name);
+        self.g
+            .slots
+            .slots
+            .iter()
+            .position(|s| s.id == id && s.kind == kind)
+    }
+
+    /// The frame (+0x08) of that slot, −1 when absent (@ 0x0045f820).
+    pub fn obj_frame(&self, name: &str, kind: i32) -> i32 {
+        self.obj_slot(name, kind)
+            .map_or(-1, |k| self.g.slots.slots[k].frame)
+    }
+
+    /// The end byte (+0x46d) of that slot, false when absent
+    /// (@ 0x0045f920).
+    pub fn obj_ended(&self, name: &str, kind: i32) -> bool {
+        self.obj_slot(name, kind)
+            .is_some_and(|k| self.g.slots.slots[k].ended)
+    }
+
+    /// Slot k, when the view has it (the original indexes its fixed array
+    /// @ 0x007594cc + 0x490 k).
+    pub fn slot(&mut self, k: usize) -> Option<&mut crate::place_anim::Slot> {
+        self.g.slots.slots.get_mut(k)
     }
 
     /// The interdimension (@ 0x00409cc0): the world left noted, then the
     /// interdimension's place at a view drawn by `rand`.
-    pub fn to_interdimension(&mut self) {
+    pub fn enter_interdimension(&mut self) {
         let w = self.world();
         self.set_flag(890, w);
         if let Ok(w) = usize::try_from(w) {
@@ -227,9 +349,14 @@ impl Game {
             // @ 0x004d3960: the spinning top's handler armed.
             "hoggar.wam" if (1..=3).contains(&vue) => h.g.puzzles.toupie_armed = true,
             "cfuner.wam" if (1..=4).contains(&vue) => cfuner_view(&mut h),
-            "hoggar.wam" | "cfuner.wam" => {}
             _ => other_view(&mut h, &wam, vue),
         }
+        // @ 0x004c2010's interdimension byte (@ 0x007592ac): 1 in
+        // `interdim.wam`, 0 elsewhere.
+        h.g.puzzles.interdim.here = wam == "interdim.wam";
+        // Right after the view hook, at both view entries (@ 0x0043fc7b,
+        // 0x0043fedb): the Ankh coffer's lid (@ 0x004c1650).
+        ldmorts::coffer_entry(&mut h);
     }
 
     /// The warp frame's hook (@ 0x004c27d0), after `Interp_GereFrame`.
@@ -270,15 +397,15 @@ impl Game {
         self.script = Some(s);
     }
 
-    /// The running screen's frame. The screens' play is M4: they wait for
-    /// a right click (leave) or for a test's input.
+    /// The running screen's frame ([`screens`]). The screens' drawing and
+    /// their sprite hit test are M4: a real click finds no sprite under
+    /// the cursor (tests give it through [`Game::screen_click`]).
     pub(super) fn screen_frame(&mut self) {
         self.draw_warp_only();
         self.draw_pointer();
-        if std::mem::take(&mut self.right_clicked) {
-            self.stop_screen();
-        }
-        self.click = false;
+        let left = std::mem::take(&mut self.click);
+        let right = std::mem::take(&mut self.right_clicked);
+        self.screen_step(left, right, None);
     }
 
     /// A screen's stop: the old mode back, the hand cleared, the click
@@ -301,7 +428,9 @@ impl Game {
             let mut h = Hx { g: self, s: &mut s };
             match screen {
                 Screen::CraneBagdad => {
+                    // Mode 3, the hand cleared (@ 0x004282e0), no scan.
                     h.g.mode = Mode::Warp;
+                    h.hand_clear();
                 }
                 _ => {
                     h.g.mode = back;
@@ -322,6 +451,113 @@ impl Game {
             }
         }
         self.script = Some(s);
+    }
+
+    /// The main loop's per-frame hook (@ 0x004c1950, called from the main
+    /// loop @ 0x004d5df9 in every mode): the Ankh coffer's lid.
+    pub(super) fn main_loop_hook(&mut self) {
+        let Some(mut s) = self.script.take() else {
+            return;
+        };
+        {
+            let mut h = Hx { g: self, s: &mut s };
+            ldmorts::coffer_frame(&mut h);
+        }
+        self.script = Some(s);
+    }
+
+    /// After a load's one-shot bytes (@ 0x00459e70), the coffer's lid
+    /// rebuilt (@ 0x004c1e20: 0x00785f2f := 0, then @ 0x004c1650).
+    pub(super) fn after_load_hook(&mut self) {
+        let Some(mut s) = self.script.take() else {
+            return;
+        };
+        {
+            let mut h = Hx { g: self, s: &mut s };
+            ldmorts::coffer_entry(&mut h);
+        }
+        self.script = Some(s);
+    }
+
+    /// [`Game::after_load_hook`] while the script is out of the game.
+    pub(super) fn after_load_hook_with(&mut self, s: &mut Script) {
+        let mut h = Hx { g: self, s };
+        ldmorts::coffer_entry(&mut h);
+    }
+
+    /// A C global of a puzzle written as a test walk's `MEM8` / `MEM32`
+    /// item does (a state the puzzle's code, or an animation, would have
+    /// reached); false for an address not modelled.
+    #[doc(hidden)]
+    pub fn test_poke(&mut self, addr: u32, v: i32) -> bool {
+        let b = v != 0;
+        let p = &mut self.puzzles;
+        match addr {
+            // The fisherman's animation ended (SPW slot 3, +0x46d).
+            0x0075a6e9 => match self.slots.slots.get_mut(3) {
+                Some(s) => s.ended = b,
+                None => return false,
+            },
+            0x00785f20 => p.ldmorts.lid.reached = v,
+            0x00786510 => p.couloir.anim.reached = v,
+            0x00785fd1 => p.jardin.banana_done = b,
+            0x00785fd2 => p.jardin.banana_playing = b,
+            0x007897a8 => p.pmagi.placard.current = v,
+            0x00789810 => p.pmagi.lampe.current = v,
+            0x00787559 => p.paleo.wolves_won = b,
+            0x00786d88 => p.paleo.hunt_hit[0] = b,
+            0x00786d48 => p.paleo.hunt_hit[1] = b,
+            0x00786dc8 => p.paleo.hunt_hit[2] = b,
+            0x00786d68 => p.paleo.hunt_hit[3] = b,
+            0x0078977d => p.paleo.tiger_throw = b,
+            0x00789780 => p.paleo.tiger_count = v,
+            0x0071f271 => p.paleo.tiger_hit = b,
+            0x00789d56 => p.freeze = b,
+            0x00789ad4 => p.tourmagi.player = v,
+            0x00789ae2 => p.tourmagi.won_seen = b,
+            _ => return false,
+        }
+        true
+    }
+
+    /// A puzzle's function called as a test walk's `CALL` item does (its
+    /// success tail or its screen's end); false when not modelled.
+    #[doc(hidden)]
+    pub fn test_call(&mut self, addr: u32) -> bool {
+        match addr {
+            // The Licorne's and the jewel case's ends.
+            0x0042e990 | 0x00412f40 => {
+                self.stop_screen();
+                return true;
+            }
+            // The camera unlocked.
+            0x00440750 => {
+                self.puzzles.mmarchd.cam_lock = false;
+                return true;
+            }
+            _ => {}
+        }
+        let Some(mut s) = self.script.take() else {
+            return false;
+        };
+        let known = {
+            let mut h = Hx { g: self, s: &mut s };
+            match addr {
+                0x004c8720 => ldmorts::isis_success(&mut h),
+                0x004d56b0 => tourmagi::player_won(&mut h),
+                0x004cf850 => pmagi::stars_solved(&mut h),
+                0x004cac90 => paleo::wolves_success(&mut h),
+                0x004d15a0 => paleo::tiger_success(&mut h),
+                0x004c9860 => paleo::hunt_end(&mut h),
+                _ => {
+                    self.script = Some(s);
+                    return false;
+                }
+            }
+            true
+        };
+        self.script = Some(s);
+        known
     }
 
     /// The screen running, if any.
@@ -363,7 +599,7 @@ fn frame(h: &mut Hx) {
     }
     if h.flag(900) == 1 {
         h.hand_clear();
-        h.to_interdimension();
+        h.enter_interdimension();
         h.set_flag(900, 0);
         h.set_flag(901, 1);
     } else if h.flag(901) == 0 {
@@ -391,12 +627,10 @@ fn frame(h: &mut Hx) {
         h.hand_clear();
     }
     if h.hand() == h.obj("CMP_OMEGA") {
-        h.to_interdimension();
+        h.enter_interdimension();
         h.hand_clear();
     }
-    if wam != "hoggar.wam" && wam != "cfuner.wam" && wam != "paleo.wam" && wam != "ldmorts.wam" {
-        other_frame_last(h, &wam, vue);
-    }
+    other_frame_last(h, &wam);
 }
 
 /// The zone record's value cleared (@ 0x00785f3c := 0).
@@ -404,6 +638,36 @@ fn clear_zone(h: &mut Hx) {
     if let Some(z) = h.g.puzzles.zone.as_mut() {
         z.1 = 0;
     }
+}
+
+/// The clicked zone record (@ 0x00785f38) as the frame functions get it,
+/// by value: +0 type, +4 value (0 = no click to handle), +8 name (kept
+/// from the last click once the value is cleared).
+#[derive(Debug, Default, Clone)]
+pub(super) struct ZoneRec {
+    pub kind: i32,
+    pub value: i32,
+    pub name: String,
+}
+
+impl ZoneRec {
+    /// A type-3 zone click not yet handled, on the zone `name`.
+    pub fn is(&self, name: &str) -> bool {
+        self.value != 0 && self.name == name
+    }
+}
+
+/// The record copied (the frame hook's 0x30-byte copy).
+fn zone_rec(h: &Hx) -> ZoneRec {
+    h.g.puzzles
+        .zone
+        .as_ref()
+        .map(|(kind, value, name)| ZoneRec {
+            kind: *kind,
+            value: *value,
+            name: name.clone(),
+        })
+        .unwrap_or_default()
 }
 
 /// The clicked zone's name when the record's value is not 0 (a type-3
@@ -502,38 +766,152 @@ fn cfuner_frame(h: &mut Hx) {
     }
 }
 
-/// The other places' view entries (filled world by world).
+/// The other places' view entries (@ 0x004c2010's cases).
 fn other_view(h: &mut Hx, wam: &str, vue: i32) {
-    let _ = vue;
     match wam {
-        "couloir.wam" | "rhea.wam" | "interdim.wam" | "paleo.wam" | "ldmorts.wam"
-        | "mmarchd.wam" | "jardin.wam" | "tourmagi.wam" | "pmagi.wam" => {
-            h.g.not_ported("the places' puzzle hooks at view entry")
-        }
+        "paleo.wam" => match vue {
+            1 | 2 => paleo::view_wolves(h),
+            4 => paleo::view_hunt(h),
+            5..=11 => paleo::view_altar(h),
+            22 | 25 | 27..=29 | 31 | 32 | 35..=44 | 48..=51 => paleo::view_common(h),
+            26 => {
+                paleo::view_common(h);
+                paleo::view_tiger(h);
+            }
+            _ => {}
+        },
+        "ldmorts.wam" => match vue {
+            2..=4 | 20 => ldmorts::view_chest(h),
+            7..=10 => {
+                clear_zone(h);
+                ldmorts::view_isis(h);
+            }
+            11 => ldmorts::view_fisherman(h),
+            _ => {}
+        },
+        "mmarchd.wam" => mmarchd::view(h),
+        "jardin.wam" => jardin::view(h, vue),
+        "tourmagi.wam" => tourmagi::view(h),
+        "pmagi.wam" => match vue {
+            10 => {
+                h.run("(LIMITEANGLEWARPY=85)");
+                pmagi::view_stars(h);
+            }
+            11 | 12 => pmagi::view_tt(h),
+            111 | 112 => pmagi::view_tr(h),
+            _ => {}
+        },
+        "interdim.wam" => interdim::view(h),
+        "couloir.wam" => couloir::view(h),
+        "rhea.wam" => rhea::view(h),
         _ => {}
     }
 }
 
 /// The places whose frame part comes before the hand tests (`paleo.wam`,
-/// `ldmorts.wam`).
+/// `ldmorts.wam`; @ 0x004c27d0's first cases). Each "(zone)" function
+/// gets the record by value, then its value is cleared.
 fn other_frame_first(h: &mut Hx, wam: &str, vue: i32) {
-    let _ = (wam, vue);
-    h.g.not_ported("the places' frame hooks");
+    let z = zone_rec(h);
+    match wam {
+        "paleo.wam" => match vue {
+            1 | 2 => {
+                paleo::frame_wolves(h, &z);
+                clear_zone(h);
+            }
+            4 => {
+                paleo::frame_hunt(h, &z);
+                clear_zone(h);
+            }
+            5..=8 => {
+                paleo::frame_altar(h, &z);
+                clear_zone(h);
+            }
+            22 | 25 | 27..=29 | 31 | 32 | 35..=44 | 48..=51 => paleo::frame_common(h),
+            26 => {
+                paleo::frame_common(h);
+                let z = zone_rec(h);
+                paleo::frame_tiger(h, &z);
+                clear_zone(h);
+            }
+            _ => {}
+        },
+        "ldmorts.wam" => {
+            match vue {
+                3 | 4 | 20 => ldmorts::frame_chest(h, &z),
+                10 => ldmorts::frame_isis(h, &z),
+                11 => ldmorts::frame_fisherman(h, &z),
+                _ => return,
+            }
+            clear_zone(h);
+        }
+        _ => {}
+    }
 }
 
-/// The places whose frame part comes after the hand tests.
-fn other_frame_last(h: &mut Hx, wam: &str, vue: i32) {
-    let _ = vue;
-    if matches!(
-        wam,
-        "mmarchd.wam"
-            | "jardin.wam"
-            | "tourmagi.wam"
-            | "pmagi.wam"
-            | "interdim.wam"
-            | "couloir.wam"
-            | "rhea.wam"
-    ) {
-        h.g.not_ported("the places' frame hooks");
+/// The places whose frame part comes after the hand tests (@ 0x004c27d0's
+/// later cases, in its order). The WAM is the one read at the hook's
+/// start; `VUE` is read again at each place.
+fn other_frame_last(h: &mut Hx, wam: &str) {
+    if wam == "mmarchd.wam" {
+        let z = zone_rec(h);
+        mmarchd::frame(h, &z);
+        clear_zone(h);
+    }
+    if wam == "jardin.wam" {
+        let vue = h.vue();
+        jardin::frame(h, vue);
+    }
+    // The tower's byte (@ 0x00789ae3): 1 in `tourmagi.wam`, 0 elsewhere.
+    if wam == "tourmagi.wam" {
+        let z = zone_rec(h);
+        tourmagi::frame(h, &z);
+        clear_zone(h);
+        h.g.puzzles.tourmagi.here = true;
+    } else {
+        h.g.puzzles.tourmagi.here = false;
+    }
+    if wam == "pmagi.wam" {
+        let z = zone_rec(h);
+        let handled = match h.vue() {
+            10 => {
+                pmagi::frame_stars(h, &z);
+                true
+            }
+            // @ 0x007898d4 set: nothing, not even the clear.
+            11 | 12 if !h.g.puzzles.pmagi.tt_done => {
+                pmagi::frame_tt(h, &z);
+                if h.g.puzzles.pmagi.tt_end {
+                    pmagi::frame_tt_end(h);
+                }
+                true
+            }
+            111 | 112 => {
+                pmagi::frame_tr(h, &z);
+                true
+            }
+            _ => false,
+        };
+        if handled {
+            clear_zone(h);
+        }
+    }
+    if wam == "interdim.wam" {
+        let z = zone_rec(h);
+        interdim::frame(h, &z);
+        clear_zone(h);
+    }
+    if wam == "couloir.wam" && !h.g.puzzles.couloir.solved {
+        let z = zone_rec(h);
+        couloir::frame(h, &z);
+        if h.g.puzzles.couloir.solved {
+            couloir::open(h);
+        }
+        clear_zone(h);
+    }
+    if wam == "rhea.wam" {
+        let z = zone_rec(h);
+        rhea::frame(h, &z);
+        clear_zone(h);
     }
 }

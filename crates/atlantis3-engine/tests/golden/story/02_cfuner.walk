@@ -1,0 +1,28 @@
+# Atlantis III - story segment 02: CFuner (world 2, CFuner.wam), chapter 9:
+# the star puzzle, the scarab case, the wooden bird -> the Land of the Dead.
+# Read by tools/emu/a3_story_script.py; grammar in its docstring and in
+# subsystems/story-walkthrough.md.  Starts at CFuner view 4 (end of 01).
+
+OBJET CHF_OISEAUBOIS        # take the wooden bird (flag46: subject DIAL_OISEAUBOIS)
+GO 1
+# The star puzzle (0x004c4f50, C code run by the frame hook 0x004c27d0 for
+# cfuner.wam view 1 on clicks of the type-4 zones CHF_ETOILEZONEG / D): its
+# success tail (@ 0x004c50e0) is RunOneCommand("(flag45=1)") + CtrlScenarIN.
+# The solving clicks are G, D, D, G, D (target ring 0x0071d530 = 1 2 2 1 2).
+SKIP puzzle cfuner_stars RUN=(flag45=1) CTRL NOFRAME
+EXPECT FLAG45=1
+EXPECT HAND=CHF_ECRIN_SCARABEE
+FRAME                       # frame hook: CHF_ECRIN_SCARABEE in hand -> Scarabee screen (mode 13)
+EXPECT MODE=13
+CLICK left                  # look at the scarab: (PlaySound=110)
+FRAME                       # subjects of the scarab (flag72)
+CLICK right                 # close: end 0x00431e50 (hand cleared, CtrlScenarIN)
+EXPECT MODE=3
+GO 2
+HAND CHF_OISEAUBOIS
+GO 5                        # departvue=5 with the bird: cinema 6, LDMorts.wam view 22, chapter 10
+EXPECT WAM=LDMorts.wam
+EXPECT CHAPTER=10
+EXPECT VUE=22
+
+CHECKPOINT 102 02_cfuner_end

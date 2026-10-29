@@ -1,0 +1,166 @@
+# Atlantis III - story segment 03: the Land of the Dead (world 2,
+# LDMorts.wam), chapters 10, 12..16 and the trip chapter 500 -> the Hoggar.
+# Read by tools/emu/a3_story_script.py.  Starts at LDMorts view 22, chapter 10.
+
+GO 23                       # flag502: dialog 95
+GO 2                        # departvue=2: cinema 7, view 5, chapter 12 (map in the bag, dialog 75)
+EXPECT CHAPTER=12
+# the high priest (view 20): cinema 8, dialog 133, flag80
+GO 6
+GO 14
+GO 16
+GO 18
+GO 20
+EXPECT FLAG80=1
+GO 18
+GO 16
+GO 14
+GO 6
+GO 5
+GO 23                       # departvue=23: the map in hand (AbortDepart)
+FRAME                       # frame hook: LDM_CARTELIEUX in hand -> AtlCarte (mode 9)
+EXPECT MODE=9
+MAP 3                       # third sprite: the priestess (chapter 13) -> chapter 500 -> view 7, chapter 13
+EXPECT CHAPTER=13
+EXPECT VUE=7
+# Chapter 13: the priestess and the Isis tiles (view 10)
+GO 8
+GO 9                        # vue=9 & flag62=0: dialog 165
+GO 10
+# The Isis tiles (frame 0x004c82b0, view 10): the 2 x 12 tiles back on
+# their own frames; success @ 0x004c8730 -> 0x004c8720: flag63 := 1 +
+# CtrlScenarIN.  Injected by calling that success function.
+SKIP puzzle isis_tiles CALL=0x004c8720
+EXPECT FLAG63=1
+EXPECT FLAG899=1
+EXPECT HAND=LDM_TALISMAN
+# to the fisherman (chapter 15)
+GO 9
+GO 8
+GO 7
+GO 23                       # the map
+FRAME
+EXPECT MODE=9
+MAP 4                       # fourth sprite: the fisherman (chapter 15) -> view 13
+EXPECT CHAPTER=15
+GO 12
+GO 11
+HAND LDM_TALISMAN
+PERSO LDM_PECHEUR01         # with the talisman: dialog 158, flag86, flag87
+EXPECT FLAG87=1
+FRAME                       # frame hook 0x004c3a20 (view 11, flag87): the fishing animation starts
+# The fishing animation (frame 0x004c3a20) ends when its slot's ended byte
+# 0x0075a6e9 is set; the real code then hides LDM_BALANCEPE, shows
+# LDM_BALANCE_PR and LDM_POISSON2, flag561 := 1.
+SKIP puzzle fisherman_anim MEM8=0x0075a6e9:1
+EXPECT FLAG561=1
+OBJET LDM_BALANCE_PR        # take the scale's plate: flag69, dialog 166, LDM_CLEFCOFFRE in bag and hand
+EXPECT FLAG69=1
+GO 12
+GO 13
+GO 23
+FRAME
+MAP 2                       # second sprite: the feathers (chapter 14) -> view 1
+EXPECT CHAPTER=14
+GO 2
+GO 3
+HAND LDM_CLEFCOFFRE
+ZONE LDM_COUVERCLEPLUMES    # 0x004cc0f0: the chest opens, flag76, LDM_PLUMES shown
+EXPECT FLAG76=1
+OBJET LDM_PLUMES            # take the feathers: chapter 14 gives LDM_PLUME0..9, flag85, save=2
+EXPECT FLAG85=1
+# The feathers' weights were drawn at the first entry of view 20 (0x004cc6c0:
+# rand() % 10 permutation, flags 545..554 = weight of LDM_PLUME0..9; LOG!
+# flagptr lines): LDM_PLUME9 weighs 9.  The map refuses more than one
+# feather (TROP_DE_PLUMES): the nine others go back into the chest.
+HAND LDM_PLUME0
+ZONE LDM_ZONEPLUMES
+HAND LDM_PLUME1
+ZONE LDM_ZONEPLUMES
+HAND LDM_PLUME2
+ZONE LDM_ZONEPLUMES
+HAND LDM_PLUME3
+ZONE LDM_ZONEPLUMES
+HAND LDM_PLUME4
+ZONE LDM_ZONEPLUMES
+HAND LDM_PLUME5
+ZONE LDM_ZONEPLUMES
+HAND LDM_PLUME6
+ZONE LDM_ZONEPLUMES
+HAND LDM_PLUME7
+ZONE LDM_ZONEPLUMES
+HAND LDM_PLUME8
+ZONE LDM_ZONEPLUMES
+EXPECT FLAG554=9
+GO 2
+GO 1
+GO 23
+FRAME
+MAP 1                       # first sprite: the high priest (chapter 12) -> view 5
+EXPECT CHAPTER=12
+GO 6
+GO 14
+GO 16
+GO 18
+GO 20
+HAND LDM_PLUME9
+ZONE LDM_ZONE_PLUME         # 0x004cc520(9): flag84 = 10 -> chapter 12: cinemas 9, 11, flag53, fresco 2
+EXPECT FLAG84=10
+EXPECT FLAG53=1
+# the Ankh (chapter 16, views 27..30)
+GO 18
+GO 16
+GO 14
+GO 6
+GO 5
+GO 23
+FRAME
+MAP 5                       # fifth sprite: the Ankh room (chapter 16) -> view 27
+EXPECT CHAPTER=16
+GO 28
+GO 29
+GO 30
+ZONE LDM_COFFRE_ANKH        # 0x004c1950: (PlaySound=111), the lid animation (ANK_COUVERCLE, 5 frames) starts
+# The lid animation is stepped by 0x004c1cd0 on the record 0x00785f18
+# (+4 count 5, +8 frames done); its end (+8 = +4) makes 0x004c1950 set
+# the slot's click type 0x00759e04 := 1 (the Ankh becomes takeable) and
+# flag501 := 1.
+SKIP puzzle ankh_lid MEM32=0x00785f20:5
+EXPECT FLAG501=1
+OBJET LDM_ANKH TYPE=1       # take the Ankh (click type 1 set by 0x004c1950): chapter 16 flag66, subject
+EXPECT HAND=LDM_ANKH
+GO 29
+GO 28
+GO 27
+GO 23
+FRAME
+MAP 1                       # the high priest (chapter 12)
+GO 6
+GO 14
+GO 16
+GO 18
+GO 20
+HAND LDM_ANKH
+ZONE LDM_ZONE_ANKH          # chapter 12: cinema 12, LDM_ANKHPR, fresco 3, flag54
+EXPECT FLAG54=1
+GO 18
+GO 16
+GO 14
+GO 6
+GO 5
+GO 23
+FRAME
+MAP 5                       # the Ankh room again (chapter 16)
+GO 28
+HAND CHF_ECRIN_SCARABEE
+FRAME                       # frame hook: the scarab case (mode 13)
+EXPECT MODE=13
+CLICK left                  # open: (PlaySound=110), 0x00759324 := 1
+FRAME                       # flags 53 and 54, VUE > 27: flag570 := 1, end -> chapter 16: cinema 13, world 1
+EXPECT FLAG570=1
+EXPECT MONDE=1
+EXPECT WAM=hoggar.wam
+EXPECT CHAPTER=5
+EXPECT VUE=21
+
+CHECKPOINT 103 03_ldm_end

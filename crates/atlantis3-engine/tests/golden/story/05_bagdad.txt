@@ -1,0 +1,2079 @@
+# Story segment 05_bagdad from the save at the end of 04_hoggar5: the original's interpreter (a3_story_script.py), stripped to the lines the test reads
+SAVEFILE CurrentCD = 0
+SAVEFILE DateAndTime = 06/01/01 12:00:00
+SAVEFILE Wam = MMarchd.wam
+SAVEFILE Monde = 3
+SAVEFILE Vue = 12
+SAVEFILE Chapitre = 28
+SAVEFILE NBFlag = 115
+SAVEFILE 2 = 1
+SAVEFILE 4 = 1
+SAVEFILE 6 = 1
+SAVEFILE 8 = 1
+SAVEFILE 9 = 1
+SAVEFILE 10 = 1
+SAVEFILE 13 = 1
+SAVEFILE 14 = 1
+SAVEFILE 15 = 1
+SAVEFILE 17 = 1
+SAVEFILE 21 = 1
+SAVEFILE 22 = 1
+SAVEFILE 23 = 1
+SAVEFILE 44 = 1
+SAVEFILE 45 = 1
+SAVEFILE 46 = 1
+SAVEFILE 53 = 1
+SAVEFILE 54 = 1
+SAVEFILE 62 = 1
+SAVEFILE 63 = 1
+SAVEFILE 66 = 1
+SAVEFILE 69 = 1
+SAVEFILE 72 = 1
+SAVEFILE 76 = 1
+SAVEFILE 80 = 1
+SAVEFILE 83 = 1
+SAVEFILE 84 = 10
+SAVEFILE 85 = 1
+SAVEFILE 86 = 1
+SAVEFILE 87 = 1
+SAVEFILE 159 = 1
+SAVEFILE 400 = 1
+SAVEFILE 404 = 1
+SAVEFILE 405 = 1
+SAVEFILE 411 = 1
+SAVEFILE 415 = 1
+SAVEFILE 420 = 1
+SAVEFILE 421 = 1
+SAVEFILE 422 = 1
+SAVEFILE 423 = 1
+SAVEFILE 424 = 1
+SAVEFILE 426 = 1
+SAVEFILE 427 = 1
+SAVEFILE 501 = 1
+SAVEFILE 502 = 1
+SAVEFILE 505 = 1
+SAVEFILE 506 = 1
+SAVEFILE 510 = 11
+SAVEFILE 511 = 4
+SAVEFILE 512 = 3
+SAVEFILE 513 = 9
+SAVEFILE 514 = 2
+SAVEFILE 516 = 10
+SAVEFILE 517 = 1
+SAVEFILE 518 = 5
+SAVEFILE 519 = 8
+SAVEFILE 520 = 7
+SAVEFILE 521 = 6
+SAVEFILE 522 = 9
+SAVEFILE 523 = 4
+SAVEFILE 525 = 7
+SAVEFILE 526 = 11
+SAVEFILE 527 = 3
+SAVEFILE 528 = 1
+SAVEFILE 529 = 8
+SAVEFILE 530 = 6
+SAVEFILE 531 = 5
+SAVEFILE 532 = 10
+SAVEFILE 533 = 2
+SAVEFILE 544 = 1
+SAVEFILE 545 = 1
+SAVEFILE 546 = 3
+SAVEFILE 547 = 5
+SAVEFILE 548 = 7
+SAVEFILE 549 = 4
+SAVEFILE 550 = 8
+SAVEFILE 551 = 6
+SAVEFILE 553 = 2
+SAVEFILE 554 = 9
+SAVEFILE 560 = 1
+SAVEFILE 561 = 1
+SAVEFILE 570 = 1
+SAVEFILE 571 = 1
+SAVEFILE 871 = 2
+SAVEFILE 885 = 1
+SAVEFILE 890 = 1
+SAVEFILE 891 = 1
+SAVEFILE 892 = 1
+SAVEFILE 895 = 1
+SAVEFILE 899 = 1
+SAVEFILE 906 = 2
+SAVEFILE 910 = 1
+SAVEFILE 918 = 1
+SAVEFILE 986 = 1
+SAVEFILE 1000 = 1
+SAVEFILE 1001 = 23
+SAVEFILE 1002 = 28
+SAVEFILE 1003 = 12
+SAVEFILE 1005 = 8
+SAVEFILE 1011 = 4
+SAVEFILE 1012 = 7
+SAVEFILE 1013 = 8
+SAVEFILE 1015 = 5
+SAVEFILE 1021 = 5
+SAVEFILE 1022 = 16
+SAVEFILE 1023 = 28
+SAVEFILE 1025 = 52
+SAVEFILE 1136 = 1
+SAVEFILE 1137 = 1
+SAVEFILE 1211 = 2
+SAVEFILE 1235 = 3
+SAVEFILE 1536 = 3
+SAVEFILE 1537 = 4
+SAVEFILE 1611 = 38
+SAVEFILE 1635 = 23
+SAVEFILE NBObjet = 1
+SAVEFILE BAG_TELECOMMANDE
+SAVEFILE //== Sauvegarde des dialogues ==
+SAVEFILE NBPersoAvecDial = 5
+SAVEFILE Perso = 1
+SAVEFILE NBSuj = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 1
+SAVEFILE NBSprite = 0
+SAVEFILE Etat = 1
+SAVEFILE ID = 2
+SAVEFILE NBSprite = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 3
+SAVEFILE NBSprite = 4
+SAVEFILE Perso = 13
+SAVEFILE NBSuj = 4
+SAVEFILE Etat = 1
+SAVEFILE ID = 4
+SAVEFILE NBSprite = 9
+SAVEFILE Etat = 1
+SAVEFILE ID = 5
+SAVEFILE NBSprite = 7
+SAVEFILE Etat = 1
+SAVEFILE ID = 6
+SAVEFILE NBSprite = 8
+SAVEFILE Etat = 1
+SAVEFILE ID = 7
+SAVEFILE NBSprite = 6
+SAVEFILE Perso = 19
+SAVEFILE NBSuj = 5
+SAVEFILE Etat = 1
+SAVEFILE ID = 14
+SAVEFILE NBSprite = 1
+SAVEFILE Etat = 1
+SAVEFILE ID = 35
+SAVEFILE NBSprite = 22
+SAVEFILE Etat = 1
+SAVEFILE ID = 22
+SAVEFILE NBSprite = 9
+SAVEFILE Etat = 1
+SAVEFILE ID = 40
+SAVEFILE NBSprite = 26
+SAVEFILE Etat = 1
+SAVEFILE ID = 43
+SAVEFILE NBSprite = 29
+SAVEFILE Perso = 40
+SAVEFILE NBSuj = 5
+SAVEFILE Etat = 1
+SAVEFILE ID = 19
+SAVEFILE NBSprite = 6
+SAVEFILE Etat = 1
+SAVEFILE ID = 30
+SAVEFILE NBSprite = 17
+SAVEFILE Etat = 1
+SAVEFILE ID = 27
+SAVEFILE NBSprite = 14
+SAVEFILE Etat = 1
+SAVEFILE ID = 36
+SAVEFILE NBSprite = 22
+SAVEFILE Etat = 1
+SAVEFILE ID = 32
+SAVEFILE NBSprite = 19
+SAVEFILE Perso = 62
+SAVEFILE NBSuj = 6
+SAVEFILE Etat = 1
+SAVEFILE ID = 55
+SAVEFILE NBSprite = 11
+SAVEFILE Etat = 1
+SAVEFILE ID = 48
+SAVEFILE NBSprite = 4
+SAVEFILE Etat = 1
+SAVEFILE ID = 49
+SAVEFILE NBSprite = 5
+SAVEFILE Etat = 1
+SAVEFILE ID = 53
+SAVEFILE NBSprite = 9
+SAVEFILE Etat = 0
+SAVEFILE ID = 47
+SAVEFILE NBSprite = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 51
+SAVEFILE NBSprite = 7
+SAVEFILE Quaternion0 = 0.000000
+SAVEFILE Quaternion1 = 0.000000
+SAVEFILE Quaternion2 = 0.000000
+SAVEFILE Quaternion3 = 1.000000
+LOG interp: SET/set(changewam=CFuner.wam)
+LOG interp: SET(showobjet=CHF_OISEAUBOIS)
+LOG interp: SET(showobjet=CHF_COUVERCLE01)
+LOG interp: SET(hideobjet=CHF_COUVERCLE02)
+LOG interp: SET(hideperso=CHF_PSYCHOP)
+LOG interp: SET/set(anglewarpx=-90)
+LOG interp: SET/set(vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME load 04_hoggar5_end.sav md5 4b57c73aa724e80d321e776d21ba08cc: quick load 104 (0x0044c9b0)
+LOG interp: SET(changecd=0)
+LOG interp: SET(monde=3)
+LOG interp: SET(ShowPerso=MMA_CHAT)
+LOG interp: SET(ShowObjet=MMA_COUVERCLE)
+LOG interp: SET(HideObjet=MMA_COUVERCLEOUVERT)
+LOG interp: SET(ShowObjet=MMA_PIERRE)
+LOG interp: SET(ShowObjet=MMA_ECHELLE)
+LOG interp: SET(HideObjet=MMA_ECHELLEBALCON)
+LOG interp: SET(ShowObjet=MMA_VASE)
+LOG interp: SET(HideObjet=MMA_VASEBRISE)
+LOG interp: SET(Vue=12)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(StartMusik=5)
+STEP 1 GO 11
+LOG interp: SET/set(cinema=80,fps=25)
+LOG interp: SET/set(anglewarpx=0)
+LOG interp: SET/set(anglewarpy=0)
+LOG interp: SET/set(vue=11)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(playcutanimp=MMA_GARDE,1)
+LOG interp: SET(playanimp=MMA_GARDE,1)
+LOG interp: SET/set(Flag118=1)
+LOG interp: SET/set(Flag120=1)
+VARS 1: LASTVUE=12 VUE=11 ANGLEWARPX=0
+FLAGS 1: 118=1 120=1 1003=11
+STATE 1: chapter=28 monde=3 wam=MMarchd.wam view=11 hand=- waiting=0 music=5)
+STEP 2 OBJET MMA_COUVERCLE
+LOG interp: SET/set(cinema=60,fps=25)
+LOG interp: SET/set(HideObjet=MMA_COUVERCLE)
+LOG interp: SET/set(ShowObjet=MMA_COUVERCLEOUVERT)
+LOG interp: SET/set(HidePerso=MMA_CHAT)
+LOG interp: SET/set(Flag119=1)
+VARS 2: SUJET=-2
+FLAGS 2: 119=1
+STATE 2: chapter=28 monde=3 wam=MMarchd.wam view=11 hand=- waiting=0 music=5)
+EXPECT FLAG119=1 ok
+STEP 3 GO 5
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(playcutanimp=MMA_GARDE,1)
+LOG interp: SET(playanimp=MMA_GARDE,1)
+VARS 3: LASTVUE=11 VUE=5 ANGLEWARPX=177 ANGLEWARPY=14
+FLAGS 3: 886=1 1003=5
+STATE 3: chapter=28 monde=3 wam=MMarchd.wam view=5 hand=- waiting=0 music=5)
+STEP 4 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(playcutanimp=MMA_GARDE,1)
+LOG interp: SET(playanimp=MMA_GARDE,1)
+VARS 4: LASTVUE=5 VUE=1 ANGLEWARPX=100 ANGLEWARPY=3
+FLAGS 4: 1003=1
+STATE 4: chapter=28 monde=3 wam=MMarchd.wam view=1 hand=- waiting=0 music=5)
+STEP 5 SKIP puzzle mmarchd_guard FLAG121=1 FLAG123=1 FLAG124=1 RUN=(HideObjet=MMA_PIERRE) RUN=(HideObjet=MMA_ECHELLE) RUN=(ShowObjet=MMA_ECHELLEBALCON)
+LOG interp: SET(HideObjet=MMA_PIERRE)
+LOG interp: SET(HideObjet=MMA_ECHELLE)
+LOG interp: SET(ShowObjet=MMA_ECHELLEBALCON)
+FLAGS 5: 121=1 123=1 124=1
+STATE 5: chapter=28 monde=3 wam=MMarchd.wam view=1 hand=- waiting=0 music=5)
+STEP 6 GO 13
+LOG interp: SET/set(Flag122=1)
+LOG interp: SET/set(AngleWarpY=0)
+LOG interp: SET/set(AngleWarpX=0)
+LOG interp: SET/set(Vue=13)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(chapter=29)
+LOG interp: SET/set(Flag122=1)
+LOG interp: SET/set(StartMusik=5)
+VARS 6: CHAPTER=29 LASTVUE=1 VUE=13 ANGLEWARPX=0 ANGLEWARPY=0
+FLAGS 6: 122=1 1003=13 1023=29
+STATE 6: chapter=29 monde=3 wam=MMarchd.wam view=13 hand=- waiting=0 music=5)
+EXPECT CHAPTER=29 ok
+STEP 7 GO 8
+LOG interp: SET/set(Cinema=61,fps=25)
+LOG interp: SET/set(ShowObjet=MMA_VASEBRISE)
+LOG interp: SET/set(HideObjet=MMA_VASE)
+LOG interp: SET/set(Flag150=1)
+LOG interp: SET/set(AngleWarpY=0)
+LOG interp: SET/set(AngleWarpX=0)
+LOG interp: SET/set(Vue=8)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+CALL rand() -> 378 (lcg)
+VARS 7: LASTVUE=13 VUE=8
+FLAGS 7: 150=1 889=1 1003=8
+STATE 7: chapter=29 monde=3 wam=MMarchd.wam view=8 hand=- waiting=0 music=5)
+EXPECT VUE=8 ok
+STEP 8 GO 14
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(Cinema=62,fps=25)
+LOG interp: SET/set(Cinema=63,fps=25)
+LOG interp: SET/set(changewam=jardin.wam)
+LOG interp: SET(HideObjet=BAG_BANANE)
+LOG interp: SET(ShowObjet=BAG_PERCHE)
+LOG interp: SET(ShowPerso=BAG_SINGE)
+LOG interp: SET(HideObjet=BAG_3BATONS)
+LOG interp: SET(ShowObjet=BAG_BOULE_LAITEUSE)
+LOG interp: SET(HideObjet=BAG_BOULE_LAITEUSEPOSEE)
+LOG interp: SET(ShowObjet=BAG_CAGE)
+LOG interp: SET(HideObjet=BAG_CAGEBAISSEE)
+LOG interp: SET(HideObjet=BAG_CORNESERRURE)
+LOG interp: SET(ShowPerso=BAG_HOURISVERTE_DEHORS)
+LOG interp: SET(HidePerso=BAG_HOURISVERTE_DEDANS)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowPerso=BAG_HOURISROUGE_DEHORS)
+LOG interp: SET(HidePerso=BAG_HOURISROUGE_DEDANS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(ShowPerso=BAG_HOURISBLEUE_DEHORS)
+LOG interp: SET(HidePerso=BAG_HOURISBLEUE_DEDANS)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET/set(AngleWarpX=100)
+LOG interp: SET/set(StopMusik=1)
+LOG interp: SET/set(StartMusik=31)
+LOG interp: SET/set(vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+VARS 8: CHAPTER=31 LASTVUE=0 VUE=4 ANGLEWARPX=100
+FLAGS 8: 829=1 912=1 1003=4 1013=6 1023=31
+STATE 8: chapter=31 monde=3 wam=jardin.wam view=4 hand=- waiting=0 music=6)
+EXPECT WAM=jardin.wam ok
+EXPECT CHAPTER=31 ok
+STEP 9 GO 15
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 9: LASTVUE=4 VUE=15 ANGLEWARPX=2 ANGLEWARPY=356
+FLAGS 9: 1003=15
+STATE 9: chapter=31 monde=3 wam=jardin.wam view=15 hand=- waiting=0 music=6)
+STEP 10 GO 29
+LOG interp: SET/set(chapter=32)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 10: CHAPTER=32 LASTVUE=15 VUE=29 ANGLEWARPX=20 ANGLEWARPY=3
+FLAGS 10: 1003=29 1023=32
+STATE 10: chapter=32 monde=3 wam=jardin.wam view=29 hand=- waiting=0 music=6)
+STEP 11 OBJET BAG_PERCHE
+LOG interp: SET/set(Flag127=1)
+VARS 11: OBJETENMAIN=144 SACADOS=8
+FLAGS 11: 127=1 1244=3 1644=8
+BAG 11: BAG_TELECOMMANDE BAG_PERCHE
+STATE 11: chapter=32 monde=3 wam=jardin.wam view=29 hand=BAG_PERCHE waiting=0 music=6)
+STEP 12 GO 15
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 12: CHAPTER=31 LASTVUE=29 VUE=15 OBJETENMAIN=0 ANGLEWARPX=189 ANGLEWARPY=0 SACADOS=0
+FLAGS 12: 1003=15 1023=31
+STATE 12: chapter=31 monde=3 wam=jardin.wam view=15 hand=- waiting=0 music=6)
+STEP 13 GO 4
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 13: LASTVUE=15 VUE=4 ANGLEWARPX=190 ANGLEWARPY=11
+FLAGS 13: 1003=4
+STATE 13: chapter=31 monde=3 wam=jardin.wam view=4 hand=- waiting=0 music=6)
+STEP 14 GO 3
+LOG interp: SET/set(chapter=38)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+VARS 14: CHAPTER=38 LASTVUE=4 VUE=3 ANGLEWARPX=151 ANGLEWARPY=0
+FLAGS 14: 827=1 1003=3 1023=38
+STATE 14: chapter=38 monde=3 wam=jardin.wam view=3 hand=- waiting=0 music=6)
+STEP 15 GO 24
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 15: CHAPTER=31 LASTVUE=3 VUE=24 ANGLEWARPX=216 ANGLEWARPY=9
+FLAGS 15: 1003=24 1023=31
+STATE 15: chapter=31 monde=3 wam=jardin.wam view=24 hand=- waiting=0 music=6)
+STEP 16 GO 23
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 16: LASTVUE=24 VUE=23 ANGLEWARPX=179 ANGLEWARPY=359
+FLAGS 16: 1003=23
+STATE 16: chapter=31 monde=3 wam=jardin.wam view=23 hand=- waiting=0 music=6)
+STEP 17 GO 22
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 17: LASTVUE=23 VUE=22 ANGLEWARPX=178
+FLAGS 17: 1003=22
+STATE 17: chapter=31 monde=3 wam=jardin.wam view=22 hand=- waiting=0 music=6)
+STEP 18 GO 19
+LOG interp: SET/set(chapter=32)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 18: CHAPTER=32 LASTVUE=22 VUE=19 ANGLEWARPX=181 ANGLEWARPY=9 SACADOS=8
+FLAGS 18: 911=1 1003=19 1023=32
+STATE 18: chapter=32 monde=3 wam=jardin.wam view=19 hand=- waiting=0 music=6)
+STEP 19 HAND BAG_PERCHE
+VARS 19: FLAG=1 OBJETENMAIN=144
+STATE 19: chapter=32 monde=3 wam=jardin.wam view=19 hand=BAG_PERCHE waiting=0 music=6)
+STEP 20 OBJET BAG_REGIMEBANANE
+FLAGS 20: 802=1 803=1
+STATE 20: chapter=32 monde=3 wam=jardin.wam view=19 hand=BAG_PERCHE waiting=0 music=6)
+STEP 21 SKIP puzzle banana_bunch RUN=(showobjet=BAG_BANANE) MEM8=0x00785fd2:0 MEM8=0x00785fd1:1
+LOG interp: SET(showobjet=BAG_BANANE)
+STATE 21: chapter=32 monde=3 wam=jardin.wam view=19 hand=BAG_PERCHE waiting=0 music=6)
+STEP 22 HAND -
+VARS 22: OBJETENMAIN=0
+STATE 22: chapter=32 monde=3 wam=jardin.wam view=19 hand=- waiting=0 music=6)
+STEP 23 OBJET BAG_BANANE
+LOG interp: SET/set(Flag803=0)
+VARS 23: OBJETENMAIN=136 SACADOS=0
+FLAGS 23: 803=0 1236=3
+BAG 23: BAG_TELECOMMANDE BAG_PERCHE BAG_BANANE
+STATE 23: chapter=32 monde=3 wam=jardin.wam view=19 hand=BAG_BANANE waiting=0 music=6)
+STEP 24 GO 18
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 24: CHAPTER=31 FLAG=0 LASTVUE=19 VUE=18 OBJETENMAIN=0 ANGLEWARPX=179 ANGLEWARPY=356
+FLAGS 24: 1003=18 1023=31
+STATE 24: chapter=31 monde=3 wam=jardin.wam view=18 hand=- waiting=0 music=6)
+STEP 25 GO 17
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 25: LASTVUE=18 VUE=17 ANGLEWARPX=88 ANGLEWARPY=359
+FLAGS 25: 1003=17
+STATE 25: chapter=31 monde=3 wam=jardin.wam view=17 hand=- waiting=0 music=6)
+STEP 26 GO 20
+LOG interp: SET/set(chapter=32)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 26: CHAPTER=32 LASTVUE=17 VUE=20 ANGLEWARPX=0 ANGLEWARPY=0
+FLAGS 26: 1003=20 1023=32
+STATE 26: chapter=32 monde=3 wam=jardin.wam view=20 hand=- waiting=0 music=6)
+STEP 27 HAND BAG_BANANE
+VARS 27: OBJETENMAIN=136
+STATE 27: chapter=32 monde=3 wam=jardin.wam view=20 hand=BAG_BANANE waiting=0 music=6)
+STEP 28 PERSO BAG_SINGE TYPE=2
+LOG interp: SET/set(BAG_PUZZLESINGEOK=1)
+LOG interp: SET/set(Flag125=1)
+LOG interp: SET/set(Flag804=1)
+LOG interp: SET/set(hideperso=BAG_SINGE)
+LOG interp: SET/set(showobjet=BAG_3BATONS)
+LOG interp: SET/set(sacados=NOT_BAG_BANANE)
+LOG interp: SET/set(cinema=71, fps=25)
+VARS 28: BAG_PUZZLESINGEOK=1
+FLAGS 28: 125=1 804=1 1236=0
+BAG 28: BAG_TELECOMMANDE BAG_PERCHE
+STATE 28: chapter=32 monde=3 wam=jardin.wam view=20 hand=BAG_BANANE waiting=0 music=6)
+EXPECT FLAG804=1 ok
+STEP 29 HAND -
+VARS 29: FLAG=1 OBJETENMAIN=0 SACADOS=8
+STATE 29: chapter=32 monde=3 wam=jardin.wam view=20 hand=- waiting=0 music=6)
+STEP 30 OBJET BAG_3BATONS
+LOG interp: SET/set(Flag125=0)
+VARS 30: OBJETENMAIN=148 SACADOS=12
+FLAGS 30: 125=0 1248=3 1648=12
+BAG 30: BAG_TELECOMMANDE BAG_PERCHE BAG_3BATONS
+STATE 30: chapter=32 monde=3 wam=jardin.wam view=20 hand=BAG_3BATONS waiting=0 music=6)
+STEP 31 HAND -
+LOG interp: SET/set(Flag126=1)
+LOG interp: SET/set(Flag125=0)
+LOG interp: SET/set(sacados=NOT_BAG_3BATONS)
+LOG interp: SET/set(sacados=BAG_BATON_BLEU)
+LOG interp: SET/set(sacados=BAG_BATON_ROUGE)
+LOG interp: SET/set(sacados=BAG_BATON_VERT)
+VARS 31: OBJETENMAIN=0
+FLAGS 31: 126=1 1237=3 1238=3 1239=3 1248=0 1637=1 1638=2 1639=3 1648=0
+BAG 31: BAG_TELECOMMANDE BAG_PERCHE BAG_BATON_BLEU BAG_BATON_ROUGE BAG_BATON_VERT
+STATE 31: chapter=32 monde=3 wam=jardin.wam view=20 hand=- waiting=0 music=6)
+EXPECT FLAG126=1 ok
+STEP 32 GO 100
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 32: FLAG=0 LASTVUE=20 VUE=100 ANGLEWARPY=358 SACADOS=8
+FLAGS 32: 1003=100
+STATE 32: chapter=32 monde=3 wam=jardin.wam view=100 hand=- waiting=0 music=6)
+STEP 33 GO 21
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 33: CHAPTER=31 LASTVUE=100 VUE=21 ANGLEWARPY=359 SACADOS=0
+FLAGS 33: 1003=21 1023=31
+STATE 33: chapter=31 monde=3 wam=jardin.wam view=21 hand=- waiting=0 music=6)
+STEP 34 GO 22
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 34: LASTVUE=21 VUE=22 ANGLEWARPX=263 ANGLEWARPY=2
+FLAGS 34: 1003=22
+STATE 34: chapter=31 monde=3 wam=jardin.wam view=22 hand=- waiting=0 music=6)
+STEP 35 GO 23
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 35: LASTVUE=22 VUE=23 ANGLEWARPX=0 ANGLEWARPY=0
+FLAGS 35: 1003=23
+STATE 35: chapter=31 monde=3 wam=jardin.wam view=23 hand=- waiting=0 music=6)
+STEP 36 GO 24
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 36: LASTVUE=23 VUE=24 ANGLEWARPX=1
+FLAGS 36: 1003=24
+STATE 36: chapter=31 monde=3 wam=jardin.wam view=24 hand=- waiting=0 music=6)
+STEP 37 GO 3
+LOG interp: SET/set(chapter=38)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 37: CHAPTER=38 LASTVUE=24 VUE=3 ANGLEWARPX=37 ANGLEWARPY=333
+FLAGS 37: 1003=3 1023=38
+STATE 37: chapter=38 monde=3 wam=jardin.wam view=3 hand=- waiting=0 music=6)
+STEP 38 GO 4
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 38: CHAPTER=31 LASTVUE=3 VUE=4 ANGLEWARPX=333 ANGLEWARPY=358
+FLAGS 38: 1003=4 1023=31
+STATE 38: chapter=31 monde=3 wam=jardin.wam view=4 hand=- waiting=0 music=6)
+STEP 39 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 39: LASTVUE=4 VUE=1 ANGLEWARPX=66 ANGLEWARPY=0
+FLAGS 39: 1003=1
+STATE 39: chapter=31 monde=3 wam=jardin.wam view=1 hand=- waiting=0 music=6)
+STEP 40 GO 2
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 40: LASTVUE=1 VUE=2 ANGLEWARPX=59
+FLAGS 40: 1003=2
+STATE 40: chapter=31 monde=3 wam=jardin.wam view=2 hand=- waiting=0 music=6)
+STEP 41 GO 27
+LOG interp: SET/set(chapter=36)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 41: CHAPTER=36 LASTVUE=2 VUE=27 ANGLEWARPX=87 ANGLEWARPY=15
+FLAGS 41: 1003=27 1023=36
+STATE 41: chapter=36 monde=3 wam=jardin.wam view=27 hand=- waiting=0 music=6)
+STEP 42 HAND BAG_BATON_VERT
+VARS 42: OBJETENMAIN=139
+STATE 42: chapter=36 monde=3 wam=jardin.wam view=27 hand=BAG_BATON_VERT waiting=0 music=6)
+STEP 43 GO 32
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(showperso=BAG_SOLDAT_BOIS)
+LOG interp: SET/set(playcutanimp=BAG_SOLDAT_BOIS,1)
+LOG interp: SET/set(playanimp=BAG_SOLDAT_BOIS,2)
+LOG interp: SET/set(flag129=1)
+FLAGS 43: 129=1
+STATE 43: chapter=36 monde=3 wam=jardin.wam view=27 hand=BAG_BATON_VERT waiting=0 music=6)
+STEP 44 GO 32
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(playcutanimp=BAG_SOLDAT_BOIS,4)
+LOG interp: SET/set(sacados=NOT_BAG_BATON_VERT)
+LOG interp: SET/set(flag128=1)
+VARS 44: FLAG=1
+FLAGS 44: 128=1 1239=0 1639=0
+BAG 44: BAG_TELECOMMANDE BAG_PERCHE BAG_BATON_BLEU BAG_BATON_ROUGE
+STATE 44: chapter=36 monde=3 wam=jardin.wam view=27 hand=BAG_BATON_VERT waiting=0 music=6)
+EXPECT FLAG128=1 ok
+STEP 45 GO 32
+LOG interp: SET/set(Flag805=1)
+LOG interp: SET/set(chapter=37)
+LOG interp: SET/set(StartMusik=7)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(showperso=BAG_HOURISVERTE_DEDANS)
+LOG interp: SET(hideperso=BAG_HOURISVERTE_DEHORS)
+VARS 45: CHAPTER=37 FLAG=0 LASTVUE=27 VUE=32 OBJETENMAIN=0 ANGLEWARPX=181 ANGLEWARPY=2
+FLAGS 45: 805=1 1003=32 1023=37
+STATE 45: chapter=37 monde=3 wam=jardin.wam view=32 hand=- waiting=0 music=7)
+EXPECT CHAPTER=37 ok
+STEP 46 GO 27
+LOG interp: SET/set(hideperso=BAG_SOLDAT_BOIS)
+LOG interp: SET/set(hideperso=BAG_HOURISVERTE_DEHORS)
+LOG interp: SET/set(chapter=36)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+VARS 46: CHAPTER=36 LASTVUE=32 VUE=27 ANGLEWARPX=359 ANGLEWARPY=15
+FLAGS 46: 1003=27 1023=36
+STATE 46: chapter=36 monde=3 wam=jardin.wam view=27 hand=- waiting=0 music=6)
+STEP 47 GO 2
+LOG interp: SET/set(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+VARS 47: CHAPTER=31 LASTVUE=27 VUE=2 ANGLEWARPX=263 ANGLEWARPY=339
+FLAGS 47: 1003=2 1023=31
+STATE 47: chapter=31 monde=3 wam=jardin.wam view=2 hand=- waiting=0 music=6)
+STEP 48 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+VARS 48: LASTVUE=2 VUE=1 ANGLEWARPX=229 ANGLEWARPY=0
+FLAGS 48: 1003=1
+STATE 48: chapter=31 monde=3 wam=jardin.wam view=1 hand=- waiting=0 music=6)
+STEP 49 GO 4
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+VARS 49: LASTVUE=1 VUE=4 ANGLEWARPX=260 ANGLEWARPY=359
+FLAGS 49: 1003=4
+STATE 49: chapter=31 monde=3 wam=jardin.wam view=4 hand=- waiting=0 music=6)
+STEP 50 GO 3
+LOG interp: SET/set(chapter=38)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+VARS 50: CHAPTER=38 LASTVUE=4 VUE=3 ANGLEWARPX=151 ANGLEWARPY=0
+FLAGS 50: 1003=3 1023=38
+STATE 50: chapter=38 monde=3 wam=jardin.wam view=3 hand=- waiting=0 music=6)
+STEP 51 HAND BAG_BATON_ROUGE
+VARS 51: OBJETENMAIN=138
+STATE 51: chapter=38 monde=3 wam=jardin.wam view=3 hand=BAG_BATON_ROUGE waiting=0 music=6)
+STEP 52 GO 33
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(HideObjet=BAG_POT_TERRE)
+LOG interp: SET/set(showperso=BAG_SOLDAT_TERRE)
+LOG interp: SET/set(playcutanimp=BAG_SOLDAT_TERRE,1)
+LOG interp: SET/set(playanimp=BAG_SOLDAT_TERRE,2)
+LOG interp: SET/set(flag135=1)
+FLAGS 52: 135=1
+STATE 52: chapter=38 monde=3 wam=jardin.wam view=3 hand=BAG_BATON_ROUGE waiting=0 music=6)
+STEP 53 GO 33
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(playcutanimp=BAG_SOLDAT_TERRE,4)
+LOG interp: SET/set(sacados=NOT_BAG_BATON_ROUGE)
+LOG interp: SET/set(flag134=1)
+VARS 53: FLAG=1
+FLAGS 53: 134=1 1238=0 1638=0
+BAG 53: BAG_TELECOMMANDE BAG_PERCHE BAG_BATON_BLEU
+STATE 53: chapter=38 monde=3 wam=jardin.wam view=3 hand=BAG_BATON_ROUGE waiting=0 music=6)
+EXPECT FLAG134=1 ok
+STEP 54 GO 33
+LOG interp: SET/set(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET/set(Flag806=1)
+LOG interp: SET/set(chapter=39)
+LOG interp: SET/set(StartMusik=7)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(showperso=BAG_HOURISROUGE_DEDANS)
+LOG interp: SET(hideperso=BAG_HOURISROUGE_DEHORS)
+VARS 54: CHAPTER=39 FLAG=0 LASTVUE=3 VUE=33 OBJETENMAIN=0 ANGLEWARPX=275
+FLAGS 54: 806=1 1003=33 1023=39
+STATE 54: chapter=39 monde=3 wam=jardin.wam view=33 hand=- waiting=0 music=7)
+EXPECT CHAPTER=39 ok
+STEP 55 GO 3
+LOG interp: SET/set(hideperso=BAG_SOLDAT_TERRE)
+LOG interp: SET/set(hideperso=BAG_HOURISROUGE_DEHORS)
+LOG interp: SET/set(chapter=38)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+VARS 55: CHAPTER=38 LASTVUE=33 VUE=3 ANGLEWARPX=87 ANGLEWARPY=11
+FLAGS 55: 1003=3 1023=38
+STATE 55: chapter=38 monde=3 wam=jardin.wam view=3 hand=- waiting=0 music=6)
+STEP 56 GO 4
+LOG interp: SET/set(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET/set(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+VARS 56: CHAPTER=31 LASTVUE=3 VUE=4 ANGLEWARPX=333 ANGLEWARPY=358
+FLAGS 56: 1003=4 1023=31
+STATE 56: chapter=31 monde=3 wam=jardin.wam view=4 hand=- waiting=0 music=6)
+STEP 57 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+VARS 57: LASTVUE=4 VUE=1 ANGLEWARPX=66 ANGLEWARPY=0
+FLAGS 57: 1003=1
+STATE 57: chapter=31 monde=3 wam=jardin.wam view=1 hand=- waiting=0 music=6)
+STEP 58 GO 5
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+VARS 58: LASTVUE=1 VUE=5 ANGLEWARPX=158 ANGLEWARPY=12
+FLAGS 58: 1003=5
+STATE 58: chapter=31 monde=3 wam=jardin.wam view=5 hand=- waiting=0 music=6)
+STEP 59 GO 6
+LOG interp: SET/set(chapter=40)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(ShowObjet=BAG_PIERRES_GARDE)
+VARS 59: CHAPTER=40 LASTVUE=5 VUE=6 ANGLEWARPX=82 ANGLEWARPY=359
+FLAGS 59: 828=1 1003=6 1023=40
+STATE 59: chapter=40 monde=3 wam=jardin.wam view=6 hand=- waiting=0 music=6)
+STEP 60 HAND BAG_BATON_BLEU
+VARS 60: OBJETENMAIN=137
+STATE 60: chapter=40 monde=3 wam=jardin.wam view=6 hand=BAG_BATON_BLEU waiting=0 music=6)
+STEP 61 GO 31
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(showperso=BAG_SOLDAT_PIERRE)
+LOG interp: SET/set(playcutanimp=BAG_SOLDAT_PIERRE,1)
+LOG interp: SET/set(playanimp=BAG_SOLDAT_PIERRE,2)
+LOG interp: SET/set(flag140=1)
+FLAGS 61: 140=1
+STATE 61: chapter=40 monde=3 wam=jardin.wam view=6 hand=BAG_BATON_BLEU waiting=0 music=6)
+STEP 62 GO 31
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET/set(playcutanimp=BAG_SOLDAT_PIERRE,4)
+LOG interp: SET/set(sacados=NOT_BAG_BATON_BLEU)
+LOG interp: SET/set(flag139=1)
+VARS 62: FLAG=1
+FLAGS 62: 139=1 1237=0 1637=0
+BAG 62: BAG_TELECOMMANDE BAG_PERCHE
+STATE 62: chapter=40 monde=3 wam=jardin.wam view=6 hand=BAG_BATON_BLEU waiting=0 music=6)
+EXPECT FLAG139=1 ok
+STEP 63 GO 31
+LOG interp: SET/set(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET/set(Flag807=1)
+LOG interp: SET/set(chapter=41)
+LOG interp: SET/set(StartMusik=7)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET(showperso=BAG_HOURISBLEUE_DEDANS)
+LOG interp: SET(hideperso=BAG_HOURISBLEUE_DEHORS)
+VARS 63: CHAPTER=41 FLAG=0 LASTVUE=6 VUE=31 OBJETENMAIN=0 ANGLEWARPX=183
+FLAGS 63: 807=1 1003=31 1023=41
+STATE 63: chapter=41 monde=3 wam=jardin.wam view=31 hand=- waiting=0 music=7)
+EXPECT CHAPTER=41 ok
+STEP 64 GO 6
+LOG interp: SET/set(hideperso=BAG_SOLDAT_PIERRE)
+LOG interp: SET/set(hideperso=BAG_HOURISBLEUE_DEHORS)
+LOG interp: SET/set(chapter=40)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 64: CHAPTER=40 LASTVUE=31 VUE=6 ANGLEWARPX=359 ANGLEWARPY=16
+FLAGS 64: 1003=6 1023=40
+STATE 64: chapter=40 monde=3 wam=jardin.wam view=6 hand=- waiting=0 music=6)
+STEP 65 GO 5
+LOG interp: SET/set(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET/set(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 65: CHAPTER=31 LASTVUE=6 VUE=5 ANGLEWARPX=271 ANGLEWARPY=357
+FLAGS 65: 1003=5 1023=31
+STATE 65: chapter=31 monde=3 wam=jardin.wam view=5 hand=- waiting=0 music=6)
+STEP 66 GO 7
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 66: LASTVUE=5 VUE=7 ANGLEWARPX=181 ANGLEWARPY=353
+FLAGS 66: 1003=7
+STATE 66: chapter=31 monde=3 wam=jardin.wam view=7 hand=- waiting=0 music=6)
+STEP 67 GO 34
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 67: LASTVUE=7 VUE=34 ANGLEWARPX=177 ANGLEWARPY=338
+FLAGS 67: 1003=34
+STATE 67: chapter=31 monde=3 wam=jardin.wam view=34 hand=- waiting=0 music=6)
+STEP 68 GO 35
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 68: LASTVUE=34 VUE=35 ANGLEWARPX=138 ANGLEWARPY=356
+FLAGS 68: 1003=35
+STATE 68: chapter=31 monde=3 wam=jardin.wam view=35 hand=- waiting=0 music=6)
+STEP 69 GO 36
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 69: LASTVUE=35 VUE=36 ANGLEWARPX=223 ANGLEWARPY=359
+FLAGS 69: 1003=36
+STATE 69: chapter=31 monde=3 wam=jardin.wam view=36 hand=- waiting=0 music=6)
+STEP 70 GO 26
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 70: LASTVUE=36 VUE=26 ANGLEWARPX=182 ANGLEWARPY=6
+FLAGS 70: 1003=26
+STATE 70: chapter=31 monde=3 wam=jardin.wam view=26 hand=- waiting=0 music=6)
+STEP 71 GO 12
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 71: LASTVUE=26 VUE=12 ANGLEWARPX=121 ANGLEWARPY=2
+FLAGS 71: 1003=12
+STATE 71: chapter=31 monde=3 wam=jardin.wam view=12 hand=- waiting=0 music=6)
+STEP 72 GO 30
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 72: LASTVUE=12 VUE=30 ANGLEWARPX=183 ANGLEWARPY=357
+FLAGS 72: 1003=30
+STATE 72: chapter=31 monde=3 wam=jardin.wam view=30 hand=- waiting=0 music=6)
+STEP 73 GO 13
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 73: LASTVUE=30 VUE=13 ANGLEWARPX=188 ANGLEWARPY=10
+FLAGS 73: 1003=13
+STATE 73: chapter=31 monde=3 wam=jardin.wam view=13 hand=- waiting=0 music=6)
+STEP 74 GO 14
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 74: LASTVUE=13 VUE=14 ANGLEWARPX=88 ANGLEWARPY=0
+FLAGS 74: 1003=14
+STATE 74: chapter=31 monde=3 wam=jardin.wam view=14 hand=- waiting=0 music=6)
+STEP 75 OBJET BAG_BOULE_LAITEUSE
+LOG interp: SET/set(Flag145=1)
+VARS 75: OBJETENMAIN=140
+FLAGS 75: 145=1 1240=3 1640=4
+BAG 75: BAG_TELECOMMANDE BAG_PERCHE BAG_BOULE_LAITEUSE
+STATE 75: chapter=31 monde=3 wam=jardin.wam view=14 hand=BAG_BOULE_LAITEUSE waiting=0 music=6)
+STEP 76 GO 13
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 76: LASTVUE=14 VUE=13 OBJETENMAIN=0 ANGLEWARPX=268 ANGLEWARPY=359
+FLAGS 76: 1003=13
+STATE 76: chapter=31 monde=3 wam=jardin.wam view=13 hand=- waiting=0 music=6)
+STEP 77 GO 30
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 77: LASTVUE=13 VUE=30 ANGLEWARPX=358 ANGLEWARPY=357
+FLAGS 77: 1003=30
+STATE 77: chapter=31 monde=3 wam=jardin.wam view=30 hand=- waiting=0 music=6)
+STEP 78 HAND BAG_BOULE_LAITEUSE
+VARS 78: OBJETENMAIN=140
+STATE 78: chapter=31 monde=3 wam=jardin.wam view=30 hand=BAG_BOULE_LAITEUSE waiting=0 music=6)
+STEP 79 ZONE BAG_ZONE_BOULELAIT
+LOG interp: SET/set(ObjetEnMain=0)
+LOG interp: SET/set(SacADos=NOT_BAG_BOULE_LAITEUSE)
+LOG interp: SET/set(ShowObjet=BAG_BOULE_LAITEUSEPOSEE)
+LOG interp: SET/set(StopMusik=1)
+LOG interp: SET/set(StartMusik=38)
+LOG interp: SET/set(Flag148=1)
+LOG interp: SET/set(Flag147=1)
+VARS 79: FLAG=1 OBJETENMAIN=0
+FLAGS 79: 147=1 148=1 1240=0 1640=0
+BAG 79: BAG_TELECOMMANDE BAG_PERCHE
+STATE 79: chapter=31 monde=3 wam=jardin.wam view=30 hand=- waiting=0 music=38)
+EXPECT FLAG147=1 ok
+STEP 80 FRAME
+LOG interp: SET(Cinema=77,fps=25)
+STATE 80: chapter=31 monde=3 wam=jardin.wam view=30 hand=- waiting=0 music=38)
+MODE 80: 11 Licorne
+EXPECT MODE=11 ok
+STEP 81 SKIP puzzle licorne RUN=(Flag147=0) RUN=(Flag149=1) RUN=(Flag146=1) RUN=(StopMusik=1) RUN=(SacADos=BAG_CORNE_LICORNE) RUN=(ObjetEnMain=BAG_CORNE_LICORNE) CALL=0x0042e990
+LOG interp: SET(Flag147=0)
+LOG interp: SET(Flag149=1)
+LOG interp: SET(Flag146=1)
+LOG interp: SET(StopMusik=1)
+LOG interp: SET(SacADos=BAG_CORNE_LICORNE)
+LOG interp: SET(ObjetEnMain=BAG_CORNE_LICORNE)
+VARS 81: OBJETENMAIN=143
+FLAGS 81: 146=1 147=0 149=1 1243=3 1643=7
+BAG 81: BAG_TELECOMMANDE BAG_PERCHE BAG_CORNE_LICORNE
+STATE 81: chapter=31 monde=3 wam=jardin.wam view=30 hand=BAG_CORNE_LICORNE waiting=0 music=38)
+EXPECT MODE=3 ok
+EXPECT HAND=BAG_CORNE_LICORNE ok
+STEP 82 GO 13
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 82: FLAG=0 LASTVUE=30 VUE=13 OBJETENMAIN=0 ANGLEWARPX=188 ANGLEWARPY=10
+FLAGS 82: 1003=13
+STATE 82: chapter=31 monde=3 wam=jardin.wam view=13 hand=- waiting=0 music=38)
+STEP 83 HAND BAG_CORNE_LICORNE
+VARS 83: OBJETENMAIN=143
+STATE 83: chapter=31 monde=3 wam=jardin.wam view=13 hand=BAG_CORNE_LICORNE waiting=0 music=38)
+STEP 84 ZONE BAG_ZONE_SERRURE
+LOG interp: SET/set(ObjetEnMain=0)
+LOG interp: SET/set(SacADos=NOT_BAG_CORNE_LICORNE)
+LOG interp: SET/set(HideObjet=BAG_CAGE)
+LOG interp: SET/set(PlaySound=811)
+LOG interp: SET/set(ShowObjet=BAG_CAGEBAISSEE)
+LOG interp: SET/set(ShowObjet=BAG_CORNESERRURE)
+LOG interp: SET/set(Flag144=1)
+LOG interp: SET/set(Flag146=0)
+VARS 84: OBJETENMAIN=0
+FLAGS 84: 144=1 146=0 1243=0 1643=0
+BAG 84: BAG_TELECOMMANDE BAG_PERCHE
+STATE 84: chapter=31 monde=3 wam=jardin.wam view=13 hand=- waiting=0 music=38)
+EXPECT FLAG144=1 ok
+STEP 85 GO 14
+LOG interp: SET/set(AbortDepart=1)
+LOG interp: SET/set(anglewarpx=90)
+LOG interp: SET/set(Vue=114)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 85: LASTVUE=13 VUE=114 ANGLEWARPX=90 ANGLEWARPY=0
+FLAGS 85: 1003=114
+STATE 85: chapter=31 monde=3 wam=jardin.wam view=114 hand=- waiting=0 music=38)
+EXPECT VUE=114 ok
+STEP 86 ZONE BAG_ZONE_ECRIN
+VARS 86: FLAG=1
+FLAGS 86: 131=1
+STATE 86: chapter=31 monde=3 wam=jardin.wam view=114 hand=- waiting=0 music=38)
+MODE 86: 14 AtlEcrin
+EXPECT MODE=14 ok
+STEP 87 SKIP puzzle ecrin CALL=0x00412f40
+LOG interp: SET(SacADos=BAG_SAPHIR)
+LOG interp: SET(SacADos=BAG_RUBIS)
+LOG interp: SET(SacADos=BAG_EMERAUDE)
+FLAGS 87: 1245=3 1246=3 1247=3 1645=9 1646=10 1647=11
+BAG 87: BAG_TELECOMMANDE BAG_PERCHE BAG_SAPHIR BAG_RUBIS BAG_EMERAUDE
+STATE 87: chapter=31 monde=3 wam=jardin.wam view=114 hand=- waiting=0 music=38)
+EXPECT MODE=3 ok
+STEP 88 GO 13
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 88: FLAG=0 LASTVUE=114 VUE=13 ANGLEWARPX=268 ANGLEWARPY=359
+FLAGS 88: 1003=13
+STATE 88: chapter=31 monde=3 wam=jardin.wam view=13 hand=- waiting=0 music=38)
+STEP 89 GO 30
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 89: LASTVUE=13 VUE=30 ANGLEWARPX=358 ANGLEWARPY=357
+FLAGS 89: 1003=30
+STATE 89: chapter=31 monde=3 wam=jardin.wam view=30 hand=- waiting=0 music=38)
+STEP 90 GO 12
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 90: LASTVUE=30 VUE=12 ANGLEWARPY=7
+FLAGS 90: 1003=12
+STATE 90: chapter=31 monde=3 wam=jardin.wam view=12 hand=- waiting=0 music=38)
+STEP 91 GO 26
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 91: LASTVUE=12 VUE=26 ANGLEWARPX=298 ANGLEWARPY=3
+FLAGS 91: 1003=26
+STATE 91: chapter=31 monde=3 wam=jardin.wam view=26 hand=- waiting=0 music=38)
+STEP 92 GO 36
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 92: LASTVUE=26 VUE=36 ANGLEWARPX=0 ANGLEWARPY=336
+FLAGS 92: 1003=36
+STATE 92: chapter=31 monde=3 wam=jardin.wam view=36 hand=- waiting=0 music=38)
+STEP 93 GO 35
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 93: LASTVUE=36 VUE=35 ANGLEWARPX=48 ANGLEWARPY=355
+FLAGS 93: 1003=35
+STATE 93: chapter=31 monde=3 wam=jardin.wam view=35 hand=- waiting=0 music=38)
+STEP 94 GO 34
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 94: LASTVUE=35 VUE=34 ANGLEWARPX=324 ANGLEWARPY=358
+FLAGS 94: 1003=34
+STATE 94: chapter=31 monde=3 wam=jardin.wam view=34 hand=- waiting=0 music=38)
+STEP 95 GO 7
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 95: LASTVUE=34 VUE=7 ANGLEWARPX=0 ANGLEWARPY=20
+FLAGS 95: 1003=7
+STATE 95: chapter=31 monde=3 wam=jardin.wam view=7 hand=- waiting=0 music=38)
+STEP 96 GO 5
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 96: LASTVUE=7 VUE=5 ANGLEWARPX=359 ANGLEWARPY=4
+FLAGS 96: 1003=5
+STATE 96: chapter=31 monde=3 wam=jardin.wam view=5 hand=- waiting=0 music=38)
+STEP 97 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 97: LASTVUE=5 VUE=1 ANGLEWARPX=343 ANGLEWARPY=359
+FLAGS 97: 1003=1
+STATE 97: chapter=31 monde=3 wam=jardin.wam view=1 hand=- waiting=0 music=38)
+STEP 98 GO 2
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 98: LASTVUE=1 VUE=2 ANGLEWARPX=59 ANGLEWARPY=0
+FLAGS 98: 1003=2
+STATE 98: chapter=31 monde=3 wam=jardin.wam view=2 hand=- waiting=0 music=38)
+STEP 99 GO 27
+LOG interp: SET/set(chapter=36)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 99: CHAPTER=36 LASTVUE=2 VUE=27 ANGLEWARPX=87 ANGLEWARPY=15
+FLAGS 99: 1003=27 1023=36
+STATE 99: chapter=36 monde=3 wam=jardin.wam view=27 hand=- waiting=0 music=6)
+STEP 100 GO 32
+LOG interp: SET/set(chapter=37)
+LOG interp: SET/set(StartMusik=7)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET(showperso=BAG_HOURISVERTE_DEDANS)
+LOG interp: SET(hideperso=BAG_HOURISVERTE_DEHORS)
+VARS 100: CHAPTER=37 LASTVUE=27 VUE=32 ANGLEWARPX=181 ANGLEWARPY=2
+FLAGS 100: 1003=32 1023=37
+STATE 100: chapter=37 monde=3 wam=jardin.wam view=32 hand=- waiting=0 music=7)
+STEP 101 HAND BAG_EMERAUDE
+VARS 101: OBJETENMAIN=147
+STATE 101: chapter=37 monde=3 wam=jardin.wam view=32 hand=BAG_EMERAUDE waiting=0 music=7)
+STEP 102 PERSO BAG_HOURISVERTE_DEDANS
+LOG interp: SET/set(Dial=198)
+LOG interp: SET/set(Flag132=1)
+FLAGS 102: 132=1
+STATE 102: chapter=37 monde=3 wam=jardin.wam view=32 hand=BAG_EMERAUDE waiting=0 music=7)
+STEP 103 PERSO BAG_HOURISVERTE_DEDANS
+LOG interp: SET/set(Dial=201)
+LOG interp: SET/set(Flag133=1)
+LOG interp: SET/set(ObjetEnMain=0)
+LOG interp: SET/set(SacADos=NOT_BAG_EMERAUDE)
+LOG interp: SET/set(SacADos=BAG_MAP_TOUR)
+LOG interp: SET/set(ObjetEnMain=BAG_MAP_TOUR)
+VARS 103: OBJETENMAIN=149
+FLAGS 103: 133=1 1247=0 1249=3 1647=0 1649=13
+BAG 103: BAG_TELECOMMANDE BAG_PERCHE BAG_SAPHIR BAG_RUBIS BAG_MAP_TOUR
+STATE 103: chapter=37 monde=3 wam=jardin.wam view=32 hand=BAG_MAP_TOUR waiting=0 music=7)
+EXPECT HAND=BAG_MAP_TOUR ok
+STEP 104 FRAME
+VARS 104: OBJETENMAIN=0
+STATE 104: chapter=37 monde=3 wam=jardin.wam view=32 hand=- waiting=0 music=7)
+MODE 104: 10 AtlCarteTour
+EXPECT MODE=10 ok
+STEP 105 CLICK right
+STATE 105: chapter=37 monde=3 wam=jardin.wam view=32 hand=- waiting=0 music=7)
+EXPECT MODE=3 ok
+STEP 106 GO 27
+LOG interp: SET/set(hideperso=BAG_SOLDAT_BOIS)
+LOG interp: SET/set(hideperso=BAG_HOURISVERTE_DEHORS)
+LOG interp: SET/set(chapter=36)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 106: CHAPTER=36 LASTVUE=32 VUE=27 ANGLEWARPX=359 ANGLEWARPY=15
+FLAGS 106: 1003=27 1023=36
+STATE 106: chapter=36 monde=3 wam=jardin.wam view=27 hand=- waiting=0 music=6)
+STEP 107 GO 2
+LOG interp: SET/set(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 107: CHAPTER=31 LASTVUE=27 VUE=2 ANGLEWARPX=263 ANGLEWARPY=339
+FLAGS 107: 1003=2 1023=31
+STATE 107: chapter=31 monde=3 wam=jardin.wam view=2 hand=- waiting=0 music=6)
+STEP 108 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 108: LASTVUE=2 VUE=1 ANGLEWARPX=229 ANGLEWARPY=0
+FLAGS 108: 1003=1
+STATE 108: chapter=31 monde=3 wam=jardin.wam view=1 hand=- waiting=0 music=6)
+STEP 109 GO 4
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 109: LASTVUE=1 VUE=4 ANGLEWARPX=260 ANGLEWARPY=359
+FLAGS 109: 1003=4
+STATE 109: chapter=31 monde=3 wam=jardin.wam view=4 hand=- waiting=0 music=6)
+STEP 110 GO 3
+LOG interp: SET/set(chapter=38)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 110: CHAPTER=38 LASTVUE=4 VUE=3 ANGLEWARPX=151 ANGLEWARPY=0
+FLAGS 110: 1003=3 1023=38
+STATE 110: chapter=38 monde=3 wam=jardin.wam view=3 hand=- waiting=0 music=6)
+STEP 111 GO 33
+LOG interp: SET/set(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET/set(chapter=39)
+LOG interp: SET/set(StartMusik=7)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET(showperso=BAG_HOURISROUGE_DEDANS)
+LOG interp: SET(hideperso=BAG_HOURISROUGE_DEHORS)
+VARS 111: CHAPTER=39 LASTVUE=3 VUE=33 ANGLEWARPX=275
+FLAGS 111: 1003=33 1023=39
+STATE 111: chapter=39 monde=3 wam=jardin.wam view=33 hand=- waiting=0 music=7)
+STEP 112 HAND BAG_RUBIS
+VARS 112: OBJETENMAIN=146
+STATE 112: chapter=39 monde=3 wam=jardin.wam view=33 hand=BAG_RUBIS waiting=0 music=7)
+STEP 113 PERSO BAG_HOURISROUGE_DEDANS
+LOG interp: SET/set(Dial=204)
+LOG interp: SET/set(Flag137=1)
+FLAGS 113: 137=1
+STATE 113: chapter=39 monde=3 wam=jardin.wam view=33 hand=BAG_RUBIS waiting=0 music=7)
+STEP 114 PERSO BAG_HOURISROUGE_DEDANS
+LOG interp: SET/set(Dial=207)
+LOG interp: SET/set(Flag138=1)
+LOG interp: SET/set(ObjetEnMain=0)
+LOG interp: SET/set(SacADos=NOT_BAG_RUBIS)
+LOG interp: SET/set(SacADos=BAG_CLE_SORTIE_TOUR)
+LOG interp: SET/set(ObjetEnMain=BAG_CLE_SORTIE_TOUR)
+VARS 114: OBJETENMAIN=142
+FLAGS 114: 138=1 1242=3 1246=0 1642=6 1646=0
+BAG 114: BAG_TELECOMMANDE BAG_PERCHE BAG_SAPHIR BAG_MAP_TOUR BAG_CLE_SORTIE_TOUR
+STATE 114: chapter=39 monde=3 wam=jardin.wam view=33 hand=BAG_CLE_SORTIE_TOUR waiting=0 music=7)
+EXPECT HAND=BAG_CLE_SORTIE_TOUR ok
+STEP 115 GO 3
+LOG interp: SET/set(hideperso=BAG_SOLDAT_TERRE)
+LOG interp: SET/set(hideperso=BAG_HOURISROUGE_DEHORS)
+LOG interp: SET/set(chapter=38)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 115: CHAPTER=38 LASTVUE=33 VUE=3 OBJETENMAIN=0 ANGLEWARPX=87 ANGLEWARPY=11
+FLAGS 115: 1003=3 1023=38
+STATE 115: chapter=38 monde=3 wam=jardin.wam view=3 hand=- waiting=0 music=6)
+STEP 116 GO 4
+LOG interp: SET/set(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET/set(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 116: CHAPTER=31 LASTVUE=3 VUE=4 ANGLEWARPX=333 ANGLEWARPY=358
+FLAGS 116: 1003=4 1023=31
+STATE 116: chapter=31 monde=3 wam=jardin.wam view=4 hand=- waiting=0 music=6)
+STEP 117 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 117: LASTVUE=4 VUE=1 ANGLEWARPX=66 ANGLEWARPY=0
+FLAGS 117: 1003=1
+STATE 117: chapter=31 monde=3 wam=jardin.wam view=1 hand=- waiting=0 music=6)
+STEP 118 GO 5
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 118: LASTVUE=1 VUE=5 ANGLEWARPX=158 ANGLEWARPY=12
+FLAGS 118: 1003=5
+STATE 118: chapter=31 monde=3 wam=jardin.wam view=5 hand=- waiting=0 music=6)
+STEP 119 GO 6
+LOG interp: SET/set(chapter=40)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 119: CHAPTER=40 LASTVUE=5 VUE=6 ANGLEWARPX=82 ANGLEWARPY=359
+FLAGS 119: 1003=6 1023=40
+STATE 119: chapter=40 monde=3 wam=jardin.wam view=6 hand=- waiting=0 music=6)
+STEP 120 GO 31
+LOG interp: SET/set(chapter=41)
+LOG interp: SET/set(StartMusik=7)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET(showperso=BAG_HOURISBLEUE_DEDANS)
+LOG interp: SET(hideperso=BAG_HOURISBLEUE_DEHORS)
+VARS 120: CHAPTER=41 LASTVUE=6 VUE=31 ANGLEWARPX=183
+FLAGS 120: 1003=31 1023=41
+STATE 120: chapter=41 monde=3 wam=jardin.wam view=31 hand=- waiting=0 music=7)
+STEP 121 HAND BAG_SAPHIR
+VARS 121: OBJETENMAIN=145
+STATE 121: chapter=41 monde=3 wam=jardin.wam view=31 hand=BAG_SAPHIR waiting=0 music=7)
+STEP 122 PERSO BAG_HOURISBLEUE_DEDANS
+LOG interp: SET/set(Dial=209)
+LOG interp: SET/set(Flag142=1)
+FLAGS 122: 142=1
+STATE 122: chapter=41 monde=3 wam=jardin.wam view=31 hand=BAG_SAPHIR waiting=0 music=7)
+STEP 123 PERSO BAG_HOURISBLEUE_DEDANS
+LOG interp: SET/set(Dial=212)
+LOG interp: SET/set(Flag143=1)
+LOG interp: SET/set(ObjetEnMain=0)
+LOG interp: SET/set(SacADos=NOT_BAG_SAPHIR)
+LOG interp: SET/set(SacADos=BAG_CLE_ENTREE_TOUR)
+LOG interp: SET/set(ObjetEnMain=BAG_CLE_ENTREE_TOUR)
+VARS 123: OBJETENMAIN=141 SACADOS=6
+FLAGS 123: 143=1 1241=3 1245=0 1641=5 1645=0
+BAG 123: BAG_TELECOMMANDE BAG_PERCHE BAG_MAP_TOUR BAG_CLE_SORTIE_TOUR BAG_CLE_ENTREE_TOUR
+STATE 123: chapter=41 monde=3 wam=jardin.wam view=31 hand=BAG_CLE_ENTREE_TOUR waiting=0 music=7)
+EXPECT HAND=BAG_CLE_ENTREE_TOUR ok
+STEP 124 GO 6
+LOG interp: SET/set(hideperso=BAG_SOLDAT_PIERRE)
+LOG interp: SET/set(hideperso=BAG_HOURISBLEUE_DEHORS)
+LOG interp: SET/set(chapter=40)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 124: CHAPTER=40 LASTVUE=31 VUE=6 OBJETENMAIN=0 ANGLEWARPX=359 ANGLEWARPY=16 SACADOS=0
+FLAGS 124: 1003=6 1023=40
+STATE 124: chapter=40 monde=3 wam=jardin.wam view=6 hand=- waiting=0 music=6)
+STEP 125 GO 5
+LOG interp: SET/set(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET/set(HideObjet=BAG_PIERRES_GARDE)
+LOG interp: SET/set(chapter=31)
+LOG interp: SET/set(StartMusik=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 125: CHAPTER=31 LASTVUE=6 VUE=5 ANGLEWARPX=271 ANGLEWARPY=357
+FLAGS 125: 1003=5 1023=31
+STATE 125: chapter=31 monde=3 wam=jardin.wam view=5 hand=- waiting=0 music=6)
+STEP 126 GO 7
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 126: LASTVUE=5 VUE=7 ANGLEWARPX=181 ANGLEWARPY=353
+FLAGS 126: 1003=7
+STATE 126: chapter=31 monde=3 wam=jardin.wam view=7 hand=- waiting=0 music=6)
+STEP 127 GO 34
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 127: LASTVUE=7 VUE=34 ANGLEWARPX=177 ANGLEWARPY=338
+FLAGS 127: 1003=34
+STATE 127: chapter=31 monde=3 wam=jardin.wam view=34 hand=- waiting=0 music=6)
+STEP 128 GO 38
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
+LOG interp: SET(ShowObjet=BAG_POT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
+LOG interp: SET(HidePerso=BAG_SOLDAT_PIERRE)
+LOG interp: SET(HideObjet=BAG_PIERRES_GARDE)
+VARS 128: LASTVUE=34 VUE=38 ANGLEWARPX=168 ANGLEWARPY=356
+FLAGS 128: 1003=38
+STATE 128: chapter=31 monde=3 wam=jardin.wam view=38 hand=- waiting=0 music=6)
+STEP 129 HAND BAG_CLE_ENTREE_TOUR
+VARS 129: OBJETENMAIN=141
+STATE 129: chapter=31 monde=3 wam=jardin.wam view=38 hand=BAG_CLE_ENTREE_TOUR waiting=0 music=6)
+STEP 130 GO 39
+LOG interp: SET/set(changewam=TourMagi.wam)
+LOG interp: SET/set(AngleWarpX=-156)
+LOG interp: SET/set(Vue=39)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(Cinema=82,fps=25)
+LOG interp: SET/set(Cinema=76,fps=25)
+LOG interp: SET/set(chapter=47)
+LOG interp: SET/set(StartMusik=6)
+VARS 130: CHAPTER=47 LASTVUE=0 VUE=39 OBJETENMAIN=0 ANGLEWARPX=204 ANGLEWARPY=0
+FLAGS 130: 800=39 801=40 914=1 1003=39 1013=13 1023=47
+STATE 130: chapter=47 monde=3 wam=TourMagi.wam view=39 hand=- waiting=0 music=6)
+EXPECT WAM=TourMagi.wam ok
+EXPECT CHAPTER=47 ok
+STEP 131 SKIP puzzle tower_race FLAG800=99 MEM32=0x00789ad4:99 RUN=(AngleWarpX=-90) RUN=(AngleWarpY=20) RUN=(Vue=99) MEM8=0x00789ae2:1 CALL=0x004d56b0
+LOG interp: SET(AngleWarpX=-90)
+LOG interp: SET(AngleWarpY=20)
+LOG interp: SET(Vue=99)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 131: LASTVUE=39 VUE=99 ANGLEWARPX=270 ANGLEWARPY=20
+FLAGS 131: 151=1 800=99 1003=99
+STATE 131: chapter=47 monde=3 wam=TourMagi.wam view=99 hand=- waiting=0 music=6)
+EXPECT FLAG151=1 ok
+EXPECT VUE=99 ok
+STEP 132 HAND BAG_CLE_SORTIE_TOUR
+VARS 132: OBJETENMAIN=142
+STATE 132: chapter=47 monde=3 wam=TourMagi.wam view=99 hand=BAG_CLE_SORTIE_TOUR waiting=0 music=6)
+STEP 133 GO 100
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(changewam=PMagi.wam)
+LOG interp: SET(HideObjet=PMA_CRANE)
+LOG interp: SET(HideObjet=PMA_SUPPORTCRANE)
+LOG interp: SET(HideObjet=PMA_CHIFFON)
+LOG interp: SET(HideObjet=PMA_LAMPE)
+LOG interp: SET(HideObjet=PMA_TIRETTE)
+LOG interp: SET(ShowObjet=PMA_COBRAS)
+LOG interp: SET(HideObjet=PMA_INDICE1)
+LOG interp: SET(HideObjet=PMA_INDICE2)
+LOG interp: SET(HideObjet=PMA_INDICE3)
+LOG interp: SET(HideObjet=PMA_INDICE4)
+LOG interp: SET(ShowObjet=PMA_LIENSLIGHT)
+LOG interp: SET(ShowObjet=PMA_ETOILESLIGHT)
+LOG interp: SET/set(anglewarpx=-40)
+LOG interp: SET/set(ObjetEnMain=0)
+LOG interp: SET/set(SacADos=NOT_BAG_CLE_SORTIE_TOUR)
+LOG interp: SET/set(SacADos=NOT_BAG_CLE_ENTREE_TOUR)
+LOG interp: SET/set(SacADos=NOT_BAG_MAP_TOUR)
+LOG interp: SET/set(StopMusik=1)
+LOG interp: SET/set(StartMusik=33)
+LOG interp: SET/set(Vue=6)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(Cinema=64,fps=25)
+LOG interp: SET/set(Cinema=74,fps=25)
+LOG interp: SET/set(chapter=48)
+LOG interp: SET/set(StartMusik=8)
+VARS 133: CHAPTER=48 LASTVUE=0 VUE=6 OBJETENMAIN=0 ANGLEWARPX=320
+FLAGS 133: 1003=6 1013=10 1023=48 1241=0 1242=0 1249=0 1641=0 1642=0 1649=0
+BAG 133: BAG_TELECOMMANDE BAG_PERCHE
+STATE 133: chapter=48 monde=3 wam=PMagi.wam view=6 hand=- waiting=0 music=8)
+EXPECT WAM=PMagi.wam ok
+EXPECT CHAPTER=48 ok
+STEP 134 GO 7
+LOG interp: SET/set(abortdepart=1)
+LOG interp: SET/set(anglewarpX=90)
+LOG interp: SET/set(vue=7)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(chapter=49)
+LOG interp: SET/set(StartMusik=8)
+VARS 134: CHAPTER=49 LASTVUE=6 VUE=7 ANGLEWARPX=90
+FLAGS 134: 1003=7 1023=49
+STATE 134: chapter=49 monde=3 wam=PMagi.wam view=7 hand=- waiting=0 music=8)
+EXPECT CHAPTER=49 ok
+STEP 135 GO 8
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 135: LASTVUE=7 VUE=8 ANGLEWARPY=3
+FLAGS 135: 1003=8
+STATE 135: chapter=49 monde=3 wam=PMagi.wam view=8 hand=- waiting=0 music=8)
+STEP 136 GO 12
+LOG interp: SET/set(AbortDepart=1)
+LOG interp: SET/set(AngleWarpX=90)
+LOG interp: SET/set(Vue=10)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(LIMITEANGLEWARPY=85)
+LOG interp: SET(ShowObjet=PMA_LIENSLIGHT
+LOG interp: SET(ShowObjet=PMA_ETOILESLIGHT
+LOG interp: SET/set(Cinema=75,fps=25)
+LOG interp: SET/set(chapter=50)
+LOG interp: SET/set(StartMusik=8)
+VARS 136: CHAPTER=50 LASTVUE=8 VUE=10 ANGLEWARPY=20 LIMITEANGLEWARPY=85
+FLAGS 136: 915=1 1003=10 1023=50
+STATE 136: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
+EXPECT CHAPTER=50 ok
+EXPECT VUE=10 ok
+STEP 137 SKIP puzzle star_room CALL=0x004cf850
+LOG interp: SET(Flag154=1)
+LOG interp: SET/set(HideObjet=PMA_COBRAS)
+LOG interp: SET/set(AngleWarpX=90)
+LOG interp: SET/set(Vue=8)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(chapter=49)
+LOG interp: SET/set(StartMusik=8)
+VARS 137: CHAPTER=49 LASTVUE=10 VUE=8 LIMITEANGLEWARPY=70
+FLAGS 137: 154=1 1003=8 1023=49
+STATE 137: chapter=49 monde=3 wam=PMagi.wam view=8 hand=- waiting=0 music=8)
+EXPECT FLAG154=1 ok
+EXPECT CHAPTER=49 ok
+EXPECT VUE=8 ok
+STEP 138 GO 12
+LOG interp: SET/set(AbortDepart=1)
+LOG interp: SET/set(AngleWarpX=270)
+LOG interp: SET/set(Vue=12)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(chapter=51)
+LOG interp: SET/set(StartMusik=8)
+VARS 138: CHAPTER=51 LASTVUE=8 VUE=12 ANGLEWARPX=269
+FLAGS 138: 813=1 814=1 815=1 816=1 817=1 916=1 1003=12 1023=51
+STATE 138: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+EXPECT CHAPTER=51 ok
+STEP 139 OBJET PMA_TT11
+FLAGS 139: 813=0 817=2 835=1
+STATE 139: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 140 OBJET PMA_TT12
+FLAGS 140: 816=0 817=3 841=1
+STATE 140: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 141 OBJET PMA_TT14
+FLAGS 141: 814=0 817=4 844=1
+STATE 141: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 142 OBJET PMA_TT13
+FLAGS 142: 815=0 817=5 832=1
+STATE 142: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 143 ZONE PMA_ZONE_TT51
+LOG interp: SET(ShowObjet=PMA_INDICE1)
+FLAGS 143: 846=1
+STATE 143: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 144 ZONE PMA_ZONE_TT52
+LOG interp: SET(ShowObjet=PMA_INDICE2)
+FLAGS 144: 847=1
+STATE 144: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 145 ZONE PMA_ZONE_TT53
+LOG interp: SET(ShowObjet=PMA_INDICE3)
+FLAGS 145: 848=1
+STATE 145: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 146 ZONE PMA_ZONE_TT54
+LOG interp: SET(ShowObjet=PMA_INDICE4)
+FLAGS 146: 849=1
+STATE 146: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 147 OBJET PMA_INDICE1
+LOG interp: SET/set(Flag902=1)
+VARS 147: OBJETENMAIN=208 SACADOS=14
+FLAGS 147: 902=1 1308=3 1708=14
+BAG 147: BAG_TELECOMMANDE BAG_PERCHE PMA_INDICE1
+STATE 147: chapter=51 monde=3 wam=PMagi.wam view=12 hand=PMA_INDICE1 waiting=0 music=8)
+STEP 148 HAND -
+VARS 148: FLAG=1 OBJETENMAIN=0
+STATE 148: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 149 OBJET PMA_INDICE2
+LOG interp: SET/set(Flag903=1)
+VARS 149: FLAG=0 OBJETENMAIN=209 SACADOS=15
+FLAGS 149: 903=1 1309=3 1709=15
+BAG 149: BAG_TELECOMMANDE BAG_PERCHE PMA_INDICE1 PMA_INDICE2
+STATE 149: chapter=51 monde=3 wam=PMagi.wam view=12 hand=PMA_INDICE2 waiting=0 music=8)
+STEP 150 HAND -
+VARS 150: FLAG=1 OBJETENMAIN=0
+STATE 150: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 151 OBJET PMA_INDICE3
+LOG interp: SET/set(Flag904=1)
+VARS 151: FLAG=0 OBJETENMAIN=210 SACADOS=16
+FLAGS 151: 904=1 1310=3 1710=16
+BAG 151: BAG_TELECOMMANDE BAG_PERCHE PMA_INDICE1 PMA_INDICE2 PMA_INDICE3
+STATE 151: chapter=51 monde=3 wam=PMagi.wam view=12 hand=PMA_INDICE3 waiting=0 music=8)
+STEP 152 HAND -
+VARS 152: FLAG=1 OBJETENMAIN=0
+STATE 152: chapter=51 monde=3 wam=PMagi.wam view=12 hand=- waiting=0 music=8)
+STEP 153 OBJET PMA_INDICE4
+LOG interp: SET/set(Flag905=1)
+VARS 153: FLAG=0 OBJETENMAIN=211 SACADOS=17
+FLAGS 153: 905=1 1311=3 1711=17
+BAG 153: BAG_TELECOMMANDE BAG_PERCHE PMA_INDICE1 PMA_INDICE2 PMA_INDICE3 PMA_INDICE4
+STATE 153: chapter=51 monde=3 wam=PMagi.wam view=12 hand=PMA_INDICE4 waiting=0 music=8)
+STEP 154 HAND -
+LOG interp: SET/set(Cinema=073,fps=25)
+LOG interp: SET/set(Flag811=1)
+LOG interp: SET/set(AngleWarpX=0)
+LOG interp: SET/set(Vue=112)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 154: LASTVUE=12 VUE=112 OBJETENMAIN=0 ANGLEWARPX=0
+FLAGS 154: 811=1 917=1 1003=112
+STATE 154: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+EXPECT FLAG811=1 ok
+EXPECT VUE=112 ok
+STEP 155 OBJET PMA_TR43
+VARS 155: FLAG=1
+FLAGS 155: 818=1 864=1
+STATE 155: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+STEP 156 OBJET PMA_TR13
+FLAGS 156: 818=2 852=1
+STATE 156: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+STEP 157 OBJET PMA_TR24
+FLAGS 157: 818=3 857=1
+STATE 157: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+STEP 158 OBJET PMA_TR11
+LOG interp: SET(ObjetEnMain=0)
+LOG interp: SET(SacADos=NOT_PMA_INDICE1)
+LOG interp: SET(SacADos=NOT_PMA_INDICE2)
+LOG interp: SET(SacADos=NOT_PMA_INDICE3)
+LOG interp: SET(SacADos=NOT_PMA_INDICE4)
+LOG interp: SET(ShowObjet=PMA_TIRETTE)
+LOG interp: SET(ShowObjet=PMA_LAMPE)
+LOG interp: SET(ShowObjet=PMA_CHIFFON)
+FLAGS 158: 812=1 818=4 850=1 1308=0 1309=0 1310=0 1311=0 1708=0 1709=0 1710=0 1711=0
+BAG 158: BAG_TELECOMMANDE BAG_PERCHE
+STATE 158: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+EXPECT FLAG812=1 ok
+STEP 159 FRAME
+STATE 159: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+STEP 160 SKIP puzzle tr_cupboard_anim MEM32=0x007897a8:12
+STATE 160: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+STEP 161 SKIP puzzle tr_lamp_anim MEM32=0x00789810:9
+STATE 161: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+STEP 162 OBJET PMA_CHIFFON
+LOG interp: SET/set(Flag58=1)
+VARS 162: FLAG=0 OBJETENMAIN=212 SACADOS=18
+FLAGS 162: 58=1 1312=3 1712=18
+BAG 162: BAG_TELECOMMANDE BAG_PERCHE PMA_CHIFFON
+STATE 162: chapter=51 monde=3 wam=PMagi.wam view=112 hand=PMA_CHIFFON waiting=0 music=8)
+STEP 163 OBJET PMA_LAMPE
+LOG interp: SET/set(ObjetEnMain=0)
+LOG interp: SET/set(SacADos=NOT_PMA_CHIFFON)
+LOG interp: SET/set(HideObjet=PMA_LAMPE)
+LOG interp: SET/set(Cinema=65,fps=25)
+LOG interp: SET/set(SacADos=PMA_ROSE)
+LOG interp: SET/set(ObjetEnMain=PMA_ROSE)
+LOG interp: SET/set(ShowObjet=PMA_SUPPORTCRANE)
+LOG interp: SET/set(ShowObjet=PMA_CRANE)
+LOG interp: SET/set(Flag158=1)
+VARS 163: FLAG=1 OBJETENMAIN=214
+FLAGS 163: 158=1 1312=0 1314=3 1712=0 1714=22
+BAG 163: BAG_TELECOMMANDE BAG_PERCHE PMA_ROSE
+STATE 163: chapter=51 monde=3 wam=PMagi.wam view=112 hand=PMA_ROSE waiting=0 music=8)
+EXPECT FLAG158=1 ok
+STEP 164 HAND -
+VARS 164: OBJETENMAIN=0
+STATE 164: chapter=51 monde=3 wam=PMagi.wam view=112 hand=- waiting=0 music=8)
+STEP 165 OBJET PMA_CRANE
+LOG interp: SET/set(Flag156=1)
+LOG interp: SET/set(Flag900=1)
+VARS 165: FLAG=0 OBJETENMAIN=213
+FLAGS 165: 156=1 900=1 1313=3 1713=19
+BAG 165: BAG_TELECOMMANDE BAG_PERCHE PMA_ROSE PMA_CRANE
+STATE 165: chapter=51 monde=3 wam=PMagi.wam view=112 hand=PMA_CRANE waiting=0 music=8)
+EXPECT FLAG900=1 ok
+STEP 166 FRAME
+LOG interp: SET(ChangeCD=7)
+LOG interp: SET(monde=5)
+LOG interp: SET(changewam=Interdim.wam)
+LOG interp: SET(AngleWarpX=0)
+LOG interp: SET(AngleWarpY=0)
+CALL rand() -> 2 (walk)
+LOG interp: SET(vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_HOGGAR)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_BAGDAD)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_PALEO)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_COULOIR)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_DAUPHIN)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_CRANE)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_VIEUX)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_TARGUI)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_OMEGA)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_HUMANITE)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_HEROINE)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_EXPAND)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_BOSS)
+LOG interp: SET(HideObjet=INT_BULLESNETTES)
+LOG interp: SET(HideObjet=INT_BULLESMOYENNES)
+LOG interp: SET(HideObjet=INT_BULLESFLOUES)
+LOG interp: SET(HideOBJET=INT_BULLENETFIN)
+LOG interp: SET(HideOBJET=INT_BULLEF2FIN)
+LOG interp: SET(HideOBJET=INT_BULLEF3FIN)
+LOG interp: SET(ShowObjet=INT_BULLESMOYENNES)
+LOG interp: SET(ShowOBJET=INT_BULLEF3FIN)
+LOG interp: SET(HideOBJET=INT_BULLENETCOMPLEXE)
+LOG interp: SET(HideOBJET=INT_BULLEFLOUCOMPLEXE)
+LOG interp: SET(HideOBJET=INT_BULLENETMARAIS)
+LOG interp: SET(HideOBJET=INT_BULLENETMAGICIEN)
+LOG interp: SET(HideOBJET=INT_BULLEF2MARAIS)
+LOG interp: SET(HideOBJET=INT_BULLEF2MAGICIEN)
+LOG interp: SET(HideOBJET=INT_BULLEF3MARAIS)
+LOG interp: SET(HideOBJET=INT_BULLEF3MAGICIEN)
+LOG interp: SET(ShowOBJET=INT_BULLEFLOUCOMPLEXE)
+LOG interp: SET(ShowOBJET=INT_BULLENETMAGICIEN)
+LOG interp: SET(ShowOBJET=INT_BULLEF3MARAIS)
+LOG interp: SET(HideOBJET=INT_BULLENETCOULOIR)
+LOG interp: SET(HideOBJET=INT_BULLEFLOUCOULOIR)
+LOG interp: SET(ShowOBJET=INT_BULLEFLOUCOULOIR)
+LOG interp: SET(chapter=52)
+LOG interp: SET/set(StartMusik=1)
+LOG interp: SET/set(flag898=1)
+LOG interp: SET/set(cinema=066 ,fps=25)
+LOG interp: SET/set(flag901=0)
+VARS 166: CHAPTER=52 LASTVUE=0 VUE=4 OBJETENMAIN=0 ANGLEWARPY=0 CHANGECD=7 SACADOS=0 MONDE=5
+FLAGS 166: 890=3 892=2 893=1 898=1 900=0 1005=4
+BAG 166: 
+SUBJ 166 INT_DAUPHIN: 
+STATE 166: chapter=52 monde=5 wam=Interdim.wam view=4 hand=- waiting=0 music=1)
+EXPECT CHAPTER=52 ok
+EXPECT VUE=4 ok
+STEP 167 GO 3
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 167: LASTVUE=4 VUE=3 ANGLEWARPX=125 ANGLEWARPY=16
+FLAGS 167: 1005=3
+STATE 167: chapter=52 monde=5 wam=Interdim.wam view=3 hand=- waiting=0 music=1)
+STEP 168 GO 8
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(PlayCutAnimP=INT_DAUPHIN,2)
+LOG interp: SET(PlayAnimP=INT_DAUPHIN,2)
+VARS 168: LASTVUE=3 VUE=8 ANGLEWARPX=335 ANGLEWARPY=353
+FLAGS 168: 1005=8
+STATE 168: chapter=52 monde=5 wam=Interdim.wam view=8 hand=- waiting=0 music=1)
+STEP 169 OBJET INT_BULLENETMAGICIEN
+LOG interp: SET/set(AngleWarpXNow=-150)
+LOG interp: SET/set(AngleWarpYNow=18)
+LOG interp: SET/set(PlayCutAnimP=INT_DAUPHIN,2)
+LOG interp: SET/set(PlayAnimP=INT_DAUPHIN,2)
+LOG interp: SET/set(Dial=157)
+LOG interp: SET/set(Flag987=1)
+LOG interp: SET/set(Flag866=1)
+LOG interp: SET/set(Flag868=1)
+FLAGS 169: 866=1 868=1 987=1
+STATE 169: chapter=52 monde=5 wam=Interdim.wam view=8 hand=- waiting=0 music=1)
+EXPECT FLAG866=1 ok
+STEP 170 OBJET INT_BULLENETMAGICIEN
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_HOGGAR)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_BAGDAD)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_PALEO)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_COULOIR)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_DAUPHIN)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_CRANE)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_VIEUX)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_TARGUI)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_OMEGA)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_HUMANITE)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_HEROINE)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_EXPAND)
+LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_BOSS)
+LOG interp: SET(EnableSuj,INT_DAUPHIN,DIAL_INT_BAGDAD)
+LOG interp: SET(DisableSuj,INT_DAUPHIN,DIAL_INT_BAGDAD)
+LOG interp: SET(EnableSuj,INT_DAUPHIN,DIAL_INT_HOGGAR)
+LOG interp: SET(DisableSuj,INT_DAUPHIN,DIAL_INT_HOGGAR)
+LOG interp: SET/set(ChangeCD=4)
+LOG interp: SET/set(monde=3)
+LOG interp: SET/set(LoadVueMonde=1)
+LOG interp: SET(HideObjet=PMA_CRANE)
+LOG interp: SET(ShowObjet=PMA_SUPPORTCRANE)
+LOG interp: SET(HideObjet=PMA_LAMPE)
+LOG interp: SET(HideObjet=PMA_CHIFFON)
+LOG interp: SET(ShowObjet=PMA_TIRETTE)
+LOG interp: SET(HideObjet=PMA_COBRAS)
+LOG interp: SET(HideObjet=PMA_INDICE1)
+LOG interp: SET(HideObjet=PMA_INDICE2)
+LOG interp: SET(HideObjet=PMA_INDICE3)
+LOG interp: SET(HideObjet=PMA_INDICE4)
+LOG interp: SET(ShowObjet=PMA_LIENSLIGHT)
+LOG interp: SET(ShowObjet=PMA_ETOILESLIGHT)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(StartMusik=8)
+VARS 170: CHAPTER=51 LASTVUE=0 VUE=112 CHANGECD=4 MONDE=3
+FLAGS 170: 868=0
+BAG 170: BAG_TELECOMMANDE BAG_PERCHE PMA_CRANE PMA_ROSE
+SUBJ 170 INT_DAUPHIN: DIAL_INT_BAGDAD- DIAL_INT_HOGGAR-
+STATE 170: chapter=51 monde=3 wam=pmagi.wam view=112 hand=- waiting=0 music=8)
+EXPECT MONDE=3 ok
+EXPECT VUE=112 ok
+STEP 171 GO 8
+LOG interp: SET/set(AbortDepart=1)
+LOG interp: SET/set(flag400=0)
+LOG interp: SET/set(flag401=1)
+LOG interp: SET/set(Cinema=83,fps=25)
+LOG interp: SET/set(Flag908=1)
+LOG interp: SET/set(ChangeCD=7)
+LOG interp: SET/set(monde=1)
+LOG interp: SET/set(LoadVueMonde)
+LOG interp: SET(hideobjet=HOG_DISQUE_TOUPIE)
+LOG interp: SET(hideobjet=CMP_MENBRANE)
+LOG interp: SET(hideobjet=HOG_ETOILE01)
+LOG interp: SET(hideobjet=HOG_ETOILE02)
+LOG interp: SET(hideobjet=HOG_ETOILE03)
+LOG interp: SET(hideobjet=HOG_ETOILE04)
+LOG interp: SET(hideobjet=HOG_ETOILE05)
+LOG interp: SET(HidePerso=HOG_BOSS)
+LOG interp: SET(HidePerso=HOG_GARDIEN03)
+LOG interp: SET(HidePerso=HOG_TOUAREGBLESSE)
+LOG interp: SET(HidePerso=CMP_BOSS)
+LOG interp: SET(HidePerso=CMP_GARDIEN03)
+LOG interp: SET(HidePerso=CMP_BOSS2)
+LOG interp: SET(ShowPerso=GRO_GARDIEN03)
+LOG interp: SET(hideobjet=HOG_OBJ_CRANE)
+LOG interp: SET(ShowPerso=CMP_ATLANTEFIGE)
+LOG interp: SET(HidePerso=CMP_ATLANTE)
+LOG interp: SET(hideobjet=CMP_CLOCHE)
+LOG interp: SET(hideobjet=CMP_TELECOMMANDE)
+LOG interp: SET(HideObjet=CMP_HOGGAR)
+LOG interp: SET(HideObjet=CMP_BAGDAD)
+LOG interp: SET(ShowObjet=CMP_BAGDADFIN)
+LOG interp: SET(HideObjet=CMP_PALEO)
+LOG interp: SET(HideObjet=CMP_PALEOFIN)
+LOG interp: SET(ShowPerso=HOG_GARDIEN04)
+LOG interp: SET(ShowObjet=CMP_TORCHE_ELECTRIQUE)
+LOG interp: SET(ShowObjet=CMP_CLEF1)
+LOG interp: SET(ShowObjet=CMP_COUTEAU)
+LOG interp: SET(ShowPerso=HOG_TOUAREGBL)
+LOG interp: SET(HidePerso=HOG_TOUAREGLI)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(StartMusik=6)
+VARS 171: CHAPTER=5 VUE=23 CHANGECD=7 SACADOS=4 MONDE=1
+FLAGS 171: 400=0 401=1 908=1
+BAG 171: HOG_OBJ_CRANE CMP_TELECOMMANDE
+STATE 171: chapter=5 monde=1 wam=hoggar.wam view=23 hand=- waiting=0 music=6)
+EXPECT MONDE=1 ok
+EXPECT FLAG908=1 ok
+EXPECT CHAPTER=5 ok
+STEP 172 CHECKPOINT 105 05_bagdad_end
+SAVEFILE CurrentCD = 0
+SAVEFILE Wam = hoggar.wam
+SAVEFILE Monde = 1
+SAVEFILE Vue = 23
+SAVEFILE Chapitre = 5
+SAVEFILE NBFlag = 196
+SAVEFILE 2 = 1
+SAVEFILE 4 = 1
+SAVEFILE 6 = 1
+SAVEFILE 8 = 1
+SAVEFILE 9 = 1
+SAVEFILE 10 = 1
+SAVEFILE 13 = 1
+SAVEFILE 14 = 1
+SAVEFILE 15 = 1
+SAVEFILE 17 = 1
+SAVEFILE 21 = 1
+SAVEFILE 22 = 1
+SAVEFILE 23 = 1
+SAVEFILE 44 = 1
+SAVEFILE 45 = 1
+SAVEFILE 46 = 1
+SAVEFILE 53 = 1
+SAVEFILE 54 = 1
+SAVEFILE 58 = 1
+SAVEFILE 62 = 1
+SAVEFILE 63 = 1
+SAVEFILE 66 = 1
+SAVEFILE 69 = 1
+SAVEFILE 72 = 1
+SAVEFILE 76 = 1
+SAVEFILE 80 = 1
+SAVEFILE 83 = 1
+SAVEFILE 84 = 10
+SAVEFILE 85 = 1
+SAVEFILE 86 = 1
+SAVEFILE 87 = 1
+SAVEFILE 118 = 1
+SAVEFILE 119 = 1
+SAVEFILE 120 = 1
+SAVEFILE 121 = 1
+SAVEFILE 122 = 1
+SAVEFILE 123 = 1
+SAVEFILE 124 = 1
+SAVEFILE 126 = 1
+SAVEFILE 127 = 1
+SAVEFILE 128 = 1
+SAVEFILE 129 = 1
+SAVEFILE 131 = 1
+SAVEFILE 132 = 1
+SAVEFILE 133 = 1
+SAVEFILE 134 = 1
+SAVEFILE 135 = 1
+SAVEFILE 137 = 1
+SAVEFILE 138 = 1
+SAVEFILE 139 = 1
+SAVEFILE 140 = 1
+SAVEFILE 142 = 1
+SAVEFILE 143 = 1
+SAVEFILE 144 = 1
+SAVEFILE 145 = 1
+SAVEFILE 148 = 1
+SAVEFILE 149 = 1
+SAVEFILE 150 = 1
+SAVEFILE 151 = 1
+SAVEFILE 154 = 1
+SAVEFILE 156 = 1
+SAVEFILE 158 = 1
+SAVEFILE 159 = 1
+SAVEFILE 401 = 1
+SAVEFILE 404 = 1
+SAVEFILE 405 = 1
+SAVEFILE 411 = 1
+SAVEFILE 415 = 1
+SAVEFILE 420 = 1
+SAVEFILE 421 = 1
+SAVEFILE 422 = 1
+SAVEFILE 423 = 1
+SAVEFILE 424 = 1
+SAVEFILE 426 = 1
+SAVEFILE 427 = 1
+SAVEFILE 501 = 1
+SAVEFILE 502 = 1
+SAVEFILE 505 = 1
+SAVEFILE 506 = 1
+SAVEFILE 510 = 11
+SAVEFILE 511 = 4
+SAVEFILE 512 = 3
+SAVEFILE 513 = 9
+SAVEFILE 514 = 2
+SAVEFILE 516 = 10
+SAVEFILE 517 = 1
+SAVEFILE 518 = 5
+SAVEFILE 519 = 8
+SAVEFILE 520 = 7
+SAVEFILE 521 = 6
+SAVEFILE 522 = 9
+SAVEFILE 523 = 4
+SAVEFILE 525 = 7
+SAVEFILE 526 = 11
+SAVEFILE 527 = 3
+SAVEFILE 528 = 1
+SAVEFILE 529 = 8
+SAVEFILE 530 = 6
+SAVEFILE 531 = 5
+SAVEFILE 532 = 10
+SAVEFILE 533 = 2
+SAVEFILE 544 = 1
+SAVEFILE 545 = 1
+SAVEFILE 546 = 3
+SAVEFILE 547 = 5
+SAVEFILE 548 = 7
+SAVEFILE 549 = 4
+SAVEFILE 550 = 8
+SAVEFILE 551 = 6
+SAVEFILE 553 = 2
+SAVEFILE 554 = 9
+SAVEFILE 560 = 1
+SAVEFILE 561 = 1
+SAVEFILE 570 = 1
+SAVEFILE 571 = 1
+SAVEFILE 800 = 99
+SAVEFILE 801 = 40
+SAVEFILE 802 = 1
+SAVEFILE 804 = 1
+SAVEFILE 805 = 1
+SAVEFILE 806 = 1
+SAVEFILE 807 = 1
+SAVEFILE 811 = 1
+SAVEFILE 812 = 1
+SAVEFILE 817 = 5
+SAVEFILE 818 = 4
+SAVEFILE 827 = 1
+SAVEFILE 828 = 1
+SAVEFILE 829 = 1
+SAVEFILE 832 = 1
+SAVEFILE 835 = 1
+SAVEFILE 841 = 1
+SAVEFILE 844 = 1
+SAVEFILE 846 = 1
+SAVEFILE 847 = 1
+SAVEFILE 848 = 1
+SAVEFILE 849 = 1
+SAVEFILE 850 = 1
+SAVEFILE 852 = 1
+SAVEFILE 857 = 1
+SAVEFILE 864 = 1
+SAVEFILE 866 = 1
+SAVEFILE 871 = 2
+SAVEFILE 885 = 1
+SAVEFILE 886 = 1
+SAVEFILE 889 = 1
+SAVEFILE 890 = 3
+SAVEFILE 891 = 1
+SAVEFILE 892 = 2
+SAVEFILE 893 = 1
+SAVEFILE 895 = 1
+SAVEFILE 898 = 1
+SAVEFILE 899 = 1
+SAVEFILE 902 = 1
+SAVEFILE 903 = 1
+SAVEFILE 904 = 1
+SAVEFILE 905 = 1
+SAVEFILE 906 = 2
+SAVEFILE 908 = 1
+SAVEFILE 910 = 1
+SAVEFILE 911 = 1
+SAVEFILE 912 = 1
+SAVEFILE 914 = 1
+SAVEFILE 915 = 1
+SAVEFILE 916 = 1
+SAVEFILE 917 = 1
+SAVEFILE 918 = 1
+SAVEFILE 986 = 1
+SAVEFILE 987 = 1
+SAVEFILE 1000 = 1
+SAVEFILE 1001 = 23
+SAVEFILE 1002 = 28
+SAVEFILE 1003 = 112
+SAVEFILE 1005 = 8
+SAVEFILE 1011 = 4
+SAVEFILE 1012 = 7
+SAVEFILE 1013 = 10
+SAVEFILE 1015 = 5
+SAVEFILE 1021 = 5
+SAVEFILE 1022 = 16
+SAVEFILE 1023 = 51
+SAVEFILE 1025 = 52
+SAVEFILE 1136 = 1
+SAVEFILE 1137 = 1
+SAVEFILE 1211 = 2
+SAVEFILE 1235 = 3
+SAVEFILE 1244 = 3
+SAVEFILE 1313 = 3
+SAVEFILE 1314 = 3
+SAVEFILE 1536 = 3
+SAVEFILE 1537 = 4
+SAVEFILE 1611 = 38
+SAVEFILE 1635 = 23
+SAVEFILE 1644 = 8
+SAVEFILE 1713 = 19
+SAVEFILE 1714 = 22
+SAVEFILE NBObjet = 2
+SAVEFILE HOG_OBJ_CRANE
+SAVEFILE CMP_TELECOMMANDE
+SAVEFILE //== Sauvegarde des dialogues ==
+SAVEFILE NBPersoAvecDial = 5
+SAVEFILE Perso = 1
+SAVEFILE NBSuj = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 1
+SAVEFILE NBSprite = 0
+SAVEFILE Etat = 1
+SAVEFILE ID = 2
+SAVEFILE NBSprite = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 3
+SAVEFILE NBSprite = 4
+SAVEFILE Perso = 13
+SAVEFILE NBSuj = 4
+SAVEFILE Etat = 1
+SAVEFILE ID = 4
+SAVEFILE NBSprite = 9
+SAVEFILE Etat = 1
+SAVEFILE ID = 5
+SAVEFILE NBSprite = 7
+SAVEFILE Etat = 1
+SAVEFILE ID = 6
+SAVEFILE NBSprite = 8
+SAVEFILE Etat = 1
+SAVEFILE ID = 7
+SAVEFILE NBSprite = 6
+SAVEFILE Perso = 19
+SAVEFILE NBSuj = 5
+SAVEFILE Etat = 1
+SAVEFILE ID = 14
+SAVEFILE NBSprite = 1
+SAVEFILE Etat = 1
+SAVEFILE ID = 35
+SAVEFILE NBSprite = 22
+SAVEFILE Etat = 1
+SAVEFILE ID = 22
+SAVEFILE NBSprite = 9
+SAVEFILE Etat = 1
+SAVEFILE ID = 40
+SAVEFILE NBSprite = 26
+SAVEFILE Etat = 1
+SAVEFILE ID = 43
+SAVEFILE NBSprite = 29
+SAVEFILE Perso = 40
+SAVEFILE NBSuj = 5
+SAVEFILE Etat = 1
+SAVEFILE ID = 19
+SAVEFILE NBSprite = 6
+SAVEFILE Etat = 1
+SAVEFILE ID = 30
+SAVEFILE NBSprite = 17
+SAVEFILE Etat = 1
+SAVEFILE ID = 27
+SAVEFILE NBSprite = 14
+SAVEFILE Etat = 1
+SAVEFILE ID = 36
+SAVEFILE NBSprite = 22
+SAVEFILE Etat = 1
+SAVEFILE ID = 32
+SAVEFILE NBSprite = 19
+SAVEFILE Perso = 62
+SAVEFILE NBSuj = 2
+SAVEFILE Etat = 0
+SAVEFILE ID = 45
+SAVEFILE NBSprite = 1
+SAVEFILE Etat = 0
+SAVEFILE ID = 44
+SAVEFILE NBSprite = 0
+SAVEFILE Quaternion0 = 0.000000
+SAVEFILE Quaternion1 = 0.000000
+SAVEFILE Quaternion2 = 0.000000
+SAVEFILE Quaternion3 = 1.000000
+STATE 172: chapter=5 monde=1 wam=hoggar.wam view=23 hand=- waiting=0 music=6)

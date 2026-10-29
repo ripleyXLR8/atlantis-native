@@ -53,7 +53,7 @@ pub struct Slot {
     /// +0x440: the pause runs (the clock does not move the frame).
     pub waiting: bool,
     /// +0x44c: the time the play started (seconds): 0 after the load.
-    start: f64,
+    pub start: f64,
     /// +0x46c: a play is to start again at once (1 at load, 0 after the
     /// first step).
     pub fresh: bool,

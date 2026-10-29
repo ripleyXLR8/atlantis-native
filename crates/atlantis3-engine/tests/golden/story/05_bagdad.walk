@@ -1,0 +1,269 @@
+# Atlantis III - story segment 05: Bagdad (world 3): the merchant's house
+# (MMarchd.wam, chapters 28, 29), the garden (jardin.wam, 31, 32, 36..41),
+# the tower (TourMagi.wam, 47), the magician's palace (PMagi.wam, 48..51),
+# the skull PMA_CRANE (interdimension), back to the Hoggar.
+# Read by tools/emu/a3_story_script.py.  Starts at MMarchd view 12, chapter 28.
+
+# Chapter 28: the guard (Puzzle_Garde, view hook 0x004c5590, frame hook
+# 0x004c5dc0; it only catches): the way subsystems/puzzles-mmarchd.md §4 gives.
+GO 11                       # out of the jar: cinema 80, Flag118, Flag120
+OBJET MMA_COUVERCLE         # the lid: cinema 60, the cat leaves, Flag119
+EXPECT FLAG119=1
+GO 5
+GO 1
+# The stone throw and the ladder (the guard's states change at his
+# animations' ends, which the harness does not model): skipped with the
+# scripts' state after them (subsystems/puzzles-mmarchd.md §6): stone
+# taken and thrown (Flag123), ladder taken (Flag121) and laid under the
+# balcony (Flag124, MMA_ECHELLEBALCON shown); the guard state stays 1.
+SKIP puzzle mmarchd_guard FLAG121=1 FLAG123=1 FLAG124=1 RUN=(HideObjet=MMA_PIERRE) RUN=(HideObjet=MMA_ECHELLE) RUN=(ShowObjet=MMA_ECHELLEBALCON)
+GO 13                       # vue=1 & DepartVue=13 & Flag124: Flag122, view 13, chapter 29
+EXPECT CHAPTER=29
+GO 8                        # DepartVue=8 & Flag150=0: cinema 61 (the vase), Flag150, Vue=8
+EXPECT VUE=8
+GO 14                       # DepartVue=14: cinemas 62, 63, jardin.wam view 4, chapter 31
+EXPECT WAM=jardin.wam
+EXPECT CHAPTER=31
+# The garden (chapter 31 hub; departures to 20/100/29/19 -> chapter 32,
+# 27 -> 36, 3 -> 38, 6 -> 40)
+GO 15
+GO 29                       # chapter 32
+OBJET BAG_PERCHE            # the pole: Flag127
+GO 15                       # chapter 31
+GO 4
+GO 3                        # chapter 38 (the earth soldier's house: departures elsewhere -> 31)
+GO 24                       # chapter 31
+GO 23
+GO 22
+GO 19                       # chapter 32
+HAND BAG_PERCHE
+OBJET BAG_REGIMEBANANE      # the bunch with the pole (0x004c3ff0): its animation, flags 802, 803
+# the bunch's animation end (slot (BAG_REGIMEBANANE, anim 1) ended, not
+# modelled): the step's tail (@ 0x004c3ff0) injected: (showobjet=BAG_BANANE),
+# playing byte 0x00785fd2 := 0, done byte 0x00785fd1 := 1
+SKIP puzzle banana_bunch RUN=(showobjet=BAG_BANANE) MEM8=0x00785fd2:0 MEM8=0x00785fd1:1
+HAND -                      # empty the hand (the pole is still in it)
+OBJET BAG_BANANE            # chapter 32: Flag803=0
+GO 18
+GO 17
+GO 20                       # the monkey (0x004cfaa0): at view 20 it plays anim 2 (state 1, click type 2) then runs to view 100
+HAND BAG_BANANE
+PERSO BAG_SINGE TYPE=2      # the monkey with the banana: BAG_PUZZLESINGEOK, Flag125, Flag804, cinema 71, BAG_3BATONS shown
+EXPECT FLAG804=1
+HAND -                      # empty the hand (the banana, given away, is still in it)
+OBJET BAG_3BATONS           # the three sticks
+HAND -                      # the inventory's scan with an empty hand: chapter 32 Flag126, the sticks split: BAG_BATON_BLEU / ROUGE / VERT
+EXPECT FLAG126=1
+# the wood soldier (chapter 36, view 27 -> 32): the green stick
+GO 100
+GO 21
+GO 22
+GO 23
+GO 24
+GO 3                        # chapter 38
+GO 4                        # chapter 31
+GO 1
+GO 2
+GO 27                       # chapter 36
+HAND BAG_BATON_VERT
+GO 32                       # flag129=0: the soldier appears (abort)
+GO 32                       # the green stick: flag128, the stick taken (abort)
+EXPECT FLAG128=1
+GO 32                       # chapter 36 departvue=32 & flag128: Flag805, chapter 37 (the green houri's room)
+EXPECT CHAPTER=37
+GO 27                       # chapter 36
+GO 2                        # chapter 31
+GO 1
+GO 4
+GO 3                        # chapter 38 (the earth soldier)
+HAND BAG_BATON_ROUGE
+GO 33                       # flag135=0: the soldier appears (pot hidden)
+GO 33                       # the red stick: flag134
+EXPECT FLAG134=1
+GO 33                       # Flag806, chapter 39 (the red houri's room)
+EXPECT CHAPTER=39
+GO 3                        # chapter 38
+GO 4                        # chapter 31
+GO 1
+GO 5
+GO 6                        # chapter 40 (the stone soldier)
+HAND BAG_BATON_BLEU
+GO 31                       # flag140=0: the soldier appears
+GO 31                       # the blue stick: flag139
+EXPECT FLAG139=1
+GO 31                       # Flag807, chapter 41 (the blue houri's room)
+EXPECT CHAPTER=41
+GO 6                        # chapter 40
+GO 5                        # chapter 31
+# the milky ball, the unicorn, the horn, the jewel case
+GO 7
+GO 34
+GO 35
+GO 36
+GO 26
+GO 12
+GO 30
+GO 13
+GO 14
+OBJET BAG_BOULE_LAITEUSE    # the milky ball: Flag145
+GO 13
+GO 30
+HAND BAG_BOULE_LAITEUSE
+ZONE BAG_ZONE_BOULELAIT     # chapter 31: the ball laid, music 38, Flag148, Flag147
+EXPECT FLAG147=1
+FRAME                       # frame hook: flag 147 -> the unicorn board (mode 11, start 0x0042e7a0 mirrored: cinema 77)
+EXPECT MODE=11
+# The unicorn board (3D, loop 0x0042eb50): its win branch (@ 0x0042f6a9)
+# runs these commands, then returns 0 -> stop 0x0042e990 (CtrlScenarIN).
+# (Its sound 803 is not played here.)
+SKIP puzzle licorne RUN=(Flag147=0) RUN=(Flag149=1) RUN=(Flag146=1) RUN=(StopMusik=1) RUN=(SacADos=BAG_CORNE_LICORNE) RUN=(ObjetEnMain=BAG_CORNE_LICORNE) CALL=0x0042e990
+EXPECT MODE=3
+EXPECT HAND=BAG_CORNE_LICORNE
+GO 13
+HAND BAG_CORNE_LICORNE
+ZONE BAG_ZONE_SERRURE       # chapter 31: the horn in the lock, the cage down, Flag144
+EXPECT FLAG144=1
+GO 14                       # DepartVue=14 & Flag144: view 114
+EXPECT VUE=114
+ZONE BAG_ZONE_ECRIN         # zone hook 0x004c32c0: flag 144, flag 131 = 0 -> AtlEcrin (mode 14), flag 131
+EXPECT MODE=14
+# The jewel case (loop 0x00412fc0): the three gems clicked, then (count 3)
+# the loop returns 0 -> stop 0x00412f40: (SacADos=BAG_SAPHIR),
+# (SacADos=BAG_RUBIS), (SacADos=BAG_EMERAUDE), CtrlScenarIN.
+SKIP puzzle ecrin CALL=0x00412f40
+EXPECT MODE=3
+# the three houris: the emerald (green: the tower map), the ruby (red: the
+# tower's exit key), the sapphire (blue, with the exit key: the entry key)
+GO 13
+GO 30
+GO 12
+GO 26
+GO 36
+GO 35
+GO 34
+GO 7
+GO 5
+GO 1
+GO 2
+GO 27                       # chapter 36
+GO 32                       # chapter 37
+HAND BAG_EMERAUDE
+PERSO BAG_HOURISVERTE_DEDANS    # first click: the first talk (dialog 198), only the first true sub-condition runs
+PERSO BAG_HOURISVERTE_DEDANS    # the gem in hand
+EXPECT HAND=BAG_MAP_TOUR
+FRAME                       # frame hook: BAG_MAP_TOUR in hand -> AtlCarteTour (mode 10)
+EXPECT MODE=10
+CLICK right                 # any click closes the tower map (loop 0x00406780 -> 0): end, CtrlScenarIN
+EXPECT MODE=3
+GO 27                       # chapter 36
+GO 2                        # chapter 31
+GO 1
+GO 4
+GO 3                        # chapter 38
+GO 33                       # chapter 39
+HAND BAG_RUBIS
+PERSO BAG_HOURISROUGE_DEDANS    # first click: the first talk (dialog 204), only the first true sub-condition runs
+PERSO BAG_HOURISROUGE_DEDANS    # the gem in hand
+EXPECT HAND=BAG_CLE_SORTIE_TOUR
+GO 3                        # chapter 38
+GO 4                        # chapter 31
+GO 1
+GO 5
+GO 6                        # chapter 40
+GO 31                       # chapter 41
+HAND BAG_SAPHIR
+PERSO BAG_HOURISBLEUE_DEDANS    # first click: the first talk (dialog 209), only the first true sub-condition runs
+PERSO BAG_HOURISBLEUE_DEDANS    # the gem in hand
+EXPECT HAND=BAG_CLE_ENTREE_TOUR
+GO 6                        # chapter 40
+GO 5                        # chapter 31
+GO 7
+GO 34
+GO 38
+HAND BAG_CLE_ENTREE_TOUR
+GO 39                       # chapter 31 departvue=39 with the entry key: TourMagi.wam view 39, cinemas 82, 76, chapter 47
+EXPECT WAM=TourMagi.wam
+EXPECT CHAPTER=47
+# The tower race (chapter 47: squares 39..99 are views; the C step
+# 0x004d5170, the dice by AtlGBoy): skipped with its win tail: the player's
+# move to 99 (flag 800 / 0x00789ad4 := 99, (AngleWarpX=-90),
+# (AngleWarpY=20), (Vue=99)), the won byte 0x00789ae2 := 1, then
+# 0x004d56b0 (0x00789ae1 := 1, Flag151 := 1, CtrlScenarIN).
+SKIP puzzle tower_race FLAG800=99 MEM32=0x00789ad4:99 RUN=(AngleWarpX=-90) RUN=(AngleWarpY=20) RUN=(Vue=99) MEM8=0x00789ae2:1 CALL=0x004d56b0
+EXPECT FLAG151=1
+EXPECT VUE=99
+HAND BAG_CLE_SORTIE_TOUR
+GO 100                      # chapter 47 departvue=100 & Flag151 & the exit key: PMagi.wam view 6, cinemas 64, 74, chapter 48
+EXPECT WAM=PMagi.wam
+EXPECT CHAPTER=48
+# The magician's palace (PMagi.wam, chapters 48..51)
+GO 7                        # chapter 48 DepartVue=7: view 7, chapter 49
+EXPECT CHAPTER=49
+GO 8
+GO 12                       # chapter 49 DepartVue=12 & flag154=0: cinema 75, view 10, chapter 50 (the star room)
+EXPECT CHAPTER=50
+EXPECT VUE=10
+# The star room (0x004ceb50: five constellations, then a six-star path
+# 33 -> 42): its success @ 0x004cf850: solved byte, (Flag154=1), the tip
+# voice stopped if still playing, CtrlScenarIN.
+SKIP puzzle star_room CALL=0x004cf850
+EXPECT FLAG154=1
+EXPECT CHAPTER=49
+EXPECT VUE=8
+GO 12                       # chapter 49 DepartVue=12, flag154=1, Flag811=0: view 12, chapter 51
+EXPECT CHAPTER=51
+# The drawer wall PMA_TT (0x004d2ac0, real): the four lock drawers, then
+# the fifth row's four zones show the clues
+OBJET PMA_TT11
+OBJET PMA_TT12
+OBJET PMA_TT14
+OBJET PMA_TT13
+ZONE PMA_ZONE_TT51
+ZONE PMA_ZONE_TT52
+ZONE PMA_ZONE_TT53
+ZONE PMA_ZONE_TT54
+OBJET PMA_INDICE1
+HAND -
+OBJET PMA_INDICE2
+HAND -
+OBJET PMA_INDICE3
+HAND -
+OBJET PMA_INDICE4
+HAND -                      # the four clues, empty hand: chapter 51 cinema 73, Flag811, view 112
+EXPECT FLAG811=1
+EXPECT VUE=112
+# The drawer wall PMA_TR (0x004d1e00, real): drawers 4-3, 1-3, 2-4, 1-1
+OBJET PMA_TR43
+OBJET PMA_TR13
+OBJET PMA_TR24
+OBJET PMA_TR11              # step 4: Flag812, (ObjetEnMain=0), the clues out of the bag
+EXPECT FLAG812=1
+FRAME                       # the pull-tab, the lamp and the cloth shown; the cupboard animation starts
+# The cupboard animation (record 0x007897a0 PMA_PLACARD01, 12 frames:
+# +8 frames done) ends; then the lamp's (0x00789808, 9 frames): the real
+# step 0x004d1e00 then puts both at their last frame, done byte, CtrlScenarIN.
+SKIP puzzle tr_cupboard_anim MEM32=0x007897a8:12
+SKIP puzzle tr_lamp_anim MEM32=0x00789810:9
+OBJET PMA_CHIFFON           # the cloth: Flag58
+OBJET PMA_LAMPE             # the cloth on the lamp: cinema 65, PMA_ROSE in bag and hand, the skull shown, Flag158
+EXPECT FLAG158=1
+HAND -
+OBJET PMA_CRANE             # the skull: chapter 51 Flag156, Flag900
+EXPECT FLAG900=1
+RAND 2                      # the interdimension's view: rand() % 6 + 2 = 4
+FRAME                       # frame hook: flag 900 -> 0x00409cc0: world 5, chapter 52 (flag890=3, flag893); cinema 66
+EXPECT CHAPTER=52
+EXPECT VUE=4
+GO 3
+GO 8
+OBJET INT_BULLENETMAGICIEN  # first click: the dolphin, dialog 157, Flag866
+EXPECT FLAG866=1
+OBJET INT_BULLENETMAGICIEN  # back: monde=3, LoadVueMonde -> PMagi.wam view 112, chapter 51
+EXPECT MONDE=3
+EXPECT VUE=112
+GO 8                        # chapter 51 Flag893=1 & DepartVue=8: flag401, cinema 83, Flag908, monde=1, LoadVueMonde -> the Hoggar
+EXPECT MONDE=1
+EXPECT FLAG908=1
+EXPECT CHAPTER=5
+
+CHECKPOINT 105 05_bagdad_end
