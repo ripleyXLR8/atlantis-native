@@ -4,8 +4,9 @@
 
 **Return to Atlantis, on today's machines.**
 
-A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997),
-written in Rust, for Windows, macOS, Linux and your browser.
+A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997) and
+*Atlantis II* (1999), written in Rust, for Windows, macOS, Linux and your
+browser.
 
 [![Build](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml/badge.svg)](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/ripleyXLR8/atlantis-native)](https://github.com/ripleyXLR8/atlantis-native/releases/latest)
@@ -56,12 +57,17 @@ original's bugs and an optional HD mode.
 </p>
 
 <p align="center">
+  <img src="docs/screenshots/atlantis2-shamballa-widescreen.jpg" width="98%" alt="Atlantis II: Shamballa in the HD mode, widescreen">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/game-library.png" width="70%" alt="The game library: several editions of the game">
 </p>
 
 <sub>From top to bottom: the player screen (macOS, HD mode); a dialog with
 its 3D talking head drawn at the window's resolution; the same view in
-the original's 640x480 and in the HD mode; widescreen; the game library.
+the original's 640x480 and in the HD mode; widescreen; *Atlantis II*'s
+Shamballa in the HD mode, widescreen; the game library.
 The game's pictures and text are © Microids (Cryo Interactive
 Entertainment), shown here to illustrate the engine; Atlantis Native
 contains none of them.</sub>
@@ -267,6 +273,11 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
 - 🔧 [Technical notes](docs/TECHNICAL.md): the engine's layout, the
   enhancements, how the HD mode works, subtitles, the web build, tests,
   roadmap.
+- 🔍 [How the Atlantis engine was reverse engineered](https://www.retroreversing.com/cryo-atlantis-engine),
+  an article on RetroReversing.
+- 🎮 [Atlantis Native on the R36S](https://github.com/Klaasvdb/atlantis-native-handheld),
+  by Klaas Van den Broeck: a frontend that runs Atlantis Native on RK3326
+  handhelds, with the gamepad as the mouse.
 
 ## Code signing policy
 
@@ -337,5 +348,5 @@ folder, for a Chinese or the Japanese release only); every package carries
 their licence files, `LICENSE-LiberationSans`, `LICENSE-NotoSerifCJK` and
 `LICENSE-NotoSansJP`, beside `LICENSE`.
 
-*Atlantis: The Lost Tales* is a trademark of its owners. This project is not
+*Atlantis: The Lost Tales* and *Atlantis II* are trademarks of their owners. This project is not
 affiliated with them.
