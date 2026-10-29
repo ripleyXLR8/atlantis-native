@@ -20,6 +20,7 @@
 //! slot every 0.25 s.
 
 use atlantis2_engine::script::BagEntry;
+use atlantis3_data::spr::{Bank, Target};
 
 /// The slot width (@ 0x00717080) and the bar's height (@ 0x00717084).
 pub const SLOT: i32 = 80;
@@ -87,20 +88,22 @@ impl Inventory {
         self.open || self.alpha > 0.0
     }
 
-    /// The fade's step, at most once per 1/50 s of the clock.
+    /// The fade's step (@ 0x00427c40): when more than 1/50 s passed since
+    /// the last one, alpha + 0.2 (1.0 once it reached 1) while open, alpha
+    /// − 0.2 while closed and above 0 (f32 sums).
     pub fn fade_step(&mut self, now: f64) {
-        if now - self.fade_time < 1.0 / 50.0 {
-            return;
-        }
-        self.fade_time = now;
-        if self.open {
-            if self.alpha >= 1.0 {
-                self.alpha = 1.0;
-            } else {
-                self.alpha += 0.2;
+        if self.open || self.alpha > 0.0 {
+            if now - self.fade_time <= 1.0 / 50.0 {
+                return;
             }
-        } else if self.alpha > 0.0 {
-            self.alpha -= 0.2;
+            self.fade_time = now;
+            self.alpha = if !self.open {
+                self.alpha - 0.2
+            } else if self.alpha >= 1.0 {
+                1.0
+            } else {
+                self.alpha + 0.2
+            };
         }
     }
 
@@ -114,10 +117,24 @@ impl Inventory {
             .then(|| (dx / SLOT) as usize + self.scroll)
     }
 
+    /// The pick of a click (@ 0x00429b80): the shown entry under the
+    /// pointer.
+    pub fn pick(
+        &self,
+        width: usize,
+        height: usize,
+        pointer: (i32, i32),
+        shown: &[BagEntry],
+    ) -> Option<BagEntry> {
+        self.slot_at(width, height, pointer)
+            .and_then(|i| shown.get(i))
+            .copied()
+    }
+
     /// The pointer at an edge scrolls one slot every 0.25 s.
     pub fn scroll_step(&mut self, width: usize, shown: usize, px: i32, now: f64) {
         let (n, _) = slots(width);
-        if now - self.scroll_time < 0.25 {
+        if now - self.scroll_time <= 0.25 {
             return;
         }
         if px <= 0 && self.scroll > 0 {
@@ -128,4 +145,162 @@ impl Inventory {
             self.scroll_time = now;
         }
     }
+}
+
+/// The banks the inventory draws with.
+pub struct Banks<'a> {
+    pub interface: Option<&'a Bank>,
+    /// `<World>Objets.SPR`.
+    pub objects: Option<&'a Bank>,
+    /// `fleche.SPR`.
+    pub arrows: Option<&'a Bank>,
+}
+
+/// One `AtlSpr_Aff` call (@ 0x004367b0): bank, sprite, top-left x, y (a
+/// centred draw already moved by half the sprite's size), alpha, and what
+/// it drew: `AFF_SPR` (`None`), `AFF_SPRTRS` at a level, or nothing.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Aff {
+    pub bank: &'static str,
+    pub index: usize,
+    pub x: i32,
+    pub y: i32,
+    pub alpha: f32,
+    pub drawn: Option<Option<u8>>,
+}
+
+/// `AtlSpr_Aff`: `AFF_SPR` at alpha ≥ 1, `AFF_SPRTRS` at
+/// `ftol(alpha × 31) & 31` below, nothing at alpha ≤ 0, on the game's
+/// target (clip maxima at the size).
+#[allow(clippy::too_many_arguments)]
+pub fn aff(
+    screen: &mut [u16],
+    w: usize,
+    h: usize,
+    name: &'static str,
+    bank: &Bank,
+    index: usize,
+    x: i32,
+    y: i32,
+    alpha: f32,
+) -> Aff {
+    let mut t = Target::screen(screen, w, h);
+    t.xmax = w as i32;
+    t.ymax = h as i32;
+    let drawn = trs_level(alpha);
+    match drawn {
+        None => {}
+        Some(None) => {
+            bank.draw(&mut t, Some(x), y, index);
+        }
+        Some(Some(l)) => {
+            bank.draw_trs(&mut t, Some(x), y, index, l);
+        }
+    }
+    Aff {
+        bank: name,
+        index,
+        x,
+        y,
+        alpha,
+        drawn,
+    }
+}
+
+/// `AtlSpr_AffCentre` (@ 0x00436b80): centred on (x, y) by half the
+/// sprite's size.
+#[allow(clippy::too_many_arguments)]
+pub fn aff_centre(
+    screen: &mut [u16],
+    w: usize,
+    h: usize,
+    name: &'static str,
+    bank: &Bank,
+    index: usize,
+    x: i32,
+    y: i32,
+    alpha: f32,
+) -> Option<Aff> {
+    // `AtlSpr_AffCentre` draws nothing at alpha 0 or below.
+    if alpha <= 0.0 {
+        return None;
+    }
+    let info = bank.info(index)?;
+    Some(aff(
+        screen,
+        w,
+        h,
+        name,
+        bank,
+        index,
+        x - i32::from(info.w) / 2,
+        y - i32::from(info.h) / 2,
+        alpha,
+    ))
+}
+
+/// The items (@ 0x004299b0), the arrows (@ 0x00428fd0) and the bar at
+/// `alpha`; the calls made.
+#[allow(clippy::too_many_arguments)]
+pub fn draw_items(
+    screen: &mut [u16],
+    w: usize,
+    h: usize,
+    banks: &Banks,
+    items: &[BagEntry],
+    scroll: usize,
+    alpha: f32,
+    objects_name: &'static str,
+) -> Vec<Aff> {
+    let mut calls = Vec::new();
+    let (n, margin) = slots(w);
+    let hi = h as i32;
+    if let Some(bank) = banks.objects {
+        for (j, e) in items.iter().skip(scroll).take(n as usize).enumerate() {
+            let x = margin + SLOT * j as i32 + 40;
+            calls.extend(aff_centre(
+                screen,
+                w,
+                h,
+                objects_name,
+                bank,
+                usize::from(e.sprite),
+                x,
+                hi - 40,
+                alpha,
+            ));
+        }
+    }
+    if let Some(bank) = banks.arrows {
+        if scroll > 0 {
+            calls.push(aff(screen, w, h, "fleche.SPR", bank, 0, 0, hi - 110, alpha));
+        }
+        if scroll + (n as usize) < items.len() {
+            calls.push(aff(
+                screen,
+                w,
+                h,
+                "fleche.SPR",
+                bank,
+                1,
+                w as i32 - 16,
+                hi - 110,
+                alpha,
+            ));
+        }
+    }
+    if let Some(bank) = banks.interface {
+        calls.extend(aff_centre(
+            screen,
+            w,
+            h,
+            "Interface.spr",
+            bank,
+            0,
+            (w / 2) as i32,
+            hi - 39,
+            alpha,
+        ));
+    }
+    calls
 }

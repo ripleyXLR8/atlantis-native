@@ -437,6 +437,16 @@ impl Game {
         self.moving.pending
     }
 
+    /// Shows the start page (`i_debut`); false when it cannot.
+    pub fn show_start_page(&mut self) -> bool {
+        false
+    }
+
+    /// Shows the save page (`i_save`); false when it cannot.
+    pub fn show_save_page(&mut self) -> bool {
+        false
+    }
+
     /// Whether a dialog plays.
     pub fn dialog_running(&self) -> bool {
         self.running.is_some()
@@ -614,7 +624,9 @@ impl Game {
         self.world_banks();
         self.prev_mode = self.mode;
         self.mode = Mode::Inventory;
-        self.look.stop();
+        // The free pointer at the centre (@ 0x00431780); the turn speeds
+        // are not cleared here.
+        self.pointer = ((self.width / 2) as i32, (self.height / 2) as i32);
         if let Some(s) = self.script.as_mut() {
             s.empty_hand();
         }
@@ -622,16 +634,26 @@ impl Game {
         self.inventory.alpha = 0.0;
         self.inventory.fade_time = self.now;
         self.click = false;
+        // `CtrlScenarIN` once (@ 0x00427a60).
+        self.with_script(|s, h| {
+            s.ctrl_scenar_in(h);
+        });
     }
 
     /// Closes the inventory (@ 0x00427b20): the mode back; the items fade
     /// out over the warp.
     fn close_inventory(&mut self) {
         self.inventory.open = false;
-        self.inventory.fade_time = self.now;
         self.mode = self.prev_mode;
+        // The turn speeds zeroed (@ 0x00431760), the pointer cursor and
+        // the hand cleared, the click flags cleared; alpha kept.
         self.look.stop();
+        if let Some(s) = self.script.as_mut() {
+            s.empty_hand();
+            s.click = false;
+        }
         self.click = false;
+        self.double_click = false;
         self.look_last = None;
     }
 
@@ -680,14 +702,10 @@ impl Game {
         y: i32,
         alpha: f32,
     ) {
-        let Some(info) = bank.info(idx) else { return };
-        let x = x - i32::from(info.w) / 2;
-        let y = y - i32::from(info.h) / 2;
-        Self::aff(screen, w, h, bank, idx, x, y, alpha);
+        crate::inventory::aff_centre(screen, w, h, "", bank, idx, x, y, alpha);
     }
 
-    /// `AtlSpr_Aff`: `AFF_SPR` at alpha ≥ 1, `AFF_SPRTRS` below, nothing
-    /// at 0.
+    /// `AtlSpr_Aff` (@ 0x004367b0).
     #[allow(clippy::too_many_arguments)]
     fn aff(
         screen: &mut [u16],
@@ -699,77 +717,40 @@ impl Game {
         y: i32,
         alpha: f32,
     ) {
-        let mut t = Target::screen(screen, w, h);
-        // The game's target: maxima are the size (formats/spr.md).
-        t.xmax = w as i32;
-        t.ymax = h as i32;
-        match crate::inventory::trs_level(alpha) {
-            None => {}
-            Some(None) => {
-                bank.draw(&mut t, Some(x), y, idx);
-            }
-            Some(Some(l)) => {
-                bank.draw_trs(&mut t, Some(x), y, idx, l);
-            }
-        }
+        crate::inventory::aff(screen, w, h, "", bank, idx, x, y, alpha);
     }
 
     /// The inventory's items, bar and arrows at its alpha (@ 0x004299b0,
     /// @ 0x00428fd0).
     fn draw_inventory_items(&mut self) {
-        let alpha = self.inventory.alpha;
-        let (w, h) = (self.width, self.height);
         let items = self.inventory_items();
-        let (n, margin) = crate::inventory::slots(w);
-        if let Some(bank) = &self.objects {
-            for (j, e) in items
-                .iter()
-                .skip(self.inventory.scroll)
-                .take(n as usize)
-                .enumerate()
-            {
-                let x = margin + crate::inventory::SLOT * j as i32 + 40;
-                Self::aff_centre(
-                    &mut self.screen,
-                    w,
-                    h,
-                    bank,
-                    usize::from(e.sprite),
-                    x,
-                    h as i32 - 40,
-                    alpha,
-                );
-            }
-        }
-        if let Some(bank) = &self.interface {
-            Self::aff_centre(
-                &mut self.screen,
-                w,
-                h,
-                bank,
-                0,
-                (w / 2) as i32,
-                h as i32 - 39,
-                alpha,
-            );
-        }
-        if let Some(bank) = &self.arrows {
-            if self.inventory.scroll > 0 {
-                Self::aff(&mut self.screen, w, h, bank, 0, 0, h as i32 - 110, alpha);
-            }
-            if self.inventory.scroll + (n as usize) < items.len() {
-                Self::aff(
-                    &mut self.screen,
-                    w,
-                    h,
-                    bank,
-                    1,
-                    w as i32 - 16,
-                    h as i32 - 110,
-                    alpha,
-                );
-            }
-        }
+        let objects = self
+            .script
+            .as_ref()
+            .and_then(|s| crate::inventory::world_bank_name(s.a3.world))
+            .map_or("Objets.spr", |n| match n {
+                "Hoggar" => "HoggarObjets.spr",
+                "LDM" => "LDMObjets.spr",
+                "Bagdad" => "BagdadObjets.spr",
+                "Paleo" => "PaleoObjets.spr",
+                _ => "InterObjets.spr",
+            });
+        let banks = crate::inventory::Banks {
+            interface: self.interface.as_ref(),
+            objects: self.objects.as_ref(),
+            arrows: self.arrows.as_ref(),
+        };
+        let (w, h) = (self.width, self.height);
+        crate::inventory::draw_items(
+            &mut self.screen,
+            w,
+            h,
+            &banks,
+            &items,
+            self.inventory.scroll,
+            self.inventory.alpha,
+            objects,
+        );
     }
 
     /// The pointer `Interface.spr` #40 at the free pointer (@ 0x004281e0).
@@ -795,25 +776,28 @@ impl Game {
     fn overlay_frame(&mut self) {
         self.draw_warp_only();
         if self.mode == Mode::Inventory {
+            // @ 0x00427c40: the items, the arrows, the bar, the pointer,
+            // the pick, `Interp_GereFrame`, then a picked object closes
+            // the inventory and goes in the hand; the fade's step.
             self.draw_inventory_items();
             self.draw_pointer();
             let items = self.inventory_items();
             self.inventory
                 .scroll_step(self.width, items.len(), self.pointer.0, self.now);
-            if std::mem::take(&mut self.click) {
-                if let Some(e) = self
-                    .inventory
-                    .slot_at(self.width, self.height, self.pointer)
-                    .and_then(|i| items.get(i))
-                {
-                    // @ 0x00428380: the inventory closed, the item in the
-                    // hand.
-                    let id = e.id;
-                    self.close_inventory();
-                    if let Some(s) = self.script.as_mut() {
-                        s.hold(id);
-                    }
+            let picked = if std::mem::take(&mut self.click) {
+                self.inventory
+                    .pick(self.width, self.height, self.pointer, &items)
+            } else {
+                None
+            };
+            let (yaw, pitch) = self.camera.angles();
+            self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
+            if let Some(e) = picked {
+                self.close_inventory();
+                if let Some(s) = self.script.as_mut() {
+                    s.hold(e.id);
                 }
+                self.frame_hooks();
             }
             self.inventory.fade_step(self.now);
         } else {
@@ -1154,10 +1138,11 @@ impl Game {
         if !self.draw_warp_only() {
             return;
         }
-        // The inventory fading out after it closed (@ 0x00427c40).
+        // The inventory fading out after it closed (@ 0x00427c40): the
+        // fade's step, then the items at the new alpha.
         if !self.inventory.open && self.inventory.alpha > 0.0 {
-            self.draw_inventory_items();
             self.inventory.fade_step(self.now);
+            self.draw_inventory_items();
         }
     }
 
@@ -1221,7 +1206,7 @@ impl Game {
             }
         }
         // The object in the hand, centred on the screen (@ 0x00428500,
-        // `<World>ObjetsEnMain.SPR`), in place of the zone cursor.
+        // `<World>ObjetsEnMain.SPR`), the zone's cursor over it.
         if let Some(sprite) = self
             .script
             .as_ref()
@@ -1242,7 +1227,6 @@ impl Game {
                     1.0,
                 );
             }
-            return;
         }
         let Some(kind) = self
             .centre

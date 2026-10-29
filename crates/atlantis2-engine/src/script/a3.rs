@@ -499,6 +499,19 @@ impl Script {
             self.vars[key] = value;
             self.a3.world = value;
             self.bag.clear();
+            // The world's bag again from the flags (@ 0x0044bb30): the
+            // objects 0..399 whose flag 1100 + id is this world, their
+            // sprite in flag 1500 + id.
+            for id in 0..400usize {
+                if self.flags.get(1100 + id) == Some(&value) && value != 0 {
+                    let sprite = self.flags.get(1500 + id).copied().unwrap_or(0);
+                    self.bag.push(super::BagEntry {
+                        sprite: sprite as u8,
+                        id: id as i32,
+                        world: value,
+                    });
+                }
+            }
             self.set_cursor(0, false);
             host.set_monde(value);
             return Some(next);
