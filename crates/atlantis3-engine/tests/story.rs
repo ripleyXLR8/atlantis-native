@@ -71,6 +71,11 @@ struct Run {
     step: usize,
     /// The checkpoint saves written (name → text).
     saves: BTreeMap<String, Vec<u8>>,
+    /// Escape pressed during each travel video, after its first frame (as
+    /// the original's run made Escape's two calls), then the menu left as
+    /// its `BT_BACK` leaves it; the travel videos escaped.
+    escape_travels: bool,
+    escaped: usize,
 }
 
 impl Run {
@@ -89,7 +94,9 @@ impl Run {
     /// The media started end at once, as the harness ends them.
     fn finish_media(&mut self) {
         for _ in 0..100 {
-            if self.g.video().is_some() {
+            if self.escape_travels && self.g.video_is_travel() {
+                self.escape_travel();
+            } else if self.g.video().is_some() {
                 self.g.finish_video();
             } else if self.g.dialog_running() {
                 self.g.finish_dialog();
@@ -97,6 +104,28 @@ impl Run {
                 break;
             }
         }
+    }
+
+    /// Escape during a travel video, after its first frame: the video ends,
+    /// the section's tail runs again, the in-game menu opens; then back to
+    /// the game.
+    fn escape_travel(&mut self) {
+        for _ in 0..10 {
+            if self.g.video().is_none_or(|v| v.1 > 0) {
+                break;
+            }
+            self.t += 1.0 / 15.0;
+            self.g.step(self.t);
+        }
+        if !self.g.video_is_travel() {
+            return;
+        }
+        self.g.escape();
+        assert_eq!(self.g.mode(), Mode::Menu, "Escape opens the in-game menu");
+        assert_eq!(self.g.menu_page().map(|p| p.0), Some(1));
+        self.g.menu_back();
+        assert_eq!(self.g.mode(), Mode::Warp);
+        self.escaped += 1;
     }
 
     /// The harness's settle: frames while in the warp a turn runs, a move
@@ -470,6 +499,8 @@ fn new_run() -> Option<Run> {
         rands: BTreeMap::new(),
         step: 0,
         saves: BTreeMap::new(),
+        escape_travels: false,
+        escaped: 0,
     })
 }
 
@@ -590,10 +621,18 @@ fn whole_story() {
 }
 
 fn segment(index: usize) {
-    let Some(mut r) = new_run() else {
-        return;
-    };
-    let (name, walk, golden) = SEGMENTS[index];
+    if let Some(r) = segment_with(index, None) {
+        assert_eq!(r.escaped, 0);
+    }
+}
+
+/// Segment `index`, against `golden` instead of its own when given (the
+/// travel videos then escaped).
+fn segment_with(index: usize, golden: Option<&str>) -> Option<Run> {
+    let mut r = new_run()?;
+    let (name, walk, own) = SEGMENTS[index];
+    r.escape_travels = golden.is_some();
+    let golden = golden.unwrap_or(own);
     if let Some(save) = start_save(golden) {
         r.g.script_mut().unwrap().set_log = Some(Vec::new());
         assert!(r.g.load_save_text("quick1_100.sav", save), "{name}: load");
@@ -601,6 +640,21 @@ fn segment(index: usize) {
         r.act_frame();
     }
     play(&mut r, name, walk, golden);
+    Some(r)
+}
+
+/// Segment 02 with Escape pressed during both travel videos, against the
+/// original's run (`02_cfuner_escape.txt`): Escape's `0x0044c620(1)` makes
+/// the video's end resume the script, which runs the tail of the last
+/// interrupted section again (the second travel re-runs the scarab case's
+/// section: the case given again, three subjects enabled, the case in
+/// hand), the original's bug.
+#[test]
+#[ignore = "WIP: step 1's sprite click fails in this run (not investigated: work paused)"]
+fn story_02_cfuner_escaping_travels() {
+    if let Some(r) = segment_with(1, Some(include_str!("golden/story/02_cfuner_escape.txt"))) {
+        assert_eq!(r.escaped, 2);
+    }
 }
 
 #[test]

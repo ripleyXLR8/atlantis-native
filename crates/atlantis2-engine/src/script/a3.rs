@@ -150,6 +150,8 @@ impl Script {
         self.click = false;
         self.click_aux = 0;
         self.vars[k.chapter] = self.chapter;
+        // The resume point's static value: the empty text.
+        self.resume_at = super::RESUME_NOTHING;
         if !self.load_chapter(host, self.chapter) {
             self.fail(format!("chapitre {} introuvable", self.chapter));
             return false;
@@ -186,6 +188,19 @@ impl Script {
         self.resume_pending = false;
         for cmd in std::mem::take(&mut self.a3.queue) {
             self.run_command(host, &cmd);
+        }
+    }
+
+    /// 0x0044c620(1), as Escape during a travel video calls it
+    /// (@ 0x0042ac50 case 4): "section waiting" set (not inside
+    /// `RunOneCommand`) and the wait lock; the `Interp_CloseInterrupt(1)`
+    /// of the video's end that follows then runs the section again from
+    /// the resume point, which still points after the last line that made
+    /// a section wait: that section's tail runs a second time (the
+    /// original's bug, kept).
+    pub fn interrupt_lock(&mut self) {
+        if !self.in_command {
+            self.resume_pending = true;
         }
     }
 
@@ -661,6 +676,9 @@ impl Script {
         self.previous_chapter = previous;
         self.chapter = d.chapter;
         self.vars[self.keys.chapter] = d.chapter;
+        // The original keeps its resume pointer, which points into the
+        // text this load replaces; the port takes it as the empty text.
+        self.resume_at = super::RESUME_NOTHING;
         if !self.load_chapter(host, d.chapter) {
             self.fail(format!(
                 "SetVariables(): chapitre introuvable scenar\\chapi{:03}.con",

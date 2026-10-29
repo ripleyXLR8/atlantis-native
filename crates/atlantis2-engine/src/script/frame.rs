@@ -341,7 +341,9 @@ impl Script {
         if self.resume_pending {
             self.resume_pending = false;
             let at = self.resume_at;
-            self.run_section(host, at);
+            if at != super::RESUME_NOTHING {
+                self.run_section(host, at);
+            }
         }
     }
 

@@ -1979,7 +1979,7 @@ impl Menus {
             .and_then(|d| std::str::from_utf8(d).ok())
             .and_then(|d| d.parse().ok())
             .unwrap_or(0);
-        let prev = if n - 1 >= 1 { n - 1 } else { count };
+        let prev = if n > 1 { n - 1 } else { count };
         let next = if n + 1 > count { 1 } else { n + 1 };
         for (m, frame) in [(prev, 2), (next, 1)] {
             let name = [prefix, m.to_string().as_bytes()].concat();

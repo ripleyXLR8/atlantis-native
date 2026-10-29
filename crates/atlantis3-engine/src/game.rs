@@ -124,6 +124,12 @@ struct Playing {
     caption: Option<crate::caption::CaptionFade>,
     /// The move's transition sprites (`spf\SPF640\<world>\`, `SPF800` with WarpRes 1024).
     spf: Vec<Bank>,
+    /// A travel video's rate (0x00756488), the time of its last frame
+    /// (0x00756440, the start's at first) and "no continue call yet"
+    /// (0x0075649e, set by `AtlHnm_start`, cleared by every call).
+    fps: u32,
+    last: f64,
+    fresh: bool,
     /// The cue lines (`hnm\cineNNN.txt`): the line, shown, done.
     cues: Vec<(atlantis3_data::cine_txt::Cue, bool, bool)>,
 }
@@ -508,6 +514,17 @@ impl Game {
         self.video
             .as_ref()
             .map(|v| (v.cinema.name(), v.cinema.frames_shown()))
+    }
+
+    /// Whether the video playing is a travel video (Hnm_Framer).
+    pub fn video_is_travel(&self) -> bool {
+        self.video.as_ref().is_some_and(|v| v.travel)
+    }
+
+    /// The screen the in-game menu captured for the save thumbnails.
+    #[doc(hidden)]
+    pub fn menu_capture(&self) -> Option<&[u16]> {
+        self.menus.capture.as_ref().map(|c| c.0.as_slice())
     }
 
     /// Whether a move waits to complete (the turn ended, the new view not
@@ -1245,10 +1262,16 @@ impl Game {
             caption: None,
             cues: Vec::new(),
             spf,
+            fps: fps.max(1),
+            last: self.now,
+            fresh: true,
         });
         self.mode = Mode::Video;
-        // The first frame at once.
-        self.video_step();
+        // A cinematic's first frame at once; a travel video's at the
+        // next frame task's `AtlHnm_continue`.
+        if !travel {
+            self.video_step();
+        }
         true
     }
 
@@ -1262,22 +1285,31 @@ impl Game {
             self.mode = Mode::Idle;
             return;
         };
-        if v.travel && std::mem::take(&mut self.click) {
-            // A click or a double click ends a travel video.
-            self.double_click = false;
-            self.end_video();
-            return;
-        }
-        let elapsed_ms = ((self.now - v.start) * 1000.0).max(0.0) as u64;
         let mut advanced = false;
-        while v.cinema.frames_shown() == 0 || v.cinema.next_due_ms() <= elapsed_ms {
+        if v.travel {
+            // Hnm_Framer (@ 0x00421f01..): nothing before 1 / fps s since
+            // the last frame (the click test not reached), then one frame.
+            v.fresh = false;
+            if self.now - v.last < 1.0 / f64::from(v.fps) {
+                return;
+            }
+            v.last = self.now;
             if !v.cinema.advance() {
-                break;
+                self.end_video();
+                return;
             }
             advanced = true;
-            let pcm = v.cinema.take_audio();
-            if !pcm.is_empty() {
-                self.audio.push(CHANNEL_CINEMA, &pcm);
+        } else {
+            let elapsed_ms = ((self.now - v.start) * 1000.0).max(0.0) as u64;
+            while v.cinema.frames_shown() == 0 || v.cinema.next_due_ms() <= elapsed_ms {
+                if !v.cinema.advance() {
+                    break;
+                }
+                advanced = true;
+                let pcm = v.cinema.take_audio();
+                if !pcm.is_empty() {
+                    self.audio.push(CHANNEL_CINEMA, &pcm);
+                }
             }
         }
         if advanced {
@@ -1341,11 +1373,53 @@ impl Game {
             }
         }
         let ended = v.cinema.ended();
+        let travel = v.travel;
         if advanced {
             self.draw_subtitle();
         }
+        // A travel video's frame drawn: a click or a double click ends it
+        // (@ 0x00422019: both flags cleared), then the stream's end.
+        if travel && (self.click || self.double_click) {
+            self.click = false;
+            self.double_click = false;
+            self.end_video();
+            return;
+        }
         if ended {
             self.end_video();
+        }
+    }
+
+    /// Escape during a travel video (@ 0x0042ac50, loop mode 4). Before
+    /// the video's first `AtlHnm_continue` call: `AtlHnm_end` only (back to
+    /// the warp, nothing else). Otherwise: the subtitle off, 0x0044c620(1)
+    /// ([`Script::interrupt_lock`]), `AtlHnm_end` (the warp mode back, then
+    /// `Interp_CloseInterrupt(1)`, which runs the last interrupted
+    /// section's tail again: the original's bug, kept), the screen captured
+    /// for the save thumbnails (the last travel frame shown), loop mode 6
+    /// with the warp to go back to, the in-game menu (page 1) — or, during
+    /// the start page's demo, page 0 without the capture. The place sounds
+    /// go on (unlike the warp's Escape).
+    pub(crate) fn escape_travel(&mut self) {
+        let Some(v) = self.video.as_ref() else {
+            return;
+        };
+        if v.fresh {
+            self.end_video();
+            return;
+        }
+        self.subtitle = None;
+        if let Some(s) = self.script.as_mut() {
+            s.interrupt_lock();
+        }
+        self.end_video();
+        if self.menus.demo {
+            self.enter_menu(crate::menu::PAGE_START);
+            return;
+        }
+        let capture = (self.screen.clone(), self.width, self.height);
+        if self.enter_menu(crate::menu::PAGE_MAIN) {
+            self.menus.capture = Some(capture);
         }
     }
 
