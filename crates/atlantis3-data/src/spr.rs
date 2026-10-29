@@ -107,6 +107,31 @@ pub trait Pixel: Copy {
     fn shade_p5_right_clip(self, f: u8) -> Self {
         self.shade(f)
     }
+    /// The translucent pixel of `AFF_SPRTRS` at level `l`: colour `c` over
+    /// `dst`, the destination's factor `g` (`l`, or `F[l][f]` in a pair).
+    fn trs(c: Self, dst: Self, l: u8, g: u8) -> Self;
+    /// The translucent shade run: `dst` with factor `g = F[l][f]`.
+    fn trs_shade(self, g: u8) -> Self;
+}
+
+/// `AFF_SPRTRS`'s factor table, built by `SprDll_Init` (spr_p6 @ 0x100018a0):
+/// `F[a][b] = a × (b & 31) / 31`, integer.
+pub fn trs_factor(a: u8, b: u8) -> u8 {
+    ((u32::from(a) * u32::from(b & 31)) / 31) as u8
+}
+
+/// One byte lane of the 32-bit translucent blitters (spr_p6 @ 0x10010c5b):
+/// `((s − d) × g + (d << 5)) >> 5` in 16-bit lanes (`psubw`, `pmullw` low
+/// word, `paddw`, `psrlw 5`), saturated by `packuswb`.
+fn mmx_trs(c: u32, dst: u32, g: u16) -> u32 {
+    let mut out = 0u32;
+    for lane in 0..4 {
+        let s = ((c >> (8 * lane)) & 0xff) as u16;
+        let d = ((dst >> (8 * lane)) & 0xff) as u16;
+        let v = s.wrapping_sub(d).wrapping_mul(g).wrapping_add(d << 5) >> 5;
+        out |= u32::from((v as i16).clamp(0, 255) as u8) << (8 * lane);
+    }
+    out
 }
 
 impl Pixel for u16 {
@@ -133,6 +158,15 @@ impl Pixel for u16 {
     /// `(c & 0xf7de) >> 1` (mask @ 0x1001b58c).
     fn half(self) -> u16 {
         half565(self)
+    }
+
+    /// `shade(c, l ^ 31) + shade(dst, g)` (spr_p6 @ 0x1000aad9).
+    fn trs(c: u16, dst: u16, l: u8, g: u8) -> u16 {
+        shade565(c, l ^ 31).wrapping_add(shade565(dst, g))
+    }
+
+    fn trs_shade(self, g: u8) -> u16 {
+        shade565(self, g)
     }
 }
 
@@ -178,6 +212,21 @@ impl Pixel for u32 {
 
     fn shade_p5_right_clip(self, f: u8) -> u32 {
         mmx_shade(0, self, f) & 0xffff
+    }
+
+    fn trs(c: u32, dst: u32, _l: u8, g: u8) -> u32 {
+        mmx_trs(c, dst, u16::from(g))
+    }
+
+    /// `(d × k) >> 5` per byte, k = `g ^ 0x1f`.
+    fn trs_shade(self, g: u8) -> u32 {
+        let k = u32::from(g ^ 0x1f);
+        let mut out = 0;
+        for lane in 0..4 {
+            let d = (self >> (8 * lane)) & 0xff;
+            out |= ((d * k) >> 5).min(255) << (8 * lane);
+        }
+        out
     }
 }
 
@@ -582,6 +631,140 @@ impl Bank {
             (Some(x), _) => (x, y),
         };
         self.blit(t, at, info, x, y, dll)
+    }
+
+    /// `AFF_SPRTRS` (spr_p6 @ 0x10001210 → 0x100025db, spr_p5 @ 0x10001190):
+    /// sprite `index` drawn translucent at `level` (the byte `& 0x1f`; the
+    /// game passes `ftol(alpha × 31)`). Families 0x78 and 0x278 (and 0x274
+    /// on a 16-bit display); any other draws nothing. In 32 bits this is
+    /// `spr_p6.dll`'s blitter without its left-clip path (which shades
+    /// pixels the unclipped path skips; not transcribed, the port draws in
+    /// 16 bits); `spr_p5.dll`'s reads its factors from the 16-bit table,
+    /// left zero on a 32-bit display (not transcribed: the game picks
+    /// `spr_p6.dll` from CPU class 4). False as [`Bank::draw`].
+    pub fn draw_trs<P: Pixel>(
+        &self,
+        t: &mut Target<P>,
+        x: Option<i32>,
+        y: i32,
+        index: usize,
+        level: u8,
+    ) -> bool {
+        if P::DEPTH != self.depth || self.is_spw() {
+            return false;
+        }
+        let Some(at) = self.sprite_at(index) else {
+            return false;
+        };
+        let Some(info) = self.info_at(at) else {
+            return false;
+        };
+        let (x, y) = match (x, info.default_pos) {
+            (None, Some((dx, dy))) => (i32::from(dx), i32::from(dy)),
+            (None, None) => (i32::MIN, y),
+            (Some(x), _) => (x, y),
+        };
+        let half_shade = match (self.depth, self.flags & 0x3fe) {
+            (_, 0x78) | (Depth::Rgb565, 0x74) => false,
+            (_, 0x278) | (Depth::Rgb565, 0x274) => true,
+            _ => return true,
+        };
+        let level = level & 0x1f;
+        let x0 = i32::from((x as i16).wrapping_sub(info.xoff));
+        let y0 = i32::from((y as i16).wrapping_sub(info.yoff));
+        let (w, h) = (i32::from(info.w), i32::from(info.h));
+        let d = &self.data;
+        let table = at + 8;
+        let first = table + 4 * usize::from(info.h);
+        for row in 0..h {
+            let sy = y0 + row;
+            if sy < t.ymin || sy >= t.ymax {
+                continue;
+            }
+            let Some(off) = u32_at(d, table + 4 * row as usize) else {
+                break;
+            };
+            let line = sy as usize * t.pitch;
+            if self
+                .trs_row(t, line, first + off as usize, x0, w, half_shade, level)
+                .is_none()
+            {
+                break;
+            }
+        }
+        true
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn trs_row<P: Pixel>(
+        &self,
+        t: &mut Target<P>,
+        line: usize,
+        mut p: usize,
+        x0: i32,
+        w: i32,
+        half_shade: bool,
+        level: u8,
+    ) -> Option<()> {
+        let d = &self.data;
+        let (xmin, xmax) = (t.xmin, t.xmax);
+        let inside = |sx: i32| sx >= xmin && sx < xmax;
+        let mut sx = x0;
+        let mut prev = Run::Start;
+        while sx < x0 + w {
+            let b = *d.get(p)?;
+            p += 1;
+            let (run, n) = next_run(prev, b);
+            prev = run;
+            match run {
+                Run::End | Run::Start => break,
+                Run::Skip => sx += n as i32,
+                Run::Pal => {
+                    for _ in 0..n {
+                        let i = *d.get(p)?;
+                        p += 1;
+                        if inside(sx) {
+                            let px = &mut t.pixels[line + sx as usize];
+                            *px =
+                                P::trs(P::from_entry(self.pal[usize::from(i)]), *px, level, level);
+                        }
+                        sx += 1;
+                    }
+                }
+                Run::Pair => {
+                    for _ in 0..n {
+                        let (f, i) = (*d.get(p)?, *d.get(p + 1)?);
+                        p += 2;
+                        if inside(sx) {
+                            let px = &mut t.pixels[line + sx as usize];
+                            *px = P::trs(
+                                P::from_entry(self.pal[usize::from(i)]),
+                                *px,
+                                level,
+                                trs_factor(level, f),
+                            );
+                        }
+                        sx += 1;
+                    }
+                }
+                Run::Shade => {
+                    let f = if half_shade {
+                        15
+                    } else {
+                        p += 1;
+                        *d.get(p - 1)?
+                    };
+                    for _ in 0..n {
+                        if inside(sx) {
+                            let px = &mut t.pixels[line + sx as usize];
+                            *px = px.trs_shade(trs_factor(level, f));
+                        }
+                        sx += 1;
+                    }
+                }
+            }
+        }
+        Some(())
     }
 
     /// `AFF_SPW` (spr_p5 @ 0x100023f0): face `face` of frame `frame` of a

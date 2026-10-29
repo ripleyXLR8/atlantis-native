@@ -290,3 +290,56 @@ fn spr_p5_draws_as_spr_p6() {
     );
     assert!(n == 0 || n == 12, "{n}");
 }
+
+const TRS_P6_565: &str = include_str!("golden/spr_trs_p6_565.txt");
+const TRS_P5_565: &str = include_str!("golden/spr_trs_p5_565.txt");
+
+/// The golden lines of one bank drawn translucent (`AFF_SPRTRS`): every
+/// level of `interface.SPR`, the inventory's levels 6, 12, 18 and 24 of
+/// the others, at the positions of [`aff_lines`].
+fn trs_lines<P: Harness>(data: &[u8], name: &str, bg: &[P], _dll: SprDll) -> String {
+    const W: usize = 1024;
+    const H: usize = 768;
+    let bank = Bank::parse(data, P::DEPTH).unwrap();
+    let levels: Vec<u8> = if name.ends_with("interface.SPR") {
+        (0..32).collect()
+    } else {
+        vec![6, 12, 18, 24]
+    };
+    let mut out = String::new();
+    let mut buf = bg.to_vec();
+    for i in 0..bank.len() {
+        let Some(info) = bank.info(i) else { continue };
+        let (w, h) = (i32::from(info.w), i32::from(info.h));
+        let (xo, yo) = (i32::from(info.xoff), i32::from(info.yoff));
+        for (tag, x, y) in [
+            ("tl", xo, yo),
+            ("clipA", xo - w / 3, yo - h / 3),
+            (
+                "clipB",
+                xo + W as i32 - 2 * w / 3,
+                yo + H as i32 - 2 * h / 3,
+            ),
+        ] {
+            for &l in &levels {
+                buf.copy_from_slice(bg);
+                let mut t = Target::screen(&mut buf, W, H);
+                assert!(bank.draw_trs(&mut t, Some(x), y, i, l), "{name}#{i}");
+                out += &format!("{name}#{i}@{tag}:{l} {}\n", P::md5(&buf));
+            }
+        }
+    }
+    out
+}
+
+/// `AFF_SPRTRS`, the inventory's fade: every sprite of the interface and
+/// inventory banks at its levels, as `spr_p6.dll` and `spr_p5.dll` draw
+/// it on a 16-bit display (the port's). The 32-bit blitters are
+/// transcribed but their left-clip path is not (it shades pixels the
+/// unclipped path skips; the golden's `clipA` lines differ there).
+#[test]
+fn translucent_sprites_as_the_original_draws_them() {
+    let n = check::<u16>(TRS_P6_565, 1024 * 768, None, SprDll::P6, trs_lines::<u16>);
+    let k = check::<u16>(TRS_P5_565, 1024 * 768, None, SprDll::P5, trs_lines::<u16>);
+    assert!((n, k) == (0, 0) || (n, k) == (8340, 8340), "{n} {k}");
+}

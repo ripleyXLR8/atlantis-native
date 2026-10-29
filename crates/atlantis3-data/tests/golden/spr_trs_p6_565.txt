@@ -1,0 +1,22 @@
+# AFF_SPRTRS (bank, dst, x, y, index, level) of atlantis3-gog-fr-spr_p6.dll (md5 94cfb7cfaf577a3aeb94914e7769d552) under Unicorn (atlantis3-re tools/emu/spr_golden.py trs p6 565),
+# descriptor 000b0305020003, 1024x768 framebuffer of 16-bit pixels, clip rows 0..766, columns 0..1022 (max = size - 1), background as spr_aff_*.txt
+# key: BANK#index@position:level  value: md5 of the framebuffer after the call (background md5 662d8cf6bc811d65737610745a48f2e4)
+# per file: md5 of the file's golden lines (`key value\n` each, in order), from tools/emu/spr_digest.py
+spr/BagdadObjets.SPR 288 d4c71d99ae87a022c49bf139eb68d35e
+spr/BagdadObjetsEnMain.SPR 288 b3e813bccd54bc18052c9e67e14b6b09
+spr/HoggarObjets.SPR 120 271394fa7aa5092167e05dde5cfce969
+spr/HoggarObjetsEnMain.SPR 120 b53fb50a0a8e5c094713870ae35be6b6
+spr/HoggarSujets52.SPR 144 d7b3071b0e5012fe24339708af52fecc
+spr/HoggarSujets64.SPR 144 9cb7365773546d1539111e2537fae05b
+spr/HoggarSujets80.SPR 144 b3355eab219486b4695ce1511f37ff3d
+spr/InterSujets52.SPR 156 05cd215016f51dfefc410e4b8a36cc52
+spr/InterSujets64.SPR 156 eca53b7f8cc02502c2cbc45aff366c36
+spr/InterSujets80.SPR 156 80cfee652d38c21366911435bdb7bc01
+spr/LDMObjets.SPR 504 b30066bdeec18a30ce14fa9d3bbfd2d9
+spr/LDMObjetsEnMain.SPR 504 01dda8069f1cef59a634ee1cabd7f30f
+spr/LDMSujets52.SPR 360 87ed958c96231b06aa86c113ff7f741a
+spr/LDMSujets64.SPR 360 26589cde6acf42f170827a15ce2f1049
+spr/LDMSujets80.SPR 360 5609eeeec944558d4c7c5fdad0de771c
+spr/PaleoObjets.SPR 156 fb54918994f578869ced7311c8fd79e3
+spr/PaleoObjetsEnMain.SPR 156 e6ae1754b9746c45ea6935d631e05012
+spr/interface.SPR 4224 6c125b48e5ed16db7f67f4b81f8af34d
