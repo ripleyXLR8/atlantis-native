@@ -224,6 +224,8 @@ pub struct Game {
     /// `<World>SujetsNN.spr` (opened by `MONDE`), `fleche.SPR`.
     objects: Option<Bank>,
     objects_hand: Option<Bank>,
+    /// `Objects.txt` of the subtitle language (the hover label's names).
+    object_names: Option<atlantis3_data::objects::ObjectNames>,
     subjects_bank: Option<Bank>,
     arrows: Option<Bank>,
     banks_world: i32,
@@ -359,6 +361,7 @@ impl Game {
             inventory: Default::default(),
             objects: None,
             objects_hand: None,
+            object_names: None,
             subjects_bank: None,
             arrows: None,
             banks_world: 0,
@@ -954,6 +957,63 @@ impl Game {
 
     /// The inventory's items, bar and arrows at its alpha (@ 0x004299b0,
     /// @ 0x00428fd0).
+    /// The hover label of the object under the pointer (@ 0x00429b80 →
+    /// @ 0x0042a530), every frame, no delay.
+    fn draw_inventory_label(&mut self) {
+        let items = self.inventory_items();
+        let Some(e) = self
+            .inventory
+            .hovered(self.width, self.height, self.pointer, &items)
+        else {
+            return;
+        };
+        let Some(key) = usize::try_from(e.id)
+            .ok()
+            .and_then(|i| self.names.name(atlantis2_data::defnames::OBJETS, i))
+            .map(|n| String::from_utf8_lossy(n).into_owned())
+        else {
+            return;
+        };
+        if self.object_names.is_none() {
+            let lang = self.startup.text_language();
+            self.object_names = self
+                .files
+                .read(atlantis3_data::objects::objects_path(&lang).trim_start_matches("Datas/"))
+                .and_then(|d| atlantis3_data::objects::ObjectNames::parse(&d).ok());
+        }
+        let Some(text) = self
+            .object_names
+            .as_ref()
+            .and_then(|n| n.name(&key))
+            .map(<[u8]>::to_vec)
+        else {
+            return;
+        };
+        let (w, h) = (self.width, self.height);
+        self.texts();
+        let Some(font) = self
+            .texts
+            .as_ref()
+            .and_then(|t| t.gdi(crate::text::FontId::Default, w))
+        else {
+            return;
+        };
+        let (_, zone, _) = crate::inventory::label(font, &text, self.pointer, w as i32, h as i32);
+        let mut screen = std::mem::take(&mut self.screen);
+        if let Some(t) = self.texts.as_ref() {
+            t.print(
+                &mut screen,
+                w,
+                h,
+                crate::text::FontId::Default,
+                &text,
+                zone,
+                0xffffff,
+            );
+        }
+        self.screen = screen;
+    }
+
     fn draw_inventory_items(&mut self) {
         let items = self.inventory_items();
         let objects = self
@@ -1013,6 +1073,7 @@ impl Game {
             // the inventory and goes in the hand; the fade's step.
             self.draw_inventory_items();
             self.draw_pointer();
+            self.draw_inventory_label();
             let items = self.inventory_items();
             self.inventory
                 .scroll_step(self.width, items.len(), self.pointer.0, self.now);

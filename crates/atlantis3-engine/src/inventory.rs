@@ -117,6 +117,18 @@ impl Inventory {
             .then(|| (dx / SLOT) as usize + self.scroll)
     }
 
+    /// The shown entry under the pointer, if any (the hover of
+    /// @ 0x00429b80).
+    pub fn hovered(
+        &self,
+        width: usize,
+        height: usize,
+        pointer: (i32, i32),
+        shown: &[BagEntry],
+    ) -> Option<BagEntry> {
+        self.pick(width, height, pointer, shown)
+    }
+
     /// The pick of a click (@ 0x00429b80): the shown entry under the
     /// pointer.
     pub fn pick(
@@ -303,4 +315,44 @@ pub fn draw_items(
         ));
     }
     calls
+}
+
+/// The hover label (@ 0x0042a530): the object's `Objects.txt` name in
+/// `AtlFont_Default`, white, at (px + 50, py − 20). A first layout
+/// (x0, W − x1, y0, H − y1, left, bottom) with x1 = x0 + 20 × length and
+/// y1 = y0 + 18 measures the text; its box (line 0's rectangle, extended
+/// by the others) is clamped to the screen's right edge only; the text is
+/// printed with the layout (x0, W − x0 − x1, y0, H − y1, left, bottom) of
+/// that box (the same slip as the tooltips' text). Returns both layouts
+/// and the lines printed.
+pub fn label(
+    font: &crate::text::GdiFont,
+    text: &[u8],
+    pointer: (i32, i32),
+    w: i32,
+    h: i32,
+) -> (crate::text::Zone, crate::text::Zone, Vec<crate::text::Line>) {
+    use crate::text::{layout, Zone};
+    let (px, py) = pointer;
+    let (x0, y0) = (px + 50, py - 20);
+    let (x1, y1) = (x0 + 20 * text.len() as i32, y0 + 18);
+    let first = Zone::new(x0, w - x1, y0, h - y1, 0, 1);
+    let lines = layout(font, text, w, h, first);
+    let th = font.tm_height;
+    let mut bx = (x0, y0, x0, y0);
+    for (j, l) in lines.iter().enumerate() {
+        let r = (l.x, l.y, l.x + l.dx.iter().sum::<i32>(), l.y + th);
+        bx = if j == 0 {
+            r
+        } else {
+            (bx.0.min(r.0), bx.1.min(r.1), bx.2.max(r.2), bx.3.max(r.3))
+        };
+    }
+    if bx.2 > w {
+        bx.0 += w - bx.2;
+        bx.2 = w;
+    }
+    let second = Zone::new(bx.0, w - bx.0 - bx.2, bx.1, h - bx.3, 0, 1);
+    let printed = layout(font, text, w, h, second);
+    (first, second, printed)
 }

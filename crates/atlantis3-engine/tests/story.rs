@@ -552,6 +552,22 @@ fn start_save(golden: &str) -> Option<Vec<u8>> {
     (!text.is_empty()).then(|| text.into_bytes())
 }
 
+/// The whole story in one run from the new game, against the original's
+/// chained run.
+#[test]
+fn whole_story() {
+    let Some(mut r) = new_run() else {
+        return;
+    };
+    let walk: String = SEGMENTS.iter().map(|s| s.1).collect::<Vec<_>>().join("\n");
+    play(
+        &mut r,
+        "chain",
+        &walk,
+        include_str!("golden/story/chain.txt"),
+    );
+}
+
 fn segment(index: usize) {
     let Some(mut r) = new_run() else {
         return;
