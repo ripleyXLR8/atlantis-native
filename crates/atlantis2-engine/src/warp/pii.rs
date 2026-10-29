@@ -35,6 +35,38 @@ const PITCH: usize = FACE_SIZE;
 /// 16 − 9).
 const TEXEL_SHIFT: u32 = 7;
 
+/// The rules of the game whose `warpPII` draws: *Atlantis II*'s, or
+/// *Atlantis III*'s ([`super::A3Raster`]).
+#[derive(Clone, Copy, Debug)]
+struct Rules {
+    /// The texture scale (*Atlantis III*: 512 · 2^21 = 2^30, `Game.exe`
+    /// @ 0x004fc3a0 storing 0x00794588 / 0x0079458c).
+    tex_scale: f64,
+    /// The word's shift to texels (*Atlantis III*: 6, @ 0x0079462c).
+    shift: u32,
+    /// *Atlantis III*'s bilinear span (`warpBFPII` @ 0x0052f000).
+    bilinear: bool,
+}
+
+const A2_RULES: Rules = Rules {
+    tex_scale: TEX_SCALE,
+    shift: TEXEL_SHIFT,
+    bilinear: false,
+};
+
+impl Rules {
+    fn of(a3: Option<super::A3Raster>) -> Rules {
+        match a3 {
+            None => A2_RULES,
+            Some(r) => Rules {
+                tex_scale: 1_073_741_824.0,
+                shift: 6,
+                bilinear: r.smooth,
+            },
+        }
+    }
+}
+
 /// The span's integer (u, v) pairs (@ 0x005ed7c0, 8 bytes each up to the
 /// masks @ 0x005edbf8): the first pixel's and one per 32-pixel block.
 const ENDS: usize = 135;
@@ -100,13 +132,13 @@ struct Gradients {
 /// two, @ 0x0057b460 for each next one): x + 0.5 and y + 0.5 stored, the
 /// integer row of y + 0.5 (`fistp` of the unrounded sum: truncation), u and
 /// v scaled and multiplied by w.
-fn prepare(v: &mut Vertex) -> i32 {
+fn prepare(v: &mut Vertex, rules: &Rules) -> i32 {
     let x = X87;
     let y = x.add(0.5, v[1]);
     v[0] = x.f(x.add(0.5, v[0]));
     v[1] = x.f(y);
-    v[3] = x.f(x.mul(x.mul(TEX_SCALE, v[3]), v[2]));
-    v[4] = x.f(x.mul(x.mul(TEX_SCALE, v[4]), v[2]));
+    v[3] = x.f(x.mul(x.mul(rules.tex_scale, v[3]), v[2]));
+    v[4] = x.f(x.mul(x.mul(rules.tex_scale, v[4]), v[2]));
     x.fistp(y)
 }
 
@@ -160,10 +192,11 @@ impl Renderer {
     /// as a fan (v₀, vₖ₋₁, vₖ), each vertex made ready once.
     pub(super) fn polygon_pii(&mut self, poly: &mut [Vertex], tex: &[u16], out: &mut [u16]) {
         self.fpu = X87;
-        let iy0 = prepare(&mut poly[0]);
-        let mut iy_prev = prepare(&mut poly[1]);
+        let rules = Rules::of(self.a3);
+        let iy0 = prepare(&mut poly[0], &rules);
+        let mut iy_prev = prepare(&mut poly[1], &rules);
         for k in 2..poly.len() {
-            let iy = prepare(&mut poly[k]);
+            let iy = prepare(&mut poly[k], &rules);
             let tri = [poly[0], poly[k - 1], poly[k]];
             self.triangle_pii(&tri, [iy0, iy_prev, iy], tex, out);
             iy_prev = iy;
@@ -355,12 +388,33 @@ impl Renderer {
             return None;
         }
         let (yt, yb) = (yt.max(ymin), yb.min(ymax));
+        let mut e = [Edge::default(); 3];
+        if self.a3.is_some() {
+            // Atlantis III (@ 0x00533e81 and its two copies): both edges
+            // first, then the `x` (ebx) edge is the left one when the `y`
+            // (edx) edge starts right of it (`fcomi`, `ja`).
+            let ex = edge(&v[x], &v[bo], yt, yb, false);
+            let ey = edge(&v[y], &v[bo], yt, yb, false);
+            (e[A], e[B]) = if above(ey.x, ex.x) {
+                (ex, ey)
+            } else {
+                (ey, ex)
+            };
+            return Some((
+                e,
+                Plan {
+                    left: A,
+                    right: B,
+                    yend: e[A].ybot,
+                    second: None,
+                },
+            ));
+        }
         let (l, r) = if below(v[x][0], v[y][0]) {
             (x, y)
         } else {
             (y, x)
         };
-        let mut e = [Edge::default(); 3];
         e[B] = edge(&v[r], &v[bo], yt, yb, false);
         e[A] = edge(&v[l], &v[bo], yt, yb, false);
         Some((
@@ -513,32 +567,41 @@ impl Renderer {
         let dv_tail = x.fistp(x.mul(x.sub(vend, vlast), t2));
         let du_tail = x.fistp(x.mul(x.sub(uend, ulast), t2));
 
+        let rules = Rules::of(self.a3);
         let mut base = y as usize * self.width + xl as usize;
         for j in 0..blocks as usize {
             let (u0, v0) = ends[j];
             let (u1, v1) = ends[j + 1];
             run(
+                &rules,
                 tex,
                 &mut out[base..base + 32],
                 word(u0),
                 word(v0),
                 block_step(u0, u1),
                 block_step(v0, v1),
+                &mut self.out_of_face,
             );
             base += 32;
         }
         let (u0, v0) = ends[blocks as usize];
         if tail == 1 {
             // @ 0x0057e0c0: one pixel.
-            out[base] = texel(tex, word(u0), word(v0));
+            out[base] = if rules.bilinear {
+                single_bilinear(tex, word(u0), word(v0), &mut self.out_of_face)
+            } else {
+                sample(&rules, tex, word(u0), word(v0), &mut self.out_of_face)
+            };
         } else {
             run(
+                &rules,
                 tex,
                 &mut out[base..base + tail as usize],
                 word(u0),
                 word(v0),
                 tail_step(du_tail),
                 tail_step(dv_tail),
+                &mut self.out_of_face,
             );
         }
     }
@@ -588,13 +651,93 @@ fn texel(tex: &[u16], u: u16, v: u16) -> u16 {
     tex[usize::from(v >> TEXEL_SHIFT) * PITCH + usize::from(u >> TEXEL_SHIFT)]
 }
 
+/// A texel of a face as plain memory: past the face's last texel the
+/// original reads whatever follows its buffer in the heap (here 0, and
+/// the read counted in `oof` when its weight is not 0).
+#[inline(always)]
+fn at(tex: &[u16], i: usize, weight: u32, oof: &mut u64) -> u16 {
+    match tex.get(i) {
+        Some(&t) => t,
+        None => {
+            if weight != 0 {
+                *oof += 1;
+            }
+            0
+        }
+    }
+}
+
+/// The pixel at the coordinate words (u, v) under `rules`: *Atlantis
+/// II*'s texel; *Atlantis III*'s texel (`psrlw 6`, `pmaddwd` by (1, 512),
+/// no wrap at the face's edge) or its bilinear filter.
+#[inline(always)]
+fn sample(rules: &Rules, tex: &[u16], u: u16, v: u16, oof: &mut u64) -> u16 {
+    if rules.shift == TEXEL_SHIFT {
+        return texel(tex, u, v);
+    }
+    let i = usize::from(u >> 6) + usize::from(v >> 6) * PITCH;
+    if !rules.bilinear {
+        return at(tex, i, 1, oof);
+    }
+    bilinear(tex, i, u32::from(u & 63), u32::from(v & 63), oof)
+}
+
+/// `warpBFPII`'s pixel (@ 0x0052f000): the four texels at `i`, `i` + 1,
+/// `i` + 512, `i` + 513 weighted by the 6-bit fractions, each colour
+/// summed and shifted right by 12.
+#[inline(always)]
+fn bilinear(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u16 {
+    let w = [
+        (64 - fu) * (64 - fv),
+        fu * (64 - fv),
+        (64 - fu) * fv,
+        fu * fv,
+    ];
+    let t = [
+        at(tex, i, w[0], oof),
+        at(tex, i + 1, w[1], oof),
+        at(tex, i + PITCH, w[2], oof),
+        at(tex, i + PITCH + 1, w[3], oof),
+    ];
+    let sum = |f: fn(u16) -> u32| -> u32 { (0..4).map(|k| w[k] * f(t[k])).sum::<u32>() >> 12 };
+    let r = sum(|c| u32::from(c >> 11));
+    let g = sum(|c| u32::from((c >> 5) & 63));
+    let b = sum(|c| u32::from(c & 31));
+    ((r << 11) | (g << 5) | b) as u16
+}
+
+/// `warpBFPII`'s lone last pixel (@ 0x0052f700): the weights are taken
+/// from the texel coordinates, not from the fractions (the code shifts
+/// before keeping the low six bits).
+#[inline(always)]
+fn single_bilinear(tex: &[u16], u: u16, v: u16, oof: &mut u64) -> u16 {
+    let (tu, tv) = (u32::from(u >> 6), u32::from(v >> 6));
+    bilinear(
+        tex,
+        (tu + tv * PITCH as u32) as usize,
+        tu & 63,
+        tv & 63,
+        oof,
+    )
+}
+
 /// Pixels from the words (u, v) by (du, dv) each, wrapping at 16 bits
 /// (`paddw`).
 #[inline(always)]
-fn run(tex: &[u16], out: &mut [u16], u: u16, v: u16, du: u16, dv: u16) {
+#[allow(clippy::too_many_arguments)]
+fn run(
+    rules: &Rules,
+    tex: &[u16],
+    out: &mut [u16],
+    u: u16,
+    v: u16,
+    du: u16,
+    dv: u16,
+    oof: &mut u64,
+) {
     let (mut u, mut v) = (u, v);
     for px in out {
-        *px = texel(tex, u, v);
+        *px = sample(rules, tex, u, v, oof);
         u = u.wrapping_add(du);
         v = v.wrapping_add(dv);
     }

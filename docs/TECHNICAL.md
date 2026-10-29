@@ -11,6 +11,8 @@
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
+| `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe`, `Datas\`, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
+| `atlantis3-engine` | Atlantis III, unfinished and not part of the program: the start-up's settings, the intro and the cinematics with their sound, the new game through the chapter scripts, the panorama (`warpBFPII`), the place animations, the cursor, the zone picks and the moves with their travel videos |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
 
 The engine is one async task: where the original's loops present a frame
@@ -3678,6 +3680,45 @@ back) into `yucatan-*.png`.
   (`crates/atlantis2-data/tests/zapfile.rs`); the menus, a save and a load
   through them, the newest save chosen by the player menu and the credits
   are run with the game's files (`crates/atlantis2-engine/tests/menus.rs`).
+
+## Atlantis III (unfinished)
+
+Atlantis III (Cryo, 2001) is being ported on the `a3/*` branches; it is
+not in the released program (no library entry, no command-line path).
+The reference is the GOG.com French release's `Game.exe` (3,473,408
+bytes), whose addresses the code cites. `atlantis3-engine` reuses
+Atlantis II's code where Atlantis III runs the same: the camera, the
+`warpPII` rasteriser (`Renderer::a3`: the texture coordinates scaled by
+2^30, the flat-top triangles' left edge chosen after both edges are set
+up, the bilinear span `warpBFPII` that the default `Smooth` option
+selects), the turn of a move (`Turn::new_a3`: π/90 with a double), the
+CON interpreter (`script::Dialect::Atlantis3`, `script/a3.rs`: keys looked
+up by name, the new `/set` keys, the per-world memory in the flags 1000+,
+the waits resumed by the warp loop) and the zone picks. The HNM codec
+plays the cinematics' sound with `SoundRule::ApcHeader` (CryoMovie's
+rules: sound when header byte +6 is not 0, the first `AA` chunk's APC
+header, a fixed number of samples per frame).
+
+What runs (milestone M1): the settings (`Atlantis3.cfg` and the install's
+registry values from GOG.com's `goggame-*.script`), the intro, the new
+game (`(chapter=600)`: the Hoggar, then chapter 1's cinematics 93, 1 and
+2), the first places with their animations, the mouse look on a 25 Hz
+tick, the cursor of the zone under the centre (`spr\Interface.spr`),
+the moves (turn, arrival, travel video). Not yet: the music and the
+sounds, the captions of the cinematics, the dialogs, the menus and the
+inventory, the saves. The developers' example `cargo run --release -p
+atlantis3-engine --example a3_shots -- <game folder> <out folder>` plays
+a new game headless and writes screenshots.
+
+Tests (`crates/atlantis3-engine/tests/`, with `ATLANTIS3_DATA` = the
+installed game): the HNM frames and the cinematics' sound against the
+original's decoders (`hnm_frames.rs`), the interpreter from start-up to
+the first interactive view (`startup_script.rs`), the panorama on grids
+of angles and the first views (`warp.rs`, `place_sprites.rs`), every
+zone pick and move of the Hoggar and of the funeral chamber
+(`navigation.rs`), and a new game played from the intro to the second
+view (`flow.rs`), all against values the original's own code computed
+under emulation.
 
 ## Tests
 

@@ -1,0 +1,210 @@
+# Frames drawn by the original Game.exe of the GOG.com release (md5
+# eb06eaa718877dfcabee6e8f89d85b31) with its sprite library spr_p6.dll (md5
+# 94cfb7cfaf577a3aeb94914e7769d552), its own code run under emulation: the warpBFPII
+# rasteriser (or warpPII without Smooth, the _nosmooth file), an 800 x 600 RGB565 screen.
+# Derived values only: MD5s of 800 x 600 LE RGB565 screens and 512 x 512 LE RGB565 faces,
+# float bits. face FILE I MD5: cube face I (0 ft, 1 bk, 2 up, 3 dn, 4 lf, 5 rt).
+# STATE WxH FOV FILE YAW PITCH MD5 MATRIX: first027f = the view entry under the process's
+# control word 0x027f, the frame switching to 0x0e7f; steady0e7f = everything under 0x0e7f;
+# MATRIX the camera's 9 floats as LE hex bytes; proj.STATE FILE fx,fy,cx,cy (LE hex).
+# full rows: whole frames (place sprites drawn into the faces); face.sprites STATE YAW PITCH I
+# MD5: face I after the sprite pass; rects: the face rectangles (top, bottom, right, left).
+face ho0004.hnm 0 97cae15ecbc09f90af32793ac6a98842
+face ho0004.hnm 1 e077128b82269c76e5261261196fb359
+face ho0004.hnm 2 adda5cea63ff8c61e90c3e95054984a2
+face ho0004.hnm 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face ho0004.hnm 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face ho0004.hnm 5 748f405287d6c456e2ff5568ef716f14
+slots 
+rects first027f 108 0 66,445,349,0 0,0,0,0 0,0,0,0 0,0,0,0 66,445,511,426 0,0,0,0
+face.sprites first027f 108 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 108 0 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 108 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 108 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 108 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 108 0 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 108 0 51aa5e47208679db4fdb82d92668a556 7178733f,00000080,78379ebe,00000000,0000803f,00000080,78379e3e,00000000,7178733f
+rects first027f 108 -70 0,83,447,0 0,0,0,0 156,511,437,0 0,0,0,0 0,71,506,24 0,0,0,0
+face.sprites first027f 108 -70 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 108 -70 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 108 -70 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 108 -70 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 108 -70 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 108 -70 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 108 -70 9126ff66ab72f40978a7fa32614a1d34 7178733f,d0ac94be,fb73d8bd,e08058b1,3d1daf3e,b48f70bf,78379e3e,96c9643f,248ba63e
+rects first027f 108 70 427,511,446,0 0,0,0,0 0,0,0,0 0,355,437,0 440,511,506,26 0,0,0,0
+face.sprites first027f 108 70 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 108 70 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 108 70 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 108 70 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 108 70 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 108 70 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 108 70 5c96b93cbaa67adcd72ac9189ef0dec5 7178733f,d0ac943e,fb73d8bd,e0805831,3d1daf3e,b48f703f,78379e3e,96c964bf,248ba63e
+rects first027f 108 35 272,511,436,0 0,0,0,0 0,0,0,0 0,203,462,0 276,511,511,317 0,0,0,0
+face.sprites first027f 108 35 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 108 35 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 108 35 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 108 35 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 108 35 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 108 35 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 108 35 2a8a35725c33562e27efd26d7b03ca01 7178733f,ad7f353e,7f9a81be,c44d3cb1,f2b3513f,e9d5123f,77379e3e,21a60bbf,7770473f
+rects first027f 107 0 68,443,354,0 0,0,0,0 0,0,0,0 0,0,0,0 68,443,511,433 0,0,0,0
+face.sprites first027f 107 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 107 0 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 107 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 107 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 107 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 107 0 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 107 0 02385be97a0727bc9cd9413186e2d84a 63d0743f,00000080,c2b195be,00000000,0000803f,00000080,c2b1953e,00000000,63d0743f
+rects first027f 109 0 64,446,344,0 0,0,0,0 0,0,0,0 0,0,0,0 64,446,511,420 0,0,0,0
+face.sprites first027f 109 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 109 0 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 109 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 109 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 109 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 109 0 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 109 0 2e1299c9483b644149cb557eb410958b 810d723f,00000080,dfb0a6be,00000000,0000803f,00000080,dfb0a63e,00000000,810d723f
+rects first027f 138 0 42,468,211,0 0,0,0,0 0,0,0,0 0,0,0,0 43,467,511,272 0,0,0,0
+face.sprites first027f 138 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 138 0 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 138 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 138 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 138 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 138 0 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 138 0 a837d8a05a954e5a480d24b6ba6905b3 234c2b3f,00000000,bf3e3ebf,00000000,0000803f,00000000,bf3e3e3f,00000000,234c2b3f
+rects first027f 78 0 77,433,511,130 0,0,0,0 0,0,0,0 0,0,0,0 0,0,0,0 76,434,42,0
+face.sprites first027f 78 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 78 0 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 78 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 78 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 78 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 78 0 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 78 0 b3e89ba034555aa14a9d1d75eebd72d1 e2677a3f,00000000,cbe6543e,00000000,0000803f,00000000,cbe654be,00000000,e2677a3f
+rects first027f 18 0 66,445,511,426 0,0,0,0 0,0,0,0 0,0,0,0 0,0,0,0 66,445,349,0
+face.sprites first027f 18 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 18 0 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 18 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 18 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 18 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 18 0 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 18 0 13d45eeb8e01d99190121c758df0e6ad 76379e3e,00000000,7278733f,00000000,0000803f,00000000,727873bf,00000000,76379e3e
+rects first027f 198 0 0,0,0,0 66,445,511,426 0,0,0,0 0,0,0,0 66,445,349,0 0,0,0,0
+face.sprites first027f 198 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 198 0 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 198 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 198 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 198 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 198 0 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 198 0 b7a99034c43dd20658533dbd520f3337 80379ebe,00000000,707873bf,00000000,0000803f,00000000,7078733f,00000000,80379ebe
+rects first027f 108 -1 57,437,350,0 0,0,0,0 0,0,0,0 0,0,0,0 58,439,511,425 0,0,0,0
+face.sprites first027f 108 -1 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 108 -1 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 108 -1 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 108 -1 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 108 -1 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 108 -1 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 108 -1 f46d53eac66bb93a8bfa8da96ed57767 7178733f,84b8b0bb,4c319ebe,e4aa702f,05f67f3f,5bf88ebc,78379e3e,01f9873c,f36e733f
+rects first027f 108 1 73,453,350,0 0,0,0,0 0,0,0,0 0,0,0,0 71,452,511,425 0,0,0,0
+face.sprites first027f 108 1 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites first027f 108 1 1 e077128b82269c76e5261261196fb359
+face.sprites first027f 108 1 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites first027f 108 1 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites first027f 108 1 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites first027f 108 1 5 748f405287d6c456e2ff5568ef716f14
+full first027f 800x600 76 ho0004.hnm 108 1 772cbf97f348e6da86b5bf5d684fc740 7178733f,84b8b03b,4c319ebe,e4aa70af,05f67f3f,5bf88e3c,78379e3e,01f987bc,f36e733f
+rects steady0e7f 108 0 66,445,349,0 0,0,0,0 0,0,0,0 0,0,0,0 66,445,511,426 0,0,0,0
+face.sprites steady0e7f 108 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 108 0 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 108 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 108 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 108 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 108 0 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 108 0 09aaaf4699ae561d70e26c7d0b1d0fe0 6f78733f,00000080,7d379ebe,00000000,0000803f,00000080,7d379e3e,00000000,6f78733f
+rects steady0e7f 108 -70 0,83,447,0 0,0,0,0 156,511,437,0 0,0,0,0 0,71,506,24 0,0,0,0
+face.sprites steady0e7f 108 -70 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 108 -70 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 108 -70 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 108 -70 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 108 -70 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 108 -70 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 108 -70 ca819ad3c19e007218f66d9f02faff2a 6f78733f,d2ac94be,0774d8bd,0059ba30,4e1daf3e,a98f70bf,7b379e3e,8ac9643f,348ba63e
+rects steady0e7f 108 70 427,511,446,0 0,0,0,0 0,0,0,0 0,355,437,0 440,511,506,26 0,0,0,0
+face.sprites steady0e7f 108 70 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 108 70 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 108 70 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 108 70 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 108 70 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 108 70 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 108 70 eef9e0eb7c0790df09696e4a4c573cf7 6f78733f,d2ac943e,0774d8bd,0059bab0,4e1daf3e,a98f703f,7b379e3e,8ac964bf,348ba63e
+rects steady0e7f 108 35 272,511,436,0 0,0,0,0 0,0,0,0 0,203,462,0 276,511,511,317 0,0,0,0
+face.sprites steady0e7f 108 35 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 108 35 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 108 35 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 108 35 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 108 35 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 108 35 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 108 35 4b3f98127a1764578fd29fc2838a181b 6f78733f,ae7f353e,839a81be,00541faf,f4b3513f,e2d5123f,7c379e3e,19a60bbf,7970473f
+rects steady0e7f 107 0 68,443,354,0 0,0,0,0 0,0,0,0 0,0,0,0 68,443,511,433 0,0,0,0
+face.sprites steady0e7f 107 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 107 0 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 107 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 107 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 107 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 107 0 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 107 0 2915e28281ceae74590e3187a05265bb 62d0743f,00000080,c2b195be,00000000,0000803f,00000080,c2b1953e,00000000,62d0743f
+rects steady0e7f 109 0 64,446,344,0 0,0,0,0 0,0,0,0 0,0,0,0 64,446,511,420 0,0,0,0
+face.sprites steady0e7f 109 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 109 0 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 109 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 109 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 109 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 109 0 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 109 0 c966e1cdc2f89c985e181a5f9e70dfa0 810d723f,00000080,deb0a6be,00000000,0000803f,00000080,deb0a63e,00000000,810d723f
+rects steady0e7f 138 0 42,468,211,0 0,0,0,0 0,0,0,0 0,0,0,0 43,467,511,272 0,0,0,0
+face.sprites steady0e7f 138 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 138 0 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 138 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 138 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 138 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 138 0 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 138 0 aef6e580c85203a126ea982e2d7720a3 264c2b3f,00000000,ba3e3ebf,00000000,0000803f,00000000,ba3e3e3f,00000000,264c2b3f
+rects steady0e7f 78 0 77,433,511,130 0,0,0,0 0,0,0,0 0,0,0,0 0,0,0,0 76,434,42,0
+face.sprites steady0e7f 78 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 78 0 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 78 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 78 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 78 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 78 0 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 78 0 e9d5f1eb5f8efd8c401819a97e66fef5 e2677a3f,00000000,c2e6543e,00000000,0000803f,00000000,c2e654be,00000000,e2677a3f
+rects steady0e7f 18 0 66,445,511,426 0,0,0,0 0,0,0,0 0,0,0,0 0,0,0,0 66,445,349,0
+face.sprites steady0e7f 18 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 18 0 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 18 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 18 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 18 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 18 0 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 18 0 d72761d04b9537dec66fa7108b706449 84379e3e,00000000,6a78733f,00000000,0000803f,00000000,6a7873bf,00000000,84379e3e
+rects steady0e7f 198 0 0,0,0,0 66,445,511,426 0,0,0,0 0,0,0,0 66,445,349,0 0,0,0,0
+face.sprites steady0e7f 198 0 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 198 0 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 198 0 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 198 0 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 198 0 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 198 0 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 198 0 459a47f3e7a86060ca20060b239a95a5 6c379ebe,00000000,6a7873bf,00000000,0000803f,00000000,6a78733f,00000000,6c379ebe
+rects steady0e7f 108 -1 57,437,350,0 0,0,0,0 0,0,0,0 0,0,0,0 58,439,511,425 0,0,0,0
+face.sprites steady0e7f 108 -1 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 108 -1 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 108 -1 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 108 -1 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 108 -1 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 108 -1 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 108 -1 0d6dcd86827577a172e09c9a9a3558f7 6f78733f,85b8b0bb,4f319ebe,0077642e,04f67f3f,52f88ebc,7a379e3e,f9f8873c,f16e733f
+rects steady0e7f 108 1 73,453,350,0 0,0,0,0 0,0,0,0 0,0,0,0 71,452,511,425 0,0,0,0
+face.sprites steady0e7f 108 1 0 97cae15ecbc09f90af32793ac6a98842
+face.sprites steady0e7f 108 1 1 e077128b82269c76e5261261196fb359
+face.sprites steady0e7f 108 1 2 adda5cea63ff8c61e90c3e95054984a2
+face.sprites steady0e7f 108 1 3 fc8a6cb9962ca434ad035c5fcd6c34be
+face.sprites steady0e7f 108 1 4 6d6d815fe4cdf03cd8a2cad7e0c575ff
+face.sprites steady0e7f 108 1 5 748f405287d6c456e2ff5568ef716f14
+full steady0e7f 800x600 76 ho0004.hnm 108 1 30124b5862401d02f4af6bb42e421625 6f78733f,85b8b03b,4f319ebe,007764ae,04f67f3f,52f88e3c,7a379e3e,f9f887bc,f16e733f

@@ -1,0 +1,202 @@
+# The interpreter of the original Game.exe of the GOG.com release (md5
+# eb06eaa718877dfcabee6e8f89d85b31), its own code run under emulation over the install's
+# scripts: start-up (chapter 0's first /INIT), the menu's new game ((chapter=600) ->
+# chapi600 -> chapi001), then warp frames of Interp_GereFrame, every waiting section
+# ended at once. STEP: a step of the sequence; LOG interp: SET<line>: each SetVariables
+# call; CALL: the engine functions the script called, with their arguments (stubbed);
+# VARS / FLAGS / STATE: the state after a step (non-zero variables and flags).
+STEP interp_init 0x0044ad80
+STEP limits (start-up 0x004d6806..0x004d683f)
+STEP chapter_var 0x0044a1a0
+STEP load_chapter0_runinit 0x004d6b10
+LOG interp: SET/set(changewam=CFuner.wam)
+CALL AtlWam_Load('CFuner.wam')
+LOG interp: SET(showobjet=CHF_OISEAUBOIS)
+CALL Show(47, 2, 0)
+LOG interp: SET(showobjet=CHF_COUVERCLE01)
+CALL Show(44, 2, 0)
+LOG interp: SET(hideobjet=CHF_COUVERCLE02)
+CALL Hide(45, 2, 0)
+LOG interp: SET(hideperso=CHF_PSYCHOP)
+CALL Hide(19, 1, 0)
+LOG interp: SET/set(anglewarpx=-90)
+LOG interp: SET/set(vue=4)
+CALL AtlWam_FindView('CFuner.wam', 4)
+CALL AtlWam_SetCurrentVue(view 4)
+CALL AtlWarp_EnterVue(view 4; start yaw -1.5707963705062866 pitch 0.0)
+CALL Hand_Clear()
+VARS after start-up: NEARW77=6 VUE=4 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70
+FLAGS after start-up: 1011=1
+STATE after start-up: chapter=0 monde=1 interrupt=0 in_runone=0 yaw=-1.5707963705062866 pitch=0.0 start_yaw=-1.5707963705062866 start_pitch=0.0 cur_view_no=4 wam='CFuner.wam' wam_by_world=[0, 1, 0, 0, 0, 0] chapter_by_world=[0, 0, 0, 0, 0, 0] music=''
+STEP new_game resets 0x00451190 0x00459e70 0x004c1e20 0x0042a020 0x0043bbc0 0x0045f0c0(1)
+STEP RunOneCommand (chapter=600) 0x00447840
+LOG interp: SET(chapter=600)
+LOG interp: SET/set(ChangeCD=2)
+LOG interp: SET/set(monde=1)
+CALL Sound_StopAll(0)
+CALL Subtitle_Clear()
+CALL Monde_LoadSprites(1, 0)
+CALL Dial_Free()
+CALL Dial_Init()
+LOG interp: SET/set(changewam=hoggar.wam)
+CALL AtlWam_Load('hoggar.wam')
+LOG interp: SET(hideobjet=HOG_DISQUE_TOUPIE)
+CALL Hide(24, 2, 0)
+LOG interp: SET(showobjet=CMP_MENBRANE)
+CALL Show(25, 2, 0)
+LOG interp: SET(hideobjet=HOG_ETOILE01)
+CALL Hide(14, 2, 0)
+LOG interp: SET(hideobjet=HOG_ETOILE02)
+CALL Hide(15, 2, 0)
+LOG interp: SET(hideobjet=HOG_ETOILE03)
+CALL Hide(16, 2, 0)
+LOG interp: SET(hideobjet=HOG_ETOILE04)
+CALL Hide(17, 2, 0)
+LOG interp: SET(hideobjet=HOG_ETOILE05)
+CALL Hide(18, 2, 0)
+LOG interp: SET(HidePerso=HOG_BOSS)
+CALL Hide(10, 1, 0)
+LOG interp: SET(HidePerso=HOG_GARDIEN03)
+CALL Hide(3, 1, 0)
+LOG interp: SET(HidePerso=HOG_TOUAREGBLESSE)
+CALL Hide(7, 1, 0)
+LOG interp: SET(HidePerso=CMP_BOSS)
+CALL Hide(13, 1, 0)
+LOG interp: SET(HidePerso=CMP_GARDIEN03)
+CALL Hide(12, 1, 0)
+LOG interp: SET(HidePerso=CMP_BOSS2)
+CALL Hide(14, 1, 0)
+LOG interp: SET(HidePerso=GRO_GARDIEN03)
+CALL Hide(11, 1, 0)
+LOG interp: SET(hideobjet=HOG_OBJ_CRANE)
+CALL Hide(36, 2, 0)
+LOG interp: SET(ShowPerso=CMP_ATLANTEFIGE)
+CALL Show(17, 1, 0)
+LOG interp: SET(HidePerso=CMP_ATLANTE)
+CALL Hide(16, 1, 0)
+LOG interp: SET(hideobjet=CMP_CLOCHE)
+CALL Hide(26, 2, 0)
+LOG interp: SET(hideobjet=CMP_TELECOMMANDE)
+CALL Hide(37, 2, 0)
+LOG interp: SET(HideObjet=CMP_HOGGAR)
+CALL Hide(27, 2, 0)
+LOG interp: SET(HideObjet=CMP_BAGDAD)
+CALL Hide(28, 2, 0)
+LOG interp: SET(HideObjet=CMP_BAGDADFIN)
+CALL Hide(29, 2, 0)
+LOG interp: SET(HideObjet=CMP_PALEO)
+CALL Hide(30, 2, 0)
+LOG interp: SET(HideObjet=CMP_PALEOFIN)
+CALL Hide(31, 2, 0)
+LOG interp: SET(ShowPerso=HOG_GARDIEN04)
+CALL Show(4, 1, 0)
+LOG interp: SET(ShowObjet=CMP_TORCHE_ELECTRIQUE)
+CALL Show(41, 2, 0)
+LOG interp: SET(ShowObjet=CMP_CLEF1)
+CALL Show(39, 2, 0)
+LOG interp: SET(ShowObjet=CMP_COUTEAU)
+CALL Show(42, 2, 0)
+LOG interp: SET(ShowPerso=HOG_TOUAREGBL)
+CALL Show(8, 1, 0)
+LOG interp: SET(HidePerso=HOG_TOUAREGLI)
+CALL Hide(9, 1, 0)
+LOG interp: SET/set(sacados=HOG_OBJ_BATON)
+CALL Bag_Add(34, 1)
+LOG interp: SET/set(sacados=HOG_OBJ_DISQUE)
+CALL Bag_Add(35, 2)
+LOG interp: SET/set(anglewarpx=108)
+LOG interp: SET/set(vue=4)
+CALL AtlWam_FindView('hoggar.wam', 4)
+CALL AtlWam_SetCurrentVue(view 4)
+CALL AtlWarp_EnterVue(view 4; start yaw 1.884955644607544 pitch 0.0)
+CALL Hand_Clear()
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+CALL Hide(6, 1, 0)
+LOG interp: SET/set(HideObjet=HOG_ETOILE01)
+CALL Hide(14, 2, 0)
+LOG interp: SET/set(HideObjet=HOG_ETOILE02)
+CALL Hide(15, 2, 0)
+LOG interp: SET/set(HideObjet=HOG_ETOILE03)
+CALL Hide(16, 2, 0)
+LOG interp: SET/set(HideObjet=HOG_ETOILE04)
+CALL Hide(17, 2, 0)
+LOG interp: SET/set(HideObjet=HOG_ETOILE05)
+CALL Hide(18, 2, 0)
+LOG interp: SET/set(HOG_PUZZLETOUPIEOK=0)
+LOG interp: SET/set(HOG_TOUPIEOK=0)
+LOG interp: SET/set(chapter=1)
+LOG interp: SET/set(StartMusik=4)
+CALL Music_IsPlaying('music\\hoggar\\Muzik04.apc') -> 0
+CALL Sound_StopAll(1)
+CALL Music_Play('music\\hoggar\\Muzik04.apc', 1)
+VARS after (chapter=600): CHAPTER=1 NEARW77=6 ARRIVEEVUE=4 VUE=4 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after (chapter=600): 1011=4 1021=1
+STATE after (chapter=600): chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP back_to_game 0x00451280: Interp_CloseInterrupt(1)
+STEP warp frame 0: Interp_GereFrame 0x0044b6c0
+CALL Hand_Clear()
+LOG interp: SET/set(cinema=093,fps=25)
+CALL AtlHnm_start('cine093.hnm', 'cine093.txt', 25, 0) -> 1
+VARS after frame 0: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 0: 1011=4 1021=1
+STATE after frame 0: chapter=1 monde=1 interrupt=1 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP video/dialog end: Interp_CloseInterrupt(1)
+LOG interp: SET/set(cinema=001,fps=25)
+CALL AtlHnm_start('cine001.hnm', 'cine001.txt', 25, 0) -> 1
+STEP video/dialog end: Interp_CloseInterrupt(1)
+LOG interp: SET/set(cinema=002,fps=25)
+CALL AtlHnm_start('cine002.hnm', 'cine002.txt', 25, 0) -> 1
+STEP video/dialog end: Interp_CloseInterrupt(1)
+LOG interp: SET/set(Flag1000=1)
+VARS after frame 0 resumes: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 0 resumes: 1000=1 1011=4 1021=1
+STATE after frame 0 resumes: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP warp frame 1: Interp_GereFrame 0x0044b6c0
+VARS after frame 1: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 1: 1000=1 1011=4 1021=1
+STATE after frame 1: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+VARS after frame 1 resumes: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 1 resumes: 1000=1 1011=4 1021=1
+STATE after frame 1 resumes: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP warp frame 2: Interp_GereFrame 0x0044b6c0
+VARS after frame 2: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 2: 1000=1 1011=4 1021=1
+STATE after frame 2: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+VARS after frame 2 resumes: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 2 resumes: 1000=1 1011=4 1021=1
+STATE after frame 2 resumes: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP warp frame 3: Interp_GereFrame 0x0044b6c0
+VARS after frame 3: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 3: 1000=1 1011=4 1021=1
+STATE after frame 3: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+VARS after frame 3 resumes: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 3 resumes: 1000=1 1011=4 1021=1
+STATE after frame 3 resumes: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP warp frame 4: Interp_GereFrame 0x0044b6c0
+VARS after frame 4: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 4: 1000=1 1011=4 1021=1
+STATE after frame 4: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+VARS after frame 4 resumes: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 4 resumes: 1000=1 1011=4 1021=1
+STATE after frame 4 resumes: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP warp frame 5: Interp_GereFrame 0x0044b6c0
+VARS after frame 5: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 5: 1000=1 1011=4 1021=1
+STATE after frame 5: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+VARS after frame 5 resumes: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 5 resumes: 1000=1 1011=4 1021=1
+STATE after frame 5 resumes: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP warp frame 6: Interp_GereFrame 0x0044b6c0
+VARS after frame 6: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 6: 1000=1 1011=4 1021=1
+STATE after frame 6: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+VARS after frame 6 resumes: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 6 resumes: 1000=1 1011=4 1021=1
+STATE after frame 6 resumes: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+STEP warp frame 7: Interp_GereFrame 0x0044b6c0
+VARS after frame 7: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 7: 1000=1 1011=4 1021=1
+STATE after frame 7: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'
+VARS after frame 7 resumes: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS after frame 7 resumes: 1000=1 1011=4 1021=1
+STATE after frame 7 resumes: chapter=1 monde=1 interrupt=0 in_runone=0 yaw=1.884955644607544 pitch=0.0 start_yaw=1.884955644607544 start_pitch=0.0 cur_view_no=4 wam='hoggar.wam' wam_by_world=[0, 4, 0, 0, 0, 0] chapter_by_world=[0, 1, 0, 0, 0, 0] music='4)'

@@ -296,4 +296,58 @@ pub trait Host {
 
     /// `CREDITS` (@ 0x00486e00); the section then waits.
     fn credits(&mut self) {}
+
+    // Atlantis III's calls (its `Game.exe`'s addresses).
+
+    /// `CINEMA=n,fps=f` (`AtlHnm_start("cine%03d.hnm", "cine%03d.txt",
+    /// fps, 0)` @ 0x004481ed): whether the film started (then the section
+    /// waits for its end, `super::Script::close_interrupt`).
+    fn play_cinema(&mut self, n: i32, fps: i32) -> bool {
+        let _ = fps;
+        self.play_video(&format!("cine{n:03}.hnm"), None)
+    }
+
+    /// The show / hide commands `CHANGEWAM` runs for place `wam` given the
+    /// story flags (@ 0x0044f0c0).
+    fn wam_commands(&mut self, wam: &str, flags: &[i32]) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// `INITRECALAGE` (@ 0x004410b0): the camera starts turning toward
+    /// (yaw, pitch), radians; false when it is already there.
+    fn init_recalage(&mut self, yaw: f32, pitch: f32) -> bool {
+        false
+    }
+
+    /// Whether a camera re-alignment runs (@ 0x00756080).
+    fn recalage_running(&self) -> bool {
+        false
+    }
+
+    /// `DISPLAY` (@ 0x00449262): one whole frame drawn and shown now.
+    fn display(&mut self) {}
+
+    /// `PLAYVOICE=a,b,c,d` (@ 0x0040da70).
+    fn play_voice(&mut self, values: [i32; 4]) {}
+
+    /// `SAVE=n` (@ 0x0044c6d0): the quick save `n`.
+    fn quick_save(&mut self, n: i32) {}
+
+    /// `LOAD=n` (@ 0x0044c9b0).
+    fn quick_load(&mut self, n: i32) {}
+
+    /// `DIAL=n[, voixoff]` (`AtlDial_start` @ 0x0040cfe0).
+    fn dial_start_a3(&mut self, n: i32, voixoff: bool) -> DialStart {
+        let _ = voixoff;
+        self.dial_start(n)
+    }
+
+    /// `GAMEOVER` set (@ 0x0042ac50).
+    fn game_over(&mut self) {}
+
+    /// Whether the animation (kind, id, n) has ended (record +0x471), for
+    /// `WAITFORFINANIMP` / `WAITFORFINANIMO`.
+    fn anim_ended(&mut self, kind: i32, id: i32, n: i32) -> bool {
+        true
+    }
 }

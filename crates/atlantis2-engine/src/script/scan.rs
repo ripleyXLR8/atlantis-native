@@ -30,6 +30,10 @@ impl Script {
     /// `None` when it ran nothing or the section must wait.
     pub fn run_line(&mut self, host: &mut dyn Host, mut p: usize) -> Option<usize> {
         loop {
+            // Atlantis III stops at the text's end (@ 0x0044abf0).
+            if self.is_a3() && self.b(S, p) == 0 {
+                return None;
+            }
             if self.at(S, p, b"/set") {
                 let r = self.set_variables(host, S, p);
                 return if r.is_some() && !self.resume_pending {
@@ -65,6 +69,10 @@ impl Script {
                 return None;
             }
             p = q + 1;
+            // Atlantis III stops at the text's end (@ 0x0044a5e0).
+            if self.is_a3() && self.b(S, p) == 0 {
+                return None;
+            }
             if self.at(S, p, b"/con") {
                 return None;
             }
@@ -91,6 +99,10 @@ impl Script {
     pub fn ctrl_scenar_in(&mut self, host: &mut dyn Host) -> Option<usize> {
         log::debug!("# CtrlScenarIN #");
         if self.fatal.is_some() {
+            return None;
+        }
+        // Atlantis III scans nothing while a section waits (@ 0x0044a2f0).
+        if self.is_a3() && self.resume_pending {
             return None;
         }
         let start = self.after_fininit();
@@ -228,6 +240,12 @@ impl Script {
             self.fail("RunInit: no /INIT".into());
             return false;
         };
+        if self.is_a3() {
+            // Atlantis III clears the reload flag before the first line
+            // (@ 0x0044a6f0): a `chapter=` outside a `/INIT` does not run
+            // the new block's first line twice.
+            self.chapter_reload = false;
+        }
         let mut i2 = self.search_set_cool(host, init + 7);
         loop {
             if self.resume_pending || self.travel_refused {
@@ -373,6 +391,15 @@ impl Script {
     /// `RunOneCommand` (@ 0x00481800): a `(KEY=value)` command of the
     /// engine through the `/set` handler, with no resume point.
     pub fn run_command(&mut self, host: &mut dyn Host, command: &[u8]) {
+        if self.is_a3() && self.resume_pending && !self.in_command {
+            // Atlantis III (@ 0x00447a38): queued in place of the rest of
+            // the waiting section.
+            let mut t = command.to_vec();
+            t.truncate(0xfd);
+            self.a3.queue.push(t);
+            return;
+        }
+        let was = self.in_command;
         let mut t = if command.len() < 0xfe {
             command.to_vec()
         } else {
@@ -384,7 +411,7 @@ impl Script {
         self.command = t;
         self.in_command = true;
         self.set_variables(host, Src::Command, 0);
-        self.in_command = false;
+        self.in_command = was;
     }
 
     /// `RunOneCommand_AfterDisplay` (@ 0x00481790): a command for the next

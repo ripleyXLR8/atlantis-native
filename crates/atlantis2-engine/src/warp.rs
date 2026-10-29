@@ -104,9 +104,23 @@ struct Edge {
     dv: f64,
 }
 
+/// *Atlantis III*'s `warpPII` (its `Game.exe`, set-up @ 0x00533000, scan
+/// @ 0x00535100, span @ 0x0052e000, or @ 0x0052f000 with `Smooth`):
+/// *Atlantis II*'s routines with the texture coordinates scaled by 2^30
+/// (texel · 64 + a 6-bit fraction), the flat-top triangles' left edge
+/// chosen after both edges are set up, and with `Smooth` (`warpBFPII`,
+/// the default) a bilinear filter between the four texels around each
+/// sample.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct A3Raster {
+    pub smooth: bool,
+}
+
 /// The cube renderer for one screen size.
 pub struct Renderer {
     pub variant: Variant,
+    /// *Atlantis III*'s rules for `warpPII` ([`Variant::PII`] only).
+    pub a3: Option<A3Raster>,
     /// The x87 control word: the process's when the frame starts; `warpPII`
     /// sets [`Fpu::Chop`] at its first polygon and leaves it.
     pub fpu: Fpu,
@@ -115,7 +129,9 @@ pub struct Renderer {
     /// `warpC`: spans whose texel index left the face (the original reads
     /// the memory beside it; here the nearest texel). None in any frame
     /// the original was checked on. `warpPII` wraps its texel coordinates
-    /// within the face and never leaves it.
+    /// within the face and never leaves it; *Atlantis III*'s does not wrap
+    /// (texel reads past the face, with a weight, are counted here: the
+    /// original reads the heap beyond the face's buffer).
     pub out_of_face: u64,
 }
 
@@ -157,6 +173,7 @@ impl Renderer {
     pub fn new(variant: Variant, fpu: Fpu, width: usize, height: usize) -> Renderer {
         Renderer {
             variant,
+            a3: None,
             fpu,
             width,
             height,

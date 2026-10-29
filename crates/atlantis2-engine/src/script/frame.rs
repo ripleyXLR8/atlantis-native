@@ -89,8 +89,16 @@ impl Script {
         }
         self.vars[k.vue] = self.view_number;
         self.vars[k.abortdepart] = 0;
-        self.vars[k.limiteanglewarpy] = 70;
-        self.vars[k.limiteanglewarpx] = -1;
+        if self.is_a3() {
+            // Atlantis III (@ 0x0044a350) keeps the limits and clears
+            // `PSYCHOMOVE`.
+            if let Ok(i) = self.names.id(defnames::VARIABLES, b"PSYCHOMOVE") {
+                self.vars[i] = 0;
+            }
+        } else {
+            self.vars[k.limiteanglewarpy] = 70;
+            self.vars[k.limiteanglewarpx] = -1;
+        }
         self.vars[k.sacados] = 0;
         self.vars[k.flag] = 0;
         self.vars[k.objetenmain] = 0;
@@ -121,13 +129,21 @@ impl Script {
         if event != 0 {
             self.special_event(host, event);
         }
+        if self.is_a3() && self.vars[k.gameover] != 0 {
+            // Atlantis III (@ 0x0044b6c0): the game-over sequence.
+            host.game_over();
+        }
         if self.vars[k.exit] != 0 {
             log::info!("Interp_GereFrame: EXIT, quitat2=1");
             self.quit = true;
         }
         if self.vars[k.arriveevue] != 0 {
             self.view_reset();
-            let next = self.vars[k.objetenmain_next_warp];
+            let next = if self.is_a3() {
+                0
+            } else {
+                self.vars[k.objetenmain_next_warp]
+            };
             if next != 0 {
                 self.hold(next);
                 self.vars[k.objetenmain_next_warp] = 0;

@@ -12,9 +12,13 @@ use std::sync::{Arc, Mutex};
 
 /// The channel of the cinematics' sound.
 pub const CHANNEL_CINEMA: usize = 0;
-/// The channel of `playsound` and of the place sounds' first slot; the
-/// place sounds take the next ones.
+/// The channel of `playsound`.
 pub const CHANNEL_SOUND: usize = 1;
+/// The channel of the music.
+pub const CHANNEL_MUSIC: usize = 2;
+/// The first channel of the place sounds; they take the next ones up to
+/// [`CHANNELS`].
+pub const CHANNEL_PLACE: usize = 3;
 /// How many channels the mix has.
 pub const CHANNELS: usize = 16;
 
@@ -199,6 +203,18 @@ impl Audio {
             *s = s.clamp(-1.0, 1.0);
         }
     }
+}
+
+/// The Cryo Sound Manager's volume (0..100) as a gain: hundredths of dB
+/// `trunc(−2000 · log10(100 / v))` (0 for 100, −10000 for 0), as
+/// DirectSound applies them (`Game.exe` @ 0x006b0600 → @ 0x006b0540; the
+/// object's scale +0x48 is not read yet and taken as 100).
+pub fn csm_gain(v: i32) -> f32 {
+    if v <= 0 {
+        return 0.0;
+    }
+    let db = (-2000.0 * (100.0 / f64::from(v.min(100))).log10()) as i32;
+    10f32.powf(db.max(-10000) as f32 / 2000.0)
 }
 
 #[cfg(test)]

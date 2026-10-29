@@ -29,6 +29,12 @@ impl Script {
             return None;
         }
         log::debug!("interp: SET{}", self.line_text(src, p));
+        if self.set_log.is_some() {
+            let t = self.line_text(src, p);
+            if let Some(l) = self.set_log.as_mut() {
+                l.push(t);
+            }
+        }
         if let (Some(t), Src::Chapter) = (self.trace.as_mut(), src) {
             t.push(p);
         }
@@ -99,6 +105,9 @@ impl Script {
                     return None;
                 }
             };
+            if self.is_a3() {
+                return self.set_variables_a3(host, src, p, key);
+            }
             if key == self.keys.changewam {
                 // The text between the operator and `)`.
                 let mut wam = Vec::new();
@@ -431,7 +440,7 @@ impl Script {
 
     /// The position after the first `,` at or after `p` (the handler's
     /// `while (p++, c != ',')` walks).
-    fn after_comma(&self, src: Src, mut p: usize) -> usize {
+    pub(super) fn after_comma(&self, src: Src, mut p: usize) -> usize {
         while self.b(src, p) != b',' && p < self.len(src) {
             p += 1;
         }
@@ -440,7 +449,7 @@ impl Script {
 
     /// `FUN_00485180`: the next number from `*p` (up to a CR), then past
     /// its digits and the blanks after them.
-    fn parse_int(&self, src: Src, p: &mut usize) -> i32 {
+    pub(super) fn parse_int(&self, src: Src, p: &mut usize) -> i32 {
         while !matches!(self.b(src, *p), 0 | CR) && !self.b(src, *p).is_ascii_digit() {
             *p += 1;
         }
@@ -531,7 +540,7 @@ impl Script {
     /// buffer, its `/INIT` runs (or the running one restarts on it), and
     /// the position before the new text's first section header ends the
     /// section that changed it.
-    fn change_chapter(&mut self, host: &mut dyn Host, value: i32) -> Option<usize> {
+    pub(super) fn change_chapter(&mut self, host: &mut dyn Host, value: i32) -> Option<usize> {
         self.chapter_reload = true;
         self.previous_chapter = self.chapter;
         self.chapter = value;
@@ -560,7 +569,7 @@ impl Script {
 
     /// The `VUE` branch (`AtlWam_SetCurrentVue` called @ 0x00482321): a
     /// view of the current place.
-    fn set_vue(&mut self, host: &mut dyn Host, value: i32) {
+    pub(super) fn set_vue(&mut self, host: &mut dyn Host, value: i32) {
         let k = self.keys.clone();
         self.vars[k.next_warp_invalide] = 0;
         self.vue_value = value;
@@ -576,6 +585,9 @@ impl Script {
         self.vars[k.vue] = value;
         let (x, y) = (self.start_x, self.start_y);
         host.enter_view_with_script(value, x, y, self);
+        if self.is_a3() {
+            self.note_world_view(value);
+        }
         self.view_reset();
         self.vars[k.vue] = value;
         self.click = false;
@@ -593,7 +605,7 @@ impl Script {
     /// `ENABLESUJ` (@ 0x0047f920), `DISABLESUJ` (@ 0x0047f9f0), `KILLSUJ`
     /// (@ 0x0047fa70): `PERSO,SUJ1[,SUJ2...]`, subjects matched by their
     /// `#SUJETS#` parameter.
-    fn subjects_command(&mut self, src: Src, mut p: usize, key: usize) {
+    pub(super) fn subjects_command(&mut self, src: Src, mut p: usize, key: usize) {
         let perso = self.id(defnames::PERSONNAGES, src, p);
         p = self.after_comma(src, p);
         loop {
@@ -627,7 +639,7 @@ impl Script {
 
     /// `SACADOS=NAME` (FUN_00475610 → FUN_004754f0): the object goes in the
     /// bag unless it is there.
-    fn bag_take(&mut self, host: &mut dyn Host, src: Src, p: usize) {
+    pub(super) fn bag_take(&mut self, host: &mut dyn Host, src: Src, p: usize) {
         let id = self.id(defnames::OBJETS, src, p);
         let sprite = self.param(defnames::OBJETS, src, p);
         if self.bag.iter().any(|e| e.id == id) {
@@ -714,7 +726,13 @@ impl Script {
     /// The animation keys (`PLAYANIMP` .. `ADDFRAMEOBJET` in `SetVariables`'
     /// order): the name, then the
     /// number after the comma.
-    fn anim_command(&mut self, host: &mut dyn Host, src: Src, p: usize, key: usize) -> usize {
+    pub(super) fn anim_command(
+        &mut self,
+        host: &mut dyn Host,
+        src: Src,
+        p: usize,
+        key: usize,
+    ) -> usize {
         let k = self.keys.clone();
         let either = |s: &mut Script| {
             // CONTINUEANIM, ANIM_THE_FRAME: #OBJETS#, then #PERSONNAGES#.

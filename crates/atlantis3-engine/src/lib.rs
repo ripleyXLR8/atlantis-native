@@ -14,8 +14,13 @@
 #![forbid(unsafe_code)]
 
 pub mod audio;
+pub mod caption;
 pub mod cinema;
+pub mod game;
+pub mod place_anim;
 pub mod startup;
+pub mod wam_setup;
 
 pub use cinema::{Cinema, CinemaError};
+pub use game::{Game, GameError, Mode};
 pub use startup::Startup;
