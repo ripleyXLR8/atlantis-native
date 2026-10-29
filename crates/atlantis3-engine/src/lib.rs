@@ -17,6 +17,7 @@ pub mod audio;
 pub mod caption;
 pub mod cinema;
 pub mod game;
+pub mod inventory;
 pub mod place_anim;
 pub mod startup;
 pub mod subjects;

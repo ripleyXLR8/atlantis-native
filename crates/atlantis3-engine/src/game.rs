@@ -87,6 +87,10 @@ pub enum Mode {
     Warp,
     /// Mode 4: a cinematic (CryoMovie) or a travel video (Hnm_Framer).
     Video,
+    /// Mode 7: the inventory over the frozen warp.
+    Inventory,
+    /// Mode 8: the subject menu over the frozen warp.
+    Subjects,
     /// Nothing to show (before the intro, after the game stopped).
     Idle,
 }
@@ -185,6 +189,23 @@ pub struct Game {
     /// A dialog the port does not play: the waiting section goes on at the
     /// next warp frame, as after the dialog's end.
     resume_next: bool,
+    /// The free pointer of the inventory and the subject menu
+    /// (@ 0x007592b0, 0x007592b4) and the mode they return to
+    /// (@ 0x007564e0).
+    pointer: (i32, i32),
+    prev_mode: Mode,
+    inventory: crate::inventory::Inventory,
+    /// The world's banks: `<World>Objets.SPR`, `<World>ObjetsEnMain.SPR`,
+    /// `<World>SujetsNN.spr` (opened by `MONDE`), `fleche.SPR`.
+    objects: Option<Bank>,
+    objects_hand: Option<Bank>,
+    subjects_bank: Option<Bank>,
+    arrows: Option<Bank>,
+    banks_world: i32,
+    /// The place sprite under the centre when a click was made (the
+    /// render's hit, @ 0x0077b670): its slot's character or object id and
+    /// click kind.
+    sprite_hit: Option<(i32, i32)>,
     /// The script asked to stop.
     pub quit: bool,
     /// What the scripts did that the port does not play yet (logged once
@@ -260,6 +281,15 @@ impl Game {
             coord: Coord::default(),
             listener: [0.0; 3],
             place_sounds: BTreeMap::new(),
+            pointer: (0, 0),
+            prev_mode: Mode::Warp,
+            inventory: Default::default(),
+            objects: None,
+            objects_hand: None,
+            subjects_bank: None,
+            arrows: None,
+            banks_world: 0,
+            sprite_hit: None,
             quit: false,
             not_ported: Vec::new(),
         };
@@ -392,6 +422,12 @@ impl Game {
     /// turning, the turn speeds gain dx / 2000 and lose dy / 2000; the
     /// centre zone is picked again.
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
+        if matches!(self.mode, Mode::Inventory | Mode::Subjects) {
+            // The free pointer, clamped to the screen (@ 0x004313f6).
+            self.pointer.0 = (self.pointer.0 + dx).clamp(0, self.width as i32 - 1);
+            self.pointer.1 = (self.pointer.1 + dy).clamp(0, self.height as i32 - 1);
+            return;
+        }
         if self.mode != Mode::Warp || self.moving.turn.is_some() {
             return;
         }
@@ -415,6 +451,338 @@ impl Game {
         self.last_press = Some(self.now);
     }
 
+    /// The free pointer (inventory, subject menu).
+    pub fn pointer(&self) -> (i32, i32) {
+        self.pointer
+    }
+
+    /// Puts the free pointer at (x, y) (tests; the window's absolute
+    /// mouse).
+    pub fn set_pointer(&mut self, x: i32, y: i32) {
+        self.pointer = (
+            x.clamp(0, self.width as i32 - 1),
+            y.clamp(0, self.height as i32 - 1),
+        );
+    }
+
+    /// The right button (@ 0x00431639..0x00431676): in the warp the
+    /// inventory opens (unless it is open), in the inventory it closes, in
+    /// the subject menu the menu closes.
+    pub fn right_click(&mut self) {
+        match self.mode {
+            Mode::Warp if self.moving.turn.is_none() && !self.moving.pending => {
+                self.open_inventory()
+            }
+            Mode::Inventory => self.close_inventory(),
+            Mode::Subjects => self.close_subjects(),
+            _ => {}
+        }
+    }
+
+    /// Whether the inventory is open.
+    pub fn inventory_open(&self) -> bool {
+        self.inventory.open
+    }
+
+    /// The bag entries the inventory shows (the current world's).
+    pub fn inventory_items(&self) -> Vec<atlantis2_engine::script::BagEntry> {
+        self.script
+            .as_ref()
+            .map(|s| crate::inventory::shown(&s.bag, s.a3.world))
+            .unwrap_or_default()
+    }
+
+    /// The object in the hand (`OBJETENMAIN`), 0 for none.
+    pub fn object_in_hand(&self) -> i32 {
+        self.script
+            .as_ref()
+            .map_or(0, |s| s.vars[s.keys.objetenmain])
+    }
+
+    /// The world's sprite banks, opened again when the world changed.
+    fn world_banks(&mut self) {
+        let world = self.script.as_ref().map_or(1, |s| s.a3.world);
+        if world == self.banks_world {
+            return;
+        }
+        self.banks_world = world;
+        let open = |files: &A3Files, path: String| {
+            let b = files
+                .read(&path)
+                .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok());
+            if b.is_none() {
+                log::warn!("{path}: not found");
+            }
+            b
+        };
+        let name = crate::inventory::world_bank_name(world);
+        self.objects = name.and_then(|n| open(&self.files, format!("spr/{n}Objets.SPR")));
+        self.objects_hand =
+            name.and_then(|n| open(&self.files, format!("spr/{n}ObjetsEnMain.SPR")));
+        let lay = crate::subjects::Layout::for_width(self.width);
+        self.subjects_bank = lay.bank_path(world).and_then(|p| open(&self.files, p));
+        if self.arrows.is_none() {
+            self.arrows = open(&self.files, "spr/fleche.SPR".into());
+        }
+    }
+
+    /// Opens the inventory (@ 0x00427a60): mode 7, the turn speeds
+    /// zeroed, the hand emptied, alpha 0, the fade timer restarted.
+    fn open_inventory(&mut self) {
+        self.world_banks();
+        self.prev_mode = self.mode;
+        self.mode = Mode::Inventory;
+        self.look.stop();
+        if let Some(s) = self.script.as_mut() {
+            s.empty_hand();
+        }
+        self.inventory.open = true;
+        self.inventory.alpha = 0.0;
+        self.inventory.fade_time = self.now;
+        self.click = false;
+    }
+
+    /// Closes the inventory (@ 0x00427b20): the mode back; the items fade
+    /// out over the warp.
+    fn close_inventory(&mut self) {
+        self.inventory.open = false;
+        self.inventory.fade_time = self.now;
+        self.mode = self.prev_mode;
+        self.look.stop();
+        self.click = false;
+        self.look_last = None;
+    }
+
+    /// Opens the subject menu for `character` (@ 0x00440530 →
+    /// @ 0x00427b80): `CLICPERSO`, mode 8, the pointer at the centre.
+    fn open_subjects(&mut self, character: i32) {
+        self.world_banks();
+        if let Some(s) = self.script.as_mut() {
+            let k = s.keys.clicperso;
+            s.vars[k] = character;
+        }
+        self.prev_mode = self.mode;
+        self.mode = Mode::Subjects;
+        self.pointer = ((self.width / 2) as i32, (self.height / 2) as i32);
+    }
+
+    /// Closes the subject menu (@ 0x00427be0): the mode back, the turn
+    /// speeds zeroed, the hand emptied, the click flags cleared.
+    fn close_subjects(&mut self) {
+        self.mode = self.prev_mode;
+        self.look.stop();
+        if let Some(s) = self.script.as_mut() {
+            s.empty_hand();
+            s.click = false;
+        }
+        self.click = false;
+        self.double_click = false;
+        self.look_last = None;
+    }
+
+    /// Whether the subject menu is open.
+    pub fn subjects_open(&self) -> bool {
+        self.mode == Mode::Subjects
+    }
+
+    /// A sprite drawn centred on (x, y) at an alpha (`AtlSpr_AffCentre`
+    /// @ 0x00436b80 → `AtlSpr_Aff` @ 0x004367b0).
+    fn aff_centre(
+        screen: &mut [u16],
+        w: usize,
+        h: usize,
+        bank: &Bank,
+        idx: usize,
+        x: i32,
+        y: i32,
+        alpha: f32,
+    ) {
+        let Some(info) = bank.info(idx) else { return };
+        let x = x - i32::from(info.w) / 2;
+        let y = y - i32::from(info.h) / 2;
+        Self::aff(screen, w, h, bank, idx, x, y, alpha);
+    }
+
+    /// `AtlSpr_Aff`: `AFF_SPR` at alpha ≥ 1, `AFF_SPRTRS` below, nothing
+    /// at 0.
+    #[allow(clippy::too_many_arguments)]
+    fn aff(
+        screen: &mut [u16],
+        w: usize,
+        h: usize,
+        bank: &Bank,
+        idx: usize,
+        x: i32,
+        y: i32,
+        alpha: f32,
+    ) {
+        let mut t = Target::screen(screen, w, h);
+        // The game's target: maxima are the size (formats/spr.md).
+        t.xmax = w as i32;
+        t.ymax = h as i32;
+        match crate::inventory::trs_level(alpha) {
+            None => {}
+            Some(None) => {
+                bank.draw(&mut t, Some(x), y, idx);
+            }
+            Some(Some(l)) => {
+                bank.draw_trs(&mut t, Some(x), y, idx, l);
+            }
+        }
+    }
+
+    /// The inventory's items, bar and arrows at its alpha (@ 0x004299b0,
+    /// @ 0x00428fd0).
+    fn draw_inventory_items(&mut self) {
+        let alpha = self.inventory.alpha;
+        let (w, h) = (self.width, self.height);
+        let items = self.inventory_items();
+        let (n, margin) = crate::inventory::slots(w);
+        if let Some(bank) = &self.objects {
+            for (j, e) in items
+                .iter()
+                .skip(self.inventory.scroll)
+                .take(n as usize)
+                .enumerate()
+            {
+                let x = margin + crate::inventory::SLOT * j as i32 + 40;
+                Self::aff_centre(
+                    &mut self.screen,
+                    w,
+                    h,
+                    bank,
+                    usize::from(e.sprite),
+                    x,
+                    h as i32 - 40,
+                    alpha,
+                );
+            }
+        }
+        if let Some(bank) = &self.interface {
+            Self::aff_centre(
+                &mut self.screen,
+                w,
+                h,
+                bank,
+                0,
+                (w / 2) as i32,
+                h as i32 - 39,
+                alpha,
+            );
+        }
+        if let Some(bank) = &self.arrows {
+            if self.inventory.scroll > 0 {
+                Self::aff(&mut self.screen, w, h, bank, 0, 0, h as i32 - 110, alpha);
+            }
+            if self.inventory.scroll + (n as usize) < items.len() {
+                Self::aff(
+                    &mut self.screen,
+                    w,
+                    h,
+                    bank,
+                    1,
+                    w as i32 - 16,
+                    h as i32 - 110,
+                    alpha,
+                );
+            }
+        }
+    }
+
+    /// The pointer `Interface.spr` #40 at the free pointer (@ 0x004281e0).
+    fn draw_pointer(&mut self) {
+        if let Some(bank) = &self.interface {
+            let (w, h) = (self.width, self.height);
+            Self::aff(
+                &mut self.screen,
+                w,
+                h,
+                bank,
+                40,
+                self.pointer.0,
+                self.pointer.1,
+                1.0,
+            );
+        }
+    }
+
+    /// A frame of the inventory or the subject menu (@ 0x00427c40): the
+    /// warp drawn, not stepped, without its cursor; the overlay; the
+    /// pointer; then the pick.
+    fn overlay_frame(&mut self) {
+        self.draw_warp_only();
+        if self.mode == Mode::Inventory {
+            self.draw_inventory_items();
+            self.draw_pointer();
+            let items = self.inventory_items();
+            self.inventory
+                .scroll_step(self.width, items.len(), self.pointer.0, self.now);
+            if std::mem::take(&mut self.click) {
+                if let Some(e) = self
+                    .inventory
+                    .slot_at(self.width, self.height, self.pointer)
+                    .and_then(|i| items.get(i))
+                {
+                    // @ 0x00428380: the inventory closed, the item in the
+                    // hand.
+                    let id = e.id;
+                    self.close_inventory();
+                    if let Some(s) = self.script.as_mut() {
+                        s.hold(id);
+                    }
+                }
+            }
+            self.inventory.fade_step(self.now);
+        } else {
+            self.draw_subjects();
+            self.draw_pointer();
+            if std::mem::take(&mut self.click) {
+                let lay = crate::subjects::Layout::for_width(self.width);
+                let r = self.script.as_ref().map_or(-2, |s| {
+                    lay.pick(&s.subjects, s.vars[s.keys.clicperso], self.pointer)
+                });
+                if r > -1 {
+                    self.close_subjects();
+                    self.sprite_hit = None;
+                    self.with_script(|s, h| {
+                        let k = s.keys.clone();
+                        s.vars[k.sujet] = r;
+                        s.subject_scan(h);
+                        s.vars[k.clicperso] = 0;
+                        s.vars[k.sujet] = -2;
+                    });
+                }
+            }
+        }
+    }
+
+    /// The subjects of `CLICPERSO` (@ 0x0043b850).
+    fn draw_subjects(&mut self) {
+        let lay = crate::subjects::Layout::for_width(self.width);
+        let Some(s) = self.script.as_ref() else {
+            return;
+        };
+        let cells = lay.cells(&s.subjects.list(s.vars[s.keys.clicperso]));
+        let (w, h) = (self.width, self.height);
+        for c in cells {
+            if let (Some(bank), Ok(v)) = (&self.subjects_bank, usize::try_from(c.value)) {
+                Self::aff_centre(&mut self.screen, w, h, bank, v, c.x, c.y, c.alpha);
+            }
+            if let Some(bank) = &self.interface {
+                Self::aff_centre(
+                    &mut self.screen,
+                    w,
+                    h,
+                    bank,
+                    lay.ring,
+                    c.ring.0,
+                    c.ring.1,
+                    1.0,
+                );
+            }
+        }
+    }
+
     /// One displayed frame at the game's time `now` (seconds).
     pub fn step(&mut self, now: f64) {
         self.now = now;
@@ -432,6 +800,7 @@ impl Game {
         match self.mode {
             Mode::Intro | Mode::Video => self.video_step(),
             Mode::Warp => self.warp_frame(),
+            Mode::Inventory | Mode::Subjects => self.overlay_frame(),
             Mode::Idle => {}
         }
     }
@@ -562,11 +931,17 @@ impl Game {
         // 4. Not turning: the click, `Interp_GereFrame`.
         if self.moving.turn.is_none() && !self.moving.pending {
             if self.click {
+                self.sprite_clicks();
+            }
+            if self.click && self.mode == Mode::Warp {
                 self.zone_click();
             }
             let (yaw, pitch) = self.camera.angles();
             self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
-            if self.mode != Mode::Warp {
+            if self.mode == Mode::Warp {
+                self.click_scan();
+            }
+            if !matches!(self.mode, Mode::Warp | Mode::Subjects) {
                 self.click = false;
                 self.double_click = false;
                 return;
@@ -638,8 +1013,21 @@ impl Game {
     /// The warp drawn into the screen (@ 0x00440690), then the cursor
     /// (@ 0x00440a30).
     fn draw_warp(&mut self) {
-        if self.place.faces.iter().any(|f| f.is_empty()) {
+        if !self.draw_warp_only() {
             return;
+        }
+        // The inventory fading out after it closed (@ 0x00427c40).
+        if !self.inventory.open && self.inventory.alpha > 0.0 {
+            self.draw_inventory_items();
+            self.inventory.fade_step(self.now);
+        }
+    }
+
+    /// The warp frame without the overlays (@ 0x00440690) and the cursor
+    /// (@ 0x00440a30); false when there is no cube.
+    fn draw_warp_only(&mut self) -> bool {
+        if self.place.faces.iter().any(|f| f.is_empty()) {
+            return false;
         }
         let m = self.camera.matrix();
         let proj = self.camera.projection();
@@ -662,7 +1050,10 @@ impl Game {
         if let Some(s) = self.script.as_mut() {
             s.set_fpu(self.renderer.fpu);
         }
-        self.draw_cursor();
+        if self.mode == Mode::Warp {
+            self.draw_cursor();
+        }
+        true
     }
 
     /// @ 0x00440a30 → @ 0x00428060: the cursor of the zone under the
@@ -690,6 +1081,30 @@ impl Game {
                 self.screen[(cy + k - 2) * self.width + cx] = px;
                 self.screen[cy * self.width + cx + k - 2] = px;
             }
+        }
+        // The object in the hand, centred on the screen (@ 0x00428500,
+        // `<World>ObjetsEnMain.SPR`), in place of the zone cursor.
+        if let Some(sprite) = self
+            .script
+            .as_ref()
+            .filter(|s| s.vars[s.keys.objetenmain] != 0 && s.cursor_objects)
+            .map(|s| s.cursor_sprite)
+        {
+            self.world_banks();
+            if let (Some(bank), Ok(i)) = (&self.objects_hand, usize::try_from(sprite)) {
+                let (w, h) = (self.width, self.height);
+                Self::aff_centre(
+                    &mut self.screen,
+                    w,
+                    h,
+                    bank,
+                    i,
+                    (w / 2) as i32,
+                    (h / 2) as i32,
+                    1.0,
+                );
+            }
+            return;
         }
         let Some(kind) = self
             .centre
@@ -728,6 +1143,56 @@ impl Game {
         }
     }
 
+    /// The place-sprite clicks of a warp frame: @ 0x004403e0 (click kind 1
+    /// with an empty hand: the object taken — `CLICOBJET`, hidden, in the
+    /// bag and in the hand; 3: `CLICOBJET`; 4: `CLICPERSO`), then
+    /// @ 0x00440530 (kind 2, a character with subjects, an empty hand: the
+    /// subject menu).
+    fn sprite_clicks(&mut self) {
+        let Some((id, kind)) = self.sprite_hit else {
+            return;
+        };
+        let hand = self.object_in_hand();
+        match kind {
+            1 if hand == 0 => {
+                let sprite = usize::try_from(id).map_or(0, |i| {
+                    self.names.param_of(atlantis2_data::defnames::OBJETS, i)
+                });
+                self.with_script(|s, h| s.take_object(h, id, sprite as u8));
+            }
+            3 => self.set_script_var(|k| k.clicobjet, id),
+            4 => self.set_script_var(|k| k.clicperso, id),
+            _ => {}
+        }
+        if kind == 2 && hand == 0 {
+            let n = self.script.as_ref().map_or(0, |s| s.subjects.count(id));
+            if n > 0 {
+                self.open_subjects(id);
+            }
+        }
+    }
+
+    fn set_script_var(&mut self, key: impl Fn(&atlantis2_engine::script::Keys) -> usize, v: i32) {
+        if let Some(s) = self.script.as_mut() {
+            let k = key(&s.keys);
+            s.vars[k] = v;
+        }
+    }
+
+    /// The click scan (@ 0x004405b0), on a click with neither the subject
+    /// menu nor the inventory open: `CLICPERSO` = the character of a kind
+    /// 2 sprite hit, `CtrlScenarIN` and the timer scans, then `CLICPERSO`
+    /// = `CLICOBJET` = 0, `SUJET` = −2, the click flags cleared.
+    fn click_scan(&mut self) {
+        if !self.click {
+            return;
+        }
+        let character = self.sprite_hit.filter(|h| h.1 == 2).map(|h| h.0);
+        self.with_script(|s, h| s.click_scan(h, character));
+        self.click = false;
+        self.sprite_hit = None;
+    }
+
     /// The zone click (@ 0x00420330): a move zone's departure scan, then
     /// the move; `CLICZONE` for the others.
     fn zone_click(&mut self) {
@@ -738,6 +1203,12 @@ impl Game {
         else {
             return;
         };
+        if self.sprite_hit.is_some() {
+            // A place sprite clicked this frame: `CLICZONE` = the zone's
+            // value, whatever its type.
+            self.set_script_var(|k| k.cliczone, zone.value);
+            return;
+        }
         let target = matches!(zone.kind, 1 | 2).then_some(zone.value);
         let go = self.with_script(|s, h| s.departure_scan(h, target));
         if !go {
