@@ -55,6 +55,12 @@ web-sys = { version = "0.3", features = ["File", "FileList", "Blob", "Window", "
 console_error_panic_hook = "0.1"
 console_log = "1"
 
+# The developers' window of the unfinished Atlantis III
+# (`examples/atlantis3.rs`); not part of the program.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+atlantis3-data = { path = "../atlantis3-data" }
+atlantis3-engine = { path = "../atlantis3-engine" }
+
 # The unit tests run in WebAssembly too (`wasm-bindgen-test-runner`, in
 # Node.js): the game finder of the web page.
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

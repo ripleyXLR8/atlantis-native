@@ -175,6 +175,8 @@ dependencies = [
  "atlantis-engine",
  "atlantis2-data",
  "atlantis2-engine",
+ "atlantis3-data",
+ "atlantis3-engine",
  "console_error_panic_hook",
  "console_log",
  "cpal",

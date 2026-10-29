@@ -837,6 +837,10 @@ impl Game {
         let (yaw, pitch) = self.moving.arrival;
         self.with_script(|s, _| s.arrive(next as i32));
         self.enter_view(next, yaw, pitch);
+        if let Some(mut s) = self.script.take() {
+            self.place_hooks(&mut s);
+            self.script = Some(s);
+        }
         let dest = old.and_then(|old| {
             self.place
                 .wam
@@ -1039,6 +1043,26 @@ impl Game {
             } else {
                 self.audio.set_gain(ch, gains);
             }
+        }
+    }
+
+    /// The places' hooks of a view entry (@ 0x004c2010, after the
+    /// animations and the sounds): `(LIMITEANGLEWARPY=70)` at every entry,
+    /// then per place and view the puzzles' set-ups (the Hoggar's views 1
+    /// to 3: the stars @ 0x004d3960; the funeral chamber's 1 to 4
+    /// @ 0x004c4de0; ...), not ported yet.
+    fn place_hooks(&mut self, script: &mut Script) {
+        script.run_command(self, b"(LIMITEANGLEWARPY=70)");
+        let view = self.place.view.unwrap_or(0);
+        let hooked = match self.place.name.to_ascii_lowercase().as_str() {
+            "hoggar.wam" => (1..=3).contains(&view),
+            "cfuner.wam" => (1..=4).contains(&view),
+            "paleo.wam" | "ldmorts.wam" | "mmarchd.wam" | "jardin.wam" | "tourmagi.wam"
+            | "pmagi.wam" | "interdim.wam" => true,
+            _ => false,
+        };
+        if hooked {
+            self.not_ported("the places' puzzle hooks at view entry");
         }
     }
 
@@ -1269,6 +1293,11 @@ impl Host for Game {
 
     fn enter_view(&mut self, view: i32, yaw: f32, pitch: f32) {
         Game::enter_view(self, view as u32, yaw, pitch);
+    }
+
+    fn enter_view_with_script(&mut self, view: i32, yaw: f32, pitch: f32, script: &mut Script) {
+        Game::enter_view(self, view as u32, yaw, pitch);
+        self.place_hooks(script);
     }
 
     fn turn_now(&mut self, yaw: bool, angle: f32) {
