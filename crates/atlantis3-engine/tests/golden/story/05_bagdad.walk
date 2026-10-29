@@ -46,9 +46,9 @@ HAND -                      # empty the hand (the pole is still in it)
 OBJET BAG_BANANE            # chapter 32: Flag803=0
 GO 18
 GO 17
-GO 20                       # the monkey (0x004cfaa0): at view 20 it plays anim 2 (state 1, click type 2) then runs to view 100
+GO 20                       # the monkey (0x004cfaa0): at view 20 it plays anim 2 then anim 3 (its state 1 there, click type 2), then is at view 100
 HAND BAG_BANANE
-PERSO BAG_SINGE TYPE=2      # the monkey with the banana: BAG_PUZZLESINGEOK, Flag125, Flag804, cinema 71, BAG_3BATONS shown
+PERSO BAG_SINGE SLOT=1      # the monkey with the banana (slot (BAG_SINGE, 1): anim 3, click type 2, played after anim 2): BAG_PUZZLESINGEOK, Flag125, Flag804, cinema 71, BAG_3BATONS shown
 EXPECT FLAG804=1
 HAND -                      # empty the hand (the banana, given away, is still in it)
 OBJET BAG_3BATONS           # the three sticks

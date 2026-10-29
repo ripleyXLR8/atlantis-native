@@ -92,6 +92,21 @@ impl Slots {
         view: u32,
         world: &str,
         rand: &mut Rand,
+        now: f64,
+        shown: impl Fn(i32, i32) -> Option<bool>,
+    ) -> Slots {
+        Slots::load_with(files, cache, wam, view, world, &mut || rand.rand(), now, shown)
+    }
+
+    /// [`Slots::load`] with any source of the CRT's `rand()` values.
+    #[allow(clippy::too_many_arguments)]
+    pub fn load_with(
+        files: &A3Files,
+        cache: &mut HashMap<String, Option<Arc<Bank>>>,
+        wam: &Wam,
+        view: u32,
+        world: &str,
+        rand: &mut dyn FnMut() -> i32,
         _now: f64,
         shown: impl Fn(i32, i32) -> Option<bool>,
     ) -> Slots {
@@ -123,7 +138,7 @@ impl Slots {
                 let pause = if s.delay == 0 {
                     0
                 } else {
-                    rand.rand() % s.delay.unsigned_abs() as i32 + 10
+                    rand() % s.delay.unsigned_abs() as i32 + 10
                 };
                 let mut slot_shown = s.shown != 0;
                 if let Some(v) = shown(id, kind) {

@@ -1645,6 +1645,7 @@ impl Game {
             return;
         }
         let character = self.sprite_hit.filter(|h| h.1 == 2).map(|h| h.0);
+        if std::env::var_os("STORY_DEBUG").is_some() { eprintln!("click scan: hit {:?} script click {:?}", self.sprite_hit, self.script.as_ref().map(|s| s.click)); }
         self.with_script(|s, h| s.click_scan(h, character));
         self.click = false;
         self.sprite_hit = None;
@@ -1880,13 +1881,16 @@ impl Game {
             .as_ref()
             .map(|s| s.shown.clone())
             .unwrap_or_default();
-        self.slots = Slots::load(
+        // The builder's draws come from the game's one `rand()` (queued
+        // values first: tests replaying the original's run).
+        let (queue, rand) = (&mut self.rand_queue, &mut self.rand);
+        self.slots = Slots::load_with(
             &self.files,
             &mut self.spw_cache,
             &self.place.wam,
             id,
             folder,
-            &mut self.rand,
+            &mut || queue.pop_front().unwrap_or_else(|| rand.rand()),
             self.now,
             |id, kind| {
                 shown
@@ -2858,6 +2862,9 @@ impl Game {
         self.look.stop();
         self.centre = self.pick_centre();
         self.click();
+        // The click is on that sprite (the hit record of the click's
+        // frame), even if its play moves before the frame is drawn.
+        self.sprite_hit = self.sprite_under_centre();
         true
     }
 

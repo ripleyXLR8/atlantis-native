@@ -520,6 +520,13 @@ impl Script {
     pub(crate) fn id(&mut self, section: usize, src: Src, i: usize) -> i32 {
         match self.names.id(section, self.tail(src, i)) {
             Ok(v) => v as i32,
+            Err(e) if self.is_a3() => {
+                // *Atlantis III*'s `DefName_GetIdName` (@ 0x00460860) only
+                // logs "Nom de %s inconnu" and gives 0 (a condition on
+                // `NOT_X` of a variable that is not `SACADOS` reads it).
+                log::warn!("DefName_GetIdName: {e}");
+                0
+            }
             Err(e) => {
                 self.fail(e.to_string());
                 0

@@ -132,17 +132,6 @@ impl Run {
 
     fn action(&mut self, line: &str) {
         let w: Vec<&str> = line.split_whitespace().collect();
-        // The player waits for a play a puzzle started (a lid opening)
-        // before acting (the harness, without place animations, ends them
-        // at once).
-        if matches!(w[0], "GO" | "PERSO" | "OBJET" | "ZONE" | "HAND") {
-            for _ in 0..600 {
-                if !self.g.driven_play_running() || self.g.mode() != Mode::Warp {
-                    break;
-                }
-                self.frame();
-            }
-        }
         // `EXPECT` and `RAND` are no steps of the golden.
         if !matches!(w[0], "EXPECT" | "RAND") {
             self.step += 1;
@@ -183,7 +172,14 @@ impl Run {
                     found = self.g.click_sprite(id, kind);
                 }
                 assert!(found, "{line}: not shown");
+                if std::env::var_os("STORY_DEBUG").is_some() {
+                    eprintln!("{line}: under centre {:?}, hand {}", self.g.sprite_under_centre(), self.g.object_in_hand());
+                }
                 self.act_frame();
+                if std::env::var_os("STORY_DEBUG").is_some() {
+                    let s = self.g.script().unwrap();
+                    eprintln!("  after: bag {:?} hand {} sacados {:?} mode {:?} copy_waiting {} resume {}", s.bag.iter().map(|e| e.id).collect::<Vec<_>>(), self.g.object_in_hand(), s.var("SACADOS"), self.g.mode(), s.copy_waiting, s.resume_pending);
+                }
             }
             "SUBJECT" => {
                 assert!(self.g.subjects_open(), "{line}: no subject menu");
@@ -436,7 +432,23 @@ fn changed(golden: &str) -> (BTreeMap<String, i32>, BTreeMap<usize, i32>) {
     (vars, flags)
 }
 
+struct Stderr;
+
+impl log::Log for Stderr {
+    fn enabled(&self, _: &log::Metadata) -> bool {
+        true
+    }
+    fn log(&self, r: &log::Record) {
+        eprintln!("{} {}", r.level(), r.args());
+    }
+    fn flush(&self) {}
+}
+
 fn new_run() -> Option<Run> {
+    if std::env::var_os("STORY_LOG").is_some() {
+        let _ = log::set_logger(&Stderr);
+        log::set_max_level(log::LevelFilter::Debug);
+    }
     let dir = atlantis3_data::testing::install_dir()?;
     let files = A3Files::open_dir(&dir).unwrap().0;
     let mut g = Game::new(files).expect("the game starts");
@@ -475,7 +487,7 @@ fn play(r: &mut Run, name: &str, walk: &str, golden: &str) {
                 .as_ref()
                 .unwrap()
                 .iter()
-                .map(|l| format!("SET{l}"))
+                .map(|l| format!("SET{}", l.trim_end()))
                 .collect();
         let upto: Vec<&str> = want
             .iter()
@@ -511,7 +523,7 @@ fn play(r: &mut Run, name: &str, walk: &str, golden: &str) {
             .take()
             .unwrap()
             .into_iter()
-            .map(|l| format!("SET{l}"))
+            .map(|l| format!("SET{}", l.trim_end()))
             .collect();
     for (i, (a, (step, b))) in got.iter().zip(&want).enumerate() {
         if a != b {

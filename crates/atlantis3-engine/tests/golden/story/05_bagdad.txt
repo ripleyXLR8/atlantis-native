@@ -371,9 +371,8 @@ STEP 14 GO 3
 LOG interp: SET/set(chapter=38)
 LOG interp: SET/set(StartMusik=6)
 LOG interp: SET(LIMITEANGLEWARPY=70)
-LOG interp: SET(ShowObjet=BAG_POT_TERRE)
 VARS 14: CHAPTER=38 LASTVUE=4 VUE=3 ANGLEWARPX=151 ANGLEWARPY=0
-FLAGS 14: 827=1 1003=3 1023=38
+FLAGS 14: 1003=3 1023=38
 STATE 14: chapter=38 monde=3 wam=jardin.wam view=3 hand=- waiting=0 music=6)
 STEP 15 GO 24
 LOG interp: SET/set(chapter=31)
@@ -439,7 +438,7 @@ STATE 26: chapter=32 monde=3 wam=jardin.wam view=20 hand=- waiting=0 music=6)
 STEP 27 HAND BAG_BANANE
 VARS 27: OBJETENMAIN=136
 STATE 27: chapter=32 monde=3 wam=jardin.wam view=20 hand=BAG_BANANE waiting=0 music=6)
-STEP 28 PERSO BAG_SINGE TYPE=2
+STEP 28 PERSO BAG_SINGE SLOT=1
 LOG interp: SET/set(BAG_PUZZLESINGEOK=1)
 LOG interp: SET/set(Flag125=1)
 LOG interp: SET/set(Flag804=1)
@@ -687,9 +686,8 @@ LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET(HidePerso=BAG_SOLDAT_BOIS)
 LOG interp: SET(ShowObjet=BAG_POT_TERRE)
 LOG interp: SET(HidePerso=BAG_SOLDAT_TERRE)
-LOG interp: SET(ShowObjet=BAG_PIERRES_GARDE)
 VARS 59: CHAPTER=40 LASTVUE=5 VUE=6 ANGLEWARPX=82 ANGLEWARPY=359
-FLAGS 59: 828=1 1003=6 1023=40
+FLAGS 59: 1003=6 1023=40
 STATE 59: chapter=40 monde=3 wam=jardin.wam view=6 hand=- waiting=0 music=6)
 STEP 60 HAND BAG_BATON_BLEU
 VARS 60: OBJETENMAIN=137
@@ -1426,6 +1424,7 @@ LOG interp: SET/set(SacADos=NOT_BAG_MAP_TOUR)
 LOG interp: SET/set(StopMusik=1)
 LOG interp: SET/set(StartMusik=33)
 LOG interp: SET/set(Vue=6)
+CALL rand() -> 11441 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(Cinema=64,fps=25)
 LOG interp: SET/set(Cinema=74,fps=25)
@@ -1457,6 +1456,11 @@ STEP 136 GO 12
 LOG interp: SET/set(AbortDepart=1)
 LOG interp: SET/set(AngleWarpX=90)
 LOG interp: SET/set(Vue=10)
+CALL rand() -> 11336 (lcg)
+CALL rand() -> 14653 (lcg)
+CALL rand() -> 227 (lcg)
+CALL rand() -> 26961 (lcg)
+CALL rand() -> 4380 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET(LIMITEANGLEWARPY=85)
 LOG interp: SET(ShowObjet=PMA_LIENSLIGHT
@@ -1803,7 +1807,7 @@ SAVEFILE Wam = hoggar.wam
 SAVEFILE Monde = 1
 SAVEFILE Vue = 23
 SAVEFILE Chapitre = 5
-SAVEFILE NBFlag = 196
+SAVEFILE NBFlag = 194
 SAVEFILE 2 = 1
 SAVEFILE 4 = 1
 SAVEFILE 6 = 1
@@ -1930,8 +1934,6 @@ SAVEFILE 811 = 1
 SAVEFILE 812 = 1
 SAVEFILE 817 = 5
 SAVEFILE 818 = 4
-SAVEFILE 827 = 1
-SAVEFILE 828 = 1
 SAVEFILE 829 = 1
 SAVEFILE 832 = 1
 SAVEFILE 835 = 1

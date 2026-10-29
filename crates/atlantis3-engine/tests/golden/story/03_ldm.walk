@@ -127,7 +127,7 @@ ZONE LDM_COFFRE_ANKH        # 0x004c1950: (PlaySound=111), the lid animation (AN
 # flag501 := 1.
 SKIP puzzle ankh_lid MEM32=0x00785f20:5
 EXPECT FLAG501=1
-OBJET LDM_ANKH TYPE=1       # take the Ankh (click type 1 set by 0x004c1950): chapter 16 flag66, subject
+OBJET LDM_ANKH              # take the Ankh (its slot 2 click type set to 1 by 0x004c1950 @ 0x00759e04): chapter 16 flag66, subject
 EXPECT HAND=LDM_ANKH
 GO 29
 GO 28
