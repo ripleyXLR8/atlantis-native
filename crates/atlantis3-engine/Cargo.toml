@@ -13,6 +13,7 @@ atlantis2-data = { path = "../atlantis2-data" }
 # the camera and the mouse look, the CON interpreter, the sound voices.
 atlantis2-engine = { path = "../atlantis2-engine" }
 atlantis3-data = { path = "../atlantis3-data" }
+ab_glyph = "0.2"
 libm = "=0.2.16"
 log = "0.4"
 

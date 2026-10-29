@@ -70,6 +70,9 @@ pub struct A3State {
     pub wait_anim: Option<(i32, i32, i32)>,
 }
 
+/// A saved subject: enabled, `#SUJETS#` index, value.
+pub type SavedSubject = (bool, i32, i32);
+
 /// What a save gives the script ([`Script::load_a3`]).
 #[derive(Clone, Debug, Default)]
 pub struct LoadData {
@@ -83,7 +86,7 @@ pub struct LoadData {
     /// The bag's object names.
     pub objects: Vec<Vec<u8>>,
     /// Per character its subjects (etat, `#SUJETS#` index, value).
-    pub subjects: Vec<(i32, Vec<(bool, i32, i32)>)>,
+    pub subjects: Vec<(i32, Vec<SavedSubject>)>,
     /// `Quaternion0..3`, when all four were read.
     pub camera: Option<[f32; 4]>,
 }

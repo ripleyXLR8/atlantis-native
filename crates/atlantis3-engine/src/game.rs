@@ -617,6 +617,7 @@ impl Game {
 
     /// A sprite drawn centred on (x, y) at an alpha (`AtlSpr_AffCentre`
     /// @ 0x00436b80 → `AtlSpr_Aff` @ 0x004367b0).
+    #[allow(clippy::too_many_arguments)]
     fn aff_centre(
         screen: &mut [u16],
         w: usize,

@@ -270,6 +270,7 @@ dependencies = [
 name = "atlantis3-engine"
 version = "0.5.6"
 dependencies = [
+ "ab_glyph",
  "atlantis-codecs",
  "atlantis-data",
  "atlantis2-data",
