@@ -139,7 +139,7 @@ impl Item {
     }
 
     /// The clock's frame (@ 0x00425d63..0x00425d80): `ftol(((now − start)
-    /// + acc − offset) / frame time)`, the x87 at 53 bits (the CRT's
+    /// \+ acc − offset) / frame time)`, the x87 at 53 bits (the CRT's
     /// control word 0x027f): f64 operations.
     fn clock(&self, now: f64) -> i32 {
         ftol((((now - self.t0) + self.acc2) - f64::from(self.off)) / f64::from(self.el.frame_time))

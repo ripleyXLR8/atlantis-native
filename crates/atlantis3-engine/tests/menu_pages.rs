@@ -42,7 +42,7 @@ fn thumb_image(w: usize, h: usize, kind: &str) -> Vec<u32> {
                 "grad" => {
                     ((x * 255 / (w - 1).max(1)) << 16) as u32
                         | ((y * 255 / (h - 1).max(1)) << 8) as u32
-                        | ((x + y) * 3 & 0xff) as u32
+                        | (((x + y) * 3) & 0xff) as u32
                 }
                 "bars" => {
                     if x < 2 || y < 2 || x >= w - 2 || y >= h - 2 {
@@ -326,12 +326,14 @@ fn menu_pages_as_the_original() {
         match f[0] {
             "screen" => {
                 let (w, h): (usize, usize) = (f[1].parse().unwrap(), f[2].parse().unwrap());
-                let mut config = Config::default();
-                config.resolution = (w as i32, h as i32);
-                config.langue = b"fra".to_vec();
-                config.sous_titre = b"fra".to_vec();
                 // The harness leaves `Version` empty.
-                config.version = Vec::new();
+                let config = Config {
+                    resolution: (w as i32, h as i32),
+                    langue: b"fra".to_vec(),
+                    sous_titre: b"fra".to_vec(),
+                    version: Vec::new(),
+                    ..Config::default()
+                };
                 let mut menus = Menus::default();
                 menus.load(&files, w, h, &config);
                 let saves = make_saves(w, 8);

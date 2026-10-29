@@ -247,6 +247,7 @@ pub(super) fn view_wolves(h: &mut Hx) {
 ///   restarted); `PAL_ZLCOMBAT` → the reset;
 /// - every 1 / 0.25 s (double @ 0x0071e4d8) the fight settled
 ///   (@ 0x004cae00), then the success test (@ 0x004caed0).
+#[allow(clippy::needless_range_loop)]
 pub(super) fn frame_wolves(h: &mut Hx, z: &ZoneRec) {
     if h.vue() == 1 {
         wolves_reset(h);
@@ -351,7 +352,10 @@ fn wolves_test(h: &mut Hx) {
 /// count +0xc, slot number +0x14. In the hit test's order (stag
 /// @ 0x00786d70, aurochs @ 0x00786d30, horse @ 0x00786db0, ibex
 /// @ 0x00786d50).
-const ANIMALS: [(&str, &str, usize, f32, f32, i32, i32, usize); 4] = [
+/// An animal: name, heart, flag, then the hit window and its numbers.
+type Animal = (&'static str, &'static str, usize, f32, f32, i32, i32, usize);
+
+const ANIMALS: [Animal; 4] = [
     ("PAL_CERF", "PAL_COEUR_CERF", 608, 160.0, 132.0, 1, 0x8d, 0),
     (
         "PAL_AVROCH",
@@ -444,6 +448,7 @@ pub(super) fn frame_hunt(h: &mut Hx, z: &ZoneRec) {
 
 /// @ 0x004c9384..0x004c96d4. True at a hit: the function returns there,
 /// before the tail.
+#[allow(clippy::needless_range_loop)]
 fn hunt_step(h: &mut Hx, z: &ZoneRec) -> bool {
     if h.hand() == h.obj("PAL_LANCE") {
         // A direct store, not `Hand_Clear`.

@@ -377,6 +377,7 @@ fn on_path(h: &Hx, s: i32) -> bool {
 /// complete (flag 922 + k := 1, its selections cleared, its links shown,
 /// the blink started). Quirk kept: flag 930 + **k** := the selection of
 /// star **k** (@ 0x004ce983), not the cleared stars' flags.
+#[allow(clippy::needless_range_loop)]
 fn check_constellations(h: &mut Hx) {
     if h.g.puzzles.pmagi.selected[33] {
         return;

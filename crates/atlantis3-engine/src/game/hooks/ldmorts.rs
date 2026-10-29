@@ -331,9 +331,7 @@ fn feathers_setup(h: &mut Hx) {
 
 /// The feather whose weight is `w` (the last one, as the C loop).
 fn feather_of_weight(h: &Hx, w: i32) -> Option<usize> {
-    (0..10)
-        .filter(|&n| h.g.puzzles.ldmorts.feathers[n].weight == w)
-        .last()
+    (0..10).rfind(|&n| h.g.puzzles.ldmorts.feathers[n].weight == w)
 }
 
 /// Views 2, 3, 4, 20's entry (@ 0x004cbfe0): the feathers set up once,

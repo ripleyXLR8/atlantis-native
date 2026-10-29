@@ -90,7 +90,7 @@ pub fn thumb_image(w: usize, h: usize, kind: &str) -> Vec<u32> {
                 "grad" => {
                     ((x * 255 / (w - 1).max(1)) << 16) as u32
                         | ((y * 255 / (h - 1).max(1)) << 8) as u32
-                        | ((x + y) * 3 & 0xff) as u32
+                        | (((x + y) * 3) & 0xff) as u32
                 }
                 "bars" => {
                     if x < 2 || y < 2 || x >= w - 2 || y >= h - 2 {
@@ -160,10 +160,12 @@ impl Host for NoSaves {
 /// The harness's game pictures: the start page at rest (100 s, pointer at
 /// (5, 5)), then the in-game menu at rest drawn over it 1/32 s later.
 fn game_art(files: &A3Files, w: usize, h: usize) -> [Vec<u16>; 2] {
-    let mut config = Config::default();
-    config.resolution = (w as i32, h as i32);
-    config.langue = b"fra".to_vec();
-    config.sous_titre = b"fra".to_vec();
+    let mut config = Config {
+        resolution: (w as i32, h as i32),
+        langue: b"fra".to_vec(),
+        sous_titre: b"fra".to_vec(),
+        ..Config::default()
+    };
     let mut menus = Menus::default();
     menus.load(files, w, h, &config);
     let mut screen = vec![0u16; w * h];
