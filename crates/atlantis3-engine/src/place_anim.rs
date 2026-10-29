@@ -51,12 +51,20 @@ pub struct Slot {
     /// +0x43c: the countdown of the random pause after a play.
     pub pause: i32,
     /// +0x440: the pause runs (the clock does not move the frame).
-    waiting: bool,
-    /// +0x44c: the time the play started (seconds).
+    pub waiting: bool,
+    /// +0x44c: the time the play started (seconds): 0 after the load.
     start: f64,
     /// +0x46c: a play is to start again at once (1 at load, 0 after the
     /// first step).
-    fresh: bool,
+    pub fresh: bool,
+    /// +0x434: animated (`ANIM_THE_FRAME=NAME,0` freezes the frame).
+    pub animated: bool,
+    /// +0x444: the hand-over's current weight (the state's, 100 for 0;
+    /// +10 for every draw that does not pick it).
+    pub weight: i32,
+    /// +0x20, +0x24: a successor queued, and its slot.
+    pub queued: bool,
+    pub next: Option<usize>,
     /// +0x46d: the play reached its end.
     pub ended: bool,
 }
@@ -81,7 +89,7 @@ impl Slots {
         view: u32,
         world: &str,
         rand: &mut Rand,
-        now: f64,
+        _now: f64,
         shown: impl Fn(i32, i32) -> Option<bool>,
     ) -> Slots {
         let mut out: Vec<Slot> = Vec::new();
@@ -137,8 +145,16 @@ impl Slots {
                     blink: false,
                     pause,
                     waiting: false,
-                    start: now,
+                    // The loader leaves the start at 0: the first tick
+                    // finds every shown slot past its end.
+                    start: 0.0,
                     fresh: true,
+                    animated: true,
+                    weight: if s.weight == 0 { 100 } else { s.weight },
+                    // Next-state chains (@ 0x00462c30): no Hoggar state
+                    // has one; not resolved here.
+                    queued: false,
+                    next: None,
                     ended: false,
                 });
             }
@@ -147,8 +163,8 @@ impl Slots {
     }
 
     /// `ShowPerso` / `ShowObjet` (@ 0x0045f520): the first slot of (id,
-    /// kind) whose animation is `number` (any for 0) shown, its play
-    /// started again.
+    /// kind) whose animation is `number` (any for 0) shown, fresh, not
+    /// ended, its clock restarted.
     pub fn show(&mut self, id: i32, kind: i32, number: i32, now: f64) {
         if let Some(s) = self.slots.iter_mut().find(|s| {
             s.id == id && s.kind == kind && (number == 0 || s.state.anim as i32 == number)
@@ -161,7 +177,7 @@ impl Slots {
     }
 
     /// `HidePerso` / `HideObjet` without `,x` (@ 0x0045f610): every slot of
-    /// (id, kind) hidden.
+    /// (id, kind) hidden, at frame 0, its clock restarted.
     pub fn hide(&mut self, id: i32, kind: i32, now: f64) {
         for s in self
             .slots
@@ -169,21 +185,84 @@ impl Slots {
             .filter(|s| s.id == id && s.kind == kind)
         {
             s.shown = false;
+            s.frame = 0;
             s.start = now;
         }
     }
 
-    /// The 15 Hz step (@ 0x00439c90): each shown slot of more than one
-    /// frame, outside its pause, shows frame ftol((now − start) · 15); past
-    /// its last frame, −1 and the end flag, its clock restarted; then a
-    /// slot at −1 waits its random pause (15 Hz ticks, state +0x14) and
-    /// plays again from its first frame, or hides (state end −1, or an end
-    /// equal to its first frame). The hand-over to another state of the
-    /// entity (@ 0x00439fa0, the states' weights) and the chains of next
-    /// states are not ported yet.
+    /// The hand-over (@ 0x00439fa0) of slot k at the end of its play: a
+    /// draw among the slots of the same entity whose state has a weight,
+    /// by their current weights (`rand() % total`); the slot drawn gets
+    /// its base weight back, every other one 10 more; another slot drawn
+    /// is queued as k's successor. True when k first plays on to its
+    /// file's end.
+    fn handover(&mut self, k: usize, rand: &mut Rand) -> bool {
+        if self.slots[k].next.is_some() || self.slots[k].state.weight < 1 {
+            return false;
+        }
+        let (kind, id) = (self.slots[k].kind, self.slots[k].id);
+        let cands: Vec<usize> = (0..self.slots.len())
+            .filter(|&j| {
+                let s = &self.slots[j];
+                s.kind == kind && s.id == id && s.state.weight > 0
+            })
+            .take(16)
+            .collect();
+        let total: i32 = cands.iter().map(|&j| self.slots[j].weight).sum();
+        if total <= 0 {
+            return false;
+        }
+        let mut r = rand.rand() % total;
+        let mut chosen = None;
+        let mut result = false;
+        for &j in &cands {
+            if chosen.is_none() && r < self.slots[j].weight {
+                chosen = Some(j);
+                let base = self.slots[j].state.weight;
+                self.slots[j].weight = if base == 0 { 100 } else { base };
+                if j != k {
+                    let sk = &mut self.slots[k];
+                    if sk.last != sk.count {
+                        sk.frame = sk.last;
+                        sk.last = sk.count;
+                        result = true;
+                    }
+                    sk.queued = true;
+                    sk.next = Some(j);
+                    let sj = &mut self.slots[j];
+                    sj.next = None;
+                    sj.queued = false;
+                    sj.frame = 0;
+                    sj.last = if sj.state.end < 1 {
+                        sj.count
+                    } else {
+                        sj.state.end - 1
+                    };
+                }
+            } else {
+                if chosen.is_none() {
+                    r -= self.slots[j].weight;
+                }
+                self.slots[j].weight += 10;
+            }
+        }
+        result
+    }
+
+    /// The 15 Hz step (@ 0x00439c90): each shown, animated slot outside
+    /// its pause shows the frame of its clock, `ftol((now − start) · 15)`
+    /// (more than one frame), −1 past its last one (ended unless fresh)
+    /// with its clock restarted; then each shown slot at −1: its random
+    /// pause, the hand-over (not in a dialog), a fresh slot's first frame,
+    /// its own loop (or hidden: end −1, or end = first), or the queued
+    /// successor shown in its place. `dialog`: the loop is in mode 5.
     pub fn step(&mut self, now: f64, rand: &mut Rand) {
+        self.step_in(now, rand, false);
+    }
+
+    pub fn step_in(&mut self, now: f64, rand: &mut Rand, dialog: bool) {
         for s in &mut self.slots {
-            if !s.shown || s.waiting {
+            if !s.shown || s.mode == 0 || !s.animated || s.waiting {
                 continue;
             }
             if s.last > 1 {
@@ -191,13 +270,16 @@ impl Slots {
             }
             if s.frame > s.last - 1 {
                 s.frame = -1;
-                s.ended = true;
+                if !s.ended && !s.fresh {
+                    s.ended = true;
+                }
             }
             if s.frame == -1 && s.last > 1 {
                 s.start = now;
             }
         }
-        for s in &mut self.slots {
+        for k in 0..self.slots.len() {
+            let s = &mut self.slots[k];
             if !s.shown {
                 continue;
             }
@@ -214,20 +296,34 @@ impl Slots {
                 s.pause = rand.rand() % s.state.delay.unsigned_abs() as i32 + 10;
                 s.waiting = false;
             }
+            if !dialog && self.handover(k, rand) {
+                continue;
+            }
+            let s = &mut self.slots[k];
             if s.fresh {
                 s.frame = s.first;
                 continue;
             }
-            if s.state.end == -1 {
+            if !s.queued && s.next.is_none() {
+                if s.state.end != -1 {
+                    s.frame = s.first;
+                    if s.state.end != 0 {
+                        s.last = s.state.end;
+                    }
+                    if s.state.end == 0 || s.state.end != s.state.first {
+                        continue;
+                    }
+                }
                 s.shown = false;
-                continue;
-            }
-            s.frame = s.first;
-            if s.state.end != 0 {
-                s.last = s.state.end;
-            }
-            if s.state.end != 0 && s.state.end == s.state.first {
+            } else {
                 s.shown = false;
+                if let Some(j) = s.next {
+                    let sj = &mut self.slots[j];
+                    sj.shown = true;
+                    sj.fresh = true;
+                    sj.frame = sj.first;
+                    sj.start = now;
+                }
             }
         }
     }
