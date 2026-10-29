@@ -21,6 +21,8 @@ pub const CHANNEL_MUSIC: usize = 2;
 pub const CHANNEL_PLACE: usize = 3;
 /// How many channels the mix has.
 pub const CHANNELS: usize = 16;
+/// The channel of the dialogs' voices (the place sounds stop before it).
+pub const CHANNEL_VOICE: usize = CHANNELS - 1;
 
 #[derive(Clone, Debug, Default)]
 struct Channel {

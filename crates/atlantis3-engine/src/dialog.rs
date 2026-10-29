@@ -259,3 +259,92 @@ impl Dialogs {
         PLAYERS.iter().any(|p| p.eq_ignore_ascii_case(name))
     }
 }
+
+/// A line's body video (`CHnmStream`): frames drawn through their `AL`
+/// mask, one per 15 Hz tick, the first one being frame 0, looped at the
+/// end (`video >> surface` @ 0x00443640).
+pub struct BodyVideo {
+    pub path: String,
+    data: std::sync::Arc<[u8]>,
+    video: atlantis_codecs::HnmVideo<std::sync::Arc<[u8]>>,
+    tables: atlantis_codecs::AlphaTables,
+    /// The index of the frame drawn last.
+    pub frame: i32,
+}
+
+impl BodyVideo {
+    pub fn open(path: &str, data: std::sync::Arc<[u8]>) -> Option<BodyVideo> {
+        let video = atlantis_codecs::HnmVideo::new(data.clone()).ok()?;
+        Some(BodyVideo {
+            path: path.to_string(),
+            data,
+            video,
+            tables: atlantis_codecs::AlphaTables::new(false),
+            frame: -1,
+        })
+    }
+
+    /// The next frame (rewound after the last), drawn into `dst` (`pitch`
+    /// pixels a row, `height` rows), centred vertically; its index.
+    pub fn draw_next(&mut self, dst: &mut [u16], pitch: usize, height: usize) -> i32 {
+        let next = match self.video.next_frame() {
+            Some(Ok(_)) => true,
+            _ => false,
+        };
+        if !next {
+            match atlantis_codecs::HnmVideo::new(self.data.clone()) {
+                Ok(v) => self.video = v,
+                Err(_) => return self.frame.max(0),
+            }
+            if !matches!(self.video.next_frame(), Some(Ok(_))) {
+                return 0;
+            }
+        }
+        self.frame = self.video.frames_decoded() as i32 - 1;
+        let (w, h) = (self.video.width(), self.video.height());
+        let top = height.saturating_sub(h) / 2;
+        let Some(dst) = dst.get_mut(top * pitch..) else {
+            return self.frame;
+        };
+        match self.video.alpha() {
+            Some(al) => {
+                let _ = self.tables.blend(self.video.frame(), dst, al, w, h, pitch);
+            }
+            None => {
+                let f = self.video.frame();
+                for y in 0..h.min(height - top) {
+                    let n = w.min(pitch);
+                    dst[y * pitch..y * pitch + n].copy_from_slice(&f[y * w..y * w + n]);
+                }
+            }
+        }
+        self.frame
+    }
+}
+
+/// A dialog being played (`CDialogue` and the `AtlDial_*` globals).
+pub struct Running {
+    pub dialog: i32,
+    pub voixoff: bool,
+    /// The current line (+0xc), 0 before the first.
+    pub line: i32,
+    /// The last speaker (@ 0x0074f300).
+    pub last: String,
+    /// The place animation hidden for the speaker (@ 0x00714f10,
+    /// @ 0x00755774): id and its shown state.
+    pub hidden: Option<(i32, i32)>,
+    /// The field of view before the dialog (@ 0x0074f2f0).
+    pub saved_fov: f32,
+    pub video: Option<BodyVideo>,
+    /// The voice's end (the game's seconds), `None` without a voice.
+    pub voice_end: Option<f64>,
+    /// The head's animation frame (+0x10).
+    pub head_frame: i32,
+    /// The loop mode to go back to (@ 0x0074f34c).
+    pub back: crate::game::Mode,
+    /// The dialog surface (640 x 480).
+    pub surface: Vec<u16>,
+}
+
+/// The dialog surface's size (@ 0x00714f1c, @ 0x00714f20, WarpRes 512).
+pub const SURFACE: (usize, usize) = (640, 480);

@@ -24,7 +24,7 @@ use atlantis3_data::spr::{Bank, Depth, Target};
 use atlantis3_data::A3Files;
 
 use crate::audio::{
-    csm_gain, Audio, CHANNELS, CHANNEL_CINEMA, CHANNEL_MUSIC, CHANNEL_PLACE, CHANNEL_SOUND,
+    csm_gain, Audio, CHANNEL_CINEMA, CHANNEL_MUSIC, CHANNEL_PLACE, CHANNEL_SOUND, CHANNEL_VOICE,
 };
 use crate::cinema::Cinema;
 use crate::place_anim::Slots;
@@ -91,6 +91,8 @@ pub enum Mode {
     Inventory,
     /// Mode 8: the subject menu over the frozen warp.
     Subjects,
+    /// Mode 5: a dialog (`AtlDial_Continue` @ 0x0040d3e0).
+    Dialog,
     /// Nothing to show (before the intro, after the game stopped).
     Idle,
 }
@@ -233,6 +235,15 @@ pub struct Game {
     /// line.
     texts: Option<crate::text::Texts>,
     subtitle: Option<Subtitle>,
+    /// The world's dialogs (loaded at each `MONDE`), the dialog playing,
+    /// its renderer at the dialog surface's size and the dialog's 15 Hz
+    /// tick byte (@ 0x0077adde).
+    dialogs: Option<crate::dialog::Dialogs>,
+    running: Option<crate::dialog::Running>,
+    dialog_renderer: Renderer,
+    dialog_tick: bool,
+    /// The field of view (@ 0x007182dc, radians).
+    camera_fov: f32,
     /// The script asked to stop.
     pub quit: bool,
     /// What the scripts did that the port does not play yet (logged once
@@ -257,6 +268,7 @@ impl Game {
         renderer.a3 = Some(A3Raster {
             smooth: startup.config.smooth,
         });
+        let startup_smooth = startup.config.smooth;
         let interface = files
             .read("spr/Interface.spr")
             .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok());
@@ -320,6 +332,18 @@ impl Game {
             current_cd: 0,
             texts: None,
             subtitle: None,
+            dialogs: None,
+            running: None,
+            dialog_renderer: {
+                let (w, h) = crate::dialog::SURFACE;
+                let mut r = Renderer::new(Variant::PII, Fpu::Double, w, h);
+                r.a3 = Some(A3Raster {
+                    smooth: startup_smooth,
+                });
+                r
+            },
+            dialog_tick: false,
+            camera_fov: warp_fov(Fpu::Double),
             toupie_armed: false,
             player: atlantis3_data::save::DEFAULT_PLAYER,
             saves: HashMap::new(),
@@ -415,12 +439,21 @@ impl Game {
 
     /// Whether a dialog plays.
     pub fn dialog_running(&self) -> bool {
-        false
+        self.running.is_some()
+    }
+
+    /// The dialog playing: its number and line.
+    pub fn dialog_line(&self) -> Option<(i32, i32)> {
+        self.running.as_ref().map(|r| (r.dialog, r.line))
     }
 
     /// Ends the dialog playing (tests).
     #[doc(hidden)]
-    pub fn finish_dialog(&mut self) {}
+    pub fn finish_dialog(&mut self) {
+        if self.running.is_some() {
+            self.close_dialog();
+        }
+    }
 
     /// Whether a move turns the view.
     pub fn turning(&self) -> bool {
@@ -846,11 +879,13 @@ impl Game {
             }
             self.ticks = self.ticks.wrapping_add(1);
             self.anim_tick = true;
+            self.dialog_tick = true;
         }
         match self.mode {
             Mode::Intro | Mode::Video => self.video_step(),
             Mode::Warp => self.warp_frame(),
             Mode::Inventory | Mode::Subjects => self.overlay_frame(),
+            Mode::Dialog => self.dialog_frame(),
             Mode::Idle => {}
         }
     }
@@ -1083,7 +1118,8 @@ impl Game {
         while self.look_acc >= 1.0 {
             self.look_acc -= 1.0;
             if let Some(turn) = self.moving.turn.as_mut() {
-                self.camera.set_fov(warp_fov(self.camera.fpu), w, h);
+                self.camera_fov = warp_fov(self.camera.fpu);
+                self.camera.set_fov(self.camera_fov, w, h);
                 let step = turn.step(&mut self.camera, &mut self.zoom, (w, h));
                 if !step.going {
                     // @ 0x00431aee: the move pending, a target view or not
@@ -1094,7 +1130,8 @@ impl Game {
                 }
             } else {
                 self.look.frame(&mut self.camera);
-                self.camera.set_fov(warp_fov(self.camera.fpu), w, h);
+                self.camera_fov = warp_fov(self.camera.fpu);
+                self.camera.set_fov(self.camera_fov, w, h);
             }
         }
         self.centre = self.pick_centre();
@@ -1594,7 +1631,7 @@ impl Game {
         let entries: Vec<Source> = self.place_sounds.values().cloned().collect();
         for (k, src) in entries.iter().enumerate() {
             let ch = CHANNEL_PLACE + k;
-            if ch >= CHANNELS {
+            if ch >= CHANNEL_VOICE {
                 break;
             }
             let d = [
@@ -1815,6 +1852,320 @@ impl Game {
             );
         }
         self.screen = screen;
+    }
+
+    /// `AtlDial_MainInit` for world `monde` (its `rand()` draws included).
+    fn load_dialogs(&mut self, monde: i32) {
+        let folder = WORLDS.get(monde as usize).copied().unwrap_or("");
+        let lang = self.startup.text_language();
+        self.dialogs = Some(crate::dialog::Dialogs::load(
+            &self.files,
+            folder,
+            &lang,
+            &mut self.rand,
+        ));
+    }
+
+    /// `AtlDial_start(n, voixoff)` (@ 0x0040cfe0).
+    fn start_dialog(&mut self, n: i32, voixoff: bool) {
+        // The subtitle line and the voice slots cleared.
+        self.subtitle = None;
+        let saved_fov = self.camera_fov;
+        if self.running.is_some() {
+            log::warn!("AtlDial_Start({n}) : dialogue deja initialise");
+            return;
+        }
+        if self.dialogs.is_none() {
+            let w = self.script.as_ref().map_or(1, |s| s.a3.world);
+            self.load_dialogs(w);
+        }
+        let mut dialogs = self.dialogs.take().unwrap();
+        dialogs.open(n, voixoff, &mut self.rand);
+        if dialogs.count(n) == 0 {
+            log::warn!("CDialogue::Open() : le dialogue {n} n'existe pas");
+        }
+        self.dialogs = Some(dialogs);
+        let (sw, sh) = crate::dialog::SURFACE;
+        self.running = Some(crate::dialog::Running {
+            dialog: n,
+            voixoff,
+            line: 0,
+            last: String::new(),
+            hidden: None,
+            saved_fov,
+            video: None,
+            voice_end: None,
+            head_frame: 0,
+            back: self.mode,
+            surface: vec![0; sw * sh],
+        });
+        self.look.stop();
+        if self.next_line() {
+            self.perform();
+        }
+        self.mode = Mode::Dialog;
+        if !voixoff {
+            self.dialog_camera();
+        }
+    }
+
+    /// The current line's entry.
+    fn dialog_entry(&self) -> Option<crate::dialog::Entry> {
+        let r = self.running.as_ref()?;
+        self.dialogs.as_ref()?.entry(r.dialog, r.line).cloned()
+    }
+
+    /// `NextReplique` (@ 0x00466890): the voice stopped, the next line's
+    /// body video (reopened only when its path changed) and voice; false
+    /// past the last line.
+    fn next_line(&mut self) -> bool {
+        self.audio.stop(CHANNEL_VOICE);
+        let Some(r) = self.running.as_mut() else {
+            return false;
+        };
+        r.voice_end = None;
+        r.line += 1;
+        let (n, line, voixoff) = (r.dialog, r.line, r.voixoff);
+        let Some(d) = self.dialogs.as_ref() else {
+            return false;
+        };
+        if line > d.count(n) {
+            return false;
+        }
+        let Some(e) = d.entry(n, line).cloned() else {
+            return false;
+        };
+        let lang = self.startup.voice_language();
+        let voice = d.voice_path(&e, &lang);
+        let video = d.video_path(&e);
+        if !voixoff {
+            let same = self
+                .running
+                .as_ref()
+                .and_then(|r| r.video.as_ref())
+                .is_some_and(|v| v.path.eq_ignore_ascii_case(&video));
+            if !same {
+                let opened = self
+                    .files
+                    .read(&video)
+                    .and_then(|data| crate::dialog::BodyVideo::open(&video, Arc::from(data)));
+                if let Some(r) = self.running.as_mut() {
+                    r.video = opened;
+                }
+            }
+        }
+        // `LoadSfx(voice, 1, class 2)`: Global × 0.01 × VoicesVolume.
+        let end = self.sound(&voice).map(|(rate, ch, pcm)| {
+            let g = csm_gain(self.level(self.startup.config.voices_volume));
+            let frames = pcm.len() as f64 / f64::from(ch.max(1));
+            self.audio.play(CHANNEL_VOICE, rate, ch, pcm, false, [g, g]);
+            self.now + frames / f64::from(rate.max(1))
+        });
+        if let Some(r) = self.running.as_mut() {
+            r.voice_end = end;
+            r.head_frame = 0;
+        }
+        true
+    }
+
+    /// Whether the line's voice still plays (a missing voice never ends).
+    fn voice_playing(&self) -> bool {
+        self.running
+            .as_ref()
+            .is_some_and(|r| r.voice_end.is_none_or(|e| self.now < e))
+    }
+
+    /// `CDialogue::Perform` (@ 0x00467120), the 15 Hz step: the next line
+    /// when the voice ended; the panorama into the dialog surface (at the
+    /// screen for a voice-over), the body video over it; false at the end.
+    fn perform(&mut self) -> bool {
+        let has_voice = self.running.as_ref().is_some_and(|r| r.voice_end.is_some());
+        if has_voice && !self.voice_playing() && !self.next_line() {
+            return false;
+        }
+        let Some(mut r) = self.running.take() else {
+            return false;
+        };
+        if r.voixoff {
+            self.draw_warp_only();
+        } else {
+            let (sw, sh) = crate::dialog::SURFACE;
+            let fov = self.camera_fov;
+            self.camera.set_fov(fov, sw as u32, sh as u32);
+            let m = self.camera.matrix();
+            let proj = self.camera.projection();
+            self.dialog_renderer.fpu = self.camera.fpu;
+            if !self.place.faces.iter().any(|f| f.is_empty()) {
+                self.dialog_renderer
+                    .render(&self.place.faces, &m, proj, &mut r.surface);
+            }
+            self.camera.fpu = self.dialog_renderer.fpu;
+            match r.video.as_mut() {
+                Some(v) => r.head_frame = v.draw_next(&mut r.surface, sw, sh),
+                None => r.head_frame += 1,
+            }
+        }
+        self.running = Some(r);
+        true
+    }
+
+    /// The camera set-up for the current speaker (@ 0x0040b700): the field
+    /// of view `[Focale<stand>][camera]` and the pitch levelled
+    /// (`Horizontalize` @ 0x004418a0; the head camera's pitch of `Orient`
+    /// @ 0x00441630 is not ported yet), the yaw kept.
+    fn dialog_camera(&mut self) {
+        let Some(e) = self.dialog_entry() else { return };
+        let Some(d) = self.dialogs.as_ref() else {
+            return;
+        };
+        let deg = d.focale(&e);
+        self.camera_fov = dialog_fov(self.camera.fpu, deg);
+        let (yaw, _) = self.camera.angles();
+        self.camera.enter(yaw, 0.0);
+    }
+
+    /// `AtlDial_Continue` (@ 0x0040d3e0), every frame of mode 5.
+    fn dialog_frame(&mut self) {
+        if std::mem::take(&mut self.dialog_tick) {
+            if std::mem::take(&mut self.click) {
+                self.double_click = false;
+                if !self.next_line() {
+                    self.close_dialog();
+                    return;
+                }
+            }
+            if !self.perform() {
+                self.close_dialog();
+                return;
+            }
+            let voixoff = self.running.as_ref().is_some_and(|r| r.voixoff);
+            let Some(e) = self.dialog_entry() else {
+                self.close_dialog();
+                return;
+            };
+            let last = self
+                .running
+                .as_ref()
+                .map(|r| r.last.clone())
+                .unwrap_or_default();
+            if !voixoff && e.speaker != last {
+                self.show_hidden();
+                if crate::dialog::Dialogs::is_player(&e.speaker) {
+                    self.dialog_camera();
+                    if let Some(r) = self.running.as_mut() {
+                        r.last = e.speaker.clone();
+                    }
+                    self.camera.yaw(std::f32::consts::PI);
+                    self.perform();
+                    return;
+                }
+                self.dialog_camera();
+                if crate::dialog::Dialogs::is_player(&last)
+                    && e.speaker != "dame"
+                    && e.speaker != "mons"
+                {
+                    self.camera.yaw(std::f32::consts::PI);
+                }
+                if let Some(r) = self.running.as_mut() {
+                    r.last = e.speaker.clone();
+                }
+                // The speaker's place animations hidden while he speaks;
+                // only the last one is remembered.
+                let ids: Vec<String> = self
+                    .dialogs
+                    .as_ref()
+                    .and_then(|d| d.perso(&e.speaker))
+                    .map(|p| p.id_texts.clone())
+                    .unwrap_or_default();
+                for name in ids {
+                    let Ok(id) = self
+                        .names
+                        .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
+                    else {
+                        continue;
+                    };
+                    let id = id as i32;
+                    let state = self
+                        .slots
+                        .slots
+                        .iter()
+                        .find(|s| s.id == id && s.kind == 1 && s.shown)
+                        .map_or(-1, |s| s.state.anim as i32);
+                    if let Some(r) = self.running.as_mut() {
+                        r.hidden = Some((id, state));
+                    }
+                    self.slots.hide(id, 1, self.now);
+                }
+                self.perform();
+                return;
+            }
+        }
+        self.dialog_render();
+    }
+
+    /// The remembered place animation shown again (@ 0x0045f520).
+    fn show_hidden(&mut self) {
+        if let Some((id, state)) = self.running.as_mut().and_then(|r| r.hidden.take()) {
+            if state != -1 {
+                self.slots.show(id, 1, state, self.now);
+            }
+        }
+    }
+
+    /// `CDialogue::Render` (@ 0x00467c70) and the flip: the dialog surface
+    /// stretched to the screen (a voice-over draws the panorama at the
+    /// screen's size), then the line's subtitle (`CDialogue::Display`
+    /// @ 0x0046a0e0).
+    fn dialog_render(&mut self) {
+        let Some(r) = self.running.as_ref() else {
+            return;
+        };
+        if !r.voixoff {
+            let (sw, sh) = crate::dialog::SURFACE;
+            let (w, h) = (self.width, self.height);
+            for y in 0..h {
+                let sy = y * sh / h;
+                for x in 0..w {
+                    self.screen[y * w + x] = r.surface[sy * sw + x * sw / w];
+                }
+            }
+        }
+        if self.startup.config.subtitle_on {
+            if let Some(e) = self.dialog_entry() {
+                let (w, h) = (self.width, self.height);
+                self.texts();
+                let mut screen = std::mem::take(&mut self.screen);
+                self.texts.as_ref().unwrap().print_shadowed(
+                    &mut screen,
+                    w,
+                    h,
+                    &e.text,
+                    crate::text::DIALOG_SHADOW,
+                    crate::text::DIALOG_TEXT,
+                    0xffffff,
+                );
+                self.screen = screen;
+            }
+        }
+    }
+
+    /// `AtlDial_Close` (@ 0x0040e3b0): the hidden animation shown, the
+    /// panorama turned back when a player spoke last, the field of view
+    /// restored, the mode back, then `Interp_CloseInterrupt(0)`.
+    fn close_dialog(&mut self) {
+        self.audio.stop(CHANNEL_VOICE);
+        self.show_hidden();
+        let Some(r) = self.running.take() else { return };
+        if !r.voixoff && crate::dialog::Dialogs::is_player(&r.last) {
+            self.camera.yaw(std::f32::consts::PI);
+        }
+        self.camera_fov = r.saved_fov;
+        let (w, h) = (self.width as u32, self.height as u32);
+        self.camera.set_fov(self.camera_fov, w, h);
+        self.mode = r.back;
+        self.click = false;
+        self.look_last = None;
+        self.with_script(|s, h| s.close_interrupt(h));
     }
 
     fn not_ported(&mut self, what: &str) {
@@ -2081,6 +2432,13 @@ pub fn quaternion_angles(q: [f32; 4]) -> (f32, f32) {
     (yaw, pitch)
 }
 
+/// `SetFov(deg)` (@ 0x004409f0): f32((deg · f32 π) · f32 1/180).
+fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
+    let pi = f64::from(f32::from_bits(0x4049_0fdb));
+    let k = f64::from(f32::from_bits(0x3bb6_0b61));
+    fpu.f32(fpu.mul(fpu.mul(f64::from(deg), pi), k))
+}
+
 /// The six faces of a cube file (Hnm_Framer: `IX` frames in video mode;
 /// frames → faces 1, 3, 0, 4, 5, 2 @ 0x00430745).
 pub fn faces_from_hnm(hnm: &[u8]) -> Result<[Vec<u16>; 6], atlantis_codecs::DecodeError> {
@@ -2301,14 +2659,14 @@ impl Host for Game {
     }
 
     fn dial_start_a3(&mut self, n: i32, voixoff: bool) -> DialStart {
-        let _ = (n, voixoff);
-        self.not_ported("the dialogs (DIAL)");
-        self.resume_next = true;
+        self.start_dialog(n, voixoff);
         DialStart::Started
     }
 
+    /// `MONDE=n` (@ 0x0044bb30): the dialogs freed and loaded again for
+    /// the world (`Dial_Free`, `Dial_Init`).
     fn set_monde(&mut self, monde: i32) -> bool {
-        let _ = monde;
+        self.load_dialogs(monde);
         true
     }
 }
