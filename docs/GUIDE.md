@@ -90,8 +90,9 @@ version): choose its installation folder.
 The English CD (1997 and 2001 builds), the US English CD (Interplay,
 August 1997), the French CD (May and August
 1997), the German CD (May and August 1997), the Dutch and Swedish CDs (June
-1997), the Spanish CD (August 1997), the Italian CD (July 1997), the CD
-with Cryo's patch 1.01 (over the English, French, German, Dutch,
+1997), the Spanish CD (August 1997), the Italian CD (July 1997), the Czech
+CD (Bohemia Interactive, 2000, and its GAME4U Speciál 2 re-issue, 2001;
+copied or as images), the CD with Cryo's patch 1.01 (over the English, French, German, Dutch,
 Swedish, Spanish or Italian CD), the GOG.com release in
 English, French, German, Spanish and Italian, the Traditional
 Chinese CD (1998) and the Simplified Chinese CD (1999), copied or as
@@ -718,7 +719,9 @@ not kept, erase saves you no longer need.
 - The subtitles of the 2001 and GOG.com builds are drawn with Liberation
   Sans, which has the metrics of the original's Arial (see
   [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French,
-  German and US English CDs' and the Spanish and Italian CDs'; the May 1997 English, French and
+  German and US English CDs', the Spanish and Italian CDs' and the
+  Czech CD's (its texts read in the Central European code page, as a
+  Czech Windows draws them); the May 1997 English, French and
   German CDs' and the Dutch and Swedish CDs' are drawn with their own
   pixel font, as they did (the accents and umlauts included). The Chinese CDs' are drawn with the
   player's own MingLiU or SimSun when `mingliu.ttc` (Traditional) or

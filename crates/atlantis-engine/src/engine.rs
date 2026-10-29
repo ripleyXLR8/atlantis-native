@@ -617,9 +617,12 @@ impl Engine {
         self.enhancements().fix(BugFix::LoadMusik)
     }
 
-    /// `ß` drawn and measured as two 's' ([`BugFix::SharpS`]).
+    /// `ß` drawn and measured as two 's' ([`BugFix::SharpS`]); never in the
+    /// Czech CD, whose 0xe1 is `á` with a glyph
+    /// ([`crate::enhancements::sharp_s_without_glyph`]).
     pub fn sharp_s_as_ss(&self) -> bool {
         self.enhancements().fix(BugFix::SharpS)
+            && crate::enhancements::sharp_s_without_glyph(self.game.exe.build)
     }
 
     /// The disc whose copy the reads from the disc in the drive take: the
