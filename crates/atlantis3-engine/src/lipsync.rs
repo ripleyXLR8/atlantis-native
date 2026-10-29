@@ -266,8 +266,8 @@ impl LipSync {
         if p0 > p1 && p0 > p2 && p0 > p3 {
             let h = f.div(p0, f.add(w0p, d(E4)));
             let om = f.sub(1.0, h);
-            for c in 1..=4 {
-                out[c] = f.f32(f.mul(om, d(out[c])));
+            for o in &mut out[1..=4] {
+                *o = f.f32(f.mul(om, d(*o)));
             }
             out[0] = f.f32(h);
         } else if p2 > p1 || p3 > p1 {

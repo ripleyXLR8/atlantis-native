@@ -62,7 +62,7 @@ fn place_animations_step_as_the_original() {
             "slot" => {
                 let k: usize = f[1].parse().unwrap();
                 let s = &slots.slots[k];
-                assert_eq!(format!("{}", s.name), f[2].trim_end_matches(".SPW"), "{l}");
+                assert_eq!(s.name, f[2].trim_end_matches(".SPW"), "{l}");
                 assert_eq!(
                     (s.kind, s.id),
                     (f[4].parse().unwrap(), f[6].parse().unwrap()),
