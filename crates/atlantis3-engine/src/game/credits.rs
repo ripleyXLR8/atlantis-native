@@ -215,8 +215,8 @@ impl Credits {
     /// ones in order, frame 0 (`IMG`), the texts skipped; a shown element
     /// without its bank is hidden ("Il manque %s"). The surface is not
     /// cleared: at 640 × 480 the pictures are 640 × 479 and partly
-    /// translucent, so each frame blends over the last one (experiment
-    /// 30's 640 golden).
+    /// translucent, so each frame blends over the last one (the
+    /// original's frames, `tests/golden/credits_640.txt`).
     fn draw(&mut self, w: usize, h: usize) {
         self.draws.clear();
         for it in &mut self.items {

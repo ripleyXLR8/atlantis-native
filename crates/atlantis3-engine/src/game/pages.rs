@@ -302,11 +302,14 @@ impl Game {
                     self.dialog_renderer.a3 = Some(A3Raster { smooth: c.smooth });
                     self.look.invert_y = c.invert_mouse_y;
                 }
-                Event::DisplayChange(w, h) => {
-                    self.not_ported(&format!(
-                        "the options' display re-creation ({w} x {h}, depth or texture size)"
-                    ));
+                // The page surface and the banks follow the chosen depth
+                // (the menus); the screen stays RGB565 and its size.
+                Event::DisplayChange(w, h)
+                    if (w as usize, h as usize) != (self.width, self.height) =>
+                {
+                    self.not_ported(&format!("the options' screen size switch to {w} x {h}"));
                 }
+                Event::DisplayChange(..) => {}
                 Event::ReloadTexts => self.texts = None,
             }
         }

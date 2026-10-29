@@ -32,7 +32,7 @@ use atlantis3_data::atl::{
 };
 use atlantis3_data::cfg::Config;
 use atlantis3_data::save::game_save_name;
-use atlantis3_data::spr::{Bank, Depth, Target};
+use atlantis3_data::spr::{Bank, Depth, Pixel, Target};
 use atlantis3_data::spr_encode::{darken_black, ThumbEncoder};
 use atlantis3_data::A3Files;
 
@@ -69,16 +69,15 @@ pub struct Item {
 
 impl Item {
     fn new(el: Element, bank: Option<Bank>) -> Item {
-        // The bank's load (@ 0x00425010 @ 0x0042535a..0x00425420): a
-        // `SLIDER` starts at its last frame, and so does a `BT_LOCK`
-        // neither selectable nor clickable (the active radio of a pair);
-        // every other element at frame 0. (The code tests `BT_LOCK1` the
-        // same way, but the original's run shows the languages page's
-        // `LANGUE1` / `SOUSTITRE1` at frame 0 before their page sets
-        // them: not reproduced for `BT_LOCK1`.)
+        // The bank's first load (@ 0x00425010 @ 0x0042535a..0x00425420,
+        // inside `if (+0x28 == 0)`: a reload keeps the frame): a `SLIDER`
+        // starts at its last frame, and so does a `BT_LOCK` / `BT_LOCK1`
+        // neither selectable nor clickable (the active radio of a pair,
+        // the languages page's LEDs and lists); every other element at
+        // frame 0.
         let last = match el.element_type() {
             ElementType::Slider => true,
-            ElementType::BtLock => !el.selectable && !el.clickable,
+            ElementType::BtLock | ElementType::BtLock1 => !el.selectable && !el.clickable,
             _ => false,
         };
         let frame = match (&bank, last) {
@@ -226,13 +225,43 @@ fn argb565(c: u32) -> u16 {
     (((c >> 19) & 0x1f) << 11 | ((c >> 10) & 0x3f) << 5 | ((c >> 3) & 0x1f)) as u16
 }
 
+/// A pixel of the page surface: RGB565 (`u16`) or, after the options
+/// re-created it in 32 bits, x8r8g8b8 (`u32`).
+pub trait PagePixel: Pixel {
+    /// An ARGB colour as 0x004e8280 stores it on this surface (565: each
+    /// channel truncated; 32 bits: the ARGB value itself, alpha byte
+    /// included).
+    fn from_argb(c: u32) -> Self;
+}
+
+impl PagePixel for u16 {
+    fn from_argb(c: u32) -> u16 {
+        argb565(c)
+    }
+}
+
+impl PagePixel for u32 {
+    fn from_argb(c: u32) -> u32 {
+        c
+    }
+}
+
+/// The software copy of an x8r8g8b8 surface to an RGB565 one
+/// (@ 0x004ecc40 → @ 0x004ecba0 → @ 0x004eb6d0, its 32 → 16 path): each
+/// channel truncated, `((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)`.
+pub fn x888_to_565(src: &[u32], dst: &mut [u16]) {
+    for (d, &p) in dst.iter_mut().zip(src) {
+        *d = argb565(p);
+    }
+}
+
 /// 0x004e8bd0 on a 16-bit surface: rows top..=bottom, columns
 /// left..=right, written at `y × pitch + x` with no clipping (a box
 /// clamped to the right edge writes its last column into the next row's
 /// first pixel); pixels outside the buffer are skipped (the original
 /// writes outside the surface).
-fn fill(surf: &mut [u16], w: usize, rect: [i32; 4], colour: u32) {
-    let c = argb565(colour);
+fn fill<P: PagePixel>(surf: &mut [P], w: usize, rect: [i32; 4], colour: u32) {
+    let c = P::from_argb(colour);
     let [top, bottom, right, left] = rect;
     for y in top..=bottom {
         for x in left..=right {
@@ -248,7 +277,14 @@ fn fill(surf: &mut [u16], w: usize, rect: [i32; 4], colour: u32) {
 /// rectangle (0, 0) − (W − 1, H − 1) of @ 0x004e94e0 (both ends outside on
 /// one side: nothing; else the outside end moved onto the edge), then
 /// every pixel from p0 to p1 inclusive (@ 0x004ea900).
-fn line(surf: &mut [u16], w: usize, h: usize, p0: (i32, i32), p1: (i32, i32), colour: u32) {
+fn line<P: PagePixel>(
+    surf: &mut [P],
+    w: usize,
+    h: usize,
+    p0: (i32, i32),
+    p1: (i32, i32),
+    colour: u32,
+) {
     let (wm, hm) = (w as i32 - 1, h as i32 - 1);
     let code = |(x, y): (i32, i32)| {
         let mut c = 0;
@@ -271,7 +307,7 @@ fn line(surf: &mut [u16], w: usize, h: usize, p0: (i32, i32), p1: (i32, i32), co
     }
     let clamp = |(x, y): (i32, i32)| (x.clamp(0, wm), y.clamp(0, hm));
     let (a, b) = (clamp(p0), clamp(p1));
-    let c = argb565(colour);
+    let c = P::from_argb(colour);
     for y in a.1.min(b.1)..=a.1.max(b.1) {
         for x in a.0.min(b.0)..=a.0.max(b.0) {
             surf[y as usize * w + x as usize] = c;
@@ -576,9 +612,9 @@ impl Page {
     /// the page's tooltip element, and when the page's tooltips are on the
     /// box is set up (@ 0x00414330).
     #[allow(clippy::too_many_arguments)]
-    pub fn pass(
+    pub fn pass<P: PagePixel>(
         &mut self,
-        surf: &mut [u16],
+        surf: &mut [P],
         w: usize,
         h: usize,
         now: f64,
@@ -735,7 +771,14 @@ fn play_sound(v: &[u8]) -> Vec<u8> {
 /// (@ 0x006b41b0; the other lines' rectangles go to a local and change
 /// nothing), clamped to the right edge only; the fill and the two-pixel
 /// bevel on the page surface; the flag set.
-fn tip_box(surf: &mut [u16], w: usize, h: usize, held: f64, text: &[u8], ctx: &mut TipCtx<'_>) {
+fn tip_box<P: PagePixel>(
+    surf: &mut [P],
+    w: usize,
+    h: usize,
+    held: f64,
+    text: &[u8],
+    ctx: &mut TipCtx<'_>,
+) {
     if held < 0.5 {
         ctx.tip.shown = false;
         return;
@@ -888,8 +931,16 @@ pub struct Menus {
     pub sub: u8,
     pub input: Input,
     pub tip: TipBox,
-    /// The page surface (@ 0x0077fb00).
+    /// The page surface (@ 0x0077fb00) as the screen gets it (RGB565).
     pub surface: Vec<u16>,
+    /// The page surface's format: RGB565, or x8r8g8b8 after the options'
+    /// `BT_BACK` re-created it in 32 bits; then the sprites are drawn into
+    /// `surface32` and [`Menus::surface`] is its copy to RGB565.
+    pub depth: Depth,
+    pub surface32: Vec<u32>,
+    /// The format the next re-creation uses (0x007812b0): the current one
+    /// when page 5 opens, then `BT_16BITS` / `BT_32BITS`.
+    pub format: Depth,
     /// The load page: the scroll 0x007812d0, the names (0x0077e650) and
     /// dates (0x0077fc98) of the list, the count 0x0077fa54.
     pub scroll: i32,
@@ -933,6 +984,9 @@ impl Default for Menus {
             input: Input::default(),
             tip: TipBox::default(),
             surface: Vec::new(),
+            depth: Depth::Rgb565,
+            surface32: Vec::new(),
+            format: Depth::Rgb565,
             scroll: 0,
             count: 0,
             names: vec![EMPTY.to_string(); 256],
@@ -991,6 +1045,9 @@ impl Menus {
         self.width = w;
         self.height = h;
         self.surface = vec![0; w * h];
+        self.depth = Depth::Rgb565;
+        self.surface32 = Vec::new();
+        self.format = Depth::Rgb565;
         self.slots = slot_layout(w);
     }
 
@@ -1051,6 +1108,44 @@ impl Menus {
         self.input.held = false;
     }
 
+    /// The options' `BT_BACK` with a size or depth pending (@ 0x00454f44..
+    /// 0x004551b1), after the display's re-creation (@ 0x0040fa60, the
+    /// game's [`Event::DisplayChange`]): the page surface re-created
+    /// (@ 0x004eb290) in the chosen format 0x007812b0, black, the sprite
+    /// target on it (@ 0x004362b0, `Spr_InitGraph` for a new depth), then
+    /// every page's banks freed and loaded again for that format
+    /// (@ 0x004511c0, @ 0x00451220; the elements keep their frames). The
+    /// port keeps the screen's size: a size switch is the game's
+    /// (not ported).
+    fn recreate(&mut self, env: &mut Env<'_>) {
+        let (w, h) = (self.width, self.height);
+        self.depth = self.format;
+        self.surface = vec![0; w * h];
+        self.surface32 = match self.depth {
+            Depth::Xrgb8888 => vec![0; w * h],
+            Depth::Rgb565 => Vec::new(),
+        };
+        let depth = self.depth;
+        let files = env.files;
+        for (_, p) in &mut self.pages {
+            for it in &mut p.items {
+                if it.bank.is_none() {
+                    continue;
+                }
+                let Some(name) = it.el.nomspr.clone() else {
+                    continue;
+                };
+                let thumb = name
+                    .strip_prefix(b"save\\")
+                    .and_then(|save| env.host.thumbnail(w, &String::from_utf8_lossy(save)));
+                let data = thumb.or_else(|| {
+                    files.read(menu_sprite_path(w as i32, &name).trim_start_matches("Datas/"))
+                });
+                it.bank = data.and_then(|d| Bank::parse(&d, depth).ok());
+            }
+        }
+    }
+
     /// One menu frame (@ 0x004591a0) on `screen` (the pointer is the
     /// game's): the page's handler, the page surface copied to the screen,
     /// the tooltip text, the load page's dates. Returns the effects.
@@ -1072,12 +1167,16 @@ impl Menus {
             PAGE_SAVE => self.page_save(env, &mut ev),
             _ => {}
         }
-        // The display re-created by the options' `BT_BACK` (@ 0x0040fa60,
-        // then 0x004eb290): a new, black page surface.
+        // The display re-created by the options' `BT_BACK`: a new, black
+        // page surface in the chosen format, the banks reloaded for it.
         if ev.iter().any(|e| matches!(e, Event::DisplayChange(..))) {
-            self.surface.fill(0);
+            self.recreate(env);
         }
-        // @ 0x00459250: the page surface to the screen (0x004ecc40).
+        // @ 0x00459250: the page surface to the screen (0x004ecc40; from
+        // a 32-bit page surface its 32 → 16 copy).
+        if self.depth == Depth::Xrgb8888 {
+            x888_to_565(&self.surface32, &mut self.surface);
+        }
         if screen.len() == self.surface.len() {
             screen.copy_from_slice(&self.surface);
         }
@@ -1149,12 +1248,15 @@ impl Menus {
         let font = self.bulle(env);
         let (w, h) = (self.width, self.height);
         let input = self.input;
+        let x888 = self.depth == Depth::Xrgb8888;
         let mut surface = std::mem::take(&mut self.surface);
+        let mut surface32 = std::mem::take(&mut self.surface32);
         let mut tip = self.tip;
         let mut shapes = Vec::new();
         let mut texts = Vec::new();
         let Some(p) = self.get_mut(n) else {
             self.surface = surface;
+            self.surface32 = surface32;
             return (None, None);
         };
         p.hover(env.pointer, env.now);
@@ -1164,21 +1266,20 @@ impl Menus {
             None
         };
         let c = p.click(input, env.pointer, env.now, ev);
-        let draws = p.pass(
-            &mut surface,
-            w,
-            h,
-            env.now,
-            input.button,
-            Some(TipCtx {
-                font,
-                pointer: env.pointer,
-                tip: &mut tip,
-                shapes: &mut shapes,
-                texts: &mut texts,
-            }),
-        );
+        let ctx = TipCtx {
+            font,
+            pointer: env.pointer,
+            tip: &mut tip,
+            shapes: &mut shapes,
+            texts: &mut texts,
+        };
+        let draws = if x888 {
+            p.pass(&mut surface32, w, h, env.now, input.button, Some(ctx))
+        } else {
+            p.pass(&mut surface, w, h, env.now, input.button, Some(ctx))
+        };
         self.surface = surface;
+        self.surface32 = surface32;
         self.tip = tip;
         self.shapes.extend(shapes);
         self.texts.extend(texts);
@@ -1192,28 +1293,29 @@ impl Menus {
         let font = self.bulle(env);
         let (w, h) = (self.width, self.height);
         let button = self.input.button;
+        let x888 = self.depth == Depth::Xrgb8888;
         let mut surface = std::mem::take(&mut self.surface);
+        let mut surface32 = std::mem::take(&mut self.surface32);
         let mut tip = self.tip;
         let mut shapes = Vec::new();
         let mut texts = Vec::new();
         if let Some(p) = self.get_mut(n) {
-            let draws = p.pass(
-                &mut surface,
-                w,
-                h,
-                env.now,
-                button,
-                Some(TipCtx {
-                    font,
-                    pointer: env.pointer,
-                    tip: &mut tip,
-                    shapes: &mut shapes,
-                    texts: &mut texts,
-                }),
-            );
+            let ctx = TipCtx {
+                font,
+                pointer: env.pointer,
+                tip: &mut tip,
+                shapes: &mut shapes,
+                texts: &mut texts,
+            };
+            let draws = if x888 {
+                p.pass(&mut surface32, w, h, env.now, button, Some(ctx))
+            } else {
+                p.pass(&mut surface, w, h, env.now, button, Some(ctx))
+            };
             self.draws.extend(draws);
         }
         self.surface = surface;
+        self.surface32 = surface32;
         self.tip = tip;
         self.shapes.extend(shapes);
         self.texts.extend(texts);
@@ -1389,7 +1491,7 @@ impl Menus {
     /// every one (the per-frame pass).
     fn set_thumbnails(&mut self, env: &mut Env<'_>, hide: bool) {
         let [_, _, y0, x, _, step] = self.slots;
-        let (w, files) = (self.width, env.files);
+        let (w, files, depth) = (self.width, env.files, self.depth);
         let base = (5 * self.scroll).max(0) as usize;
         let names: Vec<String> = (0..6)
             .map(|k| {
@@ -1420,7 +1522,7 @@ impl Menus {
                         let p = menu_sprite_path(w as i32, &spr);
                         files.read(p.trim_start_matches("Datas/"))
                     })
-                    .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok());
+                    .and_then(|d| Bank::parse(&d, depth).ok());
                 it.el.nomspr = Some(spr);
             }
             it.el.pos[0] = x;
@@ -1641,6 +1743,8 @@ impl Menus {
                 }
             }
             self.depth_pending = false;
+            // 0x007812b0 := the current display's format (0x0040f0e0).
+            self.format = self.depth;
             let toggles = [
                 (&b"BT_VISEUR"[..], cfg.cursor),
                 (&b"BT_SOURIS"[..], cfg.invert_mouse_y),
@@ -1718,7 +1822,15 @@ impl Menus {
                 cfg.smooth = !cfg.smooth;
                 ev.push(Event::Options);
             }
-            b"BT_32BITS" | b"BT_16BITS" => self.depth_pending = true,
+            // 0x004e7c80(0x8a) / (0x96): the format chosen.
+            b"BT_16BITS" => {
+                self.format = Depth::Rgb565;
+                self.depth_pending = true;
+            }
+            b"BT_32BITS" => {
+                self.format = Depth::Xrgb8888;
+                self.depth_pending = true;
+            }
             b"BT_VISEUR" => {
                 cfg.cursor = frame != 0;
                 ev.push(Event::Options);
@@ -1744,12 +1856,12 @@ impl Menus {
 
     /// Page 6, the languages (@ 0x004560e0). Sub-state 0: while
     /// `i_option`'s `BT_LANGUE` plays (a `BT_ANIME`: never) `i_option` is
-    /// drawn; then sub-state 1 and the lists set up: with one voice and one
-    /// subtitle language installed both LEDs at 1 and the four arrows off
-    /// (the list functions @ 0x0044d7c0, @ 0x0044d9f0, @ 0x0044dfd0 are not
-    /// transcribed: the port has only the installed language) (nothing
-    /// drawn). Sub-state 1: hover, click, element pass; no click: both LEDs
-    /// at 0; `BT_BACK`: the texts read again, page 5 in sub-state 1.
+    /// drawn; then sub-state 1 and the lists set up (nothing drawn): every
+    /// listed language "off" (@ 0x0044d7c0), the current voice and
+    /// subtitle languages on with their neighbours (@ 0x0044d9f0,
+    /// @ 0x0044dfd0, [`Menus::language_list`]); the LEDs keep the load's
+    /// last frame. Sub-state 1: hover, click, element pass; no click: both
+    /// LEDs at 0; `BT_BACK`: the texts read again, page 5 in sub-state 1.
     fn page_languages(&mut self, env: &mut Env<'_>, ev: &mut Vec<Event>) {
         if self.sub == 0 {
             if self.playing(PAGE_OPTIONS, b"BT_LANGUE") {
@@ -1757,19 +1869,26 @@ impl Menus {
                 return;
             }
             self.sub = 1;
-            for name in [&b"LED_LG"[..], b"LED_ST"] {
-                if let Some(it) = self.item(PAGE_LANGUAGES, name) {
-                    it.frame = 1;
+            // @ 0x0044d7c0("LANGUE"), ("SOUSTITRE"): `<prefix><n>` frame
+            // := 5 for n = 1 .. the count (@ 0x0044d91e).
+            for prefix in [&b"LANGUE"[..], b"SOUSTITRE"] {
+                for n in 1..=self.language_count(prefix) {
+                    let name = [prefix, n.to_string().as_bytes()].concat();
+                    if let Some(it) = self.item(PAGE_LANGUAGES, &name) {
+                        it.frame = 5;
+                    }
                 }
             }
+            let (langue, sous_titre) = (env.config.langue.clone(), env.config.sous_titre.clone());
+            self.language_list(b"LANGUE", b"lan_", &langue, [b"BT_LG_UP", b"BT_LG_DN"]);
+            self.language_list(
+                b"SOUSTITRE",
+                b"st_",
+                &sous_titre,
+                [b"BT_ST_UP", b"BT_ST_DN"],
+            );
             self.clear(PAGE_LANGUAGES);
             self.clear_flags();
-            for name in [&b"BT_LG_UP"[..], b"BT_LG_DN", b"BT_ST_UP", b"BT_ST_DN"] {
-                if let Some(it) = self.item(PAGE_LANGUAGES, name) {
-                    it.el.selectable = false;
-                    it.el.clickable = false;
-                }
-            }
             self.set_tooltips(PAGE_LANGUAGES, true);
             return;
         }
@@ -1797,6 +1916,75 @@ impl Menus {
             Some(_) => {
                 self.clear(PAGE_LANGUAGES);
                 self.clear_flags();
+            }
+        }
+    }
+
+    /// @ 0x0044d2b0: the languages listed on page 6, the elements
+    /// `<prefix>1`, `<prefix>2`, … found by name until one is missing.
+    fn language_count(&self, prefix: &[u8]) -> i32 {
+        let Some(p) = self.get(PAGE_LANGUAGES) else {
+            return 0;
+        };
+        let mut n = 0;
+        while p
+            .find(&[prefix, (n + 1).to_string().as_bytes()].concat())
+            .is_some()
+        {
+            n += 1;
+        }
+        n
+    }
+
+    /// @ 0x0044d9f0 (voices: `LANGUE`, `lan_`, `Langue`, `BT_LG_UP` /
+    /// `BT_LG_DN`) and @ 0x0044dfd0 (subtitles: `SOUSTITRE`, `st_`,
+    /// `SousTitre`, `BT_ST_UP` / `BT_ST_DN`): the element whose `nomspr`
+    /// is `<spr><language>_` (@ 0x00426ef0, the first) frame := 0
+    /// (@ 0x0044db6a); with one language listed the two arrows neither
+    /// selectable nor clickable; else, from the current element's number
+    /// N, `<prefix><N − 1>` (count below 1) frame := 2 and `<prefix><N +
+    /// 1>` (1 above the count) frame := 1.
+    fn language_list(&mut self, prefix: &[u8], spr: &[u8], language: &[u8], arrows: [&[u8]; 2]) {
+        let count = self.language_count(prefix);
+        let nomspr = [spr, language, b"_"].concat();
+        let Some(p) = self.get_mut(PAGE_LANGUAGES) else {
+            return;
+        };
+        let Some(k) = p
+            .items
+            .iter()
+            .position(|it| it.el.nomspr.as_deref() == Some(&nomspr[..]))
+        else {
+            log::warn!(
+                "menus: no language element {}",
+                String::from_utf8_lossy(&nomspr)
+            );
+            return;
+        };
+        p.items[k].frame = 0;
+        if count == 1 {
+            for name in arrows {
+                if let Some(it) = self.item(PAGE_LANGUAGES, name) {
+                    it.el.selectable = false;
+                    it.el.clickable = false;
+                }
+            }
+            return;
+        }
+        // The number after the prefix (@ 0x00445b40, 0x00444c30).
+        let n: i32 = p.items[k]
+            .el
+            .nomref
+            .get(prefix.len()..)
+            .and_then(|d| std::str::from_utf8(d).ok())
+            .and_then(|d| d.parse().ok())
+            .unwrap_or(0);
+        let prev = if n - 1 >= 1 { n - 1 } else { count };
+        let next = if n + 1 > count { 1 } else { n + 1 };
+        for (m, frame) in [(prev, 2), (next, 1)] {
+            let name = [prefix, m.to_string().as_bytes()].concat();
+            if let Some(it) = self.item(PAGE_LANGUAGES, &name) {
+                it.frame = frame;
             }
         }
     }
