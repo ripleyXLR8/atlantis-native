@@ -19,6 +19,7 @@ pub mod cinema;
 pub mod dialog;
 pub mod game;
 pub mod inventory;
+pub mod lipsync;
 pub mod menu;
 pub mod place_anim;
 pub mod startup;

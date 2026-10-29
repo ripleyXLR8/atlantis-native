@@ -104,8 +104,9 @@ pub struct Perso {
     pub stretch: f32,
     /// The nine weights as the original stores them (record +0x2c ..
     /// +0x4c): 1.0, except the slots the `[TabWeightNN]` lines write. With
-    /// the shipped keys every line writes slot 0, so slot 0 holds the last
-    /// line's value and slots 1..8 stay 1.0 (see [`TabWeightLine::slot`]).
+    /// the shipped keys every line writes slot 0, and the value written is
+    /// 0.0 (the `atof` reads the whole line), so a speaker with such lines
+    /// has [0, 1, 1, 1, 1, 1, 1, 1, 1] (see [`TabWeightLine::slot`]).
     /// Their use is `[UNKNOWN]`: nine weights match the nine morph keys of
     /// the head's lip-sync (@ 0x0047d930: eight mouth keys and the
     /// expression key); to settle, the lip-sync code.
@@ -223,7 +224,13 @@ pub fn parse_info(data: &[u8]) -> Result<Vec<Perso>, DialogError> {
                         .ok()
                         .and_then(|s| p.tab_weights.get_mut(s))
                     {
-                        *w = value;
+                        // The value stored is 0.0: the next word is read
+                        // into the key's own string (@ 0x0040c007), and the
+                        // `atof` (@ 0x0040c00e) then reads the line reader's
+                        // buffer, the whole line `[TabWeightNN]\t<v>`
+                        // [CONFIRMED-EMULATED: every speaker of the shipped
+                        // file].
+                        *w = 0.0;
                     }
                     p.tab_weight_lines.push(TabWeightLine {
                         key: latin1(key),
@@ -475,10 +482,7 @@ stray line\r\n[Perso] Other\r\n[Mesh] Ot\r\n[FinPerso]";
         assert_eq!((s.name.as_str(), s.mesh.as_str()), ("someone", "so"));
         assert_eq!((s.smooth, s.stretch, s.global_weight), (0.5, 1.5, 0.75));
         assert_eq!(s.id_texts, ["A_B", "C"]);
-        assert_eq!(
-            s.tab_weights,
-            [0.25, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-        );
+        assert_eq!(s.tab_weights, [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]);
         let slots: Vec<i32> = s.tab_weight_lines.iter().map(|l| l.slot).collect();
         assert_eq!(slots, [0, 0, 0]);
         let w = s.written_tab_weights();
