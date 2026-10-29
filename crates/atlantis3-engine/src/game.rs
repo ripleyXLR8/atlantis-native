@@ -246,6 +246,12 @@ pub struct Game {
     camera_fov: f32,
     /// The menu page shown (mode 6).
     page: Option<crate::menu::Page>,
+    /// Tests: the dialog events logged, and the voice model (a voice
+    /// plays for n `IsPlaying` calls).
+    #[doc(hidden)]
+    pub dialog_events: Option<Vec<String>>,
+    #[doc(hidden)]
+    pub voice_model: Option<u32>,
     /// The script asked to stop.
     pub quit: bool,
     /// What the scripts did that the port does not play yet (logged once
@@ -346,6 +352,8 @@ impl Game {
             },
             dialog_tick: false,
             page: None,
+            dialog_events: None,
+            voice_model: None,
             camera_fov: warp_fov(Fpu::Double),
             toupie_armed: false,
             player: atlantis3_data::save::DEFAULT_PLAYER,
@@ -565,6 +573,29 @@ impl Game {
         self.script = Some(s);
         self.store_save(&name, data);
         Some(name)
+    }
+
+    /// One pass of the dialog loop (tests): with or without the dialog's
+    /// 15 Hz tick; whether the dialog still runs.
+    #[doc(hidden)]
+    pub fn dialog_pass(&mut self, tick: bool) -> bool {
+        self.dialog_tick = tick;
+        self.dialog_frame();
+        self.running.is_some()
+    }
+
+    /// Starts dialog `n` as `DIAL` does (tests).
+    #[doc(hidden)]
+    pub fn start_dialog_now(&mut self, n: i32, voixoff: bool) {
+        self.start_dialog(n, voixoff);
+    }
+
+    /// The world's dialogs loaded again with `rand` seeded (tests).
+    #[doc(hidden)]
+    pub fn reload_dialogs(&mut self, seed: u32) {
+        self.rand = Rand::new(seed);
+        let w = self.script.as_ref().map_or(1, |s| s.a3.world);
+        self.load_dialogs(w);
     }
 
     /// Whether a dialog plays.
@@ -2005,6 +2036,7 @@ impl Game {
             saved_fov,
             video: None,
             voice_end: None,
+            voice_calls: 0,
             head_frame: 0,
             back: self.mode,
             surface: vec![0; sw * sh],
@@ -2030,6 +2062,7 @@ impl Game {
     /// past the last line.
     fn next_line(&mut self) -> bool {
         self.audio.stop(CHANNEL_VOICE);
+        self.ev(|| "Stop".into());
         let Some(r) = self.running.as_mut() else {
             return false;
         };
@@ -2059,6 +2092,8 @@ impl Game {
                     .files
                     .read(&video)
                     .and_then(|data| crate::dialog::BodyVideo::open(&video, Arc::from(data)));
+                let path = video.replace('/', "\\");
+                self.ev(|| format!("VideoOpen({path})"));
                 if let Some(r) = self.running.as_mut() {
                     r.video = opened;
                 }
@@ -2071,25 +2106,51 @@ impl Game {
             self.audio.play(CHANNEL_VOICE, rate, ch, pcm, false, [g, g]);
             self.now + frames / f64::from(rate.max(1))
         });
+        let v = voice.replace('/', "\\");
+        self.ev(|| format!("LoadSfx({v})"));
+        self.ev(|| format!("Play({v})"));
         if let Some(r) = self.running.as_mut() {
             r.voice_end = end;
+            r.voice_calls = 0;
             r.head_frame = 0;
         }
         true
     }
 
     /// Whether the line's voice still plays (a missing voice never ends).
-    fn voice_playing(&self) -> bool {
-        self.running
-            .as_ref()
-            .is_some_and(|r| r.voice_end.is_none_or(|e| self.now < e))
+    fn voice_playing(&mut self) -> bool {
+        let model = self.voice_model;
+        let now = self.now;
+        let Some(r) = self.running.as_mut() else {
+            return false;
+        };
+        let playing = match model {
+            // Tests: a voice plays for this many `IsPlaying` calls.
+            Some(n) => {
+                r.voice_calls += 1;
+                r.voice_calls <= n
+            }
+            None => r.voice_end.is_none_or(|e| now < e),
+        };
+        self.ev(|| format!("IsPlaying->{}", u8::from(playing)));
+        playing
+    }
+
+    /// A dialog event for the tests' log.
+    fn ev(&mut self, f: impl FnOnce() -> String) {
+        if let Some(l) = self.dialog_events.as_mut() {
+            l.push(f());
+        }
     }
 
     /// `CDialogue::Perform` (@ 0x00467120), the 15 Hz step: the next line
     /// when the voice ended; the panorama into the dialog surface (at the
     /// screen for a voice-over), the body video over it; false at the end.
     fn perform(&mut self) -> bool {
-        let has_voice = self.running.as_ref().is_some_and(|r| r.voice_end.is_some());
+        let has_voice = self
+            .running
+            .as_ref()
+            .is_some_and(|r| r.voice_end.is_some() || self.voice_model.is_some());
         if has_voice && !self.voice_playing() && !self.next_line() {
             return false;
         }
@@ -2113,9 +2174,15 @@ impl Game {
             }
             self.camera.fpu = self.dialog_renderer.fpu;
             match r.video.as_mut() {
-                Some(v) => r.head_frame = v.draw_next(&mut r.surface, sw, sh),
+                Some(v) => {
+                    r.head_frame = v.draw_next(&mut r.surface, sw, sh);
+                    let f = r.head_frame;
+                    self.ev(|| format!("VideoFrame(#{f})"));
+                }
                 None => r.head_frame += 1,
             }
+            let f = r.head_frame;
+            self.ev(|| format!("HeadStep({f})"));
         }
         self.running = Some(r);
         true
@@ -2133,9 +2200,16 @@ impl Game {
         let deg = d.focale(&e);
         let head = d.head_camera(&e.speaker, e.stand, e.camera);
         self.camera_fov = dialog_fov(self.camera.fpu, deg);
+        self.ev(|| format!("SetFov({:08x})", deg.to_bits()));
         match head {
-            Some(q) => self.camera.orient_to(q),
-            None => self.camera.horizontalize(),
+            Some(q) => {
+                self.ev(|| "Orient".into());
+                self.camera.orient_to(q)
+            }
+            None => {
+                self.ev(|| "Horizontalize".into());
+                self.camera.horizontalize()
+            }
         }
     }
 
@@ -2170,6 +2244,7 @@ impl Game {
                     if let Some(r) = self.running.as_mut() {
                         r.last = e.speaker.clone();
                     }
+                    self.ev(|| "Turn".into());
                     self.camera.yaw(std::f32::consts::PI);
                     self.perform();
                     return;
@@ -2179,6 +2254,7 @@ impl Game {
                     && e.speaker != "dame"
                     && e.speaker != "mons"
                 {
+                    self.ev(|| "Turn".into());
                     self.camera.yaw(std::f32::consts::PI);
                 }
                 if let Some(r) = self.running.as_mut() {
@@ -2209,6 +2285,7 @@ impl Game {
                     if let Some(r) = self.running.as_mut() {
                         r.hidden = Some((id, state));
                     }
+                    self.ev(|| format!("AnimHide({id})"));
                     self.slots.hide(id, 1, self.now);
                 }
                 self.perform();
@@ -2222,6 +2299,7 @@ impl Game {
     fn show_hidden(&mut self) {
         if let Some((id, state)) = self.running.as_mut().and_then(|r| r.hidden.take()) {
             if state != -1 {
+                self.ev(|| format!("AnimShow({id})"));
                 self.slots.show(id, 1, state, self.now);
             }
         }
@@ -2232,6 +2310,7 @@ impl Game {
     /// screen's size), then the line's subtitle (`CDialogue::Display`
     /// @ 0x0046a0e0).
     fn dialog_render(&mut self) {
+        self.ev(|| "Render".into());
         let Some(r) = self.running.as_ref() else {
             return;
         };
@@ -2272,6 +2351,7 @@ impl Game {
         self.show_hidden();
         let Some(r) = self.running.take() else { return };
         if !r.voixoff && crate::dialog::Dialogs::is_player(&r.last) {
+            self.ev(|| "Turn".into());
             self.camera.yaw(std::f32::consts::PI);
         }
         self.camera_fov = r.saved_fov;
@@ -2281,6 +2361,7 @@ impl Game {
         self.mode = r.back;
         self.click = false;
         self.look_last = None;
+        self.ev(|| "CloseInterrupt".into());
         self.with_script(|s, h| s.close_interrupt(h));
     }
 

@@ -347,6 +347,8 @@ pub struct Running {
     pub video: Option<BodyVideo>,
     /// The voice's end (the game's seconds), `None` without a voice.
     pub voice_end: Option<f64>,
+    /// `IsPlaying` calls since the voice started (the tests' voice model).
+    pub voice_calls: u32,
     /// The head's animation frame (+0x10).
     pub head_frame: i32,
     /// The loop mode to go back to (@ 0x0074f34c).
