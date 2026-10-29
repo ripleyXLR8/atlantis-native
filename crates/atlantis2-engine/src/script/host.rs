@@ -64,6 +64,9 @@ pub enum AnimOp {
     TheFrame { kind: i32, id: i32, on: bool },
     /// `ADDFRAMEPERSO` / `ADDFRAMEOBJET`.
     AddFrame { kind: i32, id: i32, frames: i32 },
+    /// `SUPFRAMEPERSO` / `SUPFRAMEOBJET` (*Atlantis III* only: the frame
+    /// removed from the id's frame list, @ 0x00438ae0).
+    SubFrame { kind: i32, id: i32, frame: i32 },
     /// `ChangeAnimGotoPerso` (FUN_0047df00, called @ 0x00482cbf): the character and the two
     /// numbers after its comma (read by @ 0x00485180).
     ChangeAnimGotoPerso { id: i32, a: i32, b: i32 },

@@ -3,10 +3,11 @@
 //! the fisherman's scale (view 11) and the Ankh coffer's lid (views
 //! 27..30).
 //!
-//! The SPW frame lists the C code edits (@ 0x00438a40 add a frame,
-//! @ 0x00438ae0 remove one, @ 0x00438ba0 test one) only choose what is
-//! drawn: they are noted `visual` (M4); the frames the code keeps in its
-//! own records are kept here.
+//! The lid, the feathers, the scale's beam, the tiles are mode-0 place
+//! sprites: the C code chooses what they show through their frame lists
+//! (@ 0x00438a40 add a frame, @ 0x00438ae0 remove one, @ 0x00438ba0 test
+//! one; [`super::super::frame_tab`]). Every board here is checked against
+//! the original under emulation (`tests/board_worlds12.rs`).
 
 use super::{Hx, ZoneRec};
 use atlantis2_engine::script::Host;
@@ -49,8 +50,11 @@ pub struct AnimRec {
 #[derive(Debug, Default, Clone)]
 pub struct State {
     /// The fisherman's scale set up (@ 0x0071d3a8, 1 until the first
-    /// entry into view 11; set again by the load).
+    /// entry into view 11; set again by the load), `LDM_BALANCEPE`'s id
+    /// (@ 0x00785f70) and frame count (@ 0x00785f74).
     pub fisherman_fresh: bool,
+    pub fisherman_id: i32,
+    pub fisherman_count: i32,
     /// The chest's set-up (@ 0x0071e778, 1 until the first entry into
     /// views 2..4 / 20; set again by the load).
     pub chest_fresh: bool,
@@ -59,9 +63,13 @@ pub struct State {
     pub b71e264: bool,
     /// The ten feathers (@ 0x007875e8).
     pub feathers: [Feather; 10],
-    /// The chest lid's frame (@ 0x00787754: 0 shut, 0xe open), the
-    /// feathers' (@ 0x0078775c), the scale's beam (@ 0x0078776c: 0 level
-    /// or right pan down, 1 left pan down).
+    /// The chest lid's object and frame (@ 0x00787750, 0x00787754: 0
+    /// shut, 0xe open), the feathers' (@ 0x00787758, 0x0078775c), the
+    /// scale's beam (@ 0x00787768, 0x0078776c: 0 level or right pan down,
+    /// 1 left pan down).
+    pub lid_id: i32,
+    pub plumes_id: i32,
+    pub scale_id: i32,
     pub lid_frame: i32,
     pub plumes_frame: i32,
     pub scale_frame: i32,
@@ -84,9 +92,12 @@ pub struct State {
     /// The tile in hand (@ 0x00786d10): (kind 4 / 5, index).
     pub held: Option<(i32, usize)>,
     /// The zone clicked (@ 0x00786cf8) and the one the held tile was
-    /// taken from (@ 0x00786a68).
+    /// taken from (@ 0x00786a68): `Aucune_Zone_Cliquée` from the static
+    /// constructors (@ 0x004c7e50, 0x004c7e90) until a click.
     pub clicked: String,
     pub picked: String,
+    /// The held KS tile's sample (@ 0x00786a80, `Rien` when none).
+    pub sample: String,
     /// The held KS tile's text shown (@ 0x00786d0c), the tiles shown
     /// (@ 0x00786d0d).
     pub tile_text: bool,
@@ -94,6 +105,11 @@ pub struct State {
     /// The Ankh coffer's lid (@ 0x00785f18, `ANK_COUVERCLE`, 5 frames).
     pub lid: AnimRec,
 }
+
+/// The zone names' initial value (@ 0x0071e268).
+const NO_ZONE: &str = "Aucune_Zone_Cliquée";
+/// The sample name's "none" (@ 0x00717094).
+const NO_SAMPLE: &str = "Rien";
 
 impl State {
     pub fn new() -> State {
@@ -103,6 +119,9 @@ impl State {
             b71e264: true,
             pan_weight: [-1, -1],
             level_sounded: true,
+            clicked: NO_ZONE.to_string(),
+            picked: NO_ZONE.to_string(),
+            sample: NO_SAMPLE.to_string(),
             ..Default::default()
         }
     }
@@ -119,11 +138,12 @@ impl State {
 
 /// @ 0x004c1c70: the record set to the object `name` and `count` frames,
 /// the frame reached 0 (the running byte kept).
-pub(super) fn anim_start(h: &Hx, rec: &mut AnimRec, name: &str, count: i32) {
+pub(super) fn anim_start(h: &mut Hx, rec: &mut AnimRec, name: &str, count: i32) {
     rec.id = h.obj(name);
     rec.count = count;
-    // visual: frames 0..count − 1 taken out of the object's frame lists
-    // (M4).
+    for f in 0..count {
+        h.subf_if_listed(rec.id, f);
+    }
     rec.reached = 0;
 }
 
@@ -133,21 +153,27 @@ pub(super) fn anim_start(h: &Hx, rec: &mut AnimRec, name: &str, count: i32) {
 /// record's last frame reached (running := 0). True when the last frame
 /// is reached.
 pub(super) fn anim_step(h: &mut Hx, rec: &mut AnimRec) -> bool {
-    // visual: frames 0..count − 1 taken out of the frame lists (M4).
+    for f in 0..rec.count {
+        h.subf_if_listed(rec.id, f);
+    }
     let now = h.now();
-    for s in h.g.slots.slots.iter_mut().filter(|s| s.id == rec.id) {
+    for k in 0..h.g.slots.slots.len() {
+        let s = &mut h.g.slots.slots[k];
+        if s.id != rec.id {
+            continue;
+        }
         if s.mode == 1 {
             if s.ended {
                 s.mode = 0;
                 rec.reached = rec.count;
                 rec.running = false;
-                // visual: frame `reached` put in the frame list
-                // (@ 0x004c1df0) (M4).
+                // @ 0x004c1df0: the last frame listed (once).
+                h.addf_if_absent(rec.id, rec.reached);
             }
         } else {
             s.frame = 0;
             s.mode = 1;
-            s.start = now;
+            s.restart_clock(now);
             rec.running = true;
         }
     }
@@ -177,8 +203,8 @@ pub(super) fn coffer_entry(h: &mut Hx) {
         lid.reached = lid.count;
     }
     if !lid.running {
-        // visual: the lid's frame `reached` in its frame list (0x004c1df0)
-        // (M4).
+        // @ 0x004c1df0.
+        h.addf_if_absent(lid.id, lid.reached);
     }
     h.g.puzzles.ldmorts.lid = lid;
 }
@@ -223,8 +249,14 @@ pub(in crate::game) fn coffer_frame(h: &mut Hx) {
 /// View 11's entry (@ 0x004c39b0): once per session (and after a load),
 /// the 210 frames of `LDM_BALANCEPE` taken out of its frame list.
 pub(super) fn view_fisherman(h: &mut Hx) {
-    // visual: frames 0..209 of `LDM_BALANCEPE` out of its frame list,
-    // @ 0x00785f74 := 210 (M4).
+    if h.g.puzzles.ldmorts.fisherman_fresh {
+        let id = h.obj("LDM_BALANCEPE");
+        h.g.puzzles.ldmorts.fisherman_id = id;
+        for f in 0..0xd2 {
+            h.subf_if_listed(id, f);
+        }
+        h.g.puzzles.ldmorts.fisherman_count = 0xd2;
+    }
     h.g.puzzles.ldmorts.fisherman_fresh = false;
 }
 
@@ -290,14 +322,30 @@ pub(super) fn frame_fisherman(h: &mut Hx, _z: &ZoneRec) {
 
 // ---- the feathers: chest, scales, pedestal (views 2..4, 20) ------------
 
-/// The feathers' set-up (@ 0x004cc5e0 → @ 0x004cc6c0): records rebuilt;
-/// with flag 85 (the feathers taken) the weights from flags 545..554,
-/// else a random permutation of 0..9 (`rand() % 10` until free) written
-/// to the records and to flags 545..554.
+/// The feathers' set-up (@ 0x004cc5e0 → @ 0x004cc6c0): the lid's, the
+/// feathers' and the beam's objects, their frames 0..13 (0..1 for the
+/// beam) taken out of their lists when listed, their frames 0; the
+/// feather records rebuilt; with flag 85 (the feathers taken) the weights
+/// from flags 545..554, else a random permutation of 0..9 (`rand() % 10`
+/// until free) written to the records and to flags 545..554.
 fn feathers_setup(h: &mut Hx) {
     h.g.puzzles.ldmorts.all_feathers_offered = false;
-    // visual: `LDM_COUVERCLE` / `LDM_PLUMES` frames 0..13 and `LDM_BALANCE`
-    // frames 0..1 out of their frame lists (M4).
+    let (lid, plumes, scale) = (
+        h.obj("LDM_COUVERCLE"),
+        h.obj("LDM_PLUMES"),
+        h.obj("LDM_BALANCE"),
+    );
+    let p = &mut h.g.puzzles.ldmorts;
+    p.lid_id = lid;
+    p.plumes_id = plumes;
+    p.scale_id = scale;
+    for f in 0..0xe {
+        h.subf_if_listed(lid, f);
+        h.subf_if_listed(plumes, f);
+    }
+    for f in 0..2 {
+        h.subf_if_listed(scale, f);
+    }
     let p = &mut h.g.puzzles.ldmorts;
     p.lid_frame = 0;
     p.plumes_frame = 0;
@@ -335,13 +383,15 @@ fn feather_of_weight(h: &Hx, w: i32) -> Option<usize> {
 }
 
 /// Views 2, 3, 4, 20's entry (@ 0x004cbfe0): the feathers set up once,
-/// the lid's frame from flag 76, the pans from flags 562 / 563, the beam
-/// (and its sound) when the scale hangs (flag 79).
+/// the lid's old frame taken out of its list and its frame from flag 76,
+/// the pans from flags 562 / 563, the beam (and its sound) when the scale
+/// hangs (flag 79), then the frames listed (@ 0x004cc8d0).
 pub(super) fn view_chest(h: &mut Hx) {
     if h.g.puzzles.ldmorts.chest_fresh {
         feathers_setup(h);
     }
-    // visual: the lid's old frame out of its frame list (M4).
+    let (lid, old) = (h.g.puzzles.ldmorts.lid_id, h.g.puzzles.ldmorts.lid_frame);
+    h.subf(lid, old);
     h.g.puzzles.ldmorts.lid_frame = if h.flag(76) == 1 { 0xe } else { 0 };
     for (p, flag) in [(0, 562), (1, 563)] {
         let f = h.flag(flag);
@@ -358,9 +408,43 @@ pub(super) fn view_chest(h: &mut Hx) {
     if h.flag(79) == 1 {
         scales(h, &ZoneRec::default());
     }
-    // visual: @ 0x004cc8d0, the lid, scale, pans' and pedestal's frames
-    // put in the frame lists (M4).
+    chest_frames(h);
     h.g.puzzles.ldmorts.chest_fresh = false;
+}
+
+/// The frames listed (@ 0x004cc8d0): in view 20 each feather's frame 0
+/// taken out (when listed) and the feather on the pedestal (weight + 1 =
+/// flag 84) listed; elsewhere the lid (frame 1 when open and the view is
+/// not 3, listed whether or not it already is; else its frame when not
+/// listed), the beam when the scale hangs, each pan's feather at its pan
+/// frame (when not listed).
+fn chest_frames(h: &mut Hx) {
+    if h.vue() == 20 {
+        for n in 0..10 {
+            let f = h.g.puzzles.ldmorts.feathers[n];
+            h.subf_if_listed(f.id, 0);
+            if h.flag(84) == f.weight + 1 {
+                h.addf(f.id, 0);
+            }
+        }
+        return;
+    }
+    let p = &h.g.puzzles.ldmorts;
+    let (lid, lid_frame, scale, scale_frame) = (p.lid_id, p.lid_frame, p.scale_id, p.scale_frame);
+    if h.flag(76) == 1 && h.vue() != 3 {
+        h.addf(lid, 1);
+    } else {
+        h.addf_if_absent(lid, lid_frame);
+    }
+    if h.flag(79) == 1 {
+        h.addf_if_absent(scale, scale_frame);
+    }
+    for p in 0..2 {
+        if let Some(n) = h.g.puzzles.ldmorts.pans[p] {
+            let f = h.g.puzzles.ldmorts.feathers[n];
+            h.addf_if_absent(f.id, f.pan_frame);
+        }
+    }
 }
 
 /// Views 3, 4, 20's frame (@ 0x004cc0f0).
@@ -372,8 +456,10 @@ pub(super) fn frame_chest(h: &mut Hx, z: &ZoneRec) {
             if let Some(s) = h.slot(3) {
                 s.mode = 0;
             }
-            // visual: the lid's frame 0xe in its frame list (M4).
+            let (lid, old) = (h.g.puzzles.ldmorts.lid_id, h.g.puzzles.ldmorts.lid_frame);
+            h.subf(lid, old);
             h.g.puzzles.ldmorts.lid_frame = 0xe;
+            h.addf(lid, 0xe);
             h.run("(EnableSuj,CHF_PSYCHOP,DIAL_TOUTES_PLUMES)");
         }
         if h.flag(76) == 1 && h.flag(85) == 1 && !h.g.puzzles.ldmorts.all_feathers_offered {
@@ -410,7 +496,7 @@ pub(super) fn frame_chest(h: &mut Hx, z: &ZoneRec) {
         if let Some(s) = h.slot(3) {
             s.frame = 0;
             s.mode = 1;
-            s.start = now;
+            s.restart_clock(now);
         }
         h.run("(showobjet=LDM_PLUMES)");
         h.run("(ObjetEnMain=0)");
@@ -426,7 +512,11 @@ pub(super) fn frame_chest(h: &mut Hx, z: &ZoneRec) {
         if z.name == "LDM_ACCROCHEBALANCE" {
             h.run("(ObjetEnMain=0)");
             h.run("(SacADos=NOT_LDM_BALANCE_PR)");
-            // visual: the scale's frame in its frame list (M4).
+            let (scale, f) = (
+                h.g.puzzles.ldmorts.scale_id,
+                h.g.puzzles.ldmorts.scale_frame,
+            );
+            h.addf(scale, f);
             h.run("(KillSuj,CHF_PSYCHOP,DIAL_BALANCE)");
             h.run("(KillSuj,CHF_PSYCHOP,DIAL_PLACE_BALANCE)");
             h.set_flag(79, 1);
@@ -442,7 +532,7 @@ pub(super) fn frame_chest(h: &mut Hx, z: &ZoneRec) {
             let f = h.g.puzzles.ldmorts.feathers[n];
             if h.hand() == f.id {
                 pedestal(h, f.weight);
-                // visual: @ 0x004cc8d0 (M4).
+                chest_frames(h);
             }
         }
     }
@@ -463,8 +553,10 @@ fn pedestal(h: &mut Hx, weight: i32) {
 
 /// The scales (@ 0x004cca40): a click on a pan (`LDM_BALANCEG` → flag
 /// 562, `LDM_BALANCED` → flag 563 := its feather's weight + 1, 0 empty),
-/// then the beam from the two weights and `(PlaySound = 103)` when it
-/// changes side.
+/// then the beam from the two weights (its old frame out of the list
+/// when listed, the new one listed) with `(PlaySound = 103)` when it
+/// changes side, and the pans' feathers at their frames (the old frame
+/// out when listed, the new one listed; not when the weights are equal).
 fn scales(h: &mut Hx, z: &ZoneRec) {
     if z.name == "LDM_BALANCEG" {
         pan(h, 0);
@@ -476,11 +568,10 @@ fn scales(h: &mut Hx, z: &ZoneRec) {
         h.set_flag(563, w + 1);
     }
     let [wg, wd] = h.g.puzzles.ldmorts.pan_weight;
-    // visual: the beam's and pans' frames swapped in the frame lists (M4).
     if wg == wd {
         beam_level(h);
     } else if wd < wg {
-        h.g.puzzles.ldmorts.scale_frame = 1;
+        set_beam(h, 1);
         if !h.g.puzzles.ldmorts.tilt_sounded {
             h.run("(PlaySound = 103)");
             h.g.puzzles.ldmorts.tilt_sounded = true;
@@ -493,9 +584,21 @@ fn scales(h: &mut Hx, z: &ZoneRec) {
     }
 }
 
+/// The beam's frame: the old one out of its list when listed, the new
+/// one listed.
+fn set_beam(h: &mut Hx, frame: i32) {
+    let (scale, old) = (
+        h.g.puzzles.ldmorts.scale_id,
+        h.g.puzzles.ldmorts.scale_frame,
+    );
+    h.subf_if_listed(scale, old);
+    h.g.puzzles.ldmorts.scale_frame = frame;
+    h.addf(scale, frame);
+}
+
 /// The beam level (frame 0), its sound once.
 fn beam_level(h: &mut Hx) {
-    h.g.puzzles.ldmorts.scale_frame = 0;
+    set_beam(h, 0);
     if !h.g.puzzles.ldmorts.level_sounded {
         h.run("(PlaySound = 103)");
         h.g.puzzles.ldmorts.level_sounded = true;
@@ -504,19 +607,21 @@ fn beam_level(h: &mut Hx) {
 }
 
 fn set_pan_frames(h: &mut Hx, left: i32, right: i32) {
-    let p = &mut h.g.puzzles.ldmorts;
-    if let Some(n) = p.pans[0] {
-        p.feathers[n].pan_frame = left;
-    }
-    if let Some(n) = p.pans[1] {
-        p.feathers[n].pan_frame = right;
+    for (p, frame) in [(0, left), (1, right)] {
+        if let Some(n) = h.g.puzzles.ldmorts.pans[p] {
+            let f = h.g.puzzles.ldmorts.feathers[n];
+            h.subf_if_listed(f.id, f.pan_frame);
+            h.g.puzzles.ldmorts.feathers[n].pan_frame = frame;
+            h.addf(f.id, frame);
+        }
     }
 }
 
 /// A pan clicked (@ 0x004cce10): empty, with a feather in hand → the
 /// feather on it (the hand variable 0, the feather out of the bag, the
 /// hand cleared); holding a feather, with an empty hand → the feather
-/// back in the bag (sprite n + 27) and in the hand.
+/// back in the bag (sprite n + 27) and in the hand, its pan frame out of
+/// its list.
 fn pan(h: &mut Hx, p: usize) {
     let hand = h.hand();
     match h.g.puzzles.ldmorts.pans[p] {
@@ -546,7 +651,7 @@ fn pan(h: &mut Hx, p: usize) {
             let f = h.g.puzzles.ldmorts.feathers[n];
             h.s.bag_add(h.g, f.id, f.sprite as u8);
             h.s.hold(f.id);
-            // visual: the feather's pan frame out of its frame list (M4).
+            h.subf(f.id, f.pan_frame);
             h.g.puzzles.ldmorts.pans[p] = None;
             h.g.puzzles.ldmorts.pan_weight[p] = -1;
         }
@@ -555,14 +660,17 @@ fn pan(h: &mut Hx, p: usize) {
 
 // ---- the Isis tiles (views 7..10) -------------------------------------
 
-/// The tiles of one kind built (@ 0x004c8790): `prefix` 0..11, each at a
-/// random free position (`rand() % 12` until free).
+/// The tiles of one kind built (@ 0x004c8790): `prefix` 0..11, each
+/// tile's own index taken out of its frame list when listed (twelve
+/// times), then at a random free position (`rand() % 12` until free).
 fn tiles_build(h: &mut Hx, prefix: &str, kind: i32, base: i32) -> [Tile; 12] {
     let mut out = [Tile::default(); 12];
     let mut taken = [false; 12];
     for (i, t) in out.iter_mut().enumerate() {
         t.id = h.obj(&format!("{prefix}{i}"));
-        // visual: frame i of the tile out of its frame list, 12 times (M4).
+        for _ in 0..12 {
+            h.subf_if_listed(t.id, i as i32);
+        }
         let mut p = h.rand() % 12;
         while taken[p as usize] {
             p = h.rand() % 12;
@@ -591,7 +699,11 @@ fn tiles_save(h: &mut Hx) {
 /// Views 7..10's entry (@ 0x004c7f40, `PuzzleIsis_Init`; the dispatch
 /// clears the zone value first): `LDM_CARREAUENMAIN` := 0, the tiles
 /// rebuilt (24 random positions drawn), saved the first time (flag 506),
-/// then the solved picture (flag 63) or the saved positions.
+/// then per index (KI, then KS) the tile's current frame out of its list
+/// when listed and its frame from the solved picture (flag 63) or the
+/// saved positions; in `LDMorts.wam` views 7..10 every tile's frame
+/// listed (each tile is a mode-0 slot showing its position); the warp
+/// cursor reset, no tile held.
 pub(super) fn view_isis(h: &mut Hx) {
     h.set_var("LDM_CARREAUENMAIN", 0);
     let ki = tiles_build(h, "LDM_ISISKI", 4, 0);
@@ -602,27 +714,33 @@ pub(super) fn view_isis(h: &mut Hx) {
         tiles_save(h);
         h.set_flag(506, 1);
     }
-    // visual: every tile's frame out of its frame list (M4).
-    if h.flag(63) == 1 {
-        let p = &mut h.g.puzzles.ldmorts;
-        for t in p.ki.iter_mut().chain(p.ks.iter_mut()) {
-            t.frame = t.own;
-        }
-    } else {
-        for i in 0..12 {
-            let (a, b) = (h.flag(510 + i), h.flag(522 + i));
-            h.g.puzzles.ldmorts.ki[i].frame = a;
-            h.g.puzzles.ldmorts.ks[i].frame = b;
-        }
+    let solved = h.flag(63) == 1;
+    for i in 0..12 {
+        let (a, b) = (h.g.puzzles.ldmorts.ki[i], h.g.puzzles.ldmorts.ks[i]);
+        h.subf_if_listed(a.id, a.frame);
+        h.subf_if_listed(b.id, b.frame);
+        let (fa, fb) = if solved {
+            (a.own, b.own)
+        } else {
+            (h.flag(510 + i), h.flag(522 + i))
+        };
+        h.g.puzzles.ldmorts.ki[i].frame = fa;
+        h.g.puzzles.ldmorts.ks[i].frame = fb;
     }
     h.g.puzzles.ldmorts.tiles_shown = true;
-    // visual: in `LDMorts.wam` views 7..10 every tile's frame in its frame
-    // list (M4).
+    let here = h.g.place.name == "LDMorts.wam" && (7..=10).contains(&h.vue());
+    if here {
+        for i in 0..12 {
+            let (a, b) = (h.g.puzzles.ldmorts.ki[i], h.g.puzzles.ldmorts.ks[i]);
+            h.addf(a.id, a.frame);
+            h.addf(b.id, b.frame);
+        }
+    }
     h.g.puzzles.ldmorts.b71e264 = false;
     if h.g.puzzles.ldmorts.held.is_some() {
         log::warn!("PuzzleIsis_Init(): Carreau en main pas NULL");
     }
-    // visual: the cursor reset (@ 0x004287f0) (M4).
+    h.g.reset_warp_cursor();
     h.g.puzzles.ldmorts.held = None;
 }
 
@@ -646,17 +764,51 @@ fn tiles<'a>(h: &'a mut Hx, kind: i32) -> &'a mut [Tile; 12] {
     }
 }
 
-/// A tile taken (@ 0x004c89c0), with an empty hand: the tile at the
-/// clicked position; `LDM_CARREAUENMAIN` := 1 in any case.
+/// The held tile (@ 0x00786d10).
+fn held_tile(h: &Hx) -> Option<Tile> {
+    let (kind, i) = h.g.puzzles.ldmorts.held?;
+    let arr = if kind == 4 {
+        &h.g.puzzles.ldmorts.ki
+    } else {
+        &h.g.puzzles.ldmorts.ks
+    };
+    Some(arr[i])
+}
+
+/// A KS tile's sample (@ 0x004c8b19..0x004c8d7f): `pret0<390 + i>.apc`
+/// in the world's voice folder (@ 0x00416030: `loc\voix\`, the voice
+/// language, the world's folder).
+fn tile_sample(h: &Hx, i: usize) -> String {
+    let lang = h.g.startup.voice_language();
+    let folder = super::super::WORLDS
+        .get(h.world() as usize)
+        .copied()
+        .unwrap_or("");
+    format!("loc\\voix\\{lang}\\{folder}\\pret0{}.apc", 390 + i)
+}
+
+/// A tile taken (@ 0x004c89c0), with an empty hand: the first tile of
+/// the kind at the clicked position held, the cursor its in-hand sprite
+/// (its index + 3: KI 3..14, KS 15..26), its frame out of its list when
+/// listed; a KS tile's sample loaded as a voice and, when loaded, kept
+/// and played. `LDM_CARREAUENMAIN` := 1 in any case.
 fn isis_pick(h: &mut Hx, kind: i32) {
     if h.hand() == 0 {
         let n = zone_number(&h.g.puzzles.ldmorts.clicked.clone());
         if h.g.puzzles.ldmorts.held.is_none() {
             if let Some(i) = tiles(h, kind).iter().position(|t| t.frame == n) {
                 h.g.puzzles.ldmorts.held = Some((kind, i));
-                // visual: the tile's cursor, its frame out of its list;
-                // for a KS tile its sample (`pret0` .. `.apc` by 390 +
-                // i, @ 0x004329e0, kept @ 0x00786a80) played (M4).
+                let t = tiles(h, kind)[i];
+                h.g.set_warp_cursor(t.index + 3);
+                h.subf_if_listed(t.id, t.frame);
+                if kind == 5 {
+                    let name = tile_sample(h, i);
+                    h.g.sfx_load(&name, 1, 2);
+                    if h.g.sfx_loaded(&name) {
+                        h.g.puzzles.ldmorts.sample = name.clone();
+                        h.g.sfx_play(&name);
+                    }
+                }
             }
         }
     }
@@ -664,21 +816,35 @@ fn isis_pick(h: &mut Hx, kind: i32) {
 }
 
 /// The held tile dropped on another position of its kind (@ 0x004c8e50):
-/// the two tiles swap their positions, the hand freed.
+/// the tile there loses its frame from its list (when listed), the two
+/// swap their positions and both are listed, the cursor reset, the hand
+/// freed.
 fn isis_swap(h: &mut Hx, kind: i32) {
     let n = zone_number(&h.g.puzzles.ldmorts.clicked.clone());
     let Some((_, k)) = h.g.puzzles.ldmorts.held else {
         return;
     };
-    let arr = tiles(h, kind);
     // The original's search has no bound: the positions are a permutation.
-    if let Some(i) = arr.iter().position(|t| t.frame == n) {
+    if let Some(i) = tiles(h, kind).iter().position(|t| t.frame == n) {
+        let other = tiles(h, kind)[i];
+        h.subf_if_listed(other.id, other.frame);
+        let arr = tiles(h, kind);
         arr[i].frame = arr[k].frame;
         arr[k].frame = n;
+        let (a, b) = (arr[k], arr[i]);
+        h.addf(a.id, a.frame);
+        h.addf(b.id, b.frame);
     }
-    // visual: both frames in their lists, the cursor reset (M4).
+    h.g.reset_warp_cursor();
     h.g.puzzles.ldmorts.held = None;
     h.set_var("LDM_CARREAUENMAIN", 0);
+}
+
+/// The held KS tile's sample stopped (@ 0x004335f0(0x00786a80)) and the
+/// name `Rien` again.
+fn stop_sample(h: &mut Hx) {
+    let name = std::mem::replace(&mut h.g.puzzles.ldmorts.sample, NO_SAMPLE.to_string());
+    h.g.sfx_stop(&name);
 }
 
 /// The test after a move (@ 0x004c8730): every tile at its own position
@@ -696,21 +862,56 @@ fn isis_test(h: &mut Hx) {
     }
 }
 
+/// The held KS tile's caption (@ 0x004c8f90, every frame): the layout
+/// (10, 10, 20, 20, left, bottom) on the screen, then the dialog text
+/// `GetTextFromDial(217 + i, 1)` (@ 0x004655a0) in `AtlFont_Default`,
+/// white (@ 0x0041e200).
+fn isis_caption(h: &mut Hx, own: i32) {
+    let id = own + 0xd9;
+    h.g.tr(|| format!("caption {id} 1"));
+    h.g.tr(|| "draw box 10 10 20 20 0 1".into());
+    h.g.tr(|| format!("textid {id} 1"));
+    h.g.tr(|| "draw text AtlFont_Default".into());
+    h.g.texts();
+    let text =
+        h.g.texts
+            .as_ref()
+            .and_then(|t| t.dial(id, 1))
+            .map(<[u8]>::to_vec);
+    let Some(text) = text else {
+        return;
+    };
+    let (w, ht) = (h.g.width, h.g.height);
+    let mut screen = std::mem::take(&mut h.g.screen);
+    if let Some(t) = h.g.texts.as_ref() {
+        t.print(
+            &mut screen,
+            w,
+            ht,
+            crate::text::FontId::Default,
+            &text,
+            crate::text::Zone::new(10, 10, 20, 20, 0, 1),
+            0xff_ffff,
+        );
+    }
+    h.g.screen = screen;
+}
+
 /// View 10's frame (@ 0x004c82b0): the tile play on the type-4 (KI) and
 /// type-5 (KS) zones `LDM_ICARO<n>` / `LDM_MCARO<n>` (n = a position),
 /// and once solved, with no re-alignment running, `flag899` := 1 and
 /// `CtrlScenarIN` every frame.
 pub(super) fn frame_isis(h: &mut Hx, z: &ZoneRec) {
     if h.hand() == 0 {
-        if let Some((5, _)) = h.g.puzzles.ldmorts.held {
+        if let Some(t) = held_tile(h).filter(|t| t.kind == 5) {
             h.g.puzzles.ldmorts.tile_text = true;
-            // visual: the held KS tile's text (0x0040f180(own + 0xd9))
-            // drawn by @ 0x004c8f90 (M4).
+            isis_caption(h, t.own);
         }
-    } else if h.g.puzzles.ldmorts.held.is_some() {
+    } else if let Some(t) = held_tile(h) {
         // An object put in hand: the tile dropped back (the variable
         // `LDM_CARREAUENMAIN` is not cleared).
-        // visual: the cursor reset, the tile's frame back in its list (M4).
+        h.g.reset_warp_cursor();
+        h.addf(t.id, t.frame);
         h.g.puzzles.ldmorts.held = None;
     }
     if h.flag(63) == 1 {
@@ -728,7 +929,7 @@ pub(super) fn frame_isis(h: &mut Hx, z: &ZoneRec) {
     if z.value == 0 {
         return;
     }
-    let Some((held_kind, _)) = h.g.puzzles.ldmorts.held else {
+    let Some(held) = held_tile(h) else {
         h.g.puzzles.ldmorts.clicked = z.name.clone();
         h.g.puzzles.ldmorts.picked = z.name.clone();
         match z.kind {
@@ -740,25 +941,25 @@ pub(super) fn frame_isis(h: &mut Hx, z: &ZoneRec) {
     h.g.puzzles.ldmorts.clicked = z.name.clone();
     if h.g.puzzles.ldmorts.clicked == h.g.puzzles.ldmorts.picked {
         // The same position again: the tile put back.
-        // visual: the cursor reset (M4).
-        if held_kind == 4 {
+        h.g.reset_warp_cursor();
+        if held.kind == 4 {
             h.run(" (PlaySound = 104) ");
         }
-        if held_kind == 5 {
-            // The tile's sample stopped (@ 0x004335f0(0x00786a80)) (M4).
+        if held.kind == 5 {
+            stop_sample(h);
             h.run(" (PlaySound = 105) ");
         }
-        // visual: the tile's frame back in its list (M4).
+        h.addf(held.id, held.frame);
         h.set_var("LDM_CARREAUENMAIN", 0);
         h.g.puzzles.ldmorts.held = None;
     } else if z.kind == 4 {
-        if held_kind == 4 {
+        if held.kind == 4 {
             isis_swap(h, 4);
             h.run(" (PlaySound = 104) ");
         }
-    } else if z.kind == 5 && held_kind == 5 {
+    } else if z.kind == 5 && held.kind == 5 {
         isis_swap(h, 5);
-        // The tile's sample stopped (M4).
+        stop_sample(h);
         h.run(" (PlaySound = 105) ");
     }
     tiles_save(h);
@@ -769,4 +970,78 @@ pub(super) fn frame_isis(h: &mut Hx, z: &ZoneRec) {
 pub(super) fn isis_success(h: &mut Hx) {
     h.set_flag(63, 1);
     h.ctrl();
+}
+
+/// Tests: a board's `st` line (the harness's C globals): `isis`,
+/// `fisherman`, `feathers`, `ankh`.
+pub(super) fn st_line(g: &crate::game::Game, board: &str) -> String {
+    let p = &g.puzzles.ldmorts;
+    let b = |v: bool| u8::from(v);
+    let ints =
+        |v: &mut dyn Iterator<Item = i32>| v.map(|x| x.to_string()).collect::<Vec<_>>().join(",");
+    match board {
+        "isis" => {
+            let held = p.held.map_or(
+                -1,
+                |(k, i)| if k == 4 { p.ki[i].index } else { p.ks[i].index },
+            );
+            let carreau = g
+                .script
+                .as_ref()
+                .and_then(|s| s.var("LDM_CARREAUENMAIN"))
+                .unwrap_or(0);
+            format!(
+                "held={held} text={} shown={} b71e264={} carreau={carreau} clicked={} picked={} \
+                 sample={} ki={} ks={}",
+                b(p.tile_text),
+                b(p.tiles_shown),
+                b(p.b71e264),
+                p.clicked,
+                p.picked,
+                p.sample,
+                ints(&mut p.ki.iter().map(|t| t.frame)),
+                ints(&mut p.ks.iter().map(|t| t.frame)),
+            )
+        }
+        "fisherman" => format!(
+            "first={} id={} n={} frz={}",
+            b(p.fisherman_fresh),
+            p.fisherman_id,
+            p.fisherman_count,
+            b(g.puzzles.freeze)
+        ),
+        "feathers" => format!(
+            "first={} lid={} plumes={} beam={} panG={} panD={} wG={} wD={} toutes={} choisie={} \
+             sndlevel={} sndtilt={} weights={} panfr={}",
+            b(p.chest_fresh),
+            p.lid_frame,
+            p.plumes_frame,
+            p.scale_frame,
+            p.pans[0].map_or(-1, |n| n as i32),
+            p.pans[1].map_or(-1, |n| n as i32),
+            p.pan_weight[0],
+            p.pan_weight[1],
+            b(p.all_feathers_offered),
+            b(p.one_feather_offered),
+            b(p.level_sounded),
+            b(p.tilt_sounded),
+            ints(&mut p.feathers.iter().map(|f| f.weight)),
+            ints(&mut p.feathers.iter().map(|f| f.pan_frame)),
+        ),
+        "ankh" => {
+            let (name, value) = g
+                .puzzles
+                .zone
+                .as_ref()
+                .map_or(("''".to_string(), 0), |z| (z.2.clone(), z.1));
+            format!(
+                "id={} count={} reached={} running={} b785f2f=0 b71d170=0 rec={name}/{value}",
+                p.lid.id,
+                p.lid.count,
+                p.lid.reached,
+                b(p.lid.running)
+            )
+        }
+        _ => String::new(),
+    }
 }

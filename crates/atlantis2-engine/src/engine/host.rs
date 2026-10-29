@@ -702,6 +702,8 @@ impl Host for Engine {
                     }
                 }
             }
+            // An Atlantis III key: no Atlantis II chapter reaches it.
+            AnimOp::SubFrame { .. } => {}
             AnimOp::ChangeAnimGotoPerso { id, a, b } => {
                 let find = |n: i32| {
                     self.slots_of(id)

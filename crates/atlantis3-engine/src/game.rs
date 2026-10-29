@@ -23,9 +23,7 @@ use atlantis2_engine::{Camera, Fpu, Renderer, Variant};
 use atlantis3_data::spr::{Bank, Depth, Target};
 use atlantis3_data::A3Files;
 
-use crate::audio::{
-    csm_gain, Audio, CHANNEL_CINEMA, CHANNEL_MUSIC, CHANNEL_PLACE, CHANNEL_SOUND, CHANNEL_VOICE,
-};
+use crate::audio::{csm_gain, Audio, CHANNEL_CINEMA, CHANNEL_MUSIC, CHANNEL_PLACE, CHANNEL_VOICE};
 use crate::cinema::Cinema;
 use crate::place_anim::Slots;
 use crate::startup::Startup;
@@ -36,6 +34,7 @@ use std::collections::{BTreeMap, HashMap};
 
 mod board;
 mod credits;
+mod frame_tab;
 mod hooks;
 mod pages;
 mod sfx;
@@ -3190,8 +3189,15 @@ impl Host for Game {
             AnimOp::TheFrame { id, on, .. } => self.slots.set_animated(id, on),
             AnimOp::Continue { id, .. } => self.slots.continue_anim(id),
             AnimOp::Stop { id, number } => self.slots.stop_anim(id, number),
-            // The frame lists of the SPW pass (visual).
-            AnimOp::AddFrame { .. } => {}
+            // `ADDFRAMEPERSO` / `ADDFRAMEOBJET` (@ 0x00449ba6 / 0x00449bfa):
+            // the frame-list add of that id, whatever the section.
+            AnimOp::AddFrame { id, frames, .. } => {
+                self.add_frame(id, frames);
+            }
+            // `SUPFRAMEPERSO` / `SUPFRAMEOBJET` (@ 0x00449c4d / 0x00449ca1).
+            AnimOp::SubFrame { id, frame, .. } => {
+                self.sub_frame(id, frame);
+            }
             _ => self.not_ported("the animation command ChangeAnimGotoPerso"),
         }
     }
@@ -3276,13 +3282,13 @@ impl Host for Game {
         self.audio.stop(CHANNEL_MUSIC);
     }
 
-    /// `PLAYSOUND=n` (@ 0x00448eb9): `sfx\soundNNN.apc` once.
+    /// `PLAYSOUND=n` (@ 0x00448eb9): `sfx\soundNNN.apc` loaded as an
+    /// effect (`LoadSfx(name, 0, 1)` @ 0x004329e0), then played
+    /// (@ 0x00433140) whatever the load gave.
     fn new_sound(&mut self, apc: &str) {
-        let path = format!("sfx/{apc}");
-        if let Some((rate, ch, pcm)) = self.sound(&path) {
-            let g = csm_gain(self.level(self.startup.config.sfx_volume));
-            self.audio.play(CHANNEL_SOUND, rate, ch, pcm, false, [g, g]);
-        }
+        let name = format!("sfx\\{apc}");
+        self.sfx_load(&name, 0, 1);
+        self.sfx_play(&name);
     }
 
     /// `EXIT=1` (@ 0x00449cc4): the credits page (loop mode 6, page 9).

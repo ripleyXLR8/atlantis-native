@@ -80,18 +80,27 @@ pub struct Puzzles {
     pub zone: Option<(i32, i32, String)>,
     /// The spinning top's handler armed by the view entry (@ 0x004d3960).
     pub toupie_armed: bool,
+    /// The spinning top's state (@ 0x007899d4): 0 idle, n = the top
+    /// thrown on zone n spins.
+    pub toupie_state: i32,
     /// The funeral chamber's star ring: the set-up byte (@ 0x0071d52c, 1
     /// until the first entry), the five last clicks (@ 0x0071d544,
     /// 1 = G, 2 = D, −1 none) and the star shown (@ 0x00786530).
     pub cfuner_fresh: bool,
     pub cfuner_ring: [i32; 5],
     pub cfuner_star: i32,
+    /// `CHF_ETOILE01`'s `#OBJETS#` index (@ 0x0078652c), set at the first
+    /// entry.
+    pub cfuner_id: i32,
     /// The screen running and the mode to go back to (`SetMode`'s result).
     pub screen: Option<Screen>,
     pub screen_back: Option<Mode>,
     /// The input freeze (@ 0x00789d56): while set the mouse handler
     /// (@ 0x00431580) ignores the buttons.
     pub freeze: bool,
+    /// The warp cursor a puzzle set (@ 0x00716e08: a sprite of the
+    /// world's in-hand bank, `None` = −1; [`Game::set_warp_cursor`]).
+    pub warp_cursor: Option<i32>,
     /// Tests: the sprite pass's cursor kind (@ 0x0076e928) as a harness
     /// wrote it; `None` in play (the hit test under the centre).
     pub cursor_kind: Option<i32>,
@@ -145,6 +154,11 @@ impl Puzzles {
 }
 
 pub(in crate::game) use screens::ecrin_gem_hit;
+
+/// Tests: the Land of the Dead boards' golden `st` lines.
+pub(super) fn ldmorts_st(g: &Game, board: &str) -> String {
+    ldmorts::st_line(g, board)
+}
 
 /// Tests: the guard's golden `st` line.
 pub(super) fn mmarchd_st(m: &mmarchd::State, freeze: bool) -> String {
@@ -395,8 +409,7 @@ impl Game {
             let mut h = Hx { g: self, s: &mut s };
             let vue = h.vue();
             if h.g.wam_is("hoggar.wam") && vue == 1 {
-                // @ 0x004d4160: a throw of the top (M4).
-                h.g.not_ported("the spinning top's throws");
+                toupie_throw(&mut h, name);
             }
             if h.g.wam_is("jardin.wam")
                 && name == "BAG_ZONE_ECRIN"
@@ -702,47 +715,159 @@ fn clicked_zone(h: &Hx) -> Option<String> {
         .map(|z| z.2.clone())
 }
 
-/// The Hoggar's views 1..3 (@ 0x004d3980): the spinning top. The throws and
-/// the stars' animation are M4; its success check and the top's return:
+/// The spinning top's animations (`HOG_ANIM_TOUPIE01..05`, the CStrings
+/// @ 0x00789958 + 0x18 (n − 1)) and the stars (`HOG_ETOILE01..05`, flags
+/// 420..424).
+const TOUPIE_ANIMS: [&str; 5] = [
+    "HOG_ANIM_TOUPIE01",
+    "HOG_ANIM_TOUPIE02",
+    "HOG_ANIM_TOUPIE03",
+    "HOG_ANIM_TOUPIE04",
+    "HOG_ANIM_TOUPIE05",
+];
+
+/// Per zone, in the step's order (@ 0x004d3a9c..0x004d40f4): the
+/// animation frame past which (`>`) a star (1..5) goes out (`false`,
+/// every frame) or lights (`true`, once: while its flag is 0).
+const TOUPIE_STARS: [&[(i32, usize, bool)]; 5] = [
+    &[
+        (0x2c, 2, false),
+        (0x48, 5, false),
+        (100, 3, false),
+        (0x7c, 1, true),
+    ],
+    &[(0x2c, 2, true)],
+    &[(0x18, 2, false), (0x36, 5, false), (0x5e, 3, true)],
+    &[
+        (0x18, 2, false),
+        (0x36, 5, false),
+        (0x56, 3, false),
+        (0x6b, 1, false),
+        (0x95, 4, true),
+    ],
+    &[(0x27, 2, false), (0x3b, 5, true)],
+];
+
+/// The throw (@ 0x004d4160, the zone click hook in `hoggar.wam` view 1):
+/// armed, `Flag13` ≠ 1, the top in hand and the zone one of
+/// `HOG_TOUPIE_ZONE01..05` → its animation shown at frame 0, the hand
+/// emptied, the top out of the bag, the state := n, the input frozen.
+fn toupie_throw(h: &mut Hx, zone: &str) {
+    if !h.g.puzzles.toupie_armed || h.flag(13) == 1 {
+        return;
+    }
+    if h.hand() != h.obj("HOG_OBJ_TOUPIE") {
+        return;
+    }
+    let Some(n) = (1..=5).find(|n| zone == format!("HOG_TOUPIE_ZONE0{n}")) else {
+        return;
+    };
+    h.run(&format!("(showobjet=HOG_ANIM_TOUPIE0{n})"));
+    h.run(&format!("(gotoframeobjet=HOG_ANIM_TOUPIE0{n},0)"));
+    h.run("(objetenmain=0)");
+    h.run("(sacados=NOT_HOG_OBJ_TOUPIE)");
+    h.g.puzzles.toupie_state = n;
+    h.g.puzzles.freeze = true;
+}
+
+/// The Hoggar's views 1..3 (@ 0x004d3980): the spinning top.
 ///
-/// - `VUE` = 1: the top in the bag → flag 415 = 1; no throw running and
-///   flags 420..424 (the five stars) all 1 → `Flag13` = 1,
-///   `(sacados=NOT_HOG_OBJ_TOUPIE)`, then `CtrlScenarIN`
-///   (@ 0x004d3adf..0x004d3b35);
-/// - another view: flag 415 = 1, `Flag13` ≠ 1 and the top not in the
-///   bag (a throw left unfinished) → the top back in the bag.
+/// - another view than 1: flag 415 = 1, `Flag13` ≠ 1 and the top not in
+///   the bag (a throw left unfinished) → the five animations hidden, the
+///   top back in the bag, the state 0, the input free;
+/// - view 1: the top in the bag → flag 415 = 1; idle with flags 420..424
+///   (the five stars) all 1 → `Flag13` = 1, `(sacados=NOT_HOG_OBJ_TOUPIE)`,
+///   the input free, `CtrlScenarIN` (no test of `Flag13`: the success
+///   repeats every frame until the scripts leave the view); a throw on
+///   zone n: the stars of its table from the animation's frame (the
+///   first slot of the object, @ 0x0045f820), then at the animation's end
+///   (its ended byte, @ 0x0045f920) the animation hidden, the top back in
+///   the bag and in hand, the state 0, the input free.
 fn hoggar_toupie_frame(h: &mut Hx) {
     if !h.g.puzzles.toupie_armed {
         return;
     }
     let vue = h.vue();
     let top = h.obj("HOG_OBJ_TOUPIE");
-    let in_bag = h.in_bag(top);
     if vue != 1 {
-        if h.flag(415) == 1 && h.flag(13) != 1 && !in_bag {
+        if h.flag(415) == 1 && h.flag(13) != 1 && !h.in_bag(top) {
+            for name in TOUPIE_ANIMS {
+                let id = h.obj(name);
+                h.g.slot_hide(id, 2);
+            }
             h.run("(sacados=HOG_OBJ_TOUPIE)");
+            h.g.puzzles.toupie_state = 0;
+            h.g.puzzles.freeze = false;
         }
         return;
     }
-    if in_bag {
+    if h.in_bag(top) {
         h.set_flag(415, 1);
     }
-    // No test of `Flag13` (@ 0x004d3adf): in view 1 the success repeats
-    // every frame until the scripts leave.
-    if (420..=424).all(|f| h.flag(f) == 1) {
-        h.set_flag(13, 1);
-        h.run("(sacados=NOT_HOG_OBJ_TOUPIE)");
-        h.ctrl();
+    let state = h.g.puzzles.toupie_state;
+    if state == 0 {
+        if (420..=424).all(|f| h.flag(f) == 1) {
+            h.set_flag(13, 1);
+            h.run("(sacados=NOT_HOG_OBJ_TOUPIE)");
+            h.g.puzzles.freeze = false;
+            h.ctrl();
+        }
+        return;
+    }
+    let Some(table) = usize::try_from(state - 1)
+        .ok()
+        .and_then(|i| TOUPIE_STARS.get(i))
+    else {
+        return;
+    };
+    let anim = TOUPIE_ANIMS[(state - 1) as usize];
+    for &(threshold, star, on) in table.iter() {
+        if h.obj_frame(anim, 2) <= threshold {
+            continue;
+        }
+        let flag = 419 + star;
+        let name = format!("HOG_ETOILE0{star}");
+        let id = h.obj(&name);
+        if on {
+            if h.flag(flag) == 0 {
+                h.g.slot_show(id, 2, 0);
+                h.run(&format!("(gotoframeobjet={name},0)"));
+                h.run("(playsound=1)");
+                h.set_flag(flag, 1);
+            }
+        } else {
+            h.g.slot_hide(id, 2);
+            h.set_flag(flag, 0);
+        }
+    }
+    if h.obj_ended(anim, 2) {
+        let id = h.obj(anim);
+        h.g.slot_hide(id, 2);
+        h.run("(sacados=HOG_OBJ_TOUPIE)");
+        h.run("(ObjetEnMain=HOG_OBJ_TOUPIE)");
+        h.g.puzzles.toupie_state = 0;
+        h.g.puzzles.freeze = false;
     }
 }
 
 /// The funeral chamber's views 1..4 (@ 0x004c4de0): at the first entry
-/// (and after a load) the ring emptied and the star shown from flag 500;
-/// in `CFuner.wam` the star's slot shown at that frame (place sprites).
+/// (and after a load) the star's frames 0..4 taken out of its list (when
+/// listed), the ring emptied and the star from flag 500; then, in
+/// `CFuner.wam` (a case-sensitive compare), the star's frame put in its
+/// list (the star `CHF_ETOILE01` is a mode-0 slot showing its list).
 fn cfuner_view(h: &mut Hx) {
     if h.g.puzzles.cfuner_fresh {
+        let id = h.obj("CHF_ETOILE01");
+        h.g.puzzles.cfuner_id = id;
+        for f in 0..5 {
+            h.subf_if_listed(id, f);
+        }
         h.g.puzzles.cfuner_ring = [-1; 5];
         h.g.puzzles.cfuner_star = h.flag(500);
+    }
+    if h.g.place.name == "CFuner.wam" {
+        let (id, star) = (h.g.puzzles.cfuner_id, h.g.puzzles.cfuner_star);
+        h.addf(id, star);
     }
     h.g.puzzles.cfuner_fresh = false;
 }
@@ -756,6 +881,10 @@ fn cfuner_frame(h: &mut Hx) {
         return;
     }
     if let Some(zone) = clicked_zone(h) {
+        let (id, old) = (h.g.puzzles.cfuner_id, h.g.puzzles.cfuner_star);
+        if zone == "CHF_ETOILEZONEG" || zone == "CHF_ETOILEZONED" {
+            h.subf(id, old);
+        }
         let p = &mut h.g.puzzles;
         let sound = if zone == "CHF_ETOILEZONEG" {
             p.cfuner_ring.rotate_left(1);
@@ -780,6 +909,7 @@ fn cfuner_frame(h: &mut Hx) {
             let star = h.g.puzzles.cfuner_star;
             h.set_flag(500, star);
             h.run(sound);
+            h.addf(id, star);
         }
     }
     if h.g.puzzles.cfuner_ring == CFUNER_SOLUTION {

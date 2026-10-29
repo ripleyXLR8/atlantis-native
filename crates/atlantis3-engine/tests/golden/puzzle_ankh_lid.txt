@@ -1,0 +1,97 @@
+# The Ankh coffer's lid (LDMorts.wam view 30): opened, entered open
+# of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation: the place's
+# CHANGEWAM set-up, the view entry, the zone click hook, and per frame the place animations' step, the frame hook
+# and the main loop's place tail run unmodified; the sound calls, CtrlScenarIN and the in-hand sprite check logged
+# only (no chapter loaded); frame n at 100 + n x 1.0025 / 15 s, one 15 Hz step per frame; rand seeded with 1 before
+# the entry. Each run starts from a new game's state. Line format: tests/common/pz.rs.
+run open
+setup wam LDMorts.wam view 30 yaw 0 pitch 0
+setup flag 501 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 ANK_COUVERCLE 0
+slots 0:psA3030027 1:3tA1030030 2:anA1030030 3:cxA1030030
+slotent 0:CHF_PSYCHOP 1:ANK_TORCHES 2:LDM_ANKH 3:ANK_COUVERCLE
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 2 0
+slot 0 3 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 3 0
+st 0 id=65 count=5 reached=0 running=0 b785f2f=0 b71d170=0 rec=''/0
+hand 0 0 -
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 1 list - ended 0
+click 3 LDM_COFFRE_ANKH
+st 3 id=65 count=5 reached=0 running=0 b785f2f=0 b71d170=0 rec=LDM_COFFRE_ANKH/1
+cmd 3 (PlaySound=111)
+snd 3 load sfx\sound111.apc 0 1
+snd 3 play sfx\sound111.apc
+subf 3 ANK_COUVERCLE 0
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 2 list - ended 0
+slot 3 3 sh 1 mode 1 fr 0 list - ended 0
+st 3 id=65 count=5 reached=0 running=1 b785f2f=0 b71d170=0 rec=NONE/1
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 3 list - ended 0
+slot 4 3 sh 1 mode 1 fr 1 list - ended 0
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 1 sh 1 mode 1 fr 4 list - ended 0
+slot 5 3 sh 1 mode 1 fr 2 list - ended 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 1 sh 1 mode 1 fr 5 list - ended 0
+slot 6 3 sh 1 mode 1 fr 3 list - ended 0
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 1 sh 1 mode 1 fr 6 list - ended 0
+slot 7 3 sh 1 mode 1 fr 4 list - ended 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 1 sh 1 mode 1 fr 7 list - ended 0
+slot 8 3 sh 1 mode 1 fr 5 list - ended 0
+addf 9 ANK_COUVERCLE 5
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 1 sh 1 mode 1 fr 8 list - ended 0
+slotck 9 2 1
+slot 9 3 sh 1 mode 0 fr 0 list 5 ended 1
+st 9 id=65 count=5 reached=5 running=0 b785f2f=0 b71d170=0 rec=NONE/1
+flags 9 501=1
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 1 sh 1 mode 1 fr 9 list - ended 0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 1 sh 1 mode 1 fr 10 list - ended 0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 1 sh 1 mode 1 fr 11 list - ended 0
+click 13 LDM_COFFRE_ANKH
+st 13 id=65 count=5 reached=5 running=0 b785f2f=0 b71d170=0 rec=LDM_COFFRE_ANKH/1
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 1 sh 1 mode 1 fr 12 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 1 sh 1 mode 1 fr 13 list - ended 0
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 1 sh 1 mode 1 fr 14 list - ended 0
+run entry_open
+setup wam LDMorts.wam view 30 yaw 0 pitch 0
+setup flag 501 1
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 ANK_COUVERCLE 5
+slots 0:psA3030027 1:3tA1030030 2:anA1030030 3:cxA1030030
+slotent 0:CHF_PSYCHOP 1:ANK_TORCHES 2:LDM_ANKH 3:ANK_COUVERCLE
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 2 0
+slot 0 3 sh 1 mode 0 fr 0 list 5 ended 0
+slotck 0 3 0
+st 0 id=65 count=5 reached=5 running=0 b785f2f=0 b71d170=0 rec=''/0
+hand 0 0 -
+slotck 1 2 1
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 1 list - ended 0
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 2 list - ended 0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 3 list - ended 0

@@ -134,6 +134,47 @@ impl Game {
         found
     }
 
+    /// The place's `CHANGEWAM` set-up (@ 0x0044f0c0: its show / hide
+    /// commands under the story flags), unlogged, as the place harnesses
+    /// run it after their set-up writes and before the view entry.
+    #[doc(hidden)]
+    pub fn board_wam_setup(&mut self) {
+        let wam = self.place.name.clone();
+        let flags = self
+            .script
+            .as_ref()
+            .map(|s| s.flags.clone())
+            .unwrap_or_default();
+        let t = self.trace.take();
+        for c in crate::wam_setup::commands(&wam, &flags) {
+            self.run_command(&c);
+        }
+        self.trace = t;
+    }
+
+    /// One place-harness frame at `now` (the M4 place harnesses of worlds
+    /// 1 and 2): the place animations' 15 Hz step (@ 0x00439c90), the
+    /// frame hook (@ 0x004c27d0), the main loop's per-place tail
+    /// (@ 0x004c1950). Their clicks go to [`Game::board_zone_hook`]
+    /// between frames.
+    #[doc(hidden)]
+    pub fn board_place_frame(&mut self, now: f64) {
+        self.now = now;
+        self.anim_tick = false;
+        self.slots.step(now, &mut self.rand);
+        self.frame_hook();
+        self.main_loop_hook();
+    }
+
+    /// `SetObjetEnMain` (@ 0x00428380) of the object `name`, or the hand
+    /// cleared (@ 0x004282e0) for `None`, unlogged.
+    #[doc(hidden)]
+    pub fn board_hand(&mut self, name: Option<&str>) {
+        let t = self.trace.take();
+        self.run_command(&format!("(objetenmain={})", name.unwrap_or("0")));
+        self.trace = t;
+    }
+
     /// One frame of the running full-screen mode at `now` with the
     /// pointer at `ptr` and the click bytes; false when the mode's frame
     /// returned 0 (its stop then ran).
@@ -248,6 +289,23 @@ impl Game {
                     self.board_mode_number()
                 ))
             }
+            "toupie" => Some(format!(
+                "state={} frz={} active={}",
+                p.toupie_state,
+                u8::from(p.freeze),
+                u8::from(p.toupie_armed)
+            )),
+            "cfuner" => {
+                let ring: Vec<String> = p.cfuner_ring.iter().map(|v| v.to_string()).collect();
+                Some(format!(
+                    "pos={} ring={} first={} id={}",
+                    p.cfuner_star,
+                    ring.join(","),
+                    u8::from(p.cfuner_fresh),
+                    p.cfuner_id
+                ))
+            }
+            "isis" | "fisherman" | "feathers" | "ankh" => Some(hooks::ldmorts_st(self, board)),
             _ => None,
         }
     }

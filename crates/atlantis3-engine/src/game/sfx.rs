@@ -154,6 +154,14 @@ impl Game {
         }
     }
 
+    /// `IsLoaded(name)` (@ 0x00433700): a sound object of that name whose
+    /// file was found.
+    pub(crate) fn sfx_loaded(&mut self, name: &str) -> bool {
+        self.tr(|| format!("snd loaded {}", if name.is_empty() { "-" } else { name }));
+        self.sfx_index(name)
+            .is_some_and(|i| self.csounds.objects[i].seconds.is_some())
+    }
+
     /// `IsPlaying(name)` (@ 0x00433780): never for an empty or unloaded
     /// name.
     pub(crate) fn sfx_playing(&self, name: &str) -> bool {

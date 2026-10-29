@@ -21,6 +21,47 @@ use std::sync::Arc;
 /// `AtlSpw_load : n>MAX_SPW_VISIBLE` (0x3f).
 pub const MAX_SLOTS: usize = 0x40;
 
+/// The entries of a slot's frame list (+0x34, 0x400 bytes).
+pub const FRAME_LIST: usize = 0x100;
+
+impl Slot {
+    /// The frames the list draws, in its order: the entries before the
+    /// first −2, the −1 ones skipped (@ 0x00439130's mode-0 loop).
+    pub fn listed_frames(&self) -> impl Iterator<Item = i32> + '_ {
+        self.frames
+            .iter()
+            .copied()
+            .take_while(|&f| f != -2)
+            .filter(|&f| f != -1)
+    }
+
+    /// Every entry of the list that is not −2, in table order (what a
+    /// harness reading the slot's memory sees).
+    pub fn frame_entries(&self) -> impl Iterator<Item = i32> + '_ {
+        self.frames.iter().copied().filter(|&f| f != -2)
+    }
+
+    /// The frames drawn this frame: the clock's frame (+0x08) in mode 1,
+    /// else the frame list's (@ 0x00439130 → @ 0x00439920 per frame).
+    pub fn drawn_frames(&self) -> Vec<i32> {
+        if self.mode == 1 {
+            if self.frame >= 0 {
+                vec![self.frame]
+            } else {
+                Vec::new()
+            }
+        } else {
+            self.listed_frames().filter(|&f| f >= 0).collect()
+        }
+    }
+
+    /// The slot's clocks restarted (+0x44c := now, the pause sums 0), as
+    /// the C code does after setting a frame and the mode.
+    pub fn restart_clock(&mut self, now: f64) {
+        self.start = now;
+    }
+}
+
 /// A slot (0x490 bytes @ 0x007594cc + 0x490 k).
 pub struct Slot {
     /// The SPW file's base name.
@@ -46,6 +87,10 @@ pub struct Slot {
     pub shown: bool,
     /// +0x2c: 1 = the frame +0x08, else the frame list.
     pub mode: i32,
+    /// +0x34..+0x433: the frame list drawn when the mode is not 1 (256
+    /// entries, −2 free, −1 skipped; [`Slots::add_frame`],
+    /// [`Slots::sub_frame`]). Empty after the load.
+    pub frames: [i32; FRAME_LIST],
     /// +0x438: drawn on odd 15 Hz ticks only.
     pub blink: bool,
     /// +0x43c: the countdown of the random pause after a play.
@@ -169,6 +214,7 @@ impl Slots {
                     state: s,
                     shown: slot_shown,
                     mode: s.single,
+                    frames: [-2; FRAME_LIST],
                     driven: s.single == 0,
                     blink: false,
                     pause,
@@ -286,6 +332,85 @@ impl Slots {
             s.shown = false;
             s.frame = 0;
         }
+    }
+
+    /// `AddSpwToFrameTab` (@ 0x00438a40, also `ADDFRAMEPERSO` /
+    /// `ADDFRAMEOBJET`): `frame` written at the first −2 entry of the
+    /// list of EVERY slot of kind 2 with that id (no duplicate test; a
+    /// full list is left as it is). False, as the original's result,
+    /// when no such slot exists (log `AddSpwToFrameTab impossible for -
+    /// non trouvé -`) or the last such slot's list is full (`Trop
+    /// d'entrée`).
+    pub fn add_frame(&mut self, id: i32, frame: i32) -> bool {
+        let mut last: Option<usize> = None;
+        for s in self.slots.iter_mut().filter(|s| s.id == id && s.kind == 2) {
+            let free = s.frames.iter().position(|&f| f == -2);
+            if let Some(i) = free {
+                s.frames[i] = frame;
+            }
+            last = Some(free.unwrap_or(FRAME_LIST));
+        }
+        match last {
+            None => {
+                log::warn!("AddSpwToFrameTab impossible for - non trouvé - : {id}");
+                false
+            }
+            Some(FRAME_LIST) => {
+                log::warn!("AddSpwToFrameTab impossible - Trop d'entrée - for {id}");
+                false
+            }
+            Some(_) => true,
+        }
+    }
+
+    /// `SubSpwToFrameTab` (@ 0x00438ae0, also `SUPFRAMEPERSO` /
+    /// `SUPFRAMEOBJET`): in the FIRST slot of kind 2 with that id whose
+    /// list has a −2, the LAST entry equal to `frame` before it gets the
+    /// list's last entry, which becomes −2 (a swap-remove: the drawing
+    /// order changes). The search walks on to the next slot of that id
+    /// only past a full list, keeping what it found. False (log
+    /// `SubSpwToFrameTab impossible !!`) when `frame` is not there; true
+    /// also when no slot of that id exists.
+    pub fn sub_frame(&mut self, id: i32, frame: i32) -> bool {
+        let mut found: Option<usize> = None;
+        let mut target: Option<(usize, usize)> = None;
+        'slots: for (k, s) in self.slots.iter().enumerate() {
+            if s.id != id || s.kind != 2 {
+                continue;
+            }
+            for (j, &f) in s.frames.iter().enumerate() {
+                if f == frame {
+                    found = Some(j);
+                }
+                if f == -2 || found == Some(0xff) {
+                    target = Some((k, j));
+                    break 'slots;
+                }
+            }
+        }
+        let Some((k, end)) = target else {
+            return true;
+        };
+        let Some(j) = found else {
+            log::warn!("SubSpwToFrameTab impossible !! for :{id} {frame}");
+            return false;
+        };
+        // @ 0x00438b5a: list[j] := list[end − 1]; list[end − 1] := −2.
+        let l = &mut self.slots[k].frames;
+        if end > 0 {
+            l[j] = l[end - 1];
+            l[end - 1] = -2;
+        }
+        true
+    }
+
+    /// @ 0x00438ba0: whether `frame` is one of the 256 entries of the list
+    /// of a slot of kind 2 with that id (past the −2 too).
+    pub fn has_frame(&self, id: i32, frame: i32) -> bool {
+        self.slots
+            .iter()
+            .filter(|s| s.id == id && s.kind == 2)
+            .any(|s| s.frames.contains(&frame))
     }
 
     /// The hand-over (@ 0x00439fa0) of slot k at the end of its play: a
@@ -436,42 +561,47 @@ impl Slots {
     pub fn hit(&self, face: usize, u: i32, v: i32) -> Option<(usize, i32)> {
         let mut out = None;
         for (k, s) in self.slots.iter().enumerate() {
-            if !s.shown || s.click == 0 || s.frame < 0 {
+            if !s.shown || s.click == 0 {
                 continue;
             }
-            let Some(info) = s.bank.face_info(s.frame as usize, face) else {
-                continue;
-            };
-            let (x, y) = (-i32::from(info.xoff), -i32::from(info.yoff));
-            let (w, h) = (i32::from(info.w), i32::from(info.h));
-            if !(x < u && u < x + w + 1 && y < v && v < y + h + 1) {
-                continue;
-            }
-            if s.bank.face_opaque_at(s.frame as usize, face, u, v) {
-                out = Some((k, if matches!(s.kind, 1 | 3) { 2 } else { 1 }));
+            for frame in s.drawn_frames() {
+                let Some(info) = s.bank.face_info(frame as usize, face) else {
+                    continue;
+                };
+                let (x, y) = (-i32::from(info.xoff), -i32::from(info.yoff));
+                let (w, h) = (i32::from(info.w), i32::from(info.h));
+                if !(x < u && u < x + w + 1 && y < v && v < y + h + 1) {
+                    continue;
+                }
+                if s.bank.face_opaque_at(frame as usize, face, u, v) {
+                    out = Some((k, if matches!(s.kind, 1 | 3) { 2 } else { 1 }));
+                }
             }
         }
         out
     }
 
-    /// The sprite pass (@ 0x00440bf0): every shown slot's frame drawn into
-    /// the faces with `AFF_SPW`, in slot order; `tick` is the 15 Hz tick
-    /// count (blinking slots are drawn on odd ticks).
+    /// The sprite pass (@ 0x00440bf0): every shown slot drawn into the
+    /// faces with `AFF_SPW`, in slot order: in mode 1 its frame, else
+    /// each frame of its list in the list's order (@ 0x00439130); `tick`
+    /// is the 15 Hz tick count (blinking slots are drawn on odd ticks).
     pub fn draw(&self, faces: &mut [Vec<u16>; 6], tick: u32) {
         for s in &self.slots {
-            if !s.shown || s.mode != 1 || s.frame < 0 || (s.blink && tick & 1 == 0) {
+            if !s.shown || (s.blink && tick & 1 == 0) {
                 continue;
             }
-            for (face, px) in faces.iter_mut().enumerate() {
-                let mut t = Target {
-                    pixels: px,
-                    pitch: 512,
-                    ymin: 0,
-                    ymax: 512,
-                    xmin: 0,
-                    xmax: 512,
-                };
-                s.bank.draw_face(&mut t, s.frame as usize, face);
+            for frame in s.drawn_frames() {
+                for (face, px) in faces.iter_mut().enumerate() {
+                    let mut t = Target {
+                        pixels: px,
+                        pitch: 512,
+                        ymin: 0,
+                        ymax: 512,
+                        xmin: 0,
+                        xmax: 512,
+                    };
+                    s.bank.draw_face(&mut t, frame as usize, face);
+                }
             }
         }
     }

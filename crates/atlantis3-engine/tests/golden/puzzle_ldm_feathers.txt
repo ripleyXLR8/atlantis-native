@@ -1,0 +1,897 @@
+# The feather chest, the scales and the pedestal (LDMorts.wam views 3, 4, 20)
+# of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation: the place's
+# CHANGEWAM set-up, the view entry, the zone click hook, and per frame the place animations' step, the frame hook
+# and the main loop's place tail run unmodified; the sound calls, CtrlScenarIN and the in-hand sprite check logged
+# only (no chapter loaded); frame n at 100 + n x 1.0025 / 15 s, one 15 Hz step per frame; rand seeded with 1 before
+# the entry. Each run starts from a new game's state. Line format: tests/common/pz.rs.
+run chest
+setup wam LDMorts.wam view 3 yaw 0 pitch 0
+setup flag 76 0
+setup flag 85 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+subf 0 LDM_COUVERCLE 0
+addf 0 LDM_COUVERCLE 0
+setup cmd (sacados=LDM_CLEFCOFFRE)
+slots 0:n1A1003003 1:waA1003003 2:tuA1003003 3:cqA1003003 4:baA1003004 5:p0A1003004 6:p1A1003004 7:p2A1003004 8:p3A1003004 9:p4A1003004 10:p5A1003004 11:p6A1003004 12:p7A1003004 13:p8A1003004 14:p9A1003004 15:psA3003001 16:psA4003001 17:cvA1003003 18:cvA2003003 19:cvA3003003 20:p0A2003003 21:p1A2003003 22:p2A2003003 23:p3A2003003 24:p4A2003003 25:p5A2003003 26:p6A2003003 27:p7A2003003 28:p8A2003003 29:p9A2003003 30:snA1003001
+slotent 0:LDM_PALMIER 1:LDM_EAU 2:LDM_PLUMES 3:LDM_COUVERCLE 4:LDM_BALANCE 5:LDM_PLUME0 6:LDM_PLUME1 7:LDM_PLUME2 8:LDM_PLUME3 9:LDM_PLUME4 10:LDM_PLUME5 11:LDM_PLUME6 12:LDM_PLUME7 13:LDM_PLUME8 14:LDM_PLUME9 15:CHF_PSYCHOP 16:CHF_PSYCHOP 17:LDM_CHAUVESOURIS01 18:LDM_CHAUVESOURIS02 19:LDM_CHAUVESOURIS03 20:COF_PLUME0 21:COF_PLUME1 22:COF_PLUME2 23:COF_PLUME3 24:COF_PLUME4 25:COF_PLUME5 26:COF_PLUME6 27:COF_PLUME7 28:COF_PLUME8 29:COF_PLUME9 30:CHF_LARVE
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 2 1
+slot 0 3 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 3 0
+slot 0 4 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 6 0
+slot 0 7 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 7 0
+slot 0 8 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 8 0
+slot 0 9 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 9 0
+slot 0 10 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 10 0
+slot 0 11 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 11 0
+slot 0 12 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 12 0
+slot 0 13 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 13 0
+slot 0 14 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 14 0
+slot 0 15 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 15 0
+slot 0 16 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 16 0
+slot 0 17 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 17 0
+slot 0 18 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 18 0
+slot 0 19 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 19 0
+slot 0 20 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 20 1
+slot 0 21 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 21 1
+slot 0 22 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 22 1
+slot 0 23 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 23 1
+slot 0 24 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 24 1
+slot 0 25 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 25 1
+slot 0 26 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 26 1
+slot 0 27 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 27 1
+slot 0 28 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 28 1
+slot 0 29 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 29 1
+slot 0 30 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 30 0
+st 0 first=0 lid=0 plumes=0 beam=0 panG=-1 panD=-1 wG=-1 wD=-1 toutes=0 choisie=0 sndlevel=1 sndtilt=0 weights=1,7,4,0,9,8,2,5,6,3 panfr=0,0,0,0,0,0,0,0,0,0
+hand 0 0 -
+bag 0 +LDM_CLEFCOFFRE -LDM_BALANCE_PR -LDM_PLUMES -LDM_PLUME0 -LDM_PLUME1 -LDM_PLUME2 -LDM_PLUME3 -LDM_PLUME4 -LDM_PLUME5 -LDM_PLUME6 -LDM_PLUME7 -LDM_PLUME8 -LDM_PLUME9
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 1 list - ended 0
+slot 2 15 sh 1 mode 1 fr 1 list - ended 0
+slot 2 17 sh 1 mode 1 fr 1 list - ended 0
+slot 2 18 sh 1 mode 1 fr 1 list - ended 0
+slot 2 19 sh 1 mode 1 fr 1 list - ended 0
+slot 2 30 sh 1 mode 1 fr 1 list - ended 0
+click 3 LDM_COUVERCLEPLUMES
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 2 list - ended 0
+slot 3 15 sh 1 mode 1 fr 2 list - ended 0
+slot 3 17 sh 1 mode 1 fr 2 list - ended 0
+slot 3 18 sh 1 mode 1 fr 2 list - ended 0
+slot 3 19 sh 1 mode 1 fr 2 list - ended 0
+slot 3 30 sh 1 mode 1 fr 2 list - ended 0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 3 list - ended 0
+slot 4 15 sh 1 mode 1 fr 3 list - ended 0
+slot 4 17 sh 1 mode 1 fr 3 list - ended 0
+slot 4 18 sh 1 mode 1 fr 3 list - ended 0
+slot 4 19 sh 1 mode 1 fr 3 list - ended 0
+slot 4 30 sh 1 mode 1 fr 3 list - ended 0
+hand 5 LDM_CLEFCOFFRE
+hand 5 112 LDM_CLEFCOFFRE
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 1 sh 1 mode 1 fr 4 list - ended 0
+slot 5 15 sh 1 mode 1 fr 4 list - ended 0
+slot 5 17 sh 1 mode 1 fr 4 list - ended 0
+slot 5 18 sh 1 mode 1 fr 4 list - ended 0
+slot 5 19 sh 1 mode 1 fr 4 list - ended 0
+slot 5 30 sh 1 mode 1 fr 4 list - ended 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 1 sh 1 mode 1 fr 5 list - ended 0
+slot 6 15 sh 1 mode 1 fr 5 list - ended 0
+slot 6 17 sh 1 mode 1 fr 5 list - ended 0
+slot 6 18 sh 1 mode 1 fr 5 list - ended 0
+slot 6 19 sh 1 mode 1 fr 5 list - ended 0
+slot 6 30 sh 1 mode 1 fr 5 list - ended 0
+click 7 LDM_ZONEPLUMES
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 1 sh 1 mode 1 fr 6 list - ended 0
+slot 7 15 sh 1 mode 1 fr 6 list - ended 0
+slot 7 17 sh 1 mode 1 fr 6 list - ended 0
+slot 7 18 sh 1 mode 1 fr 6 list - ended 0
+slot 7 19 sh 1 mode 1 fr 6 list - ended 0
+slot 7 30 sh 1 mode 1 fr 6 list - ended 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 1 sh 1 mode 1 fr 7 list - ended 0
+slot 8 15 sh 1 mode 1 fr 7 list - ended 0
+slot 8 17 sh 1 mode 1 fr 7 list - ended 0
+slot 8 18 sh 1 mode 1 fr 7 list - ended 0
+slot 8 19 sh 1 mode 1 fr 7 list - ended 0
+slot 8 30 sh 1 mode 1 fr 7 list - ended 0
+click 9 LDM_COUVERCLEPLUMES
+cmd 9 (showobjet=LDM_PLUMES)
+show 9 LDM_PLUMES kind 2 arg 0
+cmd 9 (ObjetEnMain=0)
+cmd 9 (SacADos=NOT_LDM_CLEFCOFFRE)
+cmd 9 (PlaySound = 10)
+snd 9 load sfx\sound010.apc 0 1
+snd 9 play sfx\sound010.apc
+cmd 9 (KillSuj,CHF_PSYCHOP,DIAL_CLEF_PLUMES)
+cmd 9 (KillSuj,CHF_PSYCHOP,DIAL_COFFRE_PLUMES)
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 1 sh 1 mode 1 fr 8 list - ended 0
+slot 9 2 sh 1 mode 1 fr 0 list - ended 0
+slot 9 3 sh 1 mode 1 fr 0 list 0 ended 0
+slot 9 15 sh 1 mode 1 fr 8 list - ended 0
+slot 9 17 sh 1 mode 1 fr 8 list - ended 0
+slot 9 18 sh 1 mode 1 fr 8 list - ended 0
+slot 9 19 sh 1 mode 1 fr 8 list - ended 0
+slot 9 30 sh 1 mode 1 fr 8 list - ended 0
+flags 9 76=1
+hand 9 0 -
+bag 9 -LDM_CLEFCOFFRE
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 1 sh 1 mode 1 fr 9 list - ended 0
+slot 10 3 sh 1 mode 1 fr 1 list 0 ended 0
+slot 10 15 sh 1 mode 1 fr 9 list - ended 0
+slot 10 17 sh 1 mode 1 fr 9 list - ended 0
+slot 10 18 sh 1 mode 1 fr 9 list - ended 0
+slot 10 19 sh 1 mode 1 fr 9 list - ended 0
+slot 10 30 sh 1 mode 1 fr 9 list - ended 0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 1 sh 1 mode 1 fr 10 list - ended 0
+slot 11 3 sh 1 mode 1 fr 2 list 0 ended 0
+slot 11 15 sh 1 mode 1 fr 10 list - ended 0
+slot 11 17 sh 1 mode 1 fr 10 list - ended 0
+slot 11 18 sh 1 mode 1 fr 10 list - ended 0
+slot 11 19 sh 1 mode 1 fr 10 list - ended 0
+slot 11 30 sh 1 mode 1 fr 10 list - ended 0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 1 sh 1 mode 1 fr 11 list - ended 0
+slot 12 3 sh 1 mode 1 fr 3 list 0 ended 0
+slot 12 15 sh 1 mode 1 fr 11 list - ended 0
+slot 12 17 sh 1 mode 1 fr 11 list - ended 0
+slot 12 18 sh 1 mode 1 fr 11 list - ended 0
+slot 12 19 sh 1 mode 1 fr 11 list - ended 0
+slot 12 30 sh 1 mode 1 fr 11 list - ended 0
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 1 sh 1 mode 1 fr 12 list - ended 0
+slot 13 3 sh 1 mode 1 fr 4 list 0 ended 0
+slot 13 15 sh 1 mode 1 fr 12 list - ended 0
+slot 13 17 sh 1 mode 1 fr 12 list - ended 0
+slot 13 18 sh 1 mode 1 fr 12 list - ended 0
+slot 13 19 sh 1 mode 1 fr 12 list - ended 0
+slot 13 30 sh 1 mode 1 fr 12 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 1 sh 1 mode 1 fr 13 list - ended 0
+slot 14 3 sh 1 mode 1 fr 5 list 0 ended 0
+slot 14 15 sh 1 mode 1 fr 13 list - ended 0
+slot 14 17 sh 1 mode 1 fr 13 list - ended 0
+slot 14 18 sh 1 mode 1 fr 13 list - ended 0
+slot 14 19 sh 1 mode 1 fr 13 list - ended 0
+slot 14 30 sh 1 mode 1 fr 13 list - ended 0
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 1 sh 1 mode 1 fr 14 list - ended 0
+slot 15 3 sh 1 mode 1 fr 6 list 0 ended 0
+slot 15 15 sh 1 mode 1 fr 14 list - ended 0
+slot 15 17 sh 1 mode 1 fr 14 list - ended 0
+slot 15 18 sh 1 mode 1 fr 14 list - ended 0
+slot 15 19 sh 1 mode 1 fr 14 list - ended 0
+slot 15 30 sh 1 mode 1 fr 14 list - ended 0
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 1 sh 1 mode 1 fr 15 list - ended 0
+slot 16 3 sh 1 mode 1 fr 7 list 0 ended 0
+slot 16 15 sh 1 mode 1 fr 15 list - ended 0
+slot 16 17 sh 1 mode 1 fr 15 list - ended 0
+slot 16 18 sh 1 mode 1 fr 15 list - ended 0
+slot 16 19 sh 1 mode 1 fr 15 list - ended 0
+slot 16 30 sh 1 mode 1 fr 15 list - ended 0
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 1 sh 1 mode 1 fr 16 list - ended 0
+slot 17 3 sh 1 mode 1 fr 8 list 0 ended 0
+slot 17 15 sh 1 mode 1 fr 16 list - ended 0
+slot 17 17 sh 1 mode 1 fr 16 list - ended 0
+slot 17 18 sh 1 mode 1 fr 16 list - ended 0
+slot 17 19 sh 1 mode 1 fr 16 list - ended 0
+slot 17 30 sh 1 mode 1 fr 16 list - ended 0
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 1 sh 1 mode 1 fr 17 list - ended 0
+slot 18 3 sh 1 mode 1 fr 9 list 0 ended 0
+slot 18 15 sh 1 mode 1 fr 17 list - ended 0
+slot 18 17 sh 1 mode 1 fr 17 list - ended 0
+slot 18 18 sh 1 mode 1 fr 17 list - ended 0
+slot 18 19 sh 1 mode 1 fr 17 list - ended 0
+slot 18 30 sh 1 mode 1 fr 17 list - ended 0
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 1 sh 1 mode 1 fr 18 list - ended 0
+slot 19 3 sh 1 mode 1 fr 10 list 0 ended 0
+slot 19 15 sh 1 mode 1 fr 18 list - ended 0
+slot 19 17 sh 1 mode 1 fr 18 list - ended 0
+slot 19 18 sh 1 mode 1 fr 18 list - ended 0
+slot 19 19 sh 1 mode 1 fr 18 list - ended 0
+slot 19 30 sh 1 mode 1 fr 18 list - ended 0
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 1 sh 1 mode 1 fr 19 list - ended 0
+slot 20 3 sh 1 mode 1 fr 11 list 0 ended 0
+slot 20 15 sh 1 mode 1 fr 19 list - ended 0
+slot 20 17 sh 1 mode 1 fr 19 list - ended 0
+slot 20 18 sh 1 mode 1 fr 19 list - ended 0
+slot 20 19 sh 1 mode 1 fr 19 list - ended 0
+slot 20 30 sh 1 mode 1 fr 19 list - ended 0
+slot 21 0 sh 1 mode 1 fr 0 list - ended 1
+slot 21 1 sh 1 mode 1 fr 20 list - ended 0
+slot 21 3 sh 1 mode 1 fr 12 list 0 ended 0
+slot 21 15 sh 1 mode 1 fr 20 list - ended 0
+slot 21 17 sh 1 mode 1 fr 20 list - ended 0
+slot 21 18 sh 1 mode 1 fr 20 list - ended 0
+slot 21 19 sh 1 mode 1 fr 20 list - ended 0
+slot 21 30 sh 1 mode 1 fr 20 list - ended 0
+slot 22 0 sh 1 mode 1 fr 1 list - ended 1
+slot 22 1 sh 1 mode 1 fr 0 list - ended 1
+slot 22 3 sh 1 mode 1 fr 13 list 0 ended 0
+slot 22 15 sh 1 mode 1 fr 21 list - ended 0
+slot 22 17 sh 1 mode 1 fr 21 list - ended 0
+slot 22 18 sh 1 mode 1 fr 21 list - ended 0
+slot 22 19 sh 1 mode 1 fr 21 list - ended 0
+slot 22 30 sh 1 mode 1 fr 21 list - ended 0
+slot 23 0 sh 1 mode 1 fr 2 list - ended 1
+slot 23 1 sh 1 mode 1 fr 1 list - ended 1
+slot 23 3 sh 1 mode 1 fr 14 list 0 ended 0
+slot 23 15 sh 1 mode 1 fr 22 list - ended 0
+slot 23 17 sh 1 mode 1 fr 22 list - ended 0
+slot 23 18 sh 1 mode 1 fr 22 list - ended 0
+slot 23 19 sh 1 mode 1 fr 22 list - ended 0
+slot 23 30 sh 1 mode 1 fr 22 list - ended 0
+slot 24 0 sh 1 mode 1 fr 3 list - ended 1
+slot 24 1 sh 1 mode 1 fr 2 list - ended 1
+slot 24 3 sh 1 mode 1 fr 15 list 0 ended 0
+slot 24 15 sh 1 mode 1 fr 23 list - ended 0
+slot 24 17 sh 1 mode 1 fr 23 list - ended 0
+slot 24 18 sh 1 mode 1 fr 23 list - ended 0
+slot 24 19 sh 1 mode 1 fr 23 list - ended 0
+slot 24 30 sh 1 mode 1 fr 23 list - ended 0
+subf 25 LDM_COUVERCLE 0
+addf 25 LDM_COUVERCLE 14
+cmd 25 (EnableSuj,CHF_PSYCHOP,DIAL_TOUTES_PLUMES)
+slot 25 0 sh 1 mode 1 fr 4 list - ended 1
+slot 25 1 sh 1 mode 1 fr 3 list - ended 1
+slot 25 3 sh 1 mode 0 fr 0 list 14 ended 1
+slot 25 15 sh 1 mode 1 fr 24 list - ended 0
+slot 25 17 sh 1 mode 1 fr 24 list - ended 0
+slot 25 18 sh 1 mode 1 fr 24 list - ended 0
+slot 25 19 sh 1 mode 1 fr 24 list - ended 0
+slot 25 30 sh 1 mode 1 fr 24 list - ended 0
+st 25 first=0 lid=14 plumes=0 beam=0 panG=-1 panD=-1 wG=-1 wD=-1 toutes=0 choisie=0 sndlevel=1 sndtilt=0 weights=1,7,4,0,9,8,2,5,6,3 panfr=0,0,0,0,0,0,0,0,0,0
+slot 26 0 sh 1 mode 1 fr 5 list - ended 1
+slot 26 1 sh 1 mode 1 fr 4 list - ended 1
+slot 26 15 sh 1 mode 1 fr 25 list - ended 0
+slot 26 17 sh 1 mode 1 fr 25 list - ended 0
+slot 26 18 sh 1 mode 1 fr 25 list - ended 0
+slot 26 19 sh 1 mode 1 fr 25 list - ended 0
+slot 26 30 sh 1 mode 1 fr 25 list - ended 0
+slot 27 0 sh 1 mode 1 fr 6 list - ended 1
+slot 27 1 sh 1 mode 1 fr 5 list - ended 1
+slot 27 15 sh 1 mode 1 fr 26 list - ended 0
+slot 27 17 sh 1 mode 1 fr 26 list - ended 0
+slot 27 18 sh 1 mode 1 fr 26 list - ended 0
+slot 27 19 sh 1 mode 1 fr 26 list - ended 0
+slot 27 30 sh 1 mode 1 fr 26 list - ended 0
+slot 28 0 sh 1 mode 1 fr 7 list - ended 1
+slot 28 1 sh 1 mode 1 fr 6 list - ended 1
+slot 28 15 sh 1 mode 1 fr 27 list - ended 0
+slot 28 17 sh 1 mode 1 fr 27 list - ended 0
+slot 28 18 sh 1 mode 1 fr 27 list - ended 0
+slot 28 19 sh 1 mode 1 fr 27 list - ended 0
+slot 28 30 sh 1 mode 1 fr 27 list - ended 0
+run scales
+setup wam LDMorts.wam view 4 yaw 0 pitch 0
+setup flag 76 1
+setup flag 85 1
+setup flag 79 0
+setup flag 545 3
+setup flag 546 7
+setup flag 547 0
+setup flag 548 9
+setup flag 549 1
+setup flag 550 5
+setup flag 551 8
+setup flag 552 2
+setup flag 553 6
+setup flag 554 4
+setup flag 535 1
+setup flag 536 1
+setup flag 537 1
+setup flag 538 1
+setup flag 539 1
+setup flag 540 1
+setup flag 541 1
+setup flag 542 1
+setup flag 543 1
+setup flag 544 1
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+subf 0 LDM_COUVERCLE 0
+addf 0 LDM_COUVERCLE 1
+setup cmd (sacados=LDM_BALANCE_PR)
+setup cmd (sacados=LDM_PLUME0)
+setup cmd (sacados=LDM_PLUME1)
+setup cmd (sacados=LDM_PLUME2)
+setup cmd (sacados=LDM_PLUME3)
+setup cmd (sacados=LDM_PLUME4)
+setup cmd (sacados=LDM_PLUME5)
+setup cmd (sacados=LDM_PLUME6)
+setup cmd (sacados=LDM_PLUME7)
+setup cmd (sacados=LDM_PLUME8)
+setup cmd (sacados=LDM_PLUME9)
+slots 0:n1A1004004 1:waA1004004 2:cqA1004003 3:baA1004004 4:p0A1004004 5:p1A1004004 6:p2A1004004 7:p3A1004004 8:p4A1004004 9:p5A1004004 10:p6A1004004 11:p7A1004004 12:p8A1004004 13:p9A1004004 14:cvA1004004 15:cvA2004004 16:cvA3004004
+slotent 0:LDM_PALMIER 1:LDM_EAU 2:LDM_COUVERCLE 3:LDM_BALANCE 4:LDM_PLUME0 5:LDM_PLUME1 6:LDM_PLUME2 7:LDM_PLUME3 8:LDM_PLUME4 9:LDM_PLUME5 10:LDM_PLUME6 11:LDM_PLUME7 12:LDM_PLUME8 13:LDM_PLUME9 14:LDM_CHAUVESOURIS01 15:LDM_CHAUVESOURIS02 16:LDM_CHAUVESOURIS03
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 1 mode 0 fr 0 list 1 ended 0
+slotck 0 2 0
+slot 0 3 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 3 0
+slot 0 4 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 6 0
+slot 0 7 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 7 0
+slot 0 8 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 8 0
+slot 0 9 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 9 0
+slot 0 10 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 10 0
+slot 0 11 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 11 0
+slot 0 12 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 12 0
+slot 0 13 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 13 0
+slot 0 14 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 14 0
+slot 0 15 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 15 0
+slot 0 16 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 16 0
+st 0 first=0 lid=14 plumes=0 beam=0 panG=-1 panD=-1 wG=-1 wD=-1 toutes=0 choisie=0 sndlevel=1 sndtilt=0 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,0,0,0,0,0,0,0,0,0
+hand 0 0 -
+bag 0 -LDM_CLEFCOFFRE +LDM_BALANCE_PR -LDM_PLUMES +LDM_PLUME0 +LDM_PLUME1 +LDM_PLUME2 +LDM_PLUME3 +LDM_PLUME4 +LDM_PLUME5 +LDM_PLUME6 +LDM_PLUME7 +LDM_PLUME8 +LDM_PLUME9
+cmd 1 (EnableSuj,CHF_PSYCHOP,DIAL_TOUTES_PLUMES)
+st 1 first=0 lid=14 plumes=0 beam=0 panG=-1 panD=-1 wG=-1 wD=-1 toutes=1 choisie=0 sndlevel=1 sndtilt=0 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,0,0,0,0,0,0,0,0,0
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 1 list - ended 0
+slot 2 14 sh 1 mode 1 fr 1 list - ended 0
+slot 2 15 sh 1 mode 1 fr 1 list - ended 0
+slot 2 16 sh 1 mode 1 fr 1 list - ended 0
+hand 3 LDM_BALANCE_PR
+hand 3 111 LDM_BALANCE_PR
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 2 list - ended 0
+slot 3 14 sh 1 mode 1 fr 2 list - ended 0
+slot 3 15 sh 1 mode 1 fr 2 list - ended 0
+slot 3 16 sh 1 mode 1 fr 2 list - ended 0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 3 list - ended 0
+slot 4 14 sh 1 mode 1 fr 3 list - ended 0
+slot 4 15 sh 1 mode 1 fr 3 list - ended 0
+slot 4 16 sh 1 mode 1 fr 3 list - ended 0
+click 5 LDM_BALANCEG
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 1 sh 1 mode 1 fr 4 list - ended 0
+slot 5 14 sh 1 mode 1 fr 4 list - ended 0
+slot 5 15 sh 1 mode 1 fr 4 list - ended 0
+slot 5 16 sh 1 mode 1 fr 4 list - ended 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 1 sh 1 mode 1 fr 5 list - ended 0
+slot 6 14 sh 1 mode 1 fr 5 list - ended 0
+slot 6 15 sh 1 mode 1 fr 5 list - ended 0
+slot 6 16 sh 1 mode 1 fr 5 list - ended 0
+click 7 LDM_ACCROCHEBALANCE
+cmd 7 (ObjetEnMain=0)
+cmd 7 (SacADos=NOT_LDM_BALANCE_PR)
+addf 7 LDM_BALANCE 0
+cmd 7 (KillSuj,CHF_PSYCHOP,DIAL_BALANCE)
+cmd 7 (KillSuj,CHF_PSYCHOP,DIAL_PLACE_BALANCE)
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 1 sh 1 mode 1 fr 6 list - ended 0
+slot 7 3 sh 1 mode 0 fr 0 list 0 ended 0
+slot 7 14 sh 1 mode 1 fr 6 list - ended 0
+slot 7 15 sh 1 mode 1 fr 6 list - ended 0
+slot 7 16 sh 1 mode 1 fr 6 list - ended 0
+flags 7 79=1
+hand 7 0 -
+bag 7 -LDM_BALANCE_PR
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 1 sh 1 mode 1 fr 7 list - ended 0
+slot 8 14 sh 1 mode 1 fr 7 list - ended 0
+slot 8 15 sh 1 mode 1 fr 7 list - ended 0
+slot 8 16 sh 1 mode 1 fr 7 list - ended 0
+hand 9 LDM_PLUME0
+hand 9 90 LDM_PLUME0
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 1 sh 1 mode 1 fr 8 list - ended 0
+slot 9 14 sh 1 mode 1 fr 8 list - ended 0
+slot 9 15 sh 1 mode 1 fr 8 list - ended 0
+slot 9 16 sh 1 mode 1 fr 8 list - ended 0
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 1 sh 1 mode 1 fr 9 list - ended 0
+slot 10 14 sh 1 mode 1 fr 9 list - ended 0
+slot 10 15 sh 1 mode 1 fr 9 list - ended 0
+slot 10 16 sh 1 mode 1 fr 9 list - ended 0
+click 11 LDM_BALANCEG
+subf 11 LDM_BALANCE 0
+addf 11 LDM_BALANCE 1
+cmd 11 (PlaySound = 103)
+snd 11 load sfx\sound103.apc 0 1
+snd 11 play sfx\sound103.apc
+addf 11 LDM_PLUME0 1
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 1 sh 1 mode 1 fr 10 list - ended 0
+slot 11 3 sh 1 mode 0 fr 0 list 1 ended 0
+slot 11 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 11 14 sh 1 mode 1 fr 10 list - ended 0
+slot 11 15 sh 1 mode 1 fr 10 list - ended 0
+slot 11 16 sh 1 mode 1 fr 10 list - ended 0
+st 11 first=0 lid=14 plumes=0 beam=1 panG=0 panD=-1 wG=3 wD=-1 toutes=1 choisie=0 sndlevel=0 sndtilt=1 weights=3,7,0,9,1,5,8,2,6,4 panfr=1,0,0,0,0,0,0,0,0,0
+flags 11 562=4
+hand 11 0 -
+bag 11 -LDM_PLUME0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 1 sh 1 mode 1 fr 11 list - ended 0
+slot 12 14 sh 1 mode 1 fr 11 list - ended 0
+slot 12 15 sh 1 mode 1 fr 11 list - ended 0
+slot 12 16 sh 1 mode 1 fr 11 list - ended 0
+hand 13 LDM_PLUME1
+hand 13 91 LDM_PLUME1
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 1 sh 1 mode 1 fr 12 list - ended 0
+slot 13 14 sh 1 mode 1 fr 12 list - ended 0
+slot 13 15 sh 1 mode 1 fr 12 list - ended 0
+slot 13 16 sh 1 mode 1 fr 12 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 1 sh 1 mode 1 fr 13 list - ended 0
+slot 14 14 sh 1 mode 1 fr 13 list - ended 0
+slot 14 15 sh 1 mode 1 fr 13 list - ended 0
+slot 14 16 sh 1 mode 1 fr 13 list - ended 0
+click 15 LDM_BALANCED
+subf 15 LDM_BALANCE 1
+addf 15 LDM_BALANCE 0
+cmd 15 (PlaySound = 103)
+snd 15 load sfx\sound103.apc 0 1
+snd 15 play sfx\sound103.apc
+subf 15 LDM_PLUME0 1
+addf 15 LDM_PLUME0 0
+addf 15 LDM_PLUME1 2
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 1 sh 1 mode 1 fr 14 list - ended 0
+slot 15 3 sh 1 mode 0 fr 0 list 0 ended 0
+slot 15 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 15 5 sh 1 mode 0 fr 0 list 2 ended 0
+slot 15 14 sh 1 mode 1 fr 14 list - ended 0
+slot 15 15 sh 1 mode 1 fr 14 list - ended 0
+slot 15 16 sh 1 mode 1 fr 14 list - ended 0
+st 15 first=0 lid=14 plumes=0 beam=0 panG=0 panD=1 wG=3 wD=7 toutes=1 choisie=0 sndlevel=1 sndtilt=0 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,2,0,0,0,0,0,0,0,0
+flags 15 563=8
+hand 15 0 -
+bag 15 -LDM_PLUME1
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 1 sh 1 mode 1 fr 15 list - ended 0
+slot 16 14 sh 1 mode 1 fr 15 list - ended 0
+slot 16 15 sh 1 mode 1 fr 15 list - ended 0
+slot 16 16 sh 1 mode 1 fr 15 list - ended 0
+hand 17 LDM_PLUME2
+hand 17 92 LDM_PLUME2
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 1 sh 1 mode 1 fr 16 list - ended 0
+slot 17 14 sh 1 mode 1 fr 16 list - ended 0
+slot 17 15 sh 1 mode 1 fr 16 list - ended 0
+slot 17 16 sh 1 mode 1 fr 16 list - ended 0
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 1 sh 1 mode 1 fr 17 list - ended 0
+slot 18 14 sh 1 mode 1 fr 17 list - ended 0
+slot 18 15 sh 1 mode 1 fr 17 list - ended 0
+slot 18 16 sh 1 mode 1 fr 17 list - ended 0
+click 19 LDM_BALANCED
+subf 19 LDM_BALANCE 0
+addf 19 LDM_BALANCE 0
+subf 19 LDM_PLUME0 0
+addf 19 LDM_PLUME0 0
+subf 19 LDM_PLUME1 2
+addf 19 LDM_PLUME1 2
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 1 sh 1 mode 1 fr 18 list - ended 0
+slot 19 14 sh 1 mode 1 fr 18 list - ended 0
+slot 19 15 sh 1 mode 1 fr 18 list - ended 0
+slot 19 16 sh 1 mode 1 fr 18 list - ended 0
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 1 sh 1 mode 1 fr 19 list - ended 0
+slot 20 14 sh 1 mode 1 fr 19 list - ended 0
+slot 20 15 sh 1 mode 1 fr 19 list - ended 0
+slot 20 16 sh 1 mode 1 fr 19 list - ended 0
+hand 21 0
+hand 21 0 -
+slot 21 0 sh 1 mode 1 fr 0 list - ended 1
+slot 21 1 sh 1 mode 1 fr 20 list - ended 0
+slot 21 14 sh 1 mode 1 fr 20 list - ended 0
+slot 21 15 sh 1 mode 1 fr 20 list - ended 0
+slot 21 16 sh 1 mode 1 fr 20 list - ended 0
+slot 22 0 sh 1 mode 1 fr 1 list - ended 1
+slot 22 1 sh 1 mode 1 fr 0 list - ended 1
+slot 22 14 sh 1 mode 1 fr 21 list - ended 0
+slot 22 15 sh 1 mode 1 fr 21 list - ended 0
+slot 22 16 sh 1 mode 1 fr 21 list - ended 0
+click 23 LDM_BALANCEG
+subf 23 LDM_PLUME0 0
+subf 23 LDM_BALANCE 0
+addf 23 LDM_BALANCE 0
+subf 23 LDM_PLUME1 2
+addf 23 LDM_PLUME1 2
+slot 23 0 sh 1 mode 1 fr 2 list - ended 1
+slot 23 1 sh 1 mode 1 fr 1 list - ended 1
+slot 23 4 sh 1 mode 0 fr 0 list - ended 0
+slot 23 14 sh 1 mode 1 fr 22 list - ended 0
+slot 23 15 sh 1 mode 1 fr 22 list - ended 0
+slot 23 16 sh 1 mode 1 fr 22 list - ended 0
+st 23 first=0 lid=14 plumes=0 beam=0 panG=-1 panD=1 wG=-1 wD=7 toutes=1 choisie=0 sndlevel=1 sndtilt=0 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,2,0,0,0,0,0,0,0,0
+flags 23 562=0
+hand 23 90 LDM_PLUME0
+bag 23 +LDM_PLUME0
+slot 24 0 sh 1 mode 1 fr 3 list - ended 1
+slot 24 1 sh 1 mode 1 fr 2 list - ended 1
+slot 24 14 sh 1 mode 1 fr 23 list - ended 0
+slot 24 15 sh 1 mode 1 fr 23 list - ended 0
+slot 24 16 sh 1 mode 1 fr 23 list - ended 0
+hand 25 LDM_PLUME3
+hand 25 93 LDM_PLUME3
+slot 25 0 sh 1 mode 1 fr 4 list - ended 1
+slot 25 1 sh 1 mode 1 fr 3 list - ended 1
+slot 25 14 sh 1 mode 1 fr 24 list - ended 0
+slot 25 15 sh 1 mode 1 fr 24 list - ended 0
+slot 25 16 sh 1 mode 1 fr 24 list - ended 0
+slot 26 0 sh 1 mode 1 fr 5 list - ended 1
+slot 26 1 sh 1 mode 1 fr 4 list - ended 1
+slot 26 14 sh 1 mode 1 fr 25 list - ended 0
+slot 26 15 sh 1 mode 1 fr 25 list - ended 0
+slot 26 16 sh 1 mode 1 fr 25 list - ended 0
+click 27 LDM_BALANCEG
+subf 27 LDM_BALANCE 0
+addf 27 LDM_BALANCE 1
+cmd 27 (PlaySound = 103)
+snd 27 load sfx\sound103.apc 0 1
+snd 27 play sfx\sound103.apc
+addf 27 LDM_PLUME3 1
+subf 27 LDM_PLUME1 2
+addf 27 LDM_PLUME1 3
+slot 27 0 sh 1 mode 1 fr 6 list - ended 1
+slot 27 1 sh 1 mode 1 fr 5 list - ended 1
+slot 27 3 sh 1 mode 0 fr 0 list 1 ended 0
+slot 27 5 sh 1 mode 0 fr 0 list 3 ended 0
+slot 27 7 sh 1 mode 0 fr 0 list 1 ended 0
+slot 27 14 sh 1 mode 1 fr 26 list - ended 0
+slot 27 15 sh 1 mode 1 fr 26 list - ended 0
+slot 27 16 sh 1 mode 1 fr 26 list - ended 0
+st 27 first=0 lid=14 plumes=0 beam=1 panG=3 panD=1 wG=9 wD=7 toutes=1 choisie=0 sndlevel=0 sndtilt=1 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,3,0,1,0,0,0,0,0,0
+flags 27 562=10
+hand 27 0 -
+bag 27 -LDM_PLUME3
+slot 28 0 sh 1 mode 1 fr 7 list - ended 1
+slot 28 1 sh 1 mode 1 fr 6 list - ended 1
+slot 28 14 sh 1 mode 1 fr 27 list - ended 0
+slot 28 15 sh 1 mode 1 fr 27 list - ended 0
+slot 28 16 sh 1 mode 1 fr 27 list - ended 0
+hand 29 0
+slot 29 0 sh 1 mode 1 fr 8 list - ended 1
+slot 29 1 sh 1 mode 1 fr 7 list - ended 1
+slot 29 14 sh 1 mode 1 fr 28 list - ended 0
+slot 29 15 sh 1 mode 1 fr 28 list - ended 0
+slot 29 16 sh 1 mode 1 fr 28 list - ended 0
+slot 30 0 sh 1 mode 1 fr 9 list - ended 1
+slot 30 1 sh 1 mode 1 fr 8 list - ended 1
+slot 30 14 sh 1 mode 1 fr 29 list - ended 0
+slot 30 15 sh 1 mode 1 fr 29 list - ended 0
+slot 30 16 sh 1 mode 1 fr 29 list - ended 0
+click 31 LDM_BALANCED
+subf 31 LDM_PLUME1 3
+subf 31 LDM_BALANCE 1
+addf 31 LDM_BALANCE 1
+subf 31 LDM_PLUME3 1
+addf 31 LDM_PLUME3 1
+slot 31 0 sh 1 mode 1 fr 10 list - ended 1
+slot 31 1 sh 1 mode 1 fr 9 list - ended 1
+slot 31 5 sh 1 mode 0 fr 0 list - ended 0
+slot 31 14 sh 1 mode 1 fr 30 list - ended 0
+slot 31 15 sh 1 mode 1 fr 30 list - ended 0
+slot 31 16 sh 1 mode 1 fr 30 list - ended 0
+st 31 first=0 lid=14 plumes=0 beam=1 panG=3 panD=-1 wG=9 wD=-1 toutes=1 choisie=0 sndlevel=0 sndtilt=1 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,3,0,1,0,0,0,0,0,0
+flags 31 563=0
+hand 31 91 LDM_PLUME1
+bag 31 +LDM_PLUME1
+slot 32 0 sh 1 mode 1 fr 11 list - ended 1
+slot 32 1 sh 1 mode 1 fr 10 list - ended 1
+slot 32 14 sh 1 mode 1 fr 31 list - ended 0
+slot 32 15 sh 1 mode 1 fr 31 list - ended 0
+slot 32 16 sh 1 mode 1 fr 31 list - ended 0
+hand 33 0
+hand 33 0 -
+slot 33 0 sh 1 mode 1 fr 12 list - ended 1
+slot 33 1 sh 1 mode 1 fr 11 list - ended 1
+slot 33 14 sh 1 mode 1 fr 32 list - ended 0
+slot 33 15 sh 1 mode 1 fr 32 list - ended 0
+slot 33 16 sh 1 mode 1 fr 32 list - ended 0
+slot 34 0 sh 1 mode 1 fr 13 list - ended 1
+slot 34 1 sh 1 mode 1 fr 12 list - ended 1
+slot 34 14 sh 1 mode 1 fr 33 list - ended 0
+slot 34 15 sh 1 mode 1 fr 33 list - ended 0
+slot 34 16 sh 1 mode 1 fr 33 list - ended 0
+click 35 LDM_BALANCEG
+subf 35 LDM_PLUME3 1
+subf 35 LDM_BALANCE 1
+addf 35 LDM_BALANCE 0
+cmd 35 (PlaySound = 103)
+snd 35 load sfx\sound103.apc 0 1
+snd 35 play sfx\sound103.apc
+slot 35 0 sh 1 mode 1 fr 14 list - ended 1
+slot 35 1 sh 1 mode 1 fr 13 list - ended 1
+slot 35 3 sh 1 mode 0 fr 0 list 0 ended 0
+slot 35 7 sh 1 mode 0 fr 0 list - ended 0
+slot 35 14 sh 1 mode 1 fr 34 list - ended 0
+slot 35 15 sh 1 mode 1 fr 34 list - ended 0
+slot 35 16 sh 1 mode 1 fr 34 list - ended 0
+st 35 first=0 lid=14 plumes=0 beam=0 panG=-1 panD=-1 wG=-1 wD=-1 toutes=1 choisie=0 sndlevel=1 sndtilt=0 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,3,0,1,0,0,0,0,0,0
+flags 35 562=0
+hand 35 93 LDM_PLUME3
+bag 35 +LDM_PLUME3
+slot 36 0 sh 1 mode 1 fr 15 list - ended 1
+slot 36 1 sh 1 mode 1 fr 14 list - ended 1
+slot 36 14 sh 1 mode 1 fr 35 list - ended 0
+slot 36 15 sh 1 mode 1 fr 35 list - ended 0
+slot 36 16 sh 1 mode 1 fr 35 list - ended 0
+run pedestal_right
+setup wam LDMorts.wam view 20 yaw 0 pitch 0
+setup flag 76 1
+setup flag 85 1
+setup flag 79 1
+setup flag 84 0
+setup flag 545 3
+setup flag 546 7
+setup flag 547 0
+setup flag 548 9
+setup flag 549 1
+setup flag 550 5
+setup flag 551 8
+setup flag 552 2
+setup flag 553 6
+setup flag 554 4
+setup flag 535 0
+setup flag 536 0
+setup flag 537 0
+setup flag 538 1
+setup flag 539 0
+setup flag 540 0
+setup flag 541 0
+setup flag 542 0
+setup flag 543 0
+setup flag 544 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+subf 0 LDM_COUVERCLE 0
+addf 0 LDM_BALANCE 0
+setup cmd (sacados=LDM_PLUME3)
+slots 0:1tA1020018 1:p0A2020020 2:p1A2020020 3:p2A2020020 4:p3A2020020 5:p4A2020020 6:p5A2020020 7:p6A2020020 8:p7A2020020 9:p8A2020020 10:p9A2020020 11:k1A1020020 12:k2A1020020 13:k3A1020020 14:gpA1020020 15:gpA2020020 16:anA1020020
+slotent 0:LDM_FLAMES01 1:LDM_PLUME0 2:LDM_PLUME1 3:LDM_PLUME2 4:LDM_PLUME3 5:LDM_PLUME4 6:LDM_PLUME5 7:LDM_PLUME6 8:LDM_PLUME7 9:LDM_PLUME8 10:LDM_PLUME9 11:LDM_FRESQUE1 12:LDM_FRESQUE2 13:LDM_FRESQUE3 14:LDM_GPRETRE01 15:LDM_GPRETRE01 16:LDM_ANKHPR
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 2 0
+slot 0 3 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 3 0
+slot 0 4 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 6 0
+slot 0 7 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 7 0
+slot 0 8 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 8 0
+slot 0 9 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 9 0
+slot 0 10 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 10 0
+slot 0 11 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 11 0
+slot 0 12 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 12 0
+slot 0 13 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 13 0
+slot 0 14 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 14 2
+slot 0 15 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 15 2
+slot 0 16 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 16 0
+st 0 first=0 lid=14 plumes=0 beam=0 panG=-1 panD=-1 wG=-1 wD=-1 toutes=0 choisie=0 sndlevel=1 sndtilt=0 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,0,0,0,0,0,0,0,0,0
+hand 0 0 -
+bag 0 -LDM_CLEFCOFFRE -LDM_BALANCE_PR -LDM_PLUMES -LDM_PLUME0 -LDM_PLUME1 -LDM_PLUME2 +LDM_PLUME3 -LDM_PLUME4 -LDM_PLUME5 -LDM_PLUME6 -LDM_PLUME7 -LDM_PLUME8 -LDM_PLUME9
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 14 sh 1 mode 1 fr 1 list - ended 0
+click 3 LDM_ZONE_PLUME
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 14 sh 1 mode 1 fr 2 list - ended 0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 14 sh 1 mode 1 fr 3 list - ended 0
+hand 5 LDM_PLUME3
+hand 5 93 LDM_PLUME3
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 14 sh 1 mode 1 fr 4 list - ended 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 14 sh 1 mode 1 fr 5 list - ended 0
+click 7 LDM_ZONE_PLUME
+cmd 7 (ObjetEnMain=0)
+cmd 7 (SacADos=NOT_LDM_PLUME0)
+cmd 7 (SacADos=NOT_LDM_PLUME1)
+cmd 7 (SacADos=NOT_LDM_PLUME2)
+cmd 7 (SacADos=NOT_LDM_PLUME3)
+cmd 7 (SacADos=NOT_LDM_PLUME4)
+cmd 7 (SacADos=NOT_LDM_PLUME5)
+cmd 7 (SacADos=NOT_LDM_PLUME6)
+cmd 7 (SacADos=NOT_LDM_PLUME7)
+cmd 7 (SacADos=NOT_LDM_PLUME8)
+cmd 7 (SacADos=NOT_LDM_PLUME9)
+cmd 7 (KillSuj,CHF_PSYCHOP,DIAL_GP)
+cmd 7 (KillSuj,CHF_PSYCHOP,DIAL_PLUME_CHOISIE)
+scan 7
+addf 7 LDM_PLUME3 0
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 7 14 sh 1 mode 1 fr 6 list - ended 0
+flags 7 84=10
+hand 7 0 -
+bag 7 -LDM_PLUME3
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 14 sh 1 mode 1 fr 7 list - ended 0
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 14 sh 1 mode 1 fr 8 list - ended 0
+run pedestal_wrong
+setup wam LDMorts.wam view 20 yaw 0 pitch 0
+setup flag 76 1
+setup flag 85 1
+setup flag 79 1
+setup flag 84 0
+setup flag 545 3
+setup flag 546 7
+setup flag 547 0
+setup flag 548 9
+setup flag 549 1
+setup flag 550 5
+setup flag 551 8
+setup flag 552 2
+setup flag 553 6
+setup flag 554 4
+setup flag 535 1
+setup flag 536 0
+setup flag 537 0
+setup flag 538 0
+setup flag 539 0
+setup flag 540 0
+setup flag 541 0
+setup flag 542 0
+setup flag 543 0
+setup flag 544 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+subf 0 LDM_COUVERCLE 0
+addf 0 LDM_BALANCE 0
+setup cmd (sacados=LDM_PLUME0)
+slots 0:1tA1020018 1:p0A2020020 2:p1A2020020 3:p2A2020020 4:p3A2020020 5:p4A2020020 6:p5A2020020 7:p6A2020020 8:p7A2020020 9:p8A2020020 10:p9A2020020 11:k1A1020020 12:k2A1020020 13:k3A1020020 14:gpA1020020 15:gpA2020020 16:anA1020020
+slotent 0:LDM_FLAMES01 1:LDM_PLUME0 2:LDM_PLUME1 3:LDM_PLUME2 4:LDM_PLUME3 5:LDM_PLUME4 6:LDM_PLUME5 7:LDM_PLUME6 8:LDM_PLUME7 9:LDM_PLUME8 10:LDM_PLUME9 11:LDM_FRESQUE1 12:LDM_FRESQUE2 13:LDM_FRESQUE3 14:LDM_GPRETRE01 15:LDM_GPRETRE01 16:LDM_ANKHPR
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 2 0
+slot 0 3 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 3 0
+slot 0 4 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 6 0
+slot 0 7 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 7 0
+slot 0 8 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 8 0
+slot 0 9 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 9 0
+slot 0 10 sh 1 mode 0 fr 0 list - ended 0
+slotck 0 10 0
+slot 0 11 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 11 0
+slot 0 12 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 12 0
+slot 0 13 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 13 0
+slot 0 14 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 14 2
+slot 0 15 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 15 2
+slot 0 16 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 16 0
+st 0 first=0 lid=14 plumes=0 beam=0 panG=-1 panD=-1 wG=-1 wD=-1 toutes=0 choisie=0 sndlevel=1 sndtilt=0 weights=3,7,0,9,1,5,8,2,6,4 panfr=0,0,0,0,0,0,0,0,0,0
+hand 0 0 -
+bag 0 -LDM_CLEFCOFFRE -LDM_BALANCE_PR -LDM_PLUMES +LDM_PLUME0 -LDM_PLUME1 -LDM_PLUME2 -LDM_PLUME3 -LDM_PLUME4 -LDM_PLUME5 -LDM_PLUME6 -LDM_PLUME7 -LDM_PLUME8 -LDM_PLUME9
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 14 sh 1 mode 1 fr 1 list - ended 0
+click 3 LDM_ZONE_PLUME
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 14 sh 1 mode 1 fr 2 list - ended 0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 14 sh 1 mode 1 fr 3 list - ended 0
+hand 5 LDM_PLUME0
+hand 5 90 LDM_PLUME0
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 14 sh 1 mode 1 fr 4 list - ended 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 14 sh 1 mode 1 fr 5 list - ended 0
+click 7 LDM_ZONE_PLUME
+cmd 7 (ObjetEnMain=0)
+cmd 7 (SacADos=NOT_LDM_PLUME0)
+cmd 7 (SacADos=NOT_LDM_PLUME1)
+cmd 7 (SacADos=NOT_LDM_PLUME2)
+cmd 7 (SacADos=NOT_LDM_PLUME3)
+cmd 7 (SacADos=NOT_LDM_PLUME4)
+cmd 7 (SacADos=NOT_LDM_PLUME5)
+cmd 7 (SacADos=NOT_LDM_PLUME6)
+cmd 7 (SacADos=NOT_LDM_PLUME7)
+cmd 7 (SacADos=NOT_LDM_PLUME8)
+cmd 7 (SacADos=NOT_LDM_PLUME9)
+cmd 7 (KillSuj,CHF_PSYCHOP,DIAL_GP)
+cmd 7 (KillSuj,CHF_PSYCHOP,DIAL_PLUME_CHOISIE)
+scan 7
+addf 7 LDM_PLUME0 0
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 1 sh 1 mode 0 fr 0 list 0 ended 0
+slot 7 14 sh 1 mode 1 fr 6 list - ended 0
+flags 7 84=4
+hand 7 0 -
+bag 7 -LDM_PLUME0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 14 sh 1 mode 1 fr 7 list - ended 0
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 14 sh 1 mode 1 fr 8 list - ended 0

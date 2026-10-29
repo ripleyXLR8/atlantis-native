@@ -23,7 +23,7 @@
 //! - the warp loop resumes sections waiting for a camera re-alignment, a
 //!   flag or an animation's end (@ 0x0043ff20, [`Script::check_waits`]).
 
-use super::{DialStart, Host, Script, Src, CR};
+use super::{AnimOp, DialStart, Host, Script, Src, CR};
 use atlantis2_data::defnames;
 
 /// The places whose index the world's flag 1010 + world keeps (the table
@@ -459,7 +459,22 @@ impl Script {
             self.show(host, id, kind, n);
             return Some(next);
         }
-        for name in ["UNANIMATE", "ANIMATE", "SUPFRAMEPERSO", "SUPFRAMEOBJET"] {
+        if is(self, "SUPFRAMEPERSO") || is(self, "SUPFRAMEOBJET") {
+            // @ 0x00449c18 / 0x00449c6c: the id (`#PERSONNAGES#` /
+            // `#OBJETS#`), `atoi` after the comma, @ 0x00438ae0(id, n).
+            let perso = is(self, "SUPFRAMEPERSO");
+            let (section, kind) = if perso {
+                (defnames::PERSONNAGES, 1)
+            } else {
+                (defnames::OBJETS, 2)
+            };
+            let id = self.id(section, src, p + 1);
+            let i = self.after_comma(src, p);
+            let frame = self.atoi_at(src, i);
+            host.anim(AnimOp::SubFrame { kind, id, frame });
+            return Some(self.after_cr(src, i));
+        }
+        for name in ["UNANIMATE", "ANIMATE"] {
             if is(self, name) {
                 // Not on the first chapters' path: not ported yet.
                 self.warn("SetVariables() : %s non porté", name);

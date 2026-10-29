@@ -1,0 +1,422 @@
+# The funeral chamber's star zones (CFuner.wam view 1): the winning G D D G D, a wrong start then the
+# solution, clicks after the success
+# of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation: the place's
+# CHANGEWAM set-up, the view entry, the zone click hook, and per frame the place animations' step, the frame hook
+# and the main loop's place tail run unmodified; the sound calls, CtrlScenarIN and the in-hand sprite check logged
+# only (no chapter loaded); frame n at 100 + n x 1.0025 / 15 s, one 15 Hz step per frame; rand seeded with 1 before
+# the entry. Each run starts from a new game's state. Line format: tests/common/pz.rs.
+run win GDDGD 
+setup wam CFuner.wam view 1 yaw 0 pitch 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 CHF_ETOILE01 0
+slots 0:scA1001001 1:cjA1001001 2:psA1001001 3:psA2001001 4:etA1001001 5:2tA1001004 6:cgA1001001
+slotent 0:CHF_SCARABEE 1:CHF_COUVERCLE02 2:CHF_PSYCHOP 3:CHF_PSYCHOP 4:CHF_ETOILE01 5:CHF_FLAMES01 6:CHF_COUVERCLE01
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 2 2
+slot 0 3 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 3 2
+slot 0 4 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 6 0
+st 0 pos=0 ring=-1,-1,-1,-1,-1 first=0 id=46
+hand 0 0 -
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 5 sh 1 mode 1 fr 1 list - ended 0
+click 3 CHF_ETOILEZONEG
+subf 3 CHF_ETOILE01 0
+cmd 3 (PlaySound = 101)
+snd 3 load sfx\sound101.apc 0 1
+snd 3 play sfx\sound101.apc
+addf 3 CHF_ETOILE01 4
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 4 sh 1 mode 0 fr 0 list 4 ended 0
+slot 3 5 sh 1 mode 1 fr 2 list - ended 0
+st 3 pos=4 ring=-1,-1,-1,-1,1 first=0 id=46
+flags 3 500=4
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 5 sh 1 mode 1 fr 3 list - ended 0
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 5 sh 1 mode 1 fr 4 list - ended 0
+click 6 CHF_ETOILEZONED
+subf 6 CHF_ETOILE01 4
+cmd 6 (PlaySound = 102)
+snd 6 load sfx\sound102.apc 0 1
+snd 6 play sfx\sound102.apc
+addf 6 CHF_ETOILE01 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 6 5 sh 1 mode 1 fr 5 list - ended 0
+st 6 pos=0 ring=-1,-1,-1,1,2 first=0 id=46
+flags 6 500=0
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 5 sh 1 mode 1 fr 6 list - ended 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 5 sh 1 mode 1 fr 7 list - ended 0
+click 9 CHF_ETOILEZONED
+subf 9 CHF_ETOILE01 0
+cmd 9 (PlaySound = 102)
+snd 9 load sfx\sound102.apc 0 1
+snd 9 play sfx\sound102.apc
+addf 9 CHF_ETOILE01 1
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 9 5 sh 1 mode 1 fr 8 list - ended 0
+st 9 pos=1 ring=-1,-1,1,2,2 first=0 id=46
+flags 9 500=1
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 5 sh 1 mode 1 fr 9 list - ended 0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 5 sh 1 mode 1 fr 10 list - ended 0
+click 12 CHF_ETOILEZONEG
+subf 12 CHF_ETOILE01 1
+cmd 12 (PlaySound = 101)
+snd 12 load sfx\sound101.apc 0 1
+snd 12 play sfx\sound101.apc
+addf 12 CHF_ETOILE01 0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 12 5 sh 1 mode 1 fr 11 list - ended 0
+st 12 pos=0 ring=-1,1,2,2,1 first=0 id=46
+flags 12 500=0
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 5 sh 1 mode 1 fr 12 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 5 sh 1 mode 1 fr 13 list - ended 0
+click 15 CHF_ETOILEZONED
+subf 15 CHF_ETOILE01 0
+cmd 15 (PlaySound = 102)
+snd 15 load sfx\sound102.apc 0 1
+snd 15 play sfx\sound102.apc
+addf 15 CHF_ETOILE01 1
+cmd 15 (flag45=1)
+scan 15
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 15 5 sh 1 mode 1 fr 14 list - ended 0
+st 15 pos=1 ring=1,2,2,1,2 first=0 id=46
+flags 15 45=1 500=1
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 5 sh 1 mode 1 fr 15 list - ended 0
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 5 sh 1 mode 1 fr 16 list - ended 0
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 5 sh 1 mode 1 fr 17 list - ended 0
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 5 sh 1 mode 1 fr 18 list - ended 0
+run wrong DDGDGG GDDGD
+setup wam CFuner.wam view 1 yaw 0 pitch 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 CHF_ETOILE01 0
+slots 0:scA1001001 1:cjA1001001 2:psA1001001 3:psA2001001 4:etA1001001 5:2tA1001004 6:cgA1001001
+slotent 0:CHF_SCARABEE 1:CHF_COUVERCLE02 2:CHF_PSYCHOP 3:CHF_PSYCHOP 4:CHF_ETOILE01 5:CHF_FLAMES01 6:CHF_COUVERCLE01
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 2 2
+slot 0 3 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 3 2
+slot 0 4 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 6 0
+st 0 pos=0 ring=-1,-1,-1,-1,-1 first=0 id=46
+hand 0 0 -
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 5 sh 1 mode 1 fr 1 list - ended 0
+click 3 CHF_ETOILEZONED
+subf 3 CHF_ETOILE01 0
+cmd 3 (PlaySound = 102)
+snd 3 load sfx\sound102.apc 0 1
+snd 3 play sfx\sound102.apc
+addf 3 CHF_ETOILE01 1
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 3 5 sh 1 mode 1 fr 2 list - ended 0
+st 3 pos=1 ring=-1,-1,-1,-1,2 first=0 id=46
+flags 3 500=1
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 5 sh 1 mode 1 fr 3 list - ended 0
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 5 sh 1 mode 1 fr 4 list - ended 0
+click 6 CHF_ETOILEZONED
+subf 6 CHF_ETOILE01 1
+cmd 6 (PlaySound = 102)
+snd 6 load sfx\sound102.apc 0 1
+snd 6 play sfx\sound102.apc
+addf 6 CHF_ETOILE01 2
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 4 sh 1 mode 0 fr 0 list 2 ended 0
+slot 6 5 sh 1 mode 1 fr 5 list - ended 0
+st 6 pos=2 ring=-1,-1,-1,2,2 first=0 id=46
+flags 6 500=2
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 5 sh 1 mode 1 fr 6 list - ended 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 5 sh 1 mode 1 fr 7 list - ended 0
+click 9 CHF_ETOILEZONEG
+subf 9 CHF_ETOILE01 2
+cmd 9 (PlaySound = 101)
+snd 9 load sfx\sound101.apc 0 1
+snd 9 play sfx\sound101.apc
+addf 9 CHF_ETOILE01 1
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 9 5 sh 1 mode 1 fr 8 list - ended 0
+st 9 pos=1 ring=-1,-1,2,2,1 first=0 id=46
+flags 9 500=1
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 5 sh 1 mode 1 fr 9 list - ended 0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 5 sh 1 mode 1 fr 10 list - ended 0
+click 12 CHF_ETOILEZONED
+subf 12 CHF_ETOILE01 1
+cmd 12 (PlaySound = 102)
+snd 12 load sfx\sound102.apc 0 1
+snd 12 play sfx\sound102.apc
+addf 12 CHF_ETOILE01 2
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 4 sh 1 mode 0 fr 0 list 2 ended 0
+slot 12 5 sh 1 mode 1 fr 11 list - ended 0
+st 12 pos=2 ring=-1,2,2,1,2 first=0 id=46
+flags 12 500=2
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 5 sh 1 mode 1 fr 12 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 5 sh 1 mode 1 fr 13 list - ended 0
+click 15 CHF_ETOILEZONEG
+subf 15 CHF_ETOILE01 2
+cmd 15 (PlaySound = 101)
+snd 15 load sfx\sound101.apc 0 1
+snd 15 play sfx\sound101.apc
+addf 15 CHF_ETOILE01 1
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 15 5 sh 1 mode 1 fr 14 list - ended 0
+st 15 pos=1 ring=2,2,1,2,1 first=0 id=46
+flags 15 500=1
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 5 sh 1 mode 1 fr 15 list - ended 0
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 5 sh 1 mode 1 fr 16 list - ended 0
+click 18 CHF_ETOILEZONEG
+subf 18 CHF_ETOILE01 1
+cmd 18 (PlaySound = 101)
+snd 18 load sfx\sound101.apc 0 1
+snd 18 play sfx\sound101.apc
+addf 18 CHF_ETOILE01 0
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 18 5 sh 1 mode 1 fr 17 list - ended 0
+st 18 pos=0 ring=2,1,2,1,1 first=0 id=46
+flags 18 500=0
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 5 sh 1 mode 1 fr 18 list - ended 0
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 5 sh 1 mode 1 fr 19 list - ended 0
+click 21 CHF_ETOILEZONEG
+subf 21 CHF_ETOILE01 0
+cmd 21 (PlaySound = 101)
+snd 21 load sfx\sound101.apc 0 1
+snd 21 play sfx\sound101.apc
+addf 21 CHF_ETOILE01 4
+slot 21 0 sh 1 mode 1 fr 20 list - ended 0
+slot 21 4 sh 1 mode 0 fr 0 list 4 ended 0
+slot 21 5 sh 1 mode 1 fr 20 list - ended 0
+st 21 pos=4 ring=1,2,1,1,1 first=0 id=46
+flags 21 500=4
+slot 22 0 sh 1 mode 1 fr 21 list - ended 0
+slot 22 5 sh 1 mode 1 fr 0 list - ended 1
+slot 23 0 sh 1 mode 1 fr 22 list - ended 0
+slot 23 5 sh 1 mode 1 fr 1 list - ended 1
+click 24 CHF_ETOILEZONED
+subf 24 CHF_ETOILE01 4
+cmd 24 (PlaySound = 102)
+snd 24 load sfx\sound102.apc 0 1
+snd 24 play sfx\sound102.apc
+addf 24 CHF_ETOILE01 0
+slot 24 0 sh 1 mode 1 fr 23 list - ended 0
+slot 24 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 24 5 sh 1 mode 1 fr 2 list - ended 1
+st 24 pos=0 ring=2,1,1,1,2 first=0 id=46
+flags 24 500=0
+slot 25 0 sh 1 mode 1 fr 24 list - ended 0
+slot 25 5 sh 1 mode 1 fr 3 list - ended 1
+slot 26 0 sh 1 mode 1 fr 25 list - ended 0
+slot 26 5 sh 1 mode 1 fr 4 list - ended 1
+click 27 CHF_ETOILEZONED
+subf 27 CHF_ETOILE01 0
+cmd 27 (PlaySound = 102)
+snd 27 load sfx\sound102.apc 0 1
+snd 27 play sfx\sound102.apc
+addf 27 CHF_ETOILE01 1
+slot 27 0 sh 1 mode 1 fr 26 list - ended 0
+slot 27 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 27 5 sh 1 mode 1 fr 5 list - ended 1
+st 27 pos=1 ring=1,1,1,2,2 first=0 id=46
+flags 27 500=1
+slot 28 0 sh 1 mode 1 fr 27 list - ended 0
+slot 28 5 sh 1 mode 1 fr 6 list - ended 1
+slot 29 0 sh 1 mode 1 fr 28 list - ended 0
+slot 29 5 sh 1 mode 1 fr 7 list - ended 1
+click 30 CHF_ETOILEZONEG
+subf 30 CHF_ETOILE01 1
+cmd 30 (PlaySound = 101)
+snd 30 load sfx\sound101.apc 0 1
+snd 30 play sfx\sound101.apc
+addf 30 CHF_ETOILE01 0
+slot 30 0 sh 1 mode 1 fr 29 list - ended 0
+slot 30 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 30 5 sh 1 mode 1 fr 8 list - ended 1
+st 30 pos=0 ring=1,1,2,2,1 first=0 id=46
+flags 30 500=0
+slot 31 0 sh 1 mode 1 fr 30 list - ended 0
+slot 31 5 sh 1 mode 1 fr 9 list - ended 1
+slot 32 0 sh 1 mode 1 fr 31 list - ended 0
+slot 32 5 sh 1 mode 1 fr 10 list - ended 1
+click 33 CHF_ETOILEZONED
+subf 33 CHF_ETOILE01 0
+cmd 33 (PlaySound = 102)
+snd 33 load sfx\sound102.apc 0 1
+snd 33 play sfx\sound102.apc
+addf 33 CHF_ETOILE01 1
+cmd 33 (flag45=1)
+scan 33
+slot 33 0 sh 1 mode 1 fr 32 list - ended 0
+slot 33 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 33 5 sh 1 mode 1 fr 11 list - ended 1
+st 33 pos=1 ring=1,2,2,1,2 first=0 id=46
+flags 33 45=1 500=1
+slot 34 0 sh 1 mode 1 fr 33 list - ended 0
+slot 34 5 sh 1 mode 1 fr 12 list - ended 1
+slot 35 0 sh 1 mode 1 fr 34 list - ended 0
+slot 35 5 sh 1 mode 1 fr 13 list - ended 1
+slot 36 0 sh 1 mode 1 fr 35 list - ended 0
+slot 36 5 sh 1 mode 1 fr 14 list - ended 1
+slot 37 0 sh 1 mode 1 fr 36 list - ended 0
+slot 37 5 sh 1 mode 1 fr 15 list - ended 1
+run after GDDGD G
+setup wam CFuner.wam view 1 yaw 0 pitch 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 CHF_ETOILE01 0
+slots 0:scA1001001 1:cjA1001001 2:psA1001001 3:psA2001001 4:etA1001001 5:2tA1001004 6:cgA1001001
+slotent 0:CHF_SCARABEE 1:CHF_COUVERCLE02 2:CHF_PSYCHOP 3:CHF_PSYCHOP 4:CHF_ETOILE01 5:CHF_FLAMES01 6:CHF_COUVERCLE01
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 2 2
+slot 0 3 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 3 2
+slot 0 4 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 6 0
+st 0 pos=0 ring=-1,-1,-1,-1,-1 first=0 id=46
+hand 0 0 -
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 5 sh 1 mode 1 fr 1 list - ended 0
+click 3 CHF_ETOILEZONEG
+subf 3 CHF_ETOILE01 0
+cmd 3 (PlaySound = 101)
+snd 3 load sfx\sound101.apc 0 1
+snd 3 play sfx\sound101.apc
+addf 3 CHF_ETOILE01 4
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 4 sh 1 mode 0 fr 0 list 4 ended 0
+slot 3 5 sh 1 mode 1 fr 2 list - ended 0
+st 3 pos=4 ring=-1,-1,-1,-1,1 first=0 id=46
+flags 3 500=4
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 5 sh 1 mode 1 fr 3 list - ended 0
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 5 sh 1 mode 1 fr 4 list - ended 0
+click 6 CHF_ETOILEZONED
+subf 6 CHF_ETOILE01 4
+cmd 6 (PlaySound = 102)
+snd 6 load sfx\sound102.apc 0 1
+snd 6 play sfx\sound102.apc
+addf 6 CHF_ETOILE01 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 6 5 sh 1 mode 1 fr 5 list - ended 0
+st 6 pos=0 ring=-1,-1,-1,1,2 first=0 id=46
+flags 6 500=0
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 5 sh 1 mode 1 fr 6 list - ended 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 5 sh 1 mode 1 fr 7 list - ended 0
+click 9 CHF_ETOILEZONED
+subf 9 CHF_ETOILE01 0
+cmd 9 (PlaySound = 102)
+snd 9 load sfx\sound102.apc 0 1
+snd 9 play sfx\sound102.apc
+addf 9 CHF_ETOILE01 1
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 9 5 sh 1 mode 1 fr 8 list - ended 0
+st 9 pos=1 ring=-1,-1,1,2,2 first=0 id=46
+flags 9 500=1
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 5 sh 1 mode 1 fr 9 list - ended 0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 5 sh 1 mode 1 fr 10 list - ended 0
+click 12 CHF_ETOILEZONEG
+subf 12 CHF_ETOILE01 1
+cmd 12 (PlaySound = 101)
+snd 12 load sfx\sound101.apc 0 1
+snd 12 play sfx\sound101.apc
+addf 12 CHF_ETOILE01 0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 12 5 sh 1 mode 1 fr 11 list - ended 0
+st 12 pos=0 ring=-1,1,2,2,1 first=0 id=46
+flags 12 500=0
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 5 sh 1 mode 1 fr 12 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 5 sh 1 mode 1 fr 13 list - ended 0
+click 15 CHF_ETOILEZONED
+subf 15 CHF_ETOILE01 0
+cmd 15 (PlaySound = 102)
+snd 15 load sfx\sound102.apc 0 1
+snd 15 play sfx\sound102.apc
+addf 15 CHF_ETOILE01 1
+cmd 15 (flag45=1)
+scan 15
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 15 5 sh 1 mode 1 fr 14 list - ended 0
+st 15 pos=1 ring=1,2,2,1,2 first=0 id=46
+flags 15 45=1 500=1
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 5 sh 1 mode 1 fr 15 list - ended 0
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 5 sh 1 mode 1 fr 16 list - ended 0
+click 18 CHF_ETOILEZONEG
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 5 sh 1 mode 1 fr 17 list - ended 0
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 5 sh 1 mode 1 fr 18 list - ended 0
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 5 sh 1 mode 1 fr 19 list - ended 0
+slot 21 0 sh 1 mode 1 fr 20 list - ended 0
+slot 21 5 sh 1 mode 1 fr 20 list - ended 0
+slot 22 0 sh 1 mode 1 fr 21 list - ended 0
+slot 22 5 sh 1 mode 1 fr 0 list - ended 1
