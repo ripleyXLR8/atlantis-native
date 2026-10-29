@@ -433,12 +433,9 @@ holds "atlantis" (*Atlantis 2*, *Atlantis II*, *Beyond Atlantis*...).
   example `C:\Program Files\GOG Galaxy\Games\Atlantis 2` or
   `C:\GOG Games\Atlantis 2`). It holds every disc, so no disc is asked
   for. GOG.com installs one program for its four languages (English,
-  French, German, Spanish; the texts and voices are the data's), so each
-  opens the same way; the French installation is the one tried so far.
-  An installation not updated since before July 2022 (GOG's builds "1.0"
-  and "1.0 w10") has another `Game.exe`, not supported yet: update the
-  game in GOG Galaxy, or install it again from GOG.com's current
-  installer.
+  French, German, Spanish; the texts and voices are the data's), and
+  each of them plays. Installations of GOG's older builds (2018, June
+  2022) play too.
 - CD: the folder of the installed game (the one holding `atlantis2.exe`,
   `wam`, `scenar`...), with the images of the four CDs (`.iso`, `.bin`,
   `.img`, `.mdf`, `.nrg`) or copies of the CDs in it or in a folder inside

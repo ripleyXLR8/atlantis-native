@@ -1100,12 +1100,24 @@ back) into `yucatan-*.png`.
   2022-07-13); its two older builds ("1.0", 2018, and "1.0 w10",
   2022-06) each have another `Game.exe` (MD5s
   `f8340e5a011fd2207c5bb78b4c2a9636`, `8c24ad437d9e994f657ad7751b626718`),
-  named to the player with the advice to update, not played until their
-  code is compared. The languages differ only in data: `loc\` (texts,
+  compared byte for byte with the current one: "1.0 w10" keeps the two
+  `WM_FONTCHANGE` broadcasts the hotfix removes, and "1.0" is 1.01 with
+  five of GOG's patches only (fixed drives as the CD and its empty root,
+  the two free-space tests, the CD page closing at once). The port
+  models none of the patches they lack, so all three play alike
+  (`tests/gog.rs` checks the bytes). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
-  (`crates/atlantis2-data/src/edition.rs`). GOG's folder holds an
+  (`crates/atlantis2-data/src/edition.rs`). The four languages were
+  played (`tests/gog_languages.rs`): every subtitle as the 1.01
+  executable lays it out, every letter (French `œ`, German `ß`, Spanish
+  `ñ ¿ ¡`...) a glyph of the one font, the same 1199 of 1214 voices in
+  each. Films 19, 55 and 66 read their track from `datas_a2\apc\`
+  (`cine%03d.apc` → the sounds' folder, @ 0x0047a5c0 → 0x00402760 in
+  `Game.exe`), where GOG put the English tracks: every language plays
+  them in English, in the original and here (each language's own track
+  lies unused in `apc\dial\`). GOG's folder holds an
   `atlantis2.exe` too, a 20,992-byte splash-screen launcher: the
   executable is the first of `atlantis2.exe` and `Game.exe` that is a
   known build. 1.01 moved most of the code and data; the one table the
@@ -3775,8 +3787,17 @@ the 1.01 subtitles in `tests/dialogs.rs`, the listener table in
 played again on it, its pictures written as `gog-*.png` with
 `ATLANTIS2_PNG_DIR`), `ATLANTIS2_PATCH101` the 1.01 patch's
 `atlantis2.exe` (`tests/gog.rs` puts it beside links to
-`ATLANTIS2_DATA`'s folders: a CD installation patched to 1.01). An
-Atlantis II test whose data is missing fails, saying which variable it
+`ATLANTIS2_DATA`'s folders: a CD installation patched to 1.01),
+`ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
+German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
+`1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older
+builds (`tests/gog_languages.rs`: per language the edition's name, the
+`loc` files, every subtitle against the 1.01 executable's layout under
+emulation, `tests/golden/subtitles_101_gog_*.txt`, every letter a glyph,
+every voice decoded, the film tracks, a new game to the shaman's dialog
+with a subtitle drawn, `gog-<language>-*.png` with `ATLANTIS2_PNG_DIR`;
+the older `Game.exe` byte for byte against the current one, and booted).
+An Atlantis II test whose data is missing fails, saying which variable it
 needs, unless `ATLANTIS2_SKIP_DATA_TESTS=1` asks for the game-data tests
 to be skipped (the CI's builds set it); a skipped test writes a
 `SKIPPED <test>: <what is missing>` line that `cargo test` shows

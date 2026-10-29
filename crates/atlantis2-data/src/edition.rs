@@ -11,7 +11,8 @@
 //!
 //! The GOG.com values are the per-language depots' of GOG's builds
 //! "1.0" (2018-05-04), "1.0 w10" (2022-06-21) and "1.0 w10 hotfix"
-//! (2022-07-13): the three builds ship the same `loc\` files.
+//! (2022-07-13): the three builds ship the same `loc\` files, checked
+//! on the four languages' installations.
 
 use md5::{Digest, Md5};
 
@@ -165,7 +166,7 @@ mod tests {
 
     #[test]
     fn labels() {
-        let [cd, patch, gog] = &KNOWN_BUILDS;
+        let [cd, patch, gog, w10, _] = &KNOWN_BUILDS;
         assert_eq!(
             edition_label(gog, Some(Language::German)),
             "Atlantis II, GOG.com, German (patch 1.01)"
@@ -173,6 +174,10 @@ mod tests {
         assert_eq!(
             edition_label(gog, None),
             "Atlantis II, GOG.com (patch 1.01)"
+        );
+        assert_eq!(
+            edition_label(w10, Some(Language::English)),
+            "Atlantis II, GOG.com, English (patch 1.01, June 2022 build)"
         );
         assert_eq!(
             edition_label(patch, Some(Language::French)),
