@@ -789,6 +789,26 @@ impl Bank {
             (None, None) => return false,
             (Some(x), _) => (x, y),
         };
+        self.opaque_in(at, info, x, y, px, py)
+    }
+
+    /// `SPW_COLLISION` (spr_p6 @ 0x10001270 → @ 0x10002a7d): whether face
+    /// `face` of frame `frame`, drawn with its hot spot at (0, 0), covers
+    /// the face pixel (u, v), by [`Bank::opaque_at`]'s rule.
+    pub fn face_opaque_at(&self, frame: usize, face: usize, u: i32, v: i32) -> bool {
+        if !self.is_spw() {
+            return false;
+        }
+        let Some(at) = self.face_at(frame, face) else {
+            return false;
+        };
+        let Some(info) = self.info_at(at) else {
+            return false;
+        };
+        self.opaque_in(at, info, 0, 0, u, v)
+    }
+
+    fn opaque_in(&self, at: usize, info: SpriteInfo, x: i32, y: i32, px: i32, py: i32) -> bool {
         if !matches!(
             blitter(self.flags, self.depth),
             Blitter::Draw(Rows::Palette { .. })

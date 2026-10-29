@@ -328,6 +328,34 @@ impl Slots {
         }
     }
 
+    /// The place-sprite hit test of the sprite pass (@ 0x00440bf0 →
+    /// @ 0x00439920), at the centre ray's face pixel (u, v): every shown
+    /// slot whose state is clickable, whose frame's sprite on that face
+    /// (`GET_SPWZ`: x, y, w, h with the hot spot at (0, 0)) has x < u <
+    /// x + w + 1 and y < v < y + h + 1, and whose pixel there is opaque
+    /// (`SPW_COLLISION`); the last one wins. The slot and the cursor kind
+    /// (2 for an entity of kind 1 or 3, 1 for 2 or 4).
+    pub fn hit(&self, face: usize, u: i32, v: i32) -> Option<(usize, i32)> {
+        let mut out = None;
+        for (k, s) in self.slots.iter().enumerate() {
+            if !s.shown || s.click == 0 || s.frame < 0 {
+                continue;
+            }
+            let Some(info) = s.bank.face_info(s.frame as usize, face) else {
+                continue;
+            };
+            let (x, y) = (-i32::from(info.xoff), -i32::from(info.yoff));
+            let (w, h) = (i32::from(info.w), i32::from(info.h));
+            if !(x < u && u < x + w + 1 && y < v && v < y + h + 1) {
+                continue;
+            }
+            if s.bank.face_opaque_at(s.frame as usize, face, u, v) {
+                out = Some((k, if matches!(s.kind, 1 | 3) { 2 } else { 1 }));
+            }
+        }
+        out
+    }
+
     /// The sprite pass (@ 0x00440bf0): every shown slot's frame drawn into
     /// the faces with `AFF_SPW`, in slot order; `tick` is the 15 Hz tick
     /// count (blinking slots are drawn on odd ticks).

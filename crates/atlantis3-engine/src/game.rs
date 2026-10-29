@@ -1158,8 +1158,12 @@ impl Game {
         }
         // 1. The step: 25 Hz ticks of the look or the turn, the centre pick.
         self.warp_step();
-        // 2. The frame drawn.
+        // 2. The frame drawn; with the click flag set, the sprite pass
+        // records the place sprite under the centre (@ 0x00440bf0).
         self.draw_warp();
+        if self.click && self.sprite_hit.is_none() {
+            self.sprite_hit = self.sprite_under_centre();
+        }
         // 3. The script's waits.
         if self.with_script(|s, h| s.check_waits(h)) {
             self.click = false;
@@ -1187,8 +1191,9 @@ impl Game {
             }
             self.place_sounds_frame();
         }
-        // 6. The click flags cleared.
+        // 6. The click flags cleared (and the sprite hit with them).
         self.click = false;
+        self.sprite_hit = None;
         if let Some(s) = self.script.as_mut() {
             s.click = false;
         }
@@ -2451,20 +2456,46 @@ impl Game {
         self.centre == Some(i)
     }
 
-    /// Clicks the place sprite of entity `id` of kind `kind` (1 a
-    /// character, 2 an object) shown in the view, as the render's hit test
-    /// finds it under the centre (@ 0x00440bf0): false when none is shown.
+    /// The place sprite under the screen centre (the sprite pass's hit
+    /// test @ 0x00439920): its entity id and click kind.
+    pub fn sprite_under_centre(&self) -> Option<(i32, i32)> {
+        let (face, u, v) = self.camera.texel(self.camera.cx, self.camera.cy)?;
+        let (k, _) = self.slots.hit(face, u, v)?;
+        let s = &self.slots.slots[k];
+        Some((s.id, s.click))
+    }
+
+    /// Turns the camera (1° steps from the view's entry, as the player
+    /// would) until the shown place sprite of entity `id` of kind `kind`
+    /// (1 a character, 2 an object) is under the centre, then clicks:
+    /// false when no orientation shows it there.
     #[doc(hidden)]
     pub fn click_sprite(&mut self, id: i32, kind: i32) -> bool {
-        let Some(slot) = self
-            .slots
-            .slots
-            .iter()
-            .find(|s| s.id == id && s.kind == kind && s.shown)
-        else {
-            return false;
-        };
-        self.sprite_hit = Some((id, slot.click));
+        let fpu = self.camera.fpu;
+        let mut found = None;
+        'search: for pitch in (-40..=40).map(|p: i32| if p % 2 == 0 { p / 2 } else { -(p + 1) / 2 })
+        {
+            for yaw in 0..360 {
+                let mut c = self.camera.clone();
+                c.enter(
+                    atlantis2_engine::script::a3::deg_to_rad_a3(fpu, yaw),
+                    atlantis2_engine::script::a3::deg_to_rad_a3(fpu, pitch),
+                );
+                let hit = c
+                    .texel(c.cx, c.cy)
+                    .and_then(|(f, u, v)| self.slots.hit(f, u, v))
+                    .map(|(k, _)| &self.slots.slots[k])
+                    .filter(|s| s.id == id && s.kind == kind);
+                if hit.is_some() {
+                    found = Some(c);
+                    break 'search;
+                }
+            }
+        }
+        let Some(c) = found else { return false };
+        self.camera = c;
+        self.look.stop();
+        self.centre = self.pick_centre();
         self.click();
         true
     }
