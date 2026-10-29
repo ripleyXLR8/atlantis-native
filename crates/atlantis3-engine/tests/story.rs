@@ -74,34 +74,51 @@ struct Run {
 }
 
 impl Run {
+    /// One frame. The harness's clock is frozen (no 15 Hz tick, no timer)
+    /// but during `WAIT`; a turn, which the harness ends at the next
+    /// frame, gets the time it needs here.
     fn frame(&mut self) {
-        self.t += 1.0 / 30.0;
+        let dt = if self.g.turning() { 1.0 / 30.0 } else { 0.0 };
+        self.frame_dt(dt);
+    }
+
+    fn frame_dt(&mut self, dt: f64) {
+        self.t += dt;
         self.g.step(self.t);
-        if self.g.video().is_some() {
-            self.g.finish_video();
-        }
-        if self.g.dialog_running() {
-            self.g.finish_dialog();
+        self.finish_media();
+    }
+
+    /// The media started end at once, as the harness ends them.
+    fn finish_media(&mut self) {
+        for _ in 0..100 {
+            if self.g.video().is_some() {
+                self.g.finish_video();
+            } else if self.g.dialog_running() {
+                self.g.finish_dialog();
+            } else {
+                break;
+            }
         }
     }
 
-    /// Frames until nothing moves: no turn, no pending move, no video, no
-    /// dialog, three frames in a row.
+    /// The harness's settle: frames while in the warp a turn runs, a move
+    /// is pending or the arrival scan has not run (`ARRIVEEVUE` ≠ 0).
     fn settle(&mut self) {
-        let mut calm = 0;
         for _ in 0..3000 {
-            self.frame();
-            let still = matches!(self.g.mode(), Mode::Warp | Mode::Subjects | Mode::Screen)
-                && !self.g.turning()
-                && !self.g.move_pending()
-                && self.g.video().is_none()
-                && !self.g.dialog_running();
-            calm = if still { calm + 1 } else { 0 };
-            if calm >= 3 {
+            let busy = self.g.mode() == Mode::Warp
+                && (self.g.turning() || self.g.move_pending() || self.var("ARRIVEEVUE") != 0);
+            if !busy {
                 return;
             }
+            self.frame();
         }
         panic!("the game did not settle");
+    }
+
+    /// An action's frame then the settle.
+    fn act_frame(&mut self) {
+        self.frame();
+        self.settle();
     }
 
     fn id(&self, section: usize, name: &str) -> i32 {
@@ -117,9 +134,12 @@ impl Run {
 
     fn action(&mut self, line: &str) {
         let w: Vec<&str> = line.split_whitespace().collect();
-        self.step += 1;
-        for &v in self.rands.get(&self.step).into_iter().flatten() {
-            self.g.queue_rand(v);
+        // `EXPECT` and `RAND` are no steps of the golden.
+        if !matches!(w[0], "EXPECT" | "RAND") {
+            self.step += 1;
+            for &v in self.rands.get(&self.step).into_iter().flatten() {
+                self.g.queue_rand(v);
+            }
         }
         match w[0] {
             "START" => {
@@ -133,7 +153,7 @@ impl Run {
                     "{line}: no zone to {v} under the centre"
                 );
                 self.g.click();
-                self.settle();
+                self.act_frame();
             }
             "PERSO" | "OBJET" => {
                 let (section, kind) = if w[0] == "PERSO" {
@@ -143,8 +163,7 @@ impl Run {
                 };
                 let id = self.id(section, w[1]);
                 assert!(self.g.click_sprite(id, kind), "{line}: not shown");
-                self.frame();
-                self.settle();
+                self.act_frame();
             }
             "SUBJECT" => {
                 assert!(self.g.subjects_open(), "{line}: no subject menu");
@@ -163,7 +182,7 @@ impl Run {
                     .unwrap_or_else(|| panic!("{line}: not offered"));
                 self.g.set_pointer(cell.x, cell.y);
                 self.g.click();
-                self.settle();
+                self.act_frame();
             }
             "ZONE" => {
                 let name = w[1];
@@ -175,13 +194,13 @@ impl Run {
                     "{line}"
                 );
                 self.g.click();
-                self.settle();
+                self.act_frame();
             }
             "HAND" => {
                 self.g.right_click();
-                self.frame();
                 assert!(self.g.inventory_open());
                 if w[1] == "-" {
+                    self.frame();
                     self.g.right_click();
                     self.settle();
                     return;
@@ -213,10 +232,12 @@ impl Run {
                 let s: f64 = w[1].parse().unwrap();
                 let n = (s / 0.04).round() as usize;
                 for _ in 0..n {
-                    self.frame();
+                    self.frame_dt(0.04);
                 }
+                self.settle();
             }
-            "RAND" => self.g.queue_rand(w[1].parse().unwrap()),
+            // The golden's values are queued by step, the walk's included.
+            "RAND" => {}
             "CLICK" => {
                 let left = w[1] == "left";
                 let sprite = w
@@ -224,10 +245,12 @@ impl Run {
                     .and_then(|s| s.strip_prefix("SPRITE="))
                     .map(|n| n.parse().unwrap());
                 self.g.screen_click(left, sprite);
+                self.finish_media();
                 self.settle();
             }
             "MAP" => {
                 self.g.screen_click(true, Some(w[1].parse().unwrap()));
+                self.finish_media();
                 self.settle();
             }
             "SKIP" => self.skip(&w[3..]),
@@ -260,7 +283,7 @@ impl Run {
             } else if let Some(name) = k.strip_prefix("VAR:") {
                 self.g.set_var(name, v.parse().unwrap());
             } else if k == "RUN" {
-                self.g.run_command(&v.replace('_', " "));
+                self.g.run_command(v);
             } else if k == "CALL" {
                 let a = u32::from_str_radix(v.trim_start_matches("0x"), 16).unwrap();
                 assert!(self.g.test_call(a), "SKIP {a:#x} not modelled");
@@ -284,18 +307,10 @@ impl Run {
                 panic!("SKIP item {a} not handled");
             }
         }
+        // The media the items started end at once (the harness ends them
+        // inside the step).
+        self.finish_media();
         if frames == 0 {
-            // The media the items started end at once, without a frame
-            // (the harness ends them inside the step).
-            for _ in 0..100 {
-                if self.g.video().is_some() {
-                    self.g.finish_video();
-                } else if self.g.dialog_running() {
-                    self.g.finish_dialog();
-                } else {
-                    break;
-                }
-            }
             return;
         }
         for _ in 0..frames {
@@ -344,22 +359,23 @@ fn rands(golden: &str) -> BTreeMap<usize, Vec<i32>> {
         if l.starts_with("STEP ") {
             step += 1;
         } else if let Some(v) = l.strip_prefix("CALL rand() -> ") {
-            // A value the walk forced (`RAND n`) is queued by its action.
-            if !v.ends_with("(walk)") {
-                let n = v.split_whitespace().next().unwrap();
-                out.entry(step).or_default().push(n.parse().unwrap());
-            }
+            let n = v.split_whitespace().next().unwrap();
+            out.entry(step).or_default().push(n.parse().unwrap());
         }
     }
     out
 }
 
-/// The `SetVariables` lines of a golden from its start: the new game's
-/// `(chapter=600)` or the load of the segment's save.
-fn sets(golden: &str) -> Vec<&str> {
+/// The `SetVariables` lines of a golden from its start (the new game's
+/// `(chapter=600)` or the load of the segment's save), with their step.
+fn sets(golden: &str) -> Vec<(usize, &str)> {
     let mut started = false;
+    let mut step = 0;
     let mut out = Vec::new();
     for l in golden.lines() {
+        if l.starts_with("STEP ") {
+            step += 1;
+        }
         if l.starts_with("FRAME load") {
             started = true;
         }
@@ -368,7 +384,7 @@ fn sets(golden: &str) -> Vec<&str> {
                 started = true;
             }
             if started {
-                out.push(s);
+                out.push((step, s));
             }
         }
     }
@@ -405,6 +421,7 @@ fn new_run() -> Option<Run> {
     let files = A3Files::open_dir(&dir).unwrap().0;
     let mut g = Game::new(files).expect("the game starts");
     g.seed(1);
+    g.set_harness_turns(true);
     Some(Run {
         g,
         t: 0.0,
@@ -423,10 +440,31 @@ fn play(r: &mut Run, name: &str, walk: &str, golden: &str) {
     if s.set_log.is_none() {
         s.set_log = Some(Vec::new());
     }
+    let want = sets(golden);
     for line in walk.lines() {
         let line = line.split('#').next().unwrap().trim();
-        if !line.is_empty() {
-            r.action(line);
+        if line.is_empty() {
+            continue;
+        }
+        r.action(line);
+        // The lines so far, against the golden's up to this step.
+        let got: Vec<String> = r.g.script().unwrap().set_log.as_ref().unwrap().iter()
+            .map(|l| format!("SET{l}"))
+            .collect();
+        let upto: Vec<&str> = want.iter().filter(|(s, _)| *s <= r.step).map(|(_, l)| *l).collect();
+        if let Some(i) = (0..got.len().max(upto.len())).find(|&i| got.get(i).map(String::as_str) != upto.get(i).copied()) {
+            let from = i.saturating_sub(4);
+            let flags: Vec<String> = r.g.script().unwrap().flags.iter().enumerate()
+                .filter(|(k, v)| **v != 0 && *k < 1000)
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect();
+            panic!(
+                "{name}: step {} `{line}`: SetVariables line {i} differs\n native flags {}\n golden {:#?}\n native {:#?}",
+                r.step,
+                flags.join(" "),
+                &upto[from..(i + 4).min(upto.len())],
+                &got[from..(i + 4).min(got.len())]
+            );
         }
     }
     let got: Vec<String> =
@@ -438,9 +476,15 @@ fn play(r: &mut Run, name: &str, walk: &str, golden: &str) {
             .into_iter()
             .map(|l| format!("SET{l}"))
             .collect();
-    let want = sets(golden);
-    for (i, (a, b)) in got.iter().zip(&want).enumerate() {
-        assert_eq!(a, b, "{name}: SetVariables line {i}");
+    for (i, (a, (step, b))) in got.iter().zip(&want).enumerate() {
+        if a != b {
+            let from = i.saturating_sub(4);
+            let ctx: Vec<_> = want[from..(i + 3).min(want.len())].to_vec();
+            let mine = &got[from..(i + 3).min(got.len())];
+            panic!(
+                "{name}: SetVariables line {i} (golden step {step}): {a} != {b}\n golden {ctx:#?}\n native {mine:#?}"
+            );
+        }
     }
     assert_eq!(got.len(), want.len(), "{name}: SetVariables lines");
     let (vars, flags) = changed(golden);
@@ -479,6 +523,8 @@ fn segment(index: usize) {
     if let Some(save) = start_save(golden) {
         r.g.script_mut().unwrap().set_log = Some(Vec::new());
         assert!(r.g.load_save_text("quick1_100.sav", save), "{name}: load");
+        // The harness's first warp frame after the load, and its settle.
+        r.act_frame();
     }
     play(&mut r, name, walk, golden);
 }

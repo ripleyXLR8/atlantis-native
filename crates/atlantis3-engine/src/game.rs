@@ -239,6 +239,9 @@ pub struct Game {
     puzzles: hooks::Puzzles,
     /// A right click not yet seen by a screen.
     right_clicked: bool,
+    /// Tests replaying the script harness: every move turns (see
+    /// [`Game::set_harness_turns`]).
+    harness_turns: bool,
     /// Values the next script-visible `rand()` calls return (tests: the
     /// original seeds `rand` with the clock).
     rand_queue: std::collections::VecDeque<i32>,
@@ -382,6 +385,7 @@ impl Game {
             camera_fov: warp_fov(Fpu::Double),
             puzzles: hooks::Puzzles::new(),
             right_clicked: false,
+            harness_turns: false,
             rand_queue: Default::default(),
             player: atlantis3_data::save::DEFAULT_PLAYER,
             saves: HashMap::new(),
@@ -585,6 +589,14 @@ impl Game {
         self.rand_queue
             .pop_front()
             .unwrap_or_else(|| self.rand.rand())
+    }
+
+    /// Tests replaying the original's script harness, whose move set-up
+    /// always starts a turn (ended at the next frame) even when the camera
+    /// already looks at the destination.
+    #[doc(hidden)]
+    pub fn set_harness_turns(&mut self, on: bool) {
+        self.harness_turns = on;
     }
 
     /// Queues the values the next script-visible `rand()` calls return
@@ -1085,8 +1097,6 @@ impl Game {
             self.anim_tick = true;
             self.dialog_tick = true;
         }
-        // The main loop's per-frame place part (@ 0x004d5df9 → 0x004c1950).
-        self.main_loop_hook();
         match self.mode {
             Mode::Intro | Mode::Video => self.video_step(),
             Mode::Warp => self.warp_frame(),
@@ -1096,6 +1106,9 @@ impl Game {
             Mode::Screen => self.screen_frame(),
             Mode::Idle => {}
         }
+        // The main loop's per-frame place part, after the mode's frame
+        // (@ 0x004d5df9 → 0x004c1950).
+        self.main_loop_hook();
     }
 
     // ---- videos -------------------------------------------------------
@@ -1290,8 +1303,9 @@ impl Game {
             self.click = false;
             return;
         }
-        // 4. Not turning: the click, `Interp_GereFrame`.
-        if self.moving.turn.is_none() && !self.moving.pending {
+        // 4. Not turning (a turn that ended at step 1 leaves its move
+        // pending for step 6): the click, `Interp_GereFrame`.
+        if self.moving.turn.is_none() {
             if self.click {
                 self.sprite_clicks();
             }
@@ -1305,12 +1319,21 @@ impl Game {
             if self.mode == Mode::Warp {
                 self.click_scan();
             }
-            if !matches!(self.mode, Mode::Warp | Mode::Subjects) {
-                self.click = false;
-                self.double_click = false;
-                return;
+            if matches!(self.mode, Mode::Warp | Mode::Subjects) {
+                self.place_sounds_frame();
             }
-            self.place_sounds_frame();
+        }
+        // A cinematic or a dialog the scans started does not stop the
+        // frame: its arrival block still runs (@ 0x004400ed), only a view
+        // to enter waits for the warp.
+        if !matches!(self.mode, Mode::Warp | Mode::Subjects) {
+            self.click = false;
+            self.double_click = false;
+            self.right_clicked = false;
+            if self.moving.pending && self.moving.next.is_none() {
+                self.complete_move();
+            }
+            return;
         }
         // 6. The click flags cleared (and the sprite hit with them).
         self.click = false;
@@ -1666,6 +1689,9 @@ impl Game {
     /// The turn's set-up (@ 0x004410b0); false when none is needed.
     fn start_turn(&mut self, yaw: f32, pitch: f32) -> bool {
         let (turn, turning) = Turn::new_a3(&self.camera, yaw, pitch, &self.zoom);
+        // The script harness's turn always starts (its InitRecalage stub
+        // returns 1) and ends at the next frame.
+        let turning = turning || self.harness_turns;
         self.moving.turn = turning.then_some(turn);
         turning
     }

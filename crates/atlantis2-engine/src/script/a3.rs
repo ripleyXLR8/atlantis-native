@@ -314,8 +314,9 @@ impl Script {
             return Some(next);
         }
         if is(self, "LOADVUEMONDE") {
-            self.load_vue_monde(host);
-            return Some(next);
+            // The section goes on in the remembered chapter's text, as
+            // after `CHAPTER=` (not at the old offset).
+            return self.load_vue_monde(host);
         }
         if key == k.nextvue {
             self.next_view = host.has_view(value).then_some(value);
@@ -664,22 +665,20 @@ impl Script {
 
     /// `LOADVUEMONDE` (@ 0x0044890f): back to the current world's place,
     /// view and chapter, as kept in its flags.
-    fn load_vue_monde(&mut self, host: &mut dyn Host) {
-        let Some(w) = self.world_slot("LoadVueMonde") else {
-            return;
-        };
+    fn load_vue_monde(&mut self, host: &mut dyn Host) -> Option<usize> {
+        let w = self.world_slot("LoadVueMonde")?;
         let wam = self.flags[FLAG_WORLD_WAM + w];
         let Some(name) = usize::try_from(wam).ok().and_then(|i| WAM_NAMES.get(i)) else {
             self.fail(format!("LoadVueMonde: pas de wam pour le monde {w}"));
-            return;
+            return None;
         };
         if !self.load_wam_a3(host, &format!("{name}.wam")) {
-            return;
+            return None;
         }
         let view = self.flags[FLAG_WORLD_VIEW + w];
         self.set_vue(host, view);
         let chapter = self.flags[FLAG_WORLD_CHAPTER + w];
-        self.change_chapter(host, chapter);
+        self.change_chapter(host, chapter)
     }
 
     /// The view's slot of its world, written by the view entry

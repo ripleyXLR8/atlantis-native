@@ -401,6 +401,7 @@ impl Game {
     /// under the cursor (the hit test @ 0x00437080).
     pub fn screen_click(&mut self, left: bool, sprite: Option<i32>) {
         self.screen_step(left, !left, sprite);
+        self.main_loop_hook();
     }
 
     /// Tests: the outcome of a board the port does not play (M4): the
