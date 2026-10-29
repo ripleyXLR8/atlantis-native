@@ -117,6 +117,8 @@ impl Script {
     /// the intro and the menus.
     pub fn boot_a3(&mut self, host: &mut dyn Host) -> bool {
         self.flags = vec![0; FLAGS_A3];
+        // The subject table's reset at start-up (@ 0x0043bbc0).
+        self.subjects.reset_a3();
         let k = self.keys.clone();
         self.vars[k.limiteanglewarpy] = 70;
         self.vars[k.limiteanglewarpx] = -1;
@@ -140,6 +142,8 @@ impl Script {
         self.flags.iter_mut().for_each(|f| *f = 0);
         self.set_var_a3("GAMEOVER", 0);
         self.bag.clear();
+        // The subject table reset (@ 0x00452000 → @ 0x0043bbc0).
+        self.subjects.reset_a3();
         self.run_command(host, b"(chapter=600)");
         self.close_interrupt(host);
         self.fatal.is_none()

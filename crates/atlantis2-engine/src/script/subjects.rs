@@ -64,6 +64,47 @@ impl SubjectTable {
         }
     }
 
+    /// *Atlantis III*'s reset (atlantis3-gog-fr-3473408 @ 0x0043bbc0, at
+    /// start-up, a new game and a load): every count 0 and every entry
+    /// {value −1, index −1, flag 1}, so that a click past a list answers
+    /// −1.
+    pub fn reset_a3(&mut self) {
+        for c in 0..Self::CHARACTERS as i32 {
+            let base = Self::base(c).unwrap();
+            self.set_i32(base, 0);
+            for i in 0..Self::ENTRIES {
+                self.set_entry(
+                    c,
+                    i,
+                    Subject {
+                        value: -1,
+                        index: -1,
+                        flag: 1,
+                    },
+                );
+            }
+        }
+    }
+
+    /// Writes entry `i` of a character (within the table).
+    pub fn set_entry(&mut self, character: i32, i: usize, s: Subject) {
+        let Some(at) = Self::entry_at(character, i) else {
+            return;
+        };
+        self.set_i32(at, s.value);
+        self.set_i32(at + 4, s.index);
+        if let Some(b) = self.bytes.get_mut(at + 8) {
+            *b = s.flag;
+        }
+    }
+
+    /// Sets a character's count.
+    pub fn set_count(&mut self, character: i32, n: i32) {
+        if let Some(base) = Self::base(character) {
+            self.set_i32(base, n);
+        }
+    }
+
     /// The table's bytes, as the save keeps them.
     pub fn bytes(&self) -> &[u8] {
         &self.bytes

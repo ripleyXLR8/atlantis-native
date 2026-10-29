@@ -19,6 +19,7 @@ pub mod cinema;
 pub mod game;
 pub mod place_anim;
 pub mod startup;
+pub mod subjects;
 pub mod wam_setup;
 
 pub use cinema::{Cinema, CinemaError};
