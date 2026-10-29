@@ -15,8 +15,8 @@ use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
 pub struct LauncherEntry {
     pub path: PathBuf,
     /// The game and its edition ("Atlantis: The Lost Tales, GOG.com,
-    /// French (1999 build)", "Atlantis II, GOG.com (patch 1.01)"), or why
-    /// the folder does not open.
+    /// French (1999 build)", "Atlantis II, GOG.com, French (patch
+    /// 1.01)"), or why the folder does not open.
     pub label: String,
     /// The folder opens as the game.
     pub found: bool,

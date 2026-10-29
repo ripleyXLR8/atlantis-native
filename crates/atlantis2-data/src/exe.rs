@@ -5,19 +5,28 @@
 //! are listed: another build is reported with its identifiers, so that it
 //! can be added once compared.
 //!
-//! Three builds are known:
+//! Five builds are known:
 //!
 //! - the French CD's `atlantis2.exe` (1.00, version string 3.15), the
 //!   reference every address in the comments belongs to;
 //! - the official 1.01 patch's `atlantis2.exe` (version 3.18, built
 //!   1999-11-17, one executable for the French and the English releases),
 //!   which a CD installation may hold;
-//! - GOG.com's `Game.exe`: the 1.01 executable with 18 byte patches of
-//!   GOG's (the install folder used as the CD, no free-space or CD
-//!   check, no `WM_FONTCHANGE` broadcast, fonts without antialiasing,
-//!   videos ended by their frame count only, input and window fixes for
-//!   current Windows). GOG's folder also holds an `atlantis2.exe`, a
-//!   splash-screen launcher that starts `Game.exe` ([`LAUNCHER_SIZE`]).
+//! - GOG.com's `Game.exe` of its build "1.0 w10 hotfix" (2022-07-13): the
+//!   1.01 executable with 18 byte patches of GOG's (the install folder
+//!   used as the CD, no free-space or CD check, no `WM_FONTCHANGE`
+//!   broadcast, fonts without antialiasing, videos ended by their frame
+//!   count only, input and window fixes for current Windows), one file
+//!   for its English, French, German and Spanish installations. GOG's
+//!   folder also holds an `atlantis2.exe`, a splash-screen launcher that
+//!   starts `Game.exe` ([`LAUNCHER_SIZE`]);
+//! - the `Game.exe` of GOG's two older builds, also one file for every
+//!   language: "1.0 w10" (2022-06-21), the same but for the two
+//!   `WM_FONTCHANGE` broadcasts, which it keeps, and "1.0" (2018-05-04),
+//!   1.01 with five of those patches only (the install folder as the CD,
+//!   no free-space check, the CD page closing at once). What the port
+//!   models of GOG's patches (the CD page) is in all three; the others
+//!   are Windows matters the port has no counterpart of.
 //!
 //! 1.01 moved most of the code and data (the linker order changed), so
 //! what the port reads from the executable is read at each build's own
@@ -85,7 +94,7 @@ const PLACE_SOUNDS_101: PlaceSoundTable = PlaceSoundTable {
 };
 
 /// The builds this port knows.
-pub const KNOWN_BUILDS: [Build; 3] = [
+pub const KNOWN_BUILDS: [Build; 5] = [
     Build {
         id: "atlantis2-cd-fr-2199552",
         label: "Atlantis II, French CD (1999)",
@@ -128,6 +137,34 @@ pub const KNOWN_BUILDS: [Build; 3] = [
         md5: [
             0x25, 0x4e, 0xcd, 0x84, 0x04, 0x6d, 0x75, 0xc2, 0x0a, 0x68, 0x5e, 0x7d, 0x7f, 0x91,
             0xd1, 0xd8,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: true,
+        place_sounds: PLACE_SOUNDS_101,
+    },
+    Build {
+        id: "atlantis2-gog-w10-2183168",
+        label: "Atlantis II, GOG.com (patch 1.01, June 2022 build)",
+        size: 2_183_168,
+        pe_timestamp: 0x3832_8ed1,
+        md5: [
+            0x8c, 0x24, 0xad, 0x43, 0x7d, 0x9e, 0x99, 0x4f, 0x65, 0x7a, 0xd7, 0x75, 0x1b, 0x62,
+            0x67, 0x18,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: true,
+        place_sounds: PLACE_SOUNDS_101,
+    },
+    Build {
+        id: "atlantis2-gog-2018-2183168",
+        label: "Atlantis II, GOG.com (patch 1.01, 2018 build)",
+        size: 2_183_168,
+        pe_timestamp: 0x3832_8ed1,
+        md5: [
+            0xf8, 0x34, 0x0e, 0x5a, 0x01, 0x1f, 0xd2, 0x20, 0x7c, 0x5b, 0xb7, 0x8b, 0x4c, 0x2a,
+            0x96, 0x36,
         ],
         version: "Atlantis 2 - Version 3.18 - 8/10/1999",
         release: Release::V101,
@@ -227,14 +264,14 @@ pub fn identify(exe: &[u8]) -> Result<&'static Build, ExeError> {
         .filter(|b| b.size == size && b.pe_timestamp == stamp)
         .collect();
     let md5: [u8; 16] = Md5::digest(exe).into();
-    candidates
-        .into_iter()
-        .find(|b| b.md5 == md5)
-        .ok_or(ExeError::Unknown {
-            size,
-            pe_timestamp: stamp,
-            md5: hex(&md5),
-        })
+    if let Some(b) = candidates.into_iter().find(|b| b.md5 == md5) {
+        return Ok(b);
+    }
+    Err(ExeError::Unknown {
+        size,
+        pe_timestamp: stamp,
+        md5: hex(&md5),
+    })
 }
 
 #[cfg(test)]
@@ -260,6 +297,8 @@ mod tests {
                 "5e218f7fa9754532ae1d7a4275443fef",
                 "255310e7d6bd7f823f680e2bd3be8b7f",
                 "254ecd84046d75c20a685e7d7f91d1d8",
+                "8c24ad437d9e994f657ad7751b626718",
+                "f8340e5a011fd2207c5bb78b4c2a9636",
             ]
         );
         // The listener table is 5780 bytes in every build.
@@ -272,7 +311,7 @@ mod tests {
                 .iter()
                 .filter(|b| b.release == Release::V101)
                 .count(),
-            2
+            4
         );
     }
 

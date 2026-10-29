@@ -2,7 +2,9 @@
 //!
 //! The tests that need the game read its folders from `ATLANTIS2_DATA`,
 //! `ATLANTIS2_DISCS` (the French CD), `ATLANTIS2_GOG` (GOG.com's
-//! edition) and `ATLANTIS2_PATCH101` (the 1.01 executable). Without them a
+//! edition, French), `ATLANTIS2_GOG_EN` / `_DE` / `_ES` (its other
+//! languages), `ATLANTIS2_GOG_OLD` (its older builds' `Game.exe`) and
+//! `ATLANTIS2_PATCH101` (the 1.01 executable). Without them a
 //! test must not pass as if it had run: [`missing`] fails it, unless
 //! `ATLANTIS2_SKIP_DATA_TESTS=1` asks for the game-data tests to be
 //! skipped (a build without the game, such as the CI's), and then writes a

@@ -146,8 +146,8 @@ program opens on the library's screen to choose the one to play, the
 last played selected. Each game is shown as its name and edition,
 *Atlantis: The Lost Tales, GOG.com, French (1999 build)*, *Atlantis: The
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
-it is read from images of the CDs), *Atlantis II, GOG.com (patch 1.01)*
-or *Atlantis II, French CD (1999)*, and its folder.
+it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
+1.01)* or *Atlantis II, French CD (1999)*, and its folder.
 
 | Action | Mouse | Keyboard |
 |---|---|---|
@@ -432,7 +432,10 @@ holds "atlantis" (*Atlantis 2*, *Atlantis II*, *Beyond Atlantis*...).
 - GOG.com: the installation folder (the one holding `Game.exe`, for
   example `C:\Program Files\GOG Galaxy\Games\Atlantis 2` or
   `C:\GOG Games\Atlantis 2`). It holds every disc, so no disc is asked
-  for.
+  for. GOG.com installs one program for its four languages (English,
+  French, German, Spanish; the texts and voices are the data's), and
+  each of them plays. Installations of GOG's older builds (2018, June
+  2022) play too.
 - CD: the folder of the installed game (the one holding `atlantis2.exe`,
   `wam`, `scenar`...), with the images of the four CDs (`.iso`, `.bin`,
   `.img`, `.mdf`, `.nrg`) or copies of the CDs in it or in a folder inside

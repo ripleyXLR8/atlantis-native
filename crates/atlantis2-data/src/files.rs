@@ -42,6 +42,7 @@ use std::sync::{Arc, Mutex};
 use atlantis_data::disc_image::{DiscImage, IMAGE_EXTENSIONS};
 use atlantis_data::{FileSource, StdDir};
 
+use crate::edition::{edition_label, language_of_menu_txt, Language};
 use crate::exe::{identify, Build, ExeError, EXE_NAMES, KNOWN_BUILDS, LAUNCHER_SIZE};
 
 /// Which root a folder is under.
@@ -358,6 +359,20 @@ impl A2Files {
     /// (the French CD's) for files put together otherwise (tests).
     pub fn build(&self) -> &'static Build {
         self.exe.map_or(&KNOWN_BUILDS[0], |(_, b)| b)
+    }
+
+    /// The language of the texts and voices installed, told by
+    /// `loc\Menu.txt` ([`crate::edition`]); `None` when that file is no
+    /// known one.
+    pub fn language(&self) -> Option<Language> {
+        self.read(Folder::Loc, "Menu.txt")
+            .and_then(|d| language_of_menu_txt(&d))
+    }
+
+    /// The edition's name: the build's and the language
+    /// ([`edition_label`]).
+    pub fn label(&self) -> String {
+        edition_label(self.build(), self.language())
     }
 
     /// The executable's file name in the install folder (`atlantis2.exe`,

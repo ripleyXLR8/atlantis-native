@@ -507,6 +507,12 @@ impl SubtitleFont {
         self.font.glyph_id(TextCodePage::Windows1252.char_of(b))
     }
 
+    /// Whether the font has a glyph of its own for byte `b` (Windows-1252),
+    /// not the missing-glyph box.
+    pub fn has_glyph(&self, b: u8) -> bool {
+        self.glyph(b).0 != 0
+    }
+
     /// The advance of byte `b`, in pixels.
     fn advance(&self, b: u8) -> i32 {
         let g = self.glyph(b);

@@ -562,12 +562,8 @@ pub fn boot_files(
     saves: impl FnOnce(&mut Engine),
 ) -> Result<(Engine, String), String> {
     let build = files.build();
-    log::info!(
-        "{} ({}), discs {:?}",
-        build.label,
-        build.id,
-        files.disc_numbers()
-    );
+    let label = files.label();
+    log::info!("{label} ({}), discs {:?}", build.id, files.disc_numbers());
     // Start-up: the script tables and chapter 0; the player menu or a new
     // game follows.
     let mut engine = Engine::boot(files, Variant::default(), Fpu::default(), WIDTH, HEIGHT)
@@ -585,7 +581,7 @@ pub fn boot_files(
         .duration_since(web_time::SystemTime::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u32);
     engine.seed_rand(seed);
-    Ok((engine, format!("Game: {}", build.label)))
+    Ok((engine, format!("Game: {label}")))
 }
 
 /// `--headless`: runs `frames` frames of [`PASS`] without input (the 15 Hz
