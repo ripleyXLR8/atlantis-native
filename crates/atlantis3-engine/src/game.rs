@@ -34,6 +34,9 @@ use atlantis2_engine::place_sound::{sources, Source};
 use atlantis3_data::coord::Coord;
 use std::collections::{BTreeMap, HashMap};
 
+mod hooks;
+pub use hooks::Screen;
+
 /// A decoded sound: rate, channels, interleaved samples.
 type Decoded = (u32, u16, Arc<Vec<i16>>);
 
@@ -93,6 +96,8 @@ pub enum Mode {
     Dialog,
     /// Mode 6: a menu page (@ 0x004591a0).
     Menu,
+    /// Modes 9..18: a full-screen puzzle or map ([`Screen`]).
+    Screen,
     /// Nothing to show (before the intro, after the game stopped).
     Idle,
 }
@@ -230,7 +235,10 @@ pub struct Game {
     /// never set by the GOG build's code paths met so far: 0).
     current_cd: i32,
     /// The spinning top's handler armed (@ 0x007899d3).
-    toupie_armed: bool,
+    /// The places' hooks' state ([`hooks`]).
+    puzzles: hooks::Puzzles,
+    /// A right click not yet seen by a screen.
+    right_clicked: bool,
     /// The player number of the save names (1) and the saves written,
     /// by file name; also kept in `save_dir` when one is given.
     player: i32,
@@ -369,7 +377,8 @@ impl Game {
             voice_model: None,
             dialog_heads: true,
             camera_fov: warp_fov(Fpu::Double),
-            toupie_armed: false,
+            puzzles: hooks::Puzzles::new(),
+            right_clicked: false,
             player: atlantis3_data::save::DEFAULT_PLAYER,
             saves: HashMap::new(),
             save_dir: None,
@@ -573,6 +582,7 @@ impl Game {
         };
         let save = atlantis3_data::save::SaveGame::parse(&d);
         let data = load_data(&save);
+        self.puzzles.after_load();
         self.with_script(|s, h| s.load_a3(h, &data))
     }
 
@@ -732,6 +742,7 @@ impl Game {
             }
             Mode::Inventory => self.close_inventory(),
             Mode::Subjects => self.close_subjects(),
+            Mode::Screen => self.right_clicked = true,
             _ => {}
         }
     }
@@ -962,7 +973,7 @@ impl Game {
                 if let Some(s) = self.script.as_mut() {
                     s.hold(e.id);
                 }
-                self.frame_hooks();
+                self.frame_hook();
             }
             self.inventory.fade_step(self.now);
         } else {
@@ -1036,6 +1047,7 @@ impl Game {
             Mode::Inventory | Mode::Subjects => self.overlay_frame(),
             Mode::Dialog => self.dialog_frame(),
             Mode::Menu => self.menu_frame(),
+            Mode::Screen => self.screen_frame(),
             Mode::Idle => {}
         }
     }
@@ -1243,7 +1255,7 @@ impl Game {
             let (yaw, pitch) = self.camera.angles();
             self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
             // The places' frame hook (@ 0x004c27d0).
-            self.frame_hooks();
+            self.frame_hook();
             if self.mode == Mode::Warp {
                 self.click_scan();
             }
@@ -1530,11 +1542,14 @@ impl Game {
                 let k = s.keys.cliczone;
                 s.vars[k] = zone.value;
             }
+            // The places' zone hook (@ 0x004c32c0).
+            let name = zone.name.clone().unwrap_or_default();
+            self.zone_hook(zone.kind, zone.value, &name);
         }
-        match zone.kind {
-            1 => self.move_setup(&zone),
-            2 => self.not_ported("a link to another place (zone type 2)"),
-            _ => {}
+        // Type 2 (a link to another place, @ 0x00420440) is in no WAM of
+        // the game.
+        if zone.kind == 1 {
+            self.move_setup(&zone);
         }
     }
 
@@ -1629,7 +1644,7 @@ impl Game {
         });
         self.enter_view(next, yaw, pitch);
         if let Some(mut s) = self.script.take() {
-            self.place_hooks(&mut s);
+            self.view_hook(&mut s);
             self.script = Some(s);
         }
         let dest = old.and_then(|old| {
@@ -1880,29 +1895,6 @@ impl Game {
         }
     }
 
-    /// The places' hooks of a view entry (@ 0x004c2010, after the
-    /// animations and the sounds): `(LIMITEANGLEWARPY=70)` at every entry,
-    /// then per place and view the puzzles' set-ups (the Hoggar's views 1
-    /// to 3: the stars @ 0x004d3960; the funeral chamber's 1 to 4
-    /// @ 0x004c4de0; ...), not ported yet.
-    fn place_hooks(&mut self, script: &mut Script) {
-        script.run_command(self, b"(LIMITEANGLEWARPY=70)");
-        let view = self.place.view.unwrap_or(0);
-        // The spinning top's handler armed in views 1..3 (@ 0x004d3960).
-        self.toupie_armed =
-            self.place.name.eq_ignore_ascii_case("hoggar.wam") && (1..=3).contains(&view);
-        let hooked = match self.place.name.to_ascii_lowercase().as_str() {
-            "hoggar.wam" => (1..=3).contains(&view),
-            "cfuner.wam" => (1..=4).contains(&view),
-            "paleo.wam" | "ldmorts.wam" | "mmarchd.wam" | "jardin.wam" | "tourmagi.wam"
-            | "pmagi.wam" | "interdim.wam" => true,
-            _ => false,
-        };
-        if hooked {
-            self.not_ported("the places' puzzle hooks at view entry");
-        }
-    }
-
     /// The text of a save of the script's state (the writer @ 0x00459ee0).
     fn save_text(&self, s: &Script) -> Vec<u8> {
         use atlantis3_data::save::{PersoDialogs, SaveGame, Subject};
@@ -1970,58 +1962,6 @@ impl Game {
     /// A save's text by file name (tests).
     pub fn saved(&self, name: &str) -> Option<&[u8]> {
         self.saves.get(name).map(Vec::as_slice)
-    }
-
-    /// The places' frame hook (@ 0x004c27d0): in `hoggar.wam` views 1 to
-    /// 3, the spinning top's handler (@ 0x004d3980) once armed by the view
-    /// entry (@ 0x004d3960). The throws and the stars' animation are not
-    /// ported (M4); its success check and the top's return are:
-    ///
-    /// - `VUE` = 1: the top in the bag → flag 415 = 1; no throw running and
-    ///   flags 420..424 (the five stars) all 1 → `Flag13` = 1,
-    ///   `(sacados=NOT_HOG_OBJ_TOUPIE)`, then `CtrlScenarIN`
-    ///   (@ 0x004d3adf..0x004d3b35);
-    /// - another view: flag 415 = 1, `Flag13` ≠ 1 and the top not in the
-    ///   bag (a throw left unfinished) → the top back in the bag.
-    fn frame_hooks(&mut self) {
-        if !self.toupie_armed || !self.place.name.eq_ignore_ascii_case("hoggar.wam") {
-            return;
-        }
-        let Some(s) = self.script.as_ref() else {
-            return;
-        };
-        let vue = s.vars[s.keys.vue];
-        if !(1..=3).contains(&vue) {
-            return;
-        }
-        let names = &self.names;
-        let top = names
-            .id(atlantis2_data::defnames::OBJETS, b"HOG_OBJ_TOUPIE")
-            .map_or(-1, |i| i as i32);
-        let in_bag = s.bag.iter().any(|e| e.id == top);
-        if vue != 1 {
-            if s.flags[415] == 1 && s.flags[13] != 1 && !in_bag {
-                self.run_command("(sacados=HOG_OBJ_TOUPIE)");
-            }
-            return;
-        }
-        if in_bag {
-            if let Some(s) = self.script.as_mut() {
-                s.flags[415] = 1;
-            }
-        }
-        let s = self.script.as_ref().unwrap();
-        // No test of `Flag13` (@ 0x004d3adf): in view 1 the success repeats
-        // every frame until the scripts leave.
-        if (420..=424).all(|f| s.flags[f] == 1) {
-            if let Some(s) = self.script.as_mut() {
-                s.flags[13] = 1;
-            }
-            self.run_command("(sacados=NOT_HOG_OBJ_TOUPIE)");
-            self.with_script(|s, h| {
-                s.ctrl_scenar_in(h);
-            });
-        }
     }
 
     fn texts(&mut self) -> &crate::text::Texts {
@@ -2939,7 +2879,7 @@ impl Host for Game {
 
     fn enter_view_with_script(&mut self, view: i32, yaw: f32, pitch: f32, script: &mut Script) {
         Game::enter_view(self, view as u32, yaw, pitch);
-        self.place_hooks(script);
+        self.view_hook(script);
     }
 
     /// `ANGLEWARPXNOW` / `ANGLEWARPYNOW` (*Atlantis II*'s FUN_0045ad40 /
@@ -2967,6 +2907,8 @@ impl Host for Game {
             Some(d) => {
                 let save = atlantis3_data::save::SaveGame::parse(&d);
                 let data = load_data(&save);
+                // The puzzles' one-shot rebuilds (@ 0x00459e70).
+                self.puzzles.after_load();
                 script.load_a3(self, &data);
             }
             None => log::warn!("Load: {name} not found"),
