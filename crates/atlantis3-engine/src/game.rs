@@ -2545,7 +2545,7 @@ pub fn quaternion_angles(q: [f32; 4]) -> (f32, f32) {
 
 /// `SetFov(deg)` (@ 0x004409f0): f32((f32 π · deg) · 1/180), the 1/180 a
 /// double (`fmul qword [0x007004b0]`).
-fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
+pub fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
     let pi = f64::from(f32::from_bits(0x4049_0fdb));
     fpu.f32(fpu.mul(fpu.mul(pi, f64::from(deg)), 1.0 / 180.0))
 }
