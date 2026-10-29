@@ -483,10 +483,15 @@ impl Script {
             return Some(self.wait(next));
         }
         if key == k.exit {
+            // @ 0x00449cbf..0x00449cf5: `EXIT` := the value (the quit flag
+            // 0x00789d58 is not written here, only by `Interp_GereFrame`),
+            // loop mode 6 (0x004d6b00(6)) and the credits page's start
+            // (0x00457690): the game does not quit, it shows the credits.
             self.vars[key] = value;
-            log::info!("SetVariables: EXIT");
-            self.quit = true;
-            // The section ends (the walk goes on in an empty text).
+            log::info!("SetVariables: EXIT : AtlMain_FlagQuit=true");
+            host.exit_credits();
+            // The section ends (the walk goes on in an empty text,
+            // @ 0x00449cf0: 0x0077e500).
             return Some(self.len(src));
         }
         if key == k.objetenmain {

@@ -95,7 +95,16 @@ impl Slots {
         now: f64,
         shown: impl Fn(i32, i32) -> Option<bool>,
     ) -> Slots {
-        Slots::load_with(files, cache, wam, view, world, &mut || rand.rand(), now, shown)
+        Slots::load_with(
+            files,
+            cache,
+            wam,
+            view,
+            world,
+            &mut || rand.rand(),
+            now,
+            shown,
+        )
     }
 
     /// [`Slots::load`] with any source of the CRT's `rand()` values.

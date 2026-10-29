@@ -173,7 +173,11 @@ impl Run {
                 }
                 assert!(found, "{line}: not shown");
                 if std::env::var_os("STORY_DEBUG").is_some() {
-                    eprintln!("{line}: under centre {:?}, hand {}", self.g.sprite_under_centre(), self.g.object_in_hand());
+                    eprintln!(
+                        "{line}: under centre {:?}, hand {}",
+                        self.g.sprite_under_centre(),
+                        self.g.object_in_hand()
+                    );
                 }
                 self.act_frame();
                 if std::env::var_os("STORY_DEBUG").is_some() {
@@ -340,11 +344,14 @@ impl Run {
         let s = self.g.script().unwrap();
         let got = match k {
             "WAM" => self.g.place().0.to_string(),
-            "MODE" => self
-                .g
-                .puzzle_screen()
-                .map_or(3, |s| s.mode_number())
-                .to_string(),
+            "MODE" => match self.g.mode() {
+                Mode::Menu => "6".to_string(),
+                _ => self
+                    .g
+                    .puzzle_screen()
+                    .map_or(3, |s| s.mode_number())
+                    .to_string(),
+            },
             "HAND" => {
                 let h = s.var("OBJETENMAIN").unwrap();
                 if h == 0 {

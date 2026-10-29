@@ -16,7 +16,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use atlantis3_data::spr::{Bank, Pixel, SprDll, Target};
+use atlantis3_data::spr::{Bank, Depth, Pixel, SprDll, Target};
 use md5::{Digest, Md5};
 
 const AFF_P6_565: &str = include_str!("golden/spr_aff_p6_565.txt");
@@ -334,12 +334,174 @@ fn trs_lines<P: Harness>(data: &[u8], name: &str, bg: &[P], _dll: SprDll) -> Str
 
 /// `AFF_SPRTRS`, the inventory's fade: every sprite of the interface and
 /// inventory banks at its levels, as `spr_p6.dll` and `spr_p5.dll` draw
-/// it on a 16-bit display (the port's). The 32-bit blitters are
-/// transcribed but their left-clip path is not (it shades pixels the
-/// unclipped path skips; the golden's `clipA` lines differ there).
+/// it on a 16-bit display (the port's).
 #[test]
 fn translucent_sprites_as_the_original_draws_them() {
     let n = check::<u16>(TRS_P6_565, 1024 * 768, None, SprDll::P6, trs_lines::<u16>);
     let k = check::<u16>(TRS_P5_565, 1024 * 768, None, SprDll::P5, trs_lines::<u16>);
     assert!((n, k) == (0, 0) || (n, k) == (8340, 8340), "{n} {k}");
+}
+
+const TRS_P6_X888: &str = include_str!("golden/spr_trs_p6_x888.txt");
+const TRS32_LEFTCLIP_P6: &str = include_str!("golden/spr_trs32_leftclip_p6.txt");
+
+/// The banks as the harness held them: each loaded at the same address
+/// over the previous ones, so that the bytes after a bank are those that
+/// earlier, longer banks left there, then zeros. A 32-bit left-clipped
+/// row that the S-run byte puts out of step can read past its bank's
+/// data (five sprites of the golden do); the original reads whatever
+/// memory follows.
+#[derive(Default)]
+struct HarnessMemory {
+    mem: Vec<u8>,
+}
+
+impl HarnessMemory {
+    /// `file` loaded: the bank over the memory, as a file to parse.
+    fn load(&mut self, file: &[u8]) -> Vec<u8> {
+        let body = &file[8..];
+        if self.mem.len() < body.len() {
+            self.mem.resize(body.len(), 0);
+        }
+        self.mem[..body.len()].copy_from_slice(body);
+        let mut out = file[..8].to_vec();
+        out.extend_from_slice(&self.mem);
+        out.resize(out.len() + 0x10000, 0);
+        out
+    }
+}
+
+/// `AFF_SPRTRS` on a 32-bit display, as `spr_p6.dll` draws it: every
+/// line of the golden, the 32-bit left-clip path's (`clipA`) included,
+/// with its extra byte after a skipped S run.
+#[test]
+fn translucent_sprites_in_32_bits() {
+    let Some(datas) = datas() else { return };
+    let bg = u32::background(1024 * 768);
+    assert!(
+        TRS_P6_X888.contains(&format!("background md5 {}", u32::md5(&bg))),
+        "background"
+    );
+    let mut memory = HarnessMemory::default();
+    let mut wrong = Vec::new();
+    let mut checked = 0;
+    for (name, n, want) in digests(TRS_P6_X888) {
+        let file = memory.load(&read(&datas, &name));
+        let got = trs_lines::<u32>(&file, &name, &bg, SprDll::P6);
+        assert_eq!(got.lines().count(), n, "{name}: line count");
+        if hex(got.as_bytes()) != want {
+            wrong.push(name);
+        }
+        checked += n;
+    }
+    assert!(
+        wrong.is_empty(),
+        "files differ from the original: {wrong:?}"
+    );
+    assert_eq!(checked, 8340);
+}
+
+/// The 32-bit left clip against the unclipped draw, as the golden
+/// counts it: per 0x278 bank, the rows of the sprites drawn at
+/// x = xoff − w / 3 whose visible part differs from the same sprite
+/// drawn unclipped (on a uniform background, so a plain cut would differ
+/// nowhere) — the shipped library's numbers, which the extra byte
+/// gives; then the game's own left-clipped call, the inventory bar at
+/// 800 × 600 and 640 × 480, by MD5 and differing rows.
+#[test]
+fn the_32_bit_left_clip_as_spr_p6_draws_it() {
+    const W: usize = 1024;
+    const H: usize = 768;
+    const BG: u32 = 0x0040_6080;
+    let Some(datas) = datas() else { return };
+    let mut memory = HarnessMemory::default();
+    let draw = |bank: &Bank, x: i32, y: i32, i: usize, l: u8| -> Vec<u32> {
+        let mut buf = vec![BG; W * H];
+        let mut t = Target::screen(&mut buf, W, H);
+        assert!(bank.draw_trs(&mut t, Some(x), y, i, l));
+        buf
+    };
+    let (mut banks, mut bars) = (0, 0);
+    let mut total = [0usize; 3];
+    for line in TRS32_LEFTCLIP_P6.lines().filter(|l| !l.starts_with('#')) {
+        let f: Vec<&str> = line.split_whitespace().collect();
+        let field =
+            |k: usize, key: &str| -> usize { f[k].strip_prefix(key).unwrap().parse().unwrap() };
+        if f[0].starts_with("spr/") {
+            let bank = Bank::parse(&memory.load(&read(&datas, f[0])), Depth::Xrgb8888).unwrap();
+            assert_eq!(bank.flags & 0x3fe, 0x278, "{}", f[0]);
+            let (mut calls, mut rows, mut bad) = (0, 0, 0);
+            for i in 0..bank.len() {
+                let Some(info) = bank.info(i) else { continue };
+                let (w, h) = (usize::from(info.w), usize::from(info.h));
+                let (xo, yo) = (i32::from(info.xoff), i32::from(info.yoff));
+                let d = w / 3;
+                if d == 0 {
+                    continue;
+                }
+                let rx = 200usize.min((W - 1).saturating_sub(w));
+                for l in [6, 12, 18, 24] {
+                    let reference = draw(&bank, xo + rx as i32, yo + 100, i, l);
+                    let clipped = draw(&bank, xo - d as i32, yo + 100, i, l);
+                    for y in 100..100 + h {
+                        if clipped[y * W..y * W + w - d]
+                            != reference[y * W + rx + d..y * W + rx + w]
+                        {
+                            bad += 1;
+                        }
+                    }
+                    calls += 1;
+                    rows += h;
+                }
+            }
+            assert_eq!(
+                (calls, rows, bad),
+                (
+                    field(1, "calls="),
+                    field(2, "rows="),
+                    field(3, "rows_bad_shipped=")
+                ),
+                "{}",
+                f[0]
+            );
+            total[0] += calls;
+            total[1] += rows;
+            total[2] += bad;
+            banks += 1;
+        } else if f[0] == "total" {
+            assert_eq!(
+                total,
+                [
+                    field(1, "calls="),
+                    field(2, "rows="),
+                    field(3, "rows_bad_shipped=")
+                ]
+            );
+        } else if f[0] == "bar" {
+            let bank = Bank::parse(
+                &memory.load(&read(&datas, "spr/interface.SPR")),
+                Depth::Xrgb8888,
+            )
+            .unwrap();
+            let x: i32 = f[2].strip_prefix("x=").unwrap().parse().unwrap();
+            let y: i32 = f[3].strip_prefix("y=").unwrap().parse().unwrap();
+            let l: u8 = f[4].strip_prefix("level=").unwrap().parse().unwrap();
+            let reference = draw(&bank, 27, y, 0, l);
+            let shipped = draw(&bank, x, y, 0, l);
+            assert_eq!(
+                u32::md5(&shipped),
+                f[5].strip_prefix("shipped=").unwrap(),
+                "{line}"
+            );
+            let d = (-x) as usize;
+            let bad = (y as usize..y as usize + 78)
+                .filter(|&r| {
+                    shipped[r * W..r * W + 996 - d] != reference[r * W + 27 + d..r * W + 27 + 996]
+                })
+                .count();
+            assert_eq!(bad, field(6, "rows_bad="), "{line}");
+            bars += 1;
+        }
+    }
+    assert_eq!((banks, bars, total[0]), (17, 10, 1380));
 }

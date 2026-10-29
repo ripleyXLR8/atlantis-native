@@ -637,11 +637,11 @@ impl Bank {
     /// sprite `index` drawn translucent at `level` (the byte `& 0x1f`; the
     /// game passes `ftol(alpha × 31)`). Families 0x78 and 0x278 (and 0x274
     /// on a 16-bit display); any other draws nothing. In 32 bits this is
-    /// `spr_p6.dll`'s blitter without its left-clip path (which shades
-    /// pixels the unclipped path skips; not transcribed, the port draws in
-    /// 16 bits); `spr_p5.dll`'s reads its factors from the 16-bit table,
-    /// left zero on a 32-bit display (not transcribed: the game picks
-    /// `spr_p6.dll` from CPU class 4). False as [`Bank::draw`].
+    /// `spr_p6.dll`'s blitter (@ 0x10010c5b), its left clip included
+    /// (`Bank::trs_row_left32`); `spr_p5.dll`'s reads its factors from
+    /// the 16-bit table, left zero on a 32-bit display (not transcribed:
+    /// the game picks `spr_p6.dll` from CPU class 4). False as
+    /// [`Bank::draw`].
     pub fn draw_trs<P: Pixel>(
         &self,
         t: &mut Target<P>,
@@ -676,6 +676,10 @@ impl Bank {
         let d = &self.data;
         let table = at + 8;
         let first = table + 4 * usize::from(info.h);
+        if P::DEPTH == Depth::Xrgb8888 && half_shade && x0 < t.xmin {
+            self.trs_left_clip32(t, table, first, x0, y0, w, h, level);
+            return true;
+        }
         for row in 0..h {
             let sy = y0 + row;
             if sy < t.ymin || sy >= t.ymax {
@@ -765,6 +769,177 @@ impl Bank {
             }
         }
         Some(())
+    }
+
+    /// The 32-bit 0x278 rows of `spr_p6.dll`'s `AFF_SPRTRS` (@ 0x10010c5b)
+    /// when the sprite starts left of `xmin`: the left-only row path
+    /// (@ 0x10010f65) when it ends before `xmax`, else the both-sides one
+    /// (@ 0x100111c5). The rows clipped above are skipped through the row
+    /// table; then the left-only path reads the rows one after the other
+    /// (a row starts where the previous one's end byte was, @ 0x10010e79),
+    /// while the both-sides path starts each row at its table entry
+    /// (@ 0x100110d6). Nothing is drawn when the sprite lies wholly left of
+    /// `xmin` or right of `xmax` (@ 0x10010cd4..0x10010d27).
+    #[allow(clippy::too_many_arguments)]
+    fn trs_left_clip32<P: Pixel>(
+        &self,
+        t: &mut Target<P>,
+        table: usize,
+        first: usize,
+        x0: i32,
+        y0: i32,
+        w: i32,
+        h: i32,
+        level: u8,
+    ) {
+        if x0 + w <= t.xmin || x0 >= t.xmax {
+            return;
+        }
+        let both = x0 + w > t.xmax;
+        let r0 = (t.ymin - y0).max(0);
+        let r1 = (t.ymax - y0).min(h);
+        if r1 <= r0 {
+            return;
+        }
+        let row_at =
+            |d: &[u8], row: i32| u32_at(d, table + 4 * row as usize).map(|o| first + o as usize);
+        let start = if r0 > 0 {
+            row_at(&self.data, r0)
+        } else {
+            Some(first)
+        };
+        let Some(mut p) = start else {
+            return;
+        };
+        let limit = both.then_some(t.xmax);
+        for row in r0..r1 {
+            if both {
+                let Some(q) = row_at(&self.data, row) else {
+                    return;
+                };
+                p = q;
+            }
+            let line = i64::from(y0 + row) * t.pitch as i64;
+            match self.trs_row_left32(t, line, p, x0, limit, level) {
+                Some(q) => p = q,
+                None => return,
+            }
+        }
+    }
+
+    /// One left-clipped 32-bit 0x278 row: the first `xmin − x0` pixels go
+    /// through the skip machine (K @ 0x10010f43, R @ 0x10010eec, P
+    /// @ 0x10010ec0, S @ 0x10010f1a; both-sides copies from 0x10011120),
+    /// which follows the row grammar and consumes the skipped pixels' data
+    /// (R one byte, P two); the run that crosses `xmin` is drawn from
+    /// `xmin` with its rest, then the row goes on as unclipped. The skip
+    /// of a **whole S run reads one byte more** (`inc esi` @ 0x10010f1f
+    /// and @ 0x1001117f, as if the run had the factor byte of the 0x78
+    /// family): the next control byte is dropped and the row decodes out
+    /// of step until an end byte (a partial S skip is right). The
+    /// left-only path has no right bound: a row out of step can draw past
+    /// the sprite's width, at consecutive addresses (`limit` = `None`);
+    /// the both-sides path stops at `xmax`. Returns where the row's data
+    /// ended (the byte after its end byte), `None` past the bank's data.
+    fn trs_row_left32<P: Pixel>(
+        &self,
+        t: &mut Target<P>,
+        line: i64,
+        mut p: usize,
+        x0: i32,
+        limit: Option<i32>,
+        level: u8,
+    ) -> Option<usize> {
+        let d = &self.data;
+        let shade = trs_factor(level, 15);
+        let mut need = t.xmin - x0;
+        let mut prev = Run::Start;
+        let mut run: Run;
+        let mut rest: i32;
+        loop {
+            let b = *d.get(p)?;
+            p += 1;
+            let (r, n) = next_run(prev, b);
+            prev = r;
+            if matches!(r, Run::End | Run::Start) {
+                return Some(p);
+            }
+            let n = n as i32;
+            if need < n {
+                // The run crossing `xmin`: its skipped part's data.
+                match r {
+                    Run::Pal => p += need as usize,
+                    Run::Pair => p += 2 * need as usize,
+                    _ => {}
+                }
+                run = r;
+                rest = n - need;
+                break;
+            }
+            need -= n;
+            match r {
+                Run::Pal => p += n as usize,
+                Run::Pair => p += 2 * n as usize,
+                // The extra byte (@ 0x10010f1f).
+                Run::Shade => p += 1,
+                _ => {}
+            }
+        }
+        let len = t.pixels.len() as i64;
+        let mut sx = t.xmin;
+        loop {
+            for _ in 0..rest {
+                if limit.is_some_and(|m| sx >= m) {
+                    return Some(p);
+                }
+                let at = line + i64::from(sx);
+                let slot = (0..len).contains(&at).then_some(at as usize);
+                match run {
+                    Run::Pal => {
+                        let i = *d.get(p)?;
+                        p += 1;
+                        if let Some(a) = slot {
+                            let px = &mut t.pixels[a];
+                            *px =
+                                P::trs(P::from_entry(self.pal[usize::from(i)]), *px, level, level);
+                        }
+                    }
+                    Run::Pair => {
+                        let (f, i) = (*d.get(p)?, *d.get(p + 1)?);
+                        p += 2;
+                        if let Some(a) = slot {
+                            let px = &mut t.pixels[a];
+                            *px = P::trs(
+                                P::from_entry(self.pal[usize::from(i)]),
+                                *px,
+                                level,
+                                trs_factor(level, f),
+                            );
+                        }
+                    }
+                    Run::Shade => {
+                        if let Some(a) = slot {
+                            let px = &mut t.pixels[a];
+                            *px = px.trs_shade(shade);
+                        }
+                    }
+                    _ => {}
+                }
+                sx += 1;
+            }
+            if limit.is_some_and(|m| sx >= m) {
+                return Some(p);
+            }
+            let b = *d.get(p)?;
+            p += 1;
+            let (r, n) = next_run(prev, b);
+            prev = r;
+            if matches!(r, Run::End | Run::Start) {
+                return Some(p);
+            }
+            run = r;
+            rest = n as i32;
+        }
     }
 
     /// `SPR_COLLISION` (spr_p6 @ 0x10001240 → @ 0x100029ae; the 0x278

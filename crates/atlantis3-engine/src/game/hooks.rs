@@ -27,6 +27,7 @@ mod paleo;
 mod pmagi;
 mod rhea;
 mod screens;
+mod screens_draw;
 mod tourmagi;
 
 /// A full-screen loop mode started by a hook (the mode numbers of the main
@@ -397,12 +398,16 @@ impl Game {
         self.script = Some(s);
     }
 
-    /// The running screen's frame ([`screens`]). The screens' drawing and
+    /// The running screen's frame ([`screens`]). The two maps draw
+    /// themselves in their handlers (the map's refusals come before its
+    /// drawing) and hit-test the pointer; the other screens' drawing and
     /// their sprite hit test are M4: a real click finds no sprite under
     /// the cursor (tests give it through [`Game::screen_click`]).
     pub(super) fn screen_frame(&mut self) {
-        self.draw_warp_only();
-        self.draw_pointer();
+        if !matches!(self.puzzles.screen, Some(Screen::Carte | Screen::CarteTour)) {
+            self.draw_warp_only();
+            self.draw_pointer();
+        }
         let left = std::mem::take(&mut self.click);
         let right = std::mem::take(&mut self.right_clicked);
         self.screen_step(left, right, None);

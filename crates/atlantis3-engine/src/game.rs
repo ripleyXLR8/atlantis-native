@@ -34,7 +34,9 @@ use atlantis2_engine::place_sound::{sources, Source};
 use atlantis3_data::coord::Coord;
 use std::collections::{BTreeMap, HashMap};
 
+mod credits;
 mod hooks;
+pub use credits::{Credits, Print};
 pub use hooks::Screen;
 
 /// A decoded sound: rate, channels, interleaved samples.
@@ -237,6 +239,8 @@ pub struct Game {
     /// never set by the GOG build's code paths met so far: 0).
     current_cd: i32,
     /// The spinning top's handler armed (@ 0x007899d3).
+    /// The credits page (menu page 9), after the ending.
+    credits: Option<credits::Credits>,
     /// The places' hooks' state ([`hooks`]).
     puzzles: hooks::Puzzles,
     /// A right click not yet seen by a screen.
@@ -386,6 +390,7 @@ impl Game {
             voice_model: None,
             dialog_heads: true,
             camera_fov: warp_fov(Fpu::Double),
+            credits: None,
             puzzles: hooks::Puzzles::new(),
             right_clicked: false,
             harness_turns: false,
@@ -523,6 +528,10 @@ impl Game {
     /// in the in-game menu, `BT_SAVE` writes the next save of the player,
     /// `BT_BACK` goes back to the game.
     fn menu_frame(&mut self) {
+        if self.credits.is_some() {
+            self.credits_frame();
+            return;
+        }
         let Some(mut page) = self.page.take() else {
             self.mode = Mode::Idle;
             return;
@@ -703,7 +712,7 @@ impl Game {
                 String::from_utf8_lossy(&lang)
             );
         }
-        if !self.start_video("hnm/intro.hnm", 15, false, Mode::Idle) {
+        if !self.start_video("hnm/intro.hnm", 15, false, Mode::Idle, Vec::new()) {
             self.mode = Mode::Idle;
         }
         self.mode = if self.video.is_some() {
@@ -737,7 +746,10 @@ impl Game {
     /// turning, the turn speeds gain dx / 2000 and lose dy / 2000; the
     /// centre zone is picked again.
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
-        if matches!(self.mode, Mode::Inventory | Mode::Subjects | Mode::Menu) {
+        if matches!(
+            self.mode,
+            Mode::Inventory | Mode::Subjects | Mode::Menu | Mode::Screen
+        ) {
             // The free pointer, clamped to the screen (@ 0x004313f6).
             self.pointer.0 = (self.pointer.0 + dx).clamp(0, self.width as i32 - 1);
             self.pointer.1 = (self.pointer.1 + dy).clamp(0, self.height as i32 - 1);
@@ -1176,7 +1188,14 @@ impl Game {
 
     /// `AtlHnm_start`: opens `path` (under `Datas\`) and switches to the
     /// video mode; false when the file is missing or unreadable.
-    fn start_video(&mut self, path: &str, fps: u32, travel: bool, back: Mode) -> bool {
+    fn start_video(
+        &mut self,
+        path: &str,
+        fps: u32,
+        travel: bool,
+        back: Mode,
+        spf: Vec<Bank>,
+    ) -> bool {
         let Some(data) = self.files.read(path) else {
             log::warn!("{path}: not found");
             return false;
@@ -1205,7 +1224,7 @@ impl Game {
             shown: 0,
             caption: None,
             cues: Vec::new(),
-            spf: Vec::new(),
+            spf,
         });
         self.mode = Mode::Video;
         // The first frame at once.
@@ -1295,18 +1314,9 @@ impl Game {
                 );
             } else {
                 // The move's transition sprites over the travel video
-                // (@ 0x00421fe8): each bank's sprite `frame - 1` at its
-                // default position.
+                // (@ 0x00421fe8), in the video's space.
                 let mut frame = v.cinema.frame().to_vec();
-                let k = v.shown as usize;
-                for bank in &v.spf {
-                    let mut t = Target::screen(&mut frame, w, h);
-                    t.xmax = w as i32;
-                    t.ymax = h as i32;
-                    if let Some(i) = k.checked_sub(1) {
-                        bank.draw(&mut t, None, 0, i);
-                    }
-                }
+                crate::travel::draw_transition_sprites(&mut frame, w, h, &v.spf, v.shown);
                 stretch_video(&frame, w, h, &mut self.screen, self.width, self.height);
             }
         }
@@ -1645,7 +1655,13 @@ impl Game {
             return;
         }
         let character = self.sprite_hit.filter(|h| h.1 == 2).map(|h| h.0);
-        if std::env::var_os("STORY_DEBUG").is_some() { eprintln!("click scan: hit {:?} script click {:?}", self.sprite_hit, self.script.as_ref().map(|s| s.click)); }
+        if std::env::var_os("STORY_DEBUG").is_some() {
+            eprintln!(
+                "click scan: hit {:?} script click {:?}",
+                self.sprite_hit,
+                self.script.as_ref().map(|s| s.click)
+            );
+        }
         self.with_script(|s, h| s.click_scan(h, character));
         self.click = false;
         self.sprite_hit = None;
@@ -1840,10 +1856,10 @@ impl Game {
         };
         if let (Some(d), false) = (dest, self.double_click) {
             let path = format!("hnmtraj/HNM640/{folder}/{}", d.video);
-            if self.files.size(&path).is_some() && self.start_video(&path, 15, true, Mode::Warp) {
-                if let Some(v) = self.video.as_mut() {
-                    v.spf = spf;
-                }
+            // The sprites are there before the video starts, so that its
+            // first frame has them.
+            if self.files.size(&path).is_some() {
+                self.start_video(&path, 15, true, Mode::Warp, spf);
             }
         }
     }
@@ -3048,6 +3064,10 @@ impl Host for Game {
                     faces: Default::default(),
                     cube: String::new(),
                 };
+                // The Land of the Dead's map banks (@ 0x004c372b).
+                if name.eq_ignore_ascii_case("ldmorts.wam") {
+                    self.carte_reload_banks();
+                }
                 true
             }
             Err(e) => {
@@ -3157,7 +3177,7 @@ impl Host for Game {
             format!("hnm/HNM640/{folder}/{video}")
         };
         let back = self.mode;
-        let started = self.start_video(&path, fps.max(0) as u32, false, back);
+        let started = self.start_video(&path, fps.max(0) as u32, false, back, Vec::new());
         if started {
             // The cue file and the caption file (`AtlHnm_Start`
             // @ 0x00420f68, @ 0x00420faf).
@@ -3212,6 +3232,11 @@ impl Host for Game {
             let g = csm_gain(self.level(self.startup.config.sfx_volume));
             self.audio.play(CHANNEL_SOUND, rate, ch, pcm, false, [g, g]);
         }
+    }
+
+    /// `EXIT=1` (@ 0x00449cc4): the credits page (loop mode 6, page 9).
+    fn exit_credits(&mut self) {
+        self.start_credits();
     }
 
     fn dial_start_a3(&mut self, n: i32, voixoff: bool) -> DialStart {

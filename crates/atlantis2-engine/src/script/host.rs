@@ -349,6 +349,10 @@ pub trait Host {
     /// `GAMEOVER` set (@ 0x0042ac50).
     fn game_over(&mut self) {}
 
+    /// `EXIT` set (@ 0x00449ce1..0x00449ceb): loop mode 6, then the credits
+    /// page's start (@ 0x00457690).
+    fn exit_credits(&mut self) {}
+
     /// Whether the animation (kind, id, n) has ended (record +0x471), for
     /// `WAITFORFINANIMP` / `WAITFORFINANIMO`.
     fn anim_ended(&mut self, kind: i32, id: i32, n: i32) -> bool {

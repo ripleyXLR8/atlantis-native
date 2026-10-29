@@ -6,14 +6,18 @@
 //! handler returning 0 makes the main loop call the mode's `Stop`
 //! ([`Game::stop_screen`]).
 //!
-//! The screens' drawing, their hover animations and the boards played
-//! inside two of them (the unicorn's 3D board, the game boy's reflex
-//! dice) are M4; the outcome of those boards is given by
-//! [`Game::screen_outcome`].
+//! The two maps are drawn ([`crate::maps`], `screens_draw`); the other
+//! screens' drawing, their hover animations and the boards played inside
+//! two of them (the unicorn's 3D board, the game boy's reflex dice) are
+//! M4; the outcome of those boards is given by [`Game::screen_outcome`].
+
+use std::sync::Arc;
 
 use atlantis2_engine::script::Host;
+use atlantis3_data::spr::Bank;
 
 use super::{Game, Hx, Screen};
+use crate::maps;
 
 /// The screens' globals.
 #[derive(Debug, Default, Clone)]
@@ -36,6 +40,15 @@ pub struct State {
     pub gboy_result: bool,
     pub gboy_blinks: i32,
     pub gboy_clock: f64,
+    /// `AtlCarte`'s bank `Carte.spr` (@ 0x0074e928), loaded with
+    /// `ldmorts.wam` (@ 0x00405bf0).
+    pub carte_bank: Option<Arc<Bank>>,
+    /// `AtlCarteTour`'s banks `CarteTour<W>.spr` (@ 0x0074e968) and
+    /// `PionsTour.spr` (@ 0x0074eb98), loaded by its first start
+    /// (@ 0x00406a10), and its pawns' animation.
+    pub tour_board: Option<Arc<Bank>>,
+    pub tour_pawns: Option<Arc<Bank>>,
+    pub tour_anim: maps::TourAnim,
 }
 
 impl State {
@@ -75,9 +88,25 @@ pub(super) fn start(h: &mut Hx, screen: Screen) {
             st.gboy_clock = now;
             h.g.puzzles.tourmagi.dice = 0;
         }
-        // @ 0x00431da0, 0x00405450, 0x00406620, 0x00409a40,
-        // 0x004cfee0 (0x0071f0e8 := 0, read by nobody), 0x0042e7a0:
-        // nothing the script sees besides the common part.
+        // @ 0x00405450: the pointer centred (@ 0x00431780), the cursor
+        // `Interface.spr` #40 (@ 0x00427f80), alpha 1.0.
+        Screen::Carte => {
+            h.g.pointer = maps::centre(h.g.width, h.g.height);
+        }
+        // @ 0x00406620: the banks loaded when one is empty (@ 0x00406a10),
+        // the pawns' clock at now, the pointer centred (@ 0x00431780), the
+        // cursor reset (@ 0x004282e0), alpha 1.0, the pawns' first frames
+        // (A @ 0x00789ad8, B @ 0x00789ad4).
+        Screen::CarteTour => {
+            h.g.tour_banks();
+            let t = &h.g.puzzles.tourmagi;
+            let anim = maps::TourAnim::start(t.demon, t.player, now);
+            h.g.puzzles.screens.tour_anim = anim;
+            h.g.pointer = maps::centre(h.g.width, h.g.height);
+        }
+        // @ 0x00431da0, 0x00409a40, 0x004cfee0 (0x0071f0e8 := 0, read by
+        // nobody), 0x0042e7a0: nothing the script sees besides the common
+        // part.
         _ => {}
     }
 }
@@ -93,7 +122,11 @@ pub(super) fn frame(
     match screen {
         Screen::Scarabee => scarabee(h, left, right),
         Screen::Carte => carte(h, left, right, sprite),
-        Screen::CarteTour => !(left || right),
+        Screen::CarteTour => {
+            // @ 0x00406780: drawn, then any click closes (@ 0x004069c9).
+            h.g.tour_draw();
+            !(left || right)
+        }
         Screen::Telecommande => telecommande(h, left, right, sprite),
         Screen::CraneBagdad => crane(h, left, right),
         Screen::Ecrin => ecrin(h, left, sprite),
@@ -153,44 +186,32 @@ fn scarabee(h: &mut Hx, left: bool, right: bool) -> bool {
 }
 
 /// `CARTE`, the Land of the Dead's map (@ 0x00405700). Every frame
-/// first: more than one feather carried (flags 535..544, less one for
-/// each pan of the scale holding one, flags 562 / 563) →
-/// `TROP_DE_PLUMES` := 1 and leave; the high priest not met (`flag80` =
-/// 0) → `GP_PAS_VU` := 1 and leave. A left click on map sprite k = 1..5
+/// first, before anything is drawn: more than one feather carried (flags
+/// 535..544, less one for each pan of the scale holding one, flags 562 /
+/// 563) → `TROP_DE_PLUMES` := 1 and leave; the high priest not met
+/// (`flag80` = 0) → `GP_PAS_VU` := 1 and leave. Then the map is drawn
+/// ([`maps::draw_carte`]). A left click on map sprite k = 1..5 at its
+/// drawn position (`sprite` when a test gives it, else the pointer's hit)
 /// → chapter 12, 14, 13, 15, 16 (all but 15: the fisherman gone once his
 /// scale is taken, flag 69); the current chapter → nothing; else
 /// `LDM_CHAPITRE_DEPART` := the chapter, `LDM_CHAPITRE_ARRIVEE` := the
 /// target, `(chapter=500)` and leave. A left click on nothing clears the
 /// clicks; a right click leaves.
 fn carte(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> bool {
-    let mut feathers: i32 = (535..=544).map(|f| h.flag(f)).sum();
-    if h.flag(562) != 0 {
-        feathers -= 1;
-    }
-    if h.flag(563) != 0 {
-        feathers -= 1;
-    }
-    if feathers > 1 {
-        h.set_var("TROP_DE_PLUMES", 1);
+    if let Some(r) = maps::carte_refusal(|f| h.flag(f as usize)) {
+        h.set_var(r.var(), 1);
         return false;
     }
-    if h.flag(80) == 0 {
-        h.set_var("GP_PAS_VU", 1);
-        return false;
-    }
-    // visual: the map, its five places' sprites (@ 0x00405520) (M4).
+    h.g.carte_draw();
     if !left {
         return !right;
     }
-    let target = match sprite {
-        Some(1) => 12,
-        Some(2) => 14,
-        Some(3) => 13,
-        Some(4) => 15,
-        Some(5) => 16,
+    let hit = sprite.or_else(|| h.g.carte_hit());
+    let target = match hit {
+        Some(k @ 1..=5) => maps::CARTE_CHAPTERS[k as usize - 1],
         _ => return true,
     };
-    if target != 15 && h.flag(69) == 1 && h.flag(560) != 1 {
+    if maps::carte_fishermen(target, h.flag(69), h.flag(560)) {
         h.set_flag(560, 1);
         h.run("(HidePerso=LDM_PECHEUR01)");
         h.run("(HidePerso=LDM_PECHEUR02)");
