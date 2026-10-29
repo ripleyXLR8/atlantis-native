@@ -107,6 +107,19 @@ struct Playing {
     back: Mode,
     /// The frame drawn last.
     shown: u32,
+    /// The caption (`loc\text\<lang>\CineNNN.txt`) and its fade.
+    caption: Option<crate::caption::CaptionFade>,
+    /// The cue lines (`hnm\cineNNN.txt`): the line, shown, done.
+    cues: Vec<(atlantis3_data::cine_txt::Cue, bool, bool)>,
+}
+
+/// The subtitle line (@ 0x0074f338): the text, its colour, and whether it
+/// is a caption (flag 0x00755751).
+#[derive(Clone, Debug)]
+struct Subtitle {
+    text: Vec<u8>,
+    rgb: [u8; 3],
+    caption: bool,
 }
 
 /// A move in progress (the globals @ 0x00756074..0x00756094).
@@ -216,6 +229,10 @@ pub struct Game {
     player: i32,
     saves: HashMap<String, Vec<u8>>,
     pub save_dir: Option<std::path::PathBuf>,
+    /// The text resources (loaded at the first text) and the subtitle
+    /// line.
+    texts: Option<crate::text::Texts>,
+    subtitle: Option<Subtitle>,
     /// The script asked to stop.
     pub quit: bool,
     /// What the scripts did that the port does not play yet (logged once
@@ -301,6 +318,8 @@ impl Game {
             banks_world: 0,
             sprite_hit: None,
             current_cd: 0,
+            texts: None,
+            subtitle: None,
             toupie_armed: false,
             player: atlantis3_data::save::DEFAULT_PLAYER,
             saves: HashMap::new(),
@@ -867,6 +886,8 @@ impl Game {
             travel,
             back,
             shown: 0,
+            caption: None,
+            cues: Vec::new(),
         });
         self.mode = Mode::Video;
         // The first frame at once.
@@ -904,6 +925,46 @@ impl Game {
         }
         if advanced {
             v.shown = v.cinema.frames_shown();
+            // The caption's fade and the cue lines (@ 0x00421c7f..).
+            let frame = v.shown as i32;
+            let fpu = self.camera.fpu;
+            if let Some(c) = v.caption.as_mut() {
+                for op in c.frame(frame, fpu) {
+                    self.subtitle = match op {
+                        crate::caption::CaptionOp::Set(rgb) => Some(Subtitle {
+                            text: c.caption.text.clone(),
+                            rgb,
+                            caption: true,
+                        }),
+                        crate::caption::CaptionOp::Clear => None,
+                    };
+                }
+            }
+            for (cue, shown, done) in v.cues.iter_mut() {
+                if *done {
+                    continue;
+                }
+                if !*shown && frame >= cue.from_frame {
+                    *shown = true;
+                    let text = self
+                        .texts
+                        .get_or_insert_with(|| {
+                            crate::text::Texts::load(&self.files, &self.startup.text_language())
+                        })
+                        .dial(cue.dialog, cue.line)
+                        .map(<[u8]>::to_vec)
+                        .unwrap_or_default();
+                    self.subtitle = Some(Subtitle {
+                        text,
+                        rgb: cue.rgb(),
+                        caption: false,
+                    });
+                }
+                if *shown && frame >= cue.to_frame {
+                    *done = true;
+                    self.subtitle = None;
+                }
+            }
             let (w, h) = v.cinema.size();
             stretch_video(
                 v.cinema.frame(),
@@ -914,7 +975,11 @@ impl Game {
                 self.height,
             );
         }
-        if v.cinema.ended() {
+        let ended = v.cinema.ended();
+        if advanced {
+            self.draw_subtitle();
+        }
+        if ended {
             self.end_video();
         }
     }
@@ -925,6 +990,7 @@ impl Game {
         let Some(v) = self.video.take() else {
             return;
         };
+        self.subtitle = None;
         self.audio.stop(CHANNEL_CINEMA);
         self.mode = v.back;
         if !v.travel {
@@ -1705,6 +1771,52 @@ impl Game {
         }
     }
 
+    fn texts(&mut self) -> &crate::text::Texts {
+        let lang = self.startup.text_language();
+        self.texts
+            .get_or_insert_with(|| crate::text::Texts::load(&self.files, &lang))
+    }
+
+    /// The subtitle line drawn by the flip (@ 0x0040de60) when
+    /// `SubTitleOn`: a caption centred in `AtlFont_Special`, a cue line
+    /// with its shadow.
+    fn draw_subtitle(&mut self) {
+        if !self.startup.config.subtitle_on {
+            return;
+        }
+        let Some(sub) = self.subtitle.clone() else {
+            return;
+        };
+        let (w, h) = (self.width, self.height);
+        let [r, g, b] = sub.rgb.map(u32::from);
+        let rgb = r << 16 | g << 8 | b;
+        self.texts();
+        let mut screen = std::mem::take(&mut self.screen);
+        let t = self.texts.as_ref().unwrap();
+        if sub.caption {
+            t.print(
+                &mut screen,
+                w,
+                h,
+                crate::text::FontId::Special,
+                &sub.text,
+                crate::text::CAPTION,
+                rgb,
+            );
+        } else {
+            t.print_shadowed(
+                &mut screen,
+                w,
+                h,
+                &sub.text,
+                crate::text::CUE_SHADOW,
+                crate::text::CUE_TEXT,
+                rgb,
+            );
+        }
+        self.screen = screen;
+    }
+
     fn not_ported(&mut self, what: &str) {
         if !self.not_ported.iter().any(|w| w == what) {
             log::warn!("not ported yet: {what}");
@@ -2131,7 +2243,27 @@ impl Host for Game {
             format!("hnm/HNM640/{folder}/{video}")
         };
         let back = self.mode;
-        self.start_video(&path, fps.max(0) as u32, false, back)
+        let started = self.start_video(&path, fps.max(0) as u32, false, back);
+        if started {
+            // The cue file and the caption file (`AtlHnm_Start`
+            // @ 0x00420f68, @ 0x00420faf).
+            let cues = self
+                .files
+                .read(&format!("hnm/{subtitles}"))
+                .map(|d| atlantis3_data::cine_txt::CueFile::parse(&d).cues)
+                .unwrap_or_default();
+            let text_lang = self.startup.text_language();
+            let caption = self
+                .files
+                .read(&format!("loc/text/{text_lang}/{subtitles}"))
+                .and_then(|d| atlantis3_data::cine_txt::Caption::parse(&d))
+                .map(crate::caption::CaptionFade::new);
+            if let Some(v) = self.video.as_mut() {
+                v.cues = cues.into_iter().map(|c| (c, false, false)).collect();
+                v.caption = caption;
+            }
+        }
+        started
     }
 
     /// `STARTMUSIK=n` (@ 0x0044c3b0): `music\<world>\Muzik0<n>.apc`,

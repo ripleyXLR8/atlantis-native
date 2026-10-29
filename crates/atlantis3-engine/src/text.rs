@@ -382,3 +382,90 @@ pub fn to_cp1252(ch: char) -> u8 {
     }
     (0x80u8..0xa0).find(|&b| cp1252(b) == ch).unwrap_or(b'?')
 }
+
+/// The game's text resources: the fonts of `font\font.txt`, the glyphs of
+/// `font\Atlantis.ttf` and the dialog texts of `loc\text\<lang>\Dial.txt`
+/// (the cue lines' and the dialogs' subtitles).
+pub struct Texts {
+    glyphs: Option<Glyphs>,
+    fonts: atlantis3_data::font_txt::FontTxt,
+    dial: HashMap<(i32, i32), Vec<u8>>,
+}
+
+impl Texts {
+    pub fn load(files: &atlantis3_data::A3Files, language: &str) -> Texts {
+        let strip = |p: &str| p.trim_start_matches("Datas/").to_string();
+        let glyphs = files
+            .read(&strip(atlantis3_data::font_txt::TTF_PATH))
+            .and_then(Glyphs::new);
+        if glyphs.is_none() {
+            log::warn!("font\\Atlantis.ttf missing: no text drawn");
+        }
+        let fonts = files
+            .read(&strip(atlantis3_data::font_txt::FONT_TXT_PATH))
+            .map(|d| atlantis3_data::font_txt::FontTxt::parse(&d))
+            .unwrap_or_default();
+        let dial = files
+            .read(&strip(&atlantis3_data::dialog::dial_path(language)))
+            .map(|d| {
+                atlantis3_data::dialog::parse_dial(&d)
+                    .lines
+                    .into_iter()
+                    .map(|l| ((l.dialog, l.line), l.text))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Texts {
+            glyphs,
+            fonts,
+            dial,
+        }
+    }
+
+    /// The text of line `line` of dialog `dialog` (`GetTextFromDial`).
+    pub fn dial(&self, dialog: i32, line: i32) -> Option<&[u8]> {
+        self.dial.get(&(dialog, line)).map(Vec::as_slice)
+    }
+
+    /// GDI's measurements of font `id` at a screen width.
+    pub fn gdi(&self, id: FontId, width: usize) -> Option<&'static GdiFont> {
+        let h = self.fonts.font(id.name())?.scaled_height(width as u32)?;
+        GdiFont::arial(h)
+    }
+
+    /// `AtlFont_SetLayout` + `AtlFont_Print` (@ 0x0041e190, @ 0x0041e2c0).
+    #[allow(clippy::too_many_arguments)]
+    pub fn print(
+        &self,
+        out: &mut [u16],
+        w: usize,
+        h: usize,
+        id: FontId,
+        text: &[u8],
+        zone: Zone,
+        rgb: u32,
+    ) {
+        let (Some(g), Some(gdi)) = (&self.glyphs, self.gdi(id, w)) else {
+            return;
+        };
+        let lines = layout(gdi, text, w as i32, h as i32, zone);
+        g.draw(gdi, &lines, rgb, out, w, h);
+    }
+
+    /// A text with its black shadow at (−1, +1): the dialog lines, the cue
+    /// lines and the voice slots.
+    #[allow(clippy::too_many_arguments)]
+    pub fn print_shadowed(
+        &self,
+        out: &mut [u16],
+        w: usize,
+        h: usize,
+        text: &[u8],
+        shadow: Zone,
+        zone: Zone,
+        rgb: u32,
+    ) {
+        self.print(out, w, h, FontId::Default, text, shadow, 0);
+        self.print(out, w, h, FontId::Default, text, zone, rgb);
+    }
+}
