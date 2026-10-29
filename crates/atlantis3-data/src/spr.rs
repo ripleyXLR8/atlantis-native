@@ -767,6 +767,85 @@ impl Bank {
         Some(())
     }
 
+    /// `SPR_COLLISION` (spr_p6 @ 0x10001240 → @ 0x100029ae; the 0x278
+    /// rows @ 0x100031f2): whether sprite `index`, drawn as
+    /// [`Bank::draw`] would at (x, y), covers (px, py). The pixel's row is
+    /// walked run by run with the distance d = px − run start: the run
+    /// with d ≤ its length decides (so a run's end pixel belongs to it):
+    /// a colour or pair run hits, a skip or shade run misses. Palette
+    /// families only.
+    pub fn opaque_at(&self, index: usize, x: Option<i32>, y: i32, px: i32, py: i32) -> bool {
+        if self.is_spw() {
+            return false;
+        }
+        let Some(at) = self.sprite_at(index) else {
+            return false;
+        };
+        let Some(info) = self.info_at(at) else {
+            return false;
+        };
+        let (x, y) = match (x, info.default_pos) {
+            (None, Some((dx, dy))) => (i32::from(dx), i32::from(dy)),
+            (None, None) => return false,
+            (Some(x), _) => (x, y),
+        };
+        if !matches!(
+            blitter(self.flags, self.depth),
+            Blitter::Draw(Rows::Palette { .. })
+        ) {
+            return false;
+        }
+        let half_shade = self.flags & 0x200 != 0;
+        let x0 = i32::from((x as i16).wrapping_sub(info.xoff));
+        let y0 = i32::from((y as i16).wrapping_sub(info.yoff));
+        let row = py - y0;
+        if row < 0 || row >= i32::from(info.h) || px < x0 || px >= x0 + i32::from(info.w) {
+            return false;
+        }
+        let d = &self.data;
+        let table = at + 8;
+        let first = table + 4 * usize::from(info.h);
+        let Some(off) = u32_at(d, table + 4 * row as usize) else {
+            return false;
+        };
+        let mut p = first + off as usize;
+        let mut sx = x0;
+        let mut prev = Run::Start;
+        loop {
+            let Some(&b) = d.get(p) else { return false };
+            p += 1;
+            let (run, n) = next_run(prev, b);
+            prev = run;
+            let n = n as i32;
+            let inside = px - sx <= n;
+            match run {
+                Run::End | Run::Start => return false,
+                Run::Skip => {}
+                Run::Pal => {
+                    if inside {
+                        return true;
+                    }
+                    p += n as usize;
+                }
+                Run::Pair => {
+                    if inside {
+                        return true;
+                    }
+                    p += 2 * n as usize;
+                }
+                Run::Shade => {
+                    if !half_shade {
+                        p += 1;
+                    }
+                }
+            }
+            if inside {
+                return false;
+            }
+            sx += n;
+        }
+    }
+
     /// `AFF_SPW` (spr_p5 @ 0x100023f0): face `face` of frame `frame` of a
     /// place-sprite file, its hot spot at (0, 0). False as [`Bank::draw`].
     pub fn draw_face<P: Pixel>(&self, t: &mut Target<P>, frame: usize, face: usize) -> bool {

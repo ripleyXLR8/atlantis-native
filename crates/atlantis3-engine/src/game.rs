@@ -93,6 +93,8 @@ pub enum Mode {
     Subjects,
     /// Mode 5: a dialog (`AtlDial_Continue` @ 0x0040d3e0).
     Dialog,
+    /// Mode 6: a menu page (@ 0x004591a0).
+    Menu,
     /// Nothing to show (before the intro, after the game stopped).
     Idle,
 }
@@ -244,6 +246,8 @@ pub struct Game {
     dialog_tick: bool,
     /// The field of view (@ 0x007182dc, radians).
     camera_fov: f32,
+    /// The menu page shown (mode 6).
+    page: Option<crate::menu::Page>,
     /// The script asked to stop.
     pub quit: bool,
     /// What the scripts did that the port does not play yet (logged once
@@ -343,6 +347,7 @@ impl Game {
                 r
             },
             dialog_tick: false,
+            page: None,
             camera_fov: warp_fov(Fpu::Double),
             toupie_armed: false,
             player: atlantis3_data::save::DEFAULT_PLAYER,
@@ -437,14 +442,131 @@ impl Game {
         self.moving.pending
     }
 
-    /// Shows the start page (`i_debut`); false when it cannot.
+    /// Shows the start page (`i_debut`, after the intro); false when it
+    /// cannot.
     pub fn show_start_page(&mut self) -> bool {
-        false
+        self.show_page("i_debut")
     }
 
-    /// Shows the save page (`i_save`); false when it cannot.
+    /// Shows the in-game menu (`i_princ`, whose `BT_SAVE` saves the game);
+    /// false when it cannot.
     pub fn show_save_page(&mut self) -> bool {
-        false
+        self.show_page("i_princ")
+    }
+
+    /// Shows the load page (`i_load`): its static elements (the saves'
+    /// thumbnails are not drawn yet).
+    pub fn show_load_page(&mut self) -> bool {
+        self.show_page("i_load")
+    }
+
+    fn show_page(&mut self, name: &str) -> bool {
+        let Some(page) = crate::menu::Page::load(&self.files, name, self.width, self.height) else {
+            return false;
+        };
+        if self.mode != Mode::Menu {
+            self.prev_mode = self.mode;
+        }
+        self.page = Some(page);
+        self.mode = Mode::Menu;
+        self.click = false;
+        true
+    }
+
+    /// The menu page shown, if any.
+    pub fn page(&self) -> Option<&crate::menu::Page> {
+        self.page.as_ref()
+    }
+
+    /// A menu frame: the page drawn, then a click (on release) on its
+    /// elements: on the start page, player n's new game or newest save;
+    /// in the in-game menu, `BT_SAVE` writes the next save of the player,
+    /// `BT_BACK` goes back to the game.
+    fn menu_frame(&mut self) {
+        let Some(mut page) = self.page.take() else {
+            self.mode = Mode::Idle;
+            return;
+        };
+        let (w, h) = (self.width, self.height);
+        self.screen.fill(0);
+        page.frame(&mut self.screen, w, h, self.pointer, self.now);
+        let clicked = std::mem::take(&mut self.click)
+            .then(|| page.clicked(self.pointer).map(<[u8]>::to_vec))
+            .flatten();
+        let name = page.name.clone();
+        self.page = Some(page);
+        let Some(el) = clicked else { return };
+        match (name.as_str(), el.as_slice()) {
+            ("i_debut", b"BT_QUIT") => self.quit = true,
+            ("i_debut", n) if n.starts_with(b"BT_LOAD") => {
+                let player = i32::from(n[n.len() - 1].wrapping_sub(b'0'));
+                self.new_game_or_load(player);
+            }
+            ("i_princ", b"BT_SAVE") => {
+                self.save_game();
+                self.leave_menu();
+            }
+            (_, b"BT_BACK") => self.leave_menu(),
+            _ => {}
+        }
+    }
+
+    fn leave_menu(&mut self) {
+        self.page = None;
+        self.mode = if self.prev_mode == Mode::Menu {
+            Mode::Warp
+        } else {
+            self.prev_mode
+        };
+        self.look_last = None;
+    }
+
+    /// The start page's player n (@ 0x00452000): `(chapter=600)` when
+    /// `game<n>_1.sav` does not exist, else the newest of the run of saves
+    /// from 1 loaded.
+    pub fn new_game_or_load(&mut self, player: i32) -> bool {
+        self.player = player;
+        self.page = None;
+        let mut newest = None;
+        for k in 1.. {
+            let name = atlantis3_data::save::game_save_name(player, k);
+            if self.read_save(&name).is_none() {
+                break;
+            }
+            newest = Some(name);
+        }
+        match newest {
+            None => self.new_game(),
+            Some(name) => {
+                self.mode = Mode::Warp;
+                let ok = self.load_named(&name);
+                self.look_last = None;
+                ok
+            }
+        }
+    }
+
+    /// Loads save `name` (the loader @ 0x0045b750).
+    fn load_named(&mut self, name: &str) -> bool {
+        let Some(d) = self.read_save(name) else {
+            return false;
+        };
+        let save = atlantis3_data::save::SaveGame::parse(&d);
+        let data = load_data(&save);
+        self.with_script(|s, h| s.load_a3(h, &data))
+    }
+
+    /// The player's next save `game<P>_<N>.sav` (the first N free,
+    /// @ 0x0045e300); its name.
+    pub fn save_game(&mut self) -> Option<String> {
+        let name = (1..)
+            .map(|k| atlantis3_data::save::game_save_name(self.player, k))
+            .find(|n| self.read_save(n).is_none())?;
+        let s = self.script.take()?;
+        let data = self.save_text(&s);
+        self.script = Some(s);
+        self.store_save(&name, data);
+        Some(name)
     }
 
     /// Whether a dialog plays.
@@ -514,7 +636,7 @@ impl Game {
     /// turning, the turn speeds gain dx / 2000 and lose dy / 2000; the
     /// centre zone is picked again.
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
-        if matches!(self.mode, Mode::Inventory | Mode::Subjects) {
+        if matches!(self.mode, Mode::Inventory | Mode::Subjects | Mode::Menu) {
             // The free pointer, clamped to the screen (@ 0x004313f6).
             self.pointer.0 = (self.pointer.0 + dx).clamp(0, self.width as i32 - 1);
             self.pointer.1 = (self.pointer.1 + dy).clamp(0, self.height as i32 - 1);
@@ -870,6 +992,7 @@ impl Game {
             Mode::Warp => self.warp_frame(),
             Mode::Inventory | Mode::Subjects => self.overlay_frame(),
             Mode::Dialog => self.dialog_frame(),
+            Mode::Menu => self.menu_frame(),
             Mode::Idle => {}
         }
     }
