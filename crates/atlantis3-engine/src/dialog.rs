@@ -351,6 +351,10 @@ pub struct Running {
     pub voice_calls: u32,
     /// The head's animation frame (+0x10).
     pub head_frame: i32,
+    /// The line's lip-sync analyser (+0x358) and the voice's start
+    /// (@ 0x00785538).
+    pub lipsync: Option<crate::lipsync::LipSync>,
+    pub voice_start: f64,
     /// The loop mode to go back to (@ 0x0074f34c).
     pub back: crate::game::Mode,
     /// The dialog surface (640 x 480).

@@ -272,6 +272,39 @@ impl Camera {
         }
     }
 
+    /// *Atlantis III*'s dialog camera (@ 0x004fa0b0 then @ 0x004fb8e0): the
+    /// reference frame `w` x `h`, aspect w/h, centre (w/2, h/2), viewport
+    /// 0..w−1 x 0..h−1.
+    fn sized(fpu: Fpu, c: &atlantis2_data::db::Camera, w: f64, h: f64) -> Camera {
+        let k = fpu;
+        let fov = f64::from(c.fov);
+        let fx = k.div(w, k.mul(libm::tan(k.mul(fov, 0.5)), 2.0));
+        let fy = k.f(k.mul(fx, k.div(k.div(w, h), k.div(w, h))));
+        let fx = k.f(fx);
+        let (cx, cy) = (w / 2.0, h / 2.0);
+        let (near, far) = (f64::from(c.near), f64::from(c.far));
+        let slopes = [
+            k.f(k.div(k.sub(k.sub(0.0, cx), 1.0), fx)),
+            k.f(k.div(k.sub(k.sub(0.0, cy), 1.0), fy)),
+            k.f(k.div(k.add(k.sub(w - 1.0, cx), 1.0), fx)),
+            k.f(k.div(k.add(k.sub(h - 1.0, cy), 1.0), fy)),
+        ];
+        let a = k.div(far, k.sub(far, near));
+        Camera {
+            fx,
+            fy,
+            cx,
+            cy,
+            near,
+            far,
+            slopes,
+            a: k.f(a),
+            b: k.f(k.mul(a, near)),
+            q: q64(c.rotation),
+            p: v64(c.position),
+        }
+    }
+
     /// The HD mode (a port addition): the same camera for a frame `tile`
     /// / 16 times 640 x 480 (`w` x `h` pixels), the screen point (sx, sy)
     /// of the original becoming (s·sx, s·sy): fx, fy, cx and cy times s
@@ -386,7 +419,25 @@ pub struct Head {
     /// Idle mouth accumulator and speed (+0x158, +0x15c).
     idle_acc: f64,
     idle_speed: f64,
+    /// *Atlantis III*'s head (`None` for *Atlantis II*'s).
+    a3: Option<A3Head>,
 }
+
+/// What an *Atlantis III* head adds (atlantis3-gog-fr-3473408: the
+/// speaker @ 0x00477d20, its stand @ 0x004782c0): the mesh prefix of its
+/// keys and cameras, the glance maps, the eye state (+0x2c4) and the eye
+/// weight (+0x2c8).
+struct A3Head {
+    prefix: String,
+    right: Option<Tga>,
+    left: Option<Tga>,
+    eyes: i32,
+    k: f32,
+}
+
+/// The mouth keys of the lip-sync's slots 0..7 (`PlayMorphingKey`
+/// @ 0x0047d930).
+pub const A3_MOUTH_KEYS: [&str; 8] = ["s", "i", "a", "e", "o", "w", "n", "p"];
 
 /// Objects the loader creates: a name with `-d`, or with no `-` at all
 /// (@ 0x00462550); the other mouth-shape helpers are left out.
@@ -554,7 +605,310 @@ impl Head {
             blink: 1,
             idle_acc: 0.0,
             idle_speed: 0.5,
+            a3: None,
         })
+    }
+
+    /// An *Atlantis III* head (`AddStand` @ 0x004782c0 → `LoadDataBase`
+    /// @ 0x0047bf50): the scene objects whose name holds `-base` (the head
+    /// is the last whose mesh holds `-base`; no skeleton), the morph keys
+    /// `<prefix>-<key>`, the cameras `<prefix>-c1`, `-c2`... set up for a
+    /// `width` x `height` frame (centre and aspect at that size), the face
+    /// map with its eye maps (`yf` closed, `ymf` half, `yd` / `yg` the
+    /// glances), drawn by the Pentium II's transform and the affine
+    /// `Zi32Texture16Linear1516II`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_a3(
+        fpu: Fpu,
+        scene: &Scene,
+        prefix: &str,
+        width: usize,
+        height: usize,
+        open: Tga,
+        eyes: [Option<Tga>; 4],
+    ) -> Result<Head, HeadError> {
+        let base = |n: &str| n.contains("-base");
+        let mut objects: Vec<&atlantis2_data::db::Object> =
+            scene.objects.iter().filter(|o| base(&o.name)).collect();
+        objects.sort_by(|a, b| a.name.as_bytes().cmp(b.name.as_bytes()));
+        let mut nodes = Vec::new();
+        let mut stack: Vec<(Option<usize>, &str)> = vec![(None, "")];
+        while let Some((parent, pname)) = stack.pop() {
+            if nodes.len() > objects.len() {
+                break;
+            }
+            let children: Vec<_> = objects.iter().filter(|o| o.parent == pname).collect();
+            let first = nodes.len();
+            for o in &children {
+                let lq = matq(fpu, &qmat(fpu, &q64(o.rotation)));
+                nodes.push(Node {
+                    name: o.name.clone(),
+                    parent,
+                    lq,
+                    lp: v64(o.position),
+                    ls: f64::from(o.scale),
+                    wq: [0.0; 4],
+                    wp: [0.0; 3],
+                    ws: 1.0,
+                    valid: false,
+                });
+            }
+            for (i, o) in children.iter().enumerate().rev() {
+                stack.push((Some(first + i), o.name.as_str()));
+            }
+        }
+        // The head: the last scene object whose mesh holds `-base`.
+        let (head, mesh) = nodes
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(i, n)| {
+                let o = scene.object(&n.name)?;
+                let m = scene.mesh(&o.mesh)?;
+                o.mesh.contains("-base").then_some((i, m))
+            })
+            .ok_or(HeadError::NoHeadMesh)?;
+        // Atlantis III's track builder (@ 0x00509ce0) copies the TCB
+        // rotation and position keys only: no scale keys, no linear keys;
+        // the node keeps its object's scale.
+        let tracks = nodes
+            .iter()
+            .map(|n| {
+                let d = scene.node(&n.name)?;
+                let t = Track {
+                    rotations: d
+                        .rotation_keys
+                        .iter()
+                        .map(|(t, q)| (f64::from(*t as f32), q64(*q)))
+                        .collect(),
+                    positions: d
+                        .position_keys
+                        .iter()
+                        .map(|(t, p)| (f64::from(*t as f32), v64(*p)))
+                        .collect(),
+                    scales: Vec::new(),
+                };
+                (!(t.rotations.is_empty() && t.positions.is_empty())).then_some(t)
+            })
+            .collect();
+        let mut morphs = BTreeMap::new();
+        if let Some(m) = scene.node("morphing") {
+            for (name, verts) in &m.morph_keys {
+                morphs.insert(
+                    name.as_bytes().to_vec(),
+                    verts.iter().map(|v| v64(*v)).collect(),
+                );
+            }
+        }
+        let n = mesh.face_count as usize;
+        let corners: Vec<[u16; 3]> = (0..n)
+            .map(|i| std::array::from_fn(|k| mesh.corners.get(3 * i + k).copied().unwrap_or(0)))
+            .collect();
+        let uvs = (0..n)
+            .map(|i| {
+                std::array::from_fn(|k| {
+                    mesh.uvs[0]
+                        .get(3 * i + k)
+                        .map_or([0.0; 2], |uv| [f64::from(uv[0]), f64::from(uv[1])])
+                })
+            })
+            .collect();
+        // The cameras by name (@ 0x0047dfb0: `<prefix>-c<n>`, n from 1).
+        let mut cameras = Vec::new();
+        for i in 1.. {
+            let name = format!("{prefix}-c{i}");
+            let Some(c) = scene
+                .cameras
+                .iter()
+                .find(|c| c.name.eq_ignore_ascii_case(&name))
+            else {
+                break;
+            };
+            cameras.push(Camera::sized(fpu, c, width as f64, height as f64));
+        }
+        if cameras.is_empty() {
+            return Err(HeadError::NoCamera);
+        }
+        let [closed, half, right, left] = eyes;
+        let base_name = format!("{prefix}-base").into_bytes();
+        let vertices = morphs
+            .get(&base_name)
+            .cloned()
+            .unwrap_or_else(|| mesh.vertices.iter().map(|v| v64(*v)).collect());
+        Ok(Head {
+            fpu,
+            variant: Variant::PII,
+            nodes,
+            tracks,
+            head,
+            mesh: Mesh {
+                corners,
+                uvs,
+                flat: vec![false; n],
+            },
+            name: base_name,
+            vertices,
+            morphs,
+            cameras,
+            texture: open.pixels.clone(),
+            tex_w: open.width,
+            tex_h: open.height,
+            open,
+            closed,
+            half,
+            blink: 0,
+            idle_acc: 0.0,
+            idle_speed: 0.5,
+            a3: Some(A3Head {
+                prefix: prefix.to_string(),
+                right,
+                left,
+                eyes: 0,
+                k: 0.0,
+            }),
+        })
+    }
+
+    /// *Atlantis III*'s mouth (`PlayMorphingKey` @ 0x0047d930): the mood
+    /// key copied (`-base` for mood 0, `-h<mood>` otherwise), then for each
+    /// slot with a weight, a lerp toward its key by its factor (slots 0..7
+    /// the mouth keys, slot 8 the mood key); without a voice (`None`), the
+    /// `-base` key alone.
+    pub fn mouth_a3(&mut self, mood: i32, weights: Option<&[f32; 9]>, factors: &[f32; 9]) {
+        let Some(a3) = &self.a3 else { return };
+        let prefix = a3.prefix.clone();
+        let mood_key = if mood == 0 {
+            format!("{prefix}-base")
+        } else {
+            format!("{prefix}-h{mood}")
+        };
+        let Some(w) = weights else {
+            self.name = format!("{prefix}-base").into_bytes();
+            self.copy_key();
+            return;
+        };
+        self.name = mood_key.clone().into_bytes();
+        self.copy_key();
+        for c in 0..9 {
+            if w[c] == 0.0 {
+                continue;
+            }
+            self.name = if c < 8 {
+                format!("{prefix}-{}", A3_MOUTH_KEYS[c]).into_bytes()
+            } else {
+                mood_key.clone().into_bytes()
+            };
+            self.lerp_key(f64::from(factors[c]));
+        }
+    }
+
+    /// *Atlantis III*'s eyes, one step per dialog tick (@ 0x004790d0): x =
+    /// f32(rand() · k · 1/32767); state 0: a blink (x > 0.96, map `yf`) or
+    /// a glance (x > 0.94 `yd`, x > 0.92 `yg`); 1: `ymf`; 2: open; 3: open
+    /// again (x > 0.95) or a blink (x > 0.75); k back to 0 at each event,
+    /// else k + 0.05 below 1.
+    pub fn eyes_a3(&mut self, rand: &mut Rand) {
+        let c = self.fpu;
+        let Some(a3) = self.a3.as_mut() else { return };
+        let x = c.f(c.mul(
+            c.mul(f64::from(rand.rand()), f64::from(a3.k)),
+            f64::from(f32::from_bits(0x3800_0100)),
+        ));
+        let gt = |v: u32| x > f64::from(f32::from_bits(v));
+        let blit = |tex: &mut Vec<u16>, w: usize, h: usize, src: &Tga| {
+            for y in 0..src.height.min(h) {
+                let n = src.width.min(w);
+                tex[y * w..y * w + n]
+                    .copy_from_slice(&src.pixels[y * src.width..y * src.width + n]);
+            }
+        };
+        let (w, h) = (self.tex_w, self.tex_h);
+        let mut map: Option<u8> = None;
+        match a3.eyes {
+            0 => {
+                if gt(0x3f75_c28f) {
+                    map = Some(1);
+                    a3.k = 0.0;
+                    a3.eyes = 1;
+                } else if gt(0x3f70_a3d7) {
+                    map = Some(3);
+                    a3.k = 0.0;
+                    a3.eyes = 3;
+                } else if gt(0x3f6b_851f) {
+                    map = Some(4);
+                    a3.k = 0.0;
+                    a3.eyes = 3;
+                }
+            }
+            1 => {
+                map = Some(2);
+                a3.eyes = 2;
+            }
+            2 => {
+                map = Some(0);
+                a3.eyes = 0;
+            }
+            3 => {
+                if gt(0x3f73_3333) {
+                    map = Some(0);
+                    a3.k = 0.0;
+                    a3.eyes = 0;
+                } else if gt(0x3f40_0000) {
+                    map = Some(1);
+                    a3.k = 0.0;
+                    a3.eyes = 1;
+                }
+            }
+            _ => {}
+        }
+        if a3.k < 1.0 {
+            a3.k = c.f32(c.add(f64::from(a3.k), f64::from(f32::from_bits(0x3d4c_cccd))));
+        }
+        let src = match map {
+            Some(0) => Some(&self.open),
+            Some(1) => self.closed.as_ref(),
+            Some(2) => self.half.as_ref(),
+            Some(3) => self.a3.as_ref().and_then(|a| a.right.as_ref()),
+            Some(4) => self.a3.as_ref().and_then(|a| a.left.as_ref()),
+            _ => None,
+        };
+        if let Some(src) = src.cloned() {
+            blit(&mut self.texture, w, h, &src);
+        }
+    }
+
+    /// The eye state and weight (tests).
+    pub fn eyes_state_a3(&self) -> Option<(i32, f32)> {
+        self.a3.as_ref().map(|a| (a.eyes, a.k))
+    }
+
+    /// *Atlantis III*'s head draw (@ 0x00479330 → @ 0x0047dfb0) with camera
+    /// `cam` (1-based) into a `w` x `h` frame and its Z buffer.
+    pub fn display_a3(
+        &mut self,
+        cam: usize,
+        pixels: &mut [u16],
+        zbuf: &mut [u32],
+        w: usize,
+        h: usize,
+    ) -> Stages {
+        let Some(c) = cam
+            .checked_sub(1)
+            .and_then(|i| self.cameras.get(i))
+            .cloned()
+        else {
+            log::warn!("head camera {cam} out of range");
+            return Stages::default();
+        };
+        self.draw_with(
+            &c,
+            &mut Target {
+                pixels,
+                zbuf,
+                width: w,
+                height: h,
+            },
+        )
     }
 
     /// The number of cameras (a line's camera index selects one).
@@ -955,6 +1309,9 @@ impl Head {
             }
             match self.variant {
                 Variant::C => draw_polygon(k, &mut poly, &tex, target),
+                Variant::PII if self.a3.is_some() => {
+                    crate::raster3d::linear_ii::draw_polygon(&mut poly, &tex, target)
+                }
                 Variant::PII => ii::draw_polygon(&mut poly, &tex, target),
             }
             drawn = true;

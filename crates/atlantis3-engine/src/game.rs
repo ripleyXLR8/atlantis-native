@@ -244,6 +244,8 @@ pub struct Game {
     dialog_tick: bool,
     /// The field of view (@ 0x007182dc, radians).
     camera_fov: f32,
+    /// The speakers' heads by (mesh, stand), loaded at their first line.
+    heads: HashMap<(String, i32), Option<atlantis2_engine::head::Head>>,
     /// The menu page shown (mode 6).
     page: Option<crate::menu::Page>,
     /// Tests: the dialog events logged, and the voice model (a voice
@@ -252,6 +254,10 @@ pub struct Game {
     pub dialog_events: Option<Vec<String>>,
     #[doc(hidden)]
     pub voice_model: Option<u32>,
+    /// Tests: the speakers' ticks and heads (off: as a harness that stubs
+    /// them, no `rand` drawn by the eyes).
+    #[doc(hidden)]
+    pub dialog_heads: bool,
     /// The script asked to stop.
     pub quit: bool,
     /// What the scripts did that the port does not play yet (logged once
@@ -352,8 +358,10 @@ impl Game {
             },
             dialog_tick: false,
             page: None,
+            heads: HashMap::new(),
             dialog_events: None,
             voice_model: None,
+            dialog_heads: true,
             camera_fov: warp_fov(Fpu::Double),
             toupie_armed: false,
             player: atlantis3_data::save::DEFAULT_PLAYER,
@@ -2038,6 +2046,8 @@ impl Game {
             voice_end: None,
             voice_calls: 0,
             head_frame: 0,
+            lipsync: None,
+            voice_start: 0.0,
             back: self.mode,
             surface: vec![0; sw * sh],
         });
@@ -2106,13 +2116,38 @@ impl Game {
             self.audio.play(CHANNEL_VOICE, rate, ch, pcm, false, [g, g]);
             self.now + frames / f64::from(rate.max(1))
         });
+        // The line's lip-sync analyser (@ 0x00466890), not for a
+        // voice-over.
+        let lipsync = if voixoff {
+            None
+        } else {
+            let perso = self
+                .dialogs
+                .as_ref()
+                .and_then(|d| d.perso(&e.speaker))
+                .cloned();
+            match (perso, self.sound(&voice)) {
+                (Some(p), Some((_, _, pcm))) => Some(crate::lipsync::LipSync::new(
+                    atlantis2_engine::Fpu::Chop,
+                    &pcm,
+                    p.smooth,
+                    p.stretch,
+                    p.tab_weights,
+                    crate::lipsync::gw08(atlantis2_engine::Fpu::Chop, p.global_weight),
+                )),
+                _ => None,
+            }
+        };
         let v = voice.replace('/', "\\");
         self.ev(|| format!("LoadSfx({v})"));
         self.ev(|| format!("Play({v})"));
+        let now = self.now;
         if let Some(r) = self.running.as_mut() {
             r.voice_end = end;
             r.voice_calls = 0;
             r.head_frame = 0;
+            r.lipsync = lipsync;
+            r.voice_start = now;
         }
         true
     }
@@ -2183,6 +2218,17 @@ impl Game {
             }
             let f = r.head_frame;
             self.ev(|| format!("HeadStep({f})"));
+            self.running = Some(r);
+            // The speaker's tick (@ 0x004790d0): the eyes, the pose.
+            if let Some(e) = self.dialog_entry().filter(|_| self.dialog_heads) {
+                let mut rand = std::mem::replace(&mut self.rand, Rand::new(0));
+                if let Some(h) = self.head(&e.speaker, e.stand) {
+                    h.eyes_a3(&mut rand);
+                    h.pose(f);
+                }
+                self.rand = rand;
+            }
+            return true;
         }
         self.running = Some(r);
         true
@@ -2317,10 +2363,16 @@ impl Game {
         if !r.voixoff {
             let (sw, sh) = crate::dialog::SURFACE;
             let (w, h) = (self.width, self.height);
+            // The body surface into the destination, then the head over it
+            // with a Z buffer cleared to 0 (@ 0x00467c70), then the stretch.
+            let mut dest = r.surface.clone();
+            if self.dialog_heads {
+                self.draw_head(&mut dest);
+            }
             for y in 0..h {
                 let sy = y * sh / h;
                 for x in 0..w {
-                    self.screen[y * w + x] = r.surface[sy * sw + x * sw / w];
+                    self.screen[y * w + x] = dest[sy * sw + x * sw / w];
                 }
             }
         }
@@ -2341,6 +2393,73 @@ impl Game {
                 self.screen = screen;
             }
         }
+    }
+
+    /// The current speaker's head (`AddStand` @ 0x004782c0), loaded at its
+    /// first use: `mesh\<mesh>s<stand>.db`, `map\Stand<stand>\<mesh>.tga`
+    /// and its eye maps.
+    fn head(&mut self, speaker: &str, stand: i32) -> Option<&mut atlantis2_engine::head::Head> {
+        let mesh = self.dialogs.as_ref()?.perso(speaker)?.mesh.clone();
+        let key = (mesh.clone(), stand);
+        if !self.heads.contains_key(&key) {
+            let files = &self.files;
+            let tga = |n: String| {
+                files
+                    .read(&format!("map/Stand{stand}/{n}.tga"))
+                    .and_then(|d| atlantis2_data::tga::Tga::parse(&d).ok())
+            };
+            let (sw, sh) = crate::dialog::SURFACE;
+            let head = files
+                .read(&format!("mesh/{mesh}s{stand}.db"))
+                .and_then(|d| atlantis3_data::db::parse(&d).ok())
+                .and_then(|scene| {
+                    let open = tga(mesh.clone())?;
+                    atlantis2_engine::head::Head::new_a3(
+                        atlantis2_engine::Fpu::Chop,
+                        &scene,
+                        &mesh,
+                        sw,
+                        sh,
+                        open,
+                        [
+                            tga(format!("{mesh}yf")),
+                            tga(format!("{mesh}ymf")),
+                            tga(format!("{mesh}yd")),
+                            tga(format!("{mesh}yg")),
+                        ],
+                    )
+                    .map_err(|e| log::warn!("{mesh}s{stand}.db: {e}"))
+                    .ok()
+                });
+            self.heads.insert(key.clone(), head);
+        }
+        self.heads.get_mut(&key)?.as_mut()
+    }
+
+    /// The lip-sync and the mouth (@ 0x00469870), then the head drawn over
+    /// `dest` (@ 0x00469910) with the line's camera.
+    fn draw_head(&mut self, dest: &mut [u16]) {
+        let Some(e) = self.dialog_entry() else { return };
+        let fpu = atlantis2_engine::Fpu::Chop;
+        let now = self.now;
+        let weights = self.running.as_mut().and_then(|r| {
+            let t = crate::lipsync::t_of(fpu, now - r.voice_start);
+            r.lipsync.as_mut().and_then(|l| l.eval(t))
+        });
+        let humeur = self.startup.config.humeur;
+        let Some(h) = self.head(&e.speaker, e.stand) else {
+            return;
+        };
+        let mood = if humeur && e.speaker == "hero" {
+            e.mood + 4
+        } else {
+            e.mood
+        };
+        let factors = weights.map_or([0.0; 9], |w| crate::lipsync::lerp_factors(fpu, &w));
+        h.mouth_a3(mood, weights.as_ref(), &factors);
+        let (sw, sh) = crate::dialog::SURFACE;
+        let mut z = vec![0u32; sw * sh];
+        h.display_a3(e.camera.max(1) as usize, dest, &mut z, sw, sh);
     }
 
     /// `AtlDial_Close` (@ 0x0040e3b0): the hidden animation shown, the

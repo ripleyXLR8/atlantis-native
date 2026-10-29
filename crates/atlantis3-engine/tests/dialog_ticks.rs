@@ -53,6 +53,8 @@ fn the_dialog_loop_as_the_original() {
     }
     g.reload_dialogs(1);
     g.voice_model = Some(3);
+    // The harness stubbed the speakers' ticks and the heads.
+    g.dialog_heads = false;
     g.dialog_events = Some(Vec::new());
     // Blocks: a header line and its events.
     let mut blocks: Vec<(String, Vec<String>)> = Vec::new();
