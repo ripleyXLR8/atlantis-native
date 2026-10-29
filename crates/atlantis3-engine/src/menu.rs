@@ -85,13 +85,7 @@ impl Page {
     fn frame_of(it: &Item) -> usize {
         match it.el.element_type() {
             ElementType::BtAnime => usize::from(it.hovered),
-            ElementType::BtAnime2 => {
-                if it.hovered {
-                    it.counter.max(0) as usize
-                } else {
-                    0
-                }
-            }
+            ElementType::BtAnime2 if it.hovered => it.counter.max(0) as usize,
             _ => 0,
         }
     }
