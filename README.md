@@ -279,6 +279,11 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
 - 🎮 [Atlantis Native on the R36S](https://github.com/Klaasvdb/atlantis-native-handheld),
   by Klaas Van den Broeck: a frontend that runs Atlantis Native on RK3326
   handhelds, with the gamepad as the mouse.
+- 🕹️ Handhelds and PortMaster: `crates/atlantis-sdl` is an SDL2 front end
+  for the first game (the gamepad as the mouse, an on-screen keyboard for
+  the names) based on Klaas Van den Broeck's (@Klaasvdb) R36S front end,
+  whose gamepad and keyboard code he let us bring in; `packaging/portmaster/`
+  builds a PortMaster port of it (see the [technical notes](docs/TECHNICAL.md#the-sdl2-front-end-handhelds-and-portmaster)).
 
 ## Code signing policy
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gameList>
+  <game>
+    <path>./Atlantis Native.sh</path>
+    <name>Atlantis: The Lost Tales (Atlantis Native)</name>
+    <desc>Atlantis Native, a reimplementation of Cryo's 1997 adventure Atlantis: The Lost Tales. Explore Atlantis in panoramic views, talk to its people and solve its puzzles. Needs the files of your own copy of the game (a CD release or GOG.com).</desc>
+    <releasedate>19970101T000000</releasedate>
+    <developer>Cryo Interactive / ripleyXLR8</developer>
+    <publisher>Open Source</publisher>
+    <genre>Adventure</genre>
+    <image>./atlantisnative/cover.png</image>
+  </game>
+</gameList>
