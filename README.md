@@ -283,7 +283,9 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
   for the first game (the gamepad as the mouse, an on-screen keyboard for
   the names) based on Klaas Van den Broeck's (@Klaasvdb) R36S front end,
   whose gamepad and keyboard code he let us bring in; `packaging/portmaster/`
-  builds a PortMaster port of it (see the [technical notes](docs/TECHNICAL.md#the-sdl2-front-end-handhelds-and-portmaster)).
+  builds a PortMaster port of it; a pad SDL does not know is read raw, an
+  Xbox-style one (an Xbox Wireless Controller over Bluetooth, for one)
+  without any `controls.ini` (see the [technical notes](docs/TECHNICAL.md#the-sdl2-front-end-handhelds-and-portmaster)).
 
 ## Code signing policy
 

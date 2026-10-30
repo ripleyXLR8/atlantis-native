@@ -43,7 +43,12 @@ types a space, Y switches upper / lower case, Start confirms (Enter).
 Options menu: D-pad up / down chooses, left / right or A changes, B or
 Select closes it.
 
-A pad SDL does not know falls back to raw button numbers: run
+A pad SDL does not know falls back to raw button numbers. An Xbox-style
+pad (an Xbox Wireless Controller over Bluetooth, 8BitDo and the like, with
+10 or 11 buttons) gets the Linux order (A B X Y LB RB View Start Xbox LS RS,
+View and the Xbox button as Select, the right stick on axes 3 / 4, the D-pad
+as a hat) and works without a `controls.ini`; any other pad gets the R36S's
+numbering. To change it, run
 `atlantis-native-sdl.aarch64 --input-test` over SSH in
 `ports/atlantisnative`, press every button and write the numbers into
 `ports/atlantisnative/controls.ini` (`a = 1`, `b = 0`, `start = 13`, `lx = 0`,

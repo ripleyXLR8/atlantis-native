@@ -851,7 +851,12 @@ their headers.
   (`OptionsMenu` without its HD, full screen, library and support
   entries) on Select, F10 or O, the game paused while it is open.
 - `pad.rs`: the SDL devices. A pad SDL maps is read as a game controller,
-  another as a raw joystick numbered by `controls.ini`; only the events of
+  another as a raw joystick numbered by a preset chosen from its name,
+  GUID vendor and button / axis counts (`config::Preset::for_device`:
+  the Linux evdev order for an Xbox-style pad with 10 or 11 buttons and 5
+  axes or more, such as an Xbox Wireless Controller over Bluetooth, which
+  SDL does not map; the R36S's numbering otherwise) and changed by
+  `controls.ini`; only the events of
   the pad in use count; an unplugged pad lets go of what it held (its
   mouse button or key released in the game) and the next connected one
   takes over; one plugged in later is taken.
@@ -872,7 +877,7 @@ their headers.
   held near full tilt doubles its gain at full tilt and speeds up to three
   times after a third of a second, over 1.5 s.
 - `osk.rs`: the on-screen keyboard (a strip of letters over the frame).
-- `config.rs`: `controls.ini`.
+- `config.rs`: `controls.ini` and the raw presets.
 
 `packaging/portmaster/` holds the PortMaster port (`atlantisnative`, laid
 out as in PortsMaster/PortMaster-New: launcher, `port.json`,

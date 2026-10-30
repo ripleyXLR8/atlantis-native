@@ -11,14 +11,15 @@
 //! SDL's game controller mapping is used when SDL knows the pad (its own
 //! database, `$SDL_GAMECONTROLLERCONFIG`, or a `gamecontrollerdb.txt` next
 //! to the program); otherwise the raw joystick, its buttons and axes
-//! numbered as `controls.ini` next to the program says
-//! ([`atlantis_sdl::config`]).
+//! numbered by a preset chosen by the device (the R36S's, or the Linux
+//! evdev order of an Xbox-style pad) as changed by `controls.ini` next to
+//! the program ([`atlantis_sdl::config`]).
 
 use std::collections::HashMap;
 use std::path::Path;
 
 use atlantis_sdl::buttons::{Action, Btn, Buttons};
-use atlantis_sdl::config::Controls;
+use atlantis_sdl::config::{Controls, Device, Preset};
 use atlantis_sdl::motion::{radial, Inputs};
 use sdl2::controller::{Axis, Button, GameController};
 use sdl2::event::Event;
@@ -29,6 +30,8 @@ pub struct Pad {
     controller: Option<GameController>,
     joystick: Option<Joystick>,
     pub controls: Controls,
+    /// The text of `controls.ini`, applied over each device's preset.
+    ini: Option<String>,
     /// The raw buttons read besides a mapped pad's (see [`Pad::attach`]).
     raw_extra: HashMap<u8, Btn>,
     /// The sticks' raw axes (left x, y, right x, y).
@@ -52,17 +55,15 @@ impl Pad {
             }
         }
         let path = dir.join("controls.ini");
-        let controls = match std::fs::read_to_string(&path) {
-            Ok(text) => {
-                log::info!("controls from {}", path.display());
-                Controls::parse(&text)
-            }
-            Err(_) => Controls::default(),
-        };
+        let ini = std::fs::read_to_string(&path).ok();
+        if ini.is_some() {
+            log::info!("controls from {}", path.display());
+        }
         let mut pad = Pad {
             controller: None,
             joystick: None,
-            controls,
+            controls: Controls::parse_over(Controls::default(), ini.as_deref().unwrap_or("")),
+            ini,
             raw_extra: HashMap::new(),
             axes: [0; 4],
             buttons: Buttons::default(),
@@ -97,6 +98,11 @@ impl Pad {
         }
     }
 
+    /// The numbering of `preset` changed by `controls.ini`.
+    fn set_controls(&mut self, preset: Preset) {
+        self.controls = Controls::parse_over(preset.controls(), self.ini.as_deref().unwrap_or(""));
+    }
+
     /// Takes device `i`: as a game controller when SDL maps it, else raw.
     fn attach(&mut self, i: u32, pads: &GameControllerSubsystem, joys: &JoystickSubsystem) {
         if self.attached() {
@@ -108,6 +114,7 @@ impl Pad {
             match pads.open(i) {
                 Ok(c) => {
                     log::info!("gamepad {i}: {} (mapped)", c.name());
+                    self.set_controls(Preset::R36s);
                     let mapping = c.mapping();
                     log::debug!("mapping: {mapping}");
                     // Start and Select a mapping leaves out, or (the R36S's
@@ -145,6 +152,27 @@ impl Pad {
                     j.num_axes(),
                     j.num_hats()
                 );
+                let dev = Device {
+                    name: &j.name(),
+                    guid: j.guid().raw().data,
+                    buttons: j.num_buttons(),
+                    axes: j.num_axes(),
+                };
+                let preset = Preset::for_device(&dev);
+                log::info!(
+                    "gamepad {i}: raw preset {} (vendor {:04x?}){}",
+                    match preset {
+                        Preset::R36s => "R36S",
+                        Preset::Evdev => "evdev (Xbox-style: A B X Y LB RB Back Start Guide)",
+                    },
+                    dev.vendor(),
+                    if self.ini.is_some() {
+                        ", changed by controls.ini"
+                    } else {
+                        ""
+                    }
+                );
+                self.set_controls(preset);
                 self.joystick = Some(j);
             }
             Err(e) => log::warn!("gamepad {i}: {e}"),
