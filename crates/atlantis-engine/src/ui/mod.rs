@@ -341,7 +341,10 @@ impl Engine {
                 .big
                 .locate("SPRITE\\2D\\FONTMIN.SPR")
                 .map(|(file, at, _)| (file, at)),
-            fontmin_advance: FontMinAdvances::new(&self.game.exe.credit_widths),
+            fontmin_advance: FontMinAdvances::of_build(
+                self.game.exe.build,
+                &self.game.exe.credit_widths,
+            ),
             sprmenu: bank(self, "SPRMENU.SPR", d).await,
             objects: bank(self, "OBJETS1.SPR", d).await,
             guests: bank(self, "SUIVEUR.SPR", d).await,

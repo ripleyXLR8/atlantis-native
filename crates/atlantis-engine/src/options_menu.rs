@@ -1387,10 +1387,15 @@ mod tests {
         ]);
         m.open();
         m.draw(&mut s, &font, HD);
-        // The longest edition line (the US retail CD's market) fits the
+        // The longest edition lines (the US retail CD's market, the
+        // Brazilian CD's language and month) fit the
         // box's text width.
-        let longest = "Game: CD, English (US, Interplay, August 1997 build)";
-        assert!(font.width(longest.as_bytes()) <= BOX_W - 20, "{longest}");
+        for longest in [
+            "Game: CD, English (US, Interplay, August 1997 build)",
+            "Game: CD, Brazilian Portuguese (MSD, December 1997 build)",
+        ] {
+            assert!(font.width(longest.as_bytes()) <= BOX_W - 20, "{longest}");
+        }
         // The text stays inside the box.
         for y in 0..SCREEN_H as i32 {
             for x in 0..SCREEN_W as i32 {

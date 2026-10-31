@@ -618,7 +618,7 @@ impl Engine {
     }
 
     /// `ß` drawn and measured as two 's' ([`BugFix::SharpS`]); never in the
-    /// Czech CD, whose 0xe1 is `á` with a glyph
+    /// Czech and Brazilian CDs, whose 0xe1 is `á` with a glyph
     /// ([`crate::enhancements::sharp_s_without_glyph`]).
     pub fn sharp_s_as_ss(&self) -> bool {
         self.enhancements().fix(BugFix::SharpS)

@@ -209,9 +209,76 @@ impl FontMinAdvances {
         FontMinAdvances(a)
     }
 
+    /// The advances of a build: its own FONTMIN table when it has one
+    /// (`ExeBuild::menu_widths`, atlantis-cd-pt-692736's 191 bytes at
+    /// 0x004866bf), else [`FONTMIN_ADVANCE`]; then its credits advance
+    /// table, which follows it in every build.
+    pub fn of_build(
+        build: &atlantis_data::exe::ExeBuild,
+        credit_widths: &[u8; 256],
+    ) -> FontMinAdvances {
+        let Some(own) = build.menu_widths else {
+            return FontMinAdvances::new(credit_widths);
+        };
+        let mut a = [0u8; 0x100 - 0x20];
+        let n = own.fontmin.len().min(a.len());
+        a[..n].copy_from_slice(&own.fontmin[..n]);
+        let rest = a.len() - n;
+        a[n..].copy_from_slice(&credit_widths[..rest]);
+        FontMinAdvances(a)
+    }
+
     /// The advance of glyph `idx`.
     pub fn get(&self, idx: u8) -> i32 {
         self.0.get(usize::from(idx)).map_or(0, |&a| i32::from(a))
+    }
+}
+
+/// The widths the menu walk advances the pen by and the label measure
+/// sums (`FUN_004206c8`), indexed by `byte - 0x20` with no bound: the
+/// build's FONTMAX table, then what follows it in the data segment (its
+/// FONTMIN advances). Every build but the Brazilian CD's holds
+/// [`FONTMAX_WIDTHS`] and [`FONTMIN_ADVANCE`];
+/// atlantis-cd-pt-692736 its own 224 FONTMAX widths (0x004865df, the walk
+/// @ 0x0041f486, the measure @ 0x0041f8bd), one per glyph of its fonts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FontMaxWidths([u8; 0x100 - 0x20]);
+
+impl FontMaxWidths {
+    /// The widths of a build (`ExeBuild::menu_widths`).
+    pub fn of_build(build: &atlantis_data::exe::ExeBuild) -> FontMaxWidths {
+        match build.menu_widths {
+            Some(own) => FontMaxWidths::from_tables(own.fontmax, own.fontmin),
+            None => FontMaxWidths::default(),
+        }
+    }
+
+    fn from_tables(fontmax: &[u8], fontmin: &[u8]) -> FontMaxWidths {
+        let mut a = [0u8; 0x100 - 0x20];
+        for (slot, &w) in a.iter_mut().zip(fontmax.iter().chain(fontmin)) {
+            *slot = w;
+        }
+        FontMaxWidths(a)
+    }
+
+    /// The width of glyph `c` (byte - 0x20); 0 outside the bytes 0x20..0xff.
+    pub fn get(&self, c: i32) -> i32 {
+        usize::try_from(c)
+            .ok()
+            .and_then(|i| self.0.get(i))
+            .map_or(0, |&w| i32::from(w))
+    }
+
+    /// The FONTMAX width of a label (`FUN_004206c8`).
+    pub fn measure(&self, text: &[u8]) -> i32 {
+        text.iter().map(|&c| self.get(i32::from(c) - 0x20)).sum()
+    }
+}
+
+/// [`FONTMAX_WIDTHS`], then [`FONTMIN_ADVANCE`].
+impl Default for FontMaxWidths {
+    fn default() -> FontMaxWidths {
+        FontMaxWidths::from_tables(&FONTMAX_WIDTHS, &FONTMIN_ADVANCE)
     }
 }
 
@@ -404,6 +471,8 @@ pub struct MenuRules {
     /// The language counter of the moment (0x00486098), for
     /// [`MenuRules::subtitle_languages`].
     pub subtitle_counter: u8,
+    /// The FONTMAX widths of the build ([`FontMaxWidths`]).
+    pub fontmax: FontMaxWidths,
 }
 
 /// The reference's walk, without the port's fix.
@@ -417,6 +486,7 @@ impl Default for MenuRules {
             toggle_in_step: false,
             subtitle_languages: false,
             subtitle_counter: 0,
+            fontmax: FontMaxWidths::default(),
         }
     }
 }
@@ -446,6 +516,7 @@ impl MenuRules {
             toggle_in_step: fixes.get(BugFix::SubtitlesToggle),
             subtitle_languages: build.subtitle_languages,
             subtitle_counter: 0,
+            fontmax: FontMaxWidths::of_build(build),
         }
     }
 }
@@ -499,11 +570,12 @@ pub fn walk_menu_text_in(
         t.set_count(*m, 0); // the count byte only (@ 0x0041fbc2)
     }
     let sharp_s_as_ss = rules.sharp_s_as_ss;
+    let widths = rules.fontmax;
     let ss = |c: u8| -> i32 {
         if sharp_s_as_ss && c == SHARP_S {
-            2 * fontmax_width(i32::from(b's') - 0x20)
+            2 * widths.get(i32::from(b's') - 0x20)
         } else {
-            fontmax_width(i32::from(c) - 0x20)
+            widths.get(i32::from(c) - 0x20)
         }
     };
     walk.ops.clear();
@@ -707,7 +779,7 @@ pub fn walk_menu_text_in(
                     line,
                     record: rec.count as i32 - 1,
                 });
-                pen_x += fontmax_width(glyph);
+                pen_x += widths.get(glyph);
             }
         }
         p += 1;
@@ -1030,7 +1102,8 @@ mod tests {
     use atlantis_data::exe::BUILDS;
 
     /// The menu walk's rules of every build with each fix alone, then
-    /// every fix but one: the `ß` fix sets `sharp_s_as_ss`, the line
+    /// every fix but one: the `ß` fix sets `sharp_s_as_ss` (where 0xe1 has
+    /// no glyph), the line
     /// width's the 22-px zones, the SUBTITLES record's `toggle_in_step`,
     /// each that field alone; the build's own fields whatever the fixes.
     #[test]
@@ -1042,7 +1115,10 @@ mod tests {
                     let is = |g: BugFix| if g == f { on } else { !on };
                     let r = MenuRules::of_build(b, &fixes);
                     let ctx = format!("{} {fixes:?}", b.name);
-                    assert_eq!(r.sharp_s_as_ss, is(BugFix::SharpS), "{ctx}");
+                    // Not in the Brazilian CD, whose 0xe1 is `á` with a glyph.
+                    let sharp_s =
+                        is(BugFix::SharpS) && crate::enhancements::sharp_s_without_glyph(b);
+                    assert_eq!(r.sharp_s_as_ss, sharp_s, "{ctx}");
                     let width = if is(BugFix::MenuLineWidth) {
                         22
                     } else {
@@ -1220,6 +1296,51 @@ mod tests {
     /// the table's 137 bytes, in the FONTMIN advances that follow it
     /// (FONTMIN's byte 56), as in the original; with the fix two 's'
     /// glyphs, and the centred line measured with them.
+    /// The FONTMAX widths every build but the Brazilian CD's reads: the
+    /// 137 widths, then the FONTMIN advances (`fontmax_width`); the
+    /// Brazilian CD's, its own 224 (one per glyph of its fonts), and its
+    /// FONTMIN advances (191) before the credits widths.
+    #[test]
+    fn menu_widths_of_the_builds() {
+        let d = FontMaxWidths::default();
+        for c in -1..0x100 - 0x20 {
+            assert_eq!(d.get(c), fontmax_width(c), "{c}");
+        }
+        assert_eq!(d.measure(b"OK"), font_max_measure(b"OK"));
+        for b in BUILDS.iter().filter(|b| b.menu_widths.is_none()) {
+            assert_eq!(FontMaxWidths::of_build(b), d, "{}", b.name);
+            assert_eq!(
+                MenuRules::of_build(b, &crate::enhancements::BugFixes::NONE).fontmax,
+                d
+            );
+        }
+        let pt = BUILDS
+            .iter()
+            .find(|b| b.name == "atlantis-cd-pt-692736")
+            .unwrap();
+        let own = pt.menu_widths.unwrap();
+        let w = MenuRules::of_build(pt, &crate::enhancements::BugFixes::NONE).fontmax;
+        // "OPÇÕES" (OPTMENU.TXT): 0xc7 and 0xd5 are glyphs 0xa7 and 0xb5.
+        let opcoes = b"OP\xc7\xd5ES";
+        let sum: i32 = opcoes
+            .iter()
+            .map(|&c| i32::from(own.fontmax[usize::from(c - 0x20)]))
+            .sum();
+        assert_eq!(w.measure(opcoes), sum);
+        assert_eq!(w.get(0xc7 - 0x20), i32::from(own.fontmax[0xa7]));
+        assert_ne!(w.measure(opcoes), d.measure(opcoes));
+        // FONTMIN: its 191 advances, then the credits widths.
+        let mut credits = [0u8; 256];
+        credits[0] = 33;
+        credits[4] = 44;
+        let adv = FontMinAdvances::of_build(pt, &credits);
+        assert_eq!(adv.get(0x21), i32::from(own.fontmin[0x21]));
+        assert_eq!(adv.get(190), i32::from(own.fontmin[190]));
+        assert_eq!((adv.get(191), adv.get(195)), (33, 44));
+        let other = FontMinAdvances::of_build(&BUILDS[0], &credits);
+        assert_eq!(other, FontMinAdvances::new(&credits));
+    }
+
     #[test]
     fn sharp_s_in_menu_walk() {
         let text = b"<>,100,\xe1a\r\n/fin";

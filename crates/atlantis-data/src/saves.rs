@@ -57,7 +57,9 @@ pub struct Players {
     pub marker: Vec<u8>,
     /// The 1997 builds' list: a 95-byte file, and a deletion leaves the
     /// rows after the last one as they were (atlantis-cd-en-688128
-    /// FUN_0041e030).
+    /// FUN_0041e030). With [`Players::sixth_row`], the Brazilian CD's
+    /// (atlantis-cd-pt-692736): the same list and deletion (FUN_0041de1c)
+    /// over the Chinese builds' 114-byte file.
     pub layout_1997: bool,
     /// The Chinese builds' list ([`PLAYERS_SIZE_ZH`]): the 17 bytes after
     /// the five rows, which only the file and the deletion's shift read
@@ -154,9 +156,15 @@ impl Players {
 
     /// The file the writers write: names (0x55 bytes), chapters (6),
     /// letters (6); 5 and 5 for the 1997 layout; names 0x66 bytes with the
-    /// Chinese one.
+    /// Chinese one, then 6 and 6 whatever the layout (the Brazilian CD's
+    /// 1997 list: atlantis-cd-pt-692736 FUN_0042c1d8 @ 0x0042c803..
+    /// 0x0042c83d, `push 0x66`, `push 6`, `push 6`).
     pub fn to_bytes(&self) -> Vec<u8> {
-        let n = if self.layout_1997 { 5 } else { 6 };
+        let n = if self.layout_1997 && self.sixth_row.is_none() {
+            5
+        } else {
+            6
+        };
         let mut out = Vec::with_capacity(PLAYERS_SIZE_ZH);
         for row in &self.rows {
             out.extend_from_slice(row);
@@ -265,8 +273,14 @@ impl Players {
                 b""
             };
             strcpy(&mut self.rows[last], s);
-            for r in self.count..MAX_PLAYERS {
-                strcpy(&mut self.rows[r], b"");
+            // The 1997 deletion over the 114-byte file
+            // (atlantis-cd-pt-692736 FUN_0041de1c, en-688128's FUN_0041e030
+            // but its sizes) has the same steps up to here
+            // (@ 0x0041def6..0x0041df74) and no such loop.
+            if !self.layout_1997 {
+                for r in self.count..MAX_PLAYERS {
+                    strcpy(&mut self.rows[r], b"");
+                }
             }
             self.count -= 1;
         } else {
@@ -717,6 +731,44 @@ mod tests {
         assert!(q.is_new_row(0));
         assert_eq!(q.name(1), b"");
         assert_eq!((q.name(3), q.name(4)), (&b"OLD"[..], &b"OLD"[..]));
+    }
+
+    /// The Brazilian CD's list (atlantis-cd-pt-692736): the 1997 list over
+    /// the 114-byte file (names 0x66 bytes, chapters 0x66..0x6c, letters
+    /// 0x6c..0x72: FUN_0042c1d8 @ 0x0042c803..0x0042c83d), the rows read up
+    /// to the marker; its deletion (FUN_0041de1c) empties row 4 and the old
+    /// count's last row, and leaves the rows past them as they were.
+    #[test]
+    fn layout_1997_114() {
+        let marker = b"Novo Jogador";
+        let mut p = Players::new(marker);
+        p.layout_1997 = true;
+        p.sixth_row = Some([0; NAME_LEN]);
+        p.create(b"Ana").unwrap();
+        p.chapters[0] = 3;
+        let b = p.to_bytes();
+        assert_eq!(b.len(), PLAYERS_SIZE_ZH);
+        assert_eq!(b[0x66], 3);
+        assert_eq!(&b[0x6c..0x71], b"abcde");
+        let mut q = Players::read_rows(&b, marker, false).unwrap();
+        assert_eq!(
+            (q.count, q.name(0), q.name(1)),
+            (2, &b"Ana"[..], &marker[..])
+        );
+        q.layout_1997 = true;
+        q.rows[3][..3].copy_from_slice(b"OLD");
+        q.rows[4][..3].copy_from_slice(b"OLD");
+        q.delete(0).unwrap();
+        assert_eq!(q.count, 1);
+        assert!(q.is_new_row(0));
+        assert_eq!(q.name(1), b"");
+        // The shift moved row 3 up; row 4 got the 17 bytes' string, then "".
+        assert_eq!(
+            (q.name(2), q.name(3), q.name(4)),
+            (&b"OLD"[..], &b"OLD"[..], &b""[..])
+        );
+        assert_eq!(q.to_bytes().len(), PLAYERS_SIZE_ZH);
+        assert_eq!(q.letters[4], b'a');
     }
 
     #[test]
