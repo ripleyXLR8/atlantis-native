@@ -126,7 +126,8 @@ pub struct Edition {
     /// its own: "US, Interplay" for the US retail CD (atlantis-cd-en-687104,
     /// the English August 1997 build Interplay distributed), "Bohemia
     /// Interactive" for the Czech CD (Cryo's 1.01 patch program over
-    /// Bohemia's Czech archives); `None` for the others.
+    /// Bohemia's Czech archives), "MSD" for the Brazilian CD (MSD
+    /// Multimídia's, atlantis-cd-pt-692736); `None` for the others.
     pub market: Option<&'static str>,
 }
 
@@ -153,7 +154,8 @@ impl Game {
     /// executable; only this string differs). The 1997 builds' rows have no
     /// '#': "New Player" (English), "NOUVEAU JOUEUR" (French), "NEUER
     /// SPIELER" (German), "Nieuwe speler" (Dutch), "Ny spelare" (Swedish),
-    /// "Jugador nuevo" (Spanish), "Nuovo Giocatore" (Italian).
+    /// "Jugador nuevo" (Spanish), "Nuovo Giocatore" (Italian), "Novo
+    /// Jogador" (Brazilian Portuguese, the December 1997 build).
     /// The 1.01 patch's executable is French ("#NOUVEAU JOUEUR") over
     /// whichever CD it was installed on: the language is its interface's.
     /// The Chinese builds keep the English row ("New Player", no '#'): their
@@ -192,6 +194,8 @@ impl Game {
             Some("Spanish")
         } else if starts(b"NUOVO") {
             Some("Italian")
+        } else if starts(b"NOVO") {
+            Some("Brazilian Portuguese")
         } else if starts(b"NEW") {
             Some("English")
         } else {
@@ -215,6 +219,7 @@ impl Game {
             market: match name {
                 "atlantis-cd-en-687104" => Some("US, Interplay"),
                 "atlantis-cd-cs-714240" => Some("Bohemia Interactive"),
+                "atlantis-cd-pt-692736" => Some("MSD"),
                 _ => None,
             },
         }

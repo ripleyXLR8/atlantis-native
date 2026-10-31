@@ -179,8 +179,14 @@ fn italian_positioned_zones_synthetic() {
     assert_eq!(widths(MenuRules::of_build(it, &others)), [title, 48, 112]);
     let fix = BugFixes::only(BugFix::MenuLineWidth);
     assert_eq!(widths(MenuRules::of_build(it, &fix)), [title, 66, 154]);
-    // The Italian DVD's build has the Italian CD's rule.
+    // The Italian DVD's build has the Italian CD's rule. The Brazilian
+    // CD's measures the title with its own FONTMAX widths.
     for b in &BUILDS {
+        let title = if b.menu_widths.is_some() {
+            walk(text, 6, MenuRules::of_build(b, &BugFixes::NONE)).records[0].w
+        } else {
+            title
+        };
         let want = if b.name == it.name || b.name == "atlantis-dvd-it-695296" {
             [title, 48, 112]
         } else {
