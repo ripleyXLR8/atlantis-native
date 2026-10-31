@@ -1,0 +1,35 @@
+{
+  "version": 4,
+  "name": "atlantisnative.zip",
+  "items": [
+    "Atlantis Native.sh",
+    "atlantisnative"
+  ],
+  "items_opt": [],
+  "attr": {
+    "title": "Atlantis: The Lost Tales (Atlantis Native)",
+    "porter": [
+      "ripleyXLR8",
+      "Klaasvdb"
+    ],
+    "desc": "Atlantis Native, a reimplementation of Cryo's 1997 adventure Atlantis: The Lost Tales. Explore Atlantis in panoramic views, talk to its people and solve its puzzles.",
+    "desc_md": null,
+    "inst": "Copy the files of your own Atlantis: The Lost Tales (a CD release or GOG.com) into ports/atlantisnative/gamedata.",
+    "inst_md": null,
+    "genres": [
+      "adventure",
+      "puzzle"
+    ],
+    "image": null,
+    "rtr": false,
+    "exp": false,
+    "runtime": [],
+    "store": [],
+    "availability": "full",
+    "reqs": [],
+    "arch": [
+      "aarch64"
+    ],
+    "min_glibc": "2.30"
+  }
+}

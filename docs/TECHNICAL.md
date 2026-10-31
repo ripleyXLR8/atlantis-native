@@ -12,6 +12,7 @@
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
+| `atlantis-sdl` | the first game's SDL2 front end for handhelds and PortMaster (the program `atlantis-native-sdl`, built with `--features sdl`): the gamepad as the mouse, the on-screen keyboard, SDL audio; see [The SDL2 front end](#the-sdl2-front-end-handhelds-and-portmaster) |
 
 The engine is one async task: where the original's loops present a frame
 and poll their events, the engine awaits the next frame, and the front end
@@ -830,6 +831,86 @@ while the other is gives `GameError::DvdOtherSide` (shown as *on the
 other side of the DVD*, as the original's AUTORUN.EXE says it). Add a
 game folder, the first start and Find installations add every language
 found; Locate keeps the entry's language.
+
+### The SDL2 front end (handhelds and PortMaster)
+
+`crates/atlantis-sdl` runs the first game through SDL2, for the devices
+PortMaster serves (handhelds on ArkOS, ROCKNIX, muOS, Knulli; Batocera):
+most have no desktop, so SDL draws through KMS/DRM (or under Wayland or
+X11 when there is one). It is based on Klaas Van den Broeck's (@Klaasvdb)
+R36S front end, [atlantis-native-handheld](https://github.com/Klaasvdb/atlantis-native-handheld)
+(GPL-3.0-or-later), whose gamepad-as-mouse code and on-screen keyboard he
+agreed to bring into Atlantis Native; the files taken from it say so in
+their headers.
+
+- `main.rs` (needs SDL2, `--features sdl`; linked dynamically against the
+  system's `libSDL2-2.0.so.0`): the 640x480 RGB565 frame in a streaming
+  texture, scaled to the screen keeping 4:3; the SDL audio callback pulls
+  the engine's mixer; the saves and `settings.ini` in `saves/<build>`
+  next to the program (or `$ATLANTIS_SAVES`); the port's options menu
+  (`OptionsMenu` without its HD, full screen, library and support
+  entries) on Select, F10 or O, the game paused while it is open.
+- `pad.rs`: the SDL devices. A pad SDL maps is read as a game controller,
+  another as a raw joystick numbered by a preset chosen from its name,
+  GUID vendor and button / axis counts (`config::Preset::for_device`:
+  the Linux evdev order for an Xbox-style pad with 10 or 11 buttons and 5
+  axes or more, such as an Xbox Wireless Controller over Bluetooth, which
+  SDL does not map; the R36S's numbering otherwise) and changed by
+  `controls.ini`; only the events of
+  the pad in use count; an unplugged pad lets go of what it held (its
+  mouse button or key released in the game) and the next connected one
+  takes over; one plugged in later is taken.
+- `buttons.rs`: the buttons' meaning (A left click, B right click, X
+  Space, Y Enter, Start Escape, Select the on-screen keyboard in a game
+  menu or the options menu elsewhere, Select + Start quit); a release
+  reaches the game only for a press it had.
+- `motion.rs`: the pointer and the panoramic view. The sticks' dead zone
+  is a circle (default 6000 of 32767 for a mapped pad, 4000 for a raw one;
+  `deadzone` in `controls.ini` for both), the tilt beyond it squared. The
+  speeds are per second (pointer 420 px/s, view 600 px/s at full tilt,
+  `pointer_speed` and `look_speed` in `controls.ini` scale them) and
+  applied once per engine frame for that frame's duration, so the motion
+  does not depend on how often the main loop turns (Klaas's applied a
+  per-frame speed at every turn of its loop, about every 4 ms: three to
+  four times too fast, and slower when the device was busy). The D-pad
+  starts at 30 % of full tilt and reaches it in half a second; the view
+  held near full tilt doubles its gain at full tilt and speeds up to three
+  times after a third of a second, over 1.5 s.
+- `osk.rs`: the on-screen keyboard, a grid of 4 rows of 13 cells over the
+  top of the frame (above the player screen's title): A..M, N..Z, the
+  digits and `- . '`, then four wide keys (the case switch, Space, Erase,
+  Done). Every key is within every build's name entry (0x20..0x7a: the
+  English 1997 build stores a..z as A..Z, the others keep the case and
+  take up to 0xa7). The D-pad or the left stick (its larger axis) moves in
+  two dimensions, wrapping at the edges, held moves repeat; on the last
+  row a wide key covers its columns and going up returns to the column
+  left. A presses the key, B erases, X types a space, Y switches the case,
+  Start or Done send Enter and close it, Select closes it. Drawn with a
+  5x7 font at 3x (the wide keys' labels 2x) into the 640x480 frame, which
+  the screen only scales. Klaas's one-row strip, made a grid.
+- `config.rs`: `controls.ini` and the raw presets.
+
+`packaging/portmaster/` holds the PortMaster port (`atlantisnative`, laid
+out as in PortsMaster/PortMaster-New: launcher, `port.json`,
+`gameinfo.xml`, README, the project's icon as cover and screenshot, the
+game's own files in `atlantisnative/gamedata/`) and `build.sh`, which
+cross-compiles for 64-bit ARM Linux with glibc 2.31 (cargo-zigbuild)
+and adds the licences; its zip is laid out as PortMaster-New's
+`build_release.py` lays out a port's (the launcher at the root;
+`port.json`, `gameinfo.xml`, the screenshot and the README as
+`atlantisnative.md` inside `atlantisnative/`). SDL2 is never bundled: the
+device's is used. The workflow's `portmaster` job runs it on GitHub's
+64-bit ARM runner (zig and cargo-zigbuild from PyPI, the runner's
+libSDL2 to link against, a check that no symbol needs a glibc newer than
+2.31) and publishes the zip as `atlantis-native-portmaster.zip` on the
+nightly and the numbered releases (and the `portmaster` itch.io channel
+of a numbered one). 32-bit ARM (armhf) is not built: the devices
+PortMaster serves today are 64-bit.
+
+Atlantis II is not in this front end yet: its window code
+(`crates/atlantis-app/src/a2.rs`: the game clock held in menus, the
+picture composition and scaling, its options menu, the mouse lock and the
+3D scenes' cost on a handheld) would need porting to SDL first.
 
 ### The web build
 

@@ -30,6 +30,7 @@ env:
 #   atlantis-native-linux-x64.tar.gz
 #   atlantis-native-linux-arm64.tar.gz
 #   atlantis-native-web.zip
+#   atlantis-native-portmaster.zip
 
 jobs:
   release:
@@ -42,7 +43,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$RELEASE" = nightly ]; then
-            notes="Built from the latest commit on main ($GITHUB_SHA). Playable from start to end; you need your own copy of the game. See the README for the downloads and their use. If you enjoy it: https://buymeacoffee.com/ripleyxlr8"
+            notes="Built from the latest commit on main ($GITHUB_SHA). Playable from start to end; you need your own copy of the game. See the README for the downloads and their use (atlantis-native-portmaster.zip: the first game on PortMaster handhelds). If you enjoy it: https://buymeacoffee.com/ripleyxlr8"
             if gh release view nightly >/dev/null 2>&1; then
               gh release edit nightly --notes "$notes"
             else
@@ -245,6 +246,51 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$RELEASE" atlantis-native-linux-arm64.tar.gz --clobber
 
+  # The PortMaster port of the SDL2 front end (crates/atlantis-sdl) for
+  # 64-bit ARM handhelds (R36S and other RK3326 / H700 devices, Batocera):
+  # packaging/portmaster/build.sh, linked with cargo-zigbuild against
+  # glibc 2.31 (what PortMaster's devices have) and against the runner's
+  # arm64 libSDL2 (the device's own SDL2 is used at run time).
+  portmaster:
+    needs: release
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - name: Build dependencies (SDL2 to link against, zig, cargo-zigbuild)
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libsdl2-2.0-0
+          pip3 install --user ziglang==0.14.1 cargo-zigbuild==0.24.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          # Only libSDL2.so in the linker's extra folder (not the system's
+          # glibc, which is newer than the one zig links against).
+          mkdir -p "$RUNNER_TEMP/sdl2"
+          ln -s /usr/lib/aarch64-linux-gnu/libSDL2-2.0.so.0 "$RUNNER_TEMP/sdl2/libSDL2.so"
+      - name: Test the front end
+        run: cargo test --release -p atlantis-sdl
+      - name: Build and package
+        env:
+          SDL2_LIB_DIR: ${{ runner.temp }}/sdl2
+        run: |
+          sh packaging/portmaster/build.sh
+          cp dist/portmaster/atlantisnative.zip atlantis-native-portmaster.zip
+          unzip -l atlantis-native-portmaster.zip
+          # The glibc it needs: 2.31 at most.
+          objdump -T dist/portmaster/atlantisnative/atlantisnative/atlantis-native-sdl.aarch64 \
+            | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1 | tee /dev/stderr \
+            | awk -F_ '{ split($2, v, "."); exit !(v[1] < 2 || (v[1] == 2 && v[2] <= 31)) }'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-portmaster
+          path: atlantis-native-portmaster.zip
+      - name: Publish to the release
+        if: env.PUBLISH == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE" atlantis-native-portmaster.zip --clobber
+
   web:
     needs: release
     runs-on: ubuntu-latest
@@ -308,7 +354,7 @@ jobs:
   # in their name tags the downloads; html5 is marked "playable in browser"
   # on the itch.io edit page after its first push.
   itch:
-    needs: [macos, windows-x64, windows-arm64, linux-x64, linux-arm64, web]
+    needs: [macos, windows-x64, windows-arm64, linux-x64, linux-arm64, portmaster, web]
     if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.ITCH_GAME != '' }}
     runs-on: ubuntu-latest
     steps:
@@ -317,13 +363,14 @@ jobs:
           path: artifacts
       - name: Unpack the builds
         run: |
-          mkdir -p itch/windows itch/windows-arm64 itch/linux itch/linux-arm64 itch/mac itch/mac-x64 itch/web unpacked
+          mkdir -p itch/windows itch/windows-arm64 itch/linux itch/linux-arm64 itch/mac itch/mac-x64 itch/portmaster itch/web unpacked
           unzip -q artifacts/atlantis-native-windows-x64/atlantis-native-windows-x64.zip -d itch/windows
           unzip -q artifacts/atlantis-native-windows-arm64/atlantis-native-windows-arm64.zip -d itch/windows-arm64
           tar -xzf artifacts/atlantis-native-linux-x64/atlantis-native-linux-x64.tar.gz -C itch/linux
           tar -xzf artifacts/atlantis-native-linux-arm64/atlantis-native-linux-arm64.tar.gz -C itch/linux-arm64
           cp artifacts/atlantis-native-macos-arm64/atlantis-native-macos-arm64.dmg itch/mac/
           cp artifacts/atlantis-native-macos-x64/atlantis-native-macos-x64.dmg itch/mac-x64/
+          unzip -q artifacts/atlantis-native-portmaster/atlantis-native-portmaster.zip -d itch/portmaster
           unzip -q artifacts/atlantis-native-web/atlantis-native-web.zip -d unpacked
           cp -r unpacked/atlantis-native-web/. itch/web/
           ls -R itch | head -40
@@ -344,4 +391,5 @@ jobs:
           butler/butler push itch/mac-x64 "$ITCH_GAME:macos-x64" --userversion "$version"
           butler/butler push itch/linux "$ITCH_GAME:linux-x64" --userversion "$version"
           butler/butler push itch/linux-arm64 "$ITCH_GAME:linux-arm64" --userversion "$version"
+          butler/butler push itch/portmaster "$ITCH_GAME:portmaster" --userversion "$version"
           butler/butler push itch/web "$ITCH_GAME:html5" --userversion "$version"
