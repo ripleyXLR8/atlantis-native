@@ -7,6 +7,7 @@ members = [
     "crates/atlantis2-data",
     "crates/atlantis2-engine",
     "crates/atlantis-app",
+    "crates/atlantis-sdl",
 ]
 
 [workspace.package]

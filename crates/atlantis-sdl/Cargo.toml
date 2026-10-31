@@ -1,0 +1,27 @@
+[package]
+name = "atlantis-sdl"
+description = "Atlantis Native for handhelds and PortMaster: SDL2 window, gamepad and audio around the game engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# The program needs SDL2 to build (`--features sdl`, linked dynamically
+# against the system's libSDL2-2.0.so.0); without the feature only the
+# library (the gamepad's maths, the on-screen keyboard, controls.ini) is
+# built, so that `cargo test --workspace` needs no SDL2 on any system.
+[features]
+sdl = ["dep:sdl2", "dep:env_logger"]
+
+[[bin]]
+name = "atlantis-native-sdl"
+path = "src/main.rs"
+required-features = ["sdl"]
+
+[dependencies]
+atlantis-data = { path = "../atlantis-data" }
+atlantis-engine = { path = "../atlantis-engine" }
+log = "0.4"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = { version = "0.11", default-features = false, optional = true }
+sdl2 = { version = "0.37", optional = true }

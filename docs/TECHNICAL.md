@@ -12,6 +12,7 @@
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
+| `atlantis-sdl` | the first game's SDL2 front end for handhelds and PortMaster (the program `atlantis-native-sdl`, built with `--features sdl`): the gamepad as the mouse, the on-screen keyboard, SDL audio; see [The SDL2 front end](#the-sdl2-front-end-handhelds-and-portmaster) |
 
 The engine is one async task: where the original's loops present a frame
 and poll their events, the engine awaits the next frame, and the front end
@@ -100,7 +101,7 @@ its executable's language:
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
-| `fix_sharp_s` | (not the Czech CD, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
+| `fix_sharp_s` | (not the Czech and Brazilian CDs, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
 | `fix_disc_revision` | some disc's copy of FONTMIN.SPR, FONTMIN2.SPR, CREDBLAN.SPR, CREDBLEU.SPR, or CREDITS.TXT with the builds that read it at each run, differs from disc 1's (`FixData::disc_revisions`): of the known data, the Dutch CD's and the May 1997 German CD's | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc`, `load_credits_fonts` | the credits text, the credits fonts and the player-name fonts are disc 1's whatever the disc (the original reads them from the disc in the drive: the Dutch disc 2 holds an older revision, the German May discs 2 to 4 another credits font, see [Game builds](#game-builds)) |
 | `fix_menu_line_width` | Italian CD and DVD (`menu_positioned_byte_width` 16) | `MenuRules::positioned_byte_width` | a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
 | `fix_chinese_rows` | Simplified Chinese (`CjkBreaker::Gb2312`) | `CjkSplit::row_fix` | the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)) |
@@ -318,8 +319,8 @@ original's pixels, which the tests check).
 
 ### Subtitles
 
-The 2001, GOG.com, August 1997 French and German, and the Spanish and
-Italian builds draw their subtitles with the system's Arial at 13 pixels, not smoothed. The port draws them with Liberation Sans,
+The 2001, GOG.com, August 1997 French and German, the Spanish and
+Italian, and the Brazilian builds draw their subtitles with the system's Arial at 13 pixels, not smoothed. The port draws them with Liberation Sans,
 which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
 thresholded to one bit, so every platform draws the same pixels; the text
 bytes are read in the release's code page (`TextCodePage` in
@@ -733,13 +734,34 @@ port shows as the original (its own box, OK to close), or skips with
 `fix_startup_logos`. The Japanese scripts lack the two chapters no script
 reaches (10, 86).
 
+The Brazilian CD (*Atlantis: A Lenda Perdida*, MSD Multimídia, 1997, 4
+CDs, dubbed) has its own build, `atlantis-cd-pt-692736` (December 1997,
+shown *CD, Brazilian Portuguese (MSD, December 1997 build)*): the 1998
+program's code line as a Spanish build of October 1997 has it, which
+plays as the DVD column above but for its player list, which is the
+August 1997 builds' (the new-player row `Novo Jogador` is the label
+itself, the rows read up to it) over the Chinese builds' 114-byte
+`players.atl`, with the August builds' deletion. Its archives are the
+August 1997 discs' with Portuguese voices and lip-sync, texts
+(Windows-1252), chapter names, credits, an end picture and the six
+sprite fonts redrawn with a glyph for each byte up to 0xff; its
+executable holds the widths of those fonts (`ExeBuild::menu_widths`: 224
+FONTMAX widths, 191 FONTMIN advances, then the credits widths), which the
+port's menu walk, label measure and FONTMIN drawers read
+(`FontMaxWidths`, `FontMinAdvances::of_build`). Every dialog line's rows
+were checked against its breaker under emulation. Its name entry, as the
+original's, takes the bytes up to 0xa7, so `ã`, `ç` and the other
+letters above it are not taken; its 0xe1 is `á`, so the `ß` fix does not
+apply to it.
+
 In every build the player-name font (FONTMIN) has advances for 101
 glyphs, and the original reads those of the glyphs past them from the
 credits font's table that follows it; the port does the same with each
 build's table (in the August 1997 French build a typed `£` advances 2 pixels,
 in the 2001 build 14). Likewise the menu font (FONTMAX) has 137 widths, and
 a byte past them reads the FONTMIN advances that follow; only the Czech
-CD's menus hold such bytes.
+CD's menus hold such bytes (the Brazilian CD's program has tables of its
+own, of 224 and 191 bytes).
 
 The May 1997 French build is the English May 1997 build's code, compiled five
 days earlier against an older `cryo.dll`, with its own music copy rules.
@@ -830,6 +852,86 @@ while the other is gives `GameError::DvdOtherSide` (shown as *on the
 other side of the DVD*, as the original's AUTORUN.EXE says it). Add a
 game folder, the first start and Find installations add every language
 found; Locate keeps the entry's language.
+
+### The SDL2 front end (handhelds and PortMaster)
+
+`crates/atlantis-sdl` runs the first game through SDL2, for the devices
+PortMaster serves (handhelds on ArkOS, ROCKNIX, muOS, Knulli; Batocera):
+most have no desktop, so SDL draws through KMS/DRM (or under Wayland or
+X11 when there is one). It is based on Klaas Van den Broeck's (@Klaasvdb)
+R36S front end, [atlantis-native-handheld](https://github.com/Klaasvdb/atlantis-native-handheld)
+(GPL-3.0-or-later), whose gamepad-as-mouse code and on-screen keyboard he
+agreed to bring into Atlantis Native; the files taken from it say so in
+their headers.
+
+- `main.rs` (needs SDL2, `--features sdl`; linked dynamically against the
+  system's `libSDL2-2.0.so.0`): the 640x480 RGB565 frame in a streaming
+  texture, scaled to the screen keeping 4:3; the SDL audio callback pulls
+  the engine's mixer; the saves and `settings.ini` in `saves/<build>`
+  next to the program (or `$ATLANTIS_SAVES`); the port's options menu
+  (`OptionsMenu` without its HD, full screen, library and support
+  entries) on Select, F10 or O, the game paused while it is open.
+- `pad.rs`: the SDL devices. A pad SDL maps is read as a game controller,
+  another as a raw joystick numbered by a preset chosen from its name,
+  GUID vendor and button / axis counts (`config::Preset::for_device`:
+  the Linux evdev order for an Xbox-style pad with 10 or 11 buttons and 5
+  axes or more, such as an Xbox Wireless Controller over Bluetooth, which
+  SDL does not map; the R36S's numbering otherwise) and changed by
+  `controls.ini`; only the events of
+  the pad in use count; an unplugged pad lets go of what it held (its
+  mouse button or key released in the game) and the next connected one
+  takes over; one plugged in later is taken.
+- `buttons.rs`: the buttons' meaning (A left click, B right click, X
+  Space, Y Enter, Start Escape, Select the on-screen keyboard in a game
+  menu or the options menu elsewhere, Select + Start quit); a release
+  reaches the game only for a press it had.
+- `motion.rs`: the pointer and the panoramic view. The sticks' dead zone
+  is a circle (default 6000 of 32767 for a mapped pad, 4000 for a raw one;
+  `deadzone` in `controls.ini` for both), the tilt beyond it squared. The
+  speeds are per second (pointer 420 px/s, view 600 px/s at full tilt,
+  `pointer_speed` and `look_speed` in `controls.ini` scale them) and
+  applied once per engine frame for that frame's duration, so the motion
+  does not depend on how often the main loop turns (Klaas's applied a
+  per-frame speed at every turn of its loop, about every 4 ms: three to
+  four times too fast, and slower when the device was busy). The D-pad
+  starts at 30 % of full tilt and reaches it in half a second; the view
+  held near full tilt doubles its gain at full tilt and speeds up to three
+  times after a third of a second, over 1.5 s.
+- `osk.rs`: the on-screen keyboard, a grid of 4 rows of 13 cells over the
+  top of the frame (above the player screen's title): A..M, N..Z, the
+  digits and `- . '`, then four wide keys (the case switch, Space, Erase,
+  Done). Every key is within every build's name entry (0x20..0x7a: the
+  English 1997 build stores a..z as A..Z, the others keep the case and
+  take up to 0xa7). The D-pad or the left stick (its larger axis) moves in
+  two dimensions, wrapping at the edges, held moves repeat; on the last
+  row a wide key covers its columns and going up returns to the column
+  left. A presses the key, B erases, X types a space, Y switches the case,
+  Start or Done send Enter and close it, Select closes it. Drawn with a
+  5x7 font at 3x (the wide keys' labels 2x) into the 640x480 frame, which
+  the screen only scales. Klaas's one-row strip, made a grid.
+- `config.rs`: `controls.ini` and the raw presets.
+
+`packaging/portmaster/` holds the PortMaster port (`atlantisnative`, laid
+out as in PortsMaster/PortMaster-New: launcher, `port.json`,
+`gameinfo.xml`, README, the project's icon as cover and screenshot, the
+game's own files in `atlantisnative/gamedata/`) and `build.sh`, which
+cross-compiles for 64-bit ARM Linux with glibc 2.31 (cargo-zigbuild)
+and adds the licences; its zip is laid out as PortMaster-New's
+`build_release.py` lays out a port's (the launcher at the root;
+`port.json`, `gameinfo.xml`, the screenshot and the README as
+`atlantisnative.md` inside `atlantisnative/`). SDL2 is never bundled: the
+device's is used. The workflow's `portmaster` job runs it on GitHub's
+64-bit ARM runner (zig and cargo-zigbuild from PyPI, the runner's
+libSDL2 to link against, a check that no symbol needs a glibc newer than
+2.31) and publishes the zip as `atlantis-native-portmaster.zip` on the
+nightly and the numbered releases (and the `portmaster` itch.io channel
+of a numbered one). 32-bit ARM (armhf) is not built: the devices
+PortMaster serves today are 64-bit.
+
+Atlantis II is not in this front end yet: its window code
+(`crates/atlantis-app/src/a2.rs`: the game clock held in menus, the
+picture composition and scaling, its options menu, the mouse lock and the
+3D scenes' cost on a handheld) would need porting to SDL first.
 
 ### The web build
 
@@ -3774,6 +3876,15 @@ under emulation, the Windows-1250 letters and the subtitle font's glyphs
 for them, the menu fonts' glyphs and widths, the edition and fixes, a new
 game with a name typed in Czech letters to its first dialog, a save and
 its load),
+`ATLANTIS_DATA_PTBR` a folder of the Brazilian CD's images (its `.iso`
+files) or of its `atlantis.exe` and archives (`tests/pt_cd.rs`: every dialog line's rows against the build's
+breaker under emulation, the Windows-1252 letters and the subtitle font's
+glyphs for them, the build's tables and menu fonts and widths, the
+edition and fixes, a new game with a name typed in Portuguese letters to
+its first dialog, a save and its load, every chapter the scripts reach
+entered as the chapter changes enter it), `ATLANTIS_SAVES_PTBR` a folder
+of checkpoints written by the original (`pa<N>.gam`; every chapter's
+resumed on the Brazilian CD from the player screen to its place),
 `ATLANTIS_DATA_NL1997` one of the Dutch retail CD,
 `ATLANTIS_DATA_SV1997` one of the Swedish retail CD,
 `ATLANTIS_DATA_ES1997` / `ATLANTIS_DATA_IT1997` ones of the Spanish /

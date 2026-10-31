@@ -258,12 +258,14 @@ pub struct FixData {
 }
 
 /// Whether a byte 0xe1 of the sprite fonts' texts is the `ß` no font has a
-/// glyph for ([`BugFix::SharpS`]): in every release but the Czech CD, whose
-/// FONTMAX / FONTMIN / credits fonts hold a glyph for each byte up to 0xff
-/// and whose texts are Windows-1250, 0xe1 the `á` they draw (EPI.TXT's
-/// "Za strážemi").
+/// glyph for ([`BugFix::SharpS`]): in every release but the Czech CD and
+/// the Brazilian CD, whose FONTMAX / FONTMIN / credits fonts hold a glyph
+/// for each byte up to 0xff, 0xe1 the `á` they draw (the Czech EPI.TXT's
+/// "Za strážemi" in Windows-1250; the Brazilian EPI.TXT's "Palácio" and
+/// CREDITS.TXT's "Gráfico" in Windows-1252, its program with the width
+/// tables of those glyphs, `ExeBuild::menu_widths`).
 pub fn sharp_s_without_glyph(build: &ExeBuild) -> bool {
-    build.text_code_page != atlantis_data::TextCodePage::Windows1250
+    build.text_code_page != atlantis_data::TextCodePage::Windows1250 && build.menu_widths.is_none()
 }
 
 /// Whether `name` is a menu text the menu walk draws (`SPRLIST\*MENU.TXT`,
@@ -630,6 +632,18 @@ mod tests {
             of("atlantis-cd-zh-cn-692736", plain),
             [HexagonPieces, ChineseRows, SubtitlesToggle]
         );
+        // The Brazilian CD: the 1998 program's hexagon; its 0xe1 is `á`,
+        // which its fonts draw.
+        assert_eq!(of("atlantis-cd-pt-692736", plain), [HexagonPieces]);
+        let pt = BUILDS
+            .iter()
+            .find(|b| b.name == "atlantis-cd-pt-692736")
+            .unwrap();
+        assert!(!sharp_s_without_glyph(pt));
+        assert!(BUILDS
+            .iter()
+            .filter(|b| b.name != pt.name)
+            .all(sharp_s_without_glyph));
         // The 1998 DVD's program (the hexagon not forced, as the 1997 and
         // the Chinese builds), its Italian menus and the Dutch and Swedish
         // DOS texts; the Perfect Edition's.

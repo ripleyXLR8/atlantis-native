@@ -679,6 +679,12 @@ pub struct OptionsMenu {
     /// The front end opens a window it can put in full screen (the
     /// desktop): the "Start in full screen" entry.
     fullscreen: bool,
+    /// The front end draws the HD mode: the "Graphics" entry and the HD
+    /// mode's options (not the SDL front end, which shows the 640x480
+    /// frame alone).
+    hd: bool,
+    /// The front end can open a web page: the support entry.
+    support: bool,
     /// The fixes the bug fixes' box lists: those of the game's build
     /// ([`BugFix::of_game`]), in the menu's order.
     game_fixes: Vec<BugFix>,
@@ -696,6 +702,8 @@ impl Default for OptionsMenu {
             info: Vec::new(),
             library: false,
             fullscreen: false,
+            hd: true,
+            support: true,
             game_fixes: Vec::new(),
             fix_title: String::new(),
             fix_gaps: [0; 2],
@@ -752,6 +760,20 @@ impl OptionsMenu {
         self.menu.clamp(self.entries().len());
     }
 
+    /// Whether the menu has the "Graphics" entry and the HD mode's
+    /// options (on by default; off in a front end without the HD mode).
+    pub fn set_hd_entries(&mut self, on: bool) {
+        self.hd = on;
+        self.menu.clamp(self.entries().len());
+    }
+
+    /// Whether the menu has the support entry (on by default; off in a
+    /// front end that cannot open a web page).
+    pub fn set_support_entry(&mut self, on: bool) {
+        self.support = on;
+        self.menu.clamp(self.entries().len());
+    }
+
     /// The entries shown.
     fn entries(&self) -> Vec<Entry> {
         ENTRIES
@@ -759,6 +781,9 @@ impl OptionsMenu {
             .filter(|e| match e {
                 Entry::Library => self.library,
                 Entry::Fullscreen => self.fullscreen,
+                Entry::Support => self.support,
+                Entry::Graphics => self.hd,
+                e if e.hd_only() => self.hd,
                 _ => true,
             })
             .collect()
@@ -1387,10 +1412,15 @@ mod tests {
         ]);
         m.open();
         m.draw(&mut s, &font, HD);
-        // The longest edition line (the US retail CD's market) fits the
+        // The longest edition lines (the US retail CD's market, the
+        // Brazilian CD's language and month) fit the
         // box's text width.
-        let longest = "Game: CD, English (US, Interplay, August 1997 build)";
-        assert!(font.width(longest.as_bytes()) <= BOX_W - 20, "{longest}");
+        for longest in [
+            "Game: CD, English (US, Interplay, August 1997 build)",
+            "Game: CD, Brazilian Portuguese (MSD, December 1997 build)",
+        ] {
+            assert!(font.width(longest.as_bytes()) <= BOX_W - 20, "{longest}");
+        }
         // The text stays inside the box.
         for y in 0..SCREEN_H as i32 {
             for x in 0..SCREEN_W as i32 {
@@ -1819,5 +1849,34 @@ mod tests {
         assert_eq!(m.key(Key::Left, ORIG), MenuAction::None);
         assert_eq!(m.key(Key::Enter, ORIG), MenuAction::OpenSupport);
         assert!(m.is_open(), "the menu stays open");
+    }
+
+    #[test]
+    fn a_front_end_without_hd_or_browser_hides_their_entries() {
+        let mut m = OptionsMenu::new();
+        m.set_hd_entries(false);
+        m.set_support_entry(false);
+        let shown = m.entries();
+        assert!(!shown.contains(&Entry::Graphics));
+        assert!(!shown.iter().any(|e| e.hd_only()));
+        assert!(!shown.contains(&Entry::Support));
+        assert!(shown.contains(&Entry::BugFixes) && shown.contains(&Entry::Close));
+        m.open();
+        // Down from the top reaches every shown entry, Close last.
+        let mut seen = vec![m.selected()];
+        for _ in 0..shown.len() {
+            m.key(Key::Down, ORIG);
+            if !seen.contains(&m.selected()) {
+                seen.push(m.selected());
+            }
+        }
+        assert!(seen.contains(&Entry::Close));
+        assert!(seen.iter().all(|e| shown.contains(e)));
+        assert_eq!(m.layout().row_h, ROW_H);
+        // Enter on Close closes the menu.
+        while m.selected() != Entry::Close {
+            m.key(Key::Down, ORIG);
+        }
+        assert_eq!(m.key(Key::Enter, ORIG), MenuAction::Close);
     }
 }

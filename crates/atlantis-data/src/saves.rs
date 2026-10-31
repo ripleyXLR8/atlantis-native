@@ -55,9 +55,11 @@ pub struct Players {
     pub count: usize,
     /// The row marker of the build (0x00496570, e.g. `#New Player`).
     pub marker: Vec<u8>,
-    /// The 1997 builds' list: a 95-byte file, and a deletion leaves the
-    /// rows after the last one as they were (atlantis-cd-en-688128
-    /// FUN_0041e030).
+    /// The 1997 builds' list: a 95-byte file, and a deletion without the
+    /// loop that empties the rows past the count (atlantis-cd-en-688128
+    /// FUN_0041e030). With [`Players::sixth_row`], the Brazilian CD's
+    /// (atlantis-cd-pt-692736): the same list and deletion (FUN_0041de1c)
+    /// over the Chinese builds' 114-byte file.
     pub layout_1997: bool,
     /// The Chinese builds' list ([`PLAYERS_SIZE_ZH`]): the 17 bytes after
     /// the five rows, which only the file and the deletion's shift read
@@ -154,9 +156,15 @@ impl Players {
 
     /// The file the writers write: names (0x55 bytes), chapters (6),
     /// letters (6); 5 and 5 for the 1997 layout; names 0x66 bytes with the
-    /// Chinese one.
+    /// Chinese one, then 6 and 6 whatever the layout (the Brazilian CD's
+    /// 1997 list: atlantis-cd-pt-692736 FUN_0042c1d8 @ 0x0042c803..
+    /// 0x0042c83d, `push 0x66`, `push 6`, `push 6`).
     pub fn to_bytes(&self) -> Vec<u8> {
-        let n = if self.layout_1997 { 5 } else { 6 };
+        let n = if self.layout_1997 && self.sixth_row.is_none() {
+            5
+        } else {
+            6
+        };
         let mut out = Vec::with_capacity(PLAYERS_SIZE_ZH);
         for row in &self.rows {
             out.extend_from_slice(row);
@@ -218,12 +226,12 @@ impl Players {
     /// chapters and letters); the deleted player's letter goes to slot 4,
     /// its chapter there becomes 0. With five players the last row becomes
     /// the marker and the count stays 5; otherwise the rows from the new
-    /// count on are emptied (the 1997 layout empties the new count's row
-    /// only: atlantis-cd-en-688128 FUN_0041e030 has no loop over the
-    /// others). The Chinese builds' list ([`Players::sixth_row`]) shifts
-    /// the 17 bytes after the rows into row 4 and, without five players,
-    /// writes the rows with `strcpy` (see the branch). Returns the deleted
-    /// player's letter.
+    /// count on are emptied. The Chinese builds' list
+    /// ([`Players::sixth_row`]) shifts the 17 bytes after the rows into
+    /// row 4; it and the 1997 layout, without five players, write the rows
+    /// with `strcpy` (see the branch), the 1997 layout without the loop
+    /// over the rows past the count (atlantis-cd-en-688128 FUN_0041e030).
+    /// Returns the deleted player's letter.
     pub fn delete(&mut self, row: usize) -> Option<u8> {
         if row >= self.count || self.is_new_row(row) {
             return None;
@@ -248,7 +256,7 @@ impl Players {
         if five {
             let marker = self.marker.clone();
             strcpy(&mut self.rows[MAX_PLAYERS - 1], &marker);
-        } else if self.sixth_row.is_some() {
+        } else if self.sixth_row.is_some() || self.layout_1997 {
             // atlantis-cd-zh-tw-696832 FUN_0041e65c: row 4 = "" @ 0x0041e736;
             // the old count's last row = the marker when the count is 5
             // and that row (row 4, just emptied) is not the marker, else ""
@@ -265,18 +273,23 @@ impl Players {
                 b""
             };
             strcpy(&mut self.rows[last], s);
-            for r in self.count..MAX_PLAYERS {
-                strcpy(&mut self.rows[r], b"");
+            // The 1997 deletion (atlantis-cd-en-688128 FUN_0041e030, the
+            // August builds' copies of it) has the same steps up to here,
+            // row 4 = "" @ 0x0041e10a..0x0041e114 (its shift first copies
+            // the string after the rows in memory there, which strcpy of
+            // "" leaves past the NUL; not modelled), the old count's last
+            // row @ 0x0041e128..0x0041e188, and no such loop; so has the
+            // one over the 114-byte file (atlantis-cd-pt-692736
+            // FUN_0041de1c @ 0x0041def6..0x0041df74).
+            if !self.layout_1997 {
+                for r in self.count..MAX_PLAYERS {
+                    strcpy(&mut self.rows[r], b"");
+                }
             }
             self.count -= 1;
         } else {
             self.count -= 1;
-            let end = if self.layout_1997 {
-                self.count + 1
-            } else {
-                MAX_PLAYERS
-            };
-            for r in self.count..end {
+            for r in self.count..MAX_PLAYERS {
                 self.rows[r] = [0; NAME_LEN];
             }
         }
@@ -709,14 +722,84 @@ mod tests {
             (q.count, q.name(0), q.name(1)),
             (2, &b"ALICE"[..], &marker[..])
         );
-        // Stale rows past the list stay where FUN_0041e030 leaves them.
+        // FUN_0041e030 empties row 4 and the old count's last row; the
+        // other rows past the list stay as the shift leaves them.
         q.layout_1997 = true;
         q.rows[4][..3].copy_from_slice(b"OLD");
         q.delete(0).unwrap();
         assert_eq!(q.count, 1);
         assert!(q.is_new_row(0));
         assert_eq!(q.name(1), b"");
-        assert_eq!((q.name(3), q.name(4)), (&b"OLD"[..], &b"OLD"[..]));
+        assert_eq!((q.name(3), q.name(4)), (&b"OLD"[..], &b""[..]));
+    }
+
+    /// atlantis-cd-en-688128 FUN_0041e030 with a full list: four players
+    /// and the marker in row 4 (not "five"): row 4 = "" @ 0x0041e10a, then
+    /// the old count's last row (row 4, now not the marker) = the marker @
+    /// 0x0041e153, the count 4; five players: row 4 = the marker @
+    /// 0x0041e1f3, the count stays 5.
+    #[test]
+    fn layout_1997_delete_full() {
+        let marker = b"NEW PLAYER";
+        let mut p = Players::new(marker);
+        p.layout_1997 = true;
+        for name in [&b"A"[..], b"B", b"C", b"D"] {
+            p.create(name).unwrap();
+        }
+        assert_eq!((p.count, p.player_count()), (5, 4));
+        let mut q = p.clone();
+        assert_eq!(q.delete(1), Some(b'b'));
+        assert_eq!(q.count, 4);
+        assert_eq!(
+            (q.name(0), q.name(1), q.name(2)),
+            (&b"A"[..], &b"C"[..], &b"D"[..])
+        );
+        assert!(q.is_new_row(3) && q.is_new_row(4));
+        assert_eq!((q.letters[4], q.chapters[4]), (b'b', 0));
+        p.create(b"E").unwrap();
+        assert_eq!((p.count, p.player_count()), (5, 5));
+        assert_eq!(p.delete(4), Some(b'e'));
+        assert_eq!((p.count, p.player_count()), (5, 4));
+        assert!(p.is_new_row(4));
+        assert_eq!(p.name(3), b"D");
+    }
+
+    /// The Brazilian CD's list (atlantis-cd-pt-692736): the 1997 list over
+    /// the 114-byte file (names 0x66 bytes, chapters 0x66..0x6c, letters
+    /// 0x6c..0x72: FUN_0042c1d8 @ 0x0042c803..0x0042c83d), the rows read up
+    /// to the marker; its deletion (FUN_0041de1c) empties row 4 and the old
+    /// count's last row, and leaves the rows past them as they were.
+    #[test]
+    fn layout_1997_114() {
+        let marker = b"Novo Jogador";
+        let mut p = Players::new(marker);
+        p.layout_1997 = true;
+        p.sixth_row = Some([0; NAME_LEN]);
+        p.create(b"Ana").unwrap();
+        p.chapters[0] = 3;
+        let b = p.to_bytes();
+        assert_eq!(b.len(), PLAYERS_SIZE_ZH);
+        assert_eq!(b[0x66], 3);
+        assert_eq!(&b[0x6c..0x71], b"abcde");
+        let mut q = Players::read_rows(&b, marker, false).unwrap();
+        assert_eq!(
+            (q.count, q.name(0), q.name(1)),
+            (2, &b"Ana"[..], &marker[..])
+        );
+        q.layout_1997 = true;
+        q.rows[3][..3].copy_from_slice(b"OLD");
+        q.rows[4][..3].copy_from_slice(b"OLD");
+        q.delete(0).unwrap();
+        assert_eq!(q.count, 1);
+        assert!(q.is_new_row(0));
+        assert_eq!(q.name(1), b"");
+        // The shift moved row 3 up; row 4 got the 17 bytes' string, then "".
+        assert_eq!(
+            (q.name(2), q.name(3), q.name(4)),
+            (&b"OLD"[..], &b"OLD"[..], &b""[..])
+        );
+        assert_eq!(q.to_bytes().len(), PLAYERS_SIZE_ZH);
+        assert_eq!(q.letters[4], b'a');
     }
 
     #[test]

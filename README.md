@@ -120,6 +120,7 @@ those of the latest commit:
 | macOS 11 and later, Intel | `atlantis-native-macos-x64.dmg` |
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
 | Linux 64-bit ARM, such as a Raspberry Pi 4 or 5 (glibc 2.35+, ALSA) | `atlantis-native-linux-arm64.tar.gz` |
+| Handhelds with [PortMaster](https://portmaster.games/) (64-bit ARM: R36S, RG35XX, RGB30 and the like; Batocera, ROCKNIX, ArkOS, muOS, Knulli), the first game | `atlantis-native-portmaster.zip` |
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 The web version of the latest commit is also online:
@@ -147,6 +148,17 @@ sent anywhere; the saves stay in that browser.
 > Or, in the Terminal:
 > `xattr -dr com.apple.quarantine "/Applications/Atlantis Native.app"`
 
+> **PortMaster:** unzip `atlantis-native-portmaster.zip` into the
+> device's `ports` folder (it holds `Atlantis Native.sh` and the
+> `atlantisnative` folder), then copy your game's files (the folder with
+> `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`) into
+> `ports/atlantisnative/gamedata/`, and restart the front end so it lists
+> the port. The zip can instead be put, unopened, in PortMaster's
+> `autoinstall` folder for PortMaster to install. The gamepad is the
+> mouse, an on-screen keyboard types the names; the controls are in the
+> port's `atlantisnative/atlantisnative.md`. It needs glibc 2.31 or newer
+> and the system's SDL2, as PortMaster's firmwares have.
+
 ## You need the game
 
 Atlantis Native contains **no game data**. Bring your own copy:
@@ -165,6 +177,7 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | CD, retail release (August 1997 build, 4 CDs) | Spanish | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (July 1997 build, 4 CDs) | Italian | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, Czech release (Bohemia Interactive, 2000; also GAME4U Speciál 2, 2001; 4 CDs; Cryo's 1999 patch 1.01 program) | Czech subtitles and menus, English voices | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
+| CD, Brazilian release (*Atlantis: A Lenda Perdida*, MSD Multimídia, 1997, 4 CDs; December 1997 build) | Brazilian Portuguese voices, subtitles and menus | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
 | CD with Cryo's patch 1.01 (`AT1CDINT.EXE`, 1999 build) | English, French, German, Dutch, Swedish, Spanish or Italian CD (French interface) | the folder with the patched `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
 | CD, Traditional Chinese release (1998 build, 4 CDs) | Traditional Chinese subtitles and menus, English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
@@ -179,6 +192,12 @@ on the Czech Windows it was sold for (`č`, `ř`, `ů` and the other Czech
 letters, not the Western letters a Western Windows shows there); its
 player screen keeps the French `NOUVEAU JOUEUR` row of the program it
 ships.
+The Brazilian CD has a program of its own (December 1997): its menus
+draw the Portuguese letters of its own fonts at its own widths, and its
+name entry, as the original's, takes letters up to `§` only, so a typed
+`ã` or `ç` is left out of the name. The only public dump known (Internet
+Archive) has unreadable sectors on disc 2; a few films and one panorama
+play damaged from it.
 The May 1997 German CD's program also answers four keys its developers
 left in (`T`, `R`, `F1`, `F3`: a panel of the engine's variables, and
 others); Atlantis Native does not reproduce them.
@@ -279,6 +298,14 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
 - 🎮 [Atlantis Native on the R36S](https://github.com/Klaasvdb/atlantis-native-handheld),
   by Klaas Van den Broeck: a frontend that runs Atlantis Native on RK3326
   handhelds, with the gamepad as the mouse.
+- 🕹️ Handhelds and PortMaster: `crates/atlantis-sdl` is an SDL2 front end
+  for the first game (the gamepad as the mouse, an on-screen keyboard for
+  the names) based on Klaas Van den Broeck's (@Klaasvdb) R36S front end,
+  whose gamepad and keyboard code he let us bring in; `packaging/portmaster/`
+  builds a PortMaster port of it (`atlantis-native-portmaster.zip` on
+  every release); a pad SDL does not know is read raw, an
+  Xbox-style one (an Xbox Wireless Controller over Bluetooth, for one)
+  without any `controls.ini` (see the [technical notes](docs/TECHNICAL.md#the-sdl2-front-end-handhelds-and-portmaster)).
 
 ## Code signing policy
 
