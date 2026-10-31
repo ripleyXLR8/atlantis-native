@@ -195,7 +195,9 @@ ships.
 The Brazilian CD has a program of its own (December 1997): its menus
 draw the Portuguese letters of its own fonts at its own widths, and its
 name entry, as the original's, takes letters up to `§` only, so a typed
-`ã` or `ç` is left out of the name.
+`ã` or `ç` is left out of the name. The only public dump known (Internet
+Archive) has unreadable sectors on disc 2; a few films and one panorama
+play damaged from it.
 The May 1997 German CD's program also answers four keys its developers
 left in (`T`, `R`, `F1`, `F3`: a panel of the engine's variables, and
 others); Atlantis Native does not reproduce them.
