@@ -100,7 +100,7 @@ its executable's language:
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
-| `fix_sharp_s` | (not the Czech CD, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
+| `fix_sharp_s` | (not the Czech and Brazilian CDs, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
 | `fix_disc_revision` | some disc's copy of FONTMIN.SPR, FONTMIN2.SPR, CREDBLAN.SPR, CREDBLEU.SPR, or CREDITS.TXT with the builds that read it at each run, differs from disc 1's (`FixData::disc_revisions`): of the known data, the Dutch CD's and the May 1997 German CD's | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc`, `load_credits_fonts` | the credits text, the credits fonts and the player-name fonts are disc 1's whatever the disc (the original reads them from the disc in the drive: the Dutch disc 2 holds an older revision, the German May discs 2 to 4 another credits font, see [Game builds](#game-builds)) |
 | `fix_menu_line_width` | Italian CD and DVD (`menu_positioned_byte_width` 16) | `MenuRules::positioned_byte_width` | a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
 | `fix_chinese_rows` | Simplified Chinese (`CjkBreaker::Gb2312`) | `CjkSplit::row_fix` | the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)) |
@@ -318,8 +318,8 @@ original's pixels, which the tests check).
 
 ### Subtitles
 
-The 2001, GOG.com, August 1997 French and German, and the Spanish and
-Italian builds draw their subtitles with the system's Arial at 13 pixels, not smoothed. The port draws them with Liberation Sans,
+The 2001, GOG.com, August 1997 French and German, the Spanish and
+Italian, and the Brazilian builds draw their subtitles with the system's Arial at 13 pixels, not smoothed. The port draws them with Liberation Sans,
 which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
 thresholded to one bit, so every platform draws the same pixels; the text
 bytes are read in the release's code page (`TextCodePage` in
@@ -733,13 +733,34 @@ port shows as the original (its own box, OK to close), or skips with
 `fix_startup_logos`. The Japanese scripts lack the two chapters no script
 reaches (10, 86).
 
+The Brazilian CD (*Atlantis: A Lenda Perdida*, MSD Multimídia, 1997, 4
+CDs, dubbed) has its own build, `atlantis-cd-pt-692736` (December 1997,
+shown *CD, Brazilian Portuguese (MSD, December 1997 build)*): the 1998
+program's code line as a Spanish build of October 1997 has it, which
+plays as the DVD column above but for its player list, which is the
+August 1997 builds' (the new-player row `Novo Jogador` is the label
+itself, the rows read up to it) over the Chinese builds' 114-byte
+`players.atl`, with the August builds' deletion. Its archives are the
+August 1997 discs' with Portuguese voices and lip-sync, texts
+(Windows-1252), chapter names, credits, an end picture and the six
+sprite fonts redrawn with a glyph for each byte up to 0xff; its
+executable holds the widths of those fonts (`ExeBuild::menu_widths`: 224
+FONTMAX widths, 191 FONTMIN advances, then the credits widths), which the
+port's menu walk, label measure and FONTMIN drawers read
+(`FontMaxWidths`, `FontMinAdvances::of_build`). Every dialog line's rows
+were checked against its breaker under emulation. Its name entry, as the
+original's, takes the bytes up to 0xa7, so `ã`, `ç` and the other
+letters above it are not taken; its 0xe1 is `á`, so the `ß` fix does not
+apply to it.
+
 In every build the player-name font (FONTMIN) has advances for 101
 glyphs, and the original reads those of the glyphs past them from the
 credits font's table that follows it; the port does the same with each
 build's table (in the August 1997 French build a typed `£` advances 2 pixels,
 in the 2001 build 14). Likewise the menu font (FONTMAX) has 137 widths, and
 a byte past them reads the FONTMIN advances that follow; only the Czech
-CD's menus hold such bytes.
+CD's menus hold such bytes (the Brazilian CD's program has tables of its
+own, of 224 and 191 bytes).
 
 The May 1997 French build is the English May 1997 build's code, compiled five
 days earlier against an older `cryo.dll`, with its own music copy rules.
@@ -3774,6 +3795,15 @@ under emulation, the Windows-1250 letters and the subtitle font's glyphs
 for them, the menu fonts' glyphs and widths, the edition and fixes, a new
 game with a name typed in Czech letters to its first dialog, a save and
 its load),
+`ATLANTIS_DATA_PTBR` a folder of the Brazilian CD's images (its `.iso`
+files) or of its `atlantis.exe` and archives (`tests/pt_cd.rs`: every dialog line's rows against the build's
+breaker under emulation, the Windows-1252 letters and the subtitle font's
+glyphs for them, the build's tables and menu fonts and widths, the
+edition and fixes, a new game with a name typed in Portuguese letters to
+its first dialog, a save and its load, every chapter the scripts reach
+entered as the chapter changes enter it), `ATLANTIS_SAVES_PTBR` a folder
+of checkpoints written by the original (`pa<N>.gam`; every chapter's
+resumed on the Brazilian CD from the player screen to its place),
 `ATLANTIS_DATA_NL1997` one of the Dutch retail CD,
 `ATLANTIS_DATA_SV1997` one of the Swedish retail CD,
 `ATLANTIS_DATA_ES1997` / `ATLANTIS_DATA_IT1997` ones of the Spanish /

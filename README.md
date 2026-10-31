@@ -165,6 +165,7 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | CD, retail release (August 1997 build, 4 CDs) | Spanish | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (July 1997 build, 4 CDs) | Italian | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, Czech release (Bohemia Interactive, 2000; also GAME4U Speciál 2, 2001; 4 CDs; Cryo's 1999 patch 1.01 program) | Czech subtitles and menus, English voices | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
+| CD, Brazilian release (*Atlantis: A Lenda Perdida*, MSD Multimídia, 1997, 4 CDs; December 1997 build) | Brazilian Portuguese voices, subtitles and menus | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
 | CD with Cryo's patch 1.01 (`AT1CDINT.EXE`, 1999 build) | English, French, German, Dutch, Swedish, Spanish or Italian CD (French interface) | the folder with the patched `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
 | CD, Traditional Chinese release (1998 build, 4 CDs) | Traditional Chinese subtitles and menus, English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
@@ -179,6 +180,10 @@ on the Czech Windows it was sold for (`č`, `ř`, `ů` and the other Czech
 letters, not the Western letters a Western Windows shows there); its
 player screen keeps the French `NOUVEAU JOUEUR` row of the program it
 ships.
+The Brazilian CD has a program of its own (December 1997): its menus
+draw the Portuguese letters of its own fonts at its own widths, and its
+name entry, as the original's, takes letters up to `§` only, so a typed
+`ã` or `ç` is left out of the name.
 The May 1997 German CD's program also answers four keys its developers
 left in (`T`, `R`, `F1`, `F3`: a panel of the engine's variables, and
 others); Atlantis Native does not reproduce them.
