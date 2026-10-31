@@ -227,10 +227,11 @@ impl Pad {
         }
     }
 
-    /// The left stick's x after the dead zone, for the keyboard.
-    pub fn stick_x(&self) -> f32 {
+    /// The left stick after the dead zone (x right, y down), for the
+    /// keyboard.
+    pub fn stick(&self) -> (f32, f32) {
         let dz = self.controls.deadzone(self.controller.is_some());
-        radial(self.axes[0], self.axes[1], dz).0
+        radial(self.axes[0], self.axes[1], dz)
     }
 
     /// The SDL event's actions (none when it is not the pad's).

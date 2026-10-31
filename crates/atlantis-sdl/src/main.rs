@@ -511,7 +511,7 @@ fn main() {
             if let Some(p) = sys.take_warp_request() {
                 motion.set_pointer(p);
             }
-            pad.buttons.tick(pad.stick_x());
+            pad.buttons.tick(pad.stick());
             let dt = now.duration_since(last_motion).as_secs_f32();
             last_motion = now;
             match motion.step(&pad.inputs(), dt, locked) {

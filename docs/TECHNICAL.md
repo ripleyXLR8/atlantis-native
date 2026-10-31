@@ -876,7 +876,18 @@ their headers.
   starts at 30 % of full tilt and reaches it in half a second; the view
   held near full tilt doubles its gain at full tilt and speeds up to three
   times after a third of a second, over 1.5 s.
-- `osk.rs`: the on-screen keyboard (a strip of letters over the frame).
+- `osk.rs`: the on-screen keyboard, a grid of 4 rows of 13 cells over the
+  top of the frame (above the player screen's title): A..M, N..Z, the
+  digits and `- . '`, then four wide keys (the case switch, Space, Erase,
+  Done). Every key is within every build's name entry (0x20..0x7a: the
+  English 1997 build stores a..z as A..Z, the others keep the case and
+  take up to 0xa7). The D-pad or the left stick (its larger axis) moves in
+  two dimensions, wrapping at the edges, held moves repeat; on the last
+  row a wide key covers its columns and going up returns to the column
+  left. A presses the key, B erases, X types a space, Y switches the case,
+  Start or Done send Enter and close it, Select closes it. Drawn with a
+  5x7 font at 3x (the wide keys' labels 2x) into the 640x480 frame, which
+  the screen only scales. Klaas's one-row strip, made a grid.
 - `config.rs`: `controls.ini` and the raw presets.
 
 `packaging/portmaster/` holds the PortMaster port (`atlantisnative`, laid

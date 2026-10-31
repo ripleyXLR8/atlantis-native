@@ -37,8 +37,11 @@ Saves go to `ports/atlantisnative/saves/`, the last run's log to
 | Select (elsewhere)   | Options menu (enhancements, bug fixes)        |
 | Select + Start       | Quit                                          |
 
-On-screen keyboard: left / right choose a letter, A types it, B erases, X
-types a space, Y switches upper / lower case, Start confirms (Enter).
+On-screen keyboard: a grid of letters, digits and `- . '`, with the case
+switch, Space, Erase and Done on its last row. The D-pad or the left stick
+moves (wrapping at the edges), A presses the key, B erases, X types a
+space, Y switches upper / lower case, Start or Done confirm (Enter), Select
+closes it.
 
 Options menu: D-pad up / down chooses, left / right or A changes, B or
 Select closes it.

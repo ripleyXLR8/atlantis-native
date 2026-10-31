@@ -177,7 +177,7 @@ impl Buttons {
         }
         if self.osk.active {
             return match (btn, down) {
-                (Btn::A, true) => tap(self.osk.typed()),
+                (Btn::A, true) => self.osk.press().map_or_else(Vec::new, tap),
                 (Btn::B, true) => tap(Key::Backspace),
                 (Btn::X, true) => tap(Key::Space),
                 (Btn::Y, true) => {
@@ -216,10 +216,10 @@ impl Buttons {
         vec![action]
     }
 
-    /// Once per engine frame: the keyboard's held moves (`stick_x`: the
-    /// left stick's x, -1..1), and its closing when no menu reads the
-    /// keys any more.
-    pub fn tick(&mut self, stick_x: f32) {
+    /// Once per engine frame: the keyboard's held moves (the D-pad, or
+    /// `stick`: the left stick, -1..1 on each axis, y down, its larger
+    /// axis), and its closing when no menu reads the keys any more.
+    pub fn tick(&mut self, stick: (f32, f32)) {
         if !self.osk.active {
             return;
         }
@@ -227,12 +227,25 @@ impl Buttons {
             self.osk.close();
             return;
         }
-        let dir = if self.held(Btn::Left) || stick_x < -0.5 {
-            -1
-        } else if self.held(Btn::Right) || stick_x > 0.5 {
-            1
+        let (dx, dy) = self.dpad();
+        let dir = if (dx, dy) != (0, 0) {
+            (i32::from(dx), i32::from(dy))
         } else {
-            0
+            let (x, y) = stick;
+            let axis = |v: f32| {
+                if v < -0.5 {
+                    -1
+                } else if v > 0.5 {
+                    1
+                } else {
+                    0
+                }
+            };
+            if x.abs() >= y.abs() {
+                (axis(x), 0)
+            } else {
+                (0, axis(y))
+            }
         };
         self.osk.tick(dir);
     }
@@ -241,6 +254,7 @@ impl Buttons {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::osk::Cell;
 
     #[test]
     fn the_buttons_click_and_press_keys() {
@@ -347,10 +361,65 @@ mod tests {
             ..Buttons::default()
         };
         b.osk.open();
-        b.tick(0.9);
-        assert_eq!(b.osk.typed(), Key::Char('B'));
+        b.tick((0.9, 0.2));
+        assert_eq!(b.osk.cell(), Cell::Char('B'));
         b.in_menu = false;
-        b.tick(0.0);
+        b.tick((0.0, 0.0));
         assert!(!b.osk.active);
+    }
+
+    #[test]
+    fn the_keyboard_grid_by_pad() {
+        let mut b = Buttons {
+            in_menu: true,
+            ..Buttons::default()
+        };
+        b.set(Btn::Select, true);
+        b.set(Btn::Select, false);
+        assert!(b.osk.active && b.dpad_taken());
+        // The D-pad moves down then right (no pointer move, no click).
+        assert!(b.set(Btn::Down, true).is_empty());
+        b.tick((0.0, 0.0));
+        b.set(Btn::Down, false);
+        b.tick((0.0, 0.0));
+        b.set(Btn::Right, true);
+        b.tick((0.0, 0.0));
+        b.set(Btn::Right, false);
+        assert_eq!(b.osk.cell(), Cell::Char('O'));
+        // The stick, its larger axis: down.
+        b.tick((0.0, 0.0));
+        b.tick((0.3, 0.8));
+        assert_eq!(b.osk.cell(), Cell::Char('2'));
+        b.tick((0.0, 0.0));
+        let tap = |k| vec![Action::Key(k, true), Action::Key(k, false)];
+        assert_eq!(b.set(Btn::A, true), tap(Key::Char('2')));
+        assert!(b.set(Btn::A, false).is_empty());
+        assert_eq!(b.set(Btn::B, true), tap(Key::Backspace));
+        assert_eq!(b.set(Btn::X, true), tap(Key::Space));
+        // Y switches the case: the letters typed small.
+        b.tick((0.0, -0.9));
+        assert!(b.set(Btn::Y, true).is_empty());
+        assert_eq!(b.set(Btn::A, true), tap(Key::Char('o')));
+        // Down twice to the wide keys: the case switch under the column,
+        // then right to Space, Erase and Done.
+        b.tick((0.0, 0.0));
+        b.tick((0.0, 0.9));
+        b.tick((0.0, 0.0));
+        b.tick((0.0, 0.9));
+        assert_eq!(b.osk.cell(), Cell::Shift);
+        for _ in 0..3 {
+            b.tick((0.0, 0.0));
+            b.tick((0.9, 0.0));
+        }
+        assert_eq!(b.osk.cell(), Cell::Done);
+        b.set(Btn::A, false);
+        assert_eq!(b.set(Btn::A, true), tap(Key::Enter));
+        assert!(!b.osk.active);
+        // Closed: A clicks again (after its release).
+        b.set(Btn::A, false);
+        assert_eq!(
+            b.set(Btn::A, true),
+            vec![Action::Mouse(MouseButton::Left, true)]
+        );
     }
 }
