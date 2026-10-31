@@ -895,7 +895,17 @@ out as in PortsMaster/PortMaster-New: launcher, `port.json`,
 `gameinfo.xml`, README, the project's icon as cover and screenshot, the
 game's own files in `atlantisnative/gamedata/`) and `build.sh`, which
 cross-compiles for 64-bit ARM Linux with glibc 2.31 (cargo-zigbuild)
-and adds the licences. SDL2 is never bundled: the device's is used.
+and adds the licences; its zip is laid out as PortMaster-New's
+`build_release.py` lays out a port's (the launcher at the root;
+`port.json`, `gameinfo.xml`, the screenshot and the README as
+`atlantisnative.md` inside `atlantisnative/`). SDL2 is never bundled: the
+device's is used. The workflow's `portmaster` job runs it on GitHub's
+64-bit ARM runner (zig and cargo-zigbuild from PyPI, the runner's
+libSDL2 to link against, a check that no symbol needs a glibc newer than
+2.31) and publishes the zip as `atlantis-native-portmaster.zip` on the
+nightly and the numbered releases (and the `portmaster` itch.io channel
+of a numbered one). 32-bit ARM (armhf) is not built: the devices
+PortMaster serves today are 64-bit.
 
 Atlantis II is not in this front end yet: its window code
 (`crates/atlantis-app/src/a2.rs`: the game clock held in menus, the

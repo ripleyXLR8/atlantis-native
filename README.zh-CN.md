@@ -60,6 +60,7 @@ Cryo Interactive 1997 年作品《亚特兰蒂斯：失落的传说》（*Atlant
 | macOS 11 及以上，Apple Silicon | `atlantis-native-macos-arm64.dmg` |
 | Linux x86-64（glibc 2.35+、ALSA） | `atlantis-native-linux-x64.tar.gz` |
 | Linux 64 位 ARM，例如 Raspberry Pi 4 或 5 | `atlantis-native-linux-arm64.tar.gz` |
+| 掌机（[PortMaster](https://portmaster.games/)，64 位 ARM，如 R36S），第一部游戏 | `atlantis-native-portmaster.zip`（解压到 `ports` 文件夹，游戏文件放进 `ports/atlantisnative/gamedata/`） |
 
 网页版：**https://ripleyxlr8.github.io/atlantis-native/**（Chrome、Edge、Firefox 或 Safari）。
 在网页中选择你的游戏文件夹即可：文件只在你的浏览器中读取，不会发送到任何地方。

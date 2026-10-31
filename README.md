@@ -120,6 +120,7 @@ those of the latest commit:
 | macOS 11 and later, Intel | `atlantis-native-macos-x64.dmg` |
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
 | Linux 64-bit ARM, such as a Raspberry Pi 4 or 5 (glibc 2.35+, ALSA) | `atlantis-native-linux-arm64.tar.gz` |
+| Handhelds with [PortMaster](https://portmaster.games/) (64-bit ARM: R36S, RG35XX, RGB30 and the like; Batocera, ROCKNIX, ArkOS, muOS, Knulli), the first game | `atlantis-native-portmaster.zip` |
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 The web version of the latest commit is also online:
@@ -146,6 +147,17 @@ sent anywhere; the saves stay in that browser.
 >
 > Or, in the Terminal:
 > `xattr -dr com.apple.quarantine "/Applications/Atlantis Native.app"`
+
+> **PortMaster:** unzip `atlantis-native-portmaster.zip` into the
+> device's `ports` folder (it holds `Atlantis Native.sh` and the
+> `atlantisnative` folder), then copy your game's files (the folder with
+> `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`) into
+> `ports/atlantisnative/gamedata/`, and restart the front end so it lists
+> the port. The zip can instead be put, unopened, in PortMaster's
+> `autoinstall` folder for PortMaster to install. The gamepad is the
+> mouse, an on-screen keyboard types the names; the controls are in the
+> port's `atlantisnative/atlantisnative.md`. It needs glibc 2.31 or newer
+> and the system's SDL2, as PortMaster's firmwares have.
 
 ## You need the game
 
@@ -283,7 +295,8 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
   for the first game (the gamepad as the mouse, an on-screen keyboard for
   the names) based on Klaas Van den Broeck's (@Klaasvdb) R36S front end,
   whose gamepad and keyboard code he let us bring in; `packaging/portmaster/`
-  builds a PortMaster port of it; a pad SDL does not know is read raw, an
+  builds a PortMaster port of it (`atlantis-native-portmaster.zip` on
+  every release); a pad SDL does not know is read raw, an
   Xbox-style one (an Xbox Wireless Controller over Bluetooth, for one)
   without any `controls.ini` (see the [technical notes](docs/TECHNICAL.md#the-sdl2-front-end-handhelds-and-portmaster)).
 
