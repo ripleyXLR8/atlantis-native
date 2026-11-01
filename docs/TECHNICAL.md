@@ -735,6 +735,14 @@ port shows as the original (its own box, OK to close), or skips with
 `fix_startup_logos`. The Japanese scripts lack the two chapters no script
 reaches (10, 86).
 
+The Italian *Atlantis Collection* DVD (2014) installs an unpacked tree
+equal to GOG's Italian one, with a 714240-byte `Atlantis.exe`: the 1.01
+patch program (same size and PE timestamp, so played as
+`atlantis-patch-fr-714240`, shown *CD, patch 1.01, Italian (1999 build)*)
+with three code edits for the original's platform (no CD scan, no
+free-space checks, `.\` drive strings) and the row `#NUOVO GICATORE`,
+as spelt in GOG's Italian executable. No table differs from the patch's.
+
 The Brazilian CD (*Atlantis: A Lenda Perdida*, MSD Multimídia, 1997, 4
 CDs, dubbed) has its own build, `atlantis-cd-pt-692736` (December 1997,
 shown *CD, Brazilian Portuguese (MSD, December 1997 build)*): the 1998

@@ -95,7 +95,8 @@ CD (Bohemia Interactive, 2000, and its GAME4U Speciál 2 re-issue, 2001;
 copied or as images), the Brazilian Portuguese CD (*Atlantis: A Lenda
 Perdida*, MSD Multimídia, 1997; copied or as images), the CD with Cryo's patch 1.01 (over the English, French, German, Dutch,
 Swedish, Spanish or Italian CD), the GOG.com release in
-English, French, German, Spanish and Italian, the Traditional
+English, French, German, Spanish and Italian, the first game of the Italian
+*Atlantis Collection* DVD (2014; its installed folder), the Traditional
 Chinese CD (1998) and the Simplified Chinese CD (1999), copied or as
 images, Cryo's DVD (1998: English, French, German, Dutch, Spanish,
 Italian, Swedish and Japanese; the drive, a copy of a side or the images
