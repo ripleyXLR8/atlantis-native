@@ -74,7 +74,7 @@ Cryo Interactive 1997 年作品《亚特兰蒂斯：失落的传说》（*Atlant
 
 Atlantis Native **不含任何游戏数据**，请使用你自己的正版游戏。
 除了两款中文版，还支持英文、法文、德文、荷兰文、瑞典文、西班牙文、意大利文光盘版、
-Cryo 1.01 补丁，以及 [GOG.com](https://www.gog.com/) 版（完整列表见[英文 README](README.md#you-need-the-game)）。
+Cryo 1.01 补丁、《Atlantis II》的北美 DreamCatcher 光盘版（*Beyond Atlantis*，2000），以及 [GOG.com](https://www.gog.com/) 版（完整列表见[英文 README](README.md#you-need-the-game)）。
 
 ## 快速开始
 

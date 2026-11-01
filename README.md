@@ -222,6 +222,7 @@ For *Atlantis II*:
 |---|---|---|
 | CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (or copies of the CDs) in it or in a folder inside it; in the browser, copies of the CDs (folders `CD1` to `CD4`, say, each holding the disc's `DATAS_A2`): it reads files, not images |
 | CD with the official patch 1.01 | French or English (one executable for both; tested with the French CD) | the same, with the patched `atlantis2.exe` |
+| CD, North American release (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs; its own program, version 1.01's code) | English | the same as the French CD; in the browser, copies of the CDs |
 | [GOG.com](https://www.gog.com/) (version 1.01; the builds of 2018, June 2022 and July 2022) | English, French, German, Spanish (one executable for all four) | the installation folder |
 
 Another executable is refused with its identifiers, so that it can be

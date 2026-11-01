@@ -124,6 +124,7 @@ impl BugFix {
             BugFix::MusicRestart => "Music: an ended track starts again",
             BugFix::MusicMark => "Music: the rare missing mark (1 in 32768)",
             BugFix::IrelandClicks => "Ireland: cross and ogham clicks",
+            BugFix::FilmSubtitles => "800 x 600: subtitles over the films",
         }
     }
 
@@ -151,6 +152,11 @@ impl BugFix {
                 "original may take a click for another object:",
                 "back to Tibet from the 4th stone (ch. 12), the",
                 "water's film from the 9th with the horse (ch. 14).",
+            ],
+            BugFix::FilmSubtitles => &[
+                "At 800 x 600 the original draws the subtitles",
+                "of a dialog over a film too late to be seen",
+                "(only the DreamCatcher CD shows them).",
             ],
         }
     }
@@ -811,11 +817,11 @@ mod tests {
         three.ireland_clicks = false;
         assert_eq!(
             rows(three),
-            ("Fix original bugs".into(), Some("Custom (3/4)".into()))
+            ("Fix original bugs".into(), Some("Custom (4/5)".into()))
         );
         assert_eq!(
             rows(BugFixes::only(BugFix::MusicEnd)).1.as_deref(),
-            Some("Custom (1/4)")
+            Some("Custom (1/5)")
         );
         // Pressed: all on, then all off; from a mix, all on.
         let mut m = OptionsMenu::new();
@@ -970,9 +976,9 @@ mod tests {
                 assert!(texts.iter().any(|t| t == line), "{line}");
             }
             assert_eq!(texts.last().unwrap(), FIX_KEYS);
-            // The title, 3 buttons, 4 rows of a label and a value, the
+            // The title, 3 buttons, 5 rows of a label and a value, the
             // explanation and the keys.
-            assert_eq!(t.items.len(), 1 + 3 + 4 * 2 + 4 + 1);
+            assert_eq!(t.items.len(), 1 + 3 + 5 * 2 + 4 + 1);
             assert!(s.contains(&SELECTED) && s.contains(&BG));
             // Inside the screen, a margin around.
             let (bx, by) = FIX_LAYOUT.origin(FIX_ROWS.len(), w, h);

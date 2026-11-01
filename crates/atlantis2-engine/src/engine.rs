@@ -3037,7 +3037,13 @@ impl Engine {
             self.video_frame_event(k);
         }
         // `cinema=N,M`: the dialog's step after each frame (FUN_00480830,
-        // FUN_00480840): its lines and subtitles over the film.
+        // FUN_00480840): its lines and subtitles over the film. On the
+        // surface alone where that comes after the frame's enlargement.
+        let out = if self.film_subtitles_unseen() {
+            None
+        } else {
+            out
+        };
         self.film_dialog_step(new_tick, out);
         if !new_tick {
             return;
@@ -3048,6 +3054,17 @@ impl Engine {
             return;
         }
         self.finish_video();
+    }
+
+    /// Whether a film's subtitles stay off the screen: at 800 x 600, in
+    /// the builds that draw them after the film frame's enlargement
+    /// (FUN_00402c30 @ 0x0040bc65, FUN_00480840 @ 0x0040c08e), on the 640
+    /// x 480 surface the next frame covers, unless the bug fix shows them.
+    fn film_subtitles_unseen(&self) -> bool {
+        self.display_large()
+            && self.renderer.width() == crate::display::SMALL_W
+            && !self.files.build().film_subtitles_blitted
+            && !self.enhancements.fixes.film_subtitles
     }
 
     /// The start-up intro (FUN_0049d9c0), the last step of the original's

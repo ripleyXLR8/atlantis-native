@@ -3,8 +3,9 @@
 //! The tests that need the game read its folders from `ATLANTIS2_DATA`,
 //! `ATLANTIS2_DISCS` (the French CD), `ATLANTIS2_GOG` (GOG.com's
 //! edition, French), `ATLANTIS2_GOG_EN` / `_DE` / `_ES` (its other
-//! languages), `ATLANTIS2_GOG_OLD` (its older builds' `Game.exe`) and
-//! `ATLANTIS2_PATCH101` (the 1.01 executable). Without them a
+//! languages), `ATLANTIS2_GOG_OLD` (its older builds' `Game.exe`),
+//! `ATLANTIS2_PATCH101` (the 1.01 executable) and `ATLANTIS2_DATA_US` /
+//! `ATLANTIS2_DISCS_US` (the North American CD). Without them a
 //! test must not pass as if it had run: [`missing`] fails it, unless
 //! `ATLANTIS2_SKIP_DATA_TESTS=1` asks for the game-data tests to be
 //! skipped (a build without the game, such as the CI's), and then writes a
@@ -35,7 +36,7 @@ pub fn missing(what: &str) {
         panic!(
             "{what}: this test needs the game's data; set the variables \
              (ATLANTIS2_DATA, ATLANTIS2_DISCS, ATLANTIS2_GOG, \
-             ATLANTIS2_PATCH101) or {SKIP_VAR}=1 to skip the game-data tests"
+             ATLANTIS2_PATCH101, ATLANTIS2_DATA_US, ATLANTIS2_DISCS_US) or {SKIP_VAR}=1 to skip the game-data tests"
         );
     }
     // Written straight to the standard error, which the harness does not

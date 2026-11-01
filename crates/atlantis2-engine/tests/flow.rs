@@ -65,12 +65,22 @@ thread_local! {
     /// The test plays GOG's installation (`ATLANTIS2_GOG`) instead of the
     /// CD's files.
     static ON_GOG: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the North American CD (`ATLANTIS2_DATA_US`,
+    /// `ATLANTIS2_DISCS_US`).
+    static ON_US: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 fn game() -> Option<A2Files> {
     if ON_GOG.with(|g| g.get()) {
         let dir = std::env::var_os("ATLANTIS2_GOG")?;
         let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[]).expect("GOG folder");
+        return Some(files);
+    }
+    if ON_US.with(|u| u.get()) {
+        let dir = std::env::var_os("ATLANTIS2_DATA_US")?;
+        let discs = std::env::var_os("ATLANTIS2_DISCS_US")?;
+        let (files, _) =
+            A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("US CD");
         return Some(files);
     }
     let (Some(dir), Some(discs)) = (
@@ -476,8 +486,14 @@ impl Run {
         if let Some(dir) = &self.shots {
             std::fs::create_dir_all(dir).unwrap();
             let png = atlantis2_engine::png::encode_rgb565(&self.screen, 640, 480);
-            let gog = if ON_GOG.with(|g| g.get()) { "gog-" } else { "" };
-            std::fs::write(dir.join(format!("{gog}{file}")), png).unwrap();
+            let edition = if ON_GOG.with(|g| g.get()) {
+                "gog-"
+            } else if ON_US.with(|u| u.get()) {
+                "us-"
+            } else {
+                ""
+            };
+            std::fs::write(dir.join(format!("{edition}{file}")), png).unwrap();
         }
     }
 
@@ -6058,12 +6074,28 @@ fn the_whole_game_with_the_mouse_on_gog() {
     whole_game("a2-flow-whole-game-gog");
 }
 
+/// The whole game on the North American CD (`ATLANTIS2_DATA_US`,
+/// `ATLANTIS2_DISCS_US`): the same play, the same chapters and lines. With
+/// `ATLANTIS2_PNG_DIR` its pictures are written there (`us-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_us_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_US").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_US").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_US / ATLANTIS2_DISCS_US not set");
+        return;
+    }
+    ON_US.with(|u| u.set(true));
+    whole_game("a2-flow-whole-game-us");
+}
+
 fn whole_game(scratch_name: &str) {
-    let gog = ON_GOG.with(|g| g.get());
+    let gog = ON_GOG.with(|g| g.get()) || ON_US.with(|u| u.get());
     let started = std::time::Instant::now();
     let dir = scratch(scratch_name);
     let mut r = Run::new(&dir);
-    // The worlds' own tests write the pictures (GOG's run writes its own).
+    // The worlds' own tests write the pictures (GOG's and the US CD's runs
+    // write their own).
     if !gog {
         r.shots = None;
     }
