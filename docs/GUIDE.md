@@ -102,8 +102,9 @@ images, Cryo's DVD (1998: English, French, German, Dutch, Spanish,
 Italian, Swedish and Japanese; the drive, a copy of a side or the images
 of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
-patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000)
-and the GOG.com edition (see [Atlantis II](#atlantis-ii)).
+patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
+the GOG.com edition and the Italian *Atlantis Collection* DVD (see
+[Atlantis II](#atlantis-ii)).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -248,8 +249,8 @@ What to pick:
   folder holding `atlantis.exe` and the four `BIGCD` archives, or Cryo's
   DVD (the drive or a copy of a side, then the language). CD images
   cannot be read in the browser.
-- *Atlantis II*, GOG.com: the installation folder (the one holding
-  `Game.exe` and `DATAS_A2`).
+- *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
+  installation folder (the one holding `Game.exe` and `DATAS_A2`).
 - *Atlantis II*, CD (the French CD, also patched to 1.01, or the North
   American *Beyond Atlantis*): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
@@ -467,6 +468,13 @@ with the images or copies of its four CDs. Its program has 1.01's code, so
 it plays as 1.01 too. Its intro starts with DreamCatcher's logo, and its
 second film ends without the *Atlantis II* title: that is how the disc has
 them.
+
+The Italian *Atlantis Collection* (DVD, 2014) installs one folder as GOG.com's
+does, Italian only: point Atlantis Native at it (no disc is needed). Its
+`atlantis2.exe` is a launcher, which is passed over for `Game.exe`, version
+1.01's code. The intro shows its second film twice, because the folder holds
+that film under two names. Films 19, 55 and 66 play the tracks of the
+collection's `DATAS_A2\APC\`, not GOG's English ones.
 
 The game opens in full screen, as the original does: its options file
 `atlant2.cfg` says full screen until the choice is changed. F11 switches
