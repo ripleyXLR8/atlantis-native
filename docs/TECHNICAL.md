@@ -740,7 +740,7 @@ equal to GOG's Italian one, with a 714240-byte `Atlantis.exe`: the 1.01
 patch program (same size and PE timestamp, so played as
 `atlantis-patch-fr-714240`, shown *CD, patch 1.01, Italian (1999 build)*)
 with three code edits for the original's platform (no CD scan, no
-free-space checks, `.\\` drive strings) and the row `#NUOVO GICATORE`,
+free-space checks, `.\` drive strings) and the row `#NUOVO GICATORE`,
 as spelt in GOG's Italian executable. No table differs from the patch's.
 
 The Brazilian CD (*Atlantis: A Lenda Perdida*, MSD Multimídia, 1997, 4
