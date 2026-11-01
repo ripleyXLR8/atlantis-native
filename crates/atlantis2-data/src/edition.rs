@@ -12,7 +12,8 @@
 //! The GOG.com values are the per-language depots' of GOG's builds
 //! "1.0" (2018-05-04), "1.0 w10" (2022-06-21) and "1.0 w10 hotfix"
 //! (2022-07-13): the three builds ship the same `loc\` files, checked
-//! on the four languages' installations.
+//! on the four languages' installations. The North American CD's differs
+//! from GOG's English by one line.
 
 use md5::{Digest, Md5};
 
@@ -40,7 +41,7 @@ impl Language {
 }
 
 /// The known `loc\Menu.txt` files: size, MD5, language.
-pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 5] = [
+pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 6] = [
     // The French CD's (1999), installed.
     (
         1371,
@@ -65,6 +66,16 @@ pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 5] = [
         [
             0xc5, 0x8c, 0x88, 0xb8, 0x29, 0xfa, 0x72, 0xfd, 0x34, 0x57, 0x22, 0x82, 0x3c, 0x22,
             0x4e, 0xf6,
+        ],
+        Language::English,
+    ),
+    // The North American CD (*Beyond Atlantis*, DreamCatcher, 2000): GOG's
+    // English but for line 72 (asks for "any Atlantis CD").
+    (
+        1141,
+        [
+            0xbd, 0xb1, 0xf4, 0x7e, 0x47, 0x2f, 0x44, 0xa3, 0x61, 0x7a, 0xab, 0xaa, 0xe9, 0xed,
+            0x60, 0xf7,
         ],
         Language::English,
     ),
@@ -133,6 +144,7 @@ mod tests {
                 "8932a3281058d75f7d13e32160410002",
                 "d2414c05fc852aa5118f8ec71057aebe",
                 "c58c88b829fa72fd345722823c224ef6",
+                "bdb1f47e472f44a3617aabaae9ed60f7",
                 "6eb362c3e9ca619762b1779957cd52c4",
                 "67bb8bd3b2dc54ec76676c0001dd1c7d",
             ]
@@ -166,7 +178,7 @@ mod tests {
 
     #[test]
     fn labels() {
-        let [cd, patch, gog, w10, _] = &KNOWN_BUILDS;
+        let [cd, patch, gog, w10, _, us] = &KNOWN_BUILDS;
         assert_eq!(
             edition_label(gog, Some(Language::German)),
             "Atlantis II, GOG.com, German (patch 1.01)"
@@ -186,6 +198,10 @@ mod tests {
         assert_eq!(
             edition_label(cd, Some(Language::French)),
             "Atlantis II, French CD (1999)"
+        );
+        assert_eq!(
+            edition_label(us, Some(Language::English)),
+            "Atlantis II, CD, English (DreamCatcher, 2000)"
         );
     }
 }

@@ -101,7 +101,8 @@ images, Cryo's DVD (1998: English, French, German, Dutch, Spanish,
 Italian, Swedish and Japanese; the drive, a copy of a side or the images
 of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
-patch 1.01 and the GOG.com edition (see [Atlantis II](#atlantis-ii)).
+patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000)
+and the GOG.com edition (see [Atlantis II](#atlantis-ii)).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -248,7 +249,8 @@ What to pick:
   cannot be read in the browser.
 - *Atlantis II*, GOG.com: the installation folder (the one holding
   `Game.exe` and `DATAS_A2`).
-- *Atlantis II*, CD (version 1.00, or patched to 1.01): the folder of the
+- *Atlantis II*, CD (the French CD, also patched to 1.01, or the North
+  American *Beyond Atlantis*): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
   with a copy of each of the four CDs in it, for example in folders
   `CD1` to `CD4`, each holding the disc's `DATAS_A2` folder (copy the
@@ -458,6 +460,13 @@ longer overlap) and broken after accented letters too, and no Alt+Enter
 to 1.01 (the patch's `atlantis2.exe` copied over the CD's) is played the
 same way.
 
+The North American CD (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs,
+English) installs and opens as the French CD does: the installed folder
+with the images or copies of its four CDs. Its program has 1.01's code, so
+it plays as 1.01 too. Its intro starts with DreamCatcher's logo, and its
+second film ends without the *Atlantis II* title: that is how the disc has
+them.
+
 The game opens in full screen, as the original does: its options file
 `atlant2.cfg` says full screen until the choice is changed. F11 switches
 between full screen and a window, and the choice is kept there for the
@@ -543,6 +552,11 @@ it. Its entries:
     may take it for a click on another place's object: back to Tibet
     from the fourth stone in one chapter, the water's film from the
     ninth with the horse in another.
+  - **800 x 600: subtitles over the films**: at 800 x 600 the French CD,
+    the patch 1.01 and GOG.com's edition draw the subtitles of a dialog
+    played over a film too late to be seen, so they never show; with the
+    fix they do. DreamCatcher's CD draws them in time: it shows them
+    either way.
 - **Arrow keys turn**: on by default, the arrow keys turn the view as
   the mouse does; off, as in the original, only the mouse turns it. On,
   the click that brings the window back to the front only takes the
@@ -555,7 +569,7 @@ on Linux, `%APPDATA%\atlantis-native\atlantis2` on Windows,
 beside the saves (`save\ATL<player>_<slot>.SAV`, the original's files)
 and the original's options file `atlant2.cfg`. `settings.ini` has one
 line per fix (`fix_music_end`, `fix_music_restart`, `fix_music_mark`,
-`fix_ireland_clicks`, each `on` or `off`); a `settings.ini` written by
+`fix_ireland_clicks`, `fix_film_subtitles`, each `on` or `off`); a `settings.ini` written by
 an earlier version, with its single `minor_bug_fixes` line, is still
 read: that line sets every fix. From the command line, `--hd` turns HD on and
 `--widescreen` HD with widescreen, and `--original` turns every bug fix

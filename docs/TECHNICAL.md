@@ -138,13 +138,14 @@ its own switch (`BugFix`), all on by default:
 | `fix_music_restart` | `music::Stream::refill`, `MusicFixes::restart` | a track that ends with an empty list, or with loops left, plays again from its start (the original's rewind check fails and its ring loops the last 5.9 s until another music command) |
 | `fix_music_mark` | `music::Stream::seek_mark` (`goto_mark` and the refill), `MusicFixes::mark` | a random mark drawn at the `rand()` = 0x7fff edge (one draw in 32768 of a `startmusik` entry without a mark) plays the track's last mark (the original's draw is one past the marks, a fatal error: it saves and quits) |
 | `fix_ireland_clicks` | `Engine::plain_value_fixed` | in Ireland's two puzzle views (Brigid's cross, view 2; the ogham stones, view 6) a click on a puzzle zone runs its puzzle and nothing else: the original also reads the zone's plain value as the index of a named zone, so that in chapter 12 the fourth stone sends the player back to Tibet as the weeping head does, and in chapter 14 the ninth, with the horse in hand, plays the water's film |
+| `fix_film_subtitles` | `Engine::film_subtitles_unseen` | at 800 x 600 the subtitles of a dialog over a film (`cinema=N,M`) are seen: 1.00 and 1.01 draw them after the film frame's enlargement (`FUN_00402c30` @ 0x0040bc65, then `FUN_00480840` @ 0x0040c08e) on the 640 x 480 surface the next frame covers, and the North American CD's build draws them before it (`Build::film_subtitles_blitted`), so there the switch changes nothing |
 
-These four are every use of the switch the port had before (one
+The music and Ireland ones are every use of the switch the port had before (one
 `minor_bug_fixes` for all, still read from `settings.ini`: it sets every
 fix whose own key is absent); each gates its own behaviour only, and
 with each off that behaviour is the original's, the others on or off
 (`tests/music_player.rs`, `tests/sound_glue.rs` and
-`tests/plain_values.rs` run each alone; see the Music and Ireland items
+`tests/plain_values.rs` and `tests/display.rs` run each alone; see the Music and Ireland items
 of [Atlantis II](#atlantis-ii-in-progress)). `--original` turns them all
 off there too. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
 `hd_options`, the first game's `HdOptions`), which `--hd` and
@@ -1224,8 +1225,21 @@ back) into `yucatan-*.png`.
   `atlantis2.exe` (version 3.18, 2183168 bytes, PE timestamp 0x38328ed1,
   one file for the French and the English releases) and GOG.com's
   `Game.exe` (the 1.01 executable with 18 byte patches of GOG's),
+  and the North American CD's `atlantis2.exe` (*Beyond Atlantis*,
+  DreamCatcher, version 3.18, 2199552 bytes, PE timestamp 0x38eb4fb3),
   recognised by size and timestamp and confirmed by MD5
-  (`crates/atlantis2-data/src/exe.rs`). GOG's build manifests show one
+  (`crates/atlantis2-data/src/exe.rs`). The North American build is 1.01's
+  code relinked (`Release::V101`), its listener table at its own address;
+  its additions are reached by no English `Font.txt` (`[Language]`: a
+  Japanese line break, intros for four other languages), and one change
+  shows: a film's dialog is drawn inside the film frame, before the 800 x
+  600 enlargement (`Build::film_subtitles_blitted`, `fix_film_subtitles`).
+  Its data is GOG's English but for `Menu.txt` line 72, a line of the
+  credits, the disc-request sprites, the intro (`intro00` a silent logo
+  with no `.apc`, the two films as `intro01` and `intro02`, the latter
+  re-encoded without the *Atlantis II* title, the same sound),
+  `chine.wam` without its ambient `ronfle` (no script names it), and seven
+  `pz_araig` models whose materials and textures have no accents. GOG's build manifests show one
   `Game.exe` for its English, French, German and Spanish installations
   (in the language-independent depot of its build "1.0 w10 hotfix",
   2022-07-13); its two older builds ("1.0", 2018, and "1.0 w10",
@@ -3768,7 +3782,7 @@ back) into `yucatan-*.png`.
   game's. The choices are written at once to Atlantis II's own
   `settings.ini`, beside its saves and `atlant2.cfg`, with the first
   game's keys and one per bug fix (`fix_music_end`, `fix_music_restart`,
-  `fix_music_mark`, `fix_ireland_clicks`, `ui_ux`, `graphics = original|hd`,
+  `fix_music_mark`, `fix_ireland_clicks`, `fix_film_subtitles`, `ui_ux`, `graphics = original|hd`,
   `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_sharp_subtitles`,
   `hd_widescreen`, `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
   written then too (the original writes it at exit). A window reads
@@ -3935,6 +3949,12 @@ played again on it, its pictures written as `gog-*.png` with
 `ATLANTIS2_PNG_DIR`), `ATLANTIS2_PATCH101` the 1.01 patch's
 `atlantis2.exe` (`tests/gog.rs` puts it beside links to
 `ATLANTIS2_DATA`'s folders: a CD installation patched to 1.01),
+`ATLANTIS2_DATA_US`, `ATLANTIS2_DISCS_US` the North American CD's installed
+folder and its CDs (`tests/us_cd.rs`: the edition's name, its files, every
+subtitle against the executable's layout, the three intro films, the spider's
+textures, China without `ronfle`, the browser's way of opening it, a film's
+subtitles at 800 x 600; `tests/flow.rs`'s whole game with the mouse played
+again on it, `us-*.png` with `ATLANTIS2_PNG_DIR`),
 `ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
 German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
 `1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older

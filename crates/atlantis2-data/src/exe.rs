@@ -5,7 +5,7 @@
 //! are listed: another build is reported with its identifiers, so that it
 //! can be added once compared.
 //!
-//! Five builds are known:
+//! Six builds are known:
 //!
 //! - the French CD's `atlantis2.exe` (1.00, version string 3.15), the
 //!   reference every address in the comments belongs to;
@@ -26,7 +26,12 @@
 //!   1.01 with five of those patches only (the install folder as the CD,
 //!   no free-space check, the CD page closing at once). What the port
 //!   models of GOG's patches (the CD page) is in all three; the others
-//!   are Windows matters the port has no counterpart of.
+//!   are Windows matters the port has no counterpart of;
+//! - the North American CD's `atlantis2.exe` (*Beyond Atlantis*,
+//!   DreamCatcher, 2000-04-05, version string 3.18 too): 1.01's code
+//!   relinked, whose additions an English `Font.txt` does not reach (a
+//!   Japanese line break, intros for four other languages), and one
+//!   change that shows: [`Build::film_subtitles_blitted`].
 //!
 //! 1.01 moved most of the code and data (the linker order changed), so
 //! what the port reads from the executable is read at each build's own
@@ -83,6 +88,16 @@ pub struct Build {
     pub gog: bool,
     /// The place sounds' listener table (@ 0x005dd2c0 in the reference).
     pub place_sounds: PlaceSoundTable,
+    /// Whether the subtitles of a dialog over a film (`cinema=N,M`) are
+    /// drawn before the frame's 800 x 600 enlargement. The film frame
+    /// (@ 0x0040bbb0) ends with the enlargement of the 640 x 480 surface
+    /// onto the screen (FUN_00402c30 @ 0x0040bc65); 1.00 and 1.01 draw
+    /// the dialog after that function returns (@ 0x0040c08e), on the
+    /// surface the next frame covers, so at 800 x 600 the text is never
+    /// seen. The North American CD draws it inside the frame, before the
+    /// enlargement (atlantis2-cd-us-2199552 @ 0x00403468, 0x0040347a).
+    /// At 640 x 480 the surface is the screen and the order shows nothing.
+    pub film_subtitles_blitted: bool,
 }
 
 /// The listener table of 1.01 (and GOG): the same 5780 bytes as the
@@ -94,7 +109,7 @@ const PLACE_SOUNDS_101: PlaceSoundTable = PlaceSoundTable {
 };
 
 /// The builds this port knows.
-pub const KNOWN_BUILDS: [Build; 5] = [
+pub const KNOWN_BUILDS: [Build; 6] = [
     Build {
         id: "atlantis2-cd-fr-2199552",
         label: "Atlantis II, French CD (1999)",
@@ -113,6 +128,7 @@ pub const KNOWN_BUILDS: [Build; 5] = [
             rows: 0x005d_d370,
             end: 0x005d_e954,
         },
+        film_subtitles_blitted: false,
     },
     Build {
         id: "atlantis2-patch101-2183168",
@@ -128,6 +144,7 @@ pub const KNOWN_BUILDS: [Build; 5] = [
         release: Release::V101,
         gog: false,
         place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
     },
     Build {
         id: "atlantis2-gog-fr-2183168",
@@ -142,6 +159,7 @@ pub const KNOWN_BUILDS: [Build; 5] = [
         release: Release::V101,
         gog: true,
         place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
     },
     Build {
         id: "atlantis2-gog-w10-2183168",
@@ -156,6 +174,7 @@ pub const KNOWN_BUILDS: [Build; 5] = [
         release: Release::V101,
         gog: true,
         place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
     },
     Build {
         id: "atlantis2-gog-2018-2183168",
@@ -170,6 +189,28 @@ pub const KNOWN_BUILDS: [Build; 5] = [
         release: Release::V101,
         gog: true,
         place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
+    },
+    Build {
+        id: "atlantis2-cd-us-2199552",
+        label: "Atlantis II, CD (DreamCatcher, 2000)",
+        size: 2_199_552,
+        // 2000-04-05 14:37:39 UTC.
+        pe_timestamp: 0x38eb_4fb3,
+        md5: [
+            0x0f, 0x63, 0x4c, 0x46, 0x20, 0x68, 0x0d, 0xfe, 0xa6, 0x78, 0x26, 0x45, 0xc7, 0x9d,
+            0xc8, 0x4c,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: false,
+        // The same 5780 bytes, at this link's address.
+        place_sounds: PlaceSoundTable {
+            names: 0x005d_d370,
+            rows: 0x005d_d420,
+            end: 0x005d_ea04,
+        },
+        film_subtitles_blitted: true,
     },
 ];
 
@@ -299,6 +340,7 @@ mod tests {
                 "254ecd84046d75c20a685e7d7f91d1d8",
                 "8c24ad437d9e994f657ad7751b626718",
                 "f8340e5a011fd2207c5bb78b4c2a9636",
+                "0f634c4620680dfea6782645c79dc84c",
             ]
         );
         // The listener table is 5780 bytes in every build.
@@ -311,8 +353,16 @@ mod tests {
                 .iter()
                 .filter(|b| b.release == Release::V101)
                 .count(),
-            4
+            5
         );
+        // Only the North American CD draws a film's subtitles before the
+        // 800 x 600 enlargement.
+        let later: Vec<&str> = KNOWN_BUILDS
+            .iter()
+            .filter(|b| b.film_subtitles_blitted)
+            .map(|b| b.id)
+            .collect();
+        assert_eq!(later, ["atlantis2-cd-us-2199552"]);
     }
 
     #[test]
