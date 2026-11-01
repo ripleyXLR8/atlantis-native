@@ -13,7 +13,8 @@
 //! "1.0" (2018-05-04), "1.0 w10" (2022-06-21) and "1.0 w10 hotfix"
 //! (2022-07-13): the three builds ship the same `loc\` files, checked
 //! on the four languages' installations. The North American CD's differs
-//! from GOG's English by one line.
+//! from GOG's English by one line. The Italian *Atlantis Collection*'s is
+//! Italian's only known one: no GOG.com depot of Atlantis II holds Italian.
 
 use md5::{Digest, Md5};
 
@@ -26,6 +27,7 @@ pub enum Language {
     French,
     German,
     Spanish,
+    Italian,
 }
 
 impl Language {
@@ -36,12 +38,13 @@ impl Language {
             Language::French => "French",
             Language::German => "German",
             Language::Spanish => "Spanish",
+            Language::Italian => "Italian",
         }
     }
 }
 
 /// The known `loc\Menu.txt` files: size, MD5, language.
-pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 6] = [
+pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 7] = [
     // The French CD's (1999), installed.
     (
         1371,
@@ -97,6 +100,15 @@ pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 6] = [
         ],
         Language::Spanish,
     ),
+    // The Italian *Atlantis Collection* DVD (2014).
+    (
+        1169,
+        [
+            0x78, 0x5d, 0xd7, 0xa4, 0x66, 0x78, 0x51, 0x97, 0xb8, 0x14, 0x18, 0xb0, 0x8c, 0x69,
+            0xbd, 0xef,
+        ],
+        Language::Italian,
+    ),
 ];
 
 /// The language of a `loc\Menu.txt`, `None` when it is no known file.
@@ -147,6 +159,7 @@ mod tests {
                 "bdb1f47e472f44a3617aabaae9ed60f7",
                 "6eb362c3e9ca619762b1779957cd52c4",
                 "67bb8bd3b2dc54ec76676c0001dd1c7d",
+                "785dd7a466785197b81418b08c69bdef",
             ]
         );
         // A file of a known size but other bytes names no language.
@@ -178,7 +191,7 @@ mod tests {
 
     #[test]
     fn labels() {
-        let [cd, patch, gog, w10, _, us] = &KNOWN_BUILDS;
+        let [cd, patch, gog, w10, _, us, collection] = &KNOWN_BUILDS;
         assert_eq!(
             edition_label(gog, Some(Language::German)),
             "Atlantis II, GOG.com, German (patch 1.01)"
@@ -202,6 +215,10 @@ mod tests {
         assert_eq!(
             edition_label(us, Some(Language::English)),
             "Atlantis II, CD, English (DreamCatcher, 2000)"
+        );
+        assert_eq!(
+            edition_label(collection, Some(Language::Italian)),
+            "Atlantis II, Italian Collection (patch 1.01)"
         );
     }
 }

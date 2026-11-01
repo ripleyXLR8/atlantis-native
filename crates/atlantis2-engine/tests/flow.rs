@@ -68,6 +68,9 @@ thread_local! {
     /// The test plays the North American CD (`ATLANTIS2_DATA_US`,
     /// `ATLANTIS2_DISCS_US`).
     static ON_US: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the Italian *Atlantis Collection*
+    /// (`ATLANTIS2_IT_COLLECTION`).
+    static ON_IT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 fn game() -> Option<A2Files> {
@@ -81,6 +84,11 @@ fn game() -> Option<A2Files> {
         let discs = std::env::var_os("ATLANTIS2_DISCS_US")?;
         let (files, _) =
             A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("US CD");
+        return Some(files);
+    }
+    if ON_IT.with(|i| i.get()) {
+        let dir = std::env::var_os("ATLANTIS2_IT_COLLECTION")?;
+        let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[]).expect("the collection");
         return Some(files);
     }
     let (Some(dir), Some(discs)) = (
@@ -490,6 +498,8 @@ impl Run {
                 "gog-"
             } else if ON_US.with(|u| u.get()) {
                 "us-"
+            } else if ON_IT.with(|i| i.get()) {
+                "it-"
             } else {
                 ""
             };
@@ -1590,7 +1600,9 @@ impl Run {
         self.aim(zone);
         self.tap();
         let mut all = Vec::new();
-        for _ in 0..3000 {
+        // A dialog may play on the way, as long as its voices: Italian's
+        // run the longest.
+        for _ in 0..6000 {
             all.extend(self.events());
             if self.e.loop_type == LoopType::Video {
                 all.extend(self.watch());
@@ -1600,7 +1612,7 @@ impl Run {
                 return all;
             }
         }
-        panic!("the link of view {view} leads nowhere");
+        panic!("the link of view {view} leads nowhere: {:?} place {:?} dialog {:?} video {:?} line {:?}", self.e.loop_type, self.e.place(), self.e.dialog().is_some(), self.e.video_playing(), self.e.dialog().and_then(|d| d.current_line()).map(|l| l.id.clone()));
     }
 }
 
@@ -3682,7 +3694,9 @@ impl Run {
         self.aim(zone);
         self.tap();
         let mut all = Vec::new();
-        for _ in 0..3000 {
+        // A dialog may play on the way, as long as its voices: Italian's
+        // run the longest.
+        for _ in 0..6000 {
             all.extend(self.events());
             if self.e.loop_type == LoopType::Video {
                 all.extend(self.watch());
@@ -6089,8 +6103,21 @@ fn the_whole_game_with_the_mouse_on_the_us_cd() {
     whole_game("a2-flow-whole-game-us");
 }
 
+/// The whole game on the Italian *Atlantis Collection*
+/// (`ATLANTIS2_IT_COLLECTION`): the same play, the same chapters and lines.
+/// With `ATLANTIS2_PNG_DIR` its pictures are written there (`it-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_italian_collection() {
+    if std::env::var_os("ATLANTIS2_IT_COLLECTION").is_none() {
+        atlantis2_data::testing::missing("ATLANTIS2_IT_COLLECTION not set");
+        return;
+    }
+    ON_IT.with(|i| i.set(true));
+    whole_game("a2-flow-whole-game-it");
+}
+
 fn whole_game(scratch_name: &str) {
-    let gog = ON_GOG.with(|g| g.get()) || ON_US.with(|u| u.get());
+    let gog = ON_GOG.with(|g| g.get()) || ON_US.with(|u| u.get()) || ON_IT.with(|i| i.get());
     let started = std::time::Instant::now();
     let dir = scratch(scratch_name);
     let mut r = Run::new(&dir);

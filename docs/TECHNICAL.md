@@ -1258,7 +1258,25 @@ back) into `yucatan-*.png`.
   five of GOG's patches only (fixed drives as the CD and its empty root,
   the two free-space tests, the CD page closing at once). The port
   models none of the patches they lack, so all three play alike
-  (`tests/gog_languages.rs` checks the bytes). The languages differ only in data: `loc\` (texts,
+  (`tests/gog_languages.rs` checks the bytes). The Italian *Atlantis
+  Collection*'s `Game.exe` (`4534c355a9be896c3507b475e4b5a570`, the same
+  size and timestamp) is GOG's 2018 file but for one byte, @ 0x004054c7:
+  `cmp eax,5` (the drive scan keeps CD drives, as 1.01), where GOG has 3
+  (fixed drives). It takes any CD drive for the empty root, so the original
+  wants one to be present; the port looks for no drive, and models the same
+  CD page as GOG's (`Build::gog`). Beside it `atlantis2.exe` is an AutoRun
+  Architect 2.20 program (446464 bytes) whose `Launch\Settings.ini` starts
+  `\Game.exe`; nothing reads that file but the launcher, and
+  `exe::LAUNCHER_SIZES` passes over both launchers. Its data is GOG's English
+  files but for `loc\`, the voices, the three film tracks below, a second
+  name `HNM\intro02.hnm` of `INTRO01.HNM`, which the chain `intro%02d` plays
+  (three films), and a `music\` holding only an empty `Muzik39.apc`: the
+  folder the original's music copies need, a missing copy counting as an
+  empty one (the load's open fails, then `CopyMusikToDrive`, @ 0x004771f0,
+  0x00477856). The streams are in `DATAS_A2\APC\MUSIC\`, read as for GOG. Its
+  `cine019/055/066` in `DATAS_A2\APC\`, the ones films read, match none of
+  GOG's four languages' voices nor its own `APC\DIAL\CINE*`, which is never
+  read. The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
@@ -3963,6 +3981,12 @@ subtitle against the executable's layout, the three intro films, the spider's
 textures, China without `ronfle`, the browser's way of opening it, a film's
 subtitles at 800 x 600; `tests/flow.rs`'s whole game with the mouse played
 again on it, `us-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_IT_COLLECTION` the Italian *Atlantis Collection*'s installed
+folder (`tests/it_collection.rs`: the launcher passed over, the edition's name,
+one byte against GOG's 2018 `Game.exe`, the `loc` files, every subtitle against
+the executable's layout, every letter, the voices, the film tracks, the three
+intro films, the music, a subtitle, the menu and a save; `tests/flow.rs`'s whole
+game with the mouse played again on it, `it-*.png` with `ATLANTIS2_PNG_DIR`),
 `ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
 German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
 `1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older

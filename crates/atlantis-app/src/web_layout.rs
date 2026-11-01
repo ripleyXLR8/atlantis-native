@@ -246,6 +246,25 @@ mod tests {
     }
 
     #[test]
+    fn the_italian_collection_is_its_own_disc() {
+        // Its launcher, its Launch and Splash folders, one empty music file.
+        let paths = [
+            "atlantis 2/atlantis2.exe",
+            "atlantis 2/game.exe",
+            "atlantis 2/launch/settings.ini",
+            "atlantis 2/splash/splash_1024x768.bmp",
+            "atlantis 2/music/muzik39.apc",
+            "atlantis 2/wam/tibet.wam",
+            "atlantis 2/scenar/chapi000.con",
+            "atlantis 2/datas_a2/spf/sphex.spr",
+            "atlantis 2/datas_a2/spf/mante.spr",
+        ];
+        let l = a2_layout(&paths).unwrap();
+        assert_eq!(l.install, "atlantis 2/");
+        assert_eq!(l.discs, ["atlantis 2/"]);
+    }
+
+    #[test]
     fn gog_is_its_own_disc() {
         // GOG.com: Game.exe beside wam and scenar, every disc in DATAS_A2;
         // its atlantis2.exe launcher counts as the folder too.
