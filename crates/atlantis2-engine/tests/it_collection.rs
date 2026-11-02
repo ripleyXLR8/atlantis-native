@@ -367,7 +367,7 @@ fn apart(a: &[u8], b: &[u8]) -> f64 {
 
 /// Films 19, 55 and 66: the folder the film reads (`datas_a2\apc\`) holds
 /// neither GOG's English tracks nor the same bytes as `apc\dial\`; the
-/// engine loads that file for the film.
+/// engine, with the bug fixes off, loads that file for the film.
 #[test]
 fn the_film_tracks_are_the_collection_s_own() {
     let Some(files) = game() else { return };
@@ -388,6 +388,7 @@ fn the_film_tracks_are_the_collection_s_own() {
         eprintln!("{line}");
     }
     let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.enhancements.fixes = atlantis2_engine::BugFixes::NONE;
     e.run_command(b"(monde=3)");
     e.run_command(b"(cinema=19)");
     assert!(

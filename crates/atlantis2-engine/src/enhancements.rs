@@ -46,16 +46,23 @@ pub enum BugFix {
     /// ([`atlantis2_data::exe::Build::film_subtitles_blitted`]), so there
     /// they show either way.
     FilmSubtitles,
+    /// Films 19, 55 and 66 play the track of the language installed, when
+    /// `datas_a2\\apc\\dial\\` holds one that fits
+    /// ([`crate::film_tracks`]). Off, as the original (`cine%03d.apc`
+    /// @ 0x0047a5c0 reads `datas_a2\\apc\\`, 0x00402760), they play the
+    /// `datas_a2\\apc\\` file, on GOG.com English's in every language.
+    FilmLanguage,
 }
 
 impl BugFix {
     /// Every fix, in the menu's order.
-    pub const ALL: [BugFix; 5] = [
+    pub const ALL: [BugFix; 6] = [
         BugFix::MusicEnd,
         BugFix::MusicRestart,
         BugFix::MusicMark,
         BugFix::IrelandClicks,
         BugFix::FilmSubtitles,
+        BugFix::FilmLanguage,
     ];
 
     /// Its `settings.ini` key.
@@ -66,6 +73,7 @@ impl BugFix {
             BugFix::MusicMark => "fix_music_mark",
             BugFix::IrelandClicks => "fix_ireland_clicks",
             BugFix::FilmSubtitles => "fix_film_subtitles",
+            BugFix::FilmLanguage => "fix_film_language",
         }
     }
 }
@@ -84,6 +92,8 @@ pub struct BugFixes {
     pub ireland_clicks: bool,
     /// [`BugFix::FilmSubtitles`].
     pub film_subtitles: bool,
+    /// [`BugFix::FilmLanguage`].
+    pub film_language: bool,
 }
 
 impl BugFixes {
@@ -100,6 +110,7 @@ impl BugFixes {
             music_mark: on,
             ireland_clicks: on,
             film_subtitles: on,
+            film_language: on,
         }
     }
 
@@ -117,6 +128,7 @@ impl BugFixes {
             BugFix::MusicMark => self.music_mark,
             BugFix::IrelandClicks => self.ireland_clicks,
             BugFix::FilmSubtitles => self.film_subtitles,
+            BugFix::FilmLanguage => self.film_language,
         }
     }
 
@@ -127,6 +139,7 @@ impl BugFixes {
             BugFix::MusicMark => &mut self.music_mark,
             BugFix::IrelandClicks => &mut self.ireland_clicks,
             BugFix::FilmSubtitles => &mut self.film_subtitles,
+            BugFix::FilmLanguage => &mut self.film_language,
         } = on;
     }
 

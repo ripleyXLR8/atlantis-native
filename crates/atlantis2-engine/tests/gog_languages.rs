@@ -385,8 +385,8 @@ fn each_language_s_voices_decode() {
 /// (`atlantis2-gog-fr-2183168` @ 0x00481d57 `cine%03d.apc` →
 /// 0x0047a3b0 → 0x0047a5c0 → the folder builder 0x00402760,
 /// `datas_a2\apc\`), where GOG put the English tracks for every language;
-/// each language's own track is in `apc\dial\`, which the film does not
-/// read.
+/// each language's own track is in `apc\dial\`, which the original does
+/// not read (bug fix: `tests/film_language.rs`).
 #[test]
 fn the_film_tracks_are_the_english_ones_in_every_language() {
     let Some(all) = installations() else { return };
@@ -407,6 +407,7 @@ fn the_film_tracks_are_the_english_ones_in_every_language() {
         }
         // The engine loads that file for the film.
         let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+        e.enhancements.fixes = atlantis2_engine::BugFixes::NONE;
         e.run_command(b"(monde=3)");
         e.run_command(b"(cinema=19)");
         assert!(

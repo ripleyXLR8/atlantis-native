@@ -474,7 +474,9 @@ does, Italian only: point Atlantis Native at it (no disc is needed). Its
 `atlantis2.exe` is a launcher, which is passed over for `Game.exe`, version
 1.01's code. The intro shows its second film twice, because the folder holds
 that film under two names. Films 19, 55 and 66 play the tracks of the
-collection's `DATAS_A2\APC\`, not GOG's English ones.
+collection's `DATAS_A2\APC\`, which sound Russian, with the bug fixes off (the
+original's way); by default they play the Italian tracks installed beside the
+voices.
 
 The game opens in full screen, as the original does: its options file
 `atlant2.cfg` says full screen until the choice is changed. F11 switches
@@ -537,7 +539,7 @@ it. Its entries:
 - **Screen**: the original's two screen sizes, 640 x 480 and 800 x 600
   (below); with the original graphics only.
 - **Fix original bugs**: *On* (every fix, the default), *Off* (none:
-  as the original), or *Custom (n/4)* when some are on and some off;
+  as the original), or *Custom (n/6)* when some are on and some off;
   Enter turns them all on, then all off.
 - **Choose the bug fixes...**: opens a box of its own, in the same
   style, with *All on*, *All off (as the original)*, one switch per fix
@@ -566,6 +568,13 @@ it. Its entries:
     played over a film too late to be seen, so they never show; with the
     fix they do. DreamCatcher's CD draws them in time: it shows them
     either way.
+  - **Films: sound in the game's language**: three films (19, 55 and 66)
+    read their sound from a folder that, on GOG.com, holds the English
+    tracks whatever the language installed, and on the Italian collection
+    tracks that are not the Italian ones (they sound Russian). The game's
+    own tracks are installed beside the voices, unused; with the fix these
+    films play them. Nothing changes on GOG.com in English or on the CDs,
+    whose films already speak the game's language.
 - **Arrow keys turn**: on by default, the arrow keys turn the view as
   the mouse does; off, as in the original, only the mouse turns it. On,
   the click that brings the window back to the front only takes the
@@ -578,7 +587,8 @@ on Linux, `%APPDATA%\atlantis-native\atlantis2` on Windows,
 beside the saves (`save\ATL<player>_<slot>.SAV`, the original's files)
 and the original's options file `atlant2.cfg`. `settings.ini` has one
 line per fix (`fix_music_end`, `fix_music_restart`, `fix_music_mark`,
-`fix_ireland_clicks`, `fix_film_subtitles`, each `on` or `off`); a `settings.ini` written by
+`fix_ireland_clicks`, `fix_film_subtitles`, `fix_film_language`, each `on`
+or `off`); a `settings.ini` written by
 an earlier version, with its single `minor_bug_fixes` line, is still
 read: that line sets every fix. From the command line, `--hd` turns HD on and
 `--widescreen` HD with widescreen, and `--original` turns every bug fix

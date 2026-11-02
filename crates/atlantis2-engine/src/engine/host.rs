@@ -354,7 +354,15 @@ impl Engine {
     /// the current CD's root): film 44's track, on disc 2 while the film
     /// plays from disc 4, does not load.
     pub(super) fn load_sound(&self, name: &str) -> Option<(String, Pcm)> {
-        let data = self.files.read_current(Folder::Apc, name)?;
+        let own = if self.enhancements.fixes.film_language {
+            crate::film_tracks::own_track(&self.files, name)
+        } else {
+            None
+        };
+        let data = match own {
+            Some(data) => data,
+            None => self.files.read_current(Folder::Apc, name)?,
+        };
         let apc = decode_apc(&data)
             .map_err(|e| log::warn!("{name}: {e}"))
             .ok()?;
