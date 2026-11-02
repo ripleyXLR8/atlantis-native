@@ -262,6 +262,13 @@ impl Engine {
             .collect()
     }
 
+    /// The sound of the table's loaded entry of that name, for tests and
+    /// tools.
+    pub fn sound_table_pcm(&self, name: &str) -> Option<&crate::sound::Pcm> {
+        let i = usize::try_from(self.table_find(name)?).ok()?;
+        self.place_pcm.get(&i)
+    }
+
     /// Every entry of the sound table freed (nothing stopped), and the
     /// `NEWSOUND` handle and flag as at start-up (0, clear), for tests and
     /// tools.

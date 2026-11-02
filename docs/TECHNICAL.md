@@ -139,6 +139,7 @@ its own switch (`BugFix`), all on by default:
 | `fix_music_mark` | `music::Stream::seek_mark` (`goto_mark` and the refill), `MusicFixes::mark` | a random mark drawn at the `rand()` = 0x7fff edge (one draw in 32768 of a `startmusik` entry without a mark) plays the track's last mark (the original's draw is one past the marks, a fatal error: it saves and quits) |
 | `fix_ireland_clicks` | `Engine::plain_value_fixed` | in Ireland's two puzzle views (Brigid's cross, view 2; the ogham stones, view 6) a click on a puzzle zone runs its puzzle and nothing else: the original also reads the zone's plain value as the index of a named zone, so that in chapter 12 the fourth stone sends the player back to Tibet as the weeping head does, and in chapter 14 the ninth, with the horse in hand, plays the water's film |
 | `fix_film_subtitles` | `Engine::film_subtitles_unseen` | at 800 x 600 the subtitles of a dialog over a film (`cinema=N,M`) are seen: 1.00 and 1.01 draw them after the film frame's enlargement (`FUN_00402c30` @ 0x0040bc65, then `FUN_00480840` @ 0x0040c08e) on the 640 x 480 surface the next frame covers, and the North American CD's build draws them before it (`Build::film_subtitles_blitted`), so there the switch changes nothing |
+| `fix_film_language` | `film_tracks::own_track` (`Engine::load_sound`) | films 19, 55 and 66 play `datas_a2\apc\dial\cine0NN.apc` when it fits (same rate and channels, whole, within a film frame of the `apc\` track); the original reads only `datas_a2\apc\` (`cine%03d.apc`, @ 0x0047a5c0 → 0x00402760), so its GOG.com French, German and Spanish play the English tracks and the Italian collection tracks that sound Russian. It chooses by the files, no edition or language: the CDs have no such file in `dial\` and GOG.com's English the same bytes, so nothing changes there; in the five languages' tracks the music is at the same place, sample for sample, as in the English one (`tests/film_language.rs`; below) |
 
 The music and Ireland ones are every use of the switch the port had before (one
 `minor_bug_fixes` for all, still read from `settings.ini`: it sets every
@@ -1275,8 +1276,9 @@ back) into `yucatan-*.png`.
   empty one (the load's open fails, then `CopyMusikToDrive`, @ 0x004771f0,
   0x00477856). The streams are in `DATAS_A2\APC\MUSIC\`, read as for GOG. Its
   `cine019/055/066` in `DATAS_A2\APC\`, the ones films read, match none of
-  GOG's four languages' voices nor its own `APC\DIAL\CINE*`, which is never
-  read. The languages differ only in data: `loc\` (texts,
+  GOG's four languages' voices nor its own `APC\DIAL\CINE*`, which the
+  original never reads; by ear the former sound Russian and the latter are
+  Italian (`fix_film_language` plays the latter). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
@@ -1287,8 +1289,12 @@ back) into `yucatan-*.png`.
   each. Films 19, 55 and 66 read their track from `datas_a2\apc\`
   (`cine%03d.apc` → the sounds' folder, @ 0x0047a5c0 → 0x00402760 in
   `Game.exe`), where GOG put the English tracks: every language plays
-  them in English, in the original and here (each language's own track
-  lies unused in `apc\dial\`). GOG's folder holds an
+  them in English in the original, and here with `fix_film_language` off
+  (each language's own track lies unused in `apc\dial\`; the fix plays it:
+  every track is 22050 Hz stereo of the same length, its music at the same
+  samples as the English track's, only the voice passages differing; in
+  Spanish film 55 is the one mixed differently, its whole sound at twice the
+  level). GOG's folder holds an
   `atlantis2.exe` too, a 20,992-byte splash-screen launcher: the
   executable is the first of `atlantis2.exe` and `Game.exe` that is a
   known build. 1.01 moved most of the code and data; the one table the
@@ -3808,7 +3814,7 @@ back) into `yucatan-*.png`.
   game's. The choices are written at once to Atlantis II's own
   `settings.ini`, beside its saves and `atlant2.cfg`, with the first
   game's keys and one per bug fix (`fix_music_end`, `fix_music_restart`,
-  `fix_music_mark`, `fix_ireland_clicks`, `fix_film_subtitles`, `ui_ux`, `graphics = original|hd`,
+  `fix_music_mark`, `fix_ireland_clicks`, `fix_film_subtitles`, `fix_film_language`, `ui_ux`, `graphics = original|hd`,
   `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_sharp_subtitles`,
   `hd_widescreen`, `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
   written then too (the original writes it at exit). A window reads

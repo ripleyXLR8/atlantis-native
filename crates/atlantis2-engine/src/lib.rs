@@ -32,6 +32,7 @@ pub mod dialog;
 pub mod display;
 pub mod engine;
 pub mod enhancements;
+pub mod film_tracks;
 pub mod fpu;
 pub mod hd;
 pub mod head;
