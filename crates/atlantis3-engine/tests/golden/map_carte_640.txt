@@ -1,0 +1,212 @@
+# The Land of the Dead's map screen (loop mode 9) of the original Game.exe (GOG.com, md5
+# eb06eaa718877dfcabee6e8f89d85b31) with spr_p6.dll under emulation, 640 x 480 RGB565, chapter 12, flag 80 = 1.
+# coll hover|click F X Y: the SPR_COLLISION calls (sprite F at X, Y). hover Y v...: for x = 0, 10, .., 790 the
+# label sprite drawn with the pointer at (x, Y), '-' none. click Y v...: the chapter a left click at (x, Y)
+# selects, '-' none. hoverpoint / clickpoint: the first grid point of each label / chapter.
+# frame CASE N T X Y C R ret=RET md5=SCREEN draws=...: one frame at clock T (double, hex) with the pointer at
+# X, Y, left / right click bytes C / R; RET 0 closes the screen; draws in order: `warp` (the panorama) or
+# `warp=flat` (the screen cleared to 0 instead), `C:BANK#F@X,Y` a centred draw, `BANK#F@X,Y*S` a draw at
+# X, Y with alpha bits S (little-endian hex); md5 of the screen at the flip ('-' none). event: the commands
+# run and the close; state / reopen: the variables, flags and mode after the case.
+start mode=9 old=3 open=1 alpha=0000803f pointer=320,240
+coll hover 1 295 241
+coll hover 2 247 342
+coll hover 3 185 126
+coll hover 4 517 322
+coll hover 5 398 277
+coll click 1 311 241
+coll click 2 252 342
+coll click 3 190 126
+coll click 4 522 322
+coll click 5 403 277
+hover 0 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 10 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 20 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 30 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 40 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 50 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 60 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 70 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 80 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 90 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 100 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 110 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 120 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 130 - - - - - - - - - - - - - - - - - - - - - - - - 8 8 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 140 - - - - - - - - - - - - - - - - - - - - - - - - 8 8 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 150 - - - - - - - - - - - - - - - - - - - - - - 8 - 8 8 8 8 8 8 8 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 160 - - - - - - - - - - - - - - - - - - - 8 - 8 8 - 8 8 8 8 8 8 8 8 8 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 170 - - - - - - - - - - - - - - - - - - - 8 8 8 8 8 8 8 8 8 8 8 8 8 8 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 180 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 190 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 200 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 210 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 220 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 230 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 240 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 250 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 6 6 6 6 6 6 - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 260 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 6 6 6 6 6 6 - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 270 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 6 6 6 6 6 - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 280 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 6 6 6 6 6 - - - - - - - - 10 10 - - - - - - - - - - - - - - - - - - -
+hover 290 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 6 - - - - - - - - 10 10 10 - - - - - - - - - - - - - - - - - - -
+hover 300 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 10 10 10 10 - - - - - - - - - - - - - - - - - - -
+hover 310 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 10 10 10 10 - - - - - - - - - - - - - - - - - - -
+hover 320 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 10 10 10 10 10 - - - - - - - - - - - - - - - - - -
+hover 330 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 10 10 10 10 10 - - - - - - - - - 9 9 - - - - - - -
+hover 340 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 10 10 10 10 10 10 - - - - - - - 9 9 - 9 9 9 - - - - -
+hover 350 - - - - - - - - - - - - - - - - - - - - - - - - - - - - 7 - - 7 7 - - - - - - - - - - - - - - - - - - - 9 9 9 9 9 9 9 - - - - -
+hover 360 - - - - - - - - - - - - - - - - - - - - - - - - - - - - 7 - - 7 7 - - - - - - - - - - - - - - - - - - - - 9 9 9 9 9 9 9 - - - -
+hover 370 - - - - - - - - - - - - - - - - - - - - - - - - - - - - 7 7 7 7 7 - - - - - - - - - - - - - - - - - - - - - 9 9 9 9 9 9 - - - -
+hover 380 - - - - - - - - - - - - - - - - - - - - - - - - - - - 7 7 7 7 7 7 7 - - - - - - - - - - - - - - - - - - - - 9 9 9 9 9 - - - - -
+hover 390 - - - - - - - - - - - - - - - - - - - - - - - - - 7 7 7 7 7 7 7 7 7 - - - - - - - - - - - - - - - - - - - - 9 9 - - - - - - - -
+hover 400 - - - - - - - - - - - - - - - - - - - - - - - - - 7 7 7 7 7 7 7 7 7 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 410 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 420 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 430 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 440 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 450 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 460 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hover 470 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 0 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 10 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 20 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 30 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 40 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 50 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 60 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 70 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 80 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 90 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 100 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 110 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 120 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 130 - - - - - - - - - - - - - - - - - - - - - - - - 13 13 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 140 - - - - - - - - - - - - - - - - - - - - - - - - - 13 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 150 - - - - - - - - - - - - - - - - - - - - - - - 13 13 13 13 13 13 13 13 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 160 - - - - - - - - - - - - - - - - - - - 13 - - 13 13 13 13 13 13 - 13 13 13 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 170 - - - - - - - - - - - - - - - - - - - 13 - - 13 13 13 13 13 13 13 13 13 13 13 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 180 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 190 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 200 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 210 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 220 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 230 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 240 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 250 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 12 12 12 12 12 - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 260 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 12 12 12 12 12 - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 270 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 12 12 12 12 12 - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 280 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 12 12 12 12 - - - - - - - - 16 - - - - - - - - - - - - - - - - - - -
+click 290 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 16 16 16 16 - - - - - - - - - - - - - - - - - -
+click 300 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 16 16 16 16 - - - - - - - - - - - - - - - - - -
+click 310 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 16 16 16 16 16 - - - - - - - - - - - - - - - - - -
+click 320 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 16 16 16 16 - - - - - - - - - - - - - - - - - -
+click 330 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 16 16 16 16 16 - - - - - - - - - - 15 15 - - - - - -
+click 340 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 16 16 16 16 16 - - - - - - - 15 15 - 15 15 15 - - - - -
+click 350 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 14 - 14 14 - - - - - - - - - - - - - - - - - - - - 15 15 15 15 15 15 15 - - - -
+click 360 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 14 14 14 14 - - - - - - - - - - - - - - - - - - - - - 15 15 15 15 15 15 - - - -
+click 370 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 14 14 14 14 - - - - - - - - - - - - - - - - - - - - - 15 15 15 15 15 15 - - - -
+click 380 - - - - - - - - - - - - - - - - - - - - - - - - - - - - 14 14 14 14 14 14 - - - - - - - - - - - - - - - - - - - - 15 15 15 15 15 15 - - - -
+click 390 - - - - - - - - - - - - - - - - - - - - - - - - - - 14 14 14 14 14 14 14 14 - - - - - - - - - - - - - - - - - - - - - 15 - - - - - - - -
+click 400 - - - - - - - - - - - - - - - - - - - - - - - - - - 14 14 14 14 14 14 14 14 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 410 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 420 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 430 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 440 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 450 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 460 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+click 470 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+hoverpoint 6 300 250
+hoverpoint 7 280 350
+hoverpoint 8 240 130
+hoverpoint 9 550 330
+hoverpoint 10 430 280
+clickpoint 12 320 250
+clickpoint 13 240 130
+clickpoint 14 290 350
+clickpoint 15 560 330
+clickpoint 16 440 280
+frame rest_warp 0 0000000000016940 320 240 0 0 ret=1 md5=4e98faf615a28b3353db29230e0fa284 draws=warp,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Interface.spr#40@320,240*0000803f
+frame rest 1 0000000000026940 320 240 0 0 ret=1 md5=4e98faf615a28b3353db29230e0fa284 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Interface.spr#40@320,240*0000803f
+frame rest 2 0000000000036940 5 5 0 0 ret=1 md5=f9234b8d89ee8253fd72c9737c104543 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Interface.spr#40@5,5*0000803f
+frame hover_label6 3 0000000000046940 300 250 0 0 ret=1 md5=579c41486310dc90c5911587a41d64e9 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#6@295,241*0000803f,spr\Interface.spr#40@300,250*0000803f
+frame hover_label7 4 0000000000056940 280 350 0 0 ret=1 md5=46bd2e46b154b92f99e522e80d92ea66 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#7@247,342*0000803f,spr\Interface.spr#40@280,350*0000803f
+frame hover_label8 5 0000000000066940 240 130 0 0 ret=1 md5=08535183a7070bd75eaeaf9bcd00fc37 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#8@185,126*0000803f,spr\Interface.spr#40@240,130*0000803f
+frame hover_label9 6 0000000000076940 550 330 0 0 ret=1 md5=f9a4daf9076204ad161a3a859b20836a draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#9@517,322*0000803f,spr\Interface.spr#40@550,330*0000803f
+frame hover_label10 7 0000000000086940 430 280 0 0 ret=1 md5=890d0ff35a4b9e2a316477801ea95959 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#10@398,277*0000803f,spr\Interface.spr#40@430,280*0000803f
+frame click_to_12 8 0000000000096940 320 250 1 0 ret=1 md5=7e59b6a52556891455d1058a2a2485c9 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#6@295,241*0000803f,spr\Interface.spr#40@320,250*0000803f
+state click_to_12 vars LDM_CHAPITRE_DEPART=0 LDM_CHAPITRE_ARRIVEE=0 chapter=12 mode=9 open=1 flag560=0
+frame click_to_13 9 00000000000a6940 240 130 1 0 ret=0 md5=08535183a7070bd75eaeaf9bcd00fc37 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#8@185,126*0000803f,spr\Interface.spr#40@240,130*0000803f
+event click_to_13 9 RunOneCommand '(chapter=500)'
+event click_to_13 9 AtlCarte_Close_0x004054d0
+event click_to_13 9 CtrlScenarIN_0x0044a2f0
+state click_to_13 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=13 chapter=12 mode=3 open=0 flag560=0
+reopen click_to_13 mode=9 open=1
+frame click_to_14 10 00000000000b6940 290 350 1 0 ret=0 md5=9bba8889c6ee0a62d09ffb1ec4940ba7 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Interface.spr#40@290,350*0000803f
+event click_to_14 10 RunOneCommand '(chapter=500)'
+event click_to_14 10 AtlCarte_Close_0x004054d0
+event click_to_14 10 CtrlScenarIN_0x0044a2f0
+state click_to_14 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=14 chapter=12 mode=3 open=0 flag560=0
+reopen click_to_14 mode=9 open=1
+frame click_to_15 11 00000000000c6940 560 330 1 0 ret=0 md5=2af1508af1af6c9130613dbdf37098ca draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#9@517,322*0000803f,spr\Interface.spr#40@560,330*0000803f
+event click_to_15 11 RunOneCommand '(chapter=500)'
+event click_to_15 11 AtlCarte_Close_0x004054d0
+event click_to_15 11 CtrlScenarIN_0x0044a2f0
+state click_to_15 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=15 chapter=12 mode=3 open=0 flag560=0
+reopen click_to_15 mode=9 open=1
+frame click_to_16 12 00000000000d6940 440 280 1 0 ret=0 md5=bce7de26d0978d33a8b665842fe5bbe7 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#10@398,277*0000803f,spr\Interface.spr#40@440,280*0000803f
+event click_to_16 12 RunOneCommand '(chapter=500)'
+event click_to_16 12 AtlCarte_Close_0x004054d0
+event click_to_16 12 CtrlScenarIN_0x0044a2f0
+state click_to_16 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=16 chapter=12 mode=3 open=0 flag560=0
+reopen click_to_16 mode=9 open=1
+frame fish_click_to_13 13 00000000000e6940 240 130 1 0 ret=0 md5=08535183a7070bd75eaeaf9bcd00fc37 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#8@185,126*0000803f,spr\Interface.spr#40@240,130*0000803f
+event fish_click_to_13 13 RunOneCommand '(HidePerso=LDM_PECHEUR01)'
+event fish_click_to_13 13 RunOneCommand '(HidePerso=LDM_PECHEUR02)'
+event fish_click_to_13 13 RunOneCommand '(HideObjet=LDM_POISSON2)'
+event fish_click_to_13 13 RunOneCommand '(chapter=500)'
+event fish_click_to_13 13 AtlCarte_Close_0x004054d0
+event fish_click_to_13 13 CtrlScenarIN_0x0044a2f0
+state fish_click_to_13 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=13 chapter=12 mode=3 open=0 flag560=1
+reopen fish_click_to_13 mode=9 open=1
+frame fish_click_to_14 14 00000000000f6940 290 350 1 0 ret=0 md5=9bba8889c6ee0a62d09ffb1ec4940ba7 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Interface.spr#40@290,350*0000803f
+event fish_click_to_14 14 RunOneCommand '(HidePerso=LDM_PECHEUR01)'
+event fish_click_to_14 14 RunOneCommand '(HidePerso=LDM_PECHEUR02)'
+event fish_click_to_14 14 RunOneCommand '(HideObjet=LDM_POISSON2)'
+event fish_click_to_14 14 RunOneCommand '(chapter=500)'
+event fish_click_to_14 14 AtlCarte_Close_0x004054d0
+event fish_click_to_14 14 CtrlScenarIN_0x0044a2f0
+state fish_click_to_14 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=14 chapter=12 mode=3 open=0 flag560=1
+reopen fish_click_to_14 mode=9 open=1
+frame fish_click_to_15 15 0000000000106940 560 330 1 0 ret=0 md5=2af1508af1af6c9130613dbdf37098ca draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#9@517,322*0000803f,spr\Interface.spr#40@560,330*0000803f
+event fish_click_to_15 15 RunOneCommand '(chapter=500)'
+event fish_click_to_15 15 AtlCarte_Close_0x004054d0
+event fish_click_to_15 15 CtrlScenarIN_0x0044a2f0
+state fish_click_to_15 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=15 chapter=12 mode=3 open=0 flag560=0
+reopen fish_click_to_15 mode=9 open=1
+frame fish_click_to_16 16 0000000000116940 440 280 1 0 ret=0 md5=bce7de26d0978d33a8b665842fe5bbe7 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Carte.spr#10@398,277*0000803f,spr\Interface.spr#40@440,280*0000803f
+event fish_click_to_16 16 RunOneCommand '(HidePerso=LDM_PECHEUR01)'
+event fish_click_to_16 16 RunOneCommand '(HidePerso=LDM_PECHEUR02)'
+event fish_click_to_16 16 RunOneCommand '(HideObjet=LDM_POISSON2)'
+event fish_click_to_16 16 RunOneCommand '(chapter=500)'
+event fish_click_to_16 16 AtlCarte_Close_0x004054d0
+event fish_click_to_16 16 CtrlScenarIN_0x0044a2f0
+state fish_click_to_16 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=16 chapter=12 mode=3 open=0 flag560=1
+reopen fish_click_to_16 mode=9 open=1
+frame rclick 17 0000000000126940 320 240 0 1 ret=0 md5=4e98faf615a28b3353db29230e0fa284 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Interface.spr#40@320,240*0000803f
+event rclick 17 AtlCarte_Close_0x004054d0
+event rclick 17 CtrlScenarIN_0x0044a2f0
+state rclick vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=16 chapter=12 mode=3 open=0 flag560=0
+reopen rclick mode=9 open=1
+frame click_nothing 18 0000000000136940 5 5 1 0 ret=1 md5=f9234b8d89ee8253fd72c9737c104543 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Interface.spr#40@5,5*0000803f
+state click_nothing vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=16 chapter=12 mode=9 open=1 flag560=0
+frame two_feathers 19 0000000000146940 320 240 0 0 ret=0 md5=- draws=
+event two_feathers 19 AtlCarte_Close_0x004054d0
+event two_feathers 19 CtrlScenarIN_0x0044a2f0
+state two_feathers TROP_DE_PLUMES=1 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=16 chapter=12 mode=3 open=0 flag560=0
+reopen two_feathers mode=9 open=1
+frame two_feathers_one_on_balance 20 0000000000156940 320 240 0 0 ret=1 md5=4e98faf615a28b3353db29230e0fa284 draws=warp=flat,C:spr\Carte.spr#0@320,240,spr\Carte.spr#0@-79,-59*0000803f,spr\Carte.spr#1@311,241*0000803f,spr\Carte.spr#2@252,342*0000803f,spr\Carte.spr#3@190,126*0000803f,spr\Carte.spr#4@522,322*0000803f,spr\Carte.spr#5@403,277*0000803f,spr\Interface.spr#40@320,240*0000803f
+state two_feathers_one_on_balance vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=16 chapter=12 mode=9 open=1 flag560=0
+frame gp_not_seen 21 0000000000166940 320 240 0 0 ret=0 md5=- draws=
+event gp_not_seen 21 AtlCarte_Close_0x004054d0
+event gp_not_seen 21 CtrlScenarIN_0x0044a2f0
+state gp_not_seen GP_PAS_VU=1 vars LDM_CHAPITRE_DEPART=12 LDM_CHAPITRE_ARRIVEE=16 chapter=12 mode=3 open=0 flag560=0

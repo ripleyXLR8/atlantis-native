@@ -1,0 +1,197 @@
+# Story segment 02_cfuner from the save at the end of 01_hoggar with Escape pressed during both travel videos (the original's Escape: 0x0044c620(1), then the video's end): the original's interpreter, stripped to the lines the test reads
+LOG interp: SET/set(changewam=CFuner.wam)
+LOG interp: SET(showobjet=CHF_OISEAUBOIS)
+LOG interp: SET(showobjet=CHF_COUVERCLE01)
+LOG interp: SET(hideobjet=CHF_COUVERCLE02)
+LOG interp: SET(hideperso=CHF_PSYCHOP)
+LOG interp: SET/set(anglewarpx=-90)
+LOG interp: SET/set(vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME load 01_hoggar_end.sav md5 d337e877fb03c066f26a243797c759f1: quick load 10 (0x0044c9b0)
+LOG interp: SET(changecd=0)
+LOG interp: SET(monde=2)
+LOG interp: SET(showobjet=CHF_OISEAUBOIS)
+LOG interp: SET(showobjet=CHF_COUVERCLE01)
+LOG interp: SET(hideobjet=CHF_COUVERCLE02)
+LOG interp: SET(hideperso=CHF_PSYCHOP)
+LOG interp: SET(Vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(StartMusik=1)
+STEP 1 OBJET CHF_OISEAUBOIS
+LOG interp: SET/set(enablesuj,CHF_PSYCHOP,DIAL_OISEAUBOIS)
+LOG interp: SET/set(flag46=1)
+VARS 1: OBJETENMAIN=47 SUJET=-2
+FLAGS 1: 46=1 1147=2
+BAG 1: CHF_OISEAUBOIS
+SUBJ 1 CHF_PSYCHOP: DIAL_OISEAUBOIS+
+STATE 1: chapter=9 monde=2 wam=CFuner.wam view=4 hand=CHF_OISEAUBOIS waiting=0 music=1)
+STEP 2 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+ESCAPE during travel 'cf004001.HNM': waiting=0 in_runone=0 resume=0x0077e500 (0 line ends in the next 160 bytes)
+VARS 2: LASTVUE=4 VUE=1 OBJETENMAIN=0 ANGLEWARPX=328 ANGLEWARPY=357
+FLAGS 2: 1002=1
+STATE 2: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
+STEP 3 SKIP puzzle cfuner_stars RUN=(flag45=1) CTRL NOFRAME
+LOG interp: SET(flag45=1)
+LOG interp: SET/set(cinema=005 fps=25)
+LOG interp: SET/set(HideObjet=CHF_COUVERCLE01)
+LOG interp: SET/set(ShowObjet=CHF_COUVERCLE02)
+LOG interp: SET/set(ShowPerso=CHF_PSYCHOP)
+LOG interp: SET/set(AngleWarpXNow=-100)
+LOG interp: SET/set(AngleWarpYNow=-15)
+LOG interp: SET/set(Dial=089)
+LOG interp: SET/set(SacADos=CHF_ECRIN_SCARABEE)
+LOG interp: SET/set(enablesuj,CHF_PSYCHOP,DIAL_ECRIN_SCARABEE)
+LOG interp: SET/set(enablesuj,CHF_PSYCHOP,DIAL_PASSAGES10)
+LOG interp: SET/set(enablesuj,CHF_PSYCHOP,DIAL_PSYCHOPOMPE)
+LOG interp: SET/set(ObjetEnMain=CHF_ECRIN_SCARABEE)
+VARS 3: FLAG=1 OBJETENMAIN=48 SACADOS=1
+FLAGS 3: 45=1 1148=2 1548=1
+BAG 3: CHF_OISEAUBOIS CHF_ECRIN_SCARABEE
+SUBJ 3 CHF_PSYCHOP: DIAL_OISEAUBOIS+ DIAL_ECRIN_SCARABEE+ DIAL_PASSAGES10+ DIAL_PSYCHOPOMPE+
+STATE 3: chapter=9 monde=2 wam=CFuner.wam view=1 hand=CHF_ECRIN_SCARABEE waiting=0 music=1)
+EXPECT FLAG45=1 ok
+EXPECT HAND=CHF_ECRIN_SCARABEE ok
+STEP 4 FRAME
+VARS 4: OBJETENMAIN=0 ANGLEWARPX=260 ANGLEWARPY=345
+STATE 4: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
+MODE 4: 13 Scarabee
+EXPECT MODE=13 ok
+STEP 5 CLICK left
+LOG interp: SET(PlaySound=110)
+STATE 5: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
+MODE 5: 13 Scarabee
+STEP 6 FRAME
+LOG interp: SET(killsuj,CHF_PSYCHOP,DIAL_ECRIN_SCARABEE)
+LOG interp: SET(enablesuj,CHF_PSYCHOP,DIAL_SCARABEE)
+FLAGS 6: 72=1
+SUBJ 6 CHF_PSYCHOP: DIAL_OISEAUBOIS+ DIAL_PASSAGES10+ DIAL_PSYCHOPOMPE+ DIAL_SCARABEE+
+STATE 6: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
+MODE 6: 13 Scarabee
+STEP 7 CLICK right
+STATE 7: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
+EXPECT MODE=3 ok
+STEP 8 GO 2
+LOG interp: SET(LIMITEANGLEWARPY=70)
+ESCAPE during travel 'cf001002.HNM': waiting=0 in_runone=0 resume=0x401e3fe2 (4 line ends in the next 160 bytes)
+LOG interp: SET/set(SacADos=CHF_ECRIN_SCARABEE)
+LOG interp: SET/set(enablesuj,CHF_PSYCHOP,DIAL_ECRIN_SCARABEE)
+LOG interp: SET/set(enablesuj,CHF_PSYCHOP,DIAL_PASSAGES10)
+LOG interp: SET/set(enablesuj,CHF_PSYCHOP,DIAL_PSYCHOPOMPE)
+LOG interp: SET/set(ObjetEnMain=CHF_ECRIN_SCARABEE)
+VARS 8: FLAG=0 LASTVUE=1 VUE=2 ANGLEWARPX=240 ANGLEWARPY=358
+FLAGS 8: 1002=2
+SUBJ 8 CHF_PSYCHOP: DIAL_OISEAUBOIS+ DIAL_PASSAGES10+ DIAL_PSYCHOPOMPE+ DIAL_SCARABEE+ DIAL_ECRIN_SCARABEE+
+STATE 8: chapter=9 monde=2 wam=CFuner.wam view=2 hand=- waiting=0 music=1)
+STEP 9 HAND CHF_OISEAUBOIS
+VARS 9: FLAG=1 OBJETENMAIN=47
+STATE 9: chapter=9 monde=2 wam=CFuner.wam view=2 hand=CHF_OISEAUBOIS waiting=0 music=1)
+STEP 10 GO 5
+LOG interp: SET/set(cinema=006 fps=25)
+LOG interp: SET/set(SacADos=NOT_CHF_OISEAUBOIS)
+LOG interp: SET/set(ChangeWam=LDMorts.wam)
+LOG interp: SET(showobjet=LDM_PLUMES)
+LOG interp: SET(HideObjet=LDM_FRESQUE1)
+LOG interp: SET(HideObjet=LDM_FRESQUE2)
+LOG interp: SET(HideObjet=LDM_FRESQUE3)
+LOG interp: SET(showobjet=LDM_BALANCEPE)
+LOG interp: SET(hideobjet=LDM_BALANCE_PR)
+LOG interp: SET(showperso=LDM_PECHEUR01)
+LOG interp: SET(showperso=LDM_PECHEUR02)
+LOG interp: SET(hideobjet=LDM_POISSON2)
+LOG interp: SET(showobjet=LDM_ANKH)
+LOG interp: SET(hideobjet=LDM_ANKHPR)
+LOG interp: SET(hideobjet=LDM_PLUMES)
+LOG interp: SET(hideobjet=COF_PLUME0)
+LOG interp: SET(hideobjet=COF_PLUME1)
+LOG interp: SET(hideobjet=COF_PLUME2)
+LOG interp: SET(hideobjet=COF_PLUME3)
+LOG interp: SET(hideobjet=COF_PLUME4)
+LOG interp: SET(hideobjet=COF_PLUME5)
+LOG interp: SET(hideobjet=COF_PLUME6)
+LOG interp: SET(hideobjet=COF_PLUME7)
+LOG interp: SET(hideobjet=COF_PLUME8)
+LOG interp: SET(hideobjet=COF_PLUME9)
+LOG interp: SET(showperso=CHF_PSYCHOP)
+LOG interp: SET/set(Vue=22)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(AngleWarpXNow=0)
+LOG interp: SET/set(AngleWarpYNow=0)
+LOG interp: SET/set(Chapter=10)
+LOG interp: SET/set(StartMusik=2)
+LOG interp: SET/set(EnableSuj,CHF_PSYCHOP,DIAL_BARQUE)
+LOG interp: SET/set(EnableSuj,CHF_PSYCHOP,DIAL_PSYCHO_MONDE)
+LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_PSYCHOPOMPE)
+LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_OISEAUBOIS)
+LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_PASSAGES10)
+VARS 10: CHAPTER=10 FLAG=0 LASTVUE=0 VUE=22 OBJETENMAIN=0 ANGLEWARPX=0 ANGLEWARPY=0 SACADOS=0
+FLAGS 10: 1002=22 1012=7 1022=10 1147=0
+BAG 10: CHF_ECRIN_SCARABEE
+SUBJ 10 CHF_PSYCHOP: DIAL_SCARABEE+ DIAL_ECRIN_SCARABEE+ DIAL_BARQUE+ DIAL_PSYCHO_MONDE+
+STATE 10: chapter=10 monde=2 wam=LDMorts.wam view=22 hand=- waiting=0 music=2)
+EXPECT WAM=LDMorts.wam ok
+EXPECT CHAPTER=10 ok
+EXPECT VUE=22 ok
+STEP 11 CHECKPOINT 102 02_cfuner_end
+SAVEFILE CurrentCD = 0
+SAVEFILE Wam = LDMorts.wam
+SAVEFILE Monde = 2
+SAVEFILE Vue = 22
+SAVEFILE Chapitre = 10
+SAVEFILE NBFlag = 22
+SAVEFILE 2 = 1
+SAVEFILE 4 = 1
+SAVEFILE 13 = 1
+SAVEFILE 45 = 1
+SAVEFILE 46 = 1
+SAVEFILE 72 = 1
+SAVEFILE 415 = 1
+SAVEFILE 420 = 1
+SAVEFILE 421 = 1
+SAVEFILE 422 = 1
+SAVEFILE 423 = 1
+SAVEFILE 424 = 1
+SAVEFILE 426 = 1
+SAVEFILE 1000 = 1
+SAVEFILE 1001 = 1
+SAVEFILE 1002 = 22
+SAVEFILE 1011 = 4
+SAVEFILE 1012 = 7
+SAVEFILE 1021 = 4
+SAVEFILE 1022 = 10
+SAVEFILE 1148 = 2
+SAVEFILE 1548 = 1
+SAVEFILE NBObjet = 1
+SAVEFILE CHF_ECRIN_SCARABEE
+SAVEFILE //== Sauvegarde des dialogues ==
+SAVEFILE NBPersoAvecDial = 2
+SAVEFILE Perso = 1
+SAVEFILE NBSuj = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 1
+SAVEFILE NBSprite = 0
+SAVEFILE Etat = 1
+SAVEFILE ID = 2
+SAVEFILE NBSprite = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 3
+SAVEFILE NBSprite = 4
+SAVEFILE Perso = 19
+SAVEFILE NBSuj = 4
+SAVEFILE Etat = 1
+SAVEFILE ID = 14
+SAVEFILE NBSprite = 1
+SAVEFILE Etat = 1
+SAVEFILE ID = 13
+SAVEFILE NBSprite = 0
+SAVEFILE Etat = 1
+SAVEFILE ID = 38
+SAVEFILE NBSprite = 24
+SAVEFILE Etat = 1
+SAVEFILE ID = 35
+SAVEFILE NBSprite = 22
+SAVEFILE Quaternion0 = 0.000000
+SAVEFILE Quaternion1 = 0.000000
+SAVEFILE Quaternion2 = 0.000000
+SAVEFILE Quaternion3 = 1.000000
+STATE 11: chapter=10 monde=2 wam=LDMorts.wam view=22 hand=- waiting=0 music=2)

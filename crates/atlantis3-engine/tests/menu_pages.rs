@@ -10,13 +10,17 @@
 //! state, the calls the original's harness logs (`(PlaySound = 500)`, the
 //! `Atlantis3.cfg` writes, the save files' existence tests, the loader, the
 //! writer, back to the game, the display re-creation, the start page's
-//! mode) and the text calls (tooltips, the load page's dates).
+//! mode) and the text calls (tooltips, the load page's dates). Every
+//! frame's page surface is compared, also after the options' `BT_BACK`
+//! re-created it in 32 bits (drawn by the x8r8g8b8 blitters, truncated to
+//! RGB565 by the copy to the screen).
 //!
 //! Needs the game: `ATLANTIS3_DATA`.
 
 use std::collections::HashMap;
 
 use atlantis3_data::cfg::Config;
+use atlantis3_data::spr::Depth;
 use atlantis3_data::spr_encode::{darken_black, ThumbEncoder};
 use atlantis3_data::A3Files;
 use atlantis3_engine::menu::{Env, Event, Host, Menus, TextCall};
@@ -298,7 +302,7 @@ fn menu_pages_as_the_original() {
     let mut page_of_frame = 0u8;
     let mut n = HashMap::<&str, usize>::new();
     let mut counts = [0usize; 2];
-    let (mut recreated, mut md5s) = (false, 0usize);
+    let (mut recreations, mut md5s) = (0usize, 0usize);
     for l in GOLDEN.lines().filter(|l| !l.starts_with('#')) {
         let f: Vec<&str> = l.split(' ').collect();
         match f[0] {
@@ -337,7 +341,6 @@ fn menu_pages_as_the_original() {
                 let mut menus = Menus::default();
                 menus.load(&files, w, h, &config);
                 let saves = make_saves(w, 8);
-                recreated = false;
                 s = Some(Session {
                     files: &files,
                     texts: &texts,
@@ -421,16 +424,15 @@ fn menu_pages_as_the_original() {
                 let (p0, p1) = f[8].trim_start_matches('p').split_once("->").unwrap();
                 assert_eq!(page_of_frame.to_string(), p0, "{l}");
                 assert_eq!(s.menus.page.to_string(), p1, "{l}");
-                // After the options re-created the display, the original
-                // reloads its banks (@ 0x004511c0, 0x00451220) and its
-                // surfaces differ from then on: not reproduced, only the
-                // draw calls are compared.
-                if !recreated {
-                    assert_eq!(format!("md5={}", md5_16(&s.menus.surface)), f[9], "{l}");
-                    md5s += 1;
-                }
+                // Every frame's page surface as the harness's RGB565 screen
+                // gets it (after the options re-created it in 32 bits: the
+                // x8r8g8b8 page truncated by the copy).
+                assert_eq!(format!("md5={}", md5_16(&s.menus.surface)), f[9], "{l}");
+                md5s += 1;
                 if ev.iter().any(|e| matches!(e, Event::DisplayChange(..))) {
-                    recreated = true;
+                    // The walk's last depth click is `BT_32BITS`.
+                    assert_eq!(s.menus.depth, Depth::Xrgb8888, "{l}");
+                    recreations += 1;
                 }
                 let draws: Vec<String> = s
                     .menus
@@ -476,5 +478,6 @@ fn menu_pages_as_the_original() {
         (3381, 243, 1295, 1295, 784)
     );
     assert!(counts[0] > 1500 && counts[1] > 0, "{counts:?}");
-    assert!(md5s > 1500, "{md5s} surfaces compared");
+    assert_eq!(md5s, n["frame"], "every surface compared");
+    assert_eq!(recreations, 3, "one per size");
 }

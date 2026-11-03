@@ -111,7 +111,7 @@ impl Game {
             .flatten()
     }
 
-    fn enter_menu(&mut self, page: u8) -> bool {
+    pub(super) fn enter_menu(&mut self, page: u8) -> bool {
         if !self.menus_ready() {
             return false;
         }
@@ -182,11 +182,11 @@ impl Game {
     /// menu; a dialog takes it as a click (the line ends, @ 0x0042ae60);
     /// a cinematic stops (its own wait loop's key, [`Game::skip`]); on the
     /// start page with no player the in-game menu opens with `BT_LOAD`,
-    /// `BT_SAVE` and `BT_BACK` off. Mode 4's own case (a travel video
-    /// stopped, @ 0x00422090, then the menu) is not ported: travel videos
-    /// ignore Escape.
+    /// `BT_SAVE` and `BT_BACK` off; a travel video ends and the in-game
+    /// menu opens ([`Game::escape_travel`]).
     pub fn escape(&mut self) {
         match self.mode {
+            Mode::Video if self.video.as_ref().is_some_and(|v| v.travel) => self.escape_travel(),
             Mode::Warp if self.menus.demo => {
                 self.menus.demo = false;
                 self.audio.stop(CHANNEL_PLACE);
@@ -302,14 +302,23 @@ impl Game {
                     self.dialog_renderer.a3 = Some(A3Raster { smooth: c.smooth });
                     self.look.invert_y = c.invert_mouse_y;
                 }
-                Event::DisplayChange(w, h) => {
-                    self.not_ported(&format!(
-                        "the options' display re-creation ({w} x {h}, depth or texture size)"
-                    ));
+                // The page surface and the banks follow the chosen depth
+                // (the menus); the screen stays RGB565 and its size.
+                Event::DisplayChange(w, h)
+                    if (w as usize, h as usize) != (self.width, self.height) =>
+                {
+                    self.not_ported(&format!("the options' screen size switch to {w} x {h}"));
                 }
+                Event::DisplayChange(..) => {}
                 Event::ReloadTexts => self.texts = None,
             }
         }
+    }
+
+    /// Leaves the menu as the in-game menu's `BT_BACK` does (tests).
+    #[doc(hidden)]
+    pub fn menu_back(&mut self) {
+        self.page_left();
     }
 
     /// Back to the game (@ 0x00451280): loop mode 3.

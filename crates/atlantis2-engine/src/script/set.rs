@@ -542,6 +542,10 @@ impl Script {
     /// section that changed it.
     pub(super) fn change_chapter(&mut self, host: &mut dyn Host, value: i32) -> Option<usize> {
         self.chapter_reload = true;
+        if self.is_a3() {
+            // @ 0x0044873b: the resume point := the empty text.
+            self.resume_at = super::RESUME_NOTHING;
+        }
         self.previous_chapter = self.chapter;
         self.chapter = value;
         self.vars[self.keys.chapter] = self.chapter;

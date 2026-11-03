@@ -59,6 +59,11 @@ pub const CHAPTER_BUFFER: usize = 64000;
 /// The story flags (`int flags[1024]` @ 0x006d0578).
 pub const FLAGS: usize = 1024;
 
+/// *Atlantis III*'s resume point "nothing" (the empty text 0x0077e500,
+/// the static value of 0x0071895c, written again by a chapter change
+/// @ 0x0044873b / @ 0x00448aaa): resuming runs no line.
+pub const RESUME_NOTHING: usize = usize::MAX;
+
 /// Which text a walk reads: the chapter buffer, or the command a
 /// `RunOneCommand` (@ 0x00481800) copied (with `"\r\n\r\n"` appended).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -209,7 +214,8 @@ pub struct Script {
     /// @ 0x006d1684: the `/INIT` walk skips its next section call.
     init_skip: bool,
     /// A command left the section to resume later (@ 0x006d1699), at
-    /// [`Script::resume_at`] (@ 0x006d0574).
+    /// [`Script::resume_at`] (@ 0x006d0574; *Atlantis III*: 0x0071895c,
+    /// [`RESUME_NOTHING`] for its empty text 0x0077e500).
     pub resume_pending: bool,
     pub resume_at: usize,
     /// The section waits for a music copy's please-wait page

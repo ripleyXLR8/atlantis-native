@@ -7,16 +7,25 @@
 //! surface the video frame and the sprites are drawn into, before the
 //! stretch to the screen; the last frame ends the video.
 //!
+//! The same at 640 × 480, 800 × 600 and 1024 × 768 (`travel_sprites_640.txt`,
+//! `travel_sprites_1024.txt`): the screen size changes nothing, the
+//! stretch surface is the video's size. The banks' folder follows WarpRes
+//! (`SPF800` iff 1024; the goldens ran with 512).
+//!
 //! Needs the game: `ATLANTIS3_DATA` = the installed folder.
 
 use atlantis2_data::wam::Wam;
 use atlantis3_data::spr::{Bank, Depth};
 use atlantis3_data::A3Files;
-use atlantis3_engine::travel::{destination, draw_transition_sprites, transition_paths};
+use atlantis3_engine::travel::{
+    destination, draw_transition_sprites, spf_folder, transition_paths,
+};
 use atlantis_codecs::{HnmVideo, SoundRule};
 use md5::{Digest, Md5};
 
-const GOLDEN: &str = include_str!("golden/travel_sprites.txt");
+const GOLDEN_640: &str = include_str!("golden/travel_sprites_640.txt");
+const GOLDEN_800: &str = include_str!("golden/travel_sprites.txt");
+const GOLDEN_1024: &str = include_str!("golden/travel_sprites_1024.txt");
 
 fn md5_u16(px: &[u16]) -> String {
     let bytes: Vec<u8> = px.iter().flat_map(|p| p.to_le_bytes()).collect();
@@ -35,9 +44,9 @@ struct Travel {
     frames: Vec<(u32, u32, String, String)>,
 }
 
-fn travels() -> Vec<Travel> {
+fn travels(golden: &str) -> Vec<Travel> {
     let mut out: Vec<Travel> = Vec::new();
-    for line in GOLDEN.lines().filter(|l| !l.starts_with('#')) {
+    for line in golden.lines().filter(|l| !l.starts_with('#')) {
         let f: Vec<&str> = line.split(' ').collect();
         match f[0] {
             "travel" if f[2].starts_with("list=") => {
@@ -70,14 +79,14 @@ fn travels() -> Vec<Travel> {
     out
 }
 
-#[test]
-fn transition_sprites_as_the_original_draws_them() {
+/// The golden of one screen size replayed.
+fn replay(golden: &str) {
     let Some(dir) = atlantis3_data::testing::install_dir() else {
         return;
     };
     let files = A3Files::open_dir(&dir).unwrap().0;
     let wam = Wam::parse(&files.read("wam/hoggar.wam").unwrap()).unwrap();
-    let travels = travels();
+    let travels = travels(golden);
     assert_eq!(travels.len(), 8);
     let (mut banks_checked, mut frames_checked) = (0, 0);
     for t in &travels {
@@ -88,7 +97,7 @@ fn transition_sprites_as_the_original_draws_them() {
         };
         let (from, to) = moves.split_once('_').unwrap();
         let (from, to): (u32, u32) = (from.parse().unwrap(), to.parse().unwrap());
-        let paths = transition_paths(&wam, "hoggar", from, to, |name| Some(name) == hide);
+        let paths = transition_paths(&wam, 512, "hoggar", from, to, |name| Some(name) == hide);
         let want: Vec<String> = t.list.iter().map(|p| p.replace('\\', "/")).collect();
         assert_eq!(paths.len(), want.len(), "{}: {paths:?}", t.tag);
         for (a, b) in paths.iter().zip(&want) {
@@ -127,4 +136,38 @@ fn transition_sprites_as_the_original_draws_them() {
         }
     }
     assert_eq!((banks_checked, frames_checked), (11, 712));
+}
+
+#[test]
+fn transition_sprites_as_the_original_draws_them_at_640() {
+    replay(GOLDEN_640);
+}
+
+#[test]
+fn transition_sprites_as_the_original_draws_them_at_800() {
+    replay(GOLDEN_800);
+}
+
+#[test]
+fn transition_sprites_as_the_original_draws_them_at_1024() {
+    replay(GOLDEN_1024);
+}
+
+/// WarpRes 1024 selects `spf\SPF800\`, which the GOG install does not
+/// ship: the move opens no bank.
+#[test]
+fn warp_res_1024_takes_the_spf800_folder() {
+    assert_eq!(spf_folder(512), "spf/SPF640");
+    assert_eq!(spf_folder(1024), "spf/SPF800");
+    let Some(dir) = atlantis3_data::testing::install_dir() else {
+        return;
+    };
+    let files = A3Files::open_dir(&dir).unwrap().0;
+    let wam = Wam::parse(&files.read("wam/hoggar.wam").unwrap()).unwrap();
+    let paths = transition_paths(&wam, 1024, "hoggar", 4, 5, |_| false);
+    assert!(!paths.is_empty());
+    for p in &paths {
+        assert!(p.starts_with("spf/SPF800/hoggar/"), "{p}");
+        assert!(files.read(p).is_none(), "{p}");
+    }
 }

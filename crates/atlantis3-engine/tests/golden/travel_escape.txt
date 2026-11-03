@@ -1,0 +1,165 @@
+# Escape, Space and a click during a travel video of the original Game.exe (GOG.com, md5
+# eb06eaa718877dfcabee6e8f89d85b31) under emulation: the travel hoggar.wam 4 -> 5 (ho004005.HNM, 79 frames,
+# transition bank g1004005.spr) started by the arrival block, then one AtlHnm_continue call per `frame` line
+# (clock + 0.07 s). run NAME: a fresh start. key / click: the input before the next call. frame N ret=R draws=...:
+# the call's transition sprites (R 0: the video ends). event: the calls the harness logged (Interp_CloseInterrupt
+# stubbed there, hence e514 / b9cc). state: loop mode, the mode to return to, the menu page, the framer flag, the
+# "no call yet" flag, the click byte, the Escape byte, "section waiting", the wait lock, the view.
+run escape_at_3
+event escape_at_3 0 RunOneCommand '(LIMITEANGLEWARPY=70)'
+event escape_at_3 0 SetMode_0x004d6b00 4
+event escape_at_3 0 OpenStretchSurface_0x00410090 640x480
+event escape_at_3 0 Subtitle_Off_0x0040e330
+travel escape_at_3 4 -> 5 started mode=4
+state escape_at_3 0 mode=4 back=0 page=0 framer=1 fresh=1 click=0 esc=0 e514=0 b9cc=0 view=5
+frame escape_at_3 0 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#0@def,0 flips=1
+frame escape_at_3 1 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#1@def,0 flips=1
+frame escape_at_3 2 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#2@def,0 flips=1
+key escape_at_3 3 0x1
+event escape_at_3 3 EscapeByMode_0x0042ac50 mode=4
+event escape_at_3 3 Subtitle_Off_0x0040e330
+event escape_at_3 3 Cursor_Set_0x00427f80
+event escape_at_3 3 0x0044c620 1
+event escape_at_3 3 AtlHnm_end_0x00422090
+event escape_at_3 3 CloseStretchSurface_0x00410390
+event escape_at_3 3 SetMode_0x004d6b00 3
+event escape_at_3 3 Interp_CloseInterrupt_0x0044c650 1
+event escape_at_3 3 Screen_Capture_0x00410400
+event escape_at_3 3 SetMode_0x004d6b00 6
+event escape_at_3 3 MenuPages_LoadBanks_0x00451220
+state escape_at_3 3 mode=6 back=3 page=1 framer=0 fresh=0 click=0 esc=0 e514=1 b9cc=1 view=5
+done escape_at_3 3
+state escape_at_3 3 mode=6 back=3 page=1 framer=0 fresh=0 click=0 esc=0 e514=1 b9cc=1 view=5
+run space_at_3
+event space_at_3 0 RunOneCommand '(LIMITEANGLEWARPY=70)'
+event space_at_3 0 SetMode_0x004d6b00 4
+event space_at_3 0 OpenStretchSurface_0x00410090 640x480
+event space_at_3 0 Subtitle_Off_0x0040e330
+travel space_at_3 4 -> 5 started mode=4
+state space_at_3 0 mode=4 back=0 page=0 framer=1 fresh=1 click=0 esc=0 e514=0 b9cc=0 view=5
+frame space_at_3 0 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#0@def,0 flips=1
+frame space_at_3 1 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#1@def,0 flips=1
+frame space_at_3 2 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#2@def,0 flips=1
+key space_at_3 3 0x39
+state space_at_3 3 mode=4 back=0 page=0 framer=1 fresh=0 click=0 esc=0 e514=0 b9cc=0 view=5
+frame space_at_3 3 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#3@def,0 flips=1
+frame space_at_3 4 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#4@def,0 flips=1
+frame space_at_3 5 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#5@def,0 flips=1
+frame space_at_3 6 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#6@def,0 flips=1
+frame space_at_3 7 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#7@def,0 flips=1
+frame space_at_3 8 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#8@def,0 flips=1
+frame space_at_3 9 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#9@def,0 flips=1
+frame space_at_3 10 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#10@def,0 flips=1
+frame space_at_3 11 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#11@def,0 flips=1
+frame space_at_3 12 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#12@def,0 flips=1
+frame space_at_3 13 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#13@def,0 flips=1
+frame space_at_3 14 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#14@def,0 flips=1
+frame space_at_3 15 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#15@def,0 flips=1
+frame space_at_3 16 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#16@def,0 flips=1
+frame space_at_3 17 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#17@def,0 flips=1
+frame space_at_3 18 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#18@def,0 flips=1
+frame space_at_3 19 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#19@def,0 flips=1
+frame space_at_3 20 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#20@def,0 flips=1
+frame space_at_3 21 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#21@def,0 flips=1
+frame space_at_3 22 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#22@def,0 flips=1
+frame space_at_3 23 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#23@def,0 flips=1
+frame space_at_3 24 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#24@def,0 flips=1
+frame space_at_3 25 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#25@def,0 flips=1
+frame space_at_3 26 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#26@def,0 flips=1
+frame space_at_3 27 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#27@def,0 flips=1
+frame space_at_3 28 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#28@def,0 flips=1
+frame space_at_3 29 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#29@def,0 flips=1
+frame space_at_3 30 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#30@def,0 flips=1
+frame space_at_3 31 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#31@def,0 flips=1
+frame space_at_3 32 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#32@def,0 flips=1
+frame space_at_3 33 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#33@def,0 flips=1
+frame space_at_3 34 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#34@def,0 flips=1
+frame space_at_3 35 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#35@def,0 flips=1
+frame space_at_3 36 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#36@def,0 flips=1
+frame space_at_3 37 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#37@def,0 flips=1
+frame space_at_3 38 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#38@def,0 flips=1
+frame space_at_3 39 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#39@def,0 flips=1
+frame space_at_3 40 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#40@def,0 flips=1
+frame space_at_3 41 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#41@def,0 flips=1
+frame space_at_3 42 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#42@def,0 flips=1
+frame space_at_3 43 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#43@def,0 flips=1
+frame space_at_3 44 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#44@def,0 flips=1
+frame space_at_3 45 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#45@def,0 flips=1
+frame space_at_3 46 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#46@def,0 flips=1
+frame space_at_3 47 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#47@def,0 flips=1
+frame space_at_3 48 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#48@def,0 flips=1
+frame space_at_3 49 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#49@def,0 flips=1
+frame space_at_3 50 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#50@def,0 flips=1
+frame space_at_3 51 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#51@def,0 flips=1
+frame space_at_3 52 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#52@def,0 flips=1
+frame space_at_3 53 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#53@def,0 flips=1
+frame space_at_3 54 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#54@def,0 flips=1
+frame space_at_3 55 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#55@def,0 flips=1
+frame space_at_3 56 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#56@def,0 flips=1
+frame space_at_3 57 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#57@def,0 flips=1
+frame space_at_3 58 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#58@def,0 flips=1
+frame space_at_3 59 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#59@def,0 flips=1
+frame space_at_3 60 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#60@def,0 flips=1
+frame space_at_3 61 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#61@def,0 flips=1
+frame space_at_3 62 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#62@def,0 flips=1
+frame space_at_3 63 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#63@def,0 flips=1
+frame space_at_3 64 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#64@def,0 flips=1
+frame space_at_3 65 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#65@def,0 flips=1
+frame space_at_3 66 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#66@def,0 flips=1
+frame space_at_3 67 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#67@def,0 flips=1
+frame space_at_3 68 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#68@def,0 flips=1
+frame space_at_3 69 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#69@def,0 flips=1
+frame space_at_3 70 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#70@def,0 flips=1
+frame space_at_3 71 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#71@def,0 flips=1
+frame space_at_3 72 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#72@def,0 flips=1
+frame space_at_3 73 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#73@def,0 flips=1
+frame space_at_3 74 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#74@def,0 flips=1
+frame space_at_3 75 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#75@def,0 flips=1
+frame space_at_3 76 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#76@def,0 flips=1
+frame space_at_3 77 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#77@def,0 flips=1
+frame space_at_3 78 ret=0 draws=spf\SPF640\hoggar\g1004005.spr#78@def,0 flips=1
+end space_at_3 78
+event space_at_3 78 AtlHnm_end_0x00422090
+event space_at_3 78 CloseStretchSurface_0x00410390
+event space_at_3 78 SetMode_0x004d6b00 3
+event space_at_3 78 Interp_CloseInterrupt_0x0044c650 1
+state space_at_3 78 mode=3 back=0 page=0 framer=0 fresh=0 click=0 esc=0 e514=0 b9cc=0 view=5
+done space_at_3 78
+state space_at_3 78 mode=3 back=0 page=0 framer=0 fresh=0 click=0 esc=0 e514=0 b9cc=0 view=5
+run click_at_3
+event click_at_3 0 RunOneCommand '(LIMITEANGLEWARPY=70)'
+event click_at_3 0 SetMode_0x004d6b00 4
+event click_at_3 0 OpenStretchSurface_0x00410090 640x480
+event click_at_3 0 Subtitle_Off_0x0040e330
+travel click_at_3 4 -> 5 started mode=4
+state click_at_3 0 mode=4 back=0 page=0 framer=1 fresh=1 click=0 esc=0 e514=0 b9cc=0 view=5
+frame click_at_3 0 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#0@def,0 flips=1
+frame click_at_3 1 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#1@def,0 flips=1
+frame click_at_3 2 ret=1 draws=spf\SPF640\hoggar\g1004005.spr#2@def,0 flips=1
+click click_at_3 3
+state click_at_3 3 mode=4 back=0 page=0 framer=1 fresh=0 click=1 esc=0 e514=0 b9cc=0 view=5
+frame click_at_3 3 ret=0 draws=spf\SPF640\hoggar\g1004005.spr#3@def,0 flips=1
+end click_at_3 3
+event click_at_3 3 AtlHnm_end_0x00422090
+event click_at_3 3 CloseStretchSurface_0x00410390
+event click_at_3 3 SetMode_0x004d6b00 3
+event click_at_3 3 Interp_CloseInterrupt_0x0044c650 1
+state click_at_3 3 mode=3 back=0 page=0 framer=0 fresh=0 click=0 esc=0 e514=0 b9cc=0 view=5
+done click_at_3 3
+state click_at_3 3 mode=3 back=0 page=0 framer=0 fresh=0 click=0 esc=0 e514=0 b9cc=0 view=5
+run escape_before_first_frame
+event escape_before_first_frame 0 RunOneCommand '(LIMITEANGLEWARPY=70)'
+event escape_before_first_frame 0 SetMode_0x004d6b00 4
+event escape_before_first_frame 0 OpenStretchSurface_0x00410090 640x480
+event escape_before_first_frame 0 Subtitle_Off_0x0040e330
+travel escape_before_first_frame 4 -> 5 started mode=4
+state escape_before_first_frame 0 mode=4 back=0 page=0 framer=1 fresh=1 click=0 esc=0 e514=0 b9cc=0 view=5
+key escape_before_first_frame 0 0x1
+event escape_before_first_frame 0 EscapeByMode_0x0042ac50 mode=4
+event escape_before_first_frame 0 AtlHnm_end_0x00422090
+event escape_before_first_frame 0 CloseStretchSurface_0x00410390
+event escape_before_first_frame 0 SetMode_0x004d6b00 3
+event escape_before_first_frame 0 Interp_CloseInterrupt_0x0044c650 1
+state escape_before_first_frame 0 mode=3 back=0 page=0 framer=0 fresh=0 click=0 esc=0 e514=0 b9cc=0 view=5
+done escape_before_first_frame 0
+state escape_before_first_frame 0 mode=3 back=0 page=0 framer=0 fresh=0 click=0 esc=0 e514=0 b9cc=0 view=5

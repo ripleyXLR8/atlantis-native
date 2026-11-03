@@ -28,9 +28,10 @@ pub fn destination(wam: &Wam, old: u32, next: u32) -> Option<&Destination> {
 /// the destination's `id_spf` order: for each entity name not `hidden`
 /// (its show-table state 0, @ 0x0044b8b0), the WAM entity of that CON
 /// name, its two-letter prefix and `%s%03d%03d.spr` (@ 0x00717de8) under
-/// `spf\SPF640\<world>\`. A name with no WAM entity gets no bank.
+/// [`spf_folder`]`\<world>\`. A name with no WAM entity gets no bank.
 pub fn transition_paths(
     wam: &Wam,
+    warp_res: i32,
     folder: &str,
     old: u32,
     next: u32,
@@ -47,12 +48,31 @@ pub fn transition_paths(
                 .entities
                 .iter()
                 .find(|e| e.con_name.eq_ignore_ascii_case(name))?;
-            Some(format!(
-                "spf/SPF640/{folder}/{}{old:03}{next:03}.spr",
-                e.prefix
-            ))
+            Some(transition_path(warp_res, folder, &e.prefix, old, next))
         })
         .collect()
+}
+
+/// The transition banks' folder (the static constructors' strings):
+/// `spf\` (0x00755b68) + `SPF800\` (0x00755c70) when WarpRes
+/// (0x00789d34, the panorama faces' size) is 1024, else `SPF640\`
+/// (0x00755cd0). The screen size plays no part. The GOG install ships
+/// only `spf640`, so with WarpRes 1024 no transition bank opens.
+pub fn spf_folder(warp_res: i32) -> &'static str {
+    if warp_res == 1024 {
+        "spf/SPF800"
+    } else {
+        "spf/SPF640"
+    }
+}
+
+/// The transition bank of entity prefix `prefix` for the move `old` →
+/// `next` of world folder `folder` (`%s%03d%03d.spr`, @ 0x00717de8).
+pub fn transition_path(warp_res: i32, folder: &str, prefix: &str, old: u32, next: u32) -> String {
+    format!(
+        "{}/{folder}/{prefix}{old:03}{next:03}.spr",
+        spf_folder(warp_res)
+    )
 }
 
 /// The transition sprites over video frame `n` (1 = the first): every
