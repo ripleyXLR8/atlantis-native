@@ -691,9 +691,9 @@ impl Script {
         self.previous_chapter = previous;
         self.chapter = d.chapter;
         self.vars[self.keys.chapter] = d.chapter;
-        // The original keeps its resume pointer, which points into the
-        // text this load replaces; the port takes it as the empty text.
-        self.resume_at = super::RESUME_NOTHING;
+        // The resume pointer is kept: it points into the 64000-byte chapter
+        // buffer (0x0077e510, reused by `LoadCurrentChap` @ 0x00449fc0), so
+        // at the same offset of the text this load put there.
         if !self.load_chapter(host, d.chapter) {
             self.fail(format!(
                 "SetVariables(): chapitre introuvable scenar\\chapi{:03}.con",

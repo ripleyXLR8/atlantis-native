@@ -281,10 +281,11 @@ impl Game {
                     self.page_left();
                     self.video = None;
                     self.mode = Mode::Warp;
+                    // Back to the game follows (`Event::Resume`).
                     self.load_named(&name);
                 }
                 Event::Save(name) => self.write_menu_save(&name),
-                Event::Resume => self.page_left(),
+                Event::Resume => self.back_to_game(),
                 Event::StartPage => {}
                 // `BT_QUIT` of the start page: the credits (@ 0x00457690),
                 // whose end quits.
@@ -318,10 +319,19 @@ impl Game {
     /// Leaves the menu as the in-game menu's `BT_BACK` does (tests).
     #[doc(hidden)]
     pub fn menu_back(&mut self) {
-        self.page_left();
+        self.back_to_game();
     }
 
     /// Back to the game (@ 0x00451280): loop mode 3.
+    /// Back to the game (@ 0x00451280, the in-game menu's `BT_BACK`
+    /// after its own `Interp_CloseInterrupt(1)`): `Interp_CloseInterrupt(1)`
+    /// (a section waiting when the menu opened goes on: the lock cleared),
+    /// then loop mode 3.
+    fn back_to_game(&mut self) {
+        self.with_script(|s, h| s.close_interrupt(h));
+        self.page_left();
+    }
+
     fn page_left(&mut self) {
         if self.mode == Mode::Menu {
             self.mode = Mode::Warp;

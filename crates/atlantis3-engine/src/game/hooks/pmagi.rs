@@ -636,8 +636,13 @@ pub(super) fn view_tt(h: &mut Hx) {
         p.tt_unlocked = !p.tt_locks.iter().any(|&l| l);
         p.tt_counter = counter;
     }
-    // visual: `PMA_TT%d%d` (rows 1..5, columns 1..4) drawn open or
-    // closed (M4).
+    // `PMA_TT%d%d` (rows 1..5, columns 1..4): frame 1 open, 0 closed,
+    // added only (no `subf` of the other frame at the entry).
+    for i in 0..20 {
+        let id = h.obj(&format!("PMA_TT{}{}", i / 4 + 1, i % 4 + 1));
+        let open = h.g.puzzles.pmagi.tt_open[i];
+        h.addf(id, i32::from(open));
+    }
     h.g.puzzles.pmagi.tt_reload = false;
 }
 
@@ -693,7 +698,9 @@ fn tt_clicks(h: &mut Hx, z: &ZoneRec) {
         sound(h, "sound805.apc");
         h.g.puzzles.pmagi.tt_open[15 + k] = true;
         h.set_flag(845 + k, 1);
-        // visual: `PMA_TT5k` open (M4).
+        let id = h.obj(&format!("PMA_TT5{k}"));
+        h.subf(id, 0);
+        h.addf(id, 1);
         h.run(&format!("(ShowObjet=PMA_INDICE{k})"));
     }
 }
@@ -713,7 +720,9 @@ fn tt_drawer(h: &mut Hx, r: usize, c: usize) {
             sound(h, "sound805.apc");
             h.g.puzzles.pmagi.tt_open[i] = true;
             h.set_flag(830 + i, 1);
-            // visual: `PMA_TT{r2+1}{c2+1}` open (M4).
+            let id = h.obj(&format!("PMA_TT{}{}", r2 + 1, c2 + 1));
+            h.subf(id, 0);
+            h.addf(id, 1);
             h.g.puzzles.pmagi.tt_count += 1;
             changed = true;
         }
@@ -721,7 +730,9 @@ fn tt_drawer(h: &mut Hx, r: usize, c: usize) {
         sound(h, "sound806.apc");
         h.g.puzzles.pmagi.tt_open[i] = false;
         h.set_flag(830 + i, 0);
-        // visual: closed (M4).
+        let id = h.obj(&format!("PMA_TT{}{}", r2 + 1, c2 + 1));
+        h.subf(id, 1);
+        h.addf(id, 0);
         h.g.puzzles.pmagi.tt_count -= 1;
         changed = true;
     }
@@ -751,10 +762,14 @@ pub(super) fn frame_tt_end(h: &mut Hx) {
 // ---- the drawer wall `PMA_TR` ------------------------------------------
 
 /// A record's set-up (@ 0x004c1c70): the object, its frame count, frame
-/// 0; its frames taken out of the object's frame table (visual).
-fn anim_init(h: &Hx, name: &str, frames: i32) -> Anim {
+/// 0; its frames taken out of the object's frame list.
+fn anim_init(h: &mut Hx, name: &str, frames: i32) -> Anim {
+    let obj = h.obj(name);
+    for f in 0..frames {
+        h.subf_if_listed(obj, f);
+    }
     Anim {
-        obj: h.obj(name),
+        obj,
         frames,
         current: 0,
         playing: false,
@@ -768,8 +783,10 @@ fn anim_init(h: &Hx, name: &str, frames: i32) -> Anim {
 /// the record is at its last frame.
 fn play_once(h: &mut Hx, which: fn(&mut super::Puzzles) -> &mut Anim) -> bool {
     let now = h.now();
-    let obj = which(&mut h.g.puzzles).obj;
-    // visual: the record's frames taken out of the object's table (M4).
+    let (obj, frames) = {
+        let a = which(&mut h.g.puzzles);
+        (a.obj, a.frames)
+    };
     for k in 0..h.g.slots.slots.len() {
         if h.g.slots.slots[k].id != obj {
             continue;
@@ -780,9 +797,14 @@ fn play_once(h: &mut Hx, which: fn(&mut super::Puzzles) -> &mut Anim) -> bool {
                 let a = which(&mut h.g.puzzles);
                 a.current = a.frames;
                 a.playing = false;
-                // visual: the record's frame shown (@ 0x004c1df0) (M4).
+                // The record's frame shown (@ 0x004c1df0).
+                h.addf_if_absent(obj, frames);
             }
         } else {
+            // Its frames taken out of the list, then played once.
+            for f in 0..frames {
+                h.subf_if_listed(obj, f);
+            }
             let s = &mut h.g.slots.slots[k];
             s.frame = 0;
             s.mode = 1;
@@ -886,8 +908,20 @@ pub(super) fn view_tr(h: &mut Hx) {
         }
         p.tr_step = step;
     }
-    // visual: the three records' frames shown (@ 0x004c1df0) and
-    // `PMA_TR%d%d` drawn open or closed (M4).
+    // The three records' frames shown (@ 0x004c1df0: added if absent),
+    // then `PMA_TR%d%d`: frame 1 open, 0 closed.
+    for which in [placard, tirette, lampe] {
+        let (obj, cur) = {
+            let a = which(&mut h.g.puzzles);
+            (a.obj, a.current)
+        };
+        h.addf_if_absent(obj, cur);
+    }
+    for i in 0..16 {
+        let id = h.obj(&format!("PMA_TR{}{}", i / 4 + 1, i % 4 + 1));
+        let open = h.g.puzzles.pmagi.tr_open[i];
+        h.addf(id, i32::from(open));
+    }
     h.g.puzzles.pmagi.tr_reload = false;
 }
 
@@ -932,8 +966,11 @@ pub(super) fn frame_tr(h: &mut Hx, z: &ZoneRec) {
             let p = &mut h.g.puzzles.pmagi;
             p.lampe.current = p.lampe.frames;
             p.tirette.current = p.tirette.frames;
-            // visual: both shown at their last frame (M4).
             p.tr_anims = true;
+            let (lo, lf, to, tf) = (p.lampe.obj, p.lampe.frames, p.tirette.obj, p.tirette.frames);
+            h.addf_if_absent(lo, lf);
+            h.addf_if_absent(to, tf);
+            let p = &mut h.g.puzzles.pmagi;
             // @ 0x004d2620.
             p.tr_done = true;
             h.ctrl();
@@ -949,7 +986,9 @@ fn tr_drawer(h: &mut Hx, r: usize, c: usize) {
         sound(h, "sound805.apc");
         h.g.puzzles.pmagi.tr_open[i] = true;
         h.set_flag(850 + i, 1);
-        // visual: open (M4).
+        let id = h.obj(&format!("PMA_TR{}{}", r + 1, c + 1));
+        h.subf(id, 0);
+        h.addf(id, 1);
         let v = TR_STEPS[i];
         let (step, count) = (h.g.puzzles.pmagi.tr_step, h.g.puzzles.pmagi.tr_count);
         if v == step + 1 && v == count + 1 {
@@ -974,7 +1013,9 @@ fn tr_drawer(h: &mut Hx, r: usize, c: usize) {
         sound(h, "sound806.apc");
         h.g.puzzles.pmagi.tr_open[i] = false;
         h.set_flag(850 + i, 0);
-        // visual: closed (M4).
+        let id = h.obj(&format!("PMA_TR{}{}", r + 1, c + 1));
+        h.subf(id, 1);
+        h.addf(id, 0);
         h.g.puzzles.pmagi.tr_step = 0;
         h.set_flag(818, 0);
         h.g.puzzles.pmagi.tr_count -= 1;

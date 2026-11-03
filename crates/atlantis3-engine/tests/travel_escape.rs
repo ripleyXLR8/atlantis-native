@@ -15,7 +15,7 @@
 //!   the video (no menu).
 //!
 //! The script side of that Escape (the last interrupted section's tail run
-//! again) is checked by `tests/story.rs` (`story_02_cfuner_escaping_travels`).
+//! again) is checked by `tests/story.rs` (`story_01_hoggar_escaping_travels`).
 //!
 //! Needs the game: `ATLANTIS3_DATA` = the installed folder.
 
@@ -115,7 +115,6 @@ fn field<'a>(l: &'a str, k: &str) -> &'a str {
 }
 
 #[test]
-#[ignore = "WIP: the port ends a travel one call after its last frame (Cinema::ended); work paused"]
 fn escape_space_and_click_during_a_travel_video_as_the_original() {
     if atlantis3_data::testing::install_dir().is_none() {
         return;
@@ -197,6 +196,6 @@ fn escape_space_and_click_during_a_travel_video_as_the_original() {
             assert_eq!(r.g.place().1, Some(5), "{name}: BT_BACK");
         }
     }
-    // Frames: 3 + 79 + 4 (none before the first call); 12 state lines.
-    assert_eq!(checked, 86 + 12);
+    // Frames: 3 + 79 + 4 (none before the first call); 14 state lines.
+    assert_eq!(checked, 86 + 14);
 }

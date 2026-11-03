@@ -1371,8 +1371,12 @@ impl Game {
                 stretch_video(&frame, w, h, &mut self.screen, self.width, self.height);
             }
         }
-        let ended = v.cinema.ended();
         let travel = v.travel;
+        // Hnm_Framer's end test (@ 0x00443a00, after the frame and the
+        // click test): the frames read equal the file's count, so the call
+        // that shows the last frame ends the video.
+        let ended = v.cinema.ended()
+            || (travel && advanced && v.cinema.frames_shown() >= v.cinema.frame_count());
         if advanced {
             self.draw_subtitle();
         }

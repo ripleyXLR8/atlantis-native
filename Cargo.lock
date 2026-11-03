@@ -268,7 +268,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis3-data"
-version = "0.5.6"
+version = "0.5.9"
 dependencies = [
  "atlantis-codecs",
  "atlantis-data",
@@ -279,7 +279,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis3-engine"
-version = "0.5.6"
+version = "0.5.9"
 dependencies = [
  "ab_glyph",
  "atlantis-codecs",

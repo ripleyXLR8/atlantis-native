@@ -633,7 +633,9 @@ fn segment_with(index: usize, golden: Option<&str>) -> Option<Run> {
     let (name, walk, own) = SEGMENTS[index];
     r.escape_travels = golden.is_some();
     let golden = golden.unwrap_or(own);
-    if let Some(save) = start_save(golden) {
+    // A golden without the save's dump starts from the same save as the
+    // segment's own (its `FRAME load` line names the same file and md5).
+    if let Some(save) = start_save(golden).or_else(|| start_save(own)) {
         r.g.script_mut().unwrap().set_log = Some(Vec::new());
         assert!(r.g.load_save_text("quick1_100.sav", save), "{name}: load");
         // The harness's first warp frame after the load, and its settle.
@@ -643,17 +645,16 @@ fn segment_with(index: usize, golden: Option<&str>) -> Option<Run> {
     Some(r)
 }
 
-/// Segment 02 with Escape pressed during both travel videos, against the
-/// original's run (`02_cfuner_escape.txt`): Escape's `0x0044c620(1)` makes
+/// Segment 01 with Escape pressed during every travel video that plays
+/// (the Hoggar's; the other worlds have no travel file), against the
+/// original's run (`01_hoggar_escape.txt`): Escape's `0x0044c620(1)` makes
 /// the video's end resume the script, which runs the tail of the last
-/// interrupted section again (the second travel re-runs the scarab case's
-/// section: the case given again, three subjects enabled, the case in
-/// hand), the original's bug.
+/// interrupted section again (`Flag1000=1`, `flag426=1`, the Touareg
+/// hidden again), the original's bug.
 #[test]
-#[ignore = "WIP: step 1's sprite click fails in this run (not investigated: work paused)"]
-fn story_02_cfuner_escaping_travels() {
-    if let Some(r) = segment_with(1, Some(include_str!("golden/story/02_cfuner_escape.txt"))) {
-        assert_eq!(r.escaped, 2);
+fn story_01_hoggar_escaping_travels() {
+    if let Some(r) = segment_with(0, Some(include_str!("golden/story/01_hoggar_escape.txt"))) {
+        assert_eq!(r.escaped, 8);
     }
 }
 
