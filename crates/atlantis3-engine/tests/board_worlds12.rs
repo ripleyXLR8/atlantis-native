@@ -25,7 +25,16 @@ fn check(golden: &str, world: i32, st: &'static str, runs: &[&str]) {
     let Some(files) = files() else {
         return;
     };
-    let names = replay_all(files, golden, Spec { world, st });
+    let names = replay_all(
+        files,
+        golden,
+        Spec {
+            world,
+            st,
+            palace: false,
+            tower: false,
+        },
+    );
     assert_eq!(names, runs);
 }
 

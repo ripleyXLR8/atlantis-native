@@ -6,11 +6,9 @@
 //! handler returning 0 makes the main loop call the mode's `Stop`
 //! ([`Game::stop_screen`]).
 //!
-//! The two maps, the jewel case and the unicorn's 3D board
+//! The two maps, the jewel case, the game boy and the unicorn's 3D board
 //! ([`crate::licorne`]) are drawn ([`crate::maps`], `screens_draw`); the
-//! other screens' drawing, their hover animations and the game boy's
-//! reflex dice are M4; the outcome of that board is given by
-//! [`Game::screen_outcome`].
+//! other screens' drawing and their hover animations are M4.
 
 use std::sync::Arc;
 
@@ -39,12 +37,13 @@ pub struct State {
     /// `LICORNE`: the board object (@ 0x00759140, built by the start;
     /// never freed by the stop).
     pub licorne: Option<Box<crate::licorne::Board>>,
-    /// `GBOY`: the result phase (@ 0x00756054), its blinks (@ 0x00756058)
-    /// and its clock's last time (@ 0x00755f08). The result itself is
-    /// the tower's dice (@ 0x00756060, `tourmagi::State::dice`).
-    pub gboy_result: bool,
-    pub gboy_blinks: i32,
-    pub gboy_clock: f64,
+    /// `GBOY` ([`Gboy`]); its result is the tower's dice (@ 0x00756060,
+    /// `tourmagi::State::dice`).
+    pub gboy: Gboy,
+    /// `GBoy.spr` (@ 0x00756020) and `Boitier.spr` (@ 0x00755ef0), loaded
+    /// with `tourmagi.wam` (@ 0x0041fd80).
+    pub gboy_bank: Option<Arc<Bank>>,
+    pub boitier_bank: Option<Arc<Bank>>,
     /// `AtlCarte`'s bank `Carte.spr` (@ 0x0074e928), loaded with
     /// `ldmorts.wam` (@ 0x00405bf0).
     pub carte_bank: Option<Arc<Bank>>,
@@ -55,6 +54,64 @@ pub struct State {
     pub tour_pawns: Option<Arc<Bank>>,
     pub tour_anim: maps::TourAnim,
 }
+
+/// The game boy's globals (`AtlGBoy`, @ 0x0041f660..0x0041fd80).
+#[derive(Debug, Clone, Default)]
+pub struct Gboy {
+    /// The running value 43..141 (@ 0x00716220; 42 at the start).
+    pub cursor: i32,
+    /// The index picked by the click (@ 0x00716224) and its copy
+    /// (@ 0x0071622c), −1 none.
+    pub pick: i32,
+    pub k: i32,
+    /// The count animation's frame (@ 0x00716228), −1 none.
+    pub anim: i32,
+    /// The button hit this frame (@ 0x0075605c).
+    pub hit: bool,
+    /// The result phase (@ 0x00756054) and its blinks (@ 0x00756058).
+    pub phase: bool,
+    pub blinks: i32,
+    /// The six faces' frames (@ 0x00755ed8[6]: 7i at rest).
+    pub faces: [i32; 6],
+    /// The count started (@ 0x00755fb2).
+    pub go: bool,
+    /// The 15 Hz accumulator (@ 0x00756064) and its last time
+    /// (@ 0x00756068), floats; 0 = no frame yet.
+    pub acc: f32,
+    pub last: f32,
+    /// The start's time (@ 0x00755fd0) and the result phase's clock
+    /// (@ 0x00755f08), doubles of the game's clock.
+    pub start: f64,
+    pub blink_clock: f64,
+}
+
+/// The game boy's tables (`AtlGBoy_MainInit` @ 0x0041f3c0): the picks'
+/// thresholds (@ 0x00755fb4), the cursor offsets once the threshold is
+/// reached (@ 0x00756034), the count animations' first and last frames
+/// (@ 0x00755ec0, @ 0x00755fe8), the frames where each face starts
+/// (@ 0x00755f20 + 24k, −1 none), the range of a click (@ 0x00716230,
+/// @ 0x00716234).
+const GBOY_THRESHOLDS: [i32; 6] = [116, 123, 126, 128, 129, 133];
+const GBOY_OFFSETS: [i32; 6] = [26, 46, 62, 76, 89, 98];
+const GBOY_ANIM: [(i32, i32); 6] = [
+    (241, 260),
+    (261, 284),
+    (285, 312),
+    (313, 344),
+    (345, 380),
+    (381, 420),
+];
+const GBOY_FACES: [[i32; 6]; 6] = [
+    [255, -1, -1, -1, -1, -1],
+    [278, 273, -1, -1, -1, -1],
+    [305, 300, 295, -1, -1, -1],
+    [335, 330, 325, 320, -1, -1],
+    [370, 364, 359, 353, 349, -1],
+    [417, 411, 406, 399, 394, 387],
+];
+const GBOY_RANGE: (i32, i32) = (113, 141);
+/// The cursor's step (@ 0x007003d4, a float 1/15).
+const GBOY_STEP: f32 = 1.0 / 15.0;
 
 impl State {
     pub fn new() -> State {
@@ -72,6 +129,13 @@ const TICK: f64 = 1.0 / 15.0;
 /// The game boy's result blink period (@ 0x00716218: 0.3 s).
 const GBOY_BLINK: f64 = 0.3;
 
+/// The game boy's anchors from the screen's size (@ 0x0041f80d..
+/// 0x0041f84b): the box (W − 400, H − 300), the game boy (W − 250,
+/// H − 210), the button (W − 97, H − 32).
+pub(crate) fn gboy_anchors(w: i32, h: i32) -> [(i32, i32); 3] {
+    [(w - 400, h - 300), (w - 250, h - 210), (w - 97, h - 32)]
+}
+
 /// A start's own part, after the common one ([`Hx::start_screen`]).
 pub(super) fn start(h: &mut Hx, screen: Screen) {
     let now = h.now();
@@ -88,13 +152,28 @@ pub(super) fn start(h: &mut Hx, screen: Screen) {
             st.ecrin_cursor = ECRIN_NO_GEM;
             h.g.pointer = maps::centre(h.g.width, h.g.height);
         }
-        // @ 0x0041f660: the result cleared (0x00756054, 0x00756058,
-        // 0x00756060 := 0); the dice's faces and clocks (visual, M4).
+        // @ 0x0041f660: the start's time, nothing picked, the clocks at
+        // 0, the cursor 42, the result 0, the faces at rest, the pointer
+        // centred (@ 0x00431780), the cursor `Interface.spr` #40
+        // (@ 0x00427f80).
         Screen::GBoy => {
-            st.gboy_result = false;
-            st.gboy_blinks = 0;
-            st.gboy_clock = now;
+            st.gboy = Gboy {
+                cursor: 42,
+                pick: -1,
+                k: -1,
+                anim: -1,
+                hit: false,
+                phase: false,
+                blinks: 0,
+                faces: [0, 7, 14, 21, 28, 35],
+                go: false,
+                acc: 0.0,
+                last: 0.0,
+                start: now,
+                blink_clock: st.gboy.blink_clock,
+            };
             h.g.puzzles.tourmagi.dice = 0;
+            h.g.pointer = maps::centre(h.g.width, h.g.height);
         }
         // @ 0x00405450: the pointer centred (@ 0x00431780), the cursor
         // `Interface.spr` #40 (@ 0x00427f80), alpha 1.0.
@@ -152,7 +231,7 @@ pub(super) fn frame(
             let _ = sprite;
             ecrin(h, left)
         }
-        Screen::GBoy => gboy(h),
+        Screen::GBoy => gboy(h, left, right),
         Screen::Licorne => licorne(h, left, right),
     }
 }
@@ -421,23 +500,120 @@ fn ecrin(h: &mut Hx, left: bool) -> bool {
     true
 }
 
-/// `GBOY`, the tower's dice (@ 0x0041f800). M4: the reflex play (a left
-/// click within 15 pixels of (width − 97, height − 32) while the cursor
-/// runs 43..141 at 15 Hz) that sets the result @ 0x00756060 and starts
-/// the result phase. The result phase: six blinks of 0.3 s, then the
-/// loop leaves (the stop scans and restarts music 6). The right button
-/// does nothing.
-fn gboy(h: &mut Hx) -> bool {
+/// `GBOY`, the tower's dice (@ 0x0041f800), in its order:
+///
+/// 1. a left click outside the result phase is used up: within 15 pixels
+///    of the button (squared distance < 225) the hit byte is set and, with
+///    the cursor in 113..=141 and nothing picked, the first threshold
+///    above the cursor is picked (none from 133); elsewhere the hit byte
+///    is cleared;
+/// 2. the 15 Hz steps: the clock (the game's, less the start's) feeds a
+///    float accumulator (the first frame only takes the time); for each
+///    1/15 above it, the cursor moves on (from 141 back to 43 while
+///    nothing is picked), the count animation moves on (a face starts at
+///    its frame, adding one to the result; the last frame starts the
+///    result phase), the running faces turn;
+/// 3. the result phase: every 0.3 s a blink, the sixth ends the loop
+///    (return 0, nothing drawn);
+/// 4. the cursor at the picked threshold starts the count animation;
+/// 5. the drawing ([`Game::gboy_draw`]).
+///
+/// The right button's byte is cleared, nothing else.
+fn gboy(h: &mut Hx, left: bool, right: bool) -> bool {
+    let _ = right;
+    let (w, ht) = (h.g.width as i32, h.g.height as i32);
+    let ptr = h.g.pointer;
+    let fpu = h.g.camera.fpu;
     let now = h.now();
-    let st = &mut h.g.puzzles.screens;
-    if st.gboy_result && now - st.gboy_clock > GBOY_BLINK {
-        st.gboy_clock = now;
-        st.gboy_blinks += 1;
-        if st.gboy_blinks > 5 {
-            st.gboy_result = false;
+    let mut dice = h.g.puzzles.tourmagi.dice;
+    let g = &mut h.g.puzzles.screens.gboy;
+    // 1. The click.
+    let button = gboy_anchors(w, ht)[2];
+    if left && !g.phase {
+        let (dx, dy) = (ptr.0 - button.0, ptr.1 - button.1);
+        if dx * dx + dy * dy < 225 {
+            g.hit = true;
+            if (GBOY_RANGE.0..=GBOY_RANGE.1).contains(&g.cursor) && g.pick == -1 {
+                for k in (0..6).rev() {
+                    if g.cursor < GBOY_THRESHOLDS[k] {
+                        g.pick = k as i32;
+                        g.k = k as i32;
+                        g.go = false;
+                    }
+                }
+            }
+        } else {
+            g.hit = false;
+        }
+    } else {
+        g.hit = false;
+    }
+    // 2. The clock and the 15 Hz steps (@ 0x0041f8e2..0x0041faaa).
+    let t = fpu.sub(now, g.start);
+    if g.last == 0.0 {
+        g.last = fpu.f32(t);
+    }
+    g.acc = fpu.f32(fpu.add(fpu.sub(t, f64::from(g.last)), f64::from(g.acc)));
+    g.last = fpu.f32(t);
+    let step = f64::from(GBOY_STEP);
+    while f64::from(g.acc) > step {
+        g.acc = fpu.f32(fpu.sub(f64::from(g.acc), step));
+        if g.cursor < GBOY_RANGE.1 {
+            g.cursor += 1;
+        } else if g.k == -1 {
+            g.cursor = 43;
+            g.pick = -1;
+        }
+        if g.anim != -1 {
+            let k = g.k.clamp(0, 5) as usize;
+            g.anim += 1;
+            for (i, &at) in GBOY_FACES[k].iter().enumerate() {
+                if g.anim == at {
+                    g.faces[i] = 7 * i as i32 + 1;
+                    dice += 1;
+                }
+            }
+            if g.anim == GBOY_ANIM[k].1 {
+                g.blink_clock = now;
+                g.phase = true;
+                g.blinks = 0;
+                g.anim = -1;
+            }
+        }
+        for (i, face) in g.faces.iter_mut().enumerate() {
+            let rest = 7 * i as i32;
+            if *face != rest {
+                *face += 1;
+                if *face > rest + 6 {
+                    *face = rest;
+                }
+            }
+        }
+    }
+    // 3. The result phase's blinks.
+    if g.phase && now - g.blink_clock > GBOY_BLINK {
+        g.blink_clock = now;
+        g.blinks += 1;
+        if g.blinks > 5 {
+            g.phase = false;
+            h.g.puzzles.tourmagi.dice = dice;
             return false;
         }
     }
+    // 4. The count started when the cursor reaches the threshold.
+    let mut offset = 0;
+    if g.pick != -1 {
+        let p = g.pick.clamp(0, 5) as usize;
+        if g.cursor >= GBOY_THRESHOLDS[p] {
+            offset = GBOY_OFFSETS[p];
+            if g.k != -1 && !g.go {
+                g.anim = GBOY_ANIM[g.k.clamp(0, 5) as usize].0;
+                g.go = true;
+            }
+        }
+    }
+    h.g.puzzles.tourmagi.dice = dice;
+    h.g.gboy_draw(offset);
     true
 }
 
@@ -526,9 +702,9 @@ impl Game {
         self.main_loop_hook();
     }
 
-    /// Tests: the outcome of a board the port does not play (M4): the
-    /// unicorn's win (`value` ignored), the game boy's dice `value`
-    /// (1..6) with its result phase started.
+    /// Tests: the outcome of a board written as a test walk skips it: the
+    /// unicorn's win (`value` ignored), the game boy's dice `value` (1..6)
+    /// with its result phase started.
     #[doc(hidden)]
     pub fn screen_outcome(&mut self, value: i32) {
         match self.puzzles.screen {
@@ -540,9 +716,11 @@ impl Game {
             }
             Some(Screen::GBoy) => {
                 self.puzzles.tourmagi.dice = value;
-                self.puzzles.screens.gboy_result = true;
-                self.puzzles.screens.gboy_blinks = 0;
-                self.puzzles.screens.gboy_clock = self.now;
+                let g = &mut self.puzzles.screens.gboy;
+                g.anim = -1;
+                g.phase = true;
+                g.blinks = 0;
+                g.blink_clock = self.now;
             }
             _ => {}
         }

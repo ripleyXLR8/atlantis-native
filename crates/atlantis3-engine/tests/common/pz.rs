@@ -44,7 +44,10 @@
 use std::collections::HashMap;
 
 use atlantis2_data::defnames;
+use atlantis2_engine::script::a3::deg_to_rad_a3;
+use atlantis2_engine::Fpu;
 use atlantis3_data::A3Files;
+use atlantis3_engine::game::Screen;
 use atlantis3_engine::Game;
 
 use super::board::{assert_same, runs, Clock, Run};
@@ -56,6 +59,18 @@ pub struct Spec {
     pub world: i32,
     /// The [`Game::board_st`] key of the `st` lines.
     pub st: &'static str,
+    /// The palace's and the tower's harnesses (`a3_pz_pmagi.py`,
+    /// `a3_pz_tower.py`): the set-up's commands logged at frame 0 before
+    /// `entry`, `objet` inputs, a click's frame ending with the click scan,
+    /// `end` lines.
+    pub palace: bool,
+    /// The tower's harness (`a3_pz_tower.py`, with `palace`): the first
+    /// view entered at the run's angles, `view` / `cinema` lines, the code's
+    /// view entries changing the slots (`slots <f>` / `slotent <f>` state
+    /// lines), the `GBOY` mode's frames (`die` inputs, `gboy` /
+    /// `gboystop` lines), the music players' stub (`snd stopmus`) not
+    /// compared.
+    pub tower: bool,
 }
 
 /// A game replaying a run.
@@ -71,6 +86,18 @@ pub struct Pz {
     last: HashMap<String, String>,
     flags: Vec<i32>,
     bag_watch: Vec<String>,
+    /// The palace harness's inputs for the next frame: an object click,
+    /// the click scan.
+    object: Option<String>,
+    scan: bool,
+    /// The last `snd test` answer per name (the harness writes a change
+    /// only).
+    tests: HashMap<String, String>,
+    /// The tower: the first view's angles, a die thrown in the next frame,
+    /// the slots' names last written.
+    angles: (f32, f32),
+    die: bool,
+    slot_names: String,
 }
 
 impl Pz {
@@ -78,6 +105,8 @@ impl Pz {
         let mut g = Game::new(files).expect("the game starts");
         g.trace = Some(Vec::new());
         g.flat_warp = true;
+        g.trace_views = spec.tower;
+        g.stub_cinemas = spec.tower;
         Pz {
             g,
             spec,
@@ -89,6 +118,12 @@ impl Pz {
             last: HashMap::new(),
             flags: Vec::new(),
             bag_watch: Vec::new(),
+            object: None,
+            scan: false,
+            tests: HashMap::new(),
+            angles: (0.0, 0.0),
+            die: false,
+            slot_names: String::new(),
         }
     }
 
@@ -134,6 +169,24 @@ impl Pz {
             if kind == "rand" {
                 continue;
             }
+            if self.spec.tower {
+                if l == "warp=flat" || matches!(kind, "aff" | "affc" | "flip") {
+                    continue;
+                }
+                // The mode's stop: the frame's state first.
+                if l == "stop" {
+                    self.gboy_line(f);
+                    self.out.push(format!("gboystop {f}"));
+                    continue;
+                }
+            }
+            if let Some(t) = rest.strip_prefix("test ") {
+                let (name, v) = t.rsplit_once(" -> ").unwrap_or((t, ""));
+                if self.tests.get(name).map(String::as_str) == Some(v) {
+                    continue;
+                }
+                self.tests.insert(name.to_string(), v.to_string());
+            }
             self.out.push(if rest.is_empty() {
                 format!("{kind} {f}")
             } else {
@@ -144,6 +197,18 @@ impl Pz {
 
     /// The state lines that changed (the harness's snapshot).
     fn snapshot(&mut self, f: u32, initial: bool) {
+        if self.spec.tower && !initial {
+            let (a, b) = self.slot_lines();
+            if a != self.slot_names {
+                self.slot_names = a.clone();
+                self.out
+                    .push(a.replacen("slots ", &format!("slots {f} "), 1));
+                self.out
+                    .push(b.replacen("slotent ", &format!("slotent {f} "), 1));
+                self.last
+                    .retain(|k, _| !k.starts_with("slot") && !k.starts_with("ck"));
+            }
+        }
         let n = self.g.slots().slots.len();
         for k in 0..n {
             let s = &self.g.slots().slots[k];
@@ -244,7 +309,30 @@ impl Pz {
     fn step(&mut self) {
         self.frame += 1;
         let now = self.now();
-        self.g.board_place_frame(now);
+        if self.spec.tower && self.g.puzzle_screen() == Some(Screen::GBoy) {
+            let left = std::mem::take(&mut self.die);
+            self.g.board_screen_frame(now, (703, 568), left, false);
+            self.g.board_main_tail();
+            let f = self.frame;
+            let stopped = self.g.puzzle_screen().is_none();
+            self.drain(f);
+            if !stopped {
+                self.gboy_line(f);
+            }
+            self.snapshot(f, false);
+            return;
+        }
+        if self.spec.palace {
+            let object = self.object.take();
+            let scan = std::mem::take(&mut self.scan) || object.is_some();
+            assert!(
+                self.g.board_place_click(now, object.as_deref(), scan),
+                "frame {}: no slot of {object:?}",
+                self.frame
+            );
+        } else {
+            self.g.board_place_frame(now);
+        }
         let f = self.frame;
         self.drain(f);
         self.snapshot(f, false);
@@ -253,6 +341,15 @@ impl Pz {
     fn advance_to(&mut self, f: u32) {
         while self.frame < f {
             self.step();
+        }
+    }
+
+    /// The tower: the game boy's `gboy` line when it changed.
+    fn gboy_line(&mut self, f: u32) {
+        let st = self.g.board_st("gboy").unwrap();
+        if self.last.get("gboy") != Some(&st) {
+            self.out.push(format!("gboy {f} {st}"));
+            self.last.insert("gboy".into(), st);
         }
     }
 
@@ -283,8 +380,16 @@ impl Pz {
                 }
             }
         }
+        // The frame of the last golden line that has one: a `setup` line
+        // inside the run happened then.
+        let mut seen = 0;
         for l in &run.lines {
             let w: Vec<&str> = l.split_whitespace().collect();
+            if !matches!(w[0], "setup" | "slots" | "slotent" | "table" | "note") {
+                if let Some(f) = w.get(1).and_then(|f| f.parse::<u32>().ok()) {
+                    seen = f;
+                }
+            }
             let rest = |n: usize| {
                 let mut s = *l;
                 for _ in 0..n {
@@ -294,15 +399,32 @@ impl Pz {
             };
             match w[0] {
                 "setup" => {
+                    if self.entered {
+                        self.advance_to(seen);
+                    }
                     self.out.push(l.to_string());
                     match w[1] {
                         "wam" => {
                             assert!(self.g.board_begin(w[2], self.spec.world), "{l}");
                             self.view = w[4].parse().unwrap();
+                            let a = |s: &str| deg_to_rad_a3(Fpu::Double, s.parse().unwrap());
+                            self.angles = (a(w[6]), a(w[8]));
                         }
                         "flag" => {
                             let n: usize = w[2].parse().unwrap();
                             self.g.script_mut().unwrap().flags[n] = w[3].parse().unwrap();
+                        }
+                        // The tower harness's closing commands: run logged
+                        // with the next frame's number, before its step.
+                        "cmd" if self.spec.tower && self.entered => {
+                            let f = self.frame + 1;
+                            let all = rest(2);
+                            for c in all.split_inclusive(')') {
+                                let c = c.trim();
+                                self.out.push(format!("cmd {f} {c}"));
+                                self.g.run_command(c);
+                                self.drain(f);
+                            }
                         }
                         "cmd" => {
                             let t = self.g.trace.take();
@@ -313,16 +435,25 @@ impl Pz {
                     }
                 }
                 "entry" => {
+                    if self.spec.palace {
+                        self.g.board_wam_setup_traced();
+                        self.drain(0);
+                    } else {
+                        self.g.board_wam_setup();
+                    }
                     self.out.push(l.to_string());
-                    self.g.board_wam_setup();
                     self.g.seed(1);
                     let now = self.now();
-                    self.g.board_enter(self.view, now);
+                    let (yaw, pitch) = self.angles;
+                    self.g.board_enter_at(self.view, yaw, pitch, now);
                     self.drain(0);
                     self.entered = true;
                 }
+                // A state line (`slots <f> ...`): the snapshot writes it.
+                "slots" if w[1].parse::<u32>().is_ok() => {}
                 "slots" => {
                     let (a, b) = self.slot_lines();
+                    self.slot_names = a.clone();
                     self.out.push(a);
                     self.out.push(b);
                     self.snapshot(0, true);
@@ -333,8 +464,33 @@ impl Pz {
                     self.out.push(l.to_string());
                     let now = self.now();
                     assert!(self.g.board_zone_hook(&rest(2), now), "{l}");
+                    self.scan = self.spec.palace;
                     self.drain(f);
                     self.snapshot(f, false);
+                }
+                // A die thrown in frame f (the tower harness).
+                "die" => {
+                    let f: u32 = w[1].parse().unwrap();
+                    self.advance_to(f - 1);
+                    self.out.push(l.to_string());
+                    self.die = true;
+                }
+                // An object click in frame f (the palace harness).
+                "objet" => {
+                    let f: u32 = w[1].parse().unwrap();
+                    self.advance_to(f - 1);
+                    self.out.push(l.to_string());
+                    self.object = Some(w[2].to_string());
+                }
+                "end" => {
+                    self.advance_to(last_frame);
+                    self.out.push(l.to_string());
+                }
+                // Checked by their own test.
+                "table" => self.out.push(l.to_string()),
+                "note" => {
+                    self.advance_to(seen);
+                    self.out.push(l.to_string());
                 }
                 // An input (`hand f name`), not a state line (`hand f id
                 // name`).
@@ -357,7 +513,15 @@ impl Pz {
 
 /// A golden line as compared: the bank of `cursor set` dropped; the
 /// voice language (`lang`) put in a voice file's path.
-fn normalise_golden(l: &str, lang: &str) -> String {
+fn normalise_golden(l: &str, lang: &str) -> Option<String> {
+    let w: Vec<&str> = l.split_whitespace().collect();
+    if w.len() == 4 && w[0] == "snd" && w[2] == "stopmus" {
+        return None;
+    }
+    Some(normalise_golden_line(l, lang))
+}
+
+fn normalise_golden_line(l: &str, lang: &str) -> String {
     let w: Vec<&str> = l.split_whitespace().collect();
     if w.len() == 5 && w[0] == "cursor" && w[2] == "set" {
         return format!("cursor {} set {}", w[1], w[4]);
@@ -375,7 +539,7 @@ pub fn replay_all(files: impl Fn() -> A3Files, golden: &str, spec: Spec) -> Vec<
         let want: Vec<String> = run
             .lines
             .iter()
-            .map(|l| normalise_golden(l, &lang))
+            .filter_map(|l| normalise_golden(l, &lang))
             .collect();
         assert_same(&format!("run {}", run.name), &want, &p.out);
         names.push(run.name.to_string());

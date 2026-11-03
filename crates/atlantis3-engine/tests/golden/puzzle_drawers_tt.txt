@@ -1,0 +1,605 @@
+# Drawer wall PMA_TT (PMagi.wam view 12) of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31)
+# under emulation: the place's CHANGEWAM set-up (logged), the view entry, the zone click hook, and per frame the
+# place animations' step, an object click's hit dispatch, the frame hook, the click scan and the main loop's place
+# tail run unmodified; the sound calls and CtrlScenarIN logged only (no chapter loaded); frame n at
+# 100 + n x 1.0025 / 15 s. Each run starts from a new game's state. Line format: tests/common/pz.rs.
+# st: open 0x00789880[20] (grid r*4+c, then the fifth row), locks 0x00789824[4], nopen 0x007898d8,
+#   counter 0x0071f4ac, unlocked 0x007898d6, solved 0x007898d4, stop 0x007898d5.
+run solution PMA_TT11, TT12, TT14, TT13 (the four lock drawers), then the zones PMA_ZONE_TT51..54; then Flag811 := 1 as chapter 51 sets it (the wall stops)
+setup wam PMagi.wam view 12 yaw 0 pitch 0
+cmd 0 (HideObjet=PMA_CRANE)
+hide 0 PMA_CRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_SUPPORTCRANE)
+hide 0 PMA_SUPPORTCRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_CHIFFON)
+hide 0 PMA_CHIFFON kind 2 arg 0
+cmd 0 (HideObjet=PMA_LAMPE)
+hide 0 PMA_LAMPE kind 2 arg 0
+cmd 0 (HideObjet=PMA_TIRETTE)
+hide 0 PMA_TIRETTE kind 2 arg 0
+cmd 0 (ShowObjet=PMA_COBRAS)
+show 0 PMA_COBRAS kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE1)
+hide 0 PMA_INDICE1 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE2)
+hide 0 PMA_INDICE2 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE3)
+hide 0 PMA_INDICE3 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE4)
+hide 0 PMA_INDICE4 kind 2 arg 0
+cmd 0 (ShowObjet=PMA_LIENSLIGHT)
+show 0 PMA_LIENSLIGHT kind 2 arg 0
+cmd 0 (ShowObjet=PMA_ETOILESLIGHT)
+show 0 PMA_ETOILESLIGHT kind 2 arg 0
+entry 0
+log 0 ------- Warp pm0012.hnm ------- chapter 0 --
+log 0 AtlBruitages_InitWarp(): current_vue=NULL!!!
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 PMA_TT11 0
+addf 0 PMA_TT12 0
+addf 0 PMA_TT13 0
+addf 0 PMA_TT14 0
+addf 0 PMA_TT21 0
+addf 0 PMA_TT22 0
+addf 0 PMA_TT23 0
+addf 0 PMA_TT24 0
+addf 0 PMA_TT31 0
+addf 0 PMA_TT32 0
+addf 0 PMA_TT33 0
+addf 0 PMA_TT34 0
+addf 0 PMA_TT41 0
+addf 0 PMA_TT42 0
+addf 0 PMA_TT43 0
+addf 0 PMA_TT44 0
+addf 0 PMA_TT51 0
+addf 0 PMA_TT52 0
+addf 0 PMA_TT53 0
+addf 0 PMA_TT54 0
+slots 0:uqA1012012 1:i1A1012012 2:urA1012012 3:i2A1012012 4:usA1012012 5:i3A1012012 6:utA1012012 7:i4A1012012 8:umA1012012 9:unA1012012 10:uoA1012012 11:upA1012012 12:uiA1012012 13:ujA1012012 14:ukA1012012 15:ulA1012012 16:ueA1012012 17:ufA1012012 18:ugA1012012 19:uhA1012012 20:uaA1012012 21:ubA1012012 22:ucA1012012 23:udA1012012 24:biA1012012
+slotent 0:PMA_TT51 1:PMA_INDICE1 2:PMA_TT52 3:PMA_INDICE2 4:PMA_TT53 5:PMA_INDICE3 6:PMA_TT54 7:PMA_INDICE4 8:PMA_TT41 9:PMA_TT42 10:PMA_TT43 11:PMA_TT44 12:PMA_TT31 13:PMA_TT32 14:PMA_TT33 15:PMA_TT34 16:PMA_TT21 17:PMA_TT22 18:PMA_TT23 19:PMA_TT24 20:PMA_TT11 21:PMA_TT12 22:PMA_TT13 23:PMA_TT14 24:PMA_BOUGIES01
+slot 0 0 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 0 0
+slot 0 1 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 1 1
+slot 0 2 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 2 0
+slot 0 3 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 3 1
+slot 0 4 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 4 0
+slot 0 5 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 5 1
+slot 0 6 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 6 0
+slot 0 7 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 7 1
+slot 0 8 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 8 3
+slot 0 9 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 9 3
+slot 0 10 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 10 3
+slot 0 11 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 11 3
+slot 0 12 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 12 3
+slot 0 13 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 13 3
+slot 0 14 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 14 3
+slot 0 15 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 15 3
+slot 0 16 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 16 3
+slot 0 17 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 17 3
+slot 0 18 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 18 3
+slot 0 19 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 19 3
+slot 0 20 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 20 3
+slot 0 21 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 21 3
+slot 0 22 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 22 3
+slot 0 23 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 23 3
+slot 0 24 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 24 0
+st 0 open=00000000000000000000 locks=1111 nopen=0 counter=1 unlocked=0 solved=0 stop=0
+hand 0 0 -
+bag 0 -PMA_INDICE1 -PMA_INDICE2 -PMA_INDICE3 -PMA_INDICE4
+objet 2 PMA_TT11
+snd 2 load sfx\sound805.apc 0 1
+snd 2 play sfx\sound805.apc
+subf 2 PMA_TT22 0
+addf 2 PMA_TT22 1
+log 2 -- Deverrouillage Tiroir 0 (1) !!!
+scan 2
+slot 2 17 sh 1 mode 0 fr 0 list 1 ended 0
+slot 2 24 sh 1 mode 1 fr 1 list - ended 0
+st 2 open=00000100000000000000 locks=0111 nopen=1 counter=2 unlocked=0 solved=0 stop=0
+flags 2 813=0 817=2 835=1
+slot 3 24 sh 1 mode 1 fr 2 list - ended 0
+slot 4 24 sh 1 mode 1 fr 3 list - ended 0
+objet 5 PMA_TT12
+snd 5 load sfx\sound805.apc 0 1
+snd 5 play sfx\sound805.apc
+subf 5 PMA_TT34 0
+addf 5 PMA_TT34 1
+log 5 -- Deverrouillage Tiroir 3 (4) !!!
+scan 5
+slot 5 15 sh 1 mode 0 fr 0 list 1 ended 0
+slot 5 24 sh 1 mode 1 fr 4 list - ended 0
+st 5 open=00000100000100000000 locks=0110 nopen=2 counter=3 unlocked=0 solved=0 stop=0
+flags 5 816=0 817=3 841=1
+slot 6 24 sh 1 mode 1 fr 5 list - ended 0
+slot 7 24 sh 1 mode 1 fr 6 list - ended 0
+objet 8 PMA_TT14
+snd 8 load sfx\sound805.apc 0 1
+snd 8 play sfx\sound805.apc
+subf 8 PMA_TT43 0
+addf 8 PMA_TT43 1
+log 8 -- Deverrouillage Tiroir 1 (2) !!!
+scan 8
+slot 8 10 sh 1 mode 0 fr 0 list 1 ended 0
+slot 8 24 sh 1 mode 1 fr 7 list - ended 0
+st 8 open=00000100000100100000 locks=0010 nopen=3 counter=4 unlocked=0 solved=0 stop=0
+flags 8 814=0 817=4 844=1
+slot 9 24 sh 1 mode 1 fr 8 list - ended 0
+slot 10 24 sh 1 mode 1 fr 9 list - ended 0
+objet 11 PMA_TT13
+snd 11 load sfx\sound805.apc 0 1
+snd 11 play sfx\sound805.apc
+subf 11 PMA_TT13 0
+addf 11 PMA_TT13 1
+log 11 -- Deverrouillage Tiroir 2 (3) !!!
+snd 11 load sfx\sound807.apc 0 1
+snd 11 play sfx\sound807.apc
+scan 11
+slot 11 22 sh 1 mode 0 fr 0 list 1 ended 0
+slot 11 24 sh 1 mode 1 fr 10 list - ended 0
+st 11 open=00100100000100100000 locks=0000 nopen=4 counter=5 unlocked=1 solved=0 stop=0
+flags 11 815=0 817=5 832=1
+slot 12 24 sh 1 mode 1 fr 11 list - ended 0
+slot 13 24 sh 1 mode 1 fr 12 list - ended 0
+click 14 PMA_ZONE_TT51
+snd 14 load sfx\sound805.apc 0 1
+snd 14 play sfx\sound805.apc
+log 14 -- Ouverture Tiroir Verrouillé 0 (1) !!!
+subf 14 PMA_TT51 0
+addf 14 PMA_TT51 1
+cmd 14 (ShowObjet=PMA_INDICE1)
+show 14 PMA_INDICE1 kind 2 arg 0
+scan 14
+slot 14 0 sh 1 mode 0 fr 0 list 1 ended 0
+slot 14 1 sh 1 mode 1 fr 0 list - ended 0
+slot 14 24 sh 1 mode 1 fr 13 list - ended 0
+st 14 open=00100100000100101000 locks=0000 nopen=4 counter=5 unlocked=1 solved=0 stop=0
+flags 14 846=1
+slot 15 24 sh 1 mode 1 fr 14 list - ended 0
+slot 16 24 sh 1 mode 1 fr 15 list - ended 0
+click 17 PMA_ZONE_TT52
+snd 17 load sfx\sound805.apc 0 1
+snd 17 play sfx\sound805.apc
+log 17 -- Ouverture Tiroir Verrouillé 1 (2) !!!
+subf 17 PMA_TT52 0
+addf 17 PMA_TT52 1
+cmd 17 (ShowObjet=PMA_INDICE2)
+show 17 PMA_INDICE2 kind 2 arg 0
+scan 17
+slot 17 2 sh 1 mode 0 fr 0 list 1 ended 0
+slot 17 3 sh 1 mode 1 fr 0 list - ended 0
+slot 17 24 sh 1 mode 1 fr 16 list - ended 0
+st 17 open=00100100000100101100 locks=0000 nopen=4 counter=5 unlocked=1 solved=0 stop=0
+flags 17 847=1
+slot 18 24 sh 1 mode 1 fr 17 list - ended 0
+slot 19 24 sh 1 mode 1 fr 18 list - ended 0
+click 20 PMA_ZONE_TT53
+snd 20 load sfx\sound805.apc 0 1
+snd 20 play sfx\sound805.apc
+log 20 -- Ouverture Tiroir Verrouillé 2 (3) !!!
+subf 20 PMA_TT53 0
+addf 20 PMA_TT53 1
+cmd 20 (ShowObjet=PMA_INDICE3)
+show 20 PMA_INDICE3 kind 2 arg 0
+scan 20
+slot 20 4 sh 1 mode 0 fr 0 list 1 ended 0
+slot 20 5 sh 1 mode 1 fr 0 list - ended 0
+slot 20 24 sh 1 mode 1 fr 19 list - ended 0
+st 20 open=00100100000100101110 locks=0000 nopen=4 counter=5 unlocked=1 solved=0 stop=0
+flags 20 848=1
+slot 21 24 sh 1 mode 1 fr 20 list - ended 0
+slot 22 24 sh 1 mode 1 fr 0 list - ended 1
+click 23 PMA_ZONE_TT54
+snd 23 load sfx\sound805.apc 0 1
+snd 23 play sfx\sound805.apc
+log 23 -- Ouverture Tiroir Verrouillé 3 (4) !!!
+subf 23 PMA_TT54 0
+addf 23 PMA_TT54 1
+cmd 23 (ShowObjet=PMA_INDICE4)
+show 23 PMA_INDICE4 kind 2 arg 0
+scan 23
+slot 23 6 sh 1 mode 0 fr 0 list 1 ended 0
+slot 23 7 sh 1 mode 1 fr 0 list - ended 0
+slot 23 24 sh 1 mode 1 fr 1 list - ended 1
+st 23 open=00100100000100101111 locks=0000 nopen=4 counter=5 unlocked=1 solved=0 stop=0
+flags 23 849=1
+slot 24 24 sh 1 mode 1 fr 2 list - ended 1
+slot 25 24 sh 1 mode 1 fr 3 list - ended 1
+setup flag 811 1
+slot 26 24 sh 1 mode 1 fr 4 list - ended 1
+st 26 open=00100100000100101111 locks=0000 nopen=4 counter=5 unlocked=1 solved=1 stop=1
+flags 26 811=1
+slot 27 24 sh 1 mode 1 fr 5 list - ended 1
+slot 28 24 sh 1 mode 1 fr 6 list - ended 1
+end solution frames=28
+run wrong a fifth-row zone with the locks closed (refused); PMA_TT21 clicked twice (the counter turns the rows: two different drawers open); TT22, TT23 (four open); TT24, TT31 (refused: four open); TT32 (closes an open lock drawer)
+setup wam PMagi.wam view 12 yaw 0 pitch 0
+cmd 0 (HideObjet=PMA_CRANE)
+hide 0 PMA_CRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_SUPPORTCRANE)
+hide 0 PMA_SUPPORTCRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_CHIFFON)
+hide 0 PMA_CHIFFON kind 2 arg 0
+cmd 0 (HideObjet=PMA_LAMPE)
+hide 0 PMA_LAMPE kind 2 arg 0
+cmd 0 (HideObjet=PMA_TIRETTE)
+hide 0 PMA_TIRETTE kind 2 arg 0
+cmd 0 (ShowObjet=PMA_COBRAS)
+show 0 PMA_COBRAS kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE1)
+hide 0 PMA_INDICE1 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE2)
+hide 0 PMA_INDICE2 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE3)
+hide 0 PMA_INDICE3 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE4)
+hide 0 PMA_INDICE4 kind 2 arg 0
+cmd 0 (ShowObjet=PMA_LIENSLIGHT)
+show 0 PMA_LIENSLIGHT kind 2 arg 0
+cmd 0 (ShowObjet=PMA_ETOILESLIGHT)
+show 0 PMA_ETOILESLIGHT kind 2 arg 0
+entry 0
+log 0 ------- Warp pm0012.hnm ------- chapter 0 --
+log 0 AtlBruitages_InitWarp(): current_vue=NULL!!!
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 PMA_TT11 0
+addf 0 PMA_TT12 0
+addf 0 PMA_TT13 0
+addf 0 PMA_TT14 0
+addf 0 PMA_TT21 0
+addf 0 PMA_TT22 0
+addf 0 PMA_TT23 0
+addf 0 PMA_TT24 0
+addf 0 PMA_TT31 0
+addf 0 PMA_TT32 0
+addf 0 PMA_TT33 0
+addf 0 PMA_TT34 0
+addf 0 PMA_TT41 0
+addf 0 PMA_TT42 0
+addf 0 PMA_TT43 0
+addf 0 PMA_TT44 0
+addf 0 PMA_TT51 0
+addf 0 PMA_TT52 0
+addf 0 PMA_TT53 0
+addf 0 PMA_TT54 0
+slots 0:uqA1012012 1:i1A1012012 2:urA1012012 3:i2A1012012 4:usA1012012 5:i3A1012012 6:utA1012012 7:i4A1012012 8:umA1012012 9:unA1012012 10:uoA1012012 11:upA1012012 12:uiA1012012 13:ujA1012012 14:ukA1012012 15:ulA1012012 16:ueA1012012 17:ufA1012012 18:ugA1012012 19:uhA1012012 20:uaA1012012 21:ubA1012012 22:ucA1012012 23:udA1012012 24:biA1012012
+slotent 0:PMA_TT51 1:PMA_INDICE1 2:PMA_TT52 3:PMA_INDICE2 4:PMA_TT53 5:PMA_INDICE3 6:PMA_TT54 7:PMA_INDICE4 8:PMA_TT41 9:PMA_TT42 10:PMA_TT43 11:PMA_TT44 12:PMA_TT31 13:PMA_TT32 14:PMA_TT33 15:PMA_TT34 16:PMA_TT21 17:PMA_TT22 18:PMA_TT23 19:PMA_TT24 20:PMA_TT11 21:PMA_TT12 22:PMA_TT13 23:PMA_TT14 24:PMA_BOUGIES01
+slot 0 0 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 0 0
+slot 0 1 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 1 1
+slot 0 2 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 2 0
+slot 0 3 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 3 1
+slot 0 4 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 4 0
+slot 0 5 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 5 1
+slot 0 6 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 6 0
+slot 0 7 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 7 1
+slot 0 8 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 8 3
+slot 0 9 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 9 3
+slot 0 10 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 10 3
+slot 0 11 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 11 3
+slot 0 12 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 12 3
+slot 0 13 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 13 3
+slot 0 14 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 14 3
+slot 0 15 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 15 3
+slot 0 16 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 16 3
+slot 0 17 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 17 3
+slot 0 18 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 18 3
+slot 0 19 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 19 3
+slot 0 20 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 20 3
+slot 0 21 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 21 3
+slot 0 22 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 22 3
+slot 0 23 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 23 3
+slot 0 24 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 24 0
+st 0 open=00000000000000000000 locks=1111 nopen=0 counter=1 unlocked=0 solved=0 stop=0
+hand 0 0 -
+click 2 PMA_ZONE_TT51
+log 2 -- Les tiroirs ne sont pas tous déverrouillés !!!
+scan 2
+slot 2 24 sh 1 mode 1 fr 1 list - ended 0
+slot 3 24 sh 1 mode 1 fr 2 list - ended 0
+slot 4 24 sh 1 mode 1 fr 3 list - ended 0
+objet 5 PMA_TT21
+snd 5 load sfx\sound805.apc 0 1
+snd 5 play sfx\sound805.apc
+subf 5 PMA_TT32 0
+addf 5 PMA_TT32 1
+scan 5
+slot 5 13 sh 1 mode 0 fr 0 list 1 ended 0
+slot 5 24 sh 1 mode 1 fr 4 list - ended 0
+st 5 open=00000000010000000000 locks=1111 nopen=1 counter=2 unlocked=0 solved=0 stop=0
+flags 5 817=2 839=1
+slot 6 24 sh 1 mode 1 fr 5 list - ended 0
+slot 7 24 sh 1 mode 1 fr 6 list - ended 0
+objet 8 PMA_TT21
+snd 8 load sfx\sound805.apc 0 1
+snd 8 play sfx\sound805.apc
+subf 8 PMA_TT43 0
+addf 8 PMA_TT43 1
+log 8 -- Deverrouillage Tiroir 1 (2) !!!
+scan 8
+slot 8 10 sh 1 mode 0 fr 0 list 1 ended 0
+slot 8 24 sh 1 mode 1 fr 7 list - ended 0
+st 8 open=00000000010000100000 locks=1011 nopen=2 counter=3 unlocked=0 solved=0 stop=0
+flags 8 814=0 817=3 844=1
+slot 9 24 sh 1 mode 1 fr 8 list - ended 0
+slot 10 24 sh 1 mode 1 fr 9 list - ended 0
+objet 11 PMA_TT22
+snd 11 load sfx\sound805.apc 0 1
+snd 11 play sfx\sound805.apc
+subf 11 PMA_TT11 0
+addf 11 PMA_TT11 1
+scan 11
+slot 11 20 sh 1 mode 0 fr 0 list 1 ended 0
+slot 11 24 sh 1 mode 1 fr 10 list - ended 0
+st 11 open=10000000010000100000 locks=1011 nopen=3 counter=4 unlocked=0 solved=0 stop=0
+flags 11 817=4 830=1
+slot 12 24 sh 1 mode 1 fr 11 list - ended 0
+slot 13 24 sh 1 mode 1 fr 12 list - ended 0
+objet 14 PMA_TT23
+snd 14 load sfx\sound805.apc 0 1
+snd 14 play sfx\sound805.apc
+subf 14 PMA_TT23 0
+addf 14 PMA_TT23 1
+scan 14
+slot 14 18 sh 1 mode 0 fr 0 list 1 ended 0
+slot 14 24 sh 1 mode 1 fr 13 list - ended 0
+st 14 open=10000010010000100000 locks=1011 nopen=4 counter=5 unlocked=0 solved=0 stop=0
+flags 14 817=5 836=1
+slot 15 24 sh 1 mode 1 fr 14 list - ended 0
+slot 16 24 sh 1 mode 1 fr 15 list - ended 0
+objet 17 PMA_TT24
+scan 17
+slot 17 24 sh 1 mode 1 fr 16 list - ended 0
+slot 18 24 sh 1 mode 1 fr 17 list - ended 0
+slot 19 24 sh 1 mode 1 fr 18 list - ended 0
+objet 20 PMA_TT31
+scan 20
+slot 20 24 sh 1 mode 1 fr 19 list - ended 0
+slot 21 24 sh 1 mode 1 fr 20 list - ended 0
+slot 22 24 sh 1 mode 1 fr 0 list - ended 1
+objet 23 PMA_TT32
+snd 23 load sfx\sound806.apc 0 1
+snd 23 play sfx\sound806.apc
+subf 23 PMA_TT43 1
+addf 23 PMA_TT43 0
+log 23 -- Verrouillage Tiroir 1 (2) !!!
+scan 23
+slot 23 10 sh 1 mode 0 fr 0 list 0 ended 0
+slot 23 24 sh 1 mode 1 fr 1 list - ended 1
+st 23 open=10000010010000000000 locks=1111 nopen=3 counter=6 unlocked=0 solved=0 stop=0
+flags 23 814=1 817=6 844=0
+slot 24 24 sh 1 mode 1 fr 2 list - ended 1
+slot 25 24 sh 1 mode 1 fr 3 list - ended 1
+end wrong frames=25
+run relock new game: the solution's four drawers (all unlocked), PMA_TT13 again (refused: it maps to a closed drawer, four open), then PMA_TT11 (counter 5: it maps to the open lock drawer 5, which closes: sound 807 again, unlocked 0), then the zone TT51 (refused)
+setup wam PMagi.wam view 12 yaw 0 pitch 0
+cmd 0 (HideObjet=PMA_CRANE)
+hide 0 PMA_CRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_SUPPORTCRANE)
+hide 0 PMA_SUPPORTCRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_CHIFFON)
+hide 0 PMA_CHIFFON kind 2 arg 0
+cmd 0 (HideObjet=PMA_LAMPE)
+hide 0 PMA_LAMPE kind 2 arg 0
+cmd 0 (HideObjet=PMA_TIRETTE)
+hide 0 PMA_TIRETTE kind 2 arg 0
+cmd 0 (ShowObjet=PMA_COBRAS)
+show 0 PMA_COBRAS kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE1)
+hide 0 PMA_INDICE1 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE2)
+hide 0 PMA_INDICE2 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE3)
+hide 0 PMA_INDICE3 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE4)
+hide 0 PMA_INDICE4 kind 2 arg 0
+cmd 0 (ShowObjet=PMA_LIENSLIGHT)
+show 0 PMA_LIENSLIGHT kind 2 arg 0
+cmd 0 (ShowObjet=PMA_ETOILESLIGHT)
+show 0 PMA_ETOILESLIGHT kind 2 arg 0
+entry 0
+log 0 ------- Warp pm0012.hnm ------- chapter 0 --
+log 0 AtlBruitages_InitWarp(): current_vue=NULL!!!
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 PMA_TT11 0
+addf 0 PMA_TT12 0
+addf 0 PMA_TT13 0
+addf 0 PMA_TT14 0
+addf 0 PMA_TT21 0
+addf 0 PMA_TT22 0
+addf 0 PMA_TT23 0
+addf 0 PMA_TT24 0
+addf 0 PMA_TT31 0
+addf 0 PMA_TT32 0
+addf 0 PMA_TT33 0
+addf 0 PMA_TT34 0
+addf 0 PMA_TT41 0
+addf 0 PMA_TT42 0
+addf 0 PMA_TT43 0
+addf 0 PMA_TT44 0
+addf 0 PMA_TT51 0
+addf 0 PMA_TT52 0
+addf 0 PMA_TT53 0
+addf 0 PMA_TT54 0
+slots 0:uqA1012012 1:i1A1012012 2:urA1012012 3:i2A1012012 4:usA1012012 5:i3A1012012 6:utA1012012 7:i4A1012012 8:umA1012012 9:unA1012012 10:uoA1012012 11:upA1012012 12:uiA1012012 13:ujA1012012 14:ukA1012012 15:ulA1012012 16:ueA1012012 17:ufA1012012 18:ugA1012012 19:uhA1012012 20:uaA1012012 21:ubA1012012 22:ucA1012012 23:udA1012012 24:biA1012012
+slotent 0:PMA_TT51 1:PMA_INDICE1 2:PMA_TT52 3:PMA_INDICE2 4:PMA_TT53 5:PMA_INDICE3 6:PMA_TT54 7:PMA_INDICE4 8:PMA_TT41 9:PMA_TT42 10:PMA_TT43 11:PMA_TT44 12:PMA_TT31 13:PMA_TT32 14:PMA_TT33 15:PMA_TT34 16:PMA_TT21 17:PMA_TT22 18:PMA_TT23 19:PMA_TT24 20:PMA_TT11 21:PMA_TT12 22:PMA_TT13 23:PMA_TT14 24:PMA_BOUGIES01
+slot 0 0 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 0 0
+slot 0 1 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 1 1
+slot 0 2 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 2 0
+slot 0 3 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 3 1
+slot 0 4 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 4 0
+slot 0 5 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 5 1
+slot 0 6 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 6 0
+slot 0 7 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 7 1
+slot 0 8 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 8 3
+slot 0 9 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 9 3
+slot 0 10 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 10 3
+slot 0 11 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 11 3
+slot 0 12 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 12 3
+slot 0 13 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 13 3
+slot 0 14 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 14 3
+slot 0 15 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 15 3
+slot 0 16 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 16 3
+slot 0 17 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 17 3
+slot 0 18 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 18 3
+slot 0 19 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 19 3
+slot 0 20 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 20 3
+slot 0 21 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 21 3
+slot 0 22 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 22 3
+slot 0 23 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 23 3
+slot 0 24 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 24 0
+st 0 open=00000000000000000000 locks=1111 nopen=0 counter=1 unlocked=0 solved=0 stop=0
+hand 0 0 -
+objet 2 PMA_TT11
+snd 2 load sfx\sound805.apc 0 1
+snd 2 play sfx\sound805.apc
+subf 2 PMA_TT22 0
+addf 2 PMA_TT22 1
+log 2 -- Deverrouillage Tiroir 0 (1) !!!
+scan 2
+slot 2 17 sh 1 mode 0 fr 0 list 1 ended 0
+slot 2 24 sh 1 mode 1 fr 1 list - ended 0
+st 2 open=00000100000000000000 locks=0111 nopen=1 counter=2 unlocked=0 solved=0 stop=0
+flags 2 813=0 817=2 835=1
+slot 3 24 sh 1 mode 1 fr 2 list - ended 0
+slot 4 24 sh 1 mode 1 fr 3 list - ended 0
+objet 5 PMA_TT12
+snd 5 load sfx\sound805.apc 0 1
+snd 5 play sfx\sound805.apc
+subf 5 PMA_TT34 0
+addf 5 PMA_TT34 1
+log 5 -- Deverrouillage Tiroir 3 (4) !!!
+scan 5
+slot 5 15 sh 1 mode 0 fr 0 list 1 ended 0
+slot 5 24 sh 1 mode 1 fr 4 list - ended 0
+st 5 open=00000100000100000000 locks=0110 nopen=2 counter=3 unlocked=0 solved=0 stop=0
+flags 5 816=0 817=3 841=1
+slot 6 24 sh 1 mode 1 fr 5 list - ended 0
+slot 7 24 sh 1 mode 1 fr 6 list - ended 0
+objet 8 PMA_TT14
+snd 8 load sfx\sound805.apc 0 1
+snd 8 play sfx\sound805.apc
+subf 8 PMA_TT43 0
+addf 8 PMA_TT43 1
+log 8 -- Deverrouillage Tiroir 1 (2) !!!
+scan 8
+slot 8 10 sh 1 mode 0 fr 0 list 1 ended 0
+slot 8 24 sh 1 mode 1 fr 7 list - ended 0
+st 8 open=00000100000100100000 locks=0010 nopen=3 counter=4 unlocked=0 solved=0 stop=0
+flags 8 814=0 817=4 844=1
+slot 9 24 sh 1 mode 1 fr 8 list - ended 0
+slot 10 24 sh 1 mode 1 fr 9 list - ended 0
+objet 11 PMA_TT13
+snd 11 load sfx\sound805.apc 0 1
+snd 11 play sfx\sound805.apc
+subf 11 PMA_TT13 0
+addf 11 PMA_TT13 1
+log 11 -- Deverrouillage Tiroir 2 (3) !!!
+snd 11 load sfx\sound807.apc 0 1
+snd 11 play sfx\sound807.apc
+scan 11
+slot 11 22 sh 1 mode 0 fr 0 list 1 ended 0
+slot 11 24 sh 1 mode 1 fr 10 list - ended 0
+st 11 open=00100100000100100000 locks=0000 nopen=4 counter=5 unlocked=1 solved=0 stop=0
+flags 11 815=0 817=5 832=1
+slot 12 24 sh 1 mode 1 fr 11 list - ended 0
+slot 13 24 sh 1 mode 1 fr 12 list - ended 0
+objet 14 PMA_TT13
+scan 14
+slot 14 24 sh 1 mode 1 fr 13 list - ended 0
+slot 15 24 sh 1 mode 1 fr 14 list - ended 0
+slot 16 24 sh 1 mode 1 fr 15 list - ended 0
+objet 17 PMA_TT11
+snd 17 load sfx\sound806.apc 0 1
+snd 17 play sfx\sound806.apc
+subf 17 PMA_TT22 1
+addf 17 PMA_TT22 0
+log 17 -- Verrouillage Tiroir 0 (1) !!!
+snd 17 load sfx\sound807.apc 0 1
+snd 17 play sfx\sound807.apc
+scan 17
+slot 17 17 sh 1 mode 0 fr 0 list 0 ended 0
+slot 17 24 sh 1 mode 1 fr 16 list - ended 0
+st 17 open=00100000000100100000 locks=1000 nopen=3 counter=6 unlocked=0 solved=0 stop=0
+flags 17 813=1 817=6 835=0
+slot 18 24 sh 1 mode 1 fr 17 list - ended 0
+slot 19 24 sh 1 mode 1 fr 18 list - ended 0
+click 20 PMA_ZONE_TT51
+log 20 -- Les tiroirs ne sont pas tous déverrouillés !!!
+scan 20
+slot 20 24 sh 1 mode 1 fr 19 list - ended 0
+slot 21 24 sh 1 mode 1 fr 20 list - ended 0
+slot 22 24 sh 1 mode 1 fr 0 list - ended 1
+end relock frames=22

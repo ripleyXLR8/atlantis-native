@@ -51,6 +51,9 @@ pub struct State {
     /// The `GBOY` screen's result (@ 0x00756060): 1..6, 0 = none. The
     /// screen's start sets it to 0; its play writes it.
     pub dice: i32,
+    /// The music volume saved before the die (@ 0x007899d8), put back by
+    /// the screen's stop.
+    pub saved_volume: i32,
 }
 
 impl Default for State {
@@ -74,6 +77,7 @@ impl State {
             cinema: 0,
             demon_turn: false,
             dice: 0,
+            saved_volume: 0,
         }
     }
 
@@ -111,9 +115,68 @@ pub(super) fn view(h: &mut Hx) {
         t.won_seen = w;
     }
     h.g.puzzles.tourmagi.demon_turn = false;
-    // visual: the demon's pawn next to the player (`TAS_DEMONPLUS1/2`,
-    // `TAS_DEMONMOINS1/2` slots, @ 0x004d46e0) (M4).
+    pawns(h);
     h.g.puzzles.tourmagi.reload = false;
+}
+
+/// The demon's pawn (@ 0x004d46e0, at every entry and every demon move):
+/// every slot whose SPW name starts with `pd` freed (its record zeroed,
+/// the count less one: they are the last slots, so the list is cut);
+/// then, the demon 1 or 2 squares ahead of the player or behind him, the
+/// entity `TAS_DEMONPLUS1` / `PLUS2` / `MOINS1` / `MOINS2` (found in the
+/// WAM's entity list by its CON name, entity +0x18) gets two slots (@ 0x00438530): its first state with
+/// `pda1000000.spw` (`pdb`, `pdc`, `pdd`), its second with
+/// `pda2000000.spw`.
+fn pawns(h: &mut Hx) {
+    h.g.slots.slots.retain(|s| !s.name.starts_with("pd"));
+    let (p, d) = (h.g.puzzles.tourmagi.player, h.g.puzzles.tourmagi.demon);
+    let which = [
+        (p + 1, "TAS_DEMONPLUS1", 'a'),
+        (p + 2, "TAS_DEMONPLUS2", 'b'),
+        (p - 1, "TAS_DEMONMOINS1", 'c'),
+        (p - 2, "TAS_DEMONMOINS2", 'd'),
+    ];
+    for (at, entity, letter) in which {
+        if d != at {
+            continue;
+        }
+        let Some(e) =
+            h.g.place
+                .wam
+                .entities
+                .iter()
+                .find(|e| e.con_name == entity)
+                .cloned()
+        else {
+            log::error!("{entity}: not in the WAM");
+            continue;
+        };
+        let shown = h.s.shown.clone();
+        let folder = super::super::WORLDS
+            .get(h.g.world as usize)
+            .copied()
+            .unwrap_or("");
+        for (n, s) in e.state_records().take(2).enumerate() {
+            let name = format!("pd{letter}{}000000.spw", n + 1);
+            let g = &mut *h.g;
+            let (queue, rand) = (&mut g.rand_queue, &mut g.rand);
+            g.slots.push_state(
+                &g.files,
+                &mut g.spw_cache,
+                &e,
+                s,
+                &name,
+                folder,
+                &mut || queue.pop_front().unwrap_or_else(|| rand.rand()),
+                &|id, kind| {
+                    shown
+                        .iter()
+                        .find(|r| r.id == id && r.kind == kind)
+                        .map(|r| r.shown)
+                },
+            );
+        }
+    }
 }
 
 /// The demon's die (@ 0x004d50d0): 6 below 90; at 90, 91 the exact throw
@@ -167,8 +230,10 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
             h.run("(StopMusik=1)");
             h.run("(StartMusik=40)");
             log::debug!("-------- Lancement Game Boy");
-            // sound: the music volume saved (0x007899d8 := 0x007178e8) and
-            // set to 99 (@ 0x00434100) (host, M4).
+            // The music volume saved (0x007899d8 := 0x007178e8) and set to
+            // 99 (@ 0x00434100).
+            h.g.puzzles.tourmagi.saved_volume = h.g.music_level();
+            h.g.music_volume_set(99);
             h.start_screen(Screen::GBoy);
             return;
         }
@@ -180,7 +245,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
     h.g.puzzles.tourmagi.demon = to;
     h.set_flag(801, to);
     h.g.puzzles.tourmagi.demon_to = -1;
-    // visual: the demon's pawn redrawn (@ 0x004d46e0) (M4).
+    pawns(h);
     let (d, p) = (h.g.puzzles.tourmagi.demon, h.g.puzzles.tourmagi.player);
     if d == p {
         h.g.puzzles.tourmagi.demon_to = d - 1;
@@ -190,7 +255,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
         h.g.puzzles.freeze = false;
         h.g.puzzles.tourmagi.demon_turn = false;
         log::info!("Demon a Gagne !!!");
-        // sound: every sound stopped (@ 0x00433580) (M4).
+        h.g.sfx_stop_all();
         h.set_flag(914, 0);
         h.set_flag(981, 1);
         h.ctrl();
@@ -199,12 +264,12 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
     match square(d) {
         1 | 4 => {
             h.g.puzzles.tourmagi.demon_to = d + if square(d) == 1 { 10 } else { 20 };
-            // sound: every sound stopped (@ 0x00433580) (M4).
+            h.g.sfx_stop_all();
             h.run("(Cinema=69,fps=25)");
         }
         2 | 3 => {
             h.g.puzzles.tourmagi.demon_to = d - if square(d) == 2 { 10 } else { 20 };
-            // sound: every sound stopped (@ 0x00433580) (M4).
+            h.g.sfx_stop_all();
             h.run("(Cinema=70,fps=25)");
         }
         // A plain square: the player's part in the same frame.
@@ -243,7 +308,7 @@ fn player_part(h: &mut Hx, z: &ZoneRec) {
         h.run(&format!("(Vue={at})"));
         let c = h.g.puzzles.tourmagi.cinema;
         if c != 0 {
-            // sound: every sound stopped (@ 0x00433580) (M4).
+            h.g.sfx_stop_all();
             h.run(&format!("(Cinema={c},fps=25)"));
             h.g.puzzles.tourmagi.cinema = 0;
         }
@@ -319,4 +384,28 @@ pub(super) fn player_won(h: &mut Hx) {
     h.g.puzzles.tourmagi.won = true;
     h.set_flag(151, 1);
     h.ctrl();
+}
+
+/// Tests: the race's golden `st` line.
+pub(super) fn st_line(g: &super::Game) -> String {
+    let t = &g.puzzles.tourmagi;
+    let vue = g.script.as_ref().map_or(0, |s| s.vars[s.keys.vue]);
+    format!(
+        "player={} demon={} dto={} pat={} pto={} won={} won2={} cin={} turn={} frz={} res={} \
+         mode={} vol={} saved={} vue={vue}",
+        t.player,
+        t.demon,
+        t.demon_to,
+        t.player_at,
+        t.player_to,
+        u8::from(t.won),
+        u8::from(t.won_seen),
+        t.cinema,
+        u8::from(t.demon_turn),
+        u8::from(g.puzzles.freeze),
+        t.dice,
+        g.board_mode_number(),
+        g.music_level(),
+        t.saved_volume
+    )
 }

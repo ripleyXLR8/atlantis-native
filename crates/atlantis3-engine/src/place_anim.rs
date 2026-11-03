@@ -164,76 +164,102 @@ impl Slots {
         _now: f64,
         shown: impl Fn(i32, i32) -> Option<bool>,
     ) -> Slots {
-        let mut out: Vec<Slot> = Vec::new();
+        let mut out = Slots { slots: Vec::new() };
         for e in &wam.entities {
             for s in e.state_records().filter(|s| s.view == view) {
-                if out.len() >= MAX_SLOTS - 1 {
+                if out.slots.len() >= MAX_SLOTS - 1 {
                     log::error!("AtlSpw_load : n>MAX_SPW_VISIBLE");
-                    return Slots { slots: out };
+                    return out;
                 }
                 let name = e.spw_name(&s);
-                let path = format!("spw/spw512/{world}/{name}");
-                let bank = cache
-                    .entry(path.clone())
-                    .or_insert_with(|| {
-                        files
-                            .read(&path)
-                            .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok())
-                            .map(Arc::new)
-                    })
-                    .clone();
-                let Some(bank) = bank else {
-                    log::warn!("Can't load SPW {path}");
-                    continue;
-                };
-                let count = bank.len() as i32;
-                let kind = e.kind as i32;
-                let id = e.index as i32;
-                let pause = if s.delay == 0 {
-                    0
-                } else {
-                    rand() % s.delay.unsigned_abs() as i32 + 10
-                };
-                let mut slot_shown = s.shown != 0;
-                if let Some(v) = shown(id, kind) {
-                    slot_shown = v;
-                    if v && out.iter().any(|o| o.id == id && o.kind == kind && o.shown) {
-                        slot_shown = false;
-                    }
-                }
-                out.push(Slot {
-                    name: name.trim_end_matches(".SPW").to_string(),
-                    kind,
-                    id,
-                    bank,
-                    frame: s.first,
-                    last: if s.end == 0 { count } else { s.end - 1 },
-                    count,
-                    first: s.first,
-                    click: s.click,
-                    state: s,
-                    shown: slot_shown,
-                    mode: s.single,
-                    frames: [-2; FRAME_LIST],
-                    driven: s.single == 0,
-                    blink: false,
-                    pause,
-                    waiting: false,
-                    // The loader leaves the start at 0: the first tick
-                    // finds every shown slot past its end.
-                    start: 0.0,
-                    fresh: true,
-                    animated: true,
-                    weight: if s.weight == 0 { 100 } else { s.weight },
-                    // Next-state chains (@ 0x00462c30): no Hoggar state
-                    // has one; not resolved here.
-                    queued: false,
-                    next: None,
-                    ended: false,
-                });
+                out.push_state(files, cache, e, s, &name, world, rand, &shown);
             }
         }
-        Slots { slots: out }
+        out
+    }
+
+    /// `AtlSpw_LoadOne` (@ 0x00438530): a slot for the state `s` of the
+    /// entity `e` from the SPW file `name` (`spw\spw512\<world>\`),
+    /// appended; `shown` from the state, then from the script's show table
+    /// (@ 0x0045f720: `shown(id, kind)`), and hidden when an earlier slot
+    /// of the same entity is shown; the random pause drawn when the state
+    /// has one. Nothing when the file is missing.
+    #[allow(clippy::too_many_arguments)]
+    pub fn push_state(
+        &mut self,
+        files: &A3Files,
+        cache: &mut HashMap<String, Option<Arc<Bank>>>,
+        e: &atlantis2_data::wam::Entity,
+        s: EntityState,
+        name: &str,
+        world: &str,
+        rand: &mut dyn FnMut() -> i32,
+        shown: &dyn Fn(i32, i32) -> Option<bool>,
+    ) {
+        let out = &mut self.slots;
+        let path = format!("spw/spw512/{world}/{name}");
+        let bank = cache
+            .entry(path.clone())
+            .or_insert_with(|| {
+                files
+                    .read(&path)
+                    .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok())
+                    .map(Arc::new)
+            })
+            .clone();
+        let Some(bank) = bank else {
+            log::warn!("Can't load SPW {path}");
+            return;
+        };
+        let count = bank.len() as i32;
+        let kind = e.kind as i32;
+        let id = e.index as i32;
+        let pause = if s.delay == 0 {
+            0
+        } else {
+            rand() % s.delay.unsigned_abs() as i32 + 10
+        };
+        let mut slot_shown = s.shown != 0;
+        if let Some(v) = shown(id, kind) {
+            slot_shown = v;
+            if v && out.iter().any(|o| o.id == id && o.kind == kind && o.shown) {
+                slot_shown = false;
+            }
+        }
+        let base = name
+            .strip_suffix(".SPW")
+            .or_else(|| name.strip_suffix(".spw"))
+            .unwrap_or(name);
+        out.push(Slot {
+            name: base.to_string(),
+            kind,
+            id,
+            bank,
+            frame: s.first,
+            last: if s.end == 0 { count } else { s.end - 1 },
+            count,
+            first: s.first,
+            click: s.click,
+            state: s,
+            shown: slot_shown,
+            mode: s.single,
+            frames: [-2; FRAME_LIST],
+            driven: s.single == 0,
+            blink: false,
+            pause,
+            waiting: false,
+            // The loader leaves the start at 0: the first tick
+            // finds every shown slot past its end.
+            start: 0.0,
+            fresh: true,
+            animated: true,
+            weight: if s.weight == 0 { 100 } else { s.weight },
+            // Next-state chains (@ 0x00462c30): no Hoggar state
+            // has one; not resolved here.
+            queued: false,
+            next: None,
+            ended: false,
+        });
     }
 
     /// `ShowPerso` / `ShowObjet` (@ 0x0045f520): the first slot of (id,
@@ -402,6 +428,14 @@ impl Slots {
             l[end - 1] = -2;
         }
         true
+    }
+
+    /// @ 0x00438c00: the list of every slot of kind 2 with that id
+    /// emptied (all −2).
+    pub fn clear_frames(&mut self, id: i32) {
+        for s in self.slots.iter_mut().filter(|s| s.id == id && s.kind == 2) {
+            s.frames.fill(-2);
+        }
     }
 
     /// @ 0x00438ba0: whether `frame` is one of the 256 entries of the list

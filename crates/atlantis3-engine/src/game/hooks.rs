@@ -159,6 +159,7 @@ impl Puzzles {
     }
 }
 
+pub use pmagi::star_room_tables;
 pub(in crate::game) use screens::ecrin_gem_hit;
 
 /// Tests: the Land of the Dead boards' golden `st` lines.
@@ -169,6 +170,16 @@ pub(super) fn ldmorts_st(g: &Game, board: &str) -> String {
 /// Tests: the Paleo boards' golden `st` lines.
 pub(super) fn paleo_st(g: &Game, board: &str) -> String {
     paleo::st_line(g, board)
+}
+
+/// Tests: the palace boards' golden `st` lines.
+pub(super) fn pmagi_st(g: &Game, board: &str) -> String {
+    pmagi::st_line(g, board)
+}
+
+/// Tests: the tower race's golden `st` line.
+pub(super) fn tourmagi_st(g: &Game) -> String {
+    tourmagi::st_line(g)
 }
 
 /// Tests: the corridor's golden `st` line.
@@ -439,15 +450,17 @@ impl Game {
         self.script = Some(s);
     }
 
-    /// The running screen's frame ([`screens`]). The two maps and the
-    /// jewel case draw themselves in their handlers and hit-test the
-    /// pointer; the other screens' drawing and their sprite hit test are
+    /// The running screen's frame ([`screens`]). The two maps, the jewel
+    /// case, the game boy and the unicorn draw themselves in their
+    /// handlers; the other screens' drawing and their sprite hit test are
     /// M4: a real click finds no sprite under the cursor (tests give it
     /// through [`Game::screen_click`]).
     pub(super) fn screen_frame(&mut self) {
         if !matches!(
             self.puzzles.screen,
-            Some(Screen::Carte | Screen::CarteTour | Screen::Ecrin | Screen::Licorne)
+            Some(
+                Screen::Carte | Screen::CarteTour | Screen::Ecrin | Screen::GBoy | Screen::Licorne
+            )
         ) {
             self.draw_warp_only();
             self.draw_pointer();
@@ -494,6 +507,10 @@ impl Game {
                     }
                     h.ctrl();
                     if screen == Screen::GBoy {
+                        // @ 0x0041f7d6: the music volume back
+                        // (@ 0x00434100(0x007899d8)).
+                        let v = h.g.puzzles.tourmagi.saved_volume;
+                        h.g.music_volume_set(v);
                         h.run("(StopMusik=1)");
                         h.run("(StartMusik=6)");
                     }

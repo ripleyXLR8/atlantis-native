@@ -193,6 +193,66 @@ impl Game {
         self.tr_flip();
     }
 
+    /// `AtlGBoy_ReloadSprBank` (@ 0x0041fd80), run by the `tourmagi.wam`
+    /// load (@ 0x004c34e0): `GBoy.spr` and `Boitier.spr`.
+    pub(crate) fn gboy_reload_banks(&mut self) {
+        self.puzzles.screens.gboy_bank = self.screen_bank("GBoy.spr");
+        self.puzzles.screens.boitier_bank = self.screen_bank("Boitier.spr");
+    }
+
+    /// `GBOY`'s drawing (@ 0x0041fbc2..0x0041fd5e), anchored to the
+    /// screen's bottom-right corner ([`super::screens::gboy_anchors`]):
+    /// the warp frame, `Boitier` #0, the result #(result + 2) while the
+    /// blinks are even, #1 on a hit frame else #2, `GBoy` #240, the six
+    /// faces, the count animation's frame, the cursor #(value + offset),
+    /// the pointer `Interface.spr` #40 (@ 0x004281e0), the flip; every
+    /// call at alpha 1.0 (@ 0x00756050).
+    pub(crate) fn gboy_draw(&mut self, offset: i32) {
+        self.draw_warp_only();
+        let [boxp, gb, _] = super::screens::gboy_anchors(self.width as i32, self.height as i32);
+        let st = &self.puzzles.screens;
+        let g = st.gboy.clone();
+        let (boitier, gboy) = (st.boitier_bank.clone(), st.gboy_bank.clone());
+        let dice = self.puzzles.tourmagi.dice;
+        let bp = "spr\\Boitier.spr";
+        let gp = "spr\\GBoy.spr";
+        let idx = |i: i32| usize::try_from(i).unwrap_or(0);
+        self.draw_spr_maybe(bp, boitier.as_deref(), 0, Some(boxp.0), boxp.1, 1.0);
+        if dice > 0 && g.blinks % 2 == 0 {
+            self.draw_spr_maybe(
+                bp,
+                boitier.as_deref(),
+                idx(dice + 2),
+                Some(boxp.0),
+                boxp.1,
+                1.0,
+            );
+        }
+        let b = if g.hit { 1 } else { 2 };
+        self.draw_spr_maybe(bp, boitier.as_deref(), b, Some(boxp.0), boxp.1, 1.0);
+        self.draw_spr_maybe(gp, gboy.as_deref(), 240, Some(gb.0), gb.1, 1.0);
+        for f in g.faces {
+            self.draw_spr_maybe(gp, gboy.as_deref(), idx(f), Some(gb.0), gb.1, 1.0);
+        }
+        if g.anim != -1 {
+            self.draw_spr_maybe(gp, gboy.as_deref(), idx(g.anim), Some(gb.0), gb.1, 1.0);
+        }
+        self.draw_spr_maybe(
+            gp,
+            gboy.as_deref(),
+            idx(g.cursor + offset),
+            Some(gb.0),
+            gb.1,
+            1.0,
+        );
+        if let Some(i) = self.interface.take() {
+            let (px, py) = self.pointer;
+            self.draw_spr("spr\\Interface.spr", &i, 40, Some(px), py, 1.0);
+            self.interface = Some(i);
+        }
+        self.tr_flip();
+    }
+
     /// `AtlEcrin_ReloadSprBank` (@ 0x00413370), run by the `jardin.wam`
     /// load (@ 0x004c367e): `Ecrin%d.spr`, %d the display's depth (the
     /// port draws in 16 bits). `Interface.spr` is the game's.

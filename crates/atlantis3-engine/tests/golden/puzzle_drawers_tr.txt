@@ -1,0 +1,572 @@
+# Drawer wall PMA_TR (PMagi.wam view 112) of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31)
+# under emulation, the four clues in the bag: the place's CHANGEWAM set-up (logged), the view entry, and per frame
+# the place animations' step, an object click's hit dispatch, the frame hook, the click scan and the main loop's
+# place tail run unmodified; the sound calls and CtrlScenarIN logged only (no chapter loaded); frame n at
+# 100 + n x 1.0025 / 15 s. Each run starts from a new game's state. Line format: tests/common/pz.rs.
+# st: open 0x007897f8[16] (r*4+c), nopen 0x0078981c, step 0x00789820, solved 0x00789819, cup 0x0078981a,
+#   lamp 0x0078981b, done 0x00789818, rec_* = the play-once records {object id, frames, current}/playing
+#   (cupboard 0x007897a0, pull-tab 0x00789788, lamp 0x00789808).
+run solution PMA_TR43, TR13, TR24, TR11, then frames until the end (CtrlScenarIN)
+setup wam PMagi.wam view 112 yaw 0 pitch 0
+cmd 0 (HideObjet=PMA_CRANE)
+hide 0 PMA_CRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_SUPPORTCRANE)
+hide 0 PMA_SUPPORTCRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_CHIFFON)
+hide 0 PMA_CHIFFON kind 2 arg 0
+cmd 0 (HideObjet=PMA_LAMPE)
+hide 0 PMA_LAMPE kind 2 arg 0
+cmd 0 (HideObjet=PMA_TIRETTE)
+hide 0 PMA_TIRETTE kind 2 arg 0
+cmd 0 (ShowObjet=PMA_COBRAS)
+show 0 PMA_COBRAS kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE1)
+hide 0 PMA_INDICE1 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE2)
+hide 0 PMA_INDICE2 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE3)
+hide 0 PMA_INDICE3 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE4)
+hide 0 PMA_INDICE4 kind 2 arg 0
+cmd 0 (ShowObjet=PMA_LIENSLIGHT)
+show 0 PMA_LIENSLIGHT kind 2 arg 0
+cmd 0 (ShowObjet=PMA_ETOILESLIGHT)
+show 0 PMA_ETOILESLIGHT kind 2 arg 0
+entry 0
+log 0 ------- Warp pm0112.hnm ------- chapter 0 --
+log 0 AtlBruitages_InitWarp(): current_vue=NULL!!!
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 PMA_PLACARD01 0
+addf 0 PMA_TIRETTE 0
+addf 0 PMA_LAMPE 0
+addf 0 PMA_TR11 0
+addf 0 PMA_TR12 0
+addf 0 PMA_TR13 0
+addf 0 PMA_TR14 0
+addf 0 PMA_TR21 0
+addf 0 PMA_TR22 0
+addf 0 PMA_TR23 0
+addf 0 PMA_TR24 0
+addf 0 PMA_TR31 0
+addf 0 PMA_TR32 0
+addf 0 PMA_TR33 0
+addf 0 PMA_TR34 0
+addf 0 PMA_TR41 0
+addf 0 PMA_TR42 0
+addf 0 PMA_TR43 0
+addf 0 PMA_TR44 0
+setup cmd (SacADos=PMA_INDICE1)
+setup cmd (SacADos=PMA_INDICE2)
+setup cmd (SacADos=PMA_INDICE3)
+setup cmd (SacADos=PMA_INDICE4)
+slots 0:cwA2112112 1:atA1112112 2:lgA1112112 3:mtA1112112 4:cwA1112112 5:ppA1112112 6:ymA1112112 7:ynA1112112 8:yoA1112112 9:ypA1112112 10:yiA1112112 11:yjA1112112 12:ykA1112112 13:ylA1112112 14:yeA1112112 15:yfA1112112 16:ygA1112112 17:yhA1112112 18:yaA1112112 19:ybA1112112 20:ycA1112112 21:ydA1112112 22:biA1112112
+slotent 0:PMA_SUPPORTCRANE 1:PMA_TIRETTE 2:PMA_LAMPE 3:PMA_CHIFFON 4:PMA_CRANE 5:PMA_PLACARD01 6:PMA_TR41 7:PMA_TR42 8:PMA_TR43 9:PMA_TR44 10:PMA_TR31 11:PMA_TR32 12:PMA_TR33 13:PMA_TR34 14:PMA_TR21 15:PMA_TR22 16:PMA_TR23 17:PMA_TR24 18:PMA_TR11 19:PMA_TR12 20:PMA_TR13 21:PMA_TR14 22:PMA_BOUGIES01
+slot 0 0 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 0 mode 0 fr 0 list 0 ended 0
+slotck 0 1 0
+slot 0 2 sh 0 mode 0 fr 0 list 0 ended 0
+slotck 0 2 3
+slot 0 3 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 3 1
+slot 0 4 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 4 1
+slot 0 5 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 6 3
+slot 0 7 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 7 3
+slot 0 8 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 8 3
+slot 0 9 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 9 3
+slot 0 10 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 10 3
+slot 0 11 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 11 3
+slot 0 12 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 12 3
+slot 0 13 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 13 3
+slot 0 14 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 14 3
+slot 0 15 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 15 3
+slot 0 16 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 16 3
+slot 0 17 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 17 3
+slot 0 18 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 18 3
+slot 0 19 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 19 3
+slot 0 20 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 20 3
+slot 0 21 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 21 3
+slot 0 22 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 22 0
+st 0 open=0000000000000000 nopen=0 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+hand 0 0 -
+bag 0 +PMA_INDICE1 +PMA_INDICE2 +PMA_INDICE3 +PMA_INDICE4
+objet 2 PMA_TR43
+log 2 -------- Action Tiroir 3;2 (4;3)
+snd 2 load sfx\sound805.apc 0 1
+snd 2 play sfx\sound805.apc
+log 2 -- Ouverture Tiroir 3;2 (4;3)
+subf 2 PMA_TR43 0
+addf 2 PMA_TR43 1
+log 2 Etape pointée par le tiroir : 1
+log 2 Etape OK
+log 2 NbOuverts OK
+log 2 Passage à l'étape supérieure
+scan 2
+slot 2 8 sh 1 mode 0 fr 0 list 1 ended 0
+slot 2 22 sh 1 mode 1 fr 1 list - ended 0
+st 2 open=0000000000000010 nopen=1 step=1 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 2 818=1 864=1
+slot 3 22 sh 1 mode 1 fr 2 list - ended 0
+slot 4 22 sh 1 mode 1 fr 3 list - ended 0
+objet 5 PMA_TR13
+log 5 -------- Action Tiroir 0;2 (1;3)
+snd 5 load sfx\sound805.apc 0 1
+snd 5 play sfx\sound805.apc
+log 5 -- Ouverture Tiroir 0;2 (1;3)
+subf 5 PMA_TR13 0
+addf 5 PMA_TR13 1
+log 5 Etape pointée par le tiroir : 2
+log 5 Etape OK
+log 5 NbOuverts OK
+log 5 Passage à l'étape supérieure
+scan 5
+slot 5 20 sh 1 mode 0 fr 0 list 1 ended 0
+slot 5 22 sh 1 mode 1 fr 4 list - ended 0
+st 5 open=0010000000000010 nopen=2 step=2 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 5 818=2 852=1
+slot 6 22 sh 1 mode 1 fr 5 list - ended 0
+slot 7 22 sh 1 mode 1 fr 6 list - ended 0
+objet 8 PMA_TR24
+log 8 -------- Action Tiroir 1;3 (2;4)
+snd 8 load sfx\sound805.apc 0 1
+snd 8 play sfx\sound805.apc
+log 8 -- Ouverture Tiroir 1;3 (2;4)
+subf 8 PMA_TR24 0
+addf 8 PMA_TR24 1
+log 8 Etape pointée par le tiroir : 3
+log 8 Etape OK
+log 8 NbOuverts OK
+log 8 Passage à l'étape supérieure
+scan 8
+slot 8 17 sh 1 mode 0 fr 0 list 1 ended 0
+slot 8 22 sh 1 mode 1 fr 7 list - ended 0
+st 8 open=0010000100000010 nopen=3 step=3 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 8 818=3 857=1
+slot 9 22 sh 1 mode 1 fr 8 list - ended 0
+slot 10 22 sh 1 mode 1 fr 9 list - ended 0
+objet 11 PMA_TR11
+log 11 -------- Action Tiroir 0;0 (1;1)
+snd 11 load sfx\sound805.apc 0 1
+snd 11 play sfx\sound805.apc
+log 11 -- Ouverture Tiroir 0;0 (1;1)
+subf 11 PMA_TR11 0
+addf 11 PMA_TR11 1
+log 11 Etape pointée par le tiroir : 4
+log 11 Etape OK
+log 11 NbOuverts OK
+log 11 Passage à l'étape supérieure
+cmd 11 (ObjetEnMain=0)
+cmd 11 (SacADos=NOT_PMA_INDICE1)
+cmd 11 (SacADos=NOT_PMA_INDICE2)
+cmd 11 (SacADos=NOT_PMA_INDICE3)
+cmd 11 (SacADos=NOT_PMA_INDICE4)
+snd 11 load sfx\sound808.apc 0 1
+snd 11 play sfx\sound808.apc
+cmd 11 (ShowObjet=PMA_TIRETTE)
+show 11 PMA_TIRETTE kind 2 arg 0
+cmd 11 (ShowObjet=PMA_LAMPE)
+show 11 PMA_LAMPE kind 2 arg 0
+cmd 11 (ShowObjet=PMA_CHIFFON)
+show 11 PMA_CHIFFON kind 2 arg 0
+subf 11 PMA_PLACARD01 0
+scan 11
+slot 11 1 sh 1 mode 0 fr 0 list 0 ended 0
+slot 11 2 sh 1 mode 0 fr 0 list 0 ended 0
+slot 11 3 sh 1 mode 1 fr 0 list - ended 0
+slot 11 5 sh 1 mode 1 fr 0 list - ended 0
+slot 11 18 sh 1 mode 0 fr 0 list 1 ended 0
+slot 11 22 sh 1 mode 1 fr 10 list - ended 0
+st 11 open=1010000100000010 nopen=4 step=4 solved=1 cup=0 lamp=0 done=0 rec_cup=153,12,0/1 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 11 812=1 818=4 850=1
+bag 11 -PMA_INDICE1
+bag 11 -PMA_INDICE2
+bag 11 -PMA_INDICE3
+bag 11 -PMA_INDICE4
+slot 12 5 sh 1 mode 1 fr 1 list - ended 0
+slot 12 22 sh 1 mode 1 fr 11 list - ended 0
+slot 13 5 sh 1 mode 1 fr 2 list - ended 0
+slot 13 22 sh 1 mode 1 fr 12 list - ended 0
+slot 14 5 sh 1 mode 1 fr 3 list - ended 0
+slot 14 22 sh 1 mode 1 fr 13 list - ended 0
+slot 15 5 sh 1 mode 1 fr 4 list - ended 0
+slot 15 22 sh 1 mode 1 fr 14 list - ended 0
+slot 16 5 sh 1 mode 1 fr 5 list - ended 0
+slot 16 22 sh 1 mode 1 fr 15 list - ended 0
+slot 17 5 sh 1 mode 1 fr 6 list - ended 0
+slot 17 22 sh 1 mode 1 fr 16 list - ended 0
+slot 18 5 sh 1 mode 1 fr 7 list - ended 0
+slot 18 22 sh 1 mode 1 fr 17 list - ended 0
+slot 19 5 sh 1 mode 1 fr 8 list - ended 0
+slot 19 22 sh 1 mode 1 fr 18 list - ended 0
+slot 20 5 sh 1 mode 1 fr 9 list - ended 0
+slot 20 22 sh 1 mode 1 fr 19 list - ended 0
+slot 21 5 sh 1 mode 1 fr 10 list - ended 0
+slot 21 22 sh 1 mode 1 fr 20 list - ended 0
+slot 22 5 sh 1 mode 1 fr 11 list - ended 0
+slot 22 22 sh 1 mode 1 fr 0 list - ended 1
+slot 23 5 sh 1 mode 1 fr 12 list - ended 0
+slot 23 22 sh 1 mode 1 fr 1 list - ended 1
+addf 24 PMA_PLACARD01 12
+slot 24 5 sh 1 mode 0 fr 0 list 12 ended 1
+slot 24 22 sh 1 mode 1 fr 2 list - ended 1
+st 24 open=1010000100000010 nopen=4 step=4 solved=1 cup=1 lamp=0 done=0 rec_cup=153,12,12/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+subf 25 PMA_LAMPE 0
+subf 25 PMA_TIRETTE 0
+slot 25 1 sh 1 mode 1 fr 0 list - ended 0
+slot 25 2 sh 1 mode 1 fr 0 list - ended 0
+slot 25 22 sh 1 mode 1 fr 3 list - ended 1
+st 25 open=1010000100000010 nopen=4 step=4 solved=1 cup=1 lamp=0 done=0 rec_cup=153,12,12/0 rec_tir=168,9,0/1 rec_lamp=169,9,0/1
+slot 26 1 sh 1 mode 1 fr 1 list - ended 0
+slot 26 2 sh 1 mode 1 fr 1 list - ended 0
+slot 26 22 sh 1 mode 1 fr 4 list - ended 1
+slot 27 1 sh 1 mode 1 fr 2 list - ended 0
+slot 27 2 sh 1 mode 1 fr 2 list - ended 0
+slot 27 22 sh 1 mode 1 fr 5 list - ended 1
+slot 28 1 sh 1 mode 1 fr 3 list - ended 0
+slot 28 2 sh 1 mode 1 fr 3 list - ended 0
+slot 28 22 sh 1 mode 1 fr 6 list - ended 1
+slot 29 1 sh 1 mode 1 fr 4 list - ended 0
+slot 29 2 sh 1 mode 1 fr 4 list - ended 0
+slot 29 22 sh 1 mode 1 fr 7 list - ended 1
+slot 30 1 sh 1 mode 1 fr 5 list - ended 0
+slot 30 2 sh 1 mode 1 fr 5 list - ended 0
+slot 30 22 sh 1 mode 1 fr 8 list - ended 1
+slot 31 1 sh 1 mode 1 fr 6 list - ended 0
+slot 31 2 sh 1 mode 1 fr 6 list - ended 0
+slot 31 22 sh 1 mode 1 fr 9 list - ended 1
+slot 32 1 sh 1 mode 1 fr 7 list - ended 0
+slot 32 2 sh 1 mode 1 fr 7 list - ended 0
+slot 32 22 sh 1 mode 1 fr 10 list - ended 1
+slot 33 1 sh 1 mode 1 fr 8 list - ended 0
+slot 33 2 sh 1 mode 1 fr 8 list - ended 0
+slot 33 22 sh 1 mode 1 fr 11 list - ended 1
+slot 34 1 sh 1 mode 1 fr 9 list - ended 0
+slot 34 2 sh 1 mode 1 fr 9 list - ended 0
+slot 34 22 sh 1 mode 1 fr 12 list - ended 1
+addf 35 PMA_LAMPE 9
+addf 35 PMA_TIRETTE 9
+scan 35
+slot 35 1 sh 1 mode 0 fr 0 list 9 ended 1
+slot 35 2 sh 1 mode 0 fr 0 list 9 ended 1
+slot 35 22 sh 1 mode 1 fr 13 list - ended 1
+st 35 open=1010000100000010 nopen=4 step=4 solved=1 cup=1 lamp=1 done=1 rec_cup=153,12,12/0 rec_tir=168,9,9/0 rec_lamp=169,9,9/0
+slot 36 22 sh 1 mode 1 fr 14 list - ended 1
+slot 37 22 sh 1 mode 1 fr 15 list - ended 1
+slot 38 22 sh 1 mode 1 fr 16 list - ended 1
+end solution frames=38
+run wrong TR13 first (step lost), closed again; TR43 then TR11 (lost: value 4 is not step + 1); all closed; TR43, TR13, then TR21 (a plain drawer: lost), TR21 closed, then TR24 (count 3 != 3 + ... : the rule needs value = step + 1 = open count + 1), then TR11
+setup wam PMagi.wam view 112 yaw 0 pitch 0
+cmd 0 (HideObjet=PMA_CRANE)
+hide 0 PMA_CRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_SUPPORTCRANE)
+hide 0 PMA_SUPPORTCRANE kind 2 arg 0
+cmd 0 (HideObjet=PMA_CHIFFON)
+hide 0 PMA_CHIFFON kind 2 arg 0
+cmd 0 (HideObjet=PMA_LAMPE)
+hide 0 PMA_LAMPE kind 2 arg 0
+cmd 0 (HideObjet=PMA_TIRETTE)
+hide 0 PMA_TIRETTE kind 2 arg 0
+cmd 0 (ShowObjet=PMA_COBRAS)
+show 0 PMA_COBRAS kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE1)
+hide 0 PMA_INDICE1 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE2)
+hide 0 PMA_INDICE2 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE3)
+hide 0 PMA_INDICE3 kind 2 arg 0
+cmd 0 (HideObjet=PMA_INDICE4)
+hide 0 PMA_INDICE4 kind 2 arg 0
+cmd 0 (ShowObjet=PMA_LIENSLIGHT)
+show 0 PMA_LIENSLIGHT kind 2 arg 0
+cmd 0 (ShowObjet=PMA_ETOILESLIGHT)
+show 0 PMA_ETOILESLIGHT kind 2 arg 0
+entry 0
+log 0 ------- Warp pm0112.hnm ------- chapter 0 --
+log 0 AtlBruitages_InitWarp(): current_vue=NULL!!!
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 PMA_PLACARD01 0
+addf 0 PMA_TIRETTE 0
+addf 0 PMA_LAMPE 0
+addf 0 PMA_TR11 0
+addf 0 PMA_TR12 0
+addf 0 PMA_TR13 0
+addf 0 PMA_TR14 0
+addf 0 PMA_TR21 0
+addf 0 PMA_TR22 0
+addf 0 PMA_TR23 0
+addf 0 PMA_TR24 0
+addf 0 PMA_TR31 0
+addf 0 PMA_TR32 0
+addf 0 PMA_TR33 0
+addf 0 PMA_TR34 0
+addf 0 PMA_TR41 0
+addf 0 PMA_TR42 0
+addf 0 PMA_TR43 0
+addf 0 PMA_TR44 0
+setup cmd (SacADos=PMA_INDICE1)
+setup cmd (SacADos=PMA_INDICE2)
+setup cmd (SacADos=PMA_INDICE3)
+setup cmd (SacADos=PMA_INDICE4)
+slots 0:cwA2112112 1:atA1112112 2:lgA1112112 3:mtA1112112 4:cwA1112112 5:ppA1112112 6:ymA1112112 7:ynA1112112 8:yoA1112112 9:ypA1112112 10:yiA1112112 11:yjA1112112 12:ykA1112112 13:ylA1112112 14:yeA1112112 15:yfA1112112 16:ygA1112112 17:yhA1112112 18:yaA1112112 19:ybA1112112 20:ycA1112112 21:ydA1112112 22:biA1112112
+slotent 0:PMA_SUPPORTCRANE 1:PMA_TIRETTE 2:PMA_LAMPE 3:PMA_CHIFFON 4:PMA_CRANE 5:PMA_PLACARD01 6:PMA_TR41 7:PMA_TR42 8:PMA_TR43 9:PMA_TR44 10:PMA_TR31 11:PMA_TR32 12:PMA_TR33 13:PMA_TR34 14:PMA_TR21 15:PMA_TR22 16:PMA_TR23 17:PMA_TR24 18:PMA_TR11 19:PMA_TR12 20:PMA_TR13 21:PMA_TR14 22:PMA_BOUGIES01
+slot 0 0 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 0 mode 0 fr 0 list 0 ended 0
+slotck 0 1 0
+slot 0 2 sh 0 mode 0 fr 0 list 0 ended 0
+slotck 0 2 3
+slot 0 3 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 3 1
+slot 0 4 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 4 1
+slot 0 5 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 6 3
+slot 0 7 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 7 3
+slot 0 8 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 8 3
+slot 0 9 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 9 3
+slot 0 10 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 10 3
+slot 0 11 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 11 3
+slot 0 12 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 12 3
+slot 0 13 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 13 3
+slot 0 14 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 14 3
+slot 0 15 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 15 3
+slot 0 16 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 16 3
+slot 0 17 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 17 3
+slot 0 18 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 18 3
+slot 0 19 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 19 3
+slot 0 20 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 20 3
+slot 0 21 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 21 3
+slot 0 22 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 22 0
+st 0 open=0000000000000000 nopen=0 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+hand 0 0 -
+bag 0 +PMA_INDICE1 +PMA_INDICE2 +PMA_INDICE3 +PMA_INDICE4
+objet 2 PMA_TR13
+log 2 -------- Action Tiroir 0;2 (1;3)
+snd 2 load sfx\sound805.apc 0 1
+snd 2 play sfx\sound805.apc
+log 2 -- Ouverture Tiroir 0;2 (1;3)
+subf 2 PMA_TR13 0
+addf 2 PMA_TR13 1
+log 2 Etape pointée par le tiroir : 2
+scan 2
+slot 2 20 sh 1 mode 0 fr 0 list 1 ended 0
+slot 2 22 sh 1 mode 1 fr 1 list - ended 0
+st 2 open=0010000000000000 nopen=1 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 2 852=1
+slot 3 22 sh 1 mode 1 fr 2 list - ended 0
+slot 4 22 sh 1 mode 1 fr 3 list - ended 0
+objet 5 PMA_TR13
+log 5 -------- Action Tiroir 0;2 (1;3)
+snd 5 load sfx\sound806.apc 0 1
+snd 5 play sfx\sound806.apc
+log 5 -- Fermeture Tiroir 0;2 (1;3)
+subf 5 PMA_TR13 1
+addf 5 PMA_TR13 0
+scan 5
+slot 5 20 sh 1 mode 0 fr 0 list 0 ended 0
+slot 5 22 sh 1 mode 1 fr 4 list - ended 0
+st 5 open=0000000000000000 nopen=0 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 5 852=0
+slot 6 22 sh 1 mode 1 fr 5 list - ended 0
+slot 7 22 sh 1 mode 1 fr 6 list - ended 0
+objet 8 PMA_TR43
+log 8 -------- Action Tiroir 3;2 (4;3)
+snd 8 load sfx\sound805.apc 0 1
+snd 8 play sfx\sound805.apc
+log 8 -- Ouverture Tiroir 3;2 (4;3)
+subf 8 PMA_TR43 0
+addf 8 PMA_TR43 1
+log 8 Etape pointée par le tiroir : 1
+log 8 Etape OK
+log 8 NbOuverts OK
+log 8 Passage à l'étape supérieure
+scan 8
+slot 8 8 sh 1 mode 0 fr 0 list 1 ended 0
+slot 8 22 sh 1 mode 1 fr 7 list - ended 0
+st 8 open=0000000000000010 nopen=1 step=1 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 8 818=1 864=1
+slot 9 22 sh 1 mode 1 fr 8 list - ended 0
+slot 10 22 sh 1 mode 1 fr 9 list - ended 0
+objet 11 PMA_TR11
+log 11 -------- Action Tiroir 0;0 (1;1)
+snd 11 load sfx\sound805.apc 0 1
+snd 11 play sfx\sound805.apc
+log 11 -- Ouverture Tiroir 0;0 (1;1)
+subf 11 PMA_TR11 0
+addf 11 PMA_TR11 1
+log 11 Etape pointée par le tiroir : 4
+log 11 -- Perte de l'étape
+scan 11
+slot 11 18 sh 1 mode 0 fr 0 list 1 ended 0
+slot 11 22 sh 1 mode 1 fr 10 list - ended 0
+st 11 open=1000000000000010 nopen=2 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 11 818=0 850=1
+slot 12 22 sh 1 mode 1 fr 11 list - ended 0
+slot 13 22 sh 1 mode 1 fr 12 list - ended 0
+objet 14 PMA_TR11
+log 14 -------- Action Tiroir 0;0 (1;1)
+snd 14 load sfx\sound806.apc 0 1
+snd 14 play sfx\sound806.apc
+log 14 -- Fermeture Tiroir 0;0 (1;1)
+subf 14 PMA_TR11 1
+addf 14 PMA_TR11 0
+scan 14
+slot 14 18 sh 1 mode 0 fr 0 list 0 ended 0
+slot 14 22 sh 1 mode 1 fr 13 list - ended 0
+st 14 open=0000000000000010 nopen=1 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 14 850=0
+slot 15 22 sh 1 mode 1 fr 14 list - ended 0
+slot 16 22 sh 1 mode 1 fr 15 list - ended 0
+objet 17 PMA_TR43
+log 17 -------- Action Tiroir 3;2 (4;3)
+snd 17 load sfx\sound806.apc 0 1
+snd 17 play sfx\sound806.apc
+log 17 -- Fermeture Tiroir 3;2 (4;3)
+subf 17 PMA_TR43 1
+addf 17 PMA_TR43 0
+scan 17
+slot 17 8 sh 1 mode 0 fr 0 list 0 ended 0
+slot 17 22 sh 1 mode 1 fr 16 list - ended 0
+st 17 open=0000000000000000 nopen=0 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 17 864=0
+slot 18 22 sh 1 mode 1 fr 17 list - ended 0
+slot 19 22 sh 1 mode 1 fr 18 list - ended 0
+objet 20 PMA_TR43
+log 20 -------- Action Tiroir 3;2 (4;3)
+snd 20 load sfx\sound805.apc 0 1
+snd 20 play sfx\sound805.apc
+log 20 -- Ouverture Tiroir 3;2 (4;3)
+subf 20 PMA_TR43 0
+addf 20 PMA_TR43 1
+log 20 Etape pointée par le tiroir : 1
+log 20 Etape OK
+log 20 NbOuverts OK
+log 20 Passage à l'étape supérieure
+scan 20
+slot 20 8 sh 1 mode 0 fr 0 list 1 ended 0
+slot 20 22 sh 1 mode 1 fr 19 list - ended 0
+st 20 open=0000000000000010 nopen=1 step=1 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 20 818=1 864=1
+slot 21 22 sh 1 mode 1 fr 20 list - ended 0
+slot 22 22 sh 1 mode 1 fr 0 list - ended 1
+objet 23 PMA_TR13
+log 23 -------- Action Tiroir 0;2 (1;3)
+snd 23 load sfx\sound805.apc 0 1
+snd 23 play sfx\sound805.apc
+log 23 -- Ouverture Tiroir 0;2 (1;3)
+subf 23 PMA_TR13 0
+addf 23 PMA_TR13 1
+log 23 Etape pointée par le tiroir : 2
+log 23 Etape OK
+log 23 NbOuverts OK
+log 23 Passage à l'étape supérieure
+scan 23
+slot 23 20 sh 1 mode 0 fr 0 list 1 ended 0
+slot 23 22 sh 1 mode 1 fr 1 list - ended 1
+st 23 open=0010000000000010 nopen=2 step=2 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 23 818=2 852=1
+slot 24 22 sh 1 mode 1 fr 2 list - ended 1
+slot 25 22 sh 1 mode 1 fr 3 list - ended 1
+objet 26 PMA_TR21
+log 26 -------- Action Tiroir 1;0 (2;1)
+snd 26 load sfx\sound805.apc 0 1
+snd 26 play sfx\sound805.apc
+log 26 -- Ouverture Tiroir 1;0 (2;1)
+subf 26 PMA_TR21 0
+addf 26 PMA_TR21 1
+log 26 -- Perte de l'étape
+scan 26
+slot 26 14 sh 1 mode 0 fr 0 list 1 ended 0
+slot 26 22 sh 1 mode 1 fr 4 list - ended 1
+st 26 open=0010100000000010 nopen=3 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 26 818=0 854=1
+slot 27 22 sh 1 mode 1 fr 5 list - ended 1
+slot 28 22 sh 1 mode 1 fr 6 list - ended 1
+objet 29 PMA_TR21
+log 29 -------- Action Tiroir 1;0 (2;1)
+snd 29 load sfx\sound806.apc 0 1
+snd 29 play sfx\sound806.apc
+log 29 -- Fermeture Tiroir 1;0 (2;1)
+subf 29 PMA_TR21 1
+addf 29 PMA_TR21 0
+scan 29
+slot 29 14 sh 1 mode 0 fr 0 list 0 ended 0
+slot 29 22 sh 1 mode 1 fr 7 list - ended 1
+st 29 open=0010000000000010 nopen=2 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 29 854=0
+slot 30 22 sh 1 mode 1 fr 8 list - ended 1
+slot 31 22 sh 1 mode 1 fr 9 list - ended 1
+objet 32 PMA_TR24
+log 32 -------- Action Tiroir 1;3 (2;4)
+snd 32 load sfx\sound805.apc 0 1
+snd 32 play sfx\sound805.apc
+log 32 -- Ouverture Tiroir 1;3 (2;4)
+subf 32 PMA_TR24 0
+addf 32 PMA_TR24 1
+log 32 Etape pointée par le tiroir : 3
+log 32 NbOuverts OK
+scan 32
+slot 32 17 sh 1 mode 0 fr 0 list 1 ended 0
+slot 32 22 sh 1 mode 1 fr 10 list - ended 1
+st 32 open=0010000100000010 nopen=3 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 32 857=1
+slot 33 22 sh 1 mode 1 fr 11 list - ended 1
+slot 34 22 sh 1 mode 1 fr 12 list - ended 1
+objet 35 PMA_TR11
+log 35 -------- Action Tiroir 0;0 (1;1)
+snd 35 load sfx\sound805.apc 0 1
+snd 35 play sfx\sound805.apc
+log 35 -- Ouverture Tiroir 0;0 (1;1)
+subf 35 PMA_TR11 0
+addf 35 PMA_TR11 1
+log 35 Etape pointée par le tiroir : 4
+log 35 NbOuverts OK
+scan 35
+slot 35 18 sh 1 mode 0 fr 0 list 1 ended 0
+slot 35 22 sh 1 mode 1 fr 13 list - ended 1
+st 35 open=1010000100000010 nopen=4 step=0 solved=0 cup=0 lamp=0 done=0 rec_cup=153,12,0/0 rec_tir=168,9,0/0 rec_lamp=169,9,0/0
+flags 35 850=1
+slot 36 22 sh 1 mode 1 fr 14 list - ended 1
+slot 37 22 sh 1 mode 1 fr 15 list - ended 1
+slot 38 22 sh 1 mode 1 fr 16 list - ended 1
+slot 39 22 sh 1 mode 1 fr 17 list - ended 1
+slot 40 22 sh 1 mode 1 fr 18 list - ended 1
+end wrong frames=40

@@ -40,6 +40,8 @@ mod pages;
 mod sfx;
 pub use board::BoardInput;
 pub use credits::{Credits, Print};
+#[doc(hidden)]
+pub use hooks::star_room_tables;
 pub use hooks::Screen;
 
 /// A decoded sound: rate, channels, interleaved samples.
@@ -313,6 +315,13 @@ pub struct Game {
     /// `warp=flat`).
     #[doc(hidden)]
     pub flat_warp: bool,
+    /// Tests: every view entry logged `view <n>` at its start, and a
+    /// cinematic logged `cinema <file>` and taken as played at once (the
+    /// tower harness's stub of `AtlHnm_start`).
+    #[doc(hidden)]
+    pub trace_views: bool,
+    #[doc(hidden)]
+    pub stub_cinemas: bool,
     /// Tests: the whole-story harness's sound model ([`sfx`]): `PLAYVOICE`
     /// only logged, a sound started by `Play` playing for ever.
     #[doc(hidden)]
@@ -433,6 +442,8 @@ impl Game {
             trace: None,
             trace_digest: None,
             flat_warp: false,
+            trace_views: false,
+            stub_cinemas: false,
             story_sound_model: false,
         };
         if !game.with_script(|s, h| s.boot_a3(h)) {
@@ -1582,7 +1593,8 @@ impl Game {
     }
 
     /// The warp drawn into the screen (@ 0x00440690), then the cursor
-    /// (@ 0x00440a30).
+    /// (@ 0x00440a30), the inventory's fade-out and the warp cursor
+    /// (@ 0x00427c40).
     fn draw_warp(&mut self) {
         if !self.draw_warp_only() {
             return;
@@ -1592,6 +1604,11 @@ impl Game {
         if !self.inventory.open && self.inventory.alpha > 0.0 {
             self.inventory.fade_step(self.now);
             self.draw_inventory_items();
+        }
+        // Then, neither the inventory nor the subject menu open
+        // (@ 0x00427f38), the warp cursor a puzzle set (@ 0x00428870).
+        if self.mode == Mode::Warp {
+            self.draw_warp_cursor();
         }
     }
 
@@ -1987,6 +2004,9 @@ impl Game {
     /// (`warp\Warp512\<world>\<name>`, frames to faces 1, 3, 0, 4, 5, 2),
     /// the camera turned to the arrival angles, the turn speeds stopped.
     fn enter_view(&mut self, id: u32, yaw: f32, pitch: f32) {
+        if self.trace_views {
+            self.tr(|| format!("view {id}"));
+        }
         let Some(view) = self.place.wam.view(id) else {
             log::error!("{}: no view {id}", self.place.name);
             return;
@@ -2246,6 +2266,27 @@ impl Game {
             .get_or_insert_with(|| crate::text::Texts::load(&self.files, &lang))
     }
 
+    /// `AtlSubtitle_Set(GetTextFromDial(dialog, line), r, g, b, 0)`
+    /// (@ 0x004655a0, @ 0x0040e290) as the C code calls it (the star
+    /// room's tips). Logged `text <dialog> <line>`, `sub set r g b 0`.
+    pub(crate) fn c_subtitle_set(&mut self, dialog: i32, line: i32, rgb: [u8; 3]) {
+        self.tr(|| format!("text {dialog} {line}"));
+        self.tr(|| format!("sub set {} {} {} 0", rgb[0], rgb[1], rgb[2]));
+        let text = self.texts().dial(dialog, line).map(<[u8]>::to_vec);
+        self.subtitle = text.map(|text| Subtitle {
+            text,
+            rgb,
+            caption: false,
+        });
+    }
+
+    /// `AtlSubtitle_Clear` (@ 0x0040e330) as the C code calls it. Logged
+    /// `sub clear`.
+    pub(crate) fn c_subtitle_clear(&mut self) {
+        self.tr(|| "sub clear".into());
+        self.subtitle = None;
+    }
+
     /// The subtitle line drawn by the flip (@ 0x0040de60) when
     /// `SubTitleOn`: a caption centred in `AtlFont_Special`, a cue line
     /// with its shadow.
@@ -2284,6 +2325,19 @@ impl Game {
             );
         }
         self.screen = screen;
+    }
+
+    /// The music volume set (@ 0x00434100): 0x007178e8 := v clamped to
+    /// 0..=99, the music stream's gain from master × music at once.
+    pub(crate) fn music_volume_set(&mut self, v: i32) {
+        self.startup.config.music_volume = v.clamp(0, 99);
+        let g = csm_gain(self.level(self.startup.config.music_volume));
+        self.audio.set_gain(CHANNEL_MUSIC, [g, g]);
+    }
+
+    /// The music volume (@ 0x007178e8).
+    pub(crate) fn music_level(&self) -> i32 {
+        self.startup.config.music_volume
     }
 
     /// `AtlDial_MainInit` for world `monde` (its `rand()` draws included).
@@ -3191,6 +3245,10 @@ impl Host for Game {
                 if name.eq_ignore_ascii_case("jardin.wam") {
                     self.ecrin_reload_banks();
                 }
+                // The game boy's (@ 0x004c34e0 → @ 0x0041fd80).
+                if name.eq_ignore_ascii_case("tourmagi.wam") {
+                    self.gboy_reload_banks();
+                }
                 true
             }
             Err(e) => {
@@ -3320,6 +3378,10 @@ impl Host for Game {
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         let (video, subtitles) = atlantis3_data::cine_txt::cinema_names(n as u32);
+        if self.stub_cinemas {
+            self.tr(|| format!("cinema {}", video.to_ascii_lowercase()));
+            return true;
+        }
         // The cue file decides the folder (@ 0x00420f3c..0x00421089).
         let localised = self.files.size(&format!("hnm/{subtitles}")).is_some();
         let lang = self.startup.voice_language();

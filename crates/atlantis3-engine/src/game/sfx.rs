@@ -168,6 +168,14 @@ impl Game {
         self.sfx_index(name).is_some_and(|i| self.sfx_playing_at(i))
     }
 
+    /// [`Game::sfx_playing`] as a puzzle asks it, logged `snd test NAME
+    /// -> 0|1`.
+    pub(crate) fn sfx_test(&mut self, name: &str) -> bool {
+        let v = self.sfx_playing(name);
+        self.tr(|| format!("snd test {name} -> {}", u8::from(v)));
+        v
+    }
+
     /// `Stop(name)` (@ 0x004335f0).
     pub(crate) fn sfx_stop(&mut self, name: &str) {
         self.tr(|| format!("snd stop {}", if name.is_empty() { "-" } else { name }));
@@ -179,6 +187,23 @@ impl Game {
                 }
             }
         }
+    }
+
+    /// Every sound object stopped (@ 0x00433580: a walk of the sound
+    /// library's map stopping each); the place's ambient sounds with them
+    /// [INFERRED: the ambient objects belong to the same map]. Logged `snd
+    /// stopall`.
+    pub(crate) fn sfx_stop_all(&mut self) {
+        self.tr(|| "snd stopall".into());
+        for i in 0..self.csounds.objects.len() {
+            let o = &mut self.csounds.objects[i];
+            if o.started.take().is_some() {
+                if let Some(c) = o.channel {
+                    self.audio.stop(c);
+                }
+            }
+        }
+        self.audio.stop(crate::audio::CHANNEL_PLACE);
     }
 
     /// The voice file of a dialog's line (`GetApcNameFromDial`

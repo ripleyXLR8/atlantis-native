@@ -4,9 +4,11 @@
 //!
 //! What the scripts see: the story flags 811..865, 915..972 (the puzzles'
 //! saved state), `Flag154` / `Flag812` and the commands the hooks run, the
-//! scans. The sprite objects' frame tables (`PMA_ETOILESLIGHT`,
+//! scans. The sprite objects' frame lists (`PMA_ETOILESLIGHT`,
 //! `PMA_LIENSLIGHT`, the drawers' open / closed frames, @ 0x00438a40 /
-//! 0x00438ae0) are drawing only (M4).
+//! 0x00438ae0 / 0x00438c00), the star room's blink and its spoken tips are
+//! the original's, checked against the board goldens
+//! (`tests/board_pmagi.rs`).
 
 use atlantis2_engine::script::Host;
 
@@ -22,8 +24,7 @@ const CONSTELLATIONS: [[i32; 10]; 5] = [
     [34, 35, 36, 37, 38, 39, 40, 41, 42, -1],
 ];
 
-/// Their link sprites of `PMA_LIENSLIGHT` (@ 0x007895ac + 40k; drawing).
-#[allow(dead_code)]
+/// Their link sprites of `PMA_LIENSLIGHT` (@ 0x007895ac + 40k).
 const CONSTELLATION_LINKS: [[i32; 10]; 5] = [
     [12, 2, 44, 13, 5, 20, 6, 16, -1, -1],
     [41, 38, 37, 40, 43, 39, -1, -1, -1, -1],
@@ -189,8 +190,10 @@ pub struct State {
     /// Solved (@ 0x00789694) and inert (@ 0x00789695).
     pub star_solved: bool,
     pub star_inert: bool,
-    /// The spoken tips' state (@ 0x007877cc): 0..3 playing, 4 done.
+    /// The spoken tips' state (@ 0x007877cc): 0..3 playing, 4 done, and
+    /// the voice playing (the CString @ 0x007877b8).
     pub tip: i32,
+    pub tip_voice: String,
     // ---- `PMA_TT` -------------------------------------------------------
     /// The reload byte (@ 0x0071f4a8).
     pub tt_reload: bool,
@@ -252,6 +255,7 @@ impl State {
             star_solved: false,
             star_inert: false,
             tip: 0,
+            tip_voice: String::new(),
             tt_reload: true,
             tt_open: [false; 20],
             tt_locks: [false; 4],
@@ -318,6 +322,7 @@ pub(super) fn view_stars(h: &mut Hx) {
         p.star_inert = false;
         p.star_solved = false;
         p.tip = 0;
+        p.tip_voice.clear();
         h.set_flag(915, 1);
     } else {
         h.g.puzzles.pmagi.tip = 4;
@@ -354,9 +359,41 @@ pub(super) fn view_stars(h: &mut Hx) {
             }
         }
     }
-    // visual: both sprite objects' frame tables rebuilt from the
-    // selections and completed constellations (phase 1) or from the path
-    // and its links (phase 2) (M4).
+    // Both lists cleared (@ 0x00438c00), then rebuilt: phase 1, every
+    // selected star, then per complete constellation its stars and links
+    // in turn; phase 2, the path's stars, each after the first with the
+    // link from the one before.
+    let (stars, links) = (h.obj("PMA_ETOILESLIGHT"), h.obj("PMA_LIENSLIGHT"));
+    h.g.clear_frames(stars);
+    h.g.clear_frames(links);
+    if h.flag(921) == 0 {
+        for s in 0..43 {
+            if h.g.puzzles.pmagi.selected[s] {
+                h.addf(stars, s as i32);
+            }
+        }
+        for k in 0..5 {
+            if h.flag(922 + k) == 0 {
+                continue;
+            }
+            for i in 0..10 {
+                if CONSTELLATIONS[k][i] != -1 {
+                    h.addf(stars, CONSTELLATIONS[k][i]);
+                }
+                if CONSTELLATION_LINKS[k][i] != -1 {
+                    h.addf(links, CONSTELLATION_LINKS[k][i]);
+                }
+            }
+        }
+    } else {
+        let p = h.g.puzzles.pmagi.path;
+        for i in 0..h.g.puzzles.pmagi.path_len.clamp(0, 6) as usize {
+            h.addf(stars, p[i]);
+            if i > 0 {
+                h.addf(links, link(p[i - 1], p[i]));
+            }
+        }
+    }
     h.g.puzzles.pmagi.star_reload = false;
 }
 
@@ -405,12 +442,18 @@ fn check_constellations(h: &mut Hx) {
     };
     log::debug!("Constellation {k} Complétée :-)");
     h.set_flag(922 + k, 1);
-    for &s in CONSTELLATIONS[k].iter().filter(|&&s| s != -1) {
-        h.g.puzzles.pmagi.selected[s as usize] = false;
-        let v = h.g.puzzles.pmagi.selected[k] as i32;
-        h.set_flag(930 + k, v);
+    let links = h.obj("PMA_LIENSLIGHT");
+    for i in 0..10 {
+        let s = CONSTELLATIONS[k][i];
+        if s != -1 {
+            h.g.puzzles.pmagi.selected[s as usize] = false;
+            let v = h.g.puzzles.pmagi.selected[k] as i32;
+            h.set_flag(930 + k, v);
+        }
+        if CONSTELLATION_LINKS[k][i] != -1 {
+            h.addf(links, CONSTELLATION_LINKS[k][i]);
+        }
     }
-    // visual: the constellation's links added to `PMA_LIENSLIGHT` (M4).
     let now = h.now();
     let p = &mut h.g.puzzles.pmagi;
     p.blink = true;
@@ -428,13 +471,24 @@ fn has_way(h: &Hx) -> bool {
     (0..43).any(|s| link(last, s) != -1 && !on_path(h, s))
 }
 
-/// The path reset (@ 0x004cea70, log `Reset Etoiles`): path = [33],
-/// `Flag819` = 1, `Flag820` = 33, the other entries and flags 821.. −1.
+/// The path reset (@ 0x004cea70, log `Reset Etoiles`): the path's links
+/// taken out of `PMA_LIENSLIGHT`, then its stars but the first out of
+/// `PMA_ETOILESLIGHT` (an entry −1, the constant @ 0x0071eeb4, skipped);
+/// path = [33], `Flag819` = 1, `Flag820` = 33, the other entries and
+/// flags 821.. −1.
 fn reset_path(h: &mut Hx) {
     log::debug!("Reset Etoiles");
-    // visual: the path's links and stars (but the first) removed (M4).
-    let len = h.g.puzzles.pmagi.path_len;
-    for i in 1..len.clamp(0, 6) as usize {
+    let (stars, links) = (h.obj("PMA_ETOILESLIGHT"), h.obj("PMA_LIENSLIGHT"));
+    let len = h.g.puzzles.pmagi.path_len.clamp(0, 6) as usize;
+    for i in 1..len {
+        let p = h.g.puzzles.pmagi.path;
+        h.subf(links, link(p[i - 1], p[i]));
+    }
+    for i in 1..len {
+        let s = h.g.puzzles.pmagi.path[i];
+        if s != -1 {
+            h.subf(stars, s);
+        }
         h.g.puzzles.pmagi.path[i] = -1;
         h.set_flag(820 + i, -1);
     }
@@ -452,9 +506,59 @@ pub(super) fn stars_solved(h: &mut Hx) {
     h.run("(Flag154=1)");
     if h.g.puzzles.pmagi.tip < 4 {
         // @ 0x004335f0(0x007877b8), 0x0040e330: the tip's voice and
-        // subtitle stopped (M4: the tips are not played).
+        // subtitle stopped.
+        let v = h.g.puzzles.pmagi.tip_voice.clone();
+        h.g.sfx_stop(&v);
+        h.g.c_subtitle_clear();
     }
     h.ctrl();
+}
+
+/// Tip n (1..3) started (@ 0x004cebc2..): the state := n, the voice of
+/// dialog 216 line n (@ 0x004658e0) on the tip's CString, loaded as a
+/// voice (`LoadSfx(name, 0, 2)`) and played, its text (@ 0x004655a0) on
+/// the subtitle line in `rgb`, flag 0 (@ 0x0040e290).
+fn tip_start(h: &mut Hx, n: i32, rgb: [u8; 3]) {
+    log::debug!("Tip Salle Etoile #{n}...");
+    h.g.puzzles.pmagi.tip = n;
+    let name = h.g.dialog_voice_name(216, n);
+    h.g.tr(|| format!("voicefile 216 {n} -> {name}"));
+    h.g.puzzles.pmagi.tip_voice = name.clone();
+    h.g.sfx_load(&name, 0, 2);
+    h.g.sfx_play(&name);
+    h.g.c_subtitle_set(216, n, rgb);
+}
+
+/// The tip's voice still playing (@ 0x00433780 on the tip's CString).
+fn tip_playing(h: &mut Hx) -> bool {
+    let v = h.g.puzzles.pmagi.tip_voice.clone();
+    h.g.sfx_test(&v)
+}
+
+/// The spoken tips (@ 0x004ceba4: a `switch` on the state whose cases
+/// fall through): state 0 starts tip 1; at each later stage a voice no
+/// longer playing starts the next tip (stage 3: log `Fin Tip Salle
+/// Etoile`, state 4, the subtitle cleared, @ 0x0040e330). A playing voice
+/// is tested once per stage left (up to three times a frame).
+fn tips(h: &mut Hx) {
+    let stage = h.g.puzzles.pmagi.tip;
+    if stage > 3 {
+        return;
+    }
+    if stage == 0 {
+        tip_start(h, 1, [200, 255, 255]);
+    }
+    if stage <= 1 && !tip_playing(h) {
+        tip_start(h, 2, [255, 255, 200]);
+    }
+    if stage <= 2 && !tip_playing(h) {
+        tip_start(h, 3, [200, 255, 255]);
+    }
+    if !tip_playing(h) {
+        log::debug!("Fin Tip Salle Etoile");
+        h.g.puzzles.pmagi.tip = 4;
+        h.g.c_subtitle_clear();
+    }
 }
 
 /// The star room's step (@ 0x004ceb50), in the warp mode only: the tips,
@@ -465,16 +569,7 @@ pub(super) fn frame_stars(h: &mut Hx, z: &ZoneRec) {
     if h.g.mode != super::super::Mode::Warp {
         return;
     }
-    // The tips (states 0..3): each plays voice 216 part n with its
-    // subtitle on the private channel 0x007877b8 (0x004658e0, 0x004329e0,
-    // 0x00433140, 0x0040e290) and moves on when it no longer plays
-    // (0x00433780). M4: the tips are not played, so each "ends" at once
-    // and the states run through to 4 in this frame (log `Fin Tip Salle
-    // Etoile`, 0x0040e330).
-    if h.g.puzzles.pmagi.tip < 4 {
-        h.g.not_ported("the star room's spoken tips (voice 216)");
-        h.g.puzzles.pmagi.tip = 4;
-    }
+    tips(h);
     if h.g.puzzles.pmagi.star_inert {
         return;
     }
@@ -491,33 +586,43 @@ pub(super) fn frame_stars(h: &mut Hx, z: &ZoneRec) {
         star_clicks(h, z);
         return;
     }
-    // The blink: a half-period every 0.3 s; after the sixth, its end.
+    // The blink: a half-period every 0.3 s, `PMA_LIENSLIGHT`'s slot shown
+    // or hidden (+0x28 of the slot @ 0x0045f770(id, 2), read then
+    // written); after the sixth, its end.
     let now = h.now();
-    let ended = {
-        let p = &mut h.g.puzzles.pmagi;
-        if BLINK < now - p.blink_start {
-            p.blink_start = now;
-            p.blink_count += 1;
-            // visual: the sprite object's +0x44 toggled (0x0045f770) (M4).
-            if p.blink_count > 5 {
-                p.blink = false;
-            }
+    let links = h.obj("PMA_LIENSLIGHT");
+    if BLINK < now - h.g.puzzles.pmagi.blink_start {
+        h.g.puzzles.pmagi.blink_start = now;
+        h.g.puzzles.pmagi.blink_count += 1;
+        let shown =
+            h.g.slot_of_kind(links, 2)
+                .is_some_and(|k| h.g.slots.slots[k].shown);
+        if let Some(k) = h.g.slot_of_kind(links, 2) {
+            h.g.slots.slots[k].shown = !shown;
         }
-        !p.blink
-    };
-    if !ended {
+        if h.g.puzzles.pmagi.blink_count > 5 {
+            h.g.puzzles.pmagi.blink = false;
+        }
+    }
+    if h.g.puzzles.pmagi.blink {
         return;
     }
     if h.flag(921) == 0 {
         sound(h, "sound804.apc");
         if flag_range_all(h, 922, 5) {
             h.set_flag(921, 1);
-            // visual: both sprite objects cleared (0x00438c00), star 33
-            // shown (M4).
+            let stars = h.obj("PMA_ETOILESLIGHT");
+            h.g.clear_frames(stars);
+            h.g.clear_frames(links);
             reset_path(h);
+            let first = h.g.puzzles.pmagi.path[0];
+            h.addf(stars, first);
         }
     } else {
-        // visual: the blinking object shown (+0x44 := 1) (M4).
+        // The links' slot shown again (+0x28 := 1).
+        if let Some(k) = h.g.slot_of_kind(links, 2) {
+            h.g.slots.slots[k].shown = true;
+        }
         let path = h.g.puzzles.pmagi.path;
         if path[0] == 33 && path[5] == 42 {
             h.g.puzzles.pmagi.star_inert = true;
@@ -548,13 +653,14 @@ fn star_clicks(h: &mut Hx, z: &ZoneRec) {
         let sel = !h.g.puzzles.pmagi.selected[su];
         h.g.puzzles.pmagi.selected[su] = sel;
         h.set_flag(930 + su, sel as i32);
+        let stars = h.obj("PMA_ETOILESLIGHT");
         if sel {
             log::debug!("Sélection de l'étoile {s}");
-            // visual: the star's frame added to `PMA_ETOILESLIGHT` (M4).
+            h.addf(stars, s);
             sound(h, "sound803.apc");
         } else {
             log::debug!("Désélection de l'étoile {s}");
-            // visual: the star's frame removed (M4).
+            h.subf(stars, s);
         }
         check_constellations(h);
         return;
@@ -564,19 +670,22 @@ fn star_clicks(h: &mut Hx, z: &ZoneRec) {
     if on_path(h, s) || len >= 6 {
         return;
     }
+    let (stars, links) = (h.obj("PMA_ETOILESLIGHT"), h.obj("PMA_LIENSLIGHT"));
     if len == 0 {
         log::debug!("Première étoile");
         let p = &mut h.g.puzzles.pmagi;
         p.path[0] = s;
         p.path_len = 1;
-        // visual: the star shown (M4).
+        h.addf(stars, s);
         sound(h, "sound803.apc");
     } else if link(h.g.puzzles.pmagi.path[(len - 1) as usize], s) != -1 {
         log::debug!("Nouvelle étoile en position {len} du chemin");
+        let l = link(h.g.puzzles.pmagi.path[(len - 1) as usize], s);
+        h.addf(links, l);
         let p = &mut h.g.puzzles.pmagi;
         p.path[len as usize] = s;
         p.path_len = len + 1;
-        // visual: the star and its link shown (M4).
+        h.addf(stars, s);
         sound(h, "sound804.apc");
     }
     // @ 0x004cf7d1, whether a star was added or not.
@@ -1020,4 +1129,112 @@ fn tr_drawer(h: &mut Hx, r: usize, c: usize) {
         h.set_flag(818, 0);
         h.g.puzzles.pmagi.tr_count -= 1;
     }
+}
+
+/// Tests: the palace boards' golden `st` lines (`star`, `tt`, `tr`).
+pub(super) fn st_line(g: &super::Game, board: &str) -> String {
+    let p = &g.puzzles.pmagi;
+    let bits = |v: &[bool]| -> String { v.iter().map(|&b| if b { '1' } else { '0' }).collect() };
+    let b = |v: bool| u8::from(v);
+    match board {
+        "star" => {
+            let path: Vec<String> = p.path.iter().map(|v| v.to_string()).collect();
+            format!(
+                "tip={} inert={} solved={} len={} path={} blink={} blinks={} sel={}",
+                p.tip,
+                b(p.star_inert),
+                b(p.star_solved),
+                p.path_len,
+                path.join(","),
+                b(p.blink),
+                p.blink_count,
+                bits(&p.selected)
+            )
+        }
+        "tt" => format!(
+            "open={} locks={} nopen={} counter={} unlocked={} solved={} stop={}",
+            bits(&p.tt_open),
+            bits(&p.tt_locks),
+            p.tt_count,
+            p.tt_counter,
+            b(p.tt_unlocked),
+            b(p.tt_done),
+            b(p.tt_end)
+        ),
+        _ => {
+            let rec = |a: &Anim| format!("{},{},{}/{}", a.obj, a.frames, a.current, b(a.playing));
+            format!(
+                "open={} nopen={} step={} solved={} cup={} lamp={} done={} rec_cup={} rec_tir={} \
+                 rec_lamp={}",
+                bits(&p.tr_open),
+                p.tr_count,
+                p.tr_step,
+                b(p.tr_solved),
+                b(p.tr_cupboard),
+                b(p.tr_anims),
+                b(p.tr_done),
+                rec(&p.placard),
+                rec(&p.tirette),
+                rec(&p.lampe)
+            )
+        }
+    }
+}
+
+/// Tests: the star room's tables as the golden's `table` lines: the
+/// constellations' stars and links, the link matrix by rows, its
+/// asymmetric pairs, every six-star path 33 → 42 the click rule and the
+/// success test accept.
+pub fn star_room_tables() -> Vec<String> {
+    let mut out = Vec::new();
+    let list = |v: &[i32]| -> String {
+        v.iter()
+            .filter(|&&x| x != -1)
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    for k in 0..5 {
+        out.push(format!(
+            "table constellation {k} stars {} links {}",
+            list(&CONSTELLATIONS[k]),
+            list(&CONSTELLATION_LINKS[k])
+        ));
+    }
+    for a in 0..43 {
+        let row: Vec<String> = (0..43)
+            .filter(|&b| link(a, b) != -1)
+            .map(|b| format!("{b}:{}", link(a, b)))
+            .collect();
+        out.push(format!("table link {a} {}", row.join(" ")));
+    }
+    out.push("table asymmetric -".into());
+    let mut paths: Vec<Vec<i32>> = Vec::new();
+    fn go(path: &mut Vec<i32>, paths: &mut Vec<Vec<i32>>) {
+        if path.len() == 6 {
+            if path[5] == 42 {
+                paths.push(path.clone());
+            }
+            return;
+        }
+        for s in 0..43 {
+            if !path.contains(&s) && link(*path.last().unwrap(), s) != -1 {
+                path.push(s);
+                go(path, paths);
+                path.pop();
+            }
+        }
+    }
+    go(&mut vec![33], &mut paths);
+    let p: Vec<String> = paths
+        .iter()
+        .map(|q| {
+            q.iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join("-")
+        })
+        .collect();
+    out.push(format!("table paths {} {}", paths.len(), p.join(" ")));
+    out
 }

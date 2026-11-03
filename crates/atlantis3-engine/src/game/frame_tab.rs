@@ -48,6 +48,32 @@ impl Game {
         self.slots.sub_frame(id, frame)
     }
 
+    /// @ 0x00438c00 on the object `id`: its lists emptied. Logged `clrf
+    /// NAME`.
+    pub(crate) fn clear_frames(&mut self, id: i32) {
+        if self.trace.is_some() {
+            let n = self.object_name(id);
+            self.tr(|| format!("clrf {n}"));
+        }
+        self.slots.clear_frames(id);
+    }
+
+    /// @ 0x0045f770(id, kind): the first slot of that entity and slot
+    /// kind (−8), if the view has one. Logged `slotof NAME -> k`.
+    pub(crate) fn slot_of_kind(&mut self, id: i32, kind: i32) -> Option<usize> {
+        let k = self
+            .slots
+            .slots
+            .iter()
+            .position(|s| s.id == id && s.kind == kind);
+        if self.trace.is_some() {
+            let n = self.object_name(id);
+            let v = k.map_or_else(|| "-".to_string(), |k| k.to_string());
+            self.tr(|| format!("slotof {n} -> {v}"));
+        }
+        k
+    }
+
     /// `SetCurseurWarp(bank, index)` (@ 0x00428720): the cursor drawn at
     /// the screen's centre is sprite `index` of the bank, here always the
     /// world's in-hand bank the puzzles pass (@ 0x007565f0 →
@@ -65,6 +91,39 @@ impl Game {
             self.puzzles.warp_cursor = Some(index);
         } else {
             log::warn!("SetCurseurWarp: no sprite {index}");
+        }
+    }
+
+    /// The warp cursor drawn (@ 0x00428870): with a bank name and an index
+    /// ≥ 0, `AtlSpr_AffCentre` (@ 0x00436b80) of that sprite at the
+    /// screen's centre, alpha 1.0. The warp frame's menu part (@ 0x00427c40,
+    /// called by the warp loop @ 0x0043ff7b after the panorama, the hand
+    /// object and the zone cursor @ 0x00440670) draws it, after the
+    /// inventory's fade-out bar if any, when neither the inventory
+    /// (@ 0x00756564) nor the subject menu (@ 0x0075656c) is open
+    /// (@ 0x00427f38).
+    pub(crate) fn draw_warp_cursor(&mut self) {
+        let Some(index) = self
+            .puzzles
+            .warp_cursor
+            .and_then(|i| usize::try_from(i).ok())
+        else {
+            return;
+        };
+        self.world_banks();
+        if let Some(bank) = &self.objects_hand {
+            let (w, h) = (self.width, self.height);
+            crate::inventory::aff_centre(
+                &mut self.screen,
+                w,
+                h,
+                "",
+                bank,
+                index,
+                (w / 2) as i32,
+                (h / 2) as i32,
+                1.0,
+            );
         }
     }
 

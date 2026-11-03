@@ -160,6 +160,22 @@ impl Game {
         self.trace = t;
     }
 
+    /// [`Game::board_wam_setup`] with its commands logged (the palace's
+    /// harness logs them: `cmd`, then the show / hide).
+    #[doc(hidden)]
+    pub fn board_wam_setup_traced(&mut self) {
+        let wam = self.place.name.clone();
+        let flags = self
+            .script
+            .as_ref()
+            .map(|s| s.flags.clone())
+            .unwrap_or_default();
+        for c in crate::wam_setup::commands(&wam, &flags) {
+            self.tr(|| format!("cmd {c}"));
+            self.run_command(&c);
+        }
+    }
+
     /// One place-harness frame at `now` (the M4 place harnesses of worlds
     /// 1 and 2): the place animations' 15 Hz step (@ 0x00439c90), the
     /// frame hook (@ 0x004c27d0), the main loop's per-place tail
@@ -172,6 +188,51 @@ impl Game {
         self.slots.step(now, &mut self.rand);
         self.frame_hook();
         self.main_loop_hook();
+    }
+
+    /// One place-harness frame of the palace's harness at `now`: the place
+    /// animations' step, then for an object click the hit dispatch
+    /// (@ 0x004403e0 with the hit record = the first slot of the object
+    /// `object` whose click kind is 3: `CLICOBJET` := the object), the
+    /// frame hook (@ 0x004c27d0), on a click frame (`scan`: an object or a
+    /// zone click) the click scan (@ 0x004405b0), the main loop's place
+    /// tail (@ 0x004c1950). False when the view has no such slot.
+    #[doc(hidden)]
+    pub fn board_place_click(&mut self, now: f64, object: Option<&str>, scan: bool) -> bool {
+        self.now = now;
+        self.anim_tick = false;
+        self.slots.step(now, &mut self.rand);
+        let mut found = true;
+        if scan {
+            self.click = true;
+            if let Some(s) = self.script.as_mut() {
+                s.click = true;
+            }
+        }
+        if let Some(name) = object {
+            let id = self
+                .names
+                .id(atlantis2_data::defnames::OBJETS, name.as_bytes())
+                .map_or(-1, |i| i as i32);
+            match self.slots.slots.iter().find(|s| s.id == id && s.click == 3) {
+                Some(s) => {
+                    self.sprite_hit = Some((s.id, s.click));
+                    self.sprite_clicks();
+                }
+                None => found = false,
+            }
+        }
+        self.frame_hook();
+        if scan {
+            self.click_scan();
+        }
+        self.click = false;
+        self.sprite_hit = None;
+        if let Some(s) = self.script.as_mut() {
+            s.click = false;
+        }
+        self.main_loop_hook();
+        found
     }
 
     /// The place animations' 15 Hz step (@ 0x00439c90) at `now`, alone:
@@ -188,6 +249,12 @@ impl Game {
     #[doc(hidden)]
     pub fn board_hook(&mut self) {
         self.frame_hook();
+    }
+
+    /// The main loop's per-place tail (@ 0x004c1950) alone.
+    #[doc(hidden)]
+    pub fn board_main_tail(&mut self) {
+        self.main_loop_hook();
     }
 
     /// The camera as the warp's initialisation leaves it, then turned to
@@ -240,6 +307,25 @@ impl Game {
         };
         self.screen_step(left, right, None);
         self.puzzles.screen == Some(screen)
+    }
+
+    /// The game boy (`GBOY`, mode 12) started at `now` as the race step
+    /// starts it, without its music commands: the music volume saved
+    /// (0x007899d8) and set to 99 (@ 0x00434100), then the start
+    /// (@ 0x0041f660).
+    #[doc(hidden)]
+    pub fn board_gboy_start(&mut self, now: f64) {
+        self.now = now;
+        self.puzzles.tourmagi.saved_volume = self.music_level();
+        self.music_volume_set(99);
+        let Some(mut s) = self.script.take() else {
+            return;
+        };
+        {
+            let mut h = hooks::Hx { g: self, s: &mut s };
+            h.start_screen(hooks::Screen::GBoy);
+        }
+        self.script = Some(s);
     }
 
     /// The zone click hook (@ 0x004c32c0) on the zone `name` of the view
@@ -355,6 +441,37 @@ impl Game {
             "isis" | "fisherman" | "feathers" | "ankh" => Some(hooks::ldmorts_st(self, board)),
             "wolves" | "tiger" | "hunt" | "altar" => Some(hooks::paleo_st(self, board)),
             "couloir" => Some(hooks::couloir_st(self)),
+            "star" | "tt" | "tr" => Some(hooks::pmagi_st(self, board)),
+            "tower" => Some(hooks::tourmagi_st(self)),
+            "gboy" => {
+                let g = &p.screens.gboy;
+                Some(format!(
+                    "cur={} pick={} anim={} res={} blink={}/{}",
+                    g.cursor,
+                    g.pick,
+                    g.anim,
+                    p.tourmagi.dice,
+                    u8::from(g.phase),
+                    g.blinks
+                ))
+            }
+            "gboy_full" => {
+                let g = &p.screens.gboy;
+                let faces: Vec<String> = g.faces.iter().map(|f| f.to_string()).collect();
+                Some(format!(
+                    "cur={} pick={} k={} anim={} res={} hit={} blink={}/{} faces={} go={}",
+                    g.cursor,
+                    g.pick,
+                    g.k,
+                    g.anim,
+                    p.tourmagi.dice,
+                    u8::from(g.hit),
+                    u8::from(g.phase),
+                    g.blinks,
+                    faces.join(","),
+                    u8::from(g.go)
+                ))
+            }
             _ => None,
         }
     }
