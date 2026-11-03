@@ -36,6 +36,10 @@ fn main() {
     g.board_enter(31, at(0));
     let mut n = 1;
     g.board_frame(at(n), BoardInput::None);
+    // The start plays the unicorn's film first (@ 0x0042e7a0).
+    if g.video().is_some() {
+        g.finish_video();
+    }
     assert_eq!(g.board_mode_number(), 11, "the board runs");
     let (w, h) = (g.width() as i32, g.height() as i32);
     // A scratch board finds a pointer that drops on each cell.
