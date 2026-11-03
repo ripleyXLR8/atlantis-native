@@ -78,6 +78,13 @@ pub struct Mesh {
     pub uvs: [Vec<[f32; 2]>; 3],
     /// Faces per group (one group of every face in the heads).
     pub groups: Vec<u16>,
+    /// The bones of a skinned mesh, by node name (version ≥ 4): the
+    /// names [`Mesh::vertex_bones`] index (*Atlantis III*'s Licorne
+    /// board, the binding @ 0x0051b510).
+    pub bones: Vec<String>,
+    /// Per vertex, its bone's index in [`Mesh::bones`] (empty when the
+    /// mesh has no bones).
+    pub vertex_bones: Vec<u8>,
     /// One value per corner (record +0x16c), meaning unknown. It equals
     /// `corners` in 22 of the 28 heads and differs in the other 6, where
     /// some values exceed the vertex count; the heads' draw uses `corners`
@@ -108,6 +115,10 @@ pub struct Object {
     pub rotation: [f32; 4],
     pub position: [f32; 3],
     pub scale: f32,
+    /// Version ≥ 7: the object's kind (1 a bone, 0 a mesh or a dummy;
+    /// *Atlantis III*'s Licorne board splits its scenes by it,
+    /// @ 0x004bdb20 / @ 0x004bdb80); 0 before.
+    pub kind: u32,
 }
 
 /// A material (@ 0x004a6c70).
@@ -393,8 +404,8 @@ fn read_mesh(r: &mut Reader) -> Result<Mesh, DbError> {
         if v < 6 {
             r.vec_u32()?;
         }
-        r.strings()?;
-        r.vec_u8()?;
+        m.bones = r.strings()?;
+        m.vertex_bones = r.vec_u8()?;
         m.corner_vertices = r.vec_u16()?;
         r.vec_u16()?;
         r.vec_u16()?;
@@ -417,16 +428,17 @@ fn read_object(r: &mut Reader) -> Result<Object, DbError> {
     r.string()?;
     let mesh = r.string()?;
     let parent = r.string()?;
-    let o = Object {
+    let mut o = Object {
         name,
         mesh,
         parent,
         rotation: r.floats::<4>()?,
         position: r.floats::<3>()?,
         scale: r.f32()?,
+        kind: 0,
     };
     if v >= 7 {
-        r.u32()?;
+        o.kind = r.u32()?;
     }
     if v >= 9 {
         r.vec_u32()?;

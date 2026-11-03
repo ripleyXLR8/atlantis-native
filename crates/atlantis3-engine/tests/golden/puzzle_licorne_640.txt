@@ -1,0 +1,1135 @@
+# The unicorn board (LICORNE, loop mode 11) of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31)
+# with spr_p6.dll under emulation, 640 x 480 RGB565, the Pentium II routines (x87 0x0e7f), started at 100 s; frame n
+# runs at 100 + n * 1.0025 / 15 s. Before the runs: cells (the 2D cell positions per row), maze (the openings N W S
+# E per cell), dropmap (the drop cell of a carried beacon, pointer every 10 px). Per run: pointer / click / rclick
+# (the input written before frame f), snd (load, play, stop, test -> playing), cmd (RunOneCommand), draw (the
+# warp, black here; the sprite calls: BANK#F@X,Y*ALPHA, C: a centred call), poly <f> <group> <n> <md5> (the
+# polygons given to the rasteriser per object: uni the unicorn, tri the beast, bal the beacons, held the carried
+# beacon redrawn; md5 of their 0x24-byte vertex records), md5 (the screen at the flip), path (the unicorn's node
+# list: x,y,direction,beacon), ret (the frame returned 0: the stop ran), scan (CtrlScenarIN), st (the board's
+# globals that changed; float bits for uf tf um tm rt). The game's log lines are left out.
+setup wam jardin.wam world 3 (view 31 not entered)
+cells 0 70,104 119,104 167,104 216,104 265,104 314,104 363,104 411,104 460,104 509,104 558,104
+cells 1 62,146 111,146 162,146 212,146 262,146 312,146 363,146 412,146 463,146 513,146 563,146
+cells 2 53,190 104,190 156,190 207,190 259,190 311,190 363,190 415,190 466,190 518,190 570,190
+cells 3 44,236 97,236 151,236 203,236 257,236 311,236 363,236 417,236 470,236 523,236 577,236
+cells 4 35,287 90,287 145,287 200,287 255,287 310,287 365,287 419,287 475,287 530,287 585,287
+cells 5 27,340 83,340 139,340 196,340 253,340 310,340 367,340 423,340 480,340 537,340 594,340
+cells 6 17,397 75,397 134,397 192,397 251,397 310,397 368,397 427,397 486,397 544,397 603,397
+maze 0 ...E .W.E .WS. ...E .WS. ..SE .W.E .W.E .W.E .W.E .WS.
+maze 1 ...E .W.E NWS. ..S. N.S. N.S. ..SE .W.E .W.E .W.E NWS.
+maze 2 ..SE .W.E NW.E NW.. N.S. N.S. N.S. ..SE .W.E .W.E NWS.
+maze 3 N.S. ..S. ..SE .W.E NW.. N... N.S. N..E .W.E .W.E NWS.
+maze 4 N.SE NWSE NWS. ..SE .WSE .W.E NWS. ..SE .W.E .W.E NWS.
+maze 5 N.S. N.S. N.S. N... N.S. ..S. N... N.S. ...E .W.. N.S.
+maze 6 N... N... N..E .W.E NW.. N..E .W.E NW.E .W.E NW.. N...
+dropmap 0 - - - - - 1.0 1.0 1.0 1.0 - - 2.0 2.0 2.0 2.0 - - 3.0 3.0 3.0 3.0 3.0 - - 4.0 4.0 4.0 4.0 - - 5.0 5.0 5.0 5.0 5.0 - - 6.0 6.0 6.0 6.0 - - 7.0 7.0 7.0 7.0 7.0 - 8.0 8.0 8.0 8.0 8.0 - - 9.0 9.0 9.0 9.0 - - 10.0 10.0
+dropmap 10 - - - - - 1.0 1.0 1.0 1.0 - - 2.0 2.0 2.0 2.0 - - - 3.0 3.0 3.0 3.0 - - 4.0 4.0 4.0 4.0 - - 5.0 5.0 5.0 5.0 5.0 - - 6.0 6.0 6.0 6.0 - - 7.0 7.0 7.0 7.0 - - - 8.0 8.0 8.0 8.0 - - 9.0 9.0 9.0 9.0 - - 10.0 10.0
+dropmap 20 - - - - - 1.0 1.0 1.0 1.0 - - - 2.0 2.0 2.0 - - - 3.0 3.0 3.0 - - - - 4.0 4.0 4.0 - - - 5.0 5.0 5.0 - - - 6.0 6.0 6.0 - - - - 7.0 7.0 7.0 - - - 8.0 8.0 8.0 - - - 9.0 9.0 9.0 9.0 - - - 10.0
+dropmap 30 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 40 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 50 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 60 0.1 0.1 - - - 1.1 1.1 1.1 1.1 - - - 2.1 2.1 2.1 - - - 3.1 3.1 3.1 - - - - 4.1 4.1 4.1 - - - 5.1 5.1 5.1 - - - 6.1 6.1 6.1 - - - - 7.1 7.1 7.1 - - - 8.1 8.1 8.1 - - - 9.1 9.1 9.1 9.1 - - - 10.1
+dropmap 70 0.1 0.1 0.1 - - 1.1 1.1 1.1 1.1 - - 2.1 2.1 2.1 2.1 - - - 3.1 3.1 3.1 3.1 - - 4.1 4.1 4.1 4.1 - - 5.1 5.1 5.1 5.1 5.1 - - 6.1 6.1 6.1 6.1 - - 7.1 7.1 7.1 7.1 - - - 8.1 8.1 8.1 8.1 - - 9.1 9.1 9.1 9.1 - - 10.1 10.1
+dropmap 80 0.1 0.1 0.1 - - 1.1 1.1 1.1 1.1 - - 2.1 2.1 2.1 2.1 - - 3.1 3.1 3.1 3.1 3.1 - - 4.1 4.1 4.1 4.1 - - 5.1 5.1 5.1 5.1 5.1 - - 6.1 6.1 6.1 6.1 - - 7.1 7.1 7.1 7.1 7.1 - 8.1 8.1 8.1 8.1 8.1 - - 9.1 9.1 9.1 9.1 - - 10.1 10.1
+dropmap 90 0.1 0.1 0.1 - - 1.1 1.1 1.1 1.1 - - 2.1 2.1 2.1 2.1 - - - 3.1 3.1 3.1 3.1 - - 4.1 4.1 4.1 4.1 - - 5.1 5.1 5.1 5.1 - - - 6.1 6.1 6.1 6.1 - - 7.1 7.1 7.1 7.1 - - - 8.1 8.1 8.1 8.1 - - 9.1 9.1 9.1 9.1 - - 10.1 10.1
+dropmap 100 0.1 0.1 - - - - 1.1 1.1 - - - - 2.1 2.1 2.1 - - - 3.1 3.1 3.1 - - - - 4.1 4.1 4.1 - - - 5.1 5.1 5.1 - - - 6.1 6.1 6.1 - - - - 7.1 7.1 7.1 - - - 8.1 8.1 8.1 - - - - 9.1 9.1 - - - - 10.1
+dropmap 110 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 120 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 130 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 140 0.2 0.2 - - - 1.2 1.2 1.2 1.2 - - - 2.2 2.2 2.2 - - - 3.2 3.2 3.2 - - - - 4.2 4.2 4.2 - - - 5.2 5.2 5.2 - - - 6.2 6.2 6.2 6.2 - - - 7.2 7.2 7.2 - - - 8.2 8.2 8.2 - - - 9.2 9.2 9.2 9.2 - - - 10.2
+dropmap 150 0.2 0.2 0.2 - - 1.2 1.2 1.2 1.2 - - 2.2 2.2 2.2 2.2 - - - 3.2 3.2 3.2 3.2 - - 4.2 4.2 4.2 4.2 - - 5.2 5.2 5.2 5.2 5.2 - - 6.2 6.2 6.2 6.2 - - 7.2 7.2 7.2 7.2 - - - 8.2 8.2 8.2 8.2 - - 9.2 9.2 9.2 9.2 - - 10.2 10.2
+dropmap 160 0.2 0.2 0.2 - - 1.2 1.2 1.2 1.2 - - 2.2 2.2 2.2 2.2 - - 3.2 3.2 3.2 3.2 3.2 - - 4.2 4.2 4.2 4.2 - - 5.2 5.2 5.2 5.2 5.2 - - 6.2 6.2 6.2 6.2 - - 7.2 7.2 7.2 7.2 7.2 - - 8.2 8.2 8.2 8.2 - - 9.2 9.2 9.2 9.2 - - 10.2 10.2
+dropmap 170 0.2 0.2 - - - 1.2 1.2 1.2 1.2 - - 2.2 2.2 2.2 2.2 - - - 3.2 3.2 3.2 3.2 - - 4.2 4.2 4.2 4.2 - - - 5.2 5.2 5.2 - - - 6.2 6.2 6.2 6.2 - - 7.2 7.2 7.2 7.2 - - - 8.2 8.2 8.2 8.2 - - 9.2 9.2 9.2 9.2 - - - 10.2
+dropmap 180 0.2 0.2 - - - - 1.2 1.2 - - - - 2.2 2.2 - - - - 3.2 3.2 3.2 - - - - 4.2 4.2 4.2 - - - 5.2 5.2 5.2 - - - - 6.2 6.2 - - - - 7.2 7.2 7.2 - - - 8.2 8.2 8.2 - - - - 9.2 9.2 - - - - 10.2
+dropmap 190 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 200 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 210 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 220 0.3 0.3 - - - 1.3 1.3 1.3 1.3 - - - 2.3 2.3 2.3 - - - 3.3 3.3 3.3 - - - - 4.3 4.3 4.3 - - - 5.3 5.3 5.3 - - - 6.3 6.3 6.3 - - - - 7.3 7.3 7.3 - - - 8.3 8.3 8.3 - - - 9.3 9.3 9.3 9.3 - - - 10.3
+dropmap 230 0.3 0.3 0.3 - - 1.3 1.3 1.3 1.3 - - 2.3 2.3 2.3 2.3 - - - 3.3 3.3 3.3 3.3 - - 4.3 4.3 4.3 4.3 - - 5.3 5.3 5.3 5.3 5.3 - - 6.3 6.3 6.3 6.3 - - 7.3 7.3 7.3 7.3 - - - 8.3 8.3 8.3 8.3 - - 9.3 9.3 9.3 9.3 - - 10.3 10.3
+dropmap 240 0.3 0.3 0.3 - - 1.3 1.3 1.3 1.3 - - 2.3 2.3 2.3 2.3 - - 3.3 3.3 3.3 3.3 3.3 - - 4.3 4.3 4.3 4.3 - - 5.3 5.3 5.3 5.3 5.3 - - 6.3 6.3 6.3 6.3 - - 7.3 7.3 7.3 7.3 7.3 - 8.3 8.3 8.3 8.3 8.3 - - 9.3 9.3 9.3 9.3 - - 10.3 10.3
+dropmap 250 0.3 0.3 0.3 - - 1.3 1.3 1.3 1.3 - - 2.3 2.3 2.3 2.3 - - - 3.3 3.3 3.3 3.3 - - 4.3 4.3 4.3 4.3 - - 5.3 5.3 5.3 5.3 - - - 6.3 6.3 6.3 6.3 - - 7.3 7.3 7.3 7.3 - - - 8.3 8.3 8.3 8.3 - - 9.3 9.3 9.3 9.3 - - 10.3 10.3
+dropmap 260 0.3 0.3 - - - - 1.3 1.3 - - - - 2.3 2.3 2.3 - - - 3.3 3.3 3.3 - - - - 4.3 4.3 4.3 - - - 5.3 5.3 5.3 - - - 6.3 6.3 6.3 - - - - 7.3 7.3 7.3 - - - 8.3 8.3 8.3 - - - - 9.3 9.3 - - - - 10.3
+dropmap 270 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 280 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 290 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 300 0.4 0.4 - - - 1.4 1.4 1.4 1.4 - - - 2.4 2.4 2.4 - - - 3.4 3.4 3.4 - - - - 4.4 4.4 4.4 - - - 5.4 5.4 5.4 - - - 6.4 6.4 6.4 - - - - 7.4 7.4 7.4 - - - 8.4 8.4 8.4 - - - 9.4 9.4 9.4 9.4 - - - 10.4
+dropmap 310 0.4 0.4 0.4 - - 1.4 1.4 1.4 1.4 - - 2.4 2.4 2.4 2.4 - - - 3.4 3.4 3.4 3.4 - - 4.4 4.4 4.4 4.4 - - 5.4 5.4 5.4 5.4 5.4 - - 6.4 6.4 6.4 6.4 - - 7.4 7.4 7.4 7.4 - - - 8.4 8.4 8.4 8.4 - - 9.4 9.4 9.4 9.4 - - 10.4 10.4
+dropmap 320 0.4 0.4 0.4 - - 1.4 1.4 1.4 1.4 - - 2.4 2.4 2.4 2.4 - - 3.4 3.4 3.4 3.4 3.4 - - 4.4 4.4 4.4 4.4 - - 5.4 5.4 5.4 5.4 5.4 - - 6.4 6.4 6.4 6.4 - - 7.4 7.4 7.4 7.4 7.4 - 8.4 8.4 8.4 8.4 8.4 - - 9.4 9.4 9.4 9.4 - - 10.4 10.4
+dropmap 330 0.4 0.4 0.4 - - 1.4 1.4 1.4 1.4 - - 2.4 2.4 2.4 2.4 - - - 3.4 3.4 3.4 3.4 - - 4.4 4.4 4.4 4.4 - - 5.4 5.4 5.4 5.4 5.4 - - 6.4 6.4 6.4 6.4 - - 7.4 7.4 7.4 7.4 - - - 8.4 8.4 8.4 8.4 - - 9.4 9.4 9.4 9.4 - - 10.4 10.4
+dropmap 340 0.4 0.4 - - - - 1.4 1.4 - - - - 2.4 2.4 2.4 - - - 3.4 3.4 3.4 - - - - 4.4 4.4 4.4 - - - 5.4 5.4 5.4 - - - 6.4 6.4 6.4 - - - - 7.4 7.4 7.4 - - - 8.4 8.4 8.4 - - - - 9.4 9.4 - - - - 10.4
+dropmap 350 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 360 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 370 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 380 0.5 0.5 - - - 1.5 1.5 1.5 1.5 - - - 2.5 2.5 2.5 - - - 3.5 3.5 3.5 - - - - 4.5 4.5 4.5 - - - 5.5 5.5 5.5 - - - 6.5 6.5 6.5 - - - - 7.5 7.5 7.5 - - - 8.5 8.5 8.5 - - - 9.5 9.5 9.5 9.5 - - - 10.5
+dropmap 390 0.5 0.5 0.5 - - 1.5 1.5 1.5 1.5 - - 2.5 2.5 2.5 2.5 - - - 3.5 3.5 3.5 3.5 - - 4.5 4.5 4.5 4.5 - - 5.5 5.5 5.5 5.5 5.5 - - 6.5 6.5 6.5 6.5 - - 7.5 7.5 7.5 7.5 - - - 8.5 8.5 8.5 8.5 - - 9.5 9.5 9.5 9.5 - - 10.5 10.5
+dropmap 400 0.5 0.5 0.5 - - 1.5 1.5 1.5 1.5 - - 2.5 2.5 2.5 2.5 - - 3.5 3.5 3.5 3.5 3.5 - - 4.5 4.5 4.5 4.5 - - 5.5 5.5 5.5 5.5 5.5 - - 6.5 6.5 6.5 6.5 - - 7.5 7.5 7.5 7.5 7.5 - 8.5 8.5 8.5 8.5 8.5 - - 9.5 9.5 9.5 9.5 - - 10.5 10.5
+dropmap 410 0.5 0.5 0.5 - - 1.5 1.5 1.5 1.5 - - 2.5 2.5 2.5 2.5 - - - 3.5 3.5 3.5 3.5 - - 4.5 4.5 4.5 4.5 - - 5.5 5.5 5.5 5.5 5.5 - - 6.5 6.5 6.5 6.5 - - 7.5 7.5 7.5 7.5 - - - 8.5 8.5 8.5 8.5 - - 9.5 9.5 9.5 9.5 - - 10.5 10.5
+dropmap 420 0.5 0.5 - - - - 1.5 1.5 - - - - 2.5 2.5 2.5 - - - 3.5 3.5 3.5 - - - - 4.5 4.5 4.5 - - - 5.5 5.5 5.5 - - - 6.5 6.5 6.5 - - - - 7.5 7.5 7.5 - - - 8.5 8.5 8.5 - - - - 9.5 9.5 - - - - 10.5
+dropmap 430 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 440 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 450 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+dropmap 460 0.6 0.6 - - - 1.6 1.6 1.6 1.6 - - - 2.6 2.6 2.6 - - - 3.6 3.6 3.6 - - - - 4.6 4.6 4.6 - - - 5.6 5.6 5.6 - - - 6.6 6.6 6.6 - - - - 7.6 7.6 7.6 - - - 8.6 8.6 8.6 - - - 9.6 9.6 9.6 9.6 - - - -
+dropmap 470 0.6 0.6 0.6 - - 1.6 1.6 1.6 1.6 - - 2.6 2.6 2.6 2.6 - - - 3.6 3.6 3.6 3.6 - - 4.6 4.6 4.6 4.6 - - 5.6 5.6 5.6 5.6 5.6 - - 6.6 6.6 6.6 6.6 - - 7.6 7.6 7.6 7.6 - - - 8.6 8.6 8.6 8.6 - - 9.6 9.6 9.6 9.6 - - - -
+run pick
+st 0 mode=11 act=1 run=0 held=-1 n=0 us=0 un=0 ua=0 un2=0 tsk=0 tn=0 ta=0 won=0 lost=0 end=0 cur=40 uf=00000000 tf=00000000 um=00000000 tm=00000000 rt=00000000 b0=0,7 b1=1,7 b2=2,7 b3=3,7
+snd 1 test sfx\sound810.apc -> 0
+draw 1 warp=flat
+draw 1 spr\Interface.spr#40@320,240*0000803f
+poly 1 uni 214 a5cae29a9d692c1ced0e476c424a4455
+poly 1 bal 440 59d7dcf3a7a85f366c559fde845db229
+md5 1 0c8d916fcdbdc17f0b2c1276a747f5c6
+st 1 uf=3fd55556 tf=3fd55556
+snd 2 test sfx\sound810.apc -> 0
+draw 2 warp=flat
+draw 2 spr\Interface.spr#40@320,240*0000803f
+poly 2 uni 214 b4f3b18b5c8bb36ac1bb2eedd4f5c19c
+poly 2 bal 440 59d7dcf3a7a85f366c559fde845db229
+md5 2 a4fc474edd07ae4e4c235d54dd58a1f1
+st 2 uf=40555555 tf=40555555
+pointer 3 344 456
+snd 3 test sfx\sound810.apc -> 0
+draw 3 warp=flat
+draw 3 C:spr\Interface.spr#14@344,456
+poly 3 uni 214 603263c4cdc139be375d2064a65af228
+poly 3 bal 440 59d7dcf3a7a85f366c559fde845db229
+md5 3 12611af8cafdc7091700ca7084fba3e1
+st 3 cur=14 uf=409fffff tf=409fffff
+snd 4 test sfx\sound810.apc -> 0
+draw 4 warp=flat
+draw 4 C:spr\Interface.spr#15@344,456
+poly 4 uni 213 7b1e71f58da05d639d4ca3609804a50f
+poly 4 bal 440 59d7dcf3a7a85f366c559fde845db229
+md5 4 ccfd2f480a5a043f4c876ae0b2392ec4
+st 4 cur=15 uf=40d55553 tf=40d55553
+snd 5 test sfx\sound810.apc -> 0
+draw 5 warp=flat
+draw 5 C:spr\Interface.spr#16@344,456
+poly 5 uni 213 889f435dd33651725db7c884b5e2a159
+poly 5 bal 440 59d7dcf3a7a85f366c559fde845db229
+md5 5 6db1d26cf5294993c86be8f5c5277cb0
+st 5 cur=16 uf=41055553 tf=41055553
+click 6
+snd 6 load sfx\sound806.apc 0 1
+snd 6 play sfx\sound806.apc
+snd 6 test sfx\sound810.apc -> 0
+draw 6 warp=flat
+poly 6 uni 214 10ad46f7daf3662ab1159928b16c0704
+poly 6 bal 440 59d7dcf3a7a85f366c559fde845db229
+poly 6 held 110 4bdd8e6b12b0f1827be2254da1af3df6
+md5 6 5cc14ed24bca29ef9bc9a961f7fa16a9
+st 6 held=0 cur=17 uf=411ffffd tf=411ffffd
+snd 7 test sfx\sound810.apc -> 0
+draw 7 warp=flat
+poly 7 uni 213 a98860927fe16b2d1acfa84e5c92b62d
+poly 7 bal 432 60314d107ecd9411c218551c265d654c
+poly 7 held 102 fc8dc19afa419cda57fae05dcbe6d194
+md5 7 e3adf03fc2bb2a0d0a6002e5852561f8
+st 7 cur=18 uf=413aaaa7 tf=413aaaa7
+pointer 8 603 397
+snd 8 test sfx\sound810.apc -> 0
+draw 8 warp=flat
+poly 8 uni 213 b9843e71cd9b2805217dc999efab5244
+poly 8 bal 428 fde6ea0fe55987cc26865dccf298ffc9
+poly 8 held 98 64820b57f85fe7256874fb43e5487f53
+md5 8 71fbcf6b90c3bedcd25c4acf0f8f00ca
+st 8 cur=19 uf=41555551 tf=3faaaa8b
+snd 9 test sfx\sound810.apc -> 0
+draw 9 warp=flat
+poly 9 uni 213 9f348e7bda4c09087e13166854384005
+poly 9 bal 428 fde6ea0fe55987cc26865dccf298ffc9
+poly 9 held 98 64820b57f85fe7256874fb43e5487f53
+md5 9 8a0742b63b6fb0cc8936aacabce70240
+st 9 cur=20 uf=416ffffb tf=403ffff0
+pointer 10 70 104
+snd 10 test sfx\sound810.apc -> 0
+draw 10 warp=flat
+poly 10 uni 214 c60b0e3b1b3f9df1c4af9773703be1e4
+poly 10 bal 424 a3f1dc52280710caf4639700401887d7
+poly 10 held 94 279ff7930e759e1276d1cceefc7c801d
+md5 10 4b99210a2bab342b464cb239f76ef06e
+st 10 cur=21 uf=41855552 tf=4095554d
+snd 11 test sfx\sound810.apc -> 0
+draw 11 warp=flat
+poly 11 uni 214 99228c7b9e3b02356f725ca0b47fa232
+poly 11 bal 424 a3f1dc52280710caf4639700401887d7
+poly 11 held 94 279ff7930e759e1276d1cceefc7c801d
+md5 11 d29a3fafecee10a635fd94720edefc0f
+st 11 cur=22 uf=4192aaa6 tf=40caaaa1
+pointer 12 310 240
+snd 12 test sfx\sound810.apc -> 0
+draw 12 warp=flat
+poly 12 uni 214 43983a0988d3bd60ba743917f4c62b9f
+poly 12 bal 428 90257e1f2c9e8e1c4baee30edd09f182
+poly 12 held 98 cb57ebde3a30b7b5b57c028289c56f0b
+md5 12 bebee42fed15535a8309f9eee2ee5089
+st 12 cur=23 uf=419ffffa tf=40fffff5
+snd 13 test sfx\sound810.apc -> 0
+draw 13 warp=flat
+poly 13 uni 214 3209e334af88a7d66974e2b35a51345b
+poly 13 bal 428 90257e1f2c9e8e1c4baee30edd09f182
+poly 13 held 98 cb57ebde3a30b7b5b57c028289c56f0b
+md5 13 f1e21c8f721ffbde75968e59d9015ee8
+st 13 cur=24 uf=41ad554e tf=411aaaa4
+pointer 14 400 50
+snd 14 test sfx\sound810.apc -> 0
+draw 14 warp=flat
+poly 14 uni 214 0dcc9712fbadec9a563da2334145985e
+poly 14 bal 426 36a2911a0bcdd031fe58f42f9be67a52
+poly 14 held 96 e81a70707675d11f03409472d262195c
+md5 14 dbef137eeeebfaa017ed56fc78f17e0d
+st 14 cur=13 uf=41baaaa2 tf=4135554e
+snd 15 test sfx\sound810.apc -> 0
+draw 15 warp=flat
+poly 15 uni 214 5da9d00c24433c14676f851e477b57d1
+poly 15 bal 426 36a2911a0bcdd031fe58f42f9be67a52
+poly 15 held 96 e81a70707675d11f03409472d262195c
+md5 15 9544d018f0cf2766ac87ebab38f03de2
+st 15 cur=14 uf=41c7fff6 tf=3f7fff86
+click 16
+snd 16 test sfx\sound810.apc -> 0
+draw 16 warp=flat
+poly 16 uni 214 a5cae29a9d692c1ced0e476c424a4455
+poly 16 bal 426 36a2911a0bcdd031fe58f42f9be67a52
+poly 16 held 96 e81a70707675d11f03409472d262195c
+md5 16 a69c144ec616e680a27e17c18682be19
+st 16 cur=15 uf=3fd554ab tf=402aaa8c
+pointer 17 310 240
+snd 17 test sfx\sound810.apc -> 0
+draw 17 warp=flat
+poly 17 uni 214 b4f3b18b5c8bb36ac1bb2eedd4f5c19c
+poly 17 bal 428 90257e1f2c9e8e1c4baee30edd09f182
+poly 17 held 98 cb57ebde3a30b7b5b57c028289c56f0b
+md5 17 aaabd91a1668195db96019d45f1dce9a
+st 17 cur=16 uf=40555500 tf=408aaa9b
+click 18
+snd 18 load sfx\sound809.apc 0 1
+snd 18 play sfx\sound809.apc
+snd 18 test sfx\sound810.apc -> 0
+draw 18 warp=flat
+draw 18 C:spr\Interface.spr#14@311,236
+poly 18 uni 214 603263c4cdc139be375d2064a65af228
+poly 18 bal 430 486f575a83a882a0025899ecf2bb759f
+md5 18 3b0a1bb9cd7fcd6dc3ddf16e98507858
+st 18 held=-1 n=1 cur=14 uf=409fffd4 tf=40bfffef b0=5,3
+snd 19 test sfx\sound810.apc -> 0
+draw 19 warp=flat
+draw 19 C:spr\Interface.spr#15@311,236
+poly 19 uni 213 7b1e71f58da05d639d4ca3609804a50f
+poly 19 bal 430 486f575a83a882a0025899ecf2bb759f
+md5 19 495cd973c3af1f2131f988c8b77c75fa
+st 19 cur=15 uf=40d55528 tf=40f55543
+pointer 20 344 456
+snd 20 test sfx\sound810.apc -> 0
+draw 20 warp=flat
+draw 20 C:spr\Interface.spr#16@344,456
+poly 20 uni 213 889f435dd33651725db7c884b5e2a159
+poly 20 bal 430 486f575a83a882a0025899ecf2bb759f
+md5 20 5a20b840846e296fe4ce3ede912f202e
+st 20 cur=16 uf=4105553e tf=4115554b
+click 21
+snd 21 load sfx\sound806.apc 0 1
+snd 21 play sfx\sound806.apc
+snd 21 test sfx\sound810.apc -> 0
+draw 21 warp=flat
+poly 21 uni 214 10ad46f7daf3662ab1159928b16c0704
+poly 21 bal 430 486f575a83a882a0025899ecf2bb759f
+poly 21 held 114 e57927f2fad6313aa2bf550d502c4500
+md5 21 8856c3b0c443aa0d1e99fadbbe893886
+st 21 held=1 cur=17 uf=411fffe8 tf=412ffff5
+pointer 22 370 240
+snd 22 test sfx\sound810.apc -> 0
+draw 22 warp=flat
+poly 22 uni 213 a98860927fe16b2d1acfa84e5c92b62d
+poly 22 bal 415 efff20a1e9bb3b7001d612d5635ce211
+poly 22 held 99 67c0002924871ccbe852d033b6d6f8db
+md5 22 325a73e57eda4fe656df9d4b76f7f6cc
+st 22 cur=18 uf=413aaa92 tf=3f2aa9f0
+snd 23 test sfx\sound810.apc -> 0
+draw 23 warp=flat
+poly 23 uni 213 b9843e71cd9b2805217dc999efab5244
+poly 23 bal 415 efff20a1e9bb3b7001d612d5635ce211
+poly 23 held 99 67c0002924871ccbe852d033b6d6f8db
+md5 23 d17e0c0ec05164a30b886ec203b2d1e6
+st 23 cur=19 uf=4155553c tf=40155527
+click 24
+snd 24 load sfx\sound809.apc 0 1
+snd 24 play sfx\sound809.apc
+snd 24 test sfx\sound810.apc -> 0
+draw 24 warp=flat
+draw 24 C:spr\Interface.spr#14@363,236
+poly 24 uni 213 9f348e7bda4c09087e13166854384005
+poly 24 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 24 1ed5104ce7ced624c4673a8047370c2e
+st 24 held=-1 n=2 cur=14 uf=416fffe6 tf=407fffd1 b1=6,3
+pointer 25 370 240
+snd 25 test sfx\sound810.apc -> 0
+draw 25 warp=flat
+draw 25 C:spr\Interface.spr#15@370,240
+poly 25 uni 214 c60b0e3b1b3f9df1c4af9773703be1e4
+poly 25 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 25 175fcbcef16f43feab1cdc709cc1d1d5
+st 25 cur=15 uf=41855548 tf=40b5553d
+click 26
+snd 26 load sfx\sound806.apc 0 1
+snd 26 play sfx\sound806.apc
+snd 26 test sfx\sound810.apc -> 0
+draw 26 warp=flat
+poly 26 uni 214 99228c7b9e3b02356f725ca0b47fa232
+poly 26 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+poly 26 held 99 05d902b6592594074a7bf2db673a2133
+md5 26 5e7e3da923d1dd4d7d4a2b5ff434e5be
+st 26 held=1 cur=16 uf=4192aa9c tf=40eaaa91
+pointer 27 310 240
+snd 27 test sfx\sound810.apc -> 0
+draw 27 warp=flat
+poly 27 uni 214 43983a0988d3bd60ba743917f4c62b9f
+poly 27 bal 414 b87844ee5812490b992194204b3c325e
+poly 27 held 98 481229b2d748fb7a127250c2d600c0ff
+md5 27 f5d689b196d19b5977d945116e65a91e
+st 27 cur=17 uf=419ffff0 tf=410ffff2
+snd 28 test sfx\sound810.apc -> 0
+draw 28 warp=flat
+poly 28 uni 214 3209e334af88a7d66974e2b35a51345b
+poly 28 bal 414 b87844ee5812490b992194204b3c325e
+poly 28 held 98 481229b2d748fb7a127250c2d600c0ff
+md5 28 3ef7a732581a18b4f916fb46e3eb83f8
+st 28 cur=18 uf=41ad5544 tf=412aaa9c
+rclick 29
+snd 29 load sfx\sound805.apc 0 1
+snd 29 play sfx\sound805.apc
+snd 29 test sfx\sound810.apc -> 0
+draw 29 warp=flat
+draw 29 spr\Interface.spr#40@310,240*0000803f
+poly 29 uni 214 0dcc9712fbadec9a563da2334145985e
+poly 29 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 29 3c9bf361f24889ab7d7775b8d2e5a428
+st 29 held=-1 cur=40 uf=41baaa98 tf=3eaaa8c0
+snd 30 test sfx\sound810.apc -> 0
+draw 30 warp=flat
+draw 30 C:spr\Interface.spr#14@310,240
+poly 30 uni 214 5da9d00c24433c14676f851e477b57d1
+poly 30 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 30 05ebc0d6ec4637b6cfcb488a3cc87d68
+st 30 cur=14 uf=41c7ffec tf=3fffff86
+rclick 31
+snd 31 test sfx\sound810.apc -> 0
+draw 31 warp=flat
+draw 31 C:spr\Interface.spr#15@310,240
+poly 31 uni 214 a5cae29a9d692c1ced0e476c424a4455
+poly 31 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 31 2fba4c974c4550f15f383b405e7cf62e
+st 31 cur=15 uf=3fd5540b tf=406aaa6d
+snd 32 test sfx\sound810.apc -> 0
+draw 32 warp=flat
+draw 32 C:spr\Interface.spr#16@310,240
+poly 32 uni 214 b4f3b18b5c8bb36ac1bb2eedd4f5c19c
+poly 32 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 32 250958fd46322e24df5c46abad9b578c
+st 32 cur=16 uf=405554b0 tf=40aaaa8b
+pointer 33 603 397
+snd 33 test sfx\sound810.apc -> 0
+draw 33 warp=flat
+draw 33 C:spr\Interface.spr#17@603,397
+poly 33 uni 214 603263c4cdc139be375d2064a65af228
+poly 33 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 33 789725aeac5d926067a4c55a02cf1b52
+st 33 cur=17 uf=409fffac tf=40dfffdf
+click 34
+snd 34 load sfx\sound803.apc 0 1
+snd 34 play sfx\sound803.apc
+path 34 11 10,6,0,0 10,5,0,0 10,4,1,0 9,4,1,0 8,4,1,0 7,4,2,0 7,5,2,0 7,6,1,0 6,6,1,0 5,6,0,0 5,5,0,0
+snd 34 test sfx\sound810.apc -> 0
+snd 34 load sfx\sound810.apc 0 1
+snd 34 play sfx\sound810.apc
+draw 34 warp=flat
+poly 34 uni 210 34cba65620da19ef700a145aa42586d8
+poly 34 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 34 82b531b00c556de2ea42fc8d783366a8
+st 34 run=1 us=1 un=1 ua=2 un2=1 cur=18 uf=3f555556 tf=410aaa99 um=3fd55556 rt=3fd55556
+snd 35 test sfx\sound810.apc -> 1
+draw 35 warp=flat
+poly 35 uni 209 1b3b432f28b26b76b8d3a8a467f694a4
+poly 35 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 35 960955c25413d5c5d71ff5baa922d842
+st 35 cur=19 uf=40200000 tf=41255543 um=40555555 rt=40555555
+snd 36 test sfx\sound810.apc -> 1
+draw 36 warp=flat
+poly 36 uni 198 843d6f9b406bc3427c7396d7b237445d
+poly 36 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 36 ec0ddbcacf3fd94b2a3efa1b874f065b
+st 36 cur=20 uf=40855555 tf=413fffed um=409fffff rt=409fffff
+snd 37 test sfx\sound810.apc -> 1
+draw 37 warp=flat
+poly 37 uni 192 b063c091605e9cd9e51cbc8ceb5ad6f2
+poly 37 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 37 7e13f50c2d7b3a290eed3fde5fcd411d
+st 37 cur=21 uf=40baaaa9 tf=3fd554bb um=40d55553 rt=40d55553
+snd 38 test sfx\sound810.apc -> 1
+draw 38 warp=flat
+poly 38 uni 205 cde8cb97095dc7ed476747ae24e0c669
+poly 38 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 38 babc637718a650e69e61110796218dcc
+st 38 cur=22 uf=40effffd tf=40555508 um=41055553 rt=41055553
+snd 39 test sfx\sound810.apc -> 1
+draw 39 warp=flat
+poly 39 uni 206 9313b4fee7583707dc6021c732b3929e
+poly 39 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 39 aa9880cf06d3e7a15cc266afb32ddac1
+st 39 ua=1 cur=23 uf=3f955543 tf=409fffd8 um=411ffffd rt=411ffffd
+snd 40 test sfx\sound810.apc -> 1
+draw 40 warp=flat
+poly 40 uni 204 0de1c6a12f39a81dbddcb5b7297064cb
+poly 40 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 40 9d7d673898861c03814c46e1d1aefbec
+st 40 cur=24 uf=4035554c tf=40d5552c um=413aaaa7 rt=413aaaa7
+snd 41 test sfx\sound810.apc -> 1
+draw 41 warp=flat
+poly 41 uni 208 6aae2ea32ed0f0c28ea55ed0fc898441
+poly 41 tri 154 9a67714d2f9fd2b4baa952effee5e115
+poly 41 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 41 bc961d38a37aa687f9c0c04b4c5f62e3
+st 41 tsk=1 tn=1 cur=13 uf=408ffffb tf=41055540 um=41555551 tm=3fd55556 rt=41555551
+snd 42 test sfx\sound810.apc -> 1
+draw 42 warp=flat
+poly 42 uni 202 1773978a07a41713303c64c0a9df42da
+poly 42 tri 151 8f0d9801966c2d9a0fa46d597726a6f2
+poly 42 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 42 b48cd158a7781a3341ced0e3f3feae72
+st 42 cur=14 uf=40c5554f tf=411fffea um=416ffffb tm=40555555 rt=416ffffb
+snd 43 test sfx\sound810.apc -> 1
+draw 43 warp=flat
+poly 43 uni 198 5a64efcb531a21f09268280ec5f22ea5
+poly 43 tri 138 efaf390896b66dc74c733b5eb731301a
+poly 43 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 43 9b409a9694ede62fbfae18ba7d6057e2
+st 43 us=5 un=2 cur=15 uf=40faaaa3 tf=413aaa94 um=3fbfffcb tm=409fffff rt=41855552
+snd 44 test sfx\sound810.apc -> 1
+draw 44 warp=flat
+poly 44 uni 200 d9ed178cd6844a1e9dec823f3927e813
+poly 44 tri 137 641f0a9177b481ff63b6900284a53128
+poly 44 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 44 fb56ed1438a470b4407228fb2c6f0bd5
+st 44 cur=16 uf=4117fffb tf=3faaa9f3 um=404aaa90 tm=40d55553 rt=4192aaa6
+snd 45 test sfx\sound810.apc -> 1
+draw 45 warp=flat
+poly 45 uni 201 abbbde4d6b2bd1560dee658a515fb45a
+poly 45 tri 139 11de3331a1ae9feb4f65449430c87381
+poly 45 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 45 4ac0875901f31f81324e16e49190a7aa
+st 45 cur=17 uf=4132aaa5 tf=403fffa4 um=409aaa9d tm=41055553 rt=419ffffa
+snd 46 test sfx\sound810.apc -> 1
+draw 46 warp=flat
+poly 46 uni 205 7e6b2995229fb3043fefb6ef6bbb79da
+poly 46 tri 150 9c77ffa8e786c375da46e3c10400cd87
+poly 46 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 46 4fe006b804b997c0386159793bf4ec34
+st 46 cur=18 uf=3f5554f0 tf=40955527 um=40cffff1 tm=411ffffd rt=41ad554e
+snd 47 test sfx\sound810.apc -> 1
+draw 47 warp=flat
+poly 47 uni 204 5a12799fa149dd67981f1579e6e76707
+poly 47 tri 161 ecc9a45043de63664e538e47f1d837ad
+poly 47 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 47 ac150d895fc9e7880d4b7fa230651667
+st 47 cur=19 uf=401fffe7 tf=40caaa7b um=4102aaa2 tm=413aaaa7 rt=41baaaa2
+snd 48 test sfx\sound810.apc -> 1
+draw 48 warp=flat
+poly 48 uni 206 0cf3519e43c6aa11236759a2c165a593
+poly 48 tri 156 98e2847e3936f547a133b47526f50e33
+poly 48 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 48 bc703721de26165e1ecae9f45dd07c69
+st 48 cur=20 uf=40855548 tf=40ffffcf um=411d554c tm=41555551 rt=41c7fff6
+snd 49 test sfx\sound810.apc -> 1
+draw 49 warp=flat
+poly 49 uni 193 6e9e0acb91aa00c7cf62dd902ef47317
+poly 49 tri 151 b5cbae8d74d25067065669c4d9752bd9
+poly 49 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 49 dcf3c1a82e7e051710564338766cb421
+st 49 cur=21 uf=40baaa9c tf=411aaa91 um=4137fff6 tm=416ffffb rt=41d5554a
+snd 50 test sfx\sound810.apc -> 1
+draw 50 warp=flat
+poly 50 uni 198 6781a7a7c4476657280f9bb6433551ce
+poly 50 tri 138 30ccab113db6456868daf52d23d5b06d
+poly 50 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 50 03da45b95a45d346138047bac13b681a
+st 50 cur=22 uf=40effff0 tf=4135553b um=4152aaa0 tm=41855552 rt=41e2aa9e
+snd 51 test sfx\sound810.apc -> 1
+draw 51 warp=flat
+poly 51 uni 204 1d55506fce5a4160e1d6891feebaafea
+poly 51 tri 135 218e9b732e864c3229fb982d36371f23
+poly 51 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 51 107e85900ec02a049e48599d2b060269
+st 51 cur=23 uf=4112aaa2 tf=3f7ffe56 um=416d554a tm=4192aaa6 rt=41effff2
+snd 52 test sfx\sound810.apc -> 1
+draw 52 warp=flat
+poly 52 uni 197 d004183ef50f6536fde6ebc2f4b45da4
+poly 52 tri 137 848ca67ada5d82baea05465c71f36550
+poly 52 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 52 26002077729f77019c4d553416e8bf6f
+st 52 cur=24 uf=412d554c tf=402aaa40 um=4183fffa tm=419ffffa rt=41fd5546
+snd 53 test sfx\sound810.apc -> 1
+draw 53 warp=flat
+poly 53 uni 206 57aa5b7a5cb8e47c69bfebea1e3efb20
+poly 53 tri 149 91bda6b4e09dfd7d047a9034f6508ce0
+poly 53 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 53 7cfcf6549e8da7cd5a41bdc56ad82e03
+st 53 tsk=5 tn=2 cur=13 uf=3efffec0 tf=408aaa75 um=4191554e tm=401fffcb rt=4205554d
+snd 54 test sfx\sound810.apc -> 1
+draw 54 warp=flat
+poly 54 uni 200 d0d557a0713acf2259ad4cdf95b36956
+poly 54 tri 151 0bc6fe285c2e62928c79dc384eea0234
+poly 54 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 54 28fbbd9638894f07f6ba15f6599f1c5f
+st 54 cur=14 uf=400aaa83 tf=40bfffc9 um=419eaaa2 tm=4085553a rt=420bfff7
+snd 55 test sfx\sound810.apc -> 1
+draw 55 warp=flat
+poly 55 uni 206 371c893ee52c9bb152ed7016b733f578
+poly 55 tri 156 00e2ffeedb64fe6845f3d7bab8742f11
+poly 55 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 55 6719930955f3734e89f1c620be80c63b
+st 55 us=4 un=3 cur=15 uf=4075552d tf=40f5551d um=4015550b tm=40baaa8e rt=4212aaa1
+snd 56 test sfx\sound810.apc -> 1
+draw 56 warp=flat
+poly 56 uni 195 ac6fae2bebeee1ffd839b01b25061cec
+poly 56 tri 149 c0ded0536e7bcec607f1024852abe2fa
+poly 56 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 56 d5fab1c20aed1998bcb853ae06edf3ef
+st 56 cur=16 uf=40afffeb tf=41155538 um=407fffb5 tm=40efffe2 rt=4219554b
+snd 57 test sfx\sound810.apc -> 1
+draw 57 warp=flat
+poly 57 uni 199 ae7ff91947aee7374e6d5e7ee2b83f7a
+poly 57 tri 149 ac438b9a8c045e5e1a16bdb147e48e4b
+poly 57 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 57 2962fd730fb849adb4a0de0f3b2cf9bf
+st 57 cur=17 uf=40e5553f tf=412fffe2 um=40b5552f tm=4112aa9b rt=421ffff5
+snd 58 test sfx\sound810.apc -> 1
+draw 58 warp=flat
+poly 58 uni 197 c2de234f543d53a7fd5406ac3f40aae6
+poly 58 tri 135 d8e7e3aefea0b514d7dd37d2a7acd656
+poly 58 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 58 33f284a5e8d8b60a0a74507a4ba7dcdb
+st 58 cur=18 uf=410d5549 tf=3f2aa8c0 um=40eaaa83 tm=412d5545 rt=4226aa9f
+snd 59 test sfx\sound810.apc -> 1
+draw 59 warp=flat
+poly 59 uni 201 6f1d58cb6e4d3d88c7f34da4abcb8e1f
+poly 59 tri 138 493c7c39d2728ab53c4d07e1586e39fb
+poly 59 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 59 fcbce9880a9e49ab4c27b1ae7e0145e0
+st 59 cur=19 uf=4127fff3 tf=401554db um=410fffeb tm=4147ffef rt=422d5549
+snd 60 test sfx\sound810.apc -> 1
+draw 60 warp=flat
+poly 60 uni 211 ac47a896755e802e4ab4857510dd66c1
+poly 60 tri 144 b54f0ef3463a4ea6bd8ab8ae5c0a2545
+poly 60 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 60 513110bf5efa013970affd3aeb70265a
+st 60 cur=20 uf=3e2aa740 tf=407fff85 um=412aaa95 tm=4162aa99 rt=4233fff3
+snd 61 test sfx\sound810.apc -> 1
+draw 61 warp=flat
+poly 61 uni 205 c2c04ce3df4246de0120549128fa1bd3
+poly 61 tri 149 bd33f9ce259b7c33c0364d85f3cedc79
+poly 61 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 61 ecf4d3f0c7d08460dfa7a5bcc0199eac
+st 61 cur=21 uf=3feaaa3e tf=40b55517 um=4145553f tm=417d5543 rt=423aaa9d
+snd 62 test sfx\sound810.apc -> 1
+draw 62 warp=flat
+poly 62 uni 211 36ccf962bc89de13cec9fa41f613c672
+poly 62 tri 155 af843986c8bac95090260b0eb3d512ad
+poly 62 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 62 c770a7670114ef063ccdb2fb2beab8c7
+st 62 cur=22 uf=405fffc9 tf=40eaaa6b um=415fffe9 tm=418bfff6 rt=42415547
+snd 63 test sfx\sound810.apc -> 1
+draw 63 warp=flat
+poly 63 uni 208 d7c2e9dcb3555f2c435499a2ff95147d
+poly 63 tri 151 a27d5ef05a431c1a56e36053acda756f
+poly 63 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 63 7c897d019c38453b1d6fd06d04103050
+st 63 cur=23 uf=40a55539 tf=410fffdf um=417aaa93 tm=4199554a rt=4247fff1
+snd 64 test sfx\sound810.apc -> 1
+draw 64 warp=flat
+poly 64 uni 202 b1ca0482d427270e4c817b84517b9a27
+poly 64 tri 144 35e0aa4aef15236169d11fb9b785ae3b
+poly 64 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 64 ea50e2f90068580e283ce79e71e2f213
+st 64 us=5 un=4 tsk=4 tn=3 cur=24 uf=40daaa8d tf=412aaa89 um=400aaa4b tm=3fd5548b rt=424eaa9b
+snd 65 test sfx\sound810.apc -> 1
+draw 65 warp=flat
+poly 65 uni 196 2fff07c51e823f760fd18d60c537bfc8
+poly 65 tri 130 9ce45e63ddd30b18476f6a48ff5c78a5
+poly 65 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 65 c6795a67f6292149d264065e939c1ef7
+st 65 cur=13 uf=4107fff0 tf=3eaaa660 um=407554f5 tm=405554f0 rt=42555545
+snd 66 test sfx\sound810.apc -> 1
+draw 66 warp=flat
+poly 66 uni 199 6f83e616666dfece64df2ee574b749eb
+poly 66 tri 132 0888e86de4b723b5101205aae78d5647
+poly 66 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 66 6626d5444ffe5029de5d158fb0caa6ed
+st 66 cur=14 uf=4122aa9a tf=3ffffeee um=40afffcf tm=409fffcc rt=425bffef
+snd 67 test sfx\sound810.apc -> 1
+draw 67 warp=flat
+poly 67 uni 207 99b1da5d8f53fda066af20b4f1ba5761
+poly 67 tri 142 6de036765b44d6b70c52f1d6310d60ba
+poly 67 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 67 1a6dddf51044eeb8c15a81ca4e2aafc9
+st 67 cur=15 uf=413d5544 tf=406aaa21 um=40e55523 tm=40d55520 rt=4262aa99
+snd 68 test sfx\sound810.apc -> 1
+draw 68 warp=flat
+poly 68 uni 203 9be5380f6e0ec1372b6d6dc9dc584743
+poly 68 tri 147 d3b4e86ba74530ea03b4aab0486c4f81
+poly 68 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 68 659920f7762d94d1e25772d29f4bddcd
+st 68 cur=16 uf=3fbfff73 tf=40aaaa65 um=410d553b tm=4105553a rt=42695543
+snd 69 test sfx\sound810.apc -> 1
+draw 69 warp=flat
+poly 69 uni 213 fa2127c53df28121bbbef43389c0454b
+poly 69 tri 149 bed085d4f008b0d84c74b1ae41b9e22d
+poly 69 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 69 f58fbf0b5fb548cca2244f05ccc0ef5c
+st 69 cur=17 uf=404aaa64 tf=40dfffb9 um=4127ffe5 tm=411fffe4 rt=426fffed
+snd 70 test sfx\sound810.apc -> 1
+draw 70 warp=flat
+poly 70 uni 207 8d95e944cc40ecce39194bb4981e8e90
+poly 70 tri 156 9f3358a7aa59e004a75949e0b3131a06
+poly 70 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 70 d2c86d467f0f2939ba88d6527d567e86
+st 70 cur=18 uf=409aaa87 tf=410aaa86 um=4142aa8f tm=413aaa8e rt=4276aa97
+snd 71 test sfx\sound810.apc -> 1
+draw 71 warp=flat
+poly 71 uni 202 4f59ff66e870e4c866258363c41afb7e
+poly 71 tri 153 4267a4b7738d378c531d535db6e2c9a2
+poly 71 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 71 7fe59878082071e75a5206648a842682
+st 71 cur=19 uf=40cfffdb tf=41255530 um=415d5539 tm=41555538 rt=427d5541
+snd 72 test sfx\sound810.apc -> 1
+draw 72 warp=flat
+poly 72 uni 198 845698f0d85f468d92d9750cfc3676d5
+poly 72 tri 148 44d5d83db657ee23e9227cdafc57d589
+poly 72 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 72 bba3f9fde8c1475546829cd687326cff
+st 72 cur=20 uf=4102aa97 tf=413fffda um=4177ffe3 tm=416fffe2 rt=4281fff5
+snd 73 test sfx\sound810.apc -> 1
+draw 73 warp=flat
+poly 73 uni 205 a5dc7fda1911f4bcf2c841eb50745e71
+poly 73 tri 145 e1bc941b637b595eeb0dcc5cd9ca533c
+poly 73 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 73 c7e09fee2b6d613062da7be9e972d415
+st 73 tsk=5 tn=4 cur=21 uf=411d5541 tf=3fd55423 um=41895546 tm=3fbfff0b rt=42855549
+snd 74 test sfx\sound810.apc -> 1
+draw 74 warp=flat
+poly 74 uni 208 93faec752df00903690e99d5182ff3ef
+poly 74 tri 148 05d50eb655fefdc2a90d2d8184cd83b2
+poly 74 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 74 2d6611e66ef948229035348f6ae0664b
+st 74 cur=22 uf=4137ffeb tf=405554bc um=4196aa9a tm=404aaa30 rt=4288aa9d
+snd 75 test sfx\sound810.apc -> 1
+draw 75 warp=flat
+poly 75 uni 203 47d172886425dcbe34dd51df0fc86d58
+poly 75 tri 149 3b888948b9c847cd5696d98ba8465591
+poly 75 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 75 e6b8c7e1bf6167f0274afee9ab981fca
+st 75 un=5 cur=23 uf=3f9554ab tf=409fffb2 um=3faaa98b tm=409aaa6d rt=428bfff1
+snd 76 test sfx\sound810.apc -> 1
+draw 76 warp=flat
+poly 76 uni 207 465cccff09e075464769d67fc68b37d6
+poly 76 tri 154 46563080d9305c67dce5a4af713b71a4
+poly 76 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 76 a1e031f2e0b13fbed4035283e460f9b4
+st 76 cur=24 uf=40355500 tf=40d55506 um=403fff70 tm=40cfffc1 rt=428f5545
+snd 77 test sfx\sound810.apc -> 1
+draw 77 warp=flat
+poly 77 uni 204 a0ab799233b2d4506ba69aafdeaa055a
+poly 77 tri 162 99e5378ff17f6e7a24c5e9ec07f2f0c8
+poly 77 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 77 0cb6d536543379fffd47ce2750016df8
+st 77 cur=13 uf=408fffd5 tf=4105552d um=4095550d tm=4102aa8a rt=4292aa99
+snd 78 test sfx\sound810.apc -> 1
+draw 78 warp=flat
+poly 78 uni 204 0ec401a90d151b6095529c01881025ff
+poly 78 tri 152 c9cf0aa86b6ee85cdb94716a594f5aac
+poly 78 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 78 ce5570551e98903d7d699b22bf44250f
+st 78 cur=14 uf=40c55529 tf=411fffd7 um=40caaa61 tm=411d5534 rt=4295ffed
+snd 79 test sfx\sound810.apc -> 1
+draw 79 warp=flat
+poly 79 uni 204 e8214f4fa7b91fae9364b73cf0b39925
+poly 79 tri 150 0a8bb421cfdc26667c285fa3ad45008c
+poly 79 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 79 423c57ab4a75f84240f686b4168804ea
+st 79 cur=15 uf=40faaa7d tf=413aaa81 um=40ffffb5 tm=4137ffde rt=42995541
+snd 80 test sfx\sound810.apc -> 1
+draw 80 warp=flat
+poly 80 uni 203 d0ed78c99ebfeb6918bc7df84d650317
+poly 80 tri 147 57ca2b9ee96eff9915fc0b57882fd060
+poly 80 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 80 1d1cd6154b4be68b626a25aed6fb8b76
+st 80 cur=16 uf=4117ffe8 tf=3faaa95b um=411aaa84 tm=4152aa88 rt=429caa95
+snd 81 test sfx\sound810.apc -> 1
+draw 81 warp=flat
+poly 81 uni 208 4fa97953ab37136d3c73c7d72f99d607
+poly 81 tri 148 3fc85de71180bdeabd33ce945f270207
+poly 81 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 81 678d13507495d7188e46b7a90483c421
+st 81 cur=17 uf=4132aa92 tf=403fff58 um=4135552e tm=416d5532 rt=429fffe9
+snd 82 test sfx\sound810.apc -> 1
+draw 82 warp=flat
+poly 82 uni 209 23911087a3e75738f1fba601d5017422
+poly 82 tri 148 596e7a53c33cdc4ce2ec85c772f42bde
+poly 82 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 82 39c73d61af22a5838e6cf54390e57a87
+st 82 cur=18 uf=3f5553c0 tf=40955501 um=414fffd8 tm=4183ffee rt=42a3553d
+snd 83 test sfx\sound810.apc -> 1
+draw 83 warp=flat
+poly 83 uni 207 643082c113976e7041e39596989cb609
+poly 83 tri 155 98e58ef087d526e0bff789774544f07d
+poly 83 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 83 e1346f5008aa4880e52346a31045172b
+st 83 cur=19 uf=401fff9b tf=40caaa55 um=416aaa82 tm=41915542 rt=42a6aa91
+snd 84 test sfx\sound810.apc -> 1
+draw 84 warp=flat
+poly 84 uni 209 2c125d59b41cd3e8b6321c7e31c49d9f
+poly 84 tri 161 cda0b4728e73065edb562526b388470d
+poly 84 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 84 250d29a100871b4645da021519f9e284
+st 84 cur=20 uf=40855522 tf=40ffffa9 um=4182aa96 tm=419eaa96 rt=42a9ffe5
+snd 85 test sfx\sound810.apc -> 1
+draw 85 warp=flat
+poly 85 uni 204 c1b7f6370fd84c67aca96b5fef90b654
+poly 85 tri 155 02ae6ee9c8135e3bba95c77b5470118c
+poly 85 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 85 d5428829a53155e68b53878a5fb82be5
+st 85 tn=5 cur=21 uf=40baaa76 tf=411aaa7e um=418fffea tm=401554ab rt=42ad5539
+snd 86 test sfx\sound810.apc -> 1
+draw 86 warp=flat
+poly 86 uni 201 6a570c209b3093e8bce2ae51385b6e82
+poly 86 tri 149 df8d7b416080c97abeb9c8d89bdc7a3f
+poly 86 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 86 cf1ec895169e261e897c80337b2f69b4
+st 86 cur=22 uf=40efffca tf=41355528 um=419d553e tm=407fff55 rt=42b0aa8d
+snd 87 test sfx\sound810.apc -> 1
+draw 87 warp=flat
+poly 87 uni 203 6e11eee647e0e598af46b8933c947855
+poly 87 tri 149 0a60d3935c888ff0d2dc413b4c09291e
+poly 87 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 87 307d1e42de78868c6b1c375004fe0f45
+st 87 us=4 un=6 cur=23 uf=4112aa8f tf=3f7ffd26 um=400aa9eb tm=40b554ff rt=42b3ffe1
+snd 88 test sfx\sound810.apc -> 1
+draw 88 warp=flat
+poly 88 uni 201 d6c13cf28604886c9aa82fcd7ca29a35
+poly 88 tri 146 860c6359a5bc3559b845805c38d37e54
+poly 88 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 88 3bad740337fd3677e97171b23aaf897e
+st 88 cur=24 uf=412d5539 tf=402aa9f4 um=40755495 tm=40eaaa53 rt=42b75535
+snd 89 test sfx\sound810.apc -> 1
+draw 89 warp=flat
+poly 89 uni 215 4a8ea79550a80b99ce86c3e088ec632c
+poly 89 tri 151 f1f745dfb1d47d998269aee742f3ebd2
+poly 89 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 89 cd7e2cd63da31811000d0a357c04ad0f
+st 89 cur=13 uf=3efffc60 tf=408aaa4f um=40afff9f tm=410fffd3 rt=42baaa89
+snd 90 test sfx\sound810.apc -> 1
+draw 90 warp=flat
+poly 90 uni 220 5ee54c681cc6fd9c6d92b4765f5cc753
+poly 90 tri 153 fabf25cec4a2dfd2c9dfa006c027e2a2
+poly 90 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 90 eb826c2bf9e06a185df1cf953b23f7a9
+st 90 cur=14 uf=400aaa37 tf=40bfffa3 um=40e554f3 tm=412aaa7d rt=42bdffdd
+snd 91 test sfx\sound810.apc -> 1
+draw 91 warp=flat
+poly 91 uni 215 45a3a8b026219239e6e8194151dfa2bb
+poly 91 tri 164 3d229fe55e72c739a76e41218b3ba8ab
+poly 91 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 91 cc7aea8d70d2e84368a6bacb7787edf5
+st 91 cur=15 uf=407554e1 tf=40f554f7 um=410d5523 tm=41455527 rt=42c15531
+snd 92 test sfx\sound810.apc -> 1
+draw 92 warp=flat
+poly 92 uni 208 e608a5340ce55ca30e4142f8cd13e017
+poly 92 tri 155 02c962a5746a763f8c2ea7b398de1fad
+poly 92 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 92 1314f073451a8c7ed3bfc3c0d76878eb
+st 92 cur=16 uf=40afffc5 tf=41155525 um=4127ffcd tm=415fffd1 rt=42c4aa85
+snd 93 test sfx\sound810.apc -> 1
+draw 93 warp=flat
+poly 93 uni 202 80ee0dd9f91603dcdc913bce96dc2330
+poly 93 tri 155 4a295d4483f75ac15df553e4468a5a52
+poly 93 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 93 fbca35b227a8dc4cb0620563d18b1406
+st 93 cur=17 uf=40e55519 tf=412fffcf um=4142aa77 tm=417aaa7b rt=42c7ffd9
+snd 94 test sfx\sound810.apc -> 1
+draw 94 warp=flat
+poly 94 uni 200 25da1b51063eaf3f0a0d438aaf8da10f
+poly 94 tri 148 f673ea8d5efa3643360f657101087c9c
+poly 94 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 94 26a60c7c1b5d5dd9f79fcba7320ce33f
+st 94 cur=18 uf=410d5536 tf=3f2aa790 um=415d5521 tm=418aaa92 rt=42cb552d
+snd 95 test sfx\sound810.apc -> 1
+draw 95 warp=flat
+poly 95 uni 202 1314212d7576b01efc96cd1d7a113524
+poly 95 tri 148 5804a333c9230e8212e86062aa26a757
+poly 95 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 95 03264a92612aeb525359813fa461f2ac
+st 95 cur=19 uf=4127ffe0 tf=4015548f um=4177ffcb tm=4197ffe6 rt=42ceaa81
+snd 96 test sfx\sound810.apc -> 1
+draw 96 warp=flat
+poly 96 uni 217 10be456e9f1756cda97f2509fda58c50
+poly 96 tri 150 f28f54b67e9e30aab433490e186a72cd
+poly 96 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 96 ea5d833b10544168329bbfb5e1e7fce1
+st 96 us=5 un=7 tsk=4 tn=6 cur=20 uf=3e2aa280 tf=407fff39 um=3ffffe56 tm=3fbffe4b rt=42d1ffd5
+snd 97 test sfx\sound810.apc -> 1
+draw 97 warp=flat
+poly 97 uni 220 53bee45d86a1456bdfa2101b9325f4eb
+poly 97 tri 156 fbe7489017121fb6c723e188d272f1d1
+poly 97 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 97 a737cb9d2ac0c09ea5190971c7fcb544
+st 97 cur=21 uf=3feaa9a6 tf=40b554f1 um=406aa9d5 tm=404aa9d0 rt=42d55529
+snd 98 test sfx\sound810.apc -> 1
+draw 98 warp=flat
+poly 98 uni 216 4b7505b5553b602c969ee12bef3ed71b
+poly 98 tri 162 0e81a923a4596774b06683f15f6b780c
+poly 98 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 98 a4d73296a8028be934733cf61c931139
+st 98 cur=22 uf=405fff7d tf=40eaaa45 um=40aaaa3f tm=409aaa3d rt=42d8aa7d
+snd 99 test sfx\sound810.apc -> 1
+draw 99 warp=flat
+poly 99 uni 213 35a0f0cb37d661dfc2ccf851d129bcdf
+poly 99 tri 165 7b63472c2ba705cdde89f6d3cd97e367
+poly 99 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 99 87964d0442313d0f6b902b0a2da2434b
+st 99 cur=23 uf=40a55513 tf=410fffcc um=40dfff93 tm=40cfff91 rt=42dbffd1
+snd 100 test sfx\sound810.apc -> 1
+draw 100 warp=flat
+poly 100 uni 203 a6a27e40c0bd41f24091b88170ba8db9
+poly 100 tri 165 cd5ee87cc0f45a0c99b776106038d4b8
+poly 100 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 100 6a42acb3d8c4fa13713540a9c65e1fd9
+st 100 cur=24 uf=40daaa67 tf=412aaa76 um=410aaa73 tm=4102aa72 rt=42df5525
+snd 101 test sfx\sound810.apc -> 1
+draw 101 warp=flat
+poly 101 uni 201 10c6df42586ddd57b34a4682dc242f40
+poly 101 tri 154 a8a59ed8c837fb1a55a5b506337196a5
+poly 101 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 101 54e3d7371955f5baa1982557df07ac6e
+st 101 cur=13 uf=4107ffdd tf=3eaaa400 um=4125551d tm=411d551c rt=42e2aa79
+snd 102 test sfx\sound810.apc -> 1
+draw 102 warp=flat
+poly 102 uni 204 6afd02fa6dbb8a83f1850d37efd83ca1
+poly 102 tri 148 d90e2dce560335ea0dbfd42b040474e0
+poly 102 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 102 6c3fdcabc5127f57c5ab328f27f21f59
+st 102 cur=14 uf=4122aa87 tf=3ffffe56 um=413fffc7 tm=4137ffc6 rt=42e5ffcd
+snd 103 test sfx\sound810.apc -> 1
+draw 103 warp=flat
+poly 103 uni 210 aa07f07e63f9e4fbddbc02746e283815
+poly 103 tri 155 d06ac295d7bb0fc73082d1dbb9c9d9f0
+poly 103 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 103 b73df8125a98b19d2bbb5a3491bacd19
+st 103 cur=15 uf=413d5531 tf=406aa9d5 um=415aaa71 tm=4152aa70 rt=42e95521
+snd 104 test sfx\sound810.apc -> 1
+draw 104 warp=flat
+poly 104 uni 216 9e4e53a39d9e2e100809094ed0d800a8
+poly 104 tri 164 4910eabbac75cf8381fe32da69786f2d
+poly 104 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 104 8dbab3b650d95a98de6df2a70ed0b372
+st 104 cur=16 uf=3fbffedb tf=40aaaa3f um=4175551b tm=416d551a rt=42ecaa75
+snd 105 test sfx\sound810.apc -> 1
+draw 105 warp=flat
+poly 105 uni 214 be442f1bd11edea9afdf541bcd4ad3e2
+poly 105 tri 156 94fb72f5969c046eb82e7bcf23a55e10
+poly 105 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 105 6bd21e9c329b5106376f81e6c12fd495
+st 105 tsk=5 tn=7 cur=17 uf=404aaa18 tf=40dfff93 um=4187ffe2 tm=3faaa8cb rt=42efffc9
+snd 106 test sfx\sound810.apc -> 1
+draw 106 warp=flat
+poly 106 uni 207 006c519e0ccdc76e5bdf09b6d11d295d
+poly 106 tri 163 985c2960bcba5df2024fc3b8807c40d0
+poly 106 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 106 5c14b440e9c19a3582b17fa6eb58f682
+st 106 cur=18 uf=409aaa61 tf=410aaa73 um=41955536 tm=403fff10 rt=42f3551d
+snd 107 test sfx\sound810.apc -> 1
+draw 107 warp=flat
+poly 107 uni 201 6588469c779d9ecb485abd36d27807e2
+poly 107 tri 162 c1b2781b53472cf472eaf996bf3ac972
+poly 107 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 107 1f1f58328680f9c0c7d662bef42c76ce
+st 107 us=4 un=8 cur=19 uf=40cfffb5 tf=4125551d um=3f95534b tm=409554dd rt=42f6aa71
+snd 108 test sfx\sound810.apc -> 1
+draw 108 warp=flat
+poly 108 uni 196 81237293e2fd0758b79e827b7b1149d1
+poly 108 tri 156 ee1d969f0672c1c6dfb081836db07a38
+poly 108 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 108 5b31e1044f58b9ee88611cfef4fca198
+st 108 cur=20 uf=4102aa84 tf=413fffc7 um=40355450 tm=40caaa31 rt=42f9ffc5
+snd 109 test sfx\sound810.apc -> 1
+draw 109 warp=flat
+poly 109 uni 193 f90f87c110dc1fc0832b45c84598da92
+poly 109 tri 147 a878f804db00a328caf4c5342937a6eb
+poly 109 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 109 fcf014691a71e712b55baaf4bc22b8a1
+st 109 cur=21 uf=411d552e tf=3fd5538b um=408fff7d tm=40ffff85 rt=42fd5519
+snd 110 test sfx\sound810.apc -> 1
+draw 110 warp=flat
+poly 110 uni 211 44fb503c1cfb6d75376ef8c0aebc1c8d
+poly 110 tri 150 6b827ce25e538006bb3c466e2c45fd6e
+poly 110 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 110 1685c9f774e0d1daae9c7c318d3cb754
+st 110 cur=22 uf=4137ffd8 tf=40555470 um=40c554d1 tm=411aaa6c rt=43005536
+snd 111 test sfx\sound810.apc -> 1
+draw 111 warp=flat
+poly 111 uni 208 4581c52831dd0a09063d2f943cfb40d5
+poly 111 tri 153 51be17eb92cc340ea7f9df1ef1beb96f
+poly 111 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 111 bc70cf3ff6ae6ec9ba38f5443f118a06
+st 111 cur=23 uf=3f955413 tf=409fff8c um=40faaa25 tm=41355516 rt=4301ffe0
+snd 112 test sfx\sound810.apc -> 1
+draw 112 warp=flat
+poly 112 uni 212 b5e66c332470bd738fe279ffc931d0e1
+poly 112 tri 154 053b08f368898219a904c29a8baa03ec
+poly 112 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 112 97a7d631a567164ea185301f7612ab81
+st 112 cur=24 uf=403554b4 tf=40d554e0 um=4117ffbc tm=414fffc0 rt=4303aa8a
+snd 113 test sfx\sound810.apc -> 1
+draw 113 warp=flat
+poly 113 uni 203 db7644a160ef419531597fa7a542fa4c
+poly 113 tri 162 61d3a142f933270e83debbd7e925fe7b
+poly 113 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 113 0cff3914a9a9842000dacf4b1c83e6c7
+st 113 cur=13 uf=408fffaf tf=4105551a um=4132aa66 tm=416aaa6a rt=43055534
+snd 114 test sfx\sound810.apc -> 1
+draw 114 warp=flat
+poly 114 uni 207 619c8e7aac358b9995708cd6425687e0
+poly 114 tri 158 5a964dd5e0756b5264e8c9b5f9269606
+poly 114 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 114 87e31f04886f296615b0dcf955ac03e6
+st 114 cur=14 uf=40c55503 tf=411fffc4 um=414d5510 tm=4182aa8a rt=4306ffde
+snd 115 test sfx\sound810.apc -> 1
+draw 115 warp=flat
+poly 115 uni 199 bd62544c6f4f85909ad8537075e8ff4c
+poly 115 tri 157 2368b018fc1a48ce58a56d41bfbc700a
+poly 115 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 115 e8e66597f970ce7e7d1f2d198b586a29
+st 115 cur=15 uf=40faaa57 tf=413aaa6e um=4167ffba tm=418fffde rt=4308aa88
+snd 116 test sfx\sound810.apc -> 1
+draw 116 warp=flat
+poly 116 uni 199 4ec364879761ac62e00b1fbb8e48d33c
+poly 116 tri 145 78b2f6e3b4d2821b8911e484bb35fd06
+poly 116 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 116 b2a53360988f885ec7305b41a6e89f85
+st 116 us=5 un=9 cur=16 uf=4117ffd5 tf=3faaa8c3 um=3f7ffb96 tm=419d5532 rt=430a5532
+snd 117 test sfx\sound810.apc -> 1
+draw 117 warp=flat
+poly 117 uni 209 59a88fef82ccbc311d35b0de2fdf1568
+poly 117 tri 145 f5d106b7ba864343db83643412e8edf8
+poly 117 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 117 1b21603cc30804ff6c80d3085a22454e
+st 117 tsk=4 tn=8 cur=17 uf=4132aa7f tf=403fff0c um=402aa990 tm=400aa98b rt=430bffdc
+snd 118 test sfx\sound810.apc -> 1
+draw 118 warp=flat
+poly 118 uni 216 ceb97aa49cae9bbafdd7a125d55eebae
+poly 118 tri 160 31bc6d0bd07aeb1d7699acad62a125de
+poly 118 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 118 e44bbb9b84bba5e755d9f26953ae18ae
+st 118 cur=18 uf=3f555290 tf=409554db um=408aaa1d tm=40755435 rt=430daa86
+snd 119 test sfx\sound810.apc -> 1
+draw 119 warp=flat
+poly 119 uni 208 779b121c8a26ee9156e0c1a94bbe2176
+poly 119 tri 165 8691eaeeebbe9e5bc6d4f39ae1d08b7e
+poly 119 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 119 db46530c62ea96d61030354e543ed906
+st 119 cur=19 uf=401fff4f tf=40caaa2f um=40bfff71 tm=40afff6f rt=430f5530
+snd 120 test sfx\sound810.apc -> 1
+draw 120 warp=flat
+poly 120 uni 200 0abbf2f34c399091baf56f1642992952
+poly 120 tri 169 200c23b29997ab8240223f9ed748bd31
+poly 120 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 120 0596f6e28c660f944f39445dd87be4e1
+st 120 cur=20 uf=408554fc tf=40ffff83 um=40f554c5 tm=40e554c3 rt=4310ffda
+snd 121 test sfx\sound810.apc -> 1
+draw 121 warp=flat
+poly 121 uni 199 da0fbceb2a3aa1dfbdab6adc8f27bf74
+poly 121 tri 162 eca3e04a3a9f7d4b55114fb3c103af65
+poly 121 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 121 d2cdb65b6fb547b23906fee6d9a8ff1f
+st 121 cur=21 uf=40baaa50 tf=411aaa6b um=4115550c tm=410d550b rt=4312aa84
+snd 122 test sfx\sound810.apc -> 1
+draw 122 warp=flat
+poly 122 uni 198 f6c73c96a07e2221e36f00cf2c00d612
+poly 122 tri 154 aaadaab232392096a94c887b40f67f8d
+poly 122 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 122 c9f8d5676e58587bea3a892e6dd9d202
+st 122 cur=22 uf=40efffa4 tf=41355515 um=412fffb6 tm=4127ffb5 rt=4314552e
+snd 123 test sfx\sound810.apc -> 1
+draw 123 warp=flat
+poly 123 uni 197 2038f7c78b2380d5a88d4702ae50ae4c
+poly 123 tri 155 99cd2e8c220a5eea958feee72f06d164
+poly 123 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 123 dc178d589eb73e142cb44a4bf2a0d7e7
+st 123 cur=23 uf=4112aa7c tf=3f7ffbf6 um=414aaa60 tm=4142aa5f rt=4315ffd8
+snd 124 test sfx\sound810.apc -> 1
+draw 124 warp=flat
+poly 124 uni 194 b1bb01a89e8183f020b94a058345e3b1
+poly 124 tri 147 1a7ddb93d2ac36a4aed4b2dbdae6abf7
+poly 124 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 124 7443557d9bd1a246b9527342639461a1
+st 124 cur=24 uf=412d5526 tf=402aa9a8 um=4165550a tm=415d5509 rt=4317aa82
+snd 125 test sfx\sound810.apc -> 1
+draw 125 warp=flat
+poly 125 uni 216 3d098af063a2ca5bb81de1a7226a49eb
+poly 125 tri 155 e8ffbca545ed4809598dc0578598c139
+poly 125 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 125 c05f134fbc4b44ca3d46dc8048c24f70
+st 125 cur=13 uf=3efffa00 tf=408aaa29 um=417fffb4 tm=4177ffb3 rt=4319552c
+snd 126 test sfx\sound810.apc -> 1
+draw 126 warp=flat
+poly 126 uni 203 b8f6600a18f94a5a5162bf95dd53e1c8
+poly 126 tri 157 8e7ef25da2109c53ffdcb4b3d60869bc
+poly 126 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 126 413ef20fe696b864dffd561c3be1ba25
+st 126 tsk=5 tn=9 cur=14 uf=400aa9eb tf=40bfff7d um=418d552e tm=3ffffd96 rt=431affd6
+snd 127 test sfx\sound810.apc -> 1
+draw 127 warp=flat
+poly 127 uni 211 1ee8085aefbf78bcbb7d82ed5bbbabd4
+poly 127 tri 170 770ae1f231a79ef8e1b7efb480350f8f
+poly 127 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 127 799a75663eb5005607d88376357b038e
+st 127 cur=15 uf=40755495 tf=40f554d1 um=419aaa82 tm=406aa975 rt=431caa80
+snd 128 test sfx\sound810.apc -> 1
+draw 128 warp=flat
+poly 128 uni 197 a3b72c0e0bac3da2b55dc954cd761d86
+poly 128 tri 161 9c686705c1ee7c683293febbbe5def41
+poly 128 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 128 cd7c4734c38e38592ade2c661245751a
+st 128 us=4 un=10 cur=16 uf=40afff9f tf=41155512 um=3feaa816 tm=40aaaa0f rt=431e552a
+snd 129 test sfx\sound810.apc -> 1
+draw 129 warp=flat
+poly 129 uni 195 72d2ad52af0e92a466cc7187532cdda2
+poly 129 tri 154 72641f1288517c8ef74ca51b00b35f50
+poly 129 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 129 816d468e35f785117e275820a7333e7a
+st 129 cur=17 uf=40e554f3 tf=412fffbc um=405ffeb5 tm=40dfff63 rt=431fffd4
+snd 130 test sfx\sound810.apc -> 1
+draw 130 warp=flat
+poly 130 uni 192 63d7c751094f11fcfcb80c7555d285c4
+poly 130 tri 140 a28d46ef4d988409a4718dc983ee46e3
+poly 130 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 130 621225c3628a23c4381a8b034af8f519
+st 130 cur=18 uf=410d5523 tf=3f2aa660 um=40a554af tm=410aaa5b rt=4321aa7e
+snd 131 test sfx\sound810.apc -> 1
+draw 131 warp=flat
+poly 131 uni 191 1192da26190fa183f9e251003e85fbde
+poly 131 tri 149 02bbfede671c8e49e807cccae060ca9c
+poly 131 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 131 8872e98969935194bc3b9a054fa2e805
+st 131 cur=19 uf=4127ffcd tf=40155443 um=40daaa03 tm=41255505 rt=43235528
+snd 132 test sfx\sound810.apc -> 1
+draw 132 warp=flat
+poly 132 uni 208 a81d23242b1cc50528a65ea99ecdb13d
+poly 132 tri 154 1b384381cc0779f7ae8abf1317ac17a2
+poly 132 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 132 9804f5cfb821b42406789f57ba71eeff
+st 132 cur=20 uf=3e2a9dc0 tf=407ffeed um=4107ffab tm=413fffaf rt=4324ffd2
+snd 133 test sfx\sound810.apc -> 1
+draw 133 warp=flat
+poly 133 uni 208 c1b3b636b03dcf93a26cc56016403596
+poly 133 tri 159 5830f6f00671f60d3e34b9c326aa10bb
+poly 133 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 133 7f9242662e7648b96b0b178a2d273571
+st 133 cur=21 uf=3feaa90e tf=40b554cb um=4122aa55 tm=415aaa59 rt=4326aa7c
+snd 134 test sfx\sound810.apc -> 1
+draw 134 warp=flat
+poly 134 uni 200 aca68e3bc98a076ca15051ba790aac31
+poly 134 tri 171 cf060932114fd1a749677ab55278f67f
+poly 134 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 134 01908abdcf4941a5affdbf0486d73a5d
+st 134 cur=22 uf=405fff31 tf=40eaaa1f um=413d54ff tm=41755503 rt=43285526
+snd 135 test sfx\sound810.apc -> 1
+draw 135 warp=flat
+poly 135 uni 192 da344fa3f83542107a6f2c3d26faeaf2
+poly 135 tri 167 f94ca55c30b07eabbc57ec08365e0a7e
+poly 135 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 135 bb793c2ecdd9ab435087f38df0360821
+st 135 cur=23 uf=40a554ed tf=410fffb9 um=4157ffa9 tm=4187ffd6 rt=4329ffd0
+snd 136 test sfx\sound810.apc -> 1
+draw 136 warp=flat
+poly 136 uni 194 a311610a4621894f9888e94f661d250a
+poly 136 tri 156 1d57dc1b646e914327e868086a0e90fc
+poly 136 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 136 d3f4c63dfa9bdd0a2f7468bb2001d4c1
+st 136 cur=24 uf=40daaa41 tf=412aaa63 um=4172aa53 tm=4195552a rt=432baa7a
+snd 137 test sfx\sound810.apc -> 1
+draw 137 warp=flat
+poly 137 uni 188 80450e115908644983fd228b2fdc909e
+poly 137 tri 140 fd050a26a70fb65f0c63d6b502aa754e
+poly 137 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 137 8c97acc504968f2cbbb4f83b4a1e9845
+st 137 us=3 un2=3 tsk=3 tn=10 ta=1 cur=13 uf=4107ffca tf=00000000 um=3fd5528b tm=00000000 rt=432d5524
+snd 138 test sfx\sound810.apc -> 1
+draw 138 warp=flat
+poly 138 uni 188 60d582a5cbdfcd52383390ebf068aa77
+poly 138 tri 152 a59f652694181ba897a803d2be73218d
+poly 138 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 138 640108739bf68188c73623134adbc7e7
+st 138 cur=14 uf=4122aa74 tf=3fd55556 um=405553f0 tm=3fd55556 rt=432effce
+snd 139 test sfx\sound810.apc -> 1
+draw 139 warp=flat
+poly 139 uni 189 704686b834286f8e757ca7a97662c29c
+poly 139 tri 151 88dfd991ca65648e5a1696a16ac770e9
+poly 139 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 139 bad1206f216e596156f03f455b1e9823
+st 139 cur=15 uf=413d551e tf=40555555 um=409fff4c tm=40555555 rt=4330aa78
+snd 140 test sfx\sound810.apc -> 1
+draw 140 warp=flat
+poly 140 uni 193 e60f4ccc52b14d707873a24aca2906af
+poly 140 tri 149 b5becf0a388981ec6c62dd58b264fbc3
+poly 140 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 140 d8de9571791c599edef94517869be41e
+st 140 ua=3 cur=16 uf=3fbffe43 tf=409fffff um=40d554a0 tm=409fffff rt=43325522
+snd 141 test sfx\sound810.apc -> 1
+draw 141 warp=flat
+poly 141 uni 199 dff556bba1a462664a299f9515e0033e
+poly 141 tri 148 df657123078b1a14f4fcb57aec7fc611
+poly 141 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 141 249401aa62d6661440f0871ffb8b9695
+st 141 cur=17 uf=404aa9cc tf=40d55553 um=410554fa tm=40d55553 rt=4333ffcc
+snd 142 test sfx\sound810.apc -> 1
+draw 142 warp=flat
+poly 142 tri 154 15fdb61b91dbce02e95f5e40bc7a2ff3
+poly 142 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 142 2425e24353eaae3bcd0fc605d837514b
+st 142 cur=18 uf=409aaa3b tf=41055553 um=411fffa4 tm=41055553 rt=4335aa76
+snd 143 test sfx\sound810.apc -> 1
+draw 143 warp=flat
+poly 143 tri 155 76e65756b483926b366c8999ea5b5780
+poly 143 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 143 0c86c933a553e458128ace71ff86a58c
+st 143 cur=19 uf=40cfff8f tf=411ffffd um=413aaa4e tm=411ffffd rt=43375520
+snd 144 test sfx\sound810.apc -> 1
+draw 144 warp=flat
+poly 144 tri 152 218f5eaf1269c9c4f9baad61ab5b9a24
+poly 144 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 144 b88a87fa6d5ffdffe3e217f3e7d2e59c
+st 144 cur=20 uf=4102aa71 tf=413aaaa7 um=415554f8 tm=413aaaa7 rt=4338ffca
+snd 145 test sfx\sound810.apc -> 1
+snd 145 load sfx\sound804.apc 0 1
+snd 145 play sfx\sound804.apc
+draw 145 warp=flat
+draw 145 spr\Interface.spr#40@603,397*0000803f
+poly 145 uni 201 b9f303b1be0fa1b9537b5fbdf962f2c6
+poly 145 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 145 6561117c31545cf18ed560cf8ec09731
+st 145 run=0 us=0 un=0 ua=0 un2=0 tsk=0 tn=0 ta=0 cur=40 uf=00000000 tf=00000000 um=416fffa2 tm=41555551 rt=00000000
+snd 146 test sfx\sound810.apc -> 1
+snd 146 stop sfx\sound810.apc
+draw 146 warp=flat
+draw 146 C:spr\Interface.spr#14@603,397
+poly 146 uni 214 a5cae29a9d692c1ced0e476c424a4455
+poly 146 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 146 14bcdbc22b7521a30bd204159158ff0e
+st 146 cur=14 uf=3fd55556 tf=3fd55556
+snd 147 test sfx\sound810.apc -> 0
+draw 147 warp=flat
+draw 147 C:spr\Interface.spr#15@603,397
+poly 147 uni 214 b4f3b18b5c8bb36ac1bb2eedd4f5c19c
+poly 147 bal 415 fa9fc28f6056d5a834b2d2061f0e502b
+md5 147 73ede8c6f16c1036b1a39237d0d8827c
+st 147 cur=15 uf=40555555 tf=40555555
+end pick frames 147 ok 1

@@ -6,15 +6,14 @@
 //! handler returning 0 makes the main loop call the mode's `Stop`
 //! ([`Game::stop_screen`]).
 //!
-//! The two maps and the jewel case are drawn ([`crate::maps`],
-//! `screens_draw`); the other screens' drawing, their hover animations
-//! and the boards played inside
-//! two of them (the unicorn's 3D board, the game boy's reflex dice) are
-//! M4; the outcome of those boards is given by [`Game::screen_outcome`].
+//! The two maps, the jewel case and the unicorn's 3D board
+//! ([`crate::licorne`]) are drawn ([`crate::maps`], `screens_draw`); the
+//! other screens' drawing, their hover animations and the game boy's
+//! reflex dice are M4; the outcome of that board is given by
+//! [`Game::screen_outcome`].
 
 use std::sync::Arc;
 
-use atlantis2_engine::script::Host;
 use atlantis3_data::spr::Bank;
 
 use super::{Game, Hx, Screen};
@@ -37,9 +36,9 @@ pub struct State {
     pub ecrin_clock: f64,
     pub ecrin_cursor: i32,
     pub ecrin_bank: Option<Arc<Bank>>,
-    /// `LICORNE`: the board's "won" byte (@ 0x007586d4, set by the run's
-    /// state 7 @ 0x0042d289; the board is M4).
-    pub licorne_won: bool,
+    /// `LICORNE`: the board object (@ 0x00759140, built by the start;
+    /// never freed by the stop).
+    pub licorne: Option<Box<crate::licorne::Board>>,
     /// `GBOY`: the result phase (@ 0x00756054), its blinks (@ 0x00756058)
     /// and its clock's last time (@ 0x00755f08). The result itself is
     /// the tower's dice (@ 0x00756060, `tourmagi::State::dice`).
@@ -113,9 +112,20 @@ pub(super) fn start(h: &mut Hx, screen: Screen) {
             h.g.puzzles.screens.tour_anim = anim;
             h.g.pointer = maps::centre(h.g.width, h.g.height);
         }
+        // @ 0x0042e7a0: the board object built and loaded (@ 0x004b9ca0,
+        // @ 0x004b9e40), the run reset, the pointer centred (@ 0x00431780),
+        // the cursor `Interface.spr` (@ 0x00427f80).
+        Screen::Licorne => {
+            let (w, ht) = (h.g.width, h.g.height);
+            let board = crate::licorne::Board::new(&h.g.files, w, ht, now);
+            if board.is_none() {
+                log::warn!("Licorne: the board's files are missing ({w} x {ht})");
+            }
+            h.g.puzzles.screens.licorne = board.map(Box::new);
+            h.g.pointer = maps::centre(w, ht);
+        }
         // @ 0x00431da0, 0x00409a40, 0x004cfee0 (0x0071f0e8 := 0, read by
-        // nobody), 0x0042e7a0: nothing the script sees besides the common
-        // part.
+        // nobody): nothing the script sees besides the common part.
         _ => {}
     }
 }
@@ -143,7 +153,7 @@ pub(super) fn frame(
             ecrin(h, left)
         }
         Screen::GBoy => gboy(h),
-        Screen::Licorne => licorne(h),
+        Screen::Licorne => licorne(h, left, right),
     }
 }
 
@@ -431,25 +441,61 @@ fn gboy(h: &mut Hx) -> bool {
     true
 }
 
-/// `LICORNE`, the unicorn board (@ 0x0042eb50). M4: the 3D board (four
-/// beacons placed, the unicorn's run, failures restart it). Its win
-/// (@ 0x0042f6a9): sound 803, `(Flag147=0)`, `(Flag149=1)`,
-/// `(Flag146=1)`, `(StopMusik=1)`, the horn in the bag and in the hand,
-/// and the loop leaves. No other exit (the right button drops a held
-/// beacon).
-fn licorne(h: &mut Hx) -> bool {
-    if !h.g.puzzles.screens.licorne_won {
-        return true;
+/// The board's sound and command calls on the game.
+struct LicorneHost<'a, 'b> {
+    h: &'a mut Hx<'b>,
+}
+
+impl crate::licorne::Host for LicorneHost<'_, '_> {
+    fn load(&mut self, name: &str) {
+        self.h.g.sfx_load(name, 0, 1);
     }
-    h.g.puzzles.screens.licorne_won = false;
-    h.g.new_sound("sound803.apc");
-    h.run("(Flag147=0)");
-    h.run("(Flag149=1)");
-    h.run("(Flag146=1)");
-    h.run("(StopMusik=1)");
-    h.run("(SacADos=BAG_CORNE_LICORNE)");
-    h.run("(ObjetEnMain=BAG_CORNE_LICORNE)");
-    false
+    fn play(&mut self, name: &str) {
+        self.h.g.sfx_play(name);
+    }
+    fn stop(&mut self, name: &str) {
+        self.h.g.sfx_stop(name);
+    }
+    fn playing(&mut self, name: &str) -> bool {
+        self.h.g.sfx_playing(name)
+    }
+    fn command(&mut self, cmd: &str) {
+        self.h.run(cmd);
+    }
+}
+
+/// `LICORNE`, the unicorn board (@ 0x0042eb50, [`crate::licorne`]): the
+/// input, the clocks and the run, sound 810, the outcome, then the warp
+/// frame (@ 0x00440690, every pixel of it covered), the board, the cursor
+/// and the flip. Its win (@ 0x0042f6a9): sound 803, `(Flag147=0)`,
+/// `(Flag149=1)`, `(Flag146=1)`, `(StopMusik=1)`, the horn in the bag and
+/// in the hand, and the loop leaves without a draw (the stop, @ 0x0042e990,
+/// stops sound 810). No other exit (the right button drops a carried
+/// beacon); a lost run starts again with the beacons where they are.
+fn licorne(h: &mut Hx, left: bool, right: bool) -> bool {
+    let Some(mut board) = h.g.puzzles.screens.licorne.take() else {
+        return true;
+    };
+    let now = h.now();
+    let input = crate::licorne::Input {
+        pointer: h.g.pointer,
+        left,
+        right,
+    };
+    let stay = {
+        let mut host = LicorneHost { h };
+        let stay = board.frame(input, now, &mut host);
+        if !stay {
+            board.stop(&mut host);
+        }
+        stay
+    };
+    h.g.pointer = board.pointer;
+    if stay {
+        h.g.licorne_draw(&mut board);
+    }
+    h.g.puzzles.screens.licorne = Some(board);
+    stay
 }
 
 impl Game {
@@ -486,7 +532,12 @@ impl Game {
     #[doc(hidden)]
     pub fn screen_outcome(&mut self, value: i32) {
         match self.puzzles.screen {
-            Some(Screen::Licorne) => self.puzzles.screens.licorne_won = true,
+            Some(Screen::Licorne) => {
+                if let Some(b) = self.puzzles.screens.licorne.as_mut() {
+                    b.running = true;
+                    b.won = true;
+                }
+            }
             Some(Screen::GBoy) => {
                 self.puzzles.tourmagi.dice = value;
                 self.puzzles.screens.gboy_result = true;
