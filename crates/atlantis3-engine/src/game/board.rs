@@ -138,7 +138,9 @@ impl Game {
             let k = s.keys.cliczone;
             s.vars[k] = 0;
         }
-        self.voices_release();
+        // The flip's texts (@ 0x0040de60), not drawn: the voice slots whose
+        // voice stopped freed (`SubTitleOn`, no subtitle line).
+        self.flip_plan();
         found
     }
 

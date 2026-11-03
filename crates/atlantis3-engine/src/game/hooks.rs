@@ -468,6 +468,10 @@ impl Game {
         let left = std::mem::take(&mut self.click);
         let right = std::mem::take(&mut self.right_clicked);
         self.screen_step(left, right, None);
+        // The screen's flip (its handler's @ 0x0040fdf0 call): the
+        // subtitle line or the voice slots over it (@ 0x0040de60), drawn
+        // once per frame here.
+        self.flip_texts();
     }
 
     /// A screen's stop: the old mode back, the hand cleared, the click

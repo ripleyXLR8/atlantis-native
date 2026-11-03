@@ -41,19 +41,27 @@ struct SfxObject {
     channel: Option<usize>,
 }
 
-/// A `PLAYVOICE` slot (@ 0x0074f248 + 0x38 k). Its line's text is not
-/// drawn by the port yet.
-#[allow(dead_code)]
-#[derive(Clone, Debug, Default)]
+/// A `PLAYVOICE` slot (@ 0x0074f248 + 0x38 k): its line's text (+0x00,
+/// drawn by the flip while the voice plays, [`super::subtitles`]), the
+/// voice's name (+0x14), the colour (+0x28..+0x30), busy (+0x34). A free
+/// slot has an empty text and name and the colour (255, 255, 255).
+#[derive(Clone, Debug)]
 pub(crate) struct VoiceSlot {
     pub busy: bool,
-    /// The voice's name (+0x14).
+    pub text: Vec<u8>,
     pub name: String,
-    /// The dialog line (its text, +0x00, is drawn while the voice plays)
-    /// and the colour (+0x28..+0x30).
-    pub dialog: i32,
-    pub line: i32,
     pub rgb: [i32; 3],
+}
+
+impl Default for VoiceSlot {
+    fn default() -> VoiceSlot {
+        VoiceSlot {
+            busy: false,
+            text: Vec::new(),
+            name: String::new(),
+            rgb: [255; 3],
+        }
+    }
 }
 
 /// The sound objects and the voice slots.
@@ -227,12 +235,13 @@ impl Game {
         let Some(k) = self.csounds.voices.iter().position(|v| !v.busy) else {
             return;
         };
+        // +0x00 = GetTextFromDial (@ 0x004655a0), +0x14 the voice's name.
+        let text = self.texts().dial(dialog, line).unwrap_or_default().to_vec();
         let name = self.dialog_voice_name(dialog, line);
         self.csounds.voices[k] = VoiceSlot {
             busy: true,
+            text,
             name: name.clone(),
-            dialog,
-            line,
             rgb: [r, g, b],
         };
         if self.sfx_load(&name, 0, 2) {
@@ -254,14 +263,20 @@ impl Game {
         }
     }
 
-    /// The flip's part (@ 0x0040de60): a busy slot whose voice has stopped
-    /// is freed.
-    pub(crate) fn voices_release(&mut self) {
+    /// @ 0x0040db90: every busy slot's voice stopped if it plays, the slot
+    /// freed (a dialog's start @ 0x0040d04d, Escape in the warp
+    /// @ 0x0042acea / @ 0x0042ad09 and in the start page's demo dialog
+    /// @ 0x0042aec1).
+    pub(crate) fn voices_clear(&mut self) {
         for k in 0..self.csounds.voices.len() {
-            let v = &self.csounds.voices[k];
-            if v.busy && !self.sfx_playing(&v.name.clone()) {
-                self.csounds.voices[k] = VoiceSlot::default();
+            if !self.csounds.voices[k].busy {
+                continue;
             }
+            let n = self.csounds.voices[k].name.clone();
+            if self.sfx_playing(&n) {
+                self.sfx_stop(&n);
+            }
+            self.csounds.voices[k] = VoiceSlot::default();
         }
     }
 }

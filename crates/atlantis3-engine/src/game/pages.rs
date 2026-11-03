@@ -191,11 +191,15 @@ impl Game {
                 self.menus.demo = false;
                 self.audio.stop(CHANNEL_PLACE);
                 self.subtitle = None;
+                self.voices_clear();
                 if self.enter_menu(PAGE_START) {
                     self.menus.sub = 0;
                 }
             }
             Mode::Warp => {
+                // The voice slots stopped and freed (@ 0x0042ad09), not
+                // from the inventory (@ 0x0042af2b).
+                self.voices_clear();
                 self.open_menu();
             }
             Mode::Inventory => {
@@ -262,6 +266,10 @@ impl Game {
         };
         let events = self.menus.frame(&mut env, &mut self.screen);
         self.draw_pointer();
+        // The flip (@ 0x00459268): the subtitle line or the voice slots
+        // (an Escape from the warp cleared both; from the inventory the
+        // slots go on, @ 0x0042af2b).
+        self.flip_texts();
         self.menu_events(events);
     }
 
