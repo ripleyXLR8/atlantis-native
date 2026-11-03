@@ -1422,7 +1422,12 @@ impl Head {
 /// computed, [`update_asm_node`]) seen by camera `c`: the matrix computed
 /// inline (@ 0x0057eef0), then each vertex and its clip codes, compared
 /// before the float stores.
-pub fn transform_pii(k: Fpu, c: &Camera, n: &Node, vertices: &[[f64; 3]]) -> (Stages, Vec<[f64; 3]>) {
+pub fn transform_pii(
+    k: Fpu,
+    c: &Camera,
+    n: &Node,
+    vertices: &[[f64; 3]],
+) -> (Stages, Vec<[f64; 3]>) {
     let m = |x, y| k.mul(x, y);
     // The camera node: its world pose is its local one (a child of the
     // scene root), scale 1.

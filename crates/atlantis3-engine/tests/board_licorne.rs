@@ -121,7 +121,9 @@ impl Replay {
             .map(|(k, v)| format!("{k}={v}"))
             .collect();
         if !ch.is_empty() {
-            self.log.out.push(format!("st {} {}", self.log.frame, ch.join(" ")));
+            self.log
+                .out
+                .push(format!("st {} {}", self.log.frame, ch.join(" ")));
         }
         self.last = f.into_iter().collect();
     }
@@ -132,7 +134,9 @@ impl Replay {
         let running = self.board.running;
         let path_before = self.board.nodes.clone();
         let ok = self.board.frame(input, now(f), &mut self.log);
-        if !running && self.board.running && self.board.nodes != path_before || (!running && self.board.running) {
+        if !running && self.board.running && self.board.nodes != path_before
+            || (!running && self.board.running)
+        {
             // The path line, after the click's sound.
             let nodes = &self.board.nodes;
             let s: Vec<String> = nodes
@@ -176,7 +180,17 @@ impl Replay {
                         .push(format!("draw {f} C:spr\\Interface.spr#{i}@{x},{y}"));
                     if let Some(info) = self.iface.info(i as usize) {
                         let (dx, dy) = (i32::from(info.w) / 2, i32::from(info.h) / 2);
-                        aff_at(&mut self.screen, w, h, "", &self.iface, i as usize, Some(x - dx), y - dy, 1.0);
+                        aff_at(
+                            &mut self.screen,
+                            w,
+                            h,
+                            "",
+                            &self.iface,
+                            i as usize,
+                            Some(x - dx),
+                            y - dy,
+                            1.0,
+                        );
                     }
                 }
             }
@@ -221,7 +235,13 @@ fn check(golden: &str, w: usize, h: usize, runs: &[&str]) {
                 let y: i32 = f[1].parse().unwrap();
                 for (x, c) in f[2..].iter().enumerate() {
                     let s: String = (0..4)
-                        .map(|d| if licorne::open(x as i32, y, d) { "NWSE".as_bytes()[d] as char } else { '.' })
+                        .map(|d| {
+                            if licorne::open(x as i32, y, d) {
+                                "NWSE".as_bytes()[d] as char
+                            } else {
+                                '.'
+                            }
+                        })
                         .collect();
                     assert_eq!(&s, c, "maze ({x}, {y})");
                 }
@@ -257,7 +277,10 @@ fn check(golden: &str, w: usize, h: usize, runs: &[&str]) {
         for l in run {
             let f: Vec<&str> = l.split(' ').collect();
             if matches!(f[0], "pointer" | "click" | "rclick") {
-                inputs.entry(f[1].parse().unwrap()).or_default().push(f.clone());
+                inputs
+                    .entry(f[1].parse().unwrap())
+                    .or_default()
+                    .push(f.clone());
             }
             if f[0] == "end" {
                 last_frame = f[3].parse().unwrap();
@@ -335,19 +358,16 @@ fn check(golden: &str, w: usize, h: usize, runs: &[&str]) {
 }
 
 #[test]
-#[ignore = "WIP: the unicorn's poly md5 differs from frame 78 (win) / 56 (pick) on; everything before matches"]
 fn licorne_800() {
     check(G800, 800, 600, &["win", "lose", "pick"]);
 }
 
 #[test]
-#[ignore = "WIP: the unicorn's poly md5 differs from frame 78 (win) / 56 (pick) on; everything before matches"]
 fn licorne_640() {
     check(G640, 640, 480, &["pick"]);
 }
 
 #[test]
-#[ignore = "WIP: the unicorn's poly md5 differs from frame 78 (win) / 56 (pick) on; everything before matches"]
 fn licorne_1024() {
     check(G1024, 1024, 768, &["pick"]);
 }

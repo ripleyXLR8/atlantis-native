@@ -94,10 +94,10 @@ fn identity_node(name: &str) -> Node {
 
 /// The objects of `scene` kept by `keep`, depth first from the top
 /// (parent `""`), the children of a node in name order (byte order).
-fn depth_first<'a>(
-    scene: &'a Scene,
+fn depth_first(
+    scene: &Scene,
     keep: impl Fn(&atlantis2_data::db::Object) -> bool,
-) -> Vec<(&'a atlantis2_data::db::Object, Option<usize>)> {
+) -> Vec<(&atlantis2_data::db::Object, Option<usize>)> {
     let mut objects: Vec<&atlantis2_data::db::Object> =
         scene.objects.iter().filter(|o| keep(o)).collect();
     objects.sort_by(|a, b| a.name.as_bytes().cmp(b.name.as_bytes()));
@@ -148,10 +148,22 @@ pub(crate) fn update_c(nodes: &mut [Node], i: usize) {
     // @ 0x004e6370: the parent's rotation times the node's.
     let a = pq;
     let b = n.lq;
-    let w = c.sub(c.sub(c.sub(m(a[3], b[3]), m(b[0], a[0])), m(a[1], b[1])), m(a[2], b[2]));
-    let z = c.sub(c.add(c.add(m(b[2], a[3]), m(a[2], b[3])), m(b[1], a[0])), m(a[1], b[0]));
-    let y = c.sub(c.add(c.add(m(b[1], a[3]), m(a[1], b[3])), m(a[2], b[0])), m(b[2], a[0]));
-    let x = c.sub(c.add(c.add(m(a[3], b[0]), m(a[0], b[3])), m(a[1], b[2])), m(a[2], b[1]));
+    let w = c.sub(
+        c.sub(c.sub(m(a[3], b[3]), m(b[0], a[0])), m(a[1], b[1])),
+        m(a[2], b[2]),
+    );
+    let z = c.sub(
+        c.add(c.add(m(b[2], a[3]), m(a[2], b[3])), m(b[1], a[0])),
+        m(a[1], b[0]),
+    );
+    let y = c.sub(
+        c.add(c.add(m(b[1], a[3]), m(a[1], b[3])), m(a[2], b[0])),
+        m(b[2], a[0]),
+    );
+    let x = c.sub(
+        c.add(c.add(m(a[3], b[0]), m(a[0], b[3])), m(a[1], b[2])),
+        m(a[2], b[1]),
+    );
     n.wq = [c.f(x), c.f(y), c.f(z), c.f(w)];
     let [px, py, pz, pw] = pq;
     let sa = c.f(m(ps, n.lp[0]));
@@ -252,10 +264,13 @@ fn lerp_position(t0: f64, a: &Vec3, t1: f64, b: &Vec3, t: f64) -> Vec3 {
     [c.f(c.add(xs, a[0])), c.f(c.add(y, a[1])), c.f(z)]
 }
 
+/// A track's rotation, position and scale at a time (each when it has one).
+type TrackValues = (Option<Quat>, Option<Vec3>, Option<f64>);
+
 /// A track at time `t` (@ 0x0050a150 with the flags 0x1f): the key at or
 /// after `t` (the last past the end, the first before the start), or the
 /// interpolation of its neighbours.
-fn eval(tr: &Track, t: f64) -> (Option<Quat>, Option<Vec3>, Option<f64>) {
+fn eval(tr: &Track, t: f64) -> TrackValues {
     let c = K;
     let lb = |n: usize, time: &dyn Fn(usize) -> f64| (0..n).find(|&k| time(k) >= t).unwrap_or(n);
     let q = (!tr.rotations.is_empty()).then(|| {
@@ -307,7 +322,10 @@ fn eval(tr: &Track, t: f64) -> (Option<Quat>, Option<Vec3>, Option<f64>) {
 }
 
 /// A texture file of `map\` as the display's RGB565.
-pub(crate) fn texture(files: &atlantis3_data::A3Files, name: &str) -> Option<(Vec<u16>, usize, usize)> {
+pub(crate) fn texture(
+    files: &atlantis3_data::A3Files,
+    name: &str,
+) -> Option<(Vec<u16>, usize, usize)> {
     let t = files
         .read(&format!("map/{name}"))
         .and_then(|d| Tga::parse(&d).ok())?;
@@ -349,8 +367,12 @@ impl Scene3 {
         };
         for &oi in &s.objects.clone() {
             let name = s.nodes[oi].name.clone();
-            let Some(o) = scene.object(&name) else { continue };
-            let Some(m) = scene.mesh(&o.mesh) else { continue };
+            let Some(o) = scene.object(&name) else {
+                continue;
+            };
+            let Some(m) = scene.mesh(&o.mesh) else {
+                continue;
+            };
             let tex = m
                 .materials
                 .first()
@@ -363,7 +385,12 @@ impl Scene3 {
         s
     }
 
-    fn build_mesh(&mut self, node: usize, m: &DbMesh, texture: Option<(Vec<u16>, usize, usize)>) -> ObjMesh {
+    fn build_mesh(
+        &mut self,
+        node: usize,
+        m: &DbMesh,
+        texture: Option<(Vec<u16>, usize, usize)>,
+    ) -> ObjMesh {
         let n = m.face_count as usize;
         let corners: Vec<[u16; 3]> = (0..n)
             .map(|i| std::array::from_fn(|k| m.corners.get(3 * i + k).copied().unwrap_or(0)))
@@ -380,7 +407,12 @@ impl Scene3 {
             let lookup: Vec<Option<usize>> = m
                 .bones
                 .iter()
-                .map(|b| self.skeleton.iter().copied().find(|&i| self.nodes[i].name == *b))
+                .map(|b| {
+                    self.skeleton
+                        .iter()
+                        .copied()
+                        .find(|&i| self.nodes[i].name == *b)
+                })
                 .collect();
             let mut vb = Vec::with_capacity(vertices.len());
             for (v, &bi) in vertices.iter_mut().zip(&m.vertex_bones) {
@@ -420,7 +452,11 @@ impl Scene3 {
             .map(|k| {
                 let (o, _) = list.get(k)?;
                 if self.nodes[self.skeleton[k]].name != o.name {
-                    log::warn!("Licorne: track {} on node {}", o.name, self.nodes[self.skeleton[k]].name);
+                    log::warn!(
+                        "Licorne: track {} on node {}",
+                        o.name,
+                        self.nodes[self.skeleton[k]].name
+                    );
                 }
                 scene.node(&o.name).and_then(head::track)
             })
@@ -445,7 +481,7 @@ impl Scene3 {
             return;
         };
         let t = f64::from(frame as f32);
-        let sets: Vec<(usize, (Option<Quat>, Option<Vec3>, Option<f64>))> = tracks
+        let sets: Vec<(usize, TrackValues)> = tracks
             .iter()
             .enumerate()
             .filter_map(|(i, tr)| tr.as_ref().map(|tr| (self.skeleton[i], eval(tr, t))))
@@ -547,14 +583,13 @@ impl Scene3 {
             let nv = mesh.vertices.len();
             let mut cv = vec![[0.0f64; 3]; nv];
             let mut codes = vec![0u8; nv];
-            let and;
-            match &mesh.bones {
+            let and = match &mesh.bones {
                 None => {
                     update_asm_node(K, &mut self.nodes, mesh.node);
                     let (st, out) = transform_pii(K, cam, &self.nodes[mesh.node], &mesh.vertices);
                     cv = out;
                     codes = st.codes;
-                    and = codes.iter().fold(0xff, |a, &b| a & b);
+                    codes.iter().fold(0xff, |a, &b| a & b)
                 }
                 Some(bones) => {
                     // @ 0x00690650: per bone of the skeleton list, its
@@ -574,9 +609,9 @@ impl Scene3 {
                             a &= st.codes[j];
                         }
                     }
-                    and = a;
+                    a
                 }
-            }
+            };
             if and & 0x3f != 0 {
                 continue;
             }

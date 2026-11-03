@@ -25,6 +25,7 @@ use atlantis2_engine::fpu::ftol;
 use atlantis2_engine::head::{Camera, Quat, Vec3};
 use atlantis2_engine::raster3d::Target;
 use atlantis3_data::A3Files;
+use std::cmp::Ordering;
 
 use scene::{PolyLog, Scene3, K, ROOT_OBJ, ROOT_SKEL};
 
@@ -63,7 +64,10 @@ pub fn cell_xy(x: i32, y: i32, w: i32, h: i32) -> (i32, i32) {
     let r = y as usize;
     let sx = (ROW_RIGHT[r] - ROW_LEFT[r]) * x / 10 + ROW_LEFT[r];
     let fx = K.mul(K.mul(f64::from(w), f64::from(0.00125f32)), f64::from(sx));
-    let fy = K.mul(K.mul(f64::from(h), f64::from(0.001_666_666_7_f32)), f64::from(ROW_Y[r]));
+    let fy = K.mul(
+        K.mul(f64::from(h), f64::from(0.001_666_666_7_f32)),
+        f64::from(ROW_Y[r]),
+    );
     (ftol(fx), ftol(fy))
 }
 
@@ -102,7 +106,14 @@ fn neighbour(x: i32, y: i32, d: usize) -> Option<(i32, i32)> {
 
 /// One step (@ 0x0042df00): the next cell toward beacon `b` from (x, y),
 /// (px, py) the cell left, `pdir` the direction taken from it.
-fn step(bx: &[i32; 5], by: &[i32; 5], b: usize, x: i32, y: i32, prev: (i32, i32, i32)) -> Option<(i32, i32, usize)> {
+fn step(
+    bx: &[i32; 5],
+    by: &[i32; 5],
+    b: usize,
+    x: i32,
+    y: i32,
+    prev: (i32, i32, i32),
+) -> Option<(i32, i32, usize)> {
     let (px, py, pdir) = prev;
     let mut cnt = 4;
     let mut n = [(-1, -1); 4];
@@ -132,14 +143,14 @@ fn step(bx: &[i32; 5], by: &[i32; 5], b: usize, x: i32, y: i32, prev: (i32, i32,
         i += 1;
     }
     let mut best = dist(n[i].0, n[i].1);
-    for j in i + 1..4 {
-        if n[j].0 != -1 && n[j].1 != -1 && dist(n[j].0, n[j].1) < best {
-            best = dist(n[j].0, n[j].1);
+    for &(x, y) in &n[i + 1..] {
+        if x != -1 && y != -1 && dist(x, y) < best {
+            best = dist(x, y);
         }
     }
-    for j in 0..4 {
-        if n[j].0 != -1 && dist(n[j].0, n[j].1) > best {
-            n[j] = (-1, -1);
+    for e in n.iter_mut() {
+        if e.0 != -1 && dist(e.0, e.1) > best {
+            *e = (-1, -1);
             cnt -= 1;
         }
     }
@@ -175,9 +186,9 @@ fn step(bx: &[i32; 5], by: &[i32; 5], b: usize, x: i32, y: i32, prev: (i32, i32,
         }
         let mut k = i;
         let mut bd = td(n[i]);
-        for j in i + 1..4 {
-            if n[j].0 != -1 && n[j].1 != -1 && td(n[j]) < bd {
-                bd = td(n[j]);
+        for (j, &e) in n.iter().enumerate().skip(i + 1) {
+            if e.0 != -1 && e.1 != -1 && td(e) < bd {
+                bd = td(e);
                 k = j;
             }
         }
@@ -189,8 +200,20 @@ fn step(bx: &[i32; 5], by: &[i32; 5], b: usize, x: i32, y: i32, prev: (i32, i32,
 /// The unicorn's path (@ 0x0042e2e0) from the start with the beacons'
 /// cells (unplaced ones on their tray cells) and `placed` beacons placed.
 pub fn path(beacons: &[(i32, i32); 4], placed: i32) -> (Vec<PathNode>, PathEnd) {
-    let bx = [beacons[0].0, beacons[1].0, beacons[2].0, beacons[3].0, TARGET.0];
-    let by = [beacons[0].1, beacons[1].1, beacons[2].1, beacons[3].1, TARGET.1];
+    let bx = [
+        beacons[0].0,
+        beacons[1].0,
+        beacons[2].0,
+        beacons[3].0,
+        TARGET.0,
+    ];
+    let by = [
+        beacons[0].1,
+        beacons[1].1,
+        beacons[2].1,
+        beacons[3].1,
+        TARGET.1,
+    ];
     let mut nodes = vec![PathNode {
         x: START.0,
         y: START.1,
@@ -220,7 +243,10 @@ pub fn path(beacons: &[(i32, i32); 4], placed: i32) -> (Vec<PathNode>, PathEnd) 
         });
         let k = nodes.len() - 1;
         if loops == 0 {
-            if nodes[..k].iter().any(|n| n.x == nx && n.y == ny && n.beacon == b as i32) {
+            if nodes[..k]
+                .iter()
+                .any(|n| n.x == nx && n.y == ny && n.beacon == b as i32)
+            {
                 loops = 1;
                 mark = (nx, ny, b);
             }
@@ -304,7 +330,8 @@ fn blend(a: f32, b: f32, m: f32, t: f32) -> f64 {
     let c = K;
     let (a, b) = (f64::from(a), f64::from(b));
     let mut r = c.div(f64::from(m), f64::from(t));
-    if !(r < 1.0 || r == 1.0) {
+    // fcom with 1.0: neither below nor equal (NaN included) → 1.0.
+    if !matches!(r.partial_cmp(&1.0), Some(Ordering::Less | Ordering::Equal)) {
         r = 1.0;
     } else if r < 0.0 {
         r = 0.0;
@@ -337,7 +364,13 @@ fn heading_quat(a: f32) -> Quat {
     let h = c.mul(f64::from(a), 0.5);
     let s = c.div(libm::sin(h), 1.0);
     let q = [c.f(0.0 * s), c.f(s), c.f(0.0 * s), c.f(libm::cos(h))];
-    let n2 = c.add(c.add(c.add(c.mul(q[0], q[0]), c.mul(q[1], q[1])), c.mul(q[2], q[2])), c.mul(q[3], q[3]));
+    let n2 = c.add(
+        c.add(
+            c.add(c.mul(q[0], q[0]), c.mul(q[1], q[1])),
+            c.mul(q[2], q[2]),
+        ),
+        c.mul(q[3], q[3]),
+    );
     let inv = c.div(1.0, c.sqrt(n2));
     let invf = c.f(inv);
     [
@@ -485,14 +518,19 @@ impl Board {
         let mut background = vec![0u16; w * h];
         for y in 0..h.min(bg.height) {
             let n = w.min(bg.width);
-            background[y * w..y * w + n].copy_from_slice(&bg.pixels[y * bg.width..y * bg.width + n]);
+            background[y * w..y * w + n]
+                .copy_from_slice(&bg.pixels[y * bg.width..y * bg.width + n]);
         }
         let mut zbuf = vec![0u32; w * h];
         for y in 0..h.min(zbf.header.height as usize) {
             for x in 0..w.min(zbf.header.width as usize) {
                 // @ 0x004eb6d0: z = trunc(f · 2³¹).
                 let f = f64::from(zbf.depth[y * zbf.header.width as usize + x]) * 2_147_483_648.0;
-                zbuf[y * w + x] = if f >= 4_294_967_296.0 { u32::MAX } else { f as u32 };
+                zbuf[y * w + x] = if f >= 4_294_967_296.0 {
+                    u32::MAX
+                } else {
+                    f as u32
+                };
             }
         }
         // @ 0x004ba98b: the scales.
@@ -566,8 +604,18 @@ impl Board {
         let b = |x: f64| format!("{:08x}", (x as f32).to_bits());
         out += &format!(
             "cam {} {} {} {} near {} far {} slopes {} {} {} {} a {} b {}\n",
-            b(c.fx), b(c.fy), b(c.cx), b(c.cy), b(c.near), b(c.far),
-            b(c.slopes[0]), b(c.slopes[1]), b(c.slopes[2]), b(c.slopes[3]), b(c.a), b(c.b)
+            b(c.fx),
+            b(c.fy),
+            b(c.cx),
+            b(c.cy),
+            b(c.near),
+            b(c.far),
+            b(c.slopes[0]),
+            b(c.slopes[1]),
+            b(c.slopes[2]),
+            b(c.slopes[3]),
+            b(c.a),
+            b(c.b)
         );
         for x in 0..11 {
             for y in 0..8 {
@@ -618,7 +666,11 @@ impl Board {
     /// The unicorn's (k = 0) or the beast's position (@ 0x004bc060 /
     /// 0x004bc0e0, @ 0x004bc120 / 0x004bc1a0): both roots of its scene.
     fn set_actor_pos(&mut self, k: usize, p: Vec3) {
-        let s = if k == 0 { &mut self.uni } else { &mut self.beast };
+        let s = if k == 0 {
+            &mut self.uni
+        } else {
+            &mut self.beast
+        };
         s.set_position(ROOT_SKEL, p);
         s.set_position(ROOT_OBJ, p);
     }
@@ -626,13 +678,21 @@ impl Board {
     /// The heading (@ 0x004bc320 / 0x004bc470).
     fn set_actor_heading(&mut self, k: usize, a: f32) {
         let q = heading_quat(a);
-        let s = if k == 0 { &mut self.uni } else { &mut self.beast };
+        let s = if k == 0 {
+            &mut self.uni
+        } else {
+            &mut self.beast
+        };
         s.set_rotation(ROOT_OBJ, q);
         s.set_rotation(ROOT_SKEL, q);
     }
 
     fn actor_pos(&mut self, k: usize) -> Vec3 {
-        let s = if k == 0 { &mut self.uni } else { &mut self.beast };
+        let s = if k == 0 {
+            &mut self.uni
+        } else {
+            &mut self.beast
+        };
         s.world_position(ROOT_OBJ)
     }
 
@@ -711,8 +771,12 @@ impl Board {
         });
         let p0 = self.cell(0, 0);
         let p1 = self.cell(0, 1);
-        let r: Vec3 = std::array::from_fn(|i| c.f(c.mul(f64::from(0.35f32), c.f(c.sub(p0[i], p1[i])))));
-        let r2 = c.f(c.add(c.add(c.mul(r[0], r[0]), c.mul(r[1], r[1])), c.mul(r[2], r[2])));
+        let r: Vec3 =
+            std::array::from_fn(|i| c.f(c.mul(f64::from(0.35f32), c.f(c.sub(p0[i], p1[i])))));
+        let r2 = c.f(c.add(
+            c.add(c.mul(r[0], r[0]), c.mul(r[1], r[1])),
+            c.mul(r[2], r[2]),
+        ));
         let mut hit = None;
         for x in 0..11 {
             for y in 0..7 {
@@ -763,7 +827,8 @@ impl Board {
                             Self::sound(host, "sfx\\sound806.apc");
                             self.new_beacon = true;
                             self.held = self.placed;
-                            left = false;
+                            // The click is consumed here; nothing later in
+                            // this frame reads it.
                         }
                     }
                     Some(cell) => {
@@ -882,9 +947,10 @@ impl Board {
         let (w, h) = (self.w as usize, self.h as usize);
         screen[..w * h].copy_from_slice(&self.background);
         let mut z = self.zbuf.clone();
-        let mut logs = self.polys.as_ref().map(|_| {
-            ["uni", "tri", "bal", "held"].map(|g| (g, PolyLog::default()))
-        });
+        let mut logs = self
+            .polys
+            .as_ref()
+            .map(|_| ["uni", "tri", "bal", "held"].map(|g| (g, PolyLog::default())));
         {
             let mut target = Target {
                 pixels: screen,
@@ -958,7 +1024,8 @@ impl Board {
                 }
                 self.uni_a.anim = self.uni_a.next;
             }
-            self.uni.pose(self.uni_a.anim, ftol(f64::from(self.uni_a.frame)));
+            self.uni
+                .pose(self.uni_a.anim, ftol(f64::from(self.uni_a.frame)));
             // The beast's.
             advance(&mut self.beast_a.frame, DT);
             while (self.beast.anim_frames(self.beast_a.anim) as f32) < self.beast_a.frame {
@@ -972,7 +1039,8 @@ impl Board {
                 }
                 self.beast_a.anim = self.beast_a.next;
             }
-            self.beast.pose(self.beast_a.anim, ftol(f64::from(self.beast_a.frame)));
+            self.beast
+                .pose(self.beast_a.anim, ftol(f64::from(self.beast_a.frame)));
             if self.running {
                 advance(&mut self.rt, DT);
                 while self.unicorn_step(DT, host) {}
@@ -982,9 +1050,7 @@ impl Board {
     }
 
     fn node_cell(&self, i: i32) -> (i32, i32) {
-        self.nodes
-            .get(i as usize)
-            .map_or((0, 0), |n| (n.x, n.y))
+        self.nodes.get(i as usize).map_or((0, 0), |n| (n.x, n.y))
     }
 
     fn node_pos(&self, i: i32) -> Vec3 {
@@ -997,7 +1063,11 @@ impl Board {
     fn turn_setup(&mut self, k: usize, p0: &Vec3, p1: &Vec3, p2: &Vec3, d0: i32, d1: i32) {
         let c = K;
         let (r34, r30) = (f64::from(self.r34), f64::from(self.r30));
-        let a = if k == 0 { &mut self.uni_a } else { &mut self.beast_a };
+        let a = if k == 0 {
+            &mut self.uni_a
+        } else {
+            &mut self.beast_a
+        };
         let h1x = c.mul(c.sub(p2[0], p1[0]), 0.5);
         let h1y = c.f(c.mul(c.f(c.sub(p2[1], p1[1])), 0.5));
         let h1z = c.f(c.mul(c.f(c.sub(p2[2], p1[2])), 0.5));
@@ -1035,8 +1105,12 @@ impl Board {
     /// A turn's step (@ 0x0042c520) of actor k.
     fn turn_step(&mut self, k: usize) {
         let c = K;
-        let a = if k == 0 { &mut self.uni_a } else { &mut self.beast_a };
-        let th = c.mul(f64::from(a.m), f64::from(0.098_174_773_156_642_91_f32));
+        let a = if k == 0 {
+            &mut self.uni_a
+        } else {
+            &mut self.beast_a
+        };
+        let th = c.mul(f64::from(a.m), f64::from(f32::from_bits(0x3dc9_0fdb)));
         let (u, v) = if a.flag {
             (libm::cos(th), libm::sin(th))
         } else {
@@ -1045,7 +1119,8 @@ impl Board {
         let x = c.f(c.add(c.mul(u, f64::from(a.rx)), a.centre[0]));
         let z = c.f(c.add(c.mul(v, f64::from(a.rz)), a.centre[2]));
         let p = [x, a.centre[1], z];
-        let hd = blend(a.h0, a.h1, a.m, 16.0) as f32;
+        // `fst dword` under the control word 0x0e7f: rounded toward zero.
+        let hd = c.f32(blend(a.h0, a.h1, a.m, 16.0));
         a.heading = hd;
         self.set_actor_pos(k, p);
         self.set_actor_heading(k, hd);
@@ -1249,7 +1324,8 @@ impl Board {
                 let p = motion(&t.a, &t.b, t.m, 12.0, 0);
                 self.set_actor_pos(1, p);
                 let t = &self.beast_a;
-                let hd = blend(t.h0, t.h1, t.m, 12.0) as f32;
+                // `fstp dword` (@ 0x0042d873) under 0x0e7f: toward zero.
+                let hd = K.f32(blend(t.h0, t.h1, t.m, 12.0));
                 self.set_actor_heading(1, hd);
                 if self.beast_a.m > 8.0 {
                     let far = self.cell(-1, -1);
