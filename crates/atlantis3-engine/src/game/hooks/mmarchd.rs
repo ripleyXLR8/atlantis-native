@@ -81,9 +81,6 @@ pub struct State {
     pub flight_frame: i32,
     /// Caught (@ 0x00786a59): the next frame resets and scans.
     pub caught: bool,
-    /// The camera lock (@ 0x0077b8ac, a warp global: 0x00440740 sets it,
-    /// 0x00440750 clears it; while set the turn 0x00440760 does nothing).
-    pub cam_lock: bool,
     /// The sound objects' names: the guard's last voice (@ 0x007869a8),
     /// the cat's (@ 0x007869f8), the capture voices' (@ 0x00786968), the
     /// grumbling's ambience (@ 0x00786a18).
@@ -113,7 +110,7 @@ impl State {
 }
 
 /// The golden line of the guard's globals (tests: `st`).
-pub(crate) fn st_line(m: &State, freeze: bool, flight_frame: i32) -> String {
+pub(crate) fn st_line(m: &State, freeze: bool, lock: bool, flight_frame: i32) -> String {
     let b = |v: bool| i32::from(v);
     format!(
         "G={} stone={} grumble={} been8={} caught={} pending={} restart={} pflag={} flight={} \
@@ -138,7 +135,7 @@ pub(crate) fn st_line(m: &State, freeze: bool, flight_frame: i32) -> String {
         b(m.cat_seen),
         m.voices_883,
         b(freeze),
-        b(m.cam_lock),
+        b(lock),
         b(m.reload),
     )
 }
@@ -177,7 +174,7 @@ fn set_guard(h: &mut Hx, g: i32) {
 /// The camera turned half a turn (@ 0x00440760(π)), unless locked.
 fn turn(h: &mut Hx) {
     h.g.tr(|| "turn".into());
-    if !h.g.puzzles.mmarchd.cam_lock {
+    if !h.g.puzzles.cam_lock {
         h.g.camera.yaw(std::f32::consts::PI);
     }
 }
@@ -447,7 +444,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
             h.g.draw_warp_only();
             if let Some(bank) = h.g.puzzles.mmarchd.stone_bank.clone() {
                 let path = h.g.puzzles.mmarchd.stone_bank_path.clone();
-                h.g.draw_spr(&path, &bank, f.max(0) as usize, None, 0, 1.0);
+                h.g.draw_spr(&path, &bank, f.max(0) as usize, None, i32::MIN, 1.0);
             }
             h.g.tr_flip();
         } else {
@@ -458,7 +455,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
             h.run("(playcutanimp=MMA_GARDE,3)");
             set_guard(h, 2);
             h.g.tr(|| "camunlock".into());
-            h.g.puzzles.mmarchd.cam_lock = false;
+            h.g.puzzles.cam_lock = false;
             h.g.puzzles.freeze = false;
         }
     }
@@ -503,7 +500,7 @@ pub(super) fn frame(h: &mut Hx, z: &ZoneRec) {
         h.run("(AngleWarpXNow=590)");
         h.run("(AngleWarpYNow=0)");
         h.g.tr(|| "camlock".into());
-        h.g.puzzles.mmarchd.cam_lock = true;
+        h.g.puzzles.cam_lock = true;
         h.g.puzzles.mmarchd.flight_start = now;
         h.g.puzzles.freeze = true;
     }

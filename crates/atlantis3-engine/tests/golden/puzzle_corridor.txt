@@ -1,0 +1,1058 @@
+# Corridor door sequence (Couloir.wam views 15..20) of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31)
+# under emulation: the place's set-up, the view entry, the zone click hook, and per frame the place
+# animations' step, the frame's inputs and the frame hook run unmodified; the sound calls, CtrlScenarIN
+# and the bank close logged only (no chapter loaded); frame n at 100 + n x 1.0025 / 15 s; rand seeded
+# with 1 before the entry. Each run starts from a new game's state. Line format: tests/common/place.rs.
+# st: step 0x0078651c, count 0x00786520, idle 0x0071d4c1, handled 0x0078651a, solved 0x00786519,
+#   saved 0x00786518, door = record 0x00786508 +4 count / +8 reached / +0xc running, frz 0x00789d56.
+# A door = `flag <f> 920 30|31` (chapi053's DepartVue=30/31 effect) in the door's view.
+run solution 15G 17D 18G 17G 15D 20G
+setup wam Couloir.wam view 15 yaw 0 pitch 0
+setup flag 159 1
+setup flag 866 1
+setup flag 867 1
+setup flag 908 1
+setup flag 605 1
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 0 fr 0 list - ended 0
+slot 0 2 sh 1 mode 0 fr 0 list - ended 0
+st 0 step=0 count=0 idle=1 handled=0 solved=0 saved=0 door=0/0/0 frz=0
+bag 0 -
+hand 0 0
+flag 2 920 30
+log 2 clic sur porte COU_PORTE15G
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 0 list - ended 0
+st 2 step=0 count=1 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 2 872=1 906=1
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 1 list - ended 0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 2 list - ended 0
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 1 sh 1 mode 1 fr 3 list - ended 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 1 sh 1 mode 1 fr 4 list - ended 0
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 1 sh 1 mode 1 fr 5 list - ended 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 1 sh 1 mode 1 fr 6 list - ended 0
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 1 sh 1 mode 1 fr 7 list - ended 0
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 1 sh 1 mode 1 fr 8 list - ended 0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 1 sh 1 mode 1 fr 9 list - ended 0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 1 sh 1 mode 1 fr 10 list - ended 0
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 1 sh 1 mode 1 fr 11 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 1 sh 1 mode 1 fr 12 list - ended 0
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 1 sh 1 mode 1 fr 13 list - ended 0
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 1 sh 1 mode 1 fr 14 list - ended 0
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 1 sh 1 mode 1 fr 15 list - ended 0
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 1 sh 1 mode 1 fr 16 list - ended 0
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 1 sh 1 mode 1 fr 17 list - ended 0
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 1 sh 1 mode 1 fr 18 list - ended 0
+slot 21 0 sh 1 mode 1 fr 20 list - ended 0
+slot 21 1 sh 1 mode 1 fr 19 list - ended 0
+addf 22 COU_PORTE15G 20
+log 22 Etape validée : 0
+cmd 22 (AngleWarpX=180)
+cmd 22 (Vue=15)
+cmd 22 (LIMITEANGLEWARPY=70)
+slot 22 0 sh 1 mode 1 fr 0 list - ended 0
+slot 22 1 sh 1 mode 0 fr 0 list - ended 0
+st 22 step=1 count=1 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 22 871=1 872=0
+slot 24 0 sh 1 mode 1 fr 1 list - ended 0
+enter 24 view 17 yaw 0 pitch 0 (walk)
+cmd 24 (LIMITEANGLEWARPY=70)
+slots 0:ttA1017020(COU_AIGUILLES) 1:zcA1017017(COU_PORTE17G) 2:ziA1017017(COU_PORTE17D)
+slot 24 0 sh 1 mode 1 fr 0 list - ended 0
+slot 24 1 sh 1 mode 0 fr 0 list - ended 0
+slot 24 2 sh 1 mode 0 fr 0 list - ended 0
+flag 26 920 31
+log 26 clic sur porte COU_PORTE17D
+slot 26 0 sh 1 mode 1 fr 1 list - ended 0
+slot 26 2 sh 1 mode 1 fr 0 list - ended 0
+st 26 step=1 count=2 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 26 17=1 872=1 906=2
+slot 27 0 sh 1 mode 1 fr 2 list - ended 0
+slot 27 2 sh 1 mode 1 fr 1 list - ended 0
+slot 28 0 sh 1 mode 1 fr 3 list - ended 0
+slot 28 2 sh 1 mode 1 fr 2 list - ended 0
+slot 29 0 sh 1 mode 1 fr 4 list - ended 0
+slot 29 2 sh 1 mode 1 fr 3 list - ended 0
+slot 30 0 sh 1 mode 1 fr 5 list - ended 0
+slot 30 2 sh 1 mode 1 fr 4 list - ended 0
+slot 31 0 sh 1 mode 1 fr 6 list - ended 0
+slot 31 2 sh 1 mode 1 fr 5 list - ended 0
+slot 32 0 sh 1 mode 1 fr 7 list - ended 0
+slot 32 2 sh 1 mode 1 fr 6 list - ended 0
+slot 33 0 sh 1 mode 1 fr 8 list - ended 0
+slot 33 2 sh 1 mode 1 fr 7 list - ended 0
+slot 34 0 sh 1 mode 1 fr 9 list - ended 0
+slot 34 2 sh 1 mode 1 fr 8 list - ended 0
+slot 35 0 sh 1 mode 1 fr 10 list - ended 0
+slot 35 2 sh 1 mode 1 fr 9 list - ended 0
+slot 36 0 sh 1 mode 1 fr 11 list - ended 0
+slot 36 2 sh 1 mode 1 fr 10 list - ended 0
+slot 37 0 sh 1 mode 1 fr 12 list - ended 0
+slot 37 2 sh 1 mode 1 fr 11 list - ended 0
+slot 38 0 sh 1 mode 1 fr 13 list - ended 0
+slot 38 2 sh 1 mode 1 fr 12 list - ended 0
+slot 39 0 sh 1 mode 1 fr 14 list - ended 0
+slot 39 2 sh 1 mode 1 fr 13 list - ended 0
+slot 40 0 sh 1 mode 1 fr 15 list - ended 0
+slot 40 2 sh 1 mode 1 fr 14 list - ended 0
+slot 41 0 sh 1 mode 1 fr 16 list - ended 0
+slot 41 2 sh 1 mode 1 fr 15 list - ended 0
+slot 42 0 sh 1 mode 1 fr 17 list - ended 0
+slot 42 2 sh 1 mode 1 fr 16 list - ended 0
+slot 43 0 sh 1 mode 1 fr 18 list - ended 0
+slot 43 2 sh 1 mode 1 fr 17 list - ended 0
+slot 44 0 sh 1 mode 1 fr 19 list - ended 0
+slot 44 2 sh 1 mode 1 fr 18 list - ended 0
+slot 45 0 sh 1 mode 1 fr 20 list - ended 0
+slot 45 2 sh 1 mode 1 fr 19 list - ended 0
+addf 46 COU_PORTE17D 20
+log 46 Etape validée : 1
+cmd 46 (AngleWarpX=180)
+cmd 46 (Vue=15)
+cmd 46 (LIMITEANGLEWARPY=70)
+view 46 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 46 0 sh 1 mode 1 fr 0 list - ended 0
+slot 46 1 sh 1 mode 0 fr 0 list - ended 0
+slot 46 2 sh 1 mode 0 fr 0 list - ended 0
+st 46 step=2 count=2 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 46 871=2 872=0
+slot 48 0 sh 1 mode 1 fr 1 list - ended 0
+enter 48 view 18 yaw 0 pitch 0 (walk)
+cmd 48 (LIMITEANGLEWARPY=70)
+slots 0:ttA1018020(COU_AIGUILLES) 1:zdA1018018(COU_PORTE18G) 2:zjA1018018(COU_PORTE18D)
+slot 48 0 sh 1 mode 1 fr 0 list - ended 0
+slot 48 1 sh 1 mode 0 fr 0 list - ended 0
+slot 48 2 sh 1 mode 0 fr 0 list - ended 0
+flag 50 920 30
+log 50 clic sur porte COU_PORTE18G
+slot 50 0 sh 1 mode 1 fr 1 list - ended 0
+slot 50 1 sh 1 mode 1 fr 0 list - ended 0
+st 50 step=2 count=3 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 50 872=1 906=3
+slot 51 0 sh 1 mode 1 fr 2 list - ended 0
+slot 51 1 sh 1 mode 1 fr 1 list - ended 0
+slot 52 0 sh 1 mode 1 fr 3 list - ended 0
+slot 52 1 sh 1 mode 1 fr 2 list - ended 0
+slot 53 0 sh 1 mode 1 fr 4 list - ended 0
+slot 53 1 sh 1 mode 1 fr 3 list - ended 0
+slot 54 0 sh 1 mode 1 fr 5 list - ended 0
+slot 54 1 sh 1 mode 1 fr 4 list - ended 0
+slot 55 0 sh 1 mode 1 fr 6 list - ended 0
+slot 55 1 sh 1 mode 1 fr 5 list - ended 0
+slot 56 0 sh 1 mode 1 fr 7 list - ended 0
+slot 56 1 sh 1 mode 1 fr 6 list - ended 0
+slot 57 0 sh 1 mode 1 fr 8 list - ended 0
+slot 57 1 sh 1 mode 1 fr 7 list - ended 0
+slot 58 0 sh 1 mode 1 fr 9 list - ended 0
+slot 58 1 sh 1 mode 1 fr 8 list - ended 0
+slot 59 0 sh 1 mode 1 fr 10 list - ended 0
+slot 59 1 sh 1 mode 1 fr 9 list - ended 0
+slot 60 0 sh 1 mode 1 fr 11 list - ended 0
+slot 60 1 sh 1 mode 1 fr 10 list - ended 0
+slot 61 0 sh 1 mode 1 fr 12 list - ended 0
+slot 61 1 sh 1 mode 1 fr 11 list - ended 0
+slot 62 0 sh 1 mode 1 fr 13 list - ended 0
+slot 62 1 sh 1 mode 1 fr 12 list - ended 0
+slot 63 0 sh 1 mode 1 fr 14 list - ended 0
+slot 63 1 sh 1 mode 1 fr 13 list - ended 0
+slot 64 0 sh 1 mode 1 fr 15 list - ended 0
+slot 64 1 sh 1 mode 1 fr 14 list - ended 0
+slot 65 0 sh 1 mode 1 fr 16 list - ended 0
+slot 65 1 sh 1 mode 1 fr 15 list - ended 0
+slot 66 0 sh 1 mode 1 fr 17 list - ended 0
+slot 66 1 sh 1 mode 1 fr 16 list - ended 0
+slot 67 0 sh 1 mode 1 fr 18 list - ended 0
+slot 67 1 sh 1 mode 1 fr 17 list - ended 0
+slot 68 0 sh 1 mode 1 fr 19 list - ended 0
+slot 68 1 sh 1 mode 1 fr 18 list - ended 0
+slot 69 0 sh 1 mode 1 fr 20 list - ended 0
+slot 69 1 sh 1 mode 1 fr 19 list - ended 0
+addf 70 COU_PORTE18G 20
+log 70 Etape validée : 2
+cmd 70 (AngleWarpX=180)
+cmd 70 (Vue=15)
+cmd 70 (LIMITEANGLEWARPY=70)
+view 70 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 70 0 sh 1 mode 1 fr 0 list - ended 0
+slot 70 1 sh 1 mode 0 fr 0 list - ended 0
+slot 70 2 sh 1 mode 0 fr 0 list - ended 0
+st 70 step=3 count=3 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 70 871=3 872=0
+slot 72 0 sh 1 mode 1 fr 1 list - ended 0
+enter 72 view 17 yaw 0 pitch 0 (walk)
+cmd 72 (LIMITEANGLEWARPY=70)
+slots 0:ttA1017020(COU_AIGUILLES) 1:zcA1017017(COU_PORTE17G) 2:ziA1017017(COU_PORTE17D)
+slot 72 0 sh 1 mode 1 fr 0 list - ended 0
+slot 72 1 sh 1 mode 0 fr 0 list - ended 0
+slot 72 2 sh 1 mode 0 fr 0 list - ended 0
+flag 74 920 30
+log 74 clic sur porte COU_PORTE17G
+slot 74 0 sh 1 mode 1 fr 1 list - ended 0
+slot 74 1 sh 1 mode 1 fr 0 list - ended 0
+st 74 step=3 count=4 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 74 872=1 906=4
+slot 75 0 sh 1 mode 1 fr 2 list - ended 0
+slot 75 1 sh 1 mode 1 fr 1 list - ended 0
+slot 76 0 sh 1 mode 1 fr 3 list - ended 0
+slot 76 1 sh 1 mode 1 fr 2 list - ended 0
+slot 77 0 sh 1 mode 1 fr 4 list - ended 0
+slot 77 1 sh 1 mode 1 fr 3 list - ended 0
+slot 78 0 sh 1 mode 1 fr 5 list - ended 0
+slot 78 1 sh 1 mode 1 fr 4 list - ended 0
+slot 79 0 sh 1 mode 1 fr 6 list - ended 0
+slot 79 1 sh 1 mode 1 fr 5 list - ended 0
+slot 80 0 sh 1 mode 1 fr 7 list - ended 0
+slot 80 1 sh 1 mode 1 fr 6 list - ended 0
+slot 81 0 sh 1 mode 1 fr 8 list - ended 0
+slot 81 1 sh 1 mode 1 fr 7 list - ended 0
+slot 82 0 sh 1 mode 1 fr 9 list - ended 0
+slot 82 1 sh 1 mode 1 fr 8 list - ended 0
+slot 83 0 sh 1 mode 1 fr 10 list - ended 0
+slot 83 1 sh 1 mode 1 fr 9 list - ended 0
+slot 84 0 sh 1 mode 1 fr 11 list - ended 0
+slot 84 1 sh 1 mode 1 fr 10 list - ended 0
+slot 85 0 sh 1 mode 1 fr 12 list - ended 0
+slot 85 1 sh 1 mode 1 fr 11 list - ended 0
+slot 86 0 sh 1 mode 1 fr 13 list - ended 0
+slot 86 1 sh 1 mode 1 fr 12 list - ended 0
+slot 87 0 sh 1 mode 1 fr 14 list - ended 0
+slot 87 1 sh 1 mode 1 fr 13 list - ended 0
+slot 88 0 sh 1 mode 1 fr 15 list - ended 0
+slot 88 1 sh 1 mode 1 fr 14 list - ended 0
+slot 89 0 sh 1 mode 1 fr 16 list - ended 0
+slot 89 1 sh 1 mode 1 fr 15 list - ended 0
+slot 90 0 sh 1 mode 1 fr 17 list - ended 0
+slot 90 1 sh 1 mode 1 fr 16 list - ended 0
+slot 91 0 sh 1 mode 1 fr 18 list - ended 0
+slot 91 1 sh 1 mode 1 fr 17 list - ended 0
+slot 92 0 sh 1 mode 1 fr 19 list - ended 0
+slot 92 1 sh 1 mode 1 fr 18 list - ended 0
+slot 93 0 sh 1 mode 1 fr 20 list - ended 0
+slot 93 1 sh 1 mode 1 fr 19 list - ended 0
+addf 94 COU_PORTE17G 20
+log 94 Etape validée : 3
+cmd 94 (AngleWarpX=180)
+cmd 94 (Vue=15)
+cmd 94 (LIMITEANGLEWARPY=70)
+view 94 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 94 0 sh 1 mode 1 fr 0 list - ended 0
+slot 94 1 sh 1 mode 0 fr 0 list - ended 0
+slot 94 2 sh 1 mode 0 fr 0 list - ended 0
+st 94 step=4 count=4 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 94 871=4 872=0
+slot 96 0 sh 1 mode 1 fr 1 list - ended 0
+flag 97 920 31
+log 97 clic sur porte COU_PORTE15D
+slot 97 0 sh 1 mode 1 fr 2 list - ended 0
+slot 97 2 sh 1 mode 1 fr 0 list - ended 0
+st 97 step=4 count=5 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 97 872=1 906=5
+slot 98 0 sh 1 mode 1 fr 3 list - ended 0
+slot 98 2 sh 1 mode 1 fr 1 list - ended 0
+slot 99 0 sh 1 mode 1 fr 4 list - ended 0
+slot 99 2 sh 1 mode 1 fr 2 list - ended 0
+slot 100 0 sh 1 mode 1 fr 5 list - ended 0
+slot 100 2 sh 1 mode 1 fr 3 list - ended 0
+slot 101 0 sh 1 mode 1 fr 6 list - ended 0
+slot 101 2 sh 1 mode 1 fr 4 list - ended 0
+slot 102 0 sh 1 mode 1 fr 7 list - ended 0
+slot 102 2 sh 1 mode 1 fr 5 list - ended 0
+slot 103 0 sh 1 mode 1 fr 8 list - ended 0
+slot 103 2 sh 1 mode 1 fr 6 list - ended 0
+slot 104 0 sh 1 mode 1 fr 9 list - ended 0
+slot 104 2 sh 1 mode 1 fr 7 list - ended 0
+slot 105 0 sh 1 mode 1 fr 10 list - ended 0
+slot 105 2 sh 1 mode 1 fr 8 list - ended 0
+slot 106 0 sh 1 mode 1 fr 11 list - ended 0
+slot 106 2 sh 1 mode 1 fr 9 list - ended 0
+slot 107 0 sh 1 mode 1 fr 12 list - ended 0
+slot 107 2 sh 1 mode 1 fr 10 list - ended 0
+slot 108 0 sh 1 mode 1 fr 13 list - ended 0
+slot 108 2 sh 1 mode 1 fr 11 list - ended 0
+slot 109 0 sh 1 mode 1 fr 14 list - ended 0
+slot 109 2 sh 1 mode 1 fr 12 list - ended 0
+slot 110 0 sh 1 mode 1 fr 15 list - ended 0
+slot 110 2 sh 1 mode 1 fr 13 list - ended 0
+slot 111 0 sh 1 mode 1 fr 16 list - ended 0
+slot 111 2 sh 1 mode 1 fr 14 list - ended 0
+slot 112 0 sh 1 mode 1 fr 17 list - ended 0
+slot 112 2 sh 1 mode 1 fr 15 list - ended 0
+slot 113 0 sh 1 mode 1 fr 18 list - ended 0
+slot 113 2 sh 1 mode 1 fr 16 list - ended 0
+slot 114 0 sh 1 mode 1 fr 19 list - ended 0
+slot 114 2 sh 1 mode 1 fr 17 list - ended 0
+slot 115 0 sh 1 mode 1 fr 20 list - ended 0
+slot 115 2 sh 1 mode 1 fr 18 list - ended 0
+slot 116 0 sh 1 mode 1 fr 21 list - ended 0
+slot 116 2 sh 1 mode 1 fr 19 list - ended 0
+addf 117 COU_PORTE15D 20
+log 117 Etape validée : 4
+cmd 117 (AngleWarpX=180)
+cmd 117 (Vue=15)
+cmd 117 (LIMITEANGLEWARPY=70)
+slot 117 0 sh 1 mode 1 fr 0 list - ended 0
+slot 117 2 sh 1 mode 0 fr 0 list - ended 0
+st 117 step=5 count=5 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 117 871=5 872=0
+slot 119 0 sh 1 mode 1 fr 1 list - ended 0
+enter 119 view 20 yaw 0 pitch 0 (walk)
+cmd 119 (LIMITEANGLEWARPY=70)
+slots 0:ttA1020020(COU_AIGUILLES) 1:zfA1020020(COU_PORTE20G) 2:zlA1020020(COU_PORTE20D)
+slot 119 0 sh 1 mode 1 fr 0 list - ended 0
+slot 119 1 sh 1 mode 0 fr 0 list - ended 0
+slot 119 2 sh 1 mode 0 fr 0 list - ended 0
+flag 121 920 30
+log 121 clic sur porte COU_PORTE20G
+slot 121 0 sh 1 mode 1 fr 1 list - ended 0
+slot 121 1 sh 1 mode 1 fr 0 list - ended 0
+st 121 step=5 count=6 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 121 872=1 906=6
+slot 122 0 sh 1 mode 1 fr 2 list - ended 0
+slot 122 1 sh 1 mode 1 fr 1 list - ended 0
+slot 123 0 sh 1 mode 1 fr 3 list - ended 0
+slot 123 1 sh 1 mode 1 fr 2 list - ended 0
+slot 124 0 sh 1 mode 1 fr 4 list - ended 0
+slot 124 1 sh 1 mode 1 fr 3 list - ended 0
+slot 125 0 sh 1 mode 1 fr 5 list - ended 0
+slot 125 1 sh 1 mode 1 fr 4 list - ended 0
+slot 126 0 sh 1 mode 1 fr 6 list - ended 0
+slot 126 1 sh 1 mode 1 fr 5 list - ended 0
+slot 127 0 sh 1 mode 1 fr 7 list - ended 0
+slot 127 1 sh 1 mode 1 fr 6 list - ended 0
+slot 128 0 sh 1 mode 1 fr 8 list - ended 0
+slot 128 1 sh 1 mode 1 fr 7 list - ended 0
+slot 129 0 sh 1 mode 1 fr 9 list - ended 0
+slot 129 1 sh 1 mode 1 fr 8 list - ended 0
+slot 130 0 sh 1 mode 1 fr 10 list - ended 0
+slot 130 1 sh 1 mode 1 fr 9 list - ended 0
+slot 131 0 sh 1 mode 1 fr 11 list - ended 0
+slot 131 1 sh 1 mode 1 fr 10 list - ended 0
+slot 132 0 sh 1 mode 1 fr 12 list - ended 0
+slot 132 1 sh 1 mode 1 fr 11 list - ended 0
+slot 133 0 sh 1 mode 1 fr 13 list - ended 0
+slot 133 1 sh 1 mode 1 fr 12 list - ended 0
+slot 134 0 sh 1 mode 1 fr 14 list - ended 0
+slot 134 1 sh 1 mode 1 fr 13 list - ended 0
+slot 135 0 sh 1 mode 1 fr 15 list - ended 0
+slot 135 1 sh 1 mode 1 fr 14 list - ended 0
+slot 136 0 sh 1 mode 1 fr 16 list - ended 0
+slot 136 1 sh 1 mode 1 fr 15 list - ended 0
+slot 137 0 sh 1 mode 1 fr 17 list - ended 0
+slot 137 1 sh 1 mode 1 fr 16 list - ended 0
+slot 138 0 sh 1 mode 1 fr 18 list - ended 0
+slot 138 1 sh 1 mode 1 fr 17 list - ended 0
+slot 139 0 sh 1 mode 1 fr 19 list - ended 0
+slot 139 1 sh 1 mode 1 fr 18 list - ended 0
+slot 140 0 sh 1 mode 1 fr 20 list - ended 0
+slot 140 1 sh 1 mode 1 fr 19 list - ended 0
+addf 141 COU_PORTE20G 20
+log 141 Etape validée : 5
+log 141 Puzzle Résolu
+scan 141
+slot 141 0 sh 1 mode 1 fr 21 list - ended 0
+slot 141 1 sh 1 mode 0 fr 0 list 20 ended 1
+st 141 step=6 count=6 idle=1 handled=0 solved=1 saved=1 door=20/20/0 frz=0
+flags 141 871=6 872=0 873=1
+slot 142 0 sh 1 mode 1 fr 22 list - ended 0
+slot 143 0 sh 1 mode 1 fr 23 list - ended 0
+slot 144 0 sh 1 mode 1 fr 24 list - ended 0
+slot 145 0 sh 1 mode 1 fr 25 list - ended 0
+slot 146 0 sh 1 mode 1 fr 26 list - ended 0
+run wrong 15G 15G 17D 18D (15G again keeps step 1; a wrong door resets)
+setup wam Couloir.wam view 15 yaw 0 pitch 0
+setup flag 159 1
+setup flag 866 1
+setup flag 867 1
+setup flag 908 1
+setup flag 605 1
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 0 fr 0 list - ended 0
+slot 0 2 sh 1 mode 0 fr 0 list - ended 0
+st 0 step=0 count=0 idle=1 handled=0 solved=0 saved=0 door=0/0/0 frz=0
+bag 0 -
+hand 0 0
+flag 2 920 30
+log 2 clic sur porte COU_PORTE15G
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 0 list - ended 0
+st 2 step=0 count=1 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 2 872=1 906=1
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 1 list - ended 0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 2 list - ended 0
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 1 sh 1 mode 1 fr 3 list - ended 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 1 sh 1 mode 1 fr 4 list - ended 0
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 1 sh 1 mode 1 fr 5 list - ended 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 1 sh 1 mode 1 fr 6 list - ended 0
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 1 sh 1 mode 1 fr 7 list - ended 0
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 1 sh 1 mode 1 fr 8 list - ended 0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 1 sh 1 mode 1 fr 9 list - ended 0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 1 sh 1 mode 1 fr 10 list - ended 0
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 1 sh 1 mode 1 fr 11 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 1 sh 1 mode 1 fr 12 list - ended 0
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 1 sh 1 mode 1 fr 13 list - ended 0
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 1 sh 1 mode 1 fr 14 list - ended 0
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 1 sh 1 mode 1 fr 15 list - ended 0
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 1 sh 1 mode 1 fr 16 list - ended 0
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 1 sh 1 mode 1 fr 17 list - ended 0
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 1 sh 1 mode 1 fr 18 list - ended 0
+slot 21 0 sh 1 mode 1 fr 20 list - ended 0
+slot 21 1 sh 1 mode 1 fr 19 list - ended 0
+addf 22 COU_PORTE15G 20
+log 22 Etape validée : 0
+cmd 22 (AngleWarpX=180)
+cmd 22 (Vue=15)
+cmd 22 (LIMITEANGLEWARPY=70)
+slot 22 0 sh 1 mode 1 fr 0 list - ended 0
+slot 22 1 sh 1 mode 0 fr 0 list - ended 0
+st 22 step=1 count=1 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 22 871=1 872=0
+slot 24 0 sh 1 mode 1 fr 1 list - ended 0
+flag 25 920 30
+log 25 clic sur porte COU_PORTE15G
+slot 25 0 sh 1 mode 1 fr 2 list - ended 0
+slot 25 1 sh 1 mode 1 fr 0 list - ended 0
+st 25 step=1 count=2 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 25 17=1 872=1 906=2
+slot 26 0 sh 1 mode 1 fr 3 list - ended 0
+slot 26 1 sh 1 mode 1 fr 1 list - ended 0
+slot 27 0 sh 1 mode 1 fr 4 list - ended 0
+slot 27 1 sh 1 mode 1 fr 2 list - ended 0
+slot 28 0 sh 1 mode 1 fr 5 list - ended 0
+slot 28 1 sh 1 mode 1 fr 3 list - ended 0
+slot 29 0 sh 1 mode 1 fr 6 list - ended 0
+slot 29 1 sh 1 mode 1 fr 4 list - ended 0
+slot 30 0 sh 1 mode 1 fr 7 list - ended 0
+slot 30 1 sh 1 mode 1 fr 5 list - ended 0
+slot 31 0 sh 1 mode 1 fr 8 list - ended 0
+slot 31 1 sh 1 mode 1 fr 6 list - ended 0
+slot 32 0 sh 1 mode 1 fr 9 list - ended 0
+slot 32 1 sh 1 mode 1 fr 7 list - ended 0
+slot 33 0 sh 1 mode 1 fr 10 list - ended 0
+slot 33 1 sh 1 mode 1 fr 8 list - ended 0
+slot 34 0 sh 1 mode 1 fr 11 list - ended 0
+slot 34 1 sh 1 mode 1 fr 9 list - ended 0
+slot 35 0 sh 1 mode 1 fr 12 list - ended 0
+slot 35 1 sh 1 mode 1 fr 10 list - ended 0
+slot 36 0 sh 1 mode 1 fr 13 list - ended 0
+slot 36 1 sh 1 mode 1 fr 11 list - ended 0
+slot 37 0 sh 1 mode 1 fr 14 list - ended 0
+slot 37 1 sh 1 mode 1 fr 12 list - ended 0
+slot 38 0 sh 1 mode 1 fr 15 list - ended 0
+slot 38 1 sh 1 mode 1 fr 13 list - ended 0
+slot 39 0 sh 1 mode 1 fr 16 list - ended 0
+slot 39 1 sh 1 mode 1 fr 14 list - ended 0
+slot 40 0 sh 1 mode 1 fr 17 list - ended 0
+slot 40 1 sh 1 mode 1 fr 15 list - ended 0
+slot 41 0 sh 1 mode 1 fr 18 list - ended 0
+slot 41 1 sh 1 mode 1 fr 16 list - ended 0
+slot 42 0 sh 1 mode 1 fr 19 list - ended 0
+slot 42 1 sh 1 mode 1 fr 17 list - ended 0
+slot 43 0 sh 1 mode 1 fr 20 list - ended 0
+slot 43 1 sh 1 mode 1 fr 18 list - ended 0
+slot 44 0 sh 1 mode 1 fr 21 list - ended 0
+slot 44 1 sh 1 mode 1 fr 19 list - ended 0
+addf 45 COU_PORTE15G 20
+log 45 Etape validée : 0
+cmd 45 (AngleWarpX=180)
+cmd 45 (Vue=15)
+cmd 45 (LIMITEANGLEWARPY=70)
+slot 45 0 sh 1 mode 1 fr 0 list - ended 0
+slot 45 1 sh 1 mode 0 fr 0 list - ended 0
+st 45 step=1 count=2 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 45 872=0
+slot 47 0 sh 1 mode 1 fr 1 list - ended 0
+enter 47 view 17 yaw 0 pitch 0 (walk)
+cmd 47 (LIMITEANGLEWARPY=70)
+slots 0:ttA1017020(COU_AIGUILLES) 1:zcA1017017(COU_PORTE17G) 2:ziA1017017(COU_PORTE17D)
+slot 47 0 sh 1 mode 1 fr 0 list - ended 0
+slot 47 1 sh 1 mode 0 fr 0 list - ended 0
+slot 47 2 sh 1 mode 0 fr 0 list - ended 0
+flag 49 920 31
+log 49 clic sur porte COU_PORTE17D
+slot 49 0 sh 1 mode 1 fr 1 list - ended 0
+slot 49 2 sh 1 mode 1 fr 0 list - ended 0
+st 49 step=1 count=3 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 49 872=1 906=3
+slot 50 0 sh 1 mode 1 fr 2 list - ended 0
+slot 50 2 sh 1 mode 1 fr 1 list - ended 0
+slot 51 0 sh 1 mode 1 fr 3 list - ended 0
+slot 51 2 sh 1 mode 1 fr 2 list - ended 0
+slot 52 0 sh 1 mode 1 fr 4 list - ended 0
+slot 52 2 sh 1 mode 1 fr 3 list - ended 0
+slot 53 0 sh 1 mode 1 fr 5 list - ended 0
+slot 53 2 sh 1 mode 1 fr 4 list - ended 0
+slot 54 0 sh 1 mode 1 fr 6 list - ended 0
+slot 54 2 sh 1 mode 1 fr 5 list - ended 0
+slot 55 0 sh 1 mode 1 fr 7 list - ended 0
+slot 55 2 sh 1 mode 1 fr 6 list - ended 0
+slot 56 0 sh 1 mode 1 fr 8 list - ended 0
+slot 56 2 sh 1 mode 1 fr 7 list - ended 0
+slot 57 0 sh 1 mode 1 fr 9 list - ended 0
+slot 57 2 sh 1 mode 1 fr 8 list - ended 0
+slot 58 0 sh 1 mode 1 fr 10 list - ended 0
+slot 58 2 sh 1 mode 1 fr 9 list - ended 0
+slot 59 0 sh 1 mode 1 fr 11 list - ended 0
+slot 59 2 sh 1 mode 1 fr 10 list - ended 0
+slot 60 0 sh 1 mode 1 fr 12 list - ended 0
+slot 60 2 sh 1 mode 1 fr 11 list - ended 0
+slot 61 0 sh 1 mode 1 fr 13 list - ended 0
+slot 61 2 sh 1 mode 1 fr 12 list - ended 0
+slot 62 0 sh 1 mode 1 fr 14 list - ended 0
+slot 62 2 sh 1 mode 1 fr 13 list - ended 0
+slot 63 0 sh 1 mode 1 fr 15 list - ended 0
+slot 63 2 sh 1 mode 1 fr 14 list - ended 0
+slot 64 0 sh 1 mode 1 fr 16 list - ended 0
+slot 64 2 sh 1 mode 1 fr 15 list - ended 0
+slot 65 0 sh 1 mode 1 fr 17 list - ended 0
+slot 65 2 sh 1 mode 1 fr 16 list - ended 0
+slot 66 0 sh 1 mode 1 fr 18 list - ended 0
+slot 66 2 sh 1 mode 1 fr 17 list - ended 0
+slot 67 0 sh 1 mode 1 fr 19 list - ended 0
+slot 67 2 sh 1 mode 1 fr 18 list - ended 0
+slot 68 0 sh 1 mode 1 fr 20 list - ended 0
+slot 68 2 sh 1 mode 1 fr 19 list - ended 0
+addf 69 COU_PORTE17D 20
+log 69 Etape validée : 1
+cmd 69 (AngleWarpX=180)
+cmd 69 (Vue=15)
+cmd 69 (LIMITEANGLEWARPY=70)
+view 69 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 69 0 sh 1 mode 1 fr 0 list - ended 0
+slot 69 1 sh 1 mode 0 fr 0 list - ended 0
+slot 69 2 sh 1 mode 0 fr 0 list - ended 0
+st 69 step=2 count=3 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 69 871=2 872=0
+slot 71 0 sh 1 mode 1 fr 1 list - ended 0
+enter 71 view 18 yaw 0 pitch 0 (walk)
+cmd 71 (LIMITEANGLEWARPY=70)
+slots 0:ttA1018020(COU_AIGUILLES) 1:zdA1018018(COU_PORTE18G) 2:zjA1018018(COU_PORTE18D)
+slot 71 0 sh 1 mode 1 fr 0 list - ended 0
+slot 71 1 sh 1 mode 0 fr 0 list - ended 0
+slot 71 2 sh 1 mode 0 fr 0 list - ended 0
+flag 73 920 31
+log 73 clic sur porte COU_PORTE18D
+slot 73 0 sh 1 mode 1 fr 1 list - ended 0
+slot 73 2 sh 1 mode 1 fr 0 list - ended 0
+st 73 step=2 count=4 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 73 872=1 906=4
+slot 74 0 sh 1 mode 1 fr 2 list - ended 0
+slot 74 2 sh 1 mode 1 fr 1 list - ended 0
+slot 75 0 sh 1 mode 1 fr 3 list - ended 0
+slot 75 2 sh 1 mode 1 fr 2 list - ended 0
+slot 76 0 sh 1 mode 1 fr 4 list - ended 0
+slot 76 2 sh 1 mode 1 fr 3 list - ended 0
+slot 77 0 sh 1 mode 1 fr 5 list - ended 0
+slot 77 2 sh 1 mode 1 fr 4 list - ended 0
+slot 78 0 sh 1 mode 1 fr 6 list - ended 0
+slot 78 2 sh 1 mode 1 fr 5 list - ended 0
+slot 79 0 sh 1 mode 1 fr 7 list - ended 0
+slot 79 2 sh 1 mode 1 fr 6 list - ended 0
+slot 80 0 sh 1 mode 1 fr 8 list - ended 0
+slot 80 2 sh 1 mode 1 fr 7 list - ended 0
+slot 81 0 sh 1 mode 1 fr 9 list - ended 0
+slot 81 2 sh 1 mode 1 fr 8 list - ended 0
+slot 82 0 sh 1 mode 1 fr 10 list - ended 0
+slot 82 2 sh 1 mode 1 fr 9 list - ended 0
+slot 83 0 sh 1 mode 1 fr 11 list - ended 0
+slot 83 2 sh 1 mode 1 fr 10 list - ended 0
+slot 84 0 sh 1 mode 1 fr 12 list - ended 0
+slot 84 2 sh 1 mode 1 fr 11 list - ended 0
+slot 85 0 sh 1 mode 1 fr 13 list - ended 0
+slot 85 2 sh 1 mode 1 fr 12 list - ended 0
+slot 86 0 sh 1 mode 1 fr 14 list - ended 0
+slot 86 2 sh 1 mode 1 fr 13 list - ended 0
+slot 87 0 sh 1 mode 1 fr 15 list - ended 0
+slot 87 2 sh 1 mode 1 fr 14 list - ended 0
+slot 88 0 sh 1 mode 1 fr 16 list - ended 0
+slot 88 2 sh 1 mode 1 fr 15 list - ended 0
+slot 89 0 sh 1 mode 1 fr 17 list - ended 0
+slot 89 2 sh 1 mode 1 fr 16 list - ended 0
+slot 90 0 sh 1 mode 1 fr 18 list - ended 0
+slot 90 2 sh 1 mode 1 fr 17 list - ended 0
+slot 91 0 sh 1 mode 1 fr 19 list - ended 0
+slot 91 2 sh 1 mode 1 fr 18 list - ended 0
+slot 92 0 sh 1 mode 1 fr 20 list - ended 0
+slot 92 2 sh 1 mode 1 fr 19 list - ended 0
+addf 93 COU_PORTE18D 20
+cmd 93 (AngleWarpX=180)
+cmd 93 (Vue=15)
+cmd 93 (LIMITEANGLEWARPY=70)
+view 93 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 93 0 sh 1 mode 1 fr 0 list - ended 0
+slot 93 1 sh 1 mode 0 fr 0 list - ended 0
+slot 93 2 sh 1 mode 0 fr 0 list - ended 0
+st 93 step=0 count=4 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 93 871=0 872=0
+slot 95 0 sh 1 mode 1 fr 1 list - ended 0
+slot 96 0 sh 1 mode 1 fr 2 list - ended 0
+slot 97 0 sh 1 mode 1 fr 3 list - ended 0
+slot 98 0 sh 1 mode 1 fr 4 list - ended 0
+run no_world_flags the six right doors without flags 159 866 867 908 605, then 15G
+setup wam Couloir.wam view 15 yaw 0 pitch 0
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 0 fr 0 list - ended 0
+slot 0 2 sh 1 mode 0 fr 0 list - ended 0
+st 0 step=0 count=0 idle=1 handled=0 solved=0 saved=0 door=0/0/0 frz=0
+bag 0 -
+hand 0 0
+flag 2 920 30
+log 2 clic sur porte COU_PORTE15G
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 0 list - ended 0
+st 2 step=0 count=1 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 2 872=1 906=1
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 1 list - ended 0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 2 list - ended 0
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 1 sh 1 mode 1 fr 3 list - ended 0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 1 sh 1 mode 1 fr 4 list - ended 0
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 1 sh 1 mode 1 fr 5 list - ended 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 1 sh 1 mode 1 fr 6 list - ended 0
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 1 sh 1 mode 1 fr 7 list - ended 0
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 1 sh 1 mode 1 fr 8 list - ended 0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 1 sh 1 mode 1 fr 9 list - ended 0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 1 sh 1 mode 1 fr 10 list - ended 0
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 1 sh 1 mode 1 fr 11 list - ended 0
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 1 sh 1 mode 1 fr 12 list - ended 0
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 1 sh 1 mode 1 fr 13 list - ended 0
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 1 sh 1 mode 1 fr 14 list - ended 0
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 1 sh 1 mode 1 fr 15 list - ended 0
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 1 sh 1 mode 1 fr 16 list - ended 0
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 1 sh 1 mode 1 fr 17 list - ended 0
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 1 sh 1 mode 1 fr 18 list - ended 0
+slot 21 0 sh 1 mode 1 fr 20 list - ended 0
+slot 21 1 sh 1 mode 1 fr 19 list - ended 0
+addf 22 COU_PORTE15G 20
+log 22 Etape validée : 0
+cmd 22 (AngleWarpX=180)
+cmd 22 (Vue=15)
+cmd 22 (LIMITEANGLEWARPY=70)
+slot 22 0 sh 1 mode 1 fr 0 list - ended 0
+slot 22 1 sh 1 mode 0 fr 0 list - ended 0
+st 22 step=1 count=1 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 22 871=1 872=0
+slot 24 0 sh 1 mode 1 fr 1 list - ended 0
+enter 24 view 17 yaw 0 pitch 0 (walk)
+cmd 24 (LIMITEANGLEWARPY=70)
+slots 0:ttA1017020(COU_AIGUILLES) 1:zcA1017017(COU_PORTE17G) 2:ziA1017017(COU_PORTE17D)
+slot 24 0 sh 1 mode 1 fr 0 list - ended 0
+slot 24 1 sh 1 mode 0 fr 0 list - ended 0
+slot 24 2 sh 1 mode 0 fr 0 list - ended 0
+flag 26 920 31
+log 26 clic sur porte COU_PORTE17D
+slot 26 0 sh 1 mode 1 fr 1 list - ended 0
+slot 26 2 sh 1 mode 1 fr 0 list - ended 0
+st 26 step=1 count=2 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 26 17=1 872=1 906=2
+slot 27 0 sh 1 mode 1 fr 2 list - ended 0
+slot 27 2 sh 1 mode 1 fr 1 list - ended 0
+slot 28 0 sh 1 mode 1 fr 3 list - ended 0
+slot 28 2 sh 1 mode 1 fr 2 list - ended 0
+slot 29 0 sh 1 mode 1 fr 4 list - ended 0
+slot 29 2 sh 1 mode 1 fr 3 list - ended 0
+slot 30 0 sh 1 mode 1 fr 5 list - ended 0
+slot 30 2 sh 1 mode 1 fr 4 list - ended 0
+slot 31 0 sh 1 mode 1 fr 6 list - ended 0
+slot 31 2 sh 1 mode 1 fr 5 list - ended 0
+slot 32 0 sh 1 mode 1 fr 7 list - ended 0
+slot 32 2 sh 1 mode 1 fr 6 list - ended 0
+slot 33 0 sh 1 mode 1 fr 8 list - ended 0
+slot 33 2 sh 1 mode 1 fr 7 list - ended 0
+slot 34 0 sh 1 mode 1 fr 9 list - ended 0
+slot 34 2 sh 1 mode 1 fr 8 list - ended 0
+slot 35 0 sh 1 mode 1 fr 10 list - ended 0
+slot 35 2 sh 1 mode 1 fr 9 list - ended 0
+slot 36 0 sh 1 mode 1 fr 11 list - ended 0
+slot 36 2 sh 1 mode 1 fr 10 list - ended 0
+slot 37 0 sh 1 mode 1 fr 12 list - ended 0
+slot 37 2 sh 1 mode 1 fr 11 list - ended 0
+slot 38 0 sh 1 mode 1 fr 13 list - ended 0
+slot 38 2 sh 1 mode 1 fr 12 list - ended 0
+slot 39 0 sh 1 mode 1 fr 14 list - ended 0
+slot 39 2 sh 1 mode 1 fr 13 list - ended 0
+slot 40 0 sh 1 mode 1 fr 15 list - ended 0
+slot 40 2 sh 1 mode 1 fr 14 list - ended 0
+slot 41 0 sh 1 mode 1 fr 16 list - ended 0
+slot 41 2 sh 1 mode 1 fr 15 list - ended 0
+slot 42 0 sh 1 mode 1 fr 17 list - ended 0
+slot 42 2 sh 1 mode 1 fr 16 list - ended 0
+slot 43 0 sh 1 mode 1 fr 18 list - ended 0
+slot 43 2 sh 1 mode 1 fr 17 list - ended 0
+slot 44 0 sh 1 mode 1 fr 19 list - ended 0
+slot 44 2 sh 1 mode 1 fr 18 list - ended 0
+slot 45 0 sh 1 mode 1 fr 20 list - ended 0
+slot 45 2 sh 1 mode 1 fr 19 list - ended 0
+addf 46 COU_PORTE17D 20
+log 46 Etape validée : 1
+cmd 46 (AngleWarpX=180)
+cmd 46 (Vue=15)
+cmd 46 (LIMITEANGLEWARPY=70)
+view 46 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 46 0 sh 1 mode 1 fr 0 list - ended 0
+slot 46 1 sh 1 mode 0 fr 0 list - ended 0
+slot 46 2 sh 1 mode 0 fr 0 list - ended 0
+st 46 step=2 count=2 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 46 871=2 872=0
+slot 48 0 sh 1 mode 1 fr 1 list - ended 0
+enter 48 view 18 yaw 0 pitch 0 (walk)
+cmd 48 (LIMITEANGLEWARPY=70)
+slots 0:ttA1018020(COU_AIGUILLES) 1:zdA1018018(COU_PORTE18G) 2:zjA1018018(COU_PORTE18D)
+slot 48 0 sh 1 mode 1 fr 0 list - ended 0
+slot 48 1 sh 1 mode 0 fr 0 list - ended 0
+slot 48 2 sh 1 mode 0 fr 0 list - ended 0
+flag 50 920 30
+log 50 clic sur porte COU_PORTE18G
+slot 50 0 sh 1 mode 1 fr 1 list - ended 0
+slot 50 1 sh 1 mode 1 fr 0 list - ended 0
+st 50 step=2 count=3 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 50 872=1 906=3
+slot 51 0 sh 1 mode 1 fr 2 list - ended 0
+slot 51 1 sh 1 mode 1 fr 1 list - ended 0
+slot 52 0 sh 1 mode 1 fr 3 list - ended 0
+slot 52 1 sh 1 mode 1 fr 2 list - ended 0
+slot 53 0 sh 1 mode 1 fr 4 list - ended 0
+slot 53 1 sh 1 mode 1 fr 3 list - ended 0
+slot 54 0 sh 1 mode 1 fr 5 list - ended 0
+slot 54 1 sh 1 mode 1 fr 4 list - ended 0
+slot 55 0 sh 1 mode 1 fr 6 list - ended 0
+slot 55 1 sh 1 mode 1 fr 5 list - ended 0
+slot 56 0 sh 1 mode 1 fr 7 list - ended 0
+slot 56 1 sh 1 mode 1 fr 6 list - ended 0
+slot 57 0 sh 1 mode 1 fr 8 list - ended 0
+slot 57 1 sh 1 mode 1 fr 7 list - ended 0
+slot 58 0 sh 1 mode 1 fr 9 list - ended 0
+slot 58 1 sh 1 mode 1 fr 8 list - ended 0
+slot 59 0 sh 1 mode 1 fr 10 list - ended 0
+slot 59 1 sh 1 mode 1 fr 9 list - ended 0
+slot 60 0 sh 1 mode 1 fr 11 list - ended 0
+slot 60 1 sh 1 mode 1 fr 10 list - ended 0
+slot 61 0 sh 1 mode 1 fr 12 list - ended 0
+slot 61 1 sh 1 mode 1 fr 11 list - ended 0
+slot 62 0 sh 1 mode 1 fr 13 list - ended 0
+slot 62 1 sh 1 mode 1 fr 12 list - ended 0
+slot 63 0 sh 1 mode 1 fr 14 list - ended 0
+slot 63 1 sh 1 mode 1 fr 13 list - ended 0
+slot 64 0 sh 1 mode 1 fr 15 list - ended 0
+slot 64 1 sh 1 mode 1 fr 14 list - ended 0
+slot 65 0 sh 1 mode 1 fr 16 list - ended 0
+slot 65 1 sh 1 mode 1 fr 15 list - ended 0
+slot 66 0 sh 1 mode 1 fr 17 list - ended 0
+slot 66 1 sh 1 mode 1 fr 16 list - ended 0
+slot 67 0 sh 1 mode 1 fr 18 list - ended 0
+slot 67 1 sh 1 mode 1 fr 17 list - ended 0
+slot 68 0 sh 1 mode 1 fr 19 list - ended 0
+slot 68 1 sh 1 mode 1 fr 18 list - ended 0
+slot 69 0 sh 1 mode 1 fr 20 list - ended 0
+slot 69 1 sh 1 mode 1 fr 19 list - ended 0
+addf 70 COU_PORTE18G 20
+log 70 Etape validée : 2
+cmd 70 (AngleWarpX=180)
+cmd 70 (Vue=15)
+cmd 70 (LIMITEANGLEWARPY=70)
+view 70 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 70 0 sh 1 mode 1 fr 0 list - ended 0
+slot 70 1 sh 1 mode 0 fr 0 list - ended 0
+slot 70 2 sh 1 mode 0 fr 0 list - ended 0
+st 70 step=3 count=3 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 70 871=3 872=0
+slot 72 0 sh 1 mode 1 fr 1 list - ended 0
+enter 72 view 17 yaw 0 pitch 0 (walk)
+cmd 72 (LIMITEANGLEWARPY=70)
+slots 0:ttA1017020(COU_AIGUILLES) 1:zcA1017017(COU_PORTE17G) 2:ziA1017017(COU_PORTE17D)
+slot 72 0 sh 1 mode 1 fr 0 list - ended 0
+slot 72 1 sh 1 mode 0 fr 0 list - ended 0
+slot 72 2 sh 1 mode 0 fr 0 list - ended 0
+flag 74 920 30
+log 74 clic sur porte COU_PORTE17G
+slot 74 0 sh 1 mode 1 fr 1 list - ended 0
+slot 74 1 sh 1 mode 1 fr 0 list - ended 0
+st 74 step=3 count=4 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 74 872=1 906=4
+slot 75 0 sh 1 mode 1 fr 2 list - ended 0
+slot 75 1 sh 1 mode 1 fr 1 list - ended 0
+slot 76 0 sh 1 mode 1 fr 3 list - ended 0
+slot 76 1 sh 1 mode 1 fr 2 list - ended 0
+slot 77 0 sh 1 mode 1 fr 4 list - ended 0
+slot 77 1 sh 1 mode 1 fr 3 list - ended 0
+slot 78 0 sh 1 mode 1 fr 5 list - ended 0
+slot 78 1 sh 1 mode 1 fr 4 list - ended 0
+slot 79 0 sh 1 mode 1 fr 6 list - ended 0
+slot 79 1 sh 1 mode 1 fr 5 list - ended 0
+slot 80 0 sh 1 mode 1 fr 7 list - ended 0
+slot 80 1 sh 1 mode 1 fr 6 list - ended 0
+slot 81 0 sh 1 mode 1 fr 8 list - ended 0
+slot 81 1 sh 1 mode 1 fr 7 list - ended 0
+slot 82 0 sh 1 mode 1 fr 9 list - ended 0
+slot 82 1 sh 1 mode 1 fr 8 list - ended 0
+slot 83 0 sh 1 mode 1 fr 10 list - ended 0
+slot 83 1 sh 1 mode 1 fr 9 list - ended 0
+slot 84 0 sh 1 mode 1 fr 11 list - ended 0
+slot 84 1 sh 1 mode 1 fr 10 list - ended 0
+slot 85 0 sh 1 mode 1 fr 12 list - ended 0
+slot 85 1 sh 1 mode 1 fr 11 list - ended 0
+slot 86 0 sh 1 mode 1 fr 13 list - ended 0
+slot 86 1 sh 1 mode 1 fr 12 list - ended 0
+slot 87 0 sh 1 mode 1 fr 14 list - ended 0
+slot 87 1 sh 1 mode 1 fr 13 list - ended 0
+slot 88 0 sh 1 mode 1 fr 15 list - ended 0
+slot 88 1 sh 1 mode 1 fr 14 list - ended 0
+slot 89 0 sh 1 mode 1 fr 16 list - ended 0
+slot 89 1 sh 1 mode 1 fr 15 list - ended 0
+slot 90 0 sh 1 mode 1 fr 17 list - ended 0
+slot 90 1 sh 1 mode 1 fr 16 list - ended 0
+slot 91 0 sh 1 mode 1 fr 18 list - ended 0
+slot 91 1 sh 1 mode 1 fr 17 list - ended 0
+slot 92 0 sh 1 mode 1 fr 19 list - ended 0
+slot 92 1 sh 1 mode 1 fr 18 list - ended 0
+slot 93 0 sh 1 mode 1 fr 20 list - ended 0
+slot 93 1 sh 1 mode 1 fr 19 list - ended 0
+addf 94 COU_PORTE17G 20
+log 94 Etape validée : 3
+cmd 94 (AngleWarpX=180)
+cmd 94 (Vue=15)
+cmd 94 (LIMITEANGLEWARPY=70)
+view 94 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 94 0 sh 1 mode 1 fr 0 list - ended 0
+slot 94 1 sh 1 mode 0 fr 0 list - ended 0
+slot 94 2 sh 1 mode 0 fr 0 list - ended 0
+st 94 step=4 count=4 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 94 871=4 872=0
+slot 96 0 sh 1 mode 1 fr 1 list - ended 0
+flag 97 920 31
+log 97 clic sur porte COU_PORTE15D
+slot 97 0 sh 1 mode 1 fr 2 list - ended 0
+slot 97 2 sh 1 mode 1 fr 0 list - ended 0
+st 97 step=4 count=5 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 97 872=1 906=5
+slot 98 0 sh 1 mode 1 fr 3 list - ended 0
+slot 98 2 sh 1 mode 1 fr 1 list - ended 0
+slot 99 0 sh 1 mode 1 fr 4 list - ended 0
+slot 99 2 sh 1 mode 1 fr 2 list - ended 0
+slot 100 0 sh 1 mode 1 fr 5 list - ended 0
+slot 100 2 sh 1 mode 1 fr 3 list - ended 0
+slot 101 0 sh 1 mode 1 fr 6 list - ended 0
+slot 101 2 sh 1 mode 1 fr 4 list - ended 0
+slot 102 0 sh 1 mode 1 fr 7 list - ended 0
+slot 102 2 sh 1 mode 1 fr 5 list - ended 0
+slot 103 0 sh 1 mode 1 fr 8 list - ended 0
+slot 103 2 sh 1 mode 1 fr 6 list - ended 0
+slot 104 0 sh 1 mode 1 fr 9 list - ended 0
+slot 104 2 sh 1 mode 1 fr 7 list - ended 0
+slot 105 0 sh 1 mode 1 fr 10 list - ended 0
+slot 105 2 sh 1 mode 1 fr 8 list - ended 0
+slot 106 0 sh 1 mode 1 fr 11 list - ended 0
+slot 106 2 sh 1 mode 1 fr 9 list - ended 0
+slot 107 0 sh 1 mode 1 fr 12 list - ended 0
+slot 107 2 sh 1 mode 1 fr 10 list - ended 0
+slot 108 0 sh 1 mode 1 fr 13 list - ended 0
+slot 108 2 sh 1 mode 1 fr 11 list - ended 0
+slot 109 0 sh 1 mode 1 fr 14 list - ended 0
+slot 109 2 sh 1 mode 1 fr 12 list - ended 0
+slot 110 0 sh 1 mode 1 fr 15 list - ended 0
+slot 110 2 sh 1 mode 1 fr 13 list - ended 0
+slot 111 0 sh 1 mode 1 fr 16 list - ended 0
+slot 111 2 sh 1 mode 1 fr 14 list - ended 0
+slot 112 0 sh 1 mode 1 fr 17 list - ended 0
+slot 112 2 sh 1 mode 1 fr 15 list - ended 0
+slot 113 0 sh 1 mode 1 fr 18 list - ended 0
+slot 113 2 sh 1 mode 1 fr 16 list - ended 0
+slot 114 0 sh 1 mode 1 fr 19 list - ended 0
+slot 114 2 sh 1 mode 1 fr 17 list - ended 0
+slot 115 0 sh 1 mode 1 fr 20 list - ended 0
+slot 115 2 sh 1 mode 1 fr 18 list - ended 0
+slot 116 0 sh 1 mode 1 fr 21 list - ended 0
+slot 116 2 sh 1 mode 1 fr 19 list - ended 0
+addf 117 COU_PORTE15D 20
+log 117 Etape validée : 4
+cmd 117 (AngleWarpX=180)
+cmd 117 (Vue=15)
+cmd 117 (LIMITEANGLEWARPY=70)
+slot 117 0 sh 1 mode 1 fr 0 list - ended 0
+slot 117 2 sh 1 mode 0 fr 0 list - ended 0
+st 117 step=5 count=5 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 117 871=5 872=0
+slot 119 0 sh 1 mode 1 fr 1 list - ended 0
+enter 119 view 20 yaw 0 pitch 0 (walk)
+cmd 119 (LIMITEANGLEWARPY=70)
+slots 0:ttA1020020(COU_AIGUILLES) 1:zfA1020020(COU_PORTE20G) 2:zlA1020020(COU_PORTE20D)
+slot 119 0 sh 1 mode 1 fr 0 list - ended 0
+slot 119 1 sh 1 mode 0 fr 0 list - ended 0
+slot 119 2 sh 1 mode 0 fr 0 list - ended 0
+flag 121 920 30
+log 121 clic sur porte COU_PORTE20G
+slot 121 0 sh 1 mode 1 fr 1 list - ended 0
+slot 121 1 sh 1 mode 1 fr 0 list - ended 0
+st 121 step=5 count=6 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 121 872=1 906=6
+slot 122 0 sh 1 mode 1 fr 2 list - ended 0
+slot 122 1 sh 1 mode 1 fr 1 list - ended 0
+slot 123 0 sh 1 mode 1 fr 3 list - ended 0
+slot 123 1 sh 1 mode 1 fr 2 list - ended 0
+slot 124 0 sh 1 mode 1 fr 4 list - ended 0
+slot 124 1 sh 1 mode 1 fr 3 list - ended 0
+slot 125 0 sh 1 mode 1 fr 5 list - ended 0
+slot 125 1 sh 1 mode 1 fr 4 list - ended 0
+slot 126 0 sh 1 mode 1 fr 6 list - ended 0
+slot 126 1 sh 1 mode 1 fr 5 list - ended 0
+slot 127 0 sh 1 mode 1 fr 7 list - ended 0
+slot 127 1 sh 1 mode 1 fr 6 list - ended 0
+slot 128 0 sh 1 mode 1 fr 8 list - ended 0
+slot 128 1 sh 1 mode 1 fr 7 list - ended 0
+slot 129 0 sh 1 mode 1 fr 9 list - ended 0
+slot 129 1 sh 1 mode 1 fr 8 list - ended 0
+slot 130 0 sh 1 mode 1 fr 10 list - ended 0
+slot 130 1 sh 1 mode 1 fr 9 list - ended 0
+slot 131 0 sh 1 mode 1 fr 11 list - ended 0
+slot 131 1 sh 1 mode 1 fr 10 list - ended 0
+slot 132 0 sh 1 mode 1 fr 12 list - ended 0
+slot 132 1 sh 1 mode 1 fr 11 list - ended 0
+slot 133 0 sh 1 mode 1 fr 13 list - ended 0
+slot 133 1 sh 1 mode 1 fr 12 list - ended 0
+slot 134 0 sh 1 mode 1 fr 14 list - ended 0
+slot 134 1 sh 1 mode 1 fr 13 list - ended 0
+slot 135 0 sh 1 mode 1 fr 15 list - ended 0
+slot 135 1 sh 1 mode 1 fr 14 list - ended 0
+slot 136 0 sh 1 mode 1 fr 16 list - ended 0
+slot 136 1 sh 1 mode 1 fr 15 list - ended 0
+slot 137 0 sh 1 mode 1 fr 17 list - ended 0
+slot 137 1 sh 1 mode 1 fr 16 list - ended 0
+slot 138 0 sh 1 mode 1 fr 18 list - ended 0
+slot 138 1 sh 1 mode 1 fr 17 list - ended 0
+slot 139 0 sh 1 mode 1 fr 19 list - ended 0
+slot 139 1 sh 1 mode 1 fr 18 list - ended 0
+slot 140 0 sh 1 mode 1 fr 20 list - ended 0
+slot 140 1 sh 1 mode 1 fr 19 list - ended 0
+addf 141 COU_PORTE20G 20
+log 141 Etape validée : 5
+cmd 141 (AngleWarpX=180)
+cmd 141 (Vue=15)
+cmd 141 (LIMITEANGLEWARPY=70)
+view 141 15 (entered by the code)
+slots 0:ttA1015020(COU_AIGUILLES) 1:zaA1015015(COU_PORTE15G) 2:zgA1015015(COU_PORTE15D)
+slot 141 0 sh 1 mode 1 fr 0 list - ended 0
+slot 141 1 sh 1 mode 0 fr 0 list - ended 0
+slot 141 2 sh 1 mode 0 fr 0 list - ended 0
+st 141 step=6 count=6 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 141 871=6 872=0
+slot 143 0 sh 1 mode 1 fr 1 list - ended 0
+flag 144 920 30
+log 144 clic sur porte COU_PORTE15G
+slot 144 0 sh 1 mode 1 fr 2 list - ended 0
+slot 144 1 sh 1 mode 1 fr 0 list - ended 0
+st 144 step=6 count=7 idle=0 handled=0 solved=0 saved=0 door=20/0/1 frz=1
+flags 144 872=1 906=7
+slot 145 0 sh 1 mode 1 fr 3 list - ended 0
+slot 145 1 sh 1 mode 1 fr 1 list - ended 0
+slot 146 0 sh 1 mode 1 fr 4 list - ended 0
+slot 146 1 sh 1 mode 1 fr 2 list - ended 0
+slot 147 0 sh 1 mode 1 fr 5 list - ended 0
+slot 147 1 sh 1 mode 1 fr 3 list - ended 0
+slot 148 0 sh 1 mode 1 fr 6 list - ended 0
+slot 148 1 sh 1 mode 1 fr 4 list - ended 0
+slot 149 0 sh 1 mode 1 fr 7 list - ended 0
+slot 149 1 sh 1 mode 1 fr 5 list - ended 0
+slot 150 0 sh 1 mode 1 fr 8 list - ended 0
+slot 150 1 sh 1 mode 1 fr 6 list - ended 0
+slot 151 0 sh 1 mode 1 fr 9 list - ended 0
+slot 151 1 sh 1 mode 1 fr 7 list - ended 0
+slot 152 0 sh 1 mode 1 fr 10 list - ended 0
+slot 152 1 sh 1 mode 1 fr 8 list - ended 0
+slot 153 0 sh 1 mode 1 fr 11 list - ended 0
+slot 153 1 sh 1 mode 1 fr 9 list - ended 0
+slot 154 0 sh 1 mode 1 fr 12 list - ended 0
+slot 154 1 sh 1 mode 1 fr 10 list - ended 0
+slot 155 0 sh 1 mode 1 fr 13 list - ended 0
+slot 155 1 sh 1 mode 1 fr 11 list - ended 0
+slot 156 0 sh 1 mode 1 fr 14 list - ended 0
+slot 156 1 sh 1 mode 1 fr 12 list - ended 0
+slot 157 0 sh 1 mode 1 fr 15 list - ended 0
+slot 157 1 sh 1 mode 1 fr 13 list - ended 0
+slot 158 0 sh 1 mode 1 fr 16 list - ended 0
+slot 158 1 sh 1 mode 1 fr 14 list - ended 0
+slot 159 0 sh 1 mode 1 fr 17 list - ended 0
+slot 159 1 sh 1 mode 1 fr 15 list - ended 0
+slot 160 0 sh 1 mode 1 fr 18 list - ended 0
+slot 160 1 sh 1 mode 1 fr 16 list - ended 0
+slot 161 0 sh 1 mode 1 fr 19 list - ended 0
+slot 161 1 sh 1 mode 1 fr 17 list - ended 0
+slot 162 0 sh 1 mode 1 fr 20 list - ended 0
+slot 162 1 sh 1 mode 1 fr 18 list - ended 0
+slot 163 0 sh 1 mode 1 fr 21 list - ended 0
+slot 163 1 sh 1 mode 1 fr 19 list - ended 0
+addf 164 COU_PORTE15G 20
+log 164 Etape validée : 0
+cmd 164 (AngleWarpX=180)
+cmd 164 (Vue=15)
+cmd 164 (LIMITEANGLEWARPY=70)
+slot 164 0 sh 1 mode 1 fr 0 list - ended 0
+slot 164 1 sh 1 mode 0 fr 0 list - ended 0
+st 164 step=1 count=7 idle=1 handled=0 solved=0 saved=0 door=20/20/0 frz=0
+flags 164 871=1 872=0
+slot 166 0 sh 1 mode 1 fr 1 list - ended 0
+slot 167 0 sh 1 mode 1 fr 2 list - ended 0
+slot 168 0 sh 1 mode 1 fr 3 list - ended 0
+slot 169 0 sh 1 mode 1 fr 4 list - ended 0

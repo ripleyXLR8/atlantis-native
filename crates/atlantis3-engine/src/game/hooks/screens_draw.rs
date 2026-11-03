@@ -98,7 +98,9 @@ impl Game {
     }
 
     /// `AtlSpr_Aff` (@ 0x004367b0) of a bank the C code holds (`path` its
-    /// file, `spr\Name.spr`): x = `None` for the sprite's own position.
+    /// file, `spr\Name.spr`): x = `None` for the sprite's own position
+    /// (0x80000000; y is then ignored, logged `def` when it is
+    /// 0x80000000 too).
     pub(crate) fn draw_spr(
         &mut self,
         path: &str,
@@ -108,13 +110,33 @@ impl Game {
         y: i32,
         alpha: f32,
     ) {
+        self.draw_spr_maybe(path, Some(bank), index, x, y, alpha);
+    }
+
+    /// [`Game::draw_spr`] of a bank that may be closed: the call is made
+    /// (and logged) all the same, nothing is drawn.
+    pub(crate) fn draw_spr_maybe(
+        &mut self,
+        path: &str,
+        bank: Option<&Bank>,
+        index: usize,
+        x: Option<i32>,
+        y: i32,
+        alpha: f32,
+    ) {
         let (w, h) = (self.width, self.height);
-        let a = aff_at(&mut self.screen, w, h, "", bank, index, x, y, alpha);
+        if let Some(bank) = bank {
+            aff_at(&mut self.screen, w, h, "", bank, index, x, y, alpha);
+        }
         self.tr(|| {
-            let (xs, ys) = match x {
-                Some(x) => (x.to_string(), a.y.to_string()),
-                None => ("def".to_string(), "def".to_string()),
+            let show = |v: i32| {
+                if v == i32::MIN {
+                    "def".to_string()
+                } else {
+                    v.to_string()
+                }
             };
+            let (xs, ys) = (show(x.unwrap_or(i32::MIN)), show(y));
             let hex: String = alpha
                 .to_bits()
                 .to_le_bytes()

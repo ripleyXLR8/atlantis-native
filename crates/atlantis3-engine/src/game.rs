@@ -1554,6 +1554,13 @@ impl Game {
                     self.moving.pending = true;
                     return;
                 }
+            } else if self.puzzles.cam_lock {
+                // The rotations (@ 0x00440760 / @ 0x004407c0) do nothing
+                // under the camera lock; the speeds still decay and the
+                // limits are tested on the camera as it is.
+                self.look.frame_locked(&self.camera);
+                self.camera_fov = warp_fov(self.camera.fpu);
+                self.camera.set_fov(self.camera_fov, w, h);
             } else {
                 self.look.frame(&mut self.camera);
                 self.camera_fov = warp_fov(self.camera.fpu);
@@ -3213,10 +3220,14 @@ impl Host for Game {
     /// FUN_0045ada0, the same camera code): the yaw set about the root's
     /// Y (the pitch dropped), or a pitch from the current orientation.
     fn turn_now(&mut self, yaw: bool, angle: f32) {
-        if yaw {
-            self.camera.set_yaw(angle);
-        } else {
-            self.camera.pitch_from_here(angle);
+        // @ 0x00440820 / @ 0x00440880 return at once under the camera lock
+        // (0x0077b8ac).
+        if !self.puzzles.cam_lock {
+            if yaw {
+                self.camera.set_yaw(angle);
+            } else {
+                self.camera.pitch_from_here(angle);
+            }
         }
         self.look.stop();
         self.centre = self.pick_centre();

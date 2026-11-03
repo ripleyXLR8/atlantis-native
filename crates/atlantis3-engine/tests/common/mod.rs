@@ -4,4 +4,5 @@
 #![allow(dead_code)]
 
 pub mod board;
+pub mod place;
 pub mod pz;

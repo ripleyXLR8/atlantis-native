@@ -57,6 +57,14 @@ impl Game {
     /// `now`, yaw and pitch 0.
     #[doc(hidden)]
     pub fn board_enter(&mut self, view: u32, now: f64) {
+        self.board_enter_at(view, 0.0, 0.0, now);
+    }
+
+    /// [`Game::board_enter`] at the arrival angles `yaw`, `pitch`
+    /// (radians, as the `/set` handler leaves them @ 0x00756074 /
+    /// 0x00756078).
+    #[doc(hidden)]
+    pub fn board_enter_at(&mut self, view: u32, yaw: f32, pitch: f32, now: f64) {
         self.now = now;
         if let Some(s) = self.script.as_mut() {
             let old = s.vars[s.keys.vue];
@@ -64,7 +72,7 @@ impl Game {
             s.vars[s.keys.vue] = view as i32;
         }
         let before = self.rand.state;
-        self.enter_view(view, 0.0, 0.0);
+        self.enter_view(view, yaw, pitch);
         self.tr_rand_since(before);
         if let Some(mut s) = self.script.take() {
             self.view_hook(&mut s);
@@ -166,6 +174,45 @@ impl Game {
         self.main_loop_hook();
     }
 
+    /// The place animations' 15 Hz step (@ 0x00439c90) at `now`, alone:
+    /// the Paleo / corridor harness gives its inputs between it and the
+    /// frame hook ([`Game::board_hook`]).
+    #[doc(hidden)]
+    pub fn board_anim_step(&mut self, now: f64) {
+        self.now = now;
+        self.anim_tick = false;
+        self.slots.step(now, &mut self.rand);
+    }
+
+    /// The frame hook (@ 0x004c27d0) alone.
+    #[doc(hidden)]
+    pub fn board_hook(&mut self) {
+        self.frame_hook();
+    }
+
+    /// The camera as the warp's initialisation leaves it, then turned to
+    /// the arrival angles (radians) as the view entry turns it: the aim
+    /// the player turned to.
+    #[doc(hidden)]
+    pub fn board_camera(&mut self, yaw: f32, pitch: f32) {
+        self.reset_camera();
+        self.camera.enter(yaw, pitch);
+        self.centre = self.pick_centre();
+    }
+
+    /// The screen centre's angles (@ 0x004408e0), radians.
+    #[doc(hidden)]
+    pub fn board_aim(&self) -> (f32, f32) {
+        self.camera.angles()
+    }
+
+    /// The right button's byte (@ 0x007592b9) set, as the mouse handler
+    /// sets it.
+    #[doc(hidden)]
+    pub fn board_right_button(&mut self) {
+        self.right_clicked = true;
+    }
+
     /// `SetObjetEnMain` (@ 0x00428380) of the object `name`, or the hand
     /// cleared (@ 0x004282e0) for `None`, unlogged.
     #[doc(hidden)]
@@ -254,7 +301,7 @@ impl Game {
         match board {
             "guard" => {
                 let m = &p.mmarchd;
-                Some(hooks::mmarchd_st(m, p.freeze))
+                Some(hooks::mmarchd_st(m, p.freeze, p.cam_lock))
             }
             "jardin" => {
                 let j = &p.jardin;
@@ -306,6 +353,8 @@ impl Game {
                 ))
             }
             "isis" | "fisherman" | "feathers" | "ankh" => Some(hooks::ldmorts_st(self, board)),
+            "wolves" | "tiger" | "hunt" | "altar" => Some(hooks::paleo_st(self, board)),
+            "couloir" => Some(hooks::couloir_st(self)),
             _ => None,
         }
     }

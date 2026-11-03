@@ -3,13 +3,19 @@
 //! bear and salmon ambience (views 22..51) and the tiger stone throw
 //! (view 26).
 //!
-//! The spear and stone sprites drawn over the warp, the screen-size
-//! reads (@ 0x0040ef70 / 0x0040ef90) and the frame lists of the hearts
-//! (@ 0x00438a40 / 0x00438ae0) are drawing (M4). The camera lock
-//! (@ 0x00440740 / 0x00440750, the byte @ 0x0077b8ac) taken during the
-//! throws is not modelled (the port has no lock yet).
+//! The spear and the stone are drawn by the frame functions themselves
+//! over the warp frame (`AtlSpr_Aff` @ 0x004367b0, banks by the screen's
+//! width @ 0x0040ef50); the hearts are drawn only through their slots'
+//! frame lists (@ 0x00438a40 / 0x00438ae0 / 0x00438ba0); the camera lock
+//! (@ 0x00440740 / 0x00440750, the byte @ 0x0077b8ac) holds during both
+//! throws, so the aim at the click is the aim of the hit test.
+
+use std::sync::Arc;
+
+use atlantis3_data::spr::Bank;
 
 use super::{Hx, ZoneRec};
+use crate::game::Game;
 
 /// A wolf (0x178-byte records from 0x00786e00, built @ 0x004ca4f0).
 #[derive(Debug, Default, Clone)]
@@ -50,6 +56,9 @@ pub struct State {
     pub hunt_draw: bool,
     /// The 25 Hz clock's start (@ 0x00786d18).
     pub hunt_clock: f64,
+    /// The spear's bank (@ 0x00786d90) and its file.
+    pub hunt_bank: Option<Arc<Bank>>,
+    pub hunt_bank_path: String,
 
     /// The altar's one-shot build byte (@ 0x0071d420).
     pub altar_fresh: bool,
@@ -72,6 +81,9 @@ pub struct State {
     pub tiger_throw: bool,
     pub tiger_count: i32,
     pub tiger_clock: f64,
+    /// The stone's bank (@ 0x00789768) and its file.
+    pub tiger_bank: Option<Arc<Bank>>,
+    pub tiger_bank_path: String,
 }
 
 impl State {
@@ -395,10 +407,11 @@ fn aim(h: &Hx) -> (f32, f32) {
 }
 
 /// View 4 entry (@ 0x004c92e0): at the first entry the hit bytes from
-/// flags 608..611 (@ 0x004c98b0) and, in view 4, the spear's sprite
-/// opened (`Lance*.spr`, or `propulseur*.spr` with `Flag614` = 1: M4)
-/// and the animals shown or hidden by their flags (@ 0x004c9ba0); every
-/// entry the 25 Hz clock restarted.
+/// flags 608..611 (@ 0x004c98b0) and, in view 4, the spear's bank opened
+/// (closed first when open; `Lance<640|800>.spr` / `Lance1024.spr`, or
+/// `propulseur<640|800>.spr` / `propulseur1024.SPR` with `Flag614` = 1,
+/// by the screen's width) and the animals shown or hidden by their flags
+/// (@ 0x004c9ba0); every entry the 25 Hz clock restarted.
 pub(super) fn view_hunt(h: &mut Hx) {
     if h.g.puzzles.paleo.hunt_fresh {
         for (k, a) in ANIMALS.iter().enumerate() {
@@ -407,7 +420,20 @@ pub(super) fn view_hunt(h: &mut Hx) {
         }
         // @ 0x004c9ba0.
         if h.vue() == 4 {
-            // visual: the spear's sprite bank opened (M4).
+            let open = h.g.puzzles.paleo.hunt_bank_path.clone();
+            if !open.is_empty() {
+                h.g.puzzles.paleo.hunt_bank = close_bank(h, &open);
+            }
+            let file = if h.flag(614) == 1 {
+                bank_file(h.g.width, "propulseur", "SPR")
+            } else {
+                bank_file(h.g.width, "Lance", "spr")
+            };
+            if let Some(file) = file {
+                let (path, bank) = open_bank(h.g, &file);
+                h.g.puzzles.paleo.hunt_bank_path = path;
+                h.g.puzzles.paleo.hunt_bank = bank;
+            }
             for (k, cmd) in [
                 ("(ShowObjet=PAL_CERF)", "(HideObjet=PAL_CERF)"),
                 ("(ShowObjet=PAL_AVROCH)", "(HideObjet=PAL_AVROCH)"),
@@ -461,14 +487,16 @@ fn hunt_step(h: &mut Hx, z: &ZoneRec) -> bool {
         p.hunt_count = 0;
         p.hunt_draw = true;
     }
-    // visual: with the draw byte the spear drawn (@ 0x004c9720, M4).
+    if h.g.puzzles.paleo.hunt_draw {
+        hunt_draw(h);
+    }
     if z.value != 0 && h.g.puzzles.paleo.hunt_aim {
         if (1..=5).any(|n| z.name == format!("PAL_ZONE_LANCE{n}")) {
             h.run("(PlaySound=201)");
             let k = h.s.keys.objetenmain;
             h.s.vars[k] = 0;
             h.g.puzzles.paleo.hunt_aim = false;
-            // The camera locked (@ 0x00440740).
+            lock(h, true);
         }
         return false;
     }
@@ -483,7 +511,7 @@ fn hunt_step(h: &mut Hx, z: &ZoneRec) -> bool {
     if h.g.puzzles.paleo.hunt_count < 25 {
         h.g.puzzles.paleo.hunt_count += 1;
     } else {
-        // The camera unlocked (@ 0x00440750); the spear not drawn.
+        lock(h, false);
         h.g.puzzles.paleo.hunt_draw = false;
     }
     if h.g.puzzles.paleo.hunt_count == 12 {
@@ -554,12 +582,25 @@ fn hunt_hit_test(h: &mut Hx, k: usize) -> bool {
 /// button's byte cleared, the camera unlocked, `(sacados=NOT_PAL_LANCE)`,
 /// `Flag620` := 0, `Flag91` := 1, `CtrlScenarIN`.
 pub(super) fn hunt_end(h: &mut Hx) {
-    // visual: the sprite bank @ 0x00786d90 closed (M4).
+    let path = h.g.puzzles.paleo.hunt_bank_path.clone();
+    h.g.puzzles.paleo.hunt_bank = close_bank(h, &path);
     h.g.right_clicked = false;
+    lock(h, false);
     h.run("(sacados=NOT_PAL_LANCE)");
     h.set_flag(620, 0);
     h.set_flag(91, 1);
     h.ctrl();
+}
+
+/// The spear (@ 0x004c9720): `AtlSpr_Aff` of the counter's sprite at
+/// its own position, y = the screen's height / 2 (@ 0x0040ef90, ignored
+/// with the own position), alpha 1 (0x0071e324).
+fn hunt_draw(h: &mut Hx) {
+    let path = h.g.puzzles.paleo.hunt_bank_path.clone();
+    let bank = h.g.puzzles.paleo.hunt_bank.clone();
+    let i = h.g.puzzles.paleo.hunt_count.max(0) as usize;
+    let y = (h.g.height as i32) >> 1;
+    h.g.draw_spr_maybe(&path, bank.as_deref(), i, None, y, 1.0);
 }
 
 /// The hearts (records @ 0x00785fe0 + 0x48 k): name, bag sprite (+8).
@@ -571,14 +612,27 @@ const HEARTS: [(&str, u8); 4] = [
 ];
 
 /// Views 5..11 entry (@ 0x004c42c0): every entry the positions from
-/// flags 616..619 − 1 (visual: the hearts' frame lists rebuilt, M4).
+/// flags 616..619 − 1; every heart's frame 0 taken out of its list when
+/// listed (@ 0x00438ba0 / 0x00438ae0), then every placed heart's
+/// position (≠ −1) added (@ 0x00438a40): the hearts are drawn only
+/// through these lists (mode-0 slots of four frames, one per position).
 pub(super) fn view_altar(h: &mut Hx) {
     for k in 0..4 {
         let v = h.flag(616 + k) - 1;
         h.g.puzzles.paleo.altar_pos[k] = v;
     }
-    // visual: frame 0 removed from each heart's list, its position's
-    // frame added (@ 0x00438ba0 / 0x00438ae0 / 0x00438a40, M4).
+    // Two passes (@ 0x004c4405..0x004c4426, @ 0x004c4439..0x004c4450).
+    for (name, _) in HEARTS {
+        let id = h.obj(name);
+        h.subf_if_listed(id, 0);
+    }
+    for (k, (name, _)) in HEARTS.iter().enumerate() {
+        let pos = h.g.puzzles.paleo.altar_pos[k];
+        if pos != -1 {
+            let id = h.obj(name);
+            h.addf(id, pos);
+        }
+    }
     h.g.puzzles.paleo.altar_fresh = false;
 }
 
@@ -617,8 +671,8 @@ fn altar_place(h: &mut Hx, position: i32) {
             if h.g.puzzles.paleo.altar_pos[k] != position {
                 continue;
             }
-            // visual: the frame removed from its list (@ 0x00438ae0).
             let id = h.obj(name);
+            h.subf(id, position);
             h.s.bag_add(h.g, id, *sprite);
             h.s.hold(id);
             h.g.puzzles.paleo.altar_pos[k] = -1;
@@ -632,7 +686,8 @@ fn altar_place(h: &mut Hx, position: i32) {
             continue;
         }
         h.g.puzzles.paleo.altar_pos[k] = position;
-        // visual: the frame added to its list (@ 0x00438a40).
+        let id = h.obj(name);
+        h.addf(id, position);
         h.run("(ObjetEnMain=0)");
         let id = h.obj(name);
         h.s.bag_remove(id);
@@ -748,9 +803,19 @@ fn stop_ended(h: &mut Hx, id: i32) {
 
 /// View 26 entry (@ 0x004d1130): the byte @ 0x0071f272 cleared; at the
 /// first entry with `Flag111` = 0 the hit byte cleared; no aim, no
-/// throw; the stone's sprite opened (`CaillouTigre*.spr`, @ 0x004d15d0:
-/// M4); the 20 Hz clock restarted.
+/// throw; the stone's bank opened (@ 0x004d15d0: closed first when open,
+/// `CaillouTigre<640|800>.spr` / `CaillouTigre1024.SPR` by the screen's
+/// width); the 20 Hz clock restarted.
 pub(super) fn view_tiger(h: &mut Hx) {
+    let open = h.g.puzzles.paleo.tiger_bank_path.clone();
+    if !open.is_empty() {
+        h.g.puzzles.paleo.tiger_bank = close_bank(h, &open);
+    }
+    if let Some(file) = bank_file(h.g.width, "CaillouTigre", "SPR") {
+        let (path, bank) = open_bank(h.g, &file);
+        h.g.puzzles.paleo.tiger_bank_path = path;
+        h.g.puzzles.paleo.tiger_bank = bank;
+    }
     let now = h.now();
     let flag111 = h.flag(111);
     let p = &mut h.g.puzzles.paleo;
@@ -779,16 +844,18 @@ pub(super) fn frame_tiger(h: &mut Hx, z: &ZoneRec) {
             h.g.puzzles.paleo.tiger_aim = true;
             h.g.puzzles.paleo.tiger_count = 0;
         }
-        // visual: the stone drawn (@ 0x004d1470, M4).
+        tiger_draw(h);
     } else {
         h.g.puzzles.paleo.tiger_aim = false;
-        // visual: while thrown, the stone drawn (@ 0x004d1470, M4).
+        if h.g.puzzles.paleo.tiger_throw {
+            tiger_draw(h);
+        }
     }
     if z.value != 0 && h.g.puzzles.paleo.tiger_aim && z.name == "PAL_ZONE_LANCER" {
         h.hand_clear();
         h.g.puzzles.paleo.tiger_aim = false;
         h.g.puzzles.paleo.tiger_throw = true;
-        // The camera locked (@ 0x00440740).
+        lock(h, true);
         h.g.puzzles.freeze = true;
     }
     // The 20 Hz clock (double @ 0x0071f278).
@@ -800,16 +867,14 @@ pub(super) fn frame_tiger(h: &mut Hx, z: &ZoneRec) {
         h.g.puzzles.paleo.tiger_count += 1;
         return;
     }
-    // The camera unlocked (@ 0x00440750).
+    lock(h, false);
     h.g.puzzles.freeze = false;
     h.g.puzzles.paleo.tiger_throw = false;
     h.g.puzzles.paleo.tiger_count = 0;
     if tiger_hit_test(h) {
         h.g.puzzles.paleo.tiger_hit = true;
         h.set_flag(111, 1);
-        // @ 0x004d15a0. visual: the sprite bank @ 0x00789768 closed (M4).
-        h.g.right_clicked = false;
-        h.ctrl();
+        tiger_success(h);
         return;
     }
     h.set_flag(111, 2);
@@ -846,9 +911,103 @@ pub(super) fn wolves_success(h: &mut Hx) {
     h.ctrl();
 }
 
-/// The tiger stone's hit tail (@ 0x004d15a0): the right button's byte
-/// cleared, `CtrlScenarIN`.
+/// The tiger stone's hit tail (@ 0x004d15a0): the stone's bank closed,
+/// the right button's byte cleared, the camera unlocked, `CtrlScenarIN`.
 pub(super) fn tiger_success(h: &mut Hx) {
+    let path = h.g.puzzles.paleo.tiger_bank_path.clone();
+    h.g.puzzles.paleo.tiger_bank = close_bank(h, &path);
     h.g.right_clicked = false;
+    lock(h, false);
     h.ctrl();
+}
+
+/// The stone (@ 0x004d1470, in `paleo.wam` view 26): `AtlSpr_Aff` of the
+/// counter's sprite at its own position, alpha 1 (0x0071f274).
+fn tiger_draw(h: &mut Hx) {
+    if !h.g.wam_is("paleo.wam") || h.vue() != 26 {
+        return;
+    }
+    let path = h.g.puzzles.paleo.tiger_bank_path.clone();
+    let bank = h.g.puzzles.paleo.tiger_bank.clone();
+    let i = h.g.puzzles.paleo.tiger_count.max(0) as usize;
+    h.g.draw_spr_maybe(&path, bank.as_deref(), i, None, i32::MIN, 1.0);
+}
+
+/// The camera lock (@ 0x00440740 := 1, @ 0x00440750 := 0), logged
+/// `lock 1` / `lock 0` at each call.
+fn lock(h: &mut Hx, on: bool) {
+    h.g.tr(|| format!("lock {}", u8::from(on)));
+    h.g.puzzles.cam_lock = on;
+}
+
+/// A puzzle bank's file by the screen's width (@ 0x0040ef50): 640, 800
+/// or 1024 (the 1024 names as the code spells them); none for another
+/// width.
+fn bank_file(width: usize, base: &str, ext1024: &str) -> Option<String> {
+    match width {
+        640 | 800 => Some(format!("{base}{width}.spr")),
+        1024 => Some(format!("{base}1024.{ext1024}")),
+        _ => None,
+    }
+}
+
+/// A bank closed (@ 0x004365b0, logged `sprclose <file>`): its file name
+/// is kept.
+fn close_bank(h: &mut Hx, path: &str) -> Option<Arc<Bank>> {
+    let p = path.to_string();
+    h.g.tr(|| format!("sprclose {p}"));
+    None
+}
+
+/// A bank opened: its file (`spr\Name`) and the bank (none when missing).
+fn open_bank(g: &Game, file: &str) -> (String, Option<Arc<Bank>>) {
+    (format!("spr\\{file}"), g.screen_bank(file))
+}
+
+/// Tests: the boards' golden `st` lines (the harness's globals).
+pub(crate) fn st_line(g: &Game, board: &str) -> String {
+    let p = &g.puzzles.paleo;
+    let b = |v: bool| u8::from(v);
+    let rbtn = b(g.right_clicked);
+    let lock = b(g.puzzles.cam_lock);
+    match board {
+        "wolves" => {
+            const NAMES: [&str; 5] = ["blanc", "gris", "noir", "marron", "jaune"];
+            let f = |w: Option<usize>| w.map_or("-", |k| NAMES[k]);
+            let ps: String = p
+                .wolves
+                .iter()
+                .map(|w| format!("{}{}", b(w.picked), b(w.submitted)))
+                .collect();
+            format!(
+                "A={} B={} picked_submitted={ps} stopped={} won={}",
+                f(p.fighter_a),
+                f(p.fighter_b),
+                b(p.wolves_stopped),
+                b(p.wolves_won)
+            )
+        }
+        "tiger" => format!(
+            "aim={} throw={} count={} hit={} frz={} lock={lock} rbtn={rbtn}",
+            b(p.tiger_aim),
+            b(p.tiger_throw),
+            p.tiger_count,
+            b(p.tiger_hit),
+            b(g.puzzles.freeze)
+        ),
+        "hunt" => {
+            let hits: String = p.hunt_hit.iter().map(|&v| b(v).to_string()).collect();
+            format!(
+                "hits={hits} aim={} count={} draw={} lock={lock} rbtn={rbtn}",
+                b(p.hunt_aim),
+                p.hunt_count,
+                b(p.hunt_draw)
+            )
+        }
+        "altar" => {
+            let v: Vec<String> = p.altar_pos.iter().map(|v| v.to_string()).collect();
+            format!("pos={}", v.join(","))
+        }
+        _ => String::new(),
+    }
 }

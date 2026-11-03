@@ -98,6 +98,12 @@ pub struct Puzzles {
     /// The input freeze (@ 0x00789d56): while set the mouse handler
     /// (@ 0x00431580) ignores the buttons.
     pub freeze: bool,
+    /// The camera lock (@ 0x0077b8ac, a warp global: @ 0x00440740 sets
+    /// it, @ 0x00440750 clears it; while set the camera's rotations
+    /// @ 0x00440760 / @ 0x004407c0 (the look, its limits, the π turn) and
+    /// `AngleWarpXNow` / `AngleWarpYNow` (@ 0x00440820 / @ 0x00440880) do
+    /// nothing). Taken by the market's stone and Paleo's two throws.
+    pub cam_lock: bool,
     /// The warp cursor a puzzle set (@ 0x00716e08: a sprite of the
     /// world's in-hand bank, `None` = −1; [`Game::set_warp_cursor`]).
     pub warp_cursor: Option<i32>,
@@ -160,9 +166,19 @@ pub(super) fn ldmorts_st(g: &Game, board: &str) -> String {
     ldmorts::st_line(g, board)
 }
 
+/// Tests: the Paleo boards' golden `st` lines.
+pub(super) fn paleo_st(g: &Game, board: &str) -> String {
+    paleo::st_line(g, board)
+}
+
+/// Tests: the corridor's golden `st` line.
+pub(super) fn couloir_st(g: &Game) -> String {
+    couloir::st_line(g)
+}
+
 /// Tests: the guard's golden `st` line.
-pub(super) fn mmarchd_st(m: &mmarchd::State, freeze: bool) -> String {
-    mmarchd::st_line(m, freeze, m.flight_frame)
+pub(super) fn mmarchd_st(m: &mmarchd::State, freeze: bool, lock: bool) -> String {
+    mmarchd::st_line(m, freeze, lock, m.flight_frame)
 }
 
 /// The solution of the funeral chamber's ring (@ 0x0071d530): G, D, D, G, D.
@@ -567,7 +583,7 @@ impl Game {
             }
             // The camera unlocked.
             0x00440750 => {
-                self.puzzles.mmarchd.cam_lock = false;
+                self.puzzles.cam_lock = false;
                 return true;
             }
             _ => {}

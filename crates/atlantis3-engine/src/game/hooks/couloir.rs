@@ -171,3 +171,23 @@ pub(super) fn open(h: &mut Hx) {
     h.set_flag(873, 1);
     h.ctrl();
 }
+
+/// Tests: the board's golden `st` line (the harness's globals: the door
+/// record's count / reached / running).
+pub(crate) fn st_line(g: &crate::game::Game) -> String {
+    let c = &g.puzzles.couloir;
+    let b = |v: bool| u8::from(v);
+    format!(
+        "step={} count={} idle={} handled={} solved={} saved={} door={}/{}/{} frz={}",
+        c.step,
+        c.count,
+        b(c.idle),
+        b(c.handled),
+        b(c.solved),
+        b(c.solved_saved),
+        c.anim.count,
+        c.anim.reached,
+        b(c.anim.running),
+        b(g.puzzles.freeze)
+    )
+}

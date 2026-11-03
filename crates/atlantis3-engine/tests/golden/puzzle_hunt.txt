@@ -1,0 +1,1636 @@
+# Hunt with the spear (paleo.wam view 4) of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31)
+# under emulation: the place's set-up, the view entry, the zone click hook, and per frame the place
+# animations' step, the frame's inputs and the frame hook run unmodified; the sound calls, CtrlScenarIN
+# and the bank close logged only (no chapter loaded); frame n at 100 + n x 1.0025 / 15 s; rand seeded
+# with 1 before the entry. Each run starts from a new game's state. Line format: tests/common/place.rs.
+# st: hits = the hit bytes stag 0x00786d88, aurochs 0x00786d48, horse 0x00786dc8, ibex 0x00786d68;
+#   aim 0x0071e321, count 0x00786dd0 (25 Hz), draw 0x00786dcc, lock 0x0077b8ac, rbtn 0x007592b9.
+# Flags 608..611 (hearts), 620 (throwing), 91 (end).  Slots 0..3 = the stag, aurochs, horse, ibex.
+# Each throw: the spear in hand (the frame takes it), then at the click frame the camera is turned to
+#   the animal's window computed for its slot frame + lead at the hit tick (0x004c99d0), then
+#   PAL_ZONE_LANCE1 is clicked.  Hit rule (0x004c99d0, at count 12, only with flag 614 = 1): pitch
+#   band 1 = (1, 10), band 2 = (-23, -12); o = 360 / frames * slot frame; yaw + 180 in
+#   (hi - o + 180, lo - o + 185), bounds +360 when below -180.
+run win propulsor, four hits
+setup wam paleo.wam view 4 yaw 0 pitch 0
+setup cmd (sacados=PAL_LANCE)
+setup flag 614 1 (the propulsor, chapi027)
+slots 0:ceA1004004(PAL_CERF) 1:pxA1004004(PAL_AVROCH) 2:smA1004004(PAL_CHEVAL) 3:saA1004004(PAL_BOUQUETIN) 4:laA1004004(PAL_LANCE)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slot 0 2 sh 1 mode 1 fr 0 list - ended 0
+slot 0 3 sh 1 mode 1 fr 0 list - ended 0
+slot 0 4 sh 1 mode 1 fr 0 list - ended 0
+st 0 hits=0000 aim=1 count=0 draw=0 lock=0 rbtn=0
+bag 0 +PAL_LANCE
+hand 0 0
+slot 1 0 sh 1 mode 1 fr 1 list - ended 0
+slot 1 1 sh 1 mode 1 fr 1 list - ended 0
+slot 1 2 sh 1 mode 1 fr 1 list - ended 0
+slot 1 3 sh 1 mode 1 fr 1 list - ended 0
+slot 2 0 sh 1 mode 1 fr 2 list - ended 0
+slot 2 1 sh 1 mode 1 fr 2 list - ended 0
+slot 2 2 sh 1 mode 1 fr 2 list - ended 0
+slot 2 3 sh 1 mode 1 fr 2 list - ended 0
+hand 3 PAL_LANCE
+cmd 3 (sacados=NOT_PAL_LANCE)
+draw 3 spr\propulseur800.spr#0@def,300*0000803f
+slot 3 0 sh 1 mode 1 fr 3 list - ended 0
+slot 3 1 sh 1 mode 1 fr 3 list - ended 0
+slot 3 2 sh 1 mode 1 fr 3 list - ended 0
+slot 3 3 sh 1 mode 1 fr 3 list - ended 0
+st 3 hits=0000 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 3 620=1
+hand 3 0
+bag 3 -PAL_LANCE
+draw 4 spr\propulseur800.spr#0@def,300*0000803f
+slot 4 0 sh 1 mode 1 fr 4 list - ended 0
+slot 4 1 sh 1 mode 1 fr 4 list - ended 0
+slot 4 2 sh 1 mode 1 fr 4 list - ended 0
+slot 4 3 sh 1 mode 1 fr 4 list - ended 0
+camera 5 105.1 5
+aim 5 yaw=285.103 pitch=5.000
+click 5 PAL_ZONE_LANCE1
+draw 5 spr\propulseur800.spr#0@def,300*0000803f
+cmd 5 (PlaySound=201)
+snd 5 load sfx\sound201.apc 0 1
+snd 5 play sfx\sound201.apc
+lock 5 1
+slot 5 0 sh 1 mode 1 fr 5 list - ended 0
+slot 5 1 sh 1 mode 1 fr 5 list - ended 0
+slot 5 2 sh 1 mode 1 fr 5 list - ended 0
+slot 5 3 sh 1 mode 1 fr 5 list - ended 0
+st 5 hits=0000 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 6 spr\propulseur800.spr#0@def,300*0000803f
+slot 6 0 sh 1 mode 1 fr 6 list - ended 0
+slot 6 1 sh 1 mode 1 fr 6 list - ended 0
+slot 6 2 sh 1 mode 1 fr 6 list - ended 0
+slot 6 3 sh 1 mode 1 fr 6 list - ended 0
+st 6 hits=0000 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 7 spr\propulseur800.spr#1@def,300*0000803f
+slot 7 0 sh 1 mode 1 fr 7 list - ended 0
+slot 7 1 sh 1 mode 1 fr 7 list - ended 0
+slot 7 2 sh 1 mode 1 fr 7 list - ended 0
+slot 7 3 sh 1 mode 1 fr 7 list - ended 0
+st 7 hits=0000 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 8 spr\propulseur800.spr#2@def,300*0000803f
+slot 8 0 sh 1 mode 1 fr 8 list - ended 0
+slot 8 1 sh 1 mode 1 fr 8 list - ended 0
+slot 8 2 sh 1 mode 1 fr 8 list - ended 0
+slot 8 3 sh 1 mode 1 fr 8 list - ended 0
+st 8 hits=0000 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 9 spr\propulseur800.spr#3@def,300*0000803f
+slot 9 0 sh 1 mode 1 fr 9 list - ended 0
+slot 9 1 sh 1 mode 1 fr 9 list - ended 0
+slot 9 2 sh 1 mode 1 fr 9 list - ended 0
+slot 9 3 sh 1 mode 1 fr 9 list - ended 0
+st 9 hits=0000 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 10 spr\propulseur800.spr#4@def,300*0000803f
+slot 10 0 sh 1 mode 1 fr 10 list - ended 0
+slot 10 1 sh 1 mode 1 fr 10 list - ended 0
+slot 10 2 sh 1 mode 1 fr 10 list - ended 0
+slot 10 3 sh 1 mode 1 fr 10 list - ended 0
+st 10 hits=0000 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 11 spr\propulseur800.spr#5@def,300*0000803f
+slot 11 0 sh 1 mode 1 fr 11 list - ended 0
+slot 11 1 sh 1 mode 1 fr 11 list - ended 0
+slot 11 2 sh 1 mode 1 fr 11 list - ended 0
+slot 11 3 sh 1 mode 1 fr 11 list - ended 0
+st 11 hits=0000 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 12 spr\propulseur800.spr#6@def,300*0000803f
+slot 12 0 sh 1 mode 1 fr 12 list - ended 0
+slot 12 1 sh 1 mode 1 fr 12 list - ended 0
+slot 12 2 sh 1 mode 1 fr 12 list - ended 0
+slot 12 3 sh 1 mode 1 fr 12 list - ended 0
+st 12 hits=0000 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 13 spr\propulseur800.spr#7@def,300*0000803f
+slot 13 0 sh 1 mode 1 fr 13 list - ended 0
+slot 13 1 sh 1 mode 1 fr 13 list - ended 0
+slot 13 2 sh 1 mode 1 fr 13 list - ended 0
+slot 13 3 sh 1 mode 1 fr 13 list - ended 0
+st 13 hits=0000 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 14 spr\propulseur800.spr#8@def,300*0000803f
+slot 14 0 sh 1 mode 1 fr 14 list - ended 0
+slot 14 1 sh 1 mode 1 fr 14 list - ended 0
+slot 14 2 sh 1 mode 1 fr 14 list - ended 0
+slot 14 3 sh 1 mode 1 fr 14 list - ended 0
+st 14 hits=0000 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 15 spr\propulseur800.spr#9@def,300*0000803f
+slot 15 0 sh 1 mode 1 fr 15 list - ended 0
+slot 15 1 sh 1 mode 1 fr 15 list - ended 0
+slot 15 2 sh 1 mode 1 fr 15 list - ended 0
+slot 15 3 sh 1 mode 1 fr 15 list - ended 0
+st 15 hits=0000 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 16 spr\propulseur800.spr#10@def,300*0000803f
+slot 16 0 sh 1 mode 1 fr 16 list - ended 0
+slot 16 1 sh 1 mode 1 fr 16 list - ended 0
+slot 16 2 sh 1 mode 1 fr 16 list - ended 0
+slot 16 3 sh 1 mode 1 fr 16 list - ended 0
+st 16 hits=0000 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 17 spr\propulseur800.spr#11@def,300*0000803f
+cmd 17 (HideObjet=PAL_CERF)
+hide 17 PAL_CERF kind 2 arg 0
+cmd 17 (SacADos=PAL_COEUR_CERF)
+slot 17 0 sh 0 mode 1 fr 0 list - ended 0
+slot 17 1 sh 1 mode 1 fr 17 list - ended 0
+slot 17 2 sh 1 mode 1 fr 17 list - ended 0
+slot 17 3 sh 1 mode 1 fr 17 list - ended 0
+st 17 hits=1000 aim=0 count=12 draw=1 lock=1 rbtn=0
+flags 17 608=1
+bag 17 +PAL_COEUR_CERF
+draw 18 spr\propulseur800.spr#12@def,300*0000803f
+slot 18 1 sh 1 mode 1 fr 18 list - ended 0
+slot 18 2 sh 1 mode 1 fr 18 list - ended 0
+slot 18 3 sh 1 mode 1 fr 18 list - ended 0
+st 18 hits=1000 aim=0 count=13 draw=1 lock=1 rbtn=0
+draw 19 spr\propulseur800.spr#13@def,300*0000803f
+slot 19 1 sh 1 mode 1 fr 19 list - ended 0
+slot 19 2 sh 1 mode 1 fr 19 list - ended 0
+slot 19 3 sh 1 mode 1 fr 19 list - ended 0
+st 19 hits=1000 aim=0 count=14 draw=1 lock=1 rbtn=0
+draw 20 spr\propulseur800.spr#14@def,300*0000803f
+slot 20 1 sh 1 mode 1 fr 20 list - ended 0
+slot 20 2 sh 1 mode 1 fr 20 list - ended 0
+slot 20 3 sh 1 mode 1 fr 20 list - ended 0
+st 20 hits=1000 aim=0 count=15 draw=1 lock=1 rbtn=0
+draw 21 spr\propulseur800.spr#15@def,300*0000803f
+slot 21 1 sh 1 mode 1 fr 21 list - ended 0
+slot 21 2 sh 1 mode 1 fr 21 list - ended 0
+slot 21 3 sh 1 mode 1 fr 21 list - ended 0
+st 21 hits=1000 aim=0 count=16 draw=1 lock=1 rbtn=0
+draw 22 spr\propulseur800.spr#16@def,300*0000803f
+slot 22 1 sh 1 mode 1 fr 22 list - ended 0
+slot 22 2 sh 1 mode 1 fr 22 list - ended 0
+slot 22 3 sh 1 mode 1 fr 22 list - ended 0
+st 22 hits=1000 aim=0 count=17 draw=1 lock=1 rbtn=0
+draw 23 spr\propulseur800.spr#17@def,300*0000803f
+slot 23 1 sh 1 mode 1 fr 23 list - ended 0
+slot 23 2 sh 1 mode 1 fr 23 list - ended 0
+slot 23 3 sh 1 mode 1 fr 23 list - ended 0
+st 23 hits=1000 aim=0 count=18 draw=1 lock=1 rbtn=0
+draw 24 spr\propulseur800.spr#18@def,300*0000803f
+slot 24 1 sh 1 mode 1 fr 24 list - ended 0
+slot 24 2 sh 1 mode 1 fr 24 list - ended 0
+slot 24 3 sh 1 mode 1 fr 24 list - ended 0
+st 24 hits=1000 aim=0 count=19 draw=1 lock=1 rbtn=0
+draw 25 spr\propulseur800.spr#19@def,300*0000803f
+slot 25 1 sh 1 mode 1 fr 25 list - ended 0
+slot 25 2 sh 1 mode 1 fr 25 list - ended 0
+slot 25 3 sh 1 mode 1 fr 25 list - ended 0
+st 25 hits=1000 aim=0 count=20 draw=1 lock=1 rbtn=0
+draw 26 spr\propulseur800.spr#20@def,300*0000803f
+slot 26 1 sh 1 mode 1 fr 26 list - ended 0
+slot 26 2 sh 1 mode 1 fr 26 list - ended 0
+slot 26 3 sh 1 mode 1 fr 26 list - ended 0
+st 26 hits=1000 aim=0 count=21 draw=1 lock=1 rbtn=0
+draw 27 spr\propulseur800.spr#21@def,300*0000803f
+slot 27 1 sh 1 mode 1 fr 27 list - ended 0
+slot 27 2 sh 1 mode 1 fr 27 list - ended 0
+slot 27 3 sh 1 mode 1 fr 27 list - ended 0
+st 27 hits=1000 aim=0 count=22 draw=1 lock=1 rbtn=0
+draw 28 spr\propulseur800.spr#22@def,300*0000803f
+slot 28 1 sh 1 mode 1 fr 28 list - ended 0
+slot 28 2 sh 1 mode 1 fr 28 list - ended 0
+slot 28 3 sh 1 mode 1 fr 28 list - ended 0
+st 28 hits=1000 aim=0 count=23 draw=1 lock=1 rbtn=0
+draw 29 spr\propulseur800.spr#23@def,300*0000803f
+slot 29 1 sh 1 mode 1 fr 29 list - ended 0
+slot 29 2 sh 1 mode 1 fr 29 list - ended 0
+slot 29 3 sh 1 mode 1 fr 29 list - ended 0
+st 29 hits=1000 aim=0 count=24 draw=1 lock=1 rbtn=0
+draw 30 spr\propulseur800.spr#24@def,300*0000803f
+cmd 30 (sacados=PAL_LANCE)
+slot 30 1 sh 1 mode 1 fr 30 list - ended 0
+slot 30 2 sh 1 mode 1 fr 30 list - ended 0
+slot 30 3 sh 1 mode 1 fr 30 list - ended 0
+st 30 hits=1000 aim=0 count=25 draw=1 lock=1 rbtn=0
+flags 30 620=0
+bag 30 +PAL_LANCE
+draw 31 spr\propulseur800.spr#25@def,300*0000803f
+lock 31 0
+cmd 31 (sacados=PAL_LANCE)
+slot 31 1 sh 1 mode 1 fr 31 list - ended 0
+slot 31 2 sh 1 mode 1 fr 31 list - ended 0
+slot 31 3 sh 1 mode 1 fr 31 list - ended 0
+st 31 hits=1000 aim=0 count=25 draw=0 lock=0 rbtn=0
+lock 32 0
+cmd 32 (sacados=PAL_LANCE)
+slot 32 1 sh 1 mode 1 fr 32 list - ended 0
+slot 32 2 sh 1 mode 1 fr 32 list - ended 0
+slot 32 3 sh 1 mode 1 fr 32 list - ended 0
+hand 33 PAL_LANCE
+cmd 33 (sacados=NOT_PAL_LANCE)
+draw 33 spr\propulseur800.spr#0@def,300*0000803f
+slot 33 1 sh 1 mode 1 fr 33 list - ended 0
+slot 33 2 sh 1 mode 1 fr 33 list - ended 0
+slot 33 3 sh 1 mode 1 fr 33 list - ended 0
+st 33 hits=1000 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 33 620=1
+hand 33 0
+bag 33 -PAL_LANCE
+draw 34 spr\propulseur800.spr#0@def,300*0000803f
+slot 34 1 sh 1 mode 1 fr 34 list - ended 0
+slot 34 2 sh 1 mode 1 fr 34 list - ended 0
+slot 34 3 sh 1 mode 1 fr 34 list - ended 0
+camera 35 143.3 -17
+aim 35 yaw=323.304 pitch=-17.001
+click 35 PAL_ZONE_LANCE1
+draw 35 spr\propulseur800.spr#0@def,300*0000803f
+cmd 35 (PlaySound=201)
+snd 35 load sfx\sound201.apc 0 1
+snd 35 play sfx\sound201.apc
+lock 35 1
+slot 35 1 sh 1 mode 1 fr 35 list - ended 0
+slot 35 2 sh 1 mode 1 fr 35 list - ended 0
+slot 35 3 sh 1 mode 1 fr 35 list - ended 0
+st 35 hits=1000 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 36 spr\propulseur800.spr#0@def,300*0000803f
+slot 36 1 sh 1 mode 1 fr 36 list - ended 0
+slot 36 2 sh 1 mode 1 fr 36 list - ended 0
+slot 36 3 sh 1 mode 1 fr 36 list - ended 0
+st 36 hits=1000 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 37 spr\propulseur800.spr#1@def,300*0000803f
+slot 37 1 sh 1 mode 1 fr 37 list - ended 0
+slot 37 2 sh 1 mode 1 fr 37 list - ended 0
+slot 37 3 sh 1 mode 1 fr 37 list - ended 0
+st 37 hits=1000 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 38 spr\propulseur800.spr#2@def,300*0000803f
+slot 38 1 sh 1 mode 1 fr 38 list - ended 0
+slot 38 2 sh 1 mode 1 fr 38 list - ended 0
+slot 38 3 sh 1 mode 1 fr 38 list - ended 0
+st 38 hits=1000 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 39 spr\propulseur800.spr#3@def,300*0000803f
+slot 39 1 sh 1 mode 1 fr 39 list - ended 0
+slot 39 2 sh 1 mode 1 fr 39 list - ended 0
+slot 39 3 sh 1 mode 1 fr 39 list - ended 0
+st 39 hits=1000 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 40 spr\propulseur800.spr#4@def,300*0000803f
+slot 40 1 sh 1 mode 1 fr 40 list - ended 0
+slot 40 2 sh 1 mode 1 fr 40 list - ended 0
+slot 40 3 sh 1 mode 1 fr 40 list - ended 0
+st 40 hits=1000 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 41 spr\propulseur800.spr#5@def,300*0000803f
+slot 41 1 sh 1 mode 1 fr 41 list - ended 0
+slot 41 2 sh 1 mode 1 fr 41 list - ended 0
+slot 41 3 sh 1 mode 1 fr 41 list - ended 0
+st 41 hits=1000 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 42 spr\propulseur800.spr#6@def,300*0000803f
+slot 42 1 sh 1 mode 1 fr 42 list - ended 0
+slot 42 2 sh 1 mode 1 fr 42 list - ended 0
+slot 42 3 sh 1 mode 1 fr 42 list - ended 0
+st 42 hits=1000 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 43 spr\propulseur800.spr#7@def,300*0000803f
+slot 43 1 sh 1 mode 1 fr 43 list - ended 0
+slot 43 2 sh 1 mode 1 fr 43 list - ended 0
+slot 43 3 sh 1 mode 1 fr 43 list - ended 0
+st 43 hits=1000 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 44 spr\propulseur800.spr#8@def,300*0000803f
+slot 44 1 sh 1 mode 1 fr 44 list - ended 0
+slot 44 2 sh 1 mode 1 fr 44 list - ended 0
+slot 44 3 sh 1 mode 1 fr 44 list - ended 0
+st 44 hits=1000 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 45 spr\propulseur800.spr#9@def,300*0000803f
+slot 45 1 sh 1 mode 1 fr 45 list - ended 0
+slot 45 2 sh 1 mode 1 fr 45 list - ended 0
+slot 45 3 sh 1 mode 1 fr 45 list - ended 0
+st 45 hits=1000 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 46 spr\propulseur800.spr#10@def,300*0000803f
+slot 46 1 sh 1 mode 1 fr 46 list - ended 0
+slot 46 2 sh 1 mode 1 fr 46 list - ended 0
+slot 46 3 sh 1 mode 1 fr 46 list - ended 0
+st 46 hits=1000 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 47 spr\propulseur800.spr#11@def,300*0000803f
+cmd 47 (HideObjet=PAL_AVROCH)
+hide 47 PAL_AVROCH kind 2 arg 0
+cmd 47 (SacADos=PAL_COEUR_AVROCH)
+slot 47 1 sh 0 mode 1 fr 0 list - ended 0
+slot 47 2 sh 1 mode 1 fr 47 list - ended 0
+slot 47 3 sh 1 mode 1 fr 47 list - ended 0
+st 47 hits=1100 aim=0 count=12 draw=1 lock=1 rbtn=0
+flags 47 609=1
+bag 47 +PAL_COEUR_AVROCH
+draw 48 spr\propulseur800.spr#12@def,300*0000803f
+slot 48 2 sh 1 mode 1 fr 48 list - ended 0
+slot 48 3 sh 1 mode 1 fr 48 list - ended 0
+st 48 hits=1100 aim=0 count=13 draw=1 lock=1 rbtn=0
+draw 49 spr\propulseur800.spr#13@def,300*0000803f
+slot 49 2 sh 1 mode 1 fr 49 list - ended 0
+slot 49 3 sh 1 mode 1 fr 49 list - ended 0
+st 49 hits=1100 aim=0 count=14 draw=1 lock=1 rbtn=0
+draw 50 spr\propulseur800.spr#14@def,300*0000803f
+slot 50 2 sh 1 mode 1 fr 50 list - ended 0
+slot 50 3 sh 1 mode 1 fr 50 list - ended 0
+st 50 hits=1100 aim=0 count=15 draw=1 lock=1 rbtn=0
+draw 51 spr\propulseur800.spr#15@def,300*0000803f
+slot 51 2 sh 1 mode 1 fr 51 list - ended 0
+slot 51 3 sh 1 mode 1 fr 51 list - ended 0
+st 51 hits=1100 aim=0 count=16 draw=1 lock=1 rbtn=0
+draw 52 spr\propulseur800.spr#16@def,300*0000803f
+slot 52 2 sh 1 mode 1 fr 52 list - ended 0
+slot 52 3 sh 1 mode 1 fr 52 list - ended 0
+st 52 hits=1100 aim=0 count=17 draw=1 lock=1 rbtn=0
+draw 53 spr\propulseur800.spr#17@def,300*0000803f
+slot 53 2 sh 1 mode 1 fr 53 list - ended 0
+slot 53 3 sh 1 mode 1 fr 53 list - ended 0
+st 53 hits=1100 aim=0 count=18 draw=1 lock=1 rbtn=0
+draw 54 spr\propulseur800.spr#18@def,300*0000803f
+slot 54 2 sh 1 mode 1 fr 54 list - ended 0
+slot 54 3 sh 1 mode 1 fr 54 list - ended 0
+st 54 hits=1100 aim=0 count=19 draw=1 lock=1 rbtn=0
+draw 55 spr\propulseur800.spr#19@def,300*0000803f
+slot 55 2 sh 1 mode 1 fr 55 list - ended 0
+slot 55 3 sh 1 mode 1 fr 55 list - ended 0
+st 55 hits=1100 aim=0 count=20 draw=1 lock=1 rbtn=0
+draw 56 spr\propulseur800.spr#20@def,300*0000803f
+slot 56 2 sh 1 mode 1 fr 56 list - ended 0
+slot 56 3 sh 1 mode 1 fr 56 list - ended 0
+st 56 hits=1100 aim=0 count=21 draw=1 lock=1 rbtn=0
+draw 57 spr\propulseur800.spr#21@def,300*0000803f
+slot 57 2 sh 1 mode 1 fr 57 list - ended 0
+slot 57 3 sh 1 mode 1 fr 57 list - ended 0
+st 57 hits=1100 aim=0 count=22 draw=1 lock=1 rbtn=0
+draw 58 spr\propulseur800.spr#22@def,300*0000803f
+slot 58 2 sh 1 mode 1 fr 58 list - ended 0
+slot 58 3 sh 1 mode 1 fr 58 list - ended 0
+st 58 hits=1100 aim=0 count=23 draw=1 lock=1 rbtn=0
+draw 59 spr\propulseur800.spr#23@def,300*0000803f
+slot 59 2 sh 1 mode 1 fr 59 list - ended 0
+slot 59 3 sh 1 mode 1 fr 59 list - ended 0
+st 59 hits=1100 aim=0 count=24 draw=1 lock=1 rbtn=0
+draw 60 spr\propulseur800.spr#24@def,300*0000803f
+cmd 60 (sacados=PAL_LANCE)
+slot 60 2 sh 1 mode 1 fr 60 list - ended 0
+slot 60 3 sh 1 mode 1 fr 60 list - ended 0
+st 60 hits=1100 aim=0 count=25 draw=1 lock=1 rbtn=0
+flags 60 620=0
+bag 60 +PAL_LANCE
+draw 61 spr\propulseur800.spr#25@def,300*0000803f
+lock 61 0
+cmd 61 (sacados=PAL_LANCE)
+slot 61 2 sh 1 mode 1 fr 61 list - ended 0
+slot 61 3 sh 1 mode 1 fr 61 list - ended 0
+st 61 hits=1100 aim=0 count=25 draw=0 lock=0 rbtn=0
+lock 62 0
+cmd 62 (sacados=PAL_LANCE)
+slot 62 2 sh 1 mode 1 fr 62 list - ended 0
+slot 62 3 sh 1 mode 1 fr 62 list - ended 0
+hand 63 PAL_LANCE
+cmd 63 (sacados=NOT_PAL_LANCE)
+draw 63 spr\propulseur800.spr#0@def,300*0000803f
+slot 63 2 sh 1 mode 1 fr 63 list - ended 0
+slot 63 3 sh 1 mode 1 fr 63 list - ended 0
+st 63 hits=1100 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 63 620=1
+hand 63 0
+bag 63 -PAL_LANCE
+draw 64 spr\propulseur800.spr#0@def,300*0000803f
+slot 64 2 sh 1 mode 1 fr 64 list - ended 0
+slot 64 3 sh 1 mode 1 fr 64 list - ended 0
+camera 65 -10.6 5
+aim 65 yaw=169.400 pitch=5.000
+click 65 PAL_ZONE_LANCE1
+draw 65 spr\propulseur800.spr#0@def,300*0000803f
+cmd 65 (PlaySound=201)
+snd 65 load sfx\sound201.apc 0 1
+snd 65 play sfx\sound201.apc
+lock 65 1
+slot 65 2 sh 1 mode 1 fr 65 list - ended 0
+slot 65 3 sh 1 mode 1 fr 65 list - ended 0
+st 65 hits=1100 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 66 spr\propulseur800.spr#0@def,300*0000803f
+slot 66 2 sh 1 mode 1 fr 66 list - ended 0
+slot 66 3 sh 1 mode 1 fr 66 list - ended 0
+st 66 hits=1100 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 67 spr\propulseur800.spr#1@def,300*0000803f
+slot 67 2 sh 1 mode 1 fr 67 list - ended 0
+slot 67 3 sh 1 mode 1 fr 67 list - ended 0
+st 67 hits=1100 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 68 spr\propulseur800.spr#2@def,300*0000803f
+slot 68 2 sh 1 mode 1 fr 68 list - ended 0
+slot 68 3 sh 1 mode 1 fr 68 list - ended 0
+st 68 hits=1100 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 69 spr\propulseur800.spr#3@def,300*0000803f
+slot 69 2 sh 1 mode 1 fr 69 list - ended 0
+slot 69 3 sh 1 mode 1 fr 69 list - ended 0
+st 69 hits=1100 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 70 spr\propulseur800.spr#4@def,300*0000803f
+slot 70 2 sh 1 mode 1 fr 70 list - ended 0
+slot 70 3 sh 1 mode 1 fr 70 list - ended 0
+st 70 hits=1100 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 71 spr\propulseur800.spr#5@def,300*0000803f
+slot 71 2 sh 1 mode 1 fr 71 list - ended 0
+slot 71 3 sh 1 mode 1 fr 71 list - ended 0
+st 71 hits=1100 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 72 spr\propulseur800.spr#6@def,300*0000803f
+slot 72 2 sh 1 mode 1 fr 72 list - ended 0
+slot 72 3 sh 1 mode 1 fr 72 list - ended 0
+st 72 hits=1100 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 73 spr\propulseur800.spr#7@def,300*0000803f
+slot 73 2 sh 1 mode 1 fr 73 list - ended 0
+slot 73 3 sh 1 mode 1 fr 73 list - ended 0
+st 73 hits=1100 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 74 spr\propulseur800.spr#8@def,300*0000803f
+slot 74 2 sh 1 mode 1 fr 74 list - ended 0
+slot 74 3 sh 1 mode 1 fr 74 list - ended 0
+st 74 hits=1100 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 75 spr\propulseur800.spr#9@def,300*0000803f
+slot 75 2 sh 1 mode 1 fr 75 list - ended 0
+slot 75 3 sh 1 mode 1 fr 75 list - ended 0
+st 75 hits=1100 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 76 spr\propulseur800.spr#10@def,300*0000803f
+slot 76 2 sh 1 mode 1 fr 76 list - ended 0
+slot 76 3 sh 1 mode 1 fr 76 list - ended 0
+st 76 hits=1100 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 77 spr\propulseur800.spr#11@def,300*0000803f
+cmd 77 (HideObjet=PAL_CHEVAL)
+hide 77 PAL_CHEVAL kind 2 arg 0
+cmd 77 (SacADos=PAL_COEUR_CHEVAL)
+slot 77 2 sh 0 mode 1 fr 0 list - ended 0
+slot 77 3 sh 1 mode 1 fr 77 list - ended 0
+st 77 hits=1110 aim=0 count=12 draw=1 lock=1 rbtn=0
+flags 77 610=1
+bag 77 +PAL_COEUR_CHEVAL
+draw 78 spr\propulseur800.spr#12@def,300*0000803f
+slot 78 3 sh 1 mode 1 fr 78 list - ended 0
+st 78 hits=1110 aim=0 count=13 draw=1 lock=1 rbtn=0
+draw 79 spr\propulseur800.spr#13@def,300*0000803f
+slot 79 3 sh 1 mode 1 fr 79 list - ended 0
+st 79 hits=1110 aim=0 count=14 draw=1 lock=1 rbtn=0
+draw 80 spr\propulseur800.spr#14@def,300*0000803f
+slot 80 3 sh 1 mode 1 fr 80 list - ended 0
+st 80 hits=1110 aim=0 count=15 draw=1 lock=1 rbtn=0
+draw 81 spr\propulseur800.spr#15@def,300*0000803f
+slot 81 3 sh 1 mode 1 fr 81 list - ended 0
+st 81 hits=1110 aim=0 count=16 draw=1 lock=1 rbtn=0
+draw 82 spr\propulseur800.spr#16@def,300*0000803f
+slot 82 3 sh 1 mode 1 fr 82 list - ended 0
+st 82 hits=1110 aim=0 count=17 draw=1 lock=1 rbtn=0
+draw 83 spr\propulseur800.spr#17@def,300*0000803f
+slot 83 3 sh 1 mode 1 fr 83 list - ended 0
+st 83 hits=1110 aim=0 count=18 draw=1 lock=1 rbtn=0
+draw 84 spr\propulseur800.spr#18@def,300*0000803f
+slot 84 3 sh 1 mode 1 fr 84 list - ended 0
+st 84 hits=1110 aim=0 count=19 draw=1 lock=1 rbtn=0
+draw 85 spr\propulseur800.spr#19@def,300*0000803f
+slot 85 3 sh 1 mode 1 fr 85 list - ended 0
+st 85 hits=1110 aim=0 count=20 draw=1 lock=1 rbtn=0
+draw 86 spr\propulseur800.spr#20@def,300*0000803f
+slot 86 3 sh 1 mode 1 fr 86 list - ended 0
+st 86 hits=1110 aim=0 count=21 draw=1 lock=1 rbtn=0
+draw 87 spr\propulseur800.spr#21@def,300*0000803f
+slot 87 3 sh 1 mode 1 fr 87 list - ended 0
+st 87 hits=1110 aim=0 count=22 draw=1 lock=1 rbtn=0
+draw 88 spr\propulseur800.spr#22@def,300*0000803f
+slot 88 3 sh 1 mode 1 fr 88 list - ended 0
+st 88 hits=1110 aim=0 count=23 draw=1 lock=1 rbtn=0
+draw 89 spr\propulseur800.spr#23@def,300*0000803f
+slot 89 3 sh 1 mode 1 fr 89 list - ended 0
+st 89 hits=1110 aim=0 count=24 draw=1 lock=1 rbtn=0
+draw 90 spr\propulseur800.spr#24@def,300*0000803f
+cmd 90 (sacados=PAL_LANCE)
+slot 90 3 sh 1 mode 1 fr 90 list - ended 0
+st 90 hits=1110 aim=0 count=25 draw=1 lock=1 rbtn=0
+flags 90 620=0
+bag 90 +PAL_LANCE
+draw 91 spr\propulseur800.spr#25@def,300*0000803f
+lock 91 0
+cmd 91 (sacados=PAL_LANCE)
+slot 91 3 sh 1 mode 1 fr 91 list - ended 0
+st 91 hits=1110 aim=0 count=25 draw=0 lock=0 rbtn=0
+lock 92 0
+cmd 92 (sacados=PAL_LANCE)
+slot 92 3 sh 1 mode 1 fr 92 list - ended 0
+hand 93 PAL_LANCE
+cmd 93 (sacados=NOT_PAL_LANCE)
+draw 93 spr\propulseur800.spr#0@def,300*0000803f
+slot 93 3 sh 1 mode 1 fr 93 list - ended 0
+st 93 hits=1110 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 93 620=1
+hand 93 0
+bag 93 -PAL_LANCE
+draw 94 spr\propulseur800.spr#0@def,300*0000803f
+slot 94 3 sh 1 mode 1 fr 94 list - ended 0
+camera 95 -123.1 -17
+aim 95 yaw=56.896 pitch=-17.000
+click 95 PAL_ZONE_LANCE1
+draw 95 spr\propulseur800.spr#0@def,300*0000803f
+cmd 95 (PlaySound=201)
+snd 95 load sfx\sound201.apc 0 1
+snd 95 play sfx\sound201.apc
+lock 95 1
+slot 95 3 sh 1 mode 1 fr 95 list - ended 0
+st 95 hits=1110 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 96 spr\propulseur800.spr#0@def,300*0000803f
+slot 96 3 sh 1 mode 1 fr 96 list - ended 0
+st 96 hits=1110 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 97 spr\propulseur800.spr#1@def,300*0000803f
+slot 97 3 sh 1 mode 1 fr 97 list - ended 0
+st 97 hits=1110 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 98 spr\propulseur800.spr#2@def,300*0000803f
+slot 98 3 sh 1 mode 1 fr 98 list - ended 0
+st 98 hits=1110 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 99 spr\propulseur800.spr#3@def,300*0000803f
+slot 99 3 sh 1 mode 1 fr 99 list - ended 0
+st 99 hits=1110 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 100 spr\propulseur800.spr#4@def,300*0000803f
+slot 100 3 sh 1 mode 1 fr 100 list - ended 0
+st 100 hits=1110 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 101 spr\propulseur800.spr#5@def,300*0000803f
+slot 101 3 sh 1 mode 1 fr 101 list - ended 0
+st 101 hits=1110 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 102 spr\propulseur800.spr#6@def,300*0000803f
+slot 102 3 sh 1 mode 1 fr 102 list - ended 0
+st 102 hits=1110 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 103 spr\propulseur800.spr#7@def,300*0000803f
+slot 103 3 sh 1 mode 1 fr 103 list - ended 0
+st 103 hits=1110 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 104 spr\propulseur800.spr#8@def,300*0000803f
+slot 104 3 sh 1 mode 1 fr 104 list - ended 0
+st 104 hits=1110 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 105 spr\propulseur800.spr#9@def,300*0000803f
+slot 105 3 sh 1 mode 1 fr 105 list - ended 0
+st 105 hits=1110 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 106 spr\propulseur800.spr#10@def,300*0000803f
+slot 106 3 sh 1 mode 1 fr 106 list - ended 0
+st 106 hits=1110 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 107 spr\propulseur800.spr#11@def,300*0000803f
+cmd 107 (HideObjet=PAL_BOUQUETIN)
+hide 107 PAL_BOUQUETIN kind 2 arg 0
+cmd 107 (SacADos=PAL_COEUR_BOUQUETIN)
+slot 107 3 sh 0 mode 1 fr 0 list - ended 0
+st 107 hits=1111 aim=0 count=12 draw=1 lock=1 rbtn=0
+flags 107 611=1
+bag 107 +PAL_COEUR_BOUQUETIN
+sprclose 108 spr\propulseur800.spr
+lock 108 0
+cmd 108 (sacados=NOT_PAL_LANCE)
+scan 108
+st 108 hits=1111 aim=0 count=12 draw=1 lock=0 rbtn=0
+flags 108 620=0 91=1
+run miss propulsor, aim off the stag, then a right click
+setup wam paleo.wam view 4 yaw 0 pitch 0
+setup cmd (sacados=PAL_LANCE)
+setup flag 614 1 (the propulsor, chapi027)
+slots 0:ceA1004004(PAL_CERF) 1:pxA1004004(PAL_AVROCH) 2:smA1004004(PAL_CHEVAL) 3:saA1004004(PAL_BOUQUETIN) 4:laA1004004(PAL_LANCE)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slot 0 2 sh 1 mode 1 fr 0 list - ended 0
+slot 0 3 sh 1 mode 1 fr 0 list - ended 0
+slot 0 4 sh 1 mode 1 fr 0 list - ended 0
+st 0 hits=0000 aim=1 count=0 draw=0 lock=0 rbtn=0
+bag 0 +PAL_LANCE
+hand 0 0
+slot 1 0 sh 1 mode 1 fr 1 list - ended 0
+slot 1 1 sh 1 mode 1 fr 1 list - ended 0
+slot 1 2 sh 1 mode 1 fr 1 list - ended 0
+slot 1 3 sh 1 mode 1 fr 1 list - ended 0
+slot 2 0 sh 1 mode 1 fr 2 list - ended 0
+slot 2 1 sh 1 mode 1 fr 2 list - ended 0
+slot 2 2 sh 1 mode 1 fr 2 list - ended 0
+slot 2 3 sh 1 mode 1 fr 2 list - ended 0
+hand 3 PAL_LANCE
+cmd 3 (sacados=NOT_PAL_LANCE)
+draw 3 spr\propulseur800.spr#0@def,300*0000803f
+slot 3 0 sh 1 mode 1 fr 3 list - ended 0
+slot 3 1 sh 1 mode 1 fr 3 list - ended 0
+slot 3 2 sh 1 mode 1 fr 3 list - ended 0
+slot 3 3 sh 1 mode 1 fr 3 list - ended 0
+st 3 hits=0000 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 3 620=1
+hand 3 0
+bag 3 -PAL_LANCE
+draw 4 spr\propulseur800.spr#0@def,300*0000803f
+slot 4 0 sh 1 mode 1 fr 4 list - ended 0
+slot 4 1 sh 1 mode 1 fr 4 list - ended 0
+slot 4 2 sh 1 mode 1 fr 4 list - ended 0
+slot 4 3 sh 1 mode 1 fr 4 list - ended 0
+camera 5 0 5
+aim 5 yaw=180.000 pitch=5.000
+click 5 PAL_ZONE_LANCE1
+draw 5 spr\propulseur800.spr#0@def,300*0000803f
+cmd 5 (PlaySound=201)
+snd 5 load sfx\sound201.apc 0 1
+snd 5 play sfx\sound201.apc
+lock 5 1
+slot 5 0 sh 1 mode 1 fr 5 list - ended 0
+slot 5 1 sh 1 mode 1 fr 5 list - ended 0
+slot 5 2 sh 1 mode 1 fr 5 list - ended 0
+slot 5 3 sh 1 mode 1 fr 5 list - ended 0
+st 5 hits=0000 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 6 spr\propulseur800.spr#0@def,300*0000803f
+slot 6 0 sh 1 mode 1 fr 6 list - ended 0
+slot 6 1 sh 1 mode 1 fr 6 list - ended 0
+slot 6 2 sh 1 mode 1 fr 6 list - ended 0
+slot 6 3 sh 1 mode 1 fr 6 list - ended 0
+st 6 hits=0000 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 7 spr\propulseur800.spr#1@def,300*0000803f
+slot 7 0 sh 1 mode 1 fr 7 list - ended 0
+slot 7 1 sh 1 mode 1 fr 7 list - ended 0
+slot 7 2 sh 1 mode 1 fr 7 list - ended 0
+slot 7 3 sh 1 mode 1 fr 7 list - ended 0
+st 7 hits=0000 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 8 spr\propulseur800.spr#2@def,300*0000803f
+slot 8 0 sh 1 mode 1 fr 8 list - ended 0
+slot 8 1 sh 1 mode 1 fr 8 list - ended 0
+slot 8 2 sh 1 mode 1 fr 8 list - ended 0
+slot 8 3 sh 1 mode 1 fr 8 list - ended 0
+st 8 hits=0000 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 9 spr\propulseur800.spr#3@def,300*0000803f
+slot 9 0 sh 1 mode 1 fr 9 list - ended 0
+slot 9 1 sh 1 mode 1 fr 9 list - ended 0
+slot 9 2 sh 1 mode 1 fr 9 list - ended 0
+slot 9 3 sh 1 mode 1 fr 9 list - ended 0
+st 9 hits=0000 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 10 spr\propulseur800.spr#4@def,300*0000803f
+slot 10 0 sh 1 mode 1 fr 10 list - ended 0
+slot 10 1 sh 1 mode 1 fr 10 list - ended 0
+slot 10 2 sh 1 mode 1 fr 10 list - ended 0
+slot 10 3 sh 1 mode 1 fr 10 list - ended 0
+st 10 hits=0000 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 11 spr\propulseur800.spr#5@def,300*0000803f
+slot 11 0 sh 1 mode 1 fr 11 list - ended 0
+slot 11 1 sh 1 mode 1 fr 11 list - ended 0
+slot 11 2 sh 1 mode 1 fr 11 list - ended 0
+slot 11 3 sh 1 mode 1 fr 11 list - ended 0
+st 11 hits=0000 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 12 spr\propulseur800.spr#6@def,300*0000803f
+slot 12 0 sh 1 mode 1 fr 12 list - ended 0
+slot 12 1 sh 1 mode 1 fr 12 list - ended 0
+slot 12 2 sh 1 mode 1 fr 12 list - ended 0
+slot 12 3 sh 1 mode 1 fr 12 list - ended 0
+st 12 hits=0000 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 13 spr\propulseur800.spr#7@def,300*0000803f
+slot 13 0 sh 1 mode 1 fr 13 list - ended 0
+slot 13 1 sh 1 mode 1 fr 13 list - ended 0
+slot 13 2 sh 1 mode 1 fr 13 list - ended 0
+slot 13 3 sh 1 mode 1 fr 13 list - ended 0
+st 13 hits=0000 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 14 spr\propulseur800.spr#8@def,300*0000803f
+slot 14 0 sh 1 mode 1 fr 14 list - ended 0
+slot 14 1 sh 1 mode 1 fr 14 list - ended 0
+slot 14 2 sh 1 mode 1 fr 14 list - ended 0
+slot 14 3 sh 1 mode 1 fr 14 list - ended 0
+st 14 hits=0000 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 15 spr\propulseur800.spr#9@def,300*0000803f
+slot 15 0 sh 1 mode 1 fr 15 list - ended 0
+slot 15 1 sh 1 mode 1 fr 15 list - ended 0
+slot 15 2 sh 1 mode 1 fr 15 list - ended 0
+slot 15 3 sh 1 mode 1 fr 15 list - ended 0
+st 15 hits=0000 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 16 spr\propulseur800.spr#10@def,300*0000803f
+slot 16 0 sh 1 mode 1 fr 16 list - ended 0
+slot 16 1 sh 1 mode 1 fr 16 list - ended 0
+slot 16 2 sh 1 mode 1 fr 16 list - ended 0
+slot 16 3 sh 1 mode 1 fr 16 list - ended 0
+st 16 hits=0000 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 17 spr\propulseur800.spr#11@def,300*0000803f
+slot 17 0 sh 1 mode 1 fr 17 list - ended 0
+slot 17 1 sh 1 mode 1 fr 17 list - ended 0
+slot 17 2 sh 1 mode 1 fr 17 list - ended 0
+slot 17 3 sh 1 mode 1 fr 17 list - ended 0
+st 17 hits=0000 aim=0 count=12 draw=1 lock=1 rbtn=0
+draw 18 spr\propulseur800.spr#12@def,300*0000803f
+slot 18 0 sh 1 mode 1 fr 18 list - ended 0
+slot 18 1 sh 1 mode 1 fr 18 list - ended 0
+slot 18 2 sh 1 mode 1 fr 18 list - ended 0
+slot 18 3 sh 1 mode 1 fr 18 list - ended 0
+st 18 hits=0000 aim=0 count=13 draw=1 lock=1 rbtn=0
+draw 19 spr\propulseur800.spr#13@def,300*0000803f
+slot 19 0 sh 1 mode 1 fr 19 list - ended 0
+slot 19 1 sh 1 mode 1 fr 19 list - ended 0
+slot 19 2 sh 1 mode 1 fr 19 list - ended 0
+slot 19 3 sh 1 mode 1 fr 19 list - ended 0
+st 19 hits=0000 aim=0 count=14 draw=1 lock=1 rbtn=0
+draw 20 spr\propulseur800.spr#14@def,300*0000803f
+slot 20 0 sh 1 mode 1 fr 20 list - ended 0
+slot 20 1 sh 1 mode 1 fr 20 list - ended 0
+slot 20 2 sh 1 mode 1 fr 20 list - ended 0
+slot 20 3 sh 1 mode 1 fr 20 list - ended 0
+st 20 hits=0000 aim=0 count=15 draw=1 lock=1 rbtn=0
+draw 21 spr\propulseur800.spr#15@def,300*0000803f
+slot 21 0 sh 1 mode 1 fr 21 list - ended 0
+slot 21 1 sh 1 mode 1 fr 21 list - ended 0
+slot 21 2 sh 1 mode 1 fr 21 list - ended 0
+slot 21 3 sh 1 mode 1 fr 21 list - ended 0
+st 21 hits=0000 aim=0 count=16 draw=1 lock=1 rbtn=0
+draw 22 spr\propulseur800.spr#16@def,300*0000803f
+slot 22 0 sh 1 mode 1 fr 22 list - ended 0
+slot 22 1 sh 1 mode 1 fr 22 list - ended 0
+slot 22 2 sh 1 mode 1 fr 22 list - ended 0
+slot 22 3 sh 1 mode 1 fr 22 list - ended 0
+st 22 hits=0000 aim=0 count=17 draw=1 lock=1 rbtn=0
+draw 23 spr\propulseur800.spr#17@def,300*0000803f
+slot 23 0 sh 1 mode 1 fr 23 list - ended 0
+slot 23 1 sh 1 mode 1 fr 23 list - ended 0
+slot 23 2 sh 1 mode 1 fr 23 list - ended 0
+slot 23 3 sh 1 mode 1 fr 23 list - ended 0
+st 23 hits=0000 aim=0 count=18 draw=1 lock=1 rbtn=0
+draw 24 spr\propulseur800.spr#18@def,300*0000803f
+slot 24 0 sh 1 mode 1 fr 24 list - ended 0
+slot 24 1 sh 1 mode 1 fr 24 list - ended 0
+slot 24 2 sh 1 mode 1 fr 24 list - ended 0
+slot 24 3 sh 1 mode 1 fr 24 list - ended 0
+st 24 hits=0000 aim=0 count=19 draw=1 lock=1 rbtn=0
+draw 25 spr\propulseur800.spr#19@def,300*0000803f
+slot 25 0 sh 1 mode 1 fr 25 list - ended 0
+slot 25 1 sh 1 mode 1 fr 25 list - ended 0
+slot 25 2 sh 1 mode 1 fr 25 list - ended 0
+slot 25 3 sh 1 mode 1 fr 25 list - ended 0
+st 25 hits=0000 aim=0 count=20 draw=1 lock=1 rbtn=0
+draw 26 spr\propulseur800.spr#20@def,300*0000803f
+slot 26 0 sh 1 mode 1 fr 26 list - ended 0
+slot 26 1 sh 1 mode 1 fr 26 list - ended 0
+slot 26 2 sh 1 mode 1 fr 26 list - ended 0
+slot 26 3 sh 1 mode 1 fr 26 list - ended 0
+st 26 hits=0000 aim=0 count=21 draw=1 lock=1 rbtn=0
+draw 27 spr\propulseur800.spr#21@def,300*0000803f
+slot 27 0 sh 1 mode 1 fr 27 list - ended 0
+slot 27 1 sh 1 mode 1 fr 27 list - ended 0
+slot 27 2 sh 1 mode 1 fr 27 list - ended 0
+slot 27 3 sh 1 mode 1 fr 27 list - ended 0
+st 27 hits=0000 aim=0 count=22 draw=1 lock=1 rbtn=0
+draw 28 spr\propulseur800.spr#22@def,300*0000803f
+slot 28 0 sh 1 mode 1 fr 28 list - ended 0
+slot 28 1 sh 1 mode 1 fr 28 list - ended 0
+slot 28 2 sh 1 mode 1 fr 28 list - ended 0
+slot 28 3 sh 1 mode 1 fr 28 list - ended 0
+st 28 hits=0000 aim=0 count=23 draw=1 lock=1 rbtn=0
+draw 29 spr\propulseur800.spr#23@def,300*0000803f
+slot 29 0 sh 1 mode 1 fr 29 list - ended 0
+slot 29 1 sh 1 mode 1 fr 29 list - ended 0
+slot 29 2 sh 1 mode 1 fr 29 list - ended 0
+slot 29 3 sh 1 mode 1 fr 29 list - ended 0
+st 29 hits=0000 aim=0 count=24 draw=1 lock=1 rbtn=0
+draw 30 spr\propulseur800.spr#24@def,300*0000803f
+cmd 30 (sacados=PAL_LANCE)
+slot 30 0 sh 1 mode 1 fr 30 list - ended 0
+slot 30 1 sh 1 mode 1 fr 30 list - ended 0
+slot 30 2 sh 1 mode 1 fr 30 list - ended 0
+slot 30 3 sh 1 mode 1 fr 30 list - ended 0
+st 30 hits=0000 aim=0 count=25 draw=1 lock=1 rbtn=0
+flags 30 620=0
+bag 30 +PAL_LANCE
+draw 31 spr\propulseur800.spr#25@def,300*0000803f
+lock 31 0
+cmd 31 (sacados=PAL_LANCE)
+slot 31 0 sh 1 mode 1 fr 31 list - ended 0
+slot 31 1 sh 1 mode 1 fr 31 list - ended 0
+slot 31 2 sh 1 mode 1 fr 31 list - ended 0
+slot 31 3 sh 1 mode 1 fr 31 list - ended 0
+st 31 hits=0000 aim=0 count=25 draw=0 lock=0 rbtn=0
+rclick 32
+lock 32 0
+cmd 32 (sacados=PAL_LANCE)
+sprclose 32 spr\propulseur800.spr
+lock 32 0
+cmd 32 (sacados=NOT_PAL_LANCE)
+scan 32
+slot 32 0 sh 1 mode 1 fr 32 list - ended 0
+slot 32 1 sh 1 mode 1 fr 32 list - ended 0
+slot 32 2 sh 1 mode 1 fr 32 list - ended 0
+slot 32 3 sh 1 mode 1 fr 32 list - ended 0
+flags 32 91=1
+bag 32 -PAL_LANCE
+lock 33 0
+cmd 33 (sacados=PAL_LANCE)
+slot 33 0 sh 1 mode 1 fr 33 list - ended 0
+slot 33 1 sh 1 mode 1 fr 33 list - ended 0
+slot 33 2 sh 1 mode 1 fr 33 list - ended 0
+slot 33 3 sh 1 mode 1 fr 33 list - ended 0
+bag 33 +PAL_LANCE
+lock 34 0
+cmd 34 (sacados=PAL_LANCE)
+slot 34 0 sh 1 mode 1 fr 34 list - ended 0
+slot 34 1 sh 1 mode 1 fr 34 list - ended 0
+slot 34 2 sh 1 mode 1 fr 34 list - ended 0
+slot 34 3 sh 1 mode 1 fr 34 list - ended 0
+lock 35 0
+cmd 35 (sacados=PAL_LANCE)
+slot 35 0 sh 1 mode 1 fr 35 list - ended 0
+slot 35 1 sh 1 mode 1 fr 35 list - ended 0
+slot 35 2 sh 1 mode 1 fr 35 list - ended 0
+slot 35 3 sh 1 mode 1 fr 35 list - ended 0
+lock 36 0
+cmd 36 (sacados=PAL_LANCE)
+slot 36 0 sh 1 mode 1 fr 36 list - ended 0
+slot 36 1 sh 1 mode 1 fr 36 list - ended 0
+slot 36 2 sh 1 mode 1 fr 36 list - ended 0
+slot 36 3 sh 1 mode 1 fr 36 list - ended 0
+run no_propulsor flag614=0, aim on the stag (no hit test)
+setup wam paleo.wam view 4 yaw 0 pitch 0
+setup cmd (sacados=PAL_LANCE)
+slots 0:ceA1004004(PAL_CERF) 1:pxA1004004(PAL_AVROCH) 2:smA1004004(PAL_CHEVAL) 3:saA1004004(PAL_BOUQUETIN) 4:laA1004004(PAL_LANCE)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slot 0 2 sh 1 mode 1 fr 0 list - ended 0
+slot 0 3 sh 1 mode 1 fr 0 list - ended 0
+slot 0 4 sh 1 mode 1 fr 0 list - ended 0
+st 0 hits=0000 aim=1 count=0 draw=0 lock=0 rbtn=0
+bag 0 +PAL_LANCE
+hand 0 0
+slot 1 0 sh 1 mode 1 fr 1 list - ended 0
+slot 1 1 sh 1 mode 1 fr 1 list - ended 0
+slot 1 2 sh 1 mode 1 fr 1 list - ended 0
+slot 1 3 sh 1 mode 1 fr 1 list - ended 0
+slot 2 0 sh 1 mode 1 fr 2 list - ended 0
+slot 2 1 sh 1 mode 1 fr 2 list - ended 0
+slot 2 2 sh 1 mode 1 fr 2 list - ended 0
+slot 2 3 sh 1 mode 1 fr 2 list - ended 0
+hand 3 PAL_LANCE
+cmd 3 (sacados=NOT_PAL_LANCE)
+draw 3 spr\Lance800.spr#0@def,300*0000803f
+slot 3 0 sh 1 mode 1 fr 3 list - ended 0
+slot 3 1 sh 1 mode 1 fr 3 list - ended 0
+slot 3 2 sh 1 mode 1 fr 3 list - ended 0
+slot 3 3 sh 1 mode 1 fr 3 list - ended 0
+st 3 hits=0000 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 3 620=1
+hand 3 0
+bag 3 -PAL_LANCE
+draw 4 spr\Lance800.spr#0@def,300*0000803f
+slot 4 0 sh 1 mode 1 fr 4 list - ended 0
+slot 4 1 sh 1 mode 1 fr 4 list - ended 0
+slot 4 2 sh 1 mode 1 fr 4 list - ended 0
+slot 4 3 sh 1 mode 1 fr 4 list - ended 0
+camera 5 105.1 5
+aim 5 yaw=285.103 pitch=5.000
+click 5 PAL_ZONE_LANCE1
+draw 5 spr\Lance800.spr#0@def,300*0000803f
+cmd 5 (PlaySound=201)
+snd 5 load sfx\sound201.apc 0 1
+snd 5 play sfx\sound201.apc
+lock 5 1
+slot 5 0 sh 1 mode 1 fr 5 list - ended 0
+slot 5 1 sh 1 mode 1 fr 5 list - ended 0
+slot 5 2 sh 1 mode 1 fr 5 list - ended 0
+slot 5 3 sh 1 mode 1 fr 5 list - ended 0
+st 5 hits=0000 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 6 spr\Lance800.spr#0@def,300*0000803f
+slot 6 0 sh 1 mode 1 fr 6 list - ended 0
+slot 6 1 sh 1 mode 1 fr 6 list - ended 0
+slot 6 2 sh 1 mode 1 fr 6 list - ended 0
+slot 6 3 sh 1 mode 1 fr 6 list - ended 0
+st 6 hits=0000 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 7 spr\Lance800.spr#1@def,300*0000803f
+slot 7 0 sh 1 mode 1 fr 7 list - ended 0
+slot 7 1 sh 1 mode 1 fr 7 list - ended 0
+slot 7 2 sh 1 mode 1 fr 7 list - ended 0
+slot 7 3 sh 1 mode 1 fr 7 list - ended 0
+st 7 hits=0000 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 8 spr\Lance800.spr#2@def,300*0000803f
+slot 8 0 sh 1 mode 1 fr 8 list - ended 0
+slot 8 1 sh 1 mode 1 fr 8 list - ended 0
+slot 8 2 sh 1 mode 1 fr 8 list - ended 0
+slot 8 3 sh 1 mode 1 fr 8 list - ended 0
+st 8 hits=0000 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 9 spr\Lance800.spr#3@def,300*0000803f
+slot 9 0 sh 1 mode 1 fr 9 list - ended 0
+slot 9 1 sh 1 mode 1 fr 9 list - ended 0
+slot 9 2 sh 1 mode 1 fr 9 list - ended 0
+slot 9 3 sh 1 mode 1 fr 9 list - ended 0
+st 9 hits=0000 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 10 spr\Lance800.spr#4@def,300*0000803f
+slot 10 0 sh 1 mode 1 fr 10 list - ended 0
+slot 10 1 sh 1 mode 1 fr 10 list - ended 0
+slot 10 2 sh 1 mode 1 fr 10 list - ended 0
+slot 10 3 sh 1 mode 1 fr 10 list - ended 0
+st 10 hits=0000 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 11 spr\Lance800.spr#5@def,300*0000803f
+slot 11 0 sh 1 mode 1 fr 11 list - ended 0
+slot 11 1 sh 1 mode 1 fr 11 list - ended 0
+slot 11 2 sh 1 mode 1 fr 11 list - ended 0
+slot 11 3 sh 1 mode 1 fr 11 list - ended 0
+st 11 hits=0000 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 12 spr\Lance800.spr#6@def,300*0000803f
+slot 12 0 sh 1 mode 1 fr 12 list - ended 0
+slot 12 1 sh 1 mode 1 fr 12 list - ended 0
+slot 12 2 sh 1 mode 1 fr 12 list - ended 0
+slot 12 3 sh 1 mode 1 fr 12 list - ended 0
+st 12 hits=0000 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 13 spr\Lance800.spr#7@def,300*0000803f
+slot 13 0 sh 1 mode 1 fr 13 list - ended 0
+slot 13 1 sh 1 mode 1 fr 13 list - ended 0
+slot 13 2 sh 1 mode 1 fr 13 list - ended 0
+slot 13 3 sh 1 mode 1 fr 13 list - ended 0
+st 13 hits=0000 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 14 spr\Lance800.spr#8@def,300*0000803f
+slot 14 0 sh 1 mode 1 fr 14 list - ended 0
+slot 14 1 sh 1 mode 1 fr 14 list - ended 0
+slot 14 2 sh 1 mode 1 fr 14 list - ended 0
+slot 14 3 sh 1 mode 1 fr 14 list - ended 0
+st 14 hits=0000 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 15 spr\Lance800.spr#9@def,300*0000803f
+slot 15 0 sh 1 mode 1 fr 15 list - ended 0
+slot 15 1 sh 1 mode 1 fr 15 list - ended 0
+slot 15 2 sh 1 mode 1 fr 15 list - ended 0
+slot 15 3 sh 1 mode 1 fr 15 list - ended 0
+st 15 hits=0000 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 16 spr\Lance800.spr#10@def,300*0000803f
+slot 16 0 sh 1 mode 1 fr 16 list - ended 0
+slot 16 1 sh 1 mode 1 fr 16 list - ended 0
+slot 16 2 sh 1 mode 1 fr 16 list - ended 0
+slot 16 3 sh 1 mode 1 fr 16 list - ended 0
+st 16 hits=0000 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 17 spr\Lance800.spr#11@def,300*0000803f
+slot 17 0 sh 1 mode 1 fr 17 list - ended 0
+slot 17 1 sh 1 mode 1 fr 17 list - ended 0
+slot 17 2 sh 1 mode 1 fr 17 list - ended 0
+slot 17 3 sh 1 mode 1 fr 17 list - ended 0
+st 17 hits=0000 aim=0 count=12 draw=1 lock=1 rbtn=0
+draw 18 spr\Lance800.spr#12@def,300*0000803f
+slot 18 0 sh 1 mode 1 fr 18 list - ended 0
+slot 18 1 sh 1 mode 1 fr 18 list - ended 0
+slot 18 2 sh 1 mode 1 fr 18 list - ended 0
+slot 18 3 sh 1 mode 1 fr 18 list - ended 0
+st 18 hits=0000 aim=0 count=13 draw=1 lock=1 rbtn=0
+draw 19 spr\Lance800.spr#13@def,300*0000803f
+slot 19 0 sh 1 mode 1 fr 19 list - ended 0
+slot 19 1 sh 1 mode 1 fr 19 list - ended 0
+slot 19 2 sh 1 mode 1 fr 19 list - ended 0
+slot 19 3 sh 1 mode 1 fr 19 list - ended 0
+st 19 hits=0000 aim=0 count=14 draw=1 lock=1 rbtn=0
+draw 20 spr\Lance800.spr#14@def,300*0000803f
+slot 20 0 sh 1 mode 1 fr 20 list - ended 0
+slot 20 1 sh 1 mode 1 fr 20 list - ended 0
+slot 20 2 sh 1 mode 1 fr 20 list - ended 0
+slot 20 3 sh 1 mode 1 fr 20 list - ended 0
+st 20 hits=0000 aim=0 count=15 draw=1 lock=1 rbtn=0
+draw 21 spr\Lance800.spr#15@def,300*0000803f
+slot 21 0 sh 1 mode 1 fr 21 list - ended 0
+slot 21 1 sh 1 mode 1 fr 21 list - ended 0
+slot 21 2 sh 1 mode 1 fr 21 list - ended 0
+slot 21 3 sh 1 mode 1 fr 21 list - ended 0
+st 21 hits=0000 aim=0 count=16 draw=1 lock=1 rbtn=0
+draw 22 spr\Lance800.spr#16@def,300*0000803f
+slot 22 0 sh 1 mode 1 fr 22 list - ended 0
+slot 22 1 sh 1 mode 1 fr 22 list - ended 0
+slot 22 2 sh 1 mode 1 fr 22 list - ended 0
+slot 22 3 sh 1 mode 1 fr 22 list - ended 0
+st 22 hits=0000 aim=0 count=17 draw=1 lock=1 rbtn=0
+draw 23 spr\Lance800.spr#17@def,300*0000803f
+slot 23 0 sh 1 mode 1 fr 23 list - ended 0
+slot 23 1 sh 1 mode 1 fr 23 list - ended 0
+slot 23 2 sh 1 mode 1 fr 23 list - ended 0
+slot 23 3 sh 1 mode 1 fr 23 list - ended 0
+st 23 hits=0000 aim=0 count=18 draw=1 lock=1 rbtn=0
+draw 24 spr\Lance800.spr#18@def,300*0000803f
+slot 24 0 sh 1 mode 1 fr 24 list - ended 0
+slot 24 1 sh 1 mode 1 fr 24 list - ended 0
+slot 24 2 sh 1 mode 1 fr 24 list - ended 0
+slot 24 3 sh 1 mode 1 fr 24 list - ended 0
+st 24 hits=0000 aim=0 count=19 draw=1 lock=1 rbtn=0
+draw 25 spr\Lance800.spr#19@def,300*0000803f
+slot 25 0 sh 1 mode 1 fr 25 list - ended 0
+slot 25 1 sh 1 mode 1 fr 25 list - ended 0
+slot 25 2 sh 1 mode 1 fr 25 list - ended 0
+slot 25 3 sh 1 mode 1 fr 25 list - ended 0
+st 25 hits=0000 aim=0 count=20 draw=1 lock=1 rbtn=0
+draw 26 spr\Lance800.spr#20@def,300*0000803f
+slot 26 0 sh 1 mode 1 fr 26 list - ended 0
+slot 26 1 sh 1 mode 1 fr 26 list - ended 0
+slot 26 2 sh 1 mode 1 fr 26 list - ended 0
+slot 26 3 sh 1 mode 1 fr 26 list - ended 0
+st 26 hits=0000 aim=0 count=21 draw=1 lock=1 rbtn=0
+draw 27 spr\Lance800.spr#21@def,300*0000803f
+slot 27 0 sh 1 mode 1 fr 27 list - ended 0
+slot 27 1 sh 1 mode 1 fr 27 list - ended 0
+slot 27 2 sh 1 mode 1 fr 27 list - ended 0
+slot 27 3 sh 1 mode 1 fr 27 list - ended 0
+st 27 hits=0000 aim=0 count=22 draw=1 lock=1 rbtn=0
+draw 28 spr\Lance800.spr#22@def,300*0000803f
+slot 28 0 sh 1 mode 1 fr 28 list - ended 0
+slot 28 1 sh 1 mode 1 fr 28 list - ended 0
+slot 28 2 sh 1 mode 1 fr 28 list - ended 0
+slot 28 3 sh 1 mode 1 fr 28 list - ended 0
+st 28 hits=0000 aim=0 count=23 draw=1 lock=1 rbtn=0
+draw 29 spr\Lance800.spr#23@def,300*0000803f
+slot 29 0 sh 1 mode 1 fr 29 list - ended 0
+slot 29 1 sh 1 mode 1 fr 29 list - ended 0
+slot 29 2 sh 1 mode 1 fr 29 list - ended 0
+slot 29 3 sh 1 mode 1 fr 29 list - ended 0
+st 29 hits=0000 aim=0 count=24 draw=1 lock=1 rbtn=0
+draw 30 spr\Lance800.spr#24@def,300*0000803f
+cmd 30 (sacados=PAL_LANCE)
+slot 30 0 sh 1 mode 1 fr 30 list - ended 0
+slot 30 1 sh 1 mode 1 fr 30 list - ended 0
+slot 30 2 sh 1 mode 1 fr 30 list - ended 0
+slot 30 3 sh 1 mode 1 fr 30 list - ended 0
+st 30 hits=0000 aim=0 count=25 draw=1 lock=1 rbtn=0
+flags 30 620=0
+bag 30 +PAL_LANCE
+draw 31 spr\Lance800.spr#25@def,300*0000803f
+lock 31 0
+cmd 31 (sacados=PAL_LANCE)
+slot 31 0 sh 1 mode 1 fr 31 list - ended 0
+slot 31 1 sh 1 mode 1 fr 31 list - ended 0
+slot 31 2 sh 1 mode 1 fr 31 list - ended 0
+slot 31 3 sh 1 mode 1 fr 31 list - ended 0
+st 31 hits=0000 aim=0 count=25 draw=0 lock=0 rbtn=0
+lock 32 0
+cmd 32 (sacados=PAL_LANCE)
+slot 32 0 sh 1 mode 1 fr 32 list - ended 0
+slot 32 1 sh 1 mode 1 fr 32 list - ended 0
+slot 32 2 sh 1 mode 1 fr 32 list - ended 0
+slot 32 3 sh 1 mode 1 fr 32 list - ended 0
+lock 33 0
+cmd 33 (sacados=PAL_LANCE)
+slot 33 0 sh 1 mode 1 fr 33 list - ended 0
+slot 33 1 sh 1 mode 1 fr 33 list - ended 0
+slot 33 2 sh 1 mode 1 fr 33 list - ended 0
+slot 33 3 sh 1 mode 1 fr 33 list - ended 0
+lock 34 0
+cmd 34 (sacados=PAL_LANCE)
+slot 34 0 sh 1 mode 1 fr 34 list - ended 0
+slot 34 1 sh 1 mode 1 fr 34 list - ended 0
+slot 34 2 sh 1 mode 1 fr 34 list - ended 0
+slot 34 3 sh 1 mode 1 fr 34 list - ended 0
+lock 35 0
+cmd 35 (sacados=PAL_LANCE)
+slot 35 0 sh 1 mode 1 fr 35 list - ended 0
+slot 35 1 sh 1 mode 1 fr 35 list - ended 0
+slot 35 2 sh 1 mode 1 fr 35 list - ended 0
+slot 35 3 sh 1 mode 1 fr 35 list - ended 0
+run edges stag window -3 % (miss), +3 % (hit); aurochs at pitch -10 (no band: miss)
+setup wam paleo.wam view 4 yaw 0 pitch 0
+setup cmd (sacados=PAL_LANCE)
+setup flag 614 1 (the propulsor, chapi027)
+slots 0:ceA1004004(PAL_CERF) 1:pxA1004004(PAL_AVROCH) 2:smA1004004(PAL_CHEVAL) 3:saA1004004(PAL_BOUQUETIN) 4:laA1004004(PAL_LANCE)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slot 0 2 sh 1 mode 1 fr 0 list - ended 0
+slot 0 3 sh 1 mode 1 fr 0 list - ended 0
+slot 0 4 sh 1 mode 1 fr 0 list - ended 0
+st 0 hits=0000 aim=1 count=0 draw=0 lock=0 rbtn=0
+bag 0 +PAL_LANCE
+hand 0 0
+slot 1 0 sh 1 mode 1 fr 1 list - ended 0
+slot 1 1 sh 1 mode 1 fr 1 list - ended 0
+slot 1 2 sh 1 mode 1 fr 1 list - ended 0
+slot 1 3 sh 1 mode 1 fr 1 list - ended 0
+slot 2 0 sh 1 mode 1 fr 2 list - ended 0
+slot 2 1 sh 1 mode 1 fr 2 list - ended 0
+slot 2 2 sh 1 mode 1 fr 2 list - ended 0
+slot 2 3 sh 1 mode 1 fr 2 list - ended 0
+hand 3 PAL_LANCE
+cmd 3 (sacados=NOT_PAL_LANCE)
+draw 3 spr\propulseur800.spr#0@def,300*0000803f
+slot 3 0 sh 1 mode 1 fr 3 list - ended 0
+slot 3 1 sh 1 mode 1 fr 3 list - ended 0
+slot 3 2 sh 1 mode 1 fr 3 list - ended 0
+slot 3 3 sh 1 mode 1 fr 3 list - ended 0
+st 3 hits=0000 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 3 620=1
+hand 3 0
+bag 3 -PAL_LANCE
+draw 4 spr\propulseur800.spr#0@def,300*0000803f
+slot 4 0 sh 1 mode 1 fr 4 list - ended 0
+slot 4 1 sh 1 mode 1 fr 4 list - ended 0
+slot 4 2 sh 1 mode 1 fr 4 list - ended 0
+slot 4 3 sh 1 mode 1 fr 4 list - ended 0
+camera 5 87.6 5
+aim 5 yaw=267.603 pitch=5.000
+click 5 PAL_ZONE_LANCE1
+draw 5 spr\propulseur800.spr#0@def,300*0000803f
+cmd 5 (PlaySound=201)
+snd 5 load sfx\sound201.apc 0 1
+snd 5 play sfx\sound201.apc
+lock 5 1
+slot 5 0 sh 1 mode 1 fr 5 list - ended 0
+slot 5 1 sh 1 mode 1 fr 5 list - ended 0
+slot 5 2 sh 1 mode 1 fr 5 list - ended 0
+slot 5 3 sh 1 mode 1 fr 5 list - ended 0
+st 5 hits=0000 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 6 spr\propulseur800.spr#0@def,300*0000803f
+slot 6 0 sh 1 mode 1 fr 6 list - ended 0
+slot 6 1 sh 1 mode 1 fr 6 list - ended 0
+slot 6 2 sh 1 mode 1 fr 6 list - ended 0
+slot 6 3 sh 1 mode 1 fr 6 list - ended 0
+st 6 hits=0000 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 7 spr\propulseur800.spr#1@def,300*0000803f
+slot 7 0 sh 1 mode 1 fr 7 list - ended 0
+slot 7 1 sh 1 mode 1 fr 7 list - ended 0
+slot 7 2 sh 1 mode 1 fr 7 list - ended 0
+slot 7 3 sh 1 mode 1 fr 7 list - ended 0
+st 7 hits=0000 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 8 spr\propulseur800.spr#2@def,300*0000803f
+slot 8 0 sh 1 mode 1 fr 8 list - ended 0
+slot 8 1 sh 1 mode 1 fr 8 list - ended 0
+slot 8 2 sh 1 mode 1 fr 8 list - ended 0
+slot 8 3 sh 1 mode 1 fr 8 list - ended 0
+st 8 hits=0000 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 9 spr\propulseur800.spr#3@def,300*0000803f
+slot 9 0 sh 1 mode 1 fr 9 list - ended 0
+slot 9 1 sh 1 mode 1 fr 9 list - ended 0
+slot 9 2 sh 1 mode 1 fr 9 list - ended 0
+slot 9 3 sh 1 mode 1 fr 9 list - ended 0
+st 9 hits=0000 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 10 spr\propulseur800.spr#4@def,300*0000803f
+slot 10 0 sh 1 mode 1 fr 10 list - ended 0
+slot 10 1 sh 1 mode 1 fr 10 list - ended 0
+slot 10 2 sh 1 mode 1 fr 10 list - ended 0
+slot 10 3 sh 1 mode 1 fr 10 list - ended 0
+st 10 hits=0000 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 11 spr\propulseur800.spr#5@def,300*0000803f
+slot 11 0 sh 1 mode 1 fr 11 list - ended 0
+slot 11 1 sh 1 mode 1 fr 11 list - ended 0
+slot 11 2 sh 1 mode 1 fr 11 list - ended 0
+slot 11 3 sh 1 mode 1 fr 11 list - ended 0
+st 11 hits=0000 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 12 spr\propulseur800.spr#6@def,300*0000803f
+slot 12 0 sh 1 mode 1 fr 12 list - ended 0
+slot 12 1 sh 1 mode 1 fr 12 list - ended 0
+slot 12 2 sh 1 mode 1 fr 12 list - ended 0
+slot 12 3 sh 1 mode 1 fr 12 list - ended 0
+st 12 hits=0000 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 13 spr\propulseur800.spr#7@def,300*0000803f
+slot 13 0 sh 1 mode 1 fr 13 list - ended 0
+slot 13 1 sh 1 mode 1 fr 13 list - ended 0
+slot 13 2 sh 1 mode 1 fr 13 list - ended 0
+slot 13 3 sh 1 mode 1 fr 13 list - ended 0
+st 13 hits=0000 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 14 spr\propulseur800.spr#8@def,300*0000803f
+slot 14 0 sh 1 mode 1 fr 14 list - ended 0
+slot 14 1 sh 1 mode 1 fr 14 list - ended 0
+slot 14 2 sh 1 mode 1 fr 14 list - ended 0
+slot 14 3 sh 1 mode 1 fr 14 list - ended 0
+st 14 hits=0000 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 15 spr\propulseur800.spr#9@def,300*0000803f
+slot 15 0 sh 1 mode 1 fr 15 list - ended 0
+slot 15 1 sh 1 mode 1 fr 15 list - ended 0
+slot 15 2 sh 1 mode 1 fr 15 list - ended 0
+slot 15 3 sh 1 mode 1 fr 15 list - ended 0
+st 15 hits=0000 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 16 spr\propulseur800.spr#10@def,300*0000803f
+slot 16 0 sh 1 mode 1 fr 16 list - ended 0
+slot 16 1 sh 1 mode 1 fr 16 list - ended 0
+slot 16 2 sh 1 mode 1 fr 16 list - ended 0
+slot 16 3 sh 1 mode 1 fr 16 list - ended 0
+st 16 hits=0000 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 17 spr\propulseur800.spr#11@def,300*0000803f
+slot 17 0 sh 1 mode 1 fr 17 list - ended 0
+slot 17 1 sh 1 mode 1 fr 17 list - ended 0
+slot 17 2 sh 1 mode 1 fr 17 list - ended 0
+slot 17 3 sh 1 mode 1 fr 17 list - ended 0
+st 17 hits=0000 aim=0 count=12 draw=1 lock=1 rbtn=0
+draw 18 spr\propulseur800.spr#12@def,300*0000803f
+slot 18 0 sh 1 mode 1 fr 18 list - ended 0
+slot 18 1 sh 1 mode 1 fr 18 list - ended 0
+slot 18 2 sh 1 mode 1 fr 18 list - ended 0
+slot 18 3 sh 1 mode 1 fr 18 list - ended 0
+st 18 hits=0000 aim=0 count=13 draw=1 lock=1 rbtn=0
+draw 19 spr\propulseur800.spr#13@def,300*0000803f
+slot 19 0 sh 1 mode 1 fr 19 list - ended 0
+slot 19 1 sh 1 mode 1 fr 19 list - ended 0
+slot 19 2 sh 1 mode 1 fr 19 list - ended 0
+slot 19 3 sh 1 mode 1 fr 19 list - ended 0
+st 19 hits=0000 aim=0 count=14 draw=1 lock=1 rbtn=0
+draw 20 spr\propulseur800.spr#14@def,300*0000803f
+slot 20 0 sh 1 mode 1 fr 20 list - ended 0
+slot 20 1 sh 1 mode 1 fr 20 list - ended 0
+slot 20 2 sh 1 mode 1 fr 20 list - ended 0
+slot 20 3 sh 1 mode 1 fr 20 list - ended 0
+st 20 hits=0000 aim=0 count=15 draw=1 lock=1 rbtn=0
+draw 21 spr\propulseur800.spr#15@def,300*0000803f
+slot 21 0 sh 1 mode 1 fr 21 list - ended 0
+slot 21 1 sh 1 mode 1 fr 21 list - ended 0
+slot 21 2 sh 1 mode 1 fr 21 list - ended 0
+slot 21 3 sh 1 mode 1 fr 21 list - ended 0
+st 21 hits=0000 aim=0 count=16 draw=1 lock=1 rbtn=0
+draw 22 spr\propulseur800.spr#16@def,300*0000803f
+slot 22 0 sh 1 mode 1 fr 22 list - ended 0
+slot 22 1 sh 1 mode 1 fr 22 list - ended 0
+slot 22 2 sh 1 mode 1 fr 22 list - ended 0
+slot 22 3 sh 1 mode 1 fr 22 list - ended 0
+st 22 hits=0000 aim=0 count=17 draw=1 lock=1 rbtn=0
+draw 23 spr\propulseur800.spr#17@def,300*0000803f
+slot 23 0 sh 1 mode 1 fr 23 list - ended 0
+slot 23 1 sh 1 mode 1 fr 23 list - ended 0
+slot 23 2 sh 1 mode 1 fr 23 list - ended 0
+slot 23 3 sh 1 mode 1 fr 23 list - ended 0
+st 23 hits=0000 aim=0 count=18 draw=1 lock=1 rbtn=0
+draw 24 spr\propulseur800.spr#18@def,300*0000803f
+slot 24 0 sh 1 mode 1 fr 24 list - ended 0
+slot 24 1 sh 1 mode 1 fr 24 list - ended 0
+slot 24 2 sh 1 mode 1 fr 24 list - ended 0
+slot 24 3 sh 1 mode 1 fr 24 list - ended 0
+st 24 hits=0000 aim=0 count=19 draw=1 lock=1 rbtn=0
+draw 25 spr\propulseur800.spr#19@def,300*0000803f
+slot 25 0 sh 1 mode 1 fr 25 list - ended 0
+slot 25 1 sh 1 mode 1 fr 25 list - ended 0
+slot 25 2 sh 1 mode 1 fr 25 list - ended 0
+slot 25 3 sh 1 mode 1 fr 25 list - ended 0
+st 25 hits=0000 aim=0 count=20 draw=1 lock=1 rbtn=0
+draw 26 spr\propulseur800.spr#20@def,300*0000803f
+slot 26 0 sh 1 mode 1 fr 26 list - ended 0
+slot 26 1 sh 1 mode 1 fr 26 list - ended 0
+slot 26 2 sh 1 mode 1 fr 26 list - ended 0
+slot 26 3 sh 1 mode 1 fr 26 list - ended 0
+st 26 hits=0000 aim=0 count=21 draw=1 lock=1 rbtn=0
+draw 27 spr\propulseur800.spr#21@def,300*0000803f
+slot 27 0 sh 1 mode 1 fr 27 list - ended 0
+slot 27 1 sh 1 mode 1 fr 27 list - ended 0
+slot 27 2 sh 1 mode 1 fr 27 list - ended 0
+slot 27 3 sh 1 mode 1 fr 27 list - ended 0
+st 27 hits=0000 aim=0 count=22 draw=1 lock=1 rbtn=0
+draw 28 spr\propulseur800.spr#22@def,300*0000803f
+slot 28 0 sh 1 mode 1 fr 28 list - ended 0
+slot 28 1 sh 1 mode 1 fr 28 list - ended 0
+slot 28 2 sh 1 mode 1 fr 28 list - ended 0
+slot 28 3 sh 1 mode 1 fr 28 list - ended 0
+st 28 hits=0000 aim=0 count=23 draw=1 lock=1 rbtn=0
+draw 29 spr\propulseur800.spr#23@def,300*0000803f
+slot 29 0 sh 1 mode 1 fr 29 list - ended 0
+slot 29 1 sh 1 mode 1 fr 29 list - ended 0
+slot 29 2 sh 1 mode 1 fr 29 list - ended 0
+slot 29 3 sh 1 mode 1 fr 29 list - ended 0
+st 29 hits=0000 aim=0 count=24 draw=1 lock=1 rbtn=0
+draw 30 spr\propulseur800.spr#24@def,300*0000803f
+cmd 30 (sacados=PAL_LANCE)
+slot 30 0 sh 1 mode 1 fr 30 list - ended 0
+slot 30 1 sh 1 mode 1 fr 30 list - ended 0
+slot 30 2 sh 1 mode 1 fr 30 list - ended 0
+slot 30 3 sh 1 mode 1 fr 30 list - ended 0
+st 30 hits=0000 aim=0 count=25 draw=1 lock=1 rbtn=0
+flags 30 620=0
+bag 30 +PAL_LANCE
+draw 31 spr\propulseur800.spr#25@def,300*0000803f
+lock 31 0
+cmd 31 (sacados=PAL_LANCE)
+slot 31 0 sh 1 mode 1 fr 31 list - ended 0
+slot 31 1 sh 1 mode 1 fr 31 list - ended 0
+slot 31 2 sh 1 mode 1 fr 31 list - ended 0
+slot 31 3 sh 1 mode 1 fr 31 list - ended 0
+st 31 hits=0000 aim=0 count=25 draw=0 lock=0 rbtn=0
+lock 32 0
+cmd 32 (sacados=PAL_LANCE)
+slot 32 0 sh 1 mode 1 fr 32 list - ended 0
+slot 32 1 sh 1 mode 1 fr 32 list - ended 0
+slot 32 2 sh 1 mode 1 fr 32 list - ended 0
+slot 32 3 sh 1 mode 1 fr 32 list - ended 0
+hand 33 PAL_LANCE
+cmd 33 (sacados=NOT_PAL_LANCE)
+draw 33 spr\propulseur800.spr#0@def,300*0000803f
+slot 33 0 sh 1 mode 1 fr 33 list - ended 0
+slot 33 1 sh 1 mode 1 fr 33 list - ended 0
+slot 33 2 sh 1 mode 1 fr 33 list - ended 0
+slot 33 3 sh 1 mode 1 fr 33 list - ended 0
+st 33 hits=0000 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 33 620=1
+hand 33 0
+bag 33 -PAL_LANCE
+draw 34 spr\propulseur800.spr#0@def,300*0000803f
+slot 34 0 sh 1 mode 1 fr 34 list - ended 0
+slot 34 1 sh 1 mode 1 fr 34 list - ended 0
+slot 34 2 sh 1 mode 1 fr 34 list - ended 0
+slot 34 3 sh 1 mode 1 fr 34 list - ended 0
+camera 35 13.0 5
+aim 35 yaw=193.000 pitch=5.000
+click 35 PAL_ZONE_LANCE1
+draw 35 spr\propulseur800.spr#0@def,300*0000803f
+cmd 35 (PlaySound=201)
+snd 35 load sfx\sound201.apc 0 1
+snd 35 play sfx\sound201.apc
+lock 35 1
+slot 35 0 sh 1 mode 1 fr 35 list - ended 0
+slot 35 1 sh 1 mode 1 fr 35 list - ended 0
+slot 35 2 sh 1 mode 1 fr 35 list - ended 0
+slot 35 3 sh 1 mode 1 fr 35 list - ended 0
+st 35 hits=0000 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 36 spr\propulseur800.spr#0@def,300*0000803f
+slot 36 0 sh 1 mode 1 fr 36 list - ended 0
+slot 36 1 sh 1 mode 1 fr 36 list - ended 0
+slot 36 2 sh 1 mode 1 fr 36 list - ended 0
+slot 36 3 sh 1 mode 1 fr 36 list - ended 0
+st 36 hits=0000 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 37 spr\propulseur800.spr#1@def,300*0000803f
+slot 37 0 sh 1 mode 1 fr 37 list - ended 0
+slot 37 1 sh 1 mode 1 fr 37 list - ended 0
+slot 37 2 sh 1 mode 1 fr 37 list - ended 0
+slot 37 3 sh 1 mode 1 fr 37 list - ended 0
+st 37 hits=0000 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 38 spr\propulseur800.spr#2@def,300*0000803f
+slot 38 0 sh 1 mode 1 fr 38 list - ended 0
+slot 38 1 sh 1 mode 1 fr 38 list - ended 0
+slot 38 2 sh 1 mode 1 fr 38 list - ended 0
+slot 38 3 sh 1 mode 1 fr 38 list - ended 0
+st 38 hits=0000 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 39 spr\propulseur800.spr#3@def,300*0000803f
+slot 39 0 sh 1 mode 1 fr 39 list - ended 0
+slot 39 1 sh 1 mode 1 fr 39 list - ended 0
+slot 39 2 sh 1 mode 1 fr 39 list - ended 0
+slot 39 3 sh 1 mode 1 fr 39 list - ended 0
+st 39 hits=0000 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 40 spr\propulseur800.spr#4@def,300*0000803f
+slot 40 0 sh 1 mode 1 fr 40 list - ended 0
+slot 40 1 sh 1 mode 1 fr 40 list - ended 0
+slot 40 2 sh 1 mode 1 fr 40 list - ended 0
+slot 40 3 sh 1 mode 1 fr 40 list - ended 0
+st 40 hits=0000 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 41 spr\propulseur800.spr#5@def,300*0000803f
+slot 41 0 sh 1 mode 1 fr 41 list - ended 0
+slot 41 1 sh 1 mode 1 fr 41 list - ended 0
+slot 41 2 sh 1 mode 1 fr 41 list - ended 0
+slot 41 3 sh 1 mode 1 fr 41 list - ended 0
+st 41 hits=0000 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 42 spr\propulseur800.spr#6@def,300*0000803f
+slot 42 0 sh 1 mode 1 fr 42 list - ended 0
+slot 42 1 sh 1 mode 1 fr 42 list - ended 0
+slot 42 2 sh 1 mode 1 fr 42 list - ended 0
+slot 42 3 sh 1 mode 1 fr 42 list - ended 0
+st 42 hits=0000 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 43 spr\propulseur800.spr#7@def,300*0000803f
+slot 43 0 sh 1 mode 1 fr 43 list - ended 0
+slot 43 1 sh 1 mode 1 fr 43 list - ended 0
+slot 43 2 sh 1 mode 1 fr 43 list - ended 0
+slot 43 3 sh 1 mode 1 fr 43 list - ended 0
+st 43 hits=0000 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 44 spr\propulseur800.spr#8@def,300*0000803f
+slot 44 0 sh 1 mode 1 fr 44 list - ended 0
+slot 44 1 sh 1 mode 1 fr 44 list - ended 0
+slot 44 2 sh 1 mode 1 fr 44 list - ended 0
+slot 44 3 sh 1 mode 1 fr 44 list - ended 0
+st 44 hits=0000 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 45 spr\propulseur800.spr#9@def,300*0000803f
+slot 45 0 sh 1 mode 1 fr 45 list - ended 0
+slot 45 1 sh 1 mode 1 fr 45 list - ended 0
+slot 45 2 sh 1 mode 1 fr 45 list - ended 0
+slot 45 3 sh 1 mode 1 fr 45 list - ended 0
+st 45 hits=0000 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 46 spr\propulseur800.spr#10@def,300*0000803f
+slot 46 0 sh 1 mode 1 fr 46 list - ended 0
+slot 46 1 sh 1 mode 1 fr 46 list - ended 0
+slot 46 2 sh 1 mode 1 fr 46 list - ended 0
+slot 46 3 sh 1 mode 1 fr 46 list - ended 0
+st 46 hits=0000 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 47 spr\propulseur800.spr#11@def,300*0000803f
+cmd 47 (HideObjet=PAL_CERF)
+hide 47 PAL_CERF kind 2 arg 0
+cmd 47 (SacADos=PAL_COEUR_CERF)
+slot 47 0 sh 0 mode 1 fr 0 list - ended 0
+slot 47 1 sh 1 mode 1 fr 47 list - ended 0
+slot 47 2 sh 1 mode 1 fr 47 list - ended 0
+slot 47 3 sh 1 mode 1 fr 47 list - ended 0
+st 47 hits=1000 aim=0 count=12 draw=1 lock=1 rbtn=0
+flags 47 608=1
+bag 47 +PAL_COEUR_CERF
+draw 48 spr\propulseur800.spr#12@def,300*0000803f
+slot 48 1 sh 1 mode 1 fr 48 list - ended 0
+slot 48 2 sh 1 mode 1 fr 48 list - ended 0
+slot 48 3 sh 1 mode 1 fr 48 list - ended 0
+st 48 hits=1000 aim=0 count=13 draw=1 lock=1 rbtn=0
+draw 49 spr\propulseur800.spr#13@def,300*0000803f
+slot 49 1 sh 1 mode 1 fr 49 list - ended 0
+slot 49 2 sh 1 mode 1 fr 49 list - ended 0
+slot 49 3 sh 1 mode 1 fr 49 list - ended 0
+st 49 hits=1000 aim=0 count=14 draw=1 lock=1 rbtn=0
+draw 50 spr\propulseur800.spr#14@def,300*0000803f
+slot 50 1 sh 1 mode 1 fr 50 list - ended 0
+slot 50 2 sh 1 mode 1 fr 50 list - ended 0
+slot 50 3 sh 1 mode 1 fr 50 list - ended 0
+st 50 hits=1000 aim=0 count=15 draw=1 lock=1 rbtn=0
+draw 51 spr\propulseur800.spr#15@def,300*0000803f
+slot 51 1 sh 1 mode 1 fr 51 list - ended 0
+slot 51 2 sh 1 mode 1 fr 51 list - ended 0
+slot 51 3 sh 1 mode 1 fr 51 list - ended 0
+st 51 hits=1000 aim=0 count=16 draw=1 lock=1 rbtn=0
+draw 52 spr\propulseur800.spr#16@def,300*0000803f
+slot 52 1 sh 1 mode 1 fr 52 list - ended 0
+slot 52 2 sh 1 mode 1 fr 52 list - ended 0
+slot 52 3 sh 1 mode 1 fr 52 list - ended 0
+st 52 hits=1000 aim=0 count=17 draw=1 lock=1 rbtn=0
+draw 53 spr\propulseur800.spr#17@def,300*0000803f
+slot 53 1 sh 1 mode 1 fr 53 list - ended 0
+slot 53 2 sh 1 mode 1 fr 53 list - ended 0
+slot 53 3 sh 1 mode 1 fr 53 list - ended 0
+st 53 hits=1000 aim=0 count=18 draw=1 lock=1 rbtn=0
+draw 54 spr\propulseur800.spr#18@def,300*0000803f
+slot 54 1 sh 1 mode 1 fr 54 list - ended 0
+slot 54 2 sh 1 mode 1 fr 54 list - ended 0
+slot 54 3 sh 1 mode 1 fr 54 list - ended 0
+st 54 hits=1000 aim=0 count=19 draw=1 lock=1 rbtn=0
+draw 55 spr\propulseur800.spr#19@def,300*0000803f
+slot 55 1 sh 1 mode 1 fr 55 list - ended 0
+slot 55 2 sh 1 mode 1 fr 55 list - ended 0
+slot 55 3 sh 1 mode 1 fr 55 list - ended 0
+st 55 hits=1000 aim=0 count=20 draw=1 lock=1 rbtn=0
+draw 56 spr\propulseur800.spr#20@def,300*0000803f
+slot 56 1 sh 1 mode 1 fr 56 list - ended 0
+slot 56 2 sh 1 mode 1 fr 56 list - ended 0
+slot 56 3 sh 1 mode 1 fr 56 list - ended 0
+st 56 hits=1000 aim=0 count=21 draw=1 lock=1 rbtn=0
+draw 57 spr\propulseur800.spr#21@def,300*0000803f
+slot 57 1 sh 1 mode 1 fr 57 list - ended 0
+slot 57 2 sh 1 mode 1 fr 57 list - ended 0
+slot 57 3 sh 1 mode 1 fr 57 list - ended 0
+st 57 hits=1000 aim=0 count=22 draw=1 lock=1 rbtn=0
+draw 58 spr\propulseur800.spr#22@def,300*0000803f
+slot 58 1 sh 1 mode 1 fr 58 list - ended 0
+slot 58 2 sh 1 mode 1 fr 58 list - ended 0
+slot 58 3 sh 1 mode 1 fr 58 list - ended 0
+st 58 hits=1000 aim=0 count=23 draw=1 lock=1 rbtn=0
+draw 59 spr\propulseur800.spr#23@def,300*0000803f
+slot 59 1 sh 1 mode 1 fr 59 list - ended 0
+slot 59 2 sh 1 mode 1 fr 59 list - ended 0
+slot 59 3 sh 1 mode 1 fr 59 list - ended 0
+st 59 hits=1000 aim=0 count=24 draw=1 lock=1 rbtn=0
+draw 60 spr\propulseur800.spr#24@def,300*0000803f
+cmd 60 (sacados=PAL_LANCE)
+slot 60 1 sh 1 mode 1 fr 60 list - ended 0
+slot 60 2 sh 1 mode 1 fr 60 list - ended 0
+slot 60 3 sh 1 mode 1 fr 60 list - ended 0
+st 60 hits=1000 aim=0 count=25 draw=1 lock=1 rbtn=0
+flags 60 620=0
+bag 60 +PAL_LANCE
+draw 61 spr\propulseur800.spr#25@def,300*0000803f
+lock 61 0
+cmd 61 (sacados=PAL_LANCE)
+slot 61 1 sh 1 mode 1 fr 61 list - ended 0
+slot 61 2 sh 1 mode 1 fr 61 list - ended 0
+slot 61 3 sh 1 mode 1 fr 61 list - ended 0
+st 61 hits=1000 aim=0 count=25 draw=0 lock=0 rbtn=0
+lock 62 0
+cmd 62 (sacados=PAL_LANCE)
+slot 62 1 sh 1 mode 1 fr 62 list - ended 0
+slot 62 2 sh 1 mode 1 fr 62 list - ended 0
+slot 62 3 sh 1 mode 1 fr 62 list - ended 0
+hand 63 PAL_LANCE
+cmd 63 (sacados=NOT_PAL_LANCE)
+draw 63 spr\propulseur800.spr#0@def,300*0000803f
+slot 63 1 sh 1 mode 1 fr 63 list - ended 0
+slot 63 2 sh 1 mode 1 fr 63 list - ended 0
+slot 63 3 sh 1 mode 1 fr 63 list - ended 0
+st 63 hits=1000 aim=1 count=0 draw=1 lock=0 rbtn=0
+flags 63 620=1
+hand 63 0
+bag 63 -PAL_LANCE
+draw 64 spr\propulseur800.spr#0@def,300*0000803f
+slot 64 1 sh 1 mode 1 fr 64 list - ended 0
+slot 64 2 sh 1 mode 1 fr 64 list - ended 0
+slot 64 3 sh 1 mode 1 fr 64 list - ended 0
+camera 65 60.9 -10
+aim 65 yaw=240.902 pitch=-10.000
+click 65 PAL_ZONE_LANCE1
+draw 65 spr\propulseur800.spr#0@def,300*0000803f
+cmd 65 (PlaySound=201)
+snd 65 load sfx\sound201.apc 0 1
+snd 65 play sfx\sound201.apc
+lock 65 1
+slot 65 1 sh 1 mode 1 fr 65 list - ended 0
+slot 65 2 sh 1 mode 1 fr 65 list - ended 0
+slot 65 3 sh 1 mode 1 fr 65 list - ended 0
+st 65 hits=1000 aim=0 count=0 draw=1 lock=1 rbtn=0
+draw 66 spr\propulseur800.spr#0@def,300*0000803f
+slot 66 1 sh 1 mode 1 fr 66 list - ended 0
+slot 66 2 sh 1 mode 1 fr 66 list - ended 0
+slot 66 3 sh 1 mode 1 fr 66 list - ended 0
+st 66 hits=1000 aim=0 count=1 draw=1 lock=1 rbtn=0
+draw 67 spr\propulseur800.spr#1@def,300*0000803f
+slot 67 1 sh 1 mode 1 fr 67 list - ended 0
+slot 67 2 sh 1 mode 1 fr 67 list - ended 0
+slot 67 3 sh 1 mode 1 fr 67 list - ended 0
+st 67 hits=1000 aim=0 count=2 draw=1 lock=1 rbtn=0
+draw 68 spr\propulseur800.spr#2@def,300*0000803f
+slot 68 1 sh 1 mode 1 fr 68 list - ended 0
+slot 68 2 sh 1 mode 1 fr 68 list - ended 0
+slot 68 3 sh 1 mode 1 fr 68 list - ended 0
+st 68 hits=1000 aim=0 count=3 draw=1 lock=1 rbtn=0
+draw 69 spr\propulseur800.spr#3@def,300*0000803f
+slot 69 1 sh 1 mode 1 fr 69 list - ended 0
+slot 69 2 sh 1 mode 1 fr 69 list - ended 0
+slot 69 3 sh 1 mode 1 fr 69 list - ended 0
+st 69 hits=1000 aim=0 count=4 draw=1 lock=1 rbtn=0
+draw 70 spr\propulseur800.spr#4@def,300*0000803f
+slot 70 1 sh 1 mode 1 fr 70 list - ended 0
+slot 70 2 sh 1 mode 1 fr 70 list - ended 0
+slot 70 3 sh 1 mode 1 fr 70 list - ended 0
+st 70 hits=1000 aim=0 count=5 draw=1 lock=1 rbtn=0
+draw 71 spr\propulseur800.spr#5@def,300*0000803f
+slot 71 1 sh 1 mode 1 fr 71 list - ended 0
+slot 71 2 sh 1 mode 1 fr 71 list - ended 0
+slot 71 3 sh 1 mode 1 fr 71 list - ended 0
+st 71 hits=1000 aim=0 count=6 draw=1 lock=1 rbtn=0
+draw 72 spr\propulseur800.spr#6@def,300*0000803f
+slot 72 1 sh 1 mode 1 fr 72 list - ended 0
+slot 72 2 sh 1 mode 1 fr 72 list - ended 0
+slot 72 3 sh 1 mode 1 fr 72 list - ended 0
+st 72 hits=1000 aim=0 count=7 draw=1 lock=1 rbtn=0
+draw 73 spr\propulseur800.spr#7@def,300*0000803f
+slot 73 1 sh 1 mode 1 fr 73 list - ended 0
+slot 73 2 sh 1 mode 1 fr 73 list - ended 0
+slot 73 3 sh 1 mode 1 fr 73 list - ended 0
+st 73 hits=1000 aim=0 count=8 draw=1 lock=1 rbtn=0
+draw 74 spr\propulseur800.spr#8@def,300*0000803f
+slot 74 1 sh 1 mode 1 fr 74 list - ended 0
+slot 74 2 sh 1 mode 1 fr 74 list - ended 0
+slot 74 3 sh 1 mode 1 fr 74 list - ended 0
+st 74 hits=1000 aim=0 count=9 draw=1 lock=1 rbtn=0
+draw 75 spr\propulseur800.spr#9@def,300*0000803f
+slot 75 1 sh 1 mode 1 fr 75 list - ended 0
+slot 75 2 sh 1 mode 1 fr 75 list - ended 0
+slot 75 3 sh 1 mode 1 fr 75 list - ended 0
+st 75 hits=1000 aim=0 count=10 draw=1 lock=1 rbtn=0
+draw 76 spr\propulseur800.spr#10@def,300*0000803f
+slot 76 1 sh 1 mode 1 fr 76 list - ended 0
+slot 76 2 sh 1 mode 1 fr 76 list - ended 0
+slot 76 3 sh 1 mode 1 fr 76 list - ended 0
+st 76 hits=1000 aim=0 count=11 draw=1 lock=1 rbtn=0
+draw 77 spr\propulseur800.spr#11@def,300*0000803f
+slot 77 1 sh 1 mode 1 fr 77 list - ended 0
+slot 77 2 sh 1 mode 1 fr 77 list - ended 0
+slot 77 3 sh 1 mode 1 fr 77 list - ended 0
+st 77 hits=1000 aim=0 count=12 draw=1 lock=1 rbtn=0
+draw 78 spr\propulseur800.spr#12@def,300*0000803f
+slot 78 1 sh 1 mode 1 fr 78 list - ended 0
+slot 78 2 sh 1 mode 1 fr 78 list - ended 0
+slot 78 3 sh 1 mode 1 fr 78 list - ended 0
+st 78 hits=1000 aim=0 count=13 draw=1 lock=1 rbtn=0
+draw 79 spr\propulseur800.spr#13@def,300*0000803f
+slot 79 1 sh 1 mode 1 fr 79 list - ended 0
+slot 79 2 sh 1 mode 1 fr 79 list - ended 0
+slot 79 3 sh 1 mode 1 fr 79 list - ended 0
+st 79 hits=1000 aim=0 count=14 draw=1 lock=1 rbtn=0
+draw 80 spr\propulseur800.spr#14@def,300*0000803f
+slot 80 1 sh 1 mode 1 fr 80 list - ended 0
+slot 80 2 sh 1 mode 1 fr 80 list - ended 0
+slot 80 3 sh 1 mode 1 fr 80 list - ended 0
+st 80 hits=1000 aim=0 count=15 draw=1 lock=1 rbtn=0
+draw 81 spr\propulseur800.spr#15@def,300*0000803f
+slot 81 1 sh 1 mode 1 fr 81 list - ended 0
+slot 81 2 sh 1 mode 1 fr 81 list - ended 0
+slot 81 3 sh 1 mode 1 fr 81 list - ended 0
+st 81 hits=1000 aim=0 count=16 draw=1 lock=1 rbtn=0
+draw 82 spr\propulseur800.spr#16@def,300*0000803f
+slot 82 1 sh 1 mode 1 fr 82 list - ended 0
+slot 82 2 sh 1 mode 1 fr 82 list - ended 0
+slot 82 3 sh 1 mode 1 fr 82 list - ended 0
+st 82 hits=1000 aim=0 count=17 draw=1 lock=1 rbtn=0
+draw 83 spr\propulseur800.spr#17@def,300*0000803f
+slot 83 1 sh 1 mode 1 fr 83 list - ended 0
+slot 83 2 sh 1 mode 1 fr 83 list - ended 0
+slot 83 3 sh 1 mode 1 fr 83 list - ended 0
+st 83 hits=1000 aim=0 count=18 draw=1 lock=1 rbtn=0
+draw 84 spr\propulseur800.spr#18@def,300*0000803f
+slot 84 1 sh 1 mode 1 fr 84 list - ended 0
+slot 84 2 sh 1 mode 1 fr 84 list - ended 0
+slot 84 3 sh 1 mode 1 fr 84 list - ended 0
+st 84 hits=1000 aim=0 count=19 draw=1 lock=1 rbtn=0
+draw 85 spr\propulseur800.spr#19@def,300*0000803f
+slot 85 1 sh 1 mode 1 fr 85 list - ended 0
+slot 85 2 sh 1 mode 1 fr 85 list - ended 0
+slot 85 3 sh 1 mode 1 fr 85 list - ended 0
+st 85 hits=1000 aim=0 count=20 draw=1 lock=1 rbtn=0
+draw 86 spr\propulseur800.spr#20@def,300*0000803f
+slot 86 1 sh 1 mode 1 fr 86 list - ended 0
+slot 86 2 sh 1 mode 1 fr 86 list - ended 0
+slot 86 3 sh 1 mode 1 fr 86 list - ended 0
+st 86 hits=1000 aim=0 count=21 draw=1 lock=1 rbtn=0
+draw 87 spr\propulseur800.spr#21@def,300*0000803f
+slot 87 1 sh 1 mode 1 fr 87 list - ended 0
+slot 87 2 sh 1 mode 1 fr 87 list - ended 0
+slot 87 3 sh 1 mode 1 fr 87 list - ended 0
+st 87 hits=1000 aim=0 count=22 draw=1 lock=1 rbtn=0
+draw 88 spr\propulseur800.spr#22@def,300*0000803f
+slot 88 1 sh 1 mode 1 fr 88 list - ended 0
+slot 88 2 sh 1 mode 1 fr 88 list - ended 0
+slot 88 3 sh 1 mode 1 fr 88 list - ended 0
+st 88 hits=1000 aim=0 count=23 draw=1 lock=1 rbtn=0
+draw 89 spr\propulseur800.spr#23@def,300*0000803f
+slot 89 1 sh 1 mode 1 fr 89 list - ended 0
+slot 89 2 sh 1 mode 1 fr 89 list - ended 0
+slot 89 3 sh 1 mode 1 fr 89 list - ended 0
+st 89 hits=1000 aim=0 count=24 draw=1 lock=1 rbtn=0
+draw 90 spr\propulseur800.spr#24@def,300*0000803f
+cmd 90 (sacados=PAL_LANCE)
+slot 90 1 sh 1 mode 1 fr 90 list - ended 0
+slot 90 2 sh 1 mode 1 fr 90 list - ended 0
+slot 90 3 sh 1 mode 1 fr 90 list - ended 0
+st 90 hits=1000 aim=0 count=25 draw=1 lock=1 rbtn=0
+flags 90 620=0
+bag 90 +PAL_LANCE
+draw 91 spr\propulseur800.spr#25@def,300*0000803f
+lock 91 0
+cmd 91 (sacados=PAL_LANCE)
+slot 91 1 sh 1 mode 1 fr 91 list - ended 0
+slot 91 2 sh 1 mode 1 fr 91 list - ended 0
+slot 91 3 sh 1 mode 1 fr 91 list - ended 0
+st 91 hits=1000 aim=0 count=25 draw=0 lock=0 rbtn=0
+lock 92 0
+cmd 92 (sacados=PAL_LANCE)
+slot 92 1 sh 1 mode 1 fr 92 list - ended 0
+slot 92 2 sh 1 mode 1 fr 92 list - ended 0
+slot 92 3 sh 1 mode 1 fr 92 list - ended 0
+lock 93 0
+cmd 93 (sacados=PAL_LANCE)
+slot 93 1 sh 1 mode 1 fr 93 list - ended 0
+slot 93 2 sh 1 mode 1 fr 93 list - ended 0
+slot 93 3 sh 1 mode 1 fr 93 list - ended 0
+lock 94 0
+cmd 94 (sacados=PAL_LANCE)
+slot 94 1 sh 1 mode 1 fr 94 list - ended 0
+slot 94 2 sh 1 mode 1 fr 94 list - ended 0
+slot 94 3 sh 1 mode 1 fr 94 list - ended 0
+lock 95 0
+cmd 95 (sacados=PAL_LANCE)
+slot 95 1 sh 1 mode 1 fr 95 list - ended 0
+slot 95 2 sh 1 mode 1 fr 95 list - ended 0
+slot 95 3 sh 1 mode 1 fr 95 list - ended 0
