@@ -38,11 +38,14 @@ mod frame_tab;
 mod hooks;
 mod pages;
 mod sfx;
+mod subtitles;
+
 pub use board::BoardInput;
 pub use credits::{Credits, Print};
 #[doc(hidden)]
 pub use hooks::star_room_tables;
 pub use hooks::Screen;
+pub use subtitles::{TextPrint, VoiceSlotState};
 
 /// A decoded sound: rate, channels, interleaved samples.
 type Decoded = (u32, u16, Arc<Vec<i16>>);
@@ -1178,6 +1181,9 @@ impl Game {
             self.draw_inventory_items();
             self.draw_pointer();
             self.draw_inventory_label();
+            // The flip (@ 0x00427cc6): the subtitle line or the voice
+            // slots over the inventory.
+            self.flip_texts();
             let items = self.inventory_items();
             self.inventory
                 .scroll_step(self.width, items.len(), self.pointer.0, self.now);
@@ -1200,6 +1206,8 @@ impl Game {
         } else {
             self.draw_subjects();
             self.draw_pointer();
+            // The flip (@ 0x00427ed1), before the pick.
+            self.flip_texts();
             if std::mem::take(&mut self.click) {
                 let lay = crate::subjects::Layout::for_width(self.width);
                 let r = self.script.as_ref().map_or(-2, |s| {
@@ -1274,8 +1282,6 @@ impl Game {
         // The main loop's per-frame place part, after the mode's frame
         // (@ 0x004d5df9 → 0x004c1950).
         self.main_loop_hook();
-        // The flip's voice slots (@ 0x0040de60).
-        self.voices_release();
     }
 
     // ---- videos -------------------------------------------------------
@@ -1435,8 +1441,10 @@ impl Game {
         // that shows the last frame ends the video.
         let ended = v.cinema.ended()
             || (travel && advanced && v.cinema.frames_shown() >= v.cinema.frame_count());
+        // The flip of a new frame (@ 0x00422002): the subtitle line, else
+        // the voice slots (@ 0x0040de60).
         if advanced {
-            self.draw_subtitle();
+            self.flip_texts();
         }
         // A travel video's frame drawn: a click or a double click ends it
         // (@ 0x00422019: both flags cleared), then the stream's end.
@@ -1520,13 +1528,17 @@ impl Game {
         self.warp_step();
         // 2. The frame drawn; with the click flag set, the sprite pass
         // records the place sprite under the centre (@ 0x00440bf0).
-        self.draw_warp();
+        let drawn = self.draw_warp();
         if self.click && self.sprite_hit.is_none() {
             self.sprite_hit = self.sprite_under_centre();
         }
-        // 3. The script's waits.
+        // 3. The script's waits; one that ends flips the drawn frame
+        // (@ 0x0043ffaa, 0x0044001b, 0x00440067).
         if self.with_script(|s, h| s.check_waits(h)) {
             self.click = false;
+            if drawn && !self.flip_suppressed() {
+                self.flip_texts();
+            }
             return;
         }
         // 4. Not turning (a turn that ended at step 1 leaves its move
@@ -1551,6 +1563,12 @@ impl Game {
             if matches!(self.mode, Mode::Warp | Mode::Subjects) {
                 self.place_sounds_frame();
             }
+        }
+        // 5. The flip of the drawn frame (@ 0x004400e5), unless the frame
+        // started a video or a dialog (loop mode 4 or 5): the subtitle line
+        // or the voice slots over the warp (@ 0x0040de60).
+        if drawn && !self.flip_suppressed() {
+            self.flip_texts();
         }
         // A cinematic or a dialog the scans started does not stop the
         // frame: its arrival block still runs (@ 0x004400ed), only a view
@@ -1648,9 +1666,9 @@ impl Game {
     /// The warp drawn into the screen (@ 0x00440690), then the cursor
     /// (@ 0x00440a30), the inventory's fade-out and the warp cursor
     /// (@ 0x00427c40).
-    fn draw_warp(&mut self) {
+    fn draw_warp(&mut self) -> bool {
         if !self.draw_warp_only() {
-            return;
+            return false;
         }
         // The inventory fading out after it closed (@ 0x00427c40): the
         // fade's step, then the items at the new alpha.
@@ -1663,6 +1681,14 @@ impl Game {
         if self.mode == Mode::Warp {
             self.draw_warp_cursor();
         }
+        true
+    }
+
+    /// The warp frame's test before its flip (@ 0x004400c4..0x004400d8):
+    /// no flip once the frame started a video or a dialog (loop mode 4 or
+    /// 5).
+    fn flip_suppressed(&self) -> bool {
+        matches!(self.mode, Mode::Intro | Mode::Video | Mode::Dialog)
     }
 
     /// The warp frame without the overlays (@ 0x00440690) and the cursor
@@ -2355,46 +2381,6 @@ impl Game {
         self.subtitle = None;
     }
 
-    /// The subtitle line drawn by the flip (@ 0x0040de60) when
-    /// `SubTitleOn`: a caption centred in `AtlFont_Special`, a cue line
-    /// with its shadow.
-    fn draw_subtitle(&mut self) {
-        if !self.startup.config.subtitle_on {
-            return;
-        }
-        let Some(sub) = self.subtitle.clone() else {
-            return;
-        };
-        let (w, h) = (self.width, self.height);
-        let [r, g, b] = sub.rgb.map(u32::from);
-        let rgb = r << 16 | g << 8 | b;
-        self.texts();
-        let mut screen = std::mem::take(&mut self.screen);
-        let t = self.texts.as_ref().unwrap();
-        if sub.caption {
-            t.print(
-                &mut screen,
-                w,
-                h,
-                crate::text::FontId::Special,
-                &sub.text,
-                crate::text::CAPTION,
-                rgb,
-            );
-        } else {
-            t.print_shadowed(
-                &mut screen,
-                w,
-                h,
-                &sub.text,
-                crate::text::CUE_SHADOW,
-                crate::text::CUE_TEXT,
-                rgb,
-            );
-        }
-        self.screen = screen;
-    }
-
     /// The music volume set (@ 0x00434100): 0x007178e8 := v clamped to
     /// 0..=99, the music stream's gain from master × music at once.
     pub(crate) fn music_volume_set(&mut self, v: i32) {
@@ -2428,8 +2414,10 @@ impl Game {
 
     /// `AtlDial_start(n, voixoff)` (@ 0x0040cfe0).
     fn start_dialog(&mut self, n: i32, voixoff: bool) {
-        // The subtitle line and the voice slots cleared.
+        // The subtitle line cleared, the voice slots stopped and freed
+        // (@ 0x0040db90).
         self.subtitle = None;
+        self.voices_clear();
         let saved_fov = self.camera_fov;
         if self.running.is_some() {
             log::warn!("AtlDial_Start({n}) : dialogue deja initialise");
@@ -2810,6 +2798,8 @@ impl Game {
                 self.screen = screen;
             }
         }
+        // Then the subtitle line or the voice slots (@ 0x0040fff8).
+        self.flip_texts();
     }
 
     /// The current speaker's head (`AddStand` @ 0x004782c0), loaded at its
