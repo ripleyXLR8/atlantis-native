@@ -467,7 +467,8 @@ impl Game {
         }
         let left = std::mem::take(&mut self.click);
         let right = std::mem::take(&mut self.right_clicked);
-        self.screen_step(left, right, None);
+        let sprite = self.screen_sprite.take();
+        self.screen_step(left, right, sprite);
     }
 
     /// A screen's stop: the old mode back, the hand cleared, the click

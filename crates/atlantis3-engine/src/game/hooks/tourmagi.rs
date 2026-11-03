@@ -137,7 +137,7 @@ fn pawns(h: &mut Hx) {
         (p - 2, "TAS_DEMONMOINS2", 'd'),
     ];
     for (at, entity, letter) in which {
-        if d != at {
+        if d != at || h.g.stub_pawn_files {
             continue;
         }
         let Some(e) =

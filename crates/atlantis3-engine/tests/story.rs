@@ -8,6 +8,8 @@
 //! Cinematics, travel videos and dialogs are ended as soon as they start,
 //! as the original's run ended them; puzzles are replaced by their result
 //! (the walks' `SKIP` lines); `rand()` gives the original run's values.
+//! The `played_*` tests replay the same story with every puzzle solved
+//! from the player's input ([`played`]).
 //!
 //! Needs the game: `ATLANTIS3_DATA` = the installed folder.
 
@@ -76,19 +78,76 @@ struct Run {
     /// its `BT_BACK` leaves it; the travel videos escaped.
     escape_travels: bool,
     escaped: usize,
+    /// The played walks ([`played`]): the played harness's clock (1.0025 /
+    /// 15 s a frame), the frame counts of the golden's steps, the `rand()`
+    /// generator's state expected at each step's end.
+    played: bool,
+    frames: BTreeMap<usize, usize>,
+    lcg: BTreeMap<usize, u32>,
+    lcg_vals: BTreeMap<usize, Vec<i32>>,
+    lcg_from: u32,
+    /// A `CAMERA` action set the aim of the next `ZONE`.
+    camera_aimed: bool,
 }
+
+/// The played harness's frame: 1.0025 / 15 s.
+const PLAYED_DT: f64 = 1.0025 / 15.0;
 
 impl Run {
     /// One frame, 1/30 s.
     fn frame(&mut self) {
-        let dt = 1.0 / 30.0;
+        let dt = if self.played { PLAYED_DT } else { 1.0 / 30.0 };
         self.frame_dt(dt);
     }
 
     fn frame_dt(&mut self, dt: f64) {
         self.t += dt;
+        let before = self.g.rand_state();
         self.g.step(self.t);
         self.finish_media();
+        if std::env::var_os("STORY_FRAMES").is_some() {
+            let mut r = atlantis2_engine::crt::Rand::new(before);
+            let mut draws = Vec::new();
+            while r.state != self.g.rand_state() && draws.len() < 50 {
+                draws.push(r.rand());
+            }
+            let slots: Vec<String> = self
+                .g
+                .slots()
+                .slots
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.shown || std::env::var_os("STORY_ALL").is_some())
+                .map(|(k, s)| {
+                    format!(
+                        "{k}:{}/{}/{} sh{} f{} l{} n{} m{} an{} fr{} w{} p{} d{} e{}",
+                        s.name,
+                        s.id,
+                        s.kind,
+                        u8::from(s.shown),
+                        s.frame,
+                        s.last,
+                        s.count,
+                        s.mode,
+                        u8::from(s.animated),
+                        u8::from(s.fresh),
+                        u8::from(s.waiting),
+                        s.pause,
+                        s.state.delay,
+                        u8::from(s.ended)
+                    )
+                })
+                .collect();
+            eprintln!(
+                "  frame step {} t={:.4} {:?} view {:?} rand {:?} slots [{}]",
+                self.step,
+                self.t,
+                self.g.mode(),
+                self.g.place().1,
+                draws,
+                slots.join(", ")
+            );
+        }
     }
 
     /// The media started end at once, as the harness ends them.
@@ -169,6 +228,15 @@ impl Run {
             }
         }
         match w[0] {
+            "START" if self.played => {
+                // The harness's clock at the start-up: 100 s.
+                self.t = 100.0;
+                self.g.set_clock(self.t);
+                self.g.seed(1);
+                self.lcg_from = 1;
+                assert!(self.g.new_game());
+                self.settle();
+            }
             "START" => {
                 assert!(self.g.new_game());
                 self.settle();
@@ -193,6 +261,8 @@ impl Run {
                 // clicked: the player waits for the next one (the
                 // harness, without place animations, clicks at once).
                 let mut found = self.g.click_sprite(id, kind);
+                // The played walks wait for it themselves.
+                assert!(found || !self.played, "{line}: not under any aim");
                 for _ in 0..300 {
                     if found {
                         break;
@@ -235,13 +305,51 @@ impl Run {
             }
             "ZONE" => {
                 let name = w[1];
-                assert!(
-                    self.g.aim_at_zone(|z| z
-                        .name
+                let is = |z: &atlantis2_data::wam::Zone| {
+                    z.name
                         .as_deref()
-                        .is_some_and(|n| n.eq_ignore_ascii_case(name))),
-                    "{line}"
-                );
+                        .is_some_and(|n| n.eq_ignore_ascii_case(name))
+                };
+                // Already under the centre: no turn. After a `CAMERA` aim
+                // (the played harness clicks a zone by name, not checking
+                // the aim), a zone of the same kind and value under the
+                // centre: the hunt's `PAL_ZONE_LANCE1..5`.
+                let aimed = std::mem::take(&mut self.camera_aimed);
+                let (_, v) = self.g.place();
+                let zones = v
+                    .and_then(|v| self.g.wam().view(v))
+                    .map(|v| v.zones.clone());
+                let zones = zones.unwrap_or_default();
+                let target = zones.iter().find(|z| is(z)).cloned();
+                let here = self
+                    .g
+                    .centre_zone()
+                    .and_then(|i| zones.get(i))
+                    .is_some_and(|z| {
+                        is(z)
+                            || (aimed
+                                && target
+                                    .as_ref()
+                                    .is_some_and(|t| t.kind == z.kind && t.value == z.value))
+                    });
+                if std::env::var_os("STORY_FRAMES").is_some() {
+                    eprintln!(
+                        "  {line}: under the centre {here} ({:?}), angles {:?}",
+                        self.g.centre_zone(),
+                        self.g.angles_deg()
+                    );
+                }
+                if !here && aimed {
+                    // No zone of the kind under the `CAMERA` aim: the
+                    // harness's click by name, the aim kept.
+                    let i = zones.iter().position(is).expect("the zone");
+                    self.g.zone_override = Some(i);
+                    if std::env::var_os("STORY_FRAMES").is_some() {
+                        eprintln!("  {line}: no such zone under the aim: clicked by name");
+                    }
+                } else {
+                    assert!(here || self.g.aim_at_zone(is), "{line}");
+                }
                 self.g.click();
                 self.act_frame();
             }
@@ -255,12 +363,19 @@ impl Run {
                     return;
                 }
                 let id = self.id(defnames::OBJETS, w[1]);
-                let j = self
-                    .g
-                    .inventory_items()
-                    .iter()
-                    .position(|e| e.id == id)
-                    .unwrap_or_else(|| panic!("{line}: not in the bag"));
+                let j = self.g.inventory_items().iter().position(|e| e.id == id);
+                let Some(j) = j.filter(|_| !self.played).or(j) else {
+                    // The played harness picks an object that is not in
+                    // the bag as well (the hunt's spear): the inventory
+                    // closes and `SetObjetEnMain` refuses the id ("id
+                    // invalide"), the hand stays empty; one frame.
+                    assert!(self.played, "{line}: not in the bag");
+                    self.g.close_inventory_now();
+                    self.frame();
+                    assert!(!self.g.inventory_open());
+                    self.settle();
+                    return;
+                };
                 let (n, margin) = atlantis3_engine::inventory::slots(self.g.width());
                 assert!((j as i32) < n, "{line}: scrolling not handled");
                 self.g
@@ -269,6 +384,69 @@ impl Run {
                 self.frame();
                 assert!(!self.g.inventory_open());
                 self.settle();
+            }
+            "FRAME" | "WAIT" | "FRAMES_UNTIL" if self.played => {
+                // The golden's frames of the step (`FRAME k.j`).
+                let n = self.frames.get(&self.step).copied().unwrap_or(0);
+                if w[0] == "FRAME" {
+                    let want: usize = w.get(1).map_or(1, |n| n.parse().unwrap());
+                    assert_eq!(n, want, "{line}: the golden's frames");
+                }
+                for _ in 0..n {
+                    self.frame();
+                }
+                self.settle();
+            }
+            "CAMERA" => {
+                // As the `/set` handler converts: degrees × π_f32 ×
+                // (1/180)_f32, rounded to f32.
+                let rad = |d: &str| {
+                    let d: f64 = d.parse().unwrap();
+                    (d * f64::from(std::f32::consts::PI) * f64::from(1.0f32 / 180.0)) as f32
+                };
+                self.g.board_camera(rad(w[1]), rad(w[2]));
+                self.camera_aimed = true;
+            }
+            "POINTER" => {
+                self.g
+                    .set_pointer(w[1].parse().unwrap(), w[2].parse().unwrap());
+            }
+            "CLICK" | "MAP" if self.played => {
+                let mut left = true;
+                if w[0] == "MAP" {
+                    self.g.screen_sprite = Some(w[1].parse().unwrap());
+                } else {
+                    left = w[1] == "left";
+                    for item in &w[2..] {
+                        let (k, v) = item.split_once('=').unwrap();
+                        match k {
+                            "SPRITE" => self.g.screen_sprite = Some(v.parse().unwrap()),
+                            "POINTER" => {
+                                let (x, y) = v.split_once(',').unwrap();
+                                self.g.set_pointer(x.parse().unwrap(), y.parse().unwrap());
+                            }
+                            _ => panic!("{line}: {k}"),
+                        }
+                    }
+                }
+                if left {
+                    self.g.click();
+                } else {
+                    self.g.right_click();
+                }
+                self.frame();
+                self.g.screen_sprite = None;
+                self.settle();
+            }
+            "CHECKPOINT" if self.played => {
+                // The quick save, then what a run from it does after its
+                // start-up: clock 100000 (n − 100) s, `rand` state n, the
+                // quick load and one frame.
+                let n: i32 = w[1].parse().unwrap();
+                let name = self.g.quick_save_now(n);
+                let text = self.g.saved(&name).expect("checkpoint saved").to_vec();
+                self.saves.insert(w[2].to_string(), text.clone());
+                self.reload(n, &name, text);
             }
             "FRAME" => {
                 let n: usize = w.get(1).map_or(1, |n| n.parse().unwrap());
@@ -311,6 +489,40 @@ impl Run {
             }
             "EXPECT" => self.expect(line, w[1]),
             other => panic!("unknown action {other}"),
+        }
+    }
+
+    /// A quick load as the played harness's checkpoint and segment start
+    /// make it.
+    fn reload(&mut self, n: i32, name: &str, text: Vec<u8>) {
+        self.t = 100000.0 * f64::from(n - 100);
+        self.g.set_clock(self.t);
+        self.g.seed(n as u32);
+        self.lcg_from = n as u32;
+        assert!(self.g.load_save_text(name, text), "load {name}");
+        self.finish_media();
+        self.act_frame();
+    }
+
+    /// The `rand()` generator against the golden's draws up to this step.
+    fn check_lcg(&mut self, line: &str) {
+        let now = self.g.rand_state();
+        let from = std::mem::replace(&mut self.lcg_from, now);
+        if let Some(&want) = self.lcg.get(&self.step) {
+            if now != want {
+                // The draws of the step, the port's and the golden's.
+                let mut r = atlantis2_engine::crt::Rand::new(from);
+                let mut got = Vec::new();
+                while r.state != now && got.len() < 2000 {
+                    got.push(r.rand());
+                }
+                panic!(
+                    "step {} `{line}`: rand() draws differ from the golden's\n golden {:?}\n native {:?} (from state {from})",
+                    self.step,
+                    self.lcg_vals.get(&self.step),
+                    got
+                );
+            }
         }
     }
 
@@ -418,6 +630,58 @@ fn rands(golden: &str) -> BTreeMap<usize, Vec<i32>> {
     out
 }
 
+/// The played goldens: the walk's `rand()` values by step (the `(walk)`
+/// draws; the others come from the generator), the frames of each step
+/// (`FRAME k.j`), and the generator's state at each step's end (from
+/// `start`, reseeded at a checkpoint, one draw per `(lcg)` line).
+#[allow(clippy::type_complexity)]
+fn played_tables(
+    golden: &str,
+    start: u32,
+) -> (
+    BTreeMap<usize, Vec<i32>>,
+    BTreeMap<usize, usize>,
+    BTreeMap<usize, u32>,
+    BTreeMap<usize, Vec<i32>>,
+) {
+    let mut walk: BTreeMap<usize, Vec<i32>> = BTreeMap::new();
+    let mut frames: BTreeMap<usize, usize> = BTreeMap::new();
+    let mut lcg = BTreeMap::new();
+    let mut vals: BTreeMap<usize, Vec<i32>> = BTreeMap::new();
+    let mut r = atlantis2_engine::crt::Rand::new(start);
+    let mut step = 0;
+    for l in golden.lines() {
+        if l.starts_with("STEP ") {
+            lcg.insert(step, r.state);
+            step += 1;
+        } else if let Some(v) = l.strip_prefix("CALL rand() -> ") {
+            let (n, kind) = v.split_once(' ').unwrap();
+            if kind == "(walk)" {
+                walk.entry(step).or_default().push(n.parse().unwrap());
+            } else {
+                assert_eq!(kind, "(lcg)");
+                let v: i32 = n.parse().unwrap();
+                assert_eq!(r.rand(), v, "golden step {step}");
+                vals.entry(step).or_default().push(v);
+            }
+        } else if let Some(rest) = l.strip_prefix("CHECKPOINT ") {
+            let n = rest.split("quick save ").nth(1).unwrap();
+            let n: u32 = n.split_whitespace().next().unwrap().parse().unwrap();
+            r = atlantis2_engine::crt::Rand::new(n);
+        } else if let Some(f) = l.strip_prefix("FRAME ") {
+            // `FRAME k.j` or, in a screen's loop mode, `FRAME k.j mode n`.
+            let f = f.split(" mode ").next().unwrap();
+            if let Some((k, j)) = f.split_once('.') {
+                if k.parse::<usize>() == Ok(step) && j.parse::<usize>().is_ok() {
+                    *frames.entry(step).or_default() += 1;
+                }
+            }
+        }
+    }
+    lcg.insert(step, r.state);
+    (walk, frames, lcg, vals)
+}
+
 /// The `SetVariables` lines of a golden from its start (the new game's
 /// `(chapter=600)` or the load of the segment's save), with their step.
 fn sets(golden: &str) -> Vec<(usize, &str)> {
@@ -501,12 +765,20 @@ fn new_run() -> Option<Run> {
         saves: BTreeMap::new(),
         escape_travels: false,
         escaped: 0,
+        played: false,
+        frames: BTreeMap::new(),
+        lcg: BTreeMap::new(),
+        lcg_vals: BTreeMap::new(),
+        lcg_from: 0,
+        camera_aimed: false,
     })
 }
 
 /// Plays one segment's walk on `r` and checks it against its golden.
 fn play(r: &mut Run, name: &str, walk: &str, golden: &str) {
-    r.rands = rands(golden);
+    if !r.played {
+        r.rands = rands(golden);
+    }
     r.step = 0;
     let s = r.g.script_mut().unwrap();
     if s.set_log.is_none() {
@@ -519,6 +791,9 @@ fn play(r: &mut Run, name: &str, walk: &str, golden: &str) {
             continue;
         }
         r.action(line);
+        if r.played {
+            r.check_lcg(line);
+        }
         // The lines so far, against the golden's up to this step.
         let got: Vec<String> =
             r.g.script()
@@ -696,4 +971,182 @@ fn story_07_rhea() {
 #[test]
 fn story_08_ending() {
     segment(7);
+}
+
+/// The played story (M4): the same story with every puzzle solved from
+/// the player's input by the boards' code, against the original's
+/// interpreter and puzzle code playing the walks
+/// (`tests/golden/story_played/NN_<segment>.walk` and `.txt`): the clock
+/// runs 1.0025 / 15 s a frame (one place-animation step each), the steps'
+/// frames are the golden's, the sounds and voices play their files'
+/// lengths, `rand()` is the generator's (seeded 1 at the start-up, n at a
+/// checkpoint n's reload) but for the walks' `RAND` values, and its state
+/// is checked after every step. New actions: `CAMERA yaw pitch` (the
+/// player turned there), `POINTER x y` and `CLICK left|right [SPRITE=n]
+/// [POINTER=x,y]` (the screens' free pointer; the sprite the screen's hit
+/// test answers), `FRAMES_UNTIL cond` (the golden's frames of the step).
+mod played {
+    use super::*;
+
+    pub const SEGMENTS: &[(&str, &str, &str)] = &[
+        (
+            "01_hoggar",
+            include_str!("golden/story_played/01_hoggar.walk"),
+            include_str!("golden/story_played/01_hoggar.txt"),
+        ),
+        (
+            "02_cfuner",
+            include_str!("golden/story_played/02_cfuner.walk"),
+            include_str!("golden/story_played/02_cfuner.txt"),
+        ),
+        (
+            "03_ldm",
+            include_str!("golden/story_played/03_ldm.walk"),
+            include_str!("golden/story_played/03_ldm.txt"),
+        ),
+        (
+            "04_hoggar5",
+            include_str!("golden/story_played/04_hoggar5.walk"),
+            include_str!("golden/story_played/04_hoggar5.txt"),
+        ),
+        (
+            "05_bagdad",
+            include_str!("golden/story_played/05_bagdad.walk"),
+            include_str!("golden/story_played/05_bagdad.txt"),
+        ),
+        (
+            "06_paleo",
+            include_str!("golden/story_played/06_paleo.walk"),
+            include_str!("golden/story_played/06_paleo.txt"),
+        ),
+        (
+            "07_rhea",
+            include_str!("golden/story_played/07_rhea.walk"),
+            include_str!("golden/story_played/07_rhea.txt"),
+        ),
+        (
+            "08_ending",
+            include_str!("golden/story_played/08_ending.walk"),
+            include_str!("golden/story_played/08_ending.txt"),
+        ),
+    ];
+
+    /// The original's checkpoint saves: segment i + 1 starts from save i.
+    const SAVES: &[&[u8]] = &[
+        include_bytes!("golden/story_played/saves/01_hoggar_end.sav"),
+        include_bytes!("golden/story_played/saves/02_cfuner_end.sav"),
+        include_bytes!("golden/story_played/saves/03_ldm_end.sav"),
+        include_bytes!("golden/story_played/saves/04_hoggar5_end.sav"),
+        include_bytes!("golden/story_played/saves/05_bagdad_end.sav"),
+        include_bytes!("golden/story_played/saves/06_paleo_end.sav"),
+        include_bytes!("golden/story_played/saves/07_rhea_end.sav"),
+    ];
+
+    fn new_played() -> Option<Run> {
+        let mut r = new_run()?;
+        r.played = true;
+        // The played harness's sounds and voices: their files' lengths.
+        r.g.story_sound_model = false;
+        // The harness stubs the dialogs' set-up and start (and ends each
+        // dialog at once) and runs no place sound: no `rand()` drawn there.
+        r.g.stub_rand = true;
+        // Its file layer does not find the tower's pawn files
+        // (`LoadSPW() : Fichier .SPW introuvable`): no pawn slots.
+        r.g.stub_pawn_files = true;
+        r.g.dialog_heads = false;
+        Some(r)
+    }
+
+    fn run(r: &mut Run, name: &str, walk: &str, golden: &str, start: u32) {
+        let (walk_rands, frames, lcg, vals) = played_tables(golden, start);
+        r.rands = walk_rands;
+        r.frames = frames;
+        r.lcg = lcg;
+        r.lcg_vals = vals;
+        play(r, name, walk, golden);
+    }
+
+    /// Segment `index` from the original's save at the end of the
+    /// previous one (checkpoint 100 + index).
+    pub fn segment(index: usize) {
+        let Some(mut r) = new_played() else {
+            return;
+        };
+        let (name, walk, golden) = SEGMENTS[index];
+        let n = 100 + index as i32;
+        let mut seed = 1;
+        if let Some(save) = index.checked_sub(1).map(|i| SAVES[i].to_vec()) {
+            r.g.script_mut().unwrap().set_log = Some(Vec::new());
+            let file = atlantis3_data::save::quick_save_name(1, n);
+            r.reload(n, &file, save);
+            r.step = 0;
+            let t = played_tables(golden, n as u32);
+            r.lcg = t.2;
+            r.lcg_vals = t.3;
+            r.lcg_from = n as u32;
+            r.check_lcg("the load");
+            seed = n as u32;
+        }
+        run(&mut r, name, walk, golden, seed);
+    }
+
+    /// The whole story played in one run from the new game to `exit=1`.
+    pub fn whole() {
+        let Some(mut r) = new_played() else {
+            return;
+        };
+        let walk: String = SEGMENTS.iter().map(|s| s.1).collect::<Vec<_>>().join("\n");
+        run(
+            &mut r,
+            "played chain",
+            &walk,
+            include_str!("golden/story_played/chain.txt"),
+            1,
+        );
+    }
+}
+
+#[test]
+fn played_whole_story() {
+    played::whole();
+}
+
+#[test]
+fn played_01_hoggar() {
+    played::segment(0);
+}
+
+#[test]
+fn played_02_cfuner() {
+    played::segment(1);
+}
+
+#[test]
+fn played_03_ldm() {
+    played::segment(2);
+}
+
+#[test]
+fn played_04_hoggar5() {
+    played::segment(3);
+}
+
+#[test]
+fn played_05_bagdad() {
+    played::segment(4);
+}
+
+#[test]
+fn played_06_paleo() {
+    played::segment(5);
+}
+
+#[test]
+fn played_07_rhea() {
+    played::segment(6);
+}
+
+#[test]
+fn played_08_ending() {
+    played::segment(7);
 }

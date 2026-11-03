@@ -326,6 +326,24 @@ pub struct Game {
     /// only logged, a sound started by `Play` playing for ever.
     #[doc(hidden)]
     pub story_sound_model: bool,
+    /// Tests: the screen bank's sprite the next screen frame's hit test
+    /// (@ 0x00437080) answers, as a walk's `CLICK ... SPRITE=n` gives it.
+    #[doc(hidden)]
+    pub screen_sprite: Option<i32>,
+    /// Tests: the parts the whole-story harness stubs (the dialogs' set-up
+    /// and start, the place sounds' restarts) draw from a generator of
+    /// their own, leaving `rand` alone as the stubs do.
+    #[doc(hidden)]
+    pub stub_rand: bool,
+    /// Tests: the tower's demon pawn files not found, as in the
+    /// whole-story harness, whose file layer for the game's own loads
+    /// does not hold the `spw\spw512` files.
+    #[doc(hidden)]
+    pub stub_pawn_files: bool,
+    /// Tests: the zone (index in the view) the next click lands on
+    /// whatever the aim, as a harness clicking zones by name does.
+    #[doc(hidden)]
+    pub zone_override: Option<usize>,
 }
 
 impl Game {
@@ -445,6 +463,10 @@ impl Game {
             trace_views: false,
             stub_cinemas: false,
             story_sound_model: false,
+            screen_sprite: None,
+            stub_rand: false,
+            stub_pawn_files: false,
+            zone_override: None,
         };
         if !game.with_script(|s, h| s.boot_a3(h)) {
             return Err(GameError::Script(game.script_error()));
@@ -658,6 +680,21 @@ impl Game {
     /// (tests replaying the original's run).
     pub fn queue_rand(&mut self, v: i32) {
         self.rand_queue.push_back(v);
+    }
+
+    /// The state of `rand`'s generator (tests: checking the draws made
+    /// against a run of the original).
+    #[doc(hidden)]
+    pub fn rand_state(&self) -> u32 {
+        self.rand.state
+    }
+
+    /// The game's clock set to `t` without the ticks in between (tests: a
+    /// harness clock that jumps, as at a checkpoint's reload).
+    #[doc(hidden)]
+    pub fn set_clock(&mut self, t: f64) {
+        self.now = t;
+        self.tick_last = t;
     }
 
     /// Loads a save's text as the loader does (@ 0x0045b750), the save kept
@@ -934,6 +971,16 @@ impl Game {
 
     /// Closes the inventory (@ 0x00427b20): the mode back; the items fade
     /// out over the warp.
+    /// The inventory closed as a pick closes it (@ 0x00427b20), without
+    /// the right button (tests: a harness picking an object that is not
+    /// in the bag, which `SetObjetEnMain` then refuses).
+    #[doc(hidden)]
+    pub fn close_inventory_now(&mut self) {
+        if self.inventory.open {
+            self.close_inventory();
+        }
+    }
+
     fn close_inventory(&mut self) {
         self.inventory.open = false;
         self.mode = self.prev_mode;
@@ -1545,6 +1592,12 @@ impl Game {
             None => 0.0,
         };
         self.look_last = Some(self.now);
+        // The script harness's turn ends at the frame after its start,
+        // the camera as it was.
+        if self.harness_turns && self.moving.turn.take().is_some() {
+            self.moving.pending = true;
+            return;
+        }
         let fpu = self.camera.fpu;
         self.look_acc = fpu.f32(fpu.add(f64::from(self.look_acc), fpu.mul(dt, 25.0)));
         if let Some(s) = self.script.as_ref() {
@@ -1800,8 +1853,8 @@ impl Game {
     /// The zone click (@ 0x00420330): a move zone's departure scan, then
     /// the move; `CLICZONE` for the others.
     fn zone_click(&mut self) {
-        let Some(zone) = self
-            .centre
+        let centre = self.zone_override.take().or(self.centre);
+        let Some(zone) = centre
             .and_then(|i| self.place.wam.view(self.place.view?)?.zones.get(i))
             .cloned()
         else {
@@ -2004,6 +2057,24 @@ impl Game {
     /// (`warp\Warp512\<world>\<name>`, frames to faces 1, 3, 0, 4, 5, 2),
     /// the camera turned to the arrival angles, the turn speeds stopped.
     fn enter_view(&mut self, id: u32, yaw: f32, pitch: f32) {
+        let shown = self
+            .script
+            .as_ref()
+            .map(|s| s.shown.clone())
+            .unwrap_or_default();
+        self.enter_view_shown(id, yaw, pitch, shown);
+    }
+
+    /// [`Game::enter_view`] with the script's show table (@ 0x0076b920)
+    /// `shown`: a script's `VUE` enters the view with the script out of
+    /// the game.
+    fn enter_view_shown(
+        &mut self,
+        id: u32,
+        yaw: f32,
+        pitch: f32,
+        shown: Vec<atlantis2_engine::script::Shown>,
+    ) {
         if self.trace_views {
             self.tr(|| format!("view {id}"));
         }
@@ -2031,11 +2102,6 @@ impl Game {
         log::info!("view {id}: {path}");
         self.place.view = Some(id);
         self.place_sounds_enter(id);
-        let shown = self
-            .script
-            .as_ref()
-            .map(|s| s.shown.clone())
-            .unwrap_or_default();
         // The builder's draws come from the game's one `rand()` (queued
         // values first: tests replaying the original's run).
         let (queue, rand) = (&mut self.rand_queue, &mut self.rand);
@@ -2179,7 +2245,9 @@ impl Game {
                 g * (1.0 + pan).min(1.0) as f32,
             ];
             if !self.audio.is_playing(ch) {
-                self.rand.rand();
+                if !self.stub_rand {
+                    self.rand.rand();
+                }
                 if let Some(first) = src.files.first() {
                     if let Some((rate, chans, pcm)) = self.sound(&format!("sfx/{first}")) {
                         self.audio.play(ch, rate, chans, pcm, false, gains);
@@ -2344,11 +2412,17 @@ impl Game {
     fn load_dialogs(&mut self, monde: i32) {
         let folder = WORLDS.get(monde as usize).copied().unwrap_or("");
         let lang = self.startup.text_language();
+        let mut stub = Rand::new(0);
+        let rand = if self.stub_rand {
+            &mut stub
+        } else {
+            &mut self.rand
+        };
         self.dialogs = Some(crate::dialog::Dialogs::load(
             &self.files,
             folder,
             &lang,
-            &mut self.rand,
+            rand,
         ));
     }
 
@@ -2366,7 +2440,13 @@ impl Game {
             self.load_dialogs(w);
         }
         let mut dialogs = self.dialogs.take().unwrap();
-        dialogs.open(n, voixoff, &mut self.rand);
+        let mut stub = Rand::new(0);
+        let rand = if self.stub_rand {
+            &mut stub
+        } else {
+            &mut self.rand
+        };
+        dialogs.open(n, voixoff, rand);
         if dialogs.count(n) == 0 {
             log::warn!("CDialogue::Open() : le dialogue {n} n'existe pas");
         }
@@ -3270,7 +3350,9 @@ impl Host for Game {
     }
 
     fn enter_view_with_script(&mut self, view: i32, yaw: f32, pitch: f32, script: &mut Script) {
-        Game::enter_view(self, view as u32, yaw, pitch);
+        // The slots' loader reads the show table (@ 0x004388d9..0x0043892e)
+        // the script's commands wrote before the `VUE`.
+        Game::enter_view_shown(self, view as u32, yaw, pitch, script.shown.clone());
         self.view_hook(script);
     }
 

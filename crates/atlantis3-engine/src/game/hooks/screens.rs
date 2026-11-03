@@ -227,10 +227,7 @@ pub(super) fn frame(
         }
         Screen::Telecommande => telecommande(h, left, right, sprite),
         Screen::CraneBagdad => crane(h, left, right),
-        Screen::Ecrin => {
-            let _ = sprite;
-            ecrin(h, left)
-        }
+        Screen::Ecrin => ecrin(h, left, sprite),
         Screen::GBoy => gboy(h, left, right),
         Screen::Licorne => licorne(h, left, right),
     }
@@ -446,8 +443,9 @@ pub(in crate::game) fn ecrin_gem_hit(
 /// frame is drawn and flipped, then a left click on the hovered gem
 /// takes it (the right button does nothing). At the first tick with the
 /// three taken the loop returns 0 before drawing (the stop puts the gems
-/// in the bag). No sound.
-fn ecrin(h: &mut Hx, left: bool) -> bool {
+/// in the bag). No sound. `sprite`: tests, the hit test answered for that
+/// bank sprite (gem k is sprite k + 1) instead of the pointer's.
+fn ecrin(h: &mut Hx, left: bool, sprite: Option<i32>) -> bool {
     let now = h.now();
     let ptr = h.g.pointer;
     let (w, ht) = (h.g.width as i32, h.g.height as i32);
@@ -457,9 +455,12 @@ fn ecrin(h: &mut Hx, left: bool) -> bool {
     let mut hovered = None;
     if st.ecrin_fade == 1.0 && st.ecrin_count != 3 {
         for k in 0..3 {
-            let hit = bank
-                .as_ref()
-                .is_some_and(|b| ecrin_gem_hit(b, k, w, ht, ptr));
+            let hit = match sprite {
+                Some(n) => n == k as i32 + 1,
+                None => bank
+                    .as_ref()
+                    .is_some_and(|b| ecrin_gem_hit(b, k, w, ht, ptr)),
+            };
             if !st.ecrin_taken[k] && hit {
                 hovered = Some(k);
             }
