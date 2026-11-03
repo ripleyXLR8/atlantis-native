@@ -65,6 +65,21 @@ fn german_may_cd_iso_images() {
     assert!(data.len() > 1000);
 }
 
+/// The US retail CD (Interplay): its four ISO images (only the `.iso`
+/// files of the folder `ATLANTIS_DATA_EN_US97` names), its August 1997
+/// build and its discs' archives (no `WAV\ATA0897D.APC`, as the other
+/// August 1997 discs).
+#[test]
+fn us_cd_iso_images() {
+    let Some(g) = common::game_en_us97("us_cd_iso_images") else {
+        return;
+    };
+    assert_eq!(g.exe.build.name, "atlantis-cd-en-687104");
+    assert!(!g.big.contains("WAV\\ATA0897D.APC"));
+    let data = g.big.read("WAV\\ATA0001A.APC").expect("a voice");
+    assert!(data.len() > 1000);
+}
+
 #[test]
 fn dutch_cd_raw_images() {
     if let Some(g) = open("ATLANTIS_BIN_NL") {

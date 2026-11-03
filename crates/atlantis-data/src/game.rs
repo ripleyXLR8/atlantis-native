@@ -91,6 +91,15 @@ impl Game {
             }
         }
         big.set_loose(unpacked);
+        // The Czech CD: the 1.01 patch program over its own archives.
+        let mut exe = exe;
+        if exe.build.name == crate::exe::BUILDS[2].name
+            && big
+                .read("SPRLIST\\SELEMENU.TXT")
+                .is_some_and(|m| crate::exe::is_czech_menu(&m))
+        {
+            exe.build = &crate::exe::CS_CD;
+        }
         Ok(Game {
             exe,
             big,
@@ -113,6 +122,13 @@ pub struct Edition {
     pub build_year: u16,
     /// Its month, for the 1997 builds.
     pub build_month: Option<&'static str>,
+    /// The market and distributor of a release that has a build or data of
+    /// its own: "US, Interplay" for the US retail CD (atlantis-cd-en-687104,
+    /// the English August 1997 build Interplay distributed), "Bohemia
+    /// Interactive" for the Czech CD (Cryo's 1.01 patch program over
+    /// Bohemia's Czech archives), "MSD" for the Brazilian CD (MSD
+    /// Multimídia's, atlantis-cd-pt-692736); `None` for the others.
+    pub market: Option<&'static str>,
 }
 
 impl std::fmt::Display for Edition {
@@ -121,9 +137,13 @@ impl std::fmt::Display for Edition {
         if let Some(l) = self.language {
             write!(f, ", {l}")?;
         }
+        write!(f, " (")?;
+        if let Some(m) = self.market {
+            write!(f, "{m}, ")?;
+        }
         match self.build_month {
-            Some(m) => write!(f, " ({m} {} build)", self.build_year),
-            None => write!(f, " ({} build)", self.build_year),
+            Some(m) => write!(f, "{m} {} build)", self.build_year),
+            None => write!(f, "{} build)", self.build_year),
         }
     }
 }
@@ -134,11 +154,13 @@ impl Game {
     /// executable; only this string differs). The 1997 builds' rows have no
     /// '#': "New Player" (English), "NOUVEAU JOUEUR" (French), "NEUER
     /// SPIELER" (German), "Nieuwe speler" (Dutch), "Ny spelare" (Swedish),
-    /// "Jugador nuevo" (Spanish), "Nuovo Giocatore" (Italian).
+    /// "Jugador nuevo" (Spanish), "Nuovo Giocatore" (Italian), "Novo
+    /// Jogador" (Brazilian Portuguese, the December 1997 build).
     /// The 1.01 patch's executable is French ("#NOUVEAU JOUEUR") over
     /// whichever CD it was installed on: the language is its interface's.
     /// The Chinese builds keep the English row ("New Player", no '#'): their
-    /// language is their texts' code page's. The 1998 DVD builds' rows have
+    /// language is their texts' code page's, as the Czech CD's (Windows-1250
+    /// texts under the patch program's French row). The 1998 DVD builds' rows have
     /// a '#' and the 1997 case: "#Nieuwe speler", "#Ny spelare",
     /// "#Jugador nuevo", "#Nuovo Giocatore".
     pub fn edition(&self) -> Edition {
@@ -151,7 +173,9 @@ impl Game {
             .unwrap_or(marker)
             .to_ascii_uppercase();
         let starts = |p: &[u8]| row.starts_with(p);
-        let language = if self.exe.build.text_code_page == TextCodePage::Windows950 {
+        let language = if self.exe.build.text_code_page == TextCodePage::Windows1250 {
+            Some("Czech")
+        } else if self.exe.build.text_code_page == TextCodePage::Windows950 {
             Some("Traditional Chinese")
         } else if self.exe.build.text_code_page == TextCodePage::Windows936 {
             Some("Simplified Chinese")
@@ -170,6 +194,8 @@ impl Game {
             Some("Spanish")
         } else if starts(b"NUOVO") {
             Some("Italian")
+        } else if starts(b"NOVO") {
+            Some("Brazilian Portuguese")
         } else if starts(b"NEW") {
             Some("English")
         } else {
@@ -190,6 +216,12 @@ impl Game {
             language,
             build_year: self.exe.build.year,
             build_month: self.exe.build.month,
+            market: match name {
+                "atlantis-cd-en-687104" => Some("US, Interplay"),
+                "atlantis-cd-cs-714240" => Some("Bohemia Interactive"),
+                "atlantis-cd-pt-692736" => Some("MSD"),
+                _ => None,
+            },
         }
     }
 }

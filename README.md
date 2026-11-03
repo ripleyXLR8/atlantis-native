@@ -4,8 +4,9 @@
 
 **Return to Atlantis, on today's machines.**
 
-A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997),
-written in Rust, for Windows, macOS, Linux and your browser.
+A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997) and
+*Atlantis II* (1999), written in Rust, for Windows, macOS, Linux and your
+browser.
 
 [![Build](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml/badge.svg)](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/ripleyXLR8/atlantis-native)](https://github.com/ripleyXLR8/atlantis-native/releases/latest)
@@ -56,19 +57,24 @@ original's bugs and an optional HD mode.
 </p>
 
 <p align="center">
+  <img src="docs/screenshots/atlantis2-shamballa-widescreen.jpg" width="98%" alt="Atlantis II: Shamballa in the HD mode, widescreen">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/game-library.png" width="70%" alt="The game library: several editions of the game">
 </p>
 
 <sub>From top to bottom: the player screen (macOS, HD mode); a dialog with
 its 3D talking head drawn at the window's resolution; the same view in
-the original's 640x480 and in the HD mode; widescreen; the game library.
+the original's 640x480 and in the HD mode; widescreen; *Atlantis II*'s
+Shamballa in the HD mode, widescreen; the game library.
 The game's pictures and text are © Microids (Cryo Interactive
 Entertainment), shown here to illustrate the engine; Atlantis Native
 contains none of them.</sub>
 
 ## Features
 
-- 🖥️ **Windows, macOS (Apple Silicon and Intel), Linux and the web**: one engine, the
+- 🖥️ **Windows (x64 and ARM), macOS (Apple Silicon and Intel), Linux and the web**: one engine, the
   same game everywhere, even in a browser tab.
 - 🎯 **Faithful**: the scripts, dialogs, music, 3D heads and puzzles run the
   original's own logic. The heads are drawn with the original's arithmetic,
@@ -109,10 +115,12 @@ those of the latest commit:
 | System | File |
 |---|---|
 | Windows 10 and later, 64-bit | `atlantis-native-windows-x64.zip` |
+| Windows 11 on ARM (Snapdragon PCs, Surface) | `atlantis-native-windows-arm64.zip` |
 | macOS 11 and later, Apple Silicon | `atlantis-native-macos-arm64.dmg` |
 | macOS 11 and later, Intel | `atlantis-native-macos-x64.dmg` |
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
 | Linux 64-bit ARM, such as a Raspberry Pi 4 or 5 (glibc 2.35+, ALSA) | `atlantis-native-linux-arm64.tar.gz` |
+| Handhelds with [PortMaster](https://portmaster.games/) (64-bit ARM: R36S, RG35XX, RGB30 and the like; Batocera, ROCKNIX, ArkOS, muOS, Knulli), the first game | `atlantis-native-portmaster.zip` |
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 The web version of the latest commit is also online:
@@ -140,6 +148,17 @@ sent anywhere; the saves stay in that browser.
 > Or, in the Terminal:
 > `xattr -dr com.apple.quarantine "/Applications/Atlantis Native.app"`
 
+> **PortMaster:** unzip `atlantis-native-portmaster.zip` into the
+> device's `ports` folder (it holds `Atlantis Native.sh` and the
+> `atlantisnative` folder), then copy your game's files (the folder with
+> `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`) into
+> `ports/atlantisnative/gamedata/`, and restart the front end so it lists
+> the port. The zip can instead be put, unopened, in PortMaster's
+> `autoinstall` folder for PortMaster to install. The gamepad is the
+> mouse, an on-screen keyboard types the names; the controls are in the
+> port's `atlantisnative/atlantisnative.md`. It needs glibc 2.31 or newer
+> and the system's SDL2, as PortMaster's firmwares have.
+
 ## You need the game
 
 Atlantis Native contains **no game data**. Bring your own copy:
@@ -148,6 +167,7 @@ Atlantis Native contains **no game data**. Bring your own copy:
 |---|---|---|
 | CD (2001 build) | English | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (May 1997 build) | English | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
+| CD, US retail release (Interplay, August 1997 build, 4 CDs) | English | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
 | CD, retail release (August 1997 build, 4 CDs) | French | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release, first pressing (May 1997 build, 4 CDs) | French | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (August 1997 build, 4 CDs) | German | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
@@ -156,15 +176,29 @@ Atlantis Native contains **no game data**. Bring your own copy:
 | CD, retail release (June 1997 build, 4 CDs) | Swedish | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (August 1997 build, 4 CDs) | Spanish | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | CD, retail release (July 1997 build, 4 CDs) | Italian | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
+| CD, Czech release (Bohemia Interactive, 2000; also GAME4U Speciál 2, 2001; 4 CDs; Cryo's 1999 patch 1.01 program) | Czech subtitles and menus, English voices | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
+| CD, Brazilian release (*Atlantis: A Lenda Perdida*, MSD Multimídia, 1997, 4 CDs; December 1997 build) | Brazilian Portuguese voices, subtitles and menus | the folder with `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG`, or the four disc images |
 | CD with Cryo's patch 1.01 (`AT1CDINT.EXE`, 1999 build) | English, French, German, Dutch, Swedish, Spanish or Italian CD (French interface) | the folder with the patched `atlantis.exe` and `BIGCD1.BIG` … `BIGCD4.BIG` |
 | [GOG.com](https://www.gog.com/) | English, French, German, Spanish, Italian | the installation folder |
+| *Atlantis Collection*, Italian DVD compilation (2014; shown as *CD, patch 1.01, Italian (1999 build)*, its program being Cryo's patch 1.01 with Italian strings) | Italian | the folder its installer creates for *Atlantis: Segreti di un Mondo Perduto* |
 | CD, Traditional Chinese release (1998 build, 4 CDs) | Traditional Chinese subtitles and menus, English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
 | CD, Simplified Chinese release (1999 build, 4 CDs) | Simplified Chinese subtitles (Traditional Chinese menus, as shipped), English voices | the folder with `atlantis.exe` and the four `BIGCD` archives, or the four disc images |
 | Cryo's DVD-ROM (1998 build, one double-sided DVD) | English, French, German, Dutch (side A); Spanish, Italian, Swedish, Japanese (side B: Japanese or English subtitles, English menus and voices); each language its own edition | the DVD drive, a copy of a side (the folder holding `FACE_A` or `FACE_B`), or the images of the sides (`.iso`) in one folder |
 | Perfect Edition (Tgames' 2018 package of the DVD's English version) | English | the installation folder |
 
-Each build plays as it shipped: the 1997 English CD, the May 1997
-French and German CDs and the Dutch and Swedish CDs, for one, draw their subtitles in their own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
+Each build plays as it shipped: the May 1997 English, French and German
+CDs and the Dutch and Swedish CDs, for one, draw their subtitles in their own 8x8 pixel font (see [Game builds](docs/TECHNICAL.md#game-builds)).
+The Czech CD's subtitles are read in the Central European code page, as
+on the Czech Windows it was sold for (`č`, `ř`, `ů` and the other Czech
+letters, not the Western letters a Western Windows shows there); its
+player screen keeps the French `NOUVEAU JOUEUR` row of the program it
+ships.
+The Brazilian CD has a program of its own (December 1997): its menus
+draw the Portuguese letters of its own fonts at its own widths, and its
+name entry, as the original's, takes letters up to `§` only, so a typed
+`ã` or `ç` is left out of the name. The only public dump known (Internet
+Archive) has unreadable sectors on disc 2; a few films and one panorama
+play damaged from it.
 The May 1997 German CD's program also answers four keys its developers
 left in (`T`, `R`, `F1`, `F3`: a panel of the engine's variables, and
 others); Atlantis Native does not reproduce them.
@@ -189,7 +223,9 @@ For *Atlantis II*:
 |---|---|---|
 | CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (or copies of the CDs) in it or in a folder inside it; in the browser, copies of the CDs (folders `CD1` to `CD4`, say, each holding the disc's `DATAS_A2`): it reads files, not images |
 | CD with the official patch 1.01 | French or English (one executable for both; tested with the French CD) | the same, with the patched `atlantis2.exe` |
-| [GOG.com](https://www.gog.com/) (version 1.01) | French (tested) | the installation folder |
+| CD, North American release (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs; its own program, version 1.01's code) | English | the same as the French CD; in the browser, copies of the CDs |
+| [GOG.com](https://www.gog.com/) (version 1.01; the builds of 2018, June 2022 and July 2022) | English, French, German, Spanish (one executable for all four) | the installation folder |
+| *Atlantis Collection*, Italian DVD compilation (2014; shown as *Italian Collection (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
 
 Another executable is refused with its identifiers, so that it can be
 added. The web version plays both games: see
@@ -260,6 +296,19 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
 - 🔧 [Technical notes](docs/TECHNICAL.md): the engine's layout, the
   enhancements, how the HD mode works, subtitles, the web build, tests,
   roadmap.
+- 🔍 [How the Atlantis engine was reverse engineered](https://www.retroreversing.com/cryo-atlantis-engine),
+  an article on RetroReversing.
+- 🎮 [Atlantis Native on the R36S](https://github.com/Klaasvdb/atlantis-native-handheld),
+  by Klaas Van den Broeck: a frontend that runs Atlantis Native on RK3326
+  handhelds, with the gamepad as the mouse.
+- 🕹️ Handhelds and PortMaster: `crates/atlantis-sdl` is an SDL2 front end
+  for the first game (the gamepad as the mouse, an on-screen keyboard for
+  the names) based on Klaas Van den Broeck's (@Klaasvdb) R36S front end,
+  whose gamepad and keyboard code he let us bring in; `packaging/portmaster/`
+  builds a PortMaster port of it (`atlantis-native-portmaster.zip` on
+  every release); a pad SDL does not know is read raw, an
+  Xbox-style one (an Xbox Wireless Controller over Bluetooth, for one)
+  without any `controls.ini` (see the [technical notes](docs/TECHNICAL.md#the-sdl2-front-end-handhelds-and-portmaster)).
 
 ## Code signing policy
 
@@ -330,5 +379,5 @@ folder, for a Chinese or the Japanese release only); every package carries
 their licence files, `LICENSE-LiberationSans`, `LICENSE-NotoSerifCJK` and
 `LICENSE-NotoSansJP`, beside `LICENSE`.
 
-*Atlantis: The Lost Tales* is a trademark of its owners. This project is not
+*Atlantis: The Lost Tales* and *Atlantis II* are trademarks of their owners. This project is not
 affiliated with them.

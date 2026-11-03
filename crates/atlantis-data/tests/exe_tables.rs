@@ -8,7 +8,8 @@
 //! `ATLANTIS_DATA_NL1997` for the Dutch retail CD's build,
 //! `ATLANTIS_DATA_SV1997` for the Swedish retail CD's build,
 //! `ATLANTIS_DATA_DE_MAY97` for the folder of the German retail CD's first
-//! pressing's images (its May 1997 build),
+//! pressing's images (its May 1997 build), `ATLANTIS_DATA_EN_US97` for the
+//! folder of the US retail CD's images (its August 1997 build),
 //! `ATLANTIS_DATA_ES1997` / `ATLANTIS_DATA_IT1997` for the Spanish and
 //! Italian retail CDs' builds and `ATLANTIS_DATA_PATCH101` for a CD install with Cryo's patch 1.01);
 //! skipped without it.
@@ -16,8 +17,8 @@
 mod common;
 
 use common::{
-    game, game_1997, game_de1997, game_de_may97, game_es1997, game_fr1997, game_fr1997_may,
-    game_it1997, game_nl1997, game_patch101, game_sv1997, golden_map, md5_hex,
+    game, game_1997, game_de1997, game_de_may97, game_en_us97, game_es1997, game_fr1997,
+    game_fr1997_may, game_it1997, game_nl1997, game_patch101, game_sv1997, golden_map, md5_hex,
 };
 
 fn joined(names: &[String]) -> String {
@@ -170,6 +171,90 @@ fn tables_of_the_german_1997_build() {
         assert_eq!(exe.music_names, f.music_names);
         assert_eq!(exe.newsound_names, f.newsound_names);
     }
+}
+
+/// The US 1997 build (atlantis-cd-en-687104, Interplay): the French
+/// August build's code but for the warp cursor's ids 0x219 / 0x21a and
+/// Rhea's camera 2 (the reference's rules), its DGROUP layout, its own PE
+/// stamp; the player row "New Player" (no '#', also the label), the
+/// credits widths four bytes lower (0x004866d1) with the French bytes, the
+/// inventory and guest tables four bytes lower too (0x00486784,
+/// 0x00486858) with the French bytes; music and sound tables at the French
+/// build's addresses.
+#[test]
+fn tables_of_the_us_1997_build() {
+    let Some(us) = game_en_us97("tables_of_the_us_1997_build") else {
+        return;
+    };
+    let exe = &us.exe;
+    assert_eq!(exe.build.name, "atlantis-cd-en-687104");
+    check_sound_tables(&us);
+    assert_eq!(exe.new_player_marker, b"New Player");
+    assert_eq!(exe.new_player_label, b"New Player");
+    assert_eq!(exe.inventory_object_ids.len(), 51);
+    assert_eq!(exe.inventory_object_ids[39], 0);
+    assert_eq!(exe.guest_sprite_ids.len(), 9);
+    assert_eq!(
+        [
+            exe.credit_widths[0x1c],
+            exe.credit_widths[0x1e],
+            exe.credit_widths[0x1f]
+        ],
+        [17, 2, 10]
+    );
+    let fr_build = atlantis_data::exe::BUILDS
+        .iter()
+        .find(|b| b.name == "atlantis-cd-fr-687104")
+        .unwrap();
+    let mut b = *exe.build;
+    assert!(b.cursor_id_rule && b.rhea_camera2);
+    assert_eq!((b.year, b.month), (1997, Some("August")));
+    b.name = fr_build.name;
+    b.pe_timestamp = fr_build.pe_timestamp;
+    b.credit_widths_va = fr_build.credit_widths_va;
+    b.inventory_va = fr_build.inventory_va;
+    b.guest_va = fr_build.guest_va;
+    b.cursor_id_rule = false;
+    b.rhea_camera2 = false;
+    assert_eq!(&b, fr_build);
+    if let Some(fr) = game_fr1997("tables_of_the_us_1997_build (French August)") {
+        let f = &fr.exe;
+        assert_eq!(exe.inventory_object_ids, f.inventory_object_ids);
+        assert_eq!(exe.guest_sprite_ids, f.guest_sprite_ids);
+        assert_eq!(exe.credit_widths, f.credit_widths);
+        assert_eq!(exe.music_names, f.music_names);
+        assert_eq!(exe.newsound_names, f.newsound_names);
+    }
+}
+
+/// The US CD's archives: every member several discs carry is the same
+/// bytes on each.
+#[test]
+fn us_archives_disc_copies() {
+    let Some(us) = game_en_us97("us_archives_disc_copies") else {
+        return;
+    };
+    let big = &us.big;
+    let mut names: Vec<String> = big.names().map(str::to_string).collect();
+    names.sort();
+    let mut shared = 0;
+    for n in &names {
+        let discs = big.discs_of(n);
+        if discs.len() < 2 {
+            continue;
+        }
+        shared += 1;
+        let copies: Vec<Vec<u8>> = discs
+            .iter()
+            .map(|&d| {
+                big.set_disc_copy(Some(d));
+                big.read(n).unwrap()
+            })
+            .collect();
+        big.set_disc_copy(None);
+        assert!(copies.iter().all(|c| c == &copies[0]), "{n}");
+    }
+    assert_eq!(shared, 1292);
 }
 
 /// The French May 1997 build (atlantis-cd-fr-688640): DGROUP at

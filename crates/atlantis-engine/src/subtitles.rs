@@ -82,7 +82,7 @@ pub fn cjk_font_file(code_page: TextCodePage) -> Option<&'static str> {
         TextCodePage::Windows950 => Some("NotoSerifTC-Subset.otf"),
         TextCodePage::Windows936 => Some("NotoSerifSC-Subset.otf"),
         TextCodePage::Windows932 => Some("NotoSansJP-Subset.otf"),
-        TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+        TextCodePage::Windows1252 | TextCodePage::Windows1250 | TextCodePage::Dos850 => None,
     }
 }
 
@@ -97,7 +97,9 @@ pub fn provide_cjk_font(code_page: TextCodePage, data: Vec<u8>) -> bool {
         TextCodePage::Windows950 => &FETCHED_CJK[0],
         TextCodePage::Windows936 => &FETCHED_CJK[1],
         TextCodePage::Windows932 => &FETCHED_CJK[2],
-        TextCodePage::Windows1252 | TextCodePage::Dos850 => return false,
+        TextCodePage::Windows1252 | TextCodePage::Windows1250 | TextCodePage::Dos850 => {
+            return false
+        }
     };
     if slot.get().is_some() || FontRef::try_from_slice(&data).is_err() {
         return false;
@@ -113,7 +115,7 @@ fn bundled_cjk(code_page: TextCodePage) -> Option<&'static [u8]> {
         TextCodePage::Windows950 => Some(NOTO_SERIF_TC),
         TextCodePage::Windows936 => Some(NOTO_SERIF_SC),
         TextCodePage::Windows932 => Some(NOTO_SANS_JP),
-        TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+        TextCodePage::Windows1252 | TextCodePage::Windows1250 | TextCodePage::Dos850 => None,
     }
 }
 
@@ -125,7 +127,7 @@ fn bundled_cjk(code_page: TextCodePage) -> Option<&'static [u8]> {
         TextCodePage::Windows950 => FETCHED_CJK[0].get().copied(),
         TextCodePage::Windows936 => FETCHED_CJK[1].get().copied(),
         TextCodePage::Windows932 => FETCHED_CJK[2].get().copied(),
-        TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+        TextCodePage::Windows1252 | TextCodePage::Windows1250 | TextCodePage::Dos850 => None,
     }
 }
 
@@ -280,7 +282,7 @@ pub fn player_font(code_page: TextCodePage) -> Option<(&'static str, &'static st
         TextCodePage::Windows950 => Some(("mingliu.ttc", "MingLiU")),
         TextCodePage::Windows936 => Some(("simsun.ttc", "SimSun")),
         TextCodePage::Windows932 => Some(("msgothic.ttc", "MS PGothic")),
-        TextCodePage::Windows1252 | TextCodePage::Dos850 => None,
+        TextCodePage::Windows1252 | TextCodePage::Windows1250 | TextCodePage::Dos850 => None,
     }
 }
 

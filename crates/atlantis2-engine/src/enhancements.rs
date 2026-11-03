@@ -38,15 +38,31 @@ pub enum BugFix {
     /// in chapter 14 the value-9 zone with the horse plays the water's
     /// film, and so on ([`crate::engine::irish_plain_value_zone`]).
     IrelandClicks,
+    /// At 800 x 600 the subtitles of a dialog over a film are seen. Off,
+    /// as 1.00 and 1.01, they are drawn after the frame's enlargement
+    /// (the film frame's FUN_00402c30 @ 0x0040bc65, then FUN_00480840
+    /// @ 0x0040c08e), on the surface the next frame covers: never seen.
+    /// The North American CD draws them before it
+    /// ([`atlantis2_data::exe::Build::film_subtitles_blitted`]), so there
+    /// they show either way.
+    FilmSubtitles,
+    /// Films 19, 55 and 66 play the track of the language installed, when
+    /// `datas_a2\\apc\\dial\\` holds one that fits
+    /// ([`crate::film_tracks`]). Off, as the original (`cine%03d.apc`
+    /// @ 0x0047a5c0 reads `datas_a2\\apc\\`, 0x00402760), they play the
+    /// `datas_a2\\apc\\` file, on GOG.com English's in every language.
+    FilmLanguage,
 }
 
 impl BugFix {
     /// Every fix, in the menu's order.
-    pub const ALL: [BugFix; 4] = [
+    pub const ALL: [BugFix; 6] = [
         BugFix::MusicEnd,
         BugFix::MusicRestart,
         BugFix::MusicMark,
         BugFix::IrelandClicks,
+        BugFix::FilmSubtitles,
+        BugFix::FilmLanguage,
     ];
 
     /// Its `settings.ini` key.
@@ -56,6 +72,8 @@ impl BugFix {
             BugFix::MusicRestart => "fix_music_restart",
             BugFix::MusicMark => "fix_music_mark",
             BugFix::IrelandClicks => "fix_ireland_clicks",
+            BugFix::FilmSubtitles => "fix_film_subtitles",
+            BugFix::FilmLanguage => "fix_film_language",
         }
     }
 }
@@ -72,6 +90,10 @@ pub struct BugFixes {
     pub music_mark: bool,
     /// [`BugFix::IrelandClicks`].
     pub ireland_clicks: bool,
+    /// [`BugFix::FilmSubtitles`].
+    pub film_subtitles: bool,
+    /// [`BugFix::FilmLanguage`].
+    pub film_language: bool,
 }
 
 impl BugFixes {
@@ -87,6 +109,8 @@ impl BugFixes {
             music_restart: on,
             music_mark: on,
             ireland_clicks: on,
+            film_subtitles: on,
+            film_language: on,
         }
     }
 
@@ -103,6 +127,8 @@ impl BugFixes {
             BugFix::MusicRestart => self.music_restart,
             BugFix::MusicMark => self.music_mark,
             BugFix::IrelandClicks => self.ireland_clicks,
+            BugFix::FilmSubtitles => self.film_subtitles,
+            BugFix::FilmLanguage => self.film_language,
         }
     }
 
@@ -112,6 +138,8 @@ impl BugFixes {
             BugFix::MusicRestart => &mut self.music_restart,
             BugFix::MusicMark => &mut self.music_mark,
             BugFix::IrelandClicks => &mut self.ireland_clicks,
+            BugFix::FilmSubtitles => &mut self.film_subtitles,
+            BugFix::FilmLanguage => &mut self.film_language,
         } = on;
     }
 

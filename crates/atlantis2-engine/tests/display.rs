@@ -15,7 +15,7 @@ use atlantis2_engine::crt::Rand;
 use atlantis2_engine::display::{blit_640_to_800, NATIVE_DIALOGS};
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::{MenuHost, PageKind};
-use atlantis2_engine::{Camera, Engine, Fpu, LoopType, Variant};
+use atlantis2_engine::{BugFixes, Camera, Engine, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
 fn md5_hex(px: &[u16]) -> String {
@@ -282,4 +282,58 @@ fn the_dialogs_by_number() {
     r.wait(2);
     assert_eq!((r.e.width(), r.e.height()), (800, 600));
     assert!(NATIVE_DIALOGS.contains(&44));
+}
+
+/// A film's dialog at 800 x 600 (`cinema=19,71`): 1.00 and 1.01 draw its
+/// subtitles after the film frame's enlargement (FUN_00402c30 @ 0x0040bc65,
+/// FUN_00480840 @ 0x0040c08e) on the surface the next frame covers, so the
+/// screens are those of the film alone; the bug fix shows them. At 640 x
+/// 480 they show either way.
+#[test]
+fn a_film_s_subtitles_at_800_x_600_need_the_fix_on_1_00() {
+    if game().is_none() {
+        return;
+    }
+    let frames = |large: bool, fixes: BugFixes, command: &[u8]| {
+        let mut e = Engine::boot(
+            game().unwrap(),
+            Variant::default(),
+            Fpu::default(),
+            640,
+            480,
+        )
+        .unwrap();
+        e.enhancements.fixes = fixes;
+        e.start_new_game().unwrap();
+        e.end_video();
+        for _ in 0..30 {
+            e.tick();
+            e.pass(None);
+        }
+        e.set_screen_800(large);
+        e.run_command(b"(monde=1)");
+        e.run_command(command);
+        let (w, h) = e.screen_size();
+        let mut screen = vec![0u16; w * h];
+        let mut out = Vec::new();
+        for _ in 0..600 {
+            e.tick();
+            e.pass(Some(&mut screen));
+            if e.loop_type != LoopType::Video {
+                break;
+            }
+            out.push(screen.clone());
+        }
+        out
+    };
+    let differing =
+        |a: &[Vec<u16>], b: &[Vec<u16>]| a.iter().zip(b).filter(|(x, y)| x != y).count();
+    let film = frames(true, BugFixes::ALL, b"(cinema=19)");
+    let unseen = frames(true, BugFixes::NONE, b"(cinema=19,71)");
+    let seen = frames(true, BugFixes::ALL, b"(cinema=19,71)");
+    assert_eq!(differing(&film, &unseen), 0);
+    assert!(differing(&film, &seen) > 15);
+    let film = frames(false, BugFixes::NONE, b"(cinema=19)");
+    let small = frames(false, BugFixes::NONE, b"(cinema=19,71)");
+    assert!(differing(&film, &small) > 15);
 }

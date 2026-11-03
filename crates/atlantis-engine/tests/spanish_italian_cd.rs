@@ -134,7 +134,7 @@ fn italian_con_lines_match_original() {
 
 /// The Spanish build restarts the rat's T0023 search at point 0
 /// (FUN_004348fc @ 0x00434933), the reference's rule; the French August,
-/// German and Italian builds do not.
+/// German, US and Italian builds do not.
 #[test]
 fn rat_search_restart_by_build() {
     assert!(build("atlantis-cd-es-687104").rat_search_restart);
@@ -142,6 +142,7 @@ fn rat_search_restart_by_build() {
     for b in [
         "atlantis-cd-fr-687104",
         "atlantis-cd-de-687104",
+        "atlantis-cd-en-687104",
         "atlantis-cd-it-687104",
     ] {
         assert!(!build(b).rat_search_restart, "{b}");
@@ -178,8 +179,14 @@ fn italian_positioned_zones_synthetic() {
     assert_eq!(widths(MenuRules::of_build(it, &others)), [title, 48, 112]);
     let fix = BugFixes::only(BugFix::MenuLineWidth);
     assert_eq!(widths(MenuRules::of_build(it, &fix)), [title, 66, 154]);
-    // The Italian DVD's build has the Italian CD's rule.
+    // The Italian DVD's build has the Italian CD's rule. The Brazilian
+    // CD's measures the title with its own FONTMAX widths.
     for b in &BUILDS {
+        let title = if b.menu_widths.is_some() {
+            walk(text, 6, MenuRules::of_build(b, &BugFixes::NONE)).records[0].w
+        } else {
+            title
+        };
         let want = if b.name == it.name || b.name == "atlantis-dvd-it-695296" {
             [title, 48, 112]
         } else {

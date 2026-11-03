@@ -257,6 +257,17 @@ pub struct FixData {
     pub disc_revisions: bool,
 }
 
+/// Whether a byte 0xe1 of the sprite fonts' texts is the `ß` no font has a
+/// glyph for ([`BugFix::SharpS`]): in every release but the Czech CD and
+/// the Brazilian CD, whose FONTMAX / FONTMIN / credits fonts hold a glyph
+/// for each byte up to 0xff, 0xe1 the `á` they draw (the Czech EPI.TXT's
+/// "Za strážemi" in Windows-1250; the Brazilian EPI.TXT's "Palácio" and
+/// CREDITS.TXT's "Gráfico" in Windows-1252, its program with the width
+/// tables of those glyphs, `ExeBuild::menu_widths`).
+pub fn sharp_s_without_glyph(build: &ExeBuild) -> bool {
+    build.text_code_page != atlantis_data::TextCodePage::Windows1250 && build.menu_widths.is_none()
+}
+
 /// Whether `name` is a menu text the menu walk draws (`SPRLIST\*MENU.TXT`,
 /// `ERRORn.TXT`, `WAIT.TXT`): not a sprite list, nor a leftover of the
 /// developers that no build reads (the Japanese DVD's `ALLSAVE.TXT` and
@@ -330,7 +341,7 @@ impl FixData {
             let Some(bytes) = read(&name, disc) else {
                 continue;
             };
-            if bytes.contains(&crate::ui::layout::SHARP_S) {
+            if bytes.contains(&crate::ui::layout::SHARP_S) && sharp_s_without_glyph(build) {
                 data.sharp_s |= match name.as_str() {
                     "SPRLIST\\CREDITS.TXT" => true,
                     "SPRLIST\\EPI.TXT" => epi_drawn,
@@ -590,6 +601,7 @@ mod tests {
         assert_eq!(of("atlantis-patch-fr-714240", dutch), [DiscRevision]);
         assert_eq!(of("atlantis-cd-en-688128", plain), [HexagonPieces]);
         assert_eq!(of("atlantis-cd-fr-687104", plain), [HexagonPieces]);
+        assert_eq!(of("atlantis-cd-en-687104", plain), [HexagonPieces]);
         assert_eq!(
             of("atlantis-cd-fr-688640", plain),
             [HexagonPieces, LoadMusik]
@@ -620,6 +632,18 @@ mod tests {
             of("atlantis-cd-zh-cn-692736", plain),
             [HexagonPieces, ChineseRows, SubtitlesToggle]
         );
+        // The Brazilian CD: the 1998 program's hexagon; its 0xe1 is `á`,
+        // which its fonts draw.
+        assert_eq!(of("atlantis-cd-pt-692736", plain), [HexagonPieces]);
+        let pt = BUILDS
+            .iter()
+            .find(|b| b.name == "atlantis-cd-pt-692736")
+            .unwrap();
+        assert!(!sharp_s_without_glyph(pt));
+        assert!(BUILDS
+            .iter()
+            .filter(|b| b.name != pt.name)
+            .all(sharp_s_without_glyph));
         // The 1998 DVD's program (the hexagon not forced, as the 1997 and
         // the Chinese builds), its Italian menus and the Dutch and Swedish
         // DOS texts; the Perfect Edition's.

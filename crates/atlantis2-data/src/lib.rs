@@ -5,6 +5,7 @@
 //! behaviour stays traceable to the original code.
 //!
 //! - [`exe`]: which build an `atlantis2.exe` is;
+//! - [`edition`]: the language of a game folder, for the edition's name;
 //! - [`files`]: the install folder and the four discs, with the disc rule
 //!   of the `MONDE` script variable;
 //! - [`wam`]: the `WAM V2.8` place files (views, moves, 3D click zones);
@@ -35,6 +36,7 @@ pub mod con;
 pub mod db;
 pub mod defnames;
 pub mod dialog;
+pub mod edition;
 pub mod exe;
 pub mod files;
 pub mod menu_txt;

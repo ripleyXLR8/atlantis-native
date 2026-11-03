@@ -14,6 +14,7 @@
 | `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe`, `Datas\`, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
 | `atlantis3-engine` | Atlantis III, unfinished and not part of the program: the start-up's settings, the intro and the cinematics with their sound, the new game through the chapter scripts, the panorama (`warpBFPII`), the place animations, the cursor, the zone picks and the moves with their travel videos |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
+| `atlantis-sdl` | the first game's SDL2 front end for handhelds and PortMaster (the program `atlantis-native-sdl`, built with `--features sdl`): the gamepad as the mouse, the on-screen keyboard, SDL audio; see [The SDL2 front end](#the-sdl2-front-end-handhelds-and-portmaster) |
 
 The engine is one async task: where the original's loops present a frame
 and poll their events, the engine awaits the next frame, and the front end
@@ -79,7 +80,7 @@ with three groups, those of the ScummVM port:
 | Group | Default | What it changes |
 |---|---|---|
 | `fixes` (`BugFixes`) | all on | the fixes of minor bugs of the original, each its own switch (`BugFix`, below) |
-| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001, English 1997 and May 1997 French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
+| `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and May 1997 English and French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 
 The bug fixes, each with its `settings.ini` key; the last seven fix a
@@ -102,7 +103,7 @@ its executable's language:
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
-| `fix_sharp_s` | a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
+| `fix_sharp_s` | (not the Czech and Brazilian CDs, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
 | `fix_disc_revision` | some disc's copy of FONTMIN.SPR, FONTMIN2.SPR, CREDBLAN.SPR, CREDBLEU.SPR, or CREDITS.TXT with the builds that read it at each run, differs from disc 1's (`FixData::disc_revisions`): of the known data, the Dutch CD's and the May 1997 German CD's | `Engine::read_from_current_disc`, `load_fontmin_from_current_disc`, `load_credits_fonts` | the credits text, the credits fonts and the player-name fonts are disc 1's whatever the disc (the original reads them from the disc in the drive: the Dutch disc 2 holds an older revision, the German May discs 2 to 4 another credits font, see [Game builds](#game-builds)) |
 | `fix_menu_line_width` | Italian CD and DVD (`menu_positioned_byte_width` 16) | `MenuRules::positioned_byte_width` | a menu line at a fixed place answers over 22 pixels per byte, as in every other build, so the whole drawn word highlights and takes the click (the original's 16 pixels per byte stop short of it: the right end of `OK` and `Annulla`, see [Game builds](#game-builds)) |
 | `fix_chinese_rows` | Simplified Chinese (`CjkBreaker::Gb2312`) | `CjkSplit::row_fix` | the subtitle rows start and end between characters: the row after an ideographic space starts after the whole space, not on its second byte, and a punctuation mark is only taken where a character starts, not across two characters (see [Subtitles](#subtitles)) |
@@ -139,13 +140,15 @@ its own switch (`BugFix`), all on by default:
 | `fix_music_restart` | `music::Stream::refill`, `MusicFixes::restart` | a track that ends with an empty list, or with loops left, plays again from its start (the original's rewind check fails and its ring loops the last 5.9 s until another music command) |
 | `fix_music_mark` | `music::Stream::seek_mark` (`goto_mark` and the refill), `MusicFixes::mark` | a random mark drawn at the `rand()` = 0x7fff edge (one draw in 32768 of a `startmusik` entry without a mark) plays the track's last mark (the original's draw is one past the marks, a fatal error: it saves and quits) |
 | `fix_ireland_clicks` | `Engine::plain_value_fixed` | in Ireland's two puzzle views (Brigid's cross, view 2; the ogham stones, view 6) a click on a puzzle zone runs its puzzle and nothing else: the original also reads the zone's plain value as the index of a named zone, so that in chapter 12 the fourth stone sends the player back to Tibet as the weeping head does, and in chapter 14 the ninth, with the horse in hand, plays the water's film |
+| `fix_film_subtitles` | `Engine::film_subtitles_unseen` | at 800 x 600 the subtitles of a dialog over a film (`cinema=N,M`) are seen: 1.00 and 1.01 draw them after the film frame's enlargement (`FUN_00402c30` @ 0x0040bc65, then `FUN_00480840` @ 0x0040c08e) on the 640 x 480 surface the next frame covers, and the North American CD's build draws them before it (`Build::film_subtitles_blitted`), so there the switch changes nothing |
+| `fix_film_language` | `film_tracks::own_track` (`Engine::load_sound`) | films 19, 55 and 66 play `datas_a2\apc\dial\cine0NN.apc` when it fits (same rate and channels, whole, within a film frame of the `apc\` track); the original reads only `datas_a2\apc\` (`cine%03d.apc`, @ 0x0047a5c0 → 0x00402760), so its GOG.com French, German and Spanish play the English tracks and the Italian collection tracks that sound Russian. It chooses by the files, no edition or language: the CDs have no such file in `dial\` and GOG.com's English the same bytes, so nothing changes there; in the five languages' tracks the music is at the same place, sample for sample, as in the English one (`tests/film_language.rs`; below) |
 
-These four are every use of the switch the port had before (one
+The music and Ireland ones are every use of the switch the port had before (one
 `minor_bug_fixes` for all, still read from `settings.ini`: it sets every
 fix whose own key is absent); each gates its own behaviour only, and
 with each off that behaviour is the original's, the others on or off
 (`tests/music_player.rs`, `tests/sound_glue.rs` and
-`tests/plain_values.rs` run each alone; see the Music and Ireland items
+`tests/plain_values.rs` and `tests/display.rs` run each alone; see the Music and Ireland items
 of [Atlantis II](#atlantis-ii-in-progress)). `--original` turns them all
 off there too. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
 `hd_options`, the first game's `HdOptions`), which `--hd` and
@@ -320,14 +323,14 @@ original's pixels, which the tests check).
 
 ### Subtitles
 
-The 2001, GOG.com, August 1997 French and German, and the Spanish and
-Italian builds draw their subtitles with the system's Arial at 13 pixels, not smoothed. The port draws them with Liberation Sans,
+The 2001, GOG.com, August 1997 French and German, the Spanish and
+Italian, and the Brazilian builds draw their subtitles with the system's Arial at 13 pixels, not smoothed. The port draws them with Liberation Sans,
 which has Arial's metrics, at the same size, rasterised by `ab_glyph` and
 thresholded to one bit, so every platform draws the same pixels; the text
 bytes are read in the release's code page (`TextCodePage` in
 `crates/atlantis-data/src/text.rs`): Windows-1252, but for the May 1997
 French and German CDs and the Dutch and Swedish CDs, whose texts are in
-the DOS code page 850.
+the DOS code page 850, and the Czech CD, whose texts are Windows-1250.
 The font is bundled
 in `assets/fonts`.
 
@@ -371,7 +374,7 @@ first glyph past 635). Its English subtitles (the SUBTITLES button's
 second state) are cut as the reference's and drawn in the same font, at
 the reference's base.
 
-The 1997 English CD has no Windows text: it draws its subtitles with the
+The May 1997 English CD has no Windows text: it draws its subtitles with the
 8x8 pixel font `DIALOG\FONTS.BIN` of the game's archives (one glyph per
 byte, the IBM PC set), white over a black shadow, in rows 10 pixels apart
 broken in a 75-byte window, and the port does the same (`BitmapFont`,
@@ -432,10 +435,10 @@ the 2001 build's is given the text without them.
 
 ### Game builds
 
-The port knows twenty-three builds of `atlantis.exe` (`ExeBuild` in
+The port knows twenty-four builds of `atlantis.exe` (`ExeBuild` in
 `crates/atlantis-data/src/exe.rs`), found by their size and the PE
 header's timestamp (the 2001 build and the patch 1.01 build have the same
-size, as have the August 1997 French and German builds and the Spanish
+size, as have the August 1997 French, German and US builds and the Spanish
 and Italian ones, the English, Dutch and Swedish 1997 retail
 builds, the DVD's English, French, German, Spanish and Italian
 builds, and its Dutch and Swedish ones, and the Japanese DVD's and the
@@ -445,12 +448,12 @@ size and timestamp too, and are told apart by a path string
 them, and the code differences that change what a player sees follow the
 build:
 
-| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French and German (August), Spanish and Italian retail CDs (1997) | French retail CD (May 1997) | Traditional and Simplified Chinese CDs (1998, 1999) | DVD (1998) and Perfect Edition | Japanese DVD (1998) |
+| | 2001 English CD | GOG.com (1999) | English retail CD (May 1997) | French, German and US English (August), Spanish and Italian retail CDs (1997) | French retail CD (May 1997) | Traditional and Simplified Chinese CDs (1998, 1999) | DVD (1998) and Perfect Edition | Japanese DVD (1998) |
 |---|---|---|---|---|---|---|---|---|
 | subtitles | Arial, 14-pixel rows | Arial | 8x8 font, 10-pixel rows | Arial | 8x8 font, 10-pixel rows (DOS code page texts) | MingLiU / SimSun, 18-pixel rows (Big5 / GBK texts) | Arial, 14-pixel rows (the Dutch and Swedish DVDs' DOS code page texts read as Windows-1252) | MS PGothic, 18-pixel rows (Shift-JIS texts), cut at the spaces and 36 pixels lower; English: the reference's rows |
 | SUBTITLES item | three-click cycle | three-click cycle | plain toggle | plain toggle | plain toggle | three-click cycle, on at start-up | three-click cycle | three states: Japanese, English, none (the chapter's script read again) |
-| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor | talk cursor |
-| Rhea always on camera 2 | yes | no | no | no | no | no | no | no |
+| cursor ids 0x219 / 0x21a | navigate cursor | talk cursor | talk cursor | talk cursor (US: navigate cursor) | talk cursor | talk cursor | talk cursor | talk cursor |
+| Rhea always on camera 2 | yes | no | no | no (US: yes) | no | no | no | no |
 | second death in a section | same narrator line | next line | same line | next line | same line | next line | next line | next line |
 | game-over voice | after the image | after the image | before the image | after the image | before the image | after the image | after the image | after the image |
 | players.atl | 97 bytes | 97 bytes | 95 bytes; names in capitals, 0x20..0x7a | 95 bytes | 95 bytes; names in capitals, 0x20..0x7a | 114 bytes | 97 bytes | 97 bytes |
@@ -511,6 +514,22 @@ Both have Windows-1252 CON texts (the Spanish `¡ ¿ á é í ñ ó ú ü`..., t
 Italian `à è é ì ò ù`), broken into rows as the 2001 build breaks them;
 their menu, LOAD-list and credits texts hold their letters at the DOS
 code page's places, where the sprite fonts have a glyph for each.
+
+The US retail CD's build (Interplay, August 1997, built two days after
+the French one) is the August 1997 French build's code with two of the
+2001 build's rules, its only code changes: the warp cursor shows the
+navigate cursor, not the talk cursor, over the characters 0x219 and
+0x21a, and Rhea (character 0x230) is always on camera 2 in the dialogs.
+Everything else in that column applies to it. Its new-player row reads
+`New Player`, four bytes shorter than the French one, so its credits
+font table, inventory and guest tables are four bytes up from the
+French build's (with its bytes: the typed 0xa1, 0xa3, 0xa4 of the LOAD
+list advance 17, 2, 10). Its data are the August 1997 revision (the
+French August discs' scripts, fonts and menu files) with English texts:
+the May 1997 English CD's dialog texts with 31 lines corrected or in
+American spelling, a few script changes of that revision (chapters 15,
+47 and 70, two sprite offsets), CON texts in ASCII; its discs hold the
+same copy of every member they share.
 
 The Dutch retail CD's build (June 1997) is the English May 1997 build's
 code: everything in that column applies to it, but for the names typed
@@ -642,6 +661,33 @@ copy, no start-up CD scan, an immediate exit on closing) concern how the
 original runs on a later system, not the game; the port handles the
 window, the disk and the pace in its own way for every build.
 
+The Czech CD (Bohemia Interactive, 2000; the same discs, disc 1 with a
+PDF manual added, in the magazine re-issue GAME4U Speciál 2, 2001) ships
+that 1.01 program as its `atlantis.exe`, byte for byte, over archives of
+its own: the US August 1997 discs' (the same scripts, films and English
+voices) with Czech dialog texts, menus, chapter names and credits, the
+six sprite fonts (FONTMAX, FONTMAX2, FONTMIN, FONTMIN2, CREDBLAN,
+CREDBLEU) redrawn with a glyph for each byte up to 0xff, and an end
+picture of its own (`IMAGES\END.TGA`). Since the executable cannot tell it from the patch, the port
+recognises the release by its player screen's menu
+(`SPRLIST\SELEMENU.TXT`, `ZVOLTE JMÉNO HRÁČE`) and plays it as its own
+entry, `atlantis-cd-cs-714240` (`exe::CS_CD`: the patch build's every
+field but the name, which keeps its saves apart, and the code page), shown
+*CD, Czech (Bohemia Interactive, 1999 build)*. Its texts are
+Windows-1250: the program passes the subtitles to Windows in Arial asked
+in the default character set, which a Czech Windows reads in code page
+1250 (`č ř ů ě ť ď ň`, where a Western Windows reads `è ø ù ì` and other
+signs), and the port reads them so. The rows are the 2001 build's,
+as its breaker is. The menus and the LOAD list draw the Czech letters
+from the fonts' new glyphs, at the widths the program reads for them: as
+the original's tables have 137 FONTMAX widths and 101 FONTMIN advances,
+the bytes past them read on in the table that follows (FONTMIN's after
+FONTMAX's, the credits font's after FONTMIN's), and the port reads them
+the same way. The program's French new-player row (`NOUVEAU JOUEUR`)
+stays, and its name entry takes the Windows-1250 letters up to 0xa7
+(`Š Ť Ž š ť ž`). Its 0xe1 is `á`, which the Czech fonts draw, so the
+`ß` fix does not apply to it.
+
 Cryo's DVD-ROM of 1998 holds eight builds of the 1998 program the
 Chinese builds descend from: every flag above is the Chinese builds' but
 where those changed it (their
@@ -692,13 +738,44 @@ port shows as the original (its own box, OK to close), or skips with
 `fix_startup_logos`. The Japanese scripts lack the two chapters no script
 reaches (10, 86).
 
+The Italian *Atlantis Collection* DVD (2014) installs an unpacked tree
+equal to GOG's Italian one, with a 714240-byte `Atlantis.exe`: the 1.01
+patch program (same size and PE timestamp, so played as
+`atlantis-patch-fr-714240`, shown *CD, patch 1.01, Italian (1999 build)*)
+with three code edits for the original's platform (no CD scan, no
+free-space checks, `.\` drive strings) and the row `#NUOVO GICATORE`,
+as spelt in GOG's Italian executable. No table differs from the patch's.
+
+The Brazilian CD (*Atlantis: A Lenda Perdida*, MSD Multimídia, 1997, 4
+CDs, dubbed) has its own build, `atlantis-cd-pt-692736` (December 1997,
+shown *CD, Brazilian Portuguese (MSD, December 1997 build)*): the 1998
+program's code line as a Spanish build of October 1997 has it, which
+plays as the DVD column above but for its player list, which is the
+August 1997 builds' (the new-player row `Novo Jogador` is the label
+itself, the rows read up to it) over the Chinese builds' 114-byte
+`players.atl`, with the August builds' deletion. Its archives are the
+August 1997 discs' with Portuguese voices and lip-sync, texts
+(Windows-1252), chapter names, credits, an end picture and the six
+sprite fonts redrawn with a glyph for each byte up to 0xff; its
+executable holds the widths of those fonts (`ExeBuild::menu_widths`: 224
+FONTMAX widths, 191 FONTMIN advances, then the credits widths), which the
+port's menu walk, label measure and FONTMIN drawers read
+(`FontMaxWidths`, `FontMinAdvances::of_build`). Every dialog line's rows
+were checked against its breaker under emulation. Its name entry, as the
+original's, takes the bytes up to 0xa7, so `ã`, `ç` and the other
+letters above it are not taken; its 0xe1 is `á`, so the `ß` fix does not
+apply to it.
+
 In every build the player-name font (FONTMIN) has advances for 101
 glyphs, and the original reads those of the glyphs past them from the
 credits font's table that follows it; the port does the same with each
 build's table (in the August 1997 French build a typed `£` advances 2 pixels,
-in the 2001 build 14).
+in the 2001 build 14). Likewise the menu font (FONTMAX) has 137 widths, and
+a byte past them reads the FONTMIN advances that follow; only the Czech
+CD's menus hold such bytes (the Brazilian CD's program has tables of its
+own, of 224 and 191 bytes).
 
-The May 1997 French build is the English 1997 build's code, compiled five
+The May 1997 French build is the English May 1997 build's code, compiled five
 days earlier against an older `cryo.dll`, with its own music copy rules.
 By default the port follows them; with the LOADMUSIK fix (`fix_loadmusik`, on by
 default) LOADMUSIK copies its tracks one by one as the other builds do,
@@ -787,6 +864,86 @@ while the other is gives `GameError::DvdOtherSide` (shown as *on the
 other side of the DVD*, as the original's AUTORUN.EXE says it). Add a
 game folder, the first start and Find installations add every language
 found; Locate keeps the entry's language.
+
+### The SDL2 front end (handhelds and PortMaster)
+
+`crates/atlantis-sdl` runs the first game through SDL2, for the devices
+PortMaster serves (handhelds on ArkOS, ROCKNIX, muOS, Knulli; Batocera):
+most have no desktop, so SDL draws through KMS/DRM (or under Wayland or
+X11 when there is one). It is based on Klaas Van den Broeck's (@Klaasvdb)
+R36S front end, [atlantis-native-handheld](https://github.com/Klaasvdb/atlantis-native-handheld)
+(GPL-3.0-or-later), whose gamepad-as-mouse code and on-screen keyboard he
+agreed to bring into Atlantis Native; the files taken from it say so in
+their headers.
+
+- `main.rs` (needs SDL2, `--features sdl`; linked dynamically against the
+  system's `libSDL2-2.0.so.0`): the 640x480 RGB565 frame in a streaming
+  texture, scaled to the screen keeping 4:3; the SDL audio callback pulls
+  the engine's mixer; the saves and `settings.ini` in `saves/<build>`
+  next to the program (or `$ATLANTIS_SAVES`); the port's options menu
+  (`OptionsMenu` without its HD, full screen, library and support
+  entries) on Select, F10 or O, the game paused while it is open.
+- `pad.rs`: the SDL devices. A pad SDL maps is read as a game controller,
+  another as a raw joystick numbered by a preset chosen from its name,
+  GUID vendor and button / axis counts (`config::Preset::for_device`:
+  the Linux evdev order for an Xbox-style pad with 10 or 11 buttons and 5
+  axes or more, such as an Xbox Wireless Controller over Bluetooth, which
+  SDL does not map; the R36S's numbering otherwise) and changed by
+  `controls.ini`; only the events of
+  the pad in use count; an unplugged pad lets go of what it held (its
+  mouse button or key released in the game) and the next connected one
+  takes over; one plugged in later is taken.
+- `buttons.rs`: the buttons' meaning (A left click, B right click, X
+  Space, Y Enter, Start Escape, Select the on-screen keyboard in a game
+  menu or the options menu elsewhere, Select + Start quit); a release
+  reaches the game only for a press it had.
+- `motion.rs`: the pointer and the panoramic view. The sticks' dead zone
+  is a circle (default 6000 of 32767 for a mapped pad, 4000 for a raw one;
+  `deadzone` in `controls.ini` for both), the tilt beyond it squared. The
+  speeds are per second (pointer 420 px/s, view 600 px/s at full tilt,
+  `pointer_speed` and `look_speed` in `controls.ini` scale them) and
+  applied once per engine frame for that frame's duration, so the motion
+  does not depend on how often the main loop turns (Klaas's applied a
+  per-frame speed at every turn of its loop, about every 4 ms: three to
+  four times too fast, and slower when the device was busy). The D-pad
+  starts at 30 % of full tilt and reaches it in half a second; the view
+  held near full tilt doubles its gain at full tilt and speeds up to three
+  times after a third of a second, over 1.5 s.
+- `osk.rs`: the on-screen keyboard, a grid of 4 rows of 13 cells over the
+  top of the frame (above the player screen's title): A..M, N..Z, the
+  digits and `- . '`, then four wide keys (the case switch, Space, Erase,
+  Done). Every key is within every build's name entry (0x20..0x7a: the
+  English 1997 build stores a..z as A..Z, the others keep the case and
+  take up to 0xa7). The D-pad or the left stick (its larger axis) moves in
+  two dimensions, wrapping at the edges, held moves repeat; on the last
+  row a wide key covers its columns and going up returns to the column
+  left. A presses the key, B erases, X types a space, Y switches the case,
+  Start or Done send Enter and close it, Select closes it. Drawn with a
+  5x7 font at 3x (the wide keys' labels 2x) into the 640x480 frame, which
+  the screen only scales. Klaas's one-row strip, made a grid.
+- `config.rs`: `controls.ini` and the raw presets.
+
+`packaging/portmaster/` holds the PortMaster port (`atlantisnative`, laid
+out as in PortsMaster/PortMaster-New: launcher, `port.json`,
+`gameinfo.xml`, README, the project's icon as cover and screenshot, the
+game's own files in `atlantisnative/gamedata/`) and `build.sh`, which
+cross-compiles for 64-bit ARM Linux with glibc 2.31 (cargo-zigbuild)
+and adds the licences; its zip is laid out as PortMaster-New's
+`build_release.py` lays out a port's (the launcher at the root;
+`port.json`, `gameinfo.xml`, the screenshot and the README as
+`atlantisnative.md` inside `atlantisnative/`). SDL2 is never bundled: the
+device's is used. The workflow's `portmaster` job runs it on GitHub's
+64-bit ARM runner (zig and cargo-zigbuild from PyPI, the runner's
+libSDL2 to link against, a check that no symbol needs a glibc newer than
+2.31) and publishes the zip as `atlantis-native-portmaster.zip` on the
+nightly and the numbered releases (and the `portmaster` itch.io channel
+of a numbered one). 32-bit ARM (armhf) is not built: the devices
+PortMaster serves today are 64-bit.
+
+Atlantis II is not in this front end yet: its window code
+(`crates/atlantis-app/src/a2.rs`: the game clock held in menus, the
+picture composition and scaling, its options menu, the mouse lock and the
+3D scenes' cost on a handheld) would need porting to SDL first.
 
 ### The web build
 
@@ -1079,8 +1236,67 @@ back) into `yucatan-*.png`.
   `atlantis2.exe` (version 3.18, 2183168 bytes, PE timestamp 0x38328ed1,
   one file for the French and the English releases) and GOG.com's
   `Game.exe` (the 1.01 executable with 18 byte patches of GOG's),
+  and the North American CD's `atlantis2.exe` (*Beyond Atlantis*,
+  DreamCatcher, version 3.18, 2199552 bytes, PE timestamp 0x38eb4fb3),
   recognised by size and timestamp and confirmed by MD5
-  (`crates/atlantis2-data/src/exe.rs`). GOG's folder holds an
+  (`crates/atlantis2-data/src/exe.rs`). The North American build is 1.01's
+  code relinked (`Release::V101`), its listener table at its own address;
+  its additions are reached by no English `Font.txt` (`[Language]`: a
+  Japanese line break, intros for four other languages), and one change
+  shows: a film's dialog is drawn inside the film frame, before the 800 x
+  600 enlargement (`Build::film_subtitles_blitted`, `fix_film_subtitles`).
+  Its data is GOG's English but for `Menu.txt` line 72, a line of the
+  credits, the disc-request sprites, the intro (`intro00` a silent logo
+  with no `.apc`, the two films as `intro01` and `intro02`, the latter
+  re-encoded without the *Atlantis II* title, the same sound),
+  `chine.wam` without its ambient `ronfle` (no script names it), and seven
+  `pz_araig` models whose materials and textures have no accents. GOG's build manifests show one
+  `Game.exe` for its English, French, German and Spanish installations
+  (in the language-independent depot of its build "1.0 w10 hotfix",
+  2022-07-13); its two older builds ("1.0", 2018, and "1.0 w10",
+  2022-06) each have another `Game.exe` (MD5s
+  `f8340e5a011fd2207c5bb78b4c2a9636`, `8c24ad437d9e994f657ad7751b626718`),
+  compared byte for byte with the current one: "1.0 w10" keeps the two
+  `WM_FONTCHANGE` broadcasts the hotfix removes, and "1.0" is 1.01 with
+  five of GOG's patches only (fixed drives as the CD and its empty root,
+  the two free-space tests, the CD page closing at once). The port
+  models none of the patches they lack, so all three play alike
+  (`tests/gog_languages.rs` checks the bytes). The Italian *Atlantis
+  Collection*'s `Game.exe` (`4534c355a9be896c3507b475e4b5a570`, the same
+  size and timestamp) is GOG's 2018 file but for one byte, @ 0x004054c7:
+  `cmp eax,5` (the drive scan keeps CD drives, as 1.01), where GOG has 3
+  (fixed drives). It takes any CD drive for the empty root, so the original
+  wants one to be present; the port looks for no drive, and models the same
+  CD page as GOG's (`Build::gog`). Beside it `atlantis2.exe` is an AutoRun
+  Architect 2.20 program (446464 bytes) whose `Launch\Settings.ini` starts
+  `\Game.exe`; nothing reads that file but the launcher, and
+  `exe::LAUNCHER_SIZES` passes over both launchers. Its data is GOG's English
+  files but for `loc\`, the voices, the three film tracks below, a second
+  name `HNM\intro02.hnm` of `INTRO01.HNM`, which the chain `intro%02d` plays
+  (three films), and a `music\` holding only an empty `Muzik39.apc`: the
+  folder the original's music copies need, a missing copy counting as an
+  empty one (the load's open fails, then `CopyMusikToDrive`, @ 0x004771f0,
+  0x00477856). The streams are in `DATAS_A2\APC\MUSIC\`, read as for GOG. Its
+  `cine019/055/066` in `DATAS_A2\APC\`, the ones films read, match none of
+  GOG's four languages' voices nor its own `APC\DIAL\CINE*`, which the
+  original never reads; by ear the former sound Russian and the latter are
+  Italian (`fix_film_language` plays the latter). The languages differ only in data: `loc\` (texts,
+  `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
+  language shown with the edition ("Atlantis II, GOG.com, German (patch
+  1.01)") is told by the MD5 of `loc\Menu.txt`
+  (`crates/atlantis2-data/src/edition.rs`). The four languages were
+  played (`tests/gog_languages.rs`): every subtitle as the 1.01
+  executable lays it out, every letter (French `œ`, German `ß`, Spanish
+  `ñ ¿ ¡`...) a glyph of the one font, the same 1199 of 1214 voices in
+  each. Films 19, 55 and 66 read their track from `datas_a2\apc\`
+  (`cine%03d.apc` → the sounds' folder, @ 0x0047a5c0 → 0x00402760 in
+  `Game.exe`), where GOG put the English tracks: every language plays
+  them in English in the original, and here with `fix_film_language` off
+  (each language's own track lies unused in `apc\dial\`; the fix plays it:
+  every track is 22050 Hz stereo of the same length, its music at the same
+  samples as the English track's, only the voice passages differing; in
+  Spanish film 55 is the one mixed differently, its whole sound at twice the
+  level). GOG's folder holds an
   `atlantis2.exe` too, a 20,992-byte splash-screen launcher: the
   executable is the first of `atlantis2.exe` and `Game.exe` that is a
   known build. 1.01 moved most of the code and data; the one table the
@@ -3600,7 +3816,7 @@ back) into `yucatan-*.png`.
   game's. The choices are written at once to Atlantis II's own
   `settings.ini`, beside its saves and `atlant2.cfg`, with the first
   game's keys and one per bug fix (`fix_music_end`, `fix_music_restart`,
-  `fix_music_mark`, `fix_ireland_clicks`, `ui_ux`, `graphics = original|hd`,
+  `fix_music_mark`, `fix_ireland_clicks`, `fix_film_subtitles`, `fix_film_language`, `ui_ux`, `graphics = original|hd`,
   `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_sharp_subtitles`,
   `hd_widescreen`, `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
   written then too (the original writes it at exit). A window reads
@@ -3724,7 +3940,7 @@ under emulation.
 
 Tests that need the game files read the game directory from the
 `ATLANTIS_DATA` environment variable (the 2001 English CD) and are
-skipped without it; `ATLANTIS_DATA_1997` names a folder of the 1997
+skipped without it; `ATLANTIS_DATA_1997` names a folder of the May 1997
 English retail CD, `ATLANTIS_DATA_FR1997` one of the August 1997 French
 retail CD, `ATLANTIS_DATA_FR1997_MAY` one of the May 1997 French retail CD
 (the first pressing), `ATLANTIS_DATA_DE1997` one of the German retail CD,
@@ -3735,6 +3951,27 @@ its DOS code page letters, one subtitle's pixels, the LOAD list's `ß`,
 the credits fonts of the disc in the drive, a new game to its first
 dialog, a save and its load from the player screen and the LOAD list;
 its tables, archives and edition in `atlantis-data`'s tests),
+`ATLANTIS_DATA_EN_US97` a folder of the US retail CD's images (its
+`.iso` files: Interplay's August 1997 build; `tests/us_cd.rs`: every
+dialog line's rows against the build's breaker under emulation, its
+menu font advances and fixes, a new game to its first dialog, a save and
+its load; its tables, archives and edition in `atlantis-data`'s tests),
+`ATLANTIS_DATA_CS` a folder of the Czech CD's images (its `.iso`
+files: the 1.01 program over Bohemia Interactive's archives;
+`tests/cs_cd.rs`: every dialog line's rows against the program's breaker
+under emulation, the Windows-1250 letters and the subtitle font's glyphs
+for them, the menu fonts' glyphs and widths, the edition and fixes, a new
+game with a name typed in Czech letters to its first dialog, a save and
+its load),
+`ATLANTIS_DATA_PTBR` a folder of the Brazilian CD's images (its `.iso`
+files) or of its `atlantis.exe` and archives (`tests/pt_cd.rs`: every dialog line's rows against the build's
+breaker under emulation, the Windows-1252 letters and the subtitle font's
+glyphs for them, the build's tables and menu fonts and widths, the
+edition and fixes, a new game with a name typed in Portuguese letters to
+its first dialog, a save and its load, every chapter the scripts reach
+entered as the chapter changes enter it), `ATLANTIS_SAVES_PTBR` a folder
+of checkpoints written by the original (`pa<N>.gam`; every chapter's
+resumed on the Brazilian CD from the player screen to its place),
 `ATLANTIS_DATA_NL1997` one of the Dutch retail CD,
 `ATLANTIS_DATA_SV1997` one of the Swedish retail CD,
 `ATLANTIS_DATA_ES1997` / `ATLANTIS_DATA_IT1997` ones of the Spanish /
@@ -3784,8 +4021,29 @@ the 1.01 subtitles in `tests/dialogs.rs`, the listener table in
 played again on it, its pictures written as `gog-*.png` with
 `ATLANTIS2_PNG_DIR`), `ATLANTIS2_PATCH101` the 1.01 patch's
 `atlantis2.exe` (`tests/gog.rs` puts it beside links to
-`ATLANTIS2_DATA`'s folders: a CD installation patched to 1.01). An
-Atlantis II test whose data is missing fails, saying which variable it
+`ATLANTIS2_DATA`'s folders: a CD installation patched to 1.01),
+`ATLANTIS2_DATA_US`, `ATLANTIS2_DISCS_US` the North American CD's installed
+folder and its CDs (`tests/us_cd.rs`: the edition's name, its files, every
+subtitle against the executable's layout, the three intro films, the spider's
+textures, China without `ronfle`, the browser's way of opening it, a film's
+subtitles at 800 x 600; `tests/flow.rs`'s whole game with the mouse played
+again on it, `us-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_IT_COLLECTION` the Italian *Atlantis Collection*'s installed
+folder (`tests/it_collection.rs`: the launcher passed over, the edition's name,
+one byte against GOG's 2018 `Game.exe`, the `loc` files, every subtitle against
+the executable's layout, every letter, the voices, the film tracks, the three
+intro films, the music, a subtitle, the menu and a save; `tests/flow.rs`'s whole
+game with the mouse played again on it, `it-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
+German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
+`1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older
+builds (`tests/gog_languages.rs`: per language the edition's name, the
+`loc` files, every subtitle against the 1.01 executable's layout under
+emulation, `tests/golden/subtitles_101_gog_*.txt`, every letter a glyph,
+every voice decoded, the film tracks, a new game to the shaman's dialog
+with a subtitle drawn, `gog-<language>-*.png` with `ATLANTIS2_PNG_DIR`;
+the older `Game.exe` byte for byte against the current one, and booted).
+An Atlantis II test whose data is missing fails, saying which variable it
 needs, unless `ATLANTIS2_SKIP_DATA_TESTS=1` asks for the game-data tests
 to be skipped (the CI's builds set it); a skipped test writes a
 `SKIPPED <test>: <what is missing>` line that `cargo test` shows
@@ -3837,6 +4095,7 @@ ATLANTIS_DATA=/path/to/game ATLANTIS_DATA_1997=/path/to/1997 \
 ATLANTIS_DATA_FR1997=/path/to/fr1997 ATLANTIS_DATA_FR1997_MAY=/path/to/fr1997may \
 ATLANTIS_DATA_DE1997=/path/to/de1997 ATLANTIS_DATA_NL1997=/path/to/nl1997 \
 ATLANTIS_DATA_DE_MAY97=/path/to/de-may-1997-images \
+ATLANTIS_DATA_EN_US97=/path/to/us-1997-images ATLANTIS_DATA_CS=/path/to/czech-images \
 ATLANTIS_DATA_SV1997=/path/to/sv1997 ATLANTIS_DATA_ES1997=/path/to/es1997 \
 ATLANTIS_DATA_IT1997=/path/to/it1997 ATLANTIS_DATA_PATCH101=/path/to/patch101 \
 cargo test --release

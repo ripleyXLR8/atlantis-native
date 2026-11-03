@@ -321,8 +321,8 @@ impl App {
     pub fn play_opened(&mut self, opened: Opened, folder: &Path) {
         match opened {
             Opened::LostTales(game, _) => self.play_game(*game, Some(folder)),
-            Opened::Atlantis2(build) => {
-                log::info!("game folder {} ({})", folder.display(), build.label);
+            Opened::Atlantis2(label) => {
+                log::info!("game folder {} ({label})", folder.display());
                 self.stop_game();
                 let Some(session) = &mut self.session else {
                     return;
@@ -685,7 +685,10 @@ mod tests {
         let l = app.session().unwrap().launcher().unwrap();
         let labels: Vec<&str> = l.entries().iter().map(|e| e.label.as_str()).collect();
         assert!(l.entries().iter().all(|e| e.found), "{labels:?}");
-        assert_eq!(labels.last(), Some(&"Atlantis II, GOG.com (patch 1.01)"));
+        assert_eq!(
+            labels.last(),
+            Some(&"Atlantis II, GOG.com, French (patch 1.01)")
+        );
         if first.is_some() {
             assert!(labels[0].starts_with("Atlantis: The Lost Tales, "));
         }

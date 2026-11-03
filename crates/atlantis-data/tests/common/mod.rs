@@ -195,8 +195,20 @@ fn g9_matches_printf() {
 /// may hold other copies of the discs), `None` (the test skipped) without
 /// it.
 pub fn game_de_may97(test: &str) -> Option<Game> {
-    let Some(dir) = std::env::var_os("ATLANTIS_DATA_DE_MAY97") else {
-        eprintln!("ATLANTIS_DATA_DE_MAY97 not set: {test} skipped");
+    iso_game("ATLANTIS_DATA_DE_MAY97", test)
+}
+
+/// The US retail CD (Interplay, the August 1997 build) from the `.iso`
+/// images in the folder `ATLANTIS_DATA_EN_US97` names, `None` (the test
+/// skipped) without it.
+pub fn game_en_us97(test: &str) -> Option<Game> {
+    iso_game("ATLANTIS_DATA_EN_US97", test)
+}
+
+/// The game of the four `.iso` images in the folder `var` names.
+fn iso_game(var: &str, test: &str) -> Option<Game> {
+    let Some(dir) = std::env::var_os(var) else {
+        eprintln!("{var} not set: {test} skipped");
         return None;
     };
     let mut paths: Vec<_> = std::fs::read_dir(&dir)

@@ -9,10 +9,11 @@ members = [
     "crates/atlantis3-data",
     "crates/atlantis3-engine",
     "crates/atlantis-app",
+    "crates/atlantis-sdl",
 ]
 
 [workspace.package]
-version = "0.5.6"
+version = "0.5.9"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/ripleyXLR8/atlantis-native"

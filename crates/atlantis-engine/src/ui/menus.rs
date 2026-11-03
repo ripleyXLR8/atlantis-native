@@ -181,7 +181,7 @@ impl Engine {
                 Input::KeyDown(Key::Down) => mi.down = true,
                 Input::KeyDown(Key::Space) => mi.codes.push(b' '),
                 Input::KeyDown(Key::Char(c)) => {
-                    let code = name_key_code(c);
+                    let code = name_key_code(c, self.game.exe.build.text_code_page);
                     if code != 0 {
                         mi.codes.push(code);
                     }

@@ -33,7 +33,8 @@
 //! discs' file names carry accents (`TR-D-tête araignée.tga`, which the
 //! spider's and the canoe's `.db` files name); GOG has them only without
 //! accents and under 8.3 names: a name not found is looked for with its
-//! accents folded, then as its ISO 9660 level-1 name ([`alias_of`]).
+//! accents folded, then as its ISO 9660 level-1 name ([`alias_of`]). The
+//! Italian *Atlantis Collection* has the same layout, with another launcher.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -42,7 +43,8 @@ use std::sync::{Arc, Mutex};
 use atlantis_data::disc_image::{DiscImage, IMAGE_EXTENSIONS};
 use atlantis_data::{FileSource, StdDir};
 
-use crate::exe::{identify, Build, ExeError, EXE_NAMES, KNOWN_BUILDS, LAUNCHER_SIZE};
+use crate::edition::{edition_label, language_of_menu_txt, Language};
+use crate::exe::{identify, Build, ExeError, EXE_NAMES, KNOWN_BUILDS, LAUNCHER_SIZES};
 
 /// Which root a folder is under.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -225,9 +227,10 @@ pub fn alias_of<'a>(name: &str, entries: &'a [String]) -> Option<&'a str> {
 }
 
 /// The executable of an install folder: `atlantis2.exe` (the CD's, or the
-/// 1.01 patch's) or GOG's `Game.exe`, the first that is a known build. GOG's
-/// `atlantis2.exe` launcher is passed over; an executable of an unknown
-/// build is reported (the first one met, the launcher aside).
+/// 1.01 patch's) or `Game.exe` (GOG's, the Italian Collection's), the first
+/// that is a known build. An `atlantis2.exe` launcher ([`LAUNCHER_SIZES`]) is
+/// passed over; an executable of an unknown build is reported (the first one
+/// met, the launcher aside).
 pub fn find_exe(
     install: &dyn FileSource,
 ) -> Result<(&'static str, &'static Build, Vec<u8>), OpenError> {
@@ -239,9 +242,10 @@ pub fn find_exe(
         match identify(&data) {
             Ok(build) => return Ok((name, build, data)),
             Err(error) => {
-                let launcher = name == EXE_NAMES[0] && data.len() as u64 == LAUNCHER_SIZE;
+                let launcher =
+                    name == EXE_NAMES[0] && LAUNCHER_SIZES.contains(&(data.len() as u64));
                 if launcher {
-                    log::debug!("{name}: GOG's launcher, not the game");
+                    log::debug!("{name}: a launcher, not the game");
                 } else if unknown.is_none() {
                     unknown = Some(OpenError::Exe { name, error });
                 }
@@ -358,6 +362,20 @@ impl A2Files {
     /// (the French CD's) for files put together otherwise (tests).
     pub fn build(&self) -> &'static Build {
         self.exe.map_or(&KNOWN_BUILDS[0], |(_, b)| b)
+    }
+
+    /// The language of the texts and voices installed, told by
+    /// `loc\Menu.txt` ([`crate::edition`]); `None` when that file is no
+    /// known one.
+    pub fn language(&self) -> Option<Language> {
+        self.read(Folder::Loc, "Menu.txt")
+            .and_then(|d| language_of_menu_txt(&d))
+    }
+
+    /// The edition's name: the build's and the language
+    /// ([`edition_label`]).
+    pub fn label(&self) -> String {
+        edition_label(self.build(), self.language())
     }
 
     /// The executable's file name in the install folder (`atlantis2.exe`,
@@ -815,13 +833,23 @@ mod tests {
     fn the_executable_under_its_names() {
         // GOG: the launcher under atlantis2.exe, the game as Game.exe.
         let mut gog = MemFiles::new();
-        let mut launcher = vec![0u8; LAUNCHER_SIZE as usize];
+        let mut launcher = vec![0u8; LAUNCHER_SIZES[0] as usize];
         launcher[..2].copy_from_slice(b"MZ");
         launcher[0x3c] = 0x80;
         launcher[0x80..0x84].copy_from_slice(b"PE\0\0");
         launcher[0x88..0x8c].copy_from_slice(&0x4c19_e4d8u32.to_le_bytes());
         gog.insert("atlantis2.exe", launcher.clone());
         assert!(matches!(find_exe(&gog), Err(OpenError::NoExecutable)));
+        // The Italian Collection's launcher is passed over the same way.
+        let mut collection = MemFiles::new();
+        let mut autorun = launcher.clone();
+        autorun.resize(LAUNCHER_SIZES[1] as usize, 0);
+        autorun[0x88..0x8c].copy_from_slice(&0x4868_1974u32.to_le_bytes());
+        collection.insert("atlantis2.exe", autorun);
+        assert!(matches!(
+            find_exe(&collection),
+            Err(OpenError::NoExecutable)
+        ));
         gog.insert("Game.exe", b"MZ".to_vec());
         match find_exe(&gog) {
             Err(OpenError::Exe { name, error }) => {

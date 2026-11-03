@@ -5,19 +5,39 @@
 //! are listed: another build is reported with its identifiers, so that it
 //! can be added once compared.
 //!
-//! Three builds are known:
+//! Seven builds are known:
 //!
 //! - the French CD's `atlantis2.exe` (1.00, version string 3.15), the
 //!   reference every address in the comments belongs to;
 //! - the official 1.01 patch's `atlantis2.exe` (version 3.18, built
 //!   1999-11-17, one executable for the French and the English releases),
 //!   which a CD installation may hold;
-//! - GOG.com's `Game.exe`: the 1.01 executable with 18 byte patches of
-//!   GOG's (the install folder used as the CD, no free-space or CD
-//!   check, no `WM_FONTCHANGE` broadcast, fonts without antialiasing,
-//!   videos ended by their frame count only, input and window fixes for
-//!   current Windows). GOG's folder also holds an `atlantis2.exe`, a
-//!   splash-screen launcher that starts `Game.exe` ([`LAUNCHER_SIZE`]).
+//! - GOG.com's `Game.exe` of its build "1.0 w10 hotfix" (2022-07-13): the
+//!   1.01 executable with 18 byte patches of GOG's (the install folder
+//!   used as the CD, no free-space or CD check, no `WM_FONTCHANGE`
+//!   broadcast, fonts without antialiasing, videos ended by their frame
+//!   count only, input and window fixes for current Windows), one file
+//!   for its English, French, German and Spanish installations. GOG's
+//!   folder also holds an `atlantis2.exe`, a splash-screen launcher that
+//!   starts `Game.exe` ([`LAUNCHER_SIZES`]);
+//! - the `Game.exe` of GOG's two older builds, also one file for every
+//!   language: "1.0 w10" (2022-06-21), the same but for the two
+//!   `WM_FONTCHANGE` broadcasts, which it keeps, and "1.0" (2018-05-04),
+//!   1.01 with five of those patches only (the install folder as the CD,
+//!   no free-space check, the CD page closing at once). What the port
+//!   models of GOG's patches (the CD page) is in all three; the others
+//!   are Windows matters the port has no counterpart of;
+//! - the North American CD's `atlantis2.exe` (*Beyond Atlantis*,
+//!   DreamCatcher, 2000-04-05, version string 3.18 too): 1.01's code
+//!   relinked, whose additions an English `Font.txt` does not reach (a
+//!   Japanese line break, intros for four other languages), and one
+//!   change that shows: [`Build::film_subtitles_blitted`];
+//! - the `Game.exe` of the Italian *Atlantis Collection* DVD (2014): 1.01
+//!   with four of the five patches of GOG's 2018 build, byte for byte. It
+//!   lacks the one that takes a fixed drive for the CD, so the original
+//!   wants some CD drive in the machine (the port looks for no drive). Its
+//!   folder also holds an `atlantis2.exe`, here an AutoRun Architect
+//!   launcher that starts `Game.exe` ([`LAUNCHER_SIZES`]).
 //!
 //! 1.01 moved most of the code and data (the linker order changed), so
 //! what the port reads from the executable is read at each build's own
@@ -70,10 +90,22 @@ pub struct Build {
     pub version: &'static str,
     /// The release of its code.
     pub release: Release,
-    /// GOG.com's patches of the 1.01 executable (`Game.exe`).
+    /// GOG.com's patches of the 1.01 executable (`Game.exe`), of which
+    /// the port models the CD page closing at once. The Italian
+    /// *Atlantis Collection*'s `Game.exe` has that one too.
     pub gog: bool,
     /// The place sounds' listener table (@ 0x005dd2c0 in the reference).
     pub place_sounds: PlaceSoundTable,
+    /// Whether the subtitles of a dialog over a film (`cinema=N,M`) are
+    /// drawn before the frame's 800 x 600 enlargement. The film frame
+    /// (@ 0x0040bbb0) ends with the enlargement of the 640 x 480 surface
+    /// onto the screen (FUN_00402c30 @ 0x0040bc65); 1.00 and 1.01 draw
+    /// the dialog after that function returns (@ 0x0040c08e), on the
+    /// surface the next frame covers, so at 800 x 600 the text is never
+    /// seen. The North American CD draws it inside the frame, before the
+    /// enlargement (atlantis2-cd-us-2199552 @ 0x00403468, 0x0040347a).
+    /// At 640 x 480 the surface is the screen and the order shows nothing.
+    pub film_subtitles_blitted: bool,
 }
 
 /// The listener table of 1.01 (and GOG): the same 5780 bytes as the
@@ -85,7 +117,7 @@ const PLACE_SOUNDS_101: PlaceSoundTable = PlaceSoundTable {
 };
 
 /// The builds this port knows.
-pub const KNOWN_BUILDS: [Build; 3] = [
+pub const KNOWN_BUILDS: [Build; 7] = [
     Build {
         id: "atlantis2-cd-fr-2199552",
         label: "Atlantis II, French CD (1999)",
@@ -104,6 +136,7 @@ pub const KNOWN_BUILDS: [Build; 3] = [
             rows: 0x005d_d370,
             end: 0x005d_e954,
         },
+        film_subtitles_blitted: false,
     },
     Build {
         id: "atlantis2-patch101-2183168",
@@ -119,6 +152,7 @@ pub const KNOWN_BUILDS: [Build; 3] = [
         release: Release::V101,
         gog: false,
         place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
     },
     Build {
         id: "atlantis2-gog-fr-2183168",
@@ -133,15 +167,85 @@ pub const KNOWN_BUILDS: [Build; 3] = [
         release: Release::V101,
         gog: true,
         place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
+    },
+    Build {
+        id: "atlantis2-gog-w10-2183168",
+        label: "Atlantis II, GOG.com (patch 1.01, June 2022 build)",
+        size: 2_183_168,
+        pe_timestamp: 0x3832_8ed1,
+        md5: [
+            0x8c, 0x24, 0xad, 0x43, 0x7d, 0x9e, 0x99, 0x4f, 0x65, 0x7a, 0xd7, 0x75, 0x1b, 0x62,
+            0x67, 0x18,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: true,
+        place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
+    },
+    Build {
+        id: "atlantis2-gog-2018-2183168",
+        label: "Atlantis II, GOG.com (patch 1.01, 2018 build)",
+        size: 2_183_168,
+        pe_timestamp: 0x3832_8ed1,
+        md5: [
+            0xf8, 0x34, 0x0e, 0x5a, 0x01, 0x1f, 0xd2, 0x20, 0x7c, 0x5b, 0xb7, 0x8b, 0x4c, 0x2a,
+            0x96, 0x36,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: true,
+        place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
+    },
+    Build {
+        id: "atlantis2-cd-us-2199552",
+        label: "Atlantis II, CD (DreamCatcher, 2000)",
+        size: 2_199_552,
+        // 2000-04-05 14:37:39 UTC.
+        pe_timestamp: 0x38eb_4fb3,
+        md5: [
+            0x0f, 0x63, 0x4c, 0x46, 0x20, 0x68, 0x0d, 0xfe, 0xa6, 0x78, 0x26, 0x45, 0xc7, 0x9d,
+            0xc8, 0x4c,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: false,
+        // The same 5780 bytes, at this link's address.
+        place_sounds: PlaceSoundTable {
+            names: 0x005d_d370,
+            rows: 0x005d_d420,
+            end: 0x005d_ea04,
+        },
+        film_subtitles_blitted: true,
+    },
+    Build {
+        id: "atlantis2-collection-it-2183168",
+        label: "Atlantis II, Italian Collection (patch 1.01)",
+        size: 2_183_168,
+        pe_timestamp: 0x3832_8ed1,
+        md5: [
+            0x45, 0x34, 0xc3, 0x55, 0xa9, 0xbe, 0x89, 0x6c, 0x35, 0x07, 0xb4, 0x75, 0xe4, 0xb5,
+            0xa5, 0x70,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        release: Release::V101,
+        gog: true,
+        place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
     },
 ];
 
-/// The size of GOG's `atlantis2.exe`, the DotEmu splash-screen launcher
-/// that starts `Game.exe` (20,992 bytes, PE timestamp 0x4c19e4d8).
-pub const LAUNCHER_SIZE: u64 = 20_992;
+/// The sizes of the launchers that go by `atlantis2.exe` beside a
+/// `Game.exe`, none of them the game: GOG's DotEmu splash screen (20,992
+/// bytes, PE timestamp 0x4c19e4d8) and the Italian *Atlantis Collection*'s
+/// AutoRun Architect 2.20 program (446,464 bytes, PE timestamp 0x48681974),
+/// which reads `Launch\Settings.ini`.
+pub const LAUNCHER_SIZES: [u64; 2] = [20_992, 446_464];
 
 /// The file names the game's executable goes by: the CD's and the
-/// patch's `atlantis2.exe`, GOG's `Game.exe`.
+/// patch's `atlantis2.exe`, GOG's and the Italian Collection's `Game.exe`.
 pub const EXE_NAMES: [&str; 2] = ["atlantis2.exe", "Game.exe"];
 
 /// Why an executable is not a known build.
@@ -227,14 +331,14 @@ pub fn identify(exe: &[u8]) -> Result<&'static Build, ExeError> {
         .filter(|b| b.size == size && b.pe_timestamp == stamp)
         .collect();
     let md5: [u8; 16] = Md5::digest(exe).into();
-    candidates
-        .into_iter()
-        .find(|b| b.md5 == md5)
-        .ok_or(ExeError::Unknown {
-            size,
-            pe_timestamp: stamp,
-            md5: hex(&md5),
-        })
+    if let Some(b) = candidates.into_iter().find(|b| b.md5 == md5) {
+        return Ok(b);
+    }
+    Err(ExeError::Unknown {
+        size,
+        pe_timestamp: stamp,
+        md5: hex(&md5),
+    })
 }
 
 #[cfg(test)]
@@ -260,6 +364,10 @@ mod tests {
                 "5e218f7fa9754532ae1d7a4275443fef",
                 "255310e7d6bd7f823f680e2bd3be8b7f",
                 "254ecd84046d75c20a685e7d7f91d1d8",
+                "8c24ad437d9e994f657ad7751b626718",
+                "f8340e5a011fd2207c5bb78b4c2a9636",
+                "0f634c4620680dfea6782645c79dc84c",
+                "4534c355a9be896c3507b475e4b5a570",
             ]
         );
         // The listener table is 5780 bytes in every build.
@@ -272,8 +380,16 @@ mod tests {
                 .iter()
                 .filter(|b| b.release == Release::V101)
                 .count(),
-            2
+            6
         );
+        // Only the North American CD draws a film's subtitles before the
+        // 800 x 600 enlargement.
+        let later: Vec<&str> = KNOWN_BUILDS
+            .iter()
+            .filter(|b| b.film_subtitles_blitted)
+            .map(|b| b.id)
+            .collect();
+        assert_eq!(later, ["atlantis2-cd-us-2199552"]);
     }
 
     #[test]

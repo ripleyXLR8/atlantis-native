@@ -87,18 +87,24 @@ version): choose its installation folder.
 
 ### Supported editions
 
-The English CD (1997 and 2001 builds), the French CD (May and August
+The English CD (1997 and 2001 builds), the US English CD (Interplay,
+August 1997), the French CD (May and August
 1997), the German CD (May and August 1997), the Dutch and Swedish CDs (June
-1997), the Spanish CD (August 1997), the Italian CD (July 1997), the CD
-with Cryo's patch 1.01 (over the English, French, German, Dutch,
+1997), the Spanish CD (August 1997), the Italian CD (July 1997), the Czech
+CD (Bohemia Interactive, 2000, and its GAME4U Speciál 2 re-issue, 2001;
+copied or as images), the Brazilian Portuguese CD (*Atlantis: A Lenda
+Perdida*, MSD Multimídia, 1997; copied or as images), the CD with Cryo's patch 1.01 (over the English, French, German, Dutch,
 Swedish, Spanish or Italian CD), the GOG.com release in
-English, French, German, Spanish and Italian, the Traditional
+English, French, German, Spanish and Italian, the first game of the Italian
+*Atlantis Collection* DVD (2014; its installed folder), the Traditional
 Chinese CD (1998) and the Simplified Chinese CD (1999), copied or as
 images, Cryo's DVD (1998: English, French, German, Dutch, Spanish,
 Italian, Swedish and Japanese; the drive, a copy of a side or the images
 of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
-patch 1.01 and the GOG.com edition (see [Atlantis II](#atlantis-ii)).
+patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
+the GOG.com edition and the Italian *Atlantis Collection* DVD (see
+[Atlantis II](#atlantis-ii)).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -145,8 +151,8 @@ program opens on the library's screen to choose the one to play, the
 last played selected. Each game is shown as its name and edition,
 *Atlantis: The Lost Tales, GOG.com, French (1999 build)*, *Atlantis: The
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
-it is read from images of the CDs), *Atlantis II, GOG.com (patch 1.01)*
-or *Atlantis II, French CD (1999)*, and its folder.
+it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
+1.01)* or *Atlantis II, French CD (1999)*, and its folder.
 
 | Action | Mouse | Keyboard |
 |---|---|---|
@@ -243,9 +249,10 @@ What to pick:
   folder holding `atlantis.exe` and the four `BIGCD` archives, or Cryo's
   DVD (the drive or a copy of a side, then the language). CD images
   cannot be read in the browser.
-- *Atlantis II*, GOG.com: the installation folder (the one holding
-  `Game.exe` and `DATAS_A2`).
-- *Atlantis II*, CD (version 1.00, or patched to 1.01): the folder of the
+- *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
+  installation folder (the one holding `Game.exe` and `DATAS_A2`).
+- *Atlantis II*, CD (the French CD, also patched to 1.01, or the North
+  American *Beyond Atlantis*): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
   with a copy of each of the four CDs in it, for example in folders
   `CD1` to `CD4`, each holding the disc's `DATAS_A2` folder (copy the
@@ -431,7 +438,10 @@ holds "atlantis" (*Atlantis 2*, *Atlantis II*, *Beyond Atlantis*...).
 - GOG.com: the installation folder (the one holding `Game.exe`, for
   example `C:\Program Files\GOG Galaxy\Games\Atlantis 2` or
   `C:\GOG Games\Atlantis 2`). It holds every disc, so no disc is asked
-  for.
+  for. GOG.com installs one program for its four languages (English,
+  French, German, Spanish; the texts and voices are the data's), and
+  each of them plays. Installations of GOG's older builds (2018, June
+  2022) play too.
 - CD: the folder of the installed game (the one holding `atlantis2.exe`,
   `wam`, `scenar`...), with the images of the four CDs (`.iso`, `.bin`,
   `.img`, `.mdf`, `.nrg`) or copies of the CDs in it or in a folder inside
@@ -451,6 +461,22 @@ longer overlap) and broken after accented letters too, and no Alt+Enter
 (F11 switches full screen with every version). A CD installation patched
 to 1.01 (the patch's `atlantis2.exe` copied over the CD's) is played the
 same way.
+
+The North American CD (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs,
+English) installs and opens as the French CD does: the installed folder
+with the images or copies of its four CDs. Its program has 1.01's code, so
+it plays as 1.01 too. Its intro starts with DreamCatcher's logo, and its
+second film ends without the *Atlantis II* title: that is how the disc has
+them.
+
+The Italian *Atlantis Collection* (DVD, 2014) installs one folder as GOG.com's
+does, Italian only: point Atlantis Native at it (no disc is needed). Its
+`atlantis2.exe` is a launcher, which is passed over for `Game.exe`, version
+1.01's code. The intro shows its second film twice, because the folder holds
+that film under two names. Films 19, 55 and 66 play the tracks of the
+collection's `DATAS_A2\APC\`, which sound Russian, with the bug fixes off (the
+original's way); by default they play the Italian tracks installed beside the
+voices.
 
 The game opens in full screen, as the original does: its options file
 `atlant2.cfg` says full screen until the choice is changed. F11 switches
@@ -513,7 +539,7 @@ it. Its entries:
 - **Screen**: the original's two screen sizes, 640 x 480 and 800 x 600
   (below); with the original graphics only.
 - **Fix original bugs**: *On* (every fix, the default), *Off* (none:
-  as the original), or *Custom (n/4)* when some are on and some off;
+  as the original), or *Custom (n/6)* when some are on and some off;
   Enter turns them all on, then all off.
 - **Choose the bug fixes...**: opens a box of its own, in the same
   style, with *All on*, *All off (as the original)*, one switch per fix
@@ -537,6 +563,18 @@ it. Its entries:
     may take it for a click on another place's object: back to Tibet
     from the fourth stone in one chapter, the water's film from the
     ninth with the horse in another.
+  - **800 x 600: subtitles over the films**: at 800 x 600 the French CD,
+    the patch 1.01 and GOG.com's edition draw the subtitles of a dialog
+    played over a film too late to be seen, so they never show; with the
+    fix they do. DreamCatcher's CD draws them in time: it shows them
+    either way.
+  - **Films: sound in the game's language**: three films (19, 55 and 66)
+    read their sound from a folder that, on GOG.com, holds the English
+    tracks whatever the language installed, and on the Italian collection
+    tracks that are not the Italian ones (they sound Russian). The game's
+    own tracks are installed beside the voices, unused; with the fix these
+    films play them. Nothing changes on GOG.com in English or on the CDs,
+    whose films already speak the game's language.
 - **Arrow keys turn**: on by default, the arrow keys turn the view as
   the mouse does; off, as in the original, only the mouse turns it. On,
   the click that brings the window back to the front only takes the
@@ -549,7 +587,8 @@ on Linux, `%APPDATA%\atlantis-native\atlantis2` on Windows,
 beside the saves (`save\ATL<player>_<slot>.SAV`, the original's files)
 and the original's options file `atlant2.cfg`. `settings.ini` has one
 line per fix (`fix_music_end`, `fix_music_restart`, `fix_music_mark`,
-`fix_ireland_clicks`, each `on` or `off`); a `settings.ini` written by
+`fix_ireland_clicks`, `fix_film_subtitles`, `fix_film_language`, each `on`
+or `off`); a `settings.ini` written by
 an earlier version, with its single `minor_bug_fixes` line, is still
 read: that line sets every fix. From the command line, `--hd` turns HD on and
 `--widescreen` HD with widescreen, and `--original` turns every bug fix
@@ -663,8 +702,8 @@ leaves the deleted player's files behind.)
 
 The files are those the build you play writes: the 1997 CDs write a
 95-byte `players.atl` (five chapter and letter bytes, where the later
-builds write six), and the English one and the May 1997 French and
-German ones store typed names in capitals.
+builds write six), and the May 1997 English, French and German ones
+store typed names in capitals.
 
 The same folder holds `settings.ini`: the options of the game's menus
 (subtitles, OMNI 3D mode, the master, music, effects and voices volumes,
@@ -713,8 +752,10 @@ not kept, erase saves you no longer need.
   deleting a player deletes its own checkpoints.
 - The subtitles of the 2001 and GOG.com builds are drawn with Liberation
   Sans, which has the metrics of the original's Arial (see
-  [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French
-  and German CDs' and the Spanish and Italian CDs'; the 1997 English CD's, the May 1997 French and
+  [Subtitles](TECHNICAL.md#subtitles)), as are the August 1997 French,
+  German and US English CDs', the Spanish and Italian CDs' and the
+  Czech CD's (its texts read in the Central European code page, as a
+  Czech Windows draws them) and the Brazilian CD's; the May 1997 English, French and
   German CDs' and the Dutch and Swedish CDs' are drawn with their own
   pixel font, as they did (the accents and umlauts included). The Chinese CDs' are drawn with the
   player's own MingLiU or SimSun when `mingliu.ttc` (Traditional) or

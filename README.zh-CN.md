@@ -60,6 +60,7 @@ Cryo Interactive 1997 年作品《亚特兰蒂斯：失落的传说》（*Atlant
 | macOS 11 及以上，Apple Silicon | `atlantis-native-macos-arm64.dmg` |
 | Linux x86-64（glibc 2.35+、ALSA） | `atlantis-native-linux-x64.tar.gz` |
 | Linux 64 位 ARM，例如 Raspberry Pi 4 或 5 | `atlantis-native-linux-arm64.tar.gz` |
+| 掌机（[PortMaster](https://portmaster.games/)，64 位 ARM，如 R36S），第一部游戏 | `atlantis-native-portmaster.zip`（解压到 `ports` 文件夹，游戏文件放进 `ports/atlantisnative/gamedata/`） |
 
 网页版：**https://ripleyxlr8.github.io/atlantis-native/**（Chrome、Edge、Firefox 或 Safari）。
 在网页中选择你的游戏文件夹即可：文件只在你的浏览器中读取，不会发送到任何地方。
@@ -73,7 +74,7 @@ Cryo Interactive 1997 年作品《亚特兰蒂斯：失落的传说》（*Atlant
 
 Atlantis Native **不含任何游戏数据**，请使用你自己的正版游戏。
 除了两款中文版，还支持英文、法文、德文、荷兰文、瑞典文、西班牙文、意大利文光盘版、
-Cryo 1.01 补丁，以及 [GOG.com](https://www.gog.com/) 版（完整列表见[英文 README](README.md#you-need-the-game)）。
+Cryo 1.01 补丁、《Atlantis II》的北美 DreamCatcher 光盘版（*Beyond Atlantis*，2000）、意大利文 *Atlantis Collection* DVD，以及 [GOG.com](https://www.gog.com/) 版（完整列表见[英文 README](README.md#you-need-the-game)）。
 
 ## 快速开始
 
