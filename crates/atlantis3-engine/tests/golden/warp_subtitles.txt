@@ -3,10 +3,16 @@
 # slots' clear, the stop by voice name and the flip's text draw run unmodified, in the order of the STEP
 # lines, at three screen sizes; a voice plays from its Play until `end`, `stop` or `clearvoices`. Texts
 # given by the md5 of their Windows-1252 bytes (- empty). Ops: flip | sub d l r g b (the star room's tip:
-# GetTextFromDial, flag 0) | clear | voice d l r g b | end NAME | stop NAME | clearvoices | subon 0|1.
-# LAYOUT mL mR mT mB halign valign; DRAW x y colour font n dx md5(line); after each flip
+# GetTextFromDial, flag 0) | caption d l r g b (the same with flag 1: a cinematic caption) | clear |
+# voice d l r g b | end NAME | stop NAME | clearvoices | subon 0|1. FONT: the fonts made at the size
+# (CreateFontA). LAYOUT mL mR mT mB halign valign; DRAW x y colour font n dx md5(line); after each flip
 # SLOT k busy rgb voice md5(text) and SUB flag rgb md5(text). The world's dialogs: Bagdad (3).
 SCREEN 640 480
+FONT AtlFont_Default height=18 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Bulle height=17 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Special height=21 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Titre height=53 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Credit height=16 face=Arial weight=400 charset=0 quality=4 pitch=2
 STEP 0 flip
 SLOT 0 0 255,255,255 - -
 SLOT 1 0 255,255,255 - -
@@ -223,7 +229,60 @@ SLOT 0 0 255,255,255 - -
 SLOT 1 0 255,255,255 - -
 SLOT 2 0 255,255,255 - -
 SUB 0 200,255,255 -
+STEP 38 caption 216 1 200 255 255
+STEP 39 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 37 412 c8ffff AtlFont_Special 75 11,10,10,10,10,4,10,5,5,4,4,5,9,10,5,6,10,5,6,10,10,9,10,5,9,10,10,4,5,5,10,10,10,9,5,10,10,10,5,9,10,4,4,10,5,5,5,4,10,5,5,10,10,5,5,10,10,6,14,4,5,4,10,9,5,4,10,4,10,5,10,4,10,10,9 e4dba11e3f57f9d9a4780efd29e57494
+DRAW 146 433 c8ffff AtlFont_Special 45 9,5,10,4,4,10,9,5,5,10,10,6,10,10,5,10,10,10,9,5,4,10,9,5,10,6,10,5,10,10,10,10,10,6,9,5,4,10,5,4,10,4,10,9,5 1e3caceded385a2500f798d2edabc63e
+SLOT 0 0 255,255,255 - -
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 e1e87901243a2ce5ad80c3a321a23a1a
+STEP 40 voice 199 1 200 255 255
+STEP 41 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 37 412 c8ffff AtlFont_Special 75 11,10,10,10,10,4,10,5,5,4,4,5,9,10,5,6,10,5,6,10,10,9,10,5,9,10,10,4,5,5,10,10,10,9,5,10,10,10,5,9,10,4,4,10,5,5,5,4,10,5,5,10,10,5,5,10,10,6,14,4,5,4,10,9,5,4,10,4,10,5,10,4,10,10,9 e4dba11e3f57f9d9a4780efd29e57494
+DRAW 146 433 c8ffff AtlFont_Special 45 9,5,10,4,4,10,9,5,5,10,10,6,10,10,5,10,10,10,9,5,4,10,9,5,10,6,10,5,10,10,10,10,10,6,9,5,4,10,5,4,10,4,10,9,5 1e3caceded385a2500f798d2edabc63e
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 e1e87901243a2ce5ad80c3a321a23a1a
+STEP 42 clear
+STEP 43 flip
+LAYOUT 9 11 36 4 0 1
+DRAW 9 439 000000 AtlFont_Default 86 10,8,4,9,9,8,4,9,3,8,8,4,4,9,5,9,4,4,3,9,4,7,9,3,9,8,5,4,9,4,9,4,4,4,9,9,8,8,4,3,9,4,3,9,5,9,4,8,4,9,8,4,13,9,9,4,8,4,9,8,4,4,12,8,9,3,8,4,13,7,8,4,9,5,9,8,4,9,3,3,9,4,4,5,4,3 8eca63c02015d99560a0d6198fd53cd7
+DRAW 9 457 000000 AtlFont_Default 11 8,9,8,9,8,7,5,4,5,4,9 bc82b7ce7a1a6c4c32d92c1fe50ab180
+LAYOUT 10 10 35 5 0 1
+DRAW 10 438 c8ffff AtlFont_Default 86 10,8,4,9,9,8,4,9,3,8,8,4,4,9,5,9,4,4,3,9,4,7,9,3,9,8,5,4,9,4,9,4,4,4,9,9,8,8,4,3,9,4,3,9,5,9,4,8,4,9,8,4,13,9,9,4,8,4,9,8,4,4,12,8,9,3,8,4,13,7,8,4,9,5,9,8,4,9,3,3,9,4,4,5,4,3 8eca63c02015d99560a0d6198fd53cd7
+DRAW 10 456 c8ffff AtlFont_Default 11 8,9,8,9,8,7,5,4,5,4,9 bc82b7ce7a1a6c4c32d92c1fe50ab180
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 0 200,255,255 -
+STEP 44 caption 216 3 200 255 255
+STEP 45 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 40 370 c8ffff AtlFont_Special 74 11,10,10,5,5,10,3,10,5,10,4,5,5,10,10,9,5,10,10,6,10,10,5,5,4,4,5,10,10,10,9,10,4,5,5,10,10,9,10,6,10,5,9,10,5,9,10,6,9,4,6,5,10,10,5,9,10,9,5,9,10,10,9,5,5,4,4,5,10,10,9,10,4,5 050c296a4c39e9ed8c7ffa14dd3abc87
+DRAW 19 391 c8ffff AtlFont_Special 79 9,3,10,10,10,6,10,5,10,10,9,10,10,9,6,4,6,5,10,10,10,9,5,10,10,10,4,4,10,5,9,10,10,9,5,10,4,4,10,5,4,10,10,5,4,10,9,5,9,10,10,6,10,9,5,4,3,10,9,10,4,10,10,5,5,10,10,9,10,9,10,5,5,4,4,5,4,10,4 df7c69be60670cd996aa9829516910ff
+DRAW 18 412 c8ffff AtlFont_Special 77 5,10,10,10,6,10,4,5,5,10,10,9,10,4,5,10,5,4,10,9,10,4,4,9,10,6,5,10,10,5,6,10,5,14,10,10,10,10,5,10,10,4,9,5,9,10,5,5,6,10,9,10,6,5,10,10,5,9,10,10,14,4,10,5,10,5,5,6,10,9,10,6,9,5,4,10,9 3ec4d82c981023e760a83c7d5d09382e
+DRAW 261 433 c8ffff AtlFont_Special 16 8,4,10,10,8,5,4,10,4,10,5,10,4,10,9,5 324962d2c9db941b86d2738508e5341a
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 d967b51d04462f7dbc412c4f925797a1
+STEP 46 clear
+STEP 47 clearvoices
+STEP 48 flip
+SLOT 0 0 255,255,255 - -
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 0 200,255,255 -
 SCREEN 800 600
+FONT AtlFont_Default height=21 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Bulle height=19 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Special height=24 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Titre height=60 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Credit height=18 face=Arial weight=400 charset=0 quality=4 pitch=2
 STEP 0 flip
 SLOT 0 0 255,255,255 - -
 SLOT 1 0 255,255,255 - -
@@ -430,7 +489,57 @@ SLOT 0 0 255,255,255 - -
 SLOT 1 0 255,255,255 - -
 SLOT 2 0 255,255,255 - -
 SUB 0 200,255,255 -
+STEP 38 caption 216 1 200 255 255
+STEP 39 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 33 526 c8ffff AtlFont_Special 84 13,12,11,11,12,5,11,6,6,5,4,6,11,12,6,7,12,6,7,12,11,11,12,6,11,12,11,4,6,6,11,12,11,11,6,11,11,12,6,11,12,4,4,12,6,6,6,4,12,6,6,12,11,6,6,11,12,7,16,5,6,4,12,11,6,4,12,5,11,6,12,5,11,12,11,6,12,6,12,5,4,12,11,6 439155ca9291492a87230390b09c96ef
+DRAW 234 550 c8ffff AtlFont_Special 36 10,12,7,11,11,6,11,12,11,11,6,4,12,11,6,11,7,12,6,12,11,11,12,11,7,11,6,5,11,6,5,11,5,12,11,6 7d86aedca2024bf5398ae9fc6337d170
+SLOT 0 0 255,255,255 - -
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 e1e87901243a2ce5ad80c3a321a23a1a
+STEP 40 voice 199 1 200 255 255
+STEP 41 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 33 526 c8ffff AtlFont_Special 84 13,12,11,11,12,5,11,6,6,5,4,6,11,12,6,7,12,6,7,12,11,11,12,6,11,12,11,4,6,6,11,12,11,11,6,11,11,12,6,11,12,4,4,12,6,6,6,4,12,6,6,12,11,6,6,11,12,7,16,5,6,4,12,11,6,4,12,5,11,6,12,5,11,12,11,6,12,6,12,5,4,12,11,6 439155ca9291492a87230390b09c96ef
+DRAW 234 550 c8ffff AtlFont_Special 36 10,12,7,11,11,6,11,12,11,11,6,4,12,11,6,11,7,12,6,12,11,11,12,11,7,11,6,5,11,6,5,11,5,12,11,6 7d86aedca2024bf5398ae9fc6337d170
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 e1e87901243a2ce5ad80c3a321a23a1a
+STEP 42 clear
+STEP 43 flip
+LAYOUT 9 11 36 4 0 1
+DRAW 9 574 000000 AtlFont_Default 98 12,10,5,10,10,10,5,10,4,10,9,5,5,10,6,10,5,5,4,10,5,9,10,4,10,10,6,5,10,5,10,4,5,5,10,10,10,9,5,4,10,5,4,10,6,10,4,10,5,10,10,5,14,10,10,4,9,4,10,10,5,5,14,10,10,4,9,5,14,9,9,5,10,6,10,9,5,10,4,4,10,4,5,6,4,4,5,10,10,9,10,10,9,6,4,6,5,10 25616d326930b2f1be242a8eeda3c698
+LAYOUT 10 10 35 5 0 1
+DRAW 10 573 c8ffff AtlFont_Default 98 12,10,5,10,10,10,5,10,4,10,9,5,5,10,6,10,5,5,4,10,5,9,10,4,10,10,6,5,10,5,10,4,5,5,10,10,10,9,5,4,10,5,4,10,6,10,4,10,5,10,10,5,14,10,10,4,9,4,10,10,5,5,14,10,10,4,9,5,14,9,9,5,10,6,10,9,5,10,4,4,10,4,5,6,4,4,5,10,10,9,10,10,9,6,4,6,5,10 25616d326930b2f1be242a8eeda3c698
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 0 200,255,255 -
+STEP 44 caption 216 3 200 255 255
+STEP 45 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 32 502 c8ffff AtlFont_Special 82 12,12,11,6,6,11,4,12,6,12,5,6,6,11,12,11,6,11,12,7,11,11,6,6,6,4,6,11,12,11,11,12,5,6,6,12,11,11,12,7,12,6,11,12,6,11,12,7,11,5,7,6,11,12,6,11,12,11,6,11,12,11,11,6,6,6,4,6,11,12,11,12,5,6,6,11,4,12,11,12,7,11 cd67d67f4f24f7e94f42b2fe01fc06a5
+DRAW 10 526 c8ffff AtlFont_Special 88 10,12,11,12,11,11,7,5,7,6,11,12,11,11,6,11,11,12,4,4,12,6,11,12,11,11,6,12,4,4,12,6,5,12,11,6,4,12,11,6,11,12,11,7,12,11,6,4,4,12,11,12,5,12,11,6,6,12,11,11,12,11,12,6,6,6,4,6,4,11,5,6,6,12,11,11,7,12,5,6,6,12,11,11,11,5,6,12 384b5ba230bcbca2abcb25bd67aa2a1e
+DRAW 49 550 c8ffff AtlFont_Special 77 3,12,11,12,4,5,11,12,7,6,11,12,6,7,12,6,16,12,11,11,12,6,11,11,5,11,6,11,12,6,6,7,12,11,12,7,6,11,11,6,11,11,12,16,5,11,6,12,6,6,7,12,11,12,7,11,6,4,12,11,6,11,5,12,11,10,6,4,12,5,11,6,12,5,11,11,6 b959902d23a650bce6cbcfea65a5aa50
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 d967b51d04462f7dbc412c4f925797a1
+STEP 46 clear
+STEP 47 clearvoices
+STEP 48 flip
+SLOT 0 0 255,255,255 - -
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 0 200,255,255 -
 SCREEN 1024 768
+FONT AtlFont_Default height=23 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Bulle height=20 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Special height=26 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Titre height=66 face=Arial weight=400 charset=0 quality=4 pitch=2
+FONT AtlFont_Credit height=19 face=Arial weight=400 charset=0 quality=4 pitch=2
 STEP 0 flip
 SLOT 0 0 255,255,255 - -
 SLOT 1 0 255,255,255 - -
@@ -625,6 +734,51 @@ SUB 0 200,255,255 -
 STEP 35 voice 214 2 200 200 200
 STEP 36 clearvoices
 STEP 37 flip
+SLOT 0 0 255,255,255 - -
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 0 200,255,255 -
+STEP 38 caption 216 1 200 255 255
+STEP 39 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 44 690 c8ffff AtlFont_Special 99 14,13,12,12,13,5,12,6,6,5,4,6,12,13,6,8,13,6,8,13,12,11,13,6,12,13,12,4,6,6,12,13,12,12,6,12,12,13,6,12,13,4,4,13,6,6,7,4,13,6,6,13,12,6,6,12,13,8,18,5,6,4,13,12,6,4,13,5,12,6,13,5,12,13,12,6,13,6,13,5,4,13,12,6,6,12,13,8,12,12,6,12,13,12,12,6,4,13,12 9b6327753167a92ebe49c53a00d90233
+DRAW 409 716 c8ffff AtlFont_Special 21 11,8,13,7,13,12,12,13,12,8,12,6,5,12,7,5,12,5,13,12,6 f135173b567c9b92daa84f5380ffeeaa
+SLOT 0 0 255,255,255 - -
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 e1e87901243a2ce5ad80c3a321a23a1a
+STEP 40 voice 199 1 200 255 255
+STEP 41 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 44 690 c8ffff AtlFont_Special 99 14,13,12,12,13,5,12,6,6,5,4,6,12,13,6,8,13,6,8,13,12,11,13,6,12,13,12,4,6,6,12,13,12,12,6,12,12,13,6,12,13,4,4,13,6,6,7,4,13,6,6,13,12,6,6,12,13,8,18,5,6,4,13,12,6,4,13,5,12,6,13,5,12,13,12,6,13,6,13,5,4,13,12,6,6,12,13,8,12,12,6,12,13,12,12,6,4,13,12 9b6327753167a92ebe49c53a00d90233
+DRAW 409 716 c8ffff AtlFont_Special 21 11,8,13,7,13,12,12,13,12,8,12,6,5,12,7,5,12,5,13,12,6 f135173b567c9b92daa84f5380ffeeaa
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 e1e87901243a2ce5ad80c3a321a23a1a
+STEP 42 clear
+STEP 43 flip
+LAYOUT 9 11 36 4 0 1
+DRAW 9 740 000000 AtlFont_Default 98 12,10,6,11,11,10,6,11,4,10,10,6,6,11,7,11,6,6,4,11,6,9,11,4,11,10,7,6,11,6,11,4,6,6,11,11,10,10,6,4,11,6,4,11,7,11,4,10,6,11,10,6,16,11,11,4,10,4,11,10,6,6,16,10,11,4,10,6,16,10,10,6,11,7,11,10,6,11,4,4,11,4,6,7,4,4,6,11,11,10,11,10,9,7,4,7,6,11 25616d326930b2f1be242a8eeda3c698
+LAYOUT 10 10 35 5 0 1
+DRAW 10 739 c8ffff AtlFont_Default 98 12,10,6,11,11,10,6,11,4,10,10,6,6,11,7,11,6,6,4,11,6,9,11,4,11,10,7,6,11,6,11,4,6,6,11,11,10,10,6,4,11,6,4,11,7,11,4,10,6,11,10,6,16,11,11,4,10,4,11,10,6,6,16,10,11,4,10,6,16,10,10,6,11,7,11,10,6,11,4,4,11,4,6,7,4,4,6,11,11,10,11,10,9,7,4,7,6,11 25616d326930b2f1be242a8eeda3c698
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 0 200,255,255 -
+STEP 44 caption 216 3 200 255 255
+STEP 45 flip
+LAYOUT 10 10 35 25 2 1
+DRAW 10 664 c8ffff AtlFont_Special 104 13,13,12,6,6,12,4,13,6,13,5,6,6,12,13,12,6,12,13,8,12,12,6,6,6,4,6,12,13,12,11,13,5,6,6,13,12,12,13,8,13,6,12,13,6,12,13,8,11,5,8,6,12,13,6,12,13,12,6,12,13,12,12,6,6,6,4,6,12,13,11,13,5,6,6,12,4,13,12,13,8,12,6,12,13,12,13,12,11,8,5,8,6,12,13,12,12,6,12,12,13,4,4,13 be7bd28facaabb2591abceb28709102f
+DRAW 23 690 c8ffff AtlFont_Special 103 11,13,12,12,6,13,4,4,13,6,5,13,12,6,4,13,12,6,12,13,12,8,13,12,6,4,4,13,11,13,5,13,12,6,6,13,12,11,13,11,13,6,6,6,4,6,4,12,5,6,7,13,12,12,8,13,5,6,6,13,12,12,12,5,6,13,6,4,13,12,13,4,5,12,13,8,6,12,13,6,8,13,6,18,13,12,12,13,6,12,12,5,12,6,12,13,6,7,8,13,11,13,8 aa99b036bbb96ab346fa6dbc05f7ac30
+DRAW 319 716 c8ffff AtlFont_Special 40 11,12,6,12,12,13,18,5,12,6,13,6,6,8,13,11,13,8,12,6,4,13,12,6,12,5,13,12,11,6,4,13,5,12,6,13,5,12,12,6 1c27aaab33500c3a2d63a14bb46cc7e2
+SLOT 0 1 200,255,255 loc\voix\fra\bagdad\SHEH0481.apc 25616d326930b2f1be242a8eeda3c698
+SLOT 1 0 255,255,255 - -
+SLOT 2 0 255,255,255 - -
+SUB 1 200,255,255 d967b51d04462f7dbc412c4f925797a1
+STEP 46 clear
+STEP 47 clearvoices
+STEP 48 flip
 SLOT 0 0 255,255,255 - -
 SLOT 1 0 255,255,255 - -
 SLOT 2 0 255,255,255 - -

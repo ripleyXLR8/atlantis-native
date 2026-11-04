@@ -9,6 +9,18 @@
 //! The two maps, the jewel case, the game boy and the unicorn's 3D board
 //! ([`crate::licorne`]) are drawn ([`crate::maps`], `screens_draw`); the
 //! other screens' drawing and their hover animations are M4.
+//!
+//! Each handler has one call of the flip (@ 0x0040fdf0, the texts of
+//! @ 0x0040de60: `Game::flip_texts`), after its drawing and before its
+//! clicks; the paths that leave before drawing do not flip
+//! [CONFIRMED-STATIC]: the map's refusals (@ 0x004057ec), the scarab's
+//! close with `VUE` > 27 (@ 0x004320fc), the jewel case's tick with the
+//! three gems taken (@ 0x004131f4), the game boy's sixth blink
+//! (@ 0x0041fb6f), the unicorn's win (@ 0x0042f82c). The draws' other
+//! guards are the screens' open bytes (map 0x0074e960, tower map
+//! 0x0074ebac, scarab 0x0075931c, game boy 0x0075604c, remote
+//! 0x00789724), set by the starts and 1 while the screen runs; the
+//! skull's handler always flips.
 
 use std::sync::Arc;
 
@@ -223,6 +235,7 @@ pub(super) fn frame(
         Screen::CarteTour => {
             // @ 0x00406780: drawn, then any click closes (@ 0x004069c9).
             h.g.tour_draw();
+            h.g.flip_texts();
             !(left || right)
         }
         Screen::Telecommande => telecommande(h, left, right, sprite),
@@ -272,6 +285,8 @@ fn scarabee(h: &mut Hx, left: bool, right: bool) -> bool {
             }
         }
     }
+    // The flip (@ 0x004321a7), before the clicks.
+    h.g.flip_texts();
     if left && !h.g.puzzles.screens.scarab_open {
         h.run("(PlaySound=110)");
         h.g.puzzles.screens.scarab_open = true;
@@ -301,6 +316,8 @@ fn carte(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> bool {
         return false;
     }
     h.g.carte_draw();
+    // The flip (@ 0x00405936), before the clicks.
+    h.g.flip_texts();
     if !left {
         return !right;
     }
@@ -334,6 +351,8 @@ fn carte(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> bool {
 /// elsewhere button 0x2c = home, `(Chapter=607)`. The loop stays; a
 /// right click leaves.
 fn telecommande(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> bool {
+    // The flip (@ 0x004d0742), before the clicks.
+    h.g.flip_texts();
     if !left {
         return !right;
     }
@@ -408,6 +427,8 @@ fn hide_worlds(h: &mut Hx) {
 /// the interdimension (as @ 0x00409cc0, with `flag901` := 1 before the
 /// commands) and leaves; a right click leaves.
 fn crane(h: &mut Hx, left: bool, right: bool) -> bool {
+    // The flip (@ 0x00409bbb), before the clicks.
+    h.g.flip_texts();
     if left {
         h.set_flag(901, 1);
         h.enter_interdimension();
@@ -491,6 +512,8 @@ fn ecrin(h: &mut Hx, left: bool, sprite: Option<i32>) -> bool {
         }
     }
     h.g.ecrin_draw();
+    // The flip (@ 0x00413321), before the click.
+    h.g.flip_texts();
     if left {
         let st = &mut h.g.puzzles.screens;
         if let Some(k) = hovered {
@@ -615,6 +638,8 @@ fn gboy(h: &mut Hx, left: bool, right: bool) -> bool {
     }
     h.g.puzzles.tourmagi.dice = dice;
     h.g.gboy_draw(offset);
+    // The flip (@ 0x0041fd5e).
+    h.g.flip_texts();
     true
 }
 
@@ -670,6 +695,8 @@ fn licorne(h: &mut Hx, left: bool, right: bool) -> bool {
     h.g.pointer = board.pointer;
     if stay {
         h.g.licorne_draw(&mut board);
+        // The flip (@ 0x0042fa28).
+        h.g.flip_texts();
     }
     h.g.puzzles.screens.licorne = Some(board);
     stay

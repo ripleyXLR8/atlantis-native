@@ -168,6 +168,18 @@ impl Game {
                 args[1],
                 [args[2] as u8, args[3] as u8, args[4] as u8],
             ),
+            // The setter with flag 1 (a cinematic caption's branch of the
+            // flip, as the videos' captions set it).
+            "caption" => {
+                self.c_subtitle_set(
+                    args[0],
+                    args[1],
+                    [args[2] as u8, args[3] as u8, args[4] as u8],
+                );
+                if let Some(sub) = self.subtitle.as_mut() {
+                    sub.caption = true;
+                }
+            }
             "clear" => self.c_subtitle_clear(),
             "voice" => self.play_voice_c(args[0], args[1], args[2], args[3], args[4]),
             "clearvoices" => self.voices_clear(),
