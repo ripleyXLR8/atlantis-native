@@ -106,7 +106,9 @@ impl Run {
         self.g.run_command("(ObjetEnMain=LDM_CARTELIEUX)");
         self.frames(10);
         let (w, h) = (self.g.width() as i32, self.g.height() as i32);
-        self.g.set_pointer(w / 2 - 60, h / 2 + 100);
+        // On label 6 (place 1): its hover test sits at (cx − 25, cy + 1),
+        // the goldens' first hover points at (cx − 20, cy + 10) / (cx − 22, cy + 6).
+        self.g.set_pointer(w / 2, h / 2 + 10);
         self.frames(10);
     }
 }
