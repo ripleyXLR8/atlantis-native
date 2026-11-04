@@ -140,6 +140,7 @@ its own switch (`BugFix`), all on by default:
 | `fix_ireland_clicks` | `Engine::plain_value_fixed` | in Ireland's two puzzle views (Brigid's cross, view 2; the ogham stones, view 6) a click on a puzzle zone runs its puzzle and nothing else: the original also reads the zone's plain value as the index of a named zone, so that in chapter 12 the fourth stone sends the player back to Tibet as the weeping head does, and in chapter 14 the ninth, with the horse in hand, plays the water's film |
 | `fix_film_subtitles` | `Engine::film_subtitles_unseen` | at 800 x 600 the subtitles of a dialog over a film (`cinema=N,M`) are seen: 1.00 and 1.01 draw them after the film frame's enlargement (`FUN_00402c30` @ 0x0040bc65, then `FUN_00480840` @ 0x0040c08e) on the 640 x 480 surface the next frame covers, and the North American CD's build draws them before it (`Build::film_subtitles_blitted`), so there the switch changes nothing |
 | `fix_film_language` | `film_tracks::own_track` (`Engine::load_sound`) | films 19, 55 and 66 play `datas_a2\apc\dial\cine0NN.apc` when it fits (same rate and channels, whole, within a film frame of the `apc\` track); the original reads only `datas_a2\apc\` (`cine%03d.apc`, @ 0x0047a5c0 → 0x00402760), so its GOG.com French, German and Spanish play the English tracks and the Italian collection tracks that sound Russian. It chooses by the files, no edition or language: the CDs have no such file in `dial\` and GOG.com's English the same bytes, so nothing changes there; in the five languages' tracks the music is at the same place, sample for sample, as in the English one (`tests/film_language.rs`; below) |
+| `fix_wooden_girl` | `Script` (`hideperso`, `Host::hideperso_hides_object`) | `hideperso=NAME` also hides the object named NAME (`hideobjet=NAME`). The original's `hideperso` looks for a character only (FUN_0048c6b0 matches a record's id and kind, FUN_0048c730 the show table's row): in `livre.wam` the wooden girl is the object `FILLE_BOIS` (shown at load on views 51-57 and 59-61), which `defnames.con` names as a character too, and chapter 16 hides it with `hideperso` once the goddess has answered about the statue or the poet, then shows the freed girl `FILLE_LIVRE`: in the original both are drawn in the book. `FILLE_BOIS` is the only name of both sections a script hides or shows, so nothing else changes (`tests/book_girl.rs`: both girls drawn into the cube with the fix off, the freed one alone with it on). Reported by Klaas Van den Broeck (@Klaasvdb), github.com/Klaasvdb/atlantis2-notes (original-bugs.md #14) |
 
 The music and Ireland ones are every use of the switch the port had before (one
 `minor_bug_fixes` for all, still read from `settings.ini`: it sets every
@@ -147,8 +148,32 @@ fix whose own key is absent); each gates its own behaviour only, and
 with each off that behaviour is the original's, the others on or off
 (`tests/music_player.rs`, `tests/sound_glue.rs` and
 `tests/plain_values.rs` and `tests/display.rs` run each alone; see the Music and Ireland items
-of [Atlantis II](#atlantis-ii-in-progress)). `--original` turns them all
-off there too. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
+of [Atlantis II](#atlantis-ii-in-progress); `tests/book_girl.rs` for
+`fix_wooden_girl`). `--original` turns them all
+off there too.
+
+Two more bugs of the original that Klaas Van den Broeck (@Klaasvdb)
+reported (github.com/Klaasvdb/atlantis2-notes, original-bugs.md #12 and
+#34) are real in its code but never reached with the game's data, so they
+have no switch (it would change nothing); the port keeps the original's
+rules:
+
+- A dialog whose hero speaks last leaves the view turned by π: the end
+  (FUN_004808a0) turns back only for a hero's line still current (an
+  Escape, or another `dial`), and the angles the start saves (@ 0x006cf2c0)
+  are never read again. Every dialog of every world played with the
+  original's turn rule: six end turned, Ireland's 68 and China's 348-352,
+  one hero line each; no chapter starts 68, and 348-352 answer a click on
+  a labyrinth soul, which cannot happen; an Escape at any line leaves no
+  dialog turned (`tests/dialog_turn.rs`).
+- `stopmusik` (FUN_00477090, its only caller the script key) fades the
+  music out but leaves `current_music` (@ 0x00673f30, written only by the
+  play function FUN_0047a200) set, so a later `startmusik` of that track
+  would play nothing. Each of the chapters' twelve `stopmusik` (chapters 16,
+  28, 46, 75 eight times, 83) is followed by a chapter whose start plays
+  another track (Tibet's 30 after Ireland's, Yucatán's or China's; 1 or 3,
+  23, 11/12/15, 38 or 39 after Tibet's 30), or by the credits and the
+  game's exit; the same in every edition. It also holds the [HD mode](#hd-mode) (`hd`, off by default, and
 `hd_options`, the first game's `HdOptions`), which `--hd` and
 `--widescreen` turn on; see the HD mode item of
 [Atlantis II](#atlantis-ii-in-progress).
@@ -3814,7 +3839,7 @@ back) into `yucatan-*.png`.
   game's. The choices are written at once to Atlantis II's own
   `settings.ini`, beside its saves and `atlant2.cfg`, with the first
   game's keys and one per bug fix (`fix_music_end`, `fix_music_restart`,
-  `fix_music_mark`, `fix_ireland_clicks`, `fix_film_subtitles`, `fix_film_language`, `ui_ux`, `graphics = original|hd`,
+  `fix_music_mark`, `fix_ireland_clicks`, `fix_film_subtitles`, `fix_film_language`, `fix_wooden_girl`, `ui_ux`, `graphics = original|hd`,
   `hd_panorama`, `hd_sharpen`, `hd_interface`, `hd_sharp_subtitles`,
   `hd_widescreen`, `hd_video_sides = black|blur`); the screen size goes to `atlant2.cfg`,
   written then too (the original writes it at exit). A window reads

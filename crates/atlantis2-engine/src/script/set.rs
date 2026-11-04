@@ -291,6 +291,18 @@ impl Script {
             }
             let comma = self.b(src, i) == b',';
             self.hide(host, id, kind, comma);
+            // Bug fix (`fix_wooden_girl`): a name of the character
+            // section that is an object's name too is hidden as that
+            // object as well. In the shipped scripts only `FILLE_BOIS`,
+            // the wooden girl of `livre.wam` (an object there), is both;
+            // chapter 16 hides it with `hideperso` once the goddess has
+            // answered. Reported by Klaas Van den Broeck (@Klaasvdb),
+            // github.com/Klaasvdb/atlantis2-notes (original-bugs.md #14).
+            if key == k.hideperso && host.hideperso_hides_object() {
+                if let Ok(object) = self.names.id(defnames::OBJETS, self.tail(src, p + 1)) {
+                    self.hide(host, object as i32, 2, comma);
+                }
+            }
             return Some(self.after_cr(src, i));
         }
         if key == k.showperso {
