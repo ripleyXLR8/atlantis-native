@@ -88,6 +88,75 @@ struct Run {
     lcg_from: u32,
     /// A `CAMERA` action set the aim of the next `ZONE`.
     camera_aimed: bool,
+    /// The played goldens' per-step state ([`StepRef`]) and the script's
+    /// variables and flags at the previous step's end.
+    refs: BTreeMap<usize, StepRef>,
+    prev: Option<(Vec<i32>, Vec<i32>)>,
+    /// The frames run since the step began.
+    step_frames: usize,
+}
+
+/// What a played golden records of a step: the frames it ran (`FRAME`
+/// lines but `FRAME load`), and after it the `STATE` line, the loop mode
+/// (`MODE`, 3 when absent), the variables and flags that changed (`VARS`,
+/// `FLAGS`) and a checkpoint's save (`SAVEFILE` lines).
+#[derive(Default)]
+struct StepRef {
+    frames: usize,
+    state: Option<String>,
+    mode: Option<i32>,
+    vars: BTreeMap<String, i32>,
+    flags: BTreeMap<usize, i32>,
+    save: Option<Vec<String>>,
+}
+
+/// The per-step records of a played golden.
+fn step_refs(golden: &str) -> BTreeMap<usize, StepRef> {
+    let mut out: BTreeMap<usize, StepRef> = BTreeMap::new();
+    let mut step = 0;
+    let mut in_save = false;
+    let kv = |rest: &str| -> Vec<(String, i32)> {
+        rest.split_once(": ")
+            .map_or("", |x| x.1)
+            .split_whitespace()
+            .map(|kv| {
+                let (k, v) = kv.split_once('=').unwrap();
+                (k.to_string(), v.parse().unwrap())
+            })
+            .collect()
+    };
+    for l in golden.lines() {
+        if l.starts_with("STEP ") {
+            step += 1;
+            in_save = false;
+            continue;
+        }
+        let r = out.entry(step).or_default();
+        if let Some(rest) = l.strip_prefix("SAVEFILE ") {
+            if in_save {
+                r.save.get_or_insert_with(Vec::new).push(rest.to_string());
+            }
+            continue;
+        }
+        in_save = false;
+        if l.starts_with("CHECKPOINT ") {
+            in_save = true;
+            r.save = Some(Vec::new());
+        } else if l.starts_with("FRAME ") && !l.starts_with("FRAME load") {
+            r.frames += 1;
+        } else if let Some(rest) = l.strip_prefix("STATE ") {
+            r.state = Some(rest.split_once(": ").unwrap().1.to_string());
+        } else if let Some(rest) = l.strip_prefix("MODE ") {
+            let m = rest.split_once(": ").unwrap().1;
+            r.mode = Some(m.split_whitespace().next().unwrap().parse().unwrap());
+        } else if l.starts_with("VARS ") {
+            r.vars.extend(kv(l));
+        } else if l.starts_with("FLAGS ") {
+            r.flags
+                .extend(kv(l).into_iter().map(|(k, v)| (k.parse().unwrap(), v)));
+        }
+    }
+    out
 }
 
 /// The played harness's frame: 1.0025 / 15 s.
@@ -101,6 +170,7 @@ impl Run {
     }
 
     fn frame_dt(&mut self, dt: f64) {
+        self.step_frames += 1;
         self.t += dt;
         let before = self.g.rand_state();
         self.g.step(self.t);
@@ -223,6 +293,7 @@ impl Run {
         // `EXPECT` and `RAND` are no steps of the golden.
         if !matches!(w[0], "EXPECT" | "RAND") {
             self.step += 1;
+            self.step_frames = 0;
             for &v in self.rands.get(&self.step).into_iter().flatten() {
                 self.g.queue_rand(v);
             }
@@ -355,6 +426,9 @@ impl Run {
             }
             "HAND" => {
                 self.g.right_click();
+                // The media the opening's scan started end before the
+                // inventory's frame, as the harness ends them.
+                self.finish_media();
                 assert!(self.g.inventory_open());
                 if w[1] == "-" {
                     self.frame();
@@ -392,8 +466,20 @@ impl Run {
                     let want: usize = w.get(1).map_or(1, |n| n.parse().unwrap());
                     assert_eq!(n, want, "{line}: the golden's frames");
                 }
-                for _ in 0..n {
+                for i in 0..n {
+                    // `FRAMES_UNTIL`: the condition is first true after the
+                    // golden's frames (when the port can read it).
+                    if w[0] == "FRAMES_UNTIL" {
+                        assert_ne!(self.cond(w[1]), Some(true), "{line}: true after {i} frames");
+                    }
                     self.frame();
+                }
+                if w[0] == "FRAMES_UNTIL" {
+                    assert_ne!(
+                        self.cond(w[1]),
+                        Some(false),
+                        "{line}: false after {n} frames"
+                    );
                 }
                 self.settle();
             }
@@ -502,6 +588,188 @@ impl Run {
         assert!(self.g.load_save_text(name, text), "load {name}");
         self.finish_media();
         self.act_frame();
+    }
+
+    /// A `FRAMES_UNTIL` condition as the played harness tests it, when the
+    /// port can read all its terms: `FLAGn=v`, `MODE=n`, `|`, `&` (`None`
+    /// for a puzzle's C global, `SLOTFRAME`, `SHOWN`, `CLICKABLE`).
+    fn cond(&self, c: &str) -> Option<bool> {
+        if c.contains('|') {
+            let v: Option<Vec<bool>> = c.split('|').map(|x| self.cond(x)).collect();
+            return v.map(|v| v.into_iter().any(|b| b));
+        }
+        if c.contains('&') {
+            let v: Option<Vec<bool>> = c.split('&').map(|x| self.cond(x)).collect();
+            return v.map(|v| v.into_iter().all(|b| b));
+        }
+        let (k, v) = c.split_once('=')?;
+        if let Some(f) = k.strip_prefix("FLAG") {
+            let f: usize = f.parse().ok()?;
+            return Some(self.g.script()?.flags[f] == v.parse::<i32>().ok()?);
+        }
+        if k == "MODE" {
+            return Some(self.mode_number() == v.parse::<i32>().ok()?);
+        }
+        None
+    }
+
+    /// The script's variables and flags now.
+    fn snapshot(&self) -> (Vec<i32>, Vec<i32>) {
+        let s = self.g.script().unwrap();
+        (s.vars.clone(), s.flags.clone())
+    }
+
+    /// The variables' names as the played harness prints them: the
+    /// `#VARIABLES#` name, `NAME@index` for a later one of equal names
+    /// (the game's lookup finds the first), `#index` for an empty one.
+    fn var_names(&self) -> Vec<String> {
+        let names = self.g.names();
+        let mut seen = std::collections::BTreeSet::new();
+        (0..names.len(defnames::VARIABLES))
+            .map(|i| {
+                let n = String::from_utf8_lossy(names.name(defnames::VARIABLES, i).unwrap_or(b""))
+                    .into_owned();
+                let u = if n.is_empty() {
+                    format!("#{i}")
+                } else if seen.contains(&n) {
+                    format!("{n}@{i}")
+                } else {
+                    n.clone()
+                };
+                seen.insert(n);
+                u
+            })
+            .collect()
+    }
+
+    /// The loop mode's number (@ 0x00789af0).
+    fn mode_number(&self) -> i32 {
+        match self.g.mode() {
+            Mode::Intro => 1,
+            Mode::Warp => 3,
+            Mode::Video => 4,
+            Mode::Dialog => 5,
+            Mode::Menu => 6,
+            Mode::Inventory => 7,
+            Mode::Subjects => 8,
+            Mode::Screen => self.g.puzzle_screen().map_or(-1, |s| s.mode_number()),
+            Mode::Idle => 0,
+        }
+    }
+
+    /// The played golden's record of this step against the port: the
+    /// `STATE` line, the loop mode, the variables and flags the step
+    /// changed (exactly those, with their values) and a checkpoint's save.
+    fn check_step(&mut self, name: &str, line: &str) {
+        let Some(r) = self.refs.get(&self.step) else {
+            return;
+        };
+        let mut bad = Vec::new();
+        if self.step_frames != r.frames {
+            bad.push(format!(
+                "frames: golden {}, native {}",
+                r.frames, self.step_frames
+            ));
+        }
+        let s = self.g.script().unwrap();
+        if let Some(want) = &r.state {
+            let h = s.var("OBJETENMAIN").unwrap();
+            let hand = if h == 0 {
+                "-".to_string()
+            } else {
+                String::from_utf8_lossy(self.g.names().name(defnames::OBJETS, h as usize).unwrap())
+                    .into_owned()
+            };
+            let (wam, view) = self.g.place();
+            let got = format!(
+                "chapter={} monde={} wam={} view={} hand={} waiting={} music={}",
+                s.chapter,
+                s.a3.world,
+                wam,
+                view.map_or(-1, |v| v as i64),
+                hand,
+                u8::from(s.resume_pending),
+                String::from_utf8_lossy(&s.music)
+            );
+            if &got != want {
+                bad.push(format!("STATE\n  golden {want}\n  native {got}"));
+            }
+        }
+        let mode = self.mode_number();
+        if mode != r.mode.unwrap_or(3) {
+            bad.push(format!(
+                "MODE: golden {:?}, native {mode}",
+                r.mode.unwrap_or(3)
+            ));
+        }
+        let now = self.snapshot();
+        let (pv, pf) = self
+            .prev
+            .take()
+            .unwrap_or_else(|| (vec![0; now.0.len()], vec![0; now.1.len()]));
+        // Not compared: `ANGLEWARPX` / `ANGLEWARPY` (the harness's camera
+        // model: `CAMERA` sets it, its re-alignment does not turn) and the
+        // tick task's `RANDOM`, `TIME1`, `TIME2` (0x0043e550 is not in the
+        // harness's frame).
+        let skip = |n: &str| {
+            matches!(
+                n,
+                "ANGLEWARPX" | "ANGLEWARPY" | "RANDOM" | "TIME1" | "TIME2"
+            )
+        };
+        let names = self.var_names();
+        let got: BTreeMap<String, i32> = (0..names.len())
+            .filter(|&i| now.0[i] != pv[i] && !skip(&names[i]))
+            .map(|i| (names[i].clone(), now.0[i]))
+            .collect();
+        let want: BTreeMap<String, i32> = r
+            .vars
+            .iter()
+            .filter(|(k, _)| !skip(k))
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+        if got != want {
+            bad.push(format!("VARS\n  golden {want:?}\n  native {got:?}"));
+        }
+        let got: BTreeMap<usize, i32> = (0..now.1.len())
+            .filter(|&i| now.1[i] != pf[i])
+            .map(|i| (i, now.1[i]))
+            .collect();
+        if got != r.flags {
+            bad.push(format!("FLAGS\n  golden {:?}\n  native {got:?}", r.flags));
+        }
+        if let Some(want) = &r.save {
+            let words: Vec<&str> = line.split_whitespace().collect();
+            let text = self.saves.get(words[2]).expect("the checkpoint's save");
+            // Not compared: the date (the golden has none) and the camera's
+            // `Quaternion0..3` (the harness's camera model, as `ANGLEWARPX`).
+            let cam = |l: &str| l.starts_with("Quaternion");
+            let got: Vec<String> = String::from_utf8_lossy(text)
+                .lines()
+                .filter(|l| !l.starts_with("DateAndTime") && !cam(l))
+                .map(str::to_string)
+                .collect();
+            let want: Vec<String> = want.iter().filter(|l| !cam(l)).cloned().collect();
+            if got != want {
+                let i = (0..got.len().max(want.len()))
+                    .find(|&i| got.get(i) != want.get(i))
+                    .unwrap();
+                bad.push(format!(
+                    "SAVEFILE line {i}: golden {:?}, native {:?}",
+                    want.get(i),
+                    got.get(i)
+                ));
+            }
+        }
+        self.prev = Some(now);
+        if !bad.is_empty() {
+            let msg = format!("{name}: step {} `{line}`: {}", self.step, bad.join("\n "));
+            if std::env::var_os("STORY_SOFT").is_some() {
+                eprintln!("{msg}");
+            } else {
+                panic!("{msg}");
+            }
+        }
     }
 
     /// The `rand()` generator against the golden's draws up to this step.
@@ -771,6 +1039,9 @@ fn new_run() -> Option<Run> {
         lcg_vals: BTreeMap::new(),
         lcg_from: 0,
         camera_aimed: false,
+        refs: BTreeMap::new(),
+        prev: None,
+        step_frames: 0,
     })
 }
 
@@ -793,6 +1064,9 @@ fn play(r: &mut Run, name: &str, walk: &str, golden: &str) {
         r.action(line);
         if r.played {
             r.check_lcg(line);
+            if !line.starts_with("EXPECT") && !line.starts_with("RAND") {
+                r.check_step(name, line);
+            }
         }
         // The lines so far, against the golden's up to this step.
         let got: Vec<String> =
@@ -980,11 +1254,19 @@ fn story_08_ending() {
 /// runs 1.0025 / 15 s a frame (one place-animation step each), the steps'
 /// frames are the golden's, the sounds and voices play their files'
 /// lengths, `rand()` is the generator's (seeded 1 at the start-up, n at a
-/// checkpoint n's reload) but for the walks' `RAND` values, and its state
-/// is checked after every step. New actions: `CAMERA yaw pitch` (the
+/// checkpoint n's reload) but for the walks' `RAND` values. After every
+/// step: the generator's state, the frames the step ran, the `STATE` line
+/// (chapter, world, place, view, hand, section waiting, music), the loop
+/// mode, the variables and flags the step changed (exactly those, but the
+/// harness's camera model's `ANGLEWARPX` / `ANGLEWARPY` and the tick
+/// task's `RANDOM`, `TIME1`, `TIME2`) and a checkpoint's save (but its
+/// date and camera quaternion). New actions: `CAMERA yaw pitch` (the
 /// player turned there), `POINTER x y` and `CLICK left|right [SPRITE=n]
 /// [POINTER=x,y]` (the screens' free pointer; the sprite the screen's hit
-/// test answers), `FRAMES_UNTIL cond` (the golden's frames of the step).
+/// test answers), `FRAMES_UNTIL cond` (the golden's frames of the step;
+/// a `FLAGn=v` / `MODE=n` condition is checked false before the last of
+/// them and true after it; a puzzle's C global, `SLOTFRAME`, `SHOWN` and
+/// `CLICKABLE` are not read by the test).
 mod played {
     use super::*;
 
@@ -1063,6 +1345,7 @@ mod played {
         r.frames = frames;
         r.lcg = lcg;
         r.lcg_vals = vals;
+        r.refs = step_refs(golden);
         play(r, name, walk, golden);
     }
 
@@ -1085,6 +1368,9 @@ mod played {
             r.lcg_vals = t.3;
             r.lcg_from = n as u32;
             r.check_lcg("the load");
+            // The harness's reference for the first step's `VARS` /
+            // `FLAGS`: the state after the load.
+            r.prev = Some(r.snapshot());
             seed = n as u32;
         }
         run(&mut r, name, walk, golden, seed);

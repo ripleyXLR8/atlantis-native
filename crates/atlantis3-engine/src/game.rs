@@ -1580,6 +1580,12 @@ impl Game {
             if self.moving.pending && self.moving.next.is_none() {
                 self.complete_move();
             }
+            // `CLICZONE` = 0 @ 0x0044037e..0x00440388 whatever the mode:
+            // no mode test between the flip and the frame's end.
+            if let Some(s) = self.script.as_mut() {
+                let k = s.keys.cliczone;
+                s.vars[k] = 0;
+            }
             return;
         }
         // 6. The click flags cleared (and the sprite hit with them).

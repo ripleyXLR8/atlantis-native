@@ -1,4 +1,4 @@
-# Played story segment 01_hoggar: the original's interpreter and puzzle code playing the walk, stripped to the lines the test reads
+# Played story segment 01_hoggar: the original's interpreter and puzzle code playing the walk, stripped to the lines the test reads and every frame the run made
 STEP 1 START
 LOG interp: SET/set(changewam=CFuner.wam)
 LOG interp: SET(showobjet=CHF_OISEAUBOIS)
@@ -57,6 +57,7 @@ LOG interp: SET/set(HOG_PUZZLETOUPIEOK=0)
 LOG interp: SET/set(HOG_TOUPIEOK=0)
 LOG interp: SET/set(chapter=1)
 LOG interp: SET/set(StartMusik=4)
+FRAME first warp frame
 LOG interp: SET/set(cinema=093,fps=25)
 LOG interp: SET/set(cinema=001,fps=25)
 LOG interp: SET/set(cinema=002,fps=25)
@@ -67,6 +68,7 @@ STATE 1: chapter=1 monde=1 wam=hoggar.wam view=4 hand=- waiting=0 music=4)
 EXPECT CHAPTER=1 ok
 EXPECT VUE=4 ok
 STEP 2 GO 5
+FRAME 2.0 click zone -> view 5
 LOG interp: SET/set(Save=1)
 SAVEFILE CurrentCD = 0
 SAVEFILE Wam = hoggar.wam
@@ -92,7 +94,9 @@ SAVEFILE Quaternion1 = 0.000000
 SAVEFILE Quaternion2 = 0.000000
 SAVEFILE Quaternion3 = 1.000000
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+FRAME 2.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 2.2 move
 CALL rand() -> 41 (lcg)
 CALL rand() -> 18467 (lcg)
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
@@ -100,9 +104,12 @@ VARS 2: LASTVUE=4 VUE=5 ANGLEWARPX=110 ANGLEWARPY=9 SUJET=-2
 FLAGS 2: 1001=5
 STATE 2: chapter=1 monde=1 wam=hoggar.wam view=5 hand=- waiting=0 music=4)
 STEP 3 GO 6
+FRAME 3.0 click zone -> view 6
 LOG interp: SET/set(dial=001, voixoff)
 LOG interp: SET/set(flag426=1)
+FRAME 3.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 3.2 move
 CALL rand() -> 6334 (lcg)
 CALL rand() -> 26500 (lcg)
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
@@ -110,11 +117,14 @@ VARS 3: LASTVUE=5 VUE=6 ANGLEWARPX=170 ANGLEWARPY=356
 FLAGS 3: 426=1 1001=6
 STATE 3: chapter=1 monde=1 wam=hoggar.wam view=6 hand=- waiting=0 music=4)
 STEP 4 GO 7
+FRAME 4.0 click zone -> view 7
 LOG interp: SET/set(chapter=2)
 LOG interp: SET/set(StartMusik=4)
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
 LOG interp: SET/set(enablesuj,HOG_GARDIEN01,HOG_G1_SITE,HOG_G1_PUITS,HOG_G1_G1)
+FRAME 4.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 4.2 move
 CALL rand() -> 19169 (lcg)
 CALL rand() -> 15724 (lcg)
 VARS 4: CHAPTER=2 LASTVUE=6 VUE=7 ANGLEWARPX=156 ANGLEWARPY=1
@@ -122,10 +132,12 @@ FLAGS 4: 1001=7 1021=2
 STATE 4: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
 EXPECT CHAPTER=2 ok
 STEP 5 PERSO HOG_GARDIEN01
+FRAME 5.0 click HOG_GARDIEN01
 VARS 5: CLICPERSO=1
 STATE 5: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
 MODE 5: 8 subject menu
 STEP 6 SUBJECT HOG_G1_SITE
+FRAME 6.0 subject menu frame 0x00427c40: pick HOG_G1_SITE
 LOG interp: SET/set(disablesuj,HOG_GARDIEN01,HOG_G1_SITE)
 LOG interp: SET/set(dial=5)
 LOG interp: SET/set(dial=8)
@@ -134,10 +146,12 @@ VARS 6: CLICPERSO=0
 FLAGS 6: 3=1
 STATE 6: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
 STEP 7 PERSO HOG_GARDIEN01
+FRAME 7.0 click HOG_GARDIEN01
 VARS 7: CLICPERSO=1
 STATE 7: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
 MODE 7: 8 subject menu
 STEP 8 SUBJECT HOG_G1_PUITS
+FRAME 8.0 subject menu frame 0x00427c40: pick HOG_G1_PUITS
 LOG interp: SET/set(dial=6)
 LOG interp: SET/set(cinema=027,fps=25)
 LOG interp: SET/set(Load=1)
@@ -176,6 +190,7 @@ LOG interp: SET(HidePerso=HOG_TOUAREGLI)
 LOG interp: SET(Vue=4)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(StartMusik=4)
+FRAME 8.1 after
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
 VARS 8: CHAPTER=1 LASTVUE=0 CLICPERSO=0 VUE=4 CHANGECD=0
 FLAGS 8: 3=0 426=0 1001=4 1021=1
@@ -184,6 +199,7 @@ EXPECT CHAPTER=1 ok
 EXPECT VUE=4 ok
 EXPECT FLAG3=0 ok
 STEP 9 GO 5
+FRAME 9.0 click zone -> view 5
 LOG interp: SET/set(Save=1)
 SAVEFILE CurrentCD = 0
 SAVEFILE Wam = hoggar.wam
@@ -209,7 +225,9 @@ SAVEFILE Quaternion1 = 0.000000
 SAVEFILE Quaternion2 = 0.000000
 SAVEFILE Quaternion3 = 1.000000
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+FRAME 9.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 9.2 move
 CALL rand() -> 11478 (lcg)
 CALL rand() -> 29358 (lcg)
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
@@ -217,9 +235,12 @@ VARS 9: LASTVUE=4 VUE=5 ANGLEWARPX=110 ANGLEWARPY=9
 FLAGS 9: 1001=5
 STATE 9: chapter=1 monde=1 wam=hoggar.wam view=5 hand=- waiting=0 music=4)
 STEP 10 GO 6
+FRAME 10.0 click zone -> view 6
 LOG interp: SET/set(dial=001, voixoff)
 LOG interp: SET/set(flag426=1)
+FRAME 10.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 10.2 move
 CALL rand() -> 26962 (lcg)
 CALL rand() -> 24464 (lcg)
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
@@ -227,26 +248,33 @@ VARS 10: LASTVUE=5 VUE=6 ANGLEWARPX=170 ANGLEWARPY=356
 FLAGS 10: 426=1 1001=6
 STATE 10: chapter=1 monde=1 wam=hoggar.wam view=6 hand=- waiting=0 music=4)
 STEP 11 GO 7
+FRAME 11.0 click zone -> view 7
 LOG interp: SET/set(chapter=2)
 LOG interp: SET/set(StartMusik=4)
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
 LOG interp: SET/set(enablesuj,HOG_GARDIEN01,HOG_G1_SITE,HOG_G1_PUITS,HOG_G1_G1)
+FRAME 11.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 11.2 move
 CALL rand() -> 5705 (lcg)
 CALL rand() -> 28145 (lcg)
 VARS 11: CHAPTER=2 LASTVUE=6 VUE=7 ANGLEWARPX=156 ANGLEWARPY=1
 FLAGS 11: 1001=7 1021=2
 STATE 11: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
 STEP 12 GO 10
+FRAME 12.0 click zone -> view 10
 LOG interp: SET/set(Flag2=1)
 LOG interp: SET/set(chapter=3)
 LOG interp: SET/set(StartMusik=4)
+FRAME 12.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 12.2 move
 VARS 12: CHAPTER=3 LASTVUE=7 VUE=10 ANGLEWARPX=21 ANGLEWARPY=355
 FLAGS 12: 2=1 1001=10 1021=3
 STATE 12: chapter=3 monde=1 wam=hoggar.wam view=10 hand=- waiting=0 music=4)
 EXPECT CHAPTER=3 ok
 STEP 13 GO 11
+FRAME 13.0 click zone -> view 11
 LOG interp: SET/set(Flag4=1)
 LOG interp: SET/set(AbortDepart=1)
 LOG interp: SET/set(cinema=003 fps=25)
@@ -258,23 +286,32 @@ FLAGS 13: 4=1
 STATE 13: chapter=3 monde=1 wam=hoggar.wam view=10 hand=- waiting=0 music=4)
 EXPECT VUE=10 ok
 STEP 14 GO 13
+FRAME 14.0 click zone -> view 13
+FRAME 14.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 14.2 move
 CALL rand() -> 23281 (lcg)
 CALL rand() -> 16827 (lcg)
 VARS 14: LASTVUE=10 VUE=13 ANGLEWARPX=192 ANGLEWARPY=1
 FLAGS 14: 1001=13
 STATE 14: chapter=3 monde=1 wam=hoggar.wam view=13 hand=- waiting=0 music=4)
 STEP 15 GO 2
+FRAME 15.0 click zone -> view 2
 LOG interp: SET/set(chapter=4)
 LOG interp: SET/set(StartMusik=5)
 LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+FRAME 15.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 15.2 move
 VARS 15: CHAPTER=4 LASTVUE=13 VUE=2 ANGLEWARPX=70 ANGLEWARPY=359
 FLAGS 15: 1001=2 1021=4
 STATE 15: chapter=4 monde=1 wam=hoggar.wam view=2 hand=- waiting=0 music=5)
 EXPECT CHAPTER=4 ok
 STEP 16 GO 1
+FRAME 16.0 click zone -> view 1
+FRAME 16.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 16.2 move
 CALL rand() -> 9961 (lcg)
 CALL rand() -> 491 (lcg)
 CALL rand() -> 2995 (lcg)
@@ -283,18 +320,22 @@ VARS 16: LASTVUE=2 VUE=1 ANGLEWARPX=4 ANGLEWARPY=10
 FLAGS 16: 1001=1
 STATE 16: chapter=4 monde=1 wam=hoggar.wam view=1 hand=- waiting=0 music=5)
 STEP 17 HAND HOG_OBJ_DISQUE
+FRAME 17.1 inventory frame 0x00427c40: pick HOG_OBJ_DISQUE
 VARS 17: OBJETENMAIN=35
 STATE 17: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_DISQUE waiting=0 music=5)
 STEP 18 ZONE HOG_TOUPIE_POSE
+FRAME 18.0 click zone HOG_TOUPIE_POSE
 LOG interp: SET/set(showobjet=HOG_DISQUE_TOUPIE)
 LOG interp: SET/set(sacados=NOT_HOG_OBJ_DISQUE)
 LOG interp: SET/set(flag416=1)
 FLAGS 18: 416=1 1135=0 1535=0
 STATE 18: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_DISQUE waiting=0 music=5)
 STEP 19 HAND HOG_OBJ_BATON
+FRAME 19.1 inventory frame 0x00427c40: pick HOG_OBJ_BATON
 VARS 19: OBJETENMAIN=34
 STATE 19: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_BATON waiting=0 music=5)
 STEP 20 ZONE HOG_TOUPIE_POSE
+FRAME 20.0 click zone HOG_TOUPIE_POSE
 LOG interp: SET/set(hideobjet=HOG_DISQUE_TOUPIE)
 LOG interp: SET/set(sacados=NOT_HOG_OBJ_BATON)
 LOG interp: SET/set(sacados=HOG_OBJ_TOUPIE)
@@ -305,6 +346,7 @@ FLAGS 20: 416=0 1133=1 1134=0 1534=0
 STATE 20: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_TOUPIE waiting=0 music=5)
 EXPECT HAND=HOG_OBJ_TOUPIE ok
 STEP 21 ZONE HOG_TOUPIE_ZONE04
+FRAME 21.0 click zone HOG_TOUPIE_ZONE04
 LOG interp: SET(showobjet=HOG_ANIM_TOUPIE04)
 LOG interp: SET(gotoframeobjet=HOG_ANIM_TOUPIE04,0)
 LOG interp: SET(objetenmain=0)
@@ -518,6 +560,7 @@ FRAME 23.0
 FLAGS 23: 415=1
 STATE 23: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_TOUPIE waiting=0 music=5)
 STEP 24 ZONE HOG_TOUPIE_ZONE01
+FRAME 24.0 click zone HOG_TOUPIE_ZONE01
 LOG interp: SET(showobjet=HOG_ANIM_TOUPIE01)
 LOG interp: SET(gotoframeobjet=HOG_ANIM_TOUPIE01,0)
 LOG interp: SET(objetenmain=0)
@@ -716,6 +759,7 @@ STEP 26 FRAME
 FRAME 26.0
 STATE 26: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_TOUPIE waiting=0 music=5)
 STEP 27 ZONE HOG_TOUPIE_ZONE03
+FRAME 27.0 click zone HOG_TOUPIE_ZONE03
 LOG interp: SET(showobjet=HOG_ANIM_TOUPIE03)
 LOG interp: SET(gotoframeobjet=HOG_ANIM_TOUPIE03,0)
 LOG interp: SET(objetenmain=0)
@@ -882,6 +926,7 @@ STEP 29 FRAME
 FRAME 29.0
 STATE 29: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_TOUPIE waiting=0 music=5)
 STEP 30 ZONE HOG_TOUPIE_ZONE05
+FRAME 30.0 click zone HOG_TOUPIE_ZONE05
 LOG interp: SET(showobjet=HOG_ANIM_TOUPIE05)
 LOG interp: SET(gotoframeobjet=HOG_ANIM_TOUPIE05,0)
 LOG interp: SET(objetenmain=0)
@@ -1028,6 +1073,7 @@ STEP 32 FRAME
 FRAME 32.0
 STATE 32: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_TOUPIE waiting=0 music=5)
 STEP 33 ZONE HOG_TOUPIE_ZONE02
+FRAME 33.0 click zone HOG_TOUPIE_ZONE02
 LOG interp: SET(showobjet=HOG_ANIM_TOUPIE02)
 LOG interp: SET(gotoframeobjet=HOG_ANIM_TOUPIE02,0)
 LOG interp: SET(objetenmain=0)
@@ -1138,6 +1184,7 @@ LOG interp: SET/set(AngleWarpXNow=180)
 LOG interp: SET/set(AngleWarpYNow=0)
 LOG interp: SET/set(Chapter=9)
 LOG interp: SET/set(StartMusik=1)
+FRAME 34.76 after
 VARS 34: CHAPTER=9 LASTVUE=0 VUE=4 ANGLEWARPX=180 ANGLEWARPY=0 CHANGECD=2 SACADOS=0 MONDE=2
 FLAGS 34: 13=1 421=1 1002=4 1012=1 1022=9
 STATE 34: chapter=9 monde=2 wam=CFuner.wam view=4 hand=- waiting=0 music=1)
@@ -1198,5 +1245,6 @@ LOG interp: SET(hideperso=CHF_PSYCHOP)
 LOG interp: SET(Vue=4)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(StartMusik=1)
+FRAME first warp frame after load
 VARS 35: ANGLEWARPX=4 ANGLEWARPY=10 CHANGECD=0
 STATE 35: chapter=9 monde=2 wam=CFuner.wam view=4 hand=- waiting=0 music=1)

@@ -1,4 +1,4 @@
-# Played story segment 02_cfuner: the original's interpreter and puzzle code playing the walk, stripped to the lines the test reads
+# Played story segment 02_cfuner: the original's interpreter and puzzle code playing the walk, stripped to the lines the test reads and every frame the run made
 LOG interp: SET/set(changewam=CFuner.wam)
 LOG interp: SET(showobjet=CHF_OISEAUBOIS)
 LOG interp: SET(showobjet=CHF_COUVERCLE01)
@@ -17,18 +17,24 @@ LOG interp: SET(hideperso=CHF_PSYCHOP)
 LOG interp: SET(Vue=4)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(StartMusik=1)
+FRAME first warp frame after load
 STEP 1 OBJET CHF_OISEAUBOIS
+FRAME 1.0 click CHF_OISEAUBOIS
 LOG interp: SET/set(enablesuj,CHF_PSYCHOP,DIAL_OISEAUBOIS)
 LOG interp: SET/set(flag46=1)
 VARS 1: OBJETENMAIN=47 SUJET=-2
 FLAGS 1: 46=1 1147=2
 STATE 1: chapter=9 monde=2 wam=CFuner.wam view=4 hand=CHF_OISEAUBOIS waiting=0 music=1)
 STEP 2 GO 1
+FRAME 2.0 click zone -> view 1
+FRAME 2.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 2.2 move
 VARS 2: LASTVUE=4 VUE=1 OBJETENMAIN=0 ANGLEWARPX=328 ANGLEWARPY=357
 FLAGS 2: 1002=1
 STATE 2: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 STEP 3 ZONE CHF_ETOILEZONEG
+FRAME 3.0 click zone CHF_ETOILEZONEG
 LOG interp: SET(PlaySound = 101)
 FLAGS 3: 500=4
 STATE 3: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
@@ -37,6 +43,7 @@ FRAME 4.0
 FRAME 4.1
 STATE 4: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 STEP 5 ZONE CHF_ETOILEZONED
+FRAME 5.0 click zone CHF_ETOILEZONED
 LOG interp: SET(PlaySound = 102)
 FLAGS 5: 500=0
 STATE 5: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
@@ -45,6 +52,7 @@ FRAME 6.0
 FRAME 6.1
 STATE 6: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 STEP 7 ZONE CHF_ETOILEZONED
+FRAME 7.0 click zone CHF_ETOILEZONED
 LOG interp: SET(PlaySound = 102)
 FLAGS 7: 500=1
 STATE 7: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
@@ -53,6 +61,7 @@ FRAME 8.0
 FRAME 8.1
 STATE 8: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 STEP 9 ZONE CHF_ETOILEZONEG
+FRAME 9.0 click zone CHF_ETOILEZONEG
 LOG interp: SET(PlaySound = 101)
 FLAGS 9: 500=0
 STATE 9: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
@@ -61,6 +70,7 @@ FRAME 10.0
 FRAME 10.1
 STATE 10: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 STEP 11 ZONE CHF_ETOILEZONED
+FRAME 11.0 click zone CHF_ETOILEZONED
 LOG interp: SET(PlaySound = 102)
 LOG interp: SET(flag45=1)
 LOG interp: SET/set(cinema=005 fps=25)
@@ -87,6 +97,7 @@ STATE 12: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 MODE 12: 13 Scarabee
 EXPECT MODE=13 ok
 STEP 13 CLICK left
+FRAME 13.0 (mode 13 Scarabee: handler 0x00431ea0, left click)
 LOG interp: SET(PlaySound=110)
 STATE 13: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 MODE 13: 13 Scarabee
@@ -98,18 +109,24 @@ FLAGS 14: 72=1
 STATE 14: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 MODE 14: 13 Scarabee
 STEP 15 CLICK right
+FRAME 15.0 (mode 13 Scarabee: handler 0x00431ea0, right click)
 STATE 15: chapter=9 monde=2 wam=CFuner.wam view=1 hand=- waiting=0 music=1)
 EXPECT MODE=3 ok
 STEP 16 GO 2
+FRAME 16.0 click zone -> view 2
+FRAME 16.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 16.2 move
 CALL rand() -> 368 (lcg)
 VARS 16: FLAG=0 LASTVUE=1 VUE=2 ANGLEWARPX=240 ANGLEWARPY=358
 FLAGS 16: 1002=2
 STATE 16: chapter=9 monde=2 wam=CFuner.wam view=2 hand=- waiting=0 music=1)
 STEP 17 HAND CHF_OISEAUBOIS
+FRAME 17.1 inventory frame 0x00427c40: pick CHF_OISEAUBOIS
 VARS 17: FLAG=1 OBJETENMAIN=47
 STATE 17: chapter=9 monde=2 wam=CFuner.wam view=2 hand=CHF_OISEAUBOIS waiting=0 music=1)
 STEP 18 GO 5
+FRAME 18.0 click zone -> view 5
 LOG interp: SET/set(cinema=006 fps=25)
 LOG interp: SET/set(SacADos=NOT_CHF_OISEAUBOIS)
 LOG interp: SET/set(ChangeWam=LDMorts.wam)
@@ -147,6 +164,7 @@ LOG interp: SET/set(EnableSuj,CHF_PSYCHOP,DIAL_PSYCHO_MONDE)
 LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_PSYCHOPOMPE)
 LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_OISEAUBOIS)
 LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_PASSAGES10)
+FRAME 18.1 move
 CALL rand() -> 11964 (lcg)
 VARS 18: CHAPTER=10 FLAG=0 LASTVUE=0 VUE=22 OBJETENMAIN=0 ANGLEWARPX=0 ANGLEWARPY=0 SACADOS=0
 FLAGS 18: 1002=22 1012=7 1022=10 1147=0
@@ -248,6 +266,7 @@ LOG interp: SET/set(EnableSuj,CHF_PSYCHOP,DIAL_PSYCHO_MONDE)
 LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_PSYCHOPOMPE)
 LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_OISEAUBOIS)
 LOG interp: SET/set(KillSuj,CHF_PSYCHOP,DIAL_PASSAGES10)
+FRAME first warp frame after load
 CALL rand() -> 371 (lcg)
 VARS 19: ANGLEWARPX=240 ANGLEWARPY=358
 STATE 19: chapter=10 monde=2 wam=LDMorts.wam view=22 hand=- waiting=0 music=2)

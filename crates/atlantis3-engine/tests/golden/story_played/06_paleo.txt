@@ -1,4 +1,4 @@
-# Played story segment 06_paleo: the original's interpreter and puzzle code playing the walk, stripped to the lines the test reads
+# Played story segment 06_paleo: the original's interpreter and puzzle code playing the walk, stripped to the lines the test reads and every frame the run made
 LOG interp: SET/set(changewam=CFuner.wam)
 LOG interp: SET(showobjet=CHF_OISEAUBOIS)
 LOG interp: SET(showobjet=CHF_COUVERCLE01)
@@ -43,13 +43,16 @@ LOG interp: SET(HidePerso=HOG_TOUAREGLI)
 LOG interp: SET(Vue=23)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(StartMusik=6)
+FRAME first warp frame after load
 CALL rand() -> 381 (lcg)
 STEP 1 HAND CMP_TELECOMMANDE
+FRAME 1.1 inventory frame 0x00427c40: pick CMP_TELECOMMANDE
 VARS 1: FLAG=1
 STATE 1: chapter=5 monde=1 wam=hoggar.wam view=23 hand=- waiting=0 music=6)
 MODE 1: 18 PuzzleTelecommande
 EXPECT MODE=18 ok
 STEP 2 CLICK left SPRITE=29
+FRAME 2.0 (mode 18 PuzzleTelecommande: handler 0x004d0550, left click)
 LOG interp: SET(HideObjet=CMP_BAGDAD)
 LOG interp: SET(HideObjet=CMP_BAGDADFIN)
 LOG interp: SET(HideObjet=CMP_HOGGAR)
@@ -61,9 +64,11 @@ FLAGS 2: 401=0 402=1
 STATE 2: chapter=5 monde=1 wam=hoggar.wam view=23 hand=- waiting=0 music=6)
 MODE 2: 18 PuzzleTelecommande
 STEP 3 CLICK right
+FRAME 3.0 (mode 18 PuzzleTelecommande: handler 0x004d0550, right click)
 STATE 3: chapter=5 monde=1 wam=hoggar.wam view=23 hand=- waiting=0 music=6)
 EXPECT FLAG402=1 ok
 STEP 4 GO 25
+FRAME 4.0 click zone -> view 25
 LOG interp: SET/set(AbortDepart=1)
 LOG interp: SET/set(flag410=1)
 LOG interp: SET/set(chapter=605)
@@ -105,11 +110,15 @@ STATE 4: chapter=17 monde=4 wam=paleo.wam view=14 hand=- waiting=0 music=3)
 EXPECT MONDE=4 ok
 EXPECT CHAPTER=17 ok
 STEP 5 GO 15
+FRAME 5.0 click zone -> view 15
+FRAME 5.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 5.2 move
 VARS 5: LASTVUE=14 VUE=15 ANGLEWARPX=90 SUJET=-2
 FLAGS 5: 1004=15
 STATE 5: chapter=17 monde=4 wam=paleo.wam view=15 hand=- waiting=0 music=3)
 STEP 6 GO 5
+FRAME 6.0 click zone -> view 5
 LOG interp: SET/set(abortdepart=1)
 LOG interp: SET/set(cinema=032,FPS=25)
 LOG interp: SET/set(vue=5)
@@ -117,51 +126,69 @@ LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(flag602=1)
 LOG interp: SET/set(chapter=19)
 LOG interp: SET/set(StartMusik=3)
+FRAME 6.1 move
 VARS 6: CHAPTER=19 LASTVUE=15 VUE=5
 FLAGS 6: 602=1 1004=5 1024=19
 STATE 6: chapter=19 monde=4 wam=paleo.wam view=5 hand=- waiting=0 music=3)
 EXPECT CHAPTER=19 ok
 STEP 7 GO 8
+FRAME 7.0 click zone -> view 8
+FRAME 7.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 7.2 move
 VARS 7: LASTVUE=5 VUE=8 ANGLEWARPX=7
 FLAGS 7: 1004=8
 STATE 7: chapter=19 monde=4 wam=paleo.wam view=8 hand=- waiting=0 music=3)
 STEP 8 GO 13
+FRAME 8.0 click zone -> view 13
+FRAME 8.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 8.2 move
 VARS 8: LASTVUE=8 VUE=13 ANGLEWARPX=43 ANGLEWARPY=355
 FLAGS 8: 1004=13
 STATE 8: chapter=19 monde=4 wam=paleo.wam view=13 hand=- waiting=0 music=3)
 STEP 9 GO 1
+FRAME 9.0 click zone -> view 1
 LOG interp: SET/set(NextVue=101)
 LOG interp: SET/set(chapter=21)
 LOG interp: SET/set(StartMusik=4)
+FRAME 9.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 9.2 move
 VARS 9: CHAPTER=21 LASTVUE=13 VUE=101 ANGLEWARPX=44 ANGLEWARPY=3
 FLAGS 9: 1004=101 1024=21
 STATE 9: chapter=21 monde=4 wam=paleo.wam view=101 hand=- waiting=0 music=4)
 EXPECT CHAPTER=21 ok
 EXPECT VUE=101 ok
 STEP 10 GO 102
+FRAME 10.0 click zone -> view 102
+FRAME 10.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 10.2 move
 VARS 10: LASTVUE=101 VUE=102 ANGLEWARPX=135 ANGLEWARPY=7
 FLAGS 10: 1004=102
 STATE 10: chapter=21 monde=4 wam=paleo.wam view=102 hand=- waiting=0 music=4)
 STEP 11 HAND PAL_BATON
+FRAME 11.1 inventory frame 0x00427c40: pick PAL_BATON
 VARS 11: OBJETENMAIN=256
 STATE 11: chapter=21 monde=4 wam=paleo.wam view=102 hand=PAL_BATON waiting=0 music=4)
 STEP 12 ZONE PAL_FOYER
+FRAME 12.0 click zone PAL_FOYER
 LOG interp: SET/set(flag104=1)
 LOG interp: SET/set(cinema=51,fps=25)
 LOG interp: SET/set(Vue=2)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 12.1 after
 VARS 12: LASTVUE=102 VUE=2 OBJETENMAIN=0
 FLAGS 12: 104=1 1004=2
 STATE 12: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 EXPECT FLAG104=1 ok
 EXPECT VUE=2 ok
 STEP 13 ZONE PAL_ZLNOIR
+FRAME 13.0 click zone PAL_ZLNOIR
 STATE 13: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 STEP 14 ZONE PAL_ZLGRIS
+FRAME 14.0 click zone PAL_ZLGRIS
 STATE 14: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 STEP 15 FRAMES_UNTIL MEM32=0x0078755c:0|MEM32=0x00787560:0
 FRAME 15.0
@@ -286,6 +313,7 @@ FRAME 15.118
 FRAME 15.119
 STATE 15: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 STEP 16 ZONE PAL_ZLJAUNE
+FRAME 16.0 click zone PAL_ZLJAUNE
 STATE 16: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 STEP 17 FRAMES_UNTIL MEM32=0x0078755c:0|MEM32=0x00787560:0
 FRAME 17.0
@@ -409,6 +437,7 @@ FRAME 17.117
 FRAME 17.118
 STATE 17: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 STEP 18 ZONE PAL_ZLMARRON
+FRAME 18.0 click zone PAL_ZLMARRON
 STATE 18: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 STEP 19 FRAMES_UNTIL MEM32=0x0078755c:0|MEM32=0x00787560:0
 FRAME 19.0
@@ -533,6 +562,7 @@ FRAME 19.118
 FRAME 19.119
 STATE 19: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 STEP 20 ZONE PAL_ZLBLANC
+FRAME 20.0 click zone PAL_ZLBLANC
 STATE 20: chapter=21 monde=4 wam=paleo.wam view=2 hand=- waiting=0 music=4)
 STEP 21 FRAMES_UNTIL FLAG105=1
 FRAME 21.0
@@ -659,17 +689,20 @@ LOG interp: SET/set(cinema=34,FPS=25)
 LOG interp: SET/set(flag603=1)
 LOG interp: SET/set(vue=202)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 21.120 after
 VARS 21: LASTVUE=2 VUE=202
 FLAGS 21: 105=1 603=1 1004=202
 STATE 21: chapter=21 monde=4 wam=paleo.wam view=202 hand=- waiting=0 music=4)
 EXPECT FLAG105=1 ok
 EXPECT VUE=202 ok
 STEP 22 GO 21
+FRAME 22.0 click zone -> view 21
 LOG interp: SET/set(cinema=35,FPS=25)
 LOG interp: SET/set(vue=21)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(chapter=22)
 LOG interp: SET/set(StartMusik=5)
+FRAME 22.1 move
 CALL rand() -> 22190 (lcg)
 CALL rand() -> 29200 (lcg)
 VARS 22: CHAPTER=22 LASTVUE=202 VUE=21
@@ -677,7 +710,10 @@ FLAGS 22: 1004=21 1024=22
 STATE 22: chapter=22 monde=4 wam=paleo.wam view=21 hand=- waiting=0 music=5)
 EXPECT CHAPTER=22 ok
 STEP 23 GO 22
+FRAME 23.0 click zone -> view 22
+FRAME 23.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 23.2 move
 CALL rand() -> 5949 (lcg)
 CALL rand() -> 10541 (lcg)
 CALL rand() -> 30887 (lcg)
@@ -686,22 +722,29 @@ VARS 23: LASTVUE=21 VUE=22 ANGLEWARPX=37 ANGLEWARPY=5
 FLAGS 23: 1004=22
 STATE 23: chapter=22 monde=4 wam=paleo.wam view=22 hand=- waiting=0 music=5)
 STEP 24 OBJET PAL_SOUCHE
+FRAME 24.0 click PAL_SOUCHE
 CALL rand() -> 19833 (lcg)
 LOG interp: SET/set(flag101=1)
 VARS 24: OBJETENMAIN=262
 FLAGS 24: 101=1 1362=4 1762=6
 STATE 24: chapter=22 monde=4 wam=paleo.wam view=22 hand=PAL_SOUCHE waiting=0 music=5)
 STEP 25 GO 23
+FRAME 25.0 click zone -> view 23
 CALL rand() -> 7463 (lcg)
+FRAME 25.1 move
 CALL rand() -> 7657 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 25.2 move
 CALL rand() -> 23091 (lcg)
 CALL rand() -> 32725 (lcg)
 VARS 25: LASTVUE=22 VUE=23 OBJETENMAIN=0 ANGLEWARPX=16 ANGLEWARPY=1
 FLAGS 25: 1004=23
 STATE 25: chapter=22 monde=4 wam=paleo.wam view=23 hand=- waiting=0 music=5)
 STEP 26 GO 24
+FRAME 26.0 click zone -> view 24
+FRAME 26.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 26.2 move
 CALL rand() -> 31964 (lcg)
 CALL rand() -> 941 (lcg)
 CALL rand() -> 24186 (lcg)
@@ -709,9 +752,11 @@ VARS 26: LASTVUE=23 VUE=24 ANGLEWARPX=5 ANGLEWARPY=9
 FLAGS 26: 1004=24
 STATE 26: chapter=22 monde=4 wam=paleo.wam view=24 hand=- waiting=0 music=5)
 STEP 27 HAND PAL_SOUCHE
+FRAME 27.1 inventory frame 0x00427c40: pick PAL_SOUCHE
 VARS 27: OBJETENMAIN=262
 STATE 27: chapter=22 monde=4 wam=paleo.wam view=24 hand=PAL_SOUCHE waiting=0 music=5)
 STEP 28 ZONE PAL_ZONE_SOUCHE1
+FRAME 28.0 click zone PAL_ZONE_SOUCHE1
 LOG interp: SET/set(flag107=1)
 LOG interp: SET/set(sacados=NOT_PAL_SOUCHE)
 LOG interp: SET/set(showobjet=PAL_SOUCHE2)
@@ -719,12 +764,14 @@ VARS 28: FLAG=1
 FLAGS 28: 107=1 1362=0 1762=0
 STATE 28: chapter=22 monde=4 wam=paleo.wam view=24 hand=PAL_SOUCHE waiting=0 music=5)
 STEP 29 GO 25
+FRAME 29.0 click zone -> view 25
 LOG interp: SET/set(abortdepart=1)
 LOG interp: SET/set(cinema=36,FPS=25)
 LOG interp: SET/set(vue=25)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(chapter=23)
 LOG interp: SET/set(StartMusik=5)
+FRAME 29.1 move
 CALL rand() -> 1412 (lcg)
 CALL rand() -> 6786 (lcg)
 LOG interp: SET/set(Flag909=1)
@@ -1080,15 +1127,19 @@ FLAGS 29: 909=1 1004=25 1024=23
 STATE 29: chapter=23 monde=4 wam=paleo.wam view=25 hand=- waiting=0 music=5)
 EXPECT CHAPTER=23 ok
 STEP 30 OBJET PAL_CAILLOU
+FRAME 30.0 click PAL_CAILLOU
 CALL rand() -> 31382 (lcg)
 LOG interp: SET/set(flag109=1)
 VARS 30: OBJETENMAIN=263
 FLAGS 30: 109=1 1363=4 1763=7
 STATE 30: chapter=23 monde=4 wam=paleo.wam view=25 hand=PAL_CAILLOU waiting=0 music=5)
 STEP 31 GO 26
+FRAME 31.0 click zone -> view 26
 CALL rand() -> 27170 (lcg)
+FRAME 31.1 move
 CALL rand() -> 7188 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 31.2 move
 CALL rand() -> 18989 (lcg)
 CALL rand() -> 25348 (lcg)
 CALL rand() -> 8775 (lcg)
@@ -1096,6 +1147,7 @@ VARS 31: LASTVUE=25 VUE=26 OBJETENMAIN=0 ANGLEWARPX=35 ANGLEWARPY=1
 FLAGS 31: 1004=26
 STATE 31: chapter=23 monde=4 wam=paleo.wam view=26 hand=- waiting=0 music=5)
 STEP 32 HAND PAL_CAILLOU
+FRAME 32.1 inventory frame 0x00427c40: pick PAL_CAILLOU
 CALL rand() -> 11674 (lcg)
 VARS 32: OBJETENMAIN=263
 STATE 32: chapter=23 monde=4 wam=paleo.wam view=26 hand=PAL_CAILLOU waiting=0 music=5)
@@ -1245,6 +1297,7 @@ CALL rand() -> 23112 (lcg)
 VARS 34: ANGLEWARPX=55 ANGLEWARPY=357
 STATE 34: chapter=23 monde=4 wam=paleo.wam view=26 hand=PAL_CAILLOU waiting=0 music=5)
 STEP 35 ZONE PAL_ZONE_LANCER
+FRAME 35.0 click zone PAL_ZONE_LANCER
 CALL rand() -> 21895 (lcg)
 VARS 35: OBJETENMAIN=0
 STATE 35: chapter=23 monde=4 wam=paleo.wam view=26 hand=- waiting=0 music=5)
@@ -1299,24 +1352,31 @@ STATE 36: chapter=23 monde=4 wam=paleo.wam view=26 hand=- waiting=0 music=5)
 EXPECT FLAG111=1 ok
 EXPECT FLAG612=1 ok
 STEP 37 OBJET PAL_LEVIER
+FRAME 37.0 click PAL_LEVIER
 CALL rand() -> 16113 (lcg)
 LOG interp: SET/set(flag112=1)
 VARS 37: OBJETENMAIN=266
 FLAGS 37: 112=1 1366=4 1766=10
 STATE 37: chapter=23 monde=4 wam=paleo.wam view=26 hand=PAL_LEVIER waiting=0 music=5)
 STEP 38 GO 27
+FRAME 38.0 click zone -> view 27
 CALL rand() -> 31707 (lcg)
+FRAME 38.1 move
 CALL rand() -> 7890 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 38.2 move
 CALL rand() -> 7549 (lcg)
 CALL rand() -> 19644 (lcg)
 VARS 38: LASTVUE=26 VUE=27 OBJETENMAIN=0 ANGLEWARPX=89 ANGLEWARPY=2
 FLAGS 38: 1004=27
 STATE 38: chapter=23 monde=4 wam=paleo.wam view=27 hand=- waiting=0 music=5)
 STEP 39 GO 28
+FRAME 39.0 click zone -> view 28
 CALL rand() -> 22381 (lcg)
+FRAME 39.1 move
 CALL rand() -> 24447 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 39.2 move
 CALL rand() -> 14979 (lcg)
 CALL rand() -> 19640 (lcg)
 CALL rand() -> 30088 (lcg)
@@ -1324,10 +1384,12 @@ VARS 39: LASTVUE=27 VUE=28 ANGLEWARPX=68 ANGLEWARPY=3
 FLAGS 39: 1004=28
 STATE 39: chapter=23 monde=4 wam=paleo.wam view=28 hand=- waiting=0 music=5)
 STEP 40 HAND PAL_LEVIER
+FRAME 40.1 inventory frame 0x00427c40: pick PAL_LEVIER
 CALL rand() -> 16702 (lcg)
 VARS 40: FLAG=1 OBJETENMAIN=266
 STATE 40: chapter=23 monde=4 wam=paleo.wam view=28 hand=PAL_LEVIER waiting=0 music=5)
 STEP 41 ZONE PAL_ZONE_ROCHER
+FRAME 41.0 click zone PAL_ZONE_ROCHER
 CALL rand() -> 7772 (lcg)
 LOG interp: SET/set(SacADos=NOT_PAL_LEVIER)
 LOG interp: SET/set(cinema=40,FPS=25)
@@ -1336,6 +1398,7 @@ LOG interp: SET/set(Vue=29)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(chapter=24)
 LOG interp: SET/set(StartMusik=5)
+FRAME 41.1 after
 CALL rand() -> 20014 (lcg)
 CALL rand() -> 4453 (lcg)
 LOG interp: SET/set(flag606=1)
@@ -1698,15 +1761,21 @@ STATE 41: chapter=24 monde=4 wam=paleo.wam view=29 hand=- waiting=0 music=5)
 EXPECT CHAPTER=24 ok
 EXPECT VUE=29 ok
 STEP 42 GO 30
+FRAME 42.0 click zone -> view 30
 CALL rand() -> 315 (lcg)
+FRAME 42.1 move
 CALL rand() -> 21460 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 42.2 move
 CALL rand() -> 24813 (lcg)
 VARS 42: LASTVUE=29 VUE=30 ANGLEWARPX=109 ANGLEWARPY=4
 FLAGS 42: 1004=30
 STATE 42: chapter=24 monde=4 wam=paleo.wam view=30 hand=- waiting=0 music=5)
 STEP 43 GO 31
+FRAME 43.0 click zone -> view 31
+FRAME 43.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 43.2 move
 CALL rand() -> 17765 (lcg)
 CALL rand() -> 25952 (lcg)
 CALL rand() -> 2872 (lcg)
@@ -1714,9 +1783,12 @@ VARS 43: LASTVUE=30 VUE=31 ANGLEWARPX=113 ANGLEWARPY=11
 FLAGS 43: 1004=31
 STATE 43: chapter=24 monde=4 wam=paleo.wam view=31 hand=- waiting=0 music=5)
 STEP 44 GO 37
+FRAME 44.0 click zone -> view 37
 CALL rand() -> 32391 (lcg)
+FRAME 44.1 move
 CALL rand() -> 21378 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 44.2 move
 CALL rand() -> 28558 (lcg)
 LOG interp: SET/set(ShowPerso=PAL_LOUP_NOIR)
 LOG interp: SET/set(flag600=1)
@@ -1726,9 +1798,12 @@ FLAGS 44: 600=1 1004=37
 STATE 44: chapter=24 monde=4 wam=paleo.wam view=37 hand=- waiting=0 music=5)
 EXPECT FLAG600=1 ok
 STEP 45 GO 31
+FRAME 45.0 click zone -> view 31
 CALL rand() -> 9518 (lcg)
+FRAME 45.1 move
 CALL rand() -> 2144 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 45.2 move
 CALL rand() -> 9150 (lcg)
 CALL rand() -> 5813 (lcg)
 CALL rand() -> 29382 (lcg)
@@ -1736,15 +1811,21 @@ VARS 45: LASTVUE=37 VUE=31 ANGLEWARPX=358 ANGLEWARPY=15
 FLAGS 45: 1004=31
 STATE 45: chapter=24 monde=4 wam=paleo.wam view=31 hand=- waiting=0 music=5)
 STEP 46 GO 30
+FRAME 46.0 click zone -> view 30
 CALL rand() -> 29474 (lcg)
+FRAME 46.1 move
 CALL rand() -> 23061 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 46.2 move
 CALL rand() -> 15383 (lcg)
 VARS 46: LASTVUE=31 VUE=30 ANGLEWARPX=297 ANGLEWARPY=16
 FLAGS 46: 1004=30
 STATE 46: chapter=24 monde=4 wam=paleo.wam view=30 hand=- waiting=0 music=5)
 STEP 47 GO 32
+FRAME 47.0 click zone -> view 32
+FRAME 47.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 47.2 move
 CALL rand() -> 9392 (lcg)
 CALL rand() -> 1401 (lcg)
 CALL rand() -> 20 (lcg)
@@ -1752,9 +1833,12 @@ VARS 47: LASTVUE=30 VUE=32 ANGLEWARPX=52 ANGLEWARPY=8
 FLAGS 47: 1004=32
 STATE 47: chapter=24 monde=4 wam=paleo.wam view=32 hand=- waiting=0 music=5)
 STEP 48 GO 34
+FRAME 48.0 click zone -> view 34
 CALL rand() -> 13138 (lcg)
+FRAME 48.1 move
 CALL rand() -> 668 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 48.2 move
 CALL rand() -> 8995 (lcg)
 LOG interp: SET/set(cinema=42,FPS=25)
 LOG interp: SET/set(HidePerso=PAL_LOUP_NOIR)
@@ -1764,7 +1848,10 @@ FLAGS 48: 114=1 1004=34
 STATE 48: chapter=24 monde=4 wam=paleo.wam view=34 hand=- waiting=0 music=5)
 EXPECT FLAG114=1 ok
 STEP 49 GO 32
+FRAME 49.0 click zone -> view 32
+FRAME 49.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 49.2 move
 CALL rand() -> 31247 (lcg)
 CALL rand() -> 24761 (lcg)
 CALL rand() -> 27550 (lcg)
@@ -1772,15 +1859,21 @@ VARS 49: LASTVUE=34 VUE=32 ANGLEWARPX=266 ANGLEWARPY=8
 FLAGS 49: 1004=32
 STATE 49: chapter=24 monde=4 wam=paleo.wam view=32 hand=- waiting=0 music=5)
 STEP 50 GO 30
+FRAME 50.0 click zone -> view 30
 CALL rand() -> 19121 (lcg)
+FRAME 50.1 move
 CALL rand() -> 14560 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 50.2 move
 CALL rand() -> 27662 (lcg)
 VARS 50: LASTVUE=32 VUE=30 ANGLEWARPX=249 ANGLEWARPY=20
 FLAGS 50: 1004=30
 STATE 50: chapter=24 monde=4 wam=paleo.wam view=30 hand=- waiting=0 music=5)
 STEP 51 GO 31
+FRAME 51.0 click zone -> view 31
+FRAME 51.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 51.2 move
 CALL rand() -> 14725 (lcg)
 CALL rand() -> 15246 (lcg)
 CALL rand() -> 22492 (lcg)
@@ -1788,34 +1881,43 @@ VARS 51: LASTVUE=30 VUE=31 ANGLEWARPX=113 ANGLEWARPY=11
 FLAGS 51: 1004=31
 STATE 51: chapter=24 monde=4 wam=paleo.wam view=31 hand=- waiting=0 music=5)
 STEP 52 GO 37
+FRAME 52.0 click zone -> view 37
 CALL rand() -> 13987 (lcg)
+FRAME 52.1 move
 CALL rand() -> 28264 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 52.2 move
 CALL rand() -> 15677 (lcg)
 CALL rand() -> 22278 (lcg)
 VARS 52: LASTVUE=31 VUE=37 ANGLEWARPX=146 ANGLEWARPY=39
 FLAGS 52: 1004=37
 STATE 52: chapter=24 monde=4 wam=paleo.wam view=37 hand=- waiting=0 music=5)
 STEP 53 OBJET PAL_PERCHE
+FRAME 53.0 click PAL_PERCHE
 CALL rand() -> 31936 (lcg)
 LOG interp: SET/set(flag613=1)
 VARS 53: OBJETENMAIN=264
 FLAGS 53: 613=1 1364=4 1764=8
 STATE 53: chapter=24 monde=4 wam=paleo.wam view=37 hand=PAL_PERCHE waiting=0 music=5)
 STEP 54 GO 38
+FRAME 54.0 click zone -> view 38
 CALL rand() -> 24705 (lcg)
+FRAME 54.1 move
 CALL rand() -> 27618 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 54.2 move
 CALL rand() -> 17795 (lcg)
 CALL rand() -> 9797 (lcg)
 VARS 54: LASTVUE=37 VUE=38 OBJETENMAIN=0 ANGLEWARPX=77 ANGLEWARPY=354
 FLAGS 54: 1004=38
 STATE 54: chapter=24 monde=4 wam=paleo.wam view=38 hand=- waiting=0 music=5)
 STEP 55 HAND PAL_PERCHE
+FRAME 55.1 inventory frame 0x00427c40: pick PAL_PERCHE
 CALL rand() -> 22590 (lcg)
 VARS 55: FLAG=1 OBJETENMAIN=264
 STATE 55: chapter=24 monde=4 wam=paleo.wam view=38 hand=PAL_PERCHE waiting=0 music=5)
 STEP 56 ZONE PAL_ZONE_PERCHE
+FRAME 56.0 click zone PAL_ZONE_PERCHE
 CALL rand() -> 11780 (lcg)
 LOG interp: SET/set(SacADos=NOT_PAL_PERCHE)
 LOG interp: SET/set(cinema=44, FPS=25)
@@ -1823,6 +1925,7 @@ LOG interp: SET/set(vue=40)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(chapter=25)
 LOG interp: SET/set(StartMusik=5)
+FRAME 56.1 after
 CALL rand() -> 28750 (lcg)
 CALL rand() -> 2704 (lcg)
 VARS 56: CHAPTER=25 FLAG=0 LASTVUE=38 VUE=40 OBJETENMAIN=0
@@ -1830,42 +1933,55 @@ FLAGS 56: 1004=40 1024=25 1364=0 1764=0
 STATE 56: chapter=25 monde=4 wam=paleo.wam view=40 hand=- waiting=0 music=5)
 EXPECT CHAPTER=25 ok
 STEP 57 GO 41
+FRAME 57.0 click zone -> view 41
 CALL rand() -> 21654 (lcg)
+FRAME 57.1 move
 CALL rand() -> 14225 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 57.2 move
 CALL rand() -> 26925 (lcg)
 CALL rand() -> 11169 (lcg)
 VARS 57: LASTVUE=40 VUE=41 ANGLEWARPX=167 ANGLEWARPY=12
 FLAGS 57: 1004=41
 STATE 57: chapter=25 monde=4 wam=paleo.wam view=41 hand=- waiting=0 music=5)
 STEP 58 GO 42
+FRAME 58.0 click zone -> view 42
 CALL rand() -> 27034 (lcg)
+FRAME 58.1 move
 CALL rand() -> 15906 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 58.2 move
 CALL rand() -> 31204 (lcg)
 CALL rand() -> 11388 (lcg)
 VARS 58: LASTVUE=41 VUE=42 ANGLEWARPX=199 ANGLEWARPY=15
 FLAGS 58: 1004=42
 STATE 58: chapter=25 monde=4 wam=paleo.wam view=42 hand=- waiting=0 music=5)
 STEP 59 GO 43
+FRAME 59.0 click zone -> view 43
 CALL rand() -> 27980 (lcg)
+FRAME 59.1 move
 CALL rand() -> 17025 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 59.2 move
 CALL rand() -> 22440 (lcg)
 CALL rand() -> 1743 (lcg)
 VARS 59: LASTVUE=42 VUE=43 ANGLEWARPX=221 ANGLEWARPY=5
 FLAGS 59: 1004=43
 STATE 59: chapter=25 monde=4 wam=paleo.wam view=43 hand=- waiting=0 music=5)
 STEP 60 GO 44
+FRAME 60.0 click zone -> view 44
 CALL rand() -> 26291 (lcg)
+FRAME 60.1 move
 CALL rand() -> 4969 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 60.2 move
 CALL rand() -> 10966 (lcg)
 CALL rand() -> 17365 (lcg)
 VARS 60: LASTVUE=43 VUE=44 ANGLEWARPX=229 ANGLEWARPY=6
 FLAGS 60: 1004=44
 STATE 60: chapter=25 monde=4 wam=paleo.wam view=44 hand=- waiting=0 music=5)
 STEP 61 GO 45
+FRAME 61.0 click zone -> view 45
 LOG interp: SET/set(cinema=45,fps=25)
 CALL rand() -> 29487 (lcg)
 LOG interp: SET/set(Vue=45)
@@ -1873,89 +1989,122 @@ LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(Chapter=26)
 LOG interp: SET/set(StartMusik=5)
 LOG interp: SET/set(Flag116=1)
+FRAME 61.1 move
 VARS 61: CHAPTER=26 LASTVUE=44 VUE=45
 FLAGS 61: 116=1 1004=45 1024=26
 STATE 61: chapter=26 monde=4 wam=paleo.wam view=45 hand=- waiting=0 music=5)
 EXPECT CHAPTER=26 ok
 STEP 62 GO 46
+FRAME 62.0 click zone -> view 46
+FRAME 62.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 62.2 move
 VARS 62: LASTVUE=45 VUE=46 ANGLEWARPX=326 ANGLEWARPY=4
 FLAGS 62: 1004=46
 STATE 62: chapter=26 monde=4 wam=paleo.wam view=46 hand=- waiting=0 music=5)
 STEP 63 GO 47
+FRAME 63.0 click zone -> view 47
+FRAME 63.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 63.2 move
 VARS 63: LASTVUE=46 VUE=47 ANGLEWARPX=53 ANGLEWARPY=7
 FLAGS 63: 1004=47
 STATE 63: chapter=26 monde=4 wam=paleo.wam view=47 hand=- waiting=0 music=5)
 STEP 64 GO 48
+FRAME 64.0 click zone -> view 48
+FRAME 64.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 64.2 move
 CALL rand() -> 28044 (lcg)
 CALL rand() -> 16101 (lcg)
 VARS 64: LASTVUE=47 VUE=48 ANGLEWARPX=96
 FLAGS 64: 1004=48
 STATE 64: chapter=26 monde=4 wam=paleo.wam view=48 hand=- waiting=0 music=5)
 STEP 65 GO 49
+FRAME 65.0 click zone -> view 49
 CALL rand() -> 15482 (lcg)
+FRAME 65.1 move
 CALL rand() -> 5643 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 65.2 move
 CALL rand() -> 23770 (lcg)
 CALL rand() -> 28314 (lcg)
 VARS 65: LASTVUE=48 VUE=49 ANGLEWARPX=138 ANGLEWARPY=15
 FLAGS 65: 1004=49
 STATE 65: chapter=26 monde=4 wam=paleo.wam view=49 hand=- waiting=0 music=5)
 STEP 66 GO 50
+FRAME 66.0 click zone -> view 50
 CALL rand() -> 9408 (lcg)
+FRAME 66.1 move
 CALL rand() -> 9809 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 66.2 move
 CALL rand() -> 17153 (lcg)
 CALL rand() -> 8314 (lcg)
 VARS 66: LASTVUE=49 VUE=50 ANGLEWARPX=205 ANGLEWARPY=11
 FLAGS 66: 1004=50
 STATE 66: chapter=26 monde=4 wam=paleo.wam view=50 hand=- waiting=0 music=5)
 STEP 67 GO 51
+FRAME 67.0 click zone -> view 51
 CALL rand() -> 26209 (lcg)
+FRAME 67.1 move
 CALL rand() -> 20194 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 67.2 move
 CALL rand() -> 10032 (lcg)
 CALL rand() -> 26501 (lcg)
 VARS 67: LASTVUE=50 VUE=51 ANGLEWARPX=279 ANGLEWARPY=14
 FLAGS 67: 1004=51
 STATE 67: chapter=26 monde=4 wam=paleo.wam view=51 hand=- waiting=0 music=5)
 STEP 68 GO 60
+FRAME 68.0 click zone -> view 60
 LOG interp: SET/set(cinema=46,FPS=25)
 CALL rand() -> 3766 (lcg)
 LOG interp: SET/set(vue=60)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(Chapter=27)
 LOG interp: SET/set(StartMusik=6)
+FRAME 68.1 move
 VARS 68: CHAPTER=27 LASTVUE=51 VUE=60
 FLAGS 68: 1004=60 1024=27
 STATE 68: chapter=27 monde=4 wam=paleo.wam view=60 hand=- waiting=0 music=6)
 EXPECT CHAPTER=27 ok
 STEP 69 GO 61
+FRAME 69.0 click zone -> view 61
+FRAME 69.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 69.2 move
 VARS 69: LASTVUE=60 VUE=61 ANGLEWARPX=89 ANGLEWARPY=5
 FLAGS 69: 1004=61
 STATE 69: chapter=27 monde=4 wam=paleo.wam view=61 hand=- waiting=0 music=6)
 STEP 70 GO 62
+FRAME 70.0 click zone -> view 62
+FRAME 70.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 70.2 move
 VARS 70: LASTVUE=61 VUE=62 ANGLEWARPX=213 ANGLEWARPY=6
 FLAGS 70: 1004=62
 STATE 70: chapter=27 monde=4 wam=paleo.wam view=62 hand=- waiting=0 music=6)
 STEP 71 GO 64
+FRAME 71.0 click zone -> view 64
+FRAME 71.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 71.2 move
 VARS 71: LASTVUE=62 VUE=64 ANGLEWARPX=157 ANGLEWARPY=5
 FLAGS 71: 1004=64
 STATE 71: chapter=27 monde=4 wam=paleo.wam view=64 hand=- waiting=0 music=6)
 STEP 72 OBJET PAL_PROPULSEUR
+FRAME 72.0 click PAL_PROPULSEUR
 LOG interp: SET/set(flag614=1)
 VARS 72: OBJETENMAIN=265 SACADOS=9
 FLAGS 72: 614=1 1365=4 1765=9
 STATE 72: chapter=27 monde=4 wam=paleo.wam view=64 hand=PAL_PROPULSEUR waiting=0 music=6)
 STEP 73 HAND -
+FRAME 73.1 inventory frame 0x00427c40
 VARS 73: FLAG=1 OBJETENMAIN=0
 STATE 73: chapter=27 monde=4 wam=paleo.wam view=64 hand=- waiting=0 music=6)
 STEP 74 OBJET PAL_CRANE
+FRAME 74.0 click PAL_CRANE
 LOG interp: SET/set(flag117=1)
 LOG interp: SET/set(Flag900=1)
 VARS 74: FLAG=0 OBJETENMAIN=267
@@ -2009,6 +2158,7 @@ LOG interp: SET(HideOBJET=INT_BULLEFLOUCOULOIR)
 LOG interp: SET(ShowOBJET=INT_BULLEFLOUCOULOIR)
 LOG interp: SET(chapter=52)
 LOG interp: SET/set(StartMusik=1)
+FRAME 75.1 after
 LOG interp: SET/set(flag607=1)
 LOG interp: SET/set(cinema=052 ,fps=25)
 LOG interp: SET/set(flag901=0)
@@ -2018,13 +2168,17 @@ STATE 75: chapter=52 monde=5 wam=Interdim.wam view=2 hand=- waiting=0 music=1)
 EXPECT CHAPTER=52 ok
 EXPECT VUE=2 ok
 STEP 76 GO 8
+FRAME 76.0 click zone -> view 8
+FRAME 76.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET(PlayCutAnimP=INT_DAUPHIN,2)
 LOG interp: SET(PlayAnimP=INT_DAUPHIN,2)
+FRAME 76.2 move
 VARS 76: LASTVUE=2 VUE=8 ANGLEWARPX=323 ANGLEWARPY=20
 FLAGS 76: 1005=8
 STATE 76: chapter=52 monde=5 wam=Interdim.wam view=8 hand=- waiting=0 music=1)
 STEP 77 OBJET INT_BULLENETMARAIS
+FRAME 77.0 click INT_BULLENETMARAIS
 LOG interp: SET/set(AngleWarpXNow=-150)
 LOG interp: SET/set(AngleWarpYNow=18)
 LOG interp: SET/set(PlayCutAnimP=INT_DAUPHIN,2)
@@ -2037,6 +2191,7 @@ FLAGS 77: 867=1 868=1 988=1
 STATE 77: chapter=52 monde=5 wam=Interdim.wam view=8 hand=- waiting=0 music=1)
 EXPECT FLAG867=1 ok
 STEP 78 OBJET INT_BULLENETMARAIS
+FRAME 78.0 click INT_BULLENETMARAIS
 LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_HOGGAR)
 LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_BAGDAD)
 LOG interp: SET(KillSuj,INT_DAUPHIN,DIAL_INT_PALEO)
@@ -2082,125 +2237,174 @@ LOG interp: SET(ShowObjet=PAL_BOUQUETIN)
 LOG interp: SET(ShowObjet=PAL_LANCE)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(StartMusik=6)
+FRAME 78.1 after
 VARS 78: CHAPTER=27 LASTVUE=0 VUE=64 CHANGECD=1 SACADOS=9 MONDE=4
 FLAGS 78: 25=1 868=0
 STATE 78: chapter=27 monde=4 wam=paleo.wam view=64 hand=- waiting=0 music=6)
 EXPECT FLAG25=1 ok
 EXPECT MONDE=4 ok
 STEP 79 GO 62
+FRAME 79.0 click zone -> view 62
+FRAME 79.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 79.2 move
 VARS 79: LASTVUE=64 VUE=62 ANGLEWARPX=339 ANGLEWARPY=4
 FLAGS 79: 1004=62
 STATE 79: chapter=27 monde=4 wam=paleo.wam view=62 hand=- waiting=0 music=6)
 STEP 80 GO 51
+FRAME 80.0 click zone -> view 51
 LOG interp: SET/set(Chapter=26)
 LOG interp: SET/set(StartMusik=5)
 LOG interp: SET/set(Flag116=1)
+FRAME 80.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 80.2 move
 CALL rand() -> 21701 (lcg)
 CALL rand() -> 13089 (lcg)
 VARS 80: CHAPTER=26 LASTVUE=62 VUE=51 ANGLEWARPX=341 ANGLEWARPY=23 SACADOS=0
 FLAGS 80: 1004=51 1024=26
 STATE 80: chapter=26 monde=4 wam=paleo.wam view=51 hand=- waiting=0 music=5)
 STEP 81 GO 50
+FRAME 81.0 click zone -> view 50
 CALL rand() -> 7201 (lcg)
+FRAME 81.1 move
 CALL rand() -> 21463 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 81.2 move
 CALL rand() -> 6080 (lcg)
 CALL rand() -> 342 (lcg)
 VARS 81: LASTVUE=51 VUE=50 ANGLEWARPX=101 ANGLEWARPY=7
 FLAGS 81: 1004=50
 STATE 81: chapter=26 monde=4 wam=paleo.wam view=50 hand=- waiting=0 music=5)
 STEP 82 GO 49
+FRAME 82.0 click zone -> view 49
 CALL rand() -> 341 (lcg)
+FRAME 82.1 move
 CALL rand() -> 29956 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 82.2 move
 CALL rand() -> 293 (lcg)
 CALL rand() -> 8355 (lcg)
 VARS 82: LASTVUE=50 VUE=49 ANGLEWARPX=69 ANGLEWARPY=16
 FLAGS 82: 1004=49
 STATE 82: chapter=26 monde=4 wam=paleo.wam view=49 hand=- waiting=0 music=5)
 STEP 83 GO 48
+FRAME 83.0 click zone -> view 48
 CALL rand() -> 18999 (lcg)
+FRAME 83.1 move
 CALL rand() -> 31300 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 83.2 move
 CALL rand() -> 21743 (lcg)
 CALL rand() -> 28908 (lcg)
 VARS 83: LASTVUE=49 VUE=48 ANGLEWARPX=355
 FLAGS 83: 1004=48
 STATE 83: chapter=26 monde=4 wam=paleo.wam view=48 hand=- waiting=0 music=5)
 STEP 84 GO 47
+FRAME 84.0 click zone -> view 47
 CALL rand() -> 5032 (lcg)
+FRAME 84.1 move
 CALL rand() -> 5963 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 84.2 move
 VARS 84: LASTVUE=48 VUE=47 ANGLEWARPX=311 ANGLEWARPY=14
 FLAGS 84: 1004=47
 STATE 84: chapter=26 monde=4 wam=paleo.wam view=47 hand=- waiting=0 music=5)
 STEP 85 GO 46
+FRAME 85.0 click zone -> view 46
+FRAME 85.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 85.2 move
 VARS 85: LASTVUE=47 VUE=46 ANGLEWARPX=245 ANGLEWARPY=23
 FLAGS 85: 1004=46
 STATE 85: chapter=26 monde=4 wam=paleo.wam view=46 hand=- waiting=0 music=5)
 STEP 86 GO 202
+FRAME 86.0 click zone -> view 202
 LOG interp: SET/set(cinema=53,fps=25)
 LOG interp: SET/set(vue=202)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(Chapter=21)
 LOG interp: SET/set(StartMusik=4)
+FRAME 86.1 move
 VARS 86: CHAPTER=21 LASTVUE=46 VUE=202
 FLAGS 86: 1004=202 1024=21
 STATE 86: chapter=21 monde=4 wam=paleo.wam view=202 hand=- waiting=0 music=4)
 EXPECT CHAPTER=21 ok
 STEP 87 GO 201
+FRAME 87.0 click zone -> view 201
+FRAME 87.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 87.2 move
 VARS 87: LASTVUE=202 VUE=201 ANGLEWARPX=293 ANGLEWARPY=2
 FLAGS 87: 1004=201
 STATE 87: chapter=21 monde=4 wam=paleo.wam view=201 hand=- waiting=0 music=4)
 STEP 88 GO 13
+FRAME 88.0 click zone -> view 13
 LOG interp: SET/set(chapter=19)
 LOG interp: SET/set(StartMusik=3)
+FRAME 88.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 88.2 move
 VARS 88: CHAPTER=19 LASTVUE=201 VUE=13 ANGLEWARPX=278 ANGLEWARPY=0
 FLAGS 88: 1004=13 1024=19
 STATE 88: chapter=19 monde=4 wam=paleo.wam view=13 hand=- waiting=0 music=3)
 STEP 89 GO 7
+FRAME 89.0 click zone -> view 7
+FRAME 89.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 89.2 move
 VARS 89: LASTVUE=13 VUE=7 ANGLEWARPX=198 ANGLEWARPY=11
 FLAGS 89: 1004=7
 STATE 89: chapter=19 monde=4 wam=paleo.wam view=7 hand=- waiting=0 music=3)
 STEP 90 GO 6
+FRAME 90.0 click zone -> view 6
+FRAME 90.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 90.2 move
 VARS 90: LASTVUE=7 VUE=6 ANGLEWARPX=192 ANGLEWARPY=2
 FLAGS 90: 1004=6
 STATE 90: chapter=19 monde=4 wam=paleo.wam view=6 hand=- waiting=0 music=3)
 STEP 91 GO 11
+FRAME 91.0 click zone -> view 11
+FRAME 91.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 91.2 move
 VARS 91: LASTVUE=6 VUE=11 ANGLEWARPX=68 ANGLEWARPY=8
 FLAGS 91: 1004=11
 STATE 91: chapter=19 monde=4 wam=paleo.wam view=11 hand=- waiting=0 music=3)
 STEP 92 GO 12
+FRAME 92.0 click zone -> view 12
+FRAME 92.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 92.2 move
 VARS 92: LASTVUE=11 VUE=12 ANGLEWARPX=112 ANGLEWARPY=358
 FLAGS 92: 1004=12
 STATE 92: chapter=19 monde=4 wam=paleo.wam view=12 hand=- waiting=0 music=3)
 STEP 93 GO 3
+FRAME 93.0 click zone -> view 3
 LOG interp: SET/set(chapter=20)
 LOG interp: SET/set(StartMusik=4)
+FRAME 93.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 93.2 move
 VARS 93: CHAPTER=20 LASTVUE=12 VUE=3 ANGLEWARPY=0
 FLAGS 93: 1004=3 1024=20
 STATE 93: chapter=20 monde=4 wam=paleo.wam view=3 hand=- waiting=0 music=4)
 EXPECT CHAPTER=20 ok
 STEP 94 GO 4
+FRAME 94.0 click zone -> view 4
+FRAME 94.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET(ShowObjet=PAL_CERF)
 LOG interp: SET(ShowObjet=PAL_AVROCH)
 LOG interp: SET(ShowObjet=PAL_CHEVAL)
 LOG interp: SET(ShowObjet=PAL_BOUQUETIN)
+FRAME 94.2 move
 VARS 94: LASTVUE=3 VUE=4 ANGLEWARPX=218 ANGLEWARPY=17
 FLAGS 94: 1004=4
 STATE 94: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 95 HAND PAL_LANCE
+FRAME 95.1 inventory frame 0x00427c40: pick PAL_LANCE
 STATE 95: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 96 FRAMES_UNTIL SLOTFRAME=PAL_CERF:20
 FRAME 96.0
@@ -2225,6 +2429,7 @@ STATE 96: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 97 CAMERA 64.2 5
 STATE 97: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 98 ZONE PAL_ZONE_LANCE1
+FRAME 98.0 click zone PAL_ZONE_LANCE1
 LOG interp: SET(PlaySound=201)
 VARS 98: ANGLEWARPX=64 ANGLEWARPY=5
 STATE 98: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2263,6 +2468,7 @@ STEP 100 FRAMES_UNTIL MEM8=0x00786dcc:0
 STATE 100: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 101 HAND PAL_LANCE
 LOG interp: SET/set(flag615=1)
+FRAME 101.1 inventory frame 0x00427c40: pick PAL_LANCE
 LOG interp: SET(sacados=NOT_PAL_LANCE)
 FLAGS 101: 615=1 620=1 1357=0
 STATE 101: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2357,6 +2563,7 @@ STATE 102: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 103 CAMERA -128.7 -17
 STATE 103: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 104 ZONE PAL_ZONE_LANCE1
+FRAME 104.0 click zone PAL_ZONE_LANCE1
 LOG interp: SET(PlaySound=201)
 VARS 104: ANGLEWARPX=232 ANGLEWARPY=343
 STATE 104: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2396,6 +2603,7 @@ FRAME 106.0
 LOG interp: SET(sacados=PAL_LANCE)
 STATE 106: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 107 HAND PAL_LANCE
+FRAME 107.1 inventory frame 0x00427c40: pick PAL_LANCE
 LOG interp: SET(sacados=NOT_PAL_LANCE)
 VARS 107: FLAG=1
 FLAGS 107: 620=1 1357=0
@@ -2506,6 +2714,7 @@ STATE 108: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 109 CAMERA 120.3 5
 STATE 109: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 110 ZONE PAL_ZONE_LANCE1
+FRAME 110.0 click zone PAL_ZONE_LANCE1
 LOG interp: SET(PlaySound=201)
 VARS 110: ANGLEWARPX=120 ANGLEWARPY=5
 STATE 110: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2545,6 +2754,7 @@ FRAME 112.0
 LOG interp: SET(sacados=PAL_LANCE)
 STATE 112: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 113 HAND PAL_LANCE
+FRAME 113.1 inventory frame 0x00427c40: pick PAL_LANCE
 LOG interp: SET(sacados=NOT_PAL_LANCE)
 FLAGS 113: 620=1 1357=0
 STATE 113: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2623,6 +2833,7 @@ STATE 114: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 115 CAMERA 33.6 -17
 STATE 115: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 116 ZONE PAL_ZONE_LANCE1
+FRAME 116.0 click zone PAL_ZONE_LANCE1
 LOG interp: SET(PlaySound=201)
 VARS 116: ANGLEWARPX=33 ANGLEWARPY=343
 STATE 116: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2647,78 +2858,110 @@ FLAGS 117: 91=1 611=1 620=0 1361=4 1761=5
 STATE 117: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 EXPECT FLAG91=1 ok
 STEP 118 GO 3
+FRAME 118.0 click zone -> view 3
+FRAME 118.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 118.2 move
 VARS 118: FLAG=0 LASTVUE=4 VUE=3 ANGLEWARPX=38 ANGLEWARPY=8
 FLAGS 118: 1004=3
 STATE 118: chapter=20 monde=4 wam=paleo.wam view=3 hand=- waiting=0 music=4)
 STEP 119 GO 12
+FRAME 119.0 click zone -> view 12
 LOG interp: SET/set(chapter=19)
 LOG interp: SET/set(StartMusik=3)
+FRAME 119.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 119.2 move
 VARS 119: CHAPTER=19 LASTVUE=3 VUE=12 ANGLEWARPX=14 ANGLEWARPY=12
 FLAGS 119: 1004=12 1024=19
 STATE 119: chapter=19 monde=4 wam=paleo.wam view=12 hand=- waiting=0 music=3)
 STEP 120 GO 11
+FRAME 120.0 click zone -> view 11
+FRAME 120.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 120.2 move
 VARS 120: LASTVUE=12 VUE=11 ANGLEWARPX=289 ANGLEWARPY=15
 FLAGS 120: 1004=11
 STATE 120: chapter=19 monde=4 wam=paleo.wam view=11 hand=- waiting=0 music=3)
 STEP 121 GO 6
+FRAME 121.0 click zone -> view 6
+FRAME 121.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 121.2 move
 VARS 121: LASTVUE=11 VUE=6 ANGLEWARPX=272 ANGLEWARPY=357
 FLAGS 121: 1004=6
 STATE 121: chapter=19 monde=4 wam=paleo.wam view=6 hand=- waiting=0 music=3)
 STEP 122 GO 5
+FRAME 122.0 click zone -> view 5
+FRAME 122.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 122.2 move
 VARS 122: LASTVUE=6 VUE=5 ANGLEWARPX=284 ANGLEWARPY=3
 FLAGS 122: 1004=5
 STATE 122: chapter=19 monde=4 wam=paleo.wam view=5 hand=- waiting=0 music=3)
 STEP 123 HAND PAL_COEUR_CHEVAL
+FRAME 123.1 inventory frame 0x00427c40: pick PAL_COEUR_CHEVAL
 VARS 123: OBJETENMAIN=260
 STATE 123: chapter=19 monde=4 wam=paleo.wam view=5 hand=PAL_COEUR_CHEVAL waiting=0 music=3)
 STEP 124 ZONE PAL_ZFEU
+FRAME 124.0 click zone PAL_ZFEU
 LOG interp: SET(PlaySound=200)
 LOG interp: SET(ObjetEnMain=0)
 VARS 124: OBJETENMAIN=0
 FLAGS 124: 618=1 1360=0 1760=0
 STATE 124: chapter=19 monde=4 wam=paleo.wam view=5 hand=- waiting=0 music=3)
 STEP 125 GO 6
+FRAME 125.0 click zone -> view 6
+FRAME 125.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 125.2 move
 VARS 125: LASTVUE=5 VUE=6 ANGLEWARPX=98 ANGLEWARPY=0
 FLAGS 125: 1004=6
 STATE 125: chapter=19 monde=4 wam=paleo.wam view=6 hand=- waiting=0 music=3)
 STEP 126 HAND PAL_COEUR_BOUQUETIN
+FRAME 126.1 inventory frame 0x00427c40: pick PAL_COEUR_BOUQUETIN
 VARS 126: OBJETENMAIN=261
 STATE 126: chapter=19 monde=4 wam=paleo.wam view=6 hand=PAL_COEUR_BOUQUETIN waiting=0 music=3)
 STEP 127 ZONE PAL_ZTERRE
+FRAME 127.0 click zone PAL_ZTERRE
 LOG interp: SET(PlaySound=200)
 LOG interp: SET(ObjetEnMain=0)
 VARS 127: OBJETENMAIN=0
 FLAGS 127: 619=4 1361=0 1761=0
 STATE 127: chapter=19 monde=4 wam=paleo.wam view=6 hand=- waiting=0 music=3)
 STEP 128 GO 7
+FRAME 128.0 click zone -> view 7
+FRAME 128.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 128.2 move
 VARS 128: LASTVUE=6 VUE=7 ANGLEWARPX=359 ANGLEWARPY=2
 FLAGS 128: 1004=7
 STATE 128: chapter=19 monde=4 wam=paleo.wam view=7 hand=- waiting=0 music=3)
 STEP 129 HAND PAL_COEUR_AVROCH
+FRAME 129.1 inventory frame 0x00427c40: pick PAL_COEUR_AVROCH
 VARS 129: OBJETENMAIN=259
 STATE 129: chapter=19 monde=4 wam=paleo.wam view=7 hand=PAL_COEUR_AVROCH waiting=0 music=3)
 STEP 130 ZONE PAL_ZEAU
+FRAME 130.0 click zone PAL_ZEAU
 LOG interp: SET(PlaySound=200)
 LOG interp: SET(ObjetEnMain=0)
 VARS 130: OBJETENMAIN=0
 FLAGS 130: 617=3 1359=0 1759=0
 STATE 130: chapter=19 monde=4 wam=paleo.wam view=7 hand=- waiting=0 music=3)
 STEP 131 GO 8
+FRAME 131.0 click zone -> view 8
+FRAME 131.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 131.2 move
 VARS 131: LASTVUE=7 VUE=8 ANGLEWARPX=255 ANGLEWARPY=0
 FLAGS 131: 1004=8
 STATE 131: chapter=19 monde=4 wam=paleo.wam view=8 hand=- waiting=0 music=3)
 STEP 132 HAND PAL_COEUR_CERF
+FRAME 132.1 inventory frame 0x00427c40: pick PAL_COEUR_CERF
 VARS 132: OBJETENMAIN=258
 STATE 132: chapter=19 monde=4 wam=paleo.wam view=8 hand=PAL_COEUR_CERF waiting=0 music=3)
 STEP 133 ZONE PAL_ZAIR
+FRAME 133.0 click zone PAL_ZAIR
 LOG interp: SET(PlaySound=200)
 LOG interp: SET(ObjetEnMain=0)
 LOG interp: SET/set(cinema=033,fps=25)
@@ -2734,27 +2977,38 @@ STATE 133: chapter=19 monde=4 wam=paleo.wam view=8 hand=- waiting=0 music=3)
 EXPECT FLAG70=1 ok
 EXPECT FLAG604=1 ok
 STEP 134 GO 5
+FRAME 134.0 click zone -> view 5
+FRAME 134.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 134.2 move
 VARS 134: LASTVUE=8 VUE=5 ANGLEWARPX=176 ANGLEWARPY=357
 FLAGS 134: 1004=5
 STATE 134: chapter=19 monde=4 wam=paleo.wam view=5 hand=- waiting=0 music=3)
 STEP 135 GO 9
+FRAME 135.0 click zone -> view 9
+FRAME 135.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 135.2 move
 VARS 135: LASTVUE=5 VUE=9 ANGLEWARPX=170 ANGLEWARPY=0
 FLAGS 135: 1004=9
 STATE 135: chapter=19 monde=4 wam=paleo.wam view=9 hand=- waiting=0 music=3)
 STEP 136 GO 10
+FRAME 136.0 click zone -> view 10
+FRAME 136.1 move
 LOG interp: SET(LIMITEANGLEWARPY=70)
+FRAME 136.2 move
 VARS 136: LASTVUE=9 VUE=10 ANGLEWARPX=182 ANGLEWARPY=346
 FLAGS 136: 1004=10
 STATE 136: chapter=19 monde=4 wam=paleo.wam view=10 hand=- waiting=0 music=3)
 STEP 137 GO 15
+FRAME 137.0 click zone -> view 15
 LOG interp: SET/set(abortdepart=1)
 LOG interp: SET/set(Cinema=47,fps=25)
 LOG interp: SET/set(vue=15)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(chapter=17)
 LOG interp: SET/set(StartMusik=3)
+FRAME 137.1 move
 LOG interp: SET/set(SacADos=NOT_PAL_PROPULSEUR)
 LOG interp: SET/set(SacADos=NOT_PAL_BATON)
 LOG interp: SET/set(SacADos=NOT_PAL_PERCHE)
@@ -2808,6 +3062,7 @@ LOG interp: SET/set(flag402=0)
 LOG interp: SET/set(flag403=1)
 LOG interp: SET/set(chapter=5)
 LOG interp: SET/set(StartMusik=6)
+FRAME 137.2 move
 CALL rand() -> 6413 (lcg)
 CALL rand() -> 15664 (lcg)
 CALL rand() -> 9790 (lcg)
@@ -3243,6 +3498,7 @@ LOG interp: SET(HidePerso=HOG_TOUAREGLI)
 LOG interp: SET(Vue=24)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(StartMusik=6)
+FRAME first warp frame after load
 CALL rand() -> 384 (lcg)
 CALL rand() -> 170 (lcg)
 VARS 138: ANGLEWARPX=182 ANGLEWARPY=346 CHANGECD=0 SACADOS=4
