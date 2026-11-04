@@ -738,6 +738,10 @@ impl Host for Engine {
         self.anim.table.set(id, i32::from(shown), kind);
     }
 
+    fn hideperso_hides_object(&mut self) -> bool {
+        self.enhancements.fixes.wooden_girl
+    }
+
     fn anim_frame(&mut self, id: i32) -> Option<i32> {
         self.anim.slots.iter().find(|s| s.id == id).map(|s| s.frame)
     }

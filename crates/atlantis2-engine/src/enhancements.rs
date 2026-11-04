@@ -52,17 +52,28 @@ pub enum BugFix {
     /// @ 0x0047a5c0 reads `datas_a2\\apc\\`, 0x00402760), they play the
     /// `datas_a2\\apc\\` file, on GOG.com English's in every language.
     FilmLanguage,
+    /// `hideperso=NAME` also hides the object of that name, so that the
+    /// wooden girl leaves Ireland's book once the goddess has answered
+    /// about the statue or the poet (chapter 16). Off, as the original
+    /// (`hideperso` looks for a character only: FUN_0048c6b0 matches the
+    /// records' kind, FUN_0048c730 the show table's), `FILLE_BOIS`, an
+    /// object in `livre.wam` but named in the character section too,
+    /// stays drawn beside the girl `showperso=FILLE_LIVRE` adds. Reported
+    /// by Klaas Van den Broeck (@Klaasvdb),
+    /// github.com/Klaasvdb/atlantis2-notes (original-bugs.md #14).
+    WoodenGirl,
 }
 
 impl BugFix {
     /// Every fix, in the menu's order.
-    pub const ALL: [BugFix; 6] = [
+    pub const ALL: [BugFix; 7] = [
         BugFix::MusicEnd,
         BugFix::MusicRestart,
         BugFix::MusicMark,
         BugFix::IrelandClicks,
         BugFix::FilmSubtitles,
         BugFix::FilmLanguage,
+        BugFix::WoodenGirl,
     ];
 
     /// Its `settings.ini` key.
@@ -74,6 +85,7 @@ impl BugFix {
             BugFix::IrelandClicks => "fix_ireland_clicks",
             BugFix::FilmSubtitles => "fix_film_subtitles",
             BugFix::FilmLanguage => "fix_film_language",
+            BugFix::WoodenGirl => "fix_wooden_girl",
         }
     }
 }
@@ -94,6 +106,8 @@ pub struct BugFixes {
     pub film_subtitles: bool,
     /// [`BugFix::FilmLanguage`].
     pub film_language: bool,
+    /// [`BugFix::WoodenGirl`].
+    pub wooden_girl: bool,
 }
 
 impl BugFixes {
@@ -111,6 +125,7 @@ impl BugFixes {
             ireland_clicks: on,
             film_subtitles: on,
             film_language: on,
+            wooden_girl: on,
         }
     }
 
@@ -129,6 +144,7 @@ impl BugFixes {
             BugFix::IrelandClicks => self.ireland_clicks,
             BugFix::FilmSubtitles => self.film_subtitles,
             BugFix::FilmLanguage => self.film_language,
+            BugFix::WoodenGirl => self.wooden_girl,
         }
     }
 
@@ -140,6 +156,7 @@ impl BugFixes {
             BugFix::IrelandClicks => &mut self.ireland_clicks,
             BugFix::FilmSubtitles => &mut self.film_subtitles,
             BugFix::FilmLanguage => &mut self.film_language,
+            BugFix::WoodenGirl => &mut self.wooden_girl,
         } = on;
     }
 

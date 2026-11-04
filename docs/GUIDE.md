@@ -539,7 +539,7 @@ it. Its entries:
 - **Screen**: the original's two screen sizes, 640 x 480 and 800 x 600
   (below); with the original graphics only.
 - **Fix original bugs**: *On* (every fix, the default), *Off* (none:
-  as the original), or *Custom (n/6)* when some are on and some off;
+  as the original), or *Custom (n/7)* when some are on and some off;
   Enter turns them all on, then all off.
 - **Choose the bug fixes...**: opens a box of its own, in the same
   style, with *All on*, *All off (as the original)*, one switch per fix
@@ -575,6 +575,11 @@ it. Its entries:
     own tracks are installed beside the voices, unused; with the fix these
     films play them. Nothing changes on GOG.com in English or on the CDs,
     whose films already speak the game's language.
+  - **Ireland: the wooden girl leaves the book**: once the goddess has
+    spoken of the statue or of the poet, the girl of the book is freed,
+    but the original still draws the wooden girl beside her; with the
+    fix only the freed girl is there. Reported by Klaas Van den Broeck
+    (@Klaasvdb), github.com/Klaasvdb/atlantis2-notes.
 - **Arrow keys turn**: on by default, the arrow keys turn the view as
   the mouse does; off, as in the original, only the mouse turns it. On,
   the click that brings the window back to the front only takes the
@@ -587,8 +592,8 @@ on Linux, `%APPDATA%\atlantis-native\atlantis2` on Windows,
 beside the saves (`save\ATL<player>_<slot>.SAV`, the original's files)
 and the original's options file `atlant2.cfg`. `settings.ini` has one
 line per fix (`fix_music_end`, `fix_music_restart`, `fix_music_mark`,
-`fix_ireland_clicks`, `fix_film_subtitles`, `fix_film_language`, each `on`
-or `off`); a `settings.ini` written by
+`fix_ireland_clicks`, `fix_film_subtitles`, `fix_film_language`,
+`fix_wooden_girl`, each `on` or `off`); a `settings.ini` written by
 an earlier version, with its single `minor_bug_fixes` line, is still
 read: that line sets every fix. From the command line, `--hd` turns HD on and
 `--widescreen` HD with widescreen, and `--original` turns every bug fix

@@ -150,6 +150,13 @@ pub trait Host {
     /// The place's animation records.
     fn anim(&mut self, op: AnimOp) {}
 
+    /// Whether `hideperso=NAME` also hides the object named NAME (the bug
+    /// fix [`crate::BugFix::WoodenGirl`]); the original looks for a
+    /// character only.
+    fn hideperso_hides_object(&mut self) -> bool {
+        false
+    }
+
     /// The show / hide table's row of (`id`, `kind`) was set
     /// (FUN_0048c730, the script's [`super::Script::shown`]): the view
     /// entries read it to choose the records shown (FUN_0048c7b0).

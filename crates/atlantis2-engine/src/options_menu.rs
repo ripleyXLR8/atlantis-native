@@ -126,6 +126,7 @@ impl BugFix {
             BugFix::IrelandClicks => "Ireland: cross and ogham clicks",
             BugFix::FilmSubtitles => "800 x 600: subtitles over the films",
             BugFix::FilmLanguage => "Films: sound in the game's language",
+            BugFix::WoodenGirl => "Ireland: the wooden girl leaves the book",
         }
     }
 
@@ -163,6 +164,11 @@ impl BugFix {
                 "Some editions (GOG.com except in English, the",
                 "Italian DVD) play three films' sound in another",
                 "language while the game's own track lies unused.",
+            ],
+            BugFix::WoodenGirl => &[
+                "After the goddess speaks of the statue or the",
+                "poet, the original still draws the wooden girl",
+                "beside the girl of the book.",
             ],
         }
     }
@@ -823,11 +829,11 @@ mod tests {
         three.ireland_clicks = false;
         assert_eq!(
             rows(three),
-            ("Fix original bugs".into(), Some("Custom (5/6)".into()))
+            ("Fix original bugs".into(), Some("Custom (6/7)".into()))
         );
         assert_eq!(
             rows(BugFixes::only(BugFix::MusicEnd)).1.as_deref(),
-            Some("Custom (1/6)")
+            Some("Custom (1/7)")
         );
         // Pressed: all on, then all off; from a mix, all on.
         let mut m = OptionsMenu::new();
@@ -982,9 +988,9 @@ mod tests {
                 assert!(texts.iter().any(|t| t == line), "{line}");
             }
             assert_eq!(texts.last().unwrap(), FIX_KEYS);
-            // The title, 3 buttons, 6 rows of a label and a value, the
+            // The title, 3 buttons, 7 rows of a label and a value, the
             // explanation and the keys.
-            assert_eq!(t.items.len(), 1 + 3 + 6 * 2 + 4 + 1);
+            assert_eq!(t.items.len(), 1 + 3 + 7 * 2 + 4 + 1);
             assert!(s.contains(&SELECTED) && s.contains(&BG));
             // Inside the screen, a margin around.
             let (bx, by) = FIX_LAYOUT.origin(FIX_ROWS.len(), w, h);
