@@ -8,8 +8,8 @@
 //!
 //! Same frame as [`super::ii`] (Atlantis II's `FastPerspective` II): the
 //! vertex pass, the integer rows, the edge macro and the case tree are the
-//! same instructions (73 paths of the case tree compared symbolically,
-//! atlantis3-re tools/emu/a3_x87sym.py), but for:
+//! same instructions (73 paths of the case tree compared symbolically
+//! under an x87 model), but for:
 //! - the vertex pass: u and v are scaled but not multiplied by w; w gets
 //!   31 added to its exponent (`add [v+8], 0x0f800000`: w · 2³¹, the Z
 //!   scale, applied once to the vertex instead of in the span);
@@ -23,8 +23,8 @@
 //!
 //! The set-up loads the x87 control word 0x0e7f (@ 0x00730e38: 53-bit
 //! precision, rounding toward zero) and never restores it: every operation
-//! is [`Fpu::Chop`]. Checked against evidence/golden/a3_raster_linear.txt
-//! (the original routine alone under Unicorn: 480 polygons, 640 x 480 and
+//! is [`Fpu::Chop`]. Checked against `tests/golden/raster_linear.txt` of
+//! `atlantis3-engine` (the original routine alone under emulation: 480 polygons, 640 x 480 and
 //! 800 x 600, 512² and 1024² textures).
 
 use super::{Binding, Target, Texture, Vertex};

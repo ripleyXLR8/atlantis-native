@@ -1,9 +1,9 @@
 //! The save-thumbnail encoder of `Game.exe` (atlantis3-gog-fr-3473408
 //! @ 0x0069c390) and its pre-pass @ 0x00410450, transcribed exactly.
 //!
-//! Model and golden: `atlantis3-re/tools/emu/a3_thumb_model.py`,
-//! `evidence/golden/a3_thumb_encoder.txt` (real encoder under Unicorn),
-//! notes `functions/saves-FUN_0069c390.md`.
+//! Checked against a golden of the real encoder run under emulation
+//! (the `case` rows of this module's tests) and against
+//! `atlantis3-engine`'s `tests/golden/save_thumbs.txt`.
 //!
 //! Output: the bytes the writer stores after `SPRCRYO1`: u32 flags 0x68,
 //! a 256-entry palette (B, G, R, 0), u32 count 1, u32 offset 4, then one

@@ -1,7 +1,6 @@
 # Atlantis III - story segment 02: CFuner (world 2, CFuner.wam), chapter 9:
 # the star puzzle, the scarab case, the wooden bird -> the Land of the Dead.
-# Read by tools/emu/a3_story_script.py; grammar in its docstring and in
-# subsystems/story-walkthrough.md.  Starts at CFuner view 4 (end of 01).
+# Read by tools/emu/a3_story_script.py.  Starts at CFuner view 4 (end of 01).
 
 OBJET CHF_OISEAUBOIS        # take the wooden bird (flag46: subject DIAL_OISEAUBOIS)
 GO 1

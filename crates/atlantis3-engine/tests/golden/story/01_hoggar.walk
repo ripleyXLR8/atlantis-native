@@ -1,7 +1,7 @@
 # Atlantis III - story segment 01: the Hoggar (world 1, hoggar.wam), new game ->
 # arrival in CFuner (world 2) chapter 9.  Read by tools/emu/a3_hoggar_script.py
-# (golden evidence/golden/a3_hoggar_script.txt) and by Atlantis Native's replay
-# test; grammar in the script's docstring and subsystems/hoggar-walkthrough.md.
+# (which recorded the golden under emulation) and by Atlantis Native's replay
+# test.
 # Same actions as a3_hoggar_walk.txt (M2); the chain goes on with a3_story_02_cfuner.txt.
 # Only actions the game allows: moves along the current view's WAM zones,
 # clicks on characters / zones of the current view, subjects of the open menu,

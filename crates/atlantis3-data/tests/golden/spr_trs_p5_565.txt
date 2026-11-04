@@ -1,7 +1,7 @@
-# AFF_SPRTRS (bank, dst, x, y, index, level) of atlantis3-gog-fr-spr_p5.dll (md5 72266c25b968fb5eaf21d41851027d7b) under Unicorn (atlantis3-re tools/emu/spr_golden.py trs p5 565),
+# AFF_SPRTRS (bank, dst, x, y, index, level) of the original spr_p5.dll (md5 72266c25b968fb5eaf21d41851027d7b) under emulation,
 # descriptor 000b0305020003, 1024x768 framebuffer of 16-bit pixels, clip rows 0..766, columns 0..1022 (max = size - 1), background as spr_aff_*.txt
 # key: BANK#index@position:level  value: md5 of the framebuffer after the call (background md5 662d8cf6bc811d65737610745a48f2e4)
-# per file: md5 of the file's golden lines (`key value\n` each, in order), from tools/emu/spr_digest.py
+# per file: md5 of the file's golden lines (`key value\n` each, in order)
 spr/BagdadObjets.SPR 288 d4c71d99ae87a022c49bf139eb68d35e
 spr/BagdadObjetsEnMain.SPR 288 b3e813bccd54bc18052c9e67e14b6b09
 spr/HoggarObjets.SPR 120 271394fa7aa5092167e05dde5cfce969

@@ -5,7 +5,7 @@
 # Read by tools/emu/a3_story_script.py.  Starts at MMarchd view 12, chapter 28.
 
 # Chapter 28: the guard (Puzzle_Garde, view hook 0x004c5590, frame hook
-# 0x004c5dc0; it only catches): the way subsystems/puzzles-mmarchd.md §4 gives.
+# 0x004c5dc0; it only catches): the house's solution as the code allows it.
 GO 11                       # out of the jar: cinema 80, Flag118, Flag120
 OBJET MMA_COUVERCLE         # the lid: cinema 60, the cat leaves, Flag119
 EXPECT FLAG119=1
@@ -13,7 +13,7 @@ GO 5
 GO 1
 # The stone throw and the ladder (the guard's states change at his
 # animations' ends, which the harness does not model): skipped with the
-# scripts' state after them (subsystems/puzzles-mmarchd.md §6): stone
+# scripts' state after them: stone
 # taken and thrown (Flag123), ladder taken (Flag121) and laid under the
 # balcony (Flag124, MMA_ECHELLEBALCON shown); the guard state stays 1.
 SKIP puzzle mmarchd_guard FLAG121=1 FLAG123=1 FLAG124=1 RUN=(HideObjet=MMA_PIERRE) RUN=(HideObjet=MMA_ECHELLE) RUN=(ShowObjet=MMA_ECHELLEBALCON)
