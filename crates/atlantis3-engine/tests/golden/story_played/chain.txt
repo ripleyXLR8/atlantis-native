@@ -7243,6 +7243,7 @@ EXPECT WAM=TourMagi.wam ok
 EXPECT CHAPTER=47 ok
 STEP 446 FRAME 2
 FRAME 446.0
+CALL rand() -> 13805 (lcg)
 FRAME 446.1
 STATE 446: chapter=47 monde=3 wam=TourMagi.wam view=39 hand=- waiting=0 music=6)
 STEP 447 ZONE TAS_ZONE_CASESUIV
@@ -7616,6 +7617,7 @@ STEP 460 FRAMES_UNTIL MODE=12
 FRAME 460.0
 LOG interp: SET(Cinema=69,fps=25)
 FRAME 460.1
+CALL rand() -> 23239 (lcg)
 FRAME 460.2
 LOG interp: SET(StopMusik=1)
 LOG interp: SET(StartMusik=40)
@@ -7780,6 +7782,7 @@ LOG interp: SET(Vue=77)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET(Cinema=67,fps=25)
 FRAME 463.59
+CALL rand() -> 32681 (lcg)
 VARS 463: LASTVUE=58 VUE=77
 FLAGS 463: 800=77 1003=77
 STATE 463: chapter=47 monde=3 wam=TourMagi.wam view=77 hand=- waiting=0 music=6)
@@ -7975,6 +7978,7 @@ LOG interp: SET(AngleWarpY=20)
 LOG interp: SET(Vue=83)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 FRAME 469.72
+CALL rand() -> 9825 (lcg)
 VARS 469: LASTVUE=77 VUE=83
 FLAGS 469: 800=83 1003=83
 STATE 469: chapter=47 monde=3 wam=TourMagi.wam view=83 hand=- waiting=0 music=6)
@@ -8170,6 +8174,7 @@ LOG interp: SET(AngleWarpY=60)
 LOG interp: SET(Vue=89)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 FRAME 475.72
+CALL rand() -> 17163 (lcg)
 FRAME 475.73
 LOG interp: SET(AngleWarpX=-90)
 LOG interp: SET(AngleWarpY=20)
@@ -8212,7 +8217,7 @@ LOG interp: SET/set(SacADos=NOT_BAG_MAP_TOUR)
 LOG interp: SET/set(StopMusik=1)
 LOG interp: SET/set(StartMusik=33)
 LOG interp: SET/set(Vue=6)
-CALL rand() -> 13805 (lcg)
+CALL rand() -> 1994 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(Cinema=64,fps=25)
 LOG interp: SET/set(Cinema=74,fps=25)
@@ -8248,11 +8253,11 @@ FRAME 481.0 click zone -> view 12
 LOG interp: SET/set(AbortDepart=1)
 LOG interp: SET/set(AngleWarpX=90)
 LOG interp: SET/set(Vue=10)
-CALL rand() -> 23239 (lcg)
-CALL rand() -> 32681 (lcg)
-CALL rand() -> 9825 (lcg)
-CALL rand() -> 17163 (lcg)
-CALL rand() -> 1994 (lcg)
+CALL rand() -> 16842 (lcg)
+CALL rand() -> 12736 (lcg)
+CALL rand() -> 9196 (lcg)
+CALL rand() -> 29551 (lcg)
+CALL rand() -> 3645 (lcg)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET(LIMITEANGLEWARPY=85)
 LOG interp: SET(ShowObjet=PMA_LIENSLIGHT
@@ -8327,6 +8332,8 @@ FRAME 497.4
 FRAME 497.5
 FRAME 497.6
 FRAME 497.7
+CALL rand() -> 28540 (lcg)
+CALL rand() -> 3508 (lcg)
 FRAME 497.8
 FRAME 497.9
 FRAME 497.10
@@ -8334,8 +8341,6 @@ FRAME 497.11
 FRAME 497.12
 FRAME 497.13
 FRAME 497.14
-CALL rand() -> 16842 (lcg)
-CALL rand() -> 12736 (lcg)
 FRAME 497.15
 FRAME 497.16
 FRAME 497.17
@@ -8350,6 +8355,8 @@ FRAME 497.25
 FRAME 497.26
 FRAME 497.27
 FRAME 497.28
+CALL rand() -> 10333 (lcg)
+CALL rand() -> 1760 (lcg)
 FRAME 497.29
 FRAME 497.30
 STATE 497: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
@@ -8376,7 +8383,6 @@ FRAME 503.0
 STATE 503: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 504 ZONE PMA_ZONE_ETOILE12
 FRAME 504.0 click zone PMA_ZONE_ETOILE12
-CALL rand() -> 9196 (lcg)
 FLAGS 504: 942=1
 STATE 504: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 505 FRAME
@@ -8405,6 +8411,7 @@ FRAME 509.7
 FRAME 509.8
 FRAME 509.9
 FRAME 509.10
+CALL rand() -> 29839 (lcg)
 FRAME 509.11
 FRAME 509.12
 FRAME 509.13
@@ -8417,7 +8424,6 @@ FRAME 509.19
 FRAME 509.20
 FRAME 509.21
 FRAME 509.22
-CALL rand() -> 29551 (lcg)
 FRAME 509.23
 FRAME 509.24
 FRAME 509.25
@@ -8440,7 +8446,6 @@ FLAGS 512: 931=1
 STATE 512: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 513 FRAME
 FRAME 513.0
-CALL rand() -> 3645 (lcg)
 STATE 513: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 514 ZONE PMA_ZONE_ETOILE02
 FRAME 514.0 click zone PMA_ZONE_ETOILE02
@@ -8462,6 +8467,7 @@ FLAGS 518: 934=1
 STATE 518: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 519 FRAME
 FRAME 519.0
+CALL rand() -> 4556 (lcg)
 STATE 519: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 520 ZONE PMA_ZONE_ETOILE05
 FRAME 520.0 click zone PMA_ZONE_ETOILE05
@@ -8506,7 +8512,6 @@ FRAME 527.13
 FRAME 527.14
 FRAME 527.15
 FRAME 527.16
-CALL rand() -> 28540 (lcg)
 FRAME 527.17
 FRAME 527.18
 FRAME 527.19
@@ -8520,6 +8525,7 @@ FRAME 527.26
 FRAME 527.27
 FRAME 527.28
 FRAME 527.29
+CALL rand() -> 16746 (lcg)
 FRAME 527.30
 STATE 527: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 528 ZONE PMA_ZONE_ETOILE23
@@ -8577,6 +8583,7 @@ FLAGS 542: 960=1
 STATE 542: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 543 FRAME
 FRAME 543.0
+CALL rand() -> 11776 (lcg)
 STATE 543: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 544 ZONE PMA_ZONE_ETOILE31
 FRAME 544.0 click zone PMA_ZONE_ETOILE31
@@ -8599,8 +8606,6 @@ FRAME 547.5
 FRAME 547.6
 FRAME 547.7
 FRAME 547.8
-CALL rand() -> 3508 (lcg)
-CALL rand() -> 10333 (lcg)
 FRAME 547.9
 FRAME 547.10
 FRAME 547.11
@@ -8616,6 +8621,7 @@ FRAME 547.20
 FRAME 547.21
 FRAME 547.22
 FRAME 547.23
+CALL rand() -> 417 (lcg)
 FRAME 547.24
 FRAME 547.25
 FRAME 547.26
@@ -8699,6 +8705,7 @@ FRAME 565.10
 FRAME 565.11
 FRAME 565.12
 FRAME 565.13
+CALL rand() -> 22405 (lcg)
 FRAME 565.14
 FRAME 565.15
 FRAME 565.16
@@ -8731,8 +8738,6 @@ FLAGS 568: 819=3 822=18
 STATE 568: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 569 FRAME
 FRAME 569.0
-CALL rand() -> 1760 (lcg)
-CALL rand() -> 29839 (lcg)
 STATE 569: chapter=50 monde=3 wam=PMagi.wam view=10 hand=- waiting=0 music=8)
 STEP 570 ZONE PMA_ZONE_ETOILE22
 FRAME 570.0 click zone PMA_ZONE_ETOILE22
@@ -8763,6 +8768,7 @@ FRAME 575.6
 FRAME 575.7
 FRAME 575.8
 FRAME 575.9
+CALL rand() -> 19632 (lcg)
 FRAME 575.10
 FRAME 575.11
 FRAME 575.12
@@ -9153,7 +9159,7 @@ LOG interp: SET(HidePerso=HOG_TOUAREGLI)
 LOG interp: SET(LIMITEANGLEWARPY=70)
 LOG interp: SET/set(StartMusik=6)
 FRAME 608.1 move
-CALL rand() -> 4556 (lcg)
+CALL rand() -> 3355 (lcg)
 VARS 608: CHAPTER=5 VUE=23 CHANGECD=7 SACADOS=4 MONDE=1
 FLAGS 608: 400=0 401=1 908=1
 STATE 608: chapter=5 monde=1 wam=hoggar.wam view=23 hand=- waiting=0 music=6)
@@ -11913,8 +11919,8 @@ FRAME 705.17
 STATE 705: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 706 CAMERA 64.2 5
 STATE 706: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 707 ZONE PAL_ZONE_LANCE1
-FRAME 707.0 click zone PAL_ZONE_LANCE1
+STEP 707 ZONE PAL_ZONE_LANCE5
+FRAME 707.0 click zone PAL_ZONE_LANCE5
 LOG interp: SET(PlaySound=201)
 VARS 707: ANGLEWARPX=64 ANGLEWARPY=5
 STATE 707: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -12047,8 +12053,8 @@ FRAME 711.85
 STATE 711: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 712 CAMERA -128.7 -17
 STATE 712: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 713 ZONE PAL_ZONE_LANCE1
-FRAME 713.0 click zone PAL_ZONE_LANCE1
+STEP 713 ZONE PAL_ZONE_LANCE3
+FRAME 713.0 click zone PAL_ZONE_LANCE3
 LOG interp: SET(PlaySound=201)
 VARS 713: ANGLEWARPX=232 ANGLEWARPY=343
 STATE 713: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -12198,8 +12204,8 @@ FRAME 717.100
 STATE 717: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 718 CAMERA 120.3 5
 STATE 718: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 719 ZONE PAL_ZONE_LANCE1
-FRAME 719.0 click zone PAL_ZONE_LANCE1
+STEP 719 ZONE PAL_ZONE_LANCE4
+FRAME 719.0 click zone PAL_ZONE_LANCE4
 LOG interp: SET(PlaySound=201)
 VARS 719: ANGLEWARPX=120 ANGLEWARPY=5
 STATE 719: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -12243,7 +12249,7 @@ FRAME 722.1 inventory frame 0x00427c40: pick PAL_LANCE
 LOG interp: SET(sacados=NOT_PAL_LANCE)
 FLAGS 722: 620=1 1357=0
 STATE 722: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 723 FRAMES_UNTIL SLOTFRAME=PAL_BOUQUETIN:20
+STEP 723 FRAMES_UNTIL SLOTFRAME=PAL_BOUQUETIN:36
 FRAME 723.0
 FRAME 723.1
 FRAME 723.2
@@ -12314,13 +12320,29 @@ FRAME 723.66
 FRAME 723.67
 FRAME 723.68
 FRAME 723.69
+FRAME 723.70
+FRAME 723.71
+FRAME 723.72
+FRAME 723.73
+FRAME 723.74
+FRAME 723.75
+FRAME 723.76
+FRAME 723.77
+FRAME 723.78
+FRAME 723.79
+FRAME 723.80
+FRAME 723.81
+FRAME 723.82
+FRAME 723.83
+FRAME 723.84
+FRAME 723.85
 STATE 723: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 724 CAMERA 33.6 -17
+STEP 724 CAMERA -0.3 -17
 STATE 724: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 725 ZONE PAL_ZONE_LANCE1
 FRAME 725.0 click zone PAL_ZONE_LANCE1
 LOG interp: SET(PlaySound=201)
-VARS 725: ANGLEWARPX=33 ANGLEWARPY=343
+VARS 725: ANGLEWARPX=0 ANGLEWARPY=343
 STATE 725: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 726 FRAMES_UNTIL FLAG91=1
 FRAME 726.0

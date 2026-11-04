@@ -382,27 +382,13 @@ impl Run {
                         .is_some_and(|n| n.eq_ignore_ascii_case(name))
                 };
                 // Already under the centre: no turn. After a `CAMERA` aim
-                // (the played harness clicks a zone by name, not checking
-                // the aim), a zone of the same kind and value under the
-                // centre: the hunt's `PAL_ZONE_LANCE1..5`.
+                // the named zone must be the one under the centre.
                 let aimed = std::mem::take(&mut self.camera_aimed);
                 let (_, v) = self.g.place();
-                let zones = v
+                let here = v
                     .and_then(|v| self.g.wam().view(v))
-                    .map(|v| v.zones.clone());
-                let zones = zones.unwrap_or_default();
-                let target = zones.iter().find(|z| is(z)).cloned();
-                let here = self
-                    .g
-                    .centre_zone()
-                    .and_then(|i| zones.get(i))
-                    .is_some_and(|z| {
-                        is(z)
-                            || (aimed
-                                && target
-                                    .as_ref()
-                                    .is_some_and(|t| t.kind == z.kind && t.value == z.value))
-                    });
+                    .and_then(|v| v.zones.get(self.g.centre_zone()?))
+                    .is_some_and(is);
                 if std::env::var_os("STORY_FRAMES").is_some() {
                     eprintln!(
                         "  {line}: under the centre {here} ({:?}), angles {:?}",
@@ -410,14 +396,8 @@ impl Run {
                         self.g.angles_deg()
                     );
                 }
-                if !here && aimed {
-                    // No zone of the kind under the `CAMERA` aim: the
-                    // harness's click by name, the aim kept.
-                    let i = zones.iter().position(is).expect("the zone");
-                    self.g.zone_override = Some(i);
-                    if std::env::var_os("STORY_FRAMES").is_some() {
-                        eprintln!("  {line}: no such zone under the aim: clicked by name");
-                    }
+                if aimed {
+                    assert!(here, "{line}: not under the aim {:?}", self.g.angles_deg());
                 } else {
                     assert!(here || self.g.aim_at_zone(is), "{line}");
                 }
@@ -1332,9 +1312,6 @@ mod played {
         // The harness stubs the dialogs' set-up and start (and ends each
         // dialog at once) and runs no place sound: no `rand()` drawn there.
         r.g.stub_rand = true;
-        // Its file layer does not find the tower's pawn files
-        // (`LoadSPW() : Fichier .SPW introuvable`): no pawn slots.
-        r.g.stub_pawn_files = true;
         r.g.dialog_heads = false;
         Some(r)
     }

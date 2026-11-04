@@ -338,15 +338,6 @@ pub struct Game {
     /// their own, leaving `rand` alone as the stubs do.
     #[doc(hidden)]
     pub stub_rand: bool,
-    /// Tests: the tower's demon pawn files not found, as in the
-    /// whole-story harness, whose file layer for the game's own loads
-    /// does not hold the `spw\spw512` files.
-    #[doc(hidden)]
-    pub stub_pawn_files: bool,
-    /// Tests: the zone (index in the view) the next click lands on
-    /// whatever the aim, as a harness clicking zones by name does.
-    #[doc(hidden)]
-    pub zone_override: Option<usize>,
 }
 
 impl Game {
@@ -468,8 +459,6 @@ impl Game {
             story_sound_model: false,
             screen_sprite: None,
             stub_rand: false,
-            stub_pawn_files: false,
-            zone_override: None,
         };
         if !game.with_script(|s, h| s.boot_a3(h)) {
             return Err(GameError::Script(game.script_error()));
@@ -1885,7 +1874,7 @@ impl Game {
     /// The zone click (@ 0x00420330): a move zone's departure scan, then
     /// the move; `CLICZONE` for the others.
     fn zone_click(&mut self) {
-        let centre = self.zone_override.take().or(self.centre);
+        let centre = self.centre;
         let Some(zone) = centre
             .and_then(|i| self.place.wam.view(self.place.view?)?.zones.get(i))
             .cloned()

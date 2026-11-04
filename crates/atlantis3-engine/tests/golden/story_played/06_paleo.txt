@@ -2428,8 +2428,8 @@ FRAME 96.17
 STATE 96: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 97 CAMERA 64.2 5
 STATE 97: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 98 ZONE PAL_ZONE_LANCE1
-FRAME 98.0 click zone PAL_ZONE_LANCE1
+STEP 98 ZONE PAL_ZONE_LANCE5
+FRAME 98.0 click zone PAL_ZONE_LANCE5
 LOG interp: SET(PlaySound=201)
 VARS 98: ANGLEWARPX=64 ANGLEWARPY=5
 STATE 98: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2562,8 +2562,8 @@ FRAME 102.85
 STATE 102: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 103 CAMERA -128.7 -17
 STATE 103: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 104 ZONE PAL_ZONE_LANCE1
-FRAME 104.0 click zone PAL_ZONE_LANCE1
+STEP 104 ZONE PAL_ZONE_LANCE3
+FRAME 104.0 click zone PAL_ZONE_LANCE3
 LOG interp: SET(PlaySound=201)
 VARS 104: ANGLEWARPX=232 ANGLEWARPY=343
 STATE 104: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2713,8 +2713,8 @@ FRAME 108.100
 STATE 108: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 109 CAMERA 120.3 5
 STATE 109: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 110 ZONE PAL_ZONE_LANCE1
-FRAME 110.0 click zone PAL_ZONE_LANCE1
+STEP 110 ZONE PAL_ZONE_LANCE4
+FRAME 110.0 click zone PAL_ZONE_LANCE4
 LOG interp: SET(PlaySound=201)
 VARS 110: ANGLEWARPX=120 ANGLEWARPY=5
 STATE 110: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
@@ -2758,7 +2758,7 @@ FRAME 113.1 inventory frame 0x00427c40: pick PAL_LANCE
 LOG interp: SET(sacados=NOT_PAL_LANCE)
 FLAGS 113: 620=1 1357=0
 STATE 113: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 114 FRAMES_UNTIL SLOTFRAME=PAL_BOUQUETIN:20
+STEP 114 FRAMES_UNTIL SLOTFRAME=PAL_BOUQUETIN:36
 FRAME 114.0
 FRAME 114.1
 FRAME 114.2
@@ -2829,13 +2829,29 @@ FRAME 114.66
 FRAME 114.67
 FRAME 114.68
 FRAME 114.69
+FRAME 114.70
+FRAME 114.71
+FRAME 114.72
+FRAME 114.73
+FRAME 114.74
+FRAME 114.75
+FRAME 114.76
+FRAME 114.77
+FRAME 114.78
+FRAME 114.79
+FRAME 114.80
+FRAME 114.81
+FRAME 114.82
+FRAME 114.83
+FRAME 114.84
+FRAME 114.85
 STATE 114: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
-STEP 115 CAMERA 33.6 -17
+STEP 115 CAMERA -0.3 -17
 STATE 115: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 116 ZONE PAL_ZONE_LANCE1
 FRAME 116.0 click zone PAL_ZONE_LANCE1
 LOG interp: SET(PlaySound=201)
-VARS 116: ANGLEWARPX=33 ANGLEWARPY=343
+VARS 116: ANGLEWARPX=0 ANGLEWARPY=343
 STATE 116: chapter=20 monde=4 wam=paleo.wam view=4 hand=- waiting=0 music=4)
 STEP 117 FRAMES_UNTIL FLAG91=1
 FRAME 117.0
