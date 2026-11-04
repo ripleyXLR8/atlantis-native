@@ -2111,12 +2111,7 @@ impl Game {
             match self.files.read(&path).map(|d| faces_from_hnm(&d)) {
                 Some(Ok(faces)) => self.place.faces = faces,
                 Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => {
-                    // The loader's fallback fills the faces with debug
-                    // colours; nothing is drawn here.
-                    log::error!("{path}: not found");
-                    self.place.faces = Default::default();
-                }
+                None => self.place.faces = missing_cube(&self.files, folder, &name),
             }
             self.place.cube = path.clone();
         }
@@ -3241,6 +3236,34 @@ pub fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
 
 /// The six faces of a cube file (Hnm_Framer: `IX` frames in video mode;
 /// frames → faces 1, 3, 0, 4, 5, 2 @ 0x00430745).
+/// The faces of a view whose cube file is missing, as the loader
+/// (@ 0x0042fd30) leaves them when its exists test (@ 0x004191e0) fails:
+/// each face filled with its debug colour (0x004e8e90: x8r8g8b8
+/// 0xff000080, 0xff800000, 0xff000040, 0xff008000, 0xff400040,
+/// 0xff004000 for faces 0..5), then six `<2 letters><ft|bk|up|dn|rt|lf>
+/// <rest>.tga` faces tried in the same folder (@ 0x00418e70, none in the
+/// game: no `warp\` TGA exists), with no log line. It happens once in a
+/// game: chapter 0's boot state (`CFuner.wam` view 4 with world 1, at
+/// start-up) asks for `warp\Warp512\hoggar\cf0004.hnm`, which is in
+/// `ldm\`; the boot state is never drawn.
+fn missing_cube(files: &A3Files, folder: &str, name: &str) -> [Vec<u16>; 6] {
+    const DEBUG: [u16; 6] = [0x0010, 0x8000, 0x0008, 0x0400, 0x4008, 0x0200];
+    let stem = name.split_once('.').map_or(name, |(s, _)| s);
+    let cut = stem.len().min(2);
+    for side in ["ft", "bk", "up", "dn", "rt", "lf"] {
+        let tga = format!(
+            "warp/Warp512/{folder}/{}{side}{}.tga",
+            &stem[..cut],
+            &stem[cut..]
+        );
+        if files.size(&tga).is_some() {
+            log::warn!("{tga}: the cube's TGA faces are not ported");
+        }
+    }
+    log::debug!("warp/Warp512/{folder}/{name}: not found (debug colours)");
+    DEBUG.map(|c| vec![c; 512 * 512])
+}
+
 pub fn faces_from_hnm(hnm: &[u8]) -> Result<[Vec<u16>; 6], atlantis_codecs::DecodeError> {
     use atlantis_codecs::{DecodeError, HnmVideo};
     let mut video = HnmVideo::new(hnm)?;

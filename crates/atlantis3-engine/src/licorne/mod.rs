@@ -33,6 +33,9 @@ use scene::{PolyLog, Scene3, K, ROOT_OBJ, ROOT_SKEL};
 /// / 0x0075913c, BSS that nothing writes).
 pub const START: (i32, i32) = (10, 6);
 pub const TARGET: (i32, i32) = (0, 0);
+/// The run's sound, stopped by the stop (@ 0x0042e990: `sound810.apc`
+/// under `sfx\`).
+pub const SOUND_810: &str = "sfx\\sound810.apc";
 
 /// The maze (@ 0x00758ec0, written by 0x0042b650): per row y, per cell x,
 /// the openings N W S E (directions 0..3: y − 1, x − 1, y + 1, x + 1).
@@ -1000,9 +1003,8 @@ impl Board {
 
     /// The stop's sound part (@ 0x0042e990): sound 810 stopped if it plays.
     pub fn stop(&mut self, host: &mut dyn Host) {
-        let s810 = "sfx\\sound810.apc";
-        if host.playing(s810) {
-            host.stop(s810);
+        if host.playing(SOUND_810) {
+            host.stop(SOUND_810);
         }
     }
 

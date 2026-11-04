@@ -672,8 +672,9 @@ impl crate::licorne::Host for LicorneHost<'_, '_> {
 /// and the flip. Its win (@ 0x0042f6a9): sound 803, `(Flag147=0)`,
 /// `(Flag149=1)`, `(Flag146=1)`, `(StopMusik=1)`, the horn in the bag and
 /// in the hand, and the loop leaves without a draw (the stop, @ 0x0042e990,
-/// stops sound 810). No other exit (the right button drops a carried
-/// beacon); a lost run starts again with the beacons where they are.
+/// stops sound 810: [`Game::stop_screen`]). No other exit but Escape
+/// ([`Game::escape_screen`]; the right button drops a carried beacon); a
+/// lost run starts again with the beacons where they are.
 fn licorne(h: &mut Hx, left: bool, right: bool) -> bool {
     let Some(mut board) = h.g.puzzles.screens.licorne.take() else {
         return true;
@@ -686,11 +687,7 @@ fn licorne(h: &mut Hx, left: bool, right: bool) -> bool {
     };
     let stay = {
         let mut host = LicorneHost { h };
-        let stay = board.frame(input, now, &mut host);
-        if !stay {
-            board.stop(&mut host);
-        }
-        stay
+        board.frame(input, now, &mut host)
     };
     h.g.pointer = board.pointer;
     if stay {

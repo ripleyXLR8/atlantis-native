@@ -475,11 +475,51 @@ impl Game {
         self.screen_step(left, right, sprite);
     }
 
+    /// Escape in a full-screen mode (the Escape handler @ 0x0042ac50, its
+    /// jump table @ 0x0042b318 by loop mode): the tower map (10, @ 0x00406730),
+    /// the game boy (12, @ 0x0041f790), the jewel case (14, @ 0x00412f40)
+    /// and the skull (15, @ 0x00409b00) call their stop; the unicorn (11)
+    /// calls its stop (@ 0x0042e990) then runs `(Flag147=0)`, `(Flag149=0)`,
+    /// `(Flag146=0)`, `(Flag148=0)`, `(SacADos=BAG_BOULE_LAITEUSE)`,
+    /// `(HideObjet=BAG_BOULE_LAITEUSEPOSEE)` (@ 0x0042b2b2): the board left,
+    /// the milky ball back in the bag. The Land of the Dead's map (9) and
+    /// the scarab case (13) have the table's empty case (@ 0x0042b30f);
+    /// the remote (18) is above the table: Escape does nothing there.
+    pub(super) fn escape_screen(&mut self) {
+        let Some(screen) = self.puzzles.screen else {
+            return;
+        };
+        match screen {
+            Screen::CarteTour | Screen::GBoy | Screen::Ecrin | Screen::CraneBagdad => {
+                self.stop_screen();
+            }
+            Screen::Licorne => {
+                self.stop_screen();
+                for c in [
+                    "(Flag147=0)",
+                    "(Flag149=0)",
+                    "(Flag146=0)",
+                    "(Flag148=0)",
+                    "(SacADos=BAG_BOULE_LAITEUSE)",
+                    "(HideObjet=BAG_BOULE_LAITEUSEPOSEE)",
+                ] {
+                    let Some(mut s) = self.script.take() else {
+                        return;
+                    };
+                    Hx { g: self, s: &mut s }.run(c);
+                    self.script = Some(s);
+                }
+            }
+            Screen::Carte | Screen::Scarabee | Screen::Telecommande => {}
+        }
+    }
+
     /// A screen's stop: the old mode back, the hand cleared, the click
     /// bytes cleared, `CtrlScenarIN` (all but the skull's, which goes back
     /// to the warp without a scan, @ 0x00409b00; the jewel case puts its
-    /// three gems in the bag first, @ 0x00412f40; the game boy's music
-    /// after the scan, @ 0x0041f790).
+    /// three gems in the bag before it clears the hand, @ 0x00412f40; the
+    /// unicorn's stops sound 810 if it plays and leaves the hand,
+    /// @ 0x0042e990; the game boy's music after the scan, @ 0x0041f790).
     pub fn stop_screen(&mut self) {
         let Some(screen) = self.puzzles.screen.take() else {
             return;
@@ -502,13 +542,19 @@ impl Game {
                 }
                 _ => {
                     h.g.mode = back;
-                    if screen != Screen::Licorne {
-                        h.hand_clear();
-                    }
-                    if screen == Screen::Ecrin {
-                        h.run("(SacADos=BAG_SAPHIR)");
-                        h.run("(SacADos=BAG_RUBIS)");
-                        h.run("(SacADos=BAG_EMERAUDE)");
+                    match screen {
+                        Screen::Ecrin => {
+                            h.run("(SacADos=BAG_SAPHIR)");
+                            h.run("(SacADos=BAG_RUBIS)");
+                            h.run("(SacADos=BAG_EMERAUDE)");
+                            h.hand_clear();
+                        }
+                        Screen::Licorne => {
+                            if h.g.sfx_test(crate::licorne::SOUND_810) {
+                                h.g.sfx_stop(crate::licorne::SOUND_810);
+                            }
+                        }
+                        _ => h.hand_clear(),
                     }
                     h.ctrl();
                     if screen == Screen::GBoy {

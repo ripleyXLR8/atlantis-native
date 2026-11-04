@@ -330,6 +330,46 @@ impl Game {
         self.script = Some(s);
     }
 
+    /// The full-screen mode of loop mode number `mode` (9..15, 18) started
+    /// at `now` by its start (the common part and the screen's own, as the
+    /// hooks start it); false for another number.
+    #[doc(hidden)]
+    pub fn board_screen_start(&mut self, mode: i32, now: f64) -> bool {
+        use hooks::Screen::*;
+        let Some(screen) = [
+            Carte,
+            CarteTour,
+            Licorne,
+            GBoy,
+            Scarabee,
+            Ecrin,
+            CraneBagdad,
+            Telecommande,
+        ]
+        .into_iter()
+        .find(|s| s.mode_number() == mode) else {
+            return false;
+        };
+        self.now = now;
+        let Some(mut s) = self.script.take() else {
+            return false;
+        };
+        {
+            let mut h = hooks::Hx { g: self, s: &mut s };
+            h.start_screen(screen);
+        }
+        self.script = Some(s);
+        true
+    }
+
+    /// The cube of the view entered (`warp/Warp512/<world>/<name>`) and its
+    /// six faces (512 x 512 RGB565, face k = the loader's surface
+    /// 0x0077af18 + 0x80 k).
+    #[doc(hidden)]
+    pub fn board_cube(&self) -> (&str, &[Vec<u16>; 6]) {
+        (&self.place.cube, &self.place.faces)
+    }
+
     /// The zone click hook (@ 0x004c32c0) on the zone `name` of the view
     /// at `now`, alone (the jewel case's harness starts the case so).
     #[doc(hidden)]
@@ -424,6 +464,11 @@ impl Game {
                     self.board_mode_number()
                 ))
             }
+            "licorne" => p
+                .screens
+                .licorne
+                .as_ref()
+                .map(|b| format!("held={} n={} run={}", b.held, b.placed, u8::from(b.running))),
             "toupie" => Some(format!(
                 "state={} frz={} active={}",
                 p.toupie_state,

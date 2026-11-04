@@ -183,7 +183,9 @@ impl Game {
     /// a cinematic stops (its own wait loop's key, [`Game::skip`]); on the
     /// start page with no player the in-game menu opens with `BT_LOAD`,
     /// `BT_SAVE` and `BT_BACK` off; a travel video ends and the in-game
-    /// menu opens ([`Game::escape_travel`]).
+    /// menu opens ([`Game::escape_travel`]); the tower map, the unicorn,
+    /// the game boy, the jewel case and the skull stop
+    /// ([`Game::escape_screen`]).
     pub fn escape(&mut self) {
         match self.mode {
             Mode::Video if self.video.as_ref().is_some_and(|v| v.travel) => self.escape_travel(),
@@ -210,6 +212,7 @@ impl Game {
                 }
             }
             Mode::Dialog => self.click = true,
+            Mode::Screen => self.escape_screen(),
             Mode::Intro | Mode::Video => self.skip(),
             Mode::Menu if self.menus.page == PAGE_START && self.player == 0 => {
                 // @ 0x0042af4a..0x0042b1b0
