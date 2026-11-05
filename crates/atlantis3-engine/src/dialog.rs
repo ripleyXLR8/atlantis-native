@@ -357,7 +357,7 @@ pub struct Running {
     pub voice_start: f64,
     /// The loop mode to go back to (@ 0x0074f34c).
     pub back: crate::game::Mode,
-    /// The dialog surface (640 x 480).
+    /// The dialog surface (640 x 480; the screen's size for a voice-over).
     pub surface: Vec<u16>,
 }
 

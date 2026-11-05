@@ -350,6 +350,19 @@ impl Page {
         w: usize,
         h: usize,
     ) -> Option<Page> {
+        Page::load_depth(files, name, tooltips, w, h, Depth::Rgb565)
+    }
+
+    /// [`Page::load_with`] with the banks parsed for the page surface's
+    /// format `depth`.
+    fn load_depth(
+        files: &A3Files,
+        name: &str,
+        tooltips: Option<(&str, &str)>,
+        w: usize,
+        h: usize,
+        depth: Depth,
+    ) -> Option<Page> {
         let path = atlantis3_data::atl::layout_path(name);
         let data = files.read(path.trim_start_matches("Datas/"))?;
         let mut layout = Layout::parse(&data, (w as i32, h as i32));
@@ -366,7 +379,7 @@ impl Page {
                     let p = menu_sprite_path(w as i32, n);
                     files
                         .read(p.trim_start_matches("Datas/"))
-                        .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok())
+                        .and_then(|d| Bank::parse(&d, depth).ok())
                 });
                 Item::new(el, bank)
             })
@@ -1029,10 +1042,17 @@ impl Menus {
             (PAGE_LANGUAGES, &langue, Some("i_langue")),
             (PAGE_SAVE, "i_save", Some("i_save")),
         ];
+        // The page surface is made in the display's format at start-up
+        // (`PixelFormat`): x8r8g8b8 for `32bits`.
+        let depth = if config.pixel_format.bits() > 16 {
+            Depth::Xrgb8888
+        } else {
+            Depth::Rgb565
+        };
         self.pages = list
             .iter()
             .filter_map(|&(n, name, t)| {
-                let p = Page::load_with(files, name, t.map(|t| (lang.as_str(), t)), w, h);
+                let p = Page::load_depth(files, name, t.map(|t| (lang.as_str(), t)), w, h, depth);
                 if p.is_none() {
                     log::warn!("menu\\desc\\{name}.atl missing: page {n} not shown");
                 }
@@ -1045,9 +1065,12 @@ impl Menus {
         self.width = w;
         self.height = h;
         self.surface = vec![0; w * h];
-        self.depth = Depth::Rgb565;
-        self.surface32 = Vec::new();
-        self.format = Depth::Rgb565;
+        self.depth = depth;
+        self.surface32 = match depth {
+            Depth::Xrgb8888 => vec![0; w * h],
+            Depth::Rgb565 => Vec::new(),
+        };
+        self.format = depth;
         self.slots = slot_layout(w);
     }
 
@@ -1109,16 +1132,17 @@ impl Menus {
     }
 
     /// The options' `BT_BACK` with a size or depth pending (@ 0x00454f44..
-    /// 0x004551b1), after the display's re-creation (@ 0x0040fa60, the
-    /// game's [`Event::DisplayChange`]): the page surface re-created
-    /// (@ 0x004eb290) in the chosen format 0x007812b0, black, the sprite
-    /// target on it (@ 0x004362b0, `Spr_InitGraph` for a new depth), then
-    /// every page's banks freed and loaded again for that format
-    /// (@ 0x004511c0, @ 0x00451220; the elements keep their frames). The
-    /// port keeps the screen's size: a size switch is the game's
-    /// (not ported).
-    fn recreate(&mut self, env: &mut Env<'_>) {
-        let (w, h) = (self.width, self.height);
+    /// 0x004551b1), after the display's re-creation at `w` x `h`
+    /// (@ 0x0040fa60, the game's [`Event::DisplayChange`]): the page
+    /// surface re-created (@ 0x004eb290) at that size in the chosen format
+    /// 0x007812b0, black, the sprite target on it (@ 0x004362b0,
+    /// `Spr_InitGraph` for a new depth), then every page's banks freed and
+    /// loaded again (@ 0x004511c0, @ 0x00451220) from `menu\spr_<W>\` of
+    /// the new width and for that format; the pages keep their state (the
+    /// `.atl` is not read again, the elements keep their frames).
+    fn recreate(&mut self, env: &mut Env<'_>, w: usize, h: usize) {
+        self.width = w;
+        self.height = h;
         self.depth = self.format;
         self.surface = vec![0; w * h];
         self.surface32 = match self.depth {
@@ -1169,17 +1193,22 @@ impl Menus {
         }
         // The display re-created by the options' `BT_BACK`: a new, black
         // page surface in the chosen format, the banks reloaded for it.
-        if ev.iter().any(|e| matches!(e, Event::DisplayChange(..))) {
-            self.recreate(env);
+        if let Some(&Event::DisplayChange(w, h)) =
+            ev.iter().find(|e| matches!(e, Event::DisplayChange(..)))
+        {
+            self.recreate(env, w as usize, h as usize);
         }
         // @ 0x00459250: the page surface to the screen (0x004ecc40; from
         // a 32-bit page surface its 32 → 16 copy).
         if self.depth == Depth::Xrgb8888 {
             x888_to_565(&self.surface32, &mut self.surface);
         }
-        if screen.len() == self.surface.len() {
-            screen.copy_from_slice(&self.surface);
+        if screen.len() != self.surface.len() {
+            // A size switch this frame: the game re-creates its screen at
+            // the new size and copies the page surface itself.
+            return ev;
         }
+        screen.copy_from_slice(&self.surface);
         // The tooltip text of the page's tooltip element when its tooltips
         // are on (@ 0x00414820).
         let page = self.page;

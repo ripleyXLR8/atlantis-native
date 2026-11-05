@@ -178,8 +178,8 @@ impl Game {
 
     /// Escape (@ 0x0042ac50 by loop mode): the panorama opens the in-game
     /// menu (or, during the start page's demo, the start page); the
-    /// inventory captures the screen, closes (@ 0x00427b20) and opens the
-    /// menu; a dialog takes it as a click (the line ends, @ 0x0042ae60);
+    /// inventory clears the subtitle line and closes (@ 0x00427b20), back
+    /// to the panorama with no menu; a dialog takes it as a click (the line ends, @ 0x0042ae60);
     /// a cinematic stops (its own wait loop's key, [`Game::skip`]); on the
     /// start page with no player the in-game menu opens with `BT_LOAD`,
     /// `BT_SAVE` and `BT_BACK` off; a travel video ends and the in-game
@@ -205,11 +205,14 @@ impl Game {
                 self.open_menu();
             }
             Mode::Inventory => {
-                let capture = (self.screen.clone(), self.width, self.height);
+                // @ 0x0042af2b: the subtitle line cleared (the voices and
+                // the place sounds play on), the menu's loop mode 6 and
+                // page 1 set and the screen captured, then the inventory's
+                // close (@ 0x00427b20) puts back the mode it saved at its
+                // opening: the panorama. No menu shows; the capture is
+                // taken again by the next Escape that opens it.
+                self.subtitle = None;
                 self.close_inventory();
-                if self.open_menu() {
-                    self.menus.capture = Some(capture);
-                }
             }
             Mode::Dialog => self.click = true,
             Mode::Screen => self.escape_screen(),
@@ -268,6 +271,12 @@ impl Game {
             pointer: self.pointer,
         };
         let events = self.menus.frame(&mut env, &mut self.screen);
+        if let Some(&Event::DisplayChange(w, h)) = events
+            .iter()
+            .find(|e| matches!(e, Event::DisplayChange(..)))
+        {
+            self.display_change(w as usize, h as usize);
+        }
         self.draw_pointer();
         // The flip (@ 0x00459268): the subtitle line or the voice slots
         // (an Escape from the warp cleared both; from the inventory the
@@ -314,17 +323,65 @@ impl Game {
                     self.dialog_renderer.a3 = Some(A3Raster { smooth: c.smooth });
                     self.look.invert_y = c.invert_mouse_y;
                 }
-                // The page surface and the banks follow the chosen depth
-                // (the menus); the screen stays RGB565 and its size.
-                Event::DisplayChange(w, h)
-                    if (w as usize, h as usize) != (self.width, self.height) =>
-                {
-                    self.not_ported(&format!("the options' screen size switch to {w} x {h}"));
-                }
+                // Done in the frame ([`Game::display_change`]).
                 Event::DisplayChange(..) => {}
                 Event::ReloadTexts => self.texts = None,
             }
         }
+    }
+
+    /// The options' `BT_BACK` with a size or depth pending
+    /// (@ 0x00454f44..0x004551b1), the game's part, in the original's
+    /// order after the page handler: the display re-created at `w` x `h`
+    /// (@ 0x0040fa60; the window follows [`Game::width`] /
+    /// [`Game::height`]) and the menus' page surface with it (black this
+    /// frame, the menus did it); `Interface.spr` and the cursor (the
+    /// port's are not size-bound); the inventory's and the screens' banks
+    /// of the new width (@ 0x0043b060, @ 0x00429420, @ 0x004c34e0: here
+    /// the subject menu's bank and the tower map's `CarteTour<W>.spr`,
+    /// opened again at their next use); the warp's pipeline and camera
+    /// (@ 0x0043f6f0, @ 0x0043f420: centre (W/2, H/2), the 76° field of
+    /// view at the new size, the viewport; the orientation kept); the
+    /// fonts made again for the new size (@ 0x0041e030, @ 0x0041d960).
+    /// `Atlantis3.cfg`'s writer reads the size and depth of the display in
+    /// use (@ 0x00408f80), so the settings take them. The warp init also
+    /// re-allocates the six cube faces (@ 0x0043f420 → 0x004eb290: new
+    /// buffers, not filled again until the next view entry); the port
+    /// keeps the loaded panorama (the original's faces hold whatever the
+    /// new allocation held).
+    pub(super) fn display_change(&mut self, w: usize, h: usize) {
+        let (w, h) = (w.max(1), h.max(1));
+        self.width = w;
+        self.height = h;
+        self.screen = vec![0; w * h];
+        if self.menus.surface.len() == self.screen.len() {
+            self.screen.copy_from_slice(&self.menus.surface);
+        }
+        let c = &mut self.startup.config;
+        c.resolution = (w as i32, h as i32);
+        c.pixel_format = match self.menus.depth {
+            atlantis3_data::spr::Depth::Xrgb8888 => atlantis3_data::cfg::PixelFormat::X8R8G8B8,
+            atlantis3_data::spr::Depth::Rgb565 => atlantis3_data::cfg::PixelFormat::R5G6B5,
+        };
+        // The banks sized by the screen's width, opened again at their
+        // next use.
+        self.banks_world = 0;
+        self.puzzles.screens.tour_board = None;
+        self.puzzles.screens.tour_pawns = None;
+        // The warp at the new size.
+        let a3 = self.renderer.a3;
+        let fpu = self.renderer.fpu;
+        self.renderer = atlantis2_engine::Renderer::new(atlantis2_engine::Variant::PII, fpu, w, h);
+        self.renderer.a3 = a3;
+        (self.camera.cx, self.camera.cy) = ((w / 2) as f32, (h / 2) as f32);
+        self.camera
+            .set_fov(atlantis2_engine::camera::WARP_FOV, w as u32, h as u32);
+        // The fonts (and the texts with them) made again.
+        self.texts = None;
+        self.pointer = (
+            self.pointer.0.clamp(0, w as i32 - 1),
+            self.pointer.1.clamp(0, h as i32 - 1),
+        );
     }
 
     /// Leaves the menu as the in-game menu's `BT_BACK` does (tests).

@@ -505,6 +505,12 @@ impl Game {
         &self.screen
     }
 
+    /// Tests: the screen to write into (what a pass leaves on it).
+    #[doc(hidden)]
+    pub fn test_screen_mut(&mut self) -> &mut [u16] {
+        &mut self.screen
+    }
+
     pub fn mode(&self) -> Mode {
         self.mode
     }
@@ -2429,7 +2435,14 @@ impl Game {
             log::warn!("CDialogue::Open() : le dialogue {n} n'existe pas");
         }
         self.dialogs = Some(dialogs);
-        let (sw, sh) = crate::dialog::SURFACE;
+        // The dialog's body surface: 640 × 480 for a 3D dialog, the
+        // screen's size for a voice-over (@ 0x0040cfe0: `new
+        // CDialogue(w, h, voixoff)`).
+        let (sw, sh) = if voixoff {
+            (self.width, self.height)
+        } else {
+            crate::dialog::SURFACE
+        };
         self.running = Some(crate::dialog::Running {
             dialog: n,
             voixoff,
@@ -2588,7 +2601,13 @@ impl Game {
             return false;
         };
         if r.voixoff {
+            // The panorama into the body surface at the screen's size
+            // (@ 0x00467120: the warp frame @ 0x00440690(+0x360)); `Render`
+            // copies it to the screen at every pass.
             self.draw_warp_only();
+            if r.surface.len() == self.screen.len() {
+                r.surface.copy_from_slice(&self.screen);
+            }
         } else {
             let (sw, sh) = crate::dialog::SURFACE;
             // Viewport(640, 480) (@ 0x0043f760): centre and projection.
@@ -2747,15 +2766,20 @@ impl Game {
     }
 
     /// `CDialogue::Render` (@ 0x00467c70) and the flip: the dialog surface
-    /// stretched to the screen (a voice-over draws the panorama at the
-    /// screen's size), then the line's subtitle (`CDialogue::Display`
+    /// stretched to the screen (a voice-over's, at the screen's size, copied
+    /// as it is: @ 0x004ecc40 to the screen at every pass, the head
+    /// @ 0x00469910 skipped), then the line's subtitle (`CDialogue::Display`
     /// @ 0x0046a0e0).
     fn dialog_render(&mut self) {
         self.ev(|| "Render".into());
         let Some(r) = self.running.as_ref() else {
             return;
         };
-        if !r.voixoff {
+        if r.voixoff {
+            if r.surface.len() == self.screen.len() {
+                self.screen.copy_from_slice(&r.surface);
+            }
+        } else {
             let (sw, sh) = crate::dialog::SURFACE;
             let (w, h) = (self.width, self.height);
             // The body surface into the destination, then the head over it

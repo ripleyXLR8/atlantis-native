@@ -104,6 +104,8 @@ struct App {
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
     shot_after: Option<f64>,
     cfg_path: PathBuf,
+    /// The game's screen size the window was last given.
+    shown: (usize, usize),
 }
 
 /// The game's sound to the default output device.
@@ -180,6 +182,15 @@ impl App {
         };
         // The game's picture at its own proportions, black bars around.
         let (gw, gh) = (self.game.width(), self.game.height());
+        // The options' size switch re-creates the display at once
+        // (@ 0x0040fa60): a window takes the new size (the surface follows
+        // the window's at the next frame); full screen keeps the monitor.
+        if (gw, gh) != self.shown {
+            self.shown = (gw, gh);
+            if !self.fullscreen {
+                let _ = window.request_inner_size(LogicalSize::new(gw as u32, gh as u32));
+            }
+        }
         let (dw, dh) = if ww * gh > wh * gw {
             (wh * gw / gh, wh)
         } else {
@@ -422,6 +433,7 @@ fn main() {
     let fullscreen = fullscreen.unwrap_or(game.startup.config.full_screen);
     let _stream = open_audio(game.audio.clone());
     let el = EventLoop::new().expect("an event loop");
+    let shown = (game.width(), game.height());
     let mut app = App {
         game,
         start: Instant::now(),
@@ -435,6 +447,7 @@ fn main() {
         surface: None,
         shot_after,
         cfg_path,
+        shown,
     };
     let _ = el.run_app(&mut app);
 }
