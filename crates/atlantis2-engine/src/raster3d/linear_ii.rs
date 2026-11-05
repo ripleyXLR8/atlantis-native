@@ -105,7 +105,7 @@ fn below(a: f64, b: f64) -> bool {
 /// (stored as floats), its integer row (`fistp` of the unrounded y + 0.5,
 /// toward zero), u and v multiplied by the binding's scales, and w's
 /// exponent raised by 31.
-pub fn draw_polygon(poly: &mut [Vertex], tex: &Texture, out: &mut Target) {
+pub fn draw_polygon<P: Copy>(poly: &mut [Vertex], tex: &Texture<P>, out: &mut Target<P>) {
     if poly.len() < 3 {
         return;
     }
@@ -133,7 +133,13 @@ pub fn draw_polygon(poly: &mut [Vertex], tex: &Texture, out: &mut Target) {
 
 /// The case tree @ 0x005d70dc on the integer rows of v0, v1, v2: as
 /// `ii::triangle` but for the flat-top cases.
-fn triangle(b: &Binding, v: [&Vertex; 3], i: [i32; 3], tex: &Texture, out: &mut Target) {
+fn triangle<P: Copy>(
+    b: &Binding,
+    v: [&Vertex; 3],
+    i: [i32; 3],
+    tex: &Texture<P>,
+    out: &mut Target<P>,
+) {
     let [v0, v1, v2] = v;
     let [i0, i1, i2] = i;
     let mut e = Scan {
@@ -205,16 +211,16 @@ struct Gradients {
     dz: u32,
 }
 
-struct Scan<'a> {
+struct Scan<'a, P> {
     b: &'a Binding,
-    tex: &'a Texture<'a>,
+    tex: &'a Texture<'a, P>,
     edges: [Edge; 3],
     g: Gradients,
 }
 
-impl Scan<'_> {
+impl<P: Copy> Scan<'_, P> {
     /// Three distinct rows, top `t`, middle `m`, bottom `b`: `ii::Scan::general`.
-    fn general(&mut self, v: [&Vertex; 3], i: [i32; 3], out: &mut Target) {
+    fn general(&mut self, v: [&Vertex; 3], i: [i32; 3], out: &mut Target<P>) {
         let [t, m, b] = v;
         let [it, im, ib] = i;
         let vp_bottom = out.height as i32;
@@ -266,7 +272,7 @@ impl Scan<'_> {
         c: &Vertex,
         itop: i32,
         ib: i32,
-        out: &mut Target,
+        out: &mut Target<P>,
     ) {
         let vp_bottom = out.height as i32;
         if itop >= vp_bottom || ib <= VP_TOP {
@@ -292,7 +298,7 @@ impl Scan<'_> {
         r: &Vertex,
         it: i32,
         ibot: i32,
-        out: &mut Target,
+        out: &mut Target<P>,
     ) {
         let vp_bottom = out.height as i32;
         if it >= vp_bottom || ibot <= VP_TOP {
@@ -316,7 +322,7 @@ impl Scan<'_> {
         ri: usize,
         end: i32,
         lower: Option<(usize, usize)>,
-        out: &mut Target,
+        out: &mut Target<P>,
     ) {
         let (l, r) = (self.edges[li], self.edges[ri]);
         let k = C.div(1.0, C.sub(r.dxdy, l.dxdy));
@@ -376,7 +382,7 @@ impl Scan<'_> {
     /// One row (@ 0x005d91f7): from the left edge's x (clipped at the left
     /// clip, `fcmovb`) to the right edge's (clipped at the right one,
     /// `cmovge`), both by `fistp` toward zero; the span when xl < xe.
-    fn row(&self, li: usize, ri: usize, y: i32, out: &mut Target) {
+    fn row(&self, li: usize, ri: usize, y: i32, out: &mut Target<P>) {
         let (l, r) = (&self.edges[li], &self.edges[ri]);
         let xr = C.fistp(r.x);
         let xl = C.fistp(if below(CLIP_LEFT, l.x) {
@@ -401,7 +407,7 @@ impl Scan<'_> {
     /// @ 0x007945c8); the odd last pixel and a 1-pixel span by the same
     /// formula. Z written with the texel when Z >= the buffer's word
     /// (unsigned, `jb` skips); Z steps for every pixel.
-    fn span(&self, l: &Edge, y: i32, xl: i32, xe: i32, out: &mut Target) {
+    fn span(&self, l: &Edge, y: i32, xl: i32, xe: i32, out: &mut Target<P>) {
         let g = &self.g;
         let n = (xe - xl) as usize;
         let d = C.sub(f64::from(xl + 1), l.x);

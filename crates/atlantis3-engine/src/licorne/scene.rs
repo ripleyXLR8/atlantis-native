@@ -54,9 +54,40 @@ struct ObjMesh {
     vertices: Vec<Vec3>,
     /// Skinned: each vertex's bone node.
     bones: Option<Vec<usize>>,
-    /// The texture (the material's map slot 1), RGB565.
-    texture: Option<(Vec<u16>, usize, usize)>,
+    /// The texture (the material's map slot 1), in both display formats.
+    texture: Option<Tex>,
     name: String,
+}
+
+/// A texture of `map\` copied into each display format (@ 0x00418e70 →
+/// @ 0x004ecc40): RGB565 and x8r8g8b8.
+#[derive(Clone, Debug)]
+#[doc(hidden)]
+pub struct Tex {
+    pub p16: Vec<u16>,
+    pub p32: Vec<u32>,
+    pub w: usize,
+    pub h: usize,
+}
+
+/// A pixel the board draws (its textures and background in that format;
+/// `Zi32Texture16Linear1516II` or, at 32 bits,
+/// `Zi32Texture32Linear32AsmPII`: the same set-up and scan).
+pub trait BoardPixel: Copy {
+    #[doc(hidden)]
+    fn of(t: &Tex) -> &[Self];
+}
+
+impl BoardPixel for u16 {
+    fn of(t: &Tex) -> &[u16] {
+        &t.p16
+    }
+}
+
+impl BoardPixel for u32 {
+    fn of(t: &Tex) -> &[u32] {
+        &t.p32
+    }
 }
 
 /// A scene of the board (`CPuzzle3D` object, 0x1e4 bytes, @ 0x004bcf80).
@@ -321,15 +352,17 @@ fn eval(tr: &Track, t: f64) -> TrackValues {
     (q, p, s)
 }
 
-/// A texture file of `map\` as the display's RGB565.
-pub(crate) fn texture(
-    files: &atlantis3_data::A3Files,
-    name: &str,
-) -> Option<(Vec<u16>, usize, usize)> {
-    let t = files
-        .read(&format!("map/{name}"))
-        .and_then(|d| Tga::parse(&d).ok())?;
-    Some((t.pixels, t.width, t.height))
+/// A texture file of `map\` in the display's formats.
+pub(crate) fn texture(files: &atlantis3_data::A3Files, name: &str) -> Option<Tex> {
+    let d = files.read(&format!("map/{name}"))?;
+    let t = Tga::parse(&d).ok()?;
+    let t32 = atlantis2_data::tga::Tga32::parse(&d).ok()?;
+    Some(Tex {
+        p16: t.pixels,
+        p32: t32.pixels,
+        w: t.width,
+        h: t.height,
+    })
 }
 
 impl Scene3 {
@@ -385,12 +418,7 @@ impl Scene3 {
         s
     }
 
-    fn build_mesh(
-        &mut self,
-        node: usize,
-        m: &DbMesh,
-        texture: Option<(Vec<u16>, usize, usize)>,
-    ) -> ObjMesh {
+    fn build_mesh(&mut self, node: usize, m: &DbMesh, texture: Option<Tex>) -> ObjMesh {
         let n = m.face_count as usize;
         let corners: Vec<[u16; 3]> = (0..n)
             .map(|i| std::array::from_fn(|k| m.corners.get(3 * i + k).copied().unwrap_or(0)))
@@ -568,10 +596,10 @@ impl Scene3 {
     /// `only` (@ 0x004be580), with camera `cam` into `target`; each
     /// polygon's vertex records go to `records` (the rasteriser's input,
     /// 0x24 bytes a vertex) when given.
-    pub fn draw(
+    pub fn draw<P: BoardPixel>(
         &mut self,
         cam: &Camera,
-        target: &mut Target,
+        target: &mut Target<P>,
         only: Option<&str>,
         mut records: Option<&mut PolyLog>,
     ) {
@@ -621,7 +649,7 @@ impl Scene3 {
             let faces = back_faces_pii(K, &mesh.corners, &cv, &mut codes);
             let proj = project(K, cam, &cv, &codes);
             let (pixels, tw, th) = match &mesh.texture {
-                Some((p, w, h)) => (p.as_slice(), *w, *h),
+                Some(t) => (P::of(t), t.w, t.h),
                 None => (&[][..], 1, 1),
             };
             let tex = Texture {

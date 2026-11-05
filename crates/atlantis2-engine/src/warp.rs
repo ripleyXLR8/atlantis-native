@@ -87,7 +87,7 @@ const TEX_SCALE: f64 = 512.0 * 256.0;
 pub const FRAME_TO_FACE: [usize; 6] = [1, 3, 0, 4, 5, 2];
 
 /// A polygon vertex: screen x, y, 1/z, u, v (floats as stored).
-pub(crate) type Vertex = [f64; 5];
+pub type Vertex = [f64; 5];
 
 /// An edge of a triangle (@ 0x00573510).
 #[derive(Clone, Copy, Debug, Default)]
@@ -114,6 +114,70 @@ struct Edge {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct A3Raster {
     pub smooth: bool,
+}
+
+/// A texel of the cube faces and a pixel of the screen the warp draws:
+/// `u16` for RGB565, `u32` for x8r8g8b8 (*Atlantis III* on a 32-bit
+/// display: the faces are made in the display's format by the warp init
+/// `Game.exe` @ 0x0043f420, the texture setter @ 0x004fc3a0 sets mode bit
+/// 0x4000 for them and the selector @ 0x004fc540 picks `warp32BFPII`,
+/// span @ 0x00539000, or `warp32PII`, span @ 0x00537000).
+pub trait WarpTexel: Copy + Default + 'static {
+    /// The bilinear pixel of the four texels at `i`, `i` + 1, `i` + 512,
+    /// `i` + 513 weighted by the 6-bit fractions `fu`, `fv`.
+    fn bilinear(tex: &[Self], i: usize, fu: u32, fv: u32, oof: &mut u64) -> Self;
+    /// `warpC` (*Atlantis II*): 16-bit only.
+    fn polygon_c(r: &mut Renderer, poly: &mut [Vertex], tex: &[Self], out: &mut [Self]);
+}
+
+impl WarpTexel for u16 {
+    #[inline(always)]
+    fn bilinear(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u16 {
+        pii::bilinear565(tex, i, fu, fv, oof)
+    }
+
+    fn polygon_c(r: &mut Renderer, poly: &mut [Vertex], tex: &[u16], out: &mut [u16]) {
+        r.polygon(poly, tex, out)
+    }
+}
+
+impl WarpTexel for u32 {
+    /// `warp32BFPII`'s pixel (@ 0x00539000; the lone last pixel
+    /// @ 0x005397c0 the same, with 16-bit's weights from the texel
+    /// coordinates): B, G and R each `Σ wₖ cₖ >> 12` with the 16-bit
+    /// span's weights (`pmaddwd` of the masked bytes, `psrld 12`), the x
+    /// byte 0. Unlike the 16-bit span, the lower row is the texel's own row
+    /// when the texel lies in the face's last row (`cmp ebx, [0x00794568]`
+    /// = (512 − 1) · 512, `jae`): no read below the face.
+    #[inline(always)]
+    fn bilinear(tex: &[u32], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u32 {
+        let w = [
+            (64 - fu) * (64 - fv),
+            fu * (64 - fv),
+            (64 - fu) * fv,
+            fu * fv,
+        ];
+        let below = if i >= (FACE_SIZE - 1) * FACE_SIZE {
+            0
+        } else {
+            FACE_SIZE
+        };
+        let t = [
+            pii::at(tex, i, w[0], oof),
+            pii::at(tex, i + 1, w[1], oof),
+            pii::at(tex, i + below, w[2], oof),
+            pii::at(tex, i + below + 1, w[3], oof),
+        ];
+        let sum = |sh: u32| -> u32 {
+            ((0..4).map(|k| w[k] * ((t[k] >> sh) & 0xff)).sum::<u32>() >> 12) << sh
+        };
+        sum(16) | sum(8) | sum(0)
+    }
+
+    /// Never chosen: *Atlantis III* draws with `warpPII`'s family.
+    fn polygon_c(_: &mut Renderer, _: &mut [Vertex], _: &[u32], _: &mut [u32]) {
+        debug_assert!(false, "warpC draws 16-bit faces only");
+    }
 }
 
 /// The cube renderer for one screen size.
@@ -200,12 +264,12 @@ impl Renderer {
     /// 1 `bk`, 2 `up`, 3 `dn`, 4 `lf`, 5 `rt`), `matrix` the camera's
     /// ([`crate::camera::Camera::matrix`]), `proj` fx, fy, cx, cy. Every
     /// pixel of `out` (width x height) is written.
-    pub fn render(
+    pub fn render<P: WarpTexel>(
         &mut self,
-        faces: &[Vec<u16>; 6],
+        faces: &[Vec<P>; 6],
         matrix: &[f32; 9],
         proj: [f32; 4],
-        out: &mut [u16],
+        out: &mut [P],
     ) {
         assert!(out.len() >= self.width * self.height);
         assert!(faces.iter().all(|f| f.len() == FACE_SIZE * FACE_SIZE));
@@ -220,7 +284,13 @@ impl Renderer {
     /// FUN_0045c030: transform the 8 corners, clip at z = 2, project, one
     /// polygon per face. The control word is read again for each face: the
     /// first polygon `warpPII` draws changes it for the rest of the frame.
-    fn cube(&mut self, faces: &[Vec<u16>; 6], matrix: &[f32; 9], proj: [f32; 4], out: &mut [u16]) {
+    fn cube<P: WarpTexel>(
+        &mut self,
+        faces: &[Vec<P>; 6],
+        matrix: &[f32; 9],
+        proj: [f32; 4],
+        out: &mut [P],
+    ) {
         let m = matrix.map(f64::from);
         let proj = proj.map(f64::from);
         let [p0, p1, p2, p3] = proj;
@@ -293,7 +363,7 @@ impl Renderer {
             // @ 0x0045c66f: the routine is called for 3 vertices or more.
             if poly.len() > 2 {
                 match self.variant {
-                    Variant::C => self.polygon(&mut poly, &faces[face], out),
+                    Variant::C => P::polygon_c(self, &mut poly, &faces[face], out),
                     Variant::PII => self.polygon_pii(&mut poly, &faces[face], out),
                 }
             }

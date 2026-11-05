@@ -171,7 +171,11 @@ fn replay(golden: &str, w: usize, h: usize) {
                 }
                 g.step(t);
                 let c = g.credits().unwrap();
-                assert_eq!(format!("md5={}", md5_px(&c.surface)), f[5], "{l}");
+                assert_eq!(
+                    format!("md5={}", md5_px(c.surface.as_565().unwrap())),
+                    f[5],
+                    "{l}"
+                );
                 assert_eq!(format!("draws={}", c.draws.join(",")), f[6], "{l}");
                 assert_eq!(format!("shown={}", c.shown_names().join(",")), f[7], "{l}");
                 assert_eq!(format!("slide={}", c.slide), f[8], "{l}");

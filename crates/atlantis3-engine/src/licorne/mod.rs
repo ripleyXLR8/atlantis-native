@@ -452,6 +452,8 @@ pub struct Board {
     /// places (0..3, 7).
     cells: Vec<Vec3>,
     background: Vec<u16>,
+    /// The background copied into an x8r8g8b8 surface (a 32-bit display).
+    background32: Vec<u32>,
     zbuf: Vec<u32>,
     pub beacons: [(i32, i32); 4],
     pub placed: i32,
@@ -512,17 +514,20 @@ impl Board {
         if ![640, 800, 1024].contains(&w) {
             return None;
         }
-        let bg = files
-            .read(&format!("map/PL_Fond{w}.tga"))
-            .and_then(|d| Tga::parse(&d).ok())?;
+        let bg_file = files.read(&format!("map/PL_Fond{w}.tga"))?;
+        let bg = Tga::parse(&bg_file).ok()?;
+        let bg32 = atlantis2_data::tga::Tga32::parse(&bg_file).ok()?;
         let zbf = files
             .read(&format!("map/PL_Fond{w}.zbf"))
             .and_then(|d| atlantis3_data::zbf::Zbf::parse(&d).ok())?;
         let mut background = vec![0u16; w * h];
+        let mut background32 = vec![0u32; w * h];
         for y in 0..h.min(bg.height) {
             let n = w.min(bg.width);
             background[y * w..y * w + n]
                 .copy_from_slice(&bg.pixels[y * bg.width..y * bg.width + n]);
+            background32[y * w..y * w + n]
+                .copy_from_slice(&bg32.pixels[y * bg.width..y * bg.width + n]);
         }
         let mut zbuf = vec![0u32; w * h];
         for y in 0..h.min(zbf.header.height as usize) {
@@ -565,6 +570,7 @@ impl Board {
             camera,
             cells,
             background,
+            background32,
             zbuf,
             beacons: [(0, 7), (1, 7), (2, 7), (3, 7)],
             placed: 0,
@@ -949,6 +955,19 @@ impl Board {
     pub fn draw(&mut self, screen: &mut [u16]) {
         let (w, h) = (self.w as usize, self.h as usize);
         screen[..w * h].copy_from_slice(&self.background);
+        self.draw_scenes(screen);
+    }
+
+    /// [`Board::draw`] on a 32-bit display: the background and the
+    /// textures in x8r8g8b8.
+    pub fn draw_x888(&mut self, screen: &mut [u32]) {
+        let (w, h) = (self.w as usize, self.h as usize);
+        screen[..w * h].copy_from_slice(&self.background32);
+        self.draw_scenes(screen);
+    }
+
+    fn draw_scenes<P: scene::BoardPixel>(&mut self, screen: &mut [P]) {
+        let (w, h) = (self.w as usize, self.h as usize);
         let mut z = self.zbuf.clone();
         let mut logs = self
             .polys

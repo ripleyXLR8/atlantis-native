@@ -25,8 +25,11 @@ use atlantis3_data::A3Files;
 
 use crate::audio::{csm_gain, Audio, CHANNEL_CINEMA, CHANNEL_MUSIC, CHANNEL_PLACE, CHANNEL_VOICE};
 use crate::cinema::Cinema;
+use crate::menu::PagePixel;
 use crate::place_anim::Slots;
+use crate::px::{Faces, Surface};
 use crate::startup::Startup;
+use crate::with_px;
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::place_sound::{sources, Source};
 use atlantis3_data::coord::Coord;
@@ -162,7 +165,8 @@ struct Place {
     wam: Wam,
     name: String,
     view: Option<u32>,
-    faces: [Vec<u16>; 6],
+    /// The six faces, in the display's format.
+    faces: Faces,
     /// The cube file the faces come from.
     cube: String,
 }
@@ -173,7 +177,8 @@ pub struct Game {
     pub startup: Startup,
     width: usize,
     height: usize,
-    screen: Vec<u16>,
+    /// The screen, in the display's format (`PixelFormat`).
+    screen: Surface,
     pub audio: Audio,
     names: DefNames,
     script: Option<Box<Script>>,
@@ -200,7 +205,7 @@ pub struct Game {
     /// passed" flag for the animations (@ 0x0077ad78, 0x0077addc).
     slots: Slots,
     spw_cache: HashMap<String, Option<Arc<Bank>>>,
-    work: [Vec<u16>; 6],
+    work: Faces,
     rand: Rand,
     ticks: u32,
     anim_tick: bool,
@@ -358,9 +363,15 @@ impl Game {
             smooth: startup.config.smooth,
         });
         let startup_smooth = startup.config.smooth;
+        // The display in the format of `PixelFormat` (@ 0x004074d0).
+        let depth = if startup.config.pixel_format.bits() > 16 {
+            Depth::Xrgb8888
+        } else {
+            Depth::Rgb565
+        };
         let interface = files
             .read("spr/Interface.spr")
-            .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok());
+            .and_then(|d| Bank::parse(&d, depth).ok());
         if interface.is_none() {
             log::warn!("spr\\Interface.spr missing or unreadable: no cursor");
         }
@@ -373,7 +384,7 @@ impl Game {
             startup,
             width,
             height,
-            screen: vec![0; width * height],
+            screen: Surface::new(depth, width * height),
             audio: Audio::new(),
             names,
             script: Some(Box::new(script)),
@@ -500,15 +511,51 @@ impl Game {
         self.height
     }
 
-    /// The screen as last drawn (RGB565, `width` x `height`).
+    /// The screen as last drawn, `width` x `height`, on a 16-bit display
+    /// (RGB565; empty on a 32-bit one: [`Game::surface`]).
     pub fn screen(&self) -> &[u16] {
+        self.screen.as_565().unwrap_or(&[])
+    }
+
+    /// The screen as last drawn, in the display's format.
+    pub fn surface(&self) -> &Surface {
         &self.screen
     }
 
-    /// Tests: the screen to write into (what a pass leaves on it).
+    /// The display's pixel format.
+    pub fn depth(&self) -> Depth {
+        self.screen.depth()
+    }
+
+    /// Tests: the game started on a display of format `depth` (as
+    /// `PixelFormat` gives it at start-up): the screen and the cursor's
+    /// bank in it; views entered after this load their cube, place sprites
+    /// and videos in it.
+    #[doc(hidden)]
+    pub fn start_at_depth(&mut self, depth: Depth) {
+        self.screen = Surface::new(depth, self.width * self.height);
+        self.interface = self
+            .files
+            .read("spr/Interface.spr")
+            .and_then(|d| Bank::parse(&d, depth).ok());
+        self.banks_world = 0;
+        self.place.cube.clear();
+    }
+
+    /// Tests: the view's cube faces as loaded (the display's format).
+    #[doc(hidden)]
+    pub fn place_faces(&self) -> &Faces {
+        &self.place.faces
+    }
+
+    /// Tests: the screen to write into (what a pass leaves on it), on a
+    /// 16-bit display.
     #[doc(hidden)]
     pub fn test_screen_mut(&mut self) -> &mut [u16] {
-        &mut self.screen
+        match &mut self.screen {
+            Surface::Rgb565(s) => s,
+            Surface::Xrgb8888(_) => &mut [],
+        }
     }
 
     pub fn mode(&self) -> Mode {
@@ -554,7 +601,7 @@ impl Game {
     /// The screen the in-game menu captured for the save thumbnails.
     #[doc(hidden)]
     pub fn menu_capture(&self) -> Option<&[u16]> {
-        self.menus.capture.as_ref().map(|c| c.0.as_slice())
+        self.menus.capture.as_ref().and_then(|c| c.0.as_565())
     }
 
     /// Whether a move waits to complete (the turn ended, the new view not
@@ -630,9 +677,10 @@ impl Game {
     /// with the screen's digest.
     fn tr_flip(&mut self) {
         if self.trace.is_some() {
-            let d = self
-                .trace_digest
-                .map_or_else(|| "-".to_string(), |f| f(&self.screen));
+            let d = self.trace_digest.map_or_else(
+                || "-".to_string(),
+                |f| f(self.screen.as_565().unwrap_or(&[])),
+            );
             self.tr(|| format!("flip {d}"));
         }
     }
@@ -925,10 +973,9 @@ impl Game {
             return;
         }
         self.banks_world = world;
+        let depth = self.depth();
         let open = |files: &A3Files, path: String| {
-            let b = files
-                .read(&path)
-                .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok());
+            let b = files.read(&path).and_then(|d| Bank::parse(&d, depth).ok());
             if b.is_none() {
                 log::warn!("{path}: not found");
             }
@@ -1030,7 +1077,7 @@ impl Game {
     /// @ 0x00436b80 → `AtlSpr_Aff` @ 0x004367b0).
     #[allow(clippy::too_many_arguments)]
     fn aff_centre(
-        screen: &mut [u16],
+        screen: &mut Surface,
         w: usize,
         h: usize,
         bank: &Bank,
@@ -1039,13 +1086,15 @@ impl Game {
         y: i32,
         alpha: f32,
     ) {
-        crate::inventory::aff_centre(screen, w, h, "", bank, idx, x, y, alpha);
+        with_px!(screen, s => {
+            crate::inventory::aff_centre(s.as_mut_slice(), w, h, "", bank, idx, x, y, alpha);
+        });
     }
 
     /// `AtlSpr_Aff` (@ 0x004367b0).
     #[allow(clippy::too_many_arguments)]
     fn aff(
-        screen: &mut [u16],
+        screen: &mut Surface,
         w: usize,
         h: usize,
         bank: &Bank,
@@ -1054,7 +1103,9 @@ impl Game {
         y: i32,
         alpha: f32,
     ) {
-        crate::inventory::aff(screen, w, h, "", bank, idx, x, y, alpha);
+        with_px!(screen, s => {
+            crate::inventory::aff(s.as_mut_slice(), w, h, "", bank, idx, x, y, alpha);
+        });
     }
 
     /// The inventory's items, bar and arrows at its alpha (@ 0x004299b0,
@@ -1101,19 +1152,17 @@ impl Game {
             return;
         };
         let (_, zone, _) = crate::inventory::label(font, &text, self.pointer, w as i32, h as i32);
-        let mut screen = std::mem::take(&mut self.screen);
         if let Some(t) = self.texts.as_ref() {
-            t.print(
-                &mut screen,
+            with_px!(&mut self.screen, s => t.print(
+                s,
                 w,
                 h,
                 crate::text::FontId::Default,
                 &text,
                 zone,
                 0xffffff,
-            );
+            ));
         }
-        self.screen = screen;
     }
 
     fn draw_inventory_items(&mut self) {
@@ -1135,16 +1184,10 @@ impl Game {
             arrows: self.arrows.as_ref(),
         };
         let (w, h) = (self.width, self.height);
-        crate::inventory::draw_items(
-            &mut self.screen,
-            w,
-            h,
-            &banks,
-            &items,
-            self.inventory.scroll,
-            self.inventory.alpha,
-            objects,
-        );
+        let (scroll, alpha) = (self.inventory.scroll, self.inventory.alpha);
+        with_px!(&mut self.screen, s => {
+            crate::inventory::draw_items(s.as_mut_slice(), w, h, &banks, &items, scroll, alpha, objects);
+        });
     }
 
     /// The pointer `Interface.spr` #40 at the free pointer (@ 0x004281e0).
@@ -1296,7 +1339,7 @@ impl Game {
             return false;
         };
         let name = path.rsplit('/').next().unwrap_or(path).to_string();
-        let cinema = match Cinema::open(&name, Arc::from(data), fps) {
+        let cinema = match Cinema::open_depth(&name, Arc::from(data), fps, self.depth()) {
             Ok(c) => c,
             Err(e) => {
                 log::warn!("{e}");
@@ -1413,21 +1456,15 @@ impl Game {
                 }
             }
             let (w, h) = v.cinema.size();
-            if v.spf.is_empty() {
-                stretch_video(
-                    v.cinema.frame(),
-                    w,
-                    h,
-                    &mut self.screen,
-                    self.width,
-                    self.height,
-                );
-            } else {
-                // The move's transition sprites over the travel video
-                // (@ 0x00421fe8), in the video's space.
-                let mut frame = v.cinema.frame().to_vec();
-                crate::travel::draw_transition_sprites(&mut frame, w, h, &v.spf, v.shown);
-                stretch_video(&frame, w, h, &mut self.screen, self.width, self.height);
+            let (sw, sh) = (self.width, self.height);
+            match (v.cinema.frame_px(), &mut self.screen) {
+                (crate::cinema::Frame::Rgb565(f), Surface::Rgb565(out)) => {
+                    video_frame(f, w, h, &v.spf, v.shown, out, sw, sh)
+                }
+                (crate::cinema::Frame::Xrgb8888(f), Surface::Xrgb8888(out)) => {
+                    video_frame(f, w, h, &v.spf, v.shown, out, sw, sh)
+                }
+                _ => {}
             }
         }
         let travel = v.travel;
@@ -1697,28 +1734,20 @@ impl Game {
     fn draw_warp_only(&mut self) -> bool {
         if self.flat_warp {
             // Tests: the harnesses' stub of @ 0x00440690.
-            self.screen.fill(0);
+            self.screen.clear();
             self.tr(|| "warp=flat".into());
             if std::mem::take(&mut self.anim_tick) {
                 self.slots.step(self.now, &mut self.rand);
             }
             return true;
         }
-        if self.place.faces.iter().any(|f| f.is_empty()) {
+        if self.place.faces.any_empty() {
             return false;
         }
         let m = self.camera.matrix();
         let proj = self.camera.projection();
-        if self.slots.slots.iter().any(|s| s.shown) {
-            for (w, f) in self.work.iter_mut().zip(&self.place.faces) {
-                w.clone_from(f);
-            }
-            self.slots.draw(&mut self.work, self.ticks);
-            self.renderer.render(&self.work, &m, proj, &mut self.screen);
-        } else {
-            self.renderer
-                .render(&self.place.faces, &m, proj, &mut self.screen);
-        }
+        let sprites = self.slots.slots.iter().any(|s| s.shown);
+        self.render_cube(&m, proj, sprites);
         // The animations' step, once per 15 Hz tick (@ 0x00439c90).
         if std::mem::take(&mut self.anim_tick) {
             self.slots.step(self.now, &mut self.rand);
@@ -1732,6 +1761,51 @@ impl Game {
             self.draw_cursor();
         }
         true
+    }
+
+    /// The cube with the view's sprites drawn into a copy of its faces
+    /// (`sprites`), or the bare faces, onto the screen. Faces of another
+    /// format than the screen (a depth switch before the next view
+    /// entry) are not drawn.
+    fn render_cube(&mut self, m: &[f32; 9], proj: [f32; 4], sprites: bool) {
+        let (renderer, slots, ticks) = (&mut self.renderer, &self.slots, self.ticks);
+        match (&self.place.faces, &mut self.work, &mut self.screen) {
+            (Faces::Rgb565(f), work, Surface::Rgb565(out)) => {
+                if sprites {
+                    if !matches!(work, Faces::Rgb565(_)) {
+                        *work = Faces::Rgb565(Default::default());
+                    }
+                    let Faces::Rgb565(w) = work else {
+                        unreachable!()
+                    };
+                    for (a, b) in w.iter_mut().zip(f) {
+                        a.clone_from(b);
+                    }
+                    slots.draw(w, ticks);
+                    renderer.render(w, m, proj, out);
+                } else {
+                    renderer.render(f, m, proj, out);
+                }
+            }
+            (Faces::Xrgb8888(f), work, Surface::Xrgb8888(out)) => {
+                if sprites {
+                    if !matches!(work, Faces::Xrgb8888(_)) {
+                        *work = Faces::Xrgb8888(Default::default());
+                    }
+                    let Faces::Xrgb8888(w) = work else {
+                        unreachable!()
+                    };
+                    for (a, b) in w.iter_mut().zip(f) {
+                        a.clone_from(b);
+                    }
+                    slots.draw(w, ticks);
+                    renderer.render(w, m, proj, out);
+                } else {
+                    renderer.render(f, m, proj, out);
+                }
+            }
+            _ => log::debug!("faces and screen of different formats: no cube drawn"),
+        }
     }
 
     /// @ 0x00440a30 → @ 0x00428060: the cursor of the zone under the
@@ -1752,13 +1826,16 @@ impl Game {
                 Some(3..=999) => 0xffff_00ff,
                 _ => 0xffff_ffff,
             };
-            let px = (((argb >> 19) & 0x1f) << 11 | ((argb >> 10) & 0x3f) << 5 | (argb >> 3) & 0x1f)
-                as u16;
-            let (cx, cy) = (self.width / 2, self.height / 2);
-            for k in 0..5 {
-                self.screen[(cy + k - 2) * self.width + cx] = px;
-                self.screen[cy * self.width + cx + k - 2] = px;
-            }
+            // Two lines of 0x004e9a00: the colour as the surface stores it
+            // (RGB565 truncated; x8r8g8b8 the ARGB value, alpha included).
+            let (cx, cy, w) = (self.width / 2, self.height / 2, self.width);
+            with_px!(&mut self.screen, s => {
+                let px = PagePixel::from_argb(argb);
+                for k in 0..5 {
+                    s[(cy + k - 2) * w + cx] = px;
+                    s[cy * w + cx + k - 2] = px;
+                }
+            });
         }
         // The object in the hand, centred on the screen (@ 0x00428500,
         // `<World>ObjetsEnMain.SPR`), the zone's cursor over it.
@@ -1806,8 +1883,11 @@ impl Game {
                 if let Some(info) = bank.info(idx) {
                     let x = (self.width / 2) as i32 - info.w as i32 / 2;
                     let y = (self.height / 2) as i32 - info.h as i32 / 2;
-                    let mut t = Target::screen(&mut self.screen, self.width, self.height);
-                    bank.draw(&mut t, Some(x), y, idx);
+                    let (w, h) = (self.width, self.height);
+                    with_px!(&mut self.screen, s => {
+                        let mut t = Target::screen(s.as_mut_slice(), w, h);
+                        bank.draw(&mut t, Some(x), y, idx);
+                    });
                 }
             }
         }
@@ -2065,7 +2145,7 @@ impl Game {
                     );
                     self.files
                         .read(&path)
-                        .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok())
+                        .and_then(|d| Bank::parse(&d, self.screen.depth()).ok())
                 })
                 .collect(),
             _ => Vec::new(),
@@ -2114,10 +2194,11 @@ impl Game {
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         let path = format!("warp/Warp512/{folder}/{name}");
         if self.place.cube != path {
-            match self.files.read(&path).map(|d| faces_from_hnm(&d)) {
+            let depth = self.depth();
+            match self.files.read(&path).map(|d| faces_of(&d, depth)) {
                 Some(Ok(faces)) => self.place.faces = faces,
                 Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => self.place.faces = missing_cube(&self.files, folder, &name),
+                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
             }
             self.place.cube = path.clone();
         }
@@ -2127,7 +2208,8 @@ impl Game {
         // The builder's draws come from the game's one `rand()` (queued
         // values first: tests replaying the original's run).
         let (queue, rand) = (&mut self.rand_queue, &mut self.rand);
-        self.slots = Slots::load_with(
+        let depth = self.screen.depth();
+        self.slots = Slots::load_depth(
             &self.files,
             &mut self.spw_cache,
             &self.place.wam,
@@ -2141,6 +2223,7 @@ impl Game {
                     .find(|r| r.id == id && r.kind == kind)
                     .map(|r| r.shown)
             },
+            depth,
         );
         self.camera.enter(yaw, pitch);
         self.look.stop();
@@ -2457,7 +2540,7 @@ impl Game {
             lipsync: None,
             voice_start: 0.0,
             back: self.mode,
-            surface: vec![0; sw * sh],
+            surface: Surface::new(self.depth(), sw * sh),
         });
         self.look.stop();
         if self.next_line() {
@@ -2506,10 +2589,10 @@ impl Game {
                 .and_then(|r| r.video.as_ref())
                 .is_some_and(|v| v.path.eq_ignore_ascii_case(&video));
             if !same {
-                let opened = self
-                    .files
-                    .read(&video)
-                    .and_then(|data| crate::dialog::BodyVideo::open(&video, Arc::from(data)));
+                let depth = self.depth();
+                let opened = self.files.read(&video).and_then(|data| {
+                    crate::dialog::BodyVideo::open_depth(&video, Arc::from(data), depth)
+                });
                 let path = video.replace('/', "\\");
                 self.ev(|| format!("VideoOpen({path})"));
                 if let Some(r) = self.running.as_mut() {
@@ -2605,9 +2688,7 @@ impl Game {
             // (@ 0x00467120: the warp frame @ 0x00440690(+0x360)); `Render`
             // copies it to the screen at every pass.
             self.draw_warp_only();
-            if r.surface.len() == self.screen.len() {
-                r.surface.copy_from_slice(&self.screen);
-            }
+            r.surface.copy_from(&self.screen);
         } else {
             let (sw, sh) = crate::dialog::SURFACE;
             // Viewport(640, 480) (@ 0x0043f760): centre and projection.
@@ -2617,9 +2698,14 @@ impl Game {
             let m = self.camera.matrix();
             let proj = self.camera.projection();
             self.dialog_renderer.fpu = self.camera.fpu;
-            if !self.place.faces.iter().any(|f| f.is_empty()) {
-                self.dialog_renderer
-                    .render(&self.place.faces, &m, proj, &mut r.surface);
+            match (&self.place.faces, &mut r.surface) {
+                (Faces::Rgb565(f), Surface::Rgb565(out)) if !self.place.faces.any_empty() => {
+                    self.dialog_renderer.render(f, &m, proj, out)
+                }
+                (Faces::Xrgb8888(f), Surface::Xrgb8888(out)) if !self.place.faces.any_empty() => {
+                    self.dialog_renderer.render(f, &m, proj, out)
+                }
+                _ => {}
             }
             self.camera.fpu = self.dialog_renderer.fpu;
             match r.video.as_mut() {
@@ -2776,9 +2862,8 @@ impl Game {
             return;
         };
         if r.voixoff {
-            if r.surface.len() == self.screen.len() {
-                self.screen.copy_from_slice(&r.surface);
-            }
+            let src = r.surface.clone();
+            self.screen.copy_from(&src);
         } else {
             let (sw, sh) = crate::dialog::SURFACE;
             let (w, h) = (self.width, self.height);
@@ -2788,28 +2873,39 @@ impl Game {
             if self.dialog_heads {
                 self.draw_head(&mut dest);
             }
-            for y in 0..h {
-                let sy = y * sh / h;
-                for x in 0..w {
-                    self.screen[y * w + x] = dest[sy * sw + x * sw / w];
+            fn stretch<P: Copy>(
+                dest: &[P],
+                out: &mut [P],
+                (sw, sh): (usize, usize),
+                (w, h): (usize, usize),
+            ) {
+                for y in 0..h {
+                    let sy = y * sh / h;
+                    for x in 0..w {
+                        out[y * w + x] = dest[sy * sw + x * sw / w];
+                    }
                 }
+            }
+            match (&dest, &mut self.screen) {
+                (Surface::Rgb565(d), Surface::Rgb565(o)) => stretch(d, o, (sw, sh), (w, h)),
+                (Surface::Xrgb8888(d), Surface::Xrgb8888(o)) => stretch(d, o, (sw, sh), (w, h)),
+                _ => {}
             }
         }
         if self.startup.config.subtitle_on {
             if let Some(e) = self.dialog_entry() {
                 let (w, h) = (self.width, self.height);
                 self.texts();
-                let mut screen = std::mem::take(&mut self.screen);
-                self.texts.as_ref().unwrap().print_shadowed(
-                    &mut screen,
+                let t = self.texts.as_ref().unwrap();
+                with_px!(&mut self.screen, s => t.print_shadowed(
+                    s,
                     w,
                     h,
                     &e.text,
                     crate::text::DIALOG_SHADOW,
                     crate::text::DIALOG_TEXT,
                     0xffffff,
-                );
-                self.screen = screen;
+                ));
             }
         }
         // Then the subtitle line or the voice slots (@ 0x0040fff8).
@@ -2859,8 +2955,42 @@ impl Game {
 
     /// The lip-sync and the mouth (@ 0x00469870), then the head drawn over
     /// `dest` (@ 0x00469910) with the line's camera.
-    fn draw_head(&mut self, dest: &mut [u16]) {
+    fn draw_head(&mut self, dest: &mut Surface) {
         let Some(e) = self.dialog_entry() else { return };
+        // On a 32-bit display the maps are loaded in x8r8g8b8 (@ 0x00418e70
+        // in the display's format).
+        let x888 = matches!(dest, Surface::Xrgb8888(_));
+        let maps32 = if x888 {
+            self.dialogs
+                .as_ref()
+                .and_then(|d| d.perso(&e.speaker))
+                .map(|p| p.mesh.clone())
+                .filter(|m| {
+                    !self
+                        .heads
+                        .get(&(m.clone(), e.stand))
+                        .and_then(|h| h.as_ref())
+                        .is_some_and(|h| h.has_x888())
+                })
+                .and_then(|mesh| {
+                    let tga = |n: String| {
+                        self.files
+                            .read(&format!("map/Stand{}/{n}.tga", e.stand))
+                            .and_then(|d| atlantis2_data::tga::Tga32::parse(&d).ok())
+                    };
+                    Some((
+                        tga(mesh.clone())?,
+                        [
+                            tga(format!("{mesh}yf")),
+                            tga(format!("{mesh}ymf")),
+                            tga(format!("{mesh}yd")),
+                            tga(format!("{mesh}yg")),
+                        ],
+                    ))
+                })
+        } else {
+            None
+        };
         let fpu = atlantis2_engine::Fpu::Chop;
         let now = self.now;
         let weights = self.running.as_mut().and_then(|r| {
@@ -2871,6 +3001,9 @@ impl Game {
         let Some(h) = self.head(&e.speaker, e.stand) else {
             return;
         };
+        if let Some((open, eyes)) = maps32 {
+            h.set_x888_maps(open, eyes);
+        }
         let mood = if humeur && e.speaker == "hero" {
             e.mood + 4
         } else {
@@ -2880,7 +3013,11 @@ impl Game {
         h.mouth_a3(mood, weights.as_ref(), &factors);
         let (sw, sh) = crate::dialog::SURFACE;
         let mut z = vec![0u32; sw * sh];
-        h.display_a3(e.camera.max(1) as usize, dest, &mut z, sw, sh);
+        let cam = e.camera.max(1) as usize;
+        match dest {
+            Surface::Rgb565(d) => h.display_a3(cam, d, &mut z, sw, sh),
+            Surface::Xrgb8888(d) => h.display_a3_x888(cam, d, &mut z, sw, sh),
+        };
     }
 
     /// `AtlDial_Close` (@ 0x0040e3b0): the hidden animation shown, the
@@ -2936,21 +3073,36 @@ impl Game {
     /// the camera's (tests: the goldens give the original's matrices).
     #[doc(hidden)]
     pub fn draw_with_matrix(&mut self, matrix: &[f32; 9], fpu: Fpu) -> &[u16] {
+        self.draw_with_matrix_surface(matrix, fpu);
+        self.screen()
+    }
+
+    /// [`Game::draw_with_matrix`] on either display (the harnesses'
+    /// pre-fill: 0xf81f, or 0x5af81f5a at 32 bits).
+    #[doc(hidden)]
+    pub fn draw_with_matrix_surface(&mut self, matrix: &[f32; 9], fpu: Fpu) -> &Surface {
         self.renderer.fpu = fpu;
         let proj = self.camera.projection();
-        for (w, f) in self.work.iter_mut().zip(&self.place.faces) {
-            w.clone_from(f);
+        match &mut self.screen {
+            Surface::Rgb565(s) => s.fill(0xf81f),
+            Surface::Xrgb8888(s) => s.fill(0x5af8_1f5a),
         }
-        self.slots.draw(&mut self.work, self.ticks);
-        self.screen.fill(0xf81f);
-        self.renderer
-            .render(&self.work, matrix, proj, &mut self.screen);
+        self.render_cube(matrix, proj, true);
         &self.screen
     }
 
-    /// The faces after the sprite pass of the last draw (tests).
+    /// The faces after the sprite pass of the last draw (tests), on a
+    /// 16-bit display.
     #[doc(hidden)]
     pub fn sprite_faces(&self) -> &[Vec<u16>; 6] {
+        static NONE: [Vec<u16>; 6] = [const { Vec::new() }; 6];
+        self.work.as_565().unwrap_or(&NONE)
+    }
+
+    /// The faces after the sprite pass of the last draw (tests), in the
+    /// display's format.
+    #[doc(hidden)]
+    pub fn sprite_faces_px(&self) -> &Faces {
         &self.work
     }
 
@@ -2966,7 +3118,7 @@ impl Game {
 
     /// Whether the view's cube was found and decoded.
     pub fn cube_loaded(&self) -> bool {
-        self.place.faces.iter().all(|f| !f.is_empty())
+        !self.place.faces.any_empty()
     }
 
     /// The place animations of the view.
@@ -3270,8 +3422,15 @@ pub fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
 /// game: chapter 0's boot state (`CFuner.wam` view 4 with world 1, at
 /// start-up) asks for `warp\Warp512\hoggar\cf0004.hnm`, which is in
 /// `ldm\`; the boot state is never drawn.
-fn missing_cube(files: &A3Files, folder: &str, name: &str) -> [Vec<u16>; 6] {
-    const DEBUG: [u16; 6] = [0x0010, 0x8000, 0x0008, 0x0400, 0x4008, 0x0200];
+fn missing_cube(files: &A3Files, folder: &str, name: &str, depth: Depth) -> Faces {
+    const DEBUG: [u32; 6] = [
+        0xff00_0080,
+        0xff80_0000,
+        0xff00_0040,
+        0xff00_8000,
+        0xff40_0040,
+        0xff00_4000,
+    ];
     let stem = name.split_once('.').map_or(name, |(s, _)| s);
     let cut = stem.len().min(2);
     for side in ["ft", "bk", "up", "dn", "rt", "lf"] {
@@ -3285,16 +3444,40 @@ fn missing_cube(files: &A3Files, folder: &str, name: &str) -> [Vec<u16>; 6] {
         }
     }
     log::debug!("warp/Warp512/{folder}/{name}: not found (debug colours)");
-    DEBUG.map(|c| vec![c; 512 * 512])
+    match depth {
+        Depth::Rgb565 => {
+            Faces::Rgb565(DEBUG.map(|c| vec![<u16 as PagePixel>::from_argb(c); 512 * 512]))
+        }
+        Depth::Xrgb8888 => Faces::Xrgb8888(DEBUG.map(|c| vec![c; 512 * 512])),
+    }
+}
+
+/// The faces of a cube file in the display's format `depth`.
+fn faces_of(hnm: &[u8], depth: Depth) -> Result<Faces, atlantis_codecs::DecodeError> {
+    Ok(match depth {
+        Depth::Rgb565 => Faces::Rgb565(faces_from_hnm_px(hnm)?),
+        Depth::Xrgb8888 => Faces::Xrgb8888(faces_from_hnm_px(hnm)?),
+    })
 }
 
 pub fn faces_from_hnm(hnm: &[u8]) -> Result<[Vec<u16>; 6], atlantis_codecs::DecodeError> {
-    use atlantis_codecs::{DecodeError, HnmVideo};
-    let mut video = HnmVideo::new(hnm)?;
+    faces_from_hnm_px(hnm)
+}
+
+/// The six faces of a cube file in the display's pixel format: `u16`
+/// RGB565, or `u32` x8r8g8b8 on a 32-bit display (the warp init makes the
+/// faces in the display's format, `CHnmStream::Open` gets its bits
+/// @ 0x0040efc0 and the decoder writes them through its 32-bit colour
+/// writer @ 0x006a349d).
+pub fn faces_from_hnm_px<P: atlantis_codecs::HnmPixel>(
+    hnm: &[u8],
+) -> Result<[Vec<P>; 6], atlantis_codecs::DecodeError> {
+    use atlantis_codecs::{DecodeError, HnmVideo, SoundRule};
+    let mut video: HnmVideo<&[u8], P> = HnmVideo::open(hnm, Vec::new(), SoundRule::Flags)?;
     if video.width() != 512 || video.height() != 512 {
         return Err(DecodeError::InvalidFileHeader);
     }
-    let mut faces: [Vec<u16>; 6] = Default::default();
+    let mut faces: [Vec<P>; 6] = Default::default();
     for &face in &FRAME_TO_FACE {
         let frame = video.next_frame().ok_or(DecodeError::NoVideo)??;
         faces[face] = frame.to_vec();
@@ -3306,20 +3489,50 @@ pub fn faces_from_hnm(hnm: &[u8]) -> Result<[Vec<u16>; 6], atlantis_codecs::Deco
 /// − h) / 2 (@ 0x004211aa..0x00421205), the surface stretched to the
 /// screen (DirectDraw's `Blt`, the driver's scaler; here the nearest
 /// pixel).
-pub fn stretch_video(frame: &[u16], w: usize, h: usize, out: &mut [u16], sw: usize, sh: usize) {
+pub fn stretch_video<P: Copy + Default>(
+    frame: &[P],
+    w: usize,
+    h: usize,
+    out: &mut [P],
+    sw: usize,
+    sh: usize,
+) {
     let surf_h = (w as f32 * 0.75) as usize;
     let top = (surf_h as i64 - h as i64) / 2;
     for y in 0..sh {
         let sy = (y * surf_h / sh) as i64 - top;
         let row = &mut out[y * sw..(y + 1) * sw];
         if sy < 0 || sy >= h as i64 {
-            row.fill(0);
+            row.fill(P::default());
             continue;
         }
         let src = &frame[sy as usize * w..(sy as usize + 1) * w];
         for (x, px) in row.iter_mut().enumerate() {
             *px = src[x * w / sw];
         }
+    }
+}
+
+/// A video frame to the screen: the move's transition sprites over a
+/// travel video first (@ 0x00421fe8, in the video's space), then the
+/// stretch ([`stretch_video`]).
+#[allow(clippy::too_many_arguments)]
+fn video_frame<P: atlantis3_data::spr::Pixel + Default>(
+    frame: &[P],
+    w: usize,
+    h: usize,
+    spf: &[Bank],
+    shown: u32,
+    out: &mut [P],
+    sw: usize,
+    sh: usize,
+) {
+    if spf.is_empty() {
+        stretch_video(frame, w, h, out, sw, sh);
+    } else {
+        let mut f = frame.to_vec();
+        crate::travel::draw_transition_sprites(&mut f, w, h, spf, shown);
+        stretch_video(&f, w, h, out, sw, sh);
     }
 }
 

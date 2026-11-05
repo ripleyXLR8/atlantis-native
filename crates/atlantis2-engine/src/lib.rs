@@ -62,4 +62,4 @@ pub use engine::{
 pub use enhancements::{BugFix, BugFixes, Enhancements};
 pub use fpu::Fpu;
 pub use script::Script;
-pub use warp::{Renderer, Variant};
+pub use warp::{Renderer, Variant, WarpTexel};

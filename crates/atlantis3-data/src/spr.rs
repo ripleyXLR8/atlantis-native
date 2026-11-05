@@ -530,6 +530,19 @@ impl Bank {
         })
     }
 
+    /// This bank, prepared for its depth, drawn after the library was set
+    /// up for a display of `depth` (`Spr_InitGraph` again, the bank not
+    /// loaded again: *Atlantis III*'s options switch the display and keep
+    /// the view's place sprites until the next view entry). The blitters
+    /// of `depth` read the bank's bytes and colour table as they are (an
+    /// RGB565 entry holds its colour in both halves).
+    pub fn as_drawn_at(&self, depth: Depth) -> Bank {
+        Bank {
+            depth,
+            ..self.clone()
+        }
+    }
+
     /// Whether this is an `SPWCRYO` file (flags & 1).
     pub fn is_spw(&self) -> bool {
         self.flags & 1 != 0

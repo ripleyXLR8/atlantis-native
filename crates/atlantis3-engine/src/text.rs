@@ -17,6 +17,7 @@
 //! font file, antialiased (`ANTIALIASED_QUALITY`; GDI's own grey levels
 //! are not reproduced).
 
+use crate::px::ScreenPixel;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -299,7 +300,7 @@ pub fn layout(font: &GdiFont, text: &[u8], w: i32, h: i32, z: Zone) -> Vec<Line>
         .collect()
 }
 
-/// Draws lines of a font into an RGB565 screen: each glyph at its pen
+/// Draws lines of a font into a screen (RGB565 or x8r8g8b8): each glyph at its pen
 /// position, the baseline `tmAscent` below the line's y, its coverage
 /// blended in `rgb` (0xRRGGBB).
 pub struct Glyphs {
@@ -314,12 +315,12 @@ impl Glyphs {
             .map(|font| Glyphs { font })
     }
 
-    pub fn draw(
+    pub fn draw<P: ScreenPixel>(
         &self,
         gdi: &GdiFont,
         lines: &[Line],
         rgb: u32,
-        out: &mut [u16],
+        out: &mut [P],
         w: usize,
         h: usize,
     ) {
@@ -344,14 +345,9 @@ impl Glyphs {
                         }
                         let px = &mut out[y as usize * w + x as usize];
                         let a = cov.min(1.0);
-                        let (dr, dg, db) = (
-                            u32::from(*px >> 11) << 3,
-                            u32::from((*px >> 5) & 0x3f) << 2,
-                            u32::from(*px & 0x1f) << 3,
-                        );
-                        let mix = |s: u32, d: u32| (s as f32 * a + d as f32 * (1.0 - a)) as u32;
-                        let (nr, ng, nb) = (mix(r, dr), mix(g, dg), mix(b, db));
-                        *px = ((nr >> 3) << 11 | (ng >> 2) << 5 | nb >> 3) as u16;
+                        let [dr, dg, db] = px.rgb8();
+                        let mix = |s: u32, d: u8| (s as f32 * a + f32::from(d) * (1.0 - a)) as u8;
+                        *px = P::from_rgb8(mix(r, dr), mix(g, dg), mix(b, db));
                     });
                 }
                 pen += d as f32;
@@ -435,9 +431,9 @@ impl Texts {
 
     /// `AtlFont_SetLayout` + `AtlFont_Print` (@ 0x0041e190, @ 0x0041e2c0).
     #[allow(clippy::too_many_arguments)]
-    pub fn print(
+    pub fn print<P: ScreenPixel>(
         &self,
-        out: &mut [u16],
+        out: &mut [P],
         w: usize,
         h: usize,
         id: FontId,
@@ -455,9 +451,9 @@ impl Texts {
     /// A text with its black shadow at (−1, +1): the dialog lines, the cue
     /// lines and the voice slots.
     #[allow(clippy::too_many_arguments)]
-    pub fn print_shadowed(
+    pub fn print_shadowed<P: ScreenPixel>(
         &self,
-        out: &mut [u16],
+        out: &mut [P],
         w: usize,
         h: usize,
         text: &[u8],

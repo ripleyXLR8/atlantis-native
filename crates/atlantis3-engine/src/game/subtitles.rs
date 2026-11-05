@@ -117,12 +117,10 @@ impl Game {
         }
         let (w, h) = (self.width, self.height);
         self.texts();
-        let mut screen = std::mem::take(&mut self.screen);
         let t = self.texts.as_ref().unwrap();
         for p in &plan {
-            t.print(&mut screen, w, h, p.font, &p.text, p.zone, p.rgb);
+            crate::with_px!(&mut self.screen, s => t.print(s, w, h, p.font, &p.text, p.zone, p.rgb));
         }
-        self.screen = screen;
     }
 
     /// Tests: @ 0x0040de60's plan at a flip (the slots it frees freed).

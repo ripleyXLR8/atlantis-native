@@ -84,3 +84,57 @@ fn hoggar_view_5_with_its_animations() {
         bad.len()
     );
 }
+
+const FIRST5_X888: &str = include_str!("golden/warp_x888_first_hoggar5.txt");
+
+/// The same view on a 32-bit display (`tests/golden/
+/// warp_x888_first_hoggar5.txt`): the faces and the place sprites in
+/// x8r8g8b8 (the banks prepared for the display, the 32-bit blitters), the
+/// cube by `warp32BFPII`.
+#[test]
+fn hoggar_view_5_with_its_animations_at_32_bits() {
+    let Some(dir) = atlantis3_data::testing::install_dir() else {
+        return;
+    };
+    let files = A3Files::open_dir(&dir).unwrap().0;
+    let mut g = Game::new(files).unwrap();
+    g.start_at_depth(atlantis3_data::spr::Depth::Xrgb8888);
+    g.run_command("(monde=1)");
+    g.run_command("(changewam=hoggar.wam)");
+    g.run_command("(vue=5)");
+    assert_eq!(g.place(), ("hoggar.wam", Some(5)));
+    let (mut n, mut bad) = (0, Vec::new());
+    for line in FIRST5_X888.lines().filter(|l| l.starts_with("full ")) {
+        let f: Vec<&str> = line.split_whitespace().collect();
+        let fpu = if f[1] == "steady0e7f" {
+            Fpu::Chop
+        } else {
+            Fpu::Double
+        };
+        let m: Vec<f32> = f[8]
+            .split(',')
+            .map(|b| {
+                f32::from_bits(u32::from_le_bytes(
+                    u32::from_str_radix(b, 16).unwrap().to_be_bytes(),
+                ))
+            })
+            .collect();
+        let screen = g.draw_with_matrix_surface(&m.try_into().unwrap(), fpu);
+        let px = screen.as_x888().expect("a 32-bit screen");
+        let bytes: Vec<u8> = px.iter().flat_map(|p| p.to_le_bytes()).collect();
+        let md5: String = Md5::digest(bytes)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        if md5 != f[7] {
+            bad.push(format!("{} {} {}", f[1], f[5], f[6]));
+        }
+        n += 1;
+    }
+    assert_eq!(n, 24);
+    assert!(
+        bad.is_empty(),
+        "{} of {n} frames differ: {bad:?}",
+        bad.len()
+    );
+}

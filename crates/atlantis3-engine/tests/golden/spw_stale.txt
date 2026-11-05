@@ -1,0 +1,14 @@
+# AFF_SPW of the original spr_p6.dll on a 32-bit face buffer with banks loaded for RGB565, run under emulation.
+# AFF_SPW of spr_p6.dll (md5 94cfb7cfaf577a3aeb94914e7769d552) on a 32-bit face buffer, banks loaded for RGB565
+spw/spw512/hoggar/2ea1001023.SPW#0 5f0e15fe668949408b63a45c476e4e3f
+spw/spw512/hoggar/2ea1021023.SPW#0 9579ac1ac68cb95f5e05853a9454a36f
+spw/spw512/hoggar/2ea1022023.SPW#0 6c886eb97287275efe5e64b46f77cda9
+spw/spw512/hoggar/2ea1023023.SPW#0 b8ea9362ec350317d5bca1f410ea9a8f
+spw/spw512/hoggar/2ea1024023.SPW#0 e5d60d51aa7825a53424b452ada6db4c
+spw/spw512/hoggar/2ea2001023.SPW#0 52f674a702a84c045282840b7abf06ef
+spw/spw512/hoggar/2ea2021023.SPW#0 fab9e0f381db348cf98f86bbb0d01cea
+spw/spw512/hoggar/2ea2022023.SPW#0 af886a0758f9b501989f88db606252e9
+spw/spw512/hoggar/2ea2023023.SPW#0 87638ed59bd1ffc3fca7323b850fe169
+spw/spw512/hoggar/2ea2024023.SPW#0 419ed7117b3fa2c84df51bb75ffd5b29
+spw/spw512/hoggar/3ea1001023.SPW#0 1d55b298db7ac26f12e58755114bc4dd
+spw/spw512/hoggar/3ea1021023.SPW#0 efa915a3be0c8362a4e24e83f6a59d18

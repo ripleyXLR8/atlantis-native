@@ -113,8 +113,8 @@ impl Game {
         self.world_banks();
         if let Some(bank) = &self.objects_hand {
             let (w, h) = (self.width, self.height);
-            crate::inventory::aff_centre(
-                &mut self.screen,
+            crate::with_px!(&mut self.screen, s => crate::inventory::aff_centre(
+                s.as_mut_slice(),
                 w,
                 h,
                 "",
@@ -123,7 +123,7 @@ impl Game {
                 (w / 2) as i32,
                 (h / 2) as i32,
                 1.0,
-            );
+            ));
         }
     }
 

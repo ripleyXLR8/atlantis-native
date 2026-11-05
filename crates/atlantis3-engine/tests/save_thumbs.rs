@@ -168,7 +168,7 @@ fn game_art(files: &A3Files, w: usize, h: usize) -> [Vec<u16>; 2] {
     };
     let mut menus = Menus::default();
     menus.load(files, w, h, &config);
-    let mut screen = vec![0u16; w * h];
+    let mut screen = atlantis3_engine::px::Surface::Rgb565(vec![0u16; w * h]);
     let mut host = NoSaves;
     let mut shot = |menus: &mut Menus, page: u8, now: f64| {
         menus.page = page;
@@ -182,7 +182,7 @@ fn game_art(files: &A3Files, w: usize, h: usize) -> [Vec<u16>; 2] {
             pointer: (5, 5),
         };
         menus.frame(&mut env, &mut screen);
-        screen.clone()
+        screen.as_565().unwrap().to_vec()
     };
     let start = shot(&mut menus, 0, 100.0);
     let princ = shot(&mut menus, 1, 100.03125);

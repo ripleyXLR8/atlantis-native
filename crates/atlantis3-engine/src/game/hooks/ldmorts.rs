@@ -882,19 +882,17 @@ fn isis_caption(h: &mut Hx, own: i32) {
         return;
     };
     let (w, ht) = (h.g.width, h.g.height);
-    let mut screen = std::mem::take(&mut h.g.screen);
     if let Some(t) = h.g.texts.as_ref() {
-        t.print(
-            &mut screen,
+        crate::with_px!(&mut h.g.screen, s => t.print(
+            s,
             w,
             ht,
             crate::text::FontId::Default,
             &text,
             crate::text::Zone::new(10, 10, 20, 20, 0, 1),
             0xff_ffff,
-        );
+        ));
     }
-    h.g.screen = screen;
 }
 
 /// View 10's frame (@ 0x004c82b0): the tile play on the type-4 (KI) and

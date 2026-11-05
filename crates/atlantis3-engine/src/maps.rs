@@ -8,7 +8,7 @@
 //! Both screens are drawn over the running warp frame (@ 0x00440690).
 
 use atlantis2_engine::Fpu;
-use atlantis3_data::spr::Bank;
+use atlantis3_data::spr::{Bank, Pixel};
 
 use crate::inventory::{aff, aff_centre, Aff};
 
@@ -117,8 +117,8 @@ pub fn carte_fishermen(chapter: i32, flag69: i32, flag560: i32) -> bool {
 /// pointer (@ 0x00405520), then the pointer `Interface.spr` #40
 /// (@ 0x004281e0; `AtlCarte_Start` set that cursor). Alpha 1.0
 /// (@ 0x0074e964, set by the start, never faded). The calls made.
-pub fn draw_carte(
-    screen: &mut [u16],
+pub fn draw_carte<P: Pixel>(
+    screen: &mut [P],
     w: usize,
     h: usize,
     carte: &Bank,
@@ -250,8 +250,8 @@ pub fn pawn_pos(fpu: Fpu, s: f32, square: i32, lift: f64) -> Option<(i32, i32)> 
 /// pointer: the start reset the cursor (@ 0x004282e0), so @ 0x004281e0
 /// draws nothing. Alpha 1.0 (@ 0x0074ebb0). The calls made.
 #[allow(clippy::too_many_arguments)]
-pub fn draw_tour(
-    screen: &mut [u16],
+pub fn draw_tour<P: Pixel>(
+    screen: &mut [P],
     w: usize,
     h: usize,
     board: &Bank,

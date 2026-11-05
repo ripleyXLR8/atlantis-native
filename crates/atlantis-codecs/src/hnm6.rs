@@ -370,18 +370,54 @@ fn motion_order(xform: u8, sx: usize, sy: usize) -> &'static [u8] {
     }
 }
 
-/// The frame buffers: RGB565, one `u16` each, rows contiguous. `cur` and
+/// A pixel of the decoder's frame buffers, in the screen's format: the
+/// original's IX decoder (*Atlantis III* `Game.exe` @ 0x006a2258) writes
+/// RGB565 through its 16-bit colour writer @ 0x006a3219 and x8r8g8b8
+/// through its 32-bit one @ 0x006a349d, chosen by the decoder context
+/// (0x006a21b0 for 0x10, 0x006a221e for 0x20).
+pub trait HnmPixel: Copy + Default + Send + Sync + 'static {
+    /// The pixel of the 8x8 block's Y, U, V values: `y` (luma >> 4),
+    /// `cr` = (16 (v' − 256) + 8) / 10 and `cb` = (u' − 256) / 3 of the
+    /// chroma, `u` the raw U coefficient.
+    fn from_ycc(y: i32, cr: i32, cb: i32, u: i32) -> Self;
+}
+
+impl HnmPixel for u16 {
+    /// The original clips G a little more and keeps 5/6/5 bits.
+    #[inline(always)]
+    fn from_ycc(cy: i32, cr: i32, cb: i32, cu: i32) -> u16 {
+        let r = (cy + 128 + cr).clamp(0, 255) as u16 & 0xf8;
+        let g = (cy + 128 - (cr >> 1) - cb).clamp(0, 251) as u16 & 0xfc;
+        let b = (cy + 128 + (cu >> 3)).clamp(0, 255) as u16 & 0xf8;
+        (r << 8) | (g << 3) | (b >> 3)
+    }
+}
+
+impl HnmPixel for u32 {
+    /// The 32-bit writer @ 0x006a349d: the same three sums, each saturated
+    /// to 0..255 (`packuswb` of the low words), stored as B, G, R and a
+    /// zero x byte (the G lane masked by 0x0000ff00 @ 0x00741ff8).
+    #[inline(always)]
+    fn from_ycc(cy: i32, cr: i32, cb: i32, cu: i32) -> u32 {
+        let r = (cy + 128 + cr).clamp(0, 255) as u32;
+        let g = (cy + 128 - (cr >> 1) - cb).clamp(0, 255) as u32;
+        let b = (cy + 128 + (cu >> 3)).clamp(0, 255) as u32;
+        (r << 16) | (g << 8) | b
+    }
+}
+
+/// The frame buffers: one pixel `P` each, rows contiguous. `cur` and
 /// `old` are the offsets of the frame being decoded and of the previous one
 /// in `px` (both 0 for warp frames, which have no previous frame).
-struct Planes<'a> {
-    px: &'a mut [u16],
+struct Planes<'a, P> {
+    px: &'a mut [P],
     w: usize,
     h: usize,
     cur: usize,
     old: usize,
 }
 
-impl Planes<'_> {
+impl<P: HnmPixel> Planes<'_, P> {
     /// Index in `px` of pixel (x, y) of the frame at `base`. Coordinates
     /// may leave the line: rows are contiguous, so a block that starts left
     /// of x = 0 ends on the previous row, as in the original.
@@ -456,7 +492,7 @@ impl Planes<'_> {
         (dx, dy): (usize, usize),
     ) -> Result<(), DecodeError> {
         let order = motion_order(xform, sx, sy);
-        let mut tmp = [0u16; 64];
+        let mut tmp = [P::default(); 64];
         for &ev in &order[..2 * sx * sy] {
             let x = usize::from(ev & 7);
             let y = usize::from((ev >> 3) & 7);
@@ -471,9 +507,8 @@ impl Planes<'_> {
         Ok(())
     }
 
-    /// Converts an 8x8 block of Y, U, V coefficients to RGB565 at (x, y) of
-    /// the current frame, with the original's green clip and channel
-    /// truncation.
+    /// Converts an 8x8 block of Y, U, V coefficients to pixels at (x, y) of
+    /// the current frame ([`HnmPixel::from_ycc`]).
     fn yuv_to_rgb(&mut self, x: usize, y: usize, coeffs: &[i32; 192]) {
         let cr_of = |v: i32| (16 * (v - 256) + 8) / 10;
         let cb_of = |v: i32| (v - 256) / 3;
@@ -488,12 +523,7 @@ impl Planes<'_> {
                 let cr = cr_of((cv >> 4) + 256);
                 let cb = cb_of((cu >> 4) + 256);
 
-                // The original clips G a little more and keeps 5/6/5 bits
-                let r = (cy + 128 + cr).clamp(0, 255) as u16 & 0xf8;
-                let g = (cy + 128 - (cr >> 1) - cb).clamp(0, 251) as u16 & 0xfc;
-                let b = (cy + 128 + (cu >> 3)).clamp(0, 255) as u16 & 0xf8;
-
-                self.px[line + rx] = (r << 8) | (g << 3) | (b >> 3);
+                self.px[line + rx] = P::from_ycc(cy, cr, cb, cu);
             }
         }
     }
@@ -517,8 +547,8 @@ fn wrap_line(x: isize, w: usize) -> isize {
 }
 
 /// The state of one frame's decoding.
-struct FrameDecoder<'a> {
-    planes: Planes<'a>,
+struct FrameDecoder<'a, P> {
+    planes: Planes<'a, P>,
     bitbuf: BitBuffer<'a>,
     motion: MotionBuffer<'a>,
     shortmo: ShortMotionBuffer<'a>,
@@ -528,7 +558,7 @@ struct FrameDecoder<'a> {
     chroma_quant: [i32; 64],
 }
 
-impl FrameDecoder<'_> {
+impl<P: HnmPixel> FrameDecoder<'_, P> {
     fn bit(&mut self) -> Result<bool, DecodeError> {
         Ok(self.bitbuf.next()? != 0)
     }
@@ -1126,7 +1156,7 @@ impl FrameDecoder<'_> {
 }
 
 /// Decodes HNM6 frames into one or two frame buffers.
-pub(crate) struct Hnm6Decoder {
+pub(crate) struct Hnm6Decoder<P = u16> {
     w: usize,
     h: usize,
     /// The file header's largest frame size.
@@ -1135,13 +1165,13 @@ pub(crate) struct Hnm6Decoder {
     /// coefficient reader may look one byte past a frame's data).
     buffer: Vec<u8>,
     /// The pixels: one frame (warp) or two frame buffers (video).
-    block: Vec<u16>,
+    block: Vec<P>,
     video_mode: bool,
     cur: usize,
     old: usize,
 }
 
-impl Hnm6Decoder {
+impl<P: HnmPixel> Hnm6Decoder<P> {
     /// A decoder of `width` x `height` frames of at most `buffer_size`
     /// bytes. Video mode keeps two frame buffers in `block`, at offsets 0
     /// and `width * height` (the block grows with zeros to hold them);
@@ -1151,12 +1181,12 @@ impl Hnm6Decoder {
         height: usize,
         buffer_size: usize,
         video_mode: bool,
-        mut block: Vec<u16>,
+        mut block: Vec<P>,
     ) -> Self {
         let frame = width * height;
         let need = if video_mode { 2 * frame } else { frame };
         if block.len() < need {
-            block.resize(need, 0);
+            block.resize(need, P::default());
         }
         Hnm6Decoder {
             w: width,
@@ -1171,12 +1201,12 @@ impl Hnm6Decoder {
     }
 
     /// The last decoded frame.
-    pub(crate) fn frame(&self) -> &[u16] {
+    pub(crate) fn frame(&self) -> &[P] {
         &self.block[self.cur..self.cur + self.w * self.h]
     }
 
     /// The last decoded frame, to draw into.
-    pub(crate) fn frame_mut(&mut self) -> &mut [u16] {
+    pub(crate) fn frame_mut(&mut self) -> &mut [P] {
         let n = self.w * self.h;
         &mut self.block[self.cur..self.cur + n]
     }
@@ -1184,13 +1214,13 @@ impl Hnm6Decoder {
     /// Video mode: the frame decoded before the last one, in the buffer
     /// the next frame is decoded into (and read from by its motion
     /// copies). `None` in warp mode.
-    pub(crate) fn previous_frame_mut(&mut self) -> Option<&mut [u16]> {
+    pub(crate) fn previous_frame_mut(&mut self) -> Option<&mut [P]> {
         let n = self.w * self.h;
         self.video_mode
             .then(move || &mut self.block[self.old..self.old + n])
     }
 
-    pub(crate) fn into_block(self) -> Vec<u16> {
+    pub(crate) fn into_block(self) -> Vec<P> {
         self.block
     }
 

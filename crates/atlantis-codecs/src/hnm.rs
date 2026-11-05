@@ -9,7 +9,7 @@
 //! decoded into frame buffers kept from one video to the next).
 
 use crate::apc::{ApcDecoder, ApcHeader, APC_HEADER_SIZE};
-use crate::hnm6::Hnm6Decoder;
+use crate::hnm6::{Hnm6Decoder, HnmPixel};
 use crate::{DecodeError, Panorama};
 
 /// Size of the file header; superchunks follow it.
@@ -123,15 +123,15 @@ struct MovieSound {
 /// cinematics) and the IW panoramas, as RGB565 frames.
 ///
 /// `D` holds the file's bytes (`Vec<u8>`, `&[u8]`, `Arc<[u8]>`...).
-pub struct HnmVideo<D: AsRef<[u8]> = Vec<u8>> {
+pub struct HnmVideo<D: AsRef<[u8]> = Vec<u8>, P: HnmPixel = u16> {
     data: D,
     width: usize,
     height: usize,
     frame_count: u32,
     warp: bool,
-    decoder: Hnm6Decoder,
+    decoder: Hnm6Decoder<P>,
     /// A caller's frame buffer block not used by a warp file.
-    spare: Option<Vec<u16>>,
+    spare: Option<Vec<P>>,
     /// Offset of the next superchunk.
     pos: usize,
     decoded: u32,
@@ -168,6 +168,15 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
     /// [`HnmVideo::with_buffers`] with the header rule `rule` for the sound
     /// track.
     pub fn with_rule(data: D, block: Vec<u16>, rule: SoundRule) -> Result<Self, DecodeError> {
+        Self::open(data, block, rule)
+    }
+}
+
+impl<D: AsRef<[u8]>, P: HnmPixel> HnmVideo<D, P> {
+    /// [`HnmVideo::with_rule`] into frame buffers of pixels `P`: `u16` for
+    /// RGB565, `u32` for the x8r8g8b8 frames of a 32-bit display
+    /// ([`HnmPixel`]).
+    pub fn open(data: D, block: Vec<P>, rule: SoundRule) -> Result<Self, DecodeError> {
         let hnm = data.as_ref();
         if hnm.len() < FILE_HEADER_SIZE {
             return Err(DecodeError::Truncated);
@@ -298,7 +307,7 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
 
     /// The last decoded frame (before the first one: the initial buffer
     /// content), `width * height` RGB565 pixels row by row.
-    pub fn frame(&self) -> &[u16] {
+    pub fn frame(&self) -> &[P] {
         self.decoder.frame()
     }
 
@@ -306,19 +315,19 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
     /// presenter draws the overlays of a video into it (atlantis.exe
     /// `FUN_0041b064` @ 0x0041b187..0x0041b192), so that the next frames'
     /// motion copies read them.
-    pub fn frame_mut(&mut self) -> &mut [u16] {
+    pub fn frame_mut(&mut self) -> &mut [P] {
         self.decoder.frame_mut()
     }
 
     /// An IX video: the buffer of the frame decoded before the last one,
     /// which the next frame is decoded into (its in-place motion copies
     /// read it first). `None` for a warp file.
-    pub fn previous_frame_mut(&mut self) -> Option<&mut [u16]> {
+    pub fn previous_frame_mut(&mut self) -> Option<&mut [P]> {
         self.decoder.previous_frame_mut()
     }
 
     /// Gives back the frame buffer block, to decode the next video into.
-    pub fn into_buffers(self) -> Vec<u16> {
+    pub fn into_buffers(self) -> Vec<P> {
         match self.spare {
             Some(block) => block,
             None => self.decoder.into_block(),
@@ -328,7 +337,7 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
     /// Decodes the next frame. `None` once the header's frame count is
     /// reached or the file ends; after an error, every later call returns
     /// `None`.
-    pub fn next_frame(&mut self) -> Option<Result<&[u16], DecodeError>> {
+    pub fn next_frame(&mut self) -> Option<Result<&[P], DecodeError>> {
         if self.finished || (self.frame_count != 0 && self.decoded >= self.frame_count) {
             self.finished = true;
             return None;

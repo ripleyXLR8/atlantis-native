@@ -16,7 +16,7 @@
 //! instead of leaving it. The last pixels of a span are interpolated
 //! towards the last pixel (a table of t − 1 and 1 / (t − 1)), not one past.
 
-use super::{Renderer, Vertex, FACE_SIZE};
+use super::{Renderer, Vertex, WarpTexel, FACE_SIZE};
 use crate::fpu::Fpu;
 
 /// The control word 0x0e7f (`fldcw` @ 0x0057b3c1 of the word @ 0x005edc78).
@@ -190,7 +190,12 @@ fn below(a: f64, b: f64) -> bool {
 impl Renderer {
     /// 0x0057b3c0: loads the control word 0x0e7f, then draws the polygon
     /// as a fan (v₀, vₖ₋₁, vₖ), each vertex made ready once.
-    pub(super) fn polygon_pii(&mut self, poly: &mut [Vertex], tex: &[u16], out: &mut [u16]) {
+    pub(super) fn polygon_pii<P: WarpTexel>(
+        &mut self,
+        poly: &mut [Vertex],
+        tex: &[P],
+        out: &mut [P],
+    ) {
         self.fpu = X87;
         let rules = Rules::of(self.a3);
         let iy0 = prepare(&mut poly[0], &rules);
@@ -206,7 +211,13 @@ impl Renderer {
     /// The triangle (v₀ eax, vₖ₋₁ edx, vₖ ebx) with the integer rows of
     /// its vertices (ebp, ecx, edi): one case per order of the rows
     /// (@ 0x0057b49f..0x0057d20b).
-    fn triangle_pii(&mut self, v: &[Vertex; 3], iy: [i32; 3], tex: &[u16], out: &mut [u16]) {
+    fn triangle_pii<P: WarpTexel>(
+        &mut self,
+        v: &[Vertex; 3],
+        iy: [i32; 3],
+        tex: &[P],
+        out: &mut [P],
+    ) {
         let [a, b, c] = iy;
         let plan = if a < b {
             if b < c {
@@ -431,7 +442,7 @@ impl Renderer {
     /// 0x0057d7c0: the gradients from the first part's two edges, then the
     /// rows of both parts. After the first part the right edge has taken
     /// one more step, and the left one too when it goes on.
-    fn scan_pii(&mut self, e: &mut [Edge; 3], plan: Plan, tex: &[u16], out: &mut [u16]) {
+    fn scan_pii<P: WarpTexel>(&mut self, e: &mut [Edge; 3], plan: Plan, tex: &[P], out: &mut [P]) {
         let x = X87;
         let (mut l, mut r) = (plan.left, plan.right);
         let inv = x.div(1.0, x.sub(e[r].dx, e[l].dx));
@@ -479,7 +490,15 @@ impl Renderer {
 
     /// A row (@ 0x0057d877): from trunc(max(0, x_left)) to
     /// min(W, trunc(x_right)), exclusive.
-    fn row_pii(&mut self, y: i32, l: &Edge, r: &Edge, g: &Gradients, tex: &[u16], out: &mut [u16]) {
+    fn row_pii<P: WarpTexel>(
+        &mut self,
+        y: i32,
+        l: &Edge,
+        r: &Edge,
+        g: &Gradients,
+        tex: &[P],
+        out: &mut [P],
+    ) {
         let x = X87;
         let xr = x.fistp(r.x);
         // fcomi of the clip's left float (@ 0x006e1418) with x_left, then
@@ -503,15 +522,15 @@ impl Renderer {
     /// 16-bit words with a step truncated to 16 bits; the last pixels from
     /// the last division to a division at the span's last pixel.
     #[allow(clippy::too_many_arguments)]
-    fn span_pii(
+    fn span_pii<P: WarpTexel>(
         &mut self,
         y: i32,
         xl: i32,
         xend: i32,
         l: &Edge,
         g: &Gradients,
-        tex: &[u16],
-        out: &mut [u16],
+        tex: &[P],
+        out: &mut [P],
     ) {
         let x = X87;
         let n = (xend - xl) as u32;
@@ -647,7 +666,7 @@ fn tail_step(d: i32) -> u16 {
 /// The texel at the coordinate words (u, v): `psrlw 7`, `pmaddwd` by
 /// (1, pitch).
 #[inline(always)]
-fn texel(tex: &[u16], u: u16, v: u16) -> u16 {
+fn texel<P: WarpTexel>(tex: &[P], u: u16, v: u16) -> P {
     tex[usize::from(v >> TEXEL_SHIFT) * PITCH + usize::from(u >> TEXEL_SHIFT)]
 }
 
@@ -655,14 +674,14 @@ fn texel(tex: &[u16], u: u16, v: u16) -> u16 {
 /// original reads whatever follows its buffer in the heap (here 0, and
 /// the read counted in `oof` when its weight is not 0).
 #[inline(always)]
-fn at(tex: &[u16], i: usize, weight: u32, oof: &mut u64) -> u16 {
+pub(super) fn at<P: WarpTexel>(tex: &[P], i: usize, weight: u32, oof: &mut u64) -> P {
     match tex.get(i) {
         Some(&t) => t,
         None => {
             if weight != 0 {
                 *oof += 1;
             }
-            0
+            P::default()
         }
     }
 }
@@ -671,7 +690,7 @@ fn at(tex: &[u16], i: usize, weight: u32, oof: &mut u64) -> u16 {
 /// II*'s texel; *Atlantis III*'s texel (`psrlw 6`, `pmaddwd` by (1, 512),
 /// no wrap at the face's edge) or its bilinear filter.
 #[inline(always)]
-fn sample(rules: &Rules, tex: &[u16], u: u16, v: u16, oof: &mut u64) -> u16 {
+fn sample<P: WarpTexel>(rules: &Rules, tex: &[P], u: u16, v: u16, oof: &mut u64) -> P {
     if rules.shift == TEXEL_SHIFT {
         return texel(tex, u, v);
     }
@@ -679,14 +698,14 @@ fn sample(rules: &Rules, tex: &[u16], u: u16, v: u16, oof: &mut u64) -> u16 {
     if !rules.bilinear {
         return at(tex, i, 1, oof);
     }
-    bilinear(tex, i, u32::from(u & 63), u32::from(v & 63), oof)
+    P::bilinear(tex, i, u32::from(u & 63), u32::from(v & 63), oof)
 }
 
 /// `warpBFPII`'s pixel (@ 0x0052f000): the four texels at `i`, `i` + 1,
 /// `i` + 512, `i` + 513 weighted by the 6-bit fractions, each colour
 /// summed and shifted right by 12.
 #[inline(always)]
-fn bilinear(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u16 {
+pub(super) fn bilinear565(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u16 {
     let w = [
         (64 - fu) * (64 - fv),
         fu * (64 - fv),
@@ -710,9 +729,9 @@ fn bilinear(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u16 {
 /// from the texel coordinates, not from the fractions (the code shifts
 /// before keeping the low six bits).
 #[inline(always)]
-fn single_bilinear(tex: &[u16], u: u16, v: u16, oof: &mut u64) -> u16 {
+fn single_bilinear<P: WarpTexel>(tex: &[P], u: u16, v: u16, oof: &mut u64) -> P {
     let (tu, tv) = (u32::from(u >> 6), u32::from(v >> 6));
-    bilinear(
+    P::bilinear(
         tex,
         (tu + tv * PITCH as u32) as usize,
         tu & 63,
@@ -725,10 +744,10 @@ fn single_bilinear(tex: &[u16], u: u16, v: u16, oof: &mut u64) -> u16 {
 /// (`paddw`).
 #[inline(always)]
 #[allow(clippy::too_many_arguments)]
-fn run(
+fn run<P: WarpTexel>(
     rules: &Rules,
-    tex: &[u16],
-    out: &mut [u16],
+    tex: &[P],
+    out: &mut [P],
     u: u16,
     v: u16,
     du: u16,

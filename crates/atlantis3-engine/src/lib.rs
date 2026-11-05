@@ -24,6 +24,7 @@ pub mod lipsync;
 pub mod maps;
 pub mod menu;
 pub mod place_anim;
+pub mod px;
 pub mod startup;
 pub mod subjects;
 pub mod text;

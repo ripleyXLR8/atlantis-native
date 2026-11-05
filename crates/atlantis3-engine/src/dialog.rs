@@ -19,6 +19,8 @@
 //!
 //! `rand()` is the C library's, shared with the rest of the game.
 
+use crate::px::Surface;
+use atlantis3_data::spr::Depth;
 use std::collections::{BTreeMap, HashMap};
 
 use atlantis2_engine::crt::Rand;
@@ -274,19 +276,55 @@ impl Dialogs {
 
 /// A line's body video (`CHnmStream`): frames drawn through their `AL`
 /// mask, one per 15 Hz tick, the first one being frame 0, looped at the
-/// end (`video >> surface` @ 0x00443640).
+/// end (`video >> surface` @ 0x00443640), decoded in the display's format.
 pub struct BodyVideo {
     pub path: String,
     data: std::sync::Arc<[u8]>,
-    video: atlantis_codecs::HnmVideo<std::sync::Arc<[u8]>>,
+    video: Body,
     tables: atlantis_codecs::AlphaTables,
     /// The index of the frame drawn last.
     pub frame: i32,
 }
 
+enum Body {
+    Rgb565(atlantis_codecs::HnmVideo<std::sync::Arc<[u8]>>),
+    Xrgb8888(atlantis_codecs::HnmVideo<std::sync::Arc<[u8]>, u32>),
+}
+
+impl Body {
+    fn open(data: std::sync::Arc<[u8]>, depth: Depth) -> Option<Body> {
+        use atlantis_codecs::{HnmVideo, SoundRule};
+        Some(match depth {
+            Depth::Rgb565 => Body::Rgb565(HnmVideo::new(data).ok()?),
+            Depth::Xrgb8888 => {
+                Body::Xrgb8888(HnmVideo::open(data, Vec::new(), SoundRule::Flags).ok()?)
+            }
+        })
+    }
+
+    fn next(&mut self) -> bool {
+        match self {
+            Body::Rgb565(v) => matches!(v.next_frame(), Some(Ok(_))),
+            Body::Xrgb8888(v) => matches!(v.next_frame(), Some(Ok(_))),
+        }
+    }
+
+    fn depth(&self) -> Depth {
+        match self {
+            Body::Rgb565(_) => Depth::Rgb565,
+            Body::Xrgb8888(_) => Depth::Xrgb8888,
+        }
+    }
+}
+
 impl BodyVideo {
     pub fn open(path: &str, data: std::sync::Arc<[u8]>) -> Option<BodyVideo> {
-        let video = atlantis_codecs::HnmVideo::new(data.clone()).ok()?;
+        BodyVideo::open_depth(path, data, Depth::Rgb565)
+    }
+
+    /// [`BodyVideo::open`] decoding into the display's format.
+    pub fn open_depth(path: &str, data: std::sync::Arc<[u8]>, depth: Depth) -> Option<BodyVideo> {
+        let video = Body::open(data.clone(), depth)?;
         Some(BodyVideo {
             path: path.to_string(),
             data,
@@ -297,37 +335,58 @@ impl BodyVideo {
     }
 
     /// The next frame (rewound after the last), drawn into `dst` (`pitch`
-    /// pixels a row, `height` rows), centred vertically; its index.
-    pub fn draw_next(&mut self, dst: &mut [u16], pitch: usize, height: usize) -> i32 {
-        let next = matches!(self.video.next_frame(), Some(Ok(_)));
-        if !next {
-            match atlantis_codecs::HnmVideo::new(self.data.clone()) {
-                Ok(v) => self.video = v,
-                Err(_) => return self.frame.max(0),
+    /// pixels a row, `height` rows), centred vertically; its index. The
+    /// mask's blend: the 16-bit tables (@ 0x006a1ec0) or the 32-bit mix
+    /// (@ 0x006a2031, [`atlantis_codecs::blend_x888`]).
+    pub fn draw_next(&mut self, dst: &mut Surface, pitch: usize, height: usize) -> i32 {
+        if !self.video.next() {
+            match Body::open(self.data.clone(), self.video.depth()) {
+                Some(v) => self.video = v,
+                None => return self.frame.max(0),
             }
-            if !matches!(self.video.next_frame(), Some(Ok(_))) {
+            if !self.video.next() {
                 return 0;
             }
         }
-        self.frame = self.video.frames_decoded() as i32 - 1;
-        let (w, h) = (self.video.width(), self.video.height());
-        let top = height.saturating_sub(h) / 2;
-        let Some(dst) = dst.get_mut(top * pitch..) else {
-            return self.frame;
-        };
-        match self.video.alpha() {
-            Some(al) => {
-                let _ = self.tables.blend(self.video.frame(), dst, al, w, h, pitch);
-            }
-            None => {
-                let f = self.video.frame();
-                for y in 0..h.min(height - top) {
-                    let n = w.min(pitch);
-                    dst[y * pitch..y * pitch + n].copy_from_slice(&f[y * w..y * w + n]);
+        match (&self.video, dst) {
+            (Body::Rgb565(v), Surface::Rgb565(dst)) => {
+                self.frame = v.frames_decoded() as i32 - 1;
+                let (w, h) = (v.width(), v.height());
+                let top = height.saturating_sub(h) / 2;
+                let Some(dst) = dst.get_mut(top * pitch..) else {
+                    return self.frame;
+                };
+                match v.alpha() {
+                    Some(al) => {
+                        let _ = self.tables.blend(v.frame(), dst, al, w, h, pitch);
+                    }
+                    None => copy_rows(v.frame(), dst, w, h.min(height - top), pitch),
                 }
             }
+            (Body::Xrgb8888(v), Surface::Xrgb8888(dst)) => {
+                self.frame = v.frames_decoded() as i32 - 1;
+                let (w, h) = (v.width(), v.height());
+                let top = height.saturating_sub(h) / 2;
+                let Some(dst) = dst.get_mut(top * pitch..) else {
+                    return self.frame;
+                };
+                match v.alpha() {
+                    Some(al) => {
+                        let _ = atlantis_codecs::blend_x888(v.frame(), dst, al, w, h, pitch);
+                    }
+                    None => copy_rows(v.frame(), dst, w, h.min(height - top), pitch),
+                }
+            }
+            _ => {}
         }
         self.frame
+    }
+}
+
+fn copy_rows<P: Copy>(f: &[P], dst: &mut [P], w: usize, rows: usize, pitch: usize) {
+    for y in 0..rows {
+        let n = w.min(pitch);
+        dst[y * pitch..y * pitch + n].copy_from_slice(&f[y * w..y * w + n]);
     }
 }
 
@@ -357,8 +416,9 @@ pub struct Running {
     pub voice_start: f64,
     /// The loop mode to go back to (@ 0x0074f34c).
     pub back: crate::game::Mode,
-    /// The dialog surface (640 x 480; the screen's size for a voice-over).
-    pub surface: Vec<u16>,
+    /// The dialog surface (640 x 480; the screen's size for a voice-over),
+    /// in the display's format.
+    pub surface: Surface,
 }
 
 /// The dialog surface's size (@ 0x00714f1c, @ 0x00714f20, WarpRes 512).

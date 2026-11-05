@@ -103,7 +103,7 @@ struct Session<'a> {
     texts: &'a Texts,
     config: Config,
     menus: Menus,
-    screen: Vec<u16>,
+    screen: atlantis3_engine::px::Surface,
     t: f64,
 }
 
@@ -173,7 +173,7 @@ fn tooltips_as_the_original() {
                     texts: &texts,
                     config,
                     menus,
-                    screen: vec![0; w * h],
+                    screen: atlantis3_engine::px::Surface::Rgb565(vec![0; w * h]),
                     t: 100.0,
                 });
             }

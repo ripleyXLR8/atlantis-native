@@ -363,11 +363,12 @@ impl Game {
     }
 
     /// The cube of the view entered (`warp/Warp512/<world>/<name>`) and its
-    /// six faces (512 x 512 RGB565, face k = the loader's surface
-    /// 0x0077af18 + 0x80 k).
+    /// six faces (512 x 512 RGB565 on a 16-bit display, face k = the
+    /// loader's surface 0x0077af18 + 0x80 k).
     #[doc(hidden)]
     pub fn board_cube(&self) -> (&str, &[Vec<u16>; 6]) {
-        (&self.place.cube, &self.place.faces)
+        static NONE: [Vec<u16>; 6] = [const { Vec::new() }; 6];
+        (&self.place.cube, self.place.faces.as_565().unwrap_or(&NONE))
     }
 
     /// The zone click hook (@ 0x004c32c0) on the zone `name` of the view

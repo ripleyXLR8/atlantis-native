@@ -20,7 +20,7 @@
 //! slot every 0.25 s.
 
 use atlantis2_engine::script::BagEntry;
-use atlantis3_data::spr::{Bank, Target};
+use atlantis3_data::spr::{Bank, Pixel, Target};
 
 /// The slot width (@ 0x00717080) and the bar's height (@ 0x00717084).
 pub const SLOT: i32 = 80;
@@ -185,8 +185,8 @@ pub struct Aff {
 /// `ftol(alpha × 31) & 31` below, nothing at alpha ≤ 0, on the game's
 /// target (clip maxima at the size).
 #[allow(clippy::too_many_arguments)]
-pub fn aff(
-    screen: &mut [u16],
+pub fn aff<P: Pixel>(
+    screen: &mut [P],
     w: usize,
     h: usize,
     name: &'static str,
@@ -202,8 +202,8 @@ pub fn aff(
 /// [`aff`] with x = `None` for the default position (0x80000000: the
 /// sprite's own, recorded as `i32::MIN`).
 #[allow(clippy::too_many_arguments)]
-pub fn aff_at(
-    screen: &mut [u16],
+pub fn aff_at<P: Pixel>(
+    screen: &mut [P],
     w: usize,
     h: usize,
     name: &'static str,
@@ -239,8 +239,8 @@ pub fn aff_at(
 /// `AtlSpr_AffCentre` (@ 0x00436b80): centred on (x, y) by half the
 /// sprite's size.
 #[allow(clippy::too_many_arguments)]
-pub fn aff_centre(
-    screen: &mut [u16],
+pub fn aff_centre<P: Pixel>(
+    screen: &mut [P],
     w: usize,
     h: usize,
     name: &'static str,
@@ -271,8 +271,8 @@ pub fn aff_centre(
 /// The items (@ 0x004299b0), the arrows (@ 0x00428fd0) and the bar at
 /// `alpha`; the calls made.
 #[allow(clippy::too_many_arguments)]
-pub fn draw_items(
-    screen: &mut [u16],
+pub fn draw_items<P: Pixel>(
+    screen: &mut [P],
     w: usize,
     h: usize,
     banks: &Banks,

@@ -14,6 +14,7 @@
 //!
 //! Needs the game: `ATLANTIS3_DATA`.
 
+use atlantis3_engine::px::Faces;
 use std::sync::Arc;
 
 use atlantis3_data::cfg::{Config, PixelFormat};
@@ -179,7 +180,7 @@ fn the_menus_switch_size_and_depth_as_the_original() {
         };
         let mut menus = Menus::default();
         menus.load(&files, 800, 600, &config);
-        let mut screen = vec![0u16; 800 * 600];
+        let mut screen = atlantis3_engine::px::Surface::Rgb565(vec![0u16; 800 * 600]);
         let mut frames = 0;
         for l in &lines {
             if l.starts_with("set ") {
@@ -203,7 +204,8 @@ fn the_menus_switch_size_and_depth_as_the_original() {
                     ev.iter().find(|e| matches!(e, Event::DisplayChange(..)))
                 {
                     // The game re-creates its screen (the game's test).
-                    screen = vec![0; w as usize * h as usize];
+                    screen =
+                        atlantis3_engine::px::Surface::Rgb565(vec![0; w as usize * h as usize]);
                     switched += 1;
                 }
                 assert_eq!(menus.page, fr.p1, "{name} {}", fr.label);
@@ -312,8 +314,22 @@ fn the_game_switches_size_and_depth_at_once_as_the_original() {
                 // page surface black on it (the pointer and the texts
                 // aside).
                 assert_eq!((g.width(), g.height()), (sw, sh), "{name}");
-                assert_eq!(g.screen().len(), sw * sh);
-                let lit = g.screen().iter().filter(|&&p| p != 0).count();
+                assert_eq!(g.surface().len(), sw * sh);
+                assert_eq!(
+                    g.surface().depth(),
+                    if bits > 16 {
+                        Depth::Xrgb8888
+                    } else {
+                        Depth::Rgb565
+                    },
+                    "{name}: the display's format"
+                );
+                let lit = g
+                    .surface()
+                    .to_rgb()
+                    .iter()
+                    .filter(|p| **p != [0; 3])
+                    .count();
                 assert!(lit < 2000, "{name}: {lit} lit pixels on the black frame");
                 let c = &g.startup.config;
                 assert_eq!(
@@ -381,16 +397,47 @@ fn the_game_switches_size_and_depth_at_once_as_the_original() {
             let m = texts.gdi(id, g.width()).unwrap();
             assert_eq!(m.height, h, "{name}: {n} at {}", g.width());
         }
-        // Back to the game: the panorama drawn at the new size.
+        // The six faces re-allocated by the warp init: zero pages from the
+        // heap (black), in the new format, until the next view entry.
+        let faces = g.place_faces();
+        assert_eq!(faces.depth(), g.depth(), "{name}");
+        let black = match faces {
+            Faces::Rgb565(f) => f
+                .iter()
+                .all(|x| x.len() == 512 * 512 && x.iter().all(|&p| p == 0)),
+            Faces::Xrgb8888(f) => f
+                .iter()
+                .all(|x| x.len() == 512 * 512 && x.iter().all(|&p| p == 0)),
+        };
+        assert!(black, "{name}: the faces black after the switch");
+        // Back to the game: the panorama at the new size, black (the
+        // boot view has no place sprite; only the pointer's pixels).
         g.menu_back();
         assert_eq!(g.mode(), Mode::Warp);
         let t = 200.0;
         g.step(t);
         g.step(t + 0.1);
-        assert_eq!(g.screen().len(), sw * sh);
+        assert_eq!(g.surface().len(), sw * sh);
+        let lit = g
+            .surface()
+            .to_rgb()
+            .iter()
+            .filter(|p| **p != [0; 3])
+            .count();
+        assert!(lit < 2000, "{name}: {lit} lit pixels on the black panorama");
+        // The next view entry loads the cube again, in the new format.
+        let (_, view) = g.place();
+        g.enter_at(view.unwrap_or(4), 0.0, 0.0);
+        g.step(t + 0.2);
+        assert_eq!(g.place_faces().depth(), g.depth(), "{name}");
         assert!(
-            g.screen().iter().any(|&p| p != 0),
-            "{name}: the panorama drawn"
+            g.surface()
+                .to_rgb()
+                .iter()
+                .filter(|p| **p != [0; 3])
+                .count()
+                > 100_000,
+            "{name}: the panorama drawn after the view entry"
         );
     }
 }

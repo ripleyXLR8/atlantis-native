@@ -25,6 +25,7 @@
 // No console window behind the game on Windows.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+use atlantis3_engine::px::Surface;
 use std::io::IsTerminal;
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -199,25 +200,38 @@ impl App {
         let (dw, dh) = (dw.max(1), dh.max(1));
         let (ox, oy) = ((ww - dw) / 2, (wh - dh) / 2);
         let xs: Vec<usize> = (0..dw).map(|x| x * gw / dw).collect();
-        let screen = self.game.screen();
         buf.fill(0);
-        for y in 0..dh {
-            let row = &screen[(y * gh / dh) * gw..][..gw];
-            let out = &mut buf[(oy + y) * ww + ox..][..dw];
-            for (o, &sx) in out.iter_mut().zip(&xs) {
-                let [r, g, b] = atlantis2_engine::png::rgb565_to_rgb(row[sx]);
-                *o = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
+        match self.game.surface() {
+            Surface::Rgb565(screen) => {
+                for y in 0..dh {
+                    let row = &screen[(y * gh / dh) * gw..][..gw];
+                    let out = &mut buf[(oy + y) * ww + ox..][..dw];
+                    for (o, &sx) in out.iter_mut().zip(&xs) {
+                        let [r, g, b] = atlantis2_engine::png::rgb565_to_rgb(row[sx]);
+                        *o = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
+                    }
+                }
+            }
+            // A 32-bit display: the pixels as they are (x byte dropped).
+            Surface::Xrgb8888(screen) => {
+                for y in 0..dh {
+                    let row = &screen[(y * gh / dh) * gw..][..gw];
+                    let out = &mut buf[(oy + y) * ww + ox..][..dw];
+                    for (o, &sx) in out.iter_mut().zip(&xs) {
+                        *o = row[sx] & 0x00ff_ffff;
+                    }
+                }
             }
         }
         let _ = buf.present();
     }
 
     fn screenshot(&mut self) {
-        let png = atlantis2_engine::png::encode_rgb565(
-            self.game.screen(),
-            self.game.width(),
-            self.game.height(),
-        );
+        let (w, h) = (self.game.width(), self.game.height());
+        let png = match self.game.surface() {
+            Surface::Rgb565(s) => atlantis2_engine::png::encode_rgb565(s, w, h),
+            Surface::Xrgb8888(s) => atlantis2_engine::png::encode_xrgb8888(s, w, h),
+        };
         let path = shot_path();
         match std::fs::write(&path, png) {
             Ok(()) => {

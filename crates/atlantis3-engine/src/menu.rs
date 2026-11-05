@@ -978,8 +978,9 @@ pub struct Menus {
     /// The thumbnail encoder, its palette history kept for the session
     /// (0x007d7be0).
     pub encoder: ThumbEncoder,
-    /// The screen captured at Escape (@ 0x00410400): RGB565, width, height.
-    pub capture: Option<(Vec<u16>, usize, usize)>,
+    /// The screen captured at Escape (@ 0x00410400): the pixels in the
+    /// display's format, width, height.
+    pub capture: Option<(crate::px::Surface, usize, usize)>,
     /// Where `Atlantis3.cfg` is written (none: not written) and the last
     /// bytes written.
     pub cfg_path: Option<std::path::PathBuf>,
@@ -1173,7 +1174,7 @@ impl Menus {
     /// One menu frame (@ 0x004591a0) on `screen` (the pointer is the
     /// game's): the page's handler, the page surface copied to the screen,
     /// the tooltip text, the load page's dates. Returns the effects.
-    pub fn frame(&mut self, env: &mut Env<'_>, screen: &mut [u16]) -> Vec<Event> {
+    pub fn frame(&mut self, env: &mut Env<'_>, screen: &mut crate::px::Surface) -> Vec<Event> {
         self.draws.clear();
         self.shapes.clear();
         self.texts.clear();
@@ -1199,7 +1200,8 @@ impl Menus {
             self.recreate(env, w as usize, h as usize);
         }
         // @ 0x00459250: the page surface to the screen (0x004ecc40; from
-        // a 32-bit page surface its 32 → 16 copy).
+        // a 32-bit page surface to a 16-bit screen its 32 → 16 copy; the
+        // same format: as it is).
         if self.depth == Depth::Xrgb8888 {
             x888_to_565(&self.surface32, &mut self.surface);
         }
@@ -1208,7 +1210,13 @@ impl Menus {
             // the new size and copies the page surface itself.
             return ev;
         }
-        screen.copy_from_slice(&self.surface);
+        match screen {
+            crate::px::Surface::Rgb565(s) => s.copy_from_slice(&self.surface),
+            crate::px::Surface::Xrgb8888(s) => match self.depth {
+                Depth::Xrgb8888 => s.copy_from_slice(&self.surface32),
+                Depth::Rgb565 => s.copy_from_slice(&to_x888(&self.surface)),
+            },
+        }
         // The tooltip text of the page's tooltip element when its tooltips
         // are on (@ 0x00414820).
         let page = self.page;
@@ -1230,7 +1238,7 @@ impl Menus {
     /// `AtlFont_Bulle` with the layout (x0, W − x0 − x1, y0, H − y1, left,
     /// bottom) — the right margin takes x0 off once too often, harmless:
     /// the text is left-aligned.
-    fn tip_text(&mut self, env: &Env<'_>, screen: &mut [u16], text: &[u8]) {
+    fn tip_text(&mut self, env: &Env<'_>, screen: &mut crate::px::Surface, text: &[u8]) {
         if !self.tip.shown {
             return;
         }
@@ -1244,7 +1252,7 @@ impl Menus {
     fn print(
         &mut self,
         env: &Env<'_>,
-        screen: &mut [u16],
+        screen: &mut crate::px::Surface,
         font: FontId,
         text: &[u8],
         zone: Zone,
@@ -1258,7 +1266,7 @@ impl Menus {
                 self.texts.push(TextCall::Draw { line, font, rgb });
             }
         }
-        t.print(screen, w, h, font, text, zone, rgb);
+        crate::with_px!(screen, s => t.print(s, w, h, font, text, zone, rgb));
     }
 
     /// The bulle font at this width.
@@ -1567,7 +1575,7 @@ impl Menus {
     /// top − k × step, left, bottom) — the zone's bottom follows the screen
     /// height, the thumbnails do not; then the thumbnails set for the next
     /// frame.
-    fn load_slots(&mut self, env: &mut Env<'_>, screen: &mut [u16]) {
+    fn load_slots(&mut self, env: &mut Env<'_>, screen: &mut crate::px::Surface) {
         let [bottom, left, _, _, top, step] = self.slots;
         for k in 0..6 {
             let i = (5 * self.scroll + k).max(0) as usize;
@@ -2131,7 +2139,7 @@ fn date_of(save: &[u8]) -> Vec<u8> {
 
 /// The stretch model of the thumbnails' `Blt` (see [`thumbnails`]):
 /// nearest neighbour, top-left aligned, `src = dst × W / w` in integers.
-pub fn stretch(src: &[u16], w: usize, h: usize, tw: usize, th: usize) -> Vec<u16> {
+pub fn stretch<P: Copy>(src: &[P], w: usize, h: usize, tw: usize, th: usize) -> Vec<P> {
     (0..tw * th)
         .map(|i| {
             let (x, y) = (i % tw, i / tw);
@@ -2177,10 +2185,25 @@ pub fn thumbnails(
     h: usize,
     encoder: &mut ThumbEncoder,
 ) -> Vec<(usize, Vec<u8>)> {
+    thumbnails_of(&crate::px::Surface::Rgb565(capture.to_vec()), w, h, encoder)
+}
+
+/// [`thumbnails`] of a capture in either format: from a 32-bit screen
+/// the `Blt` stretches x8r8g8b8 pixels into the x8r8g8b8 thumbnail
+/// surfaces (the same model), and no conversion follows.
+pub fn thumbnails_of(
+    capture: &crate::px::Surface,
+    w: usize,
+    h: usize,
+    encoder: &mut ThumbEncoder,
+) -> Vec<(usize, Vec<u8>)> {
     THUMBNAILS
         .iter()
         .map(|&(menu, tw, th)| {
-            let mut px = to_x888(&stretch(capture, w, h, tw, th));
+            let mut px = match capture {
+                crate::px::Surface::Rgb565(c) => to_x888(&stretch(c, w, h, tw, th)),
+                crate::px::Surface::Xrgb8888(c) => stretch(c, w, h, tw, th),
+            };
             darken_black(&mut px);
             let mut bank = atlantis3_data::save::THUMB_MAGIC.to_vec();
             bank.extend(encoder.encode(&px, tw, th, tw, &[]));

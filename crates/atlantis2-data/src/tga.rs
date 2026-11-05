@@ -174,6 +174,34 @@ impl Tga {
     }
 }
 
+/// A map copied into an x8r8g8b8 surface (a 32-bit display): *Atlantis
+/// III*'s TGA loader (`Game.exe` @ 0x00418e70, its surface copy
+/// @ 0x004ecc40) gives `R << 16 | G << 8 | B` with the x byte 0 for a
+/// 24-bit file (checked on every pixel of eight files under emulation);
+/// a 1-5-5-5 texel's channels are moved to the top of their byte.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Tga32 {
+    pub width: usize,
+    pub height: usize,
+    pub pixels: Vec<u32>,
+}
+
+impl Tga32 {
+    pub fn parse(data: &[u8]) -> Result<Tga32, TgaError> {
+        let d = Decoded::parse(data)?;
+        let pixels = d
+            .bgr
+            .iter()
+            .map(|&[b, g, r]| u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b))
+            .collect();
+        Ok(Tga32 {
+            width: d.width,
+            height: d.height,
+            pixels,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -33,7 +33,7 @@
 use std::collections::BTreeMap;
 
 use atlantis2_data::db::Scene;
-use atlantis2_data::tga::Tga;
+use atlantis2_data::tga::{Tga, Tga32};
 
 use crate::crt::Rand;
 use crate::fpu::Fpu;
@@ -421,6 +421,85 @@ pub struct Head {
     idle_speed: f64,
     /// *Atlantis III*'s head (`None` for *Atlantis II*'s).
     a3: Option<A3Head>,
+    /// On a 32-bit display (*Atlantis III*): the live texture and the maps
+    /// (open, closed, half, right, left) in x8r8g8b8, the eye blinks copied
+    /// into it as into [`Head::texture`].
+    x888: Option<HeadX888>,
+}
+
+struct HeadX888 {
+    texture: Vec<u32>,
+    maps: [Option<Tga32>; 5],
+}
+
+/// A pixel the head draws: RGB565 or, *Atlantis III* on a 32-bit display,
+/// x8r8g8b8 (`Zi32Texture32Linear32AsmPII`, span @ 0x0055c000: the 16-bit
+/// span with 4-byte texels; set-up and scan shared).
+trait HeadPixel: Copy {
+    fn texture(h: &Head) -> &[Self];
+    fn flat(fpu: Fpu, poly: &mut [Vertex], out: &mut Target<Self>);
+    fn perspective(
+        variant: Variant,
+        fpu: Fpu,
+        poly: &mut [Vertex],
+        tex: &Texture<Self>,
+        out: &mut Target<Self>,
+    );
+}
+
+impl HeadPixel for u16 {
+    fn texture(h: &Head) -> &[u16] {
+        &h.texture
+    }
+
+    fn flat(fpu: Fpu, poly: &mut [Vertex], out: &mut Target<u16>) {
+        crate::raster3d::draw_polygon_flat(fpu, poly, 0x0000, out);
+    }
+
+    fn perspective(
+        variant: Variant,
+        fpu: Fpu,
+        poly: &mut [Vertex],
+        tex: &Texture<u16>,
+        out: &mut Target<u16>,
+    ) {
+        match variant {
+            Variant::C => draw_polygon(fpu, poly, tex, out),
+            Variant::PII => ii::draw_polygon(poly, tex, out),
+        }
+    }
+}
+
+impl HeadPixel for u32 {
+    fn texture(h: &Head) -> &[u32] {
+        h.x888.as_ref().map_or(&[], |x| &x.texture)
+    }
+
+    /// `FlatC`'s black fill (no Z): drawn into a 16-bit scratch frame, its
+    /// pixels set to 0 here.
+    fn flat(fpu: Fpu, poly: &mut [Vertex], out: &mut Target<u32>) {
+        let mut scratch = vec![0xffffu16; out.width * out.height];
+        let mut z = vec![0u32; out.width * out.height];
+        crate::raster3d::draw_polygon_flat(
+            fpu,
+            poly,
+            0x0000,
+            &mut Target {
+                pixels: &mut scratch,
+                zbuf: &mut z,
+                width: out.width,
+                height: out.height,
+            },
+        );
+        for (d, s) in out.pixels.iter_mut().zip(&scratch) {
+            if *s == 0 {
+                *d = 0;
+            }
+        }
+    }
+
+    /// Never reached: only *Atlantis III*'s heads draw at 32 bits.
+    fn perspective(_: Variant, _: Fpu, _: &mut [Vertex], _: &Texture<u32>, _: &mut Target<u32>) {}
 }
 
 /// What an *Atlantis III* head adds (atlantis3-gog-fr-3473408: the
@@ -606,6 +685,7 @@ impl Head {
             idle_acc: 0.0,
             idle_speed: 0.5,
             a3: None,
+            x888: None,
         })
     }
 
@@ -766,7 +846,51 @@ impl Head {
                 eyes: 0,
                 k: 0.0,
             }),
+            x888: None,
         })
+    }
+
+    /// The maps of a 32-bit display (open, then `yf`, `ymf`, `yd`, `yg`),
+    /// in x8r8g8b8: the live texture starts as the open map.
+    pub fn set_x888_maps(&mut self, open: Tga32, eyes: [Option<Tga32>; 4]) {
+        let [closed, half, right, left] = eyes;
+        self.x888 = Some(HeadX888 {
+            texture: open.pixels.clone(),
+            maps: [Some(open), closed, half, right, left],
+        });
+    }
+
+    /// Whether the x8r8g8b8 maps are set.
+    pub fn has_x888(&self) -> bool {
+        self.x888.is_some()
+    }
+
+    /// [`Head::display_a3`] into an x8r8g8b8 frame (a 32-bit display).
+    pub fn display_a3_x888(
+        &mut self,
+        cam: usize,
+        pixels: &mut [u32],
+        zbuf: &mut [u32],
+        w: usize,
+        h: usize,
+    ) -> Stages {
+        let Some(c) = cam
+            .checked_sub(1)
+            .and_then(|i| self.cameras.get(i))
+            .cloned()
+        else {
+            log::warn!("head camera {cam} out of range");
+            return Stages::default();
+        };
+        self.draw_with(
+            &c,
+            &mut Target {
+                pixels,
+                zbuf,
+                width: w,
+                height: h,
+            },
+        )
     }
 
     /// *Atlantis III*'s mouth (`PlayMorphingKey` @ 0x0047d930): the mood
@@ -874,6 +998,15 @@ impl Head {
         };
         if let Some(src) = src.cloned() {
             blit(&mut self.texture, w, h, &src);
+        }
+        if let (Some(k), Some(x)) = (map, self.x888.as_mut()) {
+            if let Some(src) = &x.maps[usize::from(k)] {
+                for y in 0..src.height.min(h) {
+                    let n = src.width.min(w);
+                    x.texture[y * w..y * w + n]
+                        .copy_from_slice(&src.pixels[y * src.width..y * src.width + n]);
+                }
+            }
         }
     }
 
@@ -1235,7 +1368,7 @@ impl Head {
     }
 
     /// The pipeline with camera `c` into `target`.
-    fn draw_with(&mut self, c: &Camera, target: &mut Target) -> Stages {
+    fn draw_with<P: HeadPixel>(&mut self, c: &Camera, target: &mut Target<P>) -> Stages {
         let c = c.clone();
         let (mut st, cv) = match self.variant {
             Variant::C => self.transform_c(&c),
@@ -1264,7 +1397,7 @@ impl Head {
         // The faces (@ 0x004380b0): one group, the texture of its
         // material; three vertex records (sx, sy, w, u, v) per front face.
         let tex = Texture {
-            pixels: &self.texture,
+            pixels: P::texture(self),
             width: self.tex_w,
             height: self.tex_h,
         };
@@ -1292,15 +1425,14 @@ impl Head {
                 } else {
                     k
                 };
-                crate::raster3d::draw_polygon_flat(k, &mut poly, 0x0000, target);
+                P::flat(k, &mut poly, target);
                 continue;
             }
             match self.variant {
-                Variant::C => draw_polygon(k, &mut poly, &tex, target),
                 Variant::PII if self.a3.is_some() => {
                     crate::raster3d::linear_ii::draw_polygon(&mut poly, &tex, target)
                 }
-                Variant::PII => ii::draw_polygon(&mut poly, &tex, target),
+                v => P::perspective(v, k, &mut poly, &tex, target),
             }
             drawn = true;
         }

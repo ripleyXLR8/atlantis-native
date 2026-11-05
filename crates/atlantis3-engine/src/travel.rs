@@ -12,7 +12,7 @@
 //! surface's clip maxima are its size, exclusive (@ 0x004362b0).
 
 use atlantis2_data::wam::{Destination, Wam};
-use atlantis3_data::spr::{Bank, Target};
+use atlantis3_data::spr::{Bank, Pixel, Target};
 
 /// The destination of the move from view `old` to view `next` (the first
 /// view `old` of the WAM with a destination to `next`, @ 0x00462a60).
@@ -80,7 +80,13 @@ pub fn transition_path(warp_res: i32, folder: &str, prefix: &str, old: u32, next
 /// at its default position (`AtlSpr_Aff(bank, n − 1, 0x80000000, 0,
 /// 1.0)`), in the banks' order, into the `w` × `h` video frame. A bank
 /// shorter than the video draws nothing past its last sprite.
-pub fn draw_transition_sprites(frame: &mut [u16], w: usize, h: usize, banks: &[Bank], n: u32) {
+pub fn draw_transition_sprites<P: Pixel>(
+    frame: &mut [P],
+    w: usize,
+    h: usize,
+    banks: &[Bank],
+    n: u32,
+) {
     let Some(index) = (n as usize).checked_sub(1) else {
         return;
     };

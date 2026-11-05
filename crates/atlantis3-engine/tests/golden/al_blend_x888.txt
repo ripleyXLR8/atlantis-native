@@ -1,0 +1,10 @@
+# The AL blend of the original Game.exe for 4 bytes a pixel (@ 0x006a2031), run under emulation on synthetic inputs (see tests/al_blend_x888.rs).
+# AL blend 0x006a2031 of Game.exe (MD5 eb06eaa718877dfcabee6e8f89d85b31) under Unicorn
+case 0 16 4 16 md5=ea54b244141f4a63ed88c16e62c4c492
+case 1 16 4 20 md5=0dbb438b583ee378f5753f914d71a1f0
+case 2 40 12 40 md5=5499c91c6b92dadf5c3b75fcdd7b2689
+case 3 40 12 47 md5=0a619eb8b1b60736dbeb5b8302effa90
+case 4 64 30 64 md5=cc78c961ff08b184aded7ff31899fa46
+case 5 64 30 80 md5=67b709b0cd98f5baab66c1e45f9973f8
+case 6 8 64 8 md5=66d031983494c84dec1c4f0b8a619137
+case 7 8 64 13 md5=a2187b426336d8dea5d27dc000558b4c

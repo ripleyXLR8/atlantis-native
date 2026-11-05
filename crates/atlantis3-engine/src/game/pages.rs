@@ -347,15 +347,60 @@ impl Game {
     /// use (@ 0x00408f80), so the settings take them. The warp init also
     /// re-allocates the six cube faces (@ 0x0043f420 → 0x004eb290: new
     /// buffers, not filled again until the next view entry); the port
-    /// keeps the loaded panorama (the original's faces hold whatever the
-    /// new allocation held).
+    /// shows them as the original's (black, below).
+    ///
+    /// The display's format follows the page surface's (`BT_16BITS` /
+    /// `BT_32BITS`): the screen, the faces, the videos, the textures and
+    /// every bank the chain loads again are in it from now on. The faces:
+    /// the warp init's 0x004eb290 frees each buffer and takes a new one
+    /// from `operator new` (CRT `malloc` → `HeapAlloc(_crtheap, 0, n)`,
+    /// @ 0x006d42d3), 0x80000 + 0x3f bytes or more: above the Windows NT
+    /// heap's virtual-block threshold, so fresh committed pages, zero
+    /// filled; nothing loads a view again before the next view entry, so
+    /// the panorama is black until then, the place sprites drawn over it.
+    /// Those sprites stay the view's slots as loaded, their banks prepared
+    /// for the old format and drawn by the new format's blitters
+    /// ([`atlantis3_data::spr::Bank::as_drawn_at`]).
     pub(super) fn display_change(&mut self, w: usize, h: usize) {
         let (w, h) = (w.max(1), h.max(1));
+        let depth = self.menus.depth;
         self.width = w;
         self.height = h;
-        self.screen = vec![0; w * h];
-        if self.menus.surface.len() == self.screen.len() {
-            self.screen.copy_from_slice(&self.menus.surface);
+        self.screen = crate::px::Surface::new(depth, w * h);
+        match &mut self.screen {
+            crate::px::Surface::Rgb565(s) if self.menus.surface.len() == s.len() => {
+                s.copy_from_slice(&self.menus.surface)
+            }
+            crate::px::Surface::Xrgb8888(s) if self.menus.surface32.len() == s.len() => {
+                s.copy_from_slice(&self.menus.surface32)
+            }
+            _ => {}
+        }
+        self.place.faces = match depth {
+            atlantis3_data::spr::Depth::Rgb565 => {
+                crate::px::Faces::Rgb565(std::array::from_fn(|_| vec![0; 512 * 512]))
+            }
+            atlantis3_data::spr::Depth::Xrgb8888 => {
+                crate::px::Faces::Xrgb8888(std::array::from_fn(|_| vec![0; 512 * 512]))
+            }
+        };
+        self.place.cube.clear();
+        for slot in &mut self.slots.slots {
+            if slot.bank.depth != depth {
+                slot.bank = std::sync::Arc::new(slot.bank.as_drawn_at(depth));
+            }
+        }
+        // The banks the chain loads again in the new format (Interface.spr,
+        // the world's banks, the screens').
+        if self.interface.as_ref().is_some_and(|b| b.depth != depth) {
+            self.interface = self
+                .files
+                .read("spr/Interface.spr")
+                .and_then(|d| atlantis3_data::spr::Bank::parse(&d, depth).ok());
+        }
+        self.arrows = None;
+        if self.puzzles.screens.carte_bank.is_some() {
+            self.carte_reload_banks();
         }
         let c = &mut self.startup.config;
         c.resolution = (w as i32, h as i32);
@@ -450,7 +495,7 @@ impl Game {
         let Some((pixels, w, h)) = capture.as_ref() else {
             return;
         };
-        let banks = crate::menu::thumbnails(pixels, *w, *h, encoder);
+        let banks = crate::menu::thumbnails_of(pixels, *w, *h, encoder);
         for (menu_width, bank) in banks {
             let key = thumbnail_key(menu_width, name);
             if let Some(dir) = &self.save_dir {

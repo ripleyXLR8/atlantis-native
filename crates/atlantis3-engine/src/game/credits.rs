@@ -95,7 +95,7 @@ pub struct Credits {
     /// that the start does not set: 0 at the first start).
     toggle: bool,
     /// The page surface (@ 0x0077fb00), copied to the screen each frame.
-    pub surface: Vec<u16>,
+    pub surface: crate::px::Surface,
     /// The last frame's sprites (`bank#frame@x,y`) and text calls.
     pub draws: Vec<String>,
     pub prints: Vec<Print>,
@@ -107,6 +107,17 @@ impl Credits {
     /// The page `i_credit` for a screen `w` × `h` (the start-up's menu
     /// load, @ 0x00451570: the layout, its page texts, the banks).
     pub fn load(files: &A3Files, language: &str, w: usize, h: usize) -> Option<Credits> {
+        Credits::load_depth(files, language, w, h, Depth::Rgb565)
+    }
+
+    /// [`Credits::load`] for a display of format `depth`.
+    pub fn load_depth(
+        files: &A3Files,
+        language: &str,
+        w: usize,
+        h: usize,
+        depth: Depth,
+    ) -> Option<Credits> {
         let path = atl::layout_path("i_credit");
         let data = files.read(path.trim_start_matches("Datas/"))?;
         let mut layout = Layout::parse(&data, (w as i32, h as i32));
@@ -124,7 +135,7 @@ impl Credits {
                     let p = atl::menu_sprite_path(w as i32, n);
                     files
                         .read(p.trim_start_matches("Datas/"))
-                        .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok())
+                        .and_then(|d| Bank::parse(&d, depth).ok())
                 });
                 Item {
                     shown: el.displayed,
@@ -142,7 +153,7 @@ impl Credits {
             slide: 1,
             current: None,
             toggle: false,
-            surface: vec![0; w * h],
+            surface: crate::px::Surface::new(depth, w * h),
             draws: Vec::new(),
             prints: Vec::new(),
             config: None,
@@ -233,22 +244,25 @@ impl Credits {
                 it.shown = false;
                 continue;
             };
-            let mut t = Target::screen(&mut self.surface, w, h);
-            t.xmax = w as i32;
-            t.ymax = h as i32;
             let name = it
                 .el
                 .nomspr
                 .as_ref()
                 .map(|n| String::from_utf8_lossy(n).into_owned())
                 .unwrap_or_default();
-            if it.el.has_pos() {
-                let (x, y) = (it.el.pos[0], it.el.pos[1]);
-                bank.draw(&mut t, Some(x), y, 0);
-                self.draws.push(format!("{name}#0@{x},{y}"));
-            } else {
-                bank.draw(&mut t, None, 0, 0);
-                self.draws.push(format!("{name}#0@def"));
+            let pos = it.el.has_pos().then(|| (it.el.pos[0], it.el.pos[1]));
+            crate::with_px!(&mut self.surface, s => {
+                let mut t = Target::screen(s.as_mut_slice(), w, h);
+                t.xmax = w as i32;
+                t.ymax = h as i32;
+                match pos {
+                    Some((x, y)) => bank.draw(&mut t, Some(x), y, 0),
+                    None => bank.draw(&mut t, None, 0, 0),
+                }
+            });
+            match pos {
+                Some((x, y)) => self.draws.push(format!("{name}#0@{x},{y}")),
+                None => self.draws.push(format!("{name}#0@def")),
             }
         }
     }
@@ -348,7 +362,9 @@ impl Game {
     /// (@ 0x00451560).
     pub fn start_credits(&mut self) {
         let lang = self.startup.text_language();
-        let Some(mut c) = Credits::load(&self.files, &lang, self.width, self.height) else {
+        let Some(mut c) =
+            Credits::load_depth(&self.files, &lang, self.width, self.height, self.depth())
+        else {
             log::warn!("menu\\desc\\i_credit.atl: not found, no credits");
             self.quit = true;
             return;
@@ -377,23 +393,21 @@ impl Game {
         let clicked = std::mem::take(&mut self.click) && c.clicked(self.pointer).is_some();
         c.draw(w, h);
         c.turn(self.now, clicked);
-        if c.surface.len() == self.screen.len() {
-            self.screen.copy_from_slice(&c.surface);
-        }
+        self.screen.copy_from(&c.surface);
         let prints = c.texts(w, h);
         self.texts();
         if let Some(t) = self.texts.as_ref() {
             for p in &prints {
                 let [r, g, b] = p.rgb.map(|v| (v & 0xff) as u32);
-                t.print(
-                    &mut self.screen,
+                crate::with_px!(&mut self.screen, s => t.print(
+                    s,
                     w,
                     h,
                     font_id(&p.font),
                     &p.text,
                     p.zone,
                     r << 16 | g << 8 | b,
-                );
+                ));
             }
         }
         c.prints = prints;

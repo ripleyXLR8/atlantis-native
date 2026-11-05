@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use atlantis3_data::spr::{Bank, Depth};
+use atlantis3_data::spr::Bank;
 
 use crate::inventory::aff_at;
 use crate::maps;
@@ -21,7 +21,7 @@ impl Game {
         let b = self
             .files
             .read(&path)
-            .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok());
+            .and_then(|d| Bank::parse(&d, self.depth()).ok());
         if b.is_none() {
             log::warn!("{path}: not found");
         }
@@ -57,7 +57,9 @@ impl Game {
         let (w, h) = (self.width, self.height);
         let ptr = self.pointer;
         if let Some(carte) = self.puzzles.screens.carte_bank.clone() {
-            maps::draw_carte(&mut self.screen, w, h, &carte, None, ptr);
+            crate::with_px!(&mut self.screen, s => {
+                maps::draw_carte(s.as_mut_slice(), w, h, &carte, None, ptr);
+            });
         }
         self.draw_pointer();
     }
@@ -84,17 +86,10 @@ impl Game {
         let t = &self.puzzles.tourmagi;
         let pos = (t.demon, t.player, t.here);
         let (w, h, now) = (self.width, self.height, self.now);
-        maps::draw_tour(
-            &mut self.screen,
-            w,
-            h,
-            &board,
-            pawns.as_deref(),
-            &mut self.puzzles.screens.tour_anim,
-            fpu,
-            now,
-            pos,
-        );
+        let anim = &mut self.puzzles.screens.tour_anim;
+        crate::with_px!(&mut self.screen, s => {
+            maps::draw_tour(s.as_mut_slice(), w, h, &board, pawns.as_deref(), anim, fpu, now, pos);
+        });
     }
 
     /// `AtlSpr_Aff` (@ 0x004367b0) of a bank the C code holds (`path` its
@@ -126,7 +121,9 @@ impl Game {
     ) {
         let (w, h) = (self.width, self.height);
         if let Some(bank) = bank {
-            aff_at(&mut self.screen, w, h, "", bank, index, x, y, alpha);
+            crate::with_px!(&mut self.screen, s => {
+                aff_at(s.as_mut_slice(), w, h, "", bank, index, x, y, alpha);
+            });
         }
         self.tr(|| {
             let show = |v: i32| {
@@ -175,7 +172,10 @@ impl Game {
     /// frame centred on it), the flip.
     pub(crate) fn licorne_draw(&mut self, board: &mut crate::licorne::Board) {
         self.draw_warp_only();
-        board.draw(&mut self.screen);
+        match &mut self.screen {
+            crate::px::Surface::Rgb565(s) => board.draw(s),
+            crate::px::Surface::Xrgb8888(s) => board.draw_x888(s),
+        }
         if let Some(c) = board.cursor() {
             if let Some(i) = self.interface.take() {
                 let path = "spr\\Interface.spr";

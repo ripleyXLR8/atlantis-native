@@ -13,7 +13,7 @@
 
 use atlantis2_data::wam::{EntityState, Wam};
 use atlantis2_engine::crt::Rand;
-use atlantis3_data::spr::{Bank, Depth, Target};
+use atlantis3_data::spr::{Bank, Depth, Pixel, Target};
 use atlantis3_data::A3Files;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -70,7 +70,7 @@ pub struct Slot {
     /// index (+0x14).
     pub kind: i32,
     pub id: i32,
-    bank: Arc<Bank>,
+    pub(crate) bank: Arc<Bank>,
     /// +0x08: the frame drawn (−1: none, the play ended).
     pub frame: i32,
     /// +0x0c: the last frame: the state's end − 1, or the frame count.
@@ -121,6 +121,8 @@ pub struct Slot {
 #[derive(Default)]
 pub struct Slots {
     pub slots: Vec<Slot>,
+    /// The display's format the banks are prepared for.
+    pub depth: Depth,
 }
 
 impl Slots {
@@ -161,10 +163,39 @@ impl Slots {
         view: u32,
         world: &str,
         rand: &mut dyn FnMut() -> i32,
-        _now: f64,
+        now: f64,
         shown: impl Fn(i32, i32) -> Option<bool>,
     ) -> Slots {
-        let mut out = Slots { slots: Vec::new() };
+        Slots::load_depth(
+            files,
+            cache,
+            wam,
+            view,
+            world,
+            rand,
+            now,
+            shown,
+            Depth::Rgb565,
+        )
+    }
+
+    /// [`Slots::load_with`] for a display of format `depth`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn load_depth(
+        files: &A3Files,
+        cache: &mut HashMap<String, Option<Arc<Bank>>>,
+        wam: &Wam,
+        view: u32,
+        world: &str,
+        rand: &mut dyn FnMut() -> i32,
+        _now: f64,
+        shown: impl Fn(i32, i32) -> Option<bool>,
+        depth: Depth,
+    ) -> Slots {
+        let mut out = Slots {
+            slots: Vec::new(),
+            depth,
+        };
         for e in &wam.entities {
             for s in e.state_records().filter(|s| s.view == view) {
                 if out.slots.len() >= MAX_SLOTS - 1 {
@@ -197,13 +228,18 @@ impl Slots {
         shown: &dyn Fn(i32, i32) -> Option<bool>,
     ) {
         let out = &mut self.slots;
+        let depth = self.depth;
         let path = format!("spw/spw512/{world}/{name}");
+        let key = match depth {
+            Depth::Rgb565 => path.clone(),
+            Depth::Xrgb8888 => format!("{path}#x888"),
+        };
         let bank = cache
-            .entry(path.clone())
+            .entry(key)
             .or_insert_with(|| {
                 files
                     .read(&path)
-                    .and_then(|d| Bank::parse(&d, Depth::Rgb565).ok())
+                    .and_then(|d| Bank::parse(&d, depth).ok())
                     .map(Arc::new)
             })
             .clone();
@@ -619,7 +655,7 @@ impl Slots {
     /// faces with `AFF_SPW`, in slot order: in mode 1 its frame, else
     /// each frame of its list in the list's order (@ 0x00439130); `tick`
     /// is the 15 Hz tick count (blinking slots are drawn on odd ticks).
-    pub fn draw(&self, faces: &mut [Vec<u16>; 6], tick: u32) {
+    pub fn draw<P: Pixel>(&self, faces: &mut [Vec<P>; 6], tick: u32) {
         for s in &self.slots {
             if !s.shown || (s.blink && tick & 1 == 0) {
                 continue;

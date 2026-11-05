@@ -211,7 +211,7 @@ struct Session<'a> {
     config: Config,
     menus: Menus,
     saves: Saves,
-    screen: Vec<u16>,
+    screen: atlantis3_engine::px::Surface,
 }
 
 impl Session<'_> {
@@ -347,7 +347,7 @@ fn menu_pages_as_the_original() {
                     config,
                     menus,
                     saves: Saves(saves),
-                    screen: vec![0; w * h],
+                    screen: atlantis3_engine::px::Surface::Rgb565(vec![0; w * h]),
                 });
             }
             "set" => {
