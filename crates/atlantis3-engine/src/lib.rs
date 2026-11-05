@@ -34,5 +34,5 @@ pub mod wam_setup;
 pub use cinema::{Cinema, CinemaError};
 #[doc(hidden)]
 pub use game::star_room_tables;
-pub use game::{BoardInput, Game, GameError, Mode};
+pub use game::{cross_colour, cursor_range, BoardInput, Game, GameError, Mode};
 pub use startup::Startup;

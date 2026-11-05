@@ -51,12 +51,19 @@ impl Host for Saves<'_> {
     }
 }
 
-/// `_strdate` + `_strtime` (`MM/DD/YY HH:MM:SS`) of the system clock in
-/// UTC (the original's is the local time; the port has no time zone).
-fn date_and_time_now() -> Vec<u8> {
-    let secs = std::time::SystemTime::now()
+/// The system clock in seconds since 1970 (the default of
+/// [`Game::unix_time`]; the browser's build gives its own, the standard
+/// library has no clock there).
+pub fn system_unix_time() -> i64 {
+    std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs()) as i64;
+        .map_or(0, |d| d.as_secs()) as i64
+}
+
+/// `_strdate` + `_strtime` (`MM/DD/YY HH:MM:SS`) of the clock at `secs`
+/// (seconds since 1970) in UTC (the original's is the local time; the
+/// port has no time zone).
+fn date_and_time_now(secs: i64) -> Vec<u8> {
     let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
     // Days to the civil date (proleptic Gregorian).
     let z = days + 719_468;
@@ -479,7 +486,7 @@ impl Game {
         if let (Some(a), Some(_), Some(rest)) = (lines.next(), lines.next(), lines.next()) {
             data.extend_from_slice(a);
             data.extend_from_slice(b"\nDateAndTime = ");
-            data.extend(date_and_time_now());
+            data.extend(date_and_time_now((self.unix_time)()));
             data.push(b'\n');
             data.extend_from_slice(rest);
         } else {
@@ -507,6 +514,7 @@ impl Game {
                     log::warn!("{key}: {e}");
                 }
             }
+            self.saves_written.push(key.clone());
             self.saves.insert(key, bank);
         }
     }

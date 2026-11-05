@@ -221,6 +221,11 @@ pub struct Game {
     cursor_range: (i32, i32),
     cursor_frame: i32,
     cursor_time: f64,
+    /// The place sprite under the centre in the frame drawn (the sprite
+    /// pass's hit test, @ 0x00440bf0 → @ 0x00439940): its state's click
+    /// kind (@ 0x007594e4 + 0x490 slot) and the cursor kind (@ 0x0076e928:
+    /// 1 object, 2 character).
+    cursor_hit: Option<(i32, i32)>,
     /// The music (`STARTMUSIK`): the file playing, to start it again after
     /// a cinematic (@ 0x00433d00).
     music: Option<String>,
@@ -275,6 +280,11 @@ pub struct Game {
     player: i32,
     saves: HashMap<String, Vec<u8>>,
     pub save_dir: Option<std::path::PathBuf>,
+    /// The save files written since [`Game::take_written_saves`], by name
+    /// (an app that keeps the saves elsewhere than a folder).
+    saves_written: Vec<String>,
+    /// The clock of the saves' `DateAndTime`, in seconds since 1970.
+    pub unix_time: fn() -> i64,
     /// The text resources (loaded at the first text) and the subtitle
     /// line.
     texts: Option<crate::text::Texts>,
@@ -415,6 +425,7 @@ impl Game {
             cursor_range: (0, 0),
             cursor_frame: 0,
             cursor_time: 0.0,
+            cursor_hit: None,
             resume_next: false,
             music: None,
             sounds: HashMap::new(),
@@ -459,6 +470,8 @@ impl Game {
             player: atlantis3_data::save::DEFAULT_PLAYER,
             saves: HashMap::new(),
             save_dir: None,
+            saves_written: Vec::new(),
+            unix_time: pages::system_unix_time,
             quit: false,
             not_ported: Vec::new(),
             csounds: Default::default(),
@@ -1748,6 +1761,13 @@ impl Game {
         let proj = self.camera.projection();
         let sprites = self.slots.slots.iter().any(|s| s.shown);
         self.render_cube(&m, proj, sprites);
+        // The sprite pass's hit test, against the frames just drawn
+        // (0x0076e928 cleared @ 0x00440c07, set @ 0x00439a47 / 0x00439a5b).
+        self.cursor_hit = self
+            .camera
+            .texel_a3(self.camera.cx, self.camera.cy)
+            .and_then(|(f, u, v)| self.slots.hit(f, u, v))
+            .map(|(k, kind)| (self.slots.slots[k].click, kind));
         // The animations' step, once per 15 Hz tick (@ 0x00439c90).
         if std::mem::take(&mut self.anim_tick) {
             self.slots.step(self.now, &mut self.rand);
@@ -1816,16 +1836,11 @@ impl Game {
             .centre
             .and_then(|i| self.place.wam.view(self.place.view?)?.zones.get(i))
             .map(|z| z.kind);
+        let hit = self.cursor_hit;
         if self.startup.config.cursor {
             // The cross (`Cursor`, @ 0x00440a6a..0x00440b6c): five pixels
-            // up and across through the centre, white, blue on a type-1
-            // zone, red on type 2, magenta on 3..999.
-            let argb: u32 = match zone_kind {
-                Some(1) => 0xff00_00ff,
-                Some(2) => 0xffff_0000,
-                Some(3..=999) => 0xffff_00ff,
-                _ => 0xffff_ffff,
-            };
+            // up and across through the centre.
+            let argb = cross_colour(zone_kind, hit.is_some());
             // Two lines of 0x004e9a00: the colour as the surface stores it
             // (RGB565 truncated; x8r8g8b8 the ARGB value, alpha included).
             let (cx, cy, w) = (self.width / 2, self.height / 2, self.width);
@@ -1860,20 +1875,14 @@ impl Game {
                 );
             }
         }
-        let Some(kind) = self
-            .centre
-            .and_then(|i| self.place.wam.view(self.place.view?)?.zones.get(i))
-            .map(|z| z.kind)
-        else {
+        // @ 0x00440b9f: the place sprite under the centre first (its
+        // state's click kind, the cursor kind), else the zone (mode 0);
+        // neither: no cursor.
+        let Some((kind, mode)) = hit.or(zone_kind.map(|k| (k, 0))) else {
             return;
         };
-        let range = match kind {
-            1 | 2 => (1, 13),
-            3..=999 => (25, 40),
-            k if k >= 1000 => (25, 40),
-            _ => self.cursor_range,
-        };
-        if range != self.cursor_range {
+        let range = cursor_range(kind, mode, self.cursor_range);
+        if range.0 != self.cursor_range.0 {
             self.cursor_range = range;
             self.cursor_frame = range.0;
         }
@@ -2417,7 +2426,31 @@ impl Game {
                 log::warn!("{name}: {e}");
             }
         }
+        self.saves_written.push(name.to_string());
         self.saves.insert(name.to_string(), data);
+    }
+
+    /// A save file kept by the app (the browser's storage), as if written
+    /// in an earlier session: the menus and the scripts' loads see it.
+    pub fn insert_save(&mut self, name: &str, data: Vec<u8>) {
+        self.saves.insert(name.to_string(), data);
+    }
+
+    /// The save files written since the last call (name and bytes; the
+    /// thumbnails under their `spr_<width>/` names), for an app that keeps
+    /// them elsewhere than [`Game::save_dir`].
+    pub fn take_written_saves(&mut self) -> Vec<(String, Vec<u8>)> {
+        let names = std::mem::take(&mut self.saves_written);
+        let mut out: Vec<(String, Vec<u8>)> = Vec::new();
+        for n in names {
+            if out.iter().any(|(m, _)| *m == n) {
+                continue;
+            }
+            if let Some(d) = self.saves.get(&n) {
+                out.push((n, d.clone()));
+            }
+        }
+        out
     }
 
     fn read_save(&self, name: &str) -> Option<Vec<u8>> {
@@ -3792,6 +3825,38 @@ impl Host for Game {
         self.world = monde;
         self.load_dialogs(monde);
         true
+    }
+}
+
+/// The cross's colour (@ 0x00440a56..0x00440aaf, ARGB): white, blue on a
+/// type-1 zone, red on type 2, magenta on 3..999, and green over a place
+/// sprite the player can click (@ 0x0076e928 ≠ 0), whatever the zone.
+pub fn cross_colour(zone_kind: Option<i32>, sprite: bool) -> u32 {
+    if sprite {
+        return 0xff00_ff00;
+    }
+    match zone_kind {
+        Some(1) => 0xff00_00ff,
+        Some(2) => 0xffff_0000,
+        Some(3..=999) => 0xffff_00ff,
+        _ => 0xffff_ffff,
+    }
+}
+
+/// The cursor's frame range in `spr\Interface.spr` (@ 0x00428060..0x004280f1;
+/// start, end exclusive) for `kind` in `mode`: mode 0 (a zone, `kind` its
+/// type) 1..13 on a move, 25..40 on 3 and above, else `current`; mode 1
+/// (an object sprite, `kind` its state's click kind) 13..25 up to 2, else
+/// 25..40; mode 2 (a character sprite) 25..40.
+pub fn cursor_range(kind: i32, mode: i32, current: (i32, i32)) -> (i32, i32) {
+    match mode {
+        0 => match kind {
+            1 | 2 => (1, 13),
+            k if k >= 3 => (25, 40),
+            _ => current,
+        },
+        1 if kind <= 2 => (13, 25),
+        _ => (25, 40),
     }
 }
 
