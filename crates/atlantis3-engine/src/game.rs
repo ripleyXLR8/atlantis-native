@@ -199,6 +199,11 @@ pub struct Game {
     renderer: Renderer,
     zoom: Zoom,
     moving: Moving,
+    /// The camera's angles at the last Escape press (0x0077e648 /
+    /// 0x0078111c, stored by the keyboard callback with 0x004408e0
+    /// @ 0x0042ac35 before the Escape handler): the in-game menu's
+    /// `BT_BACK` enters the view again with them ([`Game::reenter_view`]).
+    escape_angles: (f32, f32),
     centre: Option<usize>,
     /// The view's place animations, the faces they are drawn into, the
     /// C library's `rand` and the 15 Hz tick count with its "a tick
@@ -410,6 +415,7 @@ impl Game {
             renderer,
             zoom: Zoom::default(),
             moving: Moving::default(),
+            escape_angles: (0.0, 0.0),
             centre: None,
             slots: Slots::default(),
             spw_cache: HashMap::new(),
@@ -559,6 +565,33 @@ impl Game {
     #[doc(hidden)]
     pub fn place_faces(&self) -> &Faces {
         &self.place.faces
+    }
+
+    /// Tests: every byte of the six faces set to `byte` (what new heap
+    /// blocks may hold after the options' display switch).
+    #[doc(hidden)]
+    pub fn test_fill_faces(&mut self, byte: u8) {
+        match &mut self.place.faces {
+            Faces::Rgb565(f) => f
+                .iter_mut()
+                .for_each(|x| x.fill(u16::from_ne_bytes([byte; 2]))),
+            Faces::Xrgb8888(f) => f
+                .iter_mut()
+                .for_each(|x| x.fill(u32::from_ne_bytes([byte; 4]))),
+        }
+    }
+
+    /// Tests: the view's place animations, to change.
+    #[doc(hidden)]
+    pub fn test_slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+
+    /// Tests: the angles stored at the last Escape press (0x0077e648 /
+    /// 0x0078111c).
+    #[doc(hidden)]
+    pub fn escape_angles(&self) -> (f32, f32) {
+        self.escape_angles
     }
 
     /// Tests: the screen to write into (what a pass leaves on it), on a
@@ -2214,6 +2247,62 @@ impl Game {
         log::info!("view {id}: {path}");
         self.place.view = Some(id);
         self.place_sounds_enter(id);
+        self.load_slots(id, shown);
+        self.camera.enter(yaw, pitch);
+        self.look.stop();
+        self.moving.turn = None;
+        self.look_last = None;
+        self.look_acc = 0.0;
+        self.centre = self.pick_centre();
+    }
+
+    /// The in-game menu's `BT_BACK` view re-entry (@ 0x0043fd00, called
+    /// with the angles of the last Escape press, @ 0x00454765): the cube
+    /// of the current view read again into the six faces (@ 0x0042fd30,
+    /// whatever they held: after the options' display switch, new heap
+    /// blocks), the next entry's start angles (@ 0x00441610: 0x00756074 /
+    /// 0x00756078) := those angles, the place sprites' slots cleared
+    /// (@ 0x004384d0) and loaded again (@ 0x00438530), then the view hook
+    /// (@ 0x004c2010) and the coffer's (@ 0x004c1650). Unlike the view
+    /// entry 0x0043f840: the camera, the place sounds, the turn and the
+    /// world's view are left as they are.
+    pub(super) fn reenter_view(&mut self) {
+        let Some(id) = self.place.view else {
+            return;
+        };
+        let world = self.world;
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
+        if let Some(name) = self.place.wam.view(id).map(|v| v.name.clone()) {
+            let path = format!("warp/Warp512/{folder}/{name}");
+            let depth = self.depth();
+            match self.files.read(&path).map(|d| faces_of(&d, depth)) {
+                Some(Ok(faces)) => self.place.faces = faces,
+                Some(Err(e)) => log::error!("{path}: {e:?}"),
+                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+            }
+            self.place.cube = path;
+        }
+        let (yaw, pitch) = self.escape_angles;
+        let shown = match self.script.as_mut() {
+            Some(s) => {
+                (s.start_x, s.start_y) = (yaw, pitch);
+                s.shown.clone()
+            }
+            None => Vec::new(),
+        };
+        self.load_slots(id, shown);
+        if let Some(mut s) = self.script.take() {
+            self.view_hook(&mut s);
+            self.script = Some(s);
+        }
+        self.centre = self.pick_centre();
+    }
+
+    /// The SPW slots of view `id` (@ 0x004384d0, then @ 0x00438530 per
+    /// sprite of the view), `shown` the script's show table.
+    fn load_slots(&mut self, id: u32, shown: Vec<atlantis2_engine::script::Shown>) {
+        let world = self.world;
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         // The builder's draws come from the game's one `rand()` (queued
         // values first: tests replaying the original's run).
         let (queue, rand) = (&mut self.rand_queue, &mut self.rand);
@@ -2234,12 +2323,6 @@ impl Game {
             },
             depth,
         );
-        self.camera.enter(yaw, pitch);
-        self.look.stop();
-        self.moving.turn = None;
-        self.look_last = None;
-        self.look_acc = 0.0;
-        self.centre = self.pick_centre();
     }
 
     /// A sound file decoded (cached); `None` when missing or unreadable.

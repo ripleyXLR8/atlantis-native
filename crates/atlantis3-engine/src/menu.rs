@@ -881,6 +881,9 @@ pub enum Event {
     Save(String),
     /// Back to the game (@ 0x00451280, loop mode 3).
     Resume,
+    /// The in-game menu's `BT_BACK` after [`Event::Resume`]: the view
+    /// entered again at the last Escape's angles (@ 0x0043fd00).
+    ReEnter,
     /// `BT_QUIT` of `i_princ`: loop mode 6, the start page.
     StartPage,
     /// `BT_QUIT` of the start page (@ 0x00457690).
@@ -1485,7 +1488,10 @@ impl Menus {
             b"BT_BACK" => {
                 self.clear(PAGE_MAIN);
                 self.clear_flags();
+                // @ 0x00454744..0x00454772: back to the game, then the
+                // view entered again (@ 0x0043fd00).
                 ev.push(Event::Resume);
+                ev.push(Event::ReEnter);
             }
             b"BT_QUIT" => {
                 self.page = PAGE_START;

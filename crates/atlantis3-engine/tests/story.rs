@@ -252,7 +252,11 @@ impl Run {
         self.g.escape();
         assert_eq!(self.g.mode(), Mode::Menu, "Escape opens the in-game menu");
         assert_eq!(self.g.menu_page().map(|p| p.0), Some(1));
-        self.g.menu_back();
+        // The golden's run goes on in the warp as after the back to the
+        // game (@ 0x00451280): the menu itself is not modelled there, so
+        // neither is page 1's view re-entry (@ 0x0043fd00, whose view hook
+        // would log one more `LIMITEANGLEWARPY=70`; `tests/menu_back.rs`).
+        self.g.menu_resume();
         assert_eq!(self.g.mode(), Mode::Warp);
         self.escaped += 1;
     }

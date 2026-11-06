@@ -137,6 +137,7 @@ fn events(ev: &[Event]) -> Vec<String> {
             Event::Load(n) => out.push(format!("loader_0x0045b750 'save\\\\{n}'")),
             Event::Save(n) => out.push(format!("save_writer_0x00459ee0 'save\\\\{n}'")),
             Event::Resume => out.push("back_to_game_0x00451280".into()),
+            Event::ReEnter => out.push("0x0043fd00".into()),
             Event::DisplayChange(w, h) => out.push(format!("display_mode_0x0040fa60 {w} {h}")),
             Event::StartPage => out.push("set_mode_0x004d6b00 6".into()),
             _ => {}
@@ -155,6 +156,7 @@ fn golden_event(e: &str) -> Option<String> {
         | "loader_0x0045b750"
         | "save_writer_0x00459ee0"
         | "back_to_game_0x00451280"
+        | "0x0043fd00"
         | "display_mode_0x0040fa60"
         | "set_mode_0x004d6b00" => Some(e.to_string()),
         "cfg_write_0x00408f80" => Some(k.to_string()),

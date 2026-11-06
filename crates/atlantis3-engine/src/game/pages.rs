@@ -194,6 +194,10 @@ impl Game {
     /// the game boy, the jewel case and the skull stop
     /// ([`Game::escape_screen`]).
     pub fn escape(&mut self) {
+        // The keyboard callback stores the camera's angles at every Escape
+        // press, whatever the mode (@ 0x0042ac35: 0x004408e0 into
+        // 0x0077e648 / 0x0078111c), then runs the Escape handler.
+        self.escape_angles = self.camera.angles();
         match self.mode {
             Mode::Video if self.video.as_ref().is_some_and(|v| v.travel) => self.escape_travel(),
             Mode::Warp if self.menus.demo => {
@@ -313,6 +317,7 @@ impl Game {
                 }
                 Event::Save(name) => self.write_menu_save(&name),
                 Event::Resume => self.back_to_game(),
+                Event::ReEnter => self.reenter_view(),
                 Event::StartPage => {}
                 // `BT_QUIT` of the start page: the credits (@ 0x00457690),
                 // whose end quits.
@@ -353,8 +358,8 @@ impl Game {
     /// `Atlantis3.cfg`'s writer reads the size and depth of the display in
     /// use (@ 0x00408f80), so the settings take them. The warp init also
     /// re-allocates the six cube faces (@ 0x0043f420 → 0x004eb290: new
-    /// buffers, not filled again until the next view entry); the port
-    /// shows them as the original's (black, below).
+    /// buffers, not filled by the chain); page 1's `BT_BACK` reads the
+    /// cube into them again ([`Game::reenter_view`]).
     ///
     /// The display's format follows the page surface's (`BT_16BITS` /
     /// `BT_32BITS`): the screen, the faces, the videos, the textures and
@@ -363,10 +368,11 @@ impl Game {
     /// from `operator new` (CRT `malloc` → `HeapAlloc(_crtheap, 0, n)`,
     /// @ 0x006d42d3), 0x80000 + 0x3f bytes or more: above the Windows NT
     /// heap's virtual-block threshold, so fresh committed pages, zero
-    /// filled; nothing loads a view again before the next view entry, so
-    /// the panorama is black until then, the place sprites drawn over it.
-    /// Those sprites stay the view's slots as loaded, their banks prepared
-    /// for the old format and drawn by the new format's blitters
+    /// filled, while the menu shows. Leaving the menu by page 1's
+    /// `BT_BACK` enters the view again (@ 0x0043fd00): the cube read into
+    /// the faces in the new format and the slots loaded again, so the
+    /// panorama is back at once. Until then the slots keep their banks
+    /// prepared for the old format, drawn by the new format's blitters
     /// ([`atlantis3_data::spr::Bank::as_drawn_at`]).
     pub(super) fn display_change(&mut self, w: usize, h: usize) {
         let (w, h) = (w.max(1), h.max(1));
@@ -436,9 +442,19 @@ impl Game {
         );
     }
 
-    /// Leaves the menu as the in-game menu's `BT_BACK` does (tests).
+    /// Leaves the menu as the in-game menu's `BT_BACK` does (tests): back
+    /// to the game, then the view entered again (@ 0x00454744..0x00454772).
     #[doc(hidden)]
     pub fn menu_back(&mut self) {
+        self.back_to_game();
+        self.reenter_view();
+    }
+
+    /// Leaves the menu by the back to the game alone (@ 0x00451280),
+    /// without page 1's view re-entry (tests replaying a run whose menu
+    /// was not modelled).
+    #[doc(hidden)]
+    pub fn menu_resume(&mut self) {
         self.back_to_game();
     }
 

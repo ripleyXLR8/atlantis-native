@@ -398,7 +398,7 @@ fn the_game_switches_size_and_depth_at_once_as_the_original() {
             assert_eq!(m.height, h, "{name}: {n} at {}", g.width());
         }
         // The six faces re-allocated by the warp init: zero pages from the
-        // heap (black), in the new format, until the next view entry.
+        // heap (black), in the new format, while the menu shows.
         let faces = g.place_faces();
         assert_eq!(faces.depth(), g.depth(), "{name}");
         let black = match faces {
@@ -410,26 +410,21 @@ fn the_game_switches_size_and_depth_at_once_as_the_original() {
                 .all(|x| x.len() == 512 * 512 && x.iter().all(|&p| p == 0)),
         };
         assert!(black, "{name}: the faces black after the switch");
-        // Back to the game: the panorama at the new size, black (the
-        // boot view has no place sprite; only the pointer's pixels).
+        // Back to the game by page 1's `BT_BACK`: the view entered again
+        // (@ 0x0043fd00, `tests/menu_back.rs`): the cube read again into
+        // the faces, in the new format, so the panorama is drawn at once.
         g.menu_back();
         assert_eq!(g.mode(), Mode::Warp);
+        assert_eq!(g.place_faces().depth(), g.depth(), "{name}");
+        let refilled = match g.place_faces() {
+            Faces::Rgb565(f) => f.iter().any(|x| x.iter().any(|&p| p != 0)),
+            Faces::Xrgb8888(f) => f.iter().any(|x| x.iter().any(|&p| p != 0)),
+        };
+        assert!(refilled, "{name}: the faces read again");
         let t = 200.0;
         g.step(t);
         g.step(t + 0.1);
         assert_eq!(g.surface().len(), sw * sh);
-        let lit = g
-            .surface()
-            .to_rgb()
-            .iter()
-            .filter(|p| **p != [0; 3])
-            .count();
-        assert!(lit < 2000, "{name}: {lit} lit pixels on the black panorama");
-        // The next view entry loads the cube again, in the new format.
-        let (_, view) = g.place();
-        g.enter_at(view.unwrap_or(4), 0.0, 0.0);
-        g.step(t + 0.2);
-        assert_eq!(g.place_faces().depth(), g.depth(), "{name}");
         assert!(
             g.surface()
                 .to_rgb()
@@ -437,7 +432,7 @@ fn the_game_switches_size_and_depth_at_once_as_the_original() {
                 .filter(|p| **p != [0; 3])
                 .count()
                 > 100_000,
-            "{name}: the panorama drawn after the view entry"
+            "{name}: the panorama drawn after the menu"
         );
     }
 }
