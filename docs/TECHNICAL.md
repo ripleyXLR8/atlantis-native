@@ -12,9 +12,9 @@
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
 | `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe`, `Datas\`, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
-| `atlantis3-engine` | Atlantis III, unfinished and not part of the program: the start-up's settings, the intro and the cinematics with their sound, the new game through the chapter scripts, the panorama (`warpBFPII`), the place animations, the cursor, the zone picks and the moves with their travel videos |
+| `atlantis3-engine` | Atlantis III: the start-up's settings, the intro and the cinematics with their sound, the chapter scripts, the panorama (`warpBFPII`, 16 and 32 bits), the place animations and sprites, the cursor, the moves with their travel videos, the dialogs with their 3D heads, the inventory, the menus and the saves, every puzzle and map, the ending and the credits; see [Atlantis III](#atlantis-iii) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
-| `atlantis-sdl` | the first game's SDL2 front end for handhelds and PortMaster (the program `atlantis-native-sdl`, built with `--features sdl`): the gamepad as the mouse, the on-screen keyboard, SDL audio; see [The SDL2 front end](#the-sdl2-front-end-handhelds-and-portmaster) |
+| `atlantis-sdl` | the first game's SDL2 front end (the first game only) for handhelds and PortMaster (the program `atlantis-native-sdl`, built with `--features sdl`): the gamepad as the mouse, the on-screen keyboard, SDL audio; see [The SDL2 front end](#the-sdl2-front-end-handhelds-and-portmaster) |
 
 The engine is one async task: where the original's loops present a frame
 and poll their events, the engine awaits the next frame, and the front end
@@ -868,11 +868,12 @@ has the "Game library..." entry, and Shift in its first two seconds
 (the library's one game, started without the screen) does what it does
 for the first game; either one ends that run with `a2::Ended::Library`,
 and `main.rs` makes a new `App` showing the library's screen and runs
-the loop again. The first start (`desktop::first_of_each_game`) looks
+the loop again. Atlantis III runs the same way (`a3.rs`, see
+[Atlantis III](#atlantis-iii)). The first start (`desktop::first_of_each_game`) looks
 in `setup::candidate_folders` only, as before, and opens folders until
 it has the first one of each game: one game found is offered as
-before, both are added to the library. A folder picked in the folder
-picker that holds both games (`setup::find_roots`) asks which one. The
+before, two or more are added to the library. A folder picked in the
+folder picker that holds two games (`setup::find_roots`) asks which one. The
 web build finds either game among the picked files (see
 [Atlantis II in the browser](#atlantis-ii-in-the-browser)).
 
@@ -3922,12 +3923,17 @@ back) into `yucatan-*.png`.
   through them, the newest save chosen by the player menu and the credits
   are run with the game's files (`crates/atlantis2-engine/tests/menus.rs`).
 
-## Atlantis III (unfinished)
+## Atlantis III
 
-Atlantis III (Cryo, 2001) is being ported on the `a3/*` branches; it is
-not in the released program (no library entry, no command-line path).
-The reference is the GOG.com French release's `Game.exe` (3,473,408
-bytes), whose addresses the code cites. `atlantis3-engine` reuses
+Atlantis III (Cryo, 2001) plays from the intro to the credits since
+0.6.0, on the desktop (`crates/atlantis-app/src/a3.rs`) and in the
+browser (`a3_web.rs`). The reference is the GOG.com French release's
+`Game.exe`, whose addresses the code cites; it is the only build known
+(`atlantis3_data::exe::KNOWN_BUILDS`: 3,473,408 bytes, PE timestamp
+0x3ea7b362, MD5 `eb06eaa718877dfcabee6e8f89d85b31`; its sprite
+libraries `spr_p5.dll` and `spr_p6.dll`, `SPR_DLLS`; GOG's launcher
+`Atlantis3.exe`, 19,968 bytes, is passed over). Another `Game.exe` is
+refused with its size, timestamp and MD5. `atlantis3-engine` reuses
 Atlantis II's code where Atlantis III runs the same: the camera, the
 `warpPII` rasteriser (`Renderer::a3`: the texture coordinates scaled by
 2^30, the flat-top triangles' left edge chosen after both edges are set
@@ -3940,26 +3946,65 @@ plays the cinematics' sound with `SoundRule::ApcHeader` (CryoMovie's
 rules: sound when header byte +6 is not 0, the first `AA` chunk's APC
 header, a fixed number of samples per frame).
 
-What runs (milestone M1): the settings (`Atlantis3.cfg` and the install's
-registry values from GOG.com's `goggame-*.script`), the intro, the new
-game (`(chapter=600)`: the Hoggar, then chapter 1's cinematics 93, 1 and
-2), the first places with their animations, the mouse look on a 25 Hz
-tick, the cursor of the zone under the centre (`spr\Interface.spr`),
-the moves (turn, arrival, travel video). Not yet: the music and the
-sounds, the captions of the cinematics, the dialogs, the menus and the
-inventory, the saves. The developers' example `cargo run --release -p
-atlantis3-engine --example a3_shots -- <game folder> <out folder>` plays
-a new game headless and writes screenshots.
+What runs: the settings (`Atlantis3.cfg` and the install's registry
+values from GOG.com's `goggame-*.script`), the intro, the start page and
+its players, the new game (`(chapter=600)`: the Hoggar, then chapter 1's
+cinematics 93, 1 and 2), every place of the five worlds with its
+animations, place sprites, sounds and music, the mouse look on a 25 Hz
+tick, the cursor (zones and place sprites, the options' crosshair), the
+moves with their travel videos and transition sprites, the dialogs
+(voices, body videos, 3D heads and lip-sync, subtitles, the subject
+menu), the captions, the inventory, every puzzle and map screen, the
+in-game menu's pages (save with the original's thumbnails, load,
+volumes, options with the size and depth switch, languages), the
+ending and the credits page. Every screen is drawn in the display's
+format, RGB565 or x8r8g8b8, as the original draws it on a 16- or 32-bit
+display. Texts are drawn from the game's font at the widths GDI gives
+it (a measured table), with the port's own antialiasing.
 
-Tests (`crates/atlantis3-engine/tests/`, with `ATLANTIS3_DATA` = the
-installed game): the HNM frames and the cinematics' sound against the
-original's decoders (`hnm_frames.rs`), the interpreter from start-up to
-the first interactive view (`startup_script.rs`), the panorama on grids
-of angles and the first views (`warp.rs`, `place_sprites.rs`), every
-zone pick and move of the Hoggar and of the funeral chamber
-(`navigation.rs`), and a new game played from the intro to the second
-view (`flow.rs`), all against values the original's own code computed
-under emulation.
+The desktop's `a3::A3App` is its own `ApplicationHandler`, as Atlantis
+II's is: `setup::kind_of` tells Atlantis III by `Game.exe` beside
+`Datas\scenar\defnames.con` (`atlantis3_data::files::holds_atlantis3`,
+looked at before the other games), `setup::candidate_folders` reads its
+GOG.com id 1207658958 from the registry, `desktop::open_any` gives
+`Opened::Atlantis3` with the build's label, and the session keeps the
+chosen folder (`Session::take_atlantis3`) for `main.rs` to run
+`a3::run_window_on` on the same event loop, back to the library with
+`a2::Ended::Library` (Shift in its first two seconds). The install is read
+through a `FileSource` that answers `Datas\Atlantis3.cfg` from the
+player's `atlantis3` folder once the menus wrote it there; the saves go
+to `atlantis3/save/`. The web build picks it among the picked files
+(`web_layout::a3_install`: the shallowest `game.exe` beside
+`datas/scenar/defnames.con`; with another game in the same folder the
+page asks which), keeps the saves and `Atlantis3.cfg` in `localStorage`
+under `atlantis-native/atlantis3/`, and presents the 16- or 32-bit screen
+through WebGL 2. The SDL2 front end plays the first game only.
+
+The developers' examples of `atlantis3-engine` (`a3_shots`,
+`a3_world_shots`, `a3_m4_shots`...) play scripted runs headless and write
+screenshots; `atlantis-native --headless <game folder> [frames]
+[--screenshot <file>]` checks that the game starts.
+
+Tests (`crates/atlantis3-data/tests/`, `crates/atlantis3-engine/tests/`,
+with `ATLANTIS3_DATA` = the installed game; without it they fail, unless
+`ATLANTIS3_SKIP_DATA_TESTS=1` or Atlantis II's `ATLANTIS2_SKIP_DATA_TESTS=1`,
+which the CI sets, skips them): every file of `Datas\` parsed and every
+sprite drawn against the original's blitters; the HNM frames and the
+cinematics' sound against the original's decoders (16 and 32 bits); the
+panorama and the place sprites; every zone pick and move of the Hoggar
+and of the funeral chamber; the text layout of every dialog line at
+640, 800 and 1024 pixels; the dialogs' plan, ticks, camera, speakers,
+heads and lip-sync; the inventory, the subject menu, the menu pages and
+tooltips, the save thumbnails; every puzzle's board (`board_*.rs`); the
+maps, the ending and the credits; Escape in each mode, the display
+switch and the menu's re-entry of the view; and the whole story
+(`story.rs`): the eight walk segments and the chain from a new game to
+the credits, played from the player's input, every `SetVariables`
+line, the `rand()` state, the variables, flags and checkpoint saves
+equal after every step. Each golden was computed by the original's own
+code under emulation. Not compared: the original's GDI glyph pixels,
+its DirectDraw display, and the heads' and unicorn's 32-bit spans (read
+statically).
 
 ## Tests
 
@@ -4148,4 +4193,15 @@ Atlantis II, on the `a2/m0` branch:
 | M0 | detection, the file layer, the cube renderer: a new game shows the first Tibet panorama, checked against the original's frames (done) |
 | M1 | Tibet playable: navigation, scripts, dialogs with the 3D talking heads, inventory, menus, saves |
 | next | the other worlds: Ireland (its places, chapters, dialogs, place sounds, transition sprites, its four puzzles, the way back to Tibet; done), China without its puzzles (its places and links, chapters, dialogs, place sounds, the zoom of a move, the picture viewer, the special events, the way back; done), China's seven puzzles (done), Yucatán with its grids (done), Xibalba and its three puzzles (done), the space-travel hub, Shamballa and Atlantis without their two puzzles, the end of the game (done), the fireflies and the octopus fight (done): the whole game plays |
+
+Atlantis III, merged for 0.6.0:
+
+| Milestone | Content |
+|---|---|
+| M0 | detection, the file layer, every file of `Datas\` read, every sprite drawn (done) |
+| M1 | the start-up, the intro, the new game, the first places and moves (done) |
+| M2 | the Hoggar playable: dialogs, heads, subtitles, inventory, saves, menus (done) |
+| M3 | every world and chapter, the whole story replayed against the original's interpreter (done) |
+| M4 | every puzzle, the story played from the player's input, the 32-bit display, the desktop and web front ends (done) |
+| next | other editions (none known yet), reports from players |
 

@@ -104,7 +104,9 @@ of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
 patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
 the GOG.com edition and the Italian *Atlantis Collection* DVD (see
-[Atlantis II](#atlantis-ii)).
+[Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's French release
+only; other editions are unknown and untested (see
+[Atlantis III](#atlantis-iii)).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -132,19 +134,21 @@ The message says what is wrong and what to do:
 | holds Atlantis II but none of its discs | put the images of its four CDs (or copies of the CDs) in the folder or a folder inside it |
 | holds Atlantis II's discs, not the installed game | choose the folder where Atlantis II is installed (with `atlantis2.exe`), the discs put in it |
 | (web) Atlantis II needs its four discs, and CD *n* is not among the chosen files | copy that CD into the installed game's folder or a folder inside it, and choose the folder again |
+| holds an Atlantis III program that Atlantis Native does not know | an edition not supported yet: report its size and MD5 on GitHub |
+| does not hold Atlantis III | choose GOG.com's installation folder, the one with `Game.exe` and `Datas` |
 | holds Cryo's DVD | choose the language in the game library (each language found is listed), or the folder holding `FACE_A` or `FACE_B`, the drive, or the folder of the sides' images |
 | this version is on the other side of the DVD | turn the disc over (the side it names), or put the images of both sides in one folder |
 | holds a language of Cryo's DVD without the folders its side shares | copy the whole side (the folder holding `FACE_A` or `FACE_B`) |
 
 Choosing the folder above the game's works too: Atlantis Native looks a
 few levels down for `atlantis.exe` (or Atlantis II's `atlantis2.exe` or
-`Game.exe`).
+`Game.exe`, or Atlantis III's `Game.exe` beside `Datas`).
 
 ## Several editions: the game library
 
 Atlantis Native keeps a list of the game folders you have played: the
-game library, for both games, Atlantis: The Lost Tales and
-[Atlantis II](#atlantis-ii). With one game in it, the game starts at
+game library, for the three games, Atlantis: The Lost Tales,
+[Atlantis II](#atlantis-ii) and [Atlantis III](#atlantis-iii). With one game in it, the game starts at
 once, as before. With two or more (the GOG.com release and the CD, the
 English and the French CD, the first game and Atlantis II...), the
 program opens on the library's screen to choose the one to play, the
@@ -232,9 +236,9 @@ whatever the counts say.
 
 The web page, **https://ripleyxlr8.github.io/atlantis-native/** (or the
 `atlantis-native-web.zip` of the nightly release, served over HTTP),
-plays both games in Chrome, Edge, Firefox or Safari on a computer with a
-mouse and a keyboard (Atlantis II has been tried in Chrome, Edge and
-Firefox; not yet in Safari). **Choose your game folder** and pick the
+plays the three games in Chrome, Edge, Firefox or Safari on a computer
+with a mouse and a keyboard (Atlantis II has been tried in Chrome, Edge
+and Firefox, not yet in Safari; Atlantis III in Edge only). **Choose your game folder** and pick the
 folder of your game; the browser asks to confirm that the page may read
 it. The
 files stay where they are: the page reads them inside the browser, a
@@ -261,7 +265,12 @@ What to pick:
   `Atlantis 2` and `CD1` to `CD4` side by side). The browser reads files,
   not CD images, and the four discs are needed at once (no disc can be
   added while the game runs).
-- A folder holding both games: the page asks which one to play.
+- *Atlantis III*, GOG.com (French): the installation folder (the one
+  holding `Game.exe` and `Datas`). Its saves and `Atlantis3.cfg` are
+  kept in the browser under `atlantis-native/atlantis3/`; its controls
+  are the desktop's (see [Atlantis III](#atlantis-iii)): a click takes
+  the mouse, Escape lets it go first.
+- A folder holding more than one game: the page asks which one to play.
 
 The sound starts with the first click or key (browsers allow sound only
 after one). In Atlantis II the mouse turns the view once a click has
@@ -614,6 +623,112 @@ menu (Screen) or `--resolution 800x600`; it is kept in `atlant2.cfg`. In
 the HD mode the screen stays 640 x 480 (the HD picture is drawn from it):
 the choice applies when HD is off.
 
+## Atlantis III
+
+*Atlantis III: The New World* (Cryo, 2001) plays from its start to its
+end, new in 0.6.0: the intro, the start page and its five players, the
+Hoggar, the Land of the Dead and the other worlds, every dialog with its
+voices, 3D heads and subtitles, the inventory, the maps, every puzzle,
+the ending and the credits, on Windows, macOS and Linux and in the
+browser (see [The web version](#the-web-version)). It runs the
+original's own menus and options; Atlantis Native's options menu (F10)
+and HD mode are not part of it.
+
+**Edition.** Only GOG.com's French release is known (*Atlantis 3 - The
+New World*, its `Game.exe` 3,473,408 bytes, MD5
+`eb06eaa718877dfcabee6e8f89d85b31`). Other editions (GOG.com's in other
+languages, the retail CDs and DVDs) are unknown to the project and
+untested: their `Game.exe` is refused with its size and MD5, which an
+issue on GitHub can report so that it is added.
+
+**How it was checked.** The port follows the original program's code,
+address by address, and automated tests replay what that code computed
+under emulation: the whole story played with the mouse from a new game
+to the credits (every script variable after every step), every puzzle's
+board, the menus at the three screen sizes, the dialogs' text layout and
+lip-sync, the videos and the panoramas in 16 and 32 bits. Beyond those
+replays it has been tested by the developer's own play, not yet by many
+players: please report what looks wrong.
+
+**Finding it.** The [game library](#several-editions-the-game-library)
+finds GOG.com's installation (its entry in the Windows registry, and the
+usual folders, as for Atlantis II), and **Add a game folder...** takes
+the installation folder, the one holding `Game.exe` and `Datas` (for
+example `C:\Program Files\GOG Galaxy\Games\Atlantis 3`). From the
+command line, give that folder:
+
+    atlantis-native "C:\Program Files\GOG Galaxy\Games\Atlantis 3"
+
+The game opens in its own window: in full screen when the original's
+settings say so (its `FullScreen`, which Alt+Enter changes), or with
+`--fullscreen`. `--no-intro` starts on the start page. Started from the
+library, Shift held in its first two seconds goes back to the library's
+screen (there is no F10 menu to do it later: quit, then start Atlantis
+Native with Shift held or with `--launcher`).
+
+### Atlantis III controls
+
+| Input | In the game |
+|---|---|
+| Mouse | turns the view; in the menus, the inventory and the puzzle screens, moves the game's pointer |
+| Left click | goes, takes, uses, talks; the next dialog line; in the menus, chooses |
+| Right click | opens or closes the inventory; closes the subject menu |
+| Escape | the game's menu in the view (save, load, volumes, options, quit; its Back button returns to the game); skips a cinematic, ends a travel video, leaves the puzzle screens that the original lets it leave (the tower's map, the unicorn, the game boy, the jewel case, the skull); on the credits, quits |
+| Space | skips a cinematic |
+| Alt+Enter or F11 | full screen on and off (kept in `Atlantis3.cfg`, as the original keeps it) |
+| F12 | a screenshot of the game's picture (desktop only) |
+
+The window keeps the mouse while it has the focus, as the original reads
+the mouse directly and draws its own pointer; switch to another window
+(Alt+Tab) to let it go.
+
+### Options, saves and settings
+
+The game's options page is the original's: the crosshair, 16 or 32 bits,
+smoothing, subtitles, the screen size (640 x 480, 800 x 600 or 1024 x
+768), the texture size and the mouse's vertical direction. A size or
+depth change applies when the menu is left, as in the original: the
+window takes the new size (in full screen the picture is scaled to the
+screen).
+
+The saves (`save/game<player>_<number>.sav` with their thumbnails, as the
+original names them) and `Atlantis3.cfg` (the options) are kept in the
+`atlantis3` folder of the per-user data folder (see
+[Players, checkpoints and settings](#players-checkpoints-and-settings)),
+never in the game's folder: until the options page writes the player's
+own, the installation's `Datas\Atlantis3.cfg` is read. The screenshots
+(F12) go to `atlantis3/screenshots/` there. As in the original there are
+no named saves: the menu's Save writes the next number for the current
+player, and Load lists the newest first.
+
+### Known differences
+
+- The texts (subtitles, captions, the menus' tooltips) are drawn from the
+  game's own font file (`font\Atlantis.ttf`, Arial) at the widths Windows
+  gives it, so their places and line breaks are the original's; but the
+  glyphs' antialiased pixels are Atlantis Native's own, not Windows'
+  (GDI's grey levels are not reproduced), in 16 bits and in 32 bits
+  alike.
+- Closing the in-game menu with its Back button: the same click may also
+  act in the view behind it (in a test it started a move to the next
+  view). Whether the original does the same has not been checked.
+- At the end of a script's wait the port shows the frame after the
+  call that ends the wait, where the original shows it before; no
+  difference on screen has been seen from it.
+- After a 16 / 32-bit switch in the options, a place's extra pictures
+  that a puzzle loaded before the switch are drawn only once they are
+  loaded again (the original reloads a longer list of them).
+- The heads' and the unicorn board's 32-bit drawing follows the
+  original's code read statically; it was not run under emulation as the
+  16-bit one was.
+- The window, full screen and the display change are the port's (the
+  original sets a DirectDraw display mode), as is the window keeping the
+  mouse.
+- In the browser: the sound starts with the first click or key; with
+  the mouse taken, Escape first lets it go (press it again for the
+  menu); Alt+Enter and F11 use the page's full screen; there is no F12
+  screenshot; the menu's Quit returns to the page.
+
 ## Command line
 
 The game folder can be left out of each of these: the game library
@@ -625,7 +740,7 @@ release build has no console: redirect its output to a file
 (`atlantis-native.exe --headless C:\game > out.txt`) to read it.
 
 `atlantis-native --list-games` prints the games found on this computer,
-of both games (what **Find installations** adds to the library), one per
+of every game (what **Find installations** adds to the library), one per
 line: the game and its edition, then its folder (with the Windows
 release build, redirect it to a file:
 `atlantis-native.exe --list-games > found.txt`).
@@ -656,6 +771,12 @@ the widescreen option on, for this run (`settings.ini` is not changed).
 With Atlantis II, `--hd` and `--widescreen` turn on its HD mode for the
 run, `--size 1920x1080` sizes its window and `--resolution 800x600`
 chooses the original's 800 x 600 screen (see [Atlantis II](#atlantis-ii)).
+
+With Atlantis III, `--no-intro` starts on the start page, `--fullscreen`
+opens in full screen, and `--headless /path/to/game [frames] [--screenshot
+shot.png]` plays the intro and the start page without a window (frames
+of 1/60 s) and writes the screen; the other games' options are refused
+(see [Atlantis III](#atlantis-iii)).
 
 `atlantis-native --fullscreen /path/to/game` opens the window in full
 screen (F, F11 or Alt+Enter switches it back): for a launcher such as the
@@ -694,6 +815,8 @@ files are kept in a per-user folder, one per game build:
 (`games.txt`, the game library, `support.ini`, the counts of the
 [support screen](#the-support-screen), and `atlantis-native.log` are in
 the `atlantis-native` folder itself.)
+Atlantis II's saves and settings are in its `atlantis2` folder there,
+Atlantis III's in `atlantis3` (see [Atlantis III](#atlantis-iii)).
 
 On its first start with a game whose folder holds an original
 `players.atl` (an installation the original game played), the port copies
@@ -743,13 +866,16 @@ the original's files), `atlant2.cfg`, `settings.ini` and
 `music_copies.txt`, shared by its editions as on the desktop (the saves
 of the picked folder are not taken over, as on the desktop). A browser
 gives a site about 5 MB of this storage, shared by both games (and, on
-GitHub Pages, by the other pages of the same site): an Atlantis II save
+GitHub Pages, by the other pages of the same site; Atlantis III's
+thumbnails make its saves a few KB each): an Atlantis II save
 takes one or two KB there (its file is compressed: the first one in
 Tibet, 632 bytes, is 844 characters), so thousands fit. When the browser
 refuses a file all the same, the page says so at its top: that save was
 not kept, erase saves you no longer need.
 
 ## Known differences from the original
+
+(For the first game; Atlantis III's are in [its section](#atlantis-iii).)
 
 - The window: the game runs in a resizable window (the picture scaled,
   in its 4:3 proportions) rather than fullscreen at 640x480.

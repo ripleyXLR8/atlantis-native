@@ -2,8 +2,8 @@
 //! system's folder picker, the installations on the computer, the copy
 //! from the discs), error message boxes, and the log file of a run
 //! without a terminal (a double click). The game folders used are kept in
-//! the game library ([`crate::library`]): the first game's and Atlantis
-//! II's, told apart by [`setup::kind_of`].
+//! the game library ([`crate::library`]): the first game's, Atlantis
+//! II's and Atlantis III's, told apart by [`setup::kind_of`].
 
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -292,12 +292,14 @@ pub fn open_atlantis2(dir: &Path) -> Result<String, OpenError> {
     A2Files::open_dir(dir, &[]).map(|(files, _)| files.label())
 }
 
-/// A game folder that opens, of either game.
+/// A game folder that opens, of any of the games.
 pub enum Opened {
     /// The first game, opened, and whether from disc images.
     LostTales(Box<Game>, bool),
     /// Atlantis II: its edition's name.
     Atlantis2(String),
+    /// Atlantis III: its edition's name.
+    Atlantis3(String),
 }
 
 impl Opened {
@@ -305,6 +307,7 @@ impl Opened {
         match self {
             Opened::LostTales(..) => GameKind::LostTales,
             Opened::Atlantis2(_) => GameKind::Atlantis2,
+            Opened::Atlantis3(_) => GameKind::Atlantis3,
         }
     }
 
@@ -314,17 +317,23 @@ impl Opened {
     pub fn label(&self) -> String {
         match self {
             Opened::LostTales(game, images) => edition_label(game, *images),
-            Opened::Atlantis2(label) => label.clone(),
+            Opened::Atlantis2(label) | Opened::Atlantis3(label) => label.clone(),
         }
     }
 }
 
-/// The game in `dir`, either one: Atlantis II when the folder holds it
-/// ([`setup::kind_of`]), else the first game. Why it does not open
-/// otherwise, for the log ([`setup::explain`] and
-/// [`setup::explain_atlantis2`] say it to the player).
+/// The game in `dir`, any of them: Atlantis III or Atlantis II when the
+/// folder holds it ([`setup::kind_of`]), else the first game. Why it does
+/// not open otherwise, for the log ([`setup::explain`],
+/// [`setup::explain_atlantis2`] and [`setup::explain_atlantis3`] say it
+/// to the player).
 pub fn open_any(dir: &Path) -> Result<Opened, String> {
-    if setup::kind_of(dir) == Some(GameKind::Atlantis2) {
+    let kind = setup::kind_of(dir);
+    if kind == Some(GameKind::Atlantis3) {
+        crate::a3::label(dir)
+            .map(Opened::Atlantis3)
+            .map_err(|e| e.to_string())
+    } else if kind == Some(GameKind::Atlantis2) {
         open_atlantis2(dir)
             .map(Opened::Atlantis2)
             .map_err(|e| e.to_string())
@@ -348,7 +357,22 @@ pub fn edition_label(game: &Game, from_images: bool) -> String {
 /// The game library's entry for `dir`: the game and its edition, or why
 /// it does not open.
 pub fn describe(dir: &Path) -> LauncherEntry {
-    let (label, found) = if setup::kind_of(dir) == Some(GameKind::Atlantis2) {
+    let kind = setup::kind_of(dir);
+    let (label, found) = if kind == Some(GameKind::Atlantis3) {
+        match crate::a3::label(dir) {
+            Ok(label) => (label, true),
+            Err(e) => {
+                log::info!("{}: {e}", dir.display());
+                let why = match e {
+                    atlantis3_data::files::OpenError::Exe(_) => {
+                        "Not found: an edition of Atlantis III not supported yet"
+                    }
+                    _ => "Not found: this folder no longer holds the game",
+                };
+                (why.to_string(), false)
+            }
+        }
+    } else if kind == Some(GameKind::Atlantis2) {
         match open_atlantis2(dir) {
             Ok(label) => (label, true),
             Err(e) => {
@@ -616,8 +640,8 @@ fn report_edition(dir: &Path) {
 }
 
 /// The game folder the player chooses in the system's folder picker (of
-/// either game: the folder itself or one below it, [`setup::find_roots`];
-/// a folder holding both games asks which one), with a message saying what to do when the folder is not right (its
+/// any game: the folder itself or one below it, [`setup::find_roots`];
+/// a folder holding two games or more asks which one), with a message saying what to do when the folder is not right (its
 /// third button labelled `give_up`), and the offer to copy the discs when
 /// the folder is a CD drive of the first game. The game and its folder;
 /// for Cryo's DVD, each of its languages found ([`dvd_locations`]), each
@@ -626,7 +650,7 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
     loop {
         let dir = rfd::FileDialog::new()
             .set_title(
-                "Choose the folder of your game (the one with atlantis.exe, or atlantis2.exe for Atlantis II)",
+                "Choose the folder of your game (the one with atlantis.exe, atlantis2.exe for Atlantis II, or Game.exe)",
             )
             .pick_folder()?;
         // Cryo's DVD (a copy of a side, the drive, the images of its
@@ -687,6 +711,24 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
                 }
             }
         };
+        if kind == GameKind::Atlantis3 {
+            match crate::a3::label(&root) {
+                Ok(label) => {
+                    log::info!("game folder {} ({label})", root.display());
+                    return Some(vec![(Opened::Atlantis3(label), root)]);
+                }
+                Err(e) => {
+                    log::warn!("{}: {e}", root.display());
+                    let text = setup::explain_atlantis3(&root, &e);
+                    match ask(&text, "Choose another folder", "Help", give_up) {
+                        Choice::First => {}
+                        Choice::Second => setup::open_url(setup::HELP_URL_A3),
+                        Choice::Third => return None,
+                    }
+                    continue;
+                }
+            }
+        }
         if kind == GameKind::Atlantis2 {
             match open_atlantis2(&root) {
                 Ok(label) => {
@@ -794,16 +836,16 @@ fn with_every_dvd_language(found: Vec<(PathBuf, Opened)>) -> Vec<(PathBuf, Opene
 }
 
 /// The first folder that opens of each game below `candidates`, in their
-/// order (up to 4 levels down, [`setup::find_roots`]), the first game's
-/// first: what the first start offers, as it offered the first folder of
+/// order (up to 4 levels down, [`setup::find_roots`]), in
+/// [`GameKind::ALL`]'s order: what the first start offers, as it offered the first folder of
 /// the first game that opened (a second copy of the same game is not
 /// offered, nor opened). The folders are opened until one of each game
 /// is found.
 pub fn first_of_each_game(candidates: &[PathBuf]) -> Vec<(PathBuf, Opened)> {
-    let mut found: [Option<(PathBuf, Opened)>; 2] = [None, None];
+    let mut found: [Option<(PathBuf, Opened)>; 3] = [None, None, None];
     'candidates: for c in candidates {
         for (root, kind) in setup::find_roots(c, 4) {
-            let slot = &mut found[usize::from(kind == GameKind::Atlantis2)];
+            let slot = &mut found[kind.index()];
             if slot.is_some() {
                 continue;
             }
@@ -819,7 +861,7 @@ pub fn first_of_each_game(candidates: &[PathBuf]) -> Vec<(PathBuf, Opened)> {
     found.into_iter().flatten().collect()
 }
 
-/// The game folders, of both games, below each of `candidates` (up to 4
+/// The game folders, of every game, below each of `candidates` (up to 4
 /// levels down) and `discs` (1 level), then `extra`: each once, in that
 /// order (not yet checked to open). Cryo's DVD gives each of its
 /// languages found ([`dvd_locations`]).
@@ -873,7 +915,7 @@ pub fn game_folders_in(
     out
 }
 
-/// The game folders of both games in the usual installation places
+/// The game folders of every game in the usual installation places
 /// (GOG.com's registry entries and folders, ...: [`setup::candidate_folders`]),
 /// on the mounted discs and disc images, and the copy from the discs (not
 /// yet checked to open).
@@ -885,7 +927,7 @@ fn installed_games() -> Vec<PathBuf> {
     )
 }
 
-/// The game folders found on this computer, of both games: those of
+/// The game folders found on this computer, of every game: those of
 /// [`installed_games`] that open.
 pub fn find_installations() -> Vec<PathBuf> {
     installed_games()
@@ -1172,6 +1214,44 @@ mod tests {
                 "Atlantis: The Lost Tales, Perfect Edition, English (1998 build)"
             );
         }
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Atlantis III as the library shows it: GOG.com's folder (the only
+    /// edition known), a folder of its layout with another program, and
+    /// the first start's offer of one folder of each game.
+    #[test]
+    fn describes_atlantis3() {
+        let d = tmp("a3");
+        let fake = d.join("Other/Atlantis 3");
+        touch(&fake.join("Game.exe"));
+        touch(&fake.join("Datas/scenar/defnames.con"));
+        assert_eq!(setup::kind_of(&fake), Some(GameKind::Atlantis3));
+        let e = describe(&fake);
+        assert!(
+            !e.found && e.label.contains("Atlantis III not supported yet"),
+            "{}",
+            e.label
+        );
+        assert!(open_any(&fake).is_err());
+        let Some(gog) = atlantis3_data::testing::install_dir() else {
+            let _ = std::fs::remove_dir_all(&d);
+            return;
+        };
+        let e = describe(&gog);
+        assert!(e.found, "{}", e.label);
+        assert_eq!(e.label, "Atlantis III, GOG.com, French");
+        assert!(matches!(open_any(&gog), Ok(Opened::Atlantis3(_))));
+        // Found below a parent folder, after the program met first there
+        // that does not open.
+        link(&gog, &d.join("Games/Atlantis 3"));
+        let found = first_of_each_game(&[d.join("Other"), d.join("Games")]);
+        let kinds: Vec<(PathBuf, GameKind)> =
+            found.iter().map(|(p, o)| (p.clone(), o.kind())).collect();
+        assert_eq!(
+            kinds,
+            vec![(d.join("Games/Atlantis 3"), GameKind::Atlantis3)]
+        );
         let _ = std::fs::remove_dir_all(&d);
     }
 

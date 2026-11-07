@@ -1,10 +1,7 @@
-//! Atlantis III in the browser: only in a build with the `atlantis3`
-//! feature, which no released build, page or workflow turns on (the
-//! engine is unfinished). The developers' window
-//! (`examples/atlantis3.rs`) in a page: the intro, the start page, the
-//! menus, the saves, the sound, the original's keys and its display
-//! sizes and depths (the options' switch), the frame presented through
-//! WebGL 2.
+//! Atlantis III in the browser: the desktop's window (`crate::a3`) in a
+//! page: the intro, the start page, the menus, the saves, the sound, the
+//! original's keys and its display sizes and depths (the options'
+//! switch), the frame presented through WebGL 2.
 //!
 //! The game's files are the picked folder's, read when the engine reads
 //! them ([`crate::web`]'s `PickedDir`). The saves (with their thumbnails)
@@ -337,7 +334,7 @@ impl ApplicationHandler for A3App {
         }
         use winit::platform::web::{WindowAttributesExtWebSys, WindowExtWebSys};
         let attrs = Window::default_attributes()
-            .with_title("Atlantis III (test) - Atlantis Native")
+            .with_title("Atlantis III - Atlantis Native")
             .with_append(true);
         let window = match el.create_window(attrs) {
             Ok(w) => Rc::new(w),
@@ -352,7 +349,7 @@ impl ApplicationHandler for A3App {
             self.gl = GlPresenter::new(canvas);
         }
         if self.gl.is_none() {
-            log::error!("WebGL 2 is needed for Atlantis III's test page");
+            log::error!("WebGL 2 is needed for Atlantis III");
         }
         window.set_cursor_visible(false);
         window.request_redraw();

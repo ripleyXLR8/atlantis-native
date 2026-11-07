@@ -266,10 +266,10 @@ fn dvd_files(all: HashMap<String, File>, l: &DvdLanguage, root: &str) -> HashMap
 /// language's folder (`ENG`, ...) once the player chose it: without it,
 /// a DVD of more than one language is refused with the languages found,
 /// `LANGUAGES:` then `folder=language` pairs separated by `;`, for the
-/// page to ask. A folder that holds both games is refused the same way
-/// with `GAMES:` then `id=name` pairs, until the page gives the game
-/// chosen (`game`: `atlantis` or `atlantis2`). Returns the game started
-/// (`atlantis`, `atlantis2`). `paths` gives the files' paths below the
+/// page to ask. A folder that holds more than one game is refused the
+/// same way with `GAMES:` then `id=name` pairs, until the page gives the
+/// game chosen (`game`: `atlantis`, `atlantis2` or `atlantis3`). Returns
+/// the game started (`atlantis`, `atlantis2`, `atlantis3`). `paths` gives the files' paths below the
 /// picked folder's parent when the browser does not
 /// (`webkitRelativePath`): the end-to-end runs of a browser whose driver
 /// sets files one by one (Firefox's WebDriver BiDi).
@@ -296,18 +296,28 @@ pub async fn start(
             .unwrap_or_else(|| f.name());
         all.insert(key(&rel), f);
     }
-    // Atlantis III: in a private test build only.
-    #[cfg(feature = "atlantis3")]
-    {
-        let paths: Vec<&str> = all.keys().map(String::as_str).collect();
-        if let Some(install) = crate::web_layout::a3_install(&paths) {
+    // Which game: Atlantis III, Atlantis II, the first game, or the
+    // player's choice.
+    let paths: Vec<&str> = all.keys().map(String::as_str).collect();
+    let picked = crate::web_layout::picked(&paths);
+    if let Some(install) = crate::web_layout::a3_install(&paths) {
+        use crate::web_layout::Picked;
+        let others: &[&str] = match &picked {
+            Picked::Both(_) => &["atlantis=Atlantis: The Lost Tales", "atlantis2=Atlantis II"],
+            Picked::Atlantis2(_) => &["atlantis2=Atlantis II"],
+            Picked::LostTales => &["atlantis=Atlantis: The Lost Tales"],
+            _ => &[],
+        };
+        // Atlantis III alone, or chosen among the games of the folder.
+        if others.is_empty() || game.as_deref() == Some("atlantis3") {
             start_atlantis3(all, &install)?;
             return Ok("atlantis3".into());
         }
+        if game.is_none() {
+            return Err(format!("GAMES:{};atlantis3=Atlantis III", others.join(";")).into());
+        }
     }
-    // Which game: Atlantis II, the first game, or the player's choice.
-    let paths: Vec<&str> = all.keys().map(String::as_str).collect();
-    let a2 = match crate::web_layout::picked(&paths) {
+    let a2 = match picked {
         crate::web_layout::Picked::Atlantis2(l) => Some(l),
         crate::web_layout::Picked::Both(l) => match game.as_deref() {
             Some("atlantis2") => Some(l),
@@ -769,10 +779,8 @@ fn keep_picked(all: HashMap<String, File>) -> HashMap<String, (usize, u64)> {
     index
 }
 
-/// Atlantis III from its installed folder among the picked files (the
-/// private test build's only, [`crate::a3_web`]), the saves in the
-/// browser's storage.
-#[cfg(feature = "atlantis3")]
+/// Atlantis III from its installed folder among the picked files
+/// ([`crate::a3_web`]), the saves in the browser's storage.
 fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
     let index = keep_picked(all);
     let store: Rc<dyn SaveStore> = match WebStore::new("atlantis3") {

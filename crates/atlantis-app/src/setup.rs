@@ -11,13 +11,13 @@ use std::sync::Arc;
 use atlantis2_data::files::OpenError;
 use atlantis_data::GameError;
 
-pub use crate::guide::{HELP_URL, HELP_URL_A2};
+pub use crate::guide::{HELP_URL, HELP_URL_A2, HELP_URL_A3};
 
 /// The GOG.com product ids of the games (their registry keys on Windows):
-/// the first game's, then Atlantis II's.
-const GOG_IDS: [&str; 2] = ["1207658944", "1207658951"];
+/// the first game's, Atlantis II's, then Atlantis III's.
+const GOG_IDS: [&str; 3] = ["1207658944", "1207658951", "1207658958"];
 
-/// Which of the two games a folder holds.
+/// Which of the games a folder holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GameKind {
     /// Atlantis: The Lost Tales (`atlantis.exe`, or the images of its CDs).
@@ -25,21 +25,37 @@ pub enum GameKind {
     /// Atlantis II (`atlantis2.exe`, or GOG.com's `Game.exe`:
     /// [`atlantis2_data::files::holds_atlantis2`]).
     Atlantis2,
+    /// Atlantis III (GOG.com's `Game.exe` beside `Datas\scenar\defnames.con`:
+    /// [`atlantis3_data::files::holds_atlantis3`]).
+    Atlantis3,
 }
 
 impl GameKind {
+    /// Every game, in the order the library's searches give them.
+    pub const ALL: [GameKind; 3] = [
+        GameKind::LostTales,
+        GameKind::Atlantis2,
+        GameKind::Atlantis3,
+    ];
+
+    /// Its place in [`GameKind::ALL`].
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
     /// The game's name, for people.
     pub fn name(self) -> &'static str {
         match self {
             GameKind::LostTales => "Atlantis: The Lost Tales",
             GameKind::Atlantis2 => "Atlantis II",
+            GameKind::Atlantis3 => "Atlantis III",
         }
     }
 }
 
 /// The first-start explanation.
-pub const WELCOME: &str = "Atlantis Native is a new engine for Atlantis: The Lost Tales \
-and Atlantis II. It does not include the games themselves: the pictures, videos, voices \
+pub const WELCOME: &str = "Atlantis Native is a new engine for Atlantis: The Lost Tales, \
+Atlantis II and Atlantis III. It does not include the games themselves: the pictures, videos, voices \
 and music belong to the games' publisher, so Atlantis Native plays them from your own copy.\n\n\
 Choose the folder of your game:\n\
 \u{2022} GOG.com: the folder where the game is installed \
@@ -50,7 +66,8 @@ the CD images (.iso, .bin). With a disc in the drive, Atlantis Native offers to 
 four discs itself.\n\
 \u{2022} Atlantis II on CD: the folder where the game is installed (the one with \
 atlantis2.exe), with the images of its four CDs (or copies of the CDs) in it or in a \
-folder inside it.\n\n\
+folder inside it.\n\
+\u{2022} Atlantis III: GOG.com's installation folder (the one with Game.exe and Datas).\n\n\
 Atlantis Native only reads these files and never changes them.";
 
 /// Case-insensitive lookup of a file in a folder.
@@ -74,14 +91,18 @@ pub fn names_in(dir: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Which game `dir` itself holds, if any: Atlantis II when
-/// [`atlantis2_data::files::holds_atlantis2`] says so (looked at first:
-/// its CD installation's folder may hold the images of its discs), else
-/// the first game when it holds atlantis.exe, or a CD image that is not
-/// one of Atlantis II's discs (a folder of both games' images is the
-/// first game's).
+/// Which game `dir` itself holds, if any: Atlantis III when
+/// [`atlantis3_data::files::holds_atlantis3`] says so (`Game.exe` beside
+/// `Datas\scenar\defnames.con`, which no folder of the other games has),
+/// Atlantis II when [`atlantis2_data::files::holds_atlantis2`] says so
+/// (looked at before the first game: its CD installation's folder may
+/// hold the images of its discs), else the first game when it holds
+/// atlantis.exe, or a CD image that is not one of Atlantis II's discs (a
+/// folder of both games' images is the first game's).
 pub fn kind_of(dir: &Path) -> Option<GameKind> {
-    if atlantis2_data::files::holds_atlantis2(dir) {
+    if atlantis3_data::files::holds_atlantis3(dir) {
+        Some(GameKind::Atlantis3)
+    } else if atlantis2_data::files::holds_atlantis2(dir) {
         Some(GameKind::Atlantis2)
     } else if has_file(dir, "atlantis.exe") || has_other_disc_images(dir) {
         Some(GameKind::LostTales)
@@ -129,6 +150,11 @@ pub fn find_atlantis2_root(dir: &Path, depth: usize) -> Option<PathBuf> {
     find_root(dir, depth, Some(GameKind::Atlantis2)).map(|(d, _)| d)
 }
 
+/// Atlantis III's folder below `dir` (see [`find_root`]).
+pub fn find_atlantis3_root(dir: &Path, depth: usize) -> Option<PathBuf> {
+    find_root(dir, depth, Some(GameKind::Atlantis3)).map(|(d, _)| d)
+}
+
 /// The first folder below `dir` that holds either game, and which (see
 /// [`find_root`]).
 pub fn find_any_root(dir: &Path, depth: usize) -> Option<(PathBuf, GameKind)> {
@@ -136,13 +162,13 @@ pub fn find_any_root(dir: &Path, depth: usize) -> Option<(PathBuf, GameKind)> {
 }
 
 /// The game folders below `dir`, up to `depth` levels down: the first
-/// one met of the first game and of Atlantis II (a folder holding both
-/// games side by side gives both), the first game's first; the same as
-/// [`find_game_root`] and [`find_atlantis2_root`], in one walk.
+/// one met of each game (a folder holding the games side by side gives
+/// each), in [`GameKind::ALL`]'s order; the same as [`find_game_root`],
+/// [`find_atlantis2_root`] and [`find_atlantis3_root`], in one walk.
 pub fn find_roots(dir: &Path, depth: usize) -> Vec<(PathBuf, GameKind)> {
-    fn walk(dir: &Path, depth: usize, found: &mut [Option<PathBuf>; 2]) {
+    fn walk(dir: &Path, depth: usize, found: &mut [Option<PathBuf>; 3]) {
         if let Some(k) = kind_of(dir) {
-            let slot = &mut found[usize::from(k == GameKind::Atlantis2)];
+            let slot = &mut found[k.index()];
             slot.get_or_insert_with(|| dir.to_path_buf());
             return;
         }
@@ -166,13 +192,12 @@ pub fn find_roots(dir: &Path, depth: usize) -> Vec<(PathBuf, GameKind)> {
             walk(&d, depth - 1, found);
         }
     }
-    let mut found = [None, None];
+    let mut found = [None, None, None];
     walk(dir, depth, &mut found);
-    let [first, second] = found;
-    first
-        .map(|d| (d, GameKind::LostTales))
+    found
         .into_iter()
-        .chain(second.map(|d| (d, GameKind::Atlantis2)))
+        .zip(GameKind::ALL)
+        .filter_map(|(d, k)| d.map(|d| (d, k)))
         .collect()
 }
 
@@ -255,6 +280,24 @@ pub fn explain_atlantis2(dir: &Path, err: &OpenError) -> String {
         OpenError::NoExecutable => format!(
             "{shown} does not hold Atlantis II's program (atlantis2.exe, or GOG.com's \
              Game.exe): choose the folder where the game is installed."
+        ),
+    }
+}
+
+/// What to tell the player about an Atlantis III folder that does not
+/// open.
+pub fn explain_atlantis3(dir: &Path, err: &atlantis3_data::files::OpenError) -> String {
+    let shown = dir.display();
+    match err {
+        atlantis3_data::files::OpenError::Exe(e) => format!(
+            "{shown} holds an Atlantis III program that Atlantis Native does not know \
+             ({e}): an edition of the game that is not supported yet.\n\n\
+             Supported: GOG.com's French release. Other editions are unknown to the \
+             project: an issue on GitHub with the program's size and MD5 helps."
+        ),
+        _ => format!(
+            "{shown} does not hold Atlantis III ({err}): choose the folder where the game \
+             is installed, the one with Game.exe and Datas."
         ),
     }
 }
@@ -514,6 +557,13 @@ mod tests {
         touch(&dir.join(atlantis2_data::files::DISC_MARKERS[n - 1]));
     }
 
+    /// A fake GOG.com installation of Atlantis III: `Game.exe` and
+    /// `Datas\scenar\defnames.con`.
+    fn fake_atlantis3_gog(dir: &Path) {
+        touch(&dir.join("Game.exe"));
+        touch(&dir.join("Datas/scenar/defnames.con"));
+    }
+
     #[test]
     fn tells_the_two_games_apart() {
         let d = tmp("kinds");
@@ -545,6 +595,11 @@ mod tests {
         fake_atlantis2_disc(&discs.join("CD1"), 1);
         assert_eq!(kind_of(&discs), None);
         assert!(explain(&discs, &GameError::NoExecutable).contains("discs of Atlantis II"));
+        // GOG.com's layout of Atlantis III: Game.exe too, its data in
+        // Datas.
+        let a3 = d.join("GOG Galaxy/Games/Atlantis 3");
+        fake_atlantis3_gog(&a3);
+        assert_eq!(kind_of(&a3), Some(GameKind::Atlantis3));
         // A folder that holds no game.
         let none = d.join("Documents");
         touch(&none.join("letter.txt"));
@@ -587,9 +642,24 @@ mod tests {
         // As deep as the first game's search: the folder above "Games".
         assert_eq!(find_atlantis2_root(&d, 2), Some(gog.clone()));
         assert_eq!(find_atlantis2_root(&d, 1), None);
+        // Atlantis III beside them: the three games, in their order.
+        let a3 = games.join("Atlantis 3");
+        fake_atlantis3_gog(&a3);
+        assert_eq!(find_atlantis3_root(&games, 3), Some(a3.clone()));
+        assert_eq!(find_atlantis3_root(&gog, 3), None);
+        assert_eq!(find_atlantis2_root(&a3, 3), None);
+        assert_eq!(
+            find_roots(&games, 3),
+            vec![
+                (first.clone(), GameKind::LostTales),
+                (gog.clone(), GameKind::Atlantis2),
+                (a3.clone(), GameKind::Atlantis3)
+            ]
+        );
         // The candidate folders' names: "Atlantis 2", "Atlantis II",
         // "Beyond Atlantis" all contain the word.
         let mut out = Vec::new();
+        std::fs::remove_dir_all(&a3).unwrap();
         for name in ["Atlantis II", "Beyond Atlantis", "Myst"] {
             std::fs::create_dir_all(games.join(name)).unwrap();
         }
@@ -617,6 +687,15 @@ mod tests {
         assert!(e.contains("none of its discs") && e.contains("images of the four CDs"));
         assert!(explain_atlantis2(d, &OpenError::NoExecutable).contains("Game.exe"));
         assert_eq!(GameKind::Atlantis2.name(), "Atlantis II");
+    }
+
+    #[test]
+    fn explains_atlantis3_folders() {
+        let d = Path::new("/games/Atlantis 3");
+        let e = explain_atlantis3(d, &atlantis3_data::files::OpenError::NoDatas);
+        assert!(e.contains("Game.exe and Datas"), "{e}");
+        assert_eq!(GameKind::Atlantis3.name(), "Atlantis III");
+        assert_eq!(GameKind::ALL.map(GameKind::index), [0, 1, 2]);
     }
 
     #[test]

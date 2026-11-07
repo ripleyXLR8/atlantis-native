@@ -1,6 +1,6 @@
-//! The engine of *Atlantis III: The New World* (Cryo, 2001), unfinished:
-//! not part of the released program, run only by the developers' example
-//! (`cargo run --example atlantis3`).
+//! The engine of *Atlantis III: The New World* (Cryo, 2001), played by
+//! the program's Atlantis III mode (`atlantis-app`'s `a3` on the desktop,
+//! `a3_web` in the browser).
 //!
 //! Comments cite addresses in the GOG.com release's `Game.exe` (3,473,408
 //! bytes, `atlantis3_data::exe::KNOWN_BUILDS`). Where *Atlantis III* runs

@@ -28,7 +28,7 @@ pub struct Build {
 /// The builds this port knows.
 pub const KNOWN_BUILDS: [Build; 1] = [Build {
     id: "atlantis3-gog-fr-3473408",
-    label: "Atlantis III, GOG.com",
+    label: "Atlantis III, GOG.com, French",
     size: 3_473_408,
     // 2003-04-24 09:50:26 UTC.
     pe_timestamp: 0x3ea7_b362,

@@ -152,10 +152,9 @@ pub fn picked(paths: &[&str]) -> Picked {
     }
 }
 
-/// Atlantis III's installed folder among `paths` (the private test
-/// build's only): the shallowest holding `game.exe` and
-/// `datas/scenar/defnames.con` ([`atlantis3_data::files::holds_atlantis3`]).
-#[cfg(feature = "atlantis3")]
+/// Atlantis III's installed folder among `paths`: the shallowest holding
+/// `game.exe` and `datas/scenar/defnames.con`
+/// ([`atlantis3_data::files::holds_atlantis3`]).
 pub fn a3_install(paths: &[&str]) -> Option<String> {
     paths
         .iter()
@@ -228,7 +227,6 @@ mod tests {
         "atlantis 2/loc/menu.txt",
     ];
 
-    #[cfg(feature = "atlantis3")]
     #[test]
     fn atlantis3s_installed_folder() {
         let paths = [

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlantis Native</title>
-<meta name="description" content="Play Atlantis: The Lost Tales (Cryo, 1997) and Atlantis II (Cryo, 1999) in your browser with your own copy of the game.">
+<meta name="description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999) and Atlantis III (Cryo, 2001) in your browser with your own copy of the game.">
 <link rel="icon" href="favicon.png">
 <style>
   /* In the manner of the game's own start screen (the player list): a
@@ -154,9 +154,10 @@
   /* The keys beside the frame while playing, when the game leaves them
      room (it sets body.show-keys: fit_canvas in lib.rs). */
   .keys { display: none; }
-  /* (each game's keys: body.game-a1 or body.game-a2, set by the page) */
+  /* (each game's keys: body.game-a1, game-a2 or game-a3, set by the page) */
   body.show-keys:not(.landing).game-a1 .keys.a1,
-  body.show-keys:not(.landing).game-a2 .keys.a2 {
+  body.show-keys:not(.landing).game-a2 .keys.a2,
+  body.show-keys:not(.landing).game-a3 .keys.a3 {
     display: block; position: fixed; top: 50%; transform: translateY(-50%); z-index: 2;
     width: 168px; color: var(--muted); font-size: 13px; line-height: 1.35;
   }
@@ -245,19 +246,36 @@
     <dt><kbd>F</kbd> or <kbd>F11</kbd></dt><dd>full screen</dd>
   </dl>
 </aside>
+<aside class="keys left a3">
+  <h2 class="gold">Explore</h2>
+  <dl>
+    <dt><kbd>Mouse</kbd></dt><dd>look around, or move the pointer in the menus and the inventory (a click takes the mouse)</dd>
+    <dt><kbd>Left click</kbd></dt><dd>go, take, use, talk; the next line</dd>
+    <dt><kbd>Right click</kbd></dt><dd>the inventory, open and closed</dd>
+  </dl>
+</aside>
+<aside class="keys right a3">
+  <h2 class="gold">Menus</h2>
+  <dl>
+    <dt><kbd>Esc</kbd></dt><dd>the game's menu (save, load, volumes, options, quit); skips a cinematic, ends a travel</dd>
+    <dt><kbd>Space</kbd></dt><dd>skips a cinematic</dd>
+    <dt><kbd>F11</kbd> or <kbd>Alt</kbd>+<kbd>Enter</kbd></dt><dd>full screen</dd>
+  </dl>
+</aside>
 <main id="pick">
   <h1 class="logo">Atlantis</h1>
   <div class="tagline">
     <svg class="spear" viewBox="0 0 120 40"><use href="#spear"/></svg>
-    <span class="gold">The Lost Tales · Atlantis II</span>
+    <span class="gold">The Lost Tales · Atlantis II · Atlantis III</span>
     <svg class="spear right" viewBox="0 0 120 40"><use href="#spear"/></svg>
   </div>
   <div class="tablet">
     <p>Seth, the queen's new guard, arrives in Atlantis just as Queen Rhea
        disappears; two thousand years later, in Tibet, a new hero is
-       called to save the world. <em>Atlantis Native</em> is a new engine
-       for Cryo's adventures of 1997 and 1999: both games whole, faithful
-       to the originals, playable here.</p>
+       called to save the world; in the Hoggar, an archaeologist opens the
+       way to other worlds. <em>Atlantis Native</em> is a new engine for
+       Cryo's adventures of 1997, 1999 and 2001: the three games whole,
+       faithful to the originals, playable here.</p>
     <p>It does not include the games themselves: their pictures, videos,
        voices and music belong to their publisher, so it plays them from
        <em>your own copy</em>. Choose the folder of your game:</p>
@@ -288,6 +306,14 @@
           (<code>.iso</code>…): copy the discs' files.</li>
     </ul>
     </section>
+    <section>
+    <h2 class="gold">Atlantis III</h2>
+    <ul>
+      <li><em>GOG.com</em> (French): the folder where the game is installed
+          (the one holding <code>Game.exe</code> and <code>Datas</code>).
+          Other editions are untested.</li>
+    </ul>
+    </section>
     </div>
     <div class="choose">
       <label class="menu-item"><svg class="sun" viewBox="0 0 40 40"><use href="#sun"/></svg><span class="gold">Choose your game folder</span>
@@ -311,22 +337,23 @@
   </nav>
   <span class="cryo" id="version">Atlantis Native</span>
   <span class="legal">Free software under the GPL. <i>Atlantis: The Lost Tales</i> and
-    <i>Atlantis II</i> © Microids (Cryo Interactive Entertainment); this project is not
+    <i>Atlantis II</i>, <i>Atlantis III</i> © Microids (Cryo Interactive Entertainment); this project is not
     affiliated with them.</span>
 </footer>
 <script type="module">
-  import init, { start, version, atlantis2_state, atlantis2_test } from "./pkg/atlantis_app.js";
+  import init, { start, version, atlantis2_state, atlantis2_test, atlantis3_state, atlantis3_test } from "./pkg/atlantis_app.js";
   const status = document.getElementById("status");
   status.textContent = "Loading the engine…";
   await init();
   status.textContent = "";
-  // Atlantis II's state and testing aids, for the end-to-end runs.
+  // Atlantis II's and III's state and testing aids, for the end-to-end runs.
   window.atlantis2 = { state: () => JSON.parse(atlantis2_state() || "null"), test: atlantis2_test };
+  window.atlantis3 = { state: () => JSON.parse(atlantis3_state() || "null"), test: atlantis3_test };
   // The engine's own version and commit (as in the F10 menu).
   document.getElementById("version").textContent = version();
   // Opens the game of the picked files; for Cryo's DVD, `language` is the
   // folder of the language the player chose (the engine lists them); for
-  // a folder holding both games, `game` the one chosen.
+  // a folder holding several games, `game` the one chosen.
   const open = async (files, language, game, paths) => {
     const box = document.getElementById("err");
     box.textContent = "";
@@ -335,9 +362,9 @@
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     try {
       const started = await start(files, language, game, paths);
-      document.body.classList.add(started === "atlantis2" ? "game-a2" : "game-a1");
+      document.body.classList.add(started === "atlantis2" ? "game-a2" : started === "atlantis3" ? "game-a3" : "game-a1");
       document.body.classList.remove("landing");
-      // Atlantis II quit from its menu: the page again.
+      // Atlantis II or III quit from its menu: the page again.
       window.atlantisQuit = () => location.reload();
       // Full screen: the page's, the canvas filling the screen (the game
       // draws at most 1280x960 pixels and WebGL enlarges them). F11 and
@@ -377,9 +404,9 @@
         }
         return;
       }
-      // Both games in the folder: the player chooses.
+      // Several games in the folder: the player chooses.
       if (String(err).startsWith("GAMES:")) {
-        box.append("This folder holds both games. Choose the game to play:");
+        box.append("This folder holds more than one game. Choose the game to play:");
         for (const pair of String(err).slice(6).split(";")) {
           const [id, name] = pair.split("=");
           const b = document.createElement("button");

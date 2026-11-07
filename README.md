@@ -4,9 +4,9 @@
 
 **Return to Atlantis, on today's machines.**
 
-A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997) and
-*Atlantis II* (1999), written in Rust, for Windows, macOS, Linux and your
-browser.
+A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997),
+*Atlantis II* (1999) and *Atlantis III: The New World* (2001), written in
+Rust, for Windows, macOS, Linux and your browser.
 
 [![Build](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml/badge.svg)](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/ripleyXLR8/atlantis-native)](https://github.com/ripleyXLR8/atlantis-native/releases/latest)
@@ -33,6 +33,15 @@ Its sequel *Atlantis II* (*Beyond Atlantis*, 1999) plays from start to
 end too, on Windows, macOS, Linux and in the browser: Tibet, Ireland,
 China, Yucatán and Xibalba, Shamballa and Atlantis, with every puzzle (see
 [Atlantis II](docs/GUIDE.md#atlantis-ii)).
+
+*Atlantis III: The New World* (2001) plays from start to end as well, new
+in 0.6.0, on the desktop and in the browser: from the Hoggar desert
+through the Land of the Dead and the other worlds to the credits, with
+its dialogs, menus, saves and every puzzle. Only GOG.com's French edition
+is known so far (see [Atlantis III](docs/GUIDE.md#atlantis-iii)). It has
+been checked mostly by automated replays against the original's code and
+by the developer's own play, not yet by many players: reports are
+welcome.
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
@@ -98,8 +107,12 @@ contains none of them.</sub>
 - ⚙️ **Options menu** (F10, or O): graphics, HD settings and enhancements,
   changed at once while you play.
 - 📚 **Game library**: several editions (GOG.com, CD, DVD, disc
-  images...) of both games in one list, to choose the one to play at
+  images...) of the three games in one list, to choose the one to play at
   start-up or switch from F10.
+- 🏜️ **Atlantis III** (new in 0.6.0): GOG.com's French edition, whole,
+  with the original's own menus and options (640 x 480, 800 x 600 or
+  1024 x 768, 16 or 32 bits), its saves kept apart from the game's
+  folder, F12 screenshots; on the desktop and in the browser.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
   proportions, the mouse captured while you look around; full screen at
   a key, and on the desktop kept for the next start (F10, "Start in full
@@ -120,12 +133,13 @@ those of the latest commit:
 | macOS 11 and later, Intel | `atlantis-native-macos-x64.dmg` |
 | Linux x86-64 (glibc 2.35+, ALSA) | `atlantis-native-linux-x64.tar.gz` |
 | Linux 64-bit ARM, such as a Raspberry Pi 4 or 5 (glibc 2.35+, ALSA) | `atlantis-native-linux-arm64.tar.gz` |
-| Handhelds with [PortMaster](https://portmaster.games/) (64-bit ARM: R36S, RG35XX, RGB30 and the like; Batocera, ROCKNIX, ArkOS, muOS, Knulli), the first game | `atlantis-native-portmaster.zip` |
+| Handhelds with [PortMaster](https://portmaster.games/) (64-bit ARM: R36S, RG35XX, RGB30 and the like; Batocera, ROCKNIX, ArkOS, muOS, Knulli), the first game only | `atlantis-native-portmaster.zip` |
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 The web version of the latest commit is also online:
 **https://ripleyxlr8.github.io/atlantis-native/** (Chrome, Edge, Firefox
-or Safari), for both games (Atlantis II not yet tried in Safari). Pick
+or Safari), for the three games (Atlantis II not yet tried in Safari,
+Atlantis III tried in Edge only). Pick
 your game folder there: its files are read inside your browser and never
 sent anywhere; the saves stay in that browser.
 
@@ -228,7 +242,20 @@ For *Atlantis II*:
 | *Atlantis Collection*, Italian DVD compilation (2014; shown as *Italian Collection (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
 
 Another executable is refused with its identifiers, so that it can be
-added. The web version plays both games: see
+added.
+
+For *Atlantis III*:
+
+| Release | Languages | What to point it at |
+|---|---|---|
+| [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | French | the installation folder (the one holding `Game.exe` and `Datas`) |
+
+This is the only edition the project knows. Other editions (GOG.com's in
+other languages, the retail CDs and DVDs) are unknown and untested:
+their `Game.exe` is refused with its size and MD5, so that it can be
+reported and added.
+
+The web version plays the three games: see
 [The web version](docs/GUIDE.md#the-web-version).
 
 How to get the files from your CD or GOG.com: see
@@ -243,7 +270,7 @@ options menu, e.g. *GOG.com, French (1999 build)*.
 2. Double-click **atlantis-native** (on macOS, **Atlantis Native**).
 3. The first time, choose your game folder (an installation found on
    the computer is offered first). It is remembered.
-   With more than one edition or both games, the
+   With more than one edition or game, the
    [game library](docs/GUIDE.md#several-editions-the-game-library) lets
    you choose the one to play (hold Shift at start-up to open it).
 
@@ -261,6 +288,10 @@ inside it. From the terminal, give that folder (the CD images may stay
 elsewhere with `--discs <folder>`). See
 [Atlantis II](docs/GUIDE.md#atlantis-ii).
 
+*Atlantis III* (2001) too: GOG.com's installation folder, found by the
+game library or given on the command line. See
+[Atlantis III](docs/GUIDE.md#atlantis-iii).
+
 ## Controls
 
 | Action | Control |
@@ -277,6 +308,10 @@ elsewhere with `--discs <folder>`). See
 
 On the player screen, click the last row to type a new name, then Enter
 or OK.
+
+Atlantis II and Atlantis III have controls of their own: see
+[Atlantis II](docs/GUIDE.md#controls) and
+[Atlantis III](docs/GUIDE.md#atlantis-iii-controls) in the player's guide.
 
 ## Build from source
 

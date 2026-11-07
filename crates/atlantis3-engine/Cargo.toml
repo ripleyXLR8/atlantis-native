@@ -1,6 +1,6 @@
 [package]
 name = "atlantis3-engine"
-description = "Atlantis III engine (unfinished, not in the released program): the start-up, the cinematics and the first place"
+description = "Atlantis III engine: the start-up, the cinematics, the places, the dialogs, the menus, the puzzles and the ending"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

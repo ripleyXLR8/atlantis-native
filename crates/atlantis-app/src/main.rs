@@ -59,8 +59,17 @@
 //! game alone). The first game's options but `--original` are refused in
 //! this mode, and `--discs` and `--screenshot` with the first game.
 //!
+//! A folder holding Atlantis III (GOG.com's, `Game.exe` beside `Datas\`)
+//! opens Atlantis III's own mode (`atlantis_app::a3`): the intro, the start
+//! page and the game as the original's, its saves and `Atlantis3.cfg` in
+//! the `atlantis3` folder of the per-user data folder; `--no-intro` starts
+//! on the start page, `--headless <folder> [frames] [--screenshot
+//! <file.png>]` plays the intro and the start page without a window. The
+//! game library finds and opens it too. The other games' options but
+//! `--original` and `--fullscreen` are refused in this mode.
+//!
 //! `atlantis-native --list-games` prints the games found on the computer
-//! (both games: what the library's "Find installations" adds) and ends.
+//! (every game: what the library's "Find installations" adds) and ends.
 //!
 //! `--original` (before the game directory) turns every enhancement off,
 //! in both games: the original game, bug for bug. `--new-game` skips the start-up videos
@@ -385,6 +394,53 @@ fn main() {
         None => Start::Boot,
     };
 
+    // Atlantis III: the other games' options refused (but its own:
+    // `--no-intro`, and `--screenshot` with `--headless`).
+    let a3_dir = match args.as_slice() {
+        [h, d, ..] if h == "--headless" => Some(d),
+        [d] => Some(d),
+        _ => None,
+    }
+    .filter(|d| atlantis_app::a3::holds_atlantis3(Path::new(d)))
+    .cloned();
+    if let Some(dir) = a3_dir {
+        let headless_run = args[0] == "--headless";
+        let mut not_a3: Vec<&str> = first_game_flags.clone();
+        not_a3.extend(
+            a2_flags
+                .iter()
+                .copied()
+                .filter(|f| *f != "--no-intro" && !(headless_run && *f == "--screenshot")),
+        );
+        if force_wide {
+            not_a3.push("--widescreen");
+        } else if force_hd {
+            not_a3.push("--hd");
+        }
+        refuse(&not_a3, "Atlantis III's mode");
+        let no_intro = intro == Some(false);
+        if headless_run {
+            let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
+            if let Err(e) = atlantis_app::a3::headless(
+                Path::new(&dir),
+                &atlantis_app::a3::data_dir(),
+                frames,
+                screenshot.as_deref(),
+                no_intro,
+            ) {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+            return;
+        }
+        let run = atlantis_app::a3::open(Path::new(&dir))
+            .and_then(|(game, _)| atlantis_app::a3::run_window(game, fullscreen, no_intro));
+        if let Err(e) = run {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
     if args.first().map(String::as_str) == Some("--headless")
         && args
             .get(1)
@@ -573,15 +629,15 @@ fn main() {
                         app.play_opened(opened, &dir);
                         if let Some(s) = app.session_mut() {
                             s.shift_grace();
-                            grace.set(s.wants_atlantis2());
+                            grace.set(s.wants_own_mode());
                         }
                     }
                     Startup::Launcher => app.show_launcher(None),
                 }
             }
         }
-        // Atlantis II chosen: its own mode, after this event loop.
-        !app.session().is_some_and(|s| s.wants_atlantis2())
+        // Atlantis II or III chosen: its own mode, after this event loop.
+        !app.session().is_some_and(|s| s.wants_own_mode())
     };
     let windowed = if due || force_support {
         app.show_support(data_dir(), Box::new(begin));
@@ -589,9 +645,9 @@ fn main() {
     } else {
         begin(&mut app)
     };
-    // On demand: the event loop runs again for Atlantis II when it is
-    // chosen in the game library (a program has one event loop), and for
-    // the library's screen when Atlantis II goes back to it.
+    // On demand: the event loop runs again for Atlantis II or III when it
+    // is chosen in the game library (a program has one event loop), and
+    // for the library's screen when that game goes back to it.
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     let mut windowed = windowed;
     loop {
@@ -604,29 +660,36 @@ fn main() {
             }
         }
         let atlantis2 = app.session_mut().and_then(|s| s.take_atlantis2());
+        let atlantis3 = app.session_mut().and_then(|s| s.take_atlantis3());
         // The first game's window and sound end here.
         drop(app);
-        let Some(dir) = atlantis2 else {
+        let run = if let Some(dir) = atlantis2 {
+            atlantis_app::watchdog::leave();
+            let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
+            atlantis_app::a2::open(
+                &dir,
+                &[],
+                &atlantis_app::a2::A2Start::default(),
+                enhancements,
+            )
+            .and_then(|(engine, label)| {
+                atlantis_app::a2::run_window_on(
+                    &mut el,
+                    engine,
+                    label,
+                    fullscreen,
+                    None,
+                    a2_grace.replace(false),
+                )
+            })
+        } else if let Some(dir) = atlantis3 {
+            atlantis_app::watchdog::leave();
+            atlantis_app::a3::open(&dir).and_then(|(game, _)| {
+                atlantis_app::a3::run_window_on(&mut el, game, fullscreen, a2_grace.replace(false))
+            })
+        } else {
             return;
         };
-        atlantis_app::watchdog::leave();
-        let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
-        let run = atlantis_app::a2::open(
-            &dir,
-            &[],
-            &atlantis_app::a2::A2Start::default(),
-            enhancements,
-        )
-        .and_then(|(engine, label)| {
-            atlantis_app::a2::run_window_on(
-                &mut el,
-                engine,
-                label,
-                fullscreen,
-                None,
-                a2_grace.replace(false),
-            )
-        });
         match run {
             Ok(atlantis_app::a2::Ended::Quit) => return,
             // The options menu's "Game library...", or Shift held as it

@@ -31,7 +31,9 @@ use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 pub mod a2;
 #[cfg(target_arch = "wasm32")]
 mod a2_web;
-#[cfg(all(target_arch = "wasm32", feature = "atlantis3"))]
+#[cfg(not(target_arch = "wasm32"))]
+pub mod a3;
+#[cfg(target_arch = "wasm32")]
 mod a3_web;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
