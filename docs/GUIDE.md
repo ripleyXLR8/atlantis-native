@@ -5,8 +5,9 @@
 ## Getting the game files
 
 Atlantis Native is a new engine: it does not include the game. The
-pictures, videos, voices and music of *Atlantis: The Lost Tales* belong
-to its publisher, so Atlantis Native plays them from your own copy. It
+pictures, videos, voices and music of *Atlantis: The Lost Tales*,
+*Atlantis II* and *Atlantis III* belong to their publisher, so Atlantis
+Native plays them from your own copy. It
 only reads the files and never changes them; it never runs the game's
 programs.
 
@@ -156,7 +157,8 @@ last played selected. Each game is shown as its name and edition,
 *Atlantis: The Lost Tales, GOG.com, French (1999 build)*, *Atlantis: The
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
-1.01)* or *Atlantis II, French CD (1999)*, and its folder.
+1.01)*, *Atlantis II, French CD (1999)* or *Atlantis III, GOG.com,
+French*, and its folder.
 
 | Action | Mouse | Keyboard |
 |---|---|---|
@@ -168,17 +170,17 @@ it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 | Quit | **Quit** | Escape |
 
 **Find installations** looks where the first start looks (GOG.com's
-installations of both games, the usual places, the mounted discs and
+installations of the three games, the usual places, the mounted discs and
 disc images, the copy made from the discs), adds the games not listed
 yet and says how many it found. The first start looks in the usual
 places only (not the drives) and keeps the first folder of each game
 that opens: one game found is offered to play at once, as before (a
 second copy of the same game is not offered: add it from the library);
-both games found are offered to the library, whose screen then shows
-them. **Add a game folder...** takes the folder of either game, or a
-folder above it (a few levels up); when that folder holds both games,
-it asks which one to add (choose the folder again for the other, or use
-**Find installations**). Cryo's DVD adds each of its languages found,
+two or three games found are offered to the library, whose screen then
+shows them. **Add a game folder...** takes the folder of any of the
+games, or a folder above it (a few levels up); when that folder holds
+more than one game, it asks which of the first two found to add (choose
+the folder again for the other, or use **Find installations**). Cryo's DVD adds each of its languages found,
 each its own edition (*Atlantis: The Lost Tales, DVD, German (1998
 build)*, with *from disc images* for the images of its sides); a
 language whose side is not in the drive is shown *not found*, with the
@@ -191,17 +193,18 @@ on a drive not plugged in) is shown in red as *not found*: **Locate...**
 To open the library's screen with one game in it: hold **Shift** while
 the program starts (or press it in the first two seconds of the game's
 window, where the system cannot tell before: Linux), or start it with
-`--launcher`; this works with either game. While you play, the last
+`--launcher`; this works with any of the games. While you play, the last
 entry of the options menu (F10), **Game library...**, stops the game
 and goes back to the screen to play another edition (the progress
 since the last checkpoint is not kept, as when quitting); Atlantis II's
 options menu (F10 or O) has the same entry when it was started from the
-library (not when its folder was given on the command line). The settings,
+library (not when its folder was given on the command line); Atlantis
+III has no such menu (see [Atlantis III](#atlantis-iii)). The settings,
 players and checkpoints are kept per build of the game (see
 [Players, checkpoints and settings](#players-checkpoints-and-settings)).
 
 The list is the file `games.txt` in the per-user folder, one game folder
-per line (of either game: which one is told from the folder's files),
+per line (of any of the games: which one is told from the folder's files),
 the last played first; it can be edited by hand while the program is
 closed. (Earlier versions kept one folder in
 `game-folder.txt`: it is taken over.) A game folder given on the command
@@ -865,8 +868,8 @@ picked folder on its first start. Atlantis II's files there are under
 the original's files), `atlant2.cfg`, `settings.ini` and
 `music_copies.txt`, shared by its editions as on the desktop (the saves
 of the picked folder are not taken over, as on the desktop). A browser
-gives a site about 5 MB of this storage, shared by both games (and, on
-GitHub Pages, by the other pages of the same site; Atlantis III's
+gives a site about 5 MB of this storage, shared by the three games (and,
+on GitHub Pages, by the other pages of the same site; Atlantis III's
 thumbnails make its saves a few KB each): an Atlantis II save
 takes one or two KB there (its file is compressed: the first one in
 Tibet, 632 bytes, is 844 characters), so thousands fit. When the browser

@@ -6,8 +6,8 @@
 
 | Crate | Content |
 |---|---|
-| `atlantis-data` | BigFile archives, executable tables, game detection |
-| `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound; shared by both games |
+| `atlantis-data` | BigFile archives, executable tables, game detection; the file layer (`FileSource`) the sequels read through |
+| `atlantis-codecs` | HNM6 panoramas and videos (with Atlantis II's alpha masks), APC sound (with Atlantis III's sound rule for its cinematics); shared by the three games |
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
@@ -841,9 +841,10 @@ the new release's title, icon and settings store (one per build) in
 place. A test checks that the old `Sys` is freed. The web build keeps
 its single folder picked in the page.
 
-The library holds Atlantis II's folders beside the first game's
-(`games.txt` stays one folder per line; the game is told from the
-folder's files each time). `setup::kind_of` decides: Atlantis II when
+The library holds Atlantis II's and Atlantis III's folders beside the
+first game's (`games.txt` stays one folder per line; the game is told from the
+folder's files each time). `setup::kind_of` decides: Atlantis III
+first (see [Atlantis III](#atlantis-iii)), then Atlantis II when
 `atlantis2_data::files::holds_atlantis2` says so (`atlantis2.exe`, or
 `Game.exe` beside `wam` and `scenar`), else the first game when the
 folder holds `atlantis.exe` or CD images that are not all Atlantis
@@ -853,8 +854,9 @@ open count for the first game unless one of Atlantis II's discs is
 beside them). `setup::find_root` looks a few levels down for either game (or
 one of them), and never looks into the other game's folder, so neither
 detection takes the other game's folder; `setup::candidate_folders`
-reads both GOG.com product ids from the registry (both views; the first
-game's 1207658944, Atlantis II's 1207658951) besides the usual folders.
+reads the GOG.com product ids from the registry (both views; the first
+game's 1207658944, Atlantis II's 1207658951, Atlantis III's 1207658958)
+besides the usual folders.
 `desktop::open_any` opens either: the first game's `Game`, or Atlantis
 II's build (`A2Files::open_dir`, which needs its discs in the folder or
 a folder inside it: the library keeps no `--discs`). Atlantis II has
@@ -873,8 +875,9 @@ the loop again. Atlantis III runs the same way (`a3.rs`, see
 in `setup::candidate_folders` only, as before, and opens folders until
 it has the first one of each game: one game found is offered as
 before, two or more are added to the library. A folder picked in the
-folder picker that holds two games (`setup::find_roots`) asks which one. The
-web build finds either game among the picked files (see
+folder picker that holds two games or more (`setup::find_roots`) asks
+which of the first two. The web build finds any of the three games among
+the picked files (see
 [Atlantis II in the browser](#atlantis-ii-in-the-browser)).
 
 Cryo's DVD is one disc of eight languages: each is its own edition and

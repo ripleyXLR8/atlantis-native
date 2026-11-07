@@ -70,13 +70,18 @@ original's bugs and an optional HD mode.
 </p>
 
 <p align="center">
+  <img src="docs/screenshots/atlantis3-hoggar-dialog.jpg" width="70%" alt="Atlantis III: a dialog in the Hoggar, 800 x 600, with its subtitle">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/game-library.png" width="70%" alt="The game library: several editions of the game">
 </p>
 
 <sub>From top to bottom: the player screen (macOS, HD mode); a dialog with
 its 3D talking head drawn at the window's resolution; the same view in
 the original's 640x480 and in the HD mode; widescreen; *Atlantis II*'s
-Shamballa in the HD mode, widescreen; the game library.
+Shamballa in the HD mode, widescreen; a dialog of *Atlantis III* in the
+Hoggar (GOG.com's French edition, 800 x 600); the game library.
 The game's pictures and text are © Microids (Cryo Interactive
 Entertainment), shown here to illustrate the engine; Atlantis Native
 contains none of them.</sub>
@@ -418,5 +423,5 @@ folder, for a Chinese or the Japanese release only); every package carries
 their licence files, `LICENSE-LiberationSans`, `LICENSE-NotoSerifCJK` and
 `LICENSE-NotoSansJP`, beside `LICENSE`.
 
-*Atlantis: The Lost Tales* and *Atlantis II* are trademarks of their owners. This project is not
+*Atlantis: The Lost Tales*, *Atlantis II* and *Atlantis III* are trademarks of their owners. This project is not
 affiliated with them.

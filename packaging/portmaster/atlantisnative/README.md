@@ -6,6 +6,10 @@ reimplementation of its engine in Rust, here with an SDL2 front end for
 handhelds. The gamepad stands in for the mouse; an on-screen keyboard types
 the players' names.
 
+This port plays the first game only, *Atlantis: The Lost Tales*. Its
+sequels, *Atlantis II* and *Atlantis III*, which Atlantis Native plays on
+Windows, macOS, Linux and in the browser, are not supported here.
+
 The SDL2 front end, its gamepad controls and its on-screen keyboard are
 based on [Klaas Van den Broeck's (@Klaasvdb) R36S port](https://github.com/Klaasvdb/atlantis-native-handheld).
 

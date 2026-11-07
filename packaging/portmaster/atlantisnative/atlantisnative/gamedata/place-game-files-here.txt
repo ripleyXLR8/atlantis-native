@@ -1,3 +1,6 @@
 Copy the files of your own Atlantis: The Lost Tales here (a CD release or
 GOG.com): the folder holding atlantis.exe, BIGCD1.BIG ... BIGCD4.BIG and its
 subfolders (WAV, WAM, SCENAR...).
+
+Only Atlantis: The Lost Tales plays here: the files of Atlantis II or
+Atlantis III are not supported by this port.

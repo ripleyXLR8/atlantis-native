@@ -1,6 +1,6 @@
 [package]
 name = "atlantis-codecs"
-description = "Atlantis: The Lost Tales and Atlantis II codecs: HNM6 panoramas and videos (with Atlantis II's alpha masks), UBB2 dialog videos, APC sound"
+description = "Atlantis: The Lost Tales, Atlantis II and Atlantis III codecs: HNM6 panoramas and videos (with Atlantis II's alpha masks), UBB2 dialog videos, APC sound"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "atlantis2-engine"
-description = "Atlantis II engine: the cube panoramas and, in time, the game"
+description = "Atlantis II engine: the cube panoramas, the scripts, the dialogs and 3D heads, the menus and the puzzles; its panorama, script interpreter and heads also serve Atlantis III"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

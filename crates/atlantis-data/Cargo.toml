@@ -1,6 +1,6 @@
 [package]
 name = "atlantis-data"
-description = "Atlantis: The Lost Tales data files: BigFile archives, executable tables, game detection, places and sprites"
+description = "Atlantis: The Lost Tales data files: BigFile archives, executable tables, game detection, places and sprites; the file layer Atlantis II and III read through"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

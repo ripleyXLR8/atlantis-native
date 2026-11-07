@@ -1,6 +1,6 @@
 [package]
 name = "atlantis2-data"
-description = "Atlantis II data files: game detection, the install and disc file layer, WAM places"
+description = "Atlantis II data files: game detection, the install and disc file layer, WAM places; the formats Atlantis III shares (WAM, 3D scenes, TGA, sprites)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
