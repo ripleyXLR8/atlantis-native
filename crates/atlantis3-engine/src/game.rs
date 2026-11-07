@@ -1,0 +1,3961 @@
+//! The game from launch to the places: the loop modes of `Game.exe`'s frame
+//! task (@ 0x004d5c90) that the first chapters use: the intro (mode 1), the
+//! warp (mode 3, `AtlWarp_continue` @ 0x0043ff20) and the videos (mode 4,
+//! `AtlHnm_continue` @ 0x00421c10), with the chapter scripts run by
+//! *Atlantis II*'s interpreter under *Atlantis III*'s rules
+//! (`atlantis2_engine::script::a3`).
+//!
+//! Time is the caller's: [`Game::step`] is given the seconds since the
+//! start, once per displayed frame. The menus are not ported: after the
+//! intro, [`Game::new_game`] does what the start page's empty player slot
+//! does.
+
+use std::sync::Arc;
+
+use atlantis2_data::defnames::DefNames;
+use atlantis2_data::wam::{self, Wam};
+use atlantis2_engine::camera::direction_angles;
+use atlantis2_engine::look::Look;
+use atlantis2_engine::script::{AnimOp, DialStart, Host, Script};
+use atlantis2_engine::turn::{Turn, Zoom};
+use atlantis2_engine::warp::{A3Raster, FRAME_TO_FACE};
+use atlantis2_engine::{Camera, Fpu, Renderer, Variant};
+use atlantis3_data::spr::{Bank, Depth, Target};
+use atlantis3_data::A3Files;
+
+use crate::audio::{csm_gain, Audio, CHANNEL_CINEMA, CHANNEL_MUSIC, CHANNEL_PLACE, CHANNEL_VOICE};
+use crate::cinema::Cinema;
+use crate::menu::PagePixel;
+use crate::place_anim::Slots;
+use crate::px::{Faces, Surface};
+use crate::startup::Startup;
+use crate::with_px;
+use atlantis2_engine::crt::Rand;
+use atlantis2_engine::place_sound::{sources, Source};
+use atlantis3_data::coord::Coord;
+use std::collections::{BTreeMap, HashMap};
+
+mod board;
+mod credits;
+mod frame_tab;
+mod hooks;
+mod pages;
+mod sfx;
+mod subtitles;
+
+pub use board::BoardInput;
+pub use credits::{Credits, Print};
+#[doc(hidden)]
+pub use hooks::star_room_tables;
+pub use hooks::Screen;
+pub use subtitles::{TextPrint, VoiceSlotState};
+
+/// A decoded sound: rate, channels, interleaved samples.
+type Decoded = (u32, u16, Arc<Vec<i16>>);
+
+/// The world folders (@ 0x004150b0..0x004151f0, index = `MONDE`).
+pub const WORLDS: [&str; 6] = ["", "hoggar", "ldm", "bagdad", "paleo", "inter"];
+
+/// The warp's field of view, 76°, as the 25 Hz ticks set it (@ 0x004409f0,
+/// [`dialog_fov`]: the 1/180 is a double).
+fn warp_fov(fpu: Fpu) -> f32 {
+    dialog_fov(fpu, 76.0)
+}
+
+/// The zone aim of *Atlantis III* (@ 0x004634a0): the points summed on the
+/// x87 stack and rounded to float once, then their direction's angles.
+pub fn zone_aim_a3(fpu: Fpu, points: &[[f32; 3]]) -> (f32, f32) {
+    let mut s = [0f64; 3];
+    for p in points {
+        for (i, v) in s.iter_mut().enumerate() {
+            *v = fpu.add(f64::from(p[i]), *v);
+        }
+    }
+    direction_angles(fpu, s.map(|v| fpu.f32(v)))
+}
+
+/// Why the game cannot start.
+#[derive(Debug)]
+pub enum GameError {
+    Missing(String),
+    Script(String),
+}
+
+impl std::fmt::Display for GameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GameError::Missing(n) => write!(f, "{n}: not found"),
+            GameError::Script(e) => write!(f, "script: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for GameError {}
+
+/// The loop mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// Mode 1: the intro.
+    Intro,
+    /// Mode 3: the panorama.
+    Warp,
+    /// Mode 4: a cinematic (CryoMovie) or a travel video (Hnm_Framer).
+    Video,
+    /// Mode 7: the inventory over the frozen warp.
+    Inventory,
+    /// Mode 8: the subject menu over the frozen warp.
+    Subjects,
+    /// Mode 5: a dialog (`AtlDial_Continue` @ 0x0040d3e0).
+    Dialog,
+    /// Mode 6: a menu page (@ 0x004591a0).
+    Menu,
+    /// Modes 9..18: a full-screen puzzle or map ([`Screen`]).
+    Screen,
+    /// Nothing to show (before the intro, after the game stopped).
+    Idle,
+}
+
+/// A video being played.
+struct Playing {
+    cinema: Cinema,
+    /// When it started (the game's seconds).
+    start: f64,
+    /// A travel video (Hnm_Framer, silent, 15 fps by the clock), drawn
+    /// with the move's transition sprites.
+    travel: bool,
+    /// The mode to go back to (@ 0x0075609c).
+    back: Mode,
+    /// The frame drawn last.
+    shown: u32,
+    /// The caption (`loc\text\<lang>\CineNNN.txt`) and its fade.
+    caption: Option<crate::caption::CaptionFade>,
+    /// The move's transition sprites (`spf\SPF640\<world>\`, `SPF800` with WarpRes 1024).
+    spf: Vec<Bank>,
+    /// A travel video's rate (0x00756488), the time of its last frame
+    /// (0x00756440, the start's at first) and "no continue call yet"
+    /// (0x0075649e, set by `AtlHnm_start`, cleared by every call).
+    fps: u32,
+    last: f64,
+    fresh: bool,
+    /// The cue lines (`hnm\cineNNN.txt`): the line, shown, done.
+    cues: Vec<(atlantis3_data::cine_txt::Cue, bool, bool)>,
+}
+
+/// The subtitle line (@ 0x0074f338): the text, its colour, and whether it
+/// is a caption (flag 0x00755751).
+#[derive(Clone, Debug)]
+struct Subtitle {
+    text: Vec<u8>,
+    rgb: [u8; 3],
+    caption: bool,
+}
+
+/// A move in progress (the globals @ 0x00756074..0x00756094).
+#[derive(Clone, Debug, Default)]
+struct Moving {
+    turn: Option<Turn>,
+    pending: bool,
+    next: Option<u32>,
+    arrival: (f32, f32),
+}
+
+/// The place the player is in.
+#[derive(Default)]
+struct Place {
+    wam: Wam,
+    name: String,
+    view: Option<u32>,
+    /// The six faces, in the display's format.
+    faces: Faces,
+    /// The cube file the faces come from.
+    cube: String,
+}
+
+/// The game.
+pub struct Game {
+    files: A3Files,
+    pub startup: Startup,
+    width: usize,
+    height: usize,
+    /// The screen, in the display's format (`PixelFormat`).
+    screen: Surface,
+    pub audio: Audio,
+    names: DefNames,
+    script: Option<Box<Script>>,
+    /// The world (`MONDE`, @ 0x0077bd04): the folders of the cubes, place
+    /// animations, cinematics and music.
+    world: i32,
+    mode: Mode,
+    /// The game's clock (seconds) at the last step.
+    now: f64,
+    /// The 15 Hz tick's last time and the warp step's 25 Hz accumulator
+    /// (@ 0x007592a0) and its last time (@ 0x00759298).
+    tick_last: f64,
+    look_acc: f32,
+    look_last: Option<f64>,
+    place: Place,
+    camera: Camera,
+    look: Look,
+    renderer: Renderer,
+    zoom: Zoom,
+    moving: Moving,
+    /// The camera's angles at the last Escape press (0x0077e648 /
+    /// 0x0078111c, stored by the keyboard callback with 0x004408e0
+    /// @ 0x0042ac35 before the Escape handler): the in-game menu's
+    /// `BT_BACK` enters the view again with them ([`Game::reenter_view`]).
+    escape_angles: (f32, f32),
+    centre: Option<usize>,
+    /// The view's place animations, the faces they are drawn into, the
+    /// C library's `rand` and the 15 Hz tick count with its "a tick
+    /// passed" flag for the animations (@ 0x0077ad78, 0x0077addc).
+    slots: Slots,
+    spw_cache: HashMap<String, Option<Arc<Bank>>>,
+    work: Faces,
+    rand: Rand,
+    ticks: u32,
+    anim_tick: bool,
+    video: Option<Playing>,
+    /// The click flags (@ 0x007592b8, double click @ 0x007592bb) and the
+    /// last left press (@ 0x00759280).
+    click: bool,
+    double_click: bool,
+    last_press: Option<f64>,
+    /// The cursor: `spr\Interface.spr`, its frame range and frame, and the
+    /// time of its last step (@ 0x00756570..0x00756578, 0x00756500).
+    interface: Option<Bank>,
+    cursor_range: (i32, i32),
+    cursor_frame: i32,
+    cursor_time: f64,
+    /// The place sprite under the centre in the frame drawn (the sprite
+    /// pass's hit test, @ 0x00440bf0 → @ 0x00439940): its state's click
+    /// kind (@ 0x007594e4 + 0x490 slot) and the cursor kind (@ 0x0076e928:
+    /// 1 object, 2 character).
+    cursor_hit: Option<(i32, i32)>,
+    /// The music (`STARTMUSIK`): the file playing, to start it again after
+    /// a cinematic (@ 0x00433d00).
+    music: Option<String>,
+    /// The sounds decoded so far, by file.
+    sounds: HashMap<String, Option<Decoded>>,
+    /// The place's `Coord` file, the listener's position (@ 0x0074e898)
+    /// and the active place sounds by object name (the map of
+    /// `AtlBruitages_InitWarp` @ 0x00401f30).
+    coord: Coord,
+    listener: [f32; 3],
+    place_sounds: BTreeMap<String, Source>,
+    /// A dialog the port does not play: the waiting section goes on at the
+    /// next warp frame, as after the dialog's end.
+    resume_next: bool,
+    /// The free pointer of the inventory and the subject menu
+    /// (@ 0x007592b0, 0x007592b4) and the mode they return to
+    /// (@ 0x007564e0).
+    pointer: (i32, i32),
+    prev_mode: Mode,
+    inventory: crate::inventory::Inventory,
+    /// The world's banks: `<World>Objets.SPR`, `<World>ObjetsEnMain.SPR`,
+    /// `<World>SujetsNN.spr` (opened by `MONDE`), `fleche.SPR`.
+    objects: Option<Bank>,
+    objects_hand: Option<Bank>,
+    /// `Objects.txt` of the subtitle language (the hover label's names).
+    object_names: Option<atlantis3_data::objects::ObjectNames>,
+    subjects_bank: Option<Bank>,
+    arrows: Option<Bank>,
+    banks_world: i32,
+    /// The place sprite under the centre when a click was made (the
+    /// render's hit, @ 0x0077b670): its slot's character or object id and
+    /// click kind.
+    sprite_hit: Option<(i32, i32)>,
+    /// The disc in the drive (`CurrentCD` of the saves, @ 0x00789d38;
+    /// never set by the GOG build's code paths met so far: 0).
+    current_cd: i32,
+    /// The spinning top's handler armed (@ 0x007899d3).
+    /// The credits page (menu page 9), after the ending.
+    credits: Option<credits::Credits>,
+    /// The places' hooks' state ([`hooks`]).
+    puzzles: hooks::Puzzles,
+    /// A right click not yet seen by a screen.
+    right_clicked: bool,
+    /// Tests replaying the script harness: every move turns (see
+    /// [`Game::set_harness_turns`]).
+    harness_turns: bool,
+    /// Values the next script-visible `rand()` calls return (tests: the
+    /// original seeds `rand` with the clock).
+    rand_queue: std::collections::VecDeque<i32>,
+    /// The player number of the save names (1) and the saves written,
+    /// by file name; also kept in `save_dir` when one is given.
+    player: i32,
+    saves: HashMap<String, Vec<u8>>,
+    pub save_dir: Option<std::path::PathBuf>,
+    /// The save files written since [`Game::take_written_saves`], by name
+    /// (an app that keeps the saves elsewhere than a folder).
+    saves_written: Vec<String>,
+    /// The clock of the saves' `DateAndTime`, in seconds since 1970.
+    pub unix_time: fn() -> i64,
+    /// The text resources (loaded at the first text) and the subtitle
+    /// line.
+    texts: Option<crate::text::Texts>,
+    subtitle: Option<Subtitle>,
+    /// The world's dialogs (loaded at each `MONDE`), the dialog playing,
+    /// its renderer at the dialog surface's size and the dialog's 15 Hz
+    /// tick byte (@ 0x0077adde).
+    dialogs: Option<crate::dialog::Dialogs>,
+    running: Option<crate::dialog::Running>,
+    dialog_renderer: Renderer,
+    dialog_tick: bool,
+    /// The field of view (@ 0x007182dc, radians).
+    camera_fov: f32,
+    /// The speakers' heads by (mesh, stand), loaded at their first line.
+    heads: HashMap<(String, i32), Option<atlantis2_engine::head::Head>>,
+    /// The menu page shown (mode 6).
+    /// The menu pages (loop mode 6, [`crate::menu::Menus`]).
+    menus: crate::menu::Menus,
+    /// Tests: the dialog events logged, and the voice model (a voice
+    /// plays for n `IsPlaying` calls).
+    #[doc(hidden)]
+    pub dialog_events: Option<Vec<String>>,
+    #[doc(hidden)]
+    pub voice_model: Option<u32>,
+    /// Tests: the speakers' ticks and heads (off: as a harness that stubs
+    /// them, no `rand` drawn by the eyes).
+    #[doc(hidden)]
+    pub dialog_heads: bool,
+    /// The script asked to stop.
+    pub quit: bool,
+    /// What the scripts did that the port does not play yet (logged once
+    /// each).
+    pub not_ported: Vec<String>,
+    /// The C code's sound objects and the voice slots ([`sfx`]).
+    csounds: sfx::CSounds,
+    /// Tests: the observation log of the board goldens (commands the C
+    /// code runs, shows / hides, animation calls, sounds, voices, scans,
+    /// `rand` draws, sprite calls, flips); `None` in play, where nothing
+    /// is recorded.
+    #[doc(hidden)]
+    pub trace: Option<Vec<String>>,
+    /// Tests: the digest a traced flip records of the screen.
+    #[doc(hidden)]
+    pub trace_digest: Option<fn(&[u16]) -> String>,
+    /// Tests: the panorama replaced by black (the emulation harnesses'
+    /// `warp=flat`).
+    #[doc(hidden)]
+    pub flat_warp: bool,
+    /// Tests: every view entry logged `view <n>` at its start, and a
+    /// cinematic logged `cinema <file>` and taken as played at once (the
+    /// tower harness's stub of `AtlHnm_start`).
+    #[doc(hidden)]
+    pub trace_views: bool,
+    #[doc(hidden)]
+    pub stub_cinemas: bool,
+    /// Tests: the whole-story harness's sound model ([`sfx`]): `PLAYVOICE`
+    /// only logged, a sound started by `Play` playing for ever.
+    #[doc(hidden)]
+    pub story_sound_model: bool,
+    /// Tests: the screen bank's sprite the next screen frame's hit test
+    /// (@ 0x00437080) answers, as a walk's `CLICK ... SPRITE=n` gives it.
+    #[doc(hidden)]
+    pub screen_sprite: Option<i32>,
+    /// Tests: the parts the whole-story harness stubs (the dialogs' set-up
+    /// and start, the place sounds' restarts) draw from a generator of
+    /// their own, leaving `rand` alone as the stubs do.
+    #[doc(hidden)]
+    pub stub_rand: bool,
+}
+
+impl Game {
+    /// The game of the install `files`: its settings and the start-up's
+    /// script part (chapter 0's boot state, the funeral chamber). Nothing
+    /// is shown before [`Game::start_intro`] or [`Game::new_game`].
+    pub fn new(files: A3Files) -> Result<Game, GameError> {
+        let startup = Startup::read(&files);
+        let (width, height) = startup.screen();
+        let defnames = files
+            .read("scenar/defnames.con")
+            .ok_or_else(|| GameError::Missing("scenar\\defnames.con".into()))?;
+        let names = DefNames::parse(&defnames).map_err(|e| GameError::Script(e.to_string()))?;
+        let script = Script::new_a3(&defnames).map_err(GameError::Script)?;
+        let fpu = Fpu::Double;
+        let mut renderer = Renderer::new(Variant::PII, fpu, width, height);
+        renderer.a3 = Some(A3Raster {
+            smooth: startup.config.smooth,
+        });
+        let startup_smooth = startup.config.smooth;
+        // The display in the format of `PixelFormat` (@ 0x004074d0).
+        let depth = if startup.config.pixel_format.bits() > 16 {
+            Depth::Xrgb8888
+        } else {
+            Depth::Rgb565
+        };
+        let interface = files
+            .read("spr/Interface.spr")
+            .and_then(|d| Bank::parse(&d, depth).ok());
+        if interface.is_none() {
+            log::warn!("spr\\Interface.spr missing or unreadable: no cursor");
+        }
+        let look = Look {
+            invert_y: startup.config.invert_mouse_y,
+            ..Look::default()
+        };
+        let mut game = Game {
+            files,
+            startup,
+            width,
+            height,
+            screen: Surface::new(depth, width * height),
+            audio: Audio::new(),
+            names,
+            script: Some(Box::new(script)),
+            world: 1,
+            mode: Mode::Idle,
+            now: 0.0,
+            tick_last: 0.0,
+            look_acc: 0.0,
+            look_last: None,
+            place: Place::default(),
+            camera: Camera::new(fpu, width as u32, height as u32),
+            look,
+            renderer,
+            zoom: Zoom::default(),
+            moving: Moving::default(),
+            escape_angles: (0.0, 0.0),
+            centre: None,
+            slots: Slots::default(),
+            spw_cache: HashMap::new(),
+            work: Default::default(),
+            rand: Rand::new(0),
+            ticks: 0,
+            anim_tick: false,
+            video: None,
+            click: false,
+            double_click: false,
+            last_press: None,
+            interface,
+            cursor_range: (0, 0),
+            cursor_frame: 0,
+            cursor_time: 0.0,
+            cursor_hit: None,
+            resume_next: false,
+            music: None,
+            sounds: HashMap::new(),
+            coord: Coord::default(),
+            listener: [0.0; 3],
+            place_sounds: BTreeMap::new(),
+            pointer: (0, 0),
+            prev_mode: Mode::Warp,
+            inventory: Default::default(),
+            objects: None,
+            objects_hand: None,
+            object_names: None,
+            subjects_bank: None,
+            arrows: None,
+            banks_world: 0,
+            sprite_hit: None,
+            current_cd: 0,
+            texts: None,
+            subtitle: None,
+            dialogs: None,
+            running: None,
+            dialog_renderer: {
+                let (w, h) = crate::dialog::SURFACE;
+                let mut r = Renderer::new(Variant::PII, Fpu::Double, w, h);
+                r.a3 = Some(A3Raster {
+                    smooth: startup_smooth,
+                });
+                r
+            },
+            dialog_tick: false,
+            menus: Default::default(),
+            heads: HashMap::new(),
+            dialog_events: None,
+            voice_model: None,
+            dialog_heads: true,
+            camera_fov: warp_fov(Fpu::Double),
+            credits: None,
+            puzzles: hooks::Puzzles::new(),
+            right_clicked: false,
+            harness_turns: false,
+            rand_queue: Default::default(),
+            player: atlantis3_data::save::DEFAULT_PLAYER,
+            saves: HashMap::new(),
+            save_dir: None,
+            saves_written: Vec::new(),
+            unix_time: pages::system_unix_time,
+            quit: false,
+            not_ported: Vec::new(),
+            csounds: Default::default(),
+            trace: None,
+            trace_digest: None,
+            flat_warp: false,
+            trace_views: false,
+            stub_cinemas: false,
+            story_sound_model: false,
+            screen_sprite: None,
+            stub_rand: false,
+        };
+        if !game.with_script(|s, h| s.boot_a3(h)) {
+            return Err(GameError::Script(game.script_error()));
+        }
+        Ok(game)
+    }
+
+    fn script_error(&self) -> String {
+        self.script
+            .as_ref()
+            .and_then(|s| s.fatal.clone())
+            .unwrap_or_default()
+    }
+
+    /// Runs `f` with the script and the game as its host.
+    fn with_script<R: Default>(&mut self, f: impl FnOnce(&mut Script, &mut dyn Host) -> R) -> R {
+        let Some(mut s) = self.script.take() else {
+            return R::default();
+        };
+        let r = f(&mut s, self);
+        if let Some(e) = &s.fatal {
+            log::error!("script: {e}");
+        }
+        self.quit |= s.quit;
+        self.script = Some(s);
+        r
+    }
+
+    /// The script, for tests.
+    pub fn script(&self) -> Option<&Script> {
+        self.script.as_deref()
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    /// The screen as last drawn, `width` x `height`, on a 16-bit display
+    /// (RGB565; empty on a 32-bit one: [`Game::surface`]).
+    pub fn screen(&self) -> &[u16] {
+        self.screen.as_565().unwrap_or(&[])
+    }
+
+    /// The screen as last drawn, in the display's format.
+    pub fn surface(&self) -> &Surface {
+        &self.screen
+    }
+
+    /// The display's pixel format.
+    pub fn depth(&self) -> Depth {
+        self.screen.depth()
+    }
+
+    /// Tests: the game started on a display of format `depth` (as
+    /// `PixelFormat` gives it at start-up): the screen and the cursor's
+    /// bank in it; views entered after this load their cube, place sprites
+    /// and videos in it.
+    #[doc(hidden)]
+    pub fn start_at_depth(&mut self, depth: Depth) {
+        self.screen = Surface::new(depth, self.width * self.height);
+        self.interface = self
+            .files
+            .read("spr/Interface.spr")
+            .and_then(|d| Bank::parse(&d, depth).ok());
+        self.banks_world = 0;
+        self.place.cube.clear();
+    }
+
+    /// Tests: the view's cube faces as loaded (the display's format).
+    #[doc(hidden)]
+    pub fn place_faces(&self) -> &Faces {
+        &self.place.faces
+    }
+
+    /// Tests: every byte of the six faces set to `byte` (what new heap
+    /// blocks may hold after the options' display switch).
+    #[doc(hidden)]
+    pub fn test_fill_faces(&mut self, byte: u8) {
+        match &mut self.place.faces {
+            Faces::Rgb565(f) => f
+                .iter_mut()
+                .for_each(|x| x.fill(u16::from_ne_bytes([byte; 2]))),
+            Faces::Xrgb8888(f) => f
+                .iter_mut()
+                .for_each(|x| x.fill(u32::from_ne_bytes([byte; 4]))),
+        }
+    }
+
+    /// Tests: the view's place animations, to change.
+    #[doc(hidden)]
+    pub fn test_slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+
+    /// Tests: the angles stored at the last Escape press (0x0077e648 /
+    /// 0x0078111c).
+    #[doc(hidden)]
+    pub fn escape_angles(&self) -> (f32, f32) {
+        self.escape_angles
+    }
+
+    /// Tests: the screen to write into (what a pass leaves on it), on a
+    /// 16-bit display.
+    #[doc(hidden)]
+    pub fn test_screen_mut(&mut self) -> &mut [u16] {
+        match &mut self.screen {
+            Surface::Rgb565(s) => s,
+            Surface::Xrgb8888(_) => &mut [],
+        }
+    }
+
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
+    /// The place's file name and the current view.
+    pub fn place(&self) -> (&str, Option<u32>) {
+        (&self.place.name, self.place.view)
+    }
+
+    pub fn wam(&self) -> &Wam {
+        &self.place.wam
+    }
+
+    pub fn camera(&self) -> &Camera {
+        &self.camera
+    }
+
+    /// The camera's angles in degrees (yaw, pitch).
+    pub fn angles_deg(&self) -> (f32, f32) {
+        let (y, p) = self.camera.angles();
+        (y.to_degrees(), p.to_degrees())
+    }
+
+    /// The zone under the screen centre (its index in the view).
+    pub fn centre_zone(&self) -> Option<usize> {
+        self.centre
+    }
+
+    /// The video playing: its name and the frames shown.
+    pub fn video(&self) -> Option<(&str, u32)> {
+        self.video
+            .as_ref()
+            .map(|v| (v.cinema.name(), v.cinema.frames_shown()))
+    }
+
+    /// Whether the video playing is a travel video (Hnm_Framer).
+    pub fn video_is_travel(&self) -> bool {
+        self.video.as_ref().is_some_and(|v| v.travel)
+    }
+
+    /// The screen the in-game menu captured for the save thumbnails.
+    #[doc(hidden)]
+    pub fn menu_capture(&self) -> Option<&[u16]> {
+        self.menus.capture.as_ref().and_then(|c| c.0.as_565())
+    }
+
+    /// Whether a move waits to complete (the turn ended, the new view not
+    /// entered yet).
+    pub fn move_pending(&self) -> bool {
+        self.moving.pending
+    }
+
+    /// The start page's player n (@ 0x00452000): `(chapter=600)` when
+    /// `game<n>_1.sav` does not exist, else the newest of the run of saves
+    /// from 1 loaded.
+    pub fn new_game_or_load(&mut self, player: i32) -> bool {
+        self.player = player;
+        let mut newest = None;
+        for k in 1.. {
+            let name = atlantis3_data::save::game_save_name(player, k);
+            if self.read_save(&name).is_none() {
+                break;
+            }
+            newest = Some(name);
+        }
+        match newest {
+            None => self.new_game(),
+            Some(name) => {
+                self.mode = Mode::Warp;
+                let ok = self.load_named(&name);
+                self.look_last = None;
+                ok
+            }
+        }
+    }
+
+    /// The next value of a script-visible `rand()` (@ 0x006d348b): a
+    /// queued one (tests), else the CRT's.
+    fn script_rand(&mut self) -> i32 {
+        let v = self
+            .rand_queue
+            .pop_front()
+            .unwrap_or_else(|| self.rand.rand());
+        self.tr(|| format!("rand {v}"));
+        v
+    }
+
+    /// Tests: a line of the observation log ([`Game::trace`]).
+    fn tr(&mut self, f: impl FnOnce() -> String) {
+        if let Some(t) = self.trace.as_mut() {
+            t.push(f());
+        }
+    }
+
+    /// Tests: a line naming an entity (kind 1 a character, else an
+    /// object).
+    fn tr_entity(&mut self, kind: i32, id: i32, f: impl FnOnce(&str) -> String) {
+        if self.trace.is_none() {
+            return;
+        }
+        let section = if kind == 1 {
+            atlantis2_data::defnames::PERSONNAGES
+        } else {
+            atlantis2_data::defnames::OBJETS
+        };
+        let name = usize::try_from(id)
+            .ok()
+            .and_then(|i| self.names.name(section, i))
+            .map_or_else(
+                || format!("{kind}#{id}"),
+                |n| String::from_utf8_lossy(n).into_owned(),
+            );
+        self.tr(|| f(&name));
+    }
+
+    /// Tests: the flip (@ 0x0040fdf0) of a frame the C code drew itself,
+    /// with the screen's digest.
+    fn tr_flip(&mut self) {
+        if self.trace.is_some() {
+            let d = self.trace_digest.map_or_else(
+                || "-".to_string(),
+                |f| f(self.screen.as_565().unwrap_or(&[])),
+            );
+            self.tr(|| format!("flip {d}"));
+        }
+    }
+
+    /// @ 0x0045f520: the slot of (id, kind) playing animation `number`
+    /// (or the first) shown.
+    fn slot_show(&mut self, id: i32, kind: i32, number: i32) {
+        self.tr_entity(kind, id, |e| format!("show {e} kind {kind} arg {number}"));
+        self.slots.show(id, kind, number, self.now);
+    }
+
+    /// @ 0x0045f610: every slot of (id, kind) hidden.
+    fn slot_hide(&mut self, id: i32, kind: i32) {
+        self.tr_entity(kind, id, |e| format!("hide {e} kind {kind} arg 0"));
+        self.slots.hide(id, kind, self.now);
+    }
+
+    /// Tests: the `rand()` values drawn since the generator's state was
+    /// `before` (the place animations' step, the slots' builder).
+    fn tr_rand_since(&mut self, before: u32) {
+        if self.trace.is_none() || self.rand.state == before {
+            return;
+        }
+        let mut r = Rand::new(before);
+        for _ in 0..100_000 {
+            let v = r.rand();
+            self.tr(|| format!("rand {v}"));
+            if r.state == self.rand.state {
+                break;
+            }
+        }
+    }
+
+    /// Tests replaying the original's script harness, whose move set-up
+    /// always starts a turn (ended at the next frame) even when the camera
+    /// already looks at the destination.
+    #[doc(hidden)]
+    pub fn set_harness_turns(&mut self, on: bool) {
+        self.harness_turns = on;
+    }
+
+    /// Queues the values the next script-visible `rand()` calls return
+    /// (tests replaying the original's run).
+    pub fn queue_rand(&mut self, v: i32) {
+        self.rand_queue.push_back(v);
+    }
+
+    /// The state of `rand`'s generator (tests: checking the draws made
+    /// against a run of the original).
+    #[doc(hidden)]
+    pub fn rand_state(&self) -> u32 {
+        self.rand.state
+    }
+
+    /// The game's clock set to `t` without the ticks in between (tests: a
+    /// harness clock that jumps, as at a checkpoint's reload).
+    #[doc(hidden)]
+    pub fn set_clock(&mut self, t: f64) {
+        self.now = t;
+        self.tick_last = t;
+    }
+
+    /// Loads a save's text as the loader does (@ 0x0045b750), the save kept
+    /// under `name` (tests: a story segment started from the original's
+    /// save).
+    pub fn load_save_text(&mut self, name: &str, text: Vec<u8>) -> bool {
+        self.saves.insert(name.to_string(), text);
+        self.video = None;
+        self.mode = Mode::Warp;
+        let ok = self.load_named(name);
+        self.look_last = None;
+        ok
+    }
+
+    /// Loads save `name` (the loader @ 0x0045b750).
+    fn load_named(&mut self, name: &str) -> bool {
+        let Some(d) = self.read_save(name) else {
+            return false;
+        };
+        let save = atlantis3_data::save::SaveGame::parse(&d);
+        let data = load_data(&save);
+        self.puzzles.after_load();
+        let ok = self.with_script(|s, h| s.load_a3(h, &data));
+        self.after_load_hook();
+        ok
+    }
+
+    /// The player's next save `game<P>_<N>.sav` (the first N free,
+    /// @ 0x0045e300); its name.
+    pub fn save_game(&mut self) -> Option<String> {
+        let name = (1..)
+            .map(|k| atlantis3_data::save::game_save_name(self.player, k))
+            .find(|n| self.read_save(n).is_none())?;
+        let s = self.script.take()?;
+        let data = self.save_text(&s);
+        self.script = Some(s);
+        self.store_save(&name, data);
+        Some(name)
+    }
+
+    /// One pass of the dialog loop (tests): with or without the dialog's
+    /// 15 Hz tick; whether the dialog still runs.
+    #[doc(hidden)]
+    pub fn dialog_pass(&mut self, tick: bool) -> bool {
+        self.dialog_tick = tick;
+        self.dialog_frame();
+        self.running.is_some()
+    }
+
+    /// Starts dialog `n` as `DIAL` does (tests).
+    #[doc(hidden)]
+    pub fn start_dialog_now(&mut self, n: i32, voixoff: bool) {
+        self.start_dialog(n, voixoff);
+    }
+
+    /// The world's dialogs loaded again with `rand` seeded (tests).
+    #[doc(hidden)]
+    pub fn reload_dialogs(&mut self, seed: u32) {
+        self.rand = Rand::new(seed);
+        let w = self.world;
+        self.load_dialogs(w);
+    }
+
+    /// Whether a dialog plays.
+    pub fn dialog_running(&self) -> bool {
+        self.running.is_some()
+    }
+
+    /// The dialog playing: its number and line.
+    pub fn dialog_line(&self) -> Option<(i32, i32)> {
+        self.running.as_ref().map(|r| (r.dialog, r.line))
+    }
+
+    /// Ends the dialog playing (tests).
+    #[doc(hidden)]
+    pub fn finish_dialog(&mut self) {
+        if self.running.is_some() {
+            self.close_dialog();
+        }
+    }
+
+    /// Whether a move turns the view.
+    pub fn turning(&self) -> bool {
+        self.moving.turn.is_some()
+    }
+
+    /// The intro (mode 1, @ 0x00459360): `intro.hnm` from `hnm\` at 15
+    /// frames a second, no caption (`Rien.txt` does not exist).
+    pub fn start_intro(&mut self) {
+        let lang = self.startup.config.langue.clone();
+        if lang != b"fra" && !lang.is_empty() {
+            log::warn!(
+                "intro: the localised intros ({}) are not ported: intro.hnm",
+                String::from_utf8_lossy(&lang)
+            );
+        }
+        if !self.start_video("hnm/intro.hnm", 15, false, Mode::Idle, Vec::new()) {
+            self.mode = Mode::Idle;
+        }
+        self.mode = if self.video.is_some() {
+            Mode::Intro
+        } else {
+            Mode::Idle
+        };
+    }
+
+    /// The start page's new game for an empty player slot (@ 0x00452b98):
+    /// the flags and the bag cleared, `(chapter=600)`, then the warp. The
+    /// first warp frame's arrival scan plays chapter 1's three cinematics.
+    pub fn new_game(&mut self) -> bool {
+        self.video = None;
+        self.audio.stop(CHANNEL_CINEMA);
+        self.mode = Mode::Warp;
+        let ok = self.with_script(|s, h| s.new_game_a3(h));
+        self.look_last = None;
+        ok
+    }
+
+    /// Space or Escape (`WM_KEYDOWN` in the cinematic's wait loop
+    /// @ 0x00421c5b): the cinematic stops. Travel videos ignore keys.
+    pub fn skip(&mut self) {
+        if self.video.as_ref().is_some_and(|v| !v.travel) {
+            self.end_video();
+        }
+    }
+
+    /// A mouse move of (dx, dy) mickeys (@ 0x004313a0): in the warp, not
+    /// turning, the turn speeds gain dx / 2000 and lose dy / 2000; the
+    /// centre zone is picked again.
+    pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
+        if matches!(
+            self.mode,
+            Mode::Inventory | Mode::Subjects | Mode::Menu | Mode::Screen
+        ) {
+            // The free pointer, clamped to the screen (@ 0x004313f6).
+            self.pointer.0 = (self.pointer.0 + dx).clamp(0, self.width as i32 - 1);
+            self.pointer.1 = (self.pointer.1 + dy).clamp(0, self.height as i32 - 1);
+            return;
+        }
+        if self.mode != Mode::Warp || self.moving.turn.is_some() {
+            return;
+        }
+        self.look.mouse(self.camera.fpu, dx, dy);
+        self.centre = self.pick_centre();
+    }
+
+    /// The left button pressed (@ 0x00431580): the click flag, and the
+    /// double-click flag within 0.2 s of the previous press. In a travel
+    /// video a click ends it.
+    pub fn click(&mut self) {
+        // The mouse handler skips both buttons while a puzzle freezes the
+        // input (@ 0x00431580, byte 0x00789d56).
+        if self.puzzles.freeze {
+            return;
+        }
+        if self.mode == Mode::Menu {
+            self.menus.press();
+        }
+        self.click = true;
+        if self.last_press.is_some_and(|t| self.now - t < 0.2) {
+            self.double_click = true;
+        }
+        // The script reads the same flags (`Script::click`).
+        if let Some(s) = self.script.as_mut() {
+            s.click = true;
+            s.double_click |= self.double_click;
+        }
+        self.last_press = Some(self.now);
+    }
+
+    /// The free pointer (inventory, subject menu).
+    pub fn pointer(&self) -> (i32, i32) {
+        self.pointer
+    }
+
+    /// Puts the free pointer at (x, y) (tests; the window's absolute
+    /// mouse).
+    pub fn set_pointer(&mut self, x: i32, y: i32) {
+        self.pointer = (
+            x.clamp(0, self.width as i32 - 1),
+            y.clamp(0, self.height as i32 - 1),
+        );
+    }
+
+    /// The right button (@ 0x00431639..0x00431676): in the warp the
+    /// inventory opens (unless it is open), in the inventory it closes, in
+    /// the subject menu the menu closes.
+    pub fn right_click(&mut self) {
+        if self.puzzles.freeze {
+            return;
+        }
+        // The right button's byte (0x007592b9), read by the screens and the
+        // hunt; cleared when the warp opens the inventory.
+        self.right_clicked = true;
+        match self.mode {
+            Mode::Warp if self.moving.turn.is_none() && !self.moving.pending => {
+                self.open_inventory();
+                self.right_clicked = false;
+            }
+            Mode::Inventory => self.close_inventory(),
+            Mode::Subjects => self.close_subjects(),
+            _ => {}
+        }
+    }
+
+    /// Whether the inventory is open.
+    pub fn inventory_open(&self) -> bool {
+        self.inventory.open
+    }
+
+    /// The bag entries the inventory shows (the current world's).
+    pub fn inventory_items(&self) -> Vec<atlantis2_engine::script::BagEntry> {
+        self.script
+            .as_ref()
+            .map(|s| crate::inventory::shown(&s.bag, s.a3.world))
+            .unwrap_or_default()
+    }
+
+    /// The object in the hand (`OBJETENMAIN`), 0 for none.
+    pub fn object_in_hand(&self) -> i32 {
+        self.script
+            .as_ref()
+            .map_or(0, |s| s.vars[s.keys.objetenmain])
+    }
+
+    /// The world's sprite banks, opened again when the world changed.
+    fn world_banks(&mut self) {
+        let world = self.world;
+        if world == self.banks_world {
+            return;
+        }
+        self.banks_world = world;
+        let depth = self.depth();
+        let open = |files: &A3Files, path: String| {
+            let b = files.read(&path).and_then(|d| Bank::parse(&d, depth).ok());
+            if b.is_none() {
+                log::warn!("{path}: not found");
+            }
+            b
+        };
+        let name = crate::inventory::world_bank_name(world);
+        self.objects = name.and_then(|n| open(&self.files, format!("spr/{n}Objets.SPR")));
+        self.objects_hand =
+            name.and_then(|n| open(&self.files, format!("spr/{n}ObjetsEnMain.SPR")));
+        let lay = crate::subjects::Layout::for_width(self.width);
+        self.subjects_bank = lay.bank_path(world).and_then(|p| open(&self.files, p));
+        if self.arrows.is_none() {
+            self.arrows = open(&self.files, "spr/fleche.SPR".into());
+        }
+    }
+
+    /// Opens the inventory (@ 0x00427a60): mode 7, the turn speeds
+    /// zeroed, the hand emptied, alpha 0, the fade timer restarted.
+    fn open_inventory(&mut self) {
+        self.world_banks();
+        self.prev_mode = self.mode;
+        self.mode = Mode::Inventory;
+        // The free pointer at the centre (@ 0x00431780); the turn speeds
+        // are not cleared here.
+        self.pointer = ((self.width / 2) as i32, (self.height / 2) as i32);
+        if let Some(s) = self.script.as_mut() {
+            s.empty_hand();
+        }
+        self.inventory.open = true;
+        self.inventory.alpha = 0.0;
+        self.inventory.fade_time = self.now;
+        self.click = false;
+        // `CtrlScenarIN` once (@ 0x00427a60).
+        self.with_script(|s, h| {
+            s.ctrl_scenar_in(h);
+        });
+    }
+
+    /// Closes the inventory (@ 0x00427b20): the mode back; the items fade
+    /// out over the warp.
+    /// The inventory closed as a pick closes it (@ 0x00427b20), without
+    /// the right button (tests: a harness picking an object that is not
+    /// in the bag, which `SetObjetEnMain` then refuses).
+    #[doc(hidden)]
+    pub fn close_inventory_now(&mut self) {
+        if self.inventory.open {
+            self.close_inventory();
+        }
+    }
+
+    fn close_inventory(&mut self) {
+        self.inventory.open = false;
+        self.mode = self.prev_mode;
+        // The turn speeds zeroed (@ 0x00431760), the pointer cursor and
+        // the hand cleared, the click flags cleared; alpha kept.
+        self.look.stop();
+        if let Some(s) = self.script.as_mut() {
+            s.empty_hand();
+            s.click = false;
+        }
+        self.click = false;
+        self.double_click = false;
+        self.look_last = None;
+    }
+
+    /// Opens the subject menu for `character` (@ 0x00440530 →
+    /// @ 0x00427b80): `CLICPERSO`, mode 8, the pointer at the centre.
+    fn open_subjects(&mut self, character: i32) {
+        self.world_banks();
+        if let Some(s) = self.script.as_mut() {
+            let k = s.keys.clicperso;
+            s.vars[k] = character;
+        }
+        self.prev_mode = self.mode;
+        self.mode = Mode::Subjects;
+        self.pointer = ((self.width / 2) as i32, (self.height / 2) as i32);
+    }
+
+    /// Closes the subject menu (@ 0x00427be0): the mode back, the turn
+    /// speeds zeroed, the hand emptied, the click flags cleared.
+    fn close_subjects(&mut self) {
+        self.mode = self.prev_mode;
+        self.look.stop();
+        if let Some(s) = self.script.as_mut() {
+            s.empty_hand();
+            s.click = false;
+        }
+        self.click = false;
+        self.double_click = false;
+        self.look_last = None;
+    }
+
+    /// Whether the subject menu is open.
+    pub fn subjects_open(&self) -> bool {
+        self.mode == Mode::Subjects
+    }
+
+    /// A sprite drawn centred on (x, y) at an alpha (`AtlSpr_AffCentre`
+    /// @ 0x00436b80 → `AtlSpr_Aff` @ 0x004367b0).
+    #[allow(clippy::too_many_arguments)]
+    fn aff_centre(
+        screen: &mut Surface,
+        w: usize,
+        h: usize,
+        bank: &Bank,
+        idx: usize,
+        x: i32,
+        y: i32,
+        alpha: f32,
+    ) {
+        with_px!(screen, s => {
+            crate::inventory::aff_centre(s.as_mut_slice(), w, h, "", bank, idx, x, y, alpha);
+        });
+    }
+
+    /// `AtlSpr_Aff` (@ 0x004367b0).
+    #[allow(clippy::too_many_arguments)]
+    fn aff(
+        screen: &mut Surface,
+        w: usize,
+        h: usize,
+        bank: &Bank,
+        idx: usize,
+        x: i32,
+        y: i32,
+        alpha: f32,
+    ) {
+        with_px!(screen, s => {
+            crate::inventory::aff(s.as_mut_slice(), w, h, "", bank, idx, x, y, alpha);
+        });
+    }
+
+    /// The inventory's items, bar and arrows at its alpha (@ 0x004299b0,
+    /// @ 0x00428fd0).
+    /// The hover label of the object under the pointer (@ 0x00429b80 →
+    /// @ 0x0042a530), every frame, no delay.
+    fn draw_inventory_label(&mut self) {
+        let items = self.inventory_items();
+        let Some(e) = self
+            .inventory
+            .hovered(self.width, self.height, self.pointer, &items)
+        else {
+            return;
+        };
+        let Some(key) = usize::try_from(e.id)
+            .ok()
+            .and_then(|i| self.names.name(atlantis2_data::defnames::OBJETS, i))
+            .map(|n| String::from_utf8_lossy(n).into_owned())
+        else {
+            return;
+        };
+        if self.object_names.is_none() {
+            let lang = self.startup.text_language();
+            self.object_names = self
+                .files
+                .read(atlantis3_data::objects::objects_path(&lang).trim_start_matches("Datas/"))
+                .and_then(|d| atlantis3_data::objects::ObjectNames::parse(&d).ok());
+        }
+        let Some(text) = self
+            .object_names
+            .as_ref()
+            .and_then(|n| n.name(&key))
+            .map(<[u8]>::to_vec)
+        else {
+            return;
+        };
+        let (w, h) = (self.width, self.height);
+        self.texts();
+        let Some(font) = self
+            .texts
+            .as_ref()
+            .and_then(|t| t.gdi(crate::text::FontId::Default, w))
+        else {
+            return;
+        };
+        let (_, zone, _) = crate::inventory::label(font, &text, self.pointer, w as i32, h as i32);
+        if let Some(t) = self.texts.as_ref() {
+            with_px!(&mut self.screen, s => t.print(
+                s,
+                w,
+                h,
+                crate::text::FontId::Default,
+                &text,
+                zone,
+                0xffffff,
+            ));
+        }
+    }
+
+    fn draw_inventory_items(&mut self) {
+        let items = self.inventory_items();
+        let objects = self
+            .script
+            .as_ref()
+            .and_then(|s| crate::inventory::world_bank_name(s.a3.world))
+            .map_or("Objets.spr", |n| match n {
+                "Hoggar" => "HoggarObjets.spr",
+                "LDM" => "LDMObjets.spr",
+                "Bagdad" => "BagdadObjets.spr",
+                "Paleo" => "PaleoObjets.spr",
+                _ => "InterObjets.spr",
+            });
+        let banks = crate::inventory::Banks {
+            interface: self.interface.as_ref(),
+            objects: self.objects.as_ref(),
+            arrows: self.arrows.as_ref(),
+        };
+        let (w, h) = (self.width, self.height);
+        let (scroll, alpha) = (self.inventory.scroll, self.inventory.alpha);
+        with_px!(&mut self.screen, s => {
+            crate::inventory::draw_items(s.as_mut_slice(), w, h, &banks, &items, scroll, alpha, objects);
+        });
+    }
+
+    /// The pointer `Interface.spr` #40 at the free pointer (@ 0x004281e0).
+    fn draw_pointer(&mut self) {
+        if let Some(bank) = &self.interface {
+            let (w, h) = (self.width, self.height);
+            Self::aff(
+                &mut self.screen,
+                w,
+                h,
+                bank,
+                40,
+                self.pointer.0,
+                self.pointer.1,
+                1.0,
+            );
+        }
+    }
+
+    /// A frame of the inventory or the subject menu (@ 0x00427c40): the
+    /// warp drawn, not stepped, without its cursor; the overlay; the
+    /// pointer; then the pick.
+    fn overlay_frame(&mut self) {
+        self.draw_warp_only();
+        if self.mode == Mode::Inventory {
+            // @ 0x00427c40: the items, the arrows, the bar, the pointer,
+            // the pick, `Interp_GereFrame`, then a picked object closes
+            // the inventory and goes in the hand; the fade's step.
+            self.draw_inventory_items();
+            self.draw_pointer();
+            self.draw_inventory_label();
+            // The flip (@ 0x00427cc6): the subtitle line or the voice
+            // slots over the inventory.
+            self.flip_texts();
+            let items = self.inventory_items();
+            self.inventory
+                .scroll_step(self.width, items.len(), self.pointer.0, self.now);
+            let picked = if std::mem::take(&mut self.click) {
+                self.inventory
+                    .pick(self.width, self.height, self.pointer, &items)
+            } else {
+                None
+            };
+            let (yaw, pitch) = self.camera.angles();
+            self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
+            if let Some(e) = picked {
+                self.close_inventory();
+                if let Some(s) = self.script.as_mut() {
+                    s.hold(e.id);
+                }
+                self.frame_hook();
+            }
+            self.inventory.fade_step(self.now);
+        } else {
+            self.draw_subjects();
+            self.draw_pointer();
+            // The flip (@ 0x00427ed1), before the pick.
+            self.flip_texts();
+            if std::mem::take(&mut self.click) {
+                let lay = crate::subjects::Layout::for_width(self.width);
+                let r = self.script.as_ref().map_or(-2, |s| {
+                    lay.pick(&s.subjects, s.vars[s.keys.clicperso], self.pointer)
+                });
+                if r > -1 {
+                    self.close_subjects();
+                    self.sprite_hit = None;
+                    self.with_script(|s, h| {
+                        let k = s.keys.clone();
+                        s.vars[k.sujet] = r;
+                        s.subject_scan(h);
+                        s.vars[k.clicperso] = 0;
+                        s.vars[k.sujet] = -2;
+                    });
+                }
+            }
+        }
+    }
+
+    /// The subjects of `CLICPERSO` (@ 0x0043b850).
+    fn draw_subjects(&mut self) {
+        let lay = crate::subjects::Layout::for_width(self.width);
+        let Some(s) = self.script.as_ref() else {
+            return;
+        };
+        let cells = lay.cells(&s.subjects.list(s.vars[s.keys.clicperso]));
+        let (w, h) = (self.width, self.height);
+        for c in cells {
+            if let (Some(bank), Ok(v)) = (&self.subjects_bank, usize::try_from(c.value)) {
+                Self::aff_centre(&mut self.screen, w, h, bank, v, c.x, c.y, c.alpha);
+            }
+            if let Some(bank) = &self.interface {
+                Self::aff_centre(
+                    &mut self.screen,
+                    w,
+                    h,
+                    bank,
+                    lay.ring,
+                    c.ring.0,
+                    c.ring.1,
+                    1.0,
+                );
+            }
+        }
+    }
+
+    /// One displayed frame at the game's time `now` (seconds).
+    pub fn step(&mut self, now: f64) {
+        self.now = now;
+        // The 15 Hz tick (@ 0x0043e550): the scripts' clocks.
+        while now - self.tick_last >= 1.0 / 15.0 {
+            let last = self.tick_last;
+            self.tick_last += 1.0 / 15.0;
+            let t = self.tick_last;
+            if let Some(s) = self.script.as_mut() {
+                s.tick(t, last);
+            }
+            self.ticks = self.ticks.wrapping_add(1);
+            self.anim_tick = true;
+            self.dialog_tick = true;
+        }
+        match self.mode {
+            Mode::Intro | Mode::Video => self.video_step(),
+            Mode::Warp => self.warp_frame(),
+            Mode::Inventory | Mode::Subjects => self.overlay_frame(),
+            Mode::Dialog => self.dialog_frame(),
+            Mode::Menu => self.menu_frame(),
+            Mode::Screen => self.screen_frame(),
+            Mode::Idle => {}
+        }
+        // The main loop's per-frame place part, after the mode's frame
+        // (@ 0x004d5df9 → 0x004c1950).
+        self.main_loop_hook();
+    }
+
+    // ---- videos -------------------------------------------------------
+
+    /// `AtlHnm_start`: opens `path` (under `Datas\`) and switches to the
+    /// video mode; false when the file is missing or unreadable.
+    fn start_video(
+        &mut self,
+        path: &str,
+        fps: u32,
+        travel: bool,
+        back: Mode,
+        spf: Vec<Bank>,
+    ) -> bool {
+        let Some(data) = self.files.read(path) else {
+            log::warn!("{path}: not found");
+            return false;
+        };
+        let name = path.rsplit('/').next().unwrap_or(path).to_string();
+        let cinema = match Cinema::open_depth(&name, Arc::from(data), fps, self.depth()) {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("{e}");
+                return false;
+            }
+        };
+        if let Some(f) = cinema.audio_format() {
+            self.audio.start_stream(
+                CHANNEL_CINEMA,
+                f.sample_rate,
+                f.channels,
+                self.cinema_gain(),
+            );
+        }
+        self.video = Some(Playing {
+            cinema,
+            start: self.now,
+            travel,
+            back,
+            shown: 0,
+            caption: None,
+            cues: Vec::new(),
+            spf,
+            fps: fps.max(1),
+            last: self.now,
+            fresh: true,
+        });
+        self.mode = Mode::Video;
+        // A cinematic's first frame at once; a travel video's at the
+        // next frame task's `AtlHnm_continue`.
+        if !travel {
+            self.video_step();
+        }
+        true
+    }
+
+    /// CryoMovie's volume (@ 0x006b9100 with `GlobalVolume`, 0..99).
+    fn cinema_gain(&self) -> f32 {
+        self.startup.config.global_volume as f32 / 99.0
+    }
+
+    fn video_step(&mut self) {
+        let Some(v) = self.video.as_mut() else {
+            self.mode = Mode::Idle;
+            return;
+        };
+        let mut advanced = false;
+        if v.travel {
+            // Hnm_Framer (@ 0x00421f01..): nothing before 1 / fps s since
+            // the last frame (the click test not reached), then one frame.
+            v.fresh = false;
+            if self.now - v.last < 1.0 / f64::from(v.fps) {
+                return;
+            }
+            v.last = self.now;
+            if !v.cinema.advance() {
+                self.end_video();
+                return;
+            }
+            advanced = true;
+        } else {
+            let elapsed_ms = ((self.now - v.start) * 1000.0).max(0.0) as u64;
+            while v.cinema.frames_shown() == 0 || v.cinema.next_due_ms() <= elapsed_ms {
+                if !v.cinema.advance() {
+                    break;
+                }
+                advanced = true;
+                let pcm = v.cinema.take_audio();
+                if !pcm.is_empty() {
+                    self.audio.push(CHANNEL_CINEMA, &pcm);
+                }
+            }
+        }
+        if advanced {
+            v.shown = v.cinema.frames_shown();
+            // The caption's fade and the cue lines (@ 0x00421c7f..).
+            let frame = v.shown as i32;
+            let fpu = self.camera.fpu;
+            if let Some(c) = v.caption.as_mut() {
+                for op in c.frame(frame, fpu) {
+                    self.subtitle = match op {
+                        crate::caption::CaptionOp::Set(rgb) => Some(Subtitle {
+                            text: c.caption.text.clone(),
+                            rgb,
+                            caption: true,
+                        }),
+                        crate::caption::CaptionOp::Clear => None,
+                    };
+                }
+            }
+            for (cue, shown, done) in v.cues.iter_mut() {
+                if *done {
+                    continue;
+                }
+                if !*shown && frame >= cue.from_frame {
+                    *shown = true;
+                    let text = self
+                        .texts
+                        .get_or_insert_with(|| {
+                            crate::text::Texts::load(&self.files, &self.startup.text_language())
+                        })
+                        .dial(cue.dialog, cue.line)
+                        .map(<[u8]>::to_vec)
+                        .unwrap_or_default();
+                    self.subtitle = Some(Subtitle {
+                        text,
+                        rgb: cue.rgb(),
+                        caption: false,
+                    });
+                }
+                if *shown && frame >= cue.to_frame {
+                    *done = true;
+                    self.subtitle = None;
+                }
+            }
+            let (w, h) = v.cinema.size();
+            let (sw, sh) = (self.width, self.height);
+            match (v.cinema.frame_px(), &mut self.screen) {
+                (crate::cinema::Frame::Rgb565(f), Surface::Rgb565(out)) => {
+                    video_frame(f, w, h, &v.spf, v.shown, out, sw, sh)
+                }
+                (crate::cinema::Frame::Xrgb8888(f), Surface::Xrgb8888(out)) => {
+                    video_frame(f, w, h, &v.spf, v.shown, out, sw, sh)
+                }
+                _ => {}
+            }
+        }
+        let travel = v.travel;
+        // Hnm_Framer's end test (@ 0x00443a00, after the frame and the
+        // click test): the frames read equal the file's count, so the call
+        // that shows the last frame ends the video.
+        let ended = v.cinema.ended()
+            || (travel && advanced && v.cinema.frames_shown() >= v.cinema.frame_count());
+        // The flip of a new frame (@ 0x00422002): the subtitle line, else
+        // the voice slots (@ 0x0040de60).
+        if advanced {
+            self.flip_texts();
+        }
+        // A travel video's frame drawn: a click or a double click ends it
+        // (@ 0x00422019: both flags cleared), then the stream's end.
+        if travel && (self.click || self.double_click) {
+            self.click = false;
+            self.double_click = false;
+            self.end_video();
+            return;
+        }
+        if ended {
+            self.end_video();
+        }
+    }
+
+    /// Escape during a travel video (@ 0x0042ac50, loop mode 4). Before
+    /// the video's first `AtlHnm_continue` call: `AtlHnm_end` only (back to
+    /// the warp, nothing else). Otherwise: the subtitle off, 0x0044c620(1)
+    /// ([`Script::interrupt_lock`]), `AtlHnm_end` (the warp mode back, then
+    /// `Interp_CloseInterrupt(1)`, which runs the last interrupted
+    /// section's tail again: the original's bug, kept), the screen captured
+    /// for the save thumbnails (the last travel frame shown), loop mode 6
+    /// with the warp to go back to, the in-game menu (page 1) — or, during
+    /// the start page's demo, page 0 without the capture. The place sounds
+    /// go on (unlike the warp's Escape).
+    pub(crate) fn escape_travel(&mut self) {
+        let Some(v) = self.video.as_ref() else {
+            return;
+        };
+        if v.fresh {
+            self.end_video();
+            return;
+        }
+        self.subtitle = None;
+        if let Some(s) = self.script.as_mut() {
+            s.interrupt_lock();
+        }
+        self.end_video();
+        if self.menus.demo {
+            self.enter_menu(crate::menu::PAGE_START);
+            return;
+        }
+        let capture = (self.screen.clone(), self.width, self.height);
+        if self.enter_menu(crate::menu::PAGE_MAIN) {
+            self.menus.capture = Some(capture);
+        }
+    }
+
+    /// The end of a video (@ 0x00422090): the mode back, then
+    /// `Interp_CloseInterrupt(1)`: a section waiting for it goes on.
+    fn end_video(&mut self) {
+        let Some(v) = self.video.take() else {
+            return;
+        };
+        self.subtitle = None;
+        self.audio.stop(CHANNEL_CINEMA);
+        self.mode = v.back;
+        if !v.travel {
+            // The music starts again from its beginning (@ 0x00433d00).
+            if let Some(m) = self.music.clone() {
+                self.play_music(&m);
+            }
+        }
+        if v.back == Mode::Idle {
+            return;
+        }
+        self.click = false;
+        self.with_script(|s, h| s.close_interrupt(h));
+        self.look_last = None;
+    }
+
+    // ---- the warp ------------------------------------------------------
+
+    /// `AtlWarp_continue` (@ 0x0043ff20).
+    fn warp_frame(&mut self) {
+        if std::mem::take(&mut self.resume_next) {
+            self.with_script(|s, h| {
+                s.dialog_ended(h);
+            });
+        }
+        // 1. The step: 25 Hz ticks of the look or the turn, the centre pick.
+        self.warp_step();
+        // 2. The frame drawn; with the click flag set, the sprite pass
+        // records the place sprite under the centre (@ 0x00440bf0).
+        let drawn = self.draw_warp();
+        if self.click && self.sprite_hit.is_none() {
+            self.sprite_hit = self.sprite_under_centre();
+        }
+        // 3. The script's waits; one that ends flips the drawn frame
+        // (@ 0x0043ffaa, 0x0044001b, 0x00440067).
+        if self.with_script(|s, h| s.check_waits(h)) {
+            self.click = false;
+            if drawn && !self.flip_suppressed() {
+                self.flip_texts();
+            }
+            return;
+        }
+        // 4. Not turning (a turn that ended at step 1 leaves its move
+        // pending for step 6): the click, `Interp_GereFrame`.
+        if self.moving.turn.is_none() {
+            if self.click {
+                self.sprite_clicks();
+            }
+            if self.click && self.mode == Mode::Warp {
+                self.zone_click();
+            }
+            let (yaw, pitch) = self.camera.angles();
+            self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
+            // The places' frame hook (@ 0x004c27d0).
+            self.frame_hook();
+            // The click scan (@ 0x004405b0) whenever no menu is open: a
+            // screen the frame hook started, a dialog or a film a scan
+            // started do not prevent it.
+            if !matches!(self.mode, Mode::Inventory | Mode::Subjects) {
+                self.click_scan();
+            }
+            if matches!(self.mode, Mode::Warp | Mode::Subjects) {
+                self.place_sounds_frame();
+            }
+        }
+        // 5. The flip of the drawn frame (@ 0x004400e5), unless the frame
+        // started a video or a dialog (loop mode 4 or 5): the subtitle line
+        // or the voice slots over the warp (@ 0x0040de60).
+        if drawn && !self.flip_suppressed() {
+            self.flip_texts();
+        }
+        // A cinematic or a dialog the scans started does not stop the
+        // frame: its arrival block still runs (@ 0x004400ed), only a view
+        // to enter waits for the warp.
+        if !matches!(self.mode, Mode::Warp | Mode::Subjects) {
+            self.click = false;
+            self.double_click = false;
+            self.right_clicked = false;
+            if self.moving.pending && self.moving.next.is_none() {
+                self.complete_move();
+            }
+            // `CLICZONE` = 0 @ 0x0044037e..0x00440388 whatever the mode:
+            // no mode test between the flip and the frame's end.
+            if let Some(s) = self.script.as_mut() {
+                let k = s.keys.cliczone;
+                s.vars[k] = 0;
+            }
+            return;
+        }
+        // 6. The click flags cleared (and the sprite hit with them).
+        self.click = false;
+        self.right_clicked = false;
+        self.sprite_hit = None;
+        if let Some(s) = self.script.as_mut() {
+            s.click = false;
+        }
+        // 7. A pending move completes.
+        if self.moving.pending {
+            self.complete_move();
+        }
+        self.double_click = false;
+        // 8. `CLICZONE` = 0.
+        if let Some(s) = self.script.as_mut() {
+            let k = s.keys.cliczone;
+            s.vars[k] = 0;
+        }
+    }
+
+    /// @ 0x004317a0: `dt` since the last step (at most 0.5 s) × 25 into the
+    /// accumulator; per whole tick, a turn step or the look's inertia and
+    /// limits, and the 76° field of view; then the centre pick.
+    fn warp_step(&mut self) {
+        let dt = match self.look_last {
+            Some(t) => (self.now - t).min(0.5),
+            None => 0.0,
+        };
+        self.look_last = Some(self.now);
+        // The script harness's turn ends at the frame after its start,
+        // the camera as it was.
+        if self.harness_turns && self.moving.turn.take().is_some() {
+            self.moving.pending = true;
+            return;
+        }
+        let fpu = self.camera.fpu;
+        self.look_acc = fpu.f32(fpu.add(f64::from(self.look_acc), fpu.mul(dt, 25.0)));
+        if let Some(s) = self.script.as_ref() {
+            self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
+            self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
+        }
+        let (w, h) = (self.width as u32, self.height as u32);
+        while self.look_acc >= 1.0 {
+            self.look_acc -= 1.0;
+            if let Some(turn) = self.moving.turn.as_mut() {
+                self.camera_fov = warp_fov(self.camera.fpu);
+                self.camera.set_fov(self.camera_fov, w, h);
+                let step = turn.step(&mut self.camera, &mut self.zoom, (w, h));
+                if !step.going {
+                    // @ 0x00431aee: the move pending, a target view or not
+                    // (a re-alignment, a zone aim without one).
+                    self.moving.turn = None;
+                    self.moving.pending = true;
+                    return;
+                }
+            } else if self.puzzles.cam_lock {
+                // The rotations (@ 0x00440760 / @ 0x004407c0) do nothing
+                // under the camera lock; the speeds still decay and the
+                // limits are tested on the camera as it is.
+                self.look.frame_locked(&self.camera);
+                self.camera_fov = warp_fov(self.camera.fpu);
+                self.camera.set_fov(self.camera_fov, w, h);
+            } else {
+                self.look.frame(&mut self.camera);
+                self.camera_fov = warp_fov(self.camera.fpu);
+                self.camera.set_fov(self.camera_fov, w, h);
+            }
+        }
+        self.centre = self.pick_centre();
+    }
+
+    /// The zone under the screen centre (@ 0x00463310 = *Atlantis II*'s
+    /// pick).
+    fn pick_centre(&self) -> Option<usize> {
+        let view = self.place.wam.view(self.place.view?)?;
+        let d = self
+            .camera
+            .ray(self.camera.cx, self.camera.cy)
+            .map(f64::from);
+        wam::pick(&view.zones, d)
+    }
+
+    /// The warp drawn into the screen (@ 0x00440690), then the cursor
+    /// (@ 0x00440a30), the inventory's fade-out and the warp cursor
+    /// (@ 0x00427c40).
+    fn draw_warp(&mut self) -> bool {
+        if !self.draw_warp_only() {
+            return false;
+        }
+        // The inventory fading out after it closed (@ 0x00427c40): the
+        // fade's step, then the items at the new alpha.
+        if !self.inventory.open && self.inventory.alpha > 0.0 {
+            self.inventory.fade_step(self.now);
+            self.draw_inventory_items();
+        }
+        // Then, neither the inventory nor the subject menu open
+        // (@ 0x00427f38), the warp cursor a puzzle set (@ 0x00428870).
+        if self.mode == Mode::Warp {
+            self.draw_warp_cursor();
+        }
+        true
+    }
+
+    /// The warp frame's test before its flip (@ 0x004400c4..0x004400d8):
+    /// no flip once the frame started a video or a dialog (loop mode 4 or
+    /// 5).
+    fn flip_suppressed(&self) -> bool {
+        matches!(self.mode, Mode::Intro | Mode::Video | Mode::Dialog)
+    }
+
+    /// The warp frame without the overlays (@ 0x00440690) and the cursor
+    /// (@ 0x00440a30); false when there is no cube.
+    fn draw_warp_only(&mut self) -> bool {
+        if self.flat_warp {
+            // Tests: the harnesses' stub of @ 0x00440690.
+            self.screen.clear();
+            self.tr(|| "warp=flat".into());
+            if std::mem::take(&mut self.anim_tick) {
+                self.slots.step(self.now, &mut self.rand);
+            }
+            return true;
+        }
+        if self.place.faces.any_empty() {
+            return false;
+        }
+        let m = self.camera.matrix();
+        let proj = self.camera.projection();
+        let sprites = self.slots.slots.iter().any(|s| s.shown);
+        self.render_cube(&m, proj, sprites);
+        // The sprite pass's hit test, against the frames just drawn
+        // (0x0076e928 cleared @ 0x00440c07, set @ 0x00439a47 / 0x00439a5b).
+        self.cursor_hit = self
+            .camera
+            .texel_a3(self.camera.cx, self.camera.cy)
+            .and_then(|(f, u, v)| self.slots.hit(f, u, v))
+            .map(|(k, kind)| (self.slots.slots[k].click, kind));
+        // The animations' step, once per 15 Hz tick (@ 0x00439c90).
+        if std::mem::take(&mut self.anim_tick) {
+            self.slots.step(self.now, &mut self.rand);
+        }
+        // The renderer leaves the control word 0x0e7f.
+        self.camera.fpu = self.renderer.fpu;
+        if let Some(s) = self.script.as_mut() {
+            s.set_fpu(self.renderer.fpu);
+        }
+        if self.mode == Mode::Warp {
+            self.draw_cursor();
+        }
+        true
+    }
+
+    /// The cube with the view's sprites drawn into a copy of its faces
+    /// (`sprites`), or the bare faces, onto the screen. Faces of another
+    /// format than the screen (a depth switch before the next view
+    /// entry) are not drawn.
+    fn render_cube(&mut self, m: &[f32; 9], proj: [f32; 4], sprites: bool) {
+        let (renderer, slots, ticks) = (&mut self.renderer, &self.slots, self.ticks);
+        match (&self.place.faces, &mut self.work, &mut self.screen) {
+            (Faces::Rgb565(f), work, Surface::Rgb565(out)) => {
+                if sprites {
+                    if !matches!(work, Faces::Rgb565(_)) {
+                        *work = Faces::Rgb565(Default::default());
+                    }
+                    let Faces::Rgb565(w) = work else {
+                        unreachable!()
+                    };
+                    for (a, b) in w.iter_mut().zip(f) {
+                        a.clone_from(b);
+                    }
+                    slots.draw(w, ticks);
+                    renderer.render(w, m, proj, out);
+                } else {
+                    renderer.render(f, m, proj, out);
+                }
+            }
+            (Faces::Xrgb8888(f), work, Surface::Xrgb8888(out)) => {
+                if sprites {
+                    if !matches!(work, Faces::Xrgb8888(_)) {
+                        *work = Faces::Xrgb8888(Default::default());
+                    }
+                    let Faces::Xrgb8888(w) = work else {
+                        unreachable!()
+                    };
+                    for (a, b) in w.iter_mut().zip(f) {
+                        a.clone_from(b);
+                    }
+                    slots.draw(w, ticks);
+                    renderer.render(w, m, proj, out);
+                } else {
+                    renderer.render(f, m, proj, out);
+                }
+            }
+            _ => log::debug!("faces and screen of different formats: no cube drawn"),
+        }
+    }
+
+    /// @ 0x00440a30 → @ 0x00428060: the cursor of the zone under the
+    /// centre, centred on the screen's centre, animated at 15 frames a
+    /// second of real time; none without a zone.
+    fn draw_cursor(&mut self) {
+        let zone_kind = self
+            .centre
+            .and_then(|i| self.place.wam.view(self.place.view?)?.zones.get(i))
+            .map(|z| z.kind);
+        let hit = self.cursor_hit;
+        if self.startup.config.cursor {
+            // The cross (`Cursor`, @ 0x00440a6a..0x00440b6c): five pixels
+            // up and across through the centre.
+            let argb = cross_colour(zone_kind, hit.is_some());
+            // Two lines of 0x004e9a00: the colour as the surface stores it
+            // (RGB565 truncated; x8r8g8b8 the ARGB value, alpha included).
+            let (cx, cy, w) = (self.width / 2, self.height / 2, self.width);
+            with_px!(&mut self.screen, s => {
+                let px = PagePixel::from_argb(argb);
+                for k in 0..5 {
+                    s[(cy + k - 2) * w + cx] = px;
+                    s[cy * w + cx + k - 2] = px;
+                }
+            });
+        }
+        // The object in the hand, centred on the screen (@ 0x00428500,
+        // `<World>ObjetsEnMain.SPR`), the zone's cursor over it.
+        if let Some(sprite) = self
+            .script
+            .as_ref()
+            .filter(|s| s.vars[s.keys.objetenmain] != 0 && s.cursor_objects)
+            .map(|s| s.cursor_sprite)
+        {
+            self.world_banks();
+            if let (Some(bank), Ok(i)) = (&self.objects_hand, usize::try_from(sprite)) {
+                let (w, h) = (self.width, self.height);
+                Self::aff_centre(
+                    &mut self.screen,
+                    w,
+                    h,
+                    bank,
+                    i,
+                    (w / 2) as i32,
+                    (h / 2) as i32,
+                    1.0,
+                );
+            }
+        }
+        // @ 0x00440b9f: the place sprite under the centre first (its
+        // state's click kind, the cursor kind), else the zone (mode 0);
+        // neither: no cursor.
+        let Some((kind, mode)) = hit.or(zone_kind.map(|k| (k, 0))) else {
+            return;
+        };
+        let range = cursor_range(kind, mode, self.cursor_range);
+        if range.0 != self.cursor_range.0 {
+            self.cursor_range = range;
+            self.cursor_frame = range.0;
+        }
+        if kind < 1000 {
+            if let Some(bank) = &self.interface {
+                let idx = self.cursor_frame.max(0) as usize;
+                if let Some(info) = bank.info(idx) {
+                    let x = (self.width / 2) as i32 - info.w as i32 / 2;
+                    let y = (self.height / 2) as i32 - info.h as i32 / 2;
+                    let (w, h) = (self.width, self.height);
+                    with_px!(&mut self.screen, s => {
+                        let mut t = Target::screen(s.as_mut_slice(), w, h);
+                        bank.draw(&mut t, Some(x), y, idx);
+                    });
+                }
+            }
+        }
+        if self.now - self.cursor_time >= 1.0 / 15.0 {
+            self.cursor_frame += 1;
+            self.cursor_time = self.now;
+            if self.cursor_frame >= self.cursor_range.1 {
+                self.cursor_frame = self.cursor_range.0;
+            }
+        }
+    }
+
+    /// The place-sprite clicks of a warp frame: @ 0x004403e0 (click kind 1
+    /// with an empty hand: the object taken — `CLICOBJET`, hidden, in the
+    /// bag and in the hand; 3: `CLICOBJET`; 4: `CLICPERSO`), then
+    /// @ 0x00440530 (kind 2, a character with subjects, an empty hand: the
+    /// subject menu).
+    fn sprite_clicks(&mut self) {
+        let Some((id, kind)) = self.sprite_hit else {
+            return;
+        };
+        let hand = self.object_in_hand();
+        match kind {
+            1 if hand == 0 => {
+                let sprite = usize::try_from(id).map_or(0, |i| {
+                    self.names.param_of(atlantis2_data::defnames::OBJETS, i)
+                });
+                self.with_script(|s, h| s.take_object(h, id, sprite as u8));
+            }
+            3 => self.set_script_var(|k| k.clicobjet, id),
+            4 => self.set_script_var(|k| k.clicperso, id),
+            _ => {}
+        }
+        if kind == 2 && hand == 0 {
+            let n = self.script.as_ref().map_or(0, |s| s.subjects.count(id));
+            if n > 0 {
+                self.open_subjects(id);
+            }
+        }
+    }
+
+    fn set_script_var(&mut self, key: impl Fn(&atlantis2_engine::script::Keys) -> usize, v: i32) {
+        if let Some(s) = self.script.as_mut() {
+            let k = key(&s.keys);
+            s.vars[k] = v;
+        }
+    }
+
+    /// The click scan (@ 0x004405b0), on a click with neither the subject
+    /// menu nor the inventory open: `CLICPERSO` = the character of a kind
+    /// 2 sprite hit, `CtrlScenarIN` and the timer scans, then `CLICPERSO`
+    /// = `CLICOBJET` = 0, `SUJET` = −2, the click flags cleared.
+    fn click_scan(&mut self) {
+        if !self.click {
+            return;
+        }
+        let character = self.sprite_hit.filter(|h| h.1 == 2).map(|h| h.0);
+        if std::env::var_os("STORY_DEBUG").is_some() {
+            eprintln!(
+                "click scan: hit {:?} script click {:?}",
+                self.sprite_hit,
+                self.script.as_ref().map(|s| s.click)
+            );
+        }
+        self.with_script(|s, h| s.click_scan(h, character));
+        self.click = false;
+        self.sprite_hit = None;
+    }
+
+    /// The zone click (@ 0x00420330): a move zone's departure scan, then
+    /// the move; `CLICZONE` for the others.
+    fn zone_click(&mut self) {
+        let centre = self.centre;
+        let Some(zone) = centre
+            .and_then(|i| self.place.wam.view(self.place.view?)?.zones.get(i))
+            .cloned()
+        else {
+            return;
+        };
+        if self.sprite_hit.is_some() {
+            // A place sprite clicked this frame: `CLICZONE` = the zone's
+            // value, whatever its type.
+            self.set_script_var(|k| k.cliczone, zone.value);
+            return;
+        }
+        let target = matches!(zone.kind, 1 | 2).then_some(zone.value);
+        let go = self.with_script(|s, h| s.departure_scan(h, target));
+        if !go {
+            return;
+        }
+        if zone.kind > 2 && zone.kind < 88888 {
+            if let Some(s) = self.script.as_mut() {
+                let k = s.keys.cliczone;
+                s.vars[k] = zone.value;
+            }
+            // The places' zone hook (@ 0x004c32c0).
+            let name = zone.name.clone().unwrap_or_default();
+            self.zone_hook(zone.kind, zone.value, &name);
+        }
+        // Type 2 (a link to another place, @ 0x00420440) is in no WAM of
+        // the game.
+        if zone.kind == 1 {
+            self.move_setup(&zone);
+        }
+    }
+
+    /// The move's set-up (@ 0x00420490, *Atlantis II*'s FUN_0049cc40).
+    fn move_setup(&mut self, zone: &wam::Zone) {
+        let fpu = self.camera.fpu;
+        let target = zone.value as u32;
+        let next = self.script.as_mut().and_then(|s| {
+            let k = s.keys.nextvue;
+            (s.vars[k] != 0).then(|| {
+                s.vars[k] = 0;
+                s.next_view
+            })
+        });
+        self.moving.next = match next {
+            Some(v) => v.and_then(|v| self.place.wam.view(v as u32)).map(|v| v.id),
+            None => self.place.wam.view(target).map(|v| v.id),
+        };
+        let aim = || zone_aim_a3(fpu, &zone.points);
+        if self.moving.next.is_none() {
+            let (y, p) = aim();
+            self.start_turn(y, p);
+            return;
+        }
+        let dests: Vec<_> = self
+            .place
+            .view
+            .and_then(|v| self.place.wam.view(v))
+            .map(|v| {
+                v.destinations
+                    .iter()
+                    .filter(|d| d.target == target)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut start = (999.0f32, 0.0f32);
+        for d in &dests {
+            if d.angles_as_given == 0 {
+                start = if d.start_yaw <= 998.0 {
+                    (d.start_yaw, d.start_pitch)
+                } else {
+                    aim()
+                };
+                self.moving.arrival = if d.end_yaw <= 998.0 {
+                    (d.end_yaw, d.end_pitch)
+                } else {
+                    start
+                };
+                if !self.start_turn(start.0, start.1) {
+                    self.moving.pending = true;
+                }
+            } else {
+                start = (d.start_yaw, d.start_pitch);
+                self.moving.arrival = (d.end_yaw, d.end_pitch);
+                self.start_turn(start.0, start.1);
+            }
+        }
+        if start.0 != 999.0 {
+            return;
+        }
+        let (y, p) = aim();
+        self.start_turn(y, p);
+        self.moving.arrival = (y, p);
+    }
+
+    /// The turn's set-up (@ 0x004410b0); false when none is needed.
+    fn start_turn(&mut self, yaw: f32, pitch: f32) -> bool {
+        let (turn, turning) = Turn::new_a3(&self.camera, yaw, pitch, &self.zoom);
+        // The script harness's turn always starts (its InitRecalage stub
+        // returns 1) and ends at the next frame.
+        let turning = turning || self.harness_turns;
+        self.moving.turn = turning.then_some(turn);
+        turning
+    }
+
+    /// The move's end (@ 0x0043ff20 @ 0x004401d4..): the new view entered
+    /// at the arrival angles, then its travel video.
+    fn complete_move(&mut self) {
+        self.moving.pending = false;
+        let Some(next) = self.moving.next.take() else {
+            // No view to go to (@ 0x004400ed): `CtrlScenarIN`.
+            self.with_script(|s, h| {
+                s.ctrl_scenar_in(h);
+            });
+            return;
+        };
+        let old = self.place.view;
+        let (yaw, pitch) = self.moving.arrival;
+        self.with_script(|s, _| {
+            s.arrive(next as i32);
+            // `AtlWarp_EnterVue` keeps the view in the world's slot
+            // (@ 0x0043fc5a).
+            s.note_world_view(next as i32);
+        });
+        self.enter_view(next, yaw, pitch);
+        if let Some(mut s) = self.script.take() {
+            self.view_hook(&mut s);
+            self.script = Some(s);
+        }
+        let dest = old.and_then(|old| {
+            self.place
+                .wam
+                .places
+                .iter()
+                .flat_map(|p| p.views.iter())
+                .filter(|v| v.id == old)
+                .find_map(|v| v.destinations.iter().find(|d| d.target == next))
+                .cloned()
+        });
+        let world = self.world;
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
+        // The transition sprites (@ 0x00435a90): per `id_spf` of the
+        // destination whose entity the show table does not hide, the
+        // entity's prefix and `%s%03d%03d.spr` (from view, to view).
+        let spf: Vec<Bank> = match (&dest, old) {
+            (Some(d), Some(old)) => d
+                .sprites
+                .iter()
+                .filter_map(|name| {
+                    let hidden = self.script.as_ref().is_some_and(|s| {
+                        let id = self
+                            .names
+                            .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
+                            .map(|i| (i as i32, 1))
+                            .or_else(|_| {
+                                self.names
+                                    .id(atlantis2_data::defnames::OBJETS, name.as_bytes())
+                                    .map(|i| (i as i32, 2))
+                            });
+                        id.is_ok_and(|(id, kind)| {
+                            s.shown
+                                .iter()
+                                .any(|r| r.id == id && r.kind == kind && !r.shown)
+                        })
+                    });
+                    if hidden {
+                        return None;
+                    }
+                    let e = self
+                        .place
+                        .wam
+                        .entities
+                        .iter()
+                        .find(|e| e.con_name.eq_ignore_ascii_case(name))?;
+                    let path = crate::travel::transition_path(
+                        self.startup.config.warp_res,
+                        folder,
+                        &e.prefix,
+                        old,
+                        next,
+                    );
+                    self.files
+                        .read(&path)
+                        .and_then(|d| Bank::parse(&d, self.screen.depth()).ok())
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        if let (Some(d), false) = (dest, self.double_click) {
+            let path = format!("hnmtraj/HNM640/{folder}/{}", d.video);
+            // The sprites are there before the video starts, so that its
+            // first frame has them.
+            if self.files.size(&path).is_some() {
+                self.start_video(&path, 15, true, Mode::Warp, spf);
+            }
+        }
+    }
+
+    /// `AtlWarp_EnterVue` (@ 0x0043f840): the cube of the view loaded
+    /// (`warp\Warp512\<world>\<name>`, frames to faces 1, 3, 0, 4, 5, 2),
+    /// the camera turned to the arrival angles, the turn speeds stopped.
+    fn enter_view(&mut self, id: u32, yaw: f32, pitch: f32) {
+        let shown = self
+            .script
+            .as_ref()
+            .map(|s| s.shown.clone())
+            .unwrap_or_default();
+        self.enter_view_shown(id, yaw, pitch, shown);
+    }
+
+    /// [`Game::enter_view`] with the script's show table (@ 0x0076b920)
+    /// `shown`: a script's `VUE` enters the view with the script out of
+    /// the game.
+    fn enter_view_shown(
+        &mut self,
+        id: u32,
+        yaw: f32,
+        pitch: f32,
+        shown: Vec<atlantis2_engine::script::Shown>,
+    ) {
+        if self.trace_views {
+            self.tr(|| format!("view {id}"));
+        }
+        let Some(view) = self.place.wam.view(id) else {
+            log::error!("{}: no view {id}", self.place.name);
+            return;
+        };
+        let name = view.name.clone();
+        let world = self.world;
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
+        let path = format!("warp/Warp512/{folder}/{name}");
+        if self.place.cube != path {
+            let depth = self.depth();
+            match self.files.read(&path).map(|d| faces_of(&d, depth)) {
+                Some(Ok(faces)) => self.place.faces = faces,
+                Some(Err(e)) => log::error!("{path}: {e:?}"),
+                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+            }
+            self.place.cube = path.clone();
+        }
+        log::info!("view {id}: {path}");
+        self.place.view = Some(id);
+        self.place_sounds_enter(id);
+        self.load_slots(id, shown);
+        self.camera.enter(yaw, pitch);
+        self.look.stop();
+        self.moving.turn = None;
+        self.look_last = None;
+        self.look_acc = 0.0;
+        self.centre = self.pick_centre();
+    }
+
+    /// The in-game menu's `BT_BACK` view re-entry (@ 0x0043fd00, called
+    /// with the angles of the last Escape press, @ 0x00454765): the cube
+    /// of the current view read again into the six faces (@ 0x0042fd30,
+    /// whatever they held: after the options' display switch, new heap
+    /// blocks), the next entry's start angles (@ 0x00441610: 0x00756074 /
+    /// 0x00756078) := those angles, the place sprites' slots cleared
+    /// (@ 0x004384d0) and loaded again (@ 0x00438530), then the view hook
+    /// (@ 0x004c2010) and the coffer's (@ 0x004c1650). Unlike the view
+    /// entry 0x0043f840: the camera, the place sounds, the turn and the
+    /// world's view are left as they are.
+    pub(super) fn reenter_view(&mut self) {
+        let Some(id) = self.place.view else {
+            return;
+        };
+        let world = self.world;
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
+        if let Some(name) = self.place.wam.view(id).map(|v| v.name.clone()) {
+            let path = format!("warp/Warp512/{folder}/{name}");
+            let depth = self.depth();
+            match self.files.read(&path).map(|d| faces_of(&d, depth)) {
+                Some(Ok(faces)) => self.place.faces = faces,
+                Some(Err(e)) => log::error!("{path}: {e:?}"),
+                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+            }
+            self.place.cube = path;
+        }
+        let (yaw, pitch) = self.escape_angles;
+        let shown = match self.script.as_mut() {
+            Some(s) => {
+                (s.start_x, s.start_y) = (yaw, pitch);
+                s.shown.clone()
+            }
+            None => Vec::new(),
+        };
+        self.load_slots(id, shown);
+        if let Some(mut s) = self.script.take() {
+            self.view_hook(&mut s);
+            self.script = Some(s);
+        }
+        self.centre = self.pick_centre();
+    }
+
+    /// The SPW slots of view `id` (@ 0x004384d0, then @ 0x00438530 per
+    /// sprite of the view), `shown` the script's show table.
+    fn load_slots(&mut self, id: u32, shown: Vec<atlantis2_engine::script::Shown>) {
+        let world = self.world;
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
+        // The builder's draws come from the game's one `rand()` (queued
+        // values first: tests replaying the original's run).
+        let (queue, rand) = (&mut self.rand_queue, &mut self.rand);
+        let depth = self.screen.depth();
+        self.slots = Slots::load_depth(
+            &self.files,
+            &mut self.spw_cache,
+            &self.place.wam,
+            id,
+            folder,
+            &mut || queue.pop_front().unwrap_or_else(|| rand.rand()),
+            self.now,
+            |id, kind| {
+                shown
+                    .iter()
+                    .find(|r| r.id == id && r.kind == kind)
+                    .map(|r| r.shown)
+            },
+            depth,
+        );
+    }
+
+    /// A sound file decoded (cached); `None` when missing or unreadable.
+    fn sound(&mut self, path: &str) -> Option<Decoded> {
+        if let Some(s) = self.sounds.get(path) {
+            return s.clone();
+        }
+        let s = self
+            .files
+            .read(path)
+            .and_then(|d| atlantis_codecs::decode_apc(&d).ok())
+            .map(|a| (a.sample_rate, a.channels, Arc::new(a.samples)));
+        if s.is_none() {
+            log::warn!("{path}: not found or not APC");
+        }
+        self.sounds.insert(path.to_string(), s.clone());
+        s
+    }
+
+    /// A category's volume: `ftol(GlobalVolume · 0.01f · level)`
+    /// (@ 0x00433bc8).
+    fn level(&self, level: i32) -> i32 {
+        let g = f64::from(self.startup.config.global_volume as f32) * f64::from(0.01f32);
+        (g * f64::from(level)) as i32
+    }
+
+    fn play_music(&mut self, path: &str) {
+        if let Some((rate, ch, pcm)) = self.sound(path) {
+            let g = csm_gain(self.level(self.startup.config.music_volume));
+            self.audio.play(CHANNEL_MUSIC, rate, ch, pcm, true, [g, g]);
+        }
+    }
+
+    /// `AtlBruitages_InitWarp` (@ 0x00401f30): the listener at the view's
+    /// `Warp` position of the place's `Coord` file (else 0), the active
+    /// sounds forgotten (not stopped), then each of the view's `bruitage`
+    /// records' ambient object added by name, its files loaded.
+    fn place_sounds_enter(&mut self, view: u32) {
+        self.listener = self.coord.warps.get(&view).copied().unwrap_or([0.0; 3]);
+        self.place_sounds.clear();
+        let Some(v) = self.place.wam.view(view) else {
+            return;
+        };
+        let ids: Vec<u32> = v.sounds.iter().map(|b| b.ambient_id).collect();
+        let all = sources(&self.place.wam);
+        for id in ids {
+            let Some(k) = self
+                .place
+                .wam
+                .ambient_objects
+                .iter()
+                .position(|o| o.id == id)
+            else {
+                continue;
+            };
+            let name = self.place.wam.ambient_objects[k].name.clone();
+            if self.place_sounds.contains_key(&name) {
+                continue;
+            }
+            let Some(src) = all.iter().find(|s| s.id == id).cloned() else {
+                continue;
+            };
+            for f in &src.files {
+                self.sound(&format!("sfx/{f}"));
+            }
+            self.place_sounds.insert(name, src);
+        }
+    }
+
+    /// The place sounds of a warp frame (@ 0x004024b0): each active source
+    /// whose sound is silent starts its first file again (one `rand()`
+    /// drawn and dropped); the gains follow the listener. The original
+    /// hands the positions to DirectSound3D (minimum distance 100,
+    /// rolloff 1, the listener facing the camera's −Z, heights dropped);
+    /// here the gain is 100 / distance beyond 100 and the side's share of
+    /// the direction in the listener's frame pans it, DirectSound3D's own
+    /// panning law being Windows'.
+    fn place_sounds_frame(&mut self) {
+        let (yaw, pitch) = self.camera.angles();
+        let (ps, pc) = (f64::from(pitch).sin(), f64::from(pitch).cos());
+        let (ys, yc) = (f64::from(yaw).sin(), f64::from(yaw).cos());
+        let front = [-pc * yc, ps, -pc * ys];
+        let top = [ps * yc, pc, ps * ys];
+        // Left-handed: right = top × front.
+        let right = [
+            top[1] * front[2] - top[2] * front[1],
+            top[2] * front[0] - top[0] * front[2],
+            top[0] * front[1] - top[1] * front[0],
+        ];
+        let base = csm_gain(self.level(self.startup.config.sfx_volume));
+        let l = [
+            f64::from(self.listener[0]),
+            0.0,
+            f64::from(self.listener[1]),
+        ];
+        let entries: Vec<Source> = self.place_sounds.values().cloned().collect();
+        for (k, src) in entries.iter().enumerate() {
+            let ch = CHANNEL_PLACE + k;
+            if ch >= CHANNEL_VOICE {
+                break;
+            }
+            let d = [
+                f64::from(src.pos[0]) - l[0],
+                0.0,
+                f64::from(src.pos[1]) - l[2],
+            ];
+            let dist = (d[0] * d[0] + d[2] * d[2]).sqrt();
+            let att = if dist > 100.0 { 100.0 / dist } else { 1.0 };
+            let pan = if dist > 0.0 {
+                (d[0] * right[0] + d[2] * right[2]) / dist
+            } else {
+                0.0
+            };
+            let g = base * att as f32;
+            let gains = [
+                g * (1.0 - pan).min(1.0) as f32,
+                g * (1.0 + pan).min(1.0) as f32,
+            ];
+            if !self.audio.is_playing(ch) {
+                if !self.stub_rand {
+                    self.rand.rand();
+                }
+                if let Some(first) = src.files.first() {
+                    if let Some((rate, chans, pcm)) = self.sound(&format!("sfx/{first}")) {
+                        self.audio.play(ch, rate, chans, pcm, false, gains);
+                    }
+                }
+            } else {
+                self.audio.set_gain(ch, gains);
+            }
+        }
+    }
+
+    /// The text of a save of the script's state (the writer @ 0x00459ee0).
+    fn save_text(&self, s: &Script) -> Vec<u8> {
+        use atlantis3_data::save::{PersoDialogs, SaveGame, Subject};
+        let obj_name = |id: i32| {
+            usize::try_from(id)
+                .ok()
+                .and_then(|i| self.names.name(atlantis2_data::defnames::OBJETS, i))
+                .map(<[u8]>::to_vec)
+                .unwrap_or_default()
+        };
+        let dialogs = s
+            .subjects
+            .characters()
+            .map(|p| PersoDialogs {
+                perso: p,
+                subjects: (0..s.subjects.count(p).max(0) as usize)
+                    .map(|i| {
+                        let e = s.subjects.entry(p, i);
+                        Subject {
+                            etat: e.flag != 0,
+                            id: e.index,
+                            nb_sprite: e.value,
+                        }
+                    })
+                    .collect(),
+            })
+            .collect();
+        let (yaw, pitch) = self.camera.angles();
+        let q = angles_quaternion(yaw, pitch);
+        let mut g = SaveGame {
+            current_cd: self.current_cd,
+            date_and_time: b"01/01/01 00:00:00".to_vec(),
+            wam: s.wam.clone(),
+            monde: s.a3.world,
+            vue: s.current_view.unwrap_or(0),
+            chapitre: s.chapter,
+            flags: Vec::new(),
+            objects: s.bag.iter().map(|e| obj_name(e.id)).collect(),
+            dialogs,
+            quaternion: q.map(Some),
+        };
+        g.set_flags_from_table(&s.flags);
+        g.write()
+    }
+
+    fn store_save(&mut self, name: &str, data: Vec<u8>) {
+        log::info!("-- Debut de la sauvegarde -- {name}");
+        if let Some(dir) = &self.save_dir {
+            let _ = std::fs::create_dir_all(dir);
+            if let Err(e) = std::fs::write(dir.join(name), &data) {
+                log::warn!("{name}: {e}");
+            }
+        }
+        self.saves_written.push(name.to_string());
+        self.saves.insert(name.to_string(), data);
+    }
+
+    /// A save file kept by the app (the browser's storage), as if written
+    /// in an earlier session: the menus and the scripts' loads see it.
+    pub fn insert_save(&mut self, name: &str, data: Vec<u8>) {
+        self.saves.insert(name.to_string(), data);
+    }
+
+    /// The save files written since the last call (name and bytes; the
+    /// thumbnails under their `spr_<width>/` names), for an app that keeps
+    /// them elsewhere than [`Game::save_dir`].
+    pub fn take_written_saves(&mut self) -> Vec<(String, Vec<u8>)> {
+        let names = std::mem::take(&mut self.saves_written);
+        let mut out: Vec<(String, Vec<u8>)> = Vec::new();
+        for n in names {
+            if out.iter().any(|(m, _)| *m == n) {
+                continue;
+            }
+            if let Some(d) = self.saves.get(&n) {
+                out.push((n, d.clone()));
+            }
+        }
+        out
+    }
+
+    fn read_save(&self, name: &str) -> Option<Vec<u8>> {
+        self.saves.get(name).cloned().or_else(|| {
+            self.save_dir
+                .as_ref()
+                .and_then(|d| std::fs::read(d.join(name)).ok())
+        })
+    }
+
+    /// A save's text by file name (tests).
+    pub fn saved(&self, name: &str) -> Option<&[u8]> {
+        self.saves.get(name).map(Vec::as_slice)
+    }
+
+    fn texts(&mut self) -> &crate::text::Texts {
+        let lang = self.startup.text_language();
+        self.texts
+            .get_or_insert_with(|| crate::text::Texts::load(&self.files, &lang))
+    }
+
+    /// `AtlSubtitle_Set(GetTextFromDial(dialog, line), r, g, b, 0)`
+    /// (@ 0x004655a0, @ 0x0040e290) as the C code calls it (the star
+    /// room's tips). Logged `text <dialog> <line>`, `sub set r g b 0`.
+    pub(crate) fn c_subtitle_set(&mut self, dialog: i32, line: i32, rgb: [u8; 3]) {
+        self.tr(|| format!("text {dialog} {line}"));
+        self.tr(|| format!("sub set {} {} {} 0", rgb[0], rgb[1], rgb[2]));
+        let text = self.texts().dial(dialog, line).map(<[u8]>::to_vec);
+        self.subtitle = text.map(|text| Subtitle {
+            text,
+            rgb,
+            caption: false,
+        });
+    }
+
+    /// `AtlSubtitle_Clear` (@ 0x0040e330) as the C code calls it. Logged
+    /// `sub clear`.
+    pub(crate) fn c_subtitle_clear(&mut self) {
+        self.tr(|| "sub clear".into());
+        self.subtitle = None;
+    }
+
+    /// The music volume set (@ 0x00434100): 0x007178e8 := v clamped to
+    /// 0..=99, the music stream's gain from master × music at once.
+    pub(crate) fn music_volume_set(&mut self, v: i32) {
+        self.startup.config.music_volume = v.clamp(0, 99);
+        let g = csm_gain(self.level(self.startup.config.music_volume));
+        self.audio.set_gain(CHANNEL_MUSIC, [g, g]);
+    }
+
+    /// The music volume (@ 0x007178e8).
+    pub(crate) fn music_level(&self) -> i32 {
+        self.startup.config.music_volume
+    }
+
+    /// `AtlDial_MainInit` for world `monde` (its `rand()` draws included).
+    fn load_dialogs(&mut self, monde: i32) {
+        let folder = WORLDS.get(monde as usize).copied().unwrap_or("");
+        let lang = self.startup.text_language();
+        let mut stub = Rand::new(0);
+        let rand = if self.stub_rand {
+            &mut stub
+        } else {
+            &mut self.rand
+        };
+        self.dialogs = Some(crate::dialog::Dialogs::load(
+            &self.files,
+            folder,
+            &lang,
+            rand,
+        ));
+    }
+
+    /// `AtlDial_start(n, voixoff)` (@ 0x0040cfe0).
+    fn start_dialog(&mut self, n: i32, voixoff: bool) {
+        // The subtitle line cleared, the voice slots stopped and freed
+        // (@ 0x0040db90).
+        self.subtitle = None;
+        self.voices_clear();
+        let saved_fov = self.camera_fov;
+        if self.running.is_some() {
+            log::warn!("AtlDial_Start({n}) : dialogue deja initialise");
+            return;
+        }
+        if self.dialogs.is_none() {
+            let w = self.world;
+            self.load_dialogs(w);
+        }
+        let mut dialogs = self.dialogs.take().unwrap();
+        let mut stub = Rand::new(0);
+        let rand = if self.stub_rand {
+            &mut stub
+        } else {
+            &mut self.rand
+        };
+        dialogs.open(n, voixoff, rand);
+        if dialogs.count(n) == 0 {
+            log::warn!("CDialogue::Open() : le dialogue {n} n'existe pas");
+        }
+        self.dialogs = Some(dialogs);
+        // The dialog's body surface: 640 × 480 for a 3D dialog, the
+        // screen's size for a voice-over (@ 0x0040cfe0: `new
+        // CDialogue(w, h, voixoff)`).
+        let (sw, sh) = if voixoff {
+            (self.width, self.height)
+        } else {
+            crate::dialog::SURFACE
+        };
+        self.running = Some(crate::dialog::Running {
+            dialog: n,
+            voixoff,
+            line: 0,
+            last: String::new(),
+            hidden: None,
+            saved_fov,
+            video: None,
+            voice_end: None,
+            voice_calls: 0,
+            head_frame: 0,
+            lipsync: None,
+            voice_start: 0.0,
+            back: self.mode,
+            surface: Surface::new(self.depth(), sw * sh),
+        });
+        self.look.stop();
+        if self.next_line() {
+            self.perform();
+        }
+        self.mode = Mode::Dialog;
+        if !voixoff {
+            self.dialog_camera();
+        }
+    }
+
+    /// The current line's entry.
+    fn dialog_entry(&self) -> Option<crate::dialog::Entry> {
+        let r = self.running.as_ref()?;
+        self.dialogs.as_ref()?.entry(r.dialog, r.line).cloned()
+    }
+
+    /// `NextReplique` (@ 0x00466890): the voice stopped, the next line's
+    /// body video (reopened only when its path changed) and voice; false
+    /// past the last line.
+    fn next_line(&mut self) -> bool {
+        self.audio.stop(CHANNEL_VOICE);
+        self.ev(|| "Stop".into());
+        let Some(r) = self.running.as_mut() else {
+            return false;
+        };
+        r.voice_end = None;
+        r.line += 1;
+        let (n, line, voixoff) = (r.dialog, r.line, r.voixoff);
+        let Some(d) = self.dialogs.as_ref() else {
+            return false;
+        };
+        if line > d.count(n) {
+            return false;
+        }
+        let Some(e) = d.entry(n, line).cloned() else {
+            return false;
+        };
+        let lang = self.startup.voice_language();
+        let voice = d.voice_path(&e, &lang);
+        let video = d.video_path(&e);
+        if !voixoff {
+            let same = self
+                .running
+                .as_ref()
+                .and_then(|r| r.video.as_ref())
+                .is_some_and(|v| v.path.eq_ignore_ascii_case(&video));
+            if !same {
+                let depth = self.depth();
+                let opened = self.files.read(&video).and_then(|data| {
+                    crate::dialog::BodyVideo::open_depth(&video, Arc::from(data), depth)
+                });
+                let path = video.replace('/', "\\");
+                self.ev(|| format!("VideoOpen({path})"));
+                if let Some(r) = self.running.as_mut() {
+                    r.video = opened;
+                }
+            }
+        }
+        // `LoadSfx(voice, 1, class 2)`: Global × 0.01 × VoicesVolume.
+        let end = self.sound(&voice).map(|(rate, ch, pcm)| {
+            let g = csm_gain(self.level(self.startup.config.voices_volume));
+            let frames = pcm.len() as f64 / f64::from(ch.max(1));
+            self.audio.play(CHANNEL_VOICE, rate, ch, pcm, false, [g, g]);
+            self.now + frames / f64::from(rate.max(1))
+        });
+        // The line's lip-sync analyser (@ 0x00466890), not for a
+        // voice-over.
+        let lipsync = if voixoff {
+            None
+        } else {
+            let perso = self
+                .dialogs
+                .as_ref()
+                .and_then(|d| d.perso(&e.speaker))
+                .cloned();
+            match (perso, self.sound(&voice)) {
+                (Some(p), Some((_, _, pcm))) => Some(crate::lipsync::LipSync::new(
+                    atlantis2_engine::Fpu::Chop,
+                    &pcm,
+                    p.smooth,
+                    p.stretch,
+                    p.tab_weights,
+                    crate::lipsync::gw08(atlantis2_engine::Fpu::Chop, p.global_weight),
+                )),
+                _ => None,
+            }
+        };
+        let v = voice.replace('/', "\\");
+        self.ev(|| format!("LoadSfx({v})"));
+        self.ev(|| format!("Play({v})"));
+        let now = self.now;
+        if let Some(r) = self.running.as_mut() {
+            r.voice_end = end;
+            r.voice_calls = 0;
+            r.head_frame = 0;
+            r.lipsync = lipsync;
+            r.voice_start = now;
+        }
+        true
+    }
+
+    /// Whether the line's voice still plays (a missing voice never ends).
+    fn voice_playing(&mut self) -> bool {
+        let model = self.voice_model;
+        let now = self.now;
+        let Some(r) = self.running.as_mut() else {
+            return false;
+        };
+        let playing = match model {
+            // Tests: a voice plays for this many `IsPlaying` calls.
+            Some(n) => {
+                r.voice_calls += 1;
+                r.voice_calls <= n
+            }
+            None => r.voice_end.is_none_or(|e| now < e),
+        };
+        self.ev(|| format!("IsPlaying->{}", u8::from(playing)));
+        playing
+    }
+
+    /// A dialog event for the tests' log.
+    fn ev(&mut self, f: impl FnOnce() -> String) {
+        if let Some(l) = self.dialog_events.as_mut() {
+            l.push(f());
+        }
+    }
+
+    /// `CDialogue::Perform` (@ 0x00467120), the 15 Hz step: the next line
+    /// when the voice ended; the panorama into the dialog surface (at the
+    /// screen for a voice-over), the body video over it; false at the end.
+    fn perform(&mut self) -> bool {
+        let has_voice = self
+            .running
+            .as_ref()
+            .is_some_and(|r| r.voice_end.is_some() || self.voice_model.is_some());
+        if has_voice && !self.voice_playing() && !self.next_line() {
+            return false;
+        }
+        let Some(mut r) = self.running.take() else {
+            return false;
+        };
+        if r.voixoff {
+            // The panorama into the body surface at the screen's size
+            // (@ 0x00467120: the warp frame @ 0x00440690(+0x360)); `Render`
+            // copies it to the screen at every pass.
+            self.draw_warp_only();
+            r.surface.copy_from(&self.screen);
+        } else {
+            let (sw, sh) = crate::dialog::SURFACE;
+            // Viewport(640, 480) (@ 0x0043f760): centre and projection.
+            let fov = self.camera_fov;
+            (self.camera.cx, self.camera.cy) = ((sw / 2) as f32, (sh / 2) as f32);
+            self.camera.set_fov(fov, sw as u32, sh as u32);
+            let m = self.camera.matrix();
+            let proj = self.camera.projection();
+            self.dialog_renderer.fpu = self.camera.fpu;
+            match (&self.place.faces, &mut r.surface) {
+                (Faces::Rgb565(f), Surface::Rgb565(out)) if !self.place.faces.any_empty() => {
+                    self.dialog_renderer.render(f, &m, proj, out)
+                }
+                (Faces::Xrgb8888(f), Surface::Xrgb8888(out)) if !self.place.faces.any_empty() => {
+                    self.dialog_renderer.render(f, &m, proj, out)
+                }
+                _ => {}
+            }
+            self.camera.fpu = self.dialog_renderer.fpu;
+            match r.video.as_mut() {
+                Some(v) => {
+                    r.head_frame = v.draw_next(&mut r.surface, sw, sh);
+                    let f = r.head_frame;
+                    self.ev(|| format!("VideoFrame(#{f})"));
+                }
+                None => r.head_frame += 1,
+            }
+            let f = r.head_frame;
+            self.ev(|| format!("HeadStep({f})"));
+            self.running = Some(r);
+            // The speaker's tick (@ 0x004790d0): the eyes, the pose.
+            if let Some(e) = self.dialog_entry().filter(|_| self.dialog_heads) {
+                let mut rand = std::mem::replace(&mut self.rand, Rand::new(0));
+                if let Some(h) = self.head(&e.speaker, e.stand) {
+                    h.eyes_a3(&mut rand);
+                    h.pose(f);
+                }
+                self.rand = rand;
+            }
+            return true;
+        }
+        self.running = Some(r);
+        true
+    }
+
+    /// The camera set-up for the current speaker (@ 0x0040b700): the field
+    /// of view `[Focale<stand>][camera]`, then the pitch of the head's
+    /// camera (`Orient` @ 0x00441630, the head `.db`'s camera record), or
+    /// levelled without one (`Horizontalize` @ 0x004418a0); the yaw kept.
+    fn dialog_camera(&mut self) {
+        let Some(e) = self.dialog_entry() else { return };
+        let Some(d) = self.dialogs.as_ref() else {
+            return;
+        };
+        let deg = d.focale(&e);
+        let head = d.head_camera(&e.speaker, e.stand, e.camera);
+        self.camera_fov = dialog_fov(self.camera.fpu, deg);
+        self.ev(|| format!("SetFov({:08x})", deg.to_bits()));
+        match head {
+            Some(q) => {
+                self.ev(|| "Orient".into());
+                self.camera.orient_to(q)
+            }
+            None => {
+                self.ev(|| "Horizontalize".into());
+                self.camera.horizontalize()
+            }
+        }
+    }
+
+    /// `AtlDial_Continue` (@ 0x0040d3e0), every frame of mode 5.
+    fn dialog_frame(&mut self) {
+        if std::mem::take(&mut self.dialog_tick) {
+            if std::mem::take(&mut self.click) {
+                self.double_click = false;
+                if !self.next_line() {
+                    self.close_dialog();
+                    return;
+                }
+            }
+            if !self.perform() {
+                self.close_dialog();
+                return;
+            }
+            let voixoff = self.running.as_ref().is_some_and(|r| r.voixoff);
+            let Some(e) = self.dialog_entry() else {
+                self.close_dialog();
+                return;
+            };
+            let last = self
+                .running
+                .as_ref()
+                .map(|r| r.last.clone())
+                .unwrap_or_default();
+            if !voixoff && e.speaker != last {
+                self.show_hidden();
+                if crate::dialog::Dialogs::is_player(&e.speaker) {
+                    self.dialog_camera();
+                    if let Some(r) = self.running.as_mut() {
+                        r.last = e.speaker.clone();
+                    }
+                    self.ev(|| "Turn".into());
+                    self.camera.yaw(std::f32::consts::PI);
+                    self.perform();
+                    return;
+                }
+                self.dialog_camera();
+                if crate::dialog::Dialogs::is_player(&last)
+                    && e.speaker != "dame"
+                    && e.speaker != "mons"
+                {
+                    self.ev(|| "Turn".into());
+                    self.camera.yaw(std::f32::consts::PI);
+                }
+                if let Some(r) = self.running.as_mut() {
+                    r.last = e.speaker.clone();
+                }
+                // The speaker's place animations hidden while he speaks;
+                // only the last one is remembered.
+                let ids: Vec<String> = self
+                    .dialogs
+                    .as_ref()
+                    .and_then(|d| d.perso(&e.speaker))
+                    .map(|p| p.id_texts.clone())
+                    .unwrap_or_default();
+                for name in ids {
+                    let Ok(id) = self
+                        .names
+                        .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
+                    else {
+                        continue;
+                    };
+                    let id = id as i32;
+                    let state = self
+                        .slots
+                        .slots
+                        .iter()
+                        .find(|s| s.id == id && s.kind == 1 && s.shown)
+                        .map_or(-1, |s| s.state.anim as i32);
+                    if let Some(r) = self.running.as_mut() {
+                        r.hidden = Some((id, state));
+                    }
+                    self.ev(|| format!("AnimHide({id})"));
+                    self.slots.hide(id, 1, self.now);
+                }
+                self.perform();
+                return;
+            }
+        }
+        self.dialog_render();
+    }
+
+    /// The remembered place animation shown again (@ 0x0045f520).
+    fn show_hidden(&mut self) {
+        if let Some((id, state)) = self.running.as_mut().and_then(|r| r.hidden.take()) {
+            if state != -1 {
+                self.ev(|| format!("AnimShow({id})"));
+                self.slots.show(id, 1, state, self.now);
+            }
+        }
+    }
+
+    /// `CDialogue::Render` (@ 0x00467c70) and the flip: the dialog surface
+    /// stretched to the screen (a voice-over's, at the screen's size, copied
+    /// as it is: @ 0x004ecc40 to the screen at every pass, the head
+    /// @ 0x00469910 skipped), then the line's subtitle (`CDialogue::Display`
+    /// @ 0x0046a0e0).
+    fn dialog_render(&mut self) {
+        self.ev(|| "Render".into());
+        let Some(r) = self.running.as_ref() else {
+            return;
+        };
+        if r.voixoff {
+            let src = r.surface.clone();
+            self.screen.copy_from(&src);
+        } else {
+            let (sw, sh) = crate::dialog::SURFACE;
+            let (w, h) = (self.width, self.height);
+            // The body surface into the destination, then the head over it
+            // with a Z buffer cleared to 0 (@ 0x00467c70), then the stretch.
+            let mut dest = r.surface.clone();
+            if self.dialog_heads {
+                self.draw_head(&mut dest);
+            }
+            fn stretch<P: Copy>(
+                dest: &[P],
+                out: &mut [P],
+                (sw, sh): (usize, usize),
+                (w, h): (usize, usize),
+            ) {
+                for y in 0..h {
+                    let sy = y * sh / h;
+                    for x in 0..w {
+                        out[y * w + x] = dest[sy * sw + x * sw / w];
+                    }
+                }
+            }
+            match (&dest, &mut self.screen) {
+                (Surface::Rgb565(d), Surface::Rgb565(o)) => stretch(d, o, (sw, sh), (w, h)),
+                (Surface::Xrgb8888(d), Surface::Xrgb8888(o)) => stretch(d, o, (sw, sh), (w, h)),
+                _ => {}
+            }
+        }
+        if self.startup.config.subtitle_on {
+            if let Some(e) = self.dialog_entry() {
+                let (w, h) = (self.width, self.height);
+                self.texts();
+                let t = self.texts.as_ref().unwrap();
+                with_px!(&mut self.screen, s => t.print_shadowed(
+                    s,
+                    w,
+                    h,
+                    &e.text,
+                    crate::text::DIALOG_SHADOW,
+                    crate::text::DIALOG_TEXT,
+                    0xffffff,
+                ));
+            }
+        }
+        // Then the subtitle line or the voice slots (@ 0x0040fff8).
+        self.flip_texts();
+    }
+
+    /// The current speaker's head (`AddStand` @ 0x004782c0), loaded at its
+    /// first use: `mesh\<mesh>s<stand>.db`, `map\Stand<stand>\<mesh>.tga`
+    /// and its eye maps.
+    fn head(&mut self, speaker: &str, stand: i32) -> Option<&mut atlantis2_engine::head::Head> {
+        let mesh = self.dialogs.as_ref()?.perso(speaker)?.mesh.clone();
+        let key = (mesh.clone(), stand);
+        if !self.heads.contains_key(&key) {
+            let files = &self.files;
+            let tga = |n: String| {
+                files
+                    .read(&format!("map/Stand{stand}/{n}.tga"))
+                    .and_then(|d| atlantis2_data::tga::Tga::parse(&d).ok())
+            };
+            let (sw, sh) = crate::dialog::SURFACE;
+            let head = files
+                .read(&format!("mesh/{mesh}s{stand}.db"))
+                .and_then(|d| atlantis3_data::db::parse(&d).ok())
+                .and_then(|scene| {
+                    let open = tga(mesh.clone())?;
+                    atlantis2_engine::head::Head::new_a3(
+                        atlantis2_engine::Fpu::Chop,
+                        &scene,
+                        &mesh,
+                        sw,
+                        sh,
+                        open,
+                        [
+                            tga(format!("{mesh}yf")),
+                            tga(format!("{mesh}ymf")),
+                            tga(format!("{mesh}yd")),
+                            tga(format!("{mesh}yg")),
+                        ],
+                    )
+                    .map_err(|e| log::warn!("{mesh}s{stand}.db: {e}"))
+                    .ok()
+                });
+            self.heads.insert(key.clone(), head);
+        }
+        self.heads.get_mut(&key)?.as_mut()
+    }
+
+    /// The lip-sync and the mouth (@ 0x00469870), then the head drawn over
+    /// `dest` (@ 0x00469910) with the line's camera.
+    fn draw_head(&mut self, dest: &mut Surface) {
+        let Some(e) = self.dialog_entry() else { return };
+        // On a 32-bit display the maps are loaded in x8r8g8b8 (@ 0x00418e70
+        // in the display's format).
+        let x888 = matches!(dest, Surface::Xrgb8888(_));
+        let maps32 = if x888 {
+            self.dialogs
+                .as_ref()
+                .and_then(|d| d.perso(&e.speaker))
+                .map(|p| p.mesh.clone())
+                .filter(|m| {
+                    !self
+                        .heads
+                        .get(&(m.clone(), e.stand))
+                        .and_then(|h| h.as_ref())
+                        .is_some_and(|h| h.has_x888())
+                })
+                .and_then(|mesh| {
+                    let tga = |n: String| {
+                        self.files
+                            .read(&format!("map/Stand{}/{n}.tga", e.stand))
+                            .and_then(|d| atlantis2_data::tga::Tga32::parse(&d).ok())
+                    };
+                    Some((
+                        tga(mesh.clone())?,
+                        [
+                            tga(format!("{mesh}yf")),
+                            tga(format!("{mesh}ymf")),
+                            tga(format!("{mesh}yd")),
+                            tga(format!("{mesh}yg")),
+                        ],
+                    ))
+                })
+        } else {
+            None
+        };
+        let fpu = atlantis2_engine::Fpu::Chop;
+        let now = self.now;
+        let weights = self.running.as_mut().and_then(|r| {
+            let t = crate::lipsync::t_of(fpu, now - r.voice_start);
+            r.lipsync.as_mut().and_then(|l| l.eval(t))
+        });
+        let humeur = self.startup.config.humeur;
+        let Some(h) = self.head(&e.speaker, e.stand) else {
+            return;
+        };
+        if let Some((open, eyes)) = maps32 {
+            h.set_x888_maps(open, eyes);
+        }
+        let mood = if humeur && e.speaker == "hero" {
+            e.mood + 4
+        } else {
+            e.mood
+        };
+        let factors = weights.map_or([0.0; 9], |w| crate::lipsync::lerp_factors(fpu, &w));
+        h.mouth_a3(mood, weights.as_ref(), &factors);
+        let (sw, sh) = crate::dialog::SURFACE;
+        let mut z = vec![0u32; sw * sh];
+        let cam = e.camera.max(1) as usize;
+        match dest {
+            Surface::Rgb565(d) => h.display_a3(cam, d, &mut z, sw, sh),
+            Surface::Xrgb8888(d) => h.display_a3_x888(cam, d, &mut z, sw, sh),
+        };
+    }
+
+    /// `AtlDial_Close` (@ 0x0040e3b0): the hidden animation shown, the
+    /// panorama turned back when a player spoke last, the field of view
+    /// restored, the mode back, then `Interp_CloseInterrupt(0)`.
+    fn close_dialog(&mut self) {
+        self.audio.stop(CHANNEL_VOICE);
+        self.show_hidden();
+        let Some(r) = self.running.take() else { return };
+        if !r.voixoff && crate::dialog::Dialogs::is_player(&r.last) {
+            self.ev(|| "Turn".into());
+            self.camera.yaw(std::f32::consts::PI);
+        }
+        self.camera_fov = r.saved_fov;
+        let (w, h) = (self.width as u32, self.height as u32);
+        (self.camera.cx, self.camera.cy) = ((w / 2) as f32, (h / 2) as f32);
+        self.camera.set_fov(self.camera_fov, w, h);
+        self.mode = r.back;
+        self.click = false;
+        self.look_last = None;
+        self.ev(|| "CloseInterrupt".into());
+        self.with_script(|s, h| s.close_interrupt(h));
+    }
+
+    fn not_ported(&mut self, what: &str) {
+        if !self.not_ported.iter().any(|w| w == what) {
+            log::warn!("not ported yet: {what}");
+            self.not_ported.push(what.to_string());
+        }
+    }
+
+    /// Enters a view directly at (yaw, pitch) radians (tests and the
+    /// developers' example): as a move's arrival, without its script.
+    pub fn enter_at(&mut self, view: u32, yaw: f32, pitch: f32) {
+        self.mode = Mode::Warp;
+        self.moving = Moving::default();
+        self.enter_view(view, yaw, pitch);
+    }
+
+    /// Loads a place as `CHANGEWAM` does, without its script commands
+    /// (tests).
+    pub fn load_place(&mut self, wam: &str) -> bool {
+        Host::load_wam(self, wam)
+    }
+
+    /// Runs a script command as `RunOneCommand` does (`(KEY=value)`).
+    pub fn run_command(&mut self, command: &str) {
+        self.with_script(|s, h| s.run_command(h, command.as_bytes()));
+    }
+
+    /// Draws the warp (the place animations, then the cube) with a given
+    /// camera matrix under the control word `fpu`, the projection being
+    /// the camera's (tests: the goldens give the original's matrices).
+    #[doc(hidden)]
+    pub fn draw_with_matrix(&mut self, matrix: &[f32; 9], fpu: Fpu) -> &[u16] {
+        self.draw_with_matrix_surface(matrix, fpu);
+        self.screen()
+    }
+
+    /// [`Game::draw_with_matrix`] on either display (the harnesses'
+    /// pre-fill: 0xf81f, or 0x5af81f5a at 32 bits).
+    #[doc(hidden)]
+    pub fn draw_with_matrix_surface(&mut self, matrix: &[f32; 9], fpu: Fpu) -> &Surface {
+        self.renderer.fpu = fpu;
+        let proj = self.camera.projection();
+        match &mut self.screen {
+            Surface::Rgb565(s) => s.fill(0xf81f),
+            Surface::Xrgb8888(s) => s.fill(0x5af8_1f5a),
+        }
+        self.render_cube(matrix, proj, true);
+        &self.screen
+    }
+
+    /// The faces after the sprite pass of the last draw (tests), on a
+    /// 16-bit display.
+    #[doc(hidden)]
+    pub fn sprite_faces(&self) -> &[Vec<u16>; 6] {
+        static NONE: [Vec<u16>; 6] = [const { Vec::new() }; 6];
+        self.work.as_565().unwrap_or(&NONE)
+    }
+
+    /// The faces after the sprite pass of the last draw (tests), in the
+    /// display's format.
+    #[doc(hidden)]
+    pub fn sprite_faces_px(&self) -> &Faces {
+        &self.work
+    }
+
+    /// Whether a play that C code started (a slot not played by the clock
+    /// at the view entry) still runs (tests: the player waits for it).
+    #[doc(hidden)]
+    pub fn driven_play_running(&self) -> bool {
+        self.slots
+            .slots
+            .iter()
+            .any(|s| s.driven && s.shown && s.mode == 1 && !s.ended)
+    }
+
+    /// Whether the view's cube was found and decoded.
+    pub fn cube_loaded(&self) -> bool {
+        !self.place.faces.any_empty()
+    }
+
+    /// The place animations of the view.
+    pub fn slots(&self) -> &Slots {
+        &self.slots
+    }
+
+    /// Seeds `rand` (the original seeds it with the clock).
+    pub fn seed(&mut self, seed: u32) {
+        self.rand = Rand::new(seed);
+    }
+
+    /// The x87 control word the game's float code runs under (the
+    /// process's, 0x027f, until the first warp frame leaves 0x0e7f).
+    pub fn set_fpu(&mut self, fpu: Fpu) {
+        self.camera.fpu = fpu;
+        self.renderer.fpu = fpu;
+        if let Some(s) = self.script.as_mut() {
+            s.set_fpu(fpu);
+        }
+    }
+
+    /// The world (`MONDE`) whose folders the views' cubes come from.
+    pub fn set_world(&mut self, world: i32) {
+        self.world = world;
+        if let Some(s) = self.script.as_mut() {
+            s.a3.world = world;
+        }
+    }
+
+    /// A click on the centre zone as the warp frame handles it (the zone
+    /// click and the move's set-up), without drawing (tests): (target view,
+    /// turning, move pending).
+    #[doc(hidden)]
+    pub fn click_centre_now(&mut self) -> (Option<u32>, bool, bool) {
+        self.click();
+        self.centre = self.pick_centre();
+        self.zone_click();
+        self.click = false;
+        if let Some(s) = self.script.as_mut() {
+            s.click = false;
+        }
+        (
+            self.moving.next,
+            self.moving.turn.is_some(),
+            self.moving.pending,
+        )
+    }
+
+    /// One 25 Hz tick of a move's turn (tests): whether it goes on.
+    #[doc(hidden)]
+    pub fn turn_tick(&mut self) -> bool {
+        let (w, h) = (self.width as u32, self.height as u32);
+        let Some(turn) = self.moving.turn.as_mut() else {
+            return false;
+        };
+        self.camera.set_fov(warp_fov(self.camera.fpu), w, h);
+        let going = turn.step(&mut self.camera, &mut self.zoom, (w, h)).going;
+        if !going {
+            self.moving.turn = None;
+            self.moving.pending = self.moving.next.is_some();
+        }
+        going
+    }
+
+    /// The camera put back as the warp's initialisation leaves it (the
+    /// emulation goldens restore it before each view entry), keeping the
+    /// control word.
+    #[doc(hidden)]
+    pub fn reset_camera(&mut self) {
+        let fpu = self.camera.fpu;
+        self.camera = Camera::new(Fpu::Double, self.width as u32, self.height as u32);
+        self.camera.fpu = fpu;
+    }
+
+    /// The move's turn, if one runs (tests).
+    #[doc(hidden)]
+    pub fn turn_state(&self) -> Option<&Turn> {
+        self.moving.turn.as_ref()
+    }
+
+    /// The arrival angles of the move set up (radians).
+    #[doc(hidden)]
+    pub fn move_arrival(&self) -> (f32, f32) {
+        self.moving.arrival
+    }
+
+    /// The zone of the current view under screen point (sx, sy).
+    pub fn pick_at(&self, sx: f32, sy: f32) -> Option<usize> {
+        let view = self.place.wam.view(self.place.view?)?;
+        let d = self.camera.ray(sx, sy).map(f64::from);
+        wam::pick(&view.zones, d)
+    }
+
+    /// The `defnames.con` names.
+    pub fn names(&self) -> &DefNames {
+        &self.names
+    }
+
+    /// The script, mutable (tests and the developers' tools).
+    #[doc(hidden)]
+    pub fn script_mut(&mut self) -> Option<&mut Script> {
+        self.script.as_deref_mut()
+    }
+
+    /// Turns the camera to the aim of the first zone of the current view
+    /// that `pred` accepts (as the player turning to it); whether it is
+    /// then under the centre.
+    #[doc(hidden)]
+    pub fn aim_at_zone(&mut self, pred: impl Fn(&wam::Zone) -> bool) -> bool {
+        let Some((i, z)) = self
+            .place
+            .view
+            .and_then(|v| self.place.wam.view(v))
+            .and_then(|v| v.zones.iter().enumerate().find(|(_, z)| pred(z)))
+            .map(|(i, z)| (i, z.clone()))
+        else {
+            return false;
+        };
+        let (yaw, pitch) = zone_aim_a3(self.camera.fpu, &z.points);
+        self.camera.enter(yaw, pitch);
+        self.look.stop();
+        self.centre = self.pick_centre();
+        self.centre == Some(i)
+    }
+
+    /// The place sprite under the screen centre (the sprite pass's hit
+    /// test @ 0x00439920): its entity id and click kind.
+    pub fn sprite_under_centre(&self) -> Option<(i32, i32)> {
+        let (face, u, v) = self.camera.texel_a3(self.camera.cx, self.camera.cy)?;
+        let (k, _) = self.slots.hit(face, u, v)?;
+        let s = &self.slots.slots[k];
+        Some((s.id, s.click))
+    }
+
+    /// Turns the camera (1° steps from the view's entry, as the player
+    /// would) until the shown place sprite of entity `id` of kind `kind`
+    /// (1 a character, 2 an object) is under the centre, then clicks:
+    /// false when no orientation shows it there.
+    #[doc(hidden)]
+    pub fn click_sprite(&mut self, id: i32, kind: i32) -> bool {
+        let fpu = self.camera.fpu;
+        let mut found = None;
+        'search: for pitch in
+            (-120..=120).map(|p: i32| if p % 2 == 0 { p / 2 } else { -(p + 1) / 2 })
+        {
+            for yaw in 0..360 {
+                let mut c = self.camera.clone();
+                c.enter(
+                    atlantis2_engine::script::a3::deg_to_rad_a3(fpu, yaw),
+                    atlantis2_engine::script::a3::deg_to_rad_a3(fpu, pitch),
+                );
+                let hit = c
+                    .texel_a3(c.cx, c.cy)
+                    .and_then(|(f, u, v)| self.slots.hit(f, u, v))
+                    .map(|(k, _)| &self.slots.slots[k])
+                    .filter(|s| s.id == id && s.kind == kind);
+                if hit.is_some() {
+                    found = Some(c);
+                    break 'search;
+                }
+            }
+        }
+        let Some(c) = found else { return false };
+        self.camera = c;
+        self.look.stop();
+        self.centre = self.pick_centre();
+        self.click();
+        // The click is on that sprite (the hit record of the click's
+        // frame), even if its play moves before the frame is drawn.
+        self.sprite_hit = self.sprite_under_centre();
+        true
+    }
+
+    /// Ends the video playing (a cinematic or a travel video) as its last
+    /// frame would.
+    #[doc(hidden)]
+    pub fn finish_video(&mut self) {
+        self.end_video();
+    }
+
+    /// Shows an object or a character as the scripts do, without a script
+    /// line (tests: a puzzle's result).
+    #[doc(hidden)]
+    pub fn show_entity(&mut self, kind: i32, name: &str) {
+        self.entity_unlogged(kind, name, true);
+    }
+
+    /// Hides an entity without the script's log (tests' puzzle results).
+    pub fn hide_entity(&mut self, kind: i32, name: &str) {
+        self.entity_unlogged(kind, name, false);
+    }
+
+    fn entity_unlogged(&mut self, kind: i32, name: &str, show: bool) {
+        let key = match (kind == 1, show) {
+            (true, true) => "SHOWPERSO",
+            (true, false) => "HIDEPERSO",
+            (false, true) => "SHOWOBJET",
+            (false, false) => "HIDEOBJET",
+        };
+        let log = self.script.as_mut().and_then(|s| s.set_log.take());
+        self.run_command(&format!("({key}={name})"));
+        if let Some(s) = self.script.as_mut() {
+            s.set_log = log;
+        }
+    }
+
+    /// The quick save `n` written now (@ 0x0044c6d0), as `SAVE=n` does
+    /// (tests: a story segment's checkpoint); its name.
+    pub fn quick_save_now(&mut self, n: i32) -> String {
+        let name = atlantis3_data::save::quick_save_name(self.player, n);
+        if let Some(s) = self.script.take() {
+            let data = self.save_text(&s);
+            self.script = Some(s);
+            self.store_save(&name, data);
+        }
+        name
+    }
+
+    /// `CtrlScenarIN` (@ 0x0044a2f0) now (tests' puzzle results).
+    pub fn ctrl_scenar_in(&mut self) {
+        self.with_script(|s, h| {
+            s.ctrl_scenar_in(h);
+        });
+    }
+
+    /// Writes a script variable by name (tests' puzzle results).
+    pub fn set_var(&mut self, name: &str, v: i32) {
+        if let Some(s) = self.script.as_mut() {
+            if let Ok(k) = s
+                .names
+                .id(atlantis2_data::defnames::VARIABLES, name.as_bytes())
+            {
+                s.vars[k] = v;
+            }
+        }
+    }
+}
+
+/// The script's view of a parsed save.
+fn load_data(g: &atlantis3_data::save::SaveGame) -> atlantis2_engine::script::a3::LoadData {
+    atlantis2_engine::script::a3::LoadData {
+        current_cd: g.current_cd,
+        wam: String::from_utf8_lossy(&g.wam).into_owned(),
+        monde: g.monde,
+        vue: g.vue,
+        chapter: g.chapitre,
+        flags: g.flags.clone(),
+        objects: g.objects.clone(),
+        subjects: g
+            .dialogs
+            .iter()
+            .map(|p| {
+                (
+                    p.perso,
+                    p.subjects
+                        .iter()
+                        .map(|s| (s.etat, s.id, s.nb_sprite))
+                        .collect(),
+                )
+            })
+            .collect(),
+        camera: g.camera(),
+    }
+}
+
+/// The camera's orientation as the save's `Quaternion0..3` (x, y, z, w):
+/// the yaw about Y, then the pitch about X [INFERRED: the original's
+/// quaternion @ 0x0077b678 is written by camera code not yet read; the
+/// port keeps its own convention, read back by [`quaternion_angles`]].
+pub fn angles_quaternion(yaw: f32, pitch: f32) -> [f32; 4] {
+    let (sy, cy) = (yaw * 0.5).sin_cos();
+    let (sp, cp) = (pitch * 0.5).sin_cos();
+    [cy * sp, sy * cp, -sy * sp, cy * cp]
+}
+
+/// The angles of [`angles_quaternion`].
+pub fn quaternion_angles(q: [f32; 4]) -> (f32, f32) {
+    let [x, y, z, w] = q;
+    let yaw = (2.0 * (w * y + z * x)).atan2(1.0 - 2.0 * (x * x + y * y));
+    let pitch = (2.0 * (w * x - y * z)).clamp(-1.0, 1.0).asin();
+    (yaw, pitch)
+}
+
+/// `SetFov(deg)` (@ 0x004409f0): f32((f32 π · deg) · 1/180), the 1/180 a
+/// double (`fmul qword [0x007004b0]`).
+pub fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
+    let pi = f64::from(f32::from_bits(0x4049_0fdb));
+    fpu.f32(fpu.mul(fpu.mul(pi, f64::from(deg)), 1.0 / 180.0))
+}
+
+/// The six faces of a cube file (Hnm_Framer: `IX` frames in video mode;
+/// frames → faces 1, 3, 0, 4, 5, 2 @ 0x00430745).
+/// The faces of a view whose cube file is missing, as the loader
+/// (@ 0x0042fd30) leaves them when its exists test (@ 0x004191e0) fails:
+/// each face filled with its debug colour (0x004e8e90: x8r8g8b8
+/// 0xff000080, 0xff800000, 0xff000040, 0xff008000, 0xff400040,
+/// 0xff004000 for faces 0..5), then six `<2 letters><ft|bk|up|dn|rt|lf>
+/// <rest>.tga` faces tried in the same folder (@ 0x00418e70, none in the
+/// game: no `warp\` TGA exists), with no log line. It happens once in a
+/// game: chapter 0's boot state (`CFuner.wam` view 4 with world 1, at
+/// start-up) asks for `warp\Warp512\hoggar\cf0004.hnm`, which is in
+/// `ldm\`; the boot state is never drawn.
+fn missing_cube(files: &A3Files, folder: &str, name: &str, depth: Depth) -> Faces {
+    const DEBUG: [u32; 6] = [
+        0xff00_0080,
+        0xff80_0000,
+        0xff00_0040,
+        0xff00_8000,
+        0xff40_0040,
+        0xff00_4000,
+    ];
+    let stem = name.split_once('.').map_or(name, |(s, _)| s);
+    let cut = stem.len().min(2);
+    for side in ["ft", "bk", "up", "dn", "rt", "lf"] {
+        let tga = format!(
+            "warp/Warp512/{folder}/{}{side}{}.tga",
+            &stem[..cut],
+            &stem[cut..]
+        );
+        if files.size(&tga).is_some() {
+            log::warn!("{tga}: the cube's TGA faces are not ported");
+        }
+    }
+    log::debug!("warp/Warp512/{folder}/{name}: not found (debug colours)");
+    match depth {
+        Depth::Rgb565 => {
+            Faces::Rgb565(DEBUG.map(|c| vec![<u16 as PagePixel>::from_argb(c); 512 * 512]))
+        }
+        Depth::Xrgb8888 => Faces::Xrgb8888(DEBUG.map(|c| vec![c; 512 * 512])),
+    }
+}
+
+/// The faces of a cube file in the display's format `depth`.
+fn faces_of(hnm: &[u8], depth: Depth) -> Result<Faces, atlantis_codecs::DecodeError> {
+    Ok(match depth {
+        Depth::Rgb565 => Faces::Rgb565(faces_from_hnm_px(hnm)?),
+        Depth::Xrgb8888 => Faces::Xrgb8888(faces_from_hnm_px(hnm)?),
+    })
+}
+
+pub fn faces_from_hnm(hnm: &[u8]) -> Result<[Vec<u16>; 6], atlantis_codecs::DecodeError> {
+    faces_from_hnm_px(hnm)
+}
+
+/// The six faces of a cube file in the display's pixel format: `u16`
+/// RGB565, or `u32` x8r8g8b8 on a 32-bit display (the warp init makes the
+/// faces in the display's format, `CHnmStream::Open` gets its bits
+/// @ 0x0040efc0 and the decoder writes them through its 32-bit colour
+/// writer @ 0x006a349d).
+pub fn faces_from_hnm_px<P: atlantis_codecs::HnmPixel>(
+    hnm: &[u8],
+) -> Result<[Vec<P>; 6], atlantis_codecs::DecodeError> {
+    use atlantis_codecs::{DecodeError, HnmVideo, SoundRule};
+    let mut video: HnmVideo<&[u8], P> = HnmVideo::open(hnm, Vec::new(), SoundRule::Flags)?;
+    if video.width() != 512 || video.height() != 512 {
+        return Err(DecodeError::InvalidFileHeader);
+    }
+    let mut faces: [Vec<P>; 6] = Default::default();
+    for &face in &FRAME_TO_FACE {
+        let frame = video.next_frame().ok_or(DecodeError::NoVideo)??;
+        faces[face] = frame.to_vec();
+    }
+    Ok(faces)
+}
+
+/// A video frame in a black W x ftol(W · 0.75) surface at y = (that height
+/// − h) / 2 (@ 0x004211aa..0x00421205), the surface stretched to the
+/// screen (DirectDraw's `Blt`, the driver's scaler; here the nearest
+/// pixel).
+pub fn stretch_video<P: Copy + Default>(
+    frame: &[P],
+    w: usize,
+    h: usize,
+    out: &mut [P],
+    sw: usize,
+    sh: usize,
+) {
+    let surf_h = (w as f32 * 0.75) as usize;
+    let top = (surf_h as i64 - h as i64) / 2;
+    for y in 0..sh {
+        let sy = (y * surf_h / sh) as i64 - top;
+        let row = &mut out[y * sw..(y + 1) * sw];
+        if sy < 0 || sy >= h as i64 {
+            row.fill(P::default());
+            continue;
+        }
+        let src = &frame[sy as usize * w..(sy as usize + 1) * w];
+        for (x, px) in row.iter_mut().enumerate() {
+            *px = src[x * w / sw];
+        }
+    }
+}
+
+/// A video frame to the screen: the move's transition sprites over a
+/// travel video first (@ 0x00421fe8, in the video's space), then the
+/// stretch ([`stretch_video`]).
+#[allow(clippy::too_many_arguments)]
+fn video_frame<P: atlantis3_data::spr::Pixel + Default>(
+    frame: &[P],
+    w: usize,
+    h: usize,
+    spf: &[Bank],
+    shown: u32,
+    out: &mut [P],
+    sw: usize,
+    sh: usize,
+) {
+    if spf.is_empty() {
+        stretch_video(frame, w, h, out, sw, sh);
+    } else {
+        let mut f = frame.to_vec();
+        crate::travel::draw_transition_sprites(&mut f, w, h, spf, shown);
+        stretch_video(&f, w, h, out, sw, sh);
+    }
+}
+
+impl Host for Game {
+    fn read_chapter(&mut self, chapter: i32) -> Option<Vec<u8>> {
+        self.files.read(&format!("scenar/chapi{chapter:03}.con"))
+    }
+
+    fn load_wam(&mut self, name: &str) -> bool {
+        let Some(data) = self.files.read(&format!("wam/{name}")) else {
+            log::error!("Can't load WAM {name}");
+            return false;
+        };
+        match Wam::parse(&data) {
+            Ok(mut w) => {
+                w.apply_defnames(&self.names);
+                let coord_name = Coord::file_name(name);
+                self.coord = self
+                    .files
+                    .read(&format!("scenar/{coord_name}"))
+                    .and_then(|d| Coord::parse(&d).ok())
+                    .unwrap_or_default();
+                self.place = Place {
+                    wam: w,
+                    name: name.to_string(),
+                    view: None,
+                    faces: Default::default(),
+                    cube: String::new(),
+                };
+                // The Land of the Dead's map banks (@ 0x004c372b), the
+                // jewel case's (@ 0x004c367e).
+                if name.eq_ignore_ascii_case("ldmorts.wam") {
+                    self.carte_reload_banks();
+                }
+                if name.eq_ignore_ascii_case("jardin.wam") {
+                    self.ecrin_reload_banks();
+                }
+                // The game boy's (@ 0x004c34e0 → @ 0x0041fd80).
+                if name.eq_ignore_ascii_case("tourmagi.wam") {
+                    self.gboy_reload_banks();
+                }
+                true
+            }
+            Err(e) => {
+                log::error!("{name}: {e:?}");
+                false
+            }
+        }
+    }
+
+    fn has_view(&mut self, view: i32) -> bool {
+        u32::try_from(view)
+            .ok()
+            .and_then(|v| self.place.wam.view(v))
+            .is_some()
+    }
+
+    fn enter_view(&mut self, view: i32, yaw: f32, pitch: f32) {
+        Game::enter_view(self, view as u32, yaw, pitch);
+    }
+
+    fn enter_view_with_script(&mut self, view: i32, yaw: f32, pitch: f32, script: &mut Script) {
+        // The slots' loader reads the show table (@ 0x004388d9..0x0043892e)
+        // the script's commands wrote before the `VUE`.
+        Game::enter_view_shown(self, view as u32, yaw, pitch, script.shown.clone());
+        self.view_hook(script);
+    }
+
+    /// `ANGLEWARPXNOW` / `ANGLEWARPYNOW` (*Atlantis II*'s FUN_0045ad40 /
+    /// FUN_0045ada0, the same camera code): the yaw set about the root's
+    /// Y (the pitch dropped), or a pitch from the current orientation.
+    fn turn_now(&mut self, yaw: bool, angle: f32) {
+        // @ 0x00440820 / @ 0x00440880 return at once under the camera lock
+        // (0x0077b8ac).
+        if !self.puzzles.cam_lock {
+            if yaw {
+                self.camera.set_yaw(angle);
+            } else {
+                self.camera.pitch_from_here(angle);
+            }
+        }
+        self.look.stop();
+        self.centre = self.pick_centre();
+    }
+
+    fn quick_save(&mut self, n: i32, script: &Script) {
+        let name = atlantis3_data::save::quick_save_name(self.player, n);
+        let data = self.save_text(script);
+        self.store_save(&name, data);
+    }
+
+    fn quick_load(&mut self, n: i32, script: &mut Script) {
+        let name = atlantis3_data::save::quick_save_name(self.player, n);
+        match self.read_save(&name) {
+            Some(d) => {
+                let save = atlantis3_data::save::SaveGame::parse(&d);
+                let data = load_data(&save);
+                // The puzzles' one-shot rebuilds (@ 0x00459e70).
+                self.puzzles.after_load();
+                script.load_a3(self, &data);
+                self.after_load_hook_with(script);
+            }
+            None => log::warn!("Load: {name} not found"),
+        }
+    }
+
+    /// `INITRECALAGE` (@ 0x0044922d): the move's turn set-up (@ 0x004410b0)
+    /// toward the script's angles, without a view to go to.
+    fn init_recalage(&mut self, yaw: f32, pitch: f32) -> bool {
+        self.moving.next = None;
+        self.start_turn(yaw, pitch)
+    }
+
+    /// The turn of a move or a re-alignment runs (@ 0x00756080).
+    fn recalage_running(&self) -> bool {
+        self.moving.turn.is_some()
+    }
+
+    fn set_camera_quaternion(&mut self, q: [f32; 4]) {
+        let (yaw, pitch) = quaternion_angles(q);
+        self.camera.enter(yaw, pitch);
+        self.look.stop();
+    }
+
+    fn anim(&mut self, op: AnimOp) {
+        match op {
+            AnimOp::Show { kind, id, number } => self.slot_show(id, kind, number),
+            AnimOp::Hide { kind, id } => self.slot_hide(id, kind),
+            AnimOp::Play { kind, id, number } => {
+                self.tr_entity(kind, id, |e| format!("anim {e} {number} {kind} 2"));
+                self.slots.play(id, kind, number);
+            }
+            AnimOp::GotoFrame { id, frame, .. } => self.slots.goto_frame(id, frame),
+            AnimOp::TheFrame { id, on, .. } => self.slots.set_animated(id, on),
+            AnimOp::Continue { id, .. } => self.slots.continue_anim(id),
+            AnimOp::Stop { id, number } => self.slots.stop_anim(id, number),
+            // `ADDFRAMEPERSO` / `ADDFRAMEOBJET` (@ 0x00449ba6 / 0x00449bfa):
+            // the frame-list add of that id, whatever the section.
+            AnimOp::AddFrame { id, frames, .. } => {
+                self.add_frame(id, frames);
+            }
+            // `SUPFRAMEPERSO` / `SUPFRAMEOBJET` (@ 0x00449c4d / 0x00449ca1).
+            AnimOp::SubFrame { id, frame, .. } => {
+                self.sub_frame(id, frame);
+            }
+            _ => self.not_ported("the animation command ChangeAnimGotoPerso"),
+        }
+    }
+
+    fn anim_cut(&mut self, kind: i32, id: i32, number: i32) {
+        self.tr_entity(kind, id, |e| format!("anim {e} {number} {kind} 1"));
+    }
+
+    fn scenar_in_called(&mut self) {
+        self.tr(|| "scan".into());
+    }
+
+    /// `PLAYVOICE=d,l,r,g` (@ 0x0040da70): the port's parse keeps four
+    /// numbers; the fifth (blue) is 0.
+    fn play_voice(&mut self, values: [i32; 4]) {
+        let [d, l, r, g] = values;
+        self.play_voice_c(d, l, r, g, 0);
+    }
+
+    fn wam_commands(&mut self, wam: &str, flags: &[i32]) -> Vec<String> {
+        crate::wam_setup::commands(wam, flags)
+    }
+
+    fn play_cinema(&mut self, n: i32, fps: i32) -> bool {
+        let world = self.world;
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
+        let (video, subtitles) = atlantis3_data::cine_txt::cinema_names(n as u32);
+        if self.stub_cinemas {
+            self.tr(|| format!("cinema {}", video.to_ascii_lowercase()));
+            return true;
+        }
+        // The cue file decides the folder (@ 0x00420f3c..0x00421089).
+        let localised = self.files.size(&format!("hnm/{subtitles}")).is_some();
+        let lang = self.startup.voice_language();
+        let path = if localised {
+            format!("loc/hnm/HNM640/{lang}/{folder}/{video}")
+        } else {
+            format!("hnm/HNM640/{folder}/{video}")
+        };
+        let back = self.mode;
+        let started = self.start_video(&path, fps.max(0) as u32, false, back, Vec::new());
+        if started {
+            // The cue file and the caption file (`AtlHnm_Start`
+            // @ 0x00420f68, @ 0x00420faf).
+            let cues = self
+                .files
+                .read(&format!("hnm/{subtitles}"))
+                .map(|d| atlantis3_data::cine_txt::CueFile::parse(&d).cues)
+                .unwrap_or_default();
+            let text_lang = self.startup.text_language();
+            let caption = self
+                .files
+                .read(&format!("loc/text/{text_lang}/{subtitles}"))
+                .and_then(|d| atlantis3_data::cine_txt::Caption::parse(&d))
+                .map(crate::caption::CaptionFade::new);
+            if let Some(v) = self.video.as_mut() {
+                v.cues = cues.into_iter().map(|c| (c, false, false)).collect();
+                v.caption = caption;
+            }
+        }
+        started
+    }
+
+    /// `STARTMUSIK=n` (@ 0x0044c3b0): `music\<world>\Muzik0<n>.apc`,
+    /// looped, unless it plays already. The original cross-fades two
+    /// slots by ±5 a 15 Hz tick; here the new track starts at once.
+    fn start_music(&mut self, list: &str) -> bool {
+        let n = list
+            .split([' ', '\t', ',', ';', '(', ')'])
+            .find(|w| !w.is_empty())
+            .unwrap_or("");
+        let world = self.world;
+        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
+        let path = format!("music/{folder}/Muzik0{n}.apc");
+        if self.music.as_deref() == Some(path.as_str()) && self.audio.is_playing(CHANNEL_MUSIC) {
+            return false;
+        }
+        self.music = Some(path.clone());
+        self.play_music(&path);
+        false
+    }
+
+    /// `STOPMUSIK` (@ 0x004491eb): the music faded out (here stopped).
+    fn stop_music(&mut self) {
+        self.music = None;
+        self.audio.stop(CHANNEL_MUSIC);
+    }
+
+    /// `PLAYSOUND=n` (@ 0x00448eb9): `sfx\soundNNN.apc` loaded as an
+    /// effect (`LoadSfx(name, 0, 1)` @ 0x004329e0), then played
+    /// (@ 0x00433140) whatever the load gave.
+    fn new_sound(&mut self, apc: &str) {
+        let name = format!("sfx\\{apc}");
+        self.sfx_load(&name, 0, 1);
+        self.sfx_play(&name);
+    }
+
+    /// `EXIT=1` (@ 0x00449cc4): the credits page (loop mode 6, page 9).
+    fn exit_credits(&mut self) {
+        self.start_credits();
+    }
+
+    fn dial_start_a3(&mut self, n: i32, voixoff: bool) -> DialStart {
+        self.start_dialog(n, voixoff);
+        DialStart::Started
+    }
+
+    /// `MONDE=n` (@ 0x0044bb30): the dialogs freed and loaded again for
+    /// the world (`Dial_Free`, `Dial_Init`).
+    fn set_monde(&mut self, monde: i32) -> bool {
+        // Kept here too: the script is out of `self` while it runs.
+        self.world = monde;
+        self.load_dialogs(monde);
+        true
+    }
+}
+
+/// The cross's colour (@ 0x00440a56..0x00440aaf, ARGB): white, blue on a
+/// type-1 zone, red on type 2, magenta on 3..999, and green over a place
+/// sprite the player can click (@ 0x0076e928 ≠ 0), whatever the zone.
+pub fn cross_colour(zone_kind: Option<i32>, sprite: bool) -> u32 {
+    if sprite {
+        return 0xff00_ff00;
+    }
+    match zone_kind {
+        Some(1) => 0xff00_00ff,
+        Some(2) => 0xffff_0000,
+        Some(3..=999) => 0xffff_00ff,
+        _ => 0xffff_ffff,
+    }
+}
+
+/// The cursor's frame range in `spr\Interface.spr` (@ 0x00428060..0x004280f1;
+/// start, end exclusive) for `kind` in `mode`: mode 0 (a zone, `kind` its
+/// type) 1..13 on a move, 25..40 on 3 and above, else `current`; mode 1
+/// (an object sprite, `kind` its state's click kind) 13..25 up to 2, else
+/// 25..40; mode 2 (a character sprite) 25..40.
+pub fn cursor_range(kind: i32, mode: i32, current: (i32, i32)) -> (i32, i32) {
+    match mode {
+        0 => match kind {
+            1 | 2 => (1, 13),
+            k if k >= 3 => (25, 40),
+            _ => current,
+        },
+        1 if kind <= 2 => (13, 25),
+        _ => (25, 40),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_save_quaternion_gives_the_angles_back() {
+        for (y, p) in [(0.0f32, 0.0f32), (1.9, 0.17), (-2.6, -0.3), (3.0, 1.2)] {
+            let (y2, p2) = quaternion_angles(angles_quaternion(y, p));
+            assert!(
+                (y - y2).abs() < 1e-5 && (p - p2).abs() < 1e-5,
+                "{y} {p} {y2} {p2}"
+            );
+        }
+        assert_eq!(angles_quaternion(0.0, 0.0), [0.0, 0.0, -0.0, 1.0]);
+    }
+}

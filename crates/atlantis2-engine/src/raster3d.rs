@@ -15,6 +15,7 @@
 use crate::fpu::{f, ftol, Fpu};
 
 pub mod ii;
+pub mod linear_ii;
 
 /// The dialog's frame and Z buffer: 640 x 480 whatever the screen mode
 /// (the viewport set by the dialog frame @ 0x00461430).
@@ -46,8 +47,8 @@ pub struct Vertex {
 /// powers of two (others are rounded up by the binding, as in the
 /// original).
 #[derive(Clone, Copy, Debug)]
-pub struct Texture<'a> {
-    pub pixels: &'a [u16],
+pub struct Texture<'a, P = u16> {
+    pub pixels: &'a [P],
     pub width: usize,
     pub height: usize,
 }
@@ -76,7 +77,7 @@ fn log2_up(n: usize) -> u32 {
 }
 
 impl Binding {
-    fn new(t: &Texture) -> Binding {
+    fn new<P>(t: &Texture<P>) -> Binding {
         let lw = log2_up(t.width);
         let lh = log2_up(t.height);
         let mask_u = u32::MAX.checked_shr(lh).unwrap_or(0);
@@ -124,16 +125,16 @@ struct Gradients {
 /// (0, height − 1, width − 1, 0). The original's is always 640 x 480
 /// ([`Target::screen`]); a larger one is the HD mode's (a port addition:
 /// the same routines over more pixels, see `crate::head`).
-pub struct Target<'a> {
-    pub pixels: &'a mut [u16],
+pub struct Target<'a, P = u16> {
+    pub pixels: &'a mut [P],
     pub zbuf: &'a mut [u32],
     pub width: usize,
     pub height: usize,
 }
 
-impl<'a> Target<'a> {
+impl<'a, P> Target<'a, P> {
     /// The original's 640 x 480 frame and Z buffer.
-    pub fn screen(pixels: &'a mut [u16], zbuf: &'a mut [u32]) -> Target<'a> {
+    pub fn screen(pixels: &'a mut [P], zbuf: &'a mut [u32]) -> Target<'a, P> {
         Target {
             pixels,
             zbuf,

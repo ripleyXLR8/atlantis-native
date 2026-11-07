@@ -64,6 +64,9 @@ pub enum AnimOp {
     TheFrame { kind: i32, id: i32, on: bool },
     /// `ADDFRAMEPERSO` / `ADDFRAMEOBJET`.
     AddFrame { kind: i32, id: i32, frames: i32 },
+    /// `SUPFRAMEPERSO` / `SUPFRAMEOBJET` (*Atlantis III* only: the frame
+    /// removed from the id's frame list, @ 0x00438ae0).
+    SubFrame { kind: i32, id: i32, frame: i32 },
     /// `ChangeAnimGotoPerso` (FUN_0047df00, called @ 0x00482cbf): the character and the two
     /// numbers after its comma (read by @ 0x00485180).
     ChangeAnimGotoPerso { id: i32, a: i32, b: i32 },
@@ -303,4 +306,75 @@ pub trait Host {
 
     /// `CREDITS` (@ 0x00486e00); the section then waits.
     fn credits(&mut self) {}
+
+    // Atlantis III's calls (its `Game.exe`'s addresses).
+
+    /// `CINEMA=n,fps=f` (`AtlHnm_start("cine%03d.hnm", "cine%03d.txt",
+    /// fps, 0)` @ 0x004481ed): whether the film started (then the section
+    /// waits for its end, `super::Script::close_interrupt`).
+    fn play_cinema(&mut self, n: i32, fps: i32) -> bool {
+        let _ = fps;
+        self.play_video(&format!("cine{n:03}.hnm"), None)
+    }
+
+    /// The show / hide commands `CHANGEWAM` runs for place `wam` given the
+    /// story flags (@ 0x0044f0c0).
+    fn wam_commands(&mut self, wam: &str, flags: &[i32]) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// `INITRECALAGE` (@ 0x004410b0): the camera starts turning toward
+    /// (yaw, pitch), radians; false when it is already there.
+    fn init_recalage(&mut self, yaw: f32, pitch: f32) -> bool {
+        false
+    }
+
+    /// Whether a camera re-alignment runs (@ 0x00756080).
+    fn recalage_running(&self) -> bool {
+        false
+    }
+
+    /// `DISPLAY` (@ 0x00449262): one whole frame drawn and shown now.
+    fn display(&mut self) {}
+
+    /// `PLAYVOICE=a,b,c,d` (@ 0x0040da70).
+    fn play_voice(&mut self, values: [i32; 4]) {}
+
+    /// `SAVE=n` (@ 0x0044c6d0): the quick save `n` of the script's state.
+    fn quick_save(&mut self, n: i32, script: &Script) {}
+
+    /// `LOAD=n` (@ 0x0044c9b0): quick save `n` read back
+    /// ([`Script::load_a3`]).
+    fn quick_load(&mut self, n: i32, script: &mut Script) {}
+
+    /// A loaded save's camera (`Quaternion0..3`, @ 0x00441040).
+    fn set_camera_quaternion(&mut self, q: [f32; 4]) {}
+
+    /// `DIAL=n[, voixoff]` (`AtlDial_start` @ 0x0040cfe0).
+    fn dial_start_a3(&mut self, n: i32, voixoff: bool) -> DialStart {
+        let _ = voixoff;
+        self.dial_start(n)
+    }
+
+    /// `GAMEOVER` set (@ 0x0042ac50).
+    fn game_over(&mut self) {}
+
+    /// `EXIT` set (@ 0x00449ce1..0x00449ceb): loop mode 6, then the credits
+    /// page's start (@ 0x00457690).
+    fn exit_credits(&mut self) {}
+
+    /// Whether the animation (kind, id, n) has ended (record +0x471), for
+    /// `WAITFORFINANIMP` / `WAITFORFINANIMO`.
+    fn anim_ended(&mut self, kind: i32, id: i32, n: i32) -> bool {
+        true
+    }
+
+    /// `PLAYCUTANIMP` / `PLAYCUTANIMO` entered *Atlantis III*'s C call
+    /// @ 0x0045fa90(id, number, kind, 1) (its hide and show follow as
+    /// [`AnimOp`]s): for observers only.
+    fn anim_cut(&mut self, kind: i32, id: i32, number: i32) {}
+
+    /// `CtrlScenarIN` entered (*Atlantis III* @ 0x0044a2f0): for observers
+    /// only.
+    fn scenar_in_called(&mut self) {}
 }

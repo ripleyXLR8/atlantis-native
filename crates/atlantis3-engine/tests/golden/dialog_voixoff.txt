@@ -1,0 +1,44 @@
+# A voice-over dialog's passes on the screen, original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) under
+# emulation, 800 x 600 RGB565: AtlDial_start(1, voixoff 1) (0x0040cfe0) and AtlDial_Continue (0x0040d3e0) with
+# CDialogue::Render (0x00467c70) run unmodified; the warp frame (0x00440690) stubbed to fill the surface it is given with
+# a flat colour that changes at each call; the flip (0x0040fdf0) stubbed to read the screen (md5, whether it equals the
+# dialog's body surface) and then write a 40 x 8 marker at (10, 10), standing for the texts it prints. Voices "play"
+# for 3 IsPlaying calls. TICK k = a pass with the 15 Hz tick, FRAME k.j = a pass without. EV lines: Warp(<surface>),
+# Copy(<dest>, <src>) (0x004ecc40 entered), Head() (0x00469910 entered; it returns at once for a voice-over), Flip(2)
+# screen=<md5> body=<1: the screen equals the body surface> marker_left=<1: the previous flip's marker still there>.
+START 1 voixoff=1 line=1 mode=5 size=800x600 dest=screen
+  EV Stop(loc\voix\fra\hoggar\)
+  EV Play(loc\voix\fra\hoggar\HERO0001.apc)
+  EV IsPlaying(loc\voix\fra\hoggar\HERO0001.apc)->1
+  EV Warp(body) fill=0841
+TICK 1 ret=1 line=1 mode=5
+  EV IsPlaying(loc\voix\fra\hoggar\HERO0001.apc)->1
+  EV Warp(body) fill=1082
+  EV Copy(screen, body)
+  EV Head()
+  EV Flip(2) screen=dd19d16af224e7fabafb964227949b77 body=1 marker_left=0
+FRAME 1.1 ret=1 line=1 mode=5
+  EV Copy(screen, body)
+  EV Head()
+  EV Flip(2) screen=dd19d16af224e7fabafb964227949b77 body=1 marker_left=0
+FRAME 1.2 ret=1 line=1 mode=5
+  EV Copy(screen, body)
+  EV Head()
+  EV Flip(2) screen=dd19d16af224e7fabafb964227949b77 body=1 marker_left=0
+TICK 2 ret=1 line=1 mode=5
+  EV IsPlaying(loc\voix\fra\hoggar\HERO0001.apc)->1
+  EV Warp(body) fill=18c3
+  EV Copy(screen, body)
+  EV Head()
+  EV Flip(2) screen=d91b6c774b254e980c8c65e7fd59f560 body=1 marker_left=0
+FRAME 2.1 ret=1 line=1 mode=5
+  EV Copy(screen, body)
+  EV Head()
+  EV Flip(2) screen=d91b6c774b254e980c8c65e7fd59f560 body=1 marker_left=0
+FRAME 2.2 ret=1 line=1 mode=5
+  EV Copy(screen, body)
+  EV Head()
+  EV Flip(2) screen=d91b6c774b254e980c8c65e7fd59f560 body=1 marker_left=0
+TICK 3 ret=0 line=2 mode=5
+  EV IsPlaying(loc\voix\fra\hoggar\HERO0001.apc)->0
+  EV Stop(loc\voix\fra\hoggar\HERO0001.apc)

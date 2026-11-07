@@ -152,6 +152,20 @@ pub fn picked(paths: &[&str]) -> Picked {
     }
 }
 
+/// Atlantis III's installed folder among `paths` (the private test
+/// build's only): the shallowest holding `game.exe` and
+/// `datas/scenar/defnames.con` ([`atlantis3_data::files::holds_atlantis3`]).
+#[cfg(feature = "atlantis3")]
+pub fn a3_install(paths: &[&str]) -> Option<String> {
+    paths
+        .iter()
+        .filter_map(|p| p.strip_suffix("datas/scenar/defnames.con"))
+        .filter(|dir| dir.is_empty() || dir.ends_with('/'))
+        .filter(|dir| paths.contains(&format!("{dir}game.exe").as_str()))
+        .min_by_key(|dir| (depth(dir), dir.to_string()))
+        .map(str::to_string)
+}
+
 /// The folder names of a path list (its files' folders, each once), for
 /// messages.
 pub fn top_names(paths: &[&str], prefix: &str) -> Vec<String> {
@@ -213,6 +227,21 @@ mod tests {
         "atlantis 2/cd4/datas_a2/spf/mante.spr",
         "atlantis 2/loc/menu.txt",
     ];
+
+    #[cfg(feature = "atlantis3")]
+    #[test]
+    fn atlantis3s_installed_folder() {
+        let paths = [
+            "atlantis 3/game.exe",
+            "atlantis 3/datas/scenar/defnames.con",
+            "atlantis 3/datas/wam/hoggar.wam",
+        ];
+        assert_eq!(a3_install(&paths).as_deref(), Some("atlantis 3/"));
+        assert_eq!(picked(&paths), Picked::None);
+        // No program beside the data: not the game.
+        assert_eq!(a3_install(&paths[1..]), None);
+        assert_eq!(a3_install(CD), None);
+    }
 
     #[test]
     fn the_cd_installation_with_its_discs_inside() {

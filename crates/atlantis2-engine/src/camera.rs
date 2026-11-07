@@ -122,6 +122,118 @@ fn quat_rotate_back(fpu: Fpu, q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
     ]
 }
 
+/// `f32(1 / sqrt((x² + y²) + z²))`.
+fn inv_len(fpu: Fpu, v: [f64; 3]) -> f32 {
+    let sq = fpu.add(
+        fpu.add(fpu.mul(v[0], v[0]), fpu.mul(v[1], v[1])),
+        fpu.mul(v[2], v[2]),
+    );
+    fpu.f32(fpu.div(1.0, fpu.sqrt(sq)))
+}
+
+/// *Atlantis III*'s look-at (atlantis3-gog-fr-3473408 @ 0x004fdbe0): the
+/// rotation whose third column is `dir` normalised, the first the
+/// normalised `up × n` (`n × up` read the other way when nearly
+/// parallel), the second their product; row-major.
+fn look_matrix(fpu: Fpu, dir: [f32; 3], up: [f32; 3]) -> [f32; 9] {
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let dd = dir.map(d);
+    let s = d(inv_len(fpu, dd));
+    let n = dd.map(|v| d(fpu.f32(mul(s, v))));
+    let u = up.map(d);
+    let mut r = [
+        d(fpu.f32(sub(mul(u[2], n[1]), mul(u[1], n[2])))),
+        d(fpu.f32(sub(mul(u[0], n[2]), mul(u[2], n[0])))),
+        d(fpu.f32(sub(mul(u[1], n[0]), mul(u[0], n[1])))),
+    ];
+    if add(add(mul(r[2], r[2]), mul(r[1], r[1])), mul(r[0], r[0])) < 1e-5 {
+        r = [
+            d(fpu.f32(sub(mul(u[0], n[1]), mul(u[2], n[2])))),
+            d(fpu.f32(sub(mul(u[1], n[2]), mul(u[0], n[0])))),
+            d(fpu.f32(sub(mul(u[2], n[0]), mul(u[1], n[1])))),
+        ];
+    }
+    let t = d(inv_len(fpu, r));
+    let a = r.map(|v| d(fpu.f32(mul(t, v))));
+    let b = [
+        fpu.f32(sub(mul(a[2], n[1]), mul(a[1], n[2]))),
+        fpu.f32(sub(mul(a[0], n[2]), mul(a[2], n[0]))),
+        fpu.f32(sub(mul(a[1], n[0]), mul(a[0], n[1]))),
+    ];
+    [
+        a[0] as f32,
+        b[0],
+        n[0] as f32,
+        a[1] as f32,
+        b[1],
+        n[1] as f32,
+        a[2] as f32,
+        b[2],
+        n[2] as f32,
+    ]
+}
+
+/// *Atlantis III*'s q v q* (@ 0x00434a40): the four products stored as
+/// floats, the fourth's unrounded value used for the third result.
+fn rot_a3(fpu: Fpu, q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let (q, v) = (q.map(d), v.map(d));
+    let t0 = d(fpu.f32(add(sub(mul(v[0], q[3]), mul(v[1], q[2])), mul(v[2], q[1]))));
+    let t1 = d(fpu.f32(add(sub(mul(v[1], q[3]), mul(v[2], q[0])), mul(v[0], q[2]))));
+    let t2 = d(fpu.f32(add(sub(mul(v[2], q[3]), mul(v[0], q[1])), mul(v[1], q[0]))));
+    let big_t3 = add(add(mul(v[1], q[1]), mul(v[0], q[0])), mul(v[2], q[2]));
+    let t3 = d(fpu.f32(big_t3));
+    let out2 = fpu.f32(sub(
+        add(add(mul(big_t3, q[2]), mul(t1, q[0])), mul(t2, q[3])),
+        mul(t0, q[1]),
+    ));
+    let out1 = fpu.f32(sub(
+        add(add(mul(t0, q[2]), mul(t1, q[3])), mul(t3, q[1])),
+        mul(t2, q[0]),
+    ));
+    let out0 = fpu.f32(sub(
+        add(add(mul(t3, q[0]), mul(t0, q[3])), mul(t2, q[1])),
+        mul(t1, q[2]),
+    ));
+    [out0, out1, out2]
+}
+
+/// *Atlantis III*'s q* v q (@ 0x0043a6a0): the four products stored as
+/// floats.
+fn rotb_a3(fpu: Fpu, q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
+    let (add, sub, mul) = (
+        |a, b| fpu.add(a, b),
+        |a, b| fpu.sub(a, b),
+        |a, b| fpu.mul(a, b),
+    );
+    let (q, v) = (q.map(d), v.map(d));
+    let t0 = d(fpu.f32(sub(add(mul(v[0], q[3]), mul(v[1], q[2])), mul(v[2], q[1]))));
+    let t1 = d(fpu.f32(sub(add(mul(v[2], q[0]), mul(v[1], q[3])), mul(v[0], q[2]))));
+    let t2 = d(fpu.f32(sub(add(mul(v[0], q[1]), mul(v[2], q[3])), mul(v[1], q[0]))));
+    let t3 = d(fpu.f32(sub(sub(-mul(v[0], q[0]), mul(v[1], q[1])), mul(v[2], q[2]))));
+    let out2 = fpu.f32(add(
+        sub(sub(mul(t2, q[3]), mul(t3, q[2])), mul(t1, q[0])),
+        mul(t0, q[1]),
+    ));
+    let out1 = fpu.f32(add(
+        sub(sub(mul(t1, q[3]), mul(t3, q[1])), mul(t0, q[2])),
+        mul(t2, q[0]),
+    ));
+    let out0 = fpu.f32(add(
+        sub(sub(mul(t0, q[3]), mul(t3, q[0])), mul(t2, q[1])),
+        mul(t1, q[2]),
+    ));
+    [out0, out1, out2]
+}
+
 /// A float of the original as an `f64` operand.
 #[inline(always)]
 fn d(x: f32) -> f64 {
@@ -411,6 +523,39 @@ impl Camera {
         ];
     }
 
+    /// *Atlantis III*'s `Orient` (atlantis3-gog-fr-3473408 @ 0x00441630),
+    /// the dialogs' camera set-up: the camera turned to look along the
+    /// head camera's pitch, its yaw kept, no roll. `head_q` is the head
+    /// `.db` camera's quaternion (x, y, z, w).
+    pub fn orient_to(&mut self, head_q: [f32; 4]) {
+        let fpu = self.fpu;
+        let z = [0.0, 0.0, 1.0];
+        let h = quat_rotate(fpu, head_q, z).map(d);
+        let c = quat_rotate(fpu, self.q, z).map(d);
+        let s = d(inv_len(fpu, [c[0], 0.0, c[2]]));
+        let nx = fpu.f32(fpu.mul(s, c[0]));
+        let nz = fpu.f32(fpu.mul(s, c[2]));
+        let l = fpu.sqrt(fpu.add(fpu.mul(h[0], h[0]), fpu.mul(h[2], h[2])));
+        // A −0 becomes +0 (stored through an integer path @ 0x004416xx).
+        let pos = |v: f32| if v == 0.0 { 0.0 } else { v };
+        let dir = [
+            pos(fpu.f32(fpu.mul(d(nx), l))),
+            h[1] as f32,
+            pos(fpu.f32(fpu.mul(l, d(nz)))),
+        ];
+        let m = look_matrix(fpu, dir, [0.0, -1.0, 0.0]);
+        self.q = matrix_to_quat(fpu, &m.map(d));
+    }
+
+    /// *Atlantis III*'s `Horizontalize` (@ 0x004418a0): the camera
+    /// levelled, its yaw kept.
+    pub fn horizontalize(&mut self) {
+        let fpu = self.fpu;
+        let c = quat_rotate(fpu, self.q, [0.0, 0.0, 1.0]);
+        let m = look_matrix(fpu, [c[0], 0.0, c[2]], [0.0, -1.0, 0.0]);
+        self.q = matrix_to_quat(fpu, &m.map(d));
+    }
+
     /// The matrix the cube's corners are multiplied by (FUN_0045c030:
     /// FUN_004a2a70 relative to the root, then FUN_004c6e40).
     pub fn matrix(&self) -> [f32; 9] {
@@ -473,6 +618,37 @@ impl Camera {
             let r = fpu.div(1.0, d(p[2]));
             let px = fpu.f32(fpu.add(fpu.mul(fpu.mul(d(p[0]), d(FACE_FOCAL)), r), d(FACE_CENTRE)));
             let py = fpu.f32(fpu.add(fpu.mul(fpu.mul(d(p[1]), d(FACE_FOCAL)), r), d(FACE_CENTRE)));
+            let (x, y) = (crate::fpu::ftol(d(px)), crate::fpu::ftol(d(py)));
+            if (0..=511).contains(&x) && (0..=511).contains(&y) {
+                return Some((k, x, y));
+            }
+        }
+        None
+    }
+
+    /// *Atlantis III*'s centre ray to a face pixel (atlantis3-gog-fr-3473408
+    /// @ 0x0043a1a0): [`Camera::texel`]'s steps with the rotations storing
+    /// their four intermediate products as floats (@ 0x00434a40,
+    /// @ 0x0043a6a0) and the cube's focal 0x437efffd (its 90° face cameras
+    /// as the cube's constructor sets them, @ 0x004fbb80).
+    pub fn texel_a3(&self, sx: f32, sy: f32) -> Option<(usize, i32, i32)> {
+        let fpu = self.fpu;
+        let focal = f32::from_bits(0x437e_fffd);
+        let z = fpu.div(1.0, d(0.0001f32));
+        let v = [
+            fpu.f32(fpu.mul(fpu.mul(fpu.sub(d(sx), d(self.cx)), d(self.inv_fx)), z)),
+            fpu.f32(fpu.mul(fpu.mul(fpu.sub(d(sy), d(self.cy)), d(self.inv_fy)), z)),
+            fpu.f32(z),
+        ];
+        let w = rot_a3(fpu, self.q, v);
+        for (k, q) in FACE_QUATS.iter().enumerate() {
+            let p = rotb_a3(fpu, q.map(f32::from_bits), w);
+            if p[2].partial_cmp(&FACE_NEAR) != Some(std::cmp::Ordering::Greater) {
+                continue;
+            }
+            let r = fpu.div(1.0, d(p[2]));
+            let px = fpu.f32(fpu.add(fpu.mul(fpu.mul(d(p[0]), d(focal)), r), d(FACE_CENTRE)));
+            let py = fpu.f32(fpu.add(fpu.mul(fpu.mul(d(focal), d(p[1])), r), d(FACE_CENTRE)));
             let (x, y) = (crate::fpu::ftol(d(px)), crate::fpu::ftol(d(py)));
             if (0..=511).contains(&x) && (0..=511).contains(&y) {
                 return Some((k, x, y));

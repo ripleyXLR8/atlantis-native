@@ -129,6 +129,10 @@ pub struct Turn {
     pub snap: f32,
     /// Where the braking starts (@ 0x006615a8).
     pub brake: f32,
+    /// *Atlantis III*'s step (`Game.exe` @ 0x00441320): the top speed
+    /// test is π × 1/90 with 1/90 a double (@ 0x007004c8), so the speed
+    /// reaches 2.2° a step under every control word.
+    pub top_double: bool,
 }
 
 impl Turn {
@@ -136,6 +140,17 @@ impl Turn {
     /// no turn (false) when the distance is under 0.1° and no zoom is
     /// pending (the move then waits for nothing, see the caller).
     pub fn new(cam: &Camera, yaw: f32, pitch: f32, zoom: &Zoom) -> (Turn, bool) {
+        Turn::new_with(cam, yaw, pitch, zoom, false)
+    }
+
+    /// *Atlantis III*'s set-up (`Game.exe` @ 0x004410b0): the same, with
+    /// π × 1/90 taken with the double 1/90 (@ 0x007004c8) for the
+    /// acceleration as for the step's top speed ([`Turn::top_double`]).
+    pub fn new_a3(cam: &Camera, yaw: f32, pitch: f32, zoom: &Zoom) -> (Turn, bool) {
+        Turn::new_with(cam, yaw, pitch, zoom, true)
+    }
+
+    fn new_with(cam: &Camera, yaw: f32, pitch: f32, zoom: &Zoom, a3: bool) -> (Turn, bool) {
         let fpu = cam.fpu;
         let (yaw0, pitch0) = cam.angles();
         let d_pitch = fpu.f32(fpu.sub(d(pitch), d(pitch0)));
@@ -153,7 +168,11 @@ impl Turn {
         let snap = fpu.f32(fpu.sub(d(dist), tenth));
         let q = fpu.f32(fpu.mul(d(PI), d(BRAKE)));
         let mut brake = fpu.f32(fpu.sub(d(dist), d(q)));
-        let a = fpu.mul(d(PI), d(TOP));
+        let a = if a3 {
+            fpu.mul(d(PI), 1.0 / 90.0)
+        } else {
+            fpu.mul(d(PI), d(TOP))
+        };
         let b = fpu.f32(fpu.mul(d(PI), d(RAMP)));
         let accel = fpu.f32(fpu.div(fpu.mul(a, a), d(b) + d(b)));
         let turning = d(dist) >= tenth || zoom.pending();
@@ -174,6 +193,7 @@ impl Turn {
                 accel,
                 snap,
                 brake,
+                top_double: a3,
             },
             turning,
         )
@@ -200,7 +220,11 @@ impl Turn {
                 self.done = fpu.f32(fpu.sub(d(self.dist), d(self.speed)));
             }
         } else {
-            let top = fpu.mul(d(PI), d(TOP));
+            let top = if self.top_double {
+                fpu.mul(d(PI), 1.0 / 90.0)
+            } else {
+                fpu.mul(d(PI), d(TOP))
+            };
             if top > d(self.speed) {
                 self.speed = fpu.f32(fpu.add(d(self.accel), d(self.speed)));
             }

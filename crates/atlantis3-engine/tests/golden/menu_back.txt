@@ -1,0 +1,66 @@
+# The in-game menu's BT_BACK view re-entry 0x0043fd00 of the original Game.exe (GOG.com, md5
+# eb06eaa718877dfcabee6e8f89d85b31) with spr_p6.dll under emulation, 800 x 600 RGB565: hoggar.wam view 15 entered at
+# 0, 0 by the game's own view entry 0x0043f840, 12 warp frames, the camera turned to (150, -10) degrees, 0x004408e0
+# into 0x0077e648 / 0x0078111c (the keyboard callback's call at Escape), every slot's frame set to 3, the six faces
+# overwritten (case zero: 0; case fill: 0x5a), then 0x0043fd00 run whole. Lines: entry face I MD5 (after the entry);
+# entry / before / marked slots; escape yaw=HEX pitch=HEX (f32 bits); case NAME call ... (calls in order, on entry);
+# case NAME faces=equal|differ (against the entry's); start=0x00756074,0x00756078 after; camera=same|changed
+# (0x0077b720 and 0x0077b788); slots after. Derived values only (md5s, float bits, names).
+entry face 0 d758b93d063e477175542ad33423d298
+entry face 1 f2d0eb9c346a160bfdfc99fd5f6c2988
+entry face 2 5b366d961ac23a5785cacb1d39698643
+entry face 3 86bc2b74944c7767c977defac1a1aa34
+entry face 4 5b0264df6883ad461e87412cc1e88741
+entry face 5 d6a316bfc5f0c8ec0aae215a92965423
+entry slots 0:taA1015017:shown=1:mode=1:frame=0:count=40:list=- 1:rrA1015015:shown=1:mode=1:frame=0:count=80:list=- 2:noA1015017:shown=1:mode=1:frame=0:count=160:list=- 3:g1A1015007:shown=1:mode=1:frame=0:count=40:list=- 4:g1A2015007:shown=0:mode=1:frame=0:count=40:list=- 5:g1A3015007:shown=0:mode=1:frame=0:count=40:list=- 6:g4A3015015:shown=1:mode=1:frame=0:count=1:list=- 7:xaA1015015:shown=1:mode=1:frame=0:count=1:list=- 8:toB1015015:shown=1:mode=1:frame=0:count=40:list=- 9:toB2015015:shown=0:mode=1:frame=0:count=40:list=- 10:toC1015015:shown=0:mode=1:frame=0:count=40:list=- 11:toC2015015:shown=0:mode=1:frame=0:count=40:list=- 12:cuA1015015:shown=1:mode=1:frame=0:count=1:list=- 13:ciA1015015:shown=1:mode=1:frame=0:count=1:list=-
+before slots 0:taA1015017:shown=1:mode=1:frame=0:count=40:list=- 1:rrA1015015:shown=1:mode=1:frame=0:count=80:list=- 2:noA1015017:shown=1:mode=1:frame=0:count=160:list=- 3:g1A1015007:shown=1:mode=1:frame=0:count=40:list=- 4:g1A2015007:shown=0:mode=1:frame=0:count=40:list=- 5:g1A3015007:shown=0:mode=1:frame=0:count=40:list=- 6:g4A3015015:shown=1:mode=1:frame=0:count=1:list=- 7:xaA1015015:shown=1:mode=1:frame=0:count=1:list=- 8:toB1015015:shown=1:mode=1:frame=0:count=40:list=- 9:toB2015015:shown=0:mode=1:frame=0:count=40:list=- 10:toC1015015:shown=0:mode=1:frame=0:count=40:list=- 11:toC2015015:shown=0:mode=1:frame=0:count=40:list=- 12:cuA1015015:shown=1:mode=1:frame=0:count=1:list=- 13:ciA1015015:shown=1:mode=1:frame=0:count=1:list=-
+escape yaw=40278d33 pitch=be32b8bc
+marked slots 0:taA1015017:shown=1:mode=1:frame=3:count=40:list=- 1:rrA1015015:shown=1:mode=1:frame=3:count=80:list=- 2:noA1015017:shown=1:mode=1:frame=3:count=160:list=- 3:g1A1015007:shown=1:mode=1:frame=3:count=40:list=- 4:g1A2015007:shown=0:mode=1:frame=3:count=40:list=- 5:g1A3015007:shown=0:mode=1:frame=3:count=40:list=- 6:g4A3015015:shown=1:mode=1:frame=3:count=1:list=- 7:xaA1015015:shown=1:mode=1:frame=3:count=1:list=- 8:toB1015015:shown=1:mode=1:frame=3:count=40:list=- 9:toB2015015:shown=0:mode=1:frame=3:count=40:list=- 10:toC1015015:shown=0:mode=1:frame=3:count=40:list=- 11:toC2015015:shown=0:mode=1:frame=3:count=40:list=- 12:cuA1015015:shown=1:mode=1:frame=3:count=1:list=- 13:ciA1015015:shown=1:mode=1:frame=3:count=1:list=-
+case zero call cube_load warp\Warp512\hoggar\ho0015.hnm
+case zero call start_angles 40278d33 be32b8bc
+case zero call slots_clear
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call spw_load
+case zero call view_hook
+case zero call RunOneCommand '(LIMITEANGLEWARPY=70)'
+case zero call coffer
+case zero faces=equal
+case zero start=40278d33,be32b8bc
+case zero camera=same
+case zero slots 0:taA1015017:shown=1:mode=1:frame=0:count=40:list=- 1:rrA1015015:shown=1:mode=1:frame=0:count=80:list=- 2:noA1015017:shown=1:mode=1:frame=0:count=160:list=- 3:g1A1015007:shown=1:mode=1:frame=0:count=40:list=- 4:g1A2015007:shown=0:mode=1:frame=0:count=40:list=- 5:g1A3015007:shown=0:mode=1:frame=0:count=40:list=- 6:g4A3015015:shown=1:mode=1:frame=0:count=1:list=- 7:xaA1015015:shown=1:mode=1:frame=0:count=1:list=- 8:toB1015015:shown=1:mode=1:frame=0:count=40:list=- 9:toB2015015:shown=0:mode=1:frame=0:count=40:list=- 10:toC1015015:shown=0:mode=1:frame=0:count=40:list=- 11:toC2015015:shown=0:mode=1:frame=0:count=40:list=- 12:cuA1015015:shown=1:mode=1:frame=0:count=1:list=- 13:ciA1015015:shown=1:mode=1:frame=0:count=1:list=-
+case fill call cube_load warp\Warp512\hoggar\ho0015.hnm
+case fill call start_angles 40278d33 be32b8bc
+case fill call slots_clear
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call spw_load
+case fill call view_hook
+case fill call RunOneCommand '(LIMITEANGLEWARPY=70)'
+case fill call coffer
+case fill faces=equal
+case fill start=40278d33,be32b8bc
+case fill camera=same
+case fill slots 0:taA1015017:shown=1:mode=1:frame=0:count=40:list=- 1:rrA1015015:shown=1:mode=1:frame=0:count=80:list=- 2:noA1015017:shown=1:mode=1:frame=0:count=160:list=- 3:g1A1015007:shown=1:mode=1:frame=0:count=40:list=- 4:g1A2015007:shown=0:mode=1:frame=0:count=40:list=- 5:g1A3015007:shown=0:mode=1:frame=0:count=40:list=- 6:g4A3015015:shown=1:mode=1:frame=0:count=1:list=- 7:xaA1015015:shown=1:mode=1:frame=0:count=1:list=- 8:toB1015015:shown=1:mode=1:frame=0:count=40:list=- 9:toB2015015:shown=0:mode=1:frame=0:count=40:list=- 10:toC1015015:shown=0:mode=1:frame=0:count=40:list=- 11:toC2015015:shown=0:mode=1:frame=0:count=40:list=- 12:cuA1015015:shown=1:mode=1:frame=0:count=1:list=- 13:ciA1015015:shown=1:mode=1:frame=0:count=1:list=-

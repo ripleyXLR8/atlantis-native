@@ -1,0 +1,278 @@
+# Frames decoded by the original Game.exe's HNM6 decoders for a 32-bit display (x8r8g8b8), its own code run under emulation.
+# Frames decoded by Game.exe (md5 eb06eaa718877dfcabee6e8f89d85b31) under Unicorn for a 32-bit display
+#   a 32-bit surface: 0x006b8680(0x20); Hnm_Framer opened with 0x20 as CHnmStream::Open gets it from
+#   0x0040efc0 on a 32-bit display: decoder context 0x006a1550, colour writer 0x006a349d)
+# FILE FRAME MD5              md5 of the decoded frame: width*height x8r8g8b8 u32 LE, row by row
+# FILE pcm FRAME MD5 NSAMPLES as hnm_frames.txt (the sound does not depend on the depth)
+# FILE = path under Datas/; frames 0-based in file order
+# hnm/HNM640/hoggar/cine027.hnm: frames all
+hnm/HNM640/hoggar/cine027.hnm 0 3c32790519e3e39824f9c0267be98588
+hnm/HNM640/hoggar/cine027.hnm pcm 0 3252046c943c38be5fc85c20f49d81ed 112896
+hnm/HNM640/hoggar/cine027.hnm 1 0a28b6b4837bb824312793b3659d7d1f
+hnm/HNM640/hoggar/cine027.hnm pcm 1 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 2 150fb92622e5f8987f79ff39b20a7a39
+hnm/HNM640/hoggar/cine027.hnm pcm 2 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 3 995eb67237235daed7f7175a10d055cd
+hnm/HNM640/hoggar/cine027.hnm pcm 3 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 4 307d07c65b05a124a0ae62f384c5188e
+hnm/HNM640/hoggar/cine027.hnm pcm 4 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 5 81c936456b9abd229624f062e879e325
+hnm/HNM640/hoggar/cine027.hnm pcm 5 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 6 290f6c3c579317ce26a8ace932c2663b
+hnm/HNM640/hoggar/cine027.hnm pcm 6 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 7 7e6a08ca20a5badc737688060daf2dd1
+hnm/HNM640/hoggar/cine027.hnm pcm 7 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 8 7e391b3dddd32654359304a159a1e0cb
+hnm/HNM640/hoggar/cine027.hnm pcm 8 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 9 a6be3aa9cb52cc5618c0669c65d2d8c5
+hnm/HNM640/hoggar/cine027.hnm pcm 9 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 10 b9d67b52655b23052ecd73b72c95c7d5
+hnm/HNM640/hoggar/cine027.hnm pcm 10 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 11 a69256425f7b75b1808001a53ee3fe66
+hnm/HNM640/hoggar/cine027.hnm pcm 11 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 12 20e850e2f8ecdb94f40494408fd466ad
+hnm/HNM640/hoggar/cine027.hnm pcm 12 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 13 63e1a60c6e9d4d127476bcf313d7f5f6
+hnm/HNM640/hoggar/cine027.hnm pcm 13 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 14 7bf6fb2494688a7f910e3ef1ad5e0961
+hnm/HNM640/hoggar/cine027.hnm pcm 14 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 15 61e6be19b47427845c1509b159124c88
+hnm/HNM640/hoggar/cine027.hnm pcm 15 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 16 18b1defdc641bb7bfaf37913cf11caca
+hnm/HNM640/hoggar/cine027.hnm pcm 16 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 17 8a387a56bde7145218ad1e6141ad10f0
+hnm/HNM640/hoggar/cine027.hnm pcm 17 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 18 9c18e380995912732527ada996a6ee0d
+hnm/HNM640/hoggar/cine027.hnm pcm 18 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 19 c2f018e3805cfd9bde58f8db7fea8585
+hnm/HNM640/hoggar/cine027.hnm pcm 19 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 20 fe2a1eeb65d3c5b9f8d20cfeadbfb9be
+hnm/HNM640/hoggar/cine027.hnm pcm 20 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 21 37e4fd3a3e8683e53cc55d115e088358
+hnm/HNM640/hoggar/cine027.hnm pcm 21 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 22 0595d90ab4a018f22a7d9055fe7a20a9
+hnm/HNM640/hoggar/cine027.hnm pcm 22 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 23 bff89ecfc6b1c87912edf088d43ada00
+hnm/HNM640/hoggar/cine027.hnm pcm 23 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 24 972f41c94a3aafafe3e726257e67cbb7
+hnm/HNM640/hoggar/cine027.hnm pcm 24 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+hnm/HNM640/hoggar/cine027.hnm 25 972f41c94a3aafafe3e726257e67cbb7
+hnm/HNM640/hoggar/cine027.hnm pcm 25 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+# loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm: frames 0-39,every25,last
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 0 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 0 25d6f825f426eb32b658024f34da3dd0 112896
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 1 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 1 41f2d9ecfb8e92dc29a35f1395b3d14d 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 2 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 2 0d9fc79bc4c8503d5100a38d32e1d82d 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 3 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 3 c13d66983c9252258db42a2076518689 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 4 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 4 c484078c75d5f7cf87e62fcbd65a1214 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 5 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 5 ab87d9eaa11663df234da15fb66dd591 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 6 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 6 ef7f1d2400e72f7635b20a175317b058 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 7 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 7 cdffbb562d36551f443a11cb6689b1d6 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 8 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 8 e7a8562f1c433fce69c19d09b8cdae20 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 9 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 9 7e8dec73a67a9f4820addfa17c8076ce 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 10 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 10 fc46a482bed662a3518a847b933ed29f 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 11 d3d7730b552f38269d80d38a3dc1661c
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 11 f49c00f27640d2fb6ac2874dfc48f566 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 12 427e92bce1f7987022c1e5a112b6622d
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 12 b63bc9603eae792b12b3318134ef892b 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 13 2a96e668af4bb2d618a82499798978cb
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 13 cc1e8c14f8af28c9cd0348bc659ed952 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 14 8c79e0eeb58ea10a598730c9920fe74a
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 14 f931696d808befa6aca3c790f2eeb52b 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 15 aa0ef26eabbc4662295df5e7d0eef9d5
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 15 6d95f0c4ad1a4b994aa3a09b0ccdead0 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 16 f4583893703a637c98107f6f5a70d124
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 16 171529f4781024afbfa7f016aefb9e26 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 17 d49647db28d55f48db4cb8af933d1066
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 17 2ed5682899e6d9166470a1e35df5725a 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 18 3ff9400a733e4092a964c9e681cc69ec
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 18 04ad7445c141eff172b95329c156ea56 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 19 2e737aa8a973a1555407d0010997036c
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 19 a3e363bc2935207ebbc258b46d7ae606 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 20 711675e5f85f34de26f81de911586a92
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 20 daafa9ffbb707c47bed6f679db9dc626 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 21 9318c7a7155c7929d55a959ed3815935
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 21 e0f2f3d54e481170a2b1ddb5de08b622 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 22 7abecc6ea54232e813e824ca528baaeb
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 22 190735566ced94e77fed28e984142e51 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 23 84f14132ed5b9fe7e053889ab3119969
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 23 4626881f6d9cdd88520f7cf02ba99b54 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 24 7523c42bc5e4203962ac8f50e9af8cb5
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 24 e2a445e1166e3f56308fa07bc16fcac1 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 25 0067441ce55407aae53bd86b00b9552b
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 25 ba66f29ff7ab267e024b34b36d7c4dbf 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 26 c95701fc30ef54d9acb6a9fca1d44912
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 26 f718e7cf493481d9946ebea348dfcd8a 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 27 1cea196f33566ace6e50b4d93cac6b6c
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 27 8ea48e0e583feb81ab7ea48c058309ae 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 28 18fab857acad156c90371ea0b2f762ea
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 28 03a128d931c270d5d9c28c834a4ff255 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 29 ab65cd3b1e32d59bcbd183b42f9c14d2
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 29 ba60f97391e63708fa574a0eee6d168b 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 30 aa76b245ccdb9f8ea6e7b4b3c04ff89f
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 30 cc17e9f9e2ce04b4735e257b7e1e2d6c 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 31 77c128543ee2ba840f23c882a377e709
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 31 de82ddcf6f54429aec577c9907f6858a 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 32 6b7f5673beb0484f73ad545b004aaf34
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 32 4871483dc255222cfd62fe65d219909b 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 33 edc1e2f06d3d908a0340582a6c96ca48
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 33 d43159e74d3f35f95c92befa18eb740e 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 34 af8e668cba0484443412673c76f25315
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 34 09ebd7fb8d511774fc55448e4be10e00 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 35 93db70d045c8124b5c124bd1da86ccd2
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 35 fedbc6037d3929436f3aa147d99a667e 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 36 1506b97d0fb9306f21246d0bd7045634
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 36 4e3309ae70e611aea7e8d98106d7fd30 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 37 b61c5f119b04a6050cb5a51c73f5d5ad
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 37 02bd0820bdf83680b5452b1f641288d6 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 38 58950fdef64c1ea6e93e90692c08950c
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 38 0464a1ddb71b2dba1915f623e1b7644b 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 39 2c8d44b8b5c02bb38fab2a8199006f74
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 39 cf7a79e02fd067059c243ba3a0504818 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 50 30f4c09eaec86693571fa9565ca14cb8
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 50 6c4bf171b44d12be341b8a77d9d5937d 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 75 f0e21065b9af1bead97821fb42b02757
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 75 77a500ecab087782e2dcad829b10337a 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 100 e3b0ca498b37a69d66399ccaad650d47
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 100 95bf448663d5808cf494d26ddf0d9f06 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 125 0e7bd7219d5e420791677e7cea8921a9
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 125 18d7c7ab55fc5b40b2c1e64c2a4316ba 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 150 f6ab508bc4f91f5e889a0d0acc9e82b9
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 150 10e751c9e8e1a29e3fa79c42d39e4701 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 175 f629c9e3f6b593dd5a34dd7d0af1b586
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 175 8484895209048b52a00940d0b183c977 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 200 dc93e365ce6e0e5c251d1e6ac4ce42ea
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 200 85e59143a9a526440d14707677af930b 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 225 6cf2d15d827ff8703fce2e87ee1c205c
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 225 72bf265803fc2d08af79a2d6aef6ed8b 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 250 812bc9c83bdaad938e6925088f359602
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 250 6d7589888391cdefeb136516729789d3 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 275 fbf041752bd115d80ece34308e577a7d
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 275 dcf4d75e5a705a2ef9a2a704efcb2b64 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 300 7fad193887ee8e1076b6c76e26b35793
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 300 a552db0ff66d23a7ca17f379502dfe74 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 325 5372277ff1595c4e7ffc9a04495511d6
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 325 633af962fec5d85b0d3d9f075889b018 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 350 fefa357a71f2cc0aea4dbdb295dc5671
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 350 e267d7a077fc819114da2a23f5c10d5c 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 375 5343df73ddd489eb063aa974cb116987
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 375 cab282f017dbcc667502a2c3d5af373c 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 400 8ab58d255abcbbbc6151cea65680707a
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 400 31bc3ec6b1bd2aa5de2df20f9a8f8482 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 425 67dee2adac1be10338dd67eb31bc0fa8
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 425 d2307a835bc009a9f96f221f0344ae40 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 450 bff7909605fbcb6ca6c024f03672e4ca
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 450 2438d22361c64f475e356a38e2a3e6ba 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 475 93b1636e490a9cb0fd2fd036e9471ce1
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 475 45cf6785b9f2dae0050b23442cf10a08 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 500 991ce49e39e6d852b3017a9c312fd5d9
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 500 39713a8460bae179caba630f447fb150 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 525 cb424f7aade00da6b7c35c35c1e220c5
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 525 db42eec7f5df0a825611c8bb6f56ceb2 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 550 fbf2806a646a115c97a115444bf06c2d
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 550 52f79e777967c8ceaa26344c16cde5c8 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 575 da9925bcb6e57831cb721ffc432df35b
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 575 fcfb0dfa5a43fae90e827c3329a30ae9 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 600 d94027303755405cbdc9d206f3edfe1c
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 600 7791b3ad233d90ea780173dea3a02db0 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 625 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 625 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm 633 054c3e9f7d7842b3f27466bb90805b94
+loc/hnm/HNM640/Fra/Hoggar/Cine092.hnm pcm 633 bec2f371b05ec0bbdde83ff0ee784f2f 3528
+# warp/warp512/ldm/cf0004.hnm: frames all
+warp/warp512/ldm/cf0004.hnm 0 1ec9920ffa086f2ce83a5c5281a21015
+warp/warp512/ldm/cf0004.hnm 1 75fd3ecd972931bb5e757504a3493ebd
+warp/warp512/ldm/cf0004.hnm 2 1f044592e66cc5790a56ada0290b26b3
+warp/warp512/ldm/cf0004.hnm 3 b6f8d4f44ea8dbef4c78c9d9e0d41acb
+warp/warp512/ldm/cf0004.hnm 4 125d853b17b8f1fc72f1c19ffdf149fc
+warp/warp512/ldm/cf0004.hnm 5 865327e5e4aa550b6c136638d97623ef
+# hnmtraj/HNM640/hoggar/ho004005.hnm: frames all
+hnmtraj/HNM640/hoggar/ho004005.hnm 0 8a696ebbc1847fb23ada1446a8d072ca
+hnmtraj/HNM640/hoggar/ho004005.hnm 1 d6db0b548ef5270af66b554f45f03864
+hnmtraj/HNM640/hoggar/ho004005.hnm 2 6fd6e673dc1552c6082e7899b36d6081
+hnmtraj/HNM640/hoggar/ho004005.hnm 3 efb588a2960e8f065b463eed0450bda4
+hnmtraj/HNM640/hoggar/ho004005.hnm 4 b58f22a17b62ed355f65d50c25cd476b
+hnmtraj/HNM640/hoggar/ho004005.hnm 5 ccab32be83428d17906f302b9a1295af
+hnmtraj/HNM640/hoggar/ho004005.hnm 6 b2c74946611e6d09e8fbc53fffa6b2d4
+hnmtraj/HNM640/hoggar/ho004005.hnm 7 828cc393b079bd5edf233513c12da692
+hnmtraj/HNM640/hoggar/ho004005.hnm 8 f28aac979a96ea88d8d99b792ebc34f8
+hnmtraj/HNM640/hoggar/ho004005.hnm 9 d52b22d7b5f116287b5951a09ab91e03
+hnmtraj/HNM640/hoggar/ho004005.hnm 10 0f867d3631b0615c989f159a7bd3a60d
+hnmtraj/HNM640/hoggar/ho004005.hnm 11 1f2b00cdb1cc5fece5a4505564008a7f
+hnmtraj/HNM640/hoggar/ho004005.hnm 12 d1bf3b0fc2f49c3eac593e5e3ea42ed0
+hnmtraj/HNM640/hoggar/ho004005.hnm 13 378e1b7b723ff0c15d319af4a43366b2
+hnmtraj/HNM640/hoggar/ho004005.hnm 14 8a08fc244802619d77d7e49f47bb264d
+hnmtraj/HNM640/hoggar/ho004005.hnm 15 0b185e2904892a171b8e886ce69fce30
+hnmtraj/HNM640/hoggar/ho004005.hnm 16 9816afd835e61fab91bc319bf3786f93
+hnmtraj/HNM640/hoggar/ho004005.hnm 17 f08ea40d1198b76bce0e50aa7b2a44ab
+hnmtraj/HNM640/hoggar/ho004005.hnm 18 93d811bebce13a0715fb49eed6051f12
+hnmtraj/HNM640/hoggar/ho004005.hnm 19 3223aabc5ffeda51ae187fa8b725f249
+hnmtraj/HNM640/hoggar/ho004005.hnm 20 57d6492e70e2c85bd1b41ea9757824cf
+hnmtraj/HNM640/hoggar/ho004005.hnm 21 f14baf9dd593e6f35d1b394d7e35a788
+hnmtraj/HNM640/hoggar/ho004005.hnm 22 76f324e89917abce8821714fc43a61d4
+hnmtraj/HNM640/hoggar/ho004005.hnm 23 fc9859523f4a32bfc82365073918c7b7
+hnmtraj/HNM640/hoggar/ho004005.hnm 24 8fd9486b791580a8ef344168e0d5420d
+hnmtraj/HNM640/hoggar/ho004005.hnm 25 0505cccde98b4c84509bd0a54cc142da
+hnmtraj/HNM640/hoggar/ho004005.hnm 26 a31fab88954c4c9687120175ca0d755d
+hnmtraj/HNM640/hoggar/ho004005.hnm 27 7d304871427c2f7d401c9fef82f2089c
+hnmtraj/HNM640/hoggar/ho004005.hnm 28 902de993ae47e9f0a4acdeb2ddcc19f3
+hnmtraj/HNM640/hoggar/ho004005.hnm 29 ba1fd7a9f299a4734e151620eb27cd5a
+hnmtraj/HNM640/hoggar/ho004005.hnm 30 73947c9f0cbf532994476ebb862ca50b
+hnmtraj/HNM640/hoggar/ho004005.hnm 31 b35b88d7bad11859e13dc9d49d918193
+hnmtraj/HNM640/hoggar/ho004005.hnm 32 f7265661cd564430f23b05917105658a
+hnmtraj/HNM640/hoggar/ho004005.hnm 33 69ebefec51731197c72e07c161a669b8
+hnmtraj/HNM640/hoggar/ho004005.hnm 34 50c7988615e104cea07edb780f10e3d3
+hnmtraj/HNM640/hoggar/ho004005.hnm 35 5c09659f3b2643f91d9f59d0ed51b9a0
+hnmtraj/HNM640/hoggar/ho004005.hnm 36 7b62c4cf381308121ea649361e45bb34
+hnmtraj/HNM640/hoggar/ho004005.hnm 37 e47d955f9fc5de1d667549b963d13ce7
+hnmtraj/HNM640/hoggar/ho004005.hnm 38 e9c5feac459f876bc7547937800a2843
+hnmtraj/HNM640/hoggar/ho004005.hnm 39 abf3870aa70017e149c5f4f85839c64d
+hnmtraj/HNM640/hoggar/ho004005.hnm 40 212aac2bd060cdae8e35de97122e9169
+hnmtraj/HNM640/hoggar/ho004005.hnm 41 1c4e37daec83cfa08ab4de13f0b65bcd
+hnmtraj/HNM640/hoggar/ho004005.hnm 42 81ff2978e0d3a412562d62a3768f7f1e
+hnmtraj/HNM640/hoggar/ho004005.hnm 43 0800a768f88da506ff1dd55f9bf1b4a7
+hnmtraj/HNM640/hoggar/ho004005.hnm 44 cc8e89ba5942fc940316f00eadd3956b
+hnmtraj/HNM640/hoggar/ho004005.hnm 45 24773ce987fcbced7f844e17ca6e3e8d
+hnmtraj/HNM640/hoggar/ho004005.hnm 46 b048ee55003f8e87f462002351d6f5c9
+hnmtraj/HNM640/hoggar/ho004005.hnm 47 07750ac8d75ff031e1dbddd7a333d95e
+hnmtraj/HNM640/hoggar/ho004005.hnm 48 49c796c349cef4e179d9c2c49a7cf77f
+hnmtraj/HNM640/hoggar/ho004005.hnm 49 b1be8bc116afce1544e389029e0dabe3
+hnmtraj/HNM640/hoggar/ho004005.hnm 50 7b7d87d8a2ad5e97556d087888807d18
+hnmtraj/HNM640/hoggar/ho004005.hnm 51 c02d97b2a20e4f84ff128188a3369df8
+hnmtraj/HNM640/hoggar/ho004005.hnm 52 72a5d29cac9311997712bca82225146d
+hnmtraj/HNM640/hoggar/ho004005.hnm 53 71732fccc89268547852f83c91749c4a
+hnmtraj/HNM640/hoggar/ho004005.hnm 54 537a7639e249d2d1fab16e5b9a540eb6
+hnmtraj/HNM640/hoggar/ho004005.hnm 55 732494442150e1db5009e7b0e1e79c5a
+hnmtraj/HNM640/hoggar/ho004005.hnm 56 99b019eab832ab64fdf9df158ddfe089
+hnmtraj/HNM640/hoggar/ho004005.hnm 57 1462e142a88023a91b950276604a8dbe
+hnmtraj/HNM640/hoggar/ho004005.hnm 58 27a774b8e3e1b929918e46d4fa69cb6e
+hnmtraj/HNM640/hoggar/ho004005.hnm 59 da9b41d8633fd1e9281c73a18cc33e3e
+hnmtraj/HNM640/hoggar/ho004005.hnm 60 f0110f163d22fdcc41d0d2405c4a2eef
+hnmtraj/HNM640/hoggar/ho004005.hnm 61 8818f8c1a6b249e09cc0f85ab25dca8d
+hnmtraj/HNM640/hoggar/ho004005.hnm 62 ea1c69a04db348b2fb76392602925e9d
+hnmtraj/HNM640/hoggar/ho004005.hnm 63 7285ca9f2d06dc89bfe095b8203eb7db
+hnmtraj/HNM640/hoggar/ho004005.hnm 64 5b64ab61180ca852a410b8a174717cb1
+hnmtraj/HNM640/hoggar/ho004005.hnm 65 667ae3f354258052b59e856b51252b51
+hnmtraj/HNM640/hoggar/ho004005.hnm 66 72ecb25d9714fd548785af790271ff13
+hnmtraj/HNM640/hoggar/ho004005.hnm 67 08735114b899ff5503d467b42f13c5b6
+hnmtraj/HNM640/hoggar/ho004005.hnm 68 fb6a31ff32bdba72f6f49e685980178b
+hnmtraj/HNM640/hoggar/ho004005.hnm 69 738193f16403ae10644672e734e2c3e1
+hnmtraj/HNM640/hoggar/ho004005.hnm 70 4901352e798cd11fc881219d503316a6
+hnmtraj/HNM640/hoggar/ho004005.hnm 71 8f91d63f33df1ec78d232af83fd1f4e8
+hnmtraj/HNM640/hoggar/ho004005.hnm 72 bb7101351013a0813738ed8c52518863
+hnmtraj/HNM640/hoggar/ho004005.hnm 73 a8edb026690134ac85d6d32c7c2d7d6d
+hnmtraj/HNM640/hoggar/ho004005.hnm 74 d2a18c942a3f25a28e06c2cdc3980650
+hnmtraj/HNM640/hoggar/ho004005.hnm 75 872dae213dc623267f47a3c5e19d8c76
+hnmtraj/HNM640/hoggar/ho004005.hnm 76 d460a414a29ea554b4dcd7d9c46c3dae
+hnmtraj/HNM640/hoggar/ho004005.hnm 77 8832ef4cf84a081289927b9c942fcb73
+hnmtraj/HNM640/hoggar/ho004005.hnm 78 5a16211e592727c156351eeb2b427bb9

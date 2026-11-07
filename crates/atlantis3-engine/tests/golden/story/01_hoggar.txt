@@ -1,0 +1,365 @@
+# Story segment 01_hoggar from the new game: the original's interpreter (a3_story_script.py), stripped to the lines the test reads
+STEP 1 START
+LOG interp: SET/set(changewam=CFuner.wam)
+LOG interp: SET(showobjet=CHF_OISEAUBOIS)
+LOG interp: SET(showobjet=CHF_COUVERCLE01)
+LOG interp: SET(hideobjet=CHF_COUVERCLE02)
+LOG interp: SET(hideperso=CHF_PSYCHOP)
+LOG interp: SET/set(anglewarpx=-90)
+LOG interp: SET/set(vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET(chapter=600)
+LOG interp: SET/set(ChangeCD=2)
+LOG interp: SET/set(monde=1)
+LOG interp: SET/set(changewam=hoggar.wam)
+LOG interp: SET(hideobjet=HOG_DISQUE_TOUPIE)
+LOG interp: SET(showobjet=CMP_MENBRANE)
+LOG interp: SET(hideobjet=HOG_ETOILE01)
+LOG interp: SET(hideobjet=HOG_ETOILE02)
+LOG interp: SET(hideobjet=HOG_ETOILE03)
+LOG interp: SET(hideobjet=HOG_ETOILE04)
+LOG interp: SET(hideobjet=HOG_ETOILE05)
+LOG interp: SET(HidePerso=HOG_BOSS)
+LOG interp: SET(HidePerso=HOG_GARDIEN03)
+LOG interp: SET(HidePerso=HOG_TOUAREGBLESSE)
+LOG interp: SET(HidePerso=CMP_BOSS)
+LOG interp: SET(HidePerso=CMP_GARDIEN03)
+LOG interp: SET(HidePerso=CMP_BOSS2)
+LOG interp: SET(HidePerso=GRO_GARDIEN03)
+LOG interp: SET(hideobjet=HOG_OBJ_CRANE)
+LOG interp: SET(ShowPerso=CMP_ATLANTEFIGE)
+LOG interp: SET(HidePerso=CMP_ATLANTE)
+LOG interp: SET(hideobjet=CMP_CLOCHE)
+LOG interp: SET(hideobjet=CMP_TELECOMMANDE)
+LOG interp: SET(HideObjet=CMP_HOGGAR)
+LOG interp: SET(HideObjet=CMP_BAGDAD)
+LOG interp: SET(HideObjet=CMP_BAGDADFIN)
+LOG interp: SET(HideObjet=CMP_PALEO)
+LOG interp: SET(HideObjet=CMP_PALEOFIN)
+LOG interp: SET(ShowPerso=HOG_GARDIEN04)
+LOG interp: SET(ShowObjet=CMP_TORCHE_ELECTRIQUE)
+LOG interp: SET(ShowObjet=CMP_CLEF1)
+LOG interp: SET(ShowObjet=CMP_COUTEAU)
+LOG interp: SET(ShowPerso=HOG_TOUAREGBL)
+LOG interp: SET(HidePerso=HOG_TOUAREGLI)
+LOG interp: SET/set(sacados=HOG_OBJ_BATON)
+LOG interp: SET/set(sacados=HOG_OBJ_DISQUE)
+LOG interp: SET/set(anglewarpx=108)
+LOG interp: SET/set(vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+LOG interp: SET/set(HideObjet=HOG_ETOILE01)
+LOG interp: SET/set(HideObjet=HOG_ETOILE02)
+LOG interp: SET/set(HideObjet=HOG_ETOILE03)
+LOG interp: SET/set(HideObjet=HOG_ETOILE04)
+LOG interp: SET/set(HideObjet=HOG_ETOILE05)
+LOG interp: SET/set(HOG_PUZZLETOUPIEOK=0)
+LOG interp: SET/set(HOG_TOUPIEOK=0)
+LOG interp: SET/set(chapter=1)
+LOG interp: SET/set(StartMusik=4)
+LOG interp: SET/set(cinema=093,fps=25)
+LOG interp: SET/set(cinema=001,fps=25)
+LOG interp: SET/set(cinema=002,fps=25)
+LOG interp: SET/set(Flag1000=1)
+VARS 1: CHAPTER=1 NEARW77=6 VUE=4 ANGLEWARPX=108 LIMITEANGLEWARPX=-1 LIMITEANGLEWARPY=70 CHANGECD=2 MONDE=1
+FLAGS 1: 1000=1 1001=4 1011=4 1021=1 1134=1 1135=1 1534=1 1535=2
+BAG 1: HOG_OBJ_BATON HOG_OBJ_DISQUE
+STATE 1: chapter=1 monde=1 wam=hoggar.wam view=4 hand=- waiting=0 music=4)
+EXPECT CHAPTER=1 ok
+EXPECT VUE=4 ok
+STEP 2 GO 5
+LOG interp: SET/set(Save=1)
+SAVEFILE CurrentCD = 0
+SAVEFILE Wam = hoggar.wam
+SAVEFILE Monde = 1
+SAVEFILE Vue = 4
+SAVEFILE Chapitre = 1
+SAVEFILE NBFlag = 8
+SAVEFILE 1000 = 1
+SAVEFILE 1001 = 4
+SAVEFILE 1011 = 4
+SAVEFILE 1021 = 1
+SAVEFILE 1134 = 1
+SAVEFILE 1135 = 1
+SAVEFILE 1534 = 1
+SAVEFILE 1535 = 2
+SAVEFILE NBObjet = 2
+SAVEFILE HOG_OBJ_BATON
+SAVEFILE HOG_OBJ_DISQUE
+SAVEFILE //== Sauvegarde des dialogues ==
+SAVEFILE NBPersoAvecDial = 0
+SAVEFILE Quaternion0 = 0.000000
+SAVEFILE Quaternion1 = 0.000000
+SAVEFILE Quaternion2 = 0.000000
+SAVEFILE Quaternion3 = 1.000000
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+VARS 2: LASTVUE=4 VUE=5 ANGLEWARPX=110 ANGLEWARPY=9 SUJET=-2
+FLAGS 2: 1001=5
+STATE 2: chapter=1 monde=1 wam=hoggar.wam view=5 hand=- waiting=0 music=4)
+STEP 3 GO 6
+LOG interp: SET/set(dial=001, voixoff)
+LOG interp: SET/set(flag426=1)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+VARS 3: LASTVUE=5 VUE=6 ANGLEWARPX=170 ANGLEWARPY=356
+FLAGS 3: 426=1 1001=6
+STATE 3: chapter=1 monde=1 wam=hoggar.wam view=6 hand=- waiting=0 music=4)
+STEP 4 GO 7
+LOG interp: SET/set(chapter=2)
+LOG interp: SET/set(StartMusik=4)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+LOG interp: SET/set(enablesuj,HOG_GARDIEN01,HOG_G1_SITE,HOG_G1_PUITS,HOG_G1_G1)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 4: CHAPTER=2 LASTVUE=6 VUE=7 ANGLEWARPX=156 ANGLEWARPY=1
+FLAGS 4: 1001=7 1021=2
+SUBJ 4 HOG_GARDIEN01: HOG_G1_SITE+ HOG_G1_PUITS+ HOG_G1_G1+
+STATE 4: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
+EXPECT CHAPTER=2 ok
+STEP 5 PERSO HOG_GARDIEN01
+VARS 5: CLICPERSO=1
+STATE 5: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
+MODE 5: 8 subject menu
+STEP 6 SUBJECT HOG_G1_SITE
+LOG interp: SET/set(disablesuj,HOG_GARDIEN01,HOG_G1_SITE)
+LOG interp: SET/set(dial=5)
+LOG interp: SET/set(dial=8)
+LOG interp: SET/set(Flag3=1)
+VARS 6: CLICPERSO=0
+FLAGS 6: 3=1
+SUBJ 6 HOG_GARDIEN01: HOG_G1_SITE- HOG_G1_PUITS+ HOG_G1_G1+
+STATE 6: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
+STEP 7 PERSO HOG_GARDIEN01
+VARS 7: CLICPERSO=1
+STATE 7: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
+MODE 7: 8 subject menu
+STEP 8 SUBJECT HOG_G1_PUITS
+LOG interp: SET/set(dial=6)
+LOG interp: SET/set(cinema=027,fps=25)
+LOG interp: SET/set(Load=1)
+LOG interp: SET(changecd=0)
+LOG interp: SET(monde=1)
+LOG interp: SET(hideobjet=HOG_DISQUE_TOUPIE)
+LOG interp: SET(showobjet=CMP_MENBRANE)
+LOG interp: SET(hideobjet=HOG_ETOILE01)
+LOG interp: SET(hideobjet=HOG_ETOILE02)
+LOG interp: SET(hideobjet=HOG_ETOILE03)
+LOG interp: SET(hideobjet=HOG_ETOILE04)
+LOG interp: SET(hideobjet=HOG_ETOILE05)
+LOG interp: SET(HidePerso=HOG_BOSS)
+LOG interp: SET(HidePerso=HOG_GARDIEN03)
+LOG interp: SET(HidePerso=HOG_TOUAREGBLESSE)
+LOG interp: SET(HidePerso=CMP_BOSS)
+LOG interp: SET(HidePerso=CMP_GARDIEN03)
+LOG interp: SET(HidePerso=CMP_BOSS2)
+LOG interp: SET(HidePerso=GRO_GARDIEN03)
+LOG interp: SET(hideobjet=HOG_OBJ_CRANE)
+LOG interp: SET(ShowPerso=CMP_ATLANTEFIGE)
+LOG interp: SET(HidePerso=CMP_ATLANTE)
+LOG interp: SET(hideobjet=CMP_CLOCHE)
+LOG interp: SET(hideobjet=CMP_TELECOMMANDE)
+LOG interp: SET(HideObjet=CMP_HOGGAR)
+LOG interp: SET(HideObjet=CMP_BAGDAD)
+LOG interp: SET(HideObjet=CMP_BAGDADFIN)
+LOG interp: SET(HideObjet=CMP_PALEO)
+LOG interp: SET(HideObjet=CMP_PALEOFIN)
+LOG interp: SET(ShowPerso=HOG_GARDIEN04)
+LOG interp: SET(ShowObjet=CMP_TORCHE_ELECTRIQUE)
+LOG interp: SET(ShowObjet=CMP_CLEF1)
+LOG interp: SET(ShowObjet=CMP_COUTEAU)
+LOG interp: SET(ShowPerso=HOG_TOUAREGBL)
+LOG interp: SET(HidePerso=HOG_TOUAREGLI)
+LOG interp: SET(Vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(StartMusik=4)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+VARS 8: CHAPTER=1 LASTVUE=0 CLICPERSO=0 VUE=4 CHANGECD=0
+FLAGS 8: 3=0 426=0 1001=4 1021=1
+SUBJ 8 HOG_GARDIEN01: 
+STATE 8: chapter=1 monde=1 wam=hoggar.wam view=4 hand=- waiting=0 music=4)
+EXPECT CHAPTER=1 ok
+EXPECT VUE=4 ok
+EXPECT FLAG3=0 ok
+STEP 9 GO 5
+LOG interp: SET/set(Save=1)
+SAVEFILE CurrentCD = 0
+SAVEFILE Wam = hoggar.wam
+SAVEFILE Monde = 1
+SAVEFILE Vue = 4
+SAVEFILE Chapitre = 1
+SAVEFILE NBFlag = 8
+SAVEFILE 1000 = 1
+SAVEFILE 1001 = 4
+SAVEFILE 1011 = 4
+SAVEFILE 1021 = 1
+SAVEFILE 1134 = 1
+SAVEFILE 1135 = 1
+SAVEFILE 1534 = 1
+SAVEFILE 1535 = 2
+SAVEFILE NBObjet = 2
+SAVEFILE HOG_OBJ_BATON
+SAVEFILE HOG_OBJ_DISQUE
+SAVEFILE //== Sauvegarde des dialogues ==
+SAVEFILE NBPersoAvecDial = 0
+SAVEFILE Quaternion0 = 0.000000
+SAVEFILE Quaternion1 = 0.000000
+SAVEFILE Quaternion2 = 0.000000
+SAVEFILE Quaternion3 = 1.000000
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+VARS 9: LASTVUE=4 VUE=5 ANGLEWARPX=110 ANGLEWARPY=9
+FLAGS 9: 1001=5
+STATE 9: chapter=1 monde=1 wam=hoggar.wam view=5 hand=- waiting=0 music=4)
+STEP 10 GO 6
+LOG interp: SET/set(dial=001, voixoff)
+LOG interp: SET/set(flag426=1)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+VARS 10: LASTVUE=5 VUE=6 ANGLEWARPX=170 ANGLEWARPY=356
+FLAGS 10: 426=1 1001=6
+STATE 10: chapter=1 monde=1 wam=hoggar.wam view=6 hand=- waiting=0 music=4)
+STEP 11 GO 7
+LOG interp: SET/set(chapter=2)
+LOG interp: SET/set(StartMusik=4)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+LOG interp: SET/set(enablesuj,HOG_GARDIEN01,HOG_G1_SITE,HOG_G1_PUITS,HOG_G1_G1)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 11: CHAPTER=2 LASTVUE=6 VUE=7 ANGLEWARPX=156 ANGLEWARPY=1
+FLAGS 11: 1001=7 1021=2
+SUBJ 11 HOG_GARDIEN01: HOG_G1_SITE+ HOG_G1_PUITS+ HOG_G1_G1+
+STATE 11: chapter=2 monde=1 wam=hoggar.wam view=7 hand=- waiting=0 music=4)
+STEP 12 GO 10
+LOG interp: SET/set(Flag2=1)
+LOG interp: SET/set(chapter=3)
+LOG interp: SET/set(StartMusik=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 12: CHAPTER=3 LASTVUE=7 VUE=10 ANGLEWARPX=21 ANGLEWARPY=355
+FLAGS 12: 2=1 1001=10 1021=3
+STATE 12: chapter=3 monde=1 wam=hoggar.wam view=10 hand=- waiting=0 music=4)
+EXPECT CHAPTER=3 ok
+STEP 13 GO 11
+LOG interp: SET/set(Flag4=1)
+LOG interp: SET/set(AbortDepart=1)
+LOG interp: SET/set(cinema=003 fps=25)
+LOG interp: SET/set(AngleWarpXNow=-150)
+LOG interp: SET/set(AngleWarpYNow=5)
+LOG interp: SET/set(Dial=10)
+LOG interp: SET/set(cinema=023 fps=25)
+FLAGS 13: 4=1
+STATE 13: chapter=3 monde=1 wam=hoggar.wam view=10 hand=- waiting=0 music=4)
+EXPECT VUE=10 ok
+STEP 14 GO 13
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 14: LASTVUE=10 VUE=13 ANGLEWARPX=192 ANGLEWARPY=1
+FLAGS 14: 1001=13
+STATE 14: chapter=3 monde=1 wam=hoggar.wam view=13 hand=- waiting=0 music=4)
+STEP 15 GO 2
+LOG interp: SET/set(chapter=4)
+LOG interp: SET/set(StartMusik=5)
+LOG interp: SET/set(HidePerso=HOG_TOUAREG)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 15: CHAPTER=4 LASTVUE=13 VUE=2 ANGLEWARPX=70 ANGLEWARPY=359
+FLAGS 15: 1001=2 1021=4
+STATE 15: chapter=4 monde=1 wam=hoggar.wam view=2 hand=- waiting=0 music=5)
+EXPECT CHAPTER=4 ok
+STEP 16 GO 1
+LOG interp: SET(LIMITEANGLEWARPY=70)
+VARS 16: LASTVUE=2 VUE=1 ANGLEWARPX=4 ANGLEWARPY=10
+FLAGS 16: 1001=1
+STATE 16: chapter=4 monde=1 wam=hoggar.wam view=1 hand=- waiting=0 music=5)
+STEP 17 HAND HOG_OBJ_DISQUE
+VARS 17: OBJETENMAIN=35
+STATE 17: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_DISQUE waiting=0 music=5)
+STEP 18 ZONE HOG_TOUPIE_POSE
+LOG interp: SET/set(showobjet=HOG_DISQUE_TOUPIE)
+LOG interp: SET/set(sacados=NOT_HOG_OBJ_DISQUE)
+LOG interp: SET/set(flag416=1)
+FLAGS 18: 416=1 1135=0 1535=0
+BAG 18: HOG_OBJ_BATON
+STATE 18: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_DISQUE waiting=0 music=5)
+STEP 19 HAND HOG_OBJ_BATON
+VARS 19: OBJETENMAIN=34
+STATE 19: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_BATON waiting=0 music=5)
+STEP 20 ZONE HOG_TOUPIE_POSE
+LOG interp: SET/set(hideobjet=HOG_DISQUE_TOUPIE)
+LOG interp: SET/set(sacados=NOT_HOG_OBJ_BATON)
+LOG interp: SET/set(sacados=HOG_OBJ_TOUPIE)
+LOG interp: SET/set(flag416=0)
+LOG interp: SET/set(objetenmain=HOG_OBJ_TOUPIE)
+VARS 20: OBJETENMAIN=33 SACADOS=2
+FLAGS 20: 416=0 1133=1 1134=0 1534=0
+BAG 20: HOG_OBJ_TOUPIE
+STATE 20: chapter=4 monde=1 wam=hoggar.wam view=1 hand=HOG_OBJ_TOUPIE waiting=0 music=5)
+EXPECT HAND=HOG_OBJ_TOUPIE ok
+STEP 21 SKIP puzzle toupie FLAG420=1 FLAG421=1 FLAG422=1 FLAG423=1 FLAG424=1 SHOWOBJET=HOG_ETOILE01 SHOWOBJET=HOG_ETOILE02 SHOWOBJET=HOG_ETOILE03 SHOWOBJET=HOG_ETOILE04 SHOWOBJET=HOG_ETOILE05
+LOG interp: SET(sacados=NOT_HOG_OBJ_TOUPIE)
+LOG interp: SET/set(sacados=NOT_HOG_OBJ_TOUPIE)
+LOG interp: SET/set(HideObjet=CMP_MENBRANE)
+LOG interp: SET/set(cinema=004 fps=25)
+LOG interp: SET/set(changecd=2)
+LOG interp: SET/set(Monde=2)
+LOG interp: SET/set(ChangeWam=CFuner.wam)
+LOG interp: SET(showobjet=CHF_OISEAUBOIS)
+LOG interp: SET(showobjet=CHF_COUVERCLE01)
+LOG interp: SET(hideobjet=CHF_COUVERCLE02)
+LOG interp: SET(hideperso=CHF_PSYCHOP)
+LOG interp: SET/set(Vue=4)
+LOG interp: SET(LIMITEANGLEWARPY=70)
+LOG interp: SET/set(AngleWarpXNow=180)
+LOG interp: SET/set(AngleWarpYNow=0)
+LOG interp: SET/set(Chapter=9)
+LOG interp: SET/set(StartMusik=1)
+VARS 21: CHAPTER=9 LASTVUE=0 VUE=4 OBJETENMAIN=0 ANGLEWARPX=180 ANGLEWARPY=0 CHANGECD=2 SACADOS=0 MONDE=2
+FLAGS 21: 13=1 415=1 420=1 421=1 422=1 423=1 424=1 1002=4 1012=1 1022=9 1133=0
+BAG 21: 
+STATE 21: chapter=9 monde=2 wam=CFuner.wam view=4 hand=- waiting=0 music=1)
+EXPECT FLAG13=1 ok
+EXPECT MONDE=2 ok
+EXPECT WAM=CFuner.wam ok
+EXPECT CHAPTER=9 ok
+EXPECT VUE=4 ok
+STEP 22 CHECKPOINT 101 01_hoggar_end
+SAVEFILE CurrentCD = 0
+SAVEFILE Wam = CFuner.wam
+SAVEFILE Monde = 2
+SAVEFILE Vue = 4
+SAVEFILE Chapitre = 9
+SAVEFILE NBFlag = 17
+SAVEFILE 2 = 1
+SAVEFILE 4 = 1
+SAVEFILE 13 = 1
+SAVEFILE 415 = 1
+SAVEFILE 420 = 1
+SAVEFILE 421 = 1
+SAVEFILE 422 = 1
+SAVEFILE 423 = 1
+SAVEFILE 424 = 1
+SAVEFILE 426 = 1
+SAVEFILE 1000 = 1
+SAVEFILE 1001 = 1
+SAVEFILE 1002 = 4
+SAVEFILE 1011 = 4
+SAVEFILE 1012 = 1
+SAVEFILE 1021 = 4
+SAVEFILE 1022 = 9
+SAVEFILE NBObjet = 0
+SAVEFILE //== Sauvegarde des dialogues ==
+SAVEFILE NBPersoAvecDial = 1
+SAVEFILE Perso = 1
+SAVEFILE NBSuj = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 1
+SAVEFILE NBSprite = 0
+SAVEFILE Etat = 1
+SAVEFILE ID = 2
+SAVEFILE NBSprite = 3
+SAVEFILE Etat = 1
+SAVEFILE ID = 3
+SAVEFILE NBSprite = 4
+SAVEFILE Quaternion0 = 0.000000
+SAVEFILE Quaternion1 = 0.000000
+SAVEFILE Quaternion2 = 0.000000
+SAVEFILE Quaternion3 = 1.000000
+STATE 22: chapter=9 monde=2 wam=CFuner.wam view=4 hand=- waiting=0 music=1)

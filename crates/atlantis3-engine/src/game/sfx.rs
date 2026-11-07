@@ -1,0 +1,282 @@
+//! The C code's sound objects and the `PLAYVOICE` voice slots.
+//!
+//! The puzzles talk to the Cryo Sound Library by file name: `LoadSfx(name,
+//! byte, class)` (@ 0x004329e0), `Play(name)` (@ 0x00433140),
+//! `IsPlaying(name)` (@ 0x00433780) and `Stop(name)` (@ 0x004335f0). Class
+//! 1 is the effects' volume, class 2 the voices' (@ 0x00433bc8). A sound
+//! plays from its `Play` for its file's length (frames / rate of the APC
+//! header): the model the emulation goldens use for DirectSound's own end
+//! report [INFERRED: DirectSound may report the end a buffer later].
+//!
+//! `PLAYVOICE` (@ 0x0040da70(dialog, line, r, g, b)) takes the first free
+//! of three voice slots (@ 0x0074f248, 0x38 bytes: text, voice name,
+//! colour, busy; all busy: nothing happens), names the voice of the
+//! dialog's line (`GetApcNameFromDial` @ 0x004658e0: `loc\voix\<Langue>\
+//! <world>\<word>.apc`) and plays it with `LoadSfx(voice, 0, 2)` and
+//! `Play`. The flip (@ 0x0040de60) frees a busy slot whose voice no longer
+//! plays; @ 0x0040dcc0(name) stops a busy slot's voice by name and frees
+//! the slot.
+//!
+//! Tests replaying the whole-story harness use its model instead
+//! ([`Game::story_sound_model`]): `PLAYVOICE` stubbed (nothing plays), a
+//! sound started by `Play` playing until a stop-all, which the walks never
+//! reach.
+
+use super::Game;
+use crate::audio::{csm_gain, CHANNEL_OBJECTS, OBJECT_CHANNELS};
+
+/// A sound loaded by `LoadSfx`.
+#[derive(Clone, Debug)]
+struct SfxObject {
+    /// The name as the C code gives it (`sfx\AmbMMA.apc`); compared
+    /// without case.
+    name: String,
+    /// 1: effects, 2: voices.
+    class: i32,
+    /// The file's length, `None` when it is missing.
+    seconds: Option<f64>,
+    /// The time of the last `Play` (`None`: stopped or never played).
+    started: Option<f64>,
+    /// The mix channel it last played on.
+    channel: Option<usize>,
+}
+
+/// A `PLAYVOICE` slot (@ 0x0074f248 + 0x38 k): its line's text (+0x00,
+/// drawn by the flip while the voice plays, [`super::subtitles`]), the
+/// voice's name (+0x14), the colour (+0x28..+0x30), busy (+0x34). A free
+/// slot has an empty text and name and the colour (255, 255, 255).
+#[derive(Clone, Debug)]
+pub(crate) struct VoiceSlot {
+    pub busy: bool,
+    pub text: Vec<u8>,
+    pub name: String,
+    pub rgb: [i32; 3],
+}
+
+impl Default for VoiceSlot {
+    fn default() -> VoiceSlot {
+        VoiceSlot {
+            busy: false,
+            text: Vec::new(),
+            name: String::new(),
+            rgb: [255; 3],
+        }
+    }
+}
+
+/// The sound objects and the voice slots.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CSounds {
+    objects: Vec<SfxObject>,
+    pub voices: [VoiceSlot; 3],
+}
+
+impl Game {
+    fn sfx_index(&self, name: &str) -> Option<usize> {
+        self.csounds
+            .objects
+            .iter()
+            .position(|o| o.name.eq_ignore_ascii_case(name))
+    }
+
+    /// `LoadSfx(name, byte, class)` (@ 0x004329e0): false for an empty
+    /// name (its first test).
+    pub(crate) fn sfx_load(&mut self, name: &str, byte: i32, class: i32) -> bool {
+        self.tr(|| {
+            format!(
+                "snd load {} {byte} {class}",
+                if name.is_empty() { "-" } else { name }
+            )
+        });
+        if name.is_empty() {
+            return false;
+        }
+        let path = name.replace('\\', "/");
+        let seconds = self.sound(&path).map(|(rate, ch, pcm)| {
+            pcm.len() as f64 / f64::from(ch.max(1)) / f64::from(rate.max(1))
+        });
+        match self.sfx_index(name) {
+            Some(i) => {
+                let o = &mut self.csounds.objects[i];
+                o.class = class;
+                o.seconds = seconds;
+            }
+            None => self.csounds.objects.push(SfxObject {
+                name: name.to_string(),
+                class,
+                seconds,
+                started: None,
+                channel: None,
+            }),
+        }
+        true
+    }
+
+    /// `Play(name)` (@ 0x00433140): from the start, on a free channel.
+    pub(crate) fn sfx_play(&mut self, name: &str) {
+        self.tr(|| format!("snd play {}", if name.is_empty() { "-" } else { name }));
+        let Some(i) = self.sfx_index(name) else {
+            return;
+        };
+        let now = self.now;
+        // The channel it had, else one no playing object holds.
+        let busy: Vec<usize> = self
+            .csounds
+            .objects
+            .iter()
+            .enumerate()
+            .filter(|&(j, _)| j != i && self.sfx_playing_at(j))
+            .filter_map(|(_, o)| o.channel)
+            .collect();
+        let channel = self.csounds.objects[i]
+            .channel
+            .filter(|c| !busy.contains(c))
+            .or_else(|| {
+                (CHANNEL_OBJECTS..CHANNEL_OBJECTS + OBJECT_CHANNELS).find(|c| !busy.contains(c))
+            })
+            .unwrap_or(CHANNEL_OBJECTS);
+        let o = &mut self.csounds.objects[i];
+        o.started = Some(now);
+        o.channel = Some(channel);
+        let class = o.class;
+        let path = o.name.replace('\\', "/");
+        if let Some((rate, ch, pcm)) = self.sound(&path) {
+            let level = if class == 2 {
+                self.startup.config.voices_volume
+            } else {
+                self.startup.config.sfx_volume
+            };
+            let g = csm_gain(self.level(level));
+            self.audio.play(channel, rate, ch, pcm, false, [g, g]);
+        }
+    }
+
+    fn sfx_playing_at(&self, i: usize) -> bool {
+        let o = &self.csounds.objects[i];
+        if self.story_sound_model {
+            return o.started.is_some();
+        }
+        match (o.started, o.seconds) {
+            (Some(t), Some(s)) => self.now < t + s,
+            _ => false,
+        }
+    }
+
+    /// `IsLoaded(name)` (@ 0x00433700): a sound object of that name whose
+    /// file was found.
+    pub(crate) fn sfx_loaded(&mut self, name: &str) -> bool {
+        self.tr(|| format!("snd loaded {}", if name.is_empty() { "-" } else { name }));
+        self.sfx_index(name)
+            .is_some_and(|i| self.csounds.objects[i].seconds.is_some())
+    }
+
+    /// `IsPlaying(name)` (@ 0x00433780): never for an empty or unloaded
+    /// name.
+    pub(crate) fn sfx_playing(&self, name: &str) -> bool {
+        self.sfx_index(name).is_some_and(|i| self.sfx_playing_at(i))
+    }
+
+    /// [`Game::sfx_playing`] as a puzzle asks it, logged `snd test NAME
+    /// -> 0|1`.
+    pub(crate) fn sfx_test(&mut self, name: &str) -> bool {
+        let v = self.sfx_playing(name);
+        self.tr(|| format!("snd test {name} -> {}", u8::from(v)));
+        v
+    }
+
+    /// `Stop(name)` (@ 0x004335f0).
+    pub(crate) fn sfx_stop(&mut self, name: &str) {
+        self.tr(|| format!("snd stop {}", if name.is_empty() { "-" } else { name }));
+        if let Some(i) = self.sfx_index(name) {
+            let o = &mut self.csounds.objects[i];
+            if o.started.take().is_some() {
+                if let Some(c) = o.channel {
+                    self.audio.stop(c);
+                }
+            }
+        }
+    }
+
+    /// Every sound object stopped (@ 0x00433580: a walk of the sound
+    /// library's map stopping each); the place's ambient sounds with them
+    /// [INFERRED: the ambient objects belong to the same map]. Logged `snd
+    /// stopall`.
+    pub(crate) fn sfx_stop_all(&mut self) {
+        self.tr(|| "snd stopall".into());
+        for i in 0..self.csounds.objects.len() {
+            let o = &mut self.csounds.objects[i];
+            if o.started.take().is_some() {
+                if let Some(c) = o.channel {
+                    self.audio.stop(c);
+                }
+            }
+        }
+        self.audio.stop(crate::audio::CHANNEL_PLACE);
+    }
+
+    /// The voice file of a dialog's line (`GetApcNameFromDial`
+    /// @ 0x004658e0) as the C code names it (`loc\voix\fra\bagdad\
+    /// GABA0457.apc`); empty when the world's dialogs have no such line.
+    pub(crate) fn dialog_voice_name(&self, dialog: i32, line: i32) -> String {
+        let lang = self.startup.voice_language();
+        self.dialogs
+            .as_ref()
+            .and_then(|d| d.entry(dialog, line).map(|e| d.voice_path(e, &lang)))
+            .map(|p| p.replace('/', "\\"))
+            .unwrap_or_default()
+    }
+
+    /// `PLAYVOICE` (@ 0x0040da70(dialog, line, r, g, b)).
+    pub(crate) fn play_voice_c(&mut self, dialog: i32, line: i32, r: i32, g: i32, b: i32) {
+        self.tr(|| format!("voice {dialog} {line} {r} {g} {b}"));
+        if self.story_sound_model {
+            return;
+        }
+        let Some(k) = self.csounds.voices.iter().position(|v| !v.busy) else {
+            return;
+        };
+        // +0x00 = GetTextFromDial (@ 0x004655a0), +0x14 the voice's name.
+        let text = self.texts().dial(dialog, line).unwrap_or_default().to_vec();
+        let name = self.dialog_voice_name(dialog, line);
+        self.csounds.voices[k] = VoiceSlot {
+            busy: true,
+            text,
+            name: name.clone(),
+            rgb: [r, g, b],
+        };
+        if self.sfx_load(&name, 0, 2) {
+            self.sfx_play(&name);
+        }
+    }
+
+    /// @ 0x0040dcc0(name): the busy voice slots playing `name` stopped and
+    /// freed.
+    pub(crate) fn voice_stop_named(&mut self, name: &str) {
+        self.tr(|| format!("voicestop {}", if name.is_empty() { "-" } else { name }));
+        for k in 0..self.csounds.voices.len() {
+            let v = &self.csounds.voices[k];
+            if v.busy && v.name.eq_ignore_ascii_case(name) {
+                let n = v.name.clone();
+                self.sfx_stop(&n);
+                self.csounds.voices[k] = VoiceSlot::default();
+            }
+        }
+    }
+
+    /// @ 0x0040db90: every busy slot's voice stopped if it plays, the slot
+    /// freed (a dialog's start @ 0x0040d04d, Escape in the warp
+    /// @ 0x0042acea / @ 0x0042ad09 and in the start page's demo dialog
+    /// @ 0x0042aec1).
+    pub(crate) fn voices_clear(&mut self) {
+        for k in 0..self.csounds.voices.len() {
+            if !self.csounds.voices[k].busy {
+                continue;
+            }
+            let n = self.csounds.voices[k].name.clone();
+            if self.sfx_playing(&n) {
+                self.sfx_stop(&n);
+            }
+            self.csounds.voices[k] = VoiceSlot::default();
+        }
+    }
+}

@@ -1,0 +1,33 @@
+# Atlantis III - story segment 08: the Omega, the last bubble, the Hoggar's
+# chapters 6, 7, 8 and the ending (exit=1).  Read by
+# tools/emu/a3_story_script.py.  Starts at hoggar view 24, chapter 5.
+
+RAND 0                      # the interdimension's view: 2
+HAND CMP_OMEGA              # the inventory frame's hook: CMP_OMEGA in hand -> 0x00409cc0 (flag892 = 3): world 5, chapter 52
+EXPECT CHAPTER=52
+EXPECT VUE=2
+GO 8
+OBJET INT_BULLENETFIN       # the last bubble (sharp: flag892 = 3, Flag26): Hoggar.wam view 18, chapter 6
+EXPECT MONDE=1
+EXPECT CHAPTER=6
+EXPECT VUE=18
+OBJET CMP_TORCHE_ELECTRIQUE # the torch
+PERSO HOG_GARDIEN04         # the guard, torch in hand: save=6, cinema 18, flag30, view 15, chapter 7
+EXPECT CHAPTER=7
+EXPECT VUE=15
+OBJET CMP_COUTEAU           # the knife: flag34
+PERSO HOG_TOUAREGBL         # the knife on the bound Touareg: HOG_TOUAREGLI shown, flag36
+EXPECT FLAG36=1
+OBJET CMP_CEINTURON         # the belt: flag36 -> subject HOG_TO_CLEF, CMP_CLEF2 in bag and hand, flag33
+EXPECT FLAG33=1
+HAND -
+OBJET CMP_CLEF1             # the first key: flag32
+PERSO HOG_TOUAREGLI         # flag35=0: subjects, dialog 55, flag35
+PERSO HOG_TOUAREGLI         # flag37=0: dialog 59, flag37
+EXPECT FLAG37=1
+GO 16                       # chapter 7 DepartVue=16: chapter 8
+EXPECT CHAPTER=8
+HAND CMP_CLEF1
+ZONE VOITURE                # chapter 8: flag37, the first key, flag33: cinemas 19, 92, 200, exit=1
+EXPECT EXIT=1
+EXPECT MODE=6

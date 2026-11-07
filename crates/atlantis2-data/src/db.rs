@@ -27,6 +27,31 @@ pub struct Scene {
     pub materials: Vec<Material>,
     pub nodes: Vec<Node>,
     pub cameras: Vec<Camera>,
+    /// The last section's records (@ 0x004a7590), none in Atlantis II's
+    /// files; Atlantis III's scenes hold their lights there.
+    pub lights: Vec<Light>,
+}
+
+/// Whose reader reads a `.db` file: the records of the last section are 68
+/// bytes after their strings in Atlantis II (@ 0x004a7590), 64 in Atlantis
+/// III (its `Game.exe` @ 0x0050cdc0).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Dialect {
+    #[default]
+    Atlantis2,
+    Atlantis3,
+}
+
+/// A record of the last section: a key, two strings, a vec4, a vec3 and
+/// 10 dwords (Atlantis II) or 9 (Atlantis III).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Light {
+    pub key: String,
+    pub name: String,
+    pub target: String,
+    pub rotation: [f32; 4],
+    pub position: [f32; 3],
+    pub words: Vec<u32>,
 }
 
 /// A triangle mesh (@ 0x004a6d60).
@@ -53,6 +78,13 @@ pub struct Mesh {
     pub uvs: [Vec<[f32; 2]>; 3],
     /// Faces per group (one group of every face in the heads).
     pub groups: Vec<u16>,
+    /// The bones of a skinned mesh, by node name (version ≥ 4): the
+    /// names [`Mesh::vertex_bones`] index (*Atlantis III*'s Licorne
+    /// board, the binding @ 0x0051b510).
+    pub bones: Vec<String>,
+    /// Per vertex, its bone's index in [`Mesh::bones`] (empty when the
+    /// mesh has no bones).
+    pub vertex_bones: Vec<u8>,
     /// One value per corner (record +0x16c), meaning unknown. It equals
     /// `corners` in 22 of the 28 heads and differs in the other 6, where
     /// some values exceed the vertex count; the heads' draw uses `corners`
@@ -83,6 +115,10 @@ pub struct Object {
     pub rotation: [f32; 4],
     pub position: [f32; 3],
     pub scale: f32,
+    /// Version ≥ 7: the object's kind (1 a bone, 0 a mesh or a dummy;
+    /// *Atlantis III*'s Licorne board splits its scenes by it,
+    /// @ 0x004bdb20 / @ 0x004bdb80); 0 before.
+    pub kind: u32,
 }
 
 /// A material (@ 0x004a6c70).
@@ -250,6 +286,15 @@ impl Scene {
     /// Reads a `.db` file and says how many bytes the reader consumed
     /// (the original ignores what follows).
     pub fn parse_len(data: &[u8]) -> Result<(Scene, usize), DbError> {
+        Scene::parse_len_as(data, Dialect::Atlantis2)
+    }
+
+    /// [`Scene::parse_len`] with the reader of `dialect`.
+    pub fn parse_len_as(data: &[u8], dialect: Dialect) -> Result<(Scene, usize), DbError> {
+        let words = match dialect {
+            Dialect::Atlantis2 => 10,
+            Dialect::Atlantis3 => 9,
+        };
         let mut r = Reader { b: data, at: 0 };
         let _marker = r.u32()?; // 0xff in every file; not tested
         let version = r.u32()?;
@@ -284,11 +329,15 @@ impl Scene {
             })?;
             // @ 0x004a7590: str, str, vec4, vec3, 10 dwords; none in the
             // files.
-            r.vec(8, |r| {
-                r.string()?;
-                r.string()?;
-                r.string()?;
-                r.bytes(16 + 12 + 40).map(|_| ())
+            s.lights = r.vec(8, |r| {
+                Ok(Light {
+                    key: r.string()?,
+                    name: r.string()?,
+                    target: r.string()?,
+                    rotation: r.floats::<4>()?,
+                    position: r.floats::<3>()?,
+                    words: (0..words).map(|_| r.u32()).collect::<Result<_, _>>()?,
+                })
             })?;
         }
         if (3..=8).contains(&version) {
@@ -355,8 +404,8 @@ fn read_mesh(r: &mut Reader) -> Result<Mesh, DbError> {
         if v < 6 {
             r.vec_u32()?;
         }
-        r.strings()?;
-        r.vec_u8()?;
+        m.bones = r.strings()?;
+        m.vertex_bones = r.vec_u8()?;
         m.corner_vertices = r.vec_u16()?;
         r.vec_u16()?;
         r.vec_u16()?;
@@ -379,16 +428,17 @@ fn read_object(r: &mut Reader) -> Result<Object, DbError> {
     r.string()?;
     let mesh = r.string()?;
     let parent = r.string()?;
-    let o = Object {
+    let mut o = Object {
         name,
         mesh,
         parent,
         rotation: r.floats::<4>()?,
         position: r.floats::<3>()?,
         scale: r.f32()?,
+        kind: 0,
     };
     if v >= 7 {
-        r.u32()?;
+        o.kind = r.u32()?;
     }
     if v >= 9 {
         r.vec_u32()?;

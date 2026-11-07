@@ -1,0 +1,24 @@
+# AFF_SPRTRS (bank, dst, x, y, index, level) of spr_p6.dll on a 32-bit x8r8g8b8 display, under emulation:
+# 1024x768 framebuffer, clip rows 0..766, columns 0..1022 (max = size - 1), background as spr_aff_*.txt;
+# the banks loaded one after the other at one address (a row read past its bank's data reads the
+# bytes earlier, longer banks left there, then zeros).
+# key: BANK#index@position:level  value: md5 of the framebuffer after the call (background md5 a9797eb51ea8658f82c06600751f67df)
+# per file: md5 of the file's golden lines (`key value\n` each, in order)
+spr/BagdadObjets.SPR 288 21dfdaff40191ee3b4cac3c4a891eba6
+spr/BagdadObjetsEnMain.SPR 288 155fc0e59247fb65a3be53a532a8ea8c
+spr/HoggarObjets.SPR 120 e21ba35980d4510288fef54bad9c03ab
+spr/HoggarObjetsEnMain.SPR 120 ccd7fc8f30d6b29fa72dcc54719b1a03
+spr/HoggarSujets52.SPR 144 3dbe647df0d94e28e72e6b0f60587660
+spr/HoggarSujets64.SPR 144 017d9b803bccf2258552a1d9684c63e1
+spr/HoggarSujets80.SPR 144 fa1c87ba358210731552cb8b923bad1c
+spr/InterSujets52.SPR 156 7900d177e6c26a3bf8cc40110deb28d1
+spr/InterSujets64.SPR 156 4f8775c80b7e82071cbdeefee1c10454
+spr/InterSujets80.SPR 156 1605a856709cc7cf9a1f50dbabcfba21
+spr/LDMObjets.SPR 504 5bef44e1b513e02719dc8e87283e15cc
+spr/LDMObjetsEnMain.SPR 504 706b049cfcc356ad7c02b10bd1d382f5
+spr/LDMSujets52.SPR 360 749a0992a40b0d34ec876ce928039474
+spr/LDMSujets64.SPR 360 cd75a2827612becc410bf9d47a979417
+spr/LDMSujets80.SPR 360 117b65e975631660eb8301bf657b9f76
+spr/PaleoObjets.SPR 156 6d980e9570278a153d10e88fbd1bb6ea
+spr/PaleoObjetsEnMain.SPR 156 c13aa417dc320edb53ee0f6ba13a6628
+spr/interface.SPR 4224 ce879aa06dc1724fd2ff525cdfed4a9e

@@ -1,0 +1,161 @@
+# The jewel case (ECRIN, loop mode 14, jardin.wam view 114, flag 829 = 1, flag 144 = 1, started by the zone click
+# hook on BAG_ZONE_ECRIN at 200 s) of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) with
+# spr_p6.dll under emulation, 800 x 600 RGB565, the panorama black (warp=flat). hit <gem> <sprite> box n point:
+# SPR_COLLISION of each gem on an 8-pixel grid (the box and count of the hits) and the point the runs use. frame n
+# <clock double LE hex> <x> <y> <left> <right> ret= md5= draws=: one call of the loop at 200 + (n + 1) / 32 s with
+# the pointer and the click bytes, its return, the screen's md5 at the flip, the sprite calls (BANK#F@X,Y*ALPHA,
+# C: a centred call before its own); st: fade bits, gems taken, count, cursor, loop mode; bag: the gems in the
+# bag; stop / cmd / scan: the stop's calls.
+hit 0 1 box 280,104-352,176 n 75 point 312,136
+hit 1 2 box 264,184-344,288 n 125 point 304,232
+hit 2 3 box 152,184-232,272 n 97 point 192,224
+hit overlap n 0
+run solve
+start mode=14 old=3 active=1 cursor=40 flag131=1
+st 0 fade=00000000 taken=000 count=0 cursor=40 mode=14
+bag 0 BAG_SAPHIR=0 BAG_RUBIS=0 BAG_EMERAUDE=0
+frame 0 0000000000016940 40 40 0 0 ret=1 md5=abaab7c07fc5dfd93e520384dfc05e9a draws=warp=flat,spr\Ecrin16.spr#0@400,300*00000000,spr\Ecrin16.spr#1@400,300*00000000,spr\Ecrin16.spr#2@400,300*00000000,spr\Ecrin16.spr#3@400,300*00000000
+frame 1 0000000000026940 40 40 0 0 ret=1 md5=abaab7c07fc5dfd93e520384dfc05e9a draws=warp=flat,spr\Ecrin16.spr#0@400,300*00000000,spr\Ecrin16.spr#1@400,300*00000000,spr\Ecrin16.spr#2@400,300*00000000,spr\Ecrin16.spr#3@400,300*00000000
+frame 2 0000000000036940 40 40 0 0 ret=1 md5=89173d6f217748a4be57f21a50592cc1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@40,40*0000803f
+log 2 'Ecrin transp : %f'
+st 2 fade=0000803f taken=000 count=0 cursor=40 mode=14
+frame 3 0000000000046940 312 136 0 0 ret=1 md5=a56d93fb4113a237b72b69ce91026135 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#13@312,136,spr\Interface.spr#13@285,109*0000803f
+st 3 fade=0000803f taken=000 count=0 cursor=13 mode=14
+frame 4 0000000000056940 312 136 0 0 ret=1 md5=a56d93fb4113a237b72b69ce91026135 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#13@312,136,spr\Interface.spr#13@285,109*0000803f
+frame 5 0000000000066940 312 136 0 0 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+st 5 fade=0000803f taken=000 count=0 cursor=14 mode=14
+frame 6 0000000000076940 312 136 0 0 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+frame 7 0000000000086940 312 136 0 0 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+frame 8 0000000000096940 312 136 0 0 ret=1 md5=1d12ff66daa8a1e0a2fadf119275e3bf draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@312,136,spr\Interface.spr#15@288,112*0000803f
+st 8 fade=0000803f taken=000 count=0 cursor=15 mode=14
+frame 9 00000000000a6940 312 136 0 0 ret=1 md5=1d12ff66daa8a1e0a2fadf119275e3bf draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@312,136,spr\Interface.spr#15@288,112*0000803f
+frame 10 00000000000b6940 312 136 0 0 ret=1 md5=1d12ff66daa8a1e0a2fadf119275e3bf draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@312,136,spr\Interface.spr#15@288,112*0000803f
+frame 11 00000000000c6940 312 136 0 0 ret=1 md5=3b899078170e13beb74acfd112e1058f draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#16@312,136,spr\Interface.spr#16@290,114*0000803f
+st 11 fade=0000803f taken=000 count=0 cursor=16 mode=14
+frame 12 00000000000d6940 312 136 0 0 ret=1 md5=3b899078170e13beb74acfd112e1058f draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#16@312,136,spr\Interface.spr#16@290,114*0000803f
+frame 13 00000000000e6940 312 136 0 0 ret=1 md5=3b899078170e13beb74acfd112e1058f draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#16@312,136,spr\Interface.spr#16@290,114*0000803f
+frame 14 00000000000f6940 312 136 0 0 ret=1 md5=3c30a2953a2d1dc6a0bb35ac6239bae0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#17@312,136,spr\Interface.spr#17@290,114*0000803f
+st 14 fade=0000803f taken=000 count=0 cursor=17 mode=14
+frame 15 0000000000106940 312 136 0 0 ret=1 md5=3c30a2953a2d1dc6a0bb35ac6239bae0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#17@312,136,spr\Interface.spr#17@290,114*0000803f
+frame 16 0000000000116940 312 136 0 0 ret=1 md5=3c30a2953a2d1dc6a0bb35ac6239bae0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#17@312,136,spr\Interface.spr#17@290,114*0000803f
+frame 17 0000000000126940 312 136 0 0 ret=1 md5=d49615c23cdc1fd2d2c8de8fea11e75b draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#18@312,136,spr\Interface.spr#18@290,114*0000803f
+st 17 fade=0000803f taken=000 count=0 cursor=18 mode=14
+frame 18 0000000000136940 312 136 0 0 ret=1 md5=d49615c23cdc1fd2d2c8de8fea11e75b draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#18@312,136,spr\Interface.spr#18@290,114*0000803f
+frame 19 0000000000146940 312 136 0 0 ret=1 md5=d49615c23cdc1fd2d2c8de8fea11e75b draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#18@312,136,spr\Interface.spr#18@290,114*0000803f
+frame 20 0000000000156940 312 136 0 0 ret=1 md5=92e4f057e223cd8f439183aaf154686b draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#19@312,136,spr\Interface.spr#19@290,114*0000803f
+st 20 fade=0000803f taken=000 count=0 cursor=19 mode=14
+frame 21 0000000000166940 312 136 0 0 ret=1 md5=92e4f057e223cd8f439183aaf154686b draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#19@312,136,spr\Interface.spr#19@290,114*0000803f
+frame 22 0000000000176940 312 136 0 0 ret=1 md5=92e4f057e223cd8f439183aaf154686b draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#19@312,136,spr\Interface.spr#19@290,114*0000803f
+frame 23 0000000000186940 312 136 0 0 ret=1 md5=8f9ab9788ce430eff6b46f651a3b9d6f draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#20@312,136,spr\Interface.spr#20@290,114*0000803f
+st 23 fade=0000803f taken=000 count=0 cursor=20 mode=14
+frame 24 0000000000196940 312 136 0 0 ret=1 md5=8f9ab9788ce430eff6b46f651a3b9d6f draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#20@312,136,spr\Interface.spr#20@290,114*0000803f
+frame 25 00000000001a6940 312 136 0 0 ret=1 md5=8f9ab9788ce430eff6b46f651a3b9d6f draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#20@312,136,spr\Interface.spr#20@290,114*0000803f
+frame 26 00000000001b6940 312 136 0 0 ret=1 md5=cae6e241f78a2749e1100a43d0d1ef91 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#21@312,136,spr\Interface.spr#21@290,114*0000803f
+st 26 fade=0000803f taken=000 count=0 cursor=21 mode=14
+frame 27 00000000001c6940 312 136 0 0 ret=1 md5=cae6e241f78a2749e1100a43d0d1ef91 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#21@312,136,spr\Interface.spr#21@290,114*0000803f
+frame 28 00000000001d6940 312 136 0 0 ret=1 md5=cae6e241f78a2749e1100a43d0d1ef91 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#21@312,136,spr\Interface.spr#21@290,114*0000803f
+frame 29 00000000001e6940 312 136 0 0 ret=1 md5=31de840dc8fdb5b1f72602cedfee1b78 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#22@312,136,spr\Interface.spr#22@288,112*0000803f
+st 29 fade=0000803f taken=000 count=0 cursor=22 mode=14
+frame 30 00000000001f6940 312 136 0 0 ret=1 md5=31de840dc8fdb5b1f72602cedfee1b78 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#22@312,136,spr\Interface.spr#22@288,112*0000803f
+frame 31 0000000000206940 312 136 0 0 ret=1 md5=31de840dc8fdb5b1f72602cedfee1b78 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#22@312,136,spr\Interface.spr#22@288,112*0000803f
+frame 32 0000000000216940 312 136 0 0 ret=1 md5=abf4241883c671fdc1ead174d2d14408 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#23@312,136,spr\Interface.spr#23@285,109*0000803f
+st 32 fade=0000803f taken=000 count=0 cursor=23 mode=14
+frame 33 0000000000226940 312 136 0 0 ret=1 md5=abf4241883c671fdc1ead174d2d14408 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#23@312,136,spr\Interface.spr#23@285,109*0000803f
+frame 34 0000000000236940 312 136 0 0 ret=1 md5=abf4241883c671fdc1ead174d2d14408 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#23@312,136,spr\Interface.spr#23@285,109*0000803f
+frame 35 0000000000246940 312 136 0 0 ret=1 md5=b4a156f0dde84628744c46ef06ce30f1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#24@312,136,spr\Interface.spr#24@285,109*0000803f
+st 35 fade=0000803f taken=000 count=0 cursor=24 mode=14
+frame 36 0000000000256940 312 136 0 0 ret=1 md5=b4a156f0dde84628744c46ef06ce30f1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#24@312,136,spr\Interface.spr#24@285,109*0000803f
+frame 37 0000000000266940 312 136 0 0 ret=1 md5=b4a156f0dde84628744c46ef06ce30f1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#24@312,136,spr\Interface.spr#24@285,109*0000803f
+frame 38 0000000000276940 312 136 0 0 ret=1 md5=a56d93fb4113a237b72b69ce91026135 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#13@312,136,spr\Interface.spr#13@285,109*0000803f
+st 38 fade=0000803f taken=000 count=0 cursor=13 mode=14
+frame 39 0000000000286940 312 136 0 0 ret=1 md5=a56d93fb4113a237b72b69ce91026135 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#13@312,136,spr\Interface.spr#13@285,109*0000803f
+frame 40 0000000000296940 312 136 0 0 ret=1 md5=a56d93fb4113a237b72b69ce91026135 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#13@312,136,spr\Interface.spr#13@285,109*0000803f
+frame 41 00000000002a6940 312 136 0 0 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+st 41 fade=0000803f taken=000 count=0 cursor=14 mode=14
+frame 42 00000000002b6940 312 136 0 0 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+frame 43 00000000002c6940 312 136 0 1 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+frame 44 00000000002d6940 312 136 1 0 ret=1 md5=1d12ff66daa8a1e0a2fadf119275e3bf draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@312,136,spr\Interface.spr#15@288,112*0000803f
+st 44 fade=0000803f taken=100 count=1 cursor=15 mode=14
+frame 45 00000000002e6940 312 136 0 0 ret=1 md5=7c04e91d1121522117d13caa476873e0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@312,136*0000803f
+st 45 fade=0000803f taken=100 count=1 cursor=40 mode=14
+frame 46 00000000002f6940 312 136 0 0 ret=1 md5=7c04e91d1121522117d13caa476873e0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@312,136*0000803f
+frame 47 0000000000306940 312 136 0 0 ret=1 md5=7c04e91d1121522117d13caa476873e0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@312,136*0000803f
+frame 48 0000000000316940 312 136 0 0 ret=1 md5=7c04e91d1121522117d13caa476873e0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@312,136*0000803f
+frame 49 0000000000326940 304 232 0 0 ret=1 md5=fccadb90920dc198cd12321e27560614 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#13@304,232,spr\Interface.spr#13@277,205*0000803f
+st 49 fade=0000803f taken=100 count=1 cursor=13 mode=14
+frame 50 0000000000336940 304 232 0 0 ret=1 md5=88539f0618e1c07b4063e1f8d6ed08dc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@304,232,spr\Interface.spr#14@277,205*0000803f
+st 50 fade=0000803f taken=100 count=1 cursor=14 mode=14
+frame 51 0000000000346940 304 232 0 0 ret=1 md5=88539f0618e1c07b4063e1f8d6ed08dc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@304,232,spr\Interface.spr#14@277,205*0000803f
+frame 52 0000000000356940 304 232 0 0 ret=1 md5=88539f0618e1c07b4063e1f8d6ed08dc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@304,232,spr\Interface.spr#14@277,205*0000803f
+frame 53 0000000000366940 304 232 0 0 ret=1 md5=a494e184c163438ab1bedc9c4771f2b7 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@304,232,spr\Interface.spr#15@280,208*0000803f
+st 53 fade=0000803f taken=100 count=1 cursor=15 mode=14
+frame 54 0000000000376940 304 232 1 0 ret=1 md5=a494e184c163438ab1bedc9c4771f2b7 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@304,232,spr\Interface.spr#15@280,208*0000803f
+st 54 fade=0000803f taken=110 count=2 cursor=15 mode=14
+frame 55 0000000000386940 192 224 0 0 ret=1 md5=e187a7a49bb2701c062a04d4e12a51a9 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@192,224,spr\Interface.spr#15@168,200*0000803f
+frame 56 0000000000396940 192 224 0 0 ret=1 md5=8203d47db87744383e2d86b01090d854 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#16@192,224,spr\Interface.spr#16@170,202*0000803f
+st 56 fade=0000803f taken=110 count=2 cursor=16 mode=14
+frame 57 00000000003a6940 192 224 0 0 ret=1 md5=8203d47db87744383e2d86b01090d854 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#16@192,224,spr\Interface.spr#16@170,202*0000803f
+frame 58 00000000003b6940 192 224 0 0 ret=1 md5=8203d47db87744383e2d86b01090d854 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#16@192,224,spr\Interface.spr#16@170,202*0000803f
+frame 59 00000000003c6940 192 224 0 0 ret=1 md5=dcfbfacdf8ec3b20a1c29ad7b15f86d9 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#17@192,224,spr\Interface.spr#17@170,202*0000803f
+st 59 fade=0000803f taken=110 count=2 cursor=17 mode=14
+frame 60 00000000003d6940 192 224 1 0 ret=1 md5=dcfbfacdf8ec3b20a1c29ad7b15f86d9 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#17@192,224,spr\Interface.spr#17@170,202*0000803f
+st 60 fade=0000803f taken=111 count=3 cursor=17 mode=14
+frame 61 00000000003e6940 192 224 0 0 ret=1 md5=d48ccbe4724cf6a4b3c76c06b0b16ae4 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,C:spr\Interface.spr#17@192,224,spr\Interface.spr#17@170,202*0000803f
+frame 62 00000000003f6940 192 224 0 0 ret=0 md5=- draws=
+stop 62
+cmd 62 (SacADos=BAG_SAPHIR)
+cmd 62 (SacADos=BAG_RUBIS)
+cmd 62 (SacADos=BAG_EMERAUDE)
+scan 62
+log 62 'Ecrin stop'
+log 62 'interp: SET%s'
+log 62 'interp: SET%s'
+log 62 'interp: SET%s'
+st 62 fade=0000803f taken=111 count=3 cursor=17 mode=3
+bag 62 BAG_SAPHIR=1 BAG_RUBIS=1 BAG_EMERAUDE=1
+run wrong
+start mode=14 old=3 active=1 cursor=40 flag131=1
+st 0 fade=00000000 taken=000 count=0 cursor=40 mode=14
+bag 0 BAG_SAPHIR=0 BAG_RUBIS=0 BAG_EMERAUDE=0
+frame 0 0000000000016940 312 136 1 0 ret=1 md5=abaab7c07fc5dfd93e520384dfc05e9a draws=warp=flat,spr\Ecrin16.spr#0@400,300*00000000,spr\Ecrin16.spr#1@400,300*00000000,spr\Ecrin16.spr#2@400,300*00000000,spr\Ecrin16.spr#3@400,300*00000000
+frame 1 0000000000026940 40 40 0 0 ret=1 md5=abaab7c07fc5dfd93e520384dfc05e9a draws=warp=flat,spr\Ecrin16.spr#0@400,300*00000000,spr\Ecrin16.spr#1@400,300*00000000,spr\Ecrin16.spr#2@400,300*00000000,spr\Ecrin16.spr#3@400,300*00000000
+frame 2 0000000000036940 40 40 0 0 ret=1 md5=89173d6f217748a4be57f21a50592cc1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@40,40*0000803f
+log 2 'Ecrin transp : %f'
+st 2 fade=0000803f taken=000 count=0 cursor=40 mode=14
+frame 3 0000000000046940 40 40 1 0 ret=1 md5=89173d6f217748a4be57f21a50592cc1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@40,40*0000803f
+frame 4 0000000000056940 40 40 0 1 ret=1 md5=89173d6f217748a4be57f21a50592cc1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@40,40*0000803f
+frame 5 0000000000066940 312 136 0 0 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+st 5 fade=0000803f taken=000 count=0 cursor=14 mode=14
+frame 6 0000000000076940 312 136 0 0 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+frame 7 0000000000086940 312 136 0 0 ret=1 md5=106620f52cea0f02ed09f4ab00162acc draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+frame 8 0000000000096940 312 136 0 0 ret=1 md5=1d12ff66daa8a1e0a2fadf119275e3bf draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@312,136,spr\Interface.spr#15@288,112*0000803f
+st 8 fade=0000803f taken=000 count=0 cursor=15 mode=14
+frame 9 00000000000a6940 304 232 0 0 ret=1 md5=c74334b579b8382a30c6993add1317d0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@304,232,spr\Interface.spr#15@280,208*0000803f
+frame 10 00000000000b6940 304 232 0 0 ret=1 md5=c74334b579b8382a30c6993add1317d0 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#15@304,232,spr\Interface.spr#15@280,208*0000803f
+frame 11 00000000000c6940 304 232 0 0 ret=1 md5=380d76c1413287232e4fcac2d629c12a draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#16@304,232,spr\Interface.spr#16@282,210*0000803f
+st 11 fade=0000803f taken=000 count=0 cursor=16 mode=14
+frame 12 00000000000d6940 304 232 0 0 ret=1 md5=380d76c1413287232e4fcac2d629c12a draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#16@304,232,spr\Interface.spr#16@282,210*0000803f
+frame 13 00000000000e6940 40 40 0 0 ret=1 md5=89173d6f217748a4be57f21a50592cc1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@40,40*0000803f
+st 13 fade=0000803f taken=000 count=0 cursor=40 mode=14
+frame 14 00000000000f6940 40 40 0 0 ret=1 md5=89173d6f217748a4be57f21a50592cc1 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,spr\Interface.spr#40@40,40*0000803f
+frame 15 0000000000106940 192 224 1 0 ret=1 md5=8823d343d86c0c9b6dfe615417f6c390 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Ecrin16.spr#3@400,300*0000803f,C:spr\Interface.spr#13@192,224,spr\Interface.spr#13@165,197*0000803f
+st 15 fade=0000803f taken=001 count=1 cursor=13 mode=14
+frame 16 0000000000116940 192 224 1 0 ret=1 md5=0f12fbd7afa43935df4d6873bb6b541d draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,spr\Interface.spr#40@192,224*0000803f
+st 16 fade=0000803f taken=001 count=1 cursor=40 mode=14
+frame 17 0000000000126940 304 232 1 0 ret=1 md5=74c4b5c0a89e316621f5b7a8cbed25b3 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,spr\Ecrin16.spr#2@400,300*0000803f,C:spr\Interface.spr#14@304,232,spr\Interface.spr#14@277,205*0000803f
+st 17 fade=0000803f taken=011 count=2 cursor=14 mode=14
+frame 18 0000000000136940 312 136 1 0 ret=1 md5=8eb886280841b437cfcc7b7c2c04e075 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,spr\Ecrin16.spr#1@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+st 18 fade=0000803f taken=111 count=3 cursor=14 mode=14
+frame 19 0000000000146940 312 136 1 0 ret=1 md5=106c59fd5dcf86709f0e6fd9bd3b64f3 draws=warp=flat,spr\Ecrin16.spr#0@400,300*0000803f,C:spr\Interface.spr#14@312,136,spr\Interface.spr#14@285,109*0000803f
+frame 20 0000000000156940 40 40 0 0 ret=0 md5=- draws=
+stop 20
+cmd 20 (SacADos=BAG_SAPHIR)
+cmd 20 (SacADos=BAG_RUBIS)
+cmd 20 (SacADos=BAG_EMERAUDE)
+scan 20
+log 20 'Ecrin stop'
+log 20 'interp: SET%s'
+log 20 'interp: SET%s'
+log 20 'interp: SET%s'
+st 20 fade=0000803f taken=111 count=3 cursor=14 mode=3
+bag 20 BAG_SAPHIR=1 BAG_RUBIS=1 BAG_EMERAUDE=1

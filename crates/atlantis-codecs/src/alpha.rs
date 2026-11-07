@@ -102,6 +102,98 @@ impl AlphaTables {
     }
 }
 
+/// *Atlantis III*'s `AL` blend on a 32-bit display (`Game.exe`
+/// @ 0x006a2031, chosen by @ 0x006a1e14 for 4 bytes a pixel): the same
+/// runs as [`AlphaTables::blend`], but in between each byte of the pixel
+/// (x included) becomes `(d·256 + (s − d)·8a) >> 8` (`punpcklbw`, `psubw`,
+/// `psllw 8`, `pmullw` by 8a, `paddw`, `psrlw 8`): a mix of the video and
+/// the background by a / 32, not the 16-bit tables' sum. A run that crosses
+/// a row end continues, after the row's last pixel, at the next pixel of
+/// `dst` without the row skip when it blends (the copy and skip runs take
+/// it, @ 0x006a20e9 / 0x006a2100; the blend's second part @ 0x006a215a
+/// does not): when `pitch` > `width` those pixels land on the same row.
+pub fn blend_x888(
+    video: &[u32],
+    dst: &mut [u32],
+    runs: &[u8],
+    width: usize,
+    height: usize,
+    pitch: usize,
+) -> Result<(), DecodeError> {
+    let total = width * height;
+    if video.len() < total || pitch < width {
+        return Err(DecodeError::Bitstream("alpha: buffer too small"));
+    }
+    let skip = pitch - width;
+    let mix = |s: u32, d: u32, a: u32| -> u32 {
+        let mut out = 0;
+        for lane in 0..4 {
+            let (sb, db) = ((s >> (8 * lane)) & 0xff, (d >> (8 * lane)) & 0xff);
+            let v = ((db << 8) as u16).wrapping_add(
+                (sb as u16)
+                    .wrapping_sub(db as u16)
+                    .wrapping_mul((8 * a) as u16),
+            ) >> 8;
+            out |= u32::from(v) << (8 * lane);
+        }
+        out
+    };
+    let (mut left, mut col) = (total as i64, width as i64);
+    let (mut si, mut di) = (0usize, 0usize);
+    let mut pairs = runs.as_chunks::<2>().0.iter();
+    let outside = DecodeError::Bitstream("alpha: outside the target");
+    while left > 0 {
+        if col == 0 {
+            di += skip;
+            col = width as i64;
+        }
+        let Some(pair) = pairs.next() else {
+            return Err(DecodeError::Bitstream("alpha: mask ends early"));
+        };
+        let (n, a) = (i64::from(pair[0]) + 1, u32::from(pair[1]));
+        if a > 31 {
+            return Err(DecodeError::Bitstream("alpha: bad run"));
+        }
+        left -= n;
+        col -= n;
+        let (first, second, row_skip) = if col < 0 {
+            (n + col, -col, a == 0 || a == 31)
+        } else {
+            (n, 0, false)
+        };
+        for part in 0..2 {
+            let k = if part == 0 { first } else { second };
+            if part == 1 {
+                if second == 0 {
+                    break;
+                }
+                if row_skip {
+                    di += skip;
+                }
+            }
+            for _ in 0..k {
+                if a != 0 {
+                    let d = dst.get_mut(di).ok_or(outside.clone())?;
+                    *d = if a == 31 {
+                        video[si]
+                    } else {
+                        mix(video[si], *d, a)
+                    };
+                }
+                si += 1;
+                di += 1;
+            }
+        }
+        if col < 0 {
+            col += width as i64;
+        }
+        if si > total {
+            return Err(DecodeError::Bitstream("alpha: bad run"));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

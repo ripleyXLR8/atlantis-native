@@ -1,0 +1,2030 @@
+# The magician's tower race (TourMagi.wam, from view 39 at yaw -156, pitch 20) of the original Game.exe (GOG.com,
+# md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation, from a new game's state: the view entries (the demon's
+# pawns), the race step, the zone click hook, the demon's die (rand seeded with 1) and the dice played through the
+# real GBOY mode (12, its drawing stubbed: no place animation step in its frames) run unmodified; the sound calls,
+# the music players' stop (`snd stopmus`), CtrlScenarIN and the cinematics (taken as played at once) logged only.
+# Frame n at 100 + n x 1.0025 / 15 s. A die is thrown by `die <f> <cursor>`: a left click on the button (703, 568)
+# in frame f. Line format: tests/common/pz.rs, plus view <f> <n> (a view entered by the code's (Vue=n)), cinema,
+# gboy <f> (cursor 0x00716220, pick 0x00716224, anim 0x00716228, result 0x00756060, result phase / blinks; mode-12
+# frames, on change), gboystop <f> (the mode's stop). st: player 0x00789ad4, demon 0x00789ad8, dto 0x0071f958,
+#   pat 0x0071f95c, pto 0x0071f960, won 0x00789ae1 / 0x00789ae2, cin 0x00789ae4, turn 0x00789ae8, frz 0x00789d56,
+#   res 0x00756060, mode 0x00789af0, vol 0x007178e8, saved 0x007899d8, vue = VUE.
+run player_win the player throws 1, 6, 2, 6, 6 (GBOY clicks at the cursor values 114, 131, 120, 131, 131)
+setup wam TourMagi.wam view 39 yaw -156 pitch 20
+entry 0
+view 0 39
+log 0 ------- Warp ba0039.hnm ------- chapter 0 --
+log 0 AtlBruitages_InitWarp(): current_vue=NULL!!!
+cmd 0 (LIMITEANGLEWARPY=70)
+slots 0:iaA1039039 1:pda1000000 2:pda2000000
+slotent 0:BAG_TORCHES 1:TAS_DEMONPLUS1 2:TAS_DEMONPLUS1
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 2 0
+st 0 player=39 demon=40 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=0 vue=39
+hand 0 0 -
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 1 list - ended 0
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 2 list - ended 0
+click 4 TAS_ZONE_CASESUIV
+log 4 Demon Tirage : 6 car au début
+log 4 ########################## CaseDemon : 40
+scan 4
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 3 list - ended 0
+st 4 player=39 demon=40 dto=46 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=0 vue=39
+log 5 ---------------- DemonGotoCase : 46
+log 5 Démon Lion
+snd 5 stopall
+cmd 5 (Cinema=69,fps=25)
+cinema 5 cine069.hnm
+slots 5 0:iaA1039039
+slotent 5 0:BAG_TORCHES
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slotck 5 0 0
+st 5 player=39 demon=46 dto=56 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=0 vue=39
+flags 5 801=46
+log 6 ---------------- DemonGotoCase : 56
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+st 6 player=39 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=0 vue=39
+flags 6 801=56
+cmd 7 (StopMusik=1)
+snd 7 stopmus 1
+cmd 7 (StartMusik=40)
+snd 7 stopmus 1
+log 7 -------- Lancement Game Boy
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+st 7 player=39 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=39
+gboy 8 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 9 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 10 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 11 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 12 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 13 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 14 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 15 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 16 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 17 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 18 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 19 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 20 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 21 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 22 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 23 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 24 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 25 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 26 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 27 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 28 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 29 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 30 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 31 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 32 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 33 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 34 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 35 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 36 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 37 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 38 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 39 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 40 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 41 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 42 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 43 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 44 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 45 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 46 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 47 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 48 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 49 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 50 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 51 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 52 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 53 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 54 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 55 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 56 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 57 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 58 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 59 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 60 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 61 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 62 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 63 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 64 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 65 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 66 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 67 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 68 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 69 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 70 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 71 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 72 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 73 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 74 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 75 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 76 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 77 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 78 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 79 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 80 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+die 81 114
+gboy 81 cur=115 pick=0 anim=-1 res=0 blink=0/0
+gboy 82 cur=116 pick=0 anim=241 res=0 blink=0/0
+gboy 83 cur=117 pick=0 anim=242 res=0 blink=0/0
+gboy 84 cur=118 pick=0 anim=243 res=0 blink=0/0
+gboy 85 cur=119 pick=0 anim=244 res=0 blink=0/0
+gboy 86 cur=120 pick=0 anim=245 res=0 blink=0/0
+gboy 87 cur=121 pick=0 anim=246 res=0 blink=0/0
+gboy 88 cur=122 pick=0 anim=247 res=0 blink=0/0
+gboy 89 cur=123 pick=0 anim=248 res=0 blink=0/0
+gboy 90 cur=124 pick=0 anim=249 res=0 blink=0/0
+gboy 91 cur=125 pick=0 anim=250 res=0 blink=0/0
+gboy 92 cur=126 pick=0 anim=251 res=0 blink=0/0
+gboy 93 cur=127 pick=0 anim=252 res=0 blink=0/0
+gboy 94 cur=128 pick=0 anim=253 res=0 blink=0/0
+gboy 95 cur=129 pick=0 anim=254 res=0 blink=0/0
+gboy 96 cur=130 pick=0 anim=255 res=1 blink=0/0
+st 96 player=39 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=39
+gboy 97 cur=131 pick=0 anim=256 res=1 blink=0/0
+gboy 98 cur=132 pick=0 anim=257 res=1 blink=0/0
+gboy 99 cur=133 pick=0 anim=258 res=1 blink=0/0
+gboy 100 cur=134 pick=0 anim=259 res=1 blink=0/0
+gboy 101 cur=135 pick=0 anim=-1 res=1 blink=1/0
+gboy 102 cur=136 pick=0 anim=-1 res=1 blink=1/0
+gboy 103 cur=137 pick=0 anim=-1 res=1 blink=1/0
+gboy 104 cur=138 pick=0 anim=-1 res=1 blink=1/0
+gboy 105 cur=139 pick=0 anim=-1 res=1 blink=1/0
+gboy 106 cur=140 pick=0 anim=-1 res=1 blink=1/1
+gboy 107 cur=141 pick=0 anim=-1 res=1 blink=1/1
+gboy 111 cur=141 pick=0 anim=-1 res=1 blink=1/2
+gboy 116 cur=141 pick=0 anim=-1 res=1 blink=1/3
+gboy 121 cur=141 pick=0 anim=-1 res=1 blink=1/4
+gboy 126 cur=141 pick=0 anim=-1 res=1 blink=1/5
+gboy 131 cur=141 pick=0 anim=-1 res=1 blink=0/6
+gboystop 131
+scan 131
+cmd 131 (StopMusik=1)
+snd 131 stopmus 1
+cmd 131 (StartMusik=6)
+snd 131 stopmus 1
+st 131 player=39 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=3 vol=50 saved=50 vue=39
+log 132 ########################## Resultat GameBoy : 1
+log 132 ########################## CaseJoueur : 40
+slot 132 0 sh 1 mode 1 fr 0 list - ended 1
+st 132 player=39 demon=56 dto=-1 pat=-1 pto=40 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=39
+log 133 ---------------- JoueurChangeCase : 40
+cmd 133 (AngleWarpX=-156)
+cmd 133 (AngleWarpY=20)
+cmd 133 (Vue=40)
+view 133 40
+log 133 ------- Warp ba0040.hnm ------- chapter 0 --
+cmd 133 (LIMITEANGLEWARPY=70)
+slots 133 0:iaA1040040
+slotent 133 0:BAG_TORCHES
+slot 133 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 133 0 0
+st 133 player=40 demon=56 dto=-1 pat=40 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=40
+flags 133 800=40 1003=40
+log 134 ---------------- JoueurGotoCase : 40
+st 134 player=40 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=40
+slot 135 0 sh 1 mode 1 fr 1 list - ended 0
+slot 136 0 sh 1 mode 1 fr 2 list - ended 0
+click 137 TAS_ZONE_CASESUIV
+log 137 Demon Tirage : 6 car au début
+log 137 ########################## CaseDemon : 56
+scan 137
+slot 137 0 sh 1 mode 1 fr 3 list - ended 0
+st 137 player=40 demon=56 dto=62 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=40
+log 138 ---------------- DemonGotoCase : 62
+log 138 Démon Serpent
+snd 138 stopall
+cmd 138 (Cinema=70,fps=25)
+cinema 138 cine070.hnm
+slot 138 0 sh 1 mode 1 fr 4 list - ended 0
+st 138 player=40 demon=62 dto=52 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=40
+flags 138 801=62
+log 139 ---------------- DemonGotoCase : 52
+slot 139 0 sh 1 mode 1 fr 5 list - ended 0
+st 139 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=40
+flags 139 801=52
+cmd 140 (StopMusik=1)
+snd 140 stopmus 1
+cmd 140 (StartMusik=40)
+snd 140 stopmus 1
+log 140 -------- Lancement Game Boy
+slot 140 0 sh 1 mode 1 fr 6 list - ended 0
+st 140 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=40
+gboy 141 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 142 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 143 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 144 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 145 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 146 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 147 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 148 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 149 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 150 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 151 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 152 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 153 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 154 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 155 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 156 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 157 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 158 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 159 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 160 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 161 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 162 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 163 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 164 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 165 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 166 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 167 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 168 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 169 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 170 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 171 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 172 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 173 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 174 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 175 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 176 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 177 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 178 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 179 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 180 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 181 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 182 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 183 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 184 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 185 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 186 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 187 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 188 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 189 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 190 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 191 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 192 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 193 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 194 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 195 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 196 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 197 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 198 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 199 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 200 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 201 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 202 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 203 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 204 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 205 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 206 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 207 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 208 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 209 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 210 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 211 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 212 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 213 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+gboy 214 cur=115 pick=-1 anim=-1 res=0 blink=0/0
+gboy 215 cur=116 pick=-1 anim=-1 res=0 blink=0/0
+gboy 216 cur=117 pick=-1 anim=-1 res=0 blink=0/0
+gboy 217 cur=118 pick=-1 anim=-1 res=0 blink=0/0
+gboy 218 cur=119 pick=-1 anim=-1 res=0 blink=0/0
+gboy 219 cur=120 pick=-1 anim=-1 res=0 blink=0/0
+gboy 220 cur=121 pick=-1 anim=-1 res=0 blink=0/0
+gboy 221 cur=122 pick=-1 anim=-1 res=0 blink=0/0
+gboy 222 cur=123 pick=-1 anim=-1 res=0 blink=0/0
+gboy 223 cur=124 pick=-1 anim=-1 res=0 blink=0/0
+gboy 224 cur=125 pick=-1 anim=-1 res=0 blink=0/0
+gboy 225 cur=126 pick=-1 anim=-1 res=0 blink=0/0
+gboy 226 cur=127 pick=-1 anim=-1 res=0 blink=0/0
+gboy 227 cur=128 pick=-1 anim=-1 res=0 blink=0/0
+gboy 228 cur=129 pick=-1 anim=-1 res=0 blink=0/0
+gboy 229 cur=130 pick=-1 anim=-1 res=0 blink=0/0
+gboy 230 cur=131 pick=-1 anim=-1 res=0 blink=0/0
+die 231 131
+gboy 231 cur=132 pick=5 anim=-1 res=0 blink=0/0
+gboy 232 cur=133 pick=5 anim=381 res=0 blink=0/0
+gboy 233 cur=134 pick=5 anim=382 res=0 blink=0/0
+gboy 234 cur=135 pick=5 anim=383 res=0 blink=0/0
+gboy 235 cur=136 pick=5 anim=384 res=0 blink=0/0
+gboy 236 cur=137 pick=5 anim=385 res=0 blink=0/0
+gboy 237 cur=138 pick=5 anim=386 res=0 blink=0/0
+gboy 238 cur=139 pick=5 anim=387 res=1 blink=0/0
+st 238 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=40
+gboy 239 cur=140 pick=5 anim=388 res=1 blink=0/0
+gboy 240 cur=141 pick=5 anim=389 res=1 blink=0/0
+gboy 241 cur=141 pick=5 anim=390 res=1 blink=0/0
+gboy 242 cur=141 pick=5 anim=391 res=1 blink=0/0
+gboy 243 cur=141 pick=5 anim=392 res=1 blink=0/0
+gboy 244 cur=141 pick=5 anim=393 res=1 blink=0/0
+gboy 245 cur=141 pick=5 anim=394 res=2 blink=0/0
+st 245 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=2 mode=12 vol=99 saved=50 vue=40
+gboy 246 cur=141 pick=5 anim=395 res=2 blink=0/0
+gboy 247 cur=141 pick=5 anim=396 res=2 blink=0/0
+gboy 248 cur=141 pick=5 anim=397 res=2 blink=0/0
+gboy 249 cur=141 pick=5 anim=398 res=2 blink=0/0
+gboy 250 cur=141 pick=5 anim=399 res=3 blink=0/0
+st 250 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=3 mode=12 vol=99 saved=50 vue=40
+gboy 251 cur=141 pick=5 anim=400 res=3 blink=0/0
+gboy 252 cur=141 pick=5 anim=401 res=3 blink=0/0
+gboy 253 cur=141 pick=5 anim=402 res=3 blink=0/0
+gboy 254 cur=141 pick=5 anim=403 res=3 blink=0/0
+gboy 255 cur=141 pick=5 anim=404 res=3 blink=0/0
+gboy 256 cur=141 pick=5 anim=405 res=3 blink=0/0
+gboy 257 cur=141 pick=5 anim=406 res=4 blink=0/0
+st 257 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=4 mode=12 vol=99 saved=50 vue=40
+gboy 258 cur=141 pick=5 anim=407 res=4 blink=0/0
+gboy 259 cur=141 pick=5 anim=408 res=4 blink=0/0
+gboy 260 cur=141 pick=5 anim=409 res=4 blink=0/0
+gboy 261 cur=141 pick=5 anim=410 res=4 blink=0/0
+gboy 262 cur=141 pick=5 anim=411 res=5 blink=0/0
+st 262 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=5 mode=12 vol=99 saved=50 vue=40
+gboy 263 cur=141 pick=5 anim=412 res=5 blink=0/0
+gboy 264 cur=141 pick=5 anim=413 res=5 blink=0/0
+gboy 265 cur=141 pick=5 anim=414 res=5 blink=0/0
+gboy 266 cur=141 pick=5 anim=415 res=5 blink=0/0
+gboy 267 cur=141 pick=5 anim=416 res=5 blink=0/0
+gboy 268 cur=141 pick=5 anim=417 res=6 blink=0/0
+st 268 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=6 mode=12 vol=99 saved=50 vue=40
+gboy 269 cur=141 pick=5 anim=418 res=6 blink=0/0
+gboy 270 cur=141 pick=5 anim=419 res=6 blink=0/0
+gboy 271 cur=141 pick=5 anim=-1 res=6 blink=1/0
+gboy 276 cur=141 pick=5 anim=-1 res=6 blink=1/1
+gboy 281 cur=141 pick=5 anim=-1 res=6 blink=1/2
+gboy 286 cur=141 pick=5 anim=-1 res=6 blink=1/3
+gboy 291 cur=141 pick=5 anim=-1 res=6 blink=1/4
+gboy 296 cur=141 pick=5 anim=-1 res=6 blink=1/5
+gboy 301 cur=141 pick=5 anim=-1 res=6 blink=0/6
+gboystop 301
+scan 301
+cmd 301 (StopMusik=1)
+snd 301 stopmus 1
+cmd 301 (StartMusik=6)
+snd 301 stopmus 1
+st 301 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=6 mode=3 vol=50 saved=50 vue=40
+log 302 ########################## Resultat GameBoy : 6
+log 302 ########################## CaseJoueur : 46
+slot 302 0 sh 1 mode 1 fr 0 list - ended 1
+st 302 player=40 demon=52 dto=-1 pat=-1 pto=46 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=40
+log 303 ---------------- JoueurChangeCase : 46
+cmd 303 (AngleWarpX=-156)
+cmd 303 (AngleWarpY=60)
+cmd 303 (Vue=46)
+view 303 46
+log 303 ------- Warp ba0046.hnm ------- chapter 0 --
+cmd 303 (LIMITEANGLEWARPY=70)
+slots 303 0:iaA1046046
+slotent 303 0:BAG_TORCHES
+slot 303 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 303 0 0
+st 303 player=46 demon=52 dto=-1 pat=46 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=46
+flags 303 800=46 1003=46
+log 304 ---------------- JoueurGotoCase : 46
+log 304 Voleur Lion
+st 304 player=46 demon=52 dto=-1 pat=-1 pto=56 won=0 won2=0 cin=67 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=46
+log 305 ---------------- JoueurChangeCase : 56
+cmd 305 (AngleWarpX=-156)
+cmd 305 (AngleWarpY=20)
+cmd 305 (Vue=56)
+view 305 56
+log 305 ------- Warp ba0056.hnm ------- chapter 0 --
+cmd 305 (LIMITEANGLEWARPY=70)
+snd 305 stopall
+cmd 305 (Cinema=67,fps=25)
+cinema 305 cine067.hnm
+slots 305 0:iaA1056056
+slotent 305 0:BAG_TORCHES
+slot 305 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 305 0 0
+st 305 player=56 demon=52 dto=-1 pat=56 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=56
+flags 305 800=56 1003=56
+log 306 ---------------- JoueurGotoCase : 56
+st 306 player=56 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=56
+slot 307 0 sh 1 mode 1 fr 1 list - ended 0
+slot 308 0 sh 1 mode 1 fr 2 list - ended 0
+click 309 TAS_ZONE_CASESUIV
+log 309 Demon Tirage : 6 car au début
+log 309 ########################## CaseDemon : 52
+scan 309
+slot 309 0 sh 1 mode 1 fr 3 list - ended 0
+st 309 player=56 demon=52 dto=58 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=56
+log 310 ---------------- DemonGotoCase : 58
+log 310 Démon Lune
+snd 310 stopall
+cmd 310 (Cinema=69,fps=25)
+cinema 310 cine069.hnm
+slots 310 0:iaA1056056 1:pdb1000000 2:pdb2000000
+slotent 310 0:BAG_TORCHES 1:TAS_DEMONPLUS2 2:TAS_DEMONPLUS2
+slot 310 0 sh 1 mode 1 fr 4 list - ended 0
+slotck 310 0 0
+slot 310 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 310 1 0
+slot 310 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 310 2 0
+st 310 player=56 demon=58 dto=78 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=56
+flags 310 801=58
+log 311 ---------------- DemonGotoCase : 78
+slots 311 0:iaA1056056
+slotent 311 0:BAG_TORCHES
+slot 311 0 sh 1 mode 1 fr 5 list - ended 0
+slotck 311 0 0
+st 311 player=56 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=56
+flags 311 801=78
+cmd 312 (StopMusik=1)
+snd 312 stopmus 1
+cmd 312 (StartMusik=40)
+snd 312 stopmus 1
+log 312 -------- Lancement Game Boy
+slot 312 0 sh 1 mode 1 fr 6 list - ended 0
+st 312 player=56 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=56
+gboy 313 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 314 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 315 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 316 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 317 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 318 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 319 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 320 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 321 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 322 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 323 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 324 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 325 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 326 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 327 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 328 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 329 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 330 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 331 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 332 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 333 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 334 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 335 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 336 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 337 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 338 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 339 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 340 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 341 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 342 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 343 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 344 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 345 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 346 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 347 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 348 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 349 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 350 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 351 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 352 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 353 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 354 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 355 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 356 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 357 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 358 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 359 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 360 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 361 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 362 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 363 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 364 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 365 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 366 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 367 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 368 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 369 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 370 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 371 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 372 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 373 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 374 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 375 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 376 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 377 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 378 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 379 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 380 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 381 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 382 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 383 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 384 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 385 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+gboy 386 cur=115 pick=-1 anim=-1 res=0 blink=0/0
+gboy 387 cur=116 pick=-1 anim=-1 res=0 blink=0/0
+gboy 388 cur=117 pick=-1 anim=-1 res=0 blink=0/0
+gboy 389 cur=118 pick=-1 anim=-1 res=0 blink=0/0
+gboy 390 cur=119 pick=-1 anim=-1 res=0 blink=0/0
+gboy 391 cur=120 pick=-1 anim=-1 res=0 blink=0/0
+die 392 120
+gboy 392 cur=121 pick=1 anim=-1 res=0 blink=0/0
+gboy 393 cur=122 pick=1 anim=-1 res=0 blink=0/0
+gboy 394 cur=123 pick=1 anim=261 res=0 blink=0/0
+gboy 395 cur=124 pick=1 anim=262 res=0 blink=0/0
+gboy 396 cur=125 pick=1 anim=263 res=0 blink=0/0
+gboy 397 cur=126 pick=1 anim=264 res=0 blink=0/0
+gboy 398 cur=127 pick=1 anim=265 res=0 blink=0/0
+gboy 399 cur=128 pick=1 anim=266 res=0 blink=0/0
+gboy 400 cur=129 pick=1 anim=267 res=0 blink=0/0
+gboy 401 cur=130 pick=1 anim=268 res=0 blink=0/0
+gboy 402 cur=131 pick=1 anim=269 res=0 blink=0/0
+gboy 403 cur=132 pick=1 anim=270 res=0 blink=0/0
+gboy 404 cur=133 pick=1 anim=271 res=0 blink=0/0
+gboy 405 cur=134 pick=1 anim=272 res=0 blink=0/0
+gboy 406 cur=135 pick=1 anim=273 res=1 blink=0/0
+st 406 player=56 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=56
+gboy 407 cur=136 pick=1 anim=274 res=1 blink=0/0
+gboy 408 cur=137 pick=1 anim=275 res=1 blink=0/0
+gboy 409 cur=138 pick=1 anim=276 res=1 blink=0/0
+gboy 410 cur=139 pick=1 anim=277 res=1 blink=0/0
+gboy 411 cur=140 pick=1 anim=278 res=2 blink=0/0
+st 411 player=56 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=2 mode=12 vol=99 saved=50 vue=56
+gboy 412 cur=141 pick=1 anim=279 res=2 blink=0/0
+gboy 413 cur=141 pick=1 anim=280 res=2 blink=0/0
+gboy 414 cur=141 pick=1 anim=281 res=2 blink=0/0
+gboy 415 cur=141 pick=1 anim=282 res=2 blink=0/0
+gboy 416 cur=141 pick=1 anim=283 res=2 blink=0/0
+gboy 417 cur=141 pick=1 anim=-1 res=2 blink=1/0
+gboy 422 cur=141 pick=1 anim=-1 res=2 blink=1/1
+gboy 427 cur=141 pick=1 anim=-1 res=2 blink=1/2
+gboy 432 cur=141 pick=1 anim=-1 res=2 blink=1/3
+gboy 437 cur=141 pick=1 anim=-1 res=2 blink=1/4
+gboy 442 cur=141 pick=1 anim=-1 res=2 blink=1/5
+gboy 447 cur=141 pick=1 anim=-1 res=2 blink=0/6
+gboystop 447
+scan 447
+cmd 447 (StopMusik=1)
+snd 447 stopmus 1
+cmd 447 (StartMusik=6)
+snd 447 stopmus 1
+st 447 player=56 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=2 mode=3 vol=50 saved=50 vue=56
+log 448 ########################## Resultat GameBoy : 2
+log 448 ########################## CaseJoueur : 58
+slot 448 0 sh 1 mode 1 fr 0 list - ended 1
+st 448 player=56 demon=78 dto=-1 pat=-1 pto=58 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=56
+log 449 ---------------- JoueurChangeCase : 58
+cmd 449 (AngleWarpX=-156)
+cmd 449 (AngleWarpY=60)
+cmd 449 (Vue=58)
+view 449 58
+log 449 ------- Warp ba0058.hnm ------- chapter 0 --
+cmd 449 (LIMITEANGLEWARPY=70)
+slots 449 0:iaA1058058
+slotent 449 0:BAG_TORCHES
+slot 449 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 449 0 0
+st 449 player=58 demon=78 dto=-1 pat=58 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=58
+flags 449 800=58 1003=58
+log 450 ---------------- JoueurGotoCase : 58
+log 450 Voleur Lune
+st 450 player=58 demon=78 dto=-1 pat=-1 pto=78 won=0 won2=0 cin=67 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=58
+log 451 ---------------- JoueurChangeCase : 78
+cmd 451 (AngleWarpX=-156)
+cmd 451 (AngleWarpY=20)
+cmd 451 (Vue=77)
+view 451 77
+log 451 ------- Warp ba0077.hnm ------- chapter 0 --
+cmd 451 (LIMITEANGLEWARPY=70)
+snd 451 stopall
+cmd 451 (Cinema=67,fps=25)
+cinema 451 cine067.hnm
+slots 451 0:iaA1077077 1:pda1000000 2:pda2000000
+slotent 451 0:BAG_TORCHES 1:TAS_DEMONPLUS1 2:TAS_DEMONPLUS1
+slot 451 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 451 0 0
+slot 451 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 451 1 0
+slot 451 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 451 2 0
+st 451 player=77 demon=78 dto=-1 pat=77 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=77
+flags 451 800=77 1003=77
+log 452 ---------------- JoueurGotoCase : 77
+st 452 player=77 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=77
+slot 453 0 sh 1 mode 1 fr 1 list - ended 0
+slot 453 1 sh 1 mode 1 fr 1 list - ended 0
+slot 454 0 sh 1 mode 1 fr 2 list - ended 0
+slot 454 1 sh 1 mode 1 fr 2 list - ended 0
+click 455 TAS_ZONE_CASESUIV
+log 455 Demon Tirage : 6 car au début
+log 455 ########################## CaseDemon : 78
+scan 455
+slot 455 0 sh 1 mode 1 fr 3 list - ended 0
+slot 455 1 sh 1 mode 1 fr 3 list - ended 0
+st 455 player=77 demon=78 dto=84 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=77
+log 456 ---------------- DemonGotoCase : 84
+slots 456 0:iaA1077077
+slotent 456 0:BAG_TORCHES
+slot 456 0 sh 1 mode 1 fr 4 list - ended 0
+slotck 456 0 0
+st 456 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=77
+flags 456 801=84
+cmd 457 (StopMusik=1)
+snd 457 stopmus 1
+cmd 457 (StartMusik=40)
+snd 457 stopmus 1
+log 457 -------- Lancement Game Boy
+slot 457 0 sh 1 mode 1 fr 5 list - ended 0
+st 457 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=77
+gboy 458 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 459 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 460 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 461 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 462 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 463 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 464 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 465 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 466 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 467 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 468 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 469 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 470 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 471 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 472 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 473 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 474 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 475 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 476 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 477 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 478 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 479 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 480 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 481 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 482 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 483 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 484 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 485 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 486 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 487 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 488 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 489 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 490 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 491 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 492 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 493 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 494 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 495 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 496 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 497 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 498 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 499 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 500 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 501 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 502 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 503 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 504 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 505 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 506 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 507 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 508 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 509 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 510 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 511 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 512 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 513 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 514 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 515 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 516 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 517 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 518 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 519 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 520 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 521 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 522 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 523 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 524 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 525 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 526 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 527 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 528 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 529 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 530 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+gboy 531 cur=115 pick=-1 anim=-1 res=0 blink=0/0
+gboy 532 cur=116 pick=-1 anim=-1 res=0 blink=0/0
+gboy 533 cur=117 pick=-1 anim=-1 res=0 blink=0/0
+gboy 534 cur=118 pick=-1 anim=-1 res=0 blink=0/0
+gboy 535 cur=119 pick=-1 anim=-1 res=0 blink=0/0
+gboy 536 cur=120 pick=-1 anim=-1 res=0 blink=0/0
+gboy 537 cur=121 pick=-1 anim=-1 res=0 blink=0/0
+gboy 538 cur=122 pick=-1 anim=-1 res=0 blink=0/0
+gboy 539 cur=123 pick=-1 anim=-1 res=0 blink=0/0
+gboy 540 cur=124 pick=-1 anim=-1 res=0 blink=0/0
+gboy 541 cur=125 pick=-1 anim=-1 res=0 blink=0/0
+gboy 542 cur=126 pick=-1 anim=-1 res=0 blink=0/0
+gboy 543 cur=127 pick=-1 anim=-1 res=0 blink=0/0
+gboy 544 cur=128 pick=-1 anim=-1 res=0 blink=0/0
+gboy 545 cur=129 pick=-1 anim=-1 res=0 blink=0/0
+gboy 546 cur=130 pick=-1 anim=-1 res=0 blink=0/0
+gboy 547 cur=131 pick=-1 anim=-1 res=0 blink=0/0
+die 548 131
+gboy 548 cur=132 pick=5 anim=-1 res=0 blink=0/0
+gboy 549 cur=133 pick=5 anim=381 res=0 blink=0/0
+gboy 550 cur=134 pick=5 anim=382 res=0 blink=0/0
+gboy 551 cur=135 pick=5 anim=383 res=0 blink=0/0
+gboy 552 cur=136 pick=5 anim=384 res=0 blink=0/0
+gboy 553 cur=137 pick=5 anim=385 res=0 blink=0/0
+gboy 554 cur=138 pick=5 anim=386 res=0 blink=0/0
+gboy 555 cur=139 pick=5 anim=387 res=1 blink=0/0
+st 555 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=77
+gboy 556 cur=140 pick=5 anim=388 res=1 blink=0/0
+gboy 557 cur=141 pick=5 anim=389 res=1 blink=0/0
+gboy 558 cur=141 pick=5 anim=390 res=1 blink=0/0
+gboy 559 cur=141 pick=5 anim=391 res=1 blink=0/0
+gboy 560 cur=141 pick=5 anim=392 res=1 blink=0/0
+gboy 561 cur=141 pick=5 anim=393 res=1 blink=0/0
+gboy 562 cur=141 pick=5 anim=394 res=2 blink=0/0
+st 562 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=2 mode=12 vol=99 saved=50 vue=77
+gboy 563 cur=141 pick=5 anim=395 res=2 blink=0/0
+gboy 564 cur=141 pick=5 anim=396 res=2 blink=0/0
+gboy 565 cur=141 pick=5 anim=397 res=2 blink=0/0
+gboy 566 cur=141 pick=5 anim=398 res=2 blink=0/0
+gboy 567 cur=141 pick=5 anim=399 res=3 blink=0/0
+st 567 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=3 mode=12 vol=99 saved=50 vue=77
+gboy 568 cur=141 pick=5 anim=400 res=3 blink=0/0
+gboy 569 cur=141 pick=5 anim=401 res=3 blink=0/0
+gboy 570 cur=141 pick=5 anim=402 res=3 blink=0/0
+gboy 571 cur=141 pick=5 anim=403 res=3 blink=0/0
+gboy 572 cur=141 pick=5 anim=404 res=3 blink=0/0
+gboy 573 cur=141 pick=5 anim=405 res=3 blink=0/0
+gboy 574 cur=141 pick=5 anim=406 res=4 blink=0/0
+st 574 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=4 mode=12 vol=99 saved=50 vue=77
+gboy 575 cur=141 pick=5 anim=407 res=4 blink=0/0
+gboy 576 cur=141 pick=5 anim=408 res=4 blink=0/0
+gboy 577 cur=141 pick=5 anim=409 res=4 blink=0/0
+gboy 578 cur=141 pick=5 anim=410 res=4 blink=0/0
+gboy 579 cur=141 pick=5 anim=411 res=5 blink=0/0
+st 579 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=5 mode=12 vol=99 saved=50 vue=77
+gboy 580 cur=141 pick=5 anim=412 res=5 blink=0/0
+gboy 581 cur=141 pick=5 anim=413 res=5 blink=0/0
+gboy 582 cur=141 pick=5 anim=414 res=5 blink=0/0
+gboy 583 cur=141 pick=5 anim=415 res=5 blink=0/0
+gboy 584 cur=141 pick=5 anim=416 res=5 blink=0/0
+gboy 585 cur=141 pick=5 anim=417 res=6 blink=0/0
+st 585 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=6 mode=12 vol=99 saved=50 vue=77
+gboy 586 cur=141 pick=5 anim=418 res=6 blink=0/0
+gboy 587 cur=141 pick=5 anim=419 res=6 blink=0/0
+gboy 588 cur=141 pick=5 anim=-1 res=6 blink=1/0
+gboy 593 cur=141 pick=5 anim=-1 res=6 blink=1/1
+gboy 598 cur=141 pick=5 anim=-1 res=6 blink=1/2
+gboy 603 cur=141 pick=5 anim=-1 res=6 blink=1/3
+gboy 608 cur=141 pick=5 anim=-1 res=6 blink=1/4
+gboy 613 cur=141 pick=5 anim=-1 res=6 blink=1/5
+gboy 618 cur=141 pick=5 anim=-1 res=6 blink=0/6
+gboystop 618
+scan 618
+cmd 618 (StopMusik=1)
+snd 618 stopmus 1
+cmd 618 (StartMusik=6)
+snd 618 stopmus 1
+st 618 player=77 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=6 mode=3 vol=50 saved=50 vue=77
+log 619 ########################## Resultat GameBoy : 6
+log 619 ########################## CaseJoueur : 83
+slot 619 0 sh 1 mode 1 fr 0 list - ended 1
+st 619 player=77 demon=84 dto=-1 pat=-1 pto=83 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=77
+log 620 ---------------- JoueurChangeCase : 83
+cmd 620 (AngleWarpX=-156)
+cmd 620 (AngleWarpY=20)
+cmd 620 (Vue=83)
+view 620 83
+log 620 ------- Warp ba0083.hnm ------- chapter 0 --
+cmd 620 (LIMITEANGLEWARPY=70)
+slots 620 0:iaA1083083 1:pda1000000 2:pda2000000
+slotent 620 0:BAG_TORCHES 1:TAS_DEMONPLUS1 2:TAS_DEMONPLUS1
+slot 620 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 620 0 0
+slot 620 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 620 1 0
+slot 620 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 620 2 0
+st 620 player=83 demon=84 dto=-1 pat=83 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=83
+flags 620 800=83 1003=83
+log 621 ---------------- JoueurGotoCase : 83
+st 621 player=83 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=83
+slot 622 0 sh 1 mode 1 fr 1 list - ended 0
+slot 622 1 sh 1 mode 1 fr 1 list - ended 0
+slot 623 0 sh 1 mode 1 fr 2 list - ended 0
+slot 623 1 sh 1 mode 1 fr 2 list - ended 0
+click 624 TAS_ZONE_CASESUIV
+log 624 Demon Tirage : 6 car au début
+log 624 ########################## CaseDemon : 84
+scan 624
+slot 624 0 sh 1 mode 1 fr 3 list - ended 0
+slot 624 1 sh 1 mode 1 fr 3 list - ended 0
+st 624 player=83 demon=84 dto=90 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=83
+log 625 ---------------- DemonGotoCase : 90
+slots 625 0:iaA1083083
+slotent 625 0:BAG_TORCHES
+slot 625 0 sh 1 mode 1 fr 4 list - ended 0
+slotck 625 0 0
+st 625 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=83
+flags 625 801=90
+cmd 626 (StopMusik=1)
+snd 626 stopmus 1
+cmd 626 (StartMusik=40)
+snd 626 stopmus 1
+log 626 -------- Lancement Game Boy
+slot 626 0 sh 1 mode 1 fr 5 list - ended 0
+st 626 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=83
+gboy 627 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 628 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 629 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 630 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 631 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 632 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 633 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 634 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 635 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 636 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 637 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 638 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 639 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 640 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 641 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 642 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 643 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 644 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 645 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 646 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 647 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 648 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 649 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 650 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 651 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 652 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 653 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 654 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 655 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 656 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 657 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 658 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 659 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 660 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 661 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 662 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 663 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 664 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 665 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 666 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 667 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 668 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 669 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 670 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 671 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 672 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 673 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 674 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 675 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 676 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 677 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 678 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 679 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 680 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 681 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 682 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 683 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 684 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 685 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 686 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 687 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 688 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 689 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 690 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 691 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 692 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 693 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 694 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 695 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 696 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 697 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 698 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 699 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+gboy 700 cur=115 pick=-1 anim=-1 res=0 blink=0/0
+gboy 701 cur=116 pick=-1 anim=-1 res=0 blink=0/0
+gboy 702 cur=117 pick=-1 anim=-1 res=0 blink=0/0
+gboy 703 cur=118 pick=-1 anim=-1 res=0 blink=0/0
+gboy 704 cur=119 pick=-1 anim=-1 res=0 blink=0/0
+gboy 705 cur=120 pick=-1 anim=-1 res=0 blink=0/0
+gboy 706 cur=121 pick=-1 anim=-1 res=0 blink=0/0
+gboy 707 cur=122 pick=-1 anim=-1 res=0 blink=0/0
+gboy 708 cur=123 pick=-1 anim=-1 res=0 blink=0/0
+gboy 709 cur=124 pick=-1 anim=-1 res=0 blink=0/0
+gboy 710 cur=125 pick=-1 anim=-1 res=0 blink=0/0
+gboy 711 cur=126 pick=-1 anim=-1 res=0 blink=0/0
+gboy 712 cur=127 pick=-1 anim=-1 res=0 blink=0/0
+gboy 713 cur=128 pick=-1 anim=-1 res=0 blink=0/0
+gboy 714 cur=129 pick=-1 anim=-1 res=0 blink=0/0
+gboy 715 cur=130 pick=-1 anim=-1 res=0 blink=0/0
+gboy 716 cur=131 pick=-1 anim=-1 res=0 blink=0/0
+die 717 131
+gboy 717 cur=132 pick=5 anim=-1 res=0 blink=0/0
+gboy 718 cur=133 pick=5 anim=381 res=0 blink=0/0
+gboy 719 cur=134 pick=5 anim=382 res=0 blink=0/0
+gboy 720 cur=135 pick=5 anim=383 res=0 blink=0/0
+gboy 721 cur=136 pick=5 anim=384 res=0 blink=0/0
+gboy 722 cur=137 pick=5 anim=385 res=0 blink=0/0
+gboy 723 cur=138 pick=5 anim=386 res=0 blink=0/0
+gboy 724 cur=139 pick=5 anim=387 res=1 blink=0/0
+st 724 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=83
+gboy 725 cur=140 pick=5 anim=388 res=1 blink=0/0
+gboy 726 cur=141 pick=5 anim=389 res=1 blink=0/0
+gboy 727 cur=141 pick=5 anim=390 res=1 blink=0/0
+gboy 728 cur=141 pick=5 anim=391 res=1 blink=0/0
+gboy 729 cur=141 pick=5 anim=392 res=1 blink=0/0
+gboy 730 cur=141 pick=5 anim=393 res=1 blink=0/0
+gboy 731 cur=141 pick=5 anim=394 res=2 blink=0/0
+st 731 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=2 mode=12 vol=99 saved=50 vue=83
+gboy 732 cur=141 pick=5 anim=395 res=2 blink=0/0
+gboy 733 cur=141 pick=5 anim=396 res=2 blink=0/0
+gboy 734 cur=141 pick=5 anim=397 res=2 blink=0/0
+gboy 735 cur=141 pick=5 anim=398 res=2 blink=0/0
+gboy 736 cur=141 pick=5 anim=399 res=3 blink=0/0
+st 736 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=3 mode=12 vol=99 saved=50 vue=83
+gboy 737 cur=141 pick=5 anim=400 res=3 blink=0/0
+gboy 738 cur=141 pick=5 anim=401 res=3 blink=0/0
+gboy 739 cur=141 pick=5 anim=402 res=3 blink=0/0
+gboy 740 cur=141 pick=5 anim=403 res=3 blink=0/0
+gboy 741 cur=141 pick=5 anim=404 res=3 blink=0/0
+gboy 742 cur=141 pick=5 anim=405 res=3 blink=0/0
+gboy 743 cur=141 pick=5 anim=406 res=4 blink=0/0
+st 743 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=4 mode=12 vol=99 saved=50 vue=83
+gboy 744 cur=141 pick=5 anim=407 res=4 blink=0/0
+gboy 745 cur=141 pick=5 anim=408 res=4 blink=0/0
+gboy 746 cur=141 pick=5 anim=409 res=4 blink=0/0
+gboy 747 cur=141 pick=5 anim=410 res=4 blink=0/0
+gboy 748 cur=141 pick=5 anim=411 res=5 blink=0/0
+st 748 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=5 mode=12 vol=99 saved=50 vue=83
+gboy 749 cur=141 pick=5 anim=412 res=5 blink=0/0
+gboy 750 cur=141 pick=5 anim=413 res=5 blink=0/0
+gboy 751 cur=141 pick=5 anim=414 res=5 blink=0/0
+gboy 752 cur=141 pick=5 anim=415 res=5 blink=0/0
+gboy 753 cur=141 pick=5 anim=416 res=5 blink=0/0
+gboy 754 cur=141 pick=5 anim=417 res=6 blink=0/0
+st 754 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=6 mode=12 vol=99 saved=50 vue=83
+gboy 755 cur=141 pick=5 anim=418 res=6 blink=0/0
+gboy 756 cur=141 pick=5 anim=419 res=6 blink=0/0
+gboy 757 cur=141 pick=5 anim=-1 res=6 blink=1/0
+gboy 762 cur=141 pick=5 anim=-1 res=6 blink=1/1
+gboy 767 cur=141 pick=5 anim=-1 res=6 blink=1/2
+gboy 772 cur=141 pick=5 anim=-1 res=6 blink=1/3
+gboy 777 cur=141 pick=5 anim=-1 res=6 blink=1/4
+gboy 782 cur=141 pick=5 anim=-1 res=6 blink=1/5
+gboy 787 cur=141 pick=5 anim=-1 res=6 blink=0/6
+gboystop 787
+scan 787
+cmd 787 (StopMusik=1)
+snd 787 stopmus 1
+cmd 787 (StartMusik=6)
+snd 787 stopmus 1
+st 787 player=83 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=6 mode=3 vol=50 saved=50 vue=83
+log 788 ########################## Resultat GameBoy : 6
+log 788 ########################## CaseJoueur : 89
+slot 788 0 sh 1 mode 1 fr 0 list - ended 1
+st 788 player=83 demon=90 dto=-1 pat=-1 pto=89 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=83
+log 789 ---------------- JoueurChangeCase : 89
+cmd 789 (AngleWarpX=-156)
+cmd 789 (AngleWarpY=60)
+cmd 789 (Vue=89)
+view 789 89
+log 789 ------- Warp ba0089.hnm ------- chapter 0 --
+cmd 789 (LIMITEANGLEWARPY=70)
+slots 789 0:iaA1089089 1:pda1000000 2:pda2000000
+slotent 789 0:BAG_TORCHES 1:TAS_DEMONPLUS1 2:TAS_DEMONPLUS1
+slot 789 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 789 0 0
+slot 789 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 789 1 0
+slot 789 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 789 2 0
+st 789 player=89 demon=90 dto=-1 pat=89 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=89
+flags 789 800=89 1003=89
+log 790 ---------------- JoueurGotoCase : 89
+log 790 Voleur Lion
+st 790 player=89 demon=90 dto=-1 pat=-1 pto=99 won=0 won2=0 cin=67 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=89
+log 791 ---------------- JoueurChangeCase : 99
+cmd 791 (AngleWarpX=-90)
+cmd 791 (AngleWarpY=20)
+cmd 791 (Vue=99)
+view 791 99
+log 791 ------- Warp ba0099.hnm ------- chapter 0 --
+cmd 791 (LIMITEANGLEWARPY=70)
+snd 791 stopall
+cmd 791 (Cinema=67,fps=25)
+cinema 791 cine067.hnm
+slots 791 0:iaA1099099
+slotent 791 0:BAG_TORCHES
+slot 791 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 791 0 0
+st 791 player=99 demon=90 dto=-1 pat=99 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=99
+flags 791 800=99 1003=99
+log 792 ---------------- JoueurGotoCase : 99
+log 792 Joueur a Gagne !!!
+scan 792
+st 792 player=99 demon=90 dto=-1 pat=-1 pto=-1 won=1 won2=1 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=99
+flags 792 151=1
+slot 793 0 sh 1 mode 1 fr 1 list - ended 0
+slot 794 0 sh 1 mode 1 fr 2 list - ended 0
+end player_win frames=794
+run demon_win the player throws 1 every turn (GBOY click at cursor 114): the demon reaches 99 first; then the view 39 is entered again (as chapter 47's Flag981 section does: (Vue=39)) and the board is set up anew (Flag914 = 0)
+setup wam TourMagi.wam view 39 yaw -156 pitch 20
+entry 0
+view 0 39
+log 0 ------- Warp ba0039.hnm ------- chapter 0 --
+log 0 AtlBruitages_InitWarp(): current_vue=NULL!!!
+cmd 0 (LIMITEANGLEWARPY=70)
+slots 0:iaA1039039 1:pda1000000 2:pda2000000
+slotent 0:BAG_TORCHES 1:TAS_DEMONPLUS1 2:TAS_DEMONPLUS1
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 1 0
+slot 0 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 2 0
+st 0 player=39 demon=40 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=0 vue=39
+hand 0 0 -
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 1 sh 1 mode 1 fr 1 list - ended 0
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 1 fr 2 list - ended 0
+click 4 TAS_ZONE_CASESUIV
+log 4 Demon Tirage : 6 car au début
+log 4 ########################## CaseDemon : 40
+scan 4
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 1 sh 1 mode 1 fr 3 list - ended 0
+st 4 player=39 demon=40 dto=46 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=0 vue=39
+log 5 ---------------- DemonGotoCase : 46
+log 5 Démon Lion
+snd 5 stopall
+cmd 5 (Cinema=69,fps=25)
+cinema 5 cine069.hnm
+slots 5 0:iaA1039039
+slotent 5 0:BAG_TORCHES
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slotck 5 0 0
+st 5 player=39 demon=46 dto=56 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=0 vue=39
+flags 5 801=46
+log 6 ---------------- DemonGotoCase : 56
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+st 6 player=39 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=0 vue=39
+flags 6 801=56
+cmd 7 (StopMusik=1)
+snd 7 stopmus 1
+cmd 7 (StartMusik=40)
+snd 7 stopmus 1
+log 7 -------- Lancement Game Boy
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+st 7 player=39 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=39
+gboy 8 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 9 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 10 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 11 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 12 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 13 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 14 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 15 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 16 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 17 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 18 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 19 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 20 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 21 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 22 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 23 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 24 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 25 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 26 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 27 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 28 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 29 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 30 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 31 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 32 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 33 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 34 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 35 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 36 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 37 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 38 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 39 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 40 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 41 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 42 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 43 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 44 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 45 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 46 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 47 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 48 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 49 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 50 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 51 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 52 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 53 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 54 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 55 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 56 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 57 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 58 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 59 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 60 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 61 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 62 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 63 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 64 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 65 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 66 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 67 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 68 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 69 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 70 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 71 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 72 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 73 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 74 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 75 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 76 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 77 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 78 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 79 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 80 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+die 81 114
+gboy 81 cur=115 pick=0 anim=-1 res=0 blink=0/0
+gboy 82 cur=116 pick=0 anim=241 res=0 blink=0/0
+gboy 83 cur=117 pick=0 anim=242 res=0 blink=0/0
+gboy 84 cur=118 pick=0 anim=243 res=0 blink=0/0
+gboy 85 cur=119 pick=0 anim=244 res=0 blink=0/0
+gboy 86 cur=120 pick=0 anim=245 res=0 blink=0/0
+gboy 87 cur=121 pick=0 anim=246 res=0 blink=0/0
+gboy 88 cur=122 pick=0 anim=247 res=0 blink=0/0
+gboy 89 cur=123 pick=0 anim=248 res=0 blink=0/0
+gboy 90 cur=124 pick=0 anim=249 res=0 blink=0/0
+gboy 91 cur=125 pick=0 anim=250 res=0 blink=0/0
+gboy 92 cur=126 pick=0 anim=251 res=0 blink=0/0
+gboy 93 cur=127 pick=0 anim=252 res=0 blink=0/0
+gboy 94 cur=128 pick=0 anim=253 res=0 blink=0/0
+gboy 95 cur=129 pick=0 anim=254 res=0 blink=0/0
+gboy 96 cur=130 pick=0 anim=255 res=1 blink=0/0
+st 96 player=39 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=39
+gboy 97 cur=131 pick=0 anim=256 res=1 blink=0/0
+gboy 98 cur=132 pick=0 anim=257 res=1 blink=0/0
+gboy 99 cur=133 pick=0 anim=258 res=1 blink=0/0
+gboy 100 cur=134 pick=0 anim=259 res=1 blink=0/0
+gboy 101 cur=135 pick=0 anim=-1 res=1 blink=1/0
+gboy 102 cur=136 pick=0 anim=-1 res=1 blink=1/0
+gboy 103 cur=137 pick=0 anim=-1 res=1 blink=1/0
+gboy 104 cur=138 pick=0 anim=-1 res=1 blink=1/0
+gboy 105 cur=139 pick=0 anim=-1 res=1 blink=1/0
+gboy 106 cur=140 pick=0 anim=-1 res=1 blink=1/1
+gboy 107 cur=141 pick=0 anim=-1 res=1 blink=1/1
+gboy 111 cur=141 pick=0 anim=-1 res=1 blink=1/2
+gboy 116 cur=141 pick=0 anim=-1 res=1 blink=1/3
+gboy 121 cur=141 pick=0 anim=-1 res=1 blink=1/4
+gboy 126 cur=141 pick=0 anim=-1 res=1 blink=1/5
+gboy 131 cur=141 pick=0 anim=-1 res=1 blink=0/6
+gboystop 131
+scan 131
+cmd 131 (StopMusik=1)
+snd 131 stopmus 1
+cmd 131 (StartMusik=6)
+snd 131 stopmus 1
+st 131 player=39 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=3 vol=50 saved=50 vue=39
+log 132 ########################## Resultat GameBoy : 1
+log 132 ########################## CaseJoueur : 40
+slot 132 0 sh 1 mode 1 fr 0 list - ended 1
+st 132 player=39 demon=56 dto=-1 pat=-1 pto=40 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=39
+log 133 ---------------- JoueurChangeCase : 40
+cmd 133 (AngleWarpX=-156)
+cmd 133 (AngleWarpY=20)
+cmd 133 (Vue=40)
+view 133 40
+log 133 ------- Warp ba0040.hnm ------- chapter 0 --
+cmd 133 (LIMITEANGLEWARPY=70)
+slots 133 0:iaA1040040
+slotent 133 0:BAG_TORCHES
+slot 133 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 133 0 0
+st 133 player=40 demon=56 dto=-1 pat=40 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=40
+flags 133 800=40 1003=40
+log 134 ---------------- JoueurGotoCase : 40
+st 134 player=40 demon=56 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=40
+slot 135 0 sh 1 mode 1 fr 1 list - ended 0
+slot 136 0 sh 1 mode 1 fr 2 list - ended 0
+click 137 TAS_ZONE_CASESUIV
+log 137 Demon Tirage : 6 car au début
+log 137 ########################## CaseDemon : 56
+scan 137
+slot 137 0 sh 1 mode 1 fr 3 list - ended 0
+st 137 player=40 demon=56 dto=62 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=40
+log 138 ---------------- DemonGotoCase : 62
+log 138 Démon Serpent
+snd 138 stopall
+cmd 138 (Cinema=70,fps=25)
+cinema 138 cine070.hnm
+slot 138 0 sh 1 mode 1 fr 4 list - ended 0
+st 138 player=40 demon=62 dto=52 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=40
+flags 138 801=62
+log 139 ---------------- DemonGotoCase : 52
+slot 139 0 sh 1 mode 1 fr 5 list - ended 0
+st 139 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=40
+flags 139 801=52
+cmd 140 (StopMusik=1)
+snd 140 stopmus 1
+cmd 140 (StartMusik=40)
+snd 140 stopmus 1
+log 140 -------- Lancement Game Boy
+slot 140 0 sh 1 mode 1 fr 6 list - ended 0
+st 140 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=40
+gboy 141 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 142 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 143 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 144 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 145 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 146 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 147 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 148 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 149 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 150 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 151 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 152 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 153 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 154 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 155 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 156 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 157 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 158 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 159 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 160 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 161 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 162 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 163 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 164 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 165 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 166 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 167 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 168 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 169 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 170 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 171 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 172 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 173 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 174 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 175 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 176 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 177 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 178 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 179 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 180 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 181 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 182 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 183 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 184 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 185 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 186 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 187 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 188 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 189 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 190 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 191 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 192 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 193 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 194 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 195 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 196 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 197 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 198 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 199 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 200 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 201 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 202 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 203 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 204 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 205 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 206 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 207 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 208 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 209 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 210 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 211 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 212 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 213 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+die 214 114
+gboy 214 cur=115 pick=0 anim=-1 res=0 blink=0/0
+gboy 215 cur=116 pick=0 anim=241 res=0 blink=0/0
+gboy 216 cur=117 pick=0 anim=242 res=0 blink=0/0
+gboy 217 cur=118 pick=0 anim=243 res=0 blink=0/0
+gboy 218 cur=119 pick=0 anim=244 res=0 blink=0/0
+gboy 219 cur=120 pick=0 anim=245 res=0 blink=0/0
+gboy 220 cur=121 pick=0 anim=246 res=0 blink=0/0
+gboy 221 cur=122 pick=0 anim=247 res=0 blink=0/0
+gboy 222 cur=123 pick=0 anim=248 res=0 blink=0/0
+gboy 223 cur=124 pick=0 anim=249 res=0 blink=0/0
+gboy 224 cur=125 pick=0 anim=250 res=0 blink=0/0
+gboy 225 cur=126 pick=0 anim=251 res=0 blink=0/0
+gboy 226 cur=127 pick=0 anim=252 res=0 blink=0/0
+gboy 227 cur=128 pick=0 anim=253 res=0 blink=0/0
+gboy 228 cur=129 pick=0 anim=254 res=0 blink=0/0
+gboy 229 cur=130 pick=0 anim=255 res=1 blink=0/0
+st 229 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=40
+gboy 230 cur=131 pick=0 anim=256 res=1 blink=0/0
+gboy 231 cur=132 pick=0 anim=257 res=1 blink=0/0
+gboy 232 cur=133 pick=0 anim=258 res=1 blink=0/0
+gboy 233 cur=134 pick=0 anim=259 res=1 blink=0/0
+gboy 234 cur=135 pick=0 anim=-1 res=1 blink=1/0
+gboy 235 cur=136 pick=0 anim=-1 res=1 blink=1/0
+gboy 236 cur=137 pick=0 anim=-1 res=1 blink=1/0
+gboy 237 cur=138 pick=0 anim=-1 res=1 blink=1/0
+gboy 238 cur=139 pick=0 anim=-1 res=1 blink=1/0
+gboy 239 cur=140 pick=0 anim=-1 res=1 blink=1/1
+gboy 240 cur=141 pick=0 anim=-1 res=1 blink=1/1
+gboy 244 cur=141 pick=0 anim=-1 res=1 blink=1/2
+gboy 249 cur=141 pick=0 anim=-1 res=1 blink=1/3
+gboy 254 cur=141 pick=0 anim=-1 res=1 blink=1/4
+gboy 259 cur=141 pick=0 anim=-1 res=1 blink=1/5
+gboy 264 cur=141 pick=0 anim=-1 res=1 blink=0/6
+gboystop 264
+scan 264
+cmd 264 (StopMusik=1)
+snd 264 stopmus 1
+cmd 264 (StartMusik=6)
+snd 264 stopmus 1
+st 264 player=40 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=3 vol=50 saved=50 vue=40
+log 265 ########################## Resultat GameBoy : 1
+log 265 ########################## CaseJoueur : 41
+slot 265 0 sh 1 mode 1 fr 0 list - ended 1
+st 265 player=40 demon=52 dto=-1 pat=-1 pto=41 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=40
+log 266 ---------------- JoueurChangeCase : 41
+cmd 266 (AngleWarpX=-156)
+cmd 266 (AngleWarpY=20)
+cmd 266 (Vue=41)
+view 266 41
+log 266 ------- Warp ba0041.hnm ------- chapter 0 --
+cmd 266 (LIMITEANGLEWARPY=70)
+slots 266 0:iaA1041041
+slotent 266 0:BAG_TORCHES
+slot 266 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 266 0 0
+st 266 player=41 demon=52 dto=-1 pat=41 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=41
+flags 266 800=41 1003=41
+log 267 ---------------- JoueurGotoCase : 41
+st 267 player=41 demon=52 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=41
+slot 268 0 sh 1 mode 1 fr 1 list - ended 0
+slot 269 0 sh 1 mode 1 fr 2 list - ended 0
+click 270 TAS_ZONE_CASESUIV
+log 270 Demon Tirage : 6 car au début
+log 270 ########################## CaseDemon : 52
+scan 270
+slot 270 0 sh 1 mode 1 fr 3 list - ended 0
+st 270 player=41 demon=52 dto=58 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=41
+log 271 ---------------- DemonGotoCase : 58
+log 271 Démon Lune
+snd 271 stopall
+cmd 271 (Cinema=69,fps=25)
+cinema 271 cine069.hnm
+slot 271 0 sh 1 mode 1 fr 4 list - ended 0
+st 271 player=41 demon=58 dto=78 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=41
+flags 271 801=58
+log 272 ---------------- DemonGotoCase : 78
+slot 272 0 sh 1 mode 1 fr 5 list - ended 0
+st 272 player=41 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=41
+flags 272 801=78
+cmd 273 (StopMusik=1)
+snd 273 stopmus 1
+cmd 273 (StartMusik=40)
+snd 273 stopmus 1
+log 273 -------- Lancement Game Boy
+slot 273 0 sh 1 mode 1 fr 6 list - ended 0
+st 273 player=41 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=41
+gboy 274 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 275 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 276 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 277 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 278 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 279 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 280 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 281 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 282 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 283 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 284 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 285 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 286 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 287 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 288 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 289 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 290 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 291 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 292 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 293 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 294 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 295 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 296 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 297 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 298 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 299 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 300 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 301 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 302 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 303 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 304 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 305 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 306 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 307 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 308 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 309 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 310 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 311 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 312 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 313 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 314 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 315 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 316 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 317 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 318 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 319 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 320 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 321 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 322 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 323 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 324 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 325 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 326 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 327 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 328 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 329 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 330 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 331 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 332 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 333 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 334 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 335 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 336 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 337 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 338 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 339 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 340 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 341 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 342 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 343 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 344 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 345 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 346 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+die 347 114
+gboy 347 cur=115 pick=0 anim=-1 res=0 blink=0/0
+gboy 348 cur=116 pick=0 anim=241 res=0 blink=0/0
+gboy 349 cur=117 pick=0 anim=242 res=0 blink=0/0
+gboy 350 cur=118 pick=0 anim=243 res=0 blink=0/0
+gboy 351 cur=119 pick=0 anim=244 res=0 blink=0/0
+gboy 352 cur=120 pick=0 anim=245 res=0 blink=0/0
+gboy 353 cur=121 pick=0 anim=246 res=0 blink=0/0
+gboy 354 cur=122 pick=0 anim=247 res=0 blink=0/0
+gboy 355 cur=123 pick=0 anim=248 res=0 blink=0/0
+gboy 356 cur=124 pick=0 anim=249 res=0 blink=0/0
+gboy 357 cur=125 pick=0 anim=250 res=0 blink=0/0
+gboy 358 cur=126 pick=0 anim=251 res=0 blink=0/0
+gboy 359 cur=127 pick=0 anim=252 res=0 blink=0/0
+gboy 360 cur=128 pick=0 anim=253 res=0 blink=0/0
+gboy 361 cur=129 pick=0 anim=254 res=0 blink=0/0
+gboy 362 cur=130 pick=0 anim=255 res=1 blink=0/0
+st 362 player=41 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=41
+gboy 363 cur=131 pick=0 anim=256 res=1 blink=0/0
+gboy 364 cur=132 pick=0 anim=257 res=1 blink=0/0
+gboy 365 cur=133 pick=0 anim=258 res=1 blink=0/0
+gboy 366 cur=134 pick=0 anim=259 res=1 blink=0/0
+gboy 367 cur=135 pick=0 anim=-1 res=1 blink=1/0
+gboy 368 cur=136 pick=0 anim=-1 res=1 blink=1/0
+gboy 369 cur=137 pick=0 anim=-1 res=1 blink=1/0
+gboy 370 cur=138 pick=0 anim=-1 res=1 blink=1/0
+gboy 371 cur=139 pick=0 anim=-1 res=1 blink=1/0
+gboy 372 cur=140 pick=0 anim=-1 res=1 blink=1/1
+gboy 373 cur=141 pick=0 anim=-1 res=1 blink=1/1
+gboy 377 cur=141 pick=0 anim=-1 res=1 blink=1/2
+gboy 382 cur=141 pick=0 anim=-1 res=1 blink=1/3
+gboy 387 cur=141 pick=0 anim=-1 res=1 blink=1/4
+gboy 392 cur=141 pick=0 anim=-1 res=1 blink=1/5
+gboy 397 cur=141 pick=0 anim=-1 res=1 blink=0/6
+gboystop 397
+scan 397
+cmd 397 (StopMusik=1)
+snd 397 stopmus 1
+cmd 397 (StartMusik=6)
+snd 397 stopmus 1
+st 397 player=41 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=3 vol=50 saved=50 vue=41
+log 398 ########################## Resultat GameBoy : 1
+log 398 ########################## CaseJoueur : 42
+slot 398 0 sh 1 mode 1 fr 0 list - ended 1
+st 398 player=41 demon=78 dto=-1 pat=-1 pto=42 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=41
+log 399 ---------------- JoueurChangeCase : 42
+cmd 399 (AngleWarpX=-156)
+cmd 399 (AngleWarpY=20)
+cmd 399 (Vue=42)
+view 399 42
+log 399 ------- Warp ba0042.hnm ------- chapter 0 --
+cmd 399 (LIMITEANGLEWARPY=70)
+slots 399 0:iaA1042042
+slotent 399 0:BAG_TORCHES
+slot 399 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 399 0 0
+st 399 player=42 demon=78 dto=-1 pat=42 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=42
+flags 399 800=42 1003=42
+log 400 ---------------- JoueurGotoCase : 42
+st 400 player=42 demon=78 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=42
+slot 401 0 sh 1 mode 1 fr 1 list - ended 0
+slot 402 0 sh 1 mode 1 fr 2 list - ended 0
+click 403 TAS_ZONE_CASESUIV
+log 403 Demon Tirage : 6 car au début
+log 403 ########################## CaseDemon : 78
+scan 403
+slot 403 0 sh 1 mode 1 fr 3 list - ended 0
+st 403 player=42 demon=78 dto=84 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=42
+log 404 ---------------- DemonGotoCase : 84
+slot 404 0 sh 1 mode 1 fr 4 list - ended 0
+st 404 player=42 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=42
+flags 404 801=84
+cmd 405 (StopMusik=1)
+snd 405 stopmus 1
+cmd 405 (StartMusik=40)
+snd 405 stopmus 1
+log 405 -------- Lancement Game Boy
+slot 405 0 sh 1 mode 1 fr 5 list - ended 0
+st 405 player=42 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=42
+gboy 406 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 407 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 408 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 409 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 410 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 411 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 412 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 413 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 414 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 415 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 416 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 417 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 418 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 419 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 420 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 421 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 422 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 423 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 424 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 425 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 426 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 427 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 428 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 429 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 430 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 431 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 432 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 433 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 434 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 435 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 436 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 437 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 438 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 439 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 440 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 441 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 442 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 443 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 444 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 445 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 446 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 447 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 448 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 449 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 450 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 451 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 452 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 453 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 454 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 455 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 456 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 457 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 458 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 459 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 460 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 461 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 462 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 463 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 464 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 465 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 466 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 467 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 468 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 469 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 470 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 471 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 472 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 473 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 474 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 475 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 476 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 477 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 478 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+die 479 114
+gboy 479 cur=115 pick=0 anim=-1 res=0 blink=0/0
+gboy 480 cur=116 pick=0 anim=241 res=0 blink=0/0
+gboy 481 cur=117 pick=0 anim=242 res=0 blink=0/0
+gboy 482 cur=118 pick=0 anim=243 res=0 blink=0/0
+gboy 483 cur=119 pick=0 anim=244 res=0 blink=0/0
+gboy 484 cur=120 pick=0 anim=245 res=0 blink=0/0
+gboy 485 cur=121 pick=0 anim=246 res=0 blink=0/0
+gboy 486 cur=122 pick=0 anim=247 res=0 blink=0/0
+gboy 487 cur=123 pick=0 anim=248 res=0 blink=0/0
+gboy 488 cur=124 pick=0 anim=249 res=0 blink=0/0
+gboy 489 cur=125 pick=0 anim=250 res=0 blink=0/0
+gboy 490 cur=126 pick=0 anim=251 res=0 blink=0/0
+gboy 491 cur=127 pick=0 anim=252 res=0 blink=0/0
+gboy 492 cur=128 pick=0 anim=253 res=0 blink=0/0
+gboy 493 cur=129 pick=0 anim=254 res=0 blink=0/0
+gboy 494 cur=130 pick=0 anim=255 res=1 blink=0/0
+st 494 player=42 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=42
+gboy 495 cur=131 pick=0 anim=256 res=1 blink=0/0
+gboy 496 cur=132 pick=0 anim=257 res=1 blink=0/0
+gboy 497 cur=133 pick=0 anim=258 res=1 blink=0/0
+gboy 498 cur=134 pick=0 anim=259 res=1 blink=0/0
+gboy 499 cur=135 pick=0 anim=-1 res=1 blink=1/0
+gboy 500 cur=136 pick=0 anim=-1 res=1 blink=1/0
+gboy 501 cur=137 pick=0 anim=-1 res=1 blink=1/0
+gboy 502 cur=138 pick=0 anim=-1 res=1 blink=1/0
+gboy 503 cur=139 pick=0 anim=-1 res=1 blink=1/0
+gboy 504 cur=140 pick=0 anim=-1 res=1 blink=1/1
+gboy 505 cur=141 pick=0 anim=-1 res=1 blink=1/1
+gboy 509 cur=141 pick=0 anim=-1 res=1 blink=1/2
+gboy 514 cur=141 pick=0 anim=-1 res=1 blink=1/3
+gboy 519 cur=141 pick=0 anim=-1 res=1 blink=1/4
+gboy 524 cur=141 pick=0 anim=-1 res=1 blink=1/5
+gboy 529 cur=141 pick=0 anim=-1 res=1 blink=0/6
+gboystop 529
+scan 529
+cmd 529 (StopMusik=1)
+snd 529 stopmus 1
+cmd 529 (StartMusik=6)
+snd 529 stopmus 1
+st 529 player=42 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=3 vol=50 saved=50 vue=42
+log 530 ########################## Resultat GameBoy : 1
+log 530 ########################## CaseJoueur : 43
+slot 530 0 sh 1 mode 1 fr 0 list - ended 1
+st 530 player=42 demon=84 dto=-1 pat=-1 pto=43 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=42
+log 531 ---------------- JoueurChangeCase : 43
+cmd 531 (AngleWarpX=-156)
+cmd 531 (AngleWarpY=20)
+cmd 531 (Vue=43)
+view 531 43
+log 531 ------- Warp ba0043.hnm ------- chapter 0 --
+cmd 531 (LIMITEANGLEWARPY=70)
+slots 531 0:iaA1043043
+slotent 531 0:BAG_TORCHES
+slot 531 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 531 0 0
+st 531 player=43 demon=84 dto=-1 pat=43 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=43
+flags 531 800=43 1003=43
+log 532 ---------------- JoueurGotoCase : 43
+st 532 player=43 demon=84 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=43
+slot 533 0 sh 1 mode 1 fr 1 list - ended 0
+slot 534 0 sh 1 mode 1 fr 2 list - ended 0
+click 535 TAS_ZONE_CASESUIV
+log 535 Demon Tirage : 6 car au début
+log 535 ########################## CaseDemon : 84
+scan 535
+slot 535 0 sh 1 mode 1 fr 3 list - ended 0
+st 535 player=43 demon=84 dto=90 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=43
+log 536 ---------------- DemonGotoCase : 90
+slot 536 0 sh 1 mode 1 fr 4 list - ended 0
+st 536 player=43 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=43
+flags 536 801=90
+cmd 537 (StopMusik=1)
+snd 537 stopmus 1
+cmd 537 (StartMusik=40)
+snd 537 stopmus 1
+log 537 -------- Lancement Game Boy
+slot 537 0 sh 1 mode 1 fr 5 list - ended 0
+st 537 player=43 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=43
+gboy 538 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 539 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 540 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 541 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 542 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 543 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 544 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 545 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 546 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 547 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 548 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 549 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 550 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 551 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 552 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 553 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 554 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 555 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 556 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 557 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 558 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 559 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 560 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 561 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 562 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 563 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 564 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 565 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 566 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 567 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 568 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 569 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 570 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 571 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 572 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 573 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 574 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 575 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 576 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 577 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 578 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 579 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 580 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 581 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 582 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 583 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 584 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 585 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 586 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 587 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 588 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 589 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 590 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 591 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 592 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 593 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 594 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 595 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 596 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 597 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 598 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 599 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 600 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 601 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 602 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 603 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 604 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 605 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 606 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 607 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 608 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 609 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 610 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+die 611 114
+gboy 611 cur=115 pick=0 anim=-1 res=0 blink=0/0
+gboy 612 cur=116 pick=0 anim=241 res=0 blink=0/0
+gboy 613 cur=117 pick=0 anim=242 res=0 blink=0/0
+gboy 614 cur=118 pick=0 anim=243 res=0 blink=0/0
+gboy 615 cur=119 pick=0 anim=244 res=0 blink=0/0
+gboy 616 cur=120 pick=0 anim=245 res=0 blink=0/0
+gboy 617 cur=121 pick=0 anim=246 res=0 blink=0/0
+gboy 618 cur=122 pick=0 anim=247 res=0 blink=0/0
+gboy 619 cur=123 pick=0 anim=248 res=0 blink=0/0
+gboy 620 cur=124 pick=0 anim=249 res=0 blink=0/0
+gboy 621 cur=125 pick=0 anim=250 res=0 blink=0/0
+gboy 622 cur=126 pick=0 anim=251 res=0 blink=0/0
+gboy 623 cur=127 pick=0 anim=252 res=0 blink=0/0
+gboy 624 cur=128 pick=0 anim=253 res=0 blink=0/0
+gboy 625 cur=129 pick=0 anim=254 res=0 blink=0/0
+gboy 626 cur=130 pick=0 anim=255 res=1 blink=0/0
+st 626 player=43 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=43
+gboy 627 cur=131 pick=0 anim=256 res=1 blink=0/0
+gboy 628 cur=132 pick=0 anim=257 res=1 blink=0/0
+gboy 629 cur=133 pick=0 anim=258 res=1 blink=0/0
+gboy 630 cur=134 pick=0 anim=259 res=1 blink=0/0
+gboy 631 cur=135 pick=0 anim=-1 res=1 blink=1/0
+gboy 632 cur=136 pick=0 anim=-1 res=1 blink=1/0
+gboy 633 cur=137 pick=0 anim=-1 res=1 blink=1/0
+gboy 634 cur=138 pick=0 anim=-1 res=1 blink=1/0
+gboy 635 cur=139 pick=0 anim=-1 res=1 blink=1/0
+gboy 636 cur=140 pick=0 anim=-1 res=1 blink=1/1
+gboy 637 cur=141 pick=0 anim=-1 res=1 blink=1/1
+gboy 641 cur=141 pick=0 anim=-1 res=1 blink=1/2
+gboy 646 cur=141 pick=0 anim=-1 res=1 blink=1/3
+gboy 651 cur=141 pick=0 anim=-1 res=1 blink=1/4
+gboy 656 cur=141 pick=0 anim=-1 res=1 blink=1/5
+gboy 661 cur=141 pick=0 anim=-1 res=1 blink=0/6
+gboystop 661
+scan 661
+cmd 661 (StopMusik=1)
+snd 661 stopmus 1
+cmd 661 (StartMusik=6)
+snd 661 stopmus 1
+st 661 player=43 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=3 vol=50 saved=50 vue=43
+log 662 ########################## Resultat GameBoy : 1
+log 662 ########################## CaseJoueur : 44
+slot 662 0 sh 1 mode 1 fr 0 list - ended 1
+st 662 player=43 demon=90 dto=-1 pat=-1 pto=44 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=43
+log 663 ---------------- JoueurChangeCase : 44
+cmd 663 (AngleWarpX=-156)
+cmd 663 (AngleWarpY=20)
+cmd 663 (Vue=44)
+view 663 44
+log 663 ------- Warp ba0044.hnm ------- chapter 0 --
+cmd 663 (LIMITEANGLEWARPY=70)
+slots 663 0:iaA1044044
+slotent 663 0:BAG_TORCHES
+slot 663 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 663 0 0
+st 663 player=44 demon=90 dto=-1 pat=44 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=44
+flags 663 800=44 1003=44
+log 664 ---------------- JoueurGotoCase : 44
+st 664 player=44 demon=90 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=44
+slot 665 0 sh 1 mode 1 fr 1 list - ended 0
+slot 666 0 sh 1 mode 1 fr 2 list - ended 0
+click 667 TAS_ZONE_CASESUIV
+log 667 Demon Tirage : 6 en évitant le puits
+log 667 ########################## CaseDemon : 90
+scan 667
+slot 667 0 sh 1 mode 1 fr 3 list - ended 0
+st 667 player=44 demon=90 dto=96 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=44
+log 668 ---------------- DemonGotoCase : 96
+slot 668 0 sh 1 mode 1 fr 4 list - ended 0
+st 668 player=44 demon=96 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=44
+flags 668 801=96
+cmd 669 (StopMusik=1)
+snd 669 stopmus 1
+cmd 669 (StartMusik=40)
+snd 669 stopmus 1
+log 669 -------- Lancement Game Boy
+slot 669 0 sh 1 mode 1 fr 5 list - ended 0
+st 669 player=44 demon=96 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=12 vol=99 saved=50 vue=44
+gboy 670 cur=42 pick=-1 anim=-1 res=0 blink=0/0
+gboy 671 cur=43 pick=-1 anim=-1 res=0 blink=0/0
+gboy 672 cur=44 pick=-1 anim=-1 res=0 blink=0/0
+gboy 673 cur=45 pick=-1 anim=-1 res=0 blink=0/0
+gboy 674 cur=46 pick=-1 anim=-1 res=0 blink=0/0
+gboy 675 cur=47 pick=-1 anim=-1 res=0 blink=0/0
+gboy 676 cur=48 pick=-1 anim=-1 res=0 blink=0/0
+gboy 677 cur=49 pick=-1 anim=-1 res=0 blink=0/0
+gboy 678 cur=50 pick=-1 anim=-1 res=0 blink=0/0
+gboy 679 cur=51 pick=-1 anim=-1 res=0 blink=0/0
+gboy 680 cur=52 pick=-1 anim=-1 res=0 blink=0/0
+gboy 681 cur=53 pick=-1 anim=-1 res=0 blink=0/0
+gboy 682 cur=54 pick=-1 anim=-1 res=0 blink=0/0
+gboy 683 cur=55 pick=-1 anim=-1 res=0 blink=0/0
+gboy 684 cur=56 pick=-1 anim=-1 res=0 blink=0/0
+gboy 685 cur=57 pick=-1 anim=-1 res=0 blink=0/0
+gboy 686 cur=58 pick=-1 anim=-1 res=0 blink=0/0
+gboy 687 cur=59 pick=-1 anim=-1 res=0 blink=0/0
+gboy 688 cur=60 pick=-1 anim=-1 res=0 blink=0/0
+gboy 689 cur=61 pick=-1 anim=-1 res=0 blink=0/0
+gboy 690 cur=62 pick=-1 anim=-1 res=0 blink=0/0
+gboy 691 cur=63 pick=-1 anim=-1 res=0 blink=0/0
+gboy 692 cur=64 pick=-1 anim=-1 res=0 blink=0/0
+gboy 693 cur=65 pick=-1 anim=-1 res=0 blink=0/0
+gboy 694 cur=66 pick=-1 anim=-1 res=0 blink=0/0
+gboy 695 cur=67 pick=-1 anim=-1 res=0 blink=0/0
+gboy 696 cur=68 pick=-1 anim=-1 res=0 blink=0/0
+gboy 697 cur=69 pick=-1 anim=-1 res=0 blink=0/0
+gboy 698 cur=70 pick=-1 anim=-1 res=0 blink=0/0
+gboy 699 cur=71 pick=-1 anim=-1 res=0 blink=0/0
+gboy 700 cur=72 pick=-1 anim=-1 res=0 blink=0/0
+gboy 701 cur=73 pick=-1 anim=-1 res=0 blink=0/0
+gboy 702 cur=74 pick=-1 anim=-1 res=0 blink=0/0
+gboy 703 cur=75 pick=-1 anim=-1 res=0 blink=0/0
+gboy 704 cur=76 pick=-1 anim=-1 res=0 blink=0/0
+gboy 705 cur=77 pick=-1 anim=-1 res=0 blink=0/0
+gboy 706 cur=78 pick=-1 anim=-1 res=0 blink=0/0
+gboy 707 cur=79 pick=-1 anim=-1 res=0 blink=0/0
+gboy 708 cur=80 pick=-1 anim=-1 res=0 blink=0/0
+gboy 709 cur=81 pick=-1 anim=-1 res=0 blink=0/0
+gboy 710 cur=82 pick=-1 anim=-1 res=0 blink=0/0
+gboy 711 cur=83 pick=-1 anim=-1 res=0 blink=0/0
+gboy 712 cur=84 pick=-1 anim=-1 res=0 blink=0/0
+gboy 713 cur=85 pick=-1 anim=-1 res=0 blink=0/0
+gboy 714 cur=86 pick=-1 anim=-1 res=0 blink=0/0
+gboy 715 cur=87 pick=-1 anim=-1 res=0 blink=0/0
+gboy 716 cur=88 pick=-1 anim=-1 res=0 blink=0/0
+gboy 717 cur=89 pick=-1 anim=-1 res=0 blink=0/0
+gboy 718 cur=90 pick=-1 anim=-1 res=0 blink=0/0
+gboy 719 cur=91 pick=-1 anim=-1 res=0 blink=0/0
+gboy 720 cur=92 pick=-1 anim=-1 res=0 blink=0/0
+gboy 721 cur=93 pick=-1 anim=-1 res=0 blink=0/0
+gboy 722 cur=94 pick=-1 anim=-1 res=0 blink=0/0
+gboy 723 cur=95 pick=-1 anim=-1 res=0 blink=0/0
+gboy 724 cur=96 pick=-1 anim=-1 res=0 blink=0/0
+gboy 725 cur=97 pick=-1 anim=-1 res=0 blink=0/0
+gboy 726 cur=98 pick=-1 anim=-1 res=0 blink=0/0
+gboy 727 cur=99 pick=-1 anim=-1 res=0 blink=0/0
+gboy 728 cur=100 pick=-1 anim=-1 res=0 blink=0/0
+gboy 729 cur=101 pick=-1 anim=-1 res=0 blink=0/0
+gboy 730 cur=102 pick=-1 anim=-1 res=0 blink=0/0
+gboy 731 cur=103 pick=-1 anim=-1 res=0 blink=0/0
+gboy 732 cur=104 pick=-1 anim=-1 res=0 blink=0/0
+gboy 733 cur=105 pick=-1 anim=-1 res=0 blink=0/0
+gboy 734 cur=106 pick=-1 anim=-1 res=0 blink=0/0
+gboy 735 cur=107 pick=-1 anim=-1 res=0 blink=0/0
+gboy 736 cur=108 pick=-1 anim=-1 res=0 blink=0/0
+gboy 737 cur=109 pick=-1 anim=-1 res=0 blink=0/0
+gboy 738 cur=110 pick=-1 anim=-1 res=0 blink=0/0
+gboy 739 cur=111 pick=-1 anim=-1 res=0 blink=0/0
+gboy 740 cur=112 pick=-1 anim=-1 res=0 blink=0/0
+gboy 741 cur=113 pick=-1 anim=-1 res=0 blink=0/0
+gboy 742 cur=114 pick=-1 anim=-1 res=0 blink=0/0
+die 743 114
+gboy 743 cur=115 pick=0 anim=-1 res=0 blink=0/0
+gboy 744 cur=116 pick=0 anim=241 res=0 blink=0/0
+gboy 745 cur=117 pick=0 anim=242 res=0 blink=0/0
+gboy 746 cur=118 pick=0 anim=243 res=0 blink=0/0
+gboy 747 cur=119 pick=0 anim=244 res=0 blink=0/0
+gboy 748 cur=120 pick=0 anim=245 res=0 blink=0/0
+gboy 749 cur=121 pick=0 anim=246 res=0 blink=0/0
+gboy 750 cur=122 pick=0 anim=247 res=0 blink=0/0
+gboy 751 cur=123 pick=0 anim=248 res=0 blink=0/0
+gboy 752 cur=124 pick=0 anim=249 res=0 blink=0/0
+gboy 753 cur=125 pick=0 anim=250 res=0 blink=0/0
+gboy 754 cur=126 pick=0 anim=251 res=0 blink=0/0
+gboy 755 cur=127 pick=0 anim=252 res=0 blink=0/0
+gboy 756 cur=128 pick=0 anim=253 res=0 blink=0/0
+gboy 757 cur=129 pick=0 anim=254 res=0 blink=0/0
+gboy 758 cur=130 pick=0 anim=255 res=1 blink=0/0
+st 758 player=44 demon=96 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=12 vol=99 saved=50 vue=44
+gboy 759 cur=131 pick=0 anim=256 res=1 blink=0/0
+gboy 760 cur=132 pick=0 anim=257 res=1 blink=0/0
+gboy 761 cur=133 pick=0 anim=258 res=1 blink=0/0
+gboy 762 cur=134 pick=0 anim=259 res=1 blink=0/0
+gboy 763 cur=135 pick=0 anim=-1 res=1 blink=1/0
+gboy 764 cur=136 pick=0 anim=-1 res=1 blink=1/0
+gboy 765 cur=137 pick=0 anim=-1 res=1 blink=1/0
+gboy 766 cur=138 pick=0 anim=-1 res=1 blink=1/0
+gboy 767 cur=139 pick=0 anim=-1 res=1 blink=1/0
+gboy 768 cur=140 pick=0 anim=-1 res=1 blink=1/1
+gboy 769 cur=141 pick=0 anim=-1 res=1 blink=1/1
+gboy 773 cur=141 pick=0 anim=-1 res=1 blink=1/2
+gboy 778 cur=141 pick=0 anim=-1 res=1 blink=1/3
+gboy 783 cur=141 pick=0 anim=-1 res=1 blink=1/4
+gboy 788 cur=141 pick=0 anim=-1 res=1 blink=1/5
+gboy 793 cur=141 pick=0 anim=-1 res=1 blink=0/6
+gboystop 793
+scan 793
+cmd 793 (StopMusik=1)
+snd 793 stopmus 1
+cmd 793 (StartMusik=6)
+snd 793 stopmus 1
+st 793 player=44 demon=96 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=1 mode=3 vol=50 saved=50 vue=44
+log 794 ########################## Resultat GameBoy : 1
+log 794 ########################## CaseJoueur : 45
+slot 794 0 sh 1 mode 1 fr 0 list - ended 1
+st 794 player=44 demon=96 dto=-1 pat=-1 pto=45 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=44
+log 795 ---------------- JoueurChangeCase : 45
+cmd 795 (AngleWarpX=-156)
+cmd 795 (AngleWarpY=20)
+cmd 795 (Vue=45)
+view 795 45
+log 795 ------- Warp ba0045.hnm ------- chapter 0 --
+cmd 795 (LIMITEANGLEWARPY=70)
+slots 795 0:iaA1045045
+slotent 795 0:BAG_TORCHES
+slot 795 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 795 0 0
+st 795 player=45 demon=96 dto=-1 pat=45 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=45
+flags 795 800=45 1003=45
+log 796 ---------------- JoueurGotoCase : 45
+st 796 player=45 demon=96 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=45
+slot 797 0 sh 1 mode 1 fr 1 list - ended 0
+slot 798 0 sh 1 mode 1 fr 2 list - ended 0
+click 799 TAS_ZONE_CASESUIV
+log 799 Demon Tirage calculé pour gagner
+log 799 ########################## CaseDemon : 96
+scan 799
+slot 799 0 sh 1 mode 1 fr 3 list - ended 0
+st 799 player=45 demon=96 dto=99 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=1 frz=1 res=0 mode=3 vol=50 saved=50 vue=45
+log 800 ---------------- DemonGotoCase : 99
+log 800 Demon a Gagne !!!
+snd 800 stopall
+scan 800
+slot 800 0 sh 1 mode 1 fr 4 list - ended 0
+st 800 player=45 demon=99 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=45
+flags 800 801=99 914=0 981=1
+slot 801 0 sh 1 mode 1 fr 5 list - ended 0
+slot 802 0 sh 1 mode 1 fr 6 list - ended 0
+setup cmd (AngleWarpX=-156) (Vue=39)
+cmd 803 (AngleWarpX=-156)
+cmd 803 (Vue=39)
+view 803 39
+log 803 ------- Warp ba0039.hnm ------- chapter 0 --
+cmd 803 (LIMITEANGLEWARPY=70)
+slots 803 0:iaA1039039 1:pda1000000 2:pda2000000
+slotent 803 0:BAG_TORCHES 1:TAS_DEMONPLUS1 2:TAS_DEMONPLUS1
+slot 803 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 803 0 0
+slot 803 1 sh 1 mode 1 fr 0 list - ended 0
+slotck 803 1 0
+slot 803 2 sh 0 mode 1 fr 0 list - ended 0
+slotck 803 2 0
+st 803 player=39 demon=40 dto=-1 pat=-1 pto=-1 won=0 won2=0 cin=0 turn=0 frz=0 res=0 mode=3 vol=50 saved=50 vue=39
+flags 803 800=39 801=40 914=1 1003=39
+slot 804 0 sh 1 mode 1 fr 1 list - ended 0
+slot 804 1 sh 1 mode 1 fr 1 list - ended 0
+slot 805 0 sh 1 mode 1 fr 2 list - ended 0
+slot 805 1 sh 1 mode 1 fr 2 list - ended 0
+end demon_win frames=805

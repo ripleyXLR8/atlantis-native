@@ -175,6 +175,8 @@ dependencies = [
  "atlantis-engine",
  "atlantis2-data",
  "atlantis2-engine",
+ "atlantis3-data",
+ "atlantis3-engine",
  "console_error_panic_hook",
  "console_log",
  "cpal",
@@ -262,6 +264,32 @@ dependencies = [
  "log",
  "md-5",
  "skrifa",
+]
+
+[[package]]
+name = "atlantis3-data"
+version = "0.5.9"
+dependencies = [
+ "atlantis-codecs",
+ "atlantis-data",
+ "atlantis2-data",
+ "log",
+ "md-5",
+]
+
+[[package]]
+name = "atlantis3-engine"
+version = "0.5.9"
+dependencies = [
+ "ab_glyph",
+ "atlantis-codecs",
+ "atlantis-data",
+ "atlantis2-data",
+ "atlantis2-engine",
+ "atlantis3-data",
+ "libm",
+ "log",
+ "md-5",
 ]
 
 [[package]]

@@ -296,6 +296,15 @@ pub async fn start(
             .unwrap_or_else(|| f.name());
         all.insert(key(&rel), f);
     }
+    // Atlantis III: in a private test build only.
+    #[cfg(feature = "atlantis3")]
+    {
+        let paths: Vec<&str> = all.keys().map(String::as_str).collect();
+        if let Some(install) = crate::web_layout::a3_install(&paths) {
+            start_atlantis3(all, &install)?;
+            return Ok("atlantis3".into());
+        }
+    }
     // Which game: Atlantis II, the first game, or the player's choice.
     let paths: Vec<&str> = all.keys().map(String::as_str).collect();
     let a2 = match crate::web_layout::picked(&paths) {
@@ -746,6 +755,36 @@ impl FileSource for PickedDir {
     }
 }
 
+/// The picked files kept in [`PICKED`]: lower-case path -> (index, size).
+fn keep_picked(all: HashMap<String, File>) -> HashMap<String, (usize, u64)> {
+    let mut index: HashMap<String, (usize, u64)> = HashMap::new();
+    PICKED.with(|p| {
+        let mut p = p.borrow_mut();
+        p.clear();
+        for (k, f) in all {
+            index.insert(k, (p.len(), f.size() as u64));
+            p.push(f);
+        }
+    });
+    index
+}
+
+/// Atlantis III from its installed folder among the picked files (the
+/// private test build's only, [`crate::a3_web`]), the saves in the
+/// browser's storage.
+#[cfg(feature = "atlantis3")]
+fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
+    let index = keep_picked(all);
+    let store: Rc<dyn SaveStore> = match WebStore::new("atlantis3") {
+        Some(s) => Rc::new(s),
+        None => {
+            log::warn!("no localStorage: the saves last as long as the page");
+            Rc::new(atlantis_engine::MemStore::new())
+        }
+    };
+    crate::a3_web::start(Arc::new(PickedDir::new(&index, install)), store)
+}
+
 /// Atlantis II from the picked files: its installed folder and discs
 /// ([`crate::web_layout::A2Layout`]), the saves in the browser's storage,
 /// the player menu under the start-up intro, as the desktop starts it.
@@ -756,15 +795,7 @@ fn start_atlantis2(
     use atlantis2_data::files::{find_exe, OpenError};
     let help =
         |text: &str| -> JsValue { format!("{text}\n\nHelp: {}", crate::guide::HELP_URL_A2).into() };
-    let mut index: HashMap<String, (usize, u64)> = HashMap::new();
-    PICKED.with(|p| {
-        let mut p = p.borrow_mut();
-        p.clear();
-        for (k, f) in all {
-            index.insert(k, (p.len(), f.size() as u64));
-            p.push(f);
-        }
-    });
+    let index = keep_picked(all);
     let install = PickedDir::new(&index, &layout.install);
     let (exe_name, build, _) = find_exe(&install).map_err(|e| match e {
         OpenError::Exe { name, error } => help(&format!(

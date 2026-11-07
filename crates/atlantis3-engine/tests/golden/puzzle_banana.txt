@@ -1,0 +1,775 @@
+# The garden's C parts (jardin.wam: the banana bunch, the monkey, the soldiers) of the original Game.exe (GOG.com,
+# md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation: view entries, the place-animation step, the sprite click
+# dispatch, the frame hook and the click scan run unmodified; sound layer and voices as puzzle_guard.txt; frame n
+# at 100 + n x 1.0025 / 15 s. Three runs, each from a new game's state. Line format: tests/common/board.rs.
+run banana
+setup wam jardin.wam view 19 yaw 0 pitch 0
+cmd 0 (LIMITEANGLEWARPY=70)
+voice 0 199 1 200 255 255
+snd 0 load loc\voix\fra\bagdad\SHEH0481.apc 0 2
+snd 0 play loc\voix\fra\bagdad\SHEH0481.apc
+anim 0 BAG_SINGE 1 1 1
+hide 0 BAG_SINGE kind 1 arg 0
+show 0 BAG_SINGE kind 1 arg 1
+st 0 banana_done=0 banana_playing=0 banana_reload=0 monkey_reload=0 monkey_at=20
+flags 0 125=0 128=0 134=0 139=0 802=0 803=0 804=0 827=0 828=0 829=1 911=1 912=1
+vars 0 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=19 BAG_PUZZLESINGEOK=0
+slot 5 0 BAG_REGIMEBANANE bnA2019019 sh 1 mode 1 fr 0 last 1 ended 0 next -1
+slot 6 0 BAG_REGIMEBANANE bnA1019019 sh 0 mode 1 fr 0 last 32 ended 0 next -1
+slot 7 0 BAG_BANANE bnA3019019 sh 0 mode 1 fr 0 last 1 ended 0 next -1
+log 0 ''
+log 0 '------- Warp %s ------- chapter %d --'
+log 0 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 0 'interp: SET%s'
+slots 0:bgA1019100:BAG_3BATONS 1:siA1019020:BAG_SINGE 2:siA3019100:BAG_SINGE 3:ibA1019019:BAG_REFLETS01 4:iaA1019019:BAG_FLAMMES01 5:bnA2019019:BAG_REGIMEBANANE 6:bnA1019019:BAG_REGIMEBANANE 7:bnA3019019:BAG_BANANE 8:h1A1019003:BAG_HOURISROUGE_DEHORS 9:jtA2019003:BAG_SOLDAT_TERRE
+sprite 4 BAG_REGIMEBANANE 0
+scan 4
+script 7 (sacados=BAG_PERCHE)
+script 7 (objetenmain=BAG_PERCHE)
+vars 8 OBJETENMAIN=144 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=19 BAG_PUZZLESINGEOK=0
+log 8 'interp: SET%s'
+log 8 'interp: SET%s'
+sprite 10 BAG_REGIMEBANANE 0
+anim 10 BAG_REGIMEBANANE 1 2 1
+hide 10 BAG_REGIMEBANANE kind 2 arg 0
+show 10 BAG_REGIMEBANANE kind 2 arg 1
+anim 10 BAG_REGIMEBANANE 2 2 2
+scan 10
+st 10 banana_done=0 banana_playing=1 banana_reload=0 monkey_reload=0 monkey_at=20
+flags 10 125=0 128=0 134=0 139=0 802=1 803=1 804=0 827=0 828=0 829=1 911=1 912=1
+slot 5 10 BAG_REGIMEBANANE bnA2019019 sh 0 mode 1 fr 0 last 1 ended 0 next -1
+slot 6 10 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 0 last 32 ended 0 next 5
+slot 6 11 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 1 last 32 ended 0 next 5
+slot 6 12 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 2 last 32 ended 0 next 5
+slot 6 13 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 3 last 32 ended 0 next 5
+slot 6 14 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 4 last 32 ended 0 next 5
+slot 6 15 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 5 last 32 ended 0 next 5
+slot 6 16 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 6 last 32 ended 0 next 5
+slot 6 17 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 7 last 32 ended 0 next 5
+slot 6 18 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 8 last 32 ended 0 next 5
+slot 6 19 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 9 last 32 ended 0 next 5
+slot 6 20 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 10 last 32 ended 0 next 5
+slot 6 21 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 11 last 32 ended 0 next 5
+slot 6 22 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 12 last 32 ended 0 next 5
+slot 6 23 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 13 last 32 ended 0 next 5
+slot 6 24 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 14 last 32 ended 0 next 5
+slot 6 25 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 15 last 32 ended 0 next 5
+slot 6 26 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 16 last 32 ended 0 next 5
+slot 6 27 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 17 last 32 ended 0 next 5
+slot 6 28 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 18 last 32 ended 0 next 5
+slot 6 29 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 19 last 32 ended 0 next 5
+slot 6 30 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 20 last 32 ended 0 next 5
+slot 6 31 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 21 last 32 ended 0 next 5
+slot 6 32 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 22 last 32 ended 0 next 5
+slot 6 33 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 23 last 32 ended 0 next 5
+slot 6 34 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 24 last 32 ended 0 next 5
+slot 6 35 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 25 last 32 ended 0 next 5
+slot 6 36 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 26 last 32 ended 0 next 5
+slot 6 37 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 27 last 32 ended 0 next 5
+slot 6 38 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 28 last 32 ended 0 next 5
+slot 6 39 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 29 last 32 ended 0 next 5
+slot 6 40 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 30 last 32 ended 0 next 5
+slot 6 41 BAG_REGIMEBANANE bnA1019019 sh 1 mode 1 fr 31 last 32 ended 0 next 5
+cmd 42 (showobjet=BAG_BANANE)
+show 42 BAG_BANANE kind 2 arg 0
+st 42 banana_done=1 banana_playing=0 banana_reload=0 monkey_reload=0 monkey_at=20
+slot 5 42 BAG_REGIMEBANANE bnA2019019 sh 1 mode 1 fr 0 last 1 ended 0 next -1
+slot 6 42 BAG_REGIMEBANANE bnA1019019 sh 0 mode 1 fr -1 last 32 ended 1 next 5
+slot 7 42 BAG_BANANE bnA3019019 sh 1 mode 1 fr 0 last 1 ended 0 next -1
+log 42 'interp: SET%s'
+sprite 48 BAG_REGIMEBANANE 0
+scan 48
+move 50 20
+cmd 50 (LIMITEANGLEWARPY=70)
+anim 50 BAG_SINGE 2 1 1
+hide 50 BAG_SINGE kind 1 arg 0
+show 50 BAG_SINGE kind 1 arg 2
+anim 50 BAG_SINGE 3 1 2
+st 50 banana_done=1 banana_playing=0 banana_reload=0 monkey_reload=0 monkey_at=100
+vars 50 OBJETENMAIN=144 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=20 BAG_PUZZLESINGEOK=0
+log 50 ''
+log 50 '------- Warp %s ------- chapter %d --'
+log 50 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 50 'interp: SET%s'
+move 52 19
+cmd 52 (LIMITEANGLEWARPY=70)
+anim 52 BAG_SINGE 3 1 1
+hide 52 BAG_SINGE kind 1 arg 0
+show 52 BAG_SINGE kind 1 arg 3
+vars 52 OBJETENMAIN=144 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=19 BAG_PUZZLESINGEOK=0
+slot 6 52 BAG_REGIMEBANANE bnA1019019 sh 0 mode 1 fr 0 last 32 ended 0 next -1
+log 52 ''
+log 52 '------- Warp %s ------- chapter %d --'
+log 52 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 52 'interp: SET%s'
+run monkey
+setup wam jardin.wam view 21 yaw 0 pitch 0
+cmd 0 (LIMITEANGLEWARPY=70)
+voice 0 199 1 200 255 255
+snd 0 load loc\voix\fra\bagdad\SHEH0481.apc 0 2
+snd 0 play loc\voix\fra\bagdad\SHEH0481.apc
+anim 0 BAG_SINGE 1 1 1
+hide 0 BAG_SINGE kind 1 arg 0
+show 0 BAG_SINGE kind 1 arg 1
+st 0 banana_done=0 banana_playing=0 banana_reload=1 monkey_reload=0 monkey_at=20
+flags 0 125=0 128=0 134=0 139=0 802=0 803=0 804=0 827=0 828=0 829=1 911=0 912=1
+vars 0 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=21 BAG_PUZZLESINGEOK=0
+slot 2 0 BAG_SINGE siA1021020 sh 1 mode 1 fr 0 last 29 ended 0 next -1
+slot 3 0 BAG_SINGE siA3021100 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+log 0 ''
+log 0 '------- Warp %s ------- chapter %d --'
+log 0 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 0 'interp: SET%s'
+slots 0:reA1021019:BAG_REGIMEBANANES 1:bgA1021100:BAG_3BATONS 2:siA1021020:BAG_SINGE 3:siA3021100:BAG_SINGE 4:ibA1021021:BAG_REFLETS01 5:iaA1021021:BAG_FLAMMES01
+slot 2 1 BAG_SINGE siA1021020 sh 1 mode 1 fr 1 last 29 ended 0 next -1
+slot 2 2 BAG_SINGE siA1021020 sh 1 mode 1 fr 2 last 29 ended 0 next -1
+move 2 20
+cmd 2 (LIMITEANGLEWARPY=70)
+anim 2 BAG_SINGE 2 1 1
+hide 2 BAG_SINGE kind 1 arg 0
+show 2 BAG_SINGE kind 1 arg 2
+anim 2 BAG_SINGE 3 1 2
+st 2 banana_done=0 banana_playing=0 banana_reload=1 monkey_reload=0 monkey_at=100
+vars 2 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=20 BAG_PUZZLESINGEOK=0
+slot 2 2 BAG_SINGE siA2020020 sh 1 mode 1 fr 0 last 151 ended 0 next 3
+slot 3 2 BAG_SINGE siA3020020 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+log 2 ''
+log 2 '------- Warp %s ------- chapter %d --'
+log 2 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 2 'interp: SET%s'
+slots 0:reA1020019:BAG_REGIMEBANANES 1:bgA1020100:BAG_3BATONS 2:siA2020020:BAG_SINGE 3:siA3020020:BAG_SINGE 4:ibA1020020:BAG_REFLETS01 5:iaA1020020:BAG_FLAMMES01
+slot 2 3 BAG_SINGE siA2020020 sh 1 mode 1 fr 1 last 151 ended 0 next 3
+slot 2 4 BAG_SINGE siA2020020 sh 1 mode 1 fr 2 last 151 ended 0 next 3
+slot 2 5 BAG_SINGE siA2020020 sh 1 mode 1 fr 3 last 151 ended 0 next 3
+slot 2 6 BAG_SINGE siA2020020 sh 1 mode 1 fr 4 last 151 ended 0 next 3
+slot 2 7 BAG_SINGE siA2020020 sh 1 mode 1 fr 5 last 151 ended 0 next 3
+slot 2 8 BAG_SINGE siA2020020 sh 1 mode 1 fr 6 last 151 ended 0 next 3
+slot 2 9 BAG_SINGE siA2020020 sh 1 mode 1 fr 7 last 151 ended 0 next 3
+slot 2 10 BAG_SINGE siA2020020 sh 1 mode 1 fr 8 last 151 ended 0 next 3
+slot 2 11 BAG_SINGE siA2020020 sh 1 mode 1 fr 9 last 151 ended 0 next 3
+slot 2 12 BAG_SINGE siA2020020 sh 1 mode 1 fr 10 last 151 ended 0 next 3
+slot 2 13 BAG_SINGE siA2020020 sh 1 mode 1 fr 11 last 151 ended 0 next 3
+slot 2 14 BAG_SINGE siA2020020 sh 1 mode 1 fr 12 last 151 ended 0 next 3
+slot 2 15 BAG_SINGE siA2020020 sh 1 mode 1 fr 13 last 151 ended 0 next 3
+slot 2 16 BAG_SINGE siA2020020 sh 1 mode 1 fr 14 last 151 ended 0 next 3
+slot 2 17 BAG_SINGE siA2020020 sh 1 mode 1 fr 15 last 151 ended 0 next 3
+slot 2 18 BAG_SINGE siA2020020 sh 1 mode 1 fr 16 last 151 ended 0 next 3
+slot 2 19 BAG_SINGE siA2020020 sh 1 mode 1 fr 17 last 151 ended 0 next 3
+slot 2 20 BAG_SINGE siA2020020 sh 1 mode 1 fr 18 last 151 ended 0 next 3
+slot 2 21 BAG_SINGE siA2020020 sh 1 mode 1 fr 19 last 151 ended 0 next 3
+slot 2 22 BAG_SINGE siA2020020 sh 1 mode 1 fr 20 last 151 ended 0 next 3
+slot 2 23 BAG_SINGE siA2020020 sh 1 mode 1 fr 21 last 151 ended 0 next 3
+slot 2 24 BAG_SINGE siA2020020 sh 1 mode 1 fr 22 last 151 ended 0 next 3
+slot 2 25 BAG_SINGE siA2020020 sh 1 mode 1 fr 23 last 151 ended 0 next 3
+slot 2 26 BAG_SINGE siA2020020 sh 1 mode 1 fr 24 last 151 ended 0 next 3
+slot 2 27 BAG_SINGE siA2020020 sh 1 mode 1 fr 25 last 151 ended 0 next 3
+slot 2 28 BAG_SINGE siA2020020 sh 1 mode 1 fr 26 last 151 ended 0 next 3
+slot 2 29 BAG_SINGE siA2020020 sh 1 mode 1 fr 27 last 151 ended 0 next 3
+slot 2 30 BAG_SINGE siA2020020 sh 1 mode 1 fr 28 last 151 ended 0 next 3
+slot 2 31 BAG_SINGE siA2020020 sh 1 mode 1 fr 29 last 151 ended 0 next 3
+slot 2 32 BAG_SINGE siA2020020 sh 1 mode 1 fr 30 last 151 ended 0 next 3
+move 32 100
+cmd 32 (LIMITEANGLEWARPY=70)
+anim 32 BAG_SINGE 4 1 1
+hide 32 BAG_SINGE kind 1 arg 0
+show 32 BAG_SINGE kind 1 arg 4
+anim 32 BAG_SINGE 1 1 2
+st 32 banana_done=0 banana_playing=0 banana_reload=1 monkey_reload=0 monkey_at=20
+vars 32 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=100 BAG_PUZZLESINGEOK=0
+slot 2 32 BAG_SINGE siA1100100 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+slot 3 32 BAG_SINGE siA4100100 sh 1 mode 1 fr 0 last 151 ended 0 next 2
+log 32 ''
+log 32 '------- Warp %s ------- chapter %d --'
+log 32 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 32 'interp: SET%s'
+slots 0:reA1100019:BAG_REGIMEBANANES 1:bgA1100100:BAG_3BATONS 2:siA1100100:BAG_SINGE 3:siA4100100:BAG_SINGE 4:ibA1100100:BAG_REFLETS01 5:iaA1100100:BAG_FLAMMES01
+slot 3 33 BAG_SINGE siA4100100 sh 1 mode 1 fr 1 last 151 ended 0 next 2
+slot 3 34 BAG_SINGE siA4100100 sh 1 mode 1 fr 2 last 151 ended 0 next 2
+slot 3 35 BAG_SINGE siA4100100 sh 1 mode 1 fr 3 last 151 ended 0 next 2
+slot 3 36 BAG_SINGE siA4100100 sh 1 mode 1 fr 4 last 151 ended 0 next 2
+slot 3 37 BAG_SINGE siA4100100 sh 1 mode 1 fr 5 last 151 ended 0 next 2
+slot 3 38 BAG_SINGE siA4100100 sh 1 mode 1 fr 6 last 151 ended 0 next 2
+slot 3 39 BAG_SINGE siA4100100 sh 1 mode 1 fr 7 last 151 ended 0 next 2
+slot 3 40 BAG_SINGE siA4100100 sh 1 mode 1 fr 8 last 151 ended 0 next 2
+slot 3 41 BAG_SINGE siA4100100 sh 1 mode 1 fr 9 last 151 ended 0 next 2
+slot 3 42 BAG_SINGE siA4100100 sh 1 mode 1 fr 10 last 151 ended 0 next 2
+slot 3 43 BAG_SINGE siA4100100 sh 1 mode 1 fr 11 last 151 ended 0 next 2
+slot 3 44 BAG_SINGE siA4100100 sh 1 mode 1 fr 12 last 151 ended 0 next 2
+slot 3 45 BAG_SINGE siA4100100 sh 1 mode 1 fr 13 last 151 ended 0 next 2
+slot 3 46 BAG_SINGE siA4100100 sh 1 mode 1 fr 14 last 151 ended 0 next 2
+slot 3 47 BAG_SINGE siA4100100 sh 1 mode 1 fr 15 last 151 ended 0 next 2
+slot 3 48 BAG_SINGE siA4100100 sh 1 mode 1 fr 16 last 151 ended 0 next 2
+slot 3 49 BAG_SINGE siA4100100 sh 1 mode 1 fr 17 last 151 ended 0 next 2
+slot 3 50 BAG_SINGE siA4100100 sh 1 mode 1 fr 18 last 151 ended 0 next 2
+slot 3 51 BAG_SINGE siA4100100 sh 1 mode 1 fr 19 last 151 ended 0 next 2
+slot 3 52 BAG_SINGE siA4100100 sh 1 mode 1 fr 20 last 151 ended 0 next 2
+slot 3 53 BAG_SINGE siA4100100 sh 1 mode 1 fr 21 last 151 ended 0 next 2
+slot 3 54 BAG_SINGE siA4100100 sh 1 mode 1 fr 22 last 151 ended 0 next 2
+slot 3 55 BAG_SINGE siA4100100 sh 1 mode 1 fr 23 last 151 ended 0 next 2
+slot 3 56 BAG_SINGE siA4100100 sh 1 mode 1 fr 24 last 151 ended 0 next 2
+slot 3 57 BAG_SINGE siA4100100 sh 1 mode 1 fr 25 last 151 ended 0 next 2
+slot 3 58 BAG_SINGE siA4100100 sh 1 mode 1 fr 26 last 151 ended 0 next 2
+slot 3 59 BAG_SINGE siA4100100 sh 1 mode 1 fr 27 last 151 ended 0 next 2
+slot 3 60 BAG_SINGE siA4100100 sh 1 mode 1 fr 28 last 151 ended 0 next 2
+slot 3 61 BAG_SINGE siA4100100 sh 1 mode 1 fr 29 last 151 ended 0 next 2
+slot 3 62 BAG_SINGE siA4100100 sh 1 mode 1 fr 30 last 151 ended 0 next 2
+move 62 20
+cmd 62 (LIMITEANGLEWARPY=70)
+anim 62 BAG_SINGE 2 1 1
+hide 62 BAG_SINGE kind 1 arg 0
+show 62 BAG_SINGE kind 1 arg 2
+anim 62 BAG_SINGE 3 1 2
+st 62 banana_done=0 banana_playing=0 banana_reload=1 monkey_reload=0 monkey_at=100
+vars 62 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=20 BAG_PUZZLESINGEOK=0
+slot 2 62 BAG_SINGE siA2020020 sh 1 mode 1 fr 0 last 151 ended 0 next 3
+slot 3 62 BAG_SINGE siA3020020 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+log 62 ''
+log 62 '------- Warp %s ------- chapter %d --'
+log 62 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 62 'interp: SET%s'
+slots 0:reA1020019:BAG_REGIMEBANANES 1:bgA1020100:BAG_3BATONS 2:siA2020020:BAG_SINGE 3:siA3020020:BAG_SINGE 4:ibA1020020:BAG_REFLETS01 5:iaA1020020:BAG_FLAMMES01
+slot 2 63 BAG_SINGE siA2020020 sh 1 mode 1 fr 1 last 151 ended 0 next 3
+slot 2 64 BAG_SINGE siA2020020 sh 1 mode 1 fr 2 last 151 ended 0 next 3
+slot 2 65 BAG_SINGE siA2020020 sh 1 mode 1 fr 3 last 151 ended 0 next 3
+slot 2 66 BAG_SINGE siA2020020 sh 1 mode 1 fr 4 last 151 ended 0 next 3
+slot 2 67 BAG_SINGE siA2020020 sh 1 mode 1 fr 5 last 151 ended 0 next 3
+slot 2 68 BAG_SINGE siA2020020 sh 1 mode 1 fr 6 last 151 ended 0 next 3
+slot 2 69 BAG_SINGE siA2020020 sh 1 mode 1 fr 7 last 151 ended 0 next 3
+slot 2 70 BAG_SINGE siA2020020 sh 1 mode 1 fr 8 last 151 ended 0 next 3
+slot 2 71 BAG_SINGE siA2020020 sh 1 mode 1 fr 9 last 151 ended 0 next 3
+slot 2 72 BAG_SINGE siA2020020 sh 1 mode 1 fr 10 last 151 ended 0 next 3
+slot 2 73 BAG_SINGE siA2020020 sh 1 mode 1 fr 11 last 151 ended 0 next 3
+slot 2 74 BAG_SINGE siA2020020 sh 1 mode 1 fr 12 last 151 ended 0 next 3
+slot 2 75 BAG_SINGE siA2020020 sh 1 mode 1 fr 13 last 151 ended 0 next 3
+slot 2 76 BAG_SINGE siA2020020 sh 1 mode 1 fr 14 last 151 ended 0 next 3
+slot 2 77 BAG_SINGE siA2020020 sh 1 mode 1 fr 15 last 151 ended 0 next 3
+slot 2 78 BAG_SINGE siA2020020 sh 1 mode 1 fr 16 last 151 ended 0 next 3
+slot 2 79 BAG_SINGE siA2020020 sh 1 mode 1 fr 17 last 151 ended 0 next 3
+slot 2 80 BAG_SINGE siA2020020 sh 1 mode 1 fr 18 last 151 ended 0 next 3
+slot 2 81 BAG_SINGE siA2020020 sh 1 mode 1 fr 19 last 151 ended 0 next 3
+slot 2 82 BAG_SINGE siA2020020 sh 1 mode 1 fr 20 last 151 ended 0 next 3
+slot 2 83 BAG_SINGE siA2020020 sh 1 mode 1 fr 21 last 151 ended 0 next 3
+slot 2 84 BAG_SINGE siA2020020 sh 1 mode 1 fr 22 last 151 ended 0 next 3
+slot 2 85 BAG_SINGE siA2020020 sh 1 mode 1 fr 23 last 151 ended 0 next 3
+slot 2 86 BAG_SINGE siA2020020 sh 1 mode 1 fr 24 last 151 ended 0 next 3
+slot 2 87 BAG_SINGE siA2020020 sh 1 mode 1 fr 25 last 151 ended 0 next 3
+slot 2 88 BAG_SINGE siA2020020 sh 1 mode 1 fr 26 last 151 ended 0 next 3
+slot 2 89 BAG_SINGE siA2020020 sh 1 mode 1 fr 27 last 151 ended 0 next 3
+slot 2 90 BAG_SINGE siA2020020 sh 1 mode 1 fr 28 last 151 ended 0 next 3
+slot 2 91 BAG_SINGE siA2020020 sh 1 mode 1 fr 29 last 151 ended 0 next 3
+slot 2 92 BAG_SINGE siA2020020 sh 1 mode 1 fr 30 last 151 ended 0 next 3
+move 92 100
+cmd 92 (LIMITEANGLEWARPY=70)
+anim 92 BAG_SINGE 4 1 1
+hide 92 BAG_SINGE kind 1 arg 0
+show 92 BAG_SINGE kind 1 arg 4
+anim 92 BAG_SINGE 1 1 2
+st 92 banana_done=0 banana_playing=0 banana_reload=1 monkey_reload=0 monkey_at=20
+vars 92 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=100 BAG_PUZZLESINGEOK=0
+slot 2 92 BAG_SINGE siA1100100 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+slot 3 92 BAG_SINGE siA4100100 sh 1 mode 1 fr 0 last 151 ended 0 next 2
+log 92 ''
+log 92 '------- Warp %s ------- chapter %d --'
+log 92 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 92 'interp: SET%s'
+slots 0:reA1100019:BAG_REGIMEBANANES 1:bgA1100100:BAG_3BATONS 2:siA1100100:BAG_SINGE 3:siA4100100:BAG_SINGE 4:ibA1100100:BAG_REFLETS01 5:iaA1100100:BAG_FLAMMES01
+slot 3 93 BAG_SINGE siA4100100 sh 1 mode 1 fr 1 last 151 ended 0 next 2
+slot 3 94 BAG_SINGE siA4100100 sh 1 mode 1 fr 2 last 151 ended 0 next 2
+slot 3 95 BAG_SINGE siA4100100 sh 1 mode 1 fr 3 last 151 ended 0 next 2
+slot 3 96 BAG_SINGE siA4100100 sh 1 mode 1 fr 4 last 151 ended 0 next 2
+slot 3 97 BAG_SINGE siA4100100 sh 1 mode 1 fr 5 last 151 ended 0 next 2
+slot 3 98 BAG_SINGE siA4100100 sh 1 mode 1 fr 6 last 151 ended 0 next 2
+slot 3 99 BAG_SINGE siA4100100 sh 1 mode 1 fr 7 last 151 ended 0 next 2
+slot 3 100 BAG_SINGE siA4100100 sh 1 mode 1 fr 8 last 151 ended 0 next 2
+slot 3 101 BAG_SINGE siA4100100 sh 1 mode 1 fr 9 last 151 ended 0 next 2
+slot 3 102 BAG_SINGE siA4100100 sh 1 mode 1 fr 10 last 151 ended 0 next 2
+slot 3 103 BAG_SINGE siA4100100 sh 1 mode 1 fr 11 last 151 ended 0 next 2
+slot 3 104 BAG_SINGE siA4100100 sh 1 mode 1 fr 12 last 151 ended 0 next 2
+slot 3 105 BAG_SINGE siA4100100 sh 1 mode 1 fr 13 last 151 ended 0 next 2
+slot 3 106 BAG_SINGE siA4100100 sh 1 mode 1 fr 14 last 151 ended 0 next 2
+slot 3 107 BAG_SINGE siA4100100 sh 1 mode 1 fr 15 last 151 ended 0 next 2
+slot 3 108 BAG_SINGE siA4100100 sh 1 mode 1 fr 16 last 151 ended 0 next 2
+slot 3 109 BAG_SINGE siA4100100 sh 1 mode 1 fr 17 last 151 ended 0 next 2
+slot 3 110 BAG_SINGE siA4100100 sh 1 mode 1 fr 18 last 151 ended 0 next 2
+slot 3 111 BAG_SINGE siA4100100 sh 1 mode 1 fr 19 last 151 ended 0 next 2
+slot 3 112 BAG_SINGE siA4100100 sh 1 mode 1 fr 20 last 151 ended 0 next 2
+slot 3 113 BAG_SINGE siA4100100 sh 1 mode 1 fr 21 last 151 ended 0 next 2
+slot 3 114 BAG_SINGE siA4100100 sh 1 mode 1 fr 22 last 151 ended 0 next 2
+slot 3 115 BAG_SINGE siA4100100 sh 1 mode 1 fr 23 last 151 ended 0 next 2
+slot 3 116 BAG_SINGE siA4100100 sh 1 mode 1 fr 24 last 151 ended 0 next 2
+slot 3 117 BAG_SINGE siA4100100 sh 1 mode 1 fr 25 last 151 ended 0 next 2
+slot 3 118 BAG_SINGE siA4100100 sh 1 mode 1 fr 26 last 151 ended 0 next 2
+slot 3 119 BAG_SINGE siA4100100 sh 1 mode 1 fr 27 last 151 ended 0 next 2
+slot 3 120 BAG_SINGE siA4100100 sh 1 mode 1 fr 28 last 151 ended 0 next 2
+slot 3 121 BAG_SINGE siA4100100 sh 1 mode 1 fr 29 last 151 ended 0 next 2
+slot 3 122 BAG_SINGE siA4100100 sh 1 mode 1 fr 30 last 151 ended 0 next 2
+move 122 21
+cmd 122 (LIMITEANGLEWARPY=70)
+anim 122 BAG_SINGE 1 1 1
+hide 122 BAG_SINGE kind 1 arg 0
+show 122 BAG_SINGE kind 1 arg 1
+vars 122 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=21 BAG_PUZZLESINGEOK=0
+slot 2 122 BAG_SINGE siA1021020 sh 1 mode 1 fr 0 last 29 ended 0 next -1
+slot 3 122 BAG_SINGE siA3021100 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+log 122 ''
+log 122 '------- Warp %s ------- chapter %d --'
+log 122 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 122 'interp: SET%s'
+slots 0:reA1021019:BAG_REGIMEBANANES 1:bgA1021100:BAG_3BATONS 2:siA1021020:BAG_SINGE 3:siA3021100:BAG_SINGE 4:ibA1021021:BAG_REFLETS01 5:iaA1021021:BAG_FLAMMES01
+slot 2 123 BAG_SINGE siA1021020 sh 1 mode 1 fr 1 last 29 ended 0 next -1
+slot 2 124 BAG_SINGE siA1021020 sh 1 mode 1 fr 2 last 29 ended 0 next -1
+slot 2 125 BAG_SINGE siA1021020 sh 1 mode 1 fr 3 last 29 ended 0 next -1
+slot 2 126 BAG_SINGE siA1021020 sh 1 mode 1 fr 4 last 29 ended 0 next -1
+slot 2 127 BAG_SINGE siA1021020 sh 1 mode 1 fr 5 last 29 ended 0 next -1
+slot 2 128 BAG_SINGE siA1021020 sh 1 mode 1 fr 6 last 29 ended 0 next -1
+slot 2 129 BAG_SINGE siA1021020 sh 1 mode 1 fr 7 last 29 ended 0 next -1
+slot 2 130 BAG_SINGE siA1021020 sh 1 mode 1 fr 8 last 29 ended 0 next -1
+slot 2 131 BAG_SINGE siA1021020 sh 1 mode 1 fr 9 last 29 ended 0 next -1
+slot 2 132 BAG_SINGE siA1021020 sh 1 mode 1 fr 10 last 29 ended 0 next -1
+slot 2 133 BAG_SINGE siA1021020 sh 1 mode 1 fr 11 last 29 ended 0 next -1
+slot 2 134 BAG_SINGE siA1021020 sh 1 mode 1 fr 12 last 29 ended 0 next -1
+slot 2 135 BAG_SINGE siA1021020 sh 1 mode 1 fr 13 last 29 ended 0 next -1
+slot 2 136 BAG_SINGE siA1021020 sh 1 mode 1 fr 14 last 29 ended 0 next -1
+slot 2 137 BAG_SINGE siA1021020 sh 1 mode 1 fr 15 last 29 ended 0 next -1
+slot 2 138 BAG_SINGE siA1021020 sh 1 mode 1 fr 16 last 29 ended 0 next -1
+slot 2 139 BAG_SINGE siA1021020 sh 1 mode 1 fr 17 last 29 ended 0 next -1
+slot 2 140 BAG_SINGE siA1021020 sh 1 mode 1 fr 18 last 29 ended 0 next -1
+slot 2 141 BAG_SINGE siA1021020 sh 1 mode 1 fr 19 last 29 ended 0 next -1
+slot 2 142 BAG_SINGE siA1021020 sh 1 mode 1 fr 20 last 29 ended 0 next -1
+slot 2 143 BAG_SINGE siA1021020 sh 1 mode 1 fr 21 last 29 ended 0 next -1
+slot 2 144 BAG_SINGE siA1021020 sh 1 mode 1 fr 22 last 29 ended 0 next -1
+slot 2 145 BAG_SINGE siA1021020 sh 1 mode 1 fr 23 last 29 ended 0 next -1
+slot 2 146 BAG_SINGE siA1021020 sh 1 mode 1 fr 24 last 29 ended 0 next -1
+slot 2 147 BAG_SINGE siA1021020 sh 1 mode 1 fr 25 last 29 ended 0 next -1
+slot 2 148 BAG_SINGE siA1021020 sh 1 mode 1 fr 26 last 29 ended 0 next -1
+slot 2 149 BAG_SINGE siA1021020 sh 1 mode 1 fr 27 last 29 ended 0 next -1
+slot 2 150 BAG_SINGE siA1021020 sh 1 mode 1 fr 28 last 29 ended 0 next -1
+slot 2 151 BAG_SINGE siA1021020 sh 1 mode 1 fr 0 last 29 ended 1 next -1
+slot 2 152 BAG_SINGE siA1021020 sh 1 mode 1 fr 1 last 29 ended 1 next -1
+move 152 20
+cmd 152 (LIMITEANGLEWARPY=70)
+anim 152 BAG_SINGE 2 1 1
+hide 152 BAG_SINGE kind 1 arg 0
+show 152 BAG_SINGE kind 1 arg 2
+anim 152 BAG_SINGE 3 1 2
+st 152 banana_done=0 banana_playing=0 banana_reload=1 monkey_reload=0 monkey_at=100
+vars 152 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=20 BAG_PUZZLESINGEOK=0
+slot 2 152 BAG_SINGE siA2020020 sh 1 mode 1 fr 0 last 151 ended 0 next 3
+slot 3 152 BAG_SINGE siA3020020 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+log 152 ''
+log 152 '------- Warp %s ------- chapter %d --'
+log 152 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 152 'interp: SET%s'
+slots 0:reA1020019:BAG_REGIMEBANANES 1:bgA1020100:BAG_3BATONS 2:siA2020020:BAG_SINGE 3:siA3020020:BAG_SINGE 4:ibA1020020:BAG_REFLETS01 5:iaA1020020:BAG_FLAMMES01
+slot 2 153 BAG_SINGE siA2020020 sh 1 mode 1 fr 1 last 151 ended 0 next 3
+slot 2 154 BAG_SINGE siA2020020 sh 1 mode 1 fr 2 last 151 ended 0 next 3
+slot 2 155 BAG_SINGE siA2020020 sh 1 mode 1 fr 3 last 151 ended 0 next 3
+slot 2 156 BAG_SINGE siA2020020 sh 1 mode 1 fr 4 last 151 ended 0 next 3
+slot 2 157 BAG_SINGE siA2020020 sh 1 mode 1 fr 5 last 151 ended 0 next 3
+slot 2 158 BAG_SINGE siA2020020 sh 1 mode 1 fr 6 last 151 ended 0 next 3
+slot 2 159 BAG_SINGE siA2020020 sh 1 mode 1 fr 7 last 151 ended 0 next 3
+slot 2 160 BAG_SINGE siA2020020 sh 1 mode 1 fr 8 last 151 ended 0 next 3
+slot 2 161 BAG_SINGE siA2020020 sh 1 mode 1 fr 9 last 151 ended 0 next 3
+slot 2 162 BAG_SINGE siA2020020 sh 1 mode 1 fr 10 last 151 ended 0 next 3
+slot 2 163 BAG_SINGE siA2020020 sh 1 mode 1 fr 11 last 151 ended 0 next 3
+slot 2 164 BAG_SINGE siA2020020 sh 1 mode 1 fr 12 last 151 ended 0 next 3
+slot 2 165 BAG_SINGE siA2020020 sh 1 mode 1 fr 13 last 151 ended 0 next 3
+slot 2 166 BAG_SINGE siA2020020 sh 1 mode 1 fr 14 last 151 ended 0 next 3
+slot 2 167 BAG_SINGE siA2020020 sh 1 mode 1 fr 15 last 151 ended 0 next 3
+slot 2 168 BAG_SINGE siA2020020 sh 1 mode 1 fr 16 last 151 ended 0 next 3
+slot 2 169 BAG_SINGE siA2020020 sh 1 mode 1 fr 17 last 151 ended 0 next 3
+slot 2 170 BAG_SINGE siA2020020 sh 1 mode 1 fr 18 last 151 ended 0 next 3
+slot 2 171 BAG_SINGE siA2020020 sh 1 mode 1 fr 19 last 151 ended 0 next 3
+slot 2 172 BAG_SINGE siA2020020 sh 1 mode 1 fr 20 last 151 ended 0 next 3
+slot 2 173 BAG_SINGE siA2020020 sh 1 mode 1 fr 21 last 151 ended 0 next 3
+slot 2 174 BAG_SINGE siA2020020 sh 1 mode 1 fr 22 last 151 ended 0 next 3
+slot 2 175 BAG_SINGE siA2020020 sh 1 mode 1 fr 23 last 151 ended 0 next 3
+slot 2 176 BAG_SINGE siA2020020 sh 1 mode 1 fr 24 last 151 ended 0 next 3
+slot 2 177 BAG_SINGE siA2020020 sh 1 mode 1 fr 25 last 151 ended 0 next 3
+slot 2 178 BAG_SINGE siA2020020 sh 1 mode 1 fr 26 last 151 ended 0 next 3
+slot 2 179 BAG_SINGE siA2020020 sh 1 mode 1 fr 27 last 151 ended 0 next 3
+slot 2 180 BAG_SINGE siA2020020 sh 1 mode 1 fr 28 last 151 ended 0 next 3
+slot 2 181 BAG_SINGE siA2020020 sh 1 mode 1 fr 29 last 151 ended 0 next 3
+slot 2 182 BAG_SINGE siA2020020 sh 1 mode 1 fr 30 last 151 ended 0 next 3
+move 182 20
+cmd 182 (LIMITEANGLEWARPY=70)
+anim 182 BAG_SINGE 3 1 1
+hide 182 BAG_SINGE kind 1 arg 0
+show 182 BAG_SINGE kind 1 arg 3
+slot 2 182 BAG_SINGE siA2020020 sh 0 mode 1 fr 0 last 151 ended 0 next -1
+slot 3 182 BAG_SINGE siA3020020 sh 1 mode 1 fr 0 last 29 ended 0 next -1
+log 182 ''
+log 182 '------- Warp %s ------- chapter %d --'
+log 182 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 182 'interp: SET%s'
+slots 0:reA1020019:BAG_REGIMEBANANES 1:bgA1020100:BAG_3BATONS 2:siA2020020:BAG_SINGE 3:siA3020020:BAG_SINGE 4:ibA1020020:BAG_REFLETS01 5:iaA1020020:BAG_FLAMMES01
+slot 3 183 BAG_SINGE siA3020020 sh 1 mode 1 fr 1 last 29 ended 0 next -1
+slot 3 184 BAG_SINGE siA3020020 sh 1 mode 1 fr 2 last 29 ended 0 next -1
+slot 3 185 BAG_SINGE siA3020020 sh 1 mode 1 fr 3 last 29 ended 0 next -1
+slot 3 186 BAG_SINGE siA3020020 sh 1 mode 1 fr 4 last 29 ended 0 next -1
+slot 3 187 BAG_SINGE siA3020020 sh 1 mode 1 fr 5 last 29 ended 0 next -1
+slot 3 188 BAG_SINGE siA3020020 sh 1 mode 1 fr 6 last 29 ended 0 next -1
+slot 3 189 BAG_SINGE siA3020020 sh 1 mode 1 fr 7 last 29 ended 0 next -1
+slot 3 190 BAG_SINGE siA3020020 sh 1 mode 1 fr 8 last 29 ended 0 next -1
+slot 3 191 BAG_SINGE siA3020020 sh 1 mode 1 fr 9 last 29 ended 0 next -1
+slot 3 192 BAG_SINGE siA3020020 sh 1 mode 1 fr 10 last 29 ended 0 next -1
+slot 3 193 BAG_SINGE siA3020020 sh 1 mode 1 fr 11 last 29 ended 0 next -1
+slot 3 194 BAG_SINGE siA3020020 sh 1 mode 1 fr 12 last 29 ended 0 next -1
+slot 3 195 BAG_SINGE siA3020020 sh 1 mode 1 fr 13 last 29 ended 0 next -1
+slot 3 196 BAG_SINGE siA3020020 sh 1 mode 1 fr 14 last 29 ended 0 next -1
+slot 3 197 BAG_SINGE siA3020020 sh 1 mode 1 fr 15 last 29 ended 0 next -1
+slot 3 198 BAG_SINGE siA3020020 sh 1 mode 1 fr 16 last 29 ended 0 next -1
+slot 3 199 BAG_SINGE siA3020020 sh 1 mode 1 fr 17 last 29 ended 0 next -1
+slot 3 200 BAG_SINGE siA3020020 sh 1 mode 1 fr 18 last 29 ended 0 next -1
+slot 3 201 BAG_SINGE siA3020020 sh 1 mode 1 fr 19 last 29 ended 0 next -1
+slot 3 202 BAG_SINGE siA3020020 sh 1 mode 1 fr 20 last 29 ended 0 next -1
+slot 3 203 BAG_SINGE siA3020020 sh 1 mode 1 fr 21 last 29 ended 0 next -1
+slot 3 204 BAG_SINGE siA3020020 sh 1 mode 1 fr 22 last 29 ended 0 next -1
+slot 3 205 BAG_SINGE siA3020020 sh 1 mode 1 fr 23 last 29 ended 0 next -1
+slot 3 206 BAG_SINGE siA3020020 sh 1 mode 1 fr 24 last 29 ended 0 next -1
+slot 3 207 BAG_SINGE siA3020020 sh 1 mode 1 fr 25 last 29 ended 0 next -1
+slot 3 208 BAG_SINGE siA3020020 sh 1 mode 1 fr 26 last 29 ended 0 next -1
+slot 3 209 BAG_SINGE siA3020020 sh 1 mode 1 fr 27 last 29 ended 0 next -1
+slot 3 210 BAG_SINGE siA3020020 sh 1 mode 1 fr 28 last 29 ended 0 next -1
+slot 3 211 BAG_SINGE siA3020020 sh 1 mode 1 fr 0 last 29 ended 1 next -1
+slot 3 212 BAG_SINGE siA3020020 sh 1 mode 1 fr 1 last 29 ended 1 next -1
+move 212 100
+cmd 212 (LIMITEANGLEWARPY=70)
+anim 212 BAG_SINGE 4 1 1
+hide 212 BAG_SINGE kind 1 arg 0
+show 212 BAG_SINGE kind 1 arg 4
+anim 212 BAG_SINGE 1 1 2
+st 212 banana_done=0 banana_playing=0 banana_reload=1 monkey_reload=0 monkey_at=20
+vars 212 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=100 BAG_PUZZLESINGEOK=0
+slot 2 212 BAG_SINGE siA1100100 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+slot 3 212 BAG_SINGE siA4100100 sh 1 mode 1 fr 0 last 151 ended 0 next 2
+log 212 ''
+log 212 '------- Warp %s ------- chapter %d --'
+log 212 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 212 'interp: SET%s'
+slots 0:reA1100019:BAG_REGIMEBANANES 1:bgA1100100:BAG_3BATONS 2:siA1100100:BAG_SINGE 3:siA4100100:BAG_SINGE 4:ibA1100100:BAG_REFLETS01 5:iaA1100100:BAG_FLAMMES01
+slot 3 213 BAG_SINGE siA4100100 sh 1 mode 1 fr 1 last 151 ended 0 next 2
+slot 3 214 BAG_SINGE siA4100100 sh 1 mode 1 fr 2 last 151 ended 0 next 2
+slot 3 215 BAG_SINGE siA4100100 sh 1 mode 1 fr 3 last 151 ended 0 next 2
+slot 3 216 BAG_SINGE siA4100100 sh 1 mode 1 fr 4 last 151 ended 0 next 2
+slot 3 217 BAG_SINGE siA4100100 sh 1 mode 1 fr 5 last 151 ended 0 next 2
+slot 3 218 BAG_SINGE siA4100100 sh 1 mode 1 fr 6 last 151 ended 0 next 2
+slot 3 219 BAG_SINGE siA4100100 sh 1 mode 1 fr 7 last 151 ended 0 next 2
+slot 3 220 BAG_SINGE siA4100100 sh 1 mode 1 fr 8 last 151 ended 0 next 2
+slot 3 221 BAG_SINGE siA4100100 sh 1 mode 1 fr 9 last 151 ended 0 next 2
+slot 3 222 BAG_SINGE siA4100100 sh 1 mode 1 fr 10 last 151 ended 0 next 2
+slot 3 223 BAG_SINGE siA4100100 sh 1 mode 1 fr 11 last 151 ended 0 next 2
+slot 3 224 BAG_SINGE siA4100100 sh 1 mode 1 fr 12 last 151 ended 0 next 2
+slot 3 225 BAG_SINGE siA4100100 sh 1 mode 1 fr 13 last 151 ended 0 next 2
+slot 3 226 BAG_SINGE siA4100100 sh 1 mode 1 fr 14 last 151 ended 0 next 2
+slot 3 227 BAG_SINGE siA4100100 sh 1 mode 1 fr 15 last 151 ended 0 next 2
+slot 3 228 BAG_SINGE siA4100100 sh 1 mode 1 fr 16 last 151 ended 0 next 2
+slot 3 229 BAG_SINGE siA4100100 sh 1 mode 1 fr 17 last 151 ended 0 next 2
+slot 3 230 BAG_SINGE siA4100100 sh 1 mode 1 fr 18 last 151 ended 0 next 2
+slot 3 231 BAG_SINGE siA4100100 sh 1 mode 1 fr 19 last 151 ended 0 next 2
+slot 3 232 BAG_SINGE siA4100100 sh 1 mode 1 fr 20 last 151 ended 0 next 2
+slot 3 233 BAG_SINGE siA4100100 sh 1 mode 1 fr 21 last 151 ended 0 next 2
+slot 3 234 BAG_SINGE siA4100100 sh 1 mode 1 fr 22 last 151 ended 0 next 2
+slot 3 235 BAG_SINGE siA4100100 sh 1 mode 1 fr 23 last 151 ended 0 next 2
+slot 3 236 BAG_SINGE siA4100100 sh 1 mode 1 fr 24 last 151 ended 0 next 2
+slot 3 237 BAG_SINGE siA4100100 sh 1 mode 1 fr 25 last 151 ended 0 next 2
+slot 3 238 BAG_SINGE siA4100100 sh 1 mode 1 fr 26 last 151 ended 0 next 2
+slot 3 239 BAG_SINGE siA4100100 sh 1 mode 1 fr 27 last 151 ended 0 next 2
+slot 3 240 BAG_SINGE siA4100100 sh 1 mode 1 fr 28 last 151 ended 0 next 2
+slot 3 241 BAG_SINGE siA4100100 sh 1 mode 1 fr 29 last 151 ended 0 next 2
+slot 3 242 BAG_SINGE siA4100100 sh 1 mode 1 fr 30 last 151 ended 0 next 2
+move 242 100
+cmd 242 (LIMITEANGLEWARPY=70)
+anim 242 BAG_SINGE 1 1 1
+hide 242 BAG_SINGE kind 1 arg 0
+show 242 BAG_SINGE kind 1 arg 1
+slot 2 242 BAG_SINGE siA1100100 sh 1 mode 1 fr 0 last 29 ended 0 next -1
+slot 3 242 BAG_SINGE siA4100100 sh 0 mode 1 fr 0 last 151 ended 0 next -1
+log 242 ''
+log 242 '------- Warp %s ------- chapter %d --'
+log 242 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 242 'interp: SET%s'
+slots 0:reA1100019:BAG_REGIMEBANANES 1:bgA1100100:BAG_3BATONS 2:siA1100100:BAG_SINGE 3:siA4100100:BAG_SINGE 4:ibA1100100:BAG_REFLETS01 5:iaA1100100:BAG_FLAMMES01
+slot 2 243 BAG_SINGE siA1100100 sh 1 mode 1 fr 1 last 29 ended 0 next -1
+slot 2 244 BAG_SINGE siA1100100 sh 1 mode 1 fr 2 last 29 ended 0 next -1
+slot 2 245 BAG_SINGE siA1100100 sh 1 mode 1 fr 3 last 29 ended 0 next -1
+slot 2 246 BAG_SINGE siA1100100 sh 1 mode 1 fr 4 last 29 ended 0 next -1
+slot 2 247 BAG_SINGE siA1100100 sh 1 mode 1 fr 5 last 29 ended 0 next -1
+slot 2 248 BAG_SINGE siA1100100 sh 1 mode 1 fr 6 last 29 ended 0 next -1
+slot 2 249 BAG_SINGE siA1100100 sh 1 mode 1 fr 7 last 29 ended 0 next -1
+slot 2 250 BAG_SINGE siA1100100 sh 1 mode 1 fr 8 last 29 ended 0 next -1
+slot 2 251 BAG_SINGE siA1100100 sh 1 mode 1 fr 9 last 29 ended 0 next -1
+slot 2 252 BAG_SINGE siA1100100 sh 1 mode 1 fr 10 last 29 ended 0 next -1
+slot 2 253 BAG_SINGE siA1100100 sh 1 mode 1 fr 11 last 29 ended 0 next -1
+slot 2 254 BAG_SINGE siA1100100 sh 1 mode 1 fr 12 last 29 ended 0 next -1
+slot 2 255 BAG_SINGE siA1100100 sh 1 mode 1 fr 13 last 29 ended 0 next -1
+slot 2 256 BAG_SINGE siA1100100 sh 1 mode 1 fr 14 last 29 ended 0 next -1
+slot 2 257 BAG_SINGE siA1100100 sh 1 mode 1 fr 15 last 29 ended 0 next -1
+slot 2 258 BAG_SINGE siA1100100 sh 1 mode 1 fr 16 last 29 ended 0 next -1
+slot 2 259 BAG_SINGE siA1100100 sh 1 mode 1 fr 17 last 29 ended 0 next -1
+slot 2 260 BAG_SINGE siA1100100 sh 1 mode 1 fr 18 last 29 ended 0 next -1
+slot 2 261 BAG_SINGE siA1100100 sh 1 mode 1 fr 19 last 29 ended 0 next -1
+slot 2 262 BAG_SINGE siA1100100 sh 1 mode 1 fr 20 last 29 ended 0 next -1
+slot 2 263 BAG_SINGE siA1100100 sh 1 mode 1 fr 21 last 29 ended 0 next -1
+slot 2 264 BAG_SINGE siA1100100 sh 1 mode 1 fr 22 last 29 ended 0 next -1
+slot 2 265 BAG_SINGE siA1100100 sh 1 mode 1 fr 23 last 29 ended 0 next -1
+slot 2 266 BAG_SINGE siA1100100 sh 1 mode 1 fr 24 last 29 ended 0 next -1
+slot 2 267 BAG_SINGE siA1100100 sh 1 mode 1 fr 25 last 29 ended 0 next -1
+slot 2 268 BAG_SINGE siA1100100 sh 1 mode 1 fr 26 last 29 ended 0 next -1
+slot 2 269 BAG_SINGE siA1100100 sh 1 mode 1 fr 27 last 29 ended 0 next -1
+slot 2 270 BAG_SINGE siA1100100 sh 1 mode 1 fr 28 last 29 ended 0 next -1
+slot 2 271 BAG_SINGE siA1100100 sh 1 mode 1 fr 0 last 29 ended 1 next -1
+slot 2 272 BAG_SINGE siA1100100 sh 1 mode 1 fr 1 last 29 ended 1 next -1
+script 272 (BAG_PUZZLESINGEOK=1)
+script 272 (Flag804=1)
+move 272 20
+cmd 272 (LIMITEANGLEWARPY=70)
+flags 272 125=0 128=0 134=0 139=0 802=0 803=0 804=1 827=0 828=0 829=1 911=0 912=1
+vars 272 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=20 BAG_PUZZLESINGEOK=1
+slot 2 272 BAG_SINGE siA2020020 sh 1 mode 1 fr 0 last 151 ended 0 next -1
+slot 3 272 BAG_SINGE siA3020020 sh 0 mode 1 fr 0 last 29 ended 0 next -1
+log 272 'interp: SET%s'
+log 272 'interp: SET%s'
+log 272 ''
+log 272 '------- Warp %s ------- chapter %d --'
+log 272 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 272 'interp: SET%s'
+slot 2 274 BAG_SINGE siA2020020 sh 1 mode 1 fr 1 last 151 ended 0 next -1
+slot 2 275 BAG_SINGE siA2020020 sh 1 mode 1 fr 2 last 151 ended 0 next -1
+slot 2 276 BAG_SINGE siA2020020 sh 1 mode 1 fr 3 last 151 ended 0 next -1
+slot 2 277 BAG_SINGE siA2020020 sh 1 mode 1 fr 4 last 151 ended 0 next -1
+run soldiers
+setup wam jardin.wam view 3 yaw 0 pitch 0
+cmd 0 (LIMITEANGLEWARPY=70)
+voice 0 199 1 200 255 255
+snd 0 load loc\voix\fra\bagdad\SHEH0481.apc 0 2
+snd 0 play loc\voix\fra\bagdad\SHEH0481.apc
+st 0 banana_done=0 banana_playing=0 banana_reload=1 monkey_reload=0 monkey_at=20
+flags 0 125=0 128=0 134=0 139=0 802=0 803=0 804=0 827=0 828=0 829=1 911=0 912=1
+vars 0 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=3 BAG_PUZZLESINGEOK=0
+slot 0 0 BAG_POT_TERRE jaA1003003 sh 1 mode 1 fr 0 last 1 ended 0 next -1
+slot 6 0 BAG_SOLDAT_TERRE jtA2003003 sh 0 mode 1 fr 0 last 40 ended 0 next -1
+slot 7 0 BAG_SOLDAT_TERRE jtA3003003 sh 0 mode 1 fr 0 last 45 ended 0 next -1
+slot 8 0 BAG_SOLDAT_TERRE jtA1003003 sh 0 mode 1 fr 0 last 43 ended 0 next -1
+slot 9 0 BAG_SOLDAT_TERRE jtA4003003 sh 0 mode 1 fr 50 last 49 ended 0 next -1
+slot 11 0 BAG_SOLDAT_PIERRE jrA2003006 sh 0 mode 1 fr 0 last 40 ended 0 next -1
+log 0 ''
+log 0 '------- Warp %s ------- chapter %d --'
+log 0 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 0 'interp: SET%s'
+slots 0:jaA1003003:BAG_POT_TERRE 1:ibA1003003:BAG_REFLETS01 2:iaA1003003:BAG_FLAMMES01 3:h1A3003033:BAG_HOURISROUGE_DEDANS 4:h1A1003003:BAG_HOURISROUGE_DEHORS 5:h1A2003003:BAG_HOURISROUGE_DEHORS 6:jtA2003003:BAG_SOLDAT_TERRE 7:jtA3003003:BAG_SOLDAT_TERRE 8:jtA1003003:BAG_SOLDAT_TERRE 9:jtA4003003:BAG_SOLDAT_TERRE 10:h3A1003006:BAG_HOURISBLEUE_DEHORS 11:jrA2003006:BAG_SOLDAT_PIERRE
+rand 1 41 0x0043a082
+script 3 (playcutanimp=BAG_SOLDAT_TERRE,4)
+anim 3 BAG_SOLDAT_TERRE 4 1 1
+hide 3 BAG_SOLDAT_TERRE kind 1 arg 0
+show 3 BAG_SOLDAT_TERRE kind 1 arg 4
+slot 9 4 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 1 last 49 ended 0 next -1
+log 4 'interp: SET%s'
+slot 9 5 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 2 last 49 ended 0 next -1
+slot 9 6 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 3 last 49 ended 0 next -1
+slot 9 7 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 4 last 49 ended 0 next -1
+slot 9 8 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 5 last 49 ended 0 next -1
+slot 9 9 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 6 last 49 ended 0 next -1
+slot 9 10 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 7 last 49 ended 0 next -1
+slot 9 11 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 8 last 49 ended 0 next -1
+slot 9 12 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 9 last 49 ended 0 next -1
+slot 9 13 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 10 last 49 ended 0 next -1
+slot 9 14 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 11 last 49 ended 0 next -1
+slot 9 15 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 12 last 49 ended 0 next -1
+slot 9 16 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 13 last 49 ended 0 next -1
+slot 9 17 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 14 last 49 ended 0 next -1
+slot 9 18 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 15 last 49 ended 0 next -1
+slot 9 19 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 16 last 49 ended 0 next -1
+slot 9 20 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 17 last 49 ended 0 next -1
+slot 9 21 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 18 last 49 ended 0 next -1
+slot 9 22 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 19 last 49 ended 0 next -1
+slot 9 23 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 20 last 49 ended 0 next -1
+slot 9 24 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 21 last 49 ended 0 next -1
+slot 9 25 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 22 last 49 ended 0 next -1
+slot 9 26 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 23 last 49 ended 0 next -1
+slot 9 27 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 24 last 49 ended 0 next -1
+slot 9 28 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 25 last 49 ended 0 next -1
+slot 9 29 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 26 last 49 ended 0 next -1
+slot 9 30 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 27 last 49 ended 0 next -1
+slot 9 31 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 28 last 49 ended 0 next -1
+slot 9 32 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 29 last 49 ended 0 next -1
+slot 9 33 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 30 last 49 ended 0 next -1
+slot 9 34 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 31 last 49 ended 0 next -1
+slot 9 35 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 32 last 49 ended 0 next -1
+slot 9 36 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 33 last 49 ended 0 next -1
+slot 9 37 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 34 last 49 ended 0 next -1
+slot 9 38 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 35 last 49 ended 0 next -1
+slot 9 39 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 36 last 49 ended 0 next -1
+slot 9 40 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 37 last 49 ended 0 next -1
+slot 9 41 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 38 last 49 ended 0 next -1
+rand 42 18467 0x0043a082
+slot 9 42 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 39 last 49 ended 0 next -1
+slot 9 43 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 40 last 49 ended 0 next -1
+slot 9 44 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 41 last 49 ended 0 next -1
+slot 9 45 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 42 last 49 ended 0 next -1
+slot 9 46 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 43 last 49 ended 0 next -1
+slot 9 47 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 44 last 49 ended 0 next -1
+slot 9 48 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 45 last 49 ended 0 next -1
+slot 9 49 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 46 last 49 ended 0 next -1
+slot 9 50 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 47 last 49 ended 0 next -1
+slot 9 51 BAG_SOLDAT_TERRE jtA4003003 sh 1 mode 1 fr 48 last 49 ended 0 next -1
+cmd 52 (ShowObjet=BAG_POT_TERRE)
+show 52 BAG_POT_TERRE kind 2 arg 0
+flags 52 125=0 128=0 134=0 139=0 802=0 803=0 804=0 827=1 828=0 829=1 911=0 912=1
+slot 9 52 BAG_SOLDAT_TERRE jtA4003003 sh 0 mode 1 fr 50 last 50 ended 1 next -1
+log 52 'interp: SET%s'
+move 55 6
+cmd 55 (LIMITEANGLEWARPY=70)
+vars 55 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=6 BAG_PUZZLESINGEOK=0
+slot 0 55 BAG_PIERRES_GARDE jpA1006006 sh 0 mode 1 fr 0 last 1 ended 0 next -1
+slot 4 55 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 0 last 40 ended 0 next -1
+slot 8 55 BAG_SOLDAT_PIERRE jrA2006006 sh 0 mode 1 fr 0 last 40 ended 0 next -1
+slot 9 55 BAG_SOLDAT_PIERRE jrA3006006 sh 0 mode 1 fr 0 last 45 ended 0 next -1
+slot 10 55 BAG_SOLDAT_PIERRE jrA1006006 sh 0 mode 1 fr 0 last 43 ended 0 next -1
+slot 11 55 BAG_SOLDAT_PIERRE jrA4006006 sh 0 mode 1 fr 50 last 49 ended 0 next -1
+log 55 ''
+log 55 '------- Warp %s ------- chapter %d --'
+log 55 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 55 'interp: SET%s'
+slots 0:jpA1006006:BAG_PIERRES_GARDE 1:ibA1006006:BAG_REFLETS01 2:iaA1006006:BAG_FLAMMES01 3:h1A1006003:BAG_HOURISROUGE_DEHORS 4:jtA2006003:BAG_SOLDAT_TERRE 5:h3A3006031:BAG_HOURISBLEUE_DEDANS 6:h3A1006006:BAG_HOURISBLEUE_DEHORS 7:h3A2006006:BAG_HOURISBLEUE_DEHORS 8:jrA2006006:BAG_SOLDAT_PIERRE 9:jrA3006006:BAG_SOLDAT_PIERRE 10:jrA1006006:BAG_SOLDAT_PIERRE 11:jrA4006006:BAG_SOLDAT_PIERRE
+rand 56 6334 0x0043a082
+slot 4 57 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 1 last 40 ended 0 next -1
+slot 4 58 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 2 last 40 ended 0 next -1
+script 58 (playcutanimp=BAG_SOLDAT_PIERRE,1)
+anim 58 BAG_SOLDAT_PIERRE 1 1 1
+hide 58 BAG_SOLDAT_PIERRE kind 1 arg 0
+show 58 BAG_SOLDAT_PIERRE kind 1 arg 1
+slot 4 59 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 3 last 40 ended 0 next -1
+slot 10 59 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 1 last 43 ended 0 next -1
+slot 11 59 BAG_SOLDAT_PIERRE jrA4006006 sh 0 mode 1 fr 0 last 49 ended 0 next -1
+log 59 'interp: SET%s'
+slot 4 60 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 4 last 40 ended 0 next -1
+slot 10 60 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 2 last 43 ended 0 next -1
+slot 4 61 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 5 last 40 ended 0 next -1
+slot 10 61 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 3 last 43 ended 0 next -1
+slot 4 62 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 6 last 40 ended 0 next -1
+slot 10 62 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 4 last 43 ended 0 next -1
+slot 4 63 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 7 last 40 ended 0 next -1
+slot 10 63 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 5 last 43 ended 0 next -1
+slot 4 64 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 8 last 40 ended 0 next -1
+slot 10 64 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 6 last 43 ended 0 next -1
+slot 4 65 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 9 last 40 ended 0 next -1
+slot 10 65 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 7 last 43 ended 0 next -1
+slot 4 66 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 10 last 40 ended 0 next -1
+slot 10 66 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 8 last 43 ended 0 next -1
+slot 4 67 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 11 last 40 ended 0 next -1
+slot 10 67 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 9 last 43 ended 0 next -1
+slot 4 68 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 12 last 40 ended 0 next -1
+slot 10 68 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 10 last 43 ended 0 next -1
+slot 4 69 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 13 last 40 ended 0 next -1
+slot 10 69 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 11 last 43 ended 0 next -1
+slot 4 70 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 14 last 40 ended 0 next -1
+slot 10 70 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 12 last 43 ended 0 next -1
+slot 4 71 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 15 last 40 ended 0 next -1
+slot 10 71 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 13 last 43 ended 0 next -1
+slot 4 72 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 16 last 40 ended 0 next -1
+slot 10 72 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 14 last 43 ended 0 next -1
+slot 4 73 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 17 last 40 ended 0 next -1
+slot 10 73 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 15 last 43 ended 0 next -1
+slot 4 74 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 18 last 40 ended 0 next -1
+slot 10 74 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 16 last 43 ended 0 next -1
+slot 4 75 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 19 last 40 ended 0 next -1
+slot 10 75 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 17 last 43 ended 0 next -1
+slot 4 76 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 20 last 40 ended 0 next -1
+slot 10 76 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 18 last 43 ended 0 next -1
+slot 4 77 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 21 last 40 ended 0 next -1
+slot 10 77 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 19 last 43 ended 0 next -1
+slot 4 78 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 22 last 40 ended 0 next -1
+slot 10 78 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 20 last 43 ended 0 next -1
+slot 4 79 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 23 last 40 ended 0 next -1
+slot 10 79 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 21 last 43 ended 0 next -1
+slot 4 80 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 24 last 40 ended 0 next -1
+slot 10 80 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 22 last 43 ended 0 next -1
+slot 4 81 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 25 last 40 ended 0 next -1
+slot 10 81 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 23 last 43 ended 0 next -1
+slot 4 82 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 26 last 40 ended 0 next -1
+slot 10 82 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 24 last 43 ended 0 next -1
+slot 4 83 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 27 last 40 ended 0 next -1
+slot 10 83 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 25 last 43 ended 0 next -1
+slot 4 84 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 28 last 40 ended 0 next -1
+slot 10 84 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 26 last 43 ended 0 next -1
+slot 4 85 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 29 last 40 ended 0 next -1
+slot 10 85 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 27 last 43 ended 0 next -1
+slot 4 86 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 30 last 40 ended 0 next -1
+slot 10 86 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 28 last 43 ended 0 next -1
+slot 4 87 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 31 last 40 ended 0 next -1
+slot 10 87 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 29 last 43 ended 0 next -1
+slot 4 88 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 32 last 40 ended 0 next -1
+slot 10 88 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 30 last 43 ended 0 next -1
+slot 4 89 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 33 last 40 ended 0 next -1
+slot 10 89 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 31 last 43 ended 0 next -1
+slot 4 90 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 34 last 40 ended 0 next -1
+slot 10 90 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 32 last 43 ended 0 next -1
+slot 4 91 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 35 last 40 ended 0 next -1
+slot 10 91 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 33 last 43 ended 0 next -1
+slot 4 92 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 36 last 40 ended 0 next -1
+slot 10 92 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 34 last 43 ended 0 next -1
+slot 4 93 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 37 last 40 ended 0 next -1
+slot 10 93 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 35 last 43 ended 0 next -1
+slot 4 94 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 38 last 40 ended 0 next -1
+slot 10 94 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 36 last 43 ended 0 next -1
+slot 4 95 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 39 last 40 ended 0 next -1
+slot 10 95 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 37 last 43 ended 0 next -1
+rand 96 26500 0x0043a082
+slot 4 96 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 0 last 40 ended 1 next -1
+slot 10 96 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 38 last 43 ended 0 next -1
+slot 4 97 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 1 last 40 ended 1 next -1
+slot 10 97 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 39 last 43 ended 0 next -1
+slot 4 98 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 2 last 40 ended 1 next -1
+slot 10 98 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 40 last 43 ended 0 next -1
+slot 4 99 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 3 last 40 ended 1 next -1
+slot 10 99 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 41 last 43 ended 0 next -1
+slot 4 100 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 4 last 40 ended 1 next -1
+slot 10 100 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 42 last 43 ended 0 next -1
+cmd 101 (ShowObjet=BAG_PIERRES_GARDE)
+show 101 BAG_PIERRES_GARDE kind 2 arg 0
+flags 101 125=0 128=0 134=0 139=0 802=0 803=0 804=0 827=1 828=1 829=1 911=0 912=1
+slot 0 101 BAG_PIERRES_GARDE jpA1006006 sh 1 mode 1 fr 0 last 1 ended 0 next -1
+slot 4 101 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 5 last 40 ended 1 next -1
+slot 10 101 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 0 last 43 ended 1 next -1
+log 101 'interp: SET%s'
+slot 4 102 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 6 last 40 ended 1 next -1
+slot 10 102 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 1 last 43 ended 1 next -1
+slot 4 103 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 7 last 40 ended 1 next -1
+slot 10 103 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 2 last 43 ended 1 next -1
+slot 4 104 BAG_SOLDAT_TERRE jtA2006003 sh 1 mode 1 fr 8 last 40 ended 1 next -1
+slot 10 104 BAG_SOLDAT_PIERRE jrA1006006 sh 1 mode 1 fr 3 last 43 ended 1 next -1
+script 104 (flag128=1)
+script 104 (flag134=1)
+script 104 (flag139=1)
+move 104 3
+cmd 104 (LIMITEANGLEWARPY=70)
+cmd 104 (HidePerso=BAG_SOLDAT_BOIS)
+hide 104 BAG_SOLDAT_BOIS kind 1 arg 0
+cmd 104 (ShowObjet=BAG_POT_TERRE)
+show 104 BAG_POT_TERRE kind 2 arg 0
+cmd 104 (HidePerso=BAG_SOLDAT_TERRE)
+hide 104 BAG_SOLDAT_TERRE kind 1 arg 0
+cmd 104 (HidePerso=BAG_SOLDAT_PIERRE)
+hide 104 BAG_SOLDAT_PIERRE kind 1 arg 0
+cmd 104 (HideObjet=BAG_PIERRES_GARDE)
+hide 104 BAG_PIERRES_GARDE kind 2 arg 0
+flags 104 125=0 128=1 134=1 139=1 802=0 803=0 804=0 827=1 828=1 829=1 911=0 912=1
+vars 104 OBJETENMAIN=0 CLICOBJET=0 CLICPERSO=0 CLICZONE=0 VUE=3 BAG_PUZZLESINGEOK=0
+slot 0 104 BAG_POT_TERRE jaA1003003 sh 1 mode 1 fr 0 last 1 ended 0 next -1
+slot 8 104 BAG_SOLDAT_TERRE jtA1003003 sh 0 mode 1 fr 0 last 43 ended 0 next -1
+slot 9 104 BAG_SOLDAT_TERRE jtA4003003 sh 0 mode 1 fr 0 last 49 ended 0 next -1
+slot 11 104 BAG_SOLDAT_PIERRE jrA2003006 sh 0 mode 1 fr 0 last 40 ended 0 next -1
+log 104 'interp: SET%s'
+log 104 'interp: SET%s'
+log 104 'interp: SET%s'
+log 104 ''
+log 104 '------- Warp %s ------- chapter %d --'
+log 104 'AtlBruitages_InitWarp(): current_vue=NULL!!!'
+log 104 'interp: SET%s'
+log 104 'interp: SET%s'
+log 104 'interp: SET%s'
+log 104 'interp: SET%s'
+log 104 'interp: SET%s'
+log 104 'interp: SET%s'
+rand 105 19169 0x0043a082

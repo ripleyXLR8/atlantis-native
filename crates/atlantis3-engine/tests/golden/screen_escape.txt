@@ -1,0 +1,445 @@
+# Escape in the full-screen loop modes of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) with
+# spr_p6.dll under emulation, 800 x 600 RGB565: the DirectInput keyboard callback (0x0042ab20) run unmodified with the
+# Escape key, and through it the Escape handler (0x0042ac50) by loop mode. Each run sets a screen up as that screen's
+# own golden does (tower map: TourMagi.wam view 39, start at 300 s, frame n at 300 + n / 30 s; unicorn: start at 100 s,
+# flags 147 = 148 = 1, frame n at 100 + n x 1.0025 / 15 s; game boy: volume saved, set to 99, start at 100 s, same
+# clock; jewel case: jardin.wam view 114, the zone click hook at 200 s, frame n at 200 + (n + 1) / 32 s; skull:
+# TourMagi.wam view 39, start at 300 s, frame n at 300 + n / 30 s; noop_<m>: the loop mode set to m), plays frames,
+# then presses Escape. RunOneCommand runs for real (logged) but in the game boy runs (logged only); CtrlScenarIN
+# logged only. Lines: in <f> <x> <y> <left> <right> (the input of frame f); frame <f> ret=<r> <state>; key <f>
+# (Escape after frame f); esc <f> mode=<m> (the handler entered); stop <f> <the stop entered>; snd <f> test|stop
+# (the unicorn's stop, during the key only); scan <f>; cmd <f> <command>; after <f> mode=<loop mode> <fields>
+# (open = the screen's open byte; licorne act, flags 146..149, the milky ball in the bag; game boy music volume and
+# the dice; jewel case count, taken, flag 131, the three gems in the bag).
+run tour mode=10 the tower map: three frames, then Escape
+in 1 400 300 0 0
+frame 1 ret=1 open=1
+in 2 400 300 0 0
+frame 2 ret=1 open=1
+in 3 400 300 0 0
+frame 3 ret=1 open=1
+key 3
+esc 3 mode=10
+stop 3 AtlCarteTour_Close
+scan 3
+after 3 mode=3 open=0
+run licorne_held mode=11 beacon 0 taken from the tray and held, then Escape
+in 1 400 300 0 0
+frame 1 ret=1 held=-1 n=0 run=0
+in 2 400 300 0 0
+frame 2 ret=1 held=-1 n=0 run=0
+in 3 430 570 0 0
+frame 3 ret=1 held=-1 n=0 run=0
+in 4 430 570 1 0
+frame 4 ret=1 held=0 n=0 run=0
+in 5 430 570 0 0
+frame 5 ret=1 held=0 n=0 run=0
+key 5
+esc 5 mode=11
+stop 5 Licorne_Stop
+snd 5 test sfx\sound810.apc -> 0
+scan 5
+cmd 5 (Flag147=0)
+cmd 5 (Flag149=0)
+cmd 5 (Flag146=0)
+cmd 5 (Flag148=0)
+cmd 5 (SacADos=BAG_BOULE_LAITEUSE)
+cmd 5 (HideObjet=BAG_BOULE_LAITEUSEPOSEE)
+after 5 mode=3 act=0 flag146=0 flag147=0 flag148=0 flag149=0 BAG_BOULE_LAITEUSE=1
+run licorne_running mode=11 the winning beacons placed, the run started, 20 frames, then Escape
+in 1 430 570 0 0
+frame 1 ret=1 held=-1 n=0 run=0
+in 2 430 570 1 0
+frame 2 ret=1 held=0 n=0 run=0
+in 3 700 120 0 0
+frame 3 ret=1 held=0 n=0 run=0
+in 4 700 120 0 0
+frame 4 ret=1 held=0 n=0 run=0
+in 5 700 120 1 0
+frame 5 ret=1 held=-1 n=1 run=0
+in 6 430 570 0 0
+frame 6 ret=1 held=-1 n=1 run=0
+in 7 430 570 1 0
+frame 7 ret=1 held=1 n=1 run=0
+in 8 240 570 0 0
+frame 8 ret=1 held=1 n=1 run=0
+in 9 240 570 0 0
+frame 9 ret=1 held=1 n=1 run=0
+in 10 240 570 1 0
+frame 10 ret=1 held=-1 n=2 run=0
+in 11 430 570 0 0
+frame 11 ret=1 held=-1 n=2 run=0
+in 12 430 570 1 0
+frame 12 ret=1 held=2 n=2 run=0
+in 13 20 300 0 0
+frame 13 ret=1 held=2 n=2 run=0
+in 14 20 300 0 0
+frame 14 ret=1 held=2 n=2 run=0
+in 15 20 300 1 0
+frame 15 ret=1 held=-1 n=3 run=0
+in 16 430 570 0 0
+frame 16 ret=1 held=-1 n=3 run=0
+in 17 430 570 1 0
+frame 17 ret=1 held=3 n=3 run=0
+in 18 90 30 0 0
+frame 18 ret=1 held=3 n=3 run=0
+in 19 90 30 0 0
+frame 19 ret=1 held=3 n=3 run=0
+in 20 90 30 1 0
+frame 20 ret=1 held=-1 n=4 run=0
+in 21 754 497 0 0
+frame 21 ret=1 held=-1 n=4 run=0
+in 22 754 497 1 0
+frame 22 ret=1 held=-1 n=4 run=1
+in 23 754 497 0 0
+frame 23 ret=1 held=-1 n=4 run=1
+in 24 754 497 0 0
+frame 24 ret=1 held=-1 n=4 run=1
+in 25 754 497 0 0
+frame 25 ret=1 held=-1 n=4 run=1
+in 26 754 497 0 0
+frame 26 ret=1 held=-1 n=4 run=1
+in 27 754 497 0 0
+frame 27 ret=1 held=-1 n=4 run=1
+in 28 754 497 0 0
+frame 28 ret=1 held=-1 n=4 run=1
+in 29 754 497 0 0
+frame 29 ret=1 held=-1 n=4 run=1
+in 30 754 497 0 0
+frame 30 ret=1 held=-1 n=4 run=1
+in 31 754 497 0 0
+frame 31 ret=1 held=-1 n=4 run=1
+in 32 754 497 0 0
+frame 32 ret=1 held=-1 n=4 run=1
+in 33 754 497 0 0
+frame 33 ret=1 held=-1 n=4 run=1
+in 34 754 497 0 0
+frame 34 ret=1 held=-1 n=4 run=1
+in 35 754 497 0 0
+frame 35 ret=1 held=-1 n=4 run=1
+in 36 754 497 0 0
+frame 36 ret=1 held=-1 n=4 run=1
+in 37 754 497 0 0
+frame 37 ret=1 held=-1 n=4 run=1
+in 38 754 497 0 0
+frame 38 ret=1 held=-1 n=4 run=1
+in 39 754 497 0 0
+frame 39 ret=1 held=-1 n=4 run=1
+in 40 754 497 0 0
+frame 40 ret=1 held=-1 n=4 run=1
+in 41 754 497 0 0
+frame 41 ret=1 held=-1 n=4 run=1
+in 42 754 497 0 0
+frame 42 ret=1 held=-1 n=4 run=1
+key 42
+esc 42 mode=11
+stop 42 Licorne_Stop
+snd 42 test sfx\sound810.apc -> 1
+snd 42 stop sfx\sound810.apc
+scan 42
+cmd 42 (Flag147=0)
+cmd 42 (Flag149=0)
+cmd 42 (Flag146=0)
+cmd 42 (Flag148=0)
+cmd 42 (SacADos=BAG_BOULE_LAITEUSE)
+cmd 42 (HideObjet=BAG_BOULE_LAITEUSEPOSEE)
+after 42 mode=3 act=0 flag146=0 flag147=0 flag148=0 flag149=0 BAG_BOULE_LAITEUSE=1
+run gboy_before mode=12 five frames, nothing clicked, then Escape: result 0
+in 1 400 300 0 0
+frame 1 ret=1 cur=42 anim=-1 res=0
+in 2 400 300 0 0
+frame 2 ret=1 cur=43 anim=-1 res=0
+in 3 400 300 0 0
+frame 3 ret=1 cur=44 anim=-1 res=0
+in 4 400 300 0 0
+frame 4 ret=1 cur=45 anim=-1 res=0
+in 5 400 300 0 0
+frame 5 ret=1 cur=46 anim=-1 res=0
+key 5
+esc 5 mode=12
+stop 5 AtlGBoy_Close
+scan 5
+cmd 5 (StopMusik=1)
+cmd 5 (StartMusik=6)
+after 5 mode=3 open=0 vol=50 res=0
+run gboy_counting mode=12 the button clicked at cursor 131 (result 6); Escape once the count reached 3
+in 1 400 300 0 0
+frame 1 ret=1 cur=42 anim=-1 res=0
+in 2 400 300 0 0
+frame 2 ret=1 cur=43 anim=-1 res=0
+in 3 400 300 0 0
+frame 3 ret=1 cur=44 anim=-1 res=0
+in 4 400 300 0 0
+frame 4 ret=1 cur=45 anim=-1 res=0
+in 5 400 300 0 0
+frame 5 ret=1 cur=46 anim=-1 res=0
+in 6 400 300 0 0
+frame 6 ret=1 cur=47 anim=-1 res=0
+in 7 400 300 0 0
+frame 7 ret=1 cur=48 anim=-1 res=0
+in 8 400 300 0 0
+frame 8 ret=1 cur=49 anim=-1 res=0
+in 9 400 300 0 0
+frame 9 ret=1 cur=50 anim=-1 res=0
+in 10 400 300 0 0
+frame 10 ret=1 cur=51 anim=-1 res=0
+in 11 400 300 0 0
+frame 11 ret=1 cur=52 anim=-1 res=0
+in 12 400 300 0 0
+frame 12 ret=1 cur=53 anim=-1 res=0
+in 13 400 300 0 0
+frame 13 ret=1 cur=54 anim=-1 res=0
+in 14 400 300 0 0
+frame 14 ret=1 cur=55 anim=-1 res=0
+in 15 400 300 0 0
+frame 15 ret=1 cur=56 anim=-1 res=0
+in 16 400 300 0 0
+frame 16 ret=1 cur=57 anim=-1 res=0
+in 17 400 300 0 0
+frame 17 ret=1 cur=58 anim=-1 res=0
+in 18 400 300 0 0
+frame 18 ret=1 cur=59 anim=-1 res=0
+in 19 400 300 0 0
+frame 19 ret=1 cur=60 anim=-1 res=0
+in 20 400 300 0 0
+frame 20 ret=1 cur=61 anim=-1 res=0
+in 21 400 300 0 0
+frame 21 ret=1 cur=62 anim=-1 res=0
+in 22 400 300 0 0
+frame 22 ret=1 cur=63 anim=-1 res=0
+in 23 400 300 0 0
+frame 23 ret=1 cur=64 anim=-1 res=0
+in 24 400 300 0 0
+frame 24 ret=1 cur=65 anim=-1 res=0
+in 25 400 300 0 0
+frame 25 ret=1 cur=66 anim=-1 res=0
+in 26 400 300 0 0
+frame 26 ret=1 cur=67 anim=-1 res=0
+in 27 400 300 0 0
+frame 27 ret=1 cur=68 anim=-1 res=0
+in 28 400 300 0 0
+frame 28 ret=1 cur=69 anim=-1 res=0
+in 29 400 300 0 0
+frame 29 ret=1 cur=70 anim=-1 res=0
+in 30 400 300 0 0
+frame 30 ret=1 cur=71 anim=-1 res=0
+in 31 400 300 0 0
+frame 31 ret=1 cur=72 anim=-1 res=0
+in 32 400 300 0 0
+frame 32 ret=1 cur=73 anim=-1 res=0
+in 33 400 300 0 0
+frame 33 ret=1 cur=74 anim=-1 res=0
+in 34 400 300 0 0
+frame 34 ret=1 cur=75 anim=-1 res=0
+in 35 400 300 0 0
+frame 35 ret=1 cur=76 anim=-1 res=0
+in 36 400 300 0 0
+frame 36 ret=1 cur=77 anim=-1 res=0
+in 37 400 300 0 0
+frame 37 ret=1 cur=78 anim=-1 res=0
+in 38 400 300 0 0
+frame 38 ret=1 cur=79 anim=-1 res=0
+in 39 400 300 0 0
+frame 39 ret=1 cur=80 anim=-1 res=0
+in 40 400 300 0 0
+frame 40 ret=1 cur=81 anim=-1 res=0
+in 41 400 300 0 0
+frame 41 ret=1 cur=82 anim=-1 res=0
+in 42 400 300 0 0
+frame 42 ret=1 cur=83 anim=-1 res=0
+in 43 400 300 0 0
+frame 43 ret=1 cur=84 anim=-1 res=0
+in 44 400 300 0 0
+frame 44 ret=1 cur=85 anim=-1 res=0
+in 45 400 300 0 0
+frame 45 ret=1 cur=86 anim=-1 res=0
+in 46 400 300 0 0
+frame 46 ret=1 cur=87 anim=-1 res=0
+in 47 400 300 0 0
+frame 47 ret=1 cur=88 anim=-1 res=0
+in 48 400 300 0 0
+frame 48 ret=1 cur=89 anim=-1 res=0
+in 49 400 300 0 0
+frame 49 ret=1 cur=90 anim=-1 res=0
+in 50 400 300 0 0
+frame 50 ret=1 cur=91 anim=-1 res=0
+in 51 400 300 0 0
+frame 51 ret=1 cur=92 anim=-1 res=0
+in 52 400 300 0 0
+frame 52 ret=1 cur=93 anim=-1 res=0
+in 53 400 300 0 0
+frame 53 ret=1 cur=94 anim=-1 res=0
+in 54 400 300 0 0
+frame 54 ret=1 cur=95 anim=-1 res=0
+in 55 400 300 0 0
+frame 55 ret=1 cur=96 anim=-1 res=0
+in 56 400 300 0 0
+frame 56 ret=1 cur=97 anim=-1 res=0
+in 57 400 300 0 0
+frame 57 ret=1 cur=98 anim=-1 res=0
+in 58 400 300 0 0
+frame 58 ret=1 cur=99 anim=-1 res=0
+in 59 400 300 0 0
+frame 59 ret=1 cur=100 anim=-1 res=0
+in 60 400 300 0 0
+frame 60 ret=1 cur=101 anim=-1 res=0
+in 61 400 300 0 0
+frame 61 ret=1 cur=102 anim=-1 res=0
+in 62 400 300 0 0
+frame 62 ret=1 cur=103 anim=-1 res=0
+in 63 400 300 0 0
+frame 63 ret=1 cur=104 anim=-1 res=0
+in 64 400 300 0 0
+frame 64 ret=1 cur=105 anim=-1 res=0
+in 65 400 300 0 0
+frame 65 ret=1 cur=106 anim=-1 res=0
+in 66 400 300 0 0
+frame 66 ret=1 cur=107 anim=-1 res=0
+in 67 400 300 0 0
+frame 67 ret=1 cur=108 anim=-1 res=0
+in 68 400 300 0 0
+frame 68 ret=1 cur=109 anim=-1 res=0
+in 69 400 300 0 0
+frame 69 ret=1 cur=110 anim=-1 res=0
+in 70 400 300 0 0
+frame 70 ret=1 cur=111 anim=-1 res=0
+in 71 400 300 0 0
+frame 71 ret=1 cur=112 anim=-1 res=0
+in 72 400 300 0 0
+frame 72 ret=1 cur=113 anim=-1 res=0
+in 73 400 300 0 0
+frame 73 ret=1 cur=114 anim=-1 res=0
+in 74 400 300 0 0
+frame 74 ret=1 cur=115 anim=-1 res=0
+in 75 400 300 0 0
+frame 75 ret=1 cur=116 anim=-1 res=0
+in 76 400 300 0 0
+frame 76 ret=1 cur=117 anim=-1 res=0
+in 77 400 300 0 0
+frame 77 ret=1 cur=118 anim=-1 res=0
+in 78 400 300 0 0
+frame 78 ret=1 cur=119 anim=-1 res=0
+in 79 400 300 0 0
+frame 79 ret=1 cur=120 anim=-1 res=0
+in 80 400 300 0 0
+frame 80 ret=1 cur=121 anim=-1 res=0
+in 81 400 300 0 0
+frame 81 ret=1 cur=122 anim=-1 res=0
+in 82 400 300 0 0
+frame 82 ret=1 cur=123 anim=-1 res=0
+in 83 400 300 0 0
+frame 83 ret=1 cur=124 anim=-1 res=0
+in 84 400 300 0 0
+frame 84 ret=1 cur=125 anim=-1 res=0
+in 85 400 300 0 0
+frame 85 ret=1 cur=126 anim=-1 res=0
+in 86 400 300 0 0
+frame 86 ret=1 cur=127 anim=-1 res=0
+in 87 400 300 0 0
+frame 87 ret=1 cur=128 anim=-1 res=0
+in 88 400 300 0 0
+frame 88 ret=1 cur=129 anim=-1 res=0
+in 89 400 300 0 0
+frame 89 ret=1 cur=130 anim=-1 res=0
+in 90 400 300 0 0
+frame 90 ret=1 cur=131 anim=-1 res=0
+in 91 703 568 1 0
+frame 91 ret=1 cur=132 anim=-1 res=0
+in 92 400 300 0 0
+frame 92 ret=1 cur=133 anim=381 res=0
+in 93 400 300 0 0
+frame 93 ret=1 cur=134 anim=382 res=0
+in 94 400 300 0 0
+frame 94 ret=1 cur=135 anim=383 res=0
+in 95 400 300 0 0
+frame 95 ret=1 cur=136 anim=384 res=0
+in 96 400 300 0 0
+frame 96 ret=1 cur=137 anim=385 res=0
+in 97 400 300 0 0
+frame 97 ret=1 cur=138 anim=386 res=0
+in 98 400 300 0 0
+frame 98 ret=1 cur=139 anim=387 res=1
+in 99 400 300 0 0
+frame 99 ret=1 cur=140 anim=388 res=1
+in 100 400 300 0 0
+frame 100 ret=1 cur=141 anim=389 res=1
+in 101 400 300 0 0
+frame 101 ret=1 cur=141 anim=390 res=1
+in 102 400 300 0 0
+frame 102 ret=1 cur=141 anim=391 res=1
+in 103 400 300 0 0
+frame 103 ret=1 cur=141 anim=392 res=1
+in 104 400 300 0 0
+frame 104 ret=1 cur=141 anim=393 res=1
+in 105 400 300 0 0
+frame 105 ret=1 cur=141 anim=394 res=2
+in 106 400 300 0 0
+frame 106 ret=1 cur=141 anim=395 res=2
+in 107 400 300 0 0
+frame 107 ret=1 cur=141 anim=396 res=2
+in 108 400 300 0 0
+frame 108 ret=1 cur=141 anim=397 res=2
+in 109 400 300 0 0
+frame 109 ret=1 cur=141 anim=398 res=2
+in 110 400 300 0 0
+frame 110 ret=1 cur=141 anim=399 res=3
+key 110
+esc 110 mode=12
+stop 110 AtlGBoy_Close
+scan 110
+cmd 110 (StopMusik=1)
+cmd 110 (StartMusik=6)
+after 110 mode=3 open=0 vol=50 res=3
+run ecrin_one mode=14 the first gem taken, then Escape
+in 0 40 40 0 0
+frame 0 ret=1 count=0 taken=000
+in 1 40 40 0 0
+frame 1 ret=1 count=0 taken=000
+in 2 40 40 0 0
+frame 2 ret=1 count=0 taken=000
+in 3 312 136 0 0
+frame 3 ret=1 count=0 taken=000
+in 4 312 136 1 0
+frame 4 ret=1 count=1 taken=100
+in 5 312 136 0 0
+frame 5 ret=1 count=1 taken=100
+key 5
+esc 5 mode=14
+stop 5 AtlEcrin_Stop
+cmd 5 (SacADos=BAG_SAPHIR)
+cmd 5 (SacADos=BAG_RUBIS)
+cmd 5 (SacADos=BAG_EMERAUDE)
+scan 5
+after 5 mode=3 open=0 count=1 taken=100 flag131=1 BAG_SAPHIR=1 BAG_RUBIS=1 BAG_EMERAUDE=1
+run ecrin_fade mode=14 Escape before the fade's first tick
+in 0 40 40 0 0
+frame 0 ret=1 count=0 taken=000
+key 0
+esc 0 mode=14
+stop 0 AtlEcrin_Stop
+cmd 0 (SacADos=BAG_SAPHIR)
+cmd 0 (SacADos=BAG_RUBIS)
+cmd 0 (SacADos=BAG_EMERAUDE)
+scan 0
+after 0 mode=3 open=0 count=0 taken=000 flag131=1 BAG_SAPHIR=1 BAG_RUBIS=1 BAG_EMERAUDE=1
+run crane mode=15 the crystal skull: two frames, then Escape
+in 1 400 300 0 0
+frame 1 ret=1 open=1
+in 2 400 300 0 0
+frame 2 ret=1 open=1
+key 2
+esc 2 mode=15
+stop 2 CraneBagdad_Stop
+after 2 mode=3 open=0
+run noop_9 mode=9 the Land of the Dead map: Escape
+key 0
+esc 0 mode=9
+after 0 mode=9
+run noop_13 mode=13 the scarab case: Escape
+key 0
+esc 0 mode=13
+after 0 mode=13
+run noop_18 mode=18 the remote: Escape
+key 0
+esc 0 mode=18
+after 0 mode=18

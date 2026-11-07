@@ -29,6 +29,12 @@ impl Script {
             return None;
         }
         log::debug!("interp: SET{}", self.line_text(src, p));
+        if self.set_log.is_some() {
+            let t = self.line_text(src, p);
+            if let Some(l) = self.set_log.as_mut() {
+                l.push(t);
+            }
+        }
         if let (Some(t), Src::Chapter) = (self.trace.as_mut(), src) {
             t.push(p);
         }
@@ -99,6 +105,9 @@ impl Script {
                     return None;
                 }
             };
+            if self.is_a3() {
+                return self.set_variables_a3(host, src, p, key);
+            }
             if key == self.keys.changewam {
                 // The text between the operator and `)`.
                 let mut wam = Vec::new();
@@ -443,7 +452,7 @@ impl Script {
 
     /// The position after the first `,` at or after `p` (the handler's
     /// `while (p++, c != ',')` walks).
-    fn after_comma(&self, src: Src, mut p: usize) -> usize {
+    pub(super) fn after_comma(&self, src: Src, mut p: usize) -> usize {
         while self.b(src, p) != b',' && p < self.len(src) {
             p += 1;
         }
@@ -452,7 +461,7 @@ impl Script {
 
     /// `FUN_00485180`: the next number from `*p` (up to a CR), then past
     /// its digits and the blanks after them.
-    fn parse_int(&self, src: Src, p: &mut usize) -> i32 {
+    pub(super) fn parse_int(&self, src: Src, p: &mut usize) -> i32 {
         while !matches!(self.b(src, *p), 0 | CR) && !self.b(src, *p).is_ascii_digit() {
             *p += 1;
         }
@@ -543,8 +552,12 @@ impl Script {
     /// buffer, its `/INIT` runs (or the running one restarts on it), and
     /// the position before the new text's first section header ends the
     /// section that changed it.
-    fn change_chapter(&mut self, host: &mut dyn Host, value: i32) -> Option<usize> {
+    pub(super) fn change_chapter(&mut self, host: &mut dyn Host, value: i32) -> Option<usize> {
         self.chapter_reload = true;
+        if self.is_a3() {
+            // @ 0x0044873b: the resume point := the empty text.
+            self.resume_at = super::RESUME_NOTHING;
+        }
         self.previous_chapter = self.chapter;
         self.chapter = value;
         self.vars[self.keys.chapter] = self.chapter;
@@ -572,7 +585,7 @@ impl Script {
 
     /// The `VUE` branch (`AtlWam_SetCurrentVue` called @ 0x00482321): a
     /// view of the current place.
-    fn set_vue(&mut self, host: &mut dyn Host, value: i32) {
+    pub(super) fn set_vue(&mut self, host: &mut dyn Host, value: i32) {
         let k = self.keys.clone();
         self.vars[k.next_warp_invalide] = 0;
         self.vue_value = value;
@@ -588,6 +601,9 @@ impl Script {
         self.vars[k.vue] = value;
         let (x, y) = (self.start_x, self.start_y);
         host.enter_view_with_script(value, x, y, self);
+        if self.is_a3() {
+            self.note_world_view(value);
+        }
         self.view_reset();
         self.vars[k.vue] = value;
         self.click = false;
@@ -605,7 +621,7 @@ impl Script {
     /// `ENABLESUJ` (@ 0x0047f920), `DISABLESUJ` (@ 0x0047f9f0), `KILLSUJ`
     /// (@ 0x0047fa70): `PERSO,SUJ1[,SUJ2...]`, subjects matched by their
     /// `#SUJETS#` parameter.
-    fn subjects_command(&mut self, src: Src, mut p: usize, key: usize) {
+    pub(super) fn subjects_command(&mut self, src: Src, mut p: usize, key: usize) {
         let perso = self.id(defnames::PERSONNAGES, src, p);
         p = self.after_comma(src, p);
         loop {
@@ -639,7 +655,7 @@ impl Script {
 
     /// `SACADOS=NAME` (FUN_00475610 → FUN_004754f0): the object goes in the
     /// bag unless it is there.
-    fn bag_take(&mut self, host: &mut dyn Host, src: Src, p: usize) {
+    pub(super) fn bag_take(&mut self, host: &mut dyn Host, src: Src, p: usize) {
         let id = self.id(defnames::OBJETS, src, p);
         let sprite = self.param(defnames::OBJETS, src, p);
         if self.bag.iter().any(|e| e.id == id) {
@@ -660,11 +676,14 @@ impl Script {
             return;
         }
         let monde = self.vars[self.keys.monde];
-        self.bag.push(BagEntry {
-            sprite,
-            id,
-            world: if monde == 6 { 2 } else { monde },
-        });
+        let world = if monde == 6 { 2 } else { monde };
+        self.bag.push(BagEntry { sprite, id, world });
+        if self.is_a3() {
+            // Atlantis III mirrors the object in the flags: 1100 + id = its
+            // world, 1500 + id = its sprite (atlantis3-gog-fr-3473408
+            // @ 0x00429720).
+            self.set_bag_flags(id, world, i32::from(sprite));
+        }
         if self.bag.len() > 0x59 {
             self.fail(format!("Inventaire: {} objets", self.bag.len()));
         }
@@ -680,6 +699,27 @@ impl Script {
     pub fn bag_remove(&mut self, id: i32) {
         if let Some(i) = self.bag.iter().position(|e| e.id == id) {
             self.bag.remove(i);
+            if self.is_a3() {
+                self.set_bag_flags(id, 0, 0);
+            }
+        } else if self.is_a3() {
+            let name = usize::try_from(id)
+                .ok()
+                .and_then(|i| self.names.name(defnames::OBJETS, i))
+                .map(|n| String::from_utf8_lossy(n).into_owned())
+                .unwrap_or_default();
+            log::warn!("AtlInventaire_RemoveObjet() : l'objet {name} n'est pas dans l'inventaire");
+        }
+    }
+
+    fn set_bag_flags(&mut self, id: i32, world: i32, sprite: i32) {
+        for (base, v) in [(1100, world), (1500, sprite)] {
+            if let Some(f) = usize::try_from(base + id)
+                .ok()
+                .and_then(|i| self.flags.get_mut(i))
+            {
+                *f = v;
+            }
         }
     }
 
@@ -726,7 +766,13 @@ impl Script {
     /// The animation keys (`PLAYANIMP` .. `ADDFRAMEOBJET` in `SetVariables`'
     /// order): the name, then the
     /// number after the comma.
-    fn anim_command(&mut self, host: &mut dyn Host, src: Src, p: usize, key: usize) -> usize {
+    pub(super) fn anim_command(
+        &mut self,
+        host: &mut dyn Host,
+        src: Src,
+        p: usize,
+        key: usize,
+    ) -> usize {
         let k = self.keys.clone();
         let either = |s: &mut Script| {
             // CONTINUEANIM, ANIM_THE_FRAME: #OBJETS#, then #PERSONNAGES#.

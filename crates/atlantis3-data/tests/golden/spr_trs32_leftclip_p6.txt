@@ -1,0 +1,37 @@
+# AFF_SPRTRS of spr_p6.dll, 32-bit x8r8g8b8 display, left clip, under emulation: 1024x768 target
+# (columns 0..1022), every pixel 0x00406080 before each call; the 0x278 banks loaded one after the
+# other at one address. Per bank, every sprite at levels 6, 12, 18, 24: the reference at
+# (xoff + rx, yoff + 100), rx = min(200, 1023 - w), and the clipped draw at (xoff - w / 3, yoff + 100);
+# rows_bad_shipped = the rows whose visible part differs from the reference cut (the library as
+# shipped), rows_bad_patched = the same with the S-run skip's extra byte removed.
+# bar: Interface.spr #0 at the inventory's left-clipped position (screen WxH), md5 of the target
+# after the shipped call and after the patched one, with their differing rows against a reference
+# drawn at x = 27.
+spr/BagdadObjets.SPR calls=96 rows=5688 rows_bad_shipped=552 rows_bad_patched=0
+spr/BagdadObjetsEnMain.SPR calls=96 rows=9176 rows_bad_shipped=2136 rows_bad_patched=0
+spr/HoggarObjets.SPR calls=40 rows=2396 rows_bad_shipped=4 rows_bad_patched=0
+spr/HoggarObjetsEnMain.SPR calls=40 rows=4564 rows_bad_shipped=2352 rows_bad_patched=0
+spr/HoggarSujets52.SPR calls=48 rows=2384 rows_bad_shipped=244 rows_bad_patched=0
+spr/HoggarSujets64.SPR calls=48 rows=2912 rows_bad_shipped=356 rows_bad_patched=0
+spr/HoggarSujets80.SPR calls=48 rows=3628 rows_bad_shipped=408 rows_bad_patched=0
+spr/InterSujets52.SPR calls=52 rows=2612 rows_bad_shipped=507 rows_bad_patched=0
+spr/InterSujets64.SPR calls=52 rows=3204 rows_bad_shipped=594 rows_bad_patched=0
+spr/InterSujets80.SPR calls=52 rows=4004 rows_bad_shipped=818 rows_bad_patched=0
+spr/LDMObjets.SPR calls=168 rows=8188 rows_bad_shipped=292 rows_bad_patched=0
+spr/LDMSujets52.SPR calls=120 rows=6040 rows_bad_shipped=916 rows_bad_patched=0
+spr/LDMSujets64.SPR calls=120 rows=7436 rows_bad_shipped=948 rows_bad_patched=0
+spr/LDMSujets80.SPR calls=120 rows=9288 rows_bad_shipped=1511 rows_bad_patched=0
+spr/PaleoObjets.SPR calls=52 rows=3092 rows_bad_shipped=250 rows_bad_patched=0
+spr/PaleoObjetsEnMain.SPR calls=52 rows=9460 rows_bad_shipped=2743 rows_bad_patched=0
+spr/interface.SPR calls=176 rows=7836 rows_bad_shipped=2306 rows_bad_patched=0
+total calls=1380 rows=91908 rows_bad_shipped=16937 rows_bad_patched=0
+bar 800x600 x=-98 y=522 level=0 shipped=6584e1b7046bd19a5ce209534bdd0cbc rows_bad=32 fixed=942de0c48a2889e44e2d2b33ffa812f4 rows_bad=0
+bar 800x600 x=-98 y=522 level=6 shipped=4cc01e7ba9ae16841ffd7bfaf95257d5 rows_bad=33 fixed=664b6d4acaa9140fb4daf019b7010d8a rows_bad=0
+bar 800x600 x=-98 y=522 level=12 shipped=3966225bcb34190f97213c45d87bcf0b rows_bad=33 fixed=64877099d3c0df68a4477dad6ea45bc4 rows_bad=0
+bar 800x600 x=-98 y=522 level=18 shipped=282da62cad9a9df17b36e7be31ab01c3 rows_bad=33 fixed=52a3dacdb9b6173d539fe96d00c9490c rows_bad=0
+bar 800x600 x=-98 y=522 level=24 shipped=46bea3d9c2ed4518d5c3114b0d5123ad rows_bad=33 fixed=bf4a2ce0ff4ad40255e539be8e02c477 rows_bad=0
+bar 640x480 x=-178 y=402 level=0 shipped=7c5fa8ce8ff35c53dac5fc92314a16aa rows_bad=54 fixed=543975fa8cdd8d68f2b90315511ae499 rows_bad=0
+bar 640x480 x=-178 y=402 level=6 shipped=fec5595a93600b3b0452fbcd3c0b259e rows_bad=69 fixed=4043c41eb879b130bcd0b9995220f4c2 rows_bad=0
+bar 640x480 x=-178 y=402 level=12 shipped=b2200ab70c114fea8c40f4c5a2fee4d5 rows_bad=69 fixed=3c3ea527fac1fa64908156a306260eb5 rows_bad=0
+bar 640x480 x=-178 y=402 level=18 shipped=c59a6b9a43404cd47fd88a787087b8a5 rows_bad=69 fixed=ad7c73731ce0bee20f2e54d456d3714c rows_bad=0
+bar 640x480 x=-178 y=402 level=24 shipped=0d486e94fb441f664bd63b5212e399d8 rows_bad=69 fixed=86d2cccd8671533ae655a0b8812d11aa rows_bad=0

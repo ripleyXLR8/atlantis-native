@@ -1,0 +1,261 @@
+# Altar of the four hearts (paleo.wam views 5..8) of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31)
+# under emulation: the place's set-up, the view entry, the zone click hook, and per frame the place
+# animations' step, the frame's inputs and the frame hook run unmodified; the sound calls, CtrlScenarIN
+# and the bank close logged only (no chapter loaded); frame n at 100 + n x 1.0025 / 15 s; rand seeded
+# with 1 before the entry. Each run starts from a new game's state. Line format: tests/common/place.rs.
+# st pos = the hearts' positions (record +4 @ 0x00785fe4 + 0x48 k: stag, aurochs, horse, ibex;
+#   -1 = not on the altar).  Zones PAL_ZFEU 0, PAL_ZAIR 1, PAL_ZEAU 2, PAL_ZTERRE 3.
+# Flags 616..619 (positions + 1), 70 (solved), 604.  Slot frame lists = the hearts drawn (frame
+#   = position, mode 0).
+run win horse fire, ibex earth, aurochs water, stag air
+setup wam paleo.wam view 5 yaw 0 pitch 0
+setup cmd (sacados=PAL_COEUR_CERF)
+setup cmd (sacados=PAL_COEUR_AVROCH)
+setup cmd (sacados=PAL_COEUR_CHEVAL)
+setup cmd (sacados=PAL_COEUR_BOUQUETIN)
+slots 0:ebA1005005(PAL_EAU_CAVERNE) 1:hpA1005005(PAL_HERO_MORTE) 2:hfA1005005(PAL_COEUR_CERF) 3:haA1005005(PAL_COEUR_AVROCH) 4:heA1005005(PAL_COEUR_CHEVAL) 5:htA1005005(PAL_COEUR_BOUQUETIN)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slot 0 2 sh 1 mode 0 fr 0 list - ended 0
+slot 0 3 sh 1 mode 0 fr 0 list - ended 0
+slot 0 4 sh 1 mode 0 fr 0 list - ended 0
+slot 0 5 sh 1 mode 0 fr 0 list - ended 0
+st 0 pos=-1,-1,-1,-1
+bag 0 +PAL_COEUR_CERF +PAL_COEUR_AVROCH +PAL_COEUR_CHEVAL +PAL_COEUR_BOUQUETIN
+hand 0 0
+hand 2 PAL_COEUR_CHEVAL
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+click 3 PAL_ZFEU
+cmd 3 (PlaySound=200)
+snd 3 load sfx\sound200.apc 0 1
+snd 3 play sfx\sound200.apc
+addf 3 PAL_COEUR_CHEVAL 0
+cmd 3 (ObjetEnMain=0)
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 4 sh 1 mode 0 fr 0 list 0 ended 0
+st 3 pos=-1,-1,0,-1
+flags 3 618=1
+hand 3 0
+bag 3 -PAL_COEUR_CHEVAL
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+enter 4 view 6 yaw 0 pitch 0 (walk)
+cmd 4 (LIMITEANGLEWARPY=70)
+addf 4 PAL_COEUR_CHEVAL 0
+slots 0:ebA1006005(PAL_EAU_CAVERNE) 1:hpA1006005(PAL_HERO_MORTE) 2:hfA1006005(PAL_COEUR_CERF) 3:haA1006005(PAL_COEUR_AVROCH) 4:heA1006005(PAL_COEUR_CHEVAL) 5:htA1006005(PAL_COEUR_BOUQUETIN)
+slot 4 0 sh 1 mode 1 fr 0 list - ended 0
+slot 4 1 sh 1 mode 1 fr 0 list - ended 0
+slot 4 2 sh 1 mode 0 fr 0 list - ended 0
+slot 4 3 sh 1 mode 0 fr 0 list - ended 0
+slot 4 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 4 5 sh 1 mode 0 fr 0 list - ended 0
+hand 5 PAL_COEUR_BOUQUETIN
+click 6 PAL_ZTERRE
+cmd 6 (PlaySound=200)
+snd 6 load sfx\sound200.apc 0 1
+snd 6 play sfx\sound200.apc
+addf 6 PAL_COEUR_BOUQUETIN 3
+cmd 6 (ObjetEnMain=0)
+slot 6 0 sh 1 mode 1 fr 1 list - ended 0
+slot 6 5 sh 1 mode 0 fr 0 list 3 ended 0
+st 6 pos=-1,-1,0,3
+flags 6 619=4
+hand 6 0
+bag 6 -PAL_COEUR_BOUQUETIN
+slot 7 0 sh 1 mode 1 fr 2 list - ended 0
+enter 7 view 7 yaw 0 pitch 0 (walk)
+cmd 7 (LIMITEANGLEWARPY=70)
+addf 7 PAL_COEUR_CHEVAL 0
+addf 7 PAL_COEUR_BOUQUETIN 3
+slots 0:ebA1007005(PAL_EAU_CAVERNE) 1:hpA1007005(PAL_HERO_MORTE) 2:hfA1007005(PAL_COEUR_CERF) 3:haA1007005(PAL_COEUR_AVROCH) 4:heA1007005(PAL_COEUR_CHEVAL) 5:htA1007005(PAL_COEUR_BOUQUETIN)
+slot 7 0 sh 1 mode 1 fr 0 list - ended 0
+slot 7 1 sh 1 mode 1 fr 0 list - ended 0
+slot 7 2 sh 1 mode 0 fr 0 list - ended 0
+slot 7 3 sh 1 mode 0 fr 0 list - ended 0
+slot 7 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 7 5 sh 1 mode 0 fr 0 list 3 ended 0
+hand 8 PAL_COEUR_AVROCH
+click 9 PAL_ZEAU
+cmd 9 (PlaySound=200)
+snd 9 load sfx\sound200.apc 0 1
+snd 9 play sfx\sound200.apc
+addf 9 PAL_COEUR_AVROCH 2
+cmd 9 (ObjetEnMain=0)
+slot 9 0 sh 1 mode 1 fr 1 list - ended 0
+slot 9 3 sh 1 mode 0 fr 0 list 2 ended 0
+st 9 pos=-1,2,0,3
+flags 9 617=3
+hand 9 0
+bag 9 -PAL_COEUR_AVROCH
+slot 10 0 sh 1 mode 1 fr 2 list - ended 0
+enter 10 view 8 yaw 0 pitch 0 (walk)
+cmd 10 (LIMITEANGLEWARPY=70)
+addf 10 PAL_COEUR_AVROCH 2
+addf 10 PAL_COEUR_CHEVAL 0
+addf 10 PAL_COEUR_BOUQUETIN 3
+slots 0:ebA1008005(PAL_EAU_CAVERNE) 1:hpA1008005(PAL_HERO_MORTE) 2:hfA1008005(PAL_COEUR_CERF) 3:haA1008005(PAL_COEUR_AVROCH) 4:heA1008005(PAL_COEUR_CHEVAL) 5:htA1008005(PAL_COEUR_BOUQUETIN)
+slot 10 0 sh 1 mode 1 fr 0 list - ended 0
+slot 10 1 sh 1 mode 1 fr 0 list - ended 0
+slot 10 2 sh 1 mode 0 fr 0 list - ended 0
+slot 10 3 sh 1 mode 0 fr 0 list 2 ended 0
+slot 10 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 10 5 sh 1 mode 0 fr 0 list 3 ended 0
+hand 11 PAL_COEUR_CERF
+click 12 PAL_ZAIR
+cmd 12 (PlaySound=200)
+snd 12 load sfx\sound200.apc 0 1
+snd 12 play sfx\sound200.apc
+addf 12 PAL_COEUR_CERF 1
+cmd 12 (ObjetEnMain=0)
+scan 12
+slot 12 0 sh 1 mode 1 fr 1 list - ended 0
+slot 12 2 sh 1 mode 0 fr 0 list 1 ended 0
+st 12 pos=1,2,0,3
+flags 12 616=2 70=1
+hand 12 0
+bag 12 -PAL_COEUR_CERF
+slot 13 0 sh 1 mode 1 fr 2 list - ended 0
+slot 14 0 sh 1 mode 1 fr 3 list - ended 0
+slot 15 0 sh 1 mode 1 fr 4 list - ended 0
+run wrong stag fire, horse fire (same place), empty hand on fire (both back), stag air
+setup wam paleo.wam view 5 yaw 0 pitch 0
+setup cmd (sacados=PAL_COEUR_CERF)
+setup cmd (sacados=PAL_COEUR_AVROCH)
+setup cmd (sacados=PAL_COEUR_CHEVAL)
+setup cmd (sacados=PAL_COEUR_BOUQUETIN)
+slots 0:ebA1005005(PAL_EAU_CAVERNE) 1:hpA1005005(PAL_HERO_MORTE) 2:hfA1005005(PAL_COEUR_CERF) 3:haA1005005(PAL_COEUR_AVROCH) 4:heA1005005(PAL_COEUR_CHEVAL) 5:htA1005005(PAL_COEUR_BOUQUETIN)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slot 0 2 sh 1 mode 0 fr 0 list - ended 0
+slot 0 3 sh 1 mode 0 fr 0 list - ended 0
+slot 0 4 sh 1 mode 0 fr 0 list - ended 0
+slot 0 5 sh 1 mode 0 fr 0 list - ended 0
+st 0 pos=-1,-1,-1,-1
+bag 0 +PAL_COEUR_CERF +PAL_COEUR_AVROCH +PAL_COEUR_CHEVAL +PAL_COEUR_BOUQUETIN
+hand 0 0
+hand 2 PAL_COEUR_CERF
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+click 3 PAL_ZFEU
+cmd 3 (PlaySound=200)
+snd 3 load sfx\sound200.apc 0 1
+snd 3 play sfx\sound200.apc
+addf 3 PAL_COEUR_CERF 0
+cmd 3 (ObjetEnMain=0)
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 2 sh 1 mode 0 fr 0 list 0 ended 0
+st 3 pos=0,-1,-1,-1
+flags 3 616=1
+hand 3 0
+bag 3 -PAL_COEUR_CERF
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+hand 5 PAL_COEUR_CHEVAL
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+click 6 PAL_ZFEU
+cmd 6 (PlaySound=200)
+snd 6 load sfx\sound200.apc 0 1
+snd 6 play sfx\sound200.apc
+addf 6 PAL_COEUR_CHEVAL 0
+cmd 6 (ObjetEnMain=0)
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 4 sh 1 mode 0 fr 0 list 0 ended 0
+st 6 pos=0,-1,0,-1
+flags 6 618=1
+hand 6 0
+bag 6 -PAL_COEUR_CHEVAL
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+click 8 PAL_ZFEU
+subf 8 PAL_COEUR_CERF 0
+subf 8 PAL_COEUR_CHEVAL 0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 2 sh 1 mode 0 fr 0 list - ended 0
+slot 8 4 sh 1 mode 0 fr 0 list - ended 0
+st 8 pos=-1,-1,-1,-1
+flags 8 616=0 618=0
+hand 8 PAL_COEUR_CHEVAL
+bag 8 +PAL_COEUR_CERF
+bag 8 +PAL_COEUR_CHEVAL
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+enter 9 view 8 yaw 0 pitch 0 (walk)
+cmd 9 (LIMITEANGLEWARPY=70)
+slots 0:ebA1008005(PAL_EAU_CAVERNE) 1:hpA1008005(PAL_HERO_MORTE) 2:hfA1008005(PAL_COEUR_CERF) 3:haA1008005(PAL_COEUR_AVROCH) 4:heA1008005(PAL_COEUR_CHEVAL) 5:htA1008005(PAL_COEUR_BOUQUETIN)
+slot 9 0 sh 1 mode 1 fr 0 list - ended 0
+slot 9 1 sh 1 mode 1 fr 0 list - ended 0
+slot 9 2 sh 1 mode 0 fr 0 list - ended 0
+slot 9 3 sh 1 mode 0 fr 0 list - ended 0
+slot 9 4 sh 1 mode 0 fr 0 list - ended 0
+slot 9 5 sh 1 mode 0 fr 0 list - ended 0
+hand 10 PAL_COEUR_CERF
+click 11 PAL_ZAIR
+cmd 11 (PlaySound=200)
+snd 11 load sfx\sound200.apc 0 1
+snd 11 play sfx\sound200.apc
+addf 11 PAL_COEUR_CERF 1
+cmd 11 (ObjetEnMain=0)
+slot 11 0 sh 1 mode 1 fr 1 list - ended 0
+slot 11 2 sh 1 mode 0 fr 0 list 1 ended 0
+st 11 pos=1,-1,-1,-1
+flags 11 616=2
+hand 11 0
+bag 11 -PAL_COEUR_CERF
+slot 12 0 sh 1 mode 1 fr 2 list - ended 0
+slot 13 0 sh 1 mode 1 fr 3 list - ended 0
+slot 14 0 sh 1 mode 1 fr 4 list - ended 0
+run reentry flags 616..619 = 2, 3, 0, 0 (stag air, aurochs water placed before), then horse fire, ibex earth
+setup wam paleo.wam view 5 yaw 0 pitch 0
+setup cmd (sacados=PAL_COEUR_CHEVAL)
+setup cmd (sacados=PAL_COEUR_BOUQUETIN)
+setup flag 616 2
+setup flag 617 3
+slots 0:ebA1005005(PAL_EAU_CAVERNE) 1:hpA1005005(PAL_HERO_MORTE) 2:hfA1005005(PAL_COEUR_CERF) 3:haA1005005(PAL_COEUR_AVROCH) 4:heA1005005(PAL_COEUR_CHEVAL) 5:htA1005005(PAL_COEUR_BOUQUETIN)
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slot 0 1 sh 1 mode 1 fr 0 list - ended 0
+slot 0 2 sh 1 mode 0 fr 0 list 1 ended 0
+slot 0 3 sh 1 mode 0 fr 0 list 2 ended 0
+slot 0 4 sh 1 mode 0 fr 0 list - ended 0
+slot 0 5 sh 1 mode 0 fr 0 list - ended 0
+st 0 pos=1,2,-1,-1
+bag 0 +PAL_COEUR_CHEVAL +PAL_COEUR_BOUQUETIN
+hand 0 0
+hand 2 PAL_COEUR_CHEVAL
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+click 3 PAL_ZFEU
+cmd 3 (PlaySound=200)
+snd 3 load sfx\sound200.apc 0 1
+snd 3 play sfx\sound200.apc
+addf 3 PAL_COEUR_CHEVAL 0
+cmd 3 (ObjetEnMain=0)
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 4 sh 1 mode 0 fr 0 list 0 ended 0
+st 3 pos=1,2,0,-1
+flags 3 618=1
+hand 3 0
+bag 3 -PAL_COEUR_CHEVAL
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+enter 4 view 6 yaw 0 pitch 0 (walk)
+cmd 4 (LIMITEANGLEWARPY=70)
+addf 4 PAL_COEUR_CERF 1
+addf 4 PAL_COEUR_AVROCH 2
+addf 4 PAL_COEUR_CHEVAL 0
+slots 0:ebA1006005(PAL_EAU_CAVERNE) 1:hpA1006005(PAL_HERO_MORTE) 2:hfA1006005(PAL_COEUR_CERF) 3:haA1006005(PAL_COEUR_AVROCH) 4:heA1006005(PAL_COEUR_CHEVAL) 5:htA1006005(PAL_COEUR_BOUQUETIN)
+slot 4 0 sh 1 mode 1 fr 0 list - ended 0
+slot 4 1 sh 1 mode 1 fr 0 list - ended 0
+slot 4 2 sh 1 mode 0 fr 0 list 1 ended 0
+slot 4 3 sh 1 mode 0 fr 0 list 2 ended 0
+slot 4 4 sh 1 mode 0 fr 0 list 0 ended 0
+slot 4 5 sh 1 mode 0 fr 0 list - ended 0
+hand 5 PAL_COEUR_BOUQUETIN
+click 6 PAL_ZTERRE
+cmd 6 (PlaySound=200)
+snd 6 load sfx\sound200.apc 0 1
+snd 6 play sfx\sound200.apc
+addf 6 PAL_COEUR_BOUQUETIN 3
+cmd 6 (ObjetEnMain=0)
+scan 6
+slot 6 0 sh 1 mode 1 fr 1 list - ended 0
+slot 6 5 sh 1 mode 0 fr 0 list 3 ended 0
+st 6 pos=1,2,0,3
+flags 6 619=4 70=1
+hand 6 0
+bag 6 -PAL_COEUR_BOUQUETIN
+slot 7 0 sh 1 mode 1 fr 2 list - ended 0
+slot 8 0 sh 1 mode 1 fr 3 list - ended 0
+slot 9 0 sh 1 mode 1 fr 4 list - ended 0

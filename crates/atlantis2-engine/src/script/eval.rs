@@ -163,6 +163,11 @@ impl Script {
     /// `vars[key]` with, from the value at `v`.
     pub(crate) fn cond_value(&mut self, host: &mut dyn Host, v: usize, key: usize) -> i32 {
         const SRC: Src = Src::Chapter;
+        if self.is_a3() && self.names.id(defnames::VARIABLES, b"FLAGRECALAGE").ok() == Some(key) {
+            // Atlantis III (@ 0x00446fd0): the re-alignment flag
+            // (@ 0x00756080) into the variable, then compared.
+            self.vars[key] = i32::from(host.recalage_running());
+        }
         let k = &self.keys;
         if key == k.flag {
             // FLAGnnn: flags[nnn] into vars[FLAG], nnn after "(FLAG".

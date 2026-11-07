@@ -1,0 +1,65 @@
+# The boot state's cube of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation:
+# CFuner.wam loaded with world 1 (as the start-up runs chapter 0) and with world 2, its set-up, VUE = 4, the view entry
+# and its cube loader (0x0042fd30) unmodified. Lines: exists <path> (the exists test 0x004191e0 on warp files), tga
+# <path> (the TGA face loader 0x00418e70), open <path> found|missing (file opens under warp\), log <format> (the
+# game's log lines during the entry), monde <world>, face <k> distinct <n> first <pixel, u16 LE hex> md5 <md5 of the
+# 512 x 512 RGB565 surface 0x0077af18 + 0x80 k after the entry>.
+run world 1
+exists warp\Warp512\hoggar\cf0004.hnm
+tga warp\Warp512\hoggar\cfft0004.tga
+tga warp\Warp512\hoggar\cfbk0004.tga
+tga warp\Warp512\hoggar\cfup0004.tga
+tga warp\Warp512\hoggar\cfdn0004.tga
+tga warp\Warp512\hoggar\cfrt0004.tga
+tga warp\Warp512\hoggar\cflf0004.tga
+open Datas\warp\Warp512\hoggar\cf0004.hnm missing
+open datas\warp\Warp512\hoggar\cf0004.hnm missing
+open Datas\warp\Warp512\hoggar\cfft0004.tga missing
+open datas\warp\Warp512\hoggar\cfft0004.tga missing
+open Datas\warp\Warp512\hoggar\cfbk0004.tga missing
+open datas\warp\Warp512\hoggar\cfbk0004.tga missing
+open Datas\warp\Warp512\hoggar\cfup0004.tga missing
+open datas\warp\Warp512\hoggar\cfup0004.tga missing
+open Datas\warp\Warp512\hoggar\cfdn0004.tga missing
+open datas\warp\Warp512\hoggar\cfdn0004.tga missing
+open Datas\warp\Warp512\hoggar\cfrt0004.tga missing
+open datas\warp\Warp512\hoggar\cfrt0004.tga missing
+open Datas\warp\Warp512\hoggar\cflf0004.tga missing
+open datas\warp\Warp512\hoggar\cflf0004.tga missing
+log 
+log ------- Warp %s ------- chapter %d --
+log LoadSPW() : fichier %s introuvable.
+log LoadSPW() : fichier %s introuvable.
+log LoadSPW() : fichier %s introuvable.
+log LoadSPW() : fichier %s introuvable.
+log LoadSPW() : fichier %s introuvable.
+log LoadSPW() : fichier %s introuvable.
+log LoadSPW() : fichier %s introuvable.
+log LoadSPW() : fichier %s introuvable.
+log AtlBruitages_InitWarp(): current_vue=NULL!!!
+log interp: SET%s
+log AddSpwToFrameTab impossible for - non trouvé - :%d
+monde 1
+face 0 distinct 1 first 1000 md5 8248814b2b54a6196bfdb22cdac0d0ec
+face 1 distinct 1 first 0080 md5 3d8103c428e7e894cf5f5cd54800eefa
+face 2 distinct 1 first 0800 md5 3a20779393f9352ede3335ccf6fcb450
+face 3 distinct 1 first 0004 md5 9aa6437bc645da3643d0a30c75a3ae38
+face 4 distinct 1 first 0840 md5 fed42e1878b676a6144775a0126baba1
+face 5 distinct 1 first 0002 md5 c2cd57faaf7891e54d486b247fb4ffac
+run world 2
+exists warp\Warp512\ldm\cf0004.hnm
+exists warp\Warp512\ldm\cf0004.hnm
+open Datas\warp\Warp512\ldm\cf0004.hnm found
+open Datas\warp\Warp512\ldm\cf0004.hnm found
+open Datas\warp\Warp512\ldm\cf0004.hnm found
+log 
+log ------- Warp %s ------- chapter %d --
+log AtlBruitages_InitWarp(): current_vue=NULL!!!
+log interp: SET%s
+monde 2
+face 0 distinct 1069 first 4108 md5 9a84a208894e8691eca17752758dd20a
+face 1 distinct 1644 first 2100 md5 7e3de21d3d8da8dde54801381f3eee9d
+face 2 distinct 267 first 2100 md5 9db34b1c5c499c89068242ef77c0aed6
+face 3 distinct 161 first 0129 md5 46901cd6a2a57e3b002afd8ca2363860
+face 4 distinct 1525 first 0000 md5 2c2249285e5ac60c5ef32882ee96e952
+face 5 distinct 1383 first 4100 md5 571485c7118ae213c4fd556cb509e228

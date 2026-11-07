@@ -1,0 +1,101 @@
+# Dialog head frames of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation: speaker TARG,
+# mesh\ToS1.DB, stand 1, 800 x 600 RGB565 over a checker body surface (8 x 8, 0x8410 / 0x4208), Pentium II routines, x87 0x0e7f,
+# the C library's rand from its start; per frame: the tick (eyes, pose), the mouth, the draw: md5 of the screen.
+FRAME cam 1 mouth base mood 0 frame 0 eyes 0 md5 34d42cef0cc89bfbaa31d1c5ce3681f8 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 1 mouth base mood 0 frame 20 eyes 0 md5 cf00072ab9ce95c8ccb67121332c35d1 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 1 mouth base mood 0 frame 39 eyes 0 md5 1ea541e512651f128a286225d3e94240 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 1 mouth a mood 0 frame 0 eyes 0 md5 38c74126d598dce0891d82efedcca1bc deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 1 mouth a mood 0 frame 20 eyes 0 md5 e48b57b30b2a83e68219b3e7f3b74e1c deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 1 mouth a mood 0 frame 39 eyes 0 md5 67b45ed922af51493c281fa8dc3ef0da deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 1 mouth mix mood 1 frame 0 eyes 0 md5 92c7b7f759637fe41e99965288138680 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 1 mouth mix mood 1 frame 20 eyes 0 md5 f88689cf6d6973e8f782964a3a1ad2d8 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 1 mouth mix mood 1 frame 39 eyes 0 md5 e3826025dd26fc28fa0e55c9e8cf9cf0 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth base mood 0 frame 0 eyes 0 md5 b98e8adc51d43fcc839effd42be76a1f deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth base mood 0 frame 20 eyes 0 md5 eedfed24e0856d68ab74f8c2a00fb619 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth base mood 0 frame 39 eyes 0 md5 7dee734f6b6ed1d920dbc95a5c097b1c deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth a mood 0 frame 0 eyes 0 md5 ab4e684edaa8888f4e683786a1aa8162 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth a mood 0 frame 20 eyes 0 md5 880b57dd092836c892c3885428dc88be deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth a mood 0 frame 39 eyes 0 md5 fbdda78d8f3673b63e2b3433dc86a022 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth mix mood 1 frame 0 eyes 0 md5 eecb914f62bb4dc513eb41a02010048a deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth mix mood 1 frame 20 eyes 0 md5 6d1a1bf6028ec498f6d93593968e36a0 deferred 0 routine Zi32Texture16Linear1516II
+FRAME cam 2 mouth mix mood 1 frame 39 eyes 0 md5 9698a972c8c73d4026a833520746b3e4 deferred 0 routine Zi32Texture16Linear1516II
+TICK 0 frame 0 eyes 0 k 3f73332b md5 34d42cef0cc89bfbaa31d1c5ce3681f8
+TICK 1 frame 1 eyes 0 k 3f7ffff7 md5 842e3a89d713ade93d269e32e4fc6121
+TICK 2 frame 2 eyes 1 k 3d4ccccd md5 0ba43e6c93434bbdee954c63a5390969
+TICK 3 frame 3 eyes 2 k 3dcccccd md5 5ab81a7f8e5640e67af1a9a78653e883
+TICK 4 frame 4 eyes 0 k 3e199999 md5 802d4cf57b45e2af97c3632826c232a2
+TICK 5 frame 5 eyes 0 k 3e4ccccc md5 a00339d949aee3cf819dc5ac5d2a3daa
+TICK 6 frame 6 eyes 0 k 3e7fffff md5 68ac599991fadbb5736665d1832ef416
+TICK 7 frame 7 eyes 0 k 3e999999 md5 8bcabdcfe7be37045a187083956c3f5c
+TICK 8 frame 8 eyes 0 k 3eb33332 md5 d2e6692952e03834fa9b5cfc6d37855f
+TICK 9 frame 9 eyes 0 k 3ecccccb md5 5864537f0e3db4357f113b67223ab04e
+TICK 10 frame 10 eyes 0 k 3ee66664 md5 52b2fe534977797e93b5b6f5ad646998
+TICK 11 frame 11 eyes 0 k 3efffffd md5 6fbcc59902e5f8a09bb2381b5b8a8512
+TICK 12 frame 12 eyes 0 k 3f0ccccb md5 28470077227256300046adb7569d5937
+TICK 13 frame 13 eyes 0 k 3f199997 md5 367a0223d6fa2226e3b19820c2ca1db1
+TICK 14 frame 14 eyes 0 k 3f266663 md5 098472ab928a647807734a8b592b6aaf
+TICK 15 frame 15 eyes 0 k 3f33332f md5 08ee9d03c4eafdbb76c8d8156ba07c56
+TICK 16 frame 16 eyes 0 k 3f3ffffb md5 acfd70c2a74ca3c465a732cf75685e07
+TICK 17 frame 17 eyes 0 k 3f4cccc7 md5 85ed60ec67f198534a48965a828d2567
+TICK 18 frame 18 eyes 0 k 3f599993 md5 f5b8ff75b235c9558a5f3394e943864c
+TICK 19 frame 19 eyes 0 k 3f66665f md5 7f172110037f839e1c0f60c2ca6d9ffb
+TICK 20 frame 20 eyes 0 k 3f73332b md5 cf00072ab9ce95c8ccb67121332c35d1
+TICK 21 frame 21 eyes 0 k 3f7ffff7 md5 9ef26c84a302cea79b83cdeca7e28fb5
+TICK 22 frame 22 eyes 0 k 3f866661 md5 6ab468986a24f63373c3dee163626490
+TICK 23 frame 23 eyes 0 k 3f866661 md5 08b136fb86652b5570e3e58e6c405c01
+TICK 24 frame 24 eyes 1 k 3d4ccccd md5 86d8687bf750388826a94532659bdf7e
+TICK 25 frame 25 eyes 2 k 3dcccccd md5 a0b8b62455d9fda77ecf8c000c1df578
+TICK 26 frame 26 eyes 0 k 3e199999 md5 2e87350e94cc9c0dfe57511d18dd6b8e
+TICK 27 frame 27 eyes 0 k 3e4ccccc md5 68c00e370416ea01ec8d8940c492ca2d
+TICK 28 frame 28 eyes 0 k 3e7fffff md5 bc56d4cf5063dc74102c9a47984a1df9
+TICK 29 frame 29 eyes 0 k 3e999999 md5 537f6107b9d61e51db6b683af6502c62
+TICK 30 frame 30 eyes 0 k 3eb33332 md5 d2a546fc9d039bd7d164b7cd25c5c9cb
+TICK 31 frame 31 eyes 0 k 3ecccccb md5 46601ab2e5dc8df1a638c03c71b6913d
+TICK 32 frame 32 eyes 0 k 3ee66664 md5 a6c12f157a8bf4172af24f7a1f195128
+TICK 33 frame 33 eyes 0 k 3efffffd md5 b66df47745145d4a7566d48326528d2a
+TICK 34 frame 34 eyes 0 k 3f0ccccb md5 79196e4a5ba8ff1de77c1460ea52109c
+TICK 35 frame 35 eyes 0 k 3f199997 md5 29f840b840b2034d81132294e00e8d6e
+TICK 36 frame 36 eyes 0 k 3f266663 md5 7bb31cfa7287dfe660abc37b991fdcae
+TICK 37 frame 37 eyes 0 k 3f33332f md5 f08df33cd395a22d5765356d8af96ba9
+TICK 38 frame 38 eyes 0 k 3f3ffffb md5 133a6d5a1d30be8d4a0c5af0a2b9d317
+TICK 39 frame 0 eyes 0 k 3f4cccc7 md5 34d42cef0cc89bfbaa31d1c5ce3681f8
+TICK 40 frame 1 eyes 0 k 3f599993 md5 842e3a89d713ade93d269e32e4fc6121
+TICK 41 frame 2 eyes 0 k 3f66665f md5 e6b5ffc24aa5784766fd02b026ee8987
+TICK 42 frame 3 eyes 0 k 3f73332b md5 3d32b7c49af1c59309ce9e4a2c01367e
+TICK 43 frame 4 eyes 0 k 3f7ffff7 md5 802d4cf57b45e2af97c3632826c232a2
+TICK 44 frame 5 eyes 0 k 3f866661 md5 a00339d949aee3cf819dc5ac5d2a3daa
+TICK 45 frame 6 eyes 0 k 3f866661 md5 68ac599991fadbb5736665d1832ef416
+TICK 46 frame 7 eyes 0 k 3f866661 md5 8bcabdcfe7be37045a187083956c3f5c
+TICK 47 frame 8 eyes 1 k 3d4ccccd md5 d7836e4c1a68d3d0a22413460a64cbb2
+TICK 48 frame 9 eyes 2 k 3dcccccd md5 b236642353dbf66efa688d87b246f16b
+TICK 49 frame 10 eyes 0 k 3e199999 md5 52b2fe534977797e93b5b6f5ad646998
+TICK 50 frame 11 eyes 0 k 3e4ccccc md5 6fbcc59902e5f8a09bb2381b5b8a8512
+TICK 51 frame 12 eyes 0 k 3e7fffff md5 28470077227256300046adb7569d5937
+TICK 52 frame 13 eyes 0 k 3e999999 md5 367a0223d6fa2226e3b19820c2ca1db1
+TICK 53 frame 14 eyes 0 k 3eb33332 md5 098472ab928a647807734a8b592b6aaf
+TICK 54 frame 15 eyes 0 k 3ecccccb md5 08ee9d03c4eafdbb76c8d8156ba07c56
+TICK 55 frame 16 eyes 0 k 3ee66664 md5 acfd70c2a74ca3c465a732cf75685e07
+TICK 56 frame 17 eyes 0 k 3efffffd md5 85ed60ec67f198534a48965a828d2567
+TICK 57 frame 18 eyes 0 k 3f0ccccb md5 f5b8ff75b235c9558a5f3394e943864c
+TICK 58 frame 19 eyes 0 k 3f199997 md5 7f172110037f839e1c0f60c2ca6d9ffb
+TICK 59 frame 20 eyes 0 k 3f266663 md5 cf00072ab9ce95c8ccb67121332c35d1
+TICK 60 frame 21 eyes 0 k 3f33332f md5 9ef26c84a302cea79b83cdeca7e28fb5
+TICK 61 frame 22 eyes 0 k 3f3ffffb md5 6ab468986a24f63373c3dee163626490
+TICK 62 frame 23 eyes 0 k 3f4cccc7 md5 08b136fb86652b5570e3e58e6c405c01
+TICK 63 frame 24 eyes 0 k 3f599993 md5 55f82231190597099d699e411b3978f6
+TICK 64 frame 25 eyes 0 k 3f66665f md5 d3c69976ae767367bbe99506c952a57a
+TICK 65 frame 26 eyes 0 k 3f73332b md5 2e87350e94cc9c0dfe57511d18dd6b8e
+TICK 66 frame 27 eyes 0 k 3f7ffff7 md5 68c00e370416ea01ec8d8940c492ca2d
+TICK 67 frame 28 eyes 0 k 3f866661 md5 bc56d4cf5063dc74102c9a47984a1df9
+TICK 68 frame 29 eyes 0 k 3f866661 md5 537f6107b9d61e51db6b683af6502c62
+TICK 69 frame 30 eyes 0 k 3f866661 md5 d2a546fc9d039bd7d164b7cd25c5c9cb
+TICK 70 frame 31 eyes 0 k 3f866661 md5 46601ab2e5dc8df1a638c03c71b6913d
+TICK 71 frame 32 eyes 0 k 3f866661 md5 a6c12f157a8bf4172af24f7a1f195128
+TICK 72 frame 33 eyes 0 k 3f866661 md5 b66df47745145d4a7566d48326528d2a
+TICK 73 frame 34 eyes 1 k 3d4ccccd md5 5912f23cd336231cf20420ee7ef36841
+TICK 74 frame 35 eyes 2 k 3dcccccd md5 daa5d585c3bcebb028059377f5397f44
+TICK 75 frame 36 eyes 0 k 3e199999 md5 7bb31cfa7287dfe660abc37b991fdcae
+TICK 76 frame 37 eyes 0 k 3e4ccccc md5 f08df33cd395a22d5765356d8af96ba9
+TICK 77 frame 38 eyes 0 k 3e7fffff md5 133a6d5a1d30be8d4a0c5af0a2b9d317
+TICK 78 frame 0 eyes 0 k 3e999999 md5 34d42cef0cc89bfbaa31d1c5ce3681f8
+TICK 79 frame 1 eyes 0 k 3eb33332 md5 842e3a89d713ade93d269e32e4fc6121

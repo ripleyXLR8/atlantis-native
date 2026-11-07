@@ -1,0 +1,1645 @@
+# The Isis tiles (LDMorts.wam view 10): a whole solve, wrong moves, the solved picture
+# of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) under emulation: the place's
+# CHANGEWAM set-up, the view entry, the zone click hook, and per frame the place animations' step, the frame hook
+# and the main loop's place tail run unmodified; the sound calls, CtrlScenarIN and the in-hand sprite check logged
+# only (no chapter loaded); frame n at 100 + n x 1.0025 / 15 s, one 15 Hz step per frame; rand seeded with 1 before
+# the entry. Each run starts from a new game's state. Line format: tests/common/pz.rs.
+run win
+setup wam LDMorts.wam view 10 yaw 0 pitch 0
+setup flag 63 0
+setup flag 506 0
+setup flag 899 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 LDM_ISISKI0 5
+addf 0 LDM_ISISKS0 4
+addf 0 LDM_ISISKI1 11
+addf 0 LDM_ISISKS1 10
+addf 0 LDM_ISISKI2 10
+addf 0 LDM_ISISKS2 9
+addf 0 LDM_ISISKI3 4
+addf 0 LDM_ISISKS3 8
+addf 0 LDM_ISISKI4 6
+addf 0 LDM_ISISKS4 2
+addf 0 LDM_ISISKI5 8
+addf 0 LDM_ISISKS5 11
+addf 0 LDM_ISISKI6 1
+addf 0 LDM_ISISKS6 6
+addf 0 LDM_ISISKI7 3
+addf 0 LDM_ISISKS7 7
+addf 0 LDM_ISISKI8 7
+addf 0 LDM_ISISKS8 3
+addf 0 LDM_ISISKI9 2
+addf 0 LDM_ISISKS9 5
+addf 0 LDM_ISISKI10 0
+addf 0 LDM_ISISKS10 1
+addf 0 LDM_ISISKI11 9
+addf 0 LDM_ISISKS11 0
+cursor 0 reset
+slots 0:n1A1010010 1:kaA1010010 2:kbA1010010 3:kcA1010010 4:waA1010010 5:kdA1010010 6:keA1010010 7:kfA1010010 8:kgA1010010 9:khA1010010 10:kiA1010010 11:kjA1010010 12:kkA1010010 13:klA1010010 14:kmA1010010 15:knA1010010 16:koA1010010 17:kpA1010010 18:kqA1010010 19:krA1010010 20:ksA1010010 21:ktA1010010 22:kuA1010010 23:kvA1010010 24:kwA1010010 25:kxA1010010 26:prA1010010 27:prA2010010 28:cvA1010010 29:cvA2010010 30:cvA3010010 31:cvA4010010 32:snA1010001
+slotent 0:LDM_PALMIER 1:LDM_ISISKI0 2:LDM_ISISKI1 3:LDM_ISISKI2 4:LDM_EAU 5:LDM_ISISKI3 6:LDM_ISISKI4 7:LDM_ISISKI5 8:LDM_ISISKI6 9:LDM_ISISKI7 10:LDM_ISISKI8 11:LDM_ISISKI9 12:LDM_ISISKI10 13:LDM_ISISKI11 14:LDM_ISISKS0 15:LDM_ISISKS1 16:LDM_ISISKS2 17:LDM_ISISKS3 18:LDM_ISISKS4 19:LDM_ISISKS5 20:LDM_ISISKS6 21:LDM_ISISKS7 22:LDM_ISISKS8 23:LDM_ISISKS9 24:LDM_ISISKS10 25:LDM_ISISKS11 26:LDM_PRETRESSE 27:LDM_PRETRESSE 28:LDM_CHAUVESOURIS01 29:LDM_CHAUVESOURIS02 30:LDM_CHAUVESOURIS03 31:LDM_CHAUVESOURIS04 32:CHF_LARVE
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 0 fr 0 list 5 ended 0
+slotck 0 1 0
+slot 0 2 sh 1 mode 0 fr 0 list 11 ended 0
+slotck 0 2 0
+slot 0 3 sh 1 mode 0 fr 0 list 10 ended 0
+slotck 0 3 0
+slot 0 4 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 0 fr 0 list 4 ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list 6 ended 0
+slotck 0 6 0
+slot 0 7 sh 1 mode 0 fr 0 list 8 ended 0
+slotck 0 7 0
+slot 0 8 sh 1 mode 0 fr 0 list 1 ended 0
+slotck 0 8 0
+slot 0 9 sh 1 mode 0 fr 0 list 3 ended 0
+slotck 0 9 0
+slot 0 10 sh 1 mode 0 fr 0 list 7 ended 0
+slotck 0 10 0
+slot 0 11 sh 1 mode 0 fr 0 list 2 ended 0
+slotck 0 11 0
+slot 0 12 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 12 0
+slot 0 13 sh 1 mode 0 fr 0 list 9 ended 0
+slotck 0 13 0
+slot 0 14 sh 1 mode 0 fr 0 list 4 ended 0
+slotck 0 14 0
+slot 0 15 sh 1 mode 0 fr 0 list 10 ended 0
+slotck 0 15 0
+slot 0 16 sh 1 mode 0 fr 0 list 9 ended 0
+slotck 0 16 0
+slot 0 17 sh 1 mode 0 fr 0 list 8 ended 0
+slotck 0 17 0
+slot 0 18 sh 1 mode 0 fr 0 list 2 ended 0
+slotck 0 18 0
+slot 0 19 sh 1 mode 0 fr 0 list 11 ended 0
+slotck 0 19 0
+slot 0 20 sh 1 mode 0 fr 0 list 6 ended 0
+slotck 0 20 0
+slot 0 21 sh 1 mode 0 fr 0 list 7 ended 0
+slotck 0 21 0
+slot 0 22 sh 1 mode 0 fr 0 list 3 ended 0
+slotck 0 22 0
+slot 0 23 sh 1 mode 0 fr 0 list 5 ended 0
+slotck 0 23 0
+slot 0 24 sh 1 mode 0 fr 0 list 1 ended 0
+slotck 0 24 0
+slot 0 25 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 25 0
+slot 0 26 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 26 2
+slot 0 27 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 27 2
+slot 0 28 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 28 0
+slot 0 29 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 29 0
+slot 0 30 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 30 0
+slot 0 31 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 31 0
+slot 0 32 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 32 0
+st 0 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=Aucune_Zone_Cliquée picked=Aucune_Zone_Cliquée sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+hand 0 0 -
+bag 0 -LDM_CLEFCOFFRE
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 4 sh 1 mode 1 fr 1 list - ended 0
+slot 2 26 sh 1 mode 1 fr 1 list - ended 0
+slot 2 28 sh 1 mode 1 fr 1 list - ended 0
+slot 2 29 sh 1 mode 1 fr 1 list - ended 0
+slot 2 30 sh 1 mode 1 fr 1 list - ended 0
+slot 2 31 sh 1 mode 1 fr 1 list - ended 0
+slot 2 32 sh 1 mode 1 fr 1 list - ended 0
+click 3 LDM_ICARO5
+cursor 3 set '' 3
+subf 3 LDM_ISISKI0 5
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 0 fr 0 list - ended 0
+slot 3 4 sh 1 mode 1 fr 2 list - ended 0
+slot 3 26 sh 1 mode 1 fr 2 list - ended 0
+slot 3 28 sh 1 mode 1 fr 2 list - ended 0
+slot 3 29 sh 1 mode 1 fr 2 list - ended 0
+slot 3 30 sh 1 mode 1 fr 2 list - ended 0
+slot 3 31 sh 1 mode 1 fr 2 list - ended 0
+slot 3 32 sh 1 mode 1 fr 2 list - ended 0
+st 3 held=0 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO5 picked=LDM_ICARO5 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 4 sh 1 mode 1 fr 3 list - ended 0
+slot 4 26 sh 1 mode 1 fr 3 list - ended 0
+slot 4 28 sh 1 mode 1 fr 3 list - ended 0
+slot 4 29 sh 1 mode 1 fr 3 list - ended 0
+slot 4 30 sh 1 mode 1 fr 3 list - ended 0
+slot 4 31 sh 1 mode 1 fr 3 list - ended 0
+slot 4 32 sh 1 mode 1 fr 3 list - ended 0
+click 5 LDM_ICARO0
+subf 5 LDM_ISISKI10 0
+addf 5 LDM_ISISKI0 0
+addf 5 LDM_ISISKI10 5
+cursor 5 reset
+cmd 5  (PlaySound = 104) 
+snd 5 load sfx\sound104.apc 0 1
+snd 5 play sfx\sound104.apc
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 1 sh 1 mode 0 fr 0 list 0 ended 0
+slot 5 4 sh 1 mode 1 fr 4 list - ended 0
+slot 5 12 sh 1 mode 0 fr 0 list 5 ended 0
+slot 5 26 sh 1 mode 1 fr 4 list - ended 0
+slot 5 28 sh 1 mode 1 fr 4 list - ended 0
+slot 5 29 sh 1 mode 1 fr 4 list - ended 0
+slot 5 30 sh 1 mode 1 fr 4 list - ended 0
+slot 5 31 sh 1 mode 1 fr 4 list - ended 0
+slot 5 32 sh 1 mode 1 fr 4 list - ended 0
+st 5 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO0 picked=LDM_ICARO5 sample=Rien ki=0,11,10,4,6,8,1,3,7,2,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 5 510=0 520=5
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 4 sh 1 mode 1 fr 5 list - ended 0
+slot 6 26 sh 1 mode 1 fr 5 list - ended 0
+slot 6 28 sh 1 mode 1 fr 5 list - ended 0
+slot 6 29 sh 1 mode 1 fr 5 list - ended 0
+slot 6 30 sh 1 mode 1 fr 5 list - ended 0
+slot 6 31 sh 1 mode 1 fr 5 list - ended 0
+slot 6 32 sh 1 mode 1 fr 5 list - ended 0
+click 7 LDM_ICARO11
+cursor 7 set '' 4
+subf 7 LDM_ISISKI1 11
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 2 sh 1 mode 0 fr 0 list - ended 0
+slot 7 4 sh 1 mode 1 fr 6 list - ended 0
+slot 7 26 sh 1 mode 1 fr 6 list - ended 0
+slot 7 28 sh 1 mode 1 fr 6 list - ended 0
+slot 7 29 sh 1 mode 1 fr 6 list - ended 0
+slot 7 30 sh 1 mode 1 fr 6 list - ended 0
+slot 7 31 sh 1 mode 1 fr 6 list - ended 0
+slot 7 32 sh 1 mode 1 fr 6 list - ended 0
+st 7 held=1 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO11 picked=LDM_ICARO11 sample=Rien ki=0,11,10,4,6,8,1,3,7,2,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 4 sh 1 mode 1 fr 7 list - ended 0
+slot 8 26 sh 1 mode 1 fr 7 list - ended 0
+slot 8 28 sh 1 mode 1 fr 7 list - ended 0
+slot 8 29 sh 1 mode 1 fr 7 list - ended 0
+slot 8 30 sh 1 mode 1 fr 7 list - ended 0
+slot 8 31 sh 1 mode 1 fr 7 list - ended 0
+slot 8 32 sh 1 mode 1 fr 7 list - ended 0
+click 9 LDM_ICARO1
+subf 9 LDM_ISISKI6 1
+addf 9 LDM_ISISKI1 1
+addf 9 LDM_ISISKI6 11
+cursor 9 reset
+cmd 9  (PlaySound = 104) 
+snd 9 load sfx\sound104.apc 0 1
+snd 9 play sfx\sound104.apc
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 2 sh 1 mode 0 fr 0 list 1 ended 0
+slot 9 4 sh 1 mode 1 fr 8 list - ended 0
+slot 9 8 sh 1 mode 0 fr 0 list 11 ended 0
+slot 9 26 sh 1 mode 1 fr 8 list - ended 0
+slot 9 28 sh 1 mode 1 fr 8 list - ended 0
+slot 9 29 sh 1 mode 1 fr 8 list - ended 0
+slot 9 30 sh 1 mode 1 fr 8 list - ended 0
+slot 9 31 sh 1 mode 1 fr 8 list - ended 0
+slot 9 32 sh 1 mode 1 fr 8 list - ended 0
+st 9 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO1 picked=LDM_ICARO11 sample=Rien ki=0,1,10,4,6,8,11,3,7,2,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 9 511=1 516=11
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 4 sh 1 mode 1 fr 9 list - ended 0
+slot 10 26 sh 1 mode 1 fr 9 list - ended 0
+slot 10 28 sh 1 mode 1 fr 9 list - ended 0
+slot 10 29 sh 1 mode 1 fr 9 list - ended 0
+slot 10 30 sh 1 mode 1 fr 9 list - ended 0
+slot 10 31 sh 1 mode 1 fr 9 list - ended 0
+slot 10 32 sh 1 mode 1 fr 9 list - ended 0
+click 11 LDM_ICARO10
+cursor 11 set '' 5
+subf 11 LDM_ISISKI2 10
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 3 sh 1 mode 0 fr 0 list - ended 0
+slot 11 4 sh 1 mode 1 fr 10 list - ended 0
+slot 11 26 sh 1 mode 1 fr 10 list - ended 0
+slot 11 28 sh 1 mode 1 fr 10 list - ended 0
+slot 11 29 sh 1 mode 1 fr 10 list - ended 0
+slot 11 30 sh 1 mode 1 fr 10 list - ended 0
+slot 11 31 sh 1 mode 1 fr 10 list - ended 0
+slot 11 32 sh 1 mode 1 fr 10 list - ended 0
+st 11 held=2 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO10 picked=LDM_ICARO10 sample=Rien ki=0,1,10,4,6,8,11,3,7,2,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 4 sh 1 mode 1 fr 11 list - ended 0
+slot 12 26 sh 1 mode 1 fr 11 list - ended 0
+slot 12 28 sh 1 mode 1 fr 11 list - ended 0
+slot 12 29 sh 1 mode 1 fr 11 list - ended 0
+slot 12 30 sh 1 mode 1 fr 11 list - ended 0
+slot 12 31 sh 1 mode 1 fr 11 list - ended 0
+slot 12 32 sh 1 mode 1 fr 11 list - ended 0
+click 13 LDM_ICARO2
+subf 13 LDM_ISISKI9 2
+addf 13 LDM_ISISKI2 2
+addf 13 LDM_ISISKI9 10
+cursor 13 reset
+cmd 13  (PlaySound = 104) 
+snd 13 load sfx\sound104.apc 0 1
+snd 13 play sfx\sound104.apc
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 3 sh 1 mode 0 fr 0 list 2 ended 0
+slot 13 4 sh 1 mode 1 fr 12 list - ended 0
+slot 13 11 sh 1 mode 0 fr 0 list 10 ended 0
+slot 13 26 sh 1 mode 1 fr 12 list - ended 0
+slot 13 28 sh 1 mode 1 fr 12 list - ended 0
+slot 13 29 sh 1 mode 1 fr 12 list - ended 0
+slot 13 30 sh 1 mode 1 fr 12 list - ended 0
+slot 13 31 sh 1 mode 1 fr 12 list - ended 0
+slot 13 32 sh 1 mode 1 fr 12 list - ended 0
+st 13 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO2 picked=LDM_ICARO10 sample=Rien ki=0,1,2,4,6,8,11,3,7,10,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 13 512=2 519=10
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 4 sh 1 mode 1 fr 13 list - ended 0
+slot 14 26 sh 1 mode 1 fr 13 list - ended 0
+slot 14 28 sh 1 mode 1 fr 13 list - ended 0
+slot 14 29 sh 1 mode 1 fr 13 list - ended 0
+slot 14 30 sh 1 mode 1 fr 13 list - ended 0
+slot 14 31 sh 1 mode 1 fr 13 list - ended 0
+slot 14 32 sh 1 mode 1 fr 13 list - ended 0
+click 15 LDM_ICARO4
+cursor 15 set '' 6
+subf 15 LDM_ISISKI3 4
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 4 sh 1 mode 1 fr 14 list - ended 0
+slot 15 5 sh 1 mode 0 fr 0 list - ended 0
+slot 15 26 sh 1 mode 1 fr 14 list - ended 0
+slot 15 28 sh 1 mode 1 fr 14 list - ended 0
+slot 15 29 sh 1 mode 1 fr 14 list - ended 0
+slot 15 30 sh 1 mode 1 fr 14 list - ended 0
+slot 15 31 sh 1 mode 1 fr 14 list - ended 0
+slot 15 32 sh 1 mode 1 fr 14 list - ended 0
+st 15 held=3 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO4 picked=LDM_ICARO4 sample=Rien ki=0,1,2,4,6,8,11,3,7,10,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 4 sh 1 mode 1 fr 15 list - ended 0
+slot 16 26 sh 1 mode 1 fr 15 list - ended 0
+slot 16 28 sh 1 mode 1 fr 15 list - ended 0
+slot 16 29 sh 1 mode 1 fr 15 list - ended 0
+slot 16 30 sh 1 mode 1 fr 15 list - ended 0
+slot 16 31 sh 1 mode 1 fr 15 list - ended 0
+slot 16 32 sh 1 mode 1 fr 15 list - ended 0
+click 17 LDM_ICARO3
+subf 17 LDM_ISISKI7 3
+addf 17 LDM_ISISKI3 3
+addf 17 LDM_ISISKI7 4
+cursor 17 reset
+cmd 17  (PlaySound = 104) 
+snd 17 load sfx\sound104.apc 0 1
+snd 17 play sfx\sound104.apc
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 4 sh 1 mode 1 fr 16 list - ended 0
+slot 17 5 sh 1 mode 0 fr 0 list 3 ended 0
+slot 17 9 sh 1 mode 0 fr 0 list 4 ended 0
+slot 17 26 sh 1 mode 1 fr 16 list - ended 0
+slot 17 28 sh 1 mode 1 fr 16 list - ended 0
+slot 17 29 sh 1 mode 1 fr 16 list - ended 0
+slot 17 30 sh 1 mode 1 fr 16 list - ended 0
+slot 17 31 sh 1 mode 1 fr 16 list - ended 0
+slot 17 32 sh 1 mode 1 fr 16 list - ended 0
+st 17 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO3 picked=LDM_ICARO4 sample=Rien ki=0,1,2,3,6,8,11,4,7,10,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 17 513=3 517=4
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 4 sh 1 mode 1 fr 17 list - ended 0
+slot 18 26 sh 1 mode 1 fr 17 list - ended 0
+slot 18 28 sh 1 mode 1 fr 17 list - ended 0
+slot 18 29 sh 1 mode 1 fr 17 list - ended 0
+slot 18 30 sh 1 mode 1 fr 17 list - ended 0
+slot 18 31 sh 1 mode 1 fr 17 list - ended 0
+slot 18 32 sh 1 mode 1 fr 17 list - ended 0
+click 19 LDM_ICARO6
+cursor 19 set '' 7
+subf 19 LDM_ISISKI4 6
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 4 sh 1 mode 1 fr 18 list - ended 0
+slot 19 6 sh 1 mode 0 fr 0 list - ended 0
+slot 19 26 sh 1 mode 1 fr 18 list - ended 0
+slot 19 28 sh 1 mode 1 fr 18 list - ended 0
+slot 19 29 sh 1 mode 1 fr 18 list - ended 0
+slot 19 30 sh 1 mode 1 fr 18 list - ended 0
+slot 19 31 sh 1 mode 1 fr 18 list - ended 0
+slot 19 32 sh 1 mode 1 fr 18 list - ended 0
+st 19 held=4 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO6 picked=LDM_ICARO6 sample=Rien ki=0,1,2,3,6,8,11,4,7,10,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 4 sh 1 mode 1 fr 19 list - ended 0
+slot 20 26 sh 1 mode 1 fr 19 list - ended 0
+slot 20 28 sh 1 mode 1 fr 19 list - ended 0
+slot 20 29 sh 1 mode 1 fr 19 list - ended 0
+slot 20 30 sh 1 mode 1 fr 19 list - ended 0
+slot 20 31 sh 1 mode 1 fr 19 list - ended 0
+slot 20 32 sh 1 mode 1 fr 19 list - ended 0
+click 21 LDM_ICARO4
+subf 21 LDM_ISISKI7 4
+addf 21 LDM_ISISKI4 4
+addf 21 LDM_ISISKI7 6
+cursor 21 reset
+cmd 21  (PlaySound = 104) 
+snd 21 load sfx\sound104.apc 0 1
+snd 21 play sfx\sound104.apc
+slot 21 0 sh 1 mode 1 fr 0 list - ended 1
+slot 21 4 sh 1 mode 1 fr 20 list - ended 0
+slot 21 6 sh 1 mode 0 fr 0 list 4 ended 0
+slot 21 9 sh 1 mode 0 fr 0 list 6 ended 0
+slot 21 26 sh 1 mode 1 fr 20 list - ended 0
+slot 21 28 sh 1 mode 1 fr 20 list - ended 0
+slot 21 29 sh 1 mode 1 fr 20 list - ended 0
+slot 21 30 sh 1 mode 1 fr 20 list - ended 0
+slot 21 31 sh 1 mode 1 fr 20 list - ended 0
+slot 21 32 sh 1 mode 1 fr 20 list - ended 0
+st 21 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO4 picked=LDM_ICARO6 sample=Rien ki=0,1,2,3,4,8,11,6,7,10,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 21 514=4 517=6
+slot 22 0 sh 1 mode 1 fr 1 list - ended 1
+slot 22 4 sh 1 mode 1 fr 0 list - ended 1
+slot 22 26 sh 1 mode 1 fr 21 list - ended 0
+slot 22 28 sh 1 mode 1 fr 21 list - ended 0
+slot 22 29 sh 1 mode 1 fr 21 list - ended 0
+slot 22 30 sh 1 mode 1 fr 21 list - ended 0
+slot 22 31 sh 1 mode 1 fr 21 list - ended 0
+slot 22 32 sh 1 mode 1 fr 21 list - ended 0
+click 23 LDM_ICARO8
+cursor 23 set '' 8
+subf 23 LDM_ISISKI5 8
+slot 23 0 sh 1 mode 1 fr 2 list - ended 1
+slot 23 4 sh 1 mode 1 fr 1 list - ended 1
+slot 23 7 sh 1 mode 0 fr 0 list - ended 0
+slot 23 26 sh 1 mode 1 fr 22 list - ended 0
+slot 23 28 sh 1 mode 1 fr 22 list - ended 0
+slot 23 29 sh 1 mode 1 fr 22 list - ended 0
+slot 23 30 sh 1 mode 1 fr 22 list - ended 0
+slot 23 31 sh 1 mode 1 fr 22 list - ended 0
+slot 23 32 sh 1 mode 1 fr 22 list - ended 0
+st 23 held=5 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO8 picked=LDM_ICARO8 sample=Rien ki=0,1,2,3,4,8,11,6,7,10,5,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 24 0 sh 1 mode 1 fr 3 list - ended 1
+slot 24 4 sh 1 mode 1 fr 2 list - ended 1
+slot 24 26 sh 1 mode 1 fr 23 list - ended 0
+slot 24 28 sh 1 mode 1 fr 23 list - ended 0
+slot 24 29 sh 1 mode 1 fr 23 list - ended 0
+slot 24 30 sh 1 mode 1 fr 23 list - ended 0
+slot 24 31 sh 1 mode 1 fr 23 list - ended 0
+slot 24 32 sh 1 mode 1 fr 23 list - ended 0
+click 25 LDM_ICARO5
+subf 25 LDM_ISISKI10 5
+addf 25 LDM_ISISKI5 5
+addf 25 LDM_ISISKI10 8
+cursor 25 reset
+cmd 25  (PlaySound = 104) 
+snd 25 load sfx\sound104.apc 0 1
+snd 25 play sfx\sound104.apc
+slot 25 0 sh 1 mode 1 fr 4 list - ended 1
+slot 25 4 sh 1 mode 1 fr 3 list - ended 1
+slot 25 7 sh 1 mode 0 fr 0 list 5 ended 0
+slot 25 12 sh 1 mode 0 fr 0 list 8 ended 0
+slot 25 26 sh 1 mode 1 fr 24 list - ended 0
+slot 25 28 sh 1 mode 1 fr 24 list - ended 0
+slot 25 29 sh 1 mode 1 fr 24 list - ended 0
+slot 25 30 sh 1 mode 1 fr 24 list - ended 0
+slot 25 31 sh 1 mode 1 fr 24 list - ended 0
+slot 25 32 sh 1 mode 1 fr 24 list - ended 0
+st 25 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO5 picked=LDM_ICARO8 sample=Rien ki=0,1,2,3,4,5,11,6,7,10,8,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 25 515=5 520=8
+slot 26 0 sh 1 mode 1 fr 5 list - ended 1
+slot 26 4 sh 1 mode 1 fr 4 list - ended 1
+slot 26 26 sh 1 mode 1 fr 25 list - ended 0
+slot 26 28 sh 1 mode 1 fr 25 list - ended 0
+slot 26 29 sh 1 mode 1 fr 25 list - ended 0
+slot 26 30 sh 1 mode 1 fr 25 list - ended 0
+slot 26 31 sh 1 mode 1 fr 25 list - ended 0
+slot 26 32 sh 1 mode 1 fr 25 list - ended 0
+click 27 LDM_ICARO11
+cursor 27 set '' 9
+subf 27 LDM_ISISKI6 11
+slot 27 0 sh 1 mode 1 fr 6 list - ended 1
+slot 27 4 sh 1 mode 1 fr 5 list - ended 1
+slot 27 8 sh 1 mode 0 fr 0 list - ended 0
+slot 27 26 sh 1 mode 1 fr 26 list - ended 0
+slot 27 28 sh 1 mode 1 fr 26 list - ended 0
+slot 27 29 sh 1 mode 1 fr 26 list - ended 0
+slot 27 30 sh 1 mode 1 fr 26 list - ended 0
+slot 27 31 sh 1 mode 1 fr 26 list - ended 0
+slot 27 32 sh 1 mode 1 fr 26 list - ended 0
+st 27 held=6 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO11 picked=LDM_ICARO11 sample=Rien ki=0,1,2,3,4,5,11,6,7,10,8,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 28 0 sh 1 mode 1 fr 7 list - ended 1
+slot 28 4 sh 1 mode 1 fr 6 list - ended 1
+slot 28 26 sh 1 mode 1 fr 27 list - ended 0
+slot 28 28 sh 1 mode 1 fr 27 list - ended 0
+slot 28 29 sh 1 mode 1 fr 27 list - ended 0
+slot 28 30 sh 1 mode 1 fr 27 list - ended 0
+slot 28 31 sh 1 mode 1 fr 27 list - ended 0
+slot 28 32 sh 1 mode 1 fr 27 list - ended 0
+click 29 LDM_ICARO6
+subf 29 LDM_ISISKI7 6
+addf 29 LDM_ISISKI6 6
+addf 29 LDM_ISISKI7 11
+cursor 29 reset
+cmd 29  (PlaySound = 104) 
+snd 29 load sfx\sound104.apc 0 1
+snd 29 play sfx\sound104.apc
+slot 29 0 sh 1 mode 1 fr 8 list - ended 1
+slot 29 4 sh 1 mode 1 fr 7 list - ended 1
+slot 29 8 sh 1 mode 0 fr 0 list 6 ended 0
+slot 29 9 sh 1 mode 0 fr 0 list 11 ended 0
+slot 29 26 sh 1 mode 1 fr 28 list - ended 0
+slot 29 28 sh 1 mode 1 fr 28 list - ended 0
+slot 29 29 sh 1 mode 1 fr 28 list - ended 0
+slot 29 30 sh 1 mode 1 fr 28 list - ended 0
+slot 29 31 sh 1 mode 1 fr 28 list - ended 0
+slot 29 32 sh 1 mode 1 fr 28 list - ended 0
+st 29 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO6 picked=LDM_ICARO11 sample=Rien ki=0,1,2,3,4,5,6,11,7,10,8,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 29 516=6 517=11
+slot 30 0 sh 1 mode 1 fr 9 list - ended 1
+slot 30 4 sh 1 mode 1 fr 8 list - ended 1
+slot 30 26 sh 1 mode 1 fr 29 list - ended 0
+slot 30 28 sh 1 mode 1 fr 29 list - ended 0
+slot 30 29 sh 1 mode 1 fr 29 list - ended 0
+slot 30 30 sh 1 mode 1 fr 29 list - ended 0
+slot 30 31 sh 1 mode 1 fr 29 list - ended 0
+slot 30 32 sh 1 mode 1 fr 29 list - ended 0
+click 31 LDM_ICARO11
+cursor 31 set '' 10
+subf 31 LDM_ISISKI7 11
+slot 31 0 sh 1 mode 1 fr 10 list - ended 1
+slot 31 4 sh 1 mode 1 fr 9 list - ended 1
+slot 31 9 sh 1 mode 0 fr 0 list - ended 0
+slot 31 26 sh 1 mode 1 fr 30 list - ended 0
+slot 31 28 sh 1 mode 1 fr 30 list - ended 0
+slot 31 29 sh 1 mode 1 fr 30 list - ended 0
+slot 31 30 sh 1 mode 1 fr 30 list - ended 0
+slot 31 31 sh 1 mode 1 fr 30 list - ended 0
+slot 31 32 sh 1 mode 1 fr 0 list - ended 1
+st 31 held=7 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO11 picked=LDM_ICARO11 sample=Rien ki=0,1,2,3,4,5,6,11,7,10,8,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 32 0 sh 1 mode 1 fr 11 list - ended 1
+slot 32 4 sh 1 mode 1 fr 10 list - ended 1
+slot 32 26 sh 1 mode 1 fr 31 list - ended 0
+slot 32 28 sh 1 mode 1 fr 31 list - ended 0
+slot 32 29 sh 1 mode 1 fr 31 list - ended 0
+slot 32 30 sh 1 mode 1 fr 31 list - ended 0
+slot 32 31 sh 1 mode 1 fr 31 list - ended 0
+slot 32 32 sh 1 mode 1 fr 1 list - ended 1
+click 33 LDM_ICARO7
+subf 33 LDM_ISISKI8 7
+addf 33 LDM_ISISKI7 7
+addf 33 LDM_ISISKI8 11
+cursor 33 reset
+cmd 33  (PlaySound = 104) 
+snd 33 load sfx\sound104.apc 0 1
+snd 33 play sfx\sound104.apc
+slot 33 0 sh 1 mode 1 fr 12 list - ended 1
+slot 33 4 sh 1 mode 1 fr 11 list - ended 1
+slot 33 9 sh 1 mode 0 fr 0 list 7 ended 0
+slot 33 10 sh 1 mode 0 fr 0 list 11 ended 0
+slot 33 26 sh 1 mode 1 fr 32 list - ended 0
+slot 33 28 sh 1 mode 1 fr 32 list - ended 0
+slot 33 29 sh 1 mode 1 fr 32 list - ended 0
+slot 33 30 sh 1 mode 1 fr 32 list - ended 0
+slot 33 31 sh 1 mode 1 fr 32 list - ended 0
+slot 33 32 sh 1 mode 1 fr 2 list - ended 1
+st 33 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO7 picked=LDM_ICARO11 sample=Rien ki=0,1,2,3,4,5,6,7,11,10,8,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 33 517=7 518=11
+slot 34 0 sh 1 mode 1 fr 13 list - ended 1
+slot 34 4 sh 1 mode 1 fr 12 list - ended 1
+slot 34 26 sh 1 mode 1 fr 33 list - ended 0
+slot 34 28 sh 1 mode 1 fr 33 list - ended 0
+slot 34 29 sh 1 mode 1 fr 33 list - ended 0
+slot 34 30 sh 1 mode 1 fr 33 list - ended 0
+slot 34 31 sh 1 mode 1 fr 33 list - ended 0
+slot 34 32 sh 1 mode 1 fr 3 list - ended 1
+click 35 LDM_ICARO11
+cursor 35 set '' 11
+subf 35 LDM_ISISKI8 11
+slot 35 0 sh 1 mode 1 fr 14 list - ended 1
+slot 35 4 sh 1 mode 1 fr 13 list - ended 1
+slot 35 10 sh 1 mode 0 fr 0 list - ended 0
+slot 35 26 sh 1 mode 1 fr 34 list - ended 0
+slot 35 28 sh 1 mode 1 fr 34 list - ended 0
+slot 35 29 sh 1 mode 1 fr 34 list - ended 0
+slot 35 30 sh 1 mode 1 fr 34 list - ended 0
+slot 35 31 sh 1 mode 1 fr 34 list - ended 0
+slot 35 32 sh 1 mode 1 fr 4 list - ended 1
+st 35 held=8 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO11 picked=LDM_ICARO11 sample=Rien ki=0,1,2,3,4,5,6,7,11,10,8,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 36 0 sh 1 mode 1 fr 15 list - ended 1
+slot 36 4 sh 1 mode 1 fr 14 list - ended 1
+slot 36 26 sh 1 mode 1 fr 35 list - ended 0
+slot 36 28 sh 1 mode 1 fr 35 list - ended 0
+slot 36 29 sh 1 mode 1 fr 35 list - ended 0
+slot 36 30 sh 1 mode 1 fr 35 list - ended 0
+slot 36 31 sh 1 mode 1 fr 35 list - ended 0
+slot 36 32 sh 1 mode 1 fr 5 list - ended 1
+click 37 LDM_ICARO8
+subf 37 LDM_ISISKI10 8
+addf 37 LDM_ISISKI8 8
+addf 37 LDM_ISISKI10 11
+cursor 37 reset
+cmd 37  (PlaySound = 104) 
+snd 37 load sfx\sound104.apc 0 1
+snd 37 play sfx\sound104.apc
+slot 37 0 sh 1 mode 1 fr 16 list - ended 1
+slot 37 4 sh 1 mode 1 fr 15 list - ended 1
+slot 37 10 sh 1 mode 0 fr 0 list 8 ended 0
+slot 37 12 sh 1 mode 0 fr 0 list 11 ended 0
+slot 37 26 sh 1 mode 1 fr 36 list - ended 0
+slot 37 28 sh 1 mode 1 fr 36 list - ended 0
+slot 37 29 sh 1 mode 1 fr 36 list - ended 0
+slot 37 30 sh 1 mode 1 fr 36 list - ended 0
+slot 37 31 sh 1 mode 1 fr 36 list - ended 0
+slot 37 32 sh 1 mode 1 fr 6 list - ended 1
+st 37 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO8 picked=LDM_ICARO11 sample=Rien ki=0,1,2,3,4,5,6,7,8,10,11,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 37 518=8 520=11
+slot 38 0 sh 1 mode 1 fr 17 list - ended 1
+slot 38 4 sh 1 mode 1 fr 16 list - ended 1
+slot 38 26 sh 1 mode 1 fr 37 list - ended 0
+slot 38 28 sh 1 mode 1 fr 37 list - ended 0
+slot 38 29 sh 1 mode 1 fr 37 list - ended 0
+slot 38 30 sh 1 mode 1 fr 37 list - ended 0
+slot 38 31 sh 1 mode 1 fr 37 list - ended 0
+slot 38 32 sh 1 mode 1 fr 7 list - ended 1
+click 39 LDM_ICARO10
+cursor 39 set '' 12
+subf 39 LDM_ISISKI9 10
+slot 39 0 sh 1 mode 1 fr 18 list - ended 1
+slot 39 4 sh 1 mode 1 fr 17 list - ended 1
+slot 39 11 sh 1 mode 0 fr 0 list - ended 0
+slot 39 26 sh 1 mode 1 fr 38 list - ended 0
+slot 39 28 sh 1 mode 1 fr 38 list - ended 0
+slot 39 29 sh 1 mode 1 fr 38 list - ended 0
+slot 39 30 sh 1 mode 1 fr 38 list - ended 0
+slot 39 31 sh 1 mode 1 fr 38 list - ended 0
+slot 39 32 sh 1 mode 1 fr 8 list - ended 1
+st 39 held=9 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO10 picked=LDM_ICARO10 sample=Rien ki=0,1,2,3,4,5,6,7,8,10,11,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 40 0 sh 1 mode 1 fr 19 list - ended 1
+slot 40 4 sh 1 mode 1 fr 18 list - ended 1
+slot 40 26 sh 1 mode 1 fr 39 list - ended 0
+slot 40 28 sh 1 mode 1 fr 39 list - ended 0
+slot 40 29 sh 1 mode 1 fr 39 list - ended 0
+slot 40 30 sh 1 mode 1 fr 39 list - ended 0
+slot 40 31 sh 1 mode 1 fr 39 list - ended 0
+slot 40 32 sh 1 mode 1 fr 9 list - ended 1
+click 41 LDM_ICARO9
+subf 41 LDM_ISISKI11 9
+addf 41 LDM_ISISKI9 9
+addf 41 LDM_ISISKI11 10
+cursor 41 reset
+cmd 41  (PlaySound = 104) 
+snd 41 load sfx\sound104.apc 0 1
+snd 41 play sfx\sound104.apc
+slot 41 0 sh 1 mode 1 fr 0 list - ended 1
+slot 41 4 sh 1 mode 1 fr 19 list - ended 1
+slot 41 11 sh 1 mode 0 fr 0 list 9 ended 0
+slot 41 13 sh 1 mode 0 fr 0 list 10 ended 0
+slot 41 26 sh 1 mode 1 fr 0 list - ended 1
+slot 41 28 sh 1 mode 1 fr 40 list - ended 0
+slot 41 29 sh 1 mode 1 fr 40 list - ended 0
+slot 41 30 sh 1 mode 1 fr 40 list - ended 0
+slot 41 31 sh 1 mode 1 fr 40 list - ended 0
+slot 41 32 sh 1 mode 1 fr 10 list - ended 1
+st 41 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO9 picked=LDM_ICARO10 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,11,10 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 41 519=9 521=10
+slot 42 0 sh 1 mode 1 fr 1 list - ended 1
+slot 42 4 sh 1 mode 1 fr 20 list - ended 1
+slot 42 26 sh 1 mode 1 fr 1 list - ended 1
+slot 42 28 sh 1 mode 1 fr 41 list - ended 0
+slot 42 29 sh 1 mode 1 fr 41 list - ended 0
+slot 42 30 sh 1 mode 1 fr 41 list - ended 0
+slot 42 31 sh 1 mode 1 fr 41 list - ended 0
+slot 42 32 sh 1 mode 1 fr 11 list - ended 1
+click 43 LDM_ICARO11
+cursor 43 set '' 13
+subf 43 LDM_ISISKI10 11
+slot 43 0 sh 1 mode 1 fr 2 list - ended 1
+slot 43 4 sh 1 mode 1 fr 0 list - ended 1
+slot 43 12 sh 1 mode 0 fr 0 list - ended 0
+slot 43 26 sh 1 mode 1 fr 2 list - ended 1
+slot 43 28 sh 1 mode 1 fr 42 list - ended 0
+slot 43 29 sh 1 mode 1 fr 42 list - ended 0
+slot 43 30 sh 1 mode 1 fr 42 list - ended 0
+slot 43 31 sh 1 mode 1 fr 42 list - ended 0
+slot 43 32 sh 1 mode 1 fr 12 list - ended 1
+st 43 held=10 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO11 picked=LDM_ICARO11 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,11,10 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 44 0 sh 1 mode 1 fr 3 list - ended 1
+slot 44 4 sh 1 mode 1 fr 1 list - ended 1
+slot 44 26 sh 1 mode 1 fr 3 list - ended 1
+slot 44 28 sh 1 mode 1 fr 43 list - ended 0
+slot 44 29 sh 1 mode 1 fr 43 list - ended 0
+slot 44 30 sh 1 mode 1 fr 43 list - ended 0
+slot 44 31 sh 1 mode 1 fr 43 list - ended 0
+slot 44 32 sh 1 mode 1 fr 13 list - ended 1
+click 45 LDM_ICARO10
+subf 45 LDM_ISISKI11 10
+addf 45 LDM_ISISKI10 10
+addf 45 LDM_ISISKI11 11
+cursor 45 reset
+cmd 45  (PlaySound = 104) 
+snd 45 load sfx\sound104.apc 0 1
+snd 45 play sfx\sound104.apc
+slot 45 0 sh 1 mode 1 fr 4 list - ended 1
+slot 45 4 sh 1 mode 1 fr 2 list - ended 1
+slot 45 12 sh 1 mode 0 fr 0 list 10 ended 0
+slot 45 13 sh 1 mode 0 fr 0 list 11 ended 0
+slot 45 26 sh 1 mode 1 fr 4 list - ended 1
+slot 45 28 sh 1 mode 1 fr 44 list - ended 0
+slot 45 29 sh 1 mode 1 fr 44 list - ended 0
+slot 45 30 sh 1 mode 1 fr 44 list - ended 0
+slot 45 31 sh 1 mode 1 fr 44 list - ended 0
+slot 45 32 sh 1 mode 1 fr 14 list - ended 1
+st 45 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO10 picked=LDM_ICARO11 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 45 520=10 521=11
+slot 46 0 sh 1 mode 1 fr 5 list - ended 1
+slot 46 4 sh 1 mode 1 fr 3 list - ended 1
+slot 46 26 sh 1 mode 1 fr 5 list - ended 1
+slot 46 28 sh 1 mode 1 fr 45 list - ended 0
+slot 46 29 sh 1 mode 1 fr 45 list - ended 0
+slot 46 30 sh 1 mode 1 fr 45 list - ended 0
+slot 46 31 sh 1 mode 1 fr 45 list - ended 0
+slot 46 32 sh 1 mode 1 fr 15 list - ended 1
+click 47 LDM_MCARO4
+cursor 47 set '' 15
+subf 47 LDM_ISISKS0 4
+snd 47 load loc\voix\ldm\pret0390.apc 1 2
+snd 47 loaded loc\voix\ldm\pret0390.apc
+snd 47 play loc\voix\ldm\pret0390.apc
+slot 47 0 sh 1 mode 1 fr 6 list - ended 1
+slot 47 4 sh 1 mode 1 fr 4 list - ended 1
+slot 47 14 sh 1 mode 0 fr 0 list - ended 0
+slot 47 26 sh 1 mode 1 fr 6 list - ended 1
+slot 47 28 sh 1 mode 1 fr 46 list - ended 0
+slot 47 29 sh 1 mode 1 fr 46 list - ended 0
+slot 47 30 sh 1 mode 1 fr 46 list - ended 0
+slot 47 31 sh 1 mode 1 fr 46 list - ended 0
+slot 47 32 sh 1 mode 1 fr 16 list - ended 1
+st 47 held=12 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO4 picked=LDM_MCARO4 sample=loc\voix\ldm\pret0390.apc ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=4,10,9,8,2,11,6,7,3,5,1,0
+caption 48 217 1
+draw 48 box 10 10 20 20 0 1
+textid 48 217 1
+draw 48 text AtlFont_Default
+slot 48 0 sh 1 mode 1 fr 7 list - ended 1
+slot 48 4 sh 1 mode 1 fr 5 list - ended 1
+slot 48 26 sh 1 mode 1 fr 7 list - ended 1
+slot 48 28 sh 1 mode 1 fr 47 list - ended 0
+slot 48 29 sh 1 mode 1 fr 47 list - ended 0
+slot 48 30 sh 1 mode 1 fr 47 list - ended 0
+slot 48 31 sh 1 mode 1 fr 47 list - ended 0
+slot 48 32 sh 1 mode 1 fr 17 list - ended 1
+st 48 held=12 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO4 picked=LDM_MCARO4 sample=loc\voix\ldm\pret0390.apc ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=4,10,9,8,2,11,6,7,3,5,1,0
+click 49 LDM_MCARO0
+caption 49 217 1
+draw 49 box 10 10 20 20 0 1
+textid 49 217 1
+draw 49 text AtlFont_Default
+subf 49 LDM_ISISKS11 0
+addf 49 LDM_ISISKS0 0
+addf 49 LDM_ISISKS11 4
+cursor 49 reset
+snd 49 stop loc\voix\ldm\pret0390.apc
+cmd 49  (PlaySound = 105) 
+snd 49 load sfx\sound105.apc 0 1
+snd 49 play sfx\sound105.apc
+slot 49 0 sh 1 mode 1 fr 8 list - ended 1
+slot 49 4 sh 1 mode 1 fr 6 list - ended 1
+slot 49 14 sh 1 mode 0 fr 0 list 0 ended 0
+slot 49 25 sh 1 mode 0 fr 0 list 4 ended 0
+slot 49 26 sh 1 mode 1 fr 8 list - ended 1
+slot 49 28 sh 1 mode 1 fr 48 list - ended 0
+slot 49 29 sh 1 mode 1 fr 48 list - ended 0
+slot 49 30 sh 1 mode 1 fr 48 list - ended 0
+slot 49 31 sh 1 mode 1 fr 48 list - ended 0
+slot 49 32 sh 1 mode 1 fr 18 list - ended 1
+st 49 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_MCARO0 picked=LDM_MCARO4 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,10,9,8,2,11,6,7,3,5,1,4
+flags 49 522=0 533=4
+slot 50 0 sh 1 mode 1 fr 9 list - ended 1
+slot 50 4 sh 1 mode 1 fr 7 list - ended 1
+slot 50 26 sh 1 mode 1 fr 9 list - ended 1
+slot 50 28 sh 1 mode 1 fr 49 list - ended 0
+slot 50 29 sh 1 mode 1 fr 49 list - ended 0
+slot 50 30 sh 1 mode 1 fr 49 list - ended 0
+slot 50 31 sh 1 mode 1 fr 49 list - ended 0
+slot 50 32 sh 1 mode 1 fr 19 list - ended 1
+click 51 LDM_MCARO10
+cursor 51 set '' 16
+subf 51 LDM_ISISKS1 10
+snd 51 load loc\voix\ldm\pret0391.apc 1 2
+snd 51 loaded loc\voix\ldm\pret0391.apc
+snd 51 play loc\voix\ldm\pret0391.apc
+slot 51 0 sh 1 mode 1 fr 10 list - ended 1
+slot 51 4 sh 1 mode 1 fr 8 list - ended 1
+slot 51 15 sh 1 mode 0 fr 0 list - ended 0
+slot 51 26 sh 1 mode 1 fr 10 list - ended 1
+slot 51 28 sh 1 mode 1 fr 50 list - ended 0
+slot 51 29 sh 1 mode 1 fr 50 list - ended 0
+slot 51 30 sh 1 mode 1 fr 50 list - ended 0
+slot 51 31 sh 1 mode 1 fr 50 list - ended 0
+slot 51 32 sh 1 mode 1 fr 20 list - ended 1
+st 51 held=13 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO10 picked=LDM_MCARO10 sample=loc\voix\ldm\pret0391.apc ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,10,9,8,2,11,6,7,3,5,1,4
+caption 52 218 1
+draw 52 box 10 10 20 20 0 1
+textid 52 218 1
+draw 52 text AtlFont_Default
+slot 52 0 sh 1 mode 1 fr 11 list - ended 1
+slot 52 4 sh 1 mode 1 fr 9 list - ended 1
+slot 52 26 sh 1 mode 1 fr 11 list - ended 1
+slot 52 28 sh 1 mode 1 fr 51 list - ended 0
+slot 52 29 sh 1 mode 1 fr 51 list - ended 0
+slot 52 30 sh 1 mode 1 fr 51 list - ended 0
+slot 52 31 sh 1 mode 1 fr 51 list - ended 0
+slot 52 32 sh 1 mode 1 fr 21 list - ended 1
+click 53 LDM_MCARO1
+caption 53 218 1
+draw 53 box 10 10 20 20 0 1
+textid 53 218 1
+draw 53 text AtlFont_Default
+subf 53 LDM_ISISKS10 1
+addf 53 LDM_ISISKS1 1
+addf 53 LDM_ISISKS10 10
+cursor 53 reset
+snd 53 stop loc\voix\ldm\pret0391.apc
+cmd 53  (PlaySound = 105) 
+snd 53 load sfx\sound105.apc 0 1
+snd 53 play sfx\sound105.apc
+slot 53 0 sh 1 mode 1 fr 12 list - ended 1
+slot 53 4 sh 1 mode 1 fr 10 list - ended 1
+slot 53 15 sh 1 mode 0 fr 0 list 1 ended 0
+slot 53 24 sh 1 mode 0 fr 0 list 10 ended 0
+slot 53 26 sh 1 mode 1 fr 12 list - ended 1
+slot 53 28 sh 1 mode 1 fr 52 list - ended 0
+slot 53 29 sh 1 mode 1 fr 52 list - ended 0
+slot 53 30 sh 1 mode 1 fr 52 list - ended 0
+slot 53 31 sh 1 mode 1 fr 52 list - ended 0
+slot 53 32 sh 1 mode 1 fr 22 list - ended 1
+st 53 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_MCARO1 picked=LDM_MCARO10 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,9,8,2,11,6,7,3,5,10,4
+flags 53 523=1 532=10
+slot 54 0 sh 1 mode 1 fr 13 list - ended 1
+slot 54 4 sh 1 mode 1 fr 11 list - ended 1
+slot 54 26 sh 1 mode 1 fr 13 list - ended 1
+slot 54 28 sh 1 mode 1 fr 53 list - ended 0
+slot 54 29 sh 1 mode 1 fr 53 list - ended 0
+slot 54 30 sh 1 mode 1 fr 53 list - ended 0
+slot 54 31 sh 1 mode 1 fr 53 list - ended 0
+slot 54 32 sh 1 mode 1 fr 23 list - ended 1
+click 55 LDM_MCARO9
+cursor 55 set '' 17
+subf 55 LDM_ISISKS2 9
+snd 55 load loc\voix\ldm\pret0392.apc 1 2
+snd 55 loaded loc\voix\ldm\pret0392.apc
+snd 55 play loc\voix\ldm\pret0392.apc
+slot 55 0 sh 1 mode 1 fr 14 list - ended 1
+slot 55 4 sh 1 mode 1 fr 12 list - ended 1
+slot 55 16 sh 1 mode 0 fr 0 list - ended 0
+slot 55 26 sh 1 mode 1 fr 14 list - ended 1
+slot 55 28 sh 1 mode 1 fr 54 list - ended 0
+slot 55 29 sh 1 mode 1 fr 54 list - ended 0
+slot 55 30 sh 1 mode 1 fr 54 list - ended 0
+slot 55 31 sh 1 mode 1 fr 54 list - ended 0
+slot 55 32 sh 1 mode 1 fr 24 list - ended 1
+st 55 held=14 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO9 picked=LDM_MCARO9 sample=loc\voix\ldm\pret0392.apc ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,9,8,2,11,6,7,3,5,10,4
+caption 56 219 1
+draw 56 box 10 10 20 20 0 1
+textid 56 219 1
+draw 56 text AtlFont_Default
+slot 56 0 sh 1 mode 1 fr 15 list - ended 1
+slot 56 4 sh 1 mode 1 fr 13 list - ended 1
+slot 56 26 sh 1 mode 1 fr 15 list - ended 1
+slot 56 28 sh 1 mode 1 fr 55 list - ended 0
+slot 56 29 sh 1 mode 1 fr 55 list - ended 0
+slot 56 30 sh 1 mode 1 fr 55 list - ended 0
+slot 56 31 sh 1 mode 1 fr 55 list - ended 0
+slot 56 32 sh 1 mode 1 fr 25 list - ended 1
+click 57 LDM_MCARO2
+caption 57 219 1
+draw 57 box 10 10 20 20 0 1
+textid 57 219 1
+draw 57 text AtlFont_Default
+subf 57 LDM_ISISKS4 2
+addf 57 LDM_ISISKS2 2
+addf 57 LDM_ISISKS4 9
+cursor 57 reset
+snd 57 stop loc\voix\ldm\pret0392.apc
+cmd 57  (PlaySound = 105) 
+snd 57 load sfx\sound105.apc 0 1
+snd 57 play sfx\sound105.apc
+slot 57 0 sh 1 mode 1 fr 16 list - ended 1
+slot 57 4 sh 1 mode 1 fr 14 list - ended 1
+slot 57 16 sh 1 mode 0 fr 0 list 2 ended 0
+slot 57 18 sh 1 mode 0 fr 0 list 9 ended 0
+slot 57 26 sh 1 mode 1 fr 16 list - ended 1
+slot 57 28 sh 1 mode 1 fr 56 list - ended 0
+slot 57 29 sh 1 mode 1 fr 56 list - ended 0
+slot 57 30 sh 1 mode 1 fr 56 list - ended 0
+slot 57 31 sh 1 mode 1 fr 56 list - ended 0
+slot 57 32 sh 1 mode 1 fr 26 list - ended 1
+st 57 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_MCARO2 picked=LDM_MCARO9 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,8,9,11,6,7,3,5,10,4
+flags 57 524=2 526=9
+slot 58 0 sh 1 mode 1 fr 17 list - ended 1
+slot 58 4 sh 1 mode 1 fr 15 list - ended 1
+slot 58 26 sh 1 mode 1 fr 17 list - ended 1
+slot 58 28 sh 1 mode 1 fr 57 list - ended 0
+slot 58 29 sh 1 mode 1 fr 57 list - ended 0
+slot 58 30 sh 1 mode 1 fr 57 list - ended 0
+slot 58 31 sh 1 mode 1 fr 57 list - ended 0
+slot 58 32 sh 1 mode 1 fr 27 list - ended 1
+click 59 LDM_MCARO8
+cursor 59 set '' 18
+subf 59 LDM_ISISKS3 8
+snd 59 load loc\voix\ldm\pret0393.apc 1 2
+snd 59 loaded loc\voix\ldm\pret0393.apc
+snd 59 play loc\voix\ldm\pret0393.apc
+slot 59 0 sh 1 mode 1 fr 18 list - ended 1
+slot 59 4 sh 1 mode 1 fr 16 list - ended 1
+slot 59 17 sh 1 mode 0 fr 0 list - ended 0
+slot 59 26 sh 1 mode 1 fr 18 list - ended 1
+slot 59 28 sh 1 mode 1 fr 58 list - ended 0
+slot 59 29 sh 1 mode 1 fr 58 list - ended 0
+slot 59 30 sh 1 mode 1 fr 58 list - ended 0
+slot 59 31 sh 1 mode 1 fr 58 list - ended 0
+slot 59 32 sh 1 mode 1 fr 28 list - ended 1
+st 59 held=15 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO8 picked=LDM_MCARO8 sample=loc\voix\ldm\pret0393.apc ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,8,9,11,6,7,3,5,10,4
+caption 60 220 1
+draw 60 box 10 10 20 20 0 1
+textid 60 220 1
+draw 60 text AtlFont_Default
+slot 60 0 sh 1 mode 1 fr 19 list - ended 1
+slot 60 4 sh 1 mode 1 fr 17 list - ended 1
+slot 60 26 sh 1 mode 1 fr 19 list - ended 1
+slot 60 28 sh 1 mode 1 fr 59 list - ended 0
+slot 60 29 sh 1 mode 1 fr 59 list - ended 0
+slot 60 30 sh 1 mode 1 fr 59 list - ended 0
+slot 60 31 sh 1 mode 1 fr 59 list - ended 0
+slot 60 32 sh 1 mode 1 fr 29 list - ended 1
+click 61 LDM_MCARO3
+caption 61 220 1
+draw 61 box 10 10 20 20 0 1
+textid 61 220 1
+draw 61 text AtlFont_Default
+subf 61 LDM_ISISKS8 3
+addf 61 LDM_ISISKS3 3
+addf 61 LDM_ISISKS8 8
+cursor 61 reset
+snd 61 stop loc\voix\ldm\pret0393.apc
+cmd 61  (PlaySound = 105) 
+snd 61 load sfx\sound105.apc 0 1
+snd 61 play sfx\sound105.apc
+slot 61 0 sh 1 mode 1 fr 0 list - ended 1
+slot 61 4 sh 1 mode 1 fr 18 list - ended 1
+slot 61 17 sh 1 mode 0 fr 0 list 3 ended 0
+slot 61 22 sh 1 mode 0 fr 0 list 8 ended 0
+slot 61 26 sh 1 mode 1 fr 20 list - ended 1
+slot 61 28 sh 1 mode 1 fr 0 list - ended 1
+slot 61 29 sh 1 mode 1 fr 60 list - ended 0
+slot 61 30 sh 1 mode 1 fr 60 list - ended 0
+slot 61 31 sh 1 mode 1 fr 60 list - ended 0
+slot 61 32 sh 1 mode 1 fr 0 list - ended 1
+st 61 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_MCARO3 picked=LDM_MCARO8 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,3,9,11,6,7,8,5,10,4
+flags 61 525=3 530=8
+slot 62 0 sh 1 mode 1 fr 1 list - ended 1
+slot 62 4 sh 1 mode 1 fr 19 list - ended 1
+slot 62 26 sh 1 mode 1 fr 21 list - ended 1
+slot 62 28 sh 1 mode 1 fr 1 list - ended 1
+slot 62 29 sh 1 mode 1 fr 61 list - ended 0
+slot 62 30 sh 1 mode 1 fr 61 list - ended 0
+slot 62 31 sh 1 mode 1 fr 61 list - ended 0
+slot 62 32 sh 1 mode 1 fr 1 list - ended 1
+click 63 LDM_MCARO9
+cursor 63 set '' 19
+subf 63 LDM_ISISKS4 9
+snd 63 load loc\voix\ldm\pret0394.apc 1 2
+snd 63 loaded loc\voix\ldm\pret0394.apc
+snd 63 play loc\voix\ldm\pret0394.apc
+slot 63 0 sh 1 mode 1 fr 2 list - ended 1
+slot 63 4 sh 1 mode 1 fr 20 list - ended 1
+slot 63 18 sh 1 mode 0 fr 0 list - ended 0
+slot 63 26 sh 1 mode 1 fr 22 list - ended 1
+slot 63 28 sh 1 mode 1 fr 2 list - ended 1
+slot 63 29 sh 1 mode 1 fr 62 list - ended 0
+slot 63 30 sh 1 mode 1 fr 62 list - ended 0
+slot 63 31 sh 1 mode 1 fr 62 list - ended 0
+slot 63 32 sh 1 mode 1 fr 2 list - ended 1
+st 63 held=16 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO9 picked=LDM_MCARO9 sample=loc\voix\ldm\pret0394.apc ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,3,9,11,6,7,8,5,10,4
+caption 64 221 1
+draw 64 box 10 10 20 20 0 1
+textid 64 221 1
+draw 64 text AtlFont_Default
+slot 64 0 sh 1 mode 1 fr 3 list - ended 1
+slot 64 4 sh 1 mode 1 fr 0 list - ended 1
+slot 64 26 sh 1 mode 1 fr 23 list - ended 1
+slot 64 28 sh 1 mode 1 fr 3 list - ended 1
+slot 64 29 sh 1 mode 1 fr 63 list - ended 0
+slot 64 30 sh 1 mode 1 fr 63 list - ended 0
+slot 64 31 sh 1 mode 1 fr 63 list - ended 0
+slot 64 32 sh 1 mode 1 fr 3 list - ended 1
+click 65 LDM_MCARO4
+caption 65 221 1
+draw 65 box 10 10 20 20 0 1
+textid 65 221 1
+draw 65 text AtlFont_Default
+subf 65 LDM_ISISKS11 4
+addf 65 LDM_ISISKS4 4
+addf 65 LDM_ISISKS11 9
+cursor 65 reset
+snd 65 stop loc\voix\ldm\pret0394.apc
+cmd 65  (PlaySound = 105) 
+snd 65 load sfx\sound105.apc 0 1
+snd 65 play sfx\sound105.apc
+slot 65 0 sh 1 mode 1 fr 4 list - ended 1
+slot 65 4 sh 1 mode 1 fr 1 list - ended 1
+slot 65 18 sh 1 mode 0 fr 0 list 4 ended 0
+slot 65 25 sh 1 mode 0 fr 0 list 9 ended 0
+slot 65 26 sh 1 mode 1 fr 24 list - ended 1
+slot 65 28 sh 1 mode 1 fr 4 list - ended 1
+slot 65 29 sh 1 mode 1 fr 64 list - ended 0
+slot 65 30 sh 1 mode 1 fr 64 list - ended 0
+slot 65 31 sh 1 mode 1 fr 64 list - ended 0
+slot 65 32 sh 1 mode 1 fr 4 list - ended 1
+st 65 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_MCARO4 picked=LDM_MCARO9 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,3,4,11,6,7,8,5,10,9
+flags 65 526=4 533=9
+slot 66 0 sh 1 mode 1 fr 5 list - ended 1
+slot 66 4 sh 1 mode 1 fr 2 list - ended 1
+slot 66 26 sh 1 mode 1 fr 25 list - ended 1
+slot 66 28 sh 1 mode 1 fr 5 list - ended 1
+slot 66 29 sh 1 mode 1 fr 65 list - ended 0
+slot 66 30 sh 1 mode 1 fr 65 list - ended 0
+slot 66 31 sh 1 mode 1 fr 65 list - ended 0
+slot 66 32 sh 1 mode 1 fr 5 list - ended 1
+click 67 LDM_MCARO11
+cursor 67 set '' 20
+subf 67 LDM_ISISKS5 11
+snd 67 load loc\voix\ldm\pret0395.apc 1 2
+snd 67 loaded loc\voix\ldm\pret0395.apc
+snd 67 play loc\voix\ldm\pret0395.apc
+slot 67 0 sh 1 mode 1 fr 6 list - ended 1
+slot 67 4 sh 1 mode 1 fr 3 list - ended 1
+slot 67 19 sh 1 mode 0 fr 0 list - ended 0
+slot 67 26 sh 1 mode 1 fr 26 list - ended 1
+slot 67 28 sh 1 mode 1 fr 6 list - ended 1
+slot 67 29 sh 1 mode 1 fr 66 list - ended 0
+slot 67 30 sh 1 mode 1 fr 66 list - ended 0
+slot 67 31 sh 1 mode 1 fr 66 list - ended 0
+slot 67 32 sh 1 mode 1 fr 6 list - ended 1
+st 67 held=17 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO11 picked=LDM_MCARO11 sample=loc\voix\ldm\pret0395.apc ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,3,4,11,6,7,8,5,10,9
+caption 68 222 1
+draw 68 box 10 10 20 20 0 1
+textid 68 222 1
+draw 68 text AtlFont_Default
+slot 68 0 sh 1 mode 1 fr 7 list - ended 1
+slot 68 4 sh 1 mode 1 fr 4 list - ended 1
+slot 68 26 sh 1 mode 1 fr 27 list - ended 1
+slot 68 28 sh 1 mode 1 fr 7 list - ended 1
+slot 68 29 sh 1 mode 1 fr 67 list - ended 0
+slot 68 30 sh 1 mode 1 fr 67 list - ended 0
+slot 68 31 sh 1 mode 1 fr 67 list - ended 0
+slot 68 32 sh 1 mode 1 fr 7 list - ended 1
+click 69 LDM_MCARO5
+caption 69 222 1
+draw 69 box 10 10 20 20 0 1
+textid 69 222 1
+draw 69 text AtlFont_Default
+subf 69 LDM_ISISKS9 5
+addf 69 LDM_ISISKS5 5
+addf 69 LDM_ISISKS9 11
+cursor 69 reset
+snd 69 stop loc\voix\ldm\pret0395.apc
+cmd 69  (PlaySound = 105) 
+snd 69 load sfx\sound105.apc 0 1
+snd 69 play sfx\sound105.apc
+slot 69 0 sh 1 mode 1 fr 8 list - ended 1
+slot 69 4 sh 1 mode 1 fr 5 list - ended 1
+slot 69 19 sh 1 mode 0 fr 0 list 5 ended 0
+slot 69 23 sh 1 mode 0 fr 0 list 11 ended 0
+slot 69 26 sh 1 mode 1 fr 28 list - ended 1
+slot 69 28 sh 1 mode 1 fr 8 list - ended 1
+slot 69 29 sh 1 mode 1 fr 68 list - ended 0
+slot 69 30 sh 1 mode 1 fr 68 list - ended 0
+slot 69 31 sh 1 mode 1 fr 68 list - ended 0
+slot 69 32 sh 1 mode 1 fr 8 list - ended 1
+st 69 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_MCARO5 picked=LDM_MCARO11 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,3,4,5,6,7,8,11,10,9
+flags 69 527=5 531=11
+slot 70 0 sh 1 mode 1 fr 9 list - ended 1
+slot 70 4 sh 1 mode 1 fr 6 list - ended 1
+slot 70 26 sh 1 mode 1 fr 29 list - ended 1
+slot 70 28 sh 1 mode 1 fr 9 list - ended 1
+slot 70 29 sh 1 mode 1 fr 69 list - ended 0
+slot 70 30 sh 1 mode 1 fr 69 list - ended 0
+slot 70 31 sh 1 mode 1 fr 69 list - ended 0
+slot 70 32 sh 1 mode 1 fr 9 list - ended 1
+click 71 LDM_MCARO11
+cursor 71 set '' 24
+subf 71 LDM_ISISKS9 11
+snd 71 load loc\voix\ldm\pret0399.apc 1 2
+snd 71 loaded loc\voix\ldm\pret0399.apc
+snd 71 play loc\voix\ldm\pret0399.apc
+slot 71 0 sh 1 mode 1 fr 10 list - ended 1
+slot 71 4 sh 1 mode 1 fr 7 list - ended 1
+slot 71 23 sh 1 mode 0 fr 0 list - ended 0
+slot 71 26 sh 1 mode 1 fr 30 list - ended 1
+slot 71 28 sh 1 mode 1 fr 10 list - ended 1
+slot 71 29 sh 1 mode 1 fr 70 list - ended 0
+slot 71 30 sh 1 mode 1 fr 70 list - ended 0
+slot 71 31 sh 1 mode 1 fr 70 list - ended 0
+slot 71 32 sh 1 mode 1 fr 10 list - ended 1
+st 71 held=21 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO11 picked=LDM_MCARO11 sample=loc\voix\ldm\pret0399.apc ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,3,4,5,6,7,8,11,10,9
+caption 72 226 1
+draw 72 box 10 10 20 20 0 1
+textid 72 226 1
+draw 72 text AtlFont_Default
+slot 72 0 sh 1 mode 1 fr 11 list - ended 1
+slot 72 4 sh 1 mode 1 fr 8 list - ended 1
+slot 72 26 sh 1 mode 1 fr 31 list - ended 1
+slot 72 28 sh 1 mode 1 fr 11 list - ended 1
+slot 72 29 sh 1 mode 1 fr 71 list - ended 0
+slot 72 30 sh 1 mode 1 fr 71 list - ended 0
+slot 72 31 sh 1 mode 1 fr 71 list - ended 0
+slot 72 32 sh 1 mode 1 fr 11 list - ended 1
+click 73 LDM_MCARO9
+caption 73 226 1
+draw 73 box 10 10 20 20 0 1
+textid 73 226 1
+draw 73 text AtlFont_Default
+subf 73 LDM_ISISKS11 9
+addf 73 LDM_ISISKS9 9
+addf 73 LDM_ISISKS11 11
+cursor 73 reset
+snd 73 stop loc\voix\ldm\pret0399.apc
+cmd 73  (PlaySound = 105) 
+snd 73 load sfx\sound105.apc 0 1
+snd 73 play sfx\sound105.apc
+scan 73
+slot 73 0 sh 1 mode 1 fr 12 list - ended 1
+slot 73 4 sh 1 mode 1 fr 9 list - ended 1
+slot 73 23 sh 1 mode 0 fr 0 list 9 ended 0
+slot 73 25 sh 1 mode 0 fr 0 list 11 ended 0
+slot 73 26 sh 1 mode 1 fr 32 list - ended 1
+slot 73 28 sh 1 mode 1 fr 12 list - ended 1
+slot 73 29 sh 1 mode 1 fr 72 list - ended 0
+slot 73 30 sh 1 mode 1 fr 72 list - ended 0
+slot 73 31 sh 1 mode 1 fr 72 list - ended 0
+slot 73 32 sh 1 mode 1 fr 12 list - ended 1
+st 73 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_MCARO9 picked=LDM_MCARO11 sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,3,4,5,6,7,8,9,10,11
+flags 73 63=1 531=9 533=11
+scan 74
+slot 74 0 sh 1 mode 1 fr 13 list - ended 1
+slot 74 4 sh 1 mode 1 fr 10 list - ended 1
+slot 74 26 sh 1 mode 1 fr 33 list - ended 1
+slot 74 28 sh 1 mode 1 fr 13 list - ended 1
+slot 74 29 sh 1 mode 1 fr 73 list - ended 0
+slot 74 30 sh 1 mode 1 fr 73 list - ended 0
+slot 74 31 sh 1 mode 1 fr 73 list - ended 0
+slot 74 32 sh 1 mode 1 fr 13 list - ended 1
+flags 74 899=1
+scan 75
+slot 75 0 sh 1 mode 1 fr 14 list - ended 1
+slot 75 4 sh 1 mode 1 fr 11 list - ended 1
+slot 75 26 sh 1 mode 1 fr 34 list - ended 1
+slot 75 28 sh 1 mode 1 fr 14 list - ended 1
+slot 75 29 sh 1 mode 1 fr 74 list - ended 0
+slot 75 30 sh 1 mode 1 fr 74 list - ended 0
+slot 75 31 sh 1 mode 1 fr 74 list - ended 0
+slot 75 32 sh 1 mode 1 fr 14 list - ended 1
+scan 76
+slot 76 0 sh 1 mode 1 fr 15 list - ended 1
+slot 76 4 sh 1 mode 1 fr 12 list - ended 1
+slot 76 26 sh 1 mode 1 fr 35 list - ended 1
+slot 76 28 sh 1 mode 1 fr 15 list - ended 1
+slot 76 29 sh 1 mode 1 fr 75 list - ended 0
+slot 76 30 sh 1 mode 1 fr 75 list - ended 0
+slot 76 31 sh 1 mode 1 fr 75 list - ended 0
+slot 76 32 sh 1 mode 1 fr 15 list - ended 1
+scan 77
+slot 77 0 sh 1 mode 1 fr 16 list - ended 1
+slot 77 4 sh 1 mode 1 fr 13 list - ended 1
+slot 77 26 sh 1 mode 1 fr 36 list - ended 1
+slot 77 28 sh 1 mode 1 fr 16 list - ended 1
+slot 77 29 sh 1 mode 1 fr 76 list - ended 0
+slot 77 30 sh 1 mode 1 fr 76 list - ended 0
+slot 77 31 sh 1 mode 1 fr 76 list - ended 0
+slot 77 32 sh 1 mode 1 fr 16 list - ended 1
+scan 78
+slot 78 0 sh 1 mode 1 fr 17 list - ended 1
+slot 78 4 sh 1 mode 1 fr 14 list - ended 1
+slot 78 26 sh 1 mode 1 fr 37 list - ended 1
+slot 78 28 sh 1 mode 1 fr 17 list - ended 1
+slot 78 29 sh 1 mode 1 fr 77 list - ended 0
+slot 78 30 sh 1 mode 1 fr 77 list - ended 0
+slot 78 31 sh 1 mode 1 fr 77 list - ended 0
+slot 78 32 sh 1 mode 1 fr 17 list - ended 1
+run wrong
+setup wam LDMorts.wam view 10 yaw 0 pitch 0
+setup flag 63 0
+setup flag 506 0
+setup flag 899 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 LDM_ISISKI0 5
+addf 0 LDM_ISISKS0 4
+addf 0 LDM_ISISKI1 11
+addf 0 LDM_ISISKS1 10
+addf 0 LDM_ISISKI2 10
+addf 0 LDM_ISISKS2 9
+addf 0 LDM_ISISKI3 4
+addf 0 LDM_ISISKS3 8
+addf 0 LDM_ISISKI4 6
+addf 0 LDM_ISISKS4 2
+addf 0 LDM_ISISKI5 8
+addf 0 LDM_ISISKS5 11
+addf 0 LDM_ISISKI6 1
+addf 0 LDM_ISISKS6 6
+addf 0 LDM_ISISKI7 3
+addf 0 LDM_ISISKS7 7
+addf 0 LDM_ISISKI8 7
+addf 0 LDM_ISISKS8 3
+addf 0 LDM_ISISKI9 2
+addf 0 LDM_ISISKS9 5
+addf 0 LDM_ISISKI10 0
+addf 0 LDM_ISISKS10 1
+addf 0 LDM_ISISKI11 9
+addf 0 LDM_ISISKS11 0
+cursor 0 reset
+setup cmd (sacados=LDM_CLEFCOFFRE)
+slots 0:n1A1010010 1:kaA1010010 2:kbA1010010 3:kcA1010010 4:waA1010010 5:kdA1010010 6:keA1010010 7:kfA1010010 8:kgA1010010 9:khA1010010 10:kiA1010010 11:kjA1010010 12:kkA1010010 13:klA1010010 14:kmA1010010 15:knA1010010 16:koA1010010 17:kpA1010010 18:kqA1010010 19:krA1010010 20:ksA1010010 21:ktA1010010 22:kuA1010010 23:kvA1010010 24:kwA1010010 25:kxA1010010 26:prA1010010 27:prA2010010 28:cvA1010010 29:cvA2010010 30:cvA3010010 31:cvA4010010 32:snA1010001
+slotent 0:LDM_PALMIER 1:LDM_ISISKI0 2:LDM_ISISKI1 3:LDM_ISISKI2 4:LDM_EAU 5:LDM_ISISKI3 6:LDM_ISISKI4 7:LDM_ISISKI5 8:LDM_ISISKI6 9:LDM_ISISKI7 10:LDM_ISISKI8 11:LDM_ISISKI9 12:LDM_ISISKI10 13:LDM_ISISKI11 14:LDM_ISISKS0 15:LDM_ISISKS1 16:LDM_ISISKS2 17:LDM_ISISKS3 18:LDM_ISISKS4 19:LDM_ISISKS5 20:LDM_ISISKS6 21:LDM_ISISKS7 22:LDM_ISISKS8 23:LDM_ISISKS9 24:LDM_ISISKS10 25:LDM_ISISKS11 26:LDM_PRETRESSE 27:LDM_PRETRESSE 28:LDM_CHAUVESOURIS01 29:LDM_CHAUVESOURIS02 30:LDM_CHAUVESOURIS03 31:LDM_CHAUVESOURIS04 32:CHF_LARVE
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 0 fr 0 list 5 ended 0
+slotck 0 1 0
+slot 0 2 sh 1 mode 0 fr 0 list 11 ended 0
+slotck 0 2 0
+slot 0 3 sh 1 mode 0 fr 0 list 10 ended 0
+slotck 0 3 0
+slot 0 4 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 0 fr 0 list 4 ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list 6 ended 0
+slotck 0 6 0
+slot 0 7 sh 1 mode 0 fr 0 list 8 ended 0
+slotck 0 7 0
+slot 0 8 sh 1 mode 0 fr 0 list 1 ended 0
+slotck 0 8 0
+slot 0 9 sh 1 mode 0 fr 0 list 3 ended 0
+slotck 0 9 0
+slot 0 10 sh 1 mode 0 fr 0 list 7 ended 0
+slotck 0 10 0
+slot 0 11 sh 1 mode 0 fr 0 list 2 ended 0
+slotck 0 11 0
+slot 0 12 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 12 0
+slot 0 13 sh 1 mode 0 fr 0 list 9 ended 0
+slotck 0 13 0
+slot 0 14 sh 1 mode 0 fr 0 list 4 ended 0
+slotck 0 14 0
+slot 0 15 sh 1 mode 0 fr 0 list 10 ended 0
+slotck 0 15 0
+slot 0 16 sh 1 mode 0 fr 0 list 9 ended 0
+slotck 0 16 0
+slot 0 17 sh 1 mode 0 fr 0 list 8 ended 0
+slotck 0 17 0
+slot 0 18 sh 1 mode 0 fr 0 list 2 ended 0
+slotck 0 18 0
+slot 0 19 sh 1 mode 0 fr 0 list 11 ended 0
+slotck 0 19 0
+slot 0 20 sh 1 mode 0 fr 0 list 6 ended 0
+slotck 0 20 0
+slot 0 21 sh 1 mode 0 fr 0 list 7 ended 0
+slotck 0 21 0
+slot 0 22 sh 1 mode 0 fr 0 list 3 ended 0
+slotck 0 22 0
+slot 0 23 sh 1 mode 0 fr 0 list 5 ended 0
+slotck 0 23 0
+slot 0 24 sh 1 mode 0 fr 0 list 1 ended 0
+slotck 0 24 0
+slot 0 25 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 25 0
+slot 0 26 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 26 2
+slot 0 27 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 27 2
+slot 0 28 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 28 0
+slot 0 29 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 29 0
+slot 0 30 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 30 0
+slot 0 31 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 31 0
+slot 0 32 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 32 0
+st 0 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=Aucune_Zone_Cliquée picked=Aucune_Zone_Cliquée sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+hand 0 0 -
+bag 0 +LDM_CLEFCOFFRE
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 4 sh 1 mode 1 fr 1 list - ended 0
+slot 2 26 sh 1 mode 1 fr 1 list - ended 0
+slot 2 28 sh 1 mode 1 fr 1 list - ended 0
+slot 2 29 sh 1 mode 1 fr 1 list - ended 0
+slot 2 30 sh 1 mode 1 fr 1 list - ended 0
+slot 2 31 sh 1 mode 1 fr 1 list - ended 0
+slot 2 32 sh 1 mode 1 fr 1 list - ended 0
+click 3 LDM_ICARO5
+cursor 3 set '' 3
+subf 3 LDM_ISISKI0 5
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 1 sh 1 mode 0 fr 0 list - ended 0
+slot 3 4 sh 1 mode 1 fr 2 list - ended 0
+slot 3 26 sh 1 mode 1 fr 2 list - ended 0
+slot 3 28 sh 1 mode 1 fr 2 list - ended 0
+slot 3 29 sh 1 mode 1 fr 2 list - ended 0
+slot 3 30 sh 1 mode 1 fr 2 list - ended 0
+slot 3 31 sh 1 mode 1 fr 2 list - ended 0
+slot 3 32 sh 1 mode 1 fr 2 list - ended 0
+st 3 held=0 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO5 picked=LDM_ICARO5 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 4 sh 1 mode 1 fr 3 list - ended 0
+slot 4 26 sh 1 mode 1 fr 3 list - ended 0
+slot 4 28 sh 1 mode 1 fr 3 list - ended 0
+slot 4 29 sh 1 mode 1 fr 3 list - ended 0
+slot 4 30 sh 1 mode 1 fr 3 list - ended 0
+slot 4 31 sh 1 mode 1 fr 3 list - ended 0
+slot 4 32 sh 1 mode 1 fr 3 list - ended 0
+click 5 LDM_ICARO5
+cursor 5 reset
+cmd 5  (PlaySound = 104) 
+snd 5 load sfx\sound104.apc 0 1
+snd 5 play sfx\sound104.apc
+addf 5 LDM_ISISKI0 5
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 1 sh 1 mode 0 fr 0 list 5 ended 0
+slot 5 4 sh 1 mode 1 fr 4 list - ended 0
+slot 5 26 sh 1 mode 1 fr 4 list - ended 0
+slot 5 28 sh 1 mode 1 fr 4 list - ended 0
+slot 5 29 sh 1 mode 1 fr 4 list - ended 0
+slot 5 30 sh 1 mode 1 fr 4 list - ended 0
+slot 5 31 sh 1 mode 1 fr 4 list - ended 0
+slot 5 32 sh 1 mode 1 fr 4 list - ended 0
+st 5 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO5 picked=LDM_ICARO5 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 6 0 sh 1 mode 1 fr 5 list - ended 0
+slot 6 4 sh 1 mode 1 fr 5 list - ended 0
+slot 6 26 sh 1 mode 1 fr 5 list - ended 0
+slot 6 28 sh 1 mode 1 fr 5 list - ended 0
+slot 6 29 sh 1 mode 1 fr 5 list - ended 0
+slot 6 30 sh 1 mode 1 fr 5 list - ended 0
+slot 6 31 sh 1 mode 1 fr 5 list - ended 0
+slot 6 32 sh 1 mode 1 fr 5 list - ended 0
+click 7 LDM_MCARO4
+cursor 7 set '' 15
+subf 7 LDM_ISISKS0 4
+snd 7 load loc\voix\ldm\pret0390.apc 1 2
+snd 7 loaded loc\voix\ldm\pret0390.apc
+snd 7 play loc\voix\ldm\pret0390.apc
+slot 7 0 sh 1 mode 1 fr 6 list - ended 0
+slot 7 4 sh 1 mode 1 fr 6 list - ended 0
+slot 7 14 sh 1 mode 0 fr 0 list - ended 0
+slot 7 26 sh 1 mode 1 fr 6 list - ended 0
+slot 7 28 sh 1 mode 1 fr 6 list - ended 0
+slot 7 29 sh 1 mode 1 fr 6 list - ended 0
+slot 7 30 sh 1 mode 1 fr 6 list - ended 0
+slot 7 31 sh 1 mode 1 fr 6 list - ended 0
+slot 7 32 sh 1 mode 1 fr 6 list - ended 0
+st 7 held=12 text=0 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO4 picked=LDM_MCARO4 sample=loc\voix\ldm\pret0390.apc ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+caption 8 217 1
+draw 8 box 10 10 20 20 0 1
+textid 8 217 1
+draw 8 text AtlFont_Default
+slot 8 0 sh 1 mode 1 fr 7 list - ended 0
+slot 8 4 sh 1 mode 1 fr 7 list - ended 0
+slot 8 26 sh 1 mode 1 fr 7 list - ended 0
+slot 8 28 sh 1 mode 1 fr 7 list - ended 0
+slot 8 29 sh 1 mode 1 fr 7 list - ended 0
+slot 8 30 sh 1 mode 1 fr 7 list - ended 0
+slot 8 31 sh 1 mode 1 fr 7 list - ended 0
+slot 8 32 sh 1 mode 1 fr 7 list - ended 0
+st 8 held=12 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO4 picked=LDM_MCARO4 sample=loc\voix\ldm\pret0390.apc ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+caption 9 217 1
+draw 9 box 10 10 20 20 0 1
+textid 9 217 1
+draw 9 text AtlFont_Default
+slot 9 0 sh 1 mode 1 fr 8 list - ended 0
+slot 9 4 sh 1 mode 1 fr 8 list - ended 0
+slot 9 26 sh 1 mode 1 fr 8 list - ended 0
+slot 9 28 sh 1 mode 1 fr 8 list - ended 0
+slot 9 29 sh 1 mode 1 fr 8 list - ended 0
+slot 9 30 sh 1 mode 1 fr 8 list - ended 0
+slot 9 31 sh 1 mode 1 fr 8 list - ended 0
+slot 9 32 sh 1 mode 1 fr 8 list - ended 0
+click 10 LDM_MCARO4
+caption 10 217 1
+draw 10 box 10 10 20 20 0 1
+textid 10 217 1
+draw 10 text AtlFont_Default
+cursor 10 reset
+snd 10 stop loc\voix\ldm\pret0390.apc
+cmd 10  (PlaySound = 105) 
+snd 10 load sfx\sound105.apc 0 1
+snd 10 play sfx\sound105.apc
+addf 10 LDM_ISISKS0 4
+slot 10 0 sh 1 mode 1 fr 9 list - ended 0
+slot 10 4 sh 1 mode 1 fr 9 list - ended 0
+slot 10 14 sh 1 mode 0 fr 0 list 4 ended 0
+slot 10 26 sh 1 mode 1 fr 9 list - ended 0
+slot 10 28 sh 1 mode 1 fr 9 list - ended 0
+slot 10 29 sh 1 mode 1 fr 9 list - ended 0
+slot 10 30 sh 1 mode 1 fr 9 list - ended 0
+slot 10 31 sh 1 mode 1 fr 9 list - ended 0
+slot 10 32 sh 1 mode 1 fr 9 list - ended 0
+st 10 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_MCARO4 picked=LDM_MCARO4 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 11 0 sh 1 mode 1 fr 10 list - ended 0
+slot 11 4 sh 1 mode 1 fr 10 list - ended 0
+slot 11 26 sh 1 mode 1 fr 10 list - ended 0
+slot 11 28 sh 1 mode 1 fr 10 list - ended 0
+slot 11 29 sh 1 mode 1 fr 10 list - ended 0
+slot 11 30 sh 1 mode 1 fr 10 list - ended 0
+slot 11 31 sh 1 mode 1 fr 10 list - ended 0
+slot 11 32 sh 1 mode 1 fr 10 list - ended 0
+click 12 LDM_ICARO5
+cursor 12 set '' 3
+subf 12 LDM_ISISKI0 5
+slot 12 0 sh 1 mode 1 fr 11 list - ended 0
+slot 12 1 sh 1 mode 0 fr 0 list - ended 0
+slot 12 4 sh 1 mode 1 fr 11 list - ended 0
+slot 12 26 sh 1 mode 1 fr 11 list - ended 0
+slot 12 28 sh 1 mode 1 fr 11 list - ended 0
+slot 12 29 sh 1 mode 1 fr 11 list - ended 0
+slot 12 30 sh 1 mode 1 fr 11 list - ended 0
+slot 12 31 sh 1 mode 1 fr 11 list - ended 0
+slot 12 32 sh 1 mode 1 fr 11 list - ended 0
+st 12 held=0 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO5 picked=LDM_ICARO5 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 13 0 sh 1 mode 1 fr 12 list - ended 0
+slot 13 4 sh 1 mode 1 fr 12 list - ended 0
+slot 13 26 sh 1 mode 1 fr 12 list - ended 0
+slot 13 28 sh 1 mode 1 fr 12 list - ended 0
+slot 13 29 sh 1 mode 1 fr 12 list - ended 0
+slot 13 30 sh 1 mode 1 fr 12 list - ended 0
+slot 13 31 sh 1 mode 1 fr 12 list - ended 0
+slot 13 32 sh 1 mode 1 fr 12 list - ended 0
+click 14 LDM_MCARO4
+slot 14 0 sh 1 mode 1 fr 13 list - ended 0
+slot 14 4 sh 1 mode 1 fr 13 list - ended 0
+slot 14 26 sh 1 mode 1 fr 13 list - ended 0
+slot 14 28 sh 1 mode 1 fr 13 list - ended 0
+slot 14 29 sh 1 mode 1 fr 13 list - ended 0
+slot 14 30 sh 1 mode 1 fr 13 list - ended 0
+slot 14 31 sh 1 mode 1 fr 13 list - ended 0
+slot 14 32 sh 1 mode 1 fr 13 list - ended 0
+st 14 held=0 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO4 picked=LDM_ICARO5 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 15 0 sh 1 mode 1 fr 14 list - ended 0
+slot 15 4 sh 1 mode 1 fr 14 list - ended 0
+slot 15 26 sh 1 mode 1 fr 14 list - ended 0
+slot 15 28 sh 1 mode 1 fr 14 list - ended 0
+slot 15 29 sh 1 mode 1 fr 14 list - ended 0
+slot 15 30 sh 1 mode 1 fr 14 list - ended 0
+slot 15 31 sh 1 mode 1 fr 14 list - ended 0
+slot 15 32 sh 1 mode 1 fr 14 list - ended 0
+hand 16 LDM_CLEFCOFFRE
+hand 16 112 LDM_CLEFCOFFRE
+cursor 16 reset
+addf 16 LDM_ISISKI0 5
+slot 16 0 sh 1 mode 1 fr 15 list - ended 0
+slot 16 1 sh 1 mode 0 fr 0 list 5 ended 0
+slot 16 4 sh 1 mode 1 fr 15 list - ended 0
+slot 16 26 sh 1 mode 1 fr 15 list - ended 0
+slot 16 28 sh 1 mode 1 fr 15 list - ended 0
+slot 16 29 sh 1 mode 1 fr 15 list - ended 0
+slot 16 30 sh 1 mode 1 fr 15 list - ended 0
+slot 16 31 sh 1 mode 1 fr 15 list - ended 0
+slot 16 32 sh 1 mode 1 fr 15 list - ended 0
+st 16 held=-1 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_MCARO4 picked=LDM_ICARO5 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 17 0 sh 1 mode 1 fr 16 list - ended 0
+slot 17 4 sh 1 mode 1 fr 16 list - ended 0
+slot 17 26 sh 1 mode 1 fr 16 list - ended 0
+slot 17 28 sh 1 mode 1 fr 16 list - ended 0
+slot 17 29 sh 1 mode 1 fr 16 list - ended 0
+slot 17 30 sh 1 mode 1 fr 16 list - ended 0
+slot 17 31 sh 1 mode 1 fr 16 list - ended 0
+slot 17 32 sh 1 mode 1 fr 16 list - ended 0
+click 18 LDM_ICARO5
+slot 18 0 sh 1 mode 1 fr 17 list - ended 0
+slot 18 4 sh 1 mode 1 fr 17 list - ended 0
+slot 18 26 sh 1 mode 1 fr 17 list - ended 0
+slot 18 28 sh 1 mode 1 fr 17 list - ended 0
+slot 18 29 sh 1 mode 1 fr 17 list - ended 0
+slot 18 30 sh 1 mode 1 fr 17 list - ended 0
+slot 18 31 sh 1 mode 1 fr 17 list - ended 0
+slot 18 32 sh 1 mode 1 fr 17 list - ended 0
+st 18 held=-1 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO5 picked=LDM_ICARO5 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 19 0 sh 1 mode 1 fr 18 list - ended 0
+slot 19 4 sh 1 mode 1 fr 18 list - ended 0
+slot 19 26 sh 1 mode 1 fr 18 list - ended 0
+slot 19 28 sh 1 mode 1 fr 18 list - ended 0
+slot 19 29 sh 1 mode 1 fr 18 list - ended 0
+slot 19 30 sh 1 mode 1 fr 18 list - ended 0
+slot 19 31 sh 1 mode 1 fr 18 list - ended 0
+slot 19 32 sh 1 mode 1 fr 18 list - ended 0
+hand 20 0
+hand 20 0 -
+slot 20 0 sh 1 mode 1 fr 19 list - ended 0
+slot 20 4 sh 1 mode 1 fr 19 list - ended 0
+slot 20 26 sh 1 mode 1 fr 19 list - ended 0
+slot 20 28 sh 1 mode 1 fr 19 list - ended 0
+slot 20 29 sh 1 mode 1 fr 19 list - ended 0
+slot 20 30 sh 1 mode 1 fr 19 list - ended 0
+slot 20 31 sh 1 mode 1 fr 19 list - ended 0
+slot 20 32 sh 1 mode 1 fr 19 list - ended 0
+slot 21 0 sh 1 mode 1 fr 0 list - ended 1
+slot 21 4 sh 1 mode 1 fr 20 list - ended 0
+slot 21 26 sh 1 mode 1 fr 20 list - ended 0
+slot 21 28 sh 1 mode 1 fr 20 list - ended 0
+slot 21 29 sh 1 mode 1 fr 20 list - ended 0
+slot 21 30 sh 1 mode 1 fr 20 list - ended 0
+slot 21 31 sh 1 mode 1 fr 20 list - ended 0
+slot 21 32 sh 1 mode 1 fr 20 list - ended 0
+click 22 LDM_ICARO5
+cursor 22 set '' 3
+subf 22 LDM_ISISKI0 5
+slot 22 0 sh 1 mode 1 fr 1 list - ended 1
+slot 22 1 sh 1 mode 0 fr 0 list - ended 0
+slot 22 4 sh 1 mode 1 fr 0 list - ended 1
+slot 22 26 sh 1 mode 1 fr 21 list - ended 0
+slot 22 28 sh 1 mode 1 fr 21 list - ended 0
+slot 22 29 sh 1 mode 1 fr 21 list - ended 0
+slot 22 30 sh 1 mode 1 fr 21 list - ended 0
+slot 22 31 sh 1 mode 1 fr 21 list - ended 0
+slot 22 32 sh 1 mode 1 fr 21 list - ended 0
+st 22 held=0 text=1 shown=1 b71e264=0 carreau=1 clicked=LDM_ICARO5 picked=LDM_ICARO5 sample=Rien ki=5,11,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+slot 23 0 sh 1 mode 1 fr 2 list - ended 1
+slot 23 4 sh 1 mode 1 fr 1 list - ended 1
+slot 23 26 sh 1 mode 1 fr 22 list - ended 0
+slot 23 28 sh 1 mode 1 fr 22 list - ended 0
+slot 23 29 sh 1 mode 1 fr 22 list - ended 0
+slot 23 30 sh 1 mode 1 fr 22 list - ended 0
+slot 23 31 sh 1 mode 1 fr 22 list - ended 0
+slot 23 32 sh 1 mode 1 fr 22 list - ended 0
+click 24 LDM_ICARO11
+subf 24 LDM_ISISKI1 11
+addf 24 LDM_ISISKI0 11
+addf 24 LDM_ISISKI1 5
+cursor 24 reset
+cmd 24  (PlaySound = 104) 
+snd 24 load sfx\sound104.apc 0 1
+snd 24 play sfx\sound104.apc
+slot 24 0 sh 1 mode 1 fr 3 list - ended 1
+slot 24 1 sh 1 mode 0 fr 0 list 11 ended 0
+slot 24 2 sh 1 mode 0 fr 0 list 5 ended 0
+slot 24 4 sh 1 mode 1 fr 2 list - ended 1
+slot 24 26 sh 1 mode 1 fr 23 list - ended 0
+slot 24 28 sh 1 mode 1 fr 23 list - ended 0
+slot 24 29 sh 1 mode 1 fr 23 list - ended 0
+slot 24 30 sh 1 mode 1 fr 23 list - ended 0
+slot 24 31 sh 1 mode 1 fr 23 list - ended 0
+slot 24 32 sh 1 mode 1 fr 23 list - ended 0
+st 24 held=-1 text=1 shown=1 b71e264=0 carreau=0 clicked=LDM_ICARO11 picked=LDM_ICARO5 sample=Rien ki=11,5,10,4,6,8,1,3,7,2,0,9 ks=4,10,9,8,2,11,6,7,3,5,1,0
+flags 24 510=11 511=5
+slot 25 0 sh 1 mode 1 fr 4 list - ended 1
+slot 25 4 sh 1 mode 1 fr 3 list - ended 1
+slot 25 26 sh 1 mode 1 fr 24 list - ended 0
+slot 25 28 sh 1 mode 1 fr 24 list - ended 0
+slot 25 29 sh 1 mode 1 fr 24 list - ended 0
+slot 25 30 sh 1 mode 1 fr 24 list - ended 0
+slot 25 31 sh 1 mode 1 fr 24 list - ended 0
+slot 25 32 sh 1 mode 1 fr 24 list - ended 0
+slot 26 0 sh 1 mode 1 fr 5 list - ended 1
+slot 26 4 sh 1 mode 1 fr 4 list - ended 1
+slot 26 26 sh 1 mode 1 fr 25 list - ended 0
+slot 26 28 sh 1 mode 1 fr 25 list - ended 0
+slot 26 29 sh 1 mode 1 fr 25 list - ended 0
+slot 26 30 sh 1 mode 1 fr 25 list - ended 0
+slot 26 31 sh 1 mode 1 fr 25 list - ended 0
+slot 26 32 sh 1 mode 1 fr 25 list - ended 0
+run solved
+setup wam LDMorts.wam view 10 yaw 0 pitch 0
+setup flag 63 1
+setup flag 506 0
+setup flag 899 0
+entry 0
+cmd 0 (LIMITEANGLEWARPY=70)
+addf 0 LDM_ISISKI0 0
+addf 0 LDM_ISISKS0 0
+addf 0 LDM_ISISKI1 1
+addf 0 LDM_ISISKS1 1
+addf 0 LDM_ISISKI2 2
+addf 0 LDM_ISISKS2 2
+addf 0 LDM_ISISKI3 3
+addf 0 LDM_ISISKS3 3
+addf 0 LDM_ISISKI4 4
+addf 0 LDM_ISISKS4 4
+addf 0 LDM_ISISKI5 5
+addf 0 LDM_ISISKS5 5
+addf 0 LDM_ISISKI6 6
+addf 0 LDM_ISISKS6 6
+addf 0 LDM_ISISKI7 7
+addf 0 LDM_ISISKS7 7
+addf 0 LDM_ISISKI8 8
+addf 0 LDM_ISISKS8 8
+addf 0 LDM_ISISKI9 9
+addf 0 LDM_ISISKS9 9
+addf 0 LDM_ISISKI10 10
+addf 0 LDM_ISISKS10 10
+addf 0 LDM_ISISKI11 11
+addf 0 LDM_ISISKS11 11
+cursor 0 reset
+slots 0:n1A1010010 1:kaA1010010 2:kbA1010010 3:kcA1010010 4:waA1010010 5:kdA1010010 6:keA1010010 7:kfA1010010 8:kgA1010010 9:khA1010010 10:kiA1010010 11:kjA1010010 12:kkA1010010 13:klA1010010 14:kmA1010010 15:knA1010010 16:koA1010010 17:kpA1010010 18:kqA1010010 19:krA1010010 20:ksA1010010 21:ktA1010010 22:kuA1010010 23:kvA1010010 24:kwA1010010 25:kxA1010010 26:prA1010010 27:prA2010010 28:cvA1010010 29:cvA2010010 30:cvA3010010 31:cvA4010010 32:snA1010001
+slotent 0:LDM_PALMIER 1:LDM_ISISKI0 2:LDM_ISISKI1 3:LDM_ISISKI2 4:LDM_EAU 5:LDM_ISISKI3 6:LDM_ISISKI4 7:LDM_ISISKI5 8:LDM_ISISKI6 9:LDM_ISISKI7 10:LDM_ISISKI8 11:LDM_ISISKI9 12:LDM_ISISKI10 13:LDM_ISISKI11 14:LDM_ISISKS0 15:LDM_ISISKS1 16:LDM_ISISKS2 17:LDM_ISISKS3 18:LDM_ISISKS4 19:LDM_ISISKS5 20:LDM_ISISKS6 21:LDM_ISISKS7 22:LDM_ISISKS8 23:LDM_ISISKS9 24:LDM_ISISKS10 25:LDM_ISISKS11 26:LDM_PRETRESSE 27:LDM_PRETRESSE 28:LDM_CHAUVESOURIS01 29:LDM_CHAUVESOURIS02 30:LDM_CHAUVESOURIS03 31:LDM_CHAUVESOURIS04 32:CHF_LARVE
+slot 0 0 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 0 0
+slot 0 1 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 1 0
+slot 0 2 sh 1 mode 0 fr 0 list 1 ended 0
+slotck 0 2 0
+slot 0 3 sh 1 mode 0 fr 0 list 2 ended 0
+slotck 0 3 0
+slot 0 4 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 4 0
+slot 0 5 sh 1 mode 0 fr 0 list 3 ended 0
+slotck 0 5 0
+slot 0 6 sh 1 mode 0 fr 0 list 4 ended 0
+slotck 0 6 0
+slot 0 7 sh 1 mode 0 fr 0 list 5 ended 0
+slotck 0 7 0
+slot 0 8 sh 1 mode 0 fr 0 list 6 ended 0
+slotck 0 8 0
+slot 0 9 sh 1 mode 0 fr 0 list 7 ended 0
+slotck 0 9 0
+slot 0 10 sh 1 mode 0 fr 0 list 8 ended 0
+slotck 0 10 0
+slot 0 11 sh 1 mode 0 fr 0 list 9 ended 0
+slotck 0 11 0
+slot 0 12 sh 1 mode 0 fr 0 list 10 ended 0
+slotck 0 12 0
+slot 0 13 sh 1 mode 0 fr 0 list 11 ended 0
+slotck 0 13 0
+slot 0 14 sh 1 mode 0 fr 0 list 0 ended 0
+slotck 0 14 0
+slot 0 15 sh 1 mode 0 fr 0 list 1 ended 0
+slotck 0 15 0
+slot 0 16 sh 1 mode 0 fr 0 list 2 ended 0
+slotck 0 16 0
+slot 0 17 sh 1 mode 0 fr 0 list 3 ended 0
+slotck 0 17 0
+slot 0 18 sh 1 mode 0 fr 0 list 4 ended 0
+slotck 0 18 0
+slot 0 19 sh 1 mode 0 fr 0 list 5 ended 0
+slotck 0 19 0
+slot 0 20 sh 1 mode 0 fr 0 list 6 ended 0
+slotck 0 20 0
+slot 0 21 sh 1 mode 0 fr 0 list 7 ended 0
+slotck 0 21 0
+slot 0 22 sh 1 mode 0 fr 0 list 8 ended 0
+slotck 0 22 0
+slot 0 23 sh 1 mode 0 fr 0 list 9 ended 0
+slotck 0 23 0
+slot 0 24 sh 1 mode 0 fr 0 list 10 ended 0
+slotck 0 24 0
+slot 0 25 sh 1 mode 0 fr 0 list 11 ended 0
+slotck 0 25 0
+slot 0 26 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 26 2
+slot 0 27 sh 0 mode 1 fr 0 list - ended 0
+slotck 0 27 2
+slot 0 28 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 28 0
+slot 0 29 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 29 0
+slot 0 30 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 30 0
+slot 0 31 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 31 0
+slot 0 32 sh 1 mode 1 fr 0 list - ended 0
+slotck 0 32 0
+st 0 held=-1 text=0 shown=1 b71e264=0 carreau=0 clicked=Aucune_Zone_Cliquée picked=Aucune_Zone_Cliquée sample=Rien ki=0,1,2,3,4,5,6,7,8,9,10,11 ks=0,1,2,3,4,5,6,7,8,9,10,11
+hand 0 0 -
+bag 0 -LDM_CLEFCOFFRE
+scan 1
+flags 1 899=1
+scan 2
+slot 2 0 sh 1 mode 1 fr 1 list - ended 0
+slot 2 4 sh 1 mode 1 fr 1 list - ended 0
+slot 2 26 sh 1 mode 1 fr 1 list - ended 0
+slot 2 28 sh 1 mode 1 fr 1 list - ended 0
+slot 2 29 sh 1 mode 1 fr 1 list - ended 0
+slot 2 30 sh 1 mode 1 fr 1 list - ended 0
+slot 2 31 sh 1 mode 1 fr 1 list - ended 0
+slot 2 32 sh 1 mode 1 fr 1 list - ended 0
+scan 3
+slot 3 0 sh 1 mode 1 fr 2 list - ended 0
+slot 3 4 sh 1 mode 1 fr 2 list - ended 0
+slot 3 26 sh 1 mode 1 fr 2 list - ended 0
+slot 3 28 sh 1 mode 1 fr 2 list - ended 0
+slot 3 29 sh 1 mode 1 fr 2 list - ended 0
+slot 3 30 sh 1 mode 1 fr 2 list - ended 0
+slot 3 31 sh 1 mode 1 fr 2 list - ended 0
+slot 3 32 sh 1 mode 1 fr 2 list - ended 0
+scan 4
+slot 4 0 sh 1 mode 1 fr 3 list - ended 0
+slot 4 4 sh 1 mode 1 fr 3 list - ended 0
+slot 4 26 sh 1 mode 1 fr 3 list - ended 0
+slot 4 28 sh 1 mode 1 fr 3 list - ended 0
+slot 4 29 sh 1 mode 1 fr 3 list - ended 0
+slot 4 30 sh 1 mode 1 fr 3 list - ended 0
+slot 4 31 sh 1 mode 1 fr 3 list - ended 0
+slot 4 32 sh 1 mode 1 fr 3 list - ended 0
+scan 5
+slot 5 0 sh 1 mode 1 fr 4 list - ended 0
+slot 5 4 sh 1 mode 1 fr 4 list - ended 0
+slot 5 26 sh 1 mode 1 fr 4 list - ended 0
+slot 5 28 sh 1 mode 1 fr 4 list - ended 0
+slot 5 29 sh 1 mode 1 fr 4 list - ended 0
+slot 5 30 sh 1 mode 1 fr 4 list - ended 0
+slot 5 31 sh 1 mode 1 fr 4 list - ended 0
+slot 5 32 sh 1 mode 1 fr 4 list - ended 0

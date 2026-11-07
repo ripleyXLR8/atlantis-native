@@ -95,6 +95,29 @@ impl Look {
     }
 }
 
+impl Look {
+    /// [`Look::frame`] under *Atlantis III*'s camera lock (0x0077b8ac):
+    /// the speeds decay, the rotations do nothing, the limits are tested
+    /// on the camera as it is (a speed is zeroed where it is outside).
+    pub fn frame_locked(&mut self, cam: &Camera) {
+        let fpu = cam.fpu;
+        let decay = f64::from(f32::from_bits(0x3f4c_cccd));
+        self.yaw_speed = fpu.f32(fpu.mul(f64::from(self.yaw_speed), decay));
+        self.pitch_speed = fpu.f32(fpu.mul(f64::from(self.pitch_speed), decay));
+        let pi = f64::from(f32::from_bits(0x4049_0fdb));
+        let k = f64::from(f32::from_bits(0x3bb6_0b61));
+        let rad = |deg: i32| fpu.f32(fpu.mul(fpu.mul(f64::from(deg), pi), k));
+        let (lim_y, lim_x) = (rad(self.limit_y), rad(self.limit_x));
+        let (yaw, pitch) = cam.angles();
+        if self.limit_y != NO_LIMIT && over(fpu, pitch, lim_y).is_some() {
+            self.pitch_speed = 0.0;
+        }
+        if self.limit_x != NO_LIMIT && over(fpu, yaw, lim_x).is_some() {
+            self.yaw_speed = 0.0;
+        }
+    }
+}
+
 /// The turn that brings `angle` back within ±`limit`, if it is outside
 /// (@ 0x0040c773..0x0040c7fb): angle − limit above, angle + limit below.
 fn over(fpu: Fpu, angle: f32, limit: f32) -> Option<f32> {

@@ -1,0 +1,18 @@
+# The original Game.exe's TGA loader (@ 0x00418e70) into x8r8g8b8 and r5g6b5 surfaces, run under emulation.
+# TGA loader 0x00418e70 of Game.exe (MD5 eb06eaa718877dfcabee6e8f89d85b31) under Unicorn
+tga map/PL_Fond640.tga x8r8g8b8 640 480 32 md5=ff7afafd36552de2ffd7b0c1122b2f05 model=0
+tga map/PL_Fond640.tga r5g6b5 640 480 16 md5=d4bb1b2f825fe2182116196dc4d4bbc2 model=0
+tga map/PL_Fond800.tga x8r8g8b8 800 600 32 md5=bec2a710fb88be03149f3af5b1fda2bb model=0
+tga map/PL_Fond800.tga r5g6b5 800 600 16 md5=edd5f9c9bdc6599146b0cf5f0a2b8eb6 model=0
+tga map/PL_Fond1024.tga x8r8g8b8 1024 768 32 md5=f3f39442b484a038beeee468d4fa2aa4 model=0
+tga map/PL_Fond1024.tga r5g6b5 1024 768 16 md5=e8d731cd3a4e1e209066f9ca9e8c3442 model=0
+tga map/puzpion.tga x8r8g8b8 512 512 32 md5=2e8fe53bc75e6b4ffc786873050c4ff2 model=0
+tga map/puzpion.tga r5g6b5 512 512 16 md5=216766bfa49960804d4230e9de71f9c2 model=0
+tga map/Stand1/To.tga x8r8g8b8 512 512 32 md5=ea51ce00ba090e87efbb9ddc35a487fd model=0
+tga map/Stand1/To.tga r5g6b5 512 512 16 md5=52b96ef8363f7547c6da769f3c56f153 model=0
+tga map/Stand1/Toyf.tga x8r8g8b8 512 264 32 md5=39f7b1c336126031ac13d003949a6277 model=0
+tga map/Stand1/Toyf.tga r5g6b5 512 264 16 md5=ec058910fc166bab6e217633855638e2 model=0
+tga map/Stand1/boyd.tga x8r8g8b8 512 330 32 md5=0c20524b4912cfaa15dedc19c584f273 model=0
+tga map/Stand1/boyd.tga r5g6b5 512 330 16 md5=e483f217ceb364584e4fa97e0f0c093b model=0
+tga map/Cor-tr.tga x8r8g8b8 64 128 32 md5=0883bd6ac6be34af6fd7d4b9cc690bb3 model=0
+tga map/Cor-tr.tga r5g6b5 64 128 16 md5=d038f54b1c9b8229117f520175c0ee51 model=0

@@ -33,6 +33,7 @@
 //! the game there; here it is kept in [`Script::fatal`] and every scan
 //! stops, for the host to report.
 
+pub mod a3;
 pub mod eval;
 pub mod frame;
 pub mod host;
@@ -57,6 +58,11 @@ pub const CHAPTER_BUFFER: usize = 64000;
 
 /// The story flags (`int flags[1024]` @ 0x006d0578).
 pub const FLAGS: usize = 1024;
+
+/// *Atlantis III*'s resume point "nothing" (the empty text 0x0077e500,
+/// the static value of 0x0071895c, written again by a chapter change
+/// @ 0x0044873b / @ 0x00448aaa): resuming runs no line.
+pub const RESUME_NOTHING: usize = usize::MAX;
 
 /// Which text a walk reads: the chapter buffer, or the command a
 /// `RunOneCommand` (@ 0x00481800) copied (with `"\r\n\r\n"` appended).
@@ -104,6 +110,21 @@ macro_rules! keys {
 
             fn resolve(names: &DefNames) -> Result<Keys, NameError> {
                 Ok(Keys { $($field: names.id(defnames::VARIABLES, $name)?,)* })
+            }
+
+            /// *Atlantis III*'s file lacks some of these names: each
+            /// missing one gets a slot of its own past the file's names
+            /// (from the table's end down), so that the code naming it
+            /// reads and writes a variable no script line can reach.
+            fn resolve_lenient(names: &DefNames) -> Keys {
+                let mut spare = defnames::MAX_VARIABLES;
+                let mut get = |name: &[u8]| {
+                    names.id(defnames::VARIABLES, name).unwrap_or_else(|_| {
+                        spare -= 1;
+                        spare
+                    })
+                };
+                Keys { $($field: get($name),)* }
             }
         }
     };
@@ -154,9 +175,23 @@ pub enum HandBank {
     Puzzle,
 }
 
+/// Which game's interpreter: *Atlantis III* keeps *Atlantis II*'s walks
+/// and conditions and changes its `/set` handler, per-view reset and frame
+/// rules ([`a3`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Dialect {
+    #[default]
+    Atlantis2,
+    Atlantis3,
+}
+
 /// The interpreter and the script state it keeps.
 #[derive(Clone, Debug)]
 pub struct Script {
+    /// The game whose rules run.
+    pub dialect: Dialect,
+    /// *Atlantis III*'s state ([`a3`]); unused by *Atlantis II*.
+    pub a3: a3::A3State,
     pub names: DefNames,
     pub keys: Keys,
     /// `int vars[300]` @ 0x006cfe90.
@@ -179,7 +214,8 @@ pub struct Script {
     /// @ 0x006d1684: the `/INIT` walk skips its next section call.
     init_skip: bool,
     /// A command left the section to resume later (@ 0x006d1699), at
-    /// [`Script::resume_at`] (@ 0x006d0574).
+    /// [`Script::resume_at`] (@ 0x006d0574; *Atlantis III*: 0x0071895c,
+    /// [`RESUME_NOTHING`] for its empty text 0x0077e500).
     pub resume_pending: bool,
     pub resume_at: usize,
     /// The section waits for a music copy's please-wait page
@@ -273,6 +309,10 @@ pub struct Script {
     /// For logs: the chapter and the line number of each chapter line
     /// `SetVariables` runs.
     pub lines: Option<Vec<(i32, usize)>>,
+    /// For comparisons with the original's log (`interp: SET%s`): the text
+    /// of each line `SetVariables` runs, from its start to its CR.
+    #[doc(hidden)]
+    pub set_log: Option<Vec<String>>,
 }
 
 impl Script {
@@ -281,7 +321,28 @@ impl Script {
     pub fn new(defnames: &[u8]) -> Result<Script, String> {
         let names = DefNames::parse(defnames).map_err(|e| e.to_string())?;
         let keys = Keys::resolve(&names).map_err(|e| e.to_string())?;
-        Ok(Script {
+        Ok(Script::with_keys(names, keys, Dialect::Atlantis2))
+    }
+
+    /// *Atlantis III*'s interpreter over its `defnames.con` (`LoadDefNames`
+    /// @ 0x0044b240 of its `Game.exe`, at most 300 variables): every key is
+    /// looked up by name at each use there, so a name the file lacks is
+    /// only fatal when a line uses it.
+    pub fn new_a3(defnames: &[u8]) -> Result<Script, String> {
+        let names = DefNames::parse(defnames).map_err(|e| e.to_string())?;
+        if names.len(defnames::VARIABLES) > defnames::MAX_VARIABLES {
+            return Err("LoadDefNames: plus de 300 variables".into());
+        }
+        let keys = Keys::resolve_lenient(&names);
+        let mut s = Script::with_keys(names, keys, Dialect::Atlantis3);
+        s.flags = vec![0; a3::FLAGS_A3];
+        Ok(s)
+    }
+
+    fn with_keys(names: DefNames, keys: Keys, dialect: Dialect) -> Script {
+        Script {
+            dialect,
+            a3: a3::A3State::default(),
             names,
             keys,
             vars: vec![0; defnames::MAX_VARIABLES],
@@ -336,7 +397,8 @@ impl Script {
             stub_run_init: false,
             trace: None,
             lines: None,
-        })
+            set_log: None,
+        }
     }
 
     /// A variable by name (`ReadVar` @ 0x00484ff0); `None` when the name
@@ -464,6 +526,13 @@ impl Script {
     pub(crate) fn id(&mut self, section: usize, src: Src, i: usize) -> i32 {
         match self.names.id(section, self.tail(src, i)) {
             Ok(v) => v as i32,
+            Err(e) if self.is_a3() => {
+                // *Atlantis III*'s `DefName_GetIdName` (@ 0x00460860) only
+                // logs "Nom de %s inconnu" and gives 0 (a condition on
+                // `NOT_X` of a variable that is not `SACADOS` reads it).
+                log::warn!("DefName_GetIdName: {e}");
+                0
+            }
             Err(e) => {
                 self.fail(e.to_string());
                 0

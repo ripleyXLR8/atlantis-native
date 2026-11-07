@@ -95,7 +95,7 @@ fn u32_at(b: &[u8], at: usize) -> Option<u32> {
 
 /// `SPR_CONVPAL32` (spr_p5.dll @ 0x10002428) for RGB565: B, G, R of an
 /// RGB555 entry shifted to `R << 11 | G << 6 | B`.
-fn to565(v: u16) -> u16 {
+pub fn to565(v: u16) -> u16 {
     let (b, g, r) = (v & 31, (v >> 5) & 31, (v >> 10) & 31);
     (r << 11) | (g << 6) | b
 }
@@ -103,7 +103,7 @@ fn to565(v: u16) -> u16 {
 /// The shade of a pixel by a factor f (0..31), `HI[f][c >> 8] + LO[f][c &
 /// 0xff]` of `SprDll_Init` (spr_p5.dll @ 0x100018e0) for RGB565: about
 /// `c × (31 − f) / 32` per channel.
-fn shade(c: u16, f: u8) -> u16 {
+pub fn shade(c: u16, f: u8) -> u16 {
     let k = 31 - u32::from(f & 31);
     let hb = u32::from(c >> 8);
     let lb = u32::from(c & 0xff);
@@ -115,7 +115,7 @@ fn shade(c: u16, f: u8) -> u16 {
 }
 
 /// `half(c)` with the 565 mask 0xf7de (spr_p5.dll @ 0x1003e124).
-fn half(c: u16) -> u16 {
+pub fn half(c: u16) -> u16 {
     (c & 0xf7de) >> 1
 }
 
@@ -151,8 +151,10 @@ pub enum Mode {
     Half,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum Run {
+/// A run of a sprite row ([`next_run`]): K skip, R palette indices, P
+/// pairs (factor, index), S shade, E end of the row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Run {
     Start,
     Skip,
     Pal,
@@ -164,7 +166,7 @@ enum Run {
 /// The next run of a row (spr_p5.dll @ 0x10003ac0..0x10003bbf,
 /// 0x10003fe0..0x100040c8): the meaning of the control byte's low bits
 /// depends on the previous run.
-fn next_run(prev: Run, b: u8) -> (Run, usize) {
+pub fn next_run(prev: Run, b: u8) -> (Run, usize) {
     use Run::*;
     let n1 = usize::from(b >> 1) + 1;
     let n2 = usize::from(b >> 2) + 1;

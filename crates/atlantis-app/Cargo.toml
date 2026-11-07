@@ -25,6 +25,10 @@ cpal = "0.15"
 web-time = "1"
 # The identifiers of an unknown edition in the report to the project.
 md-5 = "0.10"
+# Atlantis III in the browser, for private tests only: off in every
+# released build (`--features atlantis3`).
+atlantis3-data = { path = "../atlantis3-data", optional = true }
+atlantis3-engine = { path = "../atlantis3-engine", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
@@ -32,6 +36,11 @@ env_logger = "0.11"
 # portal (libdbus loaded at run time, zenity as the fallback): nothing to
 # link at build time.
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
+
+[features]
+# Atlantis III in the web build (unfinished; not part of the program: no
+# released build, page or workflow turns it on).
+atlantis3 = ["dep:atlantis3-data", "dep:atlantis3-engine"]
 
 # The local time of the Atlantis II saves (`GetLocalTime` in the original).
 [target.'cfg(all(unix, not(target_arch = "wasm32")))'.dependencies]
@@ -54,6 +63,12 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = ["File", "FileList", "Blob", "Window", "Storage", "HtmlCanvasElement", "WebGl2RenderingContext", "WebGlProgram", "WebGlShader", "WebGlTexture", "WebGlUniformLocation", "WebGlVertexArrayObject", "WebGlFramebuffer", "Document", "Element", "HtmlElement", "CssStyleDeclaration", "DomTokenList", "Response", "Location"] }
 console_error_panic_hook = "0.1"
 console_log = "1"
+
+# The developers' window of the unfinished Atlantis III
+# (`examples/atlantis3.rs`); not part of the program.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+atlantis3-data = { path = "../atlantis3-data" }
+atlantis3-engine = { path = "../atlantis3-engine" }
 
 # The unit tests run in WebAssembly too (`wasm-bindgen-test-runner`, in
 # Node.js): the game finder of the web page.

@@ -1,0 +1,27 @@
+# Escape in the panorama and in the inventory of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31)
+# with spr_p6.dll under emulation, 800 x 600 RGB565: the DirectInput keyboard callback (0x0042ab20) run unmodified with
+# the Escape key, and through it the Escape handler (0x0042ac50): case 0x0042acb7 for loop mode 3, 0x0042af2b for loop
+# mode 7 (the inventory opened by its own code 0x00427a60 from mode 3, three overlay frames 0x00427c40 at 1/64 s).
+# Lines: run <name> <what>; before ...; call <name>: the functions entered during the key, in order (the stop of every
+# sound object 0x00433580, the subtitle clear 0x0040e330, the voice slots' clear 0x0040db90, set_mode 0x004d6b00 with
+# its argument and the mode before, the menu pages' reset 0x00451220, the screen capture for the thumbnails 0x00410400,
+# the inventory close 0x00427b20); after mode=<loop mode> page=<menu page 0x00781120> menu_mode=<0x00789b3c>
+# inv_open=<0x00756564> prev=<the inventory's saved mode 0x007564e0>.
+run warp mode=3 Escape in the panorama
+call place_sounds_stop_all
+call subtitle_clear
+call voices_clear
+call set_mode 6 (was 3)
+call menu_pages_reset
+call capture (stubbed)
+call place_sounds_stop_all
+after mode=6 page=1 menu_mode=3 inv_open=0 prev=0
+run inventory mode=7 the inventory opened from mode 3, three frames, then Escape
+before mode=7 inv_open=1 prev=3
+call subtitle_clear
+call set_mode 6 (was 7)
+call menu_pages_reset
+call capture (stubbed)
+call inventory_close
+call set_mode 3 (was 6)
+after mode=3 page=1 menu_mode=3 inv_open=0 prev=3

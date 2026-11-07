@@ -1,0 +1,74 @@
+# The warp cursor of the original Game.exe (GOG.com, md5 eb06eaa718877dfcabee6e8f89d85b31) with spr_p6.dll under
+# emulation, hoggar.wam views 15 and 7, 800 x 600: 0x00440a30 run whole after the frame's sprite pass (`ray V YAW PITCH`,
+# the orientations of spwz_pick.txt: a hit of every slot that has one, one ray without) or with the hit 0x0076e928 and
+# the slot's click kind set directly (`set`); the zone record's type (`zone=`, - for none) given; the crosshair on
+# (`cross=0`: off). Logged: the hit and slot after it, the colour of each cross line (ARGB), 0x00428060's arguments
+# (type, mode), the frame range and frame it chose (from 0..0), whether it drew the cursor sprite.
+ray 15 144 37 zone=- -> hit=1 slot=7 line=0xff00ff00,0xff00ff00 cursor=1,1 range=13..25 frame=13 aff=1
+ray 15 144 37 zone=5 -> hit=1 slot=7 line=0xff00ff00,0xff00ff00 cursor=1,1 range=13..25 frame=13 aff=1
+ray 15 201 21 zone=- -> hit=2 slot=8 line=0xff00ff00,0xff00ff00 cursor=2,2 range=25..40 frame=25 aff=1
+ray 15 201 21 zone=5 -> hit=2 slot=8 line=0xff00ff00,0xff00ff00 cursor=2,2 range=25..40 frame=25 aff=1
+ray 15 163 0 zone=- -> hit=1 slot=13 line=0xff00ff00,0xff00ff00 cursor=3,1 range=25..40 frame=25 aff=1
+ray 15 163 0 zone=5 -> hit=1 slot=13 line=0xff00ff00,0xff00ff00 cursor=3,1 range=25..40 frame=25 aff=1
+ray 15 109 40 zone=- -> hit=0 slot=-1 line=0xffffffff,0xffffffff cursor=- range=- aff=-
+ray 15 109 40 zone=5 -> hit=0 slot=-1 line=0xffff00ff,0xffff00ff cursor=5,0 range=25..40 frame=25 aff=1
+set zone=- hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffffffff,0xffffffff cursor=- range=- aff=-
+set zone=- hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=- range=- aff=-
+set zone=0 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffffffff,0xffffffff cursor=0,0 range=0..0 frame=0 aff=1
+set zone=0 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=0,0 range=0..0 frame=0 aff=1
+set zone=-1 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffffffff,0xffffffff cursor=-1,0 range=0..0 frame=0 aff=1
+set zone=-1 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=-1,0 range=0..0 frame=0 aff=1
+set zone=1 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xff0000ff,0xff0000ff cursor=1,0 range=1..13 frame=1 aff=1
+set zone=1 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=1,0 range=1..13 frame=1 aff=1
+set zone=2 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffff0000,0xffff0000 cursor=2,0 range=1..13 frame=1 aff=1
+set zone=2 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=2,0 range=1..13 frame=1 aff=1
+set zone=3 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffff00ff,0xffff00ff cursor=3,0 range=25..40 frame=25 aff=1
+set zone=3 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=3,0 range=25..40 frame=25 aff=1
+set zone=4 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffff00ff,0xffff00ff cursor=4,0 range=25..40 frame=25 aff=1
+set zone=4 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=4,0 range=25..40 frame=25 aff=1
+set zone=999 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffff00ff,0xffff00ff cursor=999,0 range=25..40 frame=25 aff=1
+set zone=999 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=999,0 range=25..40 frame=25 aff=1
+set zone=1000 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffffffff,0xffffffff cursor=1000,0 range=25..40 frame=25 aff=-
+set zone=1000 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=1000,0 range=25..40 frame=25 aff=-
+set zone=1500 hit=0 slot_click=- cross=1 -> hit=0 slot=-1 line=0xffffffff,0xffffffff cursor=1500,0 range=25..40 frame=25 aff=-
+set zone=1500 hit=0 slot_click=- cross=0 -> hit=0 slot=-1 line=- cursor=1500,0 range=25..40 frame=25 aff=-
+set zone=- hit=1 slot_click=1 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=1,1 range=13..25 frame=13 aff=1
+set zone=1 hit=1 slot_click=1 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=1,1 range=13..25 frame=13 aff=1
+set zone=5 hit=1 slot_click=1 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=1,1 range=13..25 frame=13 aff=1
+set zone=- hit=1 slot_click=2 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=2,1 range=13..25 frame=13 aff=1
+set zone=1 hit=1 slot_click=2 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=2,1 range=13..25 frame=13 aff=1
+set zone=5 hit=1 slot_click=2 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=2,1 range=13..25 frame=13 aff=1
+set zone=- hit=1 slot_click=3 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=3,1 range=25..40 frame=25 aff=1
+set zone=1 hit=1 slot_click=3 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=3,1 range=25..40 frame=25 aff=1
+set zone=5 hit=1 slot_click=3 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=3,1 range=25..40 frame=25 aff=1
+set zone=- hit=1 slot_click=4 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=4,1 range=25..40 frame=25 aff=1
+set zone=1 hit=1 slot_click=4 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=4,1 range=25..40 frame=25 aff=1
+set zone=5 hit=1 slot_click=4 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=4,1 range=25..40 frame=25 aff=1
+set zone=- hit=1 slot_click=999 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=999,1 range=25..40 frame=25 aff=1
+set zone=1 hit=1 slot_click=999 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=999,1 range=25..40 frame=25 aff=1
+set zone=5 hit=1 slot_click=999 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=999,1 range=25..40 frame=25 aff=1
+set zone=- hit=1 slot_click=1000 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=1000,1 range=25..40 frame=25 aff=-
+set zone=1 hit=1 slot_click=1000 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=1000,1 range=25..40 frame=25 aff=-
+set zone=5 hit=1 slot_click=1000 cross=1 -> hit=1 slot=0 line=0xff00ff00,0xff00ff00 cursor=1000,1 range=25..40 frame=25 aff=-
+set zone=- hit=2 slot_click=1 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=1,2 range=25..40 frame=25 aff=1
+set zone=1 hit=2 slot_click=1 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=1,2 range=25..40 frame=25 aff=1
+set zone=5 hit=2 slot_click=1 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=1,2 range=25..40 frame=25 aff=1
+set zone=- hit=2 slot_click=2 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=2,2 range=25..40 frame=25 aff=1
+set zone=1 hit=2 slot_click=2 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=2,2 range=25..40 frame=25 aff=1
+set zone=5 hit=2 slot_click=2 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=2,2 range=25..40 frame=25 aff=1
+set zone=- hit=2 slot_click=3 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=3,2 range=25..40 frame=25 aff=1
+set zone=1 hit=2 slot_click=3 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=3,2 range=25..40 frame=25 aff=1
+set zone=5 hit=2 slot_click=3 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=3,2 range=25..40 frame=25 aff=1
+set zone=- hit=2 slot_click=4 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=4,2 range=25..40 frame=25 aff=1
+set zone=1 hit=2 slot_click=4 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=4,2 range=25..40 frame=25 aff=1
+set zone=5 hit=2 slot_click=4 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=4,2 range=25..40 frame=25 aff=1
+set zone=- hit=2 slot_click=999 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=999,2 range=25..40 frame=25 aff=1
+set zone=1 hit=2 slot_click=999 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=999,2 range=25..40 frame=25 aff=1
+set zone=5 hit=2 slot_click=999 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=999,2 range=25..40 frame=25 aff=1
+set zone=- hit=2 slot_click=1000 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=1000,2 range=25..40 frame=25 aff=-
+set zone=1 hit=2 slot_click=1000 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=1000,2 range=25..40 frame=25 aff=-
+set zone=5 hit=2 slot_click=1000 cross=1 -> hit=2 slot=0 line=0xff00ff00,0xff00ff00 cursor=1000,2 range=25..40 frame=25 aff=-
+ray 7 144 17 zone=- -> hit=2 slot=4 line=0xff00ff00,0xff00ff00 cursor=2,2 range=25..40 frame=25 aff=1
+ray 7 144 17 zone=5 -> hit=2 slot=4 line=0xff00ff00,0xff00ff00 cursor=2,2 range=25..40 frame=25 aff=1
+ray 7 139 40 zone=- -> hit=0 slot=-1 line=0xffffffff,0xffffffff cursor=- range=- aff=-
+ray 7 139 40 zone=5 -> hit=0 slot=-1 line=0xffff00ff,0xffff00ff cursor=5,0 range=25..40 frame=25 aff=1
