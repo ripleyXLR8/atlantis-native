@@ -4000,7 +4000,9 @@ and of the funeral chamber; the text layout of every dialog line at
 heads and lip-sync; the inventory, the subject menu, the menu pages and
 tooltips, the save thumbnails; every puzzle's board (`board_*.rs`); the
 maps, the ending and the credits; Escape in each mode, the display
-switch and the menu's re-entry of the view; and the whole story
+switch, the menu's re-entry of the view and the click on its Back button
+(one click byte for the menus and the panorama: the click that closes
+the menu does not act in the view, `back_click.rs`); and the whole story
 (`story.rs`): the eight walk segments and the chain from a new game to
 the credits, played from the player's input, every `SetVariables`
 line, the `rand()` state, the variables, flags and checkpoint saves

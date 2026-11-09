@@ -282,6 +282,18 @@ impl Game {
             pointer: self.pointer,
         };
         let events = self.menus.frame(&mut env, &mut self.screen);
+        // The original has one click byte (0x007592b8) for the menus and
+        // the warp: the press sets it in every mode (@ 0x004315a5), and
+        // what the page's frame leaves in it is what the next warp frame
+        // reads. Page 1 clears it at the end of every frame (0x00451560
+        // @ 0x004544af), its `BT_BACK` twice more (@ 0x0045474e and in
+        // the back to the game @ 0x004512ba): the click that closes the
+        // menu does not go on into the panorama.
+        let click = self.menus.input.click;
+        self.click = click;
+        if let Some(s) = self.script.as_mut() {
+            s.click = click;
+        }
         if let Some(&Event::DisplayChange(w, h)) = events
             .iter()
             .find(|e| matches!(e, Event::DisplayChange(..)))
