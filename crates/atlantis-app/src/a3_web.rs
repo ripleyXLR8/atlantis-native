@@ -93,8 +93,8 @@ pub fn start(install: Arc<dyn FileSource>, store: Rc<dyn SaveStore>) -> Result<(
         install,
         cfg: cfg.clone(),
     }));
-    let build = files
-        .build()
+    let label = files
+        .edition_label()
         .map_err(|e| JsValue::from(format!("Atlantis III: {e}")))?;
     let mut game = Game::new(files).map_err(|e| JsValue::from(format!("Atlantis III: {e}")))?;
     game.unix_time = || (js_sys::Date::now() / 1000.0) as i64;
@@ -109,8 +109,7 @@ pub fn start(install: Arc<dyn FileSource>, store: Rc<dyn SaveStore>) -> Result<(
         }
     }
     log::info!(
-        "Atlantis III ({}), {} files kept in the browser, {}",
-        build.label,
+        "{label}, {} files kept in the browser, {}",
         kept,
         crate::version_string()
     );

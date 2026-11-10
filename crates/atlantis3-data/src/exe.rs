@@ -16,7 +16,8 @@ pub use atlantis2_data::exe::{bytes_at, pe_timestamp};
 pub struct Build {
     /// `atlantis3-<medium>-<language>-<size>`.
     pub id: &'static str,
-    /// The edition, for people.
+    /// The edition, for people, without the language: one `Game.exe`
+    /// serves every language ([`crate::install::edition_label`] adds it).
     pub label: &'static str,
     pub size: u64,
     /// The PE header's `TimeDateStamp`.
@@ -25,10 +26,11 @@ pub struct Build {
     pub md5: [u8; 16],
 }
 
-/// The builds this port knows.
+/// The builds this port knows. GOG.com's English, French, German and
+/// Spanish installs ship this one file (the "1.0 w10" build, 2022).
 pub const KNOWN_BUILDS: [Build; 1] = [Build {
     id: "atlantis3-gog-fr-3473408",
-    label: "Atlantis III, GOG.com, French",
+    label: "Atlantis III, GOG.com",
     size: 3_473_408,
     // 2003-04-24 09:50:26 UTC.
     pe_timestamp: 0x3ea7_b362,

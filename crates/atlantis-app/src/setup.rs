@@ -292,7 +292,7 @@ pub fn explain_atlantis3(dir: &Path, err: &atlantis3_data::files::OpenError) -> 
         atlantis3_data::files::OpenError::Exe(e) => format!(
             "{shown} holds an Atlantis III program that Atlantis Native does not know \
              ({e}): an edition of the game that is not supported yet.\n\n\
-             Supported: GOG.com's French release. Other editions are unknown to the \
+             Supported: GOG.com's release (English, French, German or Spanish). Other editions are unknown to the \
              project: an issue on GitHub with the program's size and MD5 helps."
         ),
         _ => format!(

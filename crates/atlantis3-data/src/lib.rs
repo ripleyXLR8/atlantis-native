@@ -8,6 +8,8 @@
 //!
 //! - [`exe`]: which build a `Game.exe` is;
 //! - [`files`]: the installed folder and its `Datas\`;
+//! - [`install`]: the installer's registry values, the language and the
+//!   edition's name;
 //! - [`spr`]: the `SPRCRYO` sprite banks and the `SPWCRYO` place sprites,
 //!   with the blitters of the 2001 sprite library;
 //! - [`db`]: the `.db` 3D scenes (their light records);
@@ -43,6 +45,7 @@ pub mod exe;
 pub mod files;
 pub mod font_txt;
 pub mod hnm_header;
+pub mod install;
 pub mod objects;
 pub mod save;
 pub mod set;

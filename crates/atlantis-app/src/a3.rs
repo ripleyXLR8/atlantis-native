@@ -21,7 +21,8 @@
 //! is read until the menus write the player's own.
 //!
 //! The game folder is GOG.com's installation (`Game.exe` beside `Datas\`),
-//! the only edition known ([`atlantis3_data::exe::KNOWN_BUILDS`]).
+//! in English, French, German or Spanish: one executable for the four
+//! ([`atlantis3_data::exe::KNOWN_BUILDS`]), the language is the data's.
 //!
 //! Started from the game library, Shift held in the first moments goes
 //! back to the library's screen ([`crate::a2::Ended::Library`]), as for
@@ -63,10 +64,10 @@ pub fn data_dir() -> PathBuf {
     crate::desktop::data_dir().join("atlantis3")
 }
 
-/// The edition of the Atlantis III installation in `dir`, for the game
-/// library ("Atlantis III, GOG.com, French").
+/// The edition of the Atlantis III installation in `dir` with its
+/// language, for the game library ("Atlantis III, GOG.com, French").
 pub fn label(dir: &Path) -> Result<String, OpenError> {
-    A3Files::open_dir(dir).map(|(_, build)| build.label.to_string())
+    A3Files::open_dir(dir).and_then(|(files, _)| files.edition_label())
 }
 
 /// The install with `Datas\Atlantis3.cfg` taken from the player's folder
@@ -121,19 +122,18 @@ pub fn open_in(dir: &Path, base: &Path) -> Result<(Game, String), String> {
         install: StdDir::new(dir),
         cfg: cfg_path.clone(),
     }));
-    let build = files
-        .build()
+    let label = files
+        .edition_label()
         .map_err(|e| crate::setup::explain_atlantis3(dir, &e))?;
     let mut game = Game::new(files).map_err(|e| format!("{}: {e}", dir.display()))?;
     game.save_dir = Some(base.join("save"));
     game.menus_mut().cfg_path = Some(cfg_path);
     log::info!(
-        "{}, {}; saves and settings in {}",
-        build.label,
+        "{label}, {}; saves and settings in {}",
         crate::version_string(),
         base.display()
     );
-    Ok((game, build.label.to_string()))
+    Ok((game, label))
 }
 
 /// The game in `dir`, its saves and settings in [`data_dir`].

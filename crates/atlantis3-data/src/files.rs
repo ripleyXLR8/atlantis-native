@@ -74,6 +74,17 @@ impl A3Files {
         exe::identify(&exe).map_err(OpenError::Exe)
     }
 
+    /// The edition's name with the install's language ("Atlantis III,
+    /// GOG.com, English"), when `Game.exe` is a known build.
+    pub fn edition_label(&self) -> Result<String, OpenError> {
+        let build = self.build()?;
+        let (language, _) = crate::install::install_registry(self);
+        Ok(crate::install::edition_label(
+            build,
+            crate::install::Language::from_code(&language),
+        ))
+    }
+
     /// The source of the whole install.
     pub fn source(&self) -> &dyn FileSource {
         &*self.src
