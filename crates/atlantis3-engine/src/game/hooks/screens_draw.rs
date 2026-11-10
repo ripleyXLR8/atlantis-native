@@ -253,6 +253,47 @@ impl Game {
         self.tr_flip();
     }
 
+    /// `AtlScarabee_MainInit` (@ 0x00432200): `Scarabee.spr`, that name
+    /// only (the game's file names ignore case, not accents: the French
+    /// and Spanish `Scarabée.SPR` is not it). Run at start-up
+    /// (@ 0x004d67b0) and by the `ldmorts.wam` and `cfuner.wam` loads
+    /// (@ 0x004c3730, @ 0x004c3785).
+    pub(crate) fn scarab_reload_banks(&mut self) {
+        let path = "spr/Scarabee.spr";
+        self.puzzles.screens.scarab_bank = self
+            .files
+            .read(path)
+            .and_then(|d| Bank::parse(&d, self.depth()).ok())
+            .map(Arc::new);
+        if self.puzzles.screens.scarab_bank.is_none() {
+            log::warn!("AtlScarabee_MainInit() : pb ouverture spr de la carte (Scarabee.spr): the scarab case draws nothing");
+        }
+    }
+
+    /// `SCARABEE`'s drawing (@ 0x00431ece..0x004321a0): the warp frame,
+    /// then at the screen's centre (W / 2, H / 2) either the closed case
+    /// (#0, `shown` = `Some(None)`) or the open case (#1) and the scarab's
+    /// sprite `k` 57 pixels left and 37 up, every call `AtlSpr_AffCentre`
+    /// at alpha 1.0 (@ 0x00759320); then the pointer (@ 0x004281e0) and
+    /// the flip. Without the bank no sprite call draws.
+    pub(crate) fn scarab_draw(&mut self, shown: Option<Option<i32>>) {
+        self.draw_warp_only();
+        let (cx, cy) = (self.width as i32 / 2, self.height as i32 / 2);
+        if let (Some(bank), Some(s)) = (self.puzzles.screens.scarab_bank.clone(), shown) {
+            let path = "spr\\Scarabee.spr";
+            match s {
+                None => self.draw_spr_centre(path, &bank, 0, cx, cy, 1.0),
+                Some(k) => {
+                    self.draw_spr_centre(path, &bank, 1, cx, cy, 1.0);
+                    let k = usize::try_from(k).unwrap_or(0);
+                    self.draw_spr_centre(path, &bank, k, cx - 0x39, cy - 0x25, 1.0);
+                }
+            }
+        }
+        self.draw_pointer();
+        self.tr_flip();
+    }
+
     /// `AtlEcrin_ReloadSprBank` (@ 0x00413370), run by the `jardin.wam`
     /// load (@ 0x004c367e): `Ecrin%d.spr`, %d the display's depth (the
     /// port draws in 16 bits). `Interface.spr` is the game's.

@@ -37,8 +37,9 @@ China, Yucatán and Xibalba, Shamballa and Atlantis, with every puzzle (see
 *Atlantis III: The New World* (2001) plays from start to end as well, new
 in 0.6.0, on the desktop and in the browser: from the Hoggar desert
 through the Land of the Dead and the other worlds to the credits, with
-its dialogs, menus, saves and every puzzle. Only GOG.com's French edition
-is known so far (see [Atlantis III](docs/GUIDE.md#atlantis-iii)). It has
+its dialogs, menus, saves and every puzzle. GOG.com's edition is known,
+in English, French, German and Spanish (see
+[Atlantis III](docs/GUIDE.md#atlantis-iii)). It has
 been checked mostly by automated replays against the original's code and
 by the developer's own play, not yet by many players: reports are
 welcome.
@@ -114,7 +115,8 @@ contains none of them.</sub>
 - 📚 **Game library**: several editions (GOG.com, CD, DVD, disc
   images...) of the three games in one list, to choose the one to play at
   start-up or switch from F10.
-- 🏜️ **Atlantis III** (new in 0.6.0): GOG.com's French edition, whole,
+- 🏜️ **Atlantis III** (new in 0.6.0): GOG.com's edition in English,
+  French, German or Spanish, whole,
   with the original's own menus and options (640 x 480, 800 x 600 or
   1024 x 768, 16 or 32 bits), its saves kept apart from the game's
   folder, F12 screenshots; on the desktop and in the browser.
@@ -253,12 +255,14 @@ For *Atlantis III*:
 
 | Release | Languages | What to point it at |
 |---|---|---|
-| [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | French | the installation folder (the one holding `Game.exe` and `Datas`) |
+| [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | English, French, German, Spanish | the installation folder (the one holding `Game.exe` and `Datas`) |
 
-This is the only edition the project knows. Other editions (GOG.com's in
-other languages, the retail CDs and DVDs) are unknown and untested:
-their `Game.exe` is refused with its size and MD5, so that it can be
-reported and added.
+GOG.com ships the same `Game.exe` in its four languages; the language is
+read from the installation (the language GOG.com's installer records),
+and the game library names it ("Atlantis III, GOG.com, German"). This is
+the only edition the project knows. Other editions (the retail CDs and
+DVDs) are unknown and untested: their `Game.exe` is refused with its size
+and MD5, so that it can be reported and added.
 
 The web version plays the three games: see
 [The web version](docs/GUIDE.md#the-web-version).

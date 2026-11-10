@@ -215,6 +215,8 @@ pub struct Game {
     ticks: u32,
     anim_tick: bool,
     video: Option<Playing>,
+    /// The intro's videos still to play ([`intro_videos`]).
+    intro_next: Vec<(&'static str, u32)>,
     /// The click flags (@ 0x007592b8, double click @ 0x007592bb) and the
     /// last left press (@ 0x00759280).
     click: bool,
@@ -424,6 +426,7 @@ impl Game {
             ticks: 0,
             anim_tick: false,
             video: None,
+            intro_next: Vec::new(),
             click: false,
             double_click: false,
             last_press: None,
@@ -490,6 +493,8 @@ impl Game {
             screen_sprite: None,
             stub_rand: false,
         };
+        // `AtlScarabee_MainInit` (@ 0x004d67b0).
+        game.scarab_reload_banks();
         if !game.with_script(|s, h| s.boot_a3(h)) {
             return Err(GameError::Script(game.script_error()));
         }
@@ -873,24 +878,31 @@ impl Game {
         self.moving.turn.is_some()
     }
 
-    /// The intro (mode 1, @ 0x00459360): `intro.hnm` from `hnm\` at 15
-    /// frames a second, no caption (`Rien.txt` does not exist).
+    /// The intro (mode 1, @ 0x00459360): the videos of [`intro_videos`]
+    /// for `Langue`, from `hnm\`, no caption (`Rien.txt` does not exist),
+    /// one after the other; Space or Escape ends only the one playing. A
+    /// missing file is skipped, as the original's failed `AtlHnm_start`
+    /// ("cinématique introuvable", @ 0x004210d0) goes on with the next
+    /// branch: GOG.com's German install has no `intro_ger.hnm`, so it
+    /// plays `intro.hnm` alone, like the other languages.
     pub fn start_intro(&mut self) {
-        let lang = self.startup.config.langue.clone();
-        if lang != b"fra" && !lang.is_empty() {
-            log::warn!(
-                "intro: the localised intros ({}) are not ported: intro.hnm",
-                String::from_utf8_lossy(&lang)
-            );
+        let mut videos = intro_videos(&self.startup.config.langue);
+        videos.reverse();
+        self.intro_next = videos;
+        self.mode = Mode::Idle;
+        self.next_intro_video();
+    }
+
+    /// The intro's next video that opens; none left: [`Mode::Idle`].
+    fn next_intro_video(&mut self) {
+        while let Some((name, fps)) = self.intro_next.pop() {
+            if self.start_video(&format!("hnm/{name}"), fps, false, Mode::Idle, Vec::new()) {
+                self.mode = Mode::Intro;
+                return;
+            }
+            log::warn!("AtlHnm_start({name}): cinématique introuvable");
         }
-        if !self.start_video("hnm/intro.hnm", 15, false, Mode::Idle, Vec::new()) {
-            self.mode = Mode::Idle;
-        }
-        self.mode = if self.video.is_some() {
-            Mode::Intro
-        } else {
-            Mode::Idle
-        };
+        self.mode = Mode::Idle;
     }
 
     /// The start page's new game for an empty player slot (@ 0x00452b98):
@@ -1586,6 +1598,9 @@ impl Game {
             }
         }
         if v.back == Mode::Idle {
+            if !self.intro_next.is_empty() {
+                self.next_intro_video();
+            }
             return;
         }
         self.click = false;
@@ -3683,6 +3698,12 @@ impl Host for Game {
                 if name.eq_ignore_ascii_case("ldmorts.wam") {
                     self.carte_reload_banks();
                 }
+                // The scarab case's (@ 0x004c3730, @ 0x004c3785).
+                if name.eq_ignore_ascii_case("ldmorts.wam")
+                    || name.eq_ignore_ascii_case("cfuner.wam")
+                {
+                    self.scarab_reload_banks();
+                }
                 if name.eq_ignore_ascii_case("jardin.wam") {
                     self.ecrin_reload_banks();
                 }
@@ -3943,9 +3964,65 @@ pub fn cursor_range(kind: i32, mode: i32, current: (i32, i32)) -> (i32, i32) {
     }
 }
 
+/// The intro's videos and their rates for a `Langue` value (@ 0x00459360,
+/// exact compares): `usa` plays `intro_usa.hnm` instead of `intro.hnm`;
+/// every language but `rus` plays that one at 15 frames a second, then
+/// `ger`, `ita`, `cze` their `intro_<l>.hnm`, `gre` `intro_gre1.hnm` and
+/// `intro_gre2.hnm`; `rus` plays `intro_rus1.hnm`, `intro_rus2.hnm` (at
+/// 25) and `intro.hnm`. GOG.com's four languages (`fra`, `gbr`, `ger`,
+/// `esp`) ship only `intro.hnm`.
+pub fn intro_videos(langue: &[u8]) -> Vec<(&'static str, u32)> {
+    let mut out = Vec::new();
+    if langue != b"rus" {
+        out.push((
+            if langue == b"usa" {
+                "intro_usa.hnm"
+            } else {
+                "intro.hnm"
+            },
+            15,
+        ));
+    }
+    match langue {
+        b"ger" => out.push(("intro_ger.hnm", 15)),
+        b"ita" => out.push(("intro_ita.hnm", 15)),
+        b"cze" => out.push(("intro_cze.hnm", 15)),
+        b"gre" => out.extend([("intro_gre1.hnm", 15), ("intro_gre2.hnm", 15)]),
+        b"rus" => out.extend([
+            ("intro_rus1.hnm", 15),
+            ("intro_rus2.hnm", 25),
+            ("intro.hnm", 15),
+        ]),
+        _ => {}
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn intro_videos_by_language() {
+        let names = |l: &[u8]| -> Vec<&str> { intro_videos(l).iter().map(|v| v.0).collect() };
+        for l in [&b"fra"[..], b"gbr", b"esp", b"", b"GER"] {
+            assert_eq!(intro_videos(l), [("intro.hnm", 15)], "{l:?}");
+        }
+        assert_eq!(names(b"ger"), ["intro.hnm", "intro_ger.hnm"]);
+        assert_eq!(names(b"usa"), ["intro_usa.hnm"]);
+        assert_eq!(
+            names(b"gre"),
+            ["intro.hnm", "intro_gre1.hnm", "intro_gre2.hnm"]
+        );
+        assert_eq!(
+            intro_videos(b"rus"),
+            [
+                ("intro_rus1.hnm", 15),
+                ("intro_rus2.hnm", 25),
+                ("intro.hnm", 15)
+            ]
+        );
+    }
 
     #[test]
     fn the_save_quaternion_gives_the_angles_back() {

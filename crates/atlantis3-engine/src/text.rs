@@ -16,6 +16,17 @@
 //! font (`data/arial_gdi.txt`); the glyphs are drawn here from the game's
 //! font file, antialiased (`ANTIALIASED_QUALITY`; GDI's own grey levels
 //! are not reproduced).
+//!
+//! The character set is `font.txt`'s ([`atlantis3_data::font_txt`]):
+//! `ANSI_CHARSET` (French, Spanish) draws Windows-1252;
+//! `EASTEUROPE_CHARSET` (German) gives GDI the font's Central European
+//! face, so the bytes are Windows-1250 and the widths that table's
+//! (`data/arial_gdi_ee.txt`; the German texts differ only in the
+//! credits' `è`, drawn `č`). English asks for `SHIFTJIS_CHARSET`: a
+//! Windows with a Japanese font then answers with that font (MS PGothic on
+//! Windows 11) and the text library's double-byte renderer; the port
+//! draws English as a Windows without one, in Arial and Windows-1252
+//! (its texts are ASCII but for one `’`).
 
 use crate::px::ScreenPixel;
 use std::collections::HashMap;
@@ -29,57 +40,87 @@ pub struct GdiFont {
     pub tm_height: i32,
     pub ascent: i32,
     pub ave_char_width: i32,
+    /// `tmCharSet`: 0 ANSI, 238 Central European.
+    pub charset: u8,
     /// A, B, C of each byte.
     pub abc: Vec<(i32, i32, i32)>,
 }
 
 const TABLE: &str = include_str!("data/arial_gdi.txt");
+/// The same measures with `EASTEUROPE_CHARSET`.
+const TABLE_EE: &str = include_str!("data/arial_gdi_ee.txt");
+
+/// `EASTEUROPE_CHARSET`.
+pub const CHARSET_EE: u8 = 0xee;
 
 fn table() -> &'static HashMap<i32, GdiFont> {
     static T: OnceLock<HashMap<i32, GdiFont>> = OnceLock::new();
-    T.get_or_init(|| {
-        let mut out = HashMap::new();
-        let mut cur: Option<GdiFont> = None;
-        for l in TABLE.lines() {
-            let w: Vec<&str> = l.split_whitespace().collect();
-            match w.first() {
-                Some(&"FONT") => {
-                    if let Some(f) = cur.take() {
-                        out.insert(f.height, f);
-                    }
-                    let tm = w.iter().position(|x| *x == "tm").unwrap_or(0);
-                    let n = |i: usize| w.get(i).and_then(|v| v.parse().ok()).unwrap_or(0);
-                    cur = Some(GdiFont {
-                        height: n(2),
-                        tm_height: n(tm + 1),
-                        ascent: n(tm + 2),
-                        ave_char_width: n(tm + 6),
-                        abc: vec![(0, 0, 0); 256],
-                    });
+    T.get_or_init(|| parse_table(TABLE))
+}
+
+fn table_ee() -> &'static HashMap<i32, GdiFont> {
+    static T: OnceLock<HashMap<i32, GdiFont>> = OnceLock::new();
+    T.get_or_init(|| parse_table(TABLE_EE))
+}
+
+fn parse_table(text: &str) -> HashMap<i32, GdiFont> {
+    let mut out = HashMap::new();
+    let mut cur: Option<GdiFont> = None;
+    for l in text.lines() {
+        let w: Vec<&str> = l.split_whitespace().collect();
+        match w.first() {
+            Some(&"FONT") => {
+                if let Some(f) = cur.take() {
+                    out.insert(f.height, f);
                 }
-                Some(&"ABC") => {
-                    if let Some(f) = cur.as_mut() {
-                        let n = |i: usize| w.get(i).and_then(|v| v.parse().ok()).unwrap_or(0);
-                        let b: usize = n(1) as usize;
-                        if b < 256 {
-                            f.abc[b] = (n(2), n(3), n(4));
-                        }
-                    }
-                }
-                _ => {}
+                let tm = w.iter().position(|x| *x == "tm").unwrap_or(0);
+                let n = |i: usize| w.get(i).and_then(|v| v.parse().ok()).unwrap_or(0);
+                let cs = w
+                    .iter()
+                    .position(|x| *x == "charset")
+                    .map_or(0, |i| n(i + 1));
+                cur = Some(GdiFont {
+                    height: n(2),
+                    tm_height: n(tm + 1),
+                    ascent: n(tm + 2),
+                    ave_char_width: n(tm + 6),
+                    charset: u8::try_from(cs).unwrap_or(0),
+                    abc: vec![(0, 0, 0); 256],
+                });
             }
+            Some(&"ABC") => {
+                if let Some(f) = cur.as_mut() {
+                    let n = |i: usize| w.get(i).and_then(|v| v.parse().ok()).unwrap_or(0);
+                    let b: usize = n(1) as usize;
+                    if b < 256 {
+                        f.abc[b] = (n(2), n(3), n(4));
+                    }
+                }
+            }
+            _ => {}
         }
-        if let Some(f) = cur.take() {
-            out.insert(f.height, f);
-        }
-        out
-    })
+    }
+    if let Some(f) = cur.take() {
+        out.insert(f.height, f);
+    }
+    out
 }
 
 impl GdiFont {
     /// GDI's `Arial` at a requested height, when measured.
     pub fn arial(height: i32) -> Option<&'static GdiFont> {
         table().get(&height)
+    }
+
+    /// GDI's `Arial` at a requested height in a `font.txt` character set:
+    /// the Central European measures for `EASTEUROPE_CHARSET`, else the
+    /// ANSI ones (see the module's note for `SHIFTJIS_CHARSET`).
+    pub fn arial_charset(height: i32, charset: u8) -> Option<&'static GdiFont> {
+        if charset == CHARSET_EE {
+            table_ee().get(&height)
+        } else {
+            Self::arial(height)
+        }
     }
 
     /// The advances `ExtTextOutA` is given (@ 0x006b6880): A + B + C per
@@ -332,7 +373,11 @@ impl Glyphs {
             let mut pen = l.x as f32;
             let base = (l.y + gdi.ascent) as f32;
             for (&c, &d) in l.bytes.iter().zip(&l.dx) {
-                let ch = cp1252(c);
+                let ch = if gdi.charset == CHARSET_EE {
+                    cp1250(c)
+                } else {
+                    cp1252(c)
+                };
                 let id = sf.glyph_id(ch);
                 let glyph = id.with_scale_and_position(scale, ab_glyph::point(pen, base));
                 if let Some(og) = self.font.outline_glyph(glyph) {
@@ -370,6 +415,29 @@ pub fn cp1252(c: u8) -> char {
     }
 }
 
+/// A Windows-1250 (Central European) byte as a character.
+pub fn cp1250(c: u8) -> char {
+    const HIGH: [u16; 128] = [
+        0x20ac, 0x0081, 0x201a, 0x0083, 0x201e, 0x2026, 0x2020, 0x2021, 0x0088, 0x2030, 0x0160,
+        0x2039, 0x015a, 0x0164, 0x017d, 0x0179, 0x0090, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022,
+        0x2013, 0x2014, 0x0098, 0x2122, 0x0161, 0x203a, 0x015b, 0x0165, 0x017e, 0x017a, 0x00a0,
+        0x02c7, 0x02d8, 0x0141, 0x00a4, 0x0104, 0x00a6, 0x00a7, 0x00a8, 0x00a9, 0x015e, 0x00ab,
+        0x00ac, 0x00ad, 0x00ae, 0x017b, 0x00b0, 0x00b1, 0x02db, 0x0142, 0x00b4, 0x00b5, 0x00b6,
+        0x00b7, 0x00b8, 0x0105, 0x015f, 0x00bb, 0x013d, 0x02dd, 0x013e, 0x017c, 0x0154, 0x00c1,
+        0x00c2, 0x0102, 0x00c4, 0x0139, 0x0106, 0x00c7, 0x010c, 0x00c9, 0x0118, 0x00cb, 0x011a,
+        0x00cd, 0x00ce, 0x010e, 0x0110, 0x0143, 0x0147, 0x00d3, 0x00d4, 0x0150, 0x00d6, 0x00d7,
+        0x0158, 0x016e, 0x00da, 0x0170, 0x00dc, 0x00dd, 0x0162, 0x00df, 0x0155, 0x00e1, 0x00e2,
+        0x0103, 0x00e4, 0x013a, 0x0107, 0x00e7, 0x010d, 0x00e9, 0x0119, 0x00eb, 0x011b, 0x00ed,
+        0x00ee, 0x010f, 0x0111, 0x0144, 0x0148, 0x00f3, 0x00f4, 0x0151, 0x00f6, 0x00f7, 0x0159,
+        0x016f, 0x00fa, 0x0171, 0x00fc, 0x00fd, 0x0163, 0x02d9,
+    ];
+    if c < 0x80 {
+        char::from(c)
+    } else {
+        char::from_u32(u32::from(HIGH[usize::from(c - 0x80)])).unwrap_or('?')
+    }
+}
+
 /// A character as a Windows-1252 byte (`?` when it has none).
 pub fn to_cp1252(ch: char) -> u8 {
     let u = ch as u32;
@@ -384,6 +452,8 @@ pub fn to_cp1252(ch: char) -> u8 {
 /// (the cue lines' and the dialogs' subtitles).
 pub struct Texts {
     glyphs: Option<Glyphs>,
+    /// `SousTitre`, which picks the charset of `ANSI_CHARSET` fonts.
+    language: String,
     fonts: atlantis3_data::font_txt::FontTxt,
     dial: HashMap<(i32, i32), Vec<u8>>,
 }
@@ -413,6 +483,7 @@ impl Texts {
             .unwrap_or_default();
         Texts {
             glyphs,
+            language: language.to_string(),
             fonts,
             dial,
         }
@@ -425,8 +496,9 @@ impl Texts {
 
     /// GDI's measurements of font `id` at a screen width.
     pub fn gdi(&self, id: FontId, width: usize) -> Option<&'static GdiFont> {
-        let h = self.fonts.font(id.name())?.scaled_height(width as u32)?;
-        GdiFont::arial(h)
+        let def = self.fonts.font(id.name())?;
+        let h = def.scaled_height(width as u32)?;
+        GdiFont::arial_charset(h, def.charset(&self.language))
     }
 
     /// `AtlFont_SetLayout` + `AtlFont_Print` (@ 0x0041e190, @ 0x0041e2c0).
@@ -463,5 +535,39 @@ impl Texts {
     ) {
         self.print(out, w, h, FontId::Default, text, shadow, 0);
         self.print(out, w, h, FontId::Default, text, zone, rgb);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The Central European table: its own charset and, on the bytes
+    /// whose characters differ, its own widths (`è` against `č`).
+    #[test]
+    fn central_european_widths_and_characters() {
+        for h in [16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 53, 60, 66] {
+            let ansi = GdiFont::arial_charset(h, 0).unwrap();
+            let ee = GdiFont::arial_charset(h, CHARSET_EE).unwrap();
+            assert_eq!((ansi.charset, ee.charset), (0, CHARSET_EE));
+            assert_eq!(ansi.tm_height, ee.tm_height);
+            // ASCII and the German letters measure the same.
+            for c in (0x20..0x7f).chain([0xc4, 0xd6, 0xdc, 0xdf, 0xe4, 0xf6, 0xfc]) {
+                assert_eq!(ansi.abc[c], ee.abc[c], "{h} {c:#x}");
+            }
+        }
+        let (a, e) = (
+            GdiFont::arial_charset(21, 0).unwrap(),
+            GdiFont::arial_charset(21, CHARSET_EE).unwrap(),
+        );
+        assert_ne!(a.width(b"\xe8"), e.width(b"\xe8"));
+        assert_eq!((cp1252(0xe8), cp1250(0xe8)), ('è', 'č'));
+        for c in 0..=255u8 {
+            if c < 0x80 || matches!(c, 0xc4 | 0xd6 | 0xdc | 0xdf | 0xe4 | 0xf6 | 0xfc | 0xe9) {
+                assert_eq!(cp1250(c), cp1252(c), "{c:#x}");
+            }
+        }
+        // SHIFTJIS_CHARSET (the English font.txt) measures as ANSI here.
+        assert_eq!(GdiFont::arial_charset(21, 0x80).unwrap().charset, 0);
     }
 }
