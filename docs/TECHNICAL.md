@@ -4009,6 +4009,22 @@ code under emulation. Not compared: the original's GDI glyph pixels,
 its DirectDraw display, and the heads' and unicorn's 32-bit spans (read
 statically).
 
+Fixed after 0.6.0, from a review of the port against the original's code:
+
+- The remote control of the late Hoggar (loop mode 18, @ 0x004d0550)
+  is drawn and answers the mouse: `Telecommande.spr`, opened again by
+  every WAM load (@ 0x004d0c30), the remote and its four buttons drawn
+  from the screen's centre, the hovered button's 1/15 s animation
+  (@ 0x004d0040) and each button's hit test at the pointer
+  (`SPR_COLLISION` @ 0x00437080, sprites 0, 0x0e, 0x1d and 0x2c in that
+  order), which sets flags 400..404 (`tests/board_remote.rs`,
+  `tests/golden/puzzle_telecommande.txt`). In 0.6.0 a real click found
+  no button, so flags 400 and 402 were never set and chapter 5 could not
+  leave the Hoggar for Bagdad or Paleo; the story tests had given the
+  hit test's answer instead of clicking. They now place the pointer on
+  the original's hit points and click, for the remote, the jewel case
+  and the Land of the Dead's map alike.
+
 ## Tests
 
 Tests that need the game files read the game directory from the

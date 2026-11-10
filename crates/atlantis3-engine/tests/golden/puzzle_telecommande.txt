@@ -1,0 +1,238 @@
+# Derived values only (MD5s, positions, frame numbers) of what the original drew under emulation.
+# Producer: tools/emu/a3_telecommande.py (atlantis3-re), original code of atlantis3-gog-fr-3473408 (Game.exe MD5 eb06eaa718877dfcabee6e8f89d85b31)
+#   with spr_p6.dll (MD5 94cfb7cfaf577a3aeb94914e7769d552); functions run, stubs, clock and line format: the tool's docstring.
+# TELECOMMANDE (loop mode 18): hoggar.wam view 24 (run home: jardin.wam view 114, flag 829 = 1), started by 0x004cfee0;
+#   CRANEBAGDAD (loop mode 15): hoggar.wam view 24, started by 0x00409a40.
+# Screen 800x600 RGB565; panorama replaced by black (warp=flat).
+hit 0 box 248,88-416,240 n 217 point 328,160
+hit 14 box 264,288-448,480 n 301 point 352,384
+hit 29 box 456,160-624,336 n 246 point 536,248
+hit 44 box 280,168-456,336 n 249 point 368,248
+run hoggar
+start mode=18 active=1
+st 0 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=0 mode=18
+frame 0 0000000000016940 40 40 0 0 ret=1 md5=7b19889b66f721d9909d6b59291b55bb draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@40,40*0000803f
+frame 1 0000000000026940 352 384 0 0 ret=1 md5=7aa4254b24f49ca82fccd79bedf6ad7c draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+st 1 hover=0100 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=0 mode=18
+frame 2 0000000000036940 352 384 0 0 ret=1 md5=7aa4254b24f49ca82fccd79bedf6ad7c draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+frame 3 0000000000046940 352 384 0 0 ret=1 md5=7aa4254b24f49ca82fccd79bedf6ad7c draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+frame 4 0000000000056940 352 384 0 0 ret=1 md5=7aa4254b24f49ca82fccd79bedf6ad7c draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+st 4 hover=0100 fr=0,1,0,0 f400..404=0,0,0,0,0 f425=0 f427=0 mode=18
+frame 5 0000000000066940 352 384 0 0 ret=1 md5=528e28fb4dab939ae207515056c51a48 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#15@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+frame 6 0000000000076940 352 384 0 0 ret=1 md5=528e28fb4dab939ae207515056c51a48 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#15@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+frame 7 0000000000086940 352 384 0 0 ret=1 md5=528e28fb4dab939ae207515056c51a48 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#15@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+st 7 hover=0100 fr=0,2,0,0 f400..404=0,0,0,0,0 f425=0 f427=0 mode=18
+frame 8 0000000000096940 352 384 0 0 ret=1 md5=e086ea62501ee90eca58a3bef7ed9881 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#16@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+frame 9 00000000000a6940 352 384 1 0 ret=1 md5=e086ea62501ee90eca58a3bef7ed9881 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#16@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+cmd 9 (ShowPerso=CMP_ATLANTEFIGE)
+cmd 9 (HidePerso=CMP_ATLANTE)
+cmd 9 (HideObjet=CMP_BAGDAD)
+cmd 9 (HideObjet=CMP_BAGDADFIN)
+cmd 9 (HideObjet=CMP_HOGGAR)
+cmd 9 (HideObjet=CMP_PALEO)
+cmd 9 (HideObjet=CMP_PALEOFIN)
+cmd 9 (ShowObjet=CMP_BAGDAD)
+cmd 9 (PlaySound=50)
+log 9 'interp: SET%s'
+log 9 'interp: SET%s'
+log 9 'interp: SET%s'
+log 9 'interp: SET%s'
+log 9 'interp: SET%s'
+log 9 'interp: SET%s'
+log 9 'interp: SET%s'
+log 9 'interp: SET%s'
+log 9 'interp: SET%s'
+st 9 hover=0100 fr=0,2,0,0 f400..404=1,0,0,0,0 f425=0 f427=1 mode=18
+frame 10 00000000000b6940 328 160 0 0 ret=1 md5=05e0825446be9d8cda83f2dcd4e79ae7 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#16@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@328,160*0000803f
+st 10 hover=0010 fr=0,0,0,0 f400..404=1,0,0,0,0 f425=0 f427=1 mode=18
+frame 11 00000000000c6940 328 160 0 0 ret=1 md5=22a6fa1844a98c382f28f38045c9afcc draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@328,160*0000803f
+frame 12 00000000000d6940 328 160 0 0 ret=1 md5=22a6fa1844a98c382f28f38045c9afcc draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@328,160*0000803f
+frame 13 00000000000e6940 328 160 1 0 ret=1 md5=22a6fa1844a98c382f28f38045c9afcc draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@328,160*0000803f
+cmd 13 (PlaySound=51)
+log 13 'interp: SET%s'
+st 13 hover=0000 fr=0,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 14 00000000000f6940 328 160 0 0 ret=1 md5=8e5a9083cf5162c1654c966a7cd23a1d draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@328,160*0000803f
+frame 15 0000000000106940 328 160 0 0 ret=1 md5=8e5a9083cf5162c1654c966a7cd23a1d draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@328,160*0000803f
+frame 16 0000000000116940 328 160 0 0 ret=1 md5=8e5a9083cf5162c1654c966a7cd23a1d draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@328,160*0000803f
+frame 17 0000000000126940 536 248 0 0 ret=1 md5=5b545de0a1ce2c6f03ec2038c1980782 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 17 hover=1000 fr=0,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 18 0000000000136940 536 248 0 0 ret=1 md5=5b545de0a1ce2c6f03ec2038c1980782 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 19 0000000000146940 536 248 0 0 ret=1 md5=5b545de0a1ce2c6f03ec2038c1980782 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 20 0000000000156940 536 248 0 0 ret=1 md5=5b545de0a1ce2c6f03ec2038c1980782 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 20 hover=1000 fr=1,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 21 0000000000166940 536 248 0 0 ret=1 md5=345b3e5236dd07eb2907753e8b785588 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#30@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 22 0000000000176940 536 248 0 0 ret=1 md5=345b3e5236dd07eb2907753e8b785588 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#30@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 23 0000000000186940 536 248 0 0 ret=1 md5=345b3e5236dd07eb2907753e8b785588 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#30@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 23 hover=1000 fr=2,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 24 0000000000196940 536 248 0 0 ret=1 md5=34dfcd41a72b3999b6b724ce0c7e25f7 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#31@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 25 00000000001a6940 536 248 0 0 ret=1 md5=34dfcd41a72b3999b6b724ce0c7e25f7 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#31@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 26 00000000001b6940 536 248 0 0 ret=1 md5=34dfcd41a72b3999b6b724ce0c7e25f7 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#31@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 26 hover=1000 fr=3,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 27 00000000001c6940 536 248 0 0 ret=1 md5=04cd303443206f87e12ab1ff5d284395 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#32@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 28 00000000001d6940 536 248 0 0 ret=1 md5=04cd303443206f87e12ab1ff5d284395 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#32@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 29 00000000001e6940 536 248 0 0 ret=1 md5=04cd303443206f87e12ab1ff5d284395 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#32@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 29 hover=1000 fr=4,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 30 00000000001f6940 536 248 0 0 ret=1 md5=68a5b32910e105e598c2b3fc120e3bcc draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#33@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 31 0000000000206940 536 248 0 0 ret=1 md5=68a5b32910e105e598c2b3fc120e3bcc draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#33@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 32 0000000000216940 536 248 0 0 ret=1 md5=68a5b32910e105e598c2b3fc120e3bcc draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#33@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 32 hover=1000 fr=5,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 33 0000000000226940 536 248 0 0 ret=1 md5=bc6bd0fc496a18f2a8cb32c02f888b9c draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#34@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 34 0000000000236940 536 248 0 0 ret=1 md5=bc6bd0fc496a18f2a8cb32c02f888b9c draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#34@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 35 0000000000246940 536 248 0 0 ret=1 md5=bc6bd0fc496a18f2a8cb32c02f888b9c draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#34@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 35 hover=1000 fr=6,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 36 0000000000256940 536 248 0 0 ret=1 md5=534cf9fa8701426d03dd761b1bb70fa1 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#35@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 37 0000000000266940 536 248 0 0 ret=1 md5=534cf9fa8701426d03dd761b1bb70fa1 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#35@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 38 0000000000276940 536 248 0 0 ret=1 md5=534cf9fa8701426d03dd761b1bb70fa1 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#35@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 38 hover=1000 fr=7,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 39 0000000000286940 536 248 0 0 ret=1 md5=5a924f1822d4329dcd60b0f239213505 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#36@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 40 0000000000296940 536 248 0 0 ret=1 md5=5a924f1822d4329dcd60b0f239213505 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#36@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 41 00000000002a6940 536 248 0 0 ret=1 md5=5a924f1822d4329dcd60b0f239213505 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#36@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 41 hover=1000 fr=8,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 42 00000000002b6940 536 248 0 0 ret=1 md5=72d184fac69c4de4c8c6129aeb2156ae draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#37@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 43 00000000002c6940 536 248 0 0 ret=1 md5=72d184fac69c4de4c8c6129aeb2156ae draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#37@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 44 00000000002d6940 536 248 0 0 ret=1 md5=72d184fac69c4de4c8c6129aeb2156ae draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#37@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 44 hover=1000 fr=9,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 45 00000000002e6940 536 248 0 0 ret=1 md5=067049ab8a0dff7c2660f06d30c6d2c7 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#38@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 46 00000000002f6940 536 248 0 0 ret=1 md5=067049ab8a0dff7c2660f06d30c6d2c7 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#38@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 47 0000000000306940 536 248 0 0 ret=1 md5=067049ab8a0dff7c2660f06d30c6d2c7 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#38@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 47 hover=1000 fr=10,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 48 0000000000316940 536 248 0 0 ret=1 md5=48e9074a045fbffe30e6fb25d75a98b9 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#39@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 49 0000000000326940 536 248 0 0 ret=1 md5=48e9074a045fbffe30e6fb25d75a98b9 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#39@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 50 0000000000336940 536 248 0 0 ret=1 md5=48e9074a045fbffe30e6fb25d75a98b9 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#39@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 50 hover=1000 fr=11,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 51 0000000000346940 536 248 0 0 ret=1 md5=4bbcba3bfa4206234fe31c52e02525b9 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#40@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 52 0000000000356940 536 248 0 0 ret=1 md5=4bbcba3bfa4206234fe31c52e02525b9 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#40@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 53 0000000000366940 536 248 0 0 ret=1 md5=4bbcba3bfa4206234fe31c52e02525b9 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#40@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 53 hover=1000 fr=12,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 54 0000000000376940 536 248 0 0 ret=1 md5=ad66b65e426746db89d26bb49def2800 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#41@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 55 0000000000386940 536 248 0 0 ret=1 md5=ad66b65e426746db89d26bb49def2800 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#41@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 56 0000000000396940 536 248 0 0 ret=1 md5=ad66b65e426746db89d26bb49def2800 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#41@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 56 hover=1000 fr=13,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 57 00000000003a6940 536 248 0 0 ret=1 md5=71b2c0cbdee2edb13f38300267269b30 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#42@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 58 00000000003b6940 536 248 0 0 ret=1 md5=71b2c0cbdee2edb13f38300267269b30 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#42@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 59 00000000003c6940 536 248 0 0 ret=1 md5=71b2c0cbdee2edb13f38300267269b30 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#42@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 59 hover=1000 fr=14,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 60 00000000003d6940 536 248 0 0 ret=1 md5=e8ccd8ca9c108566aa5634e002a7bf40 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#43@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 61 00000000003e6940 536 248 0 0 ret=1 md5=e8ccd8ca9c108566aa5634e002a7bf40 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#43@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 62 00000000003f6940 536 248 0 0 ret=1 md5=e8ccd8ca9c108566aa5634e002a7bf40 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#43@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 62 hover=1000 fr=0,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 63 0000000000406940 536 248 0 0 ret=1 md5=5b545de0a1ce2c6f03ec2038c1980782 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 64 0000000000416940 536 248 0 0 ret=1 md5=5b545de0a1ce2c6f03ec2038c1980782 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 65 0000000000426940 536 248 0 0 ret=1 md5=5b545de0a1ce2c6f03ec2038c1980782 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+st 65 hover=1000 fr=1,0,0,0 f400..404=1,0,0,0,1 f425=0 f427=1 mode=18
+frame 66 0000000000436940 536 248 0 0 ret=1 md5=345b3e5236dd07eb2907753e8b785588 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#30@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+frame 67 0000000000446940 536 248 1 0 ret=1 md5=345b3e5236dd07eb2907753e8b785588 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#30@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+cmd 67 (HideObjet=CMP_BAGDAD)
+cmd 67 (HideObjet=CMP_BAGDADFIN)
+cmd 67 (HideObjet=CMP_HOGGAR)
+cmd 67 (HideObjet=CMP_PALEO)
+cmd 67 (HideObjet=CMP_PALEOFIN)
+cmd 67 (ShowObjet=CMP_PALEO)
+cmd 67 (PlaySound=50)
+log 67 'interp: SET%s'
+log 67 'interp: SET%s'
+log 67 'interp: SET%s'
+log 67 'interp: SET%s'
+log 67 'interp: SET%s'
+log 67 'interp: SET%s'
+log 67 'interp: SET%s'
+st 67 hover=1000 fr=1,0,0,0 f400..404=0,0,1,0,1 f425=0 f427=1 mode=18
+frame 68 0000000000456940 368 248 1 0 ret=1 md5=3a54f1f416836539d497a527c8e18904 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#30@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@368,248*0000803f
+st 68 hover=0000 fr=0,0,0,0 f400..404=0,0,1,0,1 f425=0 f427=1 mode=18
+frame 69 0000000000466940 40 40 1 0 ret=1 md5=ae56325b8019557ba8edd25f3af2b693 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@40,40*0000803f
+frame 70 0000000000476940 40 40 0 1 ret=0 md5=ae56325b8019557ba8edd25f3af2b693 draws=warp=flat,C:spr\Telecommande.spr#60@400,300,spr\Telecommande.spr#60@149,73*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@40,40*0000803f
+stop 70
+scan 70
+st 70 hover=0000 fr=0,0,0,0 f400..404=0,0,1,0,1 f425=0 f427=1 mode=3
+run ends
+start mode=18 active=1
+st 0 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=1 mode=18
+frame 0 0000000000016940 352 384 1 0 ret=1 md5=7aa4254b24f49ca82fccd79bedf6ad7c draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+cmd 0 (HideObjet=CMP_BAGDAD)
+cmd 0 (HideObjet=CMP_BAGDADFIN)
+cmd 0 (HideObjet=CMP_HOGGAR)
+cmd 0 (HideObjet=CMP_PALEO)
+cmd 0 (HideObjet=CMP_PALEOFIN)
+cmd 0 (ShowObjet=CMP_BAGDADFIN)
+cmd 0 (PlaySound=50)
+log 0 'interp: SET%s'
+log 0 'interp: SET%s'
+log 0 'interp: SET%s'
+log 0 'interp: SET%s'
+log 0 'interp: SET%s'
+log 0 'interp: SET%s'
+log 0 'interp: SET%s'
+st 0 hover=0100 fr=0,0,0,0 f400..404=0,1,0,0,0 f425=0 f427=1 mode=18
+frame 1 0000000000026940 536 248 1 0 ret=1 md5=31690a10ef91845f70d7c1cae426253f draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+cmd 1 (HideObjet=CMP_BAGDAD)
+cmd 1 (HideObjet=CMP_BAGDADFIN)
+cmd 1 (HideObjet=CMP_HOGGAR)
+cmd 1 (HideObjet=CMP_PALEO)
+cmd 1 (HideObjet=CMP_PALEOFIN)
+cmd 1 (ShowObjet=CMP_PALEOFIN)
+cmd 1 (PlaySound=50)
+log 1 'interp: SET%s'
+log 1 'interp: SET%s'
+log 1 'interp: SET%s'
+log 1 'interp: SET%s'
+log 1 'interp: SET%s'
+log 1 'interp: SET%s'
+log 1 'interp: SET%s'
+st 1 hover=1000 fr=0,0,0,0 f400..404=0,0,0,1,0 f425=0 f427=1 mode=18
+frame 2 0000000000036940 536 248 0 1 ret=0 md5=31690a10ef91845f70d7c1cae426253f draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@536,248*0000803f
+stop 2
+scan 2
+st 2 hover=1000 fr=0,0,0,0 f400..404=0,0,0,1,0 f425=0 f427=1 mode=3
+run home
+start mode=18 active=1
+st 0 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=1 mode=18
+frame 0 0000000000016940 368 248 0 0 ret=1 md5=3faa237be94ef860964813d53e782542 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@368,248*0000803f
+st 0 hover=0001 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=1 mode=18
+frame 1 0000000000026940 368 248 0 0 ret=1 md5=3faa237be94ef860964813d53e782542 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@368,248*0000803f
+frame 2 0000000000036940 368 248 0 0 ret=1 md5=3faa237be94ef860964813d53e782542 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@368,248*0000803f
+frame 3 0000000000046940 368 248 0 0 ret=1 md5=3faa237be94ef860964813d53e782542 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@368,248*0000803f
+st 3 hover=0001 fr=0,0,0,1 f400..404=0,0,0,0,0 f425=0 f427=1 mode=18
+frame 4 0000000000056940 352 384 1 0 ret=1 md5=b088f9e5502ba1148f03f5c0d6db9bb9 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#45@271,160*0000803f,spr\Interface.spr#40@352,384*0000803f
+st 4 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=1 mode=18
+frame 5 0000000000066940 368 248 1 0 ret=1 md5=3faa237be94ef860964813d53e782542 draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@368,248*0000803f
+cmd 5 (HideObjet=CMP_PALEO)
+cmd 5 (HideObjet=CMP_PALEOFIN)
+cmd 5 (HideObjet=CMP_BAGDAD)
+cmd 5 (HideObjet=CMP_BAGDADFIN)
+cmd 5 (PlaySound=50)
+cmd 5 (Chapter=607)
+log 5 'interp: SET%s'
+log 5 'interp: SET%s'
+log 5 'interp: SET%s'
+log 5 'interp: SET%s'
+log 5 'interp: SET%s'
+frame 6 0000000000076940 40 40 0 1 ret=0 md5=7b19889b66f721d9909d6b59291b55bb draws=warp=flat,C:spr\Telecommande.spr#59@400,300,spr\Telecommande.spr#59@149,73*0000803f,spr\Telecommande.spr#0@246,88*0000803f,spr\Telecommande.spr#14@260,281*0000803f,spr\Telecommande.spr#29@448,155*0000803f,spr\Telecommande.spr#44@271,160*0000803f,spr\Interface.spr#40@40,40*0000803f
+stop 6
+scan 6
+st 6 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=1 mode=3
+run crane
+start mode=15 active=1
+st 0 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=0 mode=15
+frame 0 0000000000016940 40 40 0 0 ret=1 md5=ded72b88149288c6d82688444c0f2061 draws=warp=flat,spr\GrandCrane.spr#0@400,300*0000803f
+frame 1 0000000000026940 400 300 0 0 ret=1 md5=ded72b88149288c6d82688444c0f2061 draws=warp=flat,spr\GrandCrane.spr#0@400,300*0000803f
+frame 2 0000000000036940 400 300 0 1 ret=0 md5=ded72b88149288c6d82688444c0f2061 draws=warp=flat,spr\GrandCrane.spr#0@400,300*0000803f
+stop 2
+log 2 'Crane Bagdad stop'
+st 2 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=0 mode=3
+run crane_travel
+start mode=15 active=1
+st 0 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=0 mode=15
+frame 0 0000000000016940 400 300 0 0 ret=1 md5=ded72b88149288c6d82688444c0f2061 draws=warp=flat,spr\GrandCrane.spr#0@400,300*0000803f
+frame 1 0000000000026940 400 300 1 0 ret=0 md5=ded72b88149288c6d82688444c0f2061 draws=warp=flat,spr\GrandCrane.spr#0@400,300*0000803f
+cmd 1 (ChangeCD=7)
+cmd 1 (monde=5)
+cmd 1 (changewam=Interdim.wam)
+cmd 1 (AngleWarpX=0)
+cmd 1 (AngleWarpY=0)
+cmd 1 (vue=7)
+cmd 1 (chapter=52)
+stop 1
+log 1 'interp: SET%s'
+log 1 'interp: SET%s'
+log 1 'Crane Bagdad stop'
+st 1 hover=0000 fr=0,0,0,0 f400..404=0,0,0,0,0 f425=0 f427=0 mode=3

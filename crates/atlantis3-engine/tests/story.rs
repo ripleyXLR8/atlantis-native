@@ -261,6 +261,34 @@ impl Run {
         self.escaped += 1;
     }
 
+    /// The pointer on the running screen's sprite `k`, as the walks name
+    /// it (`MAP k`, `CLICK ... SPRITE=k`), so the click that follows is a
+    /// real one, found by the screen's own hit test. The points are the
+    /// original's (800 x 600): the map's `clickpoint` lines
+    /// (`tests/golden/map_carte.txt`, sprite k = chapter 12, 14, 13, 15,
+    /// 16), the jewel case's and the remote's `hit` points
+    /// (`tests/golden/puzzle_ecrin.txt`, `tests/golden/puzzle_telecommande.txt`).
+    fn point_at(&mut self, k: i32) {
+        use atlantis3_engine::game::Screen;
+        assert_eq!((self.g.width(), self.g.height()), (800, 600));
+        let p = match (self.g.puzzle_screen(), k) {
+            (Some(Screen::Carte), 1) => (400, 310),
+            (Some(Screen::Carte), 2) => (370, 410),
+            (Some(Screen::Carte), 3) => (320, 190),
+            (Some(Screen::Carte), 4) => (640, 390),
+            (Some(Screen::Carte), 5) => (520, 340),
+            (Some(Screen::Ecrin), 1) => (312, 136),
+            (Some(Screen::Ecrin), 2) => (304, 232),
+            (Some(Screen::Ecrin), 3) => (192, 224),
+            (Some(Screen::Telecommande), 0) => (328, 160),
+            (Some(Screen::Telecommande), 14) => (352, 384),
+            (Some(Screen::Telecommande), 29) => (536, 248),
+            (Some(Screen::Telecommande), 44) => (368, 248),
+            (s, k) => panic!("no point for sprite {k} of {s:?}"),
+        };
+        self.g.set_pointer(p.0, p.1);
+    }
+
     /// The harness's settle: frames while in the warp a turn runs, a move
     /// is pending or the arrival scan has not run (`ARRIVEEVUE` ≠ 0).
     fn settle(&mut self) {
@@ -484,13 +512,13 @@ impl Run {
             "CLICK" | "MAP" if self.played => {
                 let mut left = true;
                 if w[0] == "MAP" {
-                    self.g.screen_sprite = Some(w[1].parse().unwrap());
+                    self.point_at(w[1].parse().unwrap());
                 } else {
                     left = w[1] == "left";
                     for item in &w[2..] {
                         let (k, v) = item.split_once('=').unwrap();
                         match k {
-                            "SPRITE" => self.g.screen_sprite = Some(v.parse().unwrap()),
+                            "SPRITE" => self.point_at(v.parse().unwrap()),
                             "POINTER" => {
                                 let (x, y) = v.split_once(',').unwrap();
                                 self.g.set_pointer(x.parse().unwrap(), y.parse().unwrap());
@@ -505,7 +533,6 @@ impl Run {
                     self.g.right_click();
                 }
                 self.frame();
-                self.g.screen_sprite = None;
                 self.settle();
             }
             "CHECKPOINT" if self.played => {
@@ -537,16 +564,16 @@ impl Run {
             "RAND" => {}
             "CLICK" => {
                 let left = w[1] == "left";
-                let sprite = w
-                    .get(2)
-                    .and_then(|s| s.strip_prefix("SPRITE="))
-                    .map(|n| n.parse().unwrap());
-                self.g.screen_click(left, sprite);
+                if let Some(n) = w.get(2).and_then(|s| s.strip_prefix("SPRITE=")) {
+                    self.point_at(n.parse().unwrap());
+                }
+                self.g.screen_click(left);
                 self.finish_media();
                 self.settle();
             }
             "MAP" => {
-                self.g.screen_click(true, Some(w[1].parse().unwrap()));
+                self.point_at(w[1].parse().unwrap());
+                self.g.screen_click(true);
                 self.finish_media();
                 self.settle();
             }

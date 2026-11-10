@@ -292,4 +292,43 @@ impl Game {
         }
         self.tr_flip();
     }
+
+    /// `PuzzleTelecommande_ReloadSprBank` (@ 0x004d0c30), run by every WAM
+    /// load (@ 0x004c3799): `Telecommande.spr` (its `Interface.spr`, the
+    /// cursor's bank, is the game's).
+    pub(crate) fn tele_reload_banks(&mut self) {
+        self.puzzles.screens.tele_bank = self.screen_bank("Telecommande.spr");
+    }
+
+    /// `TELECOMMANDE`'s drawing (@ 0x004d05f3..0x004d0742), from the
+    /// screen's centre (W / 2, H / 2), every call at alpha 1.0
+    /// (@ 0x00789728): the warp frame, the remote centred (#0x3b, #0x3c
+    /// once `powered`, flag 404), the power button's frame until then,
+    /// the Bagdad, Paleo and home buttons' frames
+    /// ([`super::screens::TELE_BUTTONS`]), the pointer `Interface.spr` #40
+    /// (@ 0x004281e0, the start's cursor), the flip.
+    pub(crate) fn tele_draw(&mut self, powered: bool) {
+        self.draw_warp_only();
+        let (cx, cy) = (self.width as i32 / 2, self.height as i32 / 2);
+        let st = &self.puzzles.screens;
+        let frames = st.tele_frames;
+        if let Some(bank) = st.tele_bank.clone() {
+            let path = "spr\\Telecommande.spr";
+            let (off, on) = super::screens::TELE_BODY;
+            self.draw_spr_centre(path, &bank, if powered { on } else { off }, cx, cy, 1.0);
+            for (k, &(first, (_, dy), dx, _)) in super::screens::TELE_BUTTONS.iter().enumerate() {
+                if k == 0 && powered {
+                    continue;
+                }
+                let idx = usize::try_from(first + frames[k]).unwrap_or(0);
+                self.draw_spr(path, &bank, idx, Some(cx + dx), cy + dy, 1.0);
+            }
+        }
+        if let Some(i) = self.interface.take() {
+            let (px, py) = self.pointer;
+            self.draw_spr("spr\\Interface.spr", &i, 40, Some(px), py, 1.0);
+            self.interface = Some(i);
+        }
+        self.tr_flip();
+    }
 }

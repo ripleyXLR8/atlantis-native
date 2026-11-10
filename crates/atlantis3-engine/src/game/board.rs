@@ -307,7 +307,7 @@ impl Game {
         let Some(screen) = self.puzzles.screen else {
             return false;
         };
-        self.screen_step(left, right, None);
+        self.screen_step(left, right);
         self.puzzles.screen == Some(screen)
     }
 
@@ -398,6 +398,17 @@ impl Game {
             .ecrin_bank
             .as_ref()
             .is_some_and(|b| hooks::ecrin_gem_hit(b, k, self.width as i32, self.height as i32, ptr))
+    }
+
+    /// The remote's hit test of button k (0..3: sprites 0, 0x0e, 0x1d,
+    /// 0x2c) at `ptr` (`SPR_COLLISION` @ 0x00437080, the loop's call).
+    #[doc(hidden)]
+    pub fn board_tele_hit(&self, k: usize, ptr: (i32, i32)) -> bool {
+        self.puzzles
+            .screens
+            .tele_bank
+            .as_ref()
+            .is_some_and(|b| hooks::tele_hit(b, k, self.width as i32, self.height as i32, ptr))
     }
 
     /// The loop mode's number (@ 0x00789af0): 3 the warp, the screens'.
@@ -501,6 +512,30 @@ impl Game {
                     p.tourmagi.dice,
                     u8::from(g.phase),
                     g.blinks
+                ))
+            }
+            "tele" => {
+                // The C globals' order: 0x0078972c.. (Paleo, Bagdad,
+                // power, home), 0x00789734.. the same.
+                let s = &p.screens;
+                let order = [2, 1, 0, 3];
+                let hover: String = order
+                    .iter()
+                    .map(|&k| if s.tele_hover[k] { '1' } else { '0' })
+                    .collect();
+                let fr: Vec<String> = order
+                    .iter()
+                    .map(|&k| s.tele_frames[k].to_string())
+                    .collect();
+                let flags = &self.script.as_ref()?.flags;
+                let f: Vec<String> = (400..405).map(|n| flags[n].to_string()).collect();
+                Some(format!(
+                    "hover={hover} fr={} f400..404={} f425={} f427={} mode={}",
+                    fr.join(","),
+                    f.join(","),
+                    flags[425],
+                    flags[427],
+                    self.board_mode_number()
                 ))
             }
             "gboy_full" => {

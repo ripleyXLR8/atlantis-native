@@ -349,10 +349,6 @@ pub struct Game {
     /// only logged, a sound started by `Play` playing for ever.
     #[doc(hidden)]
     pub story_sound_model: bool,
-    /// Tests: the screen bank's sprite the next screen frame's hit test
-    /// (@ 0x00437080) answers, as a walk's `CLICK ... SPRITE=n` gives it.
-    #[doc(hidden)]
-    pub screen_sprite: Option<i32>,
     /// Tests: the parts the whole-story harness stubs (the dialogs' set-up
     /// and start, the place sounds' restarts) draw from a generator of
     /// their own, leaving `rand` alone as the stubs do.
@@ -487,7 +483,6 @@ impl Game {
             trace_views: false,
             stub_cinemas: false,
             story_sound_model: false,
-            screen_sprite: None,
             stub_rand: false,
         };
         if !game.with_script(|s, h| s.boot_a3(h)) {
@@ -3690,6 +3685,8 @@ impl Host for Game {
                 if name.eq_ignore_ascii_case("tourmagi.wam") {
                     self.gboy_reload_banks();
                 }
+                // Every WAM's: the remote's (@ 0x004c3799).
+                self.tele_reload_banks();
                 true
             }
             Err(e) => {

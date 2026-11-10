@@ -415,6 +415,9 @@ impl Game {
         if self.puzzles.screens.carte_bank.is_some() {
             self.carte_reload_banks();
         }
+        if self.puzzles.screens.tele_bank.is_some() {
+            self.tele_reload_banks();
+        }
         let c = &mut self.startup.config;
         c.resolution = (w as i32, h as i32);
         c.pixel_format = match self.menus.depth {
