@@ -4060,6 +4060,10 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   bag with the right button left it set, and in the Paleolithic's view 4
   the next frame ended the hunt and took the spear out of the bag
   (`tests/right_button.rs`).
+- The right button opens the bag during a move's turn too: the callback
+  tests no turn or pending move (@ 0x00431648..0x00431671); the turn
+  waits while the bag is open and goes on after. 0.6.0 ignored the button
+  then.
 
 ## Tests
 

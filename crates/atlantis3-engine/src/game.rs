@@ -975,8 +975,9 @@ impl Game {
     }
 
     /// The right button (@ 0x00431639..0x00431676): in the warp the
-    /// inventory opens (unless it is open), in the inventory it closes, in
-    /// the subject menu the menu closes.
+    /// inventory opens (unless it is open), even during a move's turn (no
+    /// turn or pending-move test: the turn waits while the bag is open);
+    /// in the inventory it closes, in the subject menu the menu closes.
     pub fn right_click(&mut self) {
         if self.puzzles.freeze {
             return;
@@ -989,7 +990,7 @@ impl Game {
         // in the warp when the inventory's open flag is set (@ 0x0043166f).
         self.right_clicked = true;
         match self.mode {
-            Mode::Warp if self.moving.turn.is_none() && !self.moving.pending => {
+            Mode::Warp => {
                 if !self.inventory.open {
                     self.open_inventory();
                     self.right_clicked = false;

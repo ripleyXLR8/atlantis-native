@@ -7,8 +7,8 @@
 //! ```
 //!
 //! It sets the right button's byte (0x007592b9), then by loop mode: in the
-//! warp (3) the inventory opens unless its open flag is set
-//! (@ 0x00431648..0x00431671); in the
+//! warp (3) the inventory opens unless its open flag is set, with no test
+//! of a move's turn or pending move (@ 0x00431648..0x00431671); in the
 //! inventory (7) it closes (@ 0x00427b20, which clears the byte itself,
 //! @ 0x00427b5d); in the subject menu (8) the menu closes (@ 0x00427be0);
 //! after each of the three the byte is cleared (@ 0x00431676). So the
@@ -61,4 +61,33 @@ fn closing_the_bag_with_the_right_button_keeps_the_hunt() {
     }
     assert_eq!(g.script().unwrap().flags[91], 0, "the hunt ended");
     assert!(has_spear(&g), "the spear taken out of the bag");
+}
+
+#[test]
+fn the_right_button_opens_the_bag_during_a_turn() {
+    let Some(mut g) = game() else {
+        return;
+    };
+    g.set_world(1);
+    assert!(g.load_place("hoggar.wam"));
+    // `tests/golden/moves_hoggar.txt` case 1 z0: a move to view 2 with a
+    // turn first.
+    let bits = |s: &str| f32::from_bits(u32::from_str_radix(s, 16).unwrap());
+    g.reset_camera();
+    g.enter_at(1, bits("c0339fa2"), bits("3c3f89d6"));
+    let (target, turning, pending) = g.click_centre_now();
+    assert_eq!((target, turning, pending), (Some(2), true, false));
+    assert!(g.turning());
+    g.right_click();
+    assert!(g.inventory_open(), "the bag opens during the turn");
+    assert!(g.turning(), "the turn waits");
+    g.right_click();
+    assert!(!g.inventory_open());
+    assert!(g.turning());
+    // The turn goes on to its end.
+    let mut n = 0;
+    while g.turn_tick() {
+        n += 1;
+        assert!(n < 100);
+    }
 }
