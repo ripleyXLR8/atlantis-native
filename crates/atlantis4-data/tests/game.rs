@@ -391,3 +391,249 @@ fn every_font_reads() {
     kerning.sort_unstable();
     assert_eq!(kerning, [8, 44, 128, 218, 374, 916]);
 }
+
+fn md5_hex(data: &[u8]) -> String {
+    use md5::{Digest, Md5};
+    Md5::digest(data)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// The golden `key` of `tests/golden/decoded.txt`: its count and hash.
+fn golden(key: &str) -> (usize, String) {
+    let text = include_str!("golden/decoded.txt");
+    let line = text
+        .lines()
+        .find(|l| l.split(' ').next() == Some(key))
+        .unwrap_or_else(|| panic!("no golden {key}"));
+    let f: Vec<&str> = line.split(' ').collect();
+    (f[1].parse().unwrap(), f[2].to_string())
+}
+
+/// The hash of sorted "name\tWxH\tmd5\n" lines.
+fn picture_set_hash(mut lines: Vec<String>) -> (usize, String) {
+    lines.sort();
+    (lines.len(), md5_hex(lines.concat().as_bytes()))
+}
+
+fn picture_line(name: &str, img: &atlantis4_data::image::Image) -> String {
+    format!(
+        "{name}\t{}x{}\t{}\n",
+        img.width,
+        img.height,
+        md5_hex(&img.pixels)
+    )
+}
+
+/// Every PNG and TGA decodes to the reference's pixels.
+#[test]
+fn every_png_and_tga_decodes_exactly() {
+    use atlantis4_data::image;
+
+    let Some(dir) = install() else { return };
+    let mut png = Vec::new();
+    for name in files_with(&dir, "png") {
+        let data = std::fs::read(dir.join(&name)).unwrap();
+        let img = image::decode_png(&data).unwrap_or_else(|e| panic!("{name}: {e}"));
+        png.push(picture_line(&name, &img));
+    }
+    assert_eq!(picture_set_hash(png), golden("png"));
+    let mut tga = Vec::new();
+    for name in files_with(&dir, "tga") {
+        let data = std::fs::read(dir.join(&name)).unwrap();
+        let img = image::decode_tga(&data).unwrap_or_else(|e| panic!("{name}: {e}"));
+        tga.push(picture_line(&name, &img));
+    }
+    assert_eq!(picture_set_hash(tga), golden("tga"));
+    // The fonts' atlases are PNG too.
+    for name in files_with(&dir, "tef") {
+        let data = std::fs::read(dir.join(&name)).unwrap();
+        let f = atlantis4_data::font::Font::parse(&data).unwrap();
+        image::decode_png(f.atlas(&data)).unwrap_or_else(|e| panic!("{name}: {e}"));
+    }
+}
+
+/// Every JPEG file and every JPEG entry of the warp packages, decoded:
+/// (pictures, by channel count, set hash).
+fn decode_every_jpeg(dir: &Path) -> [(usize, usize, usize, Vec<String>); 2] {
+    use atlantis4_data::image;
+    use atlantis4_data::wpa::Package;
+
+    let mut out: [(usize, usize, usize, Vec<String>); 2] = Default::default();
+    let mut add = |set: usize, name: &str, data: &[u8]| {
+        let img = image::decode_jpeg(data).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let o = &mut out[set];
+        o.0 += 1;
+        match img.channels {
+            1 => o.1 += 1,
+            3 => o.2 += 1,
+            c => panic!("{name}: {c} channels"),
+        }
+        o.3.push(picture_line(name, &img));
+    };
+    for name in files_with(dir, "jpg") {
+        add(0, &name, &std::fs::read(dir.join(&name)).unwrap());
+    }
+    for name in files_with(dir, "wpa") {
+        let data = std::fs::read(dir.join(&name)).unwrap();
+        let p = Package::parse(&data).unwrap();
+        for e in p.entries.iter().filter(|e| e.name.ends_with(".jpg")) {
+            add(1, &format!("{name}:{}", e.name), p.slice(&data, e).unwrap());
+        }
+    }
+    out
+}
+
+/// Every JPEG decodes, with the channel counts of the data.
+#[test]
+fn every_jpeg_decodes() {
+    let Some(dir) = install() else { return };
+    let [files, packages] = decode_every_jpeg(&dir);
+    assert_eq!((files.0, files.1, files.2), (102, 0, 102));
+    assert_eq!((packages.0, packages.1, packages.2), (11_834, 345, 11_489));
+}
+
+/// The JPEGs decode to libjpeg-turbo's pixels (`JDCT_ISLOW`, fancy
+/// upsampling, the original's settings). Not met yet: the `jpeg-decoder`
+/// crate's inverse DCT differs; the exact decoder comes with the first
+/// scene on screen.
+#[test]
+#[ignore = "needs a JPEG decoder exact to libjpeg's JDCT_ISLOW"]
+fn every_jpeg_decodes_to_libjpeg_turbo_pixels() {
+    let Some(dir) = install() else { return };
+    let [files, packages] = decode_every_jpeg(&dir);
+    assert_eq!(picture_set_hash(files.3), golden("jpeg-files"));
+    assert_eq!(picture_set_hash(packages.3), golden("jpeg-packages"));
+}
+
+/// The samples per channel of all the `.ogg` files together (the sum of
+/// their last pages' granule positions; about 7.2 hours at 44.1 kHz).
+const FRAMES: u64 = 1_142_293_497;
+
+/// Every Ogg Vorbis sound: its pages (CRC), one Vorbis stream, decoded
+/// whole to as many samples as its last page's granule position says;
+/// every WAVE file's format.
+#[test]
+fn every_sound_decodes() {
+    use atlantis4_data::{audio, ogg};
+    use std::collections::BTreeMap;
+
+    let Some(dir) = install() else { return };
+    let mut formats = BTreeMap::<(u8, u32), usize>::new();
+    let mut frames = 0u64;
+    let names = files_with(&dir, "ogg");
+    for name in &names {
+        let data = std::fs::read(dir.join(name)).unwrap();
+        let (pages, packets) = ogg::read(&data, 1).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(packets.len(), 1, "{name}");
+        let first = packets.values().next().unwrap();
+        let ogg::StreamKind::Vorbis(info) = ogg::identify(&first[0]) else {
+            panic!("{name}: not Vorbis")
+        };
+        *formats
+            .entry((info.channels, info.sample_rate))
+            .or_default() += 1;
+        let d = audio::decode_vorbis(&data).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(
+            (d.channels, d.sample_rate),
+            (info.channels, info.sample_rate)
+        );
+        let got = d.samples.len() as u64 / u64::from(d.channels);
+        let want = pages.last().unwrap().granule;
+        assert_eq!(got, want, "{name}");
+        frames += got;
+    }
+    let formats: Vec<_> = formats.into_iter().collect();
+    assert_eq!(names.len(), 5_303);
+    assert_eq!(formats, [((1, 44_100), 4_255), ((2, 44_100), 1_048)]);
+    assert_eq!(frames, FRAMES);
+    let mut wav = BTreeMap::<(u16, u16, u32, u16), usize>::new();
+    for name in files_with(&dir, "wav") {
+        let data = std::fs::read(dir.join(&name)).unwrap();
+        let i = audio::wav_info(&data).unwrap_or_else(|e| panic!("{name}: {e}"));
+        *wav.entry((i.format, i.channels, i.sample_rate, i.bits))
+            .or_default() += 1;
+    }
+    let wav: Vec<_> = wav.into_iter().collect();
+    assert_eq!(wav, [((1, 2, 44_100, 16), 11)]);
+}
+
+/// Every Theora video: the `.ogv` files (Skeleton + Theora) and the `.ogv`
+/// entries of the warp packages (Theora alone).
+#[test]
+fn every_video_header_reads() {
+    use atlantis4_data::ogg::{self, StreamKind};
+    use atlantis4_data::wpa::Package;
+    use std::collections::BTreeMap;
+
+    let Some(dir) = install() else { return };
+    let mut census = BTreeMap::<(bool, u32, u32, u32, u32, u8), usize>::new();
+    let mut theora = |inside: bool, name: &str, data: &[u8]| {
+        let (_, packets) = ogg::read(data, 1).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let kinds: Vec<StreamKind> = packets.values().map(|p| ogg::identify(&p[0])).collect();
+        let t = kinds
+            .iter()
+            .find_map(|k| match k {
+                StreamKind::Theora(t) => Some(*t),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("{name}: no Theora"));
+        let skeleton = kinds.contains(&StreamKind::Skeleton);
+        assert_eq!(kinds.len(), 1 + usize::from(skeleton), "{name}");
+        assert_eq!(skeleton, !inside, "{name}");
+        assert_eq!(t.version, (3, 2, 1), "{name}");
+        *census
+            .entry((
+                inside,
+                t.picture_width,
+                t.picture_height,
+                t.fps.0,
+                t.fps.1,
+                t.pixel_format,
+            ))
+            .or_default() += 1;
+    };
+    let files = files_with(&dir, "ogv");
+    for name in &files {
+        theora(false, name, &std::fs::read(dir.join(name)).unwrap());
+    }
+    let mut entries = 0;
+    for name in files_with(&dir, "wpa") {
+        let data = std::fs::read(dir.join(&name)).unwrap();
+        let p = Package::parse(&data).unwrap();
+        for e in p.entries.iter().filter(|e| e.name.ends_with(".ogv")) {
+            entries += 1;
+            theora(
+                true,
+                &format!("{name}:{}", e.name),
+                p.slice(&data, e).unwrap(),
+            );
+        }
+    }
+    assert_eq!((files.len(), entries), (446, 1_484));
+    let alpha = files.iter().filter(|n| n.ends_with(".alpha.ogv")).count();
+    assert_eq!(alpha, 182);
+    // The files: (width, height, fps numerator, denominator) -> count.
+    let outside: Vec<_> = census
+        .iter()
+        .filter(|(k, _)| !k.0)
+        .map(|(k, n)| ((k.1, k.2, k.3, k.4), *n))
+        .collect();
+    assert_eq!(
+        outside,
+        [
+            ((704, 394, 24, 1), 1),
+            ((800, 448, 15, 1), 365),
+            ((800, 448, 25, 1), 72),
+            ((800, 600, 15, 1), 8),
+        ]
+    );
+    // Inside the packages: 32 sizes, widths 64 to 1024 and heights 64 to
+    // 256 in steps of 64, all
+    // 15 frames a second; every stream is 4:2:0.
+    let inside: Vec<_> = census.iter().filter(|(k, _)| k.0).collect();
+    assert_eq!(inside.len(), 32);
+    assert!(inside.iter().all(|(k, _)| (k.3, k.4) == (15, 1)));
+    assert!(census.keys().all(|k| k.5 == 0));
+}
