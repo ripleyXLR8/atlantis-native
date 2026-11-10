@@ -4049,6 +4049,11 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   while the section waits (`Script::run_command_now`;
   `tests/dialog_rhea.rs`). 0.6.0 used the speakers' `Focale` and head
   camera and left the yaw.
+- A cinematic stops the music when it starts, as `AtlHnm_start` does
+  once the film opened (@ 0x0042121b: both music slots stopped); its end
+  starts the track again from its beginning, as before. 0.6.0 played the
+  music under the films. The travel videos leave the music alone
+  (`tests/cinema_music.rs`).
 
 ## Tests
 

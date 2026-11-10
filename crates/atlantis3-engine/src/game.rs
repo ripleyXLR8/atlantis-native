@@ -3890,6 +3890,11 @@ impl Host for Game {
         let back = self.mode;
         let started = self.start_video(&path, fps.max(0) as u32, false, back, Vec::new());
         if started {
+            // `AtlHnm_start`, once CryoMovie opened the film: both music
+            // slots stopped before its playback (@ 0x0042121b:
+            // 0x00433d30(0)); the track's name is kept for its restart at
+            // the film's end (@ 0x004220cf → 0x00433d00).
+            self.audio.stop(CHANNEL_MUSIC);
             // The cue file and the caption file (`AtlHnm_Start`
             // @ 0x00420f68, @ 0x00420faf).
             let cues = self
