@@ -35,13 +35,37 @@ fn the_executable_is_known() {
     assert!(files.lang_ini().is_some());
 }
 
+/// The data folders of the install (the root also holds the executable,
+/// DLLs and files of the GOG.com installer and client, whose set changes
+/// with the client).
+const DATA_FOLDERS: [&str; 16] = [
+    "2D",
+    "3D",
+    "Common",
+    "Diary",
+    "DocumentsBrowser",
+    "GUI",
+    "Inventory",
+    "InventoryMenu",
+    "Objectives",
+    "Puzzles",
+    "Sounds",
+    "Texts",
+    "Versions",
+    "Videos",
+    "__redist",
+    "__support",
+];
+
 #[test]
-fn the_install_holds_every_file_of_the_inventory() {
+fn the_data_folders_hold_every_file_of_the_inventory() {
     let Some(dir) = install() else { return };
     let mut all = Vec::new();
-    walk(&dir, &dir, &mut all);
+    for folder in DATA_FOLDERS {
+        walk(&dir, &dir.join(folder), &mut all);
+    }
     let bytes: u64 = all.iter().map(|f| f.1).sum();
-    assert_eq!((all.len(), bytes), (9_858, 1_932_367_911));
+    assert_eq!((all.len(), bytes), (9_848, 1_928_223_369));
     let mut by_ext = std::collections::BTreeMap::<String, usize>::new();
     for (name, _) in &all {
         let base = name.rsplit('/').next().unwrap();
@@ -52,18 +76,12 @@ fn the_install_holds_every_file_of_the_inventory() {
         *by_ext.entry(ext).or_default() += 1;
     }
     let want = [
-        ("dll", 5),
-        ("exe", 1),
         ("font", 10),
-        ("hashdb", 1),
-        ("info", 1),
-        ("ini", 1),
         ("jpg", 102),
         ("lua", 504),
         ("ogg", 5_303),
         ("ogv", 446),
         ("png", 433),
-        ("script", 1),
         ("tef", 6),
         ("tga", 2),
         ("txt", 2),
