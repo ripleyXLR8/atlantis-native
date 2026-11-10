@@ -460,9 +460,11 @@ pub struct Enhancements {
     ///   (`FUN_0042ee88` @ 0x0042f036) is not shown; the line is skipped
     ///   either way.
     pub ui_ux: bool,
-    /// The arrow keys turn the view as F5..F8 do (default on, a port
-    /// convenience as Atlantis II's); off, as the original, whose input
-    /// poll (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba) reads F5..F8 only.
+    /// The arrow keys turn the view as F5..F8 do, and the load picker
+    /// takes Enter as OK and Up / Down as a row click (default on, port
+    /// conveniences as Atlantis II's); off, as the original, whose input
+    /// poll (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba) reads F5..F8 only
+    /// and whose picker (`FUN_0041cf78`) reads no key.
     pub arrow_keys: bool,
 }
 

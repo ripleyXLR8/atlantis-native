@@ -955,3 +955,35 @@ fn save_and_load() {
     h.sys.push_input(Input::Quit);
     assert!(h.until(600, |hh| !hh.alive), "the game did not end");
 }
+
+/// The WAM path of the original's checkpoints (`ATLANTIS_SAVES_PTBR`) is
+/// the buffer 0x006cdce0 whole, with the tails a longer earlier path left
+/// after the NUL (`WAM\TRONE.WAM\0\0M`): a checkpoint read and written
+/// again keeps its first 0x104 bytes.
+#[test]
+fn original_checkpoints_keep_their_wam_path_bytes() {
+    let Some(dir) = std::env::var_os("ATLANTIS_SAVES_PTBR") else {
+        eprintln!("ATLANTIS_SAVES_PTBR not set: skipped");
+        return;
+    };
+    let mut files = 0;
+    let mut tails = 0;
+    for e in std::fs::read_dir(&dir).unwrap().flatten() {
+        let name = e.file_name().to_string_lossy().to_ascii_lowercase();
+        if !name.ends_with(".gam") {
+            continue;
+        }
+        let b = std::fs::read(e.path()).unwrap();
+        let Some(cp) = Checkpoint::parse(&b) else {
+            continue;
+        };
+        files += 1;
+        let path = &b[..0x104];
+        let nul = path.iter().position(|&c| c == 0).unwrap();
+        if path[nul..].iter().any(|&c| c != 0) {
+            tails += 1;
+        }
+        assert_eq!(&cp.to_bytes()[..0x104], path, "{name}");
+    }
+    assert!(files > 0 && tails > 0, "{files} checkpoints, {tails} tails");
+}

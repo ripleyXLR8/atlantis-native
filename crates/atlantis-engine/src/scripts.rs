@@ -433,6 +433,7 @@ impl Scripts {
             // game is followed by a Vue= in the same section, which moves
             // the player; until then no place is entered.
             if let Some(wam) = set.wam_name {
+                e.set_wam_path(&latin1_bytes(&wam));
                 e.load_wam(&wam).await;
                 e.current_place = None;
                 e.current_place_id = e.wam.places.first().map(|p| p.id);
@@ -701,6 +702,8 @@ impl Scripts {
             .find(|s| Some(s.src_place) == from && s.dst_place == place)
             .cloned()
         {
+            // FUN_00422ad0 @ 0x00422b4c: the path from the record's name.
+            e.set_wam_path(&latin1_bytes(&sub.wam));
             e.load_wam(&sub.wam).await;
             e.current_place = None;
         }

@@ -199,7 +199,8 @@ pub fn mixer_volume(x: u8) -> u8 {
 /// The options of the original's menus, and the port's enhancements.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
-    /// SUBTITLES (0x004960a8).
+    /// SUBTITLES (0x004960a8): off at a fresh start, as the original
+    /// starts every run; then as the options menu leaves it.
     pub subtitles: bool,
     /// OMNI 3D MODE 2 (0x004960ac == 1): the pitch follows the mouse
     /// (y - prevY); MODE 1, the original's default, inverts it.
@@ -225,7 +226,10 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            subtitles: true,
+            // Off, as every start of the original (0x004960a8 is 0 in the
+            // data; only the options' toggle @ 0x0041d736 and a
+            // checkpoint load write it).
+            subtitles: false,
             omni3d_mode2: false,
             volumes: DEFAULT_VOLUMES,
             enhancements: Enhancements::default(),

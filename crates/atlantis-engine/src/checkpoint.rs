@@ -165,7 +165,9 @@ impl Engine {
             *g = (self.guests.id[i], self.guests.sprite[i]);
         }
         let cp = Checkpoint {
-            wam_path: format!("wam\\{}", self.wam_name.to_ascii_lowercase()).into_bytes(),
+            // The whole buffer 0x006cdce0, its tail included (WriteFile
+            // 0x104 bytes).
+            wam_path: self.wam_path.to_vec(),
             chapter,
             prev_chapter: self.prev_chapter,
             bank: 0,
@@ -245,6 +247,11 @@ impl Engine {
         // The 25 fields: the hidden persos before the WAM's sprite list.
         self.hidden_persos = cp.hidden.iter().map(|&h| i32::from(h)).collect();
         let wam = cp.wam_name();
+        // The first ReadFile fills the buffer 0x006cdce0 with the file's
+        // 0x104 bytes, its tail included.
+        self.wam_path = [0; crate::engine::WAM_PATH_LEN];
+        let n = cp.wam_path.len().min(crate::engine::WAM_PATH_LEN);
+        self.wam_path[..n].copy_from_slice(&cp.wam_path[..n]);
         if !self.load_wam(&wam).await {
             log::error!("checkpoint: {wam} missing, new game");
             self.new_game(hooks, in_play).await;
@@ -324,6 +331,35 @@ mod tests {
     use crate::persist::MemStore;
     use crate::test_support::with_engine;
     use std::rc::Rc;
+
+    /// The checkpoint's WAM path is the buffer 0x006cdce0 whole: strcpy /
+    /// strcat leave the tail of a longer earlier path after the NUL and
+    /// keep the script's case (CHAPI060 `Changewam=Sallehex.wam`), as the
+    /// real checkpoints show (`WAM\TRONE.WAM\0\0M`).
+    #[test]
+    fn checkpoint_wam_path_keeps_its_tail_and_case() {
+        let got = Rc::new(std::cell::RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        with_engine(
+            "checkpoint_wam_path_keeps_its_tail_and_case",
+            move |mut e| async move {
+                e.saves = Rc::new(MemStore::new());
+                e.set_wam_path(b"palais2.wam");
+                e.set_wam_path(b"Sallehex.wam");
+                assert_eq!(&e.wam_path[..17], b"wam\\Sallehex.wam\0");
+                e.set_wam_path(b"trone.wam");
+                e.write_checkpoint(&ScriptState::default());
+                let name = e.players.checkpoint_name(0, e.chapter as u8);
+                let b = e.saves.read(&name).expect("the checkpoint");
+                *g2.borrow_mut() = b[..0x14].to_vec();
+            },
+            |_, _| {},
+        );
+        let got = got.borrow();
+        if !got.is_empty() {
+            assert_eq!(&got[..], &b"wam\\trone.wam\0am\0\0\0\0"[..]);
+        }
+    }
 
     /// The game's own save of its settings (its options page) keeps what
     /// the front end stored since start-up: the graphics mode, the HD

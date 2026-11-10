@@ -357,6 +357,8 @@ impl Engine {
             .find(|s| s.src_place == cur && s.dst_place == next)
             .cloned();
         if let Some(sub) = sub {
+            // FUN_00422ad0 @ 0x00422b4c: the path from the record's name.
+            self.set_wam_path(&crate::con_script::script::latin1_bytes(&sub.wam));
             self.load_wam(&sub.wam).await;
             self.current_place = None;
             self.next_place_id = Some(sub.dst_place);

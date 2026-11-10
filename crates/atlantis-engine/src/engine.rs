@@ -42,6 +42,10 @@ pub const WARP_ABORT: u32 = 66666;
 /// requested vue 0x0049692c = 1; the view angles 0x00bcb59c / 0x00bcb598
 /// keep their .bss value, 0.
 pub const NEW_GAME_WAM: &str = "ATLAN1.WAM";
+
+/// The size of the WAM path buffer 0x006cdce0, the checkpoint's first
+/// field.
+pub const WAM_PATH_LEN: usize = 0x104;
 pub const NEW_GAME_VUE: u16 = 1;
 
 /// What happened, for tests and tools.
@@ -196,6 +200,9 @@ pub struct Engine {
     // The area.
     pub wam: Wam,
     pub wam_name: String,
+    /// The WAM path buffer 0x006cdce0 (0x104 bytes) as the checkpoint
+    /// writer copies it whole: see [`Engine::set_wam_path`].
+    pub wam_path: [u8; WAM_PATH_LEN],
     /// The place shown (0x006cd7c0), `None` before the first.
     pub current_place_id: Option<u16>,
     /// Its record in `wam.places`; `None` after a sub-WAM swap until the
@@ -412,6 +419,7 @@ impl Engine {
             trace: None,
             wam: Wam::default(),
             wam_name: String::new(),
+            wam_path: [0; WAM_PATH_LEN],
             current_place_id: None,
             current_place: None,
             next_place_id: None,
@@ -734,6 +742,22 @@ impl Engine {
         log::info!("{} cursor sprites", self.cursor_sprites.len());
     }
 
+    /// The WAM path buffer 0x006cdce0 rebuilt as the original does before
+    /// each WAM load (a new game @ 0x0042e250, ChangeWam= @ 0x0042a253, a
+    /// sub-WAM swap @ 0x00422b4c): strcpy(root, "" @ 0x0049619f), then
+    /// strcat("wam\\"), strcat(name). The name keeps the case of the
+    /// script line or the WAM record, and the bytes after the new NUL keep
+    /// what a longer path left there; the checkpoint writer copies the
+    /// whole buffer (0x104 bytes), so real checkpoints hold such tails
+    /// (`WAM\TRONE.WAM\0AM`).
+    pub fn set_wam_path(&mut self, name: &[u8]) {
+        let mut path = b"wam\\".to_vec();
+        path.extend_from_slice(name);
+        let n = path.len().min(WAM_PATH_LEN - 1);
+        self.wam_path[..n].copy_from_slice(&path[..n]);
+        self.wam_path[n] = 0;
+    }
+
     /// A WAM file, its centre table and sprite lists (`setupWAMByName`,
     /// `FUN_00421ebc`). The loader writes the fixed place records on every
     /// load, the chapter's WAM included (a new game @ 0x004237b5, a load
@@ -819,6 +843,9 @@ impl Engine {
         if !in_play {
             self.set_view(0.0, 0.0);
         }
+        // FUN_0042de5c's no-file branch (@ 0x0042e250..0x0042e279):
+        // `wam\` + *(0x004961e0) = "atlan1.wam".
+        self.set_wam_path(b"atlan1.wam");
         if !self.load_wam(NEW_GAME_WAM).await {
             log::error!("cannot start a new game: {NEW_GAME_WAM} missing");
             return;
@@ -1185,10 +1212,14 @@ impl Engine {
         self.music.duck(false, None);
         let outcome = self.ingame_menu().await;
         self.music.unduck(None);
+        // Every exit of FUN_0041c838, the load entry included (its
+        // `jmp 0x41ca75` @ 0x0041ca10), runs the tail that rebases the
+        // clocks (0x0041cb84..0x0041cbdc: FUN_00451cec, the Time1 / Time2 /
+        // ChapterTime bases = now, their offsets = TIME1 / TIME2). The
+        // reload then restarts ChapterTime and Time2 but not Time1
+        // (FUN_00427634), so Time1 does not count the menu's time.
+        self.rebase_con_clocks();
         match outcome {
-            // The clocks resume only when the play goes on: a reload, a
-            // quit or an abort leaves them as they are.
-            MenuOutcome::Resume if !self.should_abort() => self.rebase_con_clocks(),
             MenuOutcome::Resume => {}
             MenuOutcome::Reload => self.abort = Some(Abort::Load),
             MenuOutcome::Quit => self.abort = Some(Abort::Quit),
@@ -1240,14 +1271,15 @@ mod exit_and_menu_tests {
     use crate::sys::{Input, MouseButton, Runner};
     use crate::test_support::{button, with_engine};
 
-    /// The in-game menu ended by an abort (as a reload or a quit) leaves
-    /// the clocks alone; a resume rebases them.
+    /// Every exit of the in-game menu rebases the clocks, a load or an
+    /// abort as a resume (FUN_0041c838 @ 0x0041cb84..0x0041cbdc, reached
+    /// from the load entry @ 0x0041ca10).
     #[test]
-    fn ingame_menu_rebases_the_clocks_only_on_resume() {
+    fn ingame_menu_rebases_the_clocks_on_every_exit() {
         let got = Rc::new(RefCell::new(Vec::new()));
         let g2 = got.clone();
         let ran = with_engine(
-            "ingame_menu_rebases_the_clocks_only_on_resume",
+            "ingame_menu_rebases_the_clocks_on_every_exit",
             move |mut e| async move {
                 e.vars.set("time1", 7);
                 e.abort = Some(Abort::Load);
@@ -1269,7 +1301,7 @@ mod exit_and_menu_tests {
             return;
         }
         let got = got.borrow();
-        assert_eq!(*got, [0, 7]);
+        assert_eq!(*got, [7, 7]);
     }
 
     /// The game clock FUN_00451d0c counts from its epoch: the engine's
