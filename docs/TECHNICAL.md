@@ -3930,8 +3930,9 @@ back) into `yucatan-*.png`.
 
 Atlantis III (Cryo, 2001) plays from the intro to the credits since
 0.6.0, on the desktop (`crates/atlantis-app/src/a3.rs`) and in the
-browser (`a3_web.rs`). The reference is the GOG.com French release's
-`Game.exe`, whose addresses the code cites; it is the only build known
+browser (`a3_web.rs`). The reference is the GOG.com release's
+`Game.exe` (the same in its four languages), whose addresses the code
+cites; it is the only build known
 (`atlantis3_data::exe::KNOWN_BUILDS`: 3,473,408 bytes, PE timestamp
 0x3ea7b362, MD5 `eb06eaa718877dfcabee6e8f89d85b31`; its sprite
 libraries `spr_p5.dll` and `spr_p6.dll`, `SPR_DLLS`; GOG's launcher
@@ -3965,12 +3966,50 @@ format, RGB565 or x8r8g8b8, as the original draws it on a 16- or 32-bit
 display. Texts are drawn from the game's font at the widths GDI gives
 it (a measured table), with the port's own antialiasing.
 
+**Languages.** GOG.com sells the game in English, French, German and
+Spanish, one `Game.exe` for the four (the same file in the build's
+language-independent depot): the languages differ only in their data.
+`atlantis3_data::install` reads the installer's registry values
+(`goggame-1207658958.script`: `Language` = `gbr`, `fra`, `ger` or `esp`,
+`Install` = `CD`), which the start-up makes `Langue`, `SousTitre` and
+`Version` as the original does with its registry key; the edition's
+label adds the language (`edition_label`: *Atlantis III, GOG.com,
+German*). The language-dependent rules, from the original's code:
+
+- the intro (`game::intro_videos`, @ 0x00459360): `intro.hnm`, then for
+  `ger` `intro_ger.hnm`, which no GOG.com depot ships: the original's
+  `AtlHnm_start` fails on it and the intro ends as for the other
+  languages; the port skips a missing film the same way;
+- the fonts' charset (`font.txt`): `EASTEUROPE_CHARSET` (German) gives
+  GDI Arial's Central European set, so `text::GdiFont::arial_charset`
+  takes a second measured table (`data/arial_gdi_ee.txt`) and the glyphs
+  are Windows-1250's; `SHIFTJIS_CHARSET` (English) gets a Japanese face
+  from a Windows that has one (MS PGothic on Windows 11) and the text
+  library's double-byte renderer: the port keeps Arial and Windows-1252,
+  as a Windows without a Japanese font (a port decision; the English
+  texts are ASCII but one `’`). The English `AtlFont_Credit` asks for
+  height 20, so the tables hold 22 (20 × 1.1 at 1024 pixels);
+- the scarab case's bank (`AtlScarabee_MainInit` @ 0x00432200) is
+  `Scarabee.spr` and nothing else: the English and German installations
+  have it, the French and Spanish ones name it `Scarabée.SPR`, which the
+  original does not open, so its case draws only the panorama and the
+  pointer there (`game::hooks::screens::scarabee`, `scarab_draw`);
+- a voice file that is missing (two French-only lines) keeps the line
+  until a click, the dialogs' rule.
+
+The tests replay the story chain on each language
+(`story.rs::whole_story_other_languages`, and the one script line the
+English and German `chapi054.con` change,
+`rhea_old_man_at_875_8_by_language`) and check the labels, the intro, the
+charsets and the scarab case per language (`tests/languages.rs`), from
+`ATLANTIS3_GOG_EN`, `ATLANTIS3_GOG_DE` and `ATLANTIS3_GOG_ES`.
+
 The desktop's `a3::A3App` is its own `ApplicationHandler`, as Atlantis
 II's is: `setup::kind_of` tells Atlantis III by `Game.exe` beside
 `Datas\scenar\defnames.con` (`atlantis3_data::files::holds_atlantis3`,
 looked at before the other games), `setup::candidate_folders` reads its
 GOG.com id 1207658958 from the registry, `desktop::open_any` gives
-`Opened::Atlantis3` with the build's label, and the session keeps the
+`Opened::Atlantis3` with the edition's label (`A3Files::edition_label`), and the session keeps the
 chosen folder (`Session::take_atlantis3`) for `main.rs` to run
 `a3::run_window_on` on the same event loop, back to the library with
 `a2::Ended::Library` (Shift in its first two seconds). The install is read
@@ -3989,7 +4028,10 @@ screenshots; `atlantis-native --headless <game folder> [frames]
 [--screenshot <file>]` checks that the game starts.
 
 Tests (`crates/atlantis3-data/tests/`, `crates/atlantis3-engine/tests/`,
-with `ATLANTIS3_DATA` = the installed game; without it they fail, unless
+with `ATLANTIS3_DATA` = the installed game, French, and for the other
+languages' tests `ATLANTIS3_GOG_EN`, `ATLANTIS3_GOG_DE`,
+`ATLANTIS3_GOG_ES` = GOG.com's English, German and Spanish installations;
+without them they fail, unless
 `ATLANTIS3_SKIP_DATA_TESTS=1` or Atlantis II's `ATLANTIS2_SKIP_DATA_TESTS=1`,
 which the CI sets, skips them): every file of `Datas\` parsed and every
 sprite drawn against the original's blitters; the HNM frames and the

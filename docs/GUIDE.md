@@ -105,9 +105,9 @@ of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
 patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
 the GOG.com edition and the Italian *Atlantis Collection* DVD (see
-[Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's French release
-only; other editions are unknown and untested (see
-[Atlantis III](#atlantis-iii)).
+[Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
+English, French, German or Spanish; other editions are unknown and
+untested (see [Atlantis III](#atlantis-iii)).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -158,7 +158,7 @@ last played selected. Each game is shown as its name and edition,
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)* or *Atlantis III, GOG.com,
-French*, and its folder.
+German*, and its folder.
 
 | Action | Mouse | Keyboard |
 |---|---|---|
@@ -268,7 +268,8 @@ What to pick:
   `Atlantis 2` and `CD1` to `CD4` side by side). The browser reads files,
   not CD images, and the four discs are needed at once (no disc can be
   added while the game runs).
-- *Atlantis III*, GOG.com (French): the installation folder (the one
+- *Atlantis III*, GOG.com (English, French, German or Spanish): the
+  installation folder (the one
   holding `Game.exe` and `Datas`). Its saves and `Atlantis3.cfg` are
   kept in the browser under `atlantis-native/atlantis3/`; its controls
   are the desktop's (see [Atlantis III](#atlantis-iii)): a click takes
@@ -637,10 +638,31 @@ browser (see [The web version](#the-web-version)). It runs the
 original's own menus and options; Atlantis Native's options menu (F10)
 and HD mode are not part of it.
 
-**Edition.** Only GOG.com's French release is known (*Atlantis 3 - The
-New World*, its `Game.exe` 3,473,408 bytes, MD5
-`eb06eaa718877dfcabee6e8f89d85b31`). Other editions (GOG.com's in other
-languages, the retail CDs and DVDs) are unknown to the project and
+**Edition.** GOG.com's release is known (*Atlantis 3 - The New World*,
+its `Game.exe` 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`)
+in its four languages: English, French, German and Spanish. GOG.com
+ships the same `Game.exe` in all four; the language is the installation's
+(the one GOG.com's installer records, else the only folder of
+`Datas\loc\text`), and the game library shows it: *Atlantis III,
+GOG.com, English*. What the language changes is the original's too:
+
+- the texts, voices and dubbed films of that language;
+- the fonts' character set: the German installation's `font.txt` asks
+  for Arial's Central European set, so a few bytes are other letters (in
+  the credits, one `è` is shown `č`, as the original shows it); the
+  English one asks for a Japanese set, which on a Windows with Japanese
+  fonts gives the original a Japanese-style face: Atlantis Native draws
+  English in Arial, as a Windows without them;
+- the scarab case (Land of the Dead): only the English and German
+  installations have its pictures under the name the game asks for
+  (`Scarabee.spr`); the French and Spanish ones name the file
+  `Scarabée.SPR`, so the original shows the panorama and the pointer
+  only, and so does Atlantis Native. The case works the same either way;
+- two French lines have no voice in the other languages: their subtitle
+  stays until a click, as in the original;
+- one line of the Rhea chapter's script (English and German).
+
+Other editions (the retail CDs and DVDs) are unknown to the project and
 untested: their `Game.exe` is refused with its size and MD5, which an
 issue on GitHub can report so that it is added.
 
