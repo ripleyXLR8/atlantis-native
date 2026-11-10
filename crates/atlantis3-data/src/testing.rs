@@ -1,7 +1,10 @@
 //! The rule of the game-data tests when their data is missing.
 //!
 //! The tests that need the game read its installed folder (the one holding
-//! `Game.exe` and `Datas\`) from `ATLANTIS3_DATA`. Without it a test must
+//! `Game.exe` and `Datas\`) from `ATLANTIS3_DATA` (GOG.com's French
+//! install); the tests of the other languages read GOG.com's English,
+//! German and Spanish installs from `ATLANTIS3_GOG_EN`, `ATLANTIS3_GOG_DE`
+//! and `ATLANTIS3_GOG_ES` ([`GOG_LANGUAGES`]). Without it a test must
 //! not pass as if it had run: [`missing`] fails it, unless
 //! `ATLANTIS3_SKIP_DATA_TESTS=1` (or `ATLANTIS2_SKIP_DATA_TESTS=1`, which a
 //! build without any game sets, such as the CI's) asks for the game-data
@@ -42,6 +45,25 @@ pub fn missing(what: &str) {
         );
     }
     let _ = writeln!(std::io::stderr(), "SKIPPED {test}: {what}");
+}
+
+/// The variables naming GOG.com's other languages' installs, with their
+/// registry language codes.
+pub const GOG_LANGUAGES: [(&str, &str); 3] = [
+    ("ATLANTIS3_GOG_EN", "gbr"),
+    ("ATLANTIS3_GOG_DE", "ger"),
+    ("ATLANTIS3_GOG_ES", "esp"),
+];
+
+/// The install named by the variable `var`, or `None` after [`missing`].
+pub fn dir_of(var: &str) -> Option<PathBuf> {
+    match std::env::var_os(var) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            missing(&format!("{var} not set"));
+            None
+        }
+    }
 }
 
 /// The installed game's folder from `ATLANTIS3_DATA`, or `None` after

@@ -34,6 +34,18 @@ use crate::maps;
 pub struct State {
     /// `SCARABEE`: the case open (@ 0x00759324; not reset by the start).
     pub scarab_open: bool,
+    /// `SCARABEE`'s bank `Scarabee.spr` (@ 0x00759308), opened at
+    /// start-up and by the `ldmorts.wam` and `cfuner.wam` loads
+    /// (`AtlScarabee_MainInit` @ 0x00432200). GOG.com's French and Spanish
+    /// installs name the file `Scarabée.SPR`: the open fails there, the
+    /// name stays empty and every sprite call of the case draws nothing
+    /// (`AtlSpr_AffCentre` @ 0x00436bd9: "handle invalide").
+    pub scarab_bank: Option<Arc<Bank>>,
+    /// The dead scarab's frame (@ 0x00717738: 5 at start-up, 5..24, kept
+    /// between openings) and its 1/15 s clock (@ 0x007592e0, set by the
+    /// start).
+    pub scarab_anim: i32,
+    pub scarab_clock: f64,
     /// `ECRIN`: the gems taken (@ 0x00755990..0x00755992), their count
     /// (@ 0x0075599c), the fade (@ 0x00715860: 0.0, then 1.0 from the
     /// first tick), the 15 Hz clock's last time (@ 0x00755978), the glow
@@ -125,9 +137,15 @@ const GBOY_RANGE: (i32, i32) = (113, 141);
 /// The cursor's step (@ 0x007003d4, a float 1/15).
 const GBOY_STEP: f32 = 1.0 / 15.0;
 
+/// The dead scarab's animation frames (@ 0x00432025..0x00432035).
+pub(crate) const SCARAB_ANIM: (i32, i32) = (5, 24);
+
 impl State {
     pub fn new() -> State {
-        State::default()
+        State {
+            scarab_anim: SCARAB_ANIM.0,
+            ..State::default()
+        }
     }
 
     /// No byte of 0x00459e70 belongs to the screens (the remote's
@@ -185,6 +203,13 @@ pub(super) fn start(h: &mut Hx, screen: Screen) {
                 blink_clock: st.gboy.blink_clock,
             };
             h.g.puzzles.tourmagi.dice = 0;
+            h.g.pointer = maps::centre(h.g.width, h.g.height);
+        }
+        // @ 0x00431da0: the clock at now, the pointer centred
+        // (@ 0x00431780), alpha 1.0 (@ 0x00759320); the cursor is left
+        // as it was.
+        Screen::Scarabee => {
+            st.scarab_clock = now;
             h.g.pointer = maps::centre(h.g.width, h.g.height);
         }
         // @ 0x00405450: the pointer centred (@ 0x00431780), the cursor
@@ -253,16 +278,33 @@ pub(super) fn frame(
 /// are looked at. Then a left click on the closed case opens it with
 /// `(PlaySound=110)`; a right click closes it and leaves.
 fn scarabee(h: &mut Hx, left: bool, right: bool) -> bool {
+    // What the case shows: the closed case (#0), or the open case (#1)
+    // and the scarab (dead: the animation; larva #2; golden #3), drawn
+    // after the subjects' changes (@ 0x00431ef5..0x00432193).
+    let mut shown = None;
     if h.g.puzzles.screens.scarab_open {
         let (f53, f54) = (h.flag(53), h.flag(54));
         if f53 == 0 {
-            if f54 == 0 && h.flag(72) == 0 {
-                h.set_flag(72, 1);
-                h.run("(killsuj,CHF_PSYCHOP,DIAL_ECRIN_SCARABEE)");
-                h.run("(enablesuj,CHF_PSYCHOP,DIAL_SCARABEE)");
+            if f54 == 0 {
+                if h.flag(72) == 0 {
+                    h.set_flag(72, 1);
+                    h.run("(killsuj,CHF_PSYCHOP,DIAL_ECRIN_SCARABEE)");
+                    h.run("(enablesuj,CHF_PSYCHOP,DIAL_SCARABEE)");
+                }
+                let now = h.now();
+                let st = &mut h.g.puzzles.screens;
+                shown = Some(Some(st.scarab_anim));
+                // The dead scarab's frame on the 1/15 s clock, after its
+                // drawing (@ 0x00431fa6..0x0043203f).
+                if now - st.scarab_clock > TICK {
+                    st.scarab_clock = now;
+                    st.scarab_anim = if st.scarab_anim < SCARAB_ANIM.1 {
+                        st.scarab_anim + 1
+                    } else {
+                        SCARAB_ANIM.0
+                    };
+                }
             }
-            // visual: frames 1 and the dead scarab's animation 5..24 on
-            // the 1/15 s clock (0x00717738) (M4).
         } else if f53 == 1 {
             if f54 == 0 {
                 if h.flag(56) == 0 {
@@ -270,6 +312,7 @@ fn scarabee(h: &mut Hx, left: bool, right: bool) -> bool {
                     h.run("(enablesuj,CHF_PSYCHOP,DIAL_LARVE)");
                     h.run("(killsuj,CHF_PSYCHOP,DIAL_SCARABEE)");
                 }
+                shown = Some(Some(2));
             } else if f54 == 1 {
                 if h.vue() > 27 {
                     h.g.puzzles.screens.scarab_open = false;
@@ -282,9 +325,13 @@ fn scarabee(h: &mut Hx, left: bool, right: bool) -> bool {
                     h.run("(killsuj,CHF_PSYCHOP,DIAL_LARVE)");
                     h.run("(killsuj,CHF_PSYCHOP,DIAL_SCARABEE)");
                 }
+                shown = Some(Some(3));
             }
         }
+    } else {
+        shown = Some(None);
     }
+    h.g.scarab_draw(shown);
     // The flip (@ 0x004321a7), before the clicks.
     h.g.flip_texts();
     if left && !h.g.puzzles.screens.scarab_open {

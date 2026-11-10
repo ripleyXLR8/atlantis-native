@@ -997,11 +997,14 @@ impl log::Log for Stderr {
 }
 
 fn new_run() -> Option<Run> {
+    new_run_in(atlantis3_data::testing::install_dir()?)
+}
+
+fn new_run_in(dir: std::path::PathBuf) -> Option<Run> {
     if std::env::var_os("STORY_LOG").is_some() {
         let _ = log::set_logger(&Stderr);
         log::set_max_level(log::LevelFilter::Debug);
     }
-    let dir = atlantis3_data::testing::install_dir()?;
     let files = A3Files::open_dir(&dir).unwrap().0;
     let mut g = Game::new(files).expect("the game starts");
     g.seed(1);
@@ -1151,6 +1154,78 @@ fn whole_story() {
         &walk,
         include_str!("golden/story/chain.txt"),
     );
+}
+
+/// The whole story on GOG.com's English, German and Spanish installs,
+/// against the same chained golden: the scripts are the French install's
+/// but for `chapi054.con` (English and German), whose one changed line
+/// the walk does not reach; the voices, texts and films only change what
+/// is shown and heard.
+#[test]
+fn whole_story_other_languages() {
+    for (var, code) in atlantis3_data::testing::GOG_LANGUAGES {
+        let Some(dir) = atlantis3_data::testing::dir_of(var) else {
+            continue;
+        };
+        let mut r = new_run_in(dir).unwrap();
+        assert_eq!(r.g.startup.config.langue, code.as_bytes(), "{var}");
+        let walk: String = SEGMENTS.iter().map(|s| s.1).collect::<Vec<_>>().join("\n");
+        play(
+            &mut r,
+            &format!("chain {var}"),
+            &walk,
+            include_str!("golden/story/chain.txt"),
+        );
+    }
+}
+
+/// The one script line GOG.com's languages change (`chapi054.con`,
+/// Rhea's chapter 54): with `Flag875` = 8 (the Omega's dialog done) the
+/// French and Spanish scripts refuse the move to the old man (view 11:
+/// `AbortDepart`, dialog 255, `Flag876` := 1), the English and German ones
+/// let it go. Segment 07's walk up to `FLAG875=8`, then `GO 11`.
+#[test]
+fn rhea_old_man_at_875_8_by_language() {
+    let mut installs = Vec::new();
+    if let Some(d) = atlantis3_data::testing::install_dir() {
+        installs.push(("ATLANTIS3_DATA", d, true));
+    }
+    for (var, code) in atlantis3_data::testing::GOG_LANGUAGES {
+        if let Some(d) = atlantis3_data::testing::dir_of(var) {
+            installs.push((var, d, code == "esp"));
+        }
+    }
+    let (_, walk, golden) = SEGMENTS[6];
+    let upto: Vec<&str> = walk
+        .lines()
+        .take_while(|l| !l.starts_with("EXPECT FLAG875=8"))
+        .collect();
+    for (var, dir, refused) in installs {
+        let mut r = new_run_in(dir).unwrap();
+        r.rands = rands(golden);
+        r.g.script_mut().unwrap().set_log = Some(Vec::new());
+        let save = start_save(golden).unwrap();
+        assert!(r.g.load_save_text("quick1_100.sav", save), "{var}: load");
+        r.act_frame();
+        for line in &upto {
+            let line = line.split('#').next().unwrap().trim();
+            if !line.is_empty() {
+                r.action(line);
+            }
+        }
+        assert_eq!(r.g.script().unwrap().flags[875], 8, "{var}");
+        assert_eq!(r.g.script().unwrap().flags[876], 0, "{var}");
+        r.action("GO 11");
+        r.settle();
+        let view = r.g.place().1;
+        if refused {
+            assert_eq!(r.g.script().unwrap().flags[876], 1, "{var}: refused");
+            assert_ne!(view, Some(11), "{var}: refused");
+        } else {
+            assert_eq!(r.g.script().unwrap().flags[876], 0, "{var}: let go");
+            assert_eq!(view, Some(11), "{var}: let go");
+        }
+    }
 }
 
 fn segment(index: usize) {
