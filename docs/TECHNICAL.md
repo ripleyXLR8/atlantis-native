@@ -4077,8 +4077,9 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   0.6.0 switched only the transition sprites (`tests/warp_res.rs`).
 - A save's `DateAndTime` is the local time, as `_strdate` / `_strtime`
   give it (@ 0x00459ee0): `Game::utc_offset`, the system's time zone on
-  the desktop (`a2::utc_offset_now`), the browser's on the web. 0.6.0
-  wrote UTC.
+  the desktop (`a2::utc_offset_now`), the browser's on the web, for the
+  menu's saves and the scripts' quick saves (`SAVE=n`) alike, one writer
+  for both. 0.6.0 wrote UTC, and `01/01/01 00:00:00` in a quick save.
 
 ## Tests
 

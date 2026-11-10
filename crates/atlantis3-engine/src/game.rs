@@ -2529,7 +2529,9 @@ impl Game {
         let q = angles_quaternion(yaw, pitch);
         let mut g = SaveGame {
             current_cd: self.current_cd,
-            date_and_time: b"01/01/01 00:00:00".to_vec(),
+            // The same writer for the script's quick saves (`SAVE=n`) and
+            // the menu's (@ 0x00459ee0): the clock's date and time.
+            date_and_time: pages::date_and_time_now(self.local_time()),
             wam: s.wam.clone(),
             monde: s.a3.world,
             vue: s.current_view.unwrap_or(0),

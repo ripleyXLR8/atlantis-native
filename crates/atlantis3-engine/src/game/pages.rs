@@ -515,21 +515,10 @@ impl Game {
         let Some(s) = self.script.take() else {
             return;
         };
+        // The writer's text, its `DateAndTime` the local clock's.
         let text = self.save_text(&s);
         self.script = Some(s);
-        // The writer's second line (`DateAndTime = ...`).
-        let mut data = Vec::new();
-        let mut lines = text.splitn(3, |&b| b == b'\n');
-        if let (Some(a), Some(_), Some(rest)) = (lines.next(), lines.next(), lines.next()) {
-            data.extend_from_slice(a);
-            data.extend_from_slice(b"\nDateAndTime = ");
-            data.extend(date_and_time_now(self.local_time()));
-            data.push(b'\n');
-            data.extend_from_slice(rest);
-        } else {
-            data = text;
-        }
-        self.store_save(name, data);
+        self.store_save(name, text);
         if !atlantis3_data::save::has_thumbnail(name) {
             return;
         }
@@ -567,7 +556,7 @@ mod tests {
     }
 
     /// The saves' `DateAndTime` (@ 0x00459ee0, `_strdate` / `_strtime`):
-    /// the local time.
+    /// the local time, for the script's quick saves as for the menu's.
     #[test]
     fn saves_are_stamped_with_the_local_time() {
         let Some(mut g) = game() else {
@@ -579,6 +568,9 @@ mod tests {
         g.unix_time = || 1_700_000_000;
         g.utc_offset = || 3600;
         let want = "DateAndTime = 11/14/23 23:13:20";
+        let name = g.quick_save_now(1);
+        let text = String::from_utf8_lossy(g.saved(&name).unwrap()).into_owned();
+        assert!(text.contains(want), "{text}");
         g.write_menu_save("game1_1.sav");
         let text = String::from_utf8_lossy(g.saved("game1_1.sav").unwrap()).into_owned();
         assert!(text.contains(want), "{text}");
