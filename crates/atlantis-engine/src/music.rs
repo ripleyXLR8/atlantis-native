@@ -665,6 +665,19 @@ impl Music {
         t.new_sound_voice = Some(v);
     }
 
+    /// `AIL_set_sample_volume(0x006ce110, 0x00495e73)`: the sound menu's
+    /// OK (`FUN_0041d5f4` step 5) and the checkpoint load (`FUN_0042de5c`)
+    /// set the NewSound sample to the effects volume at once, a sample
+    /// playing included.
+    pub fn set_new_sound_volume(&self, effects_volume: u8) {
+        let t = self.timer.borrow();
+        if let Some(v) = t.new_sound_voice {
+            let balance = t.mixer.voice_volume(v).map_or(0, |x| x.1);
+            t.mixer
+                .set_volume(v, crate::persist::mixer_volume(effects_volume), balance);
+        }
+    }
+
     pub fn stop_new_sound(&self) {
         let mut t = self.timer.borrow_mut();
         if let Some(v) = t.new_sound_voice.take() {
@@ -936,7 +949,6 @@ impl Engine {
         log::info!("loadmusik: track {} '{name}' copied", idx + 1);
     }
 
-    /// The effects volume byte 0x00495e73 (0..127).
     /// StopSound (`FUN_0042b290`): the NewSound sample stops, NEWSOUND = 0
     /// and the poller's playing flag 0x00772912 cleared (@ 0x0042b2d8), the
     /// last value 0x006cd87c kept.
@@ -946,6 +958,7 @@ impl Engine {
         self.music.new_sound_playing = false;
     }
 
+    /// The effects volume byte 0x00495e73 (0..127).
     pub fn effects_volume(&self) -> u8 {
         self.ambient.effects_volume
     }
@@ -1421,7 +1434,11 @@ mod original_sound_tests {
             move |e| async move {
                 let d = e.read("WAV\\ATA0038B.APC").await.expect("ATA0038B.APC");
                 let header = apc_pcm(&d).unwrap().rate;
-                let played = voice_pcm(&d).unwrap().rate;
+                // What the line players hand to the mixer.
+                let played = crate::dialog::line_voice(&e, "WAV\\ATA0038B.APC")
+                    .await
+                    .unwrap()
+                    .rate;
                 *g2.borrow_mut() = Some((header, played));
             },
             |_, _| {},
@@ -1453,6 +1470,28 @@ mod original_sound_tests {
         );
         if ran {
             assert_eq!(*got.borrow(), Some((Some(0), 40, 40)));
+        }
+    }
+
+    /// The sound menu's OK sets a playing NewSound to the new effects
+    /// volume at once (FUN_0041d5f4 step 5, AIL_set_sample_volume on
+    /// 0x006ce110).
+    #[test]
+    fn sound_menu_ok_sets_a_playing_new_sound_volume() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "sound_menu_ok_sets_a_playing_new_sound_volume",
+            move |mut e| async move {
+                e.music.start_new_sound(pcm(30), 0x6e);
+                let v = e.music.timer.borrow().new_sound_voice.unwrap();
+                e.commit_sound_volumes([127, 110, 40, 110]);
+                *g2.borrow_mut() = e.sys.mixer.voice_volume(v).map(|x| x.0);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(mixer_volume(40)));
         }
     }
 

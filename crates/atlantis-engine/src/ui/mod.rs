@@ -462,13 +462,22 @@ impl Engine {
     }
 
     /// `FUN_0042bc58`: every guest record not hidden at (540 - 100 i,
-    /// portrait_y), when they are shown; then a moving portrait.
+    /// portrait_y), when they are shown (0x0049613c == 1) and no Escape
+    /// latch sets the menu request (0x00496138 == 0, tested by the function
+    /// itself for every caller: the turn, the video present, the warp
+    /// loop, the bar, the subject menu); then a moving portrait (the bar's
+    /// own drawing, not gated).
     pub(crate) fn draw_guests(&self, screen: &mut [u16], moving: Option<(usize, i32)>) {
         if !self.guests_shown {
             return;
         }
         let g = &self.guests;
-        for i in 0..g.count.min(Guests::SLOTS) {
+        let records = if self.escape_request {
+            0
+        } else {
+            g.count.min(Guests::SLOTS)
+        };
+        for i in 0..records {
             let s = g.sprite[i];
             if s != Guests::HIDDEN {
                 if let Some(spr) = self.ui.guests.get(usize::from(s)) {

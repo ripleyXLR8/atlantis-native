@@ -297,6 +297,16 @@ impl Engine {
             if self.bow_mode {
                 clicked = false;
             }
+            // A bar request a timer section of the previous pass left (a
+            // right press during its lines): the original's pass ends its
+            // inner loop on `0x004960c4 == 1` (FUN_0041bfa0, the
+            // `while (0x004960c4 != 1)` after the poll at 0x0041c5f2)
+            // before its head tests the click, opens the bar
+            // (FUN_0042c2c4) and clears the click flag 0x0049611c: the bar
+            // opens below and the click is lost.
+            if clicked && self.bar.request {
+                clicked = false;
+            }
 
             // The zone and the character under the pointer: a character
             // takes priority over the zone underneath it.
@@ -932,6 +942,82 @@ mod tests {
         );
         if ran {
             assert_eq!(at_click.get().unwrap() - pushed.get().unwrap(), 0);
+        }
+    }
+
+    struct RequestThenClick {
+        arm: Rc<Cell<u8>>,
+        clicked: Rc<Cell<bool>>,
+        bar: Rc<Cell<bool>>,
+    }
+
+    impl ScriptHooks for RequestThenClick {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            // A timer section whose line saw a right press: the request
+            // stays for the next pass.
+            if self.arm.get() == 1 {
+                e.bar.request = true;
+                self.arm.set(2);
+            }
+            ready(false)
+        }
+
+        fn zone_click<'a>(&'a mut self, _e: &'a mut Engine, _z: u32) -> HookFuture<'a, ()> {
+            self.clicked.set(true);
+            ready(())
+        }
+
+        fn bar_timers<'a>(&'a mut self, _e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.bar.set(true);
+            ready(false)
+        }
+    }
+
+    /// A bar request left by a timer section and a click in the next pass:
+    /// the original's inner loop ends on the request before its head reads
+    /// the click (FUN_0041bfa0, `while (0x004960c4 != 1)`), opens the bar
+    /// and clears the click flag 0x0049611c. The bar opens, the click is
+    /// lost.
+    #[test]
+    fn a_pending_bar_request_takes_the_click() {
+        let arm = Rc::new(Cell::new(0u8));
+        let clicked = Rc::new(Cell::new(false));
+        let bar = Rc::new(Cell::new(false));
+        let (a2, c2, b2) = (arm.clone(), clicked.clone(), bar.clone());
+        let (a3, c3, b3) = (arm.clone(), clicked.clone(), bar.clone());
+        let mut locked = 0u64;
+        let mut pressed = false;
+        let ran = with_engine(
+            "a_pending_bar_request_takes_the_click",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                let mut hooks = RequestThenClick {
+                    arm: a2,
+                    clicked: c2,
+                    bar: b2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _f| {
+                if b3.get() || c3.get() {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                if a3.get() == 2 && !pressed {
+                    pressed = true;
+                    button(sys, MouseButton::Left, true);
+                    return;
+                }
+                locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                if locked == 10 && a3.get() == 0 {
+                    a3.set(1);
+                }
+            },
+        );
+        if ran {
+            assert!(bar.get(), "the bar did not open");
+            assert!(!clicked.get(), "the click was handled");
         }
     }
 

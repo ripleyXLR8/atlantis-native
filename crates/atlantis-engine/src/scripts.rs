@@ -389,6 +389,8 @@ impl Scripts {
             self.exec_set(e, Some(offset), &cmd).await;
         }
         self.init_running = was;
+        // FUN_00425eb0 ends with FUN_00428da8 (@ 0x00425f4c), once.
+        after_item(e).await;
     }
 
     /// `FUN_0042a100`: a /set command, read from the CON text at `offset`
@@ -569,13 +571,11 @@ impl Scripts {
                     }
                     e.vars.set(key, 0);
                 }
-                // NewSound=N: the value is stored; the poller FUN_00432a64,
-                // run after every executed line (FUN_00428da8) and at the end
-                // of every frame (FUN_00432178), starts the sound.
-                "newsound" => {
-                    e.vars.set(key, value);
-                    e.poll_new_sound().await;
-                }
+                // NewSound=N: the value is stored and nothing more
+                // (FUN_0042a100); the poller FUN_00432a64, run after every
+                // executed item (FUN_00428da8, see `after_item`) and at the
+                // end of every frame (FUN_00432178), starts the sound.
+                "newsound" => e.vars.set(key, value),
                 // StopSound: the NewSound sample stops, whatever N but 0.
                 // FUN_0042b290 also clears the poller's playing flag
                 // 0x00772912 (@ 0x0042b2d8) but not the last value
@@ -656,6 +656,8 @@ impl Scripts {
                     if e.should_abort() || e.vars.get("gameover") != 0 {
                         break;
                     }
+                    // The executor's walk: FUN_00428da8 after the item.
+                    after_item(e).await;
                 }
             }
         }
@@ -1090,7 +1092,10 @@ impl Scripts {
                             break;
                         }
                         // A chapter change replaced the script: the walk ends.
+                        // The executor still ends that item with FUN_00428da8
+                        // (only GameOver breaks before it, 0x00428bf9..).
                         if self.chapter != entry_chapter {
+                            after_item(e).await;
                             break;
                         }
                     }
@@ -1140,10 +1145,12 @@ impl Scripts {
                             // clears the menu request (0x00428baf, 0x00428bc3).
                             e.escape_request = false;
                             i = con_escape_skip(&sec.items, i + 1, &mut line_idx);
+                            after_item(e).await;
                             continue;
                         }
                     }
                 }
+                after_item(e).await;
                 i += 1;
             }
 
@@ -1263,6 +1270,17 @@ fn gameover_value(cmd: &str) -> i32 {
 /// The end of a walk: the view goes back to the entry angles, except an
 /// axis whose ANGLEWARPX / ANGLEWARPY is non-zero: that one keeps the
 /// current angle and the variable is cleared (0x00428ccc..0x00428d68).
+/// `FUN_00428da8`, which the executor `FUN_0042844c` calls after every
+/// executed item, a /set or a line (@ 0x00428c45, after the GameOver test),
+/// and `FUN_00425eb0` once after the /INIT commands: it ends with the
+/// NewSound poller `FUN_00432a64` (decompilation of atlantis-cd-en-714240,
+/// FUN_00428da8's last call). So a sound that ended during a line is seen
+/// as done, NEWSOUND cleared, before the next item (a `Cinema=` among
+/// them) runs.
+async fn after_item(e: &mut Engine) {
+    e.poll_new_sound().await;
+}
+
 fn restore_entry(e: &mut Engine, walk: &mut Walk) {
     if e.vars.get("anglewarpx") != 0 {
         walk.entry.0 = e.warp.alpha();
@@ -1485,6 +1503,65 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
+    /// A NewSound that ends during a dialog line is seen as done before the
+    /// next item: the line players call FUN_00432178 every frame and the
+    /// executor FUN_00428da8 after every item, both ending with the poller
+    /// FUN_00432a64. So under the original's rules (`--original`, no
+    /// BugFix::CinemaSound) the following `Cinema=` starts its own sound
+    /// (CHAPI015 /190: Cinema=42, one line, Cinema=44).
+    #[test]
+    fn a_sound_that_ends_during_a_line_lets_the_next_cinematic_sound_start() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_sound_that_ends_during_a_line_lets_the_next_cinematic_sound_start",
+            move |mut e| async move {
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                let mut s = Scripts::with_dialog(Box::new(crate::dialog::Dialogs::new()));
+                e.new_game(&mut s, false).await;
+                assert!(e.game.big.contains("WAV\\ATA0190A.APC"));
+                assert!(e.game.big.contains("WAV\\CINEM044.APC"));
+                e.set_enhancements(crate::enhancements::Enhancements::original());
+                let script = crate::con_script::ConScript::parse(
+                    b"/190\r\n/sel(vue=1)\r\n[Meljanz,off] Grab him!\r\n/set(Cinema=44)\r\n/0\r\n",
+                );
+                let sec = script.sections()[0].clone();
+                // The /set commands are read from the script's text.
+                s.script = script;
+                // The first cinematic's sound, a tenth of a second long and
+                // playing as value 1.
+                let short = crate::audio::Pcm {
+                    rate: 22050,
+                    channels: 1,
+                    samples: std::sync::Arc::new(vec![0; 2205]),
+                };
+                e.music.start_new_sound(short, 0x6e);
+                e.music.new_sound_playing = true;
+                e.music.new_sound_last = 1;
+                e.vars.set("newsound", 1);
+                trace.borrow_mut().clear();
+                s.play_section(&mut e, sec, "sel", None).await;
+                let t = trace.borrow();
+                let voice = t.iter().any(
+                    |ev| matches!(ev, crate::engine::Event::Voice(n) if n.contains("ATA0190A")),
+                );
+                let started = t
+                    .iter()
+                    .any(|ev| matches!(ev, crate::engine::Event::NewSound(1, n) if n.contains("CINEM044")));
+                *g2.borrow_mut() = Some((voice, started));
+            },
+            |sys, _| {
+                // The mixer runs, so that the short sound and the voice end.
+                let mut out = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut out, 22050, 2);
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, true)));
+        }
+    }
+
     #[test]
     fn change_cd_clamps_the_disc() {
         let got: Vec<u8> = [1, 2, 3, 4, 5, 0, -1, 255, 257]
@@ -1598,6 +1675,8 @@ mod tests {
                 ];
                 for cmd in cmds {
                     s.exec_set(&mut e, None, &cmd).await;
+                    // The executor's FUN_00428da8 after the item.
+                    after_item(&mut e).await;
                     g2.borrow_mut()
                         .1
                         .push((e.music.new_sound_playing, e.music.new_sound_last));

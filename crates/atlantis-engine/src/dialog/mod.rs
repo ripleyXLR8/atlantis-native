@@ -642,11 +642,7 @@ impl Dialogs {
             e.music.duck(true, None);
         }
         let apc = format!("WAV\\ATA{:04}{}.APC", l.section, l.letter);
-        let pcm = if e.game.big.contains(&apc) {
-            e.read(&apc).await.and_then(|d| voice_pcm(&d))
-        } else {
-            None
-        };
+        let pcm = line_voice(e, &apc).await;
         match pcm {
             None => log::info!("no {apc}: line skipped"),
             Some(pcm) => {
@@ -693,6 +689,13 @@ impl Dialogs {
                         start_voice(e, &mut voice);
                     }
                     e.sys.frame().await;
+                    // FUN_00432178 once a frame in every line player (the
+                    // talking head @ 0x0042f5fc, FUN_00430258 @ 0x00430570,
+                    // FUN_004305e8 @ 0x0043080c, FUN_00430884 @ 0x00430b75):
+                    // the ambient sounds, then the NewSound poller, so a
+                    // sound that ends during a line is seen as done.
+                    e.ambient_frame();
+                    e.poll_new_sound().await;
                     let fi = poll_input(e);
                     // FUN_0041a298 in both line loops: a right press sets
                     // 0x00496120 and toggles the bar request; a left press
@@ -800,6 +803,10 @@ impl Dialogs {
             if e.should_abort() {
                 return None;
             }
+            // FUN_00425828's wait: FUN_00432178 (@ 0x004259b6), then the
+            // draw FUN_004261a0 and the poll FUN_0041a298.
+            e.ambient_frame();
+            e.poll_new_sound().await;
             {
                 // FUN_004261a0 steps the place sprites on every frame
                 // (FUN_00425304 @ 0x0042622b) before the panorama
@@ -828,10 +835,8 @@ impl Dialogs {
                 // FUN_004261a0 @ 0x00426393: FUN_0042bc58, the guests not
                 // hidden (FUN_00425828 hides all but the clicked one for a
                 // follower); none once an Escape set the menu request
-                // 0x00496138.
-                if !e.escape_request {
-                    e.draw_guests(&mut frame, None);
-                }
+                // 0x00496138 (draw_guests tests it).
+                e.draw_guests(&mut frame, None);
                 Self::draw_arrow(e, &mut frame);
                 e.sys.screen.borrow_mut().copy_from_slice(&frame);
             }
@@ -869,12 +874,7 @@ impl Dialogs {
         let voice = match narrator {
             Some((_, letter)) => {
                 let apc = format!("WAV\\{}", game_over_voice_name(req.section, *letter));
-                let pcm = if e.game.big.contains(&apc) {
-                    e.read(&apc).await.and_then(|d| voice_pcm(&d))
-                } else {
-                    None
-                };
-                pcm.map(|p| (p, apc))
+                line_voice(e, &apc).await.map(|p| (p, apc))
             }
             None => None,
         };
@@ -994,6 +994,17 @@ impl Dialogs {
         e.sys.frame().await;
         drain(e).await;
     }
+}
+
+/// The voice of a dialog line or of the narrator (`WAV\ATA....APC`), as
+/// the line players hand it to the voice sample: 22050 Hz whatever the
+/// file's header ([`voice_pcm`]); `None` when the file is missing or not
+/// an APC.
+pub(crate) async fn line_voice(e: &Engine, apc: &str) -> Option<crate::audio::Pcm> {
+    if !e.game.big.contains(apc) {
+        return None;
+    }
+    e.read(apc).await.and_then(|d| voice_pcm(&d))
 }
 
 /// The screen of an `off1` line (`FUN_00430884`; atlantis-cd-zh-tw-696832

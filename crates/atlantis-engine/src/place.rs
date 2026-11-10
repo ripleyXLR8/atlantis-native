@@ -338,9 +338,12 @@ impl Engine {
                 self.sys.hd_video.borrow_mut().t = 1.0;
             }
             self.turn_double_click.flag = false;
-            // The video puts 0x00496124 and the menu request back; without
-            // it (a double click) the port does the same, and does not take
-            // the original's place loop on with them cleared.
+            // FUN_00423ad8 resets the input flags after the video block
+            // whether the video played or not (a double click):
+            // 0x00496118, 0x0049611c, 0x00496120, 0x00496138 = 0,
+            // 0x00496124 = 1 and 0x004960c4 = 0 (decompilation of
+            // atlantis-cd-en-714240, FUN_00423ad8 after FUN_0041bc74), so
+            // the Escape latch ends here in both cases.
             self.escape_request = false;
         }
         // A sub-WAM swaps the area when (src, dst) crosses into another WAM

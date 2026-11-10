@@ -135,6 +135,8 @@ impl Engine {
         self.sys.mixer.set_master(scale(v[0]));
         self.music.with_fade(|f| f.vol = v[1]);
         self.ambient.effects_volume = v[2];
+        // The NewSound sample too (FUN_0041d5f4 step 5, FUN_0042de5c).
+        self.music.set_new_sound_volume(v[2]);
         self.voice_volume = scale(v[3]);
     }
 
