@@ -80,6 +80,23 @@ pub mod state {
     pub const CREDITS: i32 = 11;
 }
 
+/// Whether the menu frame of state `st` calls the page input FUN_00472320
+/// (FUN_00486eb0's jump table @ 0x00488fac: states 0, 5-8 and 11). The
+/// slides (1-4), the CD wait (9) and the player's start (10) do not, so a
+/// click made then stays latched in @ 0x006569c9 until a frame that reads
+/// it gives it to the widget under the pointer.
+fn reads_input(st: i32) -> bool {
+    matches!(
+        st,
+        state::IDLE
+            | state::ASK_SAVE
+            | state::ASK_ERASE
+            | state::ASK_QUIT
+            | state::LOAD_OR_SAVE
+            | state::CREDITS
+    )
+}
+
 /// The pages (`AtlMenu_start*` and their builders).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PageKind {
@@ -155,9 +172,13 @@ pub trait MenuHost {
     fn ticks(&self) -> u32;
     fn clock(&self) -> f64;
     /// The loop type becomes the menu's, the current one kept
-    /// (@ 0x006d16e0); `AtlMenu_stop` (@ 0x00489040) puts it back.
-    fn enter_menu_loop(&mut self);
-    fn leave_menu_loop(&mut self);
+    /// (@ 0x006d16e0); `AtlMenu_stop` (@ 0x00489040) puts it back. The
+    /// click byte @ 0x006569c9 is one for the game and the menus: the
+    /// game's pending click is handed to the menu on the way in (the
+    /// return value), and the menu's, when no frame took it (Escape
+    /// during a slide), back to the game on the way out (`click`).
+    fn enter_menu_loop(&mut self) -> bool;
+    fn leave_menu_loop(&mut self, click: bool);
     /// The current game screen (for the pages drawn over it).
     fn game_screen(&mut self) -> Vec<u16>;
     fn settings(&self) -> Settings;
@@ -501,7 +522,7 @@ impl Menu {
 
     fn start(&mut self, host: &mut dyn MenuHost, page: PageKind, enter_loop: bool) {
         if enter_loop {
-            host.enter_menu_loop();
+            self.input.click = host.enter_menu_loop();
         }
         let s = host.settings();
         self.values_from(host.fpu(), &s);
@@ -561,7 +582,7 @@ impl Menu {
     pub fn stop(&mut self, host: &mut dyn MenuHost) {
         if let Some(p) = self.page.take() {
             if p.kind != PageKind::PleaseWait {
-                host.leave_menu_loop();
+                host.leave_menu_loop(std::mem::take(&mut self.input.click));
             }
         }
         self.state = state::IDLE;
@@ -1265,9 +1286,30 @@ impl Menu {
             self.draw_with(out, ticks, t.as_mut());
             self.hd_texts = t;
         }
-        let act = self.action(host);
-        self.input.click = false;
+        let act = if reads_input(self.state) {
+            self.action(host)
+        } else {
+            0
+        };
         self.run(host, act);
+    }
+
+    /// A frame as [`Menu::frame`] without the draw, whose page input
+    /// (FUN_00472320) is `input` instead of the widgets' (a test hook: the
+    /// emulated golden `input_ui.txt`'s `latch` section models it), called
+    /// in the same states; true when it was called.
+    pub fn step_input(
+        &mut self,
+        host: &mut dyn MenuHost,
+        input: impl FnOnce(&mut Input) -> i32,
+    ) -> bool {
+        if self.page.is_none() {
+            return false;
+        }
+        let called = reads_input(self.state);
+        let act = if called { input(&mut self.input) } else { 0 };
+        self.run(host, act);
+        called
     }
 
     /// A frame of the state machine whose action is `act`, as if the
@@ -1309,7 +1351,10 @@ impl Menu {
         }
     }
 
-    /// FUN_00472320: the widgets asked in order.
+    /// FUN_00472320: the widgets asked in order; the click byte is cleared
+    /// when a widget answers or, with the byte set, when none does
+    /// (@ 0x0047236f, @ 0x00472360). The credits' part leaves it
+    /// (@ 0x00472378..0x004723b2).
     fn action(&mut self, host: &mut dyn MenuHost) -> i32 {
         let fpu = host.fpu();
         let input = &mut self.input;

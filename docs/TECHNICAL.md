@@ -3690,8 +3690,16 @@ back) into `yucatan-*.png`.
   when the mouse enters the box of an enabled widget, and a disabled
   widget still notes whether the mouse is in its box, so once enabled it
   keeps its count (FUN_0046d750, against the original run under
-  emulation, `tests/input_ui.rs`). Each frame the
-  widgets are asked in order and the first action wins; the state machine
+  emulation, `tests/input_ui.rs`). Each frame of the states that read
+  the input (the pages, the questions, the load / save choice, the
+  credits; not the slides, the CD wait or the player's start, FUN_00486eb0
+  @ 0x00488fac) the widgets are asked in order and the first action wins.
+  The click is the game's one click flag (@ 0x006569c9): a click made
+  during a slide stays set until the first frame that reads it, which
+  gives it to the widget under the pointer (a double click on the disc
+  opens the load page); Escape during a slide closes the menu with it
+  still set, and the next panorama frame takes it as a click on the world.
+  The state machine
   then slides the main page's panels (1 + 2 + ... pixels a frame: 30
   moves for the options and the disc, 40 for the sound, the state
   changing at the frame after the last move, as the original's; the disc

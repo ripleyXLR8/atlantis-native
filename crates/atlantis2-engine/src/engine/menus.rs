@@ -54,6 +54,12 @@ impl Engine {
         self.with_menu(|m, e| m.step_action(e, act));
     }
 
+    /// A menu frame whose page input is `input` (a test hook, see
+    /// [`Menu::step_input`]): true when the frame called it.
+    pub fn menu_step_input(&mut self, input: impl FnOnce(&mut crate::menu::Input) -> i32) -> bool {
+        self.with_menu(|m, e| m.step_input(e, input))
+    }
+
     /// The credits (`AtlMenu_start_Credits` @ 0x00486e00).
     pub fn open_credits(&mut self) {
         self.with_menu(|m, e| m.start_credits(e));
@@ -189,7 +195,7 @@ impl MenuHost for Engine {
         self.clock
     }
 
-    fn enter_menu_loop(&mut self) {
+    fn enter_menu_loop(&mut self) -> bool {
         if self.loop_type != LoopType::Menu {
             self.menu_prev_loop = self.loop_type;
         }
@@ -197,11 +203,14 @@ impl MenuHost for Engine {
         // menu code calls it): the menu frame runs no decay, and the
         // pointer's moves add to them ([`Engine::pointer_moved`]).
         self.set_loop_type(LoopType::Menu);
+        std::mem::take(&mut self.click)
     }
 
-    fn leave_menu_loop(&mut self) {
+    fn leave_menu_loop(&mut self, click: bool) {
         self.set_loop_type(self.menu_prev_loop);
-        self.click = false;
+        // A click no menu frame took (Escape during a slide) is the next
+        // warp frame's (FUN_0049ca80 tests @ 0x006569c9).
+        self.click = click;
     }
 
     fn game_screen(&mut self) -> Vec<u16> {
