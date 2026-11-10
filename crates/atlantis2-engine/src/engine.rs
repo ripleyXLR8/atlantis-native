@@ -2195,6 +2195,11 @@ impl Engine {
             if self.sprite_state != 0 {
                 self.cursor
                     .choose(0, self.sprite_state, &mut self.cursor_flag);
+            } else if self.web.hover(self.camera.fpu, &self.camera).is_some() {
+                // FUN_00491450 (@ 0x0045aa65): the centre on a spider's
+                // click quad (loaded, pickable; any puzzle mode) gives the
+                // character cursor, frames 25..39 (@ 0x0045aa6e).
+                self.cursor.choose(0x63, 2, &mut self.cursor_flag);
             } else if let Some(kind) = zone_kind {
                 self.cursor.choose(kind, 0, &mut self.cursor_flag);
             } else {

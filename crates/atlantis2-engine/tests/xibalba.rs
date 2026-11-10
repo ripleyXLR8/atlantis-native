@@ -895,6 +895,54 @@ fn the_web_is_played() {
     assert_eq!(e.puzzle_mode(), 1);
 }
 
+/// The cursor over a spider (FUN_0045a9f0 @ 0x0045aa65): with the
+/// screen's centre on a creature's click quad (FUN_00491450) the warp
+/// draw chooses the character cursor, `FUN_00474500(0x63, 2)`, frames
+/// 25..39 (`cursor_check.py`: range 25..40, frame 25), instead of the
+/// zone's; off the quads, a move zone's (frames 1..12).
+#[test]
+fn the_cursor_over_a_spider() {
+    let Some(files) = game() else { return };
+    let mut e = in_xibalba(files);
+    goto(&mut e, "toile.wam", 198, 38);
+    web_move(&mut e, 199);
+    // The creatures are loaded on the web's nodes (FUN_0048f9a0).
+    web_move(&mut e, 213);
+    let mut on = false;
+    for _ in 0..20 {
+        e.pass(None);
+        if !e.web.loaded || !e.web.pickable {
+            continue;
+        }
+        let (yaw, pitch) = atlantis2_engine::camera::zone_aim(e.camera.fpu, &e.web.quads[0]);
+        e.camera.enter(yaw, pitch);
+        e.pass(None);
+        if e.web.hit(e.camera.fpu, &e.camera) {
+            on = true;
+            break;
+        }
+    }
+    assert!(on, "the centre never on a spider's quad");
+    assert_eq!((e.cursor.start, e.cursor.end), (25, 40));
+    assert!(
+        matches!(e.cursor.shown, Some(25..=39)),
+        "{:?}",
+        e.cursor.shown
+    );
+    // Off the creatures, on a move zone: the zone's cursor.
+    let z = zone(&e, |z| z.kind == 1);
+    let (yaw, pitch) = e.zone_aim(213, z).unwrap();
+    for (y, p) in [(yaw, pitch), (yaw + 0.01, pitch), (yaw - 0.01, pitch)] {
+        e.camera.enter(y, p);
+        e.pass(None);
+        if e.centre_zone().map(|(i, _)| i) == Some(z) && !e.web.hit(e.camera.fpu, &e.camera) {
+            assert_eq!((e.cursor.start, e.cursor.end), (1, 13));
+            return;
+        }
+    }
+    panic!("no move zone off the creatures");
+}
+
 /// The dialog loop as the original's (`dialog_loop.txt`) on dialog 190
 /// (Tezcat's `voixoff0` lines between the hero's head lines) in view 123:
 /// under Tezcat's subtitles the panorama, not the hero's last head; Chac

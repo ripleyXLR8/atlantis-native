@@ -1193,8 +1193,9 @@ impl Web {
 
     /// FUN_00491450: the zone under the screen's centre, 0 the first
     /// spider's, 1 the second's (stages 2 and 4 with the second spider
-    /// out). Its caller stores it in @ 0x006d85e0, which nothing reads
-    /// before the next frame overwrites it.
+    /// out). The tick's call stores it in @ 0x006d85e0, which nothing
+    /// reads before the next frame overwrites it; the warp draw's
+    /// (@ 0x0045aa65) chooses the character cursor on it.
     pub fn hover(&self, k: Fpu, cam: &Camera) -> Option<usize> {
         if !(self.loaded && self.pickable) {
             return None;

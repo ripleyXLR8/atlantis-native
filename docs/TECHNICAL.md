@@ -1779,7 +1779,8 @@ back) into `yucatan-*.png`.
   half(half(dst))`; `Engine::spr_dll` chooses `spr_p5.dll`'s) at the
   screen centre: 1..12 over a move zone, 25..39 over
   another zone (none from type 1000 on), 13..24 or 25..39 over a
-  clickable object or character, one frame on per tick, chosen after the
+  clickable object or character, 25..39 over a creature of the spider's
+  web, one frame on per tick, chosen after the
   frame is drawn so it shows on the next one. The object in hand (its
   sprite in the world's objects bank, `spr\objtibet.spr` for Tibet) is
   drawn under the cursor; right after a take the cursor itself shows the
@@ -2637,7 +2638,9 @@ back) into `yucatan-*.png`.
   blow (film 48, four steps held); a click on a spider (its quads around
   it, @ 0x00491e40, picked at the screen's centre @ 0x00458fe0, before
   the zone's own click @ 0x0049caf2) asks about it (dialogs 187-189) or,
-  with the sword, strikes it. No randomness. The creatures are drawn over
+  with the sword, strikes it; with the centre on those quads the cursor
+  is the character cursor, frames 25..39, instead of the zone's (the
+  warp draw's FUN_00491450 @ 0x0045aa65). No randomness. The creatures are drawn over
   the cube, under the cursor and the marker, by `atl3d/warp.rs`: the scene's
   objects posed by their tracks at the model's frame, the pipeline with
   the warp camera (76°, near 1.5) and the Pentium II's rasteriser, the
