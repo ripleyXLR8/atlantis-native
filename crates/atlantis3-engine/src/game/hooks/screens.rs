@@ -7,8 +7,8 @@
 //! handler returning 0 makes the main loop call the mode's `Stop`
 //! ([`Game::stop_screen`]).
 //!
-//! The two maps, the jewel case, the game boy, the remote and the
-//! unicorn's 3D board ([`crate::licorne`]) are drawn ([`crate::maps`],
+//! The two maps, the jewel case, the game boy, the remote, the skull and
+//! the unicorn's 3D board ([`crate::licorne`]) are drawn ([`crate::maps`],
 //! `screens_draw`); every hit test is the bank's own (`SPR_COLLISION`)
 //! at the pointer.
 //!
@@ -67,9 +67,12 @@ pub struct State {
     pub tour_board: Option<Arc<Bank>>,
     pub tour_pawns: Option<Arc<Bank>>,
     pub tour_anim: maps::TourAnim,
-    /// `TELECOMMANDE`'s bank `Telecommande.spr` (@ 0x00789710), opened
-    /// again by every WAM load (@ 0x004c3799 → @ 0x004d0c30).
+    /// `TELECOMMANDE`'s bank `Telecommande.spr` (@ 0x00789710) and
+    /// `CRANEBAGDAD`'s `GrandCrane.spr` (@ 0x0074ebf0), opened again by
+    /// every WAM load (@ 0x004c3794 → @ 0x00409d80, @ 0x004c3799 →
+    /// @ 0x004d0c30).
     pub tele_bank: Option<Arc<Bank>>,
+    pub crane_bank: Option<Arc<Bank>>,
     /// The remote's hover animation (@ 0x004d0040), by button in the
     /// loop's order ([`TELE_BUTTONS`]: power, Bagdad, Paleo, home): the
     /// hovered bytes (@ 0x0078972e, 0x0078972d, 0x0078972c, 0x0078972f),
@@ -229,14 +232,14 @@ pub(super) fn start(h: &mut Hx, screen: Screen) {
             h.g.puzzles.screens.licorne = board.map(Box::new);
             h.g.pointer = maps::centre(w, ht);
         }
-        // @ 0x004cfee0 (0x0071f0e8 := 0, read by nobody): the pointer
-        // centred (@ 0x00431780), the cursor `Interface.spr` #40
-        // (@ 0x00427f80).
-        Screen::Telecommande => {
+        // @ 0x00409a40 and @ 0x004cfee0 (0x0071f0e8 := 0, read by
+        // nobody): the pointer centred (@ 0x00431780); the remote's
+        // cursor is `Interface.spr` #40 (@ 0x00427f80), the skull's is
+        // reset (@ 0x004282e0), so no pointer is drawn there.
+        Screen::CraneBagdad | Screen::Telecommande => {
             h.g.pointer = maps::centre(h.g.width, h.g.height);
         }
-        // @ 0x00431da0, 0x00409a40: nothing the script sees besides the
-        // common part.
+        // @ 0x00431da0: nothing the script sees besides the common part.
         _ => {}
     }
 }
@@ -516,10 +519,12 @@ fn hide_worlds(h: &mut Hx) {
     h.run("(HideObjet=CMP_PALEOFIN)");
 }
 
-/// `CRANEBAGDAD`, a crystal skull (@ 0x00409b40): a left click goes to
-/// the interdimension (as @ 0x00409cc0, with `flag901` := 1 before the
+/// `CRANEBAGDAD`, a crystal skull (@ 0x00409b40): drawn
+/// ([`Game::crane_draw`]) and flipped; a left click goes to the
+/// interdimension (as @ 0x00409cc0, with `flag901` := 1 before the
 /// commands) and leaves; a right click leaves.
 fn crane(h: &mut Hx, left: bool, right: bool) -> bool {
+    h.g.crane_draw();
     // The flip (@ 0x00409bbb), before the clicks.
     h.g.flip_texts();
     if left {

@@ -415,6 +415,9 @@ impl Game {
         if self.puzzles.screens.carte_bank.is_some() {
             self.carte_reload_banks();
         }
+        if self.puzzles.screens.crane_bank.is_some() {
+            self.crane_reload_banks();
+        }
         if self.puzzles.screens.tele_bank.is_some() {
             self.tele_reload_banks();
         }

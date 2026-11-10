@@ -3685,7 +3685,9 @@ impl Host for Game {
                 if name.eq_ignore_ascii_case("tourmagi.wam") {
                     self.gboy_reload_banks();
                 }
-                // Every WAM's: the remote's (@ 0x004c3799).
+                // Every WAM's: the skull's and the remote's (@ 0x004c3794,
+                // @ 0x004c3799).
+                self.crane_reload_banks();
                 self.tele_reload_banks();
                 true
             }

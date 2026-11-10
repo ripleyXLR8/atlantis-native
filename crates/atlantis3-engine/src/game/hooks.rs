@@ -452,9 +452,9 @@ impl Game {
     }
 
     /// The running screen's frame ([`screens`]). The two maps, the jewel
-    /// case, the game boy, the unicorn and the remote draw themselves in
-    /// their handlers and test their sprites at the pointer; the skull's
-    /// drawing is M4.
+    /// case, the game boy, the unicorn, the remote and the skull draw
+    /// themselves in their handlers and test their sprites at the
+    /// pointer.
     pub(super) fn screen_frame(&mut self) {
         if !matches!(
             self.puzzles.screen,
@@ -465,6 +465,7 @@ impl Game {
                     | Screen::GBoy
                     | Screen::Licorne
                     | Screen::Telecommande
+                    | Screen::CraneBagdad
             )
         ) {
             self.draw_warp_only();

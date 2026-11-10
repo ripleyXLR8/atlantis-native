@@ -1,7 +1,7 @@
-//! The late Hoggar's remote control (`TELECOMMANDE`, loop mode 18)
-//! against the original's C code under emulation
-//! (`tests/golden/puzzle_telecommande.txt`, which also holds the skull's
-//! runs, `CRANEBAGDAD`, loop mode 15). First each button's hit test on an
+//! The late Hoggar's two full-screen modes against the original's C code
+//! under emulation (`tests/golden/puzzle_telecommande.txt`): the remote
+//! control (`TELECOMMANDE`, loop mode 18) and the skull
+//! (`CRANEBAGDAD`, loop mode 15). First each button's hit test on an
 //! 8-pixel grid, then per frame the sprite calls, the screen's md5, the
 //! commands and the state (the hover bytes and frames, flags 400..404,
 //! 425, 427, the loop mode), all with the pointer at real positions: the
@@ -82,6 +82,13 @@ fn the_remote_buttons_hit_as_the_original() {
 #[test]
 fn the_remote_as_the_original() {
     replay(&["hoggar", "ends", "home"]);
+}
+
+/// The skull's runs: drawn full screen without a pointer, a right click
+/// leaves; a left click travels to the interdimension.
+#[test]
+fn the_skull_as_the_original() {
+    replay(&["crane", "crane_travel"]);
 }
 
 /// Each run: the place loaded and its view entered, the flags the run

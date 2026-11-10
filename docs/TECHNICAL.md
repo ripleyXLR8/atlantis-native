@@ -4024,6 +4024,11 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   hit test's answer instead of clicking. They now place the pointer on
   the original's hit points and click, for the remote, the jewel case
   and the Land of the Dead's map alike.
+- The skull screen (loop mode 15, @ 0x00409b40) draws the skull:
+  `GrandCrane.spr` #0 at the screen's centre over the panorama, opened
+  again by every WAM load (@ 0x00409d80), and no pointer (its start
+  resets the cursor); 0.6.0 showed the panorama with a pointer
+  (`tests/board_remote.rs`).
 
 ## Tests
 

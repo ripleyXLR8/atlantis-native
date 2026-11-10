@@ -293,6 +293,12 @@ impl Game {
         self.tr_flip();
     }
 
+    /// `GrandCrane.spr` (@ 0x00409d80), opened again by every WAM load
+    /// (@ 0x004c3794).
+    pub(crate) fn crane_reload_banks(&mut self) {
+        self.puzzles.screens.crane_bank = self.screen_bank("GrandCrane.spr");
+    }
+
     /// `PuzzleTelecommande_ReloadSprBank` (@ 0x004d0c30), run by every WAM
     /// load (@ 0x004c3799): `Telecommande.spr` (its `Interface.spr`, the
     /// cursor's bank, is the game's).
@@ -328,6 +334,19 @@ impl Game {
             let (px, py) = self.pointer;
             self.draw_spr("spr\\Interface.spr", &i, 40, Some(px), py, 1.0);
             self.interface = Some(i);
+        }
+        self.tr_flip();
+    }
+
+    /// `CRANEBAGDAD`'s drawing (@ 0x00409b6a..0x00409bbb): the warp frame,
+    /// `GrandCrane.spr` #0 (@ 0x0074ec0c, 0 every frame) at the screen's
+    /// centre at alpha 1.0 (@ 0x0074ec08), no pointer (the start reset
+    /// the cursor), the flip.
+    pub(crate) fn crane_draw(&mut self) {
+        self.draw_warp_only();
+        let (cx, cy) = (self.width as i32 / 2, self.height as i32 / 2);
+        if let Some(bank) = self.puzzles.screens.crane_bank.clone() {
+            self.draw_spr("spr\\GrandCrane.spr", &bank, 0, Some(cx), cy, 1.0);
         }
         self.tr_flip();
     }
