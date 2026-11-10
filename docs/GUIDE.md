@@ -712,9 +712,6 @@ player, and Load lists the newest first.
   glyphs' antialiased pixels are Atlantis Native's own, not Windows'
   (GDI's grey levels are not reproduced), in 16 bits and in 32 bits
   alike.
-- Closing the in-game menu with its Back button: the same click may also
-  act in the view behind it (in a test it started a move to the next
-  view). Whether the original does the same has not been checked.
 - At the end of a script's wait the port shows the frame after the
   call that ends the wait, where the original shows it before; no
   difference on screen has been seen from it.

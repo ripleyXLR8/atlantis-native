@@ -1,0 +1,65 @@
+# A click on the in-game menu's BT_BACK and the first warp frames after it, in the original Game.exe (GOG.com, md5
+# eb06eaa718877dfcabee6e8f89d85b31) with spr_p6.dll under emulation, 800 x 600 RGB565: hoggar.wam view 4 entered at
+# yaw 108, pitch 0 by the game's own view entry 0x0043f840 (the centre on the type-1 zone to view 5); the warp frame
+# task 0x0043ff20, the keyboard callback 0x0042ab20 (Escape), the menu frame 0x004591a0 (page 1 0x004543e0) and the
+# mouse button callbacks 0x00431580 (down) / 0x004316e0 (up) run whole. Cases: control (a press in the warp: the
+# move starts), back (down, a menu frame, up, a menu frame: BT_BACK), back_one (down and up before one menu frame).
+# Lines: CASE STEP b8= (click byte 0x007592b8) ba= (held 0x007592ba) bb= (double click 0x007592bb) mode= page=
+# calls=... (in order, with b8 / ba on entry); CASE STEP zone=TYPE/VALUE (under the centre) next= (next view)
+# pending= recal= (0x00756080: a turn running, the move started) vue=. Derived values only.
+pick yaw=108 zone type=1 value=5
+control warp0 b8=0 ba=0 bb=0 mode=3 page=0 calls=zone_click(b8=0,ba=0)
+control warp0 zone=1/5 next=0 pending=0 recal=0 vue=4
+control down b8=1 ba=1 bb=0 mode=3 page=0 calls=-
+control down zone=1/5 next=0 pending=0 recal=0 vue=4
+control warp1 b8=0 ba=1 bb=0 mode=3 page=0 calls=zone_click(b8=1,ba=1),departure_scan,move(b8=1,ba=1),init_recalage(b8=1,ba=1),CtrlScenarIN
+control warp1 zone=1/5 next=5 pending=0 recal=1 vue=4
+control warp2 b8=0 ba=1 bb=0 mode=3 page=0 calls=-
+control warp2 zone=1/5 next=5 pending=0 recal=1 vue=4
+control warp3 b8=0 ba=1 bb=0 mode=3 page=0 calls=-
+control warp3 zone=1/5 next=5 pending=0 recal=1 vue=4
+back warp0 b8=0 ba=0 bb=0 mode=3 page=0 calls=zone_click(b8=0,ba=0)
+back warp0 zone=1/5 next=0 pending=0 recal=0 vue=4
+back escape b8=0 ba=0 bb=0 mode=6 page=1 calls=-
+back escape zone=1/5 next=0 pending=0 recal=0 vue=4
+pointer BT_BACK 750 570
+back menu_hover0 b8=0 ba=0 bb=0 mode=6 page=1 calls=clear_flags(b8=0,ba=0)
+back menu_hover0 zone=1/5 next=0 pending=0 recal=0 vue=4
+back menu_hover1 b8=0 ba=0 bb=0 mode=6 page=1 calls=clear_flags(b8=0,ba=0)
+back menu_hover1 zone=1/5 next=0 pending=0 recal=0 vue=4
+back down b8=1 ba=1 bb=0 mode=6 page=1 calls=-
+back down zone=1/5 next=0 pending=0 recal=0 vue=4
+back menu_held b8=0 ba=0 bb=0 mode=6 page=1 calls=clear_flags(b8=1,ba=1)
+back menu_held zone=1/5 next=0 pending=0 recal=0 vue=4
+back up b8=1 ba=0 bb=0 mode=6 page=1 calls=-
+back up zone=1/5 next=0 pending=0 recal=0 vue=4
+back menu_release b8=0 ba=0 bb=0 mode=3 page=1 calls=cfg_writer(b8=1,ba=0),write_file,write_file,write_file,write_file,clear_flags(b8=1,ba=0),back_to_game(b8=0,ba=0),clear_flags(b8=0,ba=0),reentry(b8=0,ba=0)
+back menu_release zone=1/5 next=0 pending=0 recal=0 vue=4
+back warp1 b8=0 ba=0 bb=0 mode=3 page=1 calls=zone_click(b8=0,ba=0)
+back warp1 zone=1/5 next=0 pending=0 recal=0 vue=4
+back warp2 b8=0 ba=0 bb=0 mode=3 page=1 calls=zone_click(b8=0,ba=0)
+back warp2 zone=1/5 next=0 pending=0 recal=0 vue=4
+back warp3 b8=0 ba=0 bb=0 mode=3 page=1 calls=zone_click(b8=0,ba=0)
+back warp3 zone=1/5 next=0 pending=0 recal=0 vue=4
+back warp4 b8=0 ba=0 bb=0 mode=3 page=1 calls=zone_click(b8=0,ba=0)
+back warp4 zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one warp0 b8=0 ba=0 bb=0 mode=3 page=0 calls=zone_click(b8=0,ba=0)
+back_one warp0 zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one escape b8=0 ba=0 bb=0 mode=6 page=1 calls=-
+back_one escape zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one menu_hover0 b8=0 ba=0 bb=0 mode=6 page=1 calls=clear_flags(b8=0,ba=0)
+back_one menu_hover0 zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one menu_hover1 b8=0 ba=0 bb=0 mode=6 page=1 calls=clear_flags(b8=0,ba=0)
+back_one menu_hover1 zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one down_up b8=1 ba=0 bb=0 mode=6 page=1 calls=-
+back_one down_up zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one menu_release b8=0 ba=0 bb=0 mode=3 page=1 calls=cfg_writer(b8=1,ba=0),write_file,write_file,write_file,write_file,clear_flags(b8=1,ba=0),back_to_game(b8=0,ba=0),clear_flags(b8=0,ba=0),reentry(b8=0,ba=0)
+back_one menu_release zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one warp1 b8=0 ba=0 bb=0 mode=3 page=1 calls=zone_click(b8=0,ba=0)
+back_one warp1 zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one warp2 b8=0 ba=0 bb=0 mode=3 page=1 calls=zone_click(b8=0,ba=0)
+back_one warp2 zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one warp3 b8=0 ba=0 bb=0 mode=3 page=1 calls=zone_click(b8=0,ba=0)
+back_one warp3 zone=1/5 next=0 pending=0 recal=0 vue=4
+back_one warp4 b8=0 ba=0 bb=0 mode=3 page=1 calls=zone_click(b8=0,ba=0)
+back_one warp4 zone=1/5 next=0 pending=0 recal=0 vue=4
