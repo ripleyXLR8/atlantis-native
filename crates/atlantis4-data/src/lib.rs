@@ -14,6 +14,7 @@
 //! - [`anim`]: `anim.anim`, a package's cube cells and click meshes;
 //! - [`xml`]: the TinyXML-like reader of the rootless Windows-1252 XML;
 //! - [`scene`]: a scene's description (objects, animations, exits);
+//! - [`lua`]: the script inventory and loader (no interpreter yet);
 //! - [`testing`]: what a game-data test does when its data is missing.
 
 #![forbid(unsafe_code)]
@@ -21,6 +22,7 @@
 pub mod anim;
 pub mod exe;
 pub mod files;
+pub mod lua;
 pub mod scene;
 pub mod testing;
 pub mod wpa;

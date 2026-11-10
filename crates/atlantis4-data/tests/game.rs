@@ -256,3 +256,79 @@ fn every_scene_description_reads() {
         .collect();
     assert_eq!(fps, [(0.0, 70), (15.0, 1_410)]);
 }
+
+/// Every script: source text, its kind, the callbacks the scenes define,
+/// and the boot variables.
+#[test]
+fn every_script_is_source_of_a_known_kind() {
+    use atlantis4_data::lua::{self, ScriptKind};
+    use atlantis4_data::WarpPath;
+    use std::collections::BTreeMap;
+
+    let Some(dir) = install() else { return };
+    let src = atlantis_data::StdDir::new(&dir);
+    let read = |n: &str| atlantis_data::FileSource::read(&src, n).unwrap();
+    let names = files_with(&dir, "lua");
+    let mut kinds = BTreeMap::<ScriptKind, usize>::new();
+    let mut defined = BTreeMap::<String, usize>::new();
+    let mut bytes = 0;
+    let mut boot = BTreeMap::<String, String>::new();
+    for name in &names {
+        let s = read(name);
+        bytes += s.len();
+        assert!(!lua::is_bytecode(&s), "{name}");
+        let k = lua::kind(name, &s);
+        *kinds.entry(k).or_default() += 1;
+        if k == ScriptKind::Scene {
+            for f in lua::functions_defined(&s) {
+                if f.starts_with("On") {
+                    *defined.entry(f).or_default() += 1;
+                }
+            }
+        }
+        if k == ScriptKind::Boot {
+            boot.extend(lua::string_assignments(&s));
+        }
+    }
+    assert_eq!((names.len(), bytes), (504, 715_750));
+    let kinds: Vec<_> = kinds.into_iter().collect();
+    assert_eq!(
+        kinds,
+        [
+            (ScriptKind::Scene, 398),
+            (ScriptKind::GameEnter, 1),
+            (ScriptKind::Boot, 4),
+            (ScriptKind::Version, 3),
+            (ScriptKind::Layout, 96),
+            (ScriptKind::Other, 2),
+        ]
+    );
+    let defined: Vec<(&str, usize)> = defined.iter().map(|(k, n)| (k.as_str(), *n)).collect();
+    assert_eq!(
+        defined,
+        [
+            ("OnAnimationFinished", 46),
+            ("OnAnswered", 38),
+            ("OnDialogClosed", 37),
+            ("OnDialogFinished", 58),
+            ("OnDocumentClosed", 1),
+            ("OnMovieFinished", 78),
+            ("OnSoundStopped", 1),
+            ("OnWarpEnter", 398),
+            ("OnWarpLeave", 398),
+            ("OnWarpObjectHit", 398),
+        ]
+    );
+    let keys: Vec<&str> = boot.keys().map(String::as_str).collect();
+    assert_eq!(
+        keys,
+        [
+            "applicationTitle",
+            "backupPathTemplate",
+            "firstWarpPath",
+            "versionString"
+        ]
+    );
+    let first = WarpPath::parse(&boot["firstWarpPath"]).unwrap();
+    assert!(atlantis_data::FileSource::size(&src, &first.xml()).is_some());
+}
