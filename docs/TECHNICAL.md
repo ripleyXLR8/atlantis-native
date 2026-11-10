@@ -1190,8 +1190,11 @@ walks to the next view as the original does (the turn, the transition
 video, the arrival), and the scans of the warp frame run the scripts: the
 first click sends the game to chapter 75, the first arrival in view 7
 plays the shaman's greeting (dialog 360) and the section goes on after
-it. A left click ends a film and goes to a dialog's next line; Escape ends
-a dialog, and in the panorama opens the main menu (options, volumes,
+it. A left click ends a film and goes to a dialog's next line (at the
+dialog's next tick); Escape ends a dialog at once, and a click no tick
+has taken yet is then the next panorama frame's, a click on the world,
+as the original's one click flag (@ 0x006569c9) leaves it; in the
+panorama Escape opens the main menu (options, volumes,
 load and save, quit; below); the right button opens and closes the bag
 bar; a left click on a character with subjects opens the menu of the
 subjects to ask him about (below). The mandalas are laid in the shaman's
