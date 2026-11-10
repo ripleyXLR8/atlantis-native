@@ -513,11 +513,8 @@ fn every_jpeg_decodes() {
 }
 
 /// The JPEGs decode to libjpeg-turbo's pixels (`JDCT_ISLOW`, fancy
-/// upsampling, the original's settings). Not met yet: the `jpeg-decoder`
-/// crate's inverse DCT differs; the exact decoder comes with the first
-/// scene on screen.
+/// upsampling, the original's settings).
 #[test]
-#[ignore = "needs a JPEG decoder exact to libjpeg's JDCT_ISLOW"]
 fn every_jpeg_decodes_to_libjpeg_turbo_pixels() {
     let Some(dir) = install() else { return };
     let [files, packages] = decode_every_jpeg(&dir);

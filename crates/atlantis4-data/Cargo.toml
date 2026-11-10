@@ -10,7 +10,6 @@ license.workspace = true
 [dependencies]
 atlantis-data = { path = "../atlantis-data" }
 encoding_rs = "0.8"
-jpeg-decoder = { version = "0.3", default-features = false }
 lewton = "0.10"
 md-5 = "0.10"
 miniz_oxide = "0.8"

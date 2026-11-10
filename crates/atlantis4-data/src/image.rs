@@ -7,18 +7,18 @@
 //!
 //! - **PNG** with the `png` crate, palette and low bit depths expanded to 8
 //!   bits per channel. Lossless: the pixels equal libpng's.
-//! - **JPEG** with the `jpeg-decoder` crate. Every JPEG of the data is
-//!   baseline, colour 4:2:0 (11,589) or 4:4:4 (2), or grey (345 alpha
-//!   masks). The original decodes with libjpeg's defaults: `TeJpeg`'s
-//!   decoder (atlantis4-gog-en-2363910 @ 0x004b1a60) does not change the
+//! - **JPEG** with [`crate::jpeg`], this crate's decoder. Every JPEG of
+//!   the data is baseline with one scan, colour 4:2:0 (11,589) or 4:4:4
+//!   (2, one with restart markers), or grey (345 alpha masks). The
+//!   original decodes with libjpeg's defaults: `TeJpeg`'s decoder
+//!   (atlantis4-gog-en-2363910 @ 0x004b1a60) does not change the
 //!   decompression parameters libjpeg's `jpeg_read_header` sets
 //!   (@ 0x00444c00: `dct_method` = 0, `JDCT_ISLOW`, @ 0x00444d93;
-//!   `do_fancy_upsampling` = 1 @ 0x00444da5). `jpeg-decoder`'s inverse DCT
-//!   and upsampling are not libjpeg's: its pixels differ from libjpeg-turbo's
-//!   (`JDCT_ISLOW`, fancy upsampling) by at most 4 per channel, on about 6 %
-//!   of the bytes of a sample of 346 of the game's JPEGs. A decoder exact to
-//!   libjpeg's is the work of the first scene on screen; until then
-//!   [`decode_jpeg`] is right in size and channels only.
+//!   `do_fancy_upsampling` = 1 @ 0x00444da5). [`crate::jpeg`] does the same
+//!   integer IDCT, triangle upsampling and colour tables: its pixels equal
+//!   libjpeg-turbo's on all 11,936 JPEGs. (The `jpeg-decoder` crate,
+//!   used before, differed by up to 4 per channel on about 6 % of the
+//!   bytes.)
 //! - **TGA** here (types 2 and 10, 24 or 32 bits), as libpng has no part in
 //!   it; the two files of the data are type 10, 32 bits, 32 × 32.
 
@@ -44,23 +44,15 @@ impl std::fmt::Display for ImageError {
 
 impl std::error::Error for ImageError {}
 
-/// A baseline JPEG (see the module's note on exactness).
+/// A sequential JPEG, decoded as the original's libjpeg does (see the
+/// module's note).
 pub fn decode_jpeg(data: &[u8]) -> Result<Image, ImageError> {
-    let mut d = jpeg_decoder::Decoder::new(data);
-    let pixels = d.decode().map_err(|e| ImageError(format!("JPEG: {e}")))?;
-    let info = d
-        .info()
-        .ok_or_else(|| ImageError("JPEG: no header".into()))?;
-    let channels = match info.pixel_format {
-        jpeg_decoder::PixelFormat::L8 => 1,
-        jpeg_decoder::PixelFormat::RGB24 => 3,
-        other => return Err(ImageError(format!("JPEG: pixel format {other:?}"))),
-    };
+    let d = crate::jpeg::decode(data).map_err(|e| ImageError(e.0))?;
     Ok(Image {
-        width: u32::from(info.width),
-        height: u32::from(info.height),
-        channels,
-        pixels,
+        width: d.width,
+        height: d.height,
+        channels: d.channels,
+        pixels: d.pixels,
     })
 }
 

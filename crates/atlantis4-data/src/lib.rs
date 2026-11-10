@@ -18,6 +18,7 @@
 //! - [`texts`]: the dialog lines, object and document names, combinations;
 //! - [`font`]: the `TESF` fonts' metrics;
 //! - [`image`]: JPEG, PNG and TGA pictures;
+//! - [`jpeg`]: the JPEG decoder exact to libjpeg's defaults;
 //! - [`ogg`]: Ogg pages and the Vorbis, Theora and Skeleton headers;
 //! - [`audio`]: Vorbis decoding and WAVE headers;
 //! - [`testing`]: what a game-data test does when its data is missing.
@@ -30,6 +31,7 @@ pub mod exe;
 pub mod files;
 pub mod font;
 pub mod image;
+pub mod jpeg;
 pub mod lua;
 pub mod ogg;
 pub mod scene;
