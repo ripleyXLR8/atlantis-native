@@ -550,7 +550,8 @@ impl LuaState {
         let mut gc = Gc::new();
 
         // Allocate global and registry tables.
-        let global = gc.alloc_table(Table::new());
+        // lstate.c f_luaopen: luaH_new(L, 0, 2) for the globals.
+        let global = gc.alloc_table(Table::with_sizes(0, 2));
         let registry = gc.alloc_table(Table::new());
 
         // Initialize value stack: BASIC_STACK_SIZE slots, all nil.

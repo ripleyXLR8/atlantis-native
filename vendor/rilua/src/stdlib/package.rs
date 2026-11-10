@@ -1259,13 +1259,17 @@ pub fn open_package_lib(state: &mut LuaState) -> LuaResult<()> {
     set_field(state, pkg_table, "preload", Val::Table(preload_table))?;
 
     // Register `require` and `module` as globals with pkg_table upvalue.
-    register_global_fn_with_upvalues(state, "require", ll_require, vec![pkg_val])?;
-    register_global_fn_with_upvalues(state, "module", ll_module, vec![pkg_val])?;
-
-    // Register package as global.
     super::register_global_val(state, "package", pkg_val)?;
+    register_global_fn_with_upvalues(state, "module", ll_module, vec![pkg_val])?;
+    register_global_fn_with_upvalues(state, "require", ll_require, vec![pkg_val])?;
 
     // Pre-populate package.loaded with already-opened libraries.
+    fill_loaded(state, loaded_table)
+}
+
+/// Stores the standard library tables found as globals in `loaded`
+/// (`package.loaded`).
+fn fill_loaded(state: &mut LuaState, loaded_table: GcRef<Table>) -> LuaResult<()> {
     // Look up known library globals and store them.
     let lib_names = [
         "string",
@@ -1296,4 +1300,20 @@ pub fn open_package_lib(state: &mut LuaState) -> LuaResult<()> {
     }
 
     Ok(())
+}
+
+/// Adds the libraries opened after `package` to `package.loaded`.
+///
+/// PUC-Rio's `luaL_register` stores every library in `_LOADED` as it
+/// opens it; here `package` is opened in `linit.c`'s order (second), so
+/// the libraries that follow are added once all are open.
+pub(crate) fn refresh_loaded(state: &mut LuaState) -> LuaResult<()> {
+    let global = state.global;
+    let Val::Table(pkg_table) = get_field(state, global, "package") else {
+        return Ok(());
+    };
+    let Val::Table(loaded_table) = get_field(state, pkg_table, "loaded") else {
+        return Ok(());
+    };
+    fill_loaded(state, loaded_table)
 }

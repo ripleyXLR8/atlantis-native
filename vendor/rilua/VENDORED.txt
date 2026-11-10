@@ -32,3 +32,11 @@ PATCHES
    once the old key's string had been collected, so a global set to nil
    and a later new global (ChangeWarp's callback resets) ended in another
    order.
+
+3. src/vm/state.rs, src/stdlib/mod.rs, src/stdlib/package.rs: the
+   globals table is created with `luaH_new(L, 0, 2)` and the libraries are
+   opened in Lua 5.1.4's `linit.c` order, each registering its globals in
+   PUC-Rio's order (`_G`, `base_funcs`, `_VERSION`, `ipairs`, `pairs`,
+   `newproxy`; `package`, `module`, `require`); `package.loaded` receives
+   the libraries opened after `package` at the end. A fresh `pairs(_G)`
+   then walks in Lua 5.1.4's order.

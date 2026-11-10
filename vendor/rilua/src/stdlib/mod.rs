@@ -103,37 +103,41 @@ pub fn open_libs(state: &mut LuaState) -> LuaResult<()> {
 
 /// Registers selected standard libraries into the global table.
 ///
-/// Only loads libraries whose flags are set in `libs`. The package library
-/// is always loaded last (when requested) because it populates
-/// `package.loaded` with the other library tables.
+/// Only loads libraries whose flags are set in `libs`, in PUC-Rio 5.1.4's
+/// `linit.c` order: base (with coroutine), package, table, io, os, string,
+/// math, debug. The order the globals are inserted in is the order `next`
+/// walks the globals table in. `package.loaded` receives the libraries
+/// opened after `package` once all are open.
 pub fn open_libs_selective(state: &mut LuaState, libs: StdLib) -> LuaResult<()> {
     if libs.contains(StdLib::BASE) {
         open_base_lib(state)?;
     }
-    if libs.contains(StdLib::STRING) {
-        open_string_lib(state)?;
+    if libs.contains(StdLib::COROUTINE) {
+        open_coroutine_lib(state)?;
+    }
+    if libs.contains(StdLib::PACKAGE) {
+        package::open_package_lib(state)?;
     }
     if libs.contains(StdLib::TABLE) {
         open_table_lib(state)?;
     }
-    if libs.contains(StdLib::MATH) {
-        open_math_lib(state)?;
+    if libs.contains(StdLib::IO) {
+        io::open_io_lib(state)?;
     }
     if libs.contains(StdLib::OS) {
         open_os_lib(state)?;
     }
-    if libs.contains(StdLib::IO) {
-        io::open_io_lib(state)?;
+    if libs.contains(StdLib::STRING) {
+        open_string_lib(state)?;
     }
-    if libs.contains(StdLib::COROUTINE) {
-        open_coroutine_lib(state)?;
+    if libs.contains(StdLib::MATH) {
+        open_math_lib(state)?;
     }
     if libs.contains(StdLib::DEBUG) {
         open_debug_lib(state)?;
     }
-    // Package must be last: populates package.loaded with other libs.
     if libs.contains(StdLib::PACKAGE) {
-        package::open_package_lib(state)?;
+        package::refresh_loaded(state)?;
     }
     // Test library is not in ALL; must be explicitly requested.
     if libs.contains(StdLib::TEST) {
@@ -144,41 +148,40 @@ pub fn open_libs_selective(state: &mut LuaState, libs: StdLib) -> LuaResult<()> 
 
 /// Registers the base library: global functions, `_G`, `_VERSION`.
 ///
-/// Follows PUC-Rio's `luaopen_base` pattern from `lbaselib.c`.
+/// Follows PUC-Rio's `luaopen_base` pattern from `lbaselib.c`: `_G`, the
+/// `base_funcs` array in its order, `_VERSION`, `ipairs`, `pairs` and
+/// `newproxy`.
 fn open_base_lib(state: &mut LuaState) -> LuaResult<()> {
-    register_global_fn(state, "print", base::lua_print)?;
-    register_global_fn(state, "type", base::lua_type)?;
-    register_global_fn(state, "tostring", base::lua_tostring)?;
-    register_global_fn(state, "tonumber", base::lua_tonumber)?;
+    register_global_val(state, "_G", Val::Table(state.global))?;
     register_global_fn(state, "assert", base::lua_assert)?;
+    register_global_fn(state, "collectgarbage", base::lua_collectgarbage)?;
+    register_global_fn(state, "dofile", base::lua_dofile)?;
     register_global_fn(state, "error", base::lua_error)?;
-    register_global_fn(state, "pcall", base::lua_pcall)?;
-    register_global_fn(state, "xpcall", base::lua_xpcall)?;
-    register_global_fn(state, "setmetatable", base::lua_setmetatable)?;
+    register_global_fn(state, "gcinfo", base::lua_gcinfo)?;
+    register_global_fn(state, "getfenv", base::lua_getfenv)?;
     register_global_fn(state, "getmetatable", base::lua_getmetatable)?;
+    register_global_fn(state, "loadfile", base::lua_loadfile)?;
+    register_global_fn(state, "load", base::lua_load)?;
+    register_global_fn(state, "loadstring", base::lua_loadstring)?;
+    register_global_fn(state, "next", base::lua_next)?;
+    register_global_fn(state, "pcall", base::lua_pcall)?;
+    register_global_fn(state, "print", base::lua_print)?;
+    register_global_fn(state, "rawequal", base::lua_rawequal)?;
     register_global_fn(state, "rawget", base::lua_rawget)?;
     register_global_fn(state, "rawset", base::lua_rawset)?;
-    register_global_fn(state, "rawequal", base::lua_rawequal)?;
     register_global_fn(state, "select", base::lua_select)?;
-    register_global_fn(state, "unpack", base::lua_unpack)?;
-    register_global_fn(state, "next", base::lua_next)?;
-    register_global_fn(state, "pairs", base::lua_pairs)?;
-    register_global_fn(state, "ipairs", base::lua_ipairs)?;
-    register_global_fn(state, "loadstring", base::lua_loadstring)?;
-    register_global_fn(state, "loadfile", base::lua_loadfile)?;
-    register_global_fn(state, "dofile", base::lua_dofile)?;
-    register_global_fn(state, "load", base::lua_load)?;
-    register_global_fn(state, "collectgarbage", base::lua_collectgarbage)?;
     register_global_fn(state, "setfenv", base::lua_setfenv)?;
-    register_global_fn(state, "getfenv", base::lua_getfenv)?;
-    register_global_fn(state, "newproxy", base::lua_newproxy)?;
-    register_global_fn(state, "gcinfo", base::lua_gcinfo)?;
-
-    // Global values: _G (self-referential) and _VERSION.
-    register_global_val(state, "_G", Val::Table(state.global))?;
+    register_global_fn(state, "setmetatable", base::lua_setmetatable)?;
+    register_global_fn(state, "tonumber", base::lua_tonumber)?;
+    register_global_fn(state, "tostring", base::lua_tostring)?;
+    register_global_fn(state, "type", base::lua_type)?;
+    register_global_fn(state, "unpack", base::lua_unpack)?;
+    register_global_fn(state, "xpcall", base::lua_xpcall)?;
     let version_str = state.gc.intern_string(b"Lua 5.1");
     register_global_val(state, "_VERSION", Val::Str(version_str))?;
-
+    register_global_fn(state, "ipairs", base::lua_ipairs)?;
+    register_global_fn(state, "pairs", base::lua_pairs)?;
+    register_global_fn(state, "newproxy", base::lua_newproxy)?;
     Ok(())
 }
 
