@@ -4040,6 +4040,15 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   (@ 0x00459e70) and new game do not clear the byte or the camera lock
   (0x0077b8ac), and the port does not either: with the menu closed to a
   frozen game, neither is reached (`tests/escape_freeze.rs`).
+- Rhea's old couple (`dame`, `mons`) take their own dialog camera, as
+  `GereOrientation` (@ 0x0040b7c2..0x0040b80a, 0x0040b8e3..0x0040b907)
+  gives it: `SetFov` and the yaw Rhea's entry (@ 0x004cd300) stored for
+  the view (view 10: 50° / 485° and 50° / 100°, 11: 60 / 165 and 80 / 100,
+  12: 80 / 115 and 60 / 15, 13: 40 / 90 and 40 / 20), `Horizontalize`,
+  then `RunOneCommand("(AngleWarpXNow=%d)", now = 1)`, run at once even
+  while the section waits (`Script::run_command_now`;
+  `tests/dialog_rhea.rs`). 0.6.0 used the speakers' `Focale` and head
+  camera and left the yaw.
 
 ## Tests
 

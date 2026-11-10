@@ -193,6 +193,10 @@ pub struct Game {
     tick_last: f64,
     look_acc: f32,
     look_last: Option<f64>,
+    /// An `AngleWarpXNow` run by the dialogs' camera while the script was
+    /// borrowed: the script's angle (`Script::angle_x`) to set when it is
+    /// back ([`Game::run_command_now`]).
+    angle_x_now: Option<f32>,
     place: Place,
     camera: Camera,
     look: Look,
@@ -405,6 +409,7 @@ impl Game {
             tick_last: 0.0,
             look_acc: 0.0,
             look_last: None,
+            angle_x_now: None,
             place: Place::default(),
             camera: Camera::new(fpu, width as u32, height as u32),
             look,
@@ -503,6 +508,9 @@ impl Game {
         let Some(mut s) = self.script.take() else {
             return R::default();
         };
+        if let Some(a) = self.angle_x_now.take() {
+            s.angle_x = a;
+        }
         let r = f(&mut s, self);
         if let Some(e) = &s.fatal {
             log::error!("script: {e}");
@@ -1337,6 +1345,10 @@ impl Game {
     /// One displayed frame at the game's time `now` (seconds).
     pub fn step(&mut self, now: f64) {
         self.now = now;
+        if let (Some(a), Some(s)) = (self.angle_x_now, self.script.as_mut()) {
+            s.angle_x = a;
+            self.angle_x_now = None;
+        }
         // The 15 Hz tick (@ 0x0043e550): the scripts' clocks.
         while now - self.tick_last >= 1.0 / 15.0 {
             let last = self.tick_last;
@@ -2849,8 +2861,27 @@ impl Game {
     /// of view `[Focale<stand>][camera]`, then the pitch of the head's
     /// camera (`Orient` @ 0x00441630, the head `.db`'s camera record), or
     /// levelled without one (`Horizontalize` @ 0x004418a0); the yaw kept.
+    /// Rhea's old couple, `dame` and `mons`, take their own branch first
+    /// (@ 0x0040b7c2..0x0040b80a, 0x0040b8e3..0x0040b907): the field of
+    /// view and the yaw Rhea's entry stored (`rhea::RheaCamera`),
+    /// `SetFov`, `Horizontalize`, then `RunOneCommand("(AngleWarpXNow=%d)",
+    /// now = 1)` with the yaw truncated (`_ftol`), run at once.
     fn dialog_camera(&mut self) {
         let Some(e) = self.dialog_entry() else { return };
+        if let Some(k) = ["dame", "mons"].iter().position(|n| e.speaker == *n) {
+            log::debug!("{} init", if k == 0 { "DAME" } else { "MONS" });
+            let cam = self.puzzles.rhea.dialog_camera;
+            let deg = cam.fov[k];
+            self.camera_fov = dialog_fov(self.camera.fpu, deg);
+            self.ev(|| format!("SetFov({:08x})", deg.to_bits()));
+            self.ev(|| "Horizontalize".into());
+            self.camera.horizontalize();
+            let cmd = format!("(AngleWarpXNow={})", cam.yaw[k] as i32);
+            self.ev(|| format!("RunOneCommand({cmd}, now=1)"));
+            self.run_command_now(&cmd);
+            log::debug!("---");
+            return;
+        }
         let Some(d) = self.dialogs.as_ref() else {
             return;
         };
@@ -3177,6 +3208,30 @@ impl Game {
     /// Runs a script command as `RunOneCommand` does (`(KEY=value)`).
     pub fn run_command(&mut self, command: &str) {
         self.with_script(|s, h| s.run_command(h, command.as_bytes()));
+    }
+
+    /// `RunOneCommand(command, now = 1)` (@ 0x00447840): never queued
+    /// behind a waiting section. Under a script command (a dialog started
+    /// by `DIAL`, the script borrowed) only `AngleWarpXNow` is met: its
+    /// turn runs at once and the script's own copy of the angle (read by
+    /// `INITRECALAGE`) is set before the next frame.
+    fn run_command_now(&mut self, command: &str) {
+        if let Some(mut s) = self.script.take() {
+            s.run_command_now(self, command.as_bytes());
+            self.script = Some(s);
+            return;
+        }
+        let Some(v) = command
+            .strip_prefix("(AngleWarpXNow=")
+            .and_then(|r| r.strip_suffix(')'))
+            .and_then(|v| v.parse::<i32>().ok())
+        else {
+            log::warn!("RunOneCommand({command}): no script");
+            return;
+        };
+        let a = atlantis2_engine::script::a3::deg_to_rad_a3(self.camera.fpu, v);
+        Host::turn_now(self, true, a);
+        self.angle_x_now = Some(a);
     }
 
     /// Draws the warp (the place animations, then the cube) with a given
