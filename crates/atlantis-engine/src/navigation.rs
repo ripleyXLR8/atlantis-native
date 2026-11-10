@@ -264,9 +264,12 @@ impl Engine {
         // No wait at the entry (0x0041bfb8..0x0041c01e; the first frame
         // polls FUN_0041a298 @ 0x0041c5f2). A click is a press edge
         // (FUN_0042e624's latch): a button still down from a press an
-        // earlier poll saw is none, and a press no poll has seen yet (during
-        // a video's last frame, a place load) is one. The engine's input
-        // events are those edges.
+        // earlier poll saw is none, and a press no poll has seen yet is
+        // one. After a move none is left: FUN_00423ad8 polls once after
+        // the place load and clears the flags (0x00424093..0x004240ca,
+        // Engine::end_of_move_input), so a press during the video's last
+        // frame or the load is lost. The engine's input events are those
+        // edges.
         self.sys
             .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
         self.mark_pointer_mouse();

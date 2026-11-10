@@ -213,6 +213,13 @@ pub struct Engine {
     /// A script Vue= entered a place: the place loop runs its arrival scan.
     pub arrival_scan_pending: bool,
     pub arrival_from_vue: u16,
+    /// A move ended: the place loop polls the input once and clears every
+    /// input flag before the next arrival scan ([`Engine::end_of_move_input`]).
+    pub move_input_poll: bool,
+    /// The panorama a move loads (`FUN_00421cfc` at the click builds
+    /// 0x006cd288 from the destination's record in the WAM being left; see
+    /// [`Engine::execute_transition`]).
+    pub move_cyclo: Option<(u16, String)>,
     /// The first arrival scan after a chapter load reads ArriveeVue =
     /// LastVue.
     pub(crate) arrival_after_load: bool,
@@ -425,6 +432,8 @@ impl Engine {
             next_place_id: None,
             arrival_scan_pending: false,
             arrival_from_vue: 0,
+            move_input_poll: false,
+            move_cyclo: None,
             arrival_after_load: false,
             last_vue: 0,
             chapter: 0,
@@ -905,6 +914,7 @@ impl Engine {
                 let mut arrivee = self.current_place_id.map_or(-1, i32::from);
                 let scan = self.take_arrival_after_load(&mut arrivee);
                 self.do_place_change().await;
+                self.end_of_move_input();
                 self.arrival_scan_pending = false;
                 if let (Some(vue), true) =
                     (self.current_place_id, scan && self.current_place.is_some())
@@ -913,6 +923,7 @@ impl Engine {
                 }
             } else if self.arrival_scan_pending {
                 // A script Vue= already entered the place (@ 0x00423b48).
+                self.end_of_move_input();
                 self.arrival_scan_pending = false;
                 let mut arrivee = i32::from(self.arrival_from_vue);
                 let scan = self.take_arrival_after_load(&mut arrivee);
@@ -1017,6 +1028,7 @@ impl Engine {
                 if !self.should_abort() && !game_over {
                     self.transition_after_departure_vue(index).await;
                     self.vars.move_ended(); // 0x00424089
+                    self.move_input_poll = true; // 0x00424093
                 }
                 continue;
             }
@@ -1029,10 +1041,29 @@ impl Engine {
                     self.clocks.time1_offset = 0;
                     self.execute_transition(dest).await;
                     self.vars.move_ended(); // 0x00424089
+                    self.move_input_poll = true; // 0x00424093
                 }
                 _ => {}
             }
         }
+    }
+
+    /// The end of every move of `FUN_00423ad8`, after the place load and
+    /// its sprites (0x00424068, 0x00424072) and DEPARTVUE = 0: one input
+    /// poll `FUN_0041a298` (@ 0x00424093), then 0x00496118, 0x0049611c,
+    /// 0x00496120, 0x00496138 = 0, 0x00496124 = 1 and 0x004960c4 = 0
+    /// (0x00424098..0x004240ca). A left or right press or an Escape made
+    /// during the video's last frame or the place load (the video's last
+    /// frame has no poll after it) is taken by that poll and cleared at
+    /// once: the warp loop's first poll sees no new press.
+    pub(crate) fn end_of_move_input(&mut self) {
+        if !std::mem::take(&mut self.move_input_poll) {
+            return;
+        }
+        while self.sys.poll_event().is_some() {}
+        self.turn_double_click.flag = false;
+        self.escape_request = false;
+        self.bar.flags_reset();
     }
 
     /// `FUN_00431e98` on the way out (0x004197a0).
@@ -1394,5 +1425,71 @@ mod exit_and_menu_tests {
             return;
         };
         assert!(t.contains(&Event::Menu("SELEMENU.TXT".into())), "{t:?}");
+    }
+}
+
+#[cfg(test)]
+mod end_of_move_tests {
+    use super::*;
+    use crate::hooks::{ready, HookFuture};
+    use crate::sys::{Input, Key, MouseButton};
+    use crate::test_support::with_engine;
+    use std::cell::Cell;
+
+    struct Clicks(Rc<Cell<u32>>);
+
+    impl ScriptHooks for Clicks {
+        fn zone_click<'a>(&'a mut self, _e: &'a mut Engine, _z: u32) -> HookFuture<'a, ()> {
+            self.0.set(self.0.get() + 1);
+            ready(())
+        }
+    }
+
+    /// The zone clicks and the bar request after a place load, with a left
+    /// press, a right press and Escape queued during it; `moved`: the load
+    /// ends a move.
+    fn after_load(moved: bool) -> Option<(u32, bool)> {
+        let clicks = Rc::new(Cell::new(0));
+        let got = Rc::new(Cell::new(None));
+        let (c2, g2) = (clicks.clone(), got.clone());
+        let ran = with_engine(
+            "presses_during_a_move_end_are_lost",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.move_input_poll = moved;
+                // During the video's last frame and the place load.
+                let (x, y) = (320, 320);
+                for b in [MouseButton::Left, MouseButton::Right] {
+                    e.sys.push_input(Input::MouseDown { button: b, x, y });
+                    e.sys.push_input(Input::MouseUp { button: b, x, y });
+                }
+                e.sys.push_input(Input::KeyDown(Key::Escape));
+                e.sys.push_input(Input::KeyUp(Key::Escape));
+                let mut hooks = Clicks(c2);
+                e.game_step(&mut hooks).await;
+                g2.set(Some(e.bar.request));
+            },
+            |sys, f| {
+                if f == 30 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        ran.then(|| (clicks.get(), got.get().unwrap()))
+    }
+
+    /// FUN_00423ad8 polls once after a move's place load and clears every
+    /// input flag (0x00424093..0x004240ca): the warp loop sees none of the
+    /// presses made meanwhile. Without a move, the first warp pass takes
+    /// the queued click.
+    #[test]
+    fn presses_during_a_move_end_are_lost() {
+        let Some(moved) = after_load(true) else {
+            return;
+        };
+        assert_eq!(moved.0, 0, "a click after the move was handled");
+        let not_moved = after_load(false).unwrap();
+        assert_eq!(not_moved.0, 1);
     }
 }

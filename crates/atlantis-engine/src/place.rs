@@ -96,7 +96,15 @@ impl Engine {
         self.current_place_id = Some(next);
         self.next_place_id = None;
         self.vue_override = None; // `Vue` follows the place again
-        let cyclo = self.wam.places[index].cyclo.clone();
+
+        // A move loads the panorama its click named in the WAM it left
+        // (FUN_0044a424 @ 0x00423ed4); FUN_00421b4c (0x00424068) only
+        // selects the place and rebuilds the name. Every other entry
+        // loads the record's.
+        let cyclo = match self.move_cyclo.take() {
+            Some((id, name)) if id == next => name,
+            _ => self.wam.places[index].cyclo.clone(),
+        };
         if self.load_cyclo(&cyclo).await {
             self.composite_npc_sprites().await;
         }
@@ -297,7 +305,20 @@ impl Engine {
             self.next_place_id = Some(next);
             return;
         };
-        if let Some(t) = place.find_transition(next).cloned() {
+        // The click's FUN_00421cfc (@ 0x00423dc5) names the panorama from
+        // the destination's record in the current WAM, before any sub-WAM
+        // swap; FUN_0044a424 loads that name (@ 0x00423ed4) and nothing
+        // reloads it after the swap. Only BIBLION -> PALAIS3 at place 192
+        // names another picture than the new WAM's (ATL16192, not
+        // ATN16192).
+        let transition = place.find_transition(next).cloned();
+        self.move_cyclo = self
+            .wam
+            .places
+            .iter()
+            .find(|p| p.id == next)
+            .map(|p| (next, p.cyclo.clone()));
+        if let Some(t) = transition {
             // FUN_00423ad8 @ 0x00423ec0: FUN_004212cc turns the view to the
             // transition's source angles before the video.
             self.turn_to_transition(t.src_alpha, t.src_beta).await;
@@ -891,12 +912,23 @@ impl Engine {
         self.turn_to_transition(t.src_alpha, t.src_beta).await;
         // 0x00421b01..0x00421b31, before the video.
         self.set_view(t.dst_alpha, t.dst_beta);
+        // The move's tail, as for any move: FUN_0044a424(0x006cd288) @
+        // 0x00423ed4 loads the place the Vue= selected (its name built @
+        // 0x0042a66d / 0x0042a69d): the warp FOV 75.137 again after the
+        // turn's 75.187 (0x0044a6fc..0x0044a706), the pointer at (0x140,
+        // 0x140).
+        if let Some(cyclo) = self.wam.places.get(record).map(|p| p.cyclo.clone()) {
+            self.load_cyclo(&cyclo).await;
+        }
         // The same double-click test (0x00423f8a) and reset (0x00424013).
         if t.video.contains('.') && !self.turn_double_click.flag {
             self.play_transition_video(&t.video, Some((cur, cur)), TRANSITION_FRAME_MS)
                 .await;
         }
         self.turn_double_click.flag = false;
+        // Then FUN_00421b4c (no load) and FUN_0042431c (@ 0x00424072):
+        // the place's sprites again, from frame 0.
+        self.composite_npc_sprites().await;
     }
 
     /// Cinema=N: `CINEM<NNN>.HNM` full screen with its sound, at the cinema
@@ -1283,6 +1315,85 @@ mod escape_tests {
         );
         if ran {
             assert_eq!(*got.borrow(), Some((true, true)));
+        }
+    }
+}
+
+#[cfg(test)]
+mod move_panorama_tests {
+    use super::*;
+    use crate::test_support::with_engine;
+    use std::cell::RefCell;
+
+    /// The panorama `CYCLO\<name>` decoded.
+    async fn pano(e: &Engine, name: &str) -> Vec<u16> {
+        let d = e.read(&format!("CYCLO\\{name}")).await.expect(name);
+        atlantis_codecs::decode_panorama(&d).unwrap().pixels
+    }
+
+    /// The sub-WAM move BIBLION 230 -> PALAIS3 192 shows the picture the
+    /// click named in BIBLION's record of 192 (FUN_00421cfc @ 0x00423dc5,
+    /// loaded @ 0x00423ed4 before the swap), ATL16192, not PALAIS3's
+    /// ATN16192: FUN_00421b4c loads nothing after the swap.
+    #[test]
+    fn a_sub_wam_move_shows_the_source_wams_picture() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_sub_wam_move_shows_the_source_wams_picture",
+            move |mut e| async move {
+                assert!(e.load_wam("BIBLION.WAM").await);
+                let rec = |e: &Engine| {
+                    e.wam
+                        .places
+                        .iter()
+                        .find(|p| p.id == 192)
+                        .map(|p| p.cyclo.to_ascii_uppercase())
+                };
+                assert_eq!(rec(&e).as_deref(), Some("ATL16192.HNM"));
+                e.next_place_id = Some(230);
+                e.do_place_change().await;
+                e.execute_transition(192).await;
+                e.do_place_change().await;
+                assert_eq!(e.wam_name, "PALAIS3.WAM");
+                assert_eq!(e.current_place_id, Some(192));
+                assert_eq!(rec(&e).as_deref(), Some("ATN16192.HNM"));
+                let atl = pano(&e, "ATL16192.HNM").await;
+                let atn = pano(&e, "ATN16192.HNM").await;
+                *g2.borrow_mut() = Some((e.cyclo == atl, e.cyclo == atn));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, false)));
+        }
+    }
+
+    /// A departure section that ran Vue= (CHAPI062 /864) takes the move's
+    /// tail: FUN_0044a424 @ 0x00423ed4 loads the place the Vue= selected,
+    /// so the warp FOV is 75.137 again after the turn's 75.187, and the
+    /// pointer is at (0x140, 0x140).
+    #[test]
+    fn a_departure_vue_reloads_the_place() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_departure_vue_reloads_the_place",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.pointer.pos = (5, 5);
+                e.transition_after_departure_vue(0).await;
+                *g2.borrow_mut() = Some((e.warp.hfov(), e.pointer.pos));
+            },
+            |_, _| {},
+        );
+        if ran {
+            let (fov, pos) = got.borrow().unwrap();
+            assert!((fov - WARP_FOV_DEG).abs() < 1e-4, "FOV {fov}");
+            assert_ne!(fov, TURN_END_FOV_DEG);
+            assert_eq!(pos, (0x140, 0x140));
         }
     }
 }
