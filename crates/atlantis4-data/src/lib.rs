@@ -1,0 +1,22 @@
+//! Data files of *Atlantis Evolution* (Atlantis IV; Atlantis Interactive
+//! Entertainment / Microïds, 2004), as released by GOG.com: a 2012
+//! Tetraedge Engine build (C++, Lua 5.1, OpenGL, OpenAL) sharing no format
+//! with the three earlier games.
+//!
+//! Comments cite addresses in that release's `Atlantis Evolution.exe`
+//! (2,363,910 bytes, see [`exe::KNOWN_BUILDS`]), so that each behaviour
+//! stays traceable to the original code; "file +0x..." is an offset in that
+//! file.
+//!
+//! - [`exe`]: which build an executable is;
+//! - [`files`]: the installed folder, `lang.ini` and the scene names;
+//! - [`testing`]: what a game-data test does when its data is missing.
+
+#![forbid(unsafe_code)]
+
+pub mod exe;
+pub mod files;
+pub mod testing;
+
+pub use exe::{identify, Build, ExeError};
+pub use files::{A4Files, WarpPath};

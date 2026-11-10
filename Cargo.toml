@@ -8,6 +8,7 @@ members = [
     "crates/atlantis2-engine",
     "crates/atlantis3-data",
     "crates/atlantis3-engine",
+    "crates/atlantis4-data",
     "crates/atlantis-app",
     "crates/atlantis-sdl",
 ]
