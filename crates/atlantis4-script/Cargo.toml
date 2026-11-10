@@ -8,3 +8,6 @@ license.workspace = true
 # rilua is pure Rust with no dependency and builds for wasm32-unknown-unknown.
 [dependencies]
 rilua = { path = "../../vendor/rilua" }
+
+[dev-dependencies]
+atlantis4-data = { path = "../atlantis4-data" }

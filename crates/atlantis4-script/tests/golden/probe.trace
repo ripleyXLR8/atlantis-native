@@ -1,0 +1,303 @@
+LOAD Texts/Full/ApplicationTitle.lua
+READ applicationTitle h:cb9227505cce9d4c/18
+LOAD Texts/PC/BackupPathTemplate.lua
+READ backupPathTemplate h:677f77715c870724/28
+LOAD Texts/Version.lua
+READ versionString "1.0.1"
+LOAD Texts/Full/FirstWarpPath.lua
+READ firstWarpPath "3D/Bateau_CA/0001.wp"
+GAME
+LOAD 3D/OnGameEnter.lua
+LOAD Diary/Diary.lua
+LOAD Inventory/InventoryScripts.lua
+WARP 3D/Bateau_CA/0001.wp
+SCENE 3D/Bateau_CA/0001.xml
+LOAD 3D/Bateau_CA/0001.lua
+ENTER OnWarpEnter()
+CALL PlayMusic("Sounds/Musiques/muzik20.ogg")
+CALL PlaySound("Sounds/Ambiances/Bateau.ogg",-1)
+CALL SetMarker("Bateau_CO\0003.wp",0,0)
+CALL SetMarker("Bateau_CA\0002.wp",0,0)
+CALL PlayMovie("Videos/intro.ogv","Videos/intro.ogg")
+CALL SetMarker("hua2",4,0)
+CALL StartAnimationPart("hua2",14,15,-1,true)
+CALL StartAnimationPart("mla2",0,1,-1,false)
+PROBE 3
+ERR chunk: [string "probe:3"]:1: error in function 'Selected'.\n     argument #1 is '[no object]'; 'string' expected.\n
+PROBE 4
+CALL Selected(NULL)
+PROBE 5
+ERR chunk: [string "probe:5"]:1: error in function 'Selected'.\n     argument #2 is 'number'; '[no object]' expected.\n
+PROBE 6
+ERR chunk: [string "probe:6"]:1: error in function 'Selected'.\n     argument #1 is 'table'; 'string' expected.\n
+PROBE 7
+ERR chunk: [string "probe:7"]:1: error in function 'Selected'.\n     argument #1 is 'boolean'; 'string' expected.\n
+PROBE 8
+ERR chunk: [string "probe:8"]:1: error in function 'Selected'.\n     argument #1 is 'function'; 'string' expected.\n
+PROBE 9
+ERR chunk: [string "probe:9"]:1: error in function 'Selected'.\n     argument #1 is 'userdata'; 'string' expected.\n
+PROBE 10
+ERR chunk: [string "probe:10"]:1: error in function 'Selected'.\n     argument #1 is '[undefined]'; 'string' expected.\n
+PROBE 11
+CALL Selected("a")
+CALL Selected("b")
+CALL ObjectCount("truefalse")
+PROBE 12
+ERR chunk: [string "probe:12"]:1: error in function 'TestObjectLimit'.\n     argument #2 is '[no object]'; 'number' expected.\n
+PROBE 13
+CALL TestObjectLimit("a",12)
+PROBE 14
+CALL TestObjectLimit("a",26)
+PROBE 15
+ERR chunk: [string "probe:15"]:1: error in function 'TestObjectLimit'.\n     argument #2 is 'string'; 'number' expected.\n
+PROBE 16
+ERR chunk: [string "probe:16"]:1: error in function 'TestObjectLimit'.\n     argument #2 is 'string'; 'number' expected.\n
+PROBE 17
+CALL TestObjectLimit("1",2)
+PROBE 18
+CALL TestObjectLimit(NULL,2)
+PROBE 19
+CALL ObjectCount("0.1")
+PROBE 20
+CALL ObjectCount(h:d36af1c284b038eb/6)
+PROBE 21
+CALL ObjectCount(h:1ca843819d9749f9/18)
+PROBE 22
+CALL ObjectCount("-0")
+PROBE 23
+CALL ObjectCount("0.33333333333333")
+PROBE 24
+CALL ObjectCount("-12.5")
+PROBE 25
+CALL ObjectCount(h:5271e7a887380cf1/19)
+PROBE 26
+CALL PrintDebugMessage(h:69cf480885ad45af/5)
+PROBE 27
+CALL SetCondition("x")
+CALL UnsetCondition("y")
+CALL TakeObject("z")
+PROBE 28
+CALL PutObject("o",true)
+PROBE 29
+CALL PutObject("o",false)
+PROBE 30
+CALL PutObject("o",false)
+PROBE 31
+ERR chunk: [string "probe:31"]:1: error in function 'PutObject'.\n     argument #2 is 'number'; 'boolean' expected.\n
+PROBE 32
+ERR chunk: [string "probe:32"]:1: error in function 'PutObject'.\n     argument #3 is 'number'; '[no object]' expected.\n
+PROBE 33
+ERR chunk: [string "probe:33"]:1: error in function 'RemoveObject'.\n     argument #1 is '[no object]'; 'string' expected.\n
+PROBE 34
+CALL StartAnimationPart("a",1,2,-1,false)
+PROBE 35
+CALL StartAnimationPart("a",1,2,3,false)
+PROBE 36
+CALL StartAnimationPart("a",1,2,3,true)
+PROBE 37
+ERR chunk: [string "probe:37"]:1: error in function 'StartAnimationPart'.\n     argument #4 is 'nil'; 'number' expected.\n
+PROBE 38
+ERR chunk: [string "probe:38"]:1: error in function 'StartAnimationPart'.\n     argument #3 is '[no object]'; 'number' expected.\n
+PROBE 39
+ERR chunk: [string "probe:39"]:1: error in function 'StartAnimationPart'.\n     argument #3 is 'string'; 'number' expected.\n
+PROBE 40
+ERR chunk: [string "probe:40"]:1: error in function 'StartAnimationPart'.\n     argument #6 is 'number'; '[no object]' expected.\n
+PROBE 41
+ERR chunk: [string "probe:41"]:1: error in function 'StartAnimationPart'.\n     argument #4 is 'string'; 'number' expected.\n
+PROBE 42
+CALL StartAnimationPart("a",n:3ff8000000000000,n:4006000000000000,n:bff4000000000000,true)
+PROBE 43
+CALL StartAnimation("a",-1,false)
+PROBE 44
+CALL StartAnimation("a",2,false)
+PROBE 45
+ERR chunk: [string "probe:45"]:1: error in function 'StartAnimation'.\n     argument #2 is 'nil'; 'number' expected.\n
+PROBE 46
+ERR chunk: [string "probe:46"]:1: error in function 'StartAnimation'.\n     argument #2 is 'table'; 'number' expected.\n
+PROBE 47
+CALL AnimationSetToEnd("a",false)
+CALL AnimationSetToStart("a",true)
+PROBE 48
+ERR chunk: [string "probe:48"]:1: error in function 'AnimationSetToEnd'.\n     argument #2 is 'number'; 'boolean' expected.\n
+PROBE 49
+ERR chunk: [string "probe:49"]:1: error in function 'DrawText'.\n     argument #2 is '[no object]'; 'string' expected.\n
+PROBE 50
+CALL DrawText("a","b",0,"","")
+PROBE 51
+CALL DrawText("a","b",1,"","")
+PROBE 52
+CALL DrawText("a","b",1,"c","")
+PROBE 53
+CALL DrawText("a","b",1,"c","d")
+PROBE 54
+ERR chunk: [string "probe:54"]:1: error in function 'DrawText'.\n     argument #6 is 'string'; '[no object]' expected.\n
+PROBE 55
+ERR chunk: [string "probe:55"]:1: error in function 'DrawText'.\n     argument #3 is 'nil'; 'number' expected.\n
+PROBE 56
+ERR chunk: [string "probe:56"]:1: error in function 'DrawText'.\n     argument #3 is 'string'; 'number' expected.\n
+PROBE 57
+ERR chunk: [string "probe:57"]:1: error in function 'DrawText'.\n     argument #4 is 'table'; 'string' expected.\n
+PROBE 58
+CALL DrawText("a","b",1,"c","7")
+PROBE 59
+CALL ChangeWarp("3D\Barque_ME\0001.wp",false)
+PROBE 60
+CALL ChangeWarp("x",true)
+PROBE 61
+ERR chunk: [string "probe:61"]:1: error in function 'ChangeWarp'.\n     argument #1 is '[no object]'; 'string' expected.\n
+PROBE 62
+ERR chunk: [string "probe:62"]:1: error in function 'ChangeWarp'.\n     argument #2 is 'string'; 'boolean' expected.\n
+PROBE 63
+CALL AddToBag("a")
+CALL AddToBagWithoutNotification("b")
+PROBE 64
+CALL RemoveFromBag()
+PROBE 65
+CALL RemoveFromBag("a")
+PROBE 66
+CALL RemoveFromBag("1")
+PROBE 67
+CALL RemoveFromBag(NULL)
+PROBE 68
+ERR chunk: [string "probe:68"]:1: error in function 'RemoveFromBag'.\n     argument #1 is 'table'; '[no object]' expected.\n
+PROBE 69
+ERR chunk: [string "probe:69"]:1: error in function 'RemoveFromBag'.\n     argument #1 is 'string'; '[no object]' expected.\n
+PROBE 70
+ERR chunk: [string "probe:70"]:1: error in function 'RemoveFromBag'.\n     argument #1 is 'boolean'; '[no object]' expected.\n
+PROBE 71
+CALL SaveGame("0.xml")
+SAVEGAME 0.xml n=5 set=3c201fc366cc6eb4 order=73aa7cb0cabbe131
+PROBE 72
+CALL SetMarker("a",1,0)
+PROBE 73
+CALL SetMarker("a",1,2)
+PROBE 74
+ERR chunk: [string "probe:74"]:1: error in function 'SetMarker'.\n     argument #2 is '[no object]'; 'number' expected.\n
+PROBE 75
+ERR chunk: [string "probe:75"]:1: error in function 'SetMarker'.\n     argument #4 is 'number'; '[no object]' expected.\n
+PROBE 76
+CALL SetMarker("a",-1,0)
+PROBE 77
+CALL LookAt(1,2)
+PROBE 78
+ERR chunk: [string "probe:78"]:1: error in function 'LookAt'.\n     argument #2 is '[no object]'; 'number' expected.\n
+PROBE 79
+CALL LookAt(1,2)
+PROBE 80
+CALL Wait(10)
+PROBE 81
+ERR chunk: [string "probe:81"]:1: error in function 'Wait'.\n     argument #1 is '[no object]'; 'number' expected.\n
+PROBE 82
+CALL PlaySound("a",-1)
+PROBE 83
+ERR chunk: [string "probe:83"]:1: error in function 'PlaySound'.\n     argument #2 is '[no object]'; 'number' expected.\n
+PROBE 84
+CALL StopSound("a")
+CALL PlayMusic("b")
+PROBE 85
+CALL ShowPuzzle(1)
+PROBE 86
+CALL ShowPuzzle(1,2,3)
+PROBE 87
+ERR chunk: [string "probe:87"]:1: error in function 'ShowPuzzle'.\n     argument #2 is 'number'; '[no object]' expected.\n
+PROBE 88
+ERR chunk: [string "probe:88"]:1: error in function 'ShowPuzzle'.\n     argument #1 is '[no object]'; 'number' expected.\n
+PROBE 89
+ERR chunk: [string "probe:89"]:1: error in function 'ShowPuzzle'.\n     argument #1 is 'string'; 'number' expected.\n
+PROBE 90
+ERR chunk: [string "probe:90"]:1: error in function 'ShowPuzzle'.\n     argument #2 is 'number'; '[no object]' expected.\n
+PROBE 91
+CALL PlayMovie("a","b")
+PROBE 92
+ERR chunk: [string "probe:92"]:1: error in function 'PlayMovie'.\n     argument #2 is '[no object]'; 'string' expected.\n
+PROBE 93
+CALL SetFOV(60)
+PROBE 94
+CALL LoadSprite("GUI/OnScreen/a.lua")
+CALL UnloadSprite("GUI/OnScreen/a.lua")
+PROBE 95
+CALL PushAnswer("a","b")
+PROBE 96
+CALL PushAnswer("a","GUI/answer.lua")
+PROBE 97
+ERR chunk: [string "probe:97"]:1: error in function 'PushAnswer'.\n     argument #1 is '[no object]'; 'const TeString' expected.\n
+PROBE 98
+CALL PushAnswer(NULL,"GUI/answer.lua")
+PROBE 99
+ERR chunk: [string "probe:99"]:1: error in function 'PushAnswer'.\n     argument #1 is 'table'; 'const TeString' expected.\n
+PROBE 100
+ERR chunk: [string "probe:100"]:1: error in function 'PushAnswer'.\n     argument #1 is 'string'; 'const TeString' expected.\n
+PROBE 101
+ERR chunk: [string "probe:101"]:1: error in function 'PushAnswer'.\n     argument #1 is 'userdata'; 'const TeString' expected.\n
+PROBE 102
+CALL FinishGame()
+PROBE 103
+ERR chunk: [string "probe:103"]:1: error in function 'FinishGame'.\n     argument #1 is 'number'; '[no object]' expected.\n
+PROBE 104
+CALL ShowDocument("a")
+CALL HideDocument()
+CALL AddDocument("b")
+PROBE 105
+ERR chunk: [string "probe:105"]:1: error in function 'HideDocument'.\n     argument #1 is 'nil'; '[no object]' expected.\n
+PROBE 106
+CALL ClearImportantDocuments()
+CALL SetImportantDocument("a")
+PROBE 107
+ERR chunk: [string "probe:107"]:1: error in function 'ClearImportantDocuments'.\n     argument #1 is 'number'; '[no object]' expected.\n
+PROBE 108
+CALL SetViewAngleXLimits(-10,10)
+CALL SetViewAngleYLimits(-20,20)
+PROBE 109
+ERR chunk: [string "probe:109"]:1: error in function 'SetViewAngleXLimits'.\n     argument #2 is '[no object]'; 'number' expected.\n
+PROBE 110
+CALL AddRandomSound("g","f",n:3f847ae147ae147b)
+CALL PlayRandomSound("g")
+PROBE 111
+ERR chunk: [string "probe:111"]:1: error in function 'AddRandomSound'.\n     argument #3 is '[no object]'; 'number' expected.\n
+PROBE 112
+CALL OpenURL("x")
+PROBE 113
+CALL SetDiaryPage(1,"p")
+CALL ShowDiaryPage(2)
+PROBE 114
+ERR chunk: [string "probe:114"]:1: error in function 'SetDiaryPage'.\n     argument #1 is 'string'; 'number' expected.\n
+PROBE 115
+CALL SetInventoryAvatar("a")
+PROBE 116
+CALL PuzzleTimerSetDifficulty(3)
+CALL PuzzleTimerExit()
+PROBE 117
+ERR chunk: [string "probe:117"]:1: error in function 'SetDrunkFactor'.\n     argument #2 is '[no object]'; 'number' expected.\n
+PROBE 118
+CALL SetDrunkFactor(3,n:3fe0000000000000)
+PROBE 119
+CALL InitDialog("bg","")
+CALL InitDialog("bg","v")
+CALL HideDialog()
+CALL HideAnswers()
+PROBE 120
+ERR chunk: [string "probe:120"]:1: error in function 'InitDialog'.\n     argument #1 is '[no object]'; 'string' expected.\n
+PROBE 121
+ERR chunk: [string "probe:121"]:1: error in function 'HideAnswers'.\n     argument #1 is 'number'; '[no object]' expected.\n
+PROBE 122
+ERR chunk: [string "probe:122"]:1: tolua.type is not available
+PROBE 123
+ERR chunk: [string "probe:123"]:1: attempt to call global 'SetInventoryAvatarEffect' (a nil value)
+PROBE 124
+ERR load: [string "probe:124"]:1: unexpected symbol near '..'
+PROBE 125
+ERR chunk: [string "probe:125"]:1: attempt to call global 'OnGameEnterMissing' (a nil value)
+PROBE 126
+ERR chunk: [string "probe:126"]:1: attempt to perform arithmetic on a nil value
+PROBE 127
+ERR chunk: [string "probe:127"]:1: plain
+PROBE 128
+ERR chunk: (non-string error)
+PROBE 129
+ERR chunk: [string "probe:129"]:1: deep
+SAVE String "warpName" "3D/Bateau_CA/0001.wp"
+SAVE Boolean "y" 0
+SAVE Boolean "x" 1
+SAVE Boolean "INTRO" 1
+SAVE String "_VERSION" h:4de6a7b0bcdb941f/7
+SAVE count 5

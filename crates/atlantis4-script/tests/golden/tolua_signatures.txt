@@ -1,0 +1,60 @@
+# a4_lua_tolua_signatures: the 54 tolua_function entries of atlantis4-gog-en-2363910
+# (MD5 f2de382af52f1d89e32ed7c286be8b4f) in registration order (@ 0x00581950).
+# Producer: tolua_model.py; checked by tolua_emu.py, which runs each binding's
+# checks unmodified in Unicorn (185,362 argument tuples, no difference).
+# Line: <name> <C function> <checks> -> <tolua_to* calls> [fallback=<C function>];
+# checks s string, n number, b boolean, V value + "const TeString", ? optional.
+Selected 0x57fc30 s -> s1:NULL
+TestObjectLimit 0x57fa50 s n -> s1:NULL n2:0
+ObjectCount 0x57f8f0 s -> s1:NULL
+PrintDebugMessage 0x57f7c0 s -> s1:NULL
+SetCondition 0x57f6a0 s -> s1:NULL
+UnsetCondition 0x57f580 s -> s1:NULL
+TakeObject 0x581110 s -> s1:NULL
+PutObject 0x57f410 s b? -> s1:NULL b2:1
+RemoveObject 0x57f2e0 s -> s1:NULL
+StartAnimationPart 0x57f040 s n n n? b? -> s1:NULL n2:0 n3:0 n4:-1 b5:0
+StartAnimation 0x57ee40 s n? b? -> s1:NULL n2:-1 b3:0
+AnimationSetToEnd 0x57ece0 s b? -> s1:NULL b2:0
+AnimationSetToStart 0x57eb80 s b? -> s1:NULL b2:0
+DrawText 0x5801d0 s s n? s? s? -> s1:NULL s2:NULL n3:0 s4:"" s5:""
+ChangeWarp 0x580840 s b? -> s1:NULL b2:1
+AddToBag 0x580fc0 s -> s1:NULL
+AddToBagWithoutNotification 0x580e70 s -> s1:NULL
+RemoveFromBag 0x57eb00 - -> -
+RemoveFromBag 0x5800d0 s -> s1:NULL fallback=0x57eb00
+SaveGame 0x57e9d0 s -> s1:NULL
+SetMarker 0x57e7a0 s n n? -> s1:NULL n2:0 n3:0
+LookAt 0x57e680 n n -> n1:0 n2:0
+Wait 0x57e550 n -> n1:0
+PlaySound 0x57ff30 s n -> s1:NULL n2:0
+StopSound 0x57e420 s -> s1:NULL
+PlayMusic 0x57e300 s -> s1:NULL
+ShowPuzzle 0x580d60 n -> n1:0
+ShowPuzzle 0x5817b0 n n n -> n1:0 n2:0 n3:0 fallback=0x580d60
+PlayMovie 0x57e160 s s -> s1:NULL s2:NULL
+SetFOV 0x57e080 n -> n1:0
+LoadSprite 0x580c30 s -> s1:NULL
+UnloadSprite 0x5806a0 s -> s1:NULL
+PushAnswer 0x580ad0 V -> u1:NULL
+FinishGame 0x5807e0 - -> -
+ShowDocument 0x5809a0 s -> s1:NULL
+HideDocument 0x580620 - -> -
+AddDocument 0x581680 s -> s1:NULL
+ClearImportantDocuments 0x57e030 - -> -
+SetImportantDocument 0x57df60 s -> s1:NULL
+SetViewAngleXLimits 0x57de30 n n -> n1:0 n2:0
+SetViewAngleYLimits 0x57dd00 n n -> n1:0 n2:0
+AddRandomSound 0x57dae0 s s n -> s1:NULL s2:NULL n3:0
+PlayRandomSound 0x57d9b0 s -> s1:NULL
+OpenURL 0x57d870 s -> s1:NULL
+SetDiaryPage 0x5814c0 n s -> n1:0 s2:NULL
+ShowDiaryPage 0x5813a0 n -> n1:0
+SetInventoryAvatar 0x57d740 s -> s1:NULL
+PuzzleTimerSetDifficulty 0x57d650 n -> n1:0
+PuzzleTimerExit 0x580580 - -> -
+SetDrunkFactor 0x57d510 n n -> n1:0 n2:0
+InitDialog 0x57fd70 s s? -> s1:NULL s2:""
+HideDialog 0x57d490 - -> -
+PushAnswer 0x581220 s s? -> s1:NULL s2:"GUI/answer.lua" fallback=0x580ad0
+HideAnswers 0x580500 - -> -

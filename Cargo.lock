@@ -314,6 +314,7 @@ dependencies = [
 name = "atlantis4-script"
 version = "0.6.0"
 dependencies = [
+ "atlantis4-data",
  "rilua",
 ]
 
