@@ -11,18 +11,36 @@ pub struct State {
     /// A byte the entry clears (@ 0x0071eb18; set to 1 by the load,
     /// read by no code).
     pub b71eb18: bool,
-    /// The dialog's two camera values per view (@ 0x0075577c,
-    /// 0x00755780 through @ 0x0040d280 / 0x0040d290) and the two of
-    /// @ 0x00714f14 / 0x00714f18, read by the dialog code (@ 0x0040b7cd,
-    /// 0x0040b8ee).
-    pub dialog_camera: Option<[f32; 4]>,
+    /// The old couple's dialog camera ([`RheaCamera`]), set by the entry.
+    pub dialog_camera: RheaCamera,
+}
+
+/// The dialog camera of the old woman (`dame`) and the old man (`mons`):
+/// the yaw in degrees (@ 0x0075577c, 0x00755780, through @ 0x0040d280 /
+/// 0x0040d290; 0.0 at start-up) and the field of view in degrees
+/// (@ 0x00714f14, 0x00714f18; 80.0 at start-up), read by the dialogs'
+/// camera set-up (@ 0x0040b7c2..0x0040b80a, 0x0040b8e3..0x0040b907).
+/// Kept across loads and places, as the original's globals are.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RheaCamera {
+    pub yaw: [f32; 2],
+    pub fov: [f32; 2],
+}
+
+impl Default for RheaCamera {
+    fn default() -> RheaCamera {
+        RheaCamera {
+            yaw: [0.0, 0.0],
+            fov: [80.0, 80.0],
+        }
+    }
 }
 
 impl State {
     pub fn new() -> State {
         State {
             b71eb18: true,
-            dialog_camera: None,
+            dialog_camera: RheaCamera::default(),
         }
     }
 
@@ -48,6 +66,8 @@ pub(super) fn view(h: &mut Hx) {
     if h.flag(919) == 0 {
         h.set_flag(919, 1);
     }
+    // (dame yaw, mons yaw, dame FOV, mons FOV), as the entry stores them
+    // (emulated: VUE 10..13).
     let cam = match h.vue() {
         10 => Some([485.0, 100.0, 50.0, 50.0]),
         11 => Some([165.0, 100.0, 60.0, 80.0]),
@@ -59,9 +79,11 @@ pub(super) fn view(h: &mut Hx) {
         }
     };
     let r = &mut h.g.puzzles.rhea;
-    if cam.is_some() {
-        // visual: the dialog's camera values (M4).
-        r.dialog_camera = cam;
+    if let Some([yd, ym, fd, fm]) = cam {
+        r.dialog_camera = RheaCamera {
+            yaw: [yd, ym],
+            fov: [fd, fm],
+        };
     }
     r.b71eb18 = false;
 }

@@ -415,6 +415,15 @@ impl Script {
         self.in_command = was;
     }
 
+    /// Atlantis III's `RunOneCommand(command, now = 1)` (@ 0x00447840):
+    /// run at once even while a section waits (no queue).
+    pub fn run_command_now(&mut self, host: &mut dyn Host, command: &[u8]) {
+        let was = self.in_command;
+        self.in_command = true;
+        self.run_command(host, command);
+        self.in_command = was;
+    }
+
     /// `RunOneCommand_AfterDisplay` (@ 0x00481790): a command for the next
     /// warp frame.
     pub fn queue_command(&mut self, command: &[u8]) {

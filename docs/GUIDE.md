@@ -698,7 +698,7 @@ Native with Shift held or with `--launcher`).
 | Mouse | turns the view; in the menus, the inventory and the puzzle screens, moves the game's pointer |
 | Left click | goes, takes, uses, talks; the next dialog line; in the menus, chooses |
 | Right click | opens or closes the inventory; closes the subject menu |
-| Escape | the game's menu in the view (save, load, volumes, options, quit; its Back button returns to the game); skips a cinematic, ends a travel video, leaves the puzzle screens that the original lets it leave (the tower's map, the unicorn, the game boy, the jewel case, the skull); on the credits, quits |
+| Escape | the game's menu in the view (save, load, volumes, options, quit; its Back button returns to the game); skips a cinematic, ends a travel video, leaves the puzzle screens that the original lets it leave (the tower's map, the unicorn, the game boy, the jewel case, the skull); on the credits, quits. Like every key (Alt+Enter too), not while a puzzle's animation holds the controls (a throw of the spinning top or of a stone, a corridor door, the fisherman's scale, the demon's turn in the tower), as in the original |
 | Space | skips a cinematic |
 | Alt+Enter or F11 | full screen on and off (kept in `Atlantis3.cfg`, as the original keeps it) |
 | F12 | a screenshot of the game's picture (desktop only) |
@@ -715,6 +715,12 @@ smoothing, subtitles, the screen size (640 x 480, 800 x 600 or 1024 x
 depth change applies when the menu is left, as in the original: the
 window takes the new size (in full screen the picture is scaled to the
 screen).
+
+The texture size 1024 makes the game look for its 1024-pixel panoramas
+and place animations and its 800-pixel videos, as the original does;
+GOG.com's release has none of them, so with it the panoramas show plain
+colours, the place animations, cinematics, dialog films and travel
+videos are missing, as in the original. Keep 512.
 
 The saves (`save/game<player>_<number>.sav` with their thumbnails, as the
 original names them) and `Atlantis3.cfg` (the options) are kept in the

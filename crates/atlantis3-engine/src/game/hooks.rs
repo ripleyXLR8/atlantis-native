@@ -161,6 +161,7 @@ impl Puzzles {
 
 pub use pmagi::star_room_tables;
 pub(in crate::game) use screens::ecrin_gem_hit;
+pub(in crate::game) use screens::tele_hit;
 
 /// Tests: the Land of the Dead boards' golden `st` lines.
 pub(super) fn ldmorts_st(g: &Game, board: &str) -> String {
@@ -451,15 +452,20 @@ impl Game {
     }
 
     /// The running screen's frame ([`screens`]). The two maps, the jewel
-    /// case, the game boy and the unicorn draw themselves in their
-    /// handlers; the other screens' drawing and their sprite hit test are
-    /// M4: a real click finds no sprite under the cursor (tests give it
-    /// through [`Game::screen_click`]).
+    /// case, the game boy, the unicorn, the remote and the skull draw
+    /// themselves in their handlers and test their sprites at the
+    /// pointer.
     pub(super) fn screen_frame(&mut self) {
         if !matches!(
             self.puzzles.screen,
             Some(
-                Screen::Carte | Screen::CarteTour | Screen::Ecrin | Screen::GBoy | Screen::Licorne
+                Screen::Carte
+                    | Screen::CarteTour
+                    | Screen::Ecrin
+                    | Screen::GBoy
+                    | Screen::Licorne
+                    | Screen::Telecommande
+                    | Screen::CraneBagdad
             )
         ) {
             self.draw_warp_only();
@@ -467,12 +473,11 @@ impl Game {
         }
         let left = std::mem::take(&mut self.click);
         let right = std::mem::take(&mut self.right_clicked);
-        let sprite = self.screen_sprite.take();
         // The handler flips itself (its @ 0x0040fdf0 call: the subtitle
         // line or the voice slots, @ 0x0040de60) after its drawing and
         // before its clicks, not on the paths that leave before drawing
         // ([`screens`]).
-        self.screen_step(left, right, sprite);
+        self.screen_step(left, right);
     }
 
     /// Escape in a full-screen mode (the Escape handler @ 0x0042ac50, its

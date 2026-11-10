@@ -193,6 +193,10 @@ pub struct Game {
     tick_last: f64,
     look_acc: f32,
     look_last: Option<f64>,
+    /// An `AngleWarpXNow` run by the dialogs' camera while the script was
+    /// borrowed: the script's angle (`Script::angle_x`) to set when it is
+    /// back ([`Game::run_command_now`]).
+    angle_x_now: Option<f32>,
     place: Place,
     camera: Camera,
     look: Look,
@@ -292,6 +296,15 @@ pub struct Game {
     saves_written: Vec<String>,
     /// The clock of the saves' `DateAndTime`, in seconds since 1970.
     pub unix_time: fn() -> i64,
+    /// `Atlantis3.cfg`'s play-time counter in use (@ 0x00789bf0: the
+    /// player slot chosen on the start page less one, −1 none until then)
+    /// and the clock's time it last counted from (@ 0x00789b58).
+    play_slot: Option<usize>,
+    play_mark: f64,
+    /// The local time zone's offset from UTC at that time, in seconds:
+    /// the saves are stamped in local time (`_strdate` / `_strtime`). The
+    /// apps give the system's; 0 (UTC) by default.
+    pub utc_offset: fn() -> i64,
     /// The text resources (loaded at the first text) and the subtitle
     /// line.
     texts: Option<crate::text::Texts>,
@@ -351,10 +364,6 @@ pub struct Game {
     /// only logged, a sound started by `Play` playing for ever.
     #[doc(hidden)]
     pub story_sound_model: bool,
-    /// Tests: the screen bank's sprite the next screen frame's hit test
-    /// (@ 0x00437080) answers, as a walk's `CLICK ... SPRITE=n` gives it.
-    #[doc(hidden)]
-    pub screen_sprite: Option<i32>,
     /// Tests: the parts the whole-story harness stubs (the dialogs' set-up
     /// and start, the place sounds' restarts) draw from a generator of
     /// their own, leaving `rand` alone as the stubs do.
@@ -411,6 +420,7 @@ impl Game {
             tick_last: 0.0,
             look_acc: 0.0,
             look_last: None,
+            angle_x_now: None,
             place: Place::default(),
             camera: Camera::new(fpu, width as u32, height as u32),
             look,
@@ -481,6 +491,9 @@ impl Game {
             save_dir: None,
             saves_written: Vec::new(),
             unix_time: pages::system_unix_time,
+            play_slot: None,
+            play_mark: 0.0,
+            utc_offset: || 0,
             quit: false,
             not_ported: Vec::new(),
             csounds: Default::default(),
@@ -490,7 +503,6 @@ impl Game {
             trace_views: false,
             stub_cinemas: false,
             story_sound_model: false,
-            screen_sprite: None,
             stub_rand: false,
         };
         // `AtlScarabee_MainInit` (@ 0x004d67b0).
@@ -513,6 +525,9 @@ impl Game {
         let Some(mut s) = self.script.take() else {
             return R::default();
         };
+        if let Some(a) = self.angle_x_now.take() {
+            s.angle_x = a;
+        }
         let r = f(&mut s, self);
         if let Some(e) = &s.fatal {
             log::error!("script: {e}");
@@ -520,6 +535,12 @@ impl Game {
         self.quit |= s.quit;
         self.script = Some(s);
         r
+    }
+
+    /// The clock in local time, seconds since 1970 ([`Game::unix_time`]
+    /// shifted by [`Game::utc_offset`]).
+    pub(crate) fn local_time(&self) -> i64 {
+        (self.unix_time)() + (self.utc_offset)()
     }
 
     /// The script, for tests.
@@ -984,22 +1005,35 @@ impl Game {
     }
 
     /// The right button (@ 0x00431639..0x00431676): in the warp the
-    /// inventory opens (unless it is open), in the inventory it closes, in
-    /// the subject menu the menu closes.
+    /// inventory opens (unless it is open), even during a move's turn (no
+    /// turn or pending-move test: the turn waits while the bag is open);
+    /// in the inventory it closes, in the subject menu the menu closes.
     pub fn right_click(&mut self) {
         if self.puzzles.freeze {
             return;
         }
         // The right button's byte (0x007592b9), read by the screens and the
-        // hunt; cleared when the warp opens the inventory.
+        // hunt: set, then cleared again (@ 0x00431676) once the button
+        // opened or closed the inventory or closed the subject menu (the
+        // inventory's close clears it itself too, @ 0x00427b5d), so the
+        // next warp frame never sees it; left set in the other modes, and
+        // in the warp when the inventory's open flag is set (@ 0x0043166f).
         self.right_clicked = true;
         match self.mode {
-            Mode::Warp if self.moving.turn.is_none() && !self.moving.pending => {
-                self.open_inventory();
+            Mode::Warp => {
+                if !self.inventory.open {
+                    self.open_inventory();
+                    self.right_clicked = false;
+                }
+            }
+            Mode::Inventory => {
+                self.close_inventory();
                 self.right_clicked = false;
             }
-            Mode::Inventory => self.close_inventory(),
-            Mode::Subjects => self.close_subjects(),
+            Mode::Subjects => {
+                self.close_subjects();
+                self.right_clicked = false;
+            }
             _ => {}
         }
     }
@@ -1354,6 +1388,10 @@ impl Game {
     /// One displayed frame at the game's time `now` (seconds).
     pub fn step(&mut self, now: f64) {
         self.now = now;
+        if let (Some(a), Some(s)) = (self.angle_x_now, self.script.as_mut()) {
+            s.angle_x = a;
+            self.angle_x_now = None;
+        }
         // The 15 Hz tick (@ 0x0043e550): the scripts' clocks.
         while now - self.tick_last >= 1.0 / 15.0 {
             let last = self.tick_last;
@@ -2208,7 +2246,8 @@ impl Game {
             _ => Vec::new(),
         };
         if let (Some(d), false) = (dest, self.double_click) {
-            let path = format!("hnmtraj/HNM640/{folder}/{}", d.video);
+            let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
+            let path = format!("hnmtraj/{hnm}/{folder}/{}", d.video);
             // The sprites are there before the video starts, so that its
             // first frame has them.
             if self.files.size(&path).is_some() {
@@ -2249,13 +2288,17 @@ impl Game {
         let name = view.name.clone();
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
-        let path = format!("warp/Warp512/{folder}/{name}");
+        let warp = crate::travel::warp_folder(self.startup.config.warp_res);
+        let path = format!("warp/{warp}/{folder}/{name}");
         if self.place.cube != path {
             let depth = self.depth();
             match self.files.read(&path).map(|d| faces_of(&d, depth)) {
                 Some(Ok(faces)) => self.place.faces = faces,
                 Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+                None => {
+                    let dir = format!("warp/{warp}/{folder}");
+                    self.place.faces = missing_cube(&self.files, &dir, &name, depth);
+                }
             }
             self.place.cube = path.clone();
         }
@@ -2288,12 +2331,16 @@ impl Game {
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         if let Some(name) = self.place.wam.view(id).map(|v| v.name.clone()) {
-            let path = format!("warp/Warp512/{folder}/{name}");
+            let warp = crate::travel::warp_folder(self.startup.config.warp_res);
+            let path = format!("warp/{warp}/{folder}/{name}");
             let depth = self.depth();
             match self.files.read(&path).map(|d| faces_of(&d, depth)) {
                 Some(Ok(faces)) => self.place.faces = faces,
                 Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+                None => {
+                    let dir = format!("warp/{warp}/{folder}");
+                    self.place.faces = missing_cube(&self.files, &dir, &name, depth);
+                }
             }
             self.place.cube = path;
         }
@@ -2322,6 +2369,7 @@ impl Game {
         // values first: tests replaying the original's run).
         let (queue, rand) = (&mut self.rand_queue, &mut self.rand);
         let depth = self.screen.depth();
+        let spw = crate::travel::spw_folder(self.startup.config.warp_res);
         self.slots = Slots::load_depth(
             &self.files,
             &mut self.spw_cache,
@@ -2337,6 +2385,7 @@ impl Game {
                     .map(|r| r.shown)
             },
             depth,
+            spw,
         );
     }
 
@@ -2502,7 +2551,9 @@ impl Game {
         let q = angles_quaternion(yaw, pitch);
         let mut g = SaveGame {
             current_cd: self.current_cd,
-            date_and_time: b"01/01/01 00:00:00".to_vec(),
+            // The same writer for the script's quick saves (`SAVE=n`) and
+            // the menu's (@ 0x00459ee0): the clock's date and time.
+            date_and_time: pages::date_and_time_now(self.local_time()),
             wam: s.wam.clone(),
             monde: s.a3.world,
             vue: s.current_view.unwrap_or(0),
@@ -2614,8 +2665,10 @@ impl Game {
         } else {
             &mut self.rand
         };
-        self.dialogs = Some(crate::dialog::Dialogs::load(
+        let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
+        self.dialogs = Some(crate::dialog::Dialogs::load_in(
             &self.files,
+            hnm,
             folder,
             &lang,
             rand,
@@ -2638,6 +2691,8 @@ impl Game {
             self.load_dialogs(w);
         }
         let mut dialogs = self.dialogs.take().unwrap();
+        // The body videos' folder as WarpRes is now (@ 0x00417280).
+        dialogs.hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
         let mut stub = Rand::new(0);
         let rand = if self.stub_rand {
             &mut stub
@@ -2869,8 +2924,27 @@ impl Game {
     /// of view `[Focale<stand>][camera]`, then the pitch of the head's
     /// camera (`Orient` @ 0x00441630, the head `.db`'s camera record), or
     /// levelled without one (`Horizontalize` @ 0x004418a0); the yaw kept.
+    /// Rhea's old couple, `dame` and `mons`, take their own branch first
+    /// (@ 0x0040b7c2..0x0040b80a, 0x0040b8e3..0x0040b907): the field of
+    /// view and the yaw Rhea's entry stored (`rhea::RheaCamera`),
+    /// `SetFov`, `Horizontalize`, then `RunOneCommand("(AngleWarpXNow=%d)",
+    /// now = 1)` with the yaw truncated (`_ftol`), run at once.
     fn dialog_camera(&mut self) {
         let Some(e) = self.dialog_entry() else { return };
+        if let Some(k) = ["dame", "mons"].iter().position(|n| e.speaker == *n) {
+            log::debug!("{} init", if k == 0 { "DAME" } else { "MONS" });
+            let cam = self.puzzles.rhea.dialog_camera;
+            let deg = cam.fov[k];
+            self.camera_fov = dialog_fov(self.camera.fpu, deg);
+            self.ev(|| format!("SetFov({:08x})", deg.to_bits()));
+            self.ev(|| "Horizontalize".into());
+            self.camera.horizontalize();
+            let cmd = format!("(AngleWarpXNow={})", cam.yaw[k] as i32);
+            self.ev(|| format!("RunOneCommand({cmd}, now=1)"));
+            self.run_command_now(&cmd);
+            log::debug!("---");
+            return;
+        }
         let Some(d) = self.dialogs.as_ref() else {
             return;
         };
@@ -3197,6 +3271,30 @@ impl Game {
     /// Runs a script command as `RunOneCommand` does (`(KEY=value)`).
     pub fn run_command(&mut self, command: &str) {
         self.with_script(|s, h| s.run_command(h, command.as_bytes()));
+    }
+
+    /// `RunOneCommand(command, now = 1)` (@ 0x00447840): never queued
+    /// behind a waiting section. Under a script command (a dialog started
+    /// by `DIAL`, the script borrowed) only `AngleWarpXNow` is met: its
+    /// turn runs at once and the script's own copy of the angle (read by
+    /// `INITRECALAGE`) is set before the next frame.
+    fn run_command_now(&mut self, command: &str) {
+        if let Some(mut s) = self.script.take() {
+            s.run_command_now(self, command.as_bytes());
+            self.script = Some(s);
+            return;
+        }
+        let Some(v) = command
+            .strip_prefix("(AngleWarpXNow=")
+            .and_then(|r| r.strip_suffix(')'))
+            .and_then(|v| v.parse::<i32>().ok())
+        else {
+            log::warn!("RunOneCommand({command}): no script");
+            return;
+        };
+        let a = atlantis2_engine::script::a3::deg_to_rad_a3(self.camera.fpu, v);
+        Host::turn_now(self, true, a);
+        self.angle_x_now = Some(a);
     }
 
     /// Draws the warp (the place animations, then the cube) with a given
@@ -3553,7 +3651,7 @@ pub fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
 /// game: chapter 0's boot state (`CFuner.wam` view 4 with world 1, at
 /// start-up) asks for `warp\Warp512\hoggar\cf0004.hnm`, which is in
 /// `ldm\`; the boot state is never drawn.
-fn missing_cube(files: &A3Files, folder: &str, name: &str, depth: Depth) -> Faces {
+fn missing_cube(files: &A3Files, dir: &str, name: &str, depth: Depth) -> Faces {
     const DEBUG: [u32; 6] = [
         0xff00_0080,
         0xff80_0000,
@@ -3565,16 +3663,12 @@ fn missing_cube(files: &A3Files, folder: &str, name: &str, depth: Depth) -> Face
     let stem = name.split_once('.').map_or(name, |(s, _)| s);
     let cut = stem.len().min(2);
     for side in ["ft", "bk", "up", "dn", "rt", "lf"] {
-        let tga = format!(
-            "warp/Warp512/{folder}/{}{side}{}.tga",
-            &stem[..cut],
-            &stem[cut..]
-        );
+        let tga = format!("{dir}/{}{side}{}.tga", &stem[..cut], &stem[cut..]);
         if files.size(&tga).is_some() {
             log::warn!("{tga}: the cube's TGA faces are not ported");
         }
     }
-    log::debug!("warp/Warp512/{folder}/{name}: not found (debug colours)");
+    log::debug!("{dir}/{name}: not found (debug colours)");
     match depth {
         Depth::Rgb565 => {
             Faces::Rgb565(DEBUG.map(|c| vec![<u16 as PagePixel>::from_argb(c); 512 * 512]))
@@ -3711,6 +3805,10 @@ impl Host for Game {
                 if name.eq_ignore_ascii_case("tourmagi.wam") {
                     self.gboy_reload_banks();
                 }
+                // Every WAM's: the skull's and the remote's (@ 0x004c3794,
+                // @ 0x004c3799).
+                self.crane_reload_banks();
+                self.tele_reload_banks();
                 true
             }
             Err(e) => {
@@ -3849,14 +3947,20 @@ impl Host for Game {
         // The cue file decides the folder (@ 0x00420f3c..0x00421089).
         let localised = self.files.size(&format!("hnm/{subtitles}")).is_some();
         let lang = self.startup.voice_language();
+        let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
         let path = if localised {
-            format!("loc/hnm/HNM640/{lang}/{folder}/{video}")
+            format!("loc/hnm/{hnm}/{lang}/{folder}/{video}")
         } else {
-            format!("hnm/HNM640/{folder}/{video}")
+            format!("hnm/{hnm}/{folder}/{video}")
         };
         let back = self.mode;
         let started = self.start_video(&path, fps.max(0) as u32, false, back, Vec::new());
         if started {
+            // `AtlHnm_start`, once CryoMovie opened the film: both music
+            // slots stopped before its playback (@ 0x0042121b:
+            // 0x00433d30(0)); the track's name is kept for its restart at
+            // the film's end (@ 0x004220cf → 0x00433d00).
+            self.audio.stop(CHANNEL_MUSIC);
             // The cue file and the caption file (`AtlHnm_Start`
             // @ 0x00420f68, @ 0x00420faf).
             let cues = self

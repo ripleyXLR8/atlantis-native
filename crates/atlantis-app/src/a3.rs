@@ -234,7 +234,9 @@ impl A3App {
     /// The window's game before its window opens; full screen as
     /// `Atlantis3.cfg` says, or as `fullscreen` asks; the intro first
     /// unless `no_intro`.
-    pub fn new(game: Game, fullscreen: bool, no_intro: bool) -> A3App {
+    pub fn new(mut game: Game, fullscreen: bool, no_intro: bool) -> A3App {
+        // The saves' `DateAndTime` in local time.
+        game.utc_offset = crate::a2::utc_offset_now;
         let fullscreen = fullscreen || game.startup.config.full_screen;
         let audio = game.audio.clone();
         let stream = crate::audio_out::start_with(move |out, rate, channels| {
@@ -471,7 +473,10 @@ impl ApplicationHandler for A3App {
                 if event.state == ElementState::Pressed && !event.repeat =>
             {
                 match event.logical_key {
-                    Key::Named(NamedKey::Enter) if self.alt => self.toggle_fullscreen(),
+                    // Alt+Enter: not while a puzzle freezes the keys (@ 0x0042ab20).
+                    Key::Named(NamedKey::Enter) if self.alt && !self.game.keys_frozen() => {
+                        self.toggle_fullscreen()
+                    }
                     Key::Named(NamedKey::F11) => self.toggle_fullscreen(),
                     Key::Named(NamedKey::Escape) if self.game.credits().is_some() => {
                         if self.game.credits_escape() {

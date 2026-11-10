@@ -1,14 +1,16 @@
 //! The full-screen loop modes' frames (the main loop's table
 //! @ 0x004d5e30): what each one does to the script's world on a frame,
 //! with the click bytes of that frame (left @ 0x007592b8, right
-//! @ 0x007592b9) and the screen bank's sprite under the cursor (the hit
-//! test @ 0x00437080, one call per sprite index in the loop's order). A
+//! @ 0x007592b9); the screens test their bank's sprites at the pointer
+//! themselves (the hit test @ 0x00437080, one call per sprite index in
+//! the loop's order). A
 //! handler returning 0 makes the main loop call the mode's `Stop`
 //! ([`Game::stop_screen`]).
 //!
-//! The two maps, the jewel case, the game boy and the unicorn's 3D board
-//! ([`crate::licorne`]) are drawn ([`crate::maps`], `screens_draw`); the
-//! other screens' drawing and their hover animations are M4.
+//! The two maps, the jewel case, the game boy, the remote, the skull and
+//! the unicorn's 3D board ([`crate::licorne`]) are drawn ([`crate::maps`],
+//! `screens_draw`); every hit test is the bank's own (`SPR_COLLISION`)
+//! at the pointer.
 //!
 //! Each handler has one call of the flip (@ 0x0040fdf0, the texts of
 //! @ 0x0040de60: `Game::flip_texts`), after its drawing and before its
@@ -77,6 +79,21 @@ pub struct State {
     pub tour_board: Option<Arc<Bank>>,
     pub tour_pawns: Option<Arc<Bank>>,
     pub tour_anim: maps::TourAnim,
+    /// `TELECOMMANDE`'s bank `Telecommande.spr` (@ 0x00789710) and
+    /// `CRANEBAGDAD`'s `GrandCrane.spr` (@ 0x0074ebf0), opened again by
+    /// every WAM load (@ 0x004c3794 → @ 0x00409d80, @ 0x004c3799 →
+    /// @ 0x004d0c30).
+    pub tele_bank: Option<Arc<Bank>>,
+    pub crane_bank: Option<Arc<Bank>>,
+    /// The remote's hover animation (@ 0x004d0040), by button in the
+    /// loop's order ([`TELE_BUTTONS`]: power, Bagdad, Paleo, home): the
+    /// hovered bytes (@ 0x0078972e, 0x0078972d, 0x0078972c, 0x0078972f),
+    /// the frames (@ 0x0078973c, 0x00789738, 0x00789734, 0x00789740) and
+    /// the clock's last time (@ 0x007896d0). Neither the start nor the
+    /// stop resets them (only @ 0x004cffc0 does).
+    pub tele_hover: [bool; 4],
+    pub tele_frames: [i32; 4],
+    pub tele_clock: f64,
 }
 
 /// The game boy's globals (`AtlGBoy`, @ 0x0041f660..0x0041fd80).
@@ -240,32 +257,32 @@ pub(super) fn start(h: &mut Hx, screen: Screen) {
             h.g.puzzles.screens.licorne = board.map(Box::new);
             h.g.pointer = maps::centre(w, ht);
         }
-        // @ 0x00431da0, 0x00409a40, 0x004cfee0 (0x0071f0e8 := 0, read by
-        // nobody): nothing the script sees besides the common part.
+        // @ 0x00409a40 and @ 0x004cfee0 (0x0071f0e8 := 0, read by
+        // nobody): the pointer centred (@ 0x00431780); the remote's
+        // cursor is `Interface.spr` #40 (@ 0x00427f80), the skull's is
+        // reset (@ 0x004282e0), so no pointer is drawn there.
+        Screen::CraneBagdad | Screen::Telecommande => {
+            h.g.pointer = maps::centre(h.g.width, h.g.height);
+        }
+        // @ 0x00431da0: nothing the script sees besides the common part.
         _ => {}
     }
 }
 
 /// One frame of the running screen; false = the handler returned 0.
-pub(super) fn frame(
-    h: &mut Hx,
-    screen: Screen,
-    left: bool,
-    right: bool,
-    sprite: Option<i32>,
-) -> bool {
+pub(super) fn frame(h: &mut Hx, screen: Screen, left: bool, right: bool) -> bool {
     match screen {
         Screen::Scarabee => scarabee(h, left, right),
-        Screen::Carte => carte(h, left, right, sprite),
+        Screen::Carte => carte(h, left, right),
         Screen::CarteTour => {
             // @ 0x00406780: drawn, then any click closes (@ 0x004069c9).
             h.g.tour_draw();
             h.g.flip_texts();
             !(left || right)
         }
-        Screen::Telecommande => telecommande(h, left, right, sprite),
+        Screen::Telecommande => telecommande(h, left, right),
         Screen::CraneBagdad => crane(h, left, right),
-        Screen::Ecrin => ecrin(h, left, sprite),
+        Screen::Ecrin => ecrin(h, left),
         Screen::GBoy => gboy(h, left, right),
         Screen::Licorne => licorne(h, left, right),
     }
@@ -351,13 +368,13 @@ fn scarabee(h: &mut Hx, left: bool, right: bool) -> bool {
 /// 563) → `TROP_DE_PLUMES` := 1 and leave; the high priest not met
 /// (`flag80` = 0) → `GP_PAS_VU` := 1 and leave. Then the map is drawn
 /// ([`maps::draw_carte`]). A left click on map sprite k = 1..5 at its
-/// drawn position (`sprite` when a test gives it, else the pointer's hit)
+/// drawn position (the pointer's hit)
 /// → chapter 12, 14, 13, 15, 16 (all but 15: the fisherman gone once his
 /// scale is taken, flag 69); the current chapter → nothing; else
 /// `LDM_CHAPITRE_DEPART` := the chapter, `LDM_CHAPITRE_ARRIVEE` := the
 /// target, `(chapter=500)` and leave. A left click on nothing clears the
 /// clicks; a right click leaves.
-fn carte(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> bool {
+fn carte(h: &mut Hx, left: bool, right: bool) -> bool {
     if let Some(r) = maps::carte_refusal(|f| h.flag(f as usize)) {
         h.set_var(r.var(), 1);
         return false;
@@ -368,7 +385,7 @@ fn carte(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> bool {
     if !left {
         return !right;
     }
-    let hit = sprite.or_else(|| h.g.carte_hit());
+    let hit = h.g.carte_hit();
     let target = match hit {
         Some(k @ 1..=5) => maps::CARTE_CHAPTERS[k as usize - 1],
         _ => return true,
@@ -389,17 +406,93 @@ fn carte(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> bool {
     false
 }
 
-/// `TELECOMMANDE`, the remote (@ 0x004d0550; the hover animation
-/// @ 0x004d0040 is visual). A left click: the first one shows the
-/// Atlantean figure (`flag427` := 1, `flag425` := 0); then in
-/// `hoggar.wam` button 0 = the Hoggar (`flag404` := 1 and
-/// `(PlaySound=51)` once), button 0x0e = Bagdad (flag 400, or 401 after
-/// flag 908), button 0x1d = Paleo (flag 402, or 403 after flag 605);
-/// elsewhere button 0x2c = home, `(Chapter=607)`. The loop stays; a
-/// right click leaves.
-fn telecommande(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> bool {
-    // The flip (@ 0x004d0742), before the clicks.
+/// The remote's buttons in the loop's order (@ 0x004d0550, @ 0x004d0040):
+/// the first sprite, the hit test's position from the screen's centre,
+/// the drawing's x from the centre (the power button is drawn 2 pixels
+/// left of where it is tested: −0x9a @ 0x004d0670, −0x98 @ 0x004d07aa)
+/// and the last hover frame.
+pub(crate) const TELE_BUTTONS: [(i32, (i32, i32), i32, i32); 4] = [
+    (0x00, (-0x98, -0xd4), -0x9a, 13),
+    (0x0e, (-0x8c, -0x13), -0x8c, 14),
+    (0x1d, (0x30, -0x91), 0x30, 14),
+    (0x2c, (-0x81, -0x8c), -0x81, 14),
+];
+/// The remote's picture: frame 0x3b, 0x3c once powered (flag 404).
+pub(crate) const TELE_BODY: (usize, usize) = (0x3b, 0x3c);
+
+/// `SPR_COLLISION` (@ 0x00437080) of the remote's button `k`
+/// ([`TELE_BUTTONS`]) on a `w` × `h` screen at the pointer.
+pub(in crate::game) fn tele_hit(bank: &Bank, k: usize, w: i32, h: i32, ptr: (i32, i32)) -> bool {
+    let (sprite, (dx, dy), _, _) = TELE_BUTTONS[k];
+    let (cx, cy) = (w / 2, h / 2);
+    bank.opaque_at(sprite as usize, Some(cx + dx), cy + dy, ptr.0, ptr.1)
+}
+
+/// The remote's first button under the pointer, in the loop's order.
+fn tele_button(h: &Hx) -> Option<usize> {
+    let bank = h.g.puzzles.screens.tele_bank.as_ref()?;
+    let (w, ht) = (h.g.width as i32, h.g.height as i32);
+    (0..4).find(|&k| tele_hit(bank, k, w, ht, h.g.pointer))
+}
+
+/// @ 0x004cffc0: every button's hover byte and frame cleared.
+fn tele_hover_reset(st: &mut State) {
+    st.tele_hover = [false; 4];
+    st.tele_frames = [0; 4];
+}
+
+/// The remote's hover animation (@ 0x004d0040), after the drawing: the
+/// first button under the pointer (power only while flag 404 = 0; home
+/// only outside `hoggar.wam`, the others only in it) starts its cycle
+/// (every button reset, its byte set, the clock at now), then moves its
+/// frame on every 1/15 s (power 0..13, the others 0..14). A button of
+/// the wrong place, or none, resets them all; the power button once
+/// powered leaves them as they are.
+fn tele_hover(h: &mut Hx) {
+    let hit = tele_button(h);
+    let hoggar = h.g.wam_is("hoggar.wam");
+    let powered = h.flag(404) != 0;
+    let now = h.now();
+    let st = &mut h.g.puzzles.screens;
+    let Some(k) = hit else {
+        tele_hover_reset(st);
+        return;
+    };
+    if k == 0 && powered {
+        return;
+    }
+    if !st.tele_hover[k] {
+        tele_hover_reset(st);
+        if hoggar == (k != 3) {
+            st.tele_hover[k] = true;
+            st.tele_clock = now;
+        }
+        return;
+    }
+    if now - st.tele_clock > TICK {
+        st.tele_clock = now;
+        let last = TELE_BUTTONS[k].3;
+        let f = &mut st.tele_frames[k];
+        *f = if *f < last { *f + 1 } else { 0 };
+    }
+}
+
+/// `TELECOMMANDE`, the remote (@ 0x004d0550). Drawn
+/// ([`Game::tele_draw`]) and flipped, then the hover animation
+/// ([`tele_hover`]), then a left click: the first one shows the Atlantean
+/// figure (`flag427` := 1, `flag425` := 0); then the first button under
+/// the pointer, in the loop's order: in `hoggar.wam` button 0 = the
+/// Hoggar (`flag404` := 1, `(PlaySound=51)` and the hover reset once),
+/// button 0x0e = Bagdad (flag 400, or 401 after flag 908), button 0x1d =
+/// Paleo (flag 402, or 403 after flag 605); elsewhere button 0x2c = home
+/// (the hover reset, `(Chapter=607)`). The loop stays; a right click
+/// leaves.
+fn telecommande(h: &mut Hx, left: bool, right: bool) -> bool {
+    let powered = h.flag(404) != 0;
+    h.g.tele_draw(powered);
+    // The flip (@ 0x004d0742), before the hover and the clicks.
     h.g.flip_texts();
+    tele_hover(h);
     if !left {
         return !right;
     }
@@ -410,14 +503,16 @@ fn telecommande(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> boo
         h.run("(HidePerso=CMP_ATLANTE)");
     }
     let hoggar = h.g.wam_is("hoggar.wam");
-    let hit = |k: i32| sprite == Some(k);
+    let bank = h.g.puzzles.screens.tele_bank.clone();
+    let (w, ht, ptr) = (h.g.width as i32, h.g.height as i32, h.g.pointer);
+    let hit = |k: usize| bank.as_ref().is_some_and(|b| tele_hit(b, k, w, ht, ptr));
     if hit(0) && hoggar {
         if h.flag(404) == 0 {
             h.set_flag(404, 1);
             h.run("(PlaySound=51)");
-            // visual: the hover bytes reset (@ 0x004cffc0).
+            tele_hover_reset(&mut h.g.puzzles.screens);
         }
-    } else if hit(0x0e) && hoggar {
+    } else if hit(1) && hoggar {
         hide_worlds(h);
         let show = if h.flag(908) == 0 {
             h.set_flag(400, 1);
@@ -434,7 +529,7 @@ fn telecommande(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> boo
         };
         h.run(show);
         h.run("(PlaySound=50)");
-    } else if hit(0x1d) && hoggar {
+    } else if hit(2) && hoggar {
         hide_worlds(h);
         h.set_flag(400, 0);
         h.set_flag(401, 0);
@@ -449,8 +544,9 @@ fn telecommande(h: &mut Hx, left: bool, right: bool, sprite: Option<i32>) -> boo
         };
         h.run(show);
         h.run("(PlaySound=50)");
-    } else if hit(0x2c) && !hoggar {
-        // visual: the hover bytes reset (@ 0x004cffc0, 0x0078972f := 0).
+    } else if hit(3) && !hoggar {
+        // @ 0x004cffc0, then 0x0078972f := 0 again.
+        tele_hover_reset(&mut h.g.puzzles.screens);
         h.run("(HideObjet=CMP_PALEO)");
         h.run("(HideObjet=CMP_PALEOFIN)");
         h.run("(HideObjet=CMP_BAGDAD)");
@@ -470,10 +566,12 @@ fn hide_worlds(h: &mut Hx) {
     h.run("(HideObjet=CMP_PALEOFIN)");
 }
 
-/// `CRANEBAGDAD`, a crystal skull (@ 0x00409b40): a left click goes to
-/// the interdimension (as @ 0x00409cc0, with `flag901` := 1 before the
+/// `CRANEBAGDAD`, a crystal skull (@ 0x00409b40): drawn
+/// ([`Game::crane_draw`]) and flipped; a left click goes to the
+/// interdimension (as @ 0x00409cc0, with `flag901` := 1 before the
 /// commands) and leaves; a right click leaves.
 fn crane(h: &mut Hx, left: bool, right: bool) -> bool {
+    h.g.crane_draw();
     // The flip (@ 0x00409bbb), before the clicks.
     h.g.flip_texts();
     if left {
@@ -511,9 +609,8 @@ pub(in crate::game) fn ecrin_gem_hit(
 /// frame is drawn and flipped, then a left click on the hovered gem
 /// takes it (the right button does nothing). At the first tick with the
 /// three taken the loop returns 0 before drawing (the stop puts the gems
-/// in the bag). No sound. `sprite`: tests, the hit test answered for that
-/// bank sprite (gem k is sprite k + 1) instead of the pointer's.
-fn ecrin(h: &mut Hx, left: bool, sprite: Option<i32>) -> bool {
+/// in the bag). No sound.
+fn ecrin(h: &mut Hx, left: bool) -> bool {
     let now = h.now();
     let ptr = h.g.pointer;
     let (w, ht) = (h.g.width as i32, h.g.height as i32);
@@ -523,12 +620,9 @@ fn ecrin(h: &mut Hx, left: bool, sprite: Option<i32>) -> bool {
     let mut hovered = None;
     if st.ecrin_fade == 1.0 && st.ecrin_count != 3 {
         for k in 0..3 {
-            let hit = match sprite {
-                Some(n) => n == k as i32 + 1,
-                None => bank
-                    .as_ref()
-                    .is_some_and(|b| ecrin_gem_hit(b, k, w, ht, ptr)),
-            };
+            let hit = bank
+                .as_ref()
+                .is_some_and(|b| ecrin_gem_hit(b, k, w, ht, ptr));
             if !st.ecrin_taken[k] && hit {
                 hovered = Some(k);
             }
@@ -749,7 +843,7 @@ fn licorne(h: &mut Hx, left: bool, right: bool) -> bool {
 impl Game {
     /// One frame of the running screen with the given click bytes; its
     /// stop when the handler returns 0.
-    pub(in crate::game) fn screen_step(&mut self, left: bool, right: bool, sprite: Option<i32>) {
+    pub(in crate::game) fn screen_step(&mut self, left: bool, right: bool) {
         let Some(screen) = self.puzzles.screen else {
             return;
         };
@@ -758,7 +852,7 @@ impl Game {
         };
         let stay = {
             let mut h = Hx { g: self, s: &mut s };
-            frame(&mut h, screen, left, right, sprite)
+            frame(&mut h, screen, left, right)
         };
         self.script = Some(s);
         if !stay {
@@ -766,11 +860,10 @@ impl Game {
         }
     }
 
-    /// One frame of the running screen with a click (tests): `left` a
-    /// left click, else a right one; `sprite` the screen bank's sprite
-    /// under the cursor (the hit test @ 0x00437080).
-    pub fn screen_click(&mut self, left: bool, sprite: Option<i32>) {
-        self.screen_step(left, !left, sprite);
+    /// One frame of the running screen with a click at the pointer
+    /// (tests): `left` a left click, else a right one.
+    pub fn screen_click(&mut self, left: bool) {
+        self.screen_step(left, !left);
         self.main_loop_hook();
     }
 

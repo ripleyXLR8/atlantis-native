@@ -60,10 +60,10 @@ pub fn system_unix_time() -> i64 {
         .map_or(0, |d| d.as_secs()) as i64
 }
 
-/// `_strdate` + `_strtime` (`MM/DD/YY HH:MM:SS`) of the clock at `secs`
-/// (seconds since 1970) in UTC (the original's is the local time; the
-/// port has no time zone).
-fn date_and_time_now(secs: i64) -> Vec<u8> {
+/// `_strdate` + `_strtime` (`MM/DD/YY HH:MM:SS`): the local date and
+/// time at `secs`, seconds since 1970 already shifted to the local time
+/// zone ([`Game::local_time`]).
+pub(super) fn date_and_time_now(secs: i64) -> Vec<u8> {
     let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
     // Days to the civil date (proleptic Gregorian).
     let z = days + 719_468;
@@ -194,6 +194,14 @@ impl Game {
     /// the game boy, the jewel case and the skull stop
     /// ([`Game::escape_screen`]).
     pub fn escape(&mut self) {
+        // The keyboard callback handles no key while a puzzle freezes the
+        // input (@ 0x0042ab20: the byte 0x00789d56 set → `ret`): no aim
+        // stored, no Escape handler, so no menu opens during the spinning
+        // top, a corridor door, the merchant's stone or capture, the
+        // tiger's stone, the fisherman's scale or the tower's demon turn.
+        if self.keys_frozen() {
+            return;
+        }
         // The keyboard callback stores the camera's angles at every Escape
         // press, whatever the mode (@ 0x0042ac35: 0x004408e0 into
         // 0x0077e648 / 0x0078111c), then runs the Escape handler.
@@ -252,6 +260,13 @@ impl Game {
         if self.mode == Mode::Menu {
             self.menus.release();
         }
+    }
+
+    /// Whether the keyboard callback ignores every key (@ 0x0042ab20:
+    /// the input freeze byte 0x00789d56, set by a puzzle's animation):
+    /// Escape ([`Game::escape`]) and Alt+Enter do nothing then.
+    pub fn keys_frozen(&self) -> bool {
+        self.puzzles.freeze
     }
 
     /// A menu frame (loop mode 6, @ 0x004591a0): the menus' frame on the
@@ -315,7 +330,10 @@ impl Game {
                 Event::Command(c) => self.run_command(&String::from_utf8_lossy(&c)),
                 Event::WriteCfg => self.write_cfg(),
                 Event::Exists(..) => {}
-                Event::Player(n) => self.player = n,
+                Event::Player(n) => {
+                    self.player = n;
+                    self.play_time_slot(n);
+                }
                 Event::NewGame => {
                     self.page_left();
                     self.new_game();
@@ -427,6 +445,12 @@ impl Game {
         if self.puzzles.screens.carte_bank.is_some() {
             self.carte_reload_banks();
         }
+        if self.puzzles.screens.crane_bank.is_some() {
+            self.crane_reload_banks();
+        }
+        if self.puzzles.screens.tele_bank.is_some() {
+            self.tele_reload_banks();
+        }
         let c = &mut self.startup.config;
         c.resolution = (w as i32, h as i32);
         c.pixel_format = match self.menus.depth {
@@ -487,9 +511,36 @@ impl Game {
         self.look_last = None;
     }
 
+    /// The play time since the last mark added to the counter in use,
+    /// in whole seconds (`__ftol` of the clock's difference; the second
+    /// read's difference, 0x00789d30, is 0), and the mark restarted
+    /// (@ 0x0040945f..0x00409505, @ 0x004520e3..0x0045218b).
+    fn play_time_count(&mut self) {
+        if let Some(k) = self.play_slot {
+            let t = &mut self.startup.config.time[k];
+            *t = t.wrapping_add((self.now - self.play_mark) as i32);
+        }
+        self.play_mark = self.now;
+    }
+
+    /// The start page's player `n` (1..5) chosen (@ 0x00452000): the time
+    /// played so far counted to the previous player's counter, then
+    /// counter `n` − 1 in use from now.
+    fn play_time_slot(&mut self, n: i32) {
+        self.play_time_count();
+        self.play_slot = usize::try_from(n - 1).ok().filter(|&k| k < 5);
+    }
+
+    /// `Atlantis3.cfg`'s text as its writer makes it (@ 0x00408f80): the
+    /// play time counted first.
+    pub(super) fn cfg_text(&mut self) -> Vec<u8> {
+        self.play_time_count();
+        self.startup.config.write(&self.startup.install_language)
+    }
+
     /// `Atlantis3.cfg` written (@ 0x00408f80) where the app asked.
     fn write_cfg(&mut self) {
-        let data = self.startup.config.write(&self.startup.install_language);
+        let data = self.cfg_text();
         if let Some(p) = &self.menus.cfg_path {
             if let Err(e) = std::fs::write(p, &data) {
                 log::warn!("{}: {e}", p.display());
@@ -506,21 +557,10 @@ impl Game {
         let Some(s) = self.script.take() else {
             return;
         };
+        // The writer's text, its `DateAndTime` the local clock's.
         let text = self.save_text(&s);
         self.script = Some(s);
-        // The writer's second line (`DateAndTime = ...`).
-        let mut data = Vec::new();
-        let mut lines = text.splitn(3, |&b| b == b'\n');
-        if let (Some(a), Some(_), Some(rest)) = (lines.next(), lines.next(), lines.next()) {
-            data.extend_from_slice(a);
-            data.extend_from_slice(b"\nDateAndTime = ");
-            data.extend(date_and_time_now((self.unix_time)()));
-            data.push(b'\n');
-            data.extend_from_slice(rest);
-        } else {
-            data = text;
-        }
-        self.store_save(name, data);
+        self.store_save(name, text);
         if !atlantis3_data::save::has_thumbnail(name) {
             return;
         }
@@ -545,5 +585,63 @@ impl Game {
             self.saves_written.push(key.clone());
             self.saves.insert(key, bank);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn game() -> Option<Game> {
+        let dir = atlantis3_data::testing::install_dir()?;
+        Game::new(atlantis3_data::A3Files::open_dir(&dir).ok()?.0).ok()
+    }
+
+    /// `Atlantis3.cfg`'s `Time` counters (@ 0x00408f80, @ 0x00452000):
+    /// none counts before a player is chosen; then the chosen player's
+    /// grows by the whole seconds played at each write, and choosing
+    /// another player counts the time so far to the previous one.
+    #[test]
+    fn the_play_time_counters_grow_as_the_original() {
+        let Some(mut g) = game() else {
+            return;
+        };
+        g.startup.config.time = [0; 5];
+        g.now = 10.0;
+        g.cfg_text();
+        assert_eq!(g.startup.config.time, [0; 5]);
+        g.now = 20.0;
+        g.menu_events(vec![Event::Player(2)]);
+        g.now = 95.7;
+        let text = g.cfg_text();
+        assert_eq!(g.startup.config.time, [0, 75, 0, 0, 0]);
+        assert!(String::from_utf8_lossy(&text).contains("0 75 0 0 0"));
+        g.now = 100.2;
+        g.menu_events(vec![Event::Player(4)]);
+        assert_eq!(g.startup.config.time, [0, 79, 0, 0, 0]);
+        g.now = 130.0;
+        g.cfg_text();
+        assert_eq!(g.startup.config.time, [0, 79, 0, 29, 0]);
+    }
+
+    /// The saves' `DateAndTime` (@ 0x00459ee0, `_strdate` / `_strtime`):
+    /// the local time, for the script's quick saves as for the menu's.
+    #[test]
+    fn saves_are_stamped_with_the_local_time() {
+        let Some(mut g) = game() else {
+            return;
+        };
+        assert!(g.board_begin("hoggar.wam", 1));
+        g.board_enter(1, 100.0);
+        // 2023-11-14 22:13:20 UTC, one hour east of it.
+        g.unix_time = || 1_700_000_000;
+        g.utc_offset = || 3600;
+        let want = "DateAndTime = 11/14/23 23:13:20";
+        let name = g.quick_save_now(1);
+        let text = String::from_utf8_lossy(g.saved(&name).unwrap()).into_owned();
+        assert!(text.contains(want), "{text}");
+        g.write_menu_save("game1_1.sav");
+        let text = String::from_utf8_lossy(g.saved("game1_1.sav").unwrap()).into_owned();
+        assert!(text.contains(want), "{text}");
     }
 }

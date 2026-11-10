@@ -130,9 +130,10 @@ pub struct Config {
     /// accessor @ 0x004d5940.
     pub install: Vec<u8>,
     /// `Time a b c d e` (DAT_00789c0c..DAT_00789c1c): five play-time
-    /// counters; the one indexed by DAT_00789bf0 (set by the game's modes
-    /// in @ 0x00452000) grows by the time spent. Unit `[UNKNOWN]` (the
-    /// difference of `__ftol` of the timer @ 0x004e7b20). Default 0.
+    /// counters, one per start-page player; the one indexed by
+    /// DAT_00789bf0 (the player chosen, @ 0x00452000) grows at each write
+    /// (@ 0x0040945f) by the whole seconds played since the last (`__ftol`
+    /// of the difference of the clock @ 0x004e7b20, in seconds). Default 0.
     pub time: [i32; 5],
     /// `WarpRes` (DAT_00789d34): the size of the panorama cube faces,
     /// 512 or 1024 (@ 0x0043f420); 1024 also makes the warp view 800 x 600

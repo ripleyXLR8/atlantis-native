@@ -4053,6 +4053,83 @@ code under emulation. Not compared: the original's GDI glyph pixels,
 its DirectDraw display, and the heads' and unicorn's 32-bit spans (read
 statically).
 
+Fixed after 0.6.0, from a review of the port against the original's code:
+
+- The remote control of the late Hoggar (loop mode 18, @ 0x004d0550)
+  is drawn and answers the mouse: `Telecommande.spr`, opened again by
+  every WAM load (@ 0x004d0c30), the remote and its four buttons drawn
+  from the screen's centre, the hovered button's 1/15 s animation
+  (@ 0x004d0040) and each button's hit test at the pointer
+  (`SPR_COLLISION` @ 0x00437080, sprites 0, 0x0e, 0x1d and 0x2c in that
+  order), which sets flags 400..404 (`tests/board_remote.rs`,
+  `tests/golden/puzzle_telecommande.txt`). In 0.6.0 a real click found
+  no button, so flags 400 and 402 were never set and chapter 5 could not
+  leave the Hoggar for Bagdad or Paleo; the story tests had given the
+  hit test's answer instead of clicking. They now place the pointer on
+  the original's hit points and click, for the remote, the jewel case
+  and the Land of the Dead's map alike.
+- The skull screen (loop mode 15, @ 0x00409b40) draws the skull:
+  `GrandCrane.spr` #0 at the screen's centre over the panorama, opened
+  again by every WAM load (@ 0x00409d80), and no pointer (its start
+  resets the cursor); 0.6.0 showed the panorama with a pointer
+  (`tests/board_remote.rs`).
+- No key works while a puzzle freezes the input: the keyboard callback
+  (@ 0x0042ab20) returns at once while the byte 0x00789d56 is set
+  (`Game::keys_frozen`), so Escape and Alt+Enter do nothing during the
+  spinning top's throw, a corridor door, the merchant's stone and
+  captures, the tiger's stone, the fisherman's scale and the tower's
+  demon turn (the unicorn's start sets and clears it within the start).
+  In 0.6.0 Escape opened the menu there, and a load or a new game from
+  it left the freeze set, every click ignored. The original's load
+  (@ 0x00459e70) and new game do not clear the byte or the camera lock
+  (0x0077b8ac), and the port does not either: with the menu closed to a
+  frozen game, neither is reached (`tests/escape_freeze.rs`).
+- Rhea's old couple (`dame`, `mons`) take their own dialog camera, as
+  `GereOrientation` (@ 0x0040b7c2..0x0040b80a, 0x0040b8e3..0x0040b907)
+  gives it: `SetFov` and the yaw Rhea's entry (@ 0x004cd300) stored for
+  the view (view 10: 50° / 485° and 50° / 100°, 11: 60 / 165 and 80 / 100,
+  12: 80 / 115 and 60 / 15, 13: 40 / 90 and 40 / 20), `Horizontalize`,
+  then `RunOneCommand("(AngleWarpXNow=%d)", now = 1)`, run at once even
+  while the section waits (`Script::run_command_now`;
+  `tests/dialog_rhea.rs`). 0.6.0 used the speakers' `Focale` and head
+  camera and left the yaw.
+- A cinematic stops the music when it starts, as `AtlHnm_start` does
+  once the film opened (@ 0x0042121b: both music slots stopped); its end
+  starts the track again from its beginning, as before. 0.6.0 played the
+  music under the films. The travel videos leave the music alone
+  (`tests/cinema_music.rs`).
+- The right button clears its byte (0x007592b9) again once it opened or
+  closed the inventory or closed the subject menu (@ 0x00431676; the
+  inventory's close clears it too, @ 0x00427b5d). In 0.6.0 closing the
+  bag with the right button left it set, and in the Paleolithic's view 4
+  the next frame ended the hunt and took the spear out of the bag
+  (`tests/right_button.rs`).
+- The right button opens the bag during a move's turn too: the callback
+  tests no turn or pending move (@ 0x00431648..0x00431671); the turn
+  waits while the bag is open and goes on after. 0.6.0 ignored the button
+  then.
+- WarpRes (`Atlantis3.cfg`, the options' texture size) chooses every
+  folder the original's path builders choose by it, testing 1024 exactly:
+  the cube `warp\Warp1024\` (@ 0x00415a30), the place animations
+  `spw\SPW1024\` (@ 0x004164c0), and `HNM800\` for the cinematics
+  (`hnm\` @ 0x00416880, `loc\hnm\` @ 0x00416c60), the dialogs' body
+  videos (`hnmdial\` @ 0x00417280) and the travel videos (`hnmtraj\`
+  @ 0x00417670), else `Warp512`, `SPW512`, `HNM640`
+  (`travel::warp_folder`, `spw_folder`, `hnm_folder`). GOG.com ships only
+  the latter, so with 1024 the port, like the original, shows the cube's
+  debug colours and finds no place animation, film or travel video;
+  0.6.0 switched only the transition sprites (`tests/warp_res.rs`).
+- A save's `DateAndTime` is the local time, as `_strdate` / `_strtime`
+  give it (@ 0x00459ee0): `Game::utc_offset`, the system's time zone on
+  the desktop (`a2::utc_offset_now`), the browser's on the web, for the
+  menu's saves and the scripts' quick saves (`SAVE=n`) alike, one writer
+  for both. 0.6.0 wrote UTC, and `01/01/01 00:00:00` in a quick save.
+- `Atlantis3.cfg`'s `Time` counters grow as the original's writer
+  (@ 0x00408f80) makes them: the start page's player chooses the counter
+  (@ 0x00452000, counting the time so far to the previous one), and each
+  write adds the whole seconds played since the last. 0.6.0 wrote them
+  back unchanged.
+
 ## Tests
 
 Tests that need the game files read the game directory from the

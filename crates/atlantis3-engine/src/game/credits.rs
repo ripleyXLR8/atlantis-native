@@ -422,7 +422,7 @@ impl Game {
         if self.mode != Mode::Menu || self.credits.is_none() {
             return false;
         }
-        let cfg = self.startup.config.write(&self.startup.install_language);
+        let cfg = self.cfg_text();
         if let Some(c) = self.credits.as_mut() {
             c.config = Some(cfg);
         }

@@ -148,7 +148,9 @@ struct A3App {
 }
 
 impl A3App {
-    fn new(game: Game, store: Rc<dyn SaveStore>, cfg: Option<Vec<u8>>) -> A3App {
+    fn new(mut game: Game, store: Rc<dyn SaveStore>, cfg: Option<Vec<u8>>) -> A3App {
+        // The saves' `DateAndTime` in the browser's time zone.
+        game.utc_offset = crate::a2::utc_offset_now;
         A3App {
             game,
             store,
@@ -424,9 +426,12 @@ impl ApplicationHandler for A3App {
             {
                 self.gesture();
                 match event.logical_key {
-                    // Alt+Enter (@ 0x0042ab9d) and the port's F11: the
+                    // Alt+Enter (@ 0x0042ab9d, not while a puzzle freezes
+                    // the keys, @ 0x0042ab20) and the port's F11: the
                     // page's full screen.
-                    Key::Named(NamedKey::Enter) if self.alt => a2_web::toggle_fullscreen(),
+                    Key::Named(NamedKey::Enter) if self.alt && !self.game.keys_frozen() => {
+                        a2_web::toggle_fullscreen()
+                    }
                     Key::Named(NamedKey::F11) => a2_web::toggle_fullscreen(),
                     Key::Named(NamedKey::Escape) if self.game.credits().is_some() => {
                         if self.game.credits_escape() {
