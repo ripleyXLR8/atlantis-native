@@ -1,7 +1,6 @@
 //! A scene's description, `3D/<zone>/<node>.xml`, read by
 //! `TeSceneWarp3::Load` (log tag at file +0x1b10d4; the element and
-//! attribute names it looks up follow, file +0x1b10ec..+0x1b129c, and a
-//! second list for version 1.0 files, file +0x1b12c4..+0x1b1368).
+//! attribute names it looks up follow, file +0x1b10ec..+0x1b129c).
 //!
 //! The file is a flat list of elements (no root):
 //!
