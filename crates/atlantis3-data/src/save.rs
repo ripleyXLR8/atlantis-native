@@ -370,7 +370,9 @@ pub fn format_f(v: f64) -> String {
     if v.is_infinite() {
         return if v < 0.0 { "-1.#INF00" } else { "1.#INF00" }.to_string();
     }
-    let neg = v.is_sign_negative();
+    // −0.0 prints without its sign (the golden a3_save_text.txt: the
+    // quaternion's 0x80000000 written `0.000000`).
+    let neg = v.is_sign_negative() && v != 0.0;
     let a = v.abs();
     // value = 0.d0 d1 d2 ... x 10^point
     let (mut digits, point): (Vec<u8>, i32) = if a == 0.0 {
@@ -527,7 +529,7 @@ Quaternion3 = 0.812500\n";
         assert!(has_thumbnail(&game_save_name(1, 3)));
         assert!(!has_thumbnail(&quick_save_name(1, 2)));
         assert_eq!(format_f(1.0), "1.000000");
-        assert_eq!(format_f(-0.0), "-0.000000");
+        assert_eq!(format_f(-0.0), "0.000000");
         assert_eq!(format_f(0.0000004), "0.000000");
         assert_eq!(format_f(0.0000006), "0.000001");
         assert_eq!(format_f(0.0078125), "0.007813");
