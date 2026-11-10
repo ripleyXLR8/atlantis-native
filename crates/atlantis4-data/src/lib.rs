@@ -12,6 +12,8 @@
 //! - [`files`]: the installed folder, `lang.ini` and the scene names;
 //! - [`wpa`]: the `.wpa` warp packages;
 //! - [`anim`]: `anim.anim`, a package's cube cells and click meshes;
+//! - [`xml`]: the TinyXML-like reader of the rootless Windows-1252 XML;
+//! - [`scene`]: a scene's description (objects, animations, exits);
 //! - [`testing`]: what a game-data test does when its data is missing.
 
 #![forbid(unsafe_code)]
@@ -19,8 +21,10 @@
 pub mod anim;
 pub mod exe;
 pub mod files;
+pub mod scene;
 pub mod testing;
 pub mod wpa;
+pub mod xml;
 
 pub use exe::{identify, Build, ExeError};
 pub use files::{A4Files, WarpPath};

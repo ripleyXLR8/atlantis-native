@@ -180,3 +180,79 @@ fn every_warp_package_and_its_animation_read() {
         (12_231, 19_501, 11_039, 1_958_716, 882_038)
     );
 }
+
+/// Every scene description: its elements, exits that lead to scenes, and
+/// the warp packages its objects and animations name.
+#[test]
+fn every_scene_description_reads() {
+    use atlantis4_data::scene::Scene;
+    use atlantis4_data::WarpPath;
+    use std::collections::BTreeMap;
+
+    let Some(dir) = install() else { return };
+    let src = atlantis_data::StdDir::new(&dir);
+    let read = |n: &str| atlantis_data::FileSource::read(&src, n);
+    let has = |n: &str| atlantis_data::FileSource::size(&src, n).is_some();
+    let names: Vec<String> = files_with(&dir, "xml")
+        .into_iter()
+        .filter(|n| n.starts_with("3D/"))
+        .collect();
+    assert_eq!(names.len(), 398);
+    let mut versions = BTreeMap::<(u32, u32), usize>::new();
+    let mut fps = BTreeMap::<u32, usize>::new();
+    let (mut objects, mut animations, mut anim_markers, mut exits) = (0, 0, 0, 0);
+    let (mut blocks, mut cameras, mut to_scenes, mut missing_packages) = (0, 0, 0, 0);
+    let mut wp_named = 0;
+    for name in &names {
+        let s = Scene::parse(&read(name).unwrap()).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(s.unknown.is_empty(), "{name}");
+        *versions.entry(s.version.expect(name)).or_default() += 1;
+        let here = WarpPath::parse(name.strip_suffix(".xml").unwrap()).unwrap();
+        assert!(has(&here.lua()), "{name}");
+        objects += s.objects.len();
+        animations += s.animations.len();
+        anim_markers += s.animations.iter().map(|a| a.markers.len()).sum::<usize>();
+        assert!(s.objects.iter().all(|o| o.markers.len() == 1), "{name}");
+        for a in &s.animations {
+            *fps.entry(a.fps.to_bits()).or_default() += 1;
+        }
+        for p in s
+            .objects
+            .iter()
+            .map(|o| &o.name)
+            .chain(s.animations.iter().map(|a| &a.name))
+        {
+            if !has(&here.package(p)) {
+                missing_packages += 1;
+            }
+        }
+        for e in &s.exits {
+            exits += 1;
+            blocks += e.blocks.len();
+            cameras += usize::from(e.camera.is_some());
+            assert_eq!(e.markers.len(), 1, "{name}");
+            assert_eq!(e.nb_warp_block, 16, "{name}");
+            assert!(e.blocks.iter().all(|b| b.face < 6 && b.x < 16 && b.y < 16));
+            if e.linked_warp.ends_with(".wp") {
+                wp_named += 1;
+                if WarpPath::parse(&e.linked_warp).is_some_and(|w| has(&w.xml())) {
+                    to_scenes += 1;
+                }
+            }
+        }
+    }
+    let versions: Vec<_> = versions.into_iter().collect();
+    assert_eq!(versions, [((1, 0), 283), ((1, 1), 115)]);
+    assert_eq!(
+        (objects, animations, anim_markers, exits, blocks, cameras),
+        (484, 1_480, 75, 843, 52_261, 843)
+    );
+    // 37 exits name an object, not a scene; 17 name a scene that is not in
+    // the install; 13 animations name a package that is not there.
+    assert_eq!((wp_named, to_scenes, missing_packages), (806, 789, 13));
+    let fps: Vec<(f32, usize)> = fps
+        .into_iter()
+        .map(|(b, n)| (f32::from_bits(b), n))
+        .collect();
+    assert_eq!(fps, [(0.0, 70), (15.0, 1_410)]);
+}

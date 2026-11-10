@@ -9,3 +9,4 @@ license.workspace = true
 atlantis-data = { path = "../atlantis-data" }
 md-5 = "0.10"
 miniz_oxide = "0.8"
+encoding_rs = "0.8"

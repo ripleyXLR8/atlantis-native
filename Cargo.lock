@@ -303,6 +303,7 @@ name = "atlantis4-data"
 version = "0.6.0"
 dependencies = [
  "atlantis-data",
+ "encoding_rs",
  "md-5",
  "miniz_oxide",
 ]
