@@ -133,6 +133,9 @@ pub trait MetaIo {
     fn aborted(&self) -> bool {
         false
     }
+    /// `FUN_00448084` @ 0x0044812d: the bar request 0x004960c4 back to 0
+    /// on each right press the handler takes.
+    fn right_handled(&mut self) {}
 }
 
 /// What the original keeps between the stages: the pieces, their count,
@@ -441,6 +444,7 @@ impl MetaGame {
     /// press, so the repeat counter never passes 1).
     fn right_button(&mut self, io: &mut impl MetaIo) {
         if self.right {
+            io.right_handled();
             if self.repeat == 0 {
                 if self.held != 0 {
                     let pc = &mut self.pieces[(self.held - 1) as usize];
@@ -601,6 +605,9 @@ impl MetaIo for Host<'_> {
     fn start_input(&mut self) -> (i32, i32, bool, bool) {
         let m = self.host.read_input();
         (m.x, m.y, m.click, m.right)
+    }
+    fn right_handled(&mut self) {
+        self.host.e.bar.request = false;
     }
     fn boundary(&mut self, _g: &MetaGame) -> (i32, i32, bool, bool) {
         self.start_input()

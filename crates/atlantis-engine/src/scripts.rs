@@ -499,7 +499,13 @@ impl Scripts {
                     e.music_list_command(key == "loadmusik", text!(), set.value_pos)
                         .await;
                 }
-                "cinema" => e.play_cinema(value).await,
+                // Cinema=N first puts 0x00496124 = 1 and 0x00496138 = 0
+                // (0x0042a775, 0x0042a77f): an Escape latch left by a puzzle
+                // or the subject menu does not skip the film.
+                "cinema" => {
+                    e.escape_request = false;
+                    e.play_cinema(value).await;
+                }
                 // ChangeCd=n: the disc prompt for disc n (@ 0x0042a4c4:
                 // FUN_0041eda8((n - 1) & 0xff), which clamps the disc index
                 // to 3). The port reads every disc at once: no prompt, it
@@ -998,10 +1004,19 @@ impl Scripts {
         if e.should_abort() {
             return;
         }
+        // The bar request a right press in the puzzle toggled is cleared
+        // (0x004241d3); 0x00496120 stays, and so does an Escape latch
+        // (0x00496124 = 0, 0x00496138 = 1, crate::puzzle::assets::poll_flags):
+        // no puzzle function resets it, so the first voice-only line or
+        // game-over narration of the scan stops at its first poll.
+        e.bar.request = false;
         e.reload_current_view().await;
         e.vars.set("startpuzzle", 0);
         self.run_sel_scan(e).await;
         e.vars.set("finpuzzle", 0);
+        // Only now 0x00496124 = 1 (0x00424224), 0x0049611c = 0 and
+        // 0x00496138 = 0 (0x00424238).
+        e.escape_request = false;
     }
 
     /// The section executor `FUN_0042844c`: the section's /set commands and
@@ -1898,5 +1913,77 @@ mod tests {
         if ran {
             assert_eq!(*got.borrow(), [1, 0, 2, 1]);
         }
+    }
+
+    /// CHAPI066's crab puzzle left from its choice screen (FinPuzzle 1),
+    /// with Escape pressed in the puzzle first (`escape`): the post-puzzle
+    /// scan plays /941, Hona's talking head, then GameOver=20. The time
+    /// from the narrator's voice to the end of the puzzle zone, in ms.
+    fn crab_narration_ms(test: &str, escape: bool) -> Option<u64> {
+        use crate::sys::{Input, Key, MouseButton};
+        let end = Rc::new(std::cell::Cell::new(None::<u64>));
+        let voice = Rc::new(std::cell::Cell::new(None::<u64>));
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let (e2, t2, v3, t3) = (end.clone(), trace.clone(), voice.clone(), trace.clone());
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(crate::dialog::Dialogs::new()));
+                e.new_game(&mut s, false).await;
+                s.load_con_script(&mut e, 66).await;
+                // Past the chapter's first scan (/10 is /sel(Initflag=0)).
+                e.vars.set("initflag", 1);
+                e.trace = Some(t2);
+                s.run_puzzle_zone(&mut e, 15).await;
+                e2.set(Some(e.sys.millis()));
+            },
+            move |sys, frame| {
+                let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut sound, 22050, 2);
+                if v3.get().is_none()
+                    && t3.borrow().iter().any(
+                        |ev| matches!(ev, crate::engine::Event::Voice(n) if n.contains("ATA0941B")),
+                    )
+                {
+                    v3.set(Some(frame * 16));
+                }
+                let at = |x, y, down| {
+                    sys.push_input(Input::MouseMove { x, y });
+                    crate::test_support::button(sys, MouseButton::Left, down);
+                };
+                match frame {
+                    30 if escape => sys.push_input(Input::KeyDown(Key::Escape)),
+                    31 if escape => sys.push_input(Input::KeyUp(Key::Escape)),
+                    40 => at(320, 10, true),
+                    42 => at(320, 10, false),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let ev = trace.borrow();
+        assert!(
+            ev.contains(&crate::engine::Event::GameOver(20)),
+            "no game over"
+        );
+        Some(end.get().unwrap() - voice.get().expect("no narrator voice"))
+    }
+
+    /// An Escape inside a puzzle latches 0x00496124 = 0 / 0x00496138 = 1
+    /// (FUN_0041a298 @ 0x0041a419 / 0x0041a423); FUN_004240fc resets them
+    /// only after its /sel scan (0x00424224, 0x00424238), so the game-over
+    /// narration that scan reaches stops at its first poll (FUN_00426590's
+    /// wait leaves on 0x00496124 != 1). Without the Escape it plays.
+    #[test]
+    fn a_puzzle_escape_cuts_the_crab_game_over_narration() {
+        let t = "a_puzzle_escape_cuts_the_crab_game_over_narration";
+        let Some(cut) = crab_narration_ms(t, true) else {
+            return;
+        };
+        let full = crab_narration_ms(t, false).unwrap();
+        assert!(cut < 200, "cut narration lasted {cut} ms");
+        assert!(full > 2000, "full narration lasted {full} ms");
     }
 }

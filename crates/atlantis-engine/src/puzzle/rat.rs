@@ -1711,13 +1711,17 @@ impl RatIo for Host<'_> {
             .host
             .input
             .read_with(&self.host.e.sys, |down| queue.push_back(down));
+        super::assets::poll_flags(self.host.e, &m);
         if !m.click {
             if let Some(down) = self.button_messages.pop_front() {
                 self.held = down;
             }
+            // The pointer 0x004960ec / 0x004960f0 is written by the pump's
+            // WM_MOUSEMOVE only: on the click pass the click and the
+            // cursor are at the previous pass's pointer.
+            (self.mx, self.my) = (m.x, m.y);
         }
-        (self.mx, self.my) = (m.x, m.y);
-        (m.x, m.y, m.click, self.held)
+        (self.mx, self.my, m.click, self.held)
     }
     fn draw_background(&mut self, which: i32) {
         // Copy 1 goes to a second buffer and copy 2 is the frame's copy to
@@ -1804,13 +1808,14 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     game.keep_search_position = !e.game.exe.build.rat_search_restart;
     let host = PuzzleHost::new(e, hooks);
     let held = host.e.sys.buttons().0;
+    let (mx, my) = host.pointer;
     let mut host = Host {
         host,
         rat,
         held,
         button_messages: VecDeque::new(),
-        mx: 0,
-        my: 0,
+        mx,
+        my,
         deadline: 0,
     };
     host.host.screen.pictures = vec![bg];

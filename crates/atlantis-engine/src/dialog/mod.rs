@@ -2038,3 +2038,88 @@ mod still_cursor_tests {
         assert_ne!(with, without);
     }
 }
+
+#[cfg(test)]
+mod puzzle_latch_tests {
+    use super::*;
+    use crate::con_script::ConLine;
+    use crate::test_support::with_engine;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// How long line `section`/`letter` (`speaker`, `params`) plays, in ms,
+    /// the Escape latch of a puzzle set or not.
+    fn play_ms(
+        section: i32,
+        letter: char,
+        speaker: &str,
+        params: &str,
+        latched: bool,
+    ) -> Option<u64> {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let (speaker, params) = (speaker.to_string(), params.to_string());
+        let ran = with_engine(
+            "post_puzzle_voice_only_lines_stop_on_the_latch",
+            move |mut e| async move {
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                e.escape_request = latched;
+                let line = ConLine {
+                    speaker,
+                    params,
+                    text: "...".into(),
+                    ..ConLine::default()
+                };
+                let req = LineRequest {
+                    section,
+                    letter,
+                    line,
+                    perso: 514,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                let mut d = Dialogs::new();
+                let t0 = e.sys.millis();
+                d.line(&mut e, &req).await;
+                let ms = e.sys.millis() - t0;
+                // The voice-only players put the latch back at their end
+                // (0x004305b7 / 0x00430853).
+                assert!(!e.escape_request);
+                let voiced = trace
+                    .borrow()
+                    .iter()
+                    .any(|ev| matches!(ev, Event::LinePlayed { voice: true, .. }));
+                *g2.borrow_mut() = voiced.then_some(ms);
+            },
+            |sys, _| {
+                let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut sound, 22050, 2);
+            },
+        );
+        if ran {
+            *got.borrow()
+        } else {
+            None
+        }
+    }
+
+    /// The voice-only lines that follow a puzzle in which Escape was
+    /// pressed stop after one poll (their waits leave on 0x00496124 != 1:
+    /// FUN_00430258 @ 0x00430586, FUN_004305e8 @ 0x0043080c..0x00430829):
+    /// the rat's "[Chat,off] Miaou!" (CHAPI041 /590 B) and Muria's
+    /// in-puzzle hint "[Figurine,off0]" (CHAPI069 /1021 A).
+    #[test]
+    fn post_puzzle_voice_only_lines_stop_on_the_latch() {
+        for (section, letter, speaker, params) in
+            [(590, 'B', "Chat", "off"), (1021, 'A', "Figurine", "off0")]
+        {
+            let Some(full) = play_ms(section, letter, speaker, params, false) else {
+                return;
+            };
+            let cut = play_ms(section, letter, speaker, params, true).unwrap();
+            assert!(full > 300, "/{section} {letter}: {full} ms");
+            assert!(cut <= 50, "/{section} {letter}: {cut} ms with the latch");
+        }
+    }
+}
