@@ -26,3 +26,9 @@ PATCHES
    `resize`, which reinserts the hash nodes from last to first). rilua
    only extended the array, so constructors whose last item is a call
    (most nested layouts) iterated in another order.
+
+2. src/vm/table.rs (`new_key`): a main position whose value is nil is
+   taken by the new key, as in PUC-Rio's `newkey`. rilua reused it only
+   once the old key's string had been collected, so a global set to nil
+   and a later new global (ChangeWarp's callback resets) ended in another
+   order.

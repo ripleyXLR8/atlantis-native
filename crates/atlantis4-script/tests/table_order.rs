@@ -27,3 +27,12 @@ fn setlist_growth_rebuilds_the_hash_part() {
         "1 visible name position anchor ratio sizeType size"
     );
 }
+
+/// Fix 2: PUC-Rio's `newkey` takes a main position whose value is nil (a
+/// key set to nil earlier) for the new key.
+#[test]
+fn a_nil_valued_main_position_is_reused() {
+    let mut lua = atlantis4_script::new_state().expect("state");
+    let got = keys_of(&mut lua, "(function() local t = {} for i = 1, 8 do t['g' .. i] = true end t.g5 = nil t.g9 = 1 return t end)()");
+    assert_eq!(got, "g1 g7 g3 g2 g4 g6 g9 g8");
+}

@@ -1019,20 +1019,15 @@ impl Table {
             return Ok(mp);
         }
 
-        // Check if the occupant is a dead entry: a stale string key
-        // (GC-swept) with nil value. Dead entries can be safely reused
-        // because their key string no longer exists. We keep the node's
-        // `next` pointer intact so hash chain integrity is preserved.
-        //
-        // This handles the case PUC-Rio solves with LUA_TDEADKEY: after
-        // GC sweeps key strings of nil-valued entries, main_position()
-        // on the stale GcRef returns an incorrect bucket (hash defaults
-        // to 0). Without this check, Brent's Case A would use the wrong
-        // chain origin, corrupting hash chains of unrelated entries.
-        if self.nodes[mp as usize].value.is_nil()
-            && let Val::Str(r) = self.nodes[mp as usize].key
-            && strings.get(r).is_none()
-        {
+        // PUC-Rio 5.1's newkey (`if (!ttisnil(gval(mp)) || mp == dummynode)`)
+        // treats a main position whose value is nil as free, whatever its
+        // key: a key set to nil earlier, or a dead key after a collection.
+        // The new key takes that node and keeps its `next` link, so the
+        // chain through it stays intact. (rilua 0.1.27 reused such a node
+        // only once the old key's string had been collected, which put the
+        // new key elsewhere and changed the order `next` walks the table
+        // in.)
+        if self.nodes[mp as usize].value.is_nil() {
             self.nodes[mp as usize].key = key;
             return Ok(mp);
         }
