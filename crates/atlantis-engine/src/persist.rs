@@ -473,7 +473,7 @@ mod tests {
         assert_eq!(
             Settings::parse("volume_music = 300\nbad"),
             Settings {
-                volumes: [127; 4],
+                volumes: DEFAULT_VOLUMES,
                 ..Settings::default()
             }
         );

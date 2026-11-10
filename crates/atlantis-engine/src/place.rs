@@ -962,6 +962,8 @@ impl Engine {
         }
         // 5: wav\ + entry `value` of the table at 0x00496224, or the
         // cinematic's name.
+        // (The event names a cinematic's sound with its folder, as before.)
+        let event_name = cinema.clone();
         let Some(name) = cinema
             .map(|c| c.trim_start_matches("WAV\\").to_string())
             .or_else(|| {
@@ -990,7 +992,7 @@ impl Engine {
         self.music.start_new_sound(pcm, self.effects_volume());
         self.music.new_sound_playing = true;
         self.music.new_sound_last = value;
-        self.emit(Event::NewSound(value, name));
+        self.emit(Event::NewSound(value, event_name.unwrap_or(name)));
     }
 }
 
