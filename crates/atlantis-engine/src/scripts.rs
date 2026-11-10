@@ -233,6 +233,11 @@ pub struct Scripts {
     init_running: bool,
     /// The place loop's own arrival scan runs.
     in_place_arrival_scan: bool,
+    /// A timer section plays (0x00496174).
+    timer_play: bool,
+    /// The walks of a chapter's /INIT commands so far (for tests and
+    /// tools).
+    pub init_walks: u32,
     /// 0x6cccac[section]: the 1999 build's game-over counters.
     game_over_count: HashMap<i32, u8>,
 }
@@ -261,6 +266,8 @@ impl Scripts {
             scan_key: [0; 16],
             init_running: false,
             in_place_arrival_scan: false,
+            timer_play: false,
+            init_walks: 0,
             game_over_count: HashMap::new(),
         }
     }
@@ -376,6 +383,7 @@ impl Scripts {
     /// Chapter= or a GameOver=).
     async fn exec_init(&mut self, e: &mut Engine) {
         let was = std::mem::replace(&mut self.init_running, true);
+        self.init_walks += 1;
         let cmds = self.script.init_cmds().to_vec();
         for (cmd, offset) in cmds {
             self.exec_set(e, Some(offset), &cmd).await;
@@ -474,6 +482,15 @@ impl Scripts {
                 "disable" => self.bump_counter(value),
                 "vue" => self.enter_place_from_script(e, value).await,
                 "chapter" => self.change_chapter(e, value).await,
+                // The trigger commands act only for a value other than 0
+                // (the store, then `cmp [var],0 / je`: FUN_0042a100 @
+                // 0x0042ac44..0x0042b1d0): StartMusik, StopMusik, LoadMusik,
+                // ShowPerso and StopSound with 0 do nothing.
+                "startmusik" | "stopmusik" | "loadmusik" | "showperso" | "stopsound"
+                    if value == 0 =>
+                {
+                    e.vars.set(key, 0);
+                }
                 "startmusik" => e.music_start_command(value).await,
                 "stopmusik" => e.music_stop_command().await,
                 "loadmusik" | "delmusik" => {
@@ -484,8 +501,15 @@ impl Scripts {
                 // ChangeCd=n: the disc prompt for disc n (@ 0x0042a4c4:
                 // FUN_0041eda8((n - 1) & 0xff), which clamps the disc index
                 // to 3). The port reads every disc at once: no prompt, it
-                // only notes the disc, which the checkpoints keep.
-                "changecd" => e.disc = change_cd_disc(value),
+                // only notes the disc, which the checkpoints keep. The
+                // prompt's function also empties the hand (OBJETENMAIN = 0 @
+                // 0x0041ede9) and ends by clearing the input flags, the bar
+                // request among them (0x0041f032..0x0041f064).
+                "changecd" => {
+                    e.disc = change_cd_disc(value);
+                    e.vars.set("objetenmain", 0);
+                    e.bar.flags_reset();
+                }
                 // HideGuest / ShowGuest store no variable.
                 "hideguest" | "showguest" => e.guests_shown = key == "showguest",
                 // AddGuest / SubGuest (FUN_0042b480 / FUN_0042b6c0): the
@@ -612,7 +636,28 @@ impl Scripts {
         self.load_con_script(e, value as u32).await;
         if let Some(cur) = e.current_place_id {
             let last = i32::from(e.last_vue);
-            self.run_arrival_sel(e, i32::from(cur), last).await;
+            // FUN_004277c8 runs the executor for the /sel entry found; a
+            // clicked or a timer section's flag (0x00496170 / 0x00496174)
+            // is still 1, so that entry counts a play (0x00428493).
+            let counted = e.section_play || self.timer_play;
+            let played = self
+                .run_arrival_sel_counted(e, i32::from(cur), last, counted)
+                .await;
+            // With no /sel entry found FUN_004277c8 returns the start of the
+            // new CON text (0x00427800), which the executor takes as its next
+            // position (0x00428bf9..0x00428c02): it walks the file's head up
+            // to the first section header, so the /INIT commands run again,
+            // the loading flag now clear (chapters 27, 33 and 36).
+            if !played && !self.init_running && !e.should_abort() {
+                self.init_walks += 1;
+                let cmds = self.script.init_cmds().to_vec();
+                for (cmd, offset) in cmds {
+                    self.exec_set(e, Some(offset), &cmd).await;
+                    if e.should_abort() || e.vars.get("gameover") != 0 {
+                        break;
+                    }
+                }
+            }
         }
         // ARRIVEEVUE stays = LastVue: only the place loop clears it, right
         // after its own arrival scan (@ 0x00423be7). A chapter= run anywhere
@@ -674,6 +719,13 @@ impl Scripts {
 
     /// `FUN_004277c8`: the first /sel entry whose condition holds runs.
     async fn run_sel_scan(&mut self, e: &mut Engine) {
+        self.run_sel_scan_counted(e, false).await;
+    }
+
+    /// The /sel scan; `counted`: the executor counts the play of the section
+    /// it runs (0x00428493: entered while 0x00496170 or 0x00496174 is 1).
+    /// True when a section played.
+    async fn run_sel_scan_counted(&mut self, e: &mut Engine, counted: bool) -> bool {
         self.begin_scan();
         let restored = e.enhancements().restored_content;
         let found = self.script.find_sel_entry(|sec| {
@@ -681,19 +733,35 @@ impl Scripts {
             eval_entry(&self.names, key, self.script.text(), e, sec)
         });
         let sec = found.map(|i| self.script.sections()[i].clone());
-        if let Some(sec) = sec {
-            self.play_section(e, sec, "sel", None).await;
+        let Some(sec) = sec else {
+            return false;
+        };
+        if counted {
+            self.bump_counter(sec.id);
         }
+        self.play_section(e, sec, "sel", None).await;
+        true
     }
 
     /// The arrival scan: ArriveeVue = the place arrived FROM (a negative
     /// origin is no place yet: the arrived place stands for it), the /sel
-    /// scan, then ArriveeVue = 0.
-    async fn run_arrival_sel(&mut self, e: &mut Engine, arrived: i32, from: i32) {
+    /// scan, then ArriveeVue = 0. True when a section played.
+    async fn run_arrival_sel(&mut self, e: &mut Engine, arrived: i32, from: i32) -> bool {
+        self.run_arrival_sel_counted(e, arrived, from, false).await
+    }
+
+    async fn run_arrival_sel_counted(
+        &mut self,
+        e: &mut Engine,
+        arrived: i32,
+        from: i32,
+        counted: bool,
+    ) -> bool {
         e.vars
             .set("arriveevue", if from >= 0 { from } else { arrived });
-        self.run_sel_scan(e).await;
+        let played = self.run_sel_scan_counted(e, counted).await;
         e.vars.set("arriveevue", 0);
+        played
     }
 
     /// The timer scans (`FUN_0042bef4` / `FUN_0042bfa4`): with TESTTIME1 /
@@ -727,7 +795,9 @@ impl Scripts {
                     e.mark_pointer_mouse();
                 }
                 let kind = if timer == 1 { "tim1" } else { "tim2" };
+                let was = std::mem::replace(&mut self.timer_play, true);
                 self.play_section(e, sec, kind, None).await;
+                self.timer_play = was;
                 played = true;
             }
             if e.should_abort() {
@@ -1087,13 +1157,17 @@ impl Scripts {
                 && sec.goto_id > 0
                 && !had_game_over
                 && !e.should_abort();
+            // The walk's end (0x00428c92..0x00428d8b) raises the music; a
+            // `/go` (FUN_0042831c -> FUN_00425c04) only moves the walk on to
+            // its target, so the music stays as the lines left it until the
+            // walk ends.
             if !chain_go {
                 // The given object is no longer shown (0x00428c92).
                 e.given_object = None;
                 e.vars.set("clicperso", walk.clic_perso);
                 restore_entry(e, &mut walk);
+                e.music.unduck(None);
             }
-            e.music.unduck(None);
 
             if chain_go {
                 match self.script.goto_section(sec.goto_id) {
@@ -1110,6 +1184,7 @@ impl Scripts {
                         e.given_object = None;
                         e.vars.set("clicperso", walk.clic_perso);
                         restore_entry(e, &mut walk);
+                        e.music.unduck(None);
                     }
                 }
             }
@@ -1625,5 +1700,117 @@ mod tests {
         }
         let got = *got.borrow();
         assert_eq!(got, Some((true, (0x140, 0x140), 0, 0)));
+    }
+
+    struct MusicAtLines(Rc<RefCell<Vec<u8>>>);
+
+    impl DialogPresenter for MusicAtLines {
+        fn play_line<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            self.0.borrow_mut().push(e.music.fade().mode);
+            ready(LineOutcome::default())
+        }
+    }
+
+    /// A `/go` moves the walk on without its end (FUN_0042831c ->
+    /// FUN_00425c04): the music is not raised there, so the target's first
+    /// line lowers it (CHAPI001 /14 -> /3: no line before the /go).
+    #[test]
+    fn go_does_not_raise_the_music() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "go_does_not_raise_the_music",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(MusicAtLines(g2)));
+                s.chapter_loaded(&mut e, 1, false).await;
+                let sec = s.script.sections().iter().find(|x| x.id == 14).cloned();
+                let sec = sec.expect("CHAPI001 /14");
+                assert_eq!(sec.goto_id, 3);
+                assert!(!sec.items.iter().any(|i| matches!(i, ConItem::Line(_))));
+                e.music.with_fade(|f| f.mode = 0);
+                s.play_section(&mut e, sec, "con", None).await;
+            },
+            |_, _| {},
+        );
+        if ran {
+            // Mode 2 (down) at the target's first line, not 1 (up).
+            assert_eq!(got.borrow().first(), Some(&2));
+        }
+    }
+
+    /// Trigger commands with 0 do nothing (FUN_0042a100 @
+    /// 0x0042ac44..0x0042b1d0); ChangeCd empties the hand and clears the
+    /// bar request (FUN_0041eda8).
+    #[test]
+    fn zero_triggers_and_change_cd() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "zero_triggers_and_change_cd",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                let pcm = crate::audio::Pcm {
+                    rate: 22050,
+                    channels: 1,
+                    samples: std::sync::Arc::new(vec![0; 22050]),
+                };
+                e.music.start_new_sound(pcm, 0x6e);
+                e.music.new_sound_playing = true;
+                s.exec_set(&mut e, None, "stopsound=0").await;
+                g2.borrow_mut().push(e.music.new_sound_active());
+                s.exec_set(&mut e, None, "stopsound=1").await;
+                g2.borrow_mut().push(e.music.new_sound_active());
+                e.vars.set("objetenmain", 257);
+                e.bar.request = true;
+                s.exec_set(&mut e, None, "changecd=2").await;
+                g2.borrow_mut()
+                    .push(e.vars.get("objetenmain") == 0 && !e.bar.request);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [true, false, true]);
+        }
+    }
+
+    /// `chapter=` from a clicked or a timer section: the /sel entry the
+    /// nested scan runs counts a play (0x00428493); from an arrival scan,
+    /// none. With no /sel entry (chapter 36), the new /INIT commands run a
+    /// second time (0x00427800, 0x00428bf9).
+    #[test]
+    fn chapter_change_nested_scan() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "chapter_change_nested_scan",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                for (chapter, click) in [(2, true), (3, false)] {
+                    let before: u32 = s.counters.iter().map(|&c| u32::from(c)).sum();
+                    e.section_play = click;
+                    s.change_chapter(&mut e, chapter).await;
+                    e.section_play = false;
+                    let after: u32 = s.counters.iter().map(|&c| u32::from(c)).sum();
+                    g2.borrow_mut().push(after - before);
+                }
+                // Chapter 36 has no /sel entry: its /INIT runs twice; the
+                // first chapter's /sel entry ends the walk.
+                for chapter in [36, 1] {
+                    let before = s.init_walks;
+                    s.change_chapter(&mut e, chapter).await;
+                    g2.borrow_mut().push(s.init_walks - before);
+                }
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [1, 0, 2, 1]);
+        }
     }
 }
