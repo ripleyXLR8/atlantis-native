@@ -11,6 +11,9 @@
 //! - single-byte text: values are decoded as Windows-1252 (the French,
 //!   German, Spanish and Italian texts hold bytes 0x80-0xff that are no
 //!   UTF-8; the code page is inferred from their letters);
+//! - one unquoted value, `visible=0` in `Diary/Diary.xml` (which also has
+//!   LF line ends): TinyXML reads such a value up to white space, `/` or
+//!   `>`;
 //! - the only entity used is `&quot;` (28 times, in `Texts/`); TinyXML's
 //!   five named entities and `&#...;` are decoded, any other `&` is kept as
 //!   is (TinyXML's rule).
@@ -167,19 +170,37 @@ impl Parser<'_> {
                         .s
                         .get(self.at)
                         .ok_or_else(|| self.err("value expected"))?;
-                    if quote != b'"' && quote != b'\'' {
-                        return Err(self.err("quoted value expected"));
-                    }
-                    self.at += 1;
-                    let start = self.at;
-                    while self.at < self.s.len() && self.s[self.at] != quote {
+                    let value = if quote == b'"' || quote == b'\'' {
                         self.at += 1;
-                    }
-                    if self.at == self.s.len() {
-                        return Err(self.err("unterminated value"));
-                    }
-                    let value = decode_entities(&self.s[start..self.at]);
-                    self.at += 1;
+                        let start = self.at;
+                        while self.at < self.s.len() && self.s[self.at] != quote {
+                            self.at += 1;
+                        }
+                        if self.at == self.s.len() {
+                            return Err(self.err("unterminated value"));
+                        }
+                        let v = decode_entities(&self.s[start..self.at]);
+                        self.at += 1;
+                        v
+                    } else {
+                        // TinyXML's leniency: an unquoted value runs to
+                        // white space, '/' or '>'; a quote inside is an
+                        // error.
+                        let start = self.at;
+                        while let Some(&c) = self.s.get(self.at) {
+                            if c.is_ascii_whitespace() || c == b'/' || c == b'>' {
+                                break;
+                            }
+                            if c == b'"' || c == b'\'' {
+                                return Err(self.err("quote in an unquoted value"));
+                            }
+                            self.at += 1;
+                        }
+                        if self.at == start {
+                            return Err(self.err("value expected"));
+                        }
+                        decode_entities(&self.s[start..self.at])
+                    };
                     el.attributes.push((key, value));
                 }
                 None => return Err(self.err("unterminated tag")),
@@ -306,7 +327,8 @@ mod tests {
     fn broken_files_are_refused() {
         assert!(parse(b"<a>").is_err());
         assert!(parse(b"<a></b>").is_err());
-        assert!(parse(b"<a k=1/>").is_err());
+        assert_eq!(parse(b"<a k=1/>").unwrap()[0].attr("k"), Some("1"));
+        assert!(parse(b"<a k=1\"/>").is_err());
         assert!(parse(b"text").is_err());
     }
 }

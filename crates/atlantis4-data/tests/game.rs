@@ -332,3 +332,62 @@ fn every_script_is_source_of_a_known_kind() {
     let first = WarpPath::parse(&boot["firstWarpPath"]).unwrap();
     assert!(atlantis_data::FileSource::size(&src, &first.xml()).is_some());
 }
+
+/// Every text table of every language, the combinations and the diary.
+#[test]
+fn every_text_table_reads() {
+    use atlantis4_data::texts::{self, DialogTable, LANGUAGES};
+
+    let Some(dir) = install() else { return };
+    let src = atlantis_data::StdDir::new(&dir);
+    let read = |n: &str| atlantis_data::FileSource::read(&src, n).unwrap_or_else(|| panic!("{n}"));
+    let mut lines = Vec::new();
+    for lang in LANGUAGES {
+        let t = DialogTable::parse(&read(&texts::texts_path(lang))).unwrap();
+        let mut names: Vec<&str> = t.lines.iter().map(|d| d.name.as_str()).collect();
+        names.sort_unstable();
+        names.dedup();
+        lines.push((lang, t.lines.len(), names.len()));
+        let objects = texts::parse_labelled(&read(&texts::objects_path(lang)), "Object").unwrap();
+        assert_eq!(objects.len(), 42, "{lang}");
+        let docs = texts::parse_labelled(&read(&texts::documents_path(lang)), "Document").unwrap();
+        assert_eq!(docs.len(), 5, "{lang}");
+    }
+    assert_eq!(
+        lines,
+        [
+            ("de", 2_219, 2_218),
+            ("en", 2_218, 2_217),
+            ("es", 2_218, 2_217),
+            ("fr", 2_217, 2_217),
+            ("it", 2_218, 2_217),
+        ]
+    );
+    let c = texts::parse_combinations(&read(texts::COMBINATIONS_PATH)).unwrap();
+    let ins: usize = c.iter().map(|c| c.inputs.len()).sum();
+    let outs: usize = c.iter().map(|c| c.outputs.len()).sum();
+    let ids = c.iter().filter(|c| c.id.is_some()).count();
+    assert_eq!((c.len(), ins, outs, ids), (125, 302, 128, 6));
+    let diary = atlantis4_data::xml::parse(&read(texts::DIARY_PATH)).unwrap();
+    let count = |n: &str| diary.iter().filter(|e| e.name == n).count();
+    assert_eq!((count("sprite_button2"), count("value")), (6, 3));
+}
+
+/// Every `TESF` font: 256 glyphs and a PNG atlas that decodes.
+#[test]
+fn every_font_reads() {
+    use atlantis4_data::font::Font;
+
+    let Some(dir) = install() else { return };
+    let names = files_with(&dir, "tef");
+    let mut kerning = Vec::new();
+    for name in &names {
+        let data = std::fs::read(dir.join(name)).unwrap();
+        let f = Font::parse(&data).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(f.glyphs.len(), 256, "{name}");
+        kerning.push(f.kerning.len());
+    }
+    assert_eq!(names.len(), 6);
+    kerning.sort_unstable();
+    assert_eq!(kerning, [8, 44, 128, 218, 374, 916]);
+}
