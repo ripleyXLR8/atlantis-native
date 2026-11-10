@@ -325,7 +325,9 @@ button. Atlantis II keeps its own choice, as its original does (see
 In the panoramic view, the arrow keys turn (← →) and tilt (↑ ↓) the view,
 as the original's F5 / F6 and F7 / F8 do. The arrow keys are the port's
 addition: `arrow_keys = off` in `settings.ini`, or `--original`, leaves
-F5 to F8 alone, as in the original.
+F5 to F8 alone, as in the original. The same switch gives the LOAD
+list its keys (Enter for OK, ↑ ↓ to choose a row), which the
+original's list does not read.
 
 ## The options menu
 
@@ -428,7 +430,8 @@ change an entry; Escape, F10 or O close it. Its entries:
 The choices are kept at once in `settings.ini` (see [Players,
 checkpoints and settings](#players-checkpoints-and-settings)), one line
 per fix. `--original` turns every fix and the other enhancements off for
-that run only, the arrow keys' turn too: a change in the menu during such a run writes only what
+that run only, the arrow keys' turn too, and starts with the subtitles
+off: a change in the menu during such a run writes only what
 it changed.
 
 ## Atlantis II
@@ -848,7 +851,11 @@ each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
 `fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
 `fix_disc_revision`, `fix_menu_line_width`, `fix_chinese_rows`,
 `fix_subtitles_toggle`), `restored_content`, `ui_ux` and `arrow_keys`
-(the arrow keys turn the view, `on` by default). A
+(the arrow keys turn the view and the LOAD list takes Enter and ↑ ↓,
+`on` by default). SUBTITLES is off at first, as every start of the
+original; `--original` starts with it off whatever `settings.ini`
+keeps (a `settings.ini` written by an earlier version keeps the `on`
+it was written with). A
 `settings.ini` written by an earlier version, with its single
 `minor_bug_fixes` line, is still read: that line sets every fix. It also keeps `music_on_disk`, the music tracks the original game
 would have copied to its folder (it reads them from the archives here),

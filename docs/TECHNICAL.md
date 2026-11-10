@@ -38,11 +38,19 @@ The sounds follow the original's few samples (`music.rs`, `place.rs`): the
 voices play on its one voice sample, at the 22050 Hz it is set to at
 start-up whatever a file's header says (ten silent lines say 44100 Hz and
 so last twice as long); NewSound and a cinematic's own sound go through
-its NewSound poller (also run at every frame of a video), at the effects
-volume, so a cinematic whose sound does not open stops the NewSound that
-plays; a music track starts at volume 0 and fades up; the sound menu's OK
-also sets the level the music next climbs back to; a fresh start has the
-original's volumes (master 127, music, effects and voices 110).
+its NewSound poller, at the effects volume, so a cinematic whose sound
+does not open stops the NewSound that plays. The poller runs where the
+original runs it: after every item a section executes (`after_item`,
+`FUN_00428da8`), at every frame of a video, of a turn, of the warp
+loop and the bar, of every dialog line player and of the subject menu
+(`FUN_00432178`, which also keeps the ambient sounds going), so a
+sound that ends during a line is seen as done before the next
+`Cinema=`, which then starts its own; `NewSound=` itself only stores
+the value. A music track starts at volume 0 and fades up; the sound
+menu's OK (and a checkpoint load) also sets a playing NewSound to the
+effects volume, and the level the music next climbs back to; a fresh
+start has the original's volumes (master 127, music, effects and
+voices 110) and SUBTITLES off.
 
 Escape pressed in a loop of the original that does not end on it, the
 turn before a move and the subject menu, is kept as the original keeps
@@ -52,6 +60,24 @@ frame only, and after the subject menu (whose guests are then no longer
 drawn) the next voice-only line, narration or video stops at once; the
 game-over narration's Escape is gated by the bar request and bow mode as
 every other; the place sprites go on moving under the subject menu.
+The guests' portraits are not drawn while the latch stands, by any
+caller (`draw_guests` tests it, as `FUN_0042bc58` does), so not in the
+rest of the turn nor on the move's video frame either. A `Cinema=`
+clears it before its film (`0x0042a775`). Escape in a puzzle is
+latched the same way by the puzzles' input poll
+(`puzzle::assets::poll_flags`, with the right press's toggle of the bar
+request and its gate), kept through the reload and /sel scan that
+follow the puzzle and cleared only then (`run_puzzle_zone`): the
+hexagon's right button, which turns a piece on that toggle, no longer
+turns one, and the first voice-only line or game-over narration of the
+scan stops at once (the original's behaviour, kept with no switch: the
+player gets the hexagon's right button back by leaving the puzzle). A
+move ends as the original's does: after the
+place load one input poll whose presses are all cleared, so a click,
+right click or Escape made during the video's last frame or the load
+does nothing (`Engine::end_of_move_input`). A bar request left by a
+timer section's line opens the bar in the next warp pass even when that
+pass reads a click, which is then lost.
 A click in the view ends the warp loop as the original's next loop head
 does: no clock update, cursor step, timer scan or sprite step comes
 between the click and its handling. The still frame of a voice-only line
@@ -87,14 +113,32 @@ inventory bar, the object picked up, bow mode and the guests' portraits
 (`bar.rs`, `mod.rs`). The players and checkpoints are in
 `crates/atlantis-engine/src/checkpoint.rs`, their file formats in
 `crates/atlantis-data/src/saves.rs`, the save folder and the settings file
-in `crates/atlantis-engine/src/persist.rs`.
+in `crates/atlantis-engine/src/persist.rs`. A checkpoint's WAM path is
+the original's 260-byte buffer whole (`Engine::set_wam_path`): rebuilt
+by string copies, it keeps the case the script or the WAM record wrote
+and, after its end, what a longer path left there, as the original's
+files do. Every exit of the in-game menu, a load included, restarts
+the clocks from the values they stood at, so Time1 does not count the
+time spent in the menu.
+
+A move shows the panorama its click named in the WAM it leaves: for a
+move into another WAM that is the source WAM's picture of the
+destination, which differs from the new WAM's only from BIBLION to
+PALAIS3's place 192 (ATL16192, not ATN16192). A departure section that
+ran a `Vue=` takes the move's tail: the place it entered is loaded
+again (the warp field of view back to 75.137 after the turn, the
+pointer centred) and its sprites restart.
 
 The puzzles are in `crates/atlantis-engine/src/puzzle/`. `mod.rs` holds the
 dispatcher (StartPuzzle n run by zone 1000 + n: its checks, the result
 set in FinPuzzle), the cursor animation and the random generators the
 puzzles share, and what the original keeps from one puzzle to the next;
 `assets.rs` the PUZZLES\ files, the work screen, the input read at the
-frame boundaries and the puzzle samples. Each puzzle is one file: its
+frame boundaries and the puzzle samples. On the pass that reads a click
+the original's input poll returns before its message pump, which alone
+moves the pointer, so the eclipse, the rotating pieces, the hens, the
+snakes, the rat and the ogre handle a click (and draw that pass's
+cursor) at the previous pass's pointer. Each puzzle is one file: its
 state and loop, translated line for line, behind a trait of its own for
 the input, drawing and sounds, which the engine implements and the tests
 replay the original's runs through, pass by pass (`throne.rs`,
@@ -111,7 +155,7 @@ with three groups, those of the ScummVM port:
 | `fixes` (`BugFixes`) | all on | the fixes of minor bugs of the original, each its own switch (`BugFix`, below) |
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and May 1997 English and French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
-| `arrow_keys` | on | the arrow keys turn the view as F5 to F8 do in the warp loop (the original's input poll reads F5 to F8 only); off with `--original` |
+| `arrow_keys` | on | the arrow keys turn the view as F5 to F8 do in the warp loop (the original's input poll reads F5 to F8 only), and the LOAD list takes Enter as OK and Up / Down as a row click (the original's list reads no key); off with `--original` |
 
 The bug fixes, each with its `settings.ini` key; the last seven fix a
 bug of some games only (`BugFix::applies`: the build's tables, and for
