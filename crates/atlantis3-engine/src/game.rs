@@ -982,15 +982,27 @@ impl Game {
             return;
         }
         // The right button's byte (0x007592b9), read by the screens and the
-        // hunt; cleared when the warp opens the inventory.
+        // hunt: set, then cleared again (@ 0x00431676) once the button
+        // opened or closed the inventory or closed the subject menu (the
+        // inventory's close clears it itself too, @ 0x00427b5d), so the
+        // next warp frame never sees it; left set in the other modes, and
+        // in the warp when the inventory's open flag is set (@ 0x0043166f).
         self.right_clicked = true;
         match self.mode {
             Mode::Warp if self.moving.turn.is_none() && !self.moving.pending => {
-                self.open_inventory();
+                if !self.inventory.open {
+                    self.open_inventory();
+                    self.right_clicked = false;
+                }
+            }
+            Mode::Inventory => {
+                self.close_inventory();
                 self.right_clicked = false;
             }
-            Mode::Inventory => self.close_inventory(),
-            Mode::Subjects => self.close_subjects(),
+            Mode::Subjects => {
+                self.close_subjects();
+                self.right_clicked = false;
+            }
             _ => {}
         }
     }

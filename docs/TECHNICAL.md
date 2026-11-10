@@ -4054,6 +4054,12 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   starts the track again from its beginning, as before. 0.6.0 played the
   music under the films. The travel videos leave the music alone
   (`tests/cinema_music.rs`).
+- The right button clears its byte (0x007592b9) again once it opened or
+  closed the inventory or closed the subject menu (@ 0x00431676; the
+  inventory's close clears it too, @ 0x00427b5d). In 0.6.0 closing the
+  bag with the right button left it set, and in the Paleolithic's view 4
+  the next frame ended the hunt and took the spear out of the bag
+  (`tests/right_button.rs`).
 
 ## Tests
 
