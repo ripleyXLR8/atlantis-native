@@ -8,3 +8,4 @@ license.workspace = true
 [dependencies]
 atlantis-data = { path = "../atlantis-data" }
 md-5 = "0.10"
+miniz_oxide = "0.8"

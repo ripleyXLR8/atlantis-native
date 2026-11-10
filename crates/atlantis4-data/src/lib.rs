@@ -10,13 +10,17 @@
 //!
 //! - [`exe`]: which build an executable is;
 //! - [`files`]: the installed folder, `lang.ini` and the scene names;
+//! - [`wpa`]: the `.wpa` warp packages;
+//! - [`anim`]: `anim.anim`, a package's cube cells and click meshes;
 //! - [`testing`]: what a game-data test does when its data is missing.
 
 #![forbid(unsafe_code)]
 
+pub mod anim;
 pub mod exe;
 pub mod files;
 pub mod testing;
+pub mod wpa;
 
 pub use exe::{identify, Build, ExeError};
 pub use files::{A4Files, WarpPath};
