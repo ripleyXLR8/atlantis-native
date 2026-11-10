@@ -294,6 +294,10 @@ pub struct Game {
     saves_written: Vec<String>,
     /// The clock of the saves' `DateAndTime`, in seconds since 1970.
     pub unix_time: fn() -> i64,
+    /// The local time zone's offset from UTC at that time, in seconds:
+    /// the saves are stamped in local time (`_strdate` / `_strtime`). The
+    /// apps give the system's; 0 (UTC) by default.
+    pub utc_offset: fn() -> i64,
     /// The text resources (loaded at the first text) and the subtitle
     /// line.
     texts: Option<crate::text::Texts>,
@@ -479,6 +483,7 @@ impl Game {
             save_dir: None,
             saves_written: Vec::new(),
             unix_time: pages::system_unix_time,
+            utc_offset: || 0,
             quit: false,
             not_ported: Vec::new(),
             csounds: Default::default(),
@@ -518,6 +523,12 @@ impl Game {
         self.quit |= s.quit;
         self.script = Some(s);
         r
+    }
+
+    /// The clock in local time, seconds since 1970 ([`Game::unix_time`]
+    /// shifted by [`Game::utc_offset`]).
+    pub(crate) fn local_time(&self) -> i64 {
+        (self.unix_time)() + (self.utc_offset)()
     }
 
     /// The script, for tests.

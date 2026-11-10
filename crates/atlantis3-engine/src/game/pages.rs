@@ -60,10 +60,10 @@ pub fn system_unix_time() -> i64 {
         .map_or(0, |d| d.as_secs()) as i64
 }
 
-/// `_strdate` + `_strtime` (`MM/DD/YY HH:MM:SS`) of the clock at `secs`
-/// (seconds since 1970) in UTC (the original's is the local time; the
-/// port has no time zone).
-fn date_and_time_now(secs: i64) -> Vec<u8> {
+/// `_strdate` + `_strtime` (`MM/DD/YY HH:MM:SS`): the local date and
+/// time at `secs`, seconds since 1970 already shifted to the local time
+/// zone ([`Game::local_time`]).
+pub(super) fn date_and_time_now(secs: i64) -> Vec<u8> {
     let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
     // Days to the civil date (proleptic Gregorian).
     let z = days + 719_468;
@@ -523,7 +523,7 @@ impl Game {
         if let (Some(a), Some(_), Some(rest)) = (lines.next(), lines.next(), lines.next()) {
             data.extend_from_slice(a);
             data.extend_from_slice(b"\nDateAndTime = ");
-            data.extend(date_and_time_now((self.unix_time)()));
+            data.extend(date_and_time_now(self.local_time()));
             data.push(b'\n');
             data.extend_from_slice(rest);
         } else {
@@ -554,5 +554,33 @@ impl Game {
             self.saves_written.push(key.clone());
             self.saves.insert(key, bank);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn game() -> Option<Game> {
+        let dir = atlantis3_data::testing::install_dir()?;
+        Game::new(atlantis3_data::A3Files::open_dir(&dir).ok()?.0).ok()
+    }
+
+    /// The saves' `DateAndTime` (@ 0x00459ee0, `_strdate` / `_strtime`):
+    /// the local time.
+    #[test]
+    fn saves_are_stamped_with_the_local_time() {
+        let Some(mut g) = game() else {
+            return;
+        };
+        assert!(g.board_begin("hoggar.wam", 1));
+        g.board_enter(1, 100.0);
+        // 2023-11-14 22:13:20 UTC, one hour east of it.
+        g.unix_time = || 1_700_000_000;
+        g.utc_offset = || 3600;
+        let want = "DateAndTime = 11/14/23 23:13:20";
+        g.write_menu_save("game1_1.sav");
+        let text = String::from_utf8_lossy(g.saved("game1_1.sav").unwrap()).into_owned();
+        assert!(text.contains(want), "{text}");
     }
 }

@@ -469,6 +469,28 @@ fn local_now() -> SystemTime {
     SystemTime::from_unix(secs + offset, d.subsec_millis() as u16)
 }
 
+/// The local time zone's offset from UTC now, in seconds: the local
+/// time [`local_now`] gives less the clock's, to the nearest quarter of
+/// an hour (Atlantis III stamps its saves in local time, `_strdate` /
+/// `_strtime`).
+pub(crate) fn utc_offset_now() -> i64 {
+    let utc = web_time::SystemTime::now()
+        .duration_since(web_time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i64);
+    let t = local_now();
+    // Days from the civil date (proleptic Gregorian).
+    let (y, m, d) = (i64::from(t.year), i64::from(t.month), i64::from(t.day));
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    let local =
+        days * 86_400 + i64::from(t.hour) * 3600 + i64::from(t.minute) * 60 + i64::from(t.second);
+    ((local - utc) as f64 / 900.0).round() as i64 * 900
+}
+
 /// The folder of the saves, `atlant2.cfg` and `settings.ini`.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn data_dir() -> PathBuf {

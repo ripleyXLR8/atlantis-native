@@ -149,7 +149,9 @@ struct A3App {
 }
 
 impl A3App {
-    fn new(game: Game, store: Rc<dyn SaveStore>, cfg: Option<Vec<u8>>) -> A3App {
+    fn new(mut game: Game, store: Rc<dyn SaveStore>, cfg: Option<Vec<u8>>) -> A3App {
+        // The saves' `DateAndTime` in the browser's time zone.
+        game.utc_offset = crate::a2::utc_offset_now;
         A3App {
             game,
             store,

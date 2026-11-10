@@ -234,7 +234,9 @@ impl A3App {
     /// The window's game before its window opens; full screen as
     /// `Atlantis3.cfg` says, or as `fullscreen` asks; the intro first
     /// unless `no_intro`.
-    pub fn new(game: Game, fullscreen: bool, no_intro: bool) -> A3App {
+    pub fn new(mut game: Game, fullscreen: bool, no_intro: bool) -> A3App {
+        // The saves' `DateAndTime` in local time.
+        game.utc_offset = crate::a2::utc_offset_now;
         let fullscreen = fullscreen || game.startup.config.full_screen;
         let audio = game.audio.clone();
         let stream = crate::audio_out::start_with(move |out, rate, channels| {
