@@ -24,8 +24,11 @@ use atlantis2_engine::Fpu;
 use atlantis3_data::A3Files;
 use atlantis3_engine::Game;
 
-/// (view, (dame FOV, dame yaw), (mons FOV, mons yaw)).
-const GOLDEN: [(u32, (f32, i32), (f32, i32)); 4] = [
+/// A speaker's field of view (degrees) and yaw (the command's degrees).
+type Set = (f32, i32);
+
+/// (view, dame, mons).
+const GOLDEN: [(u32, Set, Set); 4] = [
     (10, (50.0, 485), (50.0, 100)),
     (11, (60.0, 165), (80.0, 100)),
     (12, (80.0, 115), (60.0, 15)),
